@@ -1,0 +1,268 @@
+html, body, div, span, applet, object, iframe,
+h1, h2, h3, h4, h5, h6, p, blockquote, pre,
+a, abbr, acronym, address, big, cite, code,
+del, dfn, em, img, ins, kbd, q, s, samp,
+small, strike, strong, sub, sup, tt, var,
+b, u, i, center,
+dl, dt, dd, ol, ul, li,
+fieldset, form, label, legend,
+table, caption, tbody, tfoot, thead, tr, th, td,
+article, aside, canvas, details, embed,
+figure, figcaption, footer, header, hgroup,
+menu, nav, output, ruby, section, summary,
+time, mark, audio, video {
+  margin: 0;
+  padding: 0;
+  border: 0;
+  font-size: 100%;
+  border-collapse: collapse;
+  font: inherit;
+  vertical-align: baseline;
+}
+
+/* HTML5 display-role reset for older browsers */
+article, aside, details, figcaption, figure,
+footer, header, hgroup, menu, nav, section {
+  display: block;
+}
+
+body {
+  line-height: 1;
+  height: 100vh;
+  width: 100vw;
+  padding: 0;
+  margin: 0;
+  font-family: sans-serif;
+  text-wrap-mode: wrap;
+}
+body iframe {
+  display: none;
+}
+
+ol, ul {
+  list-style: none;
+}
+
+blockquote, q {
+  quotes: none;
+}
+
+blockquote:before, blockquote:after,
+q:before, q:after {
+  content: "";
+  content: none;
+}
+
+table {
+  border-collapse: collapse;
+  border-spacing: 0;
+}
+
+#root {
+  position: absolute;
+  top: 0;
+  left: 0;
+  height: 100vh;
+  width: 100vw;
+  overflow: hidden;
+  background-color: hsl(340, 25%, 43%);
+}
+#root main {
+  position: absolute;
+  left: 40px;
+  top: 0;
+  width: calc(100vw - 40px);
+  display: grid;
+  height: calc(700vh - 60px);
+  grid-auto-rows: 100vh;
+  transition: top 1s;
+}
+#root main section {
+  box-shadow: hsla(340, 25%, 22%, 0.7) 0 0 12px, hsla(340, 25%, 22%, 0.7) 0 0 12px;
+  position: relative;
+  display: grid;
+  left: 0;
+  height: calc(100vh - 50px);
+  width: calc(100vw - 80px);
+  margin: 35px 20px 15px 20px;
+  border-radius: 5px;
+}
+#root main section header {
+  right: -10px;
+  top: -25px;
+  padding: 12px 20px 12px 25px;
+  font-size: 18px;
+  font-weight: 700;
+  border-radius: 5px;
+  letter-spacing: 5px;
+  position: absolute;
+  box-shadow: hsla(340, 55%, 22%, 0.7) 0 0 12px;
+}
+#root main section main {
+  color: white;
+  left: 10px;
+  width: calc(100vw - 100px);
+}
+#root main section:nth-child(1) {
+  background-color: hsla(320, 40%, 36%, 0.7);
+}
+#root main section:nth-child(1) header {
+  background-color: hsla(320, 55%, 22%, 0.7);
+  color: hsla(320, 55%, 85%, 0.7);
+}
+#root main section:nth-child(2) {
+  background-color: hsla(300, 40%, 36%, 0.7);
+}
+#root main section:nth-child(2) header {
+  background-color: hsla(300, 55%, 22%, 0.7);
+  color: hsla(300, 55%, 85%, 0.7);
+}
+#root main section:nth-child(3) {
+  background-color: hsla(280, 40%, 36%, 0.7);
+}
+#root main section:nth-child(3) header {
+  background-color: hsla(280, 55%, 22%, 0.7);
+  color: hsla(280, 55%, 85%, 0.7);
+}
+#root main section:nth-child(4) {
+  background-color: hsla(260, 40%, 36%, 0.7);
+}
+#root main section:nth-child(4) header {
+  background-color: hsla(260, 55%, 22%, 0.7);
+  color: hsla(260, 55%, 85%, 0.7);
+}
+#root main section:nth-child(5) {
+  background-color: hsla(240, 40%, 36%, 0.7);
+}
+#root main section:nth-child(5) header {
+  background-color: hsla(240, 55%, 22%, 0.7);
+  color: hsla(240, 55%, 85%, 0.7);
+}
+#root main section:nth-child(6) {
+  background-color: hsla(220, 40%, 36%, 0.7);
+}
+#root main section:nth-child(6) header {
+  background-color: hsla(220, 55%, 22%, 0.7);
+  color: hsla(220, 55%, 85%, 0.7);
+}
+#root main section:nth-child(7) {
+  background-color: hsla(340, 40%, 36%, 0.7);
+}
+#root main section:nth-child(7) header {
+  background-color: hsla(340, 55%, 22%, 0.7);
+  color: hsla(340, 55%, 85%, 0.7);
+}
+#root .projectsOpenInterface {
+  top: 0;
+}
+#root .structureOpenInterface {
+  top: -100vh;
+}
+#root .contentOpenInterface {
+  top: -200vh;
+}
+#root .styleOpenInterface {
+  top: -300vh;
+}
+#root .draftOpenInterface {
+  top: -400vh;
+}
+#root .reviseOpenInterface {
+  top: -500vh;
+}
+#root .settingsOpenInterface {
+  top: -600vh;
+}
+#root nav {
+  position: fixed;
+  top: 0;
+  width: 40px;
+  height: 100vh;
+  left: 0;
+  background-color: hsla(340, 25%, 22%, 0.7);
+  box-shadow: hsla(340, 25%, 22%, 0.7) -4px 0 12px inset, hsla(340, 25%, 22%, 0.7) -4px 0 16px inset;
+}
+#root nav button {
+  width: 45px;
+  height: 40px;
+  position: absolute;
+  transition: width 1s;
+  box-shadow: hsla(0, 0%, 0%, 0.35) 0 0 8px, hsla(0, 0%, 0%, 0.35) 0 0 10px;
+  border-radius: 0 5px 5px 0;
+  border: none;
+  padding: 0;
+  overflow: hidden;
+  cursor: pointer;
+}
+#root nav button div {
+  height: 40px;
+  width: 210px;
+  line-height: 40px;
+  top: 0;
+  left: 0;
+  margin: 0;
+  background-color: rgba(255, 255, 255, 0);
+  color: white;
+  text-align: right;
+  font-size: 18px;
+  font-weight: 700;
+  letter-spacing: 4px;
+}
+#root nav button:nth-child(1) {
+  top: 15px;
+  background-color: hsl(320, 55%, 57%);
+}
+#root nav button:nth-child(1):hover {
+  width: 220px;
+}
+#root nav button:nth-child(2) {
+  top: 65px;
+  background-color: hsl(300, 55%, 57%);
+}
+#root nav button:nth-child(2):hover {
+  width: 220px;
+}
+#root nav button:nth-child(3) {
+  top: 115px;
+  background-color: hsl(280, 55%, 57%);
+}
+#root nav button:nth-child(3):hover {
+  width: 220px;
+}
+#root nav button:nth-child(4) {
+  top: 165px;
+  background-color: hsl(260, 55%, 57%);
+}
+#root nav button:nth-child(4):hover {
+  width: 220px;
+}
+#root nav button:nth-child(5) {
+  top: 215px;
+  background-color: hsl(240, 55%, 57%);
+}
+#root nav button:nth-child(5):hover {
+  width: 220px;
+}
+#root nav button:nth-child(6) {
+  top: 265px;
+  background-color: hsl(220, 55%, 57%);
+}
+#root nav button:nth-child(6):hover {
+  width: 220px;
+}
+#root nav button:nth-child(7) {
+  bottom: 50px;
+  background-color: hsl(340, 55%, 57%);
+}
+#root nav button:nth-child(7):hover {
+  width: 220px;
+}
+#root nav button:nth-child(8) {
+  bottom: 15px;
+  height: 22px;
+  width: 22px;
+  left: 8px;
+  border-radius: 5px;
+  box-shadow: none;
+  background-color: white;
+}/*# sourceMappingURL=style.css.map */

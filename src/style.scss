@@ -1,0 +1,470 @@
+@use "sass:math";
+
+html, body, div, span, applet, object, iframe,
+h1, h2, h3, h4, h5, h6, p, blockquote, pre,
+a, abbr, acronym, address, big, cite, code,
+del, dfn, em, img, ins, kbd, q, s, samp,
+small, strike, strong, sub, sup, tt, var,
+b, u, i, center,
+dl, dt, dd, ol, ul, li,
+fieldset, form, label, legend,
+table, caption, tbody, tfoot, thead, tr, th, td,
+article, aside, canvas, details, embed, 
+figure, figcaption, footer, header, hgroup, 
+menu, nav, output, ruby, section, summary,
+time, mark, audio, video {
+	margin: 0;
+	padding: 0;
+	border: 0;
+	font-size: 100%;
+    border-collapse: collapse;
+	font: inherit;
+	vertical-align: baseline;
+}
+/* HTML5 display-role reset for older browsers */
+article, aside, details, figcaption, figure, 
+footer, header, hgroup, menu, nav, section {
+	display: block;
+}
+body {
+	line-height: 1;
+    height: 100vh;
+    width: 100vw;
+    padding: 0;
+    margin: 0;
+    font-family: sans-serif;
+    text-wrap-mode: wrap;
+    iframe {display: none;}
+}
+ol, ul {
+	list-style: none;
+}
+blockquote, q {
+	quotes: none;
+}
+blockquote:before, blockquote:after,
+q:before, q:after {
+	content: '';
+	content: none;
+}
+table {
+	border-collapse: collapse;
+	border-spacing: 0;
+}
+
+$clearBlack: hsla(0, 0%, 0%, 0.35);
+
+
+$baseBright: 15;
+$baseSat: 40%;
+$baseHue: 340;
+$hueGap: -20;
+$transparency: 0.7;
+
+$L0: $baseBright + 7;
+$L1: $baseBright + 14;
+$L2: $baseBright + 21;
+$L3: $baseBright + 28;
+$L4: $baseBright + 35;
+$L5: $baseBright + 42;
+$L6: $baseBright + 49;
+$L7: $baseBright + 56;
+$L8: $baseBright + 63;
+$L9: $baseBright + 70;
+
+$lowSat: $baseSat - 15%;
+$highSat: $baseSat + 15%;
+
+$hue1: $baseHue;
+$hue2: $hue1 + $hueGap;
+$hue3: $hue2 + $hueGap;
+$hue4: $hue3 + $hueGap;
+$hue5: $hue4 + $hueGap;
+$hue6: $hue5 + $hueGap;
+$hue7: $hue6 + $hueGap;
+
+//--------------------------------------------------------------------------------------------------------------------------------------------------------------
+
+$SettingsS0L: hsl($hue1,$lowSat,$L0); $SettingsS0S: hsl($hue1,$baseSat,$L0); $SettingsS0H: hsl($hue1,$highSat,$L0);
+$SettingsS1L: hsl($hue1,$lowSat,$L1); $SettingsS1S: hsl($hue1,$baseSat,$L1); $SettingsS1H: hsl($hue1,$highSat,$L1);
+$SettingsS2L: hsl($hue1,$lowSat,$L2); $SettingsS2S: hsl($hue1,$baseSat,$L2); $SettingsS2H: hsl($hue1,$highSat,$L2);
+$SettingsS3L: hsl($hue1,$lowSat,$L3); $SettingsS3S: hsl($hue1,$baseSat,$L3); $SettingsS3H: hsl($hue1,$highSat,$L3);
+$SettingsS4L: hsl($hue1,$lowSat,$L4); $SettingsS4S: hsl($hue1,$baseSat,$L4); $SettingsS4H: hsl($hue1,$highSat,$L4);
+$SettingsS5L: hsl($hue1,$lowSat,$L5); $SettingsS5S: hsl($hue1,$baseSat,$L5); $SettingsS5H: hsl($hue1,$highSat,$L5);
+$SettingsS6L: hsl($hue1,$lowSat,$L6); $SettingsS6S: hsl($hue1,$baseSat,$L6); $SettingsS6H: hsl($hue1,$highSat,$L6);
+$SettingsS7L: hsl($hue1,$lowSat,$L7); $SettingsS7S: hsl($hue1,$baseSat,$L7); $SettingsS7H: hsl($hue1,$highSat,$L7);
+$SettingsS8L: hsl($hue1,$lowSat,$L8); $SettingsS8S: hsl($hue1,$baseSat,$L8); $SettingsS8H: hsl($hue1,$highSat,$L8);
+$SettingsS9L: hsl($hue1,$lowSat,$L9); $SettingsS9S: hsl($hue1,$baseSat,$L9); $SettingsS9H: hsl($hue1,$highSat,$L9);
+
+$SettingsC0L: hsla($hue1,$lowSat,$L0,$transparency); $SettingsC0S: hsla($hue1,$baseSat,$L0,$transparency); $SettingsC0H: hsla($hue1,$highSat,$L0,$transparency);
+$SettingsC1L: hsla($hue1,$lowSat,$L1,$transparency); $SettingsC1S: hsla($hue1,$baseSat,$L1,$transparency); $SettingsC1H: hsla($hue1,$highSat,$L1,$transparency);
+$SettingsC2L: hsla($hue1,$lowSat,$L2,$transparency); $SettingsC2S: hsla($hue1,$baseSat,$L2,$transparency); $SettingsC2H: hsla($hue1,$highSat,$L2,$transparency);
+$SettingsC3L: hsla($hue1,$lowSat,$L3,$transparency); $SettingsC3S: hsla($hue1,$baseSat,$L3,$transparency); $SettingsC3H: hsla($hue1,$highSat,$L3,$transparency);
+$SettingsC4L: hsla($hue1,$lowSat,$L4,$transparency); $SettingsC4S: hsla($hue1,$baseSat,$L4,$transparency); $SettingsC4H: hsla($hue1,$highSat,$L4,$transparency);
+$SettingsC5L: hsla($hue1,$lowSat,$L5,$transparency); $SettingsC5S: hsla($hue1,$baseSat,$L5,$transparency); $SettingsC5H: hsla($hue1,$highSat,$L5,$transparency);
+$SettingsC6L: hsla($hue1,$lowSat,$L6,$transparency); $SettingsC6S: hsla($hue1,$baseSat,$L6,$transparency); $SettingsC6H: hsla($hue1,$highSat,$L6,$transparency);
+$SettingsC7L: hsla($hue1,$lowSat,$L7,$transparency); $SettingsC7S: hsla($hue1,$baseSat,$L7,$transparency); $SettingsC7H: hsla($hue1,$highSat,$L7,$transparency);
+$SettingsC8L: hsla($hue1,$lowSat,$L8,$transparency); $SettingsC8S: hsla($hue1,$baseSat,$L8,$transparency); $SettingsC8H: hsla($hue1,$highSat,$L8,$transparency);
+$SettingsC9L: hsla($hue1,$lowSat,$L9,$transparency); $SettingsC9S: hsla($hue1,$baseSat,$L9,$transparency); $SettingsC9H: hsla($hue1,$highSat,$L9,$transparency);
+
+//--------------------------------------------------------------------------------------------------------------------------------------------------------------
+
+$ProjectsS0L: hsl($hue2,$lowSat,$L0); $ProjectsS0S: hsl($hue2,$baseSat,$L0); $ProjectsS0H: hsl($hue2,$highSat,$L0);
+$ProjectsS1L: hsl($hue2,$lowSat,$L1); $ProjectsS1S: hsl($hue2,$baseSat,$L1); $ProjectsS1H: hsl($hue2,$highSat,$L1);
+$ProjectsS2L: hsl($hue2,$lowSat,$L2); $ProjectsS2S: hsl($hue2,$baseSat,$L2); $ProjectsS2H: hsl($hue2,$highSat,$L2);
+$ProjectsS3L: hsl($hue2,$lowSat,$L3); $ProjectsS3S: hsl($hue2,$baseSat,$L3); $ProjectsS3H: hsl($hue2,$highSat,$L3);
+$ProjectsS4L: hsl($hue2,$lowSat,$L4); $ProjectsS4S: hsl($hue2,$baseSat,$L4); $ProjectsS4H: hsl($hue2,$highSat,$L4);
+$ProjectsS5L: hsl($hue2,$lowSat,$L5); $ProjectsS5S: hsl($hue2,$baseSat,$L5); $ProjectsS5H: hsl($hue2,$highSat,$L5);
+$ProjectsS6L: hsl($hue2,$lowSat,$L6); $ProjectsS6S: hsl($hue2,$baseSat,$L6); $ProjectsS6H: hsl($hue2,$highSat,$L6);
+$ProjectsS7L: hsl($hue2,$lowSat,$L7); $ProjectsS7S: hsl($hue2,$baseSat,$L7); $ProjectsS7H: hsl($hue2,$highSat,$L7);
+$ProjectsS8L: hsl($hue2,$lowSat,$L8); $ProjectsS8S: hsl($hue2,$baseSat,$L8); $ProjectsS8H: hsl($hue2,$highSat,$L8);
+$ProjectsS9L: hsl($hue2,$lowSat,$L9); $ProjectsS9S: hsl($hue2,$baseSat,$L9); $ProjectsS9H: hsl($hue2,$highSat,$L9);
+
+$ProjectsC0L: hsla($hue2,$lowSat,$L0,$transparency); $ProjectsC0S: hsla($hue2,$baseSat,$L0,$transparency); $ProjectsC0H: hsla($hue2,$highSat,$L0,$transparency);
+$ProjectsC1L: hsla($hue2,$lowSat,$L1,$transparency); $ProjectsC1S: hsla($hue2,$baseSat,$L1,$transparency); $ProjectsC1H: hsla($hue2,$highSat,$L1,$transparency);
+$ProjectsC2L: hsla($hue2,$lowSat,$L2,$transparency); $ProjectsC2S: hsla($hue2,$baseSat,$L2,$transparency); $ProjectsC2H: hsla($hue2,$highSat,$L2,$transparency);
+$ProjectsC3L: hsla($hue2,$lowSat,$L3,$transparency); $ProjectsC3S: hsla($hue2,$baseSat,$L3,$transparency); $ProjectsC3H: hsla($hue2,$highSat,$L3,$transparency);
+$ProjectsC4L: hsla($hue2,$lowSat,$L4,$transparency); $ProjectsC4S: hsla($hue2,$baseSat,$L4,$transparency); $ProjectsC4H: hsla($hue2,$highSat,$L4,$transparency);
+$ProjectsC5L: hsla($hue2,$lowSat,$L5,$transparency); $ProjectsC5S: hsla($hue2,$baseSat,$L5,$transparency); $ProjectsC5H: hsla($hue2,$highSat,$L5,$transparency);
+$ProjectsC6L: hsla($hue2,$lowSat,$L6,$transparency); $ProjectsC6S: hsla($hue2,$baseSat,$L6,$transparency); $ProjectsC6H: hsla($hue2,$highSat,$L6,$transparency);
+$ProjectsC7L: hsla($hue2,$lowSat,$L7,$transparency); $ProjectsC7S: hsla($hue2,$baseSat,$L7,$transparency); $ProjectsC7H: hsla($hue2,$highSat,$L7,$transparency);
+$ProjectsC8L: hsla($hue2,$lowSat,$L8,$transparency); $ProjectsC8S: hsla($hue2,$baseSat,$L8,$transparency); $ProjectsC8H: hsla($hue2,$highSat,$L8,$transparency);
+$ProjectsC9L: hsla($hue2,$lowSat,$L9,$transparency); $ProjectsC9S: hsla($hue2,$baseSat,$L9,$transparency); $ProjectsC9H: hsla($hue2,$highSat,$L9,$transparency);
+
+//--------------------------------------------------------------------------------------------------------------------------------------------------------------
+
+$StructureS0L: hsl($hue3,$lowSat,$L0); $StructureS0S: hsl($hue3,$baseSat,$L0); $StructureS0H: hsl($hue3,$highSat,$L0);
+$StructureS1L: hsl($hue3,$lowSat,$L1); $StructureS1S: hsl($hue3,$baseSat,$L1); $StructureS1H: hsl($hue3,$highSat,$L1);
+$StructureS2L: hsl($hue3,$lowSat,$L2); $StructureS2S: hsl($hue3,$baseSat,$L2); $StructureS2H: hsl($hue3,$highSat,$L2);
+$StructureS3L: hsl($hue3,$lowSat,$L3); $StructureS3S: hsl($hue3,$baseSat,$L3); $StructureS3H: hsl($hue3,$highSat,$L3);
+$StructureS4L: hsl($hue3,$lowSat,$L4); $StructureS4S: hsl($hue3,$baseSat,$L4); $StructureS4H: hsl($hue3,$highSat,$L4);
+$StructureS5L: hsl($hue3,$lowSat,$L5); $StructureS5S: hsl($hue3,$baseSat,$L5); $StructureS5H: hsl($hue3,$highSat,$L5);
+$StructureS6L: hsl($hue3,$lowSat,$L6); $StructureS6S: hsl($hue3,$baseSat,$L6); $StructureS6H: hsl($hue3,$highSat,$L6);
+$StructureS7L: hsl($hue3,$lowSat,$L7); $StructureS7S: hsl($hue3,$baseSat,$L7); $StructureS7H: hsl($hue3,$highSat,$L7);
+$StructureS8L: hsl($hue3,$lowSat,$L8); $StructureS8S: hsl($hue3,$baseSat,$L8); $StructureS8H: hsl($hue3,$highSat,$L8);
+$StructureS9L: hsl($hue3,$lowSat,$L9); $StructureS9S: hsl($hue3,$baseSat,$L9); $StructureS9H: hsl($hue3,$highSat,$L9);
+
+$StructureC0L: hsla($hue3,$lowSat,$L0,$transparency); $StructureC0S: hsla($hue3,$baseSat,$L0,$transparency); $StructureC0H: hsla($hue3,$highSat,$L0,$transparency);
+$StructureC1L: hsla($hue3,$lowSat,$L1,$transparency); $StructureC1S: hsla($hue3,$baseSat,$L1,$transparency); $StructureC1H: hsla($hue3,$highSat,$L1,$transparency);
+$StructureC2L: hsla($hue3,$lowSat,$L2,$transparency); $StructureC2S: hsla($hue3,$baseSat,$L2,$transparency); $StructureC2H: hsla($hue3,$highSat,$L2,$transparency);
+$StructureC3L: hsla($hue3,$lowSat,$L3,$transparency); $StructureC3S: hsla($hue3,$baseSat,$L3,$transparency); $StructureC3H: hsla($hue3,$highSat,$L3,$transparency);
+$StructureC4L: hsla($hue3,$lowSat,$L4,$transparency); $StructureC4S: hsla($hue3,$baseSat,$L4,$transparency); $StructureC4H: hsla($hue3,$highSat,$L4,$transparency);
+$StructureC5L: hsla($hue3,$lowSat,$L5,$transparency); $StructureC5S: hsla($hue3,$baseSat,$L5,$transparency); $StructureC5H: hsla($hue3,$highSat,$L5,$transparency);
+$StructureC6L: hsla($hue3,$lowSat,$L6,$transparency); $StructureC6S: hsla($hue3,$baseSat,$L6,$transparency); $StructureC6H: hsla($hue3,$highSat,$L6,$transparency);
+$StructureC7L: hsla($hue3,$lowSat,$L7,$transparency); $StructureC7S: hsla($hue3,$baseSat,$L7,$transparency); $StructureC7H: hsla($hue3,$highSat,$L7,$transparency);
+$StructureC8L: hsla($hue3,$lowSat,$L8,$transparency); $StructureC8S: hsla($hue3,$baseSat,$L8,$transparency); $StructureC8H: hsla($hue3,$highSat,$L8,$transparency);
+$StructureC9L: hsla($hue3,$lowSat,$L9,$transparency); $StructureC9S: hsla($hue3,$baseSat,$L9,$transparency); $StructureC9H: hsla($hue3,$highSat,$L9,$transparency);
+
+//--------------------------------------------------------------------------------------------------------------------------------------------------------------
+
+$ContentS0L: hsl($hue4,$lowSat,$L0); $ContentS0S: hsl($hue4,$baseSat,$L0); $ContentS0H: hsl($hue4,$highSat,$L0);
+$ContentS1L: hsl($hue4,$lowSat,$L1); $ContentS1S: hsl($hue4,$baseSat,$L1); $ContentS1H: hsl($hue4,$highSat,$L1);
+$ContentS2L: hsl($hue4,$lowSat,$L2); $ContentS2S: hsl($hue4,$baseSat,$L2); $ContentS2H: hsl($hue4,$highSat,$L2);
+$ContentS3L: hsl($hue4,$lowSat,$L3); $ContentS3S: hsl($hue4,$baseSat,$L3); $ContentS3H: hsl($hue4,$highSat,$L3);
+$ContentS4L: hsl($hue4,$lowSat,$L4); $ContentS4S: hsl($hue4,$baseSat,$L4); $ContentS4H: hsl($hue4,$highSat,$L4);
+$ContentS5L: hsl($hue4,$lowSat,$L5); $ContentS5S: hsl($hue4,$baseSat,$L5); $ContentS5H: hsl($hue4,$highSat,$L5);
+$ContentS6L: hsl($hue4,$lowSat,$L6); $ContentS6S: hsl($hue4,$baseSat,$L6); $ContentS6H: hsl($hue4,$highSat,$L6);
+$ContentS7L: hsl($hue4,$lowSat,$L7); $ContentS7S: hsl($hue4,$baseSat,$L7); $ContentS7H: hsl($hue4,$highSat,$L7);
+$ContentS8L: hsl($hue4,$lowSat,$L8); $ContentS8S: hsl($hue4,$baseSat,$L8); $ContentS8H: hsl($hue4,$highSat,$L8);
+$ContentS9L: hsl($hue4,$lowSat,$L9); $ContentS9S: hsl($hue4,$baseSat,$L9); $ContentS9H: hsl($hue4,$highSat,$L9);
+
+$ContentC0L: hsla($hue4,$lowSat,$L0,$transparency); $ContentC0S: hsla($hue4,$baseSat,$L0,$transparency); $ContentC0H: hsla($hue4,$highSat,$L0,$transparency);
+$ContentC1L: hsla($hue4,$lowSat,$L1,$transparency); $ContentC1S: hsla($hue4,$baseSat,$L1,$transparency); $ContentC1H: hsla($hue4,$highSat,$L1,$transparency);
+$ContentC2L: hsla($hue4,$lowSat,$L2,$transparency); $ContentC2S: hsla($hue4,$baseSat,$L2,$transparency); $ContentC2H: hsla($hue4,$highSat,$L2,$transparency);
+$ContentC3L: hsla($hue4,$lowSat,$L3,$transparency); $ContentC3S: hsla($hue4,$baseSat,$L3,$transparency); $ContentC3H: hsla($hue4,$highSat,$L3,$transparency);
+$ContentC4L: hsla($hue4,$lowSat,$L4,$transparency); $ContentC4S: hsla($hue4,$baseSat,$L4,$transparency); $ContentC4H: hsla($hue4,$highSat,$L4,$transparency);
+$ContentC5L: hsla($hue4,$lowSat,$L5,$transparency); $ContentC5S: hsla($hue4,$baseSat,$L5,$transparency); $ContentC5H: hsla($hue4,$highSat,$L5,$transparency);
+$ContentC6L: hsla($hue4,$lowSat,$L6,$transparency); $ContentC6S: hsla($hue4,$baseSat,$L6,$transparency); $ContentC6H: hsla($hue4,$highSat,$L6,$transparency);
+$ContentC7L: hsla($hue4,$lowSat,$L7,$transparency); $ContentC7S: hsla($hue4,$baseSat,$L7,$transparency); $ContentC7H: hsla($hue4,$highSat,$L7,$transparency);
+$ContentC8L: hsla($hue4,$lowSat,$L8,$transparency); $ContentC8S: hsla($hue4,$baseSat,$L8,$transparency); $ContentC8H: hsla($hue4,$highSat,$L8,$transparency);
+$ContentC9L: hsla($hue4,$lowSat,$L9,$transparency); $ContentC9S: hsla($hue4,$baseSat,$L9,$transparency); $ContentC9H: hsla($hue4,$highSat,$L9,$transparency);
+
+//--------------------------------------------------------------------------------------------------------------------------------------------------------------
+
+$StyleS0L: hsl($hue5,$lowSat,$L0); $StyleS0S: hsl($hue5,$baseSat,$L0); $StyleS0H: hsl($hue5,$highSat,$L0);
+$StyleS1L: hsl($hue5,$lowSat,$L1); $StyleS1S: hsl($hue5,$baseSat,$L1); $StyleS1H: hsl($hue5,$highSat,$L1);
+$StyleS2L: hsl($hue5,$lowSat,$L2); $StyleS2S: hsl($hue5,$baseSat,$L2); $StyleS2H: hsl($hue5,$highSat,$L2);
+$StyleS3L: hsl($hue5,$lowSat,$L3); $StyleS3S: hsl($hue5,$baseSat,$L3); $StyleS3H: hsl($hue5,$highSat,$L3);
+$StyleS4L: hsl($hue5,$lowSat,$L4); $StyleS4S: hsl($hue5,$baseSat,$L4); $StyleS4H: hsl($hue5,$highSat,$L4);
+$StyleS5L: hsl($hue5,$lowSat,$L5); $StyleS5S: hsl($hue5,$baseSat,$L5); $StyleS5H: hsl($hue5,$highSat,$L5);
+$StyleS6L: hsl($hue5,$lowSat,$L6); $StyleS6S: hsl($hue5,$baseSat,$L6); $StyleS6H: hsl($hue5,$highSat,$L6);
+$StyleS7L: hsl($hue5,$lowSat,$L7); $StyleS7S: hsl($hue5,$baseSat,$L7); $StyleS7H: hsl($hue5,$highSat,$L7);
+$StyleS8L: hsl($hue5,$lowSat,$L8); $StyleS8S: hsl($hue5,$baseSat,$L8); $StyleS8H: hsl($hue5,$highSat,$L8);
+$StyleS9L: hsl($hue5,$lowSat,$L9); $StyleS9S: hsl($hue5,$baseSat,$L9); $StyleS9H: hsl($hue5,$highSat,$L9);
+
+$StyleC0L: hsla($hue5,$lowSat,$L0,$transparency); $StyleC0S: hsla($hue5,$baseSat,$L0,$transparency); $StyleC0H: hsla($hue5,$highSat,$L0,$transparency);
+$StyleC1L: hsla($hue5,$lowSat,$L1,$transparency); $StyleC1S: hsla($hue5,$baseSat,$L1,$transparency); $StyleC1H: hsla($hue5,$highSat,$L1,$transparency);
+$StyleC2L: hsla($hue5,$lowSat,$L2,$transparency); $StyleC2S: hsla($hue5,$baseSat,$L2,$transparency); $StyleC2H: hsla($hue5,$highSat,$L2,$transparency);
+$StyleC3L: hsla($hue5,$lowSat,$L3,$transparency); $StyleC3S: hsla($hue5,$baseSat,$L3,$transparency); $StyleC3H: hsla($hue5,$highSat,$L3,$transparency);
+$StyleC4L: hsla($hue5,$lowSat,$L4,$transparency); $StyleC4S: hsla($hue5,$baseSat,$L4,$transparency); $StyleC4H: hsla($hue5,$highSat,$L4,$transparency);
+$StyleC5L: hsla($hue5,$lowSat,$L5,$transparency); $StyleC5S: hsla($hue5,$baseSat,$L5,$transparency); $StyleC5H: hsla($hue5,$highSat,$L5,$transparency);
+$StyleC6L: hsla($hue5,$lowSat,$L6,$transparency); $StyleC6S: hsla($hue5,$baseSat,$L6,$transparency); $StyleC6H: hsla($hue5,$highSat,$L6,$transparency);
+$StyleC7L: hsla($hue5,$lowSat,$L7,$transparency); $StyleC7S: hsla($hue5,$baseSat,$L7,$transparency); $StyleC7H: hsla($hue5,$highSat,$L7,$transparency);
+$StyleC8L: hsla($hue5,$lowSat,$L8,$transparency); $StyleC8S: hsla($hue5,$baseSat,$L8,$transparency); $StyleC8H: hsla($hue5,$highSat,$L8,$transparency);
+$StyleC9L: hsla($hue5,$lowSat,$L9,$transparency); $StyleC9S: hsla($hue5,$baseSat,$L9,$transparency); $StyleC9H: hsla($hue5,$highSat,$L9,$transparency);
+
+//--------------------------------------------------------------------------------------------------------------------------------------------------------------
+
+$DraftS0L: hsl($hue6,$lowSat,$L0); $DraftS0S: hsl($hue6,$baseSat,$L0); $DraftS0H: hsl($hue6,$highSat,$L0);
+$DraftS1L: hsl($hue6,$lowSat,$L1); $DraftS1S: hsl($hue6,$baseSat,$L1); $DraftS1H: hsl($hue6,$highSat,$L1);
+$DraftS2L: hsl($hue6,$lowSat,$L2); $DraftS2S: hsl($hue6,$baseSat,$L2); $DraftS2H: hsl($hue6,$highSat,$L2);
+$DraftS3L: hsl($hue6,$lowSat,$L3); $DraftS3S: hsl($hue6,$baseSat,$L3); $DraftS3H: hsl($hue6,$highSat,$L3);
+$DraftS4L: hsl($hue6,$lowSat,$L4); $DraftS4S: hsl($hue6,$baseSat,$L4); $DraftS4H: hsl($hue6,$highSat,$L4);
+$DraftS5L: hsl($hue6,$lowSat,$L5); $DraftS5S: hsl($hue6,$baseSat,$L5); $DraftS5H: hsl($hue6,$highSat,$L5);
+$DraftS6L: hsl($hue6,$lowSat,$L6); $DraftS6S: hsl($hue6,$baseSat,$L6); $DraftS6H: hsl($hue6,$highSat,$L6);
+$DraftS7L: hsl($hue6,$lowSat,$L7); $DraftS7S: hsl($hue6,$baseSat,$L7); $DraftS7H: hsl($hue6,$highSat,$L7);
+$DraftS8L: hsl($hue6,$lowSat,$L8); $DraftS8S: hsl($hue6,$baseSat,$L8); $DraftS8H: hsl($hue6,$highSat,$L8);
+$DraftS9L: hsl($hue6,$lowSat,$L9); $DraftS9S: hsl($hue6,$baseSat,$L9); $DraftS9H: hsl($hue6,$highSat,$L9);
+
+$DraftC0L: hsla($hue6,$lowSat,$L0,$transparency); $DraftC0S: hsla($hue6,$baseSat,$L0,$transparency); $DraftC0H: hsla($hue6,$highSat,$L0,$transparency);
+$DraftC1L: hsla($hue6,$lowSat,$L1,$transparency); $DraftC1S: hsla($hue6,$baseSat,$L1,$transparency); $DraftC1H: hsla($hue6,$highSat,$L1,$transparency);
+$DraftC2L: hsla($hue6,$lowSat,$L2,$transparency); $DraftC2S: hsla($hue6,$baseSat,$L2,$transparency); $DraftC2H: hsla($hue6,$highSat,$L2,$transparency);
+$DraftC3L: hsla($hue6,$lowSat,$L3,$transparency); $DraftC3S: hsla($hue6,$baseSat,$L3,$transparency); $DraftC3H: hsla($hue6,$highSat,$L3,$transparency);
+$DraftC4L: hsla($hue6,$lowSat,$L4,$transparency); $DraftC4S: hsla($hue6,$baseSat,$L4,$transparency); $DraftC4H: hsla($hue6,$highSat,$L4,$transparency);
+$DraftC5L: hsla($hue6,$lowSat,$L5,$transparency); $DraftC5S: hsla($hue6,$baseSat,$L5,$transparency); $DraftC5H: hsla($hue6,$highSat,$L5,$transparency);
+$DraftC6L: hsla($hue6,$lowSat,$L6,$transparency); $DraftC6S: hsla($hue6,$baseSat,$L6,$transparency); $DraftC6H: hsla($hue6,$highSat,$L6,$transparency);
+$DraftC7L: hsla($hue6,$lowSat,$L7,$transparency); $DraftC7S: hsla($hue6,$baseSat,$L7,$transparency); $DraftC7H: hsla($hue6,$highSat,$L7,$transparency);
+$DraftC8L: hsla($hue6,$lowSat,$L8,$transparency); $DraftC8S: hsla($hue6,$baseSat,$L8,$transparency); $DraftC8H: hsla($hue6,$highSat,$L8,$transparency);
+$DraftC9L: hsla($hue6,$lowSat,$L9,$transparency); $DraftC9S: hsla($hue6,$baseSat,$L9,$transparency); $DraftC9H: hsla($hue6,$highSat,$L9,$transparency);
+
+//--------------------------------------------------------------------------------------------------------------------------------------------------------------
+
+$ReviseS0L: hsl($hue7,$lowSat,$L0); $ReviseS0S: hsl($hue7,$baseSat,$L0); $ReviseS0H: hsl($hue7,$highSat,$L0);
+$ReviseS1L: hsl($hue7,$lowSat,$L1); $ReviseS1S: hsl($hue7,$baseSat,$L1); $ReviseS1H: hsl($hue7,$highSat,$L1);
+$ReviseS2L: hsl($hue7,$lowSat,$L2); $ReviseS2S: hsl($hue7,$baseSat,$L2); $ReviseS2H: hsl($hue7,$highSat,$L2);
+$ReviseS3L: hsl($hue7,$lowSat,$L3); $ReviseS3S: hsl($hue7,$baseSat,$L3); $ReviseS3H: hsl($hue7,$highSat,$L3);
+$ReviseS4L: hsl($hue7,$lowSat,$L4); $ReviseS4S: hsl($hue7,$baseSat,$L4); $ReviseS4H: hsl($hue7,$highSat,$L4);
+$ReviseS5L: hsl($hue7,$lowSat,$L5); $ReviseS5S: hsl($hue7,$baseSat,$L5); $ReviseS5H: hsl($hue7,$highSat,$L5);
+$ReviseS6L: hsl($hue7,$lowSat,$L6); $ReviseS6S: hsl($hue7,$baseSat,$L6); $ReviseS6H: hsl($hue7,$highSat,$L6);
+$ReviseS7L: hsl($hue7,$lowSat,$L7); $ReviseS7S: hsl($hue7,$baseSat,$L7); $ReviseS7H: hsl($hue7,$highSat,$L7);
+$ReviseS8L: hsl($hue7,$lowSat,$L8); $ReviseS8S: hsl($hue7,$baseSat,$L8); $ReviseS8H: hsl($hue7,$highSat,$L8);
+$ReviseS9L: hsl($hue7,$lowSat,$L9); $ReviseS9S: hsl($hue7,$baseSat,$L9); $ReviseS9H: hsl($hue7,$highSat,$L9);
+
+$ReviseC0L: hsla($hue7,$lowSat,$L0,$transparency); $ReviseC0S: hsla($hue7,$baseSat,$L0,$transparency); $ReviseC0H: hsla($hue7,$highSat,$L0,$transparency);
+$ReviseC1L: hsla($hue7,$lowSat,$L1,$transparency); $ReviseC1S: hsla($hue7,$baseSat,$L1,$transparency); $ReviseC1H: hsla($hue7,$highSat,$L1,$transparency);
+$ReviseC2L: hsla($hue7,$lowSat,$L2,$transparency); $ReviseC2S: hsla($hue7,$baseSat,$L2,$transparency); $ReviseC2H: hsla($hue7,$highSat,$L2,$transparency);
+$ReviseC3L: hsla($hue7,$lowSat,$L3,$transparency); $ReviseC3S: hsla($hue7,$baseSat,$L3,$transparency); $ReviseC3H: hsla($hue7,$highSat,$L3,$transparency);
+$ReviseC4L: hsla($hue7,$lowSat,$L4,$transparency); $ReviseC4S: hsla($hue7,$baseSat,$L4,$transparency); $ReviseC4H: hsla($hue7,$highSat,$L4,$transparency);
+$ReviseC5L: hsla($hue7,$lowSat,$L5,$transparency); $ReviseC5S: hsla($hue7,$baseSat,$L5,$transparency); $ReviseC5H: hsla($hue7,$highSat,$L5,$transparency);
+$ReviseC6L: hsla($hue7,$lowSat,$L6,$transparency); $ReviseC6S: hsla($hue7,$baseSat,$L6,$transparency); $ReviseC6H: hsla($hue7,$highSat,$L6,$transparency);
+$ReviseC7L: hsla($hue7,$lowSat,$L7,$transparency); $ReviseC7S: hsla($hue7,$baseSat,$L7,$transparency); $ReviseC7H: hsla($hue7,$highSat,$L7,$transparency);
+$ReviseC8L: hsla($hue7,$lowSat,$L8,$transparency); $ReviseC8S: hsla($hue7,$baseSat,$L8,$transparency); $ReviseC8H: hsla($hue7,$highSat,$L8,$transparency);
+$ReviseC9L: hsla($hue7,$lowSat,$L9,$transparency); $ReviseC9S: hsla($hue7,$baseSat,$L9,$transparency); $ReviseC9H: hsla($hue7,$highSat,$L9,$transparency);
+
+//--------------------------------------------------------------------------------------------------------------------------------------------------------------
+
+
+
+
+
+
+
+
+
+
+#root {
+    position: absolute;
+    top: 0;
+    left: 0;
+    height: 100vh;
+    width: 100vw;
+    overflow: hidden;
+    // overflow-y: scroll;
+    background-color: $SettingsS3L;
+    main {
+        position: absolute;
+        left: 40px;
+        top: 0;
+        // background-color: gray;
+        width: calc(100vw - 40px);
+        display: grid;
+        height: calc(700vh - 60px);
+        grid-auto-rows: 100vh;
+        transition: top 1s;
+        section {
+            box-shadow: $SettingsC0L 0 0 12px, $SettingsC0L 0 0 12px;
+            position: relative;
+            display: grid;
+            left: 0;
+            height: calc(100vh - 50px);
+            width: calc(100vw - 80px);
+            margin: 35px 20px 15px 20px;
+            border-radius: 5px;
+            // transform: translateY(5px);
+            header {
+                right: -10px;
+                top: -25px;
+                // width: 200px;
+                padding: 12px 20px 12px 25px;
+                font-size: 18px;
+                font-weight: 700;
+                border-radius: 5px;
+                letter-spacing: 5px;
+                // height: 40px;
+                position: absolute;
+                box-shadow: $SettingsC0H 0 0 12px;
+            }
+            main {
+                color: white;
+                left: 10px;
+                width:calc(100vw - 100px);
+            }
+
+            &:nth-child(1) {
+                background-color: $ProjectsC2S;
+                header {
+                    background-color: $ProjectsC0H;
+                    color: $ProjectsC9H;
+                }
+            }
+            &:nth-child(2) {
+                background-color: $StructureC2S;
+                header {
+                    background-color: $StructureC0H;
+                    color: $StructureC9H;
+                }
+            }
+            &:nth-child(3) {
+                background-color: $ContentC2S;
+                header {
+                    background-color: $ContentC0H;
+                    color: $ContentC9H;
+                }
+            }
+            &:nth-child(4) {
+                background-color: $StyleC2S;
+                header {
+                    background-color: $StyleC0H;
+                    color: $StyleC9H;
+                }
+            }
+            &:nth-child(5) {
+                background-color: $DraftC2S;
+                header {
+                    background-color: $DraftC0H;
+                    color: $DraftC9H;
+                }
+            }
+            &:nth-child(6) {
+                background-color: $ReviseC2S;
+                header {
+                    background-color: $ReviseC0H;
+                    color: $ReviseC9H;
+                }
+            }
+            &:nth-child(7) {
+                background-color: $SettingsC2S;
+                header {
+                    background-color: $SettingsC0H;
+                    color: $SettingsC9H;
+                }
+            }
+        }
+    }
+    .projectsOpenInterface {top: 0;}
+    .structureOpenInterface {top: -100vh;}
+    .contentOpenInterface {top: -200vh;}
+    .styleOpenInterface {top: -300vh;}
+    .draftOpenInterface {top: -400vh;}
+    .reviseOpenInterface {top: -500vh;}
+    .settingsOpenInterface {top: -600vh;}
+
+    nav {
+        position: fixed;
+        top: 0;
+        width: 40px;
+        height: 100vh;
+        left: 0;
+        background-color: $SettingsC0L;
+        box-shadow: $SettingsC0L -4px 0 12px inset, $SettingsC0L -4px 0 16px inset;
+        button {
+            width: 45px;
+            height: 40px;
+            position: absolute;
+            transition: width 1s;
+            box-shadow: $clearBlack 0 0 8px, $clearBlack 0 0 10px;
+            border-radius: 0 5px 5px 0;
+            border: none;
+            padding: 0;
+            overflow: hidden;
+            cursor: pointer;
+            div {
+                // appearance: none;
+                height: 40px;
+                width: 210px;
+                line-height: 40px;
+                top: 0;
+                left: 0;
+                margin: 0;
+                background-color: rgba(255, 255, 255, 0);
+                color: white;
+                text-align: right;
+                font-size: 18px;
+                font-weight: 700;
+                letter-spacing: 4px;
+            }
+
+            
+            &:nth-child(1) {
+                top: 15px;
+                background-color: $ProjectsS5H;
+                &:hover {
+                    width: 220px;
+                }
+            }
+            &:nth-child(2) {
+                top: 65px;
+                background-color: $StructureS5H;
+                &:hover {
+                    width: 220px;
+                }
+            }
+            &:nth-child(3) {
+                top: 115px;
+                background-color: $ContentS5H;
+                &:hover {
+                    width: 220px;
+                }
+            }
+            &:nth-child(4) {
+                top: 165px;
+                background-color: $StyleS5H;
+                &:hover {
+                    width: 220px;
+                }
+            }
+            &:nth-child(5) {
+                top: 215px;
+                background-color: $DraftS5H;
+                &:hover {
+                    width: 220px;
+                }
+            }
+            &:nth-child(6) {
+                top: 265px;
+                background-color: $ReviseS5H;
+                &:hover {
+                    width: 220px;
+                }
+            }
+            &:nth-child(7) {
+                bottom: 50px;
+                background-color: $SettingsS5H;
+                &:hover {
+                    width: 220px;
+                }
+            }
+            &:nth-child(8) {
+                bottom: 15px;
+                height: 22px;
+                width: 22px;
+                left: 8px;
+                border-radius: 5px;
+                box-shadow: none;
+                background-color: white;
+            }
+        }
+    }
+
+    
+}
