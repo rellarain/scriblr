@@ -62,10 +62,180 @@ table {
     position: absolute;
     top: 0;
     left: 0;
+    height: min-content;
     height: 100vh;
     width: 100vw;
+    overflow-x: hidden;
     // overflow: hidden;
-    // overflow-y: scroll;
-    background-color: hsl(0, 0%, 18%);
+    background-color: hsl(276, 47%, 35%);
     color: white;
+    &::-webkit-scrollbar {width: 0;} // REMOVE ON PUBLISH -----------------------------------------------------------------------
+
+    .adminUI {
+        width: calc(100vw - 40px);
+        height: calc(100vh - 40px);
+        background-color: rgba(0, 0, 0, 0.3);
+        margin: 20px;
+        overflow: hidden;
+        overflow-y: auto;
+        box-shadow: 0 8px 8px rgba(0, 0, 0, 0.3) inset;
+        &::-webkit-scrollbar-thumb {
+            background-color: rgba(255, 255, 255, 0.25);
+        }
+
+
+        display: none;
+
+
+        ul {width: 500px; li {width: 480px; border-radius: 4px; margin: 10px; padding: 10px; background-color: rgba(0, 0, 0, 0.541);}}
+        
+    }
+
+    .userProjectsUI {
+        width: calc(100vw - 40px);
+        height: calc(100vh - 40px);
+        background-color: rgb(52, 98, 197);
+        margin: 20px;
+        overflow-y: auto;
+        box-shadow: 0 8px 8px rgb(0, 0, 0, .4);
+        &::-webkit-scrollbar-thumb {
+            background-color: rgba(0, 0, 0, 0.25);
+        }
+
+
+        // display: none;
+
+
+        ul {
+            width: 400px; 
+            li {
+                width: 380px; 
+                border-radius: 4px; 
+                margin: 10px; 
+                padding: 10px; 
+                background-color: rgba(0, 0, 0, 0.541);
+            }
+        }
+    }
+
+    .userProjectUI {
+        width: calc(100% - 500px);
+        height: calc(100% - 80px);
+        // height: 200vh;
+        padding: 20px;
+        background-color: rgba(0, 0, 0, 0.103);
+        margin: 20px;
+        position: absolute;
+        top: 0;
+        right: 0;
+
+
+
+        // display: none;
+
+
+        ul {width: 500px; li {width: 480px; border-radius: 4px; margin: 10px; padding: 10px; background-color: rgba(0, 0, 0, 0.541);}}
+    }
+
+    .landingPage {
+        width: calc(100vw - 40px);
+        height: calc(100vh - 40px);
+        background-color: rgb(148, 67, 67);
+        margin: 20px;
+
+
+        display: none;
+
+
+        ul {
+            width: calc(100% - 20px); 
+            margin-left: 500px;
+            li {
+                width: 480px; 
+                border-radius: 4px; 
+                margin: 10px; 
+                padding: 10px; 
+                background-color: rgba(0, 0, 0, 0.541);
+            }
+        }
+
+    }
+
+    .registrationUI {
+        width: 500px;
+        height: 400px;
+        position: absolute;
+        bottom: 10px;
+        right: 10px;
+        background-color: rgb(156, 115, 0);
+        margin: 20px;
+        
+        
+        // display: none;
+        
+        
+        ul {
+            margin: 0;
+            width: calc(100% - 20px); 
+            // width: 400px; 
+            li {
+                width: calc(100% - 20px); 
+                border-radius: 4px; 
+                margin: 10px; 
+                padding: 10px; 
+                background-color: rgba(0, 0, 0, 0.541);
+            }
+        }
+
+    }
+
+    .loginUI {
+        width: 400px;
+        height: 400px;
+        background-color: rgb(48, 114, 18);
+        margin: 20px;
+        position: absolute;
+        top: 150px;
+        left: 10px;
+
+
+        // display: none;
+
+
+        ul {
+            width: calc(100% - 20px); 
+            margin: 0;
+            li {
+                // width: 480px; 
+                width: calc(100% - 20px); 
+                border-radius: 4px; 
+                margin: 10px; padding: 10px; 
+                background-color: rgba(0, 0, 0, 0.541);
+            }
+        }
+
+    }
+
+    main {
+        position: absolute;
+        border-radius: 4px;
+
+        &::-webkit-scrollbar {
+            background-color: rgba(0, 0, 0, 0.2);
+            border-radius: 0 4px 4px 0;
+            
+        }
+        &::-webkit-scrollbar-thumb {
+            border-radius: 0 4px 4px  0;
+            
+        }
+        ul {
+            li:nth-of-type(1) {
+                background-color: rgba(0, 0, 0, 0.2); 
+                text-transform: uppercase;
+                letter-spacing: 1.5px;
+                font-weight: 600;
+            }
+        }
+    }
 }
