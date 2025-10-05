@@ -1,36 +1,65 @@
 import { useState } from "react";
 import UserProject from "./UserProject";
+import Admin from "./Admin";
 
 
 function UserProjects() {
 
+const [userProjectsState, setUserProjectsState] = useState("Home")
+
+function handleWriterProjectOpen() {
+    if (userProjectsState === "Home") {
+        setUserProjectsState("WriterProject")
+    } else {setUserProjectsState("Home")}
+}
+function handleReaderProjectOpen() {
+    if (userProjectsState === "Home") {
+        setUserProjectsState("ReaderProject")
+    } else {setUserProjectsState("Home")}
+}
 
 
 
+return (<main className={"userProjectsUI open"+userProjectsState}>
+    <section>Account Dashboard</section>
+    <section>
+        <div onClick={handleReaderProjectOpen}>
+            <button></button>
+            <button></button>
+            <button></button>
+            <button></button>
+            <button></button>
+            <button></button>
+        </div>
+        <div onClick={handleReaderProjectOpen}>
 
-
-return (<main className="userProjectsUI">
-    <ul>
-        <li>USER PROJECTS (Bookshelves)</li>
-        <li>account level information related to all reading projects, writing projects, and/or admin roles</li>
-        <li>
-            DESIGN: 
-            <br/> - 
-            <br/> - 
-            <br/> - 
-            <br/> - 
-            <br/> - 
-        </li>
-        <li>Project Schedule Tiles: links to respective project, mini/cards (reader/writer/admin, phase progress), expanded/slides ()</li>
-        <li>Notifications: feedback, reader feedback, writer feedback, </li>
-        <li>Customization: L/R handedness, account theme styling, background pattern (?)</li>
-        <li>Configuration: service level, subscription, payment method, </li>
-        <li></li>
-        <li></li>
-        <li></li>
-        <li></li>
-    </ul>
-    <UserProject/>
+        </div>
+        <div onClick={handleReaderProjectOpen}></div>
+        <div>Reader Project Dash</div>
+    </section>
+    <section>
+        <div onClick={handleWriterProjectOpen}>
+            <button></button>
+            <button></button>
+            <button></button>
+            <button></button>
+            <button></button>
+        </div>
+        <div onClick={handleWriterProjectOpen}></div>
+        <div onClick={handleWriterProjectOpen}></div>
+        <div onClick={handleWriterProjectOpen}>
+            <button></button>
+        </div>
+        <div onClick={handleWriterProjectOpen}></div>
+        <div>
+            <br/>Writer Project Dash (Project Level, Book Level)
+            <br/>
+            <br/>Project Level: 
+            <br/>
+            <br/>Book Level: manage details for book, arcs, subarcs; arc and chapter 
+        </div>
+    </section>
+    <Admin/>
 </main>)}
 
 export default UserProjects;

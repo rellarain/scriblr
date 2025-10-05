@@ -92,12 +92,14 @@ table {
     }
 
     .userProjectsUI {
-        width: calc(100vw - 40px);
-        height: calc(100vh - 40px);
-        background-color: rgb(52, 98, 197);
-        margin: 20px;
-        overflow-y: auto;
-        box-shadow: 0 8px 8px rgb(0, 0, 0, .4);
+        width: 100vw;
+        height: 100vh;
+        // background-color: rgb(52, 98, 197);
+        // overflow-y: auto;
+        // overflow-x: hidden;
+        overflow: hidden;
+        position: absolute;
+        top: 0;
         &::-webkit-scrollbar-thumb {
             background-color: rgba(0, 0, 0, 0.25);
         }
@@ -105,18 +107,108 @@ table {
 
         // display: none;
 
-
-        ul {
-            width: 400px; 
-            li {
-                width: 380px; 
-                border-radius: 4px; 
-                margin: 10px; 
-                padding: 10px; 
-                background-color: rgba(0, 0, 0, 0.541);
+        section:nth-of-type(1) {
+            width: calc(100vw - 880px);
+            height: calc(100vh - 80px);
+            position: absolute;
+            top: 60px;
+            left: 440px;
+            transition: top 1s;
+            background-color: rgba(0, 0, 0, 0.359);
+        }
+        section:nth-of-type(2) {
+            // width: 400px;
+            height: 790px;
+            background-color: rgb(24, 104, 24);
+            position: absolute;
+            bottom: 20px;
+            transition: left 1s, width 1s, height 1s;
+            left: 20px;
+            display: grid;
+            overflow: hidden;
+            grid-auto-rows: 260px;
+            div {
+                width: 380px;
+                height: 250px;
+                margin: 10px;
+                border: none;
+                cursor: pointer;
+                background-color: rgba(0, 0, 0, 0.4);
+                button {width: 30px; height: 172px;margin: 70px 8px 0 0; cursor: pointer;}
+                button:nth-of-type(1) {margin: 70px 8px 0 8px; cursor: default;}
+            }
+            div:nth-of-type(4) {
+                width: calc(100vw - 550px);
+                height: calc(100vh - 60px);
+                position: absolute;
+                transition: width 1s;
+                margin: 0;
+                left: 400px;
+                top: 10px;
+                background-color: rgba(0, 0, 0, 0.2);
+                cursor: default;
+            }
+            
+        }
+        section:nth-of-type(3) {
+            width: 400px;
+            height: calc(100vh - 40px);
+            position: absolute;
+            top: 20px;
+            transition: left 1s, width 1s;
+            left: calc(100vw - 420px);
+            background-color: rgb(152, 110, 32);
+            display: grid;
+            grid-auto-rows: calc(20% - 2px);
+            overflow: hidden;
+            div {
+                width: 380px;
+                height: calc(100% - 10px);
+                border: none;
+                margin: 10px 0 0 10px;
+                cursor: pointer;
+                background-color: rgba(0, 0, 0, 0.4);
+                button {width: 30px; height: 80%; margin: 0 8px 0 0;}
+                button:nth-of-type(1) {margin: 10% 8px 0 8px;}
+            }
+            div:nth-of-type(6) {
+                width: calc(100vw - 550px);
+                height: calc(100vh - 60px);
+                position: absolute;
+                left: 400px;
+                top: 10px;
+                margin: 0;
+                transition: width 1s;
+                background-color: rgba(0, 0, 0, 0.2);
+                cursor: default;
             }
         }
+
+
+
     }
+    .openHome {
+        // Reader Bookshelf: 
+        // Writer Bookshelf: 
+        // Account: 
+        // Admin: 
+        section:nth-of-type(1) {top: 20px;}
+        section:nth-of-type(2) {left: 20px; width: 400px;height: 790px;}
+        section:nth-of-type(3) {left: calc(100vw - 420px); width: 400px;}
+    }
+    .openReaderProject {
+        section:nth-of-type(1) {top: -100vh;}
+        section:nth-of-type(2) {left: 20px; width: calc(100vw - 40px); height: calc(100vh - 40px);}
+        section:nth-of-type(3) {left: 100vw; width: 400px;}
+    }
+    .openWriterProject {
+        section:nth-of-type(1) {top: -100vh;}
+        section:nth-of-type(2) {left: -400px; width: 400px; height: 790px;}
+        section:nth-of-type(3) {left: 20px; width: calc(100vw - 40px);}
+    }
+
+
+
 
     .userProjectUI {
         width: calc(100% - 500px);
