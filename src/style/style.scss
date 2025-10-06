@@ -67,27 +67,31 @@ table {
     width: 100vw;
     overflow-x: hidden;
     // overflow: hidden;
-    background-color: hsl(276, 47%, 35%);
+    background-color: hsl(0, 0%, 27%);
     color: white;
     &::-webkit-scrollbar {width: 0;} // REMOVE ON PUBLISH -----------------------------------------------------------------------
 
     .adminUI {
-        width: calc(100vw - 40px);
+        width: calc(100vw - 880px);
+        // width: 150px;
         height: calc(100vh - 40px);
+        height: 40px;
+        bottom: 20px;
+        right: 440px;
         background-color: rgba(0, 0, 0, 0.3);
-        margin: 20px;
+        // margin: 20px;
         overflow: hidden;
         overflow-y: auto;
-        box-shadow: 0 8px 8px rgba(0, 0, 0, 0.3) inset;
+        box-shadow: 0 6px 8px 4px rgba(0, 0, 0, 0.3) inset;
         &::-webkit-scrollbar-thumb {
             background-color: rgba(255, 255, 255, 0.25);
         }
 
 
-        display: none;
+        // display: none;
 
 
-        ul {width: 500px; li {width: 480px; border-radius: 4px; margin: 10px; padding: 10px; background-color: rgba(0, 0, 0, 0.541);}}
+        ul {display: none; width: 500px; li {width: 480px; border-radius: 4px; margin: 10px; padding: 10px; background-color: rgba(0, 0, 0, 0.541);}}
         
     }
 
@@ -109,7 +113,7 @@ table {
 
         section:nth-of-type(1) {
             width: calc(100vw - 880px);
-            height: calc(100vh - 80px);
+            height: calc(100vh - 100px);
             position: absolute;
             top: 60px;
             left: 440px;
@@ -169,7 +173,7 @@ table {
                 cursor: pointer;
                 background-color: rgba(0, 0, 0, 0.4);
                 button {width: 30px; height: 80%; margin: 0 8px 0 0;}
-                button:nth-of-type(1) {margin: 10% 8px 0 8px;}
+                button:nth-of-type(1) {margin: 5% 8px 0 8px;}
             }
             div:nth-of-type(6) {
                 width: calc(100vw - 550px);

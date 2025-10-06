@@ -67,26 +67,28 @@ table {
   height: 100vh;
   width: 100vw;
   overflow-x: hidden;
-  background-color: hsl(276, 47%, 35%);
+  background-color: hsl(0, 0%, 27%);
   color: white;
 }
 #root::-webkit-scrollbar {
   width: 0;
 }
 #root .adminUI {
-  width: calc(100vw - 40px);
+  width: calc(100vw - 880px);
   height: calc(100vh - 40px);
+  height: 40px;
+  bottom: 20px;
+  right: 440px;
   background-color: rgba(0, 0, 0, 0.3);
-  margin: 20px;
   overflow: hidden;
   overflow-y: auto;
-  box-shadow: 0 8px 8px rgba(0, 0, 0, 0.3) inset;
-  display: none;
+  box-shadow: 0 6px 8px 4px rgba(0, 0, 0, 0.3) inset;
 }
 #root .adminUI::-webkit-scrollbar-thumb {
   background-color: rgba(255, 255, 255, 0.25);
 }
 #root .adminUI ul {
+  display: none;
   width: 500px;
 }
 #root .adminUI ul li {
@@ -108,7 +110,7 @@ table {
 }
 #root .userProjectsUI section:nth-of-type(1) {
   width: calc(100vw - 880px);
-  height: calc(100vh - 80px);
+  height: calc(100vh - 100px);
   position: absolute;
   top: 60px;
   left: 440px;
@@ -181,7 +183,7 @@ table {
   margin: 0 8px 0 0;
 }
 #root .userProjectsUI section:nth-of-type(3) div button:nth-of-type(1) {
-  margin: 10% 8px 0 8px;
+  margin: 5% 8px 0 8px;
 }
 #root .userProjectsUI section:nth-of-type(3) div:nth-of-type(6) {
   width: calc(100vw - 550px);
