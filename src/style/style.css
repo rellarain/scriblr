@@ -164,7 +164,7 @@ table {
   top: 20px;
   transition: left 1s, width 1s;
   left: calc(100vw - 420px);
-  background-color: rgb(152, 110, 32);
+  background-color: rgb(121, 72, 48);
   display: grid;
   grid-auto-rows: calc(20% - 2px);
   overflow: hidden;
