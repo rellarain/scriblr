@@ -1,0 +1,121 @@
+      Landing
+        Info: 
+          Services: 
+          Contact: 
+          Pricing: 
+        Login: 
+          Account Entry: 
+          Password Entry: 
+          Passcode Entry: 
+          Forgotten Account: 
+          Forgotten Password: 
+          Forgotten Email: 
+          Request Email Passcode: 
+          Request Text Passcode: 
+          Request Authenticator?: 
+          Submit Credentials: 
+          Clear Credentials: 
+        Register: 
+          Service Selection: 
+          Payment Options: 
+          Account Details: 
+          Contact Info: 
+          Project Form: project details, questionnaire (writer method, structure, content, draft)
+            Project Details: 
+            Writer Conversion: 
+              Existing Ideas: 
+            Writer Interview:
+              Plotter: STRUCTURE >> CONTENT >> DRAFT >> REVISION
+                Frame Plotter: structure-only analysis (multibook, book, arc, subarc, chapters)
+                Full Plotter: structure and content analysis (+categories, plotlines, sequences, plotpoints)
+              Pantser: STRUCTURE >> DRAFT >> CONTENT >> REVISION
+                Converted Pantser: existing structure (book, chapter), import (255char sentence/clause segments)
+                Starting Pantser: boilerplate structure and content, open drafting tool (paragraph mode)
+              Puzzler: CONTENT >> STRUCTURE >> DRAFT >> REVISION
+                Crystal Puzzler: existing plotlines, plot sequences, and/or plotpoints
+                Fluid Puzzler: boilerplate plotlines, unassigned plotpoints
+            Structure Analysis: 
+            Content Analysis: templates (categories, plotlines, sequences, plotpoints), creator tool (with or without structure)
+            Draft Analysis: book boilerplate (blank book details, existing chapter count), drafting tool (no structure/content)
+      UserPages
+        Dashboard:
+          Home: 
+            Schedule: 
+            Activity Log: 
+            Team MGMT: 
+          Account: 
+            Customization: 
+            Payment: service levels, 
+            Training Settings:
+            Admin Settings: 
+        Training: 
+          Writer Training: 
+            Structural Outline: 
+            Content Outline: 
+            Drafting: 
+            Readers MGMT: 
+          Beta Training: 
+            Reactions: 
+          Psi Training: 
+            Plotlines: 
+            Plotpoints: 
+            Filtered Draft: 
+            Annotation: 
+          Omega Training: 
+            Typos: misspelling, misuse, 
+            Suggestions: word choice, repetitive, unclear,
+          Admin Training: 
+            Feedback: 
+            Configuration: 
+            User MGMT: 
+            Page MGMT: 
+            Admin MGMT: 
+        Admin: 
+          Feedback Processing: 
+            Sort: intention, tone, feature
+            Explicate: formatting (subject verb object)
+            Integrate: 
+            Implement: 
+            Publish: 
+          Reader Config: 
+            Alpha Config: 
+            Beta Config: 
+            Psi Config: 
+            Omega Config: word list (part of speech, structural, functional), 
+          Writer Config: 
+            Structure: 
+            Content: 
+            Draft: word lists, annotation suggestions, 
+            Revision: primary flags (CRUD; hue; default note), secondary flags (CRUD; shade/tint; default note)
+          User MGMT:
+            Permissions: 
+            Payment: status, method, frequency
+          Page MGMT: 
+            Landing Info:
+            Registration:
+            Listings: 
+          Admin MGMT: revenue, engagement, performance, permissions, training
+        WriterShelves: 
+          Shelves Component: role selector (writer), project selectors (shelves), book selectors (book spines)
+          Folder Tabs Component: project selectors (selected tab, unselected tabs)
+          Writer Dash: all projects (activity log, schedule, analytics, writer configuration)
+          Project Dash: selected project (activity log, schedule, analytics, project configuration)
+        WriterBook: 
+          Shelves Component: role selector (writer), project selectors (open shelf, hidden shelves), book selectors (unselected spines, selected cover)
+          Book Tabs Component: 
+          Book Dashboard: 
+          Book Outline: book details, arcs, subarcs, chapters, 
+        WriterPages: 
+          Book Tabs Component: 
+          Page Lens Component: outline (structure, content), draft (written copy), revise (omega, beta, alpha, psi)
+          Chapter Outline: chapter details, acts, scenes, moments, plotlines, sequences, plotpoints, dictionary/glossary, flags/notes 
+          Chapter Draft: mini chapter outline, structure selectors, drafting tool, annotation tool
+          Chapter Reader: 
+        ReaderShelves: reader roles (alpha, psi, beta, omega), reader listings (lists, details)
+          Shelves Component: role selector (reader), reader type selectors (shelves), book selectors (book spines), reader listings (general, details)
+        ReaderPages: alpha reader, psi reader, beta reader, omega reader
+          Shelves Component: role selector (reader), reader type selector (open shelf, hidden shelves), book selectors (selected cover, unselected spines)
+          Alpha Reader: 
+          Beta Reader: full copy chapter, no outline, beta flag presets (reactions)
+          Psi Reader: focused draft access, plotline-specific outline, psi flag presets
+          Omega Reader: full copy, no outline, draft analytics, custom dictionary, omega flag presets

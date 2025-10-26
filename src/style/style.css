@@ -67,262 +67,196 @@ table {
   height: 100vh;
   width: 100vw;
   overflow-x: hidden;
-  background-color: hsl(0, 0%, 27%);
+  background-color: hsl(0, 0%, 56%);
   color: white;
 }
 #root::-webkit-scrollbar {
   width: 0;
 }
-#root .adminUI {
-  width: calc(100vw - 880px);
-  height: calc(100vh - 40px);
-  height: 40px;
-  bottom: 20px;
-  right: 440px;
-  background-color: rgba(0, 0, 0, 0.3);
-  overflow: hidden;
-  overflow-y: auto;
-  box-shadow: 0 6px 8px 4px rgba(0, 0, 0, 0.3) inset;
-}
-#root .adminUI::-webkit-scrollbar-thumb {
-  background-color: rgba(255, 255, 255, 0.25);
-}
-#root .adminUI ul {
+#root .landingPage {
   display: none;
-  width: 500px;
 }
-#root .adminUI ul li {
-  width: 480px;
-  border-radius: 4px;
-  margin: 10px;
-  padding: 10px;
-  background-color: rgba(0, 0, 0, 0.541);
+#root .userHome {
+  display: none;
+}
+#root .readerPagesUI {
+  display: none;
+}
+#root .writerBookUI {
+  display: none;
 }
 #root .userProjectsUI {
   width: 100vw;
   height: 100vh;
-  overflow: hidden;
+  margin: 0;
   position: absolute;
   top: 0;
+  left: 0;
 }
-#root .userProjectsUI::-webkit-scrollbar-thumb {
-  background-color: rgba(0, 0, 0, 0.25);
-}
-#root .userProjectsUI section:nth-of-type(1) {
-  width: calc(100vw - 880px);
-  height: calc(100vh - 100px);
+#root .readerShelvesUI {
   position: absolute;
-  top: 60px;
-  left: 440px;
-  transition: top 1s;
-  background-color: rgba(0, 0, 0, 0.359);
-}
-#root .userProjectsUI section:nth-of-type(2) {
-  height: 790px;
-  background-color: rgb(24, 104, 24);
-  position: absolute;
-  bottom: 20px;
-  transition: left 1s, width 1s, height 1s;
-  left: 20px;
+  bottom: 15px;
+  left: 15px;
   display: grid;
-  overflow: hidden;
-  grid-auto-rows: 260px;
+  grid-template-columns: 350px auto 20px;
+  grid-template-areas: "shelfStack projectUI projectUIToggle";
 }
-#root .userProjectsUI section:nth-of-type(2) div {
-  width: 380px;
-  height: 250px;
+#root .readerShelvesUI .readerShelfStack {
+  grid-area: shelfStack;
+  width: 350px;
+}
+#root .readerShelvesUI .readerShelfStack .readerShelfUI {
+  width: 330px;
+  height: calc(20vh - 20px);
   margin: 10px;
-  border: none;
-  cursor: pointer;
-  background-color: rgba(0, 0, 0, 0.4);
-}
-#root .userProjectsUI section:nth-of-type(2) div button {
-  width: 30px;
-  height: 172px;
-  margin: 70px 8px 0 0;
-  cursor: pointer;
-}
-#root .userProjectsUI section:nth-of-type(2) div button:nth-of-type(1) {
-  margin: 70px 8px 0 8px;
-  cursor: default;
-}
-#root .userProjectsUI section:nth-of-type(2) div:nth-of-type(4) {
-  width: calc(100vw - 550px);
-  height: calc(100vh - 60px);
-  position: absolute;
-  transition: width 1s;
-  margin: 0;
-  left: 400px;
-  top: 10px;
   background-color: rgba(0, 0, 0, 0.2);
-  cursor: default;
 }
-#root .userProjectsUI section:nth-of-type(3) {
-  width: 400px;
-  height: calc(100vh - 40px);
-  position: absolute;
-  top: 20px;
-  transition: left 1s, width 1s;
-  left: calc(100vw - 420px);
-  background-color: rgb(121, 72, 48);
-  display: grid;
-  grid-auto-rows: calc(20% - 2px);
+#root .readerShelvesUI .readerShelfStack .readerShelfUI button {
+  width: 330px;
+  height: 30px;
+  border: none;
+  background-color: rgba(0, 0, 0, 0);
+  text-align: left;
+  color: white;
+  text-transform: uppercase;
+  line-height: 30px;
+  letter-spacing: 1px;
+  font-weight: 600;
+  cursor: pointer;
+}
+#root .readerShelvesUI .readerShelfStack .readerShelfUI div {
+  width: 330px;
+  height: calc(20vh - 50px);
   overflow: hidden;
 }
-#root .userProjectsUI section:nth-of-type(3) div {
-  width: 380px;
-  height: calc(100% - 10px);
-  border: none;
-  margin: 10px 0 0 10px;
-  cursor: pointer;
+#root .readerShelvesUI .readerShelfStack .readerShelfUI div button {
+  height: calc(20vh - 50px);
+  width: 20px;
+  margin: 15px 5px 0 0;
   background-color: rgba(0, 0, 0, 0.4);
 }
-#root .userProjectsUI section:nth-of-type(3) div button {
-  width: 30px;
-  height: 80%;
-  margin: 0 8px 0 0;
+#root .readerShelvesUI .readerShelfStack .readerShelfUI div button:nth-of-type(1) {
+  margin-left: 5px;
 }
-#root .userProjectsUI section:nth-of-type(3) div button:nth-of-type(1) {
-  margin: 5% 8px 0 8px;
-}
-#root .userProjectsUI section:nth-of-type(3) div:nth-of-type(6) {
-  width: calc(100vw - 550px);
-  height: calc(100vh - 60px);
-  position: absolute;
-  left: 400px;
-  top: 10px;
+#root .readerShelvesUI .readerProjectUI {
+  grid-area: projectUI;
   margin: 0;
+  overflow: hidden;
+  padding: 0;
+  height: 100%;
   transition: width 1s;
-  background-color: rgba(0, 0, 0, 0.2);
-  cursor: default;
 }
-#root .openHome section:nth-of-type(1) {
-  top: 20px;
+#root .readerShelvesUI .readerProjectUIToggle {
+  grid-area: projectUIToggle;
+  height: 100%;
+  width: 20px;
+  cursor: pointer;
+  background-color: rgba(0, 0, 0, 0.3);
+  border: none;
 }
-#root .openHome section:nth-of-type(2) {
-  left: 20px;
-  width: 400px;
-  height: 790px;
+#root .readerShelvesOpen {
+  background-color: rgb(255, 127, 127);
 }
-#root .openHome section:nth-of-type(3) {
-  left: calc(100vw - 420px);
-  width: 400px;
+#root .readerShelvesOpen .readerShelvesUI {
+  width: calc(100vw - 30px);
+  height: calc(100vh - 30px);
 }
-#root .openReaderProject section:nth-of-type(1) {
-  top: -100vh;
+#root .readerShelvesOpen .readerProjectUI {
+  width: calc(100vw - 400px);
 }
-#root .openReaderProject section:nth-of-type(2) {
-  left: 20px;
-  width: calc(100vw - 40px);
+#root .readerShelvesClosed {
+  background-color: rgb(119, 119, 255);
+}
+#root .readerShelvesClosed .readerShelvesUI {
+  width: 370px;
+  height: calc(80vh - 30px);
+}
+#root .readerShelvesClosed .readerProjectUI {
+  width: 0;
+}
+#root .writerShelvesUI {
+  position: absolute;
+  bottom: 15px;
+  width: -moz-max-content;
+  width: max-content;
+  right: 15px;
   height: calc(100vh - 40px);
+  display: grid;
+  grid-template-columns: 350px auto 20px;
+  grid-template-areas: "shelfStack projectUI projectUIToggle";
+  display: none;
 }
-#root .openReaderProject section:nth-of-type(3) {
-  left: 100vw;
-  width: 400px;
+#root .writerShelvesUI .writerShelfStack {
+  grid-area: shelfStack;
+  width: 350px;
 }
-#root .openWriterProject section:nth-of-type(1) {
-  top: -100vh;
+#root .writerShelvesUI .writerShelfStack .writerShelfUI {
+  width: 330px;
+  height: calc(20vh - 20px);
+  margin: 10px;
+  overflow-y: hidden;
 }
-#root .openWriterProject section:nth-of-type(2) {
-  left: -400px;
-  width: 400px;
-  height: 790px;
+#root .writerShelvesUI .writerShelfStack .writerShelfUI button {
+  width: 330px;
+  height: 30px;
+  border: none;
+  background-color: rgba(0, 0, 0, 0);
+  color: white;
+  text-transform: uppercase;
+  line-height: 30px;
+  letter-spacing: 1px;
+  text-align: right;
+  font-weight: 600;
+  cursor: pointer;
 }
-#root .openWriterProject section:nth-of-type(3) {
-  left: 20px;
-  width: calc(100vw - 40px);
+#root .writerShelvesUI .writerShelfStack .writerShelfUI div {
+  width: 330px;
+  height: calc(20vh - 50px);
+  overflow: hidden;
 }
-#root .userProjectUI {
-  width: calc(100% - 500px);
-  padding: 20px;
-  background-color: rgba(0, 0, 0, 0.103);
-  margin: 20px;
+#root .writerShelvesUI .writerShelfStack .writerShelfUI div button {
+  height: calc(20vh - 50px);
+  width: 20px;
+  margin: 15px 5px 0 0;
+  background-color: rgba(0, 0, 0, 0.4);
+}
+#root .writerShelvesUI .writerShelfStack .writerShelfUI div button:nth-of-type(1) {
+  margin-left: 5px;
+}
+#root .writerShelvesUI .writerProjectUI {
+  grid-area: projectUI;
+  margin: 0;
+  overflow: hidden;
+  height: 100%;
+  transition: width 1s;
+}
+#root .writerShelvesUI .writerProjectUIToggle {
+  grid-area: projectUIToggle;
   position: absolute;
   top: 0;
   right: 0;
-}
-#root .userProjectUI ul {
-  width: 500px;
-}
-#root .userProjectUI ul li {
-  width: 480px;
-  border-radius: 4px;
-  margin: 10px;
-  padding: 10px;
-  background-color: rgba(0, 0, 0, 0.541);
-}
-#root .landingPage {
-  width: calc(100vw - 40px);
-  height: calc(100vh - 40px);
-  background-color: rgb(148, 67, 67);
-  margin: 20px;
-  display: none;
-}
-#root .landingPage ul {
-  width: calc(100% - 20px);
-  margin-left: 500px;
-}
-#root .landingPage ul li {
-  width: 480px;
-  border-radius: 4px;
-  margin: 10px;
-  padding: 10px;
-  background-color: rgba(0, 0, 0, 0.541);
-}
-#root .registrationUI {
-  width: 500px;
-  height: 400px;
-  position: absolute;
-  bottom: 10px;
-  right: 10px;
-  background-color: rgb(156, 115, 0);
-  margin: 20px;
-}
-#root .registrationUI ul {
   margin: 0;
-  width: calc(100% - 20px);
+  border: none;
+  width: 20px;
+  height: 100%;
+  cursor: pointer;
+  background-color: rgba(0, 0, 0, 0.3);
 }
-#root .registrationUI ul li {
-  width: calc(100% - 20px);
-  border-radius: 4px;
-  margin: 10px;
-  padding: 10px;
-  background-color: rgba(0, 0, 0, 0.541);
+#root .writerShelvesOpen {
+  background-color: rgb(255, 127, 127);
 }
-#root .loginUI {
-  width: 400px;
-  height: 400px;
-  background-color: rgb(48, 114, 18);
-  margin: 20px;
-  position: absolute;
-  top: 150px;
-  left: 10px;
+#root .writerShelvesOpen .writerProjectUI {
+  width: calc(100vw - 400px);
 }
-#root .loginUI ul {
-  width: calc(100% - 20px);
-  margin: 0;
+#root .writerShelvesOpen .writerShelvesUI {
+  width: calc(100vw - 30px);
 }
-#root .loginUI ul li {
-  width: calc(100% - 20px);
-  border-radius: 4px;
-  margin: 10px;
-  padding: 10px;
-  background-color: rgba(0, 0, 0, 0.541);
+#root .writerShelvesClosed {
+  background-color: rgb(119, 119, 255);
 }
-#root main {
-  position: absolute;
-  border-radius: 4px;
+#root .writerShelvesClosed .writerProjectUI {
+  width: 0;
 }
-#root main::-webkit-scrollbar {
-  background-color: rgba(0, 0, 0, 0.2);
-  border-radius: 0 4px 4px 0;
-}
-#root main::-webkit-scrollbar-thumb {
-  border-radius: 0 4px 4px 0;
-}
-#root main ul li:nth-of-type(1) {
-  background-color: rgba(0, 0, 0, 0.2);
-  text-transform: uppercase;
-  letter-spacing: 1.5px;
-  font-weight: 600;
+#root .writerShelvesClosed .writerShelvesUI {
+  width: 370px;
 }/*# sourceMappingURL=style.css.map */
