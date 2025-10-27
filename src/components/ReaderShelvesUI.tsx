@@ -1,18 +1,21 @@
-import { useState } from "react";
+import { PropsWithChildren, PropsWithoutRef, useState } from "react";
 import ReaderShelfUI from "./ReaderShelfUI";
 import ReaderProjectUI from "./ReaderProjectUI";
 
-function ReaderShelvesUI() {
+ interface ReaderShelvesProps {
+    onButtonClick: () => void;
+ }
 
-const [readerShelvesState, setReaderShelvesState] = useState("Closed");
+ type onButtonClick = {
+    onButtonClick: () => void
+ }
 
-function handleReaderShelvesState() {
-    if (readerShelvesState == "Closed") {
-        setReaderShelvesState("Open");
-    } else {setReaderShelvesState("Closed")}
-}
+function ReaderShelvesUI({ onButtonClick }: onButtonClick) {
 
-return (<main className={"readerShelvesUI readerShelves" + readerShelvesState}>
+
+
+
+return (<main className={"readerShelvesUI"}>
     <div className="readerShelfStack">
         <ReaderShelfUI/>
         <ReaderShelfUI/>
@@ -21,7 +24,7 @@ return (<main className={"readerShelvesUI readerShelves" + readerShelvesState}>
 
     </div>
     <ReaderProjectUI/>
-    <button className="readerProjectUIToggle" onClick={handleReaderShelvesState}></button>
+    <button className="readerProjectUIToggle" onClick={onButtonClick}></button>
 
 
 </main>)}

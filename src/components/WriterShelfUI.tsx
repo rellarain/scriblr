@@ -11,6 +11,10 @@ return (<main className="writerShelfUI">
         <button></button>
         <button></button>
         <button></button>
+        <button></button>
+        <button></button>
+        <button></button>
+        <button></button>
     </div>
 
 

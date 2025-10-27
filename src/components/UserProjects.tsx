@@ -7,14 +7,21 @@ import WriterBookUI from "./WriterBookUI";
 
 function UserPages() {
 
+    const [toggleReaderShelves, setReaderShelves] = useState("Closed");
+
+    function handleToggleReaderShelves() {
+        if (toggleReaderShelves == "Reader") {
+            setReaderShelves("Closed")
+        } else {setReaderShelves("Reader")}
+    }
 
 
 
 
-return (<main className={"userProjectsUI open"}>
+return (<main className={"userProjectsUI viewing" + toggleReaderShelves}>
 
     <ReaderPagesUI/>
-    <ReaderShelvesUI/>
+    <ReaderShelvesUI onButtonClick={handleToggleReaderShelves}/>
     <UserHomeUI/>
     <WriterShelvesUI/>
     <WriterBookUI/>
