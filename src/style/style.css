@@ -263,4 +263,12 @@ table {
 #root .writerShelvesClosed .writerShelvesUI {
   width: 370px;
   z-index: 0;
+}
+#root .renderedJSON {
+  height: 100vh;
+  width: 100vw;
+  position: absolute;
+  top: 0;
+  left: 0;
+  background-color: rgba(42, 42, 42, 0.898);
 }/*# sourceMappingURL=style.css.map */

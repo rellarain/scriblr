@@ -4,6 +4,7 @@ import ReaderPagesUI from "./ReaderPagesUI";
 import ReaderShelvesUI from "./ReaderShelvesUI";
 import WriterShelvesUI from "./WriterShelvesUI";
 import WriterBookUI from "./WriterBookUI";
+import RenderedJSON from "./RenderedJSON";
 
 function UserPages() {
 
@@ -25,6 +26,7 @@ return (<main className={"userProjectsUI viewing" + toggleReaderShelves}>
     <UserHomeUI/>
     <WriterShelvesUI/>
     <WriterBookUI/>
+    <RenderedJSON/>
 
 </main>)}
 

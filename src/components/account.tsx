@@ -1,0 +1,122 @@
+export const user = [{
+    "userID": {
+        "account":{},
+        "projectID": {
+            "details": ["title50char","description250char","summary500char"],
+            "structure": {
+                "00-01-02": ["title50char","description250char",["250char","250char","250char","250char"]],
+                "bookTemplate":{},
+                "00": {},
+                "01":{},
+                "02": {
+                    "details": ["book-title50char","description250char",["250char","250char","250char","250char"]],
+                    "order": 3,
+                    "design":{
+                        "mainColor":"",
+                        "accentColor1":"",
+                        "accentColor2":"",
+                        "cover":""
+                    },
+                    "goals":{
+                        "bookWordcount": 120000,
+                        "chapterCount": 32
+                    },
+                    "assignedContent":{
+                        "CF004":["title50char","description250char"]
+                    },
+                    "unassignedContent":["DF003-077586"],
+                    "arcs":{
+                        "0":{
+                            "details":["title50char","description250char"],
+                            "assignedContent":{
+                                "CF004":["title50char","description250char"]
+                            },
+                            "order": 1,
+                            "0":{
+                                "details":["title50char","description250char"],
+                                "assignedContent":{
+                                    "CF004":["title50char","description250char"]
+                                },
+                                "order": 1
+                            }
+                        }
+                    },
+                    "chapterTemplate":{},
+                    "00":{},
+                    "01":{},
+                    "02":{},
+                    "03":{
+                        "details": ["chapter-title50char","description250char",["250char","250char","250char","250char"]],
+                        "order": 4,
+                        "goals":{
+                            "chapterWordcount":3500
+                        },
+                        "assignedContent":{
+                            "CF004":["title50char","description250char"]
+                        },
+                        "unassignedContent":["VB003-345298"],
+                        "0":{
+                            "details":["title50char","description250char"],
+                            "assignedContent":{
+                                "CF004":["title50char","description250char"]
+                            },
+                            "unassignedContent":[],
+                            "order": 1,
+                            "0":{
+                                "details":["title50char","description250char"],
+                                "assignedContent":{
+                                    "CF004":["title50char","description250char"]
+                                },
+                                "unassignedContent":[],
+                                "order": 1,
+                                "0":{
+                                    "details":["title50char","description250char"],
+                                    "assignedContent":["CA002-013453","ZS993-013453"],
+                                    "order": 1,
+                                    "draft": [
+                                        ["paraStandard","sentence","sentence",["paraSentence","clause250char","clause250char","clause250char"],""],
+                                        ["paraConvo",["characterID","sentence"],"non-dialogue sentence",["characterID","sentence"]],
+                                        ["paraConvo",["characterID","sentence","sentence","sentence"],"non-dialogue"],
+                                        ["paraStandard","sentence","sentence","sentence","sentence","sentence","sentence","sentence"]
+                                    ]
+                                }
+                            }
+                        }
+                    }
+                }
+            },
+            "content": {
+                "categoryTemplate":{},
+                "A":{},
+                "B":{},
+                "C":{
+                    "details":["title50char","description250char",["250char","250char","250char","250char"]],
+                    "subcategoryTemplate":{},
+                    "A":{},
+                    "B":{},
+                    "C":{
+                        "details": ["title50char","description250char",["250char","250char","250char","250char"]],
+                        "plotlineTemplate":{},
+                        "000":{},
+                        "001":{},
+                        "002":{
+                            "details": ["title50char","description250char",["250char","250char","250char","250char"]],
+                            "plotpointTemplate":{},
+                            "000000":{},
+                            "000001":{},
+                            "000002":{},
+                            "000003":{
+                                "details":["title50char","description250char"]
+                            }
+                        }
+                    }
+                },
+                "D":{}
+            },
+            "revision": {
+                "01.01-012":["C/R/U/D","secondaryFlag","note250char"],
+                "AA002-099876":["C/R/U/D","secondaryFlag","note250char"]
+            }
+        }
+    }
+}]

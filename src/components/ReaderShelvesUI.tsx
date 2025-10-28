@@ -1,9 +1,9 @@
-import { PropsWithChildren, PropsWithoutRef, useState } from "react";
+import { useState } from "react";
 import ReaderShelfUI from "./ReaderShelfUI";
 import ReaderProjectUI from "./ReaderProjectUI";
 
  interface ReaderShelvesProps {
-    onButtonClick: () => void;
+    onButtonClick: (handleToggleReaderShelves: string) => void;
  }
 
  type onButtonClick = {
