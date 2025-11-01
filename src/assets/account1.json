@@ -60,7 +60,7 @@
                             "assignedContent":{
                                 "CF004":["title50char","description250char"]
                             },
-                            "unassignedContent":[],
+                            "unassignedContent":["TX451-783546"],
                             "order": 1,
                             "0":{
                                 "details":["title50char","description250char"],
@@ -102,12 +102,10 @@
                         "002":{
                             "details": ["title50char","description250char",["250char","250char","250char","250char"]],
                             "plotpointTemplate":{},
-                            "000000":{},
-                            "000001":{},
-                            "000002":{},
-                            "000003":{
-                                "details":["title50char","description250char"]
-                            }
+                            "000000":["title50char","description250char"],
+                            "000001":["title50char","description250char"],
+                            "000002":["title50char","description250char"],
+                            "000003":["title50char","description250char"]
                         }
                     }
                 },
@@ -115,7 +113,11 @@
             },
             "revision": {
                 "01.01-012":["C/R/U/D","secondaryFlag","note250char"],
-                "AA002-099876":["C/R/U/D","secondaryFlag","note250char"]
+                "AA002-099876":["C/R/U/D","secondaryFlag","note250char"],
+                "02.03-4":["C/R/U/D","secondaryFlag","note250char"]
+            }, 
+            "versionHistory":{
+                "dateTime":["C/R/U/D",""]
             }
         }
     }

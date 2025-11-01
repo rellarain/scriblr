@@ -1,0 +1,1719 @@
+[{
+    "10161995": {
+        "account":{
+            "customization":{},
+            "readers":{},
+            "schedule":{},
+            "activityLog":{}
+        },
+        "projectTemplate":{
+            "AAAAAA":{
+                "details":["title50char","descr250char","sumry250char"],
+                "content":{
+                    "categoryTemplate":{
+                        "A":{
+                            "details":["title50char","descr250char",["sumry250char","sumry250char","sumry250char","sumry250char"]],
+                            "customFields":{},
+                            "subcategoryTemplate":{
+                                "A":{
+                                    "details":["title50char","descr250char",["sumry250char","sumry250char","sumry250char","sumry250char"]],
+                                    "customFields":{},
+                                    "plotlineTemplate":{
+                                        "###":{
+                                            "details":["title50char","descr250char",["sumry250char","sumry250char","sumry250char","sumry250char"]],
+                                            "customFields":{},
+                                            "plotpointTemplate":{
+                                                "######":["title50char","descr250char"],
+                                                "customFields":{}
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+                },
+                "structure":{
+                    "bookTemplate":{
+                        "details": ["title50char","descr250char",["sumry250char","sumry250char","sumry250char","sumry250char"]],
+                        "customFields":{},
+                        "order": "##",
+                        "design":{
+                            "mainColor":"###255,###255,###255",
+                            "accentColor1":"###255,###255,###255",
+                            "accentColor2":"###255,###255,###255",
+                            "cover":{}
+                        },
+                        "goals":{
+                            "bookWordcount": "#######",
+                            "chapterCount": "##"
+                        },
+                        "assignedContent":{
+                            "AA###":["title50char","descr250char"]
+                        },
+                        "unassignedContent":["AA###-######"],
+                        "arcs":{
+                            "#":{
+                                "details":["title50char","descr250char"],
+                                "assignedChaps":["##.##"],
+                                "assignedContent":{
+                                    "AA###":["title50char","descr250char"]
+                                },
+                                "order": "#",
+                                "#":{
+                                    "details":["title50char","descr250char"],
+                                    "assignedChaps":["##.##"],
+                                    "assignedContent":{
+                                        "AA###":["title50char","descr250char"]
+                                    },
+                                    "order": "#"
+                                }
+                            }
+                        },
+                        "chapterTemplate":{
+                            "details": ["title50char","descr250char",["sumry250char","sumry250char","sumry250char","sumry250char"]],
+                            "customFields":{},
+                            "order": "##",
+                            "design":{
+                                "mainColor":"###255,###255,###255",
+                                "accentColor1":"###255,###255,###255",
+                                "accentColor2":"###255,###255,###255",
+                                "illustration":{}
+                            },
+                            "goals":{
+                                "chapterWordcount":"#####"
+                            },
+                            "assignedContent":{
+                                "AA###":["title50char","descr250char"]
+                            },
+                            "unassignedContent":["AA###-######"],
+                            "0":{
+                                "details":["title50char","descr250char"],
+                                "assignedContent":{
+                                    "AA###":["title50char","descr250char"]
+                                },
+                                "unassignedContent":["AA###-######"],
+                                "order": "#",
+                                "0":{
+                                    "details":["title50char","descr250char"],
+                                    "assignedContent":{
+                                        "AA###":["title50char","descr250char"]
+                                    },
+                                    "unassignedContent":["AA###-######"],
+                                    "order": "#",
+                                    "0":{
+                                        "details":["title50char","descr250char"],
+                                        "assignedContent":["AA###-######"],
+                                        "order": "#",
+                                        "draft": [
+                                            ["paraStandard","sente250char",["longSentence","clause250char"]],
+                                            ["paraConvo",["AA###","sente250char"],"non-dialogue sente250char"]
+                                        ]
+                                    }
+                                }
+                            }
+                        }                   
+                    }
+                },
+                "revision":{},
+                "versionHistory":{
+                    "dateTime-Save#":{
+                        "itemID1":["create","title50char","descr250char",["sumry250char"]],
+                        "itemID2":["edit","valueBefore","valueAfter","valueAfter"],
+                        "itemID3":["remove","title50char","descr250char",["sumry250char"]]
+                    }
+                }
+
+            }
+        },
+        "MAGICK":{
+            "details":["Magi Saga","descr250char","sumry250char"],
+            "content":{
+                "categoryTemplate":{
+                    "A":{
+                        "details":["title50char","descr250char",["sumry250char","sumry250char","sumry250char","sumry250char"]],
+                        "customFields":{},
+                        "subcategoryTemplate":{
+                            "A":{
+                                "details":["title50char","descr250char",["sumry250char","sumry250char","sumry250char","sumry250char"]],
+                                "customFields":{},
+                                "plotlineTemplate":{
+                                    "###":{
+                                        "details":["title50char","descr250char",["sumry250char","sumry250char","sumry250char","sumry250char"]],
+                                        "customFields":{},
+                                        "plotpointTemplate":{
+                                            "######":["title50char","descr250char"],
+                                            "customFields":{}
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+                },
+                "C":{
+                    "details":["Characters","descr250char",["sumry250char","sumry250char","sumry250char","sumry250char"]],
+                    "customFields":{},
+                    "subcategoryTemplate":{
+                        "A":{
+                            "details":["title50char","descr250char",["sumry250char","sumry250char","sumry250char","sumry250char"]],
+                            "customFields":{},
+                            "plotlineTemplate":{
+                                "###":{
+                                    "details":["title50char","descr250char",["sumry250char","sumry250char","sumry250char","sumry250char"]],
+                                    "customFields":{},
+                                    "plotpointTemplate":{
+                                        "######":["title50char","descr250char"],
+                                        "customFields":{}
+                                    }
+                                }
+                            }
+                        }
+                    },
+                    "A":{
+                        "details":["Antagonists","descr250char",["sumry250char","sumry250char","sumry250char","sumry250char"]],
+                        "customFields":{},
+                        "plotlineTemplate":{
+                            "###":{
+                                "details":["title50char","descr250char",["sumry250char","sumry250char","sumry250char","sumry250char"]],
+                                "customFields":{},
+                                "plotpointTemplate":{
+                                    "######":["title50char","descr250char"],
+                                    "customFields":{}
+                                }
+                            }
+                        }
+                    },
+                    "C":{
+                        "details":["Contagonists","descr250char",["sumry250char","sumry250char","sumry250char","sumry250char"]],
+                        "customFields":{},
+                        "plotlineTemplate":{
+                            "###":{
+                                "details":["title50char","descr250char",["sumry250char","sumry250char","sumry250char","sumry250char"]],
+                                "customFields":{},
+                                "plotpointTemplate":{
+                                    "######":["title50char","descr250char"],
+                                    "customFields":{}
+                                }
+                            }
+                        }
+                    },
+                    "P":{
+                        "details":["Protagonists","descr250char",["sumry250char","sumry250char","sumry250char","sumry250char"]],
+                        "customFields":{},
+                        "plotlineTemplate":{
+                            "###":{
+                                "details":["title50char","descr250char",["sumry250char","sumry250char","sumry250char","sumry250char"]],
+                                "customFields":{},
+                                "plotpointTemplate":{
+                                    "######":["title50char","descr250char"],
+                                    "customFields":{}
+                                }
+                            }
+                        }
+                    }
+                },
+                "S":{
+                    "details":["Setting","descr250char",["sumry250char","sumry250char","sumry250char","sumry250char"]],
+                    "customFields":{},
+                    "subcategoryTemplate":{
+                        "A":{
+                            "details":["title50char","descr250char",["sumry250char","sumry250char","sumry250char","sumry250char"]],
+                            "customFields":{},
+                            "plotlineTemplate":{
+                                "###":{
+                                    "details":["title50char","descr250char",["sumry250char","sumry250char","sumry250char","sumry250char"]],
+                                    "customFields":{},
+                                    "plotpointTemplate":{
+                                        "######":["title50char","descr250char"],
+                                        "customFields":{}
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            },
+            "structure":{
+                "01-02-03":["Dawn Saga","descr250char",["sumry250char","sumry250char","sumry250char","sumry250char"]],
+                "04-05-06":["Day Saga","descr250char",["sumry250char","sumry250char","sumry250char","sumry250char"]],
+                "07-08-09":["Dusk Saga","descr250char",["sumry250char","sumry250char","sumry250char","sumry250char"]],
+                "10-11-12":["Night Saga","descr250char",["sumry250char","sumry250char","sumry250char","sumry250char"]],
+                "bookTemplate":{
+                    "details": ["title50char","descr250char",["sumry250char","sumry250char","sumry250char","sumry250char"]],
+                    "customFields":{},
+                    "order": "##",
+                    "design":{
+                        "mainColor":"###255,###255,###255",
+                        "accentColor1":"###255,###255,###255",
+                        "accentColor2":"###255,###255,###255",
+                        "cover":{}
+                    },
+                    "goals":{
+                        "bookWordcount": "#######",
+                        "chapterCount": "##"
+                    },
+                    "assignedContent":{
+                        "AA###":["title50char","descr250char"]
+                    },
+                    "unassignedContent":["AA###-######"],
+                    "arcs":{
+                        "#":{
+                            "details":["title50char","descr250char"],
+                            "assignedChaps":["##.##"],
+                            "assignedContent":{
+                                "AA###":["title50char","descr250char"]
+                            },
+                            "order": "#",
+                            "#":{
+                                "details":["title50char","descr250char"],
+                                "assignedChaps":["##.##"],
+                                "assignedContent":{
+                                    "AA###":["title50char","descr250char"]
+                                },
+                                "order": "#"
+                            }
+                        }
+                    },
+                    "chapterTemplate":{
+                        "details": ["title50char","descr250char",["sumry250char","sumry250char","sumry250char","sumry250char"]],
+                        "customFields":{},
+                        "order": "##",
+                        "design":{
+                            "mainColor":"###255,###255,###255",
+                            "accentColor1":"###255,###255,###255",
+                            "accentColor2":"###255,###255,###255",
+                            "illustration":{}
+                        },
+                        "goals":{
+                            "chapterWordcount":"#####"
+                        },
+                        "assignedContent":{
+                            "AA###":["title50char","descr250char"]
+                        },
+                        "unassignedContent":["AA###-######"],
+                        "0":{
+                            "details":["title50char","descr250char"],
+                            "assignedContent":{
+                                "AA###":["title50char","descr250char"]
+                            },
+                            "unassignedContent":["AA###-######"],
+                            "order": "#",
+                            "0":{
+                                "details":["title50char","descr250char"],
+                                "assignedContent":{
+                                    "AA###":["title50char","descr250char"]
+                                },
+                                "unassignedContent":["AA###-######"],
+                                "order": "#",
+                                "0":{
+                                    "details":["title50char","descr250char"],
+                                    "assignedContent":["AA###-######"],
+                                    "order": "#",
+                                    "draft": [
+                                        ["paraStandard","sente250char",["longSentence","clause250char"]],
+                                        ["paraConvo",["AA###","sente250char"],"non-dialogue sente250char"]
+                                    ]
+                                }
+                            }
+                        }
+                    }                   
+                },
+                "01":{
+                    "details": ["The Myth of the Starseed","descr250char",["sumry250char","sumry250char","sumry250char","sumry250char"]],
+                    "customFields":{},
+                    "order": "##",
+                    "design":{
+                        "mainColor":"###255,###255,###255",
+                        "accentColor1":"###255,###255,###255",
+                        "accentColor2":"###255,###255,###255",
+                        "cover":{}
+                    },
+                    "goals":{
+                        "bookWordcount": "#######",
+                        "chapterCount": "##"
+                    },
+                    "assignedContent":{
+                        "AA###":["title50char","descr250char"]
+                    },
+                    "unassignedContent":["AA###-######"],
+                    "arcs":{
+                        "#":{
+                            "details":["title50char","descr250char"],
+                            "assignedChaps":["##.##"],
+                            "assignedContent":{
+                                "AA###":["title50char","descr250char"]
+                            },
+                            "order": "#",
+                            "#":{
+                                "details":["title50char","descr250char"],
+                                "assignedChaps":["##.##"],
+                                "assignedContent":{
+                                    "AA###":["title50char","descr250char"]
+                                },
+                                "order": "#"
+                            }
+                        }
+                    },
+                    "chapterTemplate":{
+                        "details": ["title50char","descr250char",["sumry250char","sumry250char","sumry250char","sumry250char"]],
+                        "customFields":{},
+                        "order": "##",
+                        "design":{
+                            "mainColor":"###255,###255,###255",
+                            "accentColor1":"###255,###255,###255",
+                            "accentColor2":"###255,###255,###255",
+                            "illustration":{}
+                        },
+                        "goals":{
+                            "chapterWordcount":"#####"
+                        },
+                        "assignedContent":{
+                            "AA###":["title50char","descr250char"]
+                        },
+                        "unassignedContent":["AA###-######"],
+                        "0":{
+                            "details":["title50char","descr250char"],
+                            "assignedContent":{
+                                "AA###":["title50char","descr250char"]
+                            },
+                            "unassignedContent":["AA###-######"],
+                            "order": "#",
+                            "0":{
+                                "details":["title50char","descr250char"],
+                                "assignedContent":{
+                                    "AA###":["title50char","descr250char"]
+                                },
+                                "unassignedContent":["AA###-######"],
+                                "order": "#",
+                                "0":{
+                                    "details":["title50char","descr250char"],
+                                    "assignedContent":["AA###-######"],
+                                    "order": "#",
+                                    "draft": [
+                                        ["paraStandard","sente250char",["longSentence","clause250char"]],
+                                        ["paraConvo",["AA###","sente250char"],"non-dialogue sente250char"]
+                                    ]
+                                }
+                            }
+                        }
+                    }                   
+                },
+                "02":{
+                    "details": ["The Whispers of the Ancient Ones","descr250char",["sumry250char","sumry250char","sumry250char","sumry250char"]],
+                    "customFields":{},
+                    "order": "##",
+                    "design":{
+                        "mainColor":"###255,###255,###255",
+                        "accentColor1":"###255,###255,###255",
+                        "accentColor2":"###255,###255,###255",
+                        "cover":{}
+                    },
+                    "goals":{
+                        "bookWordcount": "#######",
+                        "chapterCount": "##"
+                    },
+                    "assignedContent":{
+                        "AA###":["title50char","descr250char"]
+                    },
+                    "unassignedContent":["AA###-######"],
+                    "arcs":{
+                        "#":{
+                            "details":["title50char","descr250char"],
+                            "assignedChaps":["##.##"],
+                            "assignedContent":{
+                                "AA###":["title50char","descr250char"]
+                            },
+                            "order": "#",
+                            "#":{
+                                "details":["title50char","descr250char"],
+                                "assignedChaps":["##.##"],
+                                "assignedContent":{
+                                    "AA###":["title50char","descr250char"]
+                                },
+                                "order": "#"
+                            }
+                        }
+                    },
+                    "chapterTemplate":{
+                        "details": ["title50char","descr250char",["sumry250char","sumry250char","sumry250char","sumry250char"]],
+                        "customFields":{},
+                        "order": "##",
+                        "design":{
+                            "mainColor":"###255,###255,###255",
+                            "accentColor1":"###255,###255,###255",
+                            "accentColor2":"###255,###255,###255",
+                            "illustration":{}
+                        },
+                        "goals":{
+                            "chapterWordcount":"#####"
+                        },
+                        "assignedContent":{
+                            "AA###":["title50char","descr250char"]
+                        },
+                        "unassignedContent":["AA###-######"],
+                        "#":{
+                            "details":["title50char","descr250char"],
+                            "assignedContent":{
+                                "AA###":["title50char","descr250char"]
+                            },
+                            "unassignedContent":["AA###-######"],
+                            "order": "#",
+                            "#":{
+                                "details":["title50char","descr250char"],
+                                "assignedContent":{
+                                    "AA###":["title50char","descr250char"]
+                                },
+                                "unassignedContent":["AA###-######"],
+                                "order": "#",
+                                "#":{
+                                    "details":["title50char","descr250char"],
+                                    "assignedContent":["AA###-######"],
+                                    "order": "#",
+                                    "draft": [
+                                        ["paraStandard","sente250char",["longSentence","clause250char"]],
+                                        ["paraConvo",["AA###","sente250char"],"non-dialogue sente250char"]
+                                    ]
+                                }
+                            }
+                        }
+                    }                   
+                }
+            },
+            "revision":{},
+            "versionHistory":{}
+
+        },
+        "MAGIXX":{
+            "content":{
+                "categoryTemplate":{
+                    "details":["title50char","descr250char",["sumry250char","sumry250char","sumry250char","sumry250char"]],
+                    "customFields":{},
+                    "A":{
+                        "details":["title50char","descr250char",["sumry250char","sumry250char","sumry250char","sumry250char"]],
+                        "customFields":{},
+                        "subcategoryTemplate":{
+                            "A":{
+                                "details":["title50char","descr250char",["sumry250char","sumry250char","sumry250char","sumry250char"]],
+                                "customFields":{},
+                                "plotlineTemplate":{
+                                    "###":{
+                                        "details":["title50char","descr250char",["sumry250char","sumry250char","sumry250char","sumry250char"]],
+                                        "plotpointTemplate":{
+                                            "######":["title50char","descr250char"]
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+                },
+                "A":{
+                    "details":["","",["","","",""]],
+                    "subcategoryTemplate":{
+                        "customFields":{},
+                        "A":{
+                            "details":["title50char","descr250char",["sumry250char","sumry250char","sumry250char","sumry250char"]],
+                            "customFields":{},
+                            "plotlineTemplate":{
+                                "###":{
+                                    "details":["title50char","descr250char",["sumry250char","sumry250char","sumry250char","sumry250char"]],
+                                    "customFields":{},
+                                    "plotpointTemplate":{
+                                        "######":["title50char","descr250char"],
+                                        "customFields":[""]
+                                    }
+                                }
+                            }
+                        }
+                    },
+                    "A":{}
+                },
+                "B":{},
+                "C":{
+                    "details":["Characters","descr250char",["sumry250char","sumry250char","sumry250char","sumry250char"]],
+                    "subcategoryTemplate":{},
+                    "A":{},
+                    "B":{},
+                    "C":{
+                        "details":["","descr250char",["sumry250char","sumry250char","sumry250char","sumry250char"]],
+                        "plotlineTemplate":{},
+                        "000":{},
+                        "001":{},
+                        "002":{
+                            "details":["title50char","descr250char",["sumry250char","sumry250char","sumry250char","sumry250char"]],
+                            "plotpointTemplate":{},
+                            "000000":["title50char","descr250char"],
+                            "000001":["title50char","descr250char"],
+                            "000002":["title50char","descr250char"],
+                            "000003":["title50char","descr250char"]
+                        }
+                    },
+                    "P":{
+                        "details":["Protagonists","descr250char",["sumry250char","sumry250char","sumry250char","sumry250char"]],
+                        "plotlineTemplate":{},
+                        "000":{
+                            "details":["title50char","descr250char",["sumry250char","sumry250char","sumry250char","sumry250char"]]
+
+                        }
+                        
+                    }
+                },
+                "F":{
+                    "details":["Form","descr250char",["sumry250char","sumry250char","sumry250char","sumry250char"]],
+                    "D":{
+                        "details":["Diction","descr250char",["sumry250char","sumry250char","sumry250char","sumry250char"]]
+
+                    },
+                    "G":{
+                        "details":["Genre","descr250char",["sumry250char","sumry250char","sumry250char","sumry250char"]],
+                        "000":{}
+                    }
+                },
+                "M":{
+                    "details":["Magic","descr250char",["sumry250char","sumry250char","sumry250char","sumry250char"]]
+                },
+                "S":{
+                    "details":["Setting","descr250char",["sumry250char","sumry250char","sumry250char","sumry250char"]],
+                    "G":{
+                        "details":["Government","descr250char",["sumry250char","sumry250char","sumry250char","sumry250char"]]
+                    }
+                },
+                "T":{
+                    "details":["Theme","descr250char",["sumry250char","sumry250char","sumry250char","sumry250char"]]
+                }
+            },
+            "revision":{
+                "01.01-012":["C/R/U/D","secondaryFlag","note250char"],
+                "AA002-099876":["C/R/U/D","secondaryFlag","note250char"],
+                "02.03-4":["C/R/U/D","secondaryFlag","note250char"]
+            }, 
+            "versionHistory":{}
+        },
+        "VAMPYR":{
+            "details":["Vampyr Saga","descr250char","sumry250char"],
+            "structure":{
+                "01-02-03":{
+                    "details":["Ancient Ones","descr250char",["sumry250char","sumry250char","sumry250char","sumry250char"]],
+                    "assignedContent":{}
+                },
+                "04-05-06":{
+                    "details":["Old Ones","descr250char",["sumry250char","sumry250char","sumry250char","sumry250char"]],
+                    "assignedContent":{}
+                },
+                "07-08-09":{
+                    "details":["New Ones","descr250char",["sumry250char","sumry250char","sumry250char","sumry250char"]],
+                    "assignedContent":{}
+                },
+
+
+                "bookTemplate":{
+                    "details": ["title50char","descr250char",["sumry250char","sumry250char","sumry250char","sumry250char"]],
+                    "customFields":{},
+                    "order": "##",
+                    "design":{
+                        "mainColor":"###255,###255,###255",
+                        "accentColor1":"###255,###255,###255",
+                        "accentColor2":"###255,###255,###255",
+                        "cover":{}
+                    },
+                    "goals":{
+                        "bookWordcount": "#######",
+                        "chapterCount": "##"
+                    },
+                    "assignedContent":{
+                        "AA###":["title50char","descr250char"]
+                    },
+                    "unassignedContent":["AA###-######"],
+                    "arcs":{
+                        "#":{
+                            "details":["title50char","descr250char"],
+                            "assignedChaps":["##.##"],
+                            "assignedContent":{
+                                "AA###":["title50char","descr250char"]
+                            },
+                            "order": "#",
+                            "#":{
+                                "details":["title50char","descr250char"],
+                                "assignedChaps":["##.##"],
+                                "assignedContent":{
+                                    "AA###":["title50char","descr250char"]
+                                },
+                                "order": "#"
+                            }
+                        }
+                    },
+                    "chapterTemplate":{
+                        "details": ["title50char","descr250char",["sumry250char","sumry250char","sumry250char","sumry250char"]],
+                        "customFields":{},
+                        "order": "##",
+                        "design":{
+                            "mainColor":"###255,###255,###255",
+                            "accentColor1":"###255,###255,###255",
+                            "accentColor2":"###255,###255,###255",
+                            "illustration":{}
+                        },
+                        "goals":{
+                            "chapterWordcount":"#####"
+                        },
+                        "assignedContent":{
+                            "AA###":["title50char","descr250char"]
+                        },
+                        "unassignedContent":["AA###-######"],
+                        "0":{
+                            "details":["title50char","descr250char"],
+                            "assignedContent":{
+                                "AA###":["title50char","descr250char"]
+                            },
+                            "unassignedContent":["AA###-######"],
+                            "order": "#",
+                            "0":{
+                                "details":["title50char","descr250char"],
+                                "assignedContent":{
+                                    "AA###":["title50char","descr250char"]
+                                },
+                                "unassignedContent":["AA###-######"],
+                                "order": "#",
+                                "0":{
+                                    "details":["title50char","descr250char"],
+                                    "assignedContent":["AA###-######"],
+                                    "order": "#",
+                                    "draft": [
+                                        ["paraStandard","sente250char",["longSentence","clause250char"]],
+                                        ["paraConvo",["AA###","sente250char"],"non-dialogue sente250char"]
+                                    ]
+                                }
+                            }
+                        }
+                    }                   
+                },
+                "01":{
+                    "details": ["Lylith","Ancient Vampyr",["sumry250char","sumry250char","sumry250char","sumry250char"]],
+                    "customFields":{},
+                    "order": "##",
+                    "design":{
+                        "mainColor":"###255,###255,###255",
+                        "accentColor1":"###255,###255,###255",
+                        "accentColor2":"###255,###255,###255",
+                        "cover":{}
+                    },
+                    "goals":{
+                        "bookWordcount": "#######",
+                        "chapterCount": "##"
+                    },
+                    "assignedContent":{
+                        "AA###":["title50char","descr250char"]
+                    },
+                    "unassignedContent":["AA###-######"],
+                    "arcs":{
+                        "#":{
+                            "details":["title50char","descr250char"],
+                            "assignedChaps":["##.##"],
+                            "assignedContent":{
+                                "AA###":["title50char","descr250char"]
+                            },
+                            "order": "#",
+                            "#":{
+                                "details":["title50char","descr250char"],
+                                "assignedChaps":["##.##"],
+                                "assignedContent":{
+                                    "AA###":["title50char","descr250char"]
+                                },
+                                "order": "#"
+                            }
+                        }
+                    },
+
+
+                    "chapterTemplate":{
+                        "details": ["title50char","descr250char",["sumry250char","sumry250char","sumry250char","sumry250char"]],
+                        "customFields":{},
+                        "order": "##",
+                        "design":{
+                            "mainColor":"###255,###255,###255",
+                            "accentColor1":"###255,###255,###255",
+                            "accentColor2":"###255,###255,###255",
+                            "illustration":{}
+                        },
+                        "goals":{
+                            "chapterWordcount":"#####"
+                        },
+                        "assignedContent":{
+                            "AA###":["title50char","descr250char"]
+                        },
+                        "unassignedContent":["AA###-######"],
+                        "0":{
+                            "details":["title50char","descr250char"],
+                            "assignedContent":{
+                                "AA###":["title50char","descr250char"]
+                            },
+                            "unassignedContent":["AA###-######"],
+                            "order": "#",
+                            "0":{
+                                "details":["title50char","descr250char"],
+                                "assignedContent":{
+                                    "AA###":["title50char","descr250char"]
+                                },
+                                "unassignedContent":["AA###-######"],
+                                "order": "#",
+                                "0":{
+                                    "details":["title50char","descr250char"],
+                                    "assignedContent":["AA###-######"],
+                                    "order": "#",
+                                    "draft": [
+                                        ["paraStandard","sente250char",["longSentence","clause250char"]],
+                                        ["paraConvo",["AA###","sente250char"],"non-dialogue sente250char"]
+                                    ]
+                                }
+                            }
+                        }
+                    }                   
+                },
+                "02":{
+                    "details": ["Nectys","Ancient Necromancer",["sumry250char","sumry250char","sumry250char","sumry250char"]],
+                    "customFields":{},
+                    "order": "##",
+                    "design":{
+                        "mainColor":"###255,###255,###255",
+                        "accentColor1":"###255,###255,###255",
+                        "accentColor2":"###255,###255,###255",
+                        "cover":{}
+                    },
+                    "goals":{
+                        "bookWordcount": "#######",
+                        "chapterCount": "##"
+                    },
+                    "assignedContent":{
+                        "AA###":["title50char","descr250char"]
+                    },
+                    "unassignedContent":["AA###-######"],
+                    "arcs":{
+                        "#":{
+                            "details":["title50char","descr250char"],
+                            "assignedChaps":["##.##"],
+                            "assignedContent":{
+                                "AA###":["title50char","descr250char"]
+                            },
+                            "order": "#",
+                            "#":{
+                                "details":["title50char","descr250char"],
+                                "assignedChaps":["##.##"],
+                                "assignedContent":{
+                                    "AA###":["title50char","descr250char"]
+                                },
+                                "order": "#"
+                            }
+                        }
+                    },
+
+
+                    "chapterTemplate":{
+                        "details": ["title50char","descr250char",["sumry250char","sumry250char","sumry250char","sumry250char"]],
+                        "customFields":{},
+                        "order": "##",
+                        "design":{
+                            "mainColor":"###255,###255,###255",
+                            "accentColor1":"###255,###255,###255",
+                            "accentColor2":"###255,###255,###255",
+                            "illustration":{}
+                        },
+                        "goals":{
+                            "chapterWordcount":"#####"
+                        },
+                        "assignedContent":{
+                            "AA###":["title50char","descr250char"]
+                        },
+                        "unassignedContent":["AA###-######"],
+                        "0":{
+                            "details":["title50char","descr250char"],
+                            "assignedContent":{
+                                "AA###":["title50char","descr250char"]
+                            },
+                            "unassignedContent":["AA###-######"],
+                            "order": "#",
+                            "0":{
+                                "details":["title50char","descr250char"],
+                                "assignedContent":{
+                                    "AA###":["title50char","descr250char"]
+                                },
+                                "unassignedContent":["AA###-######"],
+                                "order": "#",
+                                "0":{
+                                    "details":["title50char","descr250char"],
+                                    "assignedContent":["AA###-######"],
+                                    "order": "#",
+                                    "draft": [
+                                        ["paraStandard","sente250char",["longSentence","clause250char"]],
+                                        ["paraConvo",["AA###","sente250char"],"non-dialogue sente250char"]
+                                    ]
+                                }
+                            }
+                        }
+                    }                   
+                },
+                "03":{
+                    "details": ["Asha","Ancient Healer",["sumry250char","sumry250char","sumry250char","sumry250char"]],
+                    "customFields":{},
+                    "order": "##",
+                    "design":{
+                        "mainColor":"###255,###255,###255",
+                        "accentColor1":"###255,###255,###255",
+                        "accentColor2":"###255,###255,###255",
+                        "cover":{}
+                    },
+                    "goals":{
+                        "bookWordcount": "#######",
+                        "chapterCount": "##"
+                    },
+                    "assignedContent":{
+                        "AA###":["title50char","descr250char"]
+                    },
+                    "unassignedContent":["AA###-######"],
+                    "arcs":{
+                        "#":{
+                            "details":["title50char","descr250char"],
+                            "assignedChaps":["##.##"],
+                            "assignedContent":{
+                                "AA###":["title50char","descr250char"]
+                            },
+                            "order": "#",
+                            "#":{
+                                "details":["title50char","descr250char"],
+                                "assignedChaps":["##.##"],
+                                "assignedContent":{
+                                    "AA###":["title50char","descr250char"]
+                                },
+                                "order": "#"
+                            }
+                        }
+                    },
+
+
+                    "chapterTemplate":{
+                        "details": ["title50char","descr250char",["sumry250char","sumry250char","sumry250char","sumry250char"]],
+                        "customFields":{},
+                        "order": "##",
+                        "design":{
+                            "mainColor":"###255,###255,###255",
+                            "accentColor1":"###255,###255,###255",
+                            "accentColor2":"###255,###255,###255",
+                            "illustration":{}
+                        },
+                        "goals":{
+                            "chapterWordcount":"#####"
+                        },
+                        "assignedContent":{
+                            "AA###":["title50char","descr250char"]
+                        },
+                        "unassignedContent":["AA###-######"],
+                        "0":{
+                            "details":["title50char","descr250char"],
+                            "assignedContent":{
+                                "AA###":["title50char","descr250char"]
+                            },
+                            "unassignedContent":["AA###-######"],
+                            "order": "#",
+                            "0":{
+                                "details":["title50char","descr250char"],
+                                "assignedContent":{
+                                    "AA###":["title50char","descr250char"]
+                                },
+                                "unassignedContent":["AA###-######"],
+                                "order": "#",
+                                "0":{
+                                    "details":["title50char","descr250char"],
+                                    "assignedContent":["AA###-######"],
+                                    "order": "#",
+                                    "draft": [
+                                        ["paraStandard","sente250char",["longSentence","clause250char"]],
+                                        ["paraConvo",["AA###","sente250char"],"non-dialogue sente250char"]
+                                    ]
+                                }
+                            }
+                        }
+                    }                   
+                },
+                "04":{
+                    "details": ["title50char","Old Vampyr",["sumry250char","sumry250char","sumry250char","sumry250char"]],
+                    "customFields":{},
+                    "order": "##",
+                    "design":{
+                        "mainColor":"###255,###255,###255",
+                        "accentColor1":"###255,###255,###255",
+                        "accentColor2":"###255,###255,###255",
+                        "cover":{}
+                    },
+                    "goals":{
+                        "bookWordcount": "#######",
+                        "chapterCount": "##"
+                    },
+                    "assignedContent":{
+                        "AA###":["title50char","descr250char"]
+                    },
+                    "unassignedContent":["AA###-######"],
+                    "arcs":{
+                        "#":{
+                            "details":["title50char","descr250char"],
+                            "assignedChaps":["##.##"],
+                            "assignedContent":{
+                                "AA###":["title50char","descr250char"]
+                            },
+                            "order": "#",
+                            "#":{
+                                "details":["title50char","descr250char"],
+                                "assignedChaps":["##.##"],
+                                "assignedContent":{
+                                    "AA###":["title50char","descr250char"]
+                                },
+                                "order": "#"
+                            }
+                        }
+                    },
+                    "chapterTemplate":{
+                        "details": ["title50char","descr250char",["sumry250char","sumry250char","sumry250char","sumry250char"]],
+                        "customFields":{},
+                        "order": "##",
+                        "design":{
+                            "mainColor":"###255,###255,###255",
+                            "accentColor1":"###255,###255,###255",
+                            "accentColor2":"###255,###255,###255",
+                            "illustration":{}
+                        },
+                        "goals":{
+                            "chapterWordcount":"#####"
+                        },
+                        "assignedContent":{
+                            "AA###":["title50char","descr250char"]
+                        },
+                        "unassignedContent":["AA###-######"],
+                        "0":{
+                            "details":["title50char","descr250char"],
+                            "assignedContent":{
+                                "AA###":["title50char","descr250char"]
+                            },
+                            "unassignedContent":["AA###-######"],
+                            "order": "#",
+                            "0":{
+                                "details":["title50char","descr250char"],
+                                "assignedContent":{
+                                    "AA###":["title50char","descr250char"]
+                                },
+                                "unassignedContent":["AA###-######"],
+                                "order": "#",
+                                "0":{
+                                    "details":["title50char","descr250char"],
+                                    "assignedContent":["AA###-######"],
+                                    "order": "#",
+                                    "draft": [
+                                        ["paraStandard","sente250char",["longSentence","clause250char"]],
+                                        ["paraConvo",["AA###","sente250char"],"non-dialogue sente250char"]
+                                    ]
+                                }
+                            }
+                        }
+                    }                   
+                },
+                "05":{
+                    "details": ["title50char","Old Necromancer",["sumry250char","sumry250char","sumry250char","sumry250char"]],
+                    "customFields":{},
+                    "order": "##",
+                    "design":{
+                        "mainColor":"###255,###255,###255",
+                        "accentColor1":"###255,###255,###255",
+                        "accentColor2":"###255,###255,###255",
+                        "cover":{}
+                    },
+                    "goals":{
+                        "bookWordcount": "#######",
+                        "chapterCount": "##"
+                    },
+                    "assignedContent":{
+                        "AA###":["title50char","descr250char"]
+                    },
+                    "unassignedContent":["AA###-######"],
+                    "arcs":{
+                        "#":{
+                            "details":["title50char","descr250char"],
+                            "assignedChaps":["##.##"],
+                            "assignedContent":{
+                                "AA###":["title50char","descr250char"]
+                            },
+                            "order": "#",
+                            "#":{
+                                "details":["title50char","descr250char"],
+                                "assignedChaps":["##.##"],
+                                "assignedContent":{
+                                    "AA###":["title50char","descr250char"]
+                                },
+                                "order": "#"
+                            }
+                        }
+                    },
+                    "chapterTemplate":{
+                        "details": ["title50char","descr250char",["sumry250char","sumry250char","sumry250char","sumry250char"]],
+                        "customFields":{},
+                        "order": "##",
+                        "design":{
+                            "mainColor":"###255,###255,###255",
+                            "accentColor1":"###255,###255,###255",
+                            "accentColor2":"###255,###255,###255",
+                            "illustration":{}
+                        },
+                        "goals":{
+                            "chapterWordcount":"#####"
+                        },
+                        "assignedContent":{
+                            "AA###":["title50char","descr250char"]
+                        },
+                        "unassignedContent":["AA###-######"],
+                        "0":{
+                            "details":["title50char","descr250char"],
+                            "assignedContent":{
+                                "AA###":["title50char","descr250char"]
+                            },
+                            "unassignedContent":["AA###-######"],
+                            "order": "#",
+                            "0":{
+                                "details":["title50char","descr250char"],
+                                "assignedContent":{
+                                    "AA###":["title50char","descr250char"]
+                                },
+                                "unassignedContent":["AA###-######"],
+                                "order": "#",
+                                "0":{
+                                    "details":["title50char","descr250char"],
+                                    "assignedContent":["AA###-######"],
+                                    "order": "#",
+                                    "draft": [
+                                        ["paraStandard","sente250char",["longSentence","clause250char"]],
+                                        ["paraConvo",["AA###","sente250char"],"non-dialogue sente250char"]
+                                    ]
+                                }
+                            }
+                        }
+                    }                   
+                },
+                "06":{
+                    "details": ["title50char","Old Healer",["sumry250char","sumry250char","sumry250char","sumry250char"]],
+                    "customFields":{},
+                    "order": "##",
+                    "design":{
+                        "mainColor":"###255,###255,###255",
+                        "accentColor1":"###255,###255,###255",
+                        "accentColor2":"###255,###255,###255",
+                        "cover":{}
+                    },
+                    "goals":{
+                        "bookWordcount": "#######",
+                        "chapterCount": "##"
+                    },
+                    "assignedContent":{
+                        "AA###":["title50char","descr250char"]
+                    },
+                    "unassignedContent":["AA###-######"],
+                    "arcs":{
+                        "#":{
+                            "details":["title50char","descr250char"],
+                            "assignedChaps":["##.##"],
+                            "assignedContent":{
+                                "AA###":["title50char","descr250char"]
+                            },
+                            "order": "#",
+                            "#":{
+                                "details":["title50char","descr250char"],
+                                "assignedChaps":["##.##"],
+                                "assignedContent":{
+                                    "AA###":["title50char","descr250char"]
+                                },
+                                "order": "#"
+                            }
+                        }
+                    },
+                    "chapterTemplate":{
+                        "details": ["title50char","descr250char",["sumry250char","sumry250char","sumry250char","sumry250char"]],
+                        "customFields":{},
+                        "order": "##",
+                        "design":{
+                            "mainColor":"###255,###255,###255",
+                            "accentColor1":"###255,###255,###255",
+                            "accentColor2":"###255,###255,###255",
+                            "illustration":{}
+                        },
+                        "goals":{
+                            "chapterWordcount":"#####"
+                        },
+                        "assignedContent":{
+                            "AA###":["title50char","descr250char"]
+                        },
+                        "unassignedContent":["AA###-######"],
+                        "0":{
+                            "details":["title50char","descr250char"],
+                            "assignedContent":{
+                                "AA###":["title50char","descr250char"]
+                            },
+                            "unassignedContent":["AA###-######"],
+                            "order": "#",
+                            "0":{
+                                "details":["title50char","descr250char"],
+                                "assignedContent":{
+                                    "AA###":["title50char","descr250char"]
+                                },
+                                "unassignedContent":["AA###-######"],
+                                "order": "#",
+                                "0":{
+                                    "details":["title50char","descr250char"],
+                                    "assignedContent":["AA###-######"],
+                                    "order": "#",
+                                    "draft": [
+                                        ["paraStandard","sente250char",["longSentence","clause250char"]],
+                                        ["paraConvo",["AA###","sente250char"],"non-dialogue sente250char"]
+                                    ]
+                                }
+                            }
+                        }
+                    }                   
+                },
+                "07":{
+                    "details": ["title50char","New Vampyr",["sumry250char","sumry250char","sumry250char","sumry250char"]],
+                    "customFields":{},
+                    "order": "##",
+                    "design":{
+                        "mainColor":"###255,###255,###255",
+                        "accentColor1":"###255,###255,###255",
+                        "accentColor2":"###255,###255,###255",
+                        "cover":{}
+                    },
+                    "goals":{
+                        "bookWordcount": "#######",
+                        "chapterCount": "##"
+                    },
+                    "assignedContent":{
+                        "AA###":["title50char","descr250char"]
+                    },
+                    "unassignedContent":["AA###-######"],
+                    "arcs":{
+                        "#":{
+                            "details":["title50char","descr250char"],
+                            "assignedChaps":["##.##"],
+                            "assignedContent":{
+                                "AA###":["title50char","descr250char"]
+                            },
+                            "order": "#",
+                            "#":{
+                                "details":["title50char","descr250char"],
+                                "assignedChaps":["##.##"],
+                                "assignedContent":{
+                                    "AA###":["title50char","descr250char"]
+                                },
+                                "order": "#"
+                            }
+                        }
+                    },
+                    "chapterTemplate":{
+                        "details": ["title50char","descr250char",["sumry250char","sumry250char","sumry250char","sumry250char"]],
+                        "customFields":{},
+                        "order": "##",
+                        "design":{
+                            "mainColor":"###255,###255,###255",
+                            "accentColor1":"###255,###255,###255",
+                            "accentColor2":"###255,###255,###255",
+                            "illustration":{}
+                        },
+                        "goals":{
+                            "chapterWordcount":"#####"
+                        },
+                        "assignedContent":{
+                            "AA###":["title50char","descr250char"]
+                        },
+                        "unassignedContent":["AA###-######"],
+                        "0":{
+                            "details":["title50char","descr250char"],
+                            "assignedContent":{
+                                "AA###":["title50char","descr250char"]
+                            },
+                            "unassignedContent":["AA###-######"],
+                            "order": "#",
+                            "0":{
+                                "details":["title50char","descr250char"],
+                                "assignedContent":{
+                                    "AA###":["title50char","descr250char"]
+                                },
+                                "unassignedContent":["AA###-######"],
+                                "order": "#",
+                                "0":{
+                                    "details":["title50char","descr250char"],
+                                    "assignedContent":["AA###-######"],
+                                    "order": "#",
+                                    "draft": [
+                                        ["paraStandard","sente250char",["longSentence","clause250char"]],
+                                        ["paraConvo",["AA###","sente250char"],"non-dialogue sente250char"]
+                                    ]
+                                }
+                            }
+                        }
+                    }                   
+                },
+                "08":{
+                    "details": ["title50char","New Necromancer",["sumry250char","sumry250char","sumry250char","sumry250char"]],
+                    "customFields":{},
+                    "order": "##",
+                    "design":{
+                        "mainColor":"###255,###255,###255",
+                        "accentColor1":"###255,###255,###255",
+                        "accentColor2":"###255,###255,###255",
+                        "cover":{}
+                    },
+                    "goals":{
+                        "bookWordcount": "#######",
+                        "chapterCount": "##"
+                    },
+                    "assignedContent":{
+                        "AA###":["title50char","descr250char"]
+                    },
+                    "unassignedContent":["AA###-######"],
+                    "arcs":{
+                        "#":{
+                            "details":["title50char","descr250char"],
+                            "assignedChaps":["##.##"],
+                            "assignedContent":{
+                                "AA###":["title50char","descr250char"]
+                            },
+                            "order": "#",
+                            "#":{
+                                "details":["title50char","descr250char"],
+                                "assignedChaps":["##.##"],
+                                "assignedContent":{
+                                    "AA###":["title50char","descr250char"]
+                                },
+                                "order": "#"
+                            }
+                        }
+                    },
+                    "chapterTemplate":{
+                        "details": ["title50char","descr250char",["sumry250char","sumry250char","sumry250char","sumry250char"]],
+                        "customFields":{},
+                        "order": "##",
+                        "design":{
+                            "mainColor":"###255,###255,###255",
+                            "accentColor1":"###255,###255,###255",
+                            "accentColor2":"###255,###255,###255",
+                            "illustration":{}
+                        },
+                        "goals":{
+                            "chapterWordcount":"#####"
+                        },
+                        "assignedContent":{
+                            "AA###":["title50char","descr250char"]
+                        },
+                        "unassignedContent":["AA###-######"],
+                        "0":{
+                            "details":["title50char","descr250char"],
+                            "assignedContent":{
+                                "AA###":["title50char","descr250char"]
+                            },
+                            "unassignedContent":["AA###-######"],
+                            "order": "#",
+                            "0":{
+                                "details":["title50char","descr250char"],
+                                "assignedContent":{
+                                    "AA###":["title50char","descr250char"]
+                                },
+                                "unassignedContent":["AA###-######"],
+                                "order": "#",
+                                "0":{
+                                    "details":["title50char","descr250char"],
+                                    "assignedContent":["AA###-######"],
+                                    "order": "#",
+                                    "draft": [
+                                        ["paraStandard","sente250char",["longSentence","clause250char"]],
+                                        ["paraConvo",["AA###","sente250char"],"non-dialogue sente250char"]
+                                    ]
+                                }
+                            }
+                        }
+                    }                   
+                },
+                "09":{
+                    "details": ["title50char","New Healer",["sumry250char","sumry250char","sumry250char","sumry250char"]],
+                    "customFields":{},
+                    "order": "##",
+                    "design":{
+                        "mainColor":"###255,###255,###255",
+                        "accentColor1":"###255,###255,###255",
+                        "accentColor2":"###255,###255,###255",
+                        "cover":{}
+                    },
+                    "goals":{
+                        "bookWordcount": "#######",
+                        "chapterCount": "##"
+                    },
+                    "assignedContent":{
+                        "AA###":["title50char","descr250char"]
+                    },
+                    "unassignedContent":["AA###-######"],
+                    "arcs":{
+                        "#":{
+                            "details":["title50char","descr250char"],
+                            "assignedChaps":["##.##"],
+                            "assignedContent":{
+                                "AA###":["title50char","descr250char"]
+                            },
+                            "order": "#",
+                            "#":{
+                                "details":["title50char","descr250char"],
+                                "assignedChaps":["##.##"],
+                                "assignedContent":{
+                                    "AA###":["title50char","descr250char"]
+                                },
+                                "order": "#"
+                            }
+                        }
+                    },
+                    "chapterTemplate":{
+                        "details": ["title50char","descr250char",["sumry250char","sumry250char","sumry250char","sumry250char"]],
+                        "customFields":{},
+                        "order": "##",
+                        "design":{
+                            "mainColor":"###255,###255,###255",
+                            "accentColor1":"###255,###255,###255",
+                            "accentColor2":"###255,###255,###255",
+                            "illustration":{}
+                        },
+                        "goals":{
+                            "chapterWordcount":"#####"
+                        },
+                        "assignedContent":{
+                            "AA###":["title50char","descr250char"]
+                        },
+                        "unassignedContent":["AA###-######"],
+                        "0":{
+                            "details":["title50char","descr250char"],
+                            "assignedContent":{
+                                "AA###":["title50char","descr250char"]
+                            },
+                            "unassignedContent":["AA###-######"],
+                            "order": "#",
+                            "0":{
+                                "details":["title50char","descr250char"],
+                                "assignedContent":{
+                                    "AA###":["title50char","descr250char"]
+                                },
+                                "unassignedContent":["AA###-######"],
+                                "order": "#",
+                                "0":{
+                                    "details":["title50char","descr250char"],
+                                    "assignedContent":["AA###-######"],
+                                    "order": "#",
+                                    "draft": [
+                                        ["paraStandard","sente250char",["longSentence","clause250char"]],
+                                        ["paraConvo",["AA###","sente250char"],"non-dialogue sente250char"]
+                                    ]
+                                }
+                            }
+                        }
+                    }                   
+                }
+            },
+            "content":{
+                "categoryTemplate":{
+                    "A":{
+                        "details":["title50char","descr250char",["sumry250char","sumry250char","sumry250char","sumry250char"]],
+                        "customFields":{},
+                        "subcategoryTemplate":{
+                            "A":{
+                                "details":["title50char","descr250char",["sumry250char","sumry250char","sumry250char","sumry250char"]],
+                                "customFields":{},
+                                "plotlineTemplate":{
+                                    "###":{
+                                        "details":["title50char","descr250char",["sumry250char","sumry250char","sumry250char","sumry250char"]],
+                                        "customFields":{},
+                                        "plotpointTemplate":{
+                                            "######":["title50char","descr250char"],
+                                            "customFields":{}
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+                },
+                "C":{
+                    "details":["Characters","descr250char",["sumry250char","sumry250char","sumry250char","sumry250char"]],
+                    "subcategoryTemplate":{
+                        "A":{
+                            "details":["title50char","descr250char",["sumry250char","sumry250char","sumry250char","sumry250char"]],
+                            "customFields":{},
+                            "plotlineTemplate":{
+                                "###":{
+                                    "details":["title50char","descr250char",["sumry250char","sumry250char","sumry250char","sumry250char"]],
+                                    "customFields":{},
+                                    "plotpointTemplate":{
+                                        "######":["title50char","descr250char"],
+                                        "customFields":{}
+                                    }
+                                }
+                            }
+                        }
+                    },
+                    "A":{
+                        "details":["Antagonists","descr250char",["sumry250char","sumry250char","sumry250char","sumry250char"]],
+                        "customFields":{},
+                        "plotlineTemplate":{
+                            "###":{
+                                "details":["title50char","descr250char",["sumry250char","sumry250char","sumry250char","sumry250char"]],
+                                "customFields":{},
+                                "plotpointTemplate":{
+                                    "######":["title50char","descr250char"],
+                                    "customFields":{}
+                                }
+                            }
+                        },
+                        "000":{}
+                    },
+                    "P":{
+                        "details":["Protagonists","descr250char",["sumry250char","sumry250char","sumry250char","sumry250char"]],
+                        "customFields":{},
+                        "plotlineTemplate":{
+                            "###":{
+                                "details":["title50char","descr250char",["sumry250char","sumry250char","sumry250char","sumry250char"]],
+                                "customFields":{},
+                                "plotpointTemplate":{
+                                    "######":["title50char","descr250char"],
+                                    "customFields":{}
+                                }
+                            }
+                        },
+                        "000":{}
+                    }
+                },
+                "M":{
+                    "details":["Magic","descr250char",["sumry250char","sumry250char","sumry250char","sumry250char"]],
+                    "customFields":{},
+                    "subcategoryTemplate":{
+                        "A":{
+                            "details":["title50char","descr250char",["sumry250char","sumry250char","sumry250char","sumry250char"]],
+                            "customFields":{},
+                            "plotlineTemplate":{
+                                "###":{
+                                    "details":["title50char","descr250char",["sumry250char","sumry250char","sumry250char","sumry250char"]],
+                                    "customFields":{},
+                                    "plotpointTemplate":{
+                                        "######":["title50char","descr250char"],
+                                        "customFields":{}
+                                    }
+                                }
+                            }
+                        }
+                    },
+                    "H":{
+                        "details":["Healing","biological perception, illness sense",["sumry250char","sumry250char","sumry250char","sumry250char"]],
+                        "customFields":{},
+                        "plotlineTemplate":{
+                            "###":{
+                                "details":["title50char","descr250char",["sumry250char","sumry250char","sumry250char","sumry250char"]],
+                                "customFields":{},
+                                "plotpointTemplate":{
+                                    "######":["title50char","descr250char"],
+                                    "customFields":{}
+                                }
+                            }
+                        }
+                    },
+                    "N":{
+                        "details":["Necromancy","access the afterlife, speak to spirits",["sumry250char","sumry250char","sumry250char","sumry250char"]],
+                        "customFields":{},
+                        "plotlineTemplate":{
+                            "###":{
+                                "details":["title50char","descr250char",["sumry250char","sumry250char","sumry250char","sumry250char"]],
+                                "customFields":{},
+                                "plotpointTemplate":{
+                                    "######":["title50char","descr250char"],
+                                    "customFields":{}
+                                }
+                            }
+                        },
+                        "000":{
+                            "details":["Death Plane Access","mediumship",["sumry250char","sumry250char","sumry250char","sumry250char"]],
+                            "customFields":{},
+                            "plotpointTemplate":{
+                                "######":["title50char","descr250char"],
+                                "customFields":{}
+                            }
+                        },
+                        "100":{
+                            "details":["Resurrection","descr250char",["sumry250char","sumry250char","sumry250char","sumry250char"]],
+                            "customFields":{},
+                            "plotpointTemplate":{
+                                "######":["title50char","descr250char"],
+                                "customFields":{}
+                            }
+                        },
+                        "200":{
+                            "details":["title50char","descr250char",["sumry250char","sumry250char","sumry250char","sumry250char"]],
+                            "customFields":{},
+                            "plotpointTemplate":{
+                                "######":["title50char","descr250char"],
+                                "customFields":{}
+                            }
+                        },
+                        "300":{
+                            "details":["title50char","descr250char",["sumry250char","sumry250char","sumry250char","sumry250char"]],
+                            "customFields":{},
+                            "plotpointTemplate":{
+                                "######":["title50char","descr250char"],
+                                "customFields":{}
+                            }
+                        },
+                        "400":{
+                            "details":["title50char","descr250char",["sumry250char","sumry250char","sumry250char","sumry250char"]],
+                            "customFields":{},
+                            "plotpointTemplate":{
+                                "######":["title50char","descr250char"],
+                                "customFields":{}
+                            }
+                        },
+                        "500":{
+                            "details":["title50char","descr250char",["sumry250char","sumry250char","sumry250char","sumry250char"]],
+                            "customFields":{},
+                            "plotpointTemplate":{
+                                "######":["title50char","descr250char"],
+                                "customFields":{}
+                            }
+                        }
+                    },
+                    "V":{
+                        "details":["Vampyrism","demon blood",["sumry250char","sumry250char","sumry250char","sumry250char"]],
+                        "customFields":{},
+                        "plotlineTemplate":{
+                            "###":{
+                                "details":["title50char","descr250char",["sumry250char","sumry250char","sumry250char","sumry250char"]],
+                                "customFields":{},
+                                "plotpointTemplate":{
+                                    "######":["title50char","descr250char"],
+                                    "customFields":{}
+                                }
+                            }
+                        },
+                        "000":{
+                            "details":["Immortality","descr250char",["sumry250char","sumry250char","sumry250char","sumry250char"]],
+                            "customFields":{},
+                            "plotpointTemplate":{
+                                "######":["title50char","descr250char"],
+                                "customFields":{}
+                            }
+                        },
+                        "100":{
+                            "details":["Illusions","descr250char",["sumry250char","sumry250char","sumry250char","sumry250char"]],
+                            "customFields":{},
+                            "plotpointTemplate":{
+                                "######":["title50char","descr250char"],
+                                "customFields":{}
+                            }
+                        },
+                        "200":{
+                            "details":["Telepathy","descr250char",["sumry250char","sumry250char","sumry250char","sumry250char"]],
+                            "customFields":{},
+                            "plotpointTemplate":{
+                                "######":["title50char","descr250char"],
+                                "customFields":{}
+                            }
+                        },
+                        "300":{
+                            "details":["Siring","descr250char",["sumry250char","sumry250char","sumry250char","sumry250char"]],
+                            "customFields":{},
+                            "plotpointTemplate":{
+                                "######":["title50char","descr250char"],
+                                "customFields":{}
+                            }
+                        },
+                        "400":{
+                            "details":["Infernality","fire, soul sense, demons, morality",["sumry250char","sumry250char","sumry250char","sumry250char"]],
+                            "customFields":{},
+                            "plotpointTemplate":{
+                                "######":["title50char","descr250char"],
+                                "customFields":{}
+                            }
+                        },
+                        "500":{
+                            "details":["Nightbeing","silence, flight, vulnerable to daylight",["sumry250char","sumry250char","sumry250char","sumry250char"]],
+                            "customFields":{},
+                            "plotpointTemplate":{
+                                "######":["title50char","descr250char"],
+                                "customFields":{}
+                            }
+                        }
+                    }
+                },
+                "T":{
+                    "details":["Themes","descr250char",["sumry250char","sumry250char","sumry250char","sumry250char"]],
+                    "customFields":{},
+                    "subcategoryTemplate":{
+                        "A":{
+                            "details":["title50char","descr250char",["sumry250char","sumry250char","sumry250char","sumry250char"]],
+                            "customFields":{},
+                            "plotlineTemplate":{
+                                "###":{
+                                    "details":["title50char","descr250char",["sumry250char","sumry250char","sumry250char","sumry250char"]],
+                                    "customFields":{},
+                                    "plotpointTemplate":{
+                                        "######":["title50char","descr250char"],
+                                        "customFields":{}
+                                    }
+                                }
+                            }
+                        }
+                    },
+                    "B":{
+                        "details":["Blood","family, life, warmth, oxygen, iron, heart, veins, arteries",["sumry250char","sumry250char","sumry250char","sumry250char"]],
+                        "customFields":{},
+                        "plotlineTemplate":{
+                            "###":{
+                                "details":["title50char","descr250char",["sumry250char","sumry250char","sumry250char","sumry250char"]],
+                                "customFields":{},
+                                "plotpointTemplate":{
+                                    "######":["title50char","descr250char"],
+                                    "customFields":{}
+                                }
+                            }
+                        }
+                    },
+                    "C":{
+                        "details":["Curses","",["sumry250char","sumry250char","sumry250char","sumry250char"]],
+                        "customFields":{},
+                        "plotlineTemplate":{
+                            "###":{
+                                "details":["title50char","descr250char",["sumry250char","sumry250char","sumry250char","sumry250char"]],
+                                "plotpointTemplate":{
+                                    "######":["title50char","descr250char"]
+                                }
+                            }
+                        }
+                    },
+                    "D":{
+                        "details":["Darkness","",["sumry250char","sumry250char","sumry250char","sumry250char"]],
+                        "customFields":{},
+                        "plotlineTemplate":{
+                            "###":{
+                                "details":["title50char","descr250char",["sumry250char","sumry250char","sumry250char","sumry250char"]],
+                                "plotpointTemplate":{
+                                    "######":["title50char","descr250char"]
+                                }
+                            }
+                        },
+                        "000":{
+                            "details":["title50char","descr250char",["sumry250char","sumry250char","sumry250char","sumry250char"]],
+                            "customFields":{},
+                            "plotpointTemplate":{
+                                "######":["title50char","descr250char"],
+                                "customFields":{}
+                            }
+
+                        }
+                    }
+                }
+            },
+            "revision":{},
+            "versionHistory":{}
+        }
+    }
+}]
