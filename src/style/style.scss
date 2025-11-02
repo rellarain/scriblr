@@ -71,192 +71,224 @@ table {
     color: white;
     &::-webkit-scrollbar {width: 0;} // REMOVE ON PUBLISH -----------------------------------------------------------------------
 
-    .landingPage {display: none;}
-    .userHome {display: none;}
-    .readerPagesUI {display: none;}
-    .writerBookUI {display: none;}
-    
-    .userProjectsUI {
-        width: 100vw;
-        height: 100vh;
-        margin: 0;
+    .visitorUI {
+        display: none;
+    }
+    .userUI {
+        display: block;
         position: absolute;
         top: 0;
         left: 0;
-
+        width: 100vw;
+        height: 100vh;
         
-    }
-
-    .readerShelvesUI {
-        position: absolute;
-        bottom: 15px;
-        left: 15px;
-        // width: 370px;
-        display: grid;
-        grid-template-columns: 350px auto 20px;
-        background-color: rgba(0, 0, 0, 0.2);
-        grid-template-areas: "shelfStack projectUI projectUIToggle";
-
-        .readerShelfStack {
-            grid-area: shelfStack;
-            width: 350px;
-            .readerShelfUI {
-                width: 330px;
-                height: calc(20vh - 20px);
-                margin: 10px;
-                background-color: rgba(0, 0, 0, 0.2);
-                button {
-                    width: 330px;
-                    height: 30px;
-                    border: none;
-                    background-color: rgba(0, 0, 0, 0);
-                    text-align: left;
-                    color: white;
-                    text-transform: uppercase;
-                    line-height: 30px;
-                    letter-spacing: 1px;
-                    font-weight: 600;
-                    cursor: pointer;
-                }
-                div {
-                    width: 330px;
-                    height: calc(20vh - 50px);
-                    overflow: hidden;
-                    button {
-                        &:nth-of-type(1) {margin-left: 5px;}
-                        height: calc(20vh - 50px);
-                        width: 20px;
-                        margin: 15px 5px 0 0;
-                        background-color: rgba(0, 0, 0, 0.4);
-                    }
-                }
-            }
-        }
-        .readerProjectUI {
-            grid-area: projectUI;
-            margin: 0;
-            // width: 0;
-            overflow: hidden;
-            padding: 0;
-            transition: width 1s, height 1s;
-        }
-        .readerProjectUIToggle {
-            grid-area: projectUIToggle;
-            height: 100%;
-            width: 20px;
-
-            cursor: pointer;
-            background-color: rgba(0, 0, 0, 0.3);
-            border: none;
-        }
-    }
-    .readerShelvesOpen {
-        background-color: rgb(255, 127, 127);
-        .readerShelvesUI {width: calc(100vw - 30px); z-index: 1;}
-        .readerProjectUI {width: calc(100vw - 400px);height: calc(100vh - 30px);}
-    }
-    .readerShelvesClosed {
-        background-color: rgb(119, 119, 255);
-        .readerShelvesUI {width: 370px; z-index: 0;}
-        .readerProjectUI {width: 0; height: calc(80vh - 30px);}
-    }
-
-
-    .writerShelvesUI {
-        position: absolute;
-        bottom: 15px;
-        // width: 370px;
-        width: max-content;
-        right: 15px;
-        height: calc(100vh - 40px);
-        display: grid;
-        grid-template-columns: 350px auto 20px;
-        grid-template-areas: "shelfStack projectUI projectUIToggle";
         
-        // display: none;
-
-
-
-
-        .writerShelfStack {
-            grid-area: shelfStack;
-            width: 350px;
-            .writerShelfUI {
-                width: 330px;
-                height: calc(20vh - 20px);
-                margin: 10px;
-                overflow-y: hidden;
-                // overflow-x: auto;
-                background-color: rgba(0, 0, 0, 0.2);
-                button {
-                    width: 330px;
-                    height: 30px;
-                    border: none;
-                    background-color: rgba(0, 0, 0, 0);
-                    color: white;
-                    text-transform: uppercase;
-                    line-height: 30px;
-                    letter-spacing: 1px;
-                    text-align: right;
-                    font-weight: 600;
-                    cursor: pointer;
-                }
-                div {
-                    width: 330px;
-                    height: calc(20vh - 50px);
-                    overflow: hidden;
-                    button {
-                        &:nth-of-type(1) {margin-left: 5px;}
-                        height: calc(20vh - 50px);
-                        width: 20px;
-                        margin: 15px 5px 0 0;
-                        background-color: rgba(0, 0, 0, 0.4);
-                    }
-                }
-            }
-        }
-        .writerProjectUI {
-            grid-area: projectUI;
-            margin: 0;
-            // width: 0;
-            overflow: hidden;
-            height: 100%;
-            transition: width 1s;
-        }
-        .writerProjectUIToggle {
-            grid-area: projectUIToggle;
+        
+        .writerUI {
+            background-color: rgba(255, 255, 255, 0.265);
             position: absolute;
-            top: 0;
+            bottom: 0;
             right: 0;
-            margin: 0;
-            border: none;
-            width: 20px;
-            height: 100%;
-            cursor: pointer;
-            background-color: rgba(0, 0, 0, 0.3);
+
+            
+            display: block;
+            display: none;
+            
         }
-    }
-    .writerShelvesOpen {
-        background-color: rgb(255, 127, 127);
-        .writerProjectUI {width: calc(100vw - 400px);}
-        .writerShelvesUI {width: calc(100vw - 30px);z-index: 1;}
-    }
-    .writerShelvesClosed {
-        background-color: rgb(119, 119, 255);
-        .writerProjectUI {width: 0;}
-        .writerShelvesUI {width: 370px; z-index: 0;}
-    }
+        .readerUI {
+            background-color: rgba(255, 255, 255, 0.265);
+            position: absolute;
+            bottom: 0;
+            left: 0;
+            width: 100vw;
+            
+            display: none;
+            display: grid;
+
+            grid-template-columns: 33vw 33vw 33vw;
 
 
-    .renderedJSON {
-        height: 100vh;
-        width: 100vw;
-        position: absolute;
-        top: 0;
-        left: 0;
-        background-color: rgba(42, 42, 42, 0.898);
+        }
+        .folderUI {
+            background-color: rgba(255, 255, 255, 0.265);
+            position: absolute;
+            bottom: 0;
+            
 
+            display: block;
+            display: none;
+
+        }
+
+        .mobileNavBtns {
+            top: 0;
+            height: 50px;
+            width: 100vw;
+            // background-color: green;
+
+
+            button {
+                width: 100px;
+                padding: 0 10px 0 10px;
+                text-transform: uppercase;
+                height: 30px;
+                font-weight: 600;
+                font-size: 15px;
+                border: none;
+                margin: 10px;
+                letter-spacing: 1px;
+                cursor: pointer;
+                
+                &:nth-of-type(1) {
+                    clip-path: polygon(0 0, 90px 0, 100px 15px, 90px 30px, 0 30px);
+                    text-align: left;
+                    
+                }
+                &:nth-of-type(3) {
+                    clip-path: polygon(0 0, 90px 0, 100px 15px, 90px 30px, 0 30px);
+                    text-align: left;
+                    
+                }
+                &:nth-of-type(2) {
+                    clip-path: polygon(100px 0, 10px 0, 0 15px, 10px 30px, 100px 30px);
+                    text-align: right;
+                }
+                &:nth-of-type(4) {
+                    clip-path: polygon(100px 0, 10px 0, 0 15px, 10px 30px, 100px 30px);
+                    text-align: right;
+                    
+                }
+            }
+        }
+
+    }
+    .screenHome {
+        background-color: black;
+    }
+    .screenWriter {
+        background-color: orange;
+    }
+    .screenReader {
+        background-color: green;
+
+        
     }
 
 
 }
+
+//--------------------------------------------------------
+//--------------------------------------------------------
+//--------------------------------------------------------
+// MEDIA QUERIES
+//--------------------------------------------------------
+//--------------------------------------------------------
+//--------------------------------------------------------
+
+
+// All Items ()
+@media screen and (min-width:0px) {
+
+    .userUI {
+
+        .readerUI {
+            width: 100vw;
+            height: calc(100vh - 50px);
+        }
+        .writerUI {
+            width: 100vw;
+            height: calc(100vh - 50px);
+        }
+        .folderUI {
+            width: 100vw;
+            height: calc(100vh - 50px);
+
+        }
+
+    }
+
+}
+
+// 
+@media screen and (min-width:400px) {
+
+    .userUI {
+
+        .readerUI {
+            width: 20vw;
+        }
+        .writerUI {
+            width: 20vw;
+        }
+        .folderUI {
+            width: calc(60vw - 20px);
+            left: calc(20vw + 10px);
+        }
+ 
+    }
+
+}
+
+// 
+@media screen and (min-width:800px) {
+
+    .userUI {
+
+        .readerUI {
+            width: 30vw;
+        }
+        .writerUI {
+            width: 30vw;
+        }
+        .folderUI {
+            width: calc(40vw - 20px);
+            left: calc(30vw + 10px);
+        }
+ 
+    }
+
+}
+
+// 
+@media screen and (min-width:1200px) {
+
+    .userUI {
+
+        .readerUI {
+            width: 30vw;
+        }
+        .writerUI {
+            width: 30vw;
+        }
+        .folderUI {
+            width: calc(40vw - 20px);
+            left: calc(30vw + 10px);
+        }
+
+    }
+
+}
+
+// 
+@media screen and (min-width:1600px) {
+
+    .userUI {
+
+        .readerUI {
+            width: 25vw;
+        }
+        .writerUI {
+            width: 25vw;
+        }
+        .folderUI {
+            width: calc(50vw - 20px);
+            left: calc(25vw + 10px);
+        }
+        
+    }
+
+
+}
+
+// 
+@media screen and (min-width:2000px) {}
