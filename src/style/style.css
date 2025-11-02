@@ -30,6 +30,7 @@ body {
   line-height: 1;
   height: 100vh;
   width: 100vw;
+  background-color: hsl(0, 0%, 17%);
   padding: 0;
   margin: 0;
   font-family: sans-serif;
@@ -67,7 +68,7 @@ table {
   height: 100vh;
   width: 100vw;
   overflow-x: hidden;
-  background-color: hsl(0, 0%, 56%);
+  background-color: hsl(0, 0%, 17%);
   color: white;
 }
 #root::-webkit-scrollbar {
@@ -85,19 +86,17 @@ table {
   height: 100vh;
 }
 #root .userUI .writerUI {
-  background-color: rgba(255, 255, 255, 0.265);
+  background-color: rgba(0, 0, 0, 0.265);
   position: absolute;
   bottom: 0;
-  right: 0;
+  transition: right 1s, width 1s;
   display: block;
-  display: none;
 }
 #root .userUI .readerUI {
-  background-color: rgba(255, 255, 255, 0.265);
+  background-color: rgba(0, 0, 0, 0.265);
   position: absolute;
   bottom: 0;
-  left: 0;
-  width: 100vw;
+  transition: left 1s, width 1s;
   display: none;
   display: grid;
   grid-template-columns: 33vw 33vw 33vw;
@@ -106,11 +105,13 @@ table {
   background-color: rgba(255, 255, 255, 0.265);
   position: absolute;
   bottom: 0;
+  transition: left 1s, width 1s;
   display: block;
-  display: none;
 }
 #root .userUI .mobileNavBtns {
+  position: absolute;
   top: 0;
+  left: 0;
   height: 50px;
   width: 100vw;
 }
@@ -124,6 +125,8 @@ table {
   border: none;
   margin: 10px;
   letter-spacing: 1px;
+  position: absolute;
+  background-color: rgba(255, 255, 255, 0.5);
   cursor: pointer;
 }
 #root .userUI .mobileNavBtns button:nth-of-type(1) {
@@ -142,64 +145,118 @@ table {
   clip-path: polygon(100px 0, 10px 0, 0 15px, 10px 30px, 100px 30px);
   text-align: right;
 }
-#root .screenHome {
-  background-color: black;
-}
-#root .screenWriter {
-  background-color: orange;
-}
-#root .screenReader {
-  background-color: green;
-}
 
 @media screen and (min-width: 0px) {
-  .userUI .readerUI {
+  .screenHome .writerUI {
     width: 100vw;
     height: calc(100vh - 50px);
+    right: -100vw;
   }
-  .userUI .writerUI {
+  .screenHome .readerUI {
     width: 100vw;
     height: calc(100vh - 50px);
+    left: -100vw;
   }
-  .userUI .folderUI {
+  .screenHome .folderUI {
     width: 100vw;
     height: calc(100vh - 50px);
+    left: 0;
+  }
+  .screenHome .mobileNavBtns button:nth-of-type(1) {
+    right: 0;
+    top: -50px;
+    transition: top 0.7s;
+  }
+  .screenHome .mobileNavBtns button:nth-of-type(2) {
+    left: 0;
+    top: 0;
+    transition: top 0.7s 0.7s;
+  }
+  .screenHome .mobileNavBtns button:nth-of-type(3) {
+    right: 0;
+    top: 0;
+    transition: top 0.7s 0.7s;
+  }
+  .screenHome .mobileNavBtns button:nth-of-type(4) {
+    left: 0;
+    top: -50px;
+    transition: top 0.7s;
+  }
+  .screenReader .writerUI {
+    width: 100vw;
+    height: calc(100vh - 50px);
+    right: -200vw;
+  }
+  .screenReader .readerUI {
+    width: 100vw;
+    height: calc(100vh - 50px);
+    left: 0;
+  }
+  .screenReader .folderUI {
+    width: 100vw;
+    height: calc(100vh - 50px);
+    left: 100vw;
+  }
+  .screenReader .mobileNavBtns button:nth-of-type(1) {
+    right: 0;
+    top: 0;
+    transition: top 0.7s 0.7s;
+  }
+  .screenReader .mobileNavBtns button:nth-of-type(2) {
+    left: 0;
+    top: -50px;
+    transition: top 0.7s;
+  }
+  .screenReader .mobileNavBtns button:nth-of-type(3) {
+    right: 0;
+    top: -50px;
+    transition: top 0.7s;
+  }
+  .screenReader .mobileNavBtns button:nth-of-type(4) {
+    left: 0;
+    top: -50px;
+    transition: top 0.7s;
+  }
+  .screenWriter .writerUI {
+    width: 100vw;
+    height: calc(100vh - 50px);
+    right: 0;
+  }
+  .screenWriter .readerUI {
+    width: 100vw;
+    height: calc(100vh - 50px);
+    left: -200vw;
+  }
+  .screenWriter .folderUI {
+    width: 100vw;
+    height: calc(100vh - 50px);
+    left: -100vw;
+  }
+  .screenWriter .mobileNavBtns button:nth-of-type(1) {
+    right: 0;
+    top: -50px;
+    transition: top 0.7s;
+  }
+  .screenWriter .mobileNavBtns button:nth-of-type(2) {
+    left: 0;
+    top: -50px;
+    transition: top 0.7s;
+  }
+  .screenWriter .mobileNavBtns button:nth-of-type(3) {
+    right: 0;
+    top: -50px;
+    transition: top 0.7s;
+  }
+  .screenWriter .mobileNavBtns button:nth-of-type(4) {
+    left: 0;
+    top: 0;
+    transition: top 0.7s 0.7s;
   }
 }
 @media screen and (min-width: 400px) {
-  .userUI .readerUI {
-    width: 20vw;
-  }
-  .userUI .writerUI {
-    width: 20vw;
-  }
-  .userUI .folderUI {
-    width: calc(60vw - 20px);
-    left: calc(20vw + 10px);
-  }
-}
-@media screen and (min-width: 800px) {
-  .userUI .readerUI {
-    width: 30vw;
-  }
-  .userUI .writerUI {
-    width: 30vw;
-  }
-  .userUI .folderUI {
-    width: calc(40vw - 20px);
-    left: calc(30vw + 10px);
-  }
-}
-@media screen and (min-width: 1200px) {
-  .userUI .readerUI {
-    width: 30vw;
-  }
-  .userUI .writerUI {
-    width: 30vw;
-  }
-  .userUI .folderUI {
-    width: calc(40vw - 20px);
-    left: calc(30vw + 10px);
+  .screenHome .folderUI {
+    width: 80vw;
+    left: 10vw;
   }
 }
 @media screen and (min-width: 1600px) {

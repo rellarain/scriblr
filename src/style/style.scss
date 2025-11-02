@@ -30,6 +30,7 @@ body {
 	line-height: 1;
     height: 100vh;
     width: 100vw;
+    background-color: hsl(0, 0%, 17%);
     padding: 0;
     margin: 0;
     font-family: sans-serif;
@@ -67,7 +68,7 @@ table {
     width: 100vw;
     overflow-x: hidden;
     // overflow: hidden;
-    background-color: hsl(0, 0%, 56%);
+    background-color: hsl(0, 0%, 17%);
     color: white;
     &::-webkit-scrollbar {width: 0;} // REMOVE ON PUBLISH -----------------------------------------------------------------------
 
@@ -85,43 +86,43 @@ table {
         
         
         .writerUI {
-            background-color: rgba(255, 255, 255, 0.265);
+            background-color: rgba(0, 0, 0, 0.265);
             position: absolute;
             bottom: 0;
-            right: 0;
-
+            transition: right 1s, width 1s;
+            
             
             display: block;
-            display: none;
             
         }
         .readerUI {
-            background-color: rgba(255, 255, 255, 0.265);
+            background-color: rgba(0, 0, 0, 0.265);
             position: absolute;
             bottom: 0;
-            left: 0;
-            width: 100vw;
+            transition: left 1s, width 1s;
             
             display: none;
             display: grid;
-
+            
             grid-template-columns: 33vw 33vw 33vw;
-
-
+            
+            
         }
         .folderUI {
             background-color: rgba(255, 255, 255, 0.265);
             position: absolute;
             bottom: 0;
+            transition: left 1s, width 1s;
             
 
             display: block;
-            display: none;
 
         }
 
         .mobileNavBtns {
+            position: absolute;
             top: 0;
+            left: 0;
             height: 50px;
             width: 100vw;
             // background-color: green;
@@ -137,6 +138,8 @@ table {
                 border: none;
                 margin: 10px;
                 letter-spacing: 1px;
+                position: absolute;
+                background-color: rgba(255, 255, 255, 0.5);
                 cursor: pointer;
                 
                 &:nth-of-type(1) {
@@ -162,17 +165,6 @@ table {
         }
 
     }
-    .screenHome {
-        background-color: black;
-    }
-    .screenWriter {
-        background-color: orange;
-    }
-    .screenReader {
-        background-color: green;
-
-        
-    }
 
 
 }
@@ -188,23 +180,75 @@ table {
 
 // All Items ()
 @media screen and (min-width:0px) {
-
-    .userUI {
-
-        .readerUI {
-            width: 100vw;
-            height: calc(100vh - 50px);
-        }
+    
+    .screenHome {
         .writerUI {
             width: 100vw;
             height: calc(100vh - 50px);
+            right: -100vw;
+        }
+        .readerUI {
+            width: 100vw;
+            height: calc(100vh - 50px);
+            left: -100vw;
         }
         .folderUI {
             width: 100vw;
             height: calc(100vh - 50px);
-
+            left: 0;
         }
-
+        .mobileNavBtns {
+            button:nth-of-type(1) {right: 0; top: -50px; transition: top .7s;}
+            button:nth-of-type(2) {left: 0; top: 0; transition: top .7s .7s;}
+            button:nth-of-type(3) {right: 0; top: 0; transition: top .7s .7s;}
+            button:nth-of-type(4) {left: 0; top: -50px; transition: top .7s;}
+        }
+    }
+    .screenReader {
+        .writerUI {
+            width: 100vw;
+            height: calc(100vh - 50px);
+            right: -200vw;
+        }
+        .readerUI {
+            width: 100vw;
+            height: calc(100vh - 50px);
+            left: 0;
+        }
+        .folderUI {
+            width: 100vw;
+            height: calc(100vh - 50px);
+            left: 100vw;
+        }
+        .mobileNavBtns {                
+            button:nth-of-type(1) {right: 0; top: 0; transition: top .7s .7s;}
+            button:nth-of-type(2) {left: 0; top: -50px; transition: top .7s;}
+            button:nth-of-type(3) {right: 0; top: -50px; transition: top .7s;}
+            button:nth-of-type(4) {left: 0; top: -50px; transition: top .7s;}
+        }
+    }
+    .screenWriter {
+        .writerUI {
+            width: 100vw;
+            height: calc(100vh - 50px);
+            right: 0;
+        }
+        .readerUI {
+            width: 100vw;
+            height: calc(100vh - 50px);
+            left: -200vw;
+        }
+        .folderUI {
+            width: 100vw;
+            height: calc(100vh - 50px);
+            left: -100vw;
+        }
+        .mobileNavBtns {                
+            button:nth-of-type(1) {right: 0; top: -50px; transition: top .7s;}
+            button:nth-of-type(2) {left: 0; top: -50px; transition: top .7s;}
+            button:nth-of-type(3) {right: 0; top: -50px; transition: top .7s;}
+            button:nth-of-type(4) {left: 0; top: 0; transition: top .7s .7s;}
+        }
     }
 
 }
@@ -212,60 +256,28 @@ table {
 // 
 @media screen and (min-width:400px) {
 
-    .userUI {
-
-        .readerUI {
-            width: 20vw;
-        }
-        .writerUI {
-            width: 20vw;
-        }
+    .screenHome {
         .folderUI {
-            width: calc(60vw - 20px);
-            left: calc(20vw + 10px);
+            width: 80vw;
+            left: 10vw;
         }
- 
     }
+
+
 
 }
 
 // 
 @media screen and (min-width:800px) {
 
-    .userUI {
 
-        .readerUI {
-            width: 30vw;
-        }
-        .writerUI {
-            width: 30vw;
-        }
-        .folderUI {
-            width: calc(40vw - 20px);
-            left: calc(30vw + 10px);
-        }
- 
-    }
 
 }
 
 // 
 @media screen and (min-width:1200px) {
 
-    .userUI {
 
-        .readerUI {
-            width: 30vw;
-        }
-        .writerUI {
-            width: 30vw;
-        }
-        .folderUI {
-            width: calc(40vw - 20px);
-            left: calc(30vw + 10px);
-        }
-
-    }
 
 }
 
