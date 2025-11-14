@@ -119,3 +119,22 @@
           Beta Reader: full copy chapter, no outline, beta flag presets (reactions)
           Psi Reader: focused draft access, plotline-specific outline, psi flag presets
           Omega Reader: full copy, no outline, draft analytics, custom dictionary, omega flag presets
+
+
+
+
+WriterUI:
+  ShelvesUI: 
+    project management ()
+    content mgmt (categories, subcategories, plotlines, sequences, unassigned plotpoints + templates)
+    structure mgmt (multibooks, books + templates)
+    revision mgmt (notes, flags, readers)
+  CoverUI: 
+    content mgmt (sequences, unassigned plotpoints + templates)
+    structure mgmt (arcs, subarcs, chapters + templates)
+    revision mgmt (notes, flags)
+  PagesUI:
+    content mgmt (sequences, plotpoints + templates)
+    structure mgmt (acts, scenes, moments + templates)
+    draft mgmt (paragraphs, sentences, annotations, reading)
+    revision mgmt (notes, flags)

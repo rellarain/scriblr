@@ -68,7 +68,7 @@ table {
   height: 100vh;
   width: 100vw;
   overflow-x: hidden;
-  background-color: hsl(0, 0%, 17%);
+  background-color: hsl(0, 40%, 24%);
   color: white;
 }
 #root::-webkit-scrollbar {
@@ -84,13 +84,90 @@ table {
   left: 0;
   width: 100vw;
   height: 100vh;
+  overflow: hidden;
 }
 #root .userUI .writerUI {
-  background-color: rgba(0, 0, 0, 0.265);
   position: absolute;
   bottom: 0;
   transition: right 1s, width 1s;
   display: block;
+}
+#root .userUI .writerUI .wShelvesUI {
+  height: calc(100vh - 60px);
+  width: 400px;
+  width: -moz-min-content;
+  width: min-content;
+  position: absolute;
+  left: 0;
+  bottom: 10px;
+  display: grid;
+  grid-template-columns: 20px 362px auto 20px;
+  grid-template-rows: 20px auto;
+  grid-template-areas: "button2 button2 UX button3" "button1 shelves UX button3";
+}
+#root .userUI .writerUI .wShelvesUI button {
+  border: none;
+  position: absolute;
+  cursor: pointer;
+  background-color: hsl(120, 60%, 10%);
+}
+#root .userUI .writerUI .wShelvesUI button:nth-of-type(1) {
+  grid-area: button1;
+  height: 100%;
+  width: 20px;
+}
+#root .userUI .writerUI .wShelvesUI button:nth-of-type(2) {
+  grid-area: button2;
+  height: 20px;
+  width: 100%;
+}
+#root .userUI .writerUI .wShelvesUI button:nth-of-type(3) {
+  grid-area: button3;
+  height: 100%;
+  width: 20px;
+}
+#root .userUI .writerUI .wShelvesUI .wShelves {
+  background-color: hsl(120, 60%, 24%);
+  height: 100%;
+  width: 100%;
+  position: absolute;
+  grid-area: shelves;
+  background-color: hsl(120, 60%, 10%);
+}
+#root .userUI .writerUI .wShelvesUI .wShelves .wShelf {
+  height: 20vh;
+  margin: 0 0 20px 0;
+  background-color: rgba(0, 0, 0, 0.4);
+}
+#root .userUI .writerUI .wShelvesUI .wShelvesUX {
+  grid-area: UX;
+  transition: width 1s;
+  height: calc(100% - 45px);
+  background-color: hsl(0, 40%, 24%);
+  margin-top: 30px;
+  width: calc(100vw - 846px);
+}
+#root .userUI .writerUI .uxClosed .wShelvesUX {
+  width: 0;
+}
+#root .userUI .writerUI .uxClosed .wShelves .wShelf {
+  width: 100%;
+  transition: 1.5s width;
+}
+#root .userUI .writerUI .uxOpen .wShelvesUX {
+  width: calc(100vw - 846px);
+}
+#root .userUI .writerUI .uxOpen .wShelves .wShelf {
+  width: calc(100% - 20px);
+  transition: 0.5s width;
+}
+#root .userUI .writerUI .wBookUI {
+  height: 200px;
+  width: 200px;
+  position: absolute;
+  right: 0;
+  top: 0;
+  display: none;
 }
 #root .userUI .readerUI {
   background-color: rgba(0, 0, 0, 0.265);
@@ -101,12 +178,115 @@ table {
   display: grid;
   grid-template-columns: 33vw 33vw 33vw;
 }
+#root .userUI .readerUI .rShelvesUI {
+  width: 400px;
+  height: calc(80vh - 50px);
+  position: absolute;
+  right: 0;
+  bottom: 10px;
+  background-color: hsl(230, 60%, 17%);
+}
 #root .userUI .folderUI {
-  background-color: rgba(255, 255, 255, 0.265);
   position: absolute;
   bottom: 0;
-  transition: left 1s, width 1s;
+  transition: left 1s, width 1s, height 1s;
+  display: grid;
+  grid-template-rows: 50px auto;
+  grid-template-areas: "folderNav" "folderScreen";
+}
+#root .userUI .folderUI nav {
+  background-color: hsl(0, 40%, 24%);
+  grid-area: folderNav;
+}
+#root .userUI .folderUI nav .folderTab {
+  background-color: hsl(0, 40%, 24%);
+  height: 50px;
+  display: inline-grid;
+  width: -moz-min-content;
+  width: min-content;
+  grid-template-columns: 10px min-content 10px;
+  margin-left: 6px;
+  grid-template-rows: 25px 25px;
+  grid-template-areas: "emptyL folderTab emptyR" "gapLeft folderTab gapRight";
+}
+#root .userUI .folderUI nav .folderTab button {
+  -webkit-appearance: none;
+     -moz-appearance: none;
+          appearance: none;
+  background-color: hsl(0, 40%, 10%);
+  border: none;
+  grid-area: folderTab;
+  color: rgba(255, 255, 255, 0.5);
+  font-size: 16px;
+  line-height: 20px;
+  font-weight: 600;
+  letter-spacing: 1.5px;
+  vertical-align: top;
+  text-transform: uppercase;
+  border-radius: 6px 6px 0 0;
+  cursor: pointer;
+  transition: 1s height, 1s margin, 1s padding;
+  height: 50px;
+  margin: 0;
+  padding: 5px 10px 20px 10px;
+  height: 35px;
+  margin: 15px 0 0 0;
+  padding: 5px 10px 5px 10px;
+}
+#root .userUI .folderUI nav .folderTab div:nth-of-type(1) {
+  background-color: hsl(0, 40%, 10%);
+  grid-area: gapLeft;
+  width: 8px;
+  margin: 0 0 0 2px;
+}
+#root .userUI .folderUI nav .folderTab div:nth-of-type(2) {
+  background-color: hsl(0, 40%, 24%);
+  grid-area: gapLeft;
+  border-radius: 0 0 6px 0;
+}
+#root .userUI .folderUI nav .folderTab div:nth-of-type(3) {
+  background-color: hsl(0, 40%, 10%);
+  grid-area: gapRight;
+  width: 8px;
+}
+#root .userUI .folderUI nav .folderTab div:nth-of-type(4) {
+  background-color: hsl(0, 40%, 24%);
+  grid-area: gapRight;
+  border-radius: 0 0 0 6px;
+}
+#root .userUI .folderUI nav .folderTab:nth-of-type(1) {
+  margin: 0 0 0 16px;
+}
+#root .userUI .folderUI main {
+  grid-area: folderScreen;
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+}
+#root .userUI .folderUI main section {
+  border-radius: 6px 6px 0 0;
+}
+#root .userUI .folderUI main section:nth-of-type(1) {
+  position: absolute;
+  top: 0;
+  left: 0;
+  height: 100%;
+  width: calc(100% - 12px);
   display: block;
+  background-color: hsl(0, 40%, 10%);
+}
+#root .userUI .folderUI main section:nth-of-type(2) {
+  position: absolute;
+  left: 10px;
+  transition: 1s top;
+  height: calc(100% - 10px);
+  width: calc(100% - 10px);
+  display: block;
+  background-color: hsl(0, 40%, 17%);
+  top: 10px;
+  top: calc(100% - 10px);
 }
 #root .userUI .mobileNavBtns {
   position: absolute;
@@ -153,14 +333,14 @@ table {
     right: -100vw;
   }
   .screenHome .readerUI {
-    width: 100vw;
+    width: calc(100vw - 10px);
     height: calc(100vh - 50px);
     left: -100vw;
   }
   .screenHome .folderUI {
-    width: 100vw;
+    width: calc(100vw - 10px);
     height: calc(100vh - 50px);
-    left: 0;
+    left: 5px;
   }
   .screenHome .mobileNavBtns button:nth-of-type(1) {
     right: 0;
@@ -193,7 +373,7 @@ table {
     left: 0;
   }
   .screenReader .folderUI {
-    width: 100vw;
+    width: calc(100vw - 10px);
     height: calc(100vh - 50px);
     left: 100vw;
   }
@@ -228,7 +408,7 @@ table {
     left: -200vw;
   }
   .screenWriter .folderUI {
-    width: 100vw;
+    width: calc(100vw - 10px);
     height: calc(100vh - 50px);
     left: -100vw;
   }
@@ -255,19 +435,50 @@ table {
 }
 @media screen and (min-width: 400px) {
   .screenHome .folderUI {
-    width: 80vw;
-    left: 10vw;
+    width: calc(100vw - 20px);
+    left: 10px;
+  }
+}
+@media screen and (min-width: 800px) {
+  .screenHome .readerUI {
+    width: 40px;
+    left: 0;
+  }
+  .screenHome .writerUI {
+    width: 40px;
+    right: 0;
+  }
+  .screenHome .folderUI {
+    width: calc(100vw - 100px);
+    left: 50px;
   }
 }
 @media screen and (min-width: 1600px) {
-  .userUI .readerUI {
+  .screenHome .readerUI {
     width: 25vw;
+    left: 0;
   }
-  .userUI .writerUI {
+  .screenHome .writerUI {
     width: 25vw;
+    right: 0;
   }
-  .userUI .folderUI {
+  .screenHome .folderUI {
     width: calc(50vw - 20px);
+    height: calc(100vh - 10px);
     left: calc(25vw + 10px);
+  }
+  .screenReader .folderUI {
+    width: 400px;
+    left: calc(100vw - 410px);
+  }
+  .screenReader .readerUI {
+    width: calc(100vw - 420px);
+  }
+  .screenWriter .folderUI {
+    left: 10px;
+    width: 400px;
+  }
+  .screenWriter .writerUI {
+    width: calc(100vw - 420px);
   }
 }/*# sourceMappingURL=style.css.map */

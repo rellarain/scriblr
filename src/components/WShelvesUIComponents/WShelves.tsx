@@ -1,4 +1,5 @@
 import { useState } from "react";
+import WShelf from "./WShelf";
 
 function WShelves() {
 
@@ -6,6 +7,10 @@ function WShelves() {
 
 return (<main className="wShelves">
     
+    <WShelf/>
+    <WShelf/>
+    <WShelf/>
+    <WShelf/>
 
 
 

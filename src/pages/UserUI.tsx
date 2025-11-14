@@ -30,16 +30,16 @@ function UserUI() {
 
 return (<main className={"userUI screen" + screenState}>
     
-    <ReaderUI/>
-    <WriterUI/>
-    <FolderUI/>
-    <HelpUI/>
     <div className="mobileNavBtns">
         <button onClick={handleScreenHome}>Dash</button>
         <button onClick={handleScreenReader}>Reader</button>
         <button onClick={handleScreenWriter}>Writer</button>
         <button onClick={handleScreenHome}>Dash</button>
     </div>
+    <ReaderUI/>
+    <WriterUI/>
+    <FolderUI/>
+    <HelpUI/>
 
 </main>)}
 export default UserUI;

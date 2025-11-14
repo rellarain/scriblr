@@ -53,7 +53,103 @@ table {
 	border-spacing: 0;
 }
 
+$black0: rgba(0, 0, 0, 0);
+$black1: rgba(0, 0, 0, .1);
+$black2: rgba(0, 0, 0, .2);
+$black3: rgba(0, 0, 0, .3);
+$black4: rgba(0, 0, 0, .4);
+$black5: rgba(0, 0, 0, .5);
+$black6: rgba(0, 0, 0, .6);
+$black7: rgba(0, 0, 0, .7);
+$black8: rgba(0, 0, 0, .8);
+$black9: rgba(0, 0, 0, .9);
 
+$white0: rgba(255, 255, 255, 0);
+$white1: rgba(255, 255, 255, .1);
+$white2: rgba(255, 255, 255, .2);
+$white3: rgba(255, 255, 255, .3);
+$white4: rgba(255, 255, 255, .4);
+$white5: rgba(255, 255, 255, .5);
+$white6: rgba(255, 255, 255, .6);
+$white7: rgba(255, 255, 255, .7);
+$white8: rgba(255, 255, 255, .8);
+$white9: rgba(255, 255, 255, .9);
+
+
+
+$thHue: 0;
+$a1Hue: 120;
+$a2Hue: 230;
+$a3Hue: 200;
+
+
+$thSat: 40%;
+$acSat: 60%;
+$alSat: 90%;
+
+
+$bright0: 10%; // 0-30
+$bright1: $bright0 + 7%;
+$bright2: $bright1 + 7%;
+$bright3: $bright2 + 7%;
+$bright4: $bright3 + 7%;
+$bright5: $bright4 + 7%;
+$bright6: $bright5 + 7%;
+$bright7: $bright6 + 7%;
+$bright8: $bright7 + 7%;
+$bright9: $bright8 + 7%;
+
+$opacity: 1;
+
+$user0: hsla($thHue, $thSat, $bright0, $opacity);
+$user1: hsla($thHue, $thSat, $bright1, $opacity);
+$user2: hsla($thHue, $thSat, $bright2, $opacity);
+$user3: hsla($thHue, $thSat, $bright3, $opacity);
+$user4: hsla($thHue, $thSat, $bright4, $opacity);
+$user5: hsla($thHue, $thSat, $bright5, $opacity);
+$user6: hsla($thHue, $thSat, $bright6, $opacity);
+$user7: hsla($thHue, $thSat, $bright7, $opacity);
+$user8: hsla($thHue, $thSat, $bright8, $opacity);
+$user9: hsla($thHue, $thSat, $bright9, $opacity);
+
+$acc10: hsla($a1Hue, $acSat, $bright0, $opacity);
+$acc11: hsla($a1Hue, $acSat, $bright1, $opacity);
+$acc12: hsla($a1Hue, $acSat, $bright2, $opacity);
+$acc13: hsla($a1Hue, $acSat, $bright3, $opacity);
+$acc14: hsla($a1Hue, $acSat, $bright4, $opacity);
+$acc15: hsla($a1Hue, $acSat, $bright5, $opacity);
+$acc16: hsla($a1Hue, $acSat, $bright6, $opacity);
+$acc17: hsla($a1Hue, $acSat, $bright7, $opacity);
+$acc18: hsla($a1Hue, $acSat, $bright8, $opacity);
+$acc19: hsla($a1Hue, $acSat, $bright9, $opacity);
+
+$acc20: hsla($a2Hue, $acSat, $bright0, $opacity);
+$acc21: hsla($a2Hue, $acSat, $bright1, $opacity);
+$acc22: hsla($a2Hue, $acSat, $bright2, $opacity);
+$acc23: hsla($a2Hue, $acSat, $bright3, $opacity);
+$acc24: hsla($a2Hue, $acSat, $bright4, $opacity);
+$acc25: hsla($a2Hue, $acSat, $bright5, $opacity);
+$acc26: hsla($a2Hue, $acSat, $bright6, $opacity);
+$acc27: hsla($a2Hue, $acSat, $bright7, $opacity);
+$acc28: hsla($a2Hue, $acSat, $bright8, $opacity);
+$acc29: hsla($a2Hue, $acSat, $bright9, $opacity);
+
+$acc30: hsla($a3Hue, $alSat, $bright0, $opacity);
+$acc31: hsla($a3Hue, $alSat, $bright1, $opacity);
+$acc32: hsla($a3Hue, $alSat, $bright2, $opacity);
+$acc33: hsla($a3Hue, $alSat, $bright3, $opacity);
+$acc34: hsla($a3Hue, $alSat, $bright4, $opacity);
+$acc35: hsla($a3Hue, $alSat, $bright5, $opacity);
+$acc36: hsla($a3Hue, $alSat, $bright6, $opacity);
+$acc37: hsla($a3Hue, $alSat, $bright7, $opacity);
+$acc38: hsla($a3Hue, $alSat, $bright8, $opacity);
+$acc39: hsla($a3Hue, $alSat, $bright9, $opacity);
+
+
+
+$bgAccent1: hsla(120, 80%, 30%, 1);
+$bgAccent2: hsla(240, 80%, 30%, 1);
+$bgAlert: hsla(0, 0%, 17%, 1);
 
 
 
@@ -68,7 +164,7 @@ table {
     width: 100vw;
     overflow-x: hidden;
     // overflow: hidden;
-    background-color: hsl(0, 0%, 17%);
+    background-color: $user2;
     color: white;
     &::-webkit-scrollbar {width: 0;} // REMOVE ON PUBLISH -----------------------------------------------------------------------
 
@@ -82,17 +178,104 @@ table {
         left: 0;
         width: 100vw;
         height: 100vh;
-        
+        overflow: hidden;
         
         
         .writerUI {
-            background-color: rgba(0, 0, 0, 0.265);
+            // background-color: rgba(0, 0, 0, 0.265);
             position: absolute;
             bottom: 0;
             transition: right 1s, width 1s;
             
             
             display: block;
+
+            .wShelvesUI {
+                height: calc(100vh - 60px);
+                width: 400px;
+                width: min-content;
+                position: absolute;
+                left: 0;
+                bottom: 10px;
+                // background-color: $acc11;
+                display: grid;
+                grid-template-columns: 20px 362px auto 20px;
+                grid-template-rows: 20px auto;
+                grid-template-areas: 
+                    "button2 button2 UX button3"
+                    "button1 shelves UX button3"
+                ;
+
+                button {
+                    border: none;
+                    position: absolute;
+                    cursor: pointer;
+                    background-color: $acc10;
+                }
+                button:nth-of-type(1) {
+                    grid-area: button1;
+                    height: 100%;
+                    width: 20px;
+                }
+                button:nth-of-type(2) {
+                    grid-area: button2;
+                    height: 20px;
+                    width: 100%;
+                }
+                button:nth-of-type(3) {
+                    grid-area: button3;
+                    height: 100%;
+                    width: 20px;
+                }
+                .wShelves {
+                    background-color: $acc12;
+                    height: 100%;
+                    width: 100%;
+                    position: absolute;
+                    grid-area: shelves;
+                    background-color: $acc10;
+                    .wShelf {
+                        height: 20vh;
+                        // margin: 10px 10px 15px 10px;
+                        margin: 0 0 20px 0;
+                        background-color: $black4;
+                    }
+                }
+                .wShelvesUX {
+                    grid-area: UX;
+                    transition: width 1s;
+                    height: calc(100% - 45px);
+                    background-color: $user2;
+                    margin-top: 30px;
+                    width: calc(100vw - 846px);
+                    // width: 0;
+                }
+            }
+
+            .uxClosed {
+                .wShelvesUX {width: 0;}
+                .wShelves {
+                    .wShelf {width: 100%;transition: 1.5s width;}
+                }
+            }
+            .uxOpen {
+                .wShelvesUX {width: calc(100vw - 846px);}
+                .wShelves {
+                    .wShelf {width: calc(100% - 20px);transition: .5s width;}
+                }
+            }
+
+
+            .wBookUI {
+                height: 200px;
+                width: 200px;
+                position: absolute;
+                right: 0;
+                top: 0;
+
+                display: none;
+            }
+            
             
         }
         .readerUI {
@@ -105,17 +288,131 @@ table {
             display: grid;
             
             grid-template-columns: 33vw 33vw 33vw;
+
+            .rShelvesUI {
+                width: 400px;
+                height: calc(80vh - 50px);
+                position: absolute;
+                right: 0;
+                bottom: 10px;
+                background-color: $acc21;
+            }
             
             
         }
         .folderUI {
-            background-color: rgba(255, 255, 255, 0.265);
             position: absolute;
             bottom: 0;
-            transition: left 1s, width 1s;
+            transition: left 1s, width 1s, height 1s;
             
 
-            display: block;
+            display: grid;
+            grid-template-rows: 50px auto;
+            grid-template-areas: 
+                "folderNav"
+                "folderScreen"
+            ;
+
+            nav {
+
+                background-color: $user2;
+                grid-area: folderNav;
+                .folderTab {
+                    background-color: $user2;
+                    height: 50px;
+                    display: inline-grid;
+                    width: min-content;
+                    grid-template-columns: 10px min-content 10px;
+                    margin-left: 6px;
+                    grid-template-rows: 25px 25px;
+                    grid-template-areas: "emptyL folderTab emptyR" "gapLeft folderTab gapRight";
+    
+                    button {
+                        appearance: none;
+                        background-color: $user0;
+                        border: none;
+                        grid-area: folderTab;
+                        color: $white5;
+                        font-size: 16px;
+                        line-height: 20px;
+                        font-weight: 600;
+                        letter-spacing: 1.5px;
+                        vertical-align: top;
+                        text-transform: uppercase;
+                        border-radius: 6px 6px 0 0;
+                        cursor: pointer;
+                        transition: 1s height, 1s margin, 1s padding;
+                        
+                        height: 50px;
+                        margin: 0;
+                        padding: 5px 10px 20px 10px;
+                        
+                        height: 35px;
+                        margin: 15px 0 0 0;
+                        padding: 5px 10px 5px 10px;
+                    }
+    
+                    div:nth-of-type(1) {
+                        background-color: $user0;
+                        grid-area: gapLeft;
+                        width: 8px;
+                        margin: 0 0 0 2px;
+                    }
+                    div:nth-of-type(2) {
+                        background-color: $user2;
+                        grid-area: gapLeft;
+                        border-radius: 0 0 6px 0;
+                    }
+                    div:nth-of-type(3) {
+                        background-color: $user0;
+                        grid-area: gapRight;
+                        width: 8px;
+                    }
+                    div:nth-of-type(4) {
+                        background-color: $user2;
+                        grid-area: gapRight;
+                        border-radius: 0 0 0 6px;
+                    }
+                }
+                .folderTab:nth-of-type(1) {margin: 0 0 0 16px;}
+            }
+
+            main {
+                grid-area: folderScreen;
+                position: absolute;
+                top: 0;
+                left: 0;
+                width: 100%;
+                height: 100%;
+                section {
+                    border-radius: 6px 6px 0 0;
+                }
+                section:nth-of-type(1) {
+                    position: absolute;
+                    top: 0;
+                    left: 0;
+                    height: 100%;
+                    width: calc(100% - 12px);
+                    display: block;
+                    background-color: $user0;
+                    
+                }
+                section:nth-of-type(2) {
+                    position: absolute;
+                    left: 10px;
+                    transition: 1s top;
+                    height: calc(100% - 10px);
+                    width: calc(100% - 10px);
+                    display: block;
+                    background-color: $user1;
+                    
+                    top: 10px;
+                    top: calc(100% - 10px);
+                }
+
+            }
+
+
 
         }
 
@@ -188,14 +485,14 @@ table {
             right: -100vw;
         }
         .readerUI {
-            width: 100vw;
+            width: calc(100vw - 10px);
             height: calc(100vh - 50px);
             left: -100vw;
         }
         .folderUI {
-            width: 100vw;
+            width: calc(100vw - 10px);
             height: calc(100vh - 50px);
-            left: 0;
+            left: 5px;
         }
         .mobileNavBtns {
             button:nth-of-type(1) {right: 0; top: -50px; transition: top .7s;}
@@ -216,7 +513,7 @@ table {
             left: 0;
         }
         .folderUI {
-            width: 100vw;
+            width: calc(100vw - 10px);
             height: calc(100vh - 50px);
             left: 100vw;
         }
@@ -239,7 +536,7 @@ table {
             left: -200vw;
         }
         .folderUI {
-            width: 100vw;
+            width: calc(100vw - 10px);
             height: calc(100vh - 50px);
             left: -100vw;
         }
@@ -258,8 +555,8 @@ table {
 
     .screenHome {
         .folderUI {
-            width: 80vw;
-            left: 10vw;
+            width: calc(100vw - 20px);
+            left: 10px;
         }
     }
 
@@ -271,12 +568,45 @@ table {
 @media screen and (min-width:800px) {
 
 
+    .screenHome {
+        .readerUI {
+            width: 40px;
+            left: 0;
+        }
+        .writerUI {
+            width: 40px;
+            right: 0;
+        }
+        .folderUI {
+            width: calc(100vw - 100px);
+            left: 50px;
+        }
+    }
 
 }
 
 // 
 @media screen and (min-width:1200px) {
 
+    .screenHome {
+        .readerUI {}
+        .writerUI {
+
+        }
+        .folderUI {
+
+        }
+    }
+    .screenReader {
+        .readerUI {}
+        .writerUI {}
+        .folderUI {}
+    }
+    .screenWriter {
+        .readerUI {}
+        .writerUI {}
+        .folderUI {}
+    }
 
 
 }
@@ -284,19 +614,43 @@ table {
 // 
 @media screen and (min-width:1600px) {
 
-    .userUI {
+    .screenHome {
 
         .readerUI {
             width: 25vw;
+            left: 0;
         }
         .writerUI {
             width: 25vw;
+            right: 0;
         }
         .folderUI {
             width: calc(50vw - 20px);
+            height: calc(100vh - 10px);
             left: calc(25vw + 10px);
         }
         
+    }
+    .screenReader {
+        .folderUI {
+            // height: calc(100vh - 10px);
+            width: 400px;
+            left: calc(100vw - 410px);
+        }
+        .readerUI {
+            width: calc(100vw - 420px);
+        }
+    }
+    .screenWriter {
+        .folderUI {
+            // height: calc(100vh - 10px);
+            left: 10px;
+            width: 400px;
+
+        }
+        .writerUI {
+            width: calc(100vw - 420px);
+        }
     }
 
 
