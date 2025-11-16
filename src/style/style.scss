@@ -244,9 +244,10 @@ $bgAlert: hsla(0, 0%, 17%, 1);
                 .wShelvesUX {
                     grid-area: UX;
                     transition: width 1s;
-                    height: calc(100% - 45px);
+                    height: calc(100% - 30px);
                     background-color: $user2;
-                    margin-top: 30px;
+                    background-color: $acc12;
+                    margin-top: 20px;
                     width: calc(100vw - 846px);
                     // width: 0;
                 }
@@ -259,7 +260,7 @@ $bgAlert: hsla(0, 0%, 17%, 1);
                 }
             }
             .uxOpen {
-                .wShelvesUX {width: calc(100vw - 846px);}
+                .wShelvesUX {width: calc(100vw - 420px);}
                 .wShelves {
                     .wShelf {width: calc(100% - 20px);transition: .5s width;}
                 }
@@ -267,19 +268,20 @@ $bgAlert: hsla(0, 0%, 17%, 1);
 
 
             .wBookUI {
-                height: 200px;
-                width: 200px;
+                height: calc(100vh - 50px);
+                width: calc(100% - 410px);
                 position: absolute;
                 right: 0;
                 top: 0;
-
-                display: none;
+                
+                background-color: $acc25;
+                // display: none;
             }
             
             
         }
         .readerUI {
-            background-color: rgba(0, 0, 0, 0.265);
+            // background-color: rgba(0, 0, 0, 0.265);
             position: absolute;
             bottom: 0;
             transition: left 1s, width 1s;
@@ -407,7 +409,7 @@ $bgAlert: hsla(0, 0%, 17%, 1);
                     background-color: $user1;
                     
                     top: 10px;
-                    top: calc(100% - 10px);
+                    // top: calc(100% - 10px);
                 }
 
             }
@@ -508,7 +510,7 @@ $bgAlert: hsla(0, 0%, 17%, 1);
             right: -200vw;
         }
         .readerUI {
-            width: 100vw;
+            width: calc(100vw - 10px);
             height: calc(100vh - 50px);
             left: 0;
         }
@@ -526,7 +528,7 @@ $bgAlert: hsla(0, 0%, 17%, 1);
     }
     .screenWriter {
         .writerUI {
-            width: 100vw;
+            width: calc( 100vw - 10px);
             height: calc(100vh - 50px);
             right: 0;
         }
@@ -588,25 +590,7 @@ $bgAlert: hsla(0, 0%, 17%, 1);
 // 
 @media screen and (min-width:1200px) {
 
-    .screenHome {
-        .readerUI {}
-        .writerUI {
 
-        }
-        .folderUI {
-
-        }
-    }
-    .screenReader {
-        .readerUI {}
-        .writerUI {}
-        .folderUI {}
-    }
-    .screenWriter {
-        .readerUI {}
-        .writerUI {}
-        .folderUI {}
-    }
 
 
 }
@@ -614,44 +598,44 @@ $bgAlert: hsla(0, 0%, 17%, 1);
 // 
 @media screen and (min-width:1600px) {
 
-    .screenHome {
+    // .screenHome {
 
-        .readerUI {
-            width: 25vw;
-            left: 0;
-        }
-        .writerUI {
-            width: 25vw;
-            right: 0;
-        }
-        .folderUI {
-            width: calc(50vw - 20px);
-            height: calc(100vh - 10px);
-            left: calc(25vw + 10px);
-        }
+    //     .readerUI {
+    //         width: 25vw;
+    //         left: 0;
+    //     }
+    //     .writerUI {
+    //         width: 25vw;
+    //         right: 0;
+    //     }
+    //     .folderUI {
+    //         width: calc(50vw - 20px);
+    //         height: calc(100vh - 10px);
+    //         left: calc(25vw + 10px);
+    //     }
         
-    }
-    .screenReader {
-        .folderUI {
-            // height: calc(100vh - 10px);
-            width: 400px;
-            left: calc(100vw - 410px);
-        }
-        .readerUI {
-            width: calc(100vw - 420px);
-        }
-    }
-    .screenWriter {
-        .folderUI {
-            // height: calc(100vh - 10px);
-            left: 10px;
-            width: 400px;
+    // }
+    // .screenReader {
+    //     .folderUI {
+    //         // height: calc(100vh - 10px);
+    //         width: 400px;
+    //         left: calc(100vw - 410px);
+    //     }
+    //     .readerUI {
+    //         width: calc(100vw - 420px);
+    //     }
+    // }
+    // .screenWriter {
+    //     .folderUI {
+    //         // height: calc(100vh - 10px);
+    //         left: 10px;
+    //         width: 400px;
 
-        }
-        .writerUI {
-            width: calc(100vw - 420px);
-        }
-    }
+    //     }
+    //     .writerUI {
+    //         width: calc(100vw - 420px);
+    //     }
+    // }
 
 
 }

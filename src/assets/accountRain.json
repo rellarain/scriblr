@@ -11,7 +11,7 @@
                 }
             }
         },
-        "projectTemplate":{
+        "projectTemplates":{
             "AAAAAA":{
                 "details":["title50char","descr250char",["sumry250char","sumry250char","sumry250char","sumry250char"]],
                 "metaDetails":{
@@ -46,166 +46,256 @@
                         "revisionProgress":{}
                     }
                 },
-                "content":{
-                    "glossary":{},
-                    "categoryTemplate":{
-                        "A":{
-                            "details":["title50char","descr250char",["sumry250char","sumry250char","sumry250char","sumry250char"]],
-                            "customFields":{},
-                            "keywords":["keyw50char"],
-                            "subcategoryTemplate":{
-                                "A":{
-                                    "details":["title50char","descr250char",["sumry250char","sumry250char","sumry250char","sumry250char"]],
-                                    "customFields":{},
-                                    "keywords":["keyw50char"],
-                                    "plotlineTemplate":{
-                                        "###":{
-                                            "details":["title50char","descr250char",["sumry250char","sumry250char","sumry250char","sumry250char"]],
-                                            "customFields":{},
-                                            "keywords":["keyw50char"],
-                                            "plotpointTemplate":{
-                                                "######":["title50char","descr250char"],
-                                                "customFields":{}
+                "outline":{
+                    "content":{
+                        "glossary":{
+                            "term50char":["defin250char"]
+                        },
+                        "categoryTemplates":{
+                            "?":{
+                                "details":["title50char","descr250char",[
+                                    "sumry250char",
+                                    "sumry250char",
+                                    "sumry250char",
+                                    "sumry250char"
+                                ]],
+                                "customFields":{
+                                    "field50char":[]
+                                },
+                                "keywords":["keyw50char"],
+                                "subcategoryTemplates":{
+                                    "?":{
+                                        "details":["title50char","descr250char",[
+                                            "sumry250char",
+                                            "sumry250char",
+                                            "sumry250char",
+                                            "sumry250char"
+                                        ]],
+                                        "customFields":{
+                                            "field50char":[]
+                                        },
+                                        "keywords":["keyw50char"],
+                                        "plotlineTemplates":{
+                                            "###":{
+                                                "details":["title50char","descr250char",[
+                                                    "sumry250char",
+                                                    "sumry250char",
+                                                    "sumry250char",
+                                                    "sumry250char"
+                                                ]],
+                                                "customFields":{
+                                                    "field50char":[]
+                                                },
+                                                "keywords":["keyw50char"],
+                                                "plotpointTemplates":{
+                                                    "######":["title50char","descr250char"],
+                                                    "customFields":{"field50char":[]}
+                                                }
                                             }
                                         }
                                     }
                                 }
                             }
                         }
-                    }
-                },
-                "structure":{
-                    "bookTemplate":{
-                        "##":{
-                            "details": ["title50char","descr250char",["sumry250char","sumry250char","sumry250char","sumry250char"]],
-                            "customFields":{},
-                            "metaDetails":{
-                                "backDatedStart":"",
-                                "projectStart":"",
-                                "projectFinish":""
-                            },
-                            "analytics":{
-                                "structureAnalytics":{
-                                    "structureProgress":{}
+                    },
+                    "structure":{
+                        "seriesTemplates":{},
+                        "bookTemplates":{
+                            "##":{
+                                "details": ["title50char","descr250char",[
+                                    "sumry250char",
+                                    "sumry250char",
+                                    "sumry250char",
+                                    "sumry250char"
+                                ]],
+                                "customFields":{
+                                    "field50char":[]
                                 },
-                                "contentAnalytics":{
-                                    "contentProgress":{},
-                                    "multibookDensity":{},
-                                    "bookDensity":{},
-                                    "arcDensity":{},
-                                    "subarcDensity":{},
-                                    "chapterDensity":{}
+                                "metaDetails":{
+                                    "backDatedStart":"",
+                                    "projectStart":"",
+                                    "projectFinish":""
                                 },
-                                "draftAnalytics":{
-                                    "draftProgress":{},
-                                    "sentencePatterns":{},
-                                    "revisionProgress":{}
-                                }
-                            },
-                            "order": "##",
-                            "design":{
-                                "mainColor":"###255,###255,###255",
-                                "accentColor1":"###255,###255,###255",
-                                "accentColor2":"###255,###255,###255",
-                                "cover":{}
-                            },
-                            "goals":{
-                                "bookWordcount": "#######",
-                                "chapterCount": "##"
-                            },
-                            "assignedContent":{
-                                "AA###":["title50char","descr250char"]
-                            },
-                            "unassignedContent":["AA###-######"],
-                            "arcs":{
-                                "#":{
-                                    "details":["title50char","descr250char"],
-                                    "assignedChaps":["##.##"],
-                                    "assignedContent":{
-                                        "AA###":["title50char","descr250char"]
+                                "analytics":{
+                                    "structureAnalytics":{
+                                        "structureProgress":{}
                                     },
-                                    "order": "#",
+                                    "contentAnalytics":{
+                                        "contentProgress":{},
+                                        "multibookDensity":{},
+                                        "bookDensity":{},
+                                        "arcDensity":{},
+                                        "subarcDensity":{},
+                                        "chapterDensity":{}
+                                    },
+                                    "draftAnalytics":{
+                                        "draftProgress":{},
+                                        "sentencePatterns":{},
+                                        "revisionProgress":{}
+                                    }
+                                },
+                                "bookOrder": "##",
+                                "design":{
+                                    "mainColor":"###255,###255,###255",
+                                    "accentColor1":"###255,###255,###255",
+                                    "accentColor2":"###255,###255,###255",
+                                    "cover":{}
+                                },
+                                "goals":{
+                                    "bookWordcount": "#######",
+                                    "chapterCount": "##"
+                                },
+                                "assignedContent":{
+                                    "??###":["title50char","descr250char"]
+                                },
+                                "unassignedContent":["??###-######"],
+                                "arcs":{
                                     "#":{
-                                        "details":["title50char","descr250char"],
+                                        "details": ["title50char","descr250char",[
+                                            "sumry250char",
+                                            "sumry250char",
+                                            "sumry250char",
+                                            "sumry250char"
+                                        ]],
                                         "assignedChaps":["##.##"],
                                         "assignedContent":{
-                                            "AA###":["title50char","descr250char"]
+                                            "??###":["title50char","descr250char"]
                                         },
-                                        "order": "#"
-                                    }
-                                }
-                            },
-                            "chapterTemplate":{
-                                "##":{
-                                    "details": ["title50char","descr250char",["sumry250char","sumry250char","sumry250char","sumry250char"]],
-                                    "customFields":{},
-                                    "metaDetails":{
-                                        "backDatedStart":"",
-                                        "projectStart":"",
-                                        "projectFinish":""
-                                    },
-                                    "analytics":{
-                                        "structureAnalytics":{
-                                            "structureProgress":{}
-                                        },
-                                        "contentAnalytics":{
-                                            "contentProgress":{},
-                                            "actDensity":{},
-                                            "sceneDensity":{},
-                                            "momentDensity":{}
-                                        },
-                                        "draftAnalytics":{
-                                            "draftProgress":{},
-                                            "repetitiveWords":{},
-                                            "repetitivePhrases":{},
-                                            "readingLevel":{},
-                                            "sentencePatterns":{},
-                                            "revisionProgress":{}
-                                        }
-                                    },
-                                    "order": "##",
-                                    "design":{
-                                        "mainColor":"###255,###255,###255",
-                                        "accentColor1":"###255,###255,###255",
-                                        "accentColor2":"###255,###255,###255",
-                                        "illustration":{}
-                                    },
-                                    "goals":{
-                                        "chapterWordcount":"#####"
-                                    },
-                                    "assignedContent":{
-                                        "AA###":["title50char","descr250char"]
-                                    },
-                                    "unassignedContent":["AA###-######"],
-                                    "#":{
-                                        "details":["title50char","descr250char"],
-                                        "assignedContent":{
-                                            "AA###":["title50char","descr250char"]
-                                        },
-                                        "unassignedContent":["AA###-######"],
                                         "order": "#",
+                                        "#":{
+                                            "details": ["title50char","descr250char",[
+                                                "sumry250char",
+                                                "sumry250char",
+                                                "sumry250char",
+                                                "sumry250char"
+                                            ]],
+                                            "assignedChaps":["##.##"],
+                                            "assignedContent":{
+                                                "??###":["title50char","descr250char"]
+                                            },
+                                            "order": "#"
+                                        }
+                                    }
+                                },
+                                "chapterTemplates":{
+                                    "##":{
+                                        "details": ["title50char","descr250char",[
+                                            "sumry250char",
+                                            "sumry250char",
+                                            "sumry250char",
+                                            "sumry250char"
+                                        ]],
+                                        "customFields":{},
+                                        "metaDetails":{
+                                            "backDatedStart":"",
+                                            "projectStart":"",
+                                            "projectFinish":""
+                                        },
+                                        "analytics":{
+                                            "structureAnalytics":{
+                                                "structureProgress":{}
+                                            },
+                                            "contentAnalytics":{
+                                                "contentProgress":{},
+                                                "actDensity":{},
+                                                "sceneDensity":{},
+                                                "momentDensity":{}
+                                            },
+                                            "draftAnalytics":{
+                                                "draftProgress":{},
+                                                "repetitiveWords":{},
+                                                "repetitivePhrases":{},
+                                                "readingLevel":{},
+                                                "sentencePatterns":{},
+                                                "revisionProgress":{}
+                                            }
+                                        },
+                                        "chapterOrder": "##",
+                                        "design":{
+                                            "mainColor":"###255,###255,###255",
+                                            "accentColor1":"###255,###255,###255",
+                                            "accentColor2":"###255,###255,###255",
+                                            "illustration":{}
+                                        },
+                                        "goals":{
+                                            "chapterWordcount":"#####"
+                                        },
+                                        "assignedContent":{
+                                            "??###":["title50char","descr250char"],
+                                            "AA":["title50char","descr250char"]
+                                        },
+                                        "unassignedContent":["??###-######"],
                                         "#":{
                                             "details":["title50char","descr250char"],
                                             "assignedContent":{
-                                                "AA###":["title50char","descr250char"]
+                                                "??###":["title50char","descr250char"],
+                                                "AA":["title50char","descr250char"]
                                             },
-                                            "unassignedContent":["AA###-######"],
-                                            "order": "#",
+                                            "unassignedContent":["??###-######"],
+                                            "actOrder": "#",
                                             "#":{
                                                 "details":["title50char","descr250char"],
-                                                "assignedContent":["AA###-######"],
-                                                "order": "#",
-                                                "draft": [
-                                                    ["paraStandard","sente250char",["longSentence","clause250char"]],
-                                                    ["paraConvo",["AA###","sente250char"],"non-dialogue sente250char"]
-                                                ]
+                                                "assignedContent":{
+                                                    "??###":["title50char","descr250char"],
+                                                    "AA":["title50char","descr250char"]
+                                                },
+                                                "unassignedContent":["??###-######"],
+                                                "sceneOrder": "#",
+                                                "#":{
+                                                    "details":["title50char","descr250char"],
+                                                    "assignedContent":["??###-######"],
+                                                    "momentOrder": "#",
+                                                    "roughDraft": [
+                                                        ["paraStandard","sente250char",["longSentence","clause250char"]],
+                                                        ["paraConvo",["??###","sente250char"],"non-dialogue sente250char"]
+                                                    ]
+                                                }
                                             }
                                         }
                                     }
-                                }
-                            }                   
+                                }                   
+                            }
                         }
+                    },
+                    "outlineRecycling":[],
+                    "outlineExport":{
+                        "##":{}
                     }
+                },
+                "draft":{
+                    "##":{
+                        "details":["title50char","descr250char",[
+                            "sumry250char"
+                        ]],
+                        "assignedContent":{
+                            "??###":["title50char","descr250char"]
+                        },
+                        "unassignedContent":{},
+                        "bookOrder":1,
+                        "arcs":{},
+                        "##":{
+                            "details":["title50char","descr250char",[
+                                "sumry250char"
+                            ]],
+                            "assignedContent":{},
+                            "unassignedContent":{},
+                            "chapterOrder":1,
+                            "analytics":{},
+                            "paragraphTemplates":{
+                                "###?":{
+                                    "paragraphOrder":"##",
+                                    "paragraphType":["title50char","descr250char"],
+                                    "sentenceTemplates":{
+                                        "######":{}
+                                    }
+                                }
+                            }
+                        }
+                    },
+                    "draftRecycling":{
+                        "itemID":{"...":""}
+                    },
+                    "draftExport":{}
                 },
                 "revision":{
                     "flags":{
@@ -274,9 +364,10 @@
                             "Sentence Fragment":"",
                             "Fluffy":"",
                             "Unclear":""
-                        }
+                        },
+                        "Beta":{}
                     },
-                    "notes":{
+                    "authorNotes":{
                         "##":["primFlag","secFlag","note250char"],
                         "##-#":["primFlag","secFlag","note250char"],
                         "##-##":["primFlag","secFlag","note250char"],
@@ -288,15 +379,20 @@
                         "AA":["primFlag","secFlag","note250char"],
                         "AA###":["primFlag","secFlag","note250char"],
                         "AA###-######":["primFlag","secFlag","note250char"]
-                    }
+                    },
+                    "reader1Notes":{},
+                    "reader2Notes":{},
+                    "reader3Notes":{}
                 },
                 "versionHistory":{
                     "dateTime-Save#":{
                         "itemID1":["create","title50char","descr250char",["sumry250char"]],
                         "itemID2":["edit","valueBefore","valueAfter","valueAfter"],
-                        "itemID3":["remove","title50char","descr250char",["sumry250char"]]
+                        "itemID3":["remove","title50char","descr250char",["sumry250char"]],
+                        "itemID4":["reviewed","title50char","descr250char",["sumry250char"]]
                     }
-                }
+                },
+                "projectExport":{}
             }
         },
         "MAGICK":{
@@ -335,22 +431,22 @@
             },
             "content":{
                 "glossary":{},
-                "categoryTemplate":{
+                "categoryTemplates":{
                     "A":{
                         "details":["title50char","descr250char",["sumry250char","sumry250char","sumry250char","sumry250char"]],
                         "customFields":{},
                         "keywords":[""],
-                        "subcategoryTemplate":{
+                        "subcategoryTemplates":{
                             "A":{
                                 "details":["title50char","descr250char",["sumry250char","sumry250char","sumry250char","sumry250char"]],
                                 "customFields":{},
                                 "keywords":[""],
-                                "plotlineTemplate":{
+                                "plotlineTemplates":{
                                     "###":{
                                         "details":["title50char","descr250char",["sumry250char","sumry250char","sumry250char","sumry250char"]],
                                         "customFields":{},
                                         "keywords":[""],
-                                        "plotpointTemplate":{
+                                        "plotpointTemplates":{
                                             "######":["title50char","descr250char"],
                                             "customFields":{}
                                         }
@@ -364,17 +460,17 @@
                     "details":["Characters","descr250char",["sumry250char","sumry250char","sumry250char","sumry250char"]],
                     "customFields":{},
                     "keywords":[""],
-                    "subcategoryTemplate":{
+                    "subcategoryTemplates":{
                         "A":{
                             "details":["title50char","descr250char",["sumry250char","sumry250char","sumry250char","sumry250char"]],
                             "customFields":{},
                             "keywords":[""],
-                            "plotlineTemplate":{
+                            "plotlineTemplates":{
                                 "###":{
                                     "details":["title50char","descr250char",["sumry250char","sumry250char","sumry250char","sumry250char"]],
                                     "customFields":{},
                                     "keywords":[""],
-                                    "plotpointTemplate":{
+                                    "plotpointTemplates":{
                                         "######":["title50char","descr250char"],
                                         "customFields":{}
                                     }
@@ -386,12 +482,12 @@
                         "details":["Antagonists","descr250char",["sumry250char","sumry250char","sumry250char","sumry250char"]],
                         "customFields":{},
                         "keywords":[""],
-                        "plotlineTemplate":{
+                        "plotlineTemplates":{
                             "###":{
                                 "details":["title50char","descr250char",["sumry250char","sumry250char","sumry250char","sumry250char"]],
                                 "customFields":{},
                                 "keywords":[""],
-                                "plotpointTemplate":{
+                                "plotpointTemplates":{
                                     "######":["title50char","descr250char"],
                                     "customFields":{}
                                 }
@@ -402,12 +498,12 @@
                         "details":["Contagonists","descr250char",["sumry250char","sumry250char","sumry250char","sumry250char"]],
                         "customFields":{},
                         "keywords":[""],
-                        "plotlineTemplate":{
+                        "plotlineTemplates":{
                             "###":{
                                 "details":["title50char","descr250char",["sumry250char","sumry250char","sumry250char","sumry250char"]],
                                 "customFields":{},
                                 "keywords":[""],
-                                "plotpointTemplate":{
+                                "plotpointTemplates":{
                                     "######":["title50char","descr250char"],
                                     "customFields":{}
                                 }
@@ -418,7 +514,7 @@
                         "details":["Protagonists","descr250char",["sumry250char","sumry250char","sumry250char","sumry250char"]],
                         "customFields":{},
                         "keywords":[""],
-                        "plotlineTemplate":{
+                        "plotlineTemplates":{
                             "###":{
                                 "details":["title50char","descr250char",["sumry250char","sumry250char","sumry250char","sumry250char"]],
                                 "customFields":{
@@ -431,7 +527,7 @@
                                     "talents":["sumry250char","sumry250char","sumry250char","sumry250char"]
                                 },
                                 "keywords":[""],
-                                "plotpointTemplate":{
+                                "plotpointTemplates":{
                                     "######":["title50char","descr250char"],
                                     "customFields":{}
                                 }
@@ -441,7 +537,7 @@
                             "details":["Startree","descr250char",["sumry250char","sumry250char","sumry250char","sumry250char"]],
                             "customFields":{},
                             "keywords":[""],
-                            "plotpointTemplate":{
+                            "plotpointTemplates":{
                                 "######":["title50char","descr250char"],
                                 "customFields":{}
                             }
@@ -450,7 +546,7 @@
                             "details":["Starfruit","descr250char",["sumry250char","sumry250char","sumry250char","sumry250char"]],
                             "customFields":{},
                             "keywords":[""],
-                            "plotpointTemplate":{
+                            "plotpointTemplates":{
                                 "######":["title50char","descr250char"],
                                 "customFields":{}
                             }
@@ -459,7 +555,7 @@
                             "details":["Starseed","descr250char",["sumry250char","sumry250char","sumry250char","sumry250char"]],
                             "customFields":{},
                             "keywords":[""],
-                            "plotpointTemplate":{
+                            "plotpointTemplates":{
                                 "######":["title50char","descr250char"],
                                 "customFields":{}
                             }
@@ -468,7 +564,7 @@
                             "details":["Starseed Cluster","descr250char",["sumry250char","sumry250char","sumry250char","sumry250char"]],
                             "customFields":{},
                             "keywords":[""],
-                            "plotpointTemplate":{
+                            "plotpointTemplates":{
                                 "######":["title50char","descr250char"],
                                 "customFields":{}
                             }
@@ -477,7 +573,7 @@
                             "details":["title50char","descr250char",["sumry250char","sumry250char","sumry250char","sumry250char"]],
                             "customFields":{},
                             "keywords":[""],
-                            "plotpointTemplate":{
+                            "plotpointTemplates":{
                                 "######":["title50char","descr250char"],
                                 "customFields":{}
                             }
@@ -486,7 +582,7 @@
                             "details":["title50char","descr250char",["sumry250char","sumry250char","sumry250char","sumry250char"]],
                             "customFields":{},
                             "keywords":[""],
-                            "plotpointTemplate":{
+                            "plotpointTemplates":{
                                 "######":["title50char","descr250char"],
                                 "customFields":{}
                             }
@@ -495,7 +591,7 @@
                             "details":["title50char","descr250char",["sumry250char","sumry250char","sumry250char","sumry250char"]],
                             "customFields":{},
                             "keywords":[""],
-                            "plotpointTemplate":{
+                            "plotpointTemplates":{
                                 "######":["title50char","descr250char"],
                                 "customFields":{}
                             }
@@ -504,7 +600,7 @@
                             "details":["title50char","descr250char",["sumry250char","sumry250char","sumry250char","sumry250char"]],
                             "customFields":{},
                             "keywords":[""],
-                            "plotpointTemplate":{
+                            "plotpointTemplates":{
                                 "######":["title50char","descr250char"],
                                 "customFields":{}
                             }
@@ -515,17 +611,17 @@
                     "details":["Setting","descr250char",["sumry250char","sumry250char","sumry250char","sumry250char"]],
                     "customFields":{},
                     "keywords":[""],
-                    "subcategoryTemplate":{
+                    "subcategoryTemplates":{
                         "A":{
                             "details":["title50char","descr250char",["sumry250char","sumry250char","sumry250char","sumry250char"]],
                             "customFields":{},
                             "keywords":[""],
-                            "plotlineTemplate":{
+                            "plotlineTemplates":{
                                 "###":{
                                     "details":["title50char","descr250char",["sumry250char","sumry250char","sumry250char","sumry250char"]],
                                     "customFields":{},
                                     "keywords":[""],
-                                    "plotpointTemplate":{
+                                    "plotpointTemplates":{
                                         "######":["title50char","descr250char"],
                                         "customFields":{}
                                     }
@@ -537,12 +633,12 @@
                         "details":["Architecture","descr250char",["sumry250char","sumry250char","sumry250char","sumry250char"]],
                         "customFields":{},
                         "keywords":[""],
-                        "plotlineTemplate":{
+                        "plotlineTemplates":{
                             "###":{
                                 "details":["title50char","descr250char",["sumry250char","sumry250char","sumry250char","sumry250char"]],
                                 "customFields":{},
                                 "keywords":[""],
-                                "plotpointTemplate":{
+                                "plotpointTemplates":{
                                     "######":["title50char","descr250char"],
                                     "customFields":{}
                                 }
@@ -553,12 +649,12 @@
                         "details":["Biome","descr250char",["sumry250char","sumry250char","sumry250char","sumry250char"]],
                         "customFields":{},
                         "keywords":[""],
-                        "plotlineTemplate":{
+                        "plotlineTemplates":{
                             "###":{
                                 "details":["title50char","descr250char",["sumry250char","sumry250char","sumry250char","sumry250char"]],
                                 "customFields":{},
                                 "keywords":[""],
-                                "plotpointTemplate":{
+                                "plotpointTemplates":{
                                     "######":["title50char","descr250char"],
                                     "customFields":{}
                                 }
@@ -569,12 +665,12 @@
                         "details":["Culture","descr250char",["sumry250char","sumry250char","sumry250char","sumry250char"]],
                         "customFields":{},
                         "keywords":[""],
-                        "plotlineTemplate":{
+                        "plotlineTemplates":{
                             "###":{
                                 "details":["title50char","descr250char",["sumry250char","sumry250char","sumry250char","sumry250char"]],
                                 "customFields":{},
                                 "keywords":[""],
-                                "plotpointTemplate":{
+                                "plotpointTemplates":{
                                     "######":["title50char","descr250char"],
                                     "customFields":{}
                                 }
@@ -585,12 +681,12 @@
                         "details":["Education","descr250char",["sumry250char","sumry250char","sumry250char","sumry250char"]],
                         "customFields":{},
                         "keywords":[""],
-                        "plotlineTemplate":{
+                        "plotlineTemplates":{
                             "###":{
                                 "details":["title50char","descr250char",["sumry250char","sumry250char","sumry250char","sumry250char"]],
                                 "customFields":{},
                                 "keywords":[""],
-                                "plotpointTemplate":{
+                                "plotpointTemplates":{
                                     "######":["title50char","descr250char"],
                                     "customFields":{}
                                 }
@@ -601,12 +697,12 @@
                         "details":["Government","descr250char",["sumry250char","sumry250char","sumry250char","sumry250char"]],
                         "customFields":{},
                         "keywords":[""],
-                        "plotlineTemplate":{
+                        "plotlineTemplates":{
                             "###":{
                                 "details":["title50char","descr250char",["sumry250char","sumry250char","sumry250char","sumry250char"]],
                                 "customFields":{},
                                 "keywords":[""],
-                                "plotpointTemplate":{
+                                "plotpointTemplates":{
                                     "######":["title50char","descr250char"],
                                     "customFields":{}
                                 }
@@ -617,12 +713,12 @@
                         "details":["History","descr250char",["sumry250char","sumry250char","sumry250char","sumry250char"]],
                         "customFields":{},
                         "keywords":[""],
-                        "plotlineTemplate":{
+                        "plotlineTemplates":{
                             "###":{
                                 "details":["title50char","descr250char",["sumry250char","sumry250char","sumry250char","sumry250char"]],
                                 "customFields":{},
                                 "keywords":[""],
-                                "plotpointTemplate":{
+                                "plotpointTemplates":{
                                     "######":["title50char","descr250char"],
                                     "customFields":{}
                                 }
@@ -633,12 +729,12 @@
                         "details":["Religion","descr250char",["sumry250char","sumry250char","sumry250char","sumry250char"]],
                         "customFields":{},
                         "keywords":[""],
-                        "plotlineTemplate":{
+                        "plotlineTemplates":{
                             "###":{
                                 "details":["title50char","descr250char",["sumry250char","sumry250char","sumry250char","sumry250char"]],
                                 "customFields":{},
                                 "keywords":[""],
-                                "plotpointTemplate":{
+                                "plotpointTemplates":{
                                     "######":["title50char","descr250char"],
                                     "customFields":{}
                                 }
@@ -650,17 +746,17 @@
                     "details":["Theme & Symbolism","descr250char",["sumry250char","sumry250char","sumry250char","sumry250char"]],
                     "customFields":{},
                     "keywords":[""],
-                    "subcategoryTemplate":{
+                    "subcategoryTemplates":{
                         "A":{
                             "details":["title50char","descr250char",["sumry250char","sumry250char","sumry250char","sumry250char"]],
                             "customFields":{},
                             "keywords":[""],
-                            "plotlineTemplate":{
+                            "plotlineTemplates":{
                                 "###":{
                                     "details":["title50char","descr250char",["sumry250char","sumry250char","sumry250char","sumry250char"]],
                                     "customFields":{},
                                     "keywords":[""],
-                                    "plotpointTemplate":{
+                                    "plotpointTemplates":{
                                         "######":["title50char","descr250char"],
                                         "customFields":{}
                                     }
@@ -672,12 +768,12 @@
                         "details":["Dendros","tree of life, Startree",["sumry250char","sumry250char","sumry250char","sumry250char"]],
                         "customFields":{},
                         "keywords":["tree of life", "lifetree", "Startree", "Starseed",""],
-                        "plotlineTemplate":{
+                        "plotlineTemplates":{
                             "###":{
                                 "details":["title50char","descr250char",["sumry250char","sumry250char","sumry250char","sumry250char"]],
                                 "customFields":{},
                                 "keywords":[""],
-                                "plotpointTemplate":{
+                                "plotpointTemplates":{
                                     "######":["title50char","descr250char"],
                                     "customFields":{}
                                 }
@@ -687,7 +783,7 @@
                             "details":["Trees","descr250char",["sumry250char","sumry250char","sumry250char","sumry250char"]],
                             "customFields":{},
                             "keywords":[""],
-                            "plotpointTemplate":{
+                            "plotpointTemplates":{
                                 "######":["title50char","descr250char"],
                                 "customFields":{}
                             }
@@ -696,7 +792,7 @@
                             "details":["Branching","descr250char",["sumry250char","sumry250char","sumry250char","sumry250char"]],
                             "customFields":{},
                             "keywords":[""],
-                            "plotpointTemplate":{
+                            "plotpointTemplates":{
                                 "######":["title50char","descr250char"],
                                 "customFields":{}
                             }
@@ -708,17 +804,17 @@
                     "details":["Style","descr250char",["sumry250char","sumry250char","sumry250char","sumry250char"]],
                     "customFields":{},
                     "keywords":[""],
-                    "subcategoryTemplate":{
+                    "subcategoryTemplates":{
                         "A":{
                             "details":["title50char","descr250char",["sumry250char","sumry250char","sumry250char","sumry250char"]],
                             "customFields":{},
                             "keywords":[""],
-                            "plotlineTemplate":{
+                            "plotlineTemplates":{
                                 "###":{
                                     "details":["title50char","descr250char",["sumry250char","sumry250char","sumry250char","sumry250char"]],
                                     "customFields":{},
                                     "keywords":[""],
-                                    "plotpointTemplate":{
+                                    "plotpointTemplates":{
                                         "######":["title50char","descr250char"],
                                         "customFields":{}
                                     }
@@ -730,12 +826,12 @@
                         "details":["Ambience","descr250char",["sumry250char","sumry250char","sumry250char","sumry250char"]],
                         "customFields":{},
                         "keywords":[""],
-                        "plotlineTemplate":{
+                        "plotlineTemplates":{
                             "###":{
                                 "details":["title50char","descr250char",["sumry250char","sumry250char","sumry250char","sumry250char"]],
                                 "customFields":{},
                                 "keywords":[""],
-                                "plotpointTemplate":{
+                                "plotpointTemplates":{
                                     "######":["title50char","descr250char"],
                                     "customFields":{}
                                 }
@@ -746,12 +842,12 @@
                         "details":["Diction","descr250char",["sumry250char","sumry250char","sumry250char","sumry250char"]],
                         "customFields":{},
                         "keywords":[""],
-                        "plotlineTemplate":{
+                        "plotlineTemplates":{
                             "###":{
                                 "details":["title50char","descr250char",["sumry250char","sumry250char","sumry250char","sumry250char"]],
                                 "customFields":{},
                                 "keywords":[""],
-                                "plotpointTemplate":{
+                                "plotpointTemplates":{
                                     "######":["title50char","descr250char"],
                                     "customFields":{}
                                 }
@@ -762,12 +858,12 @@
                         "details":["Genre","descr250char",["sumry250char","sumry250char","sumry250char","sumry250char"]],
                         "customFields":{},
                         "keywords":[""],
-                        "plotlineTemplate":{
+                        "plotlineTemplates":{
                             "###":{
                                 "details":["title50char","descr250char",["sumry250char","sumry250char","sumry250char","sumry250char"]],
                                 "customFields":{},
                                 "keywords":[""],
-                                "plotpointTemplate":{
+                                "plotpointTemplates":{
                                     "######":["title50char","descr250char"],
                                     "customFields":{}
                                 }
@@ -781,7 +877,7 @@
                 "04-05-06":["Day Saga","descr250char",["sumry250char","sumry250char","sumry250char","sumry250char"]],
                 "07-08-09":["Dusk Saga","descr250char",["sumry250char","sumry250char","sumry250char","sumry250char"]],
                 "10-11-12":["Night Saga","descr250char",["sumry250char","sumry250char","sumry250char","sumry250char"]],
-                "bookTemplate":{
+                "bookTemplates":{
                     "##":{
                         "details": ["title50char","descr250char",["sumry250char","sumry250char","sumry250char","sumry250char"]],
                         "customFields":{},
@@ -840,7 +936,7 @@
                                 }
                             }
                         },
-                        "chapterTemplate":{
+                        "chapterTemplates":{
                             "##":{
                                 "details": ["title50char","descr250char",["sumry250char","sumry250char","sumry250char","sumry250char"]],
                                 "customFields":{},
@@ -974,7 +1070,7 @@
                             }
                         }
                     },
-                    "chapterTemplate":{
+                    "chapterTemplates":{
                         "##":{
                             "details": ["title50char","descr250char",["sumry250char","sumry250char","sumry250char","sumry250char"]],
                             "customFields":{},
@@ -1107,7 +1203,7 @@
                             }
                         }
                     },
-                    "chapterTemplate":{
+                    "chapterTemplates":{
                         "##":{
                             "details": ["title50char","descr250char",["sumry250char","sumry250char","sumry250char","sumry250char"]],
                             "customFields":{},
@@ -1240,7 +1336,7 @@
                             }
                         }
                     },
-                    "chapterTemplate":{
+                    "chapterTemplates":{
                         "##":{
                             "details": ["title50char","descr250char",["sumry250char","sumry250char","sumry250char","sumry250char"]],
                             "customFields":{},
@@ -1426,22 +1522,22 @@
             },
             "content":{
                 "glossary":{},
-                "categoryTemplate":{
+                "categoryTemplates":{
                     "A":{
                         "details":["title50char","descr250char",["sumry250char","sumry250char","sumry250char","sumry250char"]],
                         "customFields":{},
                         "keywords":[""],
-                        "subcategoryTemplate":{
+                        "subcategoryTemplates":{
                             "A":{
                                 "details":["title50char","descr250char",["sumry250char","sumry250char","sumry250char","sumry250char"]],
                                 "customFields":{},
                                 "keywords":[""],
-                                "plotlineTemplate":{
+                                "plotlineTemplates":{
                                     "###":{
                                         "details":["title50char","descr250char",["sumry250char","sumry250char","sumry250char","sumry250char"]],
                                         "customFields":{},
                                         "keywords":[""],
-                                        "plotpointTemplate":{
+                                        "plotpointTemplates":{
                                             "######":["title50char","descr250char"],
                                             "customFields":{}
                                         }
@@ -1453,17 +1549,17 @@
                 },
                 "C":{
                     "details":["Characters","descr250char",["sumry250char","sumry250char","sumry250char","sumry250char"]],
-                    "subcategoryTemplate":{
+                    "subcategoryTemplates":{
                         "A":{
                             "details":["title50char","descr250char",["sumry250char","sumry250char","sumry250char","sumry250char"]],
                             "customFields":{},
                             "keywords":[""],
-                            "plotlineTemplate":{
+                            "plotlineTemplates":{
                                 "###":{
                                     "details":["title50char","descr250char",["sumry250char","sumry250char","sumry250char","sumry250char"]],
                                     "customFields":{},
                                     "keywords":[""],
-                                    "plotpointTemplate":{
+                                    "plotpointTemplates":{
                                         "######":["title50char","descr250char"],
                                         "customFields":{}
                                     }
@@ -1475,12 +1571,12 @@
                         "details":["Antagonists","descr250char",["sumry250char","sumry250char","sumry250char","sumry250char"]],
                         "customFields":{},
                         "keywords":[""],
-                        "plotlineTemplate":{
+                        "plotlineTemplates":{
                             "###":{
                                 "details":["title50char","descr250char",["sumry250char","sumry250char","sumry250char","sumry250char"]],
                                 "customFields":{},
                                 "keywords":[""],
-                                "plotpointTemplate":{
+                                "plotpointTemplates":{
                                     "######":["title50char","descr250char"],
                                     "customFields":{}
                                 }
@@ -1491,12 +1587,12 @@
                         "details":["Protagonists","descr250char",["sumry250char","sumry250char","sumry250char","sumry250char"]],
                         "customFields":{},
                         "keywords":[""],
-                        "plotlineTemplate":{
+                        "plotlineTemplates":{
                             "###":{
                                 "details":["title50char","descr250char",["sumry250char","sumry250char","sumry250char","sumry250char"]],
                                 "customFields":{},
                                 "keywords":[""],
-                                "plotpointTemplate":{
+                                "plotpointTemplates":{
                                     "######":["title50char","descr250char"],
                                     "customFields":{}
                                 }
@@ -1508,17 +1604,17 @@
                     "details":["Magic","descr250char",["sumry250char","sumry250char","sumry250char","sumry250char"]],
                     "customFields":{},
                     "keywords":[""],
-                    "subcategoryTemplate":{
+                    "subcategoryTemplates":{
                         "A":{
                             "details":["title50char","descr250char",["sumry250char","sumry250char","sumry250char","sumry250char"]],
                             "customFields":{},
                             "keywords":[""],
-                            "plotlineTemplate":{
+                            "plotlineTemplates":{
                                 "###":{
                                     "details":["title50char","descr250char",["sumry250char","sumry250char","sumry250char","sumry250char"]],
                                     "customFields":{},
                                     "keywords":[""],
-                                    "plotpointTemplate":{
+                                    "plotpointTemplates":{
                                         "######":["title50char","descr250char"],
                                         "customFields":{}
                                     }
@@ -1530,12 +1626,12 @@
                         "details":["Healing","biological perception, illness sense",["sumry250char","sumry250char","sumry250char","sumry250char"]],
                         "customFields":{},
                         "keywords":[""],
-                        "plotlineTemplate":{
+                        "plotlineTemplates":{
                             "###":{
                                 "details":["title50char","descr250char",["sumry250char","sumry250char","sumry250char","sumry250char"]],
                                 "customFields":{},
                                 "keywords":[""],
-                                "plotpointTemplate":{
+                                "plotpointTemplates":{
                                     "######":["title50char","descr250char"],
                                     "customFields":{}
                                 }
@@ -1545,7 +1641,7 @@
                             "details":["title50char","descr250char",["sumry250char","sumry250char","sumry250char","sumry250char"]],
                             "customFields":{},
                             "keywords":[""],
-                            "plotpointTemplate":{
+                            "plotpointTemplates":{
                                 "######":["title50char","descr250char"],
                                 "customFields":{}
                             }
@@ -1555,12 +1651,12 @@
                         "details":["Necromancy","access the afterlife, speak to spirits, reanimation, reincarnation",["sumry250char","sumry250char","sumry250char","sumry250char"]],
                         "customFields":{},
                         "keywords":[""],
-                        "plotlineTemplate":{
+                        "plotlineTemplates":{
                             "###":{
                                 "details":["title50char","descr250char",["sumry250char","sumry250char","sumry250char","sumry250char"]],
                                 "customFields":{},
                                 "keywords":[""],
-                                "plotpointTemplate":{
+                                "plotpointTemplates":{
                                     "######":["title50char","descr250char"],
                                     "customFields":{}
                                 }
@@ -1570,7 +1666,7 @@
                             "details":["Astral Death Plane","",["sumry250char","sumry250char","sumry250char","sumry250char"]],
                             "customFields":{},
                             "keywords":[""],
-                            "plotpointTemplate":{
+                            "plotpointTemplates":{
                                 "######":["title50char","descr250char"],
                                 "customFields":{}
                             }
@@ -1579,7 +1675,7 @@
                             "details":["Resurrection","descr250char",["sumry250char","sumry250char","sumry250char","sumry250char"]],
                             "customFields":{},
                             "keywords":[""],
-                            "plotpointTemplate":{
+                            "plotpointTemplates":{
                                 "######":["title50char","descr250char"],
                                 "customFields":{}
                             }
@@ -1588,7 +1684,7 @@
                             "details":["Exorcism","descr250char",["sumry250char","sumry250char","sumry250char","sumry250char"]],
                             "customFields":{},
                             "keywords":[""],
-                            "plotpointTemplate":{
+                            "plotpointTemplates":{
                                 "######":["title50char","descr250char"],
                                 "customFields":{}
                             }
@@ -1597,7 +1693,7 @@
                             "details":["Channeling","descr250char",["sumry250char","sumry250char","sumry250char","sumry250char"]],
                             "customFields":{},
                             "keywords":[""],
-                            "plotpointTemplate":{
+                            "plotpointTemplates":{
                                 "######":["title50char","descr250char"],
                                 "customFields":{}
                             }
@@ -1606,7 +1702,7 @@
                             "details":["Spirit Sense","descr250char",["sumry250char","sumry250char","sumry250char","sumry250char"]],
                             "customFields":{},
                             "keywords":[""],
-                            "plotpointTemplate":{
+                            "plotpointTemplates":{
                                 "######":["title50char","descr250char"],
                                 "customFields":{}
                             }
@@ -1615,7 +1711,7 @@
                             "details":["title50char","descr250char",["sumry250char","sumry250char","sumry250char","sumry250char"]],
                             "customFields":{},
                             "keywords":[""],
-                            "plotpointTemplate":{
+                            "plotpointTemplates":{
                                 "######":["title50char","descr250char"],
                                 "customFields":{}
                             }
@@ -1625,12 +1721,12 @@
                         "details":["Vampyrism","demon blood",["sumry250char","sumry250char","sumry250char","sumry250char"]],
                         "customFields":{},
                         "keywords":[""],
-                        "plotlineTemplate":{
+                        "plotlineTemplates":{
                             "###":{
                                 "details":["title50char","descr250char",["sumry250char","sumry250char","sumry250char","sumry250char"]],
                                 "customFields":{},
                                 "keywords":[""],
-                                "plotpointTemplate":{
+                                "plotpointTemplates":{
                                     "######":["title50char","descr250char"],
                                     "customFields":{}
                                 }
@@ -1640,7 +1736,7 @@
                             "details":["Immortality","descr250char",["sumry250char","sumry250char","sumry250char","sumry250char"]],
                             "customFields":{},
                             "keywords":[""],
-                            "plotpointTemplate":{
+                            "plotpointTemplates":{
                                 "######":["title50char","descr250char"],
                                 "customFields":{}
                             }
@@ -1649,7 +1745,7 @@
                             "details":["Illusions","descr250char",["sumry250char","sumry250char","sumry250char","sumry250char"]],
                             "customFields":{},
                             "keywords":[""],
-                            "plotpointTemplate":{
+                            "plotpointTemplates":{
                                 "######":["title50char","descr250char"],
                                 "customFields":{}
                             }
@@ -1658,7 +1754,7 @@
                             "details":["Telepathy","descr250char",["sumry250char","sumry250char","sumry250char","sumry250char"]],
                             "customFields":{},
                             "keywords":[""],
-                            "plotpointTemplate":{
+                            "plotpointTemplates":{
                                 "######":["title50char","descr250char"],
                                 "customFields":{}
                             }
@@ -1667,7 +1763,7 @@
                             "details":["Siring","descr250char",["sumry250char","sumry250char","sumry250char","sumry250char"]],
                             "customFields":{},
                             "keywords":[""],
-                            "plotpointTemplate":{
+                            "plotpointTemplates":{
                                 "######":["title50char","descr250char"],
                                 "customFields":{}
                             }
@@ -1676,7 +1772,7 @@
                             "details":["Infernality","pyromancy, demons, morality",["sumry250char","sumry250char","sumry250char","sumry250char"]],
                             "customFields":{},
                             "keywords":[""],
-                            "plotpointTemplate":{
+                            "plotpointTemplates":{
                                 "######":["title50char","descr250char"],
                                 "customFields":{}
                             }
@@ -1685,7 +1781,7 @@
                             "details":["Nightbeing","silence, flight, vulnerable to daylight",["sumry250char","sumry250char","sumry250char","sumry250char"]],
                             "customFields":{},
                             "keywords":[""],
-                            "plotpointTemplate":{
+                            "plotpointTemplates":{
                                 "######":["title50char","descr250char"],
                                 "customFields":{}
                             }
@@ -1694,7 +1790,7 @@
                             "details":["Predation","enhanced senses, fangs, agility, hunger, strength",["sumry250char","sumry250char","sumry250char","sumry250char"]],
                             "customFields":{},
                             "keywords":[""],
-                            "plotpointTemplate":{
+                            "plotpointTemplates":{
                                 "######":["title50char","descr250char"],
                                 "customFields":{}
                             }
@@ -1705,17 +1801,17 @@
                     "details":["Setting","descr250char",["sumry250char","sumry250char","sumry250char","sumry250char"]],
                     "customFields":{},
                     "keywords":[""],
-                    "subcategoryTemplate":{
+                    "subcategoryTemplates":{
                         "A":{
                             "details":["title50char","descr250char",["sumry250char","sumry250char","sumry250char","sumry250char"]],
                             "customFields":{},
                             "keywords":[""],
-                            "plotlineTemplate":{
+                            "plotlineTemplates":{
                                 "###":{
                                     "details":["title50char","descr250char",["sumry250char","sumry250char","sumry250char","sumry250char"]],
                                     "customFields":{},
                                     "keywords":[""],
-                                    "plotpointTemplate":{
+                                    "plotpointTemplates":{
                                         "######":["title50char","descr250char"],
                                         "customFields":{}
                                     }
@@ -1732,12 +1828,12 @@
                         ]],
                         "customFields":{},
                         "keywords":[""],
-                        "plotlineTemplate":{
+                        "plotlineTemplates":{
                             "###":{
                                 "details":["title50char","descr250char",["sumry250char","sumry250char","sumry250char","sumry250char"]],
                                 "customFields":{},
                                 "keywords":[""],
-                                "plotpointTemplate":{
+                                "plotpointTemplates":{
                                     "######":["title50char","descr250char"],
                                     "customFields":{}
                                 }
@@ -1747,7 +1843,7 @@
                             "details":["title50char","descr250char",["sumry250char","sumry250char","sumry250char","sumry250char"]],
                             "customFields":{},
                             "keywords":[""],
-                            "plotpointTemplate":{
+                            "plotpointTemplates":{
                                 "######":["title50char","descr250char"],
                                 "customFields":{}
                             }
@@ -1762,12 +1858,12 @@
                         ]],
                         "customFields":{},
                         "keywords":[""],
-                        "plotlineTemplate":{
+                        "plotlineTemplates":{
                             "###":{
                                 "details":["title50char","descr250char",["sumry250char","sumry250char","sumry250char","sumry250char"]],
                                 "customFields":{},
                                 "keywords":[""],
-                                "plotpointTemplate":{
+                                "plotpointTemplates":{
                                     "######":["title50char","descr250char"],
                                     "customFields":{}
                                 }
@@ -1783,12 +1879,12 @@
                         ]],
                         "customFields":{},
                         "keywords":[""],
-                        "plotlineTemplate":{
+                        "plotlineTemplates":{
                             "###":{
                                 "details":["title50char","descr250char",["sumry250char","sumry250char","sumry250char","sumry250char"]],
                                 "customFields":{},
                                 "keywords":[""],
-                                "plotpointTemplate":{
+                                "plotpointTemplates":{
                                     "######":["title50char","descr250char"],
                                     "customFields":{}
                                 }
@@ -1799,12 +1895,12 @@
                         "details":["Education","descr250char",["sumry250char","sumry250char","sumry250char","sumry250char"]],
                         "customFields":{},
                         "keywords":[""],
-                        "plotlineTemplate":{
+                        "plotlineTemplates":{
                             "###":{
                                 "details":["title50char","descr250char",["sumry250char","sumry250char","sumry250char","sumry250char"]],
                                 "customFields":{},
                                 "keywords":[""],
-                                "plotpointTemplate":{
+                                "plotpointTemplates":{
                                     "######":["title50char","descr250char"],
                                     "customFields":{}
                                 }
@@ -1815,12 +1911,12 @@
                         "details":["Family","descr250char",["sumry250char","sumry250char","sumry250char","sumry250char"]],
                         "customFields":{},
                         "keywords":[""],
-                        "plotlineTemplate":{
+                        "plotlineTemplates":{
                             "###":{
                                 "details":["title50char","descr250char",["sumry250char","sumry250char","sumry250char","sumry250char"]],
                                 "customFields":{},
                                 "keywords":[""],
-                                "plotpointTemplate":{
+                                "plotpointTemplates":{
                                     "######":["title50char","descr250char"],
                                     "customFields":{}
                                 }
@@ -1831,12 +1927,12 @@
                         "details":["Government","descr250char",["sumry250char","sumry250char","sumry250char","sumry250char"]],
                         "customFields":{},
                         "keywords":[""],
-                        "plotlineTemplate":{
+                        "plotlineTemplates":{
                             "###":{
                                 "details":["title50char","descr250char",["sumry250char","sumry250char","sumry250char","sumry250char"]],
                                 "customFields":{},
                                 "keywords":[""],
-                                "plotpointTemplate":{
+                                "plotpointTemplates":{
                                     "######":["title50char","descr250char"],
                                     "customFields":{}
                                 }
@@ -1847,12 +1943,12 @@
                         "details":["History","descr250char",["sumry250char","sumry250char","sumry250char","sumry250char"]],
                         "customFields":{},
                         "keywords":[""],
-                        "plotlineTemplate":{
+                        "plotlineTemplates":{
                             "###":{
                                 "details":["title50char","descr250char",["sumry250char","sumry250char","sumry250char","sumry250char"]],
                                 "customFields":{},
                                 "keywords":[""],
-                                "plotpointTemplate":{
+                                "plotpointTemplates":{
                                     "######":["title50char","descr250char"],
                                     "customFields":{}
                                 }
@@ -1863,12 +1959,12 @@
                         "details":["Economy","descr250char",["sumry250char","sumry250char","sumry250char","sumry250char"]],
                         "customFields":{},
                         "keywords":[""],
-                        "plotlineTemplate":{
+                        "plotlineTemplates":{
                             "###":{
                                 "details":["title50char","descr250char",["sumry250char","sumry250char","sumry250char","sumry250char"]],
                                 "customFields":{},
                                 "keywords":[""],
-                                "plotpointTemplate":{
+                                "plotpointTemplates":{
                                     "######":["title50char","descr250char"],
                                     "customFields":{}
                                 }
@@ -1884,12 +1980,12 @@
                         ]],
                         "customFields":{},
                         "keywords":[""],
-                        "plotlineTemplate":{
+                        "plotlineTemplates":{
                             "###":{
                                 "details":["title50char","descr250char",["sumry250char","sumry250char","sumry250char","sumry250char"]],
                                 "customFields":{},
                                 "keywords":[""],
-                                "plotpointTemplate":{
+                                "plotpointTemplates":{
                                     "######":["title50char","descr250char"],
                                     "customFields":{}
                                 }
@@ -1900,12 +1996,12 @@
                         "details":["Religion","descr250char",["sumry250char","sumry250char","sumry250char","sumry250char"]],
                         "customFields":{},
                         "keywords":[""],
-                        "plotlineTemplate":{
+                        "plotlineTemplates":{
                             "###":{
                                 "details":["title50char","descr250char",["sumry250char","sumry250char","sumry250char","sumry250char"]],
                                 "customFields":{},
                                 "keywords":[""],
-                                "plotpointTemplate":{
+                                "plotpointTemplates":{
                                     "######":["title50char","descr250char"],
                                     "customFields":{}
                                 }
@@ -1916,12 +2012,12 @@
                         "details":["Stratification","descr250char",["sumry250char","sumry250char","sumry250char","sumry250char"]],
                         "customFields":{},
                         "keywords":[""],
-                        "plotlineTemplate":{
+                        "plotlineTemplates":{
                             "###":{
                                 "details":["title50char","descr250char",["sumry250char","sumry250char","sumry250char","sumry250char"]],
                                 "customFields":{},
                                 "keywords":[""],
-                                "plotpointTemplate":{
+                                "plotpointTemplates":{
                                     "######":["title50char","descr250char"],
                                     "customFields":{}
                                 }
@@ -1932,12 +2028,12 @@
                         "details":["Culture","descr250char",["sumry250char","sumry250char","sumry250char","sumry250char"]],
                         "customFields":{},
                         "keywords":[""],
-                        "plotlineTemplate":{
+                        "plotlineTemplates":{
                             "###":{
                                 "details":["title50char","descr250char",["sumry250char","sumry250char","sumry250char","sumry250char"]],
                                 "customFields":{},
                                 "keywords":[""],
-                                "plotpointTemplate":{
+                                "plotpointTemplates":{
                                     "######":["title50char","descr250char"],
                                     "customFields":{}
                                 }
@@ -1948,12 +2044,12 @@
                         "details":["Weather","descr250char",["sumry250char","sumry250char","sumry250char","sumry250char"]],
                         "customFields":{},
                         "keywords":[""],
-                        "plotlineTemplate":{
+                        "plotlineTemplates":{
                             "###":{
                                 "details":["title50char","descr250char",["sumry250char","sumry250char","sumry250char","sumry250char"]],
                                 "customFields":{},
                                 "keywords":[""],
-                                "plotpointTemplate":{
+                                "plotpointTemplates":{
                                     "######":["title50char","descr250char"],
                                     "customFields":{}
                                 }
@@ -1965,17 +2061,17 @@
                     "details":["Theme & Symbols","descr250char",["sumry250char","sumry250char","sumry250char","sumry250char"]],
                     "customFields":{},
                     "keywords":[""],
-                    "subcategoryTemplate":{
+                    "subcategoryTemplates":{
                         "A":{
                             "details":["title50char","descr250char",["sumry250char","sumry250char","sumry250char","sumry250char"]],
                             "customFields":{},
                             "keywords":[""],
-                            "plotlineTemplate":{
+                            "plotlineTemplates":{
                                 "###":{
                                     "details":["title50char","descr250char",["sumry250char","sumry250char","sumry250char","sumry250char"]],
                                     "customFields":{},
                                     "keywords":[""],
-                                    "plotpointTemplate":{
+                                    "plotpointTemplates":{
                                         "######":["title50char","descr250char"],
                                         "customFields":{}
                                     }
@@ -1987,12 +2083,12 @@
                         "details":["Blood","family, life, warmth, oxygen, iron, heart, veins, arteries",["sumry250char","sumry250char","sumry250char","sumry250char"]],
                         "customFields":{},
                         "keywords":[""],
-                        "plotlineTemplate":{
+                        "plotlineTemplates":{
                             "###":{
                                 "details":["title50char","descr250char",["sumry250char","sumry250char","sumry250char","sumry250char"]],
                                 "customFields":{},
                                 "keywords":[""],
-                                "plotpointTemplate":{
+                                "plotpointTemplates":{
                                     "######":["title50char","descr250char"],
                                     "customFields":{}
                                 }
@@ -2003,12 +2099,12 @@
                         "details":["Curses","",["sumry250char","sumry250char","sumry250char","sumry250char"]],
                         "customFields":{},
                         "keywords":[""],
-                        "plotlineTemplate":{
+                        "plotlineTemplates":{
                             "###":{
                                 "details":["title50char","descr250char",["sumry250char","sumry250char","sumry250char","sumry250char"]],
                                 "customFields":{},
                                 "keywords":[""],
-                                "plotpointTemplate":{
+                                "plotpointTemplates":{
                                     "######":["title50char","descr250char"]
                                 }
                             }
@@ -2018,12 +2114,12 @@
                         "details":["Death","tomb, grave, epitaph, elegy, reaper, decay, Styx, funeral bells",["sumry250char","sumry250char","sumry250char","sumry250char"]],
                         "customFields":{},
                         "keywords":[""],
-                        "plotlineTemplate":{
+                        "plotlineTemplates":{
                             "###":{
                                 "details":["title50char","descr250char",["sumry250char","sumry250char","sumry250char","sumry250char"]],
                                 "customFields":{},
                                 "keywords":[""],
-                                "plotpointTemplate":{
+                                "plotpointTemplates":{
                                     "######":["title50char","descr250char"]
                                 }
                             }
@@ -2032,7 +2128,7 @@
                             "details":["title50char","descr250char",["sumry250char","sumry250char","sumry250char","sumry250char"]],
                             "customFields":{},
                             "keywords":[""],
-                            "plotpointTemplate":{
+                            "plotpointTemplates":{
                                 "######":["title50char","descr250char"],
                                 "customFields":{}
                             }
@@ -2043,12 +2139,12 @@
                         "details":["Night","darkness, shadow, dreams, stars, moon, lamps, torches, nocturnal, twilight, flees from daylight",["sumry250char","sumry250char","sumry250char","sumry250char"]],
                         "customFields":{},
                         "keywords":[""],
-                        "plotlineTemplate":{
+                        "plotlineTemplates":{
                             "###":{
                                 "details":["title50char","descr250char",["sumry250char","sumry250char","sumry250char","sumry250char"]],
                                 "customFields":{},
                                 "keywords":[""],
-                                "plotpointTemplate":{
+                                "plotpointTemplates":{
                                     "######":["title50char","descr250char"],
                                     "customFields":{}
                                 }
@@ -2149,7 +2245,7 @@
                 },
 
 
-                "bookTemplate":{
+                "bookTemplates":{
                     "##":{
                         "details": ["title50char","descr250char",["sumry250char","sumry250char","sumry250char","sumry250char"]],
                         "customFields":{},
@@ -2197,7 +2293,7 @@
                                 }
                             }
                         },
-                        "chapterTemplate":{
+                        "chapterTemplates":{
                             "##":{
     
                                 "details": ["title50char","descr250char",["sumry250char","sumry250char","sumry250char","sumry250char"]],
@@ -2303,7 +2399,7 @@
                             }
                         }
                     },
-                    "chapterTemplate":{
+                    "chapterTemplates":{
                         "details": ["title50char","descr250char",["sumry250char","sumry250char","sumry250char","sumry250char"]],
                         "customFields":{},
                         "metaDetails":{
@@ -2405,7 +2501,7 @@
                             }
                         }
                     },
-                    "chapterTemplate":{
+                    "chapterTemplates":{
                         "details": ["title50char","descr250char",["sumry250char","sumry250char","sumry250char","sumry250char"]],
                         "customFields":{},
                         "metaDetails":{
@@ -2509,7 +2605,7 @@
                     },
 
 
-                    "chapterTemplate":{
+                    "chapterTemplates":{
                         "details": ["title50char","descr250char",["sumry250char","sumry250char","sumry250char","sumry250char"]],
                         "customFields":{},
                         "metaDetails":{
@@ -2611,7 +2707,7 @@
                             }
                         }
                     },
-                    "chapterTemplate":{
+                    "chapterTemplates":{
                         "details": ["title50char","descr250char",["sumry250char","sumry250char","sumry250char","sumry250char"]],
                         "customFields":{},
                         "metaDetails":{
@@ -2713,7 +2809,7 @@
                             }
                         }
                     },
-                    "chapterTemplate":{
+                    "chapterTemplates":{
                         "details": ["title50char","descr250char",["sumry250char","sumry250char","sumry250char","sumry250char"]],
                         "customFields":{},
                         "metaDetails":{
@@ -2815,7 +2911,7 @@
                             }
                         }
                     },
-                    "chapterTemplate":{
+                    "chapterTemplates":{
                         "details": ["title50char","descr250char",["sumry250char","sumry250char","sumry250char","sumry250char"]],
                         "customFields":{},
                         "metaDetails":{
@@ -2917,7 +3013,7 @@
                             }
                         }
                     },
-                    "chapterTemplate":{
+                    "chapterTemplates":{
                         "details": ["title50char","descr250char",["sumry250char","sumry250char","sumry250char","sumry250char"]],
                         "customFields":{},
                         "metaDetails":{
@@ -3019,7 +3115,7 @@
                             }
                         }
                     },
-                    "chapterTemplate":{
+                    "chapterTemplates":{
                         "details": ["title50char","descr250char",["sumry250char","sumry250char","sumry250char","sumry250char"]],
                         "customFields":{},
                         "metaDetails":{
@@ -3121,7 +3217,7 @@
                             }
                         }
                     },
-                    "chapterTemplate":{
+                    "chapterTemplates":{
                         "details": ["title50char","descr250char",["sumry250char","sumry250char","sumry250char","sumry250char"]],
                         "customFields":{},
                         "metaDetails":{

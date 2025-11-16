@@ -9,8 +9,8 @@ function WriterUI() {
 
 return (<main className="writerUI">
     
-    <WShelvesUI/>
     <WBookUI/>
+    <WShelvesUI/>
     <HelpUI/>
 
 </main>)}

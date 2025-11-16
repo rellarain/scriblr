@@ -142,9 +142,10 @@ table {
 #root .userUI .writerUI .wShelvesUI .wShelvesUX {
   grid-area: UX;
   transition: width 1s;
-  height: calc(100% - 45px);
+  height: calc(100% - 30px);
   background-color: hsl(0, 40%, 24%);
-  margin-top: 30px;
+  background-color: hsl(120, 60%, 24%);
+  margin-top: 20px;
   width: calc(100vw - 846px);
 }
 #root .userUI .writerUI .uxClosed .wShelvesUX {
@@ -155,22 +156,21 @@ table {
   transition: 1.5s width;
 }
 #root .userUI .writerUI .uxOpen .wShelvesUX {
-  width: calc(100vw - 846px);
+  width: calc(100vw - 420px);
 }
 #root .userUI .writerUI .uxOpen .wShelves .wShelf {
   width: calc(100% - 20px);
   transition: 0.5s width;
 }
 #root .userUI .writerUI .wBookUI {
-  height: 200px;
-  width: 200px;
+  height: calc(100vh - 50px);
+  width: calc(100% - 410px);
   position: absolute;
   right: 0;
   top: 0;
-  display: none;
+  background-color: hsl(230, 60%, 45%);
 }
 #root .userUI .readerUI {
-  background-color: rgba(0, 0, 0, 0.265);
   position: absolute;
   bottom: 0;
   transition: left 1s, width 1s;
@@ -286,7 +286,6 @@ table {
   display: block;
   background-color: hsl(0, 40%, 17%);
   top: 10px;
-  top: calc(100% - 10px);
 }
 #root .userUI .mobileNavBtns {
   position: absolute;
@@ -368,7 +367,7 @@ table {
     right: -200vw;
   }
   .screenReader .readerUI {
-    width: 100vw;
+    width: calc(100vw - 10px);
     height: calc(100vh - 50px);
     left: 0;
   }
@@ -398,7 +397,7 @@ table {
     transition: top 0.7s;
   }
   .screenWriter .writerUI {
-    width: 100vw;
+    width: calc(100vw - 10px);
     height: calc(100vh - 50px);
     right: 0;
   }
@@ -451,34 +450,5 @@ table {
   .screenHome .folderUI {
     width: calc(100vw - 100px);
     left: 50px;
-  }
-}
-@media screen and (min-width: 1600px) {
-  .screenHome .readerUI {
-    width: 25vw;
-    left: 0;
-  }
-  .screenHome .writerUI {
-    width: 25vw;
-    right: 0;
-  }
-  .screenHome .folderUI {
-    width: calc(50vw - 20px);
-    height: calc(100vh - 10px);
-    left: calc(25vw + 10px);
-  }
-  .screenReader .folderUI {
-    width: 400px;
-    left: calc(100vw - 410px);
-  }
-  .screenReader .readerUI {
-    width: calc(100vw - 420px);
-  }
-  .screenWriter .folderUI {
-    left: 10px;
-    width: 400px;
-  }
-  .screenWriter .writerUI {
-    width: calc(100vw - 420px);
   }
 }/*# sourceMappingURL=style.css.map */
