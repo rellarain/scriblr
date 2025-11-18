@@ -12,7 +12,7 @@
             }
         },
         "projectTemplates":{
-            "AAAAAA":{
+            "??????":{
                 "details":["title50char","descr250char",["sumry250char","sumry250char","sumry250char","sumry250char"]],
                 "metaDetails":{
                     "backDatedStart":"",
@@ -59,6 +59,7 @@
                                     "sumry250char",
                                     "sumry250char"
                                 ]],
+                                "prompt":"quest250char",
                                 "customFields":{
                                     "field50char":[]
                                 },
@@ -257,6 +258,7 @@
                             }
                         }
                     },
+                    "outlineImport":[],
                     "outlineRecycling":[],
                     "outlineExport":{
                         "##":{}
