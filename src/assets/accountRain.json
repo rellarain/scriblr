@@ -13,11 +13,21 @@
         },
         "projectTemplates":{
             "??????":{
-                "details":["title50char","descr250char",["sumry250char","sumry250char","sumry250char","sumry250char"]],
-                "metaDetails":{
-                    "backDatedStart":"",
-                    "projectStart":"",
-                    "projectFinish":""
+                "details":["title50char","descr250char",[
+                    "sumry250char",
+                    "sumry250char",
+                    "sumry250char",
+                    "sumry250char"
+                ]],
+                "customFields":{
+                    "metaDetails":{
+                        "backDatedStart":"",
+                        "projectStart":"",
+                        "projectFinish":""
+                    },
+                    "a-field50char":["choic50char"],
+                    "b-field50char":"descr250char"
+
                 },
                 "readers":{
                     "userID":["##.##","##.##"]
@@ -59,7 +69,6 @@
                                     "sumry250char",
                                     "sumry250char"
                                 ]],
-                                "prompt":"quest250char",
                                 "customFields":{
                                     "field50char":[]
                                 },
@@ -109,42 +118,42 @@
                                     "sumry250char",
                                     "sumry250char"
                                 ]],
-                                "customFields":{
-                                    "field50char":[]
-                                },
-                                "metaDetails":{
-                                    "backDatedStart":"",
-                                    "projectStart":"",
-                                    "projectFinish":""
-                                },
-                                "analytics":{
-                                    "structureAnalytics":{
-                                        "structureProgress":{}
-                                    },
-                                    "contentAnalytics":{
-                                        "contentProgress":{},
-                                        "multibookDensity":{},
-                                        "bookDensity":{},
-                                        "arcDensity":{},
-                                        "subarcDensity":{},
-                                        "chapterDensity":{}
-                                    },
-                                    "draftAnalytics":{
-                                        "draftProgress":{},
-                                        "sentencePatterns":{},
-                                        "revisionProgress":{}
-                                    }
-                                },
                                 "bookOrder": "##",
-                                "design":{
-                                    "mainColor":"###255,###255,###255",
-                                    "accentColor1":"###255,###255,###255",
-                                    "accentColor2":"###255,###255,###255",
-                                    "cover":{}
-                                },
-                                "goals":{
-                                    "bookWordcount": "#######",
-                                    "chapterCount": "##"
+                                "customFields":{
+                                    "bookMeta":{
+                                        "backDatedStart":"",
+                                        "projectStart":"",
+                                        "projectFinish":""
+                                    },
+                                    "analytics":{
+                                        "structureAnalytics":{
+                                            "structureProgress":{}
+                                        },
+                                        "contentAnalytics":{
+                                            "contentProgress":{},
+                                            "multibookDensity":{},
+                                            "bookDensity":{},
+                                            "arcDensity":{},
+                                            "subarcDensity":{},
+                                            "chapterDensity":{}
+                                        },
+                                        "draftAnalytics":{
+                                            "draftProgress":{},
+                                            "sentencePatterns":{},
+                                            "revisionProgress":{}
+                                        }
+                                    },
+                                    "design":{
+                                        "mainColor":"###255,###255,###255",
+                                        "accentColor1":"###255,###255,###255",
+                                        "accentColor2":"###255,###255,###255",
+                                        "cover":{}
+                                    },
+                                    "goals":{
+                                        "bookWordcount": "#######",
+                                        "chapterCount": "##"
+                                    },
+                                    "field50char":[]                                    
                                 },
                                 "assignedContent":{
                                     "??###":["title50char","descr250char"]
@@ -178,90 +187,98 @@
                                         }
                                     }
                                 },
-                                "chapterTemplates":{
-                                    "##":{
-                                        "details": ["title50char","descr250char",[
-                                            "sumry250char",
-                                            "sumry250char",
-                                            "sumry250char",
-                                            "sumry250char"
-                                        ]],
-                                        "customFields":{},
-                                        "metaDetails":{
-                                            "backDatedStart":"",
-                                            "projectStart":"",
-                                            "projectFinish":""
-                                        },
-                                        "analytics":{
-                                            "structureAnalytics":{
-                                                "structureProgress":{}
+                                "chapters":{
+                                    "chapterTemplates":{
+                                        "##":{
+                                            "details": ["title50char","descr250char",[
+                                                "sumry250char",
+                                                "sumry250char",
+                                                "sumry250char",
+                                                "sumry250char"
+                                            ]],
+                                            "chapterOrder": "##",
+                                            "analytics":{
+                                                "structureAnalytics":{
+                                                    "structureProgress":{}
+                                                },
+                                                "contentAnalytics":{
+                                                    "contentProgress":{},
+                                                    "actDensity":{},
+                                                    "sceneDensity":{},
+                                                    "momentDensity":{}
+                                                },
+                                                "draftAnalytics":{
+                                                    "draftProgress":{},
+                                                    "repetitiveWords":{},
+                                                    "repetitivePhrases":{},
+                                                    "readingLevel":{},
+                                                    "sentencePatterns":{},
+                                                    "revisionProgress":{}
+                                                }
                                             },
-                                            "contentAnalytics":{
-                                                "contentProgress":{},
-                                                "actDensity":{},
-                                                "sceneDensity":{},
-                                                "momentDensity":{}
+                                            "customFields":{
+                                                "metaDetails":{
+                                                    "backDatedStart":"",
+                                                    "projectStart":"",
+                                                    "projectFinish":""
+                                                },
+                                                "design":{
+                                                    "mainColor":"###255,###255,###255",
+                                                    "accentColor1":"###255,###255,###255",
+                                                    "accentColor2":"###255,###255,###255",
+                                                    "illustration":{}
+                                                },
+                                                "goals":{
+                                                    "chapterWordcount":"#####"
+                                                },
+                                                "field50char":[]
                                             },
-                                            "draftAnalytics":{
-                                                "draftProgress":{},
-                                                "repetitiveWords":{},
-                                                "repetitivePhrases":{},
-                                                "readingLevel":{},
-                                                "sentencePatterns":{},
-                                                "revisionProgress":{}
-                                            }
-                                        },
-                                        "chapterOrder": "##",
-                                        "design":{
-                                            "mainColor":"###255,###255,###255",
-                                            "accentColor1":"###255,###255,###255",
-                                            "accentColor2":"###255,###255,###255",
-                                            "illustration":{}
-                                        },
-                                        "goals":{
-                                            "chapterWordcount":"#####"
-                                        },
-                                        "assignedContent":{
-                                            "??###":["title50char","descr250char"],
-                                            "AA":["title50char","descr250char"]
-                                        },
-                                        "unassignedContent":["??###-######"],
-                                        "#":{
-                                            "details":["title50char","descr250char"],
                                             "assignedContent":{
-                                                "??###":["title50char","descr250char"],
-                                                "AA":["title50char","descr250char"]
+                                                "??###":["title50char","descr250char"]
                                             },
                                             "unassignedContent":["??###-######"],
-                                            "actOrder": "#",
                                             "#":{
                                                 "details":["title50char","descr250char"],
                                                 "assignedContent":{
-                                                    "??###":["title50char","descr250char"],
-                                                    "AA":["title50char","descr250char"]
+                                                    "??###":["title50char","descr250char"]
                                                 },
                                                 "unassignedContent":["??###-######"],
-                                                "sceneOrder": "#",
+                                                "actOrder": "#",
                                                 "#":{
                                                     "details":["title50char","descr250char"],
-                                                    "assignedContent":["??###-######"],
-                                                    "momentOrder": "#",
-                                                    "roughDraft": [
-                                                        ["paraStandard","sente250char",["longSentence","clause250char"]],
-                                                        ["paraConvo",["??###","sente250char"],"non-dialogue sente250char"]
-                                                    ]
+                                                    "assignedContent":{
+                                                        "??###":["title50char","descr250char"]
+                                                    },
+                                                    "unassignedContent":["??###-######"],
+                                                    "sceneOrder": "#",
+                                                    "#":{
+                                                        "details":["title50char","descr250char"],
+                                                        "assignedContent":["??###-######"],
+                                                        "momentOrder": "#",
+                                                        "roughDraft": [
+                                                            ["paraStandard","sente250char",["longSentence","clause250char"]],
+                                                            ["paraConvo",["??###","sente250char"],"non-dialogue sente250char"]
+                                                        ]
+                                                    }
                                                 }
                                             }
                                         }
-                                    }
-                                }                   
+                                    }                   
+                                }
                             }
                         }
                     },
-                    "outlineImport":[],
                     "outlineRecycling":[],
                     "outlineExport":{
-                        "##":{}
+                        "##":{
+                            "##":{
+                                "#":{
+                                    "#":{
+                                        "#":{}
+                                    }
+                                }
+                            }
+                        }
                     }
                 },
                 "draft":{
@@ -394,7 +411,35 @@
                         "itemID4":["reviewed","title50char","descr250char",["sumry250char"]]
                     }
                 },
-                "projectExport":{}
+                "projectExport":{
+                    "##-##-##-##":{},
+                    "##-##-##":{},
+                    "##-##":{},
+                    "##":{
+                        "details":["title50char","descr250char",["sumry250char"]],
+                        "customFields":{},
+                        "??###":{},
+                        "##":{
+                            "details":["title50char","descr250char",["sumry250char"]],
+                            "customFields":{},
+                            "??###":{},
+                            "#":{
+                                "details":["title50char","descr250char",["sumry250char"]],
+                                "??###":{},
+                                "#":{
+                                    "details":["title50char","descr250char",["sumry250char"]],
+                                    "??###":{},
+                                    "#":{
+                                        "details":["title50char","descr250char",["sumry250char"]],
+                                        "??###-######":{}
+                                        
+                                    }
+                                }
+                            },
+                            "draft":[{}]
+                        }
+                    }
+                }
             }
         },
         "MAGICK":{
