@@ -1,4 +1,79 @@
 [{
+    "system":{
+        "readerTool":{
+            "Alpha":{
+                "details":["descr250char",["sumry250char"]],
+                "Pi":{
+                    "details":["narrative reader",["sumry250char"]]
+                },
+                "Rho":{
+                    "details":["density reader",["sumry250char"]]
+                },
+                "Chi":{
+                    "details":["subject readers",["sumry250char"]]
+                },
+                "Zeta":{
+                    "details":["structural reader",["sumry250char"]]
+                }
+            },
+            "Beta":{
+                "details":["descr250char",["sumry250char"]],
+                "Gamma":{
+                    "details":["ambience reader",["sumry250char"]]
+                },
+                "Psi":{
+                    "details":["character reader",["sumry250char"]]
+                },
+                "Phi":{
+                    "details":["aesthetic reader",["sumry250char"]]
+                }
+            },
+            "Tau":{
+                "details":["descr250char",["sumry250char"]],
+                "Xi":{
+                    "details":["continuity reader",["sumry250char"]]
+                },
+                "Lambda":{
+                    "details":["rhythm reader",["sumry250char"]]
+                },
+                "Eta":{
+                    "details":["pacing reader",["sumry250char"]]
+                }
+            },
+            "Omega":{
+                "details":["final draft reader",["sumry250char"]],
+                "Theta":{
+                    "details":["clarity reader",["sumry250char"]]
+                },
+                "Iota":{
+                    "details":["syntax reader",["sumry250char"]]
+                },
+                "Epsilon":{
+                    "details":["precision reader",["sumry250char"]]
+                }
+            },
+            "Sigma":{
+                "details":["draft analytics report",["sumry250char"]]
+                
+            },
+            "Delta":{
+                "details":["version analytics report",["sumry250char"]]
+            },
+            "Kappa":{
+                "details":["reader analytics report",["sumry250char"]]
+
+            }
+        },
+        "revisionTool":{},
+        "outlineTool":{
+            "categoryTool":{},
+            "subcategoryTool":{} 
+        },
+        "draftTool":{
+            "dictionary":{}
+        },
+        "projectTool":{}
+    },
     "user10161995": {
         "account":{
             "configuration":{},
@@ -11,23 +86,212 @@
                 }
             }
         },
-        "projectTemplates":{
+        "??????":{
+            "details":["title50char","descr250char",[
+                "sumry250char",
+                "sumry250char"
+            ]],
+            "fields":{
+                "dates":{
+                    "projectBackDate":"YYYY/MM/DD",
+                    "projectCreated":"YYYY/MM/DD ##:##",
+                    "projectFinished":"YYYY/MM/DD ##:##"
+                },
+                "readers":{},
+                "analytics":{}
+            },
+            "customFields":{"field50char":["descr250char",{}, [], "", 0, true, null]},
+            "journal":{
+                "dateTime":[]
+            },
+            "outline":{
+                "?":{
+                    "details":["title50char","descr250char",["sumry250char"]],
+                    "?":{
+                        "details":["title50char","descr250char",["sumry250char"]],
+                        "###":{
+                            "details":["title50char","descr250char",["sumry250char"]],
+                            "########":["title50char","descr250char",["##","##","#","#","#"],{}]
+                        }
+                    }
+                },
+                "##":{
+                    "details":["title50char","descr250char",["sumry250char"]],
+                    "order":0,
+                    "fields":{
+                        "dates":{
+                            "bookBackDate":"YYYY/MM/DD",
+                            "bookCreated":"YYYY/MM/DD ##:##",
+                            "bookFinished":"YYYY/MM/DD ##:##"
+                        },
+                        "analytics":{}
+                    },
+                    "customFields":{"field50char":["descr250char",{}, [], "", 0, true, null]},
+                    "sequence":{},
+                    "?":{
+                        "details":["title50char","descr250char",["sumry250char"]],
+                        "order":0,
+                        "fields":{},
+                        "customFields":{"field50char":["descr250char",{}, [], "", 0, true, null]},
+                        "sequence":{},
+                        "?":{
+                            "details":["title50char","descr250char",["sumry250char"]],
+                            "order":0,
+                            "fields":{},
+                            "customFields":{"field50char":["descr250char",{}, [], "", 0, true, null]},
+                            "sequence":{},
+                            "##":{
+                                "details":["title50char","descr250char",["sumry250char"]],
+                                "order":0,
+                                "fields":{
+                                    "arc":"?",
+                                    "subarc":"??",
+                                    "dates":{
+                                        "chapterBackDate":"YYYY/MM/DD",
+                                        "chapterCreated":"YYYY/MM/DD ##:##",
+                                        "chapterFinished":"YYYY/MM/DD ##:##"
+                                    },
+                                    "analytics":{}
+                                },
+                                "customFields":{"field50char":["descr250char",{}, [], "", 0, true, null]},
+                                "sequence":{},
+                                "#":{
+                                    "details":["title50char","descr250char",["sumry250char"]],
+                                    "order":0,
+                                    "fields":{},
+                                    "customFields":{"field50char":["descr250char",{}, [], "", 0, true, null]},
+                                    "sequence":{},
+                                    "#":{
+                                        "details":["title50char","descr250char",["sumry250char"]],
+                                        "order":0,
+                                        "fields":{},
+                                        "customFields":{"field50char":["descr250char",{}, [], "", 0, true, null]},
+                                        "sequence":{},
+                                        "#":{
+                                            "details":["title50char","descr250char",["sumry250char"]],
+                                            "order":0,
+                                            "fields":{},
+                                            "customFields":{"field50char":["descr250char",{}, [], "", 0, true, null]}
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            },
+            "draft":{
+                "##":{
+                    "##":[
+                        ["sente250char",["sente250char"]],
+                        [{"??###":["sente250char"]},["sente250char"]]
+                    ]
+                }
+            },
+            "revision":{
+                "flags":{},
+                "notes":{
+                    "userID":{
+                        "itemID":["???","note250char"]
+                    }
+                }
+            },
+            "history":{},
+            "export":{
+                "??????":{
+                    "details":["title50char","descr250char",["sumry250char"]],
+                    "fields":{
+                        "analytics":{
+                            "structure":{},
+                            "content":{},
+                            "revision":{},
+                            "project":{}
+                        }
+                    },
+                    "journal":{"dateTime":[""]},
+                    "##":{
+                        "details":["title50char","descr250char",["sumry250char"]],
+                        "fields":{
+                            "analytics":{
+                                "structure":{},
+                                "content":{},
+                                "draft":{},
+                                "revision":{},
+                                "project":{}
+                            }
+                        },
+                        "sequence":{},
+                        "?":{
+                            "details":["title50char","descr250char",["sumry250char"]],
+                            "fields":{},
+                            "sequence":{},
+                            "?":{
+                                "details":["title50char","descr250char",["sumry250char"]],
+                                "fields":{},
+                                "sequence":{},
+                                "##":{
+                                    "details":["title50char","descr250char",["sumry250char"]],
+                                    "fields":{},
+                                    "sequence":{},
+                                    "#":{
+                                        "details":["title50char","descr250char"],
+                                        "fields":{},
+                                        "sequence":{},
+                                        "#":{
+                                            "details":["title50char","descr250char"],
+                                            "fields":{},
+                                            "sequence":{},
+                                            "#":{
+                                                "details":["title50char","descr250char"],
+                                                "fields":{},
+                                                "sequence":{},
+                                                "draft":[
+                                                    ["sente250char",["sente250char"]],
+                                                    [{"??###":["sente250char"]},["sente250char"]]
+                                                ]
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    },
+                    "?":{
+                        "details":["title50char","descr250char",["sumry250char"]],
+                        "fields":{},
+                        "?":{
+                            "details":["title50char","descr250char",["sumry250char"]],
+                            "fields":{},
+                            "###":{
+                                "details":["title50char","descr250char",["sumry250char"]],
+                                "fields":{},
+                                "########":["title50char","descr250char",["##","##","#","#","#"],{}]
+                            }
+                        }
+                    },
+                    "history":{
+
+                    }
+                }
+            }
+        },
+        "projectTemplatesOLD":{
             "??????":{
                 "details":["title50char","descr250char",[
                     "sumry250char",
-                    "sumry250char",
-                    "sumry250char",
                     "sumry250char"
                 ]],
+                "metaDetails":{
+                    "backDatedStart":"",
+                    "projectStart":"",
+                    "projectFinish":"",
+                    "journal":{
+                        "dateTime":[]
+                    }
+                },
                 "customFields":{
-                    "metaDetails":{
-                        "backDatedStart":"",
-                        "projectStart":"",
-                        "projectFinish":""
-                    },
                     "a-field50char":["choic50char"],
                     "b-field50char":"descr250char"
-
                 },
                 "readers":{
                     "userID":["##.##","##.##"]
@@ -52,8 +316,12 @@
                         "repetitiveWords":{},
                         "repetitivePhrases":{},
                         "readingLevel":{},
-                        "sentencePatterns":{},
-                        "revisionProgress":{}
+                        "sentencePatterns":{}
+                    },
+                    "revisionAnalytics":{
+                        "revisionProgress":{},
+                        "readerPatterns":{}
+
                     }
                 },
                 "outline":{
@@ -65,41 +333,35 @@
                             "?":{
                                 "details":["title50char","descr250char",[
                                     "sumry250char",
-                                    "sumry250char",
-                                    "sumry250char",
                                     "sumry250char"
                                 ]],
                                 "customFields":{
-                                    "field50char":[]
+                                    "field50char":["descr250char",[]]
                                 },
                                 "keywords":["keyw50char"],
                                 "subcategoryTemplates":{
                                     "?":{
                                         "details":["title50char","descr250char",[
                                             "sumry250char",
-                                            "sumry250char",
-                                            "sumry250char",
                                             "sumry250char"
                                         ]],
                                         "customFields":{
-                                            "field50char":[]
+                                            "field50char":["descr250char",[]]
                                         },
                                         "keywords":["keyw50char"],
                                         "plotlineTemplates":{
                                             "###":{
                                                 "details":["title50char","descr250char",[
                                                     "sumry250char",
-                                                    "sumry250char",
-                                                    "sumry250char",
                                                     "sumry250char"
                                                 ]],
                                                 "customFields":{
-                                                    "field50char":[]
+                                                    "field50char":["descr250char",[]]
                                                 },
                                                 "keywords":["keyw50char"],
                                                 "plotpointTemplates":{
                                                     "######":["title50char","descr250char"],
-                                                    "customFields":{"field50char":[]}
+                                                    "customFields":{"field50char":["descr250char",[]]}
                                                 }
                                             }
                                         }
@@ -114,34 +376,32 @@
                             "##":{
                                 "details": ["title50char","descr250char",[
                                     "sumry250char",
-                                    "sumry250char",
-                                    "sumry250char",
                                     "sumry250char"
                                 ]],
                                 "bookOrder": "##",
+                                "analytics":{
+                                    "structureAnalytics":{
+                                        "structureProgress":{}
+                                    },
+                                    "contentAnalytics":{
+                                        "contentProgress":{},
+                                        "multibookDensity":{},
+                                        "bookDensity":{},
+                                        "arcDensity":{},
+                                        "subarcDensity":{},
+                                        "chapterDensity":{}
+                                    },
+                                    "draftAnalytics":{
+                                        "draftProgress":{},
+                                        "sentencePatterns":{},
+                                        "revisionProgress":{}
+                                    }
+                                },
                                 "customFields":{
                                     "bookMeta":{
                                         "backDatedStart":"",
                                         "projectStart":"",
                                         "projectFinish":""
-                                    },
-                                    "analytics":{
-                                        "structureAnalytics":{
-                                            "structureProgress":{}
-                                        },
-                                        "contentAnalytics":{
-                                            "contentProgress":{},
-                                            "multibookDensity":{},
-                                            "bookDensity":{},
-                                            "arcDensity":{},
-                                            "subarcDensity":{},
-                                            "chapterDensity":{}
-                                        },
-                                        "draftAnalytics":{
-                                            "draftProgress":{},
-                                            "sentencePatterns":{},
-                                            "revisionProgress":{}
-                                        }
                                     },
                                     "design":{
                                         "mainColor":"###255,###255,###255",
@@ -153,7 +413,7 @@
                                         "bookWordcount": "#######",
                                         "chapterCount": "##"
                                     },
-                                    "field50char":[]                                    
+                                    "field50char":["descr250char",[]]                                    
                                 },
                                 "assignedContent":{
                                     "??###":["title50char","descr250char"]
@@ -162,8 +422,6 @@
                                 "arcs":{
                                     "#":{
                                         "details": ["title50char","descr250char",[
-                                            "sumry250char",
-                                            "sumry250char",
                                             "sumry250char",
                                             "sumry250char"
                                         ]],
@@ -174,8 +432,6 @@
                                         "order": "#",
                                         "#":{
                                             "details": ["title50char","descr250char",[
-                                                "sumry250char",
-                                                "sumry250char",
                                                 "sumry250char",
                                                 "sumry250char"
                                             ]],
@@ -197,6 +453,11 @@
                                                 "sumry250char"
                                             ]],
                                             "chapterOrder": "##",
+                                            "metaDetails":{
+                                                "backDatedStart":"",
+                                                "projectStart":"",
+                                                "projectFinish":""
+                                            },
                                             "analytics":{
                                                 "structureAnalytics":{
                                                     "structureProgress":{}
@@ -217,11 +478,6 @@
                                                 }
                                             },
                                             "customFields":{
-                                                "metaDetails":{
-                                                    "backDatedStart":"",
-                                                    "projectStart":"",
-                                                    "projectFinish":""
-                                                },
                                                 "design":{
                                                     "mainColor":"###255,###255,###255",
                                                     "accentColor1":"###255,###255,###255",
@@ -231,7 +487,7 @@
                                                 "goals":{
                                                     "chapterWordcount":"#####"
                                                 },
-                                                "field50char":[]
+                                                "field50char":{}
                                             },
                                             "assignedContent":{
                                                 "??###":["title50char","descr250char"]
@@ -268,13 +524,25 @@
                             }
                         }
                     },
-                    "outlineRecycling":[],
+                    "outlineScraps":[],
                     "outlineExport":{
+                        "?":{
+                            "?":{
+                                "###":{}
+                            }
+                        },
                         "##":{
+                            "details":["title50char","descr250char",["sumry250char"]],
                             "##":{
+                                "details":["title50char","descr250char",["sumry250char"]],
                                 "#":{
+                                    "details":["title50char","descr250char",["sumry250char"]],
                                     "#":{
-                                        "#":{}
+                                        "details":["title50char","descr250char",["sumry250char"]],
+                                        "#":{
+                                            "details":["title50char","descr250char"],
+                                            "content":{}
+                                        }
                                     }
                                 }
                             }
@@ -311,7 +579,7 @@
                             }
                         }
                     },
-                    "draftRecycling":{
+                    "draftScraps":{
                         "itemID":{"...":""}
                     },
                     "draftExport":{}
@@ -412,15 +680,51 @@
                     }
                 },
                 "projectExport":{
+                    "metaDetails":{
+                        "backDatedStart":"",
+                        "projectStart":"",
+                        "projectFinish":"",
+                        "journal":{
+                            "dateTime":[]
+                        }
+                    },
+                    "analytics":{
+                        "structureAnalytics":{},
+                        "contentAnalytics":{},
+                        "draftAnalytics":{},
+                        "revisionAnalytics":{}
+                    },
                     "##-##-##-##":{},
                     "##-##-##":{},
                     "##-##":{},
+                    "?":{
+                        "details":["title50char","descr250char",["sumry250char"],["field50char","descr250char"]],
+                        "?":{
+                            "details":["title50char","descr250char",["sumry250char"],["field50char","descr250char"]],
+                            "###":{
+                                "details":["title50char","descr250char",["sumry250char"],["field50char","descr250char"]],
+                                "######":["title50char","descr250char",["field50char","descr250char"]]
+                            }
+                        }
+                    },
                     "##":{
                         "details":["title50char","descr250char",["sumry250char"]],
+                        "analytics":{
+                            "structureAnalytics":{},
+                            "contentAnalytics":{},
+                            "draftAnalytics":{},
+                            "revisionAnalytics":{}
+                        },
                         "customFields":{},
                         "??###":{},
                         "##":{
                             "details":["title50char","descr250char",["sumry250char"]],
+                            "analytics":{
+                                "structureAnalytics":{},
+                                "contentAnalytics":{},
+                                "draftAnalytics":{},
+                                "revisionAnalytics":{}
+                            },
                             "customFields":{},
                             "??###":{},
                             "#":{
@@ -432,11 +736,16 @@
                                     "#":{
                                         "details":["title50char","descr250char",["sumry250char"]],
                                         "??###-######":{}
-                                        
                                     }
                                 }
                             },
-                            "draft":[{}]
+                            "draft":{
+                                "###":{
+                                    "######":{}
+                                }
+                            },
+                            "feedback":{},
+                            "versionHistory":{}
                         }
                     }
                 }
