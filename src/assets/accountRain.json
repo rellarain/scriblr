@@ -6,9 +6,6 @@
                 "Pi":{
                     "details":["narrative reader",["sumry250char"]]
                 },
-                "Rho":{
-                    "details":["density reader",["sumry250char"]]
-                },
                 "Chi":{
                     "details":["subject readers",["sumry250char"]]
                 },
@@ -21,20 +18,26 @@
                 "Gamma":{
                     "details":["ambience reader",["sumry250char"]]
                 },
-                "Psi":{
-                    "details":["character reader",["sumry250char"]]
-                },
                 "Phi":{
                     "details":["aesthetic reader",["sumry250char"]]
+                },
+                "Lambda":{
+                    "details":["rhythm reader",["sumry250char"]]
                 }
             },
             "Tau":{
                 "details":["timeline readers",["sumry250char"]],
                 "Xi":{
-                    "details":["continuity reader",["sumry250char"]]
+                    "details":["continuity reader: focus on stasis in the story",["sumry250char"]]
                 },
-                "Lambda":{
-                    "details":["rhythm reader",["sumry250char"]]
+                "Delta":{
+                    "details":["development reader: focus on changes in the story",["sumry250char"]]
+                },
+                "Psi":{
+                    "details":["character reader",["sumry250char"]]
+                },
+                "Rho":{
+                    "details":["density reader",["sumry250char"]]
                 },
                 "Eta":{
                     "details":["pacing reader",["sumry250char"]]
@@ -53,11 +56,8 @@
                 }
             },
             "Sigma":{
-                "details":["draft analytics report",["sumry250char"]]
+                "details":["draft/version analytics report",["sumry250char"]]
                 
-            },
-            "Delta":{
-                "details":["version analytics report",["sumry250char"]]
             },
             "Kappa":{
                 "details":["reader analytics report",["sumry250char"]]
@@ -424,6 +424,13 @@
                                     "details":["title50char","descr250char",["sumry250char"]],
                                     "fields":{},
                                     "sequence":{},
+                                    "analytics":{
+                                        "structure":{},
+                                        "content":{},
+                                        "draft":{},
+                                        "revision":{},
+                                        "project":{}
+                                    },
                                     "#":{
                                         "details":["title50char","descr250char"],
                                         "fields":{},
