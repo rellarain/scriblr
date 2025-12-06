@@ -109,7 +109,7 @@
             },
             "customFields":{"field50char":["descr250char",{}, [], "", 0, true, null]},
             "journal":{
-                "dateTime":[]
+                "HH:MM/DD/MM/YYYY/##":[]
             },
             "outline":{
                 "glossary":{
@@ -3517,9 +3517,9 @@
     },
     "vampyr":[
         "the Blood: the fountain of eternity, like death becomes her, reshapes you",
-        "hellfire: ",
+        "hellfire: black, only burns souls",
         "fire: ",
-        "",
+        "blood: heartbeat, emotion, hormones, oxygen, breath, warmth,",
 
 
 
@@ -3541,7 +3541,7 @@
 
 
 
-        "Lilyth: noctyrim, Underworld",
+        "Lilyth: seventh noctyrim, Underworld",
         "Erabyss: solyrim turned vampyrim, primarily Underworld",
         "Wylhelmina: solyri turned vampyri, primarily Overworld, starts wealthy develops",
         "",
