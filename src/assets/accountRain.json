@@ -454,6 +454,7 @@
                     "itemID3":["remove","title50char","descr250char",["sumry250char"]],
                     "itemID4":["reviewed","title50char","descr250char",["sumry250char"]]
                 }
+
             },
             "export":{
                 "??????":{
@@ -544,7 +545,7 @@
                 }
             }
         },
-        "MAGICK":{
+        "MAGICKOld":{
             "details":["Magi Saga","descr250char","sumry250char"],
             "metaDetails":{
                 "backDatedStart":"10/16/2020",
@@ -1652,7 +1653,7 @@
                 }
             }
         },
-        "VAMPYR":{
+        "VAMPYROld":{
             "details":["Vampyr Saga","descr250char","sumry250char"],
             "metaDetails":{
                 "backDatedStart":"",
@@ -3515,15 +3516,40 @@
         }
     },
     "vampyr":[
-        "the blood: the fountain of eternity, like death becomes her, reshapes you",
-        "hellfire:",
+        "the Blood: the fountain of eternity, like death becomes her, reshapes you",
+        "hellfire: ",
+        "fire: ",
+        "",
+
+
+
         "vampyri: sired from a demon or another vampyr; feed on sols, immortal, healing, vulernable to daylight, undead",
         "vampyrim: demons sired from a devil",
-        "noctyrim: devils sired from the dark fountain; night embodiment, hellfire, flight",
-        "Noctys: god of night, mother of vampyri, queen of the nightlands, Death",
-        "Solem: god of daylight, mother of souls, queen of the daylands, brahman",
-        "solyrim: awakened souls; living access to the underworld, mediumship, necromancy, resurrection, past life sense",
-        "solyri: ",
-        "sols: atman, soul/spirit, self, lifeform; access to the underworld after death"
+        "noctyrim: devils sired from the fountain of eternity; night embodiment, hellfire, flight",
+        "Noctys: god of night, mother of vampyri, Death incarnate, night incarnate",
+        "Solem: god of daylight, mother of souls, Brahman incarnate, soul incarnate",
+        "solyrim: awakened souls; living access to the underworld, necromancy, resurrection",
+        "solyri: astral access to the underworld, mediumship, past life sense",
+        "sols: atman, soul/spirit, self, lifeform; access to the underworld after death",
+
+
+
+        "",
+        "",
+        "",
+        "",
+
+
+
+        "Lilyth: noctyrim, Underworld",
+        "Erabyss: solyrim turned vampyrim, primarily Underworld",
+        "Wylhelmina: solyri turned vampyri, primarily Overworld, starts wealthy develops",
+        "",
+        "",
+        
+
+
+        "Underworld: twilight; inspired by greek myth, faerie, piranesi's house,",
+        "Overworld: day and night"
     ]
 }]
