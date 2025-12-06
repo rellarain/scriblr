@@ -275,51 +275,50 @@
                         "chapterGoal":0,
                         "chapterWordcountAve":0
                     },
+                    "analytics":{},
                     "##":{
                         "fields":{
                             "wordcountGoal":0,
                             "wordcountActual":0,
                             "chapterType":["prologue","foreword","preface","acknowledgements","author's note","epilogue"],
                             "analytics":{
-                                "draft":{
-                                    "progress":0.00,
-                                    "form":{
-                                        "sentenceTypes":{
-                                            "declarative":0,
-                                            "imperative":0,
-                                            "interrogative":0,
-                                            "exclamatory":0,
-                                            "fragments":0,
-                                            "simple":0,
-                                            "complex":0,
-                                            "multi-complex":0,
-                                            "compound":0,
-                                            "multi-compound":0,
-                                            "compound-multi-complex":0,
-                                            "multi-compound-complex":0,
-                                            "multi-compound-multi-complex":0
-                                        },
-                                        "sentencePatterns":{
-                                            "usage":{
-                                                "simple subject":{},
-                                                "subject modifier":{},
-                                                "simple predicate":{},
-                                                "predicate modifier":{},
-                                                "direct object":{},
-                                                "indirect object":{},
-                                                "object modifier":{}
-                                            }
-                                        }
+                                "progress":0.00,
+                                "form":{
+                                    "sentenceTypes":{
+                                        "declarative":0,
+                                        "imperative":0,
+                                        "interrogative":0,
+                                        "exclamatory":0,
+                                        "fragments":0,
+                                        "simple":0,
+                                        "complex":0,
+                                        "multi-complex":0,
+                                        "compound":0,
+                                        "multi-compound":0,
+                                        "compound-multi-complex":0,
+                                        "multi-compound-complex":0,
+                                        "multi-compound-multi-complex":0
                                     },
-                                    "vernacular":{
-                                        "phaseList":{
-                                            "phrase250char":0
-                                        },
-                                        "wordList":{
-                                            "word250char":0
-                                        },
-                                        "readingLevel":{}
+                                    "sentencePatterns":{
+                                        "usage":{
+                                            "simple subject":{},
+                                            "subject modifier":{},
+                                            "simple predicate":{},
+                                            "predicate modifier":{},
+                                            "direct object":{},
+                                            "indirect object":{},
+                                            "object modifier":{}
+                                        }
                                     }
+                                },
+                                "vernacular":{
+                                    "phaseList":{
+                                        "phrase250char":0
+                                    },
+                                    "wordList":{
+                                        "word250char":0
+                                    },
+                                    "readingLevel":{}
                                 }
                             }
                         },
@@ -352,6 +351,74 @@
             },
             "revision":{
                 "flags":{
+                    "General":{
+                        "Add":{
+                            "details":["color50char","note250char"],
+                            "Create":"",
+                            "Split":"",
+                            "Copy":""
+                        },
+                        "Review":{
+                            "details":["color50char","note250char"],
+                            "Repetitive":[],
+                            "Problematic":[]
+                        },
+                        "Edit":{
+                            "details":["color50char","note250char"],
+                            "Update":"",
+                            "Re-do":"",
+                            "Replace":["nowText250char","newText250char"],
+                            "Condense":"reduce wordcount",
+                            "Expand":"increase wordcount",
+                            "Simplify":"too many ideas",
+                            "Elaborate":"not enough ideas", 
+                            "Move":"",
+                            "Reorder":""
+                        },
+                        "Remove":{
+                            "details":["color50char","note250char"],
+                            "Clear":"",
+                            "Reset":"",
+                            "Delete":"",
+                            "Reduce":""
+                        },
+                        "Comment":{
+                            "details":["color50char","note250char"],
+                            "Obsessed":"I love this so much!",
+                            "Love":"I love this!",
+                            "Neutral":"note250char",
+                            "Like":"I like this.",
+                            "Dislike":"I don't like this.",
+                            "Hate":"I hate this!",
+                            "Disgust":"I hate this so much!"
+                        },
+                        "React":{
+                            "details":["color50char","note250char"],
+                            "Angry":"",
+                            "Annoyed":"",
+                            "Bored":"",
+                            "Confused":"", 
+                            "Devastated":"",
+                            "Disappointed":"",
+                            "Elated":"",
+                            "Happy":"",
+                            "Lost":"",
+                            "Sad":"",
+                            "Suspicious":""
+                        },
+                        "Omega":{
+                            "Misspelling":"",
+                            "Missuse":"",
+                            "Subject-Verb Agreement":"",
+                            "Typo":"",
+                            "Tense Agreement":"",
+                            "Run-On":"",
+                            "Wordy":"",
+                            "Sentence Fragment":"",
+                            "Fluffy":"",
+                            "Unclear":""
+                        }
+                    },
                     "Alpha":{"C/R/U/D":{"??????":["note250char"]}},
                     "Pi":{"C/R/U/D":{"??????":["note250char"]}},
                     "Rho":{"C/R/U/D":{"??????":["note250char"]}},
@@ -473,80 +540,6 @@
                     },
                     "history":{
 
-                    }
-                }
-            }
-        },
-        "projectTemplatesOLD":{
-            "??????":{
-                "revision":{
-                    "flags":{
-                        "Add":{
-                            "details":["color50char","note250char"],
-                            "Create":"",
-                            "Split":"",
-                            "Copy":""
-                        },
-                        "Review":{
-                            "details":["color50char","note250char"],
-                            "Repetitive":[],
-                            "Problematic":[]
-                        },
-                        "Edit":{
-                            "details":["color50char","note250char"],
-                            "Update":"",
-                            "Re-do":"",
-                            "Replace":["nowText250char","newText250char"],
-                            "Condense":"reduce wordcount",
-                            "Expand":"increase wordcount",
-                            "Simplify":"too many ideas",
-                            "Elaborate":"not enough ideas", 
-                            "Move":"",
-                            "Reorder":""
-                        },
-                        "Remove":{
-                            "details":["color50char","note250char"],
-                            "Clear":"",
-                            "Reset":"",
-                            "Delete":"",
-                            "Reduce":""
-                        },
-                        "Comment":{
-                            "details":["color50char","note250char"],
-                            "Obsessed":"I love this so much!",
-                            "Love":"I love this!",
-                            "Neutral":"note250char",
-                            "Like":"I like this.",
-                            "Dislike":"I don't like this.",
-                            "Hate":"I hate this!",
-                            "Disgust":"I hate this so much!"
-                        },
-                        "React":{
-                            "details":["color50char","note250char"],
-                            "Angry":"",
-                            "Annoyed":"",
-                            "Bored":"",
-                            "Confused":"", 
-                            "Devastated":"",
-                            "Disappointed":"",
-                            "Elated":"",
-                            "Happy":"",
-                            "Lost":"",
-                            "Sad":"",
-                            "Suspicious":""
-                        },
-                        "Omega":{
-                            "Misspelling":"",
-                            "Missuse":"",
-                            "Subject-Verb Agreement":"",
-                            "Typo":"",
-                            "Tense Agreement":"",
-                            "Run-On":"",
-                            "Wordy":"",
-                            "Sentence Fragment":"",
-                            "Fluffy":"",
-                            "Unclear":""
-                        }
                     }
                 }
             }
@@ -3520,5 +3513,17 @@
                 }
             }
         }
-    }
+    },
+    "vampyr":[
+        "the blood: the fountain of eternity, like death becomes her, reshapes you",
+        "hellfire:",
+        "vampyri: sired from a demon or another vampyr; feed on sols, immortal, healing, vulernable to daylight, undead",
+        "vampyrim: demons sired from a devil",
+        "noctyrim: devils sired from the dark fountain; night embodiment, hellfire, flight",
+        "Noctys: god of night, mother of vampyri, queen of the nightlands, Death",
+        "Solem: god of daylight, mother of souls, queen of the daylands, brahman",
+        "solyrim: awakened souls; living access to the underworld, mediumship, necromancy, resurrection, past life sense",
+        "solyri: ",
+        "sols: atman, soul/spirit, self, lifeform; access to the underworld after death"
+    ]
 }]
