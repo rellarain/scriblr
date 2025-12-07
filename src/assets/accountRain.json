@@ -1,5 +1,119 @@
 [{
     "system":{
+        "designPatterns":[
+            "CREATIONAL: creates objects",
+                "CONSTRUCTOR: creates new objects using function or class (formatting data from the JSON)",
+                "SINGLETON: ensures only one instance of an object/class occurs (global state management, APIs, configuration, styling, caching)",
+                "FACTORY: returns objects without creating a new instance (drafting tool)",
+                "PROTOTYPE: shares methods across object instances, which optimizes performance (sentences, books, spines, shelves, bookshelves,)",
+                "BUILDER: breaks complex object creation into step-by-step processes (creating books, content, drafts, revisions, etc.)",
+                "",
+            "STRUCTURAL: how objects are organized",
+                "",
+                "",
+                "",
+                "",
+                "",
+                "MODULES: capsule that hides private data and prints public methods ()",
+                "OPEN MODULES: capsule that displays all methods (editor tool)",
+                "ADAPTER: ",
+                "DECORATOR: ",
+                "FACADE: ",
+                "PROXY: ",
+                "COMPOSITE: ",
+            "BEHAVIORAL: how object interact with other objects", 
+                "OBSERVER: ",
+                "MEDIATOR: ",
+                "STRATEGY: ",
+                "STATE: ",
+                "ITERATOR: ",
+                "COMMAND PATTERN: undo/redo, task queues, UI actions stored for later execution",
+                "CHAIN OF RESPONSIBILITY: passes objects along until a handler is triggered ()"
+        ],
+        "designPlan":{
+            "CONTAINER":{
+                "creationalFunction":[
+                    ""
+                ],
+                "structuralFunction":[
+                    ""
+                ],
+                "behavioralFunction":[
+                    ""
+                ],
+                "USERTYPE":{
+                    "creationalFunction":[
+                        ""
+                    ],
+                    "structuralFunction":[
+                        ""
+                    ],
+                    "behavioralFunction":[
+                        ""
+                    ],
+                    "UX":{
+                        "creationalFunction":[""],
+                        "structuralFunction":[""],
+                        "behavioralFunction":[""],
+                        "experience":[
+                            ""
+                        ]
+                    },
+                    "UI":{
+                        "creationalFunction":[""],
+                        "structuralFunction":[""],
+                        "behavioralFunction":[""],
+                        "interface":[
+                            ""
+                        ]
+                    }
+                }
+            },
+            "root":{
+                "creationalFunction":[
+                    "renders visitor page",
+                    "renders registration",
+                    "renders site analytics",
+                    "",
+                    "",
+                    "",
+                    "renders user system"
+                ],
+                "structuralFunction":[
+                    ""
+                ],
+                "behavioralFunction":[
+                    "State Management: "
+                ],
+                "USERTYPE":{
+                    "creationalFunction":[
+                        ""
+                    ],
+                    "structuralFunction":[
+                        ""
+                    ],
+                    "behavioralFunction":[
+                        ""
+                    ],
+                    "UX":{
+                        "creationalFunction":[""],
+                        "structuralFunction":[""],
+                        "behavioralFunction":[""],
+                        "experience":[
+                            ""
+                        ]
+                    },
+                    "UI":{
+                        "creationalFunction":[""],
+                        "structuralFunction":[""],
+                        "behavioralFunction":[""],
+                        "interface":[
+                            ""
+                        ]
+                    }
+                }
+            }
+        },
         "readerTool":{
             "Alpha":{
                 "details":["concept readers",["sumry250char"]],
@@ -272,7 +386,8 @@
                     "fields":{
                         "wordcountGoal":0,
                         "wordcountActual":0,
-                        "chapterGoal":0,
+                        "chapterCountGoal":0,
+                        "chapterCountActual":0,
                         "chapterWordcountAve":0
                     },
                     "analytics":{},
@@ -323,15 +438,17 @@
                             }
                         },
                         "########":{
-                            "sentence":["sente250char",["claus250char"],{"??###":["sente250char"]}],
+                            "sentence":["sente250char",["claus250char"]],
+                            "speaker":"??###",
                             "order":0,
                             "plotpoints":[],
                             "fields":{
                                 "dialogue":true,
-                                "speaker":"??###",
                                 "type":["declarative/imperative/interrogative/exclamatory","simple/compound/complex/etc"]
                             },
-                            "structure":{
+                            "structure":[""],
+                            "words":[""],
+                            "structure2":{
                                 "subject":[""],
                                 "subjectModifier":[""],
                                 "subjectPhrase":[[""]],
