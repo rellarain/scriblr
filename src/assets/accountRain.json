@@ -3517,10 +3517,18 @@
     },
     "vampyr":[
         "the Blood: the fountain of eternity, like death becomes her, reshapes you",
-        "hellfire: black, only burns souls",
-        "fire: ",
-        "blood: heartbeat, emotion, hormones, oxygen, breath, warmth,",
+        "the Beast: fangs, claws, predation/hunting",
 
+
+        "hellfire: black, only burns souls, light illuminates ghosts and washes color",
+        "fire: candles, candelabra, torches",
+        "blood: heartbeat, emotion, hormones, oxygen, breath, warmth, immunity",
+        "mirror: ",
+        "nocturnal: night vision, vulernable to daylight",
+        "undead: can't cross running water, invulnerable",
+        "sin: lust, greed, hedonism/gluttony, sloth, desire, wrath, pride",
+        "",
+        "",
 
 
         "vampyri: sired from a demon or another vampyr; feed on sols, immortal, healing, vulernable to daylight, undead",
@@ -3533,12 +3541,10 @@
         "sols: atman, soul/spirit, self, lifeform; access to the underworld after death",
 
 
-
         "",
         "",
         "",
         "",
-
 
 
         "Lilyth: seventh noctyrim, Underworld",
@@ -3546,10 +3552,10 @@
         "Wylhelmina: solyri turned vampyri, primarily Overworld, starts wealthy develops",
         "",
         "",
-        
+        "",
 
 
-        "Underworld: twilight; inspired by greek myth, faerie, piranesi's house,",
-        "Overworld: day and night"
+        "Underworld: eternal twilight; inspired by greek myth, faerie, piranesi's house,",
+        "Overworld: day, night, and twilight"
     ]
 }]
