@@ -23,16 +23,17 @@ function UserSchedule() {
     // Activity Log
     // ----------------------------------------------------------------------------
     
-    let activityArray : number[] = [0,1,2,5,41,8,46,58,45,5,4,54,56412,2,51,52,6];
 
+    const [activityLog,setActivityLog] = useState<(number | string)[]>(
+        [0,1,2,5,41,8,46,58,45,5,4,54,56412,2,51,52,6,5,5,5,5]
+    )
 
-    let startGap = ((time.getHours()*4)-Math.ceil((time.getMinutes()/15)))
-    let endGap = (100 - startGap );
+    let startGap = ((time.getHours()*4)-Math.floor((time.getMinutes()/15)))
+    let endGap = (96 - time.getHours()*4 - Math.ceil(time.getMinutes()/15));
     
 
 
 
-    const [activityLog,setActivityLog] = useState<(number | string)[]>(activityArray)
     
 
     // ----------------------------------------------------------------------------
@@ -53,8 +54,6 @@ function UserSchedule() {
     
         )
     }
-
-
 
     function ScheduleInterval() {
         
@@ -92,14 +91,14 @@ function UserSchedule() {
     function ScheduleStartGap(){
 
 
-        let ClockStyling: React.CSSProperties = {
+        let clockStyling: React.CSSProperties = {
             width: (startGap - activityLog.length) + "%"
         }
 
 
         return(
 
-            <div className={'schedGap'} style={ClockStyling}>
+            <div className={'schedGap'} style={clockStyling}>
                 {startGap}
             </div>
 
