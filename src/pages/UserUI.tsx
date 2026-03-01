@@ -1,45 +1,45 @@
 import { useState } from "react";
-import ReaderUI from "./ReaderUI";
-import WriterUI from "./WriterUI";
-import FolderUI from "./FolderUI";
-import HelpUI from "../components/HelpUI";
+import useWindowDimensions from "../functionality/viewport";
+import UserNav from "../assets/components/uUI/userNav";
+import UserSchedule from "../assets/components/uUI/userSchedule";
+import TrainingUI from "../assets/components/uUI/TrainingUI";
+import HelpUI from "../assets/components/uUI/HelpUI";
+import DashUI from "../assets/components/uUI/DashUI";
+
 
 function UserUI() {
 
-    const [screenState, setScreenState]=useState("Home");
+    const {viewportWidth, viewportHeight} = useWindowDimensions();
 
-    function handleScreenHome() {
-        if (screenState !== "Home") {
-            setScreenState("Home");
-        } else {setScreenState("Home")}
-    }
+    let screenIntervals = 360;
 
-    function handleScreenWriter() {
-        if (screenState !== "Writer") {
-            setScreenState("Writer")
-        } else {setScreenState("Home")}
-    }
+    let screenColumns : number = viewportWidth / screenIntervals;
+    let screenRows : number = viewportHeight / screenIntervals;
 
-    function handleScreenReader() {
-        if (screenState !== "Reader") {
-            setScreenState("Reader")
-        } else {setScreenState("Home")}
-    }
+    let screenColumnsRnd : number = Math.floor(screenColumns);
+    let screenRowsRnd : number = Math.floor(screenRows);
+
+    let screenOrientation;
+    if (viewportHeight > viewportWidth) {
+        screenOrientation = "Portrait";
+    } else {screenOrientation = "Landscape";}
 
 
 
-return (<main className={"userUI screen" + screenState}>
-    
-    <div className="mobileNavBtns">
-        <button onClick={handleScreenHome}>Dash</button>
-        <button onClick={handleScreenReader}>Reader</button>
-        <button onClick={handleScreenWriter}>Writer</button>
-        <button onClick={handleScreenHome}>Dash</button>
-    </div>
-    <ReaderUI/>
-    <WriterUI/>
-    <FolderUI/>
-    <HelpUI/>
+
+
+
+return (<main className={"userUI screen" + screenOrientation+" screen"+screenRowsRnd+'x'+screenColumnsRnd}>
+
+    <header className="userHeader">
+        <TrainingUI/>
+        <HelpUI/>
+        <UserSchedule/>
+        <DashUI/>
+        <UserNav/>
+    </header>
+
+
 
 </main>)}
 export default UserUI;

@@ -1,18 +1,12 @@
 import { useState } from "react";
-import RShelvesUI from "../components/RShelvesUI";
-import RBookUI from "../components/RBookUI";
-import HelpUI from "../components/HelpUI";
 
 function ReaderUI() {
 
 
 
 return (<main className="readerUI">
-    
-    
-    <RShelvesUI/>
-    <RBookUI/>
-    <HelpUI/>
+    RUI: library/reader listings, books/notes and progress, pages/reader text
+      
 
 
 </main>)}
