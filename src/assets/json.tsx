@@ -68,9 +68,11 @@ let userJSON = [
         "outline" : {},
         "draft" : {},
         "revisions" : {},
-        "versionHistory" : {}
+        "history" : {}
     }},
-    {"VAMPYR" : {}}
+    {"VAMPYR" : {
+        
+    }}
 ]
 
-export default userJSON;
+export default {userJSON, sysJSON};

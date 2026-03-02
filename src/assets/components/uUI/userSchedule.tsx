@@ -16,20 +16,34 @@ function UserSchedule() {
     // ----------------------------------------------------------------------------
 
     let time : Date = new Date();
-    let timeStamp : string = time.getHours() % 12+":"+time.getMinutes().toString().padStart(2,'0');
-
+    let hour24 : number = time.getHours();
+    let hour12 : number = hour24 % 12 === 0 ? 12 : hour24 % 12;
+    let minutes : string = time.getMinutes().toString().padStart(2,'0');
+    let timeStamp : string = hour12+":"+minutes;
 
     // ----------------------------------------------------------------------------
     // Activity Log
     // ----------------------------------------------------------------------------
     
-
-    const [activityLog,setActivityLog] = useState<(number | string)[]>(
-        [0,1,2,5,41,8,46,58,45,5,4,54,56412,2,51,52,6,5,5,5,5]
+    const [activityLog,setActivityLog] = useState<(number)[]>(
+        [2,2,2,20,0,0,0,0,2,2,2,2,20,5,4,5,4,65,635]
     )
+    let schedPassedInts : number = (time.getHours() * 4) + (Math.floor(time.getMinutes()/15));
+    let totalActiveInts : number = activityLog.length;
+    let schedRemainInts : number = 96 - schedPassedInts
+    
+    let schedActivityTotal : number = 0;
+    for (let i = 0; i < totalActiveInts; i++) {
+        schedActivityTotal += activityLog[i];
+    }
+    const [averageActivity, setAverageActivity] = useState<number>(schedActivityTotal/totalActiveInts)
 
-    let startGap = ((time.getHours()*4)-Math.floor((time.getMinutes()/15)))
-    let endGap = (96 - time.getHours()*4 - Math.ceil(time.getMinutes()/15));
+
+    let startGap : number = 96 - schedPassedInts - totalActiveInts;
+
+
+
+    let endGap = schedRemainInts;
     
 
 
@@ -40,62 +54,11 @@ function UserSchedule() {
     // Sub-Components for UserSchedule
     // ----------------------------------------------------------------------------
 
-    function ActivityLog() {
-        
-        let activityLogLength : React.CSSProperties = {
-            width: activityLog.length.toString()+"%"
-        } 
-        
-        return(
-    
-            <div className={''} style={activityLogLength}>
-                {activityLog.length}
-            </div>
-    
-        )
-    }
-
-    function ScheduleInterval() {
-        
-        
-        
-        let logStyling: React.CSSProperties = {
-            width: activityLog.length.toString()+"%" 
-        }
-        
-
-        return(
-
-            <div className={'schedInterval'} style={logStyling}>
-                
-            </div>
-
-        )
-    }
-
-    function ScheduleClock() {
-
-    
-
-
-
-        return(
-
-            <div className={'schedClock'}>
-                
-            </div>
-
-        )
-    }
 
     function ScheduleStartGap(){
-
-
         let clockStyling: React.CSSProperties = {
-            width: (startGap - activityLog.length) + "%"
+            width: startGap.toString() + "%"
         }
-
-
         return(
 
             <div className={'schedGap'} style={clockStyling}>
@@ -105,20 +68,37 @@ function UserSchedule() {
         )
     }
 
+    function ActivityLog() {
+        let activityLogLength : React.CSSProperties = {
+            width: totalActiveInts.toString()+"%"
+        } 
+        let digitCommas : RegExp = /\B(?=(\d{3})+(?!\d))/g;
+        return(
+            <div className={''} style={activityLogLength}>
+                {totalActiveInts} {schedActivityTotal.toString().replace(digitCommas,",")} {Math.round(averageActivity)}
+            </div>
+        )
+    }
+
+
+    function ScheduleClock() {
+
+        return(
+            <div className={'schedClock'}>
+                {timeStamp}
+            </div>
+        )
+    }
+
+
     function ScheduleEndGap(){
-
-
         let ClockStyling: React.CSSProperties = {
             width: (endGap) + "%"
         }
-
-
         return(
-
             <div className={'schedGap'} style={ClockStyling}>
                 {endGap}
             </div>
-
         )
     }
 

@@ -5,6 +5,9 @@ import UserSchedule from "../assets/components/uUI/userSchedule";
 import TrainingUI from "../assets/components/uUI/TrainingUI";
 import HelpUI from "../assets/components/uUI/HelpUI";
 import DashUI from "../assets/components/uUI/DashUI";
+import AdminUI from "./AdminUI";
+import WriterUI from "./WriterUI";
+import ReaderUI from "./ReaderUI";
 
 
 function UserUI() {
@@ -31,6 +34,9 @@ function UserUI() {
 
 return (<main className={"userUI screen" + screenOrientation+" screen"+screenRowsRnd+'x'+screenColumnsRnd}>
 
+    <AdminUI/>
+    <WriterUI/>
+    <ReaderUI/>
     <header className="userHeader">
         <TrainingUI/>
         <HelpUI/>

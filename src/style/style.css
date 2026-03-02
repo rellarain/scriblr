@@ -33,7 +33,7 @@ body {
   background-color: hsl(0, 0%, 17%);
   padding: 0;
   margin: 0;
-  font-family: sans-serif;
+  font-family: "helvetica", sans-serif;
   text-wrap-mode: wrap;
 }
 body iframe {
@@ -82,8 +82,8 @@ table {
   top: 0;
   left: 0;
   width: 100vw;
-  height: 100vh;
   overflow: hidden;
+  height: 100vh;
 }
 #root .userUI .userHeader {
   grid-area: header;
@@ -94,7 +94,7 @@ table {
   height: 90px;
   display: grid;
   grid-template-columns: 100vw;
-  grid-template-rows: 30px min-content 10px min-content;
+  grid-template-rows: 35px min-content 15px min-content;
   grid-template-areas: "userNav" "dashUI" "userSchedule" "trainingHelpUI";
 }
 #root .userUI .userHeader .userNav {
@@ -113,7 +113,7 @@ table {
 #root .userUI .userHeader .userSchedule {
   background-color: red;
   grid-area: userSchedule;
-  box-shadow: 0 0px 10px black;
+  box-shadow: 0 4px 8px rgba(0, 0, 0, 0.705);
   display: flex;
   flex-direction: row;
   justify-content: flex-end;
@@ -135,11 +135,8 @@ table {
 #root .userUI .userHeader .userSchedule .schedClock {
   background-color: rgb(255, 255, 255);
   width: 5%;
-  height: 10px;
+  height: 15px;
   text-align: center;
-  font-weight: 800;
-  letter-spacing: 1px;
-  font-size: 10px;
 }
 #root .userUI .userHeader .trainingUI {
   background-color: purple;
@@ -161,17 +158,41 @@ table {
   height: calc(100vh - 60px);
   height: 0;
 }
-#root .writerUI {
-  position: absolute;
-  top: 80px;
-  left: 0;
-}
-#root .adminUI {
+#root .userUI .writerUI {
   position: absolute;
   top: 50px;
-  left: 20px;
+  left: 15px;
   display: block;
-  background-color: red;
+  border-radius: 8px;
+  background-color: hsl(330, 58%, 32%);
   height: calc(100vh - 65px);
-  width: calc(100vw - 40px);
+  width: calc(100vw - 50px);
+  border-right: 5px solid hsl(330, 58%, 32%);
+  padding: 0 10px;
+  white-space: pre-wrap;
+  overflow-x: hidden;
+  overflow-y: scroll;
+}
+#root .userUI .writerUI::-webkit-scrollbar {
+  background-color: red;
+  background-color: rgba(255, 255, 255, 0.231372549);
+  width: 10px;
+  padding: 5px 0;
+}
+#root .userUI .writerUI::-webkit-scrollbar-thumb {
+  background-color: rgba(255, 255, 255, 0.4588235294);
+  border-radius: 4px;
+}
+#root .userUI .adminUI {
+  position: absolute;
+  transition: top 1s;
+  left: 15px;
+  display: block;
+  border-radius: 8px;
+  background-color: rgb(136, 32, 32);
+  box-shadow: inset 0 2px 8px 4px rgba(0, 0, 0, 0.5);
+  height: calc(100vh - 65px);
+  width: calc(100vw - 30px);
+  top: 55px;
+  top: -120vh;
 }/*# sourceMappingURL=style.css.map */

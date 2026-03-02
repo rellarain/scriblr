@@ -11,9 +11,7 @@ import AdminUI from './pages/AdminUI'
 ReactDOM.createRoot(document.getElementById('root') as HTMLElement).render(
   <React.StrictMode>
     <VisitorUI/>
-    <WriterUI/>
     <ReaderUI/>
-    <AdminUI/>
     <UserUI/>
   </React.StrictMode>
 )
