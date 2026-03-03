@@ -39,7 +39,7 @@ function UserSchedule() {
     const [averageActivity, setAverageActivity] = useState<number>(schedActivityTotal/totalActiveInts)
 
 
-    let startGap : number = 96 - schedPassedInts - totalActiveInts;
+    let startGap : number =  schedPassedInts - totalActiveInts;
 
 
 
@@ -56,6 +56,7 @@ function UserSchedule() {
 
 
     function ScheduleStartGap(){
+        let newStartGap : number = startGap + totalActiveInts;
         let clockStyling: React.CSSProperties = {
             width: startGap.toString() + "%"
         }
@@ -74,8 +75,8 @@ function UserSchedule() {
         } 
         let digitCommas : RegExp = /\B(?=(\d{3})+(?!\d))/g;
         return(
-            <div className={''} style={activityLogLength}>
-                {totalActiveInts} {schedActivityTotal.toString().replace(digitCommas,",")} {Math.round(averageActivity)}
+            <div className={'activityLogIntervals'} style={activityLogLength}>
+                {totalActiveInts} 
             </div>
         )
     }

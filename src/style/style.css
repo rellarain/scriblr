@@ -94,12 +94,35 @@ table {
   height: 90px;
   display: grid;
   grid-template-columns: 100vw;
-  grid-template-rows: 35px min-content 15px min-content;
+  grid-template-rows: 45px min-content 15px min-content;
   grid-template-areas: "userNav" "dashUI" "userSchedule" "trainingHelpUI";
 }
 #root .userUI .userHeader .userNav {
   grid-area: userNav;
   background-color: hsl(330, 58%, 32%);
+}
+#root .userUI .userHeader .userNav .phaseToggle {
+  position: absolute;
+  top: 5px;
+  right: 5px;
+  width: 100px;
+  height: 35px;
+  background-color: hsl(181, 64%, 25%);
+}
+#root .userUI .userHeader .userNav .phaseToggle button {
+  height: 35px;
+  position: absolute;
+  top: 0;
+  background-color: rgba(255, 255, 255, 0);
+  border: none;
+}
+#root .userUI .userHeader .userNav .phaseToggle button:nth-of-type(1) {
+  width: calc(100% - 35px);
+  left: 0;
+}
+#root .userUI .userHeader .userNav .phaseToggle button:nth-of-type(2) {
+  width: 35px;
+  right: 0;
 }
 #root .userUI .userHeader .dashUI {
   transition: height 1s;
@@ -111,7 +134,7 @@ table {
   height: 0;
 }
 #root .userUI .userHeader .userSchedule {
-  background-color: red;
+  background-color: rgba(0, 0, 0, 0.1);
   grid-area: userSchedule;
   box-shadow: 0 4px 8px rgba(0, 0, 0, 0.705);
   display: flex;
@@ -119,6 +142,7 @@ table {
   justify-content: flex-end;
   width: 100vw;
   height: 10px;
+  color: white;
 }
 #root .userUI .userHeader .userSchedule div {
   width: 1%;
@@ -127,14 +151,15 @@ table {
 #root .userUI .userHeader .userSchedule .schedGap {
   height: 10px;
   background-color: rgba(0, 0, 0, 0.416);
-  text-align: right;
+  text-align: center;
 }
-#root .userUI .userHeader .userSchedule .schedInterval {
+#root .userUI .userHeader .userSchedule .activityLogIntervals {
   height: 15px;
+  background-color: hsl(181, 64%, 25%);
 }
 #root .userUI .userHeader .userSchedule .schedClock {
-  background-color: rgb(255, 255, 255);
-  width: 5%;
+  background-color: hsl(202, 51%, 47%);
+  width: 4%;
   height: 15px;
   text-align: center;
 }
@@ -160,28 +185,83 @@ table {
 }
 #root .userUI .writerUI {
   position: absolute;
-  top: 50px;
-  left: 15px;
+  top: 45px;
+  left: 0;
   display: block;
-  border-radius: 8px;
   background-color: hsl(330, 58%, 32%);
-  height: calc(100vh - 65px);
-  width: calc(100vw - 50px);
+  height: calc(100vh - 45px);
+  width: 100vw;
   border-right: 5px solid hsl(330, 58%, 32%);
   padding: 0 10px;
   white-space: pre-wrap;
-  overflow-x: hidden;
+}
+#root .userUI .writerUI .wShelves {
+  position: absolute;
+  display: flex;
+  flex-direction: column;
+  height: calc(100vh - 45px);
+  top: 0;
+  left: 0;
+  width: 100vw;
+}
+#root .userUI .writerUI .wShelves .shelvesContainer {
+  background-color: rgba(0, 0, 0, 0.4);
+  transition: width 1s;
+  height: calc(100vh - 45px);
+  overflow: hidden;
   overflow-y: scroll;
 }
-#root .userUI .writerUI::-webkit-scrollbar {
-  background-color: red;
-  background-color: rgba(255, 255, 255, 0.231372549);
-  width: 10px;
-  padding: 5px 0;
+#root .userUI .writerUI .wShelves .shelvesContainer .wShelf {
+  background-color: hsla(0, 0%, 0%, 0.2);
+  margin: 10px 10px 0 10px;
+  height: 200px;
 }
-#root .userUI .writerUI::-webkit-scrollbar-thumb {
-  background-color: rgba(255, 255, 255, 0.4588235294);
+#root .userUI .writerUI .wShelves .shelvesContainer .wShelf:first-of-type {
+  margin-top: 20px;
+}
+#root .userUI .writerUI .wShelves .shelvesContainer .wShelf:last-of-type {
+  margin-bottom: 60px;
+}
+#root .userUI .writerUI .wShelves .shelvesContainer::-webkit-scrollbar {
+  -webkit-appearance: none;
+          appearance: none;
+  width: 0;
+}
+#root .userUI .writerUI .wShelves .shelvesBtn {
+  position: absolute;
+  bottom: 10px;
+  left: 10px;
+  height: 40px;
+  width: 40px;
   border-radius: 4px;
+  border: none;
+  background-color: rgba(0, 0, 0, 0);
+  color: rgba(255, 255, 255, 0.383);
+  font-size: 30px;
+  font-weight: 600;
+}
+#root .userUI .writerUI .wShelves .wScreen {
+  transition: width 1s;
+  height: 100%;
+  position: absolute;
+  top: 0;
+  right: 0;
+  background-color: rgba(0, 0, 0, 0.2);
+}
+#root .userUI .writerUI .wShelves.shelvesMax .shelvesContainer {
+  width: 360px;
+}
+#root .userUI .writerUI .wShelves.shelvesMax .wScreen {
+  width: calc(100vw - 360px);
+}
+#root .userUI .writerUI .wShelves.shelvesMin .shelvesContainer {
+  width: 60px;
+}
+#root .userUI .writerUI .wShelves.shelvesMin .wScreen {
+  width: calc(100vw - 60px);
+}
+#root .userUI .writerUI .wBooks {
+  position: absolute;
 }
 #root .userUI .adminUI {
   position: absolute;

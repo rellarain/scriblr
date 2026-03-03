@@ -77,6 +77,8 @@ $white9: rgba(255, 255, 255, .9);
 
 
 $main: hsl(330, 58%, 32%);
+$accent: hsl(181, 64%, 25%);
+$alert: hsl(202, 51%, 47%);
 
 // NOTE TO SELF: TO AVOID THE SCREENS SLIDING INTO VIEW WITH TRANSITION,
 //            SET THE TRANSITION SPEED LEFT/RIGHT/TOP TO ZERO WHEN THE PAGE IS INACTIVE
@@ -118,7 +120,7 @@ $main: hsl(330, 58%, 32%);
             height: 90px;
             display: grid;
             grid-template-columns: 100vw;
-            grid-template-rows: 35px min-content 15px min-content;
+            grid-template-rows: 45px min-content 15px min-content;
             grid-template-areas: "userNav" "dashUI" "userSchedule" "trainingHelpUI";
             .userNav {
                 // background-color: blue;
@@ -126,6 +128,29 @@ $main: hsl(330, 58%, 32%);
                 // height: 40px;
                 grid-area: userNav;
                 background-color: $main;
+                .phaseToggle {
+                    position: absolute;
+                    top: 5px;
+                    right: 5px;
+                    width: 100px;
+                    height: 35px;
+                    background-color: $accent;
+                    button {
+                        height: 35px;
+                        position: absolute;
+                        top: 0;
+                        background-color: rgba(255, 255, 255, 0);
+                        border: none;
+                    }
+                    button:nth-of-type(1) {
+                        width: calc(100% - 35px);
+                        left: 0;
+                    }
+                    button:nth-of-type(2) {
+                        width: 35px;
+                        right: 0;
+                    }
+                }
             }
             .dashUI {
                 transition: height 1s;
@@ -140,7 +165,7 @@ $main: hsl(330, 58%, 32%);
                 height: 0;
             }
             .userSchedule {
-                background-color: red;
+                background-color: rgba(0, 0, 0, 0.1);
                 grid-area: userSchedule;
                 box-shadow: 0 4px 8px rgba(0, 0, 0, 0.705);
                 display: flex;
@@ -149,18 +174,20 @@ $main: hsl(330, 58%, 32%);
                 
                 width: 100vw;
                 height: 10px;
+                color: white;
                 div {width: 1%; margin: 0;}
                 .schedGap {
                     height: 10px;
                     background-color: rgba(0, 0, 0, 0.416);
-                    text-align: right;
+                    text-align: center;
                 }
-                .schedInterval {
+                .activityLogIntervals {
                     height: 15px;
+                    background-color: $accent;
                 }
                 .schedClock {
-                    background-color: rgb(255, 255, 255);
-                    width: 5%;
+                    background-color: $alert;
+                    width: 4%;
                     height: 15px;
                     text-align: center;
                 }
@@ -188,27 +215,87 @@ $main: hsl(330, 58%, 32%);
         }
         .writerUI {
             position: absolute;
-            top: 50px;
-            left: 15px;
+            top: 45px;
+            left: 0;
             display: block;
-            border-radius: 8px;
             background-color: $main;
-            height: calc(100vh - 65px);
-            width: calc(100vw - 50px);
+            height: calc(100vh - 45px);
+            width: 100vw;
             border-right: 5px solid $main;
             padding: 0 10px;
             white-space: pre-wrap;
-            overflow-x: hidden;
-            overflow-y: scroll;
-            &::-webkit-scrollbar {
-                background-color: red;
-                background-color: #ffffff3b; 
-                width: 10px;
-                padding: 5px 0;
+
+            .wShelves {
+                position: absolute;
+                display: flex;
+                flex-direction: column;
+                height: calc(100vh - 45px);
+                top: 0;
+                left: 0;
+                width: 100vw;
+                
+                .shelvesContainer {
+                    background-color: rgba(0, 0, 0, 0.4);
+                    transition: width 1s;
+                    
+                    height: calc(100vh - 45px);
+                    overflow: hidden;
+                    overflow-y: scroll;
+                    
+                    .wShelf {
+                        background-color: hsla(0, 0%, 0%, 0.2);
+                        margin: 10px 10px 0 10px;
+                        height: 200px;
+                        &:first-of-type {
+                            margin-top: 20px;
+                        }
+                        &:last-of-type {
+                            margin-bottom: 60px;
+                        }
+                    }
+
+                    &::-webkit-scrollbar {
+                        appearance: none;
+                        width: 0;
+                    }
+                }
+                .shelvesBtn {
+                    position: absolute;
+                    bottom: 10px;
+                    left: 10px;
+                    height: 40px;
+                    width: 40px;
+                    border-radius: 4px;
+                    border: none;
+
+                    background-color: rgba(0, 0, 0, 0);
+                    color: rgba(255, 255, 255, 0.383);
+                    font-size: 30px;
+                    font-weight: 600;
+                }
+
+                .wScreen {
+                    transition: width 1s;
+                    height: 100%;
+                    position: absolute;
+                    top: 0;
+                    right: 0;
+                    background-color: rgba(0, 0, 0, 0.2);
+                }
+                
+                &.shelvesMax {
+                    .shelvesContainer {width: 360px;}
+                    .wScreen {width: calc(100vw - 360px);}
+                    
+                }
+                &.shelvesMin {
+                    .shelvesContainer {width: 60px;}
+                    .wScreen {width: calc(100vw - 60px);}
+                    
+                }
             }
-            &::-webkit-scrollbar-thumb {
-                background-color: #ffffff75; 
-                border-radius: 4px;
+            .wBooks {
+                position: absolute;
             }
         }
         .adminUI {

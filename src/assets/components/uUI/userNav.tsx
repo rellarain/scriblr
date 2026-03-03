@@ -104,7 +104,7 @@ function UserNav() {
     return(
 
         <div className={'userNav'}>
-            Nav: user info, pagination/UI selection, toggles, search, {viewportHeight+"px : "+viewportWidth+"px --- "+timeStamp}
+            Nav: user info, pagination/UI selection, toggles, search, {Math.floor(viewportHeight/360)+"rows : "+Math.floor(viewportWidth/360)+"columns --- "+timeStamp}
             <PhaseToggle/>
         </div>
 

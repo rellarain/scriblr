@@ -1,3 +1,5 @@
+import WPage from "./wPage"
+
 function WBook() {
 
 
@@ -5,6 +7,7 @@ function WBook() {
 
         <div className={'wBook'}>
             
+            <WPage/>
         </div>
 
     )

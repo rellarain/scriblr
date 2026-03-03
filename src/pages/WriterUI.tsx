@@ -1,4 +1,6 @@
 import React, { useState } from "react";
+import WShelves from "../assets/components/wUI/wShelves";
+import WBook from "../assets/components/wUI/wBook";
 
 function WriterUI() {
 
@@ -9,20 +11,8 @@ function WriterUI() {
     let lineBreak : string = ".\n\n "
 
 return (<main className="writerUI">
-    WriterUI:
-    <br/>
-    <br/>
-    <br/>
-    <br/> WShelves: shelves/all projects, shelf/project, stack/series
-    <br/> WBook: cover/book, pages/chapter
-    <br/>
-    <br/>
-    <br/>
-    <p>
-        {/* {fakeDraft.split(sentences).join(lineBreak)} */}
-
-    </p>
-    <div></div>
+    <WShelves/>
+    <WBook/>
 
 </main>)}
 export default WriterUI;
