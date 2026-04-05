@@ -26,7 +26,7 @@ function UserSchedule() {
     // ----------------------------------------------------------------------------
     
     const [activityLog,setActivityLog] = useState<(number)[]>(
-        [2,2,2,20,0,0,0,0,2,2,2,2,20,5,4,5,4,65,635]
+        [2,2,2,20,0,0,0,0,2,2,2,2,20,5,4,8,86,4,526,541,45,556,5,4,65,635]
     )
     let schedPassedInts : number = (time.getHours() * 4) + (Math.floor(time.getMinutes()/15));
     let totalActiveInts : number = activityLog.length;
@@ -74,6 +74,7 @@ function UserSchedule() {
             width: totalActiveInts.toString()+"%"
         } 
         let digitCommas : RegExp = /\B(?=(\d{3})+(?!\d))/g;
+
         return(
             <div className={'activityLogIntervals'} style={activityLogLength}>
                 {totalActiveInts} 

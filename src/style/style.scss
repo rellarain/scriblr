@@ -80,8 +80,13 @@ $main: hsl(330, 58%, 32%);
 $accent: hsl(181, 64%, 25%);
 $alert: hsl(202, 51%, 47%);
 
+
+
 // NOTE TO SELF: TO AVOID THE SCREENS SLIDING INTO VIEW WITH TRANSITION,
-//            SET THE TRANSITION SPEED LEFT/RIGHT/TOP TO ZERO WHEN THE PAGE IS INACTIVE
+//    Shrink the height/width of the container 
+//    
+
+
 
 
 
@@ -120,8 +125,8 @@ $alert: hsl(202, 51%, 47%);
             height: 90px;
             display: grid;
             grid-template-columns: 100vw;
-            grid-template-rows: 45px min-content 15px min-content;
-            grid-template-areas: "userNav" "dashUI" "userSchedule" "trainingHelpUI";
+            grid-template-rows: 50px min-content min-content 15px;
+            grid-template-areas: "userNav" "dashUI" "trainingHelpUI" "userSchedule";
             .userNav {
                 // background-color: blue;
                 // width: 100vw;
@@ -130,38 +135,44 @@ $alert: hsl(202, 51%, 47%);
                 background-color: $main;
                 .phaseToggle {
                     position: absolute;
-                    top: 5px;
-                    right: 5px;
-                    width: 100px;
-                    height: 35px;
+                    top: 10px;
+                    right: 10px;
+                    width: 200px;
+                    height: 30px;
                     background-color: $accent;
                     button {
-                        height: 35px;
+                        height: 100%;
                         position: absolute;
                         top: 0;
                         background-color: rgba(255, 255, 255, 0);
                         border: none;
                     }
                     button:nth-of-type(1) {
-                        width: calc(100% - 35px);
+                        width: calc(100% - 25px);
                         left: 0;
+                        text-align: left;
+                        letter-spacing: 1.5px;
+                        padding-left: 10px;
+                        font-weight: 600;
+                        color: white;
                     }
                     button:nth-of-type(2) {
-                        width: 35px;
+                        width: 25px;
                         right: 0;
+                        padding: 0;
                     }
                 }
             }
             .dashUI {
                 transition: height 1s;
                 width: 100vw;
-                background-color: green;
+                background-color: $main;
                 grid-area: dashUI;
                 overflow: hidden;
                 
                 
                 
-                height: calc(100vh - 50px); 
+                height: calc(100vh - 70px); 
                 height: 0;
             }
             .userSchedule {
@@ -196,7 +207,7 @@ $alert: hsl(202, 51%, 47%);
                 background-color: purple;
                 transition: height 1s;
                 grid-area: trainingHelpUI;
-                height: calc(100vh - 50px); 
+                height: calc(100vh - 70px); 
                 height: 0;
                 overflow: hidden;
 
@@ -215,13 +226,14 @@ $alert: hsl(202, 51%, 47%);
         }
         .writerUI {
             position: absolute;
-            top: 45px;
+            top: 50px;
             left: 0;
             display: block;
             background-color: $main;
-            height: calc(100vh - 45px);
+            background-color: rgb(46, 68, 108);
+            height: calc(100vh - 50px);
+            width: calc(100vw - 500px);
             width: 100vw;
-            border-right: 5px solid $main;
             padding: 0 10px;
             white-space: pre-wrap;
 
@@ -235,7 +247,7 @@ $alert: hsl(202, 51%, 47%);
                 width: 100vw;
                 
                 .shelvesContainer {
-                    background-color: rgba(0, 0, 0, 0.4);
+                    // background-color: rgba(0, 0, 0, 0.4);
                     transition: width 1s;
                     
                     height: calc(100vh - 45px);
@@ -280,7 +292,162 @@ $alert: hsl(202, 51%, 47%);
                     position: absolute;
                     top: 0;
                     right: 0;
-                    background-color: rgba(0, 0, 0, 0.2);
+                    // background-color: rgba(0, 0, 0, 0.2);
+                    .testUI {
+                        position: absolute;
+                        top: 100px;
+                        left: 0px;
+                        height: 300px;
+                        width: 50vw;
+                        background-color: $main;
+                        display: block;
+                        overflow: hidden;
+                        color: rgba(255, 255, 255, 0.486);
+
+                        
+                        .testUser {
+                            
+                            position: absolute;
+                            top: 5px;
+                            right: 5px;
+                            transition: width 1s;
+                            width: calc(100% - 35px);
+                            height: calc(100% - 5px);
+                            overflow: hidden;
+                            
+                            .testAccount {
+                                width: 100%;
+                                margin: 0;
+                                overflow: hidden;
+                                transition: height 1s;
+                                background-color: rgba(0, 0, 0, 0.5);
+                                
+                                height: 30px;
+
+
+                                nav {
+                                    width: 100%;
+                                    display: flex;
+                                    flex-direction: row;
+                                    justify-content: flex-end;
+                                    button {
+                                        width: 20px;
+                                        height: 20px;
+                                        margin: 5px 0 0 5px;
+
+                                        &:first-of-type {
+                                            width: 80px;
+                                            margin-right: auto;
+                                        }
+                                        &:last-of-type {
+                                            width: 60px;
+                                            margin-right: 5px;
+                                        }
+                                    }
+                                }
+                            }
+    
+                            .testDash {
+                                
+                                width: 100%;
+                                transition: height 1s;
+                                margin: 5px 0 0 0;
+                                background-color: rgba(0, 0, 0, 0.25);
+                                overflow: hidden;
+                                
+                                
+                                height: 20px;
+                            
+                            }
+
+                            .testInterfaces {
+                                width: 100%;
+                                margin: 5px 0 0 0;
+                                height: calc(100% - 65px);
+                                transition: height 1s;
+                                background-color: $accent;
+                            }
+
+                        }
+
+                        .testAdmin {
+
+                            position: absolute;
+                            top: 5px;
+                            left: 5px;
+                            width: 20px;
+                            height: calc(100% - 10px);
+                            transition: width 1s;
+                            background-color: $alert;
+                            overflow: hidden;
+
+                            .testChats {
+                                position: absolute;
+                                display: flex;
+                                flex-direction: column;
+                                bottom: 0;
+                                left: 5px;
+                                height: 100%;
+                                background-color: rgba(0, 0, 0, 0.25);
+                                .testChat {
+                                    margin: 5px 5px 0 5px;
+                                    padding: 0; border: none;
+                                    border-radius: 2.5px;
+                                    line-height: 15px;
+                                    vertical-align: middle;
+                                    transition: height 1s, width 1s;
+
+                                    &.chatActive {
+                                        height: 100px;
+                                        width: 85px;
+                                    }
+                                    &.chatInactive {
+                                        height: 15px;
+                                        width: 15px;
+                                    }
+
+                                }
+                            }
+
+                            .testChatQueues {
+                                margin: 5px 5px 0 5px;
+                                padding: 0; border: none;
+                                border-radius: 2.5px;
+                                overflow: hidden;
+                            }
+                            
+                        }
+
+                        &.openAccount {
+                            .testUser {
+                                .testAccount {height: calc(100% - 30px); }
+                                .testDash {margin-bottom: 6px;}
+
+                            }
+                        }
+                        &.openDash {
+                            .testUser {
+                                .testDash {height: calc(100% - 40px); margin-bottom: 6px;}
+
+                            }
+                        }
+                        &.openInterface {
+                            .testUser {
+                                .testInterfaces {margin-bottom: 5px;}
+
+                            }
+                        }
+
+                        &.adminOpen {
+                            .testUser {width: calc(100% - 115px);}
+                            .testAdmin {width: 100px;}
+                        }
+                        &.adminClosed {
+                            .testUser {width: calc(100% - 45px);}
+                            .testAdmin {width: 30px;}
+                        }
+
+                    }
                 }
                 
                 &.shelvesMax {

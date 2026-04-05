@@ -10,8 +10,11 @@ import WriterUI from "./WriterUI";
 import ReaderUI from "./ReaderUI";
 
 
+
 function UserUI() {
 
+    const [time,setTime]=useState<Date>(new Date);
+    
     const {viewportWidth, viewportHeight} = useWindowDimensions();
 
     let screenIntervals = 360;
@@ -42,7 +45,7 @@ return (<main className={"userUI screen" + screenOrientation+" screen"+screenRow
         <HelpUI/>
         <UserSchedule/>
         <DashUI/>
-        <UserNav/>
+        <UserNav time={time} setTime={setTime}/>
     </header>
 
 

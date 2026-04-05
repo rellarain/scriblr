@@ -1,22 +1,25 @@
 import React, { useEffect, useState } from "react";
 import useWindowDimensions from "../../../functionality/viewport";
+import SkyScene from "./skyScene";
+
+
+interface UIProps {
+    time: Date
+    setTime: React.Dispatch<React.SetStateAction<Date>>
+}
 
 
 
-
-
-
-function UserNav() {
+function UserNav({time, setTime}:UIProps) {
     const {viewportWidth, viewportHeight} = useWindowDimensions();
     
-    let time : Date = new Date;
     let nowHour : number = time.getHours();
     let nowMins : number = time.getMinutes();
     let timeStamp : string = (time.getHours()%12).toString().padStart(2,'0')+":"+time.getMinutes().toString().padStart(2,'0');
     
     
     
-    const [initialPhase,setInitialPhase] =useState<string>('')
+    const [initialPhase,setInitialPhase] =useState<string>('Night')
     
     function handleInitialPhase(nowHour : number) {
         let x = nowHour;
@@ -46,8 +49,8 @@ function UserNav() {
         } else if (currentPhase === 'Morning') {
             setCurrentPhase('Noon')
         } else if (currentPhase === 'Noon') {
-            setCurrentPhase('Afteroon')
-        } else if (currentPhase === 'Dawn') {
+            setCurrentPhase('Afternoon')
+        } else if (currentPhase === 'Afternoon') {
             setCurrentPhase('Dusk')
         } else if (currentPhase === 'Dusk') {
             setCurrentPhase('Night')
@@ -74,13 +77,12 @@ function UserNav() {
 
             <div className={'phaseToggle'}>
                 <button onClick={handlePhaseReset}>
-                    {timeStamp}{initialPhase}
+                    {timeStamp}
                 </button>
                 <button onClick={handlePhaseToggle}>
                     <div>{currentPhase}</div>
-                    <div></div>
-                    <div></div>
                 </button>
+                <SkyScene time = {time} setTime={setTime}/>
 
                 {/* 
                     Night: , 
