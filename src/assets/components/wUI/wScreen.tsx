@@ -39,7 +39,6 @@ function WScreen() {
     
 
     return(
-
         <div className={'wScreen'}>
             <div className={'testUI open'+interfaceState+' admin'+adminState+' page'+pageState}>
                 <div className="testUser">
@@ -48,21 +47,23 @@ function WScreen() {
                             <button onClick={openAccount}>account</button>
                             <button onClick={openInterface}>VUI</button>
                             <button onClick={openInterface}>UUI</button>
+                            <button onClick={openInterface}>TUI</button>
                             <button onClick={openInterface}>RUI</button>
                             <button onClick={openInterface}>WUI</button>
-                            <button onClick={openInterface}>TUI</button>
                             <button onClick={openInterface}>AUI</button>
                             <button>dash</button>
                         </nav>
                     </div>
-                    <div className="testDash">Dash: schedule/activityLog/history, feed/notifications/updates/news</div>
+                    <div className="testDash">
+                        Dash: schedule/activityLog/history, feed/notifications/updates/news,
+                    </div>
                     <div className="testInterfaces">
-                        <div className="testVUI">VUI: welcome interface, all users</div>
-                        <div className="testUUI">UUI: social interface, registered users</div>
-                        <div className="testTUI">TUI: training interface, registered users</div>
-                        <div className="testRUI">RUI: reading interface, reader & admin users</div>
-                        <div className="testWUI">WUI: writing interface, writer & admin users</div>
-                        <div className="testAUI">AUI: administrative interface, only authorized users</div>
+                        <div className="testVUI">+ VUI: welcome interface, all users</div>
+                        <div className="testUUI">+ UUI: social interface, registered users; /community, /forum</div>
+                        <div className="testTUI">+ TUI: training interface, registered users;/modules, /project</div>
+                        <div className="testRUI">+ RUI: reader & admin users; ShelvesUI/library, ShelfUI/collection, BookUI/details/forum, PagesUI/reading </div>
+                        <div className="testWUI">+ WUI: writer & admin users; ShelvesUI/projects, ShelfUI/project, BookUI/outline, PagesUI/draft/review, PressUI/export</div>
+                        <div className="testAUI">+ AUI: administrative interface, only authorized users; tool config, user mgmt</div>
                     </div>
                 </div>
                 <div className="testAdmin">
@@ -76,17 +77,11 @@ function WScreen() {
                         <Chat/>
                     </div>
                 </div>
-                <div></div>
-
             </div>
         </div>
-
     )
 }
-
-
     function Chat() {
-        
         const [chatActivity,setChatActivity]=useState<string>('chatInactive');
         function openChat() {
             if (chatActivity !== 'chatActive') {
@@ -95,11 +90,9 @@ function WScreen() {
         }
     
         return(
-    
             <button className={'testChat '+chatActivity} onClick={openChat}>
                 +
             </button>
-    
         )
     }
 

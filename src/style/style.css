@@ -357,6 +357,8 @@ table {
   border: none;
   border-radius: 2.5px;
   overflow: hidden;
+  width: 15px;
+  height: 45px;
 }
 #root .userUI .writerUI .wShelves .wScreen .testUI.openAccount .testUser .testAccount {
   height: calc(100% - 30px);
