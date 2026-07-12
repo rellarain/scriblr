@@ -176,20 +176,21 @@ $alert: hsl(202, 51%, 47%);
                 height: 0;
             }
             .userSchedule {
-                background-color: rgba(0, 0, 0, 0.1);
+                background-color: rgba(0, 0, 0, 0.4);
                 grid-area: userSchedule;
                 box-shadow: 0 4px 8px rgba(0, 0, 0, 0.705);
                 display: flex;
                 flex-direction: row;
                 justify-content: flex-end;
-                
+                transition: height 1s;
                 width: 100vw;
                 height: 10px;
+                height: 90vh;
                 color: white;
                 div {width: 1%; margin: 0;}
                 .schedGap {
                     height: 10px;
-                    background-color: rgba(0, 0, 0, 0.416);
+                    background-color: rgba(0, 0, 0, 0);
                     text-align: center;
                 }
                 .activityLogIntervals {
@@ -230,10 +231,9 @@ $alert: hsl(202, 51%, 47%);
             left: 0;
             display: block;
             background-color: $main;
-            background-color: rgb(46, 68, 108);
+            background-color: rgb(49, 116, 240);
             height: calc(100vh - 50px);
-            width: calc(100vw - 500px);
-            width: 100vw;
+            width: calc(100vw - 20px);
             padding: 0 10px;
             white-space: pre-wrap;
 
@@ -301,6 +301,7 @@ $alert: hsl(202, 51%, 47%);
                         width: 50vw;
                         background-color: $main;
                         display: block;
+                        display: none;
                         overflow: hidden;
                         color: rgba(255, 255, 255, 0.486);
 

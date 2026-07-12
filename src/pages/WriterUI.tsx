@@ -11,8 +11,7 @@ function WriterUI() {
     let lineBreak : string = ".\n\n "
 
 return (<main className="writerUI">
-    <WShelves/>
-    <WBook/>
+    
 
 </main>)}
 export default WriterUI;
