@@ -77,8 +77,9 @@ $white9: rgba(255, 255, 255, .9);
 
 
 $main: hsl(330, 58%, 32%);
-$accent: hsl(181, 64%, 25%);
+$accent: hsl(181, 63%, 17%);
 $alert: hsl(202, 51%, 47%);
+$plan: hsl(49, 78%, 51%);
 
 
 
@@ -184,8 +185,8 @@ $alert: hsl(202, 51%, 47%);
                 justify-content: flex-end;
                 transition: height 1s;
                 width: 100vw;
-                height: 10px;
                 height: 90vh;
+                height: 10px;
                 color: white;
                 div {width: 1%; margin: 0;}
                 .schedGap {
@@ -231,7 +232,7 @@ $alert: hsl(202, 51%, 47%);
             left: 0;
             display: block;
             background-color: $main;
-            background-color: rgb(49, 116, 240);
+            background-color: rgb(31, 77, 163);
             height: calc(100vh - 50px);
             width: calc(100vw - 20px);
             padding: 0 10px;
@@ -470,22 +471,243 @@ $alert: hsl(202, 51%, 47%);
         }
         .adminUI {
             position: absolute;
-            transition: top 1s;
+            transition: bottom 1s;
             left: 15px;
-            display: block;
-            border-radius: 8px;
-            background-color: rgb(136, 32, 32);
-            box-shadow: inset 0 2px 8px 4px rgba(0, 0, 0, 0.5);
-            height: calc(100vh - 65px);
+            display: grid;
+            border-radius: 8px 8px 0 0;
+            background-color: $black6;
+            box-shadow:  0 2px 8px 4px rgba(0, 0, 0, 0.5);
+            height: calc(100vh - 75px);
+            overflow: hidden;
             width: calc(100vw - 30px);
-    
-    
-    
-    
-            top: 55px;
-            top: -120vh;
+            
+            grid-template-rows: 60px auto;
+            grid-template-columns: auto;
+            
+            bottom: -120vh;
+            bottom: 0;
+
+            .adminTabs {
+                position: absolute;
+                top: 0;
+                left: 0;
+                width: 100%;
+                height: 50px;
+                background-color: $black3;
+                display: flex;
+                
+
+                button {
+                    width: max-content;
+                    // line-height: 30px;
+                    text-transform: uppercase;
+                    font-weight: 600;
+                    font-size: 15px;
+                    vertical-align: top;
+                    cursor: pointer;
+                    letter-spacing: 2px;
+                    padding: 0 10px;
+                    border: none;
+                    color: $white5;
+                    border-radius: 4px 4px 0 0;
+                    transition: margin 1s, height 1s, padding 1s;
+                    height: 30px; 
+                    margin: 20px 0 0 10px;
+                    background-color: $black5;
+                    
+                    
+                    b {
+                        margin-left: 15px;
+                        color: $white3;
+                        height: 30px;
+                        // padding: 9px;
+                    }
+                    
+                }
+                button:first-child {
+                    padding: 0 20px;
+                    background-color: $accent; 
+                    color: $white9;
+                    height: 40px; 
+                    margin: 10px 0 0 10px;
+                    b {color: $black5}
+
+                }
+                button:last-child {
+                    background-color: $accent;
+                    margin: 10px 10px 0 auto;
+                    height: 30px;
+                    border-radius: 4px;
+                    color: $white8;
+
+                }
+            }
+            
+            .adminDeskTool {
+                height: calc(100% - 60px);
+                background-color: $accent;
+                bottom: 0;
+                right: 10px;
+                position: absolute;
+                transition: width 1s ease;
+                box-shadow:  0 2px 8px 4px rgba(0, 0, 0, 0.5);
+                border-radius: 4px 4px 0 0;
+
+                display: grid;
+                grid-template-rows: 50px auto;
+
+                width: calc(100% - 80px);
+                width: calc(100% - 410px);
+            }
+
+            .adminChatTool {
+                height: calc(100% - 80px);
+                // background-color: rgb(4, 4, 94);
+                background-color: $black4;
+                transition: width 1s;
+                position: absolute;
+                bottom: 10px;
+                border-radius: 4px 0 0 4px;
+                left: 10px;
+
+
+                width: 70px;
+                width: 390px;
+            }
         }
         
+    }
+
+    .planUI {
+        position: fixed;
+        bottom: 5px;
+        right: 5px; 
+        transition: height 1s, width 1s;
+        border-radius: 4px;
+        background-color: $plan;
+        overflow: hidden;
+        .planToggle {
+            cursor: pointer;
+            border: none;
+            border-radius: 4px;
+            position: absolute;
+            bottom: 0;
+            right: 0;
+            height: 30px;
+            line-height: 30px;
+            width: 100%;
+            background-color: $plan;
+            color: $black6;
+            font-size: 15px;
+            letter-spacing: 2px;
+            font-weight: 700;
+            text-align: center;
+            text-transform: uppercase;
+        }
+        .planContent {
+            background-color: $black2;
+            width: 100%;
+            position: absolute;
+            bottom: 30px;
+            transition: height 1s;
+            overflow-x: hidden;
+            overflow-y: scroll;
+            &::-webkit-scrollbar {background-color: $white0;}
+
+            h3 {
+                font-weight: 700;
+                font-size: 18px;
+                text-transform: uppercase;
+                letter-spacing: 6px;
+                line-height: 18px;
+                text-align: center;
+                margin: 50px 0 10px 10px;
+                padding: 15px;
+                background-color: $black6;
+                color: white;
+                border-radius: 4px;
+                &:first-child {
+                    margin-top: 10px;
+                }
+            }
+            p {
+                padding: 0 10px;
+                text-indent: 40px;
+                line-height: 24px;
+                letter-spacing: .5px;
+            }
+            ul {
+                background-color: $black2;
+                padding: 10px;
+                border-radius: 4px;
+                margin: 10px 0 0 10px;
+
+                &:last-child {
+                    margin-bottom: 10px;
+                }
+                
+                p:nth-child(1) {
+                    font-weight: 700;
+                    font-size: 18px;
+                    text-transform: uppercase;
+                    letter-spacing: 2px;
+                    line-height: 30px;
+                    padding: 0;
+                    text-indent: 0;
+                    color: $black6;
+                    b {
+                        font-weight: 700; 
+                        letter-spacing: 3px;
+                        color: black;
+                    }
+                }
+                p {
+                    line-height: 24px;
+                    text-indent: 20px;
+                    font-weight: 500;
+                    letter-spacing: .5px;
+                    padding: 0 0 5px;
+
+                }
+                li {
+                    // list-style: disc inside;
+                    background-color: $plan;
+                    // color: $white9;
+                    margin: 5px 0 0 0;
+                    border-radius: 4px;
+                    padding: 5px;
+                    text-indent: 10px hanging;
+                    line-height: 20px;
+                    b {
+                        font-weight: 600;
+                        letter-spacing: 1px;
+                        text-transform: uppercase;
+                    }
+
+                }
+
+                
+            }
+        }
+        
+        &.planActive {
+            width: 400px;
+            height: calc(100vh - 10px);
+            .planContent {
+                height: calc(100vh - 45px);
+                
+            }
+        }
+        &.planInactive {
+            height: 35px;
+            width: 70px;
+            .planContent {
+                height: 0;
+                
+            }
+        }
+
+
     }
         
         

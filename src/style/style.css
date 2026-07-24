@@ -107,7 +107,7 @@ table {
   right: 10px;
   width: 200px;
   height: 30px;
-  background-color: hsl(181, 64%, 25%);
+  background-color: hsl(181, 63%, 17%);
 }
 #root .userUI .userHeader .userNav .phaseToggle button {
   height: 100%;
@@ -148,8 +148,8 @@ table {
   justify-content: flex-end;
   transition: height 1s;
   width: 100vw;
-  height: 10px;
   height: 90vh;
+  height: 10px;
   color: white;
 }
 #root .userUI .userHeader .userSchedule div {
@@ -163,7 +163,7 @@ table {
 }
 #root .userUI .userHeader .userSchedule .activityLogIntervals {
   height: 15px;
-  background-color: hsl(181, 64%, 25%);
+  background-color: hsl(181, 63%, 17%);
 }
 #root .userUI .userHeader .userSchedule .schedClock {
   background-color: hsl(202, 51%, 47%);
@@ -197,7 +197,7 @@ table {
   left: 0;
   display: block;
   background-color: hsl(330, 58%, 32%);
-  background-color: rgb(49, 116, 240);
+  background-color: rgb(31, 77, 163);
   height: calc(100vh - 50px);
   width: calc(100vw - 20px);
   padding: 0 10px;
@@ -315,7 +315,7 @@ table {
   margin: 5px 0 0 0;
   height: calc(100% - 65px);
   transition: height 1s;
-  background-color: hsl(181, 64%, 25%);
+  background-color: hsl(181, 63%, 17%);
 }
 #root .userUI .writerUI .wShelves .wScreen .testUI .testAdmin {
   position: absolute;
@@ -404,14 +404,210 @@ table {
 }
 #root .userUI .adminUI {
   position: absolute;
-  transition: top 1s;
+  transition: bottom 1s;
   left: 15px;
-  display: block;
-  border-radius: 8px;
-  background-color: rgb(136, 32, 32);
-  box-shadow: inset 0 2px 8px 4px rgba(0, 0, 0, 0.5);
-  height: calc(100vh - 65px);
+  display: grid;
+  border-radius: 8px 8px 0 0;
+  background-color: rgba(0, 0, 0, 0.6);
+  box-shadow: 0 2px 8px 4px rgba(0, 0, 0, 0.5);
+  height: calc(100vh - 75px);
+  overflow: hidden;
   width: calc(100vw - 30px);
-  top: 55px;
-  top: -120vh;
+  grid-template-rows: 60px auto;
+  grid-template-columns: auto;
+  bottom: -120vh;
+  bottom: 0;
+}
+#root .userUI .adminUI .adminTabs {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 50px;
+  background-color: rgba(0, 0, 0, 0.3);
+  display: flex;
+}
+#root .userUI .adminUI .adminTabs button {
+  width: -moz-max-content;
+  width: max-content;
+  text-transform: uppercase;
+  font-weight: 600;
+  font-size: 15px;
+  vertical-align: top;
+  cursor: pointer;
+  letter-spacing: 2px;
+  padding: 0 10px;
+  border: none;
+  color: rgba(255, 255, 255, 0.5);
+  border-radius: 4px 4px 0 0;
+  transition: margin 1s, height 1s, padding 1s;
+  height: 30px;
+  margin: 20px 0 0 10px;
+  background-color: rgba(0, 0, 0, 0.5);
+}
+#root .userUI .adminUI .adminTabs button b {
+  margin-left: 15px;
+  color: rgba(255, 255, 255, 0.3);
+  height: 30px;
+}
+#root .userUI .adminUI .adminTabs button:first-child {
+  padding: 0 20px;
+  background-color: hsl(181, 63%, 17%);
+  color: rgba(255, 255, 255, 0.9);
+  height: 40px;
+  margin: 10px 0 0 10px;
+}
+#root .userUI .adminUI .adminTabs button:first-child b {
+  color: rgba(0, 0, 0, 0.5);
+}
+#root .userUI .adminUI .adminTabs button:last-child {
+  background-color: hsl(181, 63%, 17%);
+  margin: 10px 10px 0 auto;
+  height: 30px;
+  border-radius: 4px;
+  color: rgba(255, 255, 255, 0.8);
+}
+#root .userUI .adminUI .adminDeskTool {
+  height: calc(100% - 60px);
+  background-color: hsl(181, 63%, 17%);
+  bottom: 0;
+  right: 10px;
+  position: absolute;
+  transition: width 1s ease;
+  box-shadow: 0 2px 8px 4px rgba(0, 0, 0, 0.5);
+  border-radius: 4px 4px 0 0;
+  display: grid;
+  grid-template-rows: 50px auto;
+  width: calc(100% - 80px);
+  width: calc(100% - 410px);
+}
+#root .userUI .adminUI .adminChatTool {
+  height: calc(100% - 80px);
+  background-color: rgba(0, 0, 0, 0.4);
+  transition: width 1s;
+  position: absolute;
+  bottom: 10px;
+  border-radius: 4px 0 0 4px;
+  left: 10px;
+  width: 70px;
+  width: 390px;
+}
+#root .planUI {
+  position: fixed;
+  bottom: 5px;
+  right: 5px;
+  transition: height 1s, width 1s;
+  border-radius: 4px;
+  background-color: hsl(49, 78%, 51%);
+  overflow: hidden;
+}
+#root .planUI .planToggle {
+  cursor: pointer;
+  border: none;
+  border-radius: 4px;
+  position: absolute;
+  bottom: 0;
+  right: 0;
+  height: 30px;
+  line-height: 30px;
+  width: 100%;
+  background-color: hsl(49, 78%, 51%);
+  color: rgba(0, 0, 0, 0.6);
+  font-size: 15px;
+  letter-spacing: 2px;
+  font-weight: 700;
+  text-align: center;
+  text-transform: uppercase;
+}
+#root .planUI .planContent {
+  background-color: rgba(0, 0, 0, 0.2);
+  width: 100%;
+  position: absolute;
+  bottom: 30px;
+  transition: height 1s;
+  overflow-x: hidden;
+  overflow-y: scroll;
+}
+#root .planUI .planContent::-webkit-scrollbar {
+  background-color: rgba(255, 255, 255, 0);
+}
+#root .planUI .planContent h3 {
+  font-weight: 700;
+  font-size: 18px;
+  text-transform: uppercase;
+  letter-spacing: 6px;
+  line-height: 18px;
+  text-align: center;
+  margin: 50px 0 10px 10px;
+  padding: 15px;
+  background-color: rgba(0, 0, 0, 0.6);
+  color: white;
+  border-radius: 4px;
+}
+#root .planUI .planContent h3:first-child {
+  margin-top: 10px;
+}
+#root .planUI .planContent p {
+  padding: 0 10px;
+  text-indent: 40px;
+  line-height: 24px;
+  letter-spacing: 0.5px;
+}
+#root .planUI .planContent ul {
+  background-color: rgba(0, 0, 0, 0.2);
+  padding: 10px;
+  border-radius: 4px;
+  margin: 10px 0 0 10px;
+}
+#root .planUI .planContent ul:last-child {
+  margin-bottom: 10px;
+}
+#root .planUI .planContent ul p:nth-child(1) {
+  font-weight: 700;
+  font-size: 18px;
+  text-transform: uppercase;
+  letter-spacing: 2px;
+  line-height: 30px;
+  padding: 0;
+  text-indent: 0;
+  color: rgba(0, 0, 0, 0.6);
+}
+#root .planUI .planContent ul p:nth-child(1) b {
+  font-weight: 700;
+  letter-spacing: 3px;
+  color: black;
+}
+#root .planUI .planContent ul p {
+  line-height: 24px;
+  text-indent: 20px;
+  font-weight: 500;
+  letter-spacing: 0.5px;
+  padding: 0 0 5px;
+}
+#root .planUI .planContent ul li {
+  background-color: hsl(49, 78%, 51%);
+  margin: 5px 0 0 0;
+  border-radius: 4px;
+  padding: 5px;
+  text-indent: 10px hanging;
+  line-height: 20px;
+}
+#root .planUI .planContent ul li b {
+  font-weight: 600;
+  letter-spacing: 1px;
+  text-transform: uppercase;
+}
+#root .planUI.planActive {
+  width: 400px;
+  height: calc(100vh - 10px);
+}
+#root .planUI.planActive .planContent {
+  height: calc(100vh - 45px);
+}
+#root .planUI.planInactive {
+  height: 35px;
+  width: 70px;
+}
+#root .planUI.planInactive .planContent {
+  height: 0;
 }/*# sourceMappingURL=style.css.map */

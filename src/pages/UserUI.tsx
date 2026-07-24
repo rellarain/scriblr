@@ -37,9 +37,9 @@ function UserUI() {
 
 return (<main className={"userUI screen" + screenOrientation+" screen"+screenRowsRnd+'x'+screenColumnsRnd}>
 
-    <AdminUI/>
     <WriterUI/>
     <ReaderUI/>
+    <AdminUI/>
     <header className="userHeader">
         <TrainingUI/>
         <HelpUI/>

@@ -11,7 +11,6 @@ function SkyScene({time, setTime}:TimeProps) {
 
     let hour : number = time.getHours();
     let minute : number = time.getMinutes();
-    let second : number = time.getSeconds();
     let milliseconds : number = time.getMilliseconds();
     let remMilliseconds : number = 1000 - milliseconds;
 
@@ -28,7 +27,7 @@ function SkyScene({time, setTime}:TimeProps) {
     return(
 
         <div className={'skyScene'}>
-            sky scene {hour+":"+minute+":"+second}
+            sky scene {hour+":"+minute}
         </div>
 
     )
