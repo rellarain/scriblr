@@ -8,7 +8,7 @@ interface Props {
 }
 
 function MomentPickerSidebar({ nodes, selectedMomentId, onSelect }: Props) {
-  const ordered = documentOrder(nodes).filter((n) => n.kind !== 'book')
+  const ordered = documentOrder(nodes)
 
   return (
     <aside className="moment-picker">

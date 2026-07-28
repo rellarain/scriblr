@@ -2,9 +2,8 @@ import { useEffect, useRef, useState } from 'react'
 import { useParams } from 'react-router-dom'
 import { useOutline, useSaveOutline } from '../../api/outline'
 import type { OutlineNode, OutlineNodeKind, OutlineTree } from '../../types'
-import AddChildForm from './AddChildForm'
 import OutlineTreeView from './OutlineTreeView'
-import { addNode, getBook, kindsDeeperThan, removeNode, renameNode, reorderSiblings } from './outlineTree'
+import { addBook, addNode, removeNode, renameNode, reorderSiblings } from './outlineTree'
 
 const RENAME_SAVE_DELAY_MS = 500
 
@@ -14,6 +13,7 @@ function OutlineEditor() {
   const saveOutline = useSaveOutline(projectId ?? '')
 
   const [nodes, setNodes] = useState<OutlineNode[]>([])
+  const [newBookTitle, setNewBookTitle] = useState('')
   const schemaVersionRef = useRef(1)
   const nodesRef = useRef<OutlineNode[]>([])
   const saveTimeout = useRef<ReturnType<typeof setTimeout>>()
@@ -57,32 +57,49 @@ function OutlineEditor() {
     saveNow(next)
   }
 
-  function handleReorder(_parentId: string, orderedIds: string[]) {
+  function handleReorder(_parentId: string | null, orderedIds: string[]) {
     const next = reorderSiblings(nodes, orderedIds)
     setNodes(next)
     saveNow(next)
   }
 
-  if (isLoading) return <p>Loading outline…</p>
+  function handleAddBook() {
+    const title = newBookTitle.trim()
+    if (!title) return
+    const next = addBook(nodes, title)
+    setNodes(next)
+    saveNow(next)
+    setNewBookTitle('')
+  }
 
-  const book = getBook(nodes)
-  if (!book) return null
+  if (isLoading) return <p>Loading outline…</p>
 
   return (
     <div className="outline-editor">
-      <h2>{book.title}</h2>
-
-      <AddChildForm kindOptions={kindsDeeperThan('book')} onSubmit={(kind, title) => handleAddChild(book.id, kind, title)} />
+      <div className="outline-editor__add-book">
+        <input
+          type="text"
+          placeholder="New book title"
+          value={newBookTitle}
+          onChange={(e) => setNewBookTitle(e.target.value)}
+          onKeyDown={(e) => e.key === 'Enter' && handleAddBook()}
+        />
+        <button type="button" onClick={handleAddBook}>
+          Add book
+        </button>
+      </div>
 
       <OutlineTreeView
         nodes={nodes}
-        parentId={book.id}
+        parentId={null}
         depth={0}
         onRename={handleRename}
         onDelete={handleDelete}
         onAddChild={handleAddChild}
         onReorder={handleReorder}
       />
+
+      {nodes.length === 0 && <p>No books yet — add your first one above.</p>}
     </div>
   )
 }

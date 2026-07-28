@@ -2,8 +2,13 @@ import { OUTLINE_KIND_ORDER } from '../../types'
 import type { OutlineNode, OutlineNodeKind } from '../../types'
 import * as tree from '../../lib/nodeTree'
 
-export function getBook(nodes: OutlineNode[]): OutlineNode | undefined {
-  return nodes.find((n) => n.kind === 'book')
+/** A project may contain multiple books (e.g. a series) — all root-level nodes. */
+export function getBooks(nodes: OutlineNode[]): OutlineNode[] {
+  return tree.getRoots(nodes)
+}
+
+export function addBook(nodes: OutlineNode[], title: string): OutlineNode[] {
+  return addNode(nodes, null, 'book', title)
 }
 
 export function getChildren(nodes: OutlineNode[], parentId: string | null): OutlineNode[] {
@@ -30,7 +35,7 @@ export function kindsDeeperThan(kind: OutlineNodeKind): OutlineNodeKind[] {
 
 export function addNode(
   nodes: OutlineNode[],
-  parentId: string,
+  parentId: string | null,
   kind: OutlineNodeKind,
   title: string
 ): OutlineNode[] {

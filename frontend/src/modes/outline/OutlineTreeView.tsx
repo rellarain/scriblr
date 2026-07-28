@@ -12,7 +12,7 @@ interface Props {
   onRename: (nodeId: string, title: string) => void
   onDelete: (nodeId: string) => void
   onAddChild: (parentId: string, kind: OutlineNodeKind, title: string) => void
-  onReorder: (parentId: string, orderedIds: string[]) => void
+  onReorder: (parentId: string | null, orderedIds: string[]) => void
 }
 
 function OutlineTreeView({
@@ -29,7 +29,7 @@ function OutlineTreeView({
 
   function handleDragEnd(event: DragEndEvent) {
     const { active, over } = event
-    if (!over || active.id === over.id || parentId === null) return
+    if (!over || active.id === over.id) return
     const ordered = children.map((c) => c.id)
     const oldIndex = ordered.indexOf(String(active.id))
     const newIndex = ordered.indexOf(String(over.id))
