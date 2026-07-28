@@ -2,7 +2,7 @@ import { useSortable } from '@dnd-kit/sortable'
 import { CSS } from '@dnd-kit/utilities'
 import { nextKindInLevels } from '../../lib/nodeTree'
 import { PLOT_KIND_ORDER } from '../../types'
-import type { OutlineNode, PlotNode, PlotNodeKind } from '../../types'
+import type { PlotNode, PlotNodeKind } from '../../types'
 
 interface Props {
   node: PlotNode
@@ -10,7 +10,8 @@ interface Props {
   hasChildren: boolean
   collapsed: boolean
   onToggleCollapse: (nodeId: string) => void
-  moments: OutlineNode[]
+  plotpointTotal: number
+  plotpointAssigned: number
   onRename: (nodeId: string, title: string) => void
   onDelete: (node: PlotNode) => void
   onAddChild: (node: PlotNode) => void
@@ -19,7 +20,7 @@ interface Props {
   onEnter: (node: PlotNode) => void
   onNavigateToParent: (node: PlotNode) => void
   onBackspaceDelete: (node: PlotNode) => void
-  onUpdatePlotpoint: (nodeId: string, patch: { body?: string; assignedMomentId?: string | null }) => void
+  onUpdateBody: (nodeId: string, body: string) => void
   registerInput: (nodeId: string, el: HTMLInputElement | null) => void
 }
 
@@ -29,7 +30,8 @@ function PlotNodeRow({
   hasChildren,
   collapsed,
   onToggleCollapse,
-  moments,
+  plotpointTotal,
+  plotpointAssigned,
   onRename,
   onDelete,
   onAddChild,
@@ -38,7 +40,7 @@ function PlotNodeRow({
   onEnter,
   onNavigateToParent,
   onBackspaceDelete,
-  onUpdatePlotpoint,
+  onUpdateBody,
   registerInput,
 }: Props) {
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({
@@ -46,6 +48,8 @@ function PlotNodeRow({
   })
 
   const canAddChild = nextKindInLevels(levels, node.kind, PLOT_KIND_ORDER) !== undefined
+  const isPlotpoint = node.kind === 'plotpoint'
+  const showDescription = isPlotpoint && node.title.trim() !== ''
 
   const style = {
     transform: CSS.Transform.toString(transform),
@@ -70,8 +74,24 @@ function PlotNodeRow({
     }
   }
 
+  // Cross-tree assignment drag (plotpoint -> moment) uses native HTML5 DnD,
+  // separate from the dnd-kit sortable handle below which reorders siblings.
+  // Bail out if the drag started on that handle so the two systems don't fight.
+  function handleDragStart(e: React.DragEvent<HTMLDivElement>) {
+    if ((e.target as HTMLElement).closest('.plot-node__handle')) {
+      e.preventDefault()
+      return
+    }
+    e.dataTransfer.setData('application/x-plotpoint-id', node.id)
+    e.dataTransfer.effectAllowed = 'move'
+  }
+
   return (
-    <div className="plot-node-wrap">
+    <div
+      className={`plot-node-wrap${isPlotpoint ? ' plot-node-wrap--plotpoint' : ''}`}
+      draggable={isPlotpoint}
+      onDragStart={isPlotpoint ? handleDragStart : undefined}
+    >
       <div
         ref={setNodeRef}
         style={style}
@@ -90,7 +110,15 @@ function PlotNodeRow({
           ⠿
         </span>
         <div className="plot-node__main">
-          <span className="plot-node__kind">{node.kind}</span>
+          <span className="plot-node__kind">
+            {node.kind}
+            {node.kind === 'plotline' && (
+              <span className="plot-node__count">
+                {' '}
+                · {plotpointAssigned}/{plotpointTotal} assigned
+              </span>
+            )}
+          </span>
           <input
             ref={(el) => registerInput(node.id, el)}
             className="plot-node__title"
@@ -110,25 +138,13 @@ function PlotNodeRow({
         </button>
       </div>
 
-      {node.kind === 'plotpoint' && (
-        <div className="plot-node__plotpoint-fields">
-          <textarea
-            placeholder="What happens…"
-            value={node.body}
-            onChange={(e) => onUpdatePlotpoint(node.id, { body: e.target.value })}
-          />
-          <select
-            value={node.assignedMomentId ?? ''}
-            onChange={(e) => onUpdatePlotpoint(node.id, { assignedMomentId: e.target.value || null })}
-          >
-            <option value="">Not assigned to a moment</option>
-            {moments.map((m) => (
-              <option key={m.id} value={m.id}>
-                {m.title}
-              </option>
-            ))}
-          </select>
-        </div>
+      {showDescription && (
+        <textarea
+          className="plot-node__description"
+          placeholder="What happens…"
+          value={node.body}
+          onChange={(e) => onUpdateBody(node.id, e.target.value)}
+        />
       )}
     </div>
   )

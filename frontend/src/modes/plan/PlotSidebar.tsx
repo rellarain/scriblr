@@ -1,11 +1,9 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { useParams } from 'react-router-dom'
-import { useOutline } from '../../api/outline'
 import { usePlot, useSavePlot } from '../../api/plot'
 import { useProject, useUpdateProject } from '../../api/projects'
 import { PLOT_KIND_ORDER } from '../../types'
 import type { PlotNode, PlotNodeKind, PlotTree } from '../../types'
-import { getAllMoments } from '../outline/outlineTree'
 import PlotTreeView from './PlotTreeView'
 import {
   addCategory,
@@ -18,7 +16,7 @@ import {
   removeNode,
   renameNode,
   reorderSiblings,
-  updatePlotpoint,
+  updatePlotpointBody,
 } from './plotTree'
 
 const EDIT_SAVE_DELAY_MS = 500
@@ -31,7 +29,6 @@ interface PendingSibling {
 function PlotSidebar() {
   const { projectId } = useParams<{ projectId: string }>()
   const { data, isLoading, error } = usePlot(projectId)
-  const { data: outline } = useOutline(projectId)
   const { data: project } = useProject(projectId)
   const savePlot = useSavePlot(projectId ?? '')
   const updateProject = useUpdateProject(projectId ?? '')
@@ -81,8 +78,6 @@ function PlotSidebar() {
       return next
     })
   }
-
-  const moments = getAllMoments(outline?.nodes ?? [])
 
   function saveNow(next: PlotNode[]) {
     if (saveTimeout.current) clearTimeout(saveTimeout.current)
@@ -175,15 +170,11 @@ function PlotSidebar() {
     pendingSibling.current = { anchorId: node.id, pendingId: result.newNode.id }
   }
 
-  function handleUpdatePlotpoint(nodeId: string, patch: { body?: string; assignedMomentId?: string | null }) {
+  function handleUpdateBody(nodeId: string, body: string) {
     pendingSibling.current = null
-    const next = updatePlotpoint(nodes, nodeId, patch)
+    const next = updatePlotpointBody(nodesRef.current, nodeId, body)
     setNodes(next)
-    if (patch.assignedMomentId !== undefined) {
-      saveNow(next)
-    } else {
-      scheduleSave()
-    }
+    scheduleSave()
   }
 
   function handleReorder(orderedIds: string[]) {
@@ -254,7 +245,6 @@ function PlotSidebar() {
         levels={levels}
         collapsedIds={collapsedIds}
         onToggleCollapse={handleToggleCollapse}
-        moments={moments}
         onRename={handleRename}
         onDelete={handleDelete}
         onAddChild={handleAddChild}
@@ -263,7 +253,7 @@ function PlotSidebar() {
         onEnter={handleEnter}
         onNavigateToParent={handleNavigateToParent}
         onBackspaceDelete={handleBackspaceDelete}
-        onUpdatePlotpoint={handleUpdatePlotpoint}
+        onUpdateBody={handleUpdateBody}
         registerInput={registerInput}
         onReorder={handleReorder}
       />

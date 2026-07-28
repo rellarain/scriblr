@@ -1,9 +1,9 @@
 import { DndContext, PointerSensor, useSensor, useSensors } from '@dnd-kit/core'
 import type { DragEndEvent } from '@dnd-kit/core'
 import { SortableContext, verticalListSortingStrategy } from '@dnd-kit/sortable'
-import type { OutlineNode, PlotNode, PlotNodeKind } from '../../types'
+import type { PlotNode, PlotNodeKind } from '../../types'
 import PlotNodeRow from './PlotNodeRow'
-import { getChildren } from './plotTree'
+import { getChildren, plotpointCounts } from './plotTree'
 
 interface Props {
   nodes: PlotNode[]
@@ -11,7 +11,6 @@ interface Props {
   levels: PlotNodeKind[]
   collapsedIds: Set<string>
   onToggleCollapse: (nodeId: string) => void
-  moments: OutlineNode[]
   onRename: (nodeId: string, title: string) => void
   onDelete: (node: PlotNode) => void
   onAddChild: (node: PlotNode) => void
@@ -20,9 +19,14 @@ interface Props {
   onEnter: (node: PlotNode) => void
   onNavigateToParent: (node: PlotNode) => void
   onBackspaceDelete: (node: PlotNode) => void
-  onUpdatePlotpoint: (nodeId: string, patch: { body?: string; assignedMomentId?: string | null }) => void
+  onUpdateBody: (nodeId: string, body: string) => void
   registerInput: (nodeId: string, el: HTMLInputElement | null) => void
   onReorder: (orderedIds: string[]) => void
+}
+
+// Assigned plotpoints are shown inside their moment instead of here.
+function visibleChildren(nodes: PlotNode[], parentId: string | null): PlotNode[] {
+  return getChildren(nodes, parentId).filter((n) => !(n.kind === 'plotpoint' && n.assignedMomentId))
 }
 
 function PlotTreeView({
@@ -31,7 +35,6 @@ function PlotTreeView({
   levels,
   collapsedIds,
   onToggleCollapse,
-  moments,
   onRename,
   onDelete,
   onAddChild,
@@ -40,12 +43,12 @@ function PlotTreeView({
   onEnter,
   onNavigateToParent,
   onBackspaceDelete,
-  onUpdatePlotpoint,
+  onUpdateBody,
   registerInput,
   onReorder,
 }: Props) {
   const sensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 4 } }))
-  const children = getChildren(nodes, parentId)
+  const children = visibleChildren(nodes, parentId)
 
   function handleDragEnd(event: DragEndEvent) {
     const { active, over } = event
@@ -63,8 +66,9 @@ function PlotTreeView({
     <DndContext sensors={sensors} onDragEnd={handleDragEnd}>
       <SortableContext items={children.map((c) => c.id)} strategy={verticalListSortingStrategy}>
         {children.map((child) => {
-          const childHasChildren = getChildren(nodes, child.id).length > 0
+          const childHasChildren = visibleChildren(nodes, child.id).length > 0
           const isCollapsed = collapsedIds.has(child.id)
+          const counts = child.kind === 'plotline' ? plotpointCounts(nodes, child.id) : { total: 0, assigned: 0 }
           return (
             <div key={child.id} className="plot-node__branch">
               <PlotNodeRow
@@ -73,7 +77,8 @@ function PlotTreeView({
                 hasChildren={childHasChildren}
                 collapsed={isCollapsed}
                 onToggleCollapse={onToggleCollapse}
-                moments={moments}
+                plotpointTotal={counts.total}
+                plotpointAssigned={counts.assigned}
                 onRename={onRename}
                 onDelete={onDelete}
                 onAddChild={onAddChild}
@@ -82,7 +87,7 @@ function PlotTreeView({
                 onEnter={onEnter}
                 onNavigateToParent={onNavigateToParent}
                 onBackspaceDelete={onBackspaceDelete}
-                onUpdatePlotpoint={onUpdatePlotpoint}
+                onUpdateBody={onUpdateBody}
                 registerInput={registerInput}
               />
               {childHasChildren && !isCollapsed && (
@@ -93,7 +98,6 @@ function PlotTreeView({
                     levels={levels}
                     collapsedIds={collapsedIds}
                     onToggleCollapse={onToggleCollapse}
-                    moments={moments}
                     onRename={onRename}
                     onDelete={onDelete}
                     onAddChild={onAddChild}
@@ -102,7 +106,7 @@ function PlotTreeView({
                     onEnter={onEnter}
                     onNavigateToParent={onNavigateToParent}
                     onBackspaceDelete={onBackspaceDelete}
-                    onUpdatePlotpoint={onUpdatePlotpoint}
+                    onUpdateBody={onUpdateBody}
                     registerInput={registerInput}
                     onReorder={onReorder}
                   />

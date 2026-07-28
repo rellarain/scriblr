@@ -246,6 +246,41 @@ textarea {
   opacity: 0.5;
 }
 
+.outline-node.is-drop-target {
+  outline: 2px dashed var(--accent);
+  background: var(--accent-light);
+}
+
+.outline-node__plotpoints {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.3rem;
+  margin: 0.25rem 0 0.35rem;
+}
+
+.outline-node__plotpoint-chip {
+  display: flex;
+  align-items: center;
+  gap: 0.3rem;
+  padding: 0.15rem 0.3rem;
+  border-radius: 3px;
+  background: var(--accent-light);
+  font-size: 0.75rem;
+}
+
+.outline-node__plotpoint-chip-title {
+  color: #333;
+}
+
+.outline-node__plotpoint-unlink {
+  border: none;
+  background: transparent;
+  color: var(--accent);
+  font-size: 0.9rem;
+  line-height: 1;
+  padding: 0;
+}
+
 .outline-node__handle {
   cursor: grab;
   color: #999;
@@ -548,6 +583,13 @@ textarea {
   color: #999;
 }
 
+.plot-node__count {
+  text-transform: none;
+  letter-spacing: normal;
+  font-weight: 600;
+  color: var(--accent);
+}
+
 .plot-node__title {
   width: 100%;
   border: none;
@@ -576,30 +618,31 @@ textarea {
   color: #b00020;
 }
 
-.plot-node__plotpoint-fields {
-  margin-bottom: 0.5rem;
-  display: flex;
-  flex-direction: column;
-  gap: 0.3rem;
-  max-width: 100%;
+.plot-node-wrap--plotpoint {
+  border: 1px solid #e2e2e2;
+  border-radius: 4px;
+  background: white;
+  padding: 0.3rem 0.4rem;
+  margin-bottom: 0.3rem;
+  cursor: grab;
 }
 
-.plot-node__plotpoint-fields textarea {
+.plot-node-wrap--plotpoint .plot-node {
+  border: none;
+  background: transparent;
+  padding: 0;
+  margin-bottom: 0;
+}
+
+.plot-node__description {
   width: 100%;
   min-height: 50px;
+  margin-top: 0.3rem;
   padding: 0.4rem;
   border: 1px solid #ddd;
   border-radius: 4px;
   font-size: 0.85rem;
-}
-
-.plot-node__plotpoint-fields select {
-  width: 100%;
-  max-width: 100%;
-  padding: 0.3rem;
-  border: 1px solid #ccc;
-  border-radius: 4px;
-  font-size: 0.8rem;
+  cursor: auto;
 }
 
 /* Read mode */

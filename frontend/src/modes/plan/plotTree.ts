@@ -37,12 +37,26 @@ export function renameNode(nodes: PlotNode[], nodeId: string, title: string): Pl
   return nodes.map((n) => (n.id === nodeId ? { ...n, title } : n))
 }
 
-export function updatePlotpoint(
+export function updatePlotpointBody(nodes: PlotNode[], nodeId: string, body: string): PlotNode[] {
+  return nodes.map((n) => (n.id === nodeId ? { ...n, body } : n))
+}
+
+export function assignPlotpoint(
   nodes: PlotNode[],
-  nodeId: string,
-  patch: { body?: string; assignedMomentId?: string | null }
+  plotpointId: string,
+  momentId: string | null
 ): PlotNode[] {
-  return nodes.map((n) => (n.id === nodeId ? { ...n, ...patch } : n))
+  return nodes.map((n) => (n.id === plotpointId ? { ...n, assignedMomentId: momentId } : n))
+}
+
+/** Direct plotpoint children of `plotlineId`, and how many are assigned to a moment. */
+export function plotpointCounts(nodes: PlotNode[], plotlineId: string): { total: number; assigned: number } {
+  const children = tree.getChildren(nodes, plotlineId).filter((n) => n.kind === 'plotpoint')
+  return { total: children.length, assigned: children.filter((n) => n.assignedMomentId !== null).length }
+}
+
+export function plotpointsForMoment(nodes: PlotNode[], momentId: string): PlotNode[] {
+  return nodes.filter((n) => n.kind === 'plotpoint' && n.assignedMomentId === momentId)
 }
 
 export function removeNode(nodes: PlotNode[], nodeId: string): PlotNode[] {

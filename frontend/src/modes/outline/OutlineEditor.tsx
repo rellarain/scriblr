@@ -1,9 +1,11 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { useParams } from 'react-router-dom'
 import { useOutline, useSaveOutline } from '../../api/outline'
+import { usePlot, useSavePlot } from '../../api/plot'
 import { useProject, useUpdateProject } from '../../api/projects'
 import { OUTLINE_KIND_ORDER } from '../../types'
 import type { OutlineNode, OutlineNodeKind, OutlineTree } from '../../types'
+import { assignPlotpoint } from '../plan/plotTree'
 import OutlineTreeView from './OutlineTreeView'
 import {
   addBook,
@@ -29,8 +31,11 @@ function OutlineEditor() {
   const { projectId } = useParams<{ projectId: string }>()
   const { data, isLoading, error } = useOutline(projectId)
   const { data: project } = useProject(projectId)
+  const { data: plotData } = usePlot(projectId)
   const saveOutline = useSaveOutline(projectId ?? '')
+  const savePlot = useSavePlot(projectId ?? '')
   const updateProject = useUpdateProject(projectId ?? '')
+  const plotNodes = plotData?.nodes ?? []
 
   const [nodes, setNodes] = useState<OutlineNode[]>([])
   const [newBookTitle, setNewBookTitle] = useState('')
@@ -182,6 +187,18 @@ function OutlineEditor() {
     saveNow(next)
   }
 
+  function handleAssignPlotpoint(plotpointId: string, momentId: string) {
+    if (!plotData) return
+    const next = assignPlotpoint(plotData.nodes, plotpointId, momentId)
+    savePlot.mutate({ schemaVersion: plotData.schemaVersion, nodes: next })
+  }
+
+  function handleUnassignPlotpoint(plotpointId: string) {
+    if (!plotData) return
+    const next = assignPlotpoint(plotData.nodes, plotpointId, null)
+    savePlot.mutate({ schemaVersion: plotData.schemaVersion, nodes: next })
+  }
+
   function handleAddBook() {
     const title = newBookTitle.trim()
     if (!title) return
@@ -241,6 +258,9 @@ function OutlineEditor() {
         levels={levels}
         collapsedIds={collapsedIds}
         onToggleCollapse={handleToggleCollapse}
+        plotNodes={plotNodes}
+        onAssignPlotpoint={handleAssignPlotpoint}
+        onUnassignPlotpoint={handleUnassignPlotpoint}
         onRename={handleRename}
         onDelete={handleDelete}
         onAddChild={handleAddChild}

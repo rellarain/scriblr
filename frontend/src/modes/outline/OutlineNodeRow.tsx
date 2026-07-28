@@ -1,8 +1,9 @@
+import { useState } from 'react'
 import { useSortable } from '@dnd-kit/sortable'
 import { CSS } from '@dnd-kit/utilities'
 import { nextKindInLevels } from '../../lib/nodeTree'
 import { OUTLINE_KIND_ORDER } from '../../types'
-import type { OutlineNode, OutlineNodeKind } from '../../types'
+import type { OutlineNode, OutlineNodeKind, PlotNode } from '../../types'
 
 interface Props {
   node: OutlineNode
@@ -10,6 +11,9 @@ interface Props {
   hasChildren: boolean
   collapsed: boolean
   onToggleCollapse: (nodeId: string) => void
+  assignedPlotpoints: PlotNode[]
+  onAssignPlotpoint: (plotpointId: string, momentId: string) => void
+  onUnassignPlotpoint: (plotpointId: string) => void
   onRename: (nodeId: string, title: string) => void
   onDelete: (node: OutlineNode) => void
   onAddChild: (node: OutlineNode) => void
@@ -27,6 +31,9 @@ function OutlineNodeRow({
   hasChildren,
   collapsed,
   onToggleCollapse,
+  assignedPlotpoints,
+  onAssignPlotpoint,
+  onUnassignPlotpoint,
   onRename,
   onDelete,
   onAddChild,
@@ -40,8 +47,10 @@ function OutlineNodeRow({
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({
     id: node.id,
   })
+  const [isDropTarget, setIsDropTarget] = useState(false)
 
   const canAddChild = nextKindInLevels(levels, node.kind, OUTLINE_KIND_ORDER) !== undefined
+  const isMoment = node.kind === 'moment'
 
   const style = {
     transform: CSS.Transform.toString(transform),
@@ -66,43 +75,92 @@ function OutlineNodeRow({
     }
   }
 
+  function handleDragOver(e: React.DragEvent<HTMLDivElement>) {
+    if (!isMoment) return
+    e.preventDefault()
+  }
+
+  function handleDragEnter(e: React.DragEvent<HTMLDivElement>) {
+    if (!isMoment) return
+    e.preventDefault()
+    setIsDropTarget(true)
+  }
+
+  function handleDragLeave() {
+    setIsDropTarget(false)
+  }
+
+  function handleDrop(e: React.DragEvent<HTMLDivElement>) {
+    if (!isMoment) return
+    e.preventDefault()
+    setIsDropTarget(false)
+    const plotpointId = e.dataTransfer.getData('application/x-plotpoint-id')
+    if (plotpointId) onAssignPlotpoint(plotpointId, node.id)
+  }
+
   return (
-    <div
-      ref={setNodeRef}
-      style={style}
-      className={`outline-node outline-node--${node.kind}${isDragging ? ' is-dragging' : ''}`}
-    >
-      <button
-        type="button"
-        className={`outline-node__toggle${hasChildren ? '' : ' outline-node__toggle--empty'}`}
-        onClick={() => hasChildren && onToggleCollapse(node.id)}
-        tabIndex={-1}
-        aria-label={collapsed ? 'Expand' : 'Collapse'}
+    <div className="outline-node-wrap">
+      <div
+        ref={setNodeRef}
+        style={style}
+        className={`outline-node outline-node--${node.kind}${isDragging ? ' is-dragging' : ''}${
+          isDropTarget ? ' is-drop-target' : ''
+        }`}
+        onDragOver={handleDragOver}
+        onDragEnter={handleDragEnter}
+        onDragLeave={handleDragLeave}
+        onDrop={handleDrop}
       >
-        {hasChildren ? (collapsed ? '▸' : '▾') : ''}
-      </button>
-      <span className="outline-node__handle" {...attributes} {...listeners}>
-        ⠿
-      </span>
-      <div className="outline-node__main">
-        <span className="outline-node__kind">{node.kind}</span>
-        <input
-          ref={(el) => registerInput(node.id, el)}
-          className="outline-node__title"
-          value={node.title}
-          placeholder="Untitled"
-          onChange={(e) => onRename(node.id, e.target.value)}
-          onKeyDown={handleKeyDown}
-        />
-      </div>
-      {canAddChild && (
-        <button type="button" className="outline-node__add-toggle" onClick={() => onAddChild(node)}>
-          +
+        <button
+          type="button"
+          className={`outline-node__toggle${hasChildren ? '' : ' outline-node__toggle--empty'}`}
+          onClick={() => hasChildren && onToggleCollapse(node.id)}
+          tabIndex={-1}
+          aria-label={collapsed ? 'Expand' : 'Collapse'}
+        >
+          {hasChildren ? (collapsed ? '▸' : '▾') : ''}
         </button>
+        <span className="outline-node__handle" {...attributes} {...listeners}>
+          ⠿
+        </span>
+        <div className="outline-node__main">
+          <span className="outline-node__kind">{node.kind}</span>
+          <input
+            ref={(el) => registerInput(node.id, el)}
+            className="outline-node__title"
+            value={node.title}
+            placeholder="Untitled"
+            onChange={(e) => onRename(node.id, e.target.value)}
+            onKeyDown={handleKeyDown}
+          />
+        </div>
+        {canAddChild && (
+          <button type="button" className="outline-node__add-toggle" onClick={() => onAddChild(node)}>
+            +
+          </button>
+        )}
+        <button type="button" className="outline-node__delete" onClick={() => onDelete(node)}>
+          ✕
+        </button>
+      </div>
+
+      {isMoment && assignedPlotpoints.length > 0 && (
+        <div className="outline-node__plotpoints">
+          {assignedPlotpoints.map((p) => (
+            <div key={p.id} className="outline-node__plotpoint-chip">
+              <span className="outline-node__plotpoint-chip-title">{p.title || 'Untitled'}</span>
+              <button
+                type="button"
+                className="outline-node__plotpoint-unlink"
+                onClick={() => onUnassignPlotpoint(p.id)}
+                title="Unlink from this moment"
+              >
+                ×
+              </button>
+            </div>
+          ))}
+        </div>
       )}
-      <button type="button" className="outline-node__delete" onClick={() => onDelete(node)}>
-        ✕
-      </button>
     </div>
   )
 }
