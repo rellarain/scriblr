@@ -38,7 +38,7 @@ function ReadMode() {
           </h2>
         )
       )}
-      {ordered.length === 0 && <p>Nothing to read yet — add structure in Plan mode.</p>}
+      {ordered.length === 0 && <p>Nothing to read yet — add structure in Outline mode.</p>}
     </div>
   )
 }

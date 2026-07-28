@@ -2,7 +2,7 @@ import { NavLink, Outlet, useParams } from 'react-router-dom'
 import { useProject } from '../../api/projects'
 
 const MODE_TABS = [
-  { path: 'plan', label: 'Plan' },
+  { path: 'plan', label: 'Outline' },
   { path: 'draft', label: 'Draft' },
   { path: 'read', label: 'Read' },
   { path: 'revise', label: 'Revise' },

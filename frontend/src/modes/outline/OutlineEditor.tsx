@@ -220,18 +220,20 @@ function OutlineEditor() {
         ))}
       </div>
 
-      <div className="outline-editor__add-book">
-        <input
-          type="text"
-          placeholder="New book title"
-          value={newBookTitle}
-          onChange={(e) => setNewBookTitle(e.target.value)}
-          onKeyDown={(e) => e.key === 'Enter' && handleAddBook()}
-        />
-        <button type="button" onClick={handleAddBook}>
-          Add book
-        </button>
-      </div>
+      {nodes.length === 0 && (
+        <div className="outline-editor__add-book">
+          <input
+            type="text"
+            placeholder="New book title"
+            value={newBookTitle}
+            onChange={(e) => setNewBookTitle(e.target.value)}
+            onKeyDown={(e) => e.key === 'Enter' && handleAddBook()}
+          />
+          <button type="button" onClick={handleAddBook}>
+            Add book
+          </button>
+        </div>
+      )}
 
       <OutlineTreeView
         nodes={nodes}

@@ -37,7 +37,7 @@ function MomentPickerSidebar({ nodes, selectedMomentId, onSelect }: Props) {
           </p>
         )
       })}
-      {ordered.length === 0 && <p>No structure yet. Add some in Plan mode first.</p>}
+      {ordered.length === 0 && <p>No structure yet. Add some in Outline mode first.</p>}
     </aside>
   )
 }

@@ -233,18 +233,20 @@ function PlotSidebar() {
         ))}
       </div>
 
-      <div className="plot-sidebar__add-category">
-        <input
-          type="text"
-          placeholder="New category title"
-          value={newCategoryTitle}
-          onChange={(e) => setNewCategoryTitle(e.target.value)}
-          onKeyDown={(e) => e.key === 'Enter' && handleAddCategory()}
-        />
-        <button type="button" onClick={handleAddCategory}>
-          Add category
-        </button>
-      </div>
+      {nodes.length === 0 && (
+        <div className="plot-sidebar__add-category">
+          <input
+            type="text"
+            placeholder="New category title"
+            value={newCategoryTitle}
+            onChange={(e) => setNewCategoryTitle(e.target.value)}
+            onKeyDown={(e) => e.key === 'Enter' && handleAddCategory()}
+          />
+          <button type="button" onClick={handleAddCategory}>
+            Add category
+          </button>
+        </div>
+      )}
 
       <PlotTreeView
         nodes={nodes}
