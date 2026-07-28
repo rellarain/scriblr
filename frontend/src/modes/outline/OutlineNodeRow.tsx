@@ -22,6 +22,7 @@ interface Props {
   onEnter: (node: OutlineNode) => void
   onNavigateToParent: (node: OutlineNode) => void
   onBackspaceDelete: (node: OutlineNode) => void
+  onReparentNode: (nodeId: string, newParentId: string) => void
   registerInput: (nodeId: string, el: HTMLInputElement | null) => void
 }
 
@@ -42,6 +43,7 @@ function OutlineNodeRow({
   onEnter,
   onNavigateToParent,
   onBackspaceDelete,
+  onReparentNode,
   registerInput,
 }: Props) {
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({
@@ -75,15 +77,34 @@ function OutlineNodeRow({
     }
   }
 
+  // Cross-tree assignment drag (plotpoint -> moment) and in-tree reparenting
+  // drag (any node -> a shallower node, e.g. its parent's sibling) both use
+  // native HTML5 DnD, separate from the dnd-kit sortable handle below which
+  // reorders siblings. Bail out if the drag started on that handle so the
+  // two systems don't fight.
+  function handleDragStart(e: React.DragEvent<HTMLDivElement>) {
+    if ((e.target as HTMLElement).closest('.outline-node__handle')) {
+      e.preventDefault()
+      return
+    }
+    e.dataTransfer.setData('application/x-outline-node-id', node.id)
+    e.dataTransfer.effectAllowed = 'move'
+  }
+
+  function acceptsDrag(e: React.DragEvent<HTMLDivElement>) {
+    const types = e.dataTransfer.types
+    return types.includes('application/x-outline-node-id') || (isMoment && types.includes('application/x-plotpoint-id'))
+  }
+
   function handleDragOver(e: React.DragEvent<HTMLDivElement>) {
-    if (!isMoment) return
-    e.preventDefault()
+    if (acceptsDrag(e)) e.preventDefault()
   }
 
   function handleDragEnter(e: React.DragEvent<HTMLDivElement>) {
-    if (!isMoment) return
-    e.preventDefault()
-    setIsDropTarget(true)
+    if (acceptsDrag(e)) {
+      e.preventDefault()
+      setIsDropTarget(true)
+    }
   }
 
   function handleDragLeave() {
@@ -91,11 +112,17 @@ function OutlineNodeRow({
   }
 
   function handleDrop(e: React.DragEvent<HTMLDivElement>) {
-    if (!isMoment) return
     e.preventDefault()
     setIsDropTarget(false)
     const plotpointId = e.dataTransfer.getData('application/x-plotpoint-id')
-    if (plotpointId) onAssignPlotpoint(plotpointId, node.id)
+    if (isMoment && plotpointId) {
+      onAssignPlotpoint(plotpointId, node.id)
+      return
+    }
+    const draggedNodeId = e.dataTransfer.getData('application/x-outline-node-id')
+    if (draggedNodeId && draggedNodeId !== node.id) {
+      onReparentNode(draggedNodeId, node.id)
+    }
   }
 
   return (
@@ -103,9 +130,11 @@ function OutlineNodeRow({
       <div
         ref={setNodeRef}
         style={style}
+        draggable
         className={`outline-node outline-node--${node.kind}${isDragging ? ' is-dragging' : ''}${
           isDropTarget ? ' is-drop-target' : ''
         }`}
+        onDragStart={handleDragStart}
         onDragOver={handleDragOver}
         onDragEnter={handleDragEnter}
         onDragLeave={handleDragLeave}

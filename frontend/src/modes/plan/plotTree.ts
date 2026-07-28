@@ -189,6 +189,15 @@ export function getPreviousSibling(nodes: PlotNode[], nodeId: string): PlotNode 
   return tree.previousSibling(nodes, nodeId)
 }
 
+export function canReparentNode(nodes: PlotNode[], nodeId: string, newParentId: string): boolean {
+  return tree.canReparent(nodes, nodeId, newParentId, PLOT_KIND_ORDER)
+}
+
+/** Moves a dragged node (and its subtree) to become the last child of `newParentId`. */
+export function reparentNode(nodes: PlotNode[], nodeId: string, newParentId: string): PlotNode[] {
+  return tree.reparentNode(nodes, nodeId, newParentId)
+}
+
 /**
  * Re-parents `pendingId` (a still-empty node just created as a sibling of
  * `anchorId` via Enter) to become a child of `anchorId` instead -- the

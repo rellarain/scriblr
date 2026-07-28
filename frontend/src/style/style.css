@@ -590,6 +590,19 @@ textarea {
   color: var(--accent);
 }
 
+.plot-node__show-assigned-toggle {
+  text-transform: none;
+  letter-spacing: normal;
+  border: none;
+  background: transparent;
+  color: var(--accent);
+  text-decoration: underline;
+  font-size: 0.58rem;
+  margin-left: 0.35rem;
+  padding: 0;
+  cursor: pointer;
+}
+
 .plot-node__title {
   width: 100%;
   border: none;
@@ -625,6 +638,12 @@ textarea {
   padding: 0.3rem 0.4rem;
   margin-bottom: 0.3rem;
   cursor: grab;
+}
+
+.plot-node-wrap.is-drop-target {
+  outline: 2px dashed var(--accent);
+  background: var(--accent-light);
+  border-radius: 4px;
 }
 
 .plot-node-wrap--plotpoint .plot-node {

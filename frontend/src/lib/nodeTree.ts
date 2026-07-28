@@ -132,3 +132,50 @@ export function nextKindInLevels<K extends string>(
   const fallbackIdx = fallbackOrder.indexOf(kind)
   return fallbackIdx === -1 ? undefined : fallbackOrder[fallbackIdx + 1]
 }
+
+interface TreeNodeKinded<K extends string> extends TreeNodeBase {
+  kind: K
+}
+
+/**
+ * Whether `nodeId` may be re-parented under `newParentId` by drag-and-drop.
+ * Nesting is flexible (a node's parent may be any node of a strictly
+ * shallower kind, not necessarily the adjacent one), so the only rule is
+ * that `newParentId`'s kind must sit strictly earlier in `kindOrder` than
+ * `nodeId`'s own kind -- every existing node already satisfies that relative
+ * to its ancestors, so this same check also rules out dropping a node onto
+ * one of its own descendants (always an equal-or-deeper kind) without
+ * needing a separate cycle check.
+ */
+export function canReparent<K extends string, T extends TreeNodeKinded<K>>(
+  nodes: T[],
+  nodeId: string,
+  newParentId: string,
+  kindOrder: K[]
+): boolean {
+  if (nodeId === newParentId) return false
+  const node = nodes.find((n) => n.id === nodeId)
+  const newParent = nodes.find((n) => n.id === newParentId)
+  if (!node || !newParent) return false
+  return kindOrder.indexOf(newParent.kind) < kindOrder.indexOf(node.kind)
+}
+
+/**
+ * Moves `nodeId` to become the last child of `newParentId`. Its own kind is
+ * left unchanged (nesting is flexible), and its descendants move along with
+ * it implicitly since they still reference it as their parent. The old
+ * sibling group is renumbered to close the gap left behind.
+ */
+export function reparentNode<T extends TreeNodeBase>(
+  nodes: T[],
+  nodeId: string,
+  newParentId: string
+): T[] {
+  const node = nodes.find((n) => n.id === nodeId)
+  if (!node) return nodes
+  const withoutNode = nodes.filter((n) => n.id !== nodeId)
+  const oldSiblingIds = getChildren(withoutNode, node.parentId).map((s) => s.id)
+  const renumbered = reorderSiblings(withoutNode, oldSiblingIds)
+  const updated: T = { ...node, parentId: newParentId, order: nextOrder(renumbered, newParentId) }
+  return [...renumbered, updated]
+}

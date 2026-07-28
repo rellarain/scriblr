@@ -23,6 +23,7 @@ interface Props {
   onEnter: (node: OutlineNode) => void
   onNavigateToParent: (node: OutlineNode) => void
   onBackspaceDelete: (node: OutlineNode) => void
+  onReparentNode: (nodeId: string, newParentId: string) => void
   registerInput: (nodeId: string, el: HTMLInputElement | null) => void
   onReorder: (parentId: string | null, orderedIds: string[]) => void
 }
@@ -44,6 +45,7 @@ function OutlineTreeView({
   onEnter,
   onNavigateToParent,
   onBackspaceDelete,
+  onReparentNode,
   registerInput,
   onReorder,
 }: Props) {
@@ -89,6 +91,7 @@ function OutlineTreeView({
                 onEnter={onEnter}
                 onNavigateToParent={onNavigateToParent}
                 onBackspaceDelete={onBackspaceDelete}
+                onReparentNode={onReparentNode}
                 registerInput={registerInput}
               />
               {childHasChildren && !isCollapsed && (
@@ -110,6 +113,7 @@ function OutlineTreeView({
                     onEnter={onEnter}
                     onNavigateToParent={onNavigateToParent}
                     onBackspaceDelete={onBackspaceDelete}
+                    onReparentNode={onReparentNode}
                     registerInput={registerInput}
                     onReorder={onReorder}
                   />

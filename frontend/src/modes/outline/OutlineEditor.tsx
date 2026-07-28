@@ -9,6 +9,7 @@ import { assignPlotpoint } from '../plan/plotTree'
 import OutlineTreeView from './OutlineTreeView'
 import {
   addBook,
+  canReparentNode,
   createChildNode,
   createSiblingNode,
   escalateToChild,
@@ -18,6 +19,7 @@ import {
   removeNode,
   renameNode,
   reorderSiblings,
+  reparentNode,
 } from './outlineTree'
 
 const RENAME_SAVE_DELAY_MS = 500
@@ -187,6 +189,14 @@ function OutlineEditor() {
     saveNow(next)
   }
 
+  function handleReparentNode(nodeId: string, newParentId: string) {
+    if (!canReparentNode(nodesRef.current, nodeId, newParentId)) return
+    pendingSibling.current = null
+    const next = reparentNode(nodesRef.current, nodeId, newParentId)
+    setNodes(next)
+    saveNow(next)
+  }
+
   function handleAssignPlotpoint(plotpointId: string, momentId: string) {
     if (!plotData) return
     const next = assignPlotpoint(plotData.nodes, plotpointId, momentId)
@@ -269,6 +279,7 @@ function OutlineEditor() {
         onEnter={handleEnter}
         onNavigateToParent={handleNavigateToParent}
         onBackspaceDelete={handleBackspaceDelete}
+        onReparentNode={handleReparentNode}
         registerInput={registerInput}
         onReorder={handleReorder}
       />

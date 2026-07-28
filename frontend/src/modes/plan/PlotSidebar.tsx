@@ -9,6 +9,7 @@ import {
   addCategory,
   addCustomFieldDef,
   addKeyword,
+  canReparentNode,
   createChildNode,
   createSiblingNode,
   escalateToChild,
@@ -21,6 +22,7 @@ import {
   renameCustomFieldDef,
   renameNode,
   reorderSiblings,
+  reparentNode,
   setCustomFieldValue,
   updatePlotpointBody,
 } from './plotTree'
@@ -43,6 +45,7 @@ function PlotSidebar() {
   const [newCategoryTitle, setNewCategoryTitle] = useState('')
   const [pendingFocus, setPendingFocus] = useState<string | null>(null)
   const [collapsedIds, setCollapsedIds] = useState<Set<string>>(new Set())
+  const [showAssignedIds, setShowAssignedIds] = useState<Set<string>>(new Set())
   const schemaVersionRef = useRef(1)
   const nodesRef = useRef<PlotNode[]>([])
   const saveTimeout = useRef<ReturnType<typeof setTimeout>>()
@@ -223,6 +226,23 @@ function PlotSidebar() {
     saveNow(next)
   }
 
+  function handleToggleShowAssigned(plotlineId: string) {
+    setShowAssignedIds((prev) => {
+      const next = new Set(prev)
+      if (next.has(plotlineId)) next.delete(plotlineId)
+      else next.add(plotlineId)
+      return next
+    })
+  }
+
+  function handleReparentNode(nodeId: string, newParentId: string) {
+    if (!canReparentNode(nodesRef.current, nodeId, newParentId)) return
+    pendingSibling.current = null
+    const next = reparentNode(nodesRef.current, nodeId, newParentId)
+    setNodes(next)
+    saveNow(next)
+  }
+
   function handleReorder(orderedIds: string[]) {
     pendingSibling.current = null
     const next = reorderSiblings(nodes, orderedIds)
@@ -291,6 +311,8 @@ function PlotSidebar() {
         levels={levels}
         collapsedIds={collapsedIds}
         onToggleCollapse={handleToggleCollapse}
+        showAssignedIds={showAssignedIds}
+        onToggleShowAssigned={handleToggleShowAssigned}
         onRename={handleRename}
         onDelete={handleDelete}
         onAddChild={handleAddChild}
@@ -306,6 +328,7 @@ function PlotSidebar() {
         onSetCustomFieldValue={handleSetCustomFieldValue}
         onAddKeyword={handleAddKeyword}
         onRemoveKeyword={handleRemoveKeyword}
+        onReparentNode={handleReparentNode}
         registerInput={registerInput}
         onReorder={handleReorder}
       />

@@ -109,6 +109,15 @@ export function getPreviousSibling(nodes: OutlineNode[], nodeId: string): Outlin
   return tree.previousSibling(nodes, nodeId)
 }
 
+export function canReparentNode(nodes: OutlineNode[], nodeId: string, newParentId: string): boolean {
+  return tree.canReparent(nodes, nodeId, newParentId, OUTLINE_KIND_ORDER)
+}
+
+/** Moves a dragged node (and its subtree) to become the last child of `newParentId`. */
+export function reparentNode(nodes: OutlineNode[], nodeId: string, newParentId: string): OutlineNode[] {
+  return tree.reparentNode(nodes, nodeId, newParentId)
+}
+
 /**
  * Re-parents `pendingId` (a still-empty node that was just created as a
  * sibling of `anchorId` via Enter) to become a child of `anchorId` instead --

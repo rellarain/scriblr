@@ -29,6 +29,9 @@ interface Props {
   onSetCustomFieldValue: (plotlineId: string, fieldId: string, value: string) => void
   onAddKeyword: (plotlineId: string, keyword: string) => void
   onRemoveKeyword: (plotlineId: string, keyword: string) => void
+  onReparentNode: (nodeId: string, newParentId: string) => void
+  showAssigned: boolean
+  onToggleShowAssigned: (plotlineId: string) => void
   registerInput: (nodeId: string, el: HTMLInputElement | null) => void
 }
 
@@ -56,18 +59,23 @@ function PlotNodeRow({
   onSetCustomFieldValue,
   onAddKeyword,
   onRemoveKeyword,
+  onReparentNode,
+  showAssigned,
+  onToggleShowAssigned,
   registerInput,
 }: Props) {
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({
     id: node.id,
   })
   const [keywordDraft, setKeywordDraft] = useState('')
+  const [isDropTarget, setIsDropTarget] = useState(false)
 
   const canAddChild = nextKindInLevels(levels, node.kind, PLOT_KIND_ORDER) !== undefined
   const isPlotpoint = node.kind === 'plotpoint'
   const isCategory = node.kind === 'category'
   const isPlotline = node.kind === 'plotline'
   const showDescription = isPlotpoint && node.title.trim() !== ''
+  const canDelete = !(isPlotpoint && node.assignedMomentId)
 
   function handleKeywordKeyDown(e: React.KeyboardEvent<HTMLInputElement>) {
     if (e.key === 'Enter') {
@@ -102,23 +110,58 @@ function PlotNodeRow({
     }
   }
 
-  // Cross-tree assignment drag (plotpoint -> moment) uses native HTML5 DnD,
-  // separate from the dnd-kit sortable handle below which reorders siblings.
-  // Bail out if the drag started on that handle so the two systems don't fight.
+  // Cross-tree assignment drag (plotpoint -> moment) and in-tree reparenting
+  // drag (any node -> a shallower node, e.g. its parent's sibling) both use
+  // native HTML5 DnD, separate from the dnd-kit sortable handle below which
+  // reorders siblings. Bail out if the drag started on that handle so the
+  // two systems don't fight.
   function handleDragStart(e: React.DragEvent<HTMLDivElement>) {
     if ((e.target as HTMLElement).closest('.plot-node__handle')) {
       e.preventDefault()
       return
     }
-    e.dataTransfer.setData('application/x-plotpoint-id', node.id)
+    if (isPlotpoint) {
+      e.dataTransfer.setData('application/x-plotpoint-id', node.id)
+    }
+    e.dataTransfer.setData('application/x-plot-node-id', node.id)
     e.dataTransfer.effectAllowed = 'move'
+  }
+
+  function handleDragOver(e: React.DragEvent<HTMLDivElement>) {
+    if (e.dataTransfer.types.includes('application/x-plot-node-id')) e.preventDefault()
+  }
+
+  function handleDragEnter(e: React.DragEvent<HTMLDivElement>) {
+    if (e.dataTransfer.types.includes('application/x-plot-node-id')) {
+      e.preventDefault()
+      setIsDropTarget(true)
+    }
+  }
+
+  function handleDragLeave() {
+    setIsDropTarget(false)
+  }
+
+  function handleDrop(e: React.DragEvent<HTMLDivElement>) {
+    e.preventDefault()
+    setIsDropTarget(false)
+    const draggedNodeId = e.dataTransfer.getData('application/x-plot-node-id')
+    if (draggedNodeId && draggedNodeId !== node.id) {
+      onReparentNode(draggedNodeId, node.id)
+    }
   }
 
   return (
     <div
-      className={`plot-node-wrap${isPlotpoint ? ' plot-node-wrap--plotpoint' : ''}`}
-      draggable={isPlotpoint}
-      onDragStart={isPlotpoint ? handleDragStart : undefined}
+      className={`plot-node-wrap${isPlotpoint ? ' plot-node-wrap--plotpoint' : ''}${
+        isDropTarget ? ' is-drop-target' : ''
+      }`}
+      draggable
+      onDragStart={handleDragStart}
+      onDragOver={handleDragOver}
+      onDragEnter={handleDragEnter}
+      onDragLeave={handleDragLeave}
+      onDrop={handleDrop}
     >
       <div
         ref={setNodeRef}
@@ -140,11 +183,20 @@ function PlotNodeRow({
         <div className="plot-node__main">
           <span className="plot-node__kind">
             {node.kind}
-            {node.kind === 'plotline' && (
+            {isPlotline && (
               <span className="plot-node__count">
                 {' '}
                 · {plotpointAssigned}/{plotpointTotal} assigned
               </span>
+            )}
+            {isPlotline && plotpointAssigned > 0 && (
+              <button
+                type="button"
+                className="plot-node__show-assigned-toggle"
+                onClick={() => onToggleShowAssigned(node.id)}
+              >
+                {showAssigned ? 'Hide assigned' : 'Show assigned'}
+              </button>
             )}
           </span>
           <input
@@ -161,9 +213,11 @@ function PlotNodeRow({
             +
           </button>
         )}
-        <button type="button" className="plot-node__delete" onClick={() => onDelete(node)}>
-          ✕
-        </button>
+        {canDelete && (
+          <button type="button" className="plot-node__delete" onClick={() => onDelete(node)}>
+            ✕
+          </button>
+        )}
       </div>
 
       {showDescription && (

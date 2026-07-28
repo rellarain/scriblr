@@ -11,6 +11,8 @@ interface Props {
   levels: PlotNodeKind[]
   collapsedIds: Set<string>
   onToggleCollapse: (nodeId: string) => void
+  showAssignedIds: Set<string>
+  onToggleShowAssigned: (plotlineId: string) => void
   onRename: (nodeId: string, title: string) => void
   onDelete: (node: PlotNode) => void
   onAddChild: (node: PlotNode) => void
@@ -26,13 +28,17 @@ interface Props {
   onSetCustomFieldValue: (plotlineId: string, fieldId: string, value: string) => void
   onAddKeyword: (plotlineId: string, keyword: string) => void
   onRemoveKeyword: (plotlineId: string, keyword: string) => void
+  onReparentNode: (nodeId: string, newParentId: string) => void
   registerInput: (nodeId: string, el: HTMLInputElement | null) => void
   onReorder: (orderedIds: string[]) => void
 }
 
-// Assigned plotpoints are shown inside their moment instead of here.
-function visibleChildren(nodes: PlotNode[], parentId: string | null): PlotNode[] {
-  return getChildren(nodes, parentId).filter((n) => !(n.kind === 'plotpoint' && n.assignedMomentId))
+// Assigned plotpoints are shown inside their moment instead of here, unless
+// their plotline has its "show assigned" toggle on.
+function visibleChildren(nodes: PlotNode[], parentId: string | null, showAssignedIds: Set<string>): PlotNode[] {
+  return getChildren(nodes, parentId).filter(
+    (n) => !(n.kind === 'plotpoint' && n.assignedMomentId && !(parentId && showAssignedIds.has(parentId)))
+  )
 }
 
 function PlotTreeView({
@@ -41,6 +47,8 @@ function PlotTreeView({
   levels,
   collapsedIds,
   onToggleCollapse,
+  showAssignedIds,
+  onToggleShowAssigned,
   onRename,
   onDelete,
   onAddChild,
@@ -56,11 +64,12 @@ function PlotTreeView({
   onSetCustomFieldValue,
   onAddKeyword,
   onRemoveKeyword,
+  onReparentNode,
   registerInput,
   onReorder,
 }: Props) {
   const sensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 4 } }))
-  const children = visibleChildren(nodes, parentId)
+  const children = visibleChildren(nodes, parentId, showAssignedIds)
 
   function handleDragEnd(event: DragEndEvent) {
     const { active, over } = event
@@ -78,7 +87,7 @@ function PlotTreeView({
     <DndContext sensors={sensors} onDragEnd={handleDragEnd}>
       <SortableContext items={children.map((c) => c.id)} strategy={verticalListSortingStrategy}>
         {children.map((child) => {
-          const childHasChildren = visibleChildren(nodes, child.id).length > 0
+          const childHasChildren = visibleChildren(nodes, child.id, showAssignedIds).length > 0
           const isCollapsed = collapsedIds.has(child.id)
           const counts = child.kind === 'plotline' ? plotpointCounts(nodes, child.id) : { total: 0, assigned: 0 }
           const customFieldDefs =
@@ -94,6 +103,8 @@ function PlotTreeView({
                 plotpointTotal={counts.total}
                 plotpointAssigned={counts.assigned}
                 customFieldDefs={customFieldDefs}
+                showAssigned={child.kind === 'plotline' && showAssignedIds.has(child.id)}
+                onToggleShowAssigned={onToggleShowAssigned}
                 onRename={onRename}
                 onDelete={onDelete}
                 onAddChild={onAddChild}
@@ -109,6 +120,7 @@ function PlotTreeView({
                 onSetCustomFieldValue={onSetCustomFieldValue}
                 onAddKeyword={onAddKeyword}
                 onRemoveKeyword={onRemoveKeyword}
+                onReparentNode={onReparentNode}
                 registerInput={registerInput}
               />
               {childHasChildren && !isCollapsed && (
@@ -119,6 +131,8 @@ function PlotTreeView({
                     levels={levels}
                     collapsedIds={collapsedIds}
                     onToggleCollapse={onToggleCollapse}
+                    showAssignedIds={showAssignedIds}
+                    onToggleShowAssigned={onToggleShowAssigned}
                     onRename={onRename}
                     onDelete={onDelete}
                     onAddChild={onAddChild}
@@ -134,6 +148,7 @@ function PlotTreeView({
                     onSetCustomFieldValue={onSetCustomFieldValue}
                     onAddKeyword={onAddKeyword}
                     onRemoveKeyword={onRemoveKeyword}
+                    onReparentNode={onReparentNode}
                     registerInput={registerInput}
                     onReorder={onReorder}
                   />
