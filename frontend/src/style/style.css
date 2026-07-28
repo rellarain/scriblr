@@ -645,6 +645,120 @@ textarea {
   cursor: auto;
 }
 
+.plot-node__custom-fields-editor {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.3rem;
+  margin: 0.3rem 0 0.1rem;
+}
+
+.plot-node__custom-fields-label {
+  font-size: 0.7rem;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+  color: #999;
+}
+
+.plot-node__custom-field-chip {
+  display: flex;
+  align-items: center;
+  gap: 0.2rem;
+  padding: 0.1rem 0.3rem;
+  border-radius: 3px;
+  background: white;
+  border: 1px solid #ddd;
+}
+
+.plot-node__custom-field-name {
+  border: none;
+  background: transparent;
+  font-size: 0.8rem;
+  width: 6rem;
+}
+
+.plot-node__custom-field-remove {
+  border: none;
+  background: transparent;
+  color: var(--accent);
+  font-size: 0.85rem;
+  line-height: 1;
+  padding: 0;
+}
+
+.plot-node__custom-field-add {
+  border: none;
+  background: transparent;
+  color: var(--accent);
+  font-size: 0.8rem;
+  font-weight: 600;
+  cursor: pointer;
+  padding: 0.1rem 0.2rem;
+}
+
+.plot-node__field-values {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  margin: 0.3rem 0 0.1rem;
+}
+
+.plot-node__field-value {
+  display: flex;
+  flex-direction: column;
+  gap: 0.1rem;
+  font-size: 0.75rem;
+}
+
+.plot-node__field-value-label {
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+  color: #999;
+  font-size: 0.65rem;
+}
+
+.plot-node__field-value input {
+  border: 1px solid #ddd;
+  border-radius: 4px;
+  padding: 0.2rem 0.35rem;
+  font-size: 0.85rem;
+}
+
+.plot-node__keywords {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.3rem;
+  margin: 0.3rem 0 0.1rem;
+}
+
+.plot-node__keyword-chip {
+  display: flex;
+  align-items: center;
+  gap: 0.25rem;
+  padding: 0.15rem 0.4rem;
+  border-radius: 12px;
+  background: var(--accent-light);
+  font-size: 0.75rem;
+}
+
+.plot-node__keyword-remove {
+  border: none;
+  background: transparent;
+  color: var(--accent);
+  font-size: 0.85rem;
+  line-height: 1;
+  padding: 0;
+}
+
+.plot-node__keyword-input {
+  border: 1px solid #ddd;
+  border-radius: 12px;
+  padding: 0.15rem 0.5rem;
+  font-size: 0.75rem;
+  min-width: 6rem;
+}
+
 /* Read mode */
 
 .read-mode {

@@ -1,5 +1,5 @@
 import { PLOT_KIND_ORDER } from '../../types'
-import type { PlotNode, PlotNodeKind } from '../../types'
+import type { PlotCustomFieldDef, PlotNode, PlotNodeKind } from '../../types'
 import * as tree from '../../lib/nodeTree'
 
 export function getCategories(nodes: PlotNode[]): PlotNode[] {
@@ -29,6 +29,9 @@ export function addNode(
     title,
     body: '',
     assignedMomentId: null,
+    customFieldDefs: [],
+    customFieldValues: {},
+    keywords: [],
   }
   return [...nodes, node]
 }
@@ -59,6 +62,72 @@ export function plotpointsForMoment(nodes: PlotNode[], momentId: string): PlotNo
   return nodes.filter((n) => n.kind === 'plotpoint' && n.assignedMomentId === momentId)
 }
 
+/** A plotline's parent is always its category (the only shallower plot kind). */
+export function getCustomFieldDefsForPlotline(nodes: PlotNode[], plotlineId: string): PlotCustomFieldDef[] {
+  const plotline = nodes.find((n) => n.id === plotlineId)
+  if (!plotline || !plotline.parentId) return []
+  const category = nodes.find((n) => n.id === plotline.parentId)
+  return category?.customFieldDefs ?? []
+}
+
+export function addCustomFieldDef(nodes: PlotNode[], categoryId: string, name: string): PlotNode[] {
+  const id = `field_${crypto.randomUUID().slice(0, 8)}`
+  return nodes.map((n) =>
+    n.id === categoryId ? { ...n, customFieldDefs: [...n.customFieldDefs, { id, name }] } : n
+  )
+}
+
+export function renameCustomFieldDef(
+  nodes: PlotNode[],
+  categoryId: string,
+  fieldId: string,
+  name: string
+): PlotNode[] {
+  return nodes.map((n) =>
+    n.id === categoryId
+      ? { ...n, customFieldDefs: n.customFieldDefs.map((f) => (f.id === fieldId ? { ...f, name } : f)) }
+      : n
+  )
+}
+
+/** Removing a field definition also clears any values plotlines in this category stored for it. */
+export function removeCustomFieldDef(nodes: PlotNode[], categoryId: string, fieldId: string): PlotNode[] {
+  return nodes.map((n) => {
+    if (n.id === categoryId) {
+      return { ...n, customFieldDefs: n.customFieldDefs.filter((f) => f.id !== fieldId) }
+    }
+    if (n.kind === 'plotline' && n.parentId === categoryId && fieldId in n.customFieldValues) {
+      const nextValues = { ...n.customFieldValues }
+      delete nextValues[fieldId]
+      return { ...n, customFieldValues: nextValues }
+    }
+    return n
+  })
+}
+
+export function setCustomFieldValue(
+  nodes: PlotNode[],
+  plotlineId: string,
+  fieldId: string,
+  value: string
+): PlotNode[] {
+  return nodes.map((n) =>
+    n.id === plotlineId ? { ...n, customFieldValues: { ...n.customFieldValues, [fieldId]: value } } : n
+  )
+}
+
+export function addKeyword(nodes: PlotNode[], plotlineId: string, keyword: string): PlotNode[] {
+  const trimmed = keyword.trim()
+  if (!trimmed) return nodes
+  return nodes.map((n) =>
+    n.id === plotlineId && !n.keywords.includes(trimmed) ? { ...n, keywords: [...n.keywords, trimmed] } : n
+  )
+}
+
+export function removeKeyword(nodes: PlotNode[], plotlineId: string, keyword: string): PlotNode[] {
+  return nodes.map((n) => (n.id === plotlineId ? { ...n, keywords: n.keywords.filter((k) => k !== keyword) } : n))
+}
+
 export function removeNode(nodes: PlotNode[], nodeId: string): PlotNode[] {
   return tree.removeSubtree(nodes, nodeId)
 }
@@ -69,7 +138,18 @@ export function reorderSiblings(nodes: PlotNode[], orderedIds: string[]): PlotNo
 
 function makeNode(kind: PlotNodeKind, parentId: string | null, order: number): PlotNode {
   const id = `${kind}_${crypto.randomUUID().slice(0, 8)}`
-  return { id, kind, parentId, order, title: '', body: '', assignedMomentId: null }
+  return {
+    id,
+    kind,
+    parentId,
+    order,
+    title: '',
+    body: '',
+    assignedMomentId: null,
+    customFieldDefs: [],
+    customFieldValues: {},
+    keywords: [],
+  }
 }
 
 /**

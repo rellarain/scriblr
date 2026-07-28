@@ -3,7 +3,7 @@ import type { DragEndEvent } from '@dnd-kit/core'
 import { SortableContext, verticalListSortingStrategy } from '@dnd-kit/sortable'
 import type { PlotNode, PlotNodeKind } from '../../types'
 import PlotNodeRow from './PlotNodeRow'
-import { getChildren, plotpointCounts } from './plotTree'
+import { getChildren, getCustomFieldDefsForPlotline, plotpointCounts } from './plotTree'
 
 interface Props {
   nodes: PlotNode[]
@@ -20,6 +20,12 @@ interface Props {
   onNavigateToParent: (node: PlotNode) => void
   onBackspaceDelete: (node: PlotNode) => void
   onUpdateBody: (nodeId: string, body: string) => void
+  onAddCustomFieldDef: (categoryId: string) => void
+  onRenameCustomFieldDef: (categoryId: string, fieldId: string, name: string) => void
+  onRemoveCustomFieldDef: (categoryId: string, fieldId: string) => void
+  onSetCustomFieldValue: (plotlineId: string, fieldId: string, value: string) => void
+  onAddKeyword: (plotlineId: string, keyword: string) => void
+  onRemoveKeyword: (plotlineId: string, keyword: string) => void
   registerInput: (nodeId: string, el: HTMLInputElement | null) => void
   onReorder: (orderedIds: string[]) => void
 }
@@ -44,6 +50,12 @@ function PlotTreeView({
   onNavigateToParent,
   onBackspaceDelete,
   onUpdateBody,
+  onAddCustomFieldDef,
+  onRenameCustomFieldDef,
+  onRemoveCustomFieldDef,
+  onSetCustomFieldValue,
+  onAddKeyword,
+  onRemoveKeyword,
   registerInput,
   onReorder,
 }: Props) {
@@ -69,6 +81,8 @@ function PlotTreeView({
           const childHasChildren = visibleChildren(nodes, child.id).length > 0
           const isCollapsed = collapsedIds.has(child.id)
           const counts = child.kind === 'plotline' ? plotpointCounts(nodes, child.id) : { total: 0, assigned: 0 }
+          const customFieldDefs =
+            child.kind === 'plotline' ? getCustomFieldDefsForPlotline(nodes, child.id) : []
           return (
             <div key={child.id} className="plot-node__branch">
               <PlotNodeRow
@@ -79,6 +93,7 @@ function PlotTreeView({
                 onToggleCollapse={onToggleCollapse}
                 plotpointTotal={counts.total}
                 plotpointAssigned={counts.assigned}
+                customFieldDefs={customFieldDefs}
                 onRename={onRename}
                 onDelete={onDelete}
                 onAddChild={onAddChild}
@@ -88,6 +103,12 @@ function PlotTreeView({
                 onNavigateToParent={onNavigateToParent}
                 onBackspaceDelete={onBackspaceDelete}
                 onUpdateBody={onUpdateBody}
+                onAddCustomFieldDef={onAddCustomFieldDef}
+                onRenameCustomFieldDef={onRenameCustomFieldDef}
+                onRemoveCustomFieldDef={onRemoveCustomFieldDef}
+                onSetCustomFieldValue={onSetCustomFieldValue}
+                onAddKeyword={onAddKeyword}
+                onRemoveKeyword={onRemoveKeyword}
                 registerInput={registerInput}
               />
               {childHasChildren && !isCollapsed && (
@@ -107,6 +128,12 @@ function PlotTreeView({
                     onNavigateToParent={onNavigateToParent}
                     onBackspaceDelete={onBackspaceDelete}
                     onUpdateBody={onUpdateBody}
+                    onAddCustomFieldDef={onAddCustomFieldDef}
+                    onRenameCustomFieldDef={onRenameCustomFieldDef}
+                    onRemoveCustomFieldDef={onRemoveCustomFieldDef}
+                    onSetCustomFieldValue={onSetCustomFieldValue}
+                    onAddKeyword={onAddKeyword}
+                    onRemoveKeyword={onRemoveKeyword}
                     registerInput={registerInput}
                     onReorder={onReorder}
                   />

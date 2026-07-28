@@ -86,18 +86,25 @@ flat-list-with-parentId shape (same generic tree helpers, different domain). A p
 {
   "schemaVersion": 2,
   "nodes": [
-    { "id": "cat_001", "kind": "category", "parentId": null, "order": 0, "title": "Betrayal", "body": "", "assignedMomentId": null },
-    { "id": "pl_001", "kind": "plotline", "parentId": "cat_001", "order": 0, "title": "The mole", "body": "", "assignedMomentId": null },
-    { "id": "pp_001", "kind": "plotpoint", "parentId": "pl_001", "order": 0, "title": "Reveal", "body": "What if the villain is the narrator's future self?", "assignedMomentId": "moment_001" }
+    { "id": "cat_001", "kind": "category", "parentId": null, "order": 0, "title": "Betrayal", "body": "", "assignedMomentId": null, "customFieldDefs": [{ "id": "field_001", "name": "POV character" }], "customFieldValues": {}, "keywords": [] },
+    { "id": "pl_001", "kind": "plotline", "parentId": "cat_001", "order": 0, "title": "The mole", "body": "", "assignedMomentId": null, "customFieldDefs": [], "customFieldValues": { "field_001": "Dana" }, "keywords": ["double agent", "trust"] },
+    { "id": "pp_001", "kind": "plotpoint", "parentId": "pl_001", "order": 0, "title": "Reveal", "body": "What if the villain is the narrator's future self?", "assignedMomentId": "moment_001", "customFieldDefs": [], "customFieldValues": {}, "keywords": [] }
   ]
 }
 ```
 
 - `body` is only meaningful on `plotpoint` nodes (the actual note text); category/plotline nodes use
   `body: ""`.
-- `assignedMomentId` is only meaningful on `plotpoint` nodes — nullable, set via a dropdown in the
-  Plot sidebar populated from the outline's moment nodes. Categories and plotlines are pure
-  organizational containers.
+- `assignedMomentId` is only meaningful on `plotpoint` nodes — nullable, set by dragging the plotpoint
+  card onto a moment row in the Outline tree (native HTML5 drag-and-drop). Categories and plotlines
+  are pure organizational containers.
+- `customFieldDefs` is only meaningful on `category` nodes: an optional list of `{id, name}` field
+  definitions that plotlines within that category can fill in (e.g. "POV character", "Stakes").
+- `customFieldValues` is only meaningful on `plotline` nodes: a map of `customFieldDefs.id` (from the
+  parent category) to the plotline's free-text value for that field. A plotline's parent is always its
+  category — the only shallower plot kind — so lookup is a direct parent walk.
+- `keywords` is only meaningful on `plotline` nodes: free-text words/phrases the user attaches to a
+  plotline (e.g. for later cross-referencing), edited as removable chips plus an add-on-Enter input.
 - Rendered in the app as a sidebar alongside the focal Outline editor on the combined **Plan** page
   (`frontend/src/modes/plan/`), not as a separate tab.
 

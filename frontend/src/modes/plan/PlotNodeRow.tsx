@@ -1,8 +1,9 @@
+import { useState } from 'react'
 import { useSortable } from '@dnd-kit/sortable'
 import { CSS } from '@dnd-kit/utilities'
 import { nextKindInLevels } from '../../lib/nodeTree'
 import { PLOT_KIND_ORDER } from '../../types'
-import type { PlotNode, PlotNodeKind } from '../../types'
+import type { PlotCustomFieldDef, PlotNode, PlotNodeKind } from '../../types'
 
 interface Props {
   node: PlotNode
@@ -12,6 +13,7 @@ interface Props {
   onToggleCollapse: (nodeId: string) => void
   plotpointTotal: number
   plotpointAssigned: number
+  customFieldDefs: PlotCustomFieldDef[]
   onRename: (nodeId: string, title: string) => void
   onDelete: (node: PlotNode) => void
   onAddChild: (node: PlotNode) => void
@@ -21,6 +23,12 @@ interface Props {
   onNavigateToParent: (node: PlotNode) => void
   onBackspaceDelete: (node: PlotNode) => void
   onUpdateBody: (nodeId: string, body: string) => void
+  onAddCustomFieldDef: (categoryId: string) => void
+  onRenameCustomFieldDef: (categoryId: string, fieldId: string, name: string) => void
+  onRemoveCustomFieldDef: (categoryId: string, fieldId: string) => void
+  onSetCustomFieldValue: (plotlineId: string, fieldId: string, value: string) => void
+  onAddKeyword: (plotlineId: string, keyword: string) => void
+  onRemoveKeyword: (plotlineId: string, keyword: string) => void
   registerInput: (nodeId: string, el: HTMLInputElement | null) => void
 }
 
@@ -32,6 +40,7 @@ function PlotNodeRow({
   onToggleCollapse,
   plotpointTotal,
   plotpointAssigned,
+  customFieldDefs,
   onRename,
   onDelete,
   onAddChild,
@@ -41,15 +50,34 @@ function PlotNodeRow({
   onNavigateToParent,
   onBackspaceDelete,
   onUpdateBody,
+  onAddCustomFieldDef,
+  onRenameCustomFieldDef,
+  onRemoveCustomFieldDef,
+  onSetCustomFieldValue,
+  onAddKeyword,
+  onRemoveKeyword,
   registerInput,
 }: Props) {
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({
     id: node.id,
   })
+  const [keywordDraft, setKeywordDraft] = useState('')
 
   const canAddChild = nextKindInLevels(levels, node.kind, PLOT_KIND_ORDER) !== undefined
   const isPlotpoint = node.kind === 'plotpoint'
+  const isCategory = node.kind === 'category'
+  const isPlotline = node.kind === 'plotline'
   const showDescription = isPlotpoint && node.title.trim() !== ''
+
+  function handleKeywordKeyDown(e: React.KeyboardEvent<HTMLInputElement>) {
+    if (e.key === 'Enter') {
+      e.preventDefault()
+      if (keywordDraft.trim()) {
+        onAddKeyword(node.id, keywordDraft)
+        setKeywordDraft('')
+      }
+    }
+  }
 
   const style = {
     transform: CSS.Transform.toString(transform),
@@ -145,6 +173,76 @@ function PlotNodeRow({
           value={node.body}
           onChange={(e) => onUpdateBody(node.id, e.target.value)}
         />
+      )}
+
+      {isCategory && (
+        <div className="plot-node__custom-fields-editor">
+          <span className="plot-node__custom-fields-label">Plotline fields:</span>
+          {node.customFieldDefs.map((f) => (
+            <span key={f.id} className="plot-node__custom-field-chip">
+              <input
+                className="plot-node__custom-field-name"
+                value={f.name}
+                placeholder="Field name"
+                onChange={(e) => onRenameCustomFieldDef(node.id, f.id, e.target.value)}
+              />
+              <button
+                type="button"
+                className="plot-node__custom-field-remove"
+                onClick={() => onRemoveCustomFieldDef(node.id, f.id)}
+                title="Remove field"
+              >
+                ×
+              </button>
+            </span>
+          ))}
+          <button
+            type="button"
+            className="plot-node__custom-field-add"
+            onClick={() => onAddCustomFieldDef(node.id)}
+          >
+            + Add field
+          </button>
+        </div>
+      )}
+
+      {isPlotline && customFieldDefs.length > 0 && (
+        <div className="plot-node__field-values">
+          {customFieldDefs.map((f) => (
+            <label key={f.id} className="plot-node__field-value">
+              <span className="plot-node__field-value-label">{f.name || 'Untitled field'}</span>
+              <input
+                value={node.customFieldValues[f.id] ?? ''}
+                onChange={(e) => onSetCustomFieldValue(node.id, f.id, e.target.value)}
+              />
+            </label>
+          ))}
+        </div>
+      )}
+
+      {isPlotline && (
+        <div className="plot-node__keywords">
+          {node.keywords.map((k) => (
+            <span key={k} className="plot-node__keyword-chip">
+              {k}
+              <button
+                type="button"
+                className="plot-node__keyword-remove"
+                onClick={() => onRemoveKeyword(node.id, k)}
+                title="Remove keyword"
+              >
+                ×
+              </button>
+            </span>
+          ))}
+          <input
+            className="plot-node__keyword-input"
+            placeholder="Add keyword…"
+            value={keywordDraft}
+            onChange={(e) => setKeywordDraft(e.target.value)}
+            onKeyDown={handleKeywordKeyDown}
+          />
+        </div>
       )}
     </div>
   )

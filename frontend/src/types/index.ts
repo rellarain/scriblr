@@ -48,6 +48,11 @@ export interface OutlineTree {
 export type PlotNodeKind = 'category' | 'plotline' | 'plotpoint'
 export const PLOT_KIND_ORDER: PlotNodeKind[] = ['category', 'plotline', 'plotpoint']
 
+export interface PlotCustomFieldDef {
+  id: string
+  name: string
+}
+
 export interface PlotNode {
   id: string
   kind: PlotNodeKind
@@ -58,6 +63,14 @@ export interface PlotNode {
   body: string
   // Set only on "plotpoint" nodes: the moment (outline node id) assigned.
   assignedMomentId: string | null
+  // Set only on "category" nodes: custom field definitions plotlines within
+  // this category can fill in.
+  customFieldDefs: PlotCustomFieldDef[]
+  // Set only on "plotline" nodes: values for the parent category's custom
+  // fields, keyed by PlotCustomFieldDef.id.
+  customFieldValues: Record<string, string>
+  // Set only on "plotline" nodes: keywords/phrases connected to this plotline.
+  keywords: string[]
 }
 
 export interface PlotTree {

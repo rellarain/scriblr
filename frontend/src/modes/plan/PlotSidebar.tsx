@@ -7,15 +7,21 @@ import type { PlotNode, PlotNodeKind, PlotTree } from '../../types'
 import PlotTreeView from './PlotTreeView'
 import {
   addCategory,
+  addCustomFieldDef,
+  addKeyword,
   createChildNode,
   createSiblingNode,
   escalateToChild,
   getNextSibling,
   getPreviousSibling,
   hasChildren,
+  removeCustomFieldDef,
   removeNode,
+  removeKeyword,
+  renameCustomFieldDef,
   renameNode,
   reorderSiblings,
+  setCustomFieldValue,
   updatePlotpointBody,
 } from './plotTree'
 
@@ -177,6 +183,46 @@ function PlotSidebar() {
     scheduleSave()
   }
 
+  function handleAddCustomFieldDef(categoryId: string) {
+    pendingSibling.current = null
+    const next = addCustomFieldDef(nodesRef.current, categoryId, '')
+    setNodes(next)
+    saveNow(next)
+  }
+
+  function handleRenameCustomFieldDef(categoryId: string, fieldId: string, name: string) {
+    pendingSibling.current = null
+    setNodes((prev) => renameCustomFieldDef(prev, categoryId, fieldId, name))
+    scheduleSave()
+  }
+
+  function handleRemoveCustomFieldDef(categoryId: string, fieldId: string) {
+    pendingSibling.current = null
+    const next = removeCustomFieldDef(nodesRef.current, categoryId, fieldId)
+    setNodes(next)
+    saveNow(next)
+  }
+
+  function handleSetCustomFieldValue(plotlineId: string, fieldId: string, value: string) {
+    pendingSibling.current = null
+    setNodes((prev) => setCustomFieldValue(prev, plotlineId, fieldId, value))
+    scheduleSave()
+  }
+
+  function handleAddKeyword(plotlineId: string, keyword: string) {
+    pendingSibling.current = null
+    const next = addKeyword(nodesRef.current, plotlineId, keyword)
+    setNodes(next)
+    saveNow(next)
+  }
+
+  function handleRemoveKeyword(plotlineId: string, keyword: string) {
+    pendingSibling.current = null
+    const next = removeKeyword(nodesRef.current, plotlineId, keyword)
+    setNodes(next)
+    saveNow(next)
+  }
+
   function handleReorder(orderedIds: string[]) {
     pendingSibling.current = null
     const next = reorderSiblings(nodes, orderedIds)
@@ -254,6 +300,12 @@ function PlotSidebar() {
         onNavigateToParent={handleNavigateToParent}
         onBackspaceDelete={handleBackspaceDelete}
         onUpdateBody={handleUpdateBody}
+        onAddCustomFieldDef={handleAddCustomFieldDef}
+        onRenameCustomFieldDef={handleRenameCustomFieldDef}
+        onRemoveCustomFieldDef={handleRemoveCustomFieldDef}
+        onSetCustomFieldValue={handleSetCustomFieldValue}
+        onAddKeyword={handleAddKeyword}
+        onRemoveKeyword={handleRemoveKeyword}
         registerInput={registerInput}
         onReorder={handleReorder}
       />

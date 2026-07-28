@@ -71,6 +71,11 @@ class OutlineTree(BaseModel):
     nodes: list[OutlineNode] = Field(default_factory=list)
 
 
+class PlotCustomFieldDef(BaseModel):
+    id: str
+    name: str
+
+
 class PlotNode(BaseModel):
     id: str
     kind: PlotNodeKind
@@ -82,6 +87,14 @@ class PlotNode(BaseModel):
     # Set only on "plotpoint" nodes: the moment (outline node id) this
     # plotpoint is assigned to, if any.
     assignedMomentId: Optional[str] = None
+    # Set only on "category" nodes: custom field definitions that plotlines
+    # within this category can fill in.
+    customFieldDefs: list[PlotCustomFieldDef] = Field(default_factory=list)
+    # Set only on "plotline" nodes: values for the parent category's custom
+    # fields, keyed by PlotCustomFieldDef.id.
+    customFieldValues: dict[str, str] = Field(default_factory=dict)
+    # Set only on "plotline" nodes: keywords/phrases connected to this plotline.
+    keywords: list[str] = Field(default_factory=list)
 
 
 class PlotTree(BaseModel):
