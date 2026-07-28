@@ -1,4 +1,13 @@
-from fastapi import FastAPI
+from fastapi import FastAPI, Request
+from fastapi.responses import JSONResponse
+
+from .api import brainstorm, draft, outline, projects, revisions
+from .storage.project_store import (
+    ProjectNotFoundError,
+    SceneNotFoundError,
+    ShardCorruptError,
+    SnapshotNotFoundError,
+)
 
 
 def create_app() -> FastAPI:
@@ -7,6 +16,31 @@ def create_app() -> FastAPI:
     @app.get("/api/health")
     def health() -> dict[str, str]:
         return {"status": "ok"}
+
+    @app.exception_handler(ProjectNotFoundError)
+    async def _project_not_found(_: Request, exc: ProjectNotFoundError) -> JSONResponse:
+        return JSONResponse(status_code=404, content={"detail": str(exc)})
+
+    @app.exception_handler(SceneNotFoundError)
+    async def _scene_not_found(_: Request, exc: SceneNotFoundError) -> JSONResponse:
+        return JSONResponse(status_code=404, content={"detail": str(exc)})
+
+    @app.exception_handler(SnapshotNotFoundError)
+    async def _snapshot_not_found(_: Request, exc: SnapshotNotFoundError) -> JSONResponse:
+        return JSONResponse(status_code=404, content={"detail": str(exc)})
+
+    @app.exception_handler(ShardCorruptError)
+    async def _shard_corrupt(_: Request, exc: ShardCorruptError) -> JSONResponse:
+        return JSONResponse(
+            status_code=409,
+            content={"detail": f"shard corrupt and quarantined: {exc.reason}"},
+        )
+
+    app.include_router(projects.router)
+    app.include_router(outline.router)
+    app.include_router(draft.router)
+    app.include_router(brainstorm.router)
+    app.include_router(revisions.router)
 
     return app
 
