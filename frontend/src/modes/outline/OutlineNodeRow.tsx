@@ -1,14 +1,16 @@
 import { useState } from 'react'
 import { useSortable } from '@dnd-kit/sortable'
 import { CSS } from '@dnd-kit/utilities'
+import NodeFlagControl from '../../components/shared/NodeFlagControl'
 import { nextKindInLevels } from '../../lib/nodeTree'
 import { OUTLINE_KIND_ORDER } from '../../types'
-import type { OutlineNode, OutlineNodeKind, PlotNode } from '../../types'
+import type { NodeFlag, OutlineNode, OutlineNodeKind, PlotNode } from '../../types'
 
 interface Props {
   node: OutlineNode
   levels: OutlineNodeKind[]
   hasChildren: boolean
+  childCount: number
   collapsed: boolean
   onToggleCollapse: (nodeId: string) => void
   assignedPlotpoints: PlotNode[]
@@ -23,6 +25,7 @@ interface Props {
   onNavigateToParent: (node: OutlineNode) => void
   onBackspaceDelete: (node: OutlineNode) => void
   onReparentNode: (nodeId: string, newParentId: string) => void
+  onSetFlag: (nodeId: string, flag: NodeFlag | null) => void
   registerInput: (nodeId: string, el: HTMLInputElement | null) => void
 }
 
@@ -30,6 +33,7 @@ function OutlineNodeRow({
   node,
   levels,
   hasChildren,
+  childCount,
   collapsed,
   onToggleCollapse,
   assignedPlotpoints,
@@ -44,6 +48,7 @@ function OutlineNodeRow({
   onNavigateToParent,
   onBackspaceDelete,
   onReparentNode,
+  onSetFlag,
   registerInput,
 }: Props) {
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({
@@ -153,7 +158,15 @@ function OutlineNodeRow({
           ⠿
         </span>
         <div className="outline-node__main">
-          <span className="outline-node__kind">{node.kind}</span>
+          <span className="outline-node__kind">
+            {node.kind}
+            {childCount > 0 && (
+              <span className="outline-node__count">
+                {' '}
+                · {childCount} {childCount === 1 ? 'child' : 'children'}
+              </span>
+            )}
+          </span>
           <input
             ref={(el) => registerInput(node.id, el)}
             className="outline-node__title"
@@ -163,6 +176,7 @@ function OutlineNodeRow({
             onKeyDown={handleKeyDown}
           />
         </div>
+        <NodeFlagControl flag={node.flag} onSetFlag={(flag) => onSetFlag(node.id, flag)} />
         {canAddChild && (
           <button type="button" className="outline-node__add-toggle" onClick={() => onAddChild(node)}>
             +
@@ -177,7 +191,10 @@ function OutlineNodeRow({
         <div className="outline-node__plotpoints">
           {assignedPlotpoints.map((p) => (
             <div key={p.id} className="outline-node__plotpoint-chip">
-              <span className="outline-node__plotpoint-chip-title">{p.title || 'Untitled'}</span>
+              <span className="outline-node__plotpoint-chip-text">
+                <span className="outline-node__plotpoint-chip-title">{p.title || 'Untitled'}</span>
+                {p.body && <span className="outline-node__plotpoint-chip-description"> — {p.body}</span>}
+              </span>
               <button
                 type="button"
                 className="outline-node__plotpoint-unlink"

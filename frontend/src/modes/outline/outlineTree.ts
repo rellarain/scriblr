@@ -1,5 +1,5 @@
 import { OUTLINE_KIND_ORDER } from '../../types'
-import type { OutlineNode, OutlineNodeKind } from '../../types'
+import type { NodeFlag, OutlineNode, OutlineNodeKind } from '../../types'
 import * as tree from '../../lib/nodeTree'
 
 /** A project may contain multiple books (e.g. a series) — all root-level nodes. */
@@ -42,12 +42,17 @@ export function addNode(
     title,
     synopsis: '',
     draftRef: kind === 'moment' ? id : null,
+    flag: null,
   }
   return [...nodes, node]
 }
 
 export function renameNode(nodes: OutlineNode[], nodeId: string, title: string): OutlineNode[] {
   return nodes.map((n) => (n.id === nodeId ? { ...n, title } : n))
+}
+
+export function setFlag(nodes: OutlineNode[], nodeId: string, flag: NodeFlag | null): OutlineNode[] {
+  return nodes.map((n) => (n.id === nodeId ? { ...n, flag } : n))
 }
 
 export function removeNode(nodes: OutlineNode[], nodeId: string): OutlineNode[] {
@@ -68,6 +73,7 @@ function makeNode(kind: OutlineNodeKind, parentId: string | null, order: number)
     title: '',
     synopsis: '',
     draftRef: kind === 'moment' ? id : null,
+    flag: null,
   }
 }
 

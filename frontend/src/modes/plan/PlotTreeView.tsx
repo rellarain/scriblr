@@ -1,7 +1,7 @@
 import { DndContext, PointerSensor, useSensor, useSensors } from '@dnd-kit/core'
 import type { DragEndEvent } from '@dnd-kit/core'
 import { SortableContext, verticalListSortingStrategy } from '@dnd-kit/sortable'
-import type { PlotNode, PlotNodeKind } from '../../types'
+import type { NodeFlag, PlotNode, PlotNodeKind } from '../../types'
 import PlotNodeRow from './PlotNodeRow'
 import { getChildren, getCustomFieldDefsForPlotline, plotpointCounts } from './plotTree'
 
@@ -29,6 +29,7 @@ interface Props {
   onAddKeyword: (plotlineId: string, keyword: string) => void
   onRemoveKeyword: (plotlineId: string, keyword: string) => void
   onReparentNode: (nodeId: string, newParentId: string) => void
+  onSetFlag: (nodeId: string, flag: NodeFlag | null) => void
   registerInput: (nodeId: string, el: HTMLInputElement | null) => void
   onReorder: (orderedIds: string[]) => void
 }
@@ -65,6 +66,7 @@ function PlotTreeView({
   onAddKeyword,
   onRemoveKeyword,
   onReparentNode,
+  onSetFlag,
   registerInput,
   onReorder,
 }: Props) {
@@ -121,6 +123,7 @@ function PlotTreeView({
                 onAddKeyword={onAddKeyword}
                 onRemoveKeyword={onRemoveKeyword}
                 onReparentNode={onReparentNode}
+                onSetFlag={onSetFlag}
                 registerInput={registerInput}
               />
               {childHasChildren && !isCollapsed && (
@@ -149,6 +152,7 @@ function PlotTreeView({
                     onAddKeyword={onAddKeyword}
                     onRemoveKeyword={onRemoveKeyword}
                     onReparentNode={onReparentNode}
+                    onSetFlag={onSetFlag}
                     registerInput={registerInput}
                     onReorder={onReorder}
                   />

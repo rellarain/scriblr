@@ -1,9 +1,10 @@
-import { useState } from 'react'
+import { useRef, useState } from 'react'
 import { useSortable } from '@dnd-kit/sortable'
 import { CSS } from '@dnd-kit/utilities'
+import NodeFlagControl from '../../components/shared/NodeFlagControl'
 import { nextKindInLevels } from '../../lib/nodeTree'
 import { PLOT_KIND_ORDER } from '../../types'
-import type { PlotCustomFieldDef, PlotNode, PlotNodeKind } from '../../types'
+import type { NodeFlag, PlotCustomFieldDef, PlotNode, PlotNodeKind } from '../../types'
 
 interface Props {
   node: PlotNode
@@ -30,6 +31,7 @@ interface Props {
   onAddKeyword: (plotlineId: string, keyword: string) => void
   onRemoveKeyword: (plotlineId: string, keyword: string) => void
   onReparentNode: (nodeId: string, newParentId: string) => void
+  onSetFlag: (nodeId: string, flag: NodeFlag | null) => void
   showAssigned: boolean
   onToggleShowAssigned: (plotlineId: string) => void
   registerInput: (nodeId: string, el: HTMLInputElement | null) => void
@@ -60,6 +62,7 @@ function PlotNodeRow({
   onAddKeyword,
   onRemoveKeyword,
   onReparentNode,
+  onSetFlag,
   showAssigned,
   onToggleShowAssigned,
   registerInput,
@@ -69,6 +72,7 @@ function PlotNodeRow({
   })
   const [keywordDraft, setKeywordDraft] = useState('')
   const [isDropTarget, setIsDropTarget] = useState(false)
+  const descriptionRef = useRef<HTMLTextAreaElement>(null)
 
   const canAddChild = nextKindInLevels(levels, node.kind, PLOT_KIND_ORDER) !== undefined
   const isPlotpoint = node.kind === 'plotpoint'
@@ -100,6 +104,7 @@ function PlotNodeRow({
     } else if (e.key === 'Enter') {
       e.preventDefault()
       if (e.shiftKey) onNavigateToParent(node)
+      else if (isPlotpoint && node.title.trim() !== '') descriptionRef.current?.focus()
       else onEnter(node)
     } else if (e.key === 'Delete' && e.shiftKey) {
       e.preventDefault()
@@ -107,6 +112,15 @@ function PlotNodeRow({
     } else if (e.key === 'Backspace' && node.title === '') {
       e.preventDefault()
       onBackspaceDelete(node)
+    }
+  }
+
+  // Enter in the description creates a new plotpoint sibling (matching the
+  // title field's Enter behavior); Shift+Enter inserts an actual newline.
+  function handleDescriptionKeyDown(e: React.KeyboardEvent<HTMLTextAreaElement>) {
+    if (e.key === 'Enter' && !e.shiftKey) {
+      e.preventDefault()
+      onEnter(node)
     }
   }
 
@@ -208,6 +222,7 @@ function PlotNodeRow({
             onKeyDown={handleKeyDown}
           />
         </div>
+        <NodeFlagControl flag={node.flag} onSetFlag={(flag) => onSetFlag(node.id, flag)} />
         {canAddChild && (
           <button type="button" className="plot-node__add-toggle" onClick={() => onAddChild(node)}>
             +
@@ -222,10 +237,12 @@ function PlotNodeRow({
 
       {showDescription && (
         <textarea
+          ref={descriptionRef}
           className="plot-node__description"
           placeholder="What happens…"
           value={node.body}
           onChange={(e) => onUpdateBody(node.id, e.target.value)}
+          onKeyDown={handleDescriptionKeyDown}
         />
       )}
 
@@ -276,6 +293,14 @@ function PlotNodeRow({
 
       {isPlotline && (
         <div className="plot-node__keywords">
+          {node.title.trim() && (
+            <span
+              className="plot-node__keyword-chip plot-node__keyword-chip--default"
+              title="Automatically included: this plotline's title"
+            >
+              {node.title.trim()}
+            </span>
+          )}
           {node.keywords.map((k) => (
             <span key={k} className="plot-node__keyword-chip">
               {k}

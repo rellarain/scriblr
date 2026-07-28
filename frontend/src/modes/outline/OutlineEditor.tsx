@@ -4,7 +4,7 @@ import { useOutline, useSaveOutline } from '../../api/outline'
 import { usePlot, useSavePlot } from '../../api/plot'
 import { useProject, useUpdateProject } from '../../api/projects'
 import { OUTLINE_KIND_ORDER } from '../../types'
-import type { OutlineNode, OutlineNodeKind, OutlineTree } from '../../types'
+import type { NodeFlag, OutlineNode, OutlineNodeKind, OutlineTree } from '../../types'
 import { assignPlotpoint } from '../plan/plotTree'
 import OutlineTreeView from './OutlineTreeView'
 import {
@@ -20,6 +20,7 @@ import {
   renameNode,
   reorderSiblings,
   reparentNode,
+  setFlag,
 } from './outlineTree'
 
 const RENAME_SAVE_DELAY_MS = 500
@@ -197,6 +198,13 @@ function OutlineEditor() {
     saveNow(next)
   }
 
+  function handleSetFlag(nodeId: string, flag: NodeFlag | null) {
+    pendingSibling.current = null
+    const next = setFlag(nodesRef.current, nodeId, flag)
+    setNodes(next)
+    scheduleSave()
+  }
+
   function handleAssignPlotpoint(plotpointId: string, momentId: string) {
     if (!plotData) return
     const next = assignPlotpoint(plotData.nodes, plotpointId, momentId)
@@ -280,6 +288,7 @@ function OutlineEditor() {
         onNavigateToParent={handleNavigateToParent}
         onBackspaceDelete={handleBackspaceDelete}
         onReparentNode={handleReparentNode}
+        onSetFlag={handleSetFlag}
         registerInput={registerInput}
         onReorder={handleReorder}
       />

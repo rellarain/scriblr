@@ -51,6 +51,14 @@ class ProjectIndex(BaseModel):
     manifest: ProjectManifest = Field(default_factory=ProjectManifest)
 
 
+FlagType = Literal["review", "edit", "add", "delete"]
+
+
+class NodeFlag(BaseModel):
+    type: FlagType
+    note: str = ""
+
+
 class OutlineNode(BaseModel):
     id: str
     kind: OutlineNodeKind
@@ -64,6 +72,8 @@ class OutlineNode(BaseModel):
     # id === draftRef) so a moment can exist in the outline before any draft
     # content is written.
     draftRef: Optional[str] = None
+    # Flags this item for revision (review/edit/add/delete), with an optional note.
+    flag: Optional[NodeFlag] = None
 
 
 class OutlineTree(BaseModel):
@@ -95,6 +105,8 @@ class PlotNode(BaseModel):
     customFieldValues: dict[str, str] = Field(default_factory=dict)
     # Set only on "plotline" nodes: keywords/phrases connected to this plotline.
     keywords: list[str] = Field(default_factory=list)
+    # Flags this item for revision (review/edit/add/delete), with an optional note.
+    flag: Optional[NodeFlag] = None
 
 
 class PlotTree(BaseModel):

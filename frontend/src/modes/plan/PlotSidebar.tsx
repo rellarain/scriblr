@@ -3,7 +3,7 @@ import { useParams } from 'react-router-dom'
 import { usePlot, useSavePlot } from '../../api/plot'
 import { useProject, useUpdateProject } from '../../api/projects'
 import { PLOT_KIND_ORDER } from '../../types'
-import type { PlotNode, PlotNodeKind, PlotTree } from '../../types'
+import type { NodeFlag, PlotNode, PlotNodeKind, PlotTree } from '../../types'
 import PlotTreeView from './PlotTreeView'
 import {
   addCategory,
@@ -24,6 +24,7 @@ import {
   reorderSiblings,
   reparentNode,
   setCustomFieldValue,
+  setFlag,
   updatePlotpointBody,
 } from './plotTree'
 
@@ -226,6 +227,13 @@ function PlotSidebar() {
     saveNow(next)
   }
 
+  function handleSetFlag(nodeId: string, flag: NodeFlag | null) {
+    pendingSibling.current = null
+    const next = setFlag(nodesRef.current, nodeId, flag)
+    setNodes(next)
+    scheduleSave()
+  }
+
   function handleToggleShowAssigned(plotlineId: string) {
     setShowAssignedIds((prev) => {
       const next = new Set(prev)
@@ -329,6 +337,7 @@ function PlotSidebar() {
         onAddKeyword={handleAddKeyword}
         onRemoveKeyword={handleRemoveKeyword}
         onReparentNode={handleReparentNode}
+        onSetFlag={handleSetFlag}
         registerInput={registerInput}
         onReorder={handleReorder}
       />

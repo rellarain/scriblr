@@ -27,6 +27,13 @@ export interface ProjectIndex {
 export type OutlineNodeKind = 'book' | 'arc' | 'chapter' | 'scene' | 'moment'
 export const OUTLINE_KIND_ORDER: OutlineNodeKind[] = ['book', 'arc', 'chapter', 'scene', 'moment']
 
+export type FlagType = 'review' | 'edit' | 'add' | 'delete'
+
+export interface NodeFlag {
+  type: FlagType
+  note: string
+}
+
 export interface OutlineNode {
   id: string
   kind: OutlineNodeKind
@@ -36,6 +43,8 @@ export interface OutlineNode {
   synopsis: string
   // Set only on "moment" nodes: the moment IS the writing unit.
   draftRef: string | null
+  // Flags this item for revision (review/edit/add/delete), with an optional note.
+  flag: NodeFlag | null
 }
 
 export interface OutlineTree {
@@ -71,6 +80,8 @@ export interface PlotNode {
   customFieldValues: Record<string, string>
   // Set only on "plotline" nodes: keywords/phrases connected to this plotline.
   keywords: string[]
+  // Flags this item for revision (review/edit/add/delete), with an optional note.
+  flag: NodeFlag | null
 }
 
 export interface PlotTree {

@@ -1,7 +1,7 @@
 import { DndContext, PointerSensor, useSensor, useSensors } from '@dnd-kit/core'
 import type { DragEndEvent } from '@dnd-kit/core'
 import { SortableContext, verticalListSortingStrategy } from '@dnd-kit/sortable'
-import type { OutlineNode, OutlineNodeKind, PlotNode } from '../../types'
+import type { NodeFlag, OutlineNode, OutlineNodeKind, PlotNode } from '../../types'
 import { plotpointsForMoment } from '../plan/plotTree'
 import OutlineNodeRow from './OutlineNodeRow'
 import { getChildren } from './outlineTree'
@@ -24,6 +24,7 @@ interface Props {
   onNavigateToParent: (node: OutlineNode) => void
   onBackspaceDelete: (node: OutlineNode) => void
   onReparentNode: (nodeId: string, newParentId: string) => void
+  onSetFlag: (nodeId: string, flag: NodeFlag | null) => void
   registerInput: (nodeId: string, el: HTMLInputElement | null) => void
   onReorder: (parentId: string | null, orderedIds: string[]) => void
 }
@@ -46,6 +47,7 @@ function OutlineTreeView({
   onNavigateToParent,
   onBackspaceDelete,
   onReparentNode,
+  onSetFlag,
   registerInput,
   onReorder,
 }: Props) {
@@ -68,7 +70,8 @@ function OutlineTreeView({
     <DndContext sensors={sensors} onDragEnd={handleDragEnd}>
       <SortableContext items={children.map((c) => c.id)} strategy={verticalListSortingStrategy}>
         {children.map((child) => {
-          const childHasChildren = getChildren(nodes, child.id).length > 0
+          const childNodes = getChildren(nodes, child.id)
+          const childHasChildren = childNodes.length > 0
           const isCollapsed = collapsedIds.has(child.id)
           const assignedPlotpoints =
             child.kind === 'moment' ? plotpointsForMoment(plotNodes, child.id) : []
@@ -78,6 +81,7 @@ function OutlineTreeView({
                 node={child}
                 levels={levels}
                 hasChildren={childHasChildren}
+                childCount={childNodes.length}
                 collapsed={isCollapsed}
                 onToggleCollapse={onToggleCollapse}
                 assignedPlotpoints={assignedPlotpoints}
@@ -92,6 +96,7 @@ function OutlineTreeView({
                 onNavigateToParent={onNavigateToParent}
                 onBackspaceDelete={onBackspaceDelete}
                 onReparentNode={onReparentNode}
+                onSetFlag={onSetFlag}
                 registerInput={registerInput}
               />
               {childHasChildren && !isCollapsed && (
@@ -114,6 +119,7 @@ function OutlineTreeView({
                     onNavigateToParent={onNavigateToParent}
                     onBackspaceDelete={onBackspaceDelete}
                     onReparentNode={onReparentNode}
+                    onSetFlag={onSetFlag}
                     registerInput={registerInput}
                     onReorder={onReorder}
                   />

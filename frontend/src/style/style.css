@@ -268,8 +268,16 @@ textarea {
   font-size: 0.75rem;
 }
 
-.outline-node__plotpoint-chip-title {
+.outline-node__plotpoint-chip-text {
   color: #333;
+}
+
+.outline-node__plotpoint-chip-title {
+  font-weight: 700;
+}
+
+.outline-node__plotpoint-chip-description {
+  font-weight: 400;
 }
 
 .outline-node__plotpoint-unlink {
@@ -315,6 +323,13 @@ textarea {
   text-transform: uppercase;
   letter-spacing: 0.04em;
   color: #999;
+}
+
+.outline-node__count {
+  text-transform: none;
+  letter-spacing: normal;
+  font-weight: 600;
+  color: var(--accent);
 }
 
 .outline-node__title {
@@ -761,6 +776,13 @@ textarea {
   font-size: 0.75rem;
 }
 
+.plot-node__keyword-chip--default {
+  font-style: italic;
+  opacity: 0.8;
+  background: transparent;
+  border: 1px dashed var(--accent-light);
+}
+
 .plot-node__keyword-remove {
   border: none;
   background: transparent;
@@ -1013,4 +1035,96 @@ textarea {
   color: #b00020;
   font-size: 0.8rem;
   padding: 0;
+}
+
+/* Revision flags (Outline + Plot nodes) */
+
+.node-flag {
+  position: relative;
+  flex-shrink: 0;
+}
+
+.node-flag__toggle {
+  border: 1px solid #ddd;
+  background: transparent;
+  color: #999;
+  border-radius: 3px;
+  font-size: 0.7rem;
+  padding: 0.1rem 0.35rem;
+  cursor: pointer;
+  line-height: 1.4;
+}
+
+.node-flag__toggle--review {
+  border-color: #2563eb;
+  color: #2563eb;
+  background: #eaf1fe;
+}
+
+.node-flag__toggle--edit {
+  border-color: #b45309;
+  color: #b45309;
+  background: #fdf1e0;
+}
+
+.node-flag__toggle--add {
+  border-color: #15803d;
+  color: #15803d;
+  background: #e7f5ec;
+}
+
+.node-flag__toggle--delete {
+  border-color: #b00020;
+  color: #b00020;
+  background: #fbe7ea;
+}
+
+.node-flag__editor {
+  position: absolute;
+  top: 100%;
+  right: 0;
+  z-index: 10;
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+  min-width: 170px;
+  margin-top: 0.25rem;
+  padding: 0.5rem;
+  background: white;
+  border: 1px solid #ddd;
+  border-radius: 4px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
+}
+
+.node-flag__editor select,
+.node-flag__note {
+  border: 1px solid #ddd;
+  border-radius: 4px;
+  padding: 0.2rem 0.35rem;
+  font-size: 0.8rem;
+}
+
+.node-flag__actions {
+  display: flex;
+  justify-content: space-between;
+  gap: 0.4rem;
+}
+
+.node-flag__remove {
+  border: none;
+  background: transparent;
+  color: #b00020;
+  font-size: 0.75rem;
+  padding: 0;
+  cursor: pointer;
+}
+
+.node-flag__done {
+  border: none;
+  background: transparent;
+  color: var(--accent);
+  font-size: 0.75rem;
+  padding: 0;
+  cursor: pointer;
+  margin-left: auto;
 }

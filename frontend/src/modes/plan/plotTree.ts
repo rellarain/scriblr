@@ -1,5 +1,5 @@
 import { PLOT_KIND_ORDER } from '../../types'
-import type { PlotCustomFieldDef, PlotNode, PlotNodeKind } from '../../types'
+import type { NodeFlag, PlotCustomFieldDef, PlotNode, PlotNodeKind } from '../../types'
 import * as tree from '../../lib/nodeTree'
 
 export function getCategories(nodes: PlotNode[]): PlotNode[] {
@@ -32,12 +32,17 @@ export function addNode(
     customFieldDefs: [],
     customFieldValues: {},
     keywords: [],
+    flag: null,
   }
   return [...nodes, node]
 }
 
 export function renameNode(nodes: PlotNode[], nodeId: string, title: string): PlotNode[] {
   return nodes.map((n) => (n.id === nodeId ? { ...n, title } : n))
+}
+
+export function setFlag(nodes: PlotNode[], nodeId: string, flag: NodeFlag | null): PlotNode[] {
+  return nodes.map((n) => (n.id === nodeId ? { ...n, flag } : n))
 }
 
 export function updatePlotpointBody(nodes: PlotNode[], nodeId: string, body: string): PlotNode[] {
@@ -149,6 +154,7 @@ function makeNode(kind: PlotNodeKind, parentId: string | null, order: number): P
     customFieldDefs: [],
     customFieldValues: {},
     keywords: [],
+    flag: null,
   }
 }
 
