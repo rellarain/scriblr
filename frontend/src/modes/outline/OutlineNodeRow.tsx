@@ -17,6 +17,7 @@ interface Props {
   onPreviousSibling: (node: OutlineNode) => void
   onEnter: (node: OutlineNode) => void
   onNavigateToParent: (node: OutlineNode) => void
+  onBackspaceDelete: (node: OutlineNode) => void
   registerInput: (nodeId: string, el: HTMLInputElement | null) => void
 }
 
@@ -33,6 +34,7 @@ function OutlineNodeRow({
   onPreviousSibling,
   onEnter,
   onNavigateToParent,
+  onBackspaceDelete,
   registerInput,
 }: Props) {
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({
@@ -58,6 +60,9 @@ function OutlineNodeRow({
     } else if (e.key === 'Delete' && e.shiftKey) {
       e.preventDefault()
       onDelete(node)
+    } else if (e.key === 'Backspace' && node.title === '') {
+      e.preventDefault()
+      onBackspaceDelete(node)
     }
   }
 

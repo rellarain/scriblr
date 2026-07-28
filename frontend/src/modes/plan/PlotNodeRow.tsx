@@ -18,6 +18,7 @@ interface Props {
   onPreviousSibling: (node: PlotNode) => void
   onEnter: (node: PlotNode) => void
   onNavigateToParent: (node: PlotNode) => void
+  onBackspaceDelete: (node: PlotNode) => void
   onUpdatePlotpoint: (nodeId: string, patch: { body?: string; assignedMomentId?: string | null }) => void
   registerInput: (nodeId: string, el: HTMLInputElement | null) => void
 }
@@ -36,6 +37,7 @@ function PlotNodeRow({
   onPreviousSibling,
   onEnter,
   onNavigateToParent,
+  onBackspaceDelete,
   onUpdatePlotpoint,
   registerInput,
 }: Props) {
@@ -62,6 +64,9 @@ function PlotNodeRow({
     } else if (e.key === 'Delete' && e.shiftKey) {
       e.preventDefault()
       onDelete(node)
+    } else if (e.key === 'Backspace' && node.title === '') {
+      e.preventDefault()
+      onBackspaceDelete(node)
     }
   }
 

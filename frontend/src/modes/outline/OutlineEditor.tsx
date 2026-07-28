@@ -62,7 +62,9 @@ function OutlineEditor() {
 
   useEffect(() => {
     if (pendingFocus && inputRefs.current[pendingFocus]) {
-      inputRefs.current[pendingFocus]!.focus()
+      const el = inputRefs.current[pendingFocus]!
+      el.focus()
+      el.setSelectionRange(el.value.length, el.value.length)
       setPendingFocus(null)
     }
   }, [pendingFocus, nodes])
@@ -108,6 +110,22 @@ function OutlineEditor() {
     const next = removeNode(nodesRef.current, node.id)
     setNodes(next)
     saveNow(next)
+  }
+
+  function handleBackspaceDelete(node: OutlineNode) {
+    if (hasChildren(nodesRef.current, node.id)) {
+      const ok = confirm(
+        `Delete "${node.title || 'Untitled'}" and everything nested under it? This cannot be undone.`
+      )
+      if (!ok) return
+    }
+    pendingSibling.current = null
+    const prev = getPreviousSibling(nodesRef.current, node.id)
+    const focusTarget = prev && prev.id !== node.id ? prev.id : node.parentId
+    const next = removeNode(nodesRef.current, node.id)
+    setNodes(next)
+    saveNow(next)
+    if (focusTarget) setPendingFocus(focusTarget)
   }
 
   function handleAddChild(node: OutlineNode) {
@@ -228,6 +246,7 @@ function OutlineEditor() {
         onPreviousSibling={handlePreviousSibling}
         onEnter={handleEnter}
         onNavigateToParent={handleNavigateToParent}
+        onBackspaceDelete={handleBackspaceDelete}
         registerInput={registerInput}
         onReorder={handleReorder}
       />

@@ -19,6 +19,7 @@ interface Props {
   onPreviousSibling: (node: PlotNode) => void
   onEnter: (node: PlotNode) => void
   onNavigateToParent: (node: PlotNode) => void
+  onBackspaceDelete: (node: PlotNode) => void
   onUpdatePlotpoint: (nodeId: string, patch: { body?: string; assignedMomentId?: string | null }) => void
   registerInput: (nodeId: string, el: HTMLInputElement | null) => void
   onReorder: (orderedIds: string[]) => void
@@ -38,6 +39,7 @@ function PlotTreeView({
   onPreviousSibling,
   onEnter,
   onNavigateToParent,
+  onBackspaceDelete,
   onUpdatePlotpoint,
   registerInput,
   onReorder,
@@ -79,6 +81,7 @@ function PlotTreeView({
                 onPreviousSibling={onPreviousSibling}
                 onEnter={onEnter}
                 onNavigateToParent={onNavigateToParent}
+                onBackspaceDelete={onBackspaceDelete}
                 onUpdatePlotpoint={onUpdatePlotpoint}
                 registerInput={registerInput}
               />
@@ -98,6 +101,7 @@ function PlotTreeView({
                     onPreviousSibling={onPreviousSibling}
                     onEnter={onEnter}
                     onNavigateToParent={onNavigateToParent}
+                    onBackspaceDelete={onBackspaceDelete}
                     onUpdatePlotpoint={onUpdatePlotpoint}
                     registerInput={registerInput}
                     onReorder={onReorder}
