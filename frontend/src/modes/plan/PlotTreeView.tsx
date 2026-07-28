@@ -9,7 +9,7 @@ interface Props {
   nodes: PlotNode[]
   parentId: string | null
   levels: PlotNodeKind[]
-  collapsedIds: Set<string>
+  expandedIds: Set<string>
   onToggleCollapse: (nodeId: string) => void
   showAssignedIds: Set<string>
   onToggleShowAssigned: (plotlineId: string) => void
@@ -46,7 +46,7 @@ function PlotTreeView({
   nodes,
   parentId,
   levels,
-  collapsedIds,
+  expandedIds,
   onToggleCollapse,
   showAssignedIds,
   onToggleShowAssigned,
@@ -90,7 +90,7 @@ function PlotTreeView({
       <SortableContext items={children.map((c) => c.id)} strategy={verticalListSortingStrategy}>
         {children.map((child) => {
           const childHasChildren = visibleChildren(nodes, child.id, showAssignedIds).length > 0
-          const isCollapsed = collapsedIds.has(child.id)
+          const isCollapsed = !expandedIds.has(child.id)
           const counts = child.kind === 'plotline' ? plotpointCounts(nodes, child.id) : { total: 0, assigned: 0 }
           const customFieldDefs =
             child.kind === 'plotline' ? getCustomFieldDefsForPlotline(nodes, child.id) : []
@@ -132,7 +132,7 @@ function PlotTreeView({
                     nodes={nodes}
                     parentId={child.id}
                     levels={levels}
-                    collapsedIds={collapsedIds}
+                    expandedIds={expandedIds}
                     onToggleCollapse={onToggleCollapse}
                     showAssignedIds={showAssignedIds}
                     onToggleShowAssigned={onToggleShowAssigned}

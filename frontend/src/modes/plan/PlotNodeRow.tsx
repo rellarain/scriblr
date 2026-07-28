@@ -72,6 +72,7 @@ function PlotNodeRow({
   })
   const [keywordDraft, setKeywordDraft] = useState('')
   const [isDropTarget, setIsDropTarget] = useState(false)
+  const [fieldsExpanded, setFieldsExpanded] = useState(false)
   const descriptionRef = useRef<HTMLTextAreaElement>(null)
 
   const canAddChild = nextKindInLevels(levels, node.kind, PLOT_KIND_ORDER) !== undefined
@@ -168,8 +169,8 @@ function PlotNodeRow({
   return (
     <div
       className={`plot-node-wrap${isPlotpoint ? ' plot-node-wrap--plotpoint' : ''}${
-        isDropTarget ? ' is-drop-target' : ''
-      }`}
+        isPlotline ? ' plot-node-wrap--plotline' : ''
+      }${isDropTarget ? ' is-drop-target' : ''}`}
       draggable
       onDragStart={handleDragStart}
       onDragOver={handleDragOver}
@@ -278,16 +279,27 @@ function PlotNodeRow({
       )}
 
       {isPlotline && customFieldDefs.length > 0 && (
-        <div className="plot-node__field-values">
-          {customFieldDefs.map((f) => (
-            <label key={f.id} className="plot-node__field-value">
-              <span className="plot-node__field-value-label">{f.name || 'Untitled field'}</span>
-              <input
-                value={node.customFieldValues[f.id] ?? ''}
-                onChange={(e) => onSetCustomFieldValue(node.id, f.id, e.target.value)}
-              />
-            </label>
-          ))}
+        <div className="plot-node__field-values-section">
+          <button
+            type="button"
+            className="plot-node__fields-toggle"
+            onClick={() => setFieldsExpanded((v) => !v)}
+          >
+            {fieldsExpanded ? '▾' : '▸'} Fields ({customFieldDefs.length})
+          </button>
+          {fieldsExpanded && (
+            <div className="plot-node__field-values">
+              {customFieldDefs.map((f) => (
+                <label key={f.id} className="plot-node__field-value">
+                  <span className="plot-node__field-value-label">{f.name || 'Untitled field'}</span>
+                  <input
+                    value={node.customFieldValues[f.id] ?? ''}
+                    onChange={(e) => onSetCustomFieldValue(node.id, f.id, e.target.value)}
+                  />
+                </label>
+              ))}
+            </div>
+          )}
         </div>
       )}
 

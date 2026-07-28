@@ -4,12 +4,15 @@ from typing import Optional
 from fastapi import FastAPI, HTTPException, Request
 from fastapi.responses import FileResponse, JSONResponse
 
-from .api import draft, outline, plot, projects, revisions
+from .api import activity, analytics, draft, outline, plot, projects, revisions, schedule, scrap
 from .storage.project_store import (
+    InvalidRestoreParentError,
     MomentNotFoundError,
     ProjectNotFoundError,
+    ScrapEntryNotFoundError,
     ShardCorruptError,
     SnapshotNotFoundError,
+    TreeSnapshotNotFoundError,
 )
 
 
@@ -35,6 +38,18 @@ def create_app(static_dir: Optional[Path] = None) -> FastAPI:
     async def _snapshot_not_found(_: Request, exc: SnapshotNotFoundError) -> JSONResponse:
         return JSONResponse(status_code=404, content={"detail": str(exc)})
 
+    @app.exception_handler(TreeSnapshotNotFoundError)
+    async def _tree_snapshot_not_found(_: Request, exc: TreeSnapshotNotFoundError) -> JSONResponse:
+        return JSONResponse(status_code=404, content={"detail": str(exc)})
+
+    @app.exception_handler(ScrapEntryNotFoundError)
+    async def _scrap_entry_not_found(_: Request, exc: ScrapEntryNotFoundError) -> JSONResponse:
+        return JSONResponse(status_code=404, content={"detail": str(exc)})
+
+    @app.exception_handler(InvalidRestoreParentError)
+    async def _invalid_restore_parent(_: Request, exc: InvalidRestoreParentError) -> JSONResponse:
+        return JSONResponse(status_code=400, content={"detail": str(exc)})
+
     @app.exception_handler(ShardCorruptError)
     async def _shard_corrupt(_: Request, exc: ShardCorruptError) -> JSONResponse:
         return JSONResponse(
@@ -47,6 +62,10 @@ def create_app(static_dir: Optional[Path] = None) -> FastAPI:
     app.include_router(plot.router)
     app.include_router(draft.router)
     app.include_router(revisions.router)
+    app.include_router(activity.router)
+    app.include_router(analytics.router)
+    app.include_router(schedule.router)
+    app.include_router(scrap.router)
 
     if static_dir is not None:
         # Registered last so it only catches what the routers above didn't --

@@ -11,6 +11,7 @@ interface Props {
   levels: OutlineNodeKind[]
   hasChildren: boolean
   childCount: number
+  childKind: OutlineNodeKind | null
   collapsed: boolean
   onToggleCollapse: (nodeId: string) => void
   assignedPlotpoints: PlotNode[]
@@ -34,6 +35,7 @@ function OutlineNodeRow({
   levels,
   hasChildren,
   childCount,
+  childKind,
   collapsed,
   onToggleCollapse,
   assignedPlotpoints,
@@ -160,10 +162,11 @@ function OutlineNodeRow({
         <div className="outline-node__main">
           <span className="outline-node__kind">
             {node.kind}
-            {childCount > 0 && (
+            {childCount > 0 && childKind && (
               <span className="outline-node__count">
                 {' '}
-                · {childCount} {childCount === 1 ? 'child' : 'children'}
+                · {childCount} {childKind}
+                {childCount === 1 ? '' : 's'}
               </span>
             )}
           </span>

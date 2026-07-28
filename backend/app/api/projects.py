@@ -46,10 +46,24 @@ def update_project(
         index.title = body.title
     if body.wordCountTarget is not None:
         index.settings.wordCountTarget = body.wordCountTarget
+    if body.bookCountTarget is not None:
+        index.settings.bookCountTarget = body.bookCountTarget
+    if body.chapterCountTarget is not None:
+        index.settings.chapterCountTarget = body.chapterCountTarget
+    if body.bookWordCountTarget is not None:
+        index.settings.bookWordCountTarget = body.bookWordCountTarget
+    if body.chapterWordCountTarget is not None:
+        index.settings.chapterWordCountTarget = body.chapterWordCountTarget
+    if body.priorities is not None:
+        index.settings.priorities = body.priorities
+    if body.routines is not None:
+        index.settings.routines = body.routines
     if body.outlineLevels is not None:
         index.settings.outlineLevels = body.outlineLevels
     if body.plotLevels is not None:
         index.settings.plotLevels = body.plotLevels
+    if body.readLevels is not None:
+        index.settings.readLevels = body.readLevels
     index.updatedAt = utcnow()
     store.save_index(root, index)
     return index

@@ -9,11 +9,16 @@ from typing import Type, TypeVar
 from pydantic import BaseModel, ValidationError
 
 from .schema import (
+    DailyActivityLog,
     DraftMoment,
     OutlineTree,
     PlotTree,
     ProjectIndex,
     RevisionSnapshot,
+    ScheduleCompletionLog,
+    ScrapRegistry,
+    TreeSnapshot,
+    TreeType,
     utcnow,
 )
 
@@ -39,6 +44,28 @@ class SnapshotNotFoundError(Exception):
         self.moment_id = moment_id
         self.snapshot_id = snapshot_id
         super().__init__(f"snapshot not found: {project_id}/{moment_id}/{snapshot_id}")
+
+
+class TreeSnapshotNotFoundError(Exception):
+    def __init__(self, project_id: str, tree_type: str, snapshot_id: str) -> None:
+        self.project_id = project_id
+        self.tree_type = tree_type
+        self.snapshot_id = snapshot_id
+        super().__init__(f"tree snapshot not found: {project_id}/{tree_type}/{snapshot_id}")
+
+
+class ScrapEntryNotFoundError(Exception):
+    def __init__(self, project_id: str, moment_id: str) -> None:
+        self.project_id = project_id
+        self.moment_id = moment_id
+        super().__init__(f"scrap entry not found: {project_id}/{moment_id}")
+
+
+class InvalidRestoreParentError(Exception):
+    def __init__(self, project_id: str, parent_id: str) -> None:
+        self.project_id = project_id
+        self.parent_id = parent_id
+        super().__init__(f"invalid restore parent: {project_id}/{parent_id}")
 
 
 class ShardCorruptError(Exception):
@@ -132,6 +159,26 @@ def _revision_dir(project_dir: Path, moment_id: str) -> Path:
 
 def _revision_path(project_dir: Path, moment_id: str, snapshot_id: str) -> Path:
     return _revision_dir(project_dir, moment_id) / f"{snapshot_id}.json"
+
+
+def _tree_history_dir(project_dir: Path, tree_type: TreeType) -> Path:
+    return project_dir / f"{tree_type}-history"
+
+
+def _tree_history_path(project_dir: Path, tree_type: TreeType, snapshot_id: str) -> Path:
+    return _tree_history_dir(project_dir, tree_type) / f"{snapshot_id}.json"
+
+
+def _daily_activity_path(project_dir: Path) -> Path:
+    return project_dir / "activity" / "daily.json"
+
+
+def _schedule_completions_path(project_dir: Path) -> Path:
+    return project_dir / "schedule" / "completions.json"
+
+
+def _scrap_registry_path(project_dir: Path) -> Path:
+    return project_dir / "scrap" / "registry.json"
 
 
 def create_project(root: Path, title: str) -> ProjectIndex:
@@ -335,5 +382,136 @@ def save_revision(root: Path, project_id: str, snapshot: RevisionSnapshot) -> No
     index = load_index(root, project_id)
     if snapshot.momentId not in index.manifest.revisionMoments:
         index.manifest.revisionMoments.append(snapshot.momentId)
+        index.updatedAt = utcnow()
+        save_index(root, index)
+
+
+# ---------------------------------------------------------------------------
+# Outline/Plot tree history
+# ---------------------------------------------------------------------------
+
+
+def list_tree_snapshots(root: Path, project_id: str, tree_type: TreeType) -> list[TreeSnapshot]:
+    project_dir = project_dir_of(root, project_id)
+    if not project_dir.exists():
+        raise ProjectNotFoundError(project_id)
+    hist_dir = _tree_history_dir(project_dir, tree_type)
+    if not hist_dir.exists():
+        return []
+    snapshots: list[TreeSnapshot] = []
+    for entry in sorted(hist_dir.glob("*.json")):
+        try:
+            snapshots.append(_read_shard(entry, TreeSnapshot))
+        except ShardCorruptError:
+            continue
+    snapshots.sort(key=lambda s: s.createdAt)
+    return snapshots
+
+
+def load_tree_snapshot(root: Path, project_id: str, tree_type: TreeType, snapshot_id: str) -> TreeSnapshot:
+    project_dir = project_dir_of(root, project_id)
+    if not project_dir.exists():
+        raise ProjectNotFoundError(project_id)
+    path = _tree_history_path(project_dir, tree_type, snapshot_id)
+    if not path.exists():
+        raise TreeSnapshotNotFoundError(project_id, tree_type, snapshot_id)
+    return _read_shard(path, TreeSnapshot)
+
+
+def save_tree_snapshot(root: Path, project_id: str, snapshot: TreeSnapshot) -> None:
+    project_dir = project_dir_of(root, project_id)
+    if not project_dir.exists():
+        raise ProjectNotFoundError(project_id)
+    path = _tree_history_path(project_dir, snapshot.treeType, snapshot.snapshotId)
+    _write_shard(project_dir, path, snapshot)
+
+
+# ---------------------------------------------------------------------------
+# Daily activity aggregate (feeds the calendar heatmap)
+# ---------------------------------------------------------------------------
+
+
+def load_daily_activity(root: Path, project_id: str) -> DailyActivityLog:
+    project_dir = project_dir_of(root, project_id)
+    if not project_dir.exists():
+        raise ProjectNotFoundError(project_id)
+    path = _daily_activity_path(project_dir)
+    if not path.exists():
+        return DailyActivityLog()
+    try:
+        return _read_shard(path, DailyActivityLog)
+    except ShardCorruptError:
+        return DailyActivityLog()
+
+
+def save_daily_activity(root: Path, project_id: str, log: DailyActivityLog) -> None:
+    project_dir = project_dir_of(root, project_id)
+    if not project_dir.exists():
+        raise ProjectNotFoundError(project_id)
+    _write_shard(project_dir, _daily_activity_path(project_dir), log)
+
+
+# ---------------------------------------------------------------------------
+# Schedule completion state
+# ---------------------------------------------------------------------------
+
+
+def load_schedule_completions(root: Path, project_id: str) -> ScheduleCompletionLog:
+    project_dir = project_dir_of(root, project_id)
+    if not project_dir.exists():
+        raise ProjectNotFoundError(project_id)
+    path = _schedule_completions_path(project_dir)
+    if not path.exists():
+        return ScheduleCompletionLog()
+    try:
+        return _read_shard(path, ScheduleCompletionLog)
+    except ShardCorruptError:
+        return ScheduleCompletionLog()
+
+
+def save_schedule_completions(root: Path, project_id: str, log: ScheduleCompletionLog) -> None:
+    project_dir = project_dir_of(root, project_id)
+    if not project_dir.exists():
+        raise ProjectNotFoundError(project_id)
+    _write_shard(project_dir, _schedule_completions_path(project_dir), log)
+
+
+# ---------------------------------------------------------------------------
+# Scrap registry (orphaned draft content)
+# ---------------------------------------------------------------------------
+
+
+def load_scrap_registry(root: Path, project_id: str) -> ScrapRegistry:
+    project_dir = project_dir_of(root, project_id)
+    if not project_dir.exists():
+        raise ProjectNotFoundError(project_id)
+    path = _scrap_registry_path(project_dir)
+    if not path.exists():
+        return ScrapRegistry()
+    try:
+        return _read_shard(path, ScrapRegistry)
+    except ShardCorruptError:
+        return ScrapRegistry()
+
+
+def save_scrap_registry(root: Path, project_id: str, registry: ScrapRegistry) -> None:
+    project_dir = project_dir_of(root, project_id)
+    if not project_dir.exists():
+        raise ProjectNotFoundError(project_id)
+    _write_shard(project_dir, _scrap_registry_path(project_dir), registry)
+
+
+def delete_revision_history(root: Path, project_id: str, moment_id: str) -> None:
+    """Permanently removes a moment's revision history directory, tolerant
+    of it not existing (e.g. the moment was never manually snapshotted)."""
+    project_dir = project_dir_of(root, project_id)
+    if not project_dir.exists():
+        raise ProjectNotFoundError(project_id)
+    rev_dir = _revision_dir(project_dir, moment_id)
+    if rev_dir.exists():
+        shutil.rmtree(rev_dir)
+    index = load_index(root, project_id)
+    if moment_id in index.manifest.revisionMoments:
+        index.manifest.revisionMoments.remove(moment_id)
         index.updatedAt = utcnow()
         save_index(root, index)

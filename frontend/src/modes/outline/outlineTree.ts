@@ -23,6 +23,35 @@ export function documentOrder(nodes: OutlineNode[]): OutlineNode[] {
   return tree.depthFirstOrder(nodes)
 }
 
+/** Full subtree of `rootId` (e.g. a chapter) in document order -- unlike
+ * `getAllMoments`/`documentOrder`, this doesn't assume the project root. */
+export function subtreeOrder(nodes: OutlineNode[], rootId: string): OutlineNode[] {
+  return tree.depthFirstOrder(nodes, rootId)
+}
+
+/** Every moment nested anywhere under `rootId` (e.g. a chapter or book). */
+export function momentsInSubtree(nodes: OutlineNode[], rootId: string): OutlineNode[] {
+  return tree.depthFirstOrder(nodes, rootId).filter((n) => n.kind === 'moment')
+}
+
+/** The nearest ancestor of `nodeId` with the given `kind` (e.g. the book a
+ * chapter belongs to), or undefined if none exists. */
+export function ancestorOfKind(
+  nodes: OutlineNode[],
+  nodeId: string,
+  kind: OutlineNodeKind
+): OutlineNode | undefined {
+  const byId = new Map(nodes.map((n) => [n.id, n]))
+  let current = byId.get(nodeId)
+  while (current && current.parentId) {
+    const parent = byId.get(current.parentId)
+    if (!parent) return undefined
+    if (parent.kind === kind) return parent
+    current = parent
+  }
+  return undefined
+}
+
 export function depthOf(nodes: OutlineNode[], nodeId: string): number {
   return tree.depthOf(nodes, nodeId)
 }

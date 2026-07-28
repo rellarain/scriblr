@@ -1,6 +1,13 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { api } from './client'
-import type { OutlineNodeKind, PlotNodeKind, ProjectIndex, ProjectSummary } from '../types'
+import type {
+  OutlineNodeKind,
+  PlotNodeKind,
+  ProjectIndex,
+  ProjectPriority,
+  ProjectRoutine,
+  ProjectSummary,
+} from '../types'
 
 const projectsKey = ['projects'] as const
 const projectKey = (projectId: string) => ['projects', projectId] as const
@@ -36,8 +43,15 @@ export function useUpdateProject(projectId: string) {
     mutationFn: (patch: {
       title?: string
       wordCountTarget?: number
+      bookCountTarget?: number
+      chapterCountTarget?: number
+      bookWordCountTarget?: number
+      chapterWordCountTarget?: number
+      priorities?: ProjectPriority[]
+      routines?: ProjectRoutine[]
       outlineLevels?: OutlineNodeKind[]
       plotLevels?: PlotNodeKind[]
+      readLevels?: OutlineNodeKind[]
     }) => api.patch<ProjectIndex>(`/projects/${projectId}`, patch),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: projectsKey })

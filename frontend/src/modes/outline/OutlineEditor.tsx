@@ -43,7 +43,9 @@ function OutlineEditor() {
   const [nodes, setNodes] = useState<OutlineNode[]>([])
   const [newBookTitle, setNewBookTitle] = useState('')
   const [pendingFocus, setPendingFocus] = useState<string | null>(null)
-  const [collapsedIds, setCollapsedIds] = useState<Set<string>>(new Set())
+  // Presence in this set means "expanded" (not "collapsed") -- an empty set
+  // at load means every node with children starts collapsed/minimized.
+  const [expandedIds, setExpandedIds] = useState<Set<string>>(new Set())
   const schemaVersionRef = useRef(1)
   const nodesRef = useRef<OutlineNode[]>([])
   const saveTimeout = useRef<ReturnType<typeof setTimeout>>()
@@ -82,7 +84,7 @@ function OutlineEditor() {
   }, [])
 
   function handleToggleCollapse(nodeId: string) {
-    setCollapsedIds((prev) => {
+    setExpandedIds((prev) => {
       const next = new Set(prev)
       if (next.has(nodeId)) next.delete(nodeId)
       else next.add(nodeId)
@@ -142,6 +144,7 @@ function OutlineEditor() {
     if (!result) return
     setNodes(result.nodes)
     saveNow(result.nodes)
+    setExpandedIds((prev) => new Set(prev).add(node.id))
     setPendingFocus(result.newNode.id)
   }
 
@@ -172,6 +175,7 @@ function OutlineEditor() {
       if (next) {
         setNodes(next)
         saveNow(next)
+        setExpandedIds((prev) => new Set(prev).add(pending.anchorId))
         setPendingFocus(node.id)
       }
       return
@@ -274,7 +278,7 @@ function OutlineEditor() {
         nodes={nodes}
         parentId={null}
         levels={levels}
-        collapsedIds={collapsedIds}
+        expandedIds={expandedIds}
         onToggleCollapse={handleToggleCollapse}
         plotNodes={plotNodes}
         onAssignPlotpoint={handleAssignPlotpoint}

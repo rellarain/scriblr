@@ -54,6 +54,38 @@ def test_project_defaults_to_all_levels_and_can_be_customized(client: TestClient
     assert body["settings"]["plotLevels"] == ["category", "plotpoint"]
 
 
+def test_update_project_goals_priorities_and_routines(client: TestClient) -> None:
+    project_id = client.post("/api/projects", json={"title": "Goals Test"}).json()["projectId"]
+
+    resp = client.patch(
+        f"/api/projects/{project_id}",
+        json={
+            "bookCountTarget": 3,
+            "chapterCountTarget": 30,
+            "bookWordCountTarget": 80000,
+            "chapterWordCountTarget": 2500,
+            "priorities": [{"id": "p1", "label": "Finish Act 2", "order": 0}],
+            "routines": [
+                {"id": "r1", "label": "Morning pages", "daysOfWeek": [0, 1, 2, 3, 4], "targetWordCount": 500}
+            ],
+        },
+    )
+    assert resp.status_code == 200
+    settings = resp.json()["settings"]
+    assert settings["bookCountTarget"] == 3
+    assert settings["chapterCountTarget"] == 30
+    assert settings["bookWordCountTarget"] == 80000
+    assert settings["chapterWordCountTarget"] == 2500
+    assert settings["priorities"] == [{"id": "p1", "label": "Finish Act 2", "order": 0}]
+    assert settings["routines"] == [
+        {"id": "r1", "label": "Morning pages", "daysOfWeek": [0, 1, 2, 3, 4], "targetWordCount": 500}
+    ]
+
+    # Old projects with no priorities/routines default cleanly.
+    resp = client.get(f"/api/projects/{project_id}")
+    assert resp.json()["index"]["settings"]["priorities"][0]["label"] == "Finish Act 2"
+
+
 def test_delete_project(client: TestClient, storage_root: Path) -> None:
     project_id = client.post("/api/projects", json={"title": "Temp"}).json()["projectId"]
 

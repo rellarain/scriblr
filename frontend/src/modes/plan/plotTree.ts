@@ -67,6 +67,14 @@ export function plotpointsForMoment(nodes: PlotNode[], momentId: string): PlotNo
   return nodes.filter((n) => n.kind === 'plotpoint' && n.assignedMomentId === momentId)
 }
 
+/** All plotpoints assigned to any moment in `momentIds` (e.g. every moment
+ * within a chapter's subtree), for a chapter-scoped plotpoints sidebar. */
+export function plotpointsForMomentSet(nodes: PlotNode[], momentIds: Set<string>): PlotNode[] {
+  return nodes.filter(
+    (n) => n.kind === 'plotpoint' && n.assignedMomentId !== null && momentIds.has(n.assignedMomentId)
+  )
+}
+
 /** A plotline's parent is always its category (the only shallower plot kind). */
 export function getCustomFieldDefsForPlotline(nodes: PlotNode[], plotlineId: string): PlotCustomFieldDef[] {
   const plotline = nodes.find((n) => n.id === plotlineId)

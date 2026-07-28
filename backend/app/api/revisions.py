@@ -6,7 +6,7 @@ from fastapi import APIRouter, Depends, HTTPException, Query
 
 from ..deps import get_storage_root
 from ..models import AddCommentRequest, CreateSnapshotRequest, DiffOp, DiffResponse, UpdateCommentRequest
-from ..storage import project_store as store
+from ..storage import activity, project_store as store
 from ..storage.schema import CommentAnchor, RevisionComment, RevisionSnapshot, RevisionSummary, utcnow
 
 router = APIRouter(prefix="/api/projects/{project_id}/revisions/{moment_id}", tags=["revisions"])
@@ -94,6 +94,7 @@ def create_revision(
         wordCount=draft.wordCount,
     )
     store.save_revision(root, project_id, snapshot)
+    activity.record_daily_activity(root, project_id, draft_revisions=1)
     return snapshot
 
 
@@ -114,11 +115,16 @@ def revert_to_revision(
         wordCount=current_draft.wordCount,
     )
     store.save_revision(root, project_id, safety_snapshot)
+    activity.record_daily_activity(root, project_id, draft_revisions=1)
 
+    previous_word_count = current_draft.wordCount
     current_draft.body = target.body
     current_draft.wordCount = target.wordCount
     current_draft.updatedAt = utcnow()
     store.save_draft(root, project_id, moment_id, current_draft)
+    activity.record_daily_activity(
+        root, project_id, word_count_delta=current_draft.wordCount - previous_word_count
+    )
     return safety_snapshot
 
 

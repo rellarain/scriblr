@@ -10,7 +10,7 @@ interface Props {
   nodes: OutlineNode[]
   parentId: string | null
   levels: OutlineNodeKind[]
-  collapsedIds: Set<string>
+  expandedIds: Set<string>
   onToggleCollapse: (nodeId: string) => void
   plotNodes: PlotNode[]
   onAssignPlotpoint: (plotpointId: string, momentId: string) => void
@@ -33,7 +33,7 @@ function OutlineTreeView({
   nodes,
   parentId,
   levels,
-  collapsedIds,
+  expandedIds,
   onToggleCollapse,
   plotNodes,
   onAssignPlotpoint,
@@ -72,7 +72,8 @@ function OutlineTreeView({
         {children.map((child) => {
           const childNodes = getChildren(nodes, child.id)
           const childHasChildren = childNodes.length > 0
-          const isCollapsed = collapsedIds.has(child.id)
+          const childKind = childNodes[0]?.kind ?? null
+          const isCollapsed = !expandedIds.has(child.id)
           const assignedPlotpoints =
             child.kind === 'moment' ? plotpointsForMoment(plotNodes, child.id) : []
           return (
@@ -82,6 +83,7 @@ function OutlineTreeView({
                 levels={levels}
                 hasChildren={childHasChildren}
                 childCount={childNodes.length}
+                childKind={childKind}
                 collapsed={isCollapsed}
                 onToggleCollapse={onToggleCollapse}
                 assignedPlotpoints={assignedPlotpoints}
@@ -105,7 +107,7 @@ function OutlineTreeView({
                     nodes={nodes}
                     parentId={child.id}
                     levels={levels}
-                    collapsedIds={collapsedIds}
+                    expandedIds={expandedIds}
                     onToggleCollapse={onToggleCollapse}
                     plotNodes={plotNodes}
                     onAssignPlotpoint={onAssignPlotpoint}
