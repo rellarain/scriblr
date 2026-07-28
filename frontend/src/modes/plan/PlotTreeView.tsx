@@ -12,9 +12,12 @@ interface Props {
   levels: PlotNodeKind[]
   moments: OutlineNode[]
   onRename: (nodeId: string, title: string) => void
-  onDelete: (nodeId: string) => void
-  onTab: (node: PlotNode) => void
+  onDelete: (node: PlotNode) => void
+  onAddChild: (node: PlotNode) => void
+  onNextSibling: (node: PlotNode) => void
+  onPreviousSibling: (node: PlotNode) => void
   onEnter: (node: PlotNode) => void
+  onNavigateToParent: (node: PlotNode) => void
   onUpdatePlotpoint: (nodeId: string, patch: { body?: string; assignedMomentId?: string | null }) => void
   registerInput: (nodeId: string, el: HTMLInputElement | null) => void
   onReorder: (orderedIds: string[]) => void
@@ -28,8 +31,11 @@ function PlotTreeView({
   moments,
   onRename,
   onDelete,
-  onTab,
+  onAddChild,
+  onNextSibling,
+  onPreviousSibling,
   onEnter,
+  onNavigateToParent,
   onUpdatePlotpoint,
   registerInput,
   onReorder,
@@ -61,8 +67,11 @@ function PlotTreeView({
               moments={moments}
               onRename={onRename}
               onDelete={onDelete}
-              onTab={onTab}
+              onAddChild={onAddChild}
+              onNextSibling={onNextSibling}
+              onPreviousSibling={onPreviousSibling}
               onEnter={onEnter}
+              onNavigateToParent={onNavigateToParent}
               onUpdatePlotpoint={onUpdatePlotpoint}
               registerInput={registerInput}
             />
@@ -74,8 +83,11 @@ function PlotTreeView({
               moments={moments}
               onRename={onRename}
               onDelete={onDelete}
-              onTab={onTab}
+              onAddChild={onAddChild}
+              onNextSibling={onNextSibling}
+              onPreviousSibling={onPreviousSibling}
               onEnter={onEnter}
+              onNavigateToParent={onNavigateToParent}
               onUpdatePlotpoint={onUpdatePlotpoint}
               registerInput={registerInput}
               onReorder={onReorder}

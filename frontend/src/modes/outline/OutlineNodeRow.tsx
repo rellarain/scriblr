@@ -9,9 +9,12 @@ interface Props {
   depth: number
   levels: OutlineNodeKind[]
   onRename: (nodeId: string, title: string) => void
-  onDelete: (nodeId: string) => void
-  onTab: (node: OutlineNode) => void
+  onDelete: (node: OutlineNode) => void
+  onAddChild: (node: OutlineNode) => void
+  onNextSibling: (node: OutlineNode) => void
+  onPreviousSibling: (node: OutlineNode) => void
   onEnter: (node: OutlineNode) => void
+  onNavigateToParent: (node: OutlineNode) => void
   registerInput: (nodeId: string, el: HTMLInputElement | null) => void
 }
 
@@ -21,8 +24,11 @@ function OutlineNodeRow({
   levels,
   onRename,
   onDelete,
-  onTab,
+  onAddChild,
+  onNextSibling,
+  onPreviousSibling,
   onEnter,
+  onNavigateToParent,
   registerInput,
 }: Props) {
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({
@@ -40,10 +46,15 @@ function OutlineNodeRow({
   function handleKeyDown(e: React.KeyboardEvent<HTMLInputElement>) {
     if (e.key === 'Tab') {
       e.preventDefault()
-      onTab(node)
+      if (e.shiftKey) onPreviousSibling(node)
+      else onNextSibling(node)
     } else if (e.key === 'Enter') {
       e.preventDefault()
-      onEnter(node)
+      if (e.shiftKey) onNavigateToParent(node)
+      else onEnter(node)
+    } else if (e.key === 'Delete' && e.shiftKey) {
+      e.preventDefault()
+      onDelete(node)
     }
   }
 
@@ -66,11 +77,11 @@ function OutlineNodeRow({
         onKeyDown={handleKeyDown}
       />
       {canAddChild && (
-        <button type="button" className="outline-node__add-toggle" onClick={() => onTab(node)}>
+        <button type="button" className="outline-node__add-toggle" onClick={() => onAddChild(node)}>
           +
         </button>
       )}
-      <button type="button" className="outline-node__delete" onClick={() => onDelete(node.id)}>
+      <button type="button" className="outline-node__delete" onClick={() => onDelete(node)}>
         ✕
       </button>
     </div>

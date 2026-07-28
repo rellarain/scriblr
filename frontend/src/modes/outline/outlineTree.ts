@@ -27,12 +27,6 @@ export function depthOf(nodes: OutlineNode[], nodeId: string): number {
   return tree.depthOf(nodes, nodeId)
 }
 
-/** Kinds that may legally nest under a node of the given kind (flexible: any strictly-deeper kind). */
-export function kindsDeeperThan(kind: OutlineNodeKind): OutlineNodeKind[] {
-  const idx = OUTLINE_KIND_ORDER.indexOf(kind)
-  return OUTLINE_KIND_ORDER.slice(idx + 1)
-}
-
 export function addNode(
   nodes: OutlineNode[],
   parentId: string | null,
@@ -101,4 +95,47 @@ export function createSiblingNode(
 ): { nodes: OutlineNode[]; newNode: OutlineNode } {
   const newNode = makeNode(afterNode.kind, afterNode.parentId, 0)
   return { nodes: tree.insertSiblingAfter(nodes, afterNode.id, newNode), newNode }
+}
+
+export function hasChildren(nodes: OutlineNode[], nodeId: string): boolean {
+  return tree.getChildren(nodes, nodeId).length > 0
+}
+
+export function getNextSibling(nodes: OutlineNode[], nodeId: string): OutlineNode | undefined {
+  return tree.nextSibling(nodes, nodeId)
+}
+
+export function getPreviousSibling(nodes: OutlineNode[], nodeId: string): OutlineNode | undefined {
+  return tree.previousSibling(nodes, nodeId)
+}
+
+/**
+ * Re-parents `pendingId` (a still-empty node that was just created as a
+ * sibling of `anchorId` via Enter) to become a child of `anchorId` instead --
+ * this is the "press Enter twice" escalation. Returns null if `anchorId`'s
+ * kind is already the deepest configured level (nothing deeper to become).
+ */
+export function escalateToChild(
+  nodes: OutlineNode[],
+  levels: OutlineNodeKind[],
+  anchorId: string,
+  pendingId: string
+): OutlineNode[] | null {
+  const anchor = nodes.find((n) => n.id === anchorId)
+  const pendingNode = nodes.find((n) => n.id === pendingId)
+  if (!anchor || !pendingNode) return null
+  const kind = tree.nextKindInLevels(levels, anchor.kind, OUTLINE_KIND_ORDER)
+  if (!kind) return null
+
+  const withoutPending = nodes.filter((n) => n.id !== pendingId)
+  const oldSiblingIds = tree.getChildren(withoutPending, pendingNode.parentId).map((s) => s.id)
+  const renumbered = tree.reorderSiblings(withoutPending, oldSiblingIds)
+  const updated: OutlineNode = {
+    ...pendingNode,
+    parentId: anchor.id,
+    kind,
+    order: tree.nextOrder(renumbered, anchor.id),
+    draftRef: kind === 'moment' ? pendingNode.id : null,
+  }
+  return [...renumbered, updated]
 }

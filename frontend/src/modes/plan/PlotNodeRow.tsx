@@ -10,9 +10,12 @@ interface Props {
   levels: PlotNodeKind[]
   moments: OutlineNode[]
   onRename: (nodeId: string, title: string) => void
-  onDelete: (nodeId: string) => void
-  onTab: (node: PlotNode) => void
+  onDelete: (node: PlotNode) => void
+  onAddChild: (node: PlotNode) => void
+  onNextSibling: (node: PlotNode) => void
+  onPreviousSibling: (node: PlotNode) => void
   onEnter: (node: PlotNode) => void
+  onNavigateToParent: (node: PlotNode) => void
   onUpdatePlotpoint: (nodeId: string, patch: { body?: string; assignedMomentId?: string | null }) => void
   registerInput: (nodeId: string, el: HTMLInputElement | null) => void
 }
@@ -24,8 +27,11 @@ function PlotNodeRow({
   moments,
   onRename,
   onDelete,
-  onTab,
+  onAddChild,
+  onNextSibling,
+  onPreviousSibling,
   onEnter,
+  onNavigateToParent,
   onUpdatePlotpoint,
   registerInput,
 }: Props) {
@@ -44,10 +50,15 @@ function PlotNodeRow({
   function handleKeyDown(e: React.KeyboardEvent<HTMLInputElement>) {
     if (e.key === 'Tab') {
       e.preventDefault()
-      onTab(node)
+      if (e.shiftKey) onPreviousSibling(node)
+      else onNextSibling(node)
     } else if (e.key === 'Enter') {
       e.preventDefault()
-      onEnter(node)
+      if (e.shiftKey) onNavigateToParent(node)
+      else onEnter(node)
+    } else if (e.key === 'Delete' && e.shiftKey) {
+      e.preventDefault()
+      onDelete(node)
     }
   }
 
@@ -71,11 +82,11 @@ function PlotNodeRow({
           onKeyDown={handleKeyDown}
         />
         {canAddChild && (
-          <button type="button" className="plot-node__add-toggle" onClick={() => onTab(node)}>
+          <button type="button" className="plot-node__add-toggle" onClick={() => onAddChild(node)}>
             +
           </button>
         )}
-        <button type="button" className="plot-node__delete" onClick={() => onDelete(node.id)}>
+        <button type="button" className="plot-node__delete" onClick={() => onDelete(node)}>
           ✕
         </button>
       </div>

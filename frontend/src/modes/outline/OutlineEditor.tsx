@@ -5,9 +5,25 @@ import { useProject, useUpdateProject } from '../../api/projects'
 import { OUTLINE_KIND_ORDER } from '../../types'
 import type { OutlineNode, OutlineNodeKind, OutlineTree } from '../../types'
 import OutlineTreeView from './OutlineTreeView'
-import { addBook, createChildNode, createSiblingNode, removeNode, renameNode, reorderSiblings } from './outlineTree'
+import {
+  addBook,
+  createChildNode,
+  createSiblingNode,
+  escalateToChild,
+  getNextSibling,
+  getPreviousSibling,
+  hasChildren,
+  removeNode,
+  renameNode,
+  reorderSiblings,
+} from './outlineTree'
 
 const RENAME_SAVE_DELAY_MS = 500
+
+interface PendingSibling {
+  anchorId: string
+  pendingId: string
+}
 
 function OutlineEditor() {
   const { projectId } = useParams<{ projectId: string }>()
@@ -23,6 +39,11 @@ function OutlineEditor() {
   const nodesRef = useRef<OutlineNode[]>([])
   const saveTimeout = useRef<ReturnType<typeof setTimeout>>()
   const inputRefs = useRef<Record<string, HTMLInputElement | null>>({})
+  // Tracks a just-created empty sibling so a second, immediate Enter can
+  // escalate it into a child of the node it was created from instead of
+  // creating yet another sibling. Cleared by any other action (typing,
+  // navigation, deletion) so escalation only fires on truly consecutive Enters.
+  const pendingSibling = useRef<PendingSibling | null>(null)
 
   const levels = project?.index.settings.outlineLevels ?? OUTLINE_KIND_ORDER
 
@@ -61,17 +82,26 @@ function OutlineEditor() {
   }
 
   function handleRename(nodeId: string, title: string) {
+    pendingSibling.current = null
     setNodes((prev) => renameNode(prev, nodeId, title))
     scheduleSave()
   }
 
-  function handleDelete(nodeId: string) {
-    const next = removeNode(nodes, nodeId)
+  function handleDelete(node: OutlineNode) {
+    if (hasChildren(nodesRef.current, node.id)) {
+      const ok = confirm(
+        `Delete "${node.title || 'Untitled'}" and everything nested under it? This cannot be undone.`
+      )
+      if (!ok) return
+    }
+    pendingSibling.current = null
+    const next = removeNode(nodesRef.current, node.id)
     setNodes(next)
     saveNow(next)
   }
 
-  function handleTab(node: OutlineNode) {
+  function handleAddChild(node: OutlineNode) {
+    pendingSibling.current = null
     const result = createChildNode(nodesRef.current, levels, node)
     if (!result) return
     setNodes(result.nodes)
@@ -79,21 +109,46 @@ function OutlineEditor() {
     setPendingFocus(result.newNode.id)
   }
 
+  function handleNextSibling(node: OutlineNode) {
+    pendingSibling.current = null
+    const next = getNextSibling(nodesRef.current, node.id)
+    if (next) setPendingFocus(next.id)
+  }
+
+  function handlePreviousSibling(node: OutlineNode) {
+    pendingSibling.current = null
+    const prev = getPreviousSibling(nodesRef.current, node.id)
+    if (prev) setPendingFocus(prev.id)
+  }
+
+  function handleNavigateToParent(node: OutlineNode) {
+    pendingSibling.current = null
+    if (node.parentId) setPendingFocus(node.parentId)
+  }
+
   function handleEnter(node: OutlineNode) {
-    if (node.title.trim() === '') {
-      const next = removeNode(nodesRef.current, node.id)
-      setNodes(next)
-      saveNow(next)
-      if (node.parentId) setPendingFocus(node.parentId)
+    const pending = pendingSibling.current
+    if (pending && pending.pendingId === node.id && node.title.trim() === '') {
+      // Second consecutive Enter on the still-empty node just created below
+      // `anchorId` -- turn it into a child of that anchor instead.
+      pendingSibling.current = null
+      const next = escalateToChild(nodesRef.current, levels, pending.anchorId, node.id)
+      if (next) {
+        setNodes(next)
+        saveNow(next)
+        setPendingFocus(node.id)
+      }
       return
     }
     const result = createSiblingNode(nodesRef.current, node)
     setNodes(result.nodes)
     saveNow(result.nodes)
     setPendingFocus(result.newNode.id)
+    pendingSibling.current = { anchorId: node.id, pendingId: result.newNode.id }
   }
 
   function handleReorder(_parentId: string | null, orderedIds: string[]) {
+    pendingSibling.current = null
     const next = reorderSiblings(nodes, orderedIds)
     setNodes(next)
     saveNow(next)
@@ -157,8 +212,11 @@ function OutlineEditor() {
         levels={levels}
         onRename={handleRename}
         onDelete={handleDelete}
-        onTab={handleTab}
+        onAddChild={handleAddChild}
+        onNextSibling={handleNextSibling}
+        onPreviousSibling={handlePreviousSibling}
         onEnter={handleEnter}
+        onNavigateToParent={handleNavigateToParent}
         registerInput={registerInput}
         onReorder={handleReorder}
       />

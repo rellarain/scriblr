@@ -93,6 +93,28 @@ export function insertSiblingAfter<T extends TreeNodeBase>(
   return reorderSiblings([...nodes, newNode], orderedIds)
 }
 
+/** The next sibling after `nodeId`, wrapping around to the first if `nodeId` is last. */
+export function nextSibling<T extends TreeNodeBase>(nodes: T[], nodeId: string): T | undefined {
+  const node = nodes.find((n) => n.id === nodeId)
+  if (!node) return undefined
+  const siblings = getChildren(nodes, node.parentId)
+  if (siblings.length === 0) return undefined
+  const idx = siblings.findIndex((s) => s.id === nodeId)
+  if (idx === -1) return undefined
+  return siblings[(idx + 1) % siblings.length]
+}
+
+/** The previous sibling before `nodeId`, wrapping around to the last if `nodeId` is first. */
+export function previousSibling<T extends TreeNodeBase>(nodes: T[], nodeId: string): T | undefined {
+  const node = nodes.find((n) => n.id === nodeId)
+  if (!node) return undefined
+  const siblings = getChildren(nodes, node.parentId)
+  if (siblings.length === 0) return undefined
+  const idx = siblings.findIndex((s) => s.id === nodeId)
+  if (idx === -1) return undefined
+  return siblings[(idx - 1 + siblings.length) % siblings.length]
+}
+
 /**
  * The next kind after `kind` in `levels` (the project's configured level
  * sequence), or undefined if `kind` is already the deepest configured level.

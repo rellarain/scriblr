@@ -7,9 +7,26 @@ import { PLOT_KIND_ORDER } from '../../types'
 import type { PlotNode, PlotNodeKind, PlotTree } from '../../types'
 import { getAllMoments } from '../outline/outlineTree'
 import PlotTreeView from './PlotTreeView'
-import { addCategory, createChildNode, createSiblingNode, removeNode, renameNode, reorderSiblings, updatePlotpoint } from './plotTree'
+import {
+  addCategory,
+  createChildNode,
+  createSiblingNode,
+  escalateToChild,
+  getNextSibling,
+  getPreviousSibling,
+  hasChildren,
+  removeNode,
+  renameNode,
+  reorderSiblings,
+  updatePlotpoint,
+} from './plotTree'
 
 const EDIT_SAVE_DELAY_MS = 500
+
+interface PendingSibling {
+  anchorId: string
+  pendingId: string
+}
 
 function PlotSidebar() {
   const { projectId } = useParams<{ projectId: string }>()
@@ -26,6 +43,7 @@ function PlotSidebar() {
   const nodesRef = useRef<PlotNode[]>([])
   const saveTimeout = useRef<ReturnType<typeof setTimeout>>()
   const inputRefs = useRef<Record<string, HTMLInputElement | null>>({})
+  const pendingSibling = useRef<PendingSibling | null>(null)
 
   const levels = project?.index.settings.plotLevels ?? PLOT_KIND_ORDER
 
@@ -66,17 +84,26 @@ function PlotSidebar() {
   }
 
   function handleRename(nodeId: string, title: string) {
+    pendingSibling.current = null
     setNodes((prev) => renameNode(prev, nodeId, title))
     scheduleSave()
   }
 
-  function handleDelete(nodeId: string) {
-    const next = removeNode(nodes, nodeId)
+  function handleDelete(node: PlotNode) {
+    if (hasChildren(nodesRef.current, node.id)) {
+      const ok = confirm(
+        `Delete "${node.title || 'Untitled'}" and everything nested under it? This cannot be undone.`
+      )
+      if (!ok) return
+    }
+    pendingSibling.current = null
+    const next = removeNode(nodesRef.current, node.id)
     setNodes(next)
     saveNow(next)
   }
 
-  function handleTab(node: PlotNode) {
+  function handleAddChild(node: PlotNode) {
+    pendingSibling.current = null
     const result = createChildNode(nodesRef.current, levels, node)
     if (!result) return
     setNodes(result.nodes)
@@ -84,21 +111,44 @@ function PlotSidebar() {
     setPendingFocus(result.newNode.id)
   }
 
+  function handleNextSibling(node: PlotNode) {
+    pendingSibling.current = null
+    const next = getNextSibling(nodesRef.current, node.id)
+    if (next) setPendingFocus(next.id)
+  }
+
+  function handlePreviousSibling(node: PlotNode) {
+    pendingSibling.current = null
+    const prev = getPreviousSibling(nodesRef.current, node.id)
+    if (prev) setPendingFocus(prev.id)
+  }
+
+  function handleNavigateToParent(node: PlotNode) {
+    pendingSibling.current = null
+    if (node.parentId) setPendingFocus(node.parentId)
+  }
+
   function handleEnter(node: PlotNode) {
-    if (node.title.trim() === '') {
-      const next = removeNode(nodesRef.current, node.id)
-      setNodes(next)
-      saveNow(next)
-      if (node.parentId) setPendingFocus(node.parentId)
+    const pending = pendingSibling.current
+    if (pending && pending.pendingId === node.id && node.title.trim() === '') {
+      pendingSibling.current = null
+      const next = escalateToChild(nodesRef.current, levels, pending.anchorId, node.id)
+      if (next) {
+        setNodes(next)
+        saveNow(next)
+        setPendingFocus(node.id)
+      }
       return
     }
     const result = createSiblingNode(nodesRef.current, node)
     setNodes(result.nodes)
     saveNow(result.nodes)
     setPendingFocus(result.newNode.id)
+    pendingSibling.current = { anchorId: node.id, pendingId: result.newNode.id }
   }
 
   function handleUpdatePlotpoint(nodeId: string, patch: { body?: string; assignedMomentId?: string | null }) {
+    pendingSibling.current = null
     const next = updatePlotpoint(nodes, nodeId, patch)
     setNodes(next)
     if (patch.assignedMomentId !== undefined) {
@@ -109,6 +159,7 @@ function PlotSidebar() {
   }
 
   function handleReorder(orderedIds: string[]) {
+    pendingSibling.current = null
     const next = reorderSiblings(nodes, orderedIds)
     setNodes(next)
     saveNow(next)
@@ -175,8 +226,11 @@ function PlotSidebar() {
         moments={moments}
         onRename={handleRename}
         onDelete={handleDelete}
-        onTab={handleTab}
+        onAddChild={handleAddChild}
+        onNextSibling={handleNextSibling}
+        onPreviousSibling={handlePreviousSibling}
         onEnter={handleEnter}
+        onNavigateToParent={handleNavigateToParent}
         onUpdatePlotpoint={handleUpdatePlotpoint}
         registerInput={registerInput}
         onReorder={handleReorder}

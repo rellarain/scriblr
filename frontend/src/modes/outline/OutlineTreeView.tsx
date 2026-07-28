@@ -11,9 +11,12 @@ interface Props {
   depth: number
   levels: OutlineNodeKind[]
   onRename: (nodeId: string, title: string) => void
-  onDelete: (nodeId: string) => void
-  onTab: (node: OutlineNode) => void
+  onDelete: (node: OutlineNode) => void
+  onAddChild: (node: OutlineNode) => void
+  onNextSibling: (node: OutlineNode) => void
+  onPreviousSibling: (node: OutlineNode) => void
   onEnter: (node: OutlineNode) => void
+  onNavigateToParent: (node: OutlineNode) => void
   registerInput: (nodeId: string, el: HTMLInputElement | null) => void
   onReorder: (parentId: string | null, orderedIds: string[]) => void
 }
@@ -25,8 +28,11 @@ function OutlineTreeView({
   levels,
   onRename,
   onDelete,
-  onTab,
+  onAddChild,
+  onNextSibling,
+  onPreviousSibling,
   onEnter,
+  onNavigateToParent,
   registerInput,
   onReorder,
 }: Props) {
@@ -56,8 +62,11 @@ function OutlineTreeView({
               levels={levels}
               onRename={onRename}
               onDelete={onDelete}
-              onTab={onTab}
+              onAddChild={onAddChild}
+              onNextSibling={onNextSibling}
+              onPreviousSibling={onPreviousSibling}
               onEnter={onEnter}
+              onNavigateToParent={onNavigateToParent}
               registerInput={registerInput}
             />
             <OutlineTreeView
@@ -67,8 +76,11 @@ function OutlineTreeView({
               levels={levels}
               onRename={onRename}
               onDelete={onDelete}
-              onTab={onTab}
+              onAddChild={onAddChild}
+              onNextSibling={onNextSibling}
+              onPreviousSibling={onPreviousSibling}
               onEnter={onEnter}
+              onNavigateToParent={onNavigateToParent}
               registerInput={registerInput}
               onReorder={onReorder}
             />

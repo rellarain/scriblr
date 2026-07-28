@@ -14,11 +14,6 @@ export function getChildren(nodes: PlotNode[], parentId: string | null): PlotNod
   return tree.getChildren(nodes, parentId)
 }
 
-export function kindsDeeperThan(kind: PlotNodeKind): PlotNodeKind[] {
-  const idx = PLOT_KIND_ORDER.indexOf(kind)
-  return PLOT_KIND_ORDER.slice(idx + 1)
-}
-
 export function addNode(
   nodes: PlotNode[],
   parentId: string | null,
@@ -86,4 +81,46 @@ export function createSiblingNode(
 ): { nodes: PlotNode[]; newNode: PlotNode } {
   const newNode = makeNode(afterNode.kind, afterNode.parentId, 0)
   return { nodes: tree.insertSiblingAfter(nodes, afterNode.id, newNode), newNode }
+}
+
+export function hasChildren(nodes: PlotNode[], nodeId: string): boolean {
+  return tree.getChildren(nodes, nodeId).length > 0
+}
+
+export function getNextSibling(nodes: PlotNode[], nodeId: string): PlotNode | undefined {
+  return tree.nextSibling(nodes, nodeId)
+}
+
+export function getPreviousSibling(nodes: PlotNode[], nodeId: string): PlotNode | undefined {
+  return tree.previousSibling(nodes, nodeId)
+}
+
+/**
+ * Re-parents `pendingId` (a still-empty node just created as a sibling of
+ * `anchorId` via Enter) to become a child of `anchorId` instead -- the
+ * "press Enter twice" escalation. Returns null if `anchorId`'s kind is
+ * already the deepest configured level.
+ */
+export function escalateToChild(
+  nodes: PlotNode[],
+  levels: PlotNodeKind[],
+  anchorId: string,
+  pendingId: string
+): PlotNode[] | null {
+  const anchor = nodes.find((n) => n.id === anchorId)
+  const pendingNode = nodes.find((n) => n.id === pendingId)
+  if (!anchor || !pendingNode) return null
+  const kind = tree.nextKindInLevels(levels, anchor.kind, PLOT_KIND_ORDER)
+  if (!kind) return null
+
+  const withoutPending = nodes.filter((n) => n.id !== pendingId)
+  const oldSiblingIds = tree.getChildren(withoutPending, pendingNode.parentId).map((s) => s.id)
+  const renumbered = tree.reorderSiblings(withoutPending, oldSiblingIds)
+  const updated: PlotNode = {
+    ...pendingNode,
+    parentId: anchor.id,
+    kind,
+    order: tree.nextOrder(renumbered, anchor.id),
+  }
+  return [...renumbered, updated]
 }
