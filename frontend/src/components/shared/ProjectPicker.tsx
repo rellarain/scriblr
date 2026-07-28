@@ -15,7 +15,7 @@ function ProjectPicker() {
     if (!title) return
     const project = await createProject.mutateAsync(title)
     setNewTitle('')
-    navigate(`/project/${project.projectId}/outline`)
+    navigate(`/project/${project.projectId}/plan`)
   }
 
   function handleDelete(event: React.MouseEvent, projectId: string) {
@@ -48,7 +48,7 @@ function ProjectPicker() {
           <li
             key={project.projectId}
             className="project-picker__item"
-            onClick={() => navigate(`/project/${project.projectId}/outline`)}
+            onClick={() => navigate(`/project/${project.projectId}/plan`)}
           >
             <span>{project.title}</span>
             <button type="button" onClick={(e) => handleDelete(e, project.projectId)}>

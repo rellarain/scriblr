@@ -11,20 +11,20 @@ import DiffView from './DiffView'
 
 interface Props {
   projectId: string
-  sceneId: string
+  momentId: string
   title: string
 }
 
-function SceneRevisions({ projectId, sceneId, title }: Props) {
-  const { data: summaries, isLoading } = useRevisions(projectId, sceneId)
-  const createSnapshot = useCreateSnapshot(projectId, sceneId)
-  const revert = useRevertToSnapshot(projectId, sceneId)
+function MomentRevisions({ projectId, momentId, title }: Props) {
+  const { data: summaries, isLoading } = useRevisions(projectId, momentId)
+  const createSnapshot = useCreateSnapshot(projectId, momentId)
+  const revert = useRevertToSnapshot(projectId, momentId)
 
   const [label, setLabel] = useState('')
   const [selectedId, setSelectedId] = useState<string | null>(null)
 
-  const { data: snapshot } = useSnapshot(projectId, sceneId, selectedId ?? undefined)
-  const { data: diff } = useDiff(projectId, sceneId, selectedId ?? undefined, 'current')
+  const { data: snapshot } = useSnapshot(projectId, momentId, selectedId ?? undefined)
+  const { data: diff } = useDiff(projectId, momentId, selectedId ?? undefined, 'current')
 
   function handleSnapshot() {
     createSnapshot.mutate(label.trim(), {
@@ -101,7 +101,7 @@ function SceneRevisions({ projectId, sceneId, title }: Props) {
           {selectedId && snapshot && (
             <>
               <h4>Snapshot text &amp; comments</h4>
-              <CommentsPanel projectId={projectId} sceneId={sceneId} snapshot={snapshot} />
+              <CommentsPanel projectId={projectId} momentId={momentId} snapshot={snapshot} />
             </>
           )}
         </div>
@@ -110,4 +110,4 @@ function SceneRevisions({ projectId, sceneId, title }: Props) {
   )
 }
 
-export default SceneRevisions
+export default MomentRevisions

@@ -1,50 +1,50 @@
-import type { OutlineNode } from '../../types'
+import { OUTLINE_KIND_ORDER } from '../../types'
+import type { OutlineNode, OutlineNodeKind } from '../../types'
+import * as tree from '../../lib/nodeTree'
 
 export function getBook(nodes: OutlineNode[]): OutlineNode | undefined {
   return nodes.find((n) => n.kind === 'book')
 }
 
-export function getChapters(nodes: OutlineNode[]): OutlineNode[] {
-  return nodes.filter((n) => n.kind === 'chapter').sort((a, b) => a.order - b.order)
+export function getChildren(nodes: OutlineNode[], parentId: string | null): OutlineNode[] {
+  return tree.getChildren(nodes, parentId)
 }
 
-export function getScenes(nodes: OutlineNode[], chapterId: string): OutlineNode[] {
-  return nodes
-    .filter((n) => n.kind === 'scene' && n.parentId === chapterId)
-    .sort((a, b) => a.order - b.order)
+export function getAllMoments(nodes: OutlineNode[]): OutlineNode[] {
+  return tree.depthFirstOrder(nodes).filter((n) => n.kind === 'moment')
 }
 
-function nextOrder(nodes: OutlineNode[], parentId: string | null): number {
-  const siblings = nodes.filter((n) => n.parentId === parentId)
-  return siblings.length === 0 ? 0 : Math.max(...siblings.map((n) => n.order)) + 1
+export function documentOrder(nodes: OutlineNode[]): OutlineNode[] {
+  return tree.depthFirstOrder(nodes)
 }
 
-export function addChapter(nodes: OutlineNode[], bookId: string, title: string): OutlineNode[] {
-  const id = `ch_${crypto.randomUUID().slice(0, 8)}`
-  const chapter: OutlineNode = {
+export function depthOf(nodes: OutlineNode[], nodeId: string): number {
+  return tree.depthOf(nodes, nodeId)
+}
+
+/** Kinds that may legally nest under a node of the given kind (flexible: any strictly-deeper kind). */
+export function kindsDeeperThan(kind: OutlineNodeKind): OutlineNodeKind[] {
+  const idx = OUTLINE_KIND_ORDER.indexOf(kind)
+  return OUTLINE_KIND_ORDER.slice(idx + 1)
+}
+
+export function addNode(
+  nodes: OutlineNode[],
+  parentId: string,
+  kind: OutlineNodeKind,
+  title: string
+): OutlineNode[] {
+  const id = `${kind}_${crypto.randomUUID().slice(0, 8)}`
+  const node: OutlineNode = {
     id,
-    kind: 'chapter',
-    parentId: bookId,
-    order: nextOrder(nodes, bookId),
+    kind,
+    parentId,
+    order: tree.nextOrder(nodes, parentId),
     title,
     synopsis: '',
-    draftRef: null,
+    draftRef: kind === 'moment' ? id : null,
   }
-  return [...nodes, chapter]
-}
-
-export function addScene(nodes: OutlineNode[], chapterId: string, title: string): OutlineNode[] {
-  const id = `scene_${crypto.randomUUID().slice(0, 8)}`
-  const scene: OutlineNode = {
-    id,
-    kind: 'scene',
-    parentId: chapterId,
-    order: nextOrder(nodes, chapterId),
-    title,
-    synopsis: '',
-    draftRef: id,
-  }
-  return [...nodes, scene]
+  return [...nodes, node]
 }
 
 export function renameNode(nodes: OutlineNode[], nodeId: string, title: string): OutlineNode[] {
@@ -52,24 +52,9 @@ export function renameNode(nodes: OutlineNode[], nodeId: string, title: string):
 }
 
 export function removeNode(nodes: OutlineNode[], nodeId: string): OutlineNode[] {
-  const toRemove = new Set([nodeId])
-  // Cascade: dropping a chapter also drops its scenes.
-  for (const n of nodes) {
-    if (n.parentId === nodeId) toRemove.add(n.id)
-  }
-  return nodes.filter((n) => !toRemove.has(n.id))
+  return tree.removeSubtree(nodes, nodeId)
 }
 
-/**
- * Reorders the siblings of `parentId` to match `orderedIds`, rewriting their
- * `order` field to a dense 0..n-1 sequence. Nodes outside that sibling group
- * are returned unchanged.
- */
-export function reorderSiblings(
-  nodes: OutlineNode[],
-  parentId: string,
-  orderedIds: string[]
-): OutlineNode[] {
-  const orderById = new Map(orderedIds.map((id, index) => [id, index]))
-  return nodes.map((n) => (orderById.has(n.id) ? { ...n, order: orderById.get(n.id)! } : n))
+export function reorderSiblings(nodes: OutlineNode[], orderedIds: string[]): OutlineNode[] {
+  return tree.reorderSiblings(nodes, orderedIds)
 }

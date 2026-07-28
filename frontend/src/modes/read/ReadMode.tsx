@@ -2,10 +2,10 @@ import ReactMarkdown from 'react-markdown'
 import { useParams } from 'react-router-dom'
 import { useDraft } from '../../api/draft'
 import { useOutline } from '../../api/outline'
-import { getChapters, getScenes } from '../outline/outlineTree'
+import { documentOrder } from '../outline/outlineTree'
 
-function SceneBody({ projectId, sceneId }: { projectId: string; sceneId: string }) {
-  const { data, isLoading } = useDraft(projectId, sceneId)
+function MomentBody({ projectId, momentId }: { projectId: string; momentId: string }) {
+  const { data, isLoading } = useDraft(projectId, momentId)
   if (isLoading) return null
   if (!data?.body.trim()) return <p className="read-mode__body read-mode__body--empty">(empty)</p>
   return (
@@ -22,23 +22,23 @@ function ReadMode() {
   if (isLoading) return <p>Loading manuscript…</p>
   if (!projectId || !outline) return null
 
-  const nodes = outline.nodes
-  const chapters = getChapters(nodes)
+  const ordered = documentOrder(outline.nodes)
 
   return (
     <div className="read-mode">
-      {chapters.map((chapter) => (
-        <section key={chapter.id}>
-          <h2 className="read-mode__chapter-title">{chapter.title}</h2>
-          {getScenes(nodes, chapter.id).map((scene) => (
-            <article key={scene.id}>
-              <h3 className="read-mode__scene-title">{scene.title}</h3>
-              <SceneBody projectId={projectId} sceneId={scene.id} />
-            </article>
-          ))}
-        </section>
-      ))}
-      {chapters.length === 0 && <p>Nothing to read yet — add chapters and scenes in Outline mode.</p>}
+      {ordered.map((node) =>
+        node.kind === 'moment' ? (
+          <article key={node.id} className="read-mode__moment">
+            <h4 className="read-mode__moment-title">{node.title}</h4>
+            <MomentBody projectId={projectId} momentId={node.id} />
+          </article>
+        ) : (
+          <h2 key={node.id} className={`read-mode__heading read-mode__heading--${node.kind}`}>
+            {node.title}
+          </h2>
+        )
+      )}
+      {ordered.length === 0 && <p>Nothing to read yet — add structure in Plan mode.</p>}
     </div>
   )
 }

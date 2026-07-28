@@ -9,7 +9,7 @@ from ..models import AddCommentRequest, CreateSnapshotRequest, DiffOp, DiffRespo
 from ..storage import project_store as store
 from ..storage.schema import CommentAnchor, RevisionComment, RevisionSnapshot, RevisionSummary, utcnow
 
-router = APIRouter(prefix="/api/projects/{project_id}/revisions/{scene_id}", tags=["revisions"])
+router = APIRouter(prefix="/api/projects/{project_id}/revisions/{moment_id}", tags=["revisions"])
 
 _TOKEN_RE = re.compile(r"\S+|\s+")
 
@@ -38,9 +38,9 @@ def _diff_texts(a: str, b: str) -> list[DiffOp]:
 
 @router.get("", response_model=list[RevisionSummary])
 def list_revisions(
-    project_id: str, scene_id: str, root: Path = Depends(get_storage_root)
+    project_id: str, moment_id: str, root: Path = Depends(get_storage_root)
 ) -> list[RevisionSummary]:
-    snapshots = store.list_revisions(root, project_id, scene_id)
+    snapshots = store.list_revisions(root, project_id, moment_id)
     return [
         RevisionSummary(
             snapshotId=s.snapshotId,
@@ -56,37 +56,37 @@ def list_revisions(
 @router.get("/diff", response_model=DiffResponse)
 def diff_revisions(
     project_id: str,
-    scene_id: str,
+    moment_id: str,
     from_: str = Query(alias="from"),
     to: str = Query(default="current"),
     root: Path = Depends(get_storage_root),
 ) -> DiffResponse:
-    from_snapshot = store.load_revision(root, project_id, scene_id, from_)
+    from_snapshot = store.load_revision(root, project_id, moment_id, from_)
     if to == "current":
-        to_body = store.load_draft(root, project_id, scene_id).body
+        to_body = store.load_draft(root, project_id, moment_id).body
     else:
-        to_body = store.load_revision(root, project_id, scene_id, to).body
+        to_body = store.load_revision(root, project_id, moment_id, to).body
     return DiffResponse(ops=_diff_texts(from_snapshot.body, to_body))
 
 
 @router.get("/{snapshot_id}", response_model=RevisionSnapshot)
 def get_revision(
-    project_id: str, scene_id: str, snapshot_id: str, root: Path = Depends(get_storage_root)
+    project_id: str, moment_id: str, snapshot_id: str, root: Path = Depends(get_storage_root)
 ) -> RevisionSnapshot:
-    return store.load_revision(root, project_id, scene_id, snapshot_id)
+    return store.load_revision(root, project_id, moment_id, snapshot_id)
 
 
 @router.post("", response_model=RevisionSnapshot)
 def create_revision(
     project_id: str,
-    scene_id: str,
+    moment_id: str,
     body: CreateSnapshotRequest,
     root: Path = Depends(get_storage_root),
 ) -> RevisionSnapshot:
-    draft = store.load_draft(root, project_id, scene_id)
+    draft = store.load_draft(root, project_id, moment_id)
     snapshot = RevisionSnapshot(
         snapshotId=store.new_id("snap"),
-        sceneId=scene_id,
+        momentId=moment_id,
         createdAt=utcnow(),
         label=body.label,
         trigger="manual",
@@ -99,14 +99,14 @@ def create_revision(
 
 @router.post("/{snapshot_id}/revert", response_model=RevisionSnapshot)
 def revert_to_revision(
-    project_id: str, scene_id: str, snapshot_id: str, root: Path = Depends(get_storage_root)
+    project_id: str, moment_id: str, snapshot_id: str, root: Path = Depends(get_storage_root)
 ) -> RevisionSnapshot:
-    target = store.load_revision(root, project_id, scene_id, snapshot_id)
+    target = store.load_revision(root, project_id, moment_id, snapshot_id)
 
-    current_draft = store.load_draft(root, project_id, scene_id)
+    current_draft = store.load_draft(root, project_id, moment_id)
     safety_snapshot = RevisionSnapshot(
         snapshotId=store.new_id("snap"),
-        sceneId=scene_id,
+        momentId=moment_id,
         createdAt=utcnow(),
         label=f"before revert to {snapshot_id}",
         trigger="manual",
@@ -118,19 +118,19 @@ def revert_to_revision(
     current_draft.body = target.body
     current_draft.wordCount = target.wordCount
     current_draft.updatedAt = utcnow()
-    store.save_draft(root, project_id, scene_id, current_draft)
+    store.save_draft(root, project_id, moment_id, current_draft)
     return safety_snapshot
 
 
 @router.post("/{snapshot_id}/notes", response_model=RevisionComment)
 def add_comment(
     project_id: str,
-    scene_id: str,
+    moment_id: str,
     snapshot_id: str,
     body: AddCommentRequest,
     root: Path = Depends(get_storage_root),
 ) -> RevisionComment:
-    snapshot = store.load_revision(root, project_id, scene_id, snapshot_id)
+    snapshot = store.load_revision(root, project_id, moment_id, snapshot_id)
     comment = RevisionComment(
         id=store.new_id("cmt"),
         anchor=CommentAnchor(start=body.anchorStart, end=body.anchorEnd),
@@ -146,13 +146,13 @@ def add_comment(
 @router.patch("/{snapshot_id}/notes/{note_id}", response_model=RevisionComment)
 def update_comment(
     project_id: str,
-    scene_id: str,
+    moment_id: str,
     snapshot_id: str,
     note_id: str,
     body: UpdateCommentRequest,
     root: Path = Depends(get_storage_root),
 ) -> RevisionComment:
-    snapshot = store.load_revision(root, project_id, scene_id, snapshot_id)
+    snapshot = store.load_revision(root, project_id, moment_id, snapshot_id)
     for comment in snapshot.notes:
         if comment.id == note_id:
             if body.body is not None:
@@ -167,12 +167,12 @@ def update_comment(
 @router.delete("/{snapshot_id}/notes/{note_id}", status_code=204)
 def delete_comment(
     project_id: str,
-    scene_id: str,
+    moment_id: str,
     snapshot_id: str,
     note_id: str,
     root: Path = Depends(get_storage_root),
 ) -> None:
-    snapshot = store.load_revision(root, project_id, scene_id, snapshot_id)
+    snapshot = store.load_revision(root, project_id, moment_id, snapshot_id)
     remaining = [c for c in snapshot.notes if c.id != note_id]
     if len(remaining) == len(snapshot.notes):
         raise HTTPException(status_code=404, detail=f"comment not found: {note_id}")

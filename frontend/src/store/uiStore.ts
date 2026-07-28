@@ -1,15 +1,15 @@
 import { create } from 'zustand'
 
 interface UiState {
-  selectedSceneId: string | null
+  selectedMomentId: string | null
   sidebarCollapsed: boolean
-  setSelectedSceneId: (sceneId: string | null) => void
+  setSelectedMomentId: (momentId: string | null) => void
   toggleSidebar: () => void
 }
 
 export const useUiStore = create<UiState>((set) => ({
-  selectedSceneId: null,
+  selectedMomentId: null,
   sidebarCollapsed: false,
-  setSelectedSceneId: (sceneId) => set({ selectedSceneId: sceneId }),
+  setSelectedMomentId: (momentId) => set({ selectedMomentId: momentId }),
   toggleSidebar: () => set((state) => ({ sidebarCollapsed: !state.sidebarCollapsed })),
 }))

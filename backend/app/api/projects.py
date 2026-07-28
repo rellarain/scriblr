@@ -29,7 +29,12 @@ def get_project(project_id: str, root: Path = Depends(get_storage_root)) -> Proj
         outline = store.load_outline(root, project_id)
     except store.ShardCorruptError as e:
         warnings.append(f"outline is corrupt and was quarantined: {e.reason}")
-    return ProjectSummaryResponse(index=index, outline=outline, warnings=warnings)
+    plot = None
+    try:
+        plot = store.load_plot(root, project_id)
+    except store.ShardCorruptError as e:
+        warnings.append(f"plot tree is corrupt and was quarantined: {e.reason}")
+    return ProjectSummaryResponse(index=index, outline=outline, plot=plot, warnings=warnings)
 
 
 @router.patch("/{project_id}", response_model=ProjectIndex)

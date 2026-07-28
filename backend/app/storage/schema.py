@@ -3,7 +3,7 @@ from typing import Literal, Optional
 
 from pydantic import BaseModel, Field
 
-SCHEMA_VERSION = 1
+SCHEMA_VERSION = 2
 
 
 def utcnow() -> datetime:
@@ -12,9 +12,9 @@ def utcnow() -> datetime:
 
 class ProjectManifest(BaseModel):
     outline: str = "outline/tree.json"
-    brainstorm: str = "brainstorm/notes.json"
-    draftScenes: list[str] = Field(default_factory=list)
-    revisionScenes: list[str] = Field(default_factory=list)
+    plot: str = "brainstorm/plot.json"
+    draftMoments: list[str] = Field(default_factory=list)
+    revisionMoments: list[str] = Field(default_factory=list)
 
 
 class ProjectSettings(BaseModel):
@@ -31,7 +31,11 @@ class ProjectIndex(BaseModel):
     manifest: ProjectManifest = Field(default_factory=ProjectManifest)
 
 
-OutlineNodeKind = Literal["book", "chapter", "scene"]
+# Structural depth, shallowest first. Nesting is flexible: a node's parent
+# may be any node of a strictly shallower kind, not necessarily the adjacent
+# one (e.g. a scene may nest directly under a book, skipping arc/chapter).
+OutlineNodeKind = Literal["book", "arc", "chapter", "scene", "moment"]
+OUTLINE_KIND_ORDER: list[OutlineNodeKind] = ["book", "arc", "chapter", "scene", "moment"]
 
 
 class OutlineNode(BaseModel):
@@ -41,6 +45,11 @@ class OutlineNode(BaseModel):
     order: int
     title: str
     synopsis: str = ""
+    # Set only on "moment" nodes: the moment IS the writing/draftRef unit, so
+    # this is always equal to the node's own id once a draft has been
+    # created for it. Kept as an explicit field (rather than assuming
+    # id === draftRef) so a moment can exist in the outline before any draft
+    # content is written.
     draftRef: Optional[str] = None
 
 
@@ -49,23 +58,34 @@ class OutlineTree(BaseModel):
     nodes: list[OutlineNode] = Field(default_factory=list)
 
 
-class BrainstormNote(BaseModel):
+# Plot tree: category -> plotline -> plotpoint, mirroring the outline tree's
+# flat-list-with-parentId shape. Plotpoints are the leaf/content unit and may
+# be assigned to a moment in the outline tree.
+PlotNodeKind = Literal["category", "plotline", "plotpoint"]
+PLOT_KIND_ORDER: list[PlotNodeKind] = ["category", "plotline", "plotpoint"]
+
+
+class PlotNode(BaseModel):
     id: str
-    createdAt: datetime
-    updatedAt: datetime
-    body: str
-    tags: list[str] = Field(default_factory=list)
-    linkedOutlineNodeId: Optional[str] = None
+    kind: PlotNodeKind
+    parentId: Optional[str] = None
+    order: int
+    title: str
+    # Plotpoint body text; unused for category/plotline nodes.
+    body: str = ""
+    # Set only on "plotpoint" nodes: the moment (outline node id) this
+    # plotpoint is assigned to, if any.
+    assignedMomentId: Optional[str] = None
 
 
-class BrainstormNotes(BaseModel):
+class PlotTree(BaseModel):
     schemaVersion: int = SCHEMA_VERSION
-    notes: list[BrainstormNote] = Field(default_factory=list)
+    nodes: list[PlotNode] = Field(default_factory=list)
 
 
-class DraftScene(BaseModel):
+class DraftMoment(BaseModel):
     schemaVersion: int = SCHEMA_VERSION
-    sceneId: str
+    momentId: str
     outlineNodeId: str
     updatedAt: datetime
     wordCount: int = 0
@@ -96,7 +116,7 @@ RevisionTrigger = Literal["manual", "session-close"]
 class RevisionSnapshot(BaseModel):
     schemaVersion: int = SCHEMA_VERSION
     snapshotId: str
-    sceneId: str
+    momentId: str
     createdAt: datetime
     label: str = ""
     trigger: RevisionTrigger = "manual"

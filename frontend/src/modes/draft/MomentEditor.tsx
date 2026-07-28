@@ -5,7 +5,7 @@ const AUTOSAVE_DELAY_MS = 1500
 
 interface Props {
   projectId: string
-  sceneId: string
+  momentId: string
   title: string
 }
 
@@ -14,9 +14,9 @@ function countWords(text: string): number {
   return trimmed === '' ? 0 : trimmed.split(/\s+/).length
 }
 
-function SceneEditor({ projectId, sceneId, title }: Props) {
-  const { data, isLoading } = useDraft(projectId, sceneId)
-  const saveDraft = useSaveDraft(projectId, sceneId)
+function MomentEditor({ projectId, momentId, title }: Props) {
+  const { data, isLoading } = useDraft(projectId, momentId)
+  const saveDraft = useSaveDraft(projectId, momentId)
 
   const [body, setBody] = useState('')
   const bodyRef = useRef('')
@@ -41,9 +41,9 @@ function SceneEditor({ projectId, sceneId, title }: Props) {
     }
   }, [data])
 
-  // Flush any unsaved edit if this scene is closed (switched away from, or
+  // Flush any unsaved edit if this moment is closed (switched away from, or
   // navigated off) before the debounce timer fires — otherwise a fast
-  // scene-switch silently drops the pending change.
+  // moment-switch silently drops the pending change.
   useEffect(() => {
     return () => {
       if (saveTimeout.current) clearTimeout(saveTimeout.current)
@@ -70,7 +70,7 @@ function SceneEditor({ projectId, sceneId, title }: Props) {
     }
   }
 
-  if (isLoading) return <p>Loading scene…</p>
+  if (isLoading) return <p>Loading moment…</p>
 
   return (
     <div className="scene-editor">
@@ -92,4 +92,4 @@ function SceneEditor({ projectId, sceneId, title }: Props) {
   )
 }
 
-export default SceneEditor
+export default MomentEditor

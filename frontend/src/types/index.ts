@@ -1,8 +1,8 @@
 export interface ProjectManifest {
   outline: string
-  brainstorm: string
-  draftScenes: string[]
-  revisionScenes: string[]
+  plot: string
+  draftMoments: string[]
+  revisionMoments: string[]
 }
 
 export interface ProjectSettings {
@@ -19,7 +19,11 @@ export interface ProjectIndex {
   manifest: ProjectManifest
 }
 
-export type OutlineNodeKind = 'book' | 'chapter' | 'scene'
+// Structural depth, shallowest first. Nesting is flexible: a node's parent
+// may be any node of a strictly shallower kind, not necessarily the
+// adjacent one (e.g. a scene may nest directly under a book).
+export type OutlineNodeKind = 'book' | 'arc' | 'chapter' | 'scene' | 'moment'
+export const OUTLINE_KIND_ORDER: OutlineNodeKind[] = ['book', 'arc', 'chapter', 'scene', 'moment']
 
 export interface OutlineNode {
   id: string
@@ -28,6 +32,7 @@ export interface OutlineNode {
   order: number
   title: string
   synopsis: string
+  // Set only on "moment" nodes: the moment IS the writing unit.
   draftRef: string | null
 }
 
@@ -36,23 +41,31 @@ export interface OutlineTree {
   nodes: OutlineNode[]
 }
 
-export interface BrainstormNote {
+// Plot tree: category -> plotline -> plotpoint, mirroring the outline
+// tree's flat-list-with-parentId shape.
+export type PlotNodeKind = 'category' | 'plotline' | 'plotpoint'
+export const PLOT_KIND_ORDER: PlotNodeKind[] = ['category', 'plotline', 'plotpoint']
+
+export interface PlotNode {
   id: string
-  createdAt: string
-  updatedAt: string
+  kind: PlotNodeKind
+  parentId: string | null
+  order: number
+  title: string
+  // Plotpoint body text; unused for category/plotline nodes.
   body: string
-  tags: string[]
-  linkedOutlineNodeId: string | null
+  // Set only on "plotpoint" nodes: the moment (outline node id) assigned.
+  assignedMomentId: string | null
 }
 
-export interface BrainstormNotes {
+export interface PlotTree {
   schemaVersion: number
-  notes: BrainstormNote[]
+  nodes: PlotNode[]
 }
 
-export interface DraftScene {
+export interface DraftMoment {
   schemaVersion: number
-  sceneId: string
+  momentId: string
   outlineNodeId: string
   updatedAt: string
   wordCount: number
@@ -81,7 +94,7 @@ export type RevisionTrigger = 'manual' | 'session-close'
 export interface RevisionSnapshot {
   schemaVersion: number
   snapshotId: string
-  sceneId: string
+  momentId: string
   createdAt: string
   label: string
   trigger: RevisionTrigger
@@ -101,6 +114,7 @@ export interface RevisionSummary {
 export interface ProjectSummary {
   index: ProjectIndex
   outline: OutlineTree | null
+  plot: PlotTree | null
   warnings: string[]
 }
 

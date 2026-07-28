@@ -1,14 +1,15 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { ApiError, api } from './client'
-import type { DraftScene } from '../types'
+import type { DraftMoment } from '../types'
 
-const draftKey = (projectId: string, sceneId: string) => ['projects', projectId, 'draft', sceneId] as const
+const draftKey = (projectId: string, momentId: string) =>
+  ['projects', projectId, 'draft', momentId] as const
 
-function emptyDraft(sceneId: string): DraftScene {
+function emptyDraft(momentId: string): DraftMoment {
   return {
-    schemaVersion: 1,
-    sceneId,
-    outlineNodeId: sceneId,
+    schemaVersion: 2,
+    momentId,
+    outlineNodeId: momentId,
     updatedAt: new Date().toISOString(),
     wordCount: 0,
     format: 'markdown',
@@ -16,33 +17,33 @@ function emptyDraft(sceneId: string): DraftScene {
   }
 }
 
-export function useDraft(projectId: string | undefined, sceneId: string | undefined) {
+export function useDraft(projectId: string | undefined, momentId: string | undefined) {
   return useQuery({
-    queryKey: projectId && sceneId ? draftKey(projectId, sceneId) : ['draft', 'none'],
+    queryKey: projectId && momentId ? draftKey(projectId, momentId) : ['draft', 'none'],
     queryFn: async () => {
       try {
-        return await api.get<DraftScene>(`/projects/${projectId}/draft/${sceneId}`)
+        return await api.get<DraftMoment>(`/projects/${projectId}/draft/${momentId}`)
       } catch (e) {
         if (e instanceof ApiError && e.status === 404) {
-          return emptyDraft(sceneId as string)
+          return emptyDraft(momentId as string)
         }
         throw e
       }
     },
-    enabled: Boolean(projectId && sceneId),
+    enabled: Boolean(projectId && momentId),
   })
 }
 
-export function useSaveDraft(projectId: string, sceneId: string) {
+export function useSaveDraft(projectId: string, momentId: string) {
   const queryClient = useQueryClient()
   return useMutation({
     mutationFn: (body: string) =>
-      api.put<DraftScene>(`/projects/${projectId}/draft/${sceneId}`, {
-        outlineNodeId: sceneId,
+      api.put<DraftMoment>(`/projects/${projectId}/draft/${momentId}`, {
+        outlineNodeId: momentId,
         body,
       }),
     onSuccess: (draft) => {
-      queryClient.setQueryData(draftKey(projectId, sceneId), draft)
+      queryClient.setQueryData(draftKey(projectId, momentId), draft)
       queryClient.invalidateQueries({ queryKey: ['projects', projectId] })
     },
   })

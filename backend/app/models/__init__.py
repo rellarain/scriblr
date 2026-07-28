@@ -2,7 +2,7 @@ from typing import Literal, Optional
 
 from pydantic import BaseModel
 
-from ..storage.schema import OutlineTree, ProjectIndex
+from ..storage.schema import OutlineTree, PlotTree, ProjectIndex
 
 
 class CreateProjectRequest(BaseModel):
@@ -17,24 +17,13 @@ class UpdateProjectRequest(BaseModel):
 class ProjectSummaryResponse(BaseModel):
     index: ProjectIndex
     outline: Optional[OutlineTree] = None
+    plot: Optional[PlotTree] = None
     warnings: list[str] = []
 
 
 class UpsertDraftRequest(BaseModel):
     outlineNodeId: str
     body: str
-
-
-class CreateNoteRequest(BaseModel):
-    body: str
-    tags: list[str] = []
-    linkedOutlineNodeId: Optional[str] = None
-
-
-class UpdateNoteRequest(BaseModel):
-    body: Optional[str] = None
-    tags: Optional[list[str]] = None
-    linkedOutlineNodeId: Optional[str] = None
 
 
 class CreateSnapshotRequest(BaseModel):

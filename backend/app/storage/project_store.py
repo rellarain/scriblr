@@ -9,9 +9,9 @@ from typing import Type, TypeVar
 from pydantic import BaseModel, ValidationError
 
 from .schema import (
-    BrainstormNotes,
-    DraftScene,
+    DraftMoment,
     OutlineTree,
+    PlotTree,
     ProjectIndex,
     RevisionSnapshot,
     utcnow,
@@ -26,19 +26,19 @@ class ProjectNotFoundError(Exception):
         super().__init__(f"project not found: {project_id}")
 
 
-class SceneNotFoundError(Exception):
-    def __init__(self, project_id: str, scene_id: str) -> None:
+class MomentNotFoundError(Exception):
+    def __init__(self, project_id: str, moment_id: str) -> None:
         self.project_id = project_id
-        self.scene_id = scene_id
-        super().__init__(f"scene not found: {project_id}/{scene_id}")
+        self.moment_id = moment_id
+        super().__init__(f"moment not found: {project_id}/{moment_id}")
 
 
 class SnapshotNotFoundError(Exception):
-    def __init__(self, project_id: str, scene_id: str, snapshot_id: str) -> None:
+    def __init__(self, project_id: str, moment_id: str, snapshot_id: str) -> None:
         self.project_id = project_id
-        self.scene_id = scene_id
+        self.moment_id = moment_id
         self.snapshot_id = snapshot_id
-        super().__init__(f"snapshot not found: {project_id}/{scene_id}/{snapshot_id}")
+        super().__init__(f"snapshot not found: {project_id}/{moment_id}/{snapshot_id}")
 
 
 class ShardCorruptError(Exception):
@@ -118,20 +118,20 @@ def _outline_path(project_dir: Path) -> Path:
     return project_dir / "outline" / "tree.json"
 
 
-def _brainstorm_path(project_dir: Path) -> Path:
-    return project_dir / "brainstorm" / "notes.json"
+def _plot_path(project_dir: Path) -> Path:
+    return project_dir / "brainstorm" / "plot.json"
 
 
-def _draft_path(project_dir: Path, scene_id: str) -> Path:
-    return project_dir / "draft" / f"{scene_id}.json"
+def _draft_path(project_dir: Path, moment_id: str) -> Path:
+    return project_dir / "draft" / f"{moment_id}.json"
 
 
-def _revision_dir(project_dir: Path, scene_id: str) -> Path:
-    return project_dir / "revisions" / scene_id
+def _revision_dir(project_dir: Path, moment_id: str) -> Path:
+    return project_dir / "revisions" / moment_id
 
 
-def _revision_path(project_dir: Path, scene_id: str, snapshot_id: str) -> Path:
-    return _revision_dir(project_dir, scene_id) / f"{snapshot_id}.json"
+def _revision_path(project_dir: Path, moment_id: str, snapshot_id: str) -> Path:
+    return _revision_dir(project_dir, moment_id) / f"{snapshot_id}.json"
 
 
 def create_project(root: Path, title: str) -> ProjectIndex:
@@ -155,8 +155,8 @@ def create_project(root: Path, title: str) -> ProjectIndex:
     )
     _write_shard(project_dir, _outline_path(project_dir), outline)
 
-    notes = BrainstormNotes()
-    _write_shard(project_dir, _brainstorm_path(project_dir), notes)
+    plot = PlotTree()
+    _write_shard(project_dir, _plot_path(project_dir), plot)
 
     index = ProjectIndex(projectId=project_id, title=title, createdAt=now, updatedAt=now)
     _write_shard(project_dir, _index_path(project_dir), index)
@@ -230,66 +230,66 @@ def save_outline(root: Path, project_id: str, outline: OutlineTree) -> None:
 
 
 # ---------------------------------------------------------------------------
-# Brainstorm
+# Plot (categories -> plotlines -> plotpoints)
 # ---------------------------------------------------------------------------
 
 
-def load_brainstorm(root: Path, project_id: str) -> BrainstormNotes:
+def load_plot(root: Path, project_id: str) -> PlotTree:
     project_dir = project_dir_of(root, project_id)
-    path = _brainstorm_path(project_dir)
+    path = _plot_path(project_dir)
     if not path.exists():
         raise ProjectNotFoundError(project_id)
-    return _read_shard(path, BrainstormNotes)
+    return _read_shard(path, PlotTree)
 
 
-def save_brainstorm(root: Path, project_id: str, notes: BrainstormNotes) -> None:
+def save_plot(root: Path, project_id: str, plot: PlotTree) -> None:
     project_dir = project_dir_of(root, project_id)
     if not project_dir.exists():
         raise ProjectNotFoundError(project_id)
-    _write_shard(project_dir, _brainstorm_path(project_dir), notes)
+    _write_shard(project_dir, _plot_path(project_dir), plot)
 
 
 # ---------------------------------------------------------------------------
-# Draft scenes
+# Draft moments
 # ---------------------------------------------------------------------------
 
 
-def load_draft(root: Path, project_id: str, scene_id: str) -> DraftScene:
+def load_draft(root: Path, project_id: str, moment_id: str) -> DraftMoment:
     project_dir = project_dir_of(root, project_id)
     if not project_dir.exists():
         raise ProjectNotFoundError(project_id)
-    path = _draft_path(project_dir, scene_id)
+    path = _draft_path(project_dir, moment_id)
     if not path.exists():
-        raise SceneNotFoundError(project_id, scene_id)
-    return _read_shard(path, DraftScene)
+        raise MomentNotFoundError(project_id, moment_id)
+    return _read_shard(path, DraftMoment)
 
 
-def save_draft(root: Path, project_id: str, scene_id: str, draft: DraftScene) -> None:
+def save_draft(root: Path, project_id: str, moment_id: str, draft: DraftMoment) -> None:
     project_dir = project_dir_of(root, project_id)
     if not project_dir.exists():
         raise ProjectNotFoundError(project_id)
-    path = _draft_path(project_dir, scene_id)
+    path = _draft_path(project_dir, moment_id)
     is_new = not path.exists()
     _write_shard(project_dir, path, draft)
     if is_new:
         index = load_index(root, project_id)
-        if scene_id not in index.manifest.draftScenes:
-            index.manifest.draftScenes.append(scene_id)
+        if moment_id not in index.manifest.draftMoments:
+            index.manifest.draftMoments.append(moment_id)
         index.updatedAt = utcnow()
         save_index(root, index)
 
 
-def delete_draft(root: Path, project_id: str, scene_id: str) -> None:
+def delete_draft(root: Path, project_id: str, moment_id: str) -> None:
     project_dir = project_dir_of(root, project_id)
     if not project_dir.exists():
         raise ProjectNotFoundError(project_id)
-    path = _draft_path(project_dir, scene_id)
+    path = _draft_path(project_dir, moment_id)
     if not path.exists():
-        raise SceneNotFoundError(project_id, scene_id)
+        raise MomentNotFoundError(project_id, moment_id)
     path.unlink()
     index = load_index(root, project_id)
-    if scene_id in index.manifest.draftScenes:
-        index.manifest.draftScenes.remove(scene_id)
+    if moment_id in index.manifest.draftMoments:
+        index.manifest.draftMoments.remove(moment_id)
     index.updatedAt = utcnow()
     save_index(root, index)
 
@@ -299,11 +299,11 @@ def delete_draft(root: Path, project_id: str, scene_id: str) -> None:
 # ---------------------------------------------------------------------------
 
 
-def list_revisions(root: Path, project_id: str, scene_id: str) -> list[RevisionSnapshot]:
+def list_revisions(root: Path, project_id: str, moment_id: str) -> list[RevisionSnapshot]:
     project_dir = project_dir_of(root, project_id)
     if not project_dir.exists():
         raise ProjectNotFoundError(project_id)
-    rev_dir = _revision_dir(project_dir, scene_id)
+    rev_dir = _revision_dir(project_dir, moment_id)
     if not rev_dir.exists():
         return []
     snapshots: list[RevisionSnapshot] = []
@@ -316,13 +316,13 @@ def list_revisions(root: Path, project_id: str, scene_id: str) -> list[RevisionS
     return snapshots
 
 
-def load_revision(root: Path, project_id: str, scene_id: str, snapshot_id: str) -> RevisionSnapshot:
+def load_revision(root: Path, project_id: str, moment_id: str, snapshot_id: str) -> RevisionSnapshot:
     project_dir = project_dir_of(root, project_id)
     if not project_dir.exists():
         raise ProjectNotFoundError(project_id)
-    path = _revision_path(project_dir, scene_id, snapshot_id)
+    path = _revision_path(project_dir, moment_id, snapshot_id)
     if not path.exists():
-        raise SnapshotNotFoundError(project_id, scene_id, snapshot_id)
+        raise SnapshotNotFoundError(project_id, moment_id, snapshot_id)
     return _read_shard(path, RevisionSnapshot)
 
 
@@ -330,10 +330,10 @@ def save_revision(root: Path, project_id: str, snapshot: RevisionSnapshot) -> No
     project_dir = project_dir_of(root, project_id)
     if not project_dir.exists():
         raise ProjectNotFoundError(project_id)
-    path = _revision_path(project_dir, snapshot.sceneId, snapshot.snapshotId)
+    path = _revision_path(project_dir, snapshot.momentId, snapshot.snapshotId)
     _write_shard(project_dir, path, snapshot)
     index = load_index(root, project_id)
-    if snapshot.sceneId not in index.manifest.revisionScenes:
-        index.manifest.revisionScenes.append(snapshot.sceneId)
+    if snapshot.momentId not in index.manifest.revisionMoments:
+        index.manifest.revisionMoments.append(snapshot.momentId)
         index.updatedAt = utcnow()
         save_index(root, index)

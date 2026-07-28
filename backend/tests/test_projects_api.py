@@ -61,6 +61,6 @@ def test_corrupt_outline_surfaces_warning_without_failing_project_load(
     assert len(body["warnings"]) == 1
     assert "corrupt" in body["warnings"][0]
 
-    # Brainstorm sibling shard must still be reachable.
-    resp = client.get(f"/api/projects/{project_id}/brainstorm")
+    # Plot sibling shard must still be reachable.
+    resp = client.get(f"/api/projects/{project_id}/plot")
     assert resp.status_code == 200

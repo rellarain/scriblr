@@ -1,13 +1,12 @@
-import json
 from pathlib import Path
 
 import pytest
 
 from app.storage import project_store as store
 from app.storage.schema import (
-    BrainstormNote,
-    DraftScene,
+    DraftMoment,
     OutlineNode,
+    PlotNode,
     RevisionSnapshot,
     utcnow,
 )
@@ -19,11 +18,11 @@ def test_create_project_writes_expected_shards(storage_root: Path) -> None:
     project_dir = storage_root / index.projectId
     assert (project_dir / "index.json").exists()
     assert (project_dir / "outline" / "tree.json").exists()
-    assert (project_dir / "brainstorm" / "notes.json").exists()
+    assert (project_dir / "brainstorm" / "plot.json").exists()
 
     loaded = store.load_index(storage_root, index.projectId)
     assert loaded.title == "My Novel"
-    assert loaded.manifest.draftScenes == []
+    assert loaded.manifest.draftMoments == []
 
     outline = store.load_outline(storage_root, index.projectId)
     assert len(outline.nodes) == 1
@@ -47,91 +46,110 @@ def test_delete_project_removes_directory(storage_root: Path) -> None:
         store.load_index(storage_root, index.projectId)
 
 
-def test_outline_round_trip_and_reorder(storage_root: Path) -> None:
+def test_outline_round_trip_with_flexible_nesting(storage_root: Path) -> None:
     index = store.create_project(storage_root, "Outline Test")
     outline = store.load_outline(storage_root, index.projectId)
     book_id = outline.nodes[0].id
 
     outline.nodes.append(
-        OutlineNode(id="ch_1", kind="chapter", parentId=book_id, order=0, title="Chapter One")
+        OutlineNode(id="arc_1", kind="arc", parentId=book_id, order=0, title="Arc One")
+    )
+    outline.nodes.append(
+        OutlineNode(id="ch_1", kind="chapter", parentId="arc_1", order=0, title="Chapter One")
+    )
+    # Flexible nesting: a scene straight under the book, skipping arc/chapter.
+    outline.nodes.append(
+        OutlineNode(id="scene_1", kind="scene", parentId=book_id, order=1, title="Cold Open")
     )
     outline.nodes.append(
         OutlineNode(
-            id="scene_1",
-            kind="scene",
-            parentId="ch_1",
+            id="moment_1",
+            kind="moment",
+            parentId="scene_1",
             order=0,
-            title="Opening",
-            draftRef="scene_1",
+            title="Opening beat",
+            draftRef="moment_1",
         )
     )
     store.save_outline(storage_root, index.projectId, outline)
 
     reloaded = store.load_outline(storage_root, index.projectId)
-    assert [n.id for n in reloaded.nodes] == [book_id, "ch_1", "scene_1"]
-    assert reloaded.nodes[2].draftRef == "scene_1"
+    assert [n.id for n in reloaded.nodes] == [book_id, "arc_1", "ch_1", "scene_1", "moment_1"]
+    assert reloaded.nodes[3].parentId == book_id  # scene nested directly under book
+    assert reloaded.nodes[4].draftRef == "moment_1"
 
     updated_index = store.load_index(storage_root, index.projectId)
     assert updated_index.updatedAt >= index.updatedAt
 
 
-def test_brainstorm_round_trip(storage_root: Path) -> None:
-    index = store.create_project(storage_root, "Brainstorm Test")
-    notes = store.load_brainstorm(storage_root, index.projectId)
-    assert notes.notes == []
+def test_plot_round_trip(storage_root: Path) -> None:
+    index = store.create_project(storage_root, "Plot Test")
+    plot = store.load_plot(storage_root, index.projectId)
+    assert plot.nodes == []
 
-    now = utcnow()
-    notes.notes.append(
-        BrainstormNote(id="note_1", createdAt=now, updatedAt=now, body="A twist idea", tags=["twist"])
+    plot.nodes.append(PlotNode(id="cat_1", kind="category", parentId=None, order=0, title="Betrayal"))
+    plot.nodes.append(
+        PlotNode(id="pl_1", kind="plotline", parentId="cat_1", order=0, title="The mole")
     )
-    store.save_brainstorm(storage_root, index.projectId, notes)
+    plot.nodes.append(
+        PlotNode(
+            id="pp_1",
+            kind="plotpoint",
+            parentId="pl_1",
+            order=0,
+            title="Reveal",
+            body="The mole is the narrator's future self.",
+            assignedMomentId="moment_1",
+        )
+    )
+    store.save_plot(storage_root, index.projectId, plot)
 
-    reloaded = store.load_brainstorm(storage_root, index.projectId)
-    assert len(reloaded.notes) == 1
-    assert reloaded.notes[0].body == "A twist idea"
+    reloaded = store.load_plot(storage_root, index.projectId)
+    assert [n.id for n in reloaded.nodes] == ["cat_1", "pl_1", "pp_1"]
+    assert reloaded.nodes[2].assignedMomentId == "moment_1"
 
 
-def test_draft_save_registers_scene_in_manifest(storage_root: Path) -> None:
+def test_draft_save_registers_moment_in_manifest(storage_root: Path) -> None:
     index = store.create_project(storage_root, "Draft Test")
 
-    with pytest.raises(store.SceneNotFoundError):
-        store.load_draft(storage_root, index.projectId, "scene_1")
+    with pytest.raises(store.MomentNotFoundError):
+        store.load_draft(storage_root, index.projectId, "moment_1")
 
-    draft = DraftScene(sceneId="scene_1", outlineNodeId="scene_1", updatedAt=utcnow(), body="Hello.")
-    store.save_draft(storage_root, index.projectId, "scene_1", draft)
+    draft = DraftMoment(momentId="moment_1", outlineNodeId="moment_1", updatedAt=utcnow(), body="Hello.")
+    store.save_draft(storage_root, index.projectId, "moment_1", draft)
 
-    reloaded = store.load_draft(storage_root, index.projectId, "scene_1")
+    reloaded = store.load_draft(storage_root, index.projectId, "moment_1")
     assert reloaded.body == "Hello."
 
     updated_index = store.load_index(storage_root, index.projectId)
-    assert updated_index.manifest.draftScenes == ["scene_1"]
+    assert updated_index.manifest.draftMoments == ["moment_1"]
 
-    # A second save to the same scene must not duplicate the manifest entry.
+    # A second save to the same moment must not duplicate the manifest entry.
     draft.body = "Hello, again."
-    store.save_draft(storage_root, index.projectId, "scene_1", draft)
+    store.save_draft(storage_root, index.projectId, "moment_1", draft)
     updated_index = store.load_index(storage_root, index.projectId)
-    assert updated_index.manifest.draftScenes == ["scene_1"]
+    assert updated_index.manifest.draftMoments == ["moment_1"]
 
 
 def test_delete_draft_removes_shard_and_manifest_entry(storage_root: Path) -> None:
     index = store.create_project(storage_root, "Delete Draft Test")
-    draft = DraftScene(sceneId="scene_1", outlineNodeId="scene_1", updatedAt=utcnow(), body="Hello.")
-    store.save_draft(storage_root, index.projectId, "scene_1", draft)
+    draft = DraftMoment(momentId="moment_1", outlineNodeId="moment_1", updatedAt=utcnow(), body="Hello.")
+    store.save_draft(storage_root, index.projectId, "moment_1", draft)
 
-    store.delete_draft(storage_root, index.projectId, "scene_1")
+    store.delete_draft(storage_root, index.projectId, "moment_1")
 
-    with pytest.raises(store.SceneNotFoundError):
-        store.load_draft(storage_root, index.projectId, "scene_1")
+    with pytest.raises(store.MomentNotFoundError):
+        store.load_draft(storage_root, index.projectId, "moment_1")
 
     updated_index = store.load_index(storage_root, index.projectId)
-    assert updated_index.manifest.draftScenes == []
+    assert updated_index.manifest.draftMoments == []
 
 
 def test_revision_snapshot_round_trip_and_manifest(storage_root: Path) -> None:
     index = store.create_project(storage_root, "Revision Test")
     snapshot = RevisionSnapshot(
         snapshotId="snap_1",
-        sceneId="scene_1",
+        momentId="moment_1",
         createdAt=utcnow(),
         label="first pass",
         trigger="manual",
@@ -140,17 +158,17 @@ def test_revision_snapshot_round_trip_and_manifest(storage_root: Path) -> None:
     )
     store.save_revision(storage_root, index.projectId, snapshot)
 
-    reloaded = store.load_revision(storage_root, index.projectId, "scene_1", "snap_1")
+    reloaded = store.load_revision(storage_root, index.projectId, "moment_1", "snap_1")
     assert reloaded.body == "Once upon a time."
 
-    listed = store.list_revisions(storage_root, index.projectId, "scene_1")
+    listed = store.list_revisions(storage_root, index.projectId, "moment_1")
     assert [s.snapshotId for s in listed] == ["snap_1"]
 
     updated_index = store.load_index(storage_root, index.projectId)
-    assert updated_index.manifest.revisionScenes == ["scene_1"]
+    assert updated_index.manifest.revisionMoments == ["moment_1"]
 
     with pytest.raises(store.SnapshotNotFoundError):
-        store.load_revision(storage_root, index.projectId, "scene_1", "does_not_exist")
+        store.load_revision(storage_root, index.projectId, "moment_1", "does_not_exist")
 
 
 def test_atomic_write_survives_interrupted_replace(storage_root: Path, monkeypatch: pytest.MonkeyPatch) -> None:
@@ -191,11 +209,11 @@ def test_corrupt_shard_is_quarantined_and_siblings_survive(storage_root: Path) -
     assert exc_info.value.quarantined_path.exists()
     assert ".corrupt-" in exc_info.value.quarantined_path.name
 
-    # Sibling shards (index, brainstorm) must still load fine.
+    # Sibling shards (index, plot) must still load fine.
     reloaded_index = store.load_index(storage_root, index.projectId)
     assert reloaded_index.title == "Corruption Test"
-    reloaded_notes = store.load_brainstorm(storage_root, index.projectId)
-    assert reloaded_notes.notes == []
+    reloaded_plot = store.load_plot(storage_root, index.projectId)
+    assert reloaded_plot.nodes == []
 
 
 def test_list_projects_skips_corrupt_project_without_crashing(storage_root: Path) -> None:

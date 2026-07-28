@@ -1,10 +1,10 @@
 from fastapi import FastAPI, Request
 from fastapi.responses import JSONResponse
 
-from .api import brainstorm, draft, outline, projects, revisions
+from .api import draft, outline, plot, projects, revisions
 from .storage.project_store import (
+    MomentNotFoundError,
     ProjectNotFoundError,
-    SceneNotFoundError,
     ShardCorruptError,
     SnapshotNotFoundError,
 )
@@ -21,8 +21,8 @@ def create_app() -> FastAPI:
     async def _project_not_found(_: Request, exc: ProjectNotFoundError) -> JSONResponse:
         return JSONResponse(status_code=404, content={"detail": str(exc)})
 
-    @app.exception_handler(SceneNotFoundError)
-    async def _scene_not_found(_: Request, exc: SceneNotFoundError) -> JSONResponse:
+    @app.exception_handler(MomentNotFoundError)
+    async def _moment_not_found(_: Request, exc: MomentNotFoundError) -> JSONResponse:
         return JSONResponse(status_code=404, content={"detail": str(exc)})
 
     @app.exception_handler(SnapshotNotFoundError)
@@ -38,8 +38,8 @@ def create_app() -> FastAPI:
 
     app.include_router(projects.router)
     app.include_router(outline.router)
+    app.include_router(plot.router)
     app.include_router(draft.router)
-    app.include_router(brainstorm.router)
     app.include_router(revisions.router)
 
     return app

@@ -151,35 +151,10 @@ textarea {
   color: #b00020;
 }
 
-/* Outline mode */
+/* Outline editor (focal content of Plan mode) */
 
-.outline-mode {
-  max-width: 800px;
-}
-
-.outline-mode__add {
-  display: flex;
-  gap: 0.5rem;
-  margin-bottom: 1rem;
-}
-
-.outline-mode__add select,
-.outline-mode__add input {
-  padding: 0.4rem 0.6rem;
-  border: 1px solid #ccc;
-  border-radius: 4px;
-}
-
-.outline-mode__add input {
-  flex: 1;
-}
-
-.outline-mode__add button {
-  padding: 0.4rem 0.9rem;
-  border: none;
-  border-radius: 4px;
-  background-color: #2f4d3a;
-  color: white;
+.outline-editor {
+  min-width: 0;
 }
 
 .outline-node {
@@ -198,13 +173,12 @@ textarea {
   background: #ece7dc;
 }
 
-.outline-node--chapter {
-  margin-left: 1.25rem;
-  font-weight: 600;
+.outline-node--arc {
+  font-weight: 700;
 }
 
-.outline-node--scene {
-  margin-left: 2.5rem;
+.outline-node--chapter {
+  font-weight: 600;
 }
 
 .outline-node.is-dragging {
@@ -215,6 +189,15 @@ textarea {
   cursor: grab;
   color: #999;
   user-select: none;
+}
+
+.outline-node__kind {
+  font-size: 0.65rem;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: #999;
+  width: 4.2rem;
+  flex-shrink: 0;
 }
 
 .outline-node__title {
@@ -231,10 +214,51 @@ textarea {
   background: white;
 }
 
+.outline-node__add-toggle {
+  border: none;
+  background: transparent;
+  color: #2f4d3a;
+  font-weight: 700;
+}
+
 .outline-node__delete {
   border: none;
   background: transparent;
   color: #b00020;
+}
+
+.outline-node__add-form,
+.plot-node__add-form {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.35rem;
+  margin-bottom: 0.5rem;
+}
+
+.outline-node__add-form select,
+.outline-node__add-form input,
+.plot-node__add-form select,
+.plot-node__add-form input {
+  min-width: 0;
+  padding: 0.3rem 0.5rem;
+  border: 1px solid #ccc;
+  border-radius: 4px;
+  font-size: 0.85rem;
+}
+
+.plot-node__add-form input {
+  flex: 1 1 80px;
+}
+
+.outline-node__add-form button,
+.plot-node__add-form button {
+  padding: 0.3rem 0.6rem;
+  border: none;
+  border-radius: 4px;
+  background-color: #2f4d3a;
+  color: white;
+  font-size: 0.85rem;
+  white-space: nowrap;
 }
 
 /* Draft mode */
@@ -246,27 +270,32 @@ textarea {
   height: 100%;
 }
 
-.draft-mode__scenes {
+.moment-picker {
   overflow-y: auto;
+  overflow-x: hidden;
+  min-width: 0;
 }
 
-.draft-mode__chapter-title {
+.moment-picker__header {
   font-weight: 700;
-  margin: 1rem 0 0.25rem;
+  margin: 0.75rem 0 0.15rem;
+  font-size: 0.85rem;
+  color: #555;
 }
 
-.draft-mode__scene-link {
+.moment-picker__moment {
   display: block;
   width: 100%;
   text-align: left;
   border: none;
   background: transparent;
-  padding: 0.35rem 0.5rem;
+  padding: 0.3rem 0.5rem;
   border-radius: 4px;
   color: #333;
+  font-size: 0.9rem;
 }
 
-.draft-mode__scene-link.is-active {
+.moment-picker__moment.is-active {
   background: #2f4d3a;
   color: white;
 }
@@ -313,80 +342,123 @@ textarea {
   font-size: 0.85rem;
 }
 
-/* Brainstorm mode */
+/* Plan mode: focal Outline editor + Plot sidebar */
 
-.brainstorm-mode__add {
-  display: flex;
-  gap: 0.5rem;
-  margin-bottom: 1.5rem;
-  max-width: 600px;
-}
-
-.brainstorm-mode__add textarea {
-  flex: 1;
-  min-height: 60px;
-  padding: 0.5rem;
-  border: 1px solid #ccc;
-  border-radius: 4px;
-  resize: vertical;
-}
-
-.brainstorm-mode__add button {
-  align-self: flex-start;
-  padding: 0.5rem 1rem;
-  border: none;
-  border-radius: 4px;
-  background-color: #2f4d3a;
-  color: white;
-}
-
-.brainstorm-mode__grid {
+.plan-mode {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
-  gap: 1rem;
+  grid-template-columns: 1fr 320px;
+  gap: 2rem;
+  height: 100%;
 }
 
-.note-card {
+.plan-mode__focal {
+  min-width: 0;
+  overflow-y: auto;
+}
+
+.plan-mode__sidebar {
+  border-left: 1px solid #ddd;
+  padding-left: 1.5rem;
+  padding-right: 0.5rem;
+  overflow-y: auto;
+  overflow-x: hidden;
+  min-width: 0;
+}
+
+.plot-sidebar h3 {
+  margin-top: 0;
+}
+
+.plot-sidebar__empty {
+  color: #777;
+  font-size: 0.9rem;
+}
+
+.plot-node {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  padding: 0.3rem 0.4rem;
+  border-radius: 4px;
   background: white;
   border: 1px solid #e2e2e2;
-  border-radius: 6px;
-  padding: 0.75rem;
-  display: flex;
-  flex-direction: column;
-  gap: 0.4rem;
+  margin-bottom: 0.3rem;
+  font-size: 0.9rem;
 }
 
-.note-card__body {
-  border: none;
-  resize: vertical;
-  min-height: 80px;
-  font-size: 0.95rem;
+.plot-node--category {
+  font-weight: 700;
+  background: #ece7dc;
 }
 
-.note-card__tags {
-  border: none;
-  border-top: 1px solid #eee;
-  padding-top: 0.35rem;
-  font-size: 0.8rem;
-  color: #666;
+.plot-node--plotline {
+  font-weight: 600;
 }
 
-.note-card__footer {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  gap: 0.5rem;
+.plot-node.is-dragging {
+  opacity: 0.5;
 }
 
-.note-card__footer select {
+.plot-node__handle {
+  cursor: grab;
+  color: #999;
+  user-select: none;
+}
+
+.plot-node__kind {
+  font-size: 0.6rem;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+  color: #999;
+  width: 3.6rem;
+  flex-shrink: 0;
+}
+
+.plot-node__title {
   flex: 1;
-  font-size: 0.8rem;
+  border: none;
+  background: transparent;
+  font-size: inherit;
+  font-weight: inherit;
+  padding: 0.15rem;
 }
 
-.note-card__footer button {
+.plot-node__add-toggle {
+  border: none;
+  background: transparent;
+  color: #2f4d3a;
+  font-weight: 700;
+}
+
+.plot-node__delete {
   border: none;
   background: transparent;
   color: #b00020;
+}
+
+.plot-node__plotpoint-fields {
+  margin-bottom: 0.5rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.3rem;
+  max-width: 100%;
+}
+
+.plot-node__plotpoint-fields textarea {
+  width: 100%;
+  min-height: 50px;
+  padding: 0.4rem;
+  border: 1px solid #ddd;
+  border-radius: 4px;
+  font-size: 0.85rem;
+}
+
+.plot-node__plotpoint-fields select {
+  width: 100%;
+  max-width: 100%;
+  padding: 0.3rem;
+  border: 1px solid #ccc;
+  border-radius: 4px;
   font-size: 0.8rem;
 }
 
@@ -397,15 +469,32 @@ textarea {
   margin: 0 auto;
 }
 
-.read-mode__chapter-title {
-  margin-top: 2.5rem;
-  font-size: 1.4rem;
+.read-mode__heading {
+  margin-top: 2rem;
 }
 
-.read-mode__scene-title {
-  margin-top: 1.5rem;
-  font-size: 1.1rem;
+.read-mode__heading--book {
+  font-size: 1.8rem;
+}
+
+.read-mode__heading--arc {
+  font-size: 1.5rem;
+}
+
+.read-mode__heading--chapter {
+  font-size: 1.3rem;
+}
+
+.read-mode__heading--scene {
+  font-size: 1.05rem;
   color: #555;
+}
+
+.read-mode__moment-title {
+  margin-top: 1rem;
+  font-size: 0.9rem;
+  color: #888;
+  font-weight: 500;
 }
 
 .read-mode__body {

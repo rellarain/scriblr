@@ -4,13 +4,13 @@ import type { RevisionSnapshot } from '../../types'
 
 interface Props {
   projectId: string
-  sceneId: string
+  momentId: string
   snapshot: RevisionSnapshot
 }
 
-function CommentsPanel({ projectId, sceneId, snapshot }: Props) {
-  const addComment = useAddComment(projectId, sceneId)
-  const deleteComment = useDeleteComment(projectId, sceneId)
+function CommentsPanel({ projectId, momentId, snapshot }: Props) {
+  const addComment = useAddComment(projectId, momentId)
+  const deleteComment = useDeleteComment(projectId, momentId)
 
   const [selection, setSelection] = useState<{ start: number; end: number } | null>(null)
   const [commentText, setCommentText] = useState('')

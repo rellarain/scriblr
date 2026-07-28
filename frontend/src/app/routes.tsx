@@ -1,9 +1,8 @@
 import { Navigate, Route, Routes } from 'react-router-dom'
 import ProjectPicker from '../components/shared/ProjectPicker'
 import ProjectShell from '../components/shared/ProjectShell'
-import BrainstormMode from '../modes/brainstorm/BrainstormMode'
 import DraftMode from '../modes/draft/DraftMode'
-import OutlineMode from '../modes/outline/OutlineMode'
+import PlanMode from '../modes/plan/PlanMode'
 import ReadMode from '../modes/read/ReadMode'
 import ReviseMode from '../modes/revise/ReviseMode'
 
@@ -12,14 +11,13 @@ function AppRoutes() {
     <Routes>
       <Route path="/" element={<ProjectPicker />} />
       <Route path="/project/:projectId" element={<ProjectShell />}>
-        <Route index element={<Navigate to="outline" replace />} />
-        <Route path="brainstorm" element={<BrainstormMode />} />
-        <Route path="outline" element={<OutlineMode />} />
+        <Route index element={<Navigate to="plan" replace />} />
+        <Route path="plan" element={<PlanMode />} />
         <Route path="draft" element={<DraftMode />} />
-        <Route path="draft/:sceneId" element={<DraftMode />} />
+        <Route path="draft/:momentId" element={<DraftMode />} />
         <Route path="read" element={<ReadMode />} />
         <Route path="revise" element={<ReviseMode />} />
-        <Route path="revise/:sceneId" element={<ReviseMode />} />
+        <Route path="revise/:momentId" element={<ReviseMode />} />
       </Route>
     </Routes>
   )
