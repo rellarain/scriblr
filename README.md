@@ -32,3 +32,47 @@ Backend tests:
 cd backend
 ./.venv/Scripts/python -m pytest
 ```
+
+## Running the desktop app
+
+`backend/desktop_main.py` opens Scriblr in a native OS window (via
+[pywebview](https://pywebview.flowrl.com/)) instead of a browser tab, running
+the FastAPI backend in a background thread of the same process.
+
+**Dev mode** — live-reloading frontend, run from source:
+
+```bash
+# terminal 1
+cd frontend && npm run dev
+
+# terminal 2
+cd backend
+./.venv/Scripts/pip install -e ".[dev]"
+./.venv/Scripts/python desktop_main.py --dev
+```
+
+**Prod mode** — same window, but the backend serves the built frontend
+itself (no Node/Vite needed at runtime):
+
+```bash
+cd frontend && npm run build
+cd ../backend && ./.venv/Scripts/python desktop_main.py
+```
+
+**Packaged build** — a single distributable `.exe` with no Python or Node
+install required on the target machine:
+
+```bash
+cd frontend && npm run build
+cd ../backend
+./.venv/Scripts/pip install -e ".[dev]"
+./.venv/Scripts/python -m PyInstaller scriblr.spec --noconfirm
+```
+
+Produces `backend/dist/Scriblr.exe`. Double-click it (or run it from a
+shell) to launch — it needs no arguments and no other files alongside it,
+since the built frontend is bundled inside. Closing the window shuts the
+backend down cleanly; no process is left running. Project data is stored
+per-OS under the standard app-data directory (`%APPDATA%\Scriblr` on
+Windows), independent of wherever the `.exe` itself lives, so rebuilding
+or moving it never touches existing projects.
