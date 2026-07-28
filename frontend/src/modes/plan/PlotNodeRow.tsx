@@ -6,8 +6,10 @@ import type { OutlineNode, PlotNode, PlotNodeKind } from '../../types'
 
 interface Props {
   node: PlotNode
-  depth: number
   levels: PlotNodeKind[]
+  hasChildren: boolean
+  collapsed: boolean
+  onToggleCollapse: (nodeId: string) => void
   moments: OutlineNode[]
   onRename: (nodeId: string, title: string) => void
   onDelete: (node: PlotNode) => void
@@ -22,8 +24,10 @@ interface Props {
 
 function PlotNodeRow({
   node,
-  depth,
   levels,
+  hasChildren,
+  collapsed,
+  onToggleCollapse,
   moments,
   onRename,
   onDelete,
@@ -44,7 +48,6 @@ function PlotNodeRow({
   const style = {
     transform: CSS.Transform.toString(transform),
     transition,
-    marginLeft: `${depth * 1.25}rem`,
   }
 
   function handleKeyDown(e: React.KeyboardEvent<HTMLInputElement>) {
@@ -69,18 +72,29 @@ function PlotNodeRow({
         style={style}
         className={`plot-node plot-node--${node.kind}${isDragging ? ' is-dragging' : ''}`}
       >
+        <button
+          type="button"
+          className={`plot-node__toggle${hasChildren ? '' : ' plot-node__toggle--empty'}`}
+          onClick={() => hasChildren && onToggleCollapse(node.id)}
+          tabIndex={-1}
+          aria-label={collapsed ? 'Expand' : 'Collapse'}
+        >
+          {hasChildren ? (collapsed ? '▸' : '▾') : ''}
+        </button>
         <span className="plot-node__handle" {...attributes} {...listeners}>
           ⠿
         </span>
-        <span className="plot-node__kind">{node.kind}</span>
-        <input
-          ref={(el) => registerInput(node.id, el)}
-          className="plot-node__title"
-          value={node.title}
-          placeholder="Untitled"
-          onChange={(e) => onRename(node.id, e.target.value)}
-          onKeyDown={handleKeyDown}
-        />
+        <div className="plot-node__main">
+          <span className="plot-node__kind">{node.kind}</span>
+          <input
+            ref={(el) => registerInput(node.id, el)}
+            className="plot-node__title"
+            value={node.title}
+            placeholder="Untitled"
+            onChange={(e) => onRename(node.id, e.target.value)}
+            onKeyDown={handleKeyDown}
+          />
+        </div>
         {canAddChild && (
           <button type="button" className="plot-node__add-toggle" onClick={() => onAddChild(node)}>
             +
@@ -92,7 +106,7 @@ function PlotNodeRow({
       </div>
 
       {node.kind === 'plotpoint' && (
-        <div className="plot-node__plotpoint-fields" style={{ marginLeft: `${depth * 1.25}rem` }}>
+        <div className="plot-node__plotpoint-fields">
           <textarea
             placeholder="What happens…"
             value={node.body}

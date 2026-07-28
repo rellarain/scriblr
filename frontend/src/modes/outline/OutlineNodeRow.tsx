@@ -6,8 +6,10 @@ import type { OutlineNode, OutlineNodeKind } from '../../types'
 
 interface Props {
   node: OutlineNode
-  depth: number
   levels: OutlineNodeKind[]
+  hasChildren: boolean
+  collapsed: boolean
+  onToggleCollapse: (nodeId: string) => void
   onRename: (nodeId: string, title: string) => void
   onDelete: (node: OutlineNode) => void
   onAddChild: (node: OutlineNode) => void
@@ -20,8 +22,10 @@ interface Props {
 
 function OutlineNodeRow({
   node,
-  depth,
   levels,
+  hasChildren,
+  collapsed,
+  onToggleCollapse,
   onRename,
   onDelete,
   onAddChild,
@@ -40,7 +44,6 @@ function OutlineNodeRow({
   const style = {
     transform: CSS.Transform.toString(transform),
     transition,
-    marginLeft: `${depth * 1.25}rem`,
   }
 
   function handleKeyDown(e: React.KeyboardEvent<HTMLInputElement>) {
@@ -64,18 +67,29 @@ function OutlineNodeRow({
       style={style}
       className={`outline-node outline-node--${node.kind}${isDragging ? ' is-dragging' : ''}`}
     >
+      <button
+        type="button"
+        className={`outline-node__toggle${hasChildren ? '' : ' outline-node__toggle--empty'}`}
+        onClick={() => hasChildren && onToggleCollapse(node.id)}
+        tabIndex={-1}
+        aria-label={collapsed ? 'Expand' : 'Collapse'}
+      >
+        {hasChildren ? (collapsed ? '▸' : '▾') : ''}
+      </button>
       <span className="outline-node__handle" {...attributes} {...listeners}>
         ⠿
       </span>
-      <span className="outline-node__kind">{node.kind}</span>
-      <input
-        ref={(el) => registerInput(node.id, el)}
-        className="outline-node__title"
-        value={node.title}
-        placeholder="Untitled"
-        onChange={(e) => onRename(node.id, e.target.value)}
-        onKeyDown={handleKeyDown}
-      />
+      <div className="outline-node__main">
+        <span className="outline-node__kind">{node.kind}</span>
+        <input
+          ref={(el) => registerInput(node.id, el)}
+          className="outline-node__title"
+          value={node.title}
+          placeholder="Untitled"
+          onChange={(e) => onRename(node.id, e.target.value)}
+          onKeyDown={handleKeyDown}
+        />
+      </div>
       {canAddChild && (
         <button type="button" className="outline-node__add-toggle" onClick={() => onAddChild(node)}>
           +

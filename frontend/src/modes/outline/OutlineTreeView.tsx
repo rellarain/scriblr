@@ -8,8 +8,9 @@ import { getChildren } from './outlineTree'
 interface Props {
   nodes: OutlineNode[]
   parentId: string | null
-  depth: number
   levels: OutlineNodeKind[]
+  collapsedIds: Set<string>
+  onToggleCollapse: (nodeId: string) => void
   onRename: (nodeId: string, title: string) => void
   onDelete: (node: OutlineNode) => void
   onAddChild: (node: OutlineNode) => void
@@ -24,8 +25,9 @@ interface Props {
 function OutlineTreeView({
   nodes,
   parentId,
-  depth,
   levels,
+  collapsedIds,
+  onToggleCollapse,
   onRename,
   onDelete,
   onAddChild,
@@ -54,38 +56,49 @@ function OutlineTreeView({
   return (
     <DndContext sensors={sensors} onDragEnd={handleDragEnd}>
       <SortableContext items={children.map((c) => c.id)} strategy={verticalListSortingStrategy}>
-        {children.map((child) => (
-          <div key={child.id}>
-            <OutlineNodeRow
-              node={child}
-              depth={depth}
-              levels={levels}
-              onRename={onRename}
-              onDelete={onDelete}
-              onAddChild={onAddChild}
-              onNextSibling={onNextSibling}
-              onPreviousSibling={onPreviousSibling}
-              onEnter={onEnter}
-              onNavigateToParent={onNavigateToParent}
-              registerInput={registerInput}
-            />
-            <OutlineTreeView
-              nodes={nodes}
-              parentId={child.id}
-              depth={depth + 1}
-              levels={levels}
-              onRename={onRename}
-              onDelete={onDelete}
-              onAddChild={onAddChild}
-              onNextSibling={onNextSibling}
-              onPreviousSibling={onPreviousSibling}
-              onEnter={onEnter}
-              onNavigateToParent={onNavigateToParent}
-              registerInput={registerInput}
-              onReorder={onReorder}
-            />
-          </div>
-        ))}
+        {children.map((child) => {
+          const childHasChildren = getChildren(nodes, child.id).length > 0
+          const isCollapsed = collapsedIds.has(child.id)
+          return (
+            <div key={child.id} className="outline-node__branch">
+              <OutlineNodeRow
+                node={child}
+                levels={levels}
+                hasChildren={childHasChildren}
+                collapsed={isCollapsed}
+                onToggleCollapse={onToggleCollapse}
+                onRename={onRename}
+                onDelete={onDelete}
+                onAddChild={onAddChild}
+                onNextSibling={onNextSibling}
+                onPreviousSibling={onPreviousSibling}
+                onEnter={onEnter}
+                onNavigateToParent={onNavigateToParent}
+                registerInput={registerInput}
+              />
+              {childHasChildren && !isCollapsed && (
+                <div className="outline-node__children">
+                  <OutlineTreeView
+                    nodes={nodes}
+                    parentId={child.id}
+                    levels={levels}
+                    collapsedIds={collapsedIds}
+                    onToggleCollapse={onToggleCollapse}
+                    onRename={onRename}
+                    onDelete={onDelete}
+                    onAddChild={onAddChild}
+                    onNextSibling={onNextSibling}
+                    onPreviousSibling={onPreviousSibling}
+                    onEnter={onEnter}
+                    onNavigateToParent={onNavigateToParent}
+                    registerInput={registerInput}
+                    onReorder={onReorder}
+                  />
+                </div>
+              )}
+            </div>
+          )
+        })}
       </SortableContext>
     </DndContext>
   )

@@ -8,8 +8,9 @@ import { getChildren } from './plotTree'
 interface Props {
   nodes: PlotNode[]
   parentId: string | null
-  depth: number
   levels: PlotNodeKind[]
+  collapsedIds: Set<string>
+  onToggleCollapse: (nodeId: string) => void
   moments: OutlineNode[]
   onRename: (nodeId: string, title: string) => void
   onDelete: (node: PlotNode) => void
@@ -26,8 +27,9 @@ interface Props {
 function PlotTreeView({
   nodes,
   parentId,
-  depth,
   levels,
+  collapsedIds,
+  onToggleCollapse,
   moments,
   onRename,
   onDelete,
@@ -58,42 +60,53 @@ function PlotTreeView({
   return (
     <DndContext sensors={sensors} onDragEnd={handleDragEnd}>
       <SortableContext items={children.map((c) => c.id)} strategy={verticalListSortingStrategy}>
-        {children.map((child) => (
-          <div key={child.id}>
-            <PlotNodeRow
-              node={child}
-              depth={depth}
-              levels={levels}
-              moments={moments}
-              onRename={onRename}
-              onDelete={onDelete}
-              onAddChild={onAddChild}
-              onNextSibling={onNextSibling}
-              onPreviousSibling={onPreviousSibling}
-              onEnter={onEnter}
-              onNavigateToParent={onNavigateToParent}
-              onUpdatePlotpoint={onUpdatePlotpoint}
-              registerInput={registerInput}
-            />
-            <PlotTreeView
-              nodes={nodes}
-              parentId={child.id}
-              depth={depth + 1}
-              levels={levels}
-              moments={moments}
-              onRename={onRename}
-              onDelete={onDelete}
-              onAddChild={onAddChild}
-              onNextSibling={onNextSibling}
-              onPreviousSibling={onPreviousSibling}
-              onEnter={onEnter}
-              onNavigateToParent={onNavigateToParent}
-              onUpdatePlotpoint={onUpdatePlotpoint}
-              registerInput={registerInput}
-              onReorder={onReorder}
-            />
-          </div>
-        ))}
+        {children.map((child) => {
+          const childHasChildren = getChildren(nodes, child.id).length > 0
+          const isCollapsed = collapsedIds.has(child.id)
+          return (
+            <div key={child.id} className="plot-node__branch">
+              <PlotNodeRow
+                node={child}
+                levels={levels}
+                hasChildren={childHasChildren}
+                collapsed={isCollapsed}
+                onToggleCollapse={onToggleCollapse}
+                moments={moments}
+                onRename={onRename}
+                onDelete={onDelete}
+                onAddChild={onAddChild}
+                onNextSibling={onNextSibling}
+                onPreviousSibling={onPreviousSibling}
+                onEnter={onEnter}
+                onNavigateToParent={onNavigateToParent}
+                onUpdatePlotpoint={onUpdatePlotpoint}
+                registerInput={registerInput}
+              />
+              {childHasChildren && !isCollapsed && (
+                <div className="plot-node__children">
+                  <PlotTreeView
+                    nodes={nodes}
+                    parentId={child.id}
+                    levels={levels}
+                    collapsedIds={collapsedIds}
+                    onToggleCollapse={onToggleCollapse}
+                    moments={moments}
+                    onRename={onRename}
+                    onDelete={onDelete}
+                    onAddChild={onAddChild}
+                    onNextSibling={onNextSibling}
+                    onPreviousSibling={onPreviousSibling}
+                    onEnter={onEnter}
+                    onNavigateToParent={onNavigateToParent}
+                    onUpdatePlotpoint={onUpdatePlotpoint}
+                    registerInput={registerInput}
+                    onReorder={onReorder}
+                  />
+                </div>
+              )}
+            </div>
+          )
+        })}
       </SortableContext>
     </DndContext>
   )

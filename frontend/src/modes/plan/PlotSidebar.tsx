@@ -39,6 +39,7 @@ function PlotSidebar() {
   const [nodes, setNodes] = useState<PlotNode[]>([])
   const [newCategoryTitle, setNewCategoryTitle] = useState('')
   const [pendingFocus, setPendingFocus] = useState<string | null>(null)
+  const [collapsedIds, setCollapsedIds] = useState<Set<string>>(new Set())
   const schemaVersionRef = useRef(1)
   const nodesRef = useRef<PlotNode[]>([])
   const saveTimeout = useRef<ReturnType<typeof setTimeout>>()
@@ -69,6 +70,15 @@ function PlotSidebar() {
   const registerInput = useCallback((nodeId: string, el: HTMLInputElement | null) => {
     inputRefs.current[nodeId] = el
   }, [])
+
+  function handleToggleCollapse(nodeId: string) {
+    setCollapsedIds((prev) => {
+      const next = new Set(prev)
+      if (next.has(nodeId)) next.delete(nodeId)
+      else next.add(nodeId)
+      return next
+    })
+  }
 
   const moments = getAllMoments(outline?.nodes ?? [])
 
@@ -221,8 +231,9 @@ function PlotSidebar() {
       <PlotTreeView
         nodes={nodes}
         parentId={null}
-        depth={0}
         levels={levels}
+        collapsedIds={collapsedIds}
+        onToggleCollapse={handleToggleCollapse}
         moments={moments}
         onRename={handleRename}
         onDelete={handleDelete}

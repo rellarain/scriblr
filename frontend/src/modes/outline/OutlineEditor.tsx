@@ -35,6 +35,7 @@ function OutlineEditor() {
   const [nodes, setNodes] = useState<OutlineNode[]>([])
   const [newBookTitle, setNewBookTitle] = useState('')
   const [pendingFocus, setPendingFocus] = useState<string | null>(null)
+  const [collapsedIds, setCollapsedIds] = useState<Set<string>>(new Set())
   const schemaVersionRef = useRef(1)
   const nodesRef = useRef<OutlineNode[]>([])
   const saveTimeout = useRef<ReturnType<typeof setTimeout>>()
@@ -69,6 +70,15 @@ function OutlineEditor() {
   const registerInput = useCallback((nodeId: string, el: HTMLInputElement | null) => {
     inputRefs.current[nodeId] = el
   }, [])
+
+  function handleToggleCollapse(nodeId: string) {
+    setCollapsedIds((prev) => {
+      const next = new Set(prev)
+      if (next.has(nodeId)) next.delete(nodeId)
+      else next.add(nodeId)
+      return next
+    })
+  }
 
   function saveNow(next: OutlineNode[]) {
     if (saveTimeout.current) clearTimeout(saveTimeout.current)
@@ -208,8 +218,9 @@ function OutlineEditor() {
       <OutlineTreeView
         nodes={nodes}
         parentId={null}
-        depth={0}
         levels={levels}
+        collapsedIds={collapsedIds}
+        onToggleCollapse={handleToggleCollapse}
         onRename={handleRename}
         onDelete={handleDelete}
         onAddChild={handleAddChild}
