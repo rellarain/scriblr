@@ -22,6 +22,16 @@ function SceneEditor({ projectId, sceneId, title }: Props) {
   const bodyRef = useRef('')
   const saveTimeout = useRef<ReturnType<typeof setTimeout>>()
   const [dirty, setDirty] = useState(false)
+  const dirtyRef = useRef(false)
+  const saveDraftRef = useRef(saveDraft)
+
+  useEffect(() => {
+    saveDraftRef.current = saveDraft
+  }, [saveDraft])
+
+  useEffect(() => {
+    dirtyRef.current = dirty
+  }, [dirty])
 
   useEffect(() => {
     if (data) {
@@ -29,7 +39,19 @@ function SceneEditor({ projectId, sceneId, title }: Props) {
       bodyRef.current = data.body
       setDirty(false)
     }
-  }, [data, sceneId])
+  }, [data])
+
+  // Flush any unsaved edit if this scene is closed (switched away from, or
+  // navigated off) before the debounce timer fires — otherwise a fast
+  // scene-switch silently drops the pending change.
+  useEffect(() => {
+    return () => {
+      if (saveTimeout.current) clearTimeout(saveTimeout.current)
+      if (dirtyRef.current) {
+        saveDraftRef.current.mutate(bodyRef.current)
+      }
+    }
+  }, [])
 
   function handleChange(value: string) {
     setBody(value)

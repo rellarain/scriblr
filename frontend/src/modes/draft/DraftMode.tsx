@@ -40,7 +40,12 @@ function DraftMode() {
       </aside>
       <div className="draft-mode__editor">
         {projectId && selectedScene ? (
-          <SceneEditor projectId={projectId} sceneId={selectedScene.id} title={selectedScene.title} />
+          <SceneEditor
+            key={selectedScene.id}
+            projectId={projectId}
+            sceneId={selectedScene.id}
+            title={selectedScene.title}
+          />
         ) : (
           <p>Select a scene from the list to start writing.</p>
         )}
