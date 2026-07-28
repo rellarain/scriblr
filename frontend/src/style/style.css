@@ -236,3 +236,79 @@ textarea {
   background: transparent;
   color: #b00020;
 }
+
+/* Draft mode */
+
+.draft-mode {
+  display: grid;
+  grid-template-columns: 220px 1fr;
+  gap: 1.5rem;
+  height: 100%;
+}
+
+.draft-mode__scenes {
+  overflow-y: auto;
+}
+
+.draft-mode__chapter-title {
+  font-weight: 700;
+  margin: 1rem 0 0.25rem;
+}
+
+.draft-mode__scene-link {
+  display: block;
+  width: 100%;
+  text-align: left;
+  border: none;
+  background: transparent;
+  padding: 0.35rem 0.5rem;
+  border-radius: 4px;
+  color: #333;
+}
+
+.draft-mode__scene-link.is-active {
+  background: #2f4d3a;
+  color: white;
+}
+
+.draft-mode__editor {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+}
+
+.scene-editor {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  max-width: 720px;
+}
+
+.scene-editor__header {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  margin-bottom: 0.5rem;
+}
+
+.scene-editor__status {
+  font-size: 0.8rem;
+  color: #777;
+}
+
+.scene-editor__textarea {
+  flex: 1;
+  min-height: 400px;
+  padding: 1rem;
+  border: 1px solid #ddd;
+  border-radius: 6px;
+  font-size: 1rem;
+  line-height: 1.6;
+  resize: vertical;
+}
+
+.scene-editor__word-count {
+  margin-top: 0.5rem;
+  color: #777;
+  font-size: 0.85rem;
+}
