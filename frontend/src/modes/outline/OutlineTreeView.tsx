@@ -9,9 +9,12 @@ interface Props {
   nodes: OutlineNode[]
   parentId: string | null
   depth: number
+  levels: OutlineNodeKind[]
   onRename: (nodeId: string, title: string) => void
   onDelete: (nodeId: string) => void
-  onAddChild: (parentId: string, kind: OutlineNodeKind, title: string) => void
+  onTab: (node: OutlineNode) => void
+  onEnter: (node: OutlineNode) => void
+  registerInput: (nodeId: string, el: HTMLInputElement | null) => void
   onReorder: (parentId: string | null, orderedIds: string[]) => void
 }
 
@@ -19,9 +22,12 @@ function OutlineTreeView({
   nodes,
   parentId,
   depth,
+  levels,
   onRename,
   onDelete,
-  onAddChild,
+  onTab,
+  onEnter,
+  registerInput,
   onReorder,
 }: Props) {
   const sensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 4 } }))
@@ -47,17 +53,23 @@ function OutlineTreeView({
             <OutlineNodeRow
               node={child}
               depth={depth}
+              levels={levels}
               onRename={onRename}
               onDelete={onDelete}
-              onAddChild={onAddChild}
+              onTab={onTab}
+              onEnter={onEnter}
+              registerInput={registerInput}
             />
             <OutlineTreeView
               nodes={nodes}
               parentId={child.id}
               depth={depth + 1}
+              levels={levels}
               onRename={onRename}
               onDelete={onDelete}
-              onAddChild={onAddChild}
+              onTab={onTab}
+              onEnter={onEnter}
+              registerInput={registerInput}
               onReorder={onReorder}
             />
           </div>

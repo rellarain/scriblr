@@ -2,6 +2,11 @@
   box-sizing: border-box;
 }
 
+:root {
+  --accent: #7a3b58;
+  --accent-light: #f3e6ec;
+}
+
 html,
 body {
   margin: 0;
@@ -58,7 +63,7 @@ textarea {
   padding: 0.5rem 1rem;
   border: none;
   border-radius: 4px;
-  background-color: #2f4d3a;
+  background-color: var(--accent);
   color: white;
 }
 
@@ -83,7 +88,7 @@ textarea {
 }
 
 .project-picker__item:hover {
-  border-color: #2f4d3a;
+  border-color: var(--accent);
 }
 
 .project-picker__empty {
@@ -132,7 +137,7 @@ textarea {
 }
 
 .project-shell__nav-link.is-active {
-  background-color: #2f4d3a;
+  background-color: var(--accent);
   color: white;
 }
 
@@ -174,8 +179,43 @@ textarea {
   padding: 0.4rem 0.9rem;
   border: none;
   border-radius: 4px;
-  background-color: #2f4d3a;
+  background-color: var(--accent);
   color: white;
+}
+
+.level-config {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 0.75rem;
+  margin-bottom: 0.75rem;
+  font-size: 0.8rem;
+  color: #666;
+}
+
+.level-config__label {
+  font-weight: 600;
+}
+
+.level-config__option {
+  display: flex;
+  align-items: center;
+  gap: 0.25rem;
+  text-transform: capitalize;
+  cursor: pointer;
+}
+
+.level-config__option input[type='checkbox'] {
+  cursor: pointer;
+}
+
+.level-config__option input[type='checkbox']:disabled {
+  cursor: default;
+}
+
+.outline-editor__error,
+.plot-sidebar__error {
+  color: #b00020;
 }
 
 .outline-node {
@@ -231,14 +271,14 @@ textarea {
 }
 
 .outline-node__title:focus {
-  outline: 1px solid #2f4d3a;
+  outline: 1px solid var(--accent);
   background: white;
 }
 
 .outline-node__add-toggle {
   border: none;
   background: transparent;
-  color: #2f4d3a;
+  color: var(--accent);
   font-weight: 700;
 }
 
@@ -276,7 +316,7 @@ textarea {
   padding: 0.3rem 0.6rem;
   border: none;
   border-radius: 4px;
-  background-color: #2f4d3a;
+  background-color: var(--accent);
   color: white;
   font-size: 0.85rem;
   white-space: nowrap;
@@ -317,7 +357,7 @@ textarea {
 }
 
 .moment-picker__moment.is-active {
-  background: #2f4d3a;
+  background: var(--accent);
   color: white;
 }
 
@@ -390,6 +430,31 @@ textarea {
   margin-top: 0;
 }
 
+.plot-sidebar__add-category {
+  display: flex;
+  gap: 0.4rem;
+  margin-bottom: 0.75rem;
+}
+
+.plot-sidebar__add-category input {
+  flex: 1;
+  min-width: 0;
+  padding: 0.35rem 0.5rem;
+  border: 1px solid #ccc;
+  border-radius: 4px;
+  font-size: 0.85rem;
+}
+
+.plot-sidebar__add-category button {
+  padding: 0.35rem 0.7rem;
+  border: none;
+  border-radius: 4px;
+  background-color: var(--accent);
+  color: white;
+  font-size: 0.85rem;
+  white-space: nowrap;
+}
+
 .plot-sidebar__empty {
   color: #777;
   font-size: 0.9rem;
@@ -447,7 +512,7 @@ textarea {
 .plot-node__add-toggle {
   border: none;
   background: transparent;
-  color: #2f4d3a;
+  color: var(--accent);
   font-weight: 700;
 }
 
@@ -555,7 +620,7 @@ textarea {
   padding: 0.4rem 0.9rem;
   border: none;
   border-radius: 4px;
-  background-color: #2f4d3a;
+  background-color: var(--accent);
   color: white;
 }
 
@@ -586,8 +651,8 @@ textarea {
 }
 
 .scene-revisions__snapshot.is-active {
-  border-color: #2f4d3a;
-  background: #eaf1ec;
+  border-color: var(--accent);
+  background: var(--accent-light);
 }
 
 .scene-revisions__snapshot-label {

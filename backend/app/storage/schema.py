@@ -10,6 +10,19 @@ def utcnow() -> datetime:
     return datetime.now(timezone.utc)
 
 
+# Structural depth, shallowest first. Nesting is flexible: a node's parent
+# may be any node of a strictly shallower kind, not necessarily the adjacent
+# one (e.g. a scene may nest directly under a book, skipping arc/chapter).
+OutlineNodeKind = Literal["book", "arc", "chapter", "scene", "moment"]
+OUTLINE_KIND_ORDER: list[OutlineNodeKind] = ["book", "arc", "chapter", "scene", "moment"]
+
+# Plot tree: category -> plotline -> plotpoint, mirroring the outline tree's
+# flat-list-with-parentId shape. Plotpoints are the leaf/content unit and may
+# be assigned to a moment in the outline tree.
+PlotNodeKind = Literal["category", "plotline", "plotpoint"]
+PLOT_KIND_ORDER: list[PlotNodeKind] = ["category", "plotline", "plotpoint"]
+
+
 class ProjectManifest(BaseModel):
     outline: str = "outline/tree.json"
     plot: str = "brainstorm/plot.json"
@@ -19,6 +32,13 @@ class ProjectManifest(BaseModel):
 
 class ProjectSettings(BaseModel):
     wordCountTarget: Optional[int] = None
+    # Which structural levels this project uses, and in what order. Governs
+    # what kind a new node gets when created via Tab (child)/Enter (sibling)
+    # in the Plan UI -- new nodes no longer have their kind picked manually.
+    # A subset of OUTLINE_KIND_ORDER/PLOT_KIND_ORDER, in the same relative
+    # order; "book" and "category" are always included as the required roots.
+    outlineLevels: list[OutlineNodeKind] = Field(default_factory=lambda: list(OUTLINE_KIND_ORDER))
+    plotLevels: list[PlotNodeKind] = Field(default_factory=lambda: list(PLOT_KIND_ORDER))
 
 
 class ProjectIndex(BaseModel):
@@ -29,13 +49,6 @@ class ProjectIndex(BaseModel):
     updatedAt: datetime
     settings: ProjectSettings = Field(default_factory=ProjectSettings)
     manifest: ProjectManifest = Field(default_factory=ProjectManifest)
-
-
-# Structural depth, shallowest first. Nesting is flexible: a node's parent
-# may be any node of a strictly shallower kind, not necessarily the adjacent
-# one (e.g. a scene may nest directly under a book, skipping arc/chapter).
-OutlineNodeKind = Literal["book", "arc", "chapter", "scene", "moment"]
-OUTLINE_KIND_ORDER: list[OutlineNodeKind] = ["book", "arc", "chapter", "scene", "moment"]
 
 
 class OutlineNode(BaseModel):
@@ -56,13 +69,6 @@ class OutlineNode(BaseModel):
 class OutlineTree(BaseModel):
     schemaVersion: int = SCHEMA_VERSION
     nodes: list[OutlineNode] = Field(default_factory=list)
-
-
-# Plot tree: category -> plotline -> plotpoint, mirroring the outline tree's
-# flat-list-with-parentId shape. Plotpoints are the leaf/content unit and may
-# be assigned to a moment in the outline tree.
-PlotNodeKind = Literal["category", "plotline", "plotpoint"]
-PLOT_KIND_ORDER: list[PlotNodeKind] = ["category", "plotline", "plotpoint"]
 
 
 class PlotNode(BaseModel):

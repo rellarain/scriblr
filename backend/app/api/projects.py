@@ -46,6 +46,10 @@ def update_project(
         index.title = body.title
     if body.wordCountTarget is not None:
         index.settings.wordCountTarget = body.wordCountTarget
+    if body.outlineLevels is not None:
+        index.settings.outlineLevels = body.outlineLevels
+    if body.plotLevels is not None:
+        index.settings.plotLevels = body.plotLevels
     index.updatedAt = utcnow()
     store.save_index(root, index)
     return index

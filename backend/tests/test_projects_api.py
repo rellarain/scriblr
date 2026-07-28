@@ -36,6 +36,24 @@ def test_update_project_metadata(client: TestClient) -> None:
     assert body["settings"]["wordCountTarget"] == 50000
 
 
+def test_project_defaults_to_all_levels_and_can_be_customized(client: TestClient) -> None:
+    project_id = client.post("/api/projects", json={"title": "Levels Test"}).json()["projectId"]
+
+    resp = client.get(f"/api/projects/{project_id}")
+    settings = resp.json()["index"]["settings"]
+    assert settings["outlineLevels"] == ["book", "arc", "chapter", "scene", "moment"]
+    assert settings["plotLevels"] == ["category", "plotline", "plotpoint"]
+
+    resp = client.patch(
+        f"/api/projects/{project_id}",
+        json={"outlineLevels": ["book", "chapter", "scene"], "plotLevels": ["category", "plotpoint"]},
+    )
+    assert resp.status_code == 200
+    body = resp.json()
+    assert body["settings"]["outlineLevels"] == ["book", "chapter", "scene"]
+    assert body["settings"]["plotLevels"] == ["category", "plotpoint"]
+
+
 def test_delete_project(client: TestClient, storage_root: Path) -> None:
     project_id = client.post("/api/projects", json={"title": "Temp"}).json()["projectId"]
 

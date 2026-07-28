@@ -7,6 +7,8 @@ export interface ProjectManifest {
 
 export interface ProjectSettings {
   wordCountTarget: number | null
+  outlineLevels: OutlineNodeKind[]
+  plotLevels: PlotNodeKind[]
 }
 
 export interface ProjectIndex {

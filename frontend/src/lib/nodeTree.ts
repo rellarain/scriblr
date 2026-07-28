@@ -73,3 +73,40 @@ export function depthFirstOrder<T extends TreeNodeBase>(nodes: T[], rootId: stri
   visit(rootId)
   return result
 }
+
+/**
+ * Inserts `newNode` as the next sibling immediately after `afterNodeId`,
+ * renumbering that sibling group's `order` to match. Used for Enter-creates-
+ * sibling in the keyboard-driven Plan editors.
+ */
+export function insertSiblingAfter<T extends TreeNodeBase>(
+  nodes: T[],
+  afterNodeId: string,
+  newNode: T
+): T[] {
+  const after = nodes.find((n) => n.id === afterNodeId)
+  const parentId = after ? after.parentId : null
+  const siblings = getChildren(nodes, parentId)
+  const idx = siblings.findIndex((s) => s.id === afterNodeId)
+  const orderedIds = siblings.map((s) => s.id)
+  orderedIds.splice(idx + 1, 0, newNode.id)
+  return reorderSiblings([...nodes, newNode], orderedIds)
+}
+
+/**
+ * The next kind after `kind` in `levels` (the project's configured level
+ * sequence), or undefined if `kind` is already the deepest configured level.
+ * Falls back to `fallbackOrder` (the full canonical kind order) if `kind`
+ * isn't present in `levels` at all -- e.g. a node created before the
+ * project's level settings were narrowed to exclude its kind.
+ */
+export function nextKindInLevels<K extends string>(
+  levels: K[],
+  kind: K,
+  fallbackOrder: K[]
+): K | undefined {
+  const idx = levels.indexOf(kind)
+  if (idx !== -1) return levels[idx + 1]
+  const fallbackIdx = fallbackOrder.indexOf(kind)
+  return fallbackIdx === -1 ? undefined : fallbackOrder[fallbackIdx + 1]
+}

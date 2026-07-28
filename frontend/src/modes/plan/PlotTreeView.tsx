@@ -9,11 +9,14 @@ interface Props {
   nodes: PlotNode[]
   parentId: string | null
   depth: number
+  levels: PlotNodeKind[]
   moments: OutlineNode[]
   onRename: (nodeId: string, title: string) => void
   onDelete: (nodeId: string) => void
-  onAddChild: (parentId: string, kind: PlotNodeKind, title: string) => void
+  onTab: (node: PlotNode) => void
+  onEnter: (node: PlotNode) => void
   onUpdatePlotpoint: (nodeId: string, patch: { body?: string; assignedMomentId?: string | null }) => void
+  registerInput: (nodeId: string, el: HTMLInputElement | null) => void
   onReorder: (orderedIds: string[]) => void
 }
 
@@ -21,11 +24,14 @@ function PlotTreeView({
   nodes,
   parentId,
   depth,
+  levels,
   moments,
   onRename,
   onDelete,
-  onAddChild,
+  onTab,
+  onEnter,
   onUpdatePlotpoint,
+  registerInput,
   onReorder,
 }: Props) {
   const sensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 4 } }))
@@ -51,21 +57,27 @@ function PlotTreeView({
             <PlotNodeRow
               node={child}
               depth={depth}
+              levels={levels}
               moments={moments}
               onRename={onRename}
               onDelete={onDelete}
-              onAddChild={onAddChild}
+              onTab={onTab}
+              onEnter={onEnter}
               onUpdatePlotpoint={onUpdatePlotpoint}
+              registerInput={registerInput}
             />
             <PlotTreeView
               nodes={nodes}
               parentId={child.id}
               depth={depth + 1}
+              levels={levels}
               moments={moments}
               onRename={onRename}
               onDelete={onDelete}
-              onAddChild={onAddChild}
+              onTab={onTab}
+              onEnter={onEnter}
               onUpdatePlotpoint={onUpdatePlotpoint}
+              registerInput={registerInput}
               onReorder={onReorder}
             />
           </div>

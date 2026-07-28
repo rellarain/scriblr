@@ -6,6 +6,10 @@ export function getCategories(nodes: PlotNode[]): PlotNode[] {
   return tree.getRoots(nodes)
 }
 
+export function addCategory(nodes: PlotNode[], title: string): PlotNode[] {
+  return addNode(nodes, null, 'category', title)
+}
+
 export function getChildren(nodes: PlotNode[], parentId: string | null): PlotNode[] {
   return tree.getChildren(nodes, parentId)
 }
@@ -52,4 +56,34 @@ export function removeNode(nodes: PlotNode[], nodeId: string): PlotNode[] {
 
 export function reorderSiblings(nodes: PlotNode[], orderedIds: string[]): PlotNode[] {
   return tree.reorderSiblings(nodes, orderedIds)
+}
+
+function makeNode(kind: PlotNodeKind, parentId: string | null, order: number): PlotNode {
+  const id = `${kind}_${crypto.randomUUID().slice(0, 8)}`
+  return { id, kind, parentId, order, title: '', body: '', assignedMomentId: null }
+}
+
+/**
+ * Creates a new empty child under `parent`, its kind taken from the
+ * project's configured `levels`. Returns null if parent's kind is already
+ * the deepest configured level -- i.e. Tab is a no-op there.
+ */
+export function createChildNode(
+  nodes: PlotNode[],
+  levels: PlotNodeKind[],
+  parent: PlotNode
+): { nodes: PlotNode[]; newNode: PlotNode } | null {
+  const kind = tree.nextKindInLevels(levels, parent.kind, PLOT_KIND_ORDER)
+  if (!kind) return null
+  const newNode = makeNode(kind, parent.id, tree.nextOrder(nodes, parent.id))
+  return { nodes: [...nodes, newNode], newNode }
+}
+
+/** Creates a new empty sibling immediately after `afterNode`, same kind. */
+export function createSiblingNode(
+  nodes: PlotNode[],
+  afterNode: PlotNode
+): { nodes: PlotNode[]; newNode: PlotNode } {
+  const newNode = makeNode(afterNode.kind, afterNode.parentId, 0)
+  return { nodes: tree.insertSiblingAfter(nodes, afterNode.id, newNode), newNode }
 }

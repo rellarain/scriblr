@@ -2,7 +2,7 @@ from typing import Literal, Optional
 
 from pydantic import BaseModel
 
-from ..storage.schema import OutlineTree, PlotTree, ProjectIndex
+from ..storage.schema import OutlineNodeKind, OutlineTree, PlotNodeKind, PlotTree, ProjectIndex
 
 
 class CreateProjectRequest(BaseModel):
@@ -12,6 +12,8 @@ class CreateProjectRequest(BaseModel):
 class UpdateProjectRequest(BaseModel):
     title: Optional[str] = None
     wordCountTarget: Optional[int] = None
+    outlineLevels: Optional[list[OutlineNodeKind]] = None
+    plotLevels: Optional[list[PlotNodeKind]] = None
 
 
 class ProjectSummaryResponse(BaseModel):

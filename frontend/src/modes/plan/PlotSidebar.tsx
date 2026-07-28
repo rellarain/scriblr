@@ -1,25 +1,33 @@
-import { useEffect, useRef, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import { useParams } from 'react-router-dom'
 import { useOutline } from '../../api/outline'
 import { usePlot, useSavePlot } from '../../api/plot'
+import { useProject, useUpdateProject } from '../../api/projects'
+import { PLOT_KIND_ORDER } from '../../types'
 import type { PlotNode, PlotNodeKind, PlotTree } from '../../types'
 import { getAllMoments } from '../outline/outlineTree'
-import PlotAddChildForm from './PlotAddChildForm'
 import PlotTreeView from './PlotTreeView'
-import { addNode, removeNode, renameNode, reorderSiblings, updatePlotpoint } from './plotTree'
+import { addCategory, createChildNode, createSiblingNode, removeNode, renameNode, reorderSiblings, updatePlotpoint } from './plotTree'
 
 const EDIT_SAVE_DELAY_MS = 500
 
 function PlotSidebar() {
   const { projectId } = useParams<{ projectId: string }>()
-  const { data, isLoading } = usePlot(projectId)
+  const { data, isLoading, error } = usePlot(projectId)
   const { data: outline } = useOutline(projectId)
+  const { data: project } = useProject(projectId)
   const savePlot = useSavePlot(projectId ?? '')
+  const updateProject = useUpdateProject(projectId ?? '')
 
   const [nodes, setNodes] = useState<PlotNode[]>([])
+  const [newCategoryTitle, setNewCategoryTitle] = useState('')
+  const [pendingFocus, setPendingFocus] = useState<string | null>(null)
   const schemaVersionRef = useRef(1)
   const nodesRef = useRef<PlotNode[]>([])
   const saveTimeout = useRef<ReturnType<typeof setTimeout>>()
+  const inputRefs = useRef<Record<string, HTMLInputElement | null>>({})
+
+  const levels = project?.index.settings.plotLevels ?? PLOT_KIND_ORDER
 
   useEffect(() => {
     if (data) {
@@ -33,9 +41,21 @@ function PlotSidebar() {
     nodesRef.current = nodes
   }, [nodes])
 
+  useEffect(() => {
+    if (pendingFocus && inputRefs.current[pendingFocus]) {
+      inputRefs.current[pendingFocus]!.focus()
+      setPendingFocus(null)
+    }
+  }, [pendingFocus, nodes])
+
+  const registerInput = useCallback((nodeId: string, el: HTMLInputElement | null) => {
+    inputRefs.current[nodeId] = el
+  }, [])
+
   const moments = getAllMoments(outline?.nodes ?? [])
 
   function saveNow(next: PlotNode[]) {
+    if (saveTimeout.current) clearTimeout(saveTimeout.current)
     const tree: PlotTree = { schemaVersion: schemaVersionRef.current, nodes: next }
     savePlot.mutate(tree)
   }
@@ -56,10 +76,26 @@ function PlotSidebar() {
     saveNow(next)
   }
 
-  function handleAddChild(parentId: string | null, kind: PlotNodeKind, title: string) {
-    const next = addNode(nodes, parentId, kind, title)
-    setNodes(next)
-    saveNow(next)
+  function handleTab(node: PlotNode) {
+    const result = createChildNode(nodesRef.current, levels, node)
+    if (!result) return
+    setNodes(result.nodes)
+    saveNow(result.nodes)
+    setPendingFocus(result.newNode.id)
+  }
+
+  function handleEnter(node: PlotNode) {
+    if (node.title.trim() === '') {
+      const next = removeNode(nodesRef.current, node.id)
+      setNodes(next)
+      saveNow(next)
+      if (node.parentId) setPendingFocus(node.parentId)
+      return
+    }
+    const result = createSiblingNode(nodesRef.current, node)
+    setNodes(result.nodes)
+    saveNow(result.nodes)
+    setPendingFocus(result.newNode.id)
   }
 
   function handleUpdatePlotpoint(nodeId: string, patch: { body?: string; assignedMomentId?: string | null }) {
@@ -78,23 +114,71 @@ function PlotSidebar() {
     saveNow(next)
   }
 
+  function handleAddCategory() {
+    const title = newCategoryTitle.trim()
+    if (!title) return
+    const next = addCategory(nodes, title)
+    setNodes(next)
+    saveNow(next)
+    setNewCategoryTitle('')
+  }
+
+  function toggleLevel(kind: PlotNodeKind) {
+    if (kind === 'category') return
+    const set = new Set(levels)
+    if (set.has(kind)) set.delete(kind)
+    else set.add(kind)
+    const ordered = PLOT_KIND_ORDER.filter((k) => k === 'category' || set.has(k))
+    updateProject.mutate({ plotLevels: ordered })
+  }
+
   if (isLoading) return <p>Loading plot…</p>
+  if (error) return <p className="plot-sidebar__error">Failed to load plot. Retrying…</p>
 
   return (
     <div className="plot-sidebar">
       <h3>Plot</h3>
 
-      <PlotAddChildForm kindOptions={['category']} onSubmit={(kind, title) => handleAddChild(null, kind, title)} />
+      <div className="level-config">
+        <span className="level-config__label">Levels:</span>
+        {PLOT_KIND_ORDER.map((kind) => (
+          <label key={kind} className="level-config__option">
+            <input
+              type="checkbox"
+              checked={levels.includes(kind)}
+              disabled={kind === 'category'}
+              onChange={() => toggleLevel(kind)}
+            />
+            {kind}
+          </label>
+        ))}
+      </div>
+
+      <div className="plot-sidebar__add-category">
+        <input
+          type="text"
+          placeholder="New category title"
+          value={newCategoryTitle}
+          onChange={(e) => setNewCategoryTitle(e.target.value)}
+          onKeyDown={(e) => e.key === 'Enter' && handleAddCategory()}
+        />
+        <button type="button" onClick={handleAddCategory}>
+          Add category
+        </button>
+      </div>
 
       <PlotTreeView
         nodes={nodes}
         parentId={null}
         depth={0}
+        levels={levels}
         moments={moments}
         onRename={handleRename}
         onDelete={handleDelete}
-        onAddChild={handleAddChild}
+        onTab={handleTab}
+        onEnter={handleEnter}
         onUpdatePlotpoint={handleUpdatePlotpoint}
+        registerInput={registerInput}
         onReorder={handleReorder}
       />
 

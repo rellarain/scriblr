@@ -1,6 +1,6 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { api } from './client'
-import type { ProjectIndex, ProjectSummary } from '../types'
+import type { OutlineNodeKind, PlotNodeKind, ProjectIndex, ProjectSummary } from '../types'
 
 const projectsKey = ['projects'] as const
 const projectKey = (projectId: string) => ['projects', projectId] as const
@@ -33,8 +33,12 @@ export function useCreateProject() {
 export function useUpdateProject(projectId: string) {
   const queryClient = useQueryClient()
   return useMutation({
-    mutationFn: (patch: { title?: string; wordCountTarget?: number }) =>
-      api.patch<ProjectIndex>(`/projects/${projectId}`, patch),
+    mutationFn: (patch: {
+      title?: string
+      wordCountTarget?: number
+      outlineLevels?: OutlineNodeKind[]
+      plotLevels?: PlotNodeKind[]
+    }) => api.patch<ProjectIndex>(`/projects/${projectId}`, patch),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: projectsKey })
       queryClient.invalidateQueries({ queryKey: projectKey(projectId) })

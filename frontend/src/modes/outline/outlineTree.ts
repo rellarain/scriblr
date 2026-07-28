@@ -63,3 +63,42 @@ export function removeNode(nodes: OutlineNode[], nodeId: string): OutlineNode[] 
 export function reorderSiblings(nodes: OutlineNode[], orderedIds: string[]): OutlineNode[] {
   return tree.reorderSiblings(nodes, orderedIds)
 }
+
+function makeNode(kind: OutlineNodeKind, parentId: string | null, order: number): OutlineNode {
+  const id = `${kind}_${crypto.randomUUID().slice(0, 8)}`
+  return {
+    id,
+    kind,
+    parentId,
+    order,
+    title: '',
+    synopsis: '',
+    draftRef: kind === 'moment' ? id : null,
+  }
+}
+
+/**
+ * Creates a new empty child under `parent`, its kind taken from the
+ * project's configured `levels` (the next level deeper than parent's kind).
+ * Returns null if parent's kind is already the deepest configured level --
+ * i.e. Tab is a no-op there.
+ */
+export function createChildNode(
+  nodes: OutlineNode[],
+  levels: OutlineNodeKind[],
+  parent: OutlineNode
+): { nodes: OutlineNode[]; newNode: OutlineNode } | null {
+  const kind = tree.nextKindInLevels(levels, parent.kind, OUTLINE_KIND_ORDER)
+  if (!kind) return null
+  const newNode = makeNode(kind, parent.id, tree.nextOrder(nodes, parent.id))
+  return { nodes: [...nodes, newNode], newNode }
+}
+
+/** Creates a new empty sibling immediately after `afterNode`, same kind. */
+export function createSiblingNode(
+  nodes: OutlineNode[],
+  afterNode: OutlineNode
+): { nodes: OutlineNode[]; newNode: OutlineNode } {
+  const newNode = makeNode(afterNode.kind, afterNode.parentId, 0)
+  return { nodes: tree.insertSiblingAfter(nodes, afterNode.id, newNode), newNode }
+}
