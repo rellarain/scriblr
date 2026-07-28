@@ -17,6 +17,10 @@ backend/**/.pytest_cache/
 backend/build/
 backend/dist/
 
+# Electron (electron-builder output + deps)
+electron/node_modules
+electron/dist
+
 # Editor directories and files
 .vscode/*
 !.vscode/extensions.json
