@@ -171,7 +171,7 @@ class RevisionComment(BaseModel):
     createdAt: datetime
 
 
-RevisionTrigger = Literal["manual", "session-close"]
+RevisionTrigger = Literal["manual"]
 
 
 class RevisionSnapshot(BaseModel):

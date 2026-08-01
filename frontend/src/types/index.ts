@@ -142,7 +142,7 @@ export interface RevisionComment {
   createdAt: string
 }
 
-export type RevisionTrigger = 'manual' | 'session-close'
+export type RevisionTrigger = 'manual'
 
 export interface RevisionSnapshot {
   schemaVersion: number
