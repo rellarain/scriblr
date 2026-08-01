@@ -27,6 +27,11 @@ interface Props {
   onSetFlag: (nodeId: string, flag: NodeFlag | null) => void
   registerInput: (nodeId: string, el: HTMLInputElement | null) => void
   onReorder: (parentId: string | null, orderedIds: string[]) => void
+  /** When given, moment rows render an "open" affordance (distinct from the
+   * title input's own rename-on-click) that calls this with the moment id. */
+  onOpenMoment?: (momentId: string) => void
+  /** The owning book's color, if any -- tints every card in this tree. */
+  accentColor?: string | null
 }
 
 function OutlineTreeView({
@@ -50,6 +55,8 @@ function OutlineTreeView({
   onSetFlag,
   registerInput,
   onReorder,
+  onOpenMoment,
+  accentColor,
 }: Props) {
   const sensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 4 } }))
   const children = getChildren(nodes, parentId)
@@ -85,6 +92,7 @@ function OutlineTreeView({
                 childCount={childNodes.length}
                 childKind={childKind}
                 collapsed={isCollapsed}
+                accentColor={accentColor}
                 onToggleCollapse={onToggleCollapse}
                 assignedPlotpoints={assignedPlotpoints}
                 onAssignPlotpoint={onAssignPlotpoint}
@@ -100,6 +108,7 @@ function OutlineTreeView({
                 onReparentNode={onReparentNode}
                 onSetFlag={onSetFlag}
                 registerInput={registerInput}
+                onOpenMoment={onOpenMoment}
               />
               {childHasChildren && !isCollapsed && (
                 <div className="outline-node__children">
@@ -124,6 +133,8 @@ function OutlineTreeView({
                     onSetFlag={onSetFlag}
                     registerInput={registerInput}
                     onReorder={onReorder}
+                    onOpenMoment={onOpenMoment}
+                    accentColor={accentColor}
                   />
                 </div>
               )}

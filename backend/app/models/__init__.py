@@ -24,7 +24,6 @@ class UpdateProjectRequest(BaseModel):
     title: Optional[str] = None
     wordCountTarget: Optional[int] = None
     bookCountTarget: Optional[int] = None
-    chapterCountTarget: Optional[int] = None
     bookWordCountTarget: Optional[int] = None
     chapterWordCountTarget: Optional[int] = None
     priorities: Optional[list[ProjectPriority]] = None

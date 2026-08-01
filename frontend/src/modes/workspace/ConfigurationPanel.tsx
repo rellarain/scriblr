@@ -1,6 +1,7 @@
 import { useParams } from 'react-router-dom'
 import { useProject, useUpdateProject } from '../../api/projects'
-import type { ProjectPriority, ProjectRoutine } from '../../types'
+import { OUTLINE_KIND_ORDER } from '../../types'
+import type { OutlineNodeKind, ProjectPriority, ProjectRoutine } from '../../types'
 
 const DAY_LABELS = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun']
 
@@ -19,9 +20,19 @@ function ConfigurationPanel() {
   const settings = data.index.settings
   const priorities = settings.priorities
   const routines = settings.routines
+  const outlineLevels = settings.outlineLevels
+
+  function toggleOutlineLevel(kind: OutlineNodeKind) {
+    if (kind === 'book') return
+    const set = new Set(outlineLevels)
+    if (set.has(kind)) set.delete(kind)
+    else set.add(kind)
+    const ordered = OUTLINE_KIND_ORDER.filter((k) => k === 'book' || set.has(k))
+    updateProject.mutate({ outlineLevels: ordered })
+  }
 
   function goalField(
-    key: 'wordCountTarget' | 'bookCountTarget' | 'chapterCountTarget' | 'bookWordCountTarget' | 'chapterWordCountTarget',
+    key: 'wordCountTarget' | 'bookCountTarget' | 'bookWordCountTarget' | 'chapterWordCountTarget',
     label: string
   ) {
     return (
@@ -98,9 +109,26 @@ function ConfigurationPanel() {
         <div className="config-panel__goals">
           {goalField('wordCountTarget', 'Total word count target')}
           {goalField('bookCountTarget', 'Book count target')}
-          {goalField('chapterCountTarget', 'Chapter count target')}
           {goalField('bookWordCountTarget', 'Word count target per book')}
           {goalField('chapterWordCountTarget', 'Word count target per chapter')}
+        </div>
+      </section>
+
+      <section className="config-panel__section">
+        <h3>Outline levels</h3>
+        <div className="level-config">
+          <span className="level-config__label">Levels:</span>
+          {OUTLINE_KIND_ORDER.map((kind) => (
+            <label key={kind} className="level-config__option">
+              <input
+                type="checkbox"
+                checked={outlineLevels.includes(kind)}
+                disabled={kind === 'book'}
+                onChange={() => toggleOutlineLevel(kind)}
+              />
+              {kind}
+            </label>
+          ))}
         </div>
       </section>
 

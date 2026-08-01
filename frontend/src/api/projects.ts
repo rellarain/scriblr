@@ -44,7 +44,6 @@ export function useUpdateProject(projectId: string) {
       title?: string
       wordCountTarget?: number
       bookCountTarget?: number
-      chapterCountTarget?: number
       bookWordCountTarget?: number
       chapterWordCountTarget?: number
       priorities?: ProjectPriority[]

@@ -205,31 +205,25 @@ textarea {
   color: #b00020;
 }
 
-/* Outline editor (focal content of Plan mode) */
+/* Outline editor: the Tab/Enter/drag/flag tree-editing surface, scoped to a
+   book's arcs/chapters (BookWorkspace) or a chapter's acts/scenes/moments
+   (ChapterWorkspace) via ScopedOutlineEditor. */
 
 .outline-editor {
   min-width: 0;
 }
 
-.outline-editor__add-book {
-  display: flex;
-  gap: 0.5rem;
+.outline-editor__add-first {
   margin-bottom: 1rem;
 }
 
-.outline-editor__add-book input {
-  flex: 1;
-  padding: 0.4rem 0.6rem;
-  border: 1px solid #ccc;
-  border-radius: 4px;
-}
-
-.outline-editor__add-book button {
+.outline-editor__add-first button {
   padding: 0.4rem 0.9rem;
   border: none;
   border-radius: 4px;
   background-color: var(--accent);
   color: white;
+  cursor: pointer;
 }
 
 .level-config {
@@ -275,16 +269,8 @@ textarea {
   border-radius: 4px;
   background: white;
   border: 1px solid #e2e2e2;
+  border-left: 3px solid var(--node-accent, #e2e2e2);
   margin-bottom: 0.35rem;
-}
-
-.outline-node--book {
-  font-weight: 700;
-  background: #ece7dc;
-}
-
-.outline-node--arc {
-  font-weight: 700;
 }
 
 .outline-node--chapter {
@@ -349,7 +335,7 @@ textarea {
   flex-shrink: 0;
   border: none;
   background: transparent;
-  color: var(--accent);
+  color: var(--node-accent, var(--accent));
   cursor: pointer;
   padding: 0;
 }
@@ -378,7 +364,7 @@ textarea {
   text-transform: none;
   letter-spacing: normal;
   font-weight: 600;
-  color: var(--accent);
+  color: var(--node-accent, var(--accent));
 }
 
 .outline-node__title {
@@ -397,14 +383,14 @@ textarea {
 }
 
 .outline-node__title:focus {
-  outline: 1px solid var(--accent);
+  outline: 1px solid var(--node-accent, var(--accent));
   background: white;
 }
 
 .outline-node__add-toggle {
   border: none;
   background: transparent;
-  color: var(--accent);
+  color: var(--node-accent, var(--accent));
   font-weight: 700;
 }
 
@@ -414,76 +400,34 @@ textarea {
   color: #b00020;
 }
 
-.outline-node__add-form,
-.plot-node__add-form {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 0.35rem;
-  margin-bottom: 0.5rem;
-}
-
-.outline-node__add-form select,
-.outline-node__add-form input,
-.plot-node__add-form select,
-.plot-node__add-form input {
-  min-width: 0;
-  padding: 0.3rem 0.5rem;
-  border: 1px solid #ccc;
+.outline-node__open {
+  border: 1px solid var(--node-accent, var(--accent));
+  background: transparent;
+  color: var(--node-accent, var(--accent));
   border-radius: 4px;
-  font-size: 0.85rem;
-}
-
-.plot-node__add-form input {
-  flex: 1 1 80px;
-}
-
-.outline-node__add-form button,
-.plot-node__add-form button {
-  padding: 0.3rem 0.6rem;
-  border: none;
-  border-radius: 4px;
-  background-color: var(--accent);
-  color: white;
-  font-size: 0.85rem;
+  padding: 0.15rem 0.5rem;
+  font-size: 0.78rem;
+  cursor: pointer;
   white-space: nowrap;
 }
 
-/* Draft mode */
+/* Persistent app sidebar: project (pinned) -> books (selectable, color
+   swatch) -> arcs (inert) -> chapters (selectable). The single navigation
+   surface for the whole app -- stops at chapter depth. */
 
-.draft-mode {
-  display: grid;
-  grid-template-columns: 200px 220px 1fr 240px;
-  gap: 1.5rem;
-  height: 100%;
-  position: relative;
-}
-
-.draft-mode__placeholder {
-  color: #777;
-}
-
-.draft-mode__chapter-outline,
-.draft-mode__plotpoints {
-  overflow-y: auto;
-  min-width: 0;
-}
-
-.draft-mode__scrap-overlay {
-  position: absolute;
-  top: 0;
-  right: 0;
+.project-shell__scrap-overlay {
+  position: fixed;
+  top: 1rem;
+  right: 1rem;
   z-index: 20;
   width: 360px;
-  max-height: 100%;
+  max-height: calc(100vh - 2rem);
   overflow-y: auto;
   background: white;
   border: 1px solid #ddd;
   border-radius: 6px;
   box-shadow: 0 4px 16px rgba(0, 0, 0, 0.15);
 }
-
-/* Chapter navigation (shared by Draft and Read mode): book/arc are inert,
-   collapsible headers; only chapter rows are selectable. */
 
 .chapter-nav {
   overflow-y: auto;
@@ -520,12 +464,12 @@ textarea {
 .chapter-nav__label {
   font-weight: 700;
   font-size: 0.85rem;
-  color: #555;
+  color: #ccc;
 }
 
 .chapter-nav__label--arc {
   font-weight: 600;
-  color: #666;
+  color: #aaa;
 }
 
 .chapter-nav__chapter {
@@ -535,7 +479,7 @@ textarea {
   background: transparent;
   padding: 0.25rem 0.5rem;
   border-radius: 4px;
-  color: #333;
+  color: #ccc;
   font-size: 0.9rem;
   cursor: pointer;
 }
@@ -546,6 +490,9 @@ textarea {
 }
 
 .chapter-nav__scrap-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.2rem;
   border: 1px solid #ddd;
   background: #fdf1e0;
   color: #b45309;
@@ -560,36 +507,69 @@ textarea {
   font-size: 0.9rem;
 }
 
-/* Chapter outline (Draft mode): scene headers + moment rows scoped to the
-   selected chapter, read-only navigation. */
-
-.chapter-outline__header {
-  font-weight: 600;
-  margin: 0.6rem 0 0.15rem;
-  font-size: 0.85rem;
-  color: #555;
-}
-
-.chapter-outline__moment {
+.chapter-nav__project {
   display: block;
   width: 100%;
   text-align: left;
   border: none;
   background: transparent;
-  padding: 0.3rem 0.5rem;
+  padding: 0.35rem 0.5rem;
   border-radius: 4px;
-  color: #333;
+  color: #eee;
+  font-weight: 700;
   font-size: 0.9rem;
+  cursor: pointer;
+  margin-bottom: 0.4rem;
 }
 
-.chapter-outline__moment.is-active {
+.chapter-nav__project.is-active {
   background: var(--accent);
   color: white;
 }
 
-.chapter-outline__empty {
-  color: #777;
+.chapter-nav__swatch {
+  width: 0.6rem;
+  height: 0.6rem;
+  border-radius: 50%;
+  border: 1px solid rgba(255, 255, 255, 0.4);
+  flex-shrink: 0;
+}
+
+.chapter-nav__book {
+  flex: 1;
+  text-align: left;
+  border: none;
+  border-left: 3px solid var(--book-accent, transparent);
+  background: transparent;
+  padding: 0.25rem 0.5rem;
+  border-radius: 4px;
+  color: var(--book-accent, #eee);
+  font-weight: 700;
+  font-size: 0.9rem;
+  cursor: pointer;
+}
+
+.chapter-nav__book.is-active {
+  background: var(--book-accent, var(--accent));
+  border-left-color: var(--book-accent, var(--accent));
+  color: white;
+}
+
+.chapter-nav__add-book {
+  width: 100%;
+  margin-top: 0.5rem;
+  border: 1px dashed #555;
+  background: transparent;
+  color: #aaa;
+  border-radius: 4px;
+  padding: 0.35rem 0.5rem;
   font-size: 0.85rem;
+  cursor: pointer;
+}
+
+.chapter-nav__add-book:hover {
+  border-color: var(--accent);
+  color: var(--accent);
 }
 
 /* Draft analytics panel */
@@ -646,6 +626,29 @@ textarea {
 }
 
 .draft-analytics__top-words > span {
+  font-size: 0.8rem;
+  color: #666;
+}
+
+.draft-analytics__structure {
+  margin-top: 1rem;
+  padding-top: 0.75rem;
+  border-top: 1px solid #eee;
+}
+
+.draft-analytics__structure-title {
+  display: block;
+  font-size: 0.8rem;
+  font-weight: 600;
+  color: #444;
+  margin-bottom: 0.5rem;
+}
+
+.draft-analytics__structure-group {
+  margin-bottom: 0.5rem;
+}
+
+.draft-analytics__structure-group > span {
   font-size: 0.8rem;
   color: #666;
 }
@@ -737,6 +740,13 @@ textarea {
   margin-bottom: 0.75rem;
 }
 
+.scrap-bin-panel__header h4 {
+  display: flex;
+  align-items: center;
+  gap: 0.35rem;
+  margin: 0;
+}
+
 .scrap-bin-panel__empty {
   color: #777;
   font-size: 0.85rem;
@@ -807,42 +817,6 @@ textarea {
   margin-top: 0.5rem;
 }
 
-.moment-picker {
-  overflow-y: auto;
-  overflow-x: hidden;
-  min-width: 0;
-}
-
-.moment-picker__header {
-  font-weight: 700;
-  margin: 0.75rem 0 0.15rem;
-  font-size: 0.85rem;
-  color: #555;
-}
-
-.moment-picker__moment {
-  display: block;
-  width: 100%;
-  text-align: left;
-  border: none;
-  background: transparent;
-  padding: 0.3rem 0.5rem;
-  border-radius: 4px;
-  color: #333;
-  font-size: 0.9rem;
-}
-
-.moment-picker__moment.is-active {
-  background: var(--accent);
-  color: white;
-}
-
-.draft-mode__editor {
-  display: flex;
-  flex-direction: column;
-  height: 100%;
-}
-
 .scene-editor {
   display: flex;
   flex-direction: column;
@@ -879,50 +853,8 @@ textarea {
   font-size: 0.85rem;
 }
 
-/* Plan mode: focal Outline editor + Plot sidebar */
-
-.plan-mode {
-  display: grid;
-  /* grid-template-columns is set inline by PlanMode.tsx to reflect the
-     user-draggable sidebar width. */
-  gap: 0;
-  height: 100%;
-}
-
-.plan-mode__focal {
-  min-width: 0;
-  overflow-y: auto;
-  padding-right: 0.5rem;
-}
-
-.plan-mode__resizer {
-  cursor: col-resize;
-  position: relative;
-  touch-action: none;
-}
-
-.plan-mode__resizer::after {
-  content: '';
-  position: absolute;
-  top: 0;
-  bottom: 0;
-  left: 50%;
-  width: 2px;
-  transform: translateX(-50%);
-  background: #ddd;
-}
-
-.plan-mode__resizer:hover::after,
-.plan-mode__resizer:active::after {
-  background: var(--accent);
-}
-
-.plan-mode__sidebar {
-  padding-left: 1rem;
-  overflow-y: auto;
-  overflow-x: hidden;
-  min-width: 0;
-}
+/* Plot tree editor (categories/plotlines/plotpoints), full-width content of
+   the Plot tab in the project-level workspace. */
 
 .plot-sidebar h3 {
   margin-top: 0;
@@ -1257,65 +1189,52 @@ textarea {
   min-width: 6rem;
 }
 
-/* Read mode */
+/* Chapter read view: continuous read-only concatenation of a chapter's
+   moments, a view toggle inside the moment workspace. */
 
-.read-mode-shell {
-  display: grid;
-  grid-template-columns: 220px 1fr;
-  gap: 1.5rem;
-  height: 100%;
-}
-
-.read-mode-shell .chapter-nav {
-  border-right: 1px solid #eee;
-  padding-right: 1rem;
-}
-
-.read-mode {
+.chapter-read-view {
   max-width: 680px;
   margin: 0 auto;
   overflow-y: auto;
 }
 
-.read-mode__placeholder {
+.chapter-read-view__placeholder {
   color: #777;
 }
 
-.read-mode__heading {
+.chapter-read-view__heading {
   margin-top: 2rem;
 }
 
-.read-mode__heading--book {
-  font-size: 1.8rem;
-}
-
-.read-mode__heading--arc {
-  font-size: 1.5rem;
-}
-
-.read-mode__heading--chapter {
+.chapter-read-view__heading--chapter {
   font-size: 1.3rem;
 }
 
-.read-mode__heading--scene {
+.chapter-read-view__heading--act {
+  font-size: 1.15rem;
+  color: #555;
+}
+
+.chapter-read-view__heading--scene {
   font-size: 1.05rem;
   color: #555;
 }
 
-.read-mode__moment-title {
+.chapter-read-view__moment-title {
   margin-top: 1rem;
   font-size: 0.9rem;
   color: #888;
   font-weight: 500;
 }
 
-.read-mode__body {
+.chapter-read-view__body {
   white-space: pre-wrap;
   line-height: 1.7;
   font-size: 1.05rem;
 }
 
-/* Revise mode */
+/* Revision history: snapshot timeline, diff, comments -- embedded in the
+   moment workspace's History tab instead of a separate routed page. */
 
 .scene-revisions {
   max-width: 900px;
@@ -1603,21 +1522,24 @@ textarea {
   margin-left: auto;
 }
 
-/* Dashboard */
+/* Shared sub-tab styling for the project/moment workspaces. */
 
-.dashboard-mode {
+.project-workspace,
+.moment-workspace {
   display: flex;
   flex-direction: column;
   gap: 1.25rem;
 }
 
-.dashboard-mode__tabs {
+.project-workspace__tabs,
+.moment-workspace__tabs {
   display: flex;
   gap: 0.25rem;
   border-bottom: 1px solid #ddd;
 }
 
-.dashboard-mode__tab {
+.project-workspace__tab,
+.moment-workspace__tabs button {
   border: none;
   background: transparent;
   padding: 0.5rem 1rem;
@@ -1627,17 +1549,175 @@ textarea {
   border-bottom: 2px solid transparent;
 }
 
-.dashboard-mode__tab.is-active {
+.project-workspace__tab.is-active,
+.moment-workspace__tabs button.is-active {
   color: var(--accent);
   border-bottom-color: var(--accent);
   font-weight: 600;
 }
 
-.dashboard-mode__panel {
+.project-workspace__panel {
   max-width: 900px;
 }
 
-/* Dashboard: Configuration */
+.project-workspace__schedule {
+  display: flex;
+  flex-direction: column;
+  gap: 2rem;
+}
+
+/* Book-level workspace: settings form + a scoped arc/chapter outline editor. */
+
+.book-workspace {
+  display: flex;
+  flex-direction: column;
+  gap: 1.5rem;
+  max-width: 900px;
+}
+
+.book-workspace__settings {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+  padding-bottom: 1rem;
+  border-bottom: 1px solid #ddd;
+}
+
+.book-workspace__title-row {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+}
+
+.book-workspace__title {
+  flex: 1;
+  font-size: 1.4rem;
+  font-weight: 700;
+  border: none;
+  background: transparent;
+  padding: 0.2rem 0;
+  border-bottom: 1px solid transparent;
+}
+
+.book-workspace__title:focus {
+  outline: none;
+  border-bottom-color: var(--accent);
+}
+
+.book-workspace__field {
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+  font-size: 0.85rem;
+  color: #555;
+}
+
+.book-workspace__field input[type='number'] {
+  max-width: 160px;
+  border: 1px solid #ddd;
+  border-radius: 4px;
+  padding: 0.35rem 0.5rem;
+}
+
+.book-workspace__swatches {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+}
+
+.book-workspace__swatch {
+  width: 1.4rem;
+  height: 1.4rem;
+  border-radius: 50%;
+  border: 2px solid transparent;
+  cursor: pointer;
+  padding: 0;
+}
+
+.book-workspace__swatch.is-selected {
+  border-color: #333;
+}
+
+.book-workspace__swatch--none {
+  border: 1px solid #ccc;
+  background: white;
+  color: #999;
+  font-size: 0.8rem;
+  line-height: 1;
+}
+
+.book-workspace__plotlines {
+  gap: 0.5rem;
+}
+
+.book-workspace__plotline-category {
+  display: flex;
+  flex-direction: column;
+  gap: 0.2rem;
+  margin-bottom: 0.5rem;
+}
+
+.book-workspace__plotline-category-title {
+  font-weight: 600;
+  color: #444;
+  font-size: 0.8rem;
+}
+
+.book-workspace__plotline-option {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  font-size: 0.85rem;
+  color: #333;
+  margin-left: 0.5rem;
+}
+
+.book-workspace__error {
+  color: #b00020;
+}
+
+/* Chapter-level workspace: scoped act/scene/moment tree | moment workspace |
+   chapter plotpoints. */
+
+.chapter-workspace {
+  display: grid;
+  grid-template-columns: 280px 1fr 240px;
+  gap: 1.5rem;
+  height: 100%;
+}
+
+.chapter-workspace__tree,
+.chapter-workspace__plotpoints {
+  overflow-y: auto;
+  min-width: 0;
+}
+
+.chapter-workspace__export {
+  display: block;
+  width: 100%;
+  margin-bottom: 0.75rem;
+  border: 1px solid var(--accent);
+  background: transparent;
+  color: var(--accent);
+  border-radius: 4px;
+  padding: 0.35rem 0.5rem;
+  font-size: 0.85rem;
+  cursor: pointer;
+}
+
+.chapter-workspace__placeholder,
+.chapter-workspace__error,
+.moment-workspace__error {
+  color: #777;
+}
+
+.moment-workspace__draft {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+}
+
+/* Project-level settings form: goals, outline levels, priorities, routines. */
 
 .config-panel__section {
   margin-bottom: 1.75rem;
@@ -1712,77 +1792,100 @@ textarea {
   padding: 0.2rem 0.4rem;
 }
 
-/* Dashboard: Activity (heatmap + timeline/diff) */
+/* Condensed project stats panel: goal progress, open goals, flags, and a
+   short recent-activity list with diff/revert -- replaces the old
+   Dashboard's separate Activity/Analytics/Plan pages. No calendar heatmap. */
 
-.heatmap {
+.project-stats-panel__section {
+  margin-bottom: 1.75rem;
+}
+
+.project-stats-panel__progress {
+  margin-bottom: 0.75rem;
+}
+
+.project-stats-panel__progress-label {
+  display: flex;
+  justify-content: space-between;
+  font-size: 0.8rem;
+  color: #555;
+  margin-bottom: 0.2rem;
+}
+
+.project-stats-panel__progress-track {
+  background: #eee;
+  border-radius: 3px;
+  overflow: hidden;
+  height: 10px;
+}
+
+.project-stats-panel__progress-fill {
+  background: var(--accent);
+  height: 100%;
+}
+
+.project-stats-panel__tasks,
+.project-stats-panel__flags {
+  list-style: none;
+  padding: 0;
+  margin: 0;
   display: flex;
   flex-direction: column;
-  gap: 0.5rem;
-  overflow-x: auto;
-  padding-bottom: 0.5rem;
+  gap: 0.4rem;
 }
 
-.heatmap__grid {
-  display: flex;
-  gap: 3px;
+.project-stats-panel__tasks li {
+  padding: 0.5rem 0.7rem;
+  border: 1px solid #eee;
+  border-radius: 4px;
+  font-size: 0.85rem;
 }
 
-.heatmap__week {
-  display: flex;
-  flex-direction: column;
-  gap: 3px;
-}
-
-.heatmap__day {
-  width: 11px;
-  height: 11px;
-  border-radius: 2px;
-  background-color: #ebedf0;
-}
-
-.heatmap__day--level-1 {
-  background-color: #f3d9e3;
-}
-
-.heatmap__day--level-2 {
-  background-color: #e3a9bf;
-}
-
-.heatmap__day--level-3 {
-  background-color: #c96f92;
-}
-
-.heatmap__day--level-4 {
-  background-color: var(--accent);
-}
-
-.heatmap__legend {
+.project-stats-panel__flag-row {
   display: flex;
   align-items: center;
-  gap: 4px;
-  font-size: 0.75rem;
-  color: #888;
+  gap: 0.5rem;
+  padding: 0.4rem 0.6rem;
+  border: 1px solid #eee;
+  border-radius: 4px;
 }
 
-.activity-panel__body {
-  display: grid;
-  grid-template-columns: minmax(220px, 320px) 1fr;
-  gap: 1.5rem;
-  margin-top: 1rem;
+.project-stats-panel__flag-badge {
+  cursor: default;
+  text-transform: capitalize;
 }
 
-.activity-panel__timeline {
+.project-stats-panel__flag-title {
+  font-weight: 600;
+}
+
+.project-stats-panel__flag-kind {
+  color: #999;
+  font-size: 0.8rem;
+}
+
+.project-stats-panel__flag-note {
+  color: #666;
+  font-size: 0.85rem;
+}
+
+.project-stats-panel__empty {
+  color: #777;
+  font-size: 0.85rem;
+}
+
+.project-stats-panel__timeline {
   list-style: none;
   padding: 0;
   margin: 0;
   display: flex;
   flex-direction: column;
   gap: 0.35rem;
-  max-height: 500px;
+  max-height: 400px;
   overflow-y: auto;
 }
 
-.activity-panel__entry {
+.project-stats-panel__entry {
   width: 100%;
   text-align: left;
   display: flex;
@@ -1795,37 +1898,33 @@ textarea {
   cursor: pointer;
 }
 
-.activity-panel__entry.is-active {
+.project-stats-panel__entry.is-active {
   border-color: var(--accent);
   background: var(--accent-light);
 }
 
-.activity-panel__entry-type {
+.project-stats-panel__entry-type {
   font-size: 0.7rem;
   text-transform: uppercase;
   color: #999;
 }
 
-.activity-panel__entry-label {
+.project-stats-panel__entry-label {
   font-size: 0.85rem;
 }
 
-.activity-panel__entry-date {
+.project-stats-panel__entry-date {
   font-size: 0.7rem;
   color: #999;
 }
 
-.activity-panel__empty {
-  color: #777;
-  font-size: 0.85rem;
+.project-stats-panel__detail {
+  margin-top: 0.75rem;
+  padding-top: 0.75rem;
+  border-top: 1px solid #eee;
 }
 
-.activity-panel__detail {
-  border-left: 1px solid #eee;
-  padding-left: 1.5rem;
-}
-
-.activity-panel__revert {
+.project-stats-panel__revert {
   margin-top: 1rem;
   border: 1px solid var(--accent);
   color: var(--accent);
@@ -1884,131 +1983,7 @@ textarea {
   font-size: 0.85rem;
 }
 
-/* Dashboard: Plan */
-
-.plan-panel__section {
-  margin-bottom: 1.75rem;
-}
-
-.plan-panel__tasks,
-.plan-panel__flags {
-  list-style: none;
-  padding: 0;
-  margin: 0;
-  display: flex;
-  flex-direction: column;
-  gap: 0.4rem;
-}
-
-.plan-panel__tasks li {
-  padding: 0.5rem 0.7rem;
-  border: 1px solid #eee;
-  border-radius: 4px;
-  font-size: 0.85rem;
-}
-
-.plan-panel__flag-row {
-  display: flex;
-  align-items: center;
-  gap: 0.5rem;
-  padding: 0.4rem 0.6rem;
-  border: 1px solid #eee;
-  border-radius: 4px;
-}
-
-.plan-panel__flag-badge {
-  cursor: default;
-  text-transform: capitalize;
-}
-
-.plan-panel__flag-title {
-  font-weight: 600;
-}
-
-.plan-panel__flag-kind {
-  color: #999;
-  font-size: 0.8rem;
-}
-
-.plan-panel__flag-note {
-  color: #666;
-  font-size: 0.85rem;
-}
-
-.plan-panel__empty {
-  color: #777;
-  font-size: 0.85rem;
-}
-
-/* Dashboard: Analytics */
-
-.analytics-panel__section {
-  margin-bottom: 1.75rem;
-}
-
-.analytics-panel__progress {
-  margin-bottom: 0.75rem;
-}
-
-.analytics-panel__progress-label {
-  display: flex;
-  justify-content: space-between;
-  font-size: 0.8rem;
-  color: #555;
-  margin-bottom: 0.2rem;
-}
-
-.analytics-panel__progress-track,
-.analytics-panel__bar-track {
-  background: #eee;
-  border-radius: 3px;
-  overflow: hidden;
-  height: 10px;
-}
-
-.analytics-panel__progress-fill,
-.analytics-panel__bar-fill {
-  background: var(--accent);
-  height: 100%;
-}
-
-.analytics-panel__bar-row {
-  display: grid;
-  grid-template-columns: 160px 1fr 60px;
-  align-items: center;
-  gap: 0.6rem;
-  margin-bottom: 0.4rem;
-  font-size: 0.85rem;
-}
-
-.analytics-panel__bar-title {
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.analytics-panel__bar-value {
-  text-align: right;
-  color: #666;
-}
-
-.analytics-panel__totals {
-  list-style: none;
-  padding: 0;
-  margin: 0;
-  display: flex;
-  flex-wrap: wrap;
-  gap: 1rem;
-  font-size: 0.85rem;
-  color: #555;
-}
-
-.analytics-panel__empty {
-  color: #777;
-  font-size: 0.85rem;
-}
-
-/* Dashboard: Schedule */
+/* Schedule tab: today's derived checklist. */
 
 .schedule-panel__items {
   list-style: none;

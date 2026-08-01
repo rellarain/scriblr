@@ -4,7 +4,8 @@ from typing import Optional
 from fastapi import FastAPI, HTTPException, Request
 from fastapi.responses import FileResponse, JSONResponse
 
-from .api import activity, analytics, draft, outline, plot, projects, revisions, schedule, scrap
+from .api import activity, analytics, draft, export, outline, plot, projects, revisions, schedule, scrap
+from .storage.pdf_export import OutlineNodeNotFoundError
 from .storage.project_store import (
     InvalidRestoreParentError,
     MomentNotFoundError,
@@ -57,6 +58,10 @@ def create_app(static_dir: Optional[Path] = None) -> FastAPI:
             content={"detail": f"shard corrupt and quarantined: {exc.reason}"},
         )
 
+    @app.exception_handler(OutlineNodeNotFoundError)
+    async def _outline_node_not_found(_: Request, exc: OutlineNodeNotFoundError) -> JSONResponse:
+        return JSONResponse(status_code=404, content={"detail": str(exc)})
+
     app.include_router(projects.router)
     app.include_router(outline.router)
     app.include_router(plot.router)
@@ -66,6 +71,7 @@ def create_app(static_dir: Optional[Path] = None) -> FastAPI:
     app.include_router(analytics.router)
     app.include_router(schedule.router)
     app.include_router(scrap.router)
+    app.include_router(export.router)
 
     if static_dir is not None:
         # Registered last so it only catches what the routers above didn't --

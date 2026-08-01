@@ -2,17 +2,17 @@ import { useCallback, useEffect, useRef, useState } from 'react'
 import { useParams } from 'react-router-dom'
 import { useOutline, useSaveOutline } from '../../api/outline'
 import { usePlot, useSavePlot } from '../../api/plot'
-import { useProject, useUpdateProject } from '../../api/projects'
-import { OUTLINE_KIND_ORDER } from '../../types'
 import type { NodeFlag, OutlineNode, OutlineNodeKind, OutlineTree } from '../../types'
 import { assignPlotpoint } from '../plan/plotTree'
-import OutlineTreeView from './OutlineTreeView'
+import OutlineTreeView from '../outline/OutlineTreeView'
+import { nextKindInLevels } from '../../lib/nodeTree'
+import { OUTLINE_KIND_ORDER } from '../../types'
 import {
-  addBook,
   canReparentNode,
   createChildNode,
   createSiblingNode,
   escalateToChild,
+  getChildren,
   getNextSibling,
   getPreviousSibling,
   hasChildren,
@@ -21,7 +21,7 @@ import {
   reorderSiblings,
   reparentNode,
   setFlag,
-} from './outlineTree'
+} from '../outline/outlineTree'
 
 const RENAME_SAVE_DELAY_MS = 500
 
@@ -30,33 +30,45 @@ interface PendingSibling {
   pendingId: string
 }
 
-function OutlineEditor() {
+interface Props {
+  /** The book or chapter node whose children (arcs/chapters, or
+   * act/scenes/moments) this editor manages -- never rendered itself, only
+   * its subtree. */
+  rootId: string
+  /** Narrowed slice of the project's outlineLevels -- e.g. ['arc','chapter']
+   * for a book scope, ['act','scene','moment'] for a chapter scope. Prevents
+   * Tab/Enter-driven child creation from escalating past the intended depth. */
+  levels: OutlineNodeKind[]
+  onOpenMoment?: (momentId: string) => void
+  /** The owning book's color, if any -- tints every card in this tree. */
+  accentColor?: string | null
+}
+
+// The Tab/Enter/drag/flag outline-editing surface, scoped to start at an
+// arbitrary node instead of the project root -- OutlineTreeView already
+// supports this via its `parentId` prop; this component supplies the state
+// management (the part OutlineEditor.tsx used to own for the whole-project
+// case) parameterized by `rootId`/`levels` instead of assuming root/full levels.
+function ScopedOutlineEditor({ rootId, levels, onOpenMoment, accentColor }: Props) {
   const { projectId } = useParams<{ projectId: string }>()
   const { data, isLoading, error } = useOutline(projectId)
-  const { data: project } = useProject(projectId)
   const { data: plotData } = usePlot(projectId)
   const saveOutline = useSaveOutline(projectId ?? '')
   const savePlot = useSavePlot(projectId ?? '')
-  const updateProject = useUpdateProject(projectId ?? '')
   const plotNodes = plotData?.nodes ?? []
 
   const [nodes, setNodes] = useState<OutlineNode[]>([])
-  const [newBookTitle, setNewBookTitle] = useState('')
   const [pendingFocus, setPendingFocus] = useState<string | null>(null)
-  // Presence in this set means "expanded" (not "collapsed") -- an empty set
-  // at load means every node with children starts collapsed/minimized.
+  // Presence in this set means "expanded" -- an empty set means every node
+  // with children starts collapsed/minimized. Keyed to remount per rootId by
+  // the caller (via a `key={rootId}` on this component) so collapse state
+  // doesn't leak from one book/chapter to the next.
   const [expandedIds, setExpandedIds] = useState<Set<string>>(new Set())
   const schemaVersionRef = useRef(1)
   const nodesRef = useRef<OutlineNode[]>([])
   const saveTimeout = useRef<ReturnType<typeof setTimeout>>()
   const inputRefs = useRef<Record<string, HTMLInputElement | null>>({})
-  // Tracks a just-created empty sibling so a second, immediate Enter can
-  // escalate it into a child of the node it was created from instead of
-  // creating yet another sibling. Cleared by any other action (typing,
-  // navigation, deletion) so escalation only fires on truly consecutive Enters.
   const pendingSibling = useRef<PendingSibling | null>(null)
-
-  const levels = project?.index.settings.outlineLevels ?? OUTLINE_KIND_ORDER
 
   useEffect(() => {
     if (data) {
@@ -162,14 +174,12 @@ function OutlineEditor() {
 
   function handleNavigateToParent(node: OutlineNode) {
     pendingSibling.current = null
-    if (node.parentId) setPendingFocus(node.parentId)
+    if (node.parentId && node.parentId !== rootId) setPendingFocus(node.parentId)
   }
 
   function handleEnter(node: OutlineNode) {
     const pending = pendingSibling.current
     if (pending && pending.pendingId === node.id && node.title.trim() === '') {
-      // Second consecutive Enter on the still-empty node just created below
-      // `anchorId` -- turn it into a child of that anchor instead.
       pendingSibling.current = null
       const next = escalateToChild(nodesRef.current, levels, pending.anchorId, node.id)
       if (next) {
@@ -221,62 +231,26 @@ function OutlineEditor() {
     savePlot.mutate({ schemaVersion: plotData.schemaVersion, nodes: next })
   }
 
-  function handleAddBook() {
-    const title = newBookTitle.trim()
-    if (!title) return
-    const next = addBook(nodes, title)
-    setNodes(next)
-    saveNow(next)
-    setNewBookTitle('')
-  }
-
-  function toggleLevel(kind: OutlineNodeKind) {
-    if (kind === 'book') return
-    const set = new Set(levels)
-    if (set.has(kind)) set.delete(kind)
-    else set.add(kind)
-    const ordered = OUTLINE_KIND_ORDER.filter((k) => k === 'book' || set.has(k))
-    updateProject.mutate({ outlineLevels: ordered })
-  }
-
   if (isLoading) return <p>Loading outline…</p>
-  if (error) return <p className="outline-editor__error">Failed to load outline. Retrying…</p>
+  if (error) return <p className="outline-editor__error">Failed to load outline.</p>
+
+  const rootNode = nodes.find((n) => n.id === rootId)
+  const hasAnyChildren = rootNode ? getChildren(nodes, rootId).length > 0 : false
+  const firstChildKind = rootNode ? nextKindInLevels(levels, rootNode.kind, OUTLINE_KIND_ORDER) : undefined
 
   return (
     <div className="outline-editor">
-      <div className="level-config">
-        <span className="level-config__label">Levels:</span>
-        {OUTLINE_KIND_ORDER.map((kind) => (
-          <label key={kind} className="level-config__option">
-            <input
-              type="checkbox"
-              checked={levels.includes(kind)}
-              disabled={kind === 'book'}
-              onChange={() => toggleLevel(kind)}
-            />
-            {kind}
-          </label>
-        ))}
-      </div>
-
-      {nodes.length === 0 && (
-        <div className="outline-editor__add-book">
-          <input
-            type="text"
-            placeholder="New book title"
-            value={newBookTitle}
-            onChange={(e) => setNewBookTitle(e.target.value)}
-            onKeyDown={(e) => e.key === 'Enter' && handleAddBook()}
-          />
-          <button type="button" onClick={handleAddBook}>
-            Add book
+      {rootNode && !hasAnyChildren && firstChildKind && (
+        <div className="outline-editor__add-first">
+          <button type="button" onClick={() => handleAddChild(rootNode)}>
+            + Add {firstChildKind}
           </button>
         </div>
       )}
 
       <OutlineTreeView
         nodes={nodes}
-        parentId={null}
+        parentId={rootId}
         levels={levels}
         expandedIds={expandedIds}
         onToggleCollapse={handleToggleCollapse}
@@ -295,11 +269,11 @@ function OutlineEditor() {
         onSetFlag={handleSetFlag}
         registerInput={registerInput}
         onReorder={handleReorder}
+        onOpenMoment={onOpenMoment}
+        accentColor={accentColor}
       />
-
-      {nodes.length === 0 && <p>No books yet — add your first one above.</p>}
     </div>
   )
 }
 
-export default OutlineEditor
+export default ScopedOutlineEditor

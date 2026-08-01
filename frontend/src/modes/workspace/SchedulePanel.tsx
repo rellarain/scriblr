@@ -48,19 +48,21 @@ function buildItems(
       items.push({ id: `priority:${p.id}`, label: p.label })
     })
 
-  const { totals, goals } = analytics
+  const { totals, goals, perBook } = analytics
   if (goals.wordCountTarget != null && totals.totalWordCount < goals.wordCountTarget) {
     items.push({
       id: 'goal:wordCount',
       label: `${goals.wordCountTarget - totals.totalWordCount} words to go on the overall word count goal`,
     })
   }
-  if (goals.chapterCountTarget != null && totals.chapterCount < goals.chapterCountTarget) {
-    items.push({
-      id: 'goal:chapterCount',
-      label: `${goals.chapterCountTarget - totals.chapterCount} more chapter(s) needed`,
-    })
-  }
+  perBook.forEach((book) => {
+    if (book.chapterCountTarget != null && book.chapterCount < book.chapterCountTarget) {
+      items.push({
+        id: `goal:chapterCount:${book.nodeId}`,
+        label: `"${book.title || 'Untitled book'}" needs ${book.chapterCountTarget - book.chapterCount} more chapter(s)`,
+      })
+    }
+  })
 
   analytics.flaggedNodes.slice(0, 3).forEach((node) => {
     items.push({

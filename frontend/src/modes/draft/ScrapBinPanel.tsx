@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import { useDraft } from '../../api/draft'
 import { useDeleteScrapEntry, useRestoreScrapEntry } from '../../api/scrap'
+import TrashIcon from '../../components/shared/TrashIcon'
 import type { OutlineNode, ScrapEntry } from '../../types'
 
 interface Props {
@@ -42,7 +43,9 @@ function ScrapBinPanel({ projectId, entries, nodes, onClose }: Props) {
   return (
     <div className="scrap-bin-panel">
       <div className="scrap-bin-panel__header">
-        <h4>Scrap bin</h4>
+        <h4>
+          <TrashIcon /> Bin
+        </h4>
         <button type="button" onClick={onClose}>
           Close
         </button>

@@ -1,9 +1,13 @@
 from fastapi.testclient import TestClient
 
 
-def _build_book_chapter_moment(client: TestClient, project_id: str) -> tuple[str, str, str]:
+def _build_book_chapter_moment(
+    client: TestClient, project_id: str, book_chapter_count_target: int | None = None
+) -> tuple[str, str, str]:
     tree = client.get(f"/api/projects/{project_id}/outline").json()
     book_id = tree["nodes"][0]["id"]
+    if book_chapter_count_target is not None:
+        tree["nodes"][0]["chapterCountTarget"] = book_chapter_count_target
     tree["nodes"].append(
         {
             "id": "ch_1",
@@ -33,9 +37,9 @@ def test_analytics_totals_and_goal_echo(client: TestClient) -> None:
     project_id = client.post("/api/projects", json={"title": "Analytics Test"}).json()["projectId"]
     client.patch(
         f"/api/projects/{project_id}",
-        json={"wordCountTarget": 100, "bookCountTarget": 1, "chapterCountTarget": 5},
+        json={"wordCountTarget": 100, "bookCountTarget": 1},
     )
-    book_id, chapter_id, moment_id = _build_book_chapter_moment(client, project_id)
+    book_id, chapter_id, moment_id = _build_book_chapter_moment(client, project_id, book_chapter_count_target=5)
     client.put(
         f"/api/projects/{project_id}/draft/{moment_id}",
         json={"outlineNodeId": moment_id, "body": "Five little words here indeed."},
@@ -52,11 +56,12 @@ def test_analytics_totals_and_goal_echo(client: TestClient) -> None:
 
     assert body["goals"]["wordCountTarget"] == 100
     assert body["goals"]["bookCountTarget"] == 1
-    assert body["goals"]["chapterCountTarget"] == 5
+    assert "chapterCountTarget" not in body["goals"]
 
     per_book = next(b for b in body["perBook"] if b["nodeId"] == book_id)
     assert per_book["wordCount"] == 5
     assert per_book["chapterCount"] == 1
+    assert per_book["chapterCountTarget"] == 5
 
     per_chapter = next(c for c in body["perChapter"] if c["nodeId"] == chapter_id)
     assert per_chapter["wordCount"] == 5

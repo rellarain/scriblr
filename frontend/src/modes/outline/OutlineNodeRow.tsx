@@ -13,6 +13,8 @@ interface Props {
   childCount: number
   childKind: OutlineNodeKind | null
   collapsed: boolean
+  /** The owning book's color, if any -- tints this card as a visual accent. */
+  accentColor?: string | null
   onToggleCollapse: (nodeId: string) => void
   assignedPlotpoints: PlotNode[]
   onAssignPlotpoint: (plotpointId: string, momentId: string) => void
@@ -28,6 +30,7 @@ interface Props {
   onReparentNode: (nodeId: string, newParentId: string) => void
   onSetFlag: (nodeId: string, flag: NodeFlag | null) => void
   registerInput: (nodeId: string, el: HTMLInputElement | null) => void
+  onOpenMoment?: (momentId: string) => void
 }
 
 function OutlineNodeRow({
@@ -37,6 +40,7 @@ function OutlineNodeRow({
   childCount,
   childKind,
   collapsed,
+  accentColor,
   onToggleCollapse,
   assignedPlotpoints,
   onAssignPlotpoint,
@@ -52,6 +56,7 @@ function OutlineNodeRow({
   onReparentNode,
   onSetFlag,
   registerInput,
+  onOpenMoment,
 }: Props) {
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({
     id: node.id,
@@ -64,7 +69,8 @@ function OutlineNodeRow({
   const style = {
     transform: CSS.Transform.toString(transform),
     transition,
-  }
+    ...(accentColor ? { '--node-accent': accentColor } : {}),
+  } as React.CSSProperties
 
   function handleKeyDown(e: React.KeyboardEvent<HTMLInputElement>) {
     if (e.key === 'Tab') {
@@ -180,6 +186,11 @@ function OutlineNodeRow({
           />
         </div>
         <NodeFlagControl flag={node.flag} onSetFlag={(flag) => onSetFlag(node.id, flag)} />
+        {isMoment && onOpenMoment && (
+          <button type="button" className="outline-node__open" onClick={() => onOpenMoment(node.id)} title="Open draft">
+            Open →
+          </button>
+        )}
         {canAddChild && (
           <button type="button" className="outline-node__add-toggle" onClick={() => onAddChild(node)}>
             +

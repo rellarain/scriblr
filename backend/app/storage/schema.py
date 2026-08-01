@@ -13,8 +13,8 @@ def utcnow() -> datetime:
 # Structural depth, shallowest first. Nesting is flexible: a node's parent
 # may be any node of a strictly shallower kind, not necessarily the adjacent
 # one (e.g. a scene may nest directly under a book, skipping arc/chapter).
-OutlineNodeKind = Literal["book", "arc", "chapter", "scene", "moment"]
-OUTLINE_KIND_ORDER: list[OutlineNodeKind] = ["book", "arc", "chapter", "scene", "moment"]
+OutlineNodeKind = Literal["book", "arc", "chapter", "act", "scene", "moment"]
+OUTLINE_KIND_ORDER: list[OutlineNodeKind] = ["book", "arc", "chapter", "act", "scene", "moment"]
 
 # Plot tree: category -> plotline -> plotpoint, mirroring the outline tree's
 # flat-list-with-parentId shape. Plotpoints are the leaf/content unit and may
@@ -47,7 +47,6 @@ class ProjectRoutine(BaseModel):
 class ProjectSettings(BaseModel):
     wordCountTarget: Optional[int] = None
     bookCountTarget: Optional[int] = None
-    chapterCountTarget: Optional[int] = None
     bookWordCountTarget: Optional[int] = None
     chapterWordCountTarget: Optional[int] = None
     priorities: list[ProjectPriority] = Field(default_factory=list)
@@ -98,6 +97,13 @@ class OutlineNode(BaseModel):
     draftRef: Optional[str] = None
     # Flags this item for revision (review/edit/add/delete), with an optional note.
     flag: Optional[NodeFlag] = None
+    # The following three fields are set only on "book" nodes -- stored
+    # generically on OutlineNode by the same convention as draftRef (moment-
+    # only) rather than a separate book model, since books are still plain
+    # OutlineNodes structurally.
+    color: Optional[str] = None
+    chapterCountTarget: Optional[int] = None
+    plotlineIds: list[str] = Field(default_factory=list)
 
 
 class OutlineTree(BaseModel):
@@ -287,7 +293,6 @@ class ProjectAnalyticsTotals(BaseModel):
 class ProjectAnalyticsGoals(BaseModel):
     wordCountTarget: Optional[int] = None
     bookCountTarget: Optional[int] = None
-    chapterCountTarget: Optional[int] = None
     bookWordCountTarget: Optional[int] = None
     chapterWordCountTarget: Optional[int] = None
 
@@ -297,6 +302,7 @@ class BookWordCount(BaseModel):
     title: str
     wordCount: int
     chapterCount: int
+    chapterCountTarget: Optional[int] = None
 
 
 class ChapterWordCount(BaseModel):

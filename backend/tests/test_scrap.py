@@ -185,7 +185,7 @@ def test_read_levels_round_trip_through_patch(client: TestClient) -> None:
     project_id = client.post("/api/projects", json={"title": "Read Levels Test"}).json()["projectId"]
 
     resp = client.get(f"/api/projects/{project_id}")
-    assert resp.json()["index"]["settings"]["readLevels"] == ["book", "arc", "chapter", "scene", "moment"]
+    assert resp.json()["index"]["settings"]["readLevels"] == ["book", "arc", "chapter", "act", "scene", "moment"]
 
     resp = client.patch(
         f"/api/projects/{project_id}", json={"readLevels": ["book", "arc", "chapter"]}

@@ -1,20 +1,37 @@
 import { useState } from 'react'
 import type { OutlineNode } from '../../types'
 import { getChildren, getRoots } from '../../lib/nodeTree'
+import TrashIcon from './TrashIcon'
 
 interface Props {
   nodes: OutlineNode[]
+  selectedBookId?: string
   selectedChapterId?: string
-  onSelect: (chapterId: string) => void
+  onSelectProject: () => void
+  onSelectBook: (bookId: string) => void
+  onSelectChapter: (chapterId: string) => void
+  onAddBook: () => void
   /** Scrap-entry counts keyed by book/chapter node id, for small badges. */
   scrapCountsByNodeId?: Record<string, number>
   onScrapBadgeClick?: (nodeId: string) => void
 }
 
-// Book/arc/chapter navigation shared by Draft and Read mode: only chapter
-// rows are selectable, book/arc rows are inert (collapsible) headers for
-// context. Stops at chapter -- scenes/moments aren't part of this nav.
-function ChapterNav({ nodes, selectedChapterId, onSelect, scrapCountsByNodeId = {}, onScrapBadgeClick }: Props) {
+// The app's persistent left sidebar: a project -> book -> arc -> chapter
+// drill-down, condensing "higher level" structure. Book and chapter rows are
+// selectable; arc rows are inert (collapsible) headers for context. Stops at
+// chapter -- act/scene/moment editing happens in the chapter-level workspace,
+// not in this nav.
+function ChapterNav({
+  nodes,
+  selectedBookId,
+  selectedChapterId,
+  onSelectProject,
+  onSelectBook,
+  onSelectChapter,
+  onAddBook,
+  scrapCountsByNodeId = {},
+  onScrapBadgeClick,
+}: Props) {
   // Presence in this set means "expanded" -- an empty set at load means
   // every book/arc starts collapsed/minimized.
   const [expandedIds, setExpandedIds] = useState<Set<string>>(new Set())
@@ -29,6 +46,7 @@ function ChapterNav({ nodes, selectedChapterId, onSelect, scrapCountsByNodeId = 
   }
 
   function renderNode(node: OutlineNode, depth: number) {
+    const isBook = node.kind === 'book'
     const isChapter = node.kind === 'chapter'
     const children = isChapter ? [] : getChildren(nodes, node.id)
     const collapsed = !expandedIds.has(node.id)
@@ -50,11 +68,28 @@ function ChapterNav({ nodes, selectedChapterId, onSelect, scrapCountsByNodeId = 
             <span className="chapter-nav__toggle chapter-nav__toggle--empty" />
           )}
 
-          {isChapter ? (
+          {isBook && (
+            <span
+              className="chapter-nav__swatch"
+              style={{ background: node.color ?? 'transparent' }}
+              aria-hidden="true"
+            />
+          )}
+
+          {isBook ? (
+            <button
+              type="button"
+              className={`chapter-nav__book${node.id === selectedBookId ? ' is-active' : ''}`}
+              style={node.color ? ({ '--book-accent': node.color } as React.CSSProperties) : undefined}
+              onClick={() => onSelectBook(node.id)}
+            >
+              {node.title || 'Untitled'}
+            </button>
+          ) : isChapter ? (
             <button
               type="button"
               className={`chapter-nav__chapter${node.id === selectedChapterId ? ' is-active' : ''}`}
-              onClick={() => onSelect(node.id)}
+              onClick={() => onSelectChapter(node.id)}
             >
               {node.title || 'Untitled'}
             </button>
@@ -71,7 +106,7 @@ function ChapterNav({ nodes, selectedChapterId, onSelect, scrapCountsByNodeId = 
               title="Orphaned draft content"
               onClick={() => onScrapBadgeClick?.(node.id)}
             >
-              Scrap ({scrapCount})
+              <TrashIcon /> {scrapCount}
             </button>
           )}
         </div>
@@ -81,11 +116,22 @@ function ChapterNav({ nodes, selectedChapterId, onSelect, scrapCountsByNodeId = 
   }
 
   const books = getRoots(nodes)
+  const isProjectActive = !selectedBookId && !selectedChapterId
 
   return (
     <nav className="chapter-nav">
+      <button
+        type="button"
+        className={`chapter-nav__project${isProjectActive ? ' is-active' : ''}`}
+        onClick={onSelectProject}
+      >
+        Project
+      </button>
       {books.map((book) => renderNode(book, 0))}
       {books.length === 0 && <p className="chapter-nav__empty">No structure yet.</p>}
+      <button type="button" className="chapter-nav__add-book" onClick={onAddBook}>
+        + Add book
+      </button>
     </nav>
   )
 }

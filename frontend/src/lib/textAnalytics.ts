@@ -39,6 +39,14 @@ function splitSentences(text: string): string[] {
     .filter(Boolean)
 }
 
+/** Like `splitSentences`, but keeps the terminal `.`/`!`/`?` attached --
+ * needed for sentence-type classification, which `splitSentences` throws
+ * away. Kept separate so `analyzeText`'s existing behavior is untouched. */
+function splitSentencesWithPunctuation(text: string): string[] {
+  const matches = text.match(/[^.!?]+[.!?]+|[^.!?]+$/g) ?? []
+  return matches.map((s) => s.trim()).filter(Boolean)
+}
+
 /** Heuristic vowel-group syllable count -- not linguistically exact, but
  * standard enough for Flesch-family formulas, with zero dependencies. */
 function countSyllables(word: string): number {
@@ -96,4 +104,143 @@ export function analyzeText(text: string): TextAnalytics {
     fleschKincaidGrade: Math.round(fleschKincaidGrade * 10) / 10,
     topWords,
   }
+}
+
+// -- Sentence type / clause structure / phrase type -------------------------
+//
+// These are lexical-heuristic *estimates*, not a real grammatical parse --
+// there's no dependency-free way to do true part-of-speech tagging. Sentence
+// type is guessed from terminal punctuation plus a curated list of common
+// imperative lead verbs; clause structure from the presence of coordinating/
+// subordinating conjunctions; phrase-type counts are whole-text tallies of
+// words from curated preposition/determiner/auxiliary-verb lists, used as
+// stand-ins for prepositional/noun/verb phrases respectively.
+
+export interface SentenceTypeCounts {
+  declarative: number
+  interrogative: number
+  exclamatory: number
+  imperative: number
+}
+
+export interface ClauseStructureCounts {
+  simple: number
+  compound: number
+  complex: number
+  compoundComplex: number
+}
+
+export interface PhraseTypeCounts {
+  nounPhrase: number
+  verbPhrase: number
+  prepositionalPhrase: number
+}
+
+export interface SentenceStructureAnalytics {
+  totalSentences: number
+  sentenceTypes: SentenceTypeCounts
+  clauseStructure: ClauseStructureCounts
+  phraseTypes: PhraseTypeCounts
+}
+
+const IMPERATIVE_LEAD_VERBS = new Set([
+  'go', 'stop', 'come', 'look', 'listen', 'wait', 'run', 'walk', 'take', 'give', 'get', 'put', 'bring',
+  'hold', 'keep', 'let', 'make', 'do', 'try', 'remember', 'forget', 'imagine', 'consider', 'think', 'watch',
+  'be', 'turn', 'open', 'close', 'push', 'pull', 'move', 'stay', 'leave', 'help', 'tell', 'ask', 'call',
+  'write', 'read', 'check', 'use', 'follow', 'start', 'begin', 'finish', 'sit', 'stand', 'wake', 'hurry',
+  'hush', 'breathe', 'focus', 'relax', 'calm', 'please', 'never', 'always', 'add', 'remove', 'avoid',
+  'ignore', 'notice', 'picture', 'pretend', 'suppose', 'say', 'speak', 'shut', 'grab', 'drop', 'throw',
+  'catch', 'build', 'break', 'fix', 'clean', 'choose', 'pick', 'send', 'answer', 'explain', 'describe',
+  'continue', 'pause',
+])
+
+const COORDINATING_CONJUNCTIONS = new Set(['and', 'but', 'or', 'nor', 'so', 'yet'])
+
+const SUBORDINATING_CONJUNCTIONS = new Set([
+  'because', 'although', 'though', 'since', 'unless', 'while', 'whereas', 'if', 'when', 'whenever',
+  'before', 'after', 'until', 'as', 'that', 'which', 'who', 'whom', 'whose', 'where', 'once',
+])
+
+const PREPOSITIONS = new Set([
+  'in', 'on', 'at', 'by', 'with', 'about', 'against', 'between', 'into', 'through', 'during', 'before',
+  'after', 'above', 'below', 'to', 'from', 'up', 'down', 'of', 'off', 'over', 'under', 'again', 'further',
+  'near', 'since', 'until', 'without', 'within', 'along', 'across', 'behind', 'beside', 'beyond', 'except',
+  'inside', 'outside', 'toward', 'towards', 'upon', 'among', 'around',
+])
+
+const DETERMINERS = new Set([
+  'the', 'a', 'an', 'this', 'that', 'these', 'those', 'my', 'your', 'his', 'her', 'its', 'our', 'their',
+  'some', 'any', 'no', 'each', 'every', 'either', 'neither',
+])
+
+const AUX_VERBS = new Set([
+  'am', 'is', 'are', 'was', 'were', 'be', 'been', 'being', 'have', 'has', 'had', 'do', 'does', 'did',
+  'will', 'would', 'shall', 'should', 'may', 'might', 'must', 'can', 'could',
+])
+
+function normalizeWord(word: string): string {
+  return word.toLowerCase().replace(/[^a-z']/g, '')
+}
+
+function classifySentenceType(sentence: string): keyof SentenceTypeCounts {
+  const hasQuestion = sentence.includes('?')
+  const words = splitWords(sentence.replace(/["'“”‘’]/g, ''))
+  const firstWord = normalizeWord(words[0] ?? '')
+  const isImperative = IMPERATIVE_LEAD_VERBS.has(firstWord)
+  if (hasQuestion && !isImperative) return 'interrogative'
+  if (isImperative) return 'imperative'
+  if (sentence.includes('!')) return 'exclamatory'
+  return 'declarative'
+}
+
+function classifyClauseStructure(sentence: string): keyof ClauseStructureCounts {
+  const words = splitWords(sentence).map(normalizeWord)
+  const hasCoordinating = words.some((w, i) => i > 0 && COORDINATING_CONJUNCTIONS.has(w))
+  const hasSubordinating = words.some((w) => SUBORDINATING_CONJUNCTIONS.has(w))
+  if (hasCoordinating && hasSubordinating) return 'compoundComplex'
+  if (hasCoordinating) return 'compound'
+  if (hasSubordinating) return 'complex'
+  return 'simple'
+}
+
+function countPhraseTypes(words: string[]): PhraseTypeCounts {
+  let nounPhrase = 0
+  let verbPhrase = 0
+  let prepositionalPhrase = 0
+  for (const raw of words) {
+    const w = normalizeWord(raw)
+    if (!w) continue
+    if (DETERMINERS.has(w)) nounPhrase++
+    if (AUX_VERBS.has(w)) verbPhrase++
+    if (PREPOSITIONS.has(w)) prepositionalPhrase++
+  }
+  return { nounPhrase, verbPhrase, prepositionalPhrase }
+}
+
+export function analyzeSentenceStructure(text: string): SentenceStructureAnalytics {
+  const sentences = splitSentencesWithPunctuation(text)
+  const sentenceTypes: SentenceTypeCounts = { declarative: 0, interrogative: 0, exclamatory: 0, imperative: 0 }
+  const clauseStructure: ClauseStructureCounts = { simple: 0, compound: 0, complex: 0, compoundComplex: 0 }
+
+  for (const sentence of sentences) {
+    sentenceTypes[classifySentenceType(sentence)]++
+    clauseStructure[classifyClauseStructure(sentence)]++
+  }
+
+  return {
+    totalSentences: sentences.length,
+    sentenceTypes,
+    clauseStructure,
+    phraseTypes: countPhraseTypes(splitWords(text)),
+  }
+}
+
+/** Case-insensitive whole-word/phrase occurrence count, e.g. for detecting
+ * how often a plotline's keyword shows up in drafted prose. */
+export function countPhraseOccurrences(text: string, phrase: string): number {
+  const trimmed = phrase.trim()
+  if (!trimmed) return 0
+  const escaped = trimmed.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
+  const pattern = new RegExp(`\\b${escaped}\\b`, 'gi')
+  return (text.match(pattern) ?? []).length
 }

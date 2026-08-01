@@ -48,8 +48,6 @@ def update_project(
         index.settings.wordCountTarget = body.wordCountTarget
     if body.bookCountTarget is not None:
         index.settings.bookCountTarget = body.bookCountTarget
-    if body.chapterCountTarget is not None:
-        index.settings.chapterCountTarget = body.chapterCountTarget
     if body.bookWordCountTarget is not None:
         index.settings.bookWordCountTarget = body.bookWordCountTarget
     if body.chapterWordCountTarget is not None:

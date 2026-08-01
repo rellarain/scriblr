@@ -129,6 +129,19 @@ export function setCustomFieldValue(
   )
 }
 
+/** Plotline nodes whose id is in `plotlineIds` -- e.g. a book's "relevant
+ * plotlines" list (`OutlineNode.plotlineIds`). */
+export function getRelevantPlotlines(nodes: PlotNode[], plotlineIds: string[]): PlotNode[] {
+  return nodes.filter((n) => n.kind === 'plotline' && plotlineIds.includes(n.id))
+}
+
+/** A plotline's title is treated as an implicit keyword throughout the Plot
+ * sidebar UI (see `PlotNodeRow.tsx`) without being stored in `keywords` --
+ * mirrored here so keyword-usage detection matches what the UI shows. */
+export function plotlineKeywords(node: PlotNode): string[] {
+  return [node.title.trim(), ...node.keywords].filter(Boolean)
+}
+
 export function addKeyword(nodes: PlotNode[], plotlineId: string, keyword: string): PlotNode[] {
   const trimmed = keyword.trim()
   if (!trimmed) return nodes

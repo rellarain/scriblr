@@ -67,6 +67,7 @@ def get_analytics(root: Path, project_id: str) -> ProjectAnalytics:
             title=book.title,
             wordCount=rollup.get(book.id, 0),
             chapterCount=sum(1 for c in chapters if _ancestor_of_kind(nodes_by_id, c.id, "book") == book.id),
+            chapterCountTarget=book.chapterCountTarget,
         )
         for book in books
     ]
@@ -102,7 +103,6 @@ def get_analytics(root: Path, project_id: str) -> ProjectAnalytics:
     goals = ProjectAnalyticsGoals(
         wordCountTarget=index.settings.wordCountTarget,
         bookCountTarget=index.settings.bookCountTarget,
-        chapterCountTarget=index.settings.chapterCountTarget,
         bookWordCountTarget=index.settings.bookWordCountTarget,
         chapterWordCountTarget=index.settings.chapterWordCountTarget,
     )

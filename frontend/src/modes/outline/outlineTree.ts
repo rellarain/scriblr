@@ -72,6 +72,9 @@ export function addNode(
     synopsis: '',
     draftRef: kind === 'moment' ? id : null,
     flag: null,
+    color: null,
+    chapterCountTarget: null,
+    plotlineIds: [],
   }
   return [...nodes, node]
 }
@@ -82,6 +85,26 @@ export function renameNode(nodes: OutlineNode[], nodeId: string, title: string):
 
 export function setFlag(nodes: OutlineNode[], nodeId: string, flag: NodeFlag | null): OutlineNode[] {
   return nodes.map((n) => (n.id === nodeId ? { ...n, flag } : n))
+}
+
+// The following three setters are meaningful only on "book" nodes, mirroring
+// how draftRef is meaningful only on "moment" nodes -- still generic
+// nodes.map updates, no book-specific storage.
+
+export function setBookColor(nodes: OutlineNode[], bookId: string, color: string | null): OutlineNode[] {
+  return nodes.map((n) => (n.id === bookId ? { ...n, color } : n))
+}
+
+export function setBookChapterCountTarget(
+  nodes: OutlineNode[],
+  bookId: string,
+  chapterCountTarget: number | null
+): OutlineNode[] {
+  return nodes.map((n) => (n.id === bookId ? { ...n, chapterCountTarget } : n))
+}
+
+export function setBookPlotlineIds(nodes: OutlineNode[], bookId: string, plotlineIds: string[]): OutlineNode[] {
+  return nodes.map((n) => (n.id === bookId ? { ...n, plotlineIds } : n))
 }
 
 export function removeNode(nodes: OutlineNode[], nodeId: string): OutlineNode[] {
@@ -103,6 +126,9 @@ function makeNode(kind: OutlineNodeKind, parentId: string | null, order: number)
     synopsis: '',
     draftRef: kind === 'moment' ? id : null,
     flag: null,
+    color: null,
+    chapterCountTarget: null,
+    plotlineIds: [],
   }
 }
 

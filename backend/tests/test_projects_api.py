@@ -36,12 +36,19 @@ def test_update_project_metadata(client: TestClient) -> None:
     assert body["settings"]["wordCountTarget"] == 50000
 
 
+def test_project_wide_chapter_count_target_no_longer_accepted(client: TestClient) -> None:
+    project_id = client.post("/api/projects", json={"title": "No Project Chapter Goal"}).json()["projectId"]
+    resp = client.patch(f"/api/projects/{project_id}", json={"chapterCountTarget": 30})
+    assert resp.status_code == 200
+    assert "chapterCountTarget" not in resp.json()["settings"]
+
+
 def test_project_defaults_to_all_levels_and_can_be_customized(client: TestClient) -> None:
     project_id = client.post("/api/projects", json={"title": "Levels Test"}).json()["projectId"]
 
     resp = client.get(f"/api/projects/{project_id}")
     settings = resp.json()["index"]["settings"]
-    assert settings["outlineLevels"] == ["book", "arc", "chapter", "scene", "moment"]
+    assert settings["outlineLevels"] == ["book", "arc", "chapter", "act", "scene", "moment"]
     assert settings["plotLevels"] == ["category", "plotline", "plotpoint"]
 
     resp = client.patch(
@@ -61,7 +68,6 @@ def test_update_project_goals_priorities_and_routines(client: TestClient) -> Non
         f"/api/projects/{project_id}",
         json={
             "bookCountTarget": 3,
-            "chapterCountTarget": 30,
             "bookWordCountTarget": 80000,
             "chapterWordCountTarget": 2500,
             "priorities": [{"id": "p1", "label": "Finish Act 2", "order": 0}],
@@ -73,7 +79,6 @@ def test_update_project_goals_priorities_and_routines(client: TestClient) -> Non
     assert resp.status_code == 200
     settings = resp.json()["settings"]
     assert settings["bookCountTarget"] == 3
-    assert settings["chapterCountTarget"] == 30
     assert settings["bookWordCountTarget"] == 80000
     assert settings["chapterWordCountTarget"] == 2500
     assert settings["priorities"] == [{"id": "p1", "label": "Finish Act 2", "order": 0}]

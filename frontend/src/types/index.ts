@@ -22,7 +22,6 @@ export interface ProjectRoutine {
 export interface ProjectSettings {
   wordCountTarget: number | null
   bookCountTarget: number | null
-  chapterCountTarget: number | null
   bookWordCountTarget: number | null
   chapterWordCountTarget: number | null
   priorities: ProjectPriority[]
@@ -48,8 +47,8 @@ export interface ProjectIndex {
 // Structural depth, shallowest first. Nesting is flexible: a node's parent
 // may be any node of a strictly shallower kind, not necessarily the
 // adjacent one (e.g. a scene may nest directly under a book).
-export type OutlineNodeKind = 'book' | 'arc' | 'chapter' | 'scene' | 'moment'
-export const OUTLINE_KIND_ORDER: OutlineNodeKind[] = ['book', 'arc', 'chapter', 'scene', 'moment']
+export type OutlineNodeKind = 'book' | 'arc' | 'chapter' | 'act' | 'scene' | 'moment'
+export const OUTLINE_KIND_ORDER: OutlineNodeKind[] = ['book', 'arc', 'chapter', 'act', 'scene', 'moment']
 
 export type FlagType = 'review' | 'edit' | 'add' | 'delete'
 
@@ -69,6 +68,10 @@ export interface OutlineNode {
   draftRef: string | null
   // Flags this item for revision (review/edit/add/delete), with an optional note.
   flag: NodeFlag | null
+  // The following are set only on "book" nodes.
+  color: string | null
+  chapterCountTarget: number | null
+  plotlineIds: string[]
 }
 
 export interface OutlineTree {
@@ -282,7 +285,6 @@ export interface ProjectAnalyticsTotals {
 export interface ProjectAnalyticsGoals {
   wordCountTarget: number | null
   bookCountTarget: number | null
-  chapterCountTarget: number | null
   bookWordCountTarget: number | null
   chapterWordCountTarget: number | null
 }
@@ -292,6 +294,7 @@ export interface BookWordCount {
   title: string
   wordCount: number
   chapterCount: number
+  chapterCountTarget: number | null
 }
 
 export interface ChapterWordCount {
