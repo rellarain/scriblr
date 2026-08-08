@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { useParams } from 'react-router-dom'
 import { usePlot, useSavePlot } from '../../api/plot'
+import { usePresets } from '../../api/presets'
 import { useProject, useUpdateProject } from '../../api/projects'
 import { PLOT_KIND_ORDER } from '../../types'
 import type { NodeFlag, PlotNode, PlotNodeKind, PlotTree } from '../../types'
@@ -9,6 +10,7 @@ import {
   addCategory,
   addCustomFieldDef,
   addKeyword,
+  applyPresetCategory,
   canReparentNode,
   createChildNode,
   createSiblingNode,
@@ -25,6 +27,7 @@ import {
   reparentNode,
   setCustomFieldValue,
   setFlag,
+  syncFieldPlotpoint,
   updatePlotpointBody,
 } from './plotTree'
 
@@ -39,11 +42,14 @@ function PlotSidebar() {
   const { projectId } = useParams<{ projectId: string }>()
   const { data, isLoading, error } = usePlot(projectId)
   const { data: project } = useProject(projectId)
+  const { data: presetCatalog } = usePresets()
+  const presetCategories = presetCatalog?.presets ?? []
   const savePlot = useSavePlot(projectId ?? '')
   const updateProject = useUpdateProject(projectId ?? '')
 
   const [nodes, setNodes] = useState<PlotNode[]>([])
   const [newCategoryTitle, setNewCategoryTitle] = useState('')
+  const [selectedPreset, setSelectedPreset] = useState('')
   const [pendingFocus, setPendingFocus] = useState<string | null>(null)
   // Presence in this set means "expanded" -- an empty set at load means
   // every category/plotline starts collapsed/minimized.
@@ -213,7 +219,13 @@ function PlotSidebar() {
 
   function handleSetCustomFieldValue(plotlineId: string, fieldId: string, value: string) {
     pendingSibling.current = null
-    setNodes((prev) => setCustomFieldValue(prev, plotlineId, fieldId, value))
+    setNodes((prev) => {
+      const withValue = setCustomFieldValue(prev, plotlineId, fieldId, value)
+      const plotline = withValue.find((n) => n.id === plotlineId)
+      const parent = plotline ? withValue.find((n) => n.id === plotline.parentId) : undefined
+      const fieldName = parent?.customFieldDefs.find((f) => f.id === fieldId)?.name ?? ''
+      return syncFieldPlotpoint(withValue, plotlineId, fieldId, fieldName, value)
+    })
     scheduleSave()
   }
 
@@ -265,10 +277,17 @@ function PlotSidebar() {
   function handleAddCategory() {
     const title = newCategoryTitle.trim()
     if (!title) return
-    const next = addCategory(nodes, title)
+    const preset = presetCategories.find((p) => p.name === selectedPreset)
+    const next = preset ? applyPresetCategory(nodes, title, preset.fields) : addCategory(nodes, title)
     setNodes(next)
     saveNow(next)
     setNewCategoryTitle('')
+    setSelectedPreset('')
+  }
+
+  function handleSelectPreset(name: string) {
+    setSelectedPreset(name)
+    if (name) setNewCategoryTitle(name)
   }
 
   function toggleLevel(kind: PlotNodeKind) {
@@ -302,20 +321,26 @@ function PlotSidebar() {
         ))}
       </div>
 
-      {nodes.length === 0 && (
-        <div className="plot-sidebar__add-category">
-          <input
-            type="text"
-            placeholder="New category title"
-            value={newCategoryTitle}
-            onChange={(e) => setNewCategoryTitle(e.target.value)}
-            onKeyDown={(e) => e.key === 'Enter' && handleAddCategory()}
-          />
-          <button type="button" onClick={handleAddCategory}>
-            Add category
-          </button>
-        </div>
-      )}
+      <div className="plot-sidebar__add-category">
+        <select value={selectedPreset} onChange={(e) => handleSelectPreset(e.target.value)}>
+          <option value="">Custom category</option>
+          {presetCategories.map((preset) => (
+            <option key={preset.id} value={preset.name}>
+              {preset.name}
+            </option>
+          ))}
+        </select>
+        <input
+          type="text"
+          placeholder="Category title"
+          value={newCategoryTitle}
+          onChange={(e) => setNewCategoryTitle(e.target.value)}
+          onKeyDown={(e) => e.key === 'Enter' && handleAddCategory()}
+        />
+        <button type="button" onClick={handleAddCategory}>
+          Add category
+        </button>
+      </div>
 
       <PlotTreeView
         nodes={nodes}

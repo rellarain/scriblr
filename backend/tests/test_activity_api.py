@@ -17,11 +17,12 @@ def test_activity_aggregates_outline_plot_and_draft_events(client: TestClient) -
     client.put(f"/api/projects/{project_id}/outline", json=tree)
 
     moment_id = "moment_1"
+    chapter_id = "chapter_1"
     client.put(
-        f"/api/projects/{project_id}/draft/{moment_id}",
+        f"/api/projects/{project_id}/draft/chapter/{chapter_id}/moment/{moment_id}",
         json={"outlineNodeId": moment_id, "body": "Four words here now."},
     )
-    client.post(f"/api/projects/{project_id}/revisions/{moment_id}", json={"label": "v1"})
+    client.post(f"/api/projects/{project_id}/revisions/{chapter_id}")
 
     resp = client.get(f"/api/projects/{project_id}/activity")
     assert resp.status_code == 200
@@ -36,7 +37,7 @@ def test_activity_aggregates_outline_plot_and_draft_events(client: TestClient) -
     assert types == {"outline", "draft"}
 
     draft_entry = next(e for e in body["log"] if e["type"] == "draft")
-    assert draft_entry["momentId"] == moment_id
+    assert draft_entry["chapterId"] == chapter_id
     assert draft_entry["wordCount"] == 4
 
     # Reverse-chronological.

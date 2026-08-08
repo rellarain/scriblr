@@ -3,21 +3,32 @@ import { NavLink, Outlet, useNavigate, useParams } from 'react-router-dom'
 import { useProject } from '../../api/projects'
 import { useOutline, useSaveOutline } from '../../api/outline'
 import { useScrap } from '../../api/scrap'
-import ChapterNav from './ChapterNav'
+import Bookshelf from './Bookshelf'
 import ScrapBinPanel from '../../modes/draft/ScrapBinPanel'
+import BulletinBoardOverlay from '../../modes/dashboard/BulletinBoardOverlay'
+import PlotDrawer from '../../modes/plot/PlotDrawer'
+import ConfigurationPanel from '../../modes/workspace/ConfigurationPanel'
+import SchedulePanel from '../../modes/workspace/SchedulePanel'
 import { addBook, ancestorOfKind } from '../../modes/outline/outlineTree'
+import type { OutlineNode } from '../../types'
 
 const COLLAPSED_STORAGE_KEY = 'scriblr:navCollapsed'
 
-/** Resolves a scrap entry to whichever of its last-known ancestors still
- * exists in the live tree (chapter first, then book), or null if neither
- * survives -- used both for sidebar badge counts and for scoping the scrap
- * bin panel to whichever badge was clicked. */
-function scrapGroupKey(
+type SidebarOverlay = 'plot' | 'dashboard' | 'settings' | null
+
+/** Resolves a scrap entry to its book ancestor -- chapters no longer have
+ * their own sidebar row (chapter nav moved into the book face's tab
+ * dividers), so every scrap badge is shown at the book level, aggregating
+ * across all of that book's chapters. */
+function scrapBookKey(
   entry: { lastChapterId: string | null; lastBookId: string | null },
+  nodes: OutlineNode[],
   liveIds: Set<string>
 ): string | null {
-  if (entry.lastChapterId && liveIds.has(entry.lastChapterId)) return entry.lastChapterId
+  if (entry.lastChapterId && liveIds.has(entry.lastChapterId)) {
+    const book = ancestorOfKind(nodes, entry.lastChapterId, 'book')
+    if (book) return book.id
+  }
   if (entry.lastBookId && liveIds.has(entry.lastBookId)) return entry.lastBookId
   return null
 }
@@ -35,6 +46,7 @@ function ProjectShell() {
   const saveOutline = useSaveOutline(projectId ?? '')
   const [collapsed, setCollapsed] = useState(() => localStorage.getItem(COLLAPSED_STORAGE_KEY) !== '0')
   const [scrapPanelScope, setScrapPanelScope] = useState<string | null>(null)
+  const [overlay, setOverlay] = useState<SidebarOverlay>(null)
 
   function toggleCollapsed() {
     setCollapsed((prev) => {
@@ -48,11 +60,11 @@ function ProjectShell() {
   const liveIds = new Set(nodes.map((n) => n.id))
   const scrapCountsByNodeId: Record<string, number> = {}
   for (const entry of scrapRegistry?.entries ?? []) {
-    const key = scrapGroupKey(entry, liveIds)
+    const key = scrapBookKey(entry, nodes, liveIds)
     if (key) scrapCountsByNodeId[key] = (scrapCountsByNodeId[key] ?? 0) + 1
   }
   const scopeEntries = scrapPanelScope
-    ? (scrapRegistry?.entries ?? []).filter((e) => scrapGroupKey(e, liveIds) === scrapPanelScope)
+    ? (scrapRegistry?.entries ?? []).filter((e) => scrapBookKey(e, nodes, liveIds) === scrapPanelScope)
     : []
 
   function handleAddBook() {
@@ -83,21 +95,19 @@ function ProjectShell() {
             {isLoading ? 'Loading…' : data?.index.title ?? 'Untitled'}
           </h2>
         )}
-        {!collapsed && (
-          <ChapterNav
+        {!collapsed && projectId && (
+          <Bookshelf
+            projectId={projectId}
             nodes={nodes}
             selectedBookId={bookId}
-            selectedChapterId={chapterId}
             onSelectProject={() => navigate(`/project/${projectId}`)}
             onSelectBook={(id) => navigate(`/project/${projectId}/book/${id}`)}
-            onSelectChapter={(id) => {
-              const parentBookId = bookId ?? ancestorOfKind(nodes, id, 'book')?.id
-              if (!parentBookId) return
-              navigate(`/project/${projectId}/book/${parentBookId}/chapter/${id}`)
-            }}
             onAddBook={handleAddBook}
             scrapCountsByNodeId={scrapCountsByNodeId}
             onScrapBadgeClick={setScrapPanelScope}
+            onOpenPlot={() => setOverlay('plot')}
+            onOpenDashboard={() => setOverlay('dashboard')}
+            onOpenSettings={() => setOverlay('settings')}
           />
         )}
         {!collapsed &&
@@ -118,6 +128,24 @@ function ProjectShell() {
             nodes={nodes}
             onClose={() => setScrapPanelScope(null)}
           />
+        </div>
+      )}
+      {overlay === 'plot' && <PlotDrawer onClose={() => setOverlay(null)} />}
+      {overlay === 'dashboard' && projectId && (
+        <BulletinBoardOverlay projectId={projectId} nodes={nodes} onClose={() => setOverlay(null)} />
+      )}
+      {overlay === 'settings' && (
+        <div className="project-shell__settings-overlay">
+          <div className="project-shell__settings-panel">
+            <div className="project-shell__settings-header">
+              <h3>Settings</h3>
+              <button type="button" onClick={() => setOverlay(null)}>
+                Close
+              </button>
+            </div>
+            <ConfigurationPanel />
+            <SchedulePanel />
+          </div>
         </div>
       )}
     </div>

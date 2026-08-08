@@ -98,3 +98,33 @@ def test_book_fields_default_to_empty_when_unset(client: TestClient) -> None:
     assert book["color"] is None
     assert book["chapterCountTarget"] is None
     assert book["plotlineIds"] == []
+    assert book["wordCountGoal"] is None
+
+
+def test_book_word_count_goal_round_trips(client: TestClient) -> None:
+    project_id = client.post("/api/projects", json={"title": "Word Count Goal Test"}).json()["projectId"]
+    tree = client.get(f"/api/projects/{project_id}/outline").json()
+    tree["nodes"][0]["wordCountGoal"] = 80000
+
+    resp = client.put(f"/api/projects/{project_id}/outline", json=tree)
+    assert resp.status_code == 200
+    assert resp.json()["nodes"][0]["wordCountGoal"] == 80000
+
+    resp = client.get(f"/api/projects/{project_id}/outline")
+    assert resp.json()["nodes"][0]["wordCountGoal"] == 80000
+
+
+def test_series_level_nests_above_book(client: TestClient) -> None:
+    project_id = client.post("/api/projects", json={"title": "Series Level Test"}).json()["projectId"]
+    tree = client.get(f"/api/projects/{project_id}/outline").json()
+    book_id = tree["nodes"][0]["id"]
+    tree["nodes"].append({"id": "series_1", "kind": "series", "parentId": None, "order": 0, "title": "The Saga"})
+    tree["nodes"][0]["parentId"] = "series_1"
+
+    resp = client.put(f"/api/projects/{project_id}/outline", json=tree)
+    assert resp.status_code == 200
+
+    resp = client.get(f"/api/projects/{project_id}/outline")
+    nodes_by_id = {n["id"]: n for n in resp.json()["nodes"]}
+    assert nodes_by_id["series_1"]["kind"] == "series"
+    assert nodes_by_id[book_id]["parentId"] == "series_1"

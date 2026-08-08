@@ -10,6 +10,8 @@ from pydantic import BaseModel, ValidationError
 
 from .schema import (
     DailyActivityLog,
+    DraftChapter,
+    DraftChapterMoment,
     DraftMoment,
     OutlineTree,
     PlotTree,
@@ -39,11 +41,11 @@ class MomentNotFoundError(Exception):
 
 
 class SnapshotNotFoundError(Exception):
-    def __init__(self, project_id: str, moment_id: str, snapshot_id: str) -> None:
+    def __init__(self, project_id: str, chapter_id: str, snapshot_id: str) -> None:
         self.project_id = project_id
-        self.moment_id = moment_id
+        self.chapter_id = chapter_id
         self.snapshot_id = snapshot_id
-        super().__init__(f"snapshot not found: {project_id}/{moment_id}/{snapshot_id}")
+        super().__init__(f"snapshot not found: {project_id}/{chapter_id}/{snapshot_id}")
 
 
 class TreeSnapshotNotFoundError(Exception):
@@ -149,16 +151,23 @@ def _plot_path(project_dir: Path) -> Path:
     return project_dir / "brainstorm" / "plot.json"
 
 
-def _draft_path(project_dir: Path, moment_id: str) -> Path:
+def _legacy_draft_path(project_dir: Path, moment_id: str) -> Path:
+    """Old, pre-hierarchy-overhaul shape: one file per moment. No longer
+    written, but still read as a one-time migration source (see
+    load_draft) -- never deleted automatically, kept as a safety net."""
     return project_dir / "draft" / f"{moment_id}.json"
 
 
-def _revision_dir(project_dir: Path, moment_id: str) -> Path:
-    return project_dir / "revisions" / moment_id
+def _chapter_draft_path(project_dir: Path, chapter_id: str) -> Path:
+    return project_dir / "draft" / f"{chapter_id}.json"
 
 
-def _revision_path(project_dir: Path, moment_id: str, snapshot_id: str) -> Path:
-    return _revision_dir(project_dir, moment_id) / f"{snapshot_id}.json"
+def _revision_dir(project_dir: Path, chapter_id: str) -> Path:
+    return project_dir / "revisions" / chapter_id
+
+
+def _revision_path(project_dir: Path, chapter_id: str, snapshot_id: str) -> Path:
+    return _revision_dir(project_dir, chapter_id) / f"{snapshot_id}.json"
 
 
 def _tree_history_dir(project_dir: Path, tree_type: TreeType) -> Path:
@@ -297,27 +306,68 @@ def save_plot(root: Path, project_id: str, plot: PlotTree) -> None:
 
 
 # ---------------------------------------------------------------------------
-# Draft moments
+# Draft moments -- stored on disk as one file per CHAPTER (DraftChapter),
+# keyed by moment id, but load_draft/save_draft/delete_draft keep the
+# per-moment API shape (DraftMoment) so callers (API routes, analytics, pdf
+# export, scrap) barely change: they now also pass the moment's chapter_id
+# (resolved via the outline tree, which every caller already has or can
+# easily get), and the server does an atomic read-merge-write into the
+# shared chapter file underneath.
 # ---------------------------------------------------------------------------
 
 
-def load_draft(root: Path, project_id: str, moment_id: str) -> DraftMoment:
+def load_draft_chapter(root: Path, project_id: str, chapter_id: str) -> DraftChapter:
     project_dir = project_dir_of(root, project_id)
     if not project_dir.exists():
         raise ProjectNotFoundError(project_id)
-    path = _draft_path(project_dir, moment_id)
+    path = _chapter_draft_path(project_dir, chapter_id)
     if not path.exists():
-        raise MomentNotFoundError(project_id, moment_id)
-    return _read_shard(path, DraftMoment)
+        return DraftChapter(chapterId=chapter_id, updatedAt=utcnow())
+    return _read_shard(path, DraftChapter)
 
 
-def save_draft(root: Path, project_id: str, moment_id: str, draft: DraftMoment) -> None:
+def _save_draft_chapter(project_dir: Path, chapter: DraftChapter) -> None:
+    _write_shard(project_dir, _chapter_draft_path(project_dir, chapter.chapterId), chapter)
+
+
+def load_draft(root: Path, project_id: str, chapter_id: str, moment_id: str) -> DraftMoment:
     project_dir = project_dir_of(root, project_id)
     if not project_dir.exists():
         raise ProjectNotFoundError(project_id)
-    path = _draft_path(project_dir, moment_id)
-    is_new = not path.exists()
-    _write_shard(project_dir, path, draft)
+    chapter = load_draft_chapter(root, project_id, chapter_id)
+    entry = chapter.moments.get(moment_id)
+    if entry is None:
+        # One-time migration: fold in an old-shape per-moment file if one
+        # exists, then persist it into the chapter file so this only
+        # happens once. The legacy file itself is left on disk untouched.
+        legacy_path = _legacy_draft_path(project_dir, moment_id)
+        if not legacy_path.exists():
+            raise MomentNotFoundError(project_id, moment_id)
+        legacy = _read_shard(legacy_path, DraftMoment)
+        entry = DraftChapterMoment(body=legacy.body, wordCount=legacy.wordCount, updatedAt=legacy.updatedAt)
+        chapter.moments[moment_id] = entry
+        chapter.updatedAt = utcnow()
+        _save_draft_chapter(project_dir, chapter)
+    return DraftMoment(
+        momentId=moment_id,
+        outlineNodeId=moment_id,
+        updatedAt=entry.updatedAt,
+        wordCount=entry.wordCount,
+        body=entry.body,
+    )
+
+
+def save_draft(root: Path, project_id: str, chapter_id: str, moment_id: str, draft: DraftMoment) -> None:
+    project_dir = project_dir_of(root, project_id)
+    if not project_dir.exists():
+        raise ProjectNotFoundError(project_id)
+    chapter = load_draft_chapter(root, project_id, chapter_id)
+    is_new = moment_id not in chapter.moments
+    chapter.moments[moment_id] = DraftChapterMoment(
+        body=draft.body, wordCount=draft.wordCount, updatedAt=draft.updatedAt
+    )
+    chapter.updatedAt = utcnow()
+    _save_draft_chapter(project_dir, chapter)
     if is_new:
         index = load_index(root, project_id)
         if moment_id not in index.manifest.draftMoments:
@@ -326,14 +376,23 @@ def save_draft(root: Path, project_id: str, moment_id: str, draft: DraftMoment) 
         save_index(root, index)
 
 
-def delete_draft(root: Path, project_id: str, moment_id: str) -> None:
+def delete_draft(root: Path, project_id: str, chapter_id: str, moment_id: str) -> None:
     project_dir = project_dir_of(root, project_id)
     if not project_dir.exists():
         raise ProjectNotFoundError(project_id)
-    path = _draft_path(project_dir, moment_id)
-    if not path.exists():
+    chapter = load_draft_chapter(root, project_id, chapter_id)
+    removed = False
+    if moment_id in chapter.moments:
+        del chapter.moments[moment_id]
+        chapter.updatedAt = utcnow()
+        _save_draft_chapter(project_dir, chapter)
+        removed = True
+    legacy_path = _legacy_draft_path(project_dir, moment_id)
+    if legacy_path.exists():
+        legacy_path.unlink()
+        removed = True
+    if not removed:
         raise MomentNotFoundError(project_id, moment_id)
-    path.unlink()
     index = load_index(root, project_id)
     if moment_id in index.manifest.draftMoments:
         index.manifest.draftMoments.remove(moment_id)
@@ -342,15 +401,19 @@ def delete_draft(root: Path, project_id: str, moment_id: str) -> None:
 
 
 # ---------------------------------------------------------------------------
-# Revisions
+# Revisions -- moved from per-moment to per-CHAPTER (see RevisionSnapshot),
+# a snapshot captures a chapter's whole moments-map at once. "auto"-trigger
+# snapshots always use the fixed snapshotId "auto", so saving one overwrites
+# the same file (a single rolling slot) instead of appending; "manual"
+# snapshots get a fresh id each time, same as before.
 # ---------------------------------------------------------------------------
 
 
-def list_revisions(root: Path, project_id: str, moment_id: str) -> list[RevisionSnapshot]:
+def list_revisions(root: Path, project_id: str, chapter_id: str) -> list[RevisionSnapshot]:
     project_dir = project_dir_of(root, project_id)
     if not project_dir.exists():
         raise ProjectNotFoundError(project_id)
-    rev_dir = _revision_dir(project_dir, moment_id)
+    rev_dir = _revision_dir(project_dir, chapter_id)
     if not rev_dir.exists():
         return []
     snapshots: list[RevisionSnapshot] = []
@@ -363,25 +426,74 @@ def list_revisions(root: Path, project_id: str, moment_id: str) -> list[Revision
     return snapshots
 
 
-def load_revision(root: Path, project_id: str, moment_id: str, snapshot_id: str) -> RevisionSnapshot:
+def load_revision(root: Path, project_id: str, chapter_id: str, snapshot_id: str) -> RevisionSnapshot:
     project_dir = project_dir_of(root, project_id)
     if not project_dir.exists():
         raise ProjectNotFoundError(project_id)
-    path = _revision_path(project_dir, moment_id, snapshot_id)
+    path = _revision_path(project_dir, chapter_id, snapshot_id)
     if not path.exists():
-        raise SnapshotNotFoundError(project_id, moment_id, snapshot_id)
+        raise SnapshotNotFoundError(project_id, chapter_id, snapshot_id)
     return _read_shard(path, RevisionSnapshot)
+
+
+def migrate_legacy_revisions(root: Path, project_id: str, chapter_id: str, moment_ids: list[str]) -> None:
+    """One-time migration: old-shape per-moment revision directories
+    (revisions/<moment_id>/<snapshot_id>.json, a single body: str) get
+    folded into the new per-chapter shape -- one new snapshot per old
+    snapshot, each containing just that one moment's body (never merged
+    across moments, since old snapshots for different moments were never
+    taken together). Old files are left on disk untouched. No-op if a
+    moment has no legacy directory, or if a given snapshot id was already
+    migrated."""
+    project_dir = project_dir_of(root, project_id)
+    if not project_dir.exists():
+        raise ProjectNotFoundError(project_id)
+    new_rev_dir = _revision_dir(project_dir, chapter_id)
+    migrated_any = False
+    for moment_id in moment_ids:
+        legacy_dir = project_dir / "revisions" / moment_id
+        if not legacy_dir.exists():
+            continue
+        for entry in sorted(legacy_dir.glob("*.json")):
+            new_path = new_rev_dir / entry.name
+            if new_path.exists():
+                continue
+            try:
+                data = json.loads(entry.read_text(encoding="utf-8"))
+            except (json.JSONDecodeError, UnicodeDecodeError):
+                continue
+            snapshot = RevisionSnapshot(
+                snapshotId=data["snapshotId"],
+                chapterId=chapter_id,
+                createdAt=data["createdAt"],
+                label=data.get("label", ""),
+                trigger=data.get("trigger", "manual"),
+                moments={moment_id: data.get("body", "")},
+                wordCount=data.get("wordCount", 0),
+                notes=[
+                    {**note, "anchor": {**note["anchor"], "momentId": moment_id}}
+                    for note in data.get("notes", [])
+                ],
+            )
+            _write_shard(project_dir, new_path, snapshot)
+            migrated_any = True
+    if migrated_any:
+        index = load_index(root, project_id)
+        if chapter_id not in index.manifest.revisionChapters:
+            index.manifest.revisionChapters.append(chapter_id)
+            index.updatedAt = utcnow()
+            save_index(root, index)
 
 
 def save_revision(root: Path, project_id: str, snapshot: RevisionSnapshot) -> None:
     project_dir = project_dir_of(root, project_id)
     if not project_dir.exists():
         raise ProjectNotFoundError(project_id)
-    path = _revision_path(project_dir, snapshot.momentId, snapshot.snapshotId)
+    path = _revision_path(project_dir, snapshot.chapterId, snapshot.snapshotId)
     _write_shard(project_dir, path, snapshot)
     index = load_index(root, project_id)
-    if snapshot.momentId not in index.manifest.revisionMoments:
-        index.manifest.revisionMoments.append(snapshot.momentId)
+    if snapshot.chapterId not in index.manifest.revisionChapters:
+        index.manifest.revisionChapters.append(snapshot.chapterId)
         index.updatedAt = utcnow()
         save_index(root, index)
 
@@ -499,19 +611,3 @@ def save_scrap_registry(root: Path, project_id: str, registry: ScrapRegistry) ->
     if not project_dir.exists():
         raise ProjectNotFoundError(project_id)
     _write_shard(project_dir, _scrap_registry_path(project_dir), registry)
-
-
-def delete_revision_history(root: Path, project_id: str, moment_id: str) -> None:
-    """Permanently removes a moment's revision history directory, tolerant
-    of it not existing (e.g. the moment was never manually snapshotted)."""
-    project_dir = project_dir_of(root, project_id)
-    if not project_dir.exists():
-        raise ProjectNotFoundError(project_id)
-    rev_dir = _revision_dir(project_dir, moment_id)
-    if rev_dir.exists():
-        shutil.rmtree(rev_dir)
-    index = load_index(root, project_id)
-    if moment_id in index.manifest.revisionMoments:
-        index.manifest.revisionMoments.remove(moment_id)
-        index.updatedAt = utcnow()
-        save_index(root, index)

@@ -23,11 +23,11 @@ function ConfigurationPanel() {
   const outlineLevels = settings.outlineLevels
 
   function toggleOutlineLevel(kind: OutlineNodeKind) {
-    if (kind === 'book') return
+    if (kind === 'book' || kind === 'chapter') return
     const set = new Set(outlineLevels)
     if (set.has(kind)) set.delete(kind)
     else set.add(kind)
-    const ordered = OUTLINE_KIND_ORDER.filter((k) => k === 'book' || set.has(k))
+    const ordered = OUTLINE_KIND_ORDER.filter((k) => k === 'book' || k === 'chapter' || set.has(k))
     updateProject.mutate({ outlineLevels: ordered })
   }
 
@@ -123,7 +123,7 @@ function ConfigurationPanel() {
               <input
                 type="checkbox"
                 checked={outlineLevels.includes(kind)}
-                disabled={kind === 'book'}
+                disabled={kind === 'book' || kind === 'chapter'}
                 onChange={() => toggleOutlineLevel(kind)}
               />
               {kind}

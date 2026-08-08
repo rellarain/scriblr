@@ -18,7 +18,8 @@ function ScrapBinPanel({ projectId, entries, nodes, onClose }: Props) {
 
   const restoreMutation = useRestoreScrapEntry(projectId)
   const deleteMutation = useDeleteScrapEntry(projectId)
-  const viewDraft = useDraft(projectId, viewingId ?? undefined)
+  const viewingEntry = viewingId ? entries.find((e) => e.momentId === viewingId) : undefined
+  const viewDraft = useDraft(projectId, viewingEntry?.lastChapterId ?? undefined, viewingId ?? undefined)
 
   const chapters = nodes.filter((n) => n.kind === 'chapter')
 

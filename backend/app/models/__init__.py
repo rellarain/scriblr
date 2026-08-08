@@ -49,11 +49,8 @@ class UpsertDraftRequest(BaseModel):
     body: str
 
 
-class CreateSnapshotRequest(BaseModel):
-    label: str = ""
-
-
 class AddCommentRequest(BaseModel):
+    momentId: str
     body: str
     anchorStart: int
     anchorEnd: int

@@ -2,7 +2,7 @@ export interface ProjectManifest {
   outline: string
   plot: string
   draftMoments: string[]
-  revisionMoments: string[]
+  revisionChapters: string[]
 }
 
 export interface ProjectPriority {
@@ -47,8 +47,10 @@ export interface ProjectIndex {
 // Structural depth, shallowest first. Nesting is flexible: a node's parent
 // may be any node of a strictly shallower kind, not necessarily the
 // adjacent one (e.g. a scene may nest directly under a book).
-export type OutlineNodeKind = 'book' | 'arc' | 'chapter' | 'act' | 'scene' | 'moment'
-export const OUTLINE_KIND_ORDER: OutlineNodeKind[] = ['book', 'arc', 'chapter', 'act', 'scene', 'moment']
+// "series" is optional; "book" and "chapter" are the only two required/
+// non-toggleable levels (see ProjectSettings.outlineLevels).
+export type OutlineNodeKind = 'series' | 'book' | 'arc' | 'chapter' | 'act' | 'scene' | 'moment'
+export const OUTLINE_KIND_ORDER: OutlineNodeKind[] = ['series', 'book', 'arc', 'chapter', 'act', 'scene', 'moment']
 
 export type FlagType = 'review' | 'edit' | 'add' | 'delete'
 
@@ -72,6 +74,8 @@ export interface OutlineNode {
   color: string | null
   chapterCountTarget: number | null
   plotlineIds: string[]
+  // Book's total word-count ambition -- drives bookshelf spine width/fill.
+  wordCountGoal: number | null
 }
 
 export interface OutlineTree {
@@ -79,10 +83,10 @@ export interface OutlineTree {
   nodes: OutlineNode[]
 }
 
-// Plot tree: category -> plotline -> plotpoint, mirroring the outline
-// tree's flat-list-with-parentId shape.
-export type PlotNodeKind = 'category' | 'plotline' | 'plotpoint'
-export const PLOT_KIND_ORDER: PlotNodeKind[] = ['category', 'plotline', 'plotpoint']
+// Plot tree: category -> subcategory -> plotline -> plotpoint, mirroring
+// the outline tree's flat-list-with-parentId shape.
+export type PlotNodeKind = 'category' | 'subcategory' | 'plotline' | 'plotpoint'
+export const PLOT_KIND_ORDER: PlotNodeKind[] = ['category', 'subcategory', 'plotline', 'plotpoint']
 
 export interface PlotCustomFieldDef {
   id: string
@@ -99,8 +103,18 @@ export interface PlotNode {
   body: string
   // Set only on "plotpoint" nodes: the moment (outline node id) assigned.
   assignedMomentId: string | null
-  // Set only on "category" nodes: custom field definitions plotlines within
-  // this category can fill in.
+  // Set only on "plotpoint" nodes, and only meaningful alongside
+  // assignedMomentId: which paragraph (0-indexed) within that moment's
+  // draft this plotpoint is anchored to. Fragile to edits, same tradeoff
+  // class as CommentAnchor -- no reconciliation on paragraph insert/delete.
+  assignedParagraphIndex: number | null
+  // Set only on "plotpoint" nodes that are a live mirror of a plotline's
+  // custom field value: the PlotCustomFieldDef.id it mirrors. Used to find
+  // the existing mirror plotpoint idempotently on every keystroke rather
+  // than creating duplicates. null for ordinary, manually-created plotpoints.
+  sourceFieldId: string | null
+  // Set only on "category" or "subcategory" nodes: custom field definitions
+  // that plotlines within this category/subcategory can fill in.
   customFieldDefs: PlotCustomFieldDef[]
   // Set only on "plotline" nodes: values for the parent category's custom
   // fields, keyed by PlotCustomFieldDef.id.
@@ -116,6 +130,23 @@ export interface PlotTree {
   nodes: PlotNode[]
 }
 
+// Global (not project-scoped) catalog of starter field-name sets for the
+// Plot sidebar's "Add category" picker, editable from the admin panel
+// reachable from the project picker.
+export interface PresetCategory {
+  id: string
+  name: string
+  fields: string[]
+}
+
+export interface PresetCatalog {
+  schemaVersion: number
+  presets: PresetCategory[]
+}
+
+// Per-moment draft shape -- still the API request/response unit for a
+// single moment's prose, even though storage moved to one shared file per
+// chapter (see DraftChapter below).
 export interface DraftMoment {
   schemaVersion: number
   momentId: string
@@ -126,10 +157,27 @@ export interface DraftMoment {
   body: string
 }
 
+export interface DraftChapterMoment {
+  body: string
+  wordCount: number
+  updatedAt: string
+}
+
+// GET /draft/chapter/{chapterId} -- the whole chapter's moments in one call.
+export interface DraftChapter {
+  schemaVersion: number
+  chapterId: string
+  updatedAt: string
+  moments: Record<string, DraftChapterMoment>
+}
+
 export type CommentFlag = 'primary' | 'secondary' | null
 
 export interface CommentAnchor {
   type: 'text-offset'
+  // Which moment (within the chapter-scoped revision snapshot) this
+  // comment's start/end offsets are measured against.
+  momentId: string
   start: number
   end: number
 }
@@ -142,16 +190,21 @@ export interface RevisionComment {
   createdAt: string
 }
 
-export type RevisionTrigger = 'manual'
+// "manual" = floppy-disk button, no naming step, label is the save's own
+// formatted date/time. "auto" = fires after 5 minutes of inactivity and
+// overwrites a single rolling slot per chapter rather than appending.
+export type RevisionTrigger = 'manual' | 'auto'
 
+// Snapshots are chapter-scoped -- a snapshot captures a chapter's whole
+// moments-map at once, consistent with drafts becoming chapter-scoped.
 export interface RevisionSnapshot {
   schemaVersion: number
   snapshotId: string
-  momentId: string
+  chapterId: string
   createdAt: string
   label: string
   trigger: RevisionTrigger
-  body: string
+  moments: Record<string, string>
   wordCount: number
   notes: RevisionComment[]
 }
@@ -260,7 +313,8 @@ export interface ActivityLogEntry {
   createdAt: string
   label: string
   trigger: string
-  momentId: string | null
+  // Set for "draft" entries -- which chapter's revision this is.
+  chapterId: string | null
   wordCount: number | null
 }
 

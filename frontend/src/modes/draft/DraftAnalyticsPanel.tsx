@@ -4,8 +4,8 @@ import { api } from '../../api/client'
 import { useDraft } from '../../api/draft'
 import { usePlot } from '../../api/plot'
 import { analyzeSentenceStructure, analyzeText, countPhraseOccurrences } from '../../lib/textAnalytics'
-import type { DraftMoment, OutlineNode } from '../../types'
-import { ancestorOfKind, momentsInSubtree } from '../outline/outlineTree'
+import type { DraftChapter, OutlineNode } from '../../types'
+import { ancestorOfKind, subtreeOrder } from '../outline/outlineTree'
 import { getRelevantPlotlines, plotlineKeywords } from '../plan/plotTree'
 
 type Scope = 'moment' | 'chapter' | 'book'
@@ -45,36 +45,33 @@ const PHRASE_TYPE_LABELS: Record<string, string> = {
 
 // Moment scope reads the existing useDraft cache (refreshes ~1.5s after
 // typing pauses, via MomentEditor's autosave) -- no live-per-keystroke wiring
-// into MomentEditor. Chapter/Book scope uses useQueries to collect every
-// moment's body in one place for aggregation, which per-moment rendering
-// (as Read mode does) doesn't need.
+// into MomentEditor. Chapter/Book scope fetches whole chapter-draft files
+// (one request per chapter, not per moment) and joins their moments' bodies.
 function DraftAnalyticsPanel({ projectId, nodes, momentId, chapterId }: Props) {
   const [scope, setScope] = useState<Scope>('moment')
 
-  const momentDraft = useDraft(projectId, momentId)
+  const momentDraft = useDraft(projectId, chapterId, momentId)
   const { data: plot } = usePlot(projectId)
   const book = chapterId ? ancestorOfKind(nodes, chapterId, 'book') : undefined
 
-  const chapterMomentIds = useMemo(
-    () => (chapterId ? momentsInSubtree(nodes, chapterId).map((m) => m.id) : []),
-    [nodes, chapterId]
-  )
-  const bookMomentIds = useMemo(
-    () => (book ? momentsInSubtree(nodes, book.id).map((m) => m.id) : []),
+  const bookChapterIds = useMemo(
+    () => (book ? subtreeOrder(nodes, book.id).filter((n) => n.kind === 'chapter').map((n) => n.id) : []),
     [nodes, book]
   )
 
-  const scopedMomentIds = scope === 'chapter' ? chapterMomentIds : scope === 'book' ? bookMomentIds : []
+  const scopedChapterIds = scope === 'chapter' ? (chapterId ? [chapterId] : []) : scope === 'book' ? bookChapterIds : []
 
   const rollupQueries = useQueries({
-    queries: scopedMomentIds.map((id) => ({
-      queryKey: ['projects', projectId, 'draft', id] as const,
-      queryFn: () => api.get<DraftMoment>(`/projects/${projectId}/draft/${id}`),
+    queries: scopedChapterIds.map((id) => ({
+      queryKey: ['projects', projectId, 'draft', 'chapter', id] as const,
+      queryFn: () => api.get<DraftChapter>(`/projects/${projectId}/draft/chapter/${id}`),
     })),
   })
 
   const rollupLoading = scope !== 'moment' && rollupQueries.some((q) => q.isLoading)
-  const rollupText = rollupQueries.map((q) => q.data?.body ?? '').join('\n\n')
+  const rollupText = rollupQueries
+    .flatMap((q) => Object.values(q.data?.moments ?? {}).map((m) => m.body))
+    .join('\n\n')
 
   const text = scope === 'moment' ? momentDraft.data?.body ?? '' : rollupText
   const analytics = useMemo(() => analyzeText(text), [text])

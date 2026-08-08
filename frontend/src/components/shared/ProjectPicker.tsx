@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useCreateProject, useDeleteProject, useProjects } from '../../api/projects'
+import AdminPresetsPanel from '../../modes/admin/AdminPresetsPanel'
 
 function ProjectPicker() {
   const { data: projects, isLoading } = useProjects()
@@ -8,6 +9,7 @@ function ProjectPicker() {
   const deleteProject = useDeleteProject()
   const navigate = useNavigate()
   const [newTitle, setNewTitle] = useState('')
+  const [showAdmin, setShowAdmin] = useState(false)
 
   async function handleCreate(event: React.FormEvent) {
     event.preventDefault()
@@ -27,7 +29,19 @@ function ProjectPicker() {
 
   return (
     <div className="project-picker">
-      <h1>Scriblr</h1>
+      <div className="project-picker__header">
+        <h1>Scriblr</h1>
+        <button type="button" className="project-picker__admin-toggle" onClick={() => setShowAdmin((v) => !v)}>
+          {showAdmin ? 'Close admin' : 'Admin'}
+        </button>
+      </div>
+
+      {showAdmin && (
+        <section className="project-picker__admin">
+          <h2>Manage presets</h2>
+          <AdminPresetsPanel />
+        </section>
+      )}
 
       <form className="project-picker__new" onSubmit={handleCreate}>
         <input

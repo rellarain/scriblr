@@ -6,7 +6,9 @@
   "scripts": {
     "dev": "vite",
     "build": "tsc && vite build",
-    "preview": "vite preview"
+    "preview": "vite preview",
+    "test": "vitest run",
+    "test:watch": "vitest"
   },
   "dependencies": {
     "@dnd-kit/core": "^6.3.1",
@@ -19,10 +21,16 @@
     "react-router-dom": "^7.18.1"
   },
   "devDependencies": {
+    "@testing-library/dom": "^9.3.4",
+    "@testing-library/jest-dom": "^6.9.1",
+    "@testing-library/react": "^14.3.1",
+    "@testing-library/user-event": "^14.6.1",
     "@types/react": "^18.0.27",
     "@types/react-dom": "^18.0.10",
-    "@vitejs/plugin-react": "^3.1.0",
+    "@vitejs/plugin-react": "^4.7.0",
+    "jsdom": "^22.1.0",
     "typescript": "^5.9.3",
-    "vite": "^4.5.14"
+    "vite": "^4.5.14",
+    "vitest": "^0.34.6"
   }
 }

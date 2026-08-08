@@ -1,9 +1,12 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { ApiError, api } from './client'
-import type { DraftMoment } from '../types'
+import type { DraftChapter, DraftMoment } from '../types'
 
-const draftKey = (projectId: string, momentId: string) =>
-  ['projects', projectId, 'draft', momentId] as const
+const draftKey = (projectId: string, chapterId: string, momentId: string) =>
+  ['projects', projectId, 'draft', 'chapter', chapterId, 'moment', momentId] as const
+
+const chapterDraftKey = (projectId: string, chapterId: string) =>
+  ['projects', projectId, 'draft', 'chapter', chapterId] as const
 
 function emptyDraft(momentId: string): DraftMoment {
   return {
@@ -17,12 +20,38 @@ function emptyDraft(momentId: string): DraftMoment {
   }
 }
 
-export function useDraft(projectId: string | undefined, momentId: string | undefined) {
+function emptyChapterDraft(chapterId: string): DraftChapter {
+  return { schemaVersion: 2, chapterId, updatedAt: new Date().toISOString(), moments: {} }
+}
+
+// Fetches an entire chapter's moments in one call.
+export function useChapterDraft(projectId: string | undefined, chapterId: string | undefined) {
   return useQuery({
-    queryKey: projectId && momentId ? draftKey(projectId, momentId) : ['draft', 'none'],
+    queryKey: projectId && chapterId ? chapterDraftKey(projectId, chapterId) : ['draft', 'chapter', 'none'],
     queryFn: async () => {
       try {
-        return await api.get<DraftMoment>(`/projects/${projectId}/draft/${momentId}`)
+        return await api.get<DraftChapter>(`/projects/${projectId}/draft/chapter/${chapterId}`)
+      } catch (e) {
+        if (e instanceof ApiError && e.status === 404) {
+          return emptyChapterDraft(chapterId as string)
+        }
+        throw e
+      }
+    },
+    enabled: Boolean(projectId && chapterId),
+  })
+}
+
+export function useDraft(
+  projectId: string | undefined,
+  chapterId: string | undefined,
+  momentId: string | undefined
+) {
+  return useQuery({
+    queryKey: projectId && chapterId && momentId ? draftKey(projectId, chapterId, momentId) : ['draft', 'none'],
+    queryFn: async () => {
+      try {
+        return await api.get<DraftMoment>(`/projects/${projectId}/draft/chapter/${chapterId}/moment/${momentId}`)
       } catch (e) {
         if (e instanceof ApiError && e.status === 404) {
           return emptyDraft(momentId as string)
@@ -30,20 +59,21 @@ export function useDraft(projectId: string | undefined, momentId: string | undef
         throw e
       }
     },
-    enabled: Boolean(projectId && momentId),
+    enabled: Boolean(projectId && chapterId && momentId),
   })
 }
 
-export function useSaveDraft(projectId: string, momentId: string) {
+export function useSaveDraft(projectId: string, chapterId: string, momentId: string) {
   const queryClient = useQueryClient()
   return useMutation({
     mutationFn: (body: string) =>
-      api.put<DraftMoment>(`/projects/${projectId}/draft/${momentId}`, {
+      api.put<DraftMoment>(`/projects/${projectId}/draft/chapter/${chapterId}/moment/${momentId}`, {
         outlineNodeId: momentId,
         body,
       }),
     onSuccess: (draft) => {
-      queryClient.setQueryData(draftKey(projectId, momentId), draft)
+      queryClient.setQueryData(draftKey(projectId, chapterId, momentId), draft)
+      queryClient.invalidateQueries({ queryKey: chapterDraftKey(projectId, chapterId) })
       queryClient.invalidateQueries({ queryKey: ['projects', projectId] })
     },
   })

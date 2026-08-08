@@ -13,21 +13,25 @@ def utcnow() -> datetime:
 # Structural depth, shallowest first. Nesting is flexible: a node's parent
 # may be any node of a strictly shallower kind, not necessarily the adjacent
 # one (e.g. a scene may nest directly under a book, skipping arc/chapter).
-OutlineNodeKind = Literal["book", "arc", "chapter", "act", "scene", "moment"]
-OUTLINE_KIND_ORDER: list[OutlineNodeKind] = ["book", "arc", "chapter", "act", "scene", "moment"]
+# "series" is optional (a book need not have one); "book" and "chapter" are
+# the only two required/non-toggleable levels (see ProjectSettings.outlineLevels).
+OutlineNodeKind = Literal["series", "book", "arc", "chapter", "act", "scene", "moment"]
+OUTLINE_KIND_ORDER: list[OutlineNodeKind] = ["series", "book", "arc", "chapter", "act", "scene", "moment"]
+REQUIRED_OUTLINE_LEVELS: list[OutlineNodeKind] = ["book", "chapter"]
 
-# Plot tree: category -> plotline -> plotpoint, mirroring the outline tree's
-# flat-list-with-parentId shape. Plotpoints are the leaf/content unit and may
-# be assigned to a moment in the outline tree.
-PlotNodeKind = Literal["category", "plotline", "plotpoint"]
-PLOT_KIND_ORDER: list[PlotNodeKind] = ["category", "plotline", "plotpoint"]
+# Plot tree: category -> subcategory -> plotline -> plotpoint, mirroring the
+# outline tree's flat-list-with-parentId shape. Plotpoints are the leaf/
+# content unit and may be assigned to a moment (and, optionally, a specific
+# paragraph within that moment's draft) in the outline tree.
+PlotNodeKind = Literal["category", "subcategory", "plotline", "plotpoint"]
+PLOT_KIND_ORDER: list[PlotNodeKind] = ["category", "subcategory", "plotline", "plotpoint"]
 
 
 class ProjectManifest(BaseModel):
     outline: str = "outline/tree.json"
     plot: str = "brainstorm/plot.json"
     draftMoments: list[str] = Field(default_factory=list)
-    revisionMoments: list[str] = Field(default_factory=list)
+    revisionChapters: list[str] = Field(default_factory=list)
 
 
 class ProjectPriority(BaseModel):
@@ -55,7 +59,8 @@ class ProjectSettings(BaseModel):
     # what kind a new node gets when created via Tab (child)/Enter (sibling)
     # in the Plan UI -- new nodes no longer have their kind picked manually.
     # A subset of OUTLINE_KIND_ORDER/PLOT_KIND_ORDER, in the same relative
-    # order; "book" and "category" are always included as the required roots.
+    # order; "book" and "chapter" (see REQUIRED_OUTLINE_LEVELS) and "category"
+    # are always included as the required levels.
     outlineLevels: list[OutlineNodeKind] = Field(default_factory=lambda: list(OUTLINE_KIND_ORDER))
     plotLevels: list[PlotNodeKind] = Field(default_factory=lambda: list(PLOT_KIND_ORDER))
     # Which levels render as visible headings in Read mode. Independent of
@@ -104,6 +109,8 @@ class OutlineNode(BaseModel):
     color: Optional[str] = None
     chapterCountTarget: Optional[int] = None
     plotlineIds: list[str] = Field(default_factory=list)
+    # Book's total word-count ambition -- drives bookshelf spine width/fill.
+    wordCountGoal: Optional[int] = None
 
 
 class OutlineTree(BaseModel):
@@ -127,8 +134,19 @@ class PlotNode(BaseModel):
     # Set only on "plotpoint" nodes: the moment (outline node id) this
     # plotpoint is assigned to, if any.
     assignedMomentId: Optional[str] = None
-    # Set only on "category" nodes: custom field definitions that plotlines
-    # within this category can fill in.
+    # Set only on "plotpoint" nodes, and only meaningful alongside
+    # assignedMomentId: which paragraph (0-indexed, split on blank lines)
+    # within that moment's draft body this plotpoint is anchored to. Like
+    # CommentAnchor below, this is a fragile, unreconciled anchor -- clamp
+    # out-of-range indices to the last paragraph rather than erroring.
+    assignedParagraphIndex: Optional[int] = None
+    # Set only on "plotpoint" nodes that are a live mirror of a plotline's
+    # custom field value: the PlotCustomFieldDef.id it mirrors. Used to find
+    # the existing mirror plotpoint idempotently on every keystroke rather
+    # than creating duplicates. None for ordinary, manually-created plotpoints.
+    sourceFieldId: Optional[str] = None
+    # Set only on "category" or "subcategory" nodes: custom field definitions
+    # that plotlines within this category/subcategory can fill in.
     customFieldDefs: list[PlotCustomFieldDef] = Field(default_factory=list)
     # Set only on "plotline" nodes: values for the parent category's custom
     # fields, keyed by PlotCustomFieldDef.id.
@@ -144,6 +162,12 @@ class PlotTree(BaseModel):
     nodes: list[PlotNode] = Field(default_factory=list)
 
 
+# Per-moment draft shape -- still the API response/request unit for a single
+# moment's prose (GET/PUT .../draft/chapter/{chapterId}/moment/{momentId}),
+# even though storage on disk moved to one shared file per chapter (see
+# DraftChapter below). Keeping this as the per-moment API shape means
+# existing per-moment autosave/analytics/plotpoint-anchoring logic needs no
+# redesign, only a retargeted endpoint.
 class DraftMoment(BaseModel):
     schemaVersion: int = SCHEMA_VERSION
     momentId: str
@@ -154,8 +178,29 @@ class DraftMoment(BaseModel):
     body: str = ""
 
 
+class DraftChapterMoment(BaseModel):
+    body: str = ""
+    wordCount: int = 0
+    updatedAt: datetime
+
+
+# Storage shape for draft/<chapter-id>.json -- one file per chapter, keyed by
+# moment, replacing the old one-file-per-moment layout. Moments stay
+# individually addressable inside the map so per-moment autosave, analytics,
+# and plotpoint-paragraph anchoring keep working against a single entry.
+class DraftChapter(BaseModel):
+    schemaVersion: int = SCHEMA_VERSION
+    chapterId: str
+    updatedAt: datetime
+    moments: dict[str, DraftChapterMoment] = Field(default_factory=dict)
+
+
 class CommentAnchor(BaseModel):
     type: Literal["text-offset"] = "text-offset"
+    # Which moment (within the chapter-scoped revision snapshot) this
+    # comment's start/end offsets are measured against -- necessary now that
+    # a snapshot spans a whole chapter's moments rather than a single body.
+    momentId: str
     start: int
     end: int
 
@@ -171,17 +216,27 @@ class RevisionComment(BaseModel):
     createdAt: datetime
 
 
-RevisionTrigger = Literal["manual"]
+# "manual" = floppy-disk button, no naming step, label is always the save's
+# formatted date/time. "auto" = fires after 5 minutes of inactivity on a
+# chapter's page and overwrites a single rolling slot per chapter rather than
+# appending -- at most one "auto"-trigger snapshot exists per chapter at a
+# time. (Reintroduced deliberately -- unlike the "session-close" trigger
+# value removed earlier as dead code, "auto" here has real, specified
+# behavior and is actually wired up.)
+RevisionTrigger = Literal["manual", "auto"]
 
 
+# Snapshots moved from per-moment to per-chapter, consistent with drafts
+# becoming chapter-scoped (DraftChapter above) -- a snapshot captures a
+# chapter's whole moments-map at once.
 class RevisionSnapshot(BaseModel):
     schemaVersion: int = SCHEMA_VERSION
     snapshotId: str
-    momentId: str
+    chapterId: str
     createdAt: datetime
     label: str = ""
     trigger: RevisionTrigger = "manual"
-    body: str = ""
+    moments: dict[str, str] = Field(default_factory=dict)  # momentId -> body, at snapshot time
     wordCount: int = 0
     notes: list[RevisionComment] = Field(default_factory=list)
 
@@ -267,7 +322,9 @@ class ActivityLogEntry(BaseModel):
     createdAt: datetime
     label: str
     trigger: str
-    momentId: Optional[str] = None
+    # Set for "draft" entries -- which chapter's revision this is (drafts/
+    # revisions are chapter-scoped; see DraftChapter/RevisionSnapshot).
+    chapterId: Optional[str] = None
     wordCount: Optional[int] = None
 
 
@@ -363,3 +420,24 @@ class ScrapEntry(BaseModel):
 class ScrapRegistry(BaseModel):
     schemaVersion: int = SCHEMA_VERSION
     entries: list[ScrapEntry] = Field(default_factory=list)
+
+
+# ---------------------------------------------------------------------------
+# Presets: a global (not project-scoped) catalog of starter field-name sets
+# for the Plot sidebar's "Add category" picker, editable from the app's admin
+# panel (reachable from the project picker, since presets apply across every
+# project). Lives at %APPDATA%\Scriblr\presets.json, a sibling of the
+# projects/ directory rather than inside any one project. Its own schema
+# version, independent of SCHEMA_VERSION, since it's an unrelated shard.
+# ---------------------------------------------------------------------------
+
+
+class PresetCategory(BaseModel):
+    id: str
+    name: str
+    fields: list[str] = Field(default_factory=list)
+
+
+class PresetCatalog(BaseModel):
+    schemaVersion: int = 1
+    presets: list[PresetCategory] = Field(default_factory=list)

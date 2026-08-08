@@ -1,19 +1,16 @@
 import { Route, Routes } from 'react-router-dom'
 import ProjectPicker from '../components/shared/ProjectPicker'
 import ProjectShell from '../components/shared/ProjectShell'
-import ProjectWorkspace from '../modes/workspace/ProjectWorkspace'
-import BookWorkspace from '../modes/workspace/BookWorkspace'
-import ChapterWorkspace from '../modes/workspace/ChapterWorkspace'
+import BookFaceWorkspace from '../modes/workspace/BookFaceWorkspace'
+import ChapterPageWorkspace from '../modes/workspace/ChapterPageWorkspace'
 
 function AppRoutes() {
   return (
     <Routes>
       <Route path="/" element={<ProjectPicker />} />
       <Route path="/project/:projectId" element={<ProjectShell />}>
-        <Route index element={<ProjectWorkspace />} />
-        <Route path="book/:bookId" element={<BookWorkspace />} />
-        <Route path="book/:bookId/chapter/:chapterId" element={<ChapterWorkspace />} />
-        <Route path="book/:bookId/chapter/:chapterId/moment/:momentId" element={<ChapterWorkspace />} />
+        <Route path="book/:bookId" element={<BookFaceWorkspace />} />
+        <Route path="book/:bookId/chapter/:chapterId" element={<ChapterPageWorkspace />} />
       </Route>
     </Routes>
   )

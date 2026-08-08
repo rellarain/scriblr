@@ -25,7 +25,7 @@ def test_deleting_a_moment_scraps_it_with_correct_ancestry(client: TestClient) -
     project_id = client.post("/api/projects", json={"title": "Scrap Test"}).json()["projectId"]
     book_id, chapter_id, moment_id = _build_book_chapter_moment(client, project_id)
     client.put(
-        f"/api/projects/{project_id}/draft/{moment_id}",
+        f"/api/projects/{project_id}/draft/chapter/{chapter_id}/moment/{moment_id}",
         json={"outlineNodeId": moment_id, "body": "Four little words here."},
     )
 
@@ -53,7 +53,7 @@ def test_deleting_a_whole_chapter_scraps_its_moment_too(client: TestClient) -> N
     project_id = client.post("/api/projects", json={"title": "Cascade Scrap Test"}).json()["projectId"]
     book_id, chapter_id, moment_id = _build_book_chapter_moment(client, project_id)
     client.put(
-        f"/api/projects/{project_id}/draft/{moment_id}",
+        f"/api/projects/{project_id}/draft/chapter/{chapter_id}/moment/{moment_id}",
         json={"outlineNodeId": moment_id, "body": "Some drafted words here."},
     )
 
@@ -85,10 +85,10 @@ def test_restore_reattaches_draft_and_revision_history(client: TestClient) -> No
     project_id = client.post("/api/projects", json={"title": "Restore Test"}).json()["projectId"]
     book_id, chapter_id, moment_id = _build_book_chapter_moment(client, project_id)
     client.put(
-        f"/api/projects/{project_id}/draft/{moment_id}",
+        f"/api/projects/{project_id}/draft/chapter/{chapter_id}/moment/{moment_id}",
         json={"outlineNodeId": moment_id, "body": "Original prose content."},
     )
-    client.post(f"/api/projects/{project_id}/revisions/{moment_id}", json={"label": "v1"})
+    client.post(f"/api/projects/{project_id}/revisions/{chapter_id}")
 
     tree = client.get(f"/api/projects/{project_id}/outline").json()
     tree["nodes"] = [n for n in tree["nodes"] if n["id"] != moment_id]
@@ -105,9 +105,9 @@ def test_restore_reattaches_draft_and_revision_history(client: TestClient) -> No
     assert restored_node["title"] == "Restored Opening"
 
     # Draft body and revision history reattach with zero copying.
-    draft = client.get(f"/api/projects/{project_id}/draft/{moment_id}").json()
+    draft = client.get(f"/api/projects/{project_id}/draft/chapter/{chapter_id}/moment/{moment_id}").json()
     assert draft["body"] == "Original prose content."
-    revisions = client.get(f"/api/projects/{project_id}/revisions/{moment_id}").json()
+    revisions = client.get(f"/api/projects/{project_id}/revisions/{chapter_id}").json()
     assert len(revisions) == 1
 
     # Scrap entry is gone.
@@ -118,7 +118,7 @@ def test_restore_rejects_invalid_parent(client: TestClient) -> None:
     project_id = client.post("/api/projects", json={"title": "Bad Restore Test"}).json()["projectId"]
     book_id, chapter_id, moment_id = _build_book_chapter_moment(client, project_id)
     client.put(
-        f"/api/projects/{project_id}/draft/{moment_id}",
+        f"/api/projects/{project_id}/draft/chapter/{chapter_id}/moment/{moment_id}",
         json={"outlineNodeId": moment_id, "body": "content"},
     )
     tree = client.get(f"/api/projects/{project_id}/outline").json()
@@ -138,14 +138,14 @@ def test_restore_rejects_invalid_parent(client: TestClient) -> None:
     assert resp.status_code in (400, 404)
 
 
-def test_permanent_delete_removes_draft_and_revisions(client: TestClient) -> None:
+def test_permanent_delete_removes_draft_but_keeps_chapter_revisions(client: TestClient) -> None:
     project_id = client.post("/api/projects", json={"title": "Permadelete Test"}).json()["projectId"]
-    _, _, moment_id = _build_book_chapter_moment(client, project_id)
+    _, chapter_id, moment_id = _build_book_chapter_moment(client, project_id)
     client.put(
-        f"/api/projects/{project_id}/draft/{moment_id}",
+        f"/api/projects/{project_id}/draft/chapter/{chapter_id}/moment/{moment_id}",
         json={"outlineNodeId": moment_id, "body": "gone soon"},
     )
-    client.post(f"/api/projects/{project_id}/revisions/{moment_id}", json={"label": "v1"})
+    client.post(f"/api/projects/{project_id}/revisions/{chapter_id}")
 
     tree = client.get(f"/api/projects/{project_id}/outline").json()
     tree["nodes"] = [n for n in tree["nodes"] if n["id"] != moment_id]
@@ -155,8 +155,10 @@ def test_permanent_delete_removes_draft_and_revisions(client: TestClient) -> Non
     assert resp.status_code == 204
 
     assert client.get(f"/api/projects/{project_id}/scrap").json()["entries"] == []
-    assert client.get(f"/api/projects/{project_id}/draft/{moment_id}").status_code == 404
-    assert client.get(f"/api/projects/{project_id}/revisions/{moment_id}").json() == []
+    assert client.get(f"/api/projects/{project_id}/draft/chapter/{chapter_id}/moment/{moment_id}").status_code == 404
+    # The chapter's revision history is untouched -- only this moment's own
+    # draft entry is removed; the chapter's revision snapshot still exists.
+    assert len(client.get(f"/api/projects/{project_id}/revisions/{chapter_id}").json()) == 1
 
 
 def test_delete_missing_scrap_entry_404s(client: TestClient) -> None:
@@ -167,9 +169,9 @@ def test_delete_missing_scrap_entry_404s(client: TestClient) -> None:
 
 def test_analytics_excludes_orphaned_moment_from_total_word_count(client: TestClient) -> None:
     project_id = client.post("/api/projects", json={"title": "Analytics Scrap Test"}).json()["projectId"]
-    _, _, moment_id = _build_book_chapter_moment(client, project_id)
+    _, chapter_id, moment_id = _build_book_chapter_moment(client, project_id)
     client.put(
-        f"/api/projects/{project_id}/draft/{moment_id}",
+        f"/api/projects/{project_id}/draft/chapter/{chapter_id}/moment/{moment_id}",
         json={"outlineNodeId": moment_id, "body": "Five little words here indeed."},
     )
     assert client.get(f"/api/projects/{project_id}/analytics").json()["totals"]["totalWordCount"] == 5
@@ -185,7 +187,15 @@ def test_read_levels_round_trip_through_patch(client: TestClient) -> None:
     project_id = client.post("/api/projects", json={"title": "Read Levels Test"}).json()["projectId"]
 
     resp = client.get(f"/api/projects/{project_id}")
-    assert resp.json()["index"]["settings"]["readLevels"] == ["book", "arc", "chapter", "act", "scene", "moment"]
+    assert resp.json()["index"]["settings"]["readLevels"] == [
+        "series",
+        "book",
+        "arc",
+        "chapter",
+        "act",
+        "scene",
+        "moment",
+    ]
 
     resp = client.patch(
         f"/api/projects/{project_id}", json={"readLevels": ["book", "arc", "chapter"]}

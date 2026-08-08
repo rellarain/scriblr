@@ -39,8 +39,11 @@ def get_analytics(root: Path, project_id: str) -> ProjectAnalytics:
     for moment_id in index.manifest.draftMoments:
         if moment_id not in nodes_by_id:
             continue  # orphaned (scrapped) -- excluded from the live project total
+        chapter_id = _ancestor_of_kind(nodes_by_id, moment_id, "chapter")
+        if chapter_id is None:
+            continue
         try:
-            draft = store.load_draft(root, project_id, moment_id)
+            draft = store.load_draft(root, project_id, chapter_id, moment_id)
         except (store.MomentNotFoundError, store.ShardCorruptError):
             continue
         moment_word_counts[moment_id] = draft.wordCount

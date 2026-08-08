@@ -3,18 +3,28 @@ import platform
 from pathlib import Path
 
 
-def get_projects_root() -> Path:
-    """Resolve the directory that holds all project folders.
-
-    Honors SCRIBLR_DATA_DIR so tests and dev tooling can redirect storage
-    without touching the real user app-data directory.
+def get_app_data_root() -> Path:
+    """Resolve the app's top-level data directory (%APPDATA%\\Scriblr on
+    Windows), the parent of `projects/`. Honors SCRIBLR_DATA_DIR like
+    `get_projects_root`. Used for data that isn't scoped to one project,
+    e.g. the global preset catalog.
     """
     override = os.environ.get("SCRIBLR_DATA_DIR")
     if override:
         root = Path(override)
     else:
         root = _default_app_data_dir() / "Scriblr"
-    projects_root = root / "projects"
+    root.mkdir(parents=True, exist_ok=True)
+    return root
+
+
+def get_projects_root() -> Path:
+    """Resolve the directory that holds all project folders.
+
+    Honors SCRIBLR_DATA_DIR so tests and dev tooling can redirect storage
+    without touching the real user app-data directory.
+    """
+    projects_root = get_app_data_root() / "projects"
     projects_root.mkdir(parents=True, exist_ok=True)
     return projects_root
 

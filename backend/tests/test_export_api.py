@@ -34,7 +34,7 @@ def _seed_project_with_draft(client: TestClient) -> tuple[str, str, str]:
     assert resp.status_code == 200
 
     resp = client.put(
-        f"/api/projects/{project_id}/draft/moment_1",
+        f"/api/projects/{project_id}/draft/chapter/ch_1/moment/moment_1",
         json={"outlineNodeId": "moment_1", "body": "**Bold** opening prose for the export test."},
     )
     assert resp.status_code == 200

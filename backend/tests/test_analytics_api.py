@@ -41,7 +41,7 @@ def test_analytics_totals_and_goal_echo(client: TestClient) -> None:
     )
     book_id, chapter_id, moment_id = _build_book_chapter_moment(client, project_id, book_chapter_count_target=5)
     client.put(
-        f"/api/projects/{project_id}/draft/{moment_id}",
+        f"/api/projects/{project_id}/draft/chapter/{chapter_id}/moment/{moment_id}",
         json={"outlineNodeId": moment_id, "body": "Five little words here indeed."},
     )
 

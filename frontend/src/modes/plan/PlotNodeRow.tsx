@@ -73,11 +73,13 @@ function PlotNodeRow({
   const [keywordDraft, setKeywordDraft] = useState('')
   const [isDropTarget, setIsDropTarget] = useState(false)
   const [fieldsExpanded, setFieldsExpanded] = useState(false)
+  const [fieldDefsExpanded, setFieldDefsExpanded] = useState(false)
   const descriptionRef = useRef<HTMLTextAreaElement>(null)
 
   const canAddChild = nextKindInLevels(levels, node.kind, PLOT_KIND_ORDER) !== undefined
   const isPlotpoint = node.kind === 'plotpoint'
   const isCategory = node.kind === 'category'
+  const isSubcategory = node.kind === 'subcategory'
   const isPlotline = node.kind === 'plotline'
   const showDescription = isPlotpoint && node.title.trim() !== ''
   const canDelete = !(isPlotpoint && node.assignedMomentId)
@@ -247,34 +249,44 @@ function PlotNodeRow({
         />
       )}
 
-      {isCategory && (
-        <div className="plot-node__custom-fields-editor">
-          <span className="plot-node__custom-fields-label">Plotline fields:</span>
-          {node.customFieldDefs.map((f) => (
-            <span key={f.id} className="plot-node__custom-field-chip">
-              <input
-                className="plot-node__custom-field-name"
-                value={f.name}
-                placeholder="Field name"
-                onChange={(e) => onRenameCustomFieldDef(node.id, f.id, e.target.value)}
-              />
-              <button
-                type="button"
-                className="plot-node__custom-field-remove"
-                onClick={() => onRemoveCustomFieldDef(node.id, f.id)}
-                title="Remove field"
-              >
-                ×
-              </button>
-            </span>
-          ))}
+      {(isCategory || isSubcategory) && (
+        <div className="plot-node__custom-fields-section">
           <button
             type="button"
-            className="plot-node__custom-field-add"
-            onClick={() => onAddCustomFieldDef(node.id)}
+            className="plot-node__fields-toggle"
+            onClick={() => setFieldDefsExpanded((v) => !v)}
           >
-            + Add field
+            {fieldDefsExpanded ? '▾' : '▸'} Plotline fields ({node.customFieldDefs.length})
           </button>
+          {fieldDefsExpanded && (
+            <div className="plot-node__custom-fields-editor">
+              {node.customFieldDefs.map((f) => (
+                <span key={f.id} className="plot-node__custom-field-chip">
+                  <input
+                    className="plot-node__custom-field-name"
+                    value={f.name}
+                    placeholder="Field name"
+                    onChange={(e) => onRenameCustomFieldDef(node.id, f.id, e.target.value)}
+                  />
+                  <button
+                    type="button"
+                    className="plot-node__custom-field-remove"
+                    onClick={() => onRemoveCustomFieldDef(node.id, f.id)}
+                    title="Remove field"
+                  >
+                    ×
+                  </button>
+                </span>
+              ))}
+              <button
+                type="button"
+                className="plot-node__custom-field-add"
+                onClick={() => onAddCustomFieldDef(node.id)}
+              >
+                + Add field
+              </button>
+            </div>
+          )}
         </div>
       )}
 

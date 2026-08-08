@@ -29,12 +29,27 @@ export function addNode(
     title,
     body: '',
     assignedMomentId: null,
+    assignedParagraphIndex: null,
+    sourceFieldId: null,
     customFieldDefs: [],
     customFieldValues: {},
     keywords: [],
     flag: null,
   }
   return [...nodes, node]
+}
+
+/** Creates a new root `category` node pre-populated with `fieldNames` as
+ * custom field defs -- a preset is just a shortcut for seeding field names,
+ * nothing more; the resulting category is otherwise indistinguishable from
+ * one built by hand. */
+export function applyPresetCategory(nodes: PlotNode[], name: string, fieldNames: string[]): PlotNode[] {
+  let next = addCategory(nodes, name)
+  const category = next[next.length - 1]
+  for (const fieldName of fieldNames) {
+    next = addCustomFieldDef(next, category.id, fieldName)
+  }
+  return next
 }
 
 export function renameNode(nodes: PlotNode[], nodeId: string, title: string): PlotNode[] {
@@ -54,7 +69,25 @@ export function assignPlotpoint(
   plotpointId: string,
   momentId: string | null
 ): PlotNode[] {
-  return nodes.map((n) => (n.id === plotpointId ? { ...n, assignedMomentId: momentId } : n))
+  // Whole-moment assignment supersedes any previous paragraph-level anchor.
+  return nodes.map((n) =>
+    n.id === plotpointId ? { ...n, assignedMomentId: momentId, assignedParagraphIndex: null } : n
+  )
+}
+
+/** Anchors a plotpoint to a specific paragraph (0-indexed, split on blank
+ * lines) within a moment's draft, rather than the whole moment. Fragile to
+ * paragraph insert/delete above the anchor -- same accepted tradeoff class
+ * as RevisionComment's text-offset anchor; no reconciliation. */
+export function assignPlotpointToParagraph(
+  nodes: PlotNode[],
+  plotpointId: string,
+  momentId: string,
+  paragraphIndex: number
+): PlotNode[] {
+  return nodes.map((n) =>
+    n.id === plotpointId ? { ...n, assignedMomentId: momentId, assignedParagraphIndex: paragraphIndex } : n
+  )
 }
 
 /** Direct plotpoint children of `plotlineId`, and how many are assigned to a moment. */
@@ -75,12 +108,46 @@ export function plotpointsForMomentSet(nodes: PlotNode[], momentIds: Set<string>
   )
 }
 
-/** A plotline's parent is always its category (the only shallower plot kind). */
+/** A plotline's direct parent is always either a category or a subcategory
+ * (the two kinds shallower than plotline); custom field defs live on
+ * whichever one it is. */
 export function getCustomFieldDefsForPlotline(nodes: PlotNode[], plotlineId: string): PlotCustomFieldDef[] {
   const plotline = nodes.find((n) => n.id === plotlineId)
   if (!plotline || !plotline.parentId) return []
   const category = nodes.find((n) => n.id === plotline.parentId)
   return category?.customFieldDefs ?? []
+}
+
+/** Live-syncs a plotline's custom field value to a mirror plotpoint child
+ * (title = field name, body = value), so a filled-in "characteristic" is
+ * immediately a real, assignable plotpoint. Idempotent via `sourceFieldId`:
+ * updates the existing mirror in place (including its title, so a later
+ * field rename propagates on the next edit) rather than duplicating. Never
+ * creates an empty plotpoint just because a field was touched but left
+ * blank, and never deletes a mirror just because its value was cleared --
+ * only removing the field definition itself (`removeCustomFieldDef`) cascades
+ * to remove mirror plotpoints, since that's a deliberate, stronger action. */
+export function syncFieldPlotpoint(
+  nodes: PlotNode[],
+  plotlineId: string,
+  fieldId: string,
+  fieldName: string,
+  value: string
+): PlotNode[] {
+  const existing = tree
+    .getChildren(nodes, plotlineId)
+    .find((n) => n.kind === 'plotpoint' && n.sourceFieldId === fieldId)
+  if (existing) {
+    return nodes.map((n) => (n.id === existing.id ? { ...n, title: fieldName, body: value } : n))
+  }
+  if (value.trim() === '') return nodes
+  const newNode: PlotNode = {
+    ...makeNode('plotpoint', plotlineId, tree.nextOrder(nodes, plotlineId)),
+    title: fieldName,
+    body: value,
+    sourceFieldId: fieldId,
+  }
+  return [...nodes, newNode]
 }
 
 export function addCustomFieldDef(nodes: PlotNode[], categoryId: string, name: string): PlotNode[] {
@@ -103,19 +170,29 @@ export function renameCustomFieldDef(
   )
 }
 
-/** Removing a field definition also clears any values plotlines in this category stored for it. */
+/** Removing a field definition also clears any values plotlines in this
+ * category/subcategory stored for it, and deletes any mirror plotpoints
+ * (`sourceFieldId === fieldId`) those plotlines had synced from it -- a
+ * deliberate, stronger cascade than clearing a value alone (see
+ * `syncFieldPlotpoint`), since removing the definition is explicit intent to
+ * drop the field entirely. */
 export function removeCustomFieldDef(nodes: PlotNode[], categoryId: string, fieldId: string): PlotNode[] {
-  return nodes.map((n) => {
-    if (n.id === categoryId) {
-      return { ...n, customFieldDefs: n.customFieldDefs.filter((f) => f.id !== fieldId) }
-    }
-    if (n.kind === 'plotline' && n.parentId === categoryId && fieldId in n.customFieldValues) {
-      const nextValues = { ...n.customFieldValues }
-      delete nextValues[fieldId]
-      return { ...n, customFieldValues: nextValues }
-    }
-    return n
-  })
+  const plotlineIds = new Set(
+    tree.getChildren(nodes, categoryId).filter((n) => n.kind === 'plotline').map((n) => n.id)
+  )
+  return nodes
+    .map((n) => {
+      if (n.id === categoryId) {
+        return { ...n, customFieldDefs: n.customFieldDefs.filter((f) => f.id !== fieldId) }
+      }
+      if (n.kind === 'plotline' && n.parentId === categoryId && fieldId in n.customFieldValues) {
+        const nextValues = { ...n.customFieldValues }
+        delete nextValues[fieldId]
+        return { ...n, customFieldValues: nextValues }
+      }
+      return n
+    })
+    .filter((n) => !(n.kind === 'plotpoint' && n.sourceFieldId === fieldId && plotlineIds.has(n.parentId as string)))
 }
 
 export function setCustomFieldValue(
@@ -172,6 +249,8 @@ function makeNode(kind: PlotNodeKind, parentId: string | null, order: number): P
     title: '',
     body: '',
     assignedMomentId: null,
+    assignedParagraphIndex: null,
+    sourceFieldId: null,
     customFieldDefs: [],
     customFieldValues: {},
     keywords: [],

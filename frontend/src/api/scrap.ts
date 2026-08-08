@@ -23,14 +23,14 @@ export function useRestoreScrapEntry(projectId: string) {
   return useMutation({
     mutationFn: ({ momentId, parentId, title }: RestoreInput) =>
       api.post<OutlineTree>(`/projects/${projectId}/scrap/${momentId}/restore`, { parentId, title }),
-    onSuccess: (outline, variables) => {
+    onSuccess: (outline) => {
       queryClient.setQueryData(['projects', projectId, 'outline'], outline)
+      // Broad invalidation (covers draft/chapter queries too) since restoring
+      // a moment reattaches draft content already stored under its
+      // last-known chapter.
       queryClient.invalidateQueries({ queryKey: ['projects', projectId] })
       queryClient.invalidateQueries({ queryKey: scrapKey(projectId) })
       queryClient.invalidateQueries({ queryKey: ['projects', projectId, 'activity'] })
-      queryClient.invalidateQueries({
-        queryKey: ['projects', projectId, 'draft', variables.momentId],
-      })
     },
   })
 }

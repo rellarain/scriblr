@@ -4,13 +4,16 @@ import type { RevisionSnapshot } from '../../types'
 
 interface Props {
   projectId: string
+  chapterId: string
   momentId: string
   snapshot: RevisionSnapshot
 }
 
-function CommentsPanel({ projectId, momentId, snapshot }: Props) {
-  const addComment = useAddComment(projectId, momentId)
-  const deleteComment = useDeleteComment(projectId, momentId)
+function CommentsPanel({ projectId, chapterId, momentId, snapshot }: Props) {
+  const addComment = useAddComment(projectId, chapterId)
+  const deleteComment = useDeleteComment(projectId, chapterId)
+  const body = snapshot.moments[momentId] ?? ''
+  const notes = snapshot.notes.filter((n) => n.anchor.momentId === momentId)
 
   const [selection, setSelection] = useState<{ start: number; end: number } | null>(null)
   const [commentText, setCommentText] = useState('')
@@ -28,6 +31,7 @@ function CommentsPanel({ projectId, momentId, snapshot }: Props) {
     addComment.mutate(
       {
         snapshotId: snapshot.snapshotId,
+        momentId,
         body: commentText.trim(),
         anchorStart: selection.start,
         anchorEnd: selection.end,
@@ -47,7 +51,7 @@ function CommentsPanel({ projectId, momentId, snapshot }: Props) {
     <div className="comments-panel">
       <textarea
         className="comments-panel__body"
-        value={snapshot.body}
+        value={body}
         readOnly
         onSelect={handleSelect}
       />
@@ -55,7 +59,7 @@ function CommentsPanel({ projectId, momentId, snapshot }: Props) {
       {selection && (
         <div className="comments-panel__new">
           <p className="comments-panel__quote">
-            “{snapshot.body.slice(selection.start, selection.end)}”
+            “{body.slice(selection.start, selection.end)}”
           </p>
           <textarea
             placeholder="Add a comment on this selection…"
@@ -79,10 +83,10 @@ function CommentsPanel({ projectId, momentId, snapshot }: Props) {
       )}
 
       <ul className="comments-panel__list">
-        {snapshot.notes.map((note) => (
+        {notes.map((note) => (
           <li key={note.id} className={`comments-panel__note${note.flag ? ` is-${note.flag}` : ''}`}>
             <p className="comments-panel__note-quote">
-              “{snapshot.body.slice(note.anchor.start, note.anchor.end)}”
+              “{body.slice(note.anchor.start, note.anchor.end)}”
             </p>
             <p className="comments-panel__note-body">{note.body}</p>
             <button

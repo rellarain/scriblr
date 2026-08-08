@@ -55,8 +55,8 @@ def get_activity(root: Path, project_id: str) -> ActivityResponse:
             )
 
     index = store.load_index(root, project_id)
-    for moment_id in index.manifest.revisionMoments:
-        for revision in store.list_revisions(root, project_id, moment_id):
+    for chapter_id in index.manifest.revisionChapters:
+        for revision in store.list_revisions(root, project_id, chapter_id):
             entries.append(
                 ActivityLogEntry(
                     id=revision.snapshotId,
@@ -64,7 +64,7 @@ def get_activity(root: Path, project_id: str) -> ActivityResponse:
                     createdAt=revision.createdAt,
                     label=revision.label or "Snapshot",
                     trigger=revision.trigger,
-                    momentId=moment_id,
+                    chapterId=chapter_id,
                     wordCount=revision.wordCount,
                 )
             )

@@ -95,11 +95,10 @@ function ProjectStatsPanel() {
   }
 
   function handleSelect(entry: ActivityLogEntry) {
-    if (entry.type === 'draft' && entry.momentId && outline) {
-      const chapter = ancestorOfKind(outline.nodes, entry.momentId, 'chapter')
-      const book = chapter ? ancestorOfKind(outline.nodes, chapter.id, 'book') : undefined
-      if (chapter && book) {
-        navigate(`/project/${projectId}/book/${book.id}/chapter/${chapter.id}/moment/${entry.momentId}`)
+    if (entry.type === 'draft' && entry.chapterId && outline) {
+      const book = ancestorOfKind(outline.nodes, entry.chapterId, 'book')
+      if (book) {
+        navigate(`/project/${projectId}/book/${book.id}/chapter/${entry.chapterId}`)
       }
       return
     }

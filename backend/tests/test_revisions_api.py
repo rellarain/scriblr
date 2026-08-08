@@ -1,52 +1,77 @@
 from fastapi.testclient import TestClient
 
 
-def _make_project_with_draft(client: TestClient, body: str) -> tuple[str, str]:
+def _make_project_with_draft(client: TestClient, body: str) -> tuple[str, str, str]:
     project_id = client.post("/api/projects", json={"title": "Revisions API Test"}).json()["projectId"]
+    chapter_id = "chapter_1"
     moment_id = "moment_1"
     client.put(
-        f"/api/projects/{project_id}/draft/{moment_id}",
+        f"/api/projects/{project_id}/draft/chapter/{chapter_id}/moment/{moment_id}",
         json={"outlineNodeId": moment_id, "body": body},
     )
-    return project_id, moment_id
+    return project_id, chapter_id, moment_id
 
 
 def test_create_and_list_snapshots(client: TestClient) -> None:
-    project_id, moment_id = _make_project_with_draft(client, "Once upon a time.")
+    project_id, chapter_id, moment_id = _make_project_with_draft(client, "Once upon a time.")
 
-    resp = client.post(
-        f"/api/projects/{project_id}/revisions/{moment_id}", json={"label": "first pass"}
-    )
+    resp = client.post(f"/api/projects/{project_id}/revisions/{chapter_id}")
     assert resp.status_code == 200
     snapshot_id = resp.json()["snapshotId"]
-    assert resp.json()["body"] == "Once upon a time."
+    assert resp.json()["moments"][moment_id] == "Once upon a time."
+    # No naming step -- the label is always a formatted date/time.
+    assert resp.json()["label"]
 
-    resp = client.get(f"/api/projects/{project_id}/revisions/{moment_id}")
+    resp = client.get(f"/api/projects/{project_id}/revisions/{chapter_id}")
     assert resp.status_code == 200
     summaries = resp.json()
     assert [s["snapshotId"] for s in summaries] == [snapshot_id]
-    # Summaries are lightweight and should not include the full body.
-    assert "body" not in summaries[0]
+    # Summaries are lightweight and should not include the full moments map.
+    assert "moments" not in summaries[0]
 
-    resp = client.get(f"/api/projects/{project_id}/revisions/{moment_id}/{snapshot_id}")
+    resp = client.get(f"/api/projects/{project_id}/revisions/{chapter_id}/{snapshot_id}")
     assert resp.status_code == 200
-    assert resp.json()["body"] == "Once upon a time."
+    assert resp.json()["moments"][moment_id] == "Once upon a time."
+
+
+def test_auto_save_overwrites_a_single_rolling_slot(client: TestClient) -> None:
+    project_id, chapter_id, moment_id = _make_project_with_draft(client, "Draft one.")
+
+    first = client.post(f"/api/projects/{project_id}/revisions/{chapter_id}/auto")
+    assert first.status_code == 200
+    assert first.json()["snapshotId"] == "auto"
+    assert first.json()["trigger"] == "auto"
+
+    client.put(
+        f"/api/projects/{project_id}/draft/chapter/{chapter_id}/moment/{moment_id}",
+        json={"outlineNodeId": moment_id, "body": "Draft two."},
+    )
+    second = client.post(f"/api/projects/{project_id}/revisions/{chapter_id}/auto")
+    assert second.json()["snapshotId"] == "auto"
+    assert second.json()["moments"][moment_id] == "Draft two."
+
+    # Still exactly one auto entry in the timeline -- it was overwritten, not appended.
+    summaries = client.get(f"/api/projects/{project_id}/revisions/{chapter_id}").json()
+    assert [s["snapshotId"] for s in summaries] == ["auto"]
+
+    # A manual save creates its own, separate entry alongside the auto slot.
+    manual = client.post(f"/api/projects/{project_id}/revisions/{chapter_id}").json()
+    summaries = client.get(f"/api/projects/{project_id}/revisions/{chapter_id}").json()
+    assert {s["snapshotId"] for s in summaries} == {"auto", manual["snapshotId"]}
 
 
 def test_diff_snapshot_against_current_draft(client: TestClient) -> None:
-    project_id, moment_id = _make_project_with_draft(client, "The cat sat on the mat.")
-    snapshot_id = client.post(
-        f"/api/projects/{project_id}/revisions/{moment_id}", json={"label": "v1"}
-    ).json()["snapshotId"]
+    project_id, chapter_id, moment_id = _make_project_with_draft(client, "The cat sat on the mat.")
+    snapshot_id = client.post(f"/api/projects/{project_id}/revisions/{chapter_id}").json()["snapshotId"]
 
     client.put(
-        f"/api/projects/{project_id}/draft/{moment_id}",
+        f"/api/projects/{project_id}/draft/chapter/{chapter_id}/moment/{moment_id}",
         json={"outlineNodeId": moment_id, "body": "The cat sat on the rug."},
     )
 
     resp = client.get(
-        f"/api/projects/{project_id}/revisions/{moment_id}/diff",
-        params={"from": snapshot_id, "to": "current"},
+        f"/api/projects/{project_id}/revisions/{chapter_id}/diff",
+        params={"momentId": moment_id, "from": snapshot_id, "to": "current"},
     )
     assert resp.status_code == 200
     ops = resp.json()["ops"]
@@ -55,63 +80,62 @@ def test_diff_snapshot_against_current_draft(client: TestClient) -> None:
 
 
 def test_revert_creates_safety_snapshot_and_restores_body(client: TestClient) -> None:
-    project_id, moment_id = _make_project_with_draft(client, "Version one.")
-    v1_id = client.post(
-        f"/api/projects/{project_id}/revisions/{moment_id}", json={"label": "v1"}
-    ).json()["snapshotId"]
+    project_id, chapter_id, moment_id = _make_project_with_draft(client, "Version one.")
+    v1_id = client.post(f"/api/projects/{project_id}/revisions/{chapter_id}").json()["snapshotId"]
 
     client.put(
-        f"/api/projects/{project_id}/draft/{moment_id}",
+        f"/api/projects/{project_id}/draft/chapter/{chapter_id}/moment/{moment_id}",
         json={"outlineNodeId": moment_id, "body": "Version two, much changed."},
     )
 
-    resp = client.post(f"/api/projects/{project_id}/revisions/{moment_id}/{v1_id}/revert")
+    resp = client.post(f"/api/projects/{project_id}/revisions/{chapter_id}/{v1_id}/revert")
     assert resp.status_code == 200
     safety_snapshot_id = resp.json()["snapshotId"]
     assert safety_snapshot_id != v1_id
-    assert resp.json()["body"] == "Version two, much changed."
+    assert resp.json()["moments"][moment_id] == "Version two, much changed."
 
-    resp = client.get(f"/api/projects/{project_id}/draft/{moment_id}")
+    resp = client.get(f"/api/projects/{project_id}/draft/chapter/{chapter_id}/moment/{moment_id}")
     assert resp.json()["body"] == "Version one."
 
-    resp = client.get(f"/api/projects/{project_id}/revisions/{moment_id}")
+    resp = client.get(f"/api/projects/{project_id}/revisions/{chapter_id}")
     ids = {s["snapshotId"] for s in resp.json()}
     assert ids == {v1_id, safety_snapshot_id}
 
 
 def test_comment_crud_on_snapshot(client: TestClient) -> None:
-    project_id, moment_id = _make_project_with_draft(client, "A sentence to annotate.")
-    snapshot_id = client.post(
-        f"/api/projects/{project_id}/revisions/{moment_id}", json={"label": "v1"}
-    ).json()["snapshotId"]
+    project_id, chapter_id, moment_id = _make_project_with_draft(client, "A sentence to annotate.")
+    snapshot_id = client.post(f"/api/projects/{project_id}/revisions/{chapter_id}").json()["snapshotId"]
 
     resp = client.post(
-        f"/api/projects/{project_id}/revisions/{moment_id}/{snapshot_id}/notes",
-        json={"body": "too on-the-nose?", "anchorStart": 0, "anchorEnd": 9, "flag": "primary"},
+        f"/api/projects/{project_id}/revisions/{chapter_id}/{snapshot_id}/notes",
+        json={"momentId": moment_id, "body": "too on-the-nose?", "anchorStart": 0, "anchorEnd": 9, "flag": "primary"},
     )
     assert resp.status_code == 200
     note_id = resp.json()["id"]
+    assert resp.json()["anchor"]["momentId"] == moment_id
 
     resp = client.patch(
-        f"/api/projects/{project_id}/revisions/{moment_id}/{snapshot_id}/notes/{note_id}",
+        f"/api/projects/{project_id}/revisions/{chapter_id}/{snapshot_id}/notes/{note_id}",
         json={"body": "updated comment"},
     )
     assert resp.status_code == 200
     assert resp.json()["body"] == "updated comment"
 
-    resp = client.get(f"/api/projects/{project_id}/revisions/{moment_id}/{snapshot_id}")
+    resp = client.get(f"/api/projects/{project_id}/revisions/{chapter_id}/{snapshot_id}")
     assert len(resp.json()["notes"]) == 1
 
     resp = client.delete(
-        f"/api/projects/{project_id}/revisions/{moment_id}/{snapshot_id}/notes/{note_id}"
+        f"/api/projects/{project_id}/revisions/{chapter_id}/{snapshot_id}/notes/{note_id}"
     )
     assert resp.status_code == 204
 
-    resp = client.get(f"/api/projects/{project_id}/revisions/{moment_id}/{snapshot_id}")
+    resp = client.get(f"/api/projects/{project_id}/revisions/{chapter_id}/{snapshot_id}")
     assert resp.json()["notes"] == []
 
 
-def test_snapshot_requires_existing_draft(client: TestClient) -> None:
+def test_snapshot_of_undrafted_chapter_is_empty_not_an_error(client: TestClient) -> None:
     project_id = client.post("/api/projects", json={"title": "No Draft Yet"}).json()["projectId"]
-    resp = client.post(f"/api/projects/{project_id}/revisions/moment_1", json={"label": "x"})
-    assert resp.status_code == 404
+    resp = client.post(f"/api/projects/{project_id}/revisions/chapter_1")
+    assert resp.status_code == 200
+    assert resp.json()["moments"] == {}
+    assert resp.json()["wordCount"] == 0

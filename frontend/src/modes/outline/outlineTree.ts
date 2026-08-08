@@ -75,6 +75,7 @@ export function addNode(
     color: null,
     chapterCountTarget: null,
     plotlineIds: [],
+    wordCountGoal: null,
   }
   return [...nodes, node]
 }
@@ -107,6 +108,14 @@ export function setBookPlotlineIds(nodes: OutlineNode[], bookId: string, plotlin
   return nodes.map((n) => (n.id === bookId ? { ...n, plotlineIds } : n))
 }
 
+export function setBookWordCountGoal(
+  nodes: OutlineNode[],
+  bookId: string,
+  wordCountGoal: number | null
+): OutlineNode[] {
+  return nodes.map((n) => (n.id === bookId ? { ...n, wordCountGoal } : n))
+}
+
 export function removeNode(nodes: OutlineNode[], nodeId: string): OutlineNode[] {
   return tree.removeSubtree(nodes, nodeId)
 }
@@ -129,6 +138,7 @@ function makeNode(kind: OutlineNodeKind, parentId: string | null, order: number)
     color: null,
     chapterCountTarget: null,
     plotlineIds: [],
+    wordCountGoal: null,
   }
 }
 

@@ -113,12 +113,12 @@ def test_draft_save_registers_moment_in_manifest(storage_root: Path) -> None:
     index = store.create_project(storage_root, "Draft Test")
 
     with pytest.raises(store.MomentNotFoundError):
-        store.load_draft(storage_root, index.projectId, "moment_1")
+        store.load_draft(storage_root, index.projectId, "chapter_1", "moment_1")
 
     draft = DraftMoment(momentId="moment_1", outlineNodeId="moment_1", updatedAt=utcnow(), body="Hello.")
-    store.save_draft(storage_root, index.projectId, "moment_1", draft)
+    store.save_draft(storage_root, index.projectId, "chapter_1", "moment_1", draft)
 
-    reloaded = store.load_draft(storage_root, index.projectId, "moment_1")
+    reloaded = store.load_draft(storage_root, index.projectId, "chapter_1", "moment_1")
     assert reloaded.body == "Hello."
 
     updated_index = store.load_index(storage_root, index.projectId)
@@ -126,7 +126,7 @@ def test_draft_save_registers_moment_in_manifest(storage_root: Path) -> None:
 
     # A second save to the same moment must not duplicate the manifest entry.
     draft.body = "Hello, again."
-    store.save_draft(storage_root, index.projectId, "moment_1", draft)
+    store.save_draft(storage_root, index.projectId, "chapter_1", "moment_1", draft)
     updated_index = store.load_index(storage_root, index.projectId)
     assert updated_index.manifest.draftMoments == ["moment_1"]
 
@@ -134,12 +134,12 @@ def test_draft_save_registers_moment_in_manifest(storage_root: Path) -> None:
 def test_delete_draft_removes_shard_and_manifest_entry(storage_root: Path) -> None:
     index = store.create_project(storage_root, "Delete Draft Test")
     draft = DraftMoment(momentId="moment_1", outlineNodeId="moment_1", updatedAt=utcnow(), body="Hello.")
-    store.save_draft(storage_root, index.projectId, "moment_1", draft)
+    store.save_draft(storage_root, index.projectId, "chapter_1", "moment_1", draft)
 
-    store.delete_draft(storage_root, index.projectId, "moment_1")
+    store.delete_draft(storage_root, index.projectId, "chapter_1", "moment_1")
 
     with pytest.raises(store.MomentNotFoundError):
-        store.load_draft(storage_root, index.projectId, "moment_1")
+        store.load_draft(storage_root, index.projectId, "chapter_1", "moment_1")
 
     updated_index = store.load_index(storage_root, index.projectId)
     assert updated_index.manifest.draftMoments == []
@@ -149,23 +149,23 @@ def test_revision_snapshot_round_trip_and_manifest(storage_root: Path) -> None:
     index = store.create_project(storage_root, "Revision Test")
     snapshot = RevisionSnapshot(
         snapshotId="snap_1",
-        momentId="moment_1",
+        chapterId="chapter_1",
         createdAt=utcnow(),
         label="first pass",
         trigger="manual",
-        body="Once upon a time.",
+        moments={"moment_1": "Once upon a time."},
         wordCount=3,
     )
     store.save_revision(storage_root, index.projectId, snapshot)
 
-    reloaded = store.load_revision(storage_root, index.projectId, "moment_1", "snap_1")
-    assert reloaded.body == "Once upon a time."
+    reloaded = store.load_revision(storage_root, index.projectId, "chapter_1", "snap_1")
+    assert reloaded.moments["moment_1"] == "Once upon a time."
 
-    listed = store.list_revisions(storage_root, index.projectId, "moment_1")
+    listed = store.list_revisions(storage_root, index.projectId, "chapter_1")
     assert [s.snapshotId for s in listed] == ["snap_1"]
 
     updated_index = store.load_index(storage_root, index.projectId)
-    assert updated_index.manifest.revisionMoments == ["moment_1"]
+    assert updated_index.manifest.revisionChapters == ["chapter_1"]
 
     with pytest.raises(store.SnapshotNotFoundError):
         store.load_revision(storage_root, index.projectId, "moment_1", "does_not_exist")

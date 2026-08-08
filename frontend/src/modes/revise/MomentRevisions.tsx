@@ -6,30 +6,32 @@ import {
   useRevisions,
   useSnapshot,
 } from '../../api/revisions'
+import SaveIcon from '../../components/shared/SaveIcon'
 import CommentsPanel from './CommentsPanel'
 import DiffView from './DiffView'
 
 interface Props {
   projectId: string
+  chapterId: string
   momentId: string
   title: string
 }
 
-function MomentRevisions({ projectId, momentId, title }: Props) {
-  const { data: summaries, isLoading } = useRevisions(projectId, momentId)
-  const createSnapshot = useCreateSnapshot(projectId, momentId)
-  const revert = useRevertToSnapshot(projectId, momentId)
+// Revisions are chapter-scoped (a snapshot captures the whole chapter's
+// moments at once), but this panel is embedded per-moment -- diff/comments
+// below are scoped to just this moment's body within the selected snapshot.
+function MomentRevisions({ projectId, chapterId, momentId, title }: Props) {
+  const { data: summaries, isLoading } = useRevisions(projectId, chapterId)
+  const createSnapshot = useCreateSnapshot(projectId, chapterId)
+  const revert = useRevertToSnapshot(projectId, chapterId)
 
-  const [label, setLabel] = useState('')
   const [selectedId, setSelectedId] = useState<string | null>(null)
 
-  const { data: snapshot } = useSnapshot(projectId, momentId, selectedId ?? undefined)
-  const { data: diff } = useDiff(projectId, momentId, selectedId ?? undefined, 'current')
+  const { data: snapshot } = useSnapshot(projectId, chapterId, selectedId ?? undefined)
+  const { data: diff } = useDiff(projectId, chapterId, momentId, selectedId ?? undefined, 'current')
 
   function handleSnapshot() {
-    createSnapshot.mutate(label.trim(), {
-      onSuccess: () => setLabel(''),
-    })
+    createSnapshot.mutate()
   }
 
   function handleRevert() {
@@ -46,17 +48,15 @@ function MomentRevisions({ projectId, momentId, title }: Props) {
     <div className="scene-revisions">
       <div className="scene-revisions__header">
         <h3>{title}</h3>
-        <div className="scene-revisions__snapshot-form">
-          <input
-            type="text"
-            placeholder="Label for this snapshot (optional)"
-            value={label}
-            onChange={(e) => setLabel(e.target.value)}
-          />
-          <button type="button" onClick={handleSnapshot} disabled={createSnapshot.isPending}>
-            Snapshot this
-          </button>
-        </div>
+        <button
+          type="button"
+          className="scene-revisions__save-button"
+          onClick={handleSnapshot}
+          disabled={createSnapshot.isPending}
+          title="Save a snapshot of this chapter now"
+        >
+          <SaveIcon /> Save snapshot
+        </button>
       </div>
 
       <div className="scene-revisions__body">
@@ -101,7 +101,7 @@ function MomentRevisions({ projectId, momentId, title }: Props) {
           {selectedId && snapshot && (
             <>
               <h4>Snapshot text &amp; comments</h4>
-              <CommentsPanel projectId={projectId} momentId={momentId} snapshot={snapshot} />
+              <CommentsPanel projectId={projectId} chapterId={chapterId} momentId={momentId} snapshot={snapshot} />
             </>
           )}
         </div>

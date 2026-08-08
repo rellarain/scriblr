@@ -55,7 +55,14 @@ def _render_toc(pdf: FPDF, outline: list[OutlineSection]) -> None:
         )
 
 
-def _render_pdf(root: Path, project_id: str, title: str, nodes: list[OutlineNode], root_id: str) -> bytes:
+def _render_pdf(
+    root: Path,
+    project_id: str,
+    title: str,
+    nodes: list[OutlineNode],
+    root_id: str,
+    initial_chapter_id: str | None = None,
+) -> bytes:
     by_parent = _children_by_parent(nodes)
 
     pdf = FPDF()
@@ -75,15 +82,16 @@ def _render_pdf(root: Path, project_id: str, title: str, nodes: list[OutlineNode
     # top-level heading after the first still gets its own fresh page.
     first_top_level = True
 
-    def walk(node_id: str, depth: int) -> None:
+    def walk(node_id: str, depth: int, chapter_id: str | None) -> None:
         nonlocal first_top_level
         for child in by_parent.get(node_id, []):
+            child_chapter_id = child.id if child.kind == "chapter" else chapter_id
             if child.kind == "moment":
                 pdf.set_font("helvetica", style="B", size=12)
                 pdf.multi_cell(0, text=child.title or "Untitled", new_x="LMARGIN", new_y="NEXT")
                 pdf.set_font("helvetica", size=11)
                 try:
-                    body = store.load_draft(root, project_id, child.id).body
+                    body = store.load_draft(root, project_id, chapter_id, child.id).body if chapter_id else ""
                 except MomentNotFoundError:
                     body = ""
                 if body.strip():
@@ -102,9 +110,9 @@ def _render_pdf(root: Path, project_id: str, title: str, nodes: list[OutlineNode
                 pdf.set_font("helvetica", style="B", size=HEADING_FONT_SIZES.get(depth, 11))
                 pdf.multi_cell(0, text=child.title or "Untitled", new_x="LMARGIN", new_y="NEXT")
                 pdf.ln(2)
-            walk(child.id, depth + 1)
+            walk(child.id, depth + 1, child_chapter_id)
 
-    walk(root_id, 0)
+    walk(root_id, 0, initial_chapter_id)
     return bytes(pdf.output())
 
 
@@ -121,4 +129,7 @@ def build_chapter_pdf(root: Path, project_id: str, chapter_id: str) -> tuple[byt
     chapter = next((n for n in outline.nodes if n.id == chapter_id and n.kind == "chapter"), None)
     if chapter is None:
         raise OutlineNodeNotFoundError(project_id, chapter_id)
-    return _render_pdf(root, project_id, chapter.title, outline.nodes, chapter.id), chapter.title
+    return (
+        _render_pdf(root, project_id, chapter.title, outline.nodes, chapter.id, initial_chapter_id=chapter.id),
+        chapter.title,
+    )

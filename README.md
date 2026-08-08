@@ -34,6 +34,14 @@ cd backend
 ./.venv/Scripts/python -m pytest
 ```
 
+Frontend tests:
+
+```bash
+cd frontend
+npm test          # one-shot run
+npm run test:watch
+```
+
 ## Running the desktop app
 
 `electron/main.js` opens Scriblr in a native window via
@@ -100,7 +108,13 @@ rebuilding/reinstalling never touches existing projects.
 > enabled, `npm run dist` will fail with `Cannot create symbolic link: A
 > required privilege is not held by the client`. Either enable Developer
 > Mode once (Settings → Privacy & Security → For developers) or run the
-> command from an elevated (Administrator) terminal.
+> command from an elevated (Administrator) terminal. With Developer Mode on,
+> `npm run dist` produces `electron/dist/Scriblr Setup <version>.exe`, a
+> per-user NSIS installer (no admin rights needed to run it) — verified by a
+> real silent install/launch/uninstall (`Scriblr Setup 0.1.0.exe /S`, then
+> `"Uninstall Scriblr.exe" /S`), which spawns the bundled
+> `scriblr-backend.exe` on a fresh dynamic port exactly like the dev-mode
+> and shortcut launches do.
 
 **Desktop shortcut** — works today even without a full `electron-builder`
 package, by launching Electron directly against `electron/` in prod mode

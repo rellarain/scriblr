@@ -47,10 +47,12 @@ def detect_and_record_orphans(
 
         chapter = _ancestor_of_kind(old_by_id, node_id, "chapter")
         book = _ancestor_of_kind(old_by_id, node_id, "book")
-        try:
-            word_count = store.load_draft(root, project_id, node_id).wordCount
-        except (store.MomentNotFoundError, store.ShardCorruptError):
-            word_count = 0
+        word_count = 0
+        if chapter is not None:
+            try:
+                word_count = store.load_draft(root, project_id, chapter.id, node_id).wordCount
+            except (store.MomentNotFoundError, store.ShardCorruptError):
+                word_count = 0
 
         registry.entries.append(
             ScrapEntry(
@@ -110,14 +112,19 @@ def restore_entry(
 
 def delete_entry_permanently(root: Path, project_id: str, moment_id: str) -> None:
     registry = store.load_scrap_registry(root, project_id)
-    remaining = [e for e in registry.entries if e.momentId != moment_id]
-    if len(remaining) == len(registry.entries):
+    entry = next((e for e in registry.entries if e.momentId == moment_id), None)
+    if entry is None:
         raise store.ScrapEntryNotFoundError(project_id, moment_id)
-    registry.entries = remaining
+    registry.entries = [e for e in registry.entries if e.momentId != moment_id]
     store.save_scrap_registry(root, project_id, registry)
 
-    try:
-        store.delete_draft(root, project_id, moment_id)
-    except store.MomentNotFoundError:
-        pass
-    store.delete_revision_history(root, project_id, moment_id)
+    # Revision history is chapter-scoped and may still hold live moments'
+    # history, so it's never deleted here -- only this moment's own draft
+    # entry (if its last-known chapter is still resolvable) is removed.
+    # Any past revision snapshots of that chapter keep this moment's old
+    # body in their record, same as git history retaining a deleted file.
+    if entry.lastChapterId is not None:
+        try:
+            store.delete_draft(root, project_id, entry.lastChapterId, moment_id)
+        except store.MomentNotFoundError:
+            pass
