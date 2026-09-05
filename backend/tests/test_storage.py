@@ -1,3 +1,4 @@
+import json
 from pathlib import Path
 
 import pytest
@@ -12,13 +13,15 @@ from app.storage.schema import (
 )
 
 
-def test_create_project_writes_expected_shards(storage_root: Path) -> None:
+def test_create_project_writes_single_project_file(storage_root: Path) -> None:
     index = store.create_project(storage_root, "My Novel")
 
     project_dir = storage_root / index.projectId
-    assert (project_dir / "index.json").exists()
-    assert (project_dir / "outline" / "tree.json").exists()
-    assert (project_dir / "brainstorm" / "plot.json").exists()
+    assert (project_dir / "project.json").exists()
+    # No more separate per-shard files/dirs for a freshly-created project.
+    assert not (project_dir / "index.json").exists()
+    assert not (project_dir / "outline").exists()
+    assert not (project_dir / "brainstorm").exists()
 
     loaded = store.load_index(storage_root, index.projectId)
     assert loaded.title == "My Novel"
@@ -174,8 +177,8 @@ def test_revision_snapshot_round_trip_and_manifest(storage_root: Path) -> None:
 def test_atomic_write_survives_interrupted_replace(storage_root: Path, monkeypatch: pytest.MonkeyPatch) -> None:
     index = store.create_project(storage_root, "Crash Test")
     project_dir = storage_root / index.projectId
-    outline_path = project_dir / "outline" / "tree.json"
-    original_bytes = outline_path.read_bytes()
+    project_file = project_dir / "project.json"
+    original_bytes = project_file.read_bytes()
 
     def boom(*_args: object, **_kwargs: object) -> None:
         raise OSError("simulated crash during os.replace")
@@ -189,39 +192,109 @@ def test_atomic_write_survives_interrupted_replace(storage_root: Path, monkeypat
 
     monkeypatch.undo()
 
-    assert outline_path.read_bytes() == original_bytes
+    assert project_file.read_bytes() == original_bytes
     # No leftover temp files should survive a failed write.
     tmp_dir = project_dir / ".tmp"
     assert list(tmp_dir.iterdir()) == []
 
 
-def test_corrupt_shard_is_quarantined_and_siblings_survive(storage_root: Path) -> None:
+def test_corrupt_section_is_quarantined_and_siblings_survive(storage_root: Path) -> None:
     index = store.create_project(storage_root, "Corruption Test")
     project_dir = storage_root / index.projectId
-    outline_path = project_dir / "outline" / "tree.json"
+    project_file = project_dir / "project.json"
 
-    outline_path.write_text("{not valid json", encoding="utf-8")
+    data = json.loads(project_file.read_text(encoding="utf-8"))
+    data["outline"] = {"nodes": "not-a-list-should-fail-validation"}
+    project_file.write_text(json.dumps(data), encoding="utf-8")
 
     with pytest.raises(store.ShardCorruptError) as exc_info:
         store.load_outline(storage_root, index.projectId)
 
-    assert not outline_path.exists()
+    # Section-level quarantine copies the bad value aside without touching
+    # project.json itself (unlike whole-file corruption, which renames it).
+    assert project_file.exists()
     assert exc_info.value.quarantined_path.exists()
-    assert ".corrupt-" in exc_info.value.quarantined_path.name
+    assert "outline.corrupt-" in exc_info.value.quarantined_path.name
 
-    # Sibling shards (index, plot) must still load fine.
+    # Sibling sections (index, plot) must still load fine from the same file.
     reloaded_index = store.load_index(storage_root, index.projectId)
     assert reloaded_index.title == "Corruption Test"
     reloaded_plot = store.load_plot(storage_root, index.projectId)
     assert reloaded_plot.nodes == []
 
 
+def test_corrupt_whole_file_is_quarantined(storage_root: Path) -> None:
+    index = store.create_project(storage_root, "Whole File Corruption Test")
+    project_dir = storage_root / index.projectId
+    project_file = project_dir / "project.json"
+
+    project_file.write_text("{not valid json", encoding="utf-8")
+
+    with pytest.raises(store.ShardCorruptError) as exc_info:
+        store.load_index(storage_root, index.projectId)
+
+    assert not project_file.exists()
+    assert exc_info.value.quarantined_path.exists()
+    assert ".corrupt-" in exc_info.value.quarantined_path.name
+
+
+def test_consolidate_project_history_prunes_old_tree_snapshots_only(storage_root: Path) -> None:
+    index = store.create_project(storage_root, "History Growth Test")
+
+    # A manual revision snapshot -- must never be pruned by compaction.
+    snapshot = RevisionSnapshot(
+        snapshotId="snap_manual",
+        chapterId="chapter_1",
+        createdAt=utcnow(),
+        label="keep me forever",
+        trigger="manual",
+        moments={"moment_1": "Some prose."},
+        wordCount=2,
+    )
+    store.save_revision(storage_root, index.projectId, snapshot)
+
+    # Under threshold: no-op.
+    assert store.consolidate_project_history(storage_root, index.projectId) == []
+
+    project_file = storage_root / index.projectId / "project.json"
+    data = json.loads(project_file.read_text(encoding="utf-8"))
+    data["outlineHistory"] = [
+        {
+            "schemaVersion": 2,
+            "snapshotId": f"tsnap_{i}",
+            "treeType": "outline",
+            "createdAt": f"2026-01-01T00:{i // 60:02d}:{i % 60:02d}+00:00",
+            "trigger": "auto",
+            "nodes": [],
+        }
+        for i in range(100)
+    ]
+    project_file.write_text(json.dumps(data), encoding="utf-8")
+
+    messages = store.consolidate_project_history(storage_root, index.projectId)
+    assert len(messages) == 1
+    assert "50" in messages[0] and "outline" in messages[0]
+
+    history = store.list_tree_snapshots(storage_root, index.projectId, "outline")
+    assert len(history) == store.TREE_HISTORY_KEEP
+    # Kept the most recent ones (highest-numbered snapshot ids, since they
+    # were assigned in createdAt order above).
+    assert {s.snapshotId for s in history} == {f"tsnap_{i}" for i in range(50, 100)}
+
+    # Manual revisions are completely untouched by compaction.
+    revisions = store.list_revisions(storage_root, index.projectId, "chapter_1")
+    assert [s.snapshotId for s in revisions] == ["snap_manual"]
+
+    # Idempotent / cheap no-op once back under threshold.
+    assert store.consolidate_project_history(storage_root, index.projectId) == []
+
+
 def test_list_projects_skips_corrupt_project_without_crashing(storage_root: Path) -> None:
     good = store.create_project(storage_root, "Good Project")
     bad = store.create_project(storage_root, "Bad Project")
 
-    bad_index_path = storage_root / bad.projectId / "index.json"
-    bad_index_path.write_text("{ this is not json", encoding="utf-8")
+    bad_project_file = storage_root / bad.projectId / "project.json"
+    bad_project_file.write_text("{ this is not json", encoding="utf-8")
 
     results = store.list_projects(storage_root)
     ids = {p.projectId for p in results}

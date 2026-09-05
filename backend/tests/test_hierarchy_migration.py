@@ -2,7 +2,42 @@ import json
 from pathlib import Path
 
 from app.storage import project_store as store
-from app.storage.schema import DraftMoment, utcnow
+from app.storage.schema import DraftMoment, OutlineTree, PlotTree, ProjectIndex, utcnow
+
+
+def test_full_project_migrates_from_old_multi_file_layout_idempotently(storage_root: Path) -> None:
+    project_id = "legacy_full_proj"
+    project_dir = storage_root / project_id
+    project_dir.mkdir()
+    now = utcnow()
+
+    index = ProjectIndex(projectId=project_id, title="Old Layout Book", createdAt=now, updatedAt=now)
+    (project_dir / "index.json").write_text(index.model_dump_json(indent=2), encoding="utf-8")
+
+    (project_dir / "outline").mkdir()
+    outline = OutlineTree(
+        nodes=[{"id": "book_1", "kind": "book", "parentId": None, "order": 0, "title": "Old Layout Book"}]
+    )
+    (project_dir / "outline" / "tree.json").write_text(outline.model_dump_json(indent=2), encoding="utf-8")
+
+    (project_dir / "brainstorm").mkdir()
+    (project_dir / "brainstorm" / "plot.json").write_text(PlotTree().model_dump_json(indent=2), encoding="utf-8")
+
+    assert not (project_dir / "project.json").exists()
+
+    loaded = store.load_index(storage_root, project_id)
+    assert loaded.title == "Old Layout Book"
+    assert (project_dir / "project.json").exists()
+    # Old files are left in place, untouched, forever.
+    assert (project_dir / "index.json").exists()
+    assert (project_dir / "outline" / "tree.json").exists()
+
+    loaded_outline = store.load_outline(storage_root, project_id)
+    assert [n.title for n in loaded_outline.nodes] == ["Old Layout Book"]
+
+    # Idempotent: re-touching the project doesn't re-migrate or error.
+    loaded_again = store.load_index(storage_root, project_id)
+    assert loaded_again.title == "Old Layout Book"
 
 
 def test_load_draft_folds_in_legacy_per_moment_file(storage_root: Path) -> None:
@@ -14,16 +49,14 @@ def test_load_draft_folds_in_legacy_per_moment_file(storage_root: Path) -> None:
     legacy = DraftMoment(momentId="moment_1", outlineNodeId="moment_1", updatedAt=utcnow(), wordCount=2, body="Old prose.")
     legacy_path.write_text(json.dumps(legacy.model_dump(mode="json")), encoding="utf-8")
 
-    # Not present in the new-shape chapter file yet.
-    chapter_path = project_dir / "draft" / "chapter_1.json"
-    assert not chapter_path.exists()
+    # Not present in project.json's drafts section yet.
+    assert "moment_1" not in store.load_draft_chapter(storage_root, index.projectId, "chapter_1").moments
 
     draft = store.load_draft(storage_root, index.projectId, "chapter_1", "moment_1")
     assert draft.body == "Old prose."
     assert draft.wordCount == 2
 
-    # Folded into the new per-chapter file...
-    assert chapter_path.exists()
+    # Folded into project.json's drafts section...
     chapter = store.load_draft_chapter(storage_root, index.projectId, "chapter_1")
     assert chapter.moments["moment_1"].body == "Old prose."
 

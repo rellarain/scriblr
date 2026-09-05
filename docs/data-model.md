@@ -1,5 +1,13 @@
 # Data model — sharded per-project JSON storage
 
+> **Historical / superseded.** This describes the pre-consolidation
+> multi-file-per-project layout and a 5-level outline / 3-level plot
+> hierarchy. Storage has since been consolidated to a single `project.json`
+> per project, and the outline/plot hierarchies have grown to 7 and 4
+> levels respectively. See the root [`README.md`](../README.md#backend-design)
+> "Backend design" section for the current design. Kept here for the
+> historical rationale behind the original per-data-type shard granularity.
+
 Each project is a folder under an OS app-data directory (resolved by `backend/app/storage/paths.py`;
 on Windows: `%APPDATA%\Scriblr\projects\<project-id>\`).
 

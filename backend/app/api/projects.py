@@ -24,6 +24,7 @@ def create_project(body: CreateProjectRequest, root: Path = Depends(get_storage_
 def get_project(project_id: str, root: Path = Depends(get_storage_root)) -> ProjectSummaryResponse:
     index = store.load_index(root, project_id)
     warnings: list[str] = []
+    warnings.extend(store.consolidate_project_history(root, project_id))
     outline = None
     try:
         outline = store.load_outline(root, project_id)

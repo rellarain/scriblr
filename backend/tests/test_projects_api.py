@@ -1,3 +1,4 @@
+import json
 from pathlib import Path
 
 from fastapi.testclient import TestClient
@@ -106,8 +107,10 @@ def test_corrupt_outline_surfaces_warning_without_failing_project_load(
     client: TestClient, storage_root: Path
 ) -> None:
     project_id = client.post("/api/projects", json={"title": "Corrupt Outline"}).json()["projectId"]
-    outline_path = storage_root / project_id / "outline" / "tree.json"
-    outline_path.write_text("{not valid json", encoding="utf-8")
+    project_file = storage_root / project_id / "project.json"
+    data = json.loads(project_file.read_text(encoding="utf-8"))
+    data["outline"] = {"nodes": "not-a-list-should-fail-validation"}
+    project_file.write_text(json.dumps(data), encoding="utf-8")
 
     resp = client.get(f"/api/projects/{project_id}")
     assert resp.status_code == 200

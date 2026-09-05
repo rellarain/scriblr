@@ -441,3 +441,26 @@ class PresetCategory(BaseModel):
 class PresetCatalog(BaseModel):
     schemaVersion: int = 1
     presets: list[PresetCategory] = Field(default_factory=list)
+
+
+# ---------------------------------------------------------------------------
+# ProjectFile: the single on-disk file a project is stored as (project.json),
+# consolidating what used to be ~10 separate shard files (index, outline,
+# plot, per-chapter drafts, per-chapter revisions, outline/plot history,
+# activity, schedule, scrap) into one. Every field reuses an existing
+# per-section model unchanged -- this is purely a container.
+# ---------------------------------------------------------------------------
+
+
+class ProjectFile(BaseModel):
+    schemaVersion: int = SCHEMA_VERSION
+    index: ProjectIndex
+    outline: OutlineTree = Field(default_factory=OutlineTree)
+    plot: PlotTree = Field(default_factory=PlotTree)
+    drafts: dict[str, DraftChapter] = Field(default_factory=dict)
+    revisions: dict[str, list[RevisionSnapshot]] = Field(default_factory=dict)
+    outlineHistory: list[TreeSnapshot] = Field(default_factory=list)
+    plotHistory: list[TreeSnapshot] = Field(default_factory=list)
+    activity: DailyActivityLog = Field(default_factory=DailyActivityLog)
+    schedule: ScheduleCompletionLog = Field(default_factory=ScheduleCompletionLog)
+    scrap: ScrapRegistry = Field(default_factory=ScrapRegistry)
