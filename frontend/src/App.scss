@@ -1,0 +1,1831 @@
+
+html, body, div, span, object, figure, h1, h2, h3, h4, h5, h6, p, blockquote, pre, a, code, em, img, small, strike, strong, sub, sup, tt, b, u, i, ol, ul, li, fieldset, form, label, table, caption, tbody, tfoot, thead, tr, th, td, main, canvas, embed, footer, header, nav, section, video{
+  margin: 0;
+  padding: 0;
+  border: 0;
+  font-size: 100%;
+  font: inherit;
+  font-family: sans-serif;
+  vertical-align: baseline;
+  text-rendering: optimizeLegibility;
+  -webkit-font-smoothing: antialiased;
+  text-size-adjust: none;
+}
+footer, header, nav, section, main{
+  display: block;
+}
+body{
+  line-height: 1;
+}
+ol, ul{
+  list-style: none;
+}
+blockquote, q{
+  quotes: none;
+}
+blockquote:before, blockquote:after, q:before, q:after{
+  content: '';
+  content: none;
+}
+table{
+  border-collapse: collapse;
+  border-spacing: 0;
+}
+input{
+  appearance: none;
+  border-radius: 0;
+}
+iframe {appearance: none;}
+button {border: none; cursor: pointer; border-radius: 4px;}
+// --------------------------------------------------------
+
+// Design tokens: the three customizable colors the app's palette is built
+// from. Each is stored as separate H/S/L channels (not a single hsl()
+// value) so a usage can override just the lightness — e.g. a lighter or
+// darker tint of the same theme color — via
+// hsl(var(--color-x-h), var(--color-x-s), <L>) while hue/saturation (the
+// color's actual identity) stay tied to one source. All usages are opaque.
+:root {
+  // Theme: desaturated base color for panel/chrome backgrounds
+  --color-theme-h: 205;
+  --color-theme-s: 22%;
+  --color-theme-l: 35%;
+
+  // Accent: vibrant color for active/selected states
+  --color-accent-h: 32;
+  --color-accent-s: 95%;
+  --color-accent-l: 55%;
+
+  // Sidebar backgrounds use the accent's hue but heavily desaturated, so
+  // the sidebar reads as part of the accent color family while staying
+  // calm enough to host content; not independently user-customizable.
+  --color-sidebar-s: 20%;
+
+  // Alert: saturated color reserved for warnings/errors/destructive actions
+  --color-alert-h: 0;
+  --color-alert-s: 72%;
+  --color-alert-l: 48%;
+}
+
+#root {
+  background-color: hsl(var(--color-theme-h), var(--color-theme-s), var(--color-theme-l));
+  width: 100vw;
+  margin: 0;
+  padding: 0;
+  height: 100vh;
+  overflow: hidden;
+  position: absolute;
+  top:0;
+  right: 0;
+  color: white;
+}
+
+
+.uiShell {
+  position: absolute;
+  inset: 0;
+  width: 100vw;
+  height: 100vh;
+  overflow: hidden;
+  background-color: hsl(var(--color-theme-h), var(--color-theme-s), var(--color-theme-l));
+  // Establishes its own stacking context so .base's negative z-index (below
+  // Header/Mainscreen/Sidebar, all z-index: 0+) is only compared against
+  // its OWN children -- without this, .base sinks below .uiShell's own
+  // background instead (since .uiShell, with no z-index of its own, isn't
+  // a stacking context boundary), making VUI invisible even when revealed.
+  z-index: 0;
+}
+
+// Header: a fixed 50px top bar (nav row 40px + ribbon row 10px) that never
+// resizes vertically. Since the Sidebar now spans the full viewport height
+// (see .sidebar) instead of starting below row 1, the header is inset by
+// --sidebar-w on the handedness side instead of running the full 100vw --
+// same treatment .headerRibbonRow already used, now shared by the whole
+// header so the nav row's content is never covered. The drawer holding
+// UUI is a SEPARATE layer (.headerDrawerClip below) rather than a 3rd/4th
+// row inside this box, so its own z-index can sit below the Sidebar too.
+.header {
+  position: absolute;
+  top: 0;
+  height: 50px;
+  z-index: 5;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+  transition: left 1s, right 1s;
+}
+.hand-right .header { left: 0; right: var(--sidebar-w); }
+.hand-left  .header { left: var(--sidebar-w); right: 0; }
+
+// Row 1 (40px): the user card is isolated on the left, the page-switch nav
+// on the right -- literal left/right, independent of handedness (a
+// deliberate break from Sidebar/Mainscreen's mirrored convention).
+.headerNavRow {
+  flex: 0 0 40px;
+  height: 40px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 0 12px;
+  background-color: hsl(var(--color-theme-h), var(--color-theme-s), calc(var(--color-theme-l) - 10%));
+}
+
+.headerUserCard {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 5px;
+  color: white;
+  padding: 4px 12px 4px 4px;
+  border-radius: 4px;
+  background: transparent;
+}
+.headerUserCardPhoto {
+  width: 32px;
+  height: 32px;
+  border-radius: 4px;
+  flex: 0 0 auto;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+  background: rgba(255, 255, 255, 0.15);
+  img { width: 100%; height: 100%; object-fit: cover; }
+}
+.headerUserCardText { display: flex; flex-direction: column; align-items: flex-start; line-height: 1.2; }
+.headerUserCardName { font-size: 13px; font-weight: 700; }
+.headerUserCardOrg { font-size: 11px; opacity: 0.75; display: flex; align-items: center; gap: 4px; }
+
+.navSwitcher {
+  display: flex;
+  gap: 4px;
+  margin: 5px;
+  padding: 4px;
+  border-radius: 4px;
+  background: transparent;
+
+  &Btn {
+    color: white;
+    background: transparent;
+    padding: 6px 10px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 4px;
+    &:hover { background: hsl(var(--color-accent-h), var(--color-accent-s), calc(var(--color-accent-l) + 15%)); }
+    &--active { background: hsl(var(--color-accent-h), var(--color-accent-s), var(--color-accent-l)); }
+  }
+}
+
+// Row 2 (10px): today's activity, one thin segment per 10-minute interval.
+// Now that .header itself is inset by --sidebar-w (see above), this just
+// fills the header's own already-narrowed width -- no separate handedness
+// inset needed here anymore.
+.headerRibbonRow {
+  position: absolute;
+  top: 40px;
+  left: 0;
+  right: 0;
+  height: 10px;
+  display: flex;
+  // Segments sit at the top of this row (flush with row 1's bottom edge)
+  // and grow DOWNWARD from there, rather than stretching to fill it --
+  // see .headerRibbonSegment.
+  align-items: flex-start;
+  background: transparent;
+}
+// Each segment is opaque and animates its own height between 0 and 10px
+// (rather than just toggling visibility) -- growing from 0, anchored at
+// the row's top (row 1's bottom edge), reads as the segment extending out
+// from beneath the navigation button area.
+.headerRibbonSegment {
+  flex: 1 1 0;
+  min-width: 0;
+  height: 100%;
+  transition: height 1s;
+  &--work { background: hsl(var(--color-accent-h), var(--color-accent-s), var(--color-accent-l)); }
+  &--nonWork { background: hsl(var(--color-theme-h), var(--color-theme-s), calc(var(--color-theme-l) + 20%)); }
+  &--break { background: hsl(var(--color-alert-h), var(--color-alert-s), var(--color-alert-l)); }
+  // Inactive -- collapsed to 0 height (rather than just transparent) so
+  // it never occupies any space, letting whatever's behind (the footer
+  // strip when minimized, UUI itself when open) show through untouched.
+  &--idle { height: 0; background: transparent; }
+  // The slot the real clock is in right now, regardless of its own kind.
+  &--current { background: white; }
+}
+
+// A fixed clipping window, right under row 1 (top: 40px) -- unlike the
+// content inside it, this box itself never resizes or moves. z-index
+// sits BELOW the Sidebar's (2) on purpose -- an expanded Sidebar should
+// overlap this layer and occupy the same portion of the screen it does
+// over Mainscreen/VUI, while staying below .header's nav row (5), which
+// always stays the topmost, opaque layer. No background of its own (see
+// .headerDrawerSlide) -- Mainscreen should show through wherever the
+// slide currently isn't.
+.headerDrawerClip {
+  position: absolute;
+  top: 40px;
+  height: calc(100vh - 40px);
+  overflow: hidden;
+  z-index: 1;
+  transition: left 1s, right 1s;
+  // Transparent everywhere its content isn't -- without this, its own box
+  // (always full Mainscreen-width/height, even while minimized) silently
+  // swallows clicks meant for Mainscreen underneath (e.g. AUI's subtabs).
+  // .headerDrawerSlide re-enables it for its own content, which overflow:
+  // hidden above already limits hit-testing to whatever's actually visible.
+  pointer-events: none;
+}
+// Matches Mainscreen's own width/inset, shrinking as the sidebar expands,
+// rather than spanning the full 100vw behind it.
+.hand-right .headerDrawerClip { left: 0; right: var(--sidebar-w); }
+.hand-left  .headerDrawerClip { left: var(--sidebar-w); right: 0; }
+
+// UUI + the footer strip, always laid out at their full natural height
+// (never resized or unmounted) and stacked normally (UUI first, footer
+// last) -- what moves is this whole assembly's transform, not its size.
+// Minimized (default): shifted up by exactly UUI's own height, so only
+// the footer -- the assembly's last 10px -- peeks out at the clip's top
+// edge, right under the activity ribbon. Open: shifted back to rest,
+// putting UUI's own top under row 1 and the footer at the very bottom of
+// the screen.
+.headerDrawerSlide {
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  transform: translateY(calc(-1 * (100vh - 50px)));
+  transition: transform 1s;
+  background-color: hsl(var(--color-theme-h), var(--color-theme-s), calc(var(--color-theme-l) - 10%));
+  pointer-events: auto;
+  &--open { transform: translateY(0); }
+}
+
+// UUI itself: always laid out at this same fixed height whether the
+// slide above is open or minimized -- minimizing only slides it out of
+// view, it never resizes UUI or its state.
+.headerDrawerRow {
+  flex: 0 0 auto;
+  height: calc(100vh - 50px);
+  display: flex;
+}
+
+// Footer strip: always laid out at this same fixed 10px, directly below
+// .headerDrawerRow -- together they total the slide's full height
+// (100vh - 50px), matching the clip exactly.
+.headerDrawerFooterRow {
+  flex: 0 0 10px;
+  height: 10px;
+  width: 100%;
+  // Explicitly darker than .header's own background (l - 10%), rather
+  // than relying on an alpha overlay blending with whatever's behind it.
+  background: hsl(var(--color-theme-h), var(--color-theme-s), calc(var(--color-theme-l) - 20%));
+}
+
+// AUI-exclusive (the console picker in .aUIPanel).
+.subNavBtn {
+  color: white;
+  background: transparent;
+  width: 32px;
+  height: 32px;
+  flex: 0 0 auto;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 4px;
+  &:hover { background: hsl(var(--color-accent-h), var(--color-accent-s), calc(var(--color-accent-l) + 15%)); }
+  &--active { background: hsl(var(--color-accent-h), var(--color-accent-s), var(--color-accent-l)); }
+}
+
+.subNav {
+  flex: 0 0 auto;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 10px 6px;
+  overflow-y: auto;
+}
+// Scoped to UUI only -- scrollable, just no visible scrollbar track.
+.uUIPanel .subNav {
+  scrollbar-width: none; // Firefox
+  -ms-overflow-style: none; // old Edge/IE
+  &::-webkit-scrollbar { display: none; } // Chrome/Safari
+}
+
+.sectionBody {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow-y: auto;
+  padding: 6px 16px 12px;
+  h2 { font-size: 15px; margin-bottom: 6px; text-transform: uppercase; letter-spacing: 1px; }
+  p { font-size: 13px; opacity: 0.85; }
+}
+// Lock/unlock toggle: theme-colored icon, no background/hover treatment
+// while locked (read-only); white icon on an alert-colored chip while
+// unlocked (editable), so the editable state reads as the louder one.
+.auiConfigModeToggle {
+  flex: 0 0 auto;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: transparent;
+  padding: 3px;
+  border-radius: 4px;
+  &--locked { color: hsl(var(--color-theme-h), var(--color-theme-s), calc(var(--color-theme-l) + 35%)); }
+  &--unlocked {
+    color: white;
+    background: hsl(var(--color-alert-h), var(--color-alert-s), var(--color-alert-l));
+  }
+}
+// Scoped to UUI only (shared .sectionBody still shows a scrollbar for AUI)
+// -- scrollable, just no visible scrollbar track.
+.uUIContent .sectionBody {
+  scrollbar-width: none; // Firefox
+  -ms-overflow-style: none; // old Edge/IE
+  &::-webkit-scrollbar { display: none; } // Chrome/Safari
+}
+// HUI's Inbox Sort tab specifically -- still scrollable, just no visible
+// scrollbar track (see InboxSection.tsx, applied only while activeTab is
+// 'sorting' -- Tone/Explicate keep the default visible scrollbar).
+.sectionBody--noScrollbar {
+  scrollbar-width: none; // Firefox
+  -ms-overflow-style: none; // old Edge/IE
+  &::-webkit-scrollbar { display: none; } // Chrome/Safari
+}
+
+// Only one of these four is ever mounted at a time, so they share layout
+// and a common theme-derived background. Mainscreen always sits at the
+// fixed collapsed 50px Header height (never resizes) -- an expanded Header
+// overlaps on top of it (z-index above) instead. AUI is NOT one of these
+// -- it moved back into the Sidebar as its own slide-out panel (see
+// .aUI/.aUIPanel and the .sidebar comment below).
+.uUI, .rUI, .tUI, .wUI {
+  position: absolute;
+  top: 50px;
+  bottom: 0;
+  transition: left 1s, right 1s;
+  overflow: hidden;
+  display: flex;
+  z-index: 0;
+  background-color: hsl(var(--color-theme-h), var(--color-theme-s), var(--color-theme-l));
+}
+.hand-right .uUI, .hand-right .rUI, .hand-right .tUI, .hand-right .wUI { left: 0; right: var(--sidebar-w); }
+.hand-left  .uUI, .hand-left  .rUI, .hand-left  .tUI, .hand-left  .wUI { left: var(--sidebar-w); right: 0; }
+// Base: bottom-most layer, same footprint as Mainscreen above (opposite the
+// sidebar), holding VUI. In practice always fully covered by Mainscreen's
+// opaque background -- present per scrilbrPlan.md's Structure section,
+// ready for future use (e.g. a pre-login/visitor backdrop).
+.base {
+  position: absolute;
+  top: 50px;
+  bottom: 0;
+  z-index: -1;
+  overflow: hidden;
+  display: flex;
+}
+.hand-right .base { left: 0; right: var(--sidebar-w); }
+.hand-left  .base { left: var(--sidebar-w); right: 0; }
+
+.vUI {
+  flex: 1 1 auto;
+  display: flex;
+  align-items: center;
+  // Fills .base completely -- .base already sits below the fixed 50px
+  // header and matches Sidebar/Mainscreen's height exactly (top: 50px;
+  // bottom: 0;), so mirroring that here (rather than an independent
+  // viewport-relative height) keeps VUI's box identically sized, with no
+  // separate assumption about the header's height to keep in sync.
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: 0;
+  transition: width 1s;
+  right: 0;
+  justify-content: center;
+  color: white;
+}
+
+.customize {
+  flex: 0 1 auto;
+  align-self: flex-start;
+  width: fit-content;
+  height: fit-content;
+  max-height: 100%;
+  overflow-y: auto;
+  padding: 24px;
+  color: white;
+  background: hsl(var(--color-theme-h), var(--color-theme-s), calc(var(--color-theme-l) - 10%));
+
+  h2 { font-size: 18px; text-transform: uppercase; letter-spacing: 1px; margin-bottom: 16px; }
+}
+
+.customizeGroup {
+  background: hsl(var(--color-theme-h), var(--color-theme-s), calc(var(--color-theme-l) - 15%));
+  border-radius: 6px;
+  padding: 12px 16px;
+  margin-bottom: 16px;
+  max-width: 360px;
+
+  label {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-size: 13px;
+    margin-top: 8px;
+
+    input[type='range'] { flex: 1 1 auto; }
+    span:last-child { width: 40px; text-align: right; font-variant-numeric: tabular-nums; }
+  }
+}
+
+.customizeGroupHeader {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 1px;
+  font-size: 13px;
+}
+
+.customizeSwatch {
+  width: 18px;
+  height: 18px;
+  border-radius: 4px;
+  flex: 0 0 auto;
+  border: 1px solid rgba(255, 255, 255, 0.3);
+}
+
+// Writer: three stacked layers (bookContainer -> bookshelfContainer ->
+// wuiSidebar, see below) instead of the shared .uUI/.rUI/.wUI base rule's
+// single-pane layout. .wUI keeps that shared rule's own position/inset
+// (still a plain Mainscreen mode) -- it just becomes a local positioning
+// context for its 3 absolutely-positioned children instead of a flex row.
+.wUI {
+  color: white;
+  --wui-sidebar-w: 300px; // fixed -- wuiSidebar doesn't expand/collapse like the HUI sidebar does
+}
+
+// Three layers, bottom to top, modeled on the same two precedents already
+// used elsewhere in this file: the sidebar-over-inset-header pattern
+// (.sidebar/.header) for the z-stack itself, and the drawer clip/slide
+// pattern (.headerDrawerClip/.headerDrawerSlide) for .shelfConsole below.
+.bookContainer {
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+  display: flex;
+}
+.bookshelfContainer {
+  position: absolute;
+  inset: 0;
+  z-index: 1;
+  display: flex;
+  // Mostly-empty top layer (see .headerDrawerClip's identical rationale) --
+  // re-enabled on its actually-visible content (.shelvesResting,
+  // .shelfConsole, .shelvesHandle) so it never blocks clicks meant for
+  // .bookContainer underneath.
+  pointer-events: none;
+}
+// Always left -- unlike the HUI sidebar, wuiSidebar doesn't mirror the
+// app's handedness setting.
+.wuiSidebar {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: 0;
+  width: var(--wui-sidebar-w);
+  z-index: 2;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 16px;
+  overflow-y: auto;
+  background: hsl(var(--color-theme-h), var(--color-theme-s), calc(var(--color-theme-l) - 10%));
+  &::-webkit-scrollbar { width: 0; }
+}
+
+// sidebarSpacer reserves wuiSidebar's own width so bookContainer/
+// bookshelfContainer's content never renders underneath it -- it's always
+// the first flex child (both layers default to flex-direction: row), which
+// puts it on the left, matching wuiSidebar's own fixed left position.
+.sidebarSpacer { flex: 0 0 var(--wui-sidebar-w); }
+
+.bookStage, .shelfStage {
+  flex: 1 1 auto;
+  min-width: 0;
+  min-height: 0;
+  position: relative;
+  display: flex;
+  flex-direction: column;
+}
+
+// The book/page/pages console mount points -- matches the old
+// .wUIConsoleContent shape (position: relative for the corner buttons).
+.bookCoverMount, .pageConsole, .pagesConsole, .shelvesResting {
+  flex: 1 1 auto;
+  min-width: 0;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  position: relative;
+}
+.shelvesResting { pointer-events: auto; }
+
+// The shelf console drawer -- always mounted while a project is open (its
+// scroll position/open sub-tab survives being hidden), sliding via
+// transform to reveal bookContainer's book view underneath when closed.
+.shelfConsole {
+  position: absolute;
+  inset: 0;
+  min-width: 0;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  pointer-events: auto;
+  background-color: hsl(var(--color-theme-h), var(--color-theme-s), var(--color-theme-l));
+  transform: translateX(100%);
+  transition: transform 0.4s;
+}
+.shelfConsole--open { transform: translateX(0); }
+
+// A small persistent pull-tab -- toggles the shelf console open/closed
+// independent of (or in addition to) its automatic activeConsole-driven
+// reveal. See ShelfLayer.tsx.
+.shelvesHandle {
+  position: absolute;
+  left: 50%;
+  bottom: 8px;
+  transform: translateX(-50%);
+  z-index: 3;
+  width: 36px;
+  height: 20px;
+  border-radius: 4px 4px 0 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: hsl(var(--color-accent-h), var(--color-accent-s), var(--color-accent-l));
+  color: white;
+  pointer-events: auto;
+  &:hover { background: hsl(var(--color-accent-h), var(--color-accent-s), calc(var(--color-accent-l) + 12%)); }
+  &[aria-pressed='true'] { background: hsl(var(--color-accent-h), var(--color-accent-s), calc(var(--color-accent-l) - 10%)); }
+}
+
+// Book-level identity strip -- a plain accent-colored bar, unrelated to the
+// bookshelf/spine visual (removed from main-screen consoles/editors).
+.bookIdentityRail {
+  flex: 0 0 auto;
+  padding: 8px 16px;
+  font-size: 16px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 1px;
+  background: hsl(var(--color-accent-h), var(--color-accent-s), var(--color-accent-l));
+  color: white;
+}
+
+// Purely decorative -- no animation library in this project, plain CSS
+// transitions matching .headerDrawerSlide/.headerRibbonSegment's existing
+// convention. 3 identical overlays (matching WUI2's original sketch count)
+// bracket the book/page/pages mounts; --opening/--flipping are driven by
+// WUI.tsx's transitionState, triggered from WuiSidebar's navigation clicks.
+.sliderPages {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  opacity: 0;
+  transform: scaleX(0);
+  transform-origin: center;
+  transition: transform 0.5s ease, opacity 0.5s ease;
+  background: linear-gradient(
+    160deg,
+    hsl(var(--color-accent-h), var(--color-sidebar-s), 38%),
+    hsl(var(--color-accent-h), var(--color-sidebar-s), 30%)
+  );
+}
+.sliderPages--opening, .sliderPages--flipping {
+  opacity: 1;
+  transform: scaleX(1);
+}
+
+.bookTabsPageModeToggle {
+  display: flex;
+  gap: 4px;
+  margin-left: auto;
+}
+
+// Each of wuiSidebar's 4 stacked per-level panels.
+.wuiSidebarPanel {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+.wuiSidebarPanelLabel {
+  display: flex;
+  align-items: center;
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 1px;
+  opacity: 0.6;
+  padding: 0 4px;
+}
+
+// A horizontally-scrolling shelf of .sidebarSpine entries, no visible
+// scrollbar -- matches .sidebarDivider's existing hidden-scrollbar
+// convention. The bookshelf/spine visual is sidebar-only territory now;
+// the main-screen editors use plain rows (.outlineChildTitle) instead.
+.sidebarShelf {
+  display: flex;
+  flex-direction: row;
+  align-items: flex-end;
+  gap: 8px;
+  overflow-x: auto;
+  overflow-y: hidden;
+  padding-bottom: 4px;
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+  &::-webkit-scrollbar { display: none; }
+}
+.sidebarSpineWrap { display: flex; flex-direction: column; align-items: center; gap: 4px; flex: 0 0 auto; }
+
+// A compact spine -- the same shape family as the old main-screen
+// .bookSpine, resized to fit a 300px sidebar column alongside its own
+// move/delete controls.
+.sidebarSpine {
+  width: 40px;
+  height: 110px;
+  border-radius: 4px;
+  background: hsl(var(--color-accent-h), var(--color-accent-s), var(--color-accent-l));
+  color: white;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 8px 3px;
+  writing-mode: vertical-rl;
+  text-orientation: mixed;
+  font-size: 11px;
+  font-weight: 700;
+  box-shadow: 2px 2px 6px rgba(0, 0, 0, 0.3);
+  &:hover { background: hsl(var(--color-accent-h), var(--color-accent-s), calc(var(--color-accent-l) + 12%)); }
+  &--active { background: hsl(var(--color-accent-h), var(--color-accent-s), calc(var(--color-accent-l) - 15%)); box-shadow: 0 0 0 2px white inset; }
+}
+
+.wUIScreenHeader {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 16px;
+}
+.wUIScreenTitle {
+  font-size: 18px;
+  text-transform: uppercase;
+  letter-spacing: 1px;
+}
+.wUISavingIndicator { font-size: 11px; opacity: 0.6; margin-left: auto; }
+.outlineWarningBanner {
+  font-size: 11px;
+  opacity: 0.85;
+  color: hsl(var(--color-alert-h), var(--color-alert-s), calc(var(--color-alert-l) + 20%));
+  margin-bottom: 8px;
+}
+
+// .ancestryBreadcrumb itself (the old single-block AncestryBreadcrumb
+// wrapper) is gone -- superseded by wuiSidebar's 4 panels -- but Back/Row
+// stay: PlotPanel's .plotBreadcrumb reuses them independently (see below).
+.ancestryBreadcrumbBack {
+  color: white;
+  text-align: left;
+  opacity: 0.7;
+  padding: 6px 4px;
+  margin-bottom: 8px;
+  &:hover { opacity: 1; }
+}
+.ancestryBreadcrumbRow {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  color: white;
+  text-align: left;
+  padding: 6px 8px;
+  border-radius: 4px;
+  &:hover { background: hsl(var(--color-accent-h), var(--color-accent-s), calc(var(--color-accent-l) + 15%)); }
+}
+
+// A plain list of child rows -- project pickers and outline/plot child
+// pickers alike (see .outlineChildTitle below). The bookshelf/spine visual
+// this used to be is sidebar-only territory now.
+.shelfRow {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  margin: 12px 0;
+}
+.bookSpineWrap { display: flex; flex-direction: row; align-items: center; gap: 8px; }
+.shelfMoveRow { display: flex; gap: 2px; }
+.shelfConfirmRow { display: flex; gap: 4px; }
+.shelfDeleteBtn { font-size: 10px; padding: 2px 6px; }
+
+// A plain, left-aligned child-row title -- used by PlotNodeEditor's
+// plot-child rows (the Plot tree's own navigation stays self-contained in
+// its editor; only the book/chapter outline's navigation moved to
+// WuiSidebar). A node's own kind badge sits beside it, reused from this
+// file's self-header, to carry the info the old spine shape used to convey.
+.outlineChildTitle {
+  flex: 1 1 auto;
+  text-align: left;
+  color: white;
+  background: rgba(255, 255, 255, 0.08);
+  padding: 6px 10px;
+  border-radius: 4px;
+  &:hover { background: hsl(var(--color-accent-h), var(--color-accent-s), calc(var(--color-accent-l) + 15%)); }
+}
+
+// The focused-node "book cover" editor panel.
+.bookCover {
+  background: linear-gradient(
+    160deg,
+    hsl(var(--color-accent-h), var(--color-sidebar-s), 38%),
+    hsl(var(--color-accent-h), var(--color-sidebar-s), 30%)
+  );
+  border-radius: 8px;
+  padding: 20px 24px;
+  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.3);
+}
+.outlineNodeKindBadge {
+  font-size: 10px;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  opacity: 0.7;
+  flex: 0 0 auto;
+}
+.outlineNodeTitleField { flex: 1 1 auto; }
+
+// Plot tree navigation: a horizontal breadcrumb sitting where AUI/UUI's
+// .subTabRow does (top of the console content pane), above .sectionBody --
+// reuses .ancestryBreadcrumbBack/.ancestryBreadcrumbRow from the sidebar
+// version, just laid out in a row instead of a column.
+.plotBreadcrumb {
+  display: flex;
+  flex-direction: row;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+  padding: 10px 16px 0;
+  .ancestryBreadcrumbBack, .ancestryBreadcrumbRow { margin-bottom: 0; }
+}
+
+.plotNodeKindBadge {
+  font-size: 10px;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  opacity: 0.7;
+  flex: 0 0 auto;
+}
+
+// Keyword chips (any node) and custom-field-DEF chips (category/subcategory
+// only) share the same chip-row layout -- both render as .plotKeywordChip.
+.plotKeywordRow, .plotCustomFieldRow {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+  margin: 10px 0;
+}
+.plotKeywordChip {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  background: rgba(0, 0, 0, 0.25);
+  color: white;
+  padding: 3px 10px;
+  border-radius: 12px;
+  font-size: 11px;
+  button {
+    color: white;
+    opacity: 0.7;
+    font-size: 13px;
+    line-height: 1;
+    &:hover { opacity: 1; }
+  }
+}
+
+// A plotline's custom-field VALUE rows (label + fillable input) -- shown
+// only for kind === 'plotline', combining its own subcategory/category
+// ancestors' field defs with its own.
+.plotFieldRow {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 6px 0;
+  label { font-size: 11px; opacity: 0.7; flex: 0 0 110px; text-transform: uppercase; letter-spacing: 0.5px; }
+  input { flex: 1 1 auto; }
+}
+
+// The Sidebar has up to three columns, outermost to innermost: AUI's own
+// panel (persistent Admin toggle, moved back in from Mainscreen), the
+// 40px navigation divider (persistent toggles), then HUI (Mainscreen
+// edge). DOM order is fixed (AUI, divider, HUI); flex-direction below
+// mirrors it per handedness so AUI always lands on the screen-edge side
+// and HUI always lands adjacent to Mainscreen, regardless of handedness.
+// Spans the full viewport height (top: 0 to bottom: 0) rather than starting
+// below the header's nav row -- .header is inset by this sidebar's own
+// width instead, so nothing underneath ever needs covering.
+.sidebar {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  width: var(--sidebar-w);
+  transition: width 1s;
+  z-index: 6; // above .header (5) and Mainscreen, in case anything transitions past its edge
+  overflow: hidden;
+  display: flex;
+}
+.hand-right .sidebar { right: 0; left: auto; flex-direction: row-reverse; }
+.hand-left  .sidebar { left: 0; right: auto; flex-direction: row; }
+
+.sidebarDivider {
+  flex: 0 0 40px;
+  width: 40px;
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  // Slightly darker than HUI's (.hUIMain) and AUI's (.aUIPanel) matching
+  // 26% shade, so the divider reads as a seam between them rather than
+  // blending into either.
+  background-color: hsl(var(--color-accent-h), var(--color-sidebar-s), 18%);
+  // Once enough chat heads are open to exceed the sidebar's height, scroll
+  // instead of overflowing -- but stay a plain nav, not a styled scroll
+  // region, so the scrollbar itself is hidden (still scrollable via wheel/
+  // touch/keyboard).
+  overflow-y: auto;
+  overflow-x: hidden;
+  scrollbar-width: none; // Firefox
+  -ms-overflow-style: none; // old Edge/IE
+  &::-webkit-scrollbar { display: none; } // Chrome/Safari
+}
+
+.dividerToggle {
+  width: 30px;
+  height: 30px;
+  flex: 0 0 30px;
+  margin: 5px 0;
+  border-radius: 4px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: white;
+  background: transparent;
+  &:hover { background: hsl(var(--color-accent-h), var(--color-accent-s), calc(var(--color-accent-l) + 15%)); }
+  &--active { background: hsl(var(--color-accent-h), var(--color-accent-s), var(--color-accent-l)); }
+}
+
+.dividerToggle--newChat {
+  background: rgba(0, 0, 0, 0.25);
+  // Inbox (just above) already contributes its own 5px bottom margin, so
+  // zeroing this one keeps the Inbox-to-New-chat gap at 5px instead of the
+  // 10px two adjacent .dividerToggle margins would otherwise stack up to.
+  margin-top: 0;
+}
+
+// No icon: each segment is one queue (active/pending), sized to the count
+// of users in it -- see SidebarDivider.tsx. Always 30px wide, 150px tall;
+// below 30 total users the segments (5px/user, also 30px wide) stack at
+// the bottom via justify-content, leaving empty space above, rather than
+// filling the full height.
+.queueButton {
+  width: 30px;
+  height: 150px;
+  flex: 0 0 150px;
+  display: flex;
+  flex-direction: column;
+  justify-content: flex-end;
+  padding: 0;
+  margin: 0;
+  border-radius: 4px;
+  overflow: hidden;
+  background: rgba(0, 0, 0, 0.25);
+  &:focus { outline: none; }
+}
+
+// Active (open, currently being helped) segments use accent hue; pending
+// (waiting to be helped) segments use alert hue. Within each, admin users
+// get the darker shade, standard users the lighter one.
+.queueButtonSegment {
+  width: 30px;
+  flex: 0 0 auto;
+  min-height: 0;
+  padding: 0;
+  margin: 0;
+  &--activeAdmin { background: hsl(var(--color-accent-h), var(--color-accent-s), calc(var(--color-accent-l) - 15%)); }
+  &--activeStandard { background: hsl(var(--color-accent-h), var(--color-accent-s), calc(var(--color-accent-l) + 15%)); }
+  &--pendingAdmin { background: hsl(var(--color-alert-h), var(--color-alert-s), calc(var(--color-alert-l) - 15%)); }
+  &--pendingStandard { background: hsl(var(--color-alert-h), var(--color-alert-s), calc(var(--color-alert-l) + 15%)); }
+}
+
+.dividerSpacer { flex: 1 1 auto; }
+
+.chatStack {
+  flex: 0 0 auto;
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+  // No top padding: the New Chat button's own 5px bottom margin already
+  // provides the gap above the first chat head.
+  padding: 0 0 4px;
+}
+.chatStackItem {
+  // Empty avatar slot — will hold a user photo; deliberately no icon/content.
+  width: 28px;
+  height: 28px;
+  flex: 0 0 auto;
+  background: rgba(255, 255, 255, 0.1);
+  border-radius: 4px;
+  &:hover { background: hsl(var(--color-accent-h), var(--color-accent-s), calc(var(--color-accent-l) + 15%)); }
+  &--active { background: hsl(var(--color-accent-h), var(--color-accent-s), var(--color-accent-l)); }
+}
+
+// AUI is now a third Sidebar slide-out panel (outermost, alongside the
+// divider and HUI -- see the .sidebar comment below). Unlike HUI's own
+// fixed-400px clipping-slot/sliding-reveal technique, AUI's target width
+// (--aui-w, set in App.tsx) is itself dynamic -- the rest of the screen
+// minus HUI's own current width -- so .aUIPanel just fills .aUI at 100%
+// and reflows as it resizes, the same way Mainscreen's own console panels
+// (.uUI etc) already reflow when their left/right insets transition.
+.aUI {
+  position: relative;
+  width: var(--aui-w, 0px);
+  min-width: 0;
+  flex: 0 0 var(--aui-w, 0px);
+  transition: width 1s, flex-basis 1s;
+  overflow: hidden;
+}
+
+.aUIPanel {
+  width: 100%;
+  height: 100%;
+  display: flex;
+  flex-direction: row;
+  // Desaturated accent color, matching the rest of the Sidebar (.hUIMain,
+  // .sidebarDivider) now that AUI lives here too, rather than the plain
+  // theme color it used as a Mainscreen page.
+  background-color: hsl(var(--color-accent-h), var(--color-sidebar-s), 26%);
+}
+// .aUIContent is the first DOM child (.aUIRail second), so a plain
+// left-to-right row already puts the rail on AUI's own right edge -- which
+// is the true screen edge (the "outer" side) in hand-right, since AUI's
+// whole box already sits flush against it there (see .sidebar's DOM-order
+// comment below). hand-left flips it so the rail lands on AUI's own left
+// edge instead, its outer side in that handedness.
+.hand-left .aUIPanel { flex-direction: row-reverse; }
+
+// The section picker, moved out of the content pane and onto AUI's own
+// outer edge, stacked directly under the Help button (see AUI.tsx) rather
+// than floating as a separate corner overlay.
+.aUIRail {
+  flex: 0 0 auto;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+  padding: 10px 6px;
+  overflow-y: auto;
+  background: rgba(0, 0, 0, 0.15);
+}
+.aUIRailDivider {
+  width: 20px;
+  height: 1px;
+  flex: 0 0 auto;
+  background: rgba(255, 255, 255, 0.2);
+}
+
+// Pins the size-control buttons to the bottom of .aUIRail (the screen's
+// bottom edge, since the rail spans the panel's full height) instead of
+// wherever the section list happens to end -- the standard flex "push to
+// end" trick.
+.aUIRailSizeGroup {
+  margin-top: auto;
+  flex: 0 0 auto;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+}
+
+// AuiConfigEditor: each console/component/feature renders as its own card,
+// nested inside its parent's card (.auiConfigNodeChildren) rather than
+// just indented, so a console visually envelopes its components, which in
+// turn envelope their features. Progressively lighter/inset per level.
+.auiConfigNode {
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 6px;
+  padding: 8px;
+  margin: 6px 0;
+  background: rgba(0, 0, 0, 0.15);
+  // Inherited by every text descendant (titles, descriptions) -- a long
+  // unbroken word (a URL, an identifier) breaks onto a new line instead
+  // of pushing past the card's edge.
+  overflow-wrap: break-word;
+  &--component { background: rgba(0, 0, 0, 0.1); }
+  &--feature { background: rgba(0, 0, 0, 0.2); }
+  &--dragging { opacity: 0.5; }
+}
+// Handle + title row -- kept separate from .auiConfigNodeChildren (below)
+// so nested cards aren't also pushed right by the handle's width; their
+// indent comes only from the card's own 8px padding + the 12px on
+// .auiConfigNodeChildren, i.e. a flat 20px from the parent card's edge.
+.auiConfigNodeMain {
+  display: flex;
+  flex-direction: row;
+  align-items: center; // centers the handle against the row+idea-field height
+  gap: 6px;
+}
+.auiConfigNodeBody {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+.auiConfigNodeRow {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+.auiConfigNodeHandle {
+  align-self: center;
+  cursor: grab;
+  opacity: 0.5;
+  flex: 0 0 auto;
+  width: 20px;
+  max-width: 20px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  &:hover { opacity: 1; }
+  &:active { cursor: grabbing; }
+}
+.auiConfigNodeCount {
+  flex: 0 0 auto;
+  color: white;
+  opacity: 0.6;
+  font-weight: 700;
+  font-size: 11px;
+}
+.auiConfigNodeCollapseBtn {
+  flex: 0 0 auto;
+  width: 18px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: transparent;
+}
+// CSS border-trick triangle instead of a unicode glyph, so the shape is
+// exactly equilateral regardless of font/rendering -- base 12px, height
+// 10px (12 * sqrt(3)/2 =~ 10.4). Points down (expanded) by default,
+// rotates to point right when collapsed.
+.auiConfigNodeCollapseTriangle {
+  width: 0;
+  height: 0;
+  border-left: 6px solid transparent;
+  border-right: 6px solid transparent;
+  border-top: 10px solid white;
+  transition: transform 0.15s ease;
+}
+.auiConfigNodeCollapseBtn--collapsed .auiConfigNodeCollapseTriangle {
+  transform: rotate(-90deg);
+}
+.auiConfigNodeDeleteBtn {
+  flex: 0 0 auto;
+  width: 22px;
+  height: 22px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: white;
+  background: rgba(0, 0, 0, 0.25);
+  border-radius: 4px;
+  &:hover { background: hsl(var(--color-accent-h), var(--color-accent-s), calc(var(--color-accent-l) + 15%)); }
+}
+// Pairs a console/component's own "+ Add child" button with its delete
+// control on one row, freeing up the title row's top-right corner for the
+// collapse caret instead.
+.auiConfigNodeFooterRow {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  margin-top: 6px;
+  .channelAddForm { margin-top: 0; }
+}
+.auiConfigNodeChildren {
+  margin-top: 6px;
+  padding-left: 12px;
+}
+// Scoped override -- .statementField's shared rule keeps its dark
+// background everywhere else (e.g. WUI's title input).
+.auiConfigNodeRow .statementField {
+  background: transparent;
+}
+// Focusing a field highlights just its own card -- scoped to :has(>
+// .auiConfigNodeMain ...) rather than :focus-within, since :focus-within
+// would also bubble up and highlight every ancestor card (a nested
+// card's fields live under .auiConfigNodeChildren, a sibling of
+// .auiConfigNodeMain, so this direct-child scoping excludes them).
+.auiConfigNode:has(> .auiConfigNodeMain .statementField:focus),
+.auiConfigNode:has(> .auiConfigNodeMain .inlineNoteInput:focus) {
+  background: hsl(var(--color-accent-h), var(--color-accent-s), var(--color-accent-l));
+}
+.auiConfigNode .statementField:focus,
+.auiConfigNode .inlineNoteInput:focus {
+  background: white;
+  color: #1a1a1a;
+}
+// While a card is selected, every text field's (otherwise empty)
+// placeholder in it -- title included, not just the description -- reads
+// as a light tint of the accent color instead of the browser default, so
+// it still looks intentional against the now accent-colored card.
+.auiConfigNode:has(> .auiConfigNodeMain :is(.statementField, .inlineNoteInput):focus) :is(.statementField, .inlineNoteInput--idea)::placeholder {
+  color: hsl(var(--color-accent-h), var(--color-accent-s), calc(var(--color-accent-l) + 35%));
+}
+// Per-kind title typography -- console/component/feature step down in
+// weight and letter-spacing so the hierarchy reads at a glance.
+.auiConfigNode--console > .auiConfigNodeMain > .auiConfigNodeBody > .auiConfigNodeRow > .statementField {
+  text-transform: uppercase;
+  font-weight: 800;
+  letter-spacing: 2px;
+  font-size: 18px;
+}
+.auiConfigNode--component > .auiConfigNodeMain > .auiConfigNodeBody > .auiConfigNodeRow > .statementField {
+  text-transform: uppercase;
+  font-weight: 700;
+  letter-spacing: 1.5px;
+  font-size: 16px;
+}
+.auiConfigNode--feature > .auiConfigNodeMain > .auiConfigNodeBody > .auiConfigNodeRow > .statementField {
+  font-weight: 700;
+  letter-spacing: 1px;
+  font-size: 14px;
+  padding-left: 10px;
+}
+
+// Read-only mirror of the editor: consoles/components reuse the exact
+// same .auiConfigNode/.auiConfigNodeChildren card envelope as the editor
+// (see AuiConfigReadOnly), just with a plain title div instead of an
+// input. Features are the one level that's *not* a card here -- a real
+// bulleted list inside their component's card. Title sizes mirror the
+// editor's per-kind input typography above.
+.auiConfigReadOnlyTitleRow {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 6px;
+}
+.auiConfigReadOnlyTitle {
+  color: white;
+}
+.auiConfigReadOnlyTitle--console {
+  text-transform: uppercase;
+  font-weight: 800;
+  letter-spacing: 2px;
+  font-size: 18px;
+}
+.auiConfigReadOnlyTitle--component {
+  text-transform: uppercase;
+  font-weight: 700;
+  letter-spacing: 1.5px;
+  font-size: 16px;
+}
+.auiConfigReadOnlyTitle--feature {
+  font-weight: 700;
+  letter-spacing: 1px;
+  font-size: 14px;
+  padding-left: 10px;
+}
+.auiConfigReadOnlyFeatureList {
+  list-style: none;
+  margin: 6px 0 0;
+  padding-left: 0;
+}
+// Hanging indent instead of a bullet: the item's own left edge sits at
+// 15px, but text-indent pulls the first line back to 0, so only wrapped
+// continuation lines actually show the 15px.
+.auiConfigReadOnlyFeatureItem {
+  margin: 4px 0;
+  padding: 4px 8px 4px 15px;
+  text-indent: -15px;
+  line-height: 20px;
+  // Matches the editor's feature card background (.auiConfigNode--feature)
+  // -- same visual weight, just without the full card border/handle/etc.
+  background: rgba(0, 0, 0, 0.2);
+  border-radius: 4px;
+}
+// A feature's own idea/description, on its own line below the title --
+// text-indent resets the -15px the <li> otherwise inherits down to this
+// block (that hang is for the title's own wrapped lines, not this).
+.auiConfigReadOnlyFeatureIdea {
+  display: block;
+  text-indent: 0;
+  font-weight: 400;
+  font-size: 14px;
+  opacity: 0.7;
+  margin-top: 2px;
+  white-space: pre-wrap;
+}
+.auiConfigReadOnlyIdea {
+  font-weight: 400;
+  letter-spacing: normal;
+  font-size: 14px;
+  opacity: 0.7;
+  text-transform: none;
+  font-variant: normal;
+  margin-top: 2px;
+  // Matches the editor's textarea (.inlineNoteInput--idea) -- newlines
+  // typed there (including the Enter-to-bullet "• " lines) render as
+  // actual line breaks here too, instead of collapsing to one line.
+  white-space: pre-wrap;
+}
+// Console/component's own description line -- separate from a feature's
+// idea (.auiConfigReadOnlyFeatureIdea below), which needs different
+// indent handling since it lives inside the feature <li>'s hanging indent.
+div.auiConfigReadOnlyIdea {
+  padding-left: 20px;
+  line-height: 25px;
+}
+
+.uUIPanel {
+  position: relative;
+  width: 100%;
+  height: 100%;
+  display: flex;
+  flex-direction: row;
+  // Matches .headerDrawerFooterRow's shade (l - 20%) -- UUI stays on the
+  // plain theme color scheme (it's mounted in the header drawer, not the
+  // Sidebar), unlike .aUIPanel's accent scheme above.
+  padding-top: 5px;
+  background-color: hsl(var(--color-theme-h), var(--color-theme-s), calc(var(--color-theme-l) - 20%));
+}
+
+.aUIContent, .uUIContent {
+  flex: 1 1 auto;
+  min-width: 0;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  position: relative;
+}
+
+// Persistent Help (top-right) / Settings (bottom-right) buttons, present
+// across every UUI/WUI subtab regardless of which console/sub-section is
+// active -- not just the ones with a dedicated Settings/Help sub-tab. AUI
+// no longer uses this -- its Help button lives in .aUIRail instead
+// (styled as a plain .subNavBtn) and it has no Settings shortcut anymore.
+.uUICornerBtn, .wUICornerBtn {
+  position: absolute;
+  right: 10px;
+  width: 30px;
+  height: 30px;
+  flex: 0 0 auto;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 4px;
+  background: rgba(0, 0, 0, 0.25);
+  color: white;
+  z-index: 1;
+  &:hover { background: hsl(var(--color-accent-h), var(--color-accent-s), calc(var(--color-accent-l) + 15%)); }
+  &--active { background: hsl(var(--color-accent-h), var(--color-accent-s), var(--color-accent-l)); }
+  &:disabled {
+    opacity: 0.3;
+    cursor: default;
+    &:hover { background: rgba(0, 0, 0, 0.25); }
+  }
+  &--help { top: 10px; }
+  &--settings { bottom: 10px; }
+}
+
+// The active console's own name (e.g. "Manager"), shown above its subtab
+// row so a subtab's title (e.g. "Allotment") in .sectionBody below always
+// reads as belonging to it.
+.aUIConsoleTitle, .uUIConsoleTitle, .wUIConsoleTitle {
+  flex: 0 0 auto;
+  padding: 10px 16px 0;
+  font-size: 18px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 1.5px;
+  color: white;
+}
+// Wraps AUI's console title together with the lock/unlock toggle (only
+// AUI has one) -- the row now owns the title's own padding so the toggle
+// lines up on the same baseline at the panel's right edge, above .subTabRow.
+.aUIConsoleTitleRow {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 10px 16px 0;
+  .aUIConsoleTitle { padding: 0; }
+}
+
+.subTabRow {
+  flex: 0 0 auto;
+  display: flex;
+  flex-direction: row;
+  flex-wrap: wrap;
+  gap: 5px;
+  padding: 10px 16px 0;
+
+  &--stacked {
+    flex-wrap: nowrap;
+    gap: 5px;
+    padding: 10px 8px 0;
+  }
+  // Always fill the row edge-to-edge, regardless of icon-only/stacked mode.
+  &--expand {
+    flex-wrap: nowrap;
+  }
+}
+
+.subTabBtn {
+  color: white;
+  background: rgba(0, 0, 0, 0.2);
+  padding: 5px 10px;
+  font-size: 14px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.6px;
+  border-radius: 4px;
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  white-space: nowrap;
+  &:hover { background: hsl(var(--color-accent-h), var(--color-accent-s), calc(var(--color-accent-l) + 15%)); }
+  &--active { background: hsl(var(--color-accent-h), var(--color-accent-s), var(--color-accent-l)); }
+  &--stacked {
+    flex-direction: column;
+    flex: 1 1 0;
+    gap: 6px;
+    padding: 4px 4px;
+  }
+  // Count badge always sits below the icon (and label, when shown) rather
+  // than inline beside them.
+  &--withCount {
+    flex-direction: column;
+    align-items: center;
+    gap: 4px;
+  }
+  &--expand {
+    flex: 1 1 0;
+  }
+}
+
+.subTabBtnMain {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+}
+
+.subTabCount {
+  // Opaque-ish dark base so the unfilled portion always reads as darker
+  // and less saturated than the fill, even when the button itself is the
+  // bright accent-colored active tab.
+  background: rgba(0, 0, 0, 0.35);
+  border-radius: 4px;
+  align-self: stretch;
+  position: relative;
+  overflow: hidden;
+  height: 8px;
+}
+
+.subTabCountFill {
+  position: absolute;
+  inset: 0;
+  width: 0;
+  background: hsl(var(--color-accent-h), var(--color-accent-s), calc(var(--color-accent-l) + 15%));
+  transition: width 1s;
+}
+
+// Sits below the bar rather than overlaid on top of it.
+.subTabCountLabel {
+  margin-top: 3px;
+  font-size: 14px;
+  font-variant-numeric: tabular-nums;
+  text-align: center;
+}
+
+.subTabCountTotal {
+  color: rgba(0, 0, 0, 0.55);
+}
+
+.subTabCountSlash {
+  font-weight: 900;
+}
+
+// --- Feedback pipeline (Tone/Channel/Explicate/Integrate/Vote/Sent/Implement) ---
+
+.feedbackList, .integrateList, .voteList, .sentList {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  margin-top: 12px;
+}
+
+.feedbackCard, .integrateRow, .voteRow, .sentRow, .taskRow {
+  background: rgba(0, 0, 0, 0.2);
+  border-radius: 6px;
+  padding: 10px 12px;
+}
+.feedbackCard--pending {
+  border-left: 3px solid hsl(var(--color-accent-h), var(--color-accent-s), calc(var(--color-accent-l) + 20%));
+}
+
+.feedbackCardText { font-size: 13px; margin-bottom: 6px; }
+.feedbackCardMeta { font-size: 11px; opacity: 0.6; margin-bottom: 8px; }
+
+// Read-only summary glyph, floated into the card's top-right corner so the
+// quote/meta text wraps around it instead of overlapping.
+.feedbackCardStatus {
+  float: right;
+  margin-left: 8px;
+  opacity: 0.85;
+}
+
+.toneRow { display: flex; gap: 6px; flex-wrap: wrap; clear: both; }
+
+.toneBtn, .voteBtn, .taskStatusBtn, .tonePriorityMoveBtn, .completeViaPlanBtn {
+  color: white;
+  background: rgba(0, 0, 0, 0.25);
+  padding: 5px 10px;
+  font-size: 12px;
+  font-weight: 700;
+  border-radius: 4px;
+  &:hover { background: hsl(var(--color-accent-h), var(--color-accent-s), calc(var(--color-accent-l) + 15%)); }
+  &--active { background: hsl(var(--color-accent-h), var(--color-accent-s), var(--color-accent-l)); }
+  &:disabled { opacity: 0.35; cursor: not-allowed; &:hover { background: rgba(0, 0, 0, 0.25); } }
+}
+.toneBtn {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+}
+
+.channelPillRow { display: flex; flex-wrap: wrap; gap: 5px; margin-bottom: 6px; }
+.channelPill, .teamBadge {
+  background: rgba(0, 0, 0, 0.3);
+  border-radius: 10px;
+  padding: 3px 8px;
+  font-size: 11px;
+  display: flex;
+  align-items: center;
+  gap: 5px;
+}
+.channelPillRemove {
+  cursor: pointer;
+  opacity: 0.7;
+  &:hover { opacity: 1; }
+}
+
+.channelAddForm, .dispatchForm {
+  display: flex;
+  gap: 6px;
+  margin-top: 4px;
+  align-items: center;
+}
+.channelAddForm select, .dispatchForm select, .teamSelect, .planSelect {
+  background: rgba(0, 0, 0, 0.3);
+  color: white;
+  border: none;
+  border-radius: 3px;
+  padding: 4px 6px;
+  font-size: 12px;
+}
+.channelAddForm input {
+  background: rgba(0, 0, 0, 0.3);
+  color: white;
+  border: none;
+  border-radius: 3px;
+  padding: 4px 6px;
+  font-size: 12px;
+  flex: 1 1 auto;
+}
+
+.explicatePane { display: flex; gap: 12px; margin: 12px 0; }
+.explicateSource { flex: 0 0 35%; }
+.explicateStatements { flex: 1 1 auto; display: flex; flex-direction: column; gap: 6px; }
+.statementRow { display: flex; gap: 4px; align-items: center; }
+.statementField {
+  flex: 1 1 0;
+  min-width: 0;
+  font-size: 12px;
+  background: rgba(0, 0, 0, 0.25);
+  border: none;
+  border-radius: 3px;
+  padding: 4px 6px;
+  color: white;
+}
+.statementRemoveBtn {
+  flex: 0 0 auto;
+  color: white;
+  background: transparent;
+  opacity: 0.6;
+  padding: 2px 6px;
+  &:hover { opacity: 1; }
+}
+.addStatementBtn { flex: 0 0 auto; white-space: nowrap; }
+
+// Generic full-width blur-committing text input, shared by Vote's
+// per-outcome rationale fields.
+.inlineNoteInput {
+  width: 100%;
+  margin-top: 6px;
+  background: rgba(0, 0, 0, 0.25);
+  border: none;
+  border-radius: 3px;
+  padding: 5px 8px;
+  color: white;
+  font-size: 12px;
+}
+// Auto-growing variant (a <textarea>, not an <input>) -- height is set
+// inline from scrollHeight on mount/change, this just makes it wrap and
+// stop offering its own scrollbar/resize handle while it grows.
+.inlineNoteInput--idea {
+  display: block;
+  resize: none;
+  overflow: hidden;
+  white-space: pre-wrap;
+  word-wrap: break-word;
+  font-family: inherit;
+  font-size: 14px;
+  line-height: 25px;
+  padding-left: 20px;
+  background: transparent;
+}
+
+.voteRationaleRow { display: flex; flex-direction: column; gap: 4px; margin-top: 6px; }
+.voteAmbivalentNote {
+  margin-top: 6px;
+  font-size: 11px;
+  color: hsl(var(--color-accent-h), var(--color-accent-s), calc(var(--color-accent-l) + 15%));
+}
+
+.senderToneBadge {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 11px;
+  opacity: 0.75;
+  margin-bottom: 4px;
+}
+
+.tonePriorityList { display: flex; flex-direction: column; gap: 6px; margin-bottom: 12px; }
+.tonePriorityRow {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  background: rgba(0, 0, 0, 0.2);
+  border-radius: 6px;
+  padding: 6px 10px;
+}
+.tonePriorityLabel { display: inline-flex; align-items: center; gap: 6px; }
+.tonePriorityMoveBtn { margin-left: 4px; }
+
+// Shared grouping-header pattern, used by Channel's tone buckets,
+// Integrate's page->component->feature tree, Vote's page->feature tree,
+// and Implement's config-target groups.
+.implementGroup { margin: 12px 0; }
+.implementGroupHeader {
+  font-size: 12px;
+  text-transform: uppercase;
+  letter-spacing: 1px;
+  opacity: 0.7;
+  margin-bottom: 6px;
+  &--sub { padding-left: 12px; opacity: 0.6; text-transform: none; letter-spacing: normal; }
+  &--leaf { padding-left: 24px; opacity: 0.5; font-size: 11px; text-transform: none; letter-spacing: normal; }
+}
+// A clipping "slot" (this rule) whose width transitions 0 <-> target for
+// layout purposes (reserves space in the Sidebar row); the actual content
+// lives in .hUIMain below, which stays at its full target width at all
+// times and is revealed by the slot's clip boundary moving -- a sliding
+// reveal instead of the content itself being squished as it reflows.
+.hUI {
+  position: relative;
+  width: var(--hui-w, 400px);
+  min-width: 0;
+  flex: 0 0 var(--hui-w, 400px);
+  transition: width 1s, flex-basis 1s;
+  overflow: hidden;
+
+  .hUIMain {
+    position: absolute;
+    top: 0;
+    width: 400px;
+    height: 100%;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+    // Desaturated accent color; darker shade for the same reason.
+    background-color: hsl(var(--color-accent-h), var(--color-sidebar-s), 26%);
+  }
+}
+.hand-right .hUIMain { right: 0; }
+.hand-left  .hUIMain { left: 0; }
+
+// --- Helper chat conversation ---
+
+.inboxSection {
+  flex: 1 1 auto;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+.helperChatsSection {
+  flex: 1 1 auto;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  padding: 6px 16px 12px;
+  overflow: hidden;
+}
+.helperChatsScroll {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow-y: auto;
+}
+
+.helperChatList { display: flex; flex-direction: column; gap: 8px; margin-top: 8px; }
+.helperChatListItem {
+  text-align: left;
+  color: white;
+  &:hover { background: hsl(var(--color-accent-h), var(--color-accent-s), calc(var(--color-accent-l) + 15%)); }
+}
+
+.helperConversation { display: flex; flex-direction: column; height: 100%; }
+.helperConversationTop {
+  flex: 0 0 auto;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 4px 0 8px;
+  font-size: 13px;
+}
+.helperBackBtn {
+  color: white;
+  background: transparent;
+  opacity: 0.7;
+  padding: 2px 6px;
+  &:hover { opacity: 1; }
+}
+
+.helperProfileHeader {
+  flex: 0 0 auto;
+  margin-bottom: 10px;
+}
+.helperProfileHeaderBtn {
+  width: 100%;
+  justify-content: space-between;
+  background: transparent;
+  color: white;
+}
+.helperProfileBody { padding: 8px 0 0; }
+.helperProfileStatRow { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 6px; }
+.helperProfileStat {
+  background: rgba(0, 0, 0, 0.2);
+  border-radius: 10px;
+  padding: 3px 8px;
+  font-size: 11px;
+}
+
+.helperMessageList {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 8px 0;
+}
+.helperMessageBubble {
+  max-width: 85%;
+  background: rgba(0, 0, 0, 0.2);
+  border-radius: 6px;
+  padding: 10px 12px;
+  &--user { align-self: flex-start; }
+  &--admin {
+    align-self: flex-end;
+    background: hsl(var(--color-accent-h), var(--color-accent-s), calc(var(--color-accent-l) - 10%));
+  }
+}
+.helperMessageMeta { font-size: 11px; opacity: 0.6; margin-top: 4px; }
+.helperMessageForm { margin-top: 6px; }
+.helperFormSentBadge { display: inline-flex; margin-top: 6px; }
+.helperMessagePageLink { cursor: default; }
+
+.helperFormBuilder { display: flex; flex-direction: column; gap: 6px; margin-top: 4px; }
+.statementField--readonly {
+  cursor: default;
+  opacity: 0.9;
+}
+
+.helperComposer {
+  flex: 0 0 auto;
+  border-top: 1px solid rgba(255, 255, 255, 0.08);
+  padding: 10px 0 4px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.helperComposerModeRow { display: flex; gap: 6px; }
+
+// --- Helper tools (help config / queue analytics) collapsible ---
+
+.helperToolsPanel { flex: 0 0 auto; margin-top: 10px; }
+.helperToolsPanelBtn { width: 100%; justify-content: space-between; background: transparent; color: white; }
+.helperToolsPanelBody { padding: 8px 0 0; }
+
+// Shared read-only placeholder body (heading + paragraph), used by the
+// Queue analytics collapsible and the composer's Help tool mode.
+.helperPlaceholderContent {
+  h2 { font-size: 15px; margin-bottom: 6px; text-transform: uppercase; letter-spacing: 1px; }
+  p { font-size: 13px; opacity: 0.85; }
+}
+
+// --- Queue console: department (page) card > console card > component list ---
+// The Queue console gets its own full-size, scrollbar-less wrapper (rather
+// than reusing .helperChatsSection/.helperChatsScroll, which other panels
+// still rely on for a visible scrollbar) so it always fills .hUIMain.
+.queueSection {
+  width: 100%;
+  height: 100%;
+  flex: 1 1 auto;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+.queueScroll {
+  width: 100%;
+  height: 100%;
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow-y: auto;
+  // Scrollable, but no visible scrollbar track.
+  scrollbar-width: none; // Firefox
+  -ms-overflow-style: none; // old Edge/IE
+  &::-webkit-scrollbar { display: none; } // Chrome/Safari
+
+  // Scoped override: .helperPlaceholderContent is shared with Settings/the
+  // composer's Help tool mode, so align just this one with the department
+  // cards' 10px side margin instead of changing the shared class.
+  > .helperPlaceholderContent { margin: 10px 0 0 10px; }
+}
+
+// Departments are collapsible cards, collapsed by default -- expand one to
+// reveal its consoles nested inside. Each console is a checkbox (checking
+// it means "accept chats from this queue"), styled as its own darkened
+// card; its component list nests one shade darker still. Checking a
+// console recolors it (and its components) into shades of the accent
+// color instead of the neutral darkened background.
+
+.queueDepartment {
+  margin: 8px 10px 0;
+  background: rgba(0, 0, 0, 0.2);
+  border-radius: 6px;
+  padding: 10px 12px;
+  &:last-child { margin-bottom: 10px; }
+}
+.queueDepartmentToggle {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  background: transparent;
+  color: white;
+  padding: 0;
+  font-size: 13px;
+  font-weight: 600;
+}
+.queueDepartmentBody { padding-top: 6px; }
+
+// A console is now just a checkbox row -- checking it means "accept chats
+// from this queue" -- styled as its own darkened card, recoloring into an
+// accent shade once checked.
+.queueConsole {
+  margin-top: 6px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  background: rgba(0, 0, 0, 0.15);
+  border-radius: 4px;
+  padding: 6px 8px;
+  color: white;
+  font-size: 12px;
+  cursor: pointer;
+  &--selected { background: hsl(var(--color-accent-h), var(--color-accent-s), var(--color-accent-l)); }
+
+  input[type='checkbox'] { accent-color: hsl(var(--color-accent-h), var(--color-accent-s), var(--color-accent-l)); }
+}
+
+.queueEmptyNote { font-size: 12px; opacity: 0.6; font-style: italic; padding: 2px 0; }

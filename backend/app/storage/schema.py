@@ -444,6 +444,35 @@ class PresetCatalog(BaseModel):
 
 
 # ---------------------------------------------------------------------------
+# AUI Configuration: a global (not project-scoped), admin-editable outline of
+# Console -> Component -> Feature ideas for each of AUI's Configuration
+# sub-tabs (Project Plan, Visitor, User, Reader, Translator, Writer, Helper,
+# Admin). One flat list for all 8 tabs combined, partitioned by `tab` and
+# nested via `parentId`/`order` -- the same shape as OutlineNode, just with
+# `kind` narrowed to 3 values and `title`/`synopsis` replaced by `name`/
+# `idea`. Lives at %APPDATA%\Scriblr\admin-config.json, a sibling of
+# presets.json. Its own schema version, independent of SCHEMA_VERSION.
+# ---------------------------------------------------------------------------
+
+AuiConfigNodeKind = Literal["console", "component", "feature"]
+
+
+class AuiConfigNode(BaseModel):
+    id: str
+    tab: str
+    kind: AuiConfigNodeKind
+    parentId: Optional[str]
+    order: int
+    name: str
+    idea: str = ""  # only meaningful for kind == "feature"; empty otherwise
+
+
+class AuiConfig(BaseModel):
+    schemaVersion: int = 1
+    nodes: list[AuiConfigNode] = Field(default_factory=list)
+
+
+# ---------------------------------------------------------------------------
 # ProjectFile: the single on-disk file a project is stored as (project.json),
 # consolidating what used to be ~10 separate shard files (index, outline,
 # plot, per-chapter drafts, per-chapter revisions, outline/plot history,

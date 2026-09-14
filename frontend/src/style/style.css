@@ -1,5 +1,15 @@
 * {
   box-sizing: border-box;
+  /* App-wide: every scrollable element stays scrollable (wheel/touch/
+     keyboard), just without a visible scrollbar track -- matches the
+     hidden-scrollbar convention already used piecemeal elsewhere
+     (.sidebarDivider, .sectionBody--noScrollbar, etc.), applied globally
+     instead of per-element. */
+  scrollbar-width: none; /* Firefox */
+  -ms-overflow-style: none; /* old Edge/IE */
+}
+*::-webkit-scrollbar {
+  display: none; /* Chrome/Safari/Electron */
 }
 
 :root {
@@ -34,8 +44,18 @@ button {
 }
 
 input,
-textarea {
+textarea,
+select {
   font-family: inherit;
+}
+
+/* App-wide: no visible focus ring/border on form fields when clicked/tabbed
+   into -- matches the borderless, background-only input styling used
+   throughout the app (e.g. .statementField, .inlineNoteInput). */
+input:focus,
+textarea:focus,
+select:focus {
+  outline: none;
 }
 
 .app,

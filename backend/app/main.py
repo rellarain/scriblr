@@ -4,7 +4,20 @@ from typing import Optional
 from fastapi import FastAPI, HTTPException, Request
 from fastapi.responses import FileResponse, JSONResponse
 
-from .api import activity, analytics, draft, export, outline, plot, presets, projects, revisions, schedule, scrap
+from .api import (
+    activity,
+    admin_config,
+    analytics,
+    draft,
+    export,
+    outline,
+    plot,
+    presets,
+    projects,
+    revisions,
+    schedule,
+    scrap,
+)
 from .storage.pdf_export import OutlineNodeNotFoundError
 from .storage.project_store import (
     InvalidRestoreParentError,
@@ -73,6 +86,7 @@ def create_app(static_dir: Optional[Path] = None) -> FastAPI:
     app.include_router(scrap.router)
     app.include_router(export.router)
     app.include_router(presets.router)
+    app.include_router(admin_config.router)
 
     if static_dir is not None:
         # Registered last so it only catches what the routers above didn't --

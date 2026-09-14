@@ -1,0 +1,359 @@
+import type { ReactNode } from 'react'
+
+export interface IconProps {
+  size?: number
+  className?: string
+}
+
+function IconBase({ size = 21, className, children }: IconProps & { children: ReactNode }) {
+  return (
+    <svg
+      width={size} height={size} viewBox="0 0 24 24"
+      fill="none" stroke="currentColor" strokeWidth={1.8}
+      strokeLinecap="round" strokeLinejoin="round"
+      className={className}
+    >
+      {children}
+    </svg>
+  )
+}
+
+export function UserIcon(props: IconProps) {
+  return <IconBase {...props}>
+    <circle cx="12" cy="8" r="4" />
+    <path d="M4 20a8 8 0 0 1 16 0" />
+  </IconBase>
+}
+
+export function BookFaceIcon(props: IconProps) {
+  return <IconBase {...props}>
+    <rect x="4" y="3" width="16" height="18" rx="1.5" />
+    <path d="M8 3v18" strokeWidth={2.6} />
+    <path d="M14 3v8l2.5-2.5 2.5 2.5v-8" />
+  </IconBase>
+}
+
+export function PencilIcon(props: IconProps) {
+  return <IconBase {...props}>
+    <path d="M4 20l1-5L16 4l4 4L9 19l-5 1Z" />
+    <path d="M14 6l4 4" />
+  </IconBase>
+}
+
+export function ShieldIcon(props: IconProps) {
+  return <IconBase {...props}>
+    <path d="M12 3l7 3v6c0 4.5-3 7.5-7 9-4-1.5-7-4.5-7-9V6l7-3Z" />
+  </IconBase>
+}
+
+export function GlobeIcon(props: IconProps) {
+  return <IconBase {...props}>
+    <circle cx="12" cy="12" r="9" />
+    <path d="M3 12h18" />
+    <path d="M12 3a14 14 0 0 1 0 18" />
+    <path d="M12 3a14 14 0 0 0 0 18" />
+  </IconBase>
+}
+
+export function SwapIcon(props: IconProps) {
+  return <IconBase {...props}>
+    <path d="M4 8h13M13 4l4 4-4 4" />
+    <path d="M20 16H7M11 12l-4 4 4 4" />
+  </IconBase>
+}
+
+export function BriefcaseIcon(props: IconProps) {
+  return <IconBase {...props}>
+    <rect x="3" y="7" width="18" height="12" rx="2" />
+    <path d="M8 7V5a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2" />
+    <path d="M3 12h18" />
+  </IconBase>
+}
+
+export function CloseIcon(props: IconProps) {
+  return <IconBase {...props}>
+    <path d="M6 6l12 12M18 6L6 18" />
+  </IconBase>
+}
+
+export function GraduationCapIcon(props: IconProps) {
+  return <IconBase {...props}>
+    <path d="M2 9l10-5 10 5-10 5-10-5Z" />
+    <path d="M6 11v5c0 1.5 2.7 3 6 3s6-1.5 6-3v-5" />
+    <path d="M22 9v6" />
+  </IconBase>
+}
+
+export function LockIcon(props: IconProps) {
+  return <IconBase {...props}>
+    <rect x="5" y="11" width="14" height="10" rx="2" fill="currentColor" strokeWidth={2.6} />
+    <path d="M8 11V7a4 4 0 0 1 8 0v4" strokeWidth={2.6} />
+  </IconBase>
+}
+
+export function UnlockIcon(props: IconProps) {
+  return <IconBase {...props}>
+    <rect x="5" y="11" width="14" height="10" rx="2" fill="currentColor" strokeWidth={2.6} />
+    <path d="M8 11V7a4 4 0 0 1 7.5-2" strokeWidth={2.6} />
+  </IconBase>
+}
+
+export function ChatBubblesIcon(props: IconProps) {
+  return <IconBase {...props}>
+    <rect x="3" y="4" width="13" height="9" rx="2" fill="currentColor" stroke="none" />
+    <rect x="8" y="9" width="13" height="9" rx="2" />
+  </IconBase>
+}
+
+export function WrenchIcon(props: IconProps) {
+  return <IconBase {...props}>
+    <path d="M14.7 6.3a4 4 0 0 1-5.4 5.4L4 17l3 3 5.3-5.3a4 4 0 0 1 5.4-5.4l-3 3-2-2 3-3Z" />
+  </IconBase>
+}
+
+export function BarChartIcon(props: IconProps) {
+  return <IconBase {...props}>
+    <rect x="4" y="14" width="4" height="7" />
+    <rect x="10" y="9" width="4" height="12" />
+    <rect x="16" y="4" width="4" height="17" />
+  </IconBase>
+}
+
+export function InboxIcon(props: IconProps) {
+  return <IconBase {...props}>
+    <path d="M4 4h16l2 8v7a1 1 0 0 1-1 1H3a1 1 0 0 1-1-1v-7L4 4Z" />
+    <path d="M2 12h5l2 3h6l2-3h5" />
+  </IconBase>
+}
+
+// A hexagon, not a literal gear -- IconBase's shared strokeLinejoin="round"
+// rounds its corners automatically, no separate arc path needed.
+export function GearIcon(props: IconProps) {
+  return <IconBase {...props}>
+    <polygon points="12,2 20.66,7 20.66,17 12,22 3.34,17 3.34,7" strokeWidth={3.6} />
+    <circle cx="12" cy="12" r="6" strokeWidth={3.6} />
+  </IconBase>
+}
+
+// Three gears at different sizes (same hexagon+circle motif as GearIcon,
+// just repeated) arranged like a gearbox -- the big gear meshing with a
+// smaller one tucked against each side of it, all just touching, never
+// overlapping -- rather than spread apart, so it reads as distinct from
+// the plain single-gear Settings icon used everywhere else.
+export function ConfigurationIcon(props: IconProps) {
+  return <IconBase {...props}>
+    <polygon points="8,5 13.2,8 13.2,14 8,17 2.8,14 2.8,8" strokeWidth={2} />
+    <circle cx="8" cy="11" r="3.6" strokeWidth={2} />
+    <polygon points="17.11,14.65 20.57,16.65 20.57,20.65 17.11,22.65 13.65,20.65 13.65,16.65" strokeWidth={1.5} />
+    <circle cx="17.11" cy="18.65" r="2.4" strokeWidth={1.5} />
+    <polygon points="15.89,1.58 18.31,2.98 18.31,5.78 15.89,7.18 13.47,5.78 13.47,2.98" strokeWidth={1} />
+    <circle cx="15.89" cy="4.38" r="1.68" strokeWidth={1} />
+  </IconBase>
+}
+
+export function PeopleIcon(props: IconProps) {
+  return <IconBase {...props}>
+    <circle cx="9" cy="8" r="3" />
+    <circle cx="17" cy="8" r="3" />
+    <path d="M3 20v-1a6 6 0 0 1 6-6 6 6 0 0 1 6 6v1" />
+    <path d="M15 13.5A6 6 0 0 1 21 19v1" />
+  </IconBase>
+}
+
+export function ToningIcon(props: IconProps) {
+  return <IconBase {...props}>
+    <circle cx="12" cy="12" r="9" />
+    <path d="M8 10h.01M16 10h.01" />
+    <path d="M8 14q4 4 8 0" />
+  </IconBase>
+}
+
+export function FrownIcon(props: IconProps) {
+  return <IconBase {...props}>
+    <circle cx="12" cy="12" r="9" />
+    <path d="M8 10h.01M16 10h.01" />
+    <path d="M8 16q4 -4 8 0" />
+  </IconBase>
+}
+
+export function MixedFaceIcon(props: IconProps) {
+  return <IconBase {...props}>
+    <circle cx="12" cy="12" r="9" />
+    <path d="M8 10h.01M16 10h.01" />
+    <path d="M8 14l8 2" />
+  </IconBase>
+}
+
+export function NeutralFaceIcon(props: IconProps) {
+  return <IconBase {...props}>
+    <circle cx="12" cy="12" r="9" />
+    <path d="M8 10h.01M16 10h.01" />
+    <path d="M8 15h8" />
+  </IconBase>
+}
+
+export function SortingIcon(props: IconProps) {
+  return <IconBase {...props}>
+    <path d="M4 5h16l-6 8v6l-4-2v-4L4 5Z" />
+  </IconBase>
+}
+
+export function ExplicatingIcon(props: IconProps) {
+  return <IconBase {...props}>
+    <path d="M4 6h16M4 12h16M4 18h16" />
+  </IconBase>
+}
+
+export function VotingIcon(props: IconProps) {
+  return <IconBase {...props}>
+    <path d="M1 7l2 2.5L9 3" />
+    <path d="M13 3l8 7M21 3l-8 7" />
+    <text x="5" y="21" fontSize="12" fontWeight="700" fill="currentColor" stroke="none" textAnchor="middle">{'&'}</text>
+    <text x="17" y="21" fontSize="12" fontWeight="700" fill="currentColor" stroke="none" textAnchor="middle">?</text>
+  </IconBase>
+}
+
+export function CheckboxIcon(props: IconProps) {
+  return <IconBase {...props}>
+    <rect x="4" y="4" width="16" height="16" rx="3" />
+    <path d="M8 12.5l2.5 2.5L16 9" />
+  </IconBase>
+}
+
+export function IntegratingIcon(props: IconProps) {
+  return <IconBase {...props}>
+    <path d="M3 5h4l7 7M3 12h11M3 19h4l7-7M14 12h6" />
+  </IconBase>
+}
+
+export function EnvelopeIcon(props: IconProps) {
+  return <IconBase {...props}>
+    <rect x="3" y="5" width="18" height="14" rx="2" />
+    <path d="M3 7l9 6 9-6" />
+  </IconBase>
+}
+
+export function TeamIcon(props: IconProps) {
+  return <IconBase {...props}>
+    <circle cx="8" cy="9" r="3" />
+    <circle cx="16" cy="9" r="3" />
+    <circle cx="12" cy="16" r="3" />
+  </IconBase>
+}
+
+export function BuildingIcon(props: IconProps) {
+  return <IconBase {...props}>
+    <rect x="5" y="3" width="14" height="18" rx="1" />
+    <path d="M9 7h2M13 7h2M9 12h2M13 12h2" />
+    <path d="M10 21v-4h4v4" />
+  </IconBase>
+}
+
+export function LibraryIcon(props: IconProps) {
+  return <IconBase {...props}>
+    <path d="M3 9L12 3l9 6" />
+    <path d="M3 9h18" />
+    <path d="M6 9v10M10 9v10M14 9v10M18 9v10" />
+    <path d="M3 19h18" />
+  </IconBase>
+}
+
+export function LayoutMiniIcon(props: IconProps) {
+  return <IconBase {...props}>
+    <rect x="3" y="4" width="18" height="16" rx="1.5" />
+    <rect x="15" y="4" width="6" height="16" rx="1" fill="currentColor" stroke="none" />
+  </IconBase>
+}
+
+export function LayoutMidiIcon(props: IconProps) {
+  return <IconBase {...props}>
+    <rect x="3" y="4" width="18" height="16" rx="1.5" />
+    <rect x="11" y="4" width="10" height="16" rx="1" fill="currentColor" stroke="none" />
+  </IconBase>
+}
+
+export function LayoutMaxIcon(props: IconProps) {
+  return <IconBase {...props}>
+    <rect x="3" y="4" width="18" height="16" rx="1.5" fill="currentColor" />
+  </IconBase>
+}
+
+export function QueueIcon(props: IconProps) {
+  return <IconBase {...props}>
+    <rect x="4" y="5" width="16" height="4" rx="1" />
+    <rect x="4" y="10" width="16" height="4" rx="1" />
+    <rect x="4" y="15" width="16" height="4" rx="1" />
+  </IconBase>
+}
+
+export function PlusIcon(props: IconProps) {
+  return <IconBase {...props}>
+    <path d="M12 5v14M5 12h14" />
+  </IconBase>
+}
+
+export function CalendarIcon(props: IconProps) {
+  return <IconBase {...props}>
+    <rect x="3" y="5" width="18" height="16" rx="2" />
+    <path d="M3 10h18M8 3v4M16 3v4" />
+  </IconBase>
+}
+
+export function HelpIcon(props: IconProps) {
+  return <IconBase {...props}>
+    <circle cx="12" cy="12" r="9" />
+    <path d="M9.5 9a2.5 2.5 0 1 1 3.5 2.3c-.8.4-1 .9-1 1.7" />
+    <path d="M12 17h.01" strokeWidth={2.6} />
+  </IconBase>
+}
+
+// Same circle outline as HelpIcon, with an "i" instead of a "?".
+export function InfoIcon(props: IconProps) {
+  return <IconBase {...props}>
+    <circle cx="12" cy="12" r="9" />
+    <path d="M12 11v5" strokeWidth={2.2} />
+    <path d="M12 7.5h.01" strokeWidth={2.8} />
+  </IconBase>
+}
+
+// A trunk splitting into two branches, each ending in a node -- for
+// Plot's category/subcategory/plotline branching structure.
+export function PlotIcon(props: IconProps) {
+  return <IconBase {...props}>
+    <circle cx="12" cy="4" r="2" />
+    <path d="M12 6v3M12 9l-6 5M12 9l6 5" />
+    <circle cx="6" cy="16" r="2" />
+    <circle cx="18" cy="16" r="2" />
+  </IconBase>
+}
+
+export function BookmarkIcon(props: IconProps) {
+  return <IconBase {...props}>
+    <path d="M6 3h12v18l-6-4-6 4V3Z" />
+  </IconBase>
+}
+
+// Arrow out of a box -- exporting content out to a file.
+export function ExportIcon(props: IconProps) {
+  return <IconBase {...props}>
+    <rect x="4" y="14" width="16" height="6" rx="1" />
+    <path d="M12 13V3M8 7l4-4 4 4" />
+  </IconBase>
+}
+
+// A single page with text lines -- draft editing (Page Console).
+export function PageIcon(props: IconProps) {
+  return <IconBase {...props}>
+    <rect x="5" y="3" width="14" height="18" rx="1.5" />
+    <path d="M8 8h8M8 12h8M8 16h5" />
+  </IconBase>
+}
+
+// Two overlapping pages -- formatted preview (Pages Console), distinct
+// from the single-page PageIcon above.
+export function PagesIcon(props: IconProps) {
+  return <IconBase {...props}>
+    <rect x="7" y="2" width="13" height="17" rx="1.5" />
+    <rect x="4" y="6" width="13" height="17" rx="1.5" />
+  </IconBase>
+}
