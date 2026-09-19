@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState, type ReactNode } from 'react'
+import { useEffect, useLayoutEffect, useRef, useState, type ReactNode } from 'react'
 import { PlusIcon, TrashIcon } from '../../icons'
 import type { OutlineNode } from '../../../api/types'
 import { HELP_COMPONENT, SETTINGS_COMPONENT, type ComponentDef } from './consoleDefs'
@@ -165,5 +165,46 @@ export function ChipEditor({ items, placeholder, onAdd, onRemove }: {
         <button type="button" aria-label={`Add ${placeholder}`} disabled={!draft.trim()} onClick={submit}><PlusIcon size={12} /></button>
       </span>
     </div>
+  )
+}
+
+// A whole-number input that shows thousands separators (160,000) while
+// keeping the value a plain number. Empty means null.
+export function NumberInput({ value, onChange, className, ...rest }: {
+  value: number | null
+  onChange: (value: number | null) => void
+  className?: string
+  'aria-label'?: string
+  placeholder?: string
+}) {
+  const ref = useRef<HTMLInputElement>(null)
+  // Digits to the right of the caret, so it can be put back after the commas move.
+  const digitsAfterCaret = useRef<number | null>(null)
+  const text = value === null ? '' : value.toLocaleString('en-US')
+
+  useLayoutEffect(() => {
+    const input = ref.current
+    const after = digitsAfterCaret.current
+    if (!input || after === null) return
+    digitsAfterCaret.current = null
+    let pos = text.length
+    for (let seen = 0; pos > 0; pos--) {
+      if (seen === after) break
+      if (/\d/.test(text[pos - 1])) seen++
+    }
+    input.setSelectionRange(pos, pos)
+  }, [text])
+
+  return (
+    <input
+      {...rest} ref={ref} className={className} type="text" inputMode="numeric" value={text}
+      onChange={e => {
+        const raw = e.target.value
+        const caret = e.target.selectionStart ?? raw.length
+        digitsAfterCaret.current = raw.slice(caret).replace(/\D/g, '').length
+        const digits = raw.replace(/\D/g, '')
+        onChange(digits === '' ? null : parseInt(digits, 10))
+      }}
+    />
   )
 }

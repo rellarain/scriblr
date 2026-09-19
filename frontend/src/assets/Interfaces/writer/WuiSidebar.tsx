@@ -13,26 +13,28 @@ import { DeleteControl } from './shared'
 
 const SPINE_HEIGHT = 100
 
-// A spine's width reflects the book's length: 5px for every 20,000 words of
-// its word-count goal. A book with a tiny (or no) goal still gets a sliver so
-// it stays on the shelf.
-const SPINE_PX_PER_20K_WORDS = 5
-const SPINE_MIN = 10
+// A spine's width reflects the book's length: 5px for every 40,000 words of
+// its word-count goal, with a sliver minimum so a book with no goal stays on
+// the shelf. Spines narrower than TITLE_MIN_WIDTH have no room for a title.
+const SPINE_PX_PER_40K_WORDS = 5
+const SPINE_MIN = 8
+const TITLE_MIN_WIDTH = 20
 export function spineWidth(goal: number | null | undefined): number {
-  const width = Math.round(((goal && goal > 0 ? goal : 0) / 20000) * SPINE_PX_PER_20K_WORDS)
+  const width = Math.round(((goal && goal > 0 ? goal : 0) / 40000) * SPINE_PX_PER_40K_WORDS)
   return Math.max(SPINE_MIN, width)
 }
 
 function Spine({ book, active, onOpen }: { book: OutlineNode; active: boolean; onOpen: () => void }) {
+  const width = spineWidth(book.wordCountGoal)
   return (
     <button
       type="button"
       className={active ? 'wrSpine wrSpine--active' : 'wrSpine'}
-      style={{ height: SPINE_HEIGHT, width: spineWidth(book.wordCountGoal), ...(book.color ? { backgroundColor: book.color } : {}) }}
+      style={{ height: SPINE_HEIGHT, width, ...(book.color ? { backgroundColor: book.color } : {}) }}
       onClick={onOpen}
       title={book.title}
     >
-      <span>{book.title}</span>
+      {width >= TITLE_MIN_WIDTH && <span>{book.title}</span>}
     </button>
   )
 }

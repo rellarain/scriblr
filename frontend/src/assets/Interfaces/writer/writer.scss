@@ -240,6 +240,8 @@
   .wrCoverWrap {
     --wr-cover-label: color-mix(in srgb, var(--wr-cover) 40%, white); --wr-cover-title: color-mix(in srgb, var(--wr-cover) 25%, white); --wr-cover-title-shadow: 0 2px 0 rgba(0, 0, 0, 0.4);
     --wr-cover-line: color-mix(in srgb, var(--wr-cover-label) 40%, transparent); --wr-cover-line-soft: color-mix(in srgb, var(--wr-cover-label) 20%, transparent); --wr-cover-field: rgba(0, 0, 0, 0.3);
+    // A brighter, more saturated shade of the cover colour (progress bars).
+    --wr-cover-bright: oklch(from var(--wr-cover) clamp(0.62, calc(l + 0.22), 0.86) calc(c * 1.6) h);
     // Placeholder text takes the cover's own hue, lightened to read on the dark fields.
     --wr-cover-hint: color-mix(in srgb, var(--wr-cover) 50%, white);
     // A light cover gets dark ink so its labels stay readable.
@@ -253,6 +255,11 @@
   .wrCoverTitle { width: 100%; box-sizing: border-box; text-align: center; background: transparent; border: 0; outline: none; font-family: Georgia, 'Times New Roman', serif; font-size: 44px; font-weight: 700; letter-spacing: 8px; text-transform: uppercase; color: var(--wr-cover-title); text-shadow: var(--wr-cover-title-shadow); padding: 0; &::placeholder { color: color-mix(in srgb, var(--wr-cover-title) 45%, transparent); } }
   .wrCoverRule { width: 220px; height: 1px; background: var(--wr-cover-line); }
   .wrCoverField { display: flex; flex-direction: column; gap: 4px; flex: 1; min-width: 0; > span { font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: 1px; color: var(--wr-cover-label); } input, textarea { background: var(--wr-cover-field); border: 0; border-radius: 4px; color: white; font-size: 13px; padding: 8px 10px; outline: none; resize: vertical; &::placeholder { color: var(--wr-cover-hint); } &:focus { box-shadow: inset 0 0 0 1px var(--wr-cover-hint); } } }
+  .wrCoverFieldHead { display: flex; align-items: baseline; justify-content: space-between; gap: 8px; }
+  .wrCoverField > .wrCoverFieldHead > .wrCoverCurrent { color: var(--wr-cover-bright); letter-spacing: 0.5px; }
+  .wrCoverInput { position: relative; display: block; border-radius: 4px; overflow: hidden; input { width: 100%; box-sizing: border-box; padding-bottom: 13px; } }
+  .wrProgress { position: absolute; left: 0; right: 0; bottom: 0; height: 5px; background: rgba(0, 0, 0, 0.35); }
+  .wrProgressFill { display: block; height: 100%; background: var(--wr-cover-bright); transition: width 0.3s ease; }
   .wrCoverRow { display: flex; gap: 14px; }
   .wrCoverSummary { display: flex; flex-direction: column; gap: 10px; }
   .wrSwatches { display: flex; flex-wrap: wrap; gap: 5px; }
@@ -266,8 +273,15 @@
   .wrBookArcHead { display: flex; align-items: center; gap: 10px; }
   .wrBookArcFoot { display: flex; align-items: center; justify-content: space-between; }
   .wrBookChapter { background: rgba(0, 0, 0, 0.3); border-radius: 6px; padding: 8px 10px; display: flex; flex-direction: column; gap: 8px; min-width: 0; }
-  .wrBookChapterTop { display: flex; align-items: center; gap: 10px; }
-  .wrBookChapterTitle { flex: 1 1 0; min-width: 0; display: flex; flex-direction: column; gap: 3px; }
+  // Two rows: the chapter number over the title; the grip, title input and action buttons share the second row.
+  .wrBookChapterTop {
+    display: grid; grid-template-columns: auto minmax(0, 1fr) auto; grid-template-rows: auto auto; column-gap: 10px; row-gap: 3px; align-items: start;
+    > .wrGrip { grid-column: 1; grid-row: 2; align-self: center; }
+    > .wrBookActions { grid-column: 3; grid-row: 2; margin-left: 0; }
+  }
+  .wrBookChapterTitle { display: contents; }
+  .wrBookChapterTitle > .wrBookNumber { grid-column: 2; grid-row: 1; }
+  .wrBookChapterTitle > .wrBookInput { grid-column: 2; grid-row: 2; }
   .wrBookNumber { font-size: 11px; font-weight: 700; letter-spacing: 1px; text-transform: uppercase; color: var(--wr-cover-hint); }
   .wrBookChapterStats { display: flex; flex-wrap: wrap; gap: 4px 12px; font-size: 11px; opacity: 0.65; padding-left: 26px; span + span::before { content: '·'; margin-right: 12px; } }
   .wrIconBtn { display: inline-flex; align-items: center; justify-content: center; width: 28px; height: 28px; border-radius: 4px; background: rgba(0, 0, 0, 0.3); color: white; &:hover { background: var(--wr-accent-light); } }

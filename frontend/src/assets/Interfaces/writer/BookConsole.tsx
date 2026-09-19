@@ -1,8 +1,9 @@
 import type { OutlineNode } from '../../../api/types'
 import type { WriterWorkspace } from './useWriterWorkspace'
 import { BOOK_COMPONENTS, HELP_COMPONENT, SETTINGS_COMPONENT } from './consoleDefs'
-import { ChapterTabs, ConsoleTitleRow, Placeholder } from './shared'
+import { ChapterTabs, ConsoleTitleRow, NumberInput, Placeholder } from './shared'
 import BookOutline from './BookOutline'
+import { useWordCounts } from './useWordCounts'
 
 // The 20 cover designs a book can wear, dark to light across the hues.
 const COVER_COLORS = [
@@ -25,9 +26,32 @@ function luminance(hex: string): number {
 }
 const LIGHT_COVER = 0.25
 
-function numberOrNull(value: string): number | null {
-  const n = parseInt(value, 10)
-  return Number.isFinite(n) && n >= 0 ? n : null
+// A goal input: the actual count sits above it at the far right of the label,
+// and a progress bar along the input's footer fills toward the goal.
+function GoalField({ label, current, goal, onChange }: {
+  label: string
+  current: number
+  goal: number | null
+  onChange: (value: number | null) => void
+}) {
+  const percent = goal && goal > 0 ? Math.min(100, Math.round((current / goal) * 100)) : 0
+  return (
+    <label className="wrCoverField">
+      <span className="wrCoverFieldHead">
+        <span>{label}</span>
+        <span className="wrCoverCurrent" title="Current">{current.toLocaleString('en-US')}</span>
+      </span>
+      <span className="wrCoverInput">
+        <NumberInput value={goal} onChange={onChange} />
+        <span
+          className="wrProgress" role="progressbar" aria-label={`${label} progress`}
+          aria-valuemin={0} aria-valuemax={100} aria-valuenow={percent} title={`${percent}%`}
+        >
+          <span className="wrProgressFill" style={{ width: `${percent}%` }} />
+        </span>
+      </span>
+    </label>
+  )
 }
 
 // The book editor is the book's cover: full height of the console, square
@@ -35,6 +59,7 @@ function numberOrNull(value: string): number | null {
 function BookCover({ w, book }: { w: WriterWorkspace; book: OutlineNode }) {
   const chapters = w.activeBookChapters
   const cover = book.color ?? DEFAULT_COVER
+  const counts = useWordCounts(w.activeProjectId)
 
   return (
     <div className={luminance(cover) > LIGHT_COVER ? 'wrCoverWrap wrCoverWrap--light' : 'wrCoverWrap'} style={{ ['--wr-cover' as string]: cover }}>
@@ -70,23 +95,17 @@ function BookCover({ w, book }: { w: WriterWorkspace; book: OutlineNode }) {
           </div>
 
           <div className="wrCoverRow">
-            <label className="wrCoverField">
-              <span>Chapter target</span>
-              <input
-                type="number" min={0} value={book.chapterCountTarget ?? ''}
-                onChange={e => w.updateOutlineNode(book.id, { chapterCountTarget: numberOrNull(e.target.value) })}
-              />
-            </label>
-            <label className="wrCoverField">
-              <span>Word goal</span>
-              <input
-                type="number" min={0} value={book.wordCountGoal ?? ''}
-                onChange={e => w.updateOutlineNode(book.id, { wordCountGoal: numberOrNull(e.target.value) })}
-              />
-            </label>
+            <GoalField
+              label="Chapter target" current={chapters.length} goal={book.chapterCountTarget}
+              onChange={n => w.updateOutlineNode(book.id, { chapterCountTarget: n })}
+            />
+            <GoalField
+              label="Word goal" current={counts.books[book.id] ?? 0} goal={book.wordCountGoal}
+              onChange={n => w.updateOutlineNode(book.id, { wordCountGoal: n })}
+            />
           </div>
 
-          <BookOutline w={w} book={book} />
+          <BookOutline w={w} book={book} chapterWords={counts.chapters} />
         </div>
       </div>
       <ChapterTabs

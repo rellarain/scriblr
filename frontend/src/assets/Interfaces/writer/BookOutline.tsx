@@ -1,8 +1,7 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useMemo } from 'react'
 import type { OutlineNode } from '../../../api/types'
 import type { WriterWorkspace } from './useWriterWorkspace'
 import { GripIcon, ListIcon, PencilIcon, PlusIcon } from '../../icons'
-import { getChapterWordCounts } from '../../../api/draftFetch'
 import { formatWords } from './wordCount'
 import { buildChildIndex, descendantsOf } from './outlineTree'
 import { DeleteControl } from './shared'
@@ -12,19 +11,10 @@ import { useNodeDnd } from './useNodeDnd'
 // chapters, and chapters can also sit directly under the book. Cards are
 // reordered and moved between arcs by dragging their grip; each has a quiet
 // trash icon (with confirmation) at the bottom right.
-function BookOutline({ w, book }: { w: WriterWorkspace; book: OutlineNode }) {
+function BookOutline({ w, book, chapterWords }: { w: WriterWorkspace; book: OutlineNode; chapterWords: Record<string, number> }) {
   const dnd = useNodeDnd(w, true)
   const index = useMemo(() => buildChildIndex(w.outlineNodes), [w.outlineNodes])
   const kids = index.get(book.id) ?? []
-
-  // Each chapter's draft word count, read when the editor opens.
-  const [chapterWords, setChapterWords] = useState<Record<string, number>>({})
-  useEffect(() => {
-    if (!w.activeProjectId) return
-    let cancelled = false
-    getChapterWordCounts(w.activeProjectId).then(counts => { if (!cancelled) setChapterWords(counts) }, () => {})
-    return () => { cancelled = true }
-  }, [w.activeProjectId])
 
   // Chapters are numbered across the whole book, in outline order.
   const chapterNumber = useMemo(
