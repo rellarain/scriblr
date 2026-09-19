@@ -27,6 +27,9 @@ export interface OutlineNode {
   draftRef: string | null
   flag: NodeFlag | null
   color: string | null
+  // Book-only: the cover / theme hue and the accent hue (null = the app's accent), 0-360.
+  themeHue?: number | null
+  accentHue?: number | null
   chapterCountTarget: number | null
   plotlineIds: string[]
   wordCountGoal: number | null
@@ -68,6 +71,9 @@ export interface PlotNode {
   customFieldValues: Record<string, string>
   keywords: string[]
   flag: NodeFlag | null
+  // Category and subcategory only: the colour hue, 0-360 (null = the theme's hue for a
+  // category, its category's hue for a subcategory).
+  hue?: number | null
 }
 export interface PlotTree {
   schemaVersion: number

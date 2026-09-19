@@ -6,26 +6,13 @@ import { SaveControl } from '../../../components/SaveControl'
 import BookOutline from './BookOutline'
 import { systemForBook } from './timeSystem'
 import { useWordCounts } from './useWordCounts'
+import { ColorRange } from '../../../components/ColorRange'
+import { relLuminance } from '../../../theme/contrast'
+import { bookThemeHue, coverColor } from '../../../theme/bookColors'
+import { derivedShades, hslCss } from '../../../theme/palettes'
+import { useThemeState } from '../../../theme/useTheme'
 
-// The 20 cover designs a book can wear, dark to light across the hues.
-const COVER_COLORS = [
-  '#5a3a1e', '#4d2a3f', '#22485c', '#2f4a36', '#7a2e2e',
-  '#a0522d', '#b8732a', '#c9b458', '#8a9a3b', '#3f7a4a',
-  '#2e7a72', '#3a8fb0', '#3d5fa8', '#5b4bb0', '#7a6ad9',
-  '#8e3f8e', '#c0507a', '#d96aa5', '#6b6b6b', '#2b2b33',
-]
-const DEFAULT_COVER = COVER_COLORS[0]
-
-// Relative luminance (0 dark .. 1 light) of a #rrggbb colour.
-function luminance(hex: string): number {
-  const m = /^#?([0-9a-f]{6})$/i.exec(hex.trim())
-  if (!m) return 0
-  const [r, g, b] = [0, 2, 4].map(i => {
-    const c = parseInt(m[1].slice(i, i + 2), 16) / 255
-    return c <= 0.03928 ? c / 12.92 : ((c + 0.055) / 1.055) ** 2.4
-  })
-  return 0.2126 * r + 0.7152 * g + 0.0722 * b
-}
+// A cover lighter than this gets dark labels instead of light ones.
 const LIGHT_COVER = 0.25
 
 // A goal input: the actual count sits above it at the far right of the label,
@@ -60,12 +47,19 @@ function GoalField({ label, current, goal, onChange }: {
 // corners, with the chapter tabs sticking out of its right edge.
 function BookCover({ w, book }: { w: WriterWorkspace; book: OutlineNode }) {
   const chapters = w.activeBookChapters
-  const cover = book.color ?? DEFAULT_COVER
   const counts = useWordCounts(w.activeProjectId)
+  // The cover is the book's theme colour: its hue at the active zone's theme
+  // saturation and brightness. The accent colour (optional) uses the accent's.
+  const { settings, activeZone } = useThemeState()
+  const palette = settings.zones[activeZone].palette
+  const themeHue = bookThemeHue(book)
+  const cover = coverColor(palette, themeHue)
+  const accentFill = derivedShades(palette, 'accent')[0].color
+  const accentOn = book.accentHue != null
   const timeSystems = w.activeProject?.settings.timeSystems ?? []
 
   return (
-    <div className={luminance(cover) > LIGHT_COVER ? 'wrCoverWrap wrCoverWrap--light' : 'wrCoverWrap'} style={{ ['--wr-cover' as string]: cover }}>
+    <div className={relLuminance(cover) > LIGHT_COVER ? 'wrCoverWrap wrCoverWrap--light' : 'wrCoverWrap'} style={{ ['--wr-cover' as string]: hslCss(cover) }}>
       <div className="wrCover">
         <div className="wrCoverSave"><SaveControl status={w.saveStatus} onSave={() => { void w.saveNow() }} onRestore={w.restoreSaved} buttonClassName="wrSmallBtn wrSaveBtn" /></div>
         <div className="wrCoverSpine" />
@@ -86,15 +80,27 @@ function BookCover({ w, book }: { w: WriterWorkspace; book: OutlineNode }) {
                 onChange={e => w.updateOutlineNode(book.id, { synopsis: e.target.value })}
               />
             </label>
-            <div className="wrSwatches" role="group" aria-label="Cover design">
-              {COVER_COLORS.map(c => (
-                <button
-                  key={c} type="button" title="Cover design" aria-label={`Cover color ${c}`} aria-pressed={c === cover}
-                  className={c === cover ? 'wrSwatch wrSwatch--active' : 'wrSwatch'}
-                  style={{ backgroundColor: c }}
-                  onClick={() => w.updateOutlineNode(book.id, { color: c })}
+            <div className="wrCoverColors">
+              <div className="wrColorRow">
+                <span className="wrColorLabel">Book colour</span>
+                <ColorRange
+                  label="Book colour" kind="hue" value={themeHue} sat={cover.s} light={cover.l}
+                  onChange={hue => w.updateOutlineNode(book.id, { themeHue: hue })}
                 />
-              ))}
+              </div>
+              <div className="wrColorRow">
+                <label className="wrColorLabel wrColorToggle">
+                  <input
+                    type="checkbox" role="switch" checked={accentOn} aria-label="Use an accent colour for this book"
+                    onChange={e => w.updateOutlineNode(book.id, { accentHue: e.target.checked ? palette.accent.h : null })}
+                  />
+                  <span>Accent colour</span>
+                </label>
+                <ColorRange
+                  label="Accent colour" kind="hue" value={book.accentHue ?? palette.accent.h} sat={palette.accent.s} light={accentFill.l}
+                  disabled={!accentOn} onChange={hue => w.updateOutlineNode(book.id, { accentHue: hue })}
+                />
+              </div>
             </div>
           </div>
 

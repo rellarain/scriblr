@@ -1,13 +1,30 @@
 from datetime import datetime, timezone
 from typing import Any, Literal, Optional
 
-from pydantic import BaseModel, Field, field_validator
+import colorsys
+import re
+
+from pydantic import BaseModel, Field, field_validator, model_validator
 
 SCHEMA_VERSION = 2
 
 
 def utcnow() -> datetime:
     return datetime.now(timezone.utc)
+
+
+_HEX_COLOR = re.compile(r"^#?([0-9a-fA-F]{6})$")
+
+
+def hex_to_hue(value: Optional[str]) -> Optional[int]:
+    """Hue (0-359 degrees) of a #rrggbb colour, or None if it is not one."""
+    match = _HEX_COLOR.match((value or "").strip())
+    if not match:
+        return None
+    digits = match.group(1)
+    r, g, b = (int(digits[i:i + 2], 16) / 255 for i in (0, 2, 4))
+    hue, _lightness, _saturation = colorsys.rgb_to_hls(r, g, b)
+    return round(hue * 360) % 360
 
 
 # Structural depth, shallowest first. Nesting is flexible: a node's parent
@@ -152,6 +169,13 @@ class OutlineNode(BaseModel):
     # only) rather than a separate book model, since books are still plain
     # OutlineNodes structurally.
     color: Optional[str] = None
+    # Set only on "book" nodes: the book's two hues (0-360). The theme hue is
+    # the cover / spine colour and re-tints the book's editors' surfaces (drawn
+    # with the theme's saturation and brightness); the accent hue re-tints
+    # active items (accent saturation and brightness), and is None for "no
+    # override". A legacy hex `color` becomes the theme hue (see below).
+    themeHue: Optional[int] = Field(default=None, ge=0, le=360)
+    accentHue: Optional[int] = Field(default=None, ge=0, le=360)
     chapterCountTarget: Optional[int] = None
     plotlineIds: list[str] = Field(default_factory=list)
     # Book's total word-count ambition -- drives bookshelf spine width/fill.
@@ -170,6 +194,16 @@ class OutlineNode(BaseModel):
     location: str = ""
     timeValue: dict[str, int] = Field(default_factory=dict)
     action: str = ""
+
+    @model_validator(mode="after")
+    def _theme_hue_from_legacy_color(self) -> "OutlineNode":
+        # Books picked one of 20 hex colours before hues existed: keep the colour
+        # family by turning the hex into the theme hue.
+        if self.themeHue is None:
+            hue = hex_to_hue(self.color)
+            if hue is not None:
+                self.themeHue = hue
+        return self
 
 
 class OutlineTree(BaseModel):
@@ -214,6 +248,11 @@ class PlotNode(BaseModel):
     keywords: list[str] = Field(default_factory=list)
     # Flags this item for revision (review/edit/add/delete), with an optional note.
     flag: Optional[NodeFlag] = None
+    # Set only on "category" and "subcategory" nodes: the colour hue (0-360). A
+    # category is drawn with the theme's saturation/brightness, a subcategory with
+    # the accent's and kept within 60 degrees of its category's hue. None = the
+    # app theme's hue (categories) or the category's hue (subcategories).
+    hue: Optional[int] = Field(default=None, ge=0, le=360)
 
 
 class PlotTree(BaseModel):

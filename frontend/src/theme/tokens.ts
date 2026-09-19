@@ -20,27 +20,15 @@ export const MIN_CONTRAST = 4.5
 export const NATIVE_CONTRAST = 3.0
 const NUDGE_MAX = 6
 
-interface Tier { hue: 'theme' | 'accent'; sat: 'theme' | number; off: number }
-
-// Surfaces derived from the theme lightness (offset in lightness points):
-// the theme's own tiers, the sidebar shades and the raised card shades.
-const TIERS: Tier[] = [
-  { hue: 'theme', sat: 'theme', off: 0 },
-  { hue: 'theme', sat: 'theme', off: -4 },
-  { hue: 'theme', sat: 'theme', off: -10 },
-  { hue: 'theme', sat: 'theme', off: -20 },
-  { hue: 'accent', sat: 20, off: -17 },
-  { hue: 'accent', sat: 20, off: -9 },
-  { hue: 'accent', sat: 20, off: -1 },
-  { hue: 'accent', sat: 20, off: -8 },
-  { hue: 'accent', sat: 22, off: 3 },
-]
+// Surfaces derived from the theme lightness (offset in lightness points), all in the
+// theme's own hue and saturation: its base, side, deep and deeper tiers, the
+// sidebar shades and the raised card shades (see theme.scss).
+const TIERS: number[] = [0, -4, -10, -20, -17, -9, -1, -8, 3]
 
 const clamp = (n: number, lo: number, hi: number) => Math.min(hi, Math.max(lo, n))
 
-function tierColor(tier: Tier, pal: ZonePalette, l: number): HSL {
-  const src = tier.hue === 'theme' ? pal.theme : pal.accent
-  return { h: src.h, s: tier.sat === 'theme' ? pal.theme.s : tier.sat, l: clamp(l + tier.off, 0, 100) }
+function tierColor(offset: number, pal: ZonePalette, l: number): HSL {
+  return { h: pal.theme.h, s: pal.theme.s, l: clamp(l + offset, 0, 100) }
 }
 
 function worstContrast(mode: InkMode, pal: ZonePalette, l: number): number {

@@ -4,6 +4,11 @@ import type { WriterWorkspace } from './useWriterWorkspace'
 import { ChevronRightIcon, CloseIcon, GripIcon, LockIcon, PlusIcon } from '../../icons'
 import { ChipEditor, DeleteControl } from './shared'
 import { focusNodeField, useNodeKeys } from '../../../lib/nodeKeys'
+import { ColorRange } from '../../../components/ColorRange'
+import { coverColor, hueDelta, hueWindow, wrapHue } from '../../../theme/bookColors'
+import { derivedShades } from '../../../theme/palettes'
+import { useThemeState } from '../../../theme/useTheme'
+import { nodeColorStyle, plotColors, type PlotColors } from './plotColors'
 import {
   assignedLevel, chapterOfAssignment, nodeLabel, orderAssignedPlotpoints, plotpointDescriptionAllowed, sortByTitle, titleAfterEdit,
 } from './plotTree'
@@ -43,7 +48,7 @@ function PlotNav({ w }: { w: WriterWorkspace }) {
           <div
             key={node.id}
             className={node.id === w.focusedPlotNodeId ? 'wrNavRow wrNavRow--active' : 'wrNavRow'}
-            style={{ paddingLeft: 8 + depth * 16 }}
+            style={{ paddingLeft: 8 + depth * 16, ...nodeColorStyle(plotColors(node, w.plotNodeById).primary) }}
           >
             <button
               type="button" className="wrNavChevron" aria-label={open ? 'Collapse' : 'Expand'}
@@ -52,7 +57,7 @@ function PlotNav({ w }: { w: WriterWorkspace }) {
             >
               <ChevronRightIcon size={12} />
             </button>
-            {isLine && <span className="wrNavMark" />}
+            <span className="wrNavMark" />
             <button type="button" className="wrNavLabel" onClick={() => w.focusPlotNode(node.id)}>{nodeLabel(node)}</button>
             {!isLine && <span className="wrNavCount">{plotlineCount(node, children)}</span>}
           </div>,
@@ -102,6 +107,51 @@ function ChildRows({ w, node, kind, addLabel }: { w: WriterWorkspace; node: Plot
   )
 }
 
+// The category and subcategory colours a node wears, as two small squares.
+function ColorTrail({ colors }: { colors: PlotColors }) {
+  if (!colors.category) return null
+  return (
+    <span className="wrColorTrail" aria-hidden="true">
+      <span className="wrColorDot" style={{ backgroundColor: colors.category }} />
+      {colors.subcategory && <span className="wrColorDot" style={{ backgroundColor: colors.subcategory }} />}
+    </span>
+  )
+}
+
+// The hue selector of a category (theme colour) or subcategory (accent colour,
+// within 60 degrees of its category's hue). Saturation and brightness are the
+// active zone's, so what the thumb shows is what the app draws.
+function HueField({ w, node }: { w: WriterWorkspace; node: PlotNode }) {
+  const { settings, activeZone } = useThemeState()
+  const pal = settings.zones[activeZone].palette
+  if (node.kind === 'subcategory') {
+    const category = node.parentId ? w.plotNodeById.get(node.parentId) : undefined
+    const centre = category?.hue ?? pal.theme.h
+    const { min, max } = hueWindow(centre)
+    const shown = centre + hueDelta(centre, node.hue ?? centre) // the same hue, inside the window
+    return (
+      <div>
+        <div className="wrLabel">Colour <span className="wrOutlineMeta">within 60° of its category</span></div>
+        <ColorRange
+          label="Subcategory colour" kind="hue" value={shown} min={min} max={max}
+          sat={pal.accent.s} light={derivedShades(pal, 'accent')[0].color.l}
+          onChange={v => w.setPlotHue(node.id, wrapHue(v), centre)}
+        />
+      </div>
+    )
+  }
+  const cover = coverColor(pal, node.hue ?? pal.theme.h)
+  return (
+    <div>
+      <div className="wrLabel">Colour</div>
+      <ColorRange
+        label="Category colour" kind="hue" value={node.hue ?? pal.theme.h} sat={cover.s} light={cover.l}
+        onChange={v => w.setPlotHue(node.id, v)}
+      />
+    </div>
+  )
+}
+
 function KeywordsField({ w, node }: { w: WriterWorkspace; node: PlotNode }) {
   return (
     <div>
@@ -116,10 +166,12 @@ function KeywordsField({ w, node }: { w: WriterWorkspace; node: PlotNode }) {
 
 function CategoryEditor({ w, node }: { w: WriterWorkspace; node: PlotNode }) {
   const isCategory = node.kind === 'category'
+  const colors = plotColors(node, w.plotNodeById)
   return (
-    <div className="wrCardPanel" data-knode={node.id}>
+    <div className="wrCardPanel wrCardPanel--colored" data-knode={node.id} style={nodeColorStyle(colors.primary)}>
       <div className="wrCardPanelHead">
         <span className="wrKindBadge">{node.kind}</span>
+        <ColorTrail colors={colors} />
         <input className="wrTitleField" data-kf="" value={node.title} onChange={e => w.updatePlotNodeField(node.id, 'title', e.target.value)} placeholder={`${isCategory ? 'Category' : 'Subcategory'} title`} />
         <DeleteControl
           tone="dark" message={`Delete ${nodeLabel(node)}? Its plotlines move to Unassigned.`}
@@ -133,6 +185,7 @@ function CategoryEditor({ w, node }: { w: WriterWorkspace; node: PlotNode }) {
           onChange={e => w.updatePlotNodeField(node.id, 'body', e.target.value)}
         />
       </div>
+      <HueField w={w} node={node} />
       <KeywordsField w={w} node={node} />
       <div>
         <div className="wrLabel">Plotline template fields</div>
@@ -187,6 +240,7 @@ function PlotlineEditor({ w, node }: { w: WriterWorkspace; node: PlotNode }) {
     [w.plotNodes, w.outlineNodes, w.activeProject, node.id, outlineById],
   )
   const hasAssigned = assigned.length > 0
+  const colors = plotColors(node, w.plotNodeById)
 
   // The custom fields a plotline fills in come from its category and
   // subcategory templates as well as its own.
@@ -222,7 +276,10 @@ function PlotlineEditor({ w, node }: { w: WriterWorkspace; node: PlotNode }) {
     const book = level === 'book' ? outlineById.get(p.assignedMomentId!) : undefined
     const locked = level === 'inner'
     return (
-      <div key={p.id} data-point={p.id} data-knode={p.id} className={dragId === p.id ? 'wrPoint wrPoint--dragging' : 'wrPoint'}>
+      <div
+        key={p.id} data-point={p.id} data-knode={p.id} style={nodeColorStyle(colors.primary)}
+        className={dragId === p.id ? 'wrPoint wrPoint--dragging' : 'wrPoint'}
+      >
         {!locked && (
           <span className="wrGrip" {...dragProps(p.id)} aria-label="Drag plotpoint" title="Drag onto a book or chapter"><GripIcon size={14} /></span>
         )}
@@ -274,9 +331,10 @@ function PlotlineEditor({ w, node }: { w: WriterWorkspace; node: PlotNode }) {
   return (
     <div className="wrPlotlineLayout">
       <div className="wrPlotlineLeft">
-        <div className="wrCardPanel" data-knode={node.id}>
+        <div className="wrCardPanel wrCardPanel--colored" data-knode={node.id} style={nodeColorStyle(colors.primary)}>
           <div className="wrCardPanelHead">
             <span className="wrKindBadge">plotline</span>
+            <ColorTrail colors={colors} />
             <input className="wrTitleField" data-kf="" value={node.title} onChange={e => w.updatePlotNodeField(node.id, 'title', e.target.value)} placeholder="Plotline title" />
             <DeleteControl
               tone="dark" message={`Delete ${nodeLabel(node)} and its plotpoints?`} onConfirm={() => w.deletePlotNode(node.id)}

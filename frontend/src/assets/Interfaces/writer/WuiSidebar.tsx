@@ -5,6 +5,8 @@ import { booksOf, buildChildIndex, chaptersOfBook, descendantsOf } from './outli
 import { ChevronDownIcon, ChevronLeftIcon, ChevronRightIcon, PlusIcon } from '../../icons'
 import { DeleteControl } from './shared'
 import { nodeLabel } from './plotTree'
+import BookScope from './BookScope'
+import { bookThemeHue, themeColorCss } from '../../../theme/bookColors'
 
 // The bookshelf look lives here and nowhere else in the Writer interface:
 // stacked project shelves when nothing is open, and -- once a project is
@@ -31,7 +33,7 @@ function Spine({ book, active, onOpen }: { book: OutlineNode; active: boolean; o
     <button
       type="button"
       className={active ? 'wrSpine wrSpine--active' : 'wrSpine'}
-      style={{ height: SPINE_HEIGHT, width, ...(book.color ? { backgroundColor: book.color } : {}) }}
+      style={{ height: SPINE_HEIGHT, width, backgroundColor: themeColorCss(bookThemeHue(book)) }}
       onClick={onOpen}
       title={nodeLabel(book)}
     >
@@ -202,6 +204,7 @@ function WuiSidebar({ workspace: w }: { workspace: WriterWorkspace }) {
         ))}
       </Panel>
 
+      <BookScope book={w.activeBook} flow>
       {w.activeBook && (
         <Panel
           label="Book" value={nodeLabel(w.activeBook)} open={isOpen('book')} onToggle={() => toggle('book')}
@@ -254,6 +257,7 @@ function WuiSidebar({ workspace: w }: { workspace: WriterWorkspace }) {
           })}
         </Panel>
       )}
+      </BookScope>
     </aside>
   )
 }

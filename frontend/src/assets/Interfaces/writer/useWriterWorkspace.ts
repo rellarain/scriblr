@@ -16,6 +16,7 @@ import { isAssignedPlotpoint } from './plotTree'
 import { useStoredState } from './storage'
 import { combineSaveStatus, useAutosave } from '../../../lib/useAutosave'
 import { insertAfter } from '../../../lib/siblingOrder'
+import { clampHueToWindow, wrapHue } from '../../../theme/bookColors'
 
 type AsyncStatus = 'idle' | 'loading' | 'error'
 
@@ -469,6 +470,33 @@ export function useWriterWorkspace() {
     commitPlot(plotNodesRef.current.map(n => (n.id === nodeId ? { ...n, [field]: value } : n)), false)
   }
 
+  // Set a category's or subcategory's colour hue. A category's new hue pulls its
+  // subcategories' own hues back within 60 degrees of it; a subcategory's stays
+  // within 60 degrees of its category's (`categoryHue`: the category's hue as
+  // shown, which is stored on the category too when it had none of its own).
+  function setPlotHue(nodeId: string, hue: number, categoryHue?: number) {
+    const prev = plotNodesRef.current
+    const target = prev.find(n => n.id === nodeId)
+    if (!target || (target.kind !== 'category' && target.kind !== 'subcategory')) return
+    const wrapped = wrapHue(hue)
+    if (target.kind === 'category') {
+      commitPlot(prev.map(n => {
+        if (n.id === nodeId) return { ...n, hue: wrapped }
+        if (n.parentId === nodeId && n.kind === 'subcategory' && n.hue != null) return { ...n, hue: clampHueToWindow(wrapped, n.hue) }
+        return n
+      }), false)
+      return
+    }
+    const parent = target.parentId ? prev.find(n => n.id === target.parentId) : undefined
+    const centre = parent?.hue ?? categoryHue
+    const value = centre != null ? clampHueToWindow(centre, wrapped) : wrapped
+    commitPlot(prev.map(n => {
+      if (n.id === nodeId) return { ...n, hue: value }
+      if (parent && n.id === parent.id && parent.hue == null && centre != null) return { ...n, hue: wrapHue(centre) }
+      return n
+    }), false)
+  }
+
   function addPlotKeyword(nodeId: string, keyword: string) {
     const trimmed = keyword.trim()
     if (!trimmed) return
@@ -593,7 +621,7 @@ export function useWriterWorkspace() {
 
     plotNodes, plotStatus, plotError, plotSaving: plotSave.saving, plotSaveError: plotSave.error,
     focusedPlotNodeId, focusedPlotNode, plotChildrenByParentId, plotNodeById,
-    focusPlotNode, addPlotNode, updatePlotNodeField, deletePlotNode,
+    focusPlotNode, addPlotNode, updatePlotNodeField, setPlotHue, deletePlotNode,
     addPlotKeyword, removePlotKeyword,
     addPlotCustomFieldDef, removePlotCustomFieldDef, updatePlotCustomFieldValue,
     assignPlotpoint,

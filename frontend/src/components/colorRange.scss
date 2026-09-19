@@ -1,0 +1,69 @@
+// The colour selector (components/ColorRange.tsx): a gradient track and a
+// square thumb outlined in white holding a smaller square of the result. The
+// native range input sits over the track, transparent, for pointer and keyboard.
+.colorRange {
+  --cr-thumb: 22px;
+  position: relative;
+  display: flex;
+  align-items: center;
+  flex: 1 1 auto;
+  min-width: 0;
+  height: var(--cr-thumb);
+}
+
+.colorRangeTrack {
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: 50%;
+  height: 12px;
+  transform: translateY(-50%);
+  border-radius: 2px;
+  background: var(--cr-track);
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.2);
+  pointer-events: none;
+}
+
+.colorRangeInput {
+  position: relative;
+  width: 100%;
+  height: var(--cr-thumb);
+  margin: 0;
+  padding: 0;
+  background: transparent;
+  cursor: pointer;
+  -webkit-appearance: none;
+  appearance: none;
+  &::-webkit-slider-runnable-track { height: var(--cr-thumb); background: transparent; }
+  &::-webkit-slider-thumb { -webkit-appearance: none; width: var(--cr-thumb); height: var(--cr-thumb); opacity: 0; }
+  &::-moz-range-track { height: var(--cr-thumb); background: transparent; }
+  &::-moz-range-thumb { width: var(--cr-thumb); height: var(--cr-thumb); border: 0; opacity: 0; }
+  &:focus { outline: none; }
+  &:disabled { cursor: default; }
+}
+
+.colorRangeThumb {
+  position: absolute;
+  top: 50%;
+  left: calc(var(--cr-thumb) / 2 + (100% - var(--cr-thumb)) * var(--cr-frac));
+  width: var(--cr-thumb);
+  height: var(--cr-thumb);
+  box-sizing: border-box;
+  transform: translate(-50%, -50%);
+  border: 2px solid #fff;
+  border-radius: 3px;
+  background: rgba(0, 0, 0, 0.35);
+  display: grid;
+  place-items: center;
+  pointer-events: none;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.5);
+}
+
+.colorRangeSwatch {
+  width: 10px;
+  height: 10px;
+  background: var(--cr-result);
+}
+
+.colorRangeInput:focus-visible ~ .colorRangeThumb { outline: 2px solid var(--accent-hover, #fff); outline-offset: 2px; }
+.colorRange--disabled { opacity: 0.45; }

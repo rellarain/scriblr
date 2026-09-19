@@ -141,7 +141,7 @@ describe('deriveTokens', () => {
           const base = { h, s: p.theme.s, l: brightness }
           expect(contrastRatio(ink, base)).toBeGreaterThanOrEqual(MIN_CONTRAST)
           const darkest = { h, s: p.theme.s, l: Math.max(0, brightness - 20) }
-          const lightest = { h: 32, s: 22, l: Math.min(100, brightness + 3) }
+          const lightest = { h, s: p.theme.s, l: Math.min(100, brightness + 3) } // the raised-active surface
           expect(contrastRatio(ink, darkest)).toBeGreaterThanOrEqual(MIN_CONTRAST)
           expect(contrastRatio(ink, lightest)).toBeGreaterThanOrEqual(MIN_CONTRAST)
         }

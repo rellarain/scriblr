@@ -66,10 +66,11 @@ html[data-theme-pending] #root {
   opacity: 0;
 }
 
-:root {
-  // Sidebar backgrounds use the accent's hue but heavily desaturated, so the
-  // sidebar reads as part of the accent color family while staying calm
-  // enough to host content; not independently user-customizable.
+// `.wrBookScope` (a book's editors, see writer/BookScope.tsx) re-declares them so
+// that overriding the hue variables on it reaches its descendants: custom
+// properties are substituted where they are declared, not where they are used.
+:root, .wrBookScope {
+  // The admin sidebar (accent 2's hue) uses this fixed, low saturation.
   --color-sidebar-s: 20%;
 
   // ---- Derived tokens (all follow the registered variables above) ----
@@ -85,12 +86,13 @@ html[data-theme-pending] #root {
   --surface-deep: hsl(var(--color-theme-h), var(--color-theme-s), calc(var(--color-theme-l) - 10%));
   --surface-deeper: hsl(var(--color-theme-h), var(--color-theme-s), calc(var(--color-theme-l) - 20%));
 
-  // Sidebar surfaces (accent hue, desaturated) and raised cards.
-  --surface-sidebar-1: hsl(var(--color-accent-h), var(--color-sidebar-s), calc(var(--color-theme-l) - 17%));
-  --surface-sidebar-2: hsl(var(--color-accent-h), var(--color-sidebar-s), calc(var(--color-theme-l) - 9%));
-  --surface-raised-a: hsl(var(--color-accent-h), 20%, calc(var(--color-theme-l) - 1%));
-  --surface-raised-b: hsl(var(--color-accent-h), 20%, calc(var(--color-theme-l) - 8%));
-  --surface-raised-active: hsl(var(--color-accent-h), 22%, calc(var(--color-theme-l) + 3%));
+  // Sidebar surfaces and raised cards: the theme's own hue and saturation at
+  // their own lightness steps (no accent tint).
+  --surface-sidebar-1: hsl(var(--color-theme-h), var(--color-theme-s), calc(var(--color-theme-l) - 17%));
+  --surface-sidebar-2: hsl(var(--color-theme-h), var(--color-theme-s), calc(var(--color-theme-l) - 9%));
+  --surface-raised-a: hsl(var(--color-theme-h), var(--color-theme-s), calc(var(--color-theme-l) - 1%));
+  --surface-raised-b: hsl(var(--color-theme-h), var(--color-theme-s), calc(var(--color-theme-l) - 8%));
+  --surface-raised-active: hsl(var(--color-theme-h), var(--color-theme-s), calc(var(--color-theme-l) + 3%));
 
   // The three action colors (and the admin one), with their variants.
   --accent: hsl(var(--color-accent-h), var(--color-accent-s), var(--color-accent-l));

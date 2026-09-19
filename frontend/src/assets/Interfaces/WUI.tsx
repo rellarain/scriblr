@@ -10,6 +10,7 @@ import {
   COMPONENTS_BY_CONSOLE, DEFAULT_COMPONENT, HELP_COMPONENT, SETTINGS_COMPONENT,
 } from './writer/consoleDefs'
 import { ConsoleTitleRow, IconColumn, Placeholder } from './writer/shared'
+import BookScope from './writer/BookScope'
 import './writer/writer.scss'
 
 // The Writer page. Navigation lives in the sidebar (project shelves, then
@@ -66,13 +67,16 @@ function WUI() {
     content = <PagesConsole w={workspace} component={component} />
   }
 
+  // A book's own colours re-tint its editors (the book, its chapters and their preview).
+  const scopedBook = console_ === 'book' || console_ === 'page' || console_ === 'pages' ? workspace.activeBook : undefined
+
   return (
     <main className="wUI wr">
       <WuiSidebar workspace={workspace} />
-      <div className="wrMain">
+      <BookScope book={scopedBook} className="wrMain">
         <IconColumn components={components} active={component} onSelect={setComponent} />
         <div className={flush ? 'wrContent wrContent--flush' : edge ? 'wrContent wrContent--edge' : 'wrContent'}>{content}</div>
-      </div>
+      </BookScope>
     </main>
   )
 }

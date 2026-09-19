@@ -26,3 +26,9 @@ export function contrastRatio(a: HSL, b: HSL): number {
 export type InkMode = 'light' | 'dark'
 export const inkColor = (mode: InkMode, themeHue: number): HSL =>
   mode === 'light' ? { h: 0, s: 0, l: 100 } : { h: themeHue, s: 12, l: 8 }
+
+// Light ink on a dark fill, dark ink on a light one (the same cut-off the
+// theme uses for its accent fills).
+const LIGHT_INK_MAX_LUMINANCE = 0.3
+export const readableInk = (fill: HSL, themeHue = 0): HSL =>
+  relLuminance(fill) <= LIGHT_INK_MAX_LUMINANCE ? inkColor('light', themeHue) : inkColor('dark', themeHue)

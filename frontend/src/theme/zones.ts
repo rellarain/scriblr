@@ -112,3 +112,16 @@ export function clockZone(settings: ThemeSettings, now: Date): ZoneKey {
 export function activeZone(settings: ThemeSettings, now: Date): ZoneKey {
   return settings.override ?? clockZone(settings, now)
 }
+
+// Give a zone another zone's whole palette (colors and brightness, not the
+// start time). Both zones must be turned on.
+export function copyPalette(settings: ThemeSettings, from: ZoneKey, to: ZoneKey): ThemeSettings {
+  if (from === to || !settings.zones[from].configured || !settings.zones[to].configured) return settings
+  return {
+    ...settings,
+    zones: {
+      ...settings.zones,
+      [to]: { ...settings.zones[to], palette: JSON.parse(JSON.stringify(settings.zones[from].palette)) },
+    },
+  }
+}

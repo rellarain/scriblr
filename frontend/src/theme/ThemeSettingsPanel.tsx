@@ -1,11 +1,14 @@
-import { useEffect, useMemo, useState, type PointerEvent as ReactPointerEvent } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { restoreSettings, saveSettingsNow, setTheme, setUi, useSettings, useSettingsSaveStatus } from '../settings/settingsStore'
 import { SaveControl } from '../components/SaveControl'
+import { ColorRange } from '../components/ColorRange'
 import { CURRENT_USER } from '../userSeed'
 import { ZONE_ICON } from './ThemeZoneToggles'
+import { readableInk } from './contrast'
 import { contrastBand, deriveTokens, effectiveBrightness } from './tokens'
-import { disableZone, enableZone, configuredZones, formatMinute, STEP_MINUTES } from './zones'
+import { copyPalette, disableZone, enableZone, configuredZones, formatMinute, STEP_MINUTES } from './zones'
 import { editBrightness, editHue, editSaturation, legalRange } from './paletteRules'
+import { derivedShades, hslCss, tints, type Swatch } from './palettes'
 import { setPreviewZone, useThemeState } from './useTheme'
 import { ZONE_KEYS, ZONE_LABEL, type PaletteKey, type Role, type ZoneKey, type ZonePalette } from './types'
 import './themeSettings.scss'
@@ -19,46 +22,33 @@ const COLOR_ROWS: Array<{ key: PaletteKey; label: string; hint: string; adminOnl
   { key: 'accent2', label: 'Accent 2', hint: 'Admin features', adminOnly: true },
 ]
 
-const HUE_TRACK = 'linear-gradient(to right, hsl(0,80%,50%), hsl(60,80%,50%), hsl(120,80%,50%), hsl(180,80%,50%), hsl(240,80%,50%), hsl(300,80%,50%), hsl(360,80%,50%))'
-
-// While a slider is being dragged the preview should track the thumb, so the
-// fade between palettes is switched off until the pointer is released.
-function liveDragProps() {
-  return {
-    onPointerDown: (_e: ReactPointerEvent) => {
-      document.documentElement.setAttribute('data-theme-live', '')
-      const end = () => {
-        document.documentElement.removeAttribute('data-theme-live')
-        window.removeEventListener('pointerup', end)
-        window.removeEventListener('pointercancel', end)
-      }
-      window.addEventListener('pointerup', end)
-      window.addEventListener('pointercancel', end)
-    },
-  }
+// One slider: its name, the colour selector, and the value.
+function SliderRow({ label, unit, value, children }: { label: string; unit: string; value: number; children: React.ReactNode }) {
+  return (
+    <div className="themeSliderRow">
+      <span>{label}</span>
+      {children}
+      <output>{value}{unit}</output>
+    </div>
+  )
 }
 
-function SliderRow({ label, value, min, max, unit, track, onChange }: {
-  label: string
-  value: number
-  min: number
-  max: number
-  unit: string
-  track?: string
-  onChange: (value: number) => void
-}) {
+// The palette generated for a colour: the shades the app really derives from
+// it (named), and an even ladder of tints.
+function Palette({ pal, colorKey }: { pal: ZonePalette; colorKey: PaletteKey }) {
+  const derived = useMemo(() => derivedShades(pal, colorKey), [pal, colorKey])
+  const ladder = useMemo(() => tints(pal, colorKey), [pal, colorKey])
+  const chip = (s: Swatch, named: boolean) => (
+    <span key={s.key} className={named ? 'themeChip themeChip--named' : 'themeChip'} title={`${s.label}: ${hslCss(s.color)}`}>
+      <span className="themeChipColor" style={{ backgroundColor: hslCss(s.color) }} />
+      {named && <span className="themeChipLabel">{s.label}</span>}
+    </span>
+  )
   return (
-    <label className="themeSliderRow">
-      <span>{label}</span>
-      <input
-        type="range" min={min} max={max} value={value}
-        style={track ? { background: track } : undefined}
-        aria-label={label}
-        onChange={e => onChange(Number(e.target.value))}
-        {...liveDragProps()}
-      />
-      <output>{value}{unit}</output>
-    </label>
+    <div className="themePalette" aria-label={`${colorKey} palette`}>
+      <div className="themePaletteRow" aria-label="Shades in use">{derived.map(s => chip(s, true))}</div>
+      <div className="themePaletteRow themePaletteRow--tints" aria-label="Tints and shades">{ladder.map(s => chip(s, false))}</div>
+    </div>
   )
 }
 
@@ -66,9 +56,10 @@ function swatchColor(vars: Record<string, string>, key: PaletteKey): string {
   return `hsl(${vars[`--color-${key}-h`]} ${vars[`--color-${key}-s`]} ${vars[`--color-${key}-l`]})`
 }
 
-// 24h strip showing which zone is in effect when, colored with each zone's
-// theme color.
-function Timeline() {
+// 24h strip showing which zone is in effect when. Each segment is a midtone of
+// its zone's accent (its accent hue and saturation at 50% lightness); every
+// zone except the one being edited is a little dimmer.
+function Timeline({ selected }: { selected: ZoneKey }) {
   const { theme } = useSettings()
   const order = configuredZones(theme.zones)
   const segments: Array<{ key: ZoneKey; from: number; to: number }> = []
@@ -88,12 +79,14 @@ function Timeline() {
     <div className="themeTimeline" role="img" aria-label="Time zones across the day">
       <div className="themeTimelineBar">
         {segments.map((seg, i) => {
-          const vars = deriveTokens(theme.zones[seg.key].palette, 'user')
+          const accent = theme.zones[seg.key].palette.accent
+          const fill = { h: accent.h, s: accent.s, l: 50 }
           const Icon = ZONE_ICON[seg.key]
           return (
             <span
-              key={`${seg.key}-${i}`} className="themeTimelineSeg"
-              style={{ left: `${(seg.from / 1440) * 100}%`, width: `${((seg.to - seg.from) / 1440) * 100}%`, backgroundColor: swatchColor(vars, 'theme') }}
+              key={`${seg.key}-${i}`}
+              className={seg.key === selected ? 'themeTimelineSeg' : 'themeTimelineSeg themeTimelineSeg--dim'}
+              style={{ left: `${(seg.from / 1440) * 100}%`, width: `${((seg.to - seg.from) / 1440) * 100}%`, backgroundColor: hslCss(fill), color: hslCss(readableInk(fill)) }}
               title={`${ZONE_LABEL[seg.key]}: ${formatMinute(seg.from % 1440)} - ${formatMinute(seg.to % 1440)}`}
             >
               <Icon size={14} />
@@ -113,6 +106,7 @@ function ZoneEditor({ zoneKey, role }: { zoneKey: ZoneKey; role: Role }) {
   const vars = useMemo(() => deriveTokens(pal, role), [pal, role])
   const band = useMemo(() => contrastBand(pal), [pal])
   const effective = effectiveBrightness(pal).brightness
+  const copySources = configuredZones(theme.zones).filter(k => k !== zoneKey)
 
   function updatePalette(fn: (p: ZonePalette) => ZonePalette) {
     setTheme(prev => ({
@@ -123,63 +117,79 @@ function ZoneEditor({ zoneKey, role }: { zoneKey: ZoneKey; role: Role }) {
 
   return (
     <div className="themeZoneEditor">
-      <label className="themeStartRow">
-        <span>Starts at</span>
-        <select
-          value={zone.startMinute}
-          onChange={e => setTheme(prev => ({
-            ...prev,
-            zones: { ...prev.zones, [zoneKey]: { ...prev.zones[zoneKey], startMinute: Number(e.target.value) } },
-          }))}
-        >
-          {START_OPTIONS.map(m => <option key={m} value={m}>{formatMinute(m)}</option>)}
-        </select>
+      <div className="themeStartRow">
+        <label>
+          <span>Starts at</span>
+          <select
+            value={zone.startMinute}
+            onChange={e => setTheme(prev => ({
+              ...prev,
+              zones: { ...prev.zones, [zoneKey]: { ...prev.zones[zoneKey], startMinute: Number(e.target.value) } },
+            }))}
+          >
+            {START_OPTIONS.map(m => <option key={m} value={m}>{formatMinute(m)}</option>)}
+          </select>
+        </label>
         <small>until the next zone starts</small>
-      </label>
+        {copySources.length > 0 && (
+          <label className="themeCopy">
+            <span>Copy colors from</span>
+            <select
+              value="" aria-label="Copy colors from another zone"
+              onChange={e => { if (e.target.value) setTheme(prev => copyPalette(prev, e.target.value as ZoneKey, zoneKey)) }}
+            >
+              <option value="">Choose a zone…</option>
+              {copySources.map(k => <option key={k} value={k}>{ZONE_LABEL[k]}</option>)}
+            </select>
+          </label>
+        )}
+      </div>
 
       {COLOR_ROWS.filter(row => !row.adminOnly || role === 'admin').map(row => {
         const range = legalRange(pal, row.key)
+        const light = derivedShades(pal, row.key)[0].color.l
+        const { h, s } = pal[row.key]
         return (
-          <fieldset key={row.key} className="themeColorGroup">
-            <legend>
+          <section key={row.key} className="themeColor">
+            <div className="themeColorHead">
               <span className="themeSwatch" style={{ backgroundColor: swatchColor(vars, row.key) }} />
-              {row.label} <small>{row.hint}</small>
-            </legend>
-            <SliderRow
-              label="Hue" value={pal[row.key].h} min={0} max={360} unit="°" track={HUE_TRACK}
-              onChange={h => updatePalette(p => editHue(p, row.key, h))}
-            />
-            <SliderRow
-              label="Saturation" value={pal[row.key].s} min={range.min} max={range.max} unit="%"
-              onChange={s => updatePalette(p => editSaturation(p, row.key, s))}
-            />
-          </fieldset>
+              <strong>{row.label}</strong> <small>{row.hint}</small>
+            </div>
+            <Palette pal={pal} colorKey={row.key} />
+            <SliderRow label="Hue" unit="°" value={h}>
+              <ColorRange
+                label={`${row.label} hue`} kind="hue" value={h} sat={s} light={light} live
+                onChange={v => updatePalette(p => editHue(p, row.key, v))}
+              />
+            </SliderRow>
+            <SliderRow label="Saturation" unit="%" value={s}>
+              <ColorRange
+                label={`${row.label} saturation`} kind="saturation" value={s} min={range.min} max={range.max} hue={h} light={light} live
+                onChange={v => updatePalette(p => editSaturation(p, row.key, v))}
+              />
+            </SliderRow>
+          </section>
         )
       })}
 
-      <fieldset className="themeColorGroup">
-        <legend>Brightness <small>text switches between light and dark automatically</small></legend>
-        <SliderRow
-          label="Brightness" value={pal.brightness} min={0} max={100} unit="%"
-          onChange={b => updatePalette(p => editBrightness(p, b))}
-        />
+      <section className="themeColor">
+        <div className="themeColorHead">
+          <strong>Brightness</strong> <small>text switches between light and dark automatically</small>
+        </div>
+        <SliderRow label="Brightness" unit="%" value={pal.brightness}>
+          <ColorRange
+            label="Brightness" kind="brightness" value={pal.brightness} hue={pal.theme.h} sat={pal.theme.s} live
+            onChange={b => updatePalette(p => editBrightness(p, b))}
+          />
+        </SliderRow>
         <div className="themeBand" aria-hidden="true" title="Between the two limits the theme cannot show readable text, so it snaps to the nearer side">
           <span style={{ left: `${band.maxLight}%`, width: `${Math.max(0, band.minDark - band.maxLight)}%` }} />
         </div>
         {effective !== pal.brightness && <p className="themeNote">Shown as {effective}% so text stays readable.</p>}
-      </fieldset>
+      </section>
 
       {zoneKey !== 'day' && (
         <div className="themeZoneActions">
-          <button
-            type="button" className="themeBtn"
-            onClick={() => setTheme(prev => ({
-              ...prev,
-              zones: { ...prev.zones, [zoneKey]: { ...prev.zones[zoneKey], palette: JSON.parse(JSON.stringify(prev.zones.day.palette)) } },
-            }))}
-          >
-            Reset from Day
-          </button>
           <button type="button" className="themeBtn" onClick={() => setTheme(prev => disableZone(prev, zoneKey))}>
             Stop using this zone
           </button>
@@ -189,7 +199,8 @@ function ZoneEditor({ zoneKey, role }: { zoneKey: ZoneKey; role: Role }) {
   )
 }
 
-// The full theme customization tool (UUI Dashboard > Settings).
+// The full theme customization tool (UUI Dashboard > Settings), all in one
+// card with its sections divided by thin rules.
 function ThemeSettingsPanel() {
   const { theme, ui } = useSettings()
   const { effectiveRole } = useThemeState()
@@ -207,70 +218,76 @@ function ThemeSettingsPanel() {
   const canViewAs = CURRENT_USER.role === 'admin'
 
   return (
-    <div className="themeSettings">
+    <div className="themeSettings themeCard">
       <div className="themeHeader">
         <h2>Theme</h2>
         <SaveControl status={saveStatus} onSave={() => { void saveSettingsNow() }} onRestore={restoreSettings} buttonClassName="themeBtn themeBtn--primary" />
       </div>
 
-      <div className="themeRow">
-        <label className="themeSwitch">
-          <input
-            type="checkbox" role="switch" checked={theme.timeBasedEnabled}
-            onChange={e => setTheme(prev => ({ ...prev, timeBasedEnabled: e.target.checked }))}
-          />
-          <span>Change theme by time of day</span>
-        </label>
-        <small>{theme.timeBasedEnabled ? 'Following the schedule below.' : 'Off - the Day palette is used.'}</small>
-      </div>
-
-      {canViewAs && (
+      <div className="themeSection">
         <div className="themeRow">
-          <span className="themeRowLabel">View as</span>
-          <div className="themeSegmented" role="group" aria-label="View as">
-            {(['user', 'admin'] as const).map(role => (
-              <button
-                key={role} type="button"
-                className={effectiveRole === role ? 'themeSegBtn themeSegBtn--active' : 'themeSegBtn'}
-                aria-pressed={effectiveRole === role}
-                onClick={() => setUi(prev => ({ ...prev, viewAs: role === CURRENT_USER.role ? null : role }))}
-              >
-                {role === 'user' ? 'User' : 'Admin'}
-              </button>
-            ))}
-          </div>
-          <small>{ui.viewAs ? 'Previewing the other role.' : 'Your own role.'}</small>
+          <label className="themeSwitch">
+            <input
+              type="checkbox" role="switch" checked={theme.timeBasedEnabled}
+              onChange={e => setTheme(prev => ({ ...prev, timeBasedEnabled: e.target.checked }))}
+            />
+            <span>Change theme by time of day</span>
+          </label>
+          <small>{theme.timeBasedEnabled ? 'Following the schedule below.' : 'Off - the Day palette is used.'}</small>
         </div>
-      )}
 
-      <Timeline />
-
-      <div className="themeZoneTabs" role="tablist" aria-label="Time zones">
-        {ZONE_KEYS.map(key => {
-          const Icon = ZONE_ICON[key]
-          const on = theme.zones[key].configured
-          return (
-            <button
-              key={key} type="button" role="tab" aria-selected={selected === key}
-              className={`themeZoneTab${selected === key ? ' themeZoneTab--active' : ''}${on ? '' : ' themeZoneTab--off'}`}
-              onClick={() => setSelected(key)}
-            >
-              <Icon size={16} /> {ZONE_LABEL[key]}
-            </button>
-          )
-        })}
+        {canViewAs && (
+          <div className="themeRow">
+            <span className="themeRowLabel">View as</span>
+            <div className="themeSegmented" role="group" aria-label="View as">
+              {(['user', 'admin'] as const).map(role => (
+                <button
+                  key={role} type="button"
+                  className={effectiveRole === role ? 'themeSegBtn themeSegBtn--active' : 'themeSegBtn'}
+                  aria-pressed={effectiveRole === role}
+                  onClick={() => setUi(prev => ({ ...prev, viewAs: role === CURRENT_USER.role ? null : role }))}
+                >
+                  {role === 'user' ? 'User' : 'Admin'}
+                </button>
+              ))}
+            </div>
+            <small>{ui.viewAs ? 'Previewing the other role.' : 'Your own role.'}</small>
+          </div>
+        )}
       </div>
 
-      {configured ? (
-        <ZoneEditor key={selected} zoneKey={selected} role={effectiveRole} />
-      ) : (
-        <div className="themeZoneOff">
-          <p>{ZONE_LABEL[selected]} is not in use. Turn it on to give it its own colors and start time.</p>
-          <button type="button" className="themeBtn themeBtn--primary" onClick={() => setTheme(prev => enableZone(prev, selected))}>
-            Use {ZONE_LABEL[selected]}
-          </button>
+      <div className="themeSection">
+        <Timeline selected={selected} />
+      </div>
+
+      <div className="themeSection">
+        <div className="themeZoneTabs" role="tablist" aria-label="Time zones">
+          {ZONE_KEYS.map(key => {
+            const Icon = ZONE_ICON[key]
+            const on = theme.zones[key].configured
+            return (
+              <button
+                key={key} type="button" role="tab" aria-selected={selected === key}
+                className={`themeZoneTab${selected === key ? ' themeZoneTab--active' : ''}${on ? '' : ' themeZoneTab--off'}`}
+                onClick={() => setSelected(key)}
+              >
+                <Icon size={16} /> {ZONE_LABEL[key]}
+              </button>
+            )
+          })}
         </div>
-      )}
+
+        {configured ? (
+          <ZoneEditor key={selected} zoneKey={selected} role={effectiveRole} />
+        ) : (
+          <div className="themeZoneOff">
+            <p>{ZONE_LABEL[selected]} is not in use. Turn it on to give it its own colors and start time.</p>
+            <button type="button" className="themeBtn themeBtn--primary" onClick={() => setTheme(prev => enableZone(prev, selected))}>
+              Use {ZONE_LABEL[selected]}
+            </button>
+          </div>
+        )}
+      </div>
     </div>
   )
 }

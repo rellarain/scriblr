@@ -1,8 +1,10 @@
 // The Writer page (WUI). All classes are prefixed `wr` and scoped under
 // `.wUI.wr`; colors come from the app's theme/accent/alert variables.
 
-.wUI.wr {
-  // Aliases onto the global theme tokens (theme/theme.scss), so the Writer follows the time-of-day palette.
+// Aliases onto the global theme tokens (theme/theme.scss), so the Writer follows the
+// time-of-day palette. Also declared inside a book's scope (BookScope.tsx), where the
+// tokens are re-derived from the book's hues.
+@mixin wrAliases {
   --wr-accent: var(--accent);
   --wr-accent-light: var(--accent-hover);
   --wr-accent-dark: var(--accent-dim);
@@ -18,6 +20,10 @@
   --wr-page-line: var(--paper-line);
   --wr-page-soft: var(--paper-soft);
   --wr-page-muted: var(--paper-muted);
+}
+
+.wUI.wr {
+  @include wrAliases;
 
   flex-direction: row;
   color: var(--ink);
@@ -134,6 +140,10 @@
 
   // ---------------------------------------------------------------- main
   .wrMain { flex: 1 1 auto; min-width: 0; height: 100%; display: flex; flex-direction: row; }
+  // A book's editors (BookScope.tsx): the tokens are re-derived from the book's hues. The
+  // page background and icon column behind them stay the user's own theme background.
+  .wrBookScope { @include wrAliases; color: var(--ink); }
+  .wrBookScope--flow { display: contents; }
   .wrIconColumn { flex: 0 0 52px; box-sizing: border-box; height: 100%; padding: 12px 10px; display: flex; flex-direction: column; gap: 6px; }
   .wrIconColumnTail { margin-top: auto; display: flex; flex-direction: column; gap: 6px; }
   .wrIconBtn {
@@ -201,11 +211,16 @@
     &--active { background: var(--wr-accent); font-weight: 700; &:hover { background: var(--wr-accent); } }
   }
   .wrNavChevron { display: inline-flex; flex: 0 0 auto; transition: transform 0.15s; }
-  .wrNavMark { width: 4px; height: 14px; border-radius: 2px; background: hsl(var(--color-theme-h), 38%, 62%); flex: 0 0 auto; }
+  .wrNavMark { width: 4px; height: 14px; border-radius: 2px; background: var(--wr-node-color, hsl(var(--color-theme-h), 38%, 62%)); flex: 0 0 auto; }
   .wrNavLabel { flex: 1; min-width: 0; text-align: left; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
   .wrNavCount { font-size: 11px; opacity: 0.7; }
   .wrPlotBody { flex: 1 1 auto; min-width: 0; min-height: 0; display: flex; flex-direction: column; gap: 10px; overflow: auto; scrollbar-width: none; &::-webkit-scrollbar { display: none; } }
 
+  // The plot colour coding: the category (theme colour) and subcategory (accent colour) squares,
+  // and a stripe down the left edge of a coloured card in the node's own colour.
+  .wrColorTrail { display: inline-flex; gap: 3px; flex: 0 0 auto; }
+  .wrColorDot { display: inline-block; width: 8px; height: 8px; border-radius: 2px; box-shadow: 0 0 0 1px rgb(255 255 255 / 0.25); }
+  .wrCardPanel.wrCardPanel--colored { box-shadow: inset 4px 0 0 var(--wr-node-color, transparent), 0 4px 14px rgb(0 0 0 / calc(0.3 * var(--shade-k))); }
   .wrCardPanel { background: var(--wr-card); border-radius: 8px; padding: 16px 18px; box-shadow: 0 4px 14px rgb(0 0 0 / calc(0.3 * var(--shade-k))); display: flex; flex-direction: column; gap: 12px; }
   .wrCardPanelHead { display: flex; align-items: center; gap: 10px; }
   .wrKindBadge { font-size: 10px; text-transform: uppercase; letter-spacing: 0.5px; opacity: 0.7; flex: 0 0 auto; }
@@ -223,7 +238,7 @@
   .wrFieldRow { display: flex; align-items: center; gap: 10px; > span { width: 88px; flex: 0 0 auto; font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: 1px; opacity: 0.65; } .wrField { padding: 6px 10px; font-size: 12px; } }
   .wrUnassigned { flex: 1 1 auto; min-height: 0; display: flex; flex-direction: column; gap: 8px; background: rgb(0 0 0 / calc(0.16 * var(--shade-k))); border-radius: 8px; padding: 12px 14px; &--over { outline: 2px dashed var(--wr-accent-light); outline-offset: 3px; } }
   .wrPointList { flex: 1 1 auto; min-height: 0; overflow-y: auto; display: flex; flex-direction: column; gap: 6px; scrollbar-width: none; &::-webkit-scrollbar { display: none; } }
-  .wrPoint { display: flex; align-items: flex-start; gap: 8px; padding: 8px 10px; border-radius: 4px; background: rgb(0 0 0 / calc(0.25 * var(--shade-k))); border-left: 3px solid var(--wr-alert); &--dragging { opacity: 0.35; } }
+  .wrPoint { display: flex; align-items: flex-start; gap: 8px; padding: 8px 10px; border-radius: 4px; background: rgb(0 0 0 / calc(0.25 * var(--shade-k))); border-left: 3px solid var(--wr-node-color, var(--wr-alert)); &--dragging { opacity: 0.35; } }
   .wrPointSection { display: flex; align-items: baseline; gap: 8px; margin-top: 4px; font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: 1px; opacity: 0.6; span { font-weight: 400; } &:first-child { margin-top: 0; } }
   .wrPointTarget { display: flex; align-items: center; gap: 6px; font-size: 10px; min-height: 16px; }
   .wrPointChapter { flex: 1 1 auto; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 10px; font-weight: 700; letter-spacing: 0.3px; opacity: 0.75; text-align: left; }
@@ -293,8 +308,18 @@
   .wrCoverSelect { box-sizing: border-box; width: 100%; background: var(--wr-cover-field); border: 0; border-radius: 4px; color: white; font-size: 13px; padding: 8px 10px; outline: none; option { color: black; } }
   .wrCoverRow { display: flex; gap: 14px; }
   .wrCoverSummary { display: flex; flex-direction: column; gap: 10px; }
-  .wrSwatches { display: flex; flex-wrap: wrap; gap: 5px; }
-  .wrSwatch { width: 22px; height: 22px; border-radius: 4px; box-shadow: 0 0 0 1px rgba(255, 255, 255, 0.3); &--active { box-shadow: 0 0 0 2px white; } }
+  // The book's two colour selectors (ColorRange.tsx) under the summary.
+  .wrCoverColors { display: flex; flex-direction: column; gap: 8px; }
+  .wrColorRow { display: grid; grid-template-columns: 132px minmax(0, 1fr); align-items: center; gap: 12px; }
+  .wrColorLabel { font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: 1px; color: var(--wr-cover-label); }
+  .wrColorToggle { display: inline-flex; align-items: center; gap: 8px; cursor: pointer; }
+  .wrColorToggle input {
+    position: relative; flex: 0 0 auto; width: 30px; height: 16px; border-radius: 8px; background: rgba(0, 0, 0, 0.4); cursor: pointer; transition: background 0.15s;
+    &::after { content: ''; position: absolute; top: 2px; left: 2px; width: 12px; height: 12px; border-radius: 50%; background: white; transition: transform 0.15s; }
+    &:checked { background: var(--wr-accent); }
+    &:checked::after { transform: translateX(14px); }
+    &:focus-visible { outline: 2px solid var(--wr-cover-hint); outline-offset: 2px; }
+  }
   .wrCoverChapters { display: flex; flex-direction: column; gap: 8px; }
   .wrCoverChaptersHead { display: flex; align-items: center; justify-content: space-between; span:first-child { font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: 1px; color: var(--wr-cover-label); } }
   .wrCoverMuted { margin: 0; font-size: 12px; color: var(--wr-cover-label); }
@@ -330,11 +355,13 @@
   // A plotpoint tile: dark, so it stands out from the (light) card it sits in.
   .wrPointTile {
     display: flex; flex-direction: column; gap: 3px; padding: 5px; border-radius: 6px; background: var(--wr-card); color: var(--ink);
-    box-shadow: 0 2px 6px rgb(0 0 0 / calc(0.25 * var(--shade-k))); text-align: left;
+    box-shadow: inset 3px 0 0 var(--wr-node-color, transparent), 0 2px 6px rgb(0 0 0 / calc(0.25 * var(--shade-k))); text-align: left;
     &--draggable { cursor: grab; }
     &--dragging { opacity: 0.35; }
   }
   .wrPointTileTop { display: flex; align-items: center; justify-content: flex-end; gap: 6px; min-height: 14px; }
+  .wrPointTileTrail .wrColorDot { margin: 0 3px 0 0; vertical-align: -1px; }
+  .wrPointTileSep { opacity: 0.6; }
   .wrPointTileTrail { flex: 1 1 auto; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; text-align: right; font-size: 9px; letter-spacing: 0.3px; color: var(--ink-faint); }
   .wrPointTileX { display: inline-flex; align-items: center; justify-content: center; width: 16px; height: 16px; flex: 0 0 auto; border-radius: 3px; opacity: 0.55; &:hover { opacity: 1; background: var(--ov-lift-2); } }
   .wrPointTileLine { font-size: 11px; line-height: 1.35; color: color-mix(in srgb, var(--ink) 80%, transparent); overflow-wrap: anywhere; }
