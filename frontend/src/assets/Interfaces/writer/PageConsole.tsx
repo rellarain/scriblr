@@ -1,5 +1,7 @@
+import type { ComponentType } from 'react'
 import type { OutlineNode } from '../../../api/types'
 import type { ChapterMode, WriterWorkspace } from './useWriterWorkspace'
+import { ListIcon, PencilIcon, EyeIcon, type IconProps } from '../../icons'
 import { HELP_COMPONENT, PAGE_COMPONENTS, SETTINGS_COMPONENT } from './consoleDefs'
 import { ChapterTabs, ConsoleTitleRow, Placeholder } from './shared'
 import { useChapterDraft } from './useChapterDraft'
@@ -14,20 +16,22 @@ export function ChapterModeButtons({ mode, hasDraft, onMode, onPreview }: {
   onMode: (mode: ChapterMode) => void
   onPreview: () => void
 }) {
-  const btn = (key: ChapterMode | 'preview', label: string, onClick: () => void, disabled = false, title?: string) => (
+  // Icons only; the selected one expands to show its name.
+  const btn = (key: ChapterMode | 'preview', label: string, Icon: ComponentType<IconProps>, onClick: () => void, disabled = false, title = label) => (
     <button
-      key={key} type="button" disabled={disabled} title={title}
+      key={key} type="button" disabled={disabled} title={title} aria-label={label}
       className={mode === key ? 'wrSegBtn wrSegBtn--active' : 'wrSegBtn'} aria-pressed={mode === key}
       onClick={onClick}
     >
-      {label}
+      <Icon size={16} />
+      <span className="wrSegLabel">{label}</span>
     </button>
   )
   return (
     <div className="wrSegmented" role="group" aria-label="Chapter mode">
-      {btn('outline', 'Outline', () => onMode('outline'))}
-      {btn('draft', 'Draft', () => onMode('draft'))}
-      {btn('preview', 'Preview', onPreview, !hasDraft, hasDraft ? undefined : 'Write some draft text to preview it')}
+      {btn('outline', 'Outline', ListIcon, () => onMode('outline'))}
+      {btn('draft', 'Draft', PencilIcon, () => onMode('draft'))}
+      {btn('preview', 'Preview', EyeIcon, onPreview, !hasDraft, hasDraft ? 'Preview' : 'Write some draft text to preview it')}
     </div>
   )
 }

@@ -11,14 +11,24 @@ import { DeleteControl } from './shared'
 // selected level (Project, then Book, then Chapter) that only appears once
 // that kind of object is selected.
 
-const SPINE_HEIGHTS = [100, 84, 94, 88]
+const SPINE_HEIGHT = 100
 
-function Spine({ book, index, active, onOpen }: { book: OutlineNode; index: number; active: boolean; onOpen: () => void }) {
+// A spine's width reflects the book's length: 5px for every 20,000 words of
+// its word-count goal. A book with a tiny (or no) goal still gets a sliver so
+// it stays on the shelf.
+const SPINE_PX_PER_20K_WORDS = 5
+const SPINE_MIN = 10
+export function spineWidth(goal: number | null | undefined): number {
+  const width = Math.round(((goal && goal > 0 ? goal : 0) / 20000) * SPINE_PX_PER_20K_WORDS)
+  return Math.max(SPINE_MIN, width)
+}
+
+function Spine({ book, active, onOpen }: { book: OutlineNode; active: boolean; onOpen: () => void }) {
   return (
     <button
       type="button"
       className={active ? 'wrSpine wrSpine--active' : 'wrSpine'}
-      style={{ height: SPINE_HEIGHTS[index % SPINE_HEIGHTS.length], ...(book.color ? { backgroundColor: book.color } : {}) }}
+      style={{ height: SPINE_HEIGHT, width: spineWidth(book.wordCountGoal), ...(book.color ? { backgroundColor: book.color } : {}) }}
       onClick={onOpen}
       title={book.title}
     >
@@ -47,10 +57,10 @@ function Shelf({ label, meta, books, activeBookId, selected, onOpenBook, onOpen,
         <span className="wrShelfMeta">{meta}</span>
         {right}
       </div>
-      <div className="wrShelfBooks">
+      <div className={activeBookId ? 'wrShelfBooks wrShelfBooks--picked' : 'wrShelfBooks'}>
         {books.length === 0 && <span className="wrShelfEmpty">No books yet</span>}
-        {books.map((b, i) => (
-          <Spine key={b.id} book={b} index={i} active={b.id === activeBookId} onOpen={() => onOpenBook(b.id)} />
+        {books.map(b => (
+          <Spine key={b.id} book={b} active={b.id === activeBookId} onOpen={() => onOpenBook(b.id)} />
         ))}
       </div>
       <div className="wrShelfBoard" />

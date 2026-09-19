@@ -437,3 +437,10 @@ export function FlagIcon(props: IconProps) {
 export function SentenceIcon(props: IconProps) {
   return <IconBase {...props}><path d="M4 8h16M4 12h10M4 16h13" /></IconBase>
 }
+
+export function EyeIcon(props: IconProps) {
+  return <IconBase {...props}>
+    <path d="M2 12s3.6-6.5 10-6.5S22 12 22 12s-3.6 6.5-10 6.5S2 12 2 12Z" />
+    <circle cx="12" cy="12" r="3" />
+  </IconBase>
+}

@@ -42,7 +42,7 @@
     &--accent { background: var(--wr-accent); }
     &--light { background: hsl(35, 18%, 88%); color: var(--wr-ink); &:hover:not(:disabled) { background: hsl(32, 90%, 86%); } }
   }
-  .wrLinkBtn { font-size: 11px; opacity: 0.8; text-decoration: underline; &:hover { opacity: 1; } &--title { font-size: 14px; font-weight: 700; text-decoration: none; opacity: 1; } }
+  .wrLinkBtn { font-size: 11px; opacity: 0.8; &:hover { opacity: 1; } &--title { font-size: 14px; font-weight: 700; opacity: 1; } }
 
   // A quiet trash icon; on confirm the message replaces it in place.
   .wrTrashBtn {
@@ -60,6 +60,7 @@
     display: inline-flex; align-items: center; cursor: grab; opacity: 0.55; flex: 0 0 auto; padding: 2px;
     &:hover { opacity: 1; }
     &--light { color: hsl(var(--color-theme-h), 8%, 40%); }
+    &--cover { color: var(--wr-cover-label); }
   }
 
   .wrChipRow { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; }
@@ -91,19 +92,20 @@
 
   .wrShelf { display: flex; flex-direction: column; gap: 5px; }
   .wrShelfHeader { display: flex; align-items: center; gap: 8px; padding: 0 2px; }
-  .wrShelfName--link { text-align: left; &:hover { color: white; text-decoration: underline; } }
+  .wrShelfName--link { text-align: left; &:hover { color: white; } }
   .wrShelfName { font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 1px; color: var(--wr-muted); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; &--selected { color: white; } }
   .wrShelfMeta { font-size: 10px; opacity: 0.6; margin-right: auto; white-space: nowrap; }
   .wrShelfBooks { display: flex; align-items: flex-end; gap: 5px; padding: 0 8px; min-height: 104px; overflow-x: auto; scrollbar-width: none; &::-webkit-scrollbar { display: none; } }
   .wrShelfEmpty { font-size: 11px; opacity: 0.6; align-self: center; }
-  .wrShelfBoard { height: 8px; background: linear-gradient(180deg, rgba(0, 0, 0, 0.5), rgba(0, 0, 0, 0.25)); border-radius: 0 0 2px 2px; }
+  .wrShelfBoard { margin-top: -5px; height: 8px; background: linear-gradient(180deg, rgba(0, 0, 0, 0.5), rgba(0, 0, 0, 0.25)); border-radius: 0 0 2px 2px; }
   .wrSpine {
-    flex: 0 0 auto; width: 30px; border-radius: 3px 3px 0 0; background: var(--wr-accent-dark); color: white; padding: 8px 2px;
+    flex: 0 0 auto; width: 30px; border-radius: 0; background: var(--wr-accent-dark); color: white; padding: 8px 2px;
     display: flex; align-items: center; justify-content: center; writing-mode: vertical-rl; font-size: 11px; font-weight: 700; letter-spacing: 0.3px;
     box-shadow: 1px 0 3px rgba(0, 0, 0, 0.35); overflow: hidden;
     &:hover { filter: brightness(1.15); }
-    &--active { background: var(--wr-accent); box-shadow: 0 0 0 2px white; }
   }
+  // With a book open, the other spines on the shelf are darkened.
+  .wrShelfBooks--picked .wrSpine:not(.wrSpine--active) { filter: brightness(0.55); &:hover { filter: brightness(0.8); } }
   .wrNewProject {
     display: flex; flex-direction: column; gap: 6px;
     input { background: var(--wr-field); border: 0; border-radius: 4px; color: white; font-size: 12px; padding: 8px 10px; outline: none; &::placeholder { color: rgba(255, 255, 255, 0.45); } }
@@ -113,7 +115,7 @@
   .wrPanel { background: rgba(0, 0, 0, 0.2); border-radius: 4px; }
   .wrPanelHeaderRow { display: flex; align-items: center; padding-right: 10px; }
   .wrPanelHeader { display: flex; align-items: center; gap: 8px; flex: 1 1 auto; min-width: 0; padding: 8px 10px; text-align: left; }
-  .wrPanelValue--link { flex: 0 1 auto; min-width: 0; margin-left: auto; padding: 8px 0; text-decoration: underline; text-underline-offset: 2px; &:hover { opacity: 0.8; } }
+  .wrPanelValue--link { flex: 0 1 auto; min-width: 0; margin-left: auto; padding: 8px 0; &:hover { opacity: 0.8; } }
   .wrPanelLabel { font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: 1px; opacity: 0.7; }
   .wrPanelValue { font-size: 12px; font-weight: 600; margin-left: auto; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
   .wrPanelBody { padding: 0 12px 12px 12px; display: flex; flex-direction: column; gap: 5px; font-size: 12px; line-height: 1.4; }
@@ -149,7 +151,10 @@
   .wrPlaceholder { padding: 6px 2px; h2 { font-size: 15px; margin: 0 0 6px; text-transform: uppercase; letter-spacing: 1px; } p { font-size: 13px; opacity: 0.85; margin: 0; } }
 
   .wrSegmented { display: flex; padding: 3px; gap: 3px; background: var(--wr-field); border-radius: 4px; }
-  .wrSegBtn { padding: 5px 12px; border-radius: 3px; font-size: 12px; font-weight: 700; &--active { background: var(--wr-accent); } &:disabled { opacity: 0.4; cursor: default; } }
+  .wrSegBtn { display: inline-flex; align-items: center; padding: 6px 8px; border-radius: 3px; font-size: 12px; font-weight: 700; &--active { background: var(--wr-accent); } &:hover:not(:disabled):not(.wrSegBtn--active) { background: rgba(255, 255, 255, 0.1); } &:disabled { opacity: 0.4; cursor: default; } }
+  // The label is hidden until its button is selected, then slides open.
+  .wrSegLabel { max-width: 0; margin-left: 0; opacity: 0; overflow: hidden; white-space: nowrap; transition: max-width 0.25s ease, margin-left 0.25s ease, opacity 0.2s ease; }
+  .wrSegBtn--active .wrSegLabel { max-width: 80px; margin-left: 6px; opacity: 1; }
 
   // ---------------------------------------------------------------- dashboard
   .wrColumns { flex: 1 1 auto; min-height: 0; display: flex; gap: 18px; &--single { .wrColumn { max-width: 640px; } } }
@@ -229,29 +234,47 @@
   }
   .wrChapterTabs--page .wrChapterTab--active { width: 38px; margin-left: 0; background: var(--wr-page); color: var(--wr-ink); box-shadow: none; }
   .wrChapterTabs--cover { padding-top: 40px; .wrChapterTab { background: color-mix(in srgb, var(--wr-cover) 62%, white); } .wrChapterTab--add { background: rgba(0, 0, 0, 0.25); } .wrChapterTab--active { width: 38px; margin-left: 0; background: var(--wr-accent); } }
+  .wrCoverWrap--light .wrChapterTabs--cover .wrChapterTab:not(.wrChapterTab--active):not(.wrChapterTab--add) { color: var(--wr-cover-label); }
 
   // ---------------------------------------------------------------- book cover
+  .wrCoverWrap {
+    --wr-cover-label: color-mix(in srgb, var(--wr-cover) 40%, white); --wr-cover-title: color-mix(in srgb, var(--wr-cover) 25%, white); --wr-cover-title-shadow: 0 2px 0 rgba(0, 0, 0, 0.4);
+    --wr-cover-line: color-mix(in srgb, var(--wr-cover-label) 40%, transparent); --wr-cover-line-soft: color-mix(in srgb, var(--wr-cover-label) 20%, transparent); --wr-cover-field: rgba(0, 0, 0, 0.3);
+    // Placeholder text takes the cover's own hue, lightened to read on the dark fields.
+    --wr-cover-hint: color-mix(in srgb, var(--wr-cover) 50%, white);
+    // A light cover gets dark ink so its labels stay readable.
+    &--light { --wr-cover-label: color-mix(in srgb, var(--wr-cover) 25%, black); --wr-cover-title: color-mix(in srgb, var(--wr-cover) 25%, black); --wr-cover-title-shadow: 0 1px 0 rgba(255, 255, 255, 0.35); --wr-cover-field: rgba(0, 0, 0, 0.42); }
+  }
   .wrCoverWrap { --wr-cover: #5a3a1e; flex: 1 1 auto; min-height: 0; display: flex; }
   .wrCover { position: relative; flex: 1 1 auto; min-width: 0; height: 100%; overflow: hidden; background: linear-gradient(135deg, var(--wr-cover), color-mix(in srgb, var(--wr-cover) 65%, black)); box-shadow: 0 6px 20px rgba(0, 0, 0, 0.45); }
   .wrCoverSpine { position: absolute; left: 0; top: 0; bottom: 0; width: 34px; background: linear-gradient(90deg, rgba(0, 0, 0, 0.55), rgba(0, 0, 0, 0.25)); box-shadow: inset -2px 0 0 rgba(255, 220, 170, 0.18); }
-  .wrCoverFrame { position: absolute; left: 56px; top: 18px; right: 22px; bottom: 18px; border: 2px solid rgba(240, 200, 140, 0.32); padding: 24px 34px; display: flex; flex-direction: column; gap: 18px; overflow-y: auto; scrollbar-width: none; &::-webkit-scrollbar { display: none; } }
+  .wrCoverFrame { position: absolute; left: 56px; top: 18px; right: 22px; bottom: 18px; border: 2px solid var(--wr-cover-line); padding: 24px 34px; display: flex; flex-direction: column; gap: 18px; overflow-y: auto; scrollbar-width: none; &::-webkit-scrollbar { display: none; } }
   .wrCoverHead { display: flex; flex-direction: column; align-items: center; gap: 6px; }
-  .wrCoverTitle { width: 100%; box-sizing: border-box; text-align: center; background: transparent; border: 0; outline: none; font-family: Georgia, 'Times New Roman', serif; font-size: 44px; font-weight: 700; letter-spacing: 8px; text-transform: uppercase; color: hsl(40, 62%, 78%); text-shadow: 0 2px 0 rgba(0, 0, 0, 0.4); padding: 0; &::placeholder { color: rgba(240, 200, 140, 0.35); } }
-  .wrCoverRule { width: 220px; height: 1px; background: rgba(240, 200, 140, 0.4); }
-  .wrCoverField { display: flex; flex-direction: column; gap: 4px; flex: 1; min-width: 0; > span { font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: 1px; color: hsl(40, 38%, 68%); } input, textarea { background: rgba(0, 0, 0, 0.3); border: 0; border-radius: 4px; color: white; font-size: 13px; padding: 8px 10px; outline: none; resize: vertical; &::placeholder { color: rgba(255, 255, 255, 0.4); } &:focus { box-shadow: inset 0 0 0 1px hsl(40, 62%, 78%); } } }
+  .wrCoverTitle { width: 100%; box-sizing: border-box; text-align: center; background: transparent; border: 0; outline: none; font-family: Georgia, 'Times New Roman', serif; font-size: 44px; font-weight: 700; letter-spacing: 8px; text-transform: uppercase; color: var(--wr-cover-title); text-shadow: var(--wr-cover-title-shadow); padding: 0; &::placeholder { color: color-mix(in srgb, var(--wr-cover-title) 45%, transparent); } }
+  .wrCoverRule { width: 220px; height: 1px; background: var(--wr-cover-line); }
+  .wrCoverField { display: flex; flex-direction: column; gap: 4px; flex: 1; min-width: 0; > span { font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: 1px; color: var(--wr-cover-label); } input, textarea { background: var(--wr-cover-field); border: 0; border-radius: 4px; color: white; font-size: 13px; padding: 8px 10px; outline: none; resize: vertical; &::placeholder { color: var(--wr-cover-hint); } &:focus { box-shadow: inset 0 0 0 1px var(--wr-cover-hint); } } }
   .wrCoverRow { display: flex; gap: 14px; }
-  .wrSwatches { display: flex; gap: 6px; padding-top: 3px; }
-  .wrSwatch { width: 26px; height: 26px; border-radius: 4px; box-shadow: 0 0 0 1px rgba(255, 255, 255, 0.3); &--active { box-shadow: 0 0 0 2px white; } }
+  .wrCoverSummary { display: flex; flex-direction: column; gap: 10px; }
+  .wrSwatches { display: flex; flex-wrap: wrap; gap: 5px; }
+  .wrSwatch { width: 22px; height: 22px; border-radius: 4px; box-shadow: 0 0 0 1px rgba(255, 255, 255, 0.3); &--active { box-shadow: 0 0 0 2px white; } }
   .wrCoverChapters { display: flex; flex-direction: column; gap: 8px; }
-  .wrCoverChaptersHead { display: flex; align-items: center; justify-content: space-between; span:first-child { font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: 1px; color: hsl(40, 38%, 68%); } }
-  .wrCoverMuted { margin: 0; font-size: 12px; color: hsl(40, 38%, 68%); }
-  .wrChapterGrid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px; }
-  .wrChapterCard { background: rgba(0, 0, 0, 0.28); border-radius: 6px; padding: 12px 14px; display: flex; flex-direction: column; gap: 8px; min-width: 0; }
-  .wrChapterCardTop { display: flex; align-items: baseline; gap: 8px; }
-  .wrChapterNumber { font-size: 22px; font-weight: 700; opacity: 0.9; }
-  .wrChapterCardTitle { flex: 1; min-width: 0; background: transparent; border: 0; outline: none; color: white; font-size: 13px; font-weight: 700; padding: 0; &:focus { box-shadow: inset 0 -1px 0 var(--wr-accent); } }
-  .wrChapterCardMeta { font-size: 11px; opacity: 0.65; }
-  .wrChapterCardActions { display: flex; gap: 6px; }
+  .wrCoverChaptersHead { display: flex; align-items: center; justify-content: space-between; span:first-child { font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: 1px; color: var(--wr-cover-label); } }
+  .wrCoverMuted { margin: 0; font-size: 12px; color: var(--wr-cover-label); }
+  .wrCoverHeadActions { display: flex; gap: 6px; }
+  .wrBookStack { display: flex; flex-direction: column; gap: 10px; }
+  .wrBookArc { background: rgba(0, 0, 0, 0.24); border: 1px solid var(--wr-cover-line-soft); border-radius: 6px; padding: 10px 12px; display: flex; flex-direction: column; gap: 8px; }
+  .wrBookArcHead { display: flex; align-items: center; gap: 10px; }
+  .wrBookArcFoot { display: flex; align-items: center; justify-content: space-between; }
+  .wrBookChapter { background: rgba(0, 0, 0, 0.3); border-radius: 6px; padding: 8px 10px; display: flex; flex-direction: column; gap: 8px; min-width: 0; }
+  .wrBookChapterTop { display: flex; align-items: center; gap: 10px; }
+  .wrBookChapterTitle { flex: 1 1 0; min-width: 0; display: flex; flex-direction: column; gap: 3px; }
+  .wrBookNumber { font-size: 11px; font-weight: 700; letter-spacing: 1px; text-transform: uppercase; color: var(--wr-cover-hint); }
+  .wrBookChapterStats { display: flex; flex-wrap: wrap; gap: 4px 12px; font-size: 11px; opacity: 0.65; padding-left: 26px; span + span::before { content: '·'; margin-right: 12px; } }
+  .wrIconBtn { display: inline-flex; align-items: center; justify-content: center; width: 28px; height: 28px; border-radius: 4px; background: rgba(0, 0, 0, 0.3); color: white; &:hover { background: var(--wr-accent-light); } }
+  .wrBookActions { margin-left: auto; display: flex; align-items: center; gap: 6px; }
+  .wrBookLabel { font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 1px; color: var(--wr-cover-label); min-width: 62px; }
+  .wrBookInput { flex: 1 1 150px; min-width: 0; box-sizing: border-box; background: var(--wr-cover-field); border: 0; outline: none; color: white; font-size: 13px; padding: 6px 10px; border-radius: 4px; &::placeholder { color: var(--wr-cover-hint); } &:focus { box-shadow: inset 0 0 0 1px var(--wr-cover-hint); } }
+  .wrBookInput--chapter { flex: 0 0 auto; font-weight: 700; letter-spacing: 1.5px; }
 
   // ---------------------------------------------------------------- pages
   .wrPageWrap { flex: 1 1 auto; min-height: 0; display: flex; justify-content: center; > .wrPage { flex: 1 1 auto; max-width: 842px; } }

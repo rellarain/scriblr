@@ -1,5 +1,5 @@
 import { ApiError, api } from './client'
-import type { DraftChapter, DraftMoment } from '../types'
+import type { DraftChapter, DraftMoment, ProjectAnalytics } from '../types'
 
 // Plain-fetch counterparts of the React Query hooks in draft.ts, for the
 // Writer interface (which has no QueryClientProvider): read a whole
@@ -14,6 +14,13 @@ export async function getChapterDraft(projectId: string, chapterId: string): Pro
     }
     throw err
   }
+}
+
+// Every chapter's total draft word count in one call (from the analytics
+// roll-up), keyed by chapter id.
+export async function getChapterWordCounts(projectId: string): Promise<Record<string, number>> {
+  const analytics = await api.get<ProjectAnalytics>(`/projects/${encodeURIComponent(projectId)}/analytics`)
+  return Object.fromEntries(analytics.perChapter.map(c => [c.nodeId, c.wordCount]))
 }
 
 export function putMomentDraft(projectId: string, chapterId: string, momentId: string, body: string): Promise<DraftMoment> {

@@ -2,8 +2,9 @@ import { useEffect, useMemo, useState } from 'react'
 import type { OutlineNode } from '../../../api/types'
 import type { ChapterMode, WriterWorkspace } from './useWriterWorkspace'
 import { ChevronDownIcon, ChevronRightIcon, GripIcon, PlusIcon } from '../../icons'
-import { buildChildIndex, moveNode, rollUpWordCounts, scenesInOrder, sceneChanges, type ChildIndex } from './outlineTree'
+import { buildChildIndex, rollUpWordCounts, scenesInOrder, sceneChanges, type ChildIndex } from './outlineTree'
 import { AutoTextarea, DeleteControl } from './shared'
+import { useNodeDnd } from './useNodeDnd'
 import { countWords, formatWords } from './wordCount'
 
 // The chapter as a page of nested cards: acts contain scenes and scenes
@@ -69,8 +70,7 @@ function ChapterOutline({ w, chapter, mode, draft }: {
   draft: ChapterDraft
 }) {
   const editable = mode === 'outline'
-  const [dragId, setDragId] = useState<string | null>(null)
-  const [overId, setOverId] = useState<string | null>(null)
+  const dnd = useNodeDnd(w, editable)
 
   const index = useMemo(() => buildChildIndex(w.outlineNodes), [w.outlineNodes])
   const labels = useMemo(() => numberNodes(index, chapter.id), [index, chapter.id])
@@ -90,61 +90,15 @@ function ChapterOutline({ w, chapter, mode, draft }: {
     return { location: unique('location'), time: unique('time'), action: unique('action') }
   }, [w.outlineNodes])
 
-  // Where a drop lands: onto a shallower kind it goes inside (appended);
-  // onto its own kind it goes before that sibling. Null = not allowed here.
-  function dropMode(targetId: string): 'inside' | 'before' | null {
-    if (!dragId) return null
-    const target = w.outlineNodes.find(n => n.id === targetId)
-    const dragged = w.outlineNodes.find(n => n.id === dragId)
-    if (!target || !dragged) return null
-    const dropAs = target.kind === dragged.kind ? 'before' : 'inside'
-    return moveNode(w.outlineNodes, dragId, targetId, dropAs) ? dropAs : null
-  }
-
-  function endDrag() { setDragId(null); setOverId(null) }
-
-  const dropProps = (id: string) => !editable ? {} : {
-    onDragOver: (e: React.DragEvent) => {
-      if (!dropMode(id)) return // not a valid target: let a parent card claim it
-      e.preventDefault()
-      e.stopPropagation()
-      if (overId !== id) setOverId(id)
-    },
-    onDrop: (e: React.DragEvent) => {
-      const dropAs = dropMode(id)
-      if (!dropAs || !dragId) return
-      e.preventDefault()
-      e.stopPropagation()
-      w.moveOutlineNodeTo(dragId, id, dropAs)
-      endDrag()
-    },
-  }
-
   // Plain render functions (not components): a component defined inside this
   // one would remount its inputs on every keystroke.
-  const grip = (id: string) => {
-    if (!editable) return null
-    return (
-      <span
-        className="wrGrip wrGrip--light" draggable aria-label="Drag to reorder" title="Drag to reorder"
-        onDragStart={e => {
-          e.stopPropagation()
-          e.dataTransfer.effectAllowed = 'move'
-          e.dataTransfer.setData('text/plain', id)
-          const card = (e.currentTarget as HTMLElement).closest('[data-node]')
-          if (card) e.dataTransfer.setDragImage(card, 12, 12)
-          setDragId(id)
-        }}
-        onDragEnd={endDrag}
-      >
-        <GripIcon size={14} />
-      </span>
-    )
-  }
+  const grip = (id: string) => editable && (
+    <span className="wrGrip wrGrip--light" aria-label="Drag to reorder" title="Drag to reorder" {...dnd.gripProps(id)}>
+      <GripIcon size={14} />
+    </span>
+  )
 
-  function cardClass(base: string, id: string) {
-    return `${base}${dragId === id ? ' wrOutlineCard--dragging' : ''}${overId === id ? ' wrOutlineCard--over' : ''}${editable ? '' : ' wrOutlineCard--readonly'}`
-  }
+  const cardClass = (base: string, id: string) => `${dnd.cardClass(base, id)}${editable ? '' : ' wrOutlineCard--readonly'}`
 
   const sceneFields = (scene: OutlineNode) => {
     const at = scenes.findIndex(s => s.id === scene.id)
@@ -191,7 +145,7 @@ function ChapterOutline({ w, chapter, mode, draft }: {
     if (node.kind === 'moment') {
       const n = labels.moment.get(node.id)
       return (
-        <div key={node.id} data-node={node.id} className={cardClass('wrMomentCard wrOutlineCard', node.id)} {...dropProps(node.id)}>
+        <div key={node.id} data-node={node.id} className={cardClass('wrMomentCard wrOutlineCard', node.id)} {...dnd.dropProps(node.id)}>
           <div className="wrMomentRow">
             <span className="wrNodeHandle">{grip(node.id)}<span className="wrNodeLabel">Moment {n}</span></span>
             {editable ? (
@@ -213,7 +167,7 @@ function ChapterOutline({ w, chapter, mode, draft }: {
     if (node.kind === 'scene') {
       const n = labels.scene.get(node.id)
       return (
-        <div key={node.id} data-node={node.id} className={cardClass('wrSceneCard wrOutlineCard', node.id)} {...dropProps(node.id)}>
+        <div key={node.id} data-node={node.id} className={cardClass('wrSceneCard wrOutlineCard', node.id)} {...dnd.dropProps(node.id)}>
           <div className="wrSceneHead">
             <span className="wrNodeHandle">{grip(node.id)}<span className="wrNodeLabel">Scene {n}</span></span>
             {sceneFields(node)}
@@ -228,7 +182,7 @@ function ChapterOutline({ w, chapter, mode, draft }: {
     if (node.kind === 'act') {
       const n = labels.act.get(node.id)
       return (
-        <div key={node.id} data-node={node.id} className={cardClass('wrActCard wrOutlineCard', node.id)} {...dropProps(node.id)}>
+        <div key={node.id} data-node={node.id} className={cardClass('wrActCard wrOutlineCard', node.id)} {...dnd.dropProps(node.id)}>
           <div className="wrActHead">
             <span className="wrNodeHandle">{grip(node.id)}<span className="wrNodeLabel">Act {n}</span></span>
             {editable ? (
@@ -253,7 +207,7 @@ function ChapterOutline({ w, chapter, mode, draft }: {
   const children = index.get(chapter.id) ?? []
 
   return (
-    <div className="wrPage wrPage--outline" {...dropProps(chapter.id)}>
+    <div className="wrPage wrPage--outline" {...dnd.dropProps(chapter.id)}>
       <div className="wrPageHead">
         <span className="wrPageKicker">Chapter {chapterNumber}</span>
         {editable ? (
