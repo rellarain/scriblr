@@ -67,12 +67,37 @@ export function scenesInOrder(nodes: OutlineNode[], chapterId: string): OutlineN
 
 export interface SceneChanges { location: boolean; time: boolean; action: boolean }
 
-// Which of a scene's fields differ from the previous scene. The first scene
-// has nothing to compare against and an empty value is never highlighted.
-export function sceneChanges(scene: OutlineNode, previous: OutlineNode | undefined): SceneChanges {
+// What an empty scene field takes from the scenes before it (display only,
+// never stored): per field, the value of the nearest earlier scene that has
+// one, so a run of empty scenes all inherit the same earlier value.
+export interface InheritedScene {
+  location?: string
+  action?: string
+  timeValue?: Record<string, number>
+}
+
+const hasText = (text: string | undefined): text is string => text !== undefined && text.trim() !== ''
+
+// The values scene `at` inherits from scenes[0..at-1] (the chapter's scenes in order).
+export function inheritedSceneValues(scenes: OutlineNode[], at: number): InheritedScene {
+  const out: InheritedScene = {}
+  for (let i = at - 1; i >= 0; i -= 1) {
+    const s = scenes[i]
+    if (out.location === undefined && hasText(s.location)) out.location = s.location
+    if (out.action === undefined && hasText(s.action)) out.action = s.action
+    if (out.timeValue === undefined && hasTime(s.timeValue)) out.timeValue = s.timeValue
+    if (out.location !== undefined && out.action !== undefined && out.timeValue !== undefined) break
+  }
+  return out
+}
+
+// Which of a scene's fields changed: it has a value of its own that differs
+// from what it inherits. An empty field only inherits (never a change), and
+// with nothing earlier to compare against nothing is a change.
+export function sceneChanges(scene: OutlineNode, inherited: InheritedScene): SceneChanges {
   const differs = (key: 'location' | 'action') =>
-    Boolean(previous) && Boolean(scene[key]) && scene[key] !== previous![key]
-  const timeDiffers = Boolean(previous) && hasTime(scene.timeValue) && timeChanged(scene.timeValue, previous!.timeValue)
+    hasText(scene[key]) && inherited[key] !== undefined && scene[key] !== inherited[key]
+  const timeDiffers = hasTime(scene.timeValue) && inherited.timeValue !== undefined && timeChanged(scene.timeValue, inherited.timeValue)
   return { location: differs('location'), time: timeDiffers, action: differs('action') }
 }
 

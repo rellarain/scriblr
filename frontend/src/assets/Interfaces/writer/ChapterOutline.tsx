@@ -2,7 +2,9 @@ import { useEffect, useMemo, useState } from 'react'
 import type { OutlineNode, PlotNode } from '../../../api/types'
 import type { ChapterMode, WriterWorkspace } from './useWriterWorkspace'
 import { ChevronDownIcon, ChevronRightIcon, GripIcon, PlusIcon } from '../../icons'
-import { buildChildIndex, nearestOfKind, rollUpWordCounts, scenesInOrder, sceneChanges, type ChildIndex } from './outlineTree'
+import {
+  buildChildIndex, inheritedSceneValues, nearestOfKind, rollUpWordCounts, scenesInOrder, sceneChanges, type ChildIndex,
+} from './outlineTree'
 import { SceneTime } from './SceneTime'
 import { PlotpointTile } from './PlotpointTile'
 import { formatTime, hasTime, systemForBook } from './timeSystem'
@@ -141,12 +143,6 @@ function ChapterOutline({ w, chapter, mode, draft, plotDrag }: {
   }, [draft.bodies, index, chapter.id])
   const words = (id: string) => wordCounts.get(id) ?? 0
 
-  const options = useMemo(() => {
-    const unique = (key: 'location' | 'action') =>
-      [...new Set(w.outlineNodes.filter(n => n.kind === 'scene').map(n => n[key] ?? '').filter(Boolean))]
-    return { location: unique('location'), action: unique('action') }
-  }, [w.outlineNodes])
-
   // The time system this chapter's book uses for its scenes' Time.
   const timeSystem = useMemo(
     () => systemForBook(w.activeProject?.settings.timeSystems ?? [], nearestOfKind(w.outlineNodes, chapter.id, 'book')),
@@ -198,41 +194,67 @@ function ChapterOutline({ w, chapter, mode, draft, plotDrag }: {
     )
   }
 
+  // A scene's Location, Time and Action. A field left empty takes the value of
+  // the nearest earlier scene in this chapter as its placeholder (never saved),
+  // or its own name when nothing precedes. A field with a value that differs
+  // from what it inherits is filled with the book's accent colour; empty or
+  // unchanged ones sit on the page background. In Draft mode they are chips: the
+  // scene's own value, else the inherited one faded, else no chip at all (and no
+  // row when there are none).
   const sceneFields = (scene: OutlineNode) => {
     const at = scenes.findIndex(s => s.id === scene.id)
-    const changes = sceneChanges(scene, at > 0 ? scenes[at - 1] : undefined)
+    const inherited = inheritedSceneValues(scenes, at)
+    const changes = sceneChanges(scene, inherited)
     const label = { location: 'Location', time: 'Time', action: 'Action' } as const
-    const field = (key: 'location' | 'action') => editable ? (
+    const changedTitle = (key: keyof typeof label) => (changes[key] ? `${label[key]} changed from the previous scene` : label[key])
+    const chip = (key: keyof typeof label, own: string, inheritedText: string) => {
+      const text = own || inheritedText
+      if (!text) return null
+      return (
+        <span
+          key={key}
+          className={`wrStripChip wrStripChip--${key}${changes[key] ? ' wrStripChip--changed' : ''}${own ? '' : ' wrStripChip--empty'}`}
+          title={changes[key] ? changedTitle(key) : undefined}
+        >
+          {text}
+        </span>
+      )
+    }
+    const timeText = formatTime(timeSystem, scene.timeValue)
+    const inheritedTimeText = inherited.timeValue ? formatTime(timeSystem, inherited.timeValue) : ''
+
+    if (!editable) {
+      const chips = [
+        chip('location', scene.location?.trim() ? scene.location : '', inherited.location ?? ''),
+        chip('time', timeText, inheritedTimeText),
+        chip('action', scene.action?.trim() ? scene.action : '', inherited.action ?? ''),
+      ].filter(Boolean)
+      return chips.length > 0 ? <div className="wrSceneFields">{chips}</div> : null
+    }
+
+    const field = (key: 'location' | 'action') => (
       <input
         className={changes[key] ? `wrSceneField wrSceneField--${key} wrSceneField--changed` : `wrSceneField wrSceneField--${key}`}
-        list={`wr-${key}-options`} placeholder={label[key]} value={scene[key] ?? ''} data-kf=""
-        aria-label={label[key]} title={changes[key] ? `${label[key]} changed from the previous scene` : label[key]}
+        placeholder={inherited[key] ?? label[key]} value={scene[key] ?? ''} data-kf=""
+        aria-label={label[key]} title={changedTitle(key)}
         onChange={e => w.updateOutlineNode(scene.id, { [key]: e.target.value })}
       />
-    ) : (
-      <span
-        className={`wrStripChip wrStripChip--${key}${changes[key] ? ' wrStripChip--changed' : ''}${scene[key] ? '' : ' wrStripChip--empty'}`}
-        title={changes[key] ? `${label[key]} changed from the previous scene` : undefined}
-      >
-        {scene[key] || label[key]}
-      </span>
     )
-    const timeText = formatTime(timeSystem, scene.timeValue)
-    const timeField = editable ? (
-      <SceneTime
-        system={timeSystem} value={scene.timeValue} changed={changes.time}
-        onChange={next => w.updateOutlineNode(scene.id, { timeValue: next })}
-      />
-    ) : (
-      <span
-        className={`wrStripChip wrStripChip--time${changes.time ? ' wrStripChip--changed' : ''}${timeText ? '' : ' wrStripChip--empty'}`}
-        title={changes.time ? 'Time changed from the previous scene' : undefined}
-      >
-        {timeText || 'Time'}
-      </span>
+    return (
+      <div className="wrSceneFields">
+        {field('location')}
+        <SceneTime
+          system={timeSystem} value={scene.timeValue} changed={changes.time} placeholder={inheritedTimeText || label.time}
+          onChange={next => w.updateOutlineNode(scene.id, { timeValue: next })}
+        />
+        {field('action')}
+      </div>
     )
-    return <div className="wrSceneFields">{field('location')}{timeField}{field('action')}</div>
   }
+
+  // A node's number: "Moment 2" in Outline mode, a bare "2" in Draft mode.
+  const numberLabel = (word: string, n: number | undefined) => (editable ? `${word} ${n}` : String(n))
+  const labelClass = editable ? 'wrNodeLabel' : 'wrNodeLabel wrNodeLabel--num'
 
   // Outline-mode card footer: read-only word count on the left, then the add
   // button; the trash icon is pinned to the bottom right.
@@ -256,23 +278,36 @@ function ChapterOutline({ w, chapter, mode, draft, plotDrag }: {
 
     if (node.kind === 'moment') {
       const n = labels.moment.get(node.id)
-      return (
-        <div key={node.id} data-node={node.id} data-knode={node.id} className={cardClass('wrMomentCard wrOutlineCard', node.id)} {...dropProps(node.id)}>
-          <div className="wrMomentRow">
-            <span className="wrNodeHandle">{grip(node.id)}<span className="wrNodeLabel">Moment {n}</span></span>
-            {editable ? (
+      if (editable) {
+        // Outline: the grip is centred down the left of the card; the first row is a
+        // read-only preview of the synopsis with the moment number at the right,
+        // the second row the synopsis input.
+        return (
+          <div key={node.id} data-node={node.id} data-knode={node.id} className={cardClass('wrMomentCard wrMomentCard--outline wrOutlineCard', node.id)} {...dropProps(node.id)}>
+            {grip(node.id)}
+            <div className="wrMomentCol">
+              <div className="wrMomentTop">
+                <span className="wrMomentPreview">{node.synopsis}</span>
+                <span className="wrNodeLabel wrNodeLabel--moment">Moment {n}</span>
+              </div>
               <input
                 className="wrOutlineInput" placeholder="Moment synopsis" value={node.synopsis} data-kf=""
                 onChange={e => w.updateOutlineNode(node.id, { synopsis: e.target.value })}
               />
-            ) : (
-              <span className={node.synopsis ? 'wrNodeDescription' : 'wrNodeDescription wrNodeDescription--empty'}>{node.synopsis || 'No synopsis'}</span>
-            )}
+              {boxed(node.id)}
+              {footer(node, null, `Delete Moment ${n}?`)}
+            </div>
+          </div>
+        )
+      }
+      return (
+        <div key={node.id} data-node={node.id} data-knode={node.id} className={cardClass('wrMomentCard wrOutlineCard', node.id)} {...dropProps(node.id)}>
+          <div className="wrMomentRow">
+            <span className="wrNodeHandle"><span className={labelClass}>{numberLabel('Moment', n)}</span></span>
+            <span className={node.synopsis ? 'wrNodeDescription' : 'wrNodeDescription wrNodeDescription--empty'}>{node.synopsis || 'No synopsis'}</span>
           </div>
           {boxed(node.id)}
-          {editable
-            ? footer(node, null, `Delete Moment ${n}?`)
-            : <DraftFooter words={words(node.id)} value={draft.bodies[node.id] ?? ''} onChange={text => draft.setBody(node.id, text)} />}
+          <DraftFooter words={words(node.id)} value={draft.bodies[node.id] ?? ''} onChange={text => draft.setBody(node.id, text)} />
         </div>
       )
     }
@@ -282,7 +317,7 @@ function ChapterOutline({ w, chapter, mode, draft, plotDrag }: {
       return (
         <div key={node.id} data-node={node.id} data-knode={node.id} className={cardClass('wrSceneCard wrOutlineCard', node.id)} {...dropProps(node.id)}>
           <div className="wrSceneHead">
-            <span className="wrNodeHandle">{grip(node.id)}<span className="wrNodeLabel">Scene {n}</span></span>
+            <span className="wrNodeHandle">{grip(node.id)}<span className={labelClass}>{numberLabel('Scene', n)}</span></span>
             {sceneFields(node)}
           </div>
           {boxed(node.id)}
@@ -298,7 +333,7 @@ function ChapterOutline({ w, chapter, mode, draft, plotDrag }: {
       return (
         <div key={node.id} data-node={node.id} data-knode={node.id} className={cardClass('wrActCard wrOutlineCard', node.id)} {...dropProps(node.id)}>
           <div className="wrActHead">
-            <span className="wrNodeHandle">{grip(node.id)}<span className="wrNodeLabel">Act {n}</span></span>
+            <span className="wrNodeHandle">{grip(node.id)}<span className={labelClass}>{numberLabel('Act', n)}</span></span>
             {editable ? (
               <input
                 className="wrOutlineInput" placeholder="Act title" value={node.title} data-kf=""
@@ -335,11 +370,6 @@ function ChapterOutline({ w, chapter, mode, draft, plotDrag }: {
         )}
         <span className="wrPageMeta">{formatWords(words(chapter.id))}</span>
       </div>
-      {(['location', 'action'] as const).map(key => (
-        <datalist key={key} id={`wr-${key}-options`}>
-          {options[key].map(v => <option key={v} value={v} />)}
-        </datalist>
-      ))}
       {children.length === 0 && (
         <p className="wrPageMuted">
           {editable ? 'Nothing outlined yet. Add an act to begin.' : 'Nothing outlined yet. Switch to Outline to add acts, scenes and moments.'}

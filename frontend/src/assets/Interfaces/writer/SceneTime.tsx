@@ -41,12 +41,14 @@ function UnitInput({ unit, value, onChange }: { unit: TimeUnit; value: number | 
 
 // A scene's Time: a button showing the formatted value (or a "Time"
 // placeholder) that opens a small popover with one input per unit of the
-// book's time system. `changed` highlights it in the accent color (it differs
-// from the previous scene).
-export function SceneTime({ system, value, changed, onChange }: {
+// book's time system. `changed` fills it with the accent color (it differs from
+// what the scene inherits); `placeholder` is what an empty Time shows: the
+// previous scene's time, or just "Time".
+export function SceneTime({ system, value, changed, placeholder = 'Time', onChange }: {
   system: TimeSystem
   value: TimeValue | undefined
   changed: boolean
+  placeholder?: string
   onChange: (next: TimeValue) => void
 }) {
   const [open, setOpen] = useState(false)
@@ -78,7 +80,7 @@ export function SceneTime({ system, value, changed, onChange }: {
         title={changed ? 'Time changed from the previous scene' : 'Set when this scene happens'}
         onClick={() => setOpen(o => !o)}
       >
-        {text || 'Time'}
+        {text || placeholder}
       </button>
       {open && (
         <div className="wrTimePopover" role="dialog" aria-label={`Time (${system.name})`}>

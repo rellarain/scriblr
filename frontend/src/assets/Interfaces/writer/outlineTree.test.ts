@@ -1,6 +1,8 @@
 import { describe, expect, it } from 'vitest'
 import type { OutlineNode, OutlineNodeKind } from '../../../api/types'
-import { booksOf, buildChildIndex, chaptersOfBook, moveNode, rollUpWordCounts, sceneChanges, scenesInOrder } from './outlineTree'
+import {
+  booksOf, buildChildIndex, chaptersOfBook, inheritedSceneValues, moveNode, rollUpWordCounts, sceneChanges, scenesInOrder,
+} from './outlineTree'
 
 function node(id: string, kind: OutlineNodeKind, parentId: string | null, order: number, extra: Partial<OutlineNode> = {}): OutlineNode {
   return {
@@ -34,11 +36,62 @@ describe('outline queries', () => {
   })
 })
 
+describe('inheritedSceneValues', () => {
+  const scene = (id: string, extra: Partial<OutlineNode> = {}) => node(id, 'scene', 'a1', 0, extra)
+
+  it('has nothing to inherit before the first scene', () => {
+    expect(inheritedSceneValues([scene('x', { location: 'Hall' })], 0)).toEqual({})
+  })
+
+  it('takes each field from the nearest earlier scene that has a value', () => {
+    const scenes = [
+      scene('s1', { location: 'Hall', action: 'Arrives', timeValue: { day: 1 } }),
+      scene('s2', { location: 'Cellar' }),
+      scene('s3', {}),
+    ]
+    expect(inheritedSceneValues(scenes, 2)).toEqual({ location: 'Cellar', action: 'Arrives', timeValue: { day: 1 } })
+    expect(inheritedSceneValues(scenes, 1)).toEqual({ location: 'Hall', action: 'Arrives', timeValue: { day: 1 } })
+  })
+
+  it('chains through scenes that are themselves empty', () => {
+    const scenes = [scene('s1', { location: 'Hall' }), scene('s2'), scene('s3'), scene('s4')]
+    expect(inheritedSceneValues(scenes, 3).location).toBe('Hall')
+  })
+
+  it('ignores blank text and empty times', () => {
+    const scenes = [scene('s1', { location: 'Hall' }), scene('s2', { location: '   ', timeValue: {} }), scene('s3')]
+    expect(inheritedSceneValues(scenes, 2)).toEqual({ location: 'Hall' })
+  })
+})
+
 describe('sceneChanges', () => {
-  it('flags only non-empty values that differ from the previous scene', () => {
-    const [s1, s2] = scenesInOrder(tree, 'c1')
-    expect(sceneChanges(s1, undefined)).toEqual({ location: false, time: false, action: false })
-    expect(sceneChanges(s2, s1)).toEqual({ location: true, time: false, action: false })
+  const scene = (extra: Partial<OutlineNode> = {}) => node('s', 'scene', 'a1', 0, extra)
+  const inherited = { location: 'Front door', action: 'Arrives', timeValue: { day: 1, time: 1080 } }
+
+  it('flags only a value of its own that differs from what it inherits', () => {
+    expect(sceneChanges(scene({ location: 'Cellar' }), inherited)).toEqual({ location: true, time: false, action: false })
+    expect(sceneChanges(scene({ location: 'Front door', action: 'Arrives', timeValue: { time: 1080, day: 1 } }), inherited))
+      .toEqual({ location: false, time: false, action: false })
+    expect(sceneChanges(scene({ timeValue: { day: 2, time: 1080 } }), inherited).time).toBe(true)
+  })
+
+  it('never flags an empty field (it inherits)', () => {
+    expect(sceneChanges(scene(), inherited)).toEqual({ location: false, time: false, action: false })
+    expect(sceneChanges(scene({ location: '  ' }), inherited).location).toBe(false)
+  })
+
+  it('has no change to flag when there is nothing to compare against', () => {
+    expect(sceneChanges(scene({ location: 'Cellar', action: 'Hides', timeValue: { day: 3 } }), {}))
+      .toEqual({ location: false, time: false, action: false })
+  })
+
+  it('compares each field with its own earlier value', () => {
+    const scenes = [
+      node('s1', 'scene', 'a1', 0, { location: 'Hall', action: 'Arrives' }),
+      node('s2', 'scene', 'a1', 1, { location: 'Cellar' }),
+      node('s3', 'scene', 'a1', 2, { location: 'Cellar', action: 'Hides' }),
+    ]
+    expect(sceneChanges(scenes[2], inheritedSceneValues(scenes, 2))).toEqual({ location: false, time: false, action: true })
   })
 })
 

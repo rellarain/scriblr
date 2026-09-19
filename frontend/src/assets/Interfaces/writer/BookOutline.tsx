@@ -104,12 +104,15 @@ function BookOutline({ w, book, chapterWords }: { w: WriterWorkspace; book: Outl
     const chapters = index.get(a.id) ?? []
     return (
       <div key={a.id} data-node={a.id} data-knode={a.id} className={dnd.cardClass('wrBookArc wrOutlineCard', a.id)} {...dnd.dropProps(a.id)}>
-        <div className="wrBookArcHead">
-          <span className="wrNodeHandle">{grip(a.id)}<span className="wrBookLabel">Arc {n}</span></span>
-          <input
-            className="wrBookInput" value={a.title} placeholder="Arc title" data-kf="" aria-label={`Arc ${n} title`}
-            onChange={e => w.updateOutlineNode(a.id, { title: e.target.value })}
-          />
+        <div className="wrBookChapterTop">
+          {grip(a.id)}
+          <div className="wrBookChapterTitle">
+            <span className="wrBookNumber">Arc {n}</span>
+            <input
+              className="wrBookInput wrBookInput--arc" value={a.title} placeholder="Arc title" data-kf="" aria-label={`Arc ${n} title`}
+              onChange={e => w.updateOutlineNode(a.id, { title: e.target.value })}
+            />
+          </div>
         </div>
         {chapters.map(chapterCard)}
         <div className="wrBookArcFoot">
