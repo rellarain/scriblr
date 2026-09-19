@@ -28,6 +28,8 @@ function WUI() {
 
   // The book editor is a full-height cover with no title row above it.
   const flush = console_ === 'book' && component === 'bookEditor'
+  // The chapter page and its Preview are full-width pages with the chapter tabs on the right edge.
+  const edge = (console_ === 'page' && component === 'chapter') || console_ === 'pages'
 
   function shelvesBody() {
     const def = components.find(c => c.key === component)
@@ -69,7 +71,7 @@ function WUI() {
       <WuiSidebar workspace={workspace} />
       <div className="wrMain">
         <IconColumn components={components} active={component} onSelect={setComponent} />
-        <div className={flush ? 'wrContent wrContent--flush' : 'wrContent'}>{content}</div>
+        <div className={flush ? 'wrContent wrContent--flush' : edge ? 'wrContent wrContent--edge' : 'wrContent'}>{content}</div>
       </div>
     </main>
   )

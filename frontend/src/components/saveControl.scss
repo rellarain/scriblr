@@ -1,0 +1,43 @@
+// The save state text next to a Save button (components/SaveControl.tsx).
+// Colors come from the theme tokens (theme/theme.scss).
+.saveControl {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.saveState {
+  font-size: 11px;
+  white-space: nowrap;
+  color: var(--ink-muted);
+  &--unsaved { color: var(--ink); }
+  &--error { color: var(--alert); font-weight: 700; }
+}
+
+.saveBtn {
+  border: 0;
+  padding: 6px 14px;
+  border-radius: 6px;
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--on-accent);
+  background: var(--accent);
+  cursor: pointer;
+  &:hover:not(:disabled) { background: var(--accent-hover); }
+  &:disabled { opacity: 0.4; cursor: default; }
+}
+
+// The floppy-disk button: icon only, whichever interface's button style it wears.
+.saveIconBtn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 0;
+  padding: 6px 9px;
+  line-height: 0;
+}
+.saveState { font-variant-numeric: tabular-nums; }
+
+// "Discard unsaved changes?" with its two buttons, in place of the control.
+.saveControl--confirm .saveConfirmBtn { padding: 6px 12px; font-size: 12px; }
+.saveConfirmBtn--quiet { opacity: 0.75; }

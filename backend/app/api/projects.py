@@ -63,6 +63,8 @@ def update_project(
         index.settings.plotLevels = body.plotLevels
     if body.readLevels is not None:
         index.settings.readLevels = body.readLevels
+    if body.timeSystems is not None:
+        index.settings.timeSystems = body.timeSystems
     index.updatedAt = utcnow()
     store.save_index(root, index)
     return index

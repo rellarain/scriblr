@@ -1,8 +1,11 @@
 import type { WriterWorkspace } from './useWriterWorkspace'
 import { HELP_COMPONENT, SETTINGS_COMPONENT, SHELF_COMPONENTS } from './consoleDefs'
 import { ConsoleTitleRow, Placeholder } from './shared'
+import { SaveControl } from '../../../components/SaveControl'
 import { chaptersOfBook } from './outlineTree'
 import PlotView from './PlotView'
+import TimeSystemEditor from './TimeSystemEditor'
+import { nodeLabel } from './plotTree'
 
 // The Shelf console: everything about the open project as a whole. Project
 // Plot is the working editor; the project outline lists its books and
@@ -17,12 +20,12 @@ function ProjectOutline({ w }: { w: WriterWorkspace }) {
           <div key={book.id} className="wrCardPanel">
             <div className="wrCardPanelHead">
               <span className="wrKindBadge">book</span>
-              <button type="button" className="wrLinkBtn wrLinkBtn--title" onClick={() => w.openBook(book.id)}>{book.title}</button>
+              <button type="button" className="wrLinkBtn wrLinkBtn--title" onClick={() => w.openBook(book.id)}>{nodeLabel(book)}</button>
               <span className="wrOutlineMeta">{chapters.length} chapters</span>
             </div>
             {chapters.map((c, i) => (
               <button key={c.id} type="button" className="wrChildRow" onClick={() => w.openChapter(c.id)}>
-                <span className="wrChildRowTitle">{i + 1} · {c.title}</span>
+                <span className="wrChildRowTitle">{i + 1} · {nodeLabel(c)}</span>
               </button>
             ))}
           </div>
@@ -41,13 +44,14 @@ function ProjectConsole({ w, component }: { w: WriterWorkspace; component: strin
   else if (w.outlineStatus === 'error') body = <p className="wrError">{w.outlineError ?? 'Failed to load the project.'}</p>
   else if (component === 'projectPlot') body = <PlotView w={w} />
   else if (component === 'projectOutline') body = <ProjectOutline w={w} />
+  else if (component === 'projectEditor') body = <TimeSystemEditor w={w} />
   else body = <Placeholder title={def?.label ?? ''} body={def?.body} />
 
   return (
     <>
       <ConsoleTitleRow
         console="Shelf" component={`${def?.label ?? ''} · ${project}`}
-        right={<span className="wrSaveState">{w.saving || w.plotSaving ? 'Saving…' : ''}</span>}
+        right={<SaveControl status={w.saveStatus} onSave={() => { void w.saveNow() }} onRestore={w.restoreSaved} buttonClassName="wrSmallBtn wrSaveBtn" />}
       />
       {w.saveError && <p className="wrError">{w.saveError}</p>}
       {w.warnings.length > 0 && <p className="wrMuted">{w.warnings.join(' ')}</p>}

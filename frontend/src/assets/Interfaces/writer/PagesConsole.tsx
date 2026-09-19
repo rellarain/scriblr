@@ -4,6 +4,7 @@ import type { WriterWorkspace } from './useWriterWorkspace'
 import { HELP_COMPONENT, PAGES_COMPONENTS, SETTINGS_COMPONENT } from './consoleDefs'
 import { ChapterTabs, ConsoleTitleRow, Placeholder, useStoredState } from './shared'
 import { buildChildIndex, descendantsOf } from './outlineTree'
+import { nodeLabel } from './plotTree'
 import { splitParagraphs, splitSentences } from './sentences'
 import { useChapterDraft } from './useChapterDraft'
 import { exportChapterPdf } from '../../../api/export'
@@ -203,7 +204,7 @@ function PagePreview({ w, chapter, component, label }: { w: WriterWorkspace; cha
       <div className="wrPage wrPage--preview">
         <div className="wrPreviewHead">
           <span className="wrPageKicker">Chapter {chapterNumber}</span>
-          <span className="wrPreviewTitle">{chapter.title}</span>
+          <span className="wrPreviewTitle">{nodeLabel(chapter)}</span>
         </div>
         {draft.error && <p className="wrPageError">{draft.error}</p>}
         {draft.status === 'loading' && <p className="wrPageMuted">Loading…</p>}

@@ -1,9 +1,13 @@
 import { useEffect, useMemo, useState } from 'react'
-import type { OutlineNode } from '../../../api/types'
+import type { OutlineNode, PlotNode } from '../../../api/types'
 import type { ChapterMode, WriterWorkspace } from './useWriterWorkspace'
 import { ChevronDownIcon, ChevronRightIcon, GripIcon, PlusIcon } from '../../icons'
-import { buildChildIndex, rollUpWordCounts, scenesInOrder, sceneChanges, type ChildIndex } from './outlineTree'
+import { buildChildIndex, nearestOfKind, rollUpWordCounts, scenesInOrder, sceneChanges, type ChildIndex } from './outlineTree'
+import { SceneTime } from './SceneTime'
+import { PlotpointTile } from './PlotpointTile'
+import { formatTime, systemForBook } from './timeSystem'
 import { AutoTextarea, DeleteControl } from './shared'
+import { nodeLabel } from './plotTree'
 import { useNodeDnd } from './useNodeDnd'
 import { countWords, formatWords } from './wordCount'
 
@@ -31,6 +35,12 @@ function numberNodes(index: ChildIndex, rootId: string): Labels {
   }
   walk(rootId)
   return labels
+}
+
+// A plotpoint being dragged from the chapter's left column onto a card.
+export interface PlotDrag {
+  dragId: string | null
+  setDragId: (id: string | null) => void
 }
 
 export interface ChapterDraft {
@@ -63,14 +73,27 @@ function DraftFooter({ words, value, onChange }: { words: number; value: string;
   )
 }
 
-function ChapterOutline({ w, chapter, mode, draft }: {
+function ChapterOutline({ w, chapter, mode, draft, plotDrag }: {
   w: WriterWorkspace
   chapter: OutlineNode
   mode: ChapterMode
   draft: ChapterDraft
+  plotDrag?: PlotDrag
 }) {
   const editable = mode === 'outline'
   const dnd = useNodeDnd(w, editable)
+  const [plotOverId, setPlotOverId] = useState<string | null>(null)
+
+  // Plotpoints assigned to each act / scene / moment (the chapter's own are in the left column).
+  const pointsByNode = useMemo(() => {
+    const map = new Map<string, PlotNode[]>()
+    for (const p of w.plotNodes) {
+      if (p.kind !== 'plotpoint' || !p.assignedMomentId || p.assignedMomentId === chapter.id) continue
+      map.set(p.assignedMomentId, [...(map.get(p.assignedMomentId) ?? []), p])
+    }
+    for (const list of map.values()) list.sort((a, b) => a.order - b.order)
+    return map
+  }, [w.plotNodes, chapter.id])
 
   const index = useMemo(() => buildChildIndex(w.outlineNodes), [w.outlineNodes])
   const labels = useMemo(() => numberNodes(index, chapter.id), [index, chapter.id])
@@ -85,10 +108,16 @@ function ChapterOutline({ w, chapter, mode, draft }: {
   const words = (id: string) => wordCounts.get(id) ?? 0
 
   const options = useMemo(() => {
-    const unique = (key: 'location' | 'time' | 'action') =>
+    const unique = (key: 'location' | 'action') =>
       [...new Set(w.outlineNodes.filter(n => n.kind === 'scene').map(n => n[key] ?? '').filter(Boolean))]
-    return { location: unique('location'), time: unique('time'), action: unique('action') }
+    return { location: unique('location'), action: unique('action') }
   }, [w.outlineNodes])
+
+  // The time system this chapter's book uses for its scenes' Time.
+  const timeSystem = useMemo(
+    () => systemForBook(w.activeProject?.settings.timeSystems ?? [], nearestOfKind(w.outlineNodes, chapter.id, 'book')),
+    [w.activeProject, w.outlineNodes, chapter.id],
+  )
 
   // Plain render functions (not components): a component defined inside this
   // one would remount its inputs on every keystroke.
@@ -98,13 +127,48 @@ function ChapterOutline({ w, chapter, mode, draft }: {
     </span>
   )
 
-  const cardClass = (base: string, id: string) => `${dnd.cardClass(base, id)}${editable ? '' : ' wrOutlineCard--readonly'}`
+  const cardClass = (base: string, id: string) =>
+    `${dnd.cardClass(base, id)}${editable ? '' : ' wrOutlineCard--readonly'}${plotOverId === id ? ' wrOutlineCard--plotOver' : ''}`
+
+  // Drop handling for a card: while a plotpoint is being dragged from the left
+  // column the card takes it (assigns it here); otherwise the normal outline
+  // drag-and-drop applies.
+  const dropProps = (id: string) => {
+    if (!editable || !plotDrag?.dragId) return dnd.dropProps(id)
+    return {
+      onDragOver: (e: React.DragEvent) => { e.preventDefault(); e.stopPropagation(); if (plotOverId !== id) setPlotOverId(id) },
+      onDragLeave: () => setPlotOverId(prev => (prev === id ? null : prev)),
+      onDrop: (e: React.DragEvent) => {
+        e.preventDefault(); e.stopPropagation()
+        if (plotDrag.dragId) w.assignPlotpoint(plotDrag.dragId, id)
+        plotDrag.setDragId(null)
+        setPlotOverId(null)
+      },
+    }
+  }
+
+  // The plotpoints boxed inside a card. In Outline mode the x unassigns from
+  // this card only (the plotpoint stays with the chapter, in the left column).
+  const boxed = (nodeId: string) => {
+    const list = pointsByNode.get(nodeId)
+    if (!list || list.length === 0) return null
+    return (
+      <div className="wrCardPoints">
+        {list.map(p => (
+          <PlotpointTile
+            key={p.id} w={w} point={p}
+            onUnassign={editable ? () => w.assignPlotpoint(p.id, chapter.id) : undefined}
+          />
+        ))}
+      </div>
+    )
+  }
 
   const sceneFields = (scene: OutlineNode) => {
     const at = scenes.findIndex(s => s.id === scene.id)
     const changes = sceneChanges(scene, at > 0 ? scenes[at - 1] : undefined)
     const label = { location: 'Location', time: 'Time', action: 'Action' } as const
-    const field = (key: 'location' | 'time' | 'action') => editable ? (
+    const field = (key: 'location' | 'action') => editable ? (
       <input
         className={changes[key] ? `wrSceneField wrSceneField--${key} wrSceneField--changed` : `wrSceneField wrSceneField--${key}`}
         list={`wr-${key}-options`} placeholder={label[key]} value={scene[key] ?? ''}
@@ -119,7 +183,21 @@ function ChapterOutline({ w, chapter, mode, draft }: {
         {scene[key] || label[key]}
       </span>
     )
-    return <div className="wrSceneFields">{field('location')}{field('time')}{field('action')}</div>
+    const timeText = formatTime(timeSystem, scene.timeValue)
+    const timeField = editable ? (
+      <SceneTime
+        system={timeSystem} value={scene.timeValue} changed={changes.time}
+        onChange={next => w.updateOutlineNode(scene.id, { timeValue: next })}
+      />
+    ) : (
+      <span
+        className={`wrStripChip wrStripChip--time${changes.time ? ' wrStripChip--changed' : ''}${timeText ? '' : ' wrStripChip--empty'}`}
+        title={changes.time ? 'Time changed from the previous scene' : undefined}
+      >
+        {timeText || 'Time'}
+      </span>
+    )
+    return <div className="wrSceneFields">{field('location')}{timeField}{field('action')}</div>
   }
 
   // Outline-mode card footer: read-only word count on the left, then the add
@@ -145,7 +223,7 @@ function ChapterOutline({ w, chapter, mode, draft }: {
     if (node.kind === 'moment') {
       const n = labels.moment.get(node.id)
       return (
-        <div key={node.id} data-node={node.id} className={cardClass('wrMomentCard wrOutlineCard', node.id)} {...dnd.dropProps(node.id)}>
+        <div key={node.id} data-node={node.id} className={cardClass('wrMomentCard wrOutlineCard', node.id)} {...dropProps(node.id)}>
           <div className="wrMomentRow">
             <span className="wrNodeHandle">{grip(node.id)}<span className="wrNodeLabel">Moment {n}</span></span>
             {editable ? (
@@ -157,6 +235,7 @@ function ChapterOutline({ w, chapter, mode, draft }: {
               <span className={node.synopsis ? 'wrNodeDescription' : 'wrNodeDescription wrNodeDescription--empty'}>{node.synopsis || 'No synopsis'}</span>
             )}
           </div>
+          {boxed(node.id)}
           {editable
             ? footer(node, null, `Delete Moment ${n}?`)
             : <DraftFooter words={words(node.id)} value={draft.bodies[node.id] ?? ''} onChange={text => draft.setBody(node.id, text)} />}
@@ -167,11 +246,12 @@ function ChapterOutline({ w, chapter, mode, draft }: {
     if (node.kind === 'scene') {
       const n = labels.scene.get(node.id)
       return (
-        <div key={node.id} data-node={node.id} className={cardClass('wrSceneCard wrOutlineCard', node.id)} {...dnd.dropProps(node.id)}>
+        <div key={node.id} data-node={node.id} className={cardClass('wrSceneCard wrOutlineCard', node.id)} {...dropProps(node.id)}>
           <div className="wrSceneHead">
             <span className="wrNodeHandle">{grip(node.id)}<span className="wrNodeLabel">Scene {n}</span></span>
             {sceneFields(node)}
           </div>
+          {boxed(node.id)}
           {kids.map(renderNode)}
           {editable && footer(node, { label: 'Moment', kind: 'moment' },
             `Delete Scene ${n}${childCount ? ` and its ${childCount} ${childCount === 1 ? 'moment' : 'moments'}` : ''}?`)}
@@ -182,7 +262,7 @@ function ChapterOutline({ w, chapter, mode, draft }: {
     if (node.kind === 'act') {
       const n = labels.act.get(node.id)
       return (
-        <div key={node.id} data-node={node.id} className={cardClass('wrActCard wrOutlineCard', node.id)} {...dnd.dropProps(node.id)}>
+        <div key={node.id} data-node={node.id} className={cardClass('wrActCard wrOutlineCard', node.id)} {...dropProps(node.id)}>
           <div className="wrActHead">
             <span className="wrNodeHandle">{grip(node.id)}<span className="wrNodeLabel">Act {n}</span></span>
             {editable ? (
@@ -194,6 +274,7 @@ function ChapterOutline({ w, chapter, mode, draft }: {
               <span className={node.title ? 'wrNodeDescription' : 'wrNodeDescription wrNodeDescription--empty'}>{node.title || 'Untitled act'}</span>
             )}
           </div>
+          {boxed(node.id)}
           {kids.map(renderNode)}
           {editable && footer(node, { label: 'Scene', kind: 'scene' },
             `Delete Act ${n}${childCount ? ' and everything in it' : ''}?`)}
@@ -216,11 +297,11 @@ function ChapterOutline({ w, chapter, mode, draft }: {
             onChange={e => w.updateOutlineNode(chapter.id, { title: e.target.value })}
           />
         ) : (
-          <span className="wrPageTitle">{chapter.title}</span>
+          <span className="wrPageTitle">{nodeLabel(chapter)}</span>
         )}
         <span className="wrPageMeta">{formatWords(words(chapter.id))}</span>
       </div>
-      {(['location', 'time', 'action'] as const).map(key => (
+      {(['location', 'action'] as const).map(key => (
         <datalist key={key} id={`wr-${key}-options`}>
           {options[key].map(v => <option key={v} value={v} />)}
         </datalist>

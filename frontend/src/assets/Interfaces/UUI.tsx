@@ -72,7 +72,7 @@ const SECTIONS: UuiSectionDef[] = [
       // showCustomize below). Kept non-empty for shape parity with every
       // other subSection.
       { key: 'accountSettings', label: 'Settings', Icon: GearIcon,
-        body: 'Customize handedness here; colors and time-of-day themes are in Dashboard > Settings.' },
+        body: 'Customize handedness and autosave here; colors and time-of-day themes are in Dashboard > Settings.' },
       { key: 'accountHelp', label: 'Help', Icon: HelpIcon,
         body: 'Resources and assistance using the Account console here.' },
     ],

@@ -13,6 +13,7 @@ from ..storage.schema import (
     ProjectIndex,
     ProjectPriority,
     ProjectRoutine,
+    TimeSystem,
 )
 
 
@@ -31,6 +32,7 @@ class UpdateProjectRequest(BaseModel):
     outlineLevels: Optional[list[OutlineNodeKind]] = None
     plotLevels: Optional[list[PlotNodeKind]] = None
     readLevels: Optional[list[OutlineNodeKind]] = None
+    timeSystems: Optional[list[TimeSystem]] = None
 
 
 class ScheduleCompletionsRequest(BaseModel):

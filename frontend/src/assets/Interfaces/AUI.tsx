@@ -10,6 +10,7 @@ import {
 import type { AuiSize } from '../../interfaceShellTypes'
 import { useAuiConfig, type AuiConfigTabKey } from './admin/useAuiConfig'
 import AuiConfigEditor, { AuiConfigReadOnly } from './admin/AuiConfigEditor'
+import { SaveControl } from '../../components/SaveControl'
 
 interface AUIProps {
   size: AuiSize
@@ -219,8 +220,16 @@ function AUI({ size, onSetSize }: AUIProps) {
   // No console has a Settings sub-tab at all -- the few scrilbrPlan.md
   // originally gave one were dropped along with the rest.
   const helpSubSection = section.subSections.find(s => s.label === 'Help')
+  const publishInfo = subSection.configTabKey ? auiConfig.publishInfo(subSection.configTabKey) : null
+
+  // Leaving what is being edited saves it (autosave's "navigation" trigger).
+  function selectSubSection(key: AuiSubSectionKey) {
+    void auiConfig.saveNow()
+    setActiveSubSection(key)
+  }
 
   function selectSection(key: AuiSectionKey) {
+    void auiConfig.saveNow()
     const next = SECTIONS.find(s => s.key === key) ?? SECTIONS[0]
     setActiveSection(key)
     setActiveSubSection(next.subSections[0].key)
@@ -233,16 +242,44 @@ function AUI({ size, onSetSize }: AUIProps) {
           <div className="aUIConsoleTitleRow">
             <h1 className="aUIConsoleTitle">{section.label}</h1>
             {subSection.configTabKey && (
+              <div className="auiConfigActions">
+                {publishInfo && (
+                  <span
+                    className={`auiPublishBadge${publishInfo.unpublished ? ' auiPublishBadge--pending' : ''}`}
+                    title={publishInfo.publishedAt ? `Last published ${new Date(publishInfo.publishedAt).toLocaleString()}` : 'Never published'}
+                  >
+                    {publishInfo.unpublished
+                      ? (publishInfo.version === null ? 'Never published' : `Unpublished changes (v${publishInfo.version})`)
+                      : `Published v${publishInfo.version}`}
+                  </span>
+                )}
+                {!configReadOnly && (
+                  <SaveControl
+                    status={auiConfig.saveStatus} label="Save draft" buttonClassName="auiSaveDraftBtn"
+                    onSave={() => { void auiConfig.saveNow() }} onRestore={auiConfig.restoreDraft}
+                    extra={
+                      <button
+                        type="button" className="auiPublishBtn"
+                        disabled={auiConfig.publishing || !publishInfo?.unpublished}
+                        title="Publish this tab's draft as the version everyone sees"
+                        onClick={() => subSection.configTabKey && void auiConfig.publishTab(subSection.configTabKey)}
+                      >
+                        {auiConfig.publishing ? 'Publishing…' : 'Publish'}
+                      </button>
+                    }
+                  />
+                )}
               <button
                 type="button"
                 className={configReadOnly ? 'auiConfigModeToggle auiConfigModeToggle--locked' : 'auiConfigModeToggle auiConfigModeToggle--unlocked'}
                 aria-pressed={configReadOnly}
                 aria-label={configReadOnly ? 'Read-only -- click to enable editing' : 'Editable -- click to make read-only'}
                 title={configReadOnly ? 'Read-only' : 'Editable'}
-                onClick={() => setConfigReadOnly(r => !r)}
+                onClick={() => { void auiConfig.saveNow(); setConfigReadOnly(r => !r) }}
               >
                 {configReadOnly ? <LockIcon size={16} /> : <UnlockIcon size={16} />}
               </button>
+              </div>
             )}
           </div>
 
@@ -251,8 +288,9 @@ function AUI({ size, onSetSize }: AUIProps) {
           <SubTabRow
             subSections={section.subSections.filter(s => s.label !== 'Help')}
             activeKey={subSection.key}
-            onSelect={setActiveSubSection}
+            onSelect={selectSubSection}
           />
+          {auiConfig.publishError && <p className="feedbackCardMeta">{auiConfig.publishError}</p>}
           <div className="sectionBody">
             <h2>{subSection.label}</h2>
             <p>{subSection.body}</p>

@@ -1,20 +1,22 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import type {
-  FlagType, NodeFlag, OutlineNode, OutlineNodeKind, PlotNode, PlotNodeKind, ProjectIndex,
+  FlagType, NodeFlag, OutlineNode, OutlineNodeKind, PlotNode, PlotNodeKind, ProjectIndex, TimeSystem,
 } from '../../../api/types'
 import {
   createProject as apiCreateProject,
   deleteProject as apiDeleteProject,
   getProject as apiGetProject,
   listProjects as apiListProjects,
+  updateProject as apiUpdateProject,
 } from '../../../api/projectsApi'
 import { putOutline as apiPutOutline } from '../../../api/outlineApi'
 import { putPlot as apiPutPlot } from '../../../api/plotApi'
 import { booksOf, buildChildIndex, chaptersOfBook, moveNode, nearestOfKind } from './outlineTree'
+import { isAssignedPlotpoint } from './plotTree'
 import { useStoredState } from './storage'
+import { combineSaveStatus, useAutosave } from '../../../lib/useAutosave'
 
 type AsyncStatus = 'idle' | 'loading' | 'error'
-const DEBOUNCE_MS = 800
 
 // Which of the five Writer consoles is showing.
 export type WuiConsole = 'shelves' | 'shelf' | 'book' | 'page' | 'pages'
@@ -56,8 +58,6 @@ export function useWriterWorkspace() {
   const [outlineStatus, setOutlineStatus] = useState<AsyncStatus>('idle')
   const [outlineError, setOutlineError] = useState<string | undefined>(undefined)
   const [warnings, setWarnings] = useState<string[]>([])
-  const [saving, setSaving] = useState<boolean>(false)
-  const [saveError, setSaveError] = useState<string | undefined>(undefined)
 
   // --- navigation: what is selected, and which console shows it ---
   const [view, setView] = useState<ProjectView>('project')
@@ -72,18 +72,14 @@ export function useWriterWorkspace() {
   const [plotSchemaVersion, setPlotSchemaVersion] = useState<number>(1)
   const [plotStatus, setPlotStatus] = useState<AsyncStatus>('idle')
   const [plotError, setPlotError] = useState<string | undefined>(undefined)
-  const [plotSaving, setPlotSaving] = useState<boolean>(false)
-  const [plotSaveError, setPlotSaveError] = useState<string | undefined>(undefined)
   const [focusedPlotNodeId, setFocusedPlotNodeId] = useState<string | null>(null)
 
-  const saveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
   const activeProjectIdRef = useRef<string | null>(null)
   const outlineNodesRef = useRef<OutlineNode[]>([])
-  activeProjectIdRef.current = activeProjectId
-  outlineNodesRef.current = outlineNodes
-
-  const plotSaveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
   const plotNodesRef = useRef<PlotNode[]>([])
+  activeProjectIdRef.current = activeProjectId
+
+  outlineNodesRef.current = outlineNodes
   plotNodesRef.current = plotNodes
 
   // --- derived outline data ---
@@ -139,86 +135,92 @@ export function useWriterWorkspace() {
   const plotNodeById = useMemo(() => new Map(plotNodes.map(n => [n.id, n])), [plotNodes])
   const focusedPlotNode = focusedPlotNodeId ? plotNodeById.get(focusedPlotNodeId) : undefined
 
-  // --- outline persistence ---
-  async function persistOutline(projectId: string, nodes: OutlineNode[]) {
-    setSaving(true)
-    setSaveError(undefined)
+  // --- persistence (autosave, see lib/useAutosave.ts) ---
+  // Text edits save after a pause; structural edits (add/delete/move) save at
+  // once; navigation flushes whatever is waiting. The value carries its own
+  // project id, so a save that finishes after switching projects can never
+  // land on the wrong one.
+  const outlineSave = useAutosave<{ projectId: string; schemaVersion: number; nodes: OutlineNode[] }>({
+    save: async ({ projectId, schemaVersion, nodes }) => {
+      const tree = await apiPutOutline(projectId, { schemaVersion, nodes })
+      // Adopt the server's copy only if nothing newer is waiting (it would
+      // otherwise briefly revert keystrokes typed while this save ran).
+      if (activeProjectIdRef.current === projectId && !outlineSave.isPending()) setOutlineNodes(tree.nodes)
+    },
+  })
+  const plotSave = useAutosave<{ projectId: string; schemaVersion: number; nodes: PlotNode[] }>({
+    save: async ({ projectId, schemaVersion, nodes }) => {
+      const tree = await apiPutPlot(projectId, { schemaVersion, nodes })
+      if (activeProjectIdRef.current === projectId && !plotSave.isPending()) setPlotNodes(tree.nodes)
+    },
+  })
+
+  // The project's time systems (Project Editor): saved like the trees.
+  const settingsSave = useAutosave<{ projectId: string; timeSystems: TimeSystem[] }>({
+    save: async ({ projectId, timeSystems }) => {
+      const index = await apiUpdateProject(projectId, { timeSystems })
+      if (activeProjectIdRef.current === projectId && !settingsSave.isPending()) setActiveProject(index)
+    },
+  })
+
+  function updateTimeSystems(next: TimeSystem[], immediate: boolean) {
+    setActiveProject(prev => (prev ? { ...prev, settings: { ...prev.settings, timeSystems: next } } : prev))
+    const projectId = activeProjectIdRef.current
+    if (!projectId) return
+    if (immediate) void settingsSave.saveNow({ projectId, timeSystems: next })
+    else settingsSave.schedule({ projectId, timeSystems: next })
+  }
+
+  // Apply an edit to the outline: `immediate` saves now (structural edits),
+  // otherwise after a pause. Computed from the ref so edits in the same tick
+  // compose, and kept out of state updaters (which run twice in StrictMode).
+  function commitOutline(next: OutlineNode[], immediate: boolean) {
+    outlineNodesRef.current = next
+    setOutlineNodes(next)
+    const projectId = activeProjectIdRef.current
+    if (!projectId) return
+    const value = { projectId, schemaVersion: outlineSchemaVersion, nodes: next }
+    if (immediate) void outlineSave.saveNow(value)
+    else outlineSave.schedule(value)
+  }
+
+  function commitPlot(next: PlotNode[], immediate: boolean) {
+    plotNodesRef.current = next
+    setPlotNodes(next)
+    const projectId = activeProjectIdRef.current
+    if (!projectId) return
+    const value = { projectId, schemaVersion: plotSchemaVersion, nodes: next }
+    if (immediate) void plotSave.saveNow(value)
+    else plotSave.schedule(value)
+  }
+
+  // Save everything waiting: navigation calls this, and so does the Save button.
+  function saveNow(): Promise<void> {
+    return Promise.all([outlineSave.flush(), plotSave.flush(), settingsSave.flush()]).then(() => undefined)
+  }
+  function flushAll() { void saveNow() }
+
+  // Throw away what has not been saved and reload the last saved outline, plot
+  // and project settings (the Save control's restore button).
+  async function restoreSaved(): Promise<void> {
+    const projectId = activeProjectIdRef.current
+    await Promise.all([outlineSave.discard(), plotSave.discard(), settingsSave.discard()])
+    if (!projectId) return
     try {
-      const tree = await apiPutOutline(projectId, { schemaVersion: outlineSchemaVersion, nodes })
-      if (activeProjectIdRef.current === projectId) setOutlineNodes(tree.nodes)
+      const summary = await apiGetProject(projectId)
+      if (activeProjectIdRef.current !== projectId) return
+      const outline = summary.outline?.nodes ?? []
+      const plot = summary.plot?.nodes ?? []
+      outlineNodesRef.current = outline
+      plotNodesRef.current = plot
+      setOutlineNodes(outline)
+      setPlotNodes(plot)
+      setActiveProject(summary.index)
     } catch (err) {
-      setSaveError(errMessage(err, 'Failed to save outline'))
-    } finally {
-      setSaving(false)
+      setOutlineError(errMessage(err, 'Failed to restore the last saved version'))
     }
   }
-
-  function persistNow(nodes: OutlineNode[]) {
-    if (saveTimerRef.current) { clearTimeout(saveTimerRef.current); saveTimerRef.current = null }
-    const projectId = activeProjectIdRef.current
-    if (projectId) void persistOutline(projectId, nodes)
-  }
-
-  function scheduleDebouncedSave(nodes: OutlineNode[]) {
-    if (saveTimerRef.current) clearTimeout(saveTimerRef.current)
-    const projectId = activeProjectIdRef.current
-    saveTimerRef.current = setTimeout(() => {
-      saveTimerRef.current = null
-      if (projectId) void persistOutline(projectId, nodes)
-    }, DEBOUNCE_MS)
-  }
-
-  function flushPendingSave() {
-    if (saveTimerRef.current) {
-      clearTimeout(saveTimerRef.current)
-      saveTimerRef.current = null
-      const projectId = activeProjectIdRef.current
-      if (projectId) void persistOutline(projectId, outlineNodesRef.current)
-    }
-  }
-
-  // --- plot persistence (mirrors outline persistence) ---
-  async function persistPlot(projectId: string, nodes: PlotNode[]) {
-    setPlotSaving(true)
-    setPlotSaveError(undefined)
-    try {
-      const tree = await apiPutPlot(projectId, { schemaVersion: plotSchemaVersion, nodes })
-      if (activeProjectIdRef.current === projectId) setPlotNodes(tree.nodes)
-    } catch (err) {
-      setPlotSaveError(errMessage(err, 'Failed to save plot'))
-    } finally {
-      setPlotSaving(false)
-    }
-  }
-
-  function persistPlotNow(nodes: PlotNode[]) {
-    if (plotSaveTimerRef.current) { clearTimeout(plotSaveTimerRef.current); plotSaveTimerRef.current = null }
-    const projectId = activeProjectIdRef.current
-    if (projectId) void persistPlot(projectId, nodes)
-  }
-
-  function schedulePlotDebouncedSave(nodes: PlotNode[]) {
-    if (plotSaveTimerRef.current) clearTimeout(plotSaveTimerRef.current)
-    const projectId = activeProjectIdRef.current
-    plotSaveTimerRef.current = setTimeout(() => {
-      plotSaveTimerRef.current = null
-      if (projectId) void persistPlot(projectId, nodes)
-    }, DEBOUNCE_MS)
-  }
-
-  function flushPendingPlotSave() {
-    if (plotSaveTimerRef.current) {
-      clearTimeout(plotSaveTimerRef.current)
-      plotSaveTimerRef.current = null
-      const projectId = activeProjectIdRef.current
-      if (projectId) void persistPlot(projectId, plotNodesRef.current)
-    }
-  }
-
-  useEffect(() => () => {
-    if (saveTimerRef.current) clearTimeout(saveTimerRef.current)
-    if (plotSaveTimerRef.current) clearTimeout(plotSaveTimerRef.current)
-  }, [])
+  const saveStatus = combineSaveStatus(outlineSave, plotSave, settingsSave)
 
   // --- projects ---
   async function loadProjects() {
@@ -260,8 +262,7 @@ export function useWriterWorkspace() {
 
   // Opens a project at the project level, or straight into one of its books.
   async function openProject(id: string, bookId?: string) {
-    flushPendingSave()
-    flushPendingPlotSave()
+    flushAll()
     setOutlineStatus('loading')
     setOutlineError(undefined)
     setPlotStatus('loading')
@@ -299,20 +300,17 @@ export function useWriterWorkspace() {
   }
 
   function backToShelves() {
-    flushPendingSave()
-    flushPendingPlotSave()
+    flushAll()
     setActiveProjectId(null)
     setActiveProject(null)
     setOutlineNodes([])
     setOutlineStatus('idle')
     setOutlineError(undefined)
     setWarnings([])
-    setSaveError(undefined)
 
     setPlotNodes([])
     setPlotStatus('idle')
     setPlotError(undefined)
-    setPlotSaveError(undefined)
     setFocusedPlotNodeId(null)
 
     setView('project')
@@ -337,12 +335,14 @@ export function useWriterWorkspace() {
 
   // --- navigation ---
   function showProject() {
+    flushAll()
     setView('project')
     setActiveBookId(null)
     setActiveChapterId(null)
   }
 
   function openBook(bookId: string) {
+    flushAll()
     setActiveBookId(bookId)
     setActiveChapterId(null)
     setView('book')
@@ -351,6 +351,7 @@ export function useWriterWorkspace() {
   // Selects a chapter without leaving the current console (the chapter tabs
   // in the Book console pick which chapter's outline shows).
   function selectChapter(chapterId: string) {
+    flushAll()
     const book = nearestOfKind(outlineNodes, chapterId, 'book')
     if (book) setActiveBookId(book.id)
     setActiveChapterId(chapterId)
@@ -366,11 +367,13 @@ export function useWriterWorkspace() {
 
   // Switches the open chapter to Outline or Draft mode.
   function showChapter(mode: ChapterMode) {
+    flushAll()
     setChapterMode(mode)
     if (activeChapterId) setView('page')
   }
 
   function showPreview() {
+    flushAll()
     if (activeChapterId) setView('pages')
   }
 
@@ -380,27 +383,21 @@ export function useWriterWorkspace() {
 
   // --- outline node mutators ---
   function addOutlineNode(parentId: string | null, kind: OutlineNodeKind, patch: Partial<OutlineNode> = {}) {
-    setOutlineNodes(prev => {
-      const node: OutlineNode = {
-        id: newId('node'), kind, parentId, order: nextOrderAmong(prev, parentId),
-        title: kind === 'act' || kind === 'scene' || kind === 'moment' ? '' : `New ${kind}`,
-        synopsis: '', draftRef: null, flag: null,
-        color: null, chapterCountTarget: null, plotlineIds: [], wordCountGoal: null,
-        location: '', time: '', action: '',
-        ...patch,
-      }
-      const next = [...prev, node]
-      persistNow(next)
-      return next
-    })
+    const prev = outlineNodesRef.current
+    const node: OutlineNode = {
+      id: newId('node'), kind, parentId, order: nextOrderAmong(prev, parentId),
+      // New nodes have no title: the input shows a placeholder until something is typed.
+      title: '',
+      synopsis: '', draftRef: null, flag: null,
+      color: null, chapterCountTarget: null, plotlineIds: [], wordCountGoal: null,
+      location: '', timeValue: {}, action: '',
+      ...patch,
+    }
+    commitOutline([...prev, node], true)
   }
 
   function updateOutlineNode(nodeId: string, patch: Partial<OutlineNode>) {
-    setOutlineNodes(prev => {
-      const next = prev.map(n => (n.id === nodeId ? { ...n, ...patch } : n))
-      scheduleDebouncedSave(next)
-      return next
-    })
+    commitOutline(outlineNodesRef.current.map(n => (n.id === nodeId ? { ...n, ...patch } : n)), false)
   }
 
   function collectDescendantIds(nodeId: string, nodes: OutlineNode[]): Set<string> {
@@ -416,34 +413,35 @@ export function useWriterWorkspace() {
   }
 
   function deleteOutlineNode(nodeId: string) {
-    setOutlineNodes(prev => {
-      const toRemove = collectDescendantIds(nodeId, prev)
-      const next = prev.filter(n => !toRemove.has(n.id))
-      persistNow(next)
-      return next
-    })
+    const prev = outlineNodesRef.current
+    const node = prev.find(n => n.id === nodeId)
+    const toRemove = collectDescendantIds(nodeId, prev)
+
+    // Plotpoints assigned to what is being deleted: those inside a chapter fall
+    // back to the chapter (still assigned to it), the rest are unassigned.
+    const plots = plotNodesRef.current
+    const affected = (p: PlotNode) => p.kind === 'plotpoint' && p.assignedMomentId != null && toRemove.has(p.assignedMomentId)
+    if (plots.some(affected)) {
+      const inner = node && (node.kind === 'act' || node.kind === 'scene' || node.kind === 'moment')
+      const chapter = inner && node.parentId ? nearestOfKind(prev, node.parentId, 'chapter') : undefined
+      commitPlot(plots.map(p => (affected(p) ? { ...p, assignedMomentId: chapter?.id ?? null, assignedParagraphIndex: null } : p)), true)
+    }
+
+    commitOutline(prev.filter(n => !toRemove.has(n.id)), true)
   }
 
   // Drag and drop: reparent/reorder a node relative to a target.
   function moveOutlineNodeTo(nodeId: string, targetId: string, mode: 'inside' | 'before') {
-    setOutlineNodes(prev => {
-      const next = moveNode(prev, nodeId, targetId, mode)
-      if (!next) return prev
-      persistNow(next)
-      return next
-    })
+    const next = moveNode(outlineNodesRef.current, nodeId, targetId, mode)
+    if (next) commitOutline(next, true)
   }
 
   function toggleNodeFlag(nodeId: string, flagType: FlagType) {
-    setOutlineNodes(prev => {
-      const next = prev.map(n => {
-        if (n.id !== nodeId) return n
-        const nextFlag: NodeFlag | null = n.flag?.type === flagType ? null : { type: flagType, note: n.flag?.note ?? '' }
-        return { ...n, flag: nextFlag }
-      })
-      persistNow(next)
-      return next
-    })
+    commitOutline(outlineNodesRef.current.map(n => {
+      if (n.id !== nodeId) return n
+      const nextFlag: NodeFlag | null = n.flag?.type === flagType ? null : { type: flagType, note: n.flag?.note ?? '' }
+      return { ...n, flag: nextFlag }
+    }), true)
   }
 
   // --- plot node mutators ---
@@ -453,80 +451,49 @@ export function useWriterWorkspace() {
 
   function addPlotNode(parentId: string | null, kind: PlotNodeKind, title?: string) {
     const id = newId('plot')
-    setPlotNodes(prev => {
-      const node: PlotNode = {
-        id, kind, parentId, order: nextOrderAmong(prev, parentId),
-        title: title ?? `New ${kind}`, body: '', assignedMomentId: null, assignedParagraphIndex: null,
-        sourceFieldId: null, customFieldDefs: [], customFieldValues: {}, keywords: [], flag: null,
-      }
-      const next = [...prev, node]
-      persistPlotNow(next)
-      return next
-    })
+    const prev = plotNodesRef.current
+    const node: PlotNode = {
+      id, kind, parentId, order: nextOrderAmong(prev, parentId),
+      title: title ?? '', body: '', assignedMomentId: null, assignedParagraphIndex: null,
+      sourceFieldId: null, customFieldDefs: [], customFieldValues: {}, keywords: [], flag: null,
+    }
+    commitPlot([...prev, node], true)
     return id
   }
 
   function updatePlotNodeField(nodeId: string, field: 'title' | 'body', value: string) {
-    setPlotNodes(prev => {
-      const next = prev.map(n => (n.id === nodeId ? { ...n, [field]: value } : n))
-      schedulePlotDebouncedSave(next)
-      return next
-    })
+    commitPlot(plotNodesRef.current.map(n => (n.id === nodeId ? { ...n, [field]: value } : n)), false)
   }
 
   function addPlotKeyword(nodeId: string, keyword: string) {
     const trimmed = keyword.trim()
     if (!trimmed) return
-    setPlotNodes(prev => {
-      const next = prev.map(n => (n.id === nodeId && !n.keywords.includes(trimmed) ? { ...n, keywords: [...n.keywords, trimmed] } : n))
-      persistPlotNow(next)
-      return next
-    })
+    commitPlot(plotNodesRef.current.map(n => (n.id === nodeId && !n.keywords.includes(trimmed) ? { ...n, keywords: [...n.keywords, trimmed] } : n)), true)
   }
 
   function removePlotKeyword(nodeId: string, keyword: string) {
-    setPlotNodes(prev => {
-      const next = prev.map(n => (n.id === nodeId ? { ...n, keywords: n.keywords.filter(k => k !== keyword) } : n))
-      persistPlotNow(next)
-      return next
-    })
+    commitPlot(plotNodesRef.current.map(n => (n.id === nodeId ? { ...n, keywords: n.keywords.filter(k => k !== keyword) } : n)), true)
   }
 
   function addPlotCustomFieldDef(nodeId: string, name: string) {
     const trimmed = name.trim()
     if (!trimmed) return
-    setPlotNodes(prev => {
-      const next = prev.map(n => (n.id === nodeId ? { ...n, customFieldDefs: [...n.customFieldDefs, { id: newId('field'), name: trimmed }] } : n))
-      persistPlotNow(next)
-      return next
-    })
+    commitPlot(plotNodesRef.current.map(n => (n.id === nodeId ? { ...n, customFieldDefs: [...n.customFieldDefs, { id: newId('field'), name: trimmed }] } : n)), true)
   }
 
   function removePlotCustomFieldDef(nodeId: string, fieldId: string) {
-    setPlotNodes(prev => {
-      const next = prev.map(n => (n.id === nodeId ? { ...n, customFieldDefs: n.customFieldDefs.filter(f => f.id !== fieldId) } : n))
-      persistPlotNow(next)
-      return next
-    })
+    commitPlot(plotNodesRef.current.map(n => (n.id === nodeId ? { ...n, customFieldDefs: n.customFieldDefs.filter(f => f.id !== fieldId) } : n)), true)
   }
 
   function updatePlotCustomFieldValue(nodeId: string, fieldId: string, value: string) {
-    setPlotNodes(prev => {
-      const next = prev.map(n => (n.id === nodeId ? { ...n, customFieldValues: { ...n.customFieldValues, [fieldId]: value } } : n))
-      schedulePlotDebouncedSave(next)
-      return next
-    })
+    commitPlot(plotNodesRef.current.map(n => (n.id === nodeId ? { ...n, customFieldValues: { ...n.customFieldValues, [fieldId]: value } } : n)), false)
   }
 
   // A plotpoint is assigned to a book or chapter by storing that outline
   // node's id in assignedMomentId (the backend treats it as an opaque id);
   // null unassigns it.
   function assignPlotpoint(pointId: string, outlineNodeId: string | null) {
-    setPlotNodes(prev => {
-      const next = prev.map(n => (n.id === pointId ? { ...n, assignedMomentId: outlineNodeId, assignedParagraphIndex: null } : n))
-      persistPlotNow(next)
-      return next
-    })
+    commitPlot(plotNodesRef.current.map(n => (n.id === pointId ? { ...n, assignedMomentId: outlineNodeId, assignedParagraphIndex: null } : n)), true)
   }
 
   // Ensures a top-level "Unassigned" category (and an "Unassigned"
@@ -565,48 +532,54 @@ export function useWriterWorkspace() {
   // category/subcategory instead. Nested subcategories are removed with their
   // parent; a plotline keeps its own plotpoints (only its parentId changes).
   function deletePlotNode(nodeId: string) {
-    setPlotNodes(prev => {
-      const target = prev.find(n => n.id === nodeId)
-      if (!target) return prev
+    const prev = plotNodesRef.current
+    const target = prev.find(n => n.id === nodeId)
+    if (!target) return
 
-      let next: PlotNode[]
-      let removed: Set<string>
-      if (target.kind === 'plotline' || target.kind === 'plotpoint') {
-        removed = collectPlotDescendantIds(nodeId, prev)
-        next = prev.filter(n => !removed.has(n.id))
-      } else {
-        removed = new Set<string>([nodeId])
-        const rescue: string[] = []
-        const queue = [nodeId]
-        while (queue.length > 0) {
-          const current = queue.shift()!
-          for (const n of prev) {
-            if (n.parentId !== current || removed.has(n.id) || rescue.includes(n.id)) continue
-            if (n.kind === 'plotline') rescue.push(n.id)
-            else { removed.add(n.id); queue.push(n.id) }
-          }
+    // Only unassigned plotpoints can be deleted, so a plotline holding an
+    // assigned one cannot be deleted either until it is unassigned.
+    const outlineById = new Map(outlineNodesRef.current.map(n => [n.id, n]))
+    if (target.kind === 'plotpoint' && isAssignedPlotpoint(target, outlineById)) return
+    if (target.kind === 'plotline'
+      && prev.some(n => n.parentId === target.id && n.kind === 'plotpoint' && isAssignedPlotpoint(n, outlineById))) return
+
+    let next: PlotNode[]
+    let removed: Set<string>
+    if (target.kind === 'plotline' || target.kind === 'plotpoint') {
+      removed = collectPlotDescendantIds(nodeId, prev)
+      next = prev.filter(n => !removed.has(n.id))
+    } else {
+      removed = new Set<string>([nodeId])
+      const rescue: string[] = []
+      const queue = [nodeId]
+      while (queue.length > 0) {
+        const current = queue.shift()!
+        for (const n of prev) {
+          if (n.parentId !== current || removed.has(n.id) || rescue.includes(n.id)) continue
+          if (n.kind === 'plotline') rescue.push(n.id)
+          else { removed.add(n.id); queue.push(n.id) }
         }
-        let working = prev
-        let bucketId: string | undefined
-        if (rescue.length > 0) {
-          const bucket = ensureUnassignedBucket(working)
-          working = bucket.nodes
-          bucketId = bucket.subcategoryId
-        }
-        next = working
-          .filter(n => !removed.has(n.id))
-          .map(n => (bucketId && rescue.includes(n.id) ? { ...n, parentId: bucketId } : n))
       }
-      persistPlotNow(next)
-      if (focusedPlotNodeId != null && removed.has(focusedPlotNodeId)) setFocusedPlotNodeId(null)
-      return next
-    })
+      let working = prev
+      let bucketId: string | undefined
+      if (rescue.length > 0) {
+        const bucket = ensureUnassignedBucket(working)
+        working = bucket.nodes
+        bucketId = bucket.subcategoryId
+      }
+      next = working
+        .filter(n => !removed.has(n.id))
+        .map(n => (bucketId && rescue.includes(n.id) ? { ...n, parentId: bucketId } : n))
+    }
+    commitPlot(next, true)
+    if (focusedPlotNodeId != null && removed.has(focusedPlotNodeId)) setFocusedPlotNodeId(null)
   }
 
   return {
     projects, projectsStatus, projectsError, projectOutlines,
     activeProjectId, activeProject, hasOpenProject,
-    outlineNodes, outlineStatus, outlineError, warnings, saving, saveError,
+    outlineNodes, outlineStatus, outlineError, warnings, saving: outlineSave.saving, saveError: outlineSave.error,
+    saveStatus, saveNow, flushAll, restoreSaved, updateTimeSystems,
     childrenByParentId, projectRoot, books, activeBook, activeBookChapters, activeChapter,
     activeConsole, activeBookId, activeChapterId,
     loadProjects, createProject, openProject, backToShelves, deleteProject,
@@ -614,7 +587,7 @@ export function useWriterWorkspace() {
     chapterMode,
     addOutlineNode, updateOutlineNode, deleteOutlineNode, moveOutlineNodeTo, toggleNodeFlag,
 
-    plotNodes, plotStatus, plotError, plotSaving, plotSaveError,
+    plotNodes, plotStatus, plotError, plotSaving: plotSave.saving, plotSaveError: plotSave.error,
     focusedPlotNodeId, focusedPlotNode, plotChildrenByParentId, plotNodeById,
     focusPlotNode, addPlotNode, updatePlotNodeField, deletePlotNode,
     addPlotKeyword, removePlotKeyword,

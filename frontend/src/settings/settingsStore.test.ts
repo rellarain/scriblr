@@ -3,7 +3,8 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { useStoredState } from '../assets/Interfaces/writer/storage'
 import { defaultThemeSettings } from '../theme/defaults'
 import {
-  __resetSettingsForTests, flushSettings, getKv, getSettings, initSettings, setKv, setTheme,
+  __resetSettingsForTests, flushSettings, getAutosavePolicy, getKv, getSettings, initSettings, normalizeAutosaveSeconds, restoreSettings,
+  setKv, setTheme, setUi, useSettingsSaveStatus,
 } from './settingsStore'
 
 interface Call { url: string; method: string; body: unknown; keepalive?: boolean }
@@ -12,7 +13,7 @@ function remote(over: Record<string, unknown> = {}) {
   return {
     schemaVersion: 1,
     theme: defaultThemeSettings(),
-    ui: { viewAs: null, handedness: 'right' },
+    ui: { viewAs: null, handedness: 'right', autosaveEnabled: true, autosaveSeconds: 30 },
     kv: {},
     migratedFromLocal: true,
     ...over,
@@ -168,5 +169,94 @@ describe('useStoredState', () => {
     respond = () => remote({ kv: { 'scriblr.writer.mode': 'draft' } })
     await act(async () => { await initSettings() })
     expect(result.current[0]).toBe('draft')
+  })
+})
+
+
+describe('save status', () => {
+  it('goes unsaved -> saving -> saved, and reports a failed send until it lands', async () => {
+    const { result } = renderHook(() => useSettingsSaveStatus())
+    expect(result.current.state).toBe('saved')
+
+    act(() => { setTheme(t => ({ ...t, timeBasedEnabled: true })) })
+    expect(result.current.state).toBe('unsaved')
+
+    await act(async () => { await flushSettings() })
+    expect(result.current.state).toBe('saved')
+
+    vi.stubGlobal('fetch', vi.fn(async () => ({ ok: false, status: 500, json: async () => ({}) })))
+    act(() => { setTheme(t => ({ ...t, timeBasedEnabled: false })) })
+    await act(async () => { await flushSettings() })
+    expect(result.current.state).toBe('error')
+    expect(result.current.dirty).toBe(true)
+
+    // The retry succeeds.
+    vi.stubGlobal('fetch', vi.fn(async () => ({ ok: true, status: 200, json: async () => ({}) })))
+    await act(async () => { await vi.advanceTimersByTimeAsync(15_100) })
+    expect(result.current.state).toBe('saved')
+  })
+})
+
+describe('autosave setting', () => {
+  const themePuts = () => calls.filter(c => c.method === 'PUT' && c.url.endsWith('/user-settings/theme'))
+
+  it('defaults to on, every 30 seconds, and only allows 30-second steps up to 10 minutes', () => {
+    expect(getAutosavePolicy()).toEqual({ enabled: true, delay: 30_000 })
+    expect(normalizeAutosaveSeconds(45)).toBe(60)
+    expect(normalizeAutosaveSeconds(0)).toBe(30)
+    expect(normalizeAutosaveSeconds(9999)).toBe(600)
+    expect(normalizeAutosaveSeconds('x')).toBe(30)
+    act(() => { setUi(u => ({ ...u, autosaveSeconds: 500 })) })
+    expect(getSettings().ui.autosaveSeconds).toBe(510)
+  })
+
+  it('sends theme changes after the chosen wait', async () => {
+    act(() => { setUi(u => ({ ...u, autosaveSeconds: 120 })) })
+    await act(async () => { await vi.advanceTimersByTimeAsync(1000) })
+    calls = []
+    act(() => { setTheme(t => ({ ...t, timeBasedEnabled: true })) })
+    await act(async () => { await vi.advanceTimersByTimeAsync(119_000) })
+    expect(themePuts()).toHaveLength(0)
+    await act(async () => { await vi.advanceTimersByTimeAsync(2000) })
+    expect(themePuts()).toHaveLength(1)
+  })
+
+  it('holds changes while it is off, until a save', async () => {
+    act(() => { setUi(u => ({ ...u, autosaveEnabled: false })) })
+    await act(async () => { await vi.advanceTimersByTimeAsync(1000) }) // the setting itself is saved promptly
+    expect(calls.some(c => c.url.endsWith('/user-settings/ui') && (c.body as { autosaveEnabled: boolean }).autosaveEnabled === false)).toBe(true)
+    calls = []
+    act(() => { setTheme(t => ({ ...t, timeBasedEnabled: true })) })
+    await act(async () => { await vi.advanceTimersByTimeAsync(700_000) })
+    expect(themePuts()).toHaveLength(0)
+    expect(getSettings().theme.timeBasedEnabled).toBe(true)
+    await act(async () => { await flushSettings() })
+    expect(themePuts()).toHaveLength(1)
+  })
+
+  it('saves what is waiting when the setting changes', async () => {
+    act(() => { setUi(u => ({ ...u, autosaveEnabled: false })) })
+    await act(async () => { await vi.advanceTimersByTimeAsync(1000) })
+    calls = []
+    act(() => { setTheme(t => ({ ...t, timeBasedEnabled: true })) })
+    act(() => { setUi(u => ({ ...u, autosaveEnabled: true, autosaveSeconds: 300 })) })
+    await act(async () => { await vi.advanceTimersByTimeAsync(0) })
+    expect(themePuts()).toHaveLength(1)
+  })
+})
+
+describe('restoreSettings', () => {
+  it('drops unsaved theme changes and reloads the saved copy', async () => {
+    const saved = defaultThemeSettings()
+    respond = call => (call.method === 'GET' ? remote({ theme: saved }) : remote())
+    const { result } = renderHook(() => useSettingsSaveStatus())
+    act(() => { setTheme(t => ({ ...t, timeBasedEnabled: true })) })
+    expect(getSettings().theme.timeBasedEnabled).toBe(true)
+    expect(result.current.dirty).toBe(true)
+    await act(async () => { await restoreSettings() })
+    expect(getSettings().theme.timeBasedEnabled).toBe(false)
+    expect(result.current.dirty).toBe(false)
+    await act(async () => { await vi.advanceTimersByTimeAsync(60_000) })
+    expect(calls.filter(c => c.method === 'PUT')).toHaveLength(0) // the dropped change is never sent
   })
 })

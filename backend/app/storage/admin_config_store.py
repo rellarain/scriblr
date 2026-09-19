@@ -6,11 +6,12 @@ helpers -- they operate purely on Path/model arguments, nothing project-id
 specific despite their parameter names.
 """
 
+import threading
 from pathlib import Path
 from typing import TypedDict
 
 from . import project_store
-from .schema import AuiConfig, AuiConfigNode, AuiConfigNodeKind
+from .schema import AuiConfig, AuiConfigDraft, AuiConfigNode, AuiConfigNodeKind, PublishedTab, utcnow
 
 
 class _FeatureSeed(TypedDict):
@@ -321,3 +322,38 @@ def load_admin_config(root: Path) -> AuiConfig:
 
 def save_admin_config(root: Path, config: AuiConfig) -> None:
     project_store._write_shard(root, _admin_config_path(root), config)
+
+
+class UnknownAdminTabError(ValueError):
+    """Publish was asked for a tab that is not one of the Configuration tabs."""
+
+
+_lock = threading.RLock()
+
+
+def save_admin_draft(root: Path, draft: AuiConfigDraft) -> AuiConfig:
+    """Replace the draft nodes; the published snapshots are left untouched."""
+    with _lock:
+        config = load_admin_config(root)
+        config.schemaVersion = draft.schemaVersion
+        config.nodes = draft.nodes
+        save_admin_config(root, config)
+        return config
+
+
+def publish_tab(root: Path, tab: str) -> AuiConfig:
+    """Freeze the current draft of one tab as its published copy (version + 1).
+    There are no other users to distribute it to yet; read-only views show this
+    copy, which is the groundwork for real distribution."""
+    if tab not in _SEED_OUTLINE:
+        raise UnknownAdminTabError(f"unknown admin config tab: {tab}")
+    with _lock:
+        config = load_admin_config(root)
+        previous = config.published.get(tab)
+        config.published[tab] = PublishedTab(
+            version=(previous.version + 1) if previous else 1,
+            publishedAt=utcnow(),
+            nodes=[n.model_copy(deep=True) for n in config.nodes if n.tab == tab],
+        )
+        save_admin_config(root, config)
+        return config

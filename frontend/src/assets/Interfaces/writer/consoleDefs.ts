@@ -31,7 +31,7 @@ export const SHELF_COMPONENTS: ComponentDef[] = [
   { key: 'projectSchedule', label: 'Project Schedule', Icon: CalendarIcon, body: 'Goals, routines, checklists and revisions for this project.' },
   { key: 'projectOutline', label: 'Project Outline', Icon: ListIcon },
   { key: 'projectPlot', label: 'Project Plot', Icon: PlotIcon },
-  { key: 'projectEditor', label: 'Project Editor', Icon: PencilIcon, body: 'Edit this project’s summary and description here.' },
+  { key: 'projectEditor', label: 'Project Editor', Icon: PencilIcon, body: 'Edit this project’s time systems here (its summary and description are coming).' },
   { key: 'outlineTemplate', label: 'Outline Template', Icon: CheckboxIcon, body: 'Manage book templates here.' },
   { key: 'seriesOutline', label: 'Series Outline', Icon: LibraryIcon, body: 'A parent container for this project’s included books.' },
 ]

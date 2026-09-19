@@ -48,6 +48,49 @@ class ProjectRoutine(BaseModel):
     targetWordCount: Optional[int] = None
 
 
+# A project's time systems: how a scene's Time is structured and ordered. A
+# system is an ordered list of units, largest to smallest (e.g. Year > Month >
+# Day > Time of day, or Week > Day). A unit is a number ("Day"), a named list
+# ("Month": January..December, "Season") or a clock time (minutes after
+# midnight). A scene stores one value per unit (any may be absent) and scenes
+# sort by comparing units in order. Standard date & time is the default.
+TimeUnitKind = Literal["number", "named", "clock"]
+
+MONTH_NAMES = [
+    "January", "February", "March", "April", "May", "June",
+    "July", "August", "September", "October", "November", "December",
+]
+
+
+class TimeUnit(BaseModel):
+    id: str
+    label: str
+    kind: TimeUnitKind = "number"
+    # Only for kind == "named": the names, in order (a value is an index into them).
+    names: list[str] = Field(default_factory=list)
+
+
+class TimeSystem(BaseModel):
+    id: str
+    name: str
+    units: list[TimeUnit] = Field(default_factory=list)
+
+
+def default_time_systems() -> list[TimeSystem]:
+    return [
+        TimeSystem(
+            id="standard",
+            name="Standard date & time",
+            units=[
+                TimeUnit(id="year", label="Year", kind="number"),
+                TimeUnit(id="month", label="Month", kind="named", names=list(MONTH_NAMES)),
+                TimeUnit(id="day", label="Day", kind="number"),
+                TimeUnit(id="time", label="Time", kind="clock"),
+            ],
+        )
+    ]
+
+
 class ProjectSettings(BaseModel):
     wordCountTarget: Optional[int] = None
     bookCountTarget: Optional[int] = None
@@ -67,6 +110,8 @@ class ProjectSettings(BaseModel):
     # outlineLevels (which governs what kinds exist at all) -- "chapter" is
     # always included here since Read mode navigates at the chapter level.
     readLevels: list[OutlineNodeKind] = Field(default_factory=lambda: list(OUTLINE_KIND_ORDER))
+    # How scenes' Time is structured (see TimeSystem). Books pick one by id.
+    timeSystems: list[TimeSystem] = Field(default_factory=default_time_systems)
 
 
 class ProjectIndex(BaseModel):
@@ -111,13 +156,19 @@ class OutlineNode(BaseModel):
     plotlineIds: list[str] = Field(default_factory=list)
     # Book's total word-count ambition -- drives bookshelf spine width/fill.
     wordCountGoal: Optional[int] = None
+    # Set only on "book" nodes: which of the project's time systems this
+    # book's scenes use (None = the project's first system).
+    timeSystemId: Optional[str] = None
     # Set only on "scene" nodes: a scene is described by where and when it
     # happens and what happens, rather than by a title/synopsis. Same
     # convention as the book-only fields above (generic OutlineNode, unused
-    # elsewhere). The UI highlights whichever of these changed from the
-    # previous scene in outline order.
+    # elsewhere). `timeValue` is one number per unit of the book's time system
+    # (clock = minutes after midnight, named = index into the names); units
+    # left blank are absent. The UI highlights whichever of these changed from
+    # the previous scene in outline order. (The old free-text `time` is gone:
+    # it is dropped when a tree is next saved.)
     location: str = ""
-    time: str = ""
+    timeValue: dict[str, int] = Field(default_factory=dict)
     action: str = ""
 
 
@@ -475,7 +526,27 @@ class AuiConfigNode(BaseModel):
     idea: str = ""  # only meaningful for kind == "feature"; empty otherwise
 
 
+class PublishedTab(BaseModel):
+    """A frozen copy of one Configuration tab, made by Publish. `nodes` (on
+    AuiConfig) is the editable DRAFT; this is what read-only consumers show."""
+
+    version: int = 1
+    publishedAt: datetime = Field(default_factory=utcnow)
+    nodes: list[AuiConfigNode] = Field(default_factory=list)
+
+
 class AuiConfig(BaseModel):
+    schemaVersion: int = 1
+    # The working draft (all tabs, flat).
+    nodes: list[AuiConfigNode] = Field(default_factory=list)
+    # Per-tab published snapshots, keyed by tab. A tab never published is absent.
+    published: dict[str, PublishedTab] = Field(default_factory=dict)
+
+
+class AuiConfigDraft(BaseModel):
+    """What a client saves: just the draft nodes. Kept separate from AuiConfig
+    so a save can never overwrite (or wipe) the published snapshots."""
+
     schemaVersion: int = 1
     nodes: list[AuiConfigNode] = Field(default_factory=list)
 
@@ -564,6 +635,10 @@ class ThemeSettings(BaseModel):
 class UiSettings(BaseModel):
     viewAs: Optional[Literal["user", "admin"]] = None
     handedness: Literal["left", "right"] = "right"
+    # Autosave preference: on/off, and how long the editors wait without a
+    # change before saving (30 seconds up to 10 minutes, in 30-second steps).
+    autosaveEnabled: bool = True
+    autosaveSeconds: int = Field(default=30, ge=30, le=600, multiple_of=30)
 
 
 class UserSettings(BaseModel):

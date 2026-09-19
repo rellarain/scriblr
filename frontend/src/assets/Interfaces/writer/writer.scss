@@ -53,6 +53,7 @@
     &:hover { opacity: 0.9; }
     &--light { color: hsl(var(--color-theme-h), 8%, 50%); }
     &--dark { color: var(--ink); }
+    &--blocked { opacity: 0.2; cursor: not-allowed; &:hover { opacity: 0.2; } }
   }
   .wrConfirm { display: inline-flex; align-items: center; gap: 8px; }
   .wrConfirmText { font-size: 11px; }
@@ -143,13 +144,18 @@
   .wrIconColumnTail .wrIconBtn:not(.wrIconBtn--active) { background: rgb(0 0 0 / calc(0.25 * var(--shade-k))); }
   .wrContent { flex: 1 1 auto; min-width: 0; min-height: 0; height: 100%; box-sizing: border-box; display: flex; flex-direction: column; padding: 0 16px 14px 6px; position: relative; }
   .wrContent--flush { padding: 0 6px 0 0; }
+  // Chapter page and Preview: the paper fills the console and the chapter tabs sit flush against its right
+  // edge (like the book cover's); the title row keeps the usual inset.
+  .wrContent--edge { padding: 0 0 14px 6px; > .wrTitleRow { padding-right: 16px; } }
+  .wrContent--edge .wrPreviewToolbar { padding-right: 16px; }
   .wrConsoleBody { flex: 1 1 auto; min-height: 0; display: flex; flex-direction: column; overflow-y: auto; scrollbar-width: none; &::-webkit-scrollbar { display: none; } }
 
   .wrTitleRow { flex: 0 0 auto; height: 44px; display: flex; align-items: center; gap: 12px; }
   .wrConsoleTitle { margin: 0; font-size: 18px; font-weight: 700; text-transform: uppercase; letter-spacing: 1.5px; }
   .wrComponentName { font-size: 13px; opacity: 0.7; }
   .wrTitleRight { margin-left: auto; display: flex; align-items: center; gap: 14px; }
-  .wrSaveState { font-size: 11px; opacity: 0.6; }
+  // The Book editor has no title row: its Save control is pinned to the cover's top-right corner.
+  .wrCoverSave { position: absolute; top: 24px; right: 38px; z-index: 3; .saveState { color: rgb(255 255 255 / 0.75); &--unsaved { color: white; } &--error { color: var(--alert); } } }
   .wrPlaceholder { padding: 6px 2px; h2 { font-size: 15px; margin: 0 0 6px; text-transform: uppercase; letter-spacing: 1px; } p { font-size: 13px; opacity: 0.85; margin: 0; } }
 
   .wrSegmented { display: flex; padding: 3px; gap: 3px; background: var(--wr-field); border-radius: 4px; }
@@ -218,6 +224,12 @@
   .wrUnassigned { flex: 1 1 auto; min-height: 0; display: flex; flex-direction: column; gap: 8px; background: rgb(0 0 0 / calc(0.16 * var(--shade-k))); border-radius: 8px; padding: 12px 14px; &--over { outline: 2px dashed var(--wr-accent-light); outline-offset: 3px; } }
   .wrPointList { flex: 1 1 auto; min-height: 0; overflow-y: auto; display: flex; flex-direction: column; gap: 6px; scrollbar-width: none; &::-webkit-scrollbar { display: none; } }
   .wrPoint { display: flex; align-items: flex-start; gap: 8px; padding: 8px 10px; border-radius: 4px; background: rgb(0 0 0 / calc(0.25 * var(--shade-k))); border-left: 3px solid var(--wr-alert); &--dragging { opacity: 0.35; } }
+  .wrPointSection { display: flex; align-items: baseline; gap: 8px; margin-top: 4px; font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: 1px; opacity: 0.6; span { font-weight: 400; } &:first-child { margin-top: 0; } }
+  .wrPointTarget { display: flex; align-items: center; gap: 6px; font-size: 10px; min-height: 16px; }
+  .wrPointChapter { flex: 1 1 auto; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 10px; font-weight: 700; letter-spacing: 0.3px; opacity: 0.75; text-align: left; }
+  .wrPointLock { display: inline-flex; opacity: 0.4; cursor: help; }
+  .wrPointUnassign { display: inline-flex; align-items: center; justify-content: center; width: 16px; height: 16px; border-radius: 3px; opacity: 0.5; &:hover { opacity: 1; background: var(--ov-lift-2); } }
+  .wrPointChip--locked { cursor: default; opacity: 0.85; svg { opacity: 0.6; } }
   .wrPointFields { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 2px; }
   .wrPointTitle { width: 100%; box-sizing: border-box; background: transparent; border: 0; outline: none; color: var(--ink); font-size: 12px; font-weight: 700; padding: 0; }
   .wrPointBody { width: 100%; box-sizing: border-box; background: transparent; border: 0; outline: none; color: color-mix(in srgb, var(--ink) 70%, transparent); font-size: 11px; padding: 0; &::placeholder { color: color-mix(in srgb, var(--ink) 35%, transparent); } }
@@ -267,6 +279,18 @@
   .wrCoverInput { position: relative; display: block; border-radius: 4px; overflow: hidden; input { width: 100%; box-sizing: border-box; padding-bottom: 13px; } }
   .wrProgress { position: absolute; left: 0; right: 0; bottom: 0; height: 5px; background: rgba(0, 0, 0, 0.35); }
   .wrProgressFill { display: block; height: 100%; background: var(--wr-cover-bright); transition: width 0.3s ease; }
+  // Project Editor: time systems.
+  .wrTimeSystems { display: flex; flex-direction: column; gap: 14px; max-width: 760px; }
+  .wrTimeAdd { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; select { background: var(--wr-field); color: var(--ink); border: 0; border-radius: 4px; padding: 6px 8px; font-size: 12px; } }
+  .wrTimeUnits { display: flex; flex-direction: column; gap: 6px; }
+  .wrTimeUnit { display: flex; align-items: center; flex-wrap: wrap; gap: 8px; }
+  .wrTimeUnit .wrTitleField { flex: 1 1 160px; }
+  .wrTimeUnit .wrTimeNames { flex: 1 1 100%; margin-left: 32px; font-weight: 400; }
+  .wrTimeKind { background: var(--wr-field); color: var(--ink); border: 0; border-radius: 4px; padding: 7px 8px; font-size: 12px; }
+  .wrTimeUnitMove { display: inline-flex; flex-direction: column; gap: 1px; button { display: flex; align-items: center; justify-content: center; width: 24px; height: 14px; border-radius: 3px; opacity: 0.6; &:hover:not(:disabled) { opacity: 1; background: var(--ov-lift-2); } &:disabled { opacity: 0.2; cursor: default; } } }
+  .wrFlip { transform: rotate(180deg); }
+  .wrTimeSystemFoot { display: flex; align-items: center; gap: 12px; }
+  .wrCoverSelect { box-sizing: border-box; width: 100%; background: var(--wr-cover-field); border: 0; border-radius: 4px; color: white; font-size: 13px; padding: 8px 10px; outline: none; option { color: black; } }
   .wrCoverRow { display: flex; gap: 14px; }
   .wrCoverSummary { display: flex; flex-direction: column; gap: 10px; }
   .wrSwatches { display: flex; flex-wrap: wrap; gap: 5px; }
@@ -298,7 +322,27 @@
   .wrBookInput--chapter { flex: 0 0 auto; font-weight: 700; letter-spacing: 1.5px; }
 
   // ---------------------------------------------------------------- pages
-  .wrPageWrap { flex: 1 1 auto; min-height: 0; display: flex; justify-content: center; > .wrPage { flex: 1 1 auto; max-width: 842px; } }
+  .wrPageWrap { flex: 1 1 auto; min-height: 0; display: flex; > .wrPage { flex: 1 1 auto; } }
+  // The chapter's plotpoints (assigned to the chapter, not yet to an act, scene or moment), at the left of the Outline page.
+  .wrChapterPoints { flex: 0 0 270px; min-width: 0; display: flex; flex-direction: column; gap: 8px; padding: 0 12px 0 0; box-sizing: border-box; }
+  .wrChapterPointsHead { display: flex; align-items: baseline; justify-content: space-between; font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: 1px; opacity: 0.75; }
+  .wrChapterPointsList { flex: 1 1 auto; min-height: 0; overflow-y: auto; display: flex; flex-direction: column; gap: 8px; scrollbar-width: none; &::-webkit-scrollbar { display: none; } }
+  // A plotpoint tile: dark, so it stands out from the (light) card it sits in.
+  .wrPointTile {
+    display: flex; flex-direction: column; gap: 3px; padding: 5px; border-radius: 6px; background: var(--wr-card); color: var(--ink);
+    box-shadow: 0 2px 6px rgb(0 0 0 / calc(0.25 * var(--shade-k))); text-align: left;
+    &--draggable { cursor: grab; }
+    &--dragging { opacity: 0.35; }
+  }
+  .wrPointTileTop { display: flex; align-items: center; justify-content: flex-end; gap: 6px; min-height: 14px; }
+  .wrPointTileTrail { flex: 1 1 auto; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; text-align: right; font-size: 9px; letter-spacing: 0.3px; color: var(--ink-faint); }
+  .wrPointTileX { display: inline-flex; align-items: center; justify-content: center; width: 16px; height: 16px; flex: 0 0 auto; border-radius: 3px; opacity: 0.55; &:hover { opacity: 1; background: var(--ov-lift-2); } }
+  .wrPointTileLine { font-size: 11px; line-height: 1.35; color: color-mix(in srgb, var(--ink) 80%, transparent); overflow-wrap: anywhere; }
+  .wrPointTileTitle { font-size: 13px; font-weight: 700; line-height: 1.3; color: var(--ink); overflow-wrap: anywhere; }
+  .wrPointTileBody { font-style: normal; }
+  // Tiles boxed inside an act / scene / moment card.
+  .wrCardPoints { display: flex; flex-direction: column; gap: 5px; }
+  .wrOutlineCard--plotOver { outline: 2px dashed var(--wr-accent); outline-offset: 2px; }
   .wrPage {
     min-width: 0; min-height: 0; background: var(--wr-page); border-radius: 4px 0 0 4px; box-shadow: 0 4px 16px rgb(0 0 0 / calc(0.35 * var(--shade-k))); color: var(--wr-ink);
     padding: 26px 34px; display: flex; flex-direction: column; gap: 14px; overflow-y: auto; box-sizing: border-box;
@@ -336,6 +380,19 @@
     &:focus { box-shadow: inset 0 0 0 1px var(--wr-accent); }
     &--changed { background: hsl(var(--color-accent-h), 90%, 86%); color: hsl(var(--color-accent-h), 82%, 28%); font-weight: 700; box-shadow: inset 3px 0 0 var(--wr-accent); }
   }
+  // A scene's Time: a button showing the formatted value; its popover holds one input per time-system unit.
+  .wrTimeWrap { position: relative; display: flex; }
+  .wrTimeBtn { min-width: 96px; width: auto; max-width: 240px; text-align: left; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; cursor: pointer; &--empty { font-style: italic; color: hsl(var(--color-theme-h), 6%, 55%); font-weight: 400; } }
+  .wrTimePopover {
+    position: absolute; top: calc(100% + 4px); left: 0; z-index: 20; min-width: 230px; padding: 10px 12px; display: flex; flex-direction: column; gap: 8px;
+    background: var(--paper); border: 1px solid var(--wr-page-line); border-radius: 6px; box-shadow: 0 8px 24px rgb(0 0 0 / 0.3); color: var(--wr-ink);
+  }
+  .wrTimePopoverTitle { font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: 1px; color: var(--wr-page-muted); }
+  .wrTimeRow {
+    display: grid; grid-template-columns: 70px minmax(0, 1fr); align-items: center; gap: 8px; font-size: 12px; font-weight: 700;
+    input, select { box-sizing: border-box; width: 100%; border: 1px solid var(--wr-page-line); border-radius: 4px; padding: 5px 8px; font-size: 12px; background: var(--paper-field); color: var(--wr-ink); outline: none; &:focus { border-color: var(--wr-accent); } }
+  }
+  .wrTimePopoverFoot { display: flex; justify-content: flex-end; gap: 6px; }
   .wrCardFoot { display: flex; align-items: center; justify-content: space-between; }
   .wrCardFootLeft { display: flex; align-items: center; gap: 10px; }
   .wrWordCount { font-size: 11px; color: var(--wr-page-muted); }
@@ -354,6 +411,8 @@
   .wrPagesBody { flex: 1 1 auto; min-height: 0; display: flex; flex-direction: column; gap: 10px; }
   .wrPreviewToolbar { flex: 0 0 auto; display: flex; align-items: center; gap: 12px; min-height: 30px; flex-wrap: wrap; }
   .wrToolGroup { display: flex; align-items: center; gap: 6px; .wrLabel { margin: 0 4px 0 0; } }
+  // The preview keeps a readable measure, centred in the wide page.
+  .wrPreviewHead, .wrPreviewIndent, .wrPreviewPara { width: 100%; max-width: 900px; margin-left: auto; margin-right: auto; box-sizing: border-box; }
   .wrPreviewHead { padding-left: 56px; display: flex; flex-direction: column; gap: 2px; margin-bottom: 6px; flex: 0 0 auto; }
   .wrPreviewTitle { font-family: Georgia, 'Times New Roman', serif; font-size: 30px; font-weight: 700; }
   .wrPreviewIndent { padding-left: 56px; }

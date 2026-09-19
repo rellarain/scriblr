@@ -3,6 +3,8 @@ import { PlusIcon, TrashIcon } from '../../icons'
 import type { OutlineNode } from '../../../api/types'
 import { HELP_COMPONENT, SETTINGS_COMPONENT, type ComponentDef } from './consoleDefs'
 
+import { nodeLabel } from './plotTree'
+
 export { useStoredState } from './storage'
 
 // The vertical icon column at the left of a console: one icon per
@@ -58,12 +60,24 @@ export function Placeholder({ title, body }: { title: string; body?: string }) {
 // A small, quiet trash button that asks for confirmation before deleting --
 // the message and Confirm/Cancel replace it in place, so it always sits
 // where the trash icon was (the bottom right of its card).
-export function DeleteControl({ message, onConfirm, tone = 'light' }: {
+export function DeleteControl({ message, onConfirm, tone = 'light', blockedReason }: {
   message: string
   onConfirm: () => void
   tone?: 'light' | 'dark'
+  // When set, deleting is not possible right now: the trash is disabled and this is its tooltip.
+  blockedReason?: string
 }) {
   const [confirming, setConfirming] = useState(false)
+  if (blockedReason) {
+    return (
+      <button
+        type="button" className={`wrTrashBtn wrTrashBtn--${tone} wrTrashBtn--blocked`}
+        aria-label="Delete (unavailable)" title={blockedReason} disabled
+      >
+        <TrashIcon size={14} />
+      </button>
+    )
+  }
   if (confirming) {
     return (
       <span className={`wrConfirm wrConfirm--${tone}`}>
@@ -97,7 +111,7 @@ export function ChapterTabs({ chapters, activeId, onSelect, onAdd, variant }: {
         <button
           key={c.id} type="button"
           className={c.id === activeId ? 'wrChapterTab wrChapterTab--active' : 'wrChapterTab'}
-          aria-label={`Chapter ${i + 1}: ${c.title}`} title={`${i + 1} · ${c.title}`}
+          aria-label={`Chapter ${i + 1}: ${nodeLabel(c)}`} title={`${i + 1} · ${nodeLabel(c)}`}
           aria-pressed={c.id === activeId}
           onClick={() => onSelect(c.id)}
         >

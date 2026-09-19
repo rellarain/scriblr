@@ -1,4 +1,5 @@
 import type { OutlineNode, OutlineNodeKind } from '../../../api/types'
+import { hasTime, timeChanged } from './timeSystem'
 import { OUTLINE_KIND_ORDER } from '../../../api/types'
 
 // Pure helpers over the flat outline list (parentId + order), shared by the
@@ -69,9 +70,10 @@ export interface SceneChanges { location: boolean; time: boolean; action: boolea
 // Which of a scene's fields differ from the previous scene. The first scene
 // has nothing to compare against and an empty value is never highlighted.
 export function sceneChanges(scene: OutlineNode, previous: OutlineNode | undefined): SceneChanges {
-  const differs = (key: 'location' | 'time' | 'action') =>
+  const differs = (key: 'location' | 'action') =>
     Boolean(previous) && Boolean(scene[key]) && scene[key] !== previous![key]
-  return { location: differs('location'), time: differs('time'), action: differs('action') }
+  const timeDiffers = Boolean(previous) && hasTime(scene.timeValue) && timeChanged(scene.timeValue, previous!.timeValue)
+  return { location: differs('location'), time: timeDiffers, action: differs('action') }
 }
 
 // A node's parent must be strictly shallower (not necessarily adjacent).

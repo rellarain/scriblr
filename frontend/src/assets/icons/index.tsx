@@ -473,3 +473,19 @@ export function MoonIcon(props: IconProps) {
     <path d="M20 14.5A8.5 8.5 0 1 1 9.5 4a7 7 0 0 0 10.5 10.5Z" />
   </IconBase>
 }
+
+export function SaveIcon(props: IconProps) {
+  return <IconBase {...props}>
+    <path d="M5 3h11l4 4v13a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1V4a1 1 0 0 1 1-1Z" />
+    <path d="M8 3v5h7V3" />
+    <path d="M7 21v-7h10v7" />
+  </IconBase>
+}
+
+// A counter-clockwise arrow: go back to the last saved version.
+export function RestoreIcon(props: IconProps) {
+  return <IconBase {...props}>
+    <path d="M3 4v5h5" />
+    <path d="M3.5 9A9 9 0 1 1 3 12" />
+  </IconBase>
+}

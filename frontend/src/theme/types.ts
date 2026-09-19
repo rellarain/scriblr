@@ -38,4 +38,11 @@ export type Handedness = 'left' | 'right'
 export interface UiSettings {
   viewAs: Role | null
   handedness: Handedness
+  // Autosave: on/off, and the seconds of inactivity before an editor saves on
+  // its own (30..600, in steps of 30).
+  autosaveEnabled: boolean
+  autosaveSeconds: number
 }
+
+export const AUTOSAVE_STEP_SECONDS = 30
+export const AUTOSAVE_MAX_SECONDS = 600

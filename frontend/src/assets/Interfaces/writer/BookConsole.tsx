@@ -2,7 +2,9 @@ import type { OutlineNode } from '../../../api/types'
 import type { WriterWorkspace } from './useWriterWorkspace'
 import { BOOK_COMPONENTS, HELP_COMPONENT, SETTINGS_COMPONENT } from './consoleDefs'
 import { ChapterTabs, ConsoleTitleRow, NumberInput, Placeholder } from './shared'
+import { SaveControl } from '../../../components/SaveControl'
 import BookOutline from './BookOutline'
+import { systemForBook } from './timeSystem'
 import { useWordCounts } from './useWordCounts'
 
 // The 20 cover designs a book can wear, dark to light across the hues.
@@ -60,10 +62,12 @@ function BookCover({ w, book }: { w: WriterWorkspace; book: OutlineNode }) {
   const chapters = w.activeBookChapters
   const cover = book.color ?? DEFAULT_COVER
   const counts = useWordCounts(w.activeProjectId)
+  const timeSystems = w.activeProject?.settings.timeSystems ?? []
 
   return (
     <div className={luminance(cover) > LIGHT_COVER ? 'wrCoverWrap wrCoverWrap--light' : 'wrCoverWrap'} style={{ ['--wr-cover' as string]: cover }}>
       <div className="wrCover">
+        <div className="wrCoverSave"><SaveControl status={w.saveStatus} onSave={() => { void w.saveNow() }} onRestore={w.restoreSaved} buttonClassName="wrSmallBtn wrSaveBtn" /></div>
         <div className="wrCoverSpine" />
         <div className="wrCoverFrame">
           <div className="wrCoverHead">
@@ -95,6 +99,17 @@ function BookCover({ w, book }: { w: WriterWorkspace; book: OutlineNode }) {
           </div>
 
           <div className="wrCoverRow">
+            {timeSystems.length > 1 && (
+              <label className="wrCoverField">
+                <span className="wrCoverFieldHead"><span>Time system</span></span>
+                <select
+                  className="wrCoverSelect" value={systemForBook(timeSystems, book).id}
+                  onChange={e => w.updateOutlineNode(book.id, { timeSystemId: e.target.value })}
+                >
+                  {timeSystems.map(sys => <option key={sys.id} value={sys.id}>{sys.name}</option>)}
+                </select>
+              </label>
+            )}
             <GoalField
               label="Chapter target" current={chapters.length} goal={book.chapterCountTarget}
               onChange={n => w.updateOutlineNode(book.id, { chapterCountTarget: n })}

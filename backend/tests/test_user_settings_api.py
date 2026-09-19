@@ -21,7 +21,7 @@ def test_get_seeds_defaults_and_is_stable(client: TestClient) -> None:
     assert body["theme"]["zones"]["day"]["configured"] is True
     assert body["theme"]["zones"]["night"]["configured"] is False
     assert body["theme"]["zones"]["day"]["palette"]["theme"] == {"h": 330, "s": 30}
-    assert body["ui"] == {"viewAs": None, "handedness": "right"}
+    assert body["ui"] == {"viewAs": None, "handedness": "right", "autosaveEnabled": True, "autosaveSeconds": 30}
     assert client.get("/api/user-settings").json() == body
 
 
@@ -61,7 +61,7 @@ def test_put_theme_rejects_out_of_range_values(client: TestClient) -> None:
 def test_put_ui(client: TestClient) -> None:
     resp = client.put("/api/user-settings/ui", json={"viewAs": "user", "handedness": "left"})
     assert resp.status_code == 200
-    assert resp.json()["ui"] == {"viewAs": "user", "handedness": "left"}
+    assert resp.json()["ui"] == {"viewAs": "user", "handedness": "left", "autosaveEnabled": True, "autosaveSeconds": 30}
     assert client.put("/api/user-settings/ui", json={"viewAs": "root", "handedness": "left"}).status_code == 422
 
 
@@ -124,3 +124,13 @@ def test_settings_persist_across_app_instances(storage_root: Path, app_data_root
 
     make().put("/api/user-settings/kv/scriblr.writer.chapterMode", json={"value": "draft"})
     assert make().get("/api/user-settings").json()["kv"] == {"scriblr.writer.chapterMode": "draft"}
+
+
+def test_put_ui_autosave(client: TestClient) -> None:
+    resp = client.put("/api/user-settings/ui", json={"autosaveEnabled": False, "autosaveSeconds": 600})
+    assert resp.status_code == 200
+    ui = resp.json()["ui"]
+    assert ui["autosaveEnabled"] is False and ui["autosaveSeconds"] == 600
+    assert client.get("/api/user-settings").json()["ui"]["autosaveSeconds"] == 600
+    for bad in (0, 15, 45, 630):
+        assert client.put("/api/user-settings/ui", json={"autosaveSeconds": bad}).status_code == 422

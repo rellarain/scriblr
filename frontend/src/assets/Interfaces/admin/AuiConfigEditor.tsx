@@ -202,7 +202,7 @@ function AddForm({ label, onAdd }: { label: string; onAdd: () => void }) {
 // instead of their own cards, and are never collapsible themselves.
 function ReadOnlyComponent({ node, tab, config }: { node: AuiConfigNode; tab: AuiConfigTabKey; config: AuiConfigWorkspace }) {
   const collapsed = config.isCollapsed(node.id, node.kind)
-  const features = config.childrenOf(tab, node.id)
+  const features = config.childrenOf(tab, node.id, 'published')
   return (
     <div className="auiConfigNode auiConfigNode--component">
       <div className="auiConfigReadOnlyTitleRow">
@@ -226,7 +226,7 @@ function ReadOnlyComponent({ node, tab, config }: { node: AuiConfigNode; tab: Au
 
 function ReadOnlyConsole({ node, tab, config }: { node: AuiConfigNode; tab: AuiConfigTabKey; config: AuiConfigWorkspace }) {
   const collapsed = config.isCollapsed(node.id, node.kind)
-  const components = config.childrenOf(tab, node.id)
+  const components = config.childrenOf(tab, node.id, 'published')
   return (
     <div className="auiConfigNode auiConfigNode--console">
       <div className="auiConfigReadOnlyTitleRow">
@@ -245,8 +245,9 @@ function ReadOnlyConsole({ node, tab, config }: { node: AuiConfigNode; tab: AuiC
   )
 }
 
+// The read-only view shows the PUBLISHED copy (the draft, for a tab that was never published).
 export function AuiConfigReadOnly({ tab, config }: AuiConfigEditorProps) {
-  const consoles = config.childrenOf(tab, null)
+  const consoles = config.childrenOf(tab, null, 'published')
   return (
     <div className="aUIOutline aUIOutline--readOnly">
       {config.status === 'loading' && <p className="feedbackCardMeta">Loading configuration…</p>}

@@ -30,10 +30,13 @@ export interface OutlineNode {
   chapterCountTarget: number | null
   plotlineIds: string[]
   wordCountGoal: number | null
+  // Book-only: which of the project's time systems its scenes use.
+  timeSystemId?: string | null
   // Scene-only (see backend OutlineNode): where/when/what instead of a
   // title and synopsis. Absent on trees saved before these fields existed.
+  // `timeValue` is one number per unit of the book's time system.
   location?: string
-  time?: string
+  timeValue?: Record<string, number>
   action?: string
 }
 
@@ -86,6 +89,22 @@ export interface ProjectManifest {
   revisionChapters: string[]
 }
 
+export type TimeUnitKind = 'number' | 'named' | 'clock'
+
+export interface TimeUnit {
+  id: string
+  label: string
+  kind: TimeUnitKind
+  names: string[]
+}
+
+// How a project's scenes structure their Time (see backend TimeSystem).
+export interface TimeSystem {
+  id: string
+  name: string
+  units: TimeUnit[]
+}
+
 export interface ProjectSettings {
   wordCountTarget: number | null
   bookCountTarget: number | null
@@ -96,6 +115,7 @@ export interface ProjectSettings {
   outlineLevels: OutlineNodeKind[]
   plotLevels: PlotNodeKind[]
   readLevels: OutlineNodeKind[]
+  timeSystems: TimeSystem[]
 }
 
 export interface ProjectIndex {
@@ -131,7 +151,23 @@ export interface AuiConfigNode {
   idea: string
 }
 
+// A frozen copy of one Configuration tab, made by Publish.
+export interface PublishedTab {
+  version: number
+  publishedAt: string
+  nodes: AuiConfigNode[]
+}
+
 export interface AuiConfig {
+  schemaVersion: number
+  // The working draft (every tab, flat).
+  nodes: AuiConfigNode[]
+  // Per-tab published snapshots, keyed by tab; a tab never published is absent.
+  published: Record<string, PublishedTab>
+}
+
+// What a save sends: only the draft. The server keeps the published copies.
+export interface AuiConfigDraft {
   schemaVersion: number
   nodes: AuiConfigNode[]
 }

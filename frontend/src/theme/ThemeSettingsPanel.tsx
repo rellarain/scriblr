@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState, type PointerEvent as ReactPointerEvent } from 'react'
-import { setTheme, setUi, useSettings } from '../settings/settingsStore'
+import { restoreSettings, saveSettingsNow, setTheme, setUi, useSettings, useSettingsSaveStatus } from '../settings/settingsStore'
+import { SaveControl } from '../components/SaveControl'
 import { CURRENT_USER } from '../userSeed'
 import { ZONE_ICON } from './ThemeZoneToggles'
 import { contrastBand, deriveTokens, effectiveBrightness } from './tokens'
@@ -192,6 +193,7 @@ function ZoneEditor({ zoneKey, role }: { zoneKey: ZoneKey; role: Role }) {
 function ThemeSettingsPanel() {
   const { theme, ui } = useSettings()
   const { effectiveRole } = useThemeState()
+  const saveStatus = useSettingsSaveStatus()
   const [selected, setSelected] = useState<ZoneKey>('day')
 
   const configured = theme.zones[selected].configured
@@ -206,7 +208,10 @@ function ThemeSettingsPanel() {
 
   return (
     <div className="themeSettings">
-      <h2>Theme</h2>
+      <div className="themeHeader">
+        <h2>Theme</h2>
+        <SaveControl status={saveStatus} onSave={() => { void saveSettingsNow() }} onRestore={restoreSettings} buttonClassName="themeBtn themeBtn--primary" />
+      </div>
 
       <div className="themeRow">
         <label className="themeSwitch">

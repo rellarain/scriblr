@@ -8,8 +8,12 @@ export class ApiError extends Error {
 }
 
 async function request<T>(path: string, init?: RequestInit): Promise<T> {
+  // A request with a body outlives the page (a save started as the window closes
+  // still completes); the browser caps keepalive bodies at 64KB.
+  const keepalive = typeof init?.body === 'string' && init.body.length < 60_000
   const response = await fetch(`/api${path}`, {
     headers: { 'Content-Type': 'application/json' },
+    keepalive,
     ...init,
   })
 

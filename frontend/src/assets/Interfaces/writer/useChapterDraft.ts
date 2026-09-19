@@ -1,27 +1,44 @@
 import { useEffect, useRef, useState } from 'react'
 import { getChapterDraft, putMomentDraft } from '../../../api/draftFetch'
+import { useAutosave } from '../../../lib/useAutosave'
 
-const DEBOUNCE_MS = 800
+// What one save sends: the moments whose text changed since they were last
+// saved (with the ids they belong to, so a save that runs after switching
+// chapters still lands on the right one).
+interface DraftChanges { projectId: string; chapterId: string; changes: Record<string, string> }
 
-// One chapter's draft: every moment's body loaded at once, with a debounced
-// save per moment as it is typed.
+// One chapter's draft: every moment's body loaded at once, autosaved as it is
+// typed (see lib/useAutosave.ts: after a pause, and flushed on navigation,
+// unmount and via flush()).
 export function useChapterDraft(projectId: string | null, chapterId: string | null) {
   const [bodies, setBodies] = useState<Record<string, string>>({})
   const [status, setStatus] = useState<'idle' | 'loading' | 'error'>('idle')
-  const [error, setError] = useState<string | undefined>(undefined)
-  const [saving, setSaving] = useState(false)
-  const timers = useRef<Map<string, ReturnType<typeof setTimeout>>>(new Map())
+  const [loadError, setLoadError] = useState<string | undefined>(undefined)
+  const [reloads, setReloads] = useState(0)
   const latest = useRef<Record<string, string>>({})
+  // Text changed since the last successful save.
+  const unsaved = useRef<Record<string, string>>({})
+
+  const autosave = useAutosave<DraftChanges>({
+    save: async ({ projectId: pid, chapterId: cid, changes }) => {
+      await Promise.all(Object.entries(changes).map(([momentId, body]) => putMomentDraft(pid, cid, momentId, body)))
+      // Anything typed again meanwhile is still unsaved.
+      for (const [momentId, body] of Object.entries(changes)) {
+        if (unsaved.current[momentId] === body) delete unsaved.current[momentId]
+      }
+    },
+  })
+  const flushRef = useRef(autosave.flush)
+  flushRef.current = autosave.flush
 
   useEffect(() => {
     let cancelled = false
-    timers.current.forEach(t => clearTimeout(t))
-    timers.current.clear()
+    unsaved.current = {}
     setBodies({})
     latest.current = {}
     if (!projectId || !chapterId) { setStatus('idle'); return }
     setStatus('loading')
-    setError(undefined)
+    setLoadError(undefined)
     getChapterDraft(projectId, chapterId)
       .then(draft => {
         if (cancelled) return
@@ -33,40 +50,39 @@ export function useChapterDraft(projectId: string | null, chapterId: string | nu
       .catch(err => {
         if (cancelled) return
         setStatus('error')
-        setError(err instanceof Error ? err.message : 'Failed to load the draft')
+        setLoadError(err instanceof Error ? err.message : 'Failed to load the draft')
       })
-    return () => { cancelled = true }
-  }, [projectId, chapterId])
-
-  // Flush pending saves when leaving the chapter/project.
-  useEffect(() => () => {
-    // projectId/chapterId here are this effect's own (the ones being left).
-    timers.current.forEach((t, momentId) => {
-      clearTimeout(t)
-      if (projectId && chapterId) void putMomentDraft(projectId, chapterId, momentId, latest.current[momentId] ?? '')
-    })
-    timers.current.clear()
-  }, [projectId, chapterId])
+    return () => {
+      cancelled = true
+      // Leaving this chapter: save what was typed (the value already carries
+      // this chapter's ids).
+      void flushRef.current()
+    }
+  }, [projectId, chapterId, reloads])
 
   function setBody(momentId: string, body: string) {
     if (!projectId || !chapterId) return
     latest.current = { ...latest.current, [momentId]: body }
+    unsaved.current = { ...unsaved.current, [momentId]: body }
     setBodies(latest.current)
-    const pending = timers.current.get(momentId)
-    if (pending) clearTimeout(pending)
-    timers.current.set(momentId, setTimeout(async () => {
-      timers.current.delete(momentId)
-      setSaving(true)
-      try {
-        await putMomentDraft(projectId, chapterId, momentId, latest.current[momentId] ?? '')
-        setError(undefined)
-      } catch (err) {
-        setError(err instanceof Error ? err.message : 'Failed to save the draft')
-      } finally {
-        setSaving(false)
-      }
-    }, DEBOUNCE_MS))
+    autosave.schedule({ projectId, chapterId, changes: { ...unsaved.current } })
   }
 
-  return { bodies, status, error, saving, setBody }
+  // Throw away the text typed since the last save and load the saved draft again.
+  async function restore() {
+    await autosave.discard()
+    unsaved.current = {}
+    setReloads(n => n + 1)
+  }
+
+  return {
+    bodies, status, setBody, restore,
+    error: loadError ?? autosave.error,
+    saving: autosave.saving,
+    dirty: autosave.dirty,
+    saveError: autosave.error,
+    lastSavedAt: autosave.lastSavedAt,
+    flush: autosave.flush,
+    saveNow: autosave.flush,
+  }
 }

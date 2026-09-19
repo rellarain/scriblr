@@ -972,6 +972,37 @@ div.auiConfigReadOnlyIdea {
   padding: 10px 16px 0;
   .aUIConsoleTitle { padding: 0; }
 }
+// AUI's Configuration tabs: the publish state, Save draft and Publish (when
+// unlocked), and the lock toggle, at the right of the title row. Admin
+// features carry the second accent.
+.auiConfigActions { display: flex; align-items: center; justify-content: flex-end; flex-wrap: wrap; gap: 8px 12px; }
+.auiPublishBadge {
+  font-size: 11px;
+  color: var(--ink-muted);
+  white-space: nowrap;
+  &--pending { color: var(--ink); font-weight: 700; }
+}
+.auiSaveDraftBtn, .auiPublishBtn {
+  border: 0;
+  padding: 6px 14px;
+  border-radius: 6px;
+  font-size: 12px;
+  font-weight: 700;
+  white-space: nowrap;
+  cursor: pointer;
+  &:disabled { opacity: 0.4; cursor: default; }
+}
+.auiSaveDraftBtn {
+  color: var(--ink);
+  background: rgb(0 0 0 / calc(0.25 * var(--shade-k)));
+  &:hover:not(:disabled) { background: color-mix(in srgb, var(--ink) 14%, transparent); }
+}
+.auiPublishBtn {
+  color: var(--on-accent2);
+  background: var(--accent2);
+  &:hover:not(:disabled) { background: var(--accent2-hover); }
+}
+
 // UUI's version: the title with the theme-zone toggles at the right edge
 // (Dashboard only).
 .uUIConsoleTitleRow {

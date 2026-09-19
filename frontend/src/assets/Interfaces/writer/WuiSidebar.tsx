@@ -4,6 +4,7 @@ import type { WriterWorkspace } from './useWriterWorkspace'
 import { booksOf, buildChildIndex, chaptersOfBook, descendantsOf } from './outlineTree'
 import { ChevronDownIcon, ChevronLeftIcon, ChevronRightIcon, PlusIcon } from '../../icons'
 import { DeleteControl } from './shared'
+import { nodeLabel } from './plotTree'
 
 // The bookshelf look lives here and nowhere else in the Writer interface:
 // stacked project shelves when nothing is open, and -- once a project is
@@ -32,9 +33,9 @@ function Spine({ book, active, onOpen }: { book: OutlineNode; active: boolean; o
       className={active ? 'wrSpine wrSpine--active' : 'wrSpine'}
       style={{ height: SPINE_HEIGHT, width, ...(book.color ? { backgroundColor: book.color } : {}) }}
       onClick={onOpen}
-      title={book.title}
+      title={nodeLabel(book)}
     >
-      {width >= TITLE_MIN_WIDTH && <span>{book.title}</span>}
+      {width >= TITLE_MIN_WIDTH && <span>{nodeLabel(book)}</span>}
     </button>
   )
 }
@@ -195,7 +196,7 @@ function WuiSidebar({ workspace: w }: { workspace: WriterWorkspace }) {
         {w.books.length === 0 && <div className="wrMuted">No books yet.</div>}
         {w.books.map(b => (
           <button key={b.id} type="button" className="wrOutlineRow" onClick={() => w.openBook(b.id)}>
-            <span>{b.title}</span>
+            <span>{nodeLabel(b)}</span>
             <span className="wrOutlineMeta">{chaptersOfBook(w.outlineNodes, b.id).length} chapters</span>
           </button>
         ))}
@@ -203,10 +204,10 @@ function WuiSidebar({ workspace: w }: { workspace: WriterWorkspace }) {
 
       {w.activeBook && (
         <Panel
-          label="Book" value={w.activeBook.title} open={isOpen('book')} onToggle={() => toggle('book')}
+          label="Book" value={nodeLabel(w.activeBook)} open={isOpen('book')} onToggle={() => toggle('book')}
           onOpen={w.activeConsole !== 'book' || w.activeChapterId ? () => w.openBook(w.activeBook!.id) : undefined}
         >
-          {kv('Title', w.activeBook.title)}
+          {kv('Title', nodeLabel(w.activeBook))}
           {kv('Chapters', w.activeBook.chapterCountTarget ? `${bookChapters.length} of ${w.activeBook.chapterCountTarget} target` : bookChapters.length)}
           {w.activeBook.wordCountGoal != null && kv('Word goal', w.activeBook.wordCountGoal.toLocaleString())}
           {w.activeBook.synopsis && <div className="wrPanelText">{w.activeBook.synopsis}</div>}
@@ -217,7 +218,7 @@ function WuiSidebar({ workspace: w }: { workspace: WriterWorkspace }) {
               const depth = n.kind === 'chapter' && n.parentId !== w.activeBook!.id ? 1 : 0
               return n.kind === 'arc' ? (
                 <div key={n.id} className="wrOutlineRow wrOutlineRow--static" style={{ paddingLeft: 6 }}>
-                  <span>{n.title}</span><span className="wrOutlineMeta">arc</span>
+                  <span>{nodeLabel(n)}</span><span className="wrOutlineMeta">arc</span>
                 </div>
               ) : (
                 <button
@@ -225,7 +226,7 @@ function WuiSidebar({ workspace: w }: { workspace: WriterWorkspace }) {
                   className={n.id === w.activeChapterId ? 'wrOutlineRow wrOutlineRow--active' : 'wrOutlineRow'}
                   onClick={() => w.openChapter(n.id)}
                 >
-                  <span>{bookChapters.findIndex(c => c.id === n.id) + 1} · {n.title}</span>
+                  <span>{bookChapters.findIndex(c => c.id === n.id) + 1} · {nodeLabel(n)}</span>
                 </button>
               )
             })}
@@ -233,7 +234,7 @@ function WuiSidebar({ workspace: w }: { workspace: WriterWorkspace }) {
       )}
 
       {w.activeChapter && (
-        <Panel label="Chapter" value={`${chapterNumber} · ${w.activeChapter.title}`} open={isOpen('chapter')} onToggle={() => toggle('chapter')}>
+        <Panel label="Chapter" value={`${chapterNumber} · ${nodeLabel(w.activeChapter)}`} open={isOpen('chapter')} onToggle={() => toggle('chapter')}>
           {kv('Chapter', chapterNumber)}
           {kv('Moments', moments)}
           <div className="wrPanelHead">Outline</div>
