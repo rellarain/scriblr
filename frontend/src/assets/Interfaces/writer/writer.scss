@@ -1,0 +1,334 @@
+// The Writer page (WUI). All classes are prefixed `wr` and scoped under
+// `.wUI.wr`; colors come from the app's theme/accent/alert variables.
+
+.wUI.wr {
+  --wr-accent: hsl(var(--color-accent-h), var(--color-accent-s), var(--color-accent-l));
+  --wr-accent-light: hsl(var(--color-accent-h), var(--color-accent-s), calc(var(--color-accent-l) + 12%));
+  --wr-accent-dark: hsl(var(--color-accent-h), calc(var(--color-accent-s) - 20%), calc(var(--color-accent-l) - 14%));
+  --wr-alert: hsl(var(--color-alert-h), var(--color-alert-s), var(--color-alert-l));
+  --wr-side: hsl(var(--color-theme-h), var(--color-theme-s), calc(var(--color-theme-l) - 4%));
+  --wr-deep: hsl(var(--color-theme-h), var(--color-theme-s), calc(var(--color-theme-l) - 12%));
+  --wr-card: linear-gradient(160deg, hsl(32, 20%, 34%), hsl(32, 20%, 27%));
+  --wr-field: rgba(0, 0, 0, 0.25);
+  --wr-muted: rgba(255, 255, 255, 0.66);
+  --wr-page: #fbf9f4;
+  --wr-ink: hsl(var(--color-theme-h), 12%, 17%);
+  --wr-page-line: hsl(35, 18%, 84%);
+  --wr-page-soft: hsl(35, 30%, 95%);
+  --wr-page-muted: hsl(var(--color-theme-h), 8%, 42%);
+
+  flex-direction: row;
+  color: white;
+
+  // The app has no global button reset; :where() keeps this at zero extra
+  // specificity so every button class below still overrides it.
+  :where(button) { background: transparent; border: 0; padding: 0; margin: 0; color: inherit; font: inherit; cursor: pointer; }
+  :where(button:disabled) { cursor: default; }
+  input, textarea, select { font-family: inherit; }
+}
+
+.wr {
+  // ---------------------------------------------------------------- shared
+  .wrMuted { font-size: 12px; opacity: 0.7; margin: 0; }
+  .wrError { font-size: 12px; margin: 0; color: hsl(var(--color-alert-h), var(--color-alert-s), calc(var(--color-alert-l) + 22%)); }
+  .wrHint { font-size: 10px; opacity: 0.6; line-height: 1.4; margin: 0; }
+  .wrLabel { font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: 1px; opacity: 0.65; margin-bottom: 4px; display: block; }
+
+  .wrSmallBtn {
+    display: inline-flex; align-items: center; gap: 4px; padding: 4px 10px; border-radius: 4px;
+    font-size: 11px; font-weight: 700; background: rgba(0, 0, 0, 0.3); color: white; white-space: nowrap;
+    &:hover:not(:disabled) { background: var(--wr-accent-light); }
+    &:disabled { opacity: 0.4; cursor: default; }
+    &--accent { background: var(--wr-accent); }
+    &--light { background: hsl(35, 18%, 88%); color: var(--wr-ink); &:hover:not(:disabled) { background: hsl(32, 90%, 86%); } }
+  }
+  .wrLinkBtn { font-size: 11px; opacity: 0.8; text-decoration: underline; &:hover { opacity: 1; } &--title { font-size: 14px; font-weight: 700; text-decoration: none; opacity: 1; } }
+
+  // A quiet trash icon; on confirm the message replaces it in place.
+  .wrTrashBtn {
+    display: inline-flex; align-items: center; justify-content: center; width: 24px; height: 24px; border-radius: 4px;
+    opacity: 0.45; flex: 0 0 auto;
+    &:hover { opacity: 0.9; }
+    &--light { color: hsl(var(--color-theme-h), 8%, 50%); }
+    &--dark { color: white; }
+  }
+  .wrConfirm { display: inline-flex; align-items: center; gap: 8px; }
+  .wrConfirmText { font-size: 11px; }
+  .wrConfirm--light .wrConfirmText { color: hsl(var(--color-theme-h), 10%, 30%); }
+
+  .wrGrip {
+    display: inline-flex; align-items: center; cursor: grab; opacity: 0.55; flex: 0 0 auto; padding: 2px;
+    &:hover { opacity: 1; }
+    &--light { color: hsl(var(--color-theme-h), 8%, 40%); }
+  }
+
+  .wrChipRow { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; }
+  .wrChip {
+    display: inline-flex; align-items: center; gap: 5px; padding: 3px 10px; border-radius: 12px; background: rgba(0, 0, 0, 0.25); font-size: 11px;
+    button { opacity: 0.6; font-size: 13px; line-height: 1; &:hover { opacity: 1; } }
+    &--small { padding: 1px 8px; font-size: 10px; }
+  }
+  .wrChipAdd {
+    display: inline-flex; align-items: center; gap: 2px; border-radius: 12px; background: rgba(0, 0, 0, 0.18); padding: 0 4px 0 10px;
+    input { width: 110px; background: transparent; border: 0; outline: none; color: white; font-size: 11px; padding: 4px 0; &::placeholder { color: rgba(255, 255, 255, 0.5); } }
+    button { display: inline-flex; padding: 3px; opacity: 0.7; &:hover:not(:disabled) { opacity: 1; } &:disabled { opacity: 0.25; } }
+  }
+
+  .wrField {
+    width: 100%; box-sizing: border-box; background: var(--wr-field); border: 0; border-radius: 4px; color: white;
+    font-size: 13px; padding: 8px 10px; outline: none; resize: vertical;
+    &:focus { box-shadow: inset 0 0 0 1px var(--wr-accent); }
+    &::placeholder { color: rgba(255, 255, 255, 0.45); }
+  }
+
+  // ---------------------------------------------------------------- sidebar
+  .wrSidebar {
+    flex: 0 0 264px; width: 264px; height: 100%; box-sizing: border-box; overflow-y: auto; background: var(--wr-side);
+    padding: 14px; display: flex; flex-direction: column; gap: 14px; scrollbar-width: none;
+    &::-webkit-scrollbar { display: none; }
+  }
+  .wrBackLink { display: flex; align-items: center; gap: 4px; font-size: 11px; opacity: 0.75; padding: 0 2px; text-align: left; &:hover { opacity: 1; } }
+
+  .wrShelf { display: flex; flex-direction: column; gap: 5px; }
+  .wrShelfHeader { display: flex; align-items: center; gap: 8px; padding: 0 2px; }
+  .wrShelfName { font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 1px; color: var(--wr-muted); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; &--selected { color: white; } }
+  .wrShelfMeta { font-size: 10px; opacity: 0.6; margin-right: auto; white-space: nowrap; }
+  .wrShelfBooks { display: flex; align-items: flex-end; gap: 5px; padding: 0 8px; min-height: 104px; overflow-x: auto; scrollbar-width: none; &::-webkit-scrollbar { display: none; } }
+  .wrShelfEmpty { font-size: 11px; opacity: 0.6; align-self: center; }
+  .wrShelfBoard { height: 8px; background: linear-gradient(180deg, rgba(0, 0, 0, 0.5), rgba(0, 0, 0, 0.25)); border-radius: 0 0 2px 2px; }
+  .wrSpine {
+    flex: 0 0 auto; width: 30px; border-radius: 3px 3px 0 0; background: var(--wr-accent-dark); color: white; padding: 8px 2px;
+    display: flex; align-items: center; justify-content: center; writing-mode: vertical-rl; font-size: 11px; font-weight: 700; letter-spacing: 0.3px;
+    box-shadow: 1px 0 3px rgba(0, 0, 0, 0.35); overflow: hidden;
+    &:hover { filter: brightness(1.15); }
+    &--active { background: var(--wr-accent); box-shadow: 0 0 0 2px white; }
+  }
+  .wrNewProject {
+    display: flex; flex-direction: column; gap: 6px;
+    input { background: var(--wr-field); border: 0; border-radius: 4px; color: white; font-size: 12px; padding: 8px 10px; outline: none; &::placeholder { color: rgba(255, 255, 255, 0.45); } }
+    .wrSmallBtn { justify-content: center; padding: 8px; }
+  }
+
+  .wrPanel { background: rgba(0, 0, 0, 0.2); border-radius: 4px; }
+  .wrPanelHeaderRow { display: flex; align-items: center; padding-right: 10px; }
+  .wrPanelHeader { display: flex; align-items: center; gap: 8px; flex: 1 1 auto; min-width: 0; padding: 8px 10px; text-align: left; }
+  .wrPanelOpen { flex: 0 0 auto; margin-left: 8px; }
+  .wrPanelLabel { font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: 1px; opacity: 0.7; }
+  .wrPanelValue { font-size: 12px; font-weight: 600; margin-left: auto; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .wrPanelBody { padding: 0 12px 12px 12px; display: flex; flex-direction: column; gap: 5px; font-size: 12px; line-height: 1.4; }
+  .wrPanelHead { margin-top: 4px; font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: 1px; opacity: 0.6; }
+  .wrPanelText { opacity: 0.9; }
+  .wrKv { display: flex; justify-content: space-between; gap: 10px; span:first-child { opacity: 0.6; } span:last-child { text-align: right; } }
+  .wrOutlineRow {
+    display: flex; align-items: center; gap: 6px; width: 100%; text-align: left; padding: 3px 6px; border-radius: 3px; font-size: 11px; opacity: 0.88;
+    &:not(.wrOutlineRow--static):hover { background: rgba(255, 255, 255, 0.1); opacity: 1; }
+    &--active { background: var(--wr-accent); font-weight: 700; opacity: 1; }
+  }
+  .wrOutlineMeta { margin-left: auto; opacity: 0.6; font-weight: 400; font-size: 10px; white-space: nowrap; }
+
+  // ---------------------------------------------------------------- main
+  .wrMain { flex: 1 1 auto; min-width: 0; height: 100%; display: flex; flex-direction: row; }
+  .wrIconColumn { flex: 0 0 52px; box-sizing: border-box; height: 100%; padding: 12px 10px; display: flex; flex-direction: column; gap: 6px; }
+  .wrIconColumnTail { margin-top: auto; display: flex; flex-direction: column; gap: 6px; }
+  .wrIconBtn {
+    width: 32px; height: 32px; border-radius: 4px; display: flex; align-items: center; justify-content: center; color: white;
+    &:hover { background: var(--wr-accent-light); }
+    &--active { background: var(--wr-accent); }
+  }
+  .wrIconColumnTail .wrIconBtn:not(.wrIconBtn--active) { background: rgba(0, 0, 0, 0.25); }
+  .wrContent { flex: 1 1 auto; min-width: 0; min-height: 0; height: 100%; box-sizing: border-box; display: flex; flex-direction: column; padding: 0 16px 14px 6px; position: relative; }
+  .wrContent--flush { padding: 0 6px 0 0; }
+  .wrConsoleBody { flex: 1 1 auto; min-height: 0; display: flex; flex-direction: column; overflow-y: auto; scrollbar-width: none; &::-webkit-scrollbar { display: none; } }
+
+  .wrTitleRow { flex: 0 0 auto; height: 44px; display: flex; align-items: center; gap: 12px; }
+  .wrConsoleTitle { margin: 0; font-size: 18px; font-weight: 700; text-transform: uppercase; letter-spacing: 1.5px; }
+  .wrComponentName { font-size: 13px; opacity: 0.7; }
+  .wrTitleRight { margin-left: auto; display: flex; align-items: center; gap: 14px; }
+  .wrSaveState { font-size: 11px; opacity: 0.6; }
+  .wrPlaceholder { padding: 6px 2px; h2 { font-size: 15px; margin: 0 0 6px; text-transform: uppercase; letter-spacing: 1px; } p { font-size: 13px; opacity: 0.85; margin: 0; } }
+
+  .wrSegmented { display: flex; padding: 3px; gap: 3px; background: var(--wr-field); border-radius: 4px; }
+  .wrSegBtn { padding: 5px 12px; border-radius: 3px; font-size: 12px; font-weight: 700; &--active { background: var(--wr-accent); } &:disabled { opacity: 0.4; cursor: default; } }
+
+  // ---------------------------------------------------------------- dashboard
+  .wrColumns { flex: 1 1 auto; min-height: 0; display: flex; gap: 18px; &--single { .wrColumn { max-width: 640px; } } }
+  .wrColumn { flex: 1 1 0; min-width: 0; display: flex; flex-direction: column; gap: 12px; overflow-y: auto; scrollbar-width: none; &::-webkit-scrollbar { display: none; } &--narrow { flex: 0 0 290px; } }
+  .wrColumnTitle { display: flex; align-items: center; font-size: 12px; font-weight: 700; text-transform: uppercase; letter-spacing: 1px; padding: 0 2px; }
+  .wrColumnAction { margin-left: auto; }
+  .wrCard { background: var(--wr-card); border-radius: 8px; padding: 16px 18px; box-shadow: 0 4px 14px rgba(0, 0, 0, 0.3); display: flex; flex-direction: column; gap: 10px; }
+  .wrCardTitle { font-size: 12px; font-weight: 700; text-transform: uppercase; letter-spacing: 1px; }
+  .wrChecklist { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 8px; }
+  .wrCheckItem { display: flex; align-items: center; gap: 8px; font-size: 13px; label { display: flex; align-items: center; gap: 10px; flex: 1; min-width: 0; cursor: pointer; } input { accent-color: var(--wr-accent); } &--done span { opacity: 0.5; text-decoration: line-through; } }
+  .wrInlineAdd { display: flex; gap: 6px; input { flex: 1; min-width: 0; background: var(--wr-field); border: 0; border-radius: 4px; color: white; font-size: 12px; padding: 6px 10px; outline: none; &::placeholder { color: rgba(255, 255, 255, 0.45); } } }
+  .wrStatRow { display: flex; gap: 18px; div { display: flex; flex-direction: column; } strong { font-size: 24px; } span { font-size: 10px; text-transform: uppercase; letter-spacing: 1px; opacity: 0.65; } }
+  .wrBarRow { display: flex; flex-direction: column; gap: 4px; }
+  .wrBarLabel { display: flex; justify-content: space-between; font-size: 12px; span:last-child { opacity: 0.7; } }
+  .wrBarTrack { height: 8px; border-radius: 4px; background: rgba(0, 0, 0, 0.35); overflow: hidden; }
+  .wrBarFill { height: 100%; background: var(--wr-accent); }
+  .wrNotes { flex: 1 1 auto; min-height: 0; overflow-y: auto; display: flex; flex-direction: column; gap: 10px; scrollbar-width: none; &::-webkit-scrollbar { display: none; } }
+  .wrNote {
+    background: var(--wr-card); border-radius: 6px; padding: 10px 12px; display: flex; flex-direction: column; gap: 4px; box-shadow: 0 2px 8px rgba(0, 0, 0, 0.25); flex: 0 0 auto;
+    &--editing { background: hsl(32, 22%, 38%); box-shadow: inset 3px 0 0 var(--wr-accent), 0 4px 12px rgba(0, 0, 0, 0.35); }
+  }
+  .wrNoteTitle { width: 100%; box-sizing: border-box; border: 0; outline: none; background: transparent; color: white; font-size: 13px; font-weight: 700; padding: 0; &::placeholder { color: rgba(255, 255, 255, 0.4); } }
+  .wrNoteBody { width: 100%; box-sizing: border-box; border: 0; outline: none; resize: none; background: transparent; color: rgba(255, 255, 255, 0.85); font-size: 12px; line-height: 1.45; padding: 0; &::placeholder { color: rgba(255, 255, 255, 0.4); } }
+  .wrNoteFoot { display: flex; justify-content: flex-end; }
+
+  // ---------------------------------------------------------------- plot
+  .wrPlotView { flex: 1 1 auto; min-height: 0; display: flex; gap: 16px; }
+  .wrPlotNav { flex: 0 0 250px; min-height: 0; display: flex; flex-direction: column; gap: 8px; background: rgba(0, 0, 0, 0.16); border-radius: 6px; padding: 10px; }
+  .wrPlotNavHead { display: flex; align-items: center; justify-content: space-between; font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: 1px; span { opacity: 0.65; } }
+  .wrPlotNavRows { flex: 1 1 auto; min-height: 0; overflow-y: auto; display: flex; flex-direction: column; gap: 3px; scrollbar-width: none; &::-webkit-scrollbar { display: none; } }
+  .wrNavRow {
+    display: flex; align-items: center; gap: 6px; padding: 5px 8px 5px 8px; border-radius: 4px; font-size: 12px; background: rgba(0, 0, 0, 0.14);
+    &:hover { background: rgba(255, 255, 255, 0.1); }
+    &--active { background: var(--wr-accent); font-weight: 700; &:hover { background: var(--wr-accent); } }
+  }
+  .wrNavChevron { display: inline-flex; flex: 0 0 auto; transition: transform 0.15s; }
+  .wrNavMark { width: 4px; height: 14px; border-radius: 2px; background: hsl(var(--color-theme-h), 38%, 62%); flex: 0 0 auto; }
+  .wrNavLabel { flex: 1; min-width: 0; text-align: left; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .wrNavCount { font-size: 11px; opacity: 0.7; }
+  .wrPlotBody { flex: 1 1 auto; min-width: 0; min-height: 0; display: flex; flex-direction: column; gap: 10px; overflow: auto; scrollbar-width: none; &::-webkit-scrollbar { display: none; } }
+
+  .wrCardPanel { background: var(--wr-card); border-radius: 8px; padding: 16px 18px; box-shadow: 0 4px 14px rgba(0, 0, 0, 0.3); display: flex; flex-direction: column; gap: 12px; }
+  .wrCardPanelHead { display: flex; align-items: center; gap: 10px; }
+  .wrKindBadge { font-size: 10px; text-transform: uppercase; letter-spacing: 0.5px; opacity: 0.7; flex: 0 0 auto; }
+  .wrTitleField { flex: 1; min-width: 0; background: var(--wr-field); border: 0; border-radius: 4px; color: white; font-size: 13px; font-weight: 700; padding: 8px 10px; outline: none; &:focus { box-shadow: inset 0 0 0 1px var(--wr-accent); } }
+  .wrChildRows { display: flex; flex-direction: column; gap: 6px; }
+  .wrChildRowsHead { display: flex; align-items: center; justify-content: space-between; gap: 10px; .wrLabel { margin-bottom: 0; } }
+  .wrChildRow { display: flex; align-items: center; gap: 12px; width: 100%; text-align: left; padding: 10px 12px; border-radius: 4px; background: rgba(0, 0, 0, 0.22); &:hover { background: rgba(255, 255, 255, 0.1); } }
+  .wrChildRowTitle { font-size: 13px; font-weight: 700; flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .wrChildRowMeta { display: flex; gap: 5px; }
+  .wrProjectOutline { display: flex; flex-direction: column; gap: 14px; max-width: 720px; }
+
+  .wrPlotlineLayout { flex: 1 1 auto; min-height: 0; display: flex; gap: 16px; }
+  .wrPlotlineLeft { flex: 0 0 350px; min-height: 0; display: flex; flex-direction: column; gap: 14px; }
+  .wrPlotlineRight { flex: 1 1 auto; min-width: 320px; min-height: 0; display: flex; flex-direction: column; gap: 14px; }
+  .wrFieldRow { display: flex; align-items: center; gap: 10px; > span { width: 88px; flex: 0 0 auto; font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: 1px; opacity: 0.65; } .wrField { padding: 6px 10px; font-size: 12px; } }
+  .wrUnassigned { flex: 1 1 auto; min-height: 0; display: flex; flex-direction: column; gap: 8px; background: rgba(0, 0, 0, 0.16); border-radius: 8px; padding: 12px 14px; &--over { outline: 2px dashed var(--wr-accent-light); outline-offset: 3px; } }
+  .wrPointList { flex: 1 1 auto; min-height: 0; overflow-y: auto; display: flex; flex-direction: column; gap: 6px; scrollbar-width: none; &::-webkit-scrollbar { display: none; } }
+  .wrPoint { display: flex; align-items: flex-start; gap: 8px; padding: 8px 10px; border-radius: 4px; background: rgba(0, 0, 0, 0.25); border-left: 3px solid var(--wr-alert); &--dragging { opacity: 0.35; } }
+  .wrPointFields { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 2px; }
+  .wrPointTitle { width: 100%; box-sizing: border-box; background: transparent; border: 0; outline: none; color: white; font-size: 12px; font-weight: 700; padding: 0; }
+  .wrPointBody { width: 100%; box-sizing: border-box; background: transparent; border: 0; outline: none; color: rgba(255, 255, 255, 0.7); font-size: 11px; padding: 0; &::placeholder { color: rgba(255, 255, 255, 0.35); } }
+  .wrOutlinePanel { flex: 1 1 auto; min-height: 0; display: flex; flex-direction: column; gap: 8px; background: rgba(0, 0, 0, 0.16); border-radius: 8px; padding: 12px 14px; }
+  .wrTargetList { flex: 1 1 auto; min-height: 0; overflow-y: auto; display: flex; flex-direction: column; gap: 5px; scrollbar-width: none; &::-webkit-scrollbar { display: none; } }
+  .wrTarget { display: flex; align-items: center; gap: 10px; border-radius: 4px; background: rgba(0, 0, 0, 0.22); padding: 8px 12px; &--over { outline: 2px dashed var(--wr-accent-light); outline-offset: 1px; background: rgba(255, 255, 255, 0.12); } }
+  .wrTargetLabel { font-size: 12px; &--book { font-weight: 700; } }
+  .wrTargetChips { margin-left: auto; display: flex; flex-wrap: wrap; gap: 5px; justify-content: flex-end; }
+  .wrPointChip { display: inline-flex; align-items: center; gap: 6px; padding: 3px 8px; border-radius: 12px; background: var(--wr-accent-dark); font-size: 11px; cursor: grab; button { opacity: 0.7; &:hover { opacity: 1; } } }
+
+  // ---------------------------------------------------------------- chapter tabs
+  .wrChapterTabs { flex: 0 0 38px; margin-left: -1px; padding-top: 28px; padding-bottom: 8px; box-sizing: border-box; max-height: 100%; display: flex; flex-direction: column; gap: 5px; overflow-y: auto; scrollbar-width: none; &::-webkit-scrollbar { display: none; } }
+  .wrChapterTab {
+    flex: 0 0 auto; width: 34px; height: 44px; border-radius: 0 8px 8px 0; display: flex; align-items: center; justify-content: center; font-size: 15px; font-weight: 700;
+    color: white; background: var(--wr-accent-dark); box-shadow: 1px 1px 3px rgba(0, 0, 0, 0.3); margin-left: -1px;
+    &:hover { filter: brightness(1.15); }
+    &--add { height: 34px; background: rgba(0, 0, 0, 0.25); box-shadow: none; margin-top: 3px; }
+  }
+  .wrChapterTabs--page .wrChapterTab--active { width: 38px; margin-left: 0; background: var(--wr-page); color: var(--wr-ink); box-shadow: none; }
+  .wrChapterTabs--cover { padding-top: 40px; .wrChapterTab { background: color-mix(in srgb, var(--wr-cover) 62%, white); } .wrChapterTab--add { background: rgba(0, 0, 0, 0.25); } .wrChapterTab--active { width: 38px; margin-left: 0; background: var(--wr-accent); } }
+
+  // ---------------------------------------------------------------- book cover
+  .wrCoverWrap { --wr-cover: #5a3a1e; flex: 1 1 auto; min-height: 0; display: flex; }
+  .wrCover { position: relative; flex: 1 1 auto; min-width: 0; height: 100%; overflow: hidden; background: linear-gradient(135deg, var(--wr-cover), color-mix(in srgb, var(--wr-cover) 65%, black)); box-shadow: 0 6px 20px rgba(0, 0, 0, 0.45); }
+  .wrCoverSpine { position: absolute; left: 0; top: 0; bottom: 0; width: 34px; background: linear-gradient(90deg, rgba(0, 0, 0, 0.55), rgba(0, 0, 0, 0.25)); box-shadow: inset -2px 0 0 rgba(255, 220, 170, 0.18); }
+  .wrCoverFrame { position: absolute; left: 56px; top: 18px; right: 22px; bottom: 18px; border: 2px solid rgba(240, 200, 140, 0.32); padding: 24px 34px; display: flex; flex-direction: column; gap: 18px; overflow-y: auto; scrollbar-width: none; &::-webkit-scrollbar { display: none; } }
+  .wrCoverHead { display: flex; flex-direction: column; align-items: center; gap: 6px; }
+  .wrCoverTitle { width: 100%; box-sizing: border-box; text-align: center; background: transparent; border: 0; outline: none; font-family: Georgia, 'Times New Roman', serif; font-size: 44px; font-weight: 700; letter-spacing: 8px; text-transform: uppercase; color: hsl(40, 62%, 78%); text-shadow: 0 2px 0 rgba(0, 0, 0, 0.4); padding: 0; &::placeholder { color: rgba(240, 200, 140, 0.35); } }
+  .wrCoverRule { width: 220px; height: 1px; background: rgba(240, 200, 140, 0.4); }
+  .wrCoverField { display: flex; flex-direction: column; gap: 4px; flex: 1; min-width: 0; > span { font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: 1px; color: hsl(40, 38%, 68%); } input, textarea { background: rgba(0, 0, 0, 0.3); border: 0; border-radius: 4px; color: white; font-size: 13px; padding: 8px 10px; outline: none; resize: vertical; &::placeholder { color: rgba(255, 255, 255, 0.4); } &:focus { box-shadow: inset 0 0 0 1px hsl(40, 62%, 78%); } } }
+  .wrCoverRow { display: flex; gap: 14px; }
+  .wrSwatches { display: flex; gap: 6px; padding-top: 3px; }
+  .wrSwatch { width: 26px; height: 26px; border-radius: 4px; box-shadow: 0 0 0 1px rgba(255, 255, 255, 0.3); &--active { box-shadow: 0 0 0 2px white; } }
+  .wrCoverChapters { display: flex; flex-direction: column; gap: 8px; }
+  .wrCoverChaptersHead { display: flex; align-items: center; justify-content: space-between; span:first-child { font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: 1px; color: hsl(40, 38%, 68%); } }
+  .wrCoverMuted { margin: 0; font-size: 12px; color: hsl(40, 38%, 68%); }
+  .wrChapterGrid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px; }
+  .wrChapterCard { background: rgba(0, 0, 0, 0.28); border-radius: 6px; padding: 12px 14px; display: flex; flex-direction: column; gap: 8px; min-width: 0; }
+  .wrChapterCardTop { display: flex; align-items: baseline; gap: 8px; }
+  .wrChapterNumber { font-size: 22px; font-weight: 700; opacity: 0.9; }
+  .wrChapterCardTitle { flex: 1; min-width: 0; background: transparent; border: 0; outline: none; color: white; font-size: 13px; font-weight: 700; padding: 0; &:focus { box-shadow: inset 0 -1px 0 var(--wr-accent); } }
+  .wrChapterCardMeta { font-size: 11px; opacity: 0.65; }
+  .wrChapterCardActions { display: flex; gap: 6px; }
+
+  // ---------------------------------------------------------------- pages
+  .wrPageWrap { flex: 1 1 auto; min-height: 0; display: flex; justify-content: center; > .wrPage { flex: 1 1 auto; max-width: 842px; } }
+  .wrPage {
+    min-width: 0; min-height: 0; background: var(--wr-page); border-radius: 4px 0 0 4px; box-shadow: 0 4px 16px rgba(0, 0, 0, 0.35); color: var(--wr-ink);
+    padding: 26px 34px; display: flex; flex-direction: column; gap: 14px; overflow-y: auto; box-sizing: border-box;
+  }
+  .wrPageHead { display: flex; align-items: baseline; gap: 12px; border-bottom: 2px solid var(--wr-page-line); padding-bottom: 10px; flex: 0 0 auto; }
+  .wrPageKicker { font-size: 12px; font-weight: 700; text-transform: uppercase; letter-spacing: 1.5px; color: var(--wr-page-muted); }
+  .wrPageTitle { font-family: Georgia, 'Times New Roman', serif; font-size: 24px; font-weight: 700; }
+  .wrPageTitleInput { flex: 1; min-width: 0; background: transparent; border: 0; outline: none; font-family: Georgia, 'Times New Roman', serif; font-size: 24px; font-weight: 700; color: var(--wr-ink); padding: 0; &:focus { box-shadow: inset 0 -1px 0 var(--wr-accent); } }
+  .wrPageMeta { margin-left: auto; font-size: 11px; color: var(--wr-page-muted); }
+  .wrPageMuted { margin: 0; font-size: 13px; color: hsl(var(--color-theme-h), 6%, 55%); }
+  .wrPageError { margin: 0; font-size: 12px; color: hsl(var(--color-alert-h), var(--color-alert-s), 40%); }
+
+  .wrStripChip { padding: 5px 8px; border-radius: 4px; font-size: 12px; background: hsl(35, 18%, 90%); color: hsl(var(--color-theme-h), 10%, 28%); max-width: 250px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+    &--empty { font-style: italic; opacity: 0.5; }
+    &--changed { background: hsl(var(--color-accent-h), 90%, 86%); color: hsl(var(--color-accent-h), 82%, 28%); font-weight: 700; box-shadow: inset 3px 0 0 var(--wr-accent); }
+  }
+  .wrDraftText { width: 100%; box-sizing: border-box; border-radius: 4px; border: 1px solid hsl(35, 18%, 82%); background: white; padding: 12px 14px; font-family: Georgia, 'Times New Roman', serif; font-size: 16px; line-height: 1.6; min-height: 70px; color: var(--wr-ink); outline: none; resize: none; overflow: hidden; &:focus { border-color: var(--wr-accent); } &::placeholder { color: hsl(var(--color-theme-h), 6%, 62%); } }
+
+  // ---------------------------------------------------------------- chapter outline (page)
+  .wrOutlineCard { transition: outline-color 0.1s; &--dragging { opacity: 0.35; } &--over { outline: 2px dashed var(--wr-accent); outline-offset: 2px; } }
+  .wrActCard { background: hsl(35, 30%, 94%); border: 1px solid var(--wr-page-line); border-radius: 6px; padding: 12px; display: flex; flex-direction: column; gap: 10px; flex: 0 0 auto; }
+  .wrSceneCard { background: hsl(35, 30%, 96%); border: 1px solid hsl(35, 18%, 86%); border-radius: 6px; padding: 10px 12px; display: flex; flex-direction: column; gap: 8px; }
+  .wrActHead { display: flex; align-items: center; gap: 10px; }
+  .wrSceneHead { display: flex; align-items: center; gap: 10px; }
+  .wrMomentCard { background: white; border: 1px solid var(--wr-page-line); border-radius: 6px; padding: 8px 10px; display: flex; flex-direction: column; gap: 6px; }
+  .wrMomentRow { display: flex; align-items: center; gap: 10px; }
+  .wrNodeHandle { display: inline-flex; align-items: center; gap: 6px; flex: 0 0 auto; }
+  .wrNodeLabel { font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 1px; color: hsl(var(--color-theme-h), 8%, 38%); min-width: 62px; }
+  .wrOutlineInput { flex: 1 1 0; min-width: 0; box-sizing: border-box; border: 1px solid var(--wr-page-line); outline: none; background: white; color: var(--wr-ink); font-family: Georgia, 'Times New Roman', serif; font-size: 13px; padding: 6px 10px; border-radius: 4px; &:focus { border-color: var(--wr-accent); } }
+  .wrSceneFields { margin-left: auto; display: flex; gap: 6px; min-width: 0; }
+  .wrSceneField {
+    box-sizing: border-box; border: 0; outline: none; border-radius: 4px; padding: 6px 8px; font-size: 12px; background: hsl(35, 18%, 90%); color: hsl(var(--color-theme-h), 10%, 28%);
+    &--location { width: 140px; } &--time { width: 96px; } &--action { width: 260px; }
+    &::placeholder { font-style: italic; color: hsl(var(--color-theme-h), 6%, 55%); }
+    &:focus { box-shadow: inset 0 0 0 1px var(--wr-accent); }
+    &--changed { background: hsl(var(--color-accent-h), 90%, 86%); color: hsl(var(--color-accent-h), 82%, 28%); font-weight: 700; box-shadow: inset 3px 0 0 var(--wr-accent); }
+  }
+  .wrCardFoot { display: flex; align-items: center; justify-content: space-between; }
+  .wrCardFootLeft { display: flex; align-items: center; gap: 10px; }
+  .wrWordCount { font-size: 11px; color: var(--wr-page-muted); }
+  .wrNodeDescription { flex: 1 1 auto; min-width: 0; font-family: Georgia, 'Times New Roman', serif; font-size: 13px; font-style: italic; color: var(--wr-ink); &--empty { color: hsl(var(--color-theme-h), 6%, 55%); } }
+  .wrOutlineCard--readonly { cursor: default; }
+
+  // Draft mode: a moment's footer is a word-count bar that opens into the draft text.
+  .wrDraftFoot { display: flex; flex-direction: column; }
+  .wrDraftFootBar { display: flex; align-items: center; gap: 6px; align-self: flex-start; font-size: 11px; color: var(--wr-page-muted); padding: 2px 4px 2px 0; &:hover { color: var(--wr-ink); } }
+  .wrDraftFootBody { display: grid; grid-template-rows: 0fr; transition: grid-template-rows 0.35s ease; }
+  .wrDraftFoot--open .wrDraftFootBody { grid-template-rows: 1fr; }
+  .wrDraftFootInner { min-height: 0; overflow: hidden; padding-top: 0; }
+  .wrDraftFoot--open .wrDraftFootInner { padding-top: 6px; }
+
+  // ---------------------------------------------------------------- preview
+  .wrPagesBody { flex: 1 1 auto; min-height: 0; display: flex; flex-direction: column; gap: 10px; }
+  .wrPreviewToolbar { flex: 0 0 auto; display: flex; align-items: center; gap: 12px; min-height: 30px; flex-wrap: wrap; }
+  .wrToolGroup { display: flex; align-items: center; gap: 6px; .wrLabel { margin: 0 4px 0 0; } }
+  .wrPreviewHead { padding-left: 56px; display: flex; flex-direction: column; gap: 2px; margin-bottom: 6px; flex: 0 0 auto; }
+  .wrPreviewTitle { font-family: Georgia, 'Times New Roman', serif; font-size: 30px; font-weight: 700; }
+  .wrPreviewIndent { padding-left: 56px; }
+  .wrPreviewPara { position: relative; padding-left: 56px; flex: 0 0 auto; }
+  .wrPreviewText { margin: 0; font-family: Georgia, 'Times New Roman', serif; font-size: 17px; line-height: 28px; text-align: justify; }
+  .wrSentence { cursor: pointer; border-radius: 2px; &:hover { background: hsl(var(--color-accent-h), 90%, 92%); } &--selected { background: hsl(var(--color-accent-h), 90%, 88%); } &--flagged { border-bottom: 2px solid var(--wr-accent); } }
+  .wrReactGutter { position: absolute; left: 0; top: 0; width: 44px; height: 100%; }
+  .wrReactBar {
+    position: absolute; width: 20px; border-radius: 4px; display: flex; flex-direction: column; align-items: center; gap: 1px; padding-top: 3px; box-sizing: border-box; overflow: hidden;
+    border: 1px dashed transparent;
+    &--like { color: hsl(var(--color-accent-h), 72%, 38%); }
+    &--dislike { color: var(--wr-alert); }
+    &--level0 { border-color: hsl(35, 18%, 78%); background: transparent; color: hsl(var(--color-theme-h), 8%, 55%); &:hover { background: hsl(35, 18%, 92%); } }
+    // Same hue and lightness at every level; only saturation rises with the strength of the reaction.
+    &--like.wrReactBar--level1 { background: hsl(var(--color-accent-h), 30%, 82%); }
+    &--like.wrReactBar--level2 { background: hsl(var(--color-accent-h), 62%, 82%); }
+    &--like.wrReactBar--level3 { background: hsl(var(--color-accent-h), 96%, 82%); }
+    &--dislike.wrReactBar--level1 { background: hsl(var(--color-alert-h), 26%, 84%); }
+    &--dislike.wrReactBar--level2 { background: hsl(var(--color-alert-h), 58%, 84%); }
+    &--dislike.wrReactBar--level3 { background: hsl(var(--color-alert-h), 92%, 84%); }
+  }
+  .wrReactPlus { font-size: 12px; font-weight: 700; line-height: 16px; }
+}

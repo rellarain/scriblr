@@ -30,6 +30,11 @@ export interface OutlineNode {
   chapterCountTarget: number | null
   plotlineIds: string[]
   wordCountGoal: number | null
+  // Scene-only (see backend OutlineNode): where/when/what instead of a
+  // title and synopsis. Absent on trees saved before these fields existed.
+  location?: string
+  time?: string
+  action?: string
 }
 
 export interface OutlineTree {

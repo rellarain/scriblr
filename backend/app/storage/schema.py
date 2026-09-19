@@ -111,6 +111,14 @@ class OutlineNode(BaseModel):
     plotlineIds: list[str] = Field(default_factory=list)
     # Book's total word-count ambition -- drives bookshelf spine width/fill.
     wordCountGoal: Optional[int] = None
+    # Set only on "scene" nodes: a scene is described by where and when it
+    # happens and what happens, rather than by a title/synopsis. Same
+    # convention as the book-only fields above (generic OutlineNode, unused
+    # elsewhere). The UI highlights whichever of these changed from the
+    # previous scene in outline order.
+    location: str = ""
+    time: str = ""
+    action: str = ""
 
 
 class OutlineTree(BaseModel):

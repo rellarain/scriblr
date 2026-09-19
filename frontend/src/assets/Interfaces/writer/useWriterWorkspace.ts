@@ -10,23 +10,17 @@ import {
 } from '../../../api/projectsApi'
 import { putOutline as apiPutOutline } from '../../../api/outlineApi'
 import { putPlot as apiPutPlot } from '../../../api/plotApi'
+import { booksOf, buildChildIndex, chaptersOfBook, moveNode, nearestOfKind } from './outlineTree'
+import { useStoredState } from './storage'
 
 type AsyncStatus = 'idle' | 'loading' | 'error'
 const DEBOUNCE_MS = 800
 
-// Which of scrilbrPlan.md's 5 WUI consoles is showing -- always derived
-// from what's focused, never an independently-clickable tab the way AUI's
-// consoles are. See useWriterWorkspace's activeConsole below for the exact
-// derivation.
+// Which of the five Writer consoles is showing.
 export type WuiConsole = 'shelves' | 'shelf' | 'book' | 'page' | 'pages'
-export type PageMode = 'draft' | 'preview'
-
-// The sliderPages transition WUI.tsx plays around a WuiSidebar navigation
-// click that crosses a book<->chapter boundary ('opening') or toggles
-// draft/preview for the focused chapter ('flipping'). Owned by WUI.tsx,
-// not this hook -- declared here alongside the rest of the shared writer
-// vocabulary since both BookLayer and WuiSidebar need the type.
-export type TransitionState = 'idle' | 'opening' | 'flipping'
+type ProjectView = 'project' | 'book' | 'page' | 'pages'
+// The two modes of the chapter page (Preview is its own console, 'pages').
+export type ChapterMode = 'outline' | 'draft'
 
 function newId(prefix: string): string {
   return `${prefix}-${Math.random().toString(36).slice(2, 9)}`
@@ -36,10 +30,22 @@ function errMessage(err: unknown, fallback: string): string {
   return err instanceof Error ? err.message : fallback
 }
 
+function nextOrderAmong<T extends { order: number; parentId: string | null }>(nodes: T[], parentId: string | null): number {
+  const siblings = nodes.filter(n => n.parentId === parentId)
+  return siblings.length === 0 ? 0 : Math.max(...siblings.map(s => s.order)) + 1
+}
+
+// Everything the Writer interface needs: the project list (with each
+// project's outline, for the sidebar shelves), the open project's outline
+// and plot trees with debounced/immediate autosave, and the navigation state
+// (which book/chapter is selected and which console shows).
 export function useWriterWorkspace() {
   const [projects, setProjects] = useState<ProjectIndex[]>([])
   const [projectsStatus, setProjectsStatus] = useState<AsyncStatus>('idle')
   const [projectsError, setProjectsError] = useState<string | undefined>(undefined)
+  // Every project's outline nodes, loaded once for the sidebar shelves and
+  // the Shelves dashboard; the open project's entry is kept in sync below.
+  const [projectOutlines, setProjectOutlines] = useState<Record<string, OutlineNode[]>>({})
 
   const [activeProjectId, setActiveProjectId] = useState<string | null>(null)
   const [activeProject, setActiveProject] = useState<ProjectIndex | null>(null)
@@ -53,9 +59,15 @@ export function useWriterWorkspace() {
   const [saving, setSaving] = useState<boolean>(false)
   const [saveError, setSaveError] = useState<string | undefined>(undefined)
 
-  const [focusedNodeId, setFocusedNodeId] = useState<string | null>(null)
+  // --- navigation: what is selected, and which console shows it ---
+  const [view, setView] = useState<ProjectView>('project')
+  const [activeBookId, setActiveBookId] = useState<string | null>(null)
+  const [activeChapterId, setActiveChapterId] = useState<string | null>(null)
+  // The last-used chapter mode is remembered across sessions.
+  const [storedMode, setChapterMode] = useStoredState<ChapterMode>('scriblr.writer.chapterMode', 'outline')
+  const chapterMode: ChapterMode = storedMode === 'draft' ? 'draft' : 'outline'
 
-  // --- plot tree (Shelf Console's Project Plot) ---
+  // --- plot tree (Shelf console's Project Plot) ---
   const [plotNodes, setPlotNodes] = useState<PlotNode[]>([])
   const [plotSchemaVersion, setPlotSchemaVersion] = useState<number>(1)
   const [plotStatus, setPlotStatus] = useState<AsyncStatus>('idle')
@@ -63,10 +75,6 @@ export function useWriterWorkspace() {
   const [plotSaving, setPlotSaving] = useState<boolean>(false)
   const [plotSaveError, setPlotSaveError] = useState<string | undefined>(undefined)
   const [focusedPlotNodeId, setFocusedPlotNodeId] = useState<string | null>(null)
-
-  // Only meaningful when the focused outline node is a chapter -- toggles
-  // Page Console (draft) vs. Pages Console (preview/export).
-  const [pageMode, setPageMode] = useState<PageMode>('draft')
 
   const saveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
   const activeProjectIdRef = useRef<string | null>(null)
@@ -79,87 +87,45 @@ export function useWriterWorkspace() {
   plotNodesRef.current = plotNodes
 
   // --- derived outline data ---
-  const nodeById = useMemo(() => new Map(outlineNodes.map(n => [n.id, n])), [outlineNodes])
-
-  const childrenByParentId = useMemo(() => {
-    const map = new Map<string | null, OutlineNode[]>()
-    for (const n of outlineNodes) {
-      const bucket = map.get(n.parentId)
-      if (bucket) bucket.push(n)
-      else map.set(n.parentId, [n])
-    }
-    for (const bucket of map.values()) bucket.sort((a, b) => a.order - b.order)
-    return map
-  }, [outlineNodes])
-
-  const focusedNode = focusedNodeId ? nodeById.get(focusedNodeId) : undefined
-  const focusedChildren = childrenByParentId.get(focusedNodeId ?? null) ?? []
-
-  const ancestryChain = useMemo(() => {
-    const chain: OutlineNode[] = []
-    let current = focusedNode
-    while (current && current.parentId) {
-      const parent = nodeById.get(current.parentId)
-      if (!parent) break
-      chain.unshift(parent)
-      current = parent
-    }
-    return chain
-  }, [focusedNode, nodeById])
-
-  // Nearest-first (self, then immediate parent, ... then root) -- used to
-  // find the closest book/chapter ancestor for console routing below.
-  const nearestFirstChain = useMemo(() => {
-    const chain: OutlineNode[] = []
-    if (focusedNode) chain.push(focusedNode)
-    for (let i = ancestryChain.length - 1; i >= 0; i--) chain.push(ancestryChain[i])
-    return chain
-  }, [focusedNode, ancestryChain])
-
-  const bookAncestorId = useMemo(
-    () => nearestFirstChain.find(n => n.kind === 'book')?.id ?? null,
-    [nearestFirstChain],
+  const childrenByParentId = useMemo(() => buildChildIndex(outlineNodes), [outlineNodes])
+  const projectRoot = useMemo(() => outlineNodes.find(n => n.parentId === null), [outlineNodes])
+  const books = useMemo(() => booksOf(outlineNodes), [outlineNodes])
+  const activeBook = useMemo(() => books.find(b => b.id === activeBookId), [books, activeBookId])
+  const activeBookChapters = useMemo(
+    () => (activeBookId ? chaptersOfBook(outlineNodes, activeBookId) : []),
+    [outlineNodes, activeBookId],
   )
-  const chapterAncestorId = useMemo(
-    () => nearestFirstChain.find(n => n.kind === 'chapter')?.id ?? null,
-    [nearestFirstChain],
+  const activeChapter = useMemo(
+    () => outlineNodes.find(n => n.id === activeChapterId && n.kind === 'chapter'),
+    [outlineNodes, activeChapterId],
   )
 
-  // Book Console owns all outline-structure editing below the book itself
-  // (arc/chapter/act/scene/moment); only a focused chapter leaves outline
-  // editing for chapter-level draft/preview (Page/Pages). Shelf Console
-  // covers the outline as a whole, so it's keyed on focus sitting at the
-  // actual root of the outline tree -- not on kind === 'series' specifically,
-  // since a single-book project's root is kind 'book' directly (no series
-  // wrapper) and Shelf-only features (Project Plot chief among them) must
-  // stay reachable for those projects too.
-  const activeConsole: WuiConsole = useMemo(() => {
-    if (!hasOpenProject) return 'shelves'
-    if (!focusedNode || focusedNode.parentId === null) return 'shelf'
-    if (focusedNode.kind === 'chapter') return pageMode === 'preview' ? 'pages' : 'page'
-    return 'book'
-  }, [hasOpenProject, focusedNode, pageMode])
+  const activeConsole: WuiConsole = !hasOpenProject ? 'shelves' : view === 'project' ? 'shelf' : view
 
-  // Reset pageMode to 'draft' whenever focus leaves chapter-kind entirely,
-  // or lands on a *different* chapter -- but not on every re-render while
-  // staying on the same chapter (outlineNodes/focusedNode's object identity
-  // changes on every save, even unrelated ones).
-  const lastChapterIdRef = useRef<string | null>(null)
+  // A selected book/chapter that no longer exists (deleted, or the project
+  // changed) falls back one level instead of leaving the interface on a
+  // dead selection.
   useEffect(() => {
-    if (focusedNode?.kind === 'chapter') {
-      if (lastChapterIdRef.current !== focusedNode.id) {
-        lastChapterIdRef.current = focusedNode.id
-        setPageMode('draft')
-      }
-    } else {
-      lastChapterIdRef.current = null
-      setPageMode('draft')
+    if (!hasOpenProject) return
+    if (activeChapterId && !activeChapter) {
+      setActiveChapterId(null)
+      setView(v => (v === 'page' || v === 'pages' ? 'book' : v))
     }
-  }, [focusedNode])
+    if (activeBookId && !activeBook) {
+      setActiveBookId(null)
+      setActiveChapterId(null)
+      setView('project')
+    }
+  }, [hasOpenProject, activeBook, activeBookId, activeChapter, activeChapterId])
 
-  // --- derived plot data (mirrors the outline block above exactly) ---
-  const plotNodeById = useMemo(() => new Map(plotNodes.map(n => [n.id, n])), [plotNodes])
+  // Keep the sidebar/dashboard copy of the open project's outline current.
+  useEffect(() => {
+    if (activeProjectId && outlineStatus === 'idle') {
+      setProjectOutlines(prev => ({ ...prev, [activeProjectId]: outlineNodes }))
+    }
+  }, [activeProjectId, outlineNodes, outlineStatus])
 
+  // --- derived plot data ---
   const plotChildrenByParentId = useMemo(() => {
     const map = new Map<string | null, PlotNode[]>()
     for (const n of plotNodes) {
@@ -170,21 +136,8 @@ export function useWriterWorkspace() {
     for (const bucket of map.values()) bucket.sort((a, b) => a.order - b.order)
     return map
   }, [plotNodes])
-
+  const plotNodeById = useMemo(() => new Map(plotNodes.map(n => [n.id, n])), [plotNodes])
   const focusedPlotNode = focusedPlotNodeId ? plotNodeById.get(focusedPlotNodeId) : undefined
-  const focusedPlotChildren = plotChildrenByParentId.get(focusedPlotNodeId ?? null) ?? []
-
-  const plotAncestryChain = useMemo(() => {
-    const chain: PlotNode[] = []
-    let current = focusedPlotNode
-    while (current && current.parentId) {
-      const parent = plotNodeById.get(current.parentId)
-      if (!parent) break
-      chain.unshift(parent)
-      current = parent
-    }
-    return chain
-  }, [focusedPlotNode, plotNodeById])
 
   // --- outline persistence ---
   async function persistOutline(projectId: string, nodes: OutlineNode[]) {
@@ -224,7 +177,7 @@ export function useWriterWorkspace() {
     }
   }
 
-  // --- plot persistence (mirrors outline persistence exactly) ---
+  // --- plot persistence (mirrors outline persistence) ---
   async function persistPlot(projectId: string, nodes: PlotNode[]) {
     setPlotSaving(true)
     setPlotSaveError(undefined)
@@ -275,6 +228,17 @@ export function useWriterWorkspace() {
       const list = await apiListProjects()
       setProjects(list)
       setProjectsStatus('idle')
+      // One summary per project fills the sidebar shelves (books) and the
+      // dashboard's counts; a project that fails to load just shows empty.
+      const entries = await Promise.all(list.map(async p => {
+        try {
+          const summary = await apiGetProject(p.projectId)
+          return [p.projectId, summary.outline?.nodes ?? []] as const
+        } catch {
+          return [p.projectId, [] as OutlineNode[]] as const
+        }
+      }))
+      setProjectOutlines(prev => ({ ...Object.fromEntries(entries), ...prev }))
     } catch (err) {
       setProjectsStatus('error')
       setProjectsError(errMessage(err, 'Failed to load projects'))
@@ -294,7 +258,8 @@ export function useWriterWorkspace() {
     }
   }
 
-  async function openProject(id: string) {
+  // Opens a project at the project level, or straight into one of its books.
+  async function openProject(id: string, bookId?: string) {
     flushPendingSave()
     flushPendingPlotSave()
     setOutlineStatus('loading')
@@ -311,14 +276,20 @@ export function useWriterWorkspace() {
       setOutlineSchemaVersion(summary.outline?.schemaVersion ?? 2)
       setWarnings(summary.warnings)
       setOutlineStatus('idle')
-      const root = nodes.find(n => n.parentId === null)
-      setFocusedNodeId(root ? root.id : null)
 
       setPlotNodes(summary.plot?.nodes ?? [])
       setPlotSchemaVersion(summary.plot?.schemaVersion ?? 1)
       setPlotStatus('idle')
       setFocusedPlotNodeId(null)
-      setPageMode('draft')
+
+      setActiveChapterId(null)
+      if (bookId && nodes.some(n => n.id === bookId && n.kind === 'book')) {
+        setActiveBookId(bookId)
+        setView('book')
+      } else {
+        setActiveBookId(null)
+        setView('project')
+      }
     } catch (err) {
       setOutlineStatus('error')
       setOutlineError(errMessage(err, 'Failed to open project'))
@@ -337,20 +308,26 @@ export function useWriterWorkspace() {
     setOutlineError(undefined)
     setWarnings([])
     setSaveError(undefined)
-    setFocusedNodeId(null)
 
     setPlotNodes([])
     setPlotStatus('idle')
     setPlotError(undefined)
     setPlotSaveError(undefined)
     setFocusedPlotNodeId(null)
-    setPageMode('draft')
+
+    setView('project')
+    setActiveBookId(null)
+    setActiveChapterId(null)
   }
 
   async function deleteProject(id: string) {
     try {
       await apiDeleteProject(id)
       setProjects(prev => prev.filter(p => p.projectId !== id))
+      setProjectOutlines(prev => {
+        const { [id]: _removed, ...rest } = prev
+        return rest
+      })
       if (activeProjectId === id) backToShelves()
     } catch (err) {
       setProjectsStatus('error')
@@ -358,57 +335,59 @@ export function useWriterWorkspace() {
     }
   }
 
-  function focusNode(nodeId: string) {
-    setFocusedNodeId(nodeId)
+  // --- navigation ---
+  function showProject() {
+    setView('project')
+    setActiveBookId(null)
+    setActiveChapterId(null)
   }
 
-  // Sidebar/subNav shortcuts: jump straight to the outline root (Shelf
-  // Console), or reveals chapter draft/preview from wherever you are.
-  function focusProjectRoot() {
-    const root = outlineNodes.find(n => n.parentId === null)
-    setFocusedNodeId(root ? root.id : null)
+  function openBook(bookId: string) {
+    setActiveBookId(bookId)
+    setActiveChapterId(null)
+    setView('book')
   }
 
-  function viewChapterDraft() {
-    if (focusedNode?.kind === 'chapter') setPageMode('draft')
+  // Selects a chapter without leaving the current console (the chapter tabs
+  // in the Book console pick which chapter's outline shows).
+  function selectChapter(chapterId: string) {
+    const book = nearestOfKind(outlineNodes, chapterId, 'book')
+    if (book) setActiveBookId(book.id)
+    setActiveChapterId(chapterId)
   }
 
-  function viewChapterPages() {
-    if (focusedNode?.kind === 'chapter') setPageMode('preview')
+  // Opens a chapter on the chapter page (Page console), in the remembered
+  // mode unless one is given.
+  function openChapter(chapterId: string, mode?: ChapterMode) {
+    selectChapter(chapterId)
+    if (mode) setChapterMode(mode)
+    setView('page')
   }
 
-  // Book Console's sub-tabs (Arc/Chapter/Act/Scene/Moment Outline) all
-  // share one FocusedNodeEditor -- clicking one focuses the nearest node
-  // of that kind (self/ancestor first, then a BFS over descendants),
-  // rather than introducing a second, parallel focus mechanism.
-  function focusNearestOfKind(kind: OutlineNodeKind) {
-    const ancestorMatch = nearestFirstChain.find(n => n.kind === kind)
-    if (ancestorMatch) { setFocusedNodeId(ancestorMatch.id); return }
+  // Switches the open chapter to Outline or Draft mode.
+  function showChapter(mode: ChapterMode) {
+    setChapterMode(mode)
+    if (activeChapterId) setView('page')
+  }
 
-    const startId = focusedNodeId ?? outlineNodes.find(n => n.parentId === null)?.id ?? null
-    if (startId == null) return
-    const queue = [startId]
-    const seen = new Set<string>([startId])
-    while (queue.length > 0) {
-      const current = queue.shift()!
-      for (const child of childrenByParentId.get(current) ?? []) {
-        if (child.kind === kind) { setFocusedNodeId(child.id); return }
-        if (!seen.has(child.id)) { seen.add(child.id); queue.push(child.id) }
-      }
-    }
-    // No node of this kind reachable from the current focus -- leave focus
-    // unchanged; the routed view shows its own "nothing focused" state.
+  function showPreview() {
+    if (activeChapterId) setView('pages')
+  }
+
+  function backToBook() {
+    if (activeBookId) openBook(activeBookId)
   }
 
   // --- outline node mutators ---
-  function addOutlineNode(parentId: string | null, kind: OutlineNodeKind) {
+  function addOutlineNode(parentId: string | null, kind: OutlineNodeKind, patch: Partial<OutlineNode> = {}) {
     setOutlineNodes(prev => {
-      const siblings = prev.filter(n => n.parentId === parentId)
-      const nextOrder = siblings.length === 0 ? 0 : Math.max(...siblings.map(s => s.order)) + 1
       const node: OutlineNode = {
-        id: newId('node'), kind, parentId, order: nextOrder,
-        title: `New ${kind}`, synopsis: '', draftRef: null, flag: null,
+        id: newId('node'), kind, parentId, order: nextOrderAmong(prev, parentId),
+        title: kind === 'act' || kind === 'scene' || kind === 'moment' ? '' : `New ${kind}`,
+        synopsis: '', draftRef: null, flag: null,
         color: null, chapterCountTarget: null, plotlineIds: [], wordCountGoal: null,
+        location: '', time: '', action: '',
+        ...patch,
       }
       const next = [...prev, node]
       persistNow(next)
@@ -416,9 +395,9 @@ export function useWriterWorkspace() {
     })
   }
 
-  function updateOutlineNodeField(nodeId: string, field: 'title' | 'synopsis', value: string) {
+  function updateOutlineNode(nodeId: string, patch: Partial<OutlineNode>) {
     setOutlineNodes(prev => {
-      const next = prev.map(n => (n.id === nodeId ? { ...n, [field]: value } : n))
+      const next = prev.map(n => (n.id === nodeId ? { ...n, ...patch } : n))
       scheduleDebouncedSave(next)
       return next
     })
@@ -438,38 +417,22 @@ export function useWriterWorkspace() {
 
   function deleteOutlineNode(nodeId: string) {
     setOutlineNodes(prev => {
-      const target = prev.find(n => n.id === nodeId)
       const toRemove = collectDescendantIds(nodeId, prev)
       const next = prev.filter(n => !toRemove.has(n.id))
       persistNow(next)
-      if (focusedNodeId != null && toRemove.has(focusedNodeId)) {
-        const fallback = target?.parentId ?? next.find(n => n.parentId === null)?.id ?? null
-        setFocusedNodeId(fallback)
-      }
       return next
     })
   }
 
-  function moveOutlineNode(nodeId: string, direction: 'up' | 'down') {
+  // Drag and drop: reparent/reorder a node relative to a target.
+  function moveOutlineNodeTo(nodeId: string, targetId: string, mode: 'inside' | 'before') {
     setOutlineNodes(prev => {
-      const node = prev.find(n => n.id === nodeId)
-      if (!node) return prev
-      const siblings = prev.filter(n => n.parentId === node.parentId).sort((a, b) => a.order - b.order)
-      const idx = siblings.findIndex(s => s.id === nodeId)
-      const swapIdx = direction === 'up' ? idx - 1 : idx + 1
-      if (swapIdx < 0 || swapIdx >= siblings.length) return prev
-      const other = siblings[swapIdx]
-      const next = prev.map(n => {
-        if (n.id === node.id) return { ...n, order: other.order }
-        if (n.id === other.id) return { ...n, order: node.order }
-        return n
-      })
+      const next = moveNode(prev, nodeId, targetId, mode)
+      if (!next) return prev
       persistNow(next)
       return next
     })
   }
-  const moveOutlineNodeUp = (nodeId: string) => moveOutlineNode(nodeId, 'up')
-  const moveOutlineNodeDown = (nodeId: string) => moveOutlineNode(nodeId, 'down')
 
   function toggleNodeFlag(nodeId: string, flagType: FlagType) {
     setOutlineNodes(prev => {
@@ -488,19 +451,19 @@ export function useWriterWorkspace() {
     setFocusedPlotNodeId(nodeId)
   }
 
-  function addPlotNode(parentId: string | null, kind: PlotNodeKind) {
+  function addPlotNode(parentId: string | null, kind: PlotNodeKind, title?: string) {
+    const id = newId('plot')
     setPlotNodes(prev => {
-      const siblings = prev.filter(n => n.parentId === parentId)
-      const nextOrder = siblings.length === 0 ? 0 : Math.max(...siblings.map(s => s.order)) + 1
       const node: PlotNode = {
-        id: newId('plot'), kind, parentId, order: nextOrder,
-        title: `New ${kind}`, body: '', assignedMomentId: null, assignedParagraphIndex: null,
+        id, kind, parentId, order: nextOrderAmong(prev, parentId),
+        title: title ?? `New ${kind}`, body: '', assignedMomentId: null, assignedParagraphIndex: null,
         sourceFieldId: null, customFieldDefs: [], customFieldValues: {}, keywords: [], flag: null,
       }
       const next = [...prev, node]
       persistPlotNow(next)
       return next
     })
+    return id
   }
 
   function updatePlotNodeField(nodeId: string, field: 'title' | 'body', value: string) {
@@ -555,31 +518,31 @@ export function useWriterWorkspace() {
     })
   }
 
+  // A plotpoint is assigned to a book or chapter by storing that outline
+  // node's id in assignedMomentId (the backend treats it as an opaque id);
+  // null unassigns it.
+  function assignPlotpoint(pointId: string, outlineNodeId: string | null) {
+    setPlotNodes(prev => {
+      const next = prev.map(n => (n.id === pointId ? { ...n, assignedMomentId: outlineNodeId, assignedParagraphIndex: null } : n))
+      persistPlotNow(next)
+      return next
+    })
+  }
+
   // Ensures a top-level "Unassigned" category (and an "Unassigned"
   // subcategory under it) exist, creating whichever are missing. Returns
   // the subcategory's id -- the landing spot for rescued plotlines.
   function ensureUnassignedBucket(nodes: PlotNode[]): { nodes: PlotNode[]; subcategoryId: string } {
     let working = nodes
+    const blank = { body: '', assignedMomentId: null, assignedParagraphIndex: null, sourceFieldId: null, customFieldDefs: [], customFieldValues: {}, keywords: [], flag: null }
     let category = working.find(n => n.parentId === null && n.kind === 'category' && n.title === 'Unassigned')
     if (!category) {
-      const topSiblings = working.filter(n => n.parentId === null)
-      const order = topSiblings.length === 0 ? 0 : Math.max(...topSiblings.map(s => s.order)) + 1
-      category = {
-        id: newId('plot'), kind: 'category', parentId: null, order, title: 'Unassigned', body: '',
-        assignedMomentId: null, assignedParagraphIndex: null, sourceFieldId: null,
-        customFieldDefs: [], customFieldValues: {}, keywords: [], flag: null,
-      }
+      category = { id: newId('plot'), kind: 'category', parentId: null, order: nextOrderAmong(working, null), title: 'Unassigned', ...blank }
       working = [...working, category]
     }
     let subcategory = working.find(n => n.parentId === category!.id && n.kind === 'subcategory' && n.title === 'Unassigned')
     if (!subcategory) {
-      const siblings = working.filter(n => n.parentId === category!.id)
-      const order = siblings.length === 0 ? 0 : Math.max(...siblings.map(s => s.order)) + 1
-      subcategory = {
-        id: newId('plot'), kind: 'subcategory', parentId: category.id, order, title: 'Unassigned', body: '',
-        assignedMomentId: null, assignedParagraphIndex: null, sourceFieldId: null,
-        customFieldDefs: [], customFieldValues: {}, keywords: [], flag: null,
-      }
+      subcategory = { id: newId('plot'), kind: 'subcategory', parentId: category.id, order: nextOrderAmong(working, category.id), title: 'Unassigned', ...blank }
       working = [...working, subcategory]
     }
     return { nodes: working, subcategoryId: subcategory.id }
@@ -597,112 +560,66 @@ export function useWriterWorkspace() {
     return ids
   }
 
-  // Deleting a category/subcategory does NOT cascade-delete its plotline
-  // descendants -- per scrilbrPlan.md, "orphaned plotlines get assigned to
-  // an unassigned category or subcategory" instead. Nested subcategories
-  // (and any other non-plotline descendants) ARE removed along with their
-  // parent; a plotline's own plotpoint children stay with it, untouched,
-  // since only the plotline's own parentId changes.
+  // Deleting a category/subcategory does NOT cascade-delete its plotlines --
+  // per scrilbrPlan.md, orphaned plotlines get assigned to an "Unassigned"
+  // category/subcategory instead. Nested subcategories are removed with their
+  // parent; a plotline keeps its own plotpoints (only its parentId changes).
   function deletePlotNode(nodeId: string) {
     setPlotNodes(prev => {
       const target = prev.find(n => n.id === nodeId)
       if (!target) return prev
 
+      let next: PlotNode[]
+      let removed: Set<string>
       if (target.kind === 'plotline' || target.kind === 'plotpoint') {
-        const toRemove = collectPlotDescendantIds(nodeId, prev)
-        const next = prev.filter(n => !toRemove.has(n.id))
-        persistPlotNow(next)
-        if (focusedPlotNodeId != null && toRemove.has(focusedPlotNodeId)) {
-          setFocusedPlotNodeId(target.parentId ?? null)
+        removed = collectPlotDescendantIds(nodeId, prev)
+        next = prev.filter(n => !removed.has(n.id))
+      } else {
+        removed = new Set<string>([nodeId])
+        const rescue: string[] = []
+        const queue = [nodeId]
+        while (queue.length > 0) {
+          const current = queue.shift()!
+          for (const n of prev) {
+            if (n.parentId !== current || removed.has(n.id) || rescue.includes(n.id)) continue
+            if (n.kind === 'plotline') rescue.push(n.id)
+            else { removed.add(n.id); queue.push(n.id) }
+          }
         }
-        return next
-      }
-
-      // category/subcategory: walk descendants, but don't descend INTO a
-      // plotline (its plotpoints stay put) -- just mark the plotline
-      // itself for rescue instead of removal.
-      const toRemove = new Set<string>([nodeId])
-      const rescuePlotlineIds: string[] = []
-      const queue = [nodeId]
-      while (queue.length > 0) {
-        const current = queue.shift()!
-        for (const n of prev) {
-          if (n.parentId !== current || toRemove.has(n.id) || rescuePlotlineIds.includes(n.id)) continue
-          if (n.kind === 'plotline') rescuePlotlineIds.push(n.id)
-          else { toRemove.add(n.id); queue.push(n.id) }
+        let working = prev
+        let bucketId: string | undefined
+        if (rescue.length > 0) {
+          const bucket = ensureUnassignedBucket(working)
+          working = bucket.nodes
+          bucketId = bucket.subcategoryId
         }
+        next = working
+          .filter(n => !removed.has(n.id))
+          .map(n => (bucketId && rescue.includes(n.id) ? { ...n, parentId: bucketId } : n))
       }
-
-      let working = prev
-      let subcategoryId: string | undefined
-      if (rescuePlotlineIds.length > 0) {
-        const bucket = ensureUnassignedBucket(working)
-        working = bucket.nodes
-        subcategoryId = bucket.subcategoryId
-      }
-      const next = working
-        .filter(n => !toRemove.has(n.id))
-        .map(n => (subcategoryId && rescuePlotlineIds.includes(n.id) ? { ...n, parentId: subcategoryId } : n))
       persistPlotNow(next)
-      if (focusedPlotNodeId != null && toRemove.has(focusedPlotNodeId)) {
-        setFocusedPlotNodeId(target.parentId ?? null)
-      }
-      return next
-    })
-  }
-
-  function movePlotNode(nodeId: string, direction: 'up' | 'down') {
-    setPlotNodes(prev => {
-      const node = prev.find(n => n.id === nodeId)
-      if (!node) return prev
-      const siblings = prev.filter(n => n.parentId === node.parentId).sort((a, b) => a.order - b.order)
-      const idx = siblings.findIndex(s => s.id === nodeId)
-      const swapIdx = direction === 'up' ? idx - 1 : idx + 1
-      if (swapIdx < 0 || swapIdx >= siblings.length) return prev
-      const other = siblings[swapIdx]
-      const next = prev.map(n => {
-        if (n.id === node.id) return { ...n, order: other.order }
-        if (n.id === other.id) return { ...n, order: node.order }
-        return n
-      })
-      persistPlotNow(next)
-      return next
-    })
-  }
-  const movePlotNodeUp = (nodeId: string) => movePlotNode(nodeId, 'up')
-  const movePlotNodeDown = (nodeId: string) => movePlotNode(nodeId, 'down')
-
-  function togglePlotNodeFlag(nodeId: string, flagType: FlagType) {
-    setPlotNodes(prev => {
-      const next = prev.map(n => {
-        if (n.id !== nodeId) return n
-        const nextFlag: NodeFlag | null = n.flag?.type === flagType ? null : { type: flagType, note: n.flag?.note ?? '' }
-        return { ...n, flag: nextFlag }
-      })
-      persistPlotNow(next)
+      if (focusedPlotNodeId != null && removed.has(focusedPlotNodeId)) setFocusedPlotNodeId(null)
       return next
     })
   }
 
   return {
-    projects, projectsStatus, projectsError,
+    projects, projectsStatus, projectsError, projectOutlines,
     activeProjectId, activeProject, hasOpenProject,
     outlineNodes, outlineStatus, outlineError, warnings, saving, saveError,
-    focusedNodeId, focusedNode, focusedChildren, ancestryChain,
-    childrenByParentId,
-    bookAncestorId, chapterAncestorId, activeConsole, pageMode,
-    loadProjects, createProject, openProject, backToShelves, deleteProject, focusNode,
-    focusProjectRoot, focusNearestOfKind, viewChapterDraft, viewChapterPages,
-    addOutlineNode, updateOutlineNodeField, deleteOutlineNode,
-    moveOutlineNodeUp, moveOutlineNodeDown, toggleNodeFlag,
+    childrenByParentId, projectRoot, books, activeBook, activeBookChapters, activeChapter,
+    activeConsole, activeBookId, activeChapterId,
+    loadProjects, createProject, openProject, backToShelves, deleteProject,
+    showProject, openBook, selectChapter, openChapter, showChapter, showPreview, backToBook,
+    chapterMode,
+    addOutlineNode, updateOutlineNode, deleteOutlineNode, moveOutlineNodeTo, toggleNodeFlag,
 
     plotNodes, plotStatus, plotError, plotSaving, plotSaveError,
-    focusedPlotNodeId, focusedPlotNode, focusedPlotChildren, plotAncestryChain,
-    plotChildrenByParentId,
+    focusedPlotNodeId, focusedPlotNode, plotChildrenByParentId, plotNodeById,
     focusPlotNode, addPlotNode, updatePlotNodeField, deletePlotNode,
-    movePlotNodeUp, movePlotNodeDown, togglePlotNodeFlag,
     addPlotKeyword, removePlotKeyword,
     addPlotCustomFieldDef, removePlotCustomFieldDef, updatePlotCustomFieldValue,
+    assignPlotpoint,
   }
 }
 

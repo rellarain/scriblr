@@ -1,0 +1,320 @@
+import { useMemo, useState } from 'react'
+import type { OutlineNode, PlotNode } from '../../../api/types'
+import type { WriterWorkspace } from './useWriterWorkspace'
+import { ChevronRightIcon, GripIcon, PlusIcon } from '../../icons'
+import { ChipEditor, DeleteControl } from './shared'
+
+// Project Plot: a collapsible navigation column (categories > subcategories
+// > plotlines) and two page views -- the category/subcategory editor, and
+// the plotline editor where unassigned plotpoints are dragged onto the
+// books and chapters of the outline (the chips there show what is assigned
+// where, so there is no separate timeline).
+
+function plotlineCount(node: PlotNode, children: Map<string | null, PlotNode[]>): number {
+  return (children.get(node.id) ?? []).reduce(
+    (n, c) => n + (c.kind === 'plotline' ? 1 : c.kind === 'plotpoint' ? 0 : plotlineCount(c, children)), 0)
+}
+
+function PlotNav({ w }: { w: WriterWorkspace }) {
+  const [collapsed, setCollapsed] = useState<Set<string>>(new Set())
+  const children = w.plotChildrenByParentId
+
+  // Everything is open by default; the chevron collapses a branch.
+  const toggle = (id: string) => setCollapsed(prev => {
+    const next = new Set(prev)
+    if (next.has(id)) next.delete(id)
+    else next.add(id)
+    return next
+  })
+
+  function rows(parentId: string | null, depth: number): React.ReactNode[] {
+    return (children.get(parentId) ?? [])
+      .filter(n => n.kind !== 'plotpoint')
+      .flatMap(node => {
+        const kids = (children.get(node.id) ?? []).filter(c => c.kind !== 'plotpoint')
+        const hasKids = kids.length > 0
+        const open = !collapsed.has(node.id)
+        const isLine = node.kind === 'plotline'
+        return [
+          <div
+            key={node.id}
+            className={node.id === w.focusedPlotNodeId ? 'wrNavRow wrNavRow--active' : 'wrNavRow'}
+            style={{ paddingLeft: 8 + depth * 16 }}
+          >
+            <button
+              type="button" className="wrNavChevron" aria-label={open ? 'Collapse' : 'Expand'}
+              style={{ visibility: hasKids ? 'visible' : 'hidden', transform: open ? 'rotate(90deg)' : undefined }}
+              onClick={() => toggle(node.id)}
+            >
+              <ChevronRightIcon size={12} />
+            </button>
+            {isLine && <span className="wrNavMark" />}
+            <button type="button" className="wrNavLabel" onClick={() => w.focusPlotNode(node.id)}>{node.title || `Untitled ${node.kind}`}</button>
+            {!isLine && <span className="wrNavCount">{plotlineCount(node, children)}</span>}
+          </div>,
+          ...(open ? rows(node.id, depth + 1) : []),
+        ]
+      })
+  }
+
+  return (
+    <div className="wrPlotNav">
+      <div className="wrPlotNavHead">
+        <span>Categories</span>
+        <button type="button" className="wrSmallBtn" onClick={() => w.focusPlotNode(w.addPlotNode(null, 'category'))}>
+          <PlusIcon size={13} /> Category
+        </button>
+      </div>
+      <div className="wrPlotNavRows">
+        {w.plotNodes.length === 0 && <p className="wrMuted">No categories yet.</p>}
+        {rows(null, 0)}
+      </div>
+    </div>
+  )
+}
+
+function ChildRows({ w, node, kind, addLabel }: { w: WriterWorkspace; node: PlotNode; kind: 'subcategory' | 'plotline'; addLabel: string }) {
+  const kids = (w.plotChildrenByParentId.get(node.id) ?? []).filter(c => c.kind === kind)
+  return (
+    <div className="wrChildRows">
+      <div className="wrChildRowsHead">
+        <span className="wrLabel">{kind === 'subcategory' ? 'Subcategories' : 'Plotlines'}</span>
+        <button type="button" className="wrSmallBtn" onClick={() => w.focusPlotNode(w.addPlotNode(node.id, kind))}>
+          <PlusIcon size={13} /> {addLabel}
+        </button>
+      </div>
+      {kids.length === 0 && <p className="wrMuted">None yet.</p>}
+      {kids.map(k => (
+        <button key={k.id} type="button" className="wrChildRow" onClick={() => w.focusPlotNode(k.id)}>
+          <span className="wrChildRowTitle">{k.title || `Untitled ${k.kind}`}</span>
+          <span className="wrChildRowMeta">
+            {k.keywords.slice(0, 3).map(kw => <span key={kw} className="wrChip wrChip--small">{kw}</span>)}
+          </span>
+          {k.kind === 'subcategory' && <span className="wrOutlineMeta">{plotlineCount(k, w.plotChildrenByParentId)} plotlines</span>}
+          {k.kind === 'plotline' && <span className="wrOutlineMeta">{(w.plotChildrenByParentId.get(k.id) ?? []).length} plotpoints</span>}
+        </button>
+      ))}
+    </div>
+  )
+}
+
+function KeywordsField({ w, node }: { w: WriterWorkspace; node: PlotNode }) {
+  return (
+    <div>
+      <div className="wrLabel">Keywords</div>
+      <ChipEditor
+        items={node.keywords.map(k => ({ key: k, label: k }))} placeholder="Add keyword…"
+        onAdd={k => w.addPlotKeyword(node.id, k)} onRemove={k => w.removePlotKeyword(node.id, k)}
+      />
+    </div>
+  )
+}
+
+function CategoryEditor({ w, node }: { w: WriterWorkspace; node: PlotNode }) {
+  const isCategory = node.kind === 'category'
+  return (
+    <div className="wrCardPanel">
+      <div className="wrCardPanelHead">
+        <span className="wrKindBadge">{node.kind}</span>
+        <input className="wrTitleField" value={node.title} onChange={e => w.updatePlotNodeField(node.id, 'title', e.target.value)} placeholder="Title" />
+        <DeleteControl
+          tone="dark" message={`Delete ${node.title || node.kind}? Its plotlines move to Unassigned.`}
+          onConfirm={() => w.deletePlotNode(node.id)}
+        />
+      </div>
+      <div>
+        <div className="wrLabel">Description</div>
+        <textarea
+          className="wrField" rows={2} placeholder="Description" value={node.body}
+          onChange={e => w.updatePlotNodeField(node.id, 'body', e.target.value)}
+        />
+      </div>
+      <KeywordsField w={w} node={node} />
+      <div>
+        <div className="wrLabel">Plotline template fields</div>
+        <ChipEditor
+          items={node.customFieldDefs.map(f => ({ key: f.id, label: f.name }))} placeholder="Add field…"
+          onAdd={name => w.addPlotCustomFieldDef(node.id, name)} onRemove={id => w.removePlotCustomFieldDef(node.id, id)}
+        />
+      </div>
+      {isCategory && <ChildRows w={w} node={node} kind="subcategory" addLabel="Subcategory" />}
+      <ChildRows w={w} node={node} kind="plotline" addLabel="Plotline" />
+    </div>
+  )
+}
+
+interface OutlineTarget { id: string; label: string; depth: number; meta: string }
+
+function PlotlineEditor({ w, node }: { w: WriterWorkspace; node: PlotNode }) {
+  const [dragId, setDragId] = useState<string | null>(null)
+  const [overId, setOverId] = useState<string | null>(null)
+  const [overUnassigned, setOverUnassigned] = useState(false)
+
+  // Books and their chapters are the drop targets.
+  const targets = useMemo<OutlineTarget[]>(() => {
+    const out: OutlineTarget[] = []
+    const byParent = new Map<string | null, OutlineNode[]>()
+    for (const n of w.outlineNodes) byParent.set(n.parentId, [...(byParent.get(n.parentId) ?? []), n])
+    for (const b of w.books) {
+      const chapters: OutlineNode[] = []
+      const walk = (id: string) => (byParent.get(id) ?? []).sort((a, c) => a.order - c.order).forEach(ch => {
+        if (ch.kind === 'chapter') chapters.push(ch)
+        walk(ch.id)
+      })
+      walk(b.id)
+      out.push({ id: b.id, label: b.title, depth: 0, meta: `${chapters.length} chapters` })
+      chapters.forEach((c, i) => out.push({ id: c.id, label: `${i + 1} · ${c.title}`, depth: 1, meta: '' }))
+    }
+    return out
+  }, [w.outlineNodes, w.books])
+  const targetIds = useMemo(() => new Set(targets.map(t => t.id)), [targets])
+
+  const points = (w.plotChildrenByParentId.get(node.id) ?? []).filter(p => p.kind === 'plotpoint')
+  const isAssigned = (p: PlotNode) => p.assignedMomentId != null && targetIds.has(p.assignedMomentId)
+  const unassigned = points.filter(p => !isAssigned(p))
+
+  // The custom fields a plotline fills in come from its category and
+  // subcategory templates as well as its own.
+  const fieldDefs = useMemo(() => {
+    const defs: { id: string; name: string }[] = []
+    let current: PlotNode | undefined = node
+    const chain: PlotNode[] = []
+    while (current) { chain.unshift(current); current = current.parentId ? w.plotNodeById.get(current.parentId) : undefined }
+    for (const n of chain) defs.push(...n.customFieldDefs)
+    return defs
+  }, [node, w.plotNodeById])
+
+  function endDrag() { setDragId(null); setOverId(null); setOverUnassigned(false) }
+
+  function dragProps(id: string) {
+    return {
+      draggable: true,
+      onDragStart: (e: React.DragEvent) => {
+        e.dataTransfer.effectAllowed = 'move'
+        e.dataTransfer.setData('text/plain', id)
+        const card = (e.currentTarget as HTMLElement).closest('[data-point]')
+        if (card) e.dataTransfer.setDragImage(card, 12, 12)
+        setDragId(id)
+      },
+      onDragEnd: endDrag,
+    }
+  }
+
+  return (
+    <div className="wrPlotlineLayout">
+      <div className="wrPlotlineLeft">
+        <div className="wrCardPanel">
+          <div className="wrCardPanelHead">
+            <span className="wrKindBadge">plotline</span>
+            <input className="wrTitleField" value={node.title} onChange={e => w.updatePlotNodeField(node.id, 'title', e.target.value)} placeholder="Title" />
+            <DeleteControl tone="dark" message={`Delete ${node.title || 'plotline'} and its plotpoints?`} onConfirm={() => w.deletePlotNode(node.id)} />
+          </div>
+          <div>
+            <div className="wrLabel">Description</div>
+            <textarea
+              className="wrField" rows={2} placeholder="Description" value={node.body}
+              onChange={e => w.updatePlotNodeField(node.id, 'body', e.target.value)}
+            />
+          </div>
+          <KeywordsField w={w} node={node} />
+          {fieldDefs.map(f => (
+            <label key={f.id} className="wrFieldRow">
+              <span>{f.name}</span>
+              <input
+                className="wrField" value={node.customFieldValues[f.id] ?? ''}
+                onChange={e => w.updatePlotCustomFieldValue(node.id, f.id, e.target.value)}
+              />
+            </label>
+          ))}
+        </div>
+
+        <div
+          className={overUnassigned ? 'wrUnassigned wrUnassigned--over' : 'wrUnassigned'}
+          onDragOver={e => { if (dragId) { e.preventDefault(); setOverUnassigned(true) } }}
+          onDragLeave={() => setOverUnassigned(false)}
+          onDrop={e => { e.preventDefault(); if (dragId) w.assignPlotpoint(dragId, null); endDrag() }}
+        >
+          <div className="wrChildRowsHead">
+            <span className="wrLabel">Unassigned plotpoints</span>
+            <button type="button" className="wrSmallBtn" onClick={() => w.addPlotNode(node.id, 'plotpoint')}><PlusIcon size={13} /> Plotpoint</button>
+          </div>
+          <div className="wrPointList">
+            {unassigned.length === 0 && (
+              <p className="wrMuted">{points.length === 0 ? 'No plotpoints yet.' : 'Every plotpoint is assigned. Drag a chip here to unassign it.'}</p>
+            )}
+            {unassigned.map(p => (
+              <div key={p.id} data-point={p.id} className={dragId === p.id ? 'wrPoint wrPoint--dragging' : 'wrPoint'}>
+                <span className="wrGrip" {...dragProps(p.id)} aria-label="Drag plotpoint" title="Drag onto a book or chapter"><GripIcon size={14} /></span>
+                <div className="wrPointFields">
+                  <input
+                    className="wrPointTitle" value={p.title} placeholder="Plotpoint"
+                    onChange={e => w.updatePlotNodeField(p.id, 'title', e.target.value)}
+                  />
+                  <input
+                    className="wrPointBody" value={p.body} placeholder="Details"
+                    onChange={e => w.updatePlotNodeField(p.id, 'body', e.target.value)}
+                  />
+                </div>
+                <DeleteControl tone="dark" message="Delete plotpoint?" onConfirm={() => w.deletePlotNode(p.id)} />
+              </div>
+            ))}
+          </div>
+        </div>
+      </div>
+
+      <div className="wrPlotlineRight">
+        <div className="wrOutlinePanel">
+          <div className="wrChildRowsHead">
+            <span className="wrLabel">Books and chapters</span>
+            <span className="wrOutlineMeta">Drop a plotpoint on a book or chapter</span>
+          </div>
+          {targets.length === 0 && <p className="wrMuted">No books yet.</p>}
+          <div className="wrTargetList">
+            {targets.map(t => (
+              <div
+                key={t.id}
+                className={overId === t.id ? 'wrTarget wrTarget--over' : 'wrTarget'}
+                style={{ marginLeft: t.depth * 22 }}
+                onDragOver={e => { if (dragId) { e.preventDefault(); setOverId(t.id) } }}
+                onDragLeave={() => setOverId(prev => (prev === t.id ? null : prev))}
+                onDrop={e => { e.preventDefault(); if (dragId) w.assignPlotpoint(dragId, t.id); endDrag() }}
+              >
+                <span className={t.depth === 0 ? 'wrTargetLabel wrTargetLabel--book' : 'wrTargetLabel'}>{t.label}</span>
+                <span className="wrOutlineMeta">{t.meta}</span>
+                <span className="wrTargetChips">
+                  {points.filter(p => p.assignedMomentId === t.id).map(p => (
+                    <span key={p.id} data-point={p.id} className="wrPointChip" {...dragProps(p.id)}>
+                      {p.title || 'Plotpoint'}
+                      <button type="button" aria-label={`Unassign ${p.title}`} onClick={() => w.assignPlotpoint(p.id, null)}>×</button>
+                    </span>
+                  ))}
+                </span>
+              </div>
+            ))}
+          </div>
+        </div>
+
+      </div>
+    </div>
+  )
+}
+
+export default function PlotView({ w }: { w: WriterWorkspace }) {
+  const node = w.focusedPlotNode
+  return (
+    <div className="wrPlotView">
+      <PlotNav w={w} />
+      <div className="wrPlotBody">
+        {w.plotSaveError && <p className="wrError">{w.plotSaveError}</p>}
+        {w.plotStatus === 'loading' && <p className="wrMuted">Loading plot…</p>}
+        {w.plotStatus === 'error' && <p className="wrError">{w.plotError ?? 'Failed to load plot.'}</p>}
+        {w.plotStatus === 'idle' && !node && <p className="wrMuted">Select a category or plotline to edit it, or add a category.</p>}
+        {w.plotStatus === 'idle' && node && (node.kind === 'plotline'
+          ? <PlotlineEditor key={node.id} w={w} node={node} />
+          : node.kind === 'plotpoint'
+            ? <p className="wrMuted">Plotpoints are edited from their plotline.</p>
+            : <CategoryEditor key={node.id} w={w} node={node} />)}
+      </div>
+    </div>
+  )
+}

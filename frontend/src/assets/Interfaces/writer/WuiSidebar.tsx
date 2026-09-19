@@ -1,224 +1,244 @@
-import { useState } from 'react'
+import { useEffect, useState, type ReactNode } from 'react'
 import type { OutlineNode } from '../../../api/types'
 import type { WriterWorkspace } from './useWriterWorkspace'
-import { PageIcon, PagesIcon } from '../../icons'
+import { booksOf, buildChildIndex, chaptersOfBook, descendantsOf } from './outlineTree'
+import { ChevronDownIcon, ChevronLeftIcon, ChevronRightIcon, PlusIcon } from '../../icons'
+import { DeleteControl } from './shared'
 
-interface WuiSidebarProps {
-  workspace: WriterWorkspace
-  onNavigate: (kind: 'opening' | 'flipping' | null, after: () => void) => void
-}
+// The bookshelf look lives here and nowhere else in the Writer interface:
+// stacked project shelves when nothing is open, and -- once a project is
+// open -- just that project's shelf, followed by one collapsible panel per
+// selected level (Project, then Book, then Chapter) that only appears once
+// that kind of object is selected.
 
-// A single node/project entry within one of the sidebar's horizontal
-// shelves -- the compact spine visual is sidebar-only (see .sidebarSpine
-// in App.scss), unlike the plain rows the main-screen editors use now.
-function SidebarSpine({
-  title, active, color, onSelect, onDelete, onMoveUp, onMoveDown, canMoveUp, canMoveDown,
-}: {
-  title: string
-  active: boolean
-  color?: string | null
-  onSelect: () => void
-  onDelete: () => void
-  onMoveUp?: () => void
-  onMoveDown?: () => void
-  canMoveUp?: boolean
-  canMoveDown?: boolean
-}) {
-  const [confirmingDelete, setConfirmingDelete] = useState(false)
+const SPINE_HEIGHTS = [100, 84, 94, 88]
 
+function Spine({ book, index, active, onOpen }: { book: OutlineNode; index: number; active: boolean; onOpen: () => void }) {
   return (
-    <div className="sidebarSpineWrap">
-      {(onMoveUp || onMoveDown) && (
-        <div className="shelfMoveRow">
-          <button type="button" className="tonePriorityMoveBtn" disabled={!canMoveUp} onClick={onMoveUp}>▲</button>
-          <button type="button" className="tonePriorityMoveBtn" disabled={!canMoveDown} onClick={onMoveDown}>▼</button>
-        </div>
-      )}
-      <button
-        type="button"
-        className={active ? 'sidebarSpine sidebarSpine--active' : 'sidebarSpine'}
-        style={color ? { backgroundColor: color } : undefined}
-        onClick={onSelect}
-      >
-        <span>{title}</span>
-      </button>
-      {confirmingDelete ? (
-        <span className="shelfConfirmRow">
-          <button type="button" className="toneBtn" onClick={() => { onDelete(); setConfirmingDelete(false) }}>Confirm</button>
-          <button type="button" className="toneBtn" onClick={() => setConfirmingDelete(false)}>Cancel</button>
-        </span>
-      ) : (
-        <button type="button" className="toneBtn shelfDeleteBtn" onClick={() => setConfirmingDelete(true)}>Delete</button>
-      )}
-    </div>
-  )
-}
-
-// "You are here" header row for a panel's current node at that level --
-// clickable to jump back to editing it after drilling into one of its
-// children below. No move/delete here; those live on its own row one
-// panel up, where it appears as a sibling instead.
-function HeaderEntry({ node, onSelect }: { node: OutlineNode; onSelect: () => void }) {
-  return (
-    <button type="button" className="ancestryBreadcrumbRow" onClick={onSelect}>
-      <span className="outlineNodeKindBadge">{node.kind}</span>
-      <span>{node.title}</span>
+    <button
+      type="button"
+      className={active ? 'wrSpine wrSpine--active' : 'wrSpine'}
+      style={{ height: SPINE_HEIGHTS[index % SPINE_HEIGHTS.length], ...(book.color ? { backgroundColor: book.color } : {}) }}
+      onClick={onOpen}
+      title={book.title}
+    >
+      <span>{book.title}</span>
     </button>
   )
 }
 
-// The entire WUI navigation surface -- 4 stacked panels, each a header
-// entry (the current node at that level) plus a horizontal shelf of its
-// direct children (a single-level picker; drilling into a child updates
-// which node is "current" and the shelf refreshes to its own children).
-// bookSidebar/chapterSidebar are dynamic: they track whichever book-or-arc
-// (resp. chapter/act/scene) node is nearest the current focus, so stepping
-// through an intermediate kind like arc reuses the same panel.
-function WuiSidebar({ workspace, onNavigate }: WuiSidebarProps) {
-  const {
-    hasOpenProject, activeProject, projects, projectsStatus, projectsError,
-    ancestryChain, focusedNode, focusNode, backToShelves,
-    childrenByParentId, chapterAncestorId, pageMode,
-    moveOutlineNodeUp, moveOutlineNodeDown, deleteOutlineNode,
-    loadProjects, createProject, openProject, deleteProject,
-    viewChapterDraft, viewChapterPages,
-  } = workspace
-
-  const [newProjectTitle, setNewProjectTitle] = useState('')
-
-  function handleCreateProject() {
-    if (!newProjectTitle.trim()) return
-    createProject(newProjectTitle.trim())
-    setNewProjectTitle('')
-  }
-
-  function navigateToNode(node: OutlineNode) {
-    const isChapterMove = node.kind === 'chapter' || chapterAncestorId != null
-    onNavigate(isChapterMove ? 'opening' : null, () => focusNode(node.id))
-  }
-
-  function togglePageMode(mode: 'draft' | 'preview') {
-    if (pageMode === mode) return
-    onNavigate('flipping', () => (mode === 'draft' ? viewChapterDraft() : viewChapterPages()))
-  }
-
-  const chain = focusedNode ? [...ancestryChain, focusedNode] : ancestryChain
-  const rootEntry = chain.find(n => n.parentId === null)
-  const bookOrArcEntries = chain.filter(n => n.kind === 'book' || n.kind === 'arc')
-  const nearestBookOrArc = bookOrArcEntries[bookOrArcEntries.length - 1]
-  const chapterSpanEntries = chain.filter(n => n.kind === 'chapter' || n.kind === 'act' || n.kind === 'scene')
-  const nearestChapterSpan = chapterSpanEntries[chapterSpanEntries.length - 1]
-
-  const activeChildId = (parentId: string) => chain.find(n => n.parentId === parentId)?.id
-
-  const rootChildren = rootEntry ? childrenByParentId.get(rootEntry.id) ?? [] : []
-  const bookOrArcChildren = nearestBookOrArc ? childrenByParentId.get(nearestBookOrArc.id) ?? [] : []
-  const chapterSpanChildren = nearestChapterSpan ? childrenByParentId.get(nearestChapterSpan.id) ?? [] : []
-
-  function renderChildShelf(children: OutlineNode[], activeId: string | undefined) {
-    return (
-      <div className="sidebarShelf">
-        {children.map((child, index) => (
-          <SidebarSpine
-            key={child.id}
-            title={child.title}
-            color={child.color}
-            active={child.id === activeId}
-            onSelect={() => navigateToNode(child)}
-            onDelete={() => deleteOutlineNode(child.id)}
-            onMoveUp={() => moveOutlineNodeUp(child.id)}
-            onMoveDown={() => moveOutlineNodeDown(child.id)}
-            canMoveUp={index > 0}
-            canMoveDown={index < children.length - 1}
-          />
+function Shelf({ label, meta, books, activeBookId, selected, onOpenBook, right }: {
+  label: string
+  meta: string
+  books: OutlineNode[]
+  activeBookId: string | null
+  selected?: boolean
+  onOpenBook: (bookId: string) => void
+  right?: ReactNode
+}) {
+  return (
+    <div className="wrShelf">
+      <div className="wrShelfHeader">
+        <span className={selected ? 'wrShelfName wrShelfName--selected' : 'wrShelfName'}>{label}</span>
+        <span className="wrShelfMeta">{meta}</span>
+        {right}
+      </div>
+      <div className="wrShelfBooks">
+        {books.length === 0 && <span className="wrShelfEmpty">No books yet</span>}
+        {books.map((b, i) => (
+          <Spine key={b.id} book={b} index={i} active={b.id === activeBookId} onOpen={() => onOpenBook(b.id)} />
         ))}
       </div>
+      <div className="wrShelfBoard" />
+    </div>
+  )
+}
+
+function Panel({ label, value, open, onToggle, onOpen, children }: {
+  label: string
+  value: string
+  open: boolean
+  onToggle: () => void
+  // Jump to this level's own console (shown only when not already there).
+  onOpen?: () => void
+  children: ReactNode
+}) {
+  return (
+    <section className="wrPanel">
+      <div className="wrPanelHeaderRow">
+        <button type="button" className="wrPanelHeader" aria-expanded={open} onClick={onToggle}>
+          {open ? <ChevronDownIcon size={14} /> : <ChevronRightIcon size={14} />}
+          <span className="wrPanelLabel">{label}</span>
+          <span className="wrPanelValue">{value}</span>
+        </button>
+        {onOpen && <button type="button" className="wrLinkBtn wrPanelOpen" onClick={onOpen}>Open</button>}
+      </div>
+      {open && <div className="wrPanelBody">{children}</div>}
+    </section>
+  )
+}
+
+const kv = (k: string, v: ReactNode) => (
+  <div className="wrKv"><span>{k}</span><span>{v}</span></div>
+)
+
+type PanelKey = 'project' | 'book' | 'chapter'
+
+function WuiSidebar({ workspace: w }: { workspace: WriterWorkspace }) {
+  const [newTitle, setNewTitle] = useState('')
+  // Only the current (deepest) panel is open; a click on a header opens that
+  // one instead. Selecting something new resets this to "the current one".
+  const [manualOpen, setManualOpen] = useState<PanelKey | 'none' | null>(null)
+  useEffect(() => { setManualOpen(null) }, [w.activeProjectId, w.activeBookId, w.activeChapterId])
+
+  function createProject() {
+    if (!newTitle.trim()) return
+    void w.createProject(newTitle.trim())
+    setNewTitle('')
+  }
+
+  if (!w.hasOpenProject) {
+    return (
+      <aside className="wrSidebar" aria-label="Project shelves">
+        {w.projectsStatus === 'loading' && <p className="wrMuted">Loading projects…</p>}
+        {w.projectsStatus === 'error' && (
+          <p className="wrMuted">
+            {w.projectsError ?? 'Failed to load projects.'}{' '}
+            <button type="button" className="wrSmallBtn" onClick={() => void w.loadProjects()}>Retry</button>
+          </p>
+        )}
+        {w.projects.map(p => {
+          const books = booksOf(w.projectOutlines[p.projectId] ?? [])
+          return (
+            <Shelf
+              key={p.projectId}
+              label={p.title}
+              meta={`${books.length} ${books.length === 1 ? 'book' : 'books'}`}
+              books={books}
+              activeBookId={null}
+              onOpenBook={bookId => void w.openProject(p.projectId, bookId)}
+              right={
+                <>
+                  <button type="button" className="wrLinkBtn" onClick={() => void w.openProject(p.projectId)}>Open</button>
+                  <DeleteControl tone="dark" message={`Delete ${p.title}?`} onConfirm={() => void w.deleteProject(p.projectId)} />
+                </>
+              }
+            />
+          )
+        })}
+        {w.projectsStatus === 'idle' && w.projects.length === 0 && <p className="wrMuted">No projects yet. Create one below.</p>}
+        <div className="wrNewProject">
+          <input
+            value={newTitle} placeholder="New project title…"
+            onChange={e => setNewTitle(e.target.value)}
+            onKeyDown={e => { if (e.key === 'Enter') createProject() }}
+          />
+          <button type="button" className="wrSmallBtn" disabled={!newTitle.trim()} onClick={createProject}>
+            <PlusIcon size={14} /> New project
+          </button>
+        </div>
+      </aside>
     )
   }
 
+  const project = w.activeProject!
+  const index = buildChildIndex(w.outlineNodes)
+  const chapterCount = w.books.reduce((n, b) => n + chaptersOfBook(w.outlineNodes, b.id).length, 0)
+  const deepest: PanelKey = w.activeChapter ? 'chapter' : w.activeBook ? 'book' : 'project'
+  const isOpen = (key: PanelKey) => (manualOpen ? manualOpen === key : deepest === key)
+  const toggle = (key: PanelKey) => setManualOpen(isOpen(key) ? 'none' : key)
+
+  const bookChapters = w.activeBook ? w.activeBookChapters : []
+  const chapterNumber = w.activeChapter ? bookChapters.findIndex(c => c.id === w.activeChapter!.id) + 1 : 0
+  const chapterTree = w.activeChapter ? descendantsOf(index, w.activeChapter.id) : []
+  const moments = chapterTree.filter(n => n.kind === 'moment').length
+  let actNo = 0
+  let sceneNo = 0
+  let momentNo = 0
+
   return (
-    <aside className="wuiSidebar" aria-label="Writer navigation">
-      <div className="projectsConsole wuiSidebarPanel">
-        <div className="wuiSidebarPanelLabel">Projects</div>
-        {hasOpenProject && (
-          <button type="button" className="ancestryBreadcrumbBack" onClick={backToShelves}>← Close project</button>
-        )}
-        {projectsStatus === 'loading' && <p className="feedbackCardMeta">Loading projects…</p>}
-        {projectsStatus === 'error' && (
-          <p className="feedbackCardMeta">
-            {projectsError ?? 'Failed to load projects.'}{' '}
-            <button type="button" className="toneBtn" onClick={loadProjects}>Retry</button>
-          </p>
-        )}
-        <div className="sidebarShelf">
-          {projects.map(p => (
-            <SidebarSpine
-              key={p.projectId}
-              title={p.title}
-              active={p.projectId === activeProject?.projectId}
-              onSelect={() => openProject(p.projectId)}
-              onDelete={() => deleteProject(p.projectId)}
-            />
-          ))}
-        </div>
-        <div className="channelAddForm">
-          <input
-            value={newProjectTitle} placeholder="New project title…"
-            onChange={e => setNewProjectTitle(e.target.value)}
-            onKeyDown={e => e.key === 'Enter' && handleCreateProject()}
-          />
-          <button type="button" className="toneBtn" disabled={!newProjectTitle.trim()} onClick={handleCreateProject}>+ New project</button>
-        </div>
-      </div>
+    <aside className="wrSidebar" aria-label="Project navigation">
+      <button type="button" className="wrBackLink" onClick={w.backToShelves}>
+        <ChevronLeftIcon size={14} /> All shelves
+      </button>
 
-      {hasOpenProject && rootEntry && (
-        <div className="shelfSidebar wuiSidebarPanel">
-          <div className="wuiSidebarPanelLabel">Shelf</div>
-          <HeaderEntry node={rootEntry} onSelect={() => navigateToNode(rootEntry)} />
-          {renderChildShelf(rootChildren, activeChildId(rootEntry.id))}
-        </div>
+      <Shelf
+        label={project.title}
+        meta={`${w.books.length} ${w.books.length === 1 ? 'book' : 'books'}`}
+        books={w.books}
+        activeBookId={w.activeBookId}
+        selected
+        onOpenBook={w.openBook}
+      />
+
+      <Panel
+        label="Project" value={project.title} open={isOpen('project')} onToggle={() => toggle('project')}
+        onOpen={w.activeConsole !== 'shelf' ? w.showProject : undefined}
+      >
+        {kv('Books', w.books.length)}
+        {kv('Chapters', chapterCount)}
+        {kv('Plot categories', w.plotNodes.filter(n => n.kind === 'category').length)}
+        <div className="wrPanelHead">Outline</div>
+        {w.books.length === 0 && <div className="wrMuted">No books yet.</div>}
+        {w.books.map(b => (
+          <button key={b.id} type="button" className="wrOutlineRow" onClick={() => w.openBook(b.id)}>
+            <span>{b.title}</span>
+            <span className="wrOutlineMeta">{chaptersOfBook(w.outlineNodes, b.id).length} chapters</span>
+          </button>
+        ))}
+      </Panel>
+
+      {w.activeBook && (
+        <Panel
+          label="Book" value={w.activeBook.title} open={isOpen('book')} onToggle={() => toggle('book')}
+          onOpen={w.activeConsole !== 'book' || w.activeChapterId ? () => w.openBook(w.activeBook!.id) : undefined}
+        >
+          {kv('Title', w.activeBook.title)}
+          {kv('Chapters', w.activeBook.chapterCountTarget ? `${bookChapters.length} of ${w.activeBook.chapterCountTarget} target` : bookChapters.length)}
+          {w.activeBook.wordCountGoal != null && kv('Word goal', w.activeBook.wordCountGoal.toLocaleString())}
+          {w.activeBook.synopsis && <div className="wrPanelText">{w.activeBook.synopsis}</div>}
+          <div className="wrPanelHead">Outline</div>
+          {descendantsOf(index, w.activeBook.id)
+            .filter(n => n.kind === 'arc' || n.kind === 'chapter')
+            .map(n => {
+              const depth = n.kind === 'chapter' && n.parentId !== w.activeBook!.id ? 1 : 0
+              return n.kind === 'arc' ? (
+                <div key={n.id} className="wrOutlineRow wrOutlineRow--static" style={{ paddingLeft: 6 }}>
+                  <span>{n.title}</span><span className="wrOutlineMeta">arc</span>
+                </div>
+              ) : (
+                <button
+                  key={n.id} type="button" style={{ paddingLeft: 6 + depth * 12 }}
+                  className={n.id === w.activeChapterId ? 'wrOutlineRow wrOutlineRow--active' : 'wrOutlineRow'}
+                  onClick={() => w.openChapter(n.id)}
+                >
+                  <span>{bookChapters.findIndex(c => c.id === n.id) + 1} · {n.title}</span>
+                </button>
+              )
+            })}
+        </Panel>
       )}
 
-      {/* Skipped when nearestBookOrArc === rootEntry -- a single-book
-          project's root is kind 'book' directly (no series wrapper), so
-          shelfSidebar's own header/shelf already covers it; showing both
-          panels would just duplicate the same node. */}
-      {nearestBookOrArc && nearestBookOrArc.id !== rootEntry?.id && (
-        <div className="bookSidebar wuiSidebarPanel">
-          <div className="wuiSidebarPanelLabel">Book</div>
-          <HeaderEntry node={nearestBookOrArc} onSelect={() => navigateToNode(nearestBookOrArc)} />
-          {renderChildShelf(bookOrArcChildren, activeChildId(nearestBookOrArc.id))}
-        </div>
-      )}
-
-      {nearestChapterSpan && (
-        <div className="chapterSidebar wuiSidebarPanel">
-          <div className="wuiSidebarPanelLabel">
-            Chapter
-            {chapterAncestorId != null && (
-              <span className="bookTabsPageModeToggle">
-                <button
-                  type="button"
-                  className={pageMode === 'draft' ? 'subTabBtn subTabBtn--active' : 'subTabBtn'}
-                  aria-label="Draft" title="Draft"
-                  onClick={() => togglePageMode('draft')}
-                >
-                  <PageIcon size={14} />
-                </button>
-                <button
-                  type="button"
-                  className={pageMode === 'preview' ? 'subTabBtn subTabBtn--active' : 'subTabBtn'}
-                  aria-label="Preview" title="Preview"
-                  onClick={() => togglePageMode('preview')}
-                >
-                  <PagesIcon size={14} />
-                </button>
-              </span>
-            )}
-          </div>
-          <HeaderEntry node={nearestChapterSpan} onSelect={() => navigateToNode(nearestChapterSpan)} />
-          {renderChildShelf(chapterSpanChildren, activeChildId(nearestChapterSpan.id))}
-        </div>
+      {w.activeChapter && (
+        <Panel label="Chapter" value={`${chapterNumber} · ${w.activeChapter.title}`} open={isOpen('chapter')} onToggle={() => toggle('chapter')}>
+          {kv('Chapter', chapterNumber)}
+          {kv('Moments', moments)}
+          <div className="wrPanelHead">Outline</div>
+          {chapterTree.length === 0 && <div className="wrMuted">Nothing outlined yet.</div>}
+          {chapterTree.map(n => {
+            let label = ''
+            let depth = 0
+            let meta = ''
+            if (n.kind === 'act') { actNo += 1; label = `Act ${actNo}`; depth = 0 }
+            else if (n.kind === 'scene') { sceneNo += 1; label = `Scene ${sceneNo}`; depth = n.parentId === w.activeChapter!.id ? 0 : 1; meta = n.location ?? '' }
+            else { momentNo += 1; label = `Moment ${momentNo}`; depth = 2 }
+            return (
+              <div key={n.id} className="wrOutlineRow wrOutlineRow--static" style={{ paddingLeft: 6 + depth * 12 }}>
+                <span>{label}</span>{meta && <span className="wrOutlineMeta">{meta}</span>}
+              </div>
+            )
+          })}
+        </Panel>
       )}
     </aside>
   )

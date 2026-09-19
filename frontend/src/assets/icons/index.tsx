@@ -357,3 +357,83 @@ export function PagesIcon(props: IconProps) {
     <rect x="4" y="6" width="13" height="17" rx="1.5" />
   </IconBase>
 }
+
+export function TrashIcon(props: IconProps) {
+  return <IconBase {...props}>
+    <path d="M4 7h16M9 7V4h6v3" />
+    <path d="M6 7l1 13h10l1-13" />
+    <path d="M10 11v6M14 11v6" />
+  </IconBase>
+}
+
+export function ChevronRightIcon(props: IconProps) {
+  return <IconBase {...props}><path d="M9 6l6 6-6 6" /></IconBase>
+}
+
+export function ChevronDownIcon(props: IconProps) {
+  return <IconBase {...props}><path d="M6 9l6 6 6-6" /></IconBase>
+}
+
+export function ChevronLeftIcon(props: IconProps) {
+  return <IconBase {...props}><path d="M15 6l-6 6 6 6" /></IconBase>
+}
+
+// Six-dot drag grip.
+export function GripIcon(props: IconProps) {
+  return <IconBase {...props}>
+    <circle cx="9" cy="6" r="1.4" fill="currentColor" />
+    <circle cx="15" cy="6" r="1.4" fill="currentColor" />
+    <circle cx="9" cy="12" r="1.4" fill="currentColor" />
+    <circle cx="15" cy="12" r="1.4" fill="currentColor" />
+    <circle cx="9" cy="18" r="1.4" fill="currentColor" />
+    <circle cx="15" cy="18" r="1.4" fill="currentColor" />
+  </IconBase>
+}
+
+// Outlined heart -- a positive reaction (Pages console).
+export function HeartIcon(props: IconProps) {
+  return <IconBase {...props}>
+    <path d="M12 20.5s-8-4.9-8-10.4A4.4 4.4 0 0 1 12 7.6a4.4 4.4 0 0 1 8 2.5c0 5.5-8 10.4-8 10.4z" />
+  </IconBase>
+}
+
+// Outlined heart with a crack down the middle -- a negative reaction.
+export function HeartHalvedIcon(props: IconProps) {
+  return <IconBase {...props}>
+    <path d="M12 20.5s-8-4.9-8-10.4A4.4 4.4 0 0 1 12 7.6a4.4 4.4 0 0 1 8 2.5c0 5.5-8 10.4-8 10.4z" />
+    <path d="M12 7.6l-2.2 3.8 3.2 2.2-2 3.6" />
+  </IconBase>
+}
+
+export function ClockIcon(props: IconProps) {
+  return <IconBase {...props}>
+    <circle cx="12" cy="12" r="9" />
+    <path d="M12 7v5l3 2" />
+  </IconBase>
+}
+
+export function ListIcon(props: IconProps) {
+  return <IconBase {...props}>
+    <path d="M9 6h11M9 12h11M9 18h11" />
+    <path d="M4.5 6h.01M4.5 12h.01M4.5 18h.01" />
+  </IconBase>
+}
+
+export function ArcIcon(props: IconProps) {
+  return <IconBase {...props}><path d="M3 19C6 5 18 5 21 19" /></IconBase>
+}
+
+export function ReactionIcon(props: IconProps) {
+  return <IconBase {...props}>
+    <circle cx="12" cy="12" r="9" />
+    <path d="M8.5 14a4 4 0 0 0 7 0M9 9.5h.01M15 9.5h.01" />
+  </IconBase>
+}
+
+export function FlagIcon(props: IconProps) {
+  return <IconBase {...props}><path d="M5 21V4M5 4h11l-2 4 2 4H5" /></IconBase>
+}
+
+export function SentenceIcon(props: IconProps) {
+  return <IconBase {...props}><path d="M4 8h16M4 12h10M4 16h13" /></IconBase>
+}

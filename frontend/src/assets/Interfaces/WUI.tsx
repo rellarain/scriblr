@@ -1,40 +1,76 @@
-import { useEffect, useRef, useState } from 'react'
-import { useWriterWorkspace, type TransitionState } from './writer/useWriterWorkspace'
-import BookLayer from './writer/BookLayer'
-import ShelfLayer from './writer/ShelfLayer'
+import { useState } from 'react'
+import { useWriterWorkspace, type WuiConsole } from './writer/useWriterWorkspace'
 import WuiSidebar from './writer/WuiSidebar'
+import ProjectConsole from './writer/ProjectConsole'
+import BookConsole from './writer/BookConsole'
+import PageConsole from './writer/PageConsole'
+import PagesConsole from './writer/PagesConsole'
+import { Dashboard, SchedulePanel, AnalyticsPanel, Scratchpad } from './writer/Dashboard'
+import {
+  COMPONENTS_BY_CONSOLE, DEFAULT_COMPONENT, HELP_COMPONENT, SETTINGS_COMPONENT,
+} from './writer/consoleDefs'
+import { ConsoleTitleRow, IconColumn, Placeholder } from './writer/shared'
+import './writer/writer.scss'
 
-const TRANSITION_MS = 600
-
-// Three stacked layers per scrilbrPlan.md's "Writer Page (WUI)" section:
-// bookContainer (book/chapter editing, bottom) -> bookshelfContainer
-// (project shelf + shelf console drawer, middle) -> wuiSidebar (all
-// navigation, topmost, always 1 column wide). WuiSidebar is the only place
-// navigation happens now, so the sliderPages transition it can trigger
-// (opening a book into a chapter, flipping draft<->preview) is owned here,
-// one level up, since BookLayer (who renders the transition) and
-// WuiSidebar (who triggers it) are siblings with no other shared parent.
+// The Writer page. Navigation lives in the sidebar (project shelves, then
+// the Project/Book/Chapter panels); the main screen is an icon column of the
+// current console's components beside that console's editor.
 function WUI() {
   const workspace = useWriterWorkspace()
-  const [transitionState, setTransitionState] = useState<TransitionState>('idle')
-  const transitionTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const console_ = workspace.activeConsole
+  const [selected, setSelected] = useState<Record<WuiConsole, string>>({ ...DEFAULT_COMPONENT })
+  const component = selected[console_]
+  const setComponent = (key: string) => setSelected(prev => ({ ...prev, [console_]: key }))
 
-  useEffect(() => () => { if (transitionTimerRef.current) clearTimeout(transitionTimerRef.current) }, [])
+  const components = COMPONENTS_BY_CONSOLE[console_]
+  const isUtility = component === SETTINGS_COMPONENT.key || component === HELP_COMPONENT.key
+  const utility = component === SETTINGS_COMPONENT.key ? SETTINGS_COMPONENT : HELP_COMPONENT
 
-  function onNavigate(kind: 'opening' | 'flipping' | null, after: () => void) {
-    if (!kind) { after(); return }
-    setTransitionState(kind)
-    transitionTimerRef.current = setTimeout(() => {
-      after()
-      setTransitionState('idle')
-    }, TRANSITION_MS)
+  // The book editor is a full-height cover with no title row above it.
+  const flush = console_ === 'book' && component === 'bookEditor'
+
+  function shelvesBody() {
+    const def = components.find(c => c.key === component)
+    const shelvesProjects = workspace.projects
+    if (component === 'dashboard') return <Dashboard projects={shelvesProjects} outlines={workspace.projectOutlines} />
+    if (component === 'schedule') return <div className="wrColumns wrColumns--single"><SchedulePanel /></div>
+    if (component === 'analytics') return <div className="wrColumns wrColumns--single"><AnalyticsPanel projects={shelvesProjects} outlines={workspace.projectOutlines} /></div>
+    if (component === 'scratchpad') return <div className="wrColumns wrColumns--single"><Scratchpad /></div>
+    return <Placeholder title={def?.label ?? ''} body={def?.body} />
+  }
+
+  let content
+  if (isUtility) {
+    content = (
+      <>
+        <ConsoleTitleRow console={console_[0].toUpperCase() + console_.slice(1)} component={utility.label} />
+        <Placeholder title={utility.label} body={utility.body} />
+      </>
+    )
+  } else if (console_ === 'shelves') {
+    content = (
+      <>
+        <ConsoleTitleRow console="Shelves" component={components.find(c => c.key === component)?.label ?? ''} />
+        <div className="wrConsoleBody">{shelvesBody()}</div>
+      </>
+    )
+  } else if (console_ === 'shelf') {
+    content = <ProjectConsole w={workspace} component={component} />
+  } else if (console_ === 'book') {
+    content = <BookConsole w={workspace} component={component} />
+  } else if (console_ === 'page') {
+    content = <PageConsole w={workspace} component={component} />
+  } else {
+    content = <PagesConsole w={workspace} component={component} />
   }
 
   return (
-    <main className="wUI">
-      <BookLayer workspace={workspace} transitionState={transitionState} />
-      <ShelfLayer workspace={workspace} />
-      <WuiSidebar workspace={workspace} onNavigate={onNavigate} />
+    <main className="wUI wr">
+      <WuiSidebar workspace={workspace} />
+      <div className="wrMain">
+        <IconColumn components={components} active={component} onSelect={setComponent} />
+        <div className={flush ? 'wrContent wrContent--flush' : 'wrContent'}>{content}</div>
+      </div>
     </main>
   )
 }
