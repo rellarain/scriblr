@@ -91,6 +91,7 @@
 
   .wrShelf { display: flex; flex-direction: column; gap: 5px; }
   .wrShelfHeader { display: flex; align-items: center; gap: 8px; padding: 0 2px; }
+  .wrShelfName--link { text-align: left; &:hover { color: white; text-decoration: underline; } }
   .wrShelfName { font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 1px; color: var(--wr-muted); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; &--selected { color: white; } }
   .wrShelfMeta { font-size: 10px; opacity: 0.6; margin-right: auto; white-space: nowrap; }
   .wrShelfBooks { display: flex; align-items: flex-end; gap: 5px; padding: 0 8px; min-height: 104px; overflow-x: auto; scrollbar-width: none; &::-webkit-scrollbar { display: none; } }
@@ -112,7 +113,7 @@
   .wrPanel { background: rgba(0, 0, 0, 0.2); border-radius: 4px; }
   .wrPanelHeaderRow { display: flex; align-items: center; padding-right: 10px; }
   .wrPanelHeader { display: flex; align-items: center; gap: 8px; flex: 1 1 auto; min-width: 0; padding: 8px 10px; text-align: left; }
-  .wrPanelOpen { flex: 0 0 auto; margin-left: 8px; }
+  .wrPanelValue--link { flex: 0 1 auto; min-width: 0; margin-left: auto; padding: 8px 0; text-decoration: underline; text-underline-offset: 2px; &:hover { opacity: 0.8; } }
   .wrPanelLabel { font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: 1px; opacity: 0.7; }
   .wrPanelValue { font-size: 12px; font-weight: 600; margin-left: auto; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
   .wrPanelBody { padding: 0 12px 12px 12px; display: flex; flex-direction: column; gap: 5px; font-size: 12px; line-height: 1.4; }

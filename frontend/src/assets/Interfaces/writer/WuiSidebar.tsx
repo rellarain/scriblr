@@ -27,19 +27,23 @@ function Spine({ book, index, active, onOpen }: { book: OutlineNode; index: numb
   )
 }
 
-function Shelf({ label, meta, books, activeBookId, selected, onOpenBook, right }: {
+function Shelf({ label, meta, books, activeBookId, selected, onOpenBook, onOpen, right }: {
   label: string
   meta: string
   books: OutlineNode[]
   activeBookId: string | null
   selected?: boolean
   onOpenBook: (bookId: string) => void
+  // Makes the shelf title a link to the project.
+  onOpen?: () => void
   right?: ReactNode
 }) {
   return (
     <div className="wrShelf">
       <div className="wrShelfHeader">
-        <span className={selected ? 'wrShelfName wrShelfName--selected' : 'wrShelfName'}>{label}</span>
+        {onOpen
+          ? <button type="button" className={selected ? 'wrShelfName wrShelfName--link wrShelfName--selected' : 'wrShelfName wrShelfName--link'} onClick={onOpen}>{label}</button>
+          : <span className={selected ? 'wrShelfName wrShelfName--selected' : 'wrShelfName'}>{label}</span>}
         <span className="wrShelfMeta">{meta}</span>
         {right}
       </div>
@@ -69,9 +73,9 @@ function Panel({ label, value, open, onToggle, onOpen, children }: {
         <button type="button" className="wrPanelHeader" aria-expanded={open} onClick={onToggle}>
           {open ? <ChevronDownIcon size={14} /> : <ChevronRightIcon size={14} />}
           <span className="wrPanelLabel">{label}</span>
-          <span className="wrPanelValue">{value}</span>
+          {!onOpen && <span className="wrPanelValue">{value}</span>}
         </button>
-        {onOpen && <button type="button" className="wrLinkBtn wrPanelOpen" onClick={onOpen}>Open</button>}
+        {onOpen && <button type="button" className="wrPanelValue wrPanelValue--link" title={`Open ${value}`} onClick={onOpen}>{value}</button>}
       </div>
       {open && <div className="wrPanelBody">{children}</div>}
     </section>
@@ -117,12 +121,8 @@ function WuiSidebar({ workspace: w }: { workspace: WriterWorkspace }) {
               books={books}
               activeBookId={null}
               onOpenBook={bookId => void w.openProject(p.projectId, bookId)}
-              right={
-                <>
-                  <button type="button" className="wrLinkBtn" onClick={() => void w.openProject(p.projectId)}>Open</button>
-                  <DeleteControl tone="dark" message={`Delete ${p.title}?`} onConfirm={() => void w.deleteProject(p.projectId)} />
-                </>
-              }
+              onOpen={() => void w.openProject(p.projectId)}
+              right={<DeleteControl tone="dark" message={`Delete ${p.title}?`} onConfirm={() => void w.deleteProject(p.projectId)} />}
             />
           )
         })}
@@ -169,6 +169,7 @@ function WuiSidebar({ workspace: w }: { workspace: WriterWorkspace }) {
         activeBookId={w.activeBookId}
         selected
         onOpenBook={w.openBook}
+        onOpen={w.activeConsole !== 'shelf' ? w.showProject : undefined}
       />
 
       <Panel
