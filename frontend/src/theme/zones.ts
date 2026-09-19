@@ -8,10 +8,11 @@ const DAY_MS = DAY_MINUTES * 60_000
 export const STEP_MINUTES = 10
 export const MAX_START = DAY_MINUTES - STEP_MINUTES
 
+// A minute of the day as a 12-hour clock time: 0 -> "12:00 AM", 1430 -> "11:50 PM".
 export function formatMinute(minute: number): string {
-  const h = Math.floor(minute / 60)
+  const h = Math.floor(minute / 60) % 24
   const m = minute % 60
-  return `${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}`
+  return `${h % 12 === 0 ? 12 : h % 12}:${String(m).padStart(2, '0')} ${h < 12 ? 'AM' : 'PM'}`
 }
 
 // Configured zones in the order they occur across the day (ties broken by the

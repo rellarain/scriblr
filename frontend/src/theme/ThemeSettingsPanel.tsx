@@ -100,7 +100,7 @@ function Timeline() {
           )
         })}
       </div>
-      <div className="themeTimelineTicks"><span>00:00</span><span>06:00</span><span>12:00</span><span>18:00</span><span>24:00</span></div>
+      <div className="themeTimelineTicks"><span>12 AM</span><span>6 AM</span><span>12 PM</span><span>6 PM</span><span>12 AM</span></div>
     </div>
   )
 }

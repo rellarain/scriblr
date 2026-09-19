@@ -135,9 +135,13 @@ describe('activeZone', () => {
 })
 
 describe('formatMinute', () => {
-  it('pads hours and minutes', () => {
-    expect(formatMinute(0)).toBe('00:00')
-    expect(formatMinute(1430)).toBe('23:50')
-    expect(formatMinute(65)).toBe('01:05')
+  it('formats 12-hour clock times', () => {
+    expect(formatMinute(0)).toBe('12:00 AM')
+    expect(formatMinute(65)).toBe('1:05 AM')
+    expect(formatMinute(420)).toBe('7:00 AM')
+    expect(formatMinute(720)).toBe('12:00 PM')
+    expect(formatMinute(1080)).toBe('6:00 PM')
+    expect(formatMinute(1430)).toBe('11:50 PM')
+    expect(formatMinute(1440)).toBe('12:00 AM')
   })
 })
