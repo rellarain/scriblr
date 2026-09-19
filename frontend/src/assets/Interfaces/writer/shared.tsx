@@ -114,11 +114,13 @@ export function ChapterTabs({ chapters, activeId, onSelect, onAdd, variant }: {
 }
 
 // A textarea that grows with its content.
-export function AutoTextarea({ value, onChange, placeholder, className }: {
+export function AutoTextarea({ value, onChange, placeholder, className, rows = 2, onKeyDown }: {
   value: string
   onChange: (next: string) => void
   placeholder?: string
   className?: string
+  rows?: number
+  onKeyDown?: (e: React.KeyboardEvent<HTMLTextAreaElement>) => void
 }) {
   const ref = useRef<HTMLTextAreaElement>(null)
   useEffect(() => {
@@ -129,8 +131,8 @@ export function AutoTextarea({ value, onChange, placeholder, className }: {
   }, [value])
   return (
     <textarea
-      ref={ref} rows={2} className={className} placeholder={placeholder} value={value}
-      onChange={e => onChange(e.target.value)}
+      ref={ref} rows={rows} className={className} placeholder={placeholder} value={value}
+      onChange={e => onChange(e.target.value)} onKeyDown={onKeyDown}
     />
   )
 }

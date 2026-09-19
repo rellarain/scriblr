@@ -6,53 +6,29 @@ import TUI from './assets/Interfaces/TUI'
 import VUI from './assets/Interfaces/VUI'
 import Header from './Header'
 import Sidebar from './Sidebar'
-import { deriveLightness, clampAccentSaturation, clampAlertSaturation } from './colorRules'
-import type { MainInterface, Handedness, HuiPanel, AuiSize, ColorKey, HSLColor } from './interfaceShellTypes'
+import type { MainInterface, HuiPanel, AuiSize } from './interfaceShellTypes'
 import { useHelperChats } from './assets/Interfaces/helper/useHelperChats'
 import { CURRENT_USER } from './userSeed'
 import { DAY_ACTIVITY } from './activitySeed'
+import { useSettings } from './settings/settingsStore'
+import { useThemeEngine } from './theme/useTheme'
 
 const SIDEBAR_DIVIDER_W = 40
 const SIDEBAR_PANEL_W = 400
 
-const DEFAULT_BASE_LIGHTNESS = 35
-const DEFAULT_COLOR_HS: Record<ColorKey, { h: number; s: number }> = {
-  theme: { h: 330, s: 30 },
-  accent: { h: 32, s: 95 },
-  alert: { h: 200, s: 100 },
-}
-
 function App() {
   const [activeMain, setActiveMain] = useState<MainInterface>('writer')
   const [showVUI, setShowVUI] = useState<boolean>(false)
-  const [handedness, setHandedness] = useState<Handedness>('right') // placeholder user setting
+  const { ui } = useSettings()
+  const handedness = ui.handedness
+  const theme = useThemeEngine()
+  const isAdmin = theme.effectiveRole === 'admin'
   const [huiExpanded, setHuiExpanded] = useState<boolean>(false)
   const [auiOpen, setAuiOpen] = useState<boolean>(false)
   const [auiSize, setAuiSize] = useState<AuiSize>('half')
   const [huiPanel, setHuiPanel] = useState<HuiPanel>('inbox')
   const [drawerOpen, setDrawerOpen] = useState<boolean>(false)
-  const [baseLightness, setBaseLightness] = useState<number>(DEFAULT_BASE_LIGHTNESS)
-  const [colorHS, setColorHS] = useState<Record<ColorKey, { h: number; s: number }>>(DEFAULT_COLOR_HS)
   const helper = useHelperChats()
-
-  const lightness = deriveLightness(baseLightness)
-  const themeColor: HSLColor = { ...colorHS.theme, l: lightness.theme }
-  const accentColor: HSLColor = { ...colorHS.accent, l: lightness.accent }
-  const alertColor: HSLColor = { ...colorHS.alert, l: lightness.alert }
-  const colors = { theme: themeColor, accent: accentColor, alert: alertColor }
-
-  function handleChangeColor(key: ColorKey, channel: 'h' | 's', value: number) {
-    setColorHS(prev => {
-      const next = { ...prev, [key]: { ...prev[key], [channel]: value } }
-      if (channel === 's') {
-        if (key === 'theme' || key === 'accent') {
-          next.accent = { ...next.accent, s: clampAccentSaturation(next.theme.s, next.accent.s) }
-        }
-        next.alert = { ...next.alert, s: clampAlertSaturation(next.accent.s, next.alert.s) }
-      }
-      return next
-    })
-  }
 
   // Re-clicking whatever's already open collapses the sidebar instead of
   // re-selecting it -- applies uniformly to Settings/Queue/Inbox and every
@@ -149,22 +125,13 @@ function App() {
     : auiSize === 'half'
     ? '50vw'
     : `${SIDEBAR_PANEL_W}px`
-  const auiWidthExpr = auiOpen ? auiOpenWidthExpr : '0px'
+  const auiWidthExpr = auiOpen && isAdmin ? auiOpenWidthExpr : '0px'
   const sidebarWidthExpr = `calc(${SIDEBAR_DIVIDER_W}px + ${auiWidthExpr} + ${huiWidthExpr})`
 
   const shellVars = {
     '--sidebar-w': sidebarWidthExpr,
     '--hui-w': huiWidthExpr,
     '--aui-w': auiWidthExpr,
-    '--color-theme-h': themeColor.h,
-    '--color-theme-s': `${themeColor.s}%`,
-    '--color-theme-l': `${themeColor.l}%`,
-    '--color-accent-h': accentColor.h,
-    '--color-accent-s': `${accentColor.s}%`,
-    '--color-accent-l': `${accentColor.l}%`,
-    '--color-alert-h': alertColor.h,
-    '--color-alert-s': `${alertColor.s}%`,
-    '--color-alert-l': `${alertColor.l}%`,
   } as React.CSSProperties
 
   return (
@@ -173,14 +140,8 @@ function App() {
         active={activeMain}
         onSelect={handleSelectMain}
         vuiOpen={showVUI}
-        colors={colors}
-        baseLightness={baseLightness}
-        onChangeLightness={setBaseLightness}
-        onChangeColor={handleChangeColor}
         drawerOpen={drawerOpen}
         onToggleDrawer={() => setDrawerOpen(v => !v)}
-        handedness={handedness}
-        onToggleHandedness={() => setHandedness(h => (h === 'right' ? 'left' : 'right'))}
         currentUser={CURRENT_USER}
         activity={DAY_ACTIVITY}
       />
@@ -200,10 +161,11 @@ function App() {
         activeStandardCount={activeStandardCount}
         pendingAdminCount={pendingAdminCount}
         pendingStandardCount={pendingStandardCount}
-        auiOpen={auiOpen}
+        auiOpen={auiOpen && isAdmin}
         onToggleAui={handleToggleAui}
         auiSize={auiSize}
         onSetAuiSize={setAuiSize}
+        isAdmin={isAdmin}
       />
 
       <div className="base">

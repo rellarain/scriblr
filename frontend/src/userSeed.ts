@@ -7,4 +7,5 @@ import type { CurrentUser } from './userTypes'
 export const CURRENT_USER: CurrentUser = {
   displayName: 'Jordan Ellis',
   orgId: 'ORG-4471',
+  role: 'admin',
 }

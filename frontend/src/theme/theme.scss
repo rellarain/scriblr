@@ -1,0 +1,123 @@
+// Time-of-day theme: the registered custom properties the whole app is
+// styled from, and the fade between palettes.
+//
+// JS (theme/applyTheme.ts) writes these on <html>; registering them with
+// @property gives them a type, so they can TRANSITION -- one `transition` on
+// <html> and every descendant sees the in-between values frame by frame
+// (they inherit). initial-value is the default (Day) palette, used until JS
+// has applied the real one.
+
+$palette: (
+  theme:   (h: 330, s: 30%,  l: 35%),
+  accent:  (h: 32,  s: 95%,  l: 43%),
+  alert:   (h: 200, s: 100%, l: 51%),
+  accent2: (h: 260, s: 60%,  l: 43%),
+);
+
+$fade: 1s;
+$fading: ();
+
+@each $name, $c in $palette {
+  @property --color-#{$name}-h { syntax: '<number>'; inherits: true; initial-value: #{map-get($c, h)}; }
+  @property --color-#{$name}-s { syntax: '<percentage>'; inherits: true; initial-value: #{map-get($c, s)}; }
+  @property --color-#{$name}-l { syntax: '<percentage>'; inherits: true; initial-value: #{map-get($c, l)}; }
+  $fading: append($fading, --color-#{$name}-h, comma);
+  $fading: append($fading, --color-#{$name}-s, comma);
+  $fading: append($fading, --color-#{$name}-l, comma);
+}
+
+@property --ink       { syntax: '<color>'; inherits: true; initial-value: hsl(0, 0%, 100%); }
+@property --on-accent { syntax: '<color>'; inherits: true; initial-value: hsl(0, 0%, 100%); }
+@property --on-alert  { syntax: '<color>'; inherits: true; initial-value: hsl(330, 12%, 8%); }
+@property --on-accent2 { syntax: '<color>'; inherits: true; initial-value: hsl(0, 0%, 100%); }
+@property --shade-k   { syntax: '<number>'; inherits: true; initial-value: 1; }
+@property --paper-l   { syntax: '<percentage>'; inherits: true; initial-value: 97%; }
+
+$fading: append($fading, --ink, comma);
+$fading: append($fading, --on-accent, comma);
+$fading: append($fading, --on-alert, comma);
+$fading: append($fading, --on-accent2, comma);
+$fading: append($fading, --shade-k, comma);
+$fading: append($fading, --paper-l, comma);
+
+$transitions: ();
+@each $prop in $fading {
+  $transitions: append($transitions, #{$prop} $fade ease, comma);
+}
+
+html {
+  transition: $transitions;
+}
+
+// No fade for the very first paint, or while a settings slider is being
+// dragged (the preview should track the thumb, not lag behind it).
+html[data-theme-boot],
+html[data-theme-live] {
+  transition: none;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  html { transition: none; }
+}
+
+// On a launch with no cached theme, the app stays hidden for the moment it
+// takes the saved theme to arrive, rather than flashing the default one.
+html[data-theme-pending] #root {
+  opacity: 0;
+}
+
+:root {
+  // Sidebar backgrounds use the accent's hue but heavily desaturated, so the
+  // sidebar reads as part of the accent color family while staying calm
+  // enough to host content; not independently user-customizable.
+  --color-sidebar-s: 20%;
+
+  // ---- Derived tokens (all follow the registered variables above) ----
+
+  // Text. --ink is white on dark palettes and near-black on light ones.
+  --ink-muted: color-mix(in srgb, var(--ink) 66%, transparent);
+  --ink-faint: color-mix(in srgb, var(--ink) 45%, transparent);
+  --hairline: color-mix(in srgb, var(--ink) 12%, transparent);
+
+  // Theme-color surfaces, base to deepest.
+  --surface-base: hsl(var(--color-theme-h), var(--color-theme-s), var(--color-theme-l));
+  --surface-side: hsl(var(--color-theme-h), var(--color-theme-s), calc(var(--color-theme-l) - 4%));
+  --surface-deep: hsl(var(--color-theme-h), var(--color-theme-s), calc(var(--color-theme-l) - 10%));
+  --surface-deeper: hsl(var(--color-theme-h), var(--color-theme-s), calc(var(--color-theme-l) - 20%));
+
+  // Sidebar surfaces (accent hue, desaturated) and raised cards.
+  --surface-sidebar-1: hsl(var(--color-accent-h), var(--color-sidebar-s), calc(var(--color-theme-l) - 17%));
+  --surface-sidebar-2: hsl(var(--color-accent-h), var(--color-sidebar-s), calc(var(--color-theme-l) - 9%));
+  --surface-raised-a: hsl(var(--color-accent-h), 20%, calc(var(--color-theme-l) - 1%));
+  --surface-raised-b: hsl(var(--color-accent-h), 20%, calc(var(--color-theme-l) - 8%));
+  --surface-raised-active: hsl(var(--color-accent-h), 22%, calc(var(--color-theme-l) + 3%));
+
+  // The three action colors (and the admin one), with their variants.
+  --accent: hsl(var(--color-accent-h), var(--color-accent-s), var(--color-accent-l));
+  --accent-hover: hsl(var(--color-accent-h), var(--color-accent-s), calc(var(--color-accent-l) + 12%));
+  --accent-dim: hsl(var(--color-accent-h), calc(var(--color-accent-s) - 20%), calc(var(--color-accent-l) - 14%));
+  --alert: hsl(var(--color-alert-h), var(--color-alert-s), var(--color-alert-l));
+  --accent2: hsl(var(--color-accent2-h), var(--color-accent2-s), var(--color-accent2-l));
+  --accent2-hover: hsl(var(--color-accent2-h), var(--color-accent2-s), calc(var(--color-accent2-l) + 12%));
+
+  // Translucent overlays: "lift" tints toward the ink (a light wash on dark
+  // themes, a dark one on light themes); "sink" darkens, and softens on light
+  // themes (--shade-k).
+  --ov-lift-1: color-mix(in srgb, var(--ink) 8%, transparent);
+  --ov-lift-2: color-mix(in srgb, var(--ink) 14%, transparent);
+  --ov-lift-3: color-mix(in srgb, var(--ink) 22%, transparent);
+  --ov-sink-1: rgb(0 0 0 / calc(0.16 * var(--shade-k)));
+  --ov-sink-2: rgb(0 0 0 / calc(0.25 * var(--shade-k)));
+  --ov-sink-3: rgb(0 0 0 / calc(0.35 * var(--shade-k)));
+  --scrim: rgb(0 0 0 / 0.5);
+
+  // The Writer's paper: light, tinted with the accent hue, dimming only at
+  // low brightness; its ink stays dark.
+  --paper: hsl(var(--color-accent-h), 45%, var(--paper-l));
+  --paper-soft: hsl(var(--color-accent-h), 30%, calc(var(--paper-l) - 2%));
+  --paper-line: hsl(var(--color-accent-h), 18%, calc(var(--paper-l) - 13%));
+  --paper-field: hsl(var(--color-accent-h), 45%, calc(var(--paper-l) + 3%));
+  --paper-ink: hsl(var(--color-theme-h), 12%, 17%);
+  --paper-muted: hsl(var(--color-theme-h), 8%, 42%);
+  --paper-error: hsl(var(--color-alert-h), var(--color-alert-s), 40%);
+}

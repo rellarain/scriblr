@@ -17,6 +17,7 @@ from .api import (
     revisions,
     schedule,
     scrap,
+    user_settings,
 )
 from .storage.pdf_export import OutlineNodeNotFoundError
 from .storage.project_store import (
@@ -87,6 +88,7 @@ def create_app(static_dir: Optional[Path] = None) -> FastAPI:
     app.include_router(export.router)
     app.include_router(presets.router)
     app.include_router(admin_config.router)
+    app.include_router(user_settings.router)
 
     if static_dir is not None:
         # Registered last so it only catches what the routers above didn't --

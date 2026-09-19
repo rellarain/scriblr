@@ -1,0 +1,119 @@
+// Theme controls in the UUI: the zone override toggles (Dashboard) and the
+// customization tool (Dashboard > Settings). Colors come from the theme tokens
+// (theme/theme.scss), so they follow whatever palette is active.
+
+.themeZoneToggles {
+  display: inline-flex;
+  gap: 6px;
+  align-items: center;
+}
+
+.themeZoneBtn {
+  border: 0;
+  width: 34px;
+  height: 34px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 6px;
+  color: var(--ink-muted);
+  background: var(--ov-sink-1);
+  cursor: pointer;
+  &:hover { color: var(--ink); background: var(--ov-lift-2); }
+  // The zone the clock is in: highlighted with the theme color (inert).
+  &--clock { color: var(--ink); background: var(--surface-base); box-shadow: inset 0 0 0 1px var(--hairline); }
+  // A forced override: highlighted with the accent color (active).
+  &--override { color: var(--on-accent); background: var(--accent); box-shadow: none; &:hover { background: var(--accent-hover); color: var(--on-accent); } }
+}
+
+.themeSettings {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  max-width: 760px;
+  color: var(--ink);
+  h2 { font-size: 18px; font-weight: 700; }
+  small { font-size: 11px; color: var(--ink-muted); }
+}
+
+.themeRow { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
+.themeRowLabel { font-size: 12px; font-weight: 700; text-transform: uppercase; letter-spacing: 1px; color: var(--ink-muted); }
+
+.themeSwitch {
+  display: inline-flex; align-items: center; gap: 8px; cursor: pointer; font-size: 13px; font-weight: 700;
+  // The global reset removes native checkboxes (appearance: none), so the
+  // switch is drawn here.
+  input {
+    position: relative; flex: 0 0 auto; width: 36px; height: 20px; border-radius: 10px; background: var(--ov-sink-3); cursor: pointer;
+    transition: background 0.15s;
+    &::after { content: ''; position: absolute; top: 2px; left: 2px; width: 16px; height: 16px; border-radius: 50%; background: var(--ink); transition: transform 0.15s; }
+    &:checked { background: var(--accent); }
+    &:checked::after { transform: translateX(16px); background: var(--on-accent); }
+    &:focus-visible { outline: 2px solid var(--accent-hover); outline-offset: 2px; }
+  }
+}
+
+.themeSegmented { display: inline-flex; padding: 3px; gap: 3px; border-radius: 6px; background: var(--ov-sink-2); }
+.themeSegBtn {
+  border: 0; background: transparent; padding: 5px 12px; border-radius: 4px; font-size: 12px; font-weight: 700; color: var(--ink-muted); cursor: pointer;
+  &:hover { color: var(--ink); }
+  &--active { color: var(--on-accent); background: var(--accent); &:hover { color: var(--on-accent); } }
+}
+
+.themeTimeline { display: flex; flex-direction: column; gap: 4px; }
+.themeTimelineBar { position: relative; height: 26px; border-radius: 6px; overflow: hidden; background: var(--ov-sink-2); }
+.themeTimelineSeg {
+  position: absolute; top: 0; bottom: 0; display: flex; align-items: center; justify-content: center; overflow: hidden;
+  color: var(--ink); box-shadow: inset 1px 0 0 var(--hairline);
+}
+.themeTimelineTicks { display: flex; justify-content: space-between; font-size: 10px; color: var(--ink-faint); }
+
+.themeZoneTabs { display: flex; gap: 6px; flex-wrap: wrap; }
+.themeZoneTab {
+  border: 0; display: inline-flex; align-items: center; gap: 6px; padding: 6px 12px; border-radius: 6px; font-size: 12px; font-weight: 700;
+  color: var(--ink-muted); background: var(--ov-sink-1); cursor: pointer;
+  &:hover { color: var(--ink); background: var(--ov-lift-2); }
+  &--off { opacity: 0.55; }
+  &--active { color: var(--on-accent); background: var(--accent); opacity: 1; &:hover { color: var(--on-accent); background: var(--accent-hover); } }
+}
+
+.themeZoneEditor { display: flex; flex-direction: column; gap: 12px; }
+.themeStartRow {
+  display: flex; align-items: center; gap: 10px; flex-wrap: wrap; font-size: 12px; font-weight: 700;
+  select { background: var(--ov-sink-2); color: var(--ink); border: 0; border-radius: 4px; padding: 6px 8px; font-size: 13px; }
+}
+
+.themeColorGroup {
+  display: flex; flex-direction: column; gap: 6px; padding: 10px 12px; border: 0; border-radius: 8px; background: var(--ov-sink-1);
+  legend { display: flex; align-items: center; gap: 8px; padding: 0 4px; font-size: 12px; font-weight: 700; }
+}
+.themeSwatch { width: 16px; height: 16px; border-radius: 4px; box-shadow: 0 0 0 1px var(--hairline); flex: 0 0 auto; }
+
+.themeSliderRow {
+  display: grid; grid-template-columns: 84px minmax(0, 1fr) 48px; align-items: center; gap: 10px; font-size: 12px;
+  input[type='range'] {
+    -webkit-appearance: none; appearance: none; height: 8px; border-radius: 4px; background: var(--ov-sink-2); outline: none; cursor: pointer;
+    &::-webkit-slider-thumb { -webkit-appearance: none; width: 16px; height: 16px; border-radius: 50%; background: var(--ink); box-shadow: 0 0 0 2px var(--accent); }
+  }
+  output { text-align: right; color: var(--ink-muted); font-variant-numeric: tabular-nums; }
+}
+
+// The brightness range where no readable text exists, hatched.
+.themeBand {
+  position: relative; height: 6px; margin-left: 94px; margin-right: 58px; border-radius: 3px; background: var(--ov-sink-1);
+  span { position: absolute; top: 0; bottom: 0; border-radius: 3px; background: repeating-linear-gradient(135deg, var(--ink-faint) 0 3px, transparent 3px 6px); }
+}
+.themeNote { margin: 0; font-size: 11px; color: var(--ink-muted); }
+
+.themeZoneActions { display: flex; gap: 8px; flex-wrap: wrap; }
+.themeBtn {
+  border: 0; padding: 7px 14px; border-radius: 6px; font-size: 12px; font-weight: 700; color: var(--ink); background: var(--ov-sink-2); cursor: pointer;
+  &:hover { background: var(--ov-lift-2); }
+  &--primary { color: var(--on-accent); background: var(--accent); &:hover { background: var(--accent-hover); } }
+}
+.themeZoneOff {
+  display: flex; flex-direction: column; align-items: flex-start; gap: 10px; padding: 14px; border-radius: 8px; background: var(--ov-sink-1);
+  p { margin: 0; font-size: 13px; color: var(--ink-muted); }
+}
+
+.themeLinkRow { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; font-size: 13px; }

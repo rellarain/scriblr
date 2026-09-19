@@ -11,12 +11,3 @@ export type HuiPanel = 'inbox' | 'settings' | 'queue'
 // current width), 'half' is half the viewport, 'column' matches a single
 // HUI-panel-width column (400px).
 export type AuiSize = 'full' | 'half' | 'column'
-
-export interface HSLColor {
-  h: number
-  s: number
-  l: number
-}
-
-export type ColorKey = 'theme' | 'accent' | 'alert'
-export type ColorChannel = keyof HSLColor

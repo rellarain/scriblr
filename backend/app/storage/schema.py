@@ -1,7 +1,7 @@
 from datetime import datetime, timezone
-from typing import Literal, Optional
+from typing import Any, Literal, Optional
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, field_validator
 
 SCHEMA_VERSION = 2
 
@@ -501,3 +501,74 @@ class ProjectFile(BaseModel):
     activity: DailyActivityLog = Field(default_factory=DailyActivityLog)
     schedule: ScheduleCompletionLog = Field(default_factory=ScheduleCompletionLog)
     scrap: ScrapRegistry = Field(default_factory=ScrapRegistry)
+
+
+# ---------------------------------------------------------------------------
+# User settings: per-user look-and-feel that must survive relaunches of the
+# packaged app (whose backend port -- and so the browser localStorage origin
+# -- changes every launch): time-of-day theme palettes, UI preferences, and a
+# small key/value map of the Writer's saved UI state (the things that used to
+# live only in localStorage). Global (not project-scoped), at
+# %APPDATA%\Scriblr\user-settings.json, a sibling of presets.json. Its own
+# schema version, independent of SCHEMA_VERSION.
+#
+# Only value RANGES are validated here. The saturation ordering between
+# theme/accent/alert/accent2 is deliberately not enforced server-side: a
+# validation failure would quarantine the whole file, so the client
+# normalizes on load instead.
+# ---------------------------------------------------------------------------
+
+ZoneKey = Literal["dawn", "day", "dusk", "night"]
+
+
+class ThemeHS(BaseModel):
+    h: int = Field(ge=0, le=360)
+    s: int = Field(ge=0, le=100)
+
+
+class ZonePalette(BaseModel):
+    brightness: int = Field(ge=0, le=100)
+    theme: ThemeHS
+    accent: ThemeHS
+    alert: ThemeHS
+    accent2: ThemeHS
+
+
+class ZoneConfig(BaseModel):
+    configured: bool
+    # Minutes after midnight, in 10-minute steps.
+    startMinute: int = Field(ge=0, le=1430)
+    palette: ZonePalette
+
+    @field_validator("startMinute")
+    @classmethod
+    def _ten_minute_steps(cls, v: int) -> int:
+        if v % 10 != 0:
+            raise ValueError("startMinute must be a multiple of 10")
+        return v
+
+
+class ThemeZones(BaseModel):
+    dawn: ZoneConfig
+    day: ZoneConfig
+    dusk: ZoneConfig
+    night: ZoneConfig
+
+
+class ThemeSettings(BaseModel):
+    timeBasedEnabled: bool = False
+    override: Optional[ZoneKey] = None
+    zones: ThemeZones
+
+
+class UiSettings(BaseModel):
+    viewAs: Optional[Literal["user", "admin"]] = None
+    handedness: Literal["left", "right"] = "right"
+
+
+class UserSettings(BaseModel):
+    schemaVersion: int = 1
+    theme: ThemeSettings
+    ui: UiSettings = Field(default_factory=UiSettings)
+    kv: dict[str, Any] = Field(default_factory=dict)
+    migratedFromLocal: bool = False

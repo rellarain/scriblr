@@ -2,7 +2,7 @@ import NavSwitcher from './NavSwitcher'
 import HeaderUserCard from './HeaderUserCard'
 import HeaderActivityRibbon from './HeaderActivityRibbon'
 import UUI from './assets/Interfaces/UUI'
-import type { MainInterface, ColorKey, Handedness, HSLColor } from './interfaceShellTypes'
+import type { MainInterface } from './interfaceShellTypes'
 import type { CurrentUser } from './userTypes'
 import type { ActivityInterval } from './activityTypes'
 
@@ -10,14 +10,8 @@ interface HeaderProps {
   active: MainInterface
   onSelect: (next: MainInterface) => void
   vuiOpen: boolean
-  colors: Record<ColorKey, HSLColor>
-  baseLightness: number
-  onChangeLightness: (value: number) => void
-  onChangeColor: (key: ColorKey, channel: 'h' | 's', value: number) => void
   drawerOpen: boolean
   onToggleDrawer: () => void
-  handedness: Handedness
-  onToggleHandedness: () => void
   currentUser: CurrentUser
   activity: ActivityInterval[]
 }
@@ -37,8 +31,7 @@ interface HeaderProps {
 //   at the very bottom of the screen. Collapsing never resizes or
 //   unmounts UUI, just slides it out of the visible window.
 function Header({
-  active, onSelect, vuiOpen, colors, baseLightness, onChangeLightness, onChangeColor,
-  drawerOpen, onToggleDrawer, handedness, onToggleHandedness, currentUser, activity,
+  active, onSelect, vuiOpen, drawerOpen, onToggleDrawer, currentUser, activity,
 }: HeaderProps) {
   return (
     <>
@@ -51,17 +44,10 @@ function Header({
         <HeaderActivityRibbon intervals={activity} />
       </header>
 
-      <div className="headerDrawerClip">
+      <div className={drawerOpen ? 'headerDrawerClip headerDrawerClip--open' : 'headerDrawerClip'}>
         <div className={drawerOpen ? 'headerDrawerSlide headerDrawerSlide--open' : 'headerDrawerSlide'}>
           <div className="headerDrawerRow">
-            <UUI
-              colors={colors}
-              baseLightness={baseLightness}
-              onChangeLightness={onChangeLightness}
-              onChangeColor={onChangeColor}
-              handedness={handedness}
-              onToggleHandedness={onToggleHandedness}
-            />
+            <UUI />
           </div>
           <div className="headerDrawerFooterRow" aria-hidden="true" />
         </div>

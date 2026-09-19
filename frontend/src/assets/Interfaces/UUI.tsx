@@ -6,14 +6,15 @@ import {
   type IconProps,
 } from '../icons'
 import CustomizeControls from '../../CustomizeControls'
-import type { ColorKey, Handedness, HSLColor } from '../../interfaceShellTypes'
+import ThemeZoneToggles from '../../theme/ThemeZoneToggles'
+import ThemeSettingsPanel from '../../theme/ThemeSettingsPanel'
 
 // Three consoles per scrilbrPlan.md's "User Page (UUI)" section. Full
 // structural skeleton, mirroring AUI.tsx's pattern exactly -- every named
 // component present and selectable, placeholder body text throughout,
-// except Account -> Settings, which hosts the real, shared
-// CustomizeControls (see App.tsx/Header.tsx) instead of placeholder text --
-// per its own comment, it was always meant to live here eventually.
+// except: Dashboard (the time-of-day theme override toggles), Dashboard ->
+// Settings (the full theme customization tool) and Account -> Settings
+// (handedness, plus a pointer to the theme tool).
 //
 // Root class is "uUIPanel"/"uUIContent", deliberately NOT "uUI" -- that
 // class already exists in App.scss as one of the 5 shared, absolutely-
@@ -71,7 +72,7 @@ const SECTIONS: UuiSectionDef[] = [
       // showCustomize below). Kept non-empty for shape parity with every
       // other subSection.
       { key: 'accountSettings', label: 'Settings', Icon: GearIcon,
-        body: 'Customize theme, accent, and alert colors, and handedness, here.' },
+        body: 'Customize handedness here; colors and time-of-day themes are in Dashboard > Settings.' },
       { key: 'accountHelp', label: 'Help', Icon: HelpIcon,
         body: 'Resources and assistance using the Account console here.' },
     ],
@@ -118,18 +119,7 @@ function SubTabRow({ subSections, activeKey, onSelect }: {
   )
 }
 
-interface UUIProps {
-  colors: Record<ColorKey, HSLColor>
-  baseLightness: number
-  onChangeLightness: (value: number) => void
-  onChangeColor: (key: ColorKey, channel: 'h' | 's', value: number) => void
-  handedness: Handedness
-  onToggleHandedness: () => void
-}
-
-function UUI({
-  colors, baseLightness, onChangeLightness, onChangeColor, handedness, onToggleHandedness,
-}: UUIProps) {
+function UUI() {
   const [activeSection, setActiveSection] = useState<UuiSectionKey>('dashboard')
   const [activeSubSection, setActiveSubSection] = useState<UuiSubSectionKey>('activityLog')
 
@@ -145,6 +135,12 @@ function UUI({
   }
 
   const showCustomize = section.key === 'account' && subSection.key === 'accountSettings'
+  const showThemeSettings = section.key === 'dashboard' && subSection.key === 'dashboardSettings'
+
+  function openThemeSettings() {
+    setActiveSection('dashboard')
+    setActiveSubSection('dashboardSettings')
+  }
 
   return (
     <section className="uUIPanel" aria-label="User panel">
@@ -185,7 +181,10 @@ function UUI({
           <GearIcon size={18} />
         </button>
 
-        <h1 className="uUIConsoleTitle">{section.label}</h1>
+        <div className="uUIConsoleTitleRow">
+          <h1 className="uUIConsoleTitle">{section.label}</h1>
+          {section.key === 'dashboard' && <ThemeZoneToggles />}
+        </div>
 
         <SubTabRow
           subSections={section.subSections.filter(s => s.label !== 'Settings' && s.label !== 'Help')}
@@ -194,14 +193,9 @@ function UUI({
         />
         <div className="sectionBody">
           {showCustomize ? (
-            <CustomizeControls
-              colors={colors}
-              baseLightness={baseLightness}
-              onChangeLightness={onChangeLightness}
-              onChangeColor={onChangeColor}
-              handedness={handedness}
-              onToggleHandedness={onToggleHandedness}
-            />
+            <CustomizeControls onOpenThemeSettings={openThemeSettings} />
+          ) : showThemeSettings ? (
+            <ThemeSettingsPanel />
           ) : (
             <>
               <h2>{subSection.label}</h2>

@@ -2,23 +2,25 @@
 // `.wUI.wr`; colors come from the app's theme/accent/alert variables.
 
 .wUI.wr {
-  --wr-accent: hsl(var(--color-accent-h), var(--color-accent-s), var(--color-accent-l));
-  --wr-accent-light: hsl(var(--color-accent-h), var(--color-accent-s), calc(var(--color-accent-l) + 12%));
-  --wr-accent-dark: hsl(var(--color-accent-h), calc(var(--color-accent-s) - 20%), calc(var(--color-accent-l) - 14%));
-  --wr-alert: hsl(var(--color-alert-h), var(--color-alert-s), var(--color-alert-l));
-  --wr-side: hsl(var(--color-theme-h), var(--color-theme-s), calc(var(--color-theme-l) - 4%));
+  // Aliases onto the global theme tokens (theme/theme.scss), so the Writer follows the time-of-day palette.
+  --wr-accent: var(--accent);
+  --wr-accent-light: var(--accent-hover);
+  --wr-accent-dark: var(--accent-dim);
+  --wr-alert: var(--alert);
+  --wr-side: var(--surface-side);
   --wr-deep: hsl(var(--color-theme-h), var(--color-theme-s), calc(var(--color-theme-l) - 12%));
-  --wr-card: linear-gradient(160deg, hsl(32, 20%, 34%), hsl(32, 20%, 27%));
-  --wr-field: rgba(0, 0, 0, 0.25);
-  --wr-muted: rgba(255, 255, 255, 0.66);
-  --wr-page: #fbf9f4;
-  --wr-ink: hsl(var(--color-theme-h), 12%, 17%);
-  --wr-page-line: hsl(35, 18%, 84%);
-  --wr-page-soft: hsl(35, 30%, 95%);
-  --wr-page-muted: hsl(var(--color-theme-h), 8%, 42%);
+  --wr-card: linear-gradient(160deg, var(--surface-raised-a), var(--surface-raised-b));
+  --wr-field: rgb(0 0 0 / calc(0.25 * var(--shade-k)));
+  --wr-muted: var(--ink-muted);
+  // The paper (chapter page, preview): follows the palette's paper tokens.
+  --wr-page: var(--paper);
+  --wr-ink: var(--paper-ink);
+  --wr-page-line: var(--paper-line);
+  --wr-page-soft: var(--paper-soft);
+  --wr-page-muted: var(--paper-muted);
 
   flex-direction: row;
-  color: white;
+  color: var(--ink);
 
   // The app has no global button reset; :where() keeps this at zero extra
   // specificity so every button class below still overrides it.
@@ -36,11 +38,11 @@
 
   .wrSmallBtn {
     display: inline-flex; align-items: center; gap: 4px; padding: 4px 10px; border-radius: 4px;
-    font-size: 11px; font-weight: 700; background: rgba(0, 0, 0, 0.3); color: white; white-space: nowrap;
+    font-size: 11px; font-weight: 700; background: rgb(0 0 0 / calc(0.3 * var(--shade-k))); color: var(--ink); white-space: nowrap;
     &:hover:not(:disabled) { background: var(--wr-accent-light); }
     &:disabled { opacity: 0.4; cursor: default; }
     &--accent { background: var(--wr-accent); }
-    &--light { background: hsl(35, 18%, 88%); color: var(--wr-ink); &:hover:not(:disabled) { background: hsl(32, 90%, 86%); } }
+    &--light { background: hsl(var(--color-accent-h), 18%, calc(var(--paper-l) - 9%)); color: var(--wr-ink); &:hover:not(:disabled) { background: hsl(var(--color-accent-h), 90%, calc(var(--paper-l) - 11%)); } }
   }
   .wrLinkBtn { font-size: 11px; opacity: 0.8; &:hover { opacity: 1; } &--title { font-size: 14px; font-weight: 700; opacity: 1; } }
 
@@ -50,7 +52,7 @@
     opacity: 0.45; flex: 0 0 auto;
     &:hover { opacity: 0.9; }
     &--light { color: hsl(var(--color-theme-h), 8%, 50%); }
-    &--dark { color: white; }
+    &--dark { color: var(--ink); }
   }
   .wrConfirm { display: inline-flex; align-items: center; gap: 8px; }
   .wrConfirmText { font-size: 11px; }
@@ -65,21 +67,21 @@
 
   .wrChipRow { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; }
   .wrChip {
-    display: inline-flex; align-items: center; gap: 5px; padding: 3px 10px; border-radius: 12px; background: rgba(0, 0, 0, 0.25); font-size: 11px;
+    display: inline-flex; align-items: center; gap: 5px; padding: 3px 10px; border-radius: 12px; background: rgb(0 0 0 / calc(0.25 * var(--shade-k))); font-size: 11px;
     button { opacity: 0.6; font-size: 13px; line-height: 1; &:hover { opacity: 1; } }
     &--small { padding: 1px 8px; font-size: 10px; }
   }
   .wrChipAdd {
-    display: inline-flex; align-items: center; gap: 2px; border-radius: 12px; background: rgba(0, 0, 0, 0.18); padding: 0 4px 0 10px;
-    input { width: 110px; background: transparent; border: 0; outline: none; color: white; font-size: 11px; padding: 4px 0; &::placeholder { color: rgba(255, 255, 255, 0.5); } }
+    display: inline-flex; align-items: center; gap: 2px; border-radius: 12px; background: rgb(0 0 0 / calc(0.18 * var(--shade-k))); padding: 0 4px 0 10px;
+    input { width: 110px; background: transparent; border: 0; outline: none; color: var(--ink); font-size: 11px; padding: 4px 0; &::placeholder { color: color-mix(in srgb, var(--ink) 50%, transparent); } }
     button { display: inline-flex; padding: 3px; opacity: 0.7; &:hover:not(:disabled) { opacity: 1; } &:disabled { opacity: 0.25; } }
   }
 
   .wrField {
-    width: 100%; box-sizing: border-box; background: var(--wr-field); border: 0; border-radius: 4px; color: white;
+    width: 100%; box-sizing: border-box; background: var(--wr-field); border: 0; border-radius: 4px; color: var(--ink);
     font-size: 13px; padding: 8px 10px; outline: none; resize: vertical;
     &:focus { box-shadow: inset 0 0 0 1px var(--wr-accent); }
-    &::placeholder { color: rgba(255, 255, 255, 0.45); }
+    &::placeholder { color: color-mix(in srgb, var(--ink) 45%, transparent); }
   }
 
   // ---------------------------------------------------------------- sidebar
@@ -92,27 +94,27 @@
 
   .wrShelf { display: flex; flex-direction: column; gap: 5px; }
   .wrShelfHeader { display: flex; align-items: center; gap: 8px; padding: 0 2px; }
-  .wrShelfName--link { text-align: left; &:hover { color: white; } }
-  .wrShelfName { font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 1px; color: var(--wr-muted); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; &--selected { color: white; } }
+  .wrShelfName--link { text-align: left; &:hover { color: var(--ink); } }
+  .wrShelfName { font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 1px; color: var(--wr-muted); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; &--selected { color: var(--ink); } }
   .wrShelfMeta { font-size: 10px; opacity: 0.6; margin-right: auto; white-space: nowrap; }
   .wrShelfBooks { display: flex; align-items: flex-end; gap: 5px; padding: 0 8px; min-height: 104px; overflow-x: auto; scrollbar-width: none; &::-webkit-scrollbar { display: none; } }
   .wrShelfEmpty { font-size: 11px; opacity: 0.6; align-self: center; }
-  .wrShelfBoard { margin-top: -5px; height: 8px; background: linear-gradient(180deg, rgba(0, 0, 0, 0.5), rgba(0, 0, 0, 0.25)); border-radius: 0 0 2px 2px; }
+  .wrShelfBoard { margin-top: -5px; height: 8px; background: linear-gradient(180deg, rgb(0 0 0 / calc(0.5 * var(--shade-k))), rgb(0 0 0 / calc(0.25 * var(--shade-k)))); border-radius: 0 0 2px 2px; }
   .wrSpine {
     flex: 0 0 auto; width: 30px; border-radius: 0; background: var(--wr-accent-dark); color: white; padding: 8px 2px;
     display: flex; align-items: center; justify-content: center; writing-mode: vertical-rl; font-size: 11px; font-weight: 700; letter-spacing: 0.3px;
-    box-shadow: 1px 0 3px rgba(0, 0, 0, 0.35); overflow: hidden;
+    box-shadow: 1px 0 3px rgb(0 0 0 / calc(0.35 * var(--shade-k))); overflow: hidden;
     &:hover { filter: brightness(1.15); }
   }
   // With a book open, the other spines on the shelf are darkened.
   .wrShelfBooks--picked .wrSpine:not(.wrSpine--active) { filter: brightness(0.55); &:hover { filter: brightness(0.8); } }
   .wrNewProject {
     display: flex; flex-direction: column; gap: 6px;
-    input { background: var(--wr-field); border: 0; border-radius: 4px; color: white; font-size: 12px; padding: 8px 10px; outline: none; &::placeholder { color: rgba(255, 255, 255, 0.45); } }
+    input { background: var(--wr-field); border: 0; border-radius: 4px; color: var(--ink); font-size: 12px; padding: 8px 10px; outline: none; &::placeholder { color: color-mix(in srgb, var(--ink) 45%, transparent); } }
     .wrSmallBtn { justify-content: center; padding: 8px; }
   }
 
-  .wrPanel { background: rgba(0, 0, 0, 0.2); border-radius: 4px; }
+  .wrPanel { background: rgb(0 0 0 / calc(0.2 * var(--shade-k))); border-radius: 4px; }
   .wrPanelHeaderRow { display: flex; align-items: center; padding-right: 10px; }
   .wrPanelHeader { display: flex; align-items: center; gap: 8px; flex: 1 1 auto; min-width: 0; padding: 8px 10px; text-align: left; }
   .wrPanelValue--link { flex: 0 1 auto; min-width: 0; margin-left: auto; padding: 8px 0; &:hover { opacity: 0.8; } }
@@ -124,7 +126,7 @@
   .wrKv { display: flex; justify-content: space-between; gap: 10px; span:first-child { opacity: 0.6; } span:last-child { text-align: right; } }
   .wrOutlineRow {
     display: flex; align-items: center; gap: 6px; width: 100%; text-align: left; padding: 3px 6px; border-radius: 3px; font-size: 11px; opacity: 0.88;
-    &:not(.wrOutlineRow--static):hover { background: rgba(255, 255, 255, 0.1); opacity: 1; }
+    &:not(.wrOutlineRow--static):hover { background: color-mix(in srgb, var(--ink) 10%, transparent); opacity: 1; }
     &--active { background: var(--wr-accent); font-weight: 700; opacity: 1; }
   }
   .wrOutlineMeta { margin-left: auto; opacity: 0.6; font-weight: 400; font-size: 10px; white-space: nowrap; }
@@ -134,11 +136,11 @@
   .wrIconColumn { flex: 0 0 52px; box-sizing: border-box; height: 100%; padding: 12px 10px; display: flex; flex-direction: column; gap: 6px; }
   .wrIconColumnTail { margin-top: auto; display: flex; flex-direction: column; gap: 6px; }
   .wrIconBtn {
-    width: 32px; height: 32px; border-radius: 4px; display: flex; align-items: center; justify-content: center; color: white;
+    width: 32px; height: 32px; border-radius: 4px; display: flex; align-items: center; justify-content: center; color: var(--ink);
     &:hover { background: var(--wr-accent-light); }
     &--active { background: var(--wr-accent); }
   }
-  .wrIconColumnTail .wrIconBtn:not(.wrIconBtn--active) { background: rgba(0, 0, 0, 0.25); }
+  .wrIconColumnTail .wrIconBtn:not(.wrIconBtn--active) { background: rgb(0 0 0 / calc(0.25 * var(--shade-k))); }
   .wrContent { flex: 1 1 auto; min-width: 0; min-height: 0; height: 100%; box-sizing: border-box; display: flex; flex-direction: column; padding: 0 16px 14px 6px; position: relative; }
   .wrContent--flush { padding: 0 6px 0 0; }
   .wrConsoleBody { flex: 1 1 auto; min-height: 0; display: flex; flex-direction: column; overflow-y: auto; scrollbar-width: none; &::-webkit-scrollbar { display: none; } }
@@ -151,7 +153,7 @@
   .wrPlaceholder { padding: 6px 2px; h2 { font-size: 15px; margin: 0 0 6px; text-transform: uppercase; letter-spacing: 1px; } p { font-size: 13px; opacity: 0.85; margin: 0; } }
 
   .wrSegmented { display: flex; padding: 3px; gap: 3px; background: var(--wr-field); border-radius: 4px; }
-  .wrSegBtn { display: inline-flex; align-items: center; padding: 6px 8px; border-radius: 3px; font-size: 12px; font-weight: 700; &--active { background: var(--wr-accent); } &:hover:not(:disabled):not(.wrSegBtn--active) { background: rgba(255, 255, 255, 0.1); } &:disabled { opacity: 0.4; cursor: default; } }
+  .wrSegBtn { display: inline-flex; align-items: center; padding: 6px 8px; border-radius: 3px; font-size: 12px; font-weight: 700; &--active { background: var(--wr-accent); } &:hover:not(:disabled):not(.wrSegBtn--active) { background: color-mix(in srgb, var(--ink) 10%, transparent); } &:disabled { opacity: 0.4; cursor: default; } }
   // The label is hidden until its button is selected, then slides open.
   .wrSegLabel { max-width: 0; margin-left: 0; opacity: 0; overflow: hidden; white-space: nowrap; transition: max-width 0.25s ease, margin-left 0.25s ease, opacity 0.2s ease; }
   .wrSegBtn--active .wrSegLabel { max-width: 80px; margin-left: 6px; opacity: 1; }
@@ -161,33 +163,35 @@
   .wrColumn { flex: 1 1 0; min-width: 0; display: flex; flex-direction: column; gap: 12px; overflow-y: auto; scrollbar-width: none; &::-webkit-scrollbar { display: none; } &--narrow { flex: 0 0 290px; } }
   .wrColumnTitle { display: flex; align-items: center; font-size: 12px; font-weight: 700; text-transform: uppercase; letter-spacing: 1px; padding: 0 2px; }
   .wrColumnAction { margin-left: auto; }
-  .wrCard { background: var(--wr-card); border-radius: 8px; padding: 16px 18px; box-shadow: 0 4px 14px rgba(0, 0, 0, 0.3); display: flex; flex-direction: column; gap: 10px; }
+  .wrCard { background: var(--wr-card); border-radius: 8px; padding: 16px 18px; box-shadow: 0 4px 14px rgb(0 0 0 / calc(0.3 * var(--shade-k))); display: flex; flex-direction: column; gap: 10px; }
   .wrCardTitle { font-size: 12px; font-weight: 700; text-transform: uppercase; letter-spacing: 1px; }
   .wrChecklist { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 8px; }
   .wrCheckItem { display: flex; align-items: center; gap: 8px; font-size: 13px; label { display: flex; align-items: center; gap: 10px; flex: 1; min-width: 0; cursor: pointer; } input { accent-color: var(--wr-accent); } &--done span { opacity: 0.5; text-decoration: line-through; } }
-  .wrInlineAdd { display: flex; gap: 6px; input { flex: 1; min-width: 0; background: var(--wr-field); border: 0; border-radius: 4px; color: white; font-size: 12px; padding: 6px 10px; outline: none; &::placeholder { color: rgba(255, 255, 255, 0.45); } } }
+  .wrInlineAdd { display: flex; gap: 6px; input { flex: 1; min-width: 0; background: var(--wr-field); border: 0; border-radius: 4px; color: var(--ink); font-size: 12px; padding: 6px 10px; outline: none; &::placeholder { color: color-mix(in srgb, var(--ink) 45%, transparent); } } }
   .wrStatRow { display: flex; gap: 18px; div { display: flex; flex-direction: column; } strong { font-size: 24px; } span { font-size: 10px; text-transform: uppercase; letter-spacing: 1px; opacity: 0.65; } }
   .wrBarRow { display: flex; flex-direction: column; gap: 4px; }
   .wrBarLabel { display: flex; justify-content: space-between; font-size: 12px; span:last-child { opacity: 0.7; } }
-  .wrBarTrack { height: 8px; border-radius: 4px; background: rgba(0, 0, 0, 0.35); overflow: hidden; }
+  .wrBarTrack { height: 8px; border-radius: 4px; background: rgb(0 0 0 / calc(0.35 * var(--shade-k))); overflow: hidden; }
   .wrBarFill { height: 100%; background: var(--wr-accent); }
   .wrNotes { flex: 1 1 auto; min-height: 0; overflow-y: auto; display: flex; flex-direction: column; gap: 10px; scrollbar-width: none; &::-webkit-scrollbar { display: none; } }
   .wrNote {
-    background: var(--wr-card); border-radius: 6px; padding: 10px 12px; display: flex; flex-direction: column; gap: 4px; box-shadow: 0 2px 8px rgba(0, 0, 0, 0.25); flex: 0 0 auto;
-    &--editing { background: hsl(32, 22%, 38%); box-shadow: inset 3px 0 0 var(--wr-accent), 0 4px 12px rgba(0, 0, 0, 0.35); }
+    position: relative; background: var(--wr-card); border-radius: 6px; padding: 10px 12px; display: flex; flex-direction: column; gap: 4px; box-shadow: 0 2px 8px rgb(0 0 0 / calc(0.25 * var(--shade-k))); flex: 0 0 auto;
+    &--editing { background: var(--surface-raised-active); box-shadow: inset 3px 0 0 var(--wr-accent), 0 4px 12px rgb(0 0 0 / calc(0.35 * var(--shade-k))); }
   }
-  .wrNoteTitle { width: 100%; box-sizing: border-box; border: 0; outline: none; background: transparent; color: white; font-size: 13px; font-weight: 700; padding: 0; &::placeholder { color: rgba(255, 255, 255, 0.4); } }
-  .wrNoteBody { width: 100%; box-sizing: border-box; border: 0; outline: none; resize: none; background: transparent; color: rgba(255, 255, 255, 0.85); font-size: 12px; line-height: 1.45; padding: 0; &::placeholder { color: rgba(255, 255, 255, 0.4); } }
-  .wrNoteFoot { display: flex; justify-content: flex-end; }
+  .wrNoteTitle { width: 100%; box-sizing: border-box; border: 0; outline: none; background: transparent; color: var(--ink); font-size: 13px; font-weight: 700; padding: 0; &::placeholder { color: color-mix(in srgb, var(--ink) 40%, transparent); } }
+  .wrNoteBody { width: 100%; box-sizing: border-box; border: 0; outline: none; resize: none; background: transparent; color: color-mix(in srgb, var(--ink) 85%, transparent); font-size: 12px; line-height: 1.45; padding: 0; display: block; overflow: hidden; &::placeholder { color: color-mix(in srgb, var(--ink) 40%, transparent); } }
+  // The delete icon floats at the card's top right while editing, so a card's height depends only on its text.
+  .wrNoteFoot { position: absolute; top: 6px; right: 6px; display: flex; }
+  .wrNote--editing .wrNoteTitle { padding-right: 26px; }
 
   // ---------------------------------------------------------------- plot
   .wrPlotView { flex: 1 1 auto; min-height: 0; display: flex; gap: 16px; }
-  .wrPlotNav { flex: 0 0 250px; min-height: 0; display: flex; flex-direction: column; gap: 8px; background: rgba(0, 0, 0, 0.16); border-radius: 6px; padding: 10px; }
+  .wrPlotNav { flex: 0 0 250px; min-height: 0; display: flex; flex-direction: column; gap: 8px; background: rgb(0 0 0 / calc(0.16 * var(--shade-k))); border-radius: 6px; padding: 10px; }
   .wrPlotNavHead { display: flex; align-items: center; justify-content: space-between; font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: 1px; span { opacity: 0.65; } }
   .wrPlotNavRows { flex: 1 1 auto; min-height: 0; overflow-y: auto; display: flex; flex-direction: column; gap: 3px; scrollbar-width: none; &::-webkit-scrollbar { display: none; } }
   .wrNavRow {
-    display: flex; align-items: center; gap: 6px; padding: 5px 8px 5px 8px; border-radius: 4px; font-size: 12px; background: rgba(0, 0, 0, 0.14);
-    &:hover { background: rgba(255, 255, 255, 0.1); }
+    display: flex; align-items: center; gap: 6px; padding: 5px 8px 5px 8px; border-radius: 4px; font-size: 12px; background: rgb(0 0 0 / calc(0.14 * var(--shade-k)));
+    &:hover { background: color-mix(in srgb, var(--ink) 10%, transparent); }
     &--active { background: var(--wr-accent); font-weight: 700; &:hover { background: var(--wr-accent); } }
   }
   .wrNavChevron { display: inline-flex; flex: 0 0 auto; transition: transform 0.15s; }
@@ -196,13 +200,13 @@
   .wrNavCount { font-size: 11px; opacity: 0.7; }
   .wrPlotBody { flex: 1 1 auto; min-width: 0; min-height: 0; display: flex; flex-direction: column; gap: 10px; overflow: auto; scrollbar-width: none; &::-webkit-scrollbar { display: none; } }
 
-  .wrCardPanel { background: var(--wr-card); border-radius: 8px; padding: 16px 18px; box-shadow: 0 4px 14px rgba(0, 0, 0, 0.3); display: flex; flex-direction: column; gap: 12px; }
+  .wrCardPanel { background: var(--wr-card); border-radius: 8px; padding: 16px 18px; box-shadow: 0 4px 14px rgb(0 0 0 / calc(0.3 * var(--shade-k))); display: flex; flex-direction: column; gap: 12px; }
   .wrCardPanelHead { display: flex; align-items: center; gap: 10px; }
   .wrKindBadge { font-size: 10px; text-transform: uppercase; letter-spacing: 0.5px; opacity: 0.7; flex: 0 0 auto; }
-  .wrTitleField { flex: 1; min-width: 0; background: var(--wr-field); border: 0; border-radius: 4px; color: white; font-size: 13px; font-weight: 700; padding: 8px 10px; outline: none; &:focus { box-shadow: inset 0 0 0 1px var(--wr-accent); } }
+  .wrTitleField { flex: 1; min-width: 0; background: var(--wr-field); border: 0; border-radius: 4px; color: var(--ink); font-size: 13px; font-weight: 700; padding: 8px 10px; outline: none; &:focus { box-shadow: inset 0 0 0 1px var(--wr-accent); } }
   .wrChildRows { display: flex; flex-direction: column; gap: 6px; }
   .wrChildRowsHead { display: flex; align-items: center; justify-content: space-between; gap: 10px; .wrLabel { margin-bottom: 0; } }
-  .wrChildRow { display: flex; align-items: center; gap: 12px; width: 100%; text-align: left; padding: 10px 12px; border-radius: 4px; background: rgba(0, 0, 0, 0.22); &:hover { background: rgba(255, 255, 255, 0.1); } }
+  .wrChildRow { display: flex; align-items: center; gap: 12px; width: 100%; text-align: left; padding: 10px 12px; border-radius: 4px; background: rgb(0 0 0 / calc(0.22 * var(--shade-k))); &:hover { background: color-mix(in srgb, var(--ink) 10%, transparent); } }
   .wrChildRowTitle { font-size: 13px; font-weight: 700; flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
   .wrChildRowMeta { display: flex; gap: 5px; }
   .wrProjectOutline { display: flex; flex-direction: column; gap: 14px; max-width: 720px; }
@@ -211,15 +215,15 @@
   .wrPlotlineLeft { flex: 0 0 350px; min-height: 0; display: flex; flex-direction: column; gap: 14px; }
   .wrPlotlineRight { flex: 1 1 auto; min-width: 320px; min-height: 0; display: flex; flex-direction: column; gap: 14px; }
   .wrFieldRow { display: flex; align-items: center; gap: 10px; > span { width: 88px; flex: 0 0 auto; font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: 1px; opacity: 0.65; } .wrField { padding: 6px 10px; font-size: 12px; } }
-  .wrUnassigned { flex: 1 1 auto; min-height: 0; display: flex; flex-direction: column; gap: 8px; background: rgba(0, 0, 0, 0.16); border-radius: 8px; padding: 12px 14px; &--over { outline: 2px dashed var(--wr-accent-light); outline-offset: 3px; } }
+  .wrUnassigned { flex: 1 1 auto; min-height: 0; display: flex; flex-direction: column; gap: 8px; background: rgb(0 0 0 / calc(0.16 * var(--shade-k))); border-radius: 8px; padding: 12px 14px; &--over { outline: 2px dashed var(--wr-accent-light); outline-offset: 3px; } }
   .wrPointList { flex: 1 1 auto; min-height: 0; overflow-y: auto; display: flex; flex-direction: column; gap: 6px; scrollbar-width: none; &::-webkit-scrollbar { display: none; } }
-  .wrPoint { display: flex; align-items: flex-start; gap: 8px; padding: 8px 10px; border-radius: 4px; background: rgba(0, 0, 0, 0.25); border-left: 3px solid var(--wr-alert); &--dragging { opacity: 0.35; } }
+  .wrPoint { display: flex; align-items: flex-start; gap: 8px; padding: 8px 10px; border-radius: 4px; background: rgb(0 0 0 / calc(0.25 * var(--shade-k))); border-left: 3px solid var(--wr-alert); &--dragging { opacity: 0.35; } }
   .wrPointFields { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 2px; }
-  .wrPointTitle { width: 100%; box-sizing: border-box; background: transparent; border: 0; outline: none; color: white; font-size: 12px; font-weight: 700; padding: 0; }
-  .wrPointBody { width: 100%; box-sizing: border-box; background: transparent; border: 0; outline: none; color: rgba(255, 255, 255, 0.7); font-size: 11px; padding: 0; &::placeholder { color: rgba(255, 255, 255, 0.35); } }
-  .wrOutlinePanel { flex: 1 1 auto; min-height: 0; display: flex; flex-direction: column; gap: 8px; background: rgba(0, 0, 0, 0.16); border-radius: 8px; padding: 12px 14px; }
+  .wrPointTitle { width: 100%; box-sizing: border-box; background: transparent; border: 0; outline: none; color: var(--ink); font-size: 12px; font-weight: 700; padding: 0; }
+  .wrPointBody { width: 100%; box-sizing: border-box; background: transparent; border: 0; outline: none; color: color-mix(in srgb, var(--ink) 70%, transparent); font-size: 11px; padding: 0; &::placeholder { color: color-mix(in srgb, var(--ink) 35%, transparent); } }
+  .wrOutlinePanel { flex: 1 1 auto; min-height: 0; display: flex; flex-direction: column; gap: 8px; background: rgb(0 0 0 / calc(0.16 * var(--shade-k))); border-radius: 8px; padding: 12px 14px; }
   .wrTargetList { flex: 1 1 auto; min-height: 0; overflow-y: auto; display: flex; flex-direction: column; gap: 5px; scrollbar-width: none; &::-webkit-scrollbar { display: none; } }
-  .wrTarget { display: flex; align-items: center; gap: 10px; border-radius: 4px; background: rgba(0, 0, 0, 0.22); padding: 8px 12px; &--over { outline: 2px dashed var(--wr-accent-light); outline-offset: 1px; background: rgba(255, 255, 255, 0.12); } }
+  .wrTarget { display: flex; align-items: center; gap: 10px; border-radius: 4px; background: rgb(0 0 0 / calc(0.22 * var(--shade-k))); padding: 8px 12px; &--over { outline: 2px dashed var(--wr-accent-light); outline-offset: 1px; background: color-mix(in srgb, var(--ink) 12%, transparent); } }
   .wrTargetLabel { font-size: 12px; &--book { font-weight: 700; } }
   .wrTargetChips { margin-left: auto; display: flex; flex-wrap: wrap; gap: 5px; justify-content: flex-end; }
   .wrPointChip { display: inline-flex; align-items: center; gap: 6px; padding: 3px 8px; border-radius: 12px; background: var(--wr-accent-dark); font-size: 11px; cursor: grab; button { opacity: 0.7; &:hover { opacity: 1; } } }
@@ -228,9 +232,9 @@
   .wrChapterTabs { flex: 0 0 38px; margin-left: -1px; padding-top: 28px; padding-bottom: 8px; box-sizing: border-box; max-height: 100%; display: flex; flex-direction: column; gap: 5px; overflow-y: auto; scrollbar-width: none; &::-webkit-scrollbar { display: none; } }
   .wrChapterTab {
     flex: 0 0 auto; width: 34px; height: 44px; border-radius: 0 8px 8px 0; display: flex; align-items: center; justify-content: center; font-size: 15px; font-weight: 700;
-    color: white; background: var(--wr-accent-dark); box-shadow: 1px 1px 3px rgba(0, 0, 0, 0.3); margin-left: -1px;
+    color: var(--on-accent); background: var(--wr-accent-dark); box-shadow: 1px 1px 3px rgb(0 0 0 / calc(0.3 * var(--shade-k))); margin-left: -1px;
     &:hover { filter: brightness(1.15); }
-    &--add { height: 34px; background: rgba(0, 0, 0, 0.25); box-shadow: none; margin-top: 3px; }
+    &--add { height: 34px; background: rgb(0 0 0 / calc(0.25 * var(--shade-k))); box-shadow: none; margin-top: 3px; }
   }
   .wrChapterTabs--page .wrChapterTab--active { width: 38px; margin-left: 0; background: var(--wr-page); color: var(--wr-ink); box-shadow: none; }
   .wrChapterTabs--cover { padding-top: 40px; .wrChapterTab { background: color-mix(in srgb, var(--wr-cover) 62%, white); } .wrChapterTab--add { background: rgba(0, 0, 0, 0.25); } .wrChapterTab--active { width: 38px; margin-left: 0; background: var(--wr-accent); } }
@@ -244,11 +248,14 @@
     --wr-cover-bright: oklch(from var(--wr-cover) clamp(0.62, calc(l + 0.22), 0.86) calc(c * 1.6) h);
     // Placeholder text takes the cover's own hue, lightened to read on the dark fields.
     --wr-cover-hint: color-mix(in srgb, var(--wr-cover) 50%, white);
+    // The cover is colored by the book, not the palette: its text stays white.
+    color: white;
     // A light cover gets dark ink so its labels stay readable.
     &--light { --wr-cover-label: color-mix(in srgb, var(--wr-cover) 25%, black); --wr-cover-title: color-mix(in srgb, var(--wr-cover) 25%, black); --wr-cover-title-shadow: 0 1px 0 rgba(255, 255, 255, 0.35); --wr-cover-field: rgba(0, 0, 0, 0.42); }
   }
   .wrCoverWrap { --wr-cover: #5a3a1e; flex: 1 1 auto; min-height: 0; display: flex; }
   .wrCover { position: relative; flex: 1 1 auto; min-width: 0; height: 100%; overflow: hidden; background: linear-gradient(135deg, var(--wr-cover), color-mix(in srgb, var(--wr-cover) 65%, black)); box-shadow: 0 6px 20px rgba(0, 0, 0, 0.45); }
+  .wrCoverWrap .wrTrashBtn--dark, .wrCoverWrap .wrConfirm--dark, .wrCoverWrap .wrSmallBtn { color: white; }
   .wrCoverSpine { position: absolute; left: 0; top: 0; bottom: 0; width: 34px; background: linear-gradient(90deg, rgba(0, 0, 0, 0.55), rgba(0, 0, 0, 0.25)); box-shadow: inset -2px 0 0 rgba(255, 220, 170, 0.18); }
   .wrCoverFrame { position: absolute; left: 56px; top: 18px; right: 22px; bottom: 18px; border: 2px solid var(--wr-cover-line); padding: 24px 34px; display: flex; flex-direction: column; gap: 18px; overflow-y: auto; scrollbar-width: none; &::-webkit-scrollbar { display: none; } }
   .wrCoverHead { display: flex; flex-direction: column; align-items: center; gap: 6px; }
@@ -293,7 +300,7 @@
   // ---------------------------------------------------------------- pages
   .wrPageWrap { flex: 1 1 auto; min-height: 0; display: flex; justify-content: center; > .wrPage { flex: 1 1 auto; max-width: 842px; } }
   .wrPage {
-    min-width: 0; min-height: 0; background: var(--wr-page); border-radius: 4px 0 0 4px; box-shadow: 0 4px 16px rgba(0, 0, 0, 0.35); color: var(--wr-ink);
+    min-width: 0; min-height: 0; background: var(--wr-page); border-radius: 4px 0 0 4px; box-shadow: 0 4px 16px rgb(0 0 0 / calc(0.35 * var(--shade-k))); color: var(--wr-ink);
     padding: 26px 34px; display: flex; flex-direction: column; gap: 14px; overflow-y: auto; box-sizing: border-box;
   }
   .wrPageHead { display: flex; align-items: baseline; gap: 12px; border-bottom: 2px solid var(--wr-page-line); padding-bottom: 10px; flex: 0 0 auto; }
@@ -304,26 +311,26 @@
   .wrPageMuted { margin: 0; font-size: 13px; color: hsl(var(--color-theme-h), 6%, 55%); }
   .wrPageError { margin: 0; font-size: 12px; color: hsl(var(--color-alert-h), var(--color-alert-s), 40%); }
 
-  .wrStripChip { padding: 5px 8px; border-radius: 4px; font-size: 12px; background: hsl(35, 18%, 90%); color: hsl(var(--color-theme-h), 10%, 28%); max-width: 250px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+  .wrStripChip { padding: 5px 8px; border-radius: 4px; font-size: 12px; background: hsl(var(--color-accent-h), 18%, calc(var(--paper-l) - 7%)); color: hsl(var(--color-theme-h), 10%, 28%); max-width: 250px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
     &--empty { font-style: italic; opacity: 0.5; }
     &--changed { background: hsl(var(--color-accent-h), 90%, 86%); color: hsl(var(--color-accent-h), 82%, 28%); font-weight: 700; box-shadow: inset 3px 0 0 var(--wr-accent); }
   }
-  .wrDraftText { width: 100%; box-sizing: border-box; border-radius: 4px; border: 1px solid hsl(35, 18%, 82%); background: white; padding: 12px 14px; font-family: Georgia, 'Times New Roman', serif; font-size: 16px; line-height: 1.6; min-height: 70px; color: var(--wr-ink); outline: none; resize: none; overflow: hidden; &:focus { border-color: var(--wr-accent); } &::placeholder { color: hsl(var(--color-theme-h), 6%, 62%); } }
+  .wrDraftText { width: 100%; box-sizing: border-box; border-radius: 4px; border: 1px solid hsl(var(--color-accent-h), 18%, calc(var(--paper-l) - 15%)); background: var(--paper-field); padding: 12px 14px; font-family: Georgia, 'Times New Roman', serif; font-size: 16px; line-height: 1.6; min-height: 70px; color: var(--wr-ink); outline: none; resize: none; overflow: hidden; &:focus { border-color: var(--wr-accent); } &::placeholder { color: hsl(var(--color-theme-h), 6%, 62%); } }
 
   // ---------------------------------------------------------------- chapter outline (page)
   .wrOutlineCard { transition: outline-color 0.1s; &--dragging { opacity: 0.35; } &--over { outline: 2px dashed var(--wr-accent); outline-offset: 2px; } }
-  .wrActCard { background: hsl(35, 30%, 94%); border: 1px solid var(--wr-page-line); border-radius: 6px; padding: 12px; display: flex; flex-direction: column; gap: 10px; flex: 0 0 auto; }
-  .wrSceneCard { background: hsl(35, 30%, 96%); border: 1px solid hsl(35, 18%, 86%); border-radius: 6px; padding: 10px 12px; display: flex; flex-direction: column; gap: 8px; }
+  .wrActCard { background: hsl(var(--color-accent-h), 30%, calc(var(--paper-l) - 3%)); border: 1px solid var(--wr-page-line); border-radius: 6px; padding: 12px; display: flex; flex-direction: column; gap: 10px; flex: 0 0 auto; }
+  .wrSceneCard { background: hsl(var(--color-accent-h), 30%, calc(var(--paper-l) - 1%)); border: 1px solid hsl(var(--color-accent-h), 18%, calc(var(--paper-l) - 11%)); border-radius: 6px; padding: 10px 12px; display: flex; flex-direction: column; gap: 8px; }
   .wrActHead { display: flex; align-items: center; gap: 10px; }
   .wrSceneHead { display: flex; align-items: center; gap: 10px; }
-  .wrMomentCard { background: white; border: 1px solid var(--wr-page-line); border-radius: 6px; padding: 8px 10px; display: flex; flex-direction: column; gap: 6px; }
+  .wrMomentCard { background: var(--paper-field); border: 1px solid var(--wr-page-line); border-radius: 6px; padding: 8px 10px; display: flex; flex-direction: column; gap: 6px; }
   .wrMomentRow { display: flex; align-items: center; gap: 10px; }
   .wrNodeHandle { display: inline-flex; align-items: center; gap: 6px; flex: 0 0 auto; }
   .wrNodeLabel { font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 1px; color: hsl(var(--color-theme-h), 8%, 38%); min-width: 62px; }
-  .wrOutlineInput { flex: 1 1 0; min-width: 0; box-sizing: border-box; border: 1px solid var(--wr-page-line); outline: none; background: white; color: var(--wr-ink); font-family: Georgia, 'Times New Roman', serif; font-size: 13px; padding: 6px 10px; border-radius: 4px; &:focus { border-color: var(--wr-accent); } }
+  .wrOutlineInput { flex: 1 1 0; min-width: 0; box-sizing: border-box; border: 1px solid var(--wr-page-line); outline: none; background: var(--paper-field); color: var(--wr-ink); font-family: Georgia, 'Times New Roman', serif; font-size: 13px; padding: 6px 10px; border-radius: 4px; &:focus { border-color: var(--wr-accent); } }
   .wrSceneFields { margin-left: auto; display: flex; gap: 6px; min-width: 0; }
   .wrSceneField {
-    box-sizing: border-box; border: 0; outline: none; border-radius: 4px; padding: 6px 8px; font-size: 12px; background: hsl(35, 18%, 90%); color: hsl(var(--color-theme-h), 10%, 28%);
+    box-sizing: border-box; border: 0; outline: none; border-radius: 4px; padding: 6px 8px; font-size: 12px; background: hsl(var(--color-accent-h), 18%, calc(var(--paper-l) - 7%)); color: hsl(var(--color-theme-h), 10%, 28%);
     &--location { width: 140px; } &--time { width: 96px; } &--action { width: 260px; }
     &::placeholder { font-style: italic; color: hsl(var(--color-theme-h), 6%, 55%); }
     &:focus { box-shadow: inset 0 0 0 1px var(--wr-accent); }
@@ -359,7 +366,7 @@
     border: 1px dashed transparent;
     &--like { color: hsl(var(--color-accent-h), 72%, 38%); }
     &--dislike { color: var(--wr-alert); }
-    &--level0 { border-color: hsl(35, 18%, 78%); background: transparent; color: hsl(var(--color-theme-h), 8%, 55%); &:hover { background: hsl(35, 18%, 92%); } }
+    &--level0 { border-color: hsl(var(--color-accent-h), 18%, calc(var(--paper-l) - 19%)); background: transparent; color: hsl(var(--color-theme-h), 8%, 55%); &:hover { background: hsl(var(--color-accent-h), 18%, calc(var(--paper-l) - 5%)); } }
     // Same hue and lightness at every level; only saturation rises with the strength of the reaction.
     &--like.wrReactBar--level1 { background: hsl(var(--color-accent-h), 30%, 82%); }
     &--like.wrReactBar--level2 { background: hsl(var(--color-accent-h), 62%, 82%); }

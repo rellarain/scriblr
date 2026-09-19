@@ -18,6 +18,7 @@ interface SidebarDividerProps {
   pendingStandardCount: number
   auiOpen: boolean
   onToggleAui: () => void
+  isAdmin: boolean
 }
 
 // The queue button is always 150px tall. Below 30 total users, each gets a
@@ -32,7 +33,7 @@ function SidebarDivider({
   conversations, selectedChatId, onActivateChats, onCreateChat, panel, onSelectPanel,
   expanded, onCollapse,
   activeAdminCount, activeStandardCount, pendingAdminCount, pendingStandardCount,
-  auiOpen, onToggleAui,
+  auiOpen, onToggleAui, isAdmin,
 }: SidebarDividerProps) {
   const totalChatCount = activeAdminCount + activeStandardCount + pendingAdminCount + pendingStandardCount
   const usesFixedHeight = totalChatCount < MAX_FIXED_USERS
@@ -58,14 +59,16 @@ function SidebarDivider({
 
   return (
     <nav className="sidebarDivider" aria-label="Sidebar controls" onClick={handleDividerClick}>
-      <button
-        type="button"
-        className={isAdminActive ? 'dividerToggle dividerToggle--active' : 'dividerToggle'}
-        aria-pressed={isAdminActive} aria-label="Admin" title="Admin"
-        onClick={onToggleAui}
-      >
-        <BriefcaseIcon size={21} />
-      </button>
+      {isAdmin && (
+        <button
+          type="button"
+          className={isAdminActive ? 'dividerToggle dividerToggle--admin dividerToggle--active' : 'dividerToggle dividerToggle--admin'}
+          aria-pressed={isAdminActive} aria-label="Admin" title="Admin"
+          onClick={onToggleAui}
+        >
+          <BriefcaseIcon size={21} />
+        </button>
+      )}
 
       {/* No icon by design -- each segment is one queue slice (crossing
           active/pending with admin/standard users), its size representing

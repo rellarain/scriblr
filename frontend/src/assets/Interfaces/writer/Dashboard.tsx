@@ -2,7 +2,7 @@ import { useRef, useState } from 'react'
 import type { OutlineNode } from '../../../api/types'
 import { PlusIcon, TrashIcon } from '../../icons'
 import { booksOf, chaptersOfBook } from './outlineTree'
-import { useStoredState } from './shared'
+import { AutoTextarea, useStoredState } from './shared'
 
 // The Shelves dashboard: schedule and analytics as equal columns and a
 // narrow scratchpad column. Checklists and notes have no backend yet, so
@@ -161,9 +161,9 @@ export function Scratchpad() {
               className="wrNoteTitle" placeholder="Title" value={n.title}
               onChange={e => patch(n.id, { title: e.target.value })} onKeyDown={e => onKeyDown(e, n.id)}
             />
-            <textarea
-              className="wrNoteBody" rows={3} placeholder="Description" value={n.body}
-              onChange={e => patch(n.id, { body: e.target.value })} onKeyDown={e => onKeyDown(e, n.id)}
+            <AutoTextarea
+              className="wrNoteBody" rows={1} placeholder="Description" value={n.body}
+              onChange={body => patch(n.id, { body })} onKeyDown={e => onKeyDown(e, n.id)}
             />
             {editingId === n.id && (
               <div className="wrNoteFoot">

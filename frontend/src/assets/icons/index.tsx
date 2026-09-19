@@ -444,3 +444,32 @@ export function EyeIcon(props: IconProps) {
     <circle cx="12" cy="12" r="3" />
   </IconBase>
 }
+
+export function SunIcon(props: IconProps) {
+  return <IconBase {...props}>
+    <circle cx="12" cy="12" r="4" />
+    <path d="M12 3v2M12 19v2M3 12h2M19 12h2M5.6 5.6l1.4 1.4M17 17l1.4 1.4M18.4 5.6L17 7M7 17l-1.4 1.4" />
+  </IconBase>
+}
+
+export function SunriseIcon(props: IconProps) {
+  return <IconBase {...props}>
+    <path d="M3 19h18M7 19a5 5 0 0 1 10 0" />
+    <path d="M12 4v5M9.5 6.5L12 4l2.5 2.5" />
+    <path d="M4.5 12.5l1.4 1.4M19.5 12.5l-1.4 1.4" />
+  </IconBase>
+}
+
+export function SunsetIcon(props: IconProps) {
+  return <IconBase {...props}>
+    <path d="M3 19h18M7 19a5 5 0 0 1 10 0" />
+    <path d="M12 4v5M9.5 6.5L12 9l2.5-2.5" />
+    <path d="M4.5 12.5l1.4 1.4M19.5 12.5l-1.4 1.4" />
+  </IconBase>
+}
+
+export function MoonIcon(props: IconProps) {
+  return <IconBase {...props}>
+    <path d="M20 14.5A8.5 8.5 0 1 1 9.5 4a7 7 0 0 0 10.5 10.5Z" />
+  </IconBase>
+}

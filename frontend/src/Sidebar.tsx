@@ -21,6 +21,8 @@ interface SidebarProps {
   onToggleAui: () => void
   auiSize: AuiSize
   onSetAuiSize: (size: AuiSize) => void
+  // Only admins get the AUI panel and its toggle.
+  isAdmin: boolean
 }
 
 // DOM order (AUI, divider, HUI) plus .sidebar's handedness-mirrored
@@ -31,11 +33,11 @@ interface SidebarProps {
 function Sidebar({
   side, onActivateChats, onCreateChat, helper, panel, onSelectPanel,
   expanded, onCollapse, activeAdminCount, activeStandardCount, pendingAdminCount, pendingStandardCount,
-  auiOpen, onToggleAui, auiSize, onSetAuiSize,
+  auiOpen, onToggleAui, auiSize, onSetAuiSize, isAdmin,
 }: SidebarProps) {
   return (
     <aside className="sidebar" aria-label={`Helper sidebar (${side})`}>
-      <AUI size={auiSize} onSetSize={onSetAuiSize} />
+      {isAdmin && <AUI size={auiSize} onSetSize={onSetAuiSize} />}
       <SidebarDivider
         conversations={helper.conversations}
         selectedChatId={helper.selectedChatId}
@@ -51,6 +53,7 @@ function Sidebar({
         pendingStandardCount={pendingStandardCount}
         auiOpen={auiOpen}
         onToggleAui={onToggleAui}
+        isAdmin={isAdmin}
       />
       <HUI side={side} helper={helper} panel={panel} />
     </aside>

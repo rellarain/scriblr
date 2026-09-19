@@ -43,6 +43,7 @@ backend/
 │       ├── analytics.py             # word-count/goal/flagged-node rollups
 │       ├── scrap.py                  # orphaned-moment detect/restore/permanent-delete
 │       ├── presets_store.py           # global (non-project) plot-preset catalog
+│       ├── user_settings_store.py      # global user settings: time-of-day theme, UI prefs, Writer UI state (kv)
 │       └── pdf_export.py               # fpdf2 book/chapter PDF export
 ├── tests/                    # 16 pytest modules, one per feature area (+ conftest.py fixtures)
 ├── server_main.py            # entrypoint used by Electron / PyInstaller
@@ -219,6 +220,7 @@ the one project-independent router).
 | `scrap` | `/api/projects/{id}/scrap` | `GET ""` registry · `POST "/{momentId}/restore"` · `DELETE "/{momentId}"` (204, permanent) |
 | `export` | `/api/projects/{id}/export` | `GET "/book/{bookId}"` PDF · `GET "/chapter/{chapterId}"` PDF |
 | `presets` | `/api/presets` | `GET ""` / `PUT ""` — global catalog (project-independent) |
+| `user_settings` | `/api/user-settings` | `GET ""` whole doc · `PUT "/theme"` · `PUT "/ui"` · `PUT "/kv/{key}"` / `DELETE "/kv/{key}"` (keys must start `scriblr.`) · `POST "/kv-import"` (one-time localStorage migration; sets only absent keys) — global (`user-settings.json`) |
 
 Plus `GET /api/health` (inline in `main.py`, not part of a router).
 
@@ -327,6 +329,41 @@ the working tree currently differs.
   `vite.config.ts`) + React Testing Library + `@testing-library/user-event`
   + `jest-dom` matchers (`src/test/setup.ts`). Covers all four `lib/`
   modules plus `BookSpine`.
+
+## Theming (time-of-day palettes)
+
+The shell (`frontend/src/App.tsx`) is themed by four optional time zones —
+**Dawn, Day, Dusk, Night**. Day is always on (and is the palette used when
+time-based theming is off); the others are opt-in. Each zone has a start time
+(10-minute steps; a zone runs until the next configured zone starts, wrapping
+past midnight) and its own palette: **theme** (inert/read-only), **accent**
+(interactive/active), **alert** (needs attention), an admin-only **accent 2**
+(admin features), and one **brightness**. Saturation must satisfy
+theme < accent < alert and theme < accent 2 < alert.
+
+- **Pure logic** lives in `frontend/src/theme/` with tests: `zones.ts` (which zone
+  applies when, enabling/disabling zones), `paletteRules.ts` (saturation rules,
+  lightness derivation), `contrast.ts` + `tokens.ts` (palette → CSS variables,
+  including automatic light/dark text — the contrast rule is documented at the
+  top of `tokens.ts`).
+- **Applying it:** `useThemeEngine()` (mounted in `App.tsx`) writes the variables
+  on `<html>`; `theme/theme.scss` registers them with `@property` so a palette
+  change cross-fades (~1s), and defines the derived tokens (`--ink`,
+  `--surface-*`, `--accent`, `--alert`, `--accent2`, `--ov-lift-*`, `--ov-sink-*`,
+  `--paper-*`) that `App.scss` and the Writer's `writer.scss` are styled from —
+  don't hard-code whites/black overlays/fixed lightness in new styles, use those.
+- **UI:** the override icons (one per configured zone; click to force, click again
+  to release) are on the UUI Dashboard; the customization tool is UUI
+  Dashboard > Settings (`theme/ThemeSettingsPanel.tsx`). "View as: User/Admin"
+  there previews the other role (there are no real accounts yet: the role comes
+  from `userSeed.ts`).
+- **Persistence:** `user-settings.json` (backend, see the API table) is the source
+  of truth; `settings/settingsStore.ts` keeps a synchronous localStorage cache
+  (so the first paint is already themed) and writes through, debounced. The
+  packaged app's backend port — and so its localStorage origin — changes every
+  launch, which is why localStorage alone isn't enough. The Writer's saved UI state
+  (`useStoredState`: chapter mode, scratchpad, checklists, reactions) uses the same
+  store, and is migrated from localStorage once.
 
 ## In-progress / not yet integrated
 
