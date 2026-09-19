@@ -15,6 +15,7 @@ import { booksOf, buildChildIndex, chaptersOfBook, moveNode, nearestOfKind } fro
 import { isAssignedPlotpoint } from './plotTree'
 import { useStoredState } from './storage'
 import { combineSaveStatus, useAutosave } from '../../../lib/useAutosave'
+import { insertAfter } from '../../../lib/siblingOrder'
 
 type AsyncStatus = 'idle' | 'loading' | 'error'
 
@@ -143,15 +144,15 @@ export function useWriterWorkspace() {
   const outlineSave = useAutosave<{ projectId: string; schemaVersion: number; nodes: OutlineNode[] }>({
     save: async ({ projectId, schemaVersion, nodes }) => {
       const tree = await apiPutOutline(projectId, { schemaVersion, nodes })
-      // Adopt the server's copy only if nothing newer is waiting (it would
+      // Adopt the server's copy only if nothing newer is waiting or queued (it would
       // otherwise briefly revert keystrokes typed while this save ran).
-      if (activeProjectIdRef.current === projectId && !outlineSave.isPending()) setOutlineNodes(tree.nodes)
+      if (activeProjectIdRef.current === projectId && !outlineSave.hasNewer()) setOutlineNodes(tree.nodes)
     },
   })
   const plotSave = useAutosave<{ projectId: string; schemaVersion: number; nodes: PlotNode[] }>({
     save: async ({ projectId, schemaVersion, nodes }) => {
       const tree = await apiPutPlot(projectId, { schemaVersion, nodes })
-      if (activeProjectIdRef.current === projectId && !plotSave.isPending()) setPlotNodes(tree.nodes)
+      if (activeProjectIdRef.current === projectId && !plotSave.hasNewer()) setPlotNodes(tree.nodes)
     },
   })
 
@@ -159,7 +160,7 @@ export function useWriterWorkspace() {
   const settingsSave = useAutosave<{ projectId: string; timeSystems: TimeSystem[] }>({
     save: async ({ projectId, timeSystems }) => {
       const index = await apiUpdateProject(projectId, { timeSystems })
-      if (activeProjectIdRef.current === projectId && !settingsSave.isPending()) setActiveProject(index)
+      if (activeProjectIdRef.current === projectId && !settingsSave.hasNewer()) setActiveProject(index)
     },
   })
 
@@ -382,7 +383,9 @@ export function useWriterWorkspace() {
   }
 
   // --- outline node mutators ---
-  function addOutlineNode(parentId: string | null, kind: OutlineNodeKind, patch: Partial<OutlineNode> = {}) {
+  // `afterId` places the new node right after that sibling (keyboard shortcuts);
+  // otherwise it goes last. Returns the new node's id.
+  function addOutlineNode(parentId: string | null, kind: OutlineNodeKind, patch: Partial<OutlineNode> = {}, afterId?: string): string {
     const prev = outlineNodesRef.current
     const node: OutlineNode = {
       id: newId('node'), kind, parentId, order: nextOrderAmong(prev, parentId),
@@ -393,7 +396,8 @@ export function useWriterWorkspace() {
       location: '', timeValue: {}, action: '',
       ...patch,
     }
-    commitOutline([...prev, node], true)
+    commitOutline(afterId ? insertAfter(prev, node, afterId, n => n.parentId === parentId) : [...prev, node], true)
+    return node.id
   }
 
   function updateOutlineNode(nodeId: string, patch: Partial<OutlineNode>) {
@@ -449,7 +453,7 @@ export function useWriterWorkspace() {
     setFocusedPlotNodeId(nodeId)
   }
 
-  function addPlotNode(parentId: string | null, kind: PlotNodeKind, title?: string) {
+  function addPlotNode(parentId: string | null, kind: PlotNodeKind, title?: string, afterId?: string) {
     const id = newId('plot')
     const prev = plotNodesRef.current
     const node: PlotNode = {
@@ -457,7 +461,7 @@ export function useWriterWorkspace() {
       title: title ?? '', body: '', assignedMomentId: null, assignedParagraphIndex: null,
       sourceFieldId: null, customFieldDefs: [], customFieldValues: {}, keywords: [], flag: null,
     }
-    commitPlot([...prev, node], true)
+    commitPlot(afterId ? insertAfter(prev, node, afterId, n => n.parentId === parentId) : [...prev, node], true)
     return id
   }
 

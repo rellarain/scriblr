@@ -128,13 +128,15 @@ export function ChapterTabs({ chapters, activeId, onSelect, onAdd, variant }: {
 }
 
 // A textarea that grows with its content.
-export function AutoTextarea({ value, onChange, placeholder, className, rows = 2, onKeyDown }: {
+export function AutoTextarea({ value, onChange, placeholder, className, rows = 2, onKeyDown, keyField }: {
   value: string
   onChange: (next: string) => void
   placeholder?: string
   className?: string
   rows?: number
   onKeyDown?: (e: React.KeyboardEvent<HTMLTextAreaElement>) => void
+  // Marks it for the node keyboard shortcuts (lib/nodeKeys.ts); 'draft' for writing text.
+  keyField?: boolean | 'draft'
 }) {
   const ref = useRef<HTMLTextAreaElement>(null)
   useEffect(() => {
@@ -146,6 +148,7 @@ export function AutoTextarea({ value, onChange, placeholder, className, rows = 2
   return (
     <textarea
       ref={ref} rows={rows} className={className} placeholder={placeholder} value={value}
+      data-kf={keyField === 'draft' ? 'draft' : keyField ? '' : undefined}
       onChange={e => onChange(e.target.value)} onKeyDown={onKeyDown}
     />
   )
@@ -174,7 +177,7 @@ export function ChipEditor({ items, placeholder, onAdd, onRemove }: {
       ))}
       <span className="wrChipAdd">
         <input
-          value={draft} placeholder={placeholder}
+          value={draft} placeholder={placeholder} data-kf=""
           onChange={e => setDraft(e.target.value)}
           onKeyDown={e => { if (e.key === 'Enter') { e.preventDefault(); submit() } }}
         />

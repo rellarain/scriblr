@@ -6,6 +6,7 @@ import { CSS } from '@dnd-kit/utilities'
 import type { AuiConfigNode } from '../../../api/types'
 import { CloseIcon } from '../../icons'
 import type { AuiConfigTabKey, AuiConfigWorkspace } from './useAuiConfig'
+import { useNodeKeys } from '../../../lib/nodeKeys'
 
 interface AuiConfigEditorProps {
   tab: AuiConfigTabKey
@@ -106,11 +107,12 @@ function NodeCard({ node, config, nestedItems, addChildLabel, onAddChild, autoFo
     return () => ro.disconnect()
   }, [showIdea])
 
-  // Once the description has some text, Enter starts a new bulleted line
+  // Once the description has some text, Shift+Enter (a new line; plain Enter
+  // adds a sibling card, see lib/nodeKeys.ts) starts a new bulleted line
   // instead of a plain one -- the very first line stays plain until
   // there's something for a second line to continue from.
   function handleIdeaKeyDown(e: React.KeyboardEvent<HTMLTextAreaElement>) {
-    if (e.key !== 'Enter') return
+    if (e.key !== 'Enter' || !e.shiftKey || e.ctrlKey || e.nativeEvent.isComposing) return
     const el = e.currentTarget
     if (el.value.trim() === '') return
     e.preventDefault()
@@ -141,6 +143,7 @@ function NodeCard({ node, config, nestedItems, addChildLabel, onAddChild, autoFo
   return (
     <div
       ref={setNodeRef}
+      data-knode={node.id}
       style={style}
       className={isDragging ? `auiConfigNode auiConfigNode--${node.kind} auiConfigNode--dragging` : `auiConfigNode auiConfigNode--${node.kind}`}
     >
@@ -149,7 +152,7 @@ function NodeCard({ node, config, nestedItems, addChildLabel, onAddChild, autoFo
         <div className="auiConfigNodeBody">
           <div className="auiConfigNodeRow">
             <input
-              className="statementField"
+              className="statementField" data-kf=""
               placeholder={`New ${node.kind.charAt(0).toUpperCase()}${node.kind.slice(1)}`}
               value={node.name}
               ref={titleRef}
@@ -164,7 +167,7 @@ function NodeCard({ node, config, nestedItems, addChildLabel, onAddChild, autoFo
           </div>
           {showIdea && (
             <textarea
-              className="inlineNoteInput inlineNoteInput--idea"
+              className="inlineNoteInput inlineNoteInput--idea" data-kf=""
               placeholder={node.kind === 'feature' ? 'Idea…' : 'Description…'}
               value={node.idea}
               rows={1}
@@ -263,6 +266,32 @@ export function AuiConfigReadOnly({ tab, config }: AuiConfigEditorProps) {
 function AuiConfigEditor({ tab, config }: AuiConfigEditorProps) {
   const sensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 4 } }))
   const consoles = config.childrenOf(tab, null)
+
+  // Keyboard shortcuts (lib/nodeKeys.ts): consoles are the top-level list;
+  // Ctrl+Enter on a feature adds a component after its component, on a
+  // component a console after its console.
+  const keys = useNodeKeys({
+    parentOf: id => config.findNode(id)?.parentId ?? null,
+    siblingsOf: id => {
+      const n = config.findNode(id)
+      return n ? config.childrenOf(tab, n.parentId).map(c => c.id) : [id]
+    },
+    isEmpty: id => {
+      const n = config.findNode(id)
+      return !n || (n.name.trim() === '' && n.idea.trim() === '' && config.childrenOf(tab, id).length === 0)
+    },
+    createSibling: id => {
+      const n = config.findNode(id)
+      return n ? config.addNode(tab, n.parentId, n.kind, id) : null
+    },
+    createParentSibling: id => {
+      const n = config.findNode(id)
+      const parent = n?.parentId ? config.findNode(n.parentId) : undefined
+      return parent ? config.addNode(tab, parent.parentId, parent.kind, parent.id) : null
+    },
+    canCreateParentSibling: id => Boolean(config.findNode(id)?.parentId),
+    remove: id => config.deleteNode(id),
+  })
   // Tracks the id of a just-created node so its NodeCard can select its
   // title input once it mounts, then clears itself (see NodeCard's
   // autoFocus effect) so it doesn't refire on later re-renders.
@@ -285,7 +314,7 @@ function AuiConfigEditor({ tab, config }: AuiConfigEditorProps) {
 
   return (
     <DndContext sensors={sensors} onDragEnd={handleDragEnd}>
-      <div className="aUIOutline">
+      <div className="aUIOutline" onKeyDown={keys.onKeyDown}>
         {config.status === 'loading' && <p className="feedbackCardMeta">Loading configuration…</p>}
         {config.status === 'error' && <p className="feedbackCardMeta">{config.error ?? 'Failed to load configuration.'}</p>}
         {config.saveError && <p className="feedbackCardMeta">{config.saveError}</p>}

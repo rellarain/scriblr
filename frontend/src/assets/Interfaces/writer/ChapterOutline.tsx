@@ -5,7 +5,8 @@ import { ChevronDownIcon, ChevronRightIcon, GripIcon, PlusIcon } from '../../ico
 import { buildChildIndex, nearestOfKind, rollUpWordCounts, scenesInOrder, sceneChanges, type ChildIndex } from './outlineTree'
 import { SceneTime } from './SceneTime'
 import { PlotpointTile } from './PlotpointTile'
-import { formatTime, systemForBook } from './timeSystem'
+import { formatTime, hasTime, systemForBook } from './timeSystem'
+import { useNodeKeys } from '../../../lib/nodeKeys'
 import { AutoTextarea, DeleteControl } from './shared'
 import { nodeLabel } from './plotTree'
 import { useNodeDnd } from './useNodeDnd'
@@ -59,14 +60,15 @@ function DraftFooter({ words, value, onChange }: { words: number; value: string;
     return () => { cancelAnimationFrame(outer); cancelAnimationFrame(inner) }
   }, [])
   return (
-    <div className={open ? 'wrDraftFoot wrDraftFoot--open' : 'wrDraftFoot'}>
+    // Focusing the text (Tab from the previous moment's draft) opens a closed one.
+    <div className={open ? 'wrDraftFoot wrDraftFoot--open' : 'wrDraftFoot'} onFocusCapture={() => setOpen(true)}>
       <button type="button" className="wrDraftFootBar" aria-expanded={open} onClick={() => setOpen(o => !o)}>
         {open ? <ChevronDownIcon size={13} /> : <ChevronRightIcon size={13} />}
         <span>{formatWords(words)}</span>
       </button>
       <div className="wrDraftFootBody">
         <div className="wrDraftFootInner">
-          <AutoTextarea className="wrDraftText" placeholder="Start drafting this moment…" value={value} onChange={onChange} />
+          <AutoTextarea className="wrDraftText" placeholder="Start drafting this moment…" value={value} onChange={onChange} keyField="draft" />
         </div>
       </div>
     </div>
@@ -96,6 +98,38 @@ function ChapterOutline({ w, chapter, mode, draft, plotDrag }: {
   }, [w.plotNodes, chapter.id])
 
   const index = useMemo(() => buildChildIndex(w.outlineNodes), [w.outlineNodes])
+  const nodeById = useMemo(() => new Map(w.outlineNodes.map(n => [n.id, n])), [w.outlineNodes])
+
+  // Keyboard shortcuts (lib/nodeKeys.ts). The chapter itself is the page's root:
+  // it has no siblings here and is never created or removed from its own title.
+  const parentNode = (id: string) => {
+    const parentId = nodeById.get(id)?.parentId
+    return parentId ? nodeById.get(parentId) : undefined
+  }
+  const keys = useNodeKeys({
+    parentOf: id => (id === chapter.id ? null : nodeById.get(id)?.parentId ?? null),
+    siblingsOf: id => (id === chapter.id ? [id] : (index.get(nodeById.get(id)?.parentId ?? null) ?? []).map(n => n.id)),
+    isEmpty: id => {
+      const n = nodeById.get(id)
+      if (!n || n.id === chapter.id) return false
+      if ((index.get(id) ?? []).length > 0 || (pointsByNode.get(id)?.length ?? 0) > 0) return false
+      return [n.title, n.synopsis, n.location ?? '', n.action ?? '', draft.bodies[id] ?? ''].every(t => t.trim() === '') && !hasTime(n.timeValue)
+    },
+    createSibling: id => {
+      const n = nodeById.get(id)
+      return n && n.id !== chapter.id ? w.addOutlineNode(n.parentId, n.kind, {}, id) : null
+    },
+    // moment -> a new scene after its scene, scene -> a new act after its act.
+    createParentSibling: id => {
+      const parent = parentNode(id)
+      return parent && parent.id !== chapter.id ? w.addOutlineNode(parent.parentId, parent.kind, {}, parent.id) : null
+    },
+    canCreateParentSibling: id => {
+      const parent = parentNode(id)
+      return Boolean(parent) && parent!.id !== chapter.id
+    },
+    remove: id => w.deleteOutlineNode(id),
+  })
   const labels = useMemo(() => numberNodes(index, chapter.id), [index, chapter.id])
   const scenes = useMemo(() => scenesInOrder(w.outlineNodes, chapter.id), [w.outlineNodes, chapter.id])
   const chapterNumber = w.activeBookChapters.findIndex(c => c.id === chapter.id) + 1
@@ -171,7 +205,7 @@ function ChapterOutline({ w, chapter, mode, draft, plotDrag }: {
     const field = (key: 'location' | 'action') => editable ? (
       <input
         className={changes[key] ? `wrSceneField wrSceneField--${key} wrSceneField--changed` : `wrSceneField wrSceneField--${key}`}
-        list={`wr-${key}-options`} placeholder={label[key]} value={scene[key] ?? ''}
+        list={`wr-${key}-options`} placeholder={label[key]} value={scene[key] ?? ''} data-kf=""
         aria-label={label[key]} title={changes[key] ? `${label[key]} changed from the previous scene` : label[key]}
         onChange={e => w.updateOutlineNode(scene.id, { [key]: e.target.value })}
       />
@@ -223,12 +257,12 @@ function ChapterOutline({ w, chapter, mode, draft, plotDrag }: {
     if (node.kind === 'moment') {
       const n = labels.moment.get(node.id)
       return (
-        <div key={node.id} data-node={node.id} className={cardClass('wrMomentCard wrOutlineCard', node.id)} {...dropProps(node.id)}>
+        <div key={node.id} data-node={node.id} data-knode={node.id} className={cardClass('wrMomentCard wrOutlineCard', node.id)} {...dropProps(node.id)}>
           <div className="wrMomentRow">
             <span className="wrNodeHandle">{grip(node.id)}<span className="wrNodeLabel">Moment {n}</span></span>
             {editable ? (
               <input
-                className="wrOutlineInput" placeholder="Moment synopsis" value={node.synopsis}
+                className="wrOutlineInput" placeholder="Moment synopsis" value={node.synopsis} data-kf=""
                 onChange={e => w.updateOutlineNode(node.id, { synopsis: e.target.value })}
               />
             ) : (
@@ -246,7 +280,7 @@ function ChapterOutline({ w, chapter, mode, draft, plotDrag }: {
     if (node.kind === 'scene') {
       const n = labels.scene.get(node.id)
       return (
-        <div key={node.id} data-node={node.id} className={cardClass('wrSceneCard wrOutlineCard', node.id)} {...dropProps(node.id)}>
+        <div key={node.id} data-node={node.id} data-knode={node.id} className={cardClass('wrSceneCard wrOutlineCard', node.id)} {...dropProps(node.id)}>
           <div className="wrSceneHead">
             <span className="wrNodeHandle">{grip(node.id)}<span className="wrNodeLabel">Scene {n}</span></span>
             {sceneFields(node)}
@@ -262,12 +296,12 @@ function ChapterOutline({ w, chapter, mode, draft, plotDrag }: {
     if (node.kind === 'act') {
       const n = labels.act.get(node.id)
       return (
-        <div key={node.id} data-node={node.id} className={cardClass('wrActCard wrOutlineCard', node.id)} {...dropProps(node.id)}>
+        <div key={node.id} data-node={node.id} data-knode={node.id} className={cardClass('wrActCard wrOutlineCard', node.id)} {...dropProps(node.id)}>
           <div className="wrActHead">
             <span className="wrNodeHandle">{grip(node.id)}<span className="wrNodeLabel">Act {n}</span></span>
             {editable ? (
               <input
-                className="wrOutlineInput" placeholder="Act title" value={node.title}
+                className="wrOutlineInput" placeholder="Act title" value={node.title} data-kf=""
                 onChange={e => w.updateOutlineNode(node.id, { title: e.target.value })}
               />
             ) : (
@@ -288,12 +322,12 @@ function ChapterOutline({ w, chapter, mode, draft, plotDrag }: {
   const children = index.get(chapter.id) ?? []
 
   return (
-    <div className="wrPage wrPage--outline" {...dnd.dropProps(chapter.id)}>
+    <div className="wrPage wrPage--outline" data-knode={chapter.id} onKeyDown={keys.onKeyDown} {...dnd.dropProps(chapter.id)}>
       <div className="wrPageHead">
         <span className="wrPageKicker">Chapter {chapterNumber}</span>
         {editable ? (
           <input
-            className="wrPageTitleInput" value={chapter.title} placeholder="Chapter title"
+            className="wrPageTitleInput" value={chapter.title} placeholder="Chapter title" data-kf=""
             onChange={e => w.updateOutlineNode(chapter.id, { title: e.target.value })}
           />
         ) : (

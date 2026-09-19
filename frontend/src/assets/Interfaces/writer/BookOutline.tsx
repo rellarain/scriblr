@@ -6,6 +6,7 @@ import { formatWords } from './wordCount'
 import { buildChildIndex, descendantsOf } from './outlineTree'
 import { DeleteControl } from './shared'
 import { useNodeDnd } from './useNodeDnd'
+import { useNodeKeys } from '../../../lib/nodeKeys'
 
 // The book's outline as nested cards in a single column: arcs contain
 // chapters, and chapters can also sit directly under the book. Cards are
@@ -15,6 +16,35 @@ function BookOutline({ w, book, chapterWords }: { w: WriterWorkspace; book: Outl
   const dnd = useNodeDnd(w, true)
   const index = useMemo(() => buildChildIndex(w.outlineNodes), [w.outlineNodes])
   const kids = index.get(book.id) ?? []
+  const nodeById = useMemo(() => new Map(w.outlineNodes.map(n => [n.id, n])), [w.outlineNodes])
+
+  // Keyboard shortcuts (lib/nodeKeys.ts). The book's direct arcs and chapters
+  // form the top-level list; a chapter inside an arc has that arc as its parent.
+  const parentNode = (id: string) => {
+    const parentId = nodeById.get(id)?.parentId
+    const parent = parentId ? nodeById.get(parentId) : undefined
+    return parent && parent.id !== book.id ? parent : undefined
+  }
+  const keys = useNodeKeys({
+    parentOf: id => parentNode(id)?.id ?? null,
+    siblingsOf: id => (index.get(nodeById.get(id)?.parentId ?? null) ?? []).filter(n => n.kind === 'arc' || n.kind === 'chapter').map(n => n.id),
+    isEmpty: id => {
+      const n = nodeById.get(id)
+      if (!n) return true
+      return n.title.trim() === '' && (index.get(id) ?? []).length === 0 && !w.plotNodes.some(p => p.assignedMomentId === id)
+    },
+    createSibling: id => {
+      const n = nodeById.get(id)
+      return n ? w.addOutlineNode(n.parentId, n.kind, {}, id) : null
+    },
+    // chapter (inside an arc) -> a new arc after that arc.
+    createParentSibling: id => {
+      const arc = parentNode(id)
+      return arc && arc.kind === 'arc' ? w.addOutlineNode(arc.parentId, 'arc', {}, arc.id) : null
+    },
+    canCreateParentSibling: id => parentNode(id)?.kind === 'arc',
+    remove: id => w.deleteOutlineNode(id),
+  })
 
   // Chapters are numbered across the whole book, in outline order.
   const chapterNumber = useMemo(
@@ -36,13 +66,13 @@ function BookOutline({ w, book, chapterWords }: { w: WriterWorkspace; book: Outl
     const count = (kind: string) => inside.filter(x => x.kind === kind).length
     const stat = (n: number, one: string) => `${n} ${one}${n === 1 ? '' : 's'}`
     return (
-      <div key={c.id} data-node={c.id} className={dnd.cardClass('wrBookChapter wrOutlineCard', c.id)} {...dnd.dropProps(c.id)}>
+      <div key={c.id} data-node={c.id} data-knode={c.id} className={dnd.cardClass('wrBookChapter wrOutlineCard', c.id)} {...dnd.dropProps(c.id)}>
         <div className="wrBookChapterTop">
           {grip(c.id)}
           <div className="wrBookChapterTitle">
             <span className="wrBookNumber">Chapter {n}</span>
             <input
-              className="wrBookInput wrBookInput--chapter" value={c.title} placeholder="Chapter title" aria-label={`Chapter ${n} title`}
+              className="wrBookInput wrBookInput--chapter" value={c.title} placeholder="Chapter title" data-kf="" aria-label={`Chapter ${n} title`}
               onChange={e => w.updateOutlineNode(c.id, { title: e.target.value })}
             />
           </div>
@@ -73,11 +103,11 @@ function BookOutline({ w, book, chapterWords }: { w: WriterWorkspace; book: Outl
     const n = arcNumber.get(a.id) ?? 0
     const chapters = index.get(a.id) ?? []
     return (
-      <div key={a.id} data-node={a.id} className={dnd.cardClass('wrBookArc wrOutlineCard', a.id)} {...dnd.dropProps(a.id)}>
+      <div key={a.id} data-node={a.id} data-knode={a.id} className={dnd.cardClass('wrBookArc wrOutlineCard', a.id)} {...dnd.dropProps(a.id)}>
         <div className="wrBookArcHead">
           <span className="wrNodeHandle">{grip(a.id)}<span className="wrBookLabel">Arc {n}</span></span>
           <input
-            className="wrBookInput" value={a.title} placeholder="Arc title" aria-label={`Arc ${n} title`}
+            className="wrBookInput" value={a.title} placeholder="Arc title" data-kf="" aria-label={`Arc ${n} title`}
             onChange={e => w.updateOutlineNode(a.id, { title: e.target.value })}
           />
         </div>
@@ -110,7 +140,7 @@ function BookOutline({ w, book, chapterWords }: { w: WriterWorkspace; book: Outl
         </span>
       </div>
       {kids.length === 0 && <p className="wrCoverMuted">Nothing outlined yet. Add an arc or a chapter to begin.</p>}
-      <div className="wrBookStack" {...dnd.dropProps(book.id)}>
+      <div className="wrBookStack" onKeyDown={keys.onKeyDown} {...dnd.dropProps(book.id)}>
         {kids.map(k => (k.kind === 'arc' ? arcCard(k) : k.kind === 'chapter' ? chapterCard(k) : null))}
       </div>
     </div>

@@ -102,6 +102,33 @@ describe('useAutosave', () => {
     expect(result.current.dirty).toBe(false)
   })
 
+  it('hasNewer is true inside a save while a later one is queued behind it', async () => {
+    const seen: boolean[] = []
+    const resolvers: Array<() => void> = []
+    let api: { hasNewer: () => boolean } = { hasNewer: () => false }
+    const save = vi.fn((_v: string) => new Promise<void>(resolve => {
+      seen.push(api.hasNewer())
+      resolvers.push(resolve)
+    }))
+    const { result } = setup(save)
+    api = result.current
+    act(() => { void result.current.saveNow('one') })
+    await act(async () => { await vi.advanceTimersByTimeAsync(0) })
+    act(() => { void result.current.saveNow('two') })
+    await act(async () => { resolvers[0](); await vi.advanceTimersByTimeAsync(0) })
+    await act(async () => { resolvers[1](); await vi.advanceTimersByTimeAsync(0) })
+    // While 'one' ran nothing else was queued yet at its start; 'two' ran alone afterwards.
+    expect(seen).toEqual([false, false])
+    // Queued behind a running save it is reported (checked while 'three' waits for 'four's turn).
+    act(() => { void result.current.saveNow('three') })
+    await act(async () => { await vi.advanceTimersByTimeAsync(0) })
+    act(() => { void result.current.saveNow('four') })
+    expect(result.current.hasNewer()).toBe(true)
+    await act(async () => { resolvers[2](); await vi.advanceTimersByTimeAsync(0) })
+    await act(async () => { resolvers[3](); await vi.advanceTimersByTimeAsync(0) })
+    expect(result.current.hasNewer()).toBe(false)
+  })
+
   it('a newer value replaces one that failed', async () => {
     let fail = true
     const save = vi.fn(async () => { if (fail) throw new Error('nope') })

@@ -3,6 +3,7 @@ import type { OutlineNode } from '../../../api/types'
 import { PlusIcon, TrashIcon } from '../../icons'
 import { booksOf, chaptersOfBook } from './outlineTree'
 import { AutoTextarea, useStoredState } from './shared'
+import { focusNodeField, useNodeKeys } from '../../../lib/nodeKeys'
 
 // The Shelves dashboard: schedule and analytics as equal columns and a
 // narrow scratchpad column. Checklists and notes have no backend yet, so
@@ -113,14 +114,16 @@ export function AnalyticsPanel({ projects, outlines }: {
 
 interface Note { id: string; title: string; body: string }
 
-// Notes are cards with a title and description. Click one to edit it, Tab
-// moves to the next field or card, and Enter adds a new card after it.
+// Notes are cards with a title and description. Click one to edit it. The
+// shared node shortcuts apply (lib/nodeKeys.ts): Enter adds a note after this
+// one, Shift+Enter is a new line, Tab moves between fields and notes, and
+// Enter, Backspace or Delete in an empty note removes it.
 export function Scratchpad() {
   const [notes, setNotes] = useStoredState<Note[]>('scriblr.writer.scratchpad', [])
   const [editingId, setEditingId] = useState<string | null>(null)
   const listRef = useRef<HTMLDivElement>(null)
 
-  function addAfter(afterId: string | null) {
+  function addAfter(afterId: string | null): string {
     const note: Note = { id: newId(), title: '', body: '' }
     setNotes(prev => {
       if (afterId === null) return [...prev, note]
@@ -128,42 +131,46 @@ export function Scratchpad() {
       return [...prev.slice(0, at), note, ...prev.slice(at)]
     })
     setEditingId(note.id)
-    setTimeout(() => listRef.current?.querySelector<HTMLInputElement>(`[data-note="${note.id}"] input`)?.focus(), 0)
+    return note.id
   }
 
   function patch(id: string, changes: Partial<Note>) {
     setNotes(prev => prev.map(n => (n.id === id ? { ...n, ...changes } : n)))
   }
 
-  function onKeyDown(e: React.KeyboardEvent, id: string) {
-    if (e.key === 'Enter' && !e.shiftKey) {
-      e.preventDefault()
-      addAfter(id)
-    }
-  }
+  const keys = useNodeKeys({
+    parentOf: () => null,
+    siblingsOf: () => notes.map(n => n.id),
+    isEmpty: id => {
+      const n = notes.find(x => x.id === id)
+      return !n || (n.title.trim() === '' && n.body.trim() === '')
+    },
+    createSibling: id => addAfter(id),
+    remove: id => setNotes(prev => prev.filter(x => x.id !== id)),
+  })
 
   return (
     <div className="wrColumn wrColumn--narrow">
       <div className="wrColumnTitle">
         Scratchpad
-        <button type="button" className="wrSmallBtn wrColumnAction" onClick={() => addAfter(null)}><PlusIcon size={14} /> Note</button>
+        <button type="button" className="wrSmallBtn wrColumnAction" onClick={() => focusNodeField(addAfter(null), 'first')}><PlusIcon size={14} /> Note</button>
       </div>
-      <div className="wrNotes" ref={listRef}>
+      <div className="wrNotes" ref={listRef} onKeyDown={keys.onKeyDown}>
         {notes.length === 0 && <p className="wrMuted">No notes yet. Add one to jot down a thought.</p>}
         {notes.map(n => (
           <div
-            key={n.id} data-note={n.id}
+            key={n.id} data-note={n.id} data-knode={n.id}
             className={editingId === n.id ? 'wrNote wrNote--editing' : 'wrNote'}
             onFocus={() => setEditingId(n.id)}
             onBlur={e => { if (!e.currentTarget.contains(e.relatedTarget as Node | null)) setEditingId(null) }}
           >
             <input
-              className="wrNoteTitle" placeholder="Title" value={n.title}
-              onChange={e => patch(n.id, { title: e.target.value })} onKeyDown={e => onKeyDown(e, n.id)}
+              className="wrNoteTitle" placeholder="Title" value={n.title} data-kf=""
+              onChange={e => patch(n.id, { title: e.target.value })}
             />
             <AutoTextarea
-              className="wrNoteBody" rows={1} placeholder="Description" value={n.body}
-              onChange={body => patch(n.id, { body })} onKeyDown={e => onKeyDown(e, n.id)}
+              className="wrNoteBody" rows={1} placeholder="Description" value={n.body} keyField
+              onChange={body => patch(n.id, { body })}
             />
             {editingId === n.id && (
               <div className="wrNoteFoot">
@@ -178,7 +185,7 @@ export function Scratchpad() {
           </div>
         ))}
       </div>
-      <p className="wrHint">Click a note to edit. Tab moves to the next field or note. Enter adds a note.</p>
+      <p className="wrHint">Enter adds a note, Shift+Enter a new line. Tab moves between notes. Enter, Backspace or Delete in an empty note removes it.</p>
     </div>
   )
 }

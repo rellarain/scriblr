@@ -36,6 +36,10 @@ export interface Autosave<T> {
   flush: () => Promise<void>
   // True while a value is waiting to be saved (debounce running, or failed).
   isPending: () => boolean
+  // True when something newer than the save now running is waiting or queued
+  // behind it. A finished save must not replace the editor's state with the
+  // server copy then: it would revert edits made while it was in flight.
+  hasNewer: () => boolean
   // Forget a waiting value without saving it (the document it belonged to is gone).
   cancel: () => void
   // cancel(), then resolves once any save already under way has finished.
@@ -128,6 +132,8 @@ export function useAutosave<T>({ save, enabled, delay, retryDelay = DEFAULT_RETR
   const flush = useCallback((): Promise<void> => run(), [run])
 
   const isPending = useCallback(() => pending.current !== null, [])
+  // Called from inside a save, where inFlight counts that save too.
+  const hasNewer = useCallback(() => pending.current !== null || inFlight.current > 1, [])
 
   const cancel = useCallback(() => {
     clearTimer()
@@ -168,8 +174,8 @@ export function useAutosave<T>({ save, enabled, delay, retryDelay = DEFAULT_RETR
   }, [run])
 
   return useMemo(
-    () => ({ schedule, saveNow, flush, isPending, cancel, discard, dirty, saving, error, lastSavedAt }),
-    [schedule, saveNow, flush, isPending, cancel, discard, dirty, saving, error, lastSavedAt],
+    () => ({ schedule, saveNow, flush, isPending, hasNewer, cancel, discard, dirty, saving, error, lastSavedAt }),
+    [schedule, saveNow, flush, isPending, hasNewer, cancel, discard, dirty, saving, error, lastSavedAt],
   )
 }
 

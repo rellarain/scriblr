@@ -2,6 +2,7 @@ import { useEffect, useMemo, useRef, useState } from 'react'
 import type { AuiConfigNode, AuiConfigNodeKind, PublishedTab } from '../../../api/types'
 import { getAdminConfig, publishAdminTab, putAdminConfig } from '../../../api/adminConfigApi'
 import { combineSaveStatus, useAutosave } from '../../../lib/useAutosave'
+import { insertAfter } from '../../../lib/siblingOrder'
 
 type AsyncStatus = 'idle' | 'loading' | 'error'
 
@@ -73,7 +74,7 @@ export function useAuiConfig() {
       const config = await putAdminConfig({ schemaVersion: 1, nodes: draft })
       setPublished(config.published ?? {})
       // Adopt the server's copy only if nothing newer is waiting.
-      if (!draftSave.isPending()) setNodes(config.nodes)
+      if (!draftSave.hasNewer()) setNodes(config.nodes)
     },
   })
 
@@ -203,7 +204,8 @@ export function useAuiConfig() {
     }
   }
 
-  function addNode(tab: AuiConfigTabKey, parentId: string | null, kind: AuiConfigNodeKind): string {
+  // `afterId` (keyboard shortcuts) places the node right after that sibling instead of at the top.
+  function addNode(tab: AuiConfigTabKey, parentId: string | null, kind: AuiConfigNodeKind, afterId?: string): string {
     const id = newId('auiNode')
     const prev = nodesRef.current
     const siblings = prev.filter(n => n.tab === tab && n.parentId === parentId)
@@ -214,7 +216,7 @@ export function useAuiConfig() {
       id, tab, kind, parentId, order: nextOrder,
       name: '', idea: '',
     }
-    commit([...prev, node], true)
+    commit(afterId ? insertAfter(prev, node, afterId, n => n.tab === tab && n.parentId === parentId) : [...prev, node], true)
     ensureExpandedAncestors(parentId)
     return id
   }
