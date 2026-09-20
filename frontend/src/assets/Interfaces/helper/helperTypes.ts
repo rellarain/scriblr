@@ -77,27 +77,6 @@ export interface ChannelTag {
   feature: string
 }
 
-export interface FeedbackItem {
-  id: string
-  text: string
-  author?: string
-  submittedAt: string
-  senderTone?: Tone           // the sender's own self-identified tone at submission; read-only
-  tone?: Tone                 // the admin's secondary tone identification, layered on top of senderTone
-  openPage?: string           // page the sender had open when submitting; defaults Sorting's Page select
-  selectedComponent?: string  // component the sender had selected; defaults Sorting's Component select
-  channels: ChannelTag[]
-}
-
-// One Statement per (subject, verb) pair -- Explicate's own standalone
-// output, an intention annotation on a sorted/toned feedback subject.
-export interface Statement {
-  id: string
-  feedbackId: string // original feedback text, looked up here, plays the "reason" role
-  subject: ChannelTag // the page/component/feature this statement is about, from Sorting
-  verb: string
-}
-
 export interface ChannelTaxonomyComponent {
   name: string
   features: string[]
@@ -107,8 +86,8 @@ export interface ChannelTaxonomyPage {
   components: ChannelTaxonomyComponent[]
 }
 
-// The fixed page -> component -> feature tree the Sorting tab's 3 cascading
-// dropdowns (and the chat composer's page-link picker) are populated from.
+// The fixed page -> component -> feature tree the chat composer's page-link
+// picker is populated from (the Inbox uses the server's four-level tree).
 // Modeled on Scriblr's own interface.
 export const CHANNEL_TAXONOMY: ChannelTaxonomyPage[] = [
   {

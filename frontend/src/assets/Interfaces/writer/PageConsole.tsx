@@ -10,6 +10,9 @@ import { useChapterDraft } from './useChapterDraft'
 import ChapterOutline, { type PlotDrag } from './ChapterOutline'
 import { PlotpointTile } from './PlotpointTile'
 import { orderAssignedPlotpoints } from './plotTree'
+import { usePublications } from './usePublications'
+import { PublishControl } from './PublishControl'
+import { latestOf, type ChapterMeta } from './chapterDates'
 
 // Outline | Draft | Preview, the buttons at the top right of the chapter
 // page (and of its preview). Preview is only available once there is draft
@@ -62,14 +65,28 @@ function ChapterPage({ w, chapter }: { w: WriterWorkspace; chapter: OutlineNode 
     [w.plotNodes, w.outlineNodes, w.activeProject, chapter.id],
   )
 
+  const pubs = usePublications(w.activeProjectId, chapter.id)
+  const hasDraft = chapterHasDraft(draft.bodies)
+  const meta: ChapterMeta = {
+    created: chapter.createdAt ?? w.activeProject?.createdAt ?? null,
+    edited: hasDraft ? draft.editedAt : null,
+    published: latestOf(pubs.publications.map(p => p.publishedAt)),
+  }
+
   const status = combineSaveStatus(w.saveStatus, { dirty: draft.dirty, saving: draft.saving, error: draft.saveError, lastSavedAt: draft.lastSavedAt })
   const saveAll = () => { void Promise.all([w.saveNow(), draft.flush()]) }
   const restoreAll = () => Promise.all([w.restoreSaved(), draft.restore()]).then(() => undefined)
   const buttons = (
     <>
       <SaveControl status={status} onSave={saveAll} onRestore={restoreAll} buttonClassName="wrSmallBtn wrSaveBtn" />
+      <PublishControl
+        disabled={!hasDraft} busy={pubs.publishing}
+        title={hasDraft ? 'Publish this chapter' : 'Write some draft text to publish it'}
+        // Publish what is saved: let any waiting edit land first.
+        onPublish={async () => { await Promise.all([w.saveNow(), draft.flush()]); await pubs.publish() }}
+      />
       <ChapterModeButtons
-        mode={w.chapterMode} hasDraft={chapterHasDraft(draft.bodies)}
+        mode={w.chapterMode} hasDraft={hasDraft}
         onMode={w.showChapter}
         // Preview loads its own copy of the draft: let the save land first.
         onPreview={() => { void draft.flush().then(() => w.showPreview()) }}
@@ -84,9 +101,11 @@ function ChapterPage({ w, chapter }: { w: WriterWorkspace; chapter: OutlineNode 
         component={`Chapter ${chapterNumber}`}
         right={buttons}
       />
-      {(w.saveStatus.error || draft.error) && <p className="wrError">{w.saveStatus.error ?? draft.error}</p>}
+      {(w.saveStatus.error || draft.error || pubs.error) && <p className="wrError">{w.saveStatus.error ?? draft.error ?? pubs.error}</p>}
       <div className="wrPageWrap">
-        {w.chapterMode === 'outline' && (
+        <ChapterOutline
+          w={w} chapter={chapter} mode={w.chapterMode} draft={draft} plotDrag={plotDrag} meta={meta}
+          sidebar={(
           <aside className="wrChapterPoints" aria-label="Chapter plotpoints">
             <div className="wrChapterPointsHead">
               <span>Plotpoints</span><span className="wrOutlineMeta">{chapterPoints.length}</span>
@@ -110,8 +129,8 @@ function ChapterPage({ w, chapter }: { w: WriterWorkspace; chapter: OutlineNode 
               ))}
             </div>
           </aside>
-        )}
-        <ChapterOutline w={w} chapter={chapter} mode={w.chapterMode} draft={draft} plotDrag={plotDrag} />
+          )}
+        />
         <ChapterTabs
           variant="page" chapters={w.activeBookChapters} activeId={chapter.id}
           onSelect={w.selectChapter}

@@ -7,7 +7,8 @@ import { accentColorCss, themeColorCss } from '../../../theme/bookColors'
 // are the active zone's, through CSS variables, so the colours follow the theme.
 //   - a category with no hue of its own shows the app theme's hue
 //   - a subcategory with no hue of its own uses its category's
-//   - a plotline (and its plotpoints) shows its subcategory's colour, else its category's
+//   - a plotline (and its plotpoints) wears its category's colour as its surface, with a left
+//     edge in its subcategory's colour (no edge without a subcategory)
 
 // The hue used when nothing is stored: the app theme's own.
 const APP_HUE = 'var(--color-theme-h)'
@@ -15,8 +16,6 @@ const APP_HUE = 'var(--color-theme-h)'
 export interface PlotColors {
   category: string | null
   subcategory: string | null
-  // What a plotline or plotpoint wears: the subcategory's colour, else the category's.
-  primary: string | null
 }
 
 export function plotColors(node: PlotNode, byId: Map<string, PlotNode>): PlotColors {
@@ -30,8 +29,14 @@ export function plotColors(node: PlotNode, byId: Map<string, PlotNode>): PlotCol
   const categoryHue = category?.hue ?? null
   const categoryCss = category ? themeColorCss(categoryHue ?? APP_HUE) : null
   const subcategoryCss = subcategory ? accentColorCss(subcategory.hue ?? categoryHue ?? APP_HUE) : null
-  return { category: categoryCss, subcategory: subcategoryCss, primary: subcategoryCss ?? categoryCss }
+  return { category: categoryCss, subcategory: subcategoryCss }
 }
 
-// The style that hands a node's colour to its CSS (`var(--wr-node-color)`).
-export const nodeColorStyle = (css: string | null) => (css ? ({ ['--wr-node-color' as string]: css }) : undefined)
+// The style that hands a node's colours to its CSS: `var(--wr-cat)` and `var(--wr-sub)`
+// (each set only when the node has that colour, so `var(--wr-sub, transparent)` works).
+export function plotColorVars(colors: PlotColors) {
+  const vars: Record<string, string> = {}
+  if (colors.category) vars['--wr-cat'] = colors.category
+  if (colors.subcategory) vars['--wr-sub'] = colors.subcategory
+  return Object.keys(vars).length > 0 ? vars : undefined
+}

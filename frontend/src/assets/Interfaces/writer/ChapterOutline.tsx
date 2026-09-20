@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
 import type { OutlineNode, PlotNode } from '../../../api/types'
 import type { ChapterMode, WriterWorkspace } from './useWriterWorkspace'
 import { ChevronDownIcon, ChevronRightIcon, GripIcon, PlusIcon } from '../../icons'
@@ -12,6 +12,8 @@ import { useNodeKeys } from '../../../lib/nodeKeys'
 import { AutoTextarea, DeleteControl } from './shared'
 import { nodeLabel } from './plotTree'
 import { useNodeDnd } from './useNodeDnd'
+import { fullDate, shortDate, type ChapterMeta } from './chapterDates'
+import { mergeDraftText } from './draftText'
 import { countWords, formatWords } from './wordCount'
 
 // The chapter as a page of nested cards: acts contain scenes and scenes
@@ -32,6 +34,8 @@ function numberNodes(index: ChildIndex, rootId: string): Labels {
   const counters = { act: 0, scene: 0, moment: 0 }
   const walk = (parentId: string) => {
     for (const n of index.get(parentId) ?? []) {
+      // The free draft is not part of the outline: it is never numbered.
+      if (n.freeDraft) continue
       if (n.kind === 'act' || n.kind === 'scene' || n.kind === 'moment') labels[n.kind].set(n.id, ++counters[n.kind])
       walk(n.id)
     }
@@ -54,7 +58,7 @@ export interface ChapterDraft {
 // The draft text under a moment card. It mounts closed and opens on the next
 // frame, so switching from Outline to Draft visibly expands it out of the
 // word-count bar; the bar collapses it again.
-function DraftFooter({ words, value, onChange }: { words: number; value: string; onChange: (text: string) => void }) {
+function DraftFooter({ words, value, onChange, grip }: { words: number; value: string; onChange: (text: string) => void; grip?: ReactNode }) {
   const [open, setOpen] = useState(false)
   useEffect(() => {
     let inner = 0
@@ -64,10 +68,13 @@ function DraftFooter({ words, value, onChange }: { words: number; value: string;
   return (
     // Focusing the text (Tab from the previous moment's draft) opens a closed one.
     <div className={open ? 'wrDraftFoot wrDraftFoot--open' : 'wrDraftFoot'} onFocusCapture={() => setOpen(true)}>
-      <button type="button" className="wrDraftFootBar" aria-expanded={open} onClick={() => setOpen(o => !o)}>
-        {open ? <ChevronDownIcon size={13} /> : <ChevronRightIcon size={13} />}
-        <span>{formatWords(words)}</span>
-      </button>
+      <div className="wrDraftFootHead">
+        {grip}
+        <button type="button" className="wrDraftFootBar" aria-expanded={open} onClick={() => setOpen(o => !o)}>
+          {open ? <ChevronDownIcon size={13} /> : <ChevronRightIcon size={13} />}
+          <span>{formatWords(words)}</span>
+        </button>
+      </div>
       <div className="wrDraftFootBody">
         <div className="wrDraftFootInner">
           <AutoTextarea className="wrDraftText" placeholder="Start drafting this moment…" value={value} onChange={onChange} keyField="draft" />
@@ -77,15 +84,25 @@ function DraftFooter({ words, value, onChange }: { words: number; value: string;
   )
 }
 
-function ChapterOutline({ w, chapter, mode, draft, plotDrag }: {
+function ChapterOutline({ w, chapter, mode, draft, plotDrag, meta, sidebar }: {
   w: WriterWorkspace
   chapter: OutlineNode
   mode: ChapterMode
   draft: ChapterDraft
   plotDrag?: PlotDrag
+  meta: ChapterMeta
+  // The chapter's plotpoint column: fixed in the page's left margin (Outline mode).
+  sidebar?: ReactNode
 }) {
   const editable = mode === 'outline'
-  const dnd = useNodeDnd(w, editable)
+  // Draft mode: one moment's draft text dropped on another is appended to it.
+  const mergeText = (sourceId: string, targetId: string) => {
+    const source = draft.bodies[sourceId] ?? ''
+    if (!source.trim()) return
+    draft.setBody(targetId, mergeDraftText(draft.bodies[targetId] ?? '', source))
+    draft.setBody(sourceId, '')
+  }
+  const dnd = useNodeDnd(w, { onMergeText: editable ? undefined : mergeText })
   const [plotOverId, setPlotOverId] = useState<string | null>(null)
 
   // Plotpoints assigned to each act / scene / moment (the chapter's own are in the left column).
@@ -110,7 +127,7 @@ function ChapterOutline({ w, chapter, mode, draft, plotDrag }: {
   }
   const keys = useNodeKeys({
     parentOf: id => (id === chapter.id ? null : nodeById.get(id)?.parentId ?? null),
-    siblingsOf: id => (id === chapter.id ? [id] : (index.get(nodeById.get(id)?.parentId ?? null) ?? []).map(n => n.id)),
+    siblingsOf: id => (id === chapter.id ? [id] : (index.get(nodeById.get(id)?.parentId ?? null) ?? []).filter(n => !n.freeDraft).map(n => n.id)),
     isEmpty: id => {
       const n = nodeById.get(id)
       if (!n || n.id === chapter.id) return false
@@ -157,14 +174,23 @@ function ChapterOutline({ w, chapter, mode, draft, plotDrag }: {
     </span>
   )
 
+  // Draft mode: the handle on a moment's footer drags its draft text.
+  const draftGrip = (id: string) => (
+    <span className="wrGrip wrGrip--light wrGrip--draft" aria-label="Drag this draft" title="Drag this draft onto a moment or between moments" {...dnd.gripProps(id)}>
+      <GripIcon size={14} />
+    </span>
+  )
+
   const cardClass = (base: string, id: string) =>
     `${dnd.cardClass(base, id)}${editable ? '' : ' wrOutlineCard--readonly'}${plotOverId === id ? ' wrOutlineCard--plotOver' : ''}`
 
   // Drop handling for a card: while a plotpoint is being dragged from the left
-  // column the card takes it (assigns it here); otherwise the normal outline
-  // drag-and-drop applies.
+  // column the card takes it (assigns it here); in Draft mode a moment takes
+  // another moment's draft text. Outline cards otherwise take no drops (they go
+  // in the gaps between cards).
   const dropProps = (id: string) => {
-    if (!editable || !plotDrag?.dragId) return dnd.dropProps(id)
+    if (!editable) return nodeById.get(id)?.kind === 'moment' ? dnd.textDropProps(id) : {}
+    if (!plotDrag?.dragId) return {}
     return {
       onDragOver: (e: React.DragEvent) => { e.preventDefault(); e.stopPropagation(); if (plotOverId !== id) setPlotOverId(id) },
       onDragLeave: () => setPlotOverId(prev => (prev === id ? null : prev)),
@@ -307,7 +333,7 @@ function ChapterOutline({ w, chapter, mode, draft, plotDrag }: {
             <span className={node.synopsis ? 'wrNodeDescription' : 'wrNodeDescription wrNodeDescription--empty'}>{node.synopsis || 'No synopsis'}</span>
           </div>
           {boxed(node.id)}
-          <DraftFooter words={words(node.id)} value={draft.bodies[node.id] ?? ''} onChange={text => draft.setBody(node.id, text)} />
+          <DraftFooter words={words(node.id)} value={draft.bodies[node.id] ?? ''} onChange={text => draft.setBody(node.id, text)} grip={draftGrip(node.id)} />
         </div>
       )
     }
@@ -321,7 +347,7 @@ function ChapterOutline({ w, chapter, mode, draft, plotDrag }: {
             {sceneFields(node)}
           </div>
           {boxed(node.id)}
-          {kids.map(renderNode)}
+          {dnd.children(node.id, kids, renderNode)}
           {editable && footer(node, { label: 'Moment', kind: 'moment' },
             `Delete Scene ${n}${childCount ? ` and its ${childCount} ${childCount === 1 ? 'moment' : 'moments'}` : ''}?`)}
         </div>
@@ -344,7 +370,7 @@ function ChapterOutline({ w, chapter, mode, draft, plotDrag }: {
             )}
           </div>
           {boxed(node.id)}
-          {kids.map(renderNode)}
+          {dnd.children(node.id, kids, renderNode)}
           {editable && footer(node, { label: 'Scene', kind: 'scene' },
             `Delete Act ${n}${childCount ? ' and everything in it' : ''}?`)}
         </div>
@@ -354,33 +380,89 @@ function ChapterOutline({ w, chapter, mode, draft, plotDrag }: {
     return null
   }
 
-  const children = index.get(chapter.id) ?? []
+  const children = (index.get(chapter.id) ?? []).filter(n => !n.freeDraft)
+  const freeNode = (index.get(chapter.id) ?? []).find(n => n.freeDraft)
+  const freeBody = freeNode ? draft.bodies[freeNode.id] ?? '' : ''
+
+  // The free draft is created with the first text typed into it. Its id is kept
+  // until the node shows up in the tree, so fast typing cannot create two.
+  const freeIdRef = useRef<string | null>(null)
+  if (freeNode) freeIdRef.current = freeNode.id
+  else if (freeIdRef.current && nodeById.has(freeIdRef.current)) freeIdRef.current = null // it became an ordinary moment
+  function typeFree(text: string) {
+    const id = freeIdRef.current ?? w.addOutlineNode(chapter.id, 'moment', { freeDraft: true, order: -1 })
+    freeIdRef.current = id
+    draft.setBody(id, text)
+  }
+  // Once the free draft has shown up in a chapter with an outline it stays while it is being edited.
+  const [freeShown, setFreeShown] = useState(false)
+  useEffect(() => { if (freeBody.trim()) setFreeShown(true) }, [freeBody])
+
+  const freeCard = (() => {
+    if (!freeNode) return null
+    if (editable) {
+      if (!freeBody.trim()) return null
+      return (
+        <div className="wrFreeCard wrFreeCard--readonly" data-testid="free-draft-card">
+          <span className="wrNodeLabel">Free draft</span>
+          <span className="wrWordCount">{formatWords(words(freeNode.id))}</span>
+        </div>
+      )
+    }
+    if (children.length === 0 || (!freeBody.trim() && !freeShown)) return null
+    return (
+      <div key={freeNode.id} data-node={freeNode.id} className={cardClass('wrMomentCard wrFreeCard wrOutlineCard', freeNode.id)} {...dropProps(freeNode.id)}>
+        <div className="wrMomentRow">
+          <span className="wrNodeHandle"><span className="wrNodeLabel wrNodeLabel--num">Free draft</span></span>
+          <span className="wrNodeDescription wrNodeDescription--empty">Not part of the outline</span>
+        </div>
+        <DraftFooter words={words(freeNode.id)} value={freeBody} onChange={typeFree} grip={draftGrip(freeNode.id)} />
+      </div>
+    )
+  })()
 
   return (
-    <div className="wrPage wrPage--outline" data-knode={chapter.id} onKeyDown={keys.onKeyDown} {...dnd.dropProps(chapter.id)}>
-      <div className="wrPageHead">
-        <span className="wrPageKicker">Chapter {chapterNumber}</span>
-        {editable ? (
-          <input
-            className="wrPageTitleInput" value={chapter.title} placeholder="Chapter title" data-kf=""
-            onChange={e => w.updateOutlineNode(chapter.id, { title: e.target.value })}
-          />
-        ) : (
-          <span className="wrPageTitle">{nodeLabel(chapter)}</span>
-        )}
-        <span className="wrPageMeta">{formatWords(words(chapter.id))}</span>
-      </div>
-      {children.length === 0 && (
-        <p className="wrPageMuted">
-          {editable ? 'Nothing outlined yet. Add an act to begin.' : 'Nothing outlined yet. Switch to Outline to add acts, scenes and moments.'}
-        </p>
-      )}
-      {children.map(renderNode)}
-      {editable && (
-        <div>
-          <button type="button" className="wrSmallBtn wrSmallBtn--light" onClick={() => w.addOutlineNode(chapter.id, 'act')}><PlusIcon size={13} /> Act</button>
+    <div className="wrPage wrPage--chapter">
+      {editable && sidebar}
+      <div className="wrPageScroll" data-knode={chapter.id} onKeyDown={keys.onKeyDown}>
+        <div className="wrPageHead">
+          {editable ? (
+            <input
+              className="wrPageTitleInput" value={chapter.title} placeholder="Chapter title" data-kf=""
+              onChange={e => w.updateOutlineNode(chapter.id, { title: e.target.value })}
+            />
+          ) : (
+            <span className="wrPageTitle">{nodeLabel(chapter)}</span>
+          )}
+          <div className="wrPageMetaRow">
+            <span className="wrPageKicker">Chapter {chapterNumber}</span>
+            <span>{formatWords(words(chapter.id))}</span>
+            {meta.created && <span title={fullDate(meta.created)}>Created {shortDate(meta.created)}</span>}
+            {meta.edited && <span title={fullDate(meta.edited)}>Edited {shortDate(meta.edited)}</span>}
+            {meta.published && <span title={fullDate(meta.published)}>Published {shortDate(meta.published)}</span>}
+          </div>
         </div>
-      )}
+        {children.length === 0 && (
+          <p className="wrPageMuted">
+            {editable
+              ? 'Nothing outlined yet. Add an act to begin.'
+              : 'Nothing outlined yet. Draft freely below, or switch to Outline to add acts, scenes and moments.'}
+          </p>
+        )}
+        {!editable && children.length === 0 && (
+          <div className="wrFreeArea">
+            <AutoTextarea className="wrDraftText" placeholder="Draft freely, no outline needed…" rows={6} value={freeBody} onChange={typeFree} />
+            <span className="wrWordCount">{formatWords(freeNode ? words(freeNode.id) : 0)}</span>
+          </div>
+        )}
+        {freeCard}
+        {dnd.children(chapter.id, children, renderNode)}
+        {editable && (
+          <div>
+            <button type="button" className="wrSmallBtn wrSmallBtn--light" onClick={() => w.addOutlineNode(chapter.id, 'act')}><PlusIcon size={13} /> Act</button>
+          </div>
+        )}
+      </div>
     </div>
   )
 }

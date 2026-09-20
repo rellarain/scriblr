@@ -14,6 +14,8 @@
   --wr-card: linear-gradient(160deg, var(--surface-raised-a), var(--surface-raised-b));
   --wr-field: rgb(0 0 0 / calc(0.25 * var(--shade-k)));
   --wr-muted: var(--ink-muted);
+  // The book's primary colour (the app theme's own colour outside a book).
+  --wr-book: hsl(var(--color-theme-h), var(--color-theme-s), var(--color-theme-l));
   // The paper (chapter page, preview): follows the palette's paper tokens.
   --wr-page: var(--paper);
   --wr-ink: var(--paper-ink);
@@ -104,9 +106,20 @@
   .wrShelfName--link { text-align: left; &:hover { color: var(--ink); } }
   .wrShelfName { font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 1px; color: var(--wr-muted); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; &--selected { color: var(--ink); } }
   .wrShelfMeta { font-size: 10px; opacity: 0.6; margin-right: auto; white-space: nowrap; }
-  .wrShelfBooks { display: flex; align-items: flex-end; gap: 5px; padding: 0 8px; min-height: 104px; overflow-x: auto; scrollbar-width: none; &::-webkit-scrollbar { display: none; } }
+  // The books stand on a board drawn at the bottom of the row; the row scrolls sideways by touch or the mouse wheel (no scrollbar).
+  .wrShelfBooks {
+    display: flex; align-items: flex-end; gap: 5px; padding: 0 8px 3px; min-height: 104px; box-sizing: content-box;
+    overflow-x: auto; overflow-y: hidden; touch-action: pan-x; overscroll-behavior-x: contain; -webkit-overflow-scrolling: touch;
+    background: linear-gradient(180deg, rgb(0 0 0 / calc(0.5 * var(--shade-k))), rgb(0 0 0 / calc(0.25 * var(--shade-k)))) no-repeat bottom / 100% 8px;
+    border-radius: 0 0 2px 2px;
+    scrollbar-width: none; &::-webkit-scrollbar { display: none; }
+  }
+  // A series: a darkened section with its label above the books it groups.
+  .wrShelfLoose { display: flex; align-items: flex-end; gap: 5px; flex: 0 0 auto; }
+  .wrShelfSeries { display: flex; flex-direction: column; justify-content: flex-end; gap: 4px; flex: 0 0 auto; padding: 4px 6px 0; border-radius: 4px 4px 0 0; background: rgb(0 0 0 / calc(0.28 * var(--shade-k))); }
+  .wrShelfSeriesLabel { max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 9px; font-weight: 700; text-transform: uppercase; letter-spacing: 1px; color: var(--wr-muted); }
+  .wrShelfSeriesBooks { display: flex; align-items: flex-end; gap: 5px; min-width: 16px; min-height: 8px; }
   .wrShelfEmpty { font-size: 11px; opacity: 0.6; align-self: center; }
-  .wrShelfBoard { margin-top: -5px; height: 8px; background: linear-gradient(180deg, rgb(0 0 0 / calc(0.5 * var(--shade-k))), rgb(0 0 0 / calc(0.25 * var(--shade-k)))); border-radius: 0 0 2px 2px; }
   .wrSpine {
     flex: 0 0 auto; width: 30px; border-radius: 0; background: var(--wr-accent-dark); color: white; padding: 8px 2px;
     display: flex; align-items: center; justify-content: center; writing-mode: vertical-rl; font-size: 11px; font-weight: 700; letter-spacing: 0.3px;
@@ -205,22 +218,28 @@
   .wrPlotNav { flex: 0 0 250px; min-height: 0; display: flex; flex-direction: column; gap: 8px; background: rgb(0 0 0 / calc(0.16 * var(--shade-k))); border-radius: 6px; padding: 10px; }
   .wrPlotNavHead { display: flex; align-items: center; justify-content: space-between; font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: 1px; span { opacity: 0.65; } }
   .wrPlotNavRows { flex: 1 1 auto; min-height: 0; overflow-y: auto; display: flex; flex-direction: column; gap: 3px; scrollbar-width: none; &::-webkit-scrollbar { display: none; } }
+  // A row wears its node's colour: a category its own (theme) colour, a subcategory its (accent) colour, a plotline its
+  // category's colour with a left edge in its subcategory's. The box itself is indented per kind (right edges stay aligned),
+  // and the selected row is a brighter shade of its own colour.
   .wrNavRow {
-    display: flex; align-items: center; gap: 6px; padding: 5px 8px 5px 8px; border-radius: 4px; font-size: 12px; background: rgb(0 0 0 / calc(0.14 * var(--shade-k)));
-    &:hover { background: color-mix(in srgb, var(--ink) 10%, transparent); }
-    &--active { background: var(--wr-accent); font-weight: 700; &:hover { background: var(--wr-accent); } }
+    --wr-row-bg: var(--wr-cat, rgb(0 0 0 / calc(0.14 * var(--shade-k)))); --wr-row-ink: var(--ink);
+    display: flex; align-items: center; gap: 6px; padding: 5px 8px; border-radius: 4px; font-size: 12px;
+    background: var(--wr-row-bg); color: var(--wr-row-ink);
+    &:hover, &--active { background: color-mix(in srgb, var(--wr-row-bg) 85%, white); }
+    &--active { font-weight: 700; }
+    &--subcategory { --wr-row-bg: var(--wr-sub, var(--wr-cat)); --wr-row-ink: var(--on-accent); margin-left: 14px; }
+    &--plotline { margin-left: 28px; box-shadow: inset 4px 0 0 var(--wr-sub, transparent); padding-left: 12px; }
   }
   .wrNavChevron { display: inline-flex; flex: 0 0 auto; transition: transform 0.15s; }
-  .wrNavMark { width: 4px; height: 14px; border-radius: 2px; background: var(--wr-node-color, hsl(var(--color-theme-h), 38%, 62%)); flex: 0 0 auto; }
   .wrNavLabel { flex: 1; min-width: 0; text-align: left; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
   .wrNavCount { font-size: 11px; opacity: 0.7; }
   .wrPlotBody { flex: 1 1 auto; min-width: 0; min-height: 0; display: flex; flex-direction: column; gap: 10px; overflow: auto; scrollbar-width: none; &::-webkit-scrollbar { display: none; } }
 
-  // The plot colour coding: the category (theme colour) and subcategory (accent colour) squares,
-  // and a stripe down the left edge of a coloured card in the node's own colour.
-  .wrColorTrail { display: inline-flex; gap: 3px; flex: 0 0 auto; }
-  .wrColorDot { display: inline-block; width: 8px; height: 8px; border-radius: 2px; box-shadow: 0 0 0 1px rgb(255 255 255 / 0.25); }
-  .wrCardPanel.wrCardPanel--colored { box-shadow: inset 4px 0 0 var(--wr-node-color, transparent), 0 4px 14px rgb(0 0 0 / calc(0.3 * var(--shade-k))); }
+  // The plot colour coding on the editor cards: a category card is its (theme) colour, a subcategory card its (accent)
+  // colour, a plotline card its category's colour with a left edge in its subcategory's.
+  .wrCardPanel.wrCardPanel--category, .wrCardPanel.wrCardPanel--plotline { background: var(--wr-cat, var(--wr-card)); }
+  .wrCardPanel.wrCardPanel--plotline { box-shadow: inset 4px 0 0 var(--wr-sub, transparent), 0 4px 14px rgb(0 0 0 / calc(0.3 * var(--shade-k))); }
+  .wrCardPanel.wrCardPanel--subcategory { background: var(--wr-sub, var(--wr-cat, var(--wr-card))); color: var(--on-accent); .wrTitleField, .wrField { color: var(--on-accent); } }
   .wrCardPanel { background: var(--wr-card); border-radius: 8px; padding: 16px 18px; box-shadow: 0 4px 14px rgb(0 0 0 / calc(0.3 * var(--shade-k))); display: flex; flex-direction: column; gap: 12px; }
   .wrCardPanelHead { display: flex; align-items: center; gap: 10px; }
   .wrKindBadge { font-size: 10px; text-transform: uppercase; letter-spacing: 0.5px; opacity: 0.7; flex: 0 0 auto; }
@@ -230,7 +249,25 @@
   .wrChildRow { display: flex; align-items: center; gap: 12px; width: 100%; text-align: left; padding: 10px 12px; border-radius: 4px; background: rgb(0 0 0 / calc(0.22 * var(--shade-k))); &:hover { background: color-mix(in srgb, var(--ink) 10%, transparent); } }
   .wrChildRowTitle { font-size: 13px; font-weight: 700; flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
   .wrChildRowMeta { display: flex; gap: 5px; }
-  .wrProjectOutline { display: flex; flex-direction: column; gap: 14px; max-width: 720px; }
+  .wrProjectOutline { display: flex; flex-direction: column; gap: 10px; max-width: 720px; }
+  .wrProjHead { display: flex; align-items: center; justify-content: space-between; .wrLabel { margin-bottom: 0; } }
+  .wrProjHeadActions { display: flex; gap: 6px; }
+  .wrProjStack { display: flex; flex-direction: column; }
+  .wrProjSeries { background: rgb(0 0 0 / calc(0.22 * var(--shade-k))); border-radius: 8px; padding: 12px 14px; display: flex; flex-direction: column; gap: 10px; }
+  .wrProjBook { background: var(--wr-card); border-radius: 6px; padding: 10px 12px; display: flex; flex-direction: column; gap: 6px; min-width: 0; box-shadow: inset 4px 0 0 var(--wr-node-color, transparent), 0 2px 8px rgb(0 0 0 / calc(0.25 * var(--shade-k))); }
+  // Two rows: the number over the title; the grip, title input and action buttons share the second row.
+  .wrProjTop {
+    display: grid; grid-template-columns: auto minmax(0, 1fr) auto; grid-template-rows: auto auto; column-gap: 10px; row-gap: 3px; align-items: start;
+    > .wrGrip { grid-column: 1; grid-row: 2; align-self: center; }
+    > .wrProjActions { grid-column: 3; grid-row: 2; align-self: center; }
+  }
+  .wrProjTitle { grid-column: 2; grid-row: 1 / span 2; display: flex; flex-direction: column; gap: 3px; min-width: 0; }
+  .wrProjNumber { font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: 1px; opacity: 0.65; }
+  .wrProjInput { box-sizing: border-box; width: 100%; background: var(--wr-field); border: 0; outline: none; color: var(--ink); font-size: 13px; font-weight: 700; letter-spacing: 1.5px; padding: 6px 10px; border-radius: 4px; &::placeholder { font-weight: 400; letter-spacing: 0; opacity: 0.6; } &:focus { box-shadow: inset 0 0 0 1px var(--wr-accent); } }
+  .wrProjSummary { box-sizing: border-box; width: 100%; background: var(--wr-field); border: 0; outline: none; color: var(--ink); font-size: 12px; padding: 6px 10px; border-radius: 4px; resize: none; &:focus { box-shadow: inset 0 0 0 1px var(--wr-accent); } }
+  .wrProjActions { display: inline-flex; align-items: center; gap: 4px; }
+  .wrProjStats { display: flex; gap: 10px; font-size: 11px; opacity: 0.7; padding-left: 24px; span + span::before { content: '\00b7'; margin-right: 10px; } }
+  .wrProjFoot { display: flex; }
 
   .wrPlotlineLayout { flex: 1 1 auto; min-height: 0; display: flex; gap: 16px; }
   .wrPlotlineLeft { flex: 0 0 350px; min-height: 0; display: flex; flex-direction: column; gap: 14px; }
@@ -238,7 +275,7 @@
   .wrFieldRow { display: flex; align-items: center; gap: 10px; > span { width: 88px; flex: 0 0 auto; font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: 1px; opacity: 0.65; } .wrField { padding: 6px 10px; font-size: 12px; } }
   .wrUnassigned { flex: 1 1 auto; min-height: 0; display: flex; flex-direction: column; gap: 8px; background: rgb(0 0 0 / calc(0.16 * var(--shade-k))); border-radius: 8px; padding: 12px 14px; &--over { outline: 2px dashed var(--wr-accent-light); outline-offset: 3px; } }
   .wrPointList { flex: 1 1 auto; min-height: 0; overflow-y: auto; display: flex; flex-direction: column; gap: 6px; scrollbar-width: none; &::-webkit-scrollbar { display: none; } }
-  .wrPoint { display: flex; align-items: flex-start; gap: 8px; padding: 8px 10px; border-radius: 4px; background: rgb(0 0 0 / calc(0.25 * var(--shade-k))); border-left: 3px solid var(--wr-node-color, var(--wr-alert)); &--dragging { opacity: 0.35; } }
+  .wrPoint { display: flex; align-items: flex-start; gap: 8px; padding: 8px 10px; border-radius: 4px; background: var(--wr-cat, rgb(0 0 0 / calc(0.25 * var(--shade-k)))); border: 1px solid rgb(255 255 255 / 0.14); box-shadow: inset 4px 0 0 var(--wr-sub, transparent), 0 2px 6px rgb(0 0 0 / calc(0.3 * var(--shade-k))); &--dragging { opacity: 0.35; } }
   .wrPointSection { display: flex; align-items: baseline; gap: 8px; margin-top: 4px; font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: 1px; opacity: 0.6; span { font-weight: 400; } &:first-child { margin-top: 0; } }
   .wrPointTarget { display: flex; align-items: center; gap: 6px; font-size: 10px; min-height: 16px; }
   .wrPointChapter { flex: 1 1 auto; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 10px; font-weight: 700; letter-spacing: 0.3px; opacity: 0.75; text-align: left; }
@@ -263,7 +300,9 @@
     &:hover { filter: brightness(1.15); }
     &--add { height: 34px; background: rgb(0 0 0 / calc(0.25 * var(--shade-k))); box-shadow: none; margin-top: 3px; }
   }
-  .wrChapterTabs--page .wrChapterTab--active { width: 38px; margin-left: 0; background: var(--wr-page); color: var(--wr-ink); box-shadow: none; }
+  .wrChapterTabs--page .wrChapterTab { background: var(--wr-book); color: var(--ink); box-shadow: 1px 1px 3px rgb(0 0 0 / calc(0.3 * var(--shade-k))), inset 0 0 0 1px var(--ov-lift-2); }
+  .wrChapterTabs--page .wrChapterTab--active { width: 38px; margin-left: 0; background: var(--wr-accent); color: var(--on-accent); }
+  .wrChapterTabs--page .wrChapterTab--add { background: rgb(0 0 0 / calc(0.25 * var(--shade-k))); color: var(--ink); box-shadow: none; }
   .wrChapterTabs--cover { padding-top: 40px; .wrChapterTab { background: color-mix(in srgb, var(--wr-cover) 62%, white); } .wrChapterTab--add { background: rgba(0, 0, 0, 0.25); } .wrChapterTab--active { width: 38px; margin-left: 0; background: var(--wr-accent); } }
   .wrCoverWrap--light .wrChapterTabs--cover .wrChapterTab:not(.wrChapterTab--active):not(.wrChapterTab--add) { color: var(--wr-cover-label); }
 
@@ -349,18 +388,17 @@
   // ---------------------------------------------------------------- pages
   .wrPageWrap { flex: 1 1 auto; min-height: 0; display: flex; > .wrPage { flex: 1 1 auto; } }
   // The chapter's plotpoints (assigned to the chapter, not yet to an act, scene or moment), at the left of the Outline page.
-  .wrChapterPoints { flex: 0 0 270px; min-width: 0; display: flex; flex-direction: column; gap: 8px; padding: 0 12px 0 0; box-sizing: border-box; }
+  .wrChapterPoints { flex: 0 0 250px; min-width: 0; min-height: 0; display: flex; flex-direction: column; gap: 8px; padding: 26px 12px 16px 16px; border-right: 1px solid var(--wr-page-line); box-sizing: border-box; }
   .wrChapterPointsHead { display: flex; align-items: baseline; justify-content: space-between; font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: 1px; opacity: 0.75; }
   .wrChapterPointsList { flex: 1 1 auto; min-height: 0; overflow-y: auto; display: flex; flex-direction: column; gap: 8px; scrollbar-width: none; &::-webkit-scrollbar { display: none; } }
   // A plotpoint tile: dark, so it stands out from the (light) card it sits in.
   .wrPointTile {
-    display: flex; flex-direction: column; gap: 3px; padding: 5px; border-radius: 6px; background: var(--wr-card); color: var(--ink);
-    box-shadow: inset 3px 0 0 var(--wr-node-color, transparent), 0 2px 6px rgb(0 0 0 / calc(0.25 * var(--shade-k))); text-align: left;
+    display: flex; flex-direction: column; gap: 3px; padding: 5px 5px 5px 9px; border-radius: 6px; background: var(--wr-cat, var(--wr-card)); color: var(--ink);
+    box-shadow: inset 4px 0 0 var(--wr-sub, transparent), 0 2px 6px rgb(0 0 0 / calc(0.25 * var(--shade-k))); text-align: left;
     &--draggable { cursor: grab; }
     &--dragging { opacity: 0.35; }
   }
   .wrPointTileTop { display: flex; align-items: center; justify-content: flex-end; gap: 6px; min-height: 14px; }
-  .wrPointTileTrail .wrColorDot { margin: 0 3px 0 0; vertical-align: -1px; }
   .wrPointTileSep { opacity: 0.6; }
   .wrPointTileTrail { flex: 1 1 auto; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; text-align: right; font-size: 9px; letter-spacing: 0.3px; color: var(--ink-faint); }
   .wrPointTileX { display: inline-flex; align-items: center; justify-content: center; width: 16px; height: 16px; flex: 0 0 auto; border-radius: 3px; opacity: 0.55; &:hover { opacity: 1; background: var(--ov-lift-2); } }
@@ -374,11 +412,20 @@
     min-width: 0; min-height: 0; background: var(--wr-page); border-radius: 4px 0 0 4px; box-shadow: 0 4px 16px rgb(0 0 0 / calc(0.35 * var(--shade-k))); color: var(--wr-ink);
     padding: 26px 34px; display: flex; flex-direction: column; gap: 14px; overflow-y: auto; box-sizing: border-box;
   }
-  .wrPageHead { display: flex; align-items: baseline; gap: 12px; border-bottom: 2px solid var(--wr-page-line); padding-bottom: 10px; flex: 0 0 auto; }
+  // The chapter page (Outline and Draft): a very light tint of the book's theme colour, with
+  // the plotpoint column pinned at its left and the outline scrolling beside it.
+  .wrPage--chapter {
+    --wr-page: hsl(var(--color-theme-h), var(--color-theme-s), calc(var(--paper-l) - 6%));
+    --wr-page-line: hsl(var(--color-theme-h), var(--color-theme-s), calc(var(--paper-l) - 18%));
+    --paper-field: hsl(var(--color-theme-h), var(--color-theme-s), calc(var(--paper-l) + 3%));
+    flex-direction: row; padding: 0; gap: 0; overflow: hidden;
+  }
+  .wrPageScroll { flex: 1 1 auto; min-width: 0; min-height: 0; overflow-y: auto; padding: 26px 34px; box-sizing: border-box; display: flex; flex-direction: column; gap: 14px; }
+  .wrPageHead { display: flex; flex-direction: column; gap: 6px; border-bottom: 2px solid var(--wr-page-line); padding-bottom: 10px; flex: 0 0 auto; }
+  .wrPageMetaRow { display: flex; flex-wrap: wrap; align-items: baseline; font-size: 11px; color: var(--wr-page-muted); > * + *::before { content: '\00b7'; margin: 0 8px; } }
   .wrPageKicker { font-size: 12px; font-weight: 700; text-transform: uppercase; letter-spacing: 1.5px; color: var(--wr-page-muted); }
   .wrPageTitle { font-family: Georgia, 'Times New Roman', serif; font-size: 24px; font-weight: 700; }
   .wrPageTitleInput { flex: 1; min-width: 0; background: transparent; border: 0; outline: none; font-family: Georgia, 'Times New Roman', serif; font-size: 24px; font-weight: 700; color: var(--wr-ink); padding: 0; &:focus { box-shadow: inset 0 -1px 0 var(--wr-accent); } }
-  .wrPageMeta { margin-left: auto; font-size: 11px; color: var(--wr-page-muted); }
   .wrPageMuted { margin: 0; font-size: 13px; color: hsl(var(--color-theme-h), 6%, 55%); }
   .wrPageError { margin: 0; font-size: 12px; color: hsl(var(--color-alert-h), var(--color-alert-s), 40%); }
 
@@ -389,6 +436,16 @@
   .wrDraftText { width: 100%; box-sizing: border-box; border-radius: 4px; border: 1px solid hsl(var(--color-accent-h), 18%, calc(var(--paper-l) - 15%)); background: var(--paper-field); padding: 12px 14px; font-family: Georgia, 'Times New Roman', serif; font-size: 16px; line-height: 1.6; min-height: 70px; color: var(--wr-ink); outline: none; resize: none; overflow: hidden; &:focus { border-color: var(--wr-accent); } &::placeholder { color: hsl(var(--color-theme-h), 6%, 62%); } }
 
   // ---------------------------------------------------------------- chapter outline (page)
+  // Drop gaps between cards (useNodeDnd.tsx): thin spacers at rest, open while a dragged card fits there,
+  // and the hovered one grows to the dragged card's height.
+  .wrChildren { display: flex; flex-direction: column; }
+  .wrDropGap { flex: 0 0 auto; height: 10px; box-sizing: border-box; border-radius: 4px; transition: height 0.15s ease, background-color 0.15s; }
+  .wrChildren > .wrDropGap:first-child, .wrChildren > .wrDropGap:last-child { height: 4px; }
+  .wrChildren > .wrDropGap--empty { height: 0; }
+  .wrDropGap--open { background: color-mix(in srgb, var(--wr-accent) 16%, transparent); }
+  .wrChildren > .wrDropGap--open:first-child, .wrChildren > .wrDropGap--open:last-child { height: 12px; }
+  .wrChildren > .wrDropGap--open.wrDropGap--empty { height: 30px; outline: 1px dashed var(--wr-accent); outline-offset: -1px; }
+  .wrDropGap--over { background: color-mix(in srgb, var(--wr-accent) 30%, transparent); outline: 2px dashed var(--wr-accent); outline-offset: -2px; }
   .wrOutlineCard { transition: outline-color 0.1s; &--dragging { opacity: 0.35; } &--over { outline: 2px dashed var(--wr-accent); outline-offset: 2px; } }
   .wrActCard { background: hsl(var(--color-accent-h), 30%, calc(var(--paper-l) - 3%)); border: 1px solid var(--wr-page-line); border-radius: 6px; padding: 12px; display: flex; flex-direction: column; gap: 10px; flex: 0 0 auto; }
   .wrSceneCard { background: hsl(var(--color-accent-h), 30%, calc(var(--paper-l) - 1%)); border: 1px solid hsl(var(--color-accent-h), 18%, calc(var(--paper-l) - 11%)); border-radius: 6px; padding: 10px 12px; display: flex; flex-direction: column; gap: 8px; }
@@ -437,6 +494,11 @@
 
   // Draft mode: a moment's footer is a word-count bar that opens into the draft text.
   .wrDraftFoot { display: flex; flex-direction: column; }
+  .wrDraftFootHead { display: flex; align-items: center; gap: 4px; }
+  .wrGrip--draft { padding: 2px 1px; }
+  .wrFreeCard--readonly { display: flex; align-items: center; justify-content: space-between; gap: 10px; padding: 8px 10px; border: 1px dashed var(--wr-page-line); border-radius: 6px; }
+  .wrFreeArea { display: flex; flex-direction: column; gap: 6px; }
+  .wrPublishConfirm { display: inline-flex; align-items: center; gap: 6px; font-size: 11px; }
   .wrDraftFootBar { display: flex; align-items: center; gap: 6px; align-self: flex-start; font-size: 11px; color: var(--wr-page-muted); padding: 2px 4px 2px 0; &:hover { color: var(--wr-ink); } }
   .wrDraftFootBody { display: grid; grid-template-rows: 0fr; transition: grid-template-rows 0.35s ease; }
   .wrDraftFoot--open .wrDraftFootBody { grid-template-rows: 1fr; }
@@ -454,6 +516,14 @@
   .wrPreviewIndent { padding-left: 56px; }
   .wrPreviewPara { position: relative; padding-left: 56px; flex: 0 0 auto; }
   .wrPreviewText { margin: 0; font-family: Georgia, 'Times New Roman', serif; font-size: 17px; line-height: 28px; text-align: justify; }
+  // Day / night: the Preview page is white with black text, or dark with light text.
+  .wrPage--day { --wr-page: #fff; --wr-ink: #000; --wr-page-line: #d8d8d8; --wr-page-muted: #555; }
+  .wrPage--night {
+    --wr-page: hsl(var(--color-theme-h), 10%, 11%); --wr-ink: hsl(0 0% 88%); --wr-page-line: hsl(var(--color-theme-h), 8%, 26%); --wr-page-muted: hsl(0 0% 62%);
+    .wrSentence:hover { background: hsl(var(--color-accent-h), 40%, 26%); }
+    .wrSentence--selected { background: hsl(var(--color-accent-h), 45%, 32%); }
+  }
+  .wrPreviewSelect { background: rgb(0 0 0 / calc(0.3 * var(--shade-k))); color: var(--ink); border: 0; border-radius: 4px; padding: 4px 8px; font-size: 11px; font-weight: 700; option { color: black; } }
   .wrSentence { cursor: pointer; border-radius: 2px; &:hover { background: hsl(var(--color-accent-h), 90%, 92%); } &--selected { background: hsl(var(--color-accent-h), 90%, 88%); } &--flagged { border-bottom: 2px solid var(--wr-accent); } }
   .wrReactGutter { position: absolute; left: 0; top: 0; width: 44px; height: 100%; }
   .wrReactBar {

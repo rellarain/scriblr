@@ -3,7 +3,7 @@ import type { PlotNode } from '../../../api/types'
 import type { WriterWorkspace } from './useWriterWorkspace'
 import { CloseIcon } from '../../icons'
 import { nodeLabel } from './plotTree'
-import { nodeColorStyle, plotColors } from './plotColors'
+import { plotColors, plotColorVars } from './plotColors'
 
 // A plotpoint on the chapter page, in the chapter's left column and boxed
 // inside the act / scene / moment it is assigned to:
@@ -29,22 +29,12 @@ export function PlotpointTile({ w, point, onUnassign, drag, dragging }: {
   return (
     <div
       className={`wrPointTile${dragging ? ' wrPointTile--dragging' : ''}${drag ? ' wrPointTile--draggable' : ''}`}
-      data-point={point.id} style={nodeColorStyle(colors.primary)}
+      data-point={point.id} style={plotColorVars(colors)}
       draggable={Boolean(drag)}
       onDragStart={drag?.onDragStart} onDragEnd={drag?.onDragEnd}
     >
       <div className="wrPointTileTop">
-        <span className="wrPointTileTrail" title={trail}>
-          {category && colors.category && <span className="wrColorDot" style={{ backgroundColor: colors.category }} />}
-          {category && nodeLabel(category)}
-          {subcategory && colors.subcategory && (
-            <>
-              <span className="wrPointTileSep"> › </span>
-              <span className="wrColorDot" style={{ backgroundColor: colors.subcategory }} />
-              {nodeLabel(subcategory)}
-            </>
-          )}
-        </span>
+        <span className="wrPointTileTrail" title={trail}>{trail}</span>
         {onUnassign && (
           <button
             type="button" className="wrPointTileX" aria-label={`Unassign ${point.title || 'plotpoint'}`}

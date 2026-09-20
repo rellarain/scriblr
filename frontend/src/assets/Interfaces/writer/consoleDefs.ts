@@ -2,7 +2,7 @@ import type { ComponentType } from 'react'
 import {
   LibraryIcon, BookFaceIcon, PageIcon, GearIcon, HelpIcon, PlotIcon, ExportIcon, CalendarIcon,
   BarChartIcon, CheckboxIcon, PencilIcon, ClockIcon, ListIcon, ArcIcon, ReactionIcon, FlagIcon,
-  SentenceIcon, type IconProps,
+  type IconProps,
 } from '../../icons'
 import type { WuiConsole } from './useWriterWorkspace'
 
@@ -33,7 +33,6 @@ export const SHELF_COMPONENTS: ComponentDef[] = [
   { key: 'projectPlot', label: 'Project Plot', Icon: PlotIcon },
   { key: 'projectEditor', label: 'Project Editor', Icon: PencilIcon, body: 'Edit this project’s time systems here (its summary and description are coming).' },
   { key: 'outlineTemplate', label: 'Outline Template', Icon: CheckboxIcon, body: 'Manage book templates here.' },
-  { key: 'seriesOutline', label: 'Series Outline', Icon: LibraryIcon, body: 'A parent container for this project’s included books.' },
 ]
 
 export const BOOK_COMPONENTS: ComponentDef[] = [
@@ -44,7 +43,6 @@ export const BOOK_COMPONENTS: ComponentDef[] = [
 
 export const PAGE_COMPONENTS: ComponentDef[] = [
   { key: 'chapter', label: 'Chapter', Icon: PageIcon },
-  { key: 'sentence', label: 'Sentence', Icon: SentenceIcon, body: 'Edit this chapter’s draft at the sentence level here.' },
 ]
 
 export const PAGES_COMPONENTS: ComponentDef[] = [

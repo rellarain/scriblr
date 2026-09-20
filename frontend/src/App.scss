@@ -1518,3 +1518,252 @@ div.auiConfigReadOnlyIdea {
 }
 
 .queueEmptyNote { font-size: 12px; opacity: 0.6; font-style: italic; padding: 2px 0; }
+
+// --- Inbox redesign: validation, processing, settings ---
+
+.dividerToggle { position: relative; }
+.dividerBadge {
+  position: absolute;
+  top: -4px;
+  right: -5px;
+  min-width: 15px;
+  height: 15px;
+  padding: 0 3px;
+  box-sizing: border-box;
+  border-radius: 8px;
+  background: hsl(0, 65%, 48%);
+  color: #fff;
+  font-size: 10px;
+  font-weight: 700;
+  line-height: 15px;
+  text-align: center;
+  pointer-events: none;
+}
+
+.inboxWho {
+  flex: 0 0 auto;
+  padding: 8px 16px 0;
+  font-size: 12px;
+  select {
+    background: rgb(0 0 0 / calc(0.3 * var(--shade-k)));
+    color: var(--ink);
+    border: none;
+    border-radius: 3px;
+    padding: 3px 6px;
+    font-size: 12px;
+  }
+}
+.inboxCount {
+  min-width: 18px;
+  padding: 0 5px;
+  border-radius: 9px;
+  background: hsl(0, 65%, 48%);
+  color: #fff;
+  font-size: 11px;
+  line-height: 18px;
+  text-align: center;
+}
+.inboxError {
+  flex: 0 0 auto;
+  margin: 8px 16px 0;
+  padding: 6px 10px;
+  border-radius: 4px;
+  background: rgb(160 30 30 / 0.35);
+  font-size: 12px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.inboxErrorClose { margin-left: auto; color: var(--ink); background: transparent; border: none; opacity: 0.7; &:hover { opacity: 1; } }
+// The Inbox's three sections share a narrow panel: a little tighter than the other sub-tabs.
+.inboxSection .subTabBtn { padding: 5px 7px; font-size: 12px; gap: 6px; }
+
+// Stage | Case, and the filter row of Process.
+.segSwitch {
+  display: flex;
+  gap: 4px;
+  padding: 3px;
+  margin-bottom: 8px;
+  border-radius: 6px;
+  background: rgb(0 0 0 / calc(0.2 * var(--shade-k)));
+  &--wrap { flex-wrap: wrap; }
+}
+.segSwitchBtn {
+  flex: 1 1 0;
+  padding: 5px 8px;
+  border-radius: 4px;
+  color: var(--ink);
+  font-size: 12px;
+  font-weight: 700;
+  white-space: nowrap;
+  background: transparent;
+  border: none;
+  &:hover { background: rgb(255 255 255 / 0.08); }
+  &--on { background: hsl(var(--color-accent-h), var(--color-accent-s), var(--color-accent-l)); color: var(--on-accent); &:hover { background: hsl(var(--color-accent-h), var(--color-accent-s), var(--color-accent-l)); } }
+}
+
+.validateTabs { padding: 0 0 4px; }
+.caseNav { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin: 4px 0 8px; }
+.caseNavLabel { font-size: 12px; opacity: 0.8; }
+.caseStage { margin-top: 10px; padding-top: 8px; border-top: 1px solid rgb(255 255 255 / 0.08); }
+.caseStageTitle { font-size: 11px; text-transform: uppercase; letter-spacing: 1px; opacity: 0.7; margin: 0 0 6px; }
+.caseStageDone { text-transform: none; letter-spacing: normal; color: hsl(140, 45%, 62%); }
+
+// Words that could indicate a verb, and the tone band of a message.
+.kwMark { background: hsl(45 90% 55% / 0.35); color: inherit; border-radius: 2px; padding: 0 1px; }
+.toneBand {
+  display: inline-block;
+  margin-left: 8px;
+  padding: 1px 7px;
+  border-radius: 9px;
+  font-size: 10px;
+  font-weight: 700;
+  color: #fff;
+  background: hsl(0, 0%, 45%);
+  &--mostlyPleasant { background: hsl(140, 45%, 34%); }
+  &--slightlyPleasant { background: hsl(140, 25%, 42%); }
+  &--slightlyUnpleasant { background: hsl(15, 50%, 46%); }
+  &--mostlyUnpleasant { background: hsl(0, 55%, 40%); }
+}
+.quorumChip {
+  display: inline-block;
+  margin-bottom: 6px;
+  padding: 1px 8px;
+  border-radius: 9px;
+  font-size: 11px;
+  background: rgb(0 0 0 / calc(0.3 * var(--shade-k)));
+  &--met { background: rgb(60 140 80 / 0.4); }
+}
+
+.channelAddForm--four, .channelAddForm--three { flex-wrap: wrap; select { flex: 1 1 90px; min-width: 0; } }
+.channelPill {
+  &--verb { background: hsl(var(--color-accent-h), calc(var(--color-accent-s) * 0.6), calc(var(--color-accent-l) - 12%)); color: var(--on-accent); }
+  &--suggest { background: transparent; border: 1px dashed rgb(255 255 255 / 0.4); color: var(--ink); cursor: pointer; &:hover { background: rgb(255 255 255 / 0.1); } }
+}
+button.channelPillRemove { display: inline-flex; align-items: center; color: inherit; background: transparent; padding: 0; }
+.explicateList { display: flex; flex-direction: column; gap: 8px; }
+.explicateChannel { display: flex; flex-direction: column; gap: 4px; align-items: flex-start; select { background: rgb(0 0 0 / calc(0.3 * var(--shade-k))); color: var(--ink); border: none; border-radius: 3px; padding: 4px 6px; font-size: 12px; } }
+
+// The vote buttons: a square check and a square x; each expands into its note field.
+.voteControl { display: flex; gap: 8px; margin: 4px 0; }
+.voteSide { display: flex; gap: 6px; align-items: center; flex: 0 0 auto; min-width: 0; &--open { flex: 1 1 0; } }
+.voteSquare {
+  flex: 0 0 32px;
+  width: 32px;
+  height: 32px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 4px;
+  color: var(--ink);
+  background: rgb(0 0 0 / calc(0.3 * var(--shade-k)));
+  border: 1px solid rgb(255 255 255 / 0.18);
+  &:hover:not(:disabled) { background: rgb(255 255 255 / 0.12); }
+  &:disabled { opacity: 0.4; cursor: not-allowed; }
+  &--approve.voteSquare--on { background: hsl(140, 50%, 36%); border-color: hsl(140, 50%, 46%); color: #fff; }
+  &--deny.voteSquare--on { background: hsl(0, 58%, 44%); border-color: hsl(0, 58%, 54%); color: #fff; }
+}
+.voteNote {
+  width: 0;
+  min-width: 0;
+  opacity: 0;
+  padding: 0;
+  border: 0;
+  height: 32px;
+  box-sizing: border-box;
+  border-radius: 4px;
+  background: rgb(0 0 0 / calc(0.3 * var(--shade-k)));
+  color: var(--ink);
+  font-size: 12px;
+  transition: width 0.18s ease, opacity 0.18s ease, padding 0.18s ease;
+}
+.voteSide--open .voteNote { width: 100%; opacity: 1; padding: 0 8px; }
+.voteLog {
+  list-style: none;
+  margin: 6px 0 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  font-size: 12px;
+  li { display: flex; gap: 6px; align-items: flex-start; }
+}
+.voteLogName { font-weight: 700; flex: 0 0 auto; }
+.voteLogNotes { display: flex; flex-direction: column; opacity: 0.85; }
+.voteMark {
+  flex: 0 0 auto;
+  width: 16px;
+  height: 16px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 3px;
+  color: #fff;
+  &--approve { background: hsl(140, 50%, 36%); }
+  &--deny { background: hsl(0, 58%, 44%); }
+}
+
+// A feedback statement case.
+.caseCard {
+  background: rgb(0 0 0 / calc(0.2 * var(--shade-k)));
+  border-radius: 6px;
+  border-left: 3px solid hsl(var(--color-accent-h), var(--color-accent-s), var(--color-accent-l));
+  &--approved { border-left-color: hsl(140, 45%, 42%); }
+  &--rejected { border-left-color: hsl(0, 50%, 45%); }
+}
+.caseHead {
+  width: 100%;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px 8px;
+  padding: 8px 10px;
+  text-align: left;
+  color: var(--ink);
+  background: transparent;
+}
+.caseHeadMain { display: flex; flex-direction: column; flex: 1 1 120px; min-width: 0; }
+.caseVerb { font-size: 14px; font-weight: 700; }
+.caseChannel { font-size: 11px; opacity: 0.7; }
+.caseTally { flex: 1 0 100%; font-size: 11px; opacity: 0.75; padding-left: 22px; }
+.statusChip {
+  padding: 1px 8px;
+  border-radius: 9px;
+  font-size: 10px;
+  font-weight: 700;
+  text-transform: uppercase;
+  background: rgb(0 0 0 / calc(0.35 * var(--shade-k)));
+  &--open { background: hsl(var(--color-accent-h), var(--color-accent-s), var(--color-accent-l)); color: var(--on-accent); }
+  &--approved { background: hsl(140, 45%, 34%); color: #fff; }
+  &--rejected { background: hsl(0, 55%, 40%); color: #fff; }
+}
+.needsDot { width: 9px; height: 9px; border-radius: 50%; background: hsl(0, 65%, 52%); flex: 0 0 auto; }
+.caseBody { padding: 4px 10px 10px; display: flex; flex-direction: column; gap: 10px; }
+.caseMessage { padding: 6px 8px; border-radius: 4px; background: rgb(255 255 255 / 0.05); margin-bottom: 4px; .feedbackCardText { margin-bottom: 2px; } .feedbackCardMeta { margin-bottom: 0; } }
+.solutionCard { padding: 8px; border-radius: 4px; background: rgb(255 255 255 / 0.06); margin-bottom: 8px; display: flex; flex-direction: column; gap: 4px; }
+.solutionHead { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; justify-content: space-between; }
+.solutionTitle { font-size: 13px; font-weight: 700; }
+.solutionText { margin: 0; font-size: 12px; opacity: 0.85; }
+.proposeForm {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  input, textarea, select {
+    background: rgb(0 0 0 / calc(0.3 * var(--shade-k)));
+    color: var(--ink);
+    border: none;
+    border-radius: 3px;
+    padding: 5px 8px;
+    font-size: 12px;
+    font-family: inherit;
+    resize: vertical;
+  }
+}
+.caseHistory { font-size: 12px; summary { cursor: pointer; opacity: 0.75; } ul { margin: 6px 0 0; padding-left: 16px; display: flex; flex-direction: column; gap: 3px; } }
+
+// Settings.
+.settingsView { display: flex; flex-direction: column; gap: 4px; }
+.verbRow { background: rgb(0 0 0 / calc(0.2 * var(--shade-k))); border-radius: 6px; padding: 8px 10px; margin-bottom: 6px; display: flex; flex-direction: column; gap: 6px; }
+.verbRowHead { display: flex; gap: 6px; align-items: center; }
+.verbConfirm { display: inline-flex; align-items: center; gap: 4px; font-size: 12px; }
+.statementField--keyword { flex: 0 1 130px; }

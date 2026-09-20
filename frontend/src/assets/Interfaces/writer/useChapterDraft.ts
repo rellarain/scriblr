@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react'
 import { getChapterDraft, putMomentDraft } from '../../../api/draftFetch'
 import { useAutosave } from '../../../lib/useAutosave'
+import { latestOf } from './chapterDates'
 
 // What one save sends: the moments whose text changed since they were last
 // saved (with the ids they belong to, so a save that runs after switching
@@ -15,6 +16,8 @@ export function useChapterDraft(projectId: string | null, chapterId: string | nu
   const [status, setStatus] = useState<'idle' | 'loading' | 'error'>('idle')
   const [loadError, setLoadError] = useState<string | undefined>(undefined)
   const [reloads, setReloads] = useState(0)
+  // When the newest saved moment was last written (as loaded from the server).
+  const [loadedAt, setLoadedAt] = useState<string | null>(null)
   const latest = useRef<Record<string, string>>({})
   // Text changed since the last successful save.
   const unsaved = useRef<Record<string, string>>({})
@@ -35,6 +38,7 @@ export function useChapterDraft(projectId: string | null, chapterId: string | nu
     let cancelled = false
     unsaved.current = {}
     setBodies({})
+    setLoadedAt(null)
     latest.current = {}
     if (!projectId || !chapterId) { setStatus('idle'); return }
     setStatus('loading')
@@ -45,6 +49,7 @@ export function useChapterDraft(projectId: string | null, chapterId: string | nu
         const next = Object.fromEntries(Object.entries(draft.moments).map(([id, m]) => [id, m.body]))
         latest.current = next
         setBodies(next)
+        setLoadedAt(latestOf(Object.values(draft.moments).map(m => m.updatedAt)))
         setStatus('idle')
       })
       .catch(err => {
@@ -82,6 +87,8 @@ export function useChapterDraft(projectId: string | null, chapterId: string | nu
     dirty: autosave.dirty,
     saveError: autosave.error,
     lastSavedAt: autosave.lastSavedAt,
+    // The newest draft save in the chapter (ISO), including saves made in this session.
+    editedAt: latestOf([loadedAt, autosave.lastSavedAt === null ? null : new Date(autosave.lastSavedAt).toISOString()]),
     flush: autosave.flush,
     saveNow: autosave.flush,
   }

@@ -1,7 +1,7 @@
-import { useEffect, useState, type ReactNode } from 'react'
+import { useEffect, useRef, useState, type ReactNode } from 'react'
 import type { OutlineNode } from '../../../api/types'
 import type { WriterWorkspace } from './useWriterWorkspace'
-import { booksOf, buildChildIndex, chaptersOfBook, descendantsOf } from './outlineTree'
+import { buildChildIndex, chaptersOfBook, descendantsOf, shelfGroups, type ShelfGroup } from './outlineTree'
 import { ChevronDownIcon, ChevronLeftIcon, ChevronRightIcon, PlusIcon } from '../../icons'
 import { DeleteControl } from './shared'
 import { nodeLabel } from './plotTree'
@@ -42,10 +42,12 @@ function Spine({ book, active, onOpen }: { book: OutlineNode; active: boolean; o
   )
 }
 
-function Shelf({ label, meta, books, activeBookId, selected, onOpenBook, onOpen, right }: {
+// A project's spines, grouped: each series is a darkened section with its label above
+// the books in it; books outside any series stand on the plain shelf.
+function Shelf({ label, meta, groups, activeBookId, selected, onOpenBook, onOpen, right }: {
   label: string
   meta: string
-  books: OutlineNode[]
+  groups: ShelfGroup[]
   activeBookId: string | null
   selected?: boolean
   onOpenBook: (bookId: string) => void
@@ -53,6 +55,23 @@ function Shelf({ label, meta, books, activeBookId, selected, onOpenBook, onOpen,
   onOpen?: () => void
   right?: ReactNode
 }) {
+  // The wheel scrolls the row sideways (a mouse wheel only turns vertically). React's onWheel
+  // is passive, so this listener is added by hand to be allowed to stop the page scrolling.
+  const booksRef = useRef<HTMLDivElement>(null)
+  useEffect(() => {
+    const el = booksRef.current
+    if (!el) return
+    const onWheel = (e: WheelEvent) => {
+      if (el.scrollWidth <= el.clientWidth || Math.abs(e.deltaX) > Math.abs(e.deltaY)) return
+      const max = el.scrollWidth - el.clientWidth
+      const next = Math.min(max, Math.max(0, el.scrollLeft + e.deltaY))
+      if (Math.abs(next - el.scrollLeft) < 1) return // at an end: let the sidebar scroll
+      e.preventDefault()
+      el.scrollLeft = next
+    }
+    el.addEventListener('wheel', onWheel, { passive: false })
+    return () => el.removeEventListener('wheel', onWheel)
+  }, [])
   return (
     <div className="wrShelf">
       <div className="wrShelfHeader">
@@ -62,13 +81,21 @@ function Shelf({ label, meta, books, activeBookId, selected, onOpenBook, onOpen,
         <span className="wrShelfMeta">{meta}</span>
         {right}
       </div>
-      <div className={activeBookId ? 'wrShelfBooks wrShelfBooks--picked' : 'wrShelfBooks'}>
-        {books.length === 0 && <span className="wrShelfEmpty">No books yet</span>}
-        {books.map(b => (
-          <Spine key={b.id} book={b} active={b.id === activeBookId} onOpen={() => onOpenBook(b.id)} />
-        ))}
+      <div ref={booksRef} className={activeBookId ? 'wrShelfBooks wrShelfBooks--picked' : 'wrShelfBooks'}>
+        {groups.every(g => g.books.length === 0 && g.series === null) && <span className="wrShelfEmpty">No books yet</span>}
+        {groups.map((g, i) => {
+          const spines = g.books.map(b => (
+            <Spine key={b.id} book={b} active={b.id === activeBookId} onOpen={() => onOpenBook(b.id)} />
+          ))
+          if (!g.series) return <div key={`loose-${i}`} className="wrShelfLoose">{spines}</div>
+          return (
+            <div key={g.series.id} className="wrShelfSeries" role="group" aria-label={`Series: ${nodeLabel(g.series)}`}>
+              <span className="wrShelfSeriesLabel" title={nodeLabel(g.series)}>{g.series.title.trim() || 'Untitled series'}</span>
+              <div className="wrShelfSeriesBooks">{spines}</div>
+            </div>
+          )
+        })}
       </div>
-      <div className="wrShelfBoard" />
     </div>
   )
 }
@@ -127,13 +154,14 @@ function WuiSidebar({ workspace: w }: { workspace: WriterWorkspace }) {
           </p>
         )}
         {w.projects.map(p => {
-          const books = booksOf(w.projectOutlines[p.projectId] ?? [])
+          const groups = shelfGroups(w.projectOutlines[p.projectId] ?? [])
+          const bookCount = groups.reduce((n, g) => n + g.books.length, 0)
           return (
             <Shelf
               key={p.projectId}
               label={p.title}
-              meta={`${books.length} ${books.length === 1 ? 'book' : 'books'}`}
-              books={books}
+              meta={`${bookCount} ${bookCount === 1 ? 'book' : 'books'}`}
+              groups={groups}
               activeBookId={null}
               onOpenBook={bookId => void w.openProject(p.projectId, bookId)}
               onOpen={() => void w.openProject(p.projectId)}
@@ -158,6 +186,7 @@ function WuiSidebar({ workspace: w }: { workspace: WriterWorkspace }) {
 
   const project = w.activeProject!
   const index = buildChildIndex(w.outlineNodes)
+  const groups = shelfGroups(w.outlineNodes)
   const chapterCount = w.books.reduce((n, b) => n + chaptersOfBook(w.outlineNodes, b.id).length, 0)
   const deepest: PanelKey = w.activeChapter ? 'chapter' : w.activeBook ? 'book' : 'project'
   const isOpen = (key: PanelKey) => (manualOpen ? manualOpen === key : deepest === key)
@@ -165,7 +194,8 @@ function WuiSidebar({ workspace: w }: { workspace: WriterWorkspace }) {
 
   const bookChapters = w.activeBook ? w.activeBookChapters : []
   const chapterNumber = w.activeChapter ? bookChapters.findIndex(c => c.id === w.activeChapter!.id) + 1 : 0
-  const chapterTree = w.activeChapter ? descendantsOf(index, w.activeChapter.id) : []
+  // The free draft is not part of the outline.
+  const chapterTree = w.activeChapter ? descendantsOf(index, w.activeChapter.id).filter(n => !n.freeDraft) : []
   const moments = chapterTree.filter(n => n.kind === 'moment').length
   let actNo = 0
   let sceneNo = 0
@@ -180,7 +210,7 @@ function WuiSidebar({ workspace: w }: { workspace: WriterWorkspace }) {
       <Shelf
         label={project.title}
         meta={`${w.books.length} ${w.books.length === 1 ? 'book' : 'books'}`}
-        books={w.books}
+        groups={groups}
         activeBookId={w.activeBookId}
         selected
         onOpenBook={w.openBook}
@@ -196,11 +226,20 @@ function WuiSidebar({ workspace: w }: { workspace: WriterWorkspace }) {
         {kv('Plot categories', w.plotNodes.filter(n => n.kind === 'category').length)}
         <div className="wrPanelHead">Outline</div>
         {w.books.length === 0 && <div className="wrMuted">No books yet.</div>}
-        {w.books.map(b => (
-          <button key={b.id} type="button" className="wrOutlineRow" onClick={() => w.openBook(b.id)}>
-            <span>{nodeLabel(b)}</span>
-            <span className="wrOutlineMeta">{chaptersOfBook(w.outlineNodes, b.id).length} chapters</span>
-          </button>
+        {groups.map((g, i) => (
+          <div key={g.series?.id ?? `loose-${i}`}>
+            {g.series && (
+              <div className="wrOutlineRow wrOutlineRow--static">
+                <span>{g.series.title.trim() || 'Untitled series'}</span><span className="wrOutlineMeta">series</span>
+              </div>
+            )}
+            {g.books.map(b => (
+              <button key={b.id} type="button" className="wrOutlineRow" style={{ paddingLeft: g.series ? 18 : 6 }} onClick={() => w.openBook(b.id)}>
+                <span>{nodeLabel(b)}</span>
+                <span className="wrOutlineMeta">{chaptersOfBook(w.outlineNodes, b.id).length} chapters</span>
+              </button>
+            ))}
+          </div>
         ))}
       </Panel>
 

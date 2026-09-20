@@ -213,6 +213,12 @@ export function VotingIcon(props: IconProps) {
   </IconBase>
 }
 
+export function CheckIcon(props: IconProps) {
+  return <IconBase {...props}>
+    <path d="M5 12.5l4.5 4.5L19 7" />
+  </IconBase>
+}
+
 export function CheckboxIcon(props: IconProps) {
   return <IconBase {...props}>
     <rect x="4" y="4" width="16" height="16" rx="3" />

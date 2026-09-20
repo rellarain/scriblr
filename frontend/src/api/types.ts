@@ -41,6 +41,10 @@ export interface OutlineNode {
   location?: string
   timeValue?: Record<string, number>
   action?: string
+  // When the node was created (absent on nodes made before this existed).
+  createdAt?: string | null
+  // The moment placed directly under a chapter for free drafting (no acts or scenes).
+  freeDraft?: boolean
 }
 
 export interface OutlineTree {
@@ -78,6 +82,17 @@ export interface PlotNode {
 export interface PlotTree {
   schemaVersion: number
   nodes: PlotNode[]
+}
+
+// One publication of a chapter: a frozen copy of its draft, in outline order.
+export interface PublicationSection { momentId: string; body: string }
+export interface Publication {
+  id: string
+  chapterId: string
+  publishedAt: string
+  wordCount: number
+  title: string
+  sections: PublicationSection[]
 }
 
 export interface ProjectPriority { id: string; label: string; order: number }

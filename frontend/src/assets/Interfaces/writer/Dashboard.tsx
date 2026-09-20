@@ -78,7 +78,7 @@ export function AnalyticsPanel({ projects, outlines }: {
     const nodes = outlines[p.projectId] ?? []
     const books = booksOf(nodes)
     const chapters = books.reduce((n, b) => n + chaptersOfBook(nodes, b.id).length, 0)
-    return { id: p.projectId, title: p.title, books: books.length, chapters, moments: nodes.filter(n => n.kind === 'moment').length }
+    return { id: p.projectId, title: p.title, books: books.length, chapters, moments: nodes.filter(n => n.kind === 'moment' && !n.freeDraft).length }
   })
   const maxChapters = Math.max(1, ...rows.map(r => r.chapters))
   const totals = rows.reduce(

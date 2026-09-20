@@ -46,6 +46,41 @@ export function booksOf(nodes: OutlineNode[]): OutlineNode[] {
   return out
 }
 
+// The project's books as the shelf shows them: a group per series (with the books in it, in
+// order) and runs of loose books (no series) between them, in outline order.
+export interface ShelfGroup { series: OutlineNode | null; books: OutlineNode[] }
+
+export function shelfGroups(nodes: OutlineNode[]): ShelfGroup[] {
+  const index = buildChildIndex(nodes)
+  const groups: ShelfGroup[] = []
+  for (const item of index.get(null) ?? []) {
+    if (item.kind === 'series') {
+      groups.push({ series: item, books: descendantsOf(index, item.id).filter(n => n.kind === 'book') })
+    } else if (item.kind === 'book') {
+      const last = groups[groups.length - 1]
+      if (last && last.series === null) last.books.push(item)
+      else groups.push({ series: null, books: [item] })
+    }
+  }
+  return groups
+}
+
+// Delete a series but keep its books: they take the series' place, in order, among its siblings.
+export function dissolveSeries(nodes: OutlineNode[], seriesId: string): OutlineNode[] {
+  const series = nodes.find(n => n.id === seriesId)
+  if (!series || series.kind !== 'series') return nodes
+  const index = buildChildIndex(nodes)
+  const parentId = series.parentId
+  const merged = (index.get(parentId) ?? []).flatMap(s => (s.id === seriesId ? index.get(seriesId) ?? [] : [s]))
+  const orderById = new Map(merged.map((n, i) => [n.id, i]))
+  return nodes
+    .filter(n => n.id !== seriesId)
+    .map(n => {
+      const moved = n.parentId === seriesId ? { ...n, parentId } : n
+      return orderById.has(n.id) ? { ...moved, order: orderById.get(n.id)! } : moved
+    })
+}
+
 export function chaptersOfBook(nodes: OutlineNode[], bookId: string): OutlineNode[] {
   return descendantsOf(buildChildIndex(nodes), bookId).filter(n => n.kind === 'chapter')
 }
@@ -106,34 +141,50 @@ export function canNest(parentKind: OutlineNodeKind, childKind: OutlineNodeKind)
   return OUTLINE_KIND_ORDER.indexOf(parentKind) < OUTLINE_KIND_ORDER.indexOf(childKind)
 }
 
-// Drag-and-drop reparenting. 'inside' appends to the target's children;
-// 'before' inserts as a sibling immediately before the target. Returns null
-// when the move is not allowed (nesting rule, or into its own subtree).
-export function moveNode(
-  nodes: OutlineNode[], nodeId: string, targetId: string, mode: 'inside' | 'before',
+// Drag-and-drop: place `nodeId` under `parentId`, immediately before the child
+// `beforeId` (or last when it is null). Returns null when the move is not allowed
+// (nesting rule, into its own subtree, or `beforeId` is not a child of `parentId`).
+export function moveNodeTo(
+  nodes: OutlineNode[], nodeId: string, parentId: string | null, beforeId: string | null,
 ): OutlineNode[] | null {
-  if (nodeId === targetId) return null
   const node = nodes.find(n => n.id === nodeId)
-  const target = nodes.find(n => n.id === targetId)
-  if (!node || !target) return null
+  if (!node || nodeId === parentId || nodeId === beforeId) return null
+  if (parentId === null) {
+    // The project's top level holds series and books only.
+    if (node.kind !== 'series' && node.kind !== 'book') return null
+  } else {
+    const parent = nodes.find(n => n.id === parentId)
+    if (!parent || !canNest(parent.kind, node.kind)) return null
+  }
 
   const index = buildChildIndex(nodes)
-  if (descendantsOf(index, nodeId).some(d => d.id === targetId)) return null
+  if (parentId !== null && descendantsOf(index, nodeId).some(d => d.id === parentId)) return null
 
-  const newParentId = mode === 'inside' ? target.id : target.parentId
-  const newParent = newParentId ? nodes.find(n => n.id === newParentId) : undefined
-  if (!newParent || !canNest(newParent.kind, node.kind)) return null
-
-  const siblings = (index.get(newParentId) ?? []).filter(n => n.id !== nodeId)
-  const at = mode === 'inside' ? siblings.length : siblings.findIndex(n => n.id === targetId)
+  const siblings = (index.get(parentId) ?? []).filter(n => n.id !== nodeId)
+  let at = siblings.length
+  if (beforeId !== null) {
+    at = siblings.findIndex(n => n.id === beforeId)
+    if (at < 0) return null
+  }
   siblings.splice(at, 0, node)
   const orderById = new Map(siblings.map((n, i) => [n.id, i]))
 
   return nodes.map(n => {
-    if (n.id === nodeId) return { ...n, parentId: newParentId, order: orderById.get(n.id)! }
-    if (n.parentId === newParentId && orderById.has(n.id)) return { ...n, order: orderById.get(n.id)! }
+    if (n.id === nodeId) return { ...n, parentId, order: orderById.get(n.id)! }
+    if (n.parentId === parentId && orderById.has(n.id)) return { ...n, order: orderById.get(n.id)! }
     return n
   })
+}
+
+// Same, relative to a target: 'inside' appends to the target's children; 'before'
+// inserts as a sibling immediately before the target.
+export function moveNode(
+  nodes: OutlineNode[], nodeId: string, targetId: string, mode: 'inside' | 'before',
+): OutlineNode[] | null {
+  const target = nodes.find(n => n.id === targetId)
+  if (!target) return null
+  if (mode === 'inside') return moveNodeTo(nodes, nodeId, target.id, null)
+  return target.parentId ? moveNodeTo(nodes, nodeId, target.parentId, target.id) : null
 }
 
 // Word counts for a chapter's whole subtree, keyed by node id: a moment is

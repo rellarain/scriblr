@@ -194,6 +194,12 @@ class OutlineNode(BaseModel):
     location: str = ""
     timeValue: dict[str, int] = Field(default_factory=dict)
     action: str = ""
+    # When the node was created (None on nodes made before this existed: the UI
+    # falls back to the project's own creation date).
+    createdAt: Optional[datetime] = None
+    # Set only on the one "moment" placed directly under a chapter for free
+    # drafting (writing without acts or scenes). Never numbered; sorts first.
+    freeDraft: bool = False
 
     @model_validator(mode="after")
     def _theme_hue_from_legacy_color(self) -> "OutlineNode":
@@ -337,6 +343,22 @@ class RevisionSnapshot(BaseModel):
     moments: dict[str, str] = Field(default_factory=dict)  # momentId -> body, at snapshot time
     wordCount: int = 0
     notes: list[RevisionComment] = Field(default_factory=list)
+
+
+class PublicationSection(BaseModel):
+    momentId: str
+    body: str = ""
+
+
+# One publication of a chapter: a frozen copy of its draft in outline order.
+# Only the newest few are kept per chapter (see project_store.MAX_PUBLICATIONS).
+class Publication(BaseModel):
+    id: str
+    chapterId: str
+    publishedAt: datetime
+    wordCount: int = 0
+    title: str = ""
+    sections: list[PublicationSection] = Field(default_factory=list)
 
 
 class RevisionSummary(BaseModel):
@@ -606,6 +628,7 @@ class ProjectFile(BaseModel):
     plot: PlotTree = Field(default_factory=PlotTree)
     drafts: dict[str, DraftChapter] = Field(default_factory=dict)
     revisions: dict[str, list[RevisionSnapshot]] = Field(default_factory=dict)
+    publications: dict[str, list[Publication]] = Field(default_factory=dict)
     outlineHistory: list[TreeSnapshot] = Field(default_factory=list)
     plotHistory: list[TreeSnapshot] = Field(default_factory=list)
     activity: DailyActivityLog = Field(default_factory=DailyActivityLog)

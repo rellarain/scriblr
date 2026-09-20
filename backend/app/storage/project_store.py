@@ -19,6 +19,7 @@ from .schema import (
     PlotTree,
     ProjectFile,
     ProjectIndex,
+    Publication,
     RevisionSnapshot,
     ScheduleCompletionLog,
     ScrapRegistry,
@@ -347,6 +348,7 @@ def _load_project_file(root: Path, project_id: str) -> tuple[ProjectFile, dict[s
         plot=_parse_section_default(raw, "plot", PlotTree, project_dir, path, errors, PlotTree()),
         drafts=_parse_dict_section(raw, "drafts", DraftChapter, project_dir, path, errors),
         revisions=_parse_dict_of_list_section(raw, "revisions", RevisionSnapshot, project_dir, path, errors),
+        publications=_parse_dict_of_list_section(raw, "publications", Publication, project_dir, path, errors),
         outlineHistory=_parse_list_section(raw, "outlineHistory", TreeSnapshot, project_dir, path, errors),
         plotHistory=_parse_list_section(raw, "plotHistory", TreeSnapshot, project_dir, path, errors),
         activity=_parse_section_default(
@@ -763,6 +765,30 @@ def save_revision(root: Path, project_id: str, snapshot: RevisionSnapshot) -> No
         if snapshot.chapterId not in pf.index.manifest.revisionChapters:
             pf.index.manifest.revisionChapters.append(snapshot.chapterId)
             pf.index.updatedAt = utcnow()
+
+    _mutate(root, project_id, _do)
+
+
+# ---------------------------------------------------------------------------
+# Publications -- per chapter, newest kept (MAX_PUBLICATIONS), stored in
+# project.json's "publications" section keyed by chapter id.
+# ---------------------------------------------------------------------------
+
+MAX_PUBLICATIONS = 3
+
+
+def list_publications(root: Path, project_id: str, chapter_id: str) -> list[Publication]:
+    """Newest first."""
+    pf, _errors = _load_project_file(root, project_id)
+    return sorted(pf.publications.get(chapter_id, []), key=lambda p: p.publishedAt, reverse=True)
+
+
+def save_publication(root: Path, project_id: str, publication: Publication) -> None:
+    def _do(pf: ProjectFile) -> None:
+        kept = pf.publications.setdefault(publication.chapterId, [])
+        kept.append(publication)
+        kept.sort(key=lambda p: p.publishedAt, reverse=True)
+        del kept[MAX_PUBLICATIONS:]
 
     _mutate(root, project_id, _do)
 

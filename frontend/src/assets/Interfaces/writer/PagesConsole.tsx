@@ -8,8 +8,10 @@ import { nodeLabel } from './plotTree'
 import { splitParagraphs, splitSentences } from './sentences'
 import { useChapterDraft } from './useChapterDraft'
 import { exportChapterPdf } from '../../../api/export'
-import { HeartHalvedIcon, HeartIcon } from '../../icons'
+import { HeartHalvedIcon, HeartIcon, MoonIcon, SunIcon } from '../../icons'
 import { ChapterModeButtons, chapterHasDraft } from './PageConsole'
+import { usePublications } from './usePublications'
+import { fullDate, shortDate } from './chapterDates'
 
 const FLAGS = ['Add', 'Remove', 'Merge', 'Change', 'Simplify', 'Expand'] as const
 type FlagName = (typeof FLAGS)[number]
@@ -113,6 +115,12 @@ function PagePreview({ w, chapter, component, label }: { w: WriterWorkspace; cha
   const [marks, setMarks] = useStoredState<Marks>(`scriblr.writer.marks.${w.activeProjectId}.${chapter.id}`, {})
   const [selected, setSelected] = useState<string | null>(null)
   const [exportMessage, setExportMessage] = useState<string | null>(null)
+  // Day: a white page with black text; night: a dark page with light text.
+  const [tone, setTone] = useStoredState<'day' | 'night'>('scriblr.writer.previewTone', 'day')
+  // The current draft, or one of the chapter's kept publications (read-only).
+  const pubs = usePublications(w.activeProjectId, chapter.id)
+  const [version, setVersion] = useState<string>('current')
+  const published = version === 'current' ? undefined : pubs.publications.find(p => p.id === version)
 
   const index = useMemo(() => buildChildIndex(w.outlineNodes), [w.outlineNodes])
   const moments = useMemo(() => descendantsOf(index, chapter.id).filter(n => n.kind === 'moment'), [index, chapter.id])
@@ -162,6 +170,10 @@ function PagePreview({ w, chapter, component, label }: { w: WriterWorkspace; cha
     }
   }
 
+  const publishedParagraphs = published
+    ? published.sections.flatMap(sec => splitParagraphs(sec.body).map((text, pi) => ({ key: `${sec.momentId}:${pi}`, text })))
+    : []
+
   const selectedFlag = selected ? marks[selected]?.flag : undefined
 
   return (
@@ -172,6 +184,25 @@ function PagePreview({ w, chapter, component, label }: { w: WriterWorkspace; cha
     />
     <div className="wrPagesBody">
       <div className="wrPreviewToolbar">
+        <div className="wrToolGroup">
+          <span className="wrLabel">Version</span>
+          <select className="wrPreviewSelect" aria-label="Version" value={published ? version : 'current'} onChange={e => setVersion(e.target.value)}>
+            <option value="current">Current draft</option>
+            {pubs.publications.map(p => (
+              <option key={p.id} value={p.id}>Published {fullDate(p.publishedAt)} · {p.wordCount.toLocaleString()} words</option>
+            ))}
+          </select>
+        </div>
+        <div className="wrToolGroup" role="group" aria-label="Page tone">
+          {(['day', 'night'] as const).map(t => (
+            <button
+              key={t} type="button" aria-pressed={tone === t} aria-label={t === 'day' ? 'Day mode' : 'Night mode'} title={t === 'day' ? 'Day mode' : 'Night mode'}
+              className={tone === t ? 'wrSmallBtn wrSmallBtn--accent' : 'wrSmallBtn'} onClick={() => setTone(t)}
+            >
+              {t === 'day' ? <SunIcon size={14} /> : <MoonIcon size={14} />}
+            </button>
+          ))}
+        </div>
         {component === 'flag' && (
           <div className="wrToolGroup">
             <span className="wrLabel">Flag</span>
@@ -201,15 +232,20 @@ function PagePreview({ w, chapter, component, label }: { w: WriterWorkspace; cha
         )}
       </div>
       <div className="wrPageWrap">
-      <div className="wrPage wrPage--preview">
+      <div className={`wrPage wrPage--preview wrPage--${tone}`}>
         <div className="wrPreviewHead">
           <span className="wrPageKicker">Chapter {chapterNumber}</span>
-          <span className="wrPreviewTitle">{nodeLabel(chapter)}</span>
+          <span className="wrPreviewTitle">{published ? published.title || nodeLabel(chapter) : nodeLabel(chapter)}</span>
+          {published && <span className="wrPageMuted" title={fullDate(published.publishedAt)}>Published {shortDate(published.publishedAt)}, a saved copy (read-only)</span>}
         </div>
         {draft.error && <p className="wrPageError">{draft.error}</p>}
-        {draft.status === 'loading' && <p className="wrPageMuted">Loading…</p>}
-        {draft.status === 'idle' && paragraphs.length === 0 && <p className="wrPageMuted wrPreviewIndent">Nothing drafted in this chapter yet.</p>}
-        {paragraphs.map(p => (
+        {!published && draft.status === 'loading' && <p className="wrPageMuted">Loading…</p>}
+        {!published && draft.status === 'idle' && paragraphs.length === 0 && <p className="wrPageMuted wrPreviewIndent">Nothing drafted in this chapter yet.</p>}
+        {published && publishedParagraphs.length === 0 && <p className="wrPageMuted wrPreviewIndent">This publication has no text.</p>}
+        {publishedParagraphs.map(p => (
+          <div key={p.key} className="wrPreviewPara"><p className="wrPreviewText">{p.text}</p></div>
+        ))}
+        {!published && paragraphs.map(p => (
           <Paragraph
             key={p.key} paragraphKey={p.key} sentences={p.sentences} marks={marks}
             selected={selected} onSelect={setSelected} onCycle={cycleMark}

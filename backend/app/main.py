@@ -10,10 +10,12 @@ from .api import (
     analytics,
     draft,
     export,
+    feedback,
     outline,
     plot,
     presets,
     projects,
+    publications,
     revisions,
     schedule,
     scrap,
@@ -81,6 +83,7 @@ def create_app(static_dir: Optional[Path] = None) -> FastAPI:
     app.include_router(plot.router)
     app.include_router(draft.router)
     app.include_router(revisions.router)
+    app.include_router(publications.router)
     app.include_router(activity.router)
     app.include_router(analytics.router)
     app.include_router(schedule.router)
@@ -89,6 +92,7 @@ def create_app(static_dir: Optional[Path] = None) -> FastAPI:
     app.include_router(presets.router)
     app.include_router(admin_config.router)
     app.include_router(user_settings.router)
+    app.include_router(feedback.router)
 
     if static_dir is not None:
         # Registered last so it only catches what the routers above didn't --

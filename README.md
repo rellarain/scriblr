@@ -220,6 +220,7 @@ the one project-independent router).
 | `scrap` | `/api/projects/{id}/scrap` | `GET ""` registry · `POST "/{momentId}/restore"` · `DELETE "/{momentId}"` (204, permanent) |
 | `export` | `/api/projects/{id}/export` | `GET "/book/{bookId}"` PDF · `GET "/chapter/{chapterId}"` PDF |
 | `presets` | `/api/presets` | `GET ""` / `PUT ""` — global catalog (project-independent) |
+| `feedback` | `/api/feedback` | Helper Inbox (app-level `feedback.json`, acts as the admin in the `X-Admin-Id` header; every call returns the whole inbox bundle): `GET ""`, `PUT /messages/{id}/validation`, `PUT /cases/{id}/vote`, `POST /cases/{id}/solutions`, `PUT /cases/{id}/solutions/{sid}/vote`, `POST /cases/{id}/close`, `POST /cases/{id}/reopen`, `POST` / `PATCH` / `DELETE /verb-categories[/{id}]` |
 | `user_settings` | `/api/user-settings` | `GET ""` whole doc · `PUT "/theme"` · `PUT "/ui"` · `PUT "/kv/{key}"` / `DELETE "/kv/{key}"` (keys must start `scriblr.`) · `POST "/kv-import"` (one-time localStorage migration; sets only absent keys) — global (`user-settings.json`) |
 
 Plus `GET /api/health` (inline in `main.py`, not part of a router).
@@ -390,8 +391,12 @@ awareness that the app above already existed:
   currently pure frontend mock state with no backend wiring, and reads
   closer to the archived legacy reader-roles concept
   (`docs/legacy-concept/`) than to anything currently backed by the API.
-- **`HUI.tsx`** (`helper/` subfolder) — a helper-chat side panel, also new,
-  also frontend-only mock state.
+- **`HUI.tsx`** (`helper/` subfolder) — a helper side panel: chats (frontend-only
+  mock state) and the **Inbox**, which is backed by the API. The Inbox validates
+  feedback messages (each admin gives a tone, channels and verbs; by stage or by
+  case) and processes the statement cases they form (votes with notes,
+  solutions, closing). See `backend/app/storage/feedback.py` for the rules
+  (quorum, tone bands, per-console access) and `helper/inbox/` for the interface.
 - **`RUI.tsx`** / **`UUI.tsx`** — Reader and Home/Dashboard-shaped views
   under the same new mode-switching `App.tsx` shell.
 

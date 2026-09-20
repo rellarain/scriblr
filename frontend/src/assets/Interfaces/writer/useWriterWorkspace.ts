@@ -11,7 +11,7 @@ import {
 } from '../../../api/projectsApi'
 import { putOutline as apiPutOutline } from '../../../api/outlineApi'
 import { putPlot as apiPutPlot } from '../../../api/plotApi'
-import { booksOf, buildChildIndex, chaptersOfBook, moveNode, nearestOfKind } from './outlineTree'
+import { booksOf, buildChildIndex, chaptersOfBook, dissolveSeries, moveNodeTo, nearestOfKind } from './outlineTree'
 import { isAssignedPlotpoint } from './plotTree'
 import { useStoredState } from './storage'
 import { combineSaveStatus, useAutosave } from '../../../lib/useAutosave'
@@ -395,6 +395,7 @@ export function useWriterWorkspace() {
       synopsis: '', draftRef: null, flag: null,
       color: null, chapterCountTarget: null, plotlineIds: [], wordCountGoal: null,
       location: '', timeValue: {}, action: '',
+      createdAt: new Date().toISOString(),
       ...patch,
     }
     commitOutline(afterId ? insertAfter(prev, node, afterId, n => n.parentId === parentId) : [...prev, node], true)
@@ -435,10 +436,16 @@ export function useWriterWorkspace() {
     commitOutline(prev.filter(n => !toRemove.has(n.id)), true)
   }
 
-  // Drag and drop: reparent/reorder a node relative to a target.
-  function moveOutlineNodeTo(nodeId: string, targetId: string, mode: 'inside' | 'before') {
-    const next = moveNode(outlineNodesRef.current, nodeId, targetId, mode)
-    if (next) commitOutline(next, true)
+  // Drag and drop: place a node under `parentId`, before its child `beforeId` (last when null).
+  function moveOutlineNodeInto(nodeId: string, parentId: string | null, beforeId: string | null) {
+    const next = moveNodeTo(outlineNodesRef.current, nodeId, parentId, beforeId)
+    // A free draft dropped among the outline becomes an ordinary moment.
+    if (next) commitOutline(next.map(n => (n.id === nodeId && n.freeDraft ? { ...n, freeDraft: false } : n)), true)
+  }
+
+  // Delete a series but keep its books (they stay where the series was, no longer grouped).
+  function deleteSeries(seriesId: string) {
+    commitOutline(dissolveSeries(outlineNodesRef.current, seriesId), true)
   }
 
   function toggleNodeFlag(nodeId: string, flagType: FlagType) {
@@ -617,7 +624,7 @@ export function useWriterWorkspace() {
     loadProjects, createProject, openProject, backToShelves, deleteProject,
     showProject, openBook, selectChapter, openChapter, showChapter, showPreview, backToBook,
     chapterMode,
-    addOutlineNode, updateOutlineNode, deleteOutlineNode, moveOutlineNodeTo, toggleNodeFlag,
+    addOutlineNode, updateOutlineNode, deleteOutlineNode, deleteSeries, moveOutlineNodeInto, toggleNodeFlag,
 
     plotNodes, plotStatus, plotError, plotSaving: plotSave.saving, plotSaveError: plotSave.error,
     focusedPlotNodeId, focusedPlotNode, plotChildrenByParentId, plotNodeById,

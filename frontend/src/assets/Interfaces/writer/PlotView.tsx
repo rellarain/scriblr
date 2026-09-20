@@ -8,7 +8,7 @@ import { ColorRange } from '../../../components/ColorRange'
 import { coverColor, hueDelta, hueWindow, wrapHue } from '../../../theme/bookColors'
 import { derivedShades } from '../../../theme/palettes'
 import { useThemeState } from '../../../theme/useTheme'
-import { nodeColorStyle, plotColors, type PlotColors } from './plotColors'
+import { plotColors, plotColorVars } from './plotColors'
 import {
   assignedLevel, chapterOfAssignment, nodeLabel, orderAssignedPlotpoints, plotpointDescriptionAllowed, sortByTitle, titleAfterEdit,
 } from './plotTree'
@@ -37,7 +37,7 @@ function PlotNav({ w }: { w: WriterWorkspace }) {
     return next
   })
 
-  function rows(parentId: string | null, depth: number): React.ReactNode[] {
+  function rows(parentId: string | null): React.ReactNode[] {
     return sortByTitle((children.get(parentId) ?? []).filter(n => n.kind !== 'plotpoint'))
       .flatMap(node => {
         const kids = (children.get(node.id) ?? []).filter(c => c.kind !== 'plotpoint')
@@ -47,8 +47,8 @@ function PlotNav({ w }: { w: WriterWorkspace }) {
         return [
           <div
             key={node.id}
-            className={node.id === w.focusedPlotNodeId ? 'wrNavRow wrNavRow--active' : 'wrNavRow'}
-            style={{ paddingLeft: 8 + depth * 16, ...nodeColorStyle(plotColors(node, w.plotNodeById).primary) }}
+            className={`wrNavRow wrNavRow--${node.kind}${node.id === w.focusedPlotNodeId ? ' wrNavRow--active' : ''}`}
+            style={plotColorVars(plotColors(node, w.plotNodeById))}
           >
             <button
               type="button" className="wrNavChevron" aria-label={open ? 'Collapse' : 'Expand'}
@@ -57,11 +57,10 @@ function PlotNav({ w }: { w: WriterWorkspace }) {
             >
               <ChevronRightIcon size={12} />
             </button>
-            <span className="wrNavMark" />
             <button type="button" className="wrNavLabel" onClick={() => w.focusPlotNode(node.id)}>{nodeLabel(node)}</button>
             {!isLine && <span className="wrNavCount">{plotlineCount(node, children)}</span>}
           </div>,
-          ...(open ? rows(node.id, depth + 1) : []),
+          ...(open ? rows(node.id) : []),
         ]
       })
   }
@@ -76,7 +75,7 @@ function PlotNav({ w }: { w: WriterWorkspace }) {
       </div>
       <div className="wrPlotNavRows">
         {w.plotNodes.length === 0 && <p className="wrMuted">No categories yet.</p>}
-        {rows(null, 0)}
+        {rows(null)}
       </div>
     </div>
   )
@@ -104,17 +103,6 @@ function ChildRows({ w, node, kind, addLabel }: { w: WriterWorkspace; node: Plot
         </button>
       ))}
     </div>
-  )
-}
-
-// The category and subcategory colours a node wears, as two small squares.
-function ColorTrail({ colors }: { colors: PlotColors }) {
-  if (!colors.category) return null
-  return (
-    <span className="wrColorTrail" aria-hidden="true">
-      <span className="wrColorDot" style={{ backgroundColor: colors.category }} />
-      {colors.subcategory && <span className="wrColorDot" style={{ backgroundColor: colors.subcategory }} />}
-    </span>
   )
 }
 
@@ -168,10 +156,9 @@ function CategoryEditor({ w, node }: { w: WriterWorkspace; node: PlotNode }) {
   const isCategory = node.kind === 'category'
   const colors = plotColors(node, w.plotNodeById)
   return (
-    <div className="wrCardPanel wrCardPanel--colored" data-knode={node.id} style={nodeColorStyle(colors.primary)}>
+    <div className={`wrCardPanel wrCardPanel--${node.kind}`} data-knode={node.id} style={plotColorVars(colors)}>
       <div className="wrCardPanelHead">
         <span className="wrKindBadge">{node.kind}</span>
-        <ColorTrail colors={colors} />
         <input className="wrTitleField" data-kf="" value={node.title} onChange={e => w.updatePlotNodeField(node.id, 'title', e.target.value)} placeholder={`${isCategory ? 'Category' : 'Subcategory'} title`} />
         <DeleteControl
           tone="dark" message={`Delete ${nodeLabel(node)}? Its plotlines move to Unassigned.`}
@@ -277,7 +264,7 @@ function PlotlineEditor({ w, node }: { w: WriterWorkspace; node: PlotNode }) {
     const locked = level === 'inner'
     return (
       <div
-        key={p.id} data-point={p.id} data-knode={p.id} style={nodeColorStyle(colors.primary)}
+        key={p.id} data-point={p.id} data-knode={p.id} style={plotColorVars(colors)}
         className={dragId === p.id ? 'wrPoint wrPoint--dragging' : 'wrPoint'}
       >
         {!locked && (
@@ -331,10 +318,9 @@ function PlotlineEditor({ w, node }: { w: WriterWorkspace; node: PlotNode }) {
   return (
     <div className="wrPlotlineLayout">
       <div className="wrPlotlineLeft">
-        <div className="wrCardPanel wrCardPanel--colored" data-knode={node.id} style={nodeColorStyle(colors.primary)}>
+        <div className="wrCardPanel wrCardPanel--plotline" data-knode={node.id} style={plotColorVars(colors)}>
           <div className="wrCardPanelHead">
             <span className="wrKindBadge">plotline</span>
-            <ColorTrail colors={colors} />
             <input className="wrTitleField" data-kf="" value={node.title} onChange={e => w.updatePlotNodeField(node.id, 'title', e.target.value)} placeholder="Plotline title" />
             <DeleteControl
               tone="dark" message={`Delete ${nodeLabel(node)} and its plotpoints?`} onConfirm={() => w.deletePlotNode(node.id)}
