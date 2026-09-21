@@ -385,9 +385,22 @@ only the hues are kept.
   `--surface-*`, `--accent`, `--alert`, `--accent2`, `--ov-lift-*`, `--ov-sink-*`,
   `--paper-*`) that `App.scss` and the Writer's `writer.scss` are styled from —
   don't hard-code whites/black overlays/fixed lightness in new styles, use those.
-- **UI:** the override icons (one per configured zone; click to force, click again
-  to release) are on the UUI Dashboard; the customization tool is UUI
-  Dashboard > Settings (`theme/ThemeSettingsPanel.tsx`). "View as: User/Admin"
+- **UI:** the **sky toggle** (`theme/SkyToggle.tsx`) sits in the header, right of the
+  Writer button: 120x30, a painted sky with two buttons. The left one (sun or moon)
+  steps to the next zone (dawn > day > dusk > night, all four, configured or not)
+  and **locks** it; the right one (time and date, dimmed while locked) goes back to
+  following the clock and turns time-based theming on. The sky per zone is built
+  from the zone's hues in `theme/skyLook.ts` (only the time text is adjusted to keep
+  the 30-point gap); `theme/sky.ts` holds the pure parts: the moon's phase (drawn at
+  night, and small in dawn and dusk), today's zodiac constellation (real star-chart
+  outlines, joined by faint lines at night, faint stars only at dawn and dusk), the
+  random flat-bottomed cloud strips (gaps 0-100px, two layers drifting at 1.5 and
+  0.8 px/s from a random start; still under reduced motion, paused while the window
+  is hidden) and the sun/moon heights; `theme/SkyScene.tsx` draws them. The
+  customization tool is UUI Dashboard > Settings (`theme/ThemeSettingsPanel.tsx`),
+  whose four zone tabs are the same 120x30 sky (`theme/SkyZoneTab.tsx`): each in its
+  own zone's sky, the zone name where the time goes and its start time (or "Off")
+  where the date goes. "View as: User/Admin"
   there previews the other role (there are no real accounts yet: the role comes
   from `userSeed.ts`).
 - **Persistence:** `user-settings.json` (backend, see the API table) is the source

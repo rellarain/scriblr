@@ -85,7 +85,8 @@ export function disableZone(settings: ThemeSettings, key: ZoneKey): ThemeSetting
 
 // Repair settings read from storage: fill missing zones, keep Day configured,
 // snap start times to 10 minutes, keep just the hues of each palette (older
-// saves also held saturation and brightness), drop a stale override.
+// saves also held saturation and brightness), drop an override that names no zone.
+// (The header toggle can lock any of the four, configured or not.)
 export function normalizeTheme(input: Partial<ThemeSettings> | null | undefined): ThemeSettings {
   const zones = {} as Record<ZoneKey, ZoneConfig>
   for (const key of ZONE_KEYS) {
@@ -98,7 +99,7 @@ export function normalizeTheme(input: Partial<ThemeSettings> | null | undefined)
       palette: normalizePalette(given?.palette ?? fallback.palette),
     }
   }
-  const override = input?.override && ZONE_KEYS.includes(input.override) && zones[input.override].configured ? input.override : null
+  const override = input?.override && ZONE_KEYS.includes(input.override) ? input.override : null
   return { timeBasedEnabled: Boolean(input?.timeBasedEnabled), override, zones }
 }
 

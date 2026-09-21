@@ -89,7 +89,9 @@ describe('kv writes', () => {
 
 describe('theme', () => {
   it('normalizes what is set and caches it', () => {
-    setTheme(t => ({ ...t, override: 'night' })) // night is not configured
+    setTheme(t => ({ ...t, override: 'night' })) // any zone can be locked, configured or not
+    expect(getSettings().theme.override).toBe('night')
+    setTheme(t => ({ ...t, override: 'noon' as never }))
     expect(getSettings().theme.override).toBeNull()
     setTheme(t => ({ ...t, timeBasedEnabled: true }))
     const cache = JSON.parse(window.localStorage.getItem('scriblr.settings.cache')!)

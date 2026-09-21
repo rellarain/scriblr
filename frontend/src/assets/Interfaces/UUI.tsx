@@ -6,13 +6,12 @@ import {
   type IconProps,
 } from '../icons'
 import CustomizeControls from '../../CustomizeControls'
-import ThemeZoneToggles from '../../theme/ThemeZoneToggles'
 import ThemeSettingsPanel from '../../theme/ThemeSettingsPanel'
 
 // Three consoles per scrilbrPlan.md's "User Page (UUI)" section. Full
 // structural skeleton, mirroring AUI.tsx's pattern exactly -- every named
 // component present and selectable, placeholder body text throughout,
-// except: Dashboard (the time-of-day theme override toggles), Dashboard ->
+// except: Dashboard ->
 // Settings (the full theme customization tool) and Account -> Settings
 // (handedness, plus a pointer to the theme tool).
 //
@@ -183,7 +182,6 @@ function UUI() {
 
         <div className="uUIConsoleTitleRow">
           <h1 className="uUIConsoleTitle">{section.label}</h1>
-          {section.key === 'dashboard' && <ThemeZoneToggles />}
         </div>
 
         <SubTabRow

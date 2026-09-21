@@ -1,6 +1,7 @@
 import NavSwitcher from './NavSwitcher'
 import HeaderUserCard from './HeaderUserCard'
 import HeaderActivityRibbon from './HeaderActivityRibbon'
+import SkyToggle from './theme/SkyToggle'
 import UUI from './assets/Interfaces/UUI'
 import type { MainInterface } from './interfaceShellTypes'
 import type { CurrentUser } from './userTypes'
@@ -38,7 +39,10 @@ function Header({
       <header className="header">
         <div className="headerNavRow">
           <HeaderUserCard user={currentUser} open={drawerOpen} onToggle={onToggleDrawer} />
-          <NavSwitcher active={active} onSelect={onSelect} vuiOpen={vuiOpen} />
+          <div className="headerNavRight">
+            <NavSwitcher active={active} onSelect={onSelect} vuiOpen={vuiOpen} />
+            <SkyToggle />
+          </div>
         </div>
 
         <HeaderActivityRibbon intervals={activity} />

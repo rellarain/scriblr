@@ -3,7 +3,9 @@ import { restoreSettings, saveSettingsNow, setTheme, setUi, useSettings, useSett
 import { SaveControl } from '../components/SaveControl'
 import { ColorRange } from '../components/ColorRange'
 import { CURRENT_USER } from '../userSeed'
-import { ZONE_ICON } from './ThemeZoneToggles'
+import { ZONE_ICON } from './zoneIcons'
+import SkyZoneTab from './SkyZoneTab'
+import { useMinuteClock } from './useMinuteClock'
 import { readableInk } from './contrast'
 import { deriveTokens } from './tokens'
 import { copyPalette, disableZone, enableZone, configuredZones, formatMinute, STEP_MINUTES } from './zones'
@@ -183,6 +185,7 @@ function ThemeSettingsPanel() {
   const { theme, ui } = useSettings()
   const { effectiveRole } = useThemeState()
   const saveStatus = useSettingsSaveStatus()
+  const now = useMinuteClock()
   const [selected, setSelected] = useState<ZoneKey>('day')
 
   const configured = theme.zones[selected].configured
@@ -240,19 +243,12 @@ function ThemeSettingsPanel() {
 
       <div className="themeSection">
         <div className="themeZoneTabs" role="tablist" aria-label="Time zones">
-          {ZONE_KEYS.map(key => {
-            const Icon = ZONE_ICON[key]
-            const on = theme.zones[key].configured
-            return (
-              <button
-                key={key} type="button" role="tab" aria-selected={selected === key}
-                className={`themeZoneTab${selected === key ? ' themeZoneTab--active' : ''}${on ? '' : ' themeZoneTab--off'}`}
-                onClick={() => setSelected(key)}
-              >
-                <Icon size={16} /> {ZONE_LABEL[key]}
-              </button>
-            )
-          })}
+          {ZONE_KEYS.map(key => (
+            <SkyZoneTab
+              key={key} zone={key} palette={theme.zones[key].palette} configured={theme.zones[key].configured}
+              startMinute={theme.zones[key].startMinute} selected={selected === key} now={now} onSelect={() => setSelected(key)}
+            />
+          ))}
         </div>
 
         {configured ? (

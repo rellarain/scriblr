@@ -136,6 +136,13 @@ button {border: none; cursor: pointer; border-radius: 4px;}
 .headerUserCardName { font-size: 13px; font-weight: 700; }
 .headerUserCardOrg { font-size: 11px; opacity: 0.75; display: flex; align-items: center; gap: 4px; }
 
+// The page-switch buttons and, right of the Writer button, the sky toggle.
+.headerNavRight {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
 .navSwitcher {
   display: flex;
   gap: 4px;

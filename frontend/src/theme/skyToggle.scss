@@ -1,0 +1,128 @@
+// The header's sky toggle (theme/SkyToggle.tsx) and the zone tabs in Theme settings
+// (theme/SkyZoneTab.tsx): 120x30 skies. Everything except the text is painted
+// behind it (theme/SkyScene.tsx); the layers stack sky, stars, sun and moon, clouds
+// (which pass in front of the orbs), then text.
+
+.skyBox {
+  position: relative;
+  display: block;
+  flex: 0 0 120px;
+  width: 120px;
+  height: 30px;
+  border-radius: 4px;
+  overflow: hidden;
+  isolation: isolate;
+  > * { position: absolute; }
+}
+.skyToggle { margin: 5px 0; }
+
+// A zone tab: the whole box is one button. The selected one gets a ring in the
+// accent colour; a zone that is not in use is dimmed but still clickable.
+.skyTab {
+  border: 0;
+  padding: 0;
+  cursor: pointer;
+  text-align: left;
+  transition: filter 0.15s, opacity 0.15s;
+  &:hover { filter: brightness(1.1); }
+  &--off { opacity: 0.55; filter: saturate(0.6); &:hover { filter: saturate(0.6) brightness(1.1); } }
+  &--selected { opacity: 1; outline: 2px solid var(--accent); outline-offset: 2px; }
+  &:focus-visible { outline: 2px solid var(--ink); outline-offset: 2px; }
+}
+.skyTabText {
+  left: 30px;
+  top: 0;
+  width: 90px;
+  height: 30px;
+  padding-right: 10px;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  justify-content: center;
+  gap: 2px;
+  line-height: 1;
+  font-variant-numeric: tabular-nums;
+  pointer-events: none;
+}
+
+.skySky,
+.skyFade { inset: 0; }
+.skyFade { pointer-events: none; animation: skyFadeOut 1s ease forwards; }
+
+.skyStars { left: 0; top: 0; overflow: visible; pointer-events: none; }
+.skyStar { transition: fill 1s; }
+.skyStar--twinkle { animation: skyTwinkle 3.2s ease-in-out infinite; }
+
+.skySun {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  pointer-events: none;
+  transition: background 1s, top 1s;
+}
+// The disc touches its SVG's edges, so let the anti-aliased rim spill over instead
+// of being sliced flat.
+.skyMoon { overflow: visible; pointer-events: none; transition: top 1s; }
+
+.skyClouds { inset: 0; overflow: hidden; pointer-events: none; }
+.skyCloudLayer {
+  position: absolute;
+  left: 0;
+  display: flex;
+  animation: skyDrift var(--dur) linear infinite;
+  will-change: transform;
+  svg { flex: 0 0 auto; display: block; }
+  &--front { bottom: 2px; }
+  &--back { bottom: 11px; }
+}
+
+.skySunBtn,
+.skyTimeBtn {
+  top: 0;
+  height: 30px;
+  border: 0;
+  background: transparent;
+  cursor: pointer;
+  transition: color 1s;
+  &:hover { background: color-mix(in srgb, currentColor 10%, transparent); }
+  &:focus-visible { outline: 2px solid currentColor; outline-offset: -3px; }
+}
+.skySunBtn { left: 0; width: 30px; }
+.skyTimeBtn {
+  left: 30px;
+  width: 90px;
+  padding: 0 10px 0 0;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  justify-content: center;
+  gap: 2px;
+  line-height: 1;
+  font-variant-numeric: tabular-nums;
+}
+.skyTime { font-size: 12px; font-weight: 600; }
+.skyDate { font-size: 9px; font-weight: 600; letter-spacing: 0.6px; }
+
+.skyBox--paused * { animation-play-state: paused; }
+
+@keyframes skyDrift {
+  from { transform: translateX(0); }
+  to { transform: translateX(calc(-1 * var(--len))); }
+}
+@keyframes skyTwinkle {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.25; }
+}
+@keyframes skyFadeOut {
+  from { opacity: 1; }
+  to { opacity: 0; }
+}
+
+html[data-theme-live] .skyFade { display: none; }
+
+@media (prefers-reduced-motion: reduce) {
+  .skyCloudLayer,
+  .skyStar--twinkle { animation: none; }
+  .skyFade { display: none; }
+  .skySun, .skyMoon, .skySunBtn, .skyTimeBtn, .skyStar { transition: none; }
+}

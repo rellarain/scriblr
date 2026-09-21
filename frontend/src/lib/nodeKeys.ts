@@ -189,6 +189,7 @@ export function focusNodeField(id: string, which: 'first' | 'last'): boolean {
   if (nodeElement(id)) return false // there, but with nothing to focus
   let tries = 0
   const retry = () => {
+    if (typeof document === 'undefined') return // the page is gone (a test environment torn down)
     tries += 1
     if (!attempt() && tries < 20) window.setTimeout(retry, 16)
   }

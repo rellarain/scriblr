@@ -113,7 +113,8 @@ describe('enable / disable / normalize', () => {
     } as unknown as ThemeSettings)
     expect(s.zones.day.configured).toBe(true)
     expect(s.zones.day.startMinute).toBe(420)
-    expect(s.override).toBeNull() // dusk is not configured
+    expect(s.override).toBe('dusk') // any zone can be locked, configured or not
+    expect(normalizeTheme({ override: 'noon' } as unknown as ThemeSettings).override).toBeNull()
     expect(normalizeTheme(null)).toEqual(defaultThemeSettings())
   })
 
