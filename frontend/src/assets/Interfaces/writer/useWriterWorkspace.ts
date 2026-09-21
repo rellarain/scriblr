@@ -13,10 +13,14 @@ import { putOutline as apiPutOutline } from '../../../api/outlineApi'
 import { putPlot as apiPutPlot } from '../../../api/plotApi'
 import { booksOf, buildChildIndex, chaptersOfBook, dissolveSeries, moveNodeTo, nearestOfKind } from './outlineTree'
 import { isAssignedPlotpoint } from './plotTree'
+import {
+  addField, addValue, assignPoint, deleteField, deleteValue, migratePlot, moveField, moveValue, renameField, syncReferences, updateValue,
+} from './plotFields'
+import { awarenessNext } from './awareness'
 import { useStoredState } from './storage'
 import { combineSaveStatus, useAutosave } from '../../../lib/useAutosave'
 import { insertAfter } from '../../../lib/siblingOrder'
-import { clampHueToWindow, wrapHue } from '../../../theme/bookColors'
+import { DEFAULT_BOOK_HUE, clampHueToWindow, wrapHue } from '../../../theme/bookColors'
 
 type AsyncStatus = 'idle' | 'loading' | 'error'
 
@@ -75,6 +79,8 @@ export function useWriterWorkspace() {
   const [plotStatus, setPlotStatus] = useState<AsyncStatus>('idle')
   const [plotError, setPlotError] = useState<string | undefined>(undefined)
   const [focusedPlotNodeId, setFocusedPlotNodeId] = useState<string | null>(null)
+  // The plotpoint a plot-outline click points at on the chapter page (shown highlighted for a moment).
+  const [highlightedPointId, setHighlightedPointId] = useState<string | null>(null)
 
   const activeProjectIdRef = useRef<string | null>(null)
   const outlineNodesRef = useRef<OutlineNode[]>([])
@@ -186,7 +192,9 @@ export function useWriterWorkspace() {
     else outlineSave.schedule(value)
   }
 
-  function commitPlot(next: PlotNode[], immediate: boolean) {
+  function commitPlot(changed: PlotNode[], immediate: boolean) {
+    // Every plotline keeps one reference per value defined on its category and subcategory.
+    const next = syncReferences(changed, new Map(outlineNodesRef.current.map(n => [n.id, n])))
     plotNodesRef.current = next
     setPlotNodes(next)
     const projectId = activeProjectIdRef.current
@@ -212,7 +220,7 @@ export function useWriterWorkspace() {
       const summary = await apiGetProject(projectId)
       if (activeProjectIdRef.current !== projectId) return
       const outline = summary.outline?.nodes ?? []
-      const plot = summary.plot?.nodes ?? []
+      const plot = migratePlot(summary.plot?.nodes ?? [], outline)
       outlineNodesRef.current = outline
       plotNodesRef.current = plot
       setOutlineNodes(outline)
@@ -280,10 +288,16 @@ export function useWriterWorkspace() {
       setWarnings(summary.warnings)
       setOutlineStatus('idle')
 
-      setPlotNodes(summary.plot?.nodes ?? [])
+      // A plot saved before fields had values is brought into the new shape (and saved that way).
+      const loaded = summary.plot?.nodes ?? []
+      const plot = migratePlot(loaded, nodes)
+      const migrated = JSON.stringify(plot) !== JSON.stringify(loaded)
+      plotNodesRef.current = plot
+      setPlotNodes(plot)
       setPlotSchemaVersion(summary.plot?.schemaVersion ?? 1)
       setPlotStatus('idle')
       setFocusedPlotNodeId(null)
+      if (migrated) void plotSave.saveNow({ projectId: id, schemaVersion: summary.plot?.schemaVersion ?? 1, nodes: plot })
 
       setActiveChapterId(null)
       if (bookId && nodes.some(n => n.id === bookId && n.kind === 'book')) {
@@ -398,6 +412,8 @@ export function useWriterWorkspace() {
       createdAt: new Date().toISOString(),
       ...patch,
     }
+    // A book's secondary colour is required: it starts as the primary hue.
+    if (kind === 'book' && node.accentHue == null) node.accentHue = node.themeHue ?? DEFAULT_BOOK_HUE
     commitOutline(afterId ? insertAfter(prev, node, afterId, n => n.parentId === parentId) : [...prev, node], true)
     return node.id
   }
@@ -430,7 +446,7 @@ export function useWriterWorkspace() {
     if (plots.some(affected)) {
       const inner = node && (node.kind === 'act' || node.kind === 'scene' || node.kind === 'moment')
       const chapter = inner && node.parentId ? nearestOfKind(prev, node.parentId, 'chapter') : undefined
-      commitPlot(plots.map(p => (affected(p) ? { ...p, assignedMomentId: chapter?.id ?? null, assignedParagraphIndex: null } : p)), true)
+      commitPlot(plots.map(p => (affected(p) ? { ...p, assignedMomentId: chapter?.id ?? null, assignedParagraphIndex: null, awareness: null } : p)), true)
     }
 
     commitOutline(prev.filter(n => !toRemove.has(n.id)), true)
@@ -514,25 +530,54 @@ export function useWriterWorkspace() {
     commitPlot(plotNodesRef.current.map(n => (n.id === nodeId ? { ...n, keywords: n.keywords.filter(k => k !== keyword) } : n)), true)
   }
 
-  function addPlotCustomFieldDef(nodeId: string, name: string) {
-    const trimmed = name.trim()
-    if (!trimmed) return
-    commitPlot(plotNodesRef.current.map(n => (n.id === nodeId ? { ...n, customFieldDefs: [...n.customFieldDefs, { id: newId('field'), name: trimmed }] } : n)), true)
+  // --- fields and their values (plotFields.ts) ---
+  const outlineMap = () => new Map(outlineNodesRef.current.map(n => [n.id, n]))
+
+  function addPlotField(ownerId: string, name = '', afterFieldId?: string): string | null {
+    const made = addField(plotNodesRef.current, ownerId, name, undefined, afterFieldId)
+    if (made.id) commitPlot(made.nodes, true)
+    return made.id
+  }
+  function renamePlotField(ownerId: string, fieldId: string, name: string) {
+    commitPlot(renameField(plotNodesRef.current, ownerId, fieldId, name), false)
+  }
+  function movePlotField(ownerId: string, fieldId: string, beforeId: string | null) {
+    commitPlot(moveField(plotNodesRef.current, ownerId, fieldId, beforeId), true)
+  }
+  function removePlotField(ownerId: string, fieldId: string) {
+    commitPlot(deleteField(plotNodesRef.current, ownerId, fieldId, outlineMap()), true)
+  }
+  function addPlotValue(holderId: string, fieldId: string, afterId?: string): string | null {
+    const made = addValue(plotNodesRef.current, holderId, fieldId, undefined, afterId)
+    if (made.id) commitPlot(made.nodes, true)
+    return made.id
+  }
+  function updatePlotValue(id: string, patch: { title?: string; body?: string }) {
+    commitPlot(updateValue(plotNodesRef.current, id, patch), false)
+  }
+  function removePlotValue(id: string) {
+    commitPlot(deleteValue(plotNodesRef.current, id, outlineMap()), true)
+  }
+  function movePlotValue(id: string, toFieldId: string) {
+    commitPlot(moveValue(plotNodesRef.current, id, toFieldId, outlineMap()), true)
+  }
+  function cyclePlotAwareness(pointId: string) {
+    commitPlot(plotNodesRef.current.map(n => (n.id === pointId && n.awareness ? { ...n, awareness: awarenessNext(n.awareness) } : n)), true)
   }
 
-  function removePlotCustomFieldDef(nodeId: string, fieldId: string) {
-    commitPlot(plotNodesRef.current.map(n => (n.id === nodeId ? { ...n, customFieldDefs: n.customFieldDefs.filter(f => f.id !== fieldId) } : n)), true)
-  }
-
-  function updatePlotCustomFieldValue(nodeId: string, fieldId: string, value: string) {
-    commitPlot(plotNodesRef.current.map(n => (n.id === nodeId ? { ...n, customFieldValues: { ...n.customFieldValues, [fieldId]: value } } : n)), false)
-  }
-
-  // A plotpoint is assigned to a book or chapter by storing that outline
-  // node's id in assignedMomentId (the backend treats it as an opaque id);
-  // null unassigns it.
+  // A plotpoint is assigned to a chapter (from the plot editor), or placed on an act, scene
+  // or moment of it (from the chapter outline), by storing that outline node's id in
+  // assignedMomentId (the backend treats it as an opaque id); null unassigns it. Placed on a
+  // moment it gets an awareness (front-stage at first).
   function assignPlotpoint(pointId: string, outlineNodeId: string | null) {
-    commitPlot(plotNodesRef.current.map(n => (n.id === pointId ? { ...n, assignedMomentId: outlineNodeId, assignedParagraphIndex: null } : n)), true)
+    const next = assignPoint(plotNodesRef.current, pointId, outlineNodeId, outlineMap())
+    if (next !== plotNodesRef.current) commitPlot(next, true)
+  }
+
+  // Point the chapter page at a plotpoint for a few seconds (a click in the plot outline).
+  function highlightPlotpoint(id: string | null) {
+    setHighlightedPointId(id)
+    if (id) window.setTimeout(() => setHighlightedPointId(cur => (cur === id ? null : cur)), 4000)
   }
 
   // Ensures a top-level "Unassigned" category (and an "Unassigned"
@@ -571,9 +616,13 @@ export function useWriterWorkspace() {
   // category/subcategory instead. Nested subcategories are removed with their
   // parent; a plotline keeps its own plotpoints (only its parentId changes).
   function deletePlotNode(nodeId: string) {
-    const prev = plotNodesRef.current
+    let prev = plotNodesRef.current
     const target = prev.find(n => n.id === nodeId)
     if (!target) return
+    // A category or subcategory goes with its fields: assigned references stay as their plotline's own values.
+    if (target.kind === 'category' || target.kind === 'subcategory') {
+      for (const def of target.customFieldDefs) prev = deleteField(prev, nodeId, def.id, outlineMap())
+    }
 
     // Only unassigned plotpoints can be deleted, so a plotline holding an
     // assigned one cannot be deleted either until it is unassigned.
@@ -630,8 +679,9 @@ export function useWriterWorkspace() {
     focusedPlotNodeId, focusedPlotNode, plotChildrenByParentId, plotNodeById,
     focusPlotNode, addPlotNode, updatePlotNodeField, setPlotHue, deletePlotNode,
     addPlotKeyword, removePlotKeyword,
-    addPlotCustomFieldDef, removePlotCustomFieldDef, updatePlotCustomFieldValue,
-    assignPlotpoint,
+    addPlotField, renamePlotField, movePlotField, removePlotField,
+    addPlotValue, updatePlotValue, removePlotValue, movePlotValue, cyclePlotAwareness,
+    assignPlotpoint, highlightedPointId, highlightPlotpoint,
   }
 }
 

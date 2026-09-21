@@ -62,7 +62,7 @@ function freeStart(zones: Record<ZoneKey, ZoneConfig>, key: ZoneKey): number {
   return start
 }
 
-// Turn a zone on, seeded with a copy of Day's palette.
+// Turn a zone on, seeded with a copy of Day's hues.
 export function enableZone(settings: ThemeSettings, key: ZoneKey): ThemeSettings {
   if (settings.zones[key].configured) return settings
   const zone: ZoneConfig = {
@@ -84,7 +84,8 @@ export function disableZone(settings: ThemeSettings, key: ZoneKey): ThemeSetting
 }
 
 // Repair settings read from storage: fill missing zones, keep Day configured,
-// snap start times to 10 minutes, normalize palettes, drop a stale override.
+// snap start times to 10 minutes, keep just the hues of each palette (older
+// saves also held saturation and brightness), drop a stale override.
 export function normalizeTheme(input: Partial<ThemeSettings> | null | undefined): ThemeSettings {
   const zones = {} as Record<ZoneKey, ZoneConfig>
   for (const key of ZONE_KEYS) {
@@ -113,8 +114,8 @@ export function activeZone(settings: ThemeSettings, now: Date): ZoneKey {
   return settings.override ?? clockZone(settings, now)
 }
 
-// Give a zone another zone's whole palette (colors and brightness, not the
-// start time). Both zones must be turned on.
+// Give a zone another zone's hues (not its start time; each zone keeps its own
+// look). Both zones must be turned on.
 export function copyPalette(settings: ThemeSettings, from: ZoneKey, to: ZoneKey): ThemeSettings {
   if (from === to || !settings.zones[from].configured || !settings.zones[to].configured) return settings
   return {

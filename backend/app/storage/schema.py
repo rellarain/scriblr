@@ -13,6 +13,9 @@ def utcnow() -> datetime:
     return datetime.now(timezone.utc)
 
 
+# The hue a book's cover has when it has none of its own (mirrors the frontend's DEFAULT_BOOK_HUE).
+DEFAULT_BOOK_HUE = 28
+
 _HEX_COLOR = re.compile(r"^#?([0-9a-fA-F]{6})$")
 
 
@@ -172,8 +175,9 @@ class OutlineNode(BaseModel):
     # Set only on "book" nodes: the book's two hues (0-360). The theme hue is
     # the cover / spine colour and re-tints the book's editors' surfaces (drawn
     # with the theme's saturation and brightness); the accent hue re-tints
-    # active items (accent saturation and brightness), and is None for "no
-    # override". A legacy hex `color` becomes the theme hue (see below).
+    # active items (accent saturation and brightness). Every book has both: a
+    # book with no accent hue gets its theme hue (drawn more saturated), see
+    # below. A legacy hex `color` becomes the theme hue.
     themeHue: Optional[int] = Field(default=None, ge=0, le=360)
     accentHue: Optional[int] = Field(default=None, ge=0, le=360)
     chapterCountTarget: Optional[int] = None
@@ -209,6 +213,9 @@ class OutlineNode(BaseModel):
             hue = hex_to_hue(self.color)
             if hue is not None:
                 self.themeHue = hue
+        # The secondary colour is required on a book: it starts as the primary hue.
+        if self.kind == "book" and self.accentHue is None:
+            self.accentHue = self.themeHue if self.themeHue is not None else DEFAULT_BOOK_HUE
         return self
 
 
@@ -259,6 +266,20 @@ class PlotNode(BaseModel):
     # the accent's and kept within 60 degrees of its category's hue. None = the
     # app theme's hue (categories) or the category's hue (subcategories).
     hue: Optional[int] = Field(default=None, ge=0, le=360)
+    # Set only on "plotpoint" nodes, which are the values of fields: the
+    # PlotCustomFieldDef.id (defined on a category, subcategory or plotline)
+    # this value belongs to. None on plotpoints saved before fields had values;
+    # the client moves those into a "Default" plotline field on load.
+    fieldId: Optional[str] = None
+    # Set only on a plotpoint that is a plotline's reference to a value defined
+    # on its category or subcategory: the id of that original value. Its title
+    # and body are then read from the original. Each plotline assigns its own
+    # reference to its own chapters.
+    refId: Optional[str] = None
+    # Set only on a plotpoint placed on a moment: what the audience and the
+    # characters know of it. front = both, back = the audience only, mid = the
+    # characters only, off = neither. None = not placed on a moment.
+    awareness: Optional[Literal["front", "back", "mid", "off"]] = None
 
 
 class PlotTree(BaseModel):
@@ -645,26 +666,28 @@ class ProjectFile(BaseModel):
 # %APPDATA%\Scriblr\user-settings.json, a sibling of presets.json. Its own
 # schema version, independent of SCHEMA_VERSION.
 #
-# Only value RANGES are validated here. The saturation ordering between
-# theme/accent/alert/accent2 is deliberately not enforced server-side: a
-# validation failure would quarantine the whole file, so the client
-# normalizes on load instead.
+# A zone's palette is just four hues (theme, accent, alert, admin accent): the
+# zone's saturation and lightness are a fixed look the frontend owns
+# (frontend/src/theme/zoneLooks.ts). Files saved by older versions also hold a
+# saturation per colour and a brightness; they still load (extra fields are
+# ignored) and are dropped the next time the settings are saved.
+#
+# Only value RANGES are validated here. A validation failure would quarantine
+# the whole file, so anything subtler is left to the client to normalize on load.
 # ---------------------------------------------------------------------------
 
 ZoneKey = Literal["dawn", "day", "dusk", "night"]
 
 
-class ThemeHS(BaseModel):
+class ThemeHue(BaseModel):
     h: int = Field(ge=0, le=360)
-    s: int = Field(ge=0, le=100)
 
 
 class ZonePalette(BaseModel):
-    brightness: int = Field(ge=0, le=100)
-    theme: ThemeHS
-    accent: ThemeHS
-    alert: ThemeHS
-    accent2: ThemeHS
+    theme: ThemeHue
+    accent: ThemeHue
+    alert: ThemeHue
+    accent2: ThemeHue
 
 
 class ZoneConfig(BaseModel):

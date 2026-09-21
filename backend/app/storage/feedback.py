@@ -1,27 +1,34 @@
 """Global (not project-scoped) storage and rules for the Helper Inbox: feedback
-messages, their per-admin validations (tone, channels, verbs), the feedback
-statement cases derived from them, and the votes, solutions and history that
-hang off each case. Lives at %APPDATA%\\Scriblr\\feedback.json, a sibling of
-admin-config.json, seeded with sample data on first use. Reuses
-project_store's atomic-write helper.
+messages, their per-admin validations (tone, then subjects with verbs), the
+feedback statement cases derived from them, and the votes, solutions and history
+that hang off each case. Lives at %APPDATA%\\Scriblr\\feedback.json, a sibling of
+admin-config.json, seeded with sample data on first use. Reuses project_store's
+atomic-write helper.
 
 How the pieces fit:
-  - Every admin validates a message independently: their own tone, the channels
-    (page > console > component > feature) it is about, and an intention verb
-    (a managed verb category) for each channel.
-  - A message reaches quorum once enough admins have completed a validation
-    (3 when three or more admins exist, else 1). Only then does it join cases.
-  - A feedback statement case is one (channel, verb) pair kept by at least half
-    of the validators. Cases are derived on read; only their votes, solutions,
-    status and history are stored (keyed by the pair).
-  - Tone is a score over every response (the sender's and each admin's):
-    pleasant +1, unpleasant -1, mixed and neutral 0, averaged, then banded.
-  - What an admin may do depends on per-console access levels (see `Admin`).
+  - Validation has two stages, in order: Tone, then Explicate (the subjects a
+    message is about, page > console > component > feature, and one or more
+    intention verbs for each: a managed verb category). Every admin validates
+    independently.
+  - There is no quorum. A message joins statement cases as soon as one validator
+    has completed it, and it joins EVERY (subject, verb) statement any completed
+    validator chose. A case is derived on read; only its votes, solutions, status
+    and history are stored (keyed by the pair).
+  - Tone: each validator gives pleasant, unpleasant, mixed (one pleasant vote and
+    one unpleasant vote) or neutral; the mix of labels gives one of six categories.
+    The sender's own tone is shown but never counted.
+  - What an admin may do depends on roles per console: processor (validate, vote),
+    configurer (propose solutions, reopen, manage verb categories, see the other
+    validators' tone labels) and planner (close a case).
+  - The Inbox is anonymous: the bundle carries no author names and no other admin's
+    id; the admin's own items are marked as theirs.
 """
 
 import hashlib
+import json
 import re
 import threading
+from datetime import datetime
 from pathlib import Path
 from typing import Literal, Optional
 
@@ -29,17 +36,20 @@ from pydantic import BaseModel, Field
 
 from . import project_store
 from .schema import utcnow
-from datetime import datetime
 
 Tone = Literal["pleasant", "unpleasant", "mixed", "neutral"]
-ToneBand = Literal["mostlyPleasant", "slightlyPleasant", "neutral", "slightlyUnpleasant", "mostlyUnpleasant"]
+ToneCategory = Literal["pleasant", "mixedPleasant", "neutral", "mixed", "mixedUnpleasant", "unpleasant"]
+Role = Literal["processor", "configurer", "planner"]
 CaseStatus = Literal["open", "approved", "rejected"]
 
+SCHEMA_VERSION = 2
 NOTE_MAX = 500
 SOLUTION_MAX = 2000
 TITLE_MAX = 120
-MAX_REQUIRED_VALIDATIONS = 3
 INBOX_CONSOLE = ("Helper", "Inbox")
+ROLE_ORDER: list[str] = ["processor", "configurer", "planner"]
+# The fixed order tone categories are listed and sorted in (most pleasant first).
+TONE_ORDER: list[str] = ["pleasant", "mixedPleasant", "neutral", "mixed", "mixedUnpleasant", "unpleasant"]
 
 # --------------------------------------------------------------------------
 # The channel tree: page > console > component > feature, from the app's own
@@ -77,12 +87,13 @@ TAXONOMY: list[dict] = [
     ]},
     {"name": "Helper", "consoles": [
         {"name": "Chat", "components": [{"name": "Conversation", "features": ["Composer", "Page Link"]}]},
-        {"name": "Inbox", "components": [{"name": "Validation", "features": ["Tone", "Channel", "Explicate"]}, {"name": "Processing", "features": ["Voting", "Solutions"]}]},
+        {"name": "Inbox", "components": [{"name": "Validation", "features": ["Tone", "Explicate"]}, {"name": "Processing", "features": ["Voting", "Solutions"]}]},
         {"name": "Queue", "components": [{"name": "Queue Meter", "features": ["Segments"]}]},
     ]},
     {"name": "Admin", "consoles": [
         {"name": "Processor", "components": [{"name": "Voting", "features": ["Approve", "Deny"]}]},
         {"name": "Organizer", "components": [{"name": "Channel Management", "features": ["Review"]}]},
+        {"name": "Manager", "components": [{"name": "Assignment", "features": ["Roles"]}]},
     ]},
     {"name": "User", "consoles": [
         {"name": "Dashboard", "components": [{"name": "Notifications", "features": ["Activity Log"]}]},
@@ -104,6 +115,11 @@ def taxonomy_has(page: str, console: str, component: str = "", feature: str = ""
                 if comp["name"] == component:
                     return not feature or feature in comp["features"]
     return False
+
+
+def all_consoles() -> list[str]:
+    """Every console as "Page/Console" (the keys roles are assigned under)."""
+    return [f"{p['name']}/{c['name']}" for p in TAXONOMY for c in p["consoles"]]
 
 
 # --------------------------------------------------------------------------
@@ -128,16 +144,11 @@ class VerbCategory(BaseModel):
 
 
 class Admin(BaseModel):
-    """Access is per console, written "Page/Console" (or "Page/*" for every console
-    of a page): processing (validate messages, vote on cases), configuration
-    (propose solutions, reopen cases, manage verb categories) and project plan
-    (with configuration: close a case)."""
+    """`roles` maps a console, written "Page/Console", to the roles the admin holds there."""
 
     id: str
     name: str
-    processing: list[str] = Field(default_factory=list)
-    configuration: list[str] = Field(default_factory=list)
-    projectPlan: list[str] = Field(default_factory=list)
+    roles: dict[str, list[Role]] = Field(default_factory=dict)
 
 
 class Statement(BaseModel):
@@ -153,7 +164,7 @@ class Validation(BaseModel):
     updatedAt: datetime = Field(default_factory=utcnow)
 
     def complete(self) -> bool:
-        """A tone, at least one channel, and a verb on every channel."""
+        """A tone, at least one subject, and at least one verb on every subject."""
         if self.tone is None or not self.channels:
             return False
         with_verb = {s.channel.key() for s in self.statements}
@@ -175,8 +186,10 @@ class Vote(BaseModel):
     adminId: str
     approve: bool = False
     deny: bool = False
+    passed: bool = False
     approveNote: str = ""
     denyNote: str = ""
+    passNote: str = ""
     updatedAt: datetime = Field(default_factory=utcnow)
 
 
@@ -210,12 +223,14 @@ class CaseState(BaseModel):
 
 
 class FeedbackFile(BaseModel):
-    schemaVersion: int = 1
+    schemaVersion: int = SCHEMA_VERSION
     admins: list[Admin] = Field(default_factory=list)
     verbCategories: list[VerbCategory] = Field(default_factory=list)
     messages: list[Message] = Field(default_factory=list)
     validations: dict[str, list[Validation]] = Field(default_factory=dict)  # messageId -> one per admin
+    messageHistory: dict[str, list[HistoryEvent]] = Field(default_factory=dict)
     cases: dict[str, CaseState] = Field(default_factory=dict)  # caseId -> state
+    roleHistory: list[HistoryEvent] = Field(default_factory=list)
 
 
 # --------------------------------------------------------------------------
@@ -258,26 +273,45 @@ _SEED_VERBS = [
     ("verb-keep", "Keep", ["keep", "great", "love", "like"]),
 ]
 
-_SEED_ADMINS = [
-    Admin(
-        id="adm-dana", name="Dana Ruiz",
-        processing=["Helper/Inbox", "Writer/*", "Reader/*", "Admin/*"],
-        configuration=["Helper/Inbox", "Writer/*"],
-        projectPlan=["Writer/*"],
-    ),
-    Admin(
-        id="adm-lee", name="Lee Park",
-        processing=["Helper/Inbox", "Writer/*", "Reader/*"],
-        configuration=["Reader/*"],
-        projectPlan=[],
-    ),
-    Admin(
-        id="adm-sam", name="Sam Ortiz",
-        processing=["Helper/Inbox", "Reader/*"],
-        configuration=[],
-        projectPlan=["Reader/*"],
-    ),
-]
+
+def _page_roles(pages: list[str], roles: list[Role]) -> dict[str, list[Role]]:
+    out: dict[str, list[Role]] = {}
+    for p in TAXONOMY:
+        if p["name"] in pages:
+            for c in p["consoles"]:
+                out[f"{p['name']}/{c['name']}"] = list(roles)
+    return out
+
+
+def _merge_roles(*maps: dict[str, list[Role]]) -> dict[str, list[Role]]:
+    out: dict[str, list[Role]] = {}
+    for m in maps:
+        for key, roles in m.items():
+            have = out.setdefault(key, [])
+            for r in roles:
+                if r not in have:
+                    have.append(r)
+    return out
+
+
+def _seed_admins() -> list[Admin]:
+    return [
+        Admin(id="adm-dana", name="Dana Ruiz", roles=_merge_roles(
+            _page_roles(["Writer", "Reader", "Admin"], ["processor"]),
+            {"Helper/Inbox": ["processor", "configurer"]},
+            _page_roles(["Writer"], ["configurer", "planner"]),
+        )),
+        Admin(id="adm-lee", name="Lee Park", roles=_merge_roles(
+            _page_roles(["Writer", "Reader"], ["processor"]),
+            {"Helper/Inbox": ["processor"]},
+            _page_roles(["Reader"], ["configurer"]),
+        )),
+        Admin(id="adm-sam", name="Sam Ortiz", roles=_merge_roles(
+            _page_roles(["Reader"], ["processor", "planner"]),
+            {"Helper/Inbox": ["processor"]},
+        )),
+    ]
+
 
 _SEED_MESSAGES = [
     Message(id="fb-1", text="The editor freezes for a second every time I paste a large block of text.", author="j.rivera",
@@ -312,7 +346,6 @@ def _v(admin: str, tone: Tone, pairs: list[tuple[ChannelTag, str]]) -> Validatio
 
 def _build_seed() -> FeedbackFile:
     validations: dict[str, list[Validation]] = {
-        # Fully validated by all three admins: they form statement cases.
         "fb-1": [_v("adm-dana", "unpleasant", [(_AUTOSAVE, "verb-fix")]), _v("adm-lee", "unpleasant", [(_AUTOSAVE, "verb-fix")]),
                  _v("adm-sam", "neutral", [(_AUTOSAVE, "verb-fix")])],
         "fb-2": [_v("adm-dana", "mixed", [(_SPINES, "verb-increase")]), _v("adm-lee", "mixed", [(_SPINES, "verb-increase")]),
@@ -321,17 +354,15 @@ def _build_seed() -> FeedbackFile:
                  _v("adm-sam", "unpleasant", [(_SPINES, "verb-increase")])],
         "fb-7": [_v("adm-dana", "pleasant", [(_SPINES, "verb-increase")]), _v("adm-lee", "mixed", [(_SPINES, "verb-increase")]),
                  _v("adm-sam", "mixed", [(_SPINES, "verb-increase")])],
-        # Still in validation.
         "fb-3": [_v("adm-dana", "unpleasant", [(_SEARCH, "verb-improve")]), _v("adm-lee", "unpleasant", [(_SEARCH, "verb-improve")])],
         "fb-4": [_v("adm-sam", "pleasant", [(_PROGRESS, "verb-keep")])],
     }
     file = FeedbackFile(
-        admins=_SEED_ADMINS,
+        admins=_seed_admins(),
         verbCategories=[VerbCategory(id=i, name=n, keywords=k) for i, n, k in _SEED_VERBS],
         messages=_SEED_MESSAGES,
         validations=validations,
     )
-    # A little voting activity so the Process list is not empty.
     case_key = f"{_SPINES.key()}::verb-increase"
     state = CaseState(id=case_id(case_key), key=case_key)
     state.votes = [
@@ -353,7 +384,7 @@ def _build_seed() -> FeedbackFile:
 
 
 # --------------------------------------------------------------------------
-# Persistence
+# Persistence (and the one-time move from schema version 1)
 # --------------------------------------------------------------------------
 
 _lock = threading.RLock()
@@ -367,13 +398,50 @@ def _save(root: Path, file: FeedbackFile) -> None:
     project_store._atomic_write_json(root, _path(root), file.model_dump(mode="json"))
 
 
+def _expand(pattern: str) -> list[str]:
+    """An old access entry, "Page/Console" or "Page/*", as explicit console keys."""
+    page, _, console = pattern.partition("/")
+    if console == "*":
+        return [k for k in all_consoles() if k.startswith(page + "/")]
+    return [pattern]
+
+
+def _migrate_v1(raw: dict) -> dict:
+    """Version 1 kept three access lists per admin (processing, configuration, project plan); version 2 keeps
+    roles per console (processor, configurer, planner). Quorum, overrides and majority filtering are gone; the
+    stored messages, validations, votes, solutions and cases carry over unchanged."""
+    mapping = (("processing", "processor"), ("configuration", "configurer"), ("projectPlan", "planner"))
+    for admin in raw.get("admins", []):
+        if "roles" in admin:
+            continue
+        roles: dict[str, list[str]] = {}
+        for old, role in mapping:
+            for pattern in admin.pop(old, None) or []:
+                for key in _expand(pattern):
+                    have = roles.setdefault(key, [])
+                    if role not in have:
+                        have.append(role)
+        admin["roles"] = roles
+    raw.setdefault("roleHistory", [])
+    raw.setdefault("messageHistory", {})
+    raw["schemaVersion"] = SCHEMA_VERSION
+    return raw
+
+
 def load(root: Path) -> FeedbackFile:
     path = _path(root)
     if not path.exists():
         file = _build_seed()
         _save(root, file)
         return file
-    return FeedbackFile.model_validate_json(path.read_text(encoding="utf-8"))
+    raw = json.loads(path.read_text(encoding="utf-8"))
+    migrated = raw.get("schemaVersion", 1) < SCHEMA_VERSION
+    if migrated:
+        raw = _migrate_v1(raw)
+    file = FeedbackFile.model_validate(raw)
+    if migrated:
+        _save(root, file)
+    return file
 
 
 def mutate(root: Path, fn) -> FeedbackFile:
@@ -385,20 +453,14 @@ def mutate(root: Path, fn) -> FeedbackFile:
 
 
 # --------------------------------------------------------------------------
-# Rules
+# Roles
 # --------------------------------------------------------------------------
+
+_ROLE_WORDS = {"processor": "the Processor role", "configurer": "the Configurer role", "planner": "the Planner role"}
 
 
 def case_id(key: str) -> str:
     return "case-" + hashlib.sha1(key.encode("utf-8")).hexdigest()[:10]
-
-
-def required_validations(file: FeedbackFile) -> int:
-    return MAX_REQUIRED_VALIDATIONS if len(file.admins) >= MAX_REQUIRED_VALIDATIONS else 1
-
-
-def _covers(patterns: list[str], page: str, console: str) -> bool:
-    return f"{page}/{console}" in patterns or f"{page}/*" in patterns
 
 
 def admin_by_id(file: FeedbackFile, admin_id: str) -> Admin:
@@ -408,44 +470,55 @@ def admin_by_id(file: FeedbackFile, admin_id: str) -> Admin:
     raise Forbidden(f"Unknown admin {admin_id!r}")
 
 
-def can(admin: Admin, level: Literal["processing", "configuration", "projectPlan"], page: str, console: str) -> bool:
-    return _covers(getattr(admin, level), page, console)
+def has_role(admin: Admin, role: str, page: str, console: str) -> bool:
+    return role in admin.roles.get(f"{page}/{console}", [])
 
 
-def require(admin: Admin, level: Literal["processing", "configuration", "projectPlan"], page: str, console: str, what: str) -> None:
-    if not can(admin, level, page, console):
-        names = {"processing": "feedback processing", "configuration": "configuration", "projectPlan": "project plan"}
-        raise Forbidden(f"{what} needs {names[level]} access to {page} > {console}.")
+def require_role(admin: Admin, role: str, page: str, console: str, what: str) -> None:
+    if not has_role(admin, role, page, console):
+        raise Forbidden(f"{what} needs {_ROLE_WORDS[role]} on {page} > {console}.")
 
 
-def require_close(admin: Admin, page: str, console: str) -> None:
-    if not (can(admin, "configuration", page, console) and can(admin, "projectPlan", page, console)):
-        raise Forbidden(f"Closing a case needs configuration and project plan access to {page} > {console}.")
+# --------------------------------------------------------------------------
+# Tone
+# --------------------------------------------------------------------------
 
 
-_TONE_VALUE: dict[str, int] = {"pleasant": 1, "unpleasant": -1, "mixed": 0, "neutral": 0}
-
-
-def tone_band(net: int, count: int) -> ToneBand:
-    """Five bands over the average response (-1 = every response unpleasant, +1 = every one pleasant):
-    0.5 or more mostly pleasant, above 0 slightly pleasant, 0 neutral, and the mirror image below."""
-    if count == 0 or net == 0:
+def tone_category(labels: list[str]) -> Optional[ToneCategory]:
+    """One category from the validators' labels. A mixed label is one pleasant vote and one unpleasant vote;
+    neutral is no vote. With n validators: neutral when half or more are neutral; else mixed when pleasant and
+    unpleasant votes each reach half; else pleasant / unpleasant at 75%; else mixed-leaning pleasant /
+    unpleasant at 50%; else mixed. None with no validators."""
+    n = len(labels)
+    if n == 0:
+        return None
+    pleasant = sum(1 for t in labels if t in ("pleasant", "mixed"))
+    unpleasant = sum(1 for t in labels if t in ("unpleasant", "mixed"))
+    neutral = sum(1 for t in labels if t == "neutral")
+    p, u, z = pleasant / n, unpleasant / n, neutral / n
+    if z >= 0.5:
         return "neutral"
-    score = net / count
-    if score >= 0.5:
-        return "mostlyPleasant"
-    if score > 0:
-        return "slightlyPleasant"
-    if score <= -0.5:
-        return "mostlyUnpleasant"
-    return "slightlyUnpleasant"
+    if p >= 0.5 and u >= 0.5:
+        return "mixed"
+    if p >= 0.75:
+        return "pleasant"
+    if u >= 0.75:
+        return "unpleasant"
+    if p >= 0.5:
+        return "mixedPleasant"
+    if u >= 0.5:
+        return "mixedUnpleasant"
+    return "mixed"
 
 
-def tone_summary(message: Message, validations: list[Validation]) -> dict:
-    """The score over every response: the sender's own tone and each admin's."""
-    tones: list[str] = [t for t in [message.senderTone, *[v.tone for v in validations]] if t is not None]
-    net = sum(_TONE_VALUE[t] for t in tones)
-    return {"net": net, "count": len(tones), "band": tone_band(net, len(tones))}
+def tone_summary(labels: list[str]) -> dict:
+    return {
+        "category": tone_category(labels),
+        "pleasant": sum(1 for t in labels if t in ("pleasant", "mixed")),
+        "unpleasant": sum(1 for t in labels if t in ("unpleasant", "mixed")),
+        "neutral": sum(1 for t in labels if t == "neutral"),
+        "n": len(labels),
+    }
 
 
 def flags_for(text: str, categories: list[VerbCategory]) -> list[dict]:
@@ -460,44 +533,53 @@ def flags_for(text: str, categories: list[VerbCategory]) -> list[dict]:
     return found
 
 
-def reconcile(message: Message, validations: list[Validation], required: int) -> dict:
-    complete = [v for v in validations if v.complete()]
-    n = len(complete)
-    channel_votes: dict[str, int] = {}
-    statement_votes: dict[tuple[str, str], int] = {}
-    channels: dict[str, ChannelTag] = {}
-    for v in complete:
-        for c in v.channels:
-            channels[c.key()] = c
-            channel_votes[c.key()] = channel_votes.get(c.key(), 0) + 1
-        for s in v.statements:
-            k = (s.channel.key(), s.verbId)
-            statement_votes[k] = statement_votes.get(k, 0) + 1
-    kept_channels = [channels[k] for k, c in channel_votes.items() if n and c * 2 >= n]
-    kept_statements = [{"channel": channels[k[0]], "verbId": k[1]} for k, c in statement_votes.items() if n and c * 2 >= n]
-    return {"complete": n, "atQuorum": n >= required, "channels": kept_channels, "statements": kept_statements}
+# --------------------------------------------------------------------------
+# Cases
+# --------------------------------------------------------------------------
 
 
 def _statement_key(channel: ChannelTag, verb_id: str) -> str:
     return f"{channel.key()}::{verb_id}"
 
 
+def selections_for(validations: list[Validation]) -> list[dict]:
+    """Every subject and verb any validator chose, with how many validators chose each, most common first."""
+    subjects: dict[str, dict] = {}
+    for v in validations:
+        for c in v.channels:
+            subjects.setdefault(c.key(), {"channel": c, "chosenBy": 0, "verbs": {}})["chosenBy"] += 1
+        for s in v.statements:
+            entry = subjects.setdefault(s.channel.key(), {"channel": s.channel, "chosenBy": 0, "verbs": {}})
+            entry["verbs"][s.verbId] = entry["verbs"].get(s.verbId, 0) + 1
+    out = []
+    for entry in subjects.values():
+        verbs = [{"verbId": vid, "chosenBy": n} for vid, n in sorted(entry["verbs"].items(), key=lambda kv: (-kv[1], kv[0]))]
+        out.append({"channel": entry["channel"], "chosenBy": entry["chosenBy"], "verbs": verbs})
+    out.sort(key=lambda e: (-e["chosenBy"], e["channel"].key()))
+    return out
+
+
 def derive_cases(file: FeedbackFile) -> list[dict]:
-    """Every statement case the messages at quorum produce, with its stored state."""
-    required = required_validations(file)
+    """Every statement case the completed validations produce, with its stored state. A message is in every
+    (subject, verb) statement chosen by any validator who completed it."""
     members: dict[str, dict] = {}
     for m in file.messages:
         vals = file.validations.get(m.id, [])
-        rec = reconcile(m, vals, required)
-        if not rec["atQuorum"]:
+        complete = [v for v in vals if v.complete()]
+        if not complete:
             continue
-        summary = tone_summary(m, vals)
-        for st in rec["statements"]:
-            key = _statement_key(st["channel"], st["verbId"])
-            entry = members.setdefault(key, {"channel": st["channel"], "verbId": st["verbId"], "messages": []})
+        labels = [v.tone for v in vals if v.tone is not None]
+        summary = tone_summary(labels)
+        per_key: dict[str, tuple[ChannelTag, str, set[str]]] = {}
+        for v in complete:
+            for st in v.statements:
+                per_key.setdefault(_statement_key(st.channel, st.verbId), (st.channel, st.verbId, set()))[2].add(v.adminId)
+        for key, (channel, verb_id, validators) in per_key.items():
+            entry = members.setdefault(key, {"channel": channel, "verbId": verb_id, "messages": [], "validators": set(), "labels": []})
+            entry["validators"] |= validators
+            entry["labels"].extend(labels)
             entry["messages"].append({
-                "messageId": m.id, "text": m.text, "author": m.author, "submittedAt": m.submittedAt,
-                "senderTone": m.senderTone, "tone": summary,
+                "messageId": m.id, "text": m.text, "submittedAt": m.submittedAt, "senderTone": m.senderTone, "tone": summary,
             })
     verbs = {v.id: v for v in file.verbCategories}
     out = []
@@ -505,8 +587,11 @@ def derive_cases(file: FeedbackFile) -> list[dict]:
         cid = case_id(key)
         state = file.cases.get(cid) or CaseState(id=cid, key=key)
         verb = verbs.get(entry["verbId"])
-        out.append({"state": state, "channel": entry["channel"], "verbId": entry["verbId"],
-                    "verbName": verb.name if verb else entry["verbId"], "messages": entry["messages"]})
+        out.append({
+            "state": state, "channel": entry["channel"], "verbId": entry["verbId"],
+            "verbName": verb.name if verb else entry["verbId"], "messages": entry["messages"],
+            "validators": len(entry["validators"]), "tone": tone_summary(entry["labels"]),
+        })
     return out
 
 
@@ -521,39 +606,79 @@ def _clean_note(note: str, on: bool) -> str:
     return note.strip()[:NOTE_MAX] if on else ""
 
 
-def apply_vote(votes: list[Vote], admin_id: str, approve: bool, deny: bool, approve_note: str, deny_note: str) -> Optional[str]:
+def apply_vote(
+    votes: list[Vote], admin_id: str, approve: bool, deny: bool, passed: bool,
+    approve_note: str, deny_note: str, pass_note: str,
+) -> Optional[str]:
     """Set (or clear) one admin's vote in a list. Returns what changed for the history, or None when only a
     note changed (typing a note is not a new vote)."""
     before = next((v for v in votes if v.adminId == admin_id), None)
-    was = (before.approve, before.deny) if before else (False, False)
+    was = (before.approve, before.deny, before.passed) if before else (False, False, False)
     votes[:] = [v for v in votes if v.adminId != admin_id]
-    if not approve and not deny:
-        return "withdrew" if was != (False, False) else None
-    votes.append(Vote(adminId=admin_id, approve=approve, deny=deny,
-                      approveNote=_clean_note(approve_note, approve), denyNote=_clean_note(deny_note, deny)))
-    if was == (approve, deny):
+    now = (approve, deny, passed)
+    if now == (False, False, False):
+        return "withdrew" if was != now else None
+    votes.append(Vote(
+        adminId=admin_id, approve=approve, deny=deny, passed=passed,
+        approveNote=_clean_note(approve_note, approve), denyNote=_clean_note(deny_note, deny), passNote=_clean_note(pass_note, passed),
+    ))
+    if was == now:
         return None
-    return "approved and denied" if approve and deny else ("approved" if approve else "denied")
+    words = [w for w, on in (("approved", approve), ("denied", deny), ("passed", passed)) if on]
+    return " and ".join(words)
+
+
+# --------------------------------------------------------------------------
+# The bundle (anonymous: no author names, no other admin's id)
+# --------------------------------------------------------------------------
+
+
+def _vote_view(v: Vote, me: str) -> dict:
+    return {
+        "mine": v.adminId == me, "approve": v.approve, "deny": v.deny, "passed": v.passed,
+        "approveNote": v.approveNote, "denyNote": v.denyNote, "passNote": v.passNote, "updatedAt": v.updatedAt.isoformat(),
+    }
+
+
+def _history_view(events: list[HistoryEvent], me: str) -> list[dict]:
+    return [{"at": e.at.isoformat(), "kind": e.kind, "detail": e.detail, "mine": e.adminId == me} for e in events]
 
 
 def bundle(file: FeedbackFile, admin_id: str) -> dict:
     """Everything the Inbox shows, for one signed-in admin."""
     me = admin_by_id(file, admin_id)
-    required = required_validations(file)
+    sees_tones = has_role(me, "configurer", *INBOX_CONSOLE)
     messages = []
     for m in file.messages:
         vals = file.validations.get(m.id, [])
-        rec = reconcile(m, vals, required)
+        views = []
+        for v in sorted(vals, key=lambda x: (x.adminId != admin_id, x.adminId)):
+            mine = v.adminId == admin_id
+            views.append({
+                "mine": mine,
+                # Other validators' individual tone labels are for Configurers only.
+                "tone": v.tone if (mine or sees_tones) else None,
+                "toneSet": v.tone is not None,
+                "channels": [c.model_dump(mode="json") for c in v.channels],
+                "statements": [s.model_dump(mode="json") for s in v.statements],
+                "complete": v.complete(),
+            })
+        labels = [v.tone for v in vals if v.tone is not None]
         messages.append({
-            "message": m.model_dump(mode="json"),
-            "flags": flags_for(m.text, file.verbCategories),
-            "validations": [v.model_dump(mode="json") | {"complete": v.complete()} for v in vals],
-            "tone": tone_summary(m, vals),
-            "reconciled": {
-                "complete": rec["complete"], "required": required, "atQuorum": rec["atQuorum"],
-                "channels": [c.model_dump(mode="json") for c in rec["channels"]],
-                "statements": [{"channel": s["channel"].model_dump(mode="json"), "verbId": s["verbId"]} for s in rec["statements"]],
+            "message": {
+                "id": m.id, "text": m.text, "submittedAt": m.submittedAt, "senderTone": m.senderTone,
+                "openPage": m.openPage, "openConsole": m.openConsole, "selectedComponent": m.selectedComponent,
             },
+            "flags": flags_for(m.text, file.verbCategories),
+            "validations": views,
+            "selections": [
+                {"channel": s["channel"].model_dump(mode="json"), "chosenBy": s["chosenBy"], "verbs": s["verbs"]}
+                for s in selections_for(vals)
+            ],
+            "tone": tone_summary(labels),
+            "validationCount": sum(1 for v in vals if v.complete()),
+            "joined": any(v.complete() for v in vals),
+            "history": _history_view(file.messageHistory.get(m.id, []), admin_id),
         })
     cases = []
     for c in derive_cases(file):
@@ -561,29 +686,35 @@ def bundle(file: FeedbackFile, admin_id: str) -> dict:
         ch: ChannelTag = c["channel"]
         cases.append({
             "id": st.id, "key": st.key, "channel": ch.model_dump(mode="json"), "verbId": c["verbId"], "verbName": c["verbName"],
-            "status": st.status, "messages": c["messages"],
-            "votes": [v.model_dump(mode="json") for v in st.votes],
-            "solutions": [s.model_dump(mode="json") for s in st.solutions],
-            "closedBy": st.closedBy, "closedAt": st.closedAt.isoformat() if st.closedAt else None, "closeNote": st.closeNote,
-            "history": [h.model_dump(mode="json") for h in st.history],
+            "status": st.status, "messages": c["messages"], "tone": c["tone"], "validators": c["validators"],
+            "votes": [_vote_view(v, admin_id) for v in st.votes if v.approve or v.deny or v.passed],
+            "solutions": [{
+                "id": s.id, "title": s.title, "description": s.description, "target": s.target.model_dump(mode="json"),
+                "mine": s.proposedBy == admin_id, "createdAt": s.createdAt.isoformat(),
+                "votes": [_vote_view(v, admin_id) for v in s.votes if v.approve or v.deny or v.passed],
+            } for s in st.solutions],
+            "closedAt": st.closedAt.isoformat() if st.closedAt else None, "closeNote": st.closeNote,
+            "history": _history_view(st.history, admin_id),
             "can": {
-                "vote": can(me, "processing", ch.page, ch.console),
-                "propose": can(me, "configuration", ch.page, ch.console),
-                "close": can(me, "configuration", ch.page, ch.console) and can(me, "projectPlan", ch.page, ch.console),
-                "reopen": can(me, "configuration", ch.page, ch.console),
+                "vote": has_role(me, "processor", ch.page, ch.console),
+                "propose": has_role(me, "configurer", ch.page, ch.console),
+                "close": has_role(me, "planner", ch.page, ch.console),
+                "reopen": has_role(me, "configurer", ch.page, ch.console),
             },
         })
     return {
         "me": me.id,
-        "admins": [a.model_dump(mode="json") for a in file.admins],
-        "requiredValidations": required,
+        "admins": [{"id": a.id, "name": a.name, "roles": a.roles} for a in file.admins],
+        "consoles": all_consoles(),
         "taxonomy": TAXONOMY,
         "verbCategories": [v.model_dump(mode="json") for v in file.verbCategories],
         "messages": messages,
         "cases": cases,
+        "roleHistory": _history_view(file.roleHistory, admin_id),
         "can": {
-            "validate": can(me, "processing", *INBOX_CONSOLE),
-            "manageVerbs": can(me, "configuration", *INBOX_CONSOLE),
+            "validate": has_role(me, "processor", *INBOX_CONSOLE),
+            "manageVerbs": has_role(me, "configurer", *INBOX_CONSOLE),
+            "seeTones": sees_tones,
         },
     }
 
@@ -604,24 +735,28 @@ def _check_tag(tag: ChannelTag, *, need_feature: bool) -> None:
     if not taxonomy_has(tag.page, tag.console, tag.component, tag.feature):
         raise FeedbackError(f"Unknown channel {tag.page} > {tag.console} > {tag.component}" + (f" > {tag.feature}" if tag.feature else ""))
     if need_feature and not tag.feature:
-        raise FeedbackError("A channel needs a page, console, component and feature.")
+        raise FeedbackError("A subject needs a page, console, component and feature.")
 
 
 def set_validation(
     file: FeedbackFile, admin_id: str, message_id: str,
     tone: Optional[Tone], channels: Optional[list[ChannelTag]], statements: Optional[list[Statement]],
 ) -> None:
-    """Update this admin's validation of a message. Fields left out are unchanged."""
+    """Update this admin's validation of a message. Fields left out are unchanged. Stages run in order: a tone
+    first, then subjects, then a verb on each subject."""
     admin = admin_by_id(file, admin_id)
-    require(admin, "processing", *INBOX_CONSOLE, what="Validating feedback")
+    require_role(admin, "processor", *INBOX_CONSOLE, what="Validating feedback")
     _message(file, message_id)
     verbs = {v.id for v in file.verbCategories}
     mine = next((v for v in file.validations.setdefault(message_id, []) if v.adminId == admin_id), None)
     if mine is None:
         mine = Validation(adminId=admin_id)
         file.validations[message_id].append(mine)
+    was_complete = mine.complete()
     if tone is not None:
         mine.tone = tone
+    if (channels is not None or statements is not None) and mine.tone is None:
+        raise FeedbackError("Tone this message first.")
     if channels is not None:
         seen: dict[str, ChannelTag] = {}
         for c in channels:
@@ -636,10 +771,12 @@ def set_validation(
             if s.verbId not in verbs:
                 raise FeedbackError(f"Unknown verb category {s.verbId!r}")
             if s.channel.key() not in have:
-                raise FeedbackError("A verb needs its channel added first.")
+                raise FeedbackError("A verb needs its subject added first.")
             keep.setdefault((s.channel.key(), s.verbId), s)
         mine.statements = list(keep.values())
     mine.updatedAt = utcnow()
+    if mine.complete() and not was_complete:
+        file.messageHistory.setdefault(message_id, []).append(HistoryEvent(adminId=admin_id, kind="validated", detail="completed a validation"))
 
 
 def _open_case(file: FeedbackFile, cid: str) -> tuple[dict, CaseState]:
@@ -651,12 +788,15 @@ def _open_case(file: FeedbackFile, cid: str) -> tuple[dict, CaseState]:
     return derived, state
 
 
-def vote_on_case(file: FeedbackFile, admin_id: str, cid: str, approve: bool, deny: bool, approve_note: str, deny_note: str) -> None:
+def vote_on_case(
+    file: FeedbackFile, admin_id: str, cid: str, approve: bool, deny: bool, passed: bool,
+    approve_note: str, deny_note: str, pass_note: str,
+) -> None:
     admin = admin_by_id(file, admin_id)
     derived, state = _open_case(file, cid)
     ch: ChannelTag = derived["channel"]
-    require(admin, "processing", ch.page, ch.console, what="Voting")
-    what = apply_vote(state.votes, admin_id, approve, deny, approve_note, deny_note)
+    require_role(admin, "processor", ch.page, ch.console, what="Voting")
+    what = apply_vote(state.votes, admin_id, approve, deny, passed, approve_note, deny_note, pass_note)
     if what:
         state.history.append(HistoryEvent(adminId=admin_id, kind="vote", detail=what))
 
@@ -665,7 +805,7 @@ def propose_solution(file: FeedbackFile, admin_id: str, cid: str, title: str, de
     admin = admin_by_id(file, admin_id)
     derived, state = _open_case(file, cid)
     ch: ChannelTag = derived["channel"]
-    require(admin, "configuration", ch.page, ch.console, what="Proposing a solution")
+    require_role(admin, "configurer", ch.page, ch.console, what="Proposing a solution")
     _check_tag(target, need_feature=False)
     title = title.strip()
     if not title:
@@ -681,16 +821,16 @@ def propose_solution(file: FeedbackFile, admin_id: str, cid: str, title: str, de
 
 def vote_on_solution(
     file: FeedbackFile, admin_id: str, cid: str, solution_id: str,
-    approve: bool, deny: bool, approve_note: str, deny_note: str,
+    approve: bool, deny: bool, passed: bool, approve_note: str, deny_note: str, pass_note: str,
 ) -> None:
     admin = admin_by_id(file, admin_id)
     derived, state = _open_case(file, cid)
     ch: ChannelTag = derived["channel"]
-    require(admin, "processing", ch.page, ch.console, what="Voting")
+    require_role(admin, "processor", ch.page, ch.console, what="Voting")
     solution = next((s for s in state.solutions if s.id == solution_id), None)
     if solution is None:
         raise NotFound(f"Solution {solution_id} not found")
-    what = apply_vote(solution.votes, admin_id, approve, deny, approve_note, deny_note)
+    what = apply_vote(solution.votes, admin_id, approve, deny, passed, approve_note, deny_note, pass_note)
     if what:
         state.history.append(HistoryEvent(adminId=admin_id, kind="solution-vote", detail=f"{what} {solution.title}"))
 
@@ -699,7 +839,7 @@ def close_case(file: FeedbackFile, admin_id: str, cid: str, outcome: Literal["ap
     admin = admin_by_id(file, admin_id)
     derived, state = _open_case(file, cid)
     ch: ChannelTag = derived["channel"]
-    require_close(admin, ch.page, ch.console)
+    require_role(admin, "planner", ch.page, ch.console, what="Closing a case")
     state.status = outcome
     state.closedBy = admin_id
     state.closedAt = utcnow()
@@ -712,7 +852,7 @@ def reopen_case(file: FeedbackFile, admin_id: str, cid: str) -> None:
     derived = find_case(file, cid)
     state: CaseState = derived["state"]
     ch: ChannelTag = derived["channel"]
-    require(admin, "configuration", ch.page, ch.console, what="Reopening a case")
+    require_role(admin, "configurer", ch.page, ch.console, what="Reopening a case")
     if state.status == "open":
         raise Conflict("This case is already open.")
     file.cases[state.id] = state
@@ -721,6 +861,34 @@ def reopen_case(file: FeedbackFile, admin_id: str, cid: str) -> None:
     state.closedAt = None
     state.closeNote = ""
     state.history.append(HistoryEvent(adminId=admin_id, kind="reopened", detail=""))
+
+
+# --- roles ------------------------------------------------------------------
+
+
+def set_roles(file: FeedbackFile, actor_id: str, admin_id: str, console: str, roles: list[str]) -> None:
+    """Set the roles an admin holds on one console (Admin > Manager > Assignment). Anyone may assign for now (no login
+    yet), but nobody can remove their own Configurer role on Helper > Inbox, so someone always manages verb categories."""
+    actor = admin_by_id(file, actor_id)
+    target = admin_by_id(file, admin_id)
+    if console not in all_consoles():
+        raise FeedbackError(f"Unknown console {console!r}")
+    unknown = [r for r in roles if r not in ROLE_ORDER]
+    if unknown:
+        raise FeedbackError(f"Unknown role {unknown[0]!r}")
+    clean = [r for r in ROLE_ORDER if r in roles]
+    inbox_key = "/".join(INBOX_CONSOLE)
+    if actor.id == target.id and console == inbox_key and "configurer" in target.roles.get(console, []) and "configurer" not in clean:
+        raise Forbidden("You cannot remove your own Configurer role on Helper > Inbox.")
+    before = list(target.roles.get(console, []))
+    if before == clean:
+        return
+    if clean:
+        target.roles[console] = clean  # type: ignore[assignment]
+    else:
+        target.roles.pop(console, None)
+    words = ", ".join(clean) if clean else "no roles"
+    file.roleHistory.append(HistoryEvent(adminId=actor_id, kind="roles", detail=f"{target.name}: {console.replace('/', ' > ')} set to {words}"))
 
 
 # --- verb categories -------------------------------------------------------
@@ -736,7 +904,7 @@ def _clean_keywords(keywords: list[str]) -> list[str]:
 
 
 def _require_manage_verbs(file: FeedbackFile, admin_id: str) -> None:
-    require(admin_by_id(file, admin_id), "configuration", *INBOX_CONSOLE, what="Managing verb categories")
+    require_role(admin_by_id(file, admin_id), "configurer", *INBOX_CONSOLE, what="Managing verb categories")
 
 
 def _name_taken(file: FeedbackFile, name: str, except_id: str = "") -> bool:

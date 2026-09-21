@@ -5,6 +5,7 @@ import {
 } from './bookColors'
 import { DEFAULT_PALETTE } from './defaults'
 import { deriveTokens } from './tokens'
+import { ZONE_LOOKS } from './zoneLooks'
 import { readableInk } from './contrast'
 
 describe('hexToHue', () => {
@@ -77,19 +78,20 @@ describe('colour css and cover colour', () => {
     expect(accentColorCss(40)).toBe('hsl(40, var(--color-accent-s), var(--color-accent-l))')
   })
 
-  it('uses the theme saturation and lightness for a cover', () => {
-    const cover = coverColor(DEFAULT_PALETTE, 200)
-    expect(cover.h).toBe(200)
-    expect(cover.s).toBe(DEFAULT_PALETTE.theme.s)
-    expect(cover.l).toBe(DEFAULT_PALETTE.brightness)
-    expect(readableInk(cover).l).toBe(100) // a mid-dark cover gets light ink
+  it('uses the theme saturation and lightness of the zone for a cover', () => {
+    const cover = coverColor(DEFAULT_PALETTE, 'day', 200)
+    expect(cover).toEqual({ h: 200, s: ZONE_LOOKS.day.themeS, l: ZONE_LOOKS.day.themeL })
+    expect(readableInk(cover).l).toBe(8) // a light cover gets dark ink
+    const night = coverColor(DEFAULT_PALETTE, 'night', 200)
+    expect(night).toEqual({ h: 200, s: ZONE_LOOKS.night.themeS, l: ZONE_LOOKS.night.themeL })
+    expect(readableInk(night).l).toBe(100) // a dark cover gets light ink
   })
 })
 
 describe('bookScopeVars', () => {
   it('swaps in the theme hue and keeps the zone saturation and lightness', () => {
-    const vars = bookScopeVars(DEFAULT_PALETTE, 'user', 200, null)
-    const base = deriveTokens(DEFAULT_PALETTE, 'user')
+    const vars = bookScopeVars(DEFAULT_PALETTE, 'day', 'user', 200, null)
+    const base = deriveTokens(DEFAULT_PALETTE, 'user', 'day')
     expect(vars['--color-theme-h']).toBe('200')
     expect(vars['--color-theme-s']).toBe(base['--color-theme-s'])
     expect(vars['--color-theme-l']).toBe(base['--color-theme-l'])
@@ -97,9 +99,9 @@ describe('bookScopeVars', () => {
   })
 
   it('swaps in the accent hue when there is one', () => {
-    const vars = bookScopeVars(DEFAULT_PALETTE, 'user', 200, 90)
+    const vars = bookScopeVars(DEFAULT_PALETTE, 'day', 'user', 200, 90)
     expect(vars['--color-accent-h']).toBe('90')
-    expect(vars['--color-accent-s']).toBe(`${DEFAULT_PALETTE.accent.s}%`)
+    expect(vars['--color-accent-s']).toBe(`${ZONE_LOOKS.day.accentS}%`)
     expect(vars['--on-accent']).toBeTruthy()
   })
 })

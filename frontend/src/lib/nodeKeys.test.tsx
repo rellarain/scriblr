@@ -6,16 +6,22 @@ import { removalTarget, resolveKey, tabCandidates, useNodeKeys, type KeyInput } 
 
 const base: KeyInput = {
   key: 'Enter', shift: false, ctrl: false, meta: false, alt: false, composing: false,
-  field: 'single', readOnly: false, fieldEmpty: false, nodeEmpty: false, hasParent: true, canCreateParentSibling: true,
+  field: 'single', readOnly: false, fieldEmpty: false, nodeEmpty: false, hasParent: true, canCreateParentSibling: true, canCreateChild: true,
 }
 const key = (over: Partial<KeyInput>) => resolveKey({ ...base, ...over })
 
 describe('resolveKey', () => {
-  it('Enter in a field with text adds a sibling; Shift+Enter is a new line in multi-line fields only', () => {
+  it('Enter in a field with text adds a sibling; Shift+Enter adds a child in single-line fields and is a new line in multi-line ones', () => {
     expect(key({})).toBe('createSibling')
     expect(key({ field: 'multi' })).toBe('createSibling')
     expect(key({ shift: true, field: 'multi' })).toBe('none') // the browser's new line
-    expect(key({ shift: true, field: 'single' })).toBe('createSibling')
+    expect(key({ shift: true, field: 'single' })).toBe('createChild')
+  })
+
+  it('Shift+Enter does nothing where the node has no child level, or in a blank field', () => {
+    expect(key({ shift: true, canCreateChild: false })).toBe('swallow')
+    expect(key({ shift: true, fieldEmpty: true })).toBe('swallow')
+    expect(key({ shift: true, nodeEmpty: true, fieldEmpty: true })).toBe('removeToParent')
   })
 
   it('Enter in a blank field of a node that has other text does nothing', () => {
@@ -170,6 +176,17 @@ function Harness({ start = initial(), snapshot }: { start?: Item[]; snapshot?: (
       return parent ? add(parent.parentId, parent.id) : null
     },
     canCreateParentSibling: id => Boolean(get(id)?.parentId),
+    // Scenes have no child level; acts take a scene.
+    createChild: id => {
+      const newId = `new${++counter}`
+      setItems(prev => {
+        const last = [...prev].reverse().find(i => i.parentId === id)
+        const at = prev.findIndex(i => i.id === (last?.id ?? id))
+        return [...prev.slice(0, at + 1), { id: newId, parentId: id, title: '', body: '' }, ...prev.slice(at + 1)]
+      })
+      return newId
+    },
+    canCreateChild: id => !get(id)?.parentId,
     remove: id => setItems(prev => prev.filter(i => i.id !== id)),
   })
   const patch = (id: string, p: Partial<Item>) => setItems(prev => prev.map(i => (i.id === id ? { ...i, ...p } : i)))
@@ -189,6 +206,23 @@ const press = (el: HTMLElement, opts: Parameters<typeof fireEvent.keyDown>[1]) =
 const focused = () => (document.activeElement as HTMLElement | null)?.getAttribute('aria-label')
 
 describe('handleNodeKey', () => {
+  it('Shift+Enter adds a child as the last of the node, and focuses it', async () => {
+    render(<Harness />)
+    field('title r1').focus()
+    expect(press(field('title r1'), { key: 'Enter', shiftKey: true })).toBe(false)
+    await waitFor(() => expect(focused()).toMatch(/^title new/))
+    const parents = [...document.querySelectorAll('[data-knode]')].map(n => (n as HTMLElement).dataset.knode)
+    expect(parents.slice(0, 5)).toEqual(['r1', 'a', 'b', parents[3], 'r2'])
+    expect(parents[3]).toMatch(/^new/)
+  })
+
+  it('Shift+Enter does nothing on a node with no child level', () => {
+    render(<Harness />)
+    field('title a').focus()
+    expect(press(field('title a'), { key: 'Enter', shiftKey: true })).toBe(false)
+    expect(document.querySelectorAll('[data-knode]').length).toBe(5)
+  })
+
   it('Enter adds a sibling right after the node and focuses its first field', async () => {
     render(<Harness />)
     field('title a').focus()

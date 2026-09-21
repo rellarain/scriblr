@@ -5,10 +5,11 @@ import { ColorRange } from '../components/ColorRange'
 import { CURRENT_USER } from '../userSeed'
 import { ZONE_ICON } from './ThemeZoneToggles'
 import { readableInk } from './contrast'
-import { contrastBand, deriveTokens, effectiveBrightness } from './tokens'
+import { deriveTokens } from './tokens'
 import { copyPalette, disableZone, enableZone, configuredZones, formatMinute, STEP_MINUTES } from './zones'
-import { editBrightness, editHue, editSaturation, legalRange } from './paletteRules'
+import { editHue } from './paletteRules'
 import { derivedShades, hslCss, tints, type Swatch } from './palettes'
+import { ZONE_LOOKS, resolvePalette } from './zoneLooks'
 import { setPreviewZone, useThemeState } from './useTheme'
 import { ZONE_KEYS, ZONE_LABEL, type PaletteKey, type Role, type ZoneKey, type ZonePalette } from './types'
 import './themeSettings.scss'
@@ -19,7 +20,7 @@ const COLOR_ROWS: Array<{ key: PaletteKey; label: string; hint: string; adminOnl
   { key: 'theme', label: 'Theme', hint: 'Inert, inactive and read-only elements' },
   { key: 'accent', label: 'Accent', hint: 'Interactive, dynamic and active items' },
   { key: 'alert', label: 'Alert', hint: 'Warnings, errors and notifications' },
-  { key: 'accent2', label: 'Accent 2', hint: 'Admin features', adminOnly: true },
+  { key: 'accent2', label: 'Admin accent', hint: 'Admin panel and admin-only items', adminOnly: true },
 ]
 
 // One slider: its name, the colour selector, and the value.
@@ -35,9 +36,9 @@ function SliderRow({ label, unit, value, children }: { label: string; unit: stri
 
 // The palette generated for a colour: the shades the app really derives from
 // it (named), and an even ladder of tints.
-function Palette({ pal, colorKey }: { pal: ZonePalette; colorKey: PaletteKey }) {
-  const derived = useMemo(() => derivedShades(pal, colorKey), [pal, colorKey])
-  const ladder = useMemo(() => tints(pal, colorKey), [pal, colorKey])
+function Palette({ pal, zone, colorKey }: { pal: ZonePalette; zone: ZoneKey; colorKey: PaletteKey }) {
+  const derived = useMemo(() => derivedShades(pal, colorKey, zone), [pal, zone, colorKey])
+  const ladder = useMemo(() => tints(pal, colorKey, zone), [pal, zone, colorKey])
   const chip = (s: Swatch, named: boolean) => (
     <span key={s.key} className={named ? 'themeChip themeChip--named' : 'themeChip'} title={`${s.label}: ${hslCss(s.color)}`}>
       <span className="themeChipColor" style={{ backgroundColor: hslCss(s.color) }} />
@@ -79,7 +80,7 @@ function Timeline({ selected }: { selected: ZoneKey }) {
     <div className="themeTimeline" role="img" aria-label="Time zones across the day">
       <div className="themeTimelineBar">
         {segments.map((seg, i) => {
-          const accent = theme.zones[seg.key].palette.accent
+          const accent = resolvePalette(theme.zones[seg.key].palette, seg.key).accent
           const fill = { h: accent.h, s: accent.s, l: 50 }
           const Icon = ZONE_ICON[seg.key]
           return (
@@ -103,9 +104,7 @@ function ZoneEditor({ zoneKey, role }: { zoneKey: ZoneKey; role: Role }) {
   const { theme } = useSettings()
   const zone = theme.zones[zoneKey]
   const pal = zone.palette
-  const vars = useMemo(() => deriveTokens(pal, role), [pal, role])
-  const band = useMemo(() => contrastBand(pal), [pal])
-  const effective = effectiveBrightness(pal).brightness
+  const vars = useMemo(() => deriveTokens(pal, role, zoneKey), [pal, role, zoneKey])
   const copySources = configuredZones(theme.zones).filter(k => k !== zoneKey)
 
   function updatePalette(fn: (p: ZonePalette) => ZonePalette) {
@@ -145,48 +144,27 @@ function ZoneEditor({ zoneKey, role }: { zoneKey: ZoneKey; role: Role }) {
         )}
       </div>
 
+      <p className="themeLook">{ZONE_LOOKS[zoneKey].summary}</p>
+
       {COLOR_ROWS.filter(row => !row.adminOnly || role === 'admin').map(row => {
-        const range = legalRange(pal, row.key)
-        const light = derivedShades(pal, row.key)[0].color.l
-        const { h, s } = pal[row.key]
+        const { s, l: light } = derivedShades(pal, row.key, zoneKey)[0].color
+        const { h } = pal[row.key]
         return (
           <section key={row.key} className="themeColor">
             <div className="themeColorHead">
               <span className="themeSwatch" style={{ backgroundColor: swatchColor(vars, row.key) }} />
               <strong>{row.label}</strong> <small>{row.hint}</small>
             </div>
-            <Palette pal={pal} colorKey={row.key} />
+            <Palette pal={pal} zone={zoneKey} colorKey={row.key} />
             <SliderRow label="Hue" unit="°" value={h}>
               <ColorRange
-                label={`${row.label} hue`} kind="hue" value={h} sat={s} light={light} live
+                label={`${row.label} hue`} value={h} sat={s} light={light} live
                 onChange={v => updatePalette(p => editHue(p, row.key, v))}
-              />
-            </SliderRow>
-            <SliderRow label="Saturation" unit="%" value={s}>
-              <ColorRange
-                label={`${row.label} saturation`} kind="saturation" value={s} min={range.min} max={range.max} hue={h} light={light} live
-                onChange={v => updatePalette(p => editSaturation(p, row.key, v))}
               />
             </SliderRow>
           </section>
         )
       })}
-
-      <section className="themeColor">
-        <div className="themeColorHead">
-          <strong>Brightness</strong> <small>text switches between light and dark automatically</small>
-        </div>
-        <SliderRow label="Brightness" unit="%" value={pal.brightness}>
-          <ColorRange
-            label="Brightness" kind="brightness" value={pal.brightness} hue={pal.theme.h} sat={pal.theme.s} live
-            onChange={b => updatePalette(p => editBrightness(p, b))}
-          />
-        </SliderRow>
-        <div className="themeBand" aria-hidden="true" title="Between the two limits the theme cannot show readable text, so it snaps to the nearer side">
-          <span style={{ left: `${band.maxLight}%`, width: `${Math.max(0, band.minDark - band.maxLight)}%` }} />
-        </div>
-        {effective !== pal.brightness && <p className="themeNote">Shown as {effective}% so text stays readable.</p>}
-      </section>
 
       {zoneKey !== 'day' && (
         <div className="themeZoneActions">

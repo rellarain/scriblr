@@ -6,7 +6,8 @@ import type { KeyboardEvent } from 'react'
 // config cards).
 //
 //   Enter            in a field with text: a new sibling after this node
-//   Shift+Enter      a new line in a multi-line field (a single-line input treats it like Enter)
+//   Shift+Enter      a new CHILD of this node (one level down); nothing where the node has no child
+//                    level. In a multi-line field it stays a new line
 //   Ctrl+Enter       a new sibling of the PARENT node
 //   Enter/Shift+Enter in an empty node: delete it, focus the first field of its parent
 //   Ctrl+Enter       in an empty node: delete it, then a new sibling of its parent
@@ -29,6 +30,7 @@ export type KeyAction =
   | 'none'                       // leave the key to the browser
   | 'swallow'                    // the key does nothing here
   | 'createSibling'
+  | 'createChild'
   | 'createParentSibling'
   | 'removeCreateParentSibling'
   | 'removeToParent'
@@ -50,6 +52,7 @@ export interface KeyInput {
   nodeEmpty: boolean             // every field is blank and the node is removable
   hasParent: boolean
   canCreateParentSibling: boolean
+  canCreateChild: boolean
 }
 
 // The whole key table, without the DOM.
@@ -64,9 +67,10 @@ export function resolveKey(k: KeyInput): KeyAction {
       return k.nodeEmpty ? 'removeCreateParentSibling' : 'createParentSibling'
     }
     if (k.nodeEmpty) return k.hasParent ? 'removeToParent' : 'swallow'
-    const newLine = k.shift && k.field === 'multi'
-    if (newLine) return 'none'
-    return k.fieldEmpty ? 'swallow' : 'createSibling'
+    if (k.shift && k.field === 'multi') return 'none' // a new line
+    if (k.fieldEmpty) return 'swallow'
+    if (k.shift) return k.canCreateChild ? 'createChild' : 'swallow'
+    return 'createSibling'
   }
 
   if (k.shift || k.ctrl) return 'none'
@@ -125,6 +129,9 @@ export interface NodeKeysAdapter {
   isEmpty(id: string): boolean
   // Insert a sibling right after this node; returns its id.
   createSibling(id: string): string | null
+  // Insert a child of this node (one level down); returns its id.
+  createChild?(id: string): string | null
+  canCreateChild?(id: string): boolean
   // Where a sibling of the parent makes sense (moment -> scene, scene -> act ...).
   createParentSibling?(id: string): string | null
   canCreateParentSibling?(id: string): boolean
@@ -215,6 +222,7 @@ export function handleNodeKey(e: KeyboardEvent<HTMLElement>, adapter: NodeKeysAd
     nodeEmpty: adapter.isEmpty(id) && ownFields(nodeEl).every(f => f.value.trim() === ''),
     hasParent: parentId !== null,
     canCreateParentSibling: canParentSibling,
+    canCreateChild: Boolean(adapter.createChild) && (adapter.canCreateChild?.(id) ?? true),
   })
   if (action === 'none') return
 
@@ -234,6 +242,11 @@ export function handleNodeKey(e: KeyboardEvent<HTMLElement>, adapter: NodeKeysAd
     case 'swallow': return
     case 'createSibling': {
       const created = adapter.createSibling(id)
+      if (created) focusTarget(adapter, { id: created, which: 'first' })
+      return
+    }
+    case 'createChild': {
+      const created = adapter.createChild?.(id)
       if (created) focusTarget(adapter, { id: created, which: 'first' })
       return
     }

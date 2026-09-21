@@ -6,8 +6,8 @@ import { useThemeState } from '../../../theme/useTheme'
 // Re-tints everything inside for one book: the book's theme colour replaces the
 // app theme's hue (surfaces, cards, backgrounds) and, when it is set, its accent
 // colour replaces the accent hue (buttons, highlights, focus, the chapter paper's
-// tint). Saturation and brightness stay the active zone's own, and the contrast
-// rules (ink, fill ink) are the theme's, so text stays readable.
+// tint). Saturation and lightness stay the active zone's own, and so do the ink
+// and the fills' ink, so text stays readable.
 //
 // The derived tokens are re-declared for `.wrBookScope` (theme/theme.scss and
 // writer.scss), which is what makes the override reach descendants.
@@ -21,10 +21,11 @@ export function BookScope({ book, className, flow = false, children }: {
   const { settings, activeZone, effectiveRole } = useThemeState()
   const palette = settings.zones[activeZone].palette
   const themeHue = book ? bookThemeHue(book) : null
-  const accentHue = book?.accentHue ?? null
+  // The book's secondary colour is required: none stored means its primary hue.
+  const accentHue = book ? book.accentHue ?? themeHue : null
   const vars = useMemo(
-    () => (themeHue === null ? null : bookScopeVars(palette, effectiveRole, themeHue, accentHue)),
-    [palette, effectiveRole, themeHue, accentHue],
+    () => (themeHue === null ? null : bookScopeVars(palette, activeZone, effectiveRole, themeHue, accentHue)),
+    [palette, activeZone, effectiveRole, themeHue, accentHue],
   )
   if (!vars) return className ? <div className={className}>{children}</div> : <>{children}</>
   return (

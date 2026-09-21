@@ -4,14 +4,15 @@
 // JS (theme/applyTheme.ts) writes these on <html>; registering them with
 // @property gives them a type, so they can TRANSITION -- one `transition` on
 // <html> and every descendant sees the in-between values frame by frame
-// (they inherit). initial-value is the default (Day) palette, used until JS
-// has applied the real one.
+// (they inherit). initial-value is the default (Day) look, used until JS
+// has applied the real one. Saturation and lightness are each zone's fixed
+// look (theme/zoneLooks.ts); only the hues are the user's.
 
 $palette: (
-  theme:   (h: 330, s: 30%,  l: 35%),
-  accent:  (h: 32,  s: 95%,  l: 43%),
-  alert:   (h: 200, s: 100%, l: 51%),
-  accent2: (h: 260, s: 60%,  l: 43%),
+  theme:   (h: 330, s: 30%, l: 86%),
+  accent:  (h: 32,  s: 80%, l: 42%),
+  alert:   (h: 200, s: 100%, l: 46%),
+  accent2: (h: 260, s: 80%, l: 42%),
 );
 
 $fade: 1s;
@@ -26,19 +27,46 @@ $fading: ();
   $fading: append($fading, --color-#{$name}-l, comma);
 }
 
-@property --ink       { syntax: '<color>'; inherits: true; initial-value: hsl(0, 0%, 100%); }
-@property --on-accent { syntax: '<color>'; inherits: true; initial-value: hsl(0, 0%, 100%); }
+@property --ink       { syntax: '<color>'; inherits: true; initial-value: hsl(330, 12%, 8%); }
+@property --on-accent { syntax: '<color>'; inherits: true; initial-value: hsl(330, 12%, 8%); }
 @property --on-alert  { syntax: '<color>'; inherits: true; initial-value: hsl(330, 12%, 8%); }
-@property --on-accent2 { syntax: '<color>'; inherits: true; initial-value: hsl(0, 0%, 100%); }
-@property --shade-k   { syntax: '<number>'; inherits: true; initial-value: 1; }
-@property --paper-l   { syntax: '<percentage>'; inherits: true; initial-value: 97%; }
+@property --on-accent2 { syntax: '<color>'; inherits: true; initial-value: hsl(330, 12%, 8%); }
+@property --shade-k   { syntax: '<number>'; inherits: true; initial-value: 0.55; }
+@property --ink-muted-a { syntax: '<percentage>'; inherits: true; initial-value: 85%; }
+@property --ink-faint-a { syntax: '<percentage>'; inherits: true; initial-value: 75%; }
+
+// Which way a fill's hover / dim shades step (away from its text), and the
+// Writer page's numbers. Lightness values are percentages, the rest numbers.
+@property --fill-dir   { syntax: '<number>'; inherits: true; initial-value: 1; }
+@each $fill in (accent, alert, accent2) {
+  @property --#{$fill}-dir  { syntax: '<number>'; inherits: true; initial-value: 1; }
+  @property --#{$fill}-away { syntax: '<color>'; inherits: true; initial-value: hsl(0, 0%, 100%); }
+}
+@property --paper-dir  { syntax: '<number>'; inherits: true; initial-value: 1; }
+$paper-props: (
+  paper-l: 97%, paper-ink-l: 17%, paper-ink2-l: 28%, paper-label-l: 38%,
+  paper-muted-l: 42%, paper-placeholder-l: 55%, paper-react-l: 83%, paper-like-l: 38%,
+);
+@each $name, $value in $paper-props {
+  @property --#{$name} { syntax: '<percentage>'; inherits: true; initial-value: $value; }
+}
 
 $fading: append($fading, --ink, comma);
 $fading: append($fading, --on-accent, comma);
 $fading: append($fading, --on-alert, comma);
 $fading: append($fading, --on-accent2, comma);
 $fading: append($fading, --shade-k, comma);
-$fading: append($fading, --paper-l, comma);
+$fading: append($fading, --ink-muted-a, comma);
+$fading: append($fading, --ink-faint-a, comma);
+$fading: append($fading, --fill-dir, comma);
+@each $fill in (accent, alert, accent2) {
+  $fading: append($fading, --#{$fill}-dir, comma);
+  $fading: append($fading, --#{$fill}-away, comma);
+}
+$fading: append($fading, --paper-dir, comma);
+@each $name, $value in $paper-props {
+  $fading: append($fading, --#{$name}, comma);
+}
 
 $transitions: ();
 @each $prop in $fading {
@@ -75,9 +103,12 @@ html[data-theme-pending] #root {
 
   // ---- Derived tokens (all follow the registered variables above) ----
 
-  // Text. --ink is white on dark palettes and near-black on light ones.
-  --ink-muted: color-mix(in srgb, var(--ink) 66%, transparent);
-  --ink-faint: color-mix(in srgb, var(--ink) 45%, transparent);
+  // Text. --ink is white on dark zones and near-black on light ones. Muted and
+  // faint are the ink at the zone's strengths (--ink-muted-a, --ink-faint-a),
+  // kept high enough that they stay 30+ lightness points from every surface
+  // (zoneLooks.test.ts).
+  --ink-muted: color-mix(in srgb, var(--ink) var(--ink-muted-a), transparent);
+  --ink-faint: color-mix(in srgb, var(--ink) var(--ink-faint-a), transparent);
   --hairline: color-mix(in srgb, var(--ink) 12%, transparent);
 
   // Theme-color surfaces, base to deepest.
@@ -96,11 +127,11 @@ html[data-theme-pending] #root {
 
   // The three action colors (and the admin one), with their variants.
   --accent: hsl(var(--color-accent-h), var(--color-accent-s), var(--color-accent-l));
-  --accent-hover: hsl(var(--color-accent-h), var(--color-accent-s), calc(var(--color-accent-l) + 12%));
-  --accent-dim: hsl(var(--color-accent-h), calc(var(--color-accent-s) - 20%), calc(var(--color-accent-l) - 14%));
+  --accent-hover: hsl(var(--color-accent-h), var(--color-accent-s), calc(var(--color-accent-l) + 12% * var(--accent-dir)));
+  --accent-dim: hsl(var(--color-accent-h), calc(var(--color-accent-s) - 20%), calc(var(--color-accent-l) + 14% * var(--accent-dir)));
   --alert: hsl(var(--color-alert-h), var(--color-alert-s), var(--color-alert-l));
   --accent2: hsl(var(--color-accent2-h), var(--color-accent2-s), var(--color-accent2-l));
-  --accent2-hover: hsl(var(--color-accent2-h), var(--color-accent2-s), calc(var(--color-accent2-l) + 12%));
+  --accent2-hover: hsl(var(--color-accent2-h), var(--color-accent2-s), calc(var(--color-accent2-l) + 12% * var(--accent2-dir)));
 
   // Translucent overlays: "lift" tints toward the ink (a light wash on dark
   // themes, a dark one on light themes); "sink" darkens, and softens on light
@@ -113,13 +144,18 @@ html[data-theme-pending] #root {
   --ov-sink-3: rgb(0 0 0 / calc(0.35 * var(--shade-k)));
   --scrim: rgb(0 0 0 / 0.5);
 
-  // The Writer's paper: light, tinted with the accent hue, dimming only at
-  // low brightness; its ink stays dark.
+  // The Writer's paper follows the zone: a light sheet with dark text by day and
+  // dawn, a dark sheet with light text at dusk and night. Its shades step toward
+  // the text (- N% * --paper-dir: darker on a light sheet, lighter on a dark
+  // one), and fields step the other way (+ N% * --paper-dir).
   --paper: hsl(var(--color-accent-h), 45%, var(--paper-l));
-  --paper-soft: hsl(var(--color-accent-h), 30%, calc(var(--paper-l) - 2%));
-  --paper-line: hsl(var(--color-accent-h), 18%, calc(var(--paper-l) - 13%));
-  --paper-field: hsl(var(--color-accent-h), 45%, calc(var(--paper-l) + 3%));
-  --paper-ink: hsl(var(--color-theme-h), 12%, 17%);
-  --paper-muted: hsl(var(--color-theme-h), 8%, 42%);
-  --paper-error: hsl(var(--color-alert-h), var(--color-alert-s), 40%);
+  --paper-soft: hsl(var(--color-accent-h), 30%, calc(var(--paper-l) - 2% * var(--paper-dir)));
+  --paper-line: hsl(var(--color-accent-h), 18%, calc(var(--paper-l) - 13% * var(--paper-dir)));
+  --paper-field: hsl(var(--color-accent-h), 45%, calc(var(--paper-l) + 3% * var(--paper-dir)));
+  --paper-ink: hsl(var(--color-theme-h), 12%, var(--paper-ink-l));
+  --paper-ink2: hsl(var(--color-theme-h), 10%, var(--paper-ink2-l));
+  --paper-label: hsl(var(--color-theme-h), 8%, var(--paper-label-l));
+  --paper-muted: hsl(var(--color-theme-h), 8%, var(--paper-muted-l));
+  --paper-placeholder: hsl(var(--color-theme-h), 6%, var(--paper-placeholder-l));
+  --paper-error: hsl(var(--color-alert-h), var(--color-alert-s), var(--color-alert-l));
 }

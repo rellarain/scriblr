@@ -1,200 +1,182 @@
-import { useState } from 'react'
+import type { ComponentType } from 'react'
 import type { Tone } from '../helperTypes'
-import { CloseIcon, FrownIcon, NeutralFaceIcon, ToningIcon } from '../../../icons'
+import { CloseIcon, FrownIcon, LockIcon, MixedFaceIcon, NeutralFaceIcon, ToningIcon, type IconProps } from '../../../icons'
 import type {
-  AdminValidation, FeedbackChannel, FeedbackStatement, MessageView, TaxonomyPage, VerbCategory,
+  AdminValidation, FeedbackChannel, FeedbackStatement, MessageView, TaxonomyPage, ToneCategory, ToneSummary, VerbCategory,
 } from './feedbackTypes'
-import { ToneStatusIcon, combineTone, isPleasant, isUnpleasant } from './inboxHelpers'
-import { BAND_LABEL, channelLabel, sameChannel, segmentText, toneScoreLabel } from './inboxLogic'
+import { CATEGORY_LABEL, channelAncestors, sameChannel, segmentText } from './inboxLogic'
+import { SubjectField } from './SubjectField'
 
-// The three inputs of validation (tone, channel, verb) and the message text with its
-// keyword highlights. Every interactive element carries `data-cf` so the case view's
-// keyboard shortcuts can move between them.
+// The two inputs of validation (tone, then subjects and verbs), the tone displays, and the message text with
+// its keyword highlights. Every interactive element carries `data-cf` so the case view's keyboard shortcuts
+// can move between them. Colours: pleasant / yes = the admin accent, unpleasant / no = the accent, neutral /
+// pass = the theme (see the .inboxSection rules in App.scss).
+
+const TONE_ICON: Record<Tone, ComponentType<IconProps>> = {
+  pleasant: ToningIcon, unpleasant: FrownIcon, mixed: MixedFaceIcon, neutral: NeutralFaceIcon,
+}
+const TONE_NAME: Record<Tone, string> = { pleasant: 'Pleasant', unpleasant: 'Unpleasant', mixed: 'Mixed', neutral: 'Neutral' }
+const TONES: Tone[] = ['pleasant', 'unpleasant', 'mixed', 'neutral']
+
+export function ToneFace({ tone, size = 14 }: { tone: Tone; size?: number }) {
+  const Icon = TONE_ICON[tone]
+  return <span className={`toneFaceIcon toneFaceIcon--${tone}`} title={TONE_NAME[tone]}><Icon size={size} /></span>
+}
+
+// A small square in the colour of a tone category (mixed is half admin accent, half accent).
+export function ToneSwatch({ category }: { category: ToneCategory | null }) {
+  if (!category) return <span className="toneSwatch toneSwatch--none" title="No tone yet" />
+  return <span className={`toneSwatch toneSwatch--${category}`} title={CATEGORY_LABEL[category]} aria-label={CATEGORY_LABEL[category]} />
+}
+
+// The score as a bar: pleasant votes, unpleasant votes and neutral validators, and the category next to it.
+export function ToneBar({ summary }: { summary: ToneSummary }) {
+  const total = summary.pleasant + summary.unpleasant + summary.neutral
+  const pct = (n: number) => `${total ? (n / total) * 100 : 0}%`
+  const label = summary.category
+    ? `${CATEGORY_LABEL[summary.category]}: ${summary.pleasant} pleasant, ${summary.unpleasant} unpleasant, ${summary.neutral} neutral`
+    : 'No tone yet'
+  return (
+    <span className="toneScore" title={label}>
+      <ToneSwatch category={summary.category} />
+      <span className="toneBar" role="img" aria-label={label}>
+        <i className="toneBar-yes" style={{ width: pct(summary.pleasant) }} />
+        <i className="toneBar-no" style={{ width: pct(summary.unpleasant) }} />
+        <i className="toneBar-mid" style={{ width: pct(summary.neutral) }} />
+      </span>
+    </span>
+  )
+}
 
 // A feedback message with the words that could indicate an intention verb marked.
 export function MessageText({ view, verbs }: { view: MessageView; verbs: VerbCategory[] }) {
   const name = (id: string) => verbs.find(v => v.id === id)?.name ?? id
   return (
     <p className="feedbackCardText">
-      &ldquo;
       {segmentText(view.message.text, view.flags).map((seg, i) => seg.flag
         ? <mark key={i} className="kwMark" title={`Could mean: ${name(seg.flag.categoryId)}`}>{seg.text}</mark>
         : <span key={i}>{seg.text}</span>)}
-      &rdquo;
     </p>
   )
 }
 
-export function MessageMeta({ view }: { view: MessageView }) {
-  const { message, tone } = view
+// The date, the sender's own tone (shown, not counted), the score, and how many validators have finished.
+// Configurers also see each other validator's label.
+export function MessageMeta({ view, showLabels }: { view: MessageView; showLabels: boolean }) {
+  const others = view.validations.filter(v => !v.mine && v.tone)
   return (
-    <p className="feedbackCardMeta">
-      {message.author} · {message.submittedAt} · sender: <ToneStatusIcon tone={message.senderTone ?? undefined} size={12} /> {message.senderTone ?? 'unspecified'}
-      <span className={`toneBand toneBand--${tone.band}`} title={`Score ${toneScoreLabel(tone)} over every response, the sender's included`}>
-        {BAND_LABEL[tone.band]} · {toneScoreLabel(tone)}
-      </span>
-    </p>
+    <div className="messageMeta">
+      <span className="feedbackCardMeta">{view.message.submittedAt}</span>
+      {view.message.senderTone && <span className="senderTone" title={`The sender said ${view.message.senderTone}`}><ToneFace tone={view.message.senderTone} size={12} /></span>}
+      <ToneBar summary={view.tone} />
+      <span className="validatorCount" title={`${view.validationCount} validator${view.validationCount === 1 ? '' : 's'} finished`}>{view.validationCount}</span>
+      {showLabels && others.length > 0 && (
+        <span className="otherTones" title="Other validators' tone labels">
+          {others.map((v, i) => <ToneFace key={i} tone={v.tone as Tone} size={12} />)}
+        </span>
+      )}
+    </div>
   )
 }
 
-// "Validated by 1 of 3": how far the message is from joining its statement cases.
-export function QuorumChip({ view, missing }: { view: MessageView; missing: string[] }) {
-  const { complete, required, atQuorum } = view.reconciled
-  return (
-    <span className={atQuorum ? 'quorumChip quorumChip--met' : 'quorumChip'} title={missing.length ? `Still to validate: ${missing.join(', ')}` : 'Every admin has validated this'}>
-      Validated by {complete} of {required}
-    </span>
-  )
-}
-
+// Four faces, no words: pleasant, unpleasant, mixed (one of each) and neutral.
 export function ToneControl({ mine, disabled, onSet }: { mine: Tone | null; disabled: boolean; onSet: (tone: Tone) => void }) {
-  const tone = mine ?? undefined
-  const pleasant = isPleasant(tone)
-  const unpleasant = isUnpleasant(tone)
   return (
-    <div className="toneRow" role="group" aria-label="Your tone">
-      <button
-        type="button" data-cf disabled={disabled} aria-pressed={pleasant}
-        className={pleasant ? 'toneBtn toneBtn--active' : 'toneBtn'}
-        onClick={() => onSet(combineTone(!pleasant, unpleasant))}
-      >
-        <ToningIcon size={14} /> Pleasant
-      </button>
-      <button
-        type="button" data-cf disabled={disabled} aria-pressed={unpleasant}
-        className={unpleasant ? 'toneBtn toneBtn--active' : 'toneBtn'}
-        onClick={() => onSet(combineTone(pleasant, !unpleasant))}
-      >
-        <FrownIcon size={14} /> Unpleasant
-      </button>
-      <button
-        type="button" data-cf disabled={disabled} aria-pressed={mine === 'neutral'}
-        className={mine === 'neutral' ? 'toneBtn toneBtn--active' : 'toneBtn'}
-        onClick={() => onSet('neutral')}
-      >
-        <NeutralFaceIcon size={14} /> Neutral
-      </button>
+    <div className="toneRow toneRow--faces" role="group" aria-label="Your tone">
+      {TONES.map(tone => {
+        const Icon = TONE_ICON[tone]
+        return (
+          <button
+            key={tone} type="button" data-cf disabled={disabled} aria-pressed={mine === tone}
+            aria-label={TONE_NAME[tone]} title={TONE_NAME[tone]}
+            className={`toneFace toneFace--${tone}${mine === tone ? ' toneFace--on' : ''}`}
+            onClick={() => onSet(tone)}
+          >
+            <Icon size={20} />
+          </button>
+        )
+      })}
     </div>
   )
 }
 
-// The page > console > component > feature picker and the channels chosen so far.
-export function ChannelControl({ view, taxonomy, mine, disabled, onSet }: {
-  view: MessageView
-  taxonomy: TaxonomyPage[]
-  mine: FeedbackChannel[]
-  disabled: boolean
-  onSet: (channels: FeedbackChannel[]) => void
-}) {
-  // Where the sender was when they wrote the message is the starting point.
-  const { openPage, openConsole, selectedComponent } = view.message
-  const startPage = taxonomy.find(p => p.name === openPage)
-  const startConsole = startPage?.consoles.find(c => c.name === openConsole)
-  const startComponent = startConsole?.components.find(c => c.name === selectedComponent)
-  const [page, setPage] = useState(startPage?.name ?? '')
-  const [consoleName, setConsole] = useState(startConsole?.name ?? '')
-  const [component, setComponent] = useState(startComponent?.name ?? '')
-  const [feature, setFeature] = useState('')
-
-  const pageDef = taxonomy.find(p => p.name === page)
-  const consoleDef = pageDef?.consoles.find(c => c.name === consoleName)
-  const componentDef = consoleDef?.components.find(c => c.name === component)
-
-  function add() {
-    if (!page || !consoleName || !component || !feature) return
-    const next: FeedbackChannel = { page, console: consoleName, component, feature }
-    if (!mine.some(c => sameChannel(c, next))) onSet([...mine, next])
-    setFeature('')
-  }
-
-  const select = (label: string, value: string, options: string[], on: (v: string) => void, off: boolean) => (
-    <select aria-label={label} data-cf value={value} disabled={disabled || off} onChange={e => on(e.target.value)}>
-      <option value="">{label}…</option>
-      {options.map(o => <option key={o} value={o}>{o}</option>)}
-    </select>
-  )
-
-  return (
-    <div>
-      <div className="channelPillRow">
-        {mine.length === 0 && <span className="feedbackCardMeta">No channel yet</span>}
-        {mine.map(tag => (
-          <span key={channelLabel(tag)} className="channelPill">
-            {channelLabel(tag)}
-            <button
-              type="button" className="channelPillRemove" data-cf disabled={disabled} aria-label={`Remove ${channelLabel(tag)}`}
-              onClick={() => onSet(mine.filter(c => !sameChannel(c, tag)))}
-            >
-              <CloseIcon size={10} />
-            </button>
-          </span>
-        ))}
-      </div>
-      <div className="channelAddForm channelAddForm--four">
-        {select('Page', page, taxonomy.map(p => p.name), v => { setPage(v); setConsole(''); setComponent(''); setFeature('') }, false)}
-        {select('Console', consoleName, pageDef?.consoles.map(c => c.name) ?? [], v => { setConsole(v); setComponent(''); setFeature('') }, !pageDef)}
-        {select('Component', component, consoleDef?.components.map(c => c.name) ?? [], v => { setComponent(v); setFeature('') }, !consoleDef)}
-        {select('Feature', feature, componentDef?.features ?? [], setFeature, !componentDef)}
-        <button type="button" className="toneBtn" data-cf disabled={disabled || !feature} onClick={add}>Add</button>
-      </div>
-    </div>
-  )
-}
-
-// A verb (a managed category) for each channel chosen, with the categories the message's
-// keywords suggest.
-export function ExplicateControl({ view, verbs, mine, disabled, onSet }: {
+// Subjects and verbs, the step that builds the feedback statements: every subject any validator chose with the
+// verbs chosen for it (most common first, each with how many validators chose it), a chip per verb that adds or
+// removes yours, the categories the message's keywords suggest, and the subject field for adding another one.
+export function ExplicateControl({ view, verbs, taxonomy, mine, disabled, locked, onSet }: {
   view: MessageView
   verbs: VerbCategory[]
+  taxonomy: TaxonomyPage[]
   mine: AdminValidation | undefined
   disabled: boolean
-  onSet: (statements: FeedbackStatement[]) => void
+  // Tone comes first.
+  locked: boolean
+  onSet: (channels: FeedbackChannel[], statements: FeedbackStatement[]) => void
 }) {
-  const channels = mine?.channels ?? []
-  const statements = mine?.statements ?? []
-  const suggested = [...new Set(view.flags.map(f => f.categoryId))]
+  const myChannels = mine?.channels ?? []
+  const myStatements = mine?.statements ?? []
   const name = (id: string) => verbs.find(v => v.id === id)?.name ?? id
-  const has = (c: FeedbackChannel, verbId: string) => statements.some(s => s.verbId === verbId && sameChannel(s.channel, c))
-  const add = (channel: FeedbackChannel, verbId: string) => { if (verbId && !has(channel, verbId)) onSet([...statements, { channel, verbId }]) }
+  const suggested = [...new Set(view.flags.map(f => f.categoryId))].filter(id => verbs.some(v => v.id === id))
+  const has = (c: FeedbackChannel, verbId: string) => myStatements.some(s => s.verbId === verbId && sameChannel(s.channel, c))
+  const off = disabled || locked
 
-  if (channels.length === 0) return <span className="feedbackCardMeta">Add a channel first, then choose what should happen there.</span>
+  function toggle(channel: FeedbackChannel, verbId: string) {
+    if (has(channel, verbId)) { onSet(myChannels, myStatements.filter(s => !(s.verbId === verbId && sameChannel(s.channel, channel)))); return }
+    const channels = myChannels.some(c => sameChannel(c, channel)) ? myChannels : [...myChannels, channel]
+    onSet(channels, [...myStatements, { channel, verbId }])
+  }
+
+  const rows = view.selections
+
   return (
     <div className="explicateList">
-      {channels.map(channel => {
-        const mineHere = statements.filter(s => sameChannel(s.channel, channel))
-        const offered = suggested.filter(id => !has(channel, id) && verbs.some(v => v.id === id))
+      {locked && <span className="lockHint" title="Tone this message first"><LockIcon size={14} /></span>}
+      {rows.map(sel => {
+        const isMine = myChannels.some(c => sameChannel(c, sel.channel))
+        const shown = [...sel.verbs.map(v => ({ id: v.verbId, count: v.chosenBy })),
+          ...suggested.filter(id => !sel.verbs.some(v => v.verbId === id)).map(id => ({ id, count: 0 }))]
         return (
-          <div key={channelLabel(channel)} className="explicateChannel">
-            <span className="channelPill">{channelLabel(channel)}</span>
-            <div className="channelPillRow">
-              {mineHere.length === 0 && <span className="feedbackCardMeta">No verb yet</span>}
-              {mineHere.map(s => (
-                <span key={s.verbId} className="channelPill channelPill--verb">
-                  {name(s.verbId)}
-                  <button
-                    type="button" className="channelPillRemove" data-cf disabled={disabled} aria-label={`Remove ${name(s.verbId)} from ${channelLabel(channel)}`}
-                    onClick={() => onSet(statements.filter(x => x !== s))}
-                  >
-                    <CloseIcon size={10} />
-                  </button>
-                </span>
-              ))}
-              {offered.map(id => (
-                <button key={id} type="button" className="channelPill channelPill--suggest" data-cf disabled={disabled} title="Suggested by a keyword in the message" onClick={() => add(channel, id)}>
-                  + {name(id)}
+          <div key={sel.channel.page + sel.channel.console + sel.channel.component + sel.channel.feature} className={isMine ? 'subjectRow subjectRow--mine' : 'subjectRow'}>
+            <div className="subjectAncestors">{channelAncestors(sel.channel).join(' / ')}</div>
+            <div className="subjectMain">
+              <span className="subjectFeature">{sel.channel.feature}</span>
+              <span className="subjectCount" title={`${sel.chosenBy} validator${sel.chosenBy === 1 ? '' : 's'} chose this subject`}>{sel.chosenBy}</span>
+              {isMine && (
+                <button
+                  type="button" className="subjectRemove" data-cf disabled={off} aria-label={`Remove ${sel.channel.feature}`} title="Remove this subject"
+                  onClick={() => onSet(myChannels.filter(c => !sameChannel(c, sel.channel)), myStatements.filter(s => !sameChannel(s.channel, sel.channel)))}
+                >
+                  <CloseIcon size={10} />
+                </button>
+              )}
+            </div>
+            <div className="verbChips">
+              {shown.map(v => (
+                <button
+                  key={v.id} type="button" data-cf disabled={off} aria-pressed={has(sel.channel, v.id)}
+                  className={`verbChip${has(sel.channel, v.id) ? ' verbChip--mine' : ''}${v.count === 0 ? ' verbChip--suggest' : ''}`}
+                  title={v.count === 0 ? 'Suggested by a keyword in the message' : `${v.count} validator${v.count === 1 ? '' : 's'} chose ${name(v.id)}`}
+                  onClick={() => toggle(sel.channel, v.id)}
+                >
+                  {name(v.id)}{v.count > 0 && <span className="verbCount">{v.count}</span>}
                 </button>
               ))}
+              <select
+                className="verbPicker" data-cf disabled={off} value="" aria-label={`Add a verb to ${sel.channel.feature}`}
+                onChange={e => { if (e.target.value) toggle(sel.channel, e.target.value) }}
+              >
+                <option value="">+</option>
+                {verbs.filter(v => !shown.some(s => s.id === v.id)).map(v => <option key={v.id} value={v.id}>{v.name}</option>)}
+              </select>
             </div>
-            <select
-              aria-label={`Add a verb to ${channelLabel(channel)}`} data-cf disabled={disabled} value=""
-              onChange={e => add(channel, e.target.value)}
-            >
-              <option value="">Add a verb…</option>
-              {verbs.filter(v => !has(channel, v.id)).map(v => <option key={v.id} value={v.id}>{v.name}</option>)}
-            </select>
           </div>
         )
       })}
+      <SubjectField
+        taxonomy={taxonomy} disabled={off}
+        start={{ page: view.message.openPage, console: view.message.openConsole, component: view.message.selectedComponent }}
+        onAdd={channel => { if (!myChannels.some(c => sameChannel(c, channel))) onSet([...myChannels, channel], myStatements) }}
+      />
     </div>
   )
 }

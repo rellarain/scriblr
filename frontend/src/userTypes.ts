@@ -4,7 +4,7 @@ export interface CurrentUser {
   displayName: string
   orgId: string
   // Placeholder role (no real accounts yet). Admins get the admin features
-  // (the AUI panel, the Accent 2 theme color); the Dashboard settings' "View
+  // (the AUI panel, the admin accent theme color); the Dashboard settings' "View
   // as" switch can preview the other role.
   role: 'user' | 'admin'
   photoUrl?: string

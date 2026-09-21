@@ -30,7 +30,7 @@ export function applyVars(vars: ThemeVars, root: HTMLElement = document.document
 }
 
 export function zoneVars(settings: ThemeSettings, zone: ZoneKey, role: Role): ThemeVars {
-  return deriveTokens(settings.zones[zone].palette, role)
+  return deriveTokens(settings.zones[zone].palette, role, zone)
 }
 
 // Apply the zone in effect right now, without any fade -- used before the

@@ -122,12 +122,8 @@
   output { text-align: right; color: var(--ink-muted); font-variant-numeric: tabular-nums; }
 }
 
-// The brightness range where no readable text exists, hatched.
-.themeBand {
-  position: relative; height: 6px; margin-left: 94px; margin-right: 58px; border-radius: 3px; background: var(--ov-sink-1);
-  span { position: absolute; top: 0; bottom: 0; border-radius: 3px; background: repeating-linear-gradient(135deg, var(--ink-faint) 0 3px, transparent 3px 6px); }
-}
-.themeNote { margin: 0; font-size: 11px; color: var(--ink-muted); }
+// What a zone fixes for you: its background, text and colour strength.
+.themeLook { margin: 0; font-size: 12px; color: var(--ink-muted); }
 
 .themeZoneActions { display: flex; gap: 8px; flex-wrap: wrap; }
 .themeBtn {

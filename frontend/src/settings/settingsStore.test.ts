@@ -101,11 +101,11 @@ describe('initSettings', () => {
   it('applies the backend copy, and the backend wins for kv', async () => {
     window.localStorage.setItem('scriblr.writer.chapterMode', JSON.stringify('outline'))
     const theme = defaultThemeSettings()
-    theme.zones.day.palette.brightness = 60
+    theme.zones.day.palette.accent.h = 60
     respond = () => remote({ theme, kv: { 'scriblr.writer.chapterMode': 'draft' } })
     await initSettings()
     expect(getSettings().loaded).toBe(true)
-    expect(getSettings().theme.zones.day.palette.brightness).toBe(60)
+    expect(getSettings().theme.zones.day.palette.accent.h).toBe(60)
     expect(getKv('scriblr.writer.chapterMode')).toBe('draft')
   })
 

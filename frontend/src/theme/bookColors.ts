@@ -1,12 +1,12 @@
 import type { HSL } from './contrast'
-import { deriveTokens, effectiveBrightness, type ThemeVars } from './tokens'
-import { deriveLightness } from './paletteRules'
-import type { Role, ZonePalette } from './types'
+import { deriveTokens, type ThemeVars } from './tokens'
+import { resolvePalette } from './zoneLooks'
+import type { Role, ZoneKey, ZonePalette } from './types'
 
 // Colours for books and plot categories. A hue is all that is stored; the
-// saturation and brightness come from the active time-of-day zone:
-//   theme colours (book cover, categories)   -> the zone's theme saturation and brightness
-//   accent colours (book accent, subcategories) -> the zone's accent saturation and brightness
+// saturation and lightness come from the active time-of-day zone's look:
+//   theme colours (book cover, categories)   -> the zone's theme saturation and lightness
+//   accent colours (book accent, subcategories) -> the zone's accent saturation and lightness
 
 export const DEFAULT_BOOK_HUE = 28
 // A subcategory's hue stays this close (either way) to its category's hue.
@@ -59,21 +59,19 @@ export function bookThemeHue(book: { themeHue?: number | null; color?: string | 
 export const themeColorCss = (hue: number | string): string => `hsl(${hue}, var(--color-theme-s), var(--color-theme-l))`
 export const accentColorCss = (hue: number | string): string => `hsl(${hue}, var(--color-accent-s), var(--color-accent-l))`
 
-// The colour a book's cover is drawn in for a zone's palette (theme saturation and brightness).
-export function coverColor(pal: ZonePalette, hue: number): HSL {
-  return { h: hue, s: pal.theme.s, l: deriveLightness(effectiveBrightness(pal).brightness).theme }
+// The colour a book's cover is drawn in for a zone (theme saturation and lightness).
+export function coverColor(pal: ZonePalette, zone: ZoneKey, hue: number): HSL {
+  const { theme } = resolvePalette(pal, zone)
+  return { h: hue, s: theme.s, l: theme.l }
 }
 
 // The theme variables for the subtree of a book's editors: the zone's own
 // palette with the book's theme hue (and accent hue, when set) swapped in.
-// Going through deriveTokens keeps the contrast rules (ink, fill ink).
-export function bookScopeVars(pal: ZonePalette, role: Role, themeHue: number, accentHue: number | null): ThemeVars {
+// Going through deriveTokens keeps the zone's look (ink, fills, page).
+export function bookScopeVars(pal: ZonePalette, zone: ZoneKey, role: Role, themeHue: number, accentHue: number | null): ThemeVars {
   return deriveTokens(
-    {
-      ...pal,
-      theme: { ...pal.theme, h: themeHue },
-      accent: { ...pal.accent, h: accentHue ?? pal.accent.h },
-    },
+    { ...pal, theme: { h: themeHue }, accent: { h: accentHue ?? pal.accent.h } },
     role,
+    zone,
   )
 }

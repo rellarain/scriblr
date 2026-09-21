@@ -1,3 +1,4 @@
+import json
 from pathlib import Path
 
 from fastapi.testclient import TestClient
@@ -20,7 +21,9 @@ def test_get_seeds_defaults_and_is_stable(client: TestClient) -> None:
     assert body["theme"]["timeBasedEnabled"] is False
     assert body["theme"]["zones"]["day"]["configured"] is True
     assert body["theme"]["zones"]["night"]["configured"] is False
-    assert body["theme"]["zones"]["day"]["palette"]["theme"] == {"h": 330, "s": 30}
+    assert body["theme"]["zones"]["day"]["palette"] == {
+        "theme": {"h": 330}, "accent": {"h": 32}, "alert": {"h": 200}, "accent2": {"h": 260},
+    }
     assert body["ui"] == {"viewAs": None, "handedness": "right", "autosaveEnabled": True, "autosaveSeconds": 30}
     assert client.get("/api/user-settings").json() == body
 
@@ -31,7 +34,7 @@ def test_put_theme_round_trips(client: TestClient) -> None:
     theme["override"] = "day"
     theme["zones"]["night"]["configured"] = True
     theme["zones"]["night"]["startMinute"] = 1290
-    theme["zones"]["night"]["palette"]["brightness"] = 12
+    theme["zones"]["night"]["palette"]["accent"] = {"h": 120}
     resp = client.put("/api/user-settings/theme", json=theme)
     assert resp.status_code == 200
     assert resp.json()["theme"] == theme
@@ -47,15 +50,37 @@ def test_put_theme_rejects_out_of_range_values(client: TestClient) -> None:
     too_late = {**theme, "zones": {**theme["zones"], "day": {**theme["zones"]["day"], "startMinute": 1440}}}
     assert client.put("/api/user-settings/theme", json=too_late).status_code == 422
 
-    palette = {**theme["zones"]["day"]["palette"], "brightness": 101}
-    bright = {**theme, "zones": {**theme["zones"], "day": {**theme["zones"]["day"], "palette": palette}}}
-    assert client.put("/api/user-settings/theme", json=bright).status_code == 422
-
-    palette = {**theme["zones"]["day"]["palette"], "theme": {"h": 361, "s": 30}}
+    palette = {**theme["zones"]["day"]["palette"], "theme": {"h": 361}}
     hue = {**theme, "zones": {**theme["zones"], "day": {**theme["zones"]["day"], "palette": palette}}}
     assert client.put("/api/user-settings/theme", json=hue).status_code == 422
 
     assert client.put("/api/user-settings/theme", json={**theme, "override": "noon"}).status_code == 422
+
+
+OLD_PALETTE = {
+    "brightness": 35,
+    "theme": {"h": 40, "s": 30}, "accent": {"h": 50, "s": 95}, "alert": {"h": 60, "s": 100}, "accent2": {"h": 70, "s": 60},
+}
+
+
+def test_a_file_saved_with_saturation_and_brightness_still_loads_with_its_hues(client: TestClient, app_data_root: Path) -> None:
+    theme = _theme(client)
+    theme["zones"]["day"]["palette"] = OLD_PALETTE
+    (app_data_root / "user-settings.json").write_text(
+        json.dumps({"schemaVersion": 1, "theme": theme, "ui": {}, "kv": {}, "migratedFromLocal": False}), encoding="utf-8",
+    )
+    palette = _theme(client)["zones"]["day"]["palette"]
+    assert palette == {"theme": {"h": 40}, "accent": {"h": 50}, "alert": {"h": 60}, "accent2": {"h": 70}}
+
+
+def test_put_theme_accepts_and_drops_the_old_saturation_and_brightness(client: TestClient) -> None:
+    theme = _theme(client)
+    theme["zones"]["day"]["palette"] = OLD_PALETTE
+    resp = client.put("/api/user-settings/theme", json=theme)
+    assert resp.status_code == 200
+    assert resp.json()["theme"]["zones"]["day"]["palette"] == {
+        "theme": {"h": 40}, "accent": {"h": 50}, "alert": {"h": 60}, "accent2": {"h": 70},
+    }
 
 
 def test_put_ui(client: TestClient) -> None:

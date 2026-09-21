@@ -152,7 +152,7 @@ button {border: none; cursor: pointer; border-radius: 4px;}
     align-items: center;
     justify-content: center;
     border-radius: 4px;
-    &:hover { background: hsl(var(--color-accent-h), var(--color-accent-s), calc(var(--color-accent-l) + 15%)); color: var(--on-accent); }
+    &:hover { background: var(--accent-hover); color: var(--on-accent); }
     &--active { background: hsl(var(--color-accent-h), var(--color-accent-s), var(--color-accent-l)); color: var(--on-accent); }
   }
 }
@@ -288,7 +288,7 @@ button {border: none; cursor: pointer; border-radius: 4px;}
   align-items: center;
   justify-content: center;
   border-radius: 4px;
-  &:hover { background: hsl(var(--color-accent-h), var(--color-accent-s), calc(var(--color-accent-l) + 15%)); color: var(--on-accent); }
+  &:hover { background: var(--accent-hover); color: var(--on-accent); }
   &--active { background: hsl(var(--color-accent-h), var(--color-accent-s), var(--color-accent-l)); color: var(--on-accent); }
 }
 
@@ -326,7 +326,7 @@ button {border: none; cursor: pointer; border-radius: 4px;}
   background: transparent;
   padding: 3px;
   border-radius: 4px;
-  &--locked { color: hsl(var(--color-theme-h), var(--color-theme-s), calc(var(--color-theme-l) + 35%)); }
+  &--locked { color: var(--ink-muted); }
   &--unlocked {
     color: var(--on-alert);
     background: hsl(var(--color-alert-h), var(--color-alert-s), var(--color-alert-l));
@@ -510,7 +510,7 @@ button {border: none; cursor: pointer; border-radius: 4px;}
   justify-content: center;
   color: var(--ink);
   background: transparent;
-  &:hover { background: hsl(var(--color-accent-h), var(--color-accent-s), calc(var(--color-accent-l) + 15%)); color: var(--on-accent); }
+  &:hover { background: var(--accent-hover); color: var(--on-accent); }
   &--active { background: hsl(var(--color-accent-h), var(--color-accent-s), var(--color-accent-l)); color: var(--on-accent); }
 }
 
@@ -557,10 +557,11 @@ button {border: none; cursor: pointer; border-radius: 4px;}
   min-height: 0;
   padding: 0;
   margin: 0;
-  &--activeAdmin { background: hsl(var(--color-accent2-h), var(--color-accent2-s), calc(var(--color-accent2-l) - 15%)); color: var(--on-accent2); }
-  &--activeStandard { background: hsl(var(--color-accent-h), var(--color-accent-s), calc(var(--color-accent-l) + 15%)); color: var(--on-accent); }
-  &--pendingAdmin { background: hsl(var(--color-alert-h), var(--color-alert-s), calc(var(--color-alert-l) - 15%)); color: var(--on-alert); }
-  &--pendingStandard { background: hsl(var(--color-alert-h), var(--color-alert-s), calc(var(--color-alert-l) + 15%)); color: var(--on-alert); }
+  // A fill, and the same colour stepped away from its text (see --accent-dir).
+  &--activeAdmin { background: var(--accent2); color: var(--on-accent2); }
+  &--activeStandard { background: hsl(var(--color-accent-h), var(--color-accent-s), calc(var(--color-accent-l) + 15% * var(--accent-dir))); color: var(--on-accent); }
+  &--pendingAdmin { background: var(--alert); color: var(--on-alert); }
+  &--pendingStandard { background: hsl(var(--color-alert-h), var(--color-alert-s), calc(var(--color-alert-l) + 15% * var(--alert-dir))); color: var(--on-alert); }
 }
 
 .dividerSpacer { flex: 1 1 auto; }
@@ -581,7 +582,7 @@ button {border: none; cursor: pointer; border-radius: 4px;}
   flex: 0 0 auto;
   background: color-mix(in srgb, var(--ink) 10%, transparent);
   border-radius: 4px;
-  &:hover { background: hsl(var(--color-accent-h), var(--color-accent-s), calc(var(--color-accent-l) + 15%)); color: var(--on-accent); }
+  &:hover { background: var(--accent-hover); color: var(--on-accent); }
   &--active { background: hsl(var(--color-accent-h), var(--color-accent-s), var(--color-accent-l)); color: var(--on-accent); }
 }
 
@@ -610,8 +611,18 @@ button {border: none; cursor: pointer; border-radius: 4px;}
   // .sidebarDivider) now that AUI lives here too, rather than the plain
   // theme color it used as a Mainscreen page.
   background-color: hsl(var(--color-accent2-h), var(--color-sidebar-s), calc(var(--color-theme-l) - 9%));
-  // Admin features carry the second accent: selected/hovered rail and
-  // sub-tab buttons use it instead of the regular accent.
+  // Everything in the admin panel wears the admin accent where the rest of the app wears the accent: the
+  // accent tokens are re-pointed at the admin accent for this subtree (the derived --accent, hover, dim
+  // and ink are re-declared because custom properties are substituted where they are declared).
+  --color-accent-h: var(--color-accent2-h);
+  --color-accent-s: var(--color-accent2-s);
+  --color-accent-l: var(--color-accent2-l);
+  --accent: var(--accent2);
+  --accent-hover: var(--accent2-hover);
+  --accent-dim: hsl(var(--color-accent2-h), calc(var(--color-accent2-s) - 20%), calc(var(--color-accent2-l) + 14% * var(--accent2-dir)));
+  --on-accent: var(--on-accent2);
+  --accent-dir: var(--accent2-dir);
+  --accent-away: var(--accent2-away);
   .subNavBtn, .subTabBtn {
     &:hover { background: var(--accent2-hover); color: var(--on-accent2); }
     &--active { background: var(--accent2); color: var(--on-accent2); }
@@ -748,7 +759,7 @@ button {border: none; cursor: pointer; border-radius: 4px;}
   color: var(--ink);
   background: rgb(0 0 0 / calc(0.25 * var(--shade-k)));
   border-radius: 4px;
-  &:hover { background: hsl(var(--color-accent-h), var(--color-accent-s), calc(var(--color-accent-l) + 15%)); color: var(--on-accent); }
+  &:hover { background: var(--accent-hover); color: var(--on-accent); }
 }
 // Pairs a console/component's own "+ Add child" button with its delete
 // control on one row, freeing up the title row's top-right corner for the
@@ -938,7 +949,7 @@ div.auiConfigReadOnlyIdea {
   background: rgb(0 0 0 / calc(0.25 * var(--shade-k)));
   color: var(--ink);
   z-index: 1;
-  &:hover { background: hsl(var(--color-accent-h), var(--color-accent-s), calc(var(--color-accent-l) + 15%)); color: var(--on-accent); }
+  &:hover { background: var(--accent-hover); color: var(--on-accent); }
   &--active { background: hsl(var(--color-accent-h), var(--color-accent-s), var(--color-accent-l)); color: var(--on-accent); }
   &:disabled {
     opacity: 0.3;
@@ -1047,7 +1058,7 @@ div.auiConfigReadOnlyIdea {
   align-items: center;
   gap: 5px;
   white-space: nowrap;
-  &:hover { background: hsl(var(--color-accent-h), var(--color-accent-s), calc(var(--color-accent-l) + 15%)); color: var(--on-accent); }
+  &:hover { background: var(--accent-hover); color: var(--on-accent); }
   &--active { background: hsl(var(--color-accent-h), var(--color-accent-s), var(--color-accent-l)); color: var(--on-accent); }
   &--stacked {
     flex-direction: column;
@@ -1089,7 +1100,7 @@ div.auiConfigReadOnlyIdea {
   position: absolute;
   inset: 0;
   width: 0;
-  background: hsl(var(--color-accent-h), var(--color-accent-s), calc(var(--color-accent-l) + 15%));
+  background: var(--accent-hover);
   transition: width 1s;
   color: var(--on-accent);
 }
@@ -1129,7 +1140,7 @@ div.auiConfigReadOnlyIdea {
 }
 
 .feedbackCardText { font-size: 13px; margin-bottom: 6px; }
-.feedbackCardMeta { font-size: 11px; opacity: 0.6; margin-bottom: 8px; }
+.feedbackCardMeta { font-size: 11px; color: var(--ink-faint); margin-bottom: 8px; }
 
 // Read-only summary glyph, floated into the card's top-right corner so the
 // quote/meta text wraps around it instead of overlapping.
@@ -1148,7 +1159,7 @@ div.auiConfigReadOnlyIdea {
   font-size: 12px;
   font-weight: 700;
   border-radius: 4px;
-  &:hover { background: hsl(var(--color-accent-h), var(--color-accent-s), calc(var(--color-accent-l) + 15%)); color: var(--on-accent); }
+  &:hover { background: var(--accent-hover); color: var(--on-accent); }
   &--active { background: hsl(var(--color-accent-h), var(--color-accent-s), var(--color-accent-l)); color: var(--on-accent); }
   &:disabled { opacity: 0.35; cursor: not-allowed; &:hover { background: rgb(0 0 0 / calc(0.25 * var(--shade-k))); } }
 }
@@ -1254,7 +1265,7 @@ div.auiConfigReadOnlyIdea {
 .voteAmbivalentNote {
   margin-top: 6px;
   font-size: 11px;
-  color: hsl(var(--color-accent-h), var(--color-accent-s), calc(var(--color-accent-l) + 15%));
+  color: var(--accent-hover);
 }
 
 .senderToneBadge {
@@ -1347,7 +1358,7 @@ div.auiConfigReadOnlyIdea {
 .helperChatListItem {
   text-align: left;
   color: var(--ink);
-  &:hover { background: hsl(var(--color-accent-h), var(--color-accent-s), calc(var(--color-accent-l) + 15%)); color: var(--on-accent); }
+  &:hover { background: var(--accent-hover); color: var(--on-accent); }
 }
 
 .helperConversation { display: flex; flex-direction: column; height: 100%; }
@@ -1403,7 +1414,7 @@ div.auiConfigReadOnlyIdea {
   &--user { align-self: flex-start; }
   &--admin {
     align-self: flex-end;
-    background: hsl(var(--color-accent-h), var(--color-accent-s), calc(var(--color-accent-l) - 10%));
+    background: hsl(var(--color-accent-h), var(--color-accent-s), calc(var(--color-accent-l) + 10% * var(--accent-dir)));
     color: var(--on-accent);
   }
 }
@@ -1519,20 +1530,36 @@ div.auiConfigReadOnlyIdea {
 
 .queueEmptyNote { font-size: 12px; opacity: 0.6; font-style: italic; padding: 2px 0; }
 
-// --- Inbox redesign: validation, processing, settings ---
+// --- Inbox: icon tabs, validation, processing, configuration ---
+//
+// One colour meaning throughout: pleasant / yes = the admin accent, unpleasant / no = the accent, neutral /
+// pass = a theme shade (the ink mixed into the sidebar surface). Mixed-leaning categories are a dimmer step of
+// their side; mixed is half of each. Alerts and badges use the alert colour.
+
+.inboxSection {
+  --tone-yes: var(--accent2);
+  --tone-yes-ink: var(--on-accent2);
+  --tone-no: var(--accent);
+  --tone-no-ink: var(--on-accent);
+  --tone-mid: color-mix(in srgb, var(--ink) 34%, var(--surface-sidebar-2));
+  --tone-mid-ink: var(--ink);
+  --field-bg: rgb(0 0 0 / calc(0.3 * var(--shade-k)));
+}
 
 .dividerToggle { position: relative; }
+// The count of what needs your vote: alert colour, centred along the bottom edge of the Inbox button.
 .dividerBadge {
   position: absolute;
-  top: -4px;
-  right: -5px;
+  bottom: -5px;
+  left: 50%;
+  transform: translateX(-50%);
   min-width: 15px;
   height: 15px;
   padding: 0 3px;
   box-sizing: border-box;
   border-radius: 8px;
-  background: hsl(0, 65%, 48%);
-  color: #fff;
+  background: var(--alert);
+  color: var(--on-alert);
   font-size: 10px;
   font-weight: 700;
   line-height: 15px;
@@ -1540,56 +1567,93 @@ div.auiConfigReadOnlyIdea {
   pointer-events: none;
 }
 
-.inboxWho {
-  flex: 0 0 auto;
-  padding: 8px 16px 0;
-  font-size: 12px;
-  select {
-    background: rgb(0 0 0 / calc(0.3 * var(--shade-k)));
-    color: var(--ink);
-    border: none;
-    border-radius: 3px;
-    padding: 3px 6px;
-    font-size: 12px;
-  }
+// Top row: three icon tabs and the sign-in chip.
+.inboxTop { flex: 0 0 auto; display: flex; align-items: center; gap: 8px; padding: 10px 12px 0; }
+.inboxTabs { flex: 1 1 auto; display: flex; gap: 5px; }
+.inboxTab {
+  position: relative;
+  flex: 1 1 0;
+  height: 34px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 4px;
+  color: var(--ink);
+  background: rgb(0 0 0 / calc(0.2 * var(--shade-k)));
+  &:hover { background: var(--accent-hover); color: var(--on-accent); }
+  &--on, &--on:hover { background: hsl(var(--color-accent-h), var(--color-accent-s), var(--color-accent-l)); color: var(--on-accent); }
 }
-.inboxCount {
-  min-width: 18px;
-  padding: 0 5px;
-  border-radius: 9px;
-  background: hsl(0, 65%, 48%);
-  color: #fff;
-  font-size: 11px;
-  line-height: 18px;
+.inboxCount, .stageCount, .segCount {
+  min-width: 16px;
+  height: 16px;
+  padding: 0 4px;
+  box-sizing: border-box;
+  border-radius: 8px;
+  background: var(--alert);
+  color: var(--on-alert);
+  font-size: 10px;
+  font-weight: 700;
+  line-height: 16px;
   text-align: center;
 }
+.inboxCount, .stageCount { position: absolute; top: -6px; right: -4px; }
+.segCount { margin-left: 4px; }
+
+.signIn { position: relative; flex: 0 0 auto; }
+.signInChip {
+  width: 30px;
+  height: 30px;
+  border-radius: 50%;
+  background: rgb(0 0 0 / calc(0.3 * var(--shade-k)));
+  color: var(--ink);
+  font-size: 11px;
+  font-weight: 700;
+  &--small { width: 22px; height: 22px; font-size: 9px; display: inline-flex; align-items: center; justify-content: center; flex: 0 0 auto; }
+}
+.signInMenu {
+  position: absolute;
+  top: calc(100% + 4px);
+  right: 0;
+  z-index: 30;
+  list-style: none;
+  margin: 0;
+  padding: 4px;
+  min-width: 150px;
+  border-radius: 6px;
+  background: var(--surface-sidebar-1);
+  box-shadow: 0 6px 18px rgb(0 0 0 / 0.35);
+}
+.signInItem { width: 100%; display: flex; align-items: center; gap: 8px; padding: 5px 6px; border-radius: 4px; color: var(--ink); font-size: 12px; text-align: left; &:hover { background: rgb(255 255 255 / 0.1); } &--on { font-weight: 700; } }
+
 .inboxError {
   flex: 0 0 auto;
-  margin: 8px 16px 0;
+  margin: 8px 12px 0;
   padding: 6px 10px;
   border-radius: 4px;
-  background: rgb(160 30 30 / 0.35);
+  background: color-mix(in srgb, var(--alert) 55%, transparent);
   font-size: 12px;
   display: flex;
   align-items: center;
   gap: 8px;
 }
 .inboxErrorClose { margin-left: auto; color: var(--ink); background: transparent; border: none; opacity: 0.7; &:hover { opacity: 1; } }
-// The Inbox's three sections share a narrow panel: a little tighter than the other sub-tabs.
-.inboxSection .subTabBtn { padding: 5px 7px; font-size: 12px; gap: 6px; }
 
-// Stage | Case, and the filter row of Process.
+// The bar above the queue: Stage | Case, hide done, and (Configurers) a sort.
+.validateBar, .processBar { display: flex; align-items: center; gap: 6px; margin-bottom: 8px; }
 .segSwitch {
   display: flex;
   gap: 4px;
   padding: 3px;
-  margin-bottom: 8px;
   border-radius: 6px;
   background: rgb(0 0 0 / calc(0.2 * var(--shade-k)));
-  &--wrap { flex-wrap: wrap; }
+  flex: 1 1 auto;
 }
 .segSwitchBtn {
   flex: 1 1 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
   padding: 5px 8px;
   border-radius: 4px;
   color: var(--ink);
@@ -1599,54 +1663,161 @@ div.auiConfigReadOnlyIdea {
   background: transparent;
   border: none;
   &:hover { background: rgb(255 255 255 / 0.08); }
-  &--on { background: hsl(var(--color-accent-h), var(--color-accent-s), var(--color-accent-l)); color: var(--on-accent); &:hover { background: hsl(var(--color-accent-h), var(--color-accent-s), var(--color-accent-l)); } }
+  &--on, &--on:hover { background: hsl(var(--color-accent-h), var(--color-accent-s), var(--color-accent-l)); color: var(--on-accent); }
+}
+.iconBtn {
+  flex: 0 0 auto;
+  width: 30px;
+  height: 30px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 4px;
+  color: var(--ink);
+  background: var(--field-bg);
+  &:hover:not(:disabled) { background: rgb(255 255 255 / 0.14); }
+  &:disabled { opacity: 0.4; cursor: not-allowed; }
+  &--on { background: hsl(var(--color-accent-h), var(--color-accent-s), var(--color-accent-l)); color: var(--on-accent); &:hover:not(:disabled) { background: hsl(var(--color-accent-h), var(--color-accent-s), var(--color-accent-l)); } }
+  &--yes { background: var(--tone-yes); color: var(--tone-yes-ink); &:hover:not(:disabled) { background: var(--tone-yes); filter: brightness(1.1); } }
+  &--no { background: var(--tone-no); color: var(--tone-no-ink); &:hover:not(:disabled) { background: var(--tone-no); filter: brightness(1.1); } }
+}
+.sortSelect, .targetRow select, .roleBar select, .verbPicker {
+  background: var(--field-bg, rgb(0 0 0 / 0.3));
+  color: var(--ink);
+  border: none;
+  border-radius: 4px;
+  padding: 4px 6px;
+  font-size: 12px;
 }
 
-.validateTabs { padding: 0 0 4px; }
+// Stages: two icon tabs, each with a progress bar and an alert-coloured count of what is left.
+.stageTabs { display: flex; gap: 5px; margin-bottom: 8px; }
+.stageTab {
+  position: relative;
+  flex: 1 1 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 5px;
+  padding: 6px 8px;
+  border-radius: 4px;
+  color: var(--ink);
+  background: rgb(0 0 0 / calc(0.2 * var(--shade-k)));
+  &:hover { background: rgb(255 255 255 / 0.1); }
+  &--on, &--on:hover { background: hsl(var(--color-accent-h), var(--color-accent-s), var(--color-accent-l)); color: var(--on-accent); }
+}
+.stageProgress { align-self: stretch; height: 5px; border-radius: 3px; background: rgb(0 0 0 / 0.35); overflow: hidden; > span { display: block; height: 100%; background: currentColor; opacity: 0.75; transition: width 0.4s; } }
+
+.feedbackCard--done { box-shadow: inset 3px 0 0 var(--ov-lift-3); }
+.messageMeta { display: flex; align-items: center; flex-wrap: wrap; gap: 8px; margin-bottom: 8px; .feedbackCardMeta { margin-bottom: 0; } }
+.validatorCount, .messageCount { padding: 0 6px; border-radius: 8px; background: rgb(0 0 0 / calc(0.3 * var(--shade-k))); font-size: 11px; }
+.senderTone { display: inline-flex; opacity: 0.85; }
+.otherTones { display: inline-flex; gap: 3px; }
+
+// Tone: swatch, bar and faces.
+.toneScore { display: inline-flex; align-items: center; gap: 6px; }
+.toneSwatch {
+  display: inline-block;
+  width: 12px;
+  height: 12px;
+  border-radius: 3px;
+  flex: 0 0 auto;
+  background: var(--tone-mid);
+  &--pleasant { background: var(--tone-yes); }
+  &--mixedPleasant { background: color-mix(in srgb, var(--tone-yes) 55%, var(--tone-mid)); }
+  &--neutral { background: var(--tone-mid); }
+  &--mixed { background: linear-gradient(90deg, var(--tone-yes) 50%, var(--tone-no) 50%); }
+  &--mixedUnpleasant { background: color-mix(in srgb, var(--tone-no) 55%, var(--tone-mid)); }
+  &--unpleasant { background: var(--tone-no); }
+  &--none { background: transparent; border: 1px dashed var(--tone-mid); box-sizing: border-box; }
+}
+.toneBar { display: inline-flex; width: 64px; height: 8px; border-radius: 4px; overflow: hidden; background: rgb(0 0 0 / 0.35); i { display: block; height: 100%; } }
+.toneBar-yes { background: var(--tone-yes); }
+.toneBar-no { background: var(--tone-no); }
+.toneBar-mid { background: var(--tone-mid); }
+.toneFaceIcon {
+  display: inline-flex;
+  &--pleasant { color: var(--tone-yes); }
+  &--unpleasant { color: var(--tone-no); }
+  &--mixed { color: color-mix(in srgb, var(--tone-yes) 50%, var(--tone-no)); }
+  &--neutral { color: var(--tone-mid); }
+}
+.toneRow--faces { display: flex; gap: 6px; }
+.toneFace {
+  flex: 1 1 0;
+  height: 36px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 6px;
+  background: var(--field-bg);
+  border: 2px solid transparent;
+  &:disabled { opacity: 0.4; cursor: not-allowed; }
+  &--pleasant { color: var(--tone-yes); &.toneFace--on { background: var(--tone-yes); color: var(--tone-yes-ink); } }
+  &--unpleasant { color: var(--tone-no); &.toneFace--on { background: var(--tone-no); color: var(--tone-no-ink); } }
+  &--mixed { color: color-mix(in srgb, var(--tone-yes) 50%, var(--tone-no)); &.toneFace--on { background: linear-gradient(90deg, var(--tone-yes) 50%, var(--tone-no) 50%); color: var(--ink); } }
+  &--neutral { color: var(--tone-mid); &.toneFace--on { background: var(--tone-mid); color: var(--tone-mid-ink); } }
+  &:hover:not(:disabled):not(.toneFace--on) { border-color: currentColor; }
+}
+
+.kwMark { background: hsl(45 90% 55% / 0.35); color: inherit; border-radius: 2px; padding: 0 1px; }
 .caseNav { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin: 4px 0 8px; }
 .caseNavLabel { font-size: 12px; opacity: 0.8; }
 .caseStage { margin-top: 10px; padding-top: 8px; border-top: 1px solid rgb(255 255 255 / 0.08); }
-.caseStageTitle { font-size: 11px; text-transform: uppercase; letter-spacing: 1px; opacity: 0.7; margin: 0 0 6px; }
-.caseStageDone { text-transform: none; letter-spacing: normal; color: hsl(140, 45%, 62%); }
+.caseStageTitle { display: flex; align-items: center; gap: 5px; font-size: 11px; text-transform: uppercase; letter-spacing: 1px; opacity: 0.85; margin: 0 0 6px; }
+.caseStageDone { text-transform: none; letter-spacing: normal; color: var(--tone-yes); }
+.lockHint { display: inline-flex; opacity: 0.7; }
 
-// Words that could indicate a verb, and the tone band of a message.
-.kwMark { background: hsl(45 90% 55% / 0.35); color: inherit; border-radius: 2px; padding: 0 1px; }
-.toneBand {
-  display: inline-block;
-  margin-left: 8px;
-  padding: 1px 7px;
-  border-radius: 9px;
-  font-size: 10px;
-  font-weight: 700;
-  color: #fff;
-  background: hsl(0, 0%, 45%);
-  &--mostlyPleasant { background: hsl(140, 45%, 34%); }
-  &--slightlyPleasant { background: hsl(140, 25%, 42%); }
-  &--slightlyUnpleasant { background: hsl(15, 50%, 46%); }
-  &--mostlyUnpleasant { background: hsl(0, 55%, 40%); }
+// Explicate: subjects with their verbs, and the subject field.
+.explicateList { display: flex; flex-direction: column; gap: 8px; align-items: stretch; }
+.subjectRow { padding: 6px 8px; border-radius: 6px; background: rgb(0 0 0 / calc(0.18 * var(--shade-k))); opacity: 0.85; &--mine { opacity: 1; box-shadow: inset 3px 0 0 var(--ink); } }
+.subjectAncestors { font-size: 10px; opacity: 0.65; }
+.subjectMain { display: flex; align-items: center; gap: 6px; }
+.subjectFeature { font-size: 13px; font-weight: 700; }
+.subjectCount { padding: 0 6px; border-radius: 8px; background: rgb(0 0 0 / 0.3); font-size: 10px; }
+.subjectRemove { display: inline-flex; align-items: center; color: var(--ink); background: transparent; opacity: 0.7; &:hover { opacity: 1; } }
+.verbChips { display: flex; flex-wrap: wrap; align-items: center; gap: 5px; margin-top: 5px; }
+.verbChip {
+  padding: 2px 9px;
+  border-radius: 10px;
+  font-size: 12px;
+  color: var(--ink);
+  background: var(--field-bg);
+  border: 1px solid transparent;
+  &--mine { border-color: var(--ink); background: rgb(255 255 255 / 0.14); font-weight: 700; }
+  &--suggest { background: transparent; border: 1px dashed rgb(255 255 255 / 0.4); }
+  &:disabled { opacity: 0.5; cursor: not-allowed; }
 }
-.quorumChip {
-  display: inline-block;
-  margin-bottom: 6px;
-  padding: 1px 8px;
-  border-radius: 9px;
-  font-size: 11px;
-  background: rgb(0 0 0 / calc(0.3 * var(--shade-k)));
-  &--met { background: rgb(60 140 80 / 0.4); }
+.verbCount { margin-left: 5px; font-size: 10px; opacity: 0.7; }
+.subjectField { position: relative; display: flex; flex-direction: column; gap: 2px; }
+.subjectPath { font-size: 10px; opacity: 0.7; }
+.subjectInput { width: 100%; box-sizing: border-box; background: var(--field-bg); color: var(--ink); border: none; border-radius: 4px; padding: 6px 8px; font-size: 12px; }
+.subjectSuggest { list-style: none; margin: 2px 0 0; padding: 3px; max-height: 160px; overflow-y: auto; border-radius: 6px; background: var(--surface-sidebar-1); box-shadow: 0 6px 16px rgb(0 0 0 / 0.3); }
+.subjectOption {
+  width: 100%;
+  text-align: left;
+  padding: 5px 8px;
+  border-radius: 4px;
+  font-size: 12px;
+  color: var(--ink);
+  background: transparent;
+  &--active { background: hsl(var(--color-accent-h), var(--color-accent-s), var(--color-accent-l)); color: var(--on-accent); }
 }
+.subjectPlus { align-self: flex-start; width: 30px; height: 30px; display: inline-flex; align-items: center; justify-content: center; border-radius: 4px; color: var(--ink); background: var(--field-bg); &:disabled { opacity: 0.4; } }
 
-.channelAddForm--four, .channelAddForm--three { flex-wrap: wrap; select { flex: 1 1 90px; min-width: 0; } }
-.channelPill {
-  &--verb { background: hsl(var(--color-accent-h), calc(var(--color-accent-s) * 0.6), calc(var(--color-accent-l) - 12%)); color: var(--on-accent); }
-  &--suggest { background: transparent; border: 1px dashed rgb(255 255 255 / 0.4); color: var(--ink); cursor: pointer; &:hover { background: rgb(255 255 255 / 0.1); } }
+// The vote buttons: check (yes), x (no), ? (pass). A selected one takes a full row with its note; the rest share the row below.
+.voteControl { display: flex; flex-direction: column; gap: 5px; margin: 4px 0; }
+.voteRow {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  border-radius: 6px;
+  overflow: hidden;
+  &--approve { background: var(--tone-yes); color: var(--tone-yes-ink); }
+  &--deny { background: var(--tone-no); color: var(--tone-no-ink); }
+  &--pass { background: var(--tone-mid); color: var(--tone-mid-ink); }
+  .voteSquare { background: transparent; border: none; color: inherit; }
 }
-button.channelPillRemove { display: inline-flex; align-items: center; color: inherit; background: transparent; padding: 0; }
-.explicateList { display: flex; flex-direction: column; gap: 8px; }
-.explicateChannel { display: flex; flex-direction: column; gap: 4px; align-items: flex-start; select { background: rgb(0 0 0 / calc(0.3 * var(--shade-k))); color: var(--ink); border: none; border-radius: 3px; padding: 4px 6px; font-size: 12px; } }
-
-// The vote buttons: a square check and a square x; each expands into its note field.
-.voteControl { display: flex; gap: 8px; margin: 4px 0; }
-.voteSide { display: flex; gap: 6px; align-items: center; flex: 0 0 auto; min-width: 0; &--open { flex: 1 1 0; } }
 .voteSquare {
   flex: 0 0 32px;
   width: 32px;
@@ -1654,42 +1825,34 @@ button.channelPillRemove { display: inline-flex; align-items: center; color: inh
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  border-radius: 4px;
-  color: var(--ink);
-  background: rgb(0 0 0 / calc(0.3 * var(--shade-k)));
-  border: 1px solid rgb(255 255 255 / 0.18);
+  border-radius: 6px;
+  border: 2px solid currentColor;
+  background: var(--field-bg);
+  box-sizing: border-box;
+  &--approve { color: var(--tone-yes); }
+  &--deny { color: var(--tone-no); }
+  &--pass { color: var(--tone-mid); }
   &:hover:not(:disabled) { background: rgb(255 255 255 / 0.12); }
   &:disabled { opacity: 0.4; cursor: not-allowed; }
-  &--approve.voteSquare--on { background: hsl(140, 50%, 36%); border-color: hsl(140, 50%, 46%); color: #fff; }
-  &--deny.voteSquare--on { background: hsl(0, 58%, 44%); border-color: hsl(0, 58%, 54%); color: #fff; }
 }
 .voteNote {
-  width: 0;
+  flex: 1 1 auto;
   min-width: 0;
-  opacity: 0;
-  padding: 0;
-  border: 0;
   height: 32px;
   box-sizing: border-box;
-  border-radius: 4px;
-  background: rgb(0 0 0 / calc(0.3 * var(--shade-k)));
-  color: var(--ink);
+  border: 0;
+  background: transparent;
+  color: inherit;
   font-size: 12px;
-  transition: width 0.18s ease, opacity 0.18s ease, padding 0.18s ease;
+  padding: 0 10px 0 2px;
+  outline: none;
+  &::placeholder { color: currentColor; opacity: 0.6; }
 }
-.voteSide--open .voteNote { width: 100%; opacity: 1; padding: 0 8px; }
-.voteLog {
-  list-style: none;
-  margin: 6px 0 0;
-  padding: 0;
-  display: flex;
-  flex-direction: column;
-  gap: 4px;
-  font-size: 12px;
-  li { display: flex; gap: 6px; align-items: flex-start; }
-}
-.voteLogName { font-weight: 700; flex: 0 0 auto; }
-.voteLogNotes { display: flex; flex-direction: column; opacity: 0.85; }
+.voteRest { display: flex; gap: 5px; }
+.voteRestItem { flex: 1 1 0; display: flex; .voteSquare { flex: 1 1 auto; width: auto; } }
+.voteRest--single .voteRestItem { flex: 0 0 calc(50% - 2.5px); }
+.voteLog { list-style: none; margin: 6px 0 0; padding: 0; display: flex; flex-direction: column; gap: 4px; font-size: 12px; li { display: flex; gap: 6px; align-items: flex-start; } }
+.voteLogNotes { display: flex; flex-direction: column; opacity: 0.9; }
 .voteMark {
   flex: 0 0 auto;
   width: 16px;
@@ -1698,72 +1861,68 @@ button.channelPillRemove { display: inline-flex; align-items: center; color: inh
   align-items: center;
   justify-content: center;
   border-radius: 3px;
-  color: #fff;
-  &--approve { background: hsl(140, 50%, 36%); }
-  &--deny { background: hsl(0, 58%, 44%); }
+  &--approve { background: var(--tone-yes); color: var(--tone-yes-ink); }
+  &--deny { background: var(--tone-no); color: var(--tone-no-ink); }
+  &--pass { background: var(--tone-mid); color: var(--tone-mid-ink); }
 }
+.tally { display: inline-flex; gap: 4px; }
+.tallyItem {
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+  padding: 0 5px;
+  border-radius: 3px;
+  font-size: 11px;
+  &--approve { background: var(--tone-yes); color: var(--tone-yes-ink); }
+  &--deny { background: var(--tone-no); color: var(--tone-no-ink); }
+  &--pass { background: var(--tone-mid); color: var(--tone-mid-ink); }
+}
+.mineTag { font-size: 10px; opacity: 0.7; }
 
-// A feedback statement case.
+// Process: filters and statement case cards (collapsed to the essentials).
+.categoryFilter { display: flex; gap: 6px; margin-bottom: 8px; }
+.categoryBtn { padding: 5px; border-radius: 4px; background: rgb(0 0 0 / calc(0.2 * var(--shade-k))); .toneSwatch { width: 18px; height: 18px; display: block; } &--on { outline: 2px solid var(--ink); } }
 .caseCard {
   background: rgb(0 0 0 / calc(0.2 * var(--shade-k)));
   border-radius: 6px;
-  border-left: 3px solid hsl(var(--color-accent-h), var(--color-accent-s), var(--color-accent-l));
-  &--approved { border-left-color: hsl(140, 45%, 42%); }
-  &--rejected { border-left-color: hsl(0, 50%, 45%); }
+  border-left: 3px solid var(--tone-mid);
+  &--approved { border-left-color: var(--tone-yes); }
+  &--rejected { border-left-color: var(--tone-no); }
 }
-.caseHead {
-  width: 100%;
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: 6px 8px;
-  padding: 8px 10px;
-  text-align: left;
-  color: var(--ink);
-  background: transparent;
-}
-.caseHeadMain { display: flex; flex-direction: column; flex: 1 1 120px; min-width: 0; }
+.caseHead { width: 100%; display: flex; flex-wrap: wrap; align-items: center; gap: 6px 8px; padding: 8px 10px; text-align: left; color: var(--ink); background: transparent; }
+.caseHeadMain { display: flex; flex-direction: column; flex: 1 1 130px; min-width: 0; }
 .caseVerb { font-size: 14px; font-weight: 700; }
-.caseChannel { font-size: 11px; opacity: 0.7; }
-.caseTally { flex: 1 0 100%; font-size: 11px; opacity: 0.75; padding-left: 22px; }
-.statusChip {
-  padding: 1px 8px;
-  border-radius: 9px;
-  font-size: 10px;
-  font-weight: 700;
-  text-transform: uppercase;
-  background: rgb(0 0 0 / calc(0.35 * var(--shade-k)));
-  &--open { background: hsl(var(--color-accent-h), var(--color-accent-s), var(--color-accent-l)); color: var(--on-accent); }
-  &--approved { background: hsl(140, 45%, 34%); color: #fff; }
-  &--rejected { background: hsl(0, 55%, 40%); color: #fff; }
-}
-.needsDot { width: 9px; height: 9px; border-radius: 50%; background: hsl(0, 65%, 52%); flex: 0 0 auto; }
+.caseChannel { font-size: 10px; opacity: 0.8; }
+.caseFeature { font-size: 12px; }
+.caseCounts { display: inline-flex; align-items: center; gap: 6px; flex-wrap: wrap; }
+.statusIcon { display: inline-flex; width: 18px; height: 18px; align-items: center; justify-content: center; border-radius: 4px; &--approved { background: var(--tone-yes); color: var(--tone-yes-ink); } &--rejected { background: var(--tone-no); color: var(--tone-no-ink); } }
+.needsDot { width: 9px; height: 9px; border-radius: 50%; background: var(--alert); flex: 0 0 auto; }
 .caseBody { padding: 4px 10px 10px; display: flex; flex-direction: column; gap: 10px; }
-.caseMessage { padding: 6px 8px; border-radius: 4px; background: rgb(255 255 255 / 0.05); margin-bottom: 4px; .feedbackCardText { margin-bottom: 2px; } .feedbackCardMeta { margin-bottom: 0; } }
+.caseMessage { padding: 6px 8px; border-radius: 4px; background: rgb(255 255 255 / 0.05); margin-bottom: 4px; .feedbackCardText { margin-bottom: 2px; } }
 .solutionCard { padding: 8px; border-radius: 4px; background: rgb(255 255 255 / 0.06); margin-bottom: 8px; display: flex; flex-direction: column; gap: 4px; }
-.solutionHead { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; justify-content: space-between; }
-.solutionTitle { font-size: 13px; font-weight: 700; }
+.solutionHead { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; }
+.solutionTitle { font-size: 13px; font-weight: 700; flex: 1 1 auto; }
 .solutionText { margin: 0; font-size: 12px; opacity: 0.85; }
+.statusRow { display: flex; align-items: center; gap: 8px; }
 .proposeForm {
   display: flex;
   flex-direction: column;
   gap: 6px;
-  input, textarea, select {
-    background: rgb(0 0 0 / calc(0.3 * var(--shade-k)));
-    color: var(--ink);
-    border: none;
-    border-radius: 3px;
-    padding: 5px 8px;
-    font-size: 12px;
-    font-family: inherit;
-    resize: vertical;
-  }
+  input, textarea { background: var(--field-bg); color: var(--ink); border: none; border-radius: 3px; padding: 5px 8px; font-size: 12px; font-family: inherit; resize: vertical; }
 }
+.targetRow { display: flex; gap: 5px; select { flex: 1 1 0; min-width: 0; } }
 .caseHistory { font-size: 12px; summary { cursor: pointer; opacity: 0.75; } ul { margin: 6px 0 0; padding-left: 16px; display: flex; flex-direction: column; gap: 3px; } }
 
-// Settings.
+// Configuration: verb categories.
 .settingsView { display: flex; flex-direction: column; gap: 4px; }
 .verbRow { background: rgb(0 0 0 / calc(0.2 * var(--shade-k))); border-radius: 6px; padding: 8px 10px; margin-bottom: 6px; display: flex; flex-direction: column; gap: 6px; }
 .verbRowHead { display: flex; gap: 6px; align-items: center; }
 .verbConfirm { display: inline-flex; align-items: center; gap: 4px; font-size: 12px; }
 .statementField--keyword { flex: 0 1 130px; }
+button.channelPillRemove { display: inline-flex; align-items: center; color: inherit; background: transparent; padding: 0; }
+
+// Admin > Manager > Assignment.
+.roleAssignment { display: flex; flex-direction: column; gap: 10px; }
+.roleBar { display: flex; align-items: center; gap: 10px; }
+.roleTable input[type='checkbox'] { appearance: auto; -webkit-appearance: checkbox; width: 16px; height: 16px; margin: 0; cursor: pointer; accent-color: var(--accent); }
+.roleTable { border-collapse: collapse; font-size: 13px; th, td { padding: 6px 12px; text-align: center; } th:first-child, td:first-child { text-align: left; } th { font-weight: 700; } tbody tr { border-top: 1px solid rgb(255 255 255 / 0.1); } }

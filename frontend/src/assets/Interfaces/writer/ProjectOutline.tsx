@@ -53,6 +53,9 @@ function ProjectOutline({ w }: { w: WriterWorkspace }) {
       return parent?.kind === 'series' ? w.addOutlineNode(parent.parentId, 'series', {}, parent.id) : null
     },
     canCreateParentSibling: id => nodeById.get(nodeById.get(id)?.parentId ?? '')?.kind === 'series',
+    // series -> a new book inside it (Shift+Enter); a book has no child card here.
+    createChild: id => (nodeById.get(id)?.kind === 'series' ? newBook(id) : null),
+    canCreateChild: id => nodeById.get(id)?.kind === 'series',
     remove: id => (nodeById.get(id)?.kind === 'series' ? w.deleteSeries(id) : w.deleteOutlineNode(id)),
   })
 

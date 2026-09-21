@@ -13,13 +13,14 @@
 }
 
 :root {
-  --accent: #7a3b58;
+  /* --accent and --ink come from the time-of-day theme (theme/theme.scss); a
+     fixed value here would override the palette wherever no book scope
+     re-derives it. */
   --accent-light: #f3e6ec;
   /* Bookshelf redesign: illustration-only palette, layered on top of the
      accent tokens above rather than replacing them. */
   --shelf-wood: #c9a373;
   --page-cream: #faf6ef;
-  --ink: #3a3530;
 }
 
 html,

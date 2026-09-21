@@ -158,13 +158,28 @@ described, now stale, in `docs/data-model.md`).
   note), `color`, `chapterCountTarget`, `plotlineIds`, `wordCountGoal`.
 - **Plot tree** (`PlotNode`/`PlotTree`) — the same flat-list-with-`parentId`
   shape, four kinds: `category < subcategory < plotline < plotpoint`
-  (`PlotNodeKind`/`PLOT_KIND_ORDER`). `customFieldDefs` (on `category`
-  nodes) define free-text fields a `plotline` can fill in via
-  `customFieldValues`; `keywords` (on `plotline` nodes) are free-text tags
-  used to detect keyword mentions in prose; `assignedMomentId` +
-  `assignedParagraphIndex` (on `plotpoint` nodes) link a plot note to a
-  specific moment/paragraph in the outline, set by dragging the plotpoint
-  card onto a moment row.
+  (`PlotNodeKind`/`PLOT_KIND_ORDER`). **Fields and values:** any category,
+  subcategory or plotline defines fields (`customFieldDefs`); each field
+  holds many **values**, and every value is a plotpoint (`fieldId`; title 1-50
+  characters, description up to 255). A value defined on a category or
+  subcategory is shown on every plotline under it as a **reference** (a
+  plotpoint with `refId`, whose text is the original's), which that plotline
+  assigns to its own chapters; deleting a category/subcategory value or field
+  turns its assigned references into the plotline's own values in a plotline
+  field of the same name, and deleting a plotline field sends its assigned values to
+  the plotline's `Scrap` field. `assignedMomentId` (on `plotpoint` nodes) is a
+  chapter (from the plot editor) or an act/scene/moment of it (from the chapter
+  outline); placed on a moment a plotpoint has an `awareness` (`front` =
+  audience and characters know, `back` = audience only, `mid` = characters only,
+  `off` = neither), changed by clicking its eye. `keywords` (on `plotline`
+  nodes) are free-text tags used to detect keyword mentions in prose. The pure
+  rules (references, deletion, migration of older plots, assignment) live in
+  `frontend/src/assets/Interfaces/writer/plotFields.ts`, and run on load.
+  Book outline nodes always have both hues: `accentHue` defaults to `themeHue`.
+- **Keyboard shortcuts** (`frontend/src/lib/nodeKeys.ts`, shared by the
+  outline, plot, scratchpad and admin config editors): Enter adds a sibling,
+  **Shift+Enter adds a child** (one level down; single-line fields only), Ctrl+Enter
+  a sibling of the parent, Backspace/Delete in an empty node removes it, Tab moves on.
 - **Drafts** — `DraftChapter`: a per-chapter map of `momentId → { body,
   wordCount, updatedAt }`. Body format is always `"markdown"` (a plain
   textarea over markdown text, no rich-text conversion layer).
@@ -220,7 +235,7 @@ the one project-independent router).
 | `scrap` | `/api/projects/{id}/scrap` | `GET ""` registry · `POST "/{momentId}/restore"` · `DELETE "/{momentId}"` (204, permanent) |
 | `export` | `/api/projects/{id}/export` | `GET "/book/{bookId}"` PDF · `GET "/chapter/{chapterId}"` PDF |
 | `presets` | `/api/presets` | `GET ""` / `PUT ""` — global catalog (project-independent) |
-| `feedback` | `/api/feedback` | Helper Inbox (app-level `feedback.json`, acts as the admin in the `X-Admin-Id` header; every call returns the whole inbox bundle): `GET ""`, `PUT /messages/{id}/validation`, `PUT /cases/{id}/vote`, `POST /cases/{id}/solutions`, `PUT /cases/{id}/solutions/{sid}/vote`, `POST /cases/{id}/close`, `POST /cases/{id}/reopen`, `POST` / `PATCH` / `DELETE /verb-categories[/{id}]` |
+| `feedback` | `/api/feedback` | Helper Inbox (app-level `feedback.json`, acts as the admin in the `X-Admin-Id` header; every call returns the whole anonymous inbox bundle): `GET ""`, `PUT /messages/{id}/validation`, `PUT /cases/{id}/vote` (yes, no, pass), `POST /cases/{id}/solutions`, `PUT /cases/{id}/solutions/{sid}/vote`, `POST /cases/{id}/close` (Planner), `POST /cases/{id}/reopen` (Configurer), `PUT /admins/{id}/roles`, `POST` / `PATCH` / `DELETE /verb-categories[/{id}]` |
 | `user_settings` | `/api/user-settings` | `GET ""` whole doc · `PUT "/theme"` · `PUT "/ui"` · `PUT "/kv/{key}"` / `DELETE "/kv/{key}"` (keys must start `scriblr.`) · `POST "/kv-import"` (one-time localStorage migration; sets only absent keys) — global (`user-settings.json`) |
 
 Plus `GET /api/health` (inline in `main.py`, not part of a router).
@@ -337,16 +352,33 @@ The shell (`frontend/src/App.tsx`) is themed by four optional time zones —
 **Dawn, Day, Dusk, Night**. Day is always on (and is the palette used when
 time-based theming is off); the others are opt-in. Each zone has a start time
 (10-minute steps; a zone runs until the next configured zone starts, wrapping
-past midnight) and its own palette: **theme** (inert/read-only), **accent**
-(interactive/active), **alert** (needs attention), an admin-only **accent 2**
-(admin features), and one **brightness**. Saturation must satisfy
-theme < accent < alert and theme < accent 2 < alert.
+past midnight) and four **hues** the user chooses: **theme** (inert/read-only),
+**accent** (interactive/active), **alert** (needs attention), and an admin-only
+**admin accent** (admin features). Everything else is the zone's fixed **look**
+(`theme/zoneLooks.ts`), so text stays readable:
+
+| Zone | Background | Theme S | Accent S | Alert S | Theme L | Accent L | Alert L |
+|---|---|---|---|---|---|---|---|
+| Night | dark, light text | 15 | 45 | 70 | 26 | 62 | 66 |
+| Dusk | dark, light text | 30 | 80 | 100 | 34 | 62 | 66 |
+| Day | light, dark text | 30 | 80 | 100 | 86 | 42 | 46 |
+| Dawn | light, dark text | 15 | 45 | 70 | 80 | 42 | 46 |
+
+Saturation always runs theme < accents < alert (the admin accent is the accent's
+twin: same saturation and lightness, only the hue differs), and **text is at
+least 30 HSL lightness points from what it sits on** (`MIN_TEXT_GAP`; enforced
+for the theme surfaces, the accent/alert fills and their hover/dim shades, the
+muted and faint ink, and the Writer page by `theme/zoneLooks.test.ts`). The
+Writer's page follows the zone too: a light sheet with dark text by day and dawn,
+a dark sheet with light text at dusk and night. Hover and dim shades of a fill
+step *away* from its text. The text on each accent, alert and admin-accent fill is picked per fill (`fillInk` in `zoneLooks.ts`): the light or dark ink, whichever reads better, always 30+ points away (at least 4.2:1 for any hue, tested); its hover/dim direction and wash colour are `--accent-dir`/`--accent-away` (and `alert`/`accent2`), while `--fill-dir`/`--away` are the zone's own for the theme surfaces. Settings saved by older
+versions (which also held a saturation per colour and a brightness) still load;
+only the hues are kept.
 
 - **Pure logic** lives in `frontend/src/theme/` with tests: `zones.ts` (which zone
-  applies when, enabling/disabling zones), `paletteRules.ts` (saturation rules,
-  lightness derivation), `contrast.ts` + `tokens.ts` (palette → CSS variables,
-  including automatic light/dark text — the contrast rule is documented at the
-  top of `tokens.ts`).
+  applies when, enabling/disabling zones), `zoneLooks.ts` (the look table and
+  `resolvePalette`), `paletteRules.ts` (hue clamping), `tokens.ts` (hues + look →
+  CSS variables), `contrast.ts` (ink colours).
 - **Applying it:** `useThemeEngine()` (mounted in `App.tsx`) writes the variables
   on `<html>`; `theme/theme.scss` registers them with `@property` so a palette
   change cross-fades (~1s), and defines the derived tokens (`--ink`,
@@ -393,10 +425,13 @@ awareness that the app above already existed:
   (`docs/legacy-concept/`) than to anything currently backed by the API.
 - **`HUI.tsx`** (`helper/` subfolder) — a helper side panel: chats (frontend-only
   mock state) and the **Inbox**, which is backed by the API. The Inbox validates
-  feedback messages (each admin gives a tone, channels and verbs; by stage or by
-  case) and processes the statement cases they form (votes with notes,
-  solutions, closing). See `backend/app/storage/feedback.py` for the rules
-  (quorum, tone bands, per-console access) and `helper/inbox/` for the interface.
+  feedback messages in two stages (tone, then the subjects and verbs that build the
+  feedback statements; by stage or by case) and processes the statement cases they
+  form (yes / no / pass votes with notes, solutions, closing). There is no quorum;
+  tone is a six-category score over the validators; access is three roles per
+  console (Processor, Configurer, Planner) assigned in Admin > Manager > Assignment;
+  the Inbox names nobody. See `backend/app/storage/feedback.py` for the rules and
+  `helper/inbox/` for the interface.
 - **`RUI.tsx`** / **`UUI.tsx`** — Reader and Home/Dashboard-shaped views
   under the same new mode-switching `App.tsx` shell.
 

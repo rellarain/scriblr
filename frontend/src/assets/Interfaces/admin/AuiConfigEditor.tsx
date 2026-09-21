@@ -290,6 +290,15 @@ function AuiConfigEditor({ tab, config }: AuiConfigEditorProps) {
       return parent ? config.addNode(tab, parent.parentId, parent.kind, parent.id) : null
     },
     canCreateParentSibling: id => Boolean(config.findNode(id)?.parentId),
+    // console -> a component, component -> a feature (Shift+Enter); a feature has no child.
+    createChild: id => {
+      const n = config.findNode(id)
+      return n?.kind === 'console' ? config.addNode(tab, id, 'component') : n?.kind === 'component' ? config.addNode(tab, id, 'feature') : null
+    },
+    canCreateChild: id => {
+      const kind = config.findNode(id)?.kind
+      return kind === 'console' || kind === 'component'
+    },
     remove: id => config.deleteNode(id),
   })
   // Tracks the id of a just-created node so its NodeCard can select its

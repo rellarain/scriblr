@@ -56,7 +56,7 @@ describe('feedback store', () => {
     stubFetch(() => reply(bundle()))
     await loadFeedback()
     stubFetch(() => reply({ detail: 'Voting needs feedback processing access to Writer > Shelf.' }, 403))
-    const ok = await changeFeedback(admin => feedbackApi.voteCase(admin, 'c', { approve: true, deny: false, approveNote: '', denyNote: '' }))
+    const ok = await changeFeedback(admin => feedbackApi.voteCase(admin, 'c', { approve: true, deny: false, passed: false, approveNote: '', denyNote: '', passNote: '' }))
     expect(ok).toBe(false)
     expect(getFeedbackState().error).toBe('Voting needs feedback processing access to Writer > Shelf.')
     expect(getFeedbackState().bundle).not.toBeNull()

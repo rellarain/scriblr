@@ -213,6 +213,13 @@ export function VotingIcon(props: IconProps) {
   </IconBase>
 }
 
+export function QuestionIcon(props: IconProps) {
+  return <IconBase {...props}>
+    <path d="M9 9a3 3 0 1 1 4.2 2.75C12.4 12.15 12 12.7 12 13.5" />
+    <path d="M12 17.5v.01" />
+  </IconBase>
+}
+
 export function CheckIcon(props: IconProps) {
   return <IconBase {...props}>
     <path d="M5 12.5l4.5 4.5L19 7" />
@@ -493,5 +500,24 @@ export function RestoreIcon(props: IconProps) {
   return <IconBase {...props}>
     <path d="M3 4v5h5" />
     <path d="M3.5 9A9 9 0 1 1 3 12" />
+  </IconBase>
+}
+
+// The four awareness eyes (a plotpoint placed on a moment): the pupil looks
+// forward, left or right, or the eye is closed.
+const EYE_OUTLINE = 'M2 12s3.6-6.5 10-6.5S22 12 22 12s-3.6 6.5-10 6.5S2 12 2 12Z'
+export function EyeForwardIcon(props: IconProps) {
+  return <IconBase {...props}><path d={EYE_OUTLINE} /><circle cx="12" cy="12" r="3" /></IconBase>
+}
+export function EyeLeftIcon(props: IconProps) {
+  return <IconBase {...props}><path d={EYE_OUTLINE} /><circle cx="8.6" cy="12" r="3" /></IconBase>
+}
+export function EyeRightIcon(props: IconProps) {
+  return <IconBase {...props}><path d={EYE_OUTLINE} /><circle cx="15.4" cy="12" r="3" /></IconBase>
+}
+export function EyeClosedIcon(props: IconProps) {
+  return <IconBase {...props}>
+    <path d="M3 10c2.6 4.4 15.4 4.4 18 0" />
+    <path d="M6 14l-1.6 2.2M12 15.4V18M18 14l1.6 2.2" />
   </IconBase>
 }

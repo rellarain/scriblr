@@ -1,90 +1,108 @@
 import type {
-  AdminValidation, FeedbackChannel, InboxBundle, KeywordFlag, MessageView, StatementCase, ToneBand, ToneSummary, FeedbackVote,
+  AdminValidation, FeedbackChannel, FeedbackVote, KeywordFlag, MessageView, StatementCase, ToneCategory,
 } from './feedbackTypes'
 
-// Pure helpers behind the Inbox: tone bands, per-admin stage progress, the case and
-// message queues, and the "needs your vote" count.
+// Pure helpers behind the Inbox: tone categories, stage progress, the message and case queues, and
+// the "needs your vote" count.
 
-export type Stage = 'tone' | 'channel' | 'explicate'
-export const STAGES: Stage[] = ['tone', 'channel', 'explicate']
+export type Stage = 'tone' | 'explicate'
+export const STAGES: Stage[] = ['tone', 'explicate']
 
-export const TONE_BANDS: ToneBand[] = ['mostlyPleasant', 'slightlyPleasant', 'neutral', 'slightlyUnpleasant', 'mostlyUnpleasant']
-export const BAND_LABEL: Record<ToneBand, string> = {
-  mostlyPleasant: 'Mostly pleasant', slightlyPleasant: 'Slightly pleasant', neutral: 'Neutral',
-  slightlyUnpleasant: 'Slightly unpleasant', mostlyUnpleasant: 'Mostly unpleasant',
+// The fixed order tone categories are listed and sorted in, most pleasant first.
+export const TONE_CATEGORIES: ToneCategory[] = ['pleasant', 'mixedPleasant', 'neutral', 'mixed', 'mixedUnpleasant', 'unpleasant']
+export const CATEGORY_LABEL: Record<ToneCategory, string> = {
+  pleasant: 'Pleasant', mixedPleasant: 'Mixed-leaning pleasant', neutral: 'Neutral', mixed: 'Mixed',
+  mixedUnpleasant: 'Mixed-leaning unpleasant', unpleasant: 'Unpleasant',
 }
-
-// The score over every response, e.g. "1/3": net (pleasant minus unpleasant) over the number of responses.
-export function toneScoreLabel(t: ToneSummary): string {
-  return t.count === 0 ? 'no responses' : `${t.net}/${t.count}`
-}
+const categoryRank = (c: ToneCategory | null) => (c === null ? TONE_CATEGORIES.length : TONE_CATEGORIES.indexOf(c))
 
 export const channelLabel = (c: FeedbackChannel) => [c.page, c.console, c.component, c.feature].filter(Boolean).join(' > ')
+// The levels above the most specific one, for the small text row over a subject.
+export const channelAncestors = (c: FeedbackChannel) => [c.page, c.console, c.component].filter(Boolean)
 export const sameChannel = (a: FeedbackChannel, b: FeedbackChannel) =>
   a.page === b.page && a.console === b.console && a.component === b.component && a.feature === b.feature
 
-export function myValidation(view: MessageView, adminId: string): AdminValidation | undefined {
-  return view.validations.find(v => v.adminId === adminId)
+export function myValidation(view: MessageView): AdminValidation | undefined {
+  return view.validations.find(v => v.mine)
 }
 
 // Whether this admin has finished one stage of a message.
-export function stageDone(view: MessageView, adminId: string, stage: Stage): boolean {
-  const v = myValidation(view, adminId)
+export function stageDone(view: MessageView, stage: Stage): boolean {
+  const v = myValidation(view)
   if (!v) return false
-  if (stage === 'tone') return v.tone !== null
-  if (stage === 'channel') return v.channels.length > 0
+  if (stage === 'tone') return v.toneSet
   return v.channels.length > 0 && v.channels.every(c => v.statements.some(s => sameChannel(s.channel, c)))
 }
 
+// Explicate opens once the message has been toned.
+export const stageLocked = (view: MessageView, stage: Stage): boolean => stage === 'explicate' && !stageDone(view, 'tone')
+
 // The unfinished count and total per stage, for the tab progress bars.
-export function stageCounts(views: MessageView[], adminId: string): Record<Stage, { count: number; total: number }> {
+export function stageCounts(views: MessageView[]): Record<Stage, { count: number; total: number }> {
   const out = {} as Record<Stage, { count: number; total: number }>
-  for (const stage of STAGES) {
-    out[stage] = { count: views.filter(v => !stageDone(v, adminId, stage)).length, total: views.length }
-  }
+  for (const stage of STAGES) out[stage] = { count: views.filter(v => !stageDone(v, stage)).length, total: views.length }
   return out
 }
 
-// Messages in the admin-defined tone priority (the most important band first), oldest first within a band.
-export function orderMessages(views: MessageView[], order: ToneBand[]): MessageView[] {
-  const rank = (band: ToneBand) => { const i = order.indexOf(band); return i === -1 ? order.length : i }
-  return [...views].sort((a, b) =>
-    rank(a.tone.band) - rank(b.tone.band) || a.message.submittedAt.localeCompare(b.message.submittedAt) || a.message.id.localeCompare(b.message.id))
+export const messageDone = (view: MessageView) => STAGES.every(s => stageDone(view, s))
+
+export type MessageSort = 'tone' | 'fewest' | 'most'
+
+// Messages in a fixed order: by tone category (most pleasant first) then oldest first; Configurers can instead
+// sort by how many validators have completed a message.
+export function orderMessages(views: MessageView[], sort: MessageSort = 'tone'): MessageView[] {
+  return [...views].sort((a, b) => {
+    if (sort === 'fewest' && a.validationCount !== b.validationCount) return a.validationCount - b.validationCount
+    if (sort === 'most' && a.validationCount !== b.validationCount) return b.validationCount - a.validationCount
+    return categoryRank(a.tone.category) - categoryRank(b.tone.category)
+      || a.message.submittedAt.localeCompare(b.message.submittedAt) || a.message.id.localeCompare(b.message.id)
+  })
+}
+
+// Keeps a queue from reshuffling while it is worked through: the ids in `known` keep their places, new
+// messages are appended in the order they would have had.
+export function stableOrder(fresh: MessageView[], known: string[]): MessageView[] {
+  const byId = new Map(fresh.map(v => [v.message.id, v]))
+  const kept = known.map(id => byId.get(id)).filter((v): v is MessageView => Boolean(v))
+  const keptIds = new Set(kept.map(v => v.message.id))
+  return [...kept, ...fresh.filter(v => !keptIds.has(v.message.id))]
 }
 
 // The first message (from `from`, wrapping round) this admin has not toned yet, or -1.
-export function firstUntoned(ordered: MessageView[], adminId: string, from = 0): number {
+export function firstUntoned(ordered: MessageView[], from = 0): number {
   for (let step = 0; step < ordered.length; step += 1) {
     const i = (from + step) % ordered.length
-    if (!stageDone(ordered[i], adminId, 'tone')) return i
+    if (!stageDone(ordered[i], 'tone')) return i
   }
   return -1
 }
 
-export function tally(votes: FeedbackVote[]): { approve: number; deny: number } {
-  return { approve: votes.filter(v => v.approve).length, deny: votes.filter(v => v.deny).length }
+export function tally(votes: FeedbackVote[]): { approve: number; deny: number; passed: number } {
+  return { approve: votes.filter(v => v.approve).length, deny: votes.filter(v => v.deny).length, passed: votes.filter(v => v.passed).length }
 }
 
+const voted = (votes: FeedbackVote[]) => votes.some(v => v.mine && (v.approve || v.deny || v.passed))
+
 // Statements and solutions this admin can vote on and has not voted on yet.
-export function needsMyVoteCount(cases: StatementCase[], adminId: string): number {
+export function needsMyVoteCount(cases: StatementCase[]): number {
   let n = 0
   for (const c of cases) {
     if (c.status !== 'open' || !c.can.vote) continue
-    if (!c.votes.some(v => v.adminId === adminId)) n += 1
-    n += c.solutions.filter(s => !s.votes.some(v => v.adminId === adminId)).length
+    if (!voted(c.votes)) n += 1
+    n += c.solutions.filter(s => !voted(s.votes)).length
   }
   return n
 }
 
-export const needsMyVote = (c: StatementCase, adminId: string) => needsMyVoteCount([c], adminId) > 0
+export const needsMyVote = (c: StatementCase) => needsMyVoteCount([c]) > 0
 
 export type CaseView = 'all' | 'needs' | 'open' | 'closed'
 export type CaseSort = 'newest' | 'votes' | 'page'
 
-export function filterCases(cases: StatementCase[], view: CaseView, page: string, adminId: string): StatementCase[] {
+export function filterCases(cases: StatementCase[], view: CaseView, category: ToneCategory | ''): StatementCase[] {
   return cases.filter(c => {
-    if (page && c.channel.page !== page) return false
-    if (view === 'needs') return needsMyVote(c, adminId)
+    if (category && c.tone.category !== category) return false
+    if (view === 'needs') return needsMyVote(c)
     if (view === 'open') return c.status === 'open'
     if (view === 'closed') return c.status !== 'open'
     return true
@@ -94,7 +112,7 @@ export function filterCases(cases: StatementCase[], view: CaseView, page: string
 const newestMessage = (c: StatementCase) => c.messages.reduce((latest, m) => (m.submittedAt > latest ? m.submittedAt : latest), '')
 
 export function sortCases(cases: StatementCase[], sort: CaseSort): StatementCase[] {
-  const votes = (c: StatementCase) => c.votes.filter(v => v.approve || v.deny).length + c.solutions.reduce((n, s) => n + s.votes.length, 0)
+  const votes = (c: StatementCase) => c.votes.length + c.solutions.reduce((n, s) => n + s.votes.length, 0)
   return [...cases].sort((a, b) => {
     if (sort === 'votes') return votes(b) - votes(a) || newestMessage(b).localeCompare(newestMessage(a))
     if (sort === 'page') return channelLabel(a.channel).localeCompare(channelLabel(b.channel))
@@ -121,8 +139,7 @@ export function segmentText(text: string, flags: KeywordFlag[]): TextSegment[] {
   return out
 }
 
-// Who still has to finish validating a message before it joins its cases.
-export function missingValidators(view: MessageView, admins: InboxBundle['admins']): string[] {
-  const done = new Set(view.validations.filter(v => v.complete).map(v => v.adminId))
-  return admins.filter(a => !done.has(a.id)).map(a => a.name)
+// "DR" for Dana Ruiz: the sign-in chip (testing only).
+export function initials(name: string): string {
+  return name.split(/\s+/).filter(Boolean).slice(0, 2).map(w => w[0].toUpperCase()).join('')
 }

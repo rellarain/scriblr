@@ -1,7 +1,7 @@
 import { useMemo, useRef, useState } from 'react'
-import type { OutlineNode, PlotNode } from '../../../api/types'
+import type { PlotNode } from '../../../api/types'
 import type { WriterWorkspace } from './useWriterWorkspace'
-import { ChevronRightIcon, CloseIcon, GripIcon, LockIcon, PlusIcon } from '../../icons'
+import { ChevronRightIcon, PlusIcon } from '../../icons'
 import { ChipEditor, DeleteControl } from './shared'
 import { focusNodeField, useNodeKeys } from '../../../lib/nodeKeys'
 import { ColorRange } from '../../../components/ColorRange'
@@ -9,9 +9,10 @@ import { coverColor, hueDelta, hueWindow, wrapHue } from '../../../theme/bookCol
 import { derivedShades } from '../../../theme/palettes'
 import { useThemeState } from '../../../theme/useTheme'
 import { plotColors, plotColorVars } from './plotColors'
-import {
-  assignedLevel, chapterOfAssignment, nodeLabel, orderAssignedPlotpoints, plotpointDescriptionAllowed, sortByTitle, titleAfterEdit,
-} from './plotTree'
+import { assignedLevel, nodeLabel, sortByTitle } from './plotTree'
+import { FieldEditor, FieldGroups, type PlotDrag, type PlotUi } from './FieldBlocks'
+import { PlotOutlinePanel } from './PlotOutlinePanel'
+import { fieldIndex, isScrapField, orderValues, valuesIn } from './plotFields'
 
 // Project Plot: a collapsible navigation column (categories > subcategories
 // > plotlines, alphabetized) and two page views -- the category/subcategory
@@ -107,12 +108,13 @@ function ChildRows({ w, node, kind, addLabel }: { w: WriterWorkspace; node: Plot
 }
 
 // The hue selector of a category (theme colour) or subcategory (accent colour,
-// within 60 degrees of its category's hue). Saturation and brightness are the
+// within 60 degrees of its category's hue). Saturation and lightness are the
 // active zone's, so what the thumb shows is what the app draws.
 function HueField({ w, node }: { w: WriterWorkspace; node: PlotNode }) {
   const { settings, activeZone } = useThemeState()
   const pal = settings.zones[activeZone].palette
   if (node.kind === 'subcategory') {
+    const accentFill = derivedShades(pal, 'accent', activeZone)[0].color
     const category = node.parentId ? w.plotNodeById.get(node.parentId) : undefined
     const centre = category?.hue ?? pal.theme.h
     const { min, max } = hueWindow(centre)
@@ -121,19 +123,19 @@ function HueField({ w, node }: { w: WriterWorkspace; node: PlotNode }) {
       <div>
         <div className="wrLabel">Colour <span className="wrOutlineMeta">within 60° of its category</span></div>
         <ColorRange
-          label="Subcategory colour" kind="hue" value={shown} min={min} max={max}
-          sat={pal.accent.s} light={derivedShades(pal, 'accent')[0].color.l}
+          label="Subcategory colour" value={shown} min={min} max={max}
+          sat={accentFill.s} light={accentFill.l}
           onChange={v => w.setPlotHue(node.id, wrapHue(v), centre)}
         />
       </div>
     )
   }
-  const cover = coverColor(pal, node.hue ?? pal.theme.h)
+  const cover = coverColor(pal, activeZone, node.hue ?? pal.theme.h)
   return (
     <div>
       <div className="wrLabel">Colour</div>
       <ColorRange
-        label="Category colour" kind="hue" value={node.hue ?? pal.theme.h} sat={cover.s} light={cover.l}
+        label="Category colour" value={node.hue ?? pal.theme.h} sat={cover.s} light={cover.l}
         onChange={v => w.setPlotHue(node.id, v)}
       />
     </div>
@@ -152,7 +154,13 @@ function KeywordsField({ w, node }: { w: WriterWorkspace; node: PlotNode }) {
   )
 }
 
-function CategoryEditor({ w, node }: { w: WriterWorkspace; node: PlotNode }) {
+// Dragging does nothing in the category and subcategory editors (their values are not assigned there).
+const NO_DRAG: PlotDrag = {
+  dragId: null, valueDrag: () => ({ onDragStart: () => {}, onDragEnd: () => {} }), dropIntoField: () => {}, dragFieldId: null, setDragFieldId: () => {},
+}
+
+function CategoryEditor({ w, node, ui }: { w: WriterWorkspace; node: PlotNode; ui: PlotUi }) {
+  const [dragFieldId, setDragFieldId] = useState<string | null>(null)
   const isCategory = node.kind === 'category'
   const colors = plotColors(node, w.plotNodeById)
   return (
@@ -174,77 +182,26 @@ function CategoryEditor({ w, node }: { w: WriterWorkspace; node: PlotNode }) {
       </div>
       <HueField w={w} node={node} />
       <KeywordsField w={w} node={node} />
-      <div>
-        <div className="wrLabel">Plotline template fields</div>
-        <ChipEditor
-          items={node.customFieldDefs.map(f => ({ key: f.id, label: f.name }))} placeholder="Add field…"
-          onAdd={name => w.addPlotCustomFieldDef(node.id, name)} onRemove={id => w.removePlotCustomFieldDef(node.id, id)}
-        />
-      </div>
+      <FieldEditor w={w} owner={node} ui={ui} drag={{ ...NO_DRAG, dragFieldId, setDragFieldId }} />
       {isCategory && <ChildRows w={w} node={node} kind="subcategory" addLabel="Subcategory" />}
       <ChildRows w={w} node={node} kind="plotline" addLabel="Plotline" />
     </div>
   )
 }
 
-interface OutlineTarget { id: string; label: string; depth: number; meta: string }
-
-function PlotlineEditor({ w, node }: { w: WriterWorkspace; node: PlotNode }) {
+function PlotlineEditor({ w, node, ui }: { w: WriterWorkspace; node: PlotNode; ui: PlotUi }) {
   const [dragId, setDragId] = useState<string | null>(null)
-  const [overId, setOverId] = useState<string | null>(null)
-  const [overUnassigned, setOverUnassigned] = useState(false)
-  // A just-added plotpoint takes focus so its title can be typed right away.
-  const [newPointId, setNewPointId] = useState<string | null>(null)
+  const [dragFieldId, setDragFieldId] = useState<string | null>(null)
+  const [showAssigned, setShowAssigned] = useState(true)
 
   const outlineById = useMemo(() => new Map(w.outlineNodes.map(n => [n.id, n])), [w.outlineNodes])
-
-  // Books and their chapters are the drop targets.
-  const targets = useMemo<OutlineTarget[]>(() => {
-    const out: OutlineTarget[] = []
-    const byParent = new Map<string | null, OutlineNode[]>()
-    for (const n of w.outlineNodes) byParent.set(n.parentId, [...(byParent.get(n.parentId) ?? []), n])
-    for (const b of w.books) {
-      const chapters: OutlineNode[] = []
-      const walk = (id: string) => (byParent.get(id) ?? []).sort((a, c) => a.order - c.order).forEach(ch => {
-        if (ch.kind === 'chapter') chapters.push(ch)
-        walk(ch.id)
-      })
-      walk(b.id)
-      out.push({ id: b.id, label: nodeLabel(b), depth: 0, meta: `${chapters.length} chapters` })
-      chapters.forEach((c, i) => out.push({ id: c.id, label: `${i + 1} · ${nodeLabel(c)}`, depth: 1, meta: '' }))
-    }
-    return out
-  }, [w.outlineNodes, w.books])
-
-  const points = (w.plotChildrenByParentId.get(node.id) ?? []).filter(p => p.kind === 'plotpoint')
-  const unassigned = points.filter(p => assignedLevel(p, outlineById) === 'none')
-  const assigned = useMemo(
-    () => orderAssignedPlotpoints(
-      points.filter(p => assignedLevel(p, outlineById) !== 'none'),
-      w.outlineNodes, w.activeProject?.settings.timeSystems ?? [],
-    ),
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-    [w.plotNodes, w.outlineNodes, w.activeProject, node.id, outlineById],
-  )
-  const hasAssigned = assigned.length > 0
+  const points = w.plotNodes.filter(p => p.kind === 'plotpoint' && p.parentId === node.id)
+  const hasAssigned = points.some(p => assignedLevel(p, outlineById) !== 'none')
   const colors = plotColors(node, w.plotNodeById)
 
-  // The custom fields a plotline fills in come from its category and
-  // subcategory templates as well as its own.
-  const fieldDefs = useMemo(() => {
-    const defs: { id: string; name: string }[] = []
-    let current: PlotNode | undefined = node
-    const chain: PlotNode[] = []
-    while (current) { chain.unshift(current); current = current.parentId ? w.plotNodeById.get(current.parentId) : undefined }
-    for (const n of chain) defs.push(...n.customFieldDefs)
-    return defs
-  }, [node, w.plotNodeById])
-
-  function endDrag() { setDragId(null); setOverId(null); setOverUnassigned(false) }
-
-  function dragProps(id: string) {
-    return {
-      draggable: true,
+  const drag: PlotDrag = {
+    dragId,
+    valueDrag: id => ({
       onDragStart: (e: React.DragEvent) => {
         e.dataTransfer.effectAllowed = 'move'
         e.dataTransfer.setData('text/plain', id)
@@ -252,67 +209,10 @@ function PlotlineEditor({ w, node }: { w: WriterWorkspace; node: PlotNode }) {
         if (card) e.dataTransfer.setDragImage(card, 12, 12)
         setDragId(id)
       },
-      onDragEnd: endDrag,
-    }
-  }
-
-  // Plain render function (not a component) so the inputs keep focus while typing.
-  const pointCard = (p: PlotNode) => {
-    const level = assignedLevel(p, outlineById)
-    const chapter = chapterOfAssignment(p, outlineById)
-    const book = level === 'book' ? outlineById.get(p.assignedMomentId!) : undefined
-    const locked = level === 'inner'
-    return (
-      <div
-        key={p.id} data-point={p.id} data-knode={p.id} style={plotColorVars(colors)}
-        className={dragId === p.id ? 'wrPoint wrPoint--dragging' : 'wrPoint'}
-      >
-        {!locked && (
-          <span className="wrGrip" {...dragProps(p.id)} aria-label="Drag plotpoint" title="Drag onto a book or chapter"><GripIcon size={14} /></span>
-        )}
-        <div className="wrPointFields">
-          {level !== 'none' && (
-            <div className="wrPointTarget">
-              {chapter ? (
-                <button
-                  type="button" className="wrLinkBtn wrPointChapter" title="Open this chapter's outline"
-                  onClick={() => w.openChapter(chapter.id, 'outline')}
-                >
-                  {nodeLabel(chapter)}
-                </button>
-              ) : (
-                <span className="wrPointChapter">{book ? nodeLabel(book) : ''}</span>
-              )}
-              {locked ? (
-                <span className="wrPointLock" title="Assigned in the chapter outline. Unassign it there first.">
-                  <LockIcon size={12} />
-                </span>
-              ) : (
-                <button
-                  type="button" className="wrPointUnassign" aria-label={`Unassign ${p.title || 'plotpoint'}`} title="Unassign"
-                  onClick={() => w.assignPlotpoint(p.id, null)}
-                >
-                  <CloseIcon size={12} />
-                </button>
-              )}
-            </div>
-          )}
-          <input
-            className="wrPointTitle" data-kf="" value={p.title} placeholder="Plotpoint title" autoFocus={p.id === newPointId}
-            onChange={e => w.updatePlotNodeField(p.id, 'title', e.target.value)}
-            // A description never stands without a title.
-            onBlur={() => { const t = titleAfterEdit(p.title, p.body); if (t !== p.title) w.updatePlotNodeField(p.id, 'title', t) }}
-          />
-          {plotpointDescriptionAllowed(p) && (
-            <input
-              className="wrPointBody" data-kf="" value={p.body} placeholder="Description"
-              onChange={e => w.updatePlotNodeField(p.id, 'body', e.target.value)}
-            />
-          )}
-        </div>
-        {level === 'none' && <DeleteControl tone="dark" message="Delete plotpoint?" onConfirm={() => w.deletePlotNode(p.id)} />}
-      </div>
-    )
+      onDragEnd: () => setDragId(null),
+    }),
+    dropIntoField: fieldId => { if (dragId) w.movePlotValue(dragId, fieldId); setDragId(null) },
+    dragFieldId, setDragFieldId,
   }
 
   return (
@@ -335,85 +235,25 @@ function PlotlineEditor({ w, node }: { w: WriterWorkspace; node: PlotNode }) {
             />
           </div>
           <KeywordsField w={w} node={node} />
-          {fieldDefs.map(f => (
-            <label key={f.id} className="wrFieldRow">
-              <span>{f.name}</span>
-              <input
-                className="wrField" data-kf="" value={node.customFieldValues[f.id] ?? ''}
-                onChange={e => w.updatePlotCustomFieldValue(node.id, f.id, e.target.value)}
-              />
-            </label>
-          ))}
         </div>
 
-        <div
-          className={overUnassigned ? 'wrUnassigned wrUnassigned--over' : 'wrUnassigned'}
-          onDragOver={e => { if (dragId) { e.preventDefault(); setOverUnassigned(true) } }}
-          onDragLeave={() => setOverUnassigned(false)}
-          onDrop={e => { e.preventDefault(); if (dragId) w.assignPlotpoint(dragId, null); endDrag() }}
-        >
+        <div className="wrFieldsPanel">
           <div className="wrChildRowsHead">
-            <span className="wrLabel">Plotpoints</span>
-            <button type="button" className="wrSmallBtn" onClick={() => setNewPointId(w.addPlotNode(node.id, 'plotpoint'))}><PlusIcon size={13} /> Plotpoint</button>
+            <span className="wrLabel">Fields</span>
+            <label className="wrShowAssigned">
+              <input type="checkbox" role="switch" checked={showAssigned} onChange={e => setShowAssigned(e.target.checked)} />
+              <span>Show assigned</span>
+            </label>
           </div>
-          <div className="wrPointList">
-            {points.length === 0 && <p className="wrMuted">No plotpoints yet.</p>}
-            {points.length > 0 && (
-              <>
-                <div className="wrPointSection">Unassigned <span>{unassigned.length}</span></div>
-                {unassigned.length === 0 && <p className="wrMuted">Every plotpoint is assigned.</p>}
-                {unassigned.map(pointCard)}
-                <div className="wrPointSection">Assigned, in order of occurrence <span>{assigned.length}</span></div>
-                {assigned.length === 0 && <p className="wrMuted">Drag a plotpoint onto a book or chapter to assign it.</p>}
-                {assigned.map(pointCard)}
-              </>
-            )}
-          </div>
+          <FieldGroups w={w} plotline={node} ui={ui} drag={drag} showAssigned={showAssigned} />
         </div>
       </div>
 
       <div className="wrPlotlineRight">
-        <div className="wrOutlinePanel">
-          <div className="wrChildRowsHead">
-            <span className="wrLabel">Books and chapters</span>
-            <span className="wrOutlineMeta">Drop a plotpoint on a book or chapter</span>
-          </div>
-          {targets.length === 0 && <p className="wrMuted">No books yet.</p>}
-          <div className="wrTargetList">
-            {targets.map(t => (
-              <div
-                key={t.id}
-                className={overId === t.id ? 'wrTarget wrTarget--over' : 'wrTarget'}
-                style={{ marginLeft: t.depth * 22 }}
-                onDragOver={e => { if (dragId) { e.preventDefault(); setOverId(t.id) } }}
-                onDragLeave={() => setOverId(prev => (prev === t.id ? null : prev))}
-                onDrop={e => { e.preventDefault(); if (dragId) w.assignPlotpoint(dragId, t.id); endDrag() }}
-              >
-                <span className={t.depth === 0 ? 'wrTargetLabel wrTargetLabel--book' : 'wrTargetLabel'}>{t.label}</span>
-                <span className="wrOutlineMeta">{t.meta}</span>
-                <span className="wrTargetChips">
-                  {points
-                    .filter(p => (t.depth === 0 ? p.assignedMomentId === t.id : chapterOfAssignment(p, outlineById)?.id === t.id))
-                    .map(p => {
-                      const locked = assignedLevel(p, outlineById) === 'inner'
-                      return locked ? (
-                        <span key={p.id} data-point={p.id} className="wrPointChip wrPointChip--locked" title="Assigned in the chapter outline. Unassign it there first.">
-                          {p.title || 'Plotpoint'}
-                          <LockIcon size={11} />
-                        </span>
-                      ) : (
-                        <span key={p.id} data-point={p.id} className="wrPointChip" {...dragProps(p.id)}>
-                          {p.title || 'Plotpoint'}
-                          <button type="button" aria-label={`Unassign ${p.title || 'plotpoint'}`} onClick={() => w.assignPlotpoint(p.id, null)}>×</button>
-                        </span>
-                      )
-                    })}
-                </span>
-              </div>
-            ))}
-          </div>
-        </div>
-
+        <PlotOutlinePanel
+          w={w} plotline={node} dragId={dragId}
+          onDropChapter={chapterId => { if (dragId) w.assignPlotpoint(dragId, chapterId); setDragId(null) }}
+        />
       </div>
     </div>
   )
@@ -421,68 +261,153 @@ function PlotlineEditor({ w, node }: { w: WriterWorkspace; node: PlotNode }) {
 
 const isBlank = (text: string | undefined) => !text || text.trim() === ''
 
-// A plotline's plotpoints in the order the list shows them: unassigned first,
-// then assigned ones in order of occurrence.
-function plotpointOrder(w: WriterWorkspace, plotlineId: string): string[] {
-  const outlineById = new Map(w.outlineNodes.map(n => [n.id, n]))
-  const points = (w.plotChildrenByParentId.get(plotlineId) ?? []).filter(p => p.kind === 'plotpoint')
-  const unassigned = points.filter(p => assignedLevel(p, outlineById) === 'none')
-  const assigned = orderAssignedPlotpoints(
-    points.filter(p => assignedLevel(p, outlineById) !== 'none'), w.outlineNodes, w.activeProject?.settings.timeSystems ?? [],
-  )
-  return [...unassigned, ...assigned].map(p => p.id)
-}
-
 export default function PlotView({ w }: { w: WriterWorkspace }) {
   const node = w.focusedPlotNode
   // Kinds of nodes created a moment ago (the workspace maps have not updated yet),
   // so focusing one can also open its editor.
   const created = useRef(new Map<string, PlotNode['kind']>())
 
-  // Keyboard shortcuts (lib/nodeKeys.ts). Categories, subcategories and plotlines
-  // are separate editors, so a sibling is shown by focusing it; plotpoints are
-  // the cards in the plotline editor. Assigned plotpoints and plotlines that
-  // hold plotpoints are never treated as empty.
+  // Which fields are open (collapsed by default), and the value just created (it takes focus).
+  const [openFields, setOpenFields] = useState<Set<string>>(new Set())
+  const [newValueId, setNewValueId] = useState<string | null>(null)
+  const ui: PlotUi = {
+    isOpen: id => openFields.has(id),
+    setOpen: (id, open) => setOpenFields(prev => {
+      if (prev.has(id) === open) return prev
+      const next = new Set(prev)
+      if (open) next.add(id)
+      else next.delete(id)
+      return next
+    }),
+    newValueId, setNewValueId,
+  }
+
+  const fields = useMemo(() => fieldIndex(w.plotNodes), [w.plotNodes])
+  const outlineById = useMemo(() => new Map(w.outlineNodes.map(o => [o.id, o])), [w.outlineNodes])
+
+  // Keyboard shortcuts (lib/nodeKeys.ts). Categories, subcategories and plotlines are
+  // separate editors, so a sibling is shown by focusing it. Inside an editor a node's fields
+  // are nodes too: a field's parent is the node being edited, a value's parent is its field.
+  //   Enter        the next value in its field, or the next field after a field name
+  //   Shift+Enter  a child: category > subcategory > plotline > a value in its first field,
+  //                a field > a value in it, a value has none
+  //   Ctrl+Enter   a value > a new field after its field, a field > a new sibling of the node
+  const holderOf = (fieldId: string) => (node?.kind === 'plotline' ? node : fields.get(fieldId)?.owner)
+  const siblingValues = (id: string) => {
+    const v = w.plotNodeById.get(id)
+    if (!v?.parentId || !v.fieldId) return [id]
+    return orderValues(valuesIn(w.plotNodes, v.parentId, v.fieldId), w.outlineNodes, w.activeProject?.settings.timeSystems ?? []).map(x => x.id)
+  }
   const keys = useNodeKeys({
-    parentOf: id => w.plotNodeById.get(id)?.parentId ?? null,
+    parentOf: id => {
+      if (fields.has(id)) return node?.id ?? null
+      const n = w.plotNodeById.get(id)
+      if (!n) return null
+      if (n.kind === 'plotpoint') return n.fieldId && fields.has(n.fieldId) ? n.fieldId : n.parentId
+      return n.parentId
+    },
     siblingsOf: id => {
+      const f = fields.get(id)
+      if (f) return f.owner.customFieldDefs.map(d => d.id)
       const n = w.plotNodeById.get(id)
       if (!n) return [id]
-      if (n.kind === 'plotpoint') return n.parentId ? plotpointOrder(w, n.parentId) : [id]
+      if (n.kind === 'plotpoint') return siblingValues(id)
       return sortByTitle((w.plotChildrenByParentId.get(n.parentId) ?? []).filter(c => c.kind === n.kind)).map(c => c.id)
     },
     isEmpty: id => {
+      const f = fields.get(id)
+      if (f) return isBlank(f.def.name) && !isScrapField(f.def) && !w.plotNodes.some(p => p.fieldId === id)
       const n = w.plotNodeById.get(id)
       if (!n) return true
-      if (!isBlank(n.title) || !isBlank(n.body) || n.keywords.length > 0) return false
-      if (n.kind === 'plotpoint') return assignedLevel(n, new Map(w.outlineNodes.map(o => [o.id, o]))) === 'none'
-      if (n.customFieldDefs.length > 0 || Object.values(n.customFieldValues).some(v => !isBlank(v))) return false
-      return (w.plotChildrenByParentId.get(id) ?? []).length === 0
+      if (n.kind === 'plotpoint') return !n.refId && isBlank(n.title) && isBlank(n.body) && assignedLevel(n, outlineById) === 'none'
+      if (!isBlank(n.title) || !isBlank(n.body) || n.keywords.length > 0 || n.customFieldDefs.length > 0) return false
+      return (w.plotChildrenByParentId.get(id) ?? []).filter(c => !c.refId).length === 0
     },
     createSibling: id => {
+      const f = fields.get(id)
+      if (f) { const made = w.addPlotField(f.owner.id, '', id); if (made) ui.setOpen(made, true); return made }
       const n = w.plotNodeById.get(id)
       if (!n) return null
+      if (n.kind === 'plotpoint') {
+        if (!n.parentId || !n.fieldId) return null
+        ui.setOpen(n.fieldId, true)
+        return w.addPlotValue(n.parentId, n.fieldId, id)
+      }
       const made = w.addPlotNode(n.parentId, n.kind, undefined, id)
       created.current.set(made, n.kind)
       return made
     },
-    // plotpoint -> a new plotline after its plotline, plotline -> a new subcategory
-    // or category after its parent, subcategory -> a new category.
-    createParentSibling: id => {
+    // A value or field starts at the plot node above it; a plotline goes down into its first field.
+    createChild: id => {
+      const f = fields.get(id)
+      if (f) {
+        const holder = holderOf(id)
+        if (!holder) return null
+        ui.setOpen(id, true)
+        return w.addPlotValue(holder.id, id)
+      }
       const n = w.plotNodeById.get(id)
-      const parent = n?.parentId ? w.plotNodeById.get(n.parentId) : undefined
+      if (!n || n.kind === 'plotpoint') return null
+      if (n.kind === 'plotline') {
+        const first = n.customFieldDefs.find(d => !isScrapField(d)) ?? undefined
+        const fieldId = first?.id ?? w.addPlotField(n.id, 'Default')
+        if (!fieldId) return null
+        ui.setOpen(fieldId, true)
+        return w.addPlotValue(n.id, fieldId)
+      }
+      const kind = n.kind === 'category' ? 'subcategory' : 'plotline'
+      const made = w.addPlotNode(n.id, kind)
+      created.current.set(made, kind)
+      return made
+    },
+    canCreateChild: id => {
+      if (fields.has(id)) return Boolean(holderOf(id))
+      const n = w.plotNodeById.get(id)
+      return Boolean(n && n.kind !== 'plotpoint')
+    },
+    // value -> a new field after its field, field -> a new sibling of the node being edited,
+    // node -> a new sibling of its parent.
+    createParentSibling: id => {
+      const f = fields.get(id)
+      if (f) {
+        if (!node) return null
+        const made = w.addPlotNode(node.parentId, node.kind, undefined, node.id)
+        created.current.set(made, node.kind)
+        return made
+      }
+      const n = w.plotNodeById.get(id)
+      if (!n) return null
+      if (n.kind === 'plotpoint') {
+        const info = n.fieldId ? fields.get(n.fieldId) : undefined
+        const ownerId = info && (info.owner.id === node?.id || info.owner.kind === 'plotline') ? info.owner.id : node?.id
+        if (!ownerId) return null
+        const made = w.addPlotField(ownerId, '', info?.owner.id === ownerId ? n.fieldId ?? undefined : undefined)
+        if (made) ui.setOpen(made, true)
+        return made
+      }
+      const parent = n.parentId ? w.plotNodeById.get(n.parentId) : undefined
       if (!parent) return null
       const made = w.addPlotNode(parent.parentId, parent.kind, undefined, parent.id)
       created.current.set(made, parent.kind)
       return made
     },
     canCreateParentSibling: id => {
-      const parentId = w.plotNodeById.get(id)?.parentId
+      if (fields.has(id)) return Boolean(node)
+      const n = w.plotNodeById.get(id)
+      if (n?.kind === 'plotpoint') return Boolean(node)
+      const parentId = n?.parentId
       return Boolean(parentId && w.plotNodeById.get(parentId))
     },
-    remove: id => w.deletePlotNode(id),
+    remove: id => {
+      const f = fields.get(id)
+      if (f) w.removePlotField(f.owner.id, id)
+      else if (w.plotNodeById.get(id)?.kind === 'plotpoint') w.removePlotValue(id)
+      else w.deletePlotNode(id)
+    },
     focusNode: (id, which) => {
-      const kind = w.plotNodeById.get(id)?.kind ?? created.current.get(id)
+      const v = w.plotNodeById.get(id)
+      if (v?.kind === 'plotpoint' && v.fieldId) ui.setOpen(v.fieldId, true)
+      const kind = v?.kind ?? created.current.get(id)
       if (kind && kind !== 'plotpoint' && w.focusedPlotNodeId !== id) w.focusPlotNode(id)
       return focusNodeField(id, which)
     },
@@ -497,10 +422,10 @@ export default function PlotView({ w }: { w: WriterWorkspace }) {
         {w.plotStatus === 'error' && <p className="wrError">{w.plotError ?? 'Failed to load plot.'}</p>}
         {w.plotStatus === 'idle' && !node && <p className="wrMuted">Select a category or plotline to edit it, or add a category.</p>}
         {w.plotStatus === 'idle' && node && (node.kind === 'plotline'
-          ? <PlotlineEditor key={node.id} w={w} node={node} />
+          ? <PlotlineEditor key={node.id} w={w} node={node} ui={ui} />
           : node.kind === 'plotpoint'
             ? <p className="wrMuted">Plotpoints are edited from their plotline.</p>
-            : <CategoryEditor key={node.id} w={w} node={node} />)}
+            : <CategoryEditor key={node.id} w={w} node={node} ui={ui} />)}
       </div>
     </div>
   )

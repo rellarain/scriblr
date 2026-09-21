@@ -1,5 +1,5 @@
 import type { Tone } from '../helperTypes'
-import type { FeedbackChannel, FeedbackStatement, InboxBundle, VoteInput } from './feedbackTypes'
+import type { FeedbackChannel, FeedbackStatement, InboxBundle, Role, VoteInput } from './feedbackTypes'
 
 // Calls to /api/feedback. There is no login yet: the signed-in admin's id travels in the
 // X-Admin-Id header and the server trusts it. Every call returns the whole Inbox bundle.
@@ -43,6 +43,8 @@ export const feedbackApi = {
   close: (admin: string, caseId: string, outcome: 'approved' | 'rejected', note: string) =>
     call(admin, 'POST', `/cases/${id(caseId)}/close`, { outcome, note }),
   reopen: (admin: string, caseId: string) => call(admin, 'POST', `/cases/${id(caseId)}/reopen`),
+  setRoles: (admin: string, targetId: string, console: string, roles: Role[]) =>
+    call(admin, 'PUT', `/admins/${id(targetId)}/roles`, { console, roles }),
   addVerb: (admin: string, name: string, keywords: string[]) => call(admin, 'POST', '/verb-categories', { name, keywords }),
   updateVerb: (admin: string, verbId: string, patch: { name?: string; keywords?: string[] }) =>
     call(admin, 'PATCH', `/verb-categories/${id(verbId)}`, patch),

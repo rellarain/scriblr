@@ -1,22 +1,26 @@
 import { useEffect, useMemo, useRef, useState, type ComponentType, type KeyboardEvent } from 'react'
-import { ChevronLeftIcon, ChevronRightIcon, ExplicatingIcon, SortingIcon, ToningIcon, type IconProps } from '../../../icons'
+import {
+  ChevronLeftIcon, ChevronRightIcon, EyeIcon, ExplicatingIcon, ListIcon, PageIcon, ToningIcon, type IconProps,
+} from '../../../icons'
 import type { Tone } from '../helperTypes'
-import type { FeedbackChannel, FeedbackStatement, InboxBundle, MessageView, ToneBand } from './feedbackTypes'
-import { STAGES, firstUntoned, missingValidators, myValidation, orderMessages, stageCounts, stageDone, type Stage } from './inboxLogic'
-import { ChannelControl, ExplicateControl, MessageMeta, MessageText, QuorumChip, ToneControl } from './ValidationControls'
+import type { FeedbackChannel, FeedbackStatement, InboxBundle, MessageView } from './feedbackTypes'
+import {
+  STAGES, firstUntoned, messageDone, myValidation, orderMessages, stableOrder, stageCounts, stageDone, stageLocked,
+  type MessageSort, type Stage,
+} from './inboxLogic'
+import { ExplicateControl, MessageMeta, MessageText, ToneControl } from './ValidationControls'
 
-// Validation: each admin gives every message a tone, the channels it is about and a verb for
-// each. Two ways to work through the queue, chosen with the Stage | Case switch:
-//   by stage  one stage at a time (Tone, Channel, Explicate), every message listed with only
-//             that stage's input
-//   by case   one message at a time with all three inputs together
-// Shortcuts: Tab / Shift+Tab move through the controls (in the case view on to the next and
-// previous case), Enter activates the focused control, Shift+Enter jumps to the first control of
-// the next stage (after Explicate: the first message still to tone).
+// Validation: each admin gives every message a tone and then the subjects it is about with a verb for each
+// (that step builds the feedback statements). Two ways to work through the queue, chosen with the Stage | Case
+// switch:
+//   by stage  one stage at a time (Tone, Explicate), every message listed with only that stage's input
+//   by case   one message at a time with both inputs together
+// Shortcuts: Tab / Shift+Tab move through the controls (in the case view on to the next and previous case),
+// Enter activates the focused control, Shift+Enter jumps to the first control of the next stage (after
+// Explicate: the first message still to tone). The queue keeps its order while you work; "hide done" is up to you.
 
 const STAGE_META: Record<Stage, { label: string; Icon: ComponentType<IconProps> }> = {
   tone: { label: 'Tone', Icon: ToningIcon },
-  channel: { label: 'Channel', Icon: SortingIcon },
   explicate: { label: 'Explicate', Icon: ExplicatingIcon },
 }
 
@@ -24,39 +28,40 @@ export type ValidateMode = 'stage' | 'case'
 
 export interface ValidateActions {
   setTone: (messageId: string, tone: Tone) => void
-  setChannels: (messageId: string, channels: FeedbackChannel[]) => void
-  setStatements: (messageId: string, statements: FeedbackStatement[]) => void
+  // Subjects and verbs together (the server takes the subjects first).
+  setExplicate: (messageId: string, channels: FeedbackChannel[], statements: FeedbackStatement[]) => void
 }
 
 interface Props {
   bundle: InboxBundle
-  adminId: string
   mode: ValidateMode
   onMode: (mode: ValidateMode) => void
-  toneOrder: ToneBand[]
+  hideDone: boolean
+  onHideDone: (hide: boolean) => void
   actions: ValidateActions
 }
 
-// One message's input for one stage (or all three, in the case view).
-function StageInput({ stage, view, bundle, adminId, actions }: {
-  stage: Stage; view: MessageView; bundle: InboxBundle; adminId: string; actions: ValidateActions
-}) {
-  const mine = myValidation(view, adminId)
-  const disabled = !bundle.can.validate
+// One message's input for one stage.
+function StageInput({ stage, view, bundle, actions }: { stage: Stage; view: MessageView; bundle: InboxBundle; actions: ValidateActions }) {
+  const mine = myValidation(view)
   const id = view.message.id
-  if (stage === 'tone') return <ToneControl mine={mine?.tone ?? null} disabled={disabled} onSet={tone => actions.setTone(id, tone)} />
-  if (stage === 'channel') {
-    return <ChannelControl view={view} taxonomy={bundle.taxonomy} mine={mine?.channels ?? []} disabled={disabled} onSet={c => actions.setChannels(id, c)} />
+  if (stage === 'tone') {
+    return <ToneControl mine={mine?.tone ?? null} disabled={!bundle.can.validate} onSet={tone => actions.setTone(id, tone)} />
   }
-  return <ExplicateControl view={view} verbs={bundle.verbCategories} mine={mine} disabled={disabled} onSet={s => actions.setStatements(id, s)} />
+  return (
+    <ExplicateControl
+      view={view} verbs={bundle.verbCategories} taxonomy={bundle.taxonomy} mine={mine}
+      disabled={!bundle.can.validate} locked={stageLocked(view, 'explicate')}
+      onSet={(channels, statements) => actions.setExplicate(id, channels, statements)}
+    />
+  )
 }
 
 function MessageHead({ view, bundle }: { view: MessageView; bundle: InboxBundle }) {
   return (
     <>
       <MessageText view={view} verbs={bundle.verbCategories} />
-      <MessageMeta view={view} />
-      <QuorumChip view={view} missing={missingValidators(view, bundle.admins)} />
+      <MessageMeta view={view} showLabels={bundle.can.seeTones} />
     </>
   )
 }
@@ -64,22 +69,34 @@ function MessageHead({ view, bundle }: { view: MessageView; bundle: InboxBundle 
 const firstControl = (root: ParentNode | null, selector = '[data-cf]') =>
   root?.querySelector<HTMLElement>(`${selector}:not(:disabled)`) ?? null
 
+// The queue in its order at the start, kept while you work (finishing a message changes its tone score,
+// which must not move it).
+function useStableQueue(views: MessageView[], sort: MessageSort): MessageView[] {
+  const known = useRef<string[]>([])
+  const sortRef = useRef(sort)
+  if (sortRef.current !== sort) { sortRef.current = sort; known.current = [] }
+  const fresh = orderMessages(views, sort)
+  const ordered = known.current.length ? stableOrder(fresh, known.current) : fresh
+  known.current = ordered.map(v => v.message.id)
+  return ordered
+}
+
 // ---- by stage ---------------------------------------------------------------------------
 
-function StageView({ bundle, adminId, ordered, actions }: { bundle: InboxBundle; adminId: string; ordered: MessageView[]; actions: ValidateActions }) {
+function StageView({ bundle, ordered, hideDone, actions }: { bundle: InboxBundle; ordered: MessageView[]; hideDone: boolean; actions: ValidateActions }) {
   const [stage, setStage] = useState<Stage>('tone')
   const listRef = useRef<HTMLDivElement>(null)
   const navRef = useRef<HTMLElement>(null)
   const focusFirst = useRef(false)
-  const counts = stageCounts(ordered, adminId)
+  const counts = stageCounts(ordered)
+  const shown = hideDone ? ordered.filter(v => !stageDone(v, stage)) : ordered
 
   useEffect(() => {
     if (!focusFirst.current) return
     focusFirst.current = false
-    // Toning starts at the first message this admin has not toned yet; the other stages at their first control.
+    // Toning starts at the first message this admin has not toned yet; the other stage at its first control.
     const target = stage === 'tone' ? firstControl(listRef.current, '[data-done="false"] [data-cf]') : null
-    // A stage with nothing to fill in yet (Explicate before any channel) keeps the cursor on its tab,
-    // so the next Shift+Enter still moves on.
+    // A stage with nothing to fill in yet keeps the cursor on its tab, so the next Shift+Enter still moves on.
     ;(target ?? firstControl(listRef.current) ?? navRef.current?.querySelector<HTMLElement>('[aria-pressed="true"]'))?.focus()
   }, [stage])
 
@@ -87,39 +104,37 @@ function StageView({ bundle, adminId, ordered, actions }: { bundle: InboxBundle;
     if (e.key !== 'Enter' || !e.shiftKey) return
     e.preventDefault()
     focusFirst.current = true
-    // After Explicate the queue starts over at Tone: the first message this admin has not toned.
     setStage(STAGES[(STAGES.indexOf(stage) + 1) % STAGES.length])
   }
 
   return (
     <div onKeyDown={onKeyDown}>
-      <nav ref={navRef} className="subTabRow subTabRow--expand validateTabs" aria-label="Validation stages">
+      <nav ref={navRef} className="stageTabs" aria-label="Validation stages">
         {STAGES.map(key => {
           const { Icon, label } = STAGE_META[key]
           const { count, total } = counts[key]
           const pct = total ? Math.round(((total - count) / total) * 100) : 0
           return (
             <button
-              key={key} type="button" aria-pressed={key === stage}
-              className={key === stage ? 'subTabBtn subTabBtn--active subTabBtn--withCount subTabBtn--expand' : 'subTabBtn subTabBtn--withCount subTabBtn--expand'}
-              onClick={() => setStage(key)}
+              key={key} type="button" aria-pressed={key === stage} aria-label={`${label}: ${count} of ${total} to do`} title={label}
+              className={key === stage ? 'stageTab stageTab--on' : 'stageTab'} onClick={() => setStage(key)}
             >
-              <span className="subTabBtnMain"><Icon size={16} /> {label}</span>
-              <span className="subTabCount"><span className="subTabCountFill" style={{ width: `${pct}%` }} /></span>
-              <span className="subTabCountLabel">{count} <span className="subTabCountTotal"><span className="subTabCountSlash">/</span> {total}</span></span>
+              <Icon size={18} />
+              <span className="stageProgress"><span style={{ width: `${pct}%` }} /></span>
+              {count > 0 && <span className="stageCount">{count}</span>}
             </button>
           )
         })}
       </nav>
       <div className="feedbackList" ref={listRef} data-stage={stage}>
-        {ordered.length === 0 && <p className="feedbackCardMeta">No feedback to validate.</p>}
-        {ordered.map(view => (
+        {shown.length === 0 && <p className="feedbackCardMeta">{ordered.length === 0 ? 'No feedback to validate.' : 'All done here.'}</p>}
+        {shown.map(view => (
           <div
-            key={view.message.id} data-done={stageDone(view, adminId, stage)}
-            className={stageDone(view, adminId, stage) ? 'feedbackCard' : 'feedbackCard feedbackCard--pending'}
+            key={view.message.id} data-done={stageDone(view, stage)}
+            className={stageDone(view, stage) ? 'feedbackCard feedbackCard--done' : 'feedbackCard'}
           >
             <MessageHead view={view} bundle={bundle} />
-            <StageInput stage={stage} view={view} bundle={bundle} adminId={adminId} actions={actions} />
+            <StageInput stage={stage} view={view} bundle={bundle} actions={actions} />
           </div>
         ))}
       </div>
@@ -129,20 +144,21 @@ function StageView({ bundle, adminId, ordered, actions }: { bundle: InboxBundle;
 
 // ---- by case ----------------------------------------------------------------------------
 
-function CaseView({ bundle, adminId, ordered, actions }: { bundle: InboxBundle; adminId: string; ordered: MessageView[]; actions: ValidateActions }) {
+function CaseView({ bundle, ordered, hideDone, actions }: { bundle: InboxBundle; ordered: MessageView[]; hideDone: boolean; actions: ValidateActions }) {
   const [currentId, setCurrentId] = useState<string | null>(null)
   const bodyRef = useRef<HTMLDivElement>(null)
   const pending = useRef<null | { where: 'first' | 'last' | Stage }>(null)
 
-  const found = ordered.findIndex(v => v.message.id === currentId)
+  const queue = hideDone ? ordered.filter(v => !messageDone(v) || v.message.id === currentId) : ordered
+  const found = queue.findIndex(v => v.message.id === currentId)
   const index = found === -1 ? 0 : found
-  const view = ordered[index]
-  const unfinished = ordered.filter(v => !STAGES.every(s => stageDone(v, adminId, s))).length
+  const view = queue[index]
+  const unfinished = ordered.filter(v => !messageDone(v)).length
 
   const go = (i: number, where: 'first' | 'last' | Stage = 'first') => {
-    if (i < 0 || i >= ordered.length) return
+    if (i < 0 || i >= queue.length) return
     pending.current = { where }
-    setCurrentId(ordered[i].message.id)
+    setCurrentId(queue[i].message.id)
   }
 
   // After moving to another case (or stage), the cursor goes where the shortcut said.
@@ -171,13 +187,13 @@ function CaseView({ bundle, adminId, ordered, actions }: { bundle: InboxBundle; 
       const stage = (active?.closest('[data-stage]')?.getAttribute('data-stage') ?? null) as Stage | null
       const focusStage = (s: Stage) => firstControl(root.querySelector(`[data-stage="${s}"]`))
       if (stage === null) { focusStage('tone')?.focus(); return }
-      // The first later stage that has a control (Explicate has none until a channel is added).
+      // The first later stage that has a control (Explicate has none until the message is toned).
       for (const next of STAGES.slice(STAGES.indexOf(stage) + 1)) {
         const el = focusStage(next)
         if (el) { el.focus(); return }
       }
-      // Past Explicate: the next case, or after the last one the first case still to tone.
-      const to = index + 1 < ordered.length ? index + 1 : firstUntoned(ordered, adminId, 0)
+      // Past the last stage: the next case, or after the last one the first case still to tone.
+      const to = index + 1 < queue.length ? index + 1 : firstUntoned(queue, 0)
       if (to === -1) return
       if (to === index) focusStage('tone')?.focus()
       else go(to, 'tone')
@@ -185,27 +201,28 @@ function CaseView({ bundle, adminId, ordered, actions }: { bundle: InboxBundle; 
     }
     if (e.key === 'Tab') {
       const all = [...root.querySelectorAll<HTMLElement>('[data-cf]:not(:disabled)')].filter(el => el.tabIndex >= 0)
-      if (!e.shiftKey && active === all[all.length - 1] && index + 1 < ordered.length) { e.preventDefault(); go(index + 1, 'first') }
+      if (!e.shiftKey && active === all[all.length - 1] && index + 1 < queue.length) { e.preventDefault(); go(index + 1, 'first') }
       if (e.shiftKey && active === all[0] && index > 0) { e.preventDefault(); go(index - 1, 'last') }
     }
   }
 
-  if (!view) return <p className="feedbackCardMeta">No feedback to validate.</p>
+  if (!view) return <p className="feedbackCardMeta">{ordered.length === 0 ? 'No feedback to validate.' : 'All done.'}</p>
   return (
     <div onKeyDown={onKeyDown}>
       <div className="caseNav">
-        <button type="button" className="toneBtn" aria-label="Previous case" disabled={index === 0} onClick={() => go(index - 1)}><ChevronLeftIcon size={14} /></button>
-        <span className="caseNavLabel">Case {index + 1} of {ordered.length} · {unfinished} unfinished</span>
-        <button type="button" className="toneBtn" aria-label="Next case" disabled={index + 1 >= ordered.length} onClick={() => go(index + 1)}><ChevronRightIcon size={14} /></button>
+        <button type="button" className="iconBtn" aria-label="Previous case" disabled={index === 0} onClick={() => go(index - 1)}><ChevronLeftIcon size={16} /></button>
+        <span className="caseNavLabel">{index + 1} / {queue.length} · {unfinished} to do</span>
+        <button type="button" className="iconBtn" aria-label="Next case" disabled={index + 1 >= queue.length} onClick={() => go(index + 1)}><ChevronRightIcon size={16} /></button>
       </div>
       <div className="feedbackCard" ref={bodyRef}>
         <MessageHead view={view} bundle={bundle} />
         {STAGES.map(stage => (
           <section key={stage} className="caseStage" data-stage={stage} aria-label={STAGE_META[stage].label}>
             <h4 className="caseStageTitle">
-              {STAGE_META[stage].label}{stageDone(view, adminId, stage) && <span className="caseStageDone"> · done</span>}
+              {(() => { const { Icon } = STAGE_META[stage]; return <Icon size={14} /> })()} {STAGE_META[stage].label}
+              {stageDone(view, stage) && <span className="caseStageDone" aria-label="done"> ✓</span>}
             </h4>
-            <StageInput stage={stage} view={view} bundle={bundle} adminId={adminId} actions={actions} />
+            <StageInput stage={stage} view={view} bundle={bundle} actions={actions} />
           </section>
         ))}
       </div>
@@ -213,18 +230,39 @@ function CaseView({ bundle, adminId, ordered, actions }: { bundle: InboxBundle; 
   )
 }
 
-export default function ValidateView({ bundle, adminId, mode, onMode, toneOrder, actions }: Props) {
-  const ordered = useMemo(() => orderMessages(bundle.messages, toneOrder), [bundle.messages, toneOrder])
+export default function ValidateView({ bundle, mode, onMode, hideDone, onHideDone, actions }: Props) {
+  const [sort, setSort] = useState<MessageSort>('tone')
+  const ordered = useStableQueue(bundle.messages, bundle.can.seeTones ? sort : 'tone')
+  const message = useMemo(() => (bundle.can.validate ? null : 'Validating needs the Processor role on Helper > Inbox.'), [bundle.can.validate])
   return (
     <div className="validateView">
-      <div className="segSwitch" role="group" aria-label="Validation mode">
-        <button type="button" aria-pressed={mode === 'stage'} className={mode === 'stage' ? 'segSwitchBtn segSwitchBtn--on' : 'segSwitchBtn'} onClick={() => onMode('stage')}>By stage</button>
-        <button type="button" aria-pressed={mode === 'case'} className={mode === 'case' ? 'segSwitchBtn segSwitchBtn--on' : 'segSwitchBtn'} onClick={() => onMode('case')}>By case</button>
+      <div className="validateBar">
+        <div className="segSwitch" role="group" aria-label="Validation mode">
+          <button type="button" aria-pressed={mode === 'stage'} className={mode === 'stage' ? 'segSwitchBtn segSwitchBtn--on' : 'segSwitchBtn'} onClick={() => onMode('stage')}>
+            <ListIcon size={14} /> Stage
+          </button>
+          <button type="button" aria-pressed={mode === 'case'} className={mode === 'case' ? 'segSwitchBtn segSwitchBtn--on' : 'segSwitchBtn'} onClick={() => onMode('case')}>
+            <PageIcon size={14} /> Case
+          </button>
+        </div>
+        <button
+          type="button" className={hideDone ? 'iconBtn iconBtn--on' : 'iconBtn'} aria-pressed={hideDone}
+          aria-label="Hide done" title={hideDone ? 'Showing what is left; click to show done too' : 'Hide done'} onClick={() => onHideDone(!hideDone)}
+        >
+          <EyeIcon size={16} />
+        </button>
+        {bundle.can.seeTones && (
+          <select className="sortSelect" aria-label="Sort messages" value={sort} onChange={e => setSort(e.target.value as MessageSort)}>
+            <option value="tone">By tone</option>
+            <option value="fewest">Fewest validations first</option>
+            <option value="most">Most validations first</option>
+          </select>
+        )}
       </div>
-      {!bundle.can.validate && <p className="feedbackCardMeta">Validating feedback needs feedback processing access to Helper &gt; Inbox. You can read but not change it.</p>}
+      {message && <p className="feedbackCardMeta">{message}</p>}
       {mode === 'stage'
-        ? <StageView bundle={bundle} adminId={adminId} ordered={ordered} actions={actions} />
-        : <CaseView bundle={bundle} adminId={adminId} ordered={ordered} actions={actions} />}
+        ? <StageView bundle={bundle} ordered={ordered} hideDone={hideDone} actions={actions} />
+        : <CaseView bundle={bundle} ordered={ordered} hideDone={hideDone} actions={actions} />}
     </div>
   )
 }

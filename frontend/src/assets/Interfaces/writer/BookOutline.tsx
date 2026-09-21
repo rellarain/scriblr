@@ -43,6 +43,9 @@ function BookOutline({ w, book, chapterWords }: { w: WriterWorkspace; book: Outl
       return arc && arc.kind === 'arc' ? w.addOutlineNode(arc.parentId, 'arc', {}, arc.id) : null
     },
     canCreateParentSibling: id => parentNode(id)?.kind === 'arc',
+    // arc -> a new chapter inside it (Shift+Enter); a chapter has no child here.
+    createChild: id => (nodeById.get(id)?.kind === 'arc' ? w.addOutlineNode(id, 'chapter') : null),
+    canCreateChild: id => nodeById.get(id)?.kind === 'arc',
     remove: id => w.deleteOutlineNode(id),
   })
 

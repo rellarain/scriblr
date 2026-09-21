@@ -155,3 +155,36 @@ def test_source_field_id_round_trips(client: TestClient) -> None:
     resp = client.get(f"/api/projects/{project_id}/plot")
     reloaded = {n["id"]: n for n in resp.json()["nodes"]}
     assert reloaded["pp_1"]["sourceFieldId"] == "field_1"
+
+
+def test_plotpoint_field_reference_and_awareness_round_trip(client: TestClient) -> None:
+    project_id = client.post("/api/projects", json={"title": "Fields"}).json()["projectId"]
+    tree = client.get(f"/api/projects/{project_id}/plot").json()
+    base = {"parentId": None, "order": 0, "title": "", "body": ""}
+    tree["nodes"] = [
+        {**base, "id": "cat", "kind": "category", "customFieldDefs": [{"id": "f1", "name": "Theme"}]},
+        {**base, "id": "val", "kind": "plotpoint", "parentId": "cat", "title": "Trust", "fieldId": "f1"},
+        {**base, "id": "line", "kind": "plotline", "parentId": "cat"},
+        {**base, "id": "ref", "kind": "plotpoint", "parentId": "line", "fieldId": "f1", "refId": "val",
+         "assignedMomentId": "m1", "awareness": "back"},
+    ]
+    assert client.put(f"/api/projects/{project_id}/plot", json=tree).status_code == 200
+    nodes = {n["id"]: n for n in client.get(f"/api/projects/{project_id}/plot").json()["nodes"]}
+    assert nodes["val"]["fieldId"] == "f1" and nodes["val"]["refId"] is None and nodes["val"]["awareness"] is None
+    assert (nodes["ref"]["refId"], nodes["ref"]["awareness"]) == ("val", "back")
+
+
+def test_plotpoint_awareness_only_takes_the_four_states(client: TestClient) -> None:
+    project_id = client.post("/api/projects", json={"title": "Bad"}).json()["projectId"]
+    tree = client.get(f"/api/projects/{project_id}/plot").json()
+    tree["nodes"] = [{"id": "p", "kind": "plotpoint", "parentId": None, "order": 0, "title": "x", "awareness": "sideways"}]
+    assert client.put(f"/api/projects/{project_id}/plot", json=tree).status_code == 422
+
+
+def test_plots_saved_before_fields_still_load(client: TestClient) -> None:
+    project_id = client.post("/api/projects", json={"title": "Old"}).json()["projectId"]
+    tree = client.get(f"/api/projects/{project_id}/plot").json()
+    tree["nodes"] = [{"id": "p", "kind": "plotpoint", "parentId": None, "order": 0, "title": "old", "body": ""}]
+    client.put(f"/api/projects/{project_id}/plot", json=tree)
+    node = client.get(f"/api/projects/{project_id}/plot").json()["nodes"][0]
+    assert (node["fieldId"], node["refId"], node["awareness"]) == (None, None, None)

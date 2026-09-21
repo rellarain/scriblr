@@ -49,13 +49,14 @@ function BookCover({ w, book }: { w: WriterWorkspace; book: OutlineNode }) {
   const chapters = w.activeBookChapters
   const counts = useWordCounts(w.activeProjectId)
   // The cover is the book's theme colour: its hue at the active zone's theme
-  // saturation and brightness. The accent colour (optional) uses the accent's.
+  // saturation and lightness. The accent colour (optional) uses the accent's.
   const { settings, activeZone } = useThemeState()
   const palette = settings.zones[activeZone].palette
   const themeHue = bookThemeHue(book)
-  const cover = coverColor(palette, themeHue)
-  const accentFill = derivedShades(palette, 'accent')[0].color
-  const accentOn = book.accentHue != null
+  const cover = coverColor(palette, activeZone, themeHue)
+  const accentFill = derivedShades(palette, 'accent', activeZone)[0].color
+  // The secondary colour is required: a book with none has its primary hue.
+  const accentHue = book.accentHue ?? themeHue
   const timeSystems = w.activeProject?.settings.timeSystems ?? []
 
   return (
@@ -82,23 +83,17 @@ function BookCover({ w, book }: { w: WriterWorkspace; book: OutlineNode }) {
             </label>
             <div className="wrCoverColors">
               <div className="wrColorRow">
-                <span className="wrColorLabel">Book colour</span>
+                <span className="wrColorLabel">Primary colour</span>
                 <ColorRange
-                  label="Book colour" kind="hue" value={themeHue} sat={cover.s} light={cover.l}
+                  label="Primary colour" value={themeHue} sat={cover.s} light={cover.l}
                   onChange={hue => w.updateOutlineNode(book.id, { themeHue: hue })}
                 />
               </div>
               <div className="wrColorRow">
-                <label className="wrColorLabel wrColorToggle">
-                  <input
-                    type="checkbox" role="switch" checked={accentOn} aria-label="Use an accent colour for this book"
-                    onChange={e => w.updateOutlineNode(book.id, { accentHue: e.target.checked ? palette.accent.h : null })}
-                  />
-                  <span>Accent colour</span>
-                </label>
+                <span className="wrColorLabel">Secondary colour</span>
                 <ColorRange
-                  label="Accent colour" kind="hue" value={book.accentHue ?? palette.accent.h} sat={palette.accent.s} light={accentFill.l}
-                  disabled={!accentOn} onChange={hue => w.updateOutlineNode(book.id, { accentHue: hue })}
+                  label="Secondary colour" value={accentHue} sat={accentFill.s} light={accentFill.l}
+                  onChange={hue => w.updateOutlineNode(book.id, { accentHue: hue })}
                 />
               </div>
             </div>

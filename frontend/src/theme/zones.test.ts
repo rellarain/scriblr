@@ -83,12 +83,12 @@ describe('msUntilNextBoundary', () => {
 })
 
 describe('enable / disable / normalize', () => {
-  it('enables a zone with a copy of the Day palette and a free start', () => {
+  it('enables a zone with a copy of the Day hues and a free start', () => {
     let s = defaultThemeSettings()
-    s.zones.day.palette.brightness = 60
+    s.zones.day.palette.accent.h = 60
     s = enableZone(s, 'night')
     expect(s.zones.night.configured).toBe(true)
-    expect(s.zones.night.palette.brightness).toBe(60)
+    expect(s.zones.night.palette.accent.h).toBe(60)
     expect(s.zones.night.palette).not.toBe(s.zones.day.palette)
   })
 
@@ -115,6 +115,12 @@ describe('enable / disable / normalize', () => {
     expect(s.zones.day.startMinute).toBe(420)
     expect(s.override).toBeNull() // dusk is not configured
     expect(normalizeTheme(null)).toEqual(defaultThemeSettings())
+  })
+
+  it('keeps just the hues of a palette saved by an older version', () => {
+    const old = { theme: { h: 10, s: 30 }, accent: { h: 20, s: 95 }, alert: { h: 30, s: 100 }, accent2: { h: 40, s: 60 }, brightness: 35 }
+    const s = normalizeTheme({ zones: { night: { configured: true, startMinute: 1260, palette: old } } } as unknown as ThemeSettings)
+    expect(s.zones.night.palette).toEqual({ theme: { h: 10 }, accent: { h: 20 }, alert: { h: 30 }, accent2: { h: 40 } })
   })
 
   it('clamps start times', () => {

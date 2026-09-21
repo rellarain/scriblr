@@ -45,7 +45,7 @@ function SidebarDivider({
   const isInboxActive = expanded && panel === 'inbox' && selectedChatId == null
   // Statements and solutions the signed-in admin can vote on and has not.
   const feedback = useFeedback()
-  const needsVote = feedback.bundle ? needsMyVoteCount(feedback.bundle.cases, feedback.adminId) : 0
+  const needsVote = feedback.bundle ? needsMyVoteCount(feedback.bundle.cases) : 0
 
   function segmentStyle(count: number) {
     return usesFixedHeight

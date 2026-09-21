@@ -5,19 +5,20 @@ export type ZoneKey = 'dawn' | 'day' | 'dusk' | 'night'
 export const ZONE_KEYS: ZoneKey[] = ['dawn', 'day', 'dusk', 'night']
 export const ZONE_LABEL: Record<ZoneKey, string> = { dawn: 'Dawn', day: 'Day', dusk: 'Dusk', night: 'Night' }
 
-export interface HS { h: number; s: number }
+export interface Hue { h: number }
 
 // theme: inert / read-only; accent: interactive / active; alert: needs
 // attention; accent2: admin features (admins only).
 export type PaletteKey = 'theme' | 'accent' | 'alert' | 'accent2'
 export const PALETTE_KEYS: PaletteKey[] = ['theme', 'accent', 'alert', 'accent2']
 
+// All a user chooses per zone: four hues. Saturation and lightness are the
+// zone's fixed look (zoneLooks.ts).
 export interface ZonePalette {
-  brightness: number // 0..100, the theme's base lightness
-  theme: HS
-  accent: HS
-  alert: HS
-  accent2: HS
+  theme: Hue
+  accent: Hue
+  alert: Hue
+  accent2: Hue
 }
 
 export interface ZoneConfig {

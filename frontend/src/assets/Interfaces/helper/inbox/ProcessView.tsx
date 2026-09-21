@@ -1,18 +1,19 @@
 import { useMemo, useState } from 'react'
-import { CheckIcon, ChevronDownIcon, ChevronRightIcon, CloseIcon, PlusIcon } from '../../../icons'
-import type {
-  FeedbackAdmin, FeedbackChannel, FeedbackSolution, FeedbackVote, InboxBundle, StatementCase, VoteInput,
-} from './feedbackTypes'
 import {
-  BAND_LABEL, channelLabel, filterCases, needsMyVote, needsMyVoteCount, sortCases, statusLabel, tally, toneScoreLabel,
+  CheckIcon, ChevronDownIcon, ChevronRightIcon, CloseIcon, ListIcon, LockIcon, PlusIcon, QuestionIcon, UnlockIcon, VotingIcon,
+} from '../../../icons'
+import type { FeedbackChannel, FeedbackSolution, FeedbackVote, InboxBundle, StatementCase, ToneCategory, VoteInput } from './feedbackTypes'
+import {
+  CATEGORY_LABEL, TONE_CATEGORIES, channelAncestors, channelLabel, filterCases, needsMyVote, needsMyVoteCount, sortCases, statusLabel, tally,
   type CaseSort, type CaseView,
 } from './inboxLogic'
+import { ToneBar, ToneSwatch } from './ValidationControls'
 import { VoteControl } from './VoteControl'
 
-// Processing: the feedback statement cases (one intention verb + one subject, with the messages
-// behind them). Admins vote for and/or against the statement, with notes; admins with
-// configuration access to the case's console propose solutions, which are voted on the same
-// way; admins with configuration and project plan access close a case as approved or rejected.
+// Processing: the feedback statement cases (one intention verb + one subject, with the messages behind
+// them). Admins vote yes / no / pass on the statement with optional notes; Configurers propose solutions, which
+// are voted on the same way; a Planner closes a case as approved or rejected. Cards are collapsed to the essentials
+// (verb, subject, tone, votes, validators); messages, solutions and history open on demand. Nobody is named.
 
 export interface ProcessActions {
   voteCase: (caseId: string, vote: VoteInput) => void
@@ -29,29 +30,43 @@ const dateOf = (iso: string) => {
   return Number.isNaN(d.getTime()) ? iso : d.toLocaleDateString(undefined, { year: 'numeric', month: 'short', day: 'numeric' })
 }
 
-const HISTORY_TEXT: Record<string, (detail: string) => string> = {
-  vote: d => `${d} the statement`,
-  'solution-vote': d => d,
-  solution: d => d,
-  closed: d => `closed the case as ${d}`,
-  reopened: () => 'reopened the case',
+// The history reads "yes", "no" and "pass" (the server logs approved / denied / passed).
+const voteWords = (detail: string) => detail.replace(/approved/g, 'yes').replace(/denied/g, 'no').replace(/passed/g, 'pass')
+const HISTORY_TEXT: Record<string, (detail: string, mine: boolean) => string> = {
+  vote: (d, mine) => `${mine ? 'You' : 'Someone'} voted ${voteWords(d)}`,
+  'solution-vote': (d, mine) => `${mine ? 'You' : 'Someone'} voted ${voteWords(d)}`,
+  solution: (d, mine) => `${mine ? 'You' : 'Someone'} ${d}`,
+  closed: (d, mine) => `${mine ? 'You' : 'A Planner'} closed the case as ${d}`,
+  reopened: (_d, mine) => `${mine ? 'You' : 'A Configurer'} reopened the case`,
 }
 
-// What the other admins voted, with their notes.
-function VoteList({ votes, admins, skip }: { votes: FeedbackVote[]; admins: FeedbackAdmin[]; skip: string }) {
-  const others = votes.filter(v => v.adminId !== skip && (v.approve || v.deny))
+// Yes, no and pass counts as three small coloured squares.
+function Tally({ votes }: { votes: FeedbackVote[] }) {
+  const t = tally(votes)
+  return (
+    <span className="tally" aria-label={`${t.approve} yes, ${t.deny} no, ${t.passed} pass`}>
+      <span className="tallyItem tallyItem--approve" title="Yes"><CheckIcon size={11} />{t.approve}</span>
+      <span className="tallyItem tallyItem--deny" title="No"><CloseIcon size={11} />{t.deny}</span>
+      <span className="tallyItem tallyItem--pass" title="Pass"><QuestionIcon size={11} />{t.passed}</span>
+    </span>
+  )
+}
+
+// What the other admins voted, with their notes (nobody is named).
+function VoteList({ votes }: { votes: FeedbackVote[] }) {
+  const others = votes.filter(v => !v.mine)
   if (others.length === 0) return null
-  const name = (id: string) => admins.find(a => a.id === id)?.name ?? id
   return (
     <ul className="voteLog">
-      {others.map(v => (
-        <li key={v.adminId}>
-          <span className="voteLogName">{name(v.adminId)}</span>
-          {v.approve && <span className="voteMark voteMark--approve" title="For"><CheckIcon size={12} /></span>}
-          {v.deny && <span className="voteMark voteMark--deny" title="Against"><CloseIcon size={12} /></span>}
+      {others.map((v, i) => (
+        <li key={i}>
+          {v.approve && <span className="voteMark voteMark--approve" title="Yes"><CheckIcon size={12} /></span>}
+          {v.deny && <span className="voteMark voteMark--deny" title="No"><CloseIcon size={12} /></span>}
+          {v.passed && <span className="voteMark voteMark--pass" title="Pass"><QuestionIcon size={12} /></span>}
           <span className="voteLogNotes">
             {v.approve && v.approveNote && <span>{v.approveNote}</span>}
             {v.deny && v.denyNote && <span>{v.denyNote}</span>}
+            {v.passed && v.passNote && <span>{v.passNote}</span>}
           </span>
         </li>
       ))}
@@ -59,26 +74,24 @@ function VoteList({ votes, admins, skip }: { votes: FeedbackVote[]; admins: Feed
   )
 }
 
-function SolutionCard({ solution, c, admins, adminId, disabled, reason, actions }: {
-  solution: FeedbackSolution; c: StatementCase; admins: FeedbackAdmin[]; adminId: string
-  disabled: boolean; reason: string; actions: ProcessActions
+function SolutionCard({ solution, c, disabled, reason, actions }: {
+  solution: FeedbackSolution; c: StatementCase; disabled: boolean; reason: string; actions: ProcessActions
 }) {
-  const t = tally(solution.votes)
-  const by = admins.find(a => a.id === solution.proposedBy)?.name ?? solution.proposedBy
   return (
     <div className="solutionCard">
       <div className="solutionHead">
         <span className="solutionTitle">{solution.title}</span>
-        <span className="channelPill">{channelLabel(solution.target)}</span>
+        {solution.mine && <span className="mineTag">yours</span>}
+        <Tally votes={solution.votes} />
       </div>
+      <div className="subjectAncestors">{channelLabel(solution.target)} · {dateOf(solution.createdAt)}</div>
       {solution.description && <p className="solutionText">{solution.description}</p>}
-      <p className="feedbackCardMeta">Proposed by {by} · {dateOf(solution.createdAt)} · {t.approve} for · {t.deny} against</p>
       <VoteControl
-        vote={solution.votes.find(v => v.adminId === adminId)} label={`the solution ${solution.title}`}
+        vote={solution.votes.find(v => v.mine)} label={`the solution ${solution.title}`}
         disabled={disabled} disabledReason={reason}
         onChange={vote => actions.voteSolution(c.id, solution.id, vote)}
       />
-      <VoteList votes={solution.votes} admins={admins} skip={adminId} />
+      <VoteList votes={solution.votes} />
     </div>
   )
 }
@@ -110,7 +123,7 @@ function ProposeForm({ c, bundle, onDone, actions }: { c: StatementCase; bundle:
         aria-label="Solution description" placeholder="What should change? (optional)" rows={3} maxLength={2000} value={description}
         onChange={e => setDescription(e.target.value)}
       />
-      <div className="channelAddForm channelAddForm--three">
+      <div className="targetRow">
         <select aria-label="Target page" value={page} onChange={e => { setPage(e.target.value); setConsole(''); setComponent('') }}>
           {bundle.taxonomy.map(p => <option key={p.name} value={p.name}>{p.name}</option>)}
         </select>
@@ -125,8 +138,8 @@ function ProposeForm({ c, bundle, onDone, actions }: { c: StatementCase; bundle:
       </div>
       {error && <p className="inboxError" role="alert">{error}</p>}
       <div className="toneRow">
-        <button type="button" className="toneBtn toneBtn--active" onClick={() => void submit()}>Propose</button>
-        <button type="button" className="toneBtn" onClick={onDone}>Cancel</button>
+        <button type="button" className="iconBtn iconBtn--yes" aria-label="Propose" title="Propose" onClick={() => void submit()}><CheckIcon size={16} /></button>
+        <button type="button" className="iconBtn" aria-label="Cancel" title="Cancel" onClick={onDone}><CloseIcon size={16} /></button>
       </div>
     </div>
   )
@@ -139,25 +152,23 @@ function CloseForm({ c, onDone, actions }: { c: StatementCase; onDone: () => voi
     <div className="proposeForm">
       <input aria-label="Closing note" placeholder="Closing note (optional)" maxLength={500} value={note} onChange={e => setNote(e.target.value)} />
       <div className="toneRow">
-        <button type="button" className="toneBtn" onClick={() => void finish('approved')}><CheckIcon size={14} /> Close as approved</button>
-        <button type="button" className="toneBtn" onClick={() => void finish('rejected')}><CloseIcon size={14} /> Close as rejected</button>
-        <button type="button" className="toneBtn" onClick={onDone}>Cancel</button>
+        <button type="button" className="iconBtn iconBtn--yes" aria-label="Close as approved" title="Close as approved" onClick={() => void finish('approved')}><CheckIcon size={16} /></button>
+        <button type="button" className="iconBtn iconBtn--no" aria-label="Close as rejected" title="Close as rejected" onClick={() => void finish('rejected')}><CloseIcon size={16} /></button>
+        <button type="button" className="iconBtn" aria-label="Cancel" title="Cancel" onClick={onDone}>×</button>
       </div>
     </div>
   )
 }
 
-function CaseCard({ c, bundle, adminId, expanded, onToggle, actions }: {
-  c: StatementCase; bundle: InboxBundle; adminId: string; expanded: boolean; onToggle: () => void; actions: ProcessActions
+function CaseCard({ c, bundle, expanded, onToggle, actions }: {
+  c: StatementCase; bundle: InboxBundle; expanded: boolean; onToggle: () => void; actions: ProcessActions
 }) {
   const [proposing, setProposing] = useState(false)
   const [closing, setClosing] = useState(false)
-  const t = tally(c.votes)
   const closed = c.status !== 'open'
   const where = `${c.channel.page} > ${c.channel.console}`
-  const name = (id: string | null) => bundle.admins.find(a => a.id === id)?.name ?? id ?? ''
-  const voteReason = closed ? 'This case is closed.' : `Voting needs feedback processing access to ${where}.`
-  const needs = needsMyVote(c, adminId)
+  const voteReason = closed ? 'This case is closed.' : `Voting needs the Processor role on ${where}.`
+  const needs = needsMyVote(c)
 
   return (
     <article className={`caseCard caseCard--${c.status}`} aria-label={`${c.verbName}: ${channelLabel(c.channel)}`}>
@@ -165,93 +176,77 @@ function CaseCard({ c, bundle, adminId, expanded, onToggle, actions }: {
         {expanded ? <ChevronDownIcon size={14} /> : <ChevronRightIcon size={14} />}
         <span className="caseHeadMain">
           <span className="caseVerb">{c.verbName}</span>
-          <span className="caseChannel">{channelLabel(c.channel)}</span>
+          <span className="caseChannel">{channelAncestors(c.channel).join(' / ')}</span>
+          <span className="caseFeature">{c.channel.feature}</span>
         </span>
-        <span className={`statusChip statusChip--${c.status}`}>{statusLabel(c)}</span>
-        <span className="caseTally">{t.approve} for · {t.deny} against · {c.messages.length} {c.messages.length === 1 ? 'message' : 'messages'}</span>
+        {closed && <span className={`statusIcon statusIcon--${c.status}`} title={statusLabel(c)}>{c.status === 'approved' ? <CheckIcon size={12} /> : <CloseIcon size={12} />}</span>}
+        <span className="caseCounts">
+          <ToneSwatch category={c.tone.category} />
+          <Tally votes={c.votes} />
+          <span className="validatorCount" title={`${c.validators} validator${c.validators === 1 ? '' : 's'}`}>{c.validators}</span>
+          <span className="messageCount" title={`${c.messages.length} message${c.messages.length === 1 ? '' : 's'}`}>{c.messages.length}</span>
+        </span>
         {needs && <span className="needsDot" title="Needs your vote" aria-label="Needs your vote" />}
       </button>
       {expanded && (
         <div className="caseBody">
-          <section aria-label="Messages">
-            <h4 className="caseStageTitle">Messages</h4>
-            {c.messages.map(m => (
-              <div key={m.messageId} className="caseMessage">
-                <p className="feedbackCardText">&ldquo;{m.text}&rdquo;</p>
-                <p className="feedbackCardMeta">
-                  {m.author} · {dateOf(m.submittedAt)}
-                  <span className={`toneBand toneBand--${m.tone.band}`}>{BAND_LABEL[m.tone.band]} · {toneScoreLabel(m.tone)}</span>
-                </p>
-              </div>
-            ))}
-          </section>
+          <ToneBar summary={c.tone} />
 
           <section aria-label="Your vote on the statement">
-            <h4 className="caseStageTitle">Do you agree this should happen?</h4>
             <VoteControl
-              vote={c.votes.find(v => v.adminId === adminId)} label="this statement"
+              vote={c.votes.find(v => v.mine)} label="this statement"
               disabled={closed || !c.can.vote} disabledReason={voteReason}
               onChange={vote => actions.voteCase(c.id, vote)}
             />
-            {!closed && !c.can.vote && <p className="feedbackCardMeta">{voteReason}</p>}
-            <VoteList votes={c.votes} admins={bundle.admins} skip={adminId} />
+            <VoteList votes={c.votes} />
           </section>
 
           <section aria-label="Solutions">
-            <h4 className="caseStageTitle">Solutions ({c.solutions.length})</h4>
-            {c.solutions.length === 0 && <p className="feedbackCardMeta">No solution proposed yet.</p>}
             {c.solutions.map(s => (
-              <SolutionCard
-                key={s.id} solution={s} c={c} admins={bundle.admins} adminId={adminId}
-                disabled={closed || !c.can.vote} reason={voteReason} actions={actions}
-              />
+              <SolutionCard key={s.id} solution={s} c={c} disabled={closed || !c.can.vote} reason={voteReason} actions={actions} />
             ))}
             {proposing
               ? <ProposeForm c={c} bundle={bundle} onDone={() => setProposing(false)} actions={actions} />
               : (
-                <div className="toneRow">
-                  <button
-                    type="button" className="toneBtn" disabled={closed || !c.can.propose}
-                    title={closed ? 'This case is closed.' : c.can.propose ? undefined : `Proposing a solution needs configuration access to ${where}.`}
-                    onClick={() => setProposing(true)}
-                  >
-                    <PlusIcon size={14} /> Propose solution
-                  </button>
-                  {!closed && !c.can.propose && <span className="feedbackCardMeta">Needs configuration access to {where}</span>}
-                </div>
+                <button
+                  type="button" className="iconBtn" aria-label="Propose a solution" disabled={closed || !c.can.propose}
+                  title={closed ? 'This case is closed.' : c.can.propose ? 'Propose a solution' : `Proposing a solution needs the Configurer role on ${where}.`}
+                  onClick={() => setProposing(true)}
+                >
+                  <PlusIcon size={16} />
+                </button>
               )}
           </section>
 
-          <section aria-label="Status">
+          <section aria-label="Messages">
+            {c.messages.map(m => (
+              <div key={m.messageId} className="caseMessage">
+                <p className="feedbackCardText">{m.text}</p>
+                <div className="messageMeta"><span className="feedbackCardMeta">{dateOf(m.submittedAt)}</span><ToneBar summary={m.tone} /></div>
+              </div>
+            ))}
+          </section>
+
+          <section aria-label="Status" className="statusRow">
             {closed ? (
               <>
-                <p className="feedbackCardMeta">
-                  {statusLabel(c)} by {name(c.closedBy)}{c.closedAt ? ` on ${dateOf(c.closedAt)}` : ''}{c.closeNote ? `: ${c.closeNote}` : ''}
-                </p>
-                <div className="toneRow">
-                  <button
-                    type="button" className="toneBtn" disabled={!c.can.reopen}
-                    title={c.can.reopen ? undefined : `Reopening needs configuration access to ${where}.`}
-                    onClick={() => actions.reopen(c.id)}
-                  >
-                    Reopen case
-                  </button>
-                  {!c.can.reopen && <span className="feedbackCardMeta">Needs configuration access to {where}</span>}
-                </div>
+                <span className="feedbackCardMeta">{statusLabel(c)}{c.closedAt ? ` ${dateOf(c.closedAt)}` : ''}{c.closeNote ? `: ${c.closeNote}` : ''}</span>
+                <button
+                  type="button" className="iconBtn" aria-label="Reopen case" disabled={!c.can.reopen}
+                  title={c.can.reopen ? 'Reopen case' : `Reopening needs the Configurer role on ${where}.`} onClick={() => actions.reopen(c.id)}
+                >
+                  <UnlockIcon size={16} />
+                </button>
               </>
             ) : closing ? (
               <CloseForm c={c} onDone={() => setClosing(false)} actions={actions} />
             ) : (
-              <div className="toneRow">
-                <button
-                  type="button" className="toneBtn" disabled={!c.can.close}
-                  title={c.can.close ? undefined : `Closing a case needs configuration and project plan access to ${where}.`}
-                  onClick={() => setClosing(true)}
-                >
-                  Close case
-                </button>
-                {!c.can.close && <span className="feedbackCardMeta">Needs configuration and project plan access to {where}</span>}
-              </div>
+              <button
+                type="button" className="iconBtn" aria-label="Close case" disabled={!c.can.close}
+                title={c.can.close ? 'Close case' : `Closing a case needs the Planner role on ${where}.`} onClick={() => setClosing(true)}
+              >
+                <LockIcon size={16} />
+              </button>
             )}
           </section>
 
@@ -260,9 +255,7 @@ function CaseCard({ c, bundle, adminId, expanded, onToggle, actions }: {
             <ul>
               {c.history.length === 0 && <li>Nothing yet.</li>}
               {[...c.history].reverse().map((h, i) => (
-                <li key={i}>
-                  <span className="feedbackCardMeta">{dateOf(h.at)}</span> {name(h.adminId)} {(HISTORY_TEXT[h.kind] ?? (d => d))(h.detail)}
-                </li>
+                <li key={i}><span className="feedbackCardMeta">{dateOf(h.at)}</span> {(HISTORY_TEXT[h.kind] ?? ((d: string) => d))(h.detail, h.mine)}</li>
               ))}
             </ul>
           </details>
@@ -272,49 +265,57 @@ function CaseCard({ c, bundle, adminId, expanded, onToggle, actions }: {
   )
 }
 
-export default function ProcessView({ bundle, adminId, actions }: { bundle: InboxBundle; adminId: string; actions: ProcessActions }) {
+export default function ProcessView({ bundle, actions }: { bundle: InboxBundle; actions: ProcessActions }) {
   const [view, setView] = useState<CaseView>('all')
-  const [page, setPage] = useState('')
+  const [category, setCategory] = useState<ToneCategory | ''>('')
   const [sort, setSort] = useState<CaseSort>('newest')
   const [openIds, setOpenIds] = useState<Set<string>>(new Set())
 
-  const shown = useMemo(
-    () => sortCases(filterCases(bundle.cases, view, page, adminId), sort),
-    [bundle.cases, view, page, sort, adminId],
-  )
-  const needs = needsMyVoteCount(bundle.cases, adminId)
+  const shown = useMemo(() => sortCases(filterCases(bundle.cases, view, category), sort), [bundle.cases, view, category, sort])
+  const needs = needsMyVoteCount(bundle.cases)
   const toggle = (id: string) => setOpenIds(prev => { const next = new Set(prev); if (next.has(id)) next.delete(id); else next.add(id); return next })
-  const pages = [...new Set(bundle.cases.map(c => c.channel.page))]
-  const VIEWS: Array<[CaseView, string]> = [['all', 'All'], ['needs', `Needs my vote${needs ? ` (${needs})` : ''}`], ['open', 'Open'], ['closed', 'Closed']]
+  const VIEWS: Array<[CaseView, string, JSX.Element]> = [
+    ['all', 'All cases', <ListIcon key="a" size={16} />],
+    ['needs', `Needs my vote${needs ? ` (${needs})` : ''}`, <VotingIcon key="n" size={16} />],
+    ['open', 'Open', <UnlockIcon key="o" size={16} />],
+    ['closed', 'Closed', <LockIcon key="c" size={16} />],
+  ]
 
   return (
     <div className="processView">
-      <div className="segSwitch segSwitch--wrap" role="group" aria-label="Show cases">
-        {VIEWS.map(([key, label]) => (
-          <button key={key} type="button" aria-pressed={view === key} className={view === key ? 'segSwitchBtn segSwitchBtn--on' : 'segSwitchBtn'} onClick={() => setView(key)}>{label}</button>
-        ))}
-      </div>
-      <div className="channelAddForm">
-        <select aria-label="Filter by page" value={page} onChange={e => setPage(e.target.value)}>
-          <option value="">All pages</option>
-          {pages.map(p => <option key={p} value={p}>{p}</option>)}
-        </select>
-        <select aria-label="Sort cases" value={sort} onChange={e => setSort(e.target.value as CaseSort)}>
-          <option value="newest">Newest feedback</option>
+      <div className="processBar">
+        <div className="segSwitch" role="group" aria-label="Show cases">
+          {VIEWS.map(([key, label, icon]) => (
+            <button
+              key={key} type="button" aria-pressed={view === key} aria-label={label} title={label}
+              className={view === key ? 'segSwitchBtn segSwitchBtn--on' : 'segSwitchBtn'} onClick={() => setView(key)}
+            >
+              {icon}{key === 'needs' && needs > 0 && <span className="segCount">{needs}</span>}
+            </button>
+          ))}
+        </div>
+        <select className="sortSelect" aria-label="Sort cases" value={sort} onChange={e => setSort(e.target.value as CaseSort)}>
+          <option value="newest">Newest</option>
           <option value="votes">Most votes</option>
-          <option value="page">Page and console</option>
+          <option value="page">Page</option>
         </select>
+      </div>
+      <div className="categoryFilter" role="group" aria-label="Filter by tone">
+        {TONE_CATEGORIES.map(cat => (
+          <button
+            key={cat} type="button" aria-pressed={category === cat} aria-label={CATEGORY_LABEL[cat]} title={CATEGORY_LABEL[cat]}
+            className={category === cat ? 'categoryBtn categoryBtn--on' : 'categoryBtn'} onClick={() => setCategory(category === cat ? '' : cat)}
+          >
+            <ToneSwatch category={cat} />
+          </button>
+        ))}
       </div>
       <div className="feedbackList">
         {shown.length === 0 && (
-          <p className="feedbackCardMeta">
-            {bundle.cases.length === 0
-              ? `No statement cases yet. A message joins its cases once ${bundle.requiredValidations} ${bundle.requiredValidations === 1 ? 'admin has' : 'admins have'} validated it.`
-              : 'No cases match these filters.'}
-          </p>
+          <p className="feedbackCardMeta">{bundle.cases.length === 0 ? 'No statement cases yet.' : 'No cases match.'}</p>
         )}
         {shown.map(c => (
-          <CaseCard key={c.id} c={c} bundle={bundle} adminId={adminId} expanded={openIds.has(c.id)} onToggle={() => toggle(c.id)} actions={actions} />
+          <CaseCard key={c.id} c={c} bundle={bundle} expanded={openIds.has(c.id)} onToggle={() => toggle(c.id)} actions={actions} />
         ))}
       </div>
     </div>

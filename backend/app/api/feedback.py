@@ -8,7 +8,7 @@ from ..deps import get_app_data_storage_root
 from ..storage import feedback as store
 
 # The Helper Inbox: validating feedback messages and processing the statement cases
-# they form (votes, notes, solutions). Every call acts as the signed-in admin named
+# they form (votes, notes, solutions), and the roles admins hold per console. Every call acts as the signed-in admin named
 # in the X-Admin-Id header (no login yet: the id is trusted); each one returns the
 # whole Inbox bundle for that admin, so the interface always shows current state.
 router = APIRouter(prefix="/api/feedback", tags=["feedback"])
@@ -40,8 +40,15 @@ class ValidationBody(BaseModel):
 class VoteBody(BaseModel):
     approve: bool = False
     deny: bool = False
+    passed: bool = False
     approveNote: str = Field(default="", max_length=store.NOTE_MAX)
     denyNote: str = Field(default="", max_length=store.NOTE_MAX)
+    passNote: str = Field(default="", max_length=store.NOTE_MAX)
+
+
+class RolesBody(BaseModel):
+    console: str
+    roles: list[str] = Field(default_factory=list)
 
 
 class SolutionBody(BaseModel):
@@ -86,7 +93,8 @@ def put_case_vote(
     case_id: str, body: VoteBody,
     admin_id: str = Depends(current_admin), root: Path = Depends(get_app_data_storage_root),
 ) -> dict:
-    return _run(root, admin_id, lambda f: store.vote_on_case(f, admin_id, case_id, body.approve, body.deny, body.approveNote, body.denyNote))
+    return _run(root, admin_id, lambda f: store.vote_on_case(
+        f, admin_id, case_id, body.approve, body.deny, body.passed, body.approveNote, body.denyNote, body.passNote))
 
 
 @router.post("/cases/{case_id}/solutions")
@@ -103,7 +111,7 @@ def put_solution_vote(
     admin_id: str = Depends(current_admin), root: Path = Depends(get_app_data_storage_root),
 ) -> dict:
     return _run(root, admin_id, lambda f: store.vote_on_solution(
-        f, admin_id, case_id, solution_id, body.approve, body.deny, body.approveNote, body.denyNote))
+        f, admin_id, case_id, solution_id, body.approve, body.deny, body.passed, body.approveNote, body.denyNote, body.passNote))
 
 
 @router.post("/cases/{case_id}/close")
@@ -119,6 +127,14 @@ def post_reopen(
     case_id: str, admin_id: str = Depends(current_admin), root: Path = Depends(get_app_data_storage_root),
 ) -> dict:
     return _run(root, admin_id, lambda f: store.reopen_case(f, admin_id, case_id))
+
+
+@router.put("/admins/{target_id}/roles")
+def put_roles(
+    target_id: str, body: RolesBody,
+    admin_id: str = Depends(current_admin), root: Path = Depends(get_app_data_storage_root),
+) -> dict:
+    return _run(root, admin_id, lambda f: store.set_roles(f, admin_id, target_id, body.console, body.roles))
 
 
 @router.post("/verb-categories")

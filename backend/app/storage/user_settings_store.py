@@ -13,7 +13,7 @@ from pathlib import Path
 from typing import Any
 
 from . import project_store
-from .schema import ThemeHS, ThemeSettings, ThemeZones, UiSettings, UserSettings, ZoneConfig, ZonePalette
+from .schema import ThemeHue, ThemeSettings, ThemeZones, UiSettings, UserSettings, ZoneConfig, ZonePalette
 
 KV_PREFIX = "scriblr."
 MAX_KEY_LENGTH = 200
@@ -27,14 +27,12 @@ class InvalidKvError(ValueError):
 
 
 def _default_palette() -> ZonePalette:
-    # The colors the app has always shipped with: the Day palette every
-    # install starts from.
+    # The hues every install starts from, in every zone.
     return ZonePalette(
-        brightness=35,
-        theme=ThemeHS(h=330, s=30),
-        accent=ThemeHS(h=32, s=95),
-        alert=ThemeHS(h=200, s=100),
-        accent2=ThemeHS(h=260, s=60),
+        theme=ThemeHue(h=330),
+        accent=ThemeHue(h=32),
+        alert=ThemeHue(h=200),
+        accent2=ThemeHue(h=260),
     )
 
 

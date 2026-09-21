@@ -43,7 +43,22 @@ def test_a_legacy_book_colour_becomes_its_theme_hue(client: TestClient) -> None:
     client.put(f"/api/projects/{project_id}/outline", json={"schemaVersion": 2, "nodes": [_node("b1", "book", None, 0, color="#3f7a4a")]})
     book = client.get(f"/api/projects/{project_id}").json()["outline"]["nodes"][0]
     assert book["themeHue"] == 131
-    assert book["accentHue"] is None
+    assert book["accentHue"] == 131  # the secondary colour is required: it starts as the primary hue
+
+
+def test_a_book_with_no_hues_gets_the_default_for_both(client: TestClient) -> None:
+    project_id = _create_project(client)
+    client.put(f"/api/projects/{project_id}/outline", json={"schemaVersion": 2, "nodes": [_node("b1", "book", None, 0)]})
+    book = client.get(f"/api/projects/{project_id}").json()["outline"]["nodes"][0]
+    assert (book["themeHue"], book["accentHue"]) == (None, 28)
+
+
+def test_only_books_get_an_accent_hue(client: TestClient) -> None:
+    project_id = _create_project(client)
+    nodes = [_node("b1", "book", None, 0), _node("c1", "chapter", "b1", 0)]
+    client.put(f"/api/projects/{project_id}/outline", json={"schemaVersion": 2, "nodes": nodes})
+    saved = {n["id"]: n["accentHue"] for n in client.get(f"/api/projects/{project_id}").json()["outline"]["nodes"]}
+    assert saved["c1"] is None
 
 
 def test_an_explicit_theme_hue_is_kept_and_the_accent_hue_round_trips(client: TestClient) -> None:

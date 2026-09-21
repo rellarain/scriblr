@@ -9,6 +9,7 @@ import { combineSaveStatus } from '../../../lib/useAutosave'
 import { useChapterDraft } from './useChapterDraft'
 import ChapterOutline, { type PlotDrag } from './ChapterOutline'
 import { PlotpointTile } from './PlotpointTile'
+import { AwarenessLegend } from './AwarenessEye'
 import { orderAssignedPlotpoints } from './plotTree'
 import { usePublications } from './usePublications'
 import { PublishControl } from './PublishControl'
@@ -106,7 +107,12 @@ function ChapterPage({ w, chapter }: { w: WriterWorkspace; chapter: OutlineNode 
         <ChapterOutline
           w={w} chapter={chapter} mode={w.chapterMode} draft={draft} plotDrag={plotDrag} meta={meta}
           sidebar={(
-          <aside className="wrChapterPoints" aria-label="Chapter plotpoints">
+          <aside
+            className="wrChapterPoints" aria-label="Chapter plotpoints"
+            // A placed tile dropped here goes back to the margin.
+            onDragOver={e => { if (plotDragId) e.preventDefault() }}
+            onDrop={e => { e.preventDefault(); if (plotDragId) w.assignPlotpoint(plotDragId, chapter.id); setPlotDragId(null) }}
+          >
             <div className="wrChapterPointsHead">
               <span>Plotpoints</span><span className="wrOutlineMeta">{chapterPoints.length}</span>
             </div>
@@ -116,7 +122,8 @@ function ChapterPage({ w, chapter }: { w: WriterWorkspace; chapter: OutlineNode 
               )}
               {chapterPoints.map(p => (
                 <PlotpointTile
-                  key={p.id} w={w} point={p} dragging={plotDragId === p.id}
+                  key={p.id} w={w} point={p} variant="margin" dragging={plotDragId === p.id}
+                  onUnassign={() => w.assignPlotpoint(p.id, null)}
                   drag={{
                     onDragStart: e => {
                       e.dataTransfer.effectAllowed = 'move'
@@ -128,6 +135,7 @@ function ChapterPage({ w, chapter }: { w: WriterWorkspace; chapter: OutlineNode 
                 />
               ))}
             </div>
+            <AwarenessLegend />
           </aside>
           )}
         />

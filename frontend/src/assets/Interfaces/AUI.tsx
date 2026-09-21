@@ -1,3 +1,4 @@
+import RoleAssignment from './admin/RoleAssignment'
 import { useState } from 'react'
 import type { ComponentType } from 'react'
 import {
@@ -293,7 +294,7 @@ function AUI({ size, onSetSize }: AUIProps) {
           {auiConfig.publishError && <p className="feedbackCardMeta">{auiConfig.publishError}</p>}
           <div className="sectionBody">
             <h2>{subSection.label}</h2>
-            <p>{subSection.body}</p>
+            {subSection.key === 'assignment' ? <RoleAssignment /> : <p>{subSection.body}</p>}
             {subSection.configTabKey && (
               configReadOnly
                 ? <AuiConfigReadOnly tab={subSection.configTabKey} config={auiConfig} />

@@ -1,35 +1,17 @@
 import { useState } from 'react'
 import { CloseIcon, PlusIcon, TrashIcon } from '../../../icons'
-import type { InboxBundle, ToneBand, VerbCategory } from './feedbackTypes'
-import { BAND_LABEL } from './inboxLogic'
+import type { InboxBundle, VerbCategory } from './feedbackTypes'
 
-// Inbox settings: the order tones are worked through (the admin's own, kept in this browser)
-// and the verb categories with their keywords (shared; needs configuration access to
+// Inbox configuration: the verb categories and their keywords (shared; managed with the Configurer role on
 // Helper > Inbox). A message's words that match a keyword are highlighted as suggested verbs.
 
-export interface SettingsActions {
+export interface ConfigurationActions {
   addVerb: (name: string, keywords: string[]) => Promise<boolean>
   updateVerb: (verbId: string, patch: { name?: string; keywords?: string[] }) => Promise<boolean>
   deleteVerb: (verbId: string) => Promise<boolean>
 }
 
-function TonePriority({ order, onMove }: { order: ToneBand[]; onMove: (band: ToneBand, direction: 'up' | 'down') => void }) {
-  return (
-    <div className="tonePriorityList">
-      {order.map((band, index) => (
-        <div key={band} className="tonePriorityRow">
-          <span className="tonePriorityLabel"><span className={`toneBand toneBand--${band}`}>{BAND_LABEL[band]}</span></span>
-          <div>
-            <button type="button" className="tonePriorityMoveBtn" aria-label={`Move ${BAND_LABEL[band]} up`} disabled={index === 0} onClick={() => onMove(band, 'up')}>▲</button>
-            <button type="button" className="tonePriorityMoveBtn" aria-label={`Move ${BAND_LABEL[band]} down`} disabled={index === order.length - 1} onClick={() => onMove(band, 'down')}>▼</button>
-          </div>
-        </div>
-      ))}
-    </div>
-  )
-}
-
-function VerbRow({ verb, editable, actions }: { verb: VerbCategory; editable: boolean; actions: SettingsActions }) {
+function VerbRow({ verb, editable, actions }: { verb: VerbCategory; editable: boolean; actions: ConfigurationActions }) {
   const [name, setName] = useState(verb.name)
   const [keyword, setKeyword] = useState('')
   const [confirming, setConfirming] = useState(false)
@@ -91,12 +73,7 @@ function VerbRow({ verb, editable, actions }: { verb: VerbCategory; editable: bo
   )
 }
 
-export default function SettingsView({ bundle, toneOrder, onMoveTone, actions }: {
-  bundle: InboxBundle
-  toneOrder: ToneBand[]
-  onMoveTone: (band: ToneBand, direction: 'up' | 'down') => void
-  actions: SettingsActions
-}) {
+export default function ConfigurationView({ bundle, actions }: { bundle: InboxBundle; actions: ConfigurationActions }) {
   const [name, setName] = useState('')
   const editable = bundle.can.manageVerbs
   const add = async () => {
@@ -106,16 +83,7 @@ export default function SettingsView({ bundle, toneOrder, onMoveTone, actions }:
 
   return (
     <div className="settingsView">
-      <h3 className="implementGroupHeader">Tone priority</h3>
-      <p className="feedbackCardMeta">Messages are worked through in this order, most important first. It is your own setting.</p>
-      <TonePriority order={toneOrder} onMove={onMoveTone} />
-
-      <h3 className="implementGroupHeader">Verb categories</h3>
-      <p className="feedbackCardMeta">
-        {editable
-          ? 'Each message is scanned for these keywords and matching words are highlighted as suggested verbs.'
-          : 'Managing verb categories needs configuration access to Helper > Inbox. You can read them here.'}
-      </p>
+      {!editable && <p className="feedbackCardMeta">Verb categories are managed with the Configurer role on Helper &gt; Inbox.</p>}
       {bundle.verbCategories.map(verb => <VerbRow key={verb.id} verb={verb} editable={editable} actions={actions} />)}
       {editable && (
         <div className="statementRow">
@@ -123,7 +91,7 @@ export default function SettingsView({ bundle, toneOrder, onMoveTone, actions }:
             className="statementField" aria-label="New verb category" placeholder="New verb category…" maxLength={60}
             value={name} onChange={e => setName(e.target.value)} onKeyDown={e => { if (e.key === 'Enter') void add() }}
           />
-          <button type="button" className="toneBtn" onClick={() => void add()}><PlusIcon size={14} /> Add</button>
+          <button type="button" className="iconBtn" aria-label="Add verb category" title="Add" onClick={() => void add()}><PlusIcon size={16} /></button>
         </div>
       )}
     </div>

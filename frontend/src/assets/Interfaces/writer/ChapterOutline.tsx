@@ -7,6 +7,7 @@ import {
 } from './outlineTree'
 import { SceneTime } from './SceneTime'
 import { PlotpointTile } from './PlotpointTile'
+import { DraftPlotNotes } from './DraftPlotNotes'
 import { formatTime, hasTime, systemForBook } from './timeSystem'
 import { useNodeKeys } from '../../../lib/nodeKeys'
 import { AutoTextarea, DeleteControl } from './shared'
@@ -147,6 +148,13 @@ function ChapterOutline({ w, chapter, mode, draft, plotDrag, meta, sidebar }: {
       const parent = parentNode(id)
       return Boolean(parent) && parent!.id !== chapter.id
     },
+    // chapter -> an act, act -> a scene, scene -> a moment (Shift+Enter); a moment has no child.
+    createChild: id => {
+      const kind = nodeById.get(id)?.kind
+      const child = kind === 'chapter' ? 'act' : kind === 'act' ? 'scene' : kind === 'scene' ? 'moment' : null
+      return child ? w.addOutlineNode(id, child) : null
+    },
+    canCreateChild: id => ['chapter', 'act', 'scene'].includes(nodeById.get(id)?.kind ?? ''),
     remove: id => w.deleteOutlineNode(id),
   })
   const labels = useMemo(() => numberNodes(index, chapter.id), [index, chapter.id])
@@ -208,17 +216,34 @@ function ChapterOutline({ w, chapter, mode, draft, plotDrag, meta, sidebar }: {
   const boxed = (nodeId: string) => {
     const list = pointsByNode.get(nodeId)
     if (!list || list.length === 0) return null
+    const onMoment = nodeById.get(nodeId)?.kind === 'moment'
     return (
       <div className="wrCardPoints">
         {list.map(p => (
           <PlotpointTile
-            key={p.id} w={w} point={p}
+            key={p.id} w={w} point={p} variant="placed" onMoment={onMoment} dragging={plotDrag?.dragId === p.id}
             onUnassign={editable ? () => w.assignPlotpoint(p.id, chapter.id) : undefined}
+            drag={editable && plotDrag ? {
+              onDragStart: e => { e.dataTransfer.effectAllowed = 'move'; e.dataTransfer.setData('text/plain', p.id); plotDrag.setDragId(p.id) },
+              onDragEnd: () => plotDrag.setDragId(null),
+            } : undefined}
           />
         ))}
       </div>
     )
   }
+
+  // Draft mode: the chapter's placed plotpoints as footnote cards in the paper's right margin, in outline order.
+  const placedPoints = useMemo(() => {
+    const ordered: PlotNode[] = []
+    const walk = (id: string) => {
+      ordered.push(...(pointsByNode.get(id) ?? []))
+      for (const kid of index.get(id) ?? []) walk(kid.id)
+    }
+    for (const kid of index.get(chapter.id) ?? []) walk(kid.id)
+    return ordered
+  }, [pointsByNode, index, chapter.id])
+  const momentIds = useMemo(() => new Set(w.outlineNodes.filter(n => n.kind === 'moment').map(n => n.id)), [w.outlineNodes])
 
   // A scene's Location, Time and Action. A field left empty takes the value of
   // the nearest earlier scene in this chapter as its placeholder (never saved),
@@ -463,6 +488,7 @@ function ChapterOutline({ w, chapter, mode, draft, plotDrag, meta, sidebar }: {
           </div>
         )}
       </div>
+      {!editable && <DraftPlotNotes w={w} points={placedPoints} momentIds={momentIds} />}
     </div>
   )
 }

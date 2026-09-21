@@ -78,7 +78,15 @@ export interface PlotNode {
   // Category and subcategory only: the colour hue, 0-360 (null = the theme's hue for a
   // category, its category's hue for a subcategory).
   hue?: number | null
+  // Plotpoints are the values of fields. `fieldId` is the field (a PlotCustomFieldDef id, defined
+  // on a category, subcategory or plotline) a value belongs to; `refId` marks a plotline's reference
+  // to a value defined on its category or subcategory (title and body are read from that original);
+  // `awareness` is set only while placed on a moment.
+  fieldId?: string | null
+  refId?: string | null
+  awareness?: Awareness | null
 }
+export type Awareness = 'front' | 'back' | 'mid' | 'off'
 export interface PlotTree {
   schemaVersion: number
   nodes: PlotNode[]
