@@ -1,21 +1,22 @@
 import { describe, expect, it } from 'vitest'
 import {
-  MINI_H, MIN_LEAF_H, MIN_LEAF_W, buildTree, computeGeometry, fixup, flattenOneColumn, isLeaf, leafIds,
-  minSize, reconcile, resizeBranch, setFixed, swapLeaves,
+  MINI_H, MIN_LEAF_H, MIN_LEAF_W, buildTree, canInsertAt, computeGeometry, fixup, flattenOneColumn, insertAtDivider, isLeaf,
+  leafIds, minSize, reconcile, resizeBranch, setFixed, swapLeaves,
 } from './splitTree'
 import type { SplitNode } from './splitTree'
 
 const P = (id: string, shape: 'mini' | 'mid') => ({ id, shape })
 
 describe('buildTree', () => {
-  it('stacks mini tiles above a split tree of the rest', () => {
+  it('stacks mini tiles below a split tree of the rest', () => {
     const tree = buildTree([P('a', 'mini'), P('b', 'mid'), P('c', 'mid')])!
-    expect(leafIds(tree)).toEqual(['a', 'b', 'c'])
-    // The outermost branch must be the col holding the fixed mini leaf.
+    expect(leafIds(tree)).toEqual(['b', 'c', 'a'])
+    // The outermost branch must be the col holding the fixed mini leaf, second.
     expect(isLeaf(tree)).toBe(false)
     const branch = tree as Exclude<SplitNode, { id: string }>
     expect(branch.dir).toBe('col')
-    expect(isLeaf(branch.a) && branch.a.fixed).toBe(true)
+    expect(isLeaf(branch.b) && branch.b.fixed).toBe(true)
+    expect(isLeaf(branch.a)).toBe(false)
   })
 
   it('keeps every tile short when the whole grid is mini, none stretching to fill leftover space', () => {
@@ -145,6 +146,72 @@ describe('flattenOneColumn', () => {
     const tree = buildTree([P('a', 'mid'), P('b', 'mid')])!
     flattenOneColumn(tree)
     expect(isLeaf(tree) ? undefined : tree.dir).toBe('row')
+  })
+})
+
+describe('canInsertAt', () => {
+  const tree: SplitNode = { dir: 'row', ratio: 0.5, a: { id: 'a' }, b: { id: 'b' } }
+
+  it('is true when the branch has room for a third minimum-sized side', () => {
+    expect(canInsertAt(tree, { x: 0, y: 0, w: 500, h: 400 }, [], false)).toBe(true)
+  })
+
+  it('is false when the branch is too small for a third side', () => {
+    expect(canInsertAt(tree, { x: 0, y: 0, w: 300, h: 400 }, [], false)).toBe(false)
+  })
+
+  it('is false for a path that lands on a leaf, not a divider', () => {
+    expect(canInsertAt(tree, { x: 0, y: 0, w: 900, h: 400 }, ['a'], false)).toBe(false)
+  })
+})
+
+describe('insertAtDivider', () => {
+  it('pulls a tile from elsewhere in the tree and wedges it in at the divider, both original sides intact', () => {
+    const tree: SplitNode = {
+      dir: 'row', ratio: 0.5,
+      a: { id: 'other' },
+      b: { dir: 'col', ratio: 0.5, a: { id: 'x' }, b: { id: 'y' } },
+    }
+    const result = insertAtDivider(tree, 'other', ['b'])
+    expect(leafIds(result)).toEqual(['x', 'other', 'y'])
+    // A col divider gains a new row, wedged directly between its two original sides.
+    const branch = result as Exclude<SplitNode, { id: string }>
+    expect(branch.dir).toBe('col')
+    expect(isLeaf(branch.a) && branch.a.id).toBe('x')
+  })
+
+  it('moves a tile already on one side of this branch to flank the divider directly', () => {
+    const tree: SplitNode = {
+      dir: 'row', ratio: 0.5,
+      a: { dir: 'col', ratio: 0.5, a: { id: 'm' }, b: { id: 'n' } },
+      b: { id: 'z' },
+    }
+    const result = insertAtDivider(tree, 'n', [])
+    expect(leafIds(result)).toEqual(['m', 'n', 'z'])
+    const branch = result as Exclude<SplitNode, { id: string }>
+    expect(isLeaf(branch.a) && branch.a.id).toBe('m')
+  })
+
+  it('keeps a fixed (mini) tile fixed at its new spot', () => {
+    const tree: SplitNode = {
+      dir: 'row', ratio: 0.5,
+      a: { id: 'other', fixed: true },
+      b: { dir: 'col', ratio: 0.5, a: { id: 'x' }, b: { id: 'y' } },
+    }
+    const result = insertAtDivider(tree, 'other', ['b'])
+    const geo = computeGeometry(result, { x: 0, y: 0, w: 400, h: 400 })
+    expect(geo.tiles.find(t => t.id === 'other')!.fixed).toBe(true)
+  })
+
+  it('is a no-op dropping a tile onto the divider right next to itself', () => {
+    const tree: SplitNode = { dir: 'row', ratio: 0.5, a: { id: 'p' }, b: { id: 'q' } }
+    expect(insertAtDivider(tree, 'p', [])).toBe(tree)
+  })
+
+  it('does nothing for an unknown id or a path landing on a leaf', () => {
+    const tree: SplitNode = { dir: 'row', ratio: 0.5, a: { id: 'a' }, b: { id: 'b' } }
+    expect(insertAtDivider(tree, 'ghost', [])).toBe(tree)
+    expect(insertAtDivider(tree, 'a', ['a'])).toBe(tree)
   })
 })
 

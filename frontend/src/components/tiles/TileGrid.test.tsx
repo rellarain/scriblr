@@ -50,16 +50,17 @@ const pointerEvent = (type: string, init: { pointerId?: number; button?: number;
   Object.assign(new Event(type, { bubbles: true, cancelable: true }), { pointerId: 1, button: 0, ...init })
 
 describe('TileGrid', () => {
-  it('stacks a mini tile as a fixed strip above the rest, filling the container exactly', () => {
+  it('stacks a mini tile as a fixed strip below the rest, its own card one column wide', () => {
     renderGrid()
     // Default container fallback is 1000x600 (useContainerSize's fallback in jsdom).
     expect(tile('editor').getAttribute('data-fixed')).toBe('true')
     expect(px(tile('editor'), 'height')).toBe(46)
-    expect(px(tile('editor'), 'top')).toBe(0)
-    expect(px(tile('editor'), 'width')).toBe(1000)
-    // Plot and Outline share the row below the mini strip, side by side, filling the width.
-    expect(px(tile('plot'), 'top')).toBe(54)
-    expect(px(tile('outline'), 'top')).toBe(54)
+    expect(px(tile('editor'), 'top')).toBe(554)
+    // Its card stays one column wide (MINI_W), not a banner across the row.
+    expect(px(tile('editor'), 'width')).toBe(240)
+    // Plot and Outline share the row above the mini strip, side by side, filling the width.
+    expect(px(tile('plot'), 'top')).toBe(0)
+    expect(px(tile('outline'), 'top')).toBe(0)
     expect(px(tile('plot'), 'left')).toBe(0)
     expect(px(tile('plot'), 'width') + px(tile('outline'), 'width') + 8).toBe(1000)
     expect(px(tile('outline'), 'left')).toBe(px(tile('plot'), 'width') + 8)
@@ -74,11 +75,12 @@ describe('TileGrid', () => {
     expect(within(tile('plot')).getByText(/plot body wide/)).toBeTruthy()
   })
 
-  it('is one column below 400px of container width: every tile spans the full width', () => {
+  it('is one column below 400px of container width: mid tiles span it, a mini tile stays one column', () => {
     vi.spyOn(HTMLElement.prototype, 'getBoundingClientRect').mockReturnValue({ width: 320, height: 500, top: 0, left: 0, right: 320, bottom: 500, x: 0, y: 0, toJSON: () => ({}) })
     renderGrid()
     expect(document.querySelector('.tileGrid')!.className).toContain('tileGrid--one')
-    for (const id of ['plot', 'outline', 'editor']) expect(px(tile(id), 'width')).toBe(320)
+    for (const id of ['plot', 'outline']) expect(px(tile(id), 'width')).toBe(320)
+    expect(px(tile('editor'), 'width')).toBe(240)
   })
 
   it('toggles a tile between mini and mid by clicking its title, and remembers it', async () => {
@@ -119,7 +121,7 @@ describe('TileGrid', () => {
     fireEvent(divider, pointerEvent('pointerup', {}))
     expect(px(tile('plot'), 'width')).toBeGreaterThan(before.plot)
     expect(px(tile('plot'), 'width') + px(tile('outline'), 'width') + 8).toBe(1000)
-    // The mini strip above wasn't touched by a divider lower in the tree.
+    // The mini strip below wasn't touched by a divider elsewhere in the tree.
     expect(px(tile('editor'), 'height')).toBe(before.editor)
   })
 
@@ -210,6 +212,41 @@ describe('TileGrid', () => {
     expect(tile('plot').getAttribute('data-fixed')).toBe('true')
   })
 
+  it('drops a dragged tile onto a divider to wedge it in as a new column or row, instead of swapping', () => {
+    const threeTiles: TileDef[] = [
+      { id: 'x', title: 'X', Icon: PlotIcon, defaultShape: 'mid', summary: 'x', render: () => <div>X body</div> },
+      { id: 'y', title: 'Y', Icon: ListIcon, defaultShape: 'mid', summary: 'y', render: () => <div>Y body</div> },
+      { id: 'z', title: 'Z', Icon: PencilIcon, defaultShape: 'mid', summary: 'z', render: () => <div>Z body</div> },
+    ]
+    renderGrid(threeTiles, 'three')
+    // X and Y share a column, split from Z -- the horizontal divider is the one between X and Y.
+    const divider = document.querySelector('[role="separator"][aria-orientation="horizontal"]') as HTMLElement
+    const dataTransfer = { setData: vi.fn(), setDragImage: vi.fn(), effectAllowed: '' }
+    fireEvent.dragStart(tile('z').querySelector('.tileHead')!, { dataTransfer })
+    fireEvent.dragOver(divider, { dataTransfer })
+    fireEvent.drop(divider, { dataTransfer })
+    // Z is now wedged directly between X and Y -- not swapped with either.
+    expect(order()).toEqual(['x', 'z', 'y'])
+    expect(tile('x')).toBeTruthy()
+    expect(tile('y')).toBeTruthy()
+  })
+
+  it('offers no divider drop when there is no room for a third side', () => {
+    vi.spyOn(HTMLElement.prototype, 'getBoundingClientRect').mockReturnValue({ width: 300, height: 200, top: 0, left: 0, right: 300, bottom: 200, x: 0, y: 0, toJSON: () => ({}) })
+    const threeTiles: TileDef[] = [
+      { id: 'x', title: 'X', Icon: PlotIcon, defaultShape: 'mid', summary: 'x', render: () => <div>X body</div> },
+      { id: 'y', title: 'Y', Icon: ListIcon, defaultShape: 'mid', summary: 'y', render: () => <div>Y body</div> },
+      { id: 'z', title: 'Z', Icon: PencilIcon, defaultShape: 'mid', summary: 'z', render: () => <div>Z body</div> },
+    ]
+    renderGrid(threeTiles, 'three-tight')
+    const divider = document.querySelector('[role="separator"][aria-orientation="horizontal"]') as HTMLElement
+    const dataTransfer = { setData: vi.fn(), setDragImage: vi.fn(), effectAllowed: '' }
+    fireEvent.dragStart(tile('z').querySelector('.tileHead')!, { dataTransfer })
+    fireEvent.dragOver(divider, { dataTransfer })
+    fireEvent.drop(divider, { dataTransfer })
+    expect(order()).toEqual(['x', 'y', 'z'])
+  })
+
   it('moves focus with the arrow keys, swaps a tile with Alt+arrows and toggles with Enter', async () => {
     const user = userEvent.setup()
     renderGrid()
@@ -218,7 +255,7 @@ describe('TileGrid', () => {
     expect(document.activeElement).toBe(tile('outline'))
     await user.keyboard('{Alt>}{ArrowLeft}{/Alt}')
     // Outline (focused) swaps with Plot, which was to its left.
-    expect(order()).toEqual(['editor', 'outline', 'plot'])
+    expect(order()).toEqual(['outline', 'plot', 'editor'])
     expect(document.activeElement).toBe(tile('outline'))
     await user.keyboard('{Enter}')
     expect(tile('outline').getAttribute('data-shape')).toBe('mini')

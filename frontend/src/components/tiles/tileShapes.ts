@@ -12,6 +12,9 @@ export type TileShape = 'mini' | 'mid'
 export const ROW_UNIT = 46
 export const GRID_GAP = 8
 export const MIN_COLUMN = 140
+// A mini tile's own card stays this wide (never the full width of its row), so a
+// collapsed tile always reads as one column, not a banner across the grid.
+export const MINI_W = 240
 // Below this container width every tile stacks edge to edge in one column.
 export const ONE_COLUMN_BELOW = 400
 

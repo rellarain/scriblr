@@ -358,9 +358,13 @@ and selecting one expands it into its console/editor. The shared system is
   neighbours and the tiles together always tile the container's exact area. A leaf can
   be **fixed** (a mini tile, or any tile dragged short): it keeps a constant ~46px
   height and its sibling absorbs the rest, and a fixed leaf's containing branch is
-  always straightened to stack vertically (`fixup`). `buildTree`/`reconcile` seed and
-  update a grid's tree from its tiles' order and shape (grafting new tiles on,
-  pruning removed ones); `computeGeometry` turns a tree plus a pixel rect into every
+  always straightened to stack vertically (`fixup`); a whole stack of minis (nested
+  `col` branches of nothing else) is recognised the same way (`isMiniStack`) and acts
+  as one fixed unit. `buildTree` seeds a fresh grid with minis stacked **below** the
+  rest, not across the top -- collapsed, low-priority content reads last, and each
+  mini's own card stays one column wide (`MINI_W`, `Tile.tsx`) however full-width its
+  row actually is. `reconcile` grafts new tiles onto an existing tree the same way,
+  pruning removed ones; `computeGeometry` turns a tree plus a pixel rect into every
   tile's and divider's rect in one pass.
 - **Container-based:** a grid measures its own width and height
   (`useContainerSize`), and reflows to full-width rows (`flattenOneColumn`) below
@@ -384,8 +388,11 @@ and selecting one expands it into its console/editor. The shared system is
   focused tile's mini/mid state, Escape collapses an open console, `[` and `]` switch
   tiles, Alt+arrows swap the focused tile with its neighbour; a divider can be dragged
   or focused and nudged with the arrow keys. Dragging a tile's header onto another
-  swaps their places, each area keeping its own size. A few quick actions (tick a
-  task, add a note or task, open an item) work without expanding. There is no
+  swaps their places, each area keeping its own size; dragging it onto a **divider**
+  instead (when there's room -- `canInsertAt`) wedges the tile in as a new side right
+  there rather than swapping -- a divider between side-by-side tiles gains a new
+  column, one between stacked tiles a new row (`insertAtDivider`). A few quick actions
+  (tick a task, add a note or task, open an item) work without expanding. There is no
   "reset layout" control -- a mis-dragged grid is put back by hand.
 - **Remembered per user** (`useSplitLayout`, stored with `useStoredState` in the
   user-settings kv as `scriblr.tiles.<gridId>`): the tree, each tile's mini/mid state,

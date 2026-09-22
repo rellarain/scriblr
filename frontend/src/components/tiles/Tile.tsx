@@ -1,6 +1,7 @@
 import type { CSSProperties, DragEvent, KeyboardEvent, MouseEvent } from 'react'
 import { LayoutMaxIcon } from '../../assets/icons'
 import type { Rect } from './splitTree'
+import { MINI_W } from './tileShapes'
 import { opensConsole, type TileDef } from './tileTypes'
 
 // Anything inside a tile that does its own thing (a checkbox, an add box, a row that
@@ -41,7 +42,10 @@ function Tile({ def, rect, fixed, oneColumn, dragging, dropTarget, onOpen, onTog
     if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); onToggleTier() }
   }
 
-  const style: CSSProperties = { left: rect.x, top: rect.y, width: rect.w, height: rect.h }
+  // A mini tile's leaf still reports its row's full width (splitTree.ts stacks
+  // minis in a column that reads as one column overall) -- but its own card stays
+  // one column wide, left-anchored, rather than stretching into a banner.
+  const style: CSSProperties = { left: rect.x, top: rect.y, width: fixed ? Math.min(rect.w, MINI_W) : rect.w, height: rect.h }
   const classes = ['tile', fixed ? 'tile--mini' : 'tile--mid', dragging ? 'tile--dragging' : '', dropTarget ? 'tile--drop' : ''].filter(Boolean).join(' ')
   return (
     <div

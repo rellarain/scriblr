@@ -1,4 +1,4 @@
-import type { CSSProperties, KeyboardEvent, PointerEvent } from 'react'
+import type { CSSProperties, DragEvent, KeyboardEvent, PointerEvent } from 'react'
 import type { SplitDir } from './splitTree'
 
 const STEP = 0.02
@@ -7,13 +7,19 @@ const BIG_STEP = 0.08
 // A drag handle between two areas of a split-tree grid: pointer-drag resizes (only
 // the two neighbours it separates -- the pointer is captured, so the drag keeps
 // tracking even outside the divider's own thin hit area), and with focus the arrow
-// keys nudge it (Shift for a bigger step).
-function Divider({ dir, ratio, style, onDragTo, onResize }: {
+// keys nudge it (Shift for a bigger step). It's also a drop target for a dragged
+// tile's header: dropping there wedges the tile in as a new side of the divider,
+// rather than swapping it with a tile (dropTarget/onDragOver/onDrop, all optional --
+// the caller only wires them up when there's room for the extra side).
+function Divider({ dir, ratio, style, dropTarget, onDragTo, onResize, onDragOver, onDrop }: {
   dir: SplitDir
   ratio: number
   style: CSSProperties
+  dropTarget?: boolean
   onDragTo: (clientX: number, clientY: number) => void
   onResize: (ratio: number) => void
+  onDragOver?: (e: DragEvent<HTMLDivElement>) => void
+  onDrop?: (e: DragEvent<HTMLDivElement>) => void
 }) {
   function onKeyDown(e: KeyboardEvent<HTMLDivElement>) {
     const dec = dir === 'row' ? 'ArrowLeft' : 'ArrowUp'
@@ -36,9 +42,13 @@ function Divider({ dir, ratio, style, onDragTo, onResize }: {
     if (e.currentTarget.hasPointerCapture(e.pointerId)) e.currentTarget.releasePointerCapture(e.pointerId)
   }
 
+  const classes = [
+    dir === 'row' ? 'tileDivider tileDivider--row' : 'tileDivider tileDivider--col',
+    dropTarget ? 'tileDivider--drop' : '',
+  ].filter(Boolean).join(' ')
   return (
     <div
-      className={dir === 'row' ? 'tileDivider tileDivider--row' : 'tileDivider tileDivider--col'}
+      className={classes}
       style={style}
       role="separator"
       aria-orientation={dir === 'row' ? 'vertical' : 'horizontal'}
@@ -50,6 +60,8 @@ function Divider({ dir, ratio, style, onDragTo, onResize }: {
       onPointerMove={onPointerMove}
       onPointerUp={onPointerUp}
       onKeyDown={onKeyDown}
+      onDragOver={onDragOver}
+      onDrop={onDrop}
     >
       <span className="tileDividerBar" />
     </div>

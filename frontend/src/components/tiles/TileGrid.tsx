@@ -6,7 +6,7 @@ import { isOneColumn } from './tileShapes'
 import { nextFocus, type Box, type Direction } from './tileNav'
 import { opensConsole, type TileDef } from './tileTypes'
 import {
-  computeGeometry, flattenOneColumn, getAtPath, minSize, rectAtPath, type Path, type SplitNode,
+  canInsertAt, computeGeometry, flattenOneColumn, getAtPath, minSize, rectAtPath, type Path, type SplitNode,
 } from './splitTree'
 import { useContainerSize } from './useContainerWidth'
 import { useSplitLayout } from './useSplitLayout'
@@ -76,6 +76,7 @@ function TileGrid({ gridId, tiles, crumbs, below, label, open: controlledOpen, o
   const [from, setFrom] = useState<Box | null>(null)
   const [dragId, setDragId] = useState<string | null>(null)
   const [overId, setOverId] = useState<string | null>(null)
+  const [overDivider, setOverDivider] = useState<string | null>(null)
   const refocus = useRef<string | null>(null)
 
   // After a tile is moved with the keyboard, keep the focus on it.
@@ -146,6 +147,7 @@ function TileGrid({ gridId, tiles, crumbs, below, label, open: controlledOpen, o
     if (!dragId || dragId === id) return
     e.preventDefault()
     setOverId(id)
+    setOverDivider(null)
   }
   function onDrop(e: DragEvent, id: string) {
     if (!dragId) return
@@ -153,6 +155,23 @@ function TileGrid({ gridId, tiles, crumbs, below, label, open: controlledOpen, o
     layout.swap(dragId, id)
     setDragId(null)
     setOverId(null)
+  }
+  function endDrag() { setDragId(null); setOverId(null); setOverDivider(null) }
+
+  // Hovering a divider (rather than another tile) while dragging offers a different
+  // drop: a new column or row wedged in right there, instead of a swap -- only when
+  // there's room for the extra side (canInsertAt).
+  function onDividerDragOver(e: DragEvent, key: string, path: Path, fixed: boolean) {
+    if (!dragId || !renderTree || !canInsertAt(renderTree, { x: 0, y: 0, w: stageW, h: stageH }, path, fixed)) return
+    e.preventDefault()
+    setOverDivider(key)
+    setOverId(null)
+  }
+  function onDividerDrop(e: DragEvent, path: Path) {
+    if (!dragId) return
+    e.preventDefault()
+    layout.insertAt(dragId, path)
+    endDrag()
   }
 
   function dragTo(path: Path, dir: 'row' | 'col', clientX: number, clientY: number) {
@@ -190,19 +209,26 @@ function TileGrid({ gridId, tiles, crumbs, below, label, open: controlledOpen, o
                 dragging={dragId === p.def.id} dropTarget={overId === p.def.id && dragId !== p.def.id}
                 onOpen={() => open(p.def)} onToggleTier={() => layout.toggleTier(p.def.id)}
                 onDragStart={e => onDragStart(e, p.def.id)} onDragOver={e => onDragOver(e, p.def.id)}
-                onDrop={e => onDrop(e, p.def.id)} onDragEnd={() => { setDragId(null); setOverId(null) }}
+                onDrop={e => onDrop(e, p.def.id)} onDragEnd={endDrag}
               />
             )
           })}
           {geometry.dividers.map(d => {
             const branch = renderTree ? getAtPath(renderTree, d.path) : null
             const ratio = branch && 'ratio' in branch ? branch.ratio : 0.5
+            const key = d.path.join('.') || 'root'
+            // A one-column stage has no room to wedge in a new side -- only offer
+            // this drop once the grid is actually split into more than one column.
+            const draggedFixed = dragId ? geometry.tiles.find(t => t.id === dragId)?.fixed ?? false : false
             return (
               <Divider
-                key={d.path.join('.') || 'root'} dir={d.dir} ratio={ratio}
+                key={key} dir={d.dir} ratio={ratio}
                 style={{ position: 'absolute', left: d.rect.x, top: d.rect.y, width: d.rect.w, height: d.rect.h }}
                 onDragTo={(x, y) => dragTo(d.path, d.dir, x, y)}
                 onResize={r => layout.resize(d.path, r)}
+                dropTarget={overDivider === key}
+                onDragOver={oneColumn ? undefined : e => onDividerDragOver(e, key, d.path, draggedFixed)}
+                onDrop={oneColumn ? undefined : e => onDividerDrop(e, d.path)}
               />
             )
           })}

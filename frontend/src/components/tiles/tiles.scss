@@ -51,6 +51,10 @@ $tile-surface: linear-gradient(160deg, var(--surface-raised-a), var(--surface-ra
 .tileDivider--row .tileDividerBar { width: 2px; height: 100%; }
 .tileDivider--col .tileDividerBar { width: 100%; height: 2px; }
 .tileDivider:hover .tileDividerBar { background: color-mix(in srgb, var(--ink) 35%, transparent); }
+// A dragged tile hovering here would be wedged in as a new side, not swapped.
+.tileDivider--drop .tileDividerBar { background: var(--accent); }
+.tileDivider--row.tileDivider--drop .tileDividerBar { width: 4px; }
+.tileDivider--col.tileDivider--drop .tileDividerBar { height: 4px; }
 
 .tile {
   position: absolute;

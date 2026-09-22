@@ -48,7 +48,7 @@ const shapes = () => Array.from(document.querySelectorAll('[data-tile-id]')).map
 describe('Shelves tiles', () => {
   it('are the template, schedule, analytics and scratchpad', () => {
     grid(shelvesTiles(workspace()), 'shelves')
-    expect(shapes()).toEqual(['template:mini', 'schedule:mid', 'analytics:mid', 'scratchpad:mid'])
+    expect(shapes()).toEqual(['schedule:mid', 'analytics:mid', 'scratchpad:mid', 'template:mini'])
   })
 
   it('shows the chapters of each project in the analytics tile', () => {
@@ -87,9 +87,9 @@ describe('Shelves tiles', () => {
 describe('Shelf tiles', () => {
   it('are the working editors as summary tiles, then placeholders, then link tiles', () => {
     grid(shelfTiles(workspace()), 'shelf')
-    // Mini tiles (schedule, history, editor, template) stack as a fixed strip above the rest.
+    // Mini tiles (schedule, history, editor, template) stack as a fixed strip below the rest.
     expect(shapes()).toEqual([
-      'schedule:mini', 'history:mini', 'editor:mini', 'template:mini', 'plot:mid', 'outline:mid', 'analytics:mid',
+      'plot:mid', 'outline:mid', 'analytics:mid', 'schedule:mini', 'history:mini', 'editor:mini', 'template:mini',
     ])
   })
 
