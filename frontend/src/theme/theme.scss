@@ -32,6 +32,7 @@ $fading: ();
 @property --on-alert  { syntax: '<color>'; inherits: true; initial-value: hsl(330, 12%, 8%); }
 @property --on-accent2 { syntax: '<color>'; inherits: true; initial-value: hsl(330, 12%, 8%); }
 @property --shade-k   { syntax: '<number>'; inherits: true; initial-value: 0.55; }
+@property --sidebar-shade-1 { syntax: '<number>'; inherits: true; initial-value: -17; }
 @property --ink-muted-a { syntax: '<percentage>'; inherits: true; initial-value: 85%; }
 @property --ink-faint-a { syntax: '<percentage>'; inherits: true; initial-value: 75%; }
 
@@ -56,6 +57,7 @@ $fading: append($fading, --on-accent, comma);
 $fading: append($fading, --on-alert, comma);
 $fading: append($fading, --on-accent2, comma);
 $fading: append($fading, --shade-k, comma);
+$fading: append($fading, --sidebar-shade-1, comma);
 $fading: append($fading, --ink-muted-a, comma);
 $fading: append($fading, --ink-faint-a, comma);
 $fading: append($fading, --fill-dir, comma);
@@ -118,8 +120,10 @@ html[data-theme-pending] #root {
   --surface-deeper: hsl(var(--color-theme-h), var(--color-theme-s), calc(var(--color-theme-l) - 20%));
 
   // Sidebar surfaces and raised cards: the theme's own hue and saturation at
-  // their own lightness steps (no accent tint).
-  --surface-sidebar-1: hsl(var(--color-theme-h), var(--color-theme-s), calc(var(--color-theme-l) - 17%));
+  // their own lightness steps (no accent tint). --surface-sidebar-1 steps by
+  // --sidebar-shade-1 (a signed number of points) instead of a fixed subtraction, so
+  // it lightens a little in a dark zone instead of crushing toward pure black.
+  --surface-sidebar-1: hsl(var(--color-theme-h), var(--color-theme-s), calc(var(--color-theme-l) + var(--sidebar-shade-1) * 1%));
   --surface-sidebar-2: hsl(var(--color-theme-h), var(--color-theme-s), calc(var(--color-theme-l) - 9%));
   --surface-raised-a: hsl(var(--color-theme-h), var(--color-theme-s), calc(var(--color-theme-l) - 1%));
   --surface-raised-b: hsl(var(--color-theme-h), var(--color-theme-s), calc(var(--color-theme-l) - 8%));

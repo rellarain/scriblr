@@ -1,5 +1,5 @@
 import type { HSL } from './contrast'
-import { DIM_SATURATION_DROP, DIM_STEP, HOVER_STEP, SURFACE_OFFSETS, fillInk, resolvePalette } from './zoneLooks'
+import { DIM_SATURATION_DROP, DIM_STEP, HOVER_STEP, SIDEBAR_SHADE_1, SURFACE_OFFSETS, ZONE_LOOKS, fillInk, resolvePalette } from './zoneLooks'
 import type { PaletteKey, ZoneKey, ZonePalette } from './types'
 
 // The generated palette shown above each colour in the theme editor: the shades
@@ -12,16 +12,19 @@ const clamp = (n: number, lo: number, hi: number) => Math.min(hi, Math.max(lo, n
 
 export const hslCss = (c: HSL): string => `hsl(${c.h}, ${c.s}%, ${c.l}%)`
 
-const SURFACE_LABELS = ['Base', 'Side', 'Deep', 'Deeper', 'Sidebar 1', 'Sidebar 2', 'Raised a', 'Raised b', 'Raised active']
+const SURFACE_LABELS = ['Base', 'Side', 'Deep', 'Deeper', 'Sidebar 2', 'Raised a', 'Raised b', 'Raised active']
 
 export function derivedShades(pal: ZonePalette, key: PaletteKey, zone: ZoneKey): Swatch[] {
   const colors = resolvePalette(pal, zone)
 
   if (key === 'theme') {
     const t = colors.theme // every surface is the theme's hue and saturation (theme.scss)
-    return SURFACE_OFFSETS.map((offset, i) => (
-      { key: SURFACE_LABELS[i], label: SURFACE_LABELS[i], color: { h: t.h, s: t.s, l: clamp(t.l + offset, 0, 100) } }
-    ))
+    const shade = (label: string, offset: number): Swatch => ({ key: label, label, color: { h: t.h, s: t.s, l: clamp(t.l + offset, 0, 100) } })
+    const shades = SURFACE_OFFSETS.map((offset, i) => shade(SURFACE_LABELS[i], offset))
+    // Sidebar 1 isn't a fixed offset -- it steps by mode (SIDEBAR_SHADE_1) -- so it's
+    // built separately and reinserted after Deeper, where it always used to sit.
+    const sidebar1 = shade('Sidebar 1', SIDEBAR_SHADE_1[ZONE_LOOKS[zone].mode])
+    return [...shades.slice(0, 4), sidebar1, ...shades.slice(4)]
   }
 
   const src = colors[key]

@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest'
 import { DEFAULT_PALETTE } from './defaults'
 import { contrastRatio } from './contrast'
 import { deriveTokens } from './tokens'
-import { DIM_STEP, HOVER_STEP, INK_STRENGTH, MIN_TEXT_GAP, PAPER_LOOKS, SURFACE_OFFSETS, ZONE_LOOKS, fillInk, resolvePalette, zoneInk } from './zoneLooks'
+import { DIM_STEP, HOVER_STEP, INK_STRENGTH, MIN_TEXT_GAP, PAPER_LOOKS, SIDEBAR_SHADE_1, SURFACE_OFFSETS, ZONE_LOOKS, fillInk, resolvePalette, zoneInk } from './zoneLooks'
 import { ZONE_KEYS, type ZoneKey } from './types'
 
 // The rule: text is at least MIN_TEXT_GAP HSL lightness points from what it sits on.
@@ -43,6 +43,17 @@ describe.each(ZONE_KEYS)('%s look', zone => {
         expect(gap(over(inkL(zone), bg, muted / 100), bg)).toBeGreaterThanOrEqual(MIN_TEXT_GAP)
         expect(gap(over(inkL(zone), bg, faint / 100), bg)).toBeGreaterThanOrEqual(MIN_TEXT_GAP)
       }
+    }
+  })
+
+  it('keeps the sidebar\'s first shade 30+ points from the ink too, however it steps for this mode', () => {
+    const shadeK = look.mode === 'dark' ? 1 : 0.55
+    const { muted, faint } = INK_STRENGTH[look.mode]
+    for (const sink of SINK) {
+      const bg = clamp(look.themeL + SIDEBAR_SHADE_1[look.mode]) * (1 - sink * shadeK)
+      expect(gap(inkL(zone), bg)).toBeGreaterThanOrEqual(MIN_TEXT_GAP)
+      expect(gap(over(inkL(zone), bg, muted / 100), bg)).toBeGreaterThanOrEqual(MIN_TEXT_GAP)
+      expect(gap(over(inkL(zone), bg, faint / 100), bg)).toBeGreaterThanOrEqual(MIN_TEXT_GAP)
     }
   })
 
@@ -151,6 +162,13 @@ describe('deriveTokens', () => {
     const day = deriveTokens(DEFAULT_PALETTE, 'admin', 'day')
     expect([day['--accent-dir'], day['--accent2-dir'], day['--accent-away'], day['--accent2-away']]).toEqual(['1', '-1', 'hsl(0, 0%, 100%)', 'hsl(0, 0%, 0%)'])
     expect(deriveTokens({ ...DEFAULT_PALETTE, accent: { h: 60 } }, 'user', 'night')['--accent-dir']).toBe('1')
+  })
+
+  it('lightens the sidebar\'s first shade in a dark zone, darkens it in a light one', () => {
+    expect(deriveTokens(DEFAULT_PALETTE, 'admin', 'night')['--sidebar-shade-1']).toBe('6')
+    expect(deriveTokens(DEFAULT_PALETTE, 'admin', 'dusk')['--sidebar-shade-1']).toBe('6')
+    expect(deriveTokens(DEFAULT_PALETTE, 'admin', 'day')['--sidebar-shade-1']).toBe('-17')
+    expect(deriveTokens(DEFAULT_PALETTE, 'admin', 'dawn')['--sidebar-shade-1']).toBe('-17')
   })
 
   it('gives non-admins the accent in place of the admin accent', () => {

@@ -1,5 +1,5 @@
 import type { HSL } from './contrast'
-import { fillDirection, fillInk, INK_STRENGTH, PAPER_LOOKS, ZONE_LOOKS, resolvePalette, zoneInk } from './zoneLooks'
+import { fillDirection, fillInk, INK_STRENGTH, PAPER_LOOKS, SIDEBAR_SHADE_1, ZONE_LOOKS, resolvePalette, zoneInk } from './zoneLooks'
 import type { Role, ZoneKey, ZonePalette } from './types'
 
 // Turns a zone's hues into the CSS custom properties the app is styled with.
@@ -58,6 +58,8 @@ export function deriveTokens(pal: ZonePalette, role: Role, zone: ZoneKey): Theme
     '--away': away(dir),
     // Black recess overlays soften on light themes.
     '--shade-k': look.mode === 'dark' ? '1' : '0.55',
+    // The sidebar divider's (and AUI's) own surface -- see SIDEBAR_SHADE_1.
+    '--sidebar-shade-1': String(SIDEBAR_SHADE_1[look.mode]),
     // The Writer's page.
     '--paper-l': `${look.paperL}%`,
     '--paper-dir': String(paper.dir),

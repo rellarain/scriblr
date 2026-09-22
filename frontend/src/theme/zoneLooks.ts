@@ -79,9 +79,16 @@ export const INK_STRENGTH: Record<ZoneMode, { muted: number; faint: number }> = 
 }
 
 // The theme's surfaces, as lightness offsets from its base (theme.scss):
-// base, side, deep, deeper, the two sidebar shades, the two raised cards, and
-// the active raised card.
-export const SURFACE_OFFSETS = [0, -4, -10, -20, -17, -9, -1, -8, 3]
+// base, side, deep, deeper, the sidebar's second shade, the two raised cards, and
+// the active raised card. The sidebar's first shade isn't a fixed offset -- see
+// SIDEBAR_SHADE_1 below -- so it's checked on its own, not in this list.
+export const SURFACE_OFFSETS = [0, -4, -10, -20, -9, -1, -8, 3]
+
+// --surface-sidebar-1's step from --color-theme-l (theme.scss): a light zone's
+// already-bright background can afford a deeper recess, but the same subtraction on
+// a dark zone's already-low lightness crushes toward pure black, so dark zones step
+// up instead, by less than light zones step down.
+export const SIDEBAR_SHADE_1: Record<ZoneMode, number> = { light: -17, dark: 6 }
 
 // The Writer's page. Its shades are written as `paper-l - N% * dir`, so they
 // step toward the text colour: darker on a light sheet (dir 1), lighter on a
