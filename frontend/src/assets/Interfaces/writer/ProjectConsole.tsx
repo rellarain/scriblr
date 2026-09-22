@@ -7,7 +7,7 @@ import { shelfTiles } from './tiles/shelfTiles'
 // The Shelf console: everything about the open project as a whole, as a grid of
 // tiles. Plot, Outline and the project editor are the working editors (each
 // expands from its tile); the remaining tiles are placeholders until they are built.
-function ProjectConsole({ w }: { w: WriterWorkspace }) {
+function ProjectConsole({ w, onMaximizeChange }: { w: WriterWorkspace; onMaximizeChange?: (on: boolean) => void }) {
   const project = w.activeProject?.title ?? ''
 
   let body
@@ -18,6 +18,7 @@ function ProjectConsole({ w }: { w: WriterWorkspace }) {
       <TileGrid
         gridId="shelf" label="Project tiles" tiles={shelfTiles(w)}
         crumbs={[{ label: 'Shelves', onClick: w.backToShelves }, { label: project }]}
+        onMaximizeChange={onMaximizeChange}
       />
     )
   }

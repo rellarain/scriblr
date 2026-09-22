@@ -1,9 +1,15 @@
-import { render, screen } from '@testing-library/react'
+import { fireEvent, render, screen } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
-import { describe, expect, it, vi } from 'vitest'
+import { beforeEach, describe, expect, it, vi } from 'vitest'
 import type { OutlineNode } from '../../../api/types'
-import WuiSidebar from './WuiSidebar'
+import WuiSidebar, { SIDEBAR_DEFAULT_WIDTH } from './WuiSidebar'
 import type { WriterWorkspace } from './useWriterWorkspace'
+
+beforeEach(() => {
+  for (const name of ['setPointerCapture', 'hasPointerCapture', 'releasePointerCapture'] as const) {
+    if (!(name in Element.prototype)) Object.defineProperty(Element.prototype, name, { value: vi.fn(() => true), configurable: true })
+  }
+})
 
 const outline = (id: string, kind: OutlineNode['kind'], parentId: string | null, over: Partial<OutlineNode> = {}): OutlineNode =>
   ({ id, kind, parentId, order: 0, title: id, synopsis: '', draftRef: null, ...over } as OutlineNode)
@@ -48,5 +54,38 @@ describe('WuiSidebar', () => {
     expect(container.querySelectorAll('.wrSideTile')).toHaveLength(2) // Project and Book
     await user.click(screen.getByRole('button', { name: /2 · Storm/ }))
     expect(w.openChapter).toHaveBeenCalledWith('c2')
+  })
+
+  it('offers no resize handle unless onWidthChange is given', () => {
+    render(<WuiSidebar workspace={closed()} />)
+    expect(screen.queryByRole('separator', { name: 'Resize sidebar' })).toBeNull()
+  })
+
+  it('drags, keyboard-nudges and double-click-resets its width through onWidthChange', () => {
+    const onWidthChange = vi.fn()
+    render(<WuiSidebar workspace={closed()} width={300} onWidthChange={onWidthChange} />)
+    const handle = screen.getByRole('separator', { name: 'Resize sidebar' })
+
+    fireEvent.pointerDown(handle, { pointerId: 1 })
+    fireEvent(handle, Object.assign(new Event('pointermove', { bubbles: true }), { pointerId: 1, movementX: 15 }))
+    expect(onWidthChange).toHaveBeenCalledWith(315)
+
+    handle.focus()
+    fireEvent.keyDown(handle, { key: 'ArrowRight' })
+    expect(onWidthChange).toHaveBeenCalledWith(310)
+    fireEvent.keyDown(handle, { key: 'ArrowLeft', shiftKey: true })
+    expect(onWidthChange).toHaveBeenCalledWith(260)
+
+    fireEvent.doubleClick(handle)
+    expect(onWidthChange).toHaveBeenCalledWith(SIDEBAR_DEFAULT_WIDTH)
+  })
+
+  it('clamps the width it reports to the min/max range', () => {
+    const onWidthChange = vi.fn()
+    render(<WuiSidebar workspace={closed()} width={205} onWidthChange={onWidthChange} />)
+    const handle = screen.getByRole('separator', { name: 'Resize sidebar' })
+    handle.focus()
+    fireEvent.keyDown(handle, { key: 'ArrowLeft', shiftKey: true })
+    expect(onWidthChange).toHaveBeenCalledWith(200)
   })
 })

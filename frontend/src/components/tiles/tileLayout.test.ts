@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { applyLayout, cycleShape, moveTile, shiftTile, type TileMeta } from './tileLayout'
+import { applyLayout, cycleShape, type TileMeta } from './tileLayout'
 
 const defs: TileMeta[] = [
   { id: 'plot', shapes: ['landscape', 'portrait', 'large'], defaultShape: 'large' },
@@ -42,23 +42,5 @@ describe('cycleShape', () => {
 
   it('keeps a single-shape tile as it is', () => {
     expect(cycleShape(defs[2], 'link')).toBe('link')
-  })
-})
-
-describe('moveTile and shiftTile', () => {
-  const order = ['a', 'b', 'c', 'd']
-  it('moves a tile before another, or to the end', () => {
-    expect(moveTile(order, 'd', 'b')).toEqual(['a', 'd', 'b', 'c'])
-    expect(moveTile(order, 'a', null)).toEqual(['b', 'c', 'd', 'a'])
-    expect(moveTile(order, 'b', 'b')).toBe(order)
-    expect(moveTile(order, 'x', 'a')).toBe(order)
-    expect(moveTile(order, 'a', 'x')).toBe(order)
-  })
-
-  it('shifts a tile by places and stops at the ends', () => {
-    expect(shiftTile(order, 'b', 1)).toEqual(['a', 'c', 'b', 'd'])
-    expect(shiftTile(order, 'c', -2)).toEqual(['c', 'a', 'b', 'd'])
-    expect(shiftTile(order, 'a', -1)).toBe(order)
-    expect(shiftTile(order, 'd', 5)).toBe(order)
   })
 })

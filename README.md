@@ -348,35 +348,62 @@ the working tree currently differs.
 
 ## Tile grids (consoles as tiles)
 
-Sub-pages are **read-only tiles** in a responsive grid; selecting one expands it into
-its console/editor. The shared system is `frontend/src/components/tiles/`:
+Sub-pages are **read-only tiles** in a grid that always **fills its own container
+exactly** -- no gaps, no ragged last row, like Claude Code's own resizable panes --
+and selecting one expands it into its console/editor. The shared system is
+`frontend/src/components/tiles/`:
 
-- **Shapes** (`tileShapes.ts`): `link` (one short row), `small`, `landscape` (2 wide),
-  `portrait` (tall), `large` (2 wide, tall) on a 46px row unit with an 8px gap. A tile
-  declares which shapes it allows and its default; some allow only one.
-- **Container-based:** a grid lays itself out by **its own width** (`useContainerWidth`),
-  columns of at least 140px, and is **one column below 400px**. In one column a link
-  tile is one row, a small or landscape tile becomes a two-row *row version* (icon,
-  name, one-line summary) and portrait and large tiles keep their height.
-- **`TileGrid`** shows the tiles, expands one into a `TileConsole` (FLIP animation over
-  the grid's area, back button and breadcrumb, a row of mini tiles to switch tiles,
-  Settings and Help as round buttons at the bottom right via `ConsoleCorner`), and can
-  nest: a tile with `children` expands into a grid of tiles that expand in turn.
-  Keyboard: arrows move between tiles, Enter opens, Escape collapses, `[` and `]`
-  switch tiles, Alt+arrows reorder; a tile header can be dragged; a shape control on
-  each tile cycles its shapes. A few quick actions (tick a task, add a note or task,
-  open an item) work without expanding.
-- **Remembered per user** (`useTileLayout`, stored with `useStoredState` in the
-  user-settings kv as `scriblr.tiles.<gridId>`): order, shapes and the open tile.
-  Pure logic in `tileLayout.ts` (`applyLayout`, `cycleShape`, `moveTile`, `shiftTile`)
-  and `tileNav.ts` (`nextFocus`).
+- **A binary split tree** (`splitTree.ts`), not a CSS grid: every branch divides its
+  rect into two along one axis at a ratio, so dragging a divider resizes only its two
+  neighbours and the tiles together always tile the container's exact area. A leaf can
+  be **fixed** (a link tile, or any tile dragged short): it keeps a constant ~46px
+  height and its sibling absorbs the rest, and a fixed leaf's containing branch is
+  always straightened to stack vertically (`fixup`). `buildTree`/`reconcile` seed and
+  update a grid's tree from its tiles' order and shape (grafting new tiles on,
+  pruning removed ones); `computeGeometry` turns a tree plus a pixel rect into every
+  tile's and divider's rect in one pass.
+- **Container-based:** a grid measures its own width and height
+  (`useContainerSize`), and reflows to full-width rows (`flattenOneColumn`) below
+  400px of container width, without touching the saved tree -- widening the
+  container returns to the saved split. A grid with trailing content below it (the
+  book face under its link tiles) sizes itself to its content instead of stretching
+  to fill the container; a tile-only grid fills the container's height.
+- **What a tile shows** is chosen from its own **measured size** (`contentTier`,
+  thresholds on width/height), not a stored label, so a tile stretched by a divider
+  earns richer content and a squeezed one shows less, live; `shapes`/`defaultShape`
+  on a `TileDef` still gate which tiers a tile allows and are the shape-control
+  button's size presets (nudging the tile's containing branch toward a narrower,
+  wider, shorter or taller share of the space).
+- **`TileGrid`** shows the tiles and their dividers, expands one into a `TileConsole`
+  (FLIP animation over the grid's area, back button and breadcrumb, a row of mini
+  tiles to switch tiles, Settings and Help as round buttons at the bottom right via
+  `ConsoleCorner`), and can nest: a tile with `children` expands into a grid of tiles
+  that expand in turn. A "Reset layout" control restores the grid's default tree.
+  Keyboard: arrows move focus between tiles, Enter opens, Escape collapses, `[` and
+  `]` switch tiles, Alt+arrows swap the focused tile with its neighbour; a divider
+  can be dragged, double-clicked to reset, or focused and nudged with the arrow keys.
+  Dragging a tile's header onto another swaps their places, each area keeping its own
+  size. A few quick actions (tick a task, add a note or task, open an item) work
+  without expanding.
+- **Remembered per user** (`useSplitLayout`, stored with `useStoredState` in the
+  user-settings kv as `scriblr.tiles.<gridId>`): the tree, each tile's shape preset,
+  the open tile, and whether its console is maximized. Pure logic in `tileLayout.ts`
+  (`applyLayout`, `cycleShape`) and `tileNav.ts` (`nextFocus`, reused for Alt+arrow's
+  nearest-neighbour swap).
+- **Maximize** (Writer only so far): double-clicking an expanded console's header
+  hides the Writer's own sidebar so the console spans the full width; it's
+  remembered with the grid's layout, stays in effect while switching tiles from the
+  mini strip, and clears on Back/Escape. `TileGrid`'s `onMaximizeChange` prop is the
+  hook other panels can wire up the same way later.
 - **Writer:** the Shelves and Shelf screens are tile grids (`writer/tiles/shelvesTiles.tsx`,
   `shelfTiles.tsx`; previews come from `tileData.ts`); the Book screen keeps the book
   face under two link tiles (`bookTiles.tsx`); the Page and Pages screens keep their
   editors (Pages' Reaction / Flag / Export are buttons in its title row). The sidebar
   stays, with its Project, Book and Chapter panels as tiles (chapters stay rows); it
-  scrolls independently of the main screen and can be **minimized** to a slim rail while
-  the main screen has two columns or fewer. Settings and Help sit at the bottom right
+  scrolls independently of the main screen, is **resizable from its right edge**
+  (drag, double-click to reset, or the arrow keys with a focused handle;
+  `scriblr.writer.sidebarWidth`), and can be **minimized** to a slim rail while the
+  main screen has two columns or fewer. Settings and Help sit at the bottom right
   of every console.
 - **User panel** (`assets/Interfaces/UUI.tsx`): Dashboard, Account and Training are
   section tiles; each expands into its pages as child tiles, which expand into their

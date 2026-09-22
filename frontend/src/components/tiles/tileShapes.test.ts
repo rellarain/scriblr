@@ -1,5 +1,7 @@
 import { describe, expect, it } from 'vitest'
-import { GRID_GAP, MIN_COLUMN, ONE_COLUMN_BELOW, TILE_SHAPES, columnsFor, heightOfRows, isOneColumn, isRowVersion, spanOf } from './tileShapes'
+import { GRID_GAP, MIN_COLUMN, ONE_COLUMN_BELOW, columnsFor, contentTier, isOneColumn } from './tileShapes'
+
+const ALL: Array<'link' | 'small' | 'landscape' | 'portrait' | 'large'> = ['link', 'small', 'landscape', 'portrait', 'large']
 
 describe('columnsFor', () => {
   it('is one column below 400px of container width and grows with the width', () => {
@@ -18,42 +20,25 @@ describe('columnsFor', () => {
   })
 })
 
-describe('spanOf', () => {
-  it('lays each shape out in the wide grid', () => {
-    expect(spanOf('link', 4)).toEqual({ cols: 1, rows: 1 })
-    expect(spanOf('small', 4)).toEqual({ cols: 1, rows: 3 })
-    expect(spanOf('landscape', 4)).toEqual({ cols: 2, rows: 3 })
-    expect(spanOf('portrait', 4)).toEqual({ cols: 1, rows: 5 })
-    expect(spanOf('large', 4)).toEqual({ cols: 2, rows: 5 })
+describe('contentTier', () => {
+  it('picks link for a very short box, whatever its width', () => {
+    expect(contentTier(600, 40, false, ALL, 'small')).toBe('link')
+    expect(contentTier(600, 40, false, ['small', 'large'], 'small')).toBe('small')
   })
 
-  it('never spans more columns than the grid has', () => {
-    for (const shape of TILE_SHAPES) expect(spanOf(shape, 2).cols).toBeLessThanOrEqual(2)
-    expect(spanOf('landscape', 1).cols).toBe(1)
+  it('picks small/landscape/portrait/large by measured width and height', () => {
+    expect(contentTier(200, 100, false, ALL, 'small')).toBe('small')
+    expect(contentTier(400, 100, false, ALL, 'small')).toBe('landscape')
+    expect(contentTier(200, 300, false, ALL, 'small')).toBe('portrait')
+    expect(contentTier(400, 300, false, ALL, 'small')).toBe('large')
   })
 
-  it('makes one column of rows: link 1, small and landscape 2, portrait and large keep their height', () => {
-    expect(spanOf('link', 1)).toEqual({ cols: 1, rows: 1 })
-    expect(spanOf('small', 1)).toEqual({ cols: 1, rows: 2 })
-    expect(spanOf('landscape', 1)).toEqual({ cols: 1, rows: 2 })
-    expect(spanOf('portrait', 1)).toEqual({ cols: 1, rows: 5 })
-    expect(spanOf('large', 1)).toEqual({ cols: 1, rows: 5 })
+  it('never reads as wide in one-column mode, however wide the box actually is', () => {
+    expect(contentTier(600, 100, true, ALL, 'small')).toBe('small')
+    expect(contentTier(600, 300, true, ALL, 'small')).toBe('portrait')
   })
-})
 
-describe('isRowVersion', () => {
-  it('applies to small and landscape tiles in one column only', () => {
-    expect(isRowVersion('small', true)).toBe(true)
-    expect(isRowVersion('landscape', true)).toBe(true)
-    expect(isRowVersion('portrait', true)).toBe(false)
-    expect(isRowVersion('link', true)).toBe(false)
-    expect(isRowVersion('small', false)).toBe(false)
-  })
-})
-
-describe('heightOfRows', () => {
-  it('counts the gaps between rows', () => {
-    expect(heightOfRows(1)).toBe(46)
-    expect(heightOfRows(3)).toBe(3 * 46 + 2 * 8)
+  it('falls back when the tier the size suggests is not one of the tile\'s allowed shapes', () => {
+    expect(contentTier(400, 300, false, ['small'], 'small')).toBe('small')
   })
 })

@@ -1,11 +1,15 @@
 import { createContext, useContext, useLayoutEffect, useRef, useState, type DragEvent, type KeyboardEvent, type ReactNode } from 'react'
+import Divider from './Divider'
 import Tile from './Tile'
 import TileConsole from './TileConsole'
-import { columnsFor } from './tileShapes'
+import { isOneColumn } from './tileShapes'
 import { nextFocus, type Box, type Direction } from './tileNav'
 import { opensConsole, type TileDef } from './tileTypes'
-import { useContainerWidth } from './useContainerWidth'
-import { useTileLayout } from './useTileLayout'
+import {
+  computeGeometry, flattenOneColumn, getAtPath, minSize, rectAtPath, type Path, type SplitNode,
+} from './splitTree'
+import { useContainerSize } from './useContainerWidth'
+import { useSplitLayout } from './useSplitLayout'
 import './tiles.scss'
 
 export interface Crumb { label: string; onClick?: () => void }
@@ -19,21 +23,26 @@ const TileHostContext = createContext<TileHost>({ open: () => {} })
 export const useTileHost = (): TileHost => useContext(TileHostContext)
 
 const ARROWS: Record<string, Direction> = { ArrowLeft: 'left', ArrowRight: 'right', ArrowUp: 'up', ArrowDown: 'down' }
+const boxOf = (r: { x: number; y: number; w: number; h: number }): Box => ({ left: r.x, top: r.y, width: r.w, height: r.h })
 
-// A responsive grid of tiles. It lays itself out by its own width (one column
-// below 400px), remembers each tile's shape and the order the user gave them,
-// and expands a selected tile into its console over the grid's whole area.
+// A grid of tiles laid out on a split tree (splitTree.ts): it always fills its own
+// container exactly (drag a divider and only its two neighbours resize -- no gaps,
+// no ragged last row), remembers each tile's place and size per user, and expands a
+// selected tile into its console over the grid's whole area.
 //
 //   - Enter or a click opens a tile; Escape (or Back) collapses it; `[` and `]`
 //     switch tiles while one is expanded.
-//   - Arrow keys move between tiles; Alt+arrows move the focused tile.
-//   - A tile's header can be dragged to a new place.
+//   - Arrow keys move between tiles; Alt+arrows swap the focused tile with its neighbour.
+//   - A tile's header can be dragged onto another to swap their places.
+//   - A divider between two tiles can be dragged, keyboard-nudged, or double-clicked to reset.
 //
 // `below` is anything that goes under the tiles (the book face under its link tiles).
 //
 // By default the grid remembers its own open tile. Pass `open` (and `onOpenChange`)
 // to control it from outside instead (the Helper panel's sidebar buttons do).
-function TileGrid({ gridId, tiles, crumbs, below, label, open: controlledOpen, onOpenChange }: {
+// `onMaximizeChange`, only wired up in the Writer so far, is told when an expanded
+// console is maximized or restored (so the caller can hide its own sidebar).
+function TileGrid({ gridId, tiles, crumbs, below, label, open: controlledOpen, onOpenChange, onMaximizeChange }: {
   gridId: string
   tiles: TileDef[]
   crumbs: Crumb[]
@@ -41,15 +50,27 @@ function TileGrid({ gridId, tiles, crumbs, below, label, open: controlledOpen, o
   label?: string
   open?: string | null
   onOpenChange?: (id: string | null) => void
+  onMaximizeChange?: (on: boolean) => void
 }) {
-  const layout = useTileLayout(gridId, tiles)
+  const layout = useSplitLayout(gridId, tiles)
   const controlled = controlledOpen !== undefined
   const openId = controlled ? (layout.placed.some(p => p.def.id === controlledOpen) ? controlledOpen : null) : layout.openId
   const setOpenId = (id: string | null) => { if (controlled) onOpenChange?.(id); else layout.setOpen(id) }
   const [cornerPanel, setCornerPanel] = useState<CornerPanel | null>(null)
-  const [gridRef, width] = useContainerWidth<HTMLDivElement>()
+  const [scrollRef, containerSize] = useContainerSize<HTMLDivElement>()
+  const stageRef = useRef<HTMLDivElement>(null)
   const areaRef = useRef<HTMLDivElement>(null)
-  const columns = columnsFor(width)
+  const oneColumn = isOneColumn(containerSize.width)
+  const renderTree: SplitNode | null = layout.tree ? (oneColumn ? flattenOneColumn(layout.tree) : layout.tree) : null
+
+  const min = renderTree ? minSize(renderTree) : { w: 0, h: 0 }
+  const stageW = Math.max(containerSize.width, min.w)
+  // A grid with something below it (the book face under its link tiles) sizes the
+  // stage to its own content instead of stretching to fill the container -- the
+  // trailing content takes the rest of the space, as it always has.
+  const stageH = below ? min.h : Math.max(containerSize.height, min.h)
+  const geometry = renderTree ? computeGeometry(renderTree, { x: 0, y: 0, w: stageW, h: stageH }) : { tiles: [], dividers: [] }
+  const byId = new Map(layout.placed.map(p => [p.def.id, p]))
 
   const [from, setFrom] = useState<Box | null>(null)
   const [dragId, setDragId] = useState<string | null>(null)
@@ -70,14 +91,20 @@ function TileGrid({ gridId, tiles, crumbs, below, label, open: controlledOpen, o
   function open(def: TileDef) {
     if (def.onOpen) { def.onOpen(); return }
     if (!opensConsole(def)) return
-    const area = areaRef.current?.getBoundingClientRect()
-    const el = areaRef.current?.querySelector<HTMLElement>(`[data-tile-id="${def.id}"]`)?.getBoundingClientRect()
-    setFrom(area && el && el.width > 0 ? { left: el.left - area.left, top: el.top - area.top, width: el.width, height: el.height } : null)
+    const g = geometry.tiles.find(t => t.id === def.id)
+    setFrom(g && g.rect.w > 0 ? boxOf(g.rect) : null)
     setCornerPanel(null)
     setOpenId(def.id)
   }
-  // Closing hands the focus back to the tile that was open.
-  function close() { refocus.current = openId; setFrom(null); setCornerPanel(null); setOpenId(null) }
+  // Closing hands the focus back to the tile that was open, and clears a maximize
+  // (the sidebar it hid, if any, comes back with it).
+  function close() {
+    refocus.current = openId
+    setFrom(null)
+    setCornerPanel(null)
+    setOpenId(null)
+    if (layout.maximized) { layout.setMaximized(false); onMaximizeChange?.(false) }
+  }
   function switchTo(id: string) { setFrom(null); setCornerPanel(null); setOpenId(id) }
   // A tile this grid does not have is left to the grid it is nested in (Account's Settings reach the Dashboard tile).
   const parentHost = useContext(TileHostContext)
@@ -96,13 +123,14 @@ function TileGrid({ gridId, tiles, crumbs, below, label, open: controlledOpen, o
     if (!dir) return
     e.preventDefault()
     const id = el.dataset.tileId!
-    if (e.altKey) {
-      layout.shift(id, dir === 'right' || dir === 'down' ? 1 : -1)
-      refocus.current = id
-      return
-    }
     const els = Array.from(areaRef.current!.querySelectorAll<HTMLElement>('[data-tile-id]'))
     const boxes = els.map(t => { const r = t.getBoundingClientRect(); return { left: r.left, top: r.top, width: r.width, height: r.height } })
+    if (e.altKey) {
+      const targetEl = els[nextFocus(boxes, els.indexOf(el), dir)]
+      const targetId = targetEl?.dataset.tileId
+      if (targetId && targetId !== id) { layout.swap(id, targetId); refocus.current = id }
+      return
+    }
     els[nextFocus(boxes, els.indexOf(el), dir)]?.focus()
   }
 
@@ -121,32 +149,76 @@ function TileGrid({ gridId, tiles, crumbs, below, label, open: controlledOpen, o
   function onDrop(e: DragEvent, id: string) {
     if (!dragId) return
     e.preventDefault()
-    layout.move(dragId, id)
+    layout.swap(dragId, id)
     setDragId(null)
     setOverId(null)
+  }
+
+  function dragTo(path: Path, dir: 'row' | 'col', clientX: number, clientY: number) {
+    const stageEl = stageRef.current
+    if (!stageEl || !renderTree) return
+    const stageBox = stageEl.getBoundingClientRect()
+    const branch = rectAtPath(renderTree, { x: 0, y: 0, w: stageW, h: stageH }, path)
+    const local = dir === 'row' ? clientX - stageBox.left - branch.x : clientY - stageBox.top - branch.y
+    const total = (dir === 'row' ? branch.w : branch.h) - 8
+    if (total <= 0) return
+    layout.resize(path, (local - 4) / total)
+  }
+
+  const maximized = layout.maximized
+  const toggleMaximize = () => {
+    const on = !maximized
+    layout.setMaximized(on)
+    onMaximizeChange?.(on)
   }
 
   return (
     <TileHostContext.Provider value={host}>
     <div className="tileArea" ref={areaRef} onKeyDown={onKeyDown}>
-      <div className="tileScroll">
-        <div ref={gridRef} className={columns <= 1 ? 'tileGrid tileGrid--one' : 'tileGrid'} role="group" aria-label={label ?? 'Tiles'} style={{ ['--tile-columns' as string]: columns }}>
-          {layout.placed.map(({ def, shape }) => (
-            <Tile
-              key={def.id} def={def} shape={shape} columns={columns}
-              dragging={dragId === def.id} dropTarget={overId === def.id && dragId !== def.id}
-              onOpen={() => open(def)} onCycleShape={() => layout.cycle(def.id)}
-              onDragStart={e => onDragStart(e, def.id)} onDragOver={e => onDragOver(e, def.id)}
-              onDrop={e => onDrop(e, def.id)} onDragEnd={() => { setDragId(null); setOverId(null) }}
-            />
-          ))}
+      <div ref={scrollRef} className="tileScroll">
+        <div
+          ref={stageRef} className={oneColumn ? 'tileGrid tileGrid--one' : 'tileGrid'} role="group"
+          aria-label={label ?? 'Tiles'} style={{ position: 'relative', width: stageW, height: stageH }}
+        >
+          {geometry.tiles.map(g => {
+            const p = byId.get(g.id)
+            if (!p) return null
+            return (
+              <Tile
+                key={p.def.id} def={p.def} rect={g.rect} fixed={g.fixed} oneColumn={oneColumn} presetShape={p.shape}
+                dragging={dragId === p.def.id} dropTarget={overId === p.def.id && dragId !== p.def.id}
+                onOpen={() => open(p.def)} onCycleShape={() => layout.cycle(p.def.id)}
+                onDragStart={e => onDragStart(e, p.def.id)} onDragOver={e => onDragOver(e, p.def.id)}
+                onDrop={e => onDrop(e, p.def.id)} onDragEnd={() => { setDragId(null); setOverId(null) }}
+              />
+            )
+          })}
+          {geometry.dividers.map(d => {
+            const branch = renderTree ? getAtPath(renderTree, d.path) : null
+            const ratio = branch && 'ratio' in branch ? branch.ratio : 0.5
+            return (
+              <Divider
+                key={d.path.join('.') || 'root'} dir={d.dir} ratio={ratio}
+                style={{ position: 'absolute', left: d.rect.x, top: d.rect.y, width: d.rect.w, height: d.rect.h }}
+                onDragTo={(x, y) => dragTo(d.path, d.dir, x, y)}
+                onResize={r => layout.resize(d.path, r)}
+                onReset={() => layout.resetBranch(d.path)}
+              />
+            )
+          })}
         </div>
         {below}
       </div>
+      {layout.placed.length > 0 && (
+        <button type="button" className="tileResetBtn" onClick={layout.resetAll} title="Reset layout" aria-label="Reset layout">
+          Reset layout
+        </button>
+      )}
       {openTile && (
         <TileConsole
           key={openTile.id === openId ? 'console' : openTile.id}
           gridId={gridId} tile={openTile} siblings={openable} crumbs={crumbs} from={from} initialPanel={cornerPanel}
+          maximized={maximized} onToggleMaximize={onMaximizeChange ? toggleMaximize : undefined}
           onSwitch={switchTo} onClose={close}
         />
       )}

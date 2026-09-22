@@ -4,9 +4,14 @@ import type { TileMeta } from './tileLayout'
 import type { TileShape } from './tileShapes'
 
 export interface TileContext {
+  // The content tier its actual measured box earns (components/tiles/tileShapes.ts's
+  // `contentTier`) -- not a stored label, so a tile stretched by a divider drag shows
+  // richer content and a squeezed one shows less, live.
   shape: TileShape
-  // The grid is one column wide: what a small or landscape tile shows is its row version.
+  // The grid is one column wide: a tile never reads as "wide" here, however wide its box is.
   oneColumn: boolean
+  width: number
+  height: number
 }
 
 // A tile: a read-only card in a grid that expands into a console. Its content

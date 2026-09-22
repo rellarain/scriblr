@@ -48,7 +48,7 @@ const shapes = () => Array.from(document.querySelectorAll('[data-tile-id]')).map
 describe('Shelves tiles', () => {
   it('are the template, schedule, analytics and scratchpad', () => {
     grid(shelvesTiles(workspace()), 'shelves')
-    expect(shapes()).toEqual(['template:link', 'schedule:landscape', 'analytics:landscape', 'scratchpad:portrait'])
+    expect(shapes()).toEqual(['template:link', 'schedule:landscape', 'analytics:large', 'scratchpad:portrait'])
   })
 
   it('shows the chapters of each project in the analytics tile', () => {
@@ -87,8 +87,9 @@ describe('Shelves tiles', () => {
 describe('Shelf tiles', () => {
   it('are the working editors as summary tiles, then placeholders, then link tiles', () => {
     grid(shelfTiles(workspace()), 'shelf')
+    // Link tiles (editor, template) stack as a fixed strip above the rest of the grid.
     expect(shapes()).toEqual([
-      'plot:large', 'outline:portrait', 'schedule:small', 'analytics:landscape', 'history:small', 'editor:link', 'template:link',
+      'editor:link', 'template:link', 'plot:large', 'outline:portrait', 'schedule:landscape', 'analytics:landscape', 'history:small',
     ])
   })
 

@@ -14,9 +14,10 @@ $tile-surface: linear-gradient(160deg, var(--surface-raised-a), var(--surface-ra
 }
 
 .tileScroll {
+  position: relative;
   flex: 1 1 auto;
   min-height: 0;
-  overflow-y: auto;
+  overflow: auto;
   padding: 2px;
   display: flex;
   flex-direction: column;
@@ -25,21 +26,54 @@ $tile-surface: linear-gradient(160deg, var(--surface-raised-a), var(--surface-ra
   &::-webkit-scrollbar { display: none; }
 }
 
-.tileGrid {
-  display: grid;
-  grid-template-columns: repeat(var(--tile-columns, 1), minmax(0, 1fr));
-  grid-auto-rows: 46px;
-  grid-auto-flow: dense;
-  gap: 8px;
-  flex: 0 0 auto;
+// The stage is sized in JS (TileGrid.tsx) to fill its container exactly, or to the
+// tree's minimum footprint when that's bigger (the scroll area then scrolls).
+// Tiles and dividers inside are positioned absolutely, from the split tree's
+// geometry (splitTree.ts's computeGeometry) -- no CSS grid, so there is never a
+// gap or a ragged last row: every leaf's rect tiles the stage exactly.
+.tileGrid { flex: 0 0 auto; }
+
+.tileResetBtn {
+  position: absolute;
+  top: 2px;
+  right: 2px;
+  z-index: 2;
+  padding: 3px 8px;
+  border: 0;
+  border-radius: 6px;
+  background: var(--ov-sink-1);
+  color: var(--ink-muted);
+  font-size: 11px;
+  cursor: pointer;
+  &:hover { background: var(--ov-lift-2); color: var(--ink); }
 }
 
+.tileDivider {
+  position: absolute;
+  z-index: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  &--row { cursor: col-resize; }
+  &--col { cursor: row-resize; }
+  &:focus-visible .tileDividerBar { background: var(--accent); }
+}
+.tileDividerBar {
+  border-radius: 2px;
+  background: transparent;
+  transition: background 0.1s;
+}
+.tileDivider--row .tileDividerBar { width: 2px; height: 100%; }
+.tileDivider--col .tileDividerBar { width: 100%; height: 2px; }
+.tileDivider:hover .tileDividerBar { background: color-mix(in srgb, var(--ink) 35%, transparent); }
+
 .tile {
-  position: relative;
+  position: absolute;
   display: flex;
   flex-direction: column;
   gap: 6px;
   min-width: 0;
+  box-sizing: border-box;
   padding: 8px 10px;
   overflow: hidden;
   border-radius: 10px;
@@ -50,8 +84,9 @@ $tile-surface: linear-gradient(160deg, var(--surface-raised-a), var(--surface-ra
   cursor: pointer;
   &:hover { box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--ink) 30%, transparent); }
   &:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
-  // A link tile is one row: name on the left, summary on the right.
-  &--link, &--row { justify-content: center; padding-top: 0; padding-bottom: 0; }
+  // A fixed (link-shaped, or squeezed short by a divider) tile is one row: name on
+  // the left, summary on the right, no body.
+  &--fixed { justify-content: center; padding-top: 0; padding-bottom: 0; }
   &--dragging { opacity: 0.5; }
   &--drop { box-shadow: inset 0 0 0 2px var(--accent); }
   p { margin: 0; }

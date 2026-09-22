@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState, type ComponentType, type ReactNode } from 'react'
+import { useEffect, useRef, useState, type ComponentType, type PointerEvent, type ReactNode } from 'react'
 import type { OutlineNode } from '../../../api/types'
 import type { WriterWorkspace } from './useWriterWorkspace'
 import { buildChildIndex, chaptersOfBook, descendantsOf, shelfGroups, type ShelfGroup } from './outlineTree'
@@ -13,6 +13,40 @@ import { bookThemeHue, themeColorCss } from '../../../theme/bookColors'
 // open -- just that project's shelf, followed by one collapsible panel per
 // selected level (Project, then Book, then Chapter) that only appears once
 // that kind of object is selected.
+
+export const SIDEBAR_DEFAULT_WIDTH = 264
+export const SIDEBAR_MIN_WIDTH = 200
+export const SIDEBAR_MAX_WIDTH = 420
+
+// The sidebar's right-edge drag handle: pointer-drag sets its width (clamped by the
+// caller), like a split-tree divider (components/tiles/Divider.tsx) but plain pixels
+// instead of a ratio, since the sidebar isn't part of a split tree. Double-click
+// restores the default width; the arrow keys nudge it (Shift for a bigger step).
+function SidebarResize({ width, onWidthChange }: { width: number; onWidthChange: (width: number) => void }) {
+  function onPointerDown(e: PointerEvent<HTMLDivElement>) {
+    if (e.button !== 0) return
+    e.preventDefault()
+    e.currentTarget.setPointerCapture(e.pointerId)
+  }
+  function onPointerMove(e: PointerEvent<HTMLDivElement>) {
+    if (!e.currentTarget.hasPointerCapture(e.pointerId) || !e.movementX) return
+    onWidthChange(width + e.movementX)
+  }
+  function onPointerUp(e: PointerEvent<HTMLDivElement>) {
+    if (e.currentTarget.hasPointerCapture(e.pointerId)) e.currentTarget.releasePointerCapture(e.pointerId)
+  }
+  return (
+    <div
+      className="wrSideResize" role="separator" aria-orientation="vertical" aria-label="Resize sidebar" tabIndex={0}
+      onPointerDown={onPointerDown} onPointerMove={onPointerMove} onPointerUp={onPointerUp}
+      onDoubleClick={() => onWidthChange(SIDEBAR_DEFAULT_WIDTH)}
+      onKeyDown={e => {
+        if (e.key === 'ArrowLeft') onWidthChange(width - (e.shiftKey ? 40 : 10))
+        else if (e.key === 'ArrowRight') onWidthChange(width + (e.shiftKey ? 40 : 10))
+      }}
+    />
+  )
+}
 
 const SPINE_HEIGHT = 100
 
@@ -135,12 +169,15 @@ const kv = (k: string, v: ReactNode) => (
 
 type PanelKey = 'project' | 'book' | 'chapter'
 
-function WuiSidebar({ workspace: w, collapsed = false, canCollapse = false, onToggleCollapsed }: {
+function WuiSidebar({ workspace: w, collapsed = false, canCollapse = false, onToggleCollapsed, width = SIDEBAR_DEFAULT_WIDTH, onWidthChange }: {
   workspace: WriterWorkspace
   // Minimized to a slim rail (only offered while the main screen is narrow, and to open it again).
   collapsed?: boolean
   canCollapse?: boolean
   onToggleCollapsed?: () => void
+  // Dragged from its right edge; omit `onWidthChange` to keep the fixed default width.
+  width?: number
+  onWidthChange?: (width: number) => void
 }) {
   const [newTitle, setNewTitle] = useState('')
   // Only the current (deepest) panel is open; a click on a header opens that
@@ -169,10 +206,15 @@ function WuiSidebar({ workspace: w, collapsed = false, canCollapse = false, onTo
       <ChevronLeftIcon size={16} />
     </button>
   ) : null
+  const sideStyle = onWidthChange ? { flexBasis: width, width } : undefined
+  const resize_ = onWidthChange
+    ? <SidebarResize width={width} onWidthChange={w => onWidthChange(Math.min(SIDEBAR_MAX_WIDTH, Math.max(SIDEBAR_MIN_WIDTH, w)))} />
+    : null
 
   if (!w.hasOpenProject) {
     return (
-      <aside className="wrSidebar" aria-label="Project shelves">
+      <aside className="wrSidebar" aria-label="Project shelves" style={sideStyle}>
+        {resize_}
         {toggle_}
         {w.projectsStatus === 'loading' && <p className="wrMuted">Loading projects…</p>}
         {w.projectsStatus === 'error' && (
@@ -230,7 +272,8 @@ function WuiSidebar({ workspace: w, collapsed = false, canCollapse = false, onTo
   let momentNo = 0
 
   return (
-    <aside className="wrSidebar" aria-label="Project navigation">
+    <aside className="wrSidebar" aria-label="Project navigation" style={sideStyle}>
+      {resize_}
       {toggle_}
       <button type="button" className="wrBackLink" onClick={w.backToShelves}>
         <ChevronLeftIcon size={14} /> All shelves

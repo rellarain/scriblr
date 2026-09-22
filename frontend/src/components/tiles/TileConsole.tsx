@@ -15,7 +15,7 @@ const canAnimate = (): boolean =>
 // tiles for switching to another tile without going back; Settings and Help sit at
 // the bottom right. A tile with child tiles shows them as a grid that can expand in
 // turn; otherwise the tile's own editor fills the body.
-function TileConsole({ gridId, tile, siblings, crumbs, from, initialPanel = null, onSwitch, onClose }: {
+function TileConsole({ gridId, tile, siblings, crumbs, from, initialPanel = null, maximized = false, onToggleMaximize, onSwitch, onClose }: {
   gridId: string
   tile: TileDef
   siblings: TileDef[]
@@ -24,6 +24,10 @@ function TileConsole({ gridId, tile, siblings, crumbs, from, initialPanel = null
   from: Box | null
   // The Settings or Help panel to start with open.
   initialPanel?: CornerPanel | null
+  // Double-clicking the header toggles this (only offered where the caller passed
+  // `onToggleMaximize` -- the Writer hides its sidebar; other panels don't wire it up yet).
+  maximized?: boolean
+  onToggleMaximize?: () => void
   onSwitch: (id: string) => void
   onClose: () => void
 }) {
@@ -61,7 +65,7 @@ function TileConsole({ gridId, tile, siblings, crumbs, from, initialPanel = null
     <div
       ref={rootRef} tabIndex={-1}
       className={animated ? 'tileConsole tileConsole--animated' : 'tileConsole'} style={style}
-      role="region" aria-label={tile.title}
+      role="region" aria-label={tile.title} data-maximized={maximized || undefined}
       onKeyDown={e => {
         const target = e.target as HTMLElement
         if (e.key === 'Escape') { e.stopPropagation(); close() }
@@ -73,7 +77,7 @@ function TileConsole({ gridId, tile, siblings, crumbs, from, initialPanel = null
         }
       }}
     >
-      <div className="tcHead">
+      <div className="tcHead" onDoubleClick={onToggleMaximize}>
         <button type="button" className="tcBack" onClick={close} aria-label="Back to tiles">
           <ChevronLeftIcon size={14} /> Back
         </button>
