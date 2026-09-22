@@ -99,6 +99,10 @@
     padding: 14px; display: flex; flex-direction: column; gap: 14px; scrollbar-width: none;
     &::-webkit-scrollbar { display: none; }
   }
+  // Minimize / show the sidebar. Minimized, it is a slim rail holding the show button.
+  .wrSideToggle { align-self: flex-end; display: inline-flex; align-items: center; justify-content: center; width: 26px; height: 26px; border-radius: 4px; color: var(--ink); background: var(--ov-sink-1); &:hover { background: var(--ov-lift-2); } }
+  .wrSidebar--collapsed { flex: 0 0 40px; width: 40px; padding: 10px 6px; align-items: center; .wrSideToggle { align-self: center; } }
+  .wrSideToggle--minimize { margin: -6px 0 -6px; }
   .wrBackLink { display: flex; align-items: center; gap: 4px; font-size: 11px; opacity: 0.75; padding: 0 2px; text-align: left; &:hover { opacity: 1; } }
 
   .wrShelf { display: flex; flex-direction: column; gap: 5px; }
@@ -134,7 +138,8 @@
     .wrSmallBtn { justify-content: center; padding: 8px; }
   }
 
-  .wrPanel { background: rgb(0 0 0 / calc(0.2 * var(--shade-k))); border-radius: 4px; }
+  // The sidebar's Project / Book / Chapter panels are tiles (components/tiles): raised, rounded, hairline.
+  .wrPanel { background: linear-gradient(160deg, var(--surface-raised-a), var(--surface-raised-b)); border-radius: 10px; box-shadow: inset 0 0 0 1px var(--hairline); }
   .wrPanelHeaderRow { display: flex; align-items: center; padding-right: 10px; }
   .wrPanelHeader { display: flex; align-items: center; gap: 8px; flex: 1 1 auto; min-width: 0; padding: 8px 10px; text-align: left; }
   .wrPanelValue--link { flex: 0 1 auto; min-width: 0; margin-left: auto; padding: 8px 0; &:hover { opacity: 0.8; } }
@@ -157,20 +162,14 @@
   // page background and icon column behind them stay the user's own theme background.
   .wrBookScope { @include wrAliases; color: var(--ink); }
   .wrBookScope--flow { display: contents; }
-  .wrIconColumn { flex: 0 0 52px; box-sizing: border-box; height: 100%; padding: 12px 10px; display: flex; flex-direction: column; gap: 6px; }
-  .wrIconColumnTail { margin-top: auto; display: flex; flex-direction: column; gap: 6px; }
-  .wrIconBtn {
-    width: 32px; height: 32px; border-radius: 4px; display: flex; align-items: center; justify-content: center; color: var(--ink);
-    &:hover { background: var(--wr-accent-light); }
-    &--active { background: var(--wr-accent); }
-  }
-  .wrIconColumnTail .wrIconBtn:not(.wrIconBtn--active) { background: rgb(0 0 0 / calc(0.25 * var(--shade-k))); }
-  .wrContent { flex: 1 1 auto; min-width: 0; min-height: 0; height: 100%; box-sizing: border-box; display: flex; flex-direction: column; padding: 0 16px 14px 6px; position: relative; }
-  .wrContent--flush { padding: 0 6px 0 0; }
+  .wrContent { flex: 1 1 auto; min-width: 0; min-height: 0; height: 100%; box-sizing: border-box; display: flex; flex-direction: column; padding: 0 16px 14px 14px; position: relative; }
+  .wrContent--flush { padding: 0 6px 0 10px; }
   // Chapter page and Preview: the paper fills the console and the chapter tabs sit flush against its right
   // edge (like the book cover's); the title row keeps the usual inset.
-  .wrContent--edge { padding: 0 0 14px 6px; > .wrTitleRow { padding-right: 16px; } }
+  .wrContent--edge { padding: 0 0 14px 10px; > .wrTitleRow { padding-right: 16px; } }
   .wrContent--edge .wrPreviewToolbar { padding-right: 16px; }
+  .wrConsoleBody--tiles { overflow: hidden; }
+  .tileScroll > .wrCoverWrap { min-height: 420px; }
   .wrConsoleBody { flex: 1 1 auto; min-height: 0; display: flex; flex-direction: column; overflow-y: auto; scrollbar-width: none; &::-webkit-scrollbar { display: none; } }
 
   .wrTitleRow { flex: 0 0 auto; height: 44px; display: flex; align-items: center; gap: 12px; }
@@ -178,7 +177,7 @@
   .wrComponentName { font-size: 13px; opacity: 0.7; }
   .wrTitleRight { margin-left: auto; display: flex; align-items: center; gap: 14px; }
   // The Book editor has no title row: its Save control is pinned to the cover's top-right corner.
-  .wrCoverSave { position: absolute; top: 24px; right: 38px; z-index: 3; .saveState { color: color-mix(in srgb, var(--wr-cover-ink) 75%, transparent); &--unsaved { color: var(--wr-cover-ink); } &--error { color: var(--alert); } } }
+  .wrCoverSave { position: absolute; top: 24px; right: 38px; z-index: 3; .saveState { color: color-mix(in srgb, var(--wr-cover-ink) 75%, transparent); &--unsaved { color: var(--wr-cover-ink); } &--error { color: var(--wr-cover-ink); text-decoration-color: var(--alert); } } }
   .wrPlaceholder { padding: 6px 2px; h2 { font-size: 15px; margin: 0 0 6px; text-transform: uppercase; letter-spacing: 1px; } p { font-size: 13px; opacity: 0.85; margin: 0; } }
 
   .wrSegmented { display: flex; padding: 3px; gap: 3px; background: var(--wr-field); border-radius: 4px; }

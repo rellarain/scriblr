@@ -42,14 +42,22 @@ describe('skyLook', () => {
     )
   })
 
-  it('leaves the sun, moon and stars at their named shades', () => {
+  it('keeps the sun white, the night moon accent-coloured and saturated, and the twilight moon muted', () => {
+    const satOf = (color: string) => Number(color.match(/,\s*(\d+)%,/)![1])
     for (const zone of ZONE_KEYS) {
       const p = palette(90)
       const look = skyLook(zone, p)
+      expect(look.sun).toBe('hsl(0, 0%, 100%)')
+      // Night moon: the accent hue, more saturated than the zone's own accent, light against dark.
       expect(hueOf(look.moonLit)).toBe(p.accent.h)
-      expect(lightnessOf(look.moonLit)).toBe(94)
-      expect(lightnessOf(look.moonShadow)).toBe(16)
-      if (zone !== 'night') expect(lightnessOf(look.sun)).toBe(zone === 'day' ? 95 : 88) // night has a moon, not a sun
+      expect(hueOf(look.moonShadow)).toBe(p.accent.h)
+      expect(satOf(look.moonLit)).toBeGreaterThan(ZONE_LOOKS.night.accentS)
+      expect(lightnessOf(look.moonLit)).toBeGreaterThan(lightnessOf(look.moonShadow))
+      // Beside the sun the moon is dimmer than it and low in saturation.
+      expect(lightnessOf(look.moonLitTwilight)).toBeLessThan(90)
+      expect(lightnessOf(look.moonShadowTwilight)).toBeGreaterThan(10)
+      expect(satOf(look.moonLitTwilight)).toBeLessThanOrEqual(20)
+      expect(satOf(look.moonLitTwilight)).toBeLessThan(satOf(look.moonLit))
       const alert = resolvePalette(p, zone).alert
       expect(look.star).toBe(`hsl(${alert.h}, ${alert.s}%, ${alert.l}%)`)
     }

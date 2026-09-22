@@ -12,8 +12,11 @@ export interface SkyLook {
   // The lightest and darkest the sky gets across the band the time and date sit in.
   band: { min: number; max: number }
   sun: string
+  // At night the moon wears the accent hue, richly saturated; beside the sun (dawn, dusk) it is a muted tint.
   moonLit: string
   moonShadow: string
+  moonLitTwilight: string
+  moonShadowTwilight: string
   star: string
   text: string
   textLocked: string
@@ -28,8 +31,10 @@ const TEXT_BOTTOM = 23
 
 const LIGHTEST = 95
 const LIGHT = 88
-const MOON_LIT = 94
-const MOON_SHADOW = 16
+const SUN = 'hsl(0, 0%, 100%)'
+// At night the moon is the accent hue, more saturated than the zone's own accent.
+const NIGHT_MOON = { s: 90, lit: 90, shadow: 22 }
+const TWILIGHT_MOON = { s: 12, lit: 78, shadow: 30 }
 const NIGHT_SKY = 10
 const DAWN_SKY = { top: 58, bottom: 92 }
 const DUSK_SKY = { bottom: 74, top: 24 }
@@ -67,7 +72,6 @@ export function skyLook(zone: ZoneKey, palette: ZonePalette): SkyLook {
   let sky: string
   let top: number
   let bottom: number
-  let sun: string
   let wantedText: number
   let cloud: { fill: string; front: number; back: number }
   switch (zone) {
@@ -75,14 +79,12 @@ export function skyLook(zone: ZoneKey, palette: ZonePalette): SkyLook {
       top = DAWN_SKY.top
       bottom = DAWN_SKY.bottom
       sky = `linear-gradient(to top, ${hsl(theme.h, theme.s, bottom)}, ${hsl(theme.h, theme.s, top)})`
-      sun = accentAt(LIGHT)
       wantedText = LIGHT
       cloud = { fill: hsl(theme.h, theme.s, 97), front: 0.55, back: 0.3 }
       break
     case 'day':
       top = bottom = accent.l
       sky = hsl(accent.h, accent.s, accent.l)
-      sun = accentAt(LIGHTEST)
       wantedText = LIGHTEST
       cloud = { fill: accentAt(82), front: 0.6, back: 0.32 }
       break
@@ -90,14 +92,12 @@ export function skyLook(zone: ZoneKey, palette: ZonePalette): SkyLook {
       top = DUSK_SKY.top
       bottom = DUSK_SKY.bottom
       sky = `linear-gradient(to top, ${hsl(accent.h, accent.s, bottom)}, ${hsl(alert.h, alert.s, top)})`
-      sun = accentAt(LIGHT)
       wantedText = LIGHT
       cloud = { fill: accentAt(78), front: 0.4, back: 0.22 }
       break
     default:
       top = bottom = NIGHT_SKY
       sky = hsl(theme.h, theme.s, NIGHT_SKY)
-      sun = accentAt(LIGHTEST)
       wantedText = accent.l
       cloud = { fill: hsl(theme.h, theme.s, 34), front: 0.5, back: 0.3 }
   }
@@ -109,9 +109,11 @@ export function skyLook(zone: ZoneKey, palette: ZonePalette): SkyLook {
   return {
     sky,
     band,
-    sun,
-    moonLit: accentAt(MOON_LIT),
-    moonShadow: accentAt(MOON_SHADOW),
+    sun: SUN,
+    moonLit: hsl(accent.h, NIGHT_MOON.s, NIGHT_MOON.lit),
+    moonShadow: hsl(accent.h, NIGHT_MOON.s, NIGHT_MOON.shadow),
+    moonLitTwilight: hsl(accent.h, TWILIGHT_MOON.s, TWILIGHT_MOON.lit),
+    moonShadowTwilight: hsl(accent.h, TWILIGHT_MOON.s, TWILIGHT_MOON.shadow),
     star: hsl(alert.h, alert.s, alert.l),
     text: accentAt(text),
     textLocked: accentAt(shiftedToward(text, band)),

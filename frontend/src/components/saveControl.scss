@@ -11,7 +11,16 @@
   white-space: nowrap;
   color: var(--ink-muted);
   &--unsaved { color: var(--ink); }
-  &--error { color: var(--alert); font-weight: 700; }
+  // The text stays in the readable ink (the alert colour on a theme surface can be
+  // under 30 lightness points from it); the alert colour marks it with an underline.
+  &--error {
+    color: var(--ink);
+    font-weight: 700;
+    text-decoration: underline;
+    text-decoration-color: var(--alert);
+    text-decoration-thickness: 2px;
+    text-underline-offset: 3px;
+  }
 }
 
 .saveBtn {

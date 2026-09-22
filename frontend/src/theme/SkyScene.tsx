@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState, type CSSProperties } from 'react'
 import { minuteOfDay } from './zones'
 import type { ZoneKey } from './types'
-import { CONSTELLATIONS, SKY_H, SKY_W, cloudStrip, moonPath, moonPhase, orbY, zodiacSign, type CloudStrip } from './sky'
+import { CLOUD_RADIUS, CONSTELLATIONS, SKY_H, SKY_W, cloudStrip, moonPath, moonPhase, orbY, zodiacSign, type CloudStrip } from './sky'
 import type { SkyLook } from './skyLook'
 
 // The painted part of the sky toggle, drawn behind whatever text sits on it: the
@@ -26,17 +26,17 @@ function CloudLayer({ strip, height, speed, start, look, className }: {
   const duration = strip.length / speed
   const shapes = (
     <svg width={strip.length} height={height} viewBox={`0 0 ${strip.length} ${height}`} fill={look.fill} aria-hidden="true">
-      {strip.clouds.map(cloud => {
-        const left = Math.min(...cloud.humps.map(h => h.cx - h.r * 0.84))
-        const right = Math.max(...cloud.humps.map(h => h.cx + h.r * 0.84))
-        const base = Math.min(...cloud.humps.map(h => h.r)) * 0.4
-        return (
-          <g key={cloud.x} transform={`translate(${cloud.x} 0)`}>
-            {cloud.humps.map((h, i) => <circle key={i} cx={h.cx} cy={height - h.r * 0.55} r={h.r} />)}
-            <rect x={left} y={height - base} width={right - left} height={base} />
-          </g>
-        )
-      })}
+      {strip.clouds.map(cloud => (
+        <g key={cloud.x} transform={`translate(${cloud.x} 0)`}>
+          {cloud.boxes.map((box, i) => (
+            // The bottom box reaches past the strip's edge so its lower corners are cut off: a flat base.
+            <rect
+              key={i} x={box.x} y={box.y} width={box.w} height={i === 0 ? box.h + CLOUD_RADIUS : box.h}
+              rx={box.round ? box.w / 2 : Math.min(CLOUD_RADIUS, box.h / 2, box.w / 2)}
+            />
+          ))}
+        </g>
+      ))}
     </svg>
   )
   const style = {
@@ -104,7 +104,7 @@ function SkyScene({ zone, look, now, following }: { zone: ZoneKey; look: SkyLook
         <span className="skySun" data-testid="sun" style={{ left: (twilight ? 14 : 15) - 5, top: orb.sun - 5, background: look.sun }} />
       )}
       {orb.moon !== undefined && (
-        <Moon fraction={fraction} size={night ? 10 : 6} x={night ? 15 : 23} y={orb.moon} lit={look.moonLit} shadow={look.moonShadow} />
+        <Moon fraction={fraction} size={night ? 10 : 6} x={night ? 15 : 23} y={orb.moon} lit={night ? look.moonLit : look.moonLitTwilight} shadow={night ? look.moonShadow : look.moonShadowTwilight} />
       )}
 
       <span className="skyClouds" aria-hidden="true">

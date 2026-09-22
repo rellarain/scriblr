@@ -346,6 +346,53 @@ the working tree currently differs.
   + `jest-dom` matchers (`src/test/setup.ts`). Covers all four `lib/`
   modules plus `BookSpine`.
 
+## Tile grids (consoles as tiles)
+
+Sub-pages are **read-only tiles** in a responsive grid; selecting one expands it into
+its console/editor. The shared system is `frontend/src/components/tiles/`:
+
+- **Shapes** (`tileShapes.ts`): `link` (one short row), `small`, `landscape` (2 wide),
+  `portrait` (tall), `large` (2 wide, tall) on a 46px row unit with an 8px gap. A tile
+  declares which shapes it allows and its default; some allow only one.
+- **Container-based:** a grid lays itself out by **its own width** (`useContainerWidth`),
+  columns of at least 140px, and is **one column below 400px**. In one column a link
+  tile is one row, a small or landscape tile becomes a two-row *row version* (icon,
+  name, one-line summary) and portrait and large tiles keep their height.
+- **`TileGrid`** shows the tiles, expands one into a `TileConsole` (FLIP animation over
+  the grid's area, back button and breadcrumb, a row of mini tiles to switch tiles,
+  Settings and Help as round buttons at the bottom right via `ConsoleCorner`), and can
+  nest: a tile with `children` expands into a grid of tiles that expand in turn.
+  Keyboard: arrows move between tiles, Enter opens, Escape collapses, `[` and `]`
+  switch tiles, Alt+arrows reorder; a tile header can be dragged; a shape control on
+  each tile cycles its shapes. A few quick actions (tick a task, add a note or task,
+  open an item) work without expanding.
+- **Remembered per user** (`useTileLayout`, stored with `useStoredState` in the
+  user-settings kv as `scriblr.tiles.<gridId>`): order, shapes and the open tile.
+  Pure logic in `tileLayout.ts` (`applyLayout`, `cycleShape`, `moveTile`, `shiftTile`)
+  and `tileNav.ts` (`nextFocus`).
+- **Writer:** the Shelves and Shelf screens are tile grids (`writer/tiles/shelvesTiles.tsx`,
+  `shelfTiles.tsx`; previews come from `tileData.ts`); the Book screen keeps the book
+  face under two link tiles (`bookTiles.tsx`); the Page and Pages screens keep their
+  editors (Pages' Reaction / Flag / Export are buttons in its title row). The sidebar
+  stays, with its Project, Book and Chapter panels as tiles (chapters stay rows); it
+  scrolls independently of the main screen and can be **minimized** to a slim rail while
+  the main screen has two columns or fewer. Settings and Help sit at the bottom right
+  of every console.
+- **User panel** (`assets/Interfaces/UUI.tsx`): Dashboard, Account and Training are
+  section tiles; each expands into its pages as child tiles, which expand into their
+  editors. Dashboard's Settings (corner button) is the theme tool; Account's are
+  handedness and autosave, and its pointer to the theme tool uses `useTileHost()` to
+  open the Dashboard tile with its Settings panel showing (a nested grid hands a tile
+  it does not have to the grid it is in).
+- **Admin panel** (`AUI.tsx`): its eight sections as tiles with their pages as child
+  tiles; a Resources config page keeps its publish badge, Save draft / Publish and
+  lock inside its console and saves when it is left. The panel-size buttons stay in a
+  slim rail. At the single-column size (400px) every tile is a row.
+- **Helper panel** (`HUI.tsx`): Inbox, Queue and Settings tiles (plus the open chat's
+  Conversation) in the 400px panel. The sidebar divider's buttons still choose the open
+  console: `TileGrid` is controlled here (`open` / `onOpenChange`), and Back or a mini
+  tile only overrides the choice until the buttons change it again.
+
 ## Theming (time-of-day palettes)
 
 The shell (`frontend/src/App.tsx`) is themed by four optional time zones —
@@ -391,11 +438,12 @@ only the hues are kept.
   and **locks** it; the right one (time and date, dimmed while locked) goes back to
   following the clock and turns time-based theming on. The sky per zone is built
   from the zone's hues in `theme/skyLook.ts` (only the time text is adjusted to keep
-  the 30-point gap); `theme/sky.ts` holds the pure parts: the moon's phase (drawn at
-  night, and small in dawn and dusk), today's zodiac constellation (real star-chart
+  the 30-point gap); `theme/sky.ts` holds the pure parts: the moon's phase (accent-coloured
+  and saturated at night; small and muted beside the always-white sun at dawn and dusk), today's zodiac constellation (real star-chart
   outlines, joined by faint lines at night, faint stars only at dawn and dusk), the
-  random flat-bottomed cloud strips (gaps 0-100px, two layers drifting at 1.5 and
-  0.8 px/s from a random start; still under reduced motion, paused while the window
+  random cloud strips (flat-based stacks of 4px-cornered rounded boxes, each
+  shorter and narrower than the one below, with an occasional circle; gaps 0-100px,
+  two layers drifting at 1.5 and 0.8 px/s from a random start; still under reduced motion, paused while the window
   is hidden) and the sun/moon heights; `theme/SkyScene.tsx` draws them. The
   customization tool is UUI Dashboard > Settings (`theme/ThemeSettingsPanel.tsx`),
   whose four zone tabs are the same 120x30 sky (`theme/SkyZoneTab.tsx`): each in its

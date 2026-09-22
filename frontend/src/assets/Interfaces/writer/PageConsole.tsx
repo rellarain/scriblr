@@ -2,7 +2,6 @@ import { useMemo, useState, type ComponentType } from 'react'
 import type { OutlineNode } from '../../../api/types'
 import type { ChapterMode, WriterWorkspace } from './useWriterWorkspace'
 import { ListIcon, PencilIcon, EyeIcon, type IconProps } from '../../icons'
-import { HELP_COMPONENT, PAGE_COMPONENTS, SETTINGS_COMPONENT } from './consoleDefs'
 import { ChapterTabs, ConsoleTitleRow, Placeholder } from './shared'
 import { SaveControl } from '../../../components/SaveControl'
 import { combineSaveStatus } from '../../../lib/useAutosave'
@@ -149,20 +148,10 @@ function ChapterPage({ w, chapter }: { w: WriterWorkspace; chapter: OutlineNode 
   )
 }
 
-function PageConsole({ w, component }: { w: WriterWorkspace; component: string }) {
+function PageConsole({ w }: { w: WriterWorkspace }) {
   const chapter = w.activeChapter
-  const def = [...PAGE_COMPONENTS, SETTINGS_COMPONENT, HELP_COMPONENT].find(c => c.key === component)
-
   if (!chapter) return <Placeholder title="Page" body="Open a chapter from the book editor to outline or draft it." />
-
-  if (component === 'chapter') return <ChapterPage key={chapter.id} w={w} chapter={chapter} />
-
-  return (
-    <>
-      <ConsoleTitleRow console="Page" component={def?.label ?? ''} />
-      <Placeholder title={def?.label ?? ''} body={def?.body} />
-    </>
-  )
+  return <ChapterPage key={chapter.id} w={w} chapter={chapter} />
 }
 
 export default PageConsole

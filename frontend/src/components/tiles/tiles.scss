@@ -1,0 +1,273 @@
+// The tile grid (components/tiles). Colours are the theme tokens (theme/theme.scss),
+// so tiles follow the time-of-day palette and keep its 30-point text gap; inside a
+// book's scope they take the book's colours.
+
+$tile-surface: linear-gradient(160deg, var(--surface-raised-a), var(--surface-raised-b));
+
+.tileArea {
+  position: relative;
+  flex: 1 1 auto;
+  min-width: 0;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+.tileScroll {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow-y: auto;
+  padding: 2px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  scrollbar-width: none;
+  &::-webkit-scrollbar { display: none; }
+}
+
+.tileGrid {
+  display: grid;
+  grid-template-columns: repeat(var(--tile-columns, 1), minmax(0, 1fr));
+  grid-auto-rows: 46px;
+  grid-auto-flow: dense;
+  gap: 8px;
+  flex: 0 0 auto;
+}
+
+.tile {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  min-width: 0;
+  padding: 8px 10px;
+  overflow: hidden;
+  border-radius: 10px;
+  background: $tile-surface;
+  box-shadow: inset 0 0 0 1px var(--hairline);
+  color: var(--ink);
+  font-size: 12px;
+  cursor: pointer;
+  &:hover { box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--ink) 30%, transparent); }
+  &:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
+  // A link tile is one row: name on the left, summary on the right.
+  &--link, &--row { justify-content: center; padding-top: 0; padding-bottom: 0; }
+  &--dragging { opacity: 0.5; }
+  &--drop { box-shadow: inset 0 0 0 2px var(--accent); }
+  p { margin: 0; }
+}
+
+.tileHead {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+  color: var(--ink-muted);
+  cursor: grab;
+}
+.tileOpen {
+  // The name keeps its room; the summary beside it gives way first.
+  flex: 0 0 auto;
+  max-width: 70%;
+  min-width: 0;
+  padding: 0;
+  border: 0;
+  background: none;
+  color: var(--ink);
+  font: inherit;
+  font-weight: 700;
+  text-align: left;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  cursor: pointer;
+}
+.tileSummary {
+  flex: 1 1 0;
+  min-width: 24px;
+  color: var(--ink-muted);
+  font-size: 11px;
+  font-weight: 400;
+  text-align: right;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.tileBody > .tileSummary { flex: 0 0 auto; text-align: left; white-space: normal; }
+.tileShape {
+  flex: 0 0 auto;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 22px;
+  height: 22px;
+  margin-left: auto;
+  padding: 0;
+  border: 0;
+  border-radius: 4px;
+  background: transparent;
+  color: var(--ink-muted);
+  opacity: 0;
+  cursor: pointer;
+  &:hover, &:focus-visible { opacity: 1; background: var(--ov-sink-1); color: var(--ink); }
+}
+.tile:hover .tileShape, .tile:focus-within .tileShape { opacity: 0.8; }
+.tileSummary + .tileShape { margin-left: 0; }
+
+.tileBody {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  color: var(--ink);
+}
+
+// Small pieces the tile bodies are made of.
+.tileBig { font-size: 22px; font-weight: 700; line-height: 1.1; }
+.tileSub { font-size: 11px; color: var(--ink-muted); }
+.tileRow {
+  display: flex;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 3px 0;
+  border-top: 1px solid var(--hairline);
+  font-size: 12px;
+  &:first-child { border-top: 0; }
+  > span:last-child { color: var(--ink-muted); text-align: right; white-space: nowrap; }
+}
+.tileRowBtn {
+  min-width: 0;
+  padding: 0;
+  border: 0;
+  background: none;
+  color: var(--ink);
+  font: inherit;
+  text-align: left;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  cursor: pointer;
+  &:hover { text-decoration: underline; }
+}
+.tileBar { height: 6px; border-radius: 3px; background: var(--ov-sink-2); overflow: hidden; > b { display: block; height: 100%; background: var(--accent); } }
+.tileQuick { display: flex; gap: 4px; input { flex: 1; min-width: 0; height: 26px; padding: 0 8px; border: 0; border-radius: 4px; background: var(--ov-sink-2); color: var(--ink); font-size: 12px; outline: none; &::placeholder { color: var(--ink-faint); } } }
+.tileCheck { display: flex; align-items: center; gap: 6px; font-size: 12px; padding: 2px 0; input { margin: 0; } }
+
+// ------------------------------------------------------------- expanded console
+
+.tileConsole {
+  position: absolute;
+  z-index: 5;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  border-radius: 10px;
+  background: $tile-surface;
+  box-shadow: inset 0 0 0 1px var(--hairline);
+  color: var(--ink);
+  &:focus { outline: none; }
+  &--animated { transition: left 0.28s ease, top 0.28s ease, width 0.28s ease, height 0.28s ease, opacity 0.28s ease; }
+}
+.tcHead {
+  flex: 0 0 auto;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 10px;
+  border-bottom: 1px solid var(--hairline);
+  font-size: 12px;
+}
+.tcBack {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 4px 8px;
+  border: 0;
+  border-radius: 4px;
+  background: var(--ov-sink-1);
+  color: var(--ink);
+  font: inherit;
+  font-weight: 700;
+  cursor: pointer;
+  &:hover { background: var(--ov-lift-2); }
+}
+.tcCrumbs { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--ink-muted); }
+.tcCrumbHere { color: var(--ink); font-weight: 700; }
+.tcCrumbLink { padding: 0; border: 0; background: none; color: inherit; font: inherit; cursor: pointer; &:hover { color: var(--ink); text-decoration: underline; } }
+.tcStrip {
+  flex: 0 0 auto;
+  display: flex;
+  gap: 6px;
+  padding: 6px 10px;
+  overflow-x: auto;
+  border-bottom: 1px solid var(--hairline);
+  font-size: 12px;
+  &::-webkit-scrollbar { height: 4px; }
+  &::-webkit-scrollbar-thumb { border-radius: 2px; background: color-mix(in srgb, var(--ink) 30%, transparent); }
+}
+.tcChip {
+  flex: 0 0 auto;
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 3px 9px;
+  border: 0;
+  border-radius: 8px;
+  background: var(--ov-sink-1);
+  color: var(--ink-muted);
+  font: inherit;
+  white-space: nowrap;
+  cursor: pointer;
+  &:hover { color: var(--ink); }
+  &--on { background: var(--accent); color: var(--on-accent); &:hover { color: var(--on-accent); } }
+}
+.tcMain { position: relative; flex: 1 1 auto; min-height: 0; display: flex; flex-direction: column; }
+.tcBody {
+  position: relative;
+  flex: 1 1 auto;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  overflow-y: auto;
+  padding: 12px 14px 56px;
+}
+
+// A console with another console open inside it (a section's page) shows only the inner one's buttons.
+.tileConsole:has(.tileConsole) > .tcMain > .ccButtons { display: none; }
+
+// Settings and Help: round buttons at the console's bottom right.
+.ccButtons { position: absolute; right: 12px; bottom: 12px; z-index: 6; display: flex; gap: 6px; }
+.ccButtons--under { z-index: 4; }
+.ccPanel--under { z-index: 3; }
+.ccBtn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  padding: 0;
+  border: 0;
+  border-radius: 50%;
+  background: var(--ov-sink-2);
+  color: var(--ink);
+  cursor: pointer;
+  &:hover { background: var(--ov-lift-2); }
+  &--on { background: var(--accent); color: var(--on-accent); &:hover { background: var(--accent-hover); color: var(--on-accent); } }
+}
+.ccPanel {
+  position: absolute;
+  inset: 0;
+  z-index: 5;
+  padding: 18px 20px 56px;
+  overflow: auto;
+  background: var(--surface-base);
+  color: var(--ink);
+  h2 { margin: 0 0 6px; font-size: 15px; text-transform: uppercase; letter-spacing: 1px; }
+  p { margin: 0; font-size: 13px; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .tileConsole--animated { transition: none; }
+}

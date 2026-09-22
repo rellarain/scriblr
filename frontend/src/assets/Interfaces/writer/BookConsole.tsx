@@ -1,7 +1,10 @@
 import type { OutlineNode } from '../../../api/types'
 import type { WriterWorkspace } from './useWriterWorkspace'
-import { BOOK_COMPONENTS, HELP_COMPONENT, SETTINGS_COMPONENT } from './consoleDefs'
-import { ChapterTabs, ConsoleTitleRow, NumberInput, Placeholder } from './shared'
+import { ChapterTabs, NumberInput, Placeholder } from './shared'
+import { nodeLabel } from './plotTree'
+import TileGrid from '../../../components/tiles/TileGrid'
+import ConsoleCorner from '../../../components/tiles/ConsoleCorner'
+import { bookLinkTiles } from './tiles/bookTiles'
 import { SaveControl } from '../../../components/SaveControl'
 import BookOutline from './BookOutline'
 import { systemForBook } from './timeSystem'
@@ -133,21 +136,20 @@ function BookCover({ w, book }: { w: WriterWorkspace; book: OutlineNode }) {
   )
 }
 
-function BookConsole({ w, component }: { w: WriterWorkspace; component: string }) {
+function BookConsole({ w }: { w: WriterWorkspace }) {
   const book = w.activeBook
   if (!book) return <Placeholder title="Book" body="Select a book on the shelf to open it." />
 
-  const def = [...BOOK_COMPONENTS, SETTINGS_COMPONENT, HELP_COMPONENT].find(c => c.key === component)
-
-  if (component === 'bookEditor') {
-    return <BookCover w={w} book={book} />
-  }
-
+  const crumbs = [
+    { label: 'Shelves', onClick: w.backToShelves },
+    { label: w.activeProject?.title ?? 'Project', onClick: w.showProject },
+    { label: nodeLabel(book) },
+  ]
   return (
-    <>
-      <ConsoleTitleRow console="Book" component={def?.label ?? ''} />
-      <Placeholder title={def?.label ?? ''} body={def?.body} />
-    </>
+    <TileGrid
+      gridId="book" label="Book pages" tiles={bookLinkTiles(w)} crumbs={crumbs}
+      below={<><BookCover w={w} book={book} /><ConsoleCorner under /></>}
+    />
   )
 }
 

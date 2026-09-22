@@ -86,8 +86,8 @@ describe('ThemeSettingsPanel zone tabs', () => {
       })
     })
     render(<ThemeSettingsPanel />)
-    const sunColor = (name: RegExp) => within(screen.getByRole('tab', { name })).getByTestId('sun').style.background
-    expect(sunColor(/^Dusk/)).not.toBe('')
-    expect(sunColor(/^Dusk/)).not.toBe(sunColor(/^Day/)) // dusk's accent hue is 120, day's is 32
+    // The sun is always white, so compare the twilight moons, which are tinted by the zone's accent hue.
+    const moonFill = (name: RegExp) => within(screen.getByRole('tab', { name })).getByTestId('moon').querySelector('path')!.getAttribute('fill')
+    expect(moonFill(/^Dusk/)).not.toBe(moonFill(/^Dawn/)) // dusk's accent hue is 120, dawn's is 32
   })
 })

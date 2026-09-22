@@ -299,20 +299,6 @@ button {border: none; cursor: pointer; border-radius: 4px;}
   &--active { background: hsl(var(--color-accent-h), var(--color-accent-s), var(--color-accent-l)); color: var(--on-accent); }
 }
 
-.subNav {
-  flex: 0 0 auto;
-  display: flex;
-  flex-direction: column;
-  gap: 6px;
-  padding: 10px 6px;
-  overflow-y: auto;
-}
-// Scoped to UUI only -- scrollable, just no visible scrollbar track.
-.uUIPanel .subNav {
-  scrollbar-width: none; // Firefox
-  -ms-overflow-style: none; // old Edge/IE
-  &::-webkit-scrollbar { display: none; } // Chrome/Safari
-}
 
 .sectionBody {
   flex: 1 1 auto;
@@ -630,7 +616,7 @@ button {border: none; cursor: pointer; border-radius: 4px;}
   --on-accent: var(--on-accent2);
   --accent-dir: var(--accent2-dir);
   --accent-away: var(--accent2-away);
-  .subNavBtn, .subTabBtn {
+  .subNavBtn {
     &:hover { background: var(--accent2-hover); color: var(--on-accent2); }
     &--active { background: var(--accent2); color: var(--on-accent2); }
   }
@@ -655,12 +641,6 @@ button {border: none; cursor: pointer; border-radius: 4px;}
   padding: 10px 6px;
   overflow-y: auto;
   background: rgb(0 0 0 / calc(0.15 * var(--shade-k)));
-}
-.aUIRailDivider {
-  width: 20px;
-  height: 1px;
-  flex: 0 0 auto;
-  background: color-mix(in srgb, var(--ink) 20%, transparent);
 }
 
 // Pins the size-control buttons to the bottom of .aUIRail (the screen's
@@ -928,6 +908,11 @@ div.auiConfigReadOnlyIdea {
   background-color: hsl(var(--color-theme-h), var(--color-theme-s), calc(var(--color-theme-l) - 20%));
 }
 
+.uUIContent--tiles, .aUIContent--tiles { padding: 20px 14px 14px; .aUIConsoleTitleRow { padding: 0 0 8px; } }
+.uUIPage, .aUIPage { h2 { margin: 0 0 6px; font-size: 15px; text-transform: uppercase; letter-spacing: 1px; } p { margin: 0 0 8px; font-size: 13px; } }
+.auiConfigActions--page { margin-bottom: 8px; }
+.hUI .hUIMain--tiles { display: flex; flex-direction: column; padding: 10px 12px 12px; }
+
 .aUIContent, .uUIContent {
   flex: 1 1 auto;
   min-width: 0;
@@ -938,34 +923,6 @@ div.auiConfigReadOnlyIdea {
   position: relative;
 }
 
-// Persistent Help (top-right) / Settings (bottom-right) buttons, present
-// across every UUI/WUI subtab regardless of which console/sub-section is
-// active -- not just the ones with a dedicated Settings/Help sub-tab. AUI
-// no longer uses this -- its Help button lives in .aUIRail instead
-// (styled as a plain .subNavBtn) and it has no Settings shortcut anymore.
-.uUICornerBtn, .wUICornerBtn {
-  position: absolute;
-  right: 10px;
-  width: 30px;
-  height: 30px;
-  flex: 0 0 auto;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  border-radius: 4px;
-  background: rgb(0 0 0 / calc(0.25 * var(--shade-k)));
-  color: var(--ink);
-  z-index: 1;
-  &:hover { background: var(--accent-hover); color: var(--on-accent); }
-  &--active { background: hsl(var(--color-accent-h), var(--color-accent-s), var(--color-accent-l)); color: var(--on-accent); }
-  &:disabled {
-    opacity: 0.3;
-    cursor: default;
-    &:hover { background: rgb(0 0 0 / calc(0.25 * var(--shade-k))); }
-  }
-  &--help { top: 10px; }
-  &--settings { bottom: 10px; }
-}
 
 // The active console's own name (e.g. "Manager"), shown above its subtab
 // row so a subtab's title (e.g. "Allotment") in .sectionBody below always
@@ -981,7 +938,7 @@ div.auiConfigReadOnlyIdea {
 }
 // Wraps AUI's console title together with the lock/unlock toggle (only
 // AUI has one) -- the row now owns the title's own padding so the toggle
-// lines up on the same baseline at the panel's right edge, above .subTabRow.
+// lines up on the same baseline at the panel's right edge, above the tiles.
 .aUIConsoleTitleRow {
   display: flex;
   align-items: center;
@@ -1029,67 +986,12 @@ div.auiConfigReadOnlyIdea {
   align-items: center;
   justify-content: space-between;
   gap: 10px;
-  padding: 10px 56px 0 16px; // right padding clears the corner Help/Settings buttons
+  padding: 0 0 8px;
   .uUIConsoleTitle { padding: 0; }
 }
 
-.subTabRow {
-  flex: 0 0 auto;
-  display: flex;
-  flex-direction: row;
-  flex-wrap: wrap;
-  gap: 5px;
-  padding: 10px 16px 0;
 
-  &--stacked {
-    flex-wrap: nowrap;
-    gap: 5px;
-    padding: 10px 8px 0;
-  }
-  // Always fill the row edge-to-edge, regardless of icon-only/stacked mode.
-  &--expand {
-    flex-wrap: nowrap;
-  }
-}
 
-.subTabBtn {
-  color: var(--ink);
-  background: rgb(0 0 0 / calc(0.2 * var(--shade-k)));
-  padding: 5px 10px;
-  font-size: 14px;
-  font-weight: 700;
-  text-transform: uppercase;
-  letter-spacing: 0.6px;
-  border-radius: 4px;
-  display: flex;
-  align-items: center;
-  gap: 5px;
-  white-space: nowrap;
-  &:hover { background: var(--accent-hover); color: var(--on-accent); }
-  &--active { background: hsl(var(--color-accent-h), var(--color-accent-s), var(--color-accent-l)); color: var(--on-accent); }
-  &--stacked {
-    flex-direction: column;
-    flex: 1 1 0;
-    gap: 6px;
-    padding: 4px 4px;
-  }
-  // Count badge always sits below the icon (and label, when shown) rather
-  // than inline beside them.
-  &--withCount {
-    flex-direction: column;
-    align-items: center;
-    gap: 4px;
-  }
-  &--expand {
-    flex: 1 1 0;
-  }
-}
-
-.subTabBtnMain {
-  display: flex;
-  align-items: center;
-  gap: 5px;
-}
 
 .subTabCount {
   // Opaque-ish dark base so the unfilled portion always reads as darker

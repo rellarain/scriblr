@@ -9,9 +9,12 @@ import { focusNodeField, useNodeKeys } from '../../../lib/nodeKeys'
 // narrow scratchpad column. Checklists and notes have no backend yet, so
 // they persist in the browser's local storage.
 
-interface ChecklistItem { id: string; label: string; done: boolean }
+export interface ChecklistItem { id: string; label: string; done: boolean }
+export const TASKS_KEY = 'scriblr.writer.tasks'
+export const ROUTINES_KEY = 'scriblr.writer.routines'
+export const NOTES_KEY = 'scriblr.writer.scratchpad'
 
-function newId(): string {
+export function newId(): string {
   return Math.random().toString(36).slice(2, 9)
 }
 
@@ -64,8 +67,8 @@ export function SchedulePanel() {
   return (
     <div className="wrColumn">
       <div className="wrColumnTitle">Schedule</div>
-      <Checklist title="Tasks" storageKey="scriblr.writer.tasks" placeholder="Add a task…" />
-      <Checklist title="Routines" storageKey="scriblr.writer.routines" placeholder="Add a routine…" />
+      <Checklist title="Tasks" storageKey={TASKS_KEY} placeholder="Add a task…" />
+      <Checklist title="Routines" storageKey={ROUTINES_KEY} placeholder="Add a routine…" />
     </div>
   )
 }
@@ -112,14 +115,14 @@ export function AnalyticsPanel({ projects, outlines }: {
   )
 }
 
-interface Note { id: string; title: string; body: string }
+export interface Note { id: string; title: string; body: string }
 
 // Notes are cards with a title and description. Click one to edit it. The
 // shared node shortcuts apply (lib/nodeKeys.ts): Enter adds a note after this
 // one, Shift+Enter is a new line, Tab moves between fields and notes, and
 // Enter, Backspace or Delete in an empty note removes it.
 export function Scratchpad() {
-  const [notes, setNotes] = useStoredState<Note[]>('scriblr.writer.scratchpad', [])
+  const [notes, setNotes] = useStoredState<Note[]>(NOTES_KEY, [])
   const [editingId, setEditingId] = useState<string | null>(null)
   const listRef = useRef<HTMLDivElement>(null)
 

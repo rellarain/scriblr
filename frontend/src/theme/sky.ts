@@ -179,8 +179,15 @@ export const CLOUD_MAX_WIDTH = 64
 export const CLOUD_MAX_GAP = 100
 const STRIP_MIN_LENGTH = 240
 
-export interface Hump { cx: number; r: number }
-export interface CloudShape { x: number; w: number; humps: Hump[] }
+// One rounded box of a cloud: `x` is from the cloud's left edge, `y` from the top of
+// the strip (whose bottom is the cloud's flat base), `w` and `h` its size.
+// A `round` one is a circle (w equals h), an occasional puff among the boxes.
+export interface CloudBox { x: number; y: number; w: number; h: number; round: boolean }
+export interface CloudShape { x: number; w: number; boxes: CloudBox[] }
+export const CLOUD_RADIUS = 4
+export const CLOUD_MIN_BOX = 8
+const CIRCLE_CHANCE = 0.35
+const BOX_OVERLAP = 2 // a box sits this far into the one below it, hiding its rounded corners
 export interface CloudStrip { clouds: CloudShape[]; length: number }
 
 function mulberry32(seed: number): () => number {
@@ -194,10 +201,13 @@ function mulberry32(seed: number): () => number {
   }
 }
 
-// A repeating run of flat-bottomed clouds: a few unequal round humps each, random
-// widths (24-64px, times `scale`) and random gaps (0-100px, never scaled). The
-// strip starts with a cloud and ends with its own gap, so the gap where the
-// strip meets its copy is also 0-100px. `height` is the tallest a cloud gets.
+// A repeating run of flat-based clouds: 2-4 stacked rounded boxes each (some levels
+// a circle), every box
+// shorter and narrower than the one below it, so a cloud thins out toward the top
+// like cirrus. Random widths (24-64px, times `scale`) and random gaps (0-100px,
+// never scaled). The strip starts with a cloud and ends with its own gap, so the
+// gap where the strip meets its copy is also 0-100px. `height` is the tallest a
+// cloud gets.
 export function cloudStrip(seed: number, height: number, scale = 1): CloudStrip {
   const rand = mulberry32(seed)
   const clouds: CloudShape[] = []
@@ -205,15 +215,38 @@ export function cloudStrip(seed: number, height: number, scale = 1): CloudStrip 
   while (x < STRIP_MIN_LENGTH) {
     if (clouds.length > 0) x += Math.floor(rand() * (CLOUD_MAX_GAP + 1))
     const w = Math.round((CLOUD_MIN_WIDTH + rand() * (CLOUD_MAX_WIDTH - CLOUD_MIN_WIDTH)) * scale)
-    const n = 2 + Math.floor(rand() * 3)
-    const humps: Hump[] = []
+    const n = 2 + Math.floor(rand() * (height >= 12 ? 3 : 2)) // a short strip has room for fewer levels
+    // Each level is about 60% as tall as the one below; together they fill 75-100% of `height`.
+    const weights = Array.from({ length: n }, (_, i) => 0.6 ** i)
+    const total = weights.reduce((a, b) => a + b, 0)
+    const fill = (0.75 + rand() * 0.25) * height + BOX_OVERLAP * (n - 1)
+    const boxes: CloudBox[] = []
+    let bx = 0
+    let bw = w
+    let top = height
     for (let i = 0; i < n; i++) {
-      const r = Math.min(height * (0.32 + rand() * 0.3), (w / n) * 0.75)
-      const reach = r * 0.84 // half the hump's width where the flat base cuts it
-      const cx = Math.min(w - reach, Math.max(reach, (w * (i + 0.5)) / n + (rand() - 0.5) * 0.12 * w))
-      humps.push({ cx: Math.round(cx * 10) / 10, r: Math.round(r * 10) / 10 })
+      if (i > 1 && top < CLOUD_MIN_BOX) break // a tall circle can use up the room
+      let h = Math.max(3, Math.round(((fill * weights[i]) / total) * 10) / 10)
+      let round = false
+      if (i > 0) {
+        const narrower = Math.max(CLOUD_MIN_BOX, Math.round(bw * (0.5 + rand() * 0.35)))
+        // Now and then the level is a circle instead of a box (as wide as it is tall, if it fits).
+        const diameter = Math.min(bw, top + BOX_OVERLAP, Math.max(h + 3, CLOUD_MIN_BOX))
+        if (rand() < CIRCLE_CHANCE && diameter >= CLOUD_MIN_BOX) {
+          round = true
+          h = Math.round(diameter * 10) / 10
+          bx += Math.round(rand() * (bw - h))
+          bw = h
+        } else {
+          bx += Math.round(rand() * (bw - narrower))
+          bw = Math.min(bw, narrower)
+        }
+      }
+      const y = i === 0 ? height - h : Math.max(0, top + BOX_OVERLAP - h)
+      boxes.push({ x: bx, y: Math.round(y * 10) / 10, w: bw, h: Math.round((i === 0 ? h : top + BOX_OVERLAP - y) * 10) / 10, round })
+      top = y
     }
-    clouds.push({ x, w, humps })
+    clouds.push({ x, w, boxes })
     x += w
   }
   return { clouds, length: x + Math.floor(rand() * (CLOUD_MAX_GAP + 1)) }

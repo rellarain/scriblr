@@ -1,8 +1,8 @@
-import { useEffect, useRef, useState, type ReactNode } from 'react'
+import { useEffect, useRef, useState, type ComponentType, type ReactNode } from 'react'
 import type { OutlineNode } from '../../../api/types'
 import type { WriterWorkspace } from './useWriterWorkspace'
 import { buildChildIndex, chaptersOfBook, descendantsOf, shelfGroups, type ShelfGroup } from './outlineTree'
-import { ChevronDownIcon, ChevronLeftIcon, ChevronRightIcon, PlusIcon } from '../../icons'
+import { BookFaceIcon, ChevronDownIcon, ChevronLeftIcon, ChevronRightIcon, LibraryIcon, PageIcon, PlusIcon, type IconProps } from '../../icons'
 import { DeleteControl } from './shared'
 import { nodeLabel } from './plotTree'
 import BookScope from './BookScope'
@@ -100,7 +100,11 @@ function Shelf({ label, meta, groups, activeBookId, selected, onOpenBook, onOpen
   )
 }
 
-function Panel({ label, value, open, onToggle, onOpen, children }: {
+// An ancestor of what is open (the project, the book, the chapter), as a tile: read-only
+// facts and navigation rows. Its header folds it; the value is a link when there is a
+// console of its own to go to.
+function Panel({ Icon, label, value, open, onToggle, onOpen, children }: {
+  Icon: ComponentType<IconProps>
   label: string
   value: string
   open: boolean
@@ -110,10 +114,11 @@ function Panel({ label, value, open, onToggle, onOpen, children }: {
   children: ReactNode
 }) {
   return (
-    <section className="wrPanel">
+    <section className="wrPanel wrSideTile">
       <div className="wrPanelHeaderRow">
         <button type="button" className="wrPanelHeader" aria-expanded={open} onClick={onToggle}>
           {open ? <ChevronDownIcon size={14} /> : <ChevronRightIcon size={14} />}
+          <Icon size={15} />
           <span className="wrPanelLabel">{label}</span>
           {!onOpen && <span className="wrPanelValue">{value}</span>}
         </button>
@@ -130,7 +135,13 @@ const kv = (k: string, v: ReactNode) => (
 
 type PanelKey = 'project' | 'book' | 'chapter'
 
-function WuiSidebar({ workspace: w }: { workspace: WriterWorkspace }) {
+function WuiSidebar({ workspace: w, collapsed = false, canCollapse = false, onToggleCollapsed }: {
+  workspace: WriterWorkspace
+  // Minimized to a slim rail (only offered while the main screen is narrow, and to open it again).
+  collapsed?: boolean
+  canCollapse?: boolean
+  onToggleCollapsed?: () => void
+}) {
   const [newTitle, setNewTitle] = useState('')
   // Only the current (deepest) panel is open; a click on a header opens that
   // one instead. Selecting something new resets this to "the current one".
@@ -143,9 +154,26 @@ function WuiSidebar({ workspace: w }: { workspace: WriterWorkspace }) {
     setNewTitle('')
   }
 
+  // The slim rail: just the button that brings the sidebar back.
+  if (collapsed) {
+    return (
+      <aside className="wrSidebar wrSidebar--collapsed" aria-label="Sidebar (minimized)">
+        <button type="button" className="wrSideToggle" onClick={onToggleCollapsed} aria-label="Show sidebar" title="Show sidebar">
+          <ChevronRightIcon size={16} />
+        </button>
+      </aside>
+    )
+  }
+  const toggle_ = canCollapse && onToggleCollapsed ? (
+    <button type="button" className="wrSideToggle wrSideToggle--minimize" onClick={onToggleCollapsed} aria-label="Minimize sidebar" title="Minimize sidebar">
+      <ChevronLeftIcon size={16} />
+    </button>
+  ) : null
+
   if (!w.hasOpenProject) {
     return (
       <aside className="wrSidebar" aria-label="Project shelves">
+        {toggle_}
         {w.projectsStatus === 'loading' && <p className="wrMuted">Loading projects…</p>}
         {w.projectsStatus === 'error' && (
           <p className="wrMuted">
@@ -203,6 +231,7 @@ function WuiSidebar({ workspace: w }: { workspace: WriterWorkspace }) {
 
   return (
     <aside className="wrSidebar" aria-label="Project navigation">
+      {toggle_}
       <button type="button" className="wrBackLink" onClick={w.backToShelves}>
         <ChevronLeftIcon size={14} /> All shelves
       </button>
@@ -218,7 +247,7 @@ function WuiSidebar({ workspace: w }: { workspace: WriterWorkspace }) {
       />
 
       <Panel
-        label="Project" value={project.title} open={isOpen('project')} onToggle={() => toggle('project')}
+        Icon={LibraryIcon} label="Project" value={project.title} open={isOpen('project')} onToggle={() => toggle('project')}
         onOpen={w.activeConsole !== 'shelf' ? w.showProject : undefined}
       >
         {kv('Books', w.books.length)}
@@ -246,7 +275,7 @@ function WuiSidebar({ workspace: w }: { workspace: WriterWorkspace }) {
       <BookScope book={w.activeBook} flow>
       {w.activeBook && (
         <Panel
-          label="Book" value={nodeLabel(w.activeBook)} open={isOpen('book')} onToggle={() => toggle('book')}
+          Icon={BookFaceIcon} label="Book" value={nodeLabel(w.activeBook)} open={isOpen('book')} onToggle={() => toggle('book')}
           onOpen={w.activeConsole !== 'book' || w.activeChapterId ? () => w.openBook(w.activeBook!.id) : undefined}
         >
           {kv('Title', nodeLabel(w.activeBook))}
@@ -276,7 +305,7 @@ function WuiSidebar({ workspace: w }: { workspace: WriterWorkspace }) {
       )}
 
       {w.activeChapter && (
-        <Panel label="Chapter" value={`${chapterNumber} · ${nodeLabel(w.activeChapter)}`} open={isOpen('chapter')} onToggle={() => toggle('chapter')}>
+        <Panel Icon={PageIcon} label="Chapter" value={`${chapterNumber} · ${nodeLabel(w.activeChapter)}`} open={isOpen('chapter')} onToggle={() => toggle('chapter')}>
           {kv('Chapter', chapterNumber)}
           {kv('Moments', moments)}
           <div className="wrPanelHead">Outline</div>

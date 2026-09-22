@@ -1,38 +1,10 @@
 import { useEffect, useLayoutEffect, useRef, useState, type ReactNode } from 'react'
 import { PlusIcon, TrashIcon } from '../../icons'
 import type { OutlineNode } from '../../../api/types'
-import { HELP_COMPONENT, SETTINGS_COMPONENT, type ComponentDef } from './consoleDefs'
 
 import { nodeLabel } from './plotTree'
 
 export { useStoredState } from './storage'
-
-// The vertical icon column at the left of a console: one icon per
-// component, with Settings and Help pinned to the bottom.
-export function IconColumn({ components, active, onSelect }: {
-  components: ComponentDef[]
-  active: string
-  onSelect: (key: string) => void
-}) {
-  const button = (c: ComponentDef) => (
-    <button
-      key={c.key} type="button"
-      className={c.key === active ? 'wrIconBtn wrIconBtn--active' : 'wrIconBtn'}
-      aria-label={c.label} title={c.label} aria-pressed={c.key === active}
-      onClick={() => onSelect(c.key)}
-    >
-      <c.Icon size={20} />
-    </button>
-  )
-  return (
-    <nav className="wrIconColumn" aria-label="Console components">
-      {components.map(button)}
-      <div className="wrIconColumnTail">
-        {[HELP_COMPONENT, SETTINGS_COMPONENT].map(button)}
-      </div>
-    </nav>
-  )
-}
 
 export function ConsoleTitleRow({ console: consoleName, component, right }: {
   console: string

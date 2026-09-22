@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import {
-  CLOUD_MAX_GAP, CLOUD_MAX_WIDTH, CLOUD_MIN_WIDTH, CONSTELLATIONS, ORB_BAND, ORB_NUDGE,
+  CLOUD_MAX_GAP, CLOUD_MAX_WIDTH, CLOUD_MIN_BOX, CLOUD_MIN_WIDTH, CONSTELLATIONS, ORB_BAND, ORB_NUDGE,
   cloudStrip, moonPath, moonPhase, nextZone, orbY, zodiacSign, type Sign,
 } from './sky'
 import { ZONE_KEYS } from './types'
@@ -132,17 +132,39 @@ describe('cloudStrip', () => {
     }
   })
 
-  it('draws 2-4 humps inside each cloud, never taller than the strip', () => {
-    const { clouds } = cloudStrip(7, 14)
-    for (const c of clouds) {
-      expect(c.humps.length).toBeGreaterThanOrEqual(2)
-      expect(c.humps.length).toBeLessThanOrEqual(4)
-      for (const h of c.humps) {
-        expect(h.cx - h.r * 0.84).toBeGreaterThanOrEqual(-0.1)
-        expect(h.cx + h.r * 0.84).toBeLessThanOrEqual(c.w + 0.1)
-        expect(h.r * 1.55).toBeLessThanOrEqual(14 + 0.01)
+  it('stacks 2-4 rounded boxes on a flat base, each shorter and narrower than the one below, inside the strip', () => {
+    for (const [height, seed] of [[14, 7], [9, 23], [14, 99], [9, 12345], [9, 1], [14, 2]]) {
+      const { clouds } = cloudStrip(seed, height)
+      for (const c of clouds) {
+        expect(c.boxes.length).toBeGreaterThanOrEqual(2)
+        expect(c.boxes.length).toBeLessThanOrEqual(4)
+        expect(c.boxes[0].y + c.boxes[0].h).toBeCloseTo(height, 5) // the base is the strip's bottom
+        expect(c.boxes[0].x).toBe(0)
+        expect(c.boxes[0].w).toBe(c.w)
+        c.boxes.forEach((b, i) => {
+          expect(b.x).toBeGreaterThanOrEqual(0)
+          expect(b.x + b.w).toBeLessThanOrEqual(c.w + 1e-6)
+          expect(b.w).toBeGreaterThanOrEqual(CLOUD_MIN_BOX)
+          expect(b.y).toBeGreaterThanOrEqual(0)
+          if (i > 0) {
+            const below = c.boxes[i - 1]
+            expect(b.w).toBeLessThanOrEqual(below.w)
+            if (!b.round) expect(b.h).toBeLessThanOrEqual(below.h + 1e-6)
+            if (b.round) expect(b.w).toBe(b.h)
+            expect(b.y).toBeLessThan(below.y)
+            expect(b.x).toBeGreaterThanOrEqual(below.x)
+            expect(b.x + b.w).toBeLessThanOrEqual(below.x + below.w + 1e-6)
+          }
+        })
       }
     }
+  })
+
+  it('has some circles among the boxes, never on the base', () => {
+    const all = [7, 23, 99, 12345, 1, 2].flatMap(seed => cloudStrip(seed, 14).clouds.flatMap(c => c.boxes))
+    expect(all.some(b => b.round)).toBe(true)
+    expect(all.some(b => !b.round && b.y < 12)).toBe(true)
+    expect(cloudStrip(7, 14).clouds.every(c => !c.boxes[0].round)).toBe(true)
   })
 
   it('is the same pattern for the same seed', () => {
