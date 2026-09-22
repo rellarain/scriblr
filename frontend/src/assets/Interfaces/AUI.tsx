@@ -5,27 +5,15 @@ import {
   BarChartIcon, VotingIcon, LibraryIcon, PeopleIcon, BuildingIcon, BriefcaseIcon,
   EnvelopeIcon, CalendarIcon, HelpIcon, TeamIcon, CheckboxIcon, GlobeIcon, SwapIcon, BookFaceIcon,
   PencilIcon, ChatBubblesIcon, UserIcon, SortingIcon, ConfigurationIcon, InfoIcon,
-  LayoutMaxIcon, LayoutMidiIcon, LayoutMiniIcon, LockIcon, UnlockIcon,
+  LockIcon, UnlockIcon,
   type IconProps,
 } from '../icons'
-import type { AuiSize } from '../../interfaceShellTypes'
 import { useAuiConfig, type AuiConfigTabKey } from './admin/useAuiConfig'
 import AuiConfigEditor, { AuiConfigReadOnly } from './admin/AuiConfigEditor'
 import { SaveControl } from '../../components/SaveControl'
 import TileGrid from '../../components/tiles/TileGrid'
 import { TileBig, TileRows, TileSub } from '../../components/tiles/tileParts'
 import type { TileDef } from '../../components/tiles/tileTypes'
-
-interface AUIProps {
-  size: AuiSize
-  onSetSize: (size: AuiSize) => void
-}
-
-const SIZE_OPTIONS: Array<{ key: AuiSize; label: string; Icon: ComponentType<IconProps> }> = [
-  { key: 'full', label: 'Fully expanded', Icon: LayoutMaxIcon },
-  { key: 'half', label: 'Half screen', Icon: LayoutMidiIcon },
-  { key: 'column', label: 'Single column', Icon: LayoutMiniIcon },
-]
 
 // Eight consoles per scrilbrPlan.md's "Admin Page (AUI)" section, plus
 // Resources (not in that doc -- added when the Console/Component/Feature
@@ -246,7 +234,7 @@ function ConfigPage({ tab, config, readOnly, onToggleReadOnly }: {
   )
 }
 
-function AUI({ size, onSetSize }: AUIProps) {
+function AUI() {
   const [configReadOnly, setConfigReadOnly] = useState(true)
   const auiConfig = useAuiConfig()
 
@@ -257,15 +245,15 @@ function AUI({ size, onSetSize }: AUIProps) {
     const help = <p>{section.subSections.find(s => s.label === 'Help')?.body}</p>
     return {
       id: section.key, title: section.label, Icon: section.Icon,
-      shapes: ['small', 'landscape', 'portrait'], defaultShape: 'landscape',
+      defaultShape: 'mid',
       summary: `${pages.length} ${pages.length === 1 ? 'page' : 'pages'}`,
       help,
-      render: ({ shape }) => (shape === 'small'
+      render: ({ height }) => (height < 140
         ? <TileBig value={pages.length} label={pages.length === 1 ? 'page' : 'pages'} />
         : <TileRows rows={pages.map(p => ({ key: p.key, label: p.label }))} />),
       children: pages.map<TileDef>(page => ({
         id: page.key, title: page.label, Icon: page.Icon,
-        shapes: ['landscape', 'small', 'link'], defaultShape: 'landscape',
+        defaultShape: 'mid',
         summary: page.body,
         help,
         render: () => <TileSub>{page.body}</TileSub>,
@@ -291,25 +279,6 @@ function AUI({ size, onSetSize }: AUIProps) {
           </div>
           <TileGrid gridId="aui" label="Admin panel tiles" tiles={tiles} crumbs={[{ label: 'Admin' }]} />
         </div>
-
-        {/* AUI's own panel-size controls -- fully expanded, half screen, or a
-            single HUI-panel-width column -- pinned to the bottom of a slim rail on
-            AUI's outer edge. */}
-        <nav className="aUIRail" aria-label="Admin panel size">
-          <div className="aUIRailSizeGroup">
-            {SIZE_OPTIONS.map(({ key, label, Icon }) => (
-              <button
-                key={key} type="button"
-                className={key === size ? 'subNavBtn subNavBtn--active' : 'subNavBtn'}
-                aria-pressed={key === size}
-                aria-label={label} title={label}
-                onClick={() => onSetSize(key)}
-              >
-                <Icon />
-              </button>
-            ))}
-          </div>
-        </nav>
       </div>
     </section>
   )

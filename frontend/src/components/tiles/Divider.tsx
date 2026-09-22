@@ -6,15 +6,14 @@ const BIG_STEP = 0.08
 
 // A drag handle between two areas of a split-tree grid: pointer-drag resizes (only
 // the two neighbours it separates -- the pointer is captured, so the drag keeps
-// tracking even outside the divider's own thin hit area), double-click restores its
-// default position, and with focus the arrow keys nudge it (Shift for a bigger step).
-function Divider({ dir, ratio, style, onDragTo, onResize, onReset }: {
+// tracking even outside the divider's own thin hit area), and with focus the arrow
+// keys nudge it (Shift for a bigger step).
+function Divider({ dir, ratio, style, onDragTo, onResize }: {
   dir: SplitDir
   ratio: number
   style: CSSProperties
   onDragTo: (clientX: number, clientY: number) => void
   onResize: (ratio: number) => void
-  onReset: () => void
 }) {
   function onKeyDown(e: KeyboardEvent<HTMLDivElement>) {
     const dec = dir === 'row' ? 'ArrowLeft' : 'ArrowUp'
@@ -50,7 +49,6 @@ function Divider({ dir, ratio, style, onDragTo, onResize, onReset }: {
       onPointerDown={onPointerDown}
       onPointerMove={onPointerMove}
       onPointerUp={onPointerUp}
-      onDoubleClick={onReset}
       onKeyDown={onKeyDown}
     >
       <span className="tileDividerBar" />

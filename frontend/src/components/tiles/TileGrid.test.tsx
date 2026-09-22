@@ -24,16 +24,16 @@ afterEach(() => {
 function defs(): TileDef[] {
   return [
     {
-      id: 'plot', title: 'Plot', Icon: PlotIcon, shapes: ['landscape', 'portrait'], defaultShape: 'landscape', summary: '6 categories',
-      render: ({ shape }) => <div>plot body {shape}<button type="button">quick</button></div>,
+      id: 'plot', title: 'Plot', Icon: PlotIcon, defaultShape: 'mid', summary: '6 categories',
+      render: ({ width }) => <div>plot body {width < 300 ? 'narrow' : 'wide'}<button type="button">quick</button></div>,
       console: () => <div>Plot editor</div>,
     },
     {
-      id: 'outline', title: 'Outline', Icon: ListIcon, shapes: ['small', 'portrait'], defaultShape: 'small', summary: '24 chapters',
-      render: ({ shape }) => <div>outline body {shape}</div>,
+      id: 'outline', title: 'Outline', Icon: ListIcon, defaultShape: 'mid', summary: '24 chapters',
+      render: ({ width }) => <div>outline body {width < 300 ? 'narrow' : 'wide'}</div>,
       console: () => <div>Outline editor</div>,
     },
-    { id: 'editor', title: 'Project editor', Icon: PencilIcon, shapes: ['link'], defaultShape: 'link', summary: '2 time systems', console: () => <div>Editor</div> },
+    { id: 'editor', title: 'Project editor', Icon: PencilIcon, defaultShape: 'mini', summary: '2 time systems', console: () => <div>Editor</div> },
   ]
 }
 
@@ -50,14 +50,14 @@ const pointerEvent = (type: string, init: { pointerId?: number; button?: number;
   Object.assign(new Event(type, { bubbles: true, cancelable: true }), { pointerId: 1, button: 0, ...init })
 
 describe('TileGrid', () => {
-  it('stacks a link tile as a fixed strip above the rest, filling the container exactly', () => {
+  it('stacks a mini tile as a fixed strip above the rest, filling the container exactly', () => {
     renderGrid()
     // Default container fallback is 1000x600 (useContainerSize's fallback in jsdom).
     expect(tile('editor').getAttribute('data-fixed')).toBe('true')
     expect(px(tile('editor'), 'height')).toBe(46)
     expect(px(tile('editor'), 'top')).toBe(0)
     expect(px(tile('editor'), 'width')).toBe(1000)
-    // Plot and Outline share the row below the link strip, side by side, filling the width.
+    // Plot and Outline share the row below the mini strip, side by side, filling the width.
     expect(px(tile('plot'), 'top')).toBe(54)
     expect(px(tile('outline'), 'top')).toBe(54)
     expect(px(tile('plot'), 'left')).toBe(0)
@@ -65,14 +65,13 @@ describe('TileGrid', () => {
     expect(px(tile('outline'), 'left')).toBe(px(tile('plot'), 'width') + 8)
   })
 
-  it('shows a fixed tile as just its name and summary; others show what their measured size earns', () => {
+  it('shows a mini tile as just its name and summary, a mid tile its own render', () => {
     renderGrid()
-    expect(tile('editor').getAttribute('data-shape')).toBe('link')
+    expect(tile('editor').getAttribute('data-shape')).toBe('mini')
     expect(within(tile('editor')).getByText('2 time systems')).toBeTruthy()
     expect(tile('editor').querySelector('.tileBody')).toBeNull()
-    // Wide and tall, but "large" isn't one of Plot's allowed shapes, so it falls back to its default.
-    expect(tile('plot').getAttribute('data-shape')).toBe('landscape')
-    expect(within(tile('plot')).getByText(/plot body landscape/)).toBeTruthy()
+    expect(tile('plot').getAttribute('data-shape')).toBe('mid')
+    expect(within(tile('plot')).getByText(/plot body wide/)).toBeTruthy()
   })
 
   it('is one column below 400px of container width: every tile spans the full width', () => {
@@ -80,82 +79,86 @@ describe('TileGrid', () => {
     renderGrid()
     expect(document.querySelector('.tileGrid')!.className).toContain('tileGrid--one')
     for (const id of ['plot', 'outline', 'editor']) expect(px(tile(id), 'width')).toBe(320)
-    // Never reads as wide in one column, whatever the container's actual width.
-    expect(tile('plot').getAttribute('data-shape')).not.toBe('landscape')
-    expect(tile('outline').getAttribute('data-shape')).not.toBe('landscape')
   })
 
-  it('changes a tile\'s size with its control and remembers it', async () => {
+  it('toggles a tile between mini and mid by clicking its title, and remembers it', async () => {
     const user = userEvent.setup()
     const { unmount } = renderGrid()
-    await user.click(within(tile('plot')).getByRole('button', { name: /Change size of Plot \(now landscape\)/ }))
-    expect(tile('plot').getAttribute('data-shape')).toBe('portrait')
-    expect(tile('editor').querySelector('.tileShape')).toBeNull() // one shape only
+    expect(tile('plot').getAttribute('data-shape')).toBe('mid')
+    await user.click(within(tile('plot')).getByRole('button', { name: 'Plot' }))
+    expect(tile('plot').getAttribute('data-shape')).toBe('mini')
+    expect(tile('plot').querySelector('.tileBody')).toBeNull()
     unmount()
     renderGrid()
-    expect(tile('plot').getAttribute('data-shape')).toBe('portrait')
+    expect(tile('plot').getAttribute('data-shape')).toBe('mini')
+  })
+
+  it('toggles by clicking anywhere on the tile that is not an interactive control', async () => {
+    const user = userEvent.setup()
+    renderGrid()
+    await user.click(tile('outline'))
+    expect(tile('outline').getAttribute('data-shape')).toBe('mini')
+  })
+
+  it('has no shape/size-cycle control any more', () => {
+    renderGrid()
+    expect(document.querySelector('.tileShape')).toBeNull()
+  })
+
+  it('has no "Reset layout" control', () => {
+    renderGrid()
+    expect(screen.queryByRole('button', { name: 'Reset layout' })).toBeNull()
   })
 
   it('resizes only the two tiles a divider separates, and leaves the container filled', () => {
     renderGrid()
     const before = { plot: px(tile('plot'), 'width'), editor: px(tile('editor'), 'height') }
     const divider = document.querySelector('[role="separator"][aria-orientation="vertical"]') as HTMLElement
-    fireEvent(divider, pointerEvent('pointerdown', { clientX: 575, clientY: 300 }))
+    fireEvent(divider, pointerEvent('pointerdown', { clientX: 500, clientY: 300 }))
     fireEvent(divider, pointerEvent('pointermove', { clientX: 700, clientY: 300 }))
     fireEvent(divider, pointerEvent('pointerup', {}))
     expect(px(tile('plot'), 'width')).toBeGreaterThan(before.plot)
     expect(px(tile('plot'), 'width') + px(tile('outline'), 'width') + 8).toBe(1000)
-    // The link strip above wasn't touched by a divider lower in the tree.
+    // The mini strip above wasn't touched by a divider lower in the tree.
     expect(px(tile('editor'), 'height')).toBe(before.editor)
   })
 
-  it('resizes a divider with the keyboard, and double-clicking it resets that split', () => {
+  it('resizes a divider with the keyboard', () => {
     renderGrid()
     const divider = document.querySelector('[role="separator"][aria-orientation="vertical"]') as HTMLElement
     const before = px(tile('plot'), 'width')
     divider.focus()
     fireEvent.keyDown(divider, { key: 'ArrowRight' })
     expect(px(tile('plot'), 'width')).toBeGreaterThan(before)
-    fireEvent.doubleClick(divider)
-    expect(px(tile('plot'), 'width')).toBe(before)
   })
 
-  it('restores the default layout from the "Reset layout" control', async () => {
+  it('opens a tile into its console (max) from its corner button, with a breadcrumb, and Back or Escape collapse it', async () => {
     const user = userEvent.setup()
     renderGrid()
-    await user.click(within(tile('plot')).getByRole('button', { name: /Change size of Plot/ }))
-    expect(tile('plot').getAttribute('data-shape')).not.toBe('landscape')
-    await user.click(screen.getByRole('button', { name: 'Reset layout' }))
-    expect(tile('plot').getAttribute('data-shape')).toBe('landscape')
-  })
-
-  it('opens a tile into its console with a breadcrumb, and Back or Escape collapse it', async () => {
-    const user = userEvent.setup()
-    renderGrid()
-    await user.click(within(tile('plot')).getByRole('button', { name: 'Plot' }))
+    await user.click(within(tile('plot')).getByRole('button', { name: 'Open Plot' }))
     const region = screen.getByRole('region', { name: 'Plot' })
     expect(within(region).getByText('Plot editor')).toBeTruthy()
     expect(within(region).getByRole('navigation', { name: 'Breadcrumb' }).textContent).toContain('Shelves › Saga › Plot')
     await user.click(within(region).getByRole('button', { name: 'Back to tiles' }))
     expect(screen.queryByRole('region', { name: 'Plot' })).toBeNull()
 
-    await user.click(tile('editor'))
+    await user.click(within(tile('editor')).getByRole('button', { name: 'Open Project editor' }))
     expect(screen.getByRole('region', { name: 'Project editor' })).toBeTruthy()
     await user.keyboard('{Escape}')
     expect(screen.queryByRole('region', { name: 'Project editor' })).toBeNull()
   })
 
-  it('does not open a tile when a quick action inside it is used', async () => {
+  it('does not toggle the tile when a quick action inside it is used', async () => {
     const user = userEvent.setup()
     renderGrid()
     await user.click(within(tile('plot')).getByRole('button', { name: 'quick' }))
-    expect(screen.queryByRole('region')).toBeNull()
+    expect(tile('plot').getAttribute('data-shape')).toBe('mid')
   })
 
   it('switches tiles from the strip of mini tiles, and with [ and ]', async () => {
     const user = userEvent.setup()
     renderGrid()
-    await user.click(within(tile('plot')).getByRole('button', { name: 'Plot' }))
+    await user.click(within(tile('plot')).getByRole('button', { name: 'Open Plot' }))
     const strip = screen.getByRole('tablist', { name: 'Tiles' })
     expect(within(strip).getAllByRole('tab').map(t => t.textContent?.trim())).toEqual(['Plot', 'Outline', 'Project editor'])
     await user.click(within(strip).getByRole('tab', { name: /Outline/ }))
@@ -169,7 +172,7 @@ describe('TileGrid', () => {
   it('keeps a tile open across a relaunch', async () => {
     const user = userEvent.setup()
     const { unmount } = renderGrid()
-    await user.click(tile('outline'))
+    await user.click(within(tile('outline')).getByRole('button', { name: 'Open Outline' }))
     unmount()
     renderGrid()
     expect(screen.getByRole('region', { name: 'Outline' })).toBeTruthy()
@@ -178,7 +181,7 @@ describe('TileGrid', () => {
   it('has Settings and Help at the console corner', async () => {
     const user = userEvent.setup()
     renderGrid()
-    await user.click(tile('plot'))
+    await user.click(within(tile('plot')).getByRole('button', { name: 'Open Plot' }))
     await user.click(screen.getByRole('button', { name: 'Help' }))
     expect(screen.getByRole('region', { name: 'Help' }).textContent).toContain('Resources and assistance')
     await user.click(screen.getByRole('button', { name: 'Settings' }))
@@ -207,7 +210,7 @@ describe('TileGrid', () => {
     expect(tile('plot').getAttribute('data-fixed')).toBe('true')
   })
 
-  it('moves focus with the arrow keys, swaps a tile with Alt+arrows and opens with Enter', async () => {
+  it('moves focus with the arrow keys, swaps a tile with Alt+arrows and toggles with Enter', async () => {
     const user = userEvent.setup()
     renderGrid()
     tile('plot').focus()
@@ -217,24 +220,31 @@ describe('TileGrid', () => {
     // Outline (focused) swaps with Plot, which was to its left.
     expect(order()).toEqual(['editor', 'outline', 'plot'])
     expect(document.activeElement).toBe(tile('outline'))
+    await user.keyboard('{Enter}')
+    expect(tile('outline').getAttribute('data-shape')).toBe('mini')
   })
 
-  it('opens a link tile that goes elsewhere instead of expanding', async () => {
+  it('has no corner button for a tile with neither a console nor onOpen', () => {
+    renderGrid([{ id: 'info', title: 'Info', Icon: PlotIcon, defaultShape: 'mid', summary: 'Just information' }])
+    expect(tile('info').querySelector('.tileMax')).toBeNull()
+  })
+
+  it('opens a mini tile that goes elsewhere instead of expanding, from its corner button', async () => {
     const onOpen = vi.fn()
     const user = userEvent.setup()
-    renderGrid([{ id: 'go', title: 'Go', Icon: PlotIcon, shapes: ['link'], defaultShape: 'link', summary: 'Elsewhere', onOpen }])
-    await user.click(tile('go'))
+    renderGrid([{ id: 'go', title: 'Go', Icon: PlotIcon, defaultShape: 'mini', summary: 'Elsewhere', onOpen }])
+    await user.click(within(tile('go')).getByRole('button', { name: 'Open Go' }))
     expect(onOpen).toHaveBeenCalledOnce()
     expect(screen.queryByRole('region')).toBeNull()
   })
 
   it('shows child tiles when a tile expands, and they can expand in turn', async () => {
     const user = userEvent.setup()
-    const child: TileDef = { id: 'kid', title: 'Kid', Icon: PencilIcon, shapes: ['small'], defaultShape: 'small', summary: 'One', console: () => <div>Kid editor</div> }
-    renderGrid([{ id: 'parent', title: 'Parent', Icon: PlotIcon, shapes: ['small'], defaultShape: 'small', summary: 'Two', children: [child] }])
-    await user.click(tile('parent'))
+    const child: TileDef = { id: 'kid', title: 'Kid', Icon: PencilIcon, defaultShape: 'mid', summary: 'One', console: () => <div>Kid editor</div> }
+    renderGrid([{ id: 'parent', title: 'Parent', Icon: PlotIcon, defaultShape: 'mid', summary: 'Two', children: [child] }])
+    await user.click(within(tile('parent')).getByRole('button', { name: 'Open Parent' }))
     const region = screen.getByRole('region', { name: 'Parent' })
-    await user.click(within(region).getByRole('button', { name: 'Kid' }))
+    await user.click(within(region).getByRole('button', { name: 'Open Kid' }))
     const inner = screen.getByRole('region', { name: 'Kid' })
     expect(within(inner).getByText('Kid editor')).toBeTruthy()
     expect(within(inner).getByRole('navigation', { name: 'Breadcrumb' }).textContent).toContain('Shelves › Saga › Parent › Kid')
@@ -246,9 +256,9 @@ describe('TileGrid', () => {
   it('appends a new tile after the saved ones', async () => {
     const user = userEvent.setup()
     const { unmount } = renderGrid()
-    await user.click(within(tile('plot')).getByRole('button', { name: /Change size/ }))
+    await user.click(within(tile('plot')).getByRole('button', { name: 'Plot' }))
     unmount()
-    renderGrid([...defs(), { id: 'extra', title: 'Extra', Icon: PlotIcon, shapes: ['small'], defaultShape: 'small', summary: 'x' }])
+    renderGrid([...defs(), { id: 'extra', title: 'Extra', Icon: PlotIcon, defaultShape: 'mid', summary: 'x' }])
     expect(order()).toContain('extra')
   })
 
@@ -279,7 +289,7 @@ describe('TileGrid', () => {
     const tiles = defs()
     tiles[0] = { ...tiles[0], console: () => <Jump /> }
     renderGrid(tiles)
-    await user.click(within(tile('plot')).getByRole('button', { name: 'Plot' }))
+    await user.click(within(tile('plot')).getByRole('button', { name: 'Open Plot' }))
     await user.click(screen.getByRole('button', { name: 'jump' }))
     expect(screen.getByRole('region', { name: 'Outline' })).toBeTruthy()
     expect(screen.getByRole('region', { name: 'Settings' })).toBeTruthy()
@@ -289,7 +299,7 @@ describe('TileGrid', () => {
     const onMaximizeChange = vi.fn()
     const user = userEvent.setup()
     const { unmount } = render(<TileGrid gridId="max" tiles={defs()} crumbs={crumbs} onMaximizeChange={onMaximizeChange} />)
-    await user.click(tile('plot'))
+    await user.click(within(tile('plot')).getByRole('button', { name: 'Open Plot' }))
     const head = document.querySelector('.tcHead')!
     fireEvent.doubleClick(head)
     expect(onMaximizeChange).toHaveBeenCalledWith(true)
@@ -301,24 +311,24 @@ describe('TileGrid', () => {
     expect(screen.getByRole('region', { name: 'Outline' }).getAttribute('data-maximized')).toBe('true')
   })
 
+  it('does not offer maximize where the caller has not wired onMaximizeChange', async () => {
+    const user = userEvent.setup()
+    renderGrid()
+    await user.click(within(tile('plot')).getByRole('button', { name: 'Open Plot' }))
+    fireEvent.doubleClick(document.querySelector('.tcHead')!)
+    expect(screen.getByRole('region', { name: 'Plot' }).getAttribute('data-maximized')).toBeNull()
+  })
+
   it('clears maximize (and reports it) when the console closes', async () => {
     const onMaximizeChange = vi.fn()
     const user = userEvent.setup()
     render(<TileGrid gridId="max2" tiles={defs()} crumbs={crumbs} onMaximizeChange={onMaximizeChange} />)
-    await user.click(tile('plot'))
+    await user.click(within(tile('plot')).getByRole('button', { name: 'Open Plot' }))
     fireEvent.doubleClick(document.querySelector('.tcHead')!)
     expect(onMaximizeChange).toHaveBeenLastCalledWith(true)
     await user.click(screen.getByRole('button', { name: 'Back to tiles' }))
     expect(onMaximizeChange).toHaveBeenLastCalledWith(false)
-    await user.click(tile('plot'))
-    expect(screen.getByRole('region', { name: 'Plot' }).getAttribute('data-maximized')).toBeNull()
-  })
-
-  it('does not offer maximize where the caller has not wired onMaximizeChange', async () => {
-    const user = userEvent.setup()
-    renderGrid()
-    await user.click(tile('plot'))
-    fireEvent.doubleClick(document.querySelector('.tcHead')!)
+    await user.click(within(tile('plot')).getByRole('button', { name: 'Open Plot' }))
     expect(screen.getByRole('region', { name: 'Plot' }).getAttribute('data-maximized')).toBeNull()
   })
 })

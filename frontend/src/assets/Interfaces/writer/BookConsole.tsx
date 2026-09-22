@@ -86,14 +86,12 @@ function BookCover({ w, book }: { w: WriterWorkspace; book: OutlineNode }) {
             </label>
             <div className="wrCoverColors">
               <div className="wrColorRow">
-                <span className="wrColorLabel">Primary colour</span>
                 <ColorRange
                   label="Primary colour" value={themeHue} sat={cover.s} light={cover.l}
                   onChange={hue => w.updateOutlineNode(book.id, { themeHue: hue })}
                 />
               </div>
               <div className="wrColorRow">
-                <span className="wrColorLabel">Secondary colour</span>
                 <ColorRange
                   label="Secondary colour" value={accentHue} sat={accentFill.s} light={accentFill.l}
                   onChange={hue => w.updateOutlineNode(book.id, { accentHue: hue })}

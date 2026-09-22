@@ -600,10 +600,10 @@ button {border: none; cursor: pointer; border-radius: 4px;}
   height: 100%;
   display: flex;
   flex-direction: row;
-  // Desaturated accent color, matching the rest of the Sidebar (.hUIMain,
-  // .sidebarDivider) now that AUI lives here too, rather than the plain
-  // theme color it used as a Mainscreen page.
-  background-color: hsl(var(--color-accent2-h), var(--color-sidebar-s), calc(var(--color-theme-l) - 9%));
+  // Matches the sidebar divider's own background (rather than the rest of the
+  // Sidebar's desaturated-accent panels) now that AUI's width is set by dragging
+  // that divider -- the two read as one continuous surface.
+  background-color: var(--surface-sidebar-1);
   // Everything in the admin panel wears the admin accent where the rest of the app wears the accent: the
   // accent tokens are re-pointed at the admin accent for this subtree (the derived --accent, hover, dim
   // and ink are re-declared because custom properties are substituted where they are declared).
@@ -621,40 +621,23 @@ button {border: none; cursor: pointer; border-radius: 4px;}
     &--active { background: var(--accent2); color: var(--on-accent2); }
   }
 }
-// .aUIContent is the first DOM child (.aUIRail second), so a plain
-// left-to-right row already puts the rail on AUI's own right edge -- which
-// is the true screen edge (the "outer" side) in hand-right, since AUI's
-// whole box already sits flush against it there (see .sidebar's DOM-order
-// comment below). hand-left flips it so the rail lands on AUI's own left
-// edge instead, its outer side in that handedness.
-.hand-left .aUIPanel { flex-direction: row-reverse; }
 
-// The section picker, moved out of the content pane and onto AUI's own
-// outer edge, stacked directly under the Help button (see AUI.tsx) rather
-// than floating as a separate corner overlay.
-.aUIRail {
-  flex: 0 0 auto;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 6px;
-  padding: 10px 6px;
-  overflow-y: auto;
-  background: rgb(0 0 0 / calc(0.15 * var(--shade-k)));
+// Dragged to set AUI's own width (--aui-w), snapping to 400px columns. A child of
+// .sidebar itself (not .aUI), positioned off the live --aui-w var so it always sits
+// exactly on AUI's outer edge, between it and the sidebar divider.
+.aUIResize {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  width: 8px;
+  z-index: 7;
+  cursor: col-resize;
+  &::after { content: ''; position: absolute; top: 0; bottom: 0; left: 3px; width: 2px; border-radius: 1px; background: transparent; }
+  &:hover::after, &:focus-visible::after { background: color-mix(in srgb, var(--ink) 35%, transparent); }
+  &:focus-visible { outline: none; }
 }
-
-// Pins the size-control buttons to the bottom of .aUIRail (the screen's
-// bottom edge, since the rail spans the panel's full height) instead of
-// wherever the section list happens to end -- the standard flex "push to
-// end" trick.
-.aUIRailSizeGroup {
-  margin-top: auto;
-  flex: 0 0 auto;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 6px;
-}
+.hand-left .aUIResize { left: calc(var(--aui-w) - 4px); }
+.hand-right .aUIResize { right: calc(var(--aui-w) - 4px); }
 
 // AuiConfigEditor: each console/component/feature renders as its own card,
 // nested inside its parent's card (.auiConfigNodeChildren) rather than
@@ -1131,6 +1114,7 @@ div.auiConfigReadOnlyIdea {
   border-radius: 3px;
   padding: 4px 6px;
   color: var(--ink);
+  &::placeholder { color: var(--ink-faint); }
 }
 .statementRemoveBtn {
   flex: 0 0 auto;
@@ -1153,6 +1137,7 @@ div.auiConfigReadOnlyIdea {
   padding: 5px 8px;
   color: var(--ink);
   font-size: 12px;
+  &::placeholder { color: var(--ink-faint); }
 }
 // Auto-growing variant (a <textarea>, not an <input>) -- height is set
 // inline from scrollHeight on mount/change, this just makes it wrap and
@@ -1700,7 +1685,7 @@ div.auiConfigReadOnlyIdea {
 .verbCount { margin-left: 5px; font-size: 10px; opacity: 0.7; }
 .subjectField { position: relative; display: flex; flex-direction: column; gap: 2px; }
 .subjectPath { font-size: 10px; opacity: 0.7; }
-.subjectInput { width: 100%; box-sizing: border-box; background: var(--field-bg); color: var(--ink); border: none; border-radius: 4px; padding: 6px 8px; font-size: 12px; }
+.subjectInput { width: 100%; box-sizing: border-box; background: var(--field-bg); color: var(--ink); border: none; border-radius: 4px; padding: 6px 8px; font-size: 12px; &::placeholder { color: var(--ink-faint); } }
 .subjectSuggest { list-style: none; margin: 2px 0 0; padding: 3px; max-height: 160px; overflow-y: auto; border-radius: 6px; background: var(--surface-sidebar-1); box-shadow: 0 6px 16px rgb(0 0 0 / 0.3); }
 .subjectOption {
   width: 100%;
@@ -1817,7 +1802,7 @@ div.auiConfigReadOnlyIdea {
   display: flex;
   flex-direction: column;
   gap: 6px;
-  input, textarea { background: var(--field-bg); color: var(--ink); border: none; border-radius: 3px; padding: 5px 8px; font-size: 12px; font-family: inherit; resize: vertical; }
+  input, textarea { background: var(--field-bg); color: var(--ink); border: none; border-radius: 3px; padding: 5px 8px; font-size: 12px; font-family: inherit; resize: vertical; &::placeholder { color: var(--ink-faint); } }
 }
 .targetRow { display: flex; gap: 5px; select { flex: 1 1 0; min-width: 0; } }
 .caseHistory { font-size: 12px; summary { cursor: pointer; opacity: 0.75; } ul { margin: 6px 0 0; padding-left: 16px; display: flex; flex-direction: column; gap: 3px; } }

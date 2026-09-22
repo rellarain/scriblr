@@ -356,7 +356,7 @@ and selecting one expands it into its console/editor. The shared system is
 - **A binary split tree** (`splitTree.ts`), not a CSS grid: every branch divides its
   rect into two along one axis at a ratio, so dragging a divider resizes only its two
   neighbours and the tiles together always tile the container's exact area. A leaf can
-  be **fixed** (a link tile, or any tile dragged short): it keeps a constant ~46px
+  be **fixed** (a mini tile, or any tile dragged short): it keeps a constant ~46px
   height and its sibling absorbs the rest, and a fixed leaf's containing branch is
   always straightened to stack vertically (`fixup`). `buildTree`/`reconcile` seed and
   update a grid's tree from its tiles' order and shape (grafting new tiles on,
@@ -366,29 +366,31 @@ and selecting one expands it into its console/editor. The shared system is
   (`useContainerSize`), and reflows to full-width rows (`flattenOneColumn`) below
   400px of container width, without touching the saved tree -- widening the
   container returns to the saved split. A grid with trailing content below it (the
-  book face under its link tiles) sizes itself to its content instead of stretching
+  book face under its mini tiles) sizes itself to its content instead of stretching
   to fill the container; a tile-only grid fills the container's height.
-- **What a tile shows** is chosen from its own **measured size** (`contentTier`,
-  thresholds on width/height), not a stored label, so a tile stretched by a divider
-  earns richer content and a squeezed one shows less, live; `shapes`/`defaultShape`
-  on a `TileDef` still gate which tiers a tile allows and are the shape-control
-  button's size presets (nudging the tile's containing branch toward a narrower,
-  wider, shorter or taller share of the space).
+- **Three states, not five shapes:** a tile is **mini** (a short, fixed-height strip:
+  name and a one-line summary, no body -- a `splitTree.ts` fixed leaf), **mid** (a
+  normal, resizable leaf showing the tile's own `render`, which scales continuously
+  with its actual measured width/height -- there's no separate size-tier label to
+  store), or **max** (the console it expands into, `TileConsole`). The tile's title
+  toggles mini/mid; a corner button (shown whenever the tile has something to open --
+  a console, child tiles, or `onOpen`) opens max. `TileDef` carries a `defaultShape:
+  'mini' | 'mid'` and no shape list -- every tile supports both.
 - **`TileGrid`** shows the tiles and their dividers, expands one into a `TileConsole`
   (FLIP animation over the grid's area, back button and breadcrumb, a row of mini
   tiles to switch tiles, Settings and Help as round buttons at the bottom right via
   `ConsoleCorner`), and can nest: a tile with `children` expands into a grid of tiles
-  that expand in turn. A "Reset layout" control restores the grid's default tree.
-  Keyboard: arrows move focus between tiles, Enter opens, Escape collapses, `[` and
-  `]` switch tiles, Alt+arrows swap the focused tile with its neighbour; a divider
-  can be dragged, double-clicked to reset, or focused and nudged with the arrow keys.
-  Dragging a tile's header onto another swaps their places, each area keeping its own
-  size. A few quick actions (tick a task, add a note or task, open an item) work
-  without expanding.
+  that expand in turn. Keyboard: arrows move focus between tiles, Enter toggles the
+  focused tile's mini/mid state, Escape collapses an open console, `[` and `]` switch
+  tiles, Alt+arrows swap the focused tile with its neighbour; a divider can be dragged
+  or focused and nudged with the arrow keys. Dragging a tile's header onto another
+  swaps their places, each area keeping its own size. A few quick actions (tick a
+  task, add a note or task, open an item) work without expanding. There is no
+  "reset layout" control -- a mis-dragged grid is put back by hand.
 - **Remembered per user** (`useSplitLayout`, stored with `useStoredState` in the
-  user-settings kv as `scriblr.tiles.<gridId>`): the tree, each tile's shape preset,
+  user-settings kv as `scriblr.tiles.<gridId>`): the tree, each tile's mini/mid state,
   the open tile, and whether its console is maximized. Pure logic in `tileLayout.ts`
-  (`applyLayout`, `cycleShape`) and `tileNav.ts` (`nextFocus`, reused for Alt+arrow's
+  (`applyLayout`) and `tileNav.ts` (`nextFocus`, reused for Alt+arrow's
   nearest-neighbour swap).
 - **Maximize** (Writer only so far): double-clicking an expanded console's header
   hides the Writer's own sidebar so the console spans the full width; it's
@@ -413,8 +415,15 @@ and selecting one expands it into its console/editor. The shared system is
   it does not have to the grid it is in).
 - **Admin panel** (`AUI.tsx`): its eight sections as tiles with their pages as child
   tiles; a Resources config page keeps its publish badge, Save draft / Publish and
-  lock inside its console and saves when it is left. The panel-size buttons stay in a
-  slim rail. At the single-column size (400px) every tile is a row.
+  lock inside its console and saves when it is left. AUI's own width is no longer a
+  handful of preset sizes -- it's dragged from its outer edge (`Sidebar.tsx`'s
+  `AuiResize`, next to the sidebar divider; the drag direction flips with
+  handedness), snapping to 400px columns and remembered as `scriblr.admin.width`;
+  `min()` in the CSS (`--aui-w`, `App.tsx`) keeps it from exceeding the rest of the
+  screen even if the window shrinks. Its panel matches the sidebar divider's own
+  background rather than the desaturated-accent tone the rest of the sidebar uses, so
+  the two read as one continuous surface. Below 400px of its own width every tile is
+  a row, same as any other grid.
 - **Helper panel** (`HUI.tsx`): Inbox, Queue and Settings tiles (plus the open chat's
   Conversation) in the 400px panel. The sidebar divider's buttons still choose the open
   console: `TileGrid` is controlled here (`open` / `onOpenChange`), and Back or a mini

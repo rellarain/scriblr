@@ -80,15 +80,15 @@ export function userTiles(): TileDef[] {
     const help = <p>{section.help}</p>
     return {
       id: section.key, title: section.label, Icon: section.Icon,
-      shapes: ['small', 'landscape', 'portrait'], defaultShape: 'landscape',
+      defaultShape: 'mid',
       summary: `${section.pages.length} pages`,
       settings, help,
-      render: ({ shape }) => (shape === 'small'
+      render: ({ height }) => (height < 140
         ? <TileBig value={section.pages.length} label="pages" />
         : <TileRows rows={section.pages.map(p => ({ key: p.key, label: p.label }))} />),
       children: section.pages.map<TileDef>(page => ({
         id: page.key, title: page.label, Icon: page.Icon,
-        shapes: ['landscape', 'small', 'link'], defaultShape: 'landscape',
+        defaultShape: 'mid',
         summary: page.body,
         settings, help,
         render: () => <TileSub>{page.body}</TileSub>,

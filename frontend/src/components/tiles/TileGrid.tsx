@@ -30,11 +30,12 @@ const boxOf = (r: { x: number; y: number; w: number; h: number }): Box => ({ lef
 // no ragged last row), remembers each tile's place and size per user, and expands a
 // selected tile into its console over the grid's whole area.
 //
-//   - Enter or a click opens a tile; Escape (or Back) collapses it; `[` and `]`
+//   - A tile's title toggles it between mini and mid; its corner button opens it into
+//     its console (max). Escape (or Back) collapses an open console; `[` and `]`
 //     switch tiles while one is expanded.
 //   - Arrow keys move between tiles; Alt+arrows swap the focused tile with its neighbour.
 //   - A tile's header can be dragged onto another to swap their places.
-//   - A divider between two tiles can be dragged, keyboard-nudged, or double-clicked to reset.
+//   - A divider between two tiles can be dragged or keyboard-nudged.
 //
 // `below` is anything that goes under the tiles (the book face under its link tiles).
 //
@@ -185,9 +186,9 @@ function TileGrid({ gridId, tiles, crumbs, below, label, open: controlledOpen, o
             if (!p) return null
             return (
               <Tile
-                key={p.def.id} def={p.def} rect={g.rect} fixed={g.fixed} oneColumn={oneColumn} presetShape={p.shape}
+                key={p.def.id} def={p.def} rect={g.rect} fixed={g.fixed} oneColumn={oneColumn}
                 dragging={dragId === p.def.id} dropTarget={overId === p.def.id && dragId !== p.def.id}
-                onOpen={() => open(p.def)} onCycleShape={() => layout.cycle(p.def.id)}
+                onOpen={() => open(p.def)} onToggleTier={() => layout.toggleTier(p.def.id)}
                 onDragStart={e => onDragStart(e, p.def.id)} onDragOver={e => onDragOver(e, p.def.id)}
                 onDrop={e => onDrop(e, p.def.id)} onDragEnd={() => { setDragId(null); setOverId(null) }}
               />
@@ -202,18 +203,12 @@ function TileGrid({ gridId, tiles, crumbs, below, label, open: controlledOpen, o
                 style={{ position: 'absolute', left: d.rect.x, top: d.rect.y, width: d.rect.w, height: d.rect.h }}
                 onDragTo={(x, y) => dragTo(d.path, d.dir, x, y)}
                 onResize={r => layout.resize(d.path, r)}
-                onReset={() => layout.resetBranch(d.path)}
               />
             )
           })}
         </div>
         {below}
       </div>
-      {layout.placed.length > 0 && (
-        <button type="button" className="tileResetBtn" onClick={layout.resetAll} title="Reset layout" aria-label="Reset layout">
-          Reset layout
-        </button>
-      )}
       {openTile && (
         <TileConsole
           key={openTile.id === openId ? 'console' : openTile.id}

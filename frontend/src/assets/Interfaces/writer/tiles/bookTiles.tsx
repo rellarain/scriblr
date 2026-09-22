@@ -15,11 +15,11 @@ export function bookLinkTiles(w: WriterWorkspace): TileDef[] {
   const page = (key: string) => () => <Placeholder title={def(key)?.label ?? ''} body={def(key)?.body} />
   return [
     {
-      id: 'outlineTemplate', title: 'Outline template', Icon: CheckboxIcon, shapes: ['link'], defaultShape: 'link',
+      id: 'outlineTemplate', title: 'Outline template', Icon: CheckboxIcon, defaultShape: 'mini',
       summary: 'Chapter templates', console: page('outlineTemplate'),
     },
     {
-      id: 'arcOutline', title: 'Arc outline', Icon: ArcIcon, shapes: ['link'], defaultShape: 'link',
+      id: 'arcOutline', title: 'Arc outline', Icon: ArcIcon, defaultShape: 'mini',
       summary: `${arcs} ${arcs === 1 ? 'arc' : 'arcs'}`, console: page('arcOutline'),
     },
   ]

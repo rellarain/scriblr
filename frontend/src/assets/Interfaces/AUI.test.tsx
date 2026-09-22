@@ -30,29 +30,19 @@ const SECTIONS = ['dashboard', 'processor', 'organizer', 'manager', 'director', 
 
 describe('AUI (the Admin panel as tiles)', () => {
   it('shows the eight sections as tiles listing their pages, without Help pages', () => {
-    render(<AUI size="half" onSetSize={() => {}} />)
+    render(<AUI />)
     expect(SECTIONS.map(id => tile(id)?.getAttribute('data-tile-id'))).toEqual(SECTIONS)
     expect(within(tile('manager')).getByText('Assignment')).toBeTruthy()
     expect(within(tile('resources')).getByText('Project Plan')).toBeTruthy()
     expect(within(tile('manager')).queryByText('Help')).toBeNull()
   })
 
-  it('keeps the panel-size buttons in a slim rail', async () => {
-    const onSetSize = vi.fn()
-    const user = userEvent.setup()
-    render(<AUI size="half" onSetSize={onSetSize} />)
-    const rail = screen.getByRole('navigation', { name: 'Admin panel size' })
-    expect(within(rail).getByRole('button', { name: 'Half screen' }).getAttribute('aria-pressed')).toBe('true')
-    await user.click(within(rail).getByRole('button', { name: 'Single column' }))
-    expect(onSetSize).toHaveBeenCalledWith('column')
-  })
-
   it('opens a page: its text, the role assignment editor, and Help at the corner', async () => {
     const user = userEvent.setup()
-    render(<AUI size="full" onSetSize={() => {}} />)
-    await user.click(within(tile('manager')).getByRole('button', { name: 'Manager' }))
+    render(<AUI />)
+    await user.click(within(tile('manager')).getByRole('button', { name: 'Open Manager' }))
     const manager = screen.getByRole('region', { name: 'Manager' })
-    await user.click(within(manager).getByRole('button', { name: 'Assignment' }))
+    await user.click(within(manager).getByRole('button', { name: 'Open Assignment' }))
     expect(within(screen.getByRole('region', { name: 'Assignment' })).getByText('role assignment')).toBeTruthy()
     await user.click(within(screen.getByRole('region', { name: 'Assignment' })).getByRole('button', { name: 'Help' }))
     expect(within(screen.getByRole('region', { name: 'Help' })).getByText(/using the Manager console/)).toBeTruthy()
@@ -60,9 +50,9 @@ describe('AUI (the Admin panel as tiles)', () => {
 
   it('shows a config page read-only with its publish badge and lock, and saves when it is left', async () => {
     const user = userEvent.setup()
-    render(<AUI size="full" onSetSize={() => {}} />)
-    await user.click(within(tile('resources')).getByRole('button', { name: 'Resources' }))
-    await user.click(within(screen.getByRole('region', { name: 'Resources' })).getByRole('button', { name: 'User' }))
+    render(<AUI />)
+    await user.click(within(tile('resources')).getByRole('button', { name: 'Open Resources' }))
+    await user.click(within(screen.getByRole('region', { name: 'Resources' })).getByRole('button', { name: 'Open User' }))
     const page = screen.getByRole('region', { name: 'User' })
     expect(within(page).getByText('read-only tree for userPageConfig')).toBeTruthy()
     expect(within(page).getByText('Published v2')).toBeTruthy()

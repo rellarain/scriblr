@@ -1,10 +1,10 @@
 import { describe, expect, it } from 'vitest'
-import { applyLayout, cycleShape, type TileMeta } from './tileLayout'
+import { applyLayout, type TileMeta } from './tileLayout'
 
 const defs: TileMeta[] = [
-  { id: 'plot', shapes: ['landscape', 'portrait', 'large'], defaultShape: 'large' },
-  { id: 'outline', shapes: ['small', 'portrait'], defaultShape: 'portrait' },
-  { id: 'editor', shapes: ['link'], defaultShape: 'link' },
+  { id: 'plot', defaultShape: 'mid' },
+  { id: 'outline', defaultShape: 'mid' },
+  { id: 'editor', defaultShape: 'mini' },
 ]
 const ids = (l: ReturnType<typeof applyLayout>) => l.map(t => t.def.id)
 
@@ -12,14 +12,14 @@ describe('applyLayout', () => {
   it('uses the defaults when nothing is saved', () => {
     const l = applyLayout(defs, undefined)
     expect(ids(l)).toEqual(['plot', 'outline', 'editor'])
-    expect(l.map(t => t.shape)).toEqual(['large', 'portrait', 'link'])
+    expect(l.map(t => t.shape)).toEqual(['mid', 'mid', 'mini'])
   })
 
   it('follows the saved order and shapes', () => {
-    const l = applyLayout(defs, { order: ['editor', 'plot', 'outline'], shapes: { plot: 'landscape', outline: 'small' } })
+    const l = applyLayout(defs, { order: ['editor', 'plot', 'outline'], shapes: { plot: 'mini', outline: 'mid' } })
     expect(ids(l)).toEqual(['editor', 'plot', 'outline'])
-    expect(l.find(t => t.def.id === 'plot')!.shape).toBe('landscape')
-    expect(l.find(t => t.def.id === 'outline')!.shape).toBe('small')
+    expect(l.find(t => t.def.id === 'plot')!.shape).toBe('mini')
+    expect(l.find(t => t.def.id === 'outline')!.shape).toBe('mid')
   })
 
   it('drops tiles that no longer exist, ignores duplicates and appends new tiles', () => {
@@ -27,20 +27,9 @@ describe('applyLayout', () => {
     expect(ids(l)).toEqual(['outline', 'plot', 'editor'])
   })
 
-  it('falls back to the default shape when the saved one is not allowed', () => {
-    const l = applyLayout(defs, { order: [], shapes: { editor: 'large', plot: 'small' } })
-    expect(l.find(t => t.def.id === 'editor')!.shape).toBe('link')
-    expect(l.find(t => t.def.id === 'plot')!.shape).toBe('large')
-  })
-})
-
-describe('cycleShape', () => {
-  it('steps through the allowed shapes and wraps', () => {
-    expect(cycleShape(defs[0], 'landscape')).toBe('portrait')
-    expect(cycleShape(defs[0], 'large')).toBe('landscape')
-  })
-
-  it('keeps a single-shape tile as it is', () => {
-    expect(cycleShape(defs[2], 'link')).toBe('link')
+  it('falls back to the default shape when the saved value is not a valid shape', () => {
+    const l = applyLayout(defs, { order: [], shapes: { editor: 'landscape', plot: 'nonsense' } })
+    expect(l.find(t => t.def.id === 'editor')!.shape).toBe('mini')
+    expect(l.find(t => t.def.id === 'plot')!.shape).toBe('mid')
   })
 })

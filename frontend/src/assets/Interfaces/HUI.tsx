@@ -29,19 +29,19 @@ function HUI({ side, helper, panel }: HUIProps) {
 
   const tiles: TileDef[] = [
     {
-      id: 'inbox', title: 'Inbox', Icon: InboxIcon, shapes: ['landscape', 'small', 'link'], defaultShape: 'landscape',
+      id: 'inbox', title: 'Inbox', Icon: InboxIcon, defaultShape: 'mid',
       summary: 'Validate, process and configure feedback',
       render: () => <TileSub>Feedback messages are validated by every admin, then processed as cases.</TileSub>,
       console: () => <InboxSection />,
     },
     {
-      id: 'queue', title: 'Queue', Icon: QueueIcon, shapes: ['landscape', 'small', 'link'], defaultShape: 'landscape',
+      id: 'queue', title: 'Queue', Icon: QueueIcon, defaultShape: 'mid',
       summary: 'Chats you are accepting',
       render: () => <TileSub>Check a queue to accept chats from it.</TileSub>,
       console: () => <QueueSection />,
     },
     {
-      id: 'settings', title: 'Settings', Icon: GearIcon, shapes: ['link', 'small'], defaultShape: 'link',
+      id: 'settings', title: 'Settings', Icon: GearIcon, defaultShape: 'mini',
       summary: 'Helper page settings',
       render: () => <TileSub>Configure Helper page settings here.</TileSub>,
       console: () => <SettingsSection />,
@@ -49,7 +49,7 @@ function HUI({ side, helper, panel }: HUIProps) {
   ]
   if (helper.selectedChatId != null) {
     tiles.push({
-      id: 'chat', title: 'Conversation', Icon: ChatBubblesIcon, shapes: ['landscape', 'small', 'link'], defaultShape: 'landscape',
+      id: 'chat', title: 'Conversation', Icon: ChatBubblesIcon, defaultShape: 'mid',
       summary: 'The chat you have open',
       render: () => <TileSub>The chat you have open.</TileSub>,
       console: () => <ChatsSection helper={helper} />,

@@ -1,11 +1,8 @@
 import { useCallback } from 'react'
 import { getKv } from '../../settings/settingsStore'
 import { useStoredState } from '../../assets/Interfaces/writer/storage'
-import { applyLayout, cycleShape, type PlacedTile } from './tileLayout'
-import {
-  buildTree, leafIds, presetRatio, reconcile, resetBranch as resetBranchAt, resizeBranch as resizeBranchAt,
-  swapLeaves as swapLeavesAt, type Path, type SplitNode,
-} from './splitTree'
+import { applyLayout, type PlacedTile } from './tileLayout'
+import { leafIds, reconcile, resizeBranch as resizeBranchAt, setFixed, swapLeaves as swapLeavesAt, type Path, type SplitNode } from './splitTree'
 import type { TileDef } from './tileTypes'
 
 interface SplitState {
@@ -24,8 +21,9 @@ export function readMaximized(gridId: string): boolean {
   return getKv<SplitState>(`scriblr.tiles.${gridId}`)?.maximized ?? false
 }
 
-// One grid's split-tree layout (each tile's place and size) and its expanded tile,
-// remembered per user with the other saved settings (settings/settingsStore.ts).
+// One grid's split-tree layout (each tile's place, and mini/mid state) and its
+// expanded (max) tile, remembered per user with the other saved settings
+// (settings/settingsStore.ts).
 export function useSplitLayout(gridId: string, defs: TileDef[]) {
   const [saved, setSaved] = useStoredState<SplitState>(`scriblr.tiles.${gridId}`, EMPTY_STATE)
 
@@ -37,7 +35,6 @@ export function useSplitLayout(gridId: string, defs: TileDef[]) {
   }
 
   const { placed, tree } = resolve(saved)
-  const seed = buildTree(placed.map(p => ({ id: p.def.id, shape: p.def.defaultShape })))
 
   const update = useCallback((fn: (tree: SplitNode, prev: SplitState) => Partial<SplitState>) => {
     setSaved(prev => {
@@ -51,20 +48,19 @@ export function useSplitLayout(gridId: string, defs: TileDef[]) {
   return {
     placed,
     tree,
-    seed,
     openId: saved.open && leafIds(tree).includes(saved.open) ? saved.open : null,
     maximized: saved.maximized,
     setOpen: (id: string | null) => setSaved(prev => ({ ...prev, open: id })),
     setMaximized: (on: boolean) => setSaved(prev => ({ ...prev, maximized: on })),
     resize: (path: Path, ratio: number) => update(t => ({ tree: resizeBranchAt(t, path, ratio) })),
-    resetBranch: (path: Path) => update(t => ({ tree: resetBranchAt(t, path, seed ?? t) })),
-    resetAll: () => setSaved(prev => ({ ...EMPTY_STATE, open: prev.open })),
     swap: (idA: string, idB: string) => update(t => ({ tree: swapLeavesAt(t, idA, idB) })),
-    cycle: (id: string) => {
+    // Toggles a tile between mini (a fixed, short strip) and mid (its own full,
+    // resizable render). Clicking a tile's title does this.
+    toggleTier: (id: string) => {
       const item = placed.find(p => p.def.id === id)
       if (!item) return
-      const next = cycleShape(item.def, item.shape)
-      update((t, prev) => ({ shapes: { ...prev.shapes, [id]: next }, tree: presetRatio(t, id, next) }))
+      const next = item.shape === 'mini' ? 'mid' : 'mini'
+      update((t, prev) => ({ shapes: { ...prev.shapes, [id]: next }, tree: setFixed(t, id, next === 'mini') }))
     },
   }
 }

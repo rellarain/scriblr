@@ -1,34 +1,33 @@
 import type { ComponentType, ReactNode } from 'react'
 import type { IconProps } from '../../assets/icons'
 import type { TileMeta } from './tileLayout'
-import type { TileShape } from './tileShapes'
 
 export interface TileContext {
-  // The content tier its actual measured box earns (components/tiles/tileShapes.ts's
-  // `contentTier`) -- not a stored label, so a tile stretched by a divider drag shows
-  // richer content and a squeezed one shows less, live.
-  shape: TileShape
   // The grid is one column wide: a tile never reads as "wide" here, however wide its box is.
   oneColumn: boolean
+  // The tile's own measured box, in a mid tile -- so its content can scale with the
+  // actual space a divider drag (or the container's own size) gives it.
   width: number
   height: number
 }
 
-// A tile: a read-only card in a grid that expands into a console. Its content
-// depends on its shape; `console` is what it becomes when expanded.
+// A tile: a read-only card in a grid with three states -- mini (a short, fixed
+// strip: name and a one-line summary), mid (this def's own `render`, scaling with
+// its measured size) and max (the console it expands into). The title toggles
+// mini/mid; a corner button opens max (only shown when there's something to open --
+// a console, child tiles, or `onOpen`).
 export interface TileDef extends TileMeta {
   title: string
   Icon: ComponentType<IconProps>
-  // One line: shown on link tiles and in the one-column row version.
+  // One line: shown on a mini tile.
   summary: string
-  // The read-only body of a small, landscape, portrait or large tile. Quick actions
-  // (ticking a task, an inline add box) may live here.
+  // The read-only body of a mid tile. Quick actions (ticking a task, an inline add box) may live here.
   render?: (ctx: TileContext) => ReactNode
-  // The editor this tile expands into.
+  // The editor this tile expands into (max).
   console?: () => ReactNode
   // Child tiles: expanding the tile shows them as a grid, and they can expand in turn.
   children?: TileDef[]
-  // A link tile that goes somewhere else instead of expanding.
+  // Goes somewhere else instead of expanding into a console.
   onOpen?: () => void
   // The content behind the Settings and Help buttons at the console's bottom right.
   settings?: ReactNode

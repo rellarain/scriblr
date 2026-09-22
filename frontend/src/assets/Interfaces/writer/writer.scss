@@ -260,7 +260,7 @@
   .wrCardPanel { background: var(--wr-card); border-radius: 8px; padding: 16px 18px; box-shadow: 0 4px 14px rgb(0 0 0 / calc(0.3 * var(--shade-k))); display: flex; flex-direction: column; gap: 12px; }
   .wrCardPanelHead { display: flex; align-items: center; gap: 10px; }
   .wrKindBadge { font-size: 10px; text-transform: uppercase; letter-spacing: 0.5px; opacity: 0.7; flex: 0 0 auto; }
-  .wrTitleField { flex: 1; min-width: 0; background: var(--wr-field); border: 0; border-radius: 4px; color: var(--ink); font-size: 13px; font-weight: 700; padding: 8px 10px; outline: none; &:focus { box-shadow: inset 0 0 0 1px var(--wr-accent); } }
+  .wrTitleField { flex: 1; min-width: 0; background: var(--wr-field); border: 0; border-radius: 4px; color: var(--ink); font-size: 13px; font-weight: 700; padding: 8px 10px; outline: none; &:focus { box-shadow: inset 0 0 0 1px var(--wr-accent); } &::placeholder { color: var(--ink-faint); } }
   .wrChildRows { display: flex; flex-direction: column; gap: 6px; }
   .wrChildRowsHead { display: flex; align-items: center; justify-content: space-between; gap: 10px; .wrLabel { margin-bottom: 0; } }
   .wrChildRow { display: flex; align-items: center; gap: 12px; width: 100%; text-align: left; padding: 10px 12px; border-radius: 4px; background: rgb(0 0 0 / calc(0.22 * var(--shade-k))); &:hover { background: color-mix(in srgb, var(--ink) 10%, transparent); } }
@@ -432,8 +432,7 @@
   .wrCoverSummary { display: flex; flex-direction: column; gap: 10px; }
   // The book's two colour selectors (ColorRange.tsx) under the summary.
   .wrCoverColors { display: flex; flex-direction: column; gap: 8px; }
-  .wrColorRow { display: grid; grid-template-columns: 132px minmax(0, 1fr); align-items: center; gap: 12px; }
-  .wrColorLabel { font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: 1px; color: var(--wr-cover-label); }
+  .wrColorRow { display: flex; align-items: center; }
   .wrColorToggle { display: inline-flex; align-items: center; gap: 8px; cursor: pointer; }
   .wrColorToggle input {
     position: relative; flex: 0 0 auto; width: 30px; height: 16px; border-radius: 8px; background: rgba(0, 0, 0, 0.4); cursor: pointer; transition: background 0.15s;
@@ -523,7 +522,7 @@
   .wrPageMetaRow { display: flex; flex-wrap: wrap; align-items: baseline; font-size: 11px; color: var(--wr-page-muted); > * + *::before { content: '\00b7'; margin: 0 8px; } }
   .wrPageKicker { font-size: 12px; font-weight: 700; text-transform: uppercase; letter-spacing: 1.5px; color: var(--wr-page-muted); }
   .wrPageTitle { font-family: Georgia, 'Times New Roman', serif; font-size: 24px; font-weight: 700; }
-  .wrPageTitleInput { flex: 1; min-width: 0; background: transparent; border: 0; outline: none; font-family: Georgia, 'Times New Roman', serif; font-size: 24px; font-weight: 700; color: var(--wr-ink); padding: 0; &:focus { box-shadow: inset 0 -1px 0 var(--wr-accent); } }
+  .wrPageTitleInput { flex: 1; min-width: 0; background: transparent; border: 0; outline: none; font-family: Georgia, 'Times New Roman', serif; font-size: 24px; font-weight: 700; color: var(--wr-ink); padding: 0; &:focus { box-shadow: inset 0 -1px 0 var(--wr-accent); } &::placeholder { color: color-mix(in srgb, var(--wr-ink) 40%, transparent); } }
   .wrPageMuted { margin: 0; font-size: 13px; color: var(--paper-muted); }
   .wrPageError { margin: 0; font-size: 12px; color: var(--paper-error); }
 
@@ -559,7 +558,7 @@
   .wrNodeLabel--moment { flex: 0 0 auto; min-width: 0; text-align: right; }
   .wrNodeHandle { display: inline-flex; align-items: center; gap: 6px; flex: 0 0 auto; }
   .wrNodeLabel { font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 1px; color: var(--paper-label); min-width: 62px; }
-  .wrOutlineInput { flex: 1 1 0; min-width: 0; box-sizing: border-box; border: 1px solid var(--wr-page-line); outline: none; background: var(--paper-field); color: var(--wr-ink); font-family: Georgia, 'Times New Roman', serif; font-size: 13px; padding: 6px 10px; border-radius: 4px; &:focus { border-color: var(--wr-accent); } }
+  .wrOutlineInput { flex: 1 1 0; min-width: 0; box-sizing: border-box; border: 1px solid var(--wr-page-line); outline: none; background: var(--paper-field); color: var(--wr-ink); font-family: Georgia, 'Times New Roman', serif; font-size: 13px; padding: 6px 10px; border-radius: 4px; &:focus { border-color: var(--wr-accent); } &::placeholder { color: var(--paper-placeholder); } }
   .wrSceneFields { margin-left: auto; display: flex; gap: 6px; min-width: 0; }
   .wrSceneField {
     box-sizing: border-box; border: 0; outline: none; border-radius: 4px; padding: 6px 8px; font-size: 12px; background: var(--wr-page); color: var(--paper-ink2);

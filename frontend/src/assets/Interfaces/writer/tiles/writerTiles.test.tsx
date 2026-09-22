@@ -48,7 +48,7 @@ const shapes = () => Array.from(document.querySelectorAll('[data-tile-id]')).map
 describe('Shelves tiles', () => {
   it('are the template, schedule, analytics and scratchpad', () => {
     grid(shelvesTiles(workspace()), 'shelves')
-    expect(shapes()).toEqual(['template:link', 'schedule:landscape', 'analytics:large', 'scratchpad:portrait'])
+    expect(shapes()).toEqual(['template:mini', 'schedule:mid', 'analytics:mid', 'scratchpad:mid'])
   })
 
   it('shows the chapters of each project in the analytics tile', () => {
@@ -78,7 +78,7 @@ describe('Shelves tiles', () => {
   it('expands the schedule tile into its panel', async () => {
     const user = userEvent.setup()
     grid(shelvesTiles(workspace()), 'shelves')
-    await user.click(within(tile('schedule')).getByRole('button', { name: 'Schedule' }))
+    await user.click(within(tile('schedule')).getByRole('button', { name: 'Open Schedule' }))
     const region = screen.getByRole('region', { name: 'Schedule' })
     expect(within(region).getByText('Routines')).toBeTruthy()
   })
@@ -87,9 +87,9 @@ describe('Shelves tiles', () => {
 describe('Shelf tiles', () => {
   it('are the working editors as summary tiles, then placeholders, then link tiles', () => {
     grid(shelfTiles(workspace()), 'shelf')
-    // Link tiles (editor, template) stack as a fixed strip above the rest of the grid.
+    // Mini tiles (schedule, history, editor, template) stack as a fixed strip above the rest.
     expect(shapes()).toEqual([
-      'editor:link', 'template:link', 'plot:large', 'outline:portrait', 'schedule:landscape', 'analytics:landscape', 'history:small',
+      'schedule:mini', 'history:mini', 'editor:mini', 'template:mini', 'plot:mid', 'outline:mid', 'analytics:mid',
     ])
   })
 
@@ -113,7 +113,7 @@ describe('Shelf tiles', () => {
     const user = userEvent.setup()
     grid(shelfTiles(workspace()), 'shelf')
     expect(within(tile('editor')).getByText('1 time system')).toBeTruthy()
-    await user.click(within(tile('history')).getByRole('button', { name: 'History' }))
+    await user.click(within(tile('history')).getByRole('button', { name: 'Open History' }))
     expect(within(screen.getByRole('region', { name: 'History' })).getByText(/version and activity/)).toBeTruthy()
   })
 })
@@ -122,9 +122,9 @@ describe('Book link tiles', () => {
   it('are the outline template and the arc outline, as short link tiles', async () => {
     const user = userEvent.setup()
     grid(bookLinkTiles(workspace()), 'book')
-    expect(shapes()).toEqual(['outlineTemplate:link', 'arcOutline:link'])
+    expect(shapes()).toEqual(['outlineTemplate:mini', 'arcOutline:mini'])
     expect(within(tile('arcOutline')).getByText('1 arc')).toBeTruthy()
-    await user.click(tile('arcOutline'))
+    await user.click(within(tile('arcOutline')).getByRole('button', { name: 'Open Arc outline' }))
     expect(within(screen.getByRole('region', { name: 'Arc outline' })).getByText(/Manage this book/)).toBeTruthy()
   })
 })

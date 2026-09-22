@@ -6,8 +6,9 @@ import TUI from './assets/Interfaces/TUI'
 import VUI from './assets/Interfaces/VUI'
 import Header from './Header'
 import Sidebar from './Sidebar'
-import type { MainInterface, HuiPanel, AuiSize } from './interfaceShellTypes'
+import type { MainInterface, HuiPanel } from './interfaceShellTypes'
 import { useHelperChats } from './assets/Interfaces/helper/useHelperChats'
+import { useStoredState } from './assets/Interfaces/writer/storage'
 import { CURRENT_USER } from './userSeed'
 import { DAY_ACTIVITY } from './activitySeed'
 import { useSettings } from './settings/settingsStore'
@@ -15,6 +16,8 @@ import { useThemeEngine } from './theme/useTheme'
 
 const SIDEBAR_DIVIDER_W = 40
 const SIDEBAR_PANEL_W = 400
+// AUI's own width snaps to multiples of this (a "column"), at any container size.
+const AUI_COLUMN_W = 400
 
 function App() {
   const [activeMain, setActiveMain] = useState<MainInterface>('writer')
@@ -25,7 +28,9 @@ function App() {
   const isAdmin = theme.effectiveRole === 'admin'
   const [huiExpanded, setHuiExpanded] = useState<boolean>(false)
   const [auiOpen, setAuiOpen] = useState<boolean>(false)
-  const [auiSize, setAuiSize] = useState<AuiSize>('half')
+  // Dragged from AUI's own outer edge (Sidebar.tsx's AuiResize), snapped to
+  // AUI_COLUMN_W-wide columns; remembered like the Writer sidebar's own width.
+  const [auiWidth, setAuiWidth] = useStoredState<number>('scriblr.admin.width', 2 * AUI_COLUMN_W)
   const [huiPanel, setHuiPanel] = useState<HuiPanel>('inbox')
   const [drawerOpen, setDrawerOpen] = useState<boolean>(false)
   const helper = useHelperChats()
@@ -78,6 +83,11 @@ function App() {
     setAuiOpen(open => !open)
   }
 
+  // Snaps to the nearest column width (a multiple of AUI_COLUMN_W), never below one.
+  function handleSetAuiWidth(width: number) {
+    setAuiWidth(Math.max(AUI_COLUMN_W, Math.round(width / AUI_COLUMN_W) * AUI_COLUMN_W))
+  }
+
   // Queue button breakdown: active (currently open, being helped) vs pending
   // (waiting to be helped) -- a heuristic off each profile's free-text
   // status -- crossed with the profile's admin/standard userType.
@@ -111,20 +121,14 @@ function App() {
 
   // Sidebar now has up to three columns: AUI's panel (outermost), the
   // persistent 40px divider, and HUI's own panel (innermost, Mainscreen
-  // edge). AUI's own width is picked via the size buttons at the bottom
-  // of its rail (auiSize): 'full' takes the rest of the screen -- minus
-  // the divider and whatever width HUI's own panel currently occupies --
-  // 'half' is half the viewport regardless of HUI, 'column' matches a
-  // single HUI-panel-width column. Only 'full' depends on HUI's width;
-  // opening AUI at 'full' with Mainscreen showing through is effectively
-  // an admin takeover of the screen (Mainscreen's own width collapses to
-  // 0 via --sidebar-w below).
+  // edge). AUI's own width is dragged from its outer edge (Sidebar.tsx's
+  // AuiResize) and snapped to AUI_COLUMN_W columns; `min()` keeps it from
+  // ever exceeding the rest of the screen (minus the divider and whatever
+  // width HUI's own panel currently occupies) even if the window shrinks --
+  // wide enough to cover the whole screen is effectively an admin takeover
+  // (Mainscreen's own width collapses to 0 via --sidebar-w below).
   const huiWidthExpr = huiExpanded ? `${SIDEBAR_PANEL_W}px` : '0px'
-  const auiOpenWidthExpr = auiSize === 'full'
-    ? `calc(100vw - ${SIDEBAR_DIVIDER_W}px - ${huiWidthExpr})`
-    : auiSize === 'half'
-    ? '50vw'
-    : `${SIDEBAR_PANEL_W}px`
+  const auiOpenWidthExpr = `min(${auiWidth}px, calc(100vw - ${SIDEBAR_DIVIDER_W}px - ${huiWidthExpr}))`
   const auiWidthExpr = auiOpen && isAdmin ? auiOpenWidthExpr : '0px'
   const sidebarWidthExpr = `calc(${SIDEBAR_DIVIDER_W}px + ${auiWidthExpr} + ${huiWidthExpr})`
 
@@ -163,8 +167,8 @@ function App() {
         pendingStandardCount={pendingStandardCount}
         auiOpen={auiOpen && isAdmin}
         onToggleAui={handleToggleAui}
-        auiSize={auiSize}
-        onSetAuiSize={setAuiSize}
+        auiWidth={auiWidth}
+        onSetAuiWidth={handleSetAuiWidth}
         isAdmin={isAdmin}
       />
 

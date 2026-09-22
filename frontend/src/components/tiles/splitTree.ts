@@ -15,11 +15,11 @@ export interface Rect { x: number; y: number; w: number; h: number }
 
 export const isLeaf = (n: SplitNode): n is SplitLeaf => !('dir' in n)
 
-// A leaf's minimum footprint (its content minimum); a fixed (link) leaf's minimum
+// A leaf's minimum footprint (its content minimum); a fixed (mini) leaf's minimum
 // height is its fixed height, not the general minimum.
 export const MIN_LEAF_W = MIN_COLUMN
 export const MIN_LEAF_H = ROW_UNIT * 2 + GRID_GAP
-export const LINK_H = ROW_UNIT
+export const MINI_H = ROW_UNIT
 
 const fixedLeaf = (id: string): SplitLeaf => ({ id, fixed: true })
 const leaf = (id: string): SplitLeaf => ({ id })
@@ -68,7 +68,7 @@ function setAtPath(node: SplitNode, path: Path, fn: (n: SplitBranch) => SplitBra
 
 // A leaf's minimum size, and a branch's (its children's, combined along the split axis).
 export function minSize(node: SplitNode): { w: number; h: number } {
-  if (isLeaf(node)) return { w: MIN_LEAF_W, h: node.fixed ? LINK_H : MIN_LEAF_H }
+  if (isLeaf(node)) return { w: MIN_LEAF_W, h: node.fixed ? MINI_H : MIN_LEAF_H }
   const ma = minSize(node.a)
   const mb = minSize(node.b)
   if (node.dir === 'row') return { w: ma.w + mb.w + GRID_GAP, h: Math.max(ma.h, mb.h) }
@@ -84,9 +84,9 @@ export function splitSizes(branch: SplitBranch, total: number): [number, number]
   const aFixed = isLeaf(a) && a.fixed
   const bFixed = isLeaf(b) && b.fixed
   const inner = total - GRID_GAP
-  if (aFixed && !bFixed) { const av = Math.min(LINK_H, Math.max(0, inner)); return [av, inner - av] }
-  if (bFixed && !aFixed) { const bv = Math.min(LINK_H, Math.max(0, inner)); return [inner - bv, bv] }
-  if (aFixed && bFixed) return [LINK_H, LINK_H]
+  if (aFixed && !bFixed) { const av = Math.min(MINI_H, Math.max(0, inner)); return [av, inner - av] }
+  if (bFixed && !aFixed) { const bv = Math.min(MINI_H, Math.max(0, inner)); return [inner - bv, bv] }
+  if (aFixed && bFixed) return [MINI_H, MINI_H]
   const minA = dir === 'row' ? minSize(a).w : minSize(a).h
   const minB = dir === 'row' ? minSize(b).w : minSize(b).h
   const lo = inner > 0 ? minA / inner : 0
@@ -148,15 +148,7 @@ export function resizeBranch(tree: SplitNode, path: Path, ratio: number): SplitN
   return setAtPath(tree, path, b => ({ ...b, ratio: clamped }))
 }
 
-// A branch's ratio back to what `seed` has at the same path (double-click a divider,
-// or "Reset layout" for the whole tree via `seed === buildTree(...)`).
-export function resetBranch(tree: SplitNode, path: Path, seed: SplitNode): SplitNode {
-  const seedNode = getAtPath(seed, path)
-  if (isLeaf(seedNode)) return tree
-  return setAtPath(tree, path, b => ({ ...b, ratio: seedNode.ratio }))
-}
-
-// Exchange two tiles' places: each area keeps its own size (and fixed/link status),
+// Exchange two tiles' places: each area keeps its own size (and fixed/mini status),
 // and the tiles simply trade which area they're in.
 export function swapLeaves(tree: SplitNode, idA: string, idB: string): SplitNode {
   if (idA === idB) return tree
@@ -174,8 +166,8 @@ export function swapLeaves(tree: SplitNode, idA: string, idB: string): SplitNode
   return map(tree)
 }
 
-// A leaf's fixed (link) flag, changed in place; the branch that directly holds it is
-// straightened out by `fixup`.
+// A leaf's fixed (mini) flag, changed in place; the branch that directly holds it is
+// straightened out by `fixup`. This is what toggling a tile between mini and mid does.
 export function setFixed(tree: SplitNode, id: string, fixed: boolean): SplitNode {
   function map(node: SplitNode): SplitNode {
     if (isLeaf(node)) return node.id === id ? { ...node, fixed } : node
@@ -197,66 +189,38 @@ export function flattenOneColumn(node: SplitNode): SplitNode {
   return { dir: 'col', ratio: node.ratio, a, b }
 }
 
-// Nudge a leaf's containing branch toward a size preset for `shape` (the tile-shape
-// button): small/portrait narrower or shorter, landscape/large wider or taller,
-// depending on which axis that branch actually splits.
-export function presetRatio(tree: SplitNode, id: string, shape: TileShape): SplitNode {
-  if (shape === 'link') return setFixed(tree, id, true)
-  const withoutFixed = setFixed(tree, id, false)
-  const path = pathOf(withoutFixed, id)
-  if (!path || path.length === 0) return withoutFixed
-  const parentPath = path.slice(0, -1)
-  const side = path[path.length - 1]
-  const parent = getAtPath(withoutFixed, parentPath)
-  if (isLeaf(parent)) return withoutFixed
-  const wide = shape === 'landscape' || shape === 'large'
-  const tall = shape === 'portrait' || shape === 'large'
-  const forA = parent.dir === 'row' ? (wide ? 0.72 : 0.2) : (tall ? 0.72 : 0.2)
-  const ratio = side === 'a' ? forA : 1 - forA
-  return resizeBranch(withoutFixed, parentPath, ratio)
-}
-
-function pathOf(node: SplitNode, id: string, path: Path = []): Path | null {
-  if (isLeaf(node)) return node.id === id ? path : null
-  return pathOf(node.a, id, [...path, 'a']) ?? pathOf(node.b, id, [...path, 'b'])
-}
-
 // Builds an initial tree from a grid's placed tiles (order + shape), used to seed a
-// fresh grid and as the "default" a Reset restores. Link-shaped tiles form a fixed
-// stack above the rest; everything else is split in half, alternating axis, biased
-// by each tile's own shape.
+// fresh grid. Mini tiles form a fixed stack above the rest; the mid tiles split the
+// remaining space evenly, alternating axis.
 export function buildTree(placed: Array<{ id: string; shape: TileShape }>): SplitNode | null {
   if (placed.length === 0) return null
-  const links = placed.filter(p => p.shape === 'link')
-  const rest = placed.filter(p => p.shape !== 'link')
+  const minis = placed.filter(p => p.shape === 'mini')
+  const rest = placed.filter(p => p.shape !== 'mini')
 
   function build(list: typeof rest, dir: SplitDir): SplitNode {
     if (list.length === 1) return leaf(list[0].id)
     const mid = Math.ceil(list.length / 2)
     const a = build(list.slice(0, mid), dir === 'row' ? 'col' : 'row')
     const b = build(list.slice(mid), dir === 'row' ? 'col' : 'row')
-    const wide = list.slice(0, mid).some(p => p.shape === 'landscape' || p.shape === 'large')
-    const tall = list.slice(0, mid).some(p => p.shape === 'portrait' || p.shape === 'large')
-    const ratio = dir === 'row' ? (wide ? 0.58 : 0.42) : (tall ? 0.58 : 0.42)
-    return { dir, ratio, a, b }
+    return { dir, ratio: 0.5, a, b }
   }
 
   if (rest.length === 0) {
-    // Every tile is link-shaped (e.g. the short link tiles above a book face): all
+    // Every tile is mini (e.g. the short link tiles above a book face): all
     // stay their fixed, short height -- nothing stretches to fill leftover space.
-    let stack: SplitNode = fixedLeaf(links[links.length - 1].id)
-    for (const link of links.slice(0, -1).reverse()) stack = col(fixedLeaf(link.id), stack)
+    let stack: SplitNode = fixedLeaf(minis[minis.length - 1].id)
+    for (const mini of minis.slice(0, -1).reverse()) stack = col(fixedLeaf(mini.id), stack)
     return fixup(stack)
   }
 
   let tree: SplitNode = build(rest, 'row')
-  for (const link of [...links].reverse()) tree = col(fixedLeaf(link.id), tree)
+  for (const mini of [...minis].reverse()) tree = col(fixedLeaf(mini.id), tree)
   return fixup(tree)
 }
 
 // Keeps a saved tree in sync with the grid's current tiles: unknown leaves are
-// pruned (replaced by their sibling), and new tiles are grafted on (link tiles
-// stacked on top, others added to the side), so ids never seen before or since
+// pruned (replaced by their sibling), and new tiles are grafted on (mini tiles
+// stacked on top, mid tiles added to the side), so ids never seen before or since
 // removed degrade the same way `applyLayout`'s order list always did.
 export function reconcile(tree: SplitNode | null, placed: Array<{ id: string; shape: TileShape }>): SplitNode {
   // Nothing saved yet: build fresh (buildTree's own order/shape heuristic), rather
@@ -278,9 +242,9 @@ export function reconcile(tree: SplitNode | null, placed: Array<{ id: string; sh
   const have = new Set(cur ? leafIds(cur) : [])
   const missing = wantIds.filter(id => !have.has(id))
   for (const id of missing) {
-    const shape = shapeOf.get(id) ?? 'small'
-    if (!cur) { cur = shape === 'link' ? fixedLeaf(id) : leaf(id); continue }
-    cur = shape === 'link' ? col(fixedLeaf(id), cur, 0.5) : row(leaf(id), cur, 0.32)
+    const shape = shapeOf.get(id) ?? 'mid'
+    if (!cur) { cur = shape === 'mini' ? fixedLeaf(id) : leaf(id); continue }
+    cur = shape === 'mini' ? col(fixedLeaf(id), cur, 0.5) : row(leaf(id), cur, 0.32)
   }
   return cur ? fixup(cur) : (buildTree(placed) ?? leaf(placed[0]?.id ?? ''))
 }
