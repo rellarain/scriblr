@@ -6,7 +6,7 @@ import { isOneColumn } from './tileShapes'
 import { nextFocus, type Box, type Direction } from './tileNav'
 import { opensConsole, type TileDef } from './tileTypes'
 import {
-  canInsertAt, computeGeometry, flattenOneColumn, getAtPath, minSize, rectAtPath, type Path, type SplitNode,
+  canInsertAt, canInsertBeside, computeGeometry, flattenOneColumn, getAtPath, minSize, rectAtPath, type Path, type SplitNode,
 } from './splitTree'
 import { useContainerSize } from './useContainerWidth'
 import { useSplitLayout } from './useSplitLayout'
@@ -24,6 +24,9 @@ export const useTileHost = (): TileHost => useContext(TileHostContext)
 
 const ARROWS: Record<string, Direction> = { ArrowLeft: 'left', ArrowRight: 'right', ArrowUp: 'up', ArrowDown: 'down' }
 const boxOf = (r: { x: number; y: number; w: number; h: number }): Box => ({ left: r.x, top: r.y, width: r.w, height: r.h })
+// The width (as a fraction of a tile's own box) of its left/right margins where
+// dropping a dragged tile splits off a new column beside it, instead of swapping.
+const EDGE_ZONE = 0.25
 
 // A grid of tiles laid out on a split tree (splitTree.ts): it always fills its own
 // container exactly (drag a divider and only its two neighbours resize -- no gaps,
@@ -77,6 +80,7 @@ function TileGrid({ gridId, tiles, crumbs, below, label, open: controlledOpen, o
   const [dragId, setDragId] = useState<string | null>(null)
   const [overId, setOverId] = useState<string | null>(null)
   const [overDivider, setOverDivider] = useState<string | null>(null)
+  const [overEdge, setOverEdge] = useState<{ id: string; side: 'left' | 'right' } | null>(null)
   const refocus = useRef<string | null>(null)
 
   // After a tile is moved with the keyboard, keep the focus on it.
@@ -143,20 +147,36 @@ function TileGrid({ gridId, tiles, crumbs, below, label, open: controlledOpen, o
     const tile = (e.currentTarget as HTMLElement).closest('.tile')
     if (tile) e.dataTransfer.setDragImage(tile, 12, 12)
   }
+  // Whether the pointer sits in a tile's left/right edge margin (and there's room
+  // to split off a new column there) rather than its middle (a swap, as usual).
+  function edgeSide(e: DragEvent, id: string): 'left' | 'right' | null {
+    if (oneColumn) return null
+    const g = geometry.tiles.find(t => t.id === id)
+    if (!g || !canInsertBeside(g.rect)) return null
+    const box = (e.currentTarget as HTMLElement).getBoundingClientRect()
+    if (box.width <= 0) return null
+    const frac = (e.clientX - box.left) / box.width
+    if (frac <= EDGE_ZONE) return 'left'
+    if (frac >= 1 - EDGE_ZONE) return 'right'
+    return null
+  }
   function onDragOver(e: DragEvent, id: string) {
     if (!dragId || dragId === id) return
     e.preventDefault()
-    setOverId(id)
+    const side = edgeSide(e, id)
+    setOverEdge(side ? { id, side } : null)
+    setOverId(side ? null : id)
     setOverDivider(null)
   }
   function onDrop(e: DragEvent, id: string) {
     if (!dragId) return
     e.preventDefault()
-    layout.swap(dragId, id)
-    setDragId(null)
-    setOverId(null)
+    const side = edgeSide(e, id)
+    if (side) layout.insertBeside(dragId, id, side)
+    else layout.swap(dragId, id)
+    endDrag()
   }
-  function endDrag() { setDragId(null); setOverId(null); setOverDivider(null) }
+  function endDrag() { setDragId(null); setOverId(null); setOverDivider(null); setOverEdge(null) }
 
   // Hovering a divider (rather than another tile) while dragging offers a different
   // drop: a new column or row wedged in right there, instead of a swap -- only when
@@ -207,6 +227,7 @@ function TileGrid({ gridId, tiles, crumbs, below, label, open: controlledOpen, o
               <Tile
                 key={p.def.id} def={p.def} rect={g.rect} fixed={g.fixed} oneColumn={oneColumn}
                 dragging={dragId === p.def.id} dropTarget={overId === p.def.id && dragId !== p.def.id}
+                edgeDrop={overEdge?.id === p.def.id ? overEdge.side : null}
                 onOpen={() => open(p.def)} onToggleTier={() => layout.toggleTier(p.def.id)}
                 onDragStart={e => onDragStart(e, p.def.id)} onDragOver={e => onDragOver(e, p.def.id)}
                 onDrop={e => onDrop(e, p.def.id)} onDragEnd={endDrag}

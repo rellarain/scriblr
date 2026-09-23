@@ -17,6 +17,9 @@ interface TileProps {
   oneColumn: boolean
   dragging: boolean
   dropTarget: boolean
+  // A dragged tile is hovering this tile's left/right edge margin -- dropping here
+  // splits off a new column beside it, rather than swapping (null: not hovering an edge).
+  edgeDrop: 'left' | 'right' | null
   onOpen: () => void
   onToggleTier: () => void
   onDragStart: (e: DragEvent) => void
@@ -29,7 +32,7 @@ interface TileProps {
 // its name and summary) or mid (its own render, scaling with its actual measured
 // size). The title toggles between them; the corner button opens the tile's console
 // (max), when it has one.
-function Tile({ def, rect, fixed, oneColumn, dragging, dropTarget, onOpen, onToggleTier, onDragStart, onDragOver, onDrop, onDragEnd }: TileProps) {
+function Tile({ def, rect, fixed, oneColumn, dragging, dropTarget, edgeDrop, onOpen, onToggleTier, onDragStart, onDragOver, onDrop, onDragEnd }: TileProps) {
   const { Icon } = def
   const canOpen = opensConsole(def) || Boolean(def.onOpen)
 
@@ -46,7 +49,10 @@ function Tile({ def, rect, fixed, oneColumn, dragging, dropTarget, onOpen, onTog
   // minis in a column that reads as one column overall) -- but its own card stays
   // one column wide, left-anchored, rather than stretching into a banner.
   const style: CSSProperties = { left: rect.x, top: rect.y, width: fixed ? Math.min(rect.w, MINI_W) : rect.w, height: rect.h }
-  const classes = ['tile', fixed ? 'tile--mini' : 'tile--mid', dragging ? 'tile--dragging' : '', dropTarget ? 'tile--drop' : ''].filter(Boolean).join(' ')
+  const classes = [
+    'tile', fixed ? 'tile--mini' : 'tile--mid', dragging ? 'tile--dragging' : '',
+    dropTarget ? 'tile--drop' : '', edgeDrop ? `tile--edge-${edgeDrop}` : '',
+  ].filter(Boolean).join(' ')
   return (
     <div
       className={classes} role="group" aria-label={def.title} tabIndex={0} data-tile-id={def.id} data-shape={fixed ? 'mini' : 'mid'} data-fixed={fixed}

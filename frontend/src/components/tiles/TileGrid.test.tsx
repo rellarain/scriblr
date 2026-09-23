@@ -49,6 +49,12 @@ const px = (el: HTMLElement, prop: 'left' | 'top' | 'width' | 'height') => parse
 const pointerEvent = (type: string, init: { pointerId?: number; button?: number; clientX?: number; clientY?: number }) =>
   Object.assign(new Event(type, { bubbles: true, cancelable: true }), { pointerId: 1, button: 0, ...init })
 
+// jsdom has no DragEvent constructor either, and fireEvent.dragOver/drop silently
+// drop clientX the same way -- build the native event by hand so edge-margin
+// detection (which reads clientX) sees it.
+const dragEvent = (type: string, init: { dataTransfer: unknown; clientX?: number }) =>
+  Object.assign(new Event(type, { bubbles: true, cancelable: true }), init)
+
 describe('TileGrid', () => {
   it('stacks a mini tile as a fixed strip below the rest, its own card one column wide', () => {
     renderGrid()
@@ -229,6 +235,58 @@ describe('TileGrid', () => {
     expect(order()).toEqual(['x', 'z', 'y'])
     expect(tile('x')).toBeTruthy()
     expect(tile('y')).toBeTruthy()
+  })
+
+  it('drops a dragged tile onto another tile\'s right edge margin to split off a new column beside it', () => {
+    // A big mock box: getBoundingClientRect stands in for both the container (so X's
+    // own computed rect clears the room-to-split minimum) and the tile div itself
+    // (so the edge-margin fraction below is read against the same box).
+    vi.spyOn(HTMLElement.prototype, 'getBoundingClientRect').mockReturnValue({ width: 1200, height: 700, top: 0, left: 0, right: 1200, bottom: 700, x: 0, y: 0, toJSON: () => ({}) })
+    const threeTiles: TileDef[] = [
+      { id: 'x', title: 'X', Icon: PlotIcon, defaultShape: 'mid', summary: 'x', render: () => <div>X body</div> },
+      { id: 'y', title: 'Y', Icon: ListIcon, defaultShape: 'mid', summary: 'y', render: () => <div>Y body</div> },
+      { id: 'z', title: 'Z', Icon: PencilIcon, defaultShape: 'mid', summary: 'z', render: () => <div>Z body</div> },
+    ]
+    renderGrid(threeTiles, 'edge-right')
+    const dataTransfer = { setData: vi.fn(), setDragImage: vi.fn(), effectAllowed: '' }
+    fireEvent.dragStart(tile('z').querySelector('.tileHead')!, { dataTransfer })
+    // Deep in X's right-edge margin (90% across the mocked 1200px-wide box).
+    fireEvent(tile('x'), dragEvent('dragover', { dataTransfer, clientX: 1080 }))
+    fireEvent(tile('x'), dragEvent('drop', { dataTransfer, clientX: 1080 }))
+    // Z is now beside X (to its right), not swapped with it -- Y is untouched elsewhere.
+    expect(order()).toEqual(['x', 'z', 'y'])
+  })
+
+  it('drops a dragged tile onto another tile\'s left edge margin to split off a new column before it', () => {
+    vi.spyOn(HTMLElement.prototype, 'getBoundingClientRect').mockReturnValue({ width: 1200, height: 700, top: 0, left: 0, right: 1200, bottom: 700, x: 0, y: 0, toJSON: () => ({}) })
+    const threeTiles: TileDef[] = [
+      { id: 'x', title: 'X', Icon: PlotIcon, defaultShape: 'mid', summary: 'x', render: () => <div>X body</div> },
+      { id: 'y', title: 'Y', Icon: ListIcon, defaultShape: 'mid', summary: 'y', render: () => <div>Y body</div> },
+      { id: 'z', title: 'Z', Icon: PencilIcon, defaultShape: 'mid', summary: 'z', render: () => <div>Z body</div> },
+    ]
+    renderGrid(threeTiles, 'edge-left')
+    const dataTransfer = { setData: vi.fn(), setDragImage: vi.fn(), effectAllowed: '' }
+    fireEvent.dragStart(tile('z').querySelector('.tileHead')!, { dataTransfer })
+    // Deep in X's left-edge margin (10% across the mocked 1200px-wide box).
+    fireEvent(tile('x'), dragEvent('dragover', { dataTransfer, clientX: 120 }))
+    fireEvent(tile('x'), dragEvent('drop', { dataTransfer, clientX: 120 }))
+    expect(order()).toEqual(['z', 'x', 'y'])
+  })
+
+  it('swaps as usual when the drop is in the middle of a tile, not its edge margin', () => {
+    vi.spyOn(HTMLElement.prototype, 'getBoundingClientRect').mockReturnValue({ width: 1200, height: 700, top: 0, left: 0, right: 1200, bottom: 700, x: 0, y: 0, toJSON: () => ({}) })
+    const threeTiles: TileDef[] = [
+      { id: 'x', title: 'X', Icon: PlotIcon, defaultShape: 'mid', summary: 'x', render: () => <div>X body</div> },
+      { id: 'y', title: 'Y', Icon: ListIcon, defaultShape: 'mid', summary: 'y', render: () => <div>Y body</div> },
+      { id: 'z', title: 'Z', Icon: PencilIcon, defaultShape: 'mid', summary: 'z', render: () => <div>Z body</div> },
+    ]
+    renderGrid(threeTiles, 'edge-middle')
+    const dataTransfer = { setData: vi.fn(), setDragImage: vi.fn(), effectAllowed: '' }
+    fireEvent.dragStart(tile('z').querySelector('.tileHead')!, { dataTransfer })
+    fireEvent(tile('x'), dragEvent('dragover', { dataTransfer, clientX: 600 }))
+    fireEvent(tile('x'), dragEvent('drop', { dataTransfer, clientX: 600 }))
+    // X and Z swapped places -- Y untouched.
+    expect(order()).toEqual(['z', 'y', 'x'])
   })
 
   it('offers no divider drop when there is no room for a third side', () => {

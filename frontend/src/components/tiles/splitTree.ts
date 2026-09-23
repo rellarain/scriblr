@@ -248,6 +248,33 @@ export function insertAtDivider(tree: SplitNode, id: string, path: Path): SplitN
   return fixup(result)
 }
 
+// Whether a leaf's own rect has room to split into two side-by-side minimum-width
+// tiles -- what dragging a tile onto its left or right edge margin would do. Every
+// leaf's minimum width is the same (MIN_LEAF_W) regardless of shape, so only the
+// rect matters here.
+export function canInsertBeside(rect: Rect): boolean {
+  return rect.w >= MIN_LEAF_W * 2 + GRID_GAP
+}
+
+// Drops a dragged tile onto another tile's left or right edge margin: wedged in as a
+// new column right beside it (not a swap), splitting that leaf's own spot into a row
+// of two -- the target keeps its own place in the tree, the dragged tile takes the
+// side it was dropped toward.
+export function insertBesideLeaf(tree: SplitNode, draggedId: string, targetId: string, side: 'left' | 'right'): SplitNode {
+  if (draggedId === targetId) return tree
+  const target = findLeaf(tree, targetId)
+  if (!target) return tree
+  const dragged = findLeaf(tree, draggedId)
+  if (!dragged) return tree
+  const newLeaf: SplitLeaf = dragged.fixed ? { id: draggedId, fixed: true } : { id: draggedId }
+  const withoutId = removeLeaf(tree, draggedId)
+  if (!withoutId) return tree
+  const newBranch: SplitBranch = side === 'left'
+    ? { dir: 'row', ratio: 0.5, a: newLeaf, b: target }
+    : { dir: 'row', ratio: 0.5, a: target, b: newLeaf }
+  return fixup(replaceRef(withoutId, target, newBranch))
+}
+
 // A leaf's fixed (mini) flag, changed in place; the branch that directly holds it is
 // straightened out by `fixup`. This is what toggling a tile between mini and mid does.
 export function setFixed(tree: SplitNode, id: string, fixed: boolean): SplitNode {

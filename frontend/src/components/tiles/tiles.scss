@@ -1,5 +1,5 @@
 // The tile grid (components/tiles). Colours are the theme tokens (theme/theme.scss),
-// so tiles follow the time-of-day palette and keep its 30-point text gap; inside a
+// so tiles follow the time-of-day palette and keep its 45-point text gap; inside a
 // book's scope they take the book's colours.
 
 $tile-surface: linear-gradient(160deg, var(--surface-raised-a), var(--surface-raised-b));
@@ -77,6 +77,10 @@ $tile-surface: linear-gradient(160deg, var(--surface-raised-a), var(--surface-ra
   &--mini { justify-content: center; padding-top: 0; padding-bottom: 0; }
   &--dragging { opacity: 0.5; }
   &--drop { box-shadow: inset 0 0 0 2px var(--accent); }
+  // Hovering this tile's left/right edge margin while dragging another one over it:
+  // a bar at that edge previews the new column a drop there would split off.
+  &--edge-left { box-shadow: inset 4px 0 0 0 var(--accent); }
+  &--edge-right { box-shadow: inset -4px 0 0 0 var(--accent); }
   p { margin: 0; }
 }
 

@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import {
-  MINI_H, MIN_LEAF_H, MIN_LEAF_W, buildTree, canInsertAt, computeGeometry, fixup, flattenOneColumn, insertAtDivider, isLeaf,
-  leafIds, minSize, reconcile, resizeBranch, setFixed, swapLeaves,
+  MINI_H, MIN_LEAF_H, MIN_LEAF_W, buildTree, canInsertAt, canInsertBeside, computeGeometry, fixup, flattenOneColumn,
+  insertAtDivider, insertBesideLeaf, isLeaf, leafIds, minSize, reconcile, resizeBranch, setFixed, swapLeaves,
 } from './splitTree'
 import type { SplitNode } from './splitTree'
 
@@ -212,6 +212,58 @@ describe('insertAtDivider', () => {
     const tree: SplitNode = { dir: 'row', ratio: 0.5, a: { id: 'a' }, b: { id: 'b' } }
     expect(insertAtDivider(tree, 'ghost', [])).toBe(tree)
     expect(insertAtDivider(tree, 'a', ['a'])).toBe(tree)
+  })
+})
+
+describe('canInsertBeside', () => {
+  it('is true when the rect has room for two minimum-width columns', () => {
+    expect(canInsertBeside({ x: 0, y: 0, w: 300, h: 200 })).toBe(true)
+  })
+
+  it('is false when the rect is too narrow to split', () => {
+    expect(canInsertBeside({ x: 0, y: 0, w: 200, h: 200 })).toBe(false)
+  })
+})
+
+describe('insertBesideLeaf', () => {
+  it('wedges a tile from elsewhere in the tree onto the left of a target leaf', () => {
+    const tree: SplitNode = { dir: 'row', ratio: 0.5, a: { id: 'other' }, b: { id: 'target' } }
+    const result = insertBesideLeaf(tree, 'other', 'target', 'left')
+    expect(leafIds(result)).toEqual(['other', 'target'])
+    const geo = computeGeometry(result, { x: 0, y: 0, w: 400, h: 400 })
+    const other = geo.tiles.find(t => t.id === 'other')!
+    const target = geo.tiles.find(t => t.id === 'target')!
+    expect(other.rect.x).toBeLessThan(target.rect.x)
+  })
+
+  it('wedges a tile onto the right of a target leaf, keeping the target in its own slot', () => {
+    const tree: SplitNode = {
+      dir: 'col', ratio: 0.5,
+      a: { id: 'target' },
+      b: { dir: 'row', ratio: 0.5, a: { id: 'x' }, b: { id: 'y' } },
+    }
+    const result = insertBesideLeaf(tree, 'y', 'target', 'right')
+    expect(leafIds(result)).toEqual(['target', 'y', 'x'])
+    const geo = computeGeometry(result, { x: 0, y: 0, w: 400, h: 400 })
+    const target = geo.tiles.find(t => t.id === 'target')!
+    const y = geo.tiles.find(t => t.id === 'y')!
+    expect(target.rect.x).toBeLessThan(y.rect.x)
+    // x's old sibling (y) is gone, so x now sits alone where the (x, y) branch was.
+    expect(geo.tiles.find(t => t.id === 'x')!.rect.w).toBeGreaterThan(target.rect.w)
+  })
+
+  it('keeps a fixed (mini) tile fixed at its new spot', () => {
+    const tree: SplitNode = { dir: 'row', ratio: 0.5, a: { id: 'other', fixed: true }, b: { id: 'target' } }
+    const result = insertBesideLeaf(tree, 'other', 'target', 'left')
+    const geo = computeGeometry(result, { x: 0, y: 0, w: 400, h: 400 })
+    expect(geo.tiles.find(t => t.id === 'other')!.fixed).toBe(true)
+  })
+
+  it('does nothing for the same tile, an unknown id, or an unknown target', () => {
+    const tree: SplitNode = { dir: 'row', ratio: 0.5, a: { id: 'a' }, b: { id: 'b' } }
+    expect(insertBesideLeaf(tree, 'a', 'a', 'left')).toBe(tree)
+    expect(insertBesideLeaf(tree, 'ghost', 'a', 'left')).toBe(tree)
+    expect(insertBesideLeaf(tree, 'a', 'ghost', 'left')).toBe(tree)
   })
 })
 

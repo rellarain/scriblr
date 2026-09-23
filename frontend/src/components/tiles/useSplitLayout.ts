@@ -3,7 +3,8 @@ import { getKv } from '../../settings/settingsStore'
 import { useStoredState } from '../../assets/Interfaces/writer/storage'
 import { applyLayout, type PlacedTile } from './tileLayout'
 import {
-  insertAtDivider, leafIds, reconcile, resizeBranch as resizeBranchAt, setFixed, swapLeaves as swapLeavesAt, type Path, type SplitNode,
+  insertAtDivider, insertBesideLeaf, leafIds, reconcile, resizeBranch as resizeBranchAt, setFixed, swapLeaves as swapLeavesAt,
+  type Path, type SplitNode,
 } from './splitTree'
 import type { TileDef } from './tileTypes'
 
@@ -59,6 +60,10 @@ export function useSplitLayout(gridId: string, defs: TileDef[]) {
     // Drops a dragged tile onto a divider instead of another tile: a new column or
     // row for it, wedged in right at that divider, rather than swapping places.
     insertAt: (id: string, path: Path) => update(t => ({ tree: insertAtDivider(t, id, path) })),
+    // Drops a dragged tile onto another tile's left/right edge margin: a new column
+    // beside it, rather than swapping places with it.
+    insertBeside: (draggedId: string, targetId: string, side: 'left' | 'right') =>
+      update(t => ({ tree: insertBesideLeaf(t, draggedId, targetId, side) })),
     // Toggles a tile between mini (a fixed, short strip) and mid (its own full,
     // resizable render). Clicking a tile's title does this.
     toggleTier: (id: string) => {
