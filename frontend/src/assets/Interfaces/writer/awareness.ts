@@ -28,7 +28,7 @@ export function awarenessNext(state: Awareness | null | undefined): Awareness {
 // A plotpoint's shade in the plot editor, from its book's hue. The strengths are
 // the zone's own: saturated is the accent's saturation, desaturated the theme's;
 // bright and dark are the accent's lightness plus and minus AWARENESS_SHIFT (a
-// dark shade stays light enough for either ink to keep its 30-point gap, so a
+// dark shade stays light enough for either ink to keep its MIN_TEXT_GAP gap, so a
 // hue is never stuck with the worse one). The text is chosen for the fill (fillInk).
 //   front  saturated,   bright     back  saturated,   dark
 //   mid    desaturated, bright     off   desaturated, dark

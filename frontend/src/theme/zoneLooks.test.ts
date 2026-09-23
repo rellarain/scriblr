@@ -2,7 +2,10 @@ import { describe, expect, it } from 'vitest'
 import { DEFAULT_PALETTE } from './defaults'
 import { contrastRatio } from './contrast'
 import { deriveTokens } from './tokens'
-import { DIM_STEP, HOVER_STEP, INK_STRENGTH, MIN_TEXT_GAP, PAPER_LOOKS, SIDEBAR_SHADE_1, SURFACE_OFFSETS, ZONE_LOOKS, fillInk, resolvePalette, zoneInk } from './zoneLooks'
+import {
+  DIM_STEP, HOVER_STEP, INK_STRENGTH, MIN_TEXT_GAP, PAPER_ERROR_SHIFT, PAPER_LOOKS, SIDEBAR_SHADE_1, SURFACE_OFFSETS, ZONE_LOOKS,
+  fillInk, resolvePalette, zoneInk,
+} from './zoneLooks'
 import { ZONE_KEYS, type ZoneKey } from './types'
 
 // The rule: text is at least MIN_TEXT_GAP HSL lightness points from what it sits on.
@@ -33,7 +36,7 @@ describe.each(ZONE_KEYS)('%s look', zone => {
     expect(look.themeL < 50).toBe(look.mode === 'dark')
   })
 
-  it('keeps every theme surface 30+ points from the ink, and from its muted and faint versions', () => {
+  it('keeps every theme surface 45+ points from the ink, and from its muted and faint versions', () => {
     const shadeK = look.mode === 'dark' ? 1 : 0.55
     const { muted, faint } = INK_STRENGTH[look.mode]
     for (const offset of SURFACE_OFFSETS) {
@@ -46,7 +49,7 @@ describe.each(ZONE_KEYS)('%s look', zone => {
     }
   })
 
-  it('keeps the sidebar\'s first shade 30+ points from the ink too, however it steps for this mode', () => {
+  it('keeps the sidebar\'s first shade 45+ points from the ink too, however it steps for this mode', () => {
     const shadeK = look.mode === 'dark' ? 1 : 0.55
     const { muted, faint } = INK_STRENGTH[look.mode]
     for (const sink of SINK) {
@@ -57,16 +60,25 @@ describe.each(ZONE_KEYS)('%s look', zone => {
     }
   })
 
-  it('picks the better ink for every hue, 30+ points from the fill and from its hover and dim shades', () => {
+  it('picks the better ink for every hue, 45+ points from the fill and from its hover and dim shades', () => {
     for (const [s, l] of [[look.accentS, look.accentL], [look.alertS, look.alertL]]) {
       for (let h = 0; h < 360; h += 5) {
         const fill = { h, s, l }
         const { ink, dir } = fillInk(fill, 330)
         expect(gap(ink.l, l)).toBeGreaterThanOrEqual(MIN_TEXT_GAP)
-        const other = ink.l > 50 ? { h: 330, s: 12, l: 8 } : { h: 0, s: 0, l: 100 }
+        const other = ink.l > 50 ? { h: 330, s: 12, l: 3 } : { h: 0, s: 0, l: 100 }
+        const otherOk = gap(other.l, l) >= MIN_TEXT_GAP
         const best = contrastRatio(ink, fill)
-        expect(best).toBeGreaterThanOrEqual(contrastRatio(other, fill))
-        expect(best).toBeGreaterThanOrEqual(4.2) // the worst case of the better of the two inks
+        // Only a genuine tie (both inks clear the floor) is decided by contrast --
+        // at today's fixed accent/alert lightnesses that never happens at this
+        // width, but stays correct if those values ever move closer together.
+        if (otherOk) expect(best).toBeGreaterThanOrEqual(contrastRatio(other, fill))
+        // The forced ink's own contrast, not the better of two choices any more --
+        // worst case is a saturated yellow alert fill in Day/Dawn, forced to white
+        // text (~1.28:1) since dark no longer clears 45 points there at all. A real,
+        // accepted readability cost of the hard 45-point floor (measured, not
+        // designed for), not a typo.
+        expect(best).toBeGreaterThanOrEqual(1.28)
         for (const step of [HOVER_STEP, DIM_STEP]) {
           const shade = { h, s, l: clamp(l + step * dir) }
           expect(gap(ink.l, shade.l)).toBeGreaterThanOrEqual(MIN_TEXT_GAP)
@@ -76,21 +88,23 @@ describe.each(ZONE_KEYS)('%s look', zone => {
     }
   })
 
-  it('keeps the Writer page text 30+ points from the page, its cards and its fields', () => {
+  it('keeps the Writer page text 45+ points from the page, its cards and its fields', () => {
     const paper = PAPER_LOOKS[look.mode]
     // The steps the page's surfaces are written with: paper-l - n * dir (a field is n = -3).
     for (const n of [0, 1, 2, 3, 5, 6, -3]) {
       const bg = look.paperL - n * paper.dir
-      // The page's error text is the alert colour itself.
-      for (const text of [paper.ink, paper.ink2, paper.label, paper.muted, paper.placeholder, look.alertL]) {
+      // The page's error text is the alert colour, stepped further from the paper
+      // like every other paper shade (--paper-error in theme.scss).
+      const paperError = look.alertL - PAPER_ERROR_SHIFT * paper.dir
+      for (const text of [paper.ink, paper.ink2, paper.label, paper.muted, paper.placeholder, paperError]) {
         expect(gap(text, bg)).toBeGreaterThanOrEqual(MIN_TEXT_GAP)
       }
-      // Draft mode's numbers and descriptions are the page ink at 60% and 75%.
-      for (const alpha of [0.6, 0.75]) expect(gap(over(paper.ink, bg, alpha), bg)).toBeGreaterThanOrEqual(MIN_TEXT_GAP)
+      // Draft mode's numbers and descriptions are the page ink at 67% and 75%.
+      for (const alpha of [0.67, 0.75]) expect(gap(over(paper.ink, bg, alpha), bg)).toBeGreaterThanOrEqual(MIN_TEXT_GAP)
     }
   })
 
-  it('keeps the reaction bars\' text 30+ points from their fill', () => {
+  it('keeps the reaction bars\' text 45+ points from their fill', () => {
     const paper = PAPER_LOOKS[look.mode]
     expect(gap(paper.like, paper.react)).toBeGreaterThanOrEqual(MIN_TEXT_GAP)
     expect(gap(look.alertL, paper.react)).toBeGreaterThanOrEqual(MIN_TEXT_GAP)
@@ -147,20 +161,25 @@ describe('deriveTokens', () => {
 
   it('uses the zone ink for the theme and picks the text of each fill for that fill', () => {
     const day = deriveTokens(DEFAULT_PALETTE, 'admin', 'day')
-    expect(day['--ink']).toBe('hsl(330, 12%, 8%)')
+    expect(day['--ink']).toBe('hsl(330, 12%, 3%)')
     expect(deriveTokens(DEFAULT_PALETTE, 'admin', 'night')['--ink']).toBe('hsl(0, 0%, 100%)')
     expect(deriveTokens(DEFAULT_PALETTE, 'admin', 'night')['--paper-dir']).toBe('-1')
-    // the default violet admin accent is dark in the light zones (light text), the orange accent is light (dark text)
+    // At this width only one ink ever clears day's accent lightness (light), so
+    // every accent/admin-accent fill gets white text there regardless of hue --
+    // there's no hue narrow enough for the dark ink to still be "ok" alongside it.
     expect(day['--on-accent2']).toBe('hsl(0, 0%, 100%)')
-    expect(day['--on-accent']).toBe('hsl(330, 12%, 8%)')
-    // a yellow accent at night gets dark text, not the white the zone ink would give
+    expect(day['--on-accent']).toBe('hsl(0, 0%, 100%)')
     const yellow = { ...DEFAULT_PALETTE, accent: { h: 60 } }
-    expect(deriveTokens(yellow, 'user', 'night')['--on-accent']).toBe('hsl(330, 12%, 8%)')
+    expect(deriveTokens(yellow, 'user', 'day')['--on-accent']).toBe('hsl(0, 0%, 100%)')
+    // Night's accent lightness is the mirror image: only dark ink ever clears it.
+    expect(deriveTokens(yellow, 'user', 'night')['--on-accent']).toBe('hsl(330, 12%, 3%)')
   })
 
   it('steps hovers and dims of each fill away from the text on it', () => {
     const day = deriveTokens(DEFAULT_PALETTE, 'admin', 'day')
-    expect([day['--accent-dir'], day['--accent2-dir'], day['--accent-away'], day['--accent2-away']]).toEqual(['1', '-1', 'hsl(0, 0%, 100%)', 'hsl(0, 0%, 0%)'])
+    // Both accents are forced to the same (light) ink in Day (see above), so both
+    // step the same way now too.
+    expect([day['--accent-dir'], day['--accent2-dir'], day['--accent-away'], day['--accent2-away']]).toEqual(['-1', '-1', 'hsl(0, 0%, 0%)', 'hsl(0, 0%, 0%)'])
     expect(deriveTokens({ ...DEFAULT_PALETTE, accent: { h: 60 } }, 'user', 'night')['--accent-dir']).toBe('1')
   })
 

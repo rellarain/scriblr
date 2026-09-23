@@ -21,9 +21,11 @@ describe('derivedShades', () => {
   it('lists fill, hover and dim for the accent, and fill only for the alert', () => {
     const accent = derivedShades(DEFAULT_PALETTE, 'accent', 'day')
     expect(accent.map(s => s.label)).toEqual(['Fill', 'Hover', 'Dim'])
-    expect(accent[1].color.l).toBe(accent[0].color.l + 12) // lighter: away from the dark text the orange accent gets
+    // Darker: away from the white text the orange accent is forced to at this width
+    // (only one ink ever clears Day's fixed accent lightness, regardless of hue).
+    expect(accent[1].color.l).toBe(accent[0].color.l - 12)
     expect(accent[2].color.s).toBe(accent[0].color.s - 20)
-    expect(accent[2].color.l).toBe(accent[0].color.l + 14)
+    expect(accent[2].color.l).toBe(accent[0].color.l - 14)
     expect(derivedShades(DEFAULT_PALETTE, 'alert', 'day').map(s => s.label)).toEqual(['Fill'])
     expect(derivedShades(DEFAULT_PALETTE, 'accent2', 'day').map(s => s.label)).toEqual(['Fill', 'Hover'])
   })

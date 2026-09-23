@@ -9,11 +9,13 @@ const palette = (h: number): ZonePalette => ({ theme: { h }, accent: { h: (h + 4
 const HUES = Array.from({ length: 36 }, (_, i) => i * 10)
 
 describe('skyLook', () => {
-  it.each(ZONE_KEYS)('%s: the time text is 30+ lightness points from the sky at every hue, locked or not', zone => {
+  it.each(ZONE_KEYS)('%s: the time text is 45+ lightness points from the sky at every hue, locked or not, and a valid colour', zone => {
     for (const h of HUES) {
       const look = skyLook(zone, palette(h))
       for (const text of [look.text, look.textLocked]) {
         const l = lightnessOf(text)
+        expect(l).toBeGreaterThanOrEqual(0)
+        expect(l).toBeLessThanOrEqual(100)
         expect(Math.abs(l - look.band.min)).toBeGreaterThanOrEqual(MIN_TEXT_GAP - 1e-6)
         expect(Math.abs(l - look.band.max)).toBeGreaterThanOrEqual(MIN_TEXT_GAP - 1e-6)
       }
@@ -38,7 +40,7 @@ describe('skyLook', () => {
     expect(night.sky).toBe(`hsl(${p.theme.h}, ${ZONE_LOOKS.night.themeS}%, 10%)`)
     expect(skyLook('dawn', p).sky).toMatch(/^linear-gradient\(to top, hsl\(200, 15%, 92%\), hsl\(200, 15%, 58%\)\)$/)
     expect(skyLook('dusk', p).sky).toBe(
-      `linear-gradient(to top, hsl(${p.accent.h}, ${ZONE_LOOKS.dusk.accentS}%, 74%), hsl(${p.alert.h}, ${ZONE_LOOKS.dusk.alertS}%, 24%))`,
+      `linear-gradient(to top, hsl(${p.accent.h}, ${ZONE_LOOKS.dusk.accentS}%, 54%), hsl(${p.alert.h}, ${ZONE_LOOKS.dusk.alertS}%, 20%))`,
     )
   })
 

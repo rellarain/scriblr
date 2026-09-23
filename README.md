@@ -455,13 +455,13 @@ past midnight) and four **hues** the user chooses: **theme** (inert/read-only),
 | Dawn | light, dark text | 15 | 45 | 70 | 80 | 42 | 46 |
 
 Saturation always runs theme < accents < alert (the admin accent is the accent's
-twin: same saturation and lightness, only the hue differs), and **text is at
-least 30 HSL lightness points from what it sits on** (`MIN_TEXT_GAP`; enforced
+twin: same saturation and lightness, only the hue differs), and **text is always
+at least 45 HSL lightness points from what it sits on** (`MIN_TEXT_GAP`; enforced
 for the theme surfaces, the accent/alert fills and their hover/dim shades, the
 muted and faint ink, and the Writer page by `theme/zoneLooks.test.ts`). The
 Writer's page follows the zone too: a light sheet with dark text by day and dawn,
 a dark sheet with light text at dusk and night. Hover and dim shades of a fill
-step *away* from its text. The text on each accent, alert and admin-accent fill is picked per fill (`fillInk` in `zoneLooks.ts`): the light or dark ink, whichever reads better, always 30+ points away (at least 4.2:1 for any hue, tested); its hover/dim direction and wash colour are `--accent-dir`/`--accent-away` (and `alert`/`accent2`), while `--fill-dir`/`--away` are the zone's own for the theme surfaces. Settings saved by older
+step *away* from its text. The text on each accent, alert and admin-accent fill is picked per fill (`fillInk` in `zoneLooks.ts`): whichever ink clears the 45-point floor -- only one of the two usually does at this width, so the choice is that one outright; contrast only breaks the tie on the rarer fill where both clear it; its hover/dim direction and wash colour are `--accent-dir`/`--accent-away` (and `alert`/`accent2`), while `--fill-dir`/`--away` are the zone's own for the theme surfaces. Settings saved by older
 versions (which also held a saturation per colour and a brightness) still load;
 only the hues are kept.
 
@@ -481,7 +481,7 @@ only the hues are kept.
   and **locks** it; the right one (time and date, dimmed while locked) goes back to
   following the clock and turns time-based theming on. The sky per zone is built
   from the zone's hues in `theme/skyLook.ts` (only the time text is adjusted to keep
-  the 30-point gap); `theme/sky.ts` holds the pure parts: the moon's phase (accent-coloured
+  the 45-point gap); `theme/sky.ts` holds the pure parts: the moon's phase (accent-coloured
   and saturated at night; small and muted beside the always-white sun at dawn and dusk), today's zodiac constellation (real star-chart
   outlines, joined by faint lines at night, faint stars only at dawn and dusk), the
   random cloud strips (flat-based stacks of 4px-cornered rounded boxes, each

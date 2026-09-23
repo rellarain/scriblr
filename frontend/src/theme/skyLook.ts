@@ -4,8 +4,8 @@ import type { ZoneKey, ZonePalette } from './types'
 // The colours of the header's sky toggle in each zone, built from the zone's
 // fixed look and the user's four hues. The named shades are the design: dawn and
 // dusk skies are gradients, the day sky is the accent colour, the night sky the
-// darkest theme shade. Only the time and date text is adjusted, so it stays
-// MIN_TEXT_GAP lightness points away from the sky behind it.
+// darkest theme shade. Only the time and date text is adjusted, so it always
+// stays MIN_TEXT_GAP lightness points away from the sky behind it.
 
 export interface SkyLook {
   sky: string
@@ -37,16 +37,23 @@ const NIGHT_MOON = { s: 90, lit: 90, shadow: 22 }
 const TWILIGHT_MOON = { s: 12, lit: 78, shadow: 30 }
 const NIGHT_SKY = 10
 const DAWN_SKY = { top: 58, bottom: 92 }
-const DUSK_SKY = { bottom: 74, top: 24 }
+// Narrower than dawn's -- at MIN_TEXT_GAP=45 no single lightness can sit 45+
+// points from both ends of a band this wide (the old {bottom:74,top:24} spanned
+// too far either way); keeping the top dark and compressing the range toward it
+// leaves the text-reading band's brighter (bottom) end at most 55, so full white
+// text (100) always clears 45 from every point in it.
+const DUSK_SKY = { bottom: 54, top: 20 }
 const LOCKED_SHIFT = 8
 
 const hsl = (h: number, s: number, l: number) => `hsl(${h}, ${s}%, ${l}%)`
 const ceil1 = (n: number) => Math.ceil(n * 10 - 1e-9) / 10
 const floor1 = (n: number) => Math.floor(n * 10 + 1e-9) / 10
 
-// The lightness the text should have: the wanted one when it is 30+ points from
+// The lightness the text should have: the wanted one when it is 45+ points from
 // the whole band, else the nearest lightness on its own side that is (or the other
-// side when its own has no room left).
+// side when its own has no room left). If neither side has room (both `above` and
+// `below` fall outside 0-100 -- possible for a wide enough band), lands on
+// whichever of 0/100 clears the band by the most, rather than an out-of-range value.
 export function readableLightness(wanted: number, band: { min: number; max: number }): number {
   const above = band.max + MIN_TEXT_GAP
   const below = band.min - MIN_TEXT_GAP
@@ -54,13 +61,18 @@ export function readableLightness(wanted: number, band: { min: number; max: numb
   const lighter = wanted >= (band.min + band.max) / 2
   if (lighter && above <= 100) return ceil1(above)
   if (!lighter && below >= 0) return floor1(below)
-  return above <= 100 ? ceil1(above) : floor1(below)
+  if (above <= 100) return ceil1(above)
+  if (below >= 0) return floor1(below)
+  return band.min >= 100 - band.max ? 0 : 100
 }
 
-// The same text a little nearer the sky (for a locked zone), never closer than 30.
+// The same text a little nearer the sky (for a locked zone), never closer than
+// MIN_TEXT_GAP. Left alone when neither side has room at all (readableLightness's
+// own best-effort value is already as close as it can safely get).
 function shiftedToward(text: number, band: { min: number; max: number }): number {
   const above = band.max + MIN_TEXT_GAP
   const below = band.min - MIN_TEXT_GAP
+  if (above > 100 && below < 0) return text
   return text >= above ? Math.max(ceil1(above), text - LOCKED_SHIFT) : Math.min(floor1(below), text + LOCKED_SHIFT)
 }
 

@@ -27,7 +27,7 @@ describe('awareness', () => {
     }
   })
 
-  it('keeps the text 30+ points from every shade, for any hue, and readable', () => {
+  it('keeps the text 45+ points from every shade, for any hue, and readable', () => {
     for (const zone of ZONE_KEYS) {
       for (const state of AWARENESS_ORDER) {
         for (let h = 0; h < 360; h += 10) {

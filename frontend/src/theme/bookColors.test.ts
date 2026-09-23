@@ -81,7 +81,7 @@ describe('colour css and cover colour', () => {
   it('uses the theme saturation and lightness of the zone for a cover', () => {
     const cover = coverColor(DEFAULT_PALETTE, 'day', 200)
     expect(cover).toEqual({ h: 200, s: ZONE_LOOKS.day.themeS, l: ZONE_LOOKS.day.themeL })
-    expect(readableInk(cover).l).toBe(8) // a light cover gets dark ink
+    expect(readableInk(cover).l).toBe(3) // a light cover gets dark ink
     const night = coverColor(DEFAULT_PALETTE, 'night', 200)
     expect(night).toEqual({ h: 200, s: ZONE_LOOKS.night.themeS, l: ZONE_LOOKS.night.themeL })
     expect(readableInk(night).l).toBe(100) // a dark cover gets light ink

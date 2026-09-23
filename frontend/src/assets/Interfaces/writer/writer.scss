@@ -249,7 +249,7 @@
   .wrCardPanel.wrCardPanel--plotline { box-shadow: inset 4px 0 0 var(--wr-sub, transparent), 0 4px 14px rgb(0 0 0 / calc(0.3 * var(--shade-k))); }
   .wrCardPanel.wrCardPanel--subcategory {
     background: var(--wr-sub, var(--wr-cat, var(--wr-card))); color: var(--on-accent); --away: var(--accent-away); .wrTitleField, .wrField { color: var(--on-accent); }
-    // On the accent fill only a light dimming keeps text 30 points from it, and the washes lift away from the text.
+    // On the accent fill only a light dimming keeps text 45 points from it, and the washes lift away from the text.
     .wrLabel, .wrKindBadge, .wrOutlineMeta, .wrMuted, .wrHint { opacity: 0.9; }
     .wrLabel .wrOutlineMeta { opacity: 1; }
     .wrSmallBtn, .wrChildRow { color: var(--on-accent); background: color-mix(in srgb, var(--away) 22%, transparent); &:hover:not(:disabled) { background: color-mix(in srgb, var(--away) 34%, transparent); } }
@@ -585,7 +585,7 @@
   .wrCardFootLeft { display: flex; align-items: center; gap: 10px; }
   .wrWordCount { font-size: 11px; color: var(--wr-page-muted); }
   // Draft mode reads in three strengths: the number faintest, the description in between, the draft text (--wr-ink) strongest.
-  .wrNodeLabel--num { min-width: 0; font-weight: 400; letter-spacing: 0; color: color-mix(in srgb, var(--wr-ink) 60%, transparent); }
+  .wrNodeLabel--num { min-width: 0; font-weight: 400; letter-spacing: 0; color: color-mix(in srgb, var(--wr-ink) 67%, transparent); }
   .wrNodeDescription { flex: 1 1 auto; min-width: 0; font-family: Georgia, 'Times New Roman', serif; font-size: 13px; font-style: italic; color: color-mix(in srgb, var(--wr-ink) 75%, transparent); &--empty { color: var(--paper-placeholder); } }
   .wrOutlineCard--readonly { cursor: default; }
 

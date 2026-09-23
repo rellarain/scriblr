@@ -27,14 +27,14 @@ $fading: ();
   $fading: append($fading, --color-#{$name}-l, comma);
 }
 
-@property --ink       { syntax: '<color>'; inherits: true; initial-value: hsl(330, 12%, 8%); }
-@property --on-accent { syntax: '<color>'; inherits: true; initial-value: hsl(330, 12%, 8%); }
-@property --on-alert  { syntax: '<color>'; inherits: true; initial-value: hsl(330, 12%, 8%); }
-@property --on-accent2 { syntax: '<color>'; inherits: true; initial-value: hsl(330, 12%, 8%); }
+@property --ink       { syntax: '<color>'; inherits: true; initial-value: hsl(330, 12%, 3%); }
+@property --on-accent { syntax: '<color>'; inherits: true; initial-value: hsl(330, 12%, 3%); }
+@property --on-alert  { syntax: '<color>'; inherits: true; initial-value: hsl(330, 12%, 3%); }
+@property --on-accent2 { syntax: '<color>'; inherits: true; initial-value: hsl(330, 12%, 3%); }
 @property --shade-k   { syntax: '<number>'; inherits: true; initial-value: 0.55; }
 @property --sidebar-shade-1 { syntax: '<number>'; inherits: true; initial-value: -17; }
-@property --ink-muted-a { syntax: '<percentage>'; inherits: true; initial-value: 85%; }
-@property --ink-faint-a { syntax: '<percentage>'; inherits: true; initial-value: 75%; }
+@property --ink-muted-a { syntax: '<percentage>'; inherits: true; initial-value: 100%; }
+@property --ink-faint-a { syntax: '<percentage>'; inherits: true; initial-value: 100%; }
 
 // Which way a fill's hover / dim shades step (away from its text), and the
 // Writer page's numbers. Lightness values are percentages, the rest numbers.
@@ -46,7 +46,7 @@ $fading: ();
 @property --paper-dir  { syntax: '<number>'; inherits: true; initial-value: 1; }
 $paper-props: (
   paper-l: 97%, paper-ink-l: 17%, paper-ink2-l: 28%, paper-label-l: 38%,
-  paper-muted-l: 42%, paper-placeholder-l: 55%, paper-react-l: 83%, paper-like-l: 38%,
+  paper-muted-l: 42%, paper-placeholder-l: 46%, paper-react-l: 91%, paper-like-l: 38%,
 );
 @each $name, $value in $paper-props {
   @property --#{$name} { syntax: '<percentage>'; inherits: true; initial-value: $value; }
@@ -107,8 +107,9 @@ html[data-theme-pending] #root {
 
   // Text. --ink is white on dark zones and near-black on light ones. Muted and
   // faint are the ink at the zone's strengths (--ink-muted-a, --ink-faint-a),
-  // kept high enough that they stay 30+ lightness points from every surface
-  // (zoneLooks.test.ts).
+  // kept high enough that they stay 45+ lightness points from every surface
+  // (zoneLooks.test.ts) -- full strength (no real transparency) on light zones,
+  // which have no room to spare once every background clears the same floor.
   --ink-muted: color-mix(in srgb, var(--ink) var(--ink-muted-a), transparent);
   --ink-faint: color-mix(in srgb, var(--ink) var(--ink-faint-a), transparent);
   --hairline: color-mix(in srgb, var(--ink) 12%, transparent);
@@ -161,5 +162,9 @@ html[data-theme-pending] #root {
   --paper-label: hsl(var(--color-theme-h), 8%, var(--paper-label-l));
   --paper-muted: hsl(var(--color-theme-h), 8%, var(--paper-muted-l));
   --paper-placeholder: hsl(var(--color-theme-h), 6%, var(--paper-placeholder-l));
-  --paper-error: hsl(var(--color-alert-h), var(--color-alert-s), var(--color-alert-l));
+  // Stepped 4 points further from the paper (same direction as every other paper
+  // shade) -- the alert colour alone doesn't clear the text/background floor
+  // against the page's own deepest surface, and it's shared by too much else to
+  // move on its own (zoneLooks.ts's PAPER_ERROR_SHIFT).
+  --paper-error: hsl(var(--color-alert-h), var(--color-alert-s), calc(var(--color-alert-l) - 4% * var(--paper-dir)));
 }

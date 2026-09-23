@@ -13,7 +13,9 @@ import type { PaletteKey, ZoneKey, ZonePalette } from './types'
 // Rules, kept by zoneLooks.test.ts:
 //  - saturation order: theme < accents < alert, in every zone (the admin accent
 //    is the accent's twin, so only its hue tells them apart);
-//  - text is at least MIN_TEXT_GAP lightness points away from what it sits on.
+//  - text is always at least MIN_TEXT_GAP lightness points away from what it
+//    sits on -- a hard floor, never relaxed even when the closer-reading ink
+//    would otherwise be picked (fillInk, below).
 export type ZoneMode = 'dark' | 'light'
 
 export interface ZoneLook {
@@ -29,7 +31,7 @@ export interface ZoneLook {
   paperL: number
 }
 
-export const MIN_TEXT_GAP = 30
+export const MIN_TEXT_GAP = 45
 
 const MUTED = { themeS: 15, accentS: 45, alertS: 70 }
 const VIVID = { themeS: 30, accentS: 80, alertS: 100 }
@@ -47,11 +49,12 @@ export const ZONE_LOOKS: Record<ZoneKey, ZoneLook> = {
 // hue) on a light one. It is also the text on every accent, alert and admin fill.
 export const zoneInk = (mode: ZoneMode, themeHue: number): HSL => inkColor(mode === 'dark' ? 'light' : 'dark', themeHue)
 
-// The text on an accent, alert or admin-accent fill is chosen per fill: the light
-// or the dark ink, whichever reads better on it, and always 30+ lightness points
-// away. (HSL lightness ignores how bright a hue looks, so a yellow and a blue at
-// the same lightness want different text.) Its hover / dim / variant shades step
-// AWAY from that text: darker under light text, lighter under dark text (`dir`).
+// The text on an accent, alert or admin-accent fill is chosen per fill: whichever
+// ink is at least MIN_TEXT_GAP points away, since only one of the two usually
+// clears that at this width; contrast only breaks the tie on the rarer fill where
+// both do. (HSL lightness ignores how bright a hue looks, so a yellow and a blue
+// at the same lightness want different text.) Its hover / dim / variant shades
+// step AWAY from that text: darker under light text, lighter under dark text (`dir`).
 export function fillInk(fill: HSL, themeHue: number): { ink: HSL; dir: 1 | -1 } {
   const light = inkColor('light', themeHue)
   const dark = inkColor('dark', themeHue)
@@ -71,11 +74,15 @@ export const DIM_STEP = 14
 export const DIM_SATURATION_DROP = 20
 
 // How strong the muted and faint versions of the ink are (percent of the ink over
-// what it sits on). Light zones need more: their deepest surfaces are darker than
-// their base by up to 20 points and the overlays darken them further.
+// what it sits on) -- kept just strong enough that the blend itself still clears
+// MIN_TEXT_GAP at the tightest surface (a dark zone's Sidebar-1 with no shadow
+// overlay yet). Light zones have no room for a translucent tier at all: their
+// deepest, most heavily shadowed surface leaves under a point of margin for the
+// raw ink itself, so any real transparency would drop the blend below the floor --
+// muted and faint render at full strength there, same as the ink itself.
 export const INK_STRENGTH: Record<ZoneMode, { muted: number; faint: number }> = {
-  dark: { muted: 75, faint: 60 },
-  light: { muted: 85, faint: 75 },
+  dark: { muted: 75, faint: 75 },
+  light: { muted: 100, faint: 100 },
 }
 
 // The theme's surfaces, as lightness offsets from its base (theme.scss):
@@ -106,9 +113,16 @@ export interface PaperLook {
 }
 
 export const PAPER_LOOKS: Record<ZoneMode, PaperLook> = {
-  light: { dir: 1, ink: 17, ink2: 28, label: 38, muted: 42, placeholder: 55, react: 83, like: 38 },
-  dark: { dir: -1, ink: 92, ink2: 84, label: 74, muted: 68, placeholder: 58, react: 29, like: 72 },
+  light: { dir: 1, ink: 17, ink2: 28, label: 38, muted: 42, placeholder: 46, react: 91, like: 38 },
+  dark: { dir: -1, ink: 92, ink2: 84, label: 74, muted: 70, placeholder: 69, react: 21, like: 72 },
 }
+
+// The page's inline error text is the alert colour itself, stepped further from
+// the paper by this many points (same direction as every other paper shade,
+// `- N% * paper.dir` in theme.scss's --paper-error) -- alertL alone doesn't clear
+// MIN_TEXT_GAP from the paper's own deepest surface at this width, and alertL is
+// shared by too much else (buttons, badges) to move on its own.
+export const PAPER_ERROR_SHIFT = 4
 
 // A palette's hues with the zone's saturation and lightness filled in.
 export type ResolvedPalette = Record<PaletteKey, HSL>
