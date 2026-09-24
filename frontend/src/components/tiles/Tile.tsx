@@ -1,5 +1,5 @@
 import type { CSSProperties, DragEvent, KeyboardEvent, MouseEvent } from 'react'
-import { LayoutMaxIcon } from '../../assets/icons'
+import { ExpandIcon } from '../../assets/icons'
 import type { Rect } from './splitTree'
 import { MINI_W } from './tileShapes'
 import { opensConsole, type TileDef } from './tileTypes'
@@ -60,12 +60,14 @@ function Tile({ def, rect, fixed, oneColumn, dragging, dropTarget, edgeDrop, onO
       onClick={onClick} onKeyDown={onKeyDown} onDragOver={onDragOver} onDrop={onDrop}
     >
       <div className="tileHead" draggable onDragStart={onDragStart} onDragEnd={onDragEnd}>
-        <Icon size={16} />
-        <button type="button" className="tileOpen" onClick={onToggleTier} aria-expanded={!fixed} aria-label={def.title}>{def.title}</button>
-        {fixed && <span className="tileSummary">{def.summary}</span>}
+        <div className="tileHeadMain">
+          <Icon size={16} />
+          <button type="button" className="tileOpen" onClick={onToggleTier} aria-expanded={!fixed} aria-label={def.title}>{def.title}</button>
+          {fixed && <span className="tileSummary">{def.summary}</span>}
+        </div>
         {canOpen && (
           <button type="button" className="tileMax" onClick={onOpen} aria-label={`Open ${def.title}`} title={`Open ${def.title}`}>
-            <LayoutMaxIcon size={14} />
+            <ExpandIcon size={14} />
           </button>
         )}
       </div>

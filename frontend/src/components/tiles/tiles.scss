@@ -87,10 +87,21 @@ $tile-surface: linear-gradient(160deg, var(--surface-raised-a), var(--surface-ra
 .tileHead {
   display: flex;
   align-items: center;
+  // space-between (not a margin-left: auto on .tileMax) puts the open button at the
+  // tile's top-right corner -- a margin can't win that fight here, since the writer's
+  // own button reset (writer.scss's .wUI.wr :where(button)) outranks a single class.
+  justify-content: space-between;
   gap: 6px;
   min-width: 0;
   color: var(--ink-muted);
   cursor: grab;
+}
+.tileHeadMain {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+  flex: 1 1 auto;
 }
 .tileOpen {
   // The name keeps its room; the summary beside it gives way first.
@@ -130,7 +141,6 @@ $tile-surface: linear-gradient(160deg, var(--surface-raised-a), var(--surface-ra
   justify-content: center;
   width: 22px;
   height: 22px;
-  margin-left: auto;
   padding: 0;
   border: 0;
   border-radius: 4px;
@@ -141,7 +151,6 @@ $tile-surface: linear-gradient(160deg, var(--surface-raised-a), var(--surface-ra
   &:hover, &:focus-visible { opacity: 1; background: var(--ov-sink-1); color: var(--ink); }
 }
 .tile:hover .tileMax, .tile:focus-within .tileMax { opacity: 0.8; }
-.tileSummary + .tileMax { margin-left: 0; }
 
 .tileBody {
   flex: 1 1 auto;

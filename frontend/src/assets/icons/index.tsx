@@ -291,6 +291,15 @@ export function LayoutMaxIcon(props: IconProps) {
   </IconBase>
 }
 
+export function ExpandIcon(props: IconProps) {
+  return <IconBase {...props}>
+    <path d="M9 3H3v6" />
+    <path d="M15 3h6v6" />
+    <path d="M3 15v6h6" />
+    <path d="M21 15v6h-6" />
+  </IconBase>
+}
+
 export function QueueIcon(props: IconProps) {
   return <IconBase {...props}>
     <rect x="4" y="5" width="16" height="4" rx="1" />
