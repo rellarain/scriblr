@@ -179,9 +179,11 @@ function ZoneEditor({ zoneKey, role }: { zoneKey: ZoneKey; role: Role }) {
   )
 }
 
-// The full theme customization tool (UUI Dashboard > Settings), all in one
-// card with its sections divided by thin rules.
-function ThemeSettingsPanel() {
+// The full theme customization tool (UUI Dashboard > Settings, and embedded
+// directly in Account > Settings too), all in one card with its sections divided
+// by thin rules. `showHeader` is false where the embedding panel already shows
+// its own heading and a shared Save/Restore control (Account > Settings).
+function ThemeSettingsPanel({ showHeader = true }: { showHeader?: boolean } = {}) {
   const { theme, ui } = useSettings()
   const { effectiveRole } = useThemeState()
   const saveStatus = useSettingsSaveStatus()
@@ -200,10 +202,12 @@ function ThemeSettingsPanel() {
 
   return (
     <div className="themeSettings themeCard">
-      <div className="themeHeader">
-        <h2>Theme</h2>
-        <SaveControl status={saveStatus} onSave={() => { void saveSettingsNow() }} onRestore={restoreSettings} buttonClassName="themeBtn themeBtn--primary" />
-      </div>
+      {showHeader && (
+        <div className="themeHeader">
+          <h2>Theme</h2>
+          <SaveControl status={saveStatus} onSave={() => { void saveSettingsNow() }} onRestore={restoreSettings} buttonClassName="themeBtn themeBtn--primary" />
+        </div>
+      )}
 
       <div className="themeSection">
         <div className="themeRow">

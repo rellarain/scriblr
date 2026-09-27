@@ -6,16 +6,17 @@ import {
 } from '../icons'
 import CustomizeControls from '../../CustomizeControls'
 import ThemeSettingsPanel from '../../theme/ThemeSettingsPanel'
-import TileGrid, { useTileHost } from '../../components/tiles/TileGrid'
+import TileGrid from '../../components/tiles/TileGrid'
 import { TileBig, TileRows, TileSub } from '../../components/tiles/tileParts'
 import type { TileDef } from '../../components/tiles/tileTypes'
 
 // The User panel (in the header drawer), per scrilbrPlan.md's "User Page (UUI)"
 // section, as tiles: Dashboard, Account and Training are section tiles; expanding
 // one shows its pages as child tiles, which expand into their editors in turn.
-// Settings and Help are the round buttons at a console's bottom right: the
-// Dashboard's Settings is the theme customization tool and the Account's are
-// handedness and autosave. Everything else is placeholder text until built.
+// Settings and Help are the round buttons at a console's bottom right: Dashboard's
+// Settings is the theme customization tool on its own; Account's carries
+// handedness and autosave plus that same theme tool, embedded inline. Everything
+// else is placeholder text until built.
 //
 // The root class is "uUIPanel"/"uUIContent", deliberately NOT "uUI" -- that class
 // already exists in App.scss as one of the shared, absolutely-positioned
@@ -33,13 +34,6 @@ interface UuiSection {
   settings?: () => ReactNode
 }
 
-// Account > Settings points at the theme tool, which is Dashboard > Settings: open
-// the Dashboard tile with its Settings panel showing.
-function AccountSettings() {
-  const host = useTileHost()
-  return <CustomizeControls onOpenThemeSettings={() => host.open('dashboard', 'settings')} />
-}
-
 const SECTIONS: UuiSection[] = [
   {
     key: 'dashboard', label: 'Dashboard', Icon: BarChartIcon,
@@ -54,7 +48,7 @@ const SECTIONS: UuiSection[] = [
   {
     key: 'account', label: 'Account', Icon: UserIcon,
     help: 'Resources and assistance using the Account console here.',
-    settings: () => <AccountSettings />,
+    settings: () => <CustomizeControls />,
     pages: [
       { key: 'profile', label: 'Profile', Icon: UserIcon, body: 'Manage your profile details here.' },
       { key: 'subscription', label: 'Subscription', Icon: CalendarIcon, body: 'Manage your subscription here.' },

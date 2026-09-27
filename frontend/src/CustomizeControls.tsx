@@ -1,15 +1,13 @@
 import { SwapIcon } from './assets/icons'
-import { setUi, useSettings } from './settings/settingsStore'
+import { SaveControl } from './components/SaveControl'
+import { restoreSettings, saveSettingsNow, setUi, useSettings, useSettingsSaveStatus } from './settings/settingsStore'
+import ThemeSettingsPanel from './theme/ThemeSettingsPanel'
 import { AUTOSAVE_MAX_SECONDS, AUTOSAVE_STEP_SECONDS } from './theme/types'
 import './theme/themeSettings.scss'
 
-interface CustomizeControlsProps {
-  // Jump to the theme customization tool (UUI Dashboard > Settings).
-  onOpenThemeSettings: () => void
-}
-
-// UUI Account > Settings: handedness, autosave, plus a pointer to the theme tool (the
-// color, brightness and time-of-day controls live in Dashboard > Settings).
+// UUI Account > Settings: handedness, autosave, and the theme tool (colors,
+// brightness, time-of-day zones), all saved by the one shared Save/Restore
+// control at the top -- they're all the same settings store underneath.
 // 30 seconds up to 10 minutes, in 30-second steps.
 const AUTOSAVE_OPTIONS = Array.from({ length: AUTOSAVE_MAX_SECONDS / AUTOSAVE_STEP_SECONDS }, (_, i) => (i + 1) * AUTOSAVE_STEP_SECONDS)
 
@@ -21,12 +19,16 @@ export function formatInterval(seconds: number): string {
   return rest === 0 ? m : `${m} ${rest} seconds`
 }
 
-function CustomizeControls({ onOpenThemeSettings }: CustomizeControlsProps) {
+function CustomizeControls() {
   const { ui } = useSettings()
+  const saveStatus = useSettingsSaveStatus()
   const handedness = ui.handedness
   return (
     <div className="customize">
-      <h2>Customize</h2>
+      <div className="themeHeader">
+        <h2>Customize</h2>
+        <SaveControl status={saveStatus} onSave={() => { void saveSettingsNow() }} onRestore={restoreSettings} buttonClassName="themeBtn themeBtn--primary" />
+      </div>
 
       <div className="customizeGroup">
         <div className="customizeGroupHeader">
@@ -68,10 +70,7 @@ function CustomizeControls({ onOpenThemeSettings }: CustomizeControlsProps) {
         </p>
       </div>
 
-      <div className="customizeGroup themeLinkRow">
-        <span>Colors, brightness and time-of-day themes</span>
-        <button type="button" className="themeBtn" onClick={onOpenThemeSettings}>Open theme settings</button>
-      </div>
+      <ThemeSettingsPanel showHeader={false} />
     </div>
   )
 }

@@ -46,16 +46,14 @@ describe('UUI (the User panel as tiles)', () => {
     expect(screen.getByRole('region', { name: 'Training' })).toBeTruthy()
   })
 
-  it('puts Account settings at the corner, and its theme pointer opens the Dashboard with its Settings showing', async () => {
+  it('puts Account settings at the corner, with the theme tool embedded inline', async () => {
     const user = userEvent.setup()
     render(<UUI />)
     await user.click(within(tile('account')).getByRole('button', { name: 'Open Account' }))
     await user.click(screen.getByRole('button', { name: 'Settings' }))
     const settings = screen.getByRole('region', { name: 'Settings' })
     expect(within(settings).getByRole('button', { name: /Handedness/ })).toBeTruthy()
-    await user.click(within(settings).getByRole('button', { name: 'Open theme settings' }))
-    expect(screen.getByRole('region', { name: 'Dashboard' })).toBeTruthy()
-    expect(within(screen.getByRole('region', { name: 'Settings' })).getByText('Change theme by time of day')).toBeTruthy()
+    expect(within(settings).getByText('Change theme by time of day')).toBeTruthy()
   })
 
   it('has Help text for a section at the corner', async () => {
