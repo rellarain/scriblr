@@ -12,10 +12,21 @@ export function useContainerSize<T extends HTMLElement>(fallback: Size = { width
   useLayoutEffect(() => {
     const el = ref.current
     if (!el) return
+    // A child sized to fill this element exactly needs its CONTENT box, not its
+    // border box -- clientWidth/clientHeight (and getBoundingClientRect) already
+    // fold the element's own padding in, so a child given that full size overflows
+    // by the padding on both sides (a few px, but enough to force an unnecessary
+    // scrollbar on an otherwise one-page layout). Subtract it back out here, once,
+    // rather than in every caller.
     const measure = () => {
+      // jsdom (the test DOM) reports an unset padding as '' rather than '0px' --
+      // parseFloat of that is NaN, so `|| 0` is load-bearing here, not just style.
+      const cs = getComputedStyle(el)
+      const padX = (parseFloat(cs.paddingLeft) || 0) + (parseFloat(cs.paddingRight) || 0)
+      const padY = (parseFloat(cs.paddingTop) || 0) + (parseFloat(cs.paddingBottom) || 0)
       const r = el.getBoundingClientRect()
-      const width = r.width || el.clientWidth
-      const height = r.height || el.clientHeight
+      const width = (r.width || el.clientWidth) - padX
+      const height = (r.height || el.clientHeight) - padY
       setSize({ width: width > 0 ? width : fallback.width, height: height > 0 ? height : fallback.height })
     }
     measure()
