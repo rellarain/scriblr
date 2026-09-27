@@ -119,6 +119,20 @@ describe('TileGrid', () => {
     expect(px(tile('a'), 'width')).toBeGreaterThan(before)
   })
 
+  it('reserves room for the drag-in-progress ghost rail so the stage shrinks instead of the ghost overlapping it', () => {
+    renderGrid([
+      { id: 'a', title: 'A', Icon: PlotIcon, defaultShape: 'mid', summary: 'a', render: () => <div>A body</div> },
+    ])
+    // With nothing minimized and no drag yet, the lone tile claims the whole container.
+    expect(px(tile('a'), 'width')).toBe(1000)
+    const dataTransfer = { setData: vi.fn(), setDragImage: vi.fn(), effectAllowed: '' }
+    fireEvent.dragStart(tile('a'), { dataTransfer })
+    // The ghost rail appears, and the stage shrinks by the same RAIL_TILE + GRID_GAP
+    // (48px) a real rail would reserve, so the two never overlap.
+    expect(document.querySelector('.tileRailGhost')).toBeTruthy()
+    expect(px(tile('a'), 'width')).toBe(1000 - 48)
+  })
+
   it('restores a rail tile to mid, with its full render, when its icon is clicked', async () => {
     const user = userEvent.setup()
     renderGrid()

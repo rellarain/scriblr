@@ -69,13 +69,17 @@ function TileGrid({ gridId, tiles, crumbs, below, label, open: controlledOpen, o
   const [scrollRef, containerSize] = useContainerSize<HTMLDivElement>()
   const stageRef = useRef<HTMLDivElement>(null)
   const areaRef = useRef<HTMLDivElement>(null)
+  const [dragId, setDragId] = useState<string | null>(null)
   // Minimized tiles collapse into one shared icon rail down the grid's left edge,
   // in a stable order independent of which branch each one actually lives under --
   // outside the resizable stage entirely, so it reserves its own fixed width before
   // the one-column check below (flattening doesn't change which leaves are fixed or
   // their pre-order, so this is safe to read off the tree before deciding to flatten it).
   const railIds = layout.tree ? fixedLeafIds(layout.tree) : []
-  const railReserve = railIds.length > 0 ? RAIL_TILE + GRID_GAP : 0
+  // While a tile is being dragged and nothing is minimized yet, the ghost rail
+  // placeholder below still needs its own room -- reserve the same space for it
+  // so the stage's tiles shrink out of its way instead of it overlapping them.
+  const railReserve = railIds.length > 0 || dragId ? RAIL_TILE + GRID_GAP : 0
   const oneColumn = isOneColumn(containerSize.width - railReserve)
   const renderTree: SplitNode | null = layout.tree ? (oneColumn ? flattenOneColumn(layout.tree) : layout.tree) : null
 
@@ -89,7 +93,6 @@ function TileGrid({ gridId, tiles, crumbs, below, label, open: controlledOpen, o
   const byId = new Map(layout.placed.map(p => [p.def.id, p]))
 
   const [from, setFrom] = useState<Box | null>(null)
-  const [dragId, setDragId] = useState<string | null>(null)
   const [overId, setOverId] = useState<string | null>(null)
   const [overDivider, setOverDivider] = useState<string | null>(null)
   const [overEdge, setOverEdge] = useState<{ id: string; side: 'left' | 'right' | 'top' | 'bottom' } | null>(null)
