@@ -1,4 +1,5 @@
 import { fireEvent, render, screen } from '@testing-library/react'
+import { useState } from 'react'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import Sidebar from './Sidebar'
 import { __resetSettingsForTests } from './settings/settingsStore'
@@ -66,6 +67,34 @@ describe('Sidebar', () => {
     fireEvent.pointerDown(handle, { pointerId: 1 })
     fireEvent(handle, Object.assign(new Event('pointermove', { bubbles: true }), { pointerId: 1, movementX: 30 }))
     expect(onSetAuiWidth).toHaveBeenCalledWith(830)
+  })
+
+  it('a real slow drag -- many small movements, none crossing a column alone -- still adds up to a resize', () => {
+    // A bare mocked onSetAuiWidth (like the two tests above) can't catch a bug
+    // where each event's delta gets measured against an already-snapped width
+    // and rounds right back to it -- this wraps Sidebar in real state and
+    // mirrors App.tsx's actual snapping formula (AUI_COLUMN_W=400), so the
+    // handle's own committed width really does feed back into the next event,
+    // the way it does in the live app. The current width is surfaced via a
+    // data attribute so the test can watch it change.
+    function Harness() {
+      const [width, setWidth] = useState(800)
+      const onSetAuiWidth = (w: number) => setWidth(Math.max(400, Math.round(w / 400) * 400))
+      return (
+        <div data-testid="width" data-width={width}>
+          <Sidebar side="right" {...baseProps} auiWidth={width} onSetAuiWidth={onSetAuiWidth} />
+        </div>
+      )
+    }
+    render(<Harness />)
+    const handle = screen.getByRole('separator', { name: 'Resize Admin panel' })
+    fireEvent.pointerDown(handle, { pointerId: 1 })
+    // Eight events of -30px each (240px total) -- no single event is anywhere
+    // near the ~200px one event alone would need to cross a column boundary.
+    for (let i = 0; i < 8; i++) {
+      fireEvent(handle, Object.assign(new Event('pointermove', { bubbles: true }), { pointerId: 1, movementX: -30 }))
+    }
+    expect(screen.getByTestId('width').dataset.width).toBe('1200')
   })
 
   it('nudges the width with the arrow keys, direction following handedness', () => {

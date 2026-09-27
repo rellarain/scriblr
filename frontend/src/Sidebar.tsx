@@ -1,4 +1,4 @@
-import type { PointerEvent } from 'react'
+import { useRef, type PointerEvent } from 'react'
 import AUI from './assets/Interfaces/AUI'
 import HUI from './assets/Interfaces/HUI'
 import SidebarDivider from './SidebarDivider'
@@ -34,14 +34,23 @@ interface SidebarProps {
 // .sidebar's DOM-order comment in App.scss).
 function AuiResize({ side, width, onWidthChange }: { side: Handedness; width: number; onWidthChange: (width: number) => void }) {
   const sign = side === 'left' ? 1 : -1
+  // The drag's own running (unsnapped) width -- movementX deltas are only a
+  // few px per event, far smaller than a column, so feeding them against the
+  // already-snapped `width` prop rounds right back to where it started every
+  // time (the drag visibly does nothing). Reset at the start of each drag and
+  // accumulated here instead, independent of whether the parent's snapped
+  // state has caught up yet.
+  const raw = useRef(width)
   function onPointerDown(e: PointerEvent<HTMLDivElement>) {
     if (e.button !== 0) return
     e.preventDefault()
+    raw.current = width
     e.currentTarget.setPointerCapture(e.pointerId)
   }
   function onPointerMove(e: PointerEvent<HTMLDivElement>) {
     if (!e.currentTarget.hasPointerCapture(e.pointerId) || !e.movementX) return
-    onWidthChange(width + sign * e.movementX)
+    raw.current += sign * e.movementX
+    onWidthChange(raw.current)
   }
   function onPointerUp(e: PointerEvent<HTMLDivElement>) {
     if (e.currentTarget.hasPointerCapture(e.pointerId)) e.currentTarget.releasePointerCapture(e.pointerId)
