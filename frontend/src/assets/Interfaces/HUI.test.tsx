@@ -30,16 +30,21 @@ describe('HUI (the Helper panel as tiles)', () => {
     expect(screen.getByText('chat console')).toBeTruthy()
   })
 
-  it('shows Inbox, Queue and Settings tiles after Back, and switching with a mini tile', async () => {
+  it('shows Inbox, Queue and Settings tiles after Back, Settings collapsed into the rail', async () => {
     const user = userEvent.setup()
     render(<HUI side="right" helper={helper()} panel="inbox" />)
     await user.click(screen.getByRole('button', { name: 'Back to tiles' }))
     expect(document.querySelector('.tileConsole')).toBeNull()
     expect(['inbox', 'queue', 'settings'].map(id => tile(id).getAttribute('data-shape'))).toEqual(['mid', 'mid', 'mini'])
+    expect(tile('settings').closest('.tileRail')).toBeTruthy()
     expect(tile('chat')).toBeNull()
     await user.click(within(tile('queue')).getByRole('button', { name: 'Open Queue' }))
     expect(screen.getByRole('region', { name: 'Queue' })).toBeTruthy()
-    await user.click(within(screen.getByRole('tablist', { name: 'Tiles' })).getByRole('tab', { name: /Settings/ }))
+    // Reaching a minimized tile's console: back to the grid, restore it from the
+    // rail, then its own corner button (no more in-console tile-switch strip).
+    await user.click(screen.getByRole('button', { name: 'Back to tiles' }))
+    await user.click(tile('settings'))
+    await user.click(within(tile('settings')).getByRole('button', { name: 'Open Settings' }))
     expect(screen.getByRole('region', { name: 'Settings' })).toBeTruthy()
   })
 
@@ -54,6 +59,6 @@ describe('HUI (the Helper panel as tiles)', () => {
 
   it('lists the conversation tile only while a chat is selected', () => {
     render(<HUI side="right" helper={helper('chat-1')} panel="inbox" />)
-    expect(screen.getAllByRole('tab').map(t => t.textContent?.trim())).toEqual(['Inbox', 'Queue', 'Settings', 'Conversation'])
+    for (const id of ['inbox', 'queue', 'settings', 'chat']) expect(tile(id)).toBeTruthy()
   })
 })

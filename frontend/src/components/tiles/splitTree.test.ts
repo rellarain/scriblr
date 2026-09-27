@@ -1,7 +1,8 @@
 import { describe, expect, it } from 'vitest'
 import {
-  MINI_H, MIN_LEAF_H, MIN_LEAF_W, buildTree, canInsertAt, canInsertBeside, computeGeometry, fixup, flattenOneColumn,
-  insertAtDivider, insertBesideLeaf, isLeaf, leafIds, minSize, reconcile, resizeBranch, setFixed, swapLeaves,
+  MIN_LEAF_H, MIN_LEAF_W, buildTree, canInsertAt, canInsertBeside, canInsertBelow, computeGeometry, fixedLeafIds, fixup,
+  flattenOneColumn, insertAtDivider, insertBelowLeaf, insertBesideLeaf, isAllFixed, isLeaf, leafIds, minSize, rectAtPath,
+  reconcile, resizeBranch, setFixed, swapLeaves,
 } from './splitTree'
 import type { SplitNode } from './splitTree'
 
@@ -19,14 +20,13 @@ describe('buildTree', () => {
     expect(isLeaf(branch.a)).toBe(false)
   })
 
-  it('keeps every tile short when the whole grid is mini, none stretching to fill leftover space', () => {
+  it('renders nothing on the stage when the whole grid is mini -- both live in the icon rail', () => {
     const tree = buildTree([P('a', 'mini'), P('b', 'mini')])!
     const geo = computeGeometry(tree, { x: 0, y: 0, w: 300, h: 300 })
-    for (const t of geo.tiles) {
-      expect(t.fixed).toBe(true)
-      expect(t.rect.h).toBe(MINI_H)
-    }
-    expect(minSize(tree)).toEqual({ w: MIN_LEAF_W, h: MINI_H * 2 + 8 })
+    expect(geo.tiles).toEqual([])
+    expect(geo.dividers).toEqual([])
+    expect(fixedLeafIds(tree)).toEqual(['a', 'b'])
+    expect(minSize(tree)).toEqual({ w: 0, h: 0 })
   })
 
   it('returns null for an empty grid and a bare leaf for one tile', () => {
@@ -55,18 +55,37 @@ describe('computeGeometry', () => {
     const geo = computeGeometry(tree, rect)
     for (const t of geo.tiles) {
       expect(t.rect.w).toBeGreaterThanOrEqual(MIN_LEAF_W - 1)
-      expect(t.rect.h).toBeGreaterThanOrEqual((t.fixed ? MINI_H : MIN_LEAF_H) - 1)
+      expect(t.rect.h).toBeGreaterThanOrEqual(MIN_LEAF_H - 1)
     }
   })
 
-  it('gives a fixed (mini) leaf exactly its fixed height and its sibling the rest', () => {
+  it('renders nothing for a fixed (mini) leaf, its sibling getting the entire rect', () => {
     const mixed = buildTree([P('mini1', 'mini'), P('rest', 'mid')])!
     const geo = computeGeometry(mixed, { x: 0, y: 0, w: 400, h: 300 })
-    const mini = geo.tiles.find(t => t.id === 'mini1')!
+    expect(geo.tiles.find(t => t.id === 'mini1')).toBeUndefined()
+    expect(fixedLeafIds(mixed)).toEqual(['mini1'])
     const rest = geo.tiles.find(t => t.id === 'rest')!
-    expect(mini.rect.h).toBe(MINI_H)
-    expect(rest.rect.h).toBe(300 - MINI_H - 8)
-    expect(rest.rect.w).toBe(400)
+    expect(rest.rect).toEqual({ x: 0, y: 0, w: 400, h: 300 })
+    expect(geo.dividers).toEqual([])
+  })
+
+  it('renders nothing for a fixed leaf under a row branch too -- direction no longer matters', () => {
+    const tree: SplitNode = { dir: 'row', ratio: 0.5, a: { id: 'mini1', fixed: true }, b: { id: 'mid1' } }
+    const geo = computeGeometry(tree, { x: 0, y: 0, w: 400, h: 300 })
+    expect(geo.tiles).toEqual([{ id: 'mid1', rect: { x: 0, y: 0, w: 400, h: 300 } }])
+    expect(geo.dividers).toEqual([])
+  })
+
+  it('collapses a branch that is fully fixed on both sides, wherever it is nested', () => {
+    const tree: SplitNode = {
+      dir: 'row', ratio: 0.5,
+      a: { id: 'mid1' },
+      b: { dir: 'col', ratio: 0.5, a: { id: 'mini1', fixed: true }, b: { id: 'mini2', fixed: true } },
+    }
+    const geo = computeGeometry(tree, { x: 0, y: 0, w: 400, h: 300 })
+    expect(geo.tiles).toEqual([{ id: 'mid1', rect: { x: 0, y: 0, w: 400, h: 300 } }])
+    expect(geo.dividers).toEqual([])
+    expect(fixedLeafIds(tree)).toEqual(['mini1', 'mini2'])
   })
 
   it('lists one divider per branch, positioned between its two sides', () => {
@@ -87,9 +106,29 @@ describe('minSize', () => {
     expect(m.h).toBe(MIN_LEAF_H)
   })
 
-  it('uses the fixed height for a mini leaf', () => {
+  it('gives a fixed side no size at all -- its sibling alone determines the minimum', () => {
     const tree: SplitNode = { dir: 'col', ratio: 0.5, a: { id: 'a', fixed: true }, b: { id: 'b' } }
-    expect(minSize(tree).h).toBe(MINI_H + MIN_LEAF_H + 8)
+    expect(minSize(tree)).toEqual({ w: MIN_LEAF_W, h: MIN_LEAF_H })
+  })
+
+  it('is zero for a fully-fixed subtree, however deep or however it is nested', () => {
+    expect(minSize({ id: 'a', fixed: true })).toEqual({ w: 0, h: 0 })
+    const nested: SplitNode = { dir: 'row', ratio: 0.5, a: { id: 'a', fixed: true }, b: { dir: 'col', ratio: 0.5, a: { id: 'b', fixed: true }, b: { id: 'c', fixed: true } } }
+    expect(isAllFixed(nested)).toBe(true)
+    expect(minSize(nested)).toEqual({ w: 0, h: 0 })
+  })
+})
+
+describe('isAllFixed / fixedLeafIds', () => {
+  it('walks the whole tree in pre-order, regardless of nesting dir', () => {
+    const mini1: SplitNode = { id: 'mini1', fixed: true }
+    const left: SplitNode = { dir: 'col', ratio: 0.5, a: mini1, b: { id: 'mid1' } }
+    const right: SplitNode = { dir: 'row', ratio: 0.5, a: { id: 'mid2' }, b: { id: 'mini2', fixed: true } }
+    const tree: SplitNode = { dir: 'row', ratio: 0.5, a: left, b: right }
+    expect(fixedLeafIds(tree)).toEqual(['mini1', 'mini2'])
+    expect(isAllFixed(tree)).toBe(false)
+    expect(isAllFixed(mini1)).toBe(true) // just mini1 alone
+    expect(isAllFixed(left)).toBe(false) // mini1 + mid1 -- mixed
   })
 })
 
@@ -106,11 +145,10 @@ describe('swapLeaves', () => {
   it('exchanges two tiles, each area keeping its own fixed status', () => {
     const tree = buildTree([P('mini1', 'mini'), P('a', 'mid'), P('b', 'mid')])!
     const swapped = swapLeaves(tree, 'mini1', 'a')
+    expect(fixedLeafIds(swapped)).toEqual(['a'])
     const geo = computeGeometry(swapped, { x: 0, y: 0, w: 400, h: 400 })
-    const a = geo.tiles.find(t => t.id === 'a')!
-    const mini1 = geo.tiles.find(t => t.id === 'mini1')!
-    expect(a.fixed).toBe(true)
-    expect(mini1.fixed).toBe(false)
+    expect(geo.tiles.find(t => t.id === 'mini1')).toBeTruthy() // now mid -- it's on the stage
+    expect(geo.tiles.find(t => t.id === 'a')).toBeUndefined() // now fixed -- it's in the rail
   })
 
   it('does nothing for an unknown id or swapping a tile with itself', () => {
@@ -199,8 +237,8 @@ describe('insertAtDivider', () => {
       b: { dir: 'col', ratio: 0.5, a: { id: 'x' }, b: { id: 'y' } },
     }
     const result = insertAtDivider(tree, 'other', ['b'])
-    const geo = computeGeometry(result, { x: 0, y: 0, w: 400, h: 400 })
-    expect(geo.tiles.find(t => t.id === 'other')!.fixed).toBe(true)
+    expect(fixedLeafIds(result)).toEqual(['other'])
+    expect(computeGeometry(result, { x: 0, y: 0, w: 400, h: 400 }).tiles.find(t => t.id === 'other')).toBeUndefined()
   })
 
   it('is a no-op dropping a tile onto the divider right next to itself', () => {
@@ -255,8 +293,8 @@ describe('insertBesideLeaf', () => {
   it('keeps a fixed (mini) tile fixed at its new spot', () => {
     const tree: SplitNode = { dir: 'row', ratio: 0.5, a: { id: 'other', fixed: true }, b: { id: 'target' } }
     const result = insertBesideLeaf(tree, 'other', 'target', 'left')
-    const geo = computeGeometry(result, { x: 0, y: 0, w: 400, h: 400 })
-    expect(geo.tiles.find(t => t.id === 'other')!.fixed).toBe(true)
+    expect(fixedLeafIds(result)).toEqual(['other'])
+    expect(computeGeometry(result, { x: 0, y: 0, w: 400, h: 400 }).tiles.find(t => t.id === 'other')).toBeUndefined()
   })
 
   it('does nothing for the same tile, an unknown id, or an unknown target', () => {
@@ -264,6 +302,75 @@ describe('insertBesideLeaf', () => {
     expect(insertBesideLeaf(tree, 'a', 'a', 'left')).toBe(tree)
     expect(insertBesideLeaf(tree, 'ghost', 'a', 'left')).toBe(tree)
     expect(insertBesideLeaf(tree, 'a', 'ghost', 'left')).toBe(tree)
+  })
+})
+
+describe('canInsertBelow', () => {
+  it('is true when the rect has room for two minimum-height rows', () => {
+    expect(canInsertBelow({ x: 0, y: 0, w: 200, h: 300 })).toBe(true)
+  })
+
+  it('is false when the rect is too short to split', () => {
+    expect(canInsertBelow({ x: 0, y: 0, w: 200, h: 150 })).toBe(false)
+  })
+})
+
+describe('insertBelowLeaf', () => {
+  it('wedges a tile from elsewhere in the tree onto the top of a target leaf', () => {
+    const tree: SplitNode = { dir: 'col', ratio: 0.5, a: { id: 'other' }, b: { id: 'target' } }
+    const result = insertBelowLeaf(tree, 'other', 'target', 'top')
+    expect(leafIds(result)).toEqual(['other', 'target'])
+    const geo = computeGeometry(result, { x: 0, y: 0, w: 400, h: 400 })
+    const other = geo.tiles.find(t => t.id === 'other')!
+    const target = geo.tiles.find(t => t.id === 'target')!
+    expect(other.rect.y).toBeLessThan(target.rect.y)
+  })
+
+  it('wedges a tile onto the bottom of a target leaf, keeping the target in its own slot', () => {
+    const tree: SplitNode = {
+      dir: 'row', ratio: 0.5,
+      a: { id: 'target' },
+      b: { dir: 'col', ratio: 0.5, a: { id: 'x' }, b: { id: 'y' } },
+    }
+    const result = insertBelowLeaf(tree, 'y', 'target', 'bottom')
+    expect(leafIds(result)).toEqual(['target', 'y', 'x'])
+    const geo = computeGeometry(result, { x: 0, y: 0, w: 400, h: 400 })
+    const target = geo.tiles.find(t => t.id === 'target')!
+    const y = geo.tiles.find(t => t.id === 'y')!
+    expect(target.rect.y).toBeLessThan(y.rect.y)
+    // x's old sibling (y) is gone, so x now sits alone where the (x, y) branch was.
+    expect(geo.tiles.find(t => t.id === 'x')!.rect.h).toBeGreaterThan(target.rect.h)
+  })
+
+  it('keeps a fixed (mini) tile fixed at its new spot', () => {
+    const tree: SplitNode = { dir: 'col', ratio: 0.5, a: { id: 'other', fixed: true }, b: { id: 'target' } }
+    const result = insertBelowLeaf(tree, 'other', 'target', 'top')
+    expect(fixedLeafIds(result)).toEqual(['other'])
+    expect(computeGeometry(result, { x: 0, y: 0, w: 400, h: 400 }).tiles.find(t => t.id === 'other')).toBeUndefined()
+  })
+
+  it('does nothing for the same tile, an unknown id, or an unknown target', () => {
+    const tree: SplitNode = { dir: 'col', ratio: 0.5, a: { id: 'a' }, b: { id: 'b' } }
+    expect(insertBelowLeaf(tree, 'a', 'a', 'top')).toBe(tree)
+    expect(insertBelowLeaf(tree, 'ghost', 'a', 'top')).toBe(tree)
+    expect(insertBelowLeaf(tree, 'a', 'ghost', 'top')).toBe(tree)
+  })
+})
+
+describe('rectAtPath', () => {
+  it('is not offset by a phantom gap when an ancestor branch has a fully-fixed sibling', () => {
+    // The root's `b` side is entirely fixed (lives in the rail, no gap reserved
+    // against it) -- root's `a` side is a real row split of mid1/mid2, and its own
+    // divider's rect must sit exactly where a plain two-tile row would put it,
+    // unaffected by the fixed sibling elsewhere in the tree.
+    const tree: SplitNode = {
+      dir: 'row', ratio: 0.5,
+      a: { dir: 'row', ratio: 0.5, a: { id: 'mid1' }, b: { id: 'mid2' } },
+      b: { id: 'mini1', fixed: true },
+    }
+    const plain: SplitNode = { dir: 'row', ratio: 0.5, a: { id: 'mid1' }, b: { id: 'mid2' } }
+    const rect = { x: 0, y: 0, w: 400, h: 300 }
+    expect(rectAtPath(tree, rect, ['a'])).toEqual(rectAtPath(plain, rect, []))
   })
 })
 
@@ -283,8 +390,8 @@ describe('reconcile', () => {
     const tree = buildTree([P('a', 'mid')])!
     const withMini = reconcile(tree, [P('a', 'mid'), P('new', 'mini')])
     expect(leafIds(withMini).sort()).toEqual(['a', 'new'])
-    const geo = computeGeometry(withMini, { x: 0, y: 0, w: 400, h: 400 })
-    expect(geo.tiles.find(t => t.id === 'new')!.fixed).toBe(true)
+    expect(fixedLeafIds(withMini)).toEqual(['new'])
+    expect(computeGeometry(withMini, { x: 0, y: 0, w: 400, h: 400 }).tiles.find(t => t.id === 'new')).toBeUndefined()
   })
 
   it('builds fresh from scratch when there is no saved tree', () => {

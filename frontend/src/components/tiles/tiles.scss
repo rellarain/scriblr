@@ -26,12 +26,63 @@ $tile-surface: linear-gradient(160deg, var(--surface-raised-a), var(--surface-ra
   &::-webkit-scrollbar { display: none; }
 }
 
+// Holds the grid's shared icon rail (minimized tiles) beside its resizable stage.
+// Relative so the drag-in-progress ghost rail (below) can anchor to its left edge
+// without disturbing this flex layout's own width.
+.tileMain { position: relative; display: flex; align-items: flex-start; gap: 8px; } // gap matches GRID_GAP (tileShapes.ts)
+
+// Every minimized tile in the grid, collapsed into one shared column of icon
+// buttons pinned along the left edge -- outside the resizable stage entirely, so
+// mid tiles reflow to use the rest of the space as if these took none of it
+// (splitTree.ts's isAllFixed-based geometry collapsing does the actual
+// space-reclaiming; this is just where the rail itself sits and how wide it is).
+.tileRail {
+  flex: 0 0 40px; // RAIL_TILE (tileShapes.ts)
+  width: 40px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  // A dragged tile hovering here would minimize it, not swap/split it.
+  &--drop { box-shadow: inset 0 0 0 2px var(--accent); border-radius: 6px; }
+}
+// While a tile is being dragged and nothing is minimized yet, there's no real
+// .tileRail to drop onto -- this stands in for it: a thin drop zone overlaid on
+// the stage's left edge (not part of the flex flow, so it doesn't reflow every
+// tile mid-drag), gone again the moment the drag ends unless it was actually used.
+.tileRailGhost {
+  position: absolute;
+  left: 0;
+  top: 0;
+  bottom: 0;
+  z-index: 2;
+  width: 40px; // RAIL_TILE (tileShapes.ts)
+  border-radius: 6px;
+  box-shadow: inset 0 0 0 2px color-mix(in srgb, var(--ink) 30%, transparent);
+  background: color-mix(in srgb, var(--ink) 6%, transparent);
+  &--drop { box-shadow: inset 0 0 0 2px var(--accent); background: color-mix(in srgb, var(--accent) 15%, transparent); }
+}
+.railTile {
+  flex: 0 0 auto;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+  border: 0;
+  border-radius: 10px;
+  background: $tile-surface;
+  box-shadow: inset 0 0 0 1px var(--hairline);
+  color: var(--ink-muted);
+  cursor: pointer;
+  &:hover { box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--ink) 30%, transparent); color: var(--ink); }
+  &:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
+}
+
 // The stage is sized in JS (TileGrid.tsx) to fill its container exactly, or to the
 // tree's minimum footprint when that's bigger (the scroll area then scrolls).
 // Tiles and dividers inside are positioned absolutely, from the split tree's
 // geometry (splitTree.ts's computeGeometry) -- no CSS grid, so there is never a
 // gap or a ragged last row: every leaf's rect tiles the stage exactly.
-.tileGrid { flex: 0 0 auto; }
+.tileGrid { flex: 0 0 auto; min-width: 0; }
 
 .tileDivider {
   position: absolute;
@@ -70,31 +121,29 @@ $tile-surface: linear-gradient(160deg, var(--surface-raised-a), var(--surface-ra
   box-shadow: inset 0 0 0 1px var(--hairline);
   color: var(--ink);
   font-size: 12px;
-  cursor: pointer;
+  cursor: grab;
   &:hover { box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--ink) 30%, transparent); }
   &:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
-  // Mini is one row: name on the left, summary on the right, no body.
-  &--mini { justify-content: center; padding-top: 0; padding-bottom: 0; }
   &--dragging { opacity: 0.5; }
   &--drop { box-shadow: inset 0 0 0 2px var(--accent); }
-  // Hovering this tile's left/right edge margin while dragging another one over it:
-  // a bar at that edge previews the new column a drop there would split off.
+  // Hovering this tile's edge margin while dragging another one over it: a bar at
+  // that edge previews the new column/row a drop there would split off.
   &--edge-left { box-shadow: inset 4px 0 0 0 var(--accent); }
   &--edge-right { box-shadow: inset -4px 0 0 0 var(--accent); }
+  &--edge-top { box-shadow: inset 0 4px 0 0 var(--accent); }
+  &--edge-bottom { box-shadow: inset 0 -4px 0 0 var(--accent); }
   p { margin: 0; }
 }
 
 .tileHead {
   display: flex;
   align-items: center;
-  // space-between (not a margin-left: auto on .tileMax) puts the open button at the
-  // tile's top-right corner -- a margin can't win that fight here, since the writer's
-  // own button reset (writer.scss's .wUI.wr :where(button)) outranks a single class.
-  justify-content: space-between;
   gap: 6px;
   min-width: 0;
   color: var(--ink-muted);
-  cursor: grab;
+  // The tile itself is the drag handle (cursor: grab); the header is the one
+  // clickable part of it, opening the tile's console.
+  cursor: pointer;
 }
 .tileHeadMain {
   display: flex;
@@ -104,9 +153,9 @@ $tile-surface: linear-gradient(160deg, var(--surface-raised-a), var(--surface-ra
   flex: 1 1 auto;
 }
 .tileOpen {
-  // The name keeps its room; the summary beside it gives way first.
+  // A long title truncates rather than stretching the header indefinitely.
   flex: 0 0 auto;
-  max-width: 70%;
+  max-width: 100%;
   min-width: 0;
   padding: 0;
   border: 0;
@@ -119,6 +168,8 @@ $tile-surface: linear-gradient(160deg, var(--surface-raised-a), var(--surface-ra
   overflow: hidden;
   text-overflow: ellipsis;
   cursor: pointer;
+  &:hover:not(:disabled), &:focus-visible:not(:disabled) { color: var(--accent); }
+  &:disabled { cursor: default; opacity: 1; }
 }
 .tileSummary {
   flex: 1 1 0;
@@ -132,25 +183,6 @@ $tile-surface: linear-gradient(160deg, var(--surface-raised-a), var(--surface-ra
   text-overflow: ellipsis;
 }
 .tileBody > .tileSummary { flex: 0 0 auto; text-align: left; white-space: normal; }
-// Opens the tile into its console (max). Faint until hovered/focused, like the
-// title's own toggle affordance -- the tile's chrome stays quiet until touched.
-.tileMax {
-  flex: 0 0 auto;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  width: 22px;
-  height: 22px;
-  padding: 0;
-  border: 0;
-  border-radius: 4px;
-  background: transparent;
-  color: var(--ink-muted);
-  opacity: 0;
-  cursor: pointer;
-  &:hover, &:focus-visible { opacity: 1; background: var(--ov-sink-1); color: var(--ink); }
-}
-.tile:hover .tileMax, .tile:focus-within .tileMax { opacity: 0.8; }
 
 .tileBody {
   flex: 1 1 auto;
@@ -234,33 +266,6 @@ $tile-surface: linear-gradient(160deg, var(--surface-raised-a), var(--surface-ra
 .tcCrumbs { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--ink-muted); }
 .tcCrumbHere { color: var(--ink); font-weight: 700; }
 .tcCrumbLink { padding: 0; border: 0; background: none; color: inherit; font: inherit; cursor: pointer; &:hover { color: var(--ink); text-decoration: underline; } }
-.tcStrip {
-  flex: 0 0 auto;
-  display: flex;
-  gap: 6px;
-  padding: 6px 10px;
-  overflow-x: auto;
-  border-bottom: 1px solid var(--hairline);
-  font-size: 12px;
-  &::-webkit-scrollbar { height: 4px; }
-  &::-webkit-scrollbar-thumb { border-radius: 2px; background: color-mix(in srgb, var(--ink) 30%, transparent); }
-}
-.tcChip {
-  flex: 0 0 auto;
-  display: inline-flex;
-  align-items: center;
-  gap: 5px;
-  padding: 3px 9px;
-  border: 0;
-  border-radius: 8px;
-  background: var(--ov-sink-1);
-  color: var(--ink-muted);
-  font: inherit;
-  white-space: nowrap;
-  cursor: pointer;
-  &:hover { color: var(--ink); }
-  &--on { background: var(--accent); color: var(--on-accent); &:hover { color: var(--on-accent); } }
-}
 .tcMain { position: relative; flex: 1 1 auto; min-height: 0; display: flex; flex-direction: column; }
 .tcBody {
   position: relative;

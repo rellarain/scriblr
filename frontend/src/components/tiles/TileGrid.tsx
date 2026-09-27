@@ -1,12 +1,14 @@
 import { createContext, useContext, useLayoutEffect, useRef, useState, type DragEvent, type KeyboardEvent, type ReactNode } from 'react'
 import Divider from './Divider'
+import RailTile from './RailTile'
 import Tile from './Tile'
 import TileConsole from './TileConsole'
-import { isOneColumn } from './tileShapes'
+import { GRID_GAP, RAIL_TILE, isOneColumn } from './tileShapes'
 import { nextFocus, type Box, type Direction } from './tileNav'
 import { opensConsole, type TileDef } from './tileTypes'
 import {
-  canInsertAt, canInsertBeside, computeGeometry, flattenOneColumn, getAtPath, minSize, rectAtPath, type Path, type SplitNode,
+  canInsertAt, canInsertBeside, canInsertBelow, computeGeometry, fixedLeafIds, flattenOneColumn, getAtPath,
+  minSize, rectAtPath, type Path, type SplitNode,
 } from './splitTree'
 import { useContainerSize } from './useContainerWidth'
 import { useSplitLayout } from './useSplitLayout'
@@ -24,8 +26,9 @@ export const useTileHost = (): TileHost => useContext(TileHostContext)
 
 const ARROWS: Record<string, Direction> = { ArrowLeft: 'left', ArrowRight: 'right', ArrowUp: 'up', ArrowDown: 'down' }
 const boxOf = (r: { x: number; y: number; w: number; h: number }): Box => ({ left: r.x, top: r.y, width: r.w, height: r.h })
-// The width (as a fraction of a tile's own box) of its left/right margins where
-// dropping a dragged tile splits off a new column beside it, instead of swapping.
+// The width (as a fraction of a tile's own box, on its own axis) of its edge
+// margins where dropping a dragged tile splits off a new column/row beside/below
+// it, instead of swapping.
 const EDGE_ZONE = 0.25
 
 // A grid of tiles laid out on a split tree (splitTree.ts): it always fills its own
@@ -33,11 +36,13 @@ const EDGE_ZONE = 0.25
 // no ragged last row), remembers each tile's place and size per user, and expands a
 // selected tile into its console over the grid's whole area.
 //
-//   - A tile's title toggles it between mini and mid; its corner button opens it into
-//     its console (max). Escape (or Back) collapses an open console; `[` and `]`
-//     switch tiles while one is expanded.
+//   - A tile's header opens it into its console (max), when it has one; clicking
+//     its body does nothing. Escape (or Back) collapses an open console.
 //   - Arrow keys move between tiles; Alt+arrows swap the focused tile with its neighbour.
-//   - A tile's header can be dragged onto another to swap their places.
+//   - The whole tile (not just its header) is a drag handle: dragging it onto
+//     another tile swaps their places, or onto that tile's edge margin splits off a
+//     new column/row beside/below it instead. Dragging it into the grid's shared
+//     icon rail (RailTile.tsx) minimizes it; clicking a rail icon restores it.
 //   - A divider between two tiles can be dragged or keyboard-nudged.
 //
 // `below` is anything that goes under the tiles (the book face under its link tiles).
@@ -64,11 +69,18 @@ function TileGrid({ gridId, tiles, crumbs, below, label, open: controlledOpen, o
   const [scrollRef, containerSize] = useContainerSize<HTMLDivElement>()
   const stageRef = useRef<HTMLDivElement>(null)
   const areaRef = useRef<HTMLDivElement>(null)
-  const oneColumn = isOneColumn(containerSize.width)
+  // Minimized tiles collapse into one shared icon rail down the grid's left edge,
+  // in a stable order independent of which branch each one actually lives under --
+  // outside the resizable stage entirely, so it reserves its own fixed width before
+  // the one-column check below (flattening doesn't change which leaves are fixed or
+  // their pre-order, so this is safe to read off the tree before deciding to flatten it).
+  const railIds = layout.tree ? fixedLeafIds(layout.tree) : []
+  const railReserve = railIds.length > 0 ? RAIL_TILE + GRID_GAP : 0
+  const oneColumn = isOneColumn(containerSize.width - railReserve)
   const renderTree: SplitNode | null = layout.tree ? (oneColumn ? flattenOneColumn(layout.tree) : layout.tree) : null
 
   const min = renderTree ? minSize(renderTree) : { w: 0, h: 0 }
-  const stageW = Math.max(containerSize.width, min.w)
+  const stageW = Math.max(containerSize.width - railReserve, min.w)
   // A grid with something below it (the book face under its link tiles) sizes the
   // stage to its own content instead of stretching to fill the container -- the
   // trailing content takes the rest of the space, as it always has.
@@ -80,7 +92,8 @@ function TileGrid({ gridId, tiles, crumbs, below, label, open: controlledOpen, o
   const [dragId, setDragId] = useState<string | null>(null)
   const [overId, setOverId] = useState<string | null>(null)
   const [overDivider, setOverDivider] = useState<string | null>(null)
-  const [overEdge, setOverEdge] = useState<{ id: string; side: 'left' | 'right' } | null>(null)
+  const [overEdge, setOverEdge] = useState<{ id: string; side: 'left' | 'right' | 'top' | 'bottom' } | null>(null)
+  const [overRail, setOverRail] = useState(false)
   const refocus = useRef<string | null>(null)
 
   // After a tile is moved with the keyboard, keep the focus on it.
@@ -91,7 +104,6 @@ function TileGrid({ gridId, tiles, crumbs, below, label, open: controlledOpen, o
     el?.focus()
   })
 
-  const openable = layout.placed.map(p => p.def).filter(opensConsole)
   const openTile = openId ? layout.placed.find(p => p.def.id === openId)?.def : undefined
 
   function open(def: TileDef) {
@@ -111,7 +123,6 @@ function TileGrid({ gridId, tiles, crumbs, below, label, open: controlledOpen, o
     setOpenId(null)
     if (layout.maximized) { layout.setMaximized(false); onMaximizeChange?.(false) }
   }
-  function switchTo(id: string) { setFrom(null); setCornerPanel(null); setOpenId(id) }
   // A tile this grid does not have is left to the grid it is nested in (Account's Settings reach the Dashboard tile).
   const parentHost = useContext(TileHostContext)
   const host: TileHost = {
@@ -147,18 +158,29 @@ function TileGrid({ gridId, tiles, crumbs, below, label, open: controlledOpen, o
     const tile = (e.currentTarget as HTMLElement).closest('.tile')
     if (tile) e.dataTransfer.setDragImage(tile, 12, 12)
   }
-  // Whether the pointer sits in a tile's left/right edge margin (and there's room
-  // to split off a new column there) rather than its middle (a swap, as usual).
-  function edgeSide(e: DragEvent, id: string): 'left' | 'right' | null {
-    if (oneColumn) return null
+  // Whether the pointer sits in one of a tile's four edge margins (and there's room
+  // to split off a new column/row there) rather than its middle (a swap, as usual).
+  // Each axis qualifies independently against its own box length (EDGE_ZONE); when
+  // both would qualify at once (near a corner), whichever the pointer sits
+  // physically closer to, in real pixels, wins -- comparing raw px (not the two
+  // axes' fractions against each other) is what keeps this right for a tile far
+  // wider than it is tall, or the reverse.
+  function edgeSide(e: DragEvent, id: string): 'left' | 'right' | 'top' | 'bottom' | null {
     const g = geometry.tiles.find(t => t.id === id)
-    if (!g || !canInsertBeside(g.rect)) return null
+    if (!g) return null
     const box = (e.currentTarget as HTMLElement).getBoundingClientRect()
-    if (box.width <= 0) return null
-    const frac = (e.clientX - box.left) / box.width
-    if (frac <= EDGE_ZONE) return 'left'
-    if (frac >= 1 - EDGE_ZONE) return 'right'
-    return null
+    if (box.width <= 0 || box.height <= 0) return null
+    const distL = e.clientX - box.left
+    const distR = box.left + box.width - e.clientX
+    const distT = e.clientY - box.top
+    const distB = box.top + box.height - e.clientY
+    const hDist = Math.min(distL, distR)
+    const vDist = Math.min(distT, distB)
+    const hOk = !oneColumn && canInsertBeside(g.rect) && hDist <= EDGE_ZONE * box.width
+    const vOk = canInsertBelow(g.rect) && vDist <= EDGE_ZONE * box.height
+    if (!hOk && !vOk) return null
+    if (hOk && (!vOk || hDist <= vDist)) return distL < distR ? 'left' : 'right'
+    return distT < distB ? 'top' : 'bottom'
   }
   function onDragOver(e: DragEvent, id: string) {
     if (!dragId || dragId === id) return
@@ -167,16 +189,36 @@ function TileGrid({ gridId, tiles, crumbs, below, label, open: controlledOpen, o
     setOverEdge(side ? { id, side } : null)
     setOverId(side ? null : id)
     setOverDivider(null)
+    setOverRail(false)
   }
   function onDrop(e: DragEvent, id: string) {
     if (!dragId) return
     e.preventDefault()
     const side = edgeSide(e, id)
-    if (side) layout.insertBeside(dragId, id, side)
+    if (side === 'left' || side === 'right') layout.insertBeside(dragId, id, side)
+    else if (side === 'top' || side === 'bottom') layout.insertBelow(dragId, id, side)
     else layout.swap(dragId, id)
     endDrag()
   }
-  function endDrag() { setDragId(null); setOverId(null); setOverDivider(null); setOverEdge(null) }
+  function endDrag() { setDragId(null); setOverId(null); setOverDivider(null); setOverEdge(null); setOverRail(false) }
+
+  // Dragging a tile into the grid's shared icon rail minimizes it -- only mid
+  // tiles are ever drag sources (rail icons are click-only), so this never needs
+  // to guard against a tile that's already minimized.
+  function onRailDragOver(e: DragEvent) {
+    if (!dragId) return
+    e.preventDefault()
+    setOverRail(true)
+    setOverId(null)
+    setOverEdge(null)
+    setOverDivider(null)
+  }
+  function onRailDrop(e: DragEvent) {
+    if (!dragId) return
+    e.preventDefault()
+    layout.toggleTier(dragId)
+    endDrag()
+  }
 
   // Hovering a divider (rather than another tile) while dragging offers a different
   // drop: a new column or row wedged in right there, instead of a swap -- only when
@@ -186,6 +228,7 @@ function TileGrid({ gridId, tiles, crumbs, below, label, open: controlledOpen, o
     e.preventDefault()
     setOverDivider(key)
     setOverId(null)
+    setOverRail(false)
   }
   function onDividerDrop(e: DragEvent, path: Path) {
     if (!dragId) return
@@ -216,52 +259,70 @@ function TileGrid({ gridId, tiles, crumbs, below, label, open: controlledOpen, o
     <TileHostContext.Provider value={host}>
     <div className="tileArea" ref={areaRef} onKeyDown={onKeyDown}>
       <div ref={scrollRef} className="tileScroll">
-        <div
-          ref={stageRef} className={oneColumn ? 'tileGrid tileGrid--one' : 'tileGrid'} role="group"
-          aria-label={label ?? 'Tiles'} style={{ position: 'relative', width: stageW, height: stageH }}
-        >
-          {geometry.tiles.map(g => {
-            const p = byId.get(g.id)
-            if (!p) return null
-            return (
-              <Tile
-                key={p.def.id} def={p.def} rect={g.rect} fixed={g.fixed} oneColumn={oneColumn}
-                dragging={dragId === p.def.id} dropTarget={overId === p.def.id && dragId !== p.def.id}
-                edgeDrop={overEdge?.id === p.def.id ? overEdge.side : null}
-                onOpen={() => open(p.def)} onToggleTier={() => layout.toggleTier(p.def.id)}
-                onDragStart={e => onDragStart(e, p.def.id)} onDragOver={e => onDragOver(e, p.def.id)}
-                onDrop={e => onDrop(e, p.def.id)} onDragEnd={endDrag}
-              />
-            )
-          })}
-          {geometry.dividers.map(d => {
-            const branch = renderTree ? getAtPath(renderTree, d.path) : null
-            const ratio = branch && 'ratio' in branch ? branch.ratio : 0.5
-            const key = d.path.join('.') || 'root'
-            // A one-column stage has no room to wedge in a new side -- only offer
-            // this drop once the grid is actually split into more than one column.
-            const draggedFixed = dragId ? geometry.tiles.find(t => t.id === dragId)?.fixed ?? false : false
-            return (
-              <Divider
-                key={key} dir={d.dir} ratio={ratio}
-                style={{ position: 'absolute', left: d.rect.x, top: d.rect.y, width: d.rect.w, height: d.rect.h }}
-                onDragTo={(x, y) => dragTo(d.path, d.dir, x, y)}
-                onResize={r => layout.resize(d.path, r)}
-                dropTarget={overDivider === key}
-                onDragOver={oneColumn ? undefined : e => onDividerDragOver(e, key, d.path, draggedFixed)}
-                onDrop={oneColumn ? undefined : e => onDividerDrop(e, d.path)}
-              />
-            )
-          })}
+        <div className="tileMain">
+          {railIds.length > 0 ? (
+            <div
+              className={overRail ? 'tileRail tileRail--drop' : 'tileRail'} role="group" aria-label="Minimized tiles"
+              onDragOver={onRailDragOver} onDrop={onRailDrop}
+            >
+              {railIds.map(id => {
+                const p = byId.get(id)
+                return p ? <RailTile key={id} def={p.def} onToggleTier={() => layout.toggleTier(id)} /> : null
+              })}
+            </div>
+          ) : dragId ? (
+            <div
+              className={overRail ? 'tileRailGhost tileRailGhost--drop' : 'tileRailGhost'} role="group" aria-label="Minimized tiles"
+              onDragOver={onRailDragOver} onDrop={onRailDrop}
+            />
+          ) : null}
+          <div
+            ref={stageRef} className={oneColumn ? 'tileGrid tileGrid--one' : 'tileGrid'} role="group"
+            aria-label={label ?? 'Tiles'} style={{ position: 'relative', width: stageW, height: stageH }}
+          >
+            {geometry.tiles.map(g => {
+              const p = byId.get(g.id)
+              if (!p) return null
+              return (
+                <Tile
+                  key={p.def.id} def={p.def} rect={g.rect} oneColumn={oneColumn}
+                  dragging={dragId === p.def.id} dropTarget={overId === p.def.id && dragId !== p.def.id}
+                  edgeDrop={overEdge?.id === p.def.id ? overEdge.side : null}
+                  onOpen={() => open(p.def)}
+                  onDragStart={e => onDragStart(e, p.def.id)} onDragOver={e => onDragOver(e, p.def.id)}
+                  onDrop={e => onDrop(e, p.def.id)} onDragEnd={endDrag}
+                />
+              )
+            })}
+            {geometry.dividers.map(d => {
+              const branch = renderTree ? getAtPath(renderTree, d.path) : null
+              const ratio = branch && 'ratio' in branch ? branch.ratio : 0.5
+              const key = d.path.join('.') || 'root'
+              // A one-column stage has no room to wedge in a new side -- only offer
+              // this drop once the grid is actually split into more than one column.
+              const draggedFixed = dragId ? byId.get(dragId)?.shape === 'mini' : false
+              return (
+                <Divider
+                  key={key} dir={d.dir} ratio={ratio}
+                  style={{ position: 'absolute', left: d.rect.x, top: d.rect.y, width: d.rect.w, height: d.rect.h }}
+                  onDragTo={(x, y) => dragTo(d.path, d.dir, x, y)}
+                  onResize={r => layout.resize(d.path, r)}
+                  dropTarget={overDivider === key}
+                  onDragOver={oneColumn ? undefined : e => onDividerDragOver(e, key, d.path, draggedFixed)}
+                  onDrop={oneColumn ? undefined : e => onDividerDrop(e, d.path)}
+                />
+              )
+            })}
+          </div>
         </div>
         {below}
       </div>
       {openTile && (
         <TileConsole
           key={openTile.id === openId ? 'console' : openTile.id}
-          gridId={gridId} tile={openTile} siblings={openable} crumbs={crumbs} from={from} initialPanel={cornerPanel}
+          gridId={gridId} tile={openTile} crumbs={crumbs} from={from} initialPanel={cornerPanel}
           maximized={maximized} onToggleMaximize={onMaximizeChange ? toggleMaximize : undefined}
-          onSwitch={switchTo} onClose={close}
+          onClose={close}
         />
       )}
     </div>

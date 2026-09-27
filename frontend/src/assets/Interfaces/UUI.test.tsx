@@ -36,13 +36,13 @@ describe('UUI (the User panel as tiles)', () => {
     expect(within(profile).getByRole('navigation', { name: 'Breadcrumb' }).textContent).toContain('User › Account › Profile')
   })
 
-  it('has the section switcher as a strip of mini tiles', async () => {
+  it('has no in-console section-switch strip -- Back and reopen switches sections instead', async () => {
     const user = userEvent.setup()
     render(<UUI />)
     await user.click(within(tile('dashboard')).getByRole('button', { name: 'Open Dashboard' }))
-    const strip = screen.getAllByRole('tablist', { name: 'Tiles' })[0]
-    expect(within(strip).getAllByRole('tab').map(t => t.textContent?.trim())).toEqual(['Dashboard', 'Account', 'Training'])
-    await user.click(within(strip).getByRole('tab', { name: /Training/ }))
+    expect(screen.queryByRole('tablist', { name: 'Tiles' })).toBeNull()
+    await user.click(screen.getByRole('button', { name: 'Back to tiles' }))
+    await user.click(within(tile('training')).getByRole('button', { name: 'Open Training' }))
     expect(screen.getByRole('region', { name: 'Training' })).toBeTruthy()
   })
 

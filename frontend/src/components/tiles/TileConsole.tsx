@@ -11,14 +11,12 @@ const canAnimate = (): boolean =>
   typeof window !== 'undefined' && typeof window.matchMedia === 'function' && !window.matchMedia('(prefers-reduced-motion: reduce)').matches
 
 // A tile expanded into its console: it grows from the tile's own place to fill the
-// grid's area. At the top are a back button and the breadcrumb, then a row of mini
-// tiles for switching to another tile without going back; Settings and Help sit at
-// the bottom right. A tile with child tiles shows them as a grid that can expand in
-// turn; otherwise the tile's own editor fills the body.
-function TileConsole({ gridId, tile, siblings, crumbs, from, initialPanel = null, maximized = false, onToggleMaximize, onSwitch, onClose }: {
+// grid's area. At the top are a back button and the breadcrumb; Settings and Help
+// sit at the bottom right. A tile with child tiles shows them as a grid that can
+// expand in turn; otherwise the tile's own editor fills the body.
+function TileConsole({ gridId, tile, crumbs, from, initialPanel = null, maximized = false, onToggleMaximize, onClose }: {
   gridId: string
   tile: TileDef
-  siblings: TileDef[]
   crumbs: Crumb[]
   // Where the tile was (in this area's coordinates), to grow from and shrink back to.
   from: Box | null
@@ -28,7 +26,6 @@ function TileConsole({ gridId, tile, siblings, crumbs, from, initialPanel = null
   // `onToggleMaximize` -- the Writer hides its sidebar; other panels don't wire it up yet).
   maximized?: boolean
   onToggleMaximize?: () => void
-  onSwitch: (id: string) => void
   onClose: () => void
 }) {
   const [box, setBox] = useState<Box | null>(from)
@@ -66,16 +63,7 @@ function TileConsole({ gridId, tile, siblings, crumbs, from, initialPanel = null
       ref={rootRef} tabIndex={-1}
       className={animated ? 'tileConsole tileConsole--animated' : 'tileConsole'} style={style}
       role="region" aria-label={tile.title} data-maximized={maximized || undefined}
-      onKeyDown={e => {
-        const target = e.target as HTMLElement
-        if (e.key === 'Escape') { e.stopPropagation(); close() }
-        const typing = target.tagName === 'INPUT' || target.tagName === 'TEXTAREA' || target.tagName === 'SELECT' || target.isContentEditable
-        if ((e.key === '[' || e.key === ']') && !typing && !e.altKey && !e.ctrlKey && !e.metaKey) {
-          const i = siblings.findIndex(s => s.id === tile.id)
-          const next = siblings[i + (e.key === ']' ? 1 : -1)]
-          if (next) { e.stopPropagation(); onSwitch(next.id) }
-        }
-      }}
+      onKeyDown={e => { if (e.key === 'Escape') { e.stopPropagation(); close() } }}
     >
       <div className="tcHead" onDoubleClick={onToggleMaximize}>
         <button type="button" className="tcBack" onClick={close} aria-label="Back to tiles">
@@ -96,20 +84,7 @@ function TileConsole({ gridId, tile, siblings, crumbs, from, initialPanel = null
         </nav>
       </div>
 
-      {siblings.length > 1 && (
-        <div className="tcStrip" role="tablist" aria-label="Tiles">
-          {siblings.map(s => (
-            <button
-              key={s.id} type="button" role="tab" aria-selected={s.id === tile.id}
-              className={s.id === tile.id ? 'tcChip tcChip--on' : 'tcChip'} onClick={() => onSwitch(s.id)}
-            >
-              <s.Icon size={14} /> {s.title}
-            </button>
-          ))}
-        </div>
-      )}
-
-      {/* The Settings and Help panel covers just the body, so Back and the strip stay in reach. */}
+      {/* The Settings and Help panel covers just the body, so Back stays in reach. */}
       <div className="tcMain">
         <div className="tcBody">
           {tile.children

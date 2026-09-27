@@ -355,44 +355,57 @@ and selecting one expands it into its console/editor. The shared system is
 
 - **A binary split tree** (`splitTree.ts`), not a CSS grid: every branch divides its
   rect into two along one axis at a ratio, so dragging a divider resizes only its two
-  neighbours and the tiles together always tile the container's exact area. A leaf can
-  be **fixed** (a mini tile, or any tile dragged short): it keeps a constant ~46px
-  height and its sibling absorbs the rest, and a fixed leaf's containing branch is
-  always straightened to stack vertically (`fixup`); a whole stack of minis (nested
-  `col` branches of nothing else) is recognised the same way (`isMiniStack`) and acts
-  as one fixed unit. `buildTree` seeds a fresh grid with minis stacked **below** the
-  rest, not across the top -- collapsed, low-priority content reads last, and each
-  mini's own card stays one column wide (`MINI_W`, `Tile.tsx`) however full-width its
-  row actually is. `reconcile` grafts new tiles onto an existing tree the same way,
-  pruning removed ones; `computeGeometry` turns a tree plus a pixel rect into every
-  tile's and divider's rect in one pass.
+  neighbours and the tiles together always tile the container's exact area. A leaf
+  can be **fixed** (minimized): a fully-fixed subtree (`isAllFixed`) contributes no
+  size at all to the geometry -- its sibling absorbs all of it, recursively, however
+  deep the fixed subtree nests or however it's shaped -- since a minimized tile
+  doesn't render on the stage at all; it renders in the grid's own icon rail instead
+  (see below). `fixedLeafIds` walks the tree in a stable pre-order to give the rail
+  its order, independent of which branch each fixed leaf actually lives under.
+  `buildTree` still groups mini leaves together when seeding a fresh grid (just a
+  convenient initial shape, not load-bearing); `reconcile` grafts new tiles onto an
+  existing tree the same way, pruning removed ones; `computeGeometry` turns a tree
+  plus a pixel rect into every non-fixed tile's and divider's rect in one pass.
 - **Container-based:** a grid measures its own width and height
-  (`useContainerSize`), and reflows to full-width rows (`flattenOneColumn`) below
-  400px of container width, without touching the saved tree -- widening the
-  container returns to the saved split. A grid with trailing content below it (the
-  book face under its mini tiles) sizes itself to its content instead of stretching
-  to fill the container; a tile-only grid fills the container's height.
-- **Three states, not five shapes:** a tile is **mini** (a short, fixed-height strip:
-  name and a one-line summary, no body -- a `splitTree.ts` fixed leaf), **mid** (a
-  normal, resizable leaf showing the tile's own `render`, which scales continuously
-  with its actual measured width/height -- there's no separate size-tier label to
-  store), or **max** (the console it expands into, `TileConsole`). The tile's title
-  toggles mini/mid; a corner button (shown whenever the tile has something to open --
-  a console, child tiles, or `onOpen`) opens max. `TileDef` carries a `defaultShape:
-  'mini' | 'mid'` and no shape list -- every tile supports both.
-- **`TileGrid`** shows the tiles and their dividers, expands one into a `TileConsole`
-  (FLIP animation over the grid's area, back button and breadcrumb, a row of mini
-  tiles to switch tiles, Settings and Help as round buttons at the bottom right via
-  `ConsoleCorner`), and can nest: a tile with `children` expands into a grid of tiles
-  that expand in turn. Keyboard: arrows move focus between tiles, Enter toggles the
-  focused tile's mini/mid state, Escape collapses an open console, `[` and `]` switch
-  tiles, Alt+arrows swap the focused tile with its neighbour; a divider can be dragged
-  or focused and nudged with the arrow keys. Dragging a tile's header onto another
+  (`useContainerSize`), reserves a fixed-width strip for its icon rail when it has
+  any minimized tiles, and reflows the rest to full-width rows (`flattenOneColumn`)
+  below 400px of *remaining* container width, without touching the saved tree --
+  widening the container returns to the saved split. A grid with trailing content
+  below it (the book face under its link tiles) sizes itself to its content instead
+  of stretching to fill the container; a tile-only grid fills the container's height.
+- **Three states, not five shapes:** a tile is **mini** (collapsed to a plain
+  icon-only square, `RAIL_TILE` = 40px, in the grid's shared left-edge rail --
+  `RailTile.tsx`, a `splitTree.ts` fixed leaf), **mid** (a normal, resizable leaf
+  showing the tile's own `render`, which scales continuously with its actual
+  measured width/height -- there's no separate size-tier label to store), or **max**
+  (the console it expands into, `TileConsole`). A mid tile's header opens it into
+  max, when it has something to open (a console, child tiles, or `onOpen`); clicking
+  its body does nothing. There is no corner button any more -- the header itself is
+  the one clickable part of the tile. `TileDef` carries a `defaultShape: 'mini' |
+  'mid'` and no shape list -- every tile supports both.
+- **`TileGrid`** shows the tiles and their dividers (plus the icon rail, when any
+  tile is minimized), expands one into a `TileConsole` (FLIP animation over the
+  grid's area, back button and breadcrumb, Settings and Help as round buttons at the
+  bottom right via `ConsoleCorner`), and can nest: a tile with `children` expands
+  into a grid of tiles that expand in turn. Keyboard: arrows move focus between
+  tiles, Enter opens the focused tile (when it has something to open), Escape
+  collapses an open console, Alt+arrows swap the focused tile with its neighbour; a
+  divider can be dragged or focused and nudged with the arrow keys. The whole tile
+  (not just its header) is the drag handle -- a plain click still opens it (a click
+  never involves movement, so the two don't conflict). Dragging it onto another tile
   swaps their places, each area keeping its own size; dragging it onto a **divider**
-  instead (when there's room -- `canInsertAt`) wedges the tile in as a new side right
-  there rather than swapping -- a divider between side-by-side tiles gains a new
-  column, one between stacked tiles a new row (`insertAtDivider`). A few quick actions
-  (tick a task, add a note or task, open an item) work without expanding. There is no
+  instead (when there's room -- `canInsertAt`) wedges the tile in as a new side
+  right there rather than swapping -- a divider between side-by-side tiles gains a
+  new column, one between stacked tiles a new row (`insertAtDivider`). Dragging it
+  onto another tile's own **edge margin** (25% of that tile's own box, on whichever
+  axis the pointer is closer to an edge on) instead splits off a new column beside
+  it (left/right, `canInsertBeside`/`insertBesideLeaf`) or a new row above/below it
+  (top/bottom, `canInsertBelow`/`insertBelowLeaf`), localized to just that one
+  target tile rather than the whole grid. Dragging it into the grid's shared icon
+  rail minimizes it instead -- a thin drop-zone placeholder appears there for the
+  duration of any drag if nothing is minimized yet, so there's always somewhere to
+  drop it; clicking a rail icon restores it to mid. A few quick actions (tick a
+  task, add a note or task, open an item) work without expanding. There is no
   "reset layout" control -- a mis-dragged grid is put back by hand.
 - **Remembered per user** (`useSplitLayout`, stored with `useStoredState` in the
   user-settings kv as `scriblr.tiles.<gridId>`): the tree, each tile's mini/mid state,
@@ -401,9 +414,8 @@ and selecting one expands it into its console/editor. The shared system is
   nearest-neighbour swap).
 - **Maximize** (Writer only so far): double-clicking an expanded console's header
   hides the Writer's own sidebar so the console spans the full width; it's
-  remembered with the grid's layout, stays in effect while switching tiles from the
-  mini strip, and clears on Back/Escape. `TileGrid`'s `onMaximizeChange` prop is the
-  hook other panels can wire up the same way later.
+  remembered with the grid's layout and clears on Back/Escape. `TileGrid`'s
+  `onMaximizeChange` prop is the hook other panels can wire up the same way later.
 - **Writer:** the Shelves and Shelf screens are tile grids (`writer/tiles/shelvesTiles.tsx`,
   `shelfTiles.tsx`; previews come from `tileData.ts`); the Book screen keeps the book
   face under two link tiles (`bookTiles.tsx`); the Page and Pages screens keep their
@@ -416,10 +428,14 @@ and selecting one expands it into its console/editor. The shared system is
   of every console.
 - **User panel** (`assets/Interfaces/UUI.tsx`): Dashboard, Account and Training are
   section tiles; each expands into its pages as child tiles, which expand into their
-  editors. Dashboard's Settings (corner button) is the theme tool; Account's are
-  handedness and autosave, and its pointer to the theme tool uses `useTileHost()` to
-  open the Dashboard tile with its Settings panel showing (a nested grid hands a tile
-  it does not have to the grid it is in).
+  editors. Dashboard's Settings (corner button) is the theme tool on its own
+  (`ThemeSettingsPanel`, own heading and Save/Restore); Account's Settings
+  (`CustomizeControls`) is handedness and autosave plus that same theme tool
+  embedded inline (`showHeader={false}`, its heading and Save/Restore replaced by
+  one shared pair covering all three groups, since they're the same settings
+  store). `useTileHost()` (a nested grid handing a tile it does not have to the
+  grid it is in) is still there for other cross-tile jumps, just not this one any
+  more.
 - **Admin panel** (`AUI.tsx`): its eight sections as tiles with their pages as child
   tiles; a Resources config page keeps its publish badge, Save draft / Publish and
   lock inside its console and saves when it is left. AUI's own width is no longer a

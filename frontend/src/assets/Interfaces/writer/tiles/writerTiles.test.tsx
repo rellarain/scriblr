@@ -48,7 +48,8 @@ const shapes = () => Array.from(document.querySelectorAll('[data-tile-id]')).map
 describe('Shelves tiles', () => {
   it('are the template, schedule, analytics and scratchpad', () => {
     grid(shelvesTiles(workspace()), 'shelves')
-    expect(shapes()).toEqual(['schedule:mid', 'analytics:mid', 'scratchpad:mid', 'template:mini'])
+    // The rail (minimized tiles) renders before the stage, so template leads.
+    expect(shapes()).toEqual(['template:mini', 'schedule:mid', 'analytics:mid', 'scratchpad:mid'])
   })
 
   it('shows the chapters of each project in the analytics tile', () => {
@@ -87,9 +88,10 @@ describe('Shelves tiles', () => {
 describe('Shelf tiles', () => {
   it('are the working editors as summary tiles, then placeholders, then link tiles', () => {
     grid(shelfTiles(workspace()), 'shelf')
-    // Mini tiles (schedule, history, editor, template) stack as a fixed strip below the rest.
+    // Mini tiles (schedule, history, editor, template) collapse into the shared
+    // icon rail, which renders before the stage in document order.
     expect(shapes()).toEqual([
-      'plot:mid', 'outline:mid', 'analytics:mid', 'schedule:mini', 'history:mini', 'editor:mini', 'template:mini',
+      'schedule:mini', 'history:mini', 'editor:mini', 'template:mini', 'plot:mid', 'outline:mid', 'analytics:mid',
     ])
   })
 
@@ -109,10 +111,13 @@ describe('Shelf tiles', () => {
     expect(screen.queryByRole('region')).toBeNull()
   })
 
-  it('shows link tiles as a name and a summary, and expands a placeholder tile', async () => {
+  it('shows link tiles as plain rail icons, and expands a placeholder tile', async () => {
     const user = userEvent.setup()
     grid(shelfTiles(workspace()), 'shelf')
-    expect(within(tile('editor')).getByText('1 time system')).toBeTruthy()
+    expect(within(tile('editor')).queryByText('1 time system')).toBeNull()
+    expect(tile('editor').getAttribute('aria-label')).toBe('Project editor')
+    // Restore History to mid first (a rail icon is click-only), then open its console.
+    await user.click(tile('history'))
     await user.click(within(tile('history')).getByRole('button', { name: 'Open History' }))
     expect(within(screen.getByRole('region', { name: 'History' })).getByText(/version and activity/)).toBeTruthy()
   })
@@ -123,7 +128,9 @@ describe('Book link tiles', () => {
     const user = userEvent.setup()
     grid(bookLinkTiles(workspace()), 'book')
     expect(shapes()).toEqual(['outlineTemplate:mini', 'arcOutline:mini'])
-    expect(within(tile('arcOutline')).getByText('1 arc')).toBeTruthy()
+    expect(tile('arcOutline').getAttribute('aria-label')).toBe('Arc outline')
+    // Restore to mid first (a rail icon is click-only), then open its console.
+    await user.click(tile('arcOutline'))
     await user.click(within(tile('arcOutline')).getByRole('button', { name: 'Open Arc outline' }))
     expect(within(screen.getByRole('region', { name: 'Arc outline' })).getByText(/Manage this book/)).toBeTruthy()
   })

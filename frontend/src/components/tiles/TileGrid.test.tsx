@@ -52,60 +52,111 @@ const pointerEvent = (type: string, init: { pointerId?: number; button?: number;
 // jsdom has no DragEvent constructor either, and fireEvent.dragOver/drop silently
 // drop clientX the same way -- build the native event by hand so edge-margin
 // detection (which reads clientX) sees it.
-const dragEvent = (type: string, init: { dataTransfer: unknown; clientX?: number }) =>
+const dragEvent = (type: string, init: { dataTransfer: unknown; clientX?: number; clientY?: number }) =>
   Object.assign(new Event(type, { bubbles: true, cancelable: true }), init)
 
 describe('TileGrid', () => {
-  it('stacks a mini tile as a fixed strip below the rest, its own card one column wide', () => {
+  it('collapses a mini tile into the grid\'s shared icon rail, mid tiles reflowing to use the rest', () => {
     renderGrid()
-    // Default container fallback is 1000x600 (useContainerSize's fallback in jsdom).
+    // Default container fallback is 1000x600 (useContainerSize's fallback in jsdom);
+    // the rail reserves RAIL_TILE + GRID_GAP (48px) off the left before the stage is sized.
     expect(tile('editor').getAttribute('data-fixed')).toBe('true')
-    expect(px(tile('editor'), 'height')).toBe(46)
-    expect(px(tile('editor'), 'top')).toBe(554)
-    // Its card stays one column wide (MINI_W), not a banner across the row.
-    expect(px(tile('editor'), 'width')).toBe(240)
-    // Plot and Outline share the row above the mini strip, side by side, filling the width.
+    expect(tile('editor').closest('.tileRail')).toBeTruthy()
+    expect(px(tile('editor'), 'width')).toBe(40)
+    expect(px(tile('editor'), 'height')).toBe(40)
+    // Plot and Outline share the whole stage, side by side, as if the rail took no room.
     expect(px(tile('plot'), 'top')).toBe(0)
     expect(px(tile('outline'), 'top')).toBe(0)
     expect(px(tile('plot'), 'left')).toBe(0)
-    expect(px(tile('plot'), 'width') + px(tile('outline'), 'width') + 8).toBe(1000)
+    expect(px(tile('plot'), 'width') + px(tile('outline'), 'width') + 8).toBe(1000 - 48)
     expect(px(tile('outline'), 'left')).toBe(px(tile('plot'), 'width') + 8)
   })
 
-  it('shows a mini tile as just its name and summary, a mid tile its own render', () => {
+  it('shows a mini tile as a plain icon in the rail, a mid tile its own render', () => {
     renderGrid()
     expect(tile('editor').getAttribute('data-shape')).toBe('mini')
-    expect(within(tile('editor')).getByText('2 time systems')).toBeTruthy()
+    expect(tile('editor').tagName).toBe('BUTTON')
+    expect(tile('editor').getAttribute('aria-label')).toBe('Project editor')
+    expect(within(tile('editor')).queryByText('2 time systems')).toBeNull()
     expect(tile('editor').querySelector('.tileBody')).toBeNull()
+    expect(tile('editor').querySelector('.tileHead')).toBeNull()
     expect(tile('plot').getAttribute('data-shape')).toBe('mid')
     expect(within(tile('plot')).getByText(/plot body wide/)).toBeTruthy()
   })
 
-  it('is one column below 400px of container width: mid tiles span it, a mini tile stays one column', () => {
+  it('collects minimized tiles from different branches into one shared rail, in pre-order', () => {
+    const fourTiles: TileDef[] = [
+      { id: 'a', title: 'A', Icon: PlotIcon, defaultShape: 'mid', summary: 'a', render: () => <div>A body</div> },
+      { id: 'b', title: 'B', Icon: ListIcon, defaultShape: 'mini', summary: 'b' },
+      { id: 'c', title: 'C', Icon: PencilIcon, defaultShape: 'mid', summary: 'c', render: () => <div>C body</div> },
+      { id: 'd', title: 'D', Icon: PlotIcon, defaultShape: 'mini', summary: 'd' },
+    ]
+    renderGrid(fourTiles, 'rail-mixed')
+    const rail = document.querySelector('.tileRail') as HTMLElement
+    // Both minimized tiles land in the SAME rail, however far apart their leaves
+    // actually sit in the underlying split tree.
+    expect(within(rail).getByLabelText('B')).toBeTruthy()
+    expect(within(rail).getByLabelText('D')).toBeTruthy()
+    expect(document.querySelectorAll('.tileRail').length).toBe(1)
+  })
+
+  it('reclaims a dragged-to-minimize tile\'s entire space for its sibling, not a fixed-size sliver', () => {
+    renderGrid([
+      { id: 'a', title: 'A', Icon: PlotIcon, defaultShape: 'mid', summary: 'a', render: () => <div>A body</div> },
+      { id: 'b', title: 'B', Icon: ListIcon, defaultShape: 'mid', summary: 'b', render: () => <div>B body</div> },
+    ])
+    // a and b start side by side (a row split) -- dragging b into the rail (nothing
+    // is minimized yet, so it's the ghost placeholder) should let a claim the whole
+    // stage width, not just its own former half.
+    const before = px(tile('a'), 'width')
+    const dataTransfer = { setData: vi.fn(), setDragImage: vi.fn(), effectAllowed: '' }
+    fireEvent.dragStart(tile('b'), { dataTransfer })
+    const ghost = document.querySelector('.tileRailGhost') as HTMLElement
+    fireEvent.dragOver(ghost, { dataTransfer })
+    fireEvent.drop(ghost, { dataTransfer })
+    expect(tile('b').getAttribute('data-shape')).toBe('mini')
+    expect(tile('b').closest('.tileRail')).toBeTruthy()
+    expect(px(tile('a'), 'width')).toBeGreaterThan(before)
+  })
+
+  it('restores a rail tile to mid, with its full render, when its icon is clicked', async () => {
+    const user = userEvent.setup()
+    renderGrid()
+    expect(tile('editor').closest('.tileRail')).toBeTruthy()
+    await user.click(tile('editor'))
+    expect(tile('editor').getAttribute('data-shape')).toBe('mid')
+    expect(tile('editor').closest('.tileRail')).toBeNull()
+    expect(within(tile('editor')).getByText('2 time systems')).toBeTruthy()
+  })
+
+  it('is one column below 400px of remaining (post-rail) container width: mid tiles span it', () => {
     vi.spyOn(HTMLElement.prototype, 'getBoundingClientRect').mockReturnValue({ width: 320, height: 500, top: 0, left: 0, right: 320, bottom: 500, x: 0, y: 0, toJSON: () => ({}) })
     renderGrid()
     expect(document.querySelector('.tileGrid')!.className).toContain('tileGrid--one')
-    for (const id of ['plot', 'outline']) expect(px(tile(id), 'width')).toBe(320)
-    expect(px(tile('editor'), 'width')).toBe(240)
+    for (const id of ['plot', 'outline']) expect(px(tile(id), 'width')).toBe(320 - 48)
+    expect(px(tile('editor'), 'width')).toBe(40)
   })
 
-  it('toggles a tile between mini and mid by clicking its title, and remembers it', async () => {
-    const user = userEvent.setup()
+  it('minimizes a tile by dragging it into the rail, and remembers it', () => {
     const { unmount } = renderGrid()
     expect(tile('plot').getAttribute('data-shape')).toBe('mid')
-    await user.click(within(tile('plot')).getByRole('button', { name: 'Plot' }))
+    const dataTransfer = { setData: vi.fn(), setDragImage: vi.fn(), effectAllowed: '' }
+    fireEvent.dragStart(tile('plot'), { dataTransfer })
+    const rail = document.querySelector('.tileRail') as HTMLElement // already populated (editor)
+    fireEvent.dragOver(rail, { dataTransfer })
+    fireEvent.drop(rail, { dataTransfer })
     expect(tile('plot').getAttribute('data-shape')).toBe('mini')
-    expect(tile('plot').querySelector('.tileBody')).toBeNull()
+    expect(tile('plot').closest('.tileRail')).toBeTruthy()
     unmount()
     renderGrid()
     expect(tile('plot').getAttribute('data-shape')).toBe('mini')
   })
 
-  it('toggles by clicking anywhere on the tile that is not an interactive control', async () => {
-    const user = userEvent.setup()
+  it('does nothing when clicking the body of a tile', () => {
     renderGrid()
-    await user.click(tile('outline'))
-    expect(tile('outline').getAttribute('data-shape')).toBe('mini')
+    fireEvent.click(tile('outline'))
+    expect(tile('outline').getAttribute('data-shape')).toBe('mid')
+    expect(screen.queryByRole('region')).toBeNull()
   })
 
   it('has no shape/size-cycle control any more', () => {
@@ -120,15 +171,16 @@ describe('TileGrid', () => {
 
   it('resizes only the two tiles a divider separates, and leaves the container filled', () => {
     renderGrid()
-    const before = { plot: px(tile('plot'), 'width'), editor: px(tile('editor'), 'height') }
+    const before = { plot: px(tile('plot'), 'width') }
     const divider = document.querySelector('[role="separator"][aria-orientation="vertical"]') as HTMLElement
     fireEvent(divider, pointerEvent('pointerdown', { clientX: 500, clientY: 300 }))
     fireEvent(divider, pointerEvent('pointermove', { clientX: 700, clientY: 300 }))
     fireEvent(divider, pointerEvent('pointerup', {}))
     expect(px(tile('plot'), 'width')).toBeGreaterThan(before.plot)
-    expect(px(tile('plot'), 'width') + px(tile('outline'), 'width') + 8).toBe(1000)
-    // The mini strip below wasn't touched by a divider elsewhere in the tree.
-    expect(px(tile('editor'), 'height')).toBe(before.editor)
+    expect(px(tile('plot'), 'width') + px(tile('outline'), 'width') + 8).toBe(1000 - 48)
+    // The rail (a divider elsewhere in the tree entirely) wasn't touched -- it's a
+    // fixed 40px icon regardless of any stage divider drag.
+    expect(px(tile('editor'), 'height')).toBe(40)
   })
 
   it('resizes a divider with the keyboard', () => {
@@ -140,7 +192,7 @@ describe('TileGrid', () => {
     expect(px(tile('plot'), 'width')).toBeGreaterThan(before)
   })
 
-  it('opens a tile into its console (max) from its corner button, with a breadcrumb, and Back or Escape collapse it', async () => {
+  it('opens a tile into its console (max) from its header, with a breadcrumb, and Back or Escape collapse it', async () => {
     const user = userEvent.setup()
     renderGrid()
     await user.click(within(tile('plot')).getByRole('button', { name: 'Open Plot' }))
@@ -150,31 +202,30 @@ describe('TileGrid', () => {
     await user.click(within(region).getByRole('button', { name: 'Back to tiles' }))
     expect(screen.queryByRole('region', { name: 'Plot' })).toBeNull()
 
+    // Editor starts minimized (in the rail): click its icon to restore it to mid first,
+    // then its now-clickable header opens the console, same as any mid tile.
+    await user.click(tile('editor'))
     await user.click(within(tile('editor')).getByRole('button', { name: 'Open Project editor' }))
     expect(screen.getByRole('region', { name: 'Project editor' })).toBeTruthy()
     await user.keyboard('{Escape}')
     expect(screen.queryByRole('region', { name: 'Project editor' })).toBeNull()
   })
 
-  it('does not toggle the tile when a quick action inside it is used', async () => {
+  it('does not open the tile when a quick action inside it is used', async () => {
     const user = userEvent.setup()
     renderGrid()
     await user.click(within(tile('plot')).getByRole('button', { name: 'quick' }))
     expect(tile('plot').getAttribute('data-shape')).toBe('mid')
+    expect(screen.queryByRole('region')).toBeNull()
   })
 
-  it('switches tiles from the strip of mini tiles, and with [ and ]', async () => {
+  it('has no sibling-switch strip or [/] shortcut in an expanded console', async () => {
     const user = userEvent.setup()
     renderGrid()
     await user.click(within(tile('plot')).getByRole('button', { name: 'Open Plot' }))
-    const strip = screen.getByRole('tablist', { name: 'Tiles' })
-    expect(within(strip).getAllByRole('tab').map(t => t.textContent?.trim())).toEqual(['Plot', 'Outline', 'Project editor'])
-    await user.click(within(strip).getByRole('tab', { name: /Outline/ }))
-    expect(screen.getByRole('region', { name: 'Outline' })).toBeTruthy()
+    expect(screen.queryByRole('tablist', { name: 'Tiles' })).toBeNull()
     await user.keyboard(']')
-    expect(screen.getByRole('region', { name: 'Project editor' })).toBeTruthy()
-    await user.keyboard('[[')
-    expect(screen.getByRole('region', { name: 'Outline' })).toBeTruthy()
+    expect(screen.getByRole('region', { name: 'Plot' })).toBeTruthy() // unchanged -- ']' does nothing now
   })
 
   it('keeps a tile open across a relaunch', async () => {
@@ -201,21 +252,22 @@ describe('TileGrid', () => {
 
   it('swaps two tiles by dragging a header, keeping each area\'s own size, and remembers it', () => {
     const { unmount } = renderGrid()
-    const editorWidth = px(tile('editor'), 'width')
+    // A rail tile is click-only, not a drag source -- it has no header to drag at all.
+    expect(tile('editor').querySelector('.tileHead')).toBeNull()
+    const outlineWidth = px(tile('outline'), 'width')
     const plotRect = { left: px(tile('plot'), 'left'), top: px(tile('plot'), 'top'), width: px(tile('plot'), 'width') }
     const dataTransfer = { setData: vi.fn(), setDragImage: vi.fn(), effectAllowed: '' }
-    fireEvent.dragStart(tile('editor').querySelector('.tileHead')!, { dataTransfer })
+    fireEvent.dragStart(tile('outline').querySelector('.tileHead')!, { dataTransfer })
     fireEvent.dragOver(tile('plot'), { dataTransfer })
     fireEvent.drop(tile('plot'), { dataTransfer })
-    // Editor's tile now sits where Plot was (Plot's area, including its size), and vice versa.
-    expect(px(tile('editor'), 'left')).toBe(plotRect.left)
-    expect(px(tile('editor'), 'top')).toBe(plotRect.top)
-    expect(px(tile('editor'), 'width')).toBe(plotRect.width)
-    expect(px(tile('plot'), 'width')).toBe(editorWidth)
-    expect(tile('plot').getAttribute('data-fixed')).toBe('true')
+    // Outline's tile now sits where Plot was (Plot's area, including its size), and vice versa.
+    expect(px(tile('outline'), 'left')).toBe(plotRect.left)
+    expect(px(tile('outline'), 'top')).toBe(plotRect.top)
+    expect(px(tile('outline'), 'width')).toBe(plotRect.width)
+    expect(px(tile('plot'), 'width')).toBe(outlineWidth)
     unmount()
     renderGrid()
-    expect(tile('plot').getAttribute('data-fixed')).toBe('true')
+    expect(px(tile('plot'), 'width')).toBe(outlineWidth)
   })
 
   it('drops a dragged tile onto a divider to wedge it in as a new column or row, instead of swapping', () => {
@@ -273,6 +325,65 @@ describe('TileGrid', () => {
     expect(order()).toEqual(['z', 'x', 'y'])
   })
 
+  it('drops a dragged tile onto another tile\'s bottom edge margin to split off a new row below it', () => {
+    vi.spyOn(HTMLElement.prototype, 'getBoundingClientRect').mockReturnValue({ width: 1200, height: 700, top: 0, left: 0, right: 1200, bottom: 700, x: 0, y: 0, toJSON: () => ({}) })
+    const threeTiles: TileDef[] = [
+      { id: 'x', title: 'X', Icon: PlotIcon, defaultShape: 'mid', summary: 'x', render: () => <div>X body</div> },
+      { id: 'y', title: 'Y', Icon: ListIcon, defaultShape: 'mid', summary: 'y', render: () => <div>Y body</div> },
+      { id: 'z', title: 'Z', Icon: PencilIcon, defaultShape: 'mid', summary: 'z', render: () => <div>Z body</div> },
+    ]
+    renderGrid(threeTiles, 'edge-bottom')
+    const dataTransfer = { setData: vi.fn(), setDragImage: vi.fn(), effectAllowed: '' }
+    fireEvent.dragStart(tile('z').querySelector('.tileHead')!, { dataTransfer })
+    // Deep in X's bottom-edge margin (90% down the mocked 700px-tall box).
+    fireEvent(tile('x'), dragEvent('dragover', { dataTransfer, clientY: 630 }))
+    fireEvent(tile('x'), dragEvent('drop', { dataTransfer, clientY: 630 }))
+    // Z is now below X (same column), not swapped with it -- Y is untouched elsewhere.
+    expect(order()).toEqual(['x', 'z', 'y'])
+    expect(px(tile('z'), 'left')).toBe(px(tile('x'), 'left'))
+    expect(px(tile('z'), 'top')).toBeGreaterThan(px(tile('x'), 'top'))
+  })
+
+  it('drops a dragged tile onto another tile\'s top edge margin to split off a new row above it', () => {
+    vi.spyOn(HTMLElement.prototype, 'getBoundingClientRect').mockReturnValue({ width: 1200, height: 700, top: 0, left: 0, right: 1200, bottom: 700, x: 0, y: 0, toJSON: () => ({}) })
+    const threeTiles: TileDef[] = [
+      { id: 'x', title: 'X', Icon: PlotIcon, defaultShape: 'mid', summary: 'x', render: () => <div>X body</div> },
+      { id: 'y', title: 'Y', Icon: ListIcon, defaultShape: 'mid', summary: 'y', render: () => <div>Y body</div> },
+      { id: 'z', title: 'Z', Icon: PencilIcon, defaultShape: 'mid', summary: 'z', render: () => <div>Z body</div> },
+    ]
+    renderGrid(threeTiles, 'edge-top')
+    const dataTransfer = { setData: vi.fn(), setDragImage: vi.fn(), effectAllowed: '' }
+    fireEvent.dragStart(tile('z').querySelector('.tileHead')!, { dataTransfer })
+    // Deep in X's top-edge margin (10% down the mocked 700px-tall box).
+    fireEvent(tile('x'), dragEvent('dragover', { dataTransfer, clientY: 70 }))
+    fireEvent(tile('x'), dragEvent('drop', { dataTransfer, clientY: 70 }))
+    expect(order()).toEqual(['z', 'x', 'y'])
+    expect(px(tile('z'), 'left')).toBe(px(tile('x'), 'left'))
+    expect(px(tile('z'), 'top')).toBeLessThan(px(tile('x'), 'top'))
+  })
+
+  it('picks the edge the pointer is physically closest to, in real pixels, near a corner', () => {
+    // A wide, short box: 400px from the left is well within the horizontal 25%
+    // margin, and 50px from the top is well within the vertical one too -- both
+    // edges qualify, so whichever the pointer is physically closer to, in raw
+    // pixels (50 vs 400), must win. A naive "check the horizontal axis first"
+    // rule would wrongly pick left/right here.
+    vi.spyOn(HTMLElement.prototype, 'getBoundingClientRect').mockReturnValue({ width: 2000, height: 300, top: 0, left: 0, right: 2000, bottom: 300, x: 0, y: 0, toJSON: () => ({}) })
+    const twoTiles: TileDef[] = [
+      { id: 'x', title: 'X', Icon: PlotIcon, defaultShape: 'mid', summary: 'x', render: () => <div>X body</div> },
+      { id: 'z', title: 'Z', Icon: PencilIcon, defaultShape: 'mid', summary: 'z', render: () => <div>Z body</div> },
+    ]
+    renderGrid(twoTiles, 'edge-corner')
+    const dataTransfer = { setData: vi.fn(), setDragImage: vi.fn(), effectAllowed: '' }
+    fireEvent.dragStart(tile('z').querySelector('.tileHead')!, { dataTransfer })
+    fireEvent(tile('x'), dragEvent('dragover', { dataTransfer, clientX: 400, clientY: 50 }))
+    fireEvent(tile('x'), dragEvent('drop', { dataTransfer, clientX: 400, clientY: 50 }))
+    // Z landed above X (the top edge won), not beside it.
+    expect(order()).toEqual(['z', 'x'])
+    expect(px(tile('z'), 'left')).toBe(px(tile('x'), 'left'))
+    expect(px(tile('z'), 'top')).toBeLessThan(px(tile('x'), 'top'))
+  })
+
   it('swaps as usual when the drop is in the middle of a tile, not its edge margin', () => {
     vi.spyOn(HTMLElement.prototype, 'getBoundingClientRect').mockReturnValue({ width: 1200, height: 700, top: 0, left: 0, right: 1200, bottom: 700, x: 0, y: 0, toJSON: () => ({}) })
     const threeTiles: TileDef[] = [
@@ -305,29 +416,35 @@ describe('TileGrid', () => {
     expect(order()).toEqual(['x', 'y', 'z'])
   })
 
-  it('moves focus with the arrow keys, swaps a tile with Alt+arrows and toggles with Enter', async () => {
+  it('moves focus with the arrow keys, swaps a tile with Alt+arrows and opens with Enter', async () => {
     const user = userEvent.setup()
     renderGrid()
     tile('plot').focus()
     await user.keyboard('{ArrowRight}')
     expect(document.activeElement).toBe(tile('outline'))
     await user.keyboard('{Alt>}{ArrowLeft}{/Alt}')
-    // Outline (focused) swaps with Plot, which was to its left.
-    expect(order()).toEqual(['outline', 'plot', 'editor'])
+    // Outline (focused) swaps with Plot, which was to its left. The rail (editor)
+    // always renders before the stage in document order, regardless of the swap.
+    expect(order()).toEqual(['editor', 'outline', 'plot'])
     expect(document.activeElement).toBe(tile('outline'))
     await user.keyboard('{Enter}')
-    expect(tile('outline').getAttribute('data-shape')).toBe('mini')
+    expect(screen.getByRole('region', { name: 'Outline' })).toBeTruthy()
   })
 
-  it('has no corner button for a tile with neither a console nor onOpen', () => {
+  it('disables the header button for a tile with neither a console nor onOpen', () => {
     renderGrid([{ id: 'info', title: 'Info', Icon: PlotIcon, defaultShape: 'mid', summary: 'Just information' }])
-    expect(tile('info').querySelector('.tileMax')).toBeNull()
+    const btn = within(tile('info')).getByRole('button', { name: 'Info' })
+    expect(btn).toBeDisabled()
   })
 
-  it('opens a mini tile that goes elsewhere instead of expanding, from its corner button', async () => {
+  it('opens a mini tile that goes elsewhere instead of expanding, from its header', async () => {
     const onOpen = vi.fn()
     const user = userEvent.setup()
     renderGrid([{ id: 'go', title: 'Go', Icon: PlotIcon, defaultShape: 'mini', summary: 'Elsewhere', onOpen }])
+    // Rail icons are click-only (toggle back to mid); the "goes elsewhere" shortcut
+    // is reached the same way any mid tile's header reaches it.
+    await user.click(tile('go'))
+    expect(onOpen).not.toHaveBeenCalled()
     await user.click(within(tile('go')).getByRole('button', { name: 'Open Go' }))
     expect(onOpen).toHaveBeenCalledOnce()
     expect(screen.queryByRole('region')).toBeNull()
@@ -348,10 +465,8 @@ describe('TileGrid', () => {
     expect(screen.getByRole('region', { name: 'Parent' })).toBeTruthy()
   })
 
-  it('appends a new tile after the saved ones', async () => {
-    const user = userEvent.setup()
+  it('appends a new tile after the saved ones', () => {
     const { unmount } = renderGrid()
-    await user.click(within(tile('plot')).getByRole('button', { name: 'Plot' }))
     unmount()
     renderGrid([...defs(), { id: 'extra', title: 'Extra', Icon: PlotIcon, defaultShape: 'mid', summary: 'x' }])
     expect(order()).toContain('extra')
@@ -365,8 +480,6 @@ describe('TileGrid', () => {
     await user.click(screen.getByRole('button', { name: 'Back to tiles' }))
     expect(onOpenChange).toHaveBeenCalledWith(null)
     expect(screen.getByRole('region', { name: 'Outline' })).toBeTruthy() // still open until the parent says so
-    await user.click(screen.getByRole('tab', { name: /Plot/ }))
-    expect(onOpenChange).toHaveBeenCalledWith('plot')
   })
 
   it('shows the grid when the controlled tile is null', () => {
@@ -390,7 +503,7 @@ describe('TileGrid', () => {
     expect(screen.getByRole('region', { name: 'Settings' })).toBeTruthy()
   })
 
-  it('double-clicking a console header maximizes it, and it stays maximized while switching tiles', async () => {
+  it('double-clicking a console header maximizes it, and it stays maximized across a relaunch', async () => {
     const onMaximizeChange = vi.fn()
     const user = userEvent.setup()
     const { unmount } = render(<TileGrid gridId="max" tiles={defs()} crumbs={crumbs} onMaximizeChange={onMaximizeChange} />)
@@ -399,11 +512,9 @@ describe('TileGrid', () => {
     fireEvent.doubleClick(head)
     expect(onMaximizeChange).toHaveBeenCalledWith(true)
     expect(screen.getByRole('region', { name: 'Plot' }).getAttribute('data-maximized')).toBe('true')
-    await user.click(screen.getByRole('tab', { name: /Outline/ }))
-    expect(screen.getByRole('region', { name: 'Outline' }).getAttribute('data-maximized')).toBe('true')
     unmount()
-    render(<TileGrid gridId="max" tiles={defs()} crumbs={crumbs} open="outline" onMaximizeChange={onMaximizeChange} />)
-    expect(screen.getByRole('region', { name: 'Outline' }).getAttribute('data-maximized')).toBe('true')
+    render(<TileGrid gridId="max" tiles={defs()} crumbs={crumbs} open="plot" onMaximizeChange={onMaximizeChange} />)
+    expect(screen.getByRole('region', { name: 'Plot' }).getAttribute('data-maximized')).toBe('true')
   })
 
   it('does not offer maximize where the caller has not wired onMaximizeChange', async () => {

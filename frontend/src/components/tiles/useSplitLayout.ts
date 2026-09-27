@@ -3,8 +3,8 @@ import { getKv } from '../../settings/settingsStore'
 import { useStoredState } from '../../assets/Interfaces/writer/storage'
 import { applyLayout, type PlacedTile } from './tileLayout'
 import {
-  insertAtDivider, insertBesideLeaf, leafIds, reconcile, resizeBranch as resizeBranchAt, setFixed, swapLeaves as swapLeavesAt,
-  type Path, type SplitNode,
+  insertAtDivider, insertBelowLeaf, insertBesideLeaf, leafIds, reconcile, resizeBranch as resizeBranchAt, setFixed,
+  swapLeaves as swapLeavesAt, type Path, type SplitNode,
 } from './splitTree'
 import type { TileDef } from './tileTypes'
 
@@ -64,8 +64,13 @@ export function useSplitLayout(gridId: string, defs: TileDef[]) {
     // beside it, rather than swapping places with it.
     insertBeside: (draggedId: string, targetId: string, side: 'left' | 'right') =>
       update(t => ({ tree: insertBesideLeaf(t, draggedId, targetId, side) })),
-    // Toggles a tile between mini (a fixed, short strip) and mid (its own full,
-    // resizable render). Clicking a tile's title does this.
+    // Drops a dragged tile onto another tile's top/bottom edge margin: a new row
+    // above/below it, rather than swapping places with it.
+    insertBelow: (draggedId: string, targetId: string, side: 'top' | 'bottom') =>
+      update(t => ({ tree: insertBelowLeaf(t, draggedId, targetId, side) })),
+    // Toggles a tile between mini (a plain icon in the grid's shared rail) and mid
+    // (its own full, resizable render). Dragging a mid tile into the rail, or
+    // clicking a rail icon, does this.
     toggleTier: (id: string) => {
       const item = placed.find(p => p.def.id === id)
       if (!item) return
