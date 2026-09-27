@@ -62,6 +62,15 @@ class CloseBody(BaseModel):
     note: str = Field(default="", max_length=store.NOTE_MAX)
 
 
+class SubmitMessageBody(BaseModel):
+    author: str = Field(max_length=120)
+    text: str = Field(max_length=store.NOTE_MAX)
+    senderTone: Optional[store.Tone] = None
+    openPage: Optional[str] = None
+    openConsole: Optional[str] = None
+    selectedComponent: Optional[str] = None
+
+
 class VerbBody(BaseModel):
     name: str = Field(max_length=60)
     keywords: list[str] = Field(default_factory=list)
@@ -76,6 +85,19 @@ class VerbPatch(BaseModel):
 def get_inbox(admin_id: str = Depends(current_admin), root: Path = Depends(get_app_data_storage_root)) -> dict:
     try:
         return store.bundle(store.load(root), admin_id)
+    except store.FeedbackError as exc:
+        raise HTTPException(status_code=exc.status, detail=str(exc)) from exc
+
+
+@router.post("/messages")
+def post_message(body: SubmitMessageBody, root: Path = Depends(get_app_data_storage_root)) -> dict:
+    """Anyone using the app can submit feedback -- unlike every other route
+    here, this one needs no signed-in admin (no X-Admin-Id)."""
+    try:
+        file = store.mutate(root, lambda f: store.create_message(
+            f, body.author, body.text, body.senderTone, body.openPage, body.openConsole, body.selectedComponent))
+        created = file.messages[-1]
+        return {"id": created.id, "submittedAt": created.submittedAt}
     except store.FeedbackError as exc:
         raise HTTPException(status_code=exc.status, detail=str(exc)) from exc
 

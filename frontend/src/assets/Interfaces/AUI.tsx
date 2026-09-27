@@ -1,26 +1,19 @@
 import RoleAssignment from './admin/RoleAssignment'
-import { useEffect, useRef, useState } from 'react'
 import type { ComponentType } from 'react'
 import {
   BarChartIcon, VotingIcon, LibraryIcon, PeopleIcon, BuildingIcon, BriefcaseIcon,
-  EnvelopeIcon, CalendarIcon, HelpIcon, TeamIcon, CheckboxIcon, GlobeIcon, SwapIcon, BookFaceIcon,
-  PencilIcon, ChatBubblesIcon, UserIcon, SortingIcon, ConfigurationIcon, InfoIcon,
-  LockIcon, UnlockIcon,
+  EnvelopeIcon, CalendarIcon, HelpIcon, TeamIcon, SortingIcon, ConfigurationIcon, InfoIcon,
   type IconProps,
 } from '../icons'
-import { useAuiConfig, type AuiConfigTabKey } from './admin/useAuiConfig'
-import AuiConfigEditor, { AuiConfigReadOnly } from './admin/AuiConfigEditor'
-import { SaveControl } from '../../components/SaveControl'
+import ResourcesConsole from './admin/resources/ResourcesConsole'
 import TileGrid from '../../components/tiles/TileGrid'
 import { TileBig, TileRows, TileSub } from '../../components/tiles/tileParts'
 import type { TileDef } from '../../components/tiles/tileTypes'
 
-// Eight consoles per scrilbrPlan.md's "Admin Page (AUI)" section, plus
-// Resources (not in that doc -- added when the Console/Component/Feature
-// outline-editor originally built under Configuration turned out to be
-// informational reference content, not actual site settings, so it moved
-// to its own section; Configuration itself stays as an empty placeholder
-// for real settings later). This is a full structural skeleton -- every
+// Eight consoles per scrilbrPlan.md's "Admin Page (AUI)" section (this array
+// covers 7 of them; Resources -- not in that doc -- is built separately
+// below, since it isn't this shape: one console, no per-page children, just
+// the article/quiz builder). This is a full structural skeleton -- every
 // named component present and selectable, placeholder body text
 // throughout -- not a rebuild of the old ad hoc feedback/presets/users
 // sections (which didn't match the doc; the parts of that pipeline the
@@ -36,18 +29,12 @@ type AuiSubSectionKey =
   | 'departmentDetails' | 'departmentRoster' | 'departmentAnalytics' | 'department' | 'directorHelp'
   | 'monitorTraining' | 'departmentSchedules' | 'hireTermAdmin' | 'officeHelp'
   | 'configOverview' | 'configHelp'
-  | 'projectPlan' | 'visitorConfig' | 'userPageConfig' | 'readerPageConfig' | 'translatorPageConfig'
-  | 'writerPageConfig' | 'helperPageConfig' | 'adminPageConfig' | 'resourcesHelp'
 
 interface AuiSubSection {
   key: AuiSubSectionKey
   label: string
   Icon: ComponentType<IconProps>
   body: string
-  // Set only on Resources' 8 page-config tabs -- mounts the shared,
-  // persisted AuiConfigEditor (admin-config.json, editable Console ->
-  // Component -> Feature tree) instead of just this plain-text body.
-  configTabKey?: AuiConfigTabKey
 }
 
 interface AuiSectionDef {
@@ -133,10 +120,7 @@ const SECTIONS: AuiSectionDef[] = [
   },
   {
     key: 'configuration', label: 'Configuration', Icon: ConfigurationIcon,
-    // Empty placeholder for now -- the Console/Component/Feature outline
-    // editor that used to live here moved to Resources (see the
-    // AuiSectionKey comment above); real site-settings content belongs
-    // here eventually.
+    // Empty placeholder for now -- real site-settings content belongs here eventually.
     subSections: [
       { key: 'configOverview', label: 'Overview', Icon: ConfigurationIcon,
         body: 'Site-wide configuration settings will live here.' },
@@ -144,100 +128,15 @@ const SECTIONS: AuiSectionDef[] = [
         body: 'Resources and assistance using the Configuration console here.' },
     ],
   },
-  {
-    key: 'resources', label: 'Resources', Icon: InfoIcon,
-    subSections: [
-      { key: 'projectPlan', label: 'Project Plan', Icon: CheckboxIcon,
-        body: "The app's own admin-facing build roadmap here, mirroring scrilbrPlan.md's page/console/component hierarchy.",
-        configTabKey: 'projectPlan' },
-      { key: 'visitorConfig', label: 'Visitor', Icon: GlobeIcon,
-        body: 'Configure the Welcome, Registration, and Login pages here.',
-        configTabKey: 'visitorConfig' },
-      { key: 'userPageConfig', label: 'User', Icon: UserIcon,
-        body: 'Configure the Dashboard, Account, and Training pages here.',
-        configTabKey: 'userPageConfig' },
-      { key: 'readerPageConfig', label: 'Reader', Icon: BookFaceIcon,
-        body: 'Configure the Nook, Library, Book, and Pages here.',
-        configTabKey: 'readerPageConfig' },
-      { key: 'translatorPageConfig', label: 'Translator', Icon: SwapIcon,
-        body: 'Configure the Translator interface here.',
-        configTabKey: 'translatorPageConfig' },
-      { key: 'writerPageConfig', label: 'Writer', Icon: PencilIcon,
-        body: 'Configure the Shelves, Shelf, Book, Page, and Pages here.',
-        configTabKey: 'writerPageConfig' },
-      { key: 'helperPageConfig', label: 'Helper', Icon: ChatBubblesIcon,
-        body: 'Configure the Schedule, Chat, Inbox, Queue, and Dispatch here.',
-        configTabKey: 'helperPageConfig' },
-      { key: 'adminPageConfig', label: 'Admin', Icon: BriefcaseIcon,
-        body: 'Configure the Dashboard, Processor, Organizer, Manager, Director, and Office here.',
-        configTabKey: 'adminPageConfig' },
-      { key: 'resourcesHelp', label: 'Help', Icon: HelpIcon,
-        body: 'Resources and assistance using the Resources console here.' },
-    ],
-  },
 ]
 
-// Leaving a config page (going back, switching tiles) saves what was being edited.
-function ConfigPage({ tab, config, readOnly, onToggleReadOnly }: {
-  tab: AuiConfigTabKey
-  config: ReturnType<typeof useAuiConfig>
-  readOnly: boolean
-  onToggleReadOnly: () => void
-}) {
-  const latest = useRef(config)
-  latest.current = config
-  useEffect(() => () => { void latest.current.saveNow() }, [])
-  const info = config.publishInfo(tab)
-  return (
-    <>
-      <div className="auiConfigActions auiConfigActions--page">
-        {info && (
-          <span
-            className={`auiPublishBadge${info.unpublished ? ' auiPublishBadge--pending' : ''}`}
-            title={info.publishedAt ? `Last published ${new Date(info.publishedAt).toLocaleString()}` : 'Never published'}
-          >
-            {info.unpublished
-              ? (info.version === null ? 'Never published' : `Unpublished changes (v${info.version})`)
-              : `Published v${info.version}`}
-          </span>
-        )}
-        {!readOnly && (
-          <SaveControl
-            status={config.saveStatus} label="Save draft" buttonClassName="auiSaveDraftBtn"
-            onSave={() => { void config.saveNow() }} onRestore={config.restoreDraft}
-            extra={
-              <button
-                type="button" className="auiPublishBtn"
-                disabled={config.publishing || !info?.unpublished}
-                title="Publish this tab's draft as the version everyone sees"
-                onClick={() => void config.publishTab(tab)}
-              >
-                {config.publishing ? 'Publishing…' : 'Publish'}
-              </button>
-            }
-          />
-        )}
-        <button
-          type="button"
-          className={readOnly ? 'auiConfigModeToggle auiConfigModeToggle--locked' : 'auiConfigModeToggle auiConfigModeToggle--unlocked'}
-          aria-pressed={readOnly}
-          aria-label={readOnly ? 'Read-only -- click to enable editing' : 'Editable -- click to make read-only'}
-          title={readOnly ? 'Read-only' : 'Editable'}
-          onClick={() => { void config.saveNow(); onToggleReadOnly() }}
-        >
-          {readOnly ? <LockIcon size={16} /> : <UnlockIcon size={16} />}
-        </button>
-      </div>
-      {config.publishError && <p className="feedbackCardMeta">{config.publishError}</p>}
-      {readOnly ? <AuiConfigReadOnly tab={tab} config={config} /> : <AuiConfigEditor tab={tab} config={config} />}
-    </>
-  )
-}
+// Not one of the Section/subSection page-editor tiles above: Resources is a
+// single console, the article/quiz builder (admin/resources/ResourcesConsole.tsx)
+// -- real backend persistence, its own Interface > Console > Component >
+// Feature tree, not a per-page settings editor.
+const RESOURCES_HELP = <p>Author Guides, Tutorials, FAQs, feedback and an Exam/Test/Quiz bank for every interface, console, component and feature here.</p>
 
 function AUI() {
-  const [configReadOnly, setConfigReadOnly] = useState(true)
-  const auiConfig = useAuiConfig()
-
   // Each section is a tile; its pages are child tiles that expand into their editors.
   // A section's Help sub-tab is the Help button at its console's corner.
   const tiles: TileDef[] = SECTIONS.map(section => {
@@ -261,13 +160,18 @@ function AUI() {
           <div className="aUIPage">
             <h2>{page.label}</h2>
             {page.key === 'assignment' ? <RoleAssignment /> : <p>{page.body}</p>}
-            {page.configTabKey && (
-              <ConfigPage tab={page.configTabKey} config={auiConfig} readOnly={configReadOnly} onToggleReadOnly={() => setConfigReadOnly(r => !r)} />
-            )}
           </div>
         ),
       })),
     }
+  })
+  tiles.push({
+    id: 'resources', title: 'Resources', Icon: InfoIcon,
+    defaultShape: 'mid',
+    summary: 'Article & quiz builder',
+    help: RESOURCES_HELP,
+    render: () => <TileSub>Author Guides, Tutorials, FAQs and Exam/Test/Quiz content here.</TileSub>,
+    console: () => <ResourcesConsole />,
   })
 
   return (

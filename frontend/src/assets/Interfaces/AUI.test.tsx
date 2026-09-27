@@ -4,23 +4,15 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { __resetSettingsForTests } from '../../settings/settingsStore'
 import AUI from './AUI'
 
-const saveNow = vi.fn()
-vi.mock('./admin/useAuiConfig', () => ({
-  useAuiConfig: () => ({
-    saveNow, saveStatus: { state: 'saved' }, restoreDraft: vi.fn(), publishing: false, publishTab: vi.fn(), publishError: null,
-    publishInfo: () => ({ version: 2, publishedAt: null, unpublished: false }),
-  }),
-}))
-vi.mock('./admin/AuiConfigEditor', () => ({
-  default: ({ tab }: { tab: string }) => <div>editor for {tab}</div>,
-  AuiConfigReadOnly: ({ tab }: { tab: string }) => <div>read-only tree for {tab}</div>,
-}))
 vi.mock('./admin/RoleAssignment', () => ({ default: () => <div>role assignment</div> }))
+// Resources' own internals (its tree, backend calls) are covered by
+// useResources.test.ts and its own component tests -- mocked here so this
+// file only exercises AUI's own section/page tile layout.
+vi.mock('./admin/resources/ResourcesConsole', () => ({ default: () => <div>resources console</div> }))
 
 beforeEach(() => {
   window.localStorage.clear()
   __resetSettingsForTests()
-  saveNow.mockClear()
   vi.stubGlobal('fetch', vi.fn(async () => ({ ok: true, status: 200, json: async () => ({}) })))
 })
 afterEach(() => { vi.unstubAllGlobals() })
@@ -33,7 +25,6 @@ describe('AUI (the Admin panel as tiles)', () => {
     render(<AUI />)
     expect(SECTIONS.map(id => tile(id)?.getAttribute('data-tile-id'))).toEqual(SECTIONS)
     expect(within(tile('manager')).getByText('Assignment')).toBeTruthy()
-    expect(within(tile('resources')).getByText('Project Plan')).toBeTruthy()
     expect(within(tile('manager')).queryByText('Help')).toBeNull()
   })
 
@@ -48,21 +39,14 @@ describe('AUI (the Admin panel as tiles)', () => {
     expect(within(screen.getByRole('region', { name: 'Help' })).getByText(/using the Manager console/)).toBeTruthy()
   })
 
-  it('shows a config page read-only with its publish badge and lock, and saves when it is left', async () => {
+  it('opens Resources straight into the article/quiz builder, with its own Help text', async () => {
     const user = userEvent.setup()
     render(<AUI />)
+    expect(within(tile('resources')).getByText(/Exam\/Test\/Quiz/)).toBeTruthy()
     await user.click(within(tile('resources')).getByRole('button', { name: 'Open Resources' }))
-    await user.click(within(screen.getByRole('region', { name: 'Resources' })).getByRole('button', { name: 'Open User' }))
-    const page = screen.getByRole('region', { name: 'User' })
-    expect(within(page).getByText('read-only tree for userPageConfig')).toBeTruthy()
-    expect(within(page).getByText('Published v2')).toBeTruthy()
-
-    await user.click(within(page).getByRole('button', { name: /Read-only -- click to enable editing/ }))
-    expect(within(page).getByText('editor for userPageConfig')).toBeTruthy()
-    expect(within(page).getByRole('button', { name: 'Publish' })).toBeTruthy()
-
-    saveNow.mockClear()
-    await user.click(within(page).getByRole('button', { name: 'Back to tiles' }))
-    expect(saveNow).toHaveBeenCalled()
+    const resources = screen.getByRole('region', { name: 'Resources' })
+    expect(within(resources).getByText('resources console')).toBeTruthy()
+    await user.click(within(resources).getByRole('button', { name: 'Help' }))
+    expect(within(screen.getByRole('region', { name: 'Help' })).getByText(/Guides, Tutorials, FAQs/)).toBeTruthy()
   })
 })

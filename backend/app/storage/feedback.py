@@ -28,6 +28,7 @@ import hashlib
 import json
 import re
 import threading
+import uuid
 from datetime import datetime
 from pathlib import Path
 from typing import Literal, Optional
@@ -729,6 +730,24 @@ def _message(file: FeedbackFile, message_id: str) -> Message:
         if m.id == message_id:
             return m
     raise NotFound(f"Message {message_id} not found")
+
+
+def create_message(
+    file: FeedbackFile, author: str, text: str, sender_tone: Optional[Tone],
+    open_page: Optional[str] = None, open_console: Optional[str] = None, selected_component: Optional[str] = None,
+) -> Message:
+    """A brand-new submission from whoever is using the app right now (not
+    necessarily a signed-in admin) -- the Resources Help preview's "Submit
+    feedback" is the first caller of this. Unlike every other mutator here,
+    this one only ever adds a message; it never needs an admin id."""
+    if not text.strip():
+        raise FeedbackError("Feedback needs some text.")
+    message = Message(
+        id=f"fb-{uuid.uuid4().hex[:10]}", text=text, author=author, submittedAt=utcnow().isoformat(),
+        senderTone=sender_tone, openPage=open_page, openConsole=open_console, selectedComponent=selected_component,
+    )
+    file.messages.append(message)
+    return message
 
 
 def _check_tag(tag: ChannelTag, *, need_feature: bool) -> None:

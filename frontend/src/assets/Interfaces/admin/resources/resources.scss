@@ -1,0 +1,286 @@
+// Resources: the article/quiz builder (ArticleBuilder.tsx, QuizBuilder.tsx,
+// ResourceTree.tsx, ResourcesConsole.tsx). Colours are the theme tokens
+// (theme/theme.scss) -- inside AUI's own scope --accent is already
+// re-pointed at the admin accent (App.scss), so this needs no colours of
+// its own.
+
+$res-surface: linear-gradient(160deg, var(--surface-raised-a), var(--surface-raised-b));
+
+.resConsole { display: flex; flex-direction: column; gap: 10px; min-height: 0; flex: 1 1 auto; }
+.resTopBar { flex: 0 0 auto; }
+
+.resSplit { display: flex; gap: 14px; min-height: 0; flex: 1 1 auto; }
+
+.resTree {
+  flex: 0 0 260px;
+  min-height: 0;
+  overflow-y: auto;
+  padding: 8px 6px;
+  border-radius: 10px;
+  background: $res-surface;
+  box-shadow: inset 0 0 0 1px var(--hairline);
+}
+.resTreeHeading {
+  padding: 4px 8px 8px;
+  font-size: 10px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--ink-faint);
+}
+.resTreeRow {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  padding: 4px 4px;
+  border-radius: 6px;
+  cursor: pointer;
+  &:hover { background: var(--ov-sink-1); }
+  &--selected { background: var(--ov-sink-2); }
+}
+.resTreeLabel {
+  flex: 1 1 auto;
+  min-width: 0;
+  border: 0;
+  background: none;
+  color: var(--ink);
+  font-size: 12.5px;
+  padding: 3px 4px;
+  border-radius: 4px;
+  &:focus { background: var(--ov-sink-1); outline: none; }
+  &::placeholder { color: var(--ink-faint); }
+}
+.resTreeIconBtn {
+  flex: 0 0 auto;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 20px;
+  height: 20px;
+  padding: 0;
+  border: 0;
+  border-radius: 4px;
+  background: none;
+  color: var(--ink-muted);
+  cursor: pointer;
+  &:hover { background: var(--ov-sink-1); color: var(--ink); }
+}
+.resTreeCaret {
+  flex: 0 0 auto;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 20px;
+  height: 20px;
+  padding: 0;
+  border: 0;
+  background: none;
+  color: var(--ink-faint);
+  cursor: pointer;
+}
+.resTreeConfirm { display: flex; gap: 4px; flex: 0 0 auto; }
+.resTreeAddRoot {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  width: 100%;
+  margin-top: 6px;
+  padding: 6px 10px;
+  border: 1px dashed var(--ink-faint);
+  border-radius: 6px;
+  background: none;
+  color: var(--ink-muted);
+  font-size: 12px;
+  cursor: pointer;
+  &:hover { color: var(--ink); border-color: var(--ink-muted); }
+}
+
+.resPane {
+  flex: 1 1 auto;
+  min-width: 0;
+  min-height: 0;
+  overflow-y: auto;
+  &--empty { color: var(--ink-faint); font-size: 13px; padding: 20px 4px; }
+}
+.resBreadcrumb { font-size: 11.5px; color: var(--ink-faint); margin-bottom: 8px; }
+
+.resToolbar { display: flex; align-items: center; justify-content: space-between; gap: 10px; margin-bottom: 14px; }
+.resPillGroup {
+  display: flex;
+  gap: 4px;
+  background: var(--ov-sink-1);
+  padding: 4px;
+  border-radius: 8px;
+  &--sub { margin-bottom: 10px; }
+}
+.resPill {
+  padding: 6px 12px;
+  border-radius: 6px;
+  border: 0;
+  background: none;
+  color: var(--ink-muted);
+  font-size: 12.5px;
+  font-weight: 600;
+  cursor: pointer;
+  &--active { background: var(--surface-base); color: var(--ink); box-shadow: 0 1px 2px rgba(0, 0, 0, 0.08); }
+}
+.resLinkBtn { border: 0; background: none; color: var(--accent); font-weight: 600; font-size: 12.5px; cursor: pointer; padding: 6px 4px; }
+.resPrimaryBtn {
+  padding: 8px 16px;
+  border-radius: 6px;
+  border: 0;
+  background: var(--accent);
+  color: var(--on-accent);
+  font-weight: 700;
+  font-size: 13px;
+  cursor: pointer;
+  &:hover { background: var(--accent-hover); }
+  &:disabled { opacity: 0.5; cursor: default; }
+  &--ghost { background: none; color: var(--accent); box-shadow: inset 0 0 0 1px var(--accent); }
+}
+.resDashedBtn {
+  padding: 7px 14px;
+  border-radius: 6px;
+  border: 1px dashed var(--ink-faint);
+  background: none;
+  color: var(--ink-muted);
+  font-size: 12.5px;
+  cursor: pointer;
+  &:hover { color: var(--ink); border-color: var(--ink-muted); }
+}
+.resSmallBtn {
+  padding: 5px 10px;
+  border-radius: 6px;
+  border: 0;
+  box-shadow: inset 0 0 0 1px var(--hairline);
+  background: var(--surface-base);
+  color: var(--ink);
+  font-size: 12px;
+  cursor: pointer;
+  &:hover { box-shadow: inset 0 0 0 1px var(--ink-muted); }
+}
+.resButtonRow { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; }
+
+.resTextarea {
+  display: block;
+  width: 100%;
+  max-width: 720px;
+  padding: 12px 14px;
+  border: 0;
+  border-radius: 8px;
+  box-shadow: inset 0 0 0 1px var(--hairline);
+  background: var(--surface-base);
+  color: var(--ink);
+  font-size: 13px;
+  line-height: 1.6;
+  resize: vertical;
+  &:focus { outline: none; box-shadow: inset 0 0 0 1px var(--accent); }
+  &--guide { height: 380px; font-family: ui-monospace, Menlo, monospace; }
+  &::placeholder { color: var(--ink-faint); }
+}
+
+.resCard {
+  max-width: 720px;
+  padding: 14px 18px;
+  margin-bottom: 12px;
+  border-radius: 10px;
+  background: $res-surface;
+  box-shadow: inset 0 0 0 1px var(--hairline);
+}
+.resCardRow { display: flex; align-items: center; gap: 8px; margin-bottom: 6px; }
+.resCardTitle {
+  flex: 1 1 auto;
+  min-width: 0;
+  border: 0;
+  background: none;
+  color: var(--ink);
+  font-weight: 700;
+  font-size: 13.5px;
+  padding: 2px 0;
+  margin-bottom: 8px;
+  &:focus { outline: none; }
+  &::placeholder { color: var(--ink-faint); font-weight: 400; }
+}
+
+.resSourceBadge {
+  flex: 0 0 auto;
+  font-size: 10px;
+  padding: 2px 8px;
+  border-radius: 10px;
+  background: var(--ov-sink-1);
+  color: var(--ink-muted);
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+  &--feedback { background: hsl(var(--color-accent2-h), 40%, 88%); color: hsl(var(--color-accent2-h), 45%, 32%); }
+}
+
+.resPromoteCard { max-width: 500px; }
+.resPromoteHeading { font-size: 10.5px; text-transform: uppercase; letter-spacing: 0.04em; color: var(--ink-faint); margin-bottom: 8px; }
+.resPromoteRow {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 7px 0;
+  border-top: 1px solid var(--hairline);
+  font-size: 12.5px;
+  &:first-child { border-top: 0; }
+  span { flex: 1 1 auto; color: var(--ink); }
+}
+.resEmptyNote { font-size: 13px; color: var(--ink-faint); max-width: 480px; line-height: 1.6; }
+
+.resPreviewCard {
+  max-width: 720px;
+  padding: 24px 28px;
+  border-radius: 10px;
+  background: $res-surface;
+  box-shadow: inset 0 0 0 1px var(--hairline);
+}
+.resPreviewHead { display: flex; align-items: center; gap: 8px; margin-bottom: 4px; h2 { margin: 0; font-size: 17px; color: var(--ink); } }
+.resBadge {
+  font-size: 10px;
+  padding: 2px 9px;
+  border-radius: 10px;
+  background: var(--ov-sink-1);
+  color: var(--ink-muted);
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+.resSubheading { font-size: 12px; text-transform: uppercase; letter-spacing: 0.04em; color: var(--ink-faint); margin: 20px 0 10px; }
+.resQuizTitle { margin: 0; font-size: 17px; color: var(--ink); }
+
+.resMarkdown {
+  font-size: 13.5px;
+  line-height: 1.65;
+  color: var(--ink);
+  h1, h2, h3 { color: var(--ink); }
+  p { margin: 0 0 10px; }
+  ul, ol { margin: 0 0 10px; padding-left: 20px; }
+  &--card { max-width: 720px; min-height: 380px; padding: 20px 24px; border-radius: 8px; box-shadow: inset 0 0 0 1px var(--hairline); background: var(--surface-base); }
+}
+.resTutorialPreview, .resFaqPreview { border-left: 2px solid var(--hairline); padding-left: 12px; margin-bottom: 12px; }
+.resTutorialTitle, .resFaqQ { font-weight: 700; font-size: 13.5px; margin-bottom: 3px; display: flex; align-items: center; gap: 8px; }
+.resFaqA { font-size: 13px; color: var(--ink-muted); line-height: 1.6; }
+
+.resFeedbackSection { border-top: 1px solid var(--hairline); margin-top: 20px; padding-top: 18px; }
+.resFeedbackSectionHead { display: flex; align-items: center; justify-content: space-between; }
+.resComingSoon { font-size: 11px; color: var(--ink-faint); font-style: italic; }
+.resFeedbackThanks { margin-top: 12px; padding: 12px 14px; background: var(--ov-sink-1); border-radius: 8px; font-size: 13px; color: var(--ink); }
+.resFeedbackForm { margin-top: 12px; }
+.resFeedbackMeta { font-size: 12px; color: var(--ink-muted); margin-bottom: 6px; }
+.resError { font-size: 12px; color: var(--alert); margin: 6px 0 0; }
+
+.resOptionRow { display: flex; align-items: center; gap: 8px; margin-bottom: 6px; }
+.resOptionText {
+  flex: 1 1 auto;
+  min-width: 0;
+  border: 0;
+  border-radius: 6px;
+  box-shadow: inset 0 0 0 1px var(--hairline);
+  background: var(--surface-base);
+  color: var(--ink);
+  padding: 6px 10px;
+  font-size: 13px;
+  &:focus { outline: none; box-shadow: inset 0 0 0 1px var(--accent); }
+}

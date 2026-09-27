@@ -187,6 +187,68 @@ export interface PublishedTab {
   nodes: AuiConfigNode[]
 }
 
+// The Resources article/quiz builder (AUI): a structural Interface > Console >
+// Component > Feature tree, seeded once from the Feedback taxonomy, plus
+// per-node Guide/Tutorials/FAQ content and (console/component/feature only)
+// an Exam/Test/Quiz question bank.
+export type ResourceNodeKind = 'interface' | 'console' | 'component' | 'feature'
+
+export interface ResourceNode {
+  id: string
+  kind: ResourceNodeKind
+  parentId: string | null
+  order: number
+  name: string
+}
+
+export interface ResourceTutorial {
+  id: string
+  title: string
+  body: string
+}
+
+export interface ResourceFaqEntry {
+  id: string
+  question: string
+  answer: string
+  source: 'authored' | 'feedback'
+  sourceMessageId: string | null
+}
+
+export interface ResourceContent {
+  guide: string
+  tutorials: ResourceTutorial[]
+  faq: ResourceFaqEntry[]
+}
+
+export interface ResourceQuestionOption {
+  id: string
+  text: string
+  isCorrect: boolean
+}
+
+export interface ResourceQuestion {
+  id: string
+  prompt: string
+  options: ResourceQuestionOption[]
+}
+
+export interface ResourceAssessment {
+  questions: ResourceQuestion[]
+}
+
+export interface ResourcesFile {
+  schemaVersion: number
+  nodes: ResourceNode[]
+  content: Record<string, ResourceContent>
+  assessments: Record<string, ResourceAssessment>
+}
+
+export interface PromotableFeedbackMessage {
+  id: string
+  text: string
+}
+
 export interface AuiConfig {
   schemaVersion: number
   // The working draft (every tab, flat).
