@@ -65,6 +65,8 @@ def update_project(
         index.settings.readLevels = body.readLevels
     if body.timeSystems is not None:
         index.settings.timeSystems = body.timeSystems
+    if body.themeHue is not None:
+        index.settings.themeHue = body.themeHue
     index.updatedAt = utcnow()
     store.save_index(root, index)
     return index

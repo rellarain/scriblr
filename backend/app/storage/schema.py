@@ -132,6 +132,11 @@ class ProjectSettings(BaseModel):
     readLevels: list[OutlineNodeKind] = Field(default_factory=lambda: list(OUTLINE_KIND_ORDER))
     # How scenes' Time is structured (see TimeSystem). Books pick one by id.
     timeSystems: list[TimeSystem] = Field(default_factory=default_time_systems)
+    # The project's own colour (a hue, 0-360), the root of the Writer's level colours:
+    # series sit within 60 degrees of it, books anywhere, arcs within 60 of their book and
+    # chapters within 60 of their arc (the OutlineNode.themeHue of each). None = the
+    # active theme's own colour.
+    themeHue: Optional[int] = Field(default=None, ge=0, le=360)
 
 
 class ProjectIndex(BaseModel):
@@ -172,7 +177,9 @@ class OutlineNode(BaseModel):
     # only) rather than a separate book model, since books are still plain
     # OutlineNodes structurally.
     color: Optional[str] = None
-    # Set only on "book" nodes: the book's two hues (0-360). The theme hue is
+    # The Writer's level colours: `themeHue` is also set on series, arcs and chapters (each
+    # within 60 degrees of its parent's hue; none = the parent's hue). On a book:
+    # the book's two hues (0-360). The theme hue is
     # the cover / spine colour and re-tints the book's editors' surfaces (drawn
     # with the theme's saturation and brightness); the accent hue re-tints
     # active items (accent saturation and brightness). Every book has both: a

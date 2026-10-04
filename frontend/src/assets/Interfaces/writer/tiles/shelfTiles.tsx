@@ -5,7 +5,7 @@ import { SHELF_COMPONENTS } from '../consoleDefs'
 import { Placeholder } from '../shared'
 import PlotView from '../PlotView'
 import ProjectOutline from '../ProjectOutline'
-import TimeSystemEditor from '../TimeSystemEditor'
+import ProjectEditor from '../ProjectEditor'
 import type { WriterWorkspace } from '../useWriterWorkspace'
 import { bookRows, categoryRows, plotCounts } from './tileData'
 
@@ -111,7 +111,7 @@ export function shelfTiles(w: WriterWorkspace): TileDef[] {
     {
       id: 'editor', title: 'Project editor', Icon: PencilIcon, defaultShape: 'mini',
       summary: `${timeSystems} ${timeSystems === 1 ? 'time system' : 'time systems'}`,
-      console: () => <TimeSystemEditor w={w} />,
+      console: () => <ProjectEditor w={w} />,
     },
     { id: 'template', title: 'Templates', Icon: CheckboxIcon, defaultShape: 'mini', summary: 'Book templates', console: placeholder('outlineTemplate') },
   ]

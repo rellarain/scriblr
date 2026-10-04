@@ -539,7 +539,11 @@ awareness that the app above already existed:
   a level's title brings the focus back, its header strip opens a Min level to Mid and
   its chevron toggles Min/Mid (remembered). Beside the Dash the Project level is the
   shelf of every project. The selected book's spine swivels into its cover
-  (`Shelf.tsx`). The levels wrap the Shelves/Shelf/Book/Page/Pages consoles' contents
+  (`Shelf.tsx`). Levels are tinted by hue (`levelHues.ts`): the project's own
+  (`ProjectSettings.themeHue`), series within 60° of it, books any hue, arcs within
+  60° of their book and chapters within 60° of their arc (each node's `themeHue`);
+  one with no hue shows its parent's, new ones take a hue spread away from their
+  siblings', and changing a parent pulls its children back inside their window. The levels wrap the Shelves/Shelf/Book/Page/Pages consoles' contents
   (tile grids, book cover, chapter page, preview), still being reshaped to the
   four-level design.
 - **`AUI.tsx`** (`feedback/` subfolder) — an admin "feedback pipeline"

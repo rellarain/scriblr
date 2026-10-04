@@ -6,6 +6,7 @@ import { formatWords } from './wordCount'
 import { buildChildIndex, descendantsOf } from './outlineTree'
 import { DeleteControl } from './shared'
 import { useNodeDnd } from './useNodeDnd'
+import HueSlider from './HueSlider'
 import { useNodeKeys } from '../../../lib/nodeKeys'
 
 // The book's outline as nested cards in a single column: arcs contain
@@ -92,6 +93,10 @@ function BookOutline({ w, book, chapterWords }: { w: WriterWorkspace; book: Outl
             />
           </span>
         </div>
+        <HueSlider
+          label={`Chapter ${n} colour`} className="wrNodeHue" hue={w.levelHueOf(c)} centre={w.hueCentreOf(c)}
+          onChange={hue => w.setNodeHue(c.id, hue)}
+        />
         <div className="wrBookChapterStats">
           <span>{stat(count('act'), 'act')}</span>
           <span>{stat(count('scene'), 'scene')}</span>
@@ -117,6 +122,10 @@ function BookOutline({ w, book, chapterWords }: { w: WriterWorkspace; book: Outl
             />
           </div>
         </div>
+        <HueSlider
+          label={`Arc ${n} colour`} className="wrNodeHue" hue={w.levelHueOf(a)} centre={w.hueCentreOf(a)}
+          onChange={hue => w.setNodeHue(a.id, hue)}
+        />
         {dnd.children(a.id, chapters, chapterCard)}
         <div className="wrBookArcFoot">
           <button type="button" className="wrSmallBtn" onClick={() => w.addOutlineNode(a.id, 'chapter')}>

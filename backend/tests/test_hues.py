@@ -84,3 +84,31 @@ def test_category_and_subcategory_hues_round_trip(client: TestClient) -> None:
     assert resp.status_code == 200
     saved = {n["id"]: n["hue"] for n in client.get(f"/api/projects/{project_id}").json()["plot"]["nodes"]}
     assert saved == {"c1": 200, "s1": 230, "c2": None}
+
+
+def test_project_theme_hue_is_stored_and_validated(client: TestClient) -> None:
+    project_id = _create_project(client)
+    assert client.get(f"/api/projects/{project_id}").json()["index"]["settings"]["themeHue"] is None
+    resp = client.patch(f"/api/projects/{project_id}", json={"themeHue": 150})
+    assert resp.status_code == 200
+    assert resp.json()["settings"]["themeHue"] == 150
+    assert client.get(f"/api/projects/{project_id}").json()["index"]["settings"]["themeHue"] == 150
+    assert client.patch(f"/api/projects/{project_id}", json={"themeHue": 400}).status_code == 422
+    # Other settings changes leave it alone.
+    client.patch(f"/api/projects/{project_id}", json={"wordCountTarget": 1000})
+    assert client.get(f"/api/projects/{project_id}").json()["index"]["settings"]["themeHue"] == 150
+
+
+def test_series_arc_and_chapter_keep_their_own_theme_hue(client: TestClient) -> None:
+    project_id = _create_project(client)
+    nodes = [
+        _node("s1", "series", None, 0, themeHue=120),
+        _node("b1", "book", "s1", 0, themeHue=200),
+        _node("a1", "arc", "b1", 0, themeHue=240),
+        _node("c1", "chapter", "a1", 0, themeHue=280),
+    ]
+    client.put(f"/api/projects/{project_id}/outline", json={"schemaVersion": 2, "nodes": nodes})
+    saved = {n["id"]: n for n in client.get(f"/api/projects/{project_id}").json()["outline"]["nodes"]}
+    assert [saved[i]["themeHue"] for i in ("s1", "b1", "a1", "c1")] == [120, 200, 240, 280]
+    # Only a book has an accent hue forced on it.
+    assert saved["a1"]["accentHue"] is None and saved["c1"]["accentHue"] is None

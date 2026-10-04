@@ -1,7 +1,7 @@
 from datetime import datetime
 from typing import Literal, Optional
 
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 
 from ..storage.schema import (
     OutlineNode,
@@ -33,6 +33,7 @@ class UpdateProjectRequest(BaseModel):
     plotLevels: Optional[list[PlotNodeKind]] = None
     readLevels: Optional[list[OutlineNodeKind]] = None
     timeSystems: Optional[list[TimeSystem]] = None
+    themeHue: Optional[int] = Field(default=None, ge=0, le=360)
 
 
 class ScheduleCompletionsRequest(BaseModel):

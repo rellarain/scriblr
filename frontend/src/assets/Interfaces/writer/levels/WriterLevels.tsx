@@ -2,6 +2,7 @@ import type { ReactNode } from 'react'
 import type { WriterWorkspace } from '../useWriterWorkspace'
 import { useStoredState } from '../storage'
 import { nodeLabel } from '../plotTree'
+import { bookThemeHue } from '../../../../theme/bookColors'
 import BookScope from '../BookScope'
 import ConsoleCorner from '../../../../components/tiles/ConsoleCorner'
 import ShelvesConsole from '../ShelvesConsole'
@@ -42,12 +43,12 @@ function WriterLevels({ w, pagesComponent, onPagesComponent }: {
         // Beside the Dash, the Project level is the shelf of every project.
         if (focus === 'dash') {
           return (
-            <LevelPanel key={level} level={level} size="min" title="Project Shelves" locked onPromote={w.showProject} onSetSize={setSize(level)} minBody={<ProjectShelves w={w} />} />
+            <LevelPanel key={level} level={level} size="min" title="Project Shelves" hue={w.projectHue} locked onPromote={w.showProject} onSetSize={setSize(level)} minBody={<ProjectShelves w={w} />} />
           )
         }
         return (
           <LevelPanel
-            key={level} level={level} size={size} title={w.activeProject?.title ?? 'Project'}
+            key={level} level={level} size={size} title={w.activeProject?.title ?? 'Project'} hue={w.projectHue}
             onPromote={w.showProject} onSetSize={setSize(level)} minBody={<ProjectMin w={w} />}
           >
             {size === 'max' ? <ProjectConsole w={w} /> : <ProjectMid w={w} />}
@@ -57,7 +58,7 @@ function WriterLevels({ w, pagesComponent, onPagesComponent }: {
       case 'outline':
         return (
           <LevelPanel
-            key={level} level={level} size={size} title={book ? nodeLabel(book) : 'Book'}
+            key={level} level={level} size={size} title={book ? nodeLabel(book) : 'Book'} hue={book ? bookThemeHue(book) : undefined}
             onPromote={() => { if (book) w.openBook(book.id) }} onSetSize={setSize(level)}
           >
             {size === 'max' ? <BookConsole w={w} /> : <OutlineMid w={w} />}
@@ -67,6 +68,7 @@ function WriterLevels({ w, pagesComponent, onPagesComponent }: {
         return (
           <LevelPanel
             key={level} level={level} size="max" title={w.activeChapter ? `Chapter ${chapterNumber} · ${nodeLabel(w.activeChapter)}` : 'Chapter'}
+            hue={w.activeChapter ? w.levelHueOf(w.activeChapter) : undefined}
             onPromote={() => {}} onSetSize={setSize(level)}
           >
             {w.activeConsole === 'pages'

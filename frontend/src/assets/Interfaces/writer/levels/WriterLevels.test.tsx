@@ -37,6 +37,7 @@ function workspace(activeConsole: WriterWorkspace['activeConsole'], over: Partia
     activeConsole, hasOpenProject: activeConsole !== 'shelves' || over.hasOpenProject === true,
     activeProject: { title: 'The Ashfall Cycle' }, activeBook: book, activeBookChapters: [chapter], activeChapter: chapter,
     showDash: vi.fn(), showProject: vi.fn(), openBook: vi.fn(),
+    projectHue: 150, levelHueOf: () => 280,
     ...over,
   } as unknown as WriterWorkspace
 }
@@ -112,6 +113,15 @@ describe('WriterLevels', () => {
     first.unmount()
     renderLevels(workspace('page'))
     expect(levelsOf()[0]).toBe('dash:mid')
+  })
+
+  it("tints each level from its own hue: project, book and chapter (the Dash keeps the theme's)", () => {
+    renderLevels(workspace('page', { projectHue: 150, levelHueOf: () => 280 } as Partial<WriterWorkspace>))
+    const hueOf = (level: string) => document.querySelector<HTMLElement>(`[data-level="${level}"]`)!.style.getPropertyValue('--wr-level-h')
+    expect(hueOf('dash')).toBe('')
+    expect(hueOf('project')).toBe('150')
+    expect(hueOf('outline')).toBe('28') // the book's own (here the book default)
+    expect(hueOf('draft')).toBe('280')
   })
 
   it('keeps the project shelves beside the Dash with no Min/Mid toggle', () => {

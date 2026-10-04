@@ -88,7 +88,7 @@ function BookCover({ w, book }: { w: WriterWorkspace; book: OutlineNode }) {
               <div className="wrColorRow">
                 <ColorRange
                   label="Primary colour" value={themeHue} sat={cover.s} light={cover.l}
-                  onChange={hue => w.updateOutlineNode(book.id, { themeHue: hue })}
+                  onChange={hue => w.setNodeHue(book.id, hue)}
                 />
               </div>
               <div className="wrColorRow">

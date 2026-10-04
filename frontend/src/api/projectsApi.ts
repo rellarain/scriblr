@@ -15,7 +15,7 @@ export function getProject(projectId: string): Promise<ProjectSummaryResponse> {
 }
 
 // Changes project settings (only the fields given are changed).
-export function updateProject(projectId: string, patch: { timeSystems?: TimeSystem[] }): Promise<ProjectIndex> {
+export function updateProject(projectId: string, patch: { timeSystems?: TimeSystem[]; themeHue?: number }): Promise<ProjectIndex> {
   return api.patch<ProjectIndex>(`/projects/${encodeURIComponent(projectId)}`, patch)
 }
 

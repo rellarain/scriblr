@@ -5,6 +5,7 @@ import { BookFaceIcon, GripIcon, PlusIcon } from '../../icons'
 import { buildChildIndex, chaptersOfBook } from './outlineTree'
 import { AutoTextarea, DeleteControl } from './shared'
 import { useNodeDnd } from './useNodeDnd'
+import HueSlider from './HueSlider'
 import { useNodeKeys } from '../../../lib/nodeKeys'
 import { useWordCounts } from './useWordCounts'
 import { formatWords } from './wordCount'
@@ -123,6 +124,10 @@ function ProjectOutline({ w }: { w: WriterWorkspace }) {
             />
           </span>
         </div>
+        <HueSlider
+          label={`Series ${n} colour`} className="wrNodeHue" hue={w.levelHueOf(series)} centre={w.hueCentreOf(series)}
+          onChange={hue => w.setNodeHue(series.id, hue)}
+        />
         <AutoTextarea
           className="wrProjSummary" placeholder="Series summary" rows={2} value={series.synopsis} keyField
           onChange={text => w.updateOutlineNode(series.id, { synopsis: text })}

@@ -145,6 +145,8 @@ export interface ProjectSettings {
   plotLevels: PlotNodeKind[]
   readLevels: OutlineNodeKind[]
   timeSystems: TimeSystem[]
+  // The project's own colour (a hue, 0-360), the root of the Writer's level colours; null = the app theme's default.
+  themeHue?: number | null
 }
 
 export interface ProjectIndex {

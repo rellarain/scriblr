@@ -21,6 +21,8 @@ import { useStoredState } from './storage'
 import { combineSaveStatus, useAutosave } from '../../../lib/useAutosave'
 import { insertAfter } from '../../../lib/siblingOrder'
 import { DEFAULT_BOOK_HUE, clampHueToWindow, wrapHue } from '../../../theme/bookColors'
+import { useThemeState } from '../../../theme/useTheme'
+import { autoPickHue, defaultProjectHue, hueCentre, levelHue, reconcileHues } from './levelHues'
 
 type AsyncStatus = 'idle' | 'loading' | 'error'
 
@@ -59,6 +61,8 @@ export function useWriterWorkspace() {
   const [activeProjectId, setActiveProjectId] = useState<string | null>(null)
   const [activeProject, setActiveProject] = useState<ProjectIndex | null>(null)
   const hasOpenProject = activeProjectId != null && activeProject != null
+  const activeProjectRef = useRef<ProjectIndex | null>(null)
+  activeProjectRef.current = activeProject
 
   const [outlineNodes, setOutlineNodes] = useState<OutlineNode[]>([])
   const [outlineSchemaVersion, setOutlineSchemaVersion] = useState<number>(2)
@@ -104,6 +108,17 @@ export function useWriterWorkspace() {
     () => outlineNodes.find(n => n.id === activeChapterId && n.kind === 'chapter'),
     [outlineNodes, activeChapterId],
   )
+
+  // --- level colours (levelHues.ts): hues only; saturation and lightness are the zone's ---
+  const { settings: themeSettings, activeZone } = useThemeState()
+  const appHue = themeSettings.zones[activeZone].palette.theme.h
+  const projectHue = activeProject?.settings.themeHue ?? defaultProjectHue(appHue)
+  const projectHueRef = useRef(projectHue)
+  projectHueRef.current = projectHue
+  const hueNodes = useMemo(() => new Map(outlineNodes.map(n => [n.id, n])), [outlineNodes])
+  const levelHueOf = (node: OutlineNode): number => levelHue(node, hueNodes, projectHue)
+  // The hue a node's own hue must stay within 60 degrees of; null for a book (any hue).
+  const hueCentreOf = (node: OutlineNode): number | null => hueCentre(node, hueNodes, projectHue)
 
   const activeConsole: WuiConsole = !hasOpenProject || view === 'shelves' ? 'shelves' : view === 'project' ? 'shelf' : view
 
@@ -164,20 +179,29 @@ export function useWriterWorkspace() {
     },
   })
 
-  // The project's time systems (Project Editor): saved like the trees.
-  const settingsSave = useAutosave<{ projectId: string; timeSystems: TimeSystem[] }>({
-    save: async ({ projectId, timeSystems }) => {
-      const index = await apiUpdateProject(projectId, { timeSystems })
+  // The project's settings the Writer edits (time systems, colour): saved like the trees.
+  // Each save carries all of them, so a later colour change never drops a waiting time-system edit.
+  const settingsSave = useAutosave<{ projectId: string; timeSystems: TimeSystem[]; themeHue: number | null }>({
+    save: async ({ projectId, timeSystems, themeHue }) => {
+      const index = await apiUpdateProject(projectId, { timeSystems, ...(themeHue != null ? { themeHue } : {}) })
       if (activeProjectIdRef.current === projectId && !settingsSave.hasNewer()) setActiveProject(index)
     },
   })
 
-  function updateTimeSystems(next: TimeSystem[], immediate: boolean) {
-    setActiveProject(prev => (prev ? { ...prev, settings: { ...prev.settings, timeSystems: next } } : prev))
+  function updateProjectSettings(patch: { timeSystems?: TimeSystem[]; themeHue?: number }, immediate: boolean) {
+    const current = activeProjectRef.current
     const projectId = activeProjectIdRef.current
-    if (!projectId) return
-    if (immediate) void settingsSave.saveNow({ projectId, timeSystems: next })
-    else settingsSave.schedule({ projectId, timeSystems: next })
+    if (!current || !projectId) return
+    const settings = { ...current.settings, ...patch }
+    const next = { ...current, settings }
+    activeProjectRef.current = next
+    setActiveProject(next)
+    const value = { projectId, timeSystems: settings.timeSystems, themeHue: settings.themeHue ?? null }
+    if (immediate) void settingsSave.saveNow(value)
+    else settingsSave.schedule(value)
+  }
+  function updateTimeSystems(next: TimeSystem[], immediate: boolean) {
+    updateProjectSettings({ timeSystems: next }, immediate)
   }
 
   // Apply an edit to the outline: `immediate` saves now (structural edits),
@@ -420,12 +444,44 @@ export function useWriterWorkspace() {
     }
     // A book's secondary colour is required: it starts as the primary hue.
     if (kind === 'book' && node.accentHue == null) node.accentHue = node.themeHue ?? DEFAULT_BOOK_HUE
+    // A new series, arc or chapter takes a hue in its window, spread away from its siblings'.
+    if ((kind === 'series' || kind === 'arc' || kind === 'chapter') && node.themeHue == null) {
+      const map = new Map(prev.map(n => [n.id, n]))
+      const parent = parentId ? map.get(parentId) : undefined
+      const centre = parent ? levelHue(parent, map, projectHueRef.current) : projectHueRef.current
+      const siblingHues = prev.filter(n => n.parentId === parentId && n.kind === kind && n.themeHue != null).map(n => n.themeHue as number)
+      node.themeHue = autoPickHue(centre, siblingHues)
+    }
     commitOutline(afterId ? insertAfter(prev, node, afterId, n => n.parentId === parentId) : [...prev, node], true)
     return node.id
   }
 
   function updateOutlineNode(nodeId: string, patch: Partial<OutlineNode>) {
     commitOutline(outlineNodesRef.current.map(n => (n.id === nodeId ? { ...n, ...patch } : n)), false)
+  }
+
+  // Sets a series', book's, arc's or chapter's own hue: held within 60 degrees of its parent's
+  // (a book may be any hue), and its children's own hues are pulled back inside their windows.
+  function setNodeHue(nodeId: string, hue: number) {
+    const prev = outlineNodesRef.current
+    const target = prev.find(n => n.id === nodeId)
+    if (!target || (target.kind !== 'series' && target.kind !== 'book' && target.kind !== 'arc' && target.kind !== 'chapter')) return
+    const map = new Map(prev.map(n => [n.id, n]))
+    const centre = hueCentre(target, map, projectHueRef.current)
+    const wrapped = wrapHue(hue)
+    const value = centre != null ? clampHueToWindow(centre, wrapped) : wrapped
+    const next = prev.map(n => (n.id === nodeId ? { ...n, themeHue: value } : n))
+    commitOutline(reconcileHues(next, projectHueRef.current), false)
+  }
+
+  // Sets the project's own hue, pulling the series' hues (and so their descendants') back inside its window.
+  function setProjectHue(hue: number) {
+    const wrapped = wrapHue(hue)
+    projectHueRef.current = wrapped
+    updateProjectSettings({ themeHue: wrapped }, false)
+    const prev = outlineNodesRef.current
+    const next = reconcileHues(prev, wrapped)
+    if (next.some((n, i) => n !== prev[i])) commitOutline(next, false)
   }
 
   function collectDescendantIds(nodeId: string, nodes: OutlineNode[]): Set<string> {
@@ -676,6 +732,7 @@ export function useWriterWorkspace() {
     saveStatus, saveNow, flushAll, restoreSaved, updateTimeSystems,
     childrenByParentId, projectRoot, books, activeBook, activeBookChapters, activeChapter,
     activeConsole, activeBookId, activeChapterId,
+    projectHue, levelHueOf, hueCentreOf, setNodeHue, setProjectHue,
     loadProjects, createProject, openProject, backToShelves, deleteProject,
     showDash, showProject, openBook, selectChapter, openChapter, showChapter, showPreview, backToBook,
     chapterMode,

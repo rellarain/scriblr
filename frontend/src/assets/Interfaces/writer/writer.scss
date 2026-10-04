@@ -167,7 +167,8 @@
   .wrBookScope--flow { display: contents; }
   // ---------------------------------------------------------------- levels
   // The Writer's four stacked levels (writer/levels/): Dash, Project, Outline, Draft. Each is a
-  // tinted panel; the tint is the active theme's hue, offset per level (a level's own hue comes later).
+  // tinted panel: the Dash in the active theme's hue, each other level in its own (--wr-level-h, set from
+  // the project's, book's or chapter's hue; levelHues.ts).
   .wrLevels { flex: 1 1 auto; min-width: 0; height: 100%; box-sizing: border-box; display: flex; flex-direction: row; gap: 10px; padding: 10px; }
   .wrLevelsSide { flex: 0 0 clamp(280px, 32%, 460px); min-width: 0; min-height: 0; display: flex; flex-direction: column; gap: 10px; }
   .wrLevels--focus-dash > .wrLevel--dash { flex: 2 1 0; }
@@ -177,8 +178,6 @@
     display: flex; flex-direction: column; min-width: 0; min-height: 0; overflow: hidden; border-radius: 12px;
     background: color-mix(in srgb, hsl(var(--wr-level-h) var(--color-theme-s) var(--color-theme-l)) 26%, var(--surface-raised-a));
     box-shadow: inset 0 0 0 1px var(--hairline);
-    &--project { --wr-level-h: calc(var(--color-theme-h) + 120); }
-    &--draft { --wr-level-h: calc(var(--color-theme-h) + 60); }
     &--max { flex: 1 1 0; }
   }
   .wrLevelsSide > .wrLevel--mid { flex: 1 1 0; }
@@ -194,6 +193,7 @@
   .wrLevelBody { flex: 1 1 auto; min-height: 0; box-sizing: border-box; display: flex; flex-direction: column; position: relative; padding: 0 12px 12px; }
   .wrLevel--mid .wrLevelBody { overflow-y: auto; scrollbar-width: none; &::-webkit-scrollbar { display: none; } }
   .wrLevelMinBody { padding: 8px 14px 12px; display: flex; flex-direction: column; gap: 12px; overflow-y: auto; scrollbar-width: none; &::-webkit-scrollbar { display: none; } }
+  .wrNodeHue { max-width: 360px; margin: 2px 0; }
   .wrOutlineMid { display: flex; flex-direction: column; gap: 5px; font-size: 12px; line-height: 1.4; padding-top: 8px; }
   // The book editor has no title row of its own; the chapter page and Preview run their paper flush to the right
   // edge, so the chapter tabs sit against it (like the book cover's).
