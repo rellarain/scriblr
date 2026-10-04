@@ -1,13 +1,13 @@
-import { useRef, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import type { OutlineNode } from '../../../api/types'
 import { PlusIcon, TrashIcon } from '../../icons'
 import { booksOf, chaptersOfBook } from './outlineTree'
 import { AutoTextarea, useStoredState } from './shared'
 import { focusNodeField, useNodeKeys } from '../../../lib/nodeKeys'
 
-// The Shelves dashboard: schedule and analytics as equal columns and a
-// narrow scratchpad column. Checklists and notes have no backend yet, so
-// they persist in the browser's local storage.
+// The Dash's panels: tasks, routines, analytics and the scratchpad, each a tab of the Dash level
+// (levels/dashTabs.tsx). Checklists and notes have no backend of their own, so they persist in the
+// user's settings store.
 
 export interface ChecklistItem { id: string; label: string; done: boolean }
 export const TASKS_KEY = 'scriblr.writer.tasks'
@@ -18,9 +18,15 @@ export function newId(): string {
   return Math.random().toString(36).slice(2, 9)
 }
 
-function Checklist({ title, storageKey, placeholder }: { title: string; storageKey: string; placeholder: string }) {
+// `query` filters the list by text; each rise of `newTick` (the level header's New button) puts the cursor in the add box.
+function Checklist({ title, storageKey, placeholder, query = '', newTick = 0 }: {
+  title: string; storageKey: string; placeholder: string; query?: string; newTick?: number
+}) {
   const [items, setItems] = useStoredState<ChecklistItem[]>(storageKey, [])
   const [draft, setDraft] = useState('')
+  const addRef = useRef<HTMLInputElement>(null)
+  useEffect(() => { if (newTick > 0) addRef.current?.focus() }, [newTick])
+  const shown = query ? items.filter(i => i.label.toLowerCase().includes(query)) : items
 
   function add() {
     if (!draft.trim()) return
@@ -32,8 +38,9 @@ function Checklist({ title, storageKey, placeholder }: { title: string; storageK
     <div className="wrCard">
       <div className="wrCardTitle">{title}</div>
       {items.length === 0 && <p className="wrMuted">Nothing here yet.</p>}
+      {items.length > 0 && shown.length === 0 && <p className="wrMuted">Nothing matches.</p>}
       <ul className="wrChecklist">
-        {items.map(item => (
+        {shown.map(item => (
           <li key={item.id} className={item.done ? 'wrCheckItem wrCheckItem--done' : 'wrCheckItem'}>
             <label>
               <input
@@ -53,7 +60,7 @@ function Checklist({ title, storageKey, placeholder }: { title: string; storageK
       </ul>
       <div className="wrInlineAdd">
         <input
-          value={draft} placeholder={placeholder}
+          ref={addRef} value={draft} placeholder={placeholder} aria-label={placeholder}
           onChange={e => setDraft(e.target.value)}
           onKeyDown={e => { if (e.key === 'Enter') add() }}
         />
@@ -63,14 +70,15 @@ function Checklist({ title, storageKey, placeholder }: { title: string; storageK
   )
 }
 
-export function SchedulePanel() {
-  return (
-    <div className="wrColumn">
-      <div className="wrColumnTitle">Schedule</div>
-      <Checklist title="Tasks" storageKey={TASKS_KEY} placeholder="Add a task…" />
-      <Checklist title="Routines" storageKey={ROUTINES_KEY} placeholder="Add a routine…" />
-    </div>
-  )
+export interface PanelContext { query?: string; newTick?: number }
+
+// The Dash's Checklist tab (tasks) and Schedule tab (routines).
+export function TasksPanel({ query, newTick }: PanelContext) {
+  return <Checklist title="Tasks" storageKey={TASKS_KEY} placeholder="Add a task…" query={query} newTick={newTick} />
+}
+
+export function RoutinesPanel({ query, newTick }: PanelContext) {
+  return <Checklist title="Routines" storageKey={ROUTINES_KEY} placeholder="Add a routine…" query={query} newTick={newTick} />
 }
 
 export function AnalyticsPanel({ projects, outlines }: {
@@ -90,8 +98,7 @@ export function AnalyticsPanel({ projects, outlines }: {
   )
 
   return (
-    <div className="wrColumn">
-      <div className="wrColumnTitle">Analytics</div>
+    <div className="wrColumn wrColumn--bare">
       <div className="wrCard">
         <div className="wrCardTitle">Across all projects</div>
         <div className="wrStatRow">
@@ -121,10 +128,11 @@ export interface Note { id: string; title: string; body: string }
 // shared node shortcuts apply (lib/nodeKeys.ts): Enter adds a note after this
 // one, Shift+Enter is a new line, Tab moves between fields and notes, and
 // Enter, Backspace or Delete in an empty note removes it.
-export function Scratchpad() {
+export function Scratchpad({ query = '', newTick = 0, bare = false }: PanelContext & { bare?: boolean } = {}) {
   const [notes, setNotes] = useStoredState<Note[]>(NOTES_KEY, [])
   const [editingId, setEditingId] = useState<string | null>(null)
   const listRef = useRef<HTMLDivElement>(null)
+  const shown = query ? notes.filter(n => `${n.title} ${n.body}`.toLowerCase().includes(query)) : notes
 
   function addAfter(afterId: string | null): string {
     const note: Note = { id: newId(), title: '', body: '' }
@@ -141,6 +149,9 @@ export function Scratchpad() {
     setNotes(prev => prev.map(n => (n.id === id ? { ...n, ...changes } : n)))
   }
 
+  // The level header's New button adds a note.
+  useEffect(() => { if (newTick > 0) focusNodeField(addAfter(null), 'first') }, [newTick]) // eslint-disable-line react-hooks/exhaustive-deps
+
   const keys = useNodeKeys({
     parentOf: () => null,
     siblingsOf: () => notes.map(n => n.id),
@@ -153,14 +164,17 @@ export function Scratchpad() {
   })
 
   return (
-    <div className="wrColumn wrColumn--narrow">
-      <div className="wrColumnTitle">
-        Scratchpad
-        <button type="button" className="wrSmallBtn wrColumnAction" onClick={() => focusNodeField(addAfter(null), 'first')}><PlusIcon size={14} /> Note</button>
-      </div>
+    <div className={bare ? 'wrNotesBare' : 'wrColumn wrColumn--narrow'}>
+      {!bare && (
+        <div className="wrColumnTitle">
+          Scratchpad
+          <button type="button" className="wrSmallBtn wrColumnAction" onClick={() => focusNodeField(addAfter(null), 'first')}><PlusIcon size={14} /> Note</button>
+        </div>
+      )}
       <div className="wrNotes" ref={listRef} onKeyDown={keys.onKeyDown}>
         {notes.length === 0 && <p className="wrMuted">No notes yet. Add one to jot down a thought.</p>}
-        {notes.map(n => (
+        {notes.length > 0 && shown.length === 0 && <p className="wrMuted">Nothing matches.</p>}
+        {shown.map(n => (
           <div
             key={n.id} data-note={n.id} data-knode={n.id}
             className={editingId === n.id ? 'wrNote wrNote--editing' : 'wrNote'}
@@ -188,21 +202,7 @@ export function Scratchpad() {
           </div>
         ))}
       </div>
-      <p className="wrHint">Enter adds a note, Shift+Enter a new line. Tab moves between notes. Enter, Backspace or Delete in an empty note removes it.</p>
+      {!bare && <p className="wrHint">Enter adds a note, Shift+Enter a new line. Tab moves between notes. Enter, Backspace or Delete in an empty note removes it.</p>}
     </div>
   )
 }
-
-export function Dashboard({ projects, outlines }: {
-  projects: { projectId: string; title: string }[]
-  outlines: Record<string, OutlineNode[]>
-}) {
-  return (
-    <div className="wrColumns">
-      <SchedulePanel />
-      <AnalyticsPanel projects={projects} outlines={outlines} />
-      <Scratchpad />
-    </div>
-  )
-}
-

@@ -1,0 +1,121 @@
+import { useState, type ComponentType, type ReactNode } from 'react'
+import { PlusIcon, SearchIcon, type IconProps } from '../../../icons'
+import { useStoredState } from '../storage'
+
+// What a tab's content is told: the header's search text, and a counter that goes up each time the
+// header's New button is pressed on that tab (a tab that has something to add reacts to the change).
+export interface TabContext { query: string; newTick: number }
+
+export interface LevelTab {
+  id: string
+  label: string
+  Icon: ComponentType<IconProps>
+  render: (ctx: TabContext) => ReactNode
+  // The header's New button, while this tab is the current one: what it adds, and an optional direct action.
+  newLabel?: string
+  onNew?: () => void
+  // The header's search box filters this tab.
+  searchable?: boolean
+  // Starts the closing group of tabs (Settings, Help), set a little apart.
+  end?: boolean
+}
+
+// The tabs of a level and what they show. At Mid one tab at a time, in one column; at Max each tab is the
+// minimised form of a tile, clicking it opens or closes that tile, and the open tiles flow into two columns.
+// The tab strip and quick actions (New, Search, Save) go in the level's header; the body is the tiles.
+export function useTabbedLevel({ storageKey, tabs, size, defaultOpen, save }: {
+  storageKey: string
+  tabs: LevelTab[]
+  size: 'min' | 'mid' | 'max'
+  defaultOpen: string[]
+  save?: ReactNode
+}): { headerExtras: ReactNode; body: ReactNode } {
+  const [active, setActive] = useStoredState<string>(`${storageKey}.tab`, tabs[0].id)
+  const [open, setOpen] = useStoredState<string[]>(`${storageKey}.open`, defaultOpen)
+  const [query, setQuery] = useState('')
+  const [searching, setSearching] = useState(false)
+  const [ticks, setTicks] = useState<Record<string, number>>({})
+
+  if (size === 'min') return { headerExtras: null, body: null }
+
+  const max = size === 'max'
+  const shown = tabs.filter(t => open.includes(t.id))
+  const known = (id: string) => tabs.some(t => t.id === id)
+  const current = max
+    ? (shown.find(t => t.id === active) ?? shown[0])
+    : (tabs.find(t => t.id === active && known(active)) ?? tabs[0])
+
+  function pick(id: string) {
+    setActive(id)
+    if (max) setOpen(prev => (prev.includes(id) ? prev.filter(x => x !== id) : [...prev, id]))
+  }
+  function add() {
+    if (!current) return
+    setTicks(prev => ({ ...prev, [current.id]: (prev[current.id] ?? 0) + 1 }))
+    current.onNew?.()
+  }
+  const ctxOf = (tab: LevelTab): TabContext => ({ query: query.trim().toLowerCase(), newTick: ticks[tab.id] ?? 0 })
+
+  const headerExtras = (
+    <div className="wrHeaderExtras">
+      <div className="wrTabBar" role="toolbar" aria-label="Tabs">
+        {tabs.map(t => {
+          const on = max ? open.includes(t.id) : current?.id === t.id
+          return (
+            <button
+              key={t.id} type="button" className={`wrTabBtn${on ? ' wrTabBtn--on' : ''}${t.end ? ' wrTabBtn--end' : ''}`}
+              aria-label={t.label} title={t.label} aria-pressed={on} onClick={() => pick(t.id)}
+            >
+              <t.Icon size={14} />
+            </button>
+          )
+        })}
+      </div>
+      <div className="wrQuickActions">
+        {searching && current?.searchable && (
+          <input className="wrQuickSearch" aria-label="Search" placeholder="Search" value={query} autoFocus onChange={e => setQuery(e.target.value)} />
+        )}
+        {current?.searchable && (
+          <button
+            type="button" className={`wrTabBtn${searching ? ' wrTabBtn--on' : ''}`} aria-label="Search this tab" title="Search" aria-pressed={searching}
+            onClick={() => { setSearching(s => !s); setQuery('') }}
+          >
+            <SearchIcon size={14} />
+          </button>
+        )}
+        {current?.newLabel && (
+          <button type="button" className="wrTabBtn" aria-label={current.newLabel} title={current.newLabel} onClick={add}>
+            <PlusIcon size={14} />
+          </button>
+        )}
+        {save}
+      </div>
+    </div>
+  )
+
+  let body: ReactNode
+  if (!max) {
+    body = current ? <div className="wrTabPane" role="region" aria-label={current.label}>{current.render(ctxOf(current))}</div> : null
+  } else {
+    const columns: LevelTab[][] = [[], []]
+    shown.forEach((t, i) => columns[i % 2].push(t))
+    body = shown.length === 0
+      ? <p className="wrMuted">Pick a tab above to open it.</p>
+      : (
+        <div className="wrTabColumns">
+          {columns.map((col, i) => (
+            <div key={i} className="wrTabColumn">
+              {col.map(t => (
+                <section key={t.id} className="wrTabTile" aria-label={t.label}>
+                  <h3 className="wrTabTileTitle"><t.Icon size={14} /> {t.label}</h3>
+                  <div className="wrTabTileBody">{t.render(ctxOf(t))}</div>
+                </section>
+              ))}
+            </div>
+          ))}
+        </div>
+      )
+  }
+
+  return { headerExtras, body }
+}

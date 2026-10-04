@@ -8,15 +8,19 @@ import WriterLevels from './WriterLevels'
 
 // The consoles inside the levels (tile grids, editors) have their own tests; here
 // they are stand-ins so this file exercises the frame itself.
-vi.mock('../ShelvesConsole', () => ({ default: () => <div>shelves console</div> }))
 vi.mock('../ProjectConsole', () => ({ default: () => <div>project console</div> }))
 vi.mock('../outline/OutlineMax', () => ({ default: () => <div>book console</div> }))
 vi.mock('../draft/DraftLevel', () => ({ default: ({ w }: { w: { activeConsole: string } }) => <div>{w.activeConsole === 'pages' ? 'pages console' : 'page console'}</div> }))
+vi.mock('./dashTabs', () => ({
+  useDashTabs: (_w: unknown, size: string) => ({
+    headerExtras: size === 'min' ? null : <div>dash tabs</div>,
+    body: size === 'min' ? null : <div>dash body ({size})</div>,
+  }),
+}))
 vi.mock('./levelBodies', () => ({
-  DashMid: () => <div>dash mid</div>,
   ProjectMid: () => <div>project mid</div>,
   ProjectMin: () => <div>project spines</div>,
-  ProjectShelves: () => <div>project shelves</div>,
+  ProjectTiles: () => <div>project tiles</div>,
   OutlineMid: () => <div>outline mid</div>,
 }))
 
@@ -48,7 +52,7 @@ describe('WriterLevels', () => {
   it('shows each focus as its own set of level sizes', () => {
     const { unmount } = renderLevels(workspace('shelves'))
     expect(levelsOf()).toEqual(['dash:max', 'project:min'])
-    expect(screen.getByText('project shelves')).toBeTruthy()
+    expect(screen.getByText('project tiles')).toBeTruthy()
     unmount()
 
     const second = renderLevels(workspace('shelf'))

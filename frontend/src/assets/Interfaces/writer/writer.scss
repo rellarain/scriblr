@@ -713,4 +713,58 @@
   .wrLevel--outline .wrField option { color: black; }
   .wrDraftStats { background: var(--wr-frame-1); }
   .wrLevel--outline .wrBookEdHead .wrSmallBtn, .wrLevel--outline .wrBookEdHead .saveIconBtn, .wrLevel--outline .wrOutlineCardsHead .wrSmallBtn { color: var(--on-accent); background: rgb(255 255 255 / 0.16); }
+
+  // ---------------------------------------------------------------- level tabs (levels/LevelTabs.tsx)
+  // The header's tab strip: 20x20 icon buttons that switch (Mid) or open and close tiles (Max), then the quick actions.
+  // In a narrow header (the Mid level beside a focused one) the title keeps a line of its own and these drop beneath it.
+  .wrLevelHeader { flex-wrap: wrap; row-gap: 2px; }
+  .wrLevelTitle { min-width: 130px; }
+  .wrHeaderExtras { flex: 0 1 auto; display: flex; flex-wrap: wrap; align-items: center; justify-content: flex-end; gap: 2px 6px; margin-left: auto; }
+  .wrTabBar, .wrQuickActions { flex: 0 0 auto; display: flex; align-items: center; gap: 2px; }
+  .wrQuickActions { margin-left: 6px; gap: 4px; }
+  .wrTabBtn {
+    display: inline-flex; align-items: center; justify-content: center; width: 20px; height: 20px; padding: 0; border-radius: 0; color: inherit; opacity: 0.7;
+    &:hover { opacity: 1; background: rgb(255 255 255 / 0.16); }
+    &--on { opacity: 1; background: rgb(0 0 0 / 0.28); }
+    &--end { margin-left: 8px; }
+  }
+  .wrQuickSearch { width: 130px; box-sizing: border-box; height: 20px; border: 0; border-radius: 0; padding: 0 6px; font-size: 11px; background: rgb(255 255 255 / 0.94); color: #1b1b1b; outline: none; }
+  .wrLevelHeader .wrSmallBtn, .wrLevelHeader .saveIconBtn { color: var(--on-accent); background: rgb(255 255 255 / 0.16); }
+  .wrLevelHeader .saveControl { font-size: 11px; }
+  .wrTabPane { display: flex; flex-direction: column; gap: 10px; min-height: 0; }
+  .wrTabColumns { flex: 1 1 auto; min-height: 0; display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 6px; align-items: start; }
+  .wrTabColumn { display: flex; flex-direction: column; gap: 6px; min-width: 0; }
+  .wrTabTile { background: var(--wr-fill-2); display: flex; flex-direction: column; min-width: 0; }
+  .wrTabTileTitle { margin: 0; display: flex; align-items: center; gap: 6px; padding: 6px 10px; font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 1px; background: var(--wr-fill-3); }
+  .wrTabTileBody { padding: 10px; display: flex; flex-direction: column; gap: 10px; min-width: 0; }
+  // What the tabs hold, on the level's own colour: cards one step deeper, light inputs.
+  .wrTabPane, .wrTabTileBody {
+    color: var(--on-accent);
+    .wrColumn { overflow: visible; max-width: none; flex: 0 0 auto; }
+    .wrCard, .wrNote { background: var(--wr-fill-3); box-shadow: none; border-radius: 0; }
+    .wrNote--editing { background: var(--wr-fill-4); box-shadow: inset 3px 0 0 rgb(255 255 255 / 0.7); }
+    .wrNotes { overflow: visible; }
+    .wrNotesBare { display: flex; flex-direction: column; gap: 10px; }
+    .wrNoteTitle, .wrNoteBody { color: var(--on-accent); &::placeholder { color: color-mix(in srgb, var(--on-accent) 55%, transparent); } }
+    .wrInlineAdd input { background: rgb(255 255 255 / 0.94); color: #1b1b1b; border-radius: 0; &::placeholder { color: #6a6a6a; } }
+    .wrSmallBtn { color: var(--on-accent); background: rgb(255 255 255 / 0.16); &:hover:not(:disabled) { background: rgb(255 255 255 / 0.28); } }
+    .wrBarTrack { background: rgb(0 0 0 / 0.3); border-radius: 0; }
+    .wrBarFill { background: rgb(255 255 255 / 0.85); }
+    .wrCheckItem input { accent-color: #fff; }
+    .wrMuted, .wrHint { opacity: 0.85; }
+  }
+  .wrHelp { display: flex; flex-direction: column; gap: 12px; font-size: 12px; line-height: 1.5; }
+  .wrHelpArticle { display: flex; flex-direction: column; gap: 6px; h4 { margin: 0; font-size: 12px; text-transform: uppercase; letter-spacing: 1px; } summary { cursor: pointer; font-weight: 700; } }
+  .wrHelpText { margin: 0; font-size: 12px; line-height: 1.5; white-space: pre-wrap; }
+
+  // The tiles beside the Dash at Max: one per project, stacked, with empty space beneath.
+  .wrProjectsColumn { background: transparent; overflow: visible; }
+  .wrProjectTiles { flex: 1 1 auto; min-height: 0; display: flex; flex-direction: column; gap: 6px; overflow-y: auto; scrollbar-width: none; &::-webkit-scrollbar { display: none; } }
+  .wrProjectTile {
+    flex: 0 0 auto; background: var(--wr-fill); color: var(--on-accent); padding: 10px 12px 12px;
+    .wrShelfName, .wrShelfSeriesLabel { color: color-mix(in srgb, var(--on-accent) 80%, transparent); &--selected { color: var(--on-accent); } }
+    .wrShelfName--link:hover { color: var(--on-accent); text-decoration: underline; }
+    .wrShelfMeta { opacity: 0.8; }
+  }
+  .wrProjectTiles .wrNewProject { flex: 0 0 auto; }
 }

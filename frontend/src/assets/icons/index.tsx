@@ -530,3 +530,10 @@ export function EyeClosedIcon(props: IconProps) {
     <path d="M6 14l-1.6 2.2M12 15.4V18M18 14l1.6 2.2" />
   </IconBase>
 }
+
+export function SearchIcon(props: IconProps) {
+  return <IconBase {...props}>
+    <circle cx="11" cy="11" r="6.5" />
+    <path d="m16 16 4.5 4.5" />
+  </IconBase>
+}

@@ -2,12 +2,11 @@ import { render, screen, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import type { OutlineNode, PlotNode } from '../../../../api/types'
-import { __resetSettingsForTests, getKv } from '../../../../settings/settingsStore'
+import { __resetSettingsForTests } from '../../../../settings/settingsStore'
 import TileGrid from '../../../../components/tiles/TileGrid'
 import type { TileDef } from '../../../../components/tiles/tileTypes'
 import type { WriterWorkspace } from '../useWriterWorkspace'
 import { shelfTiles } from './shelfTiles'
-import { shelvesTiles } from './shelvesTiles'
 
 beforeEach(() => {
   window.localStorage.clear()
@@ -43,46 +42,6 @@ function workspace(over: Record<string, unknown> = {}): WriterWorkspace {
 const grid = (tiles: TileDef[], gridId: string) => render(<TileGrid gridId={gridId} tiles={tiles} crumbs={[{ label: 'Shelves' }]} />)
 const tile = (id: string) => document.querySelector(`[data-tile-id="${id}"]`) as HTMLElement
 const shapes = () => Array.from(document.querySelectorAll('[data-tile-id]')).map(el => `${el.getAttribute('data-tile-id')}:${el.getAttribute('data-shape')}`)
-
-describe('Shelves tiles', () => {
-  it('are the template, schedule, analytics and scratchpad', () => {
-    grid(shelvesTiles(workspace()), 'shelves')
-    // The rail (minimized tiles) renders before the stage, so template leads.
-    expect(shapes()).toEqual(['template:mini', 'schedule:mid', 'analytics:mid', 'scratchpad:mid'])
-  })
-
-  it('shows the chapters of each project in the analytics tile', () => {
-    grid(shelvesTiles(workspace()), 'shelves')
-    expect(within(tile('analytics')).getByText('Saga')).toBeTruthy()
-    expect(within(tile('analytics')).getByText('2 chapters')).toBeTruthy()
-  })
-
-  it('adds and ticks a task from the schedule tile without opening it', async () => {
-    const user = userEvent.setup()
-    grid(shelvesTiles(workspace()), 'shelves')
-    await user.type(within(tile('schedule')).getByLabelText('Add a task'), 'Draft chapter 3{Enter}')
-    expect(within(tile('schedule')).getByText('Draft chapter 3')).toBeTruthy()
-    await user.click(within(tile('schedule')).getByRole('checkbox'))
-    expect(getKv<Array<{ label: string; done: boolean }>>('scriblr.writer.tasks')).toEqual([expect.objectContaining({ label: 'Draft chapter 3', done: true })])
-    expect(screen.queryByRole('region')).toBeNull()
-  })
-
-  it('adds a note from the scratchpad tile', async () => {
-    const user = userEvent.setup()
-    grid(shelvesTiles(workspace()), 'shelves')
-    await user.type(within(tile('scratchpad')).getByLabelText('Add a note'), 'Rework the storm{Enter}')
-    expect(within(tile('scratchpad')).getByText('Rework the storm')).toBeTruthy()
-    expect(getKv<Array<{ title: string }>>('scriblr.writer.scratchpad')![0].title).toBe('Rework the storm')
-  })
-
-  it('expands the schedule tile into its panel', async () => {
-    const user = userEvent.setup()
-    grid(shelvesTiles(workspace()), 'shelves')
-    await user.click(within(tile('schedule')).getByRole('button', { name: 'Open Schedule' }))
-    const region = screen.getByRole('region', { name: 'Schedule' })
-    expect(within(region).getByText('Routines')).toBeTruthy()
-  })
-})
 
 describe('Shelf tiles', () => {
   it('are the working editors as summary tiles, then placeholders, then link tiles', () => {

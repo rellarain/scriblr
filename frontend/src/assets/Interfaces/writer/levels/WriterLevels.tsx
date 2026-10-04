@@ -5,12 +5,12 @@ import { nodeLabel } from '../plotTree'
 import { bookThemeHue } from '../../../../theme/bookColors'
 import BookScope from '../BookScope'
 import ConsoleCorner from '../../../../components/tiles/ConsoleCorner'
-import ShelvesConsole from '../ShelvesConsole'
 import ProjectConsole from '../ProjectConsole'
 import OutlineMax from '../outline/OutlineMax'
 import DraftLevel from '../draft/DraftLevel'
 import LevelPanel from './LevelPanel'
-import { DashMid, OutlineMid, ProjectMid, ProjectMin, ProjectShelves } from './levelBodies'
+import { OutlineMid, ProjectMid, ProjectMin, ProjectTiles } from './levelBodies'
+import { useDashTabs } from './dashTabs'
 import { LEVELS, focusOf, levelSizes, type Level, type LevelSize, type SizeOverrides } from './levelSizes'
 
 // The Writer: four stacked levels (Dash, Project, Outline, Draft), one of them
@@ -25,6 +25,7 @@ function WriterLevels({ w, pagesComponent, onPagesComponent }: {
   const [overrides, setOverrides] = useStoredState<SizeOverrides>('scriblr.writer.levelSizes', {})
   const focus = focusOf(w.activeConsole)
   const sizes = levelSizes(focus, overrides)
+  const dashTabs = useDashTabs(w, sizes.dash === 'hidden' ? 'min' : sizes.dash)
 
   const setSize = (level: Level) => (size: 'min' | 'mid') => setOverrides(prev => ({ ...prev, [level]: size }))
   const book = w.activeBook
@@ -34,15 +35,18 @@ function WriterLevels({ w, pagesComponent, onPagesComponent }: {
     switch (level) {
       case 'dash':
         return (
-          <LevelPanel key={level} level={level} size={size} title="Writer Dashboard" onPromote={w.showDash} onSetSize={setSize(level)}>
-            {size === 'max' ? <ShelvesConsole w={w} /> : <DashMid w={w} />}
+          <LevelPanel key={level} level={level} size={size} title="Writer Dashboard" headerExtras={dashTabs.headerExtras} onPromote={w.showDash} onSetSize={setSize(level)}>
+            {dashTabs.body}
           </LevelPanel>
         )
       case 'project': {
-        // Beside the Dash, the Project level is the shelf of every project.
+        // Beside the Dash, the Project level is a tile for every project.
         if (focus === 'dash') {
           return (
-            <LevelPanel key={level} level={level} size="min" title="Project Shelves" hue={w.projectHue} locked onPromote={w.showProject} onSetSize={setSize(level)} minBody={<ProjectShelves w={w} />} />
+            <LevelPanel
+              key={level} level={level} size="min" title="Project Shelves" hue={w.projectHue} locked headerless className="wrProjectsColumn"
+              onPromote={w.showProject} onSetSize={setSize(level)} minBody={<ProjectTiles w={w} />}
+            />
           )
         }
         return (

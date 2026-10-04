@@ -538,8 +538,15 @@ awareness that the app above already existed:
   is Mid and everything further up Min, the levels below it are not shown
   (`levelSizes.ts`). Opening a project, book or chapter moves the focus down a level;
   a level's title brings the focus back, its header strip opens a Min level to Mid and
-  its chevron toggles Min/Mid (remembered). Beside the Dash the Project level is the
-  shelf of every project. The selected book's spine swivels into its cover
+  its chevron toggles Min/Mid (remembered). Beside the Dash the Project level is a green
+  tile for every project (its books on a shelf, `levelBodies.tsx` `ProjectTiles`).
+  A level's header carries its **tabs** (`levels/LevelTabs.tsx`, `useTabbedLevel`): 20×20 icon
+  buttons, ending with Settings and Help, then quick actions (Search, a context-aware New and
+  Save). At Mid one tab shows at a time; at Max each tab is a tile that its button opens or
+  closes, the open tiles flowing into two columns (open tiles and the current tab are
+  remembered). The Dash's tabs (`levels/dashTabs.tsx`) are Schedule (routines), Checklist (tasks),
+  Analytics, Scratchpad, Project template, Settings (the theme panel) and Help (the resource
+  articles written for the level in the Resources builder, `levels/HelpArticles.tsx`). The selected book's spine swivels into its cover
   (`Shelf.tsx`). Levels are tinted by hue (`levelHues.ts`): the project's own
   (`ProjectSettings.themeHue`), series within 60° of it, books any hue, arcs within
   60° of their book and chapters within 60° of their arc (each node's `themeHue`);
@@ -576,8 +583,7 @@ awareness that the app above already existed:
   (read-only footnote cards), then its acts, scenes and moments as read-only cards (fold up, remembered) each around an
   auto-growing draft input with a live word count, or, from the toggle, the preview with
   its Reaction / Flag / Export tools. A chapter with no outline is one free draft. The
-  Dash and Project levels still wrap the older consoles' contents (tile grids), being
-  reshaped to the four-level design.
+  Project level still wraps the older console's tile grid, being reshaped to tabs like the Dash.
 - **`AUI.tsx`** (`feedback/` subfolder) — an admin "feedback pipeline"
   (channel/vote/tone/integrate/implement/sent/explicate tabs). This isn't a
   duplicate of anything above — it has no committed counterpart, is

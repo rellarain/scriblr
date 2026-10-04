@@ -6,7 +6,7 @@ import type { Level, LevelSize } from './levelSizes'
 // One tinted level of the Writer frame. Its header strip is how it changes size:
 // clicking a Min level's strip opens it to Mid, the title promotes it to the focus
 // (Max), and the chevron toggles Min/Mid. The focused (Max) level just shows its title.
-function LevelPanel({ level, size, title, hue, tint, fill, onPromote, onSetSize, locked = false, headerless = false, minBody, children }: {
+function LevelPanel({ level, size, title, hue, tint, fill, onPromote, onSetSize, locked = false, headerless = false, headerExtras, className, minBody, children }: {
   level: Level
   size: Exclude<LevelSize, 'hidden'>
   title: string
@@ -22,6 +22,9 @@ function LevelPanel({ level, size, title, hue, tint, fill, onPromote, onSetSize,
   locked?: boolean
   // No header strip: the body brings its own (the Draft level's chapter tile, the Outline book editor).
   headerless?: boolean
+  // The level's tab strip and quick actions, in its header between the title and the size toggle.
+  headerExtras?: ReactNode
+  className?: string
   // What a Min level shows under its header strip (the book spines, say).
   minBody?: ReactNode
   children?: ReactNode
@@ -30,7 +33,7 @@ function LevelPanel({ level, size, title, hue, tint, fill, onPromote, onSetSize,
   const canToggle = size !== 'max' && !locked
   return (
     <section
-      className={`wrLevel wrLevel--${level} wrLevel--${size}`}
+      className={`wrLevel wrLevel--${level} wrLevel--${size}${className ? ` ${className}` : ''}`}
       aria-label={`${title} (${size})`} data-level={level} data-size={size}
       style={hue != null ? ({ '--wr-level-h': hueOfCode(hue), '--wr-level-tint': tint ?? themeColorCss(hue), '--wr-level-fill': fill ?? fillColorCss(hue) } as CSSProperties) : undefined}
     >
@@ -45,6 +48,7 @@ function LevelPanel({ level, size, title, hue, tint, fill, onPromote, onSetSize,
               {title}
             </button>
           )}
+        {headerExtras}
         {canToggle && (
           <button
             type="button" className="wrLevelToggle"
