@@ -4,7 +4,7 @@ import type { WriterWorkspace } from './useWriterWorkspace'
 import { ChevronRightIcon, PlusIcon } from '../../icons'
 import { ChipEditor, DeleteControl } from './shared'
 import { focusNodeField, useNodeKeys } from '../../../lib/nodeKeys'
-import { encodeHue, hueOfCode, isNeutralHue } from '../../../theme/bookColors'
+import { encodeHue, hueOfCode } from '../../../theme/bookColors'
 import { useThemeState } from '../../../theme/useTheme'
 import HueSlider from './HueSlider'
 import { plotColors, plotColorVars } from './plotColors'
@@ -107,12 +107,12 @@ function ChildRows({ w, node, kind, addLabel }: { w: WriterWorkspace; node: Plot
   )
 }
 
-// The colour selector of a category (unlimited: any hue in any tone) or subcategory (limited: the
-// tones round its category's hue, within 60 degrees). Saturation and lightness are the active
+// The colour selector of a category (unlimited: any hue in any brightness) or subcategory (limited: the
+// brightnesses round its category's hue, within 60 degrees). Saturation and lightness are the active
 // zone's, so what the thumb shows is what the app draws.
 function HueField({ w, node }: { w: WriterWorkspace; node: PlotNode }) {
   const { settings, activeZone } = useThemeState()
-  const appCode = encodeHue(settings.zones[activeZone].palette.theme.h, 'saturated')
+  const appCode = encodeHue(settings.zones[activeZone].palette.theme.h, 'base')
   if (node.kind === 'subcategory') {
     const category = node.parentId ? w.plotNodeById.get(node.parentId) : undefined
     const categoryCode = category?.hue ?? appCode
@@ -120,7 +120,7 @@ function HueField({ w, node }: { w: WriterWorkspace; node: PlotNode }) {
       <div>
         <div className="wrLabel">Colour <span className="wrOutlineMeta">within 60° of its category</span></div>
         <HueSlider
-          label="Subcategory colour" hue={node.hue ?? categoryCode} centre={isNeutralHue(categoryCode) ? null : hueOfCode(categoryCode)}
+          label="Subcategory colour" hue={node.hue ?? categoryCode} centre={hueOfCode(categoryCode)}
           onChange={code => w.setPlotHue(node.id, code, categoryCode)}
         />
       </div>

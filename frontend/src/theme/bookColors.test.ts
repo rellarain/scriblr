@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import {
-  DEFAULT_BOOK_HUE, NEUTRAL_CODE, TONES, accentColorCss, bookScopeVars, bookThemeHue, clampCodeToWindow, clampHueToWindow, coverColor, decodeHue,
-  encodeHue, hexToHue, hueDelta, hueInToneOf, hueOfCode, hueWindow, isLightColor, isNeutralHue, themeColorCss, toneHsl, toneOf, wrapHue,
+  DEFAULT_BOOK_HUE, TONES, TONE_NAME, accentColorCss, bookScopeVars, bookThemeHue, clampCodeToWindow, clampHueToWindow, coverColor, decodeHue,
+  encodeHue, fillColorCss, hexToHue, hueDelta, hueInToneOf, hueOfCode, hueWindow, isLightColor, themeColorCss, toneHsl, toneOf, wrapHue,
   type Tone,
 } from './bookColors'
 import { DEFAULT_PALETTE } from './defaults'
@@ -108,27 +108,27 @@ describe('bookScopeVars', () => {
 
 
 describe('hue codes', () => {
-  it('holds a hue and a tone in one number', () => {
+  it('holds a hue and a brightness in one number', () => {
     expect([1, 200, 359, 360].map(c => decodeHue(c))).toEqual([
-      { kind: 'hue', hue: 1, tone: 'saturated' }, { kind: 'hue', hue: 200, tone: 'saturated' },
-      { kind: 'hue', hue: 359, tone: 'saturated' }, { kind: 'hue', hue: 0, tone: 'saturated' },
+      { hue: 1, tone: 'base' }, { hue: 200, tone: 'base' }, { hue: 359, tone: 'base' }, { hue: 0, tone: 'base' },
     ])
-    expect(decodeHue(0)).toEqual({ kind: 'hue', hue: 0, tone: 'desaturated' })
-    expect(decodeHue(-120)).toEqual({ kind: 'hue', hue: 120, tone: 'desaturated' })
-    expect(decodeHue(-360)).toEqual({ kind: 'hue', hue: 0, tone: 'desaturated' })
-    expect(decodeHue(361)).toEqual({ kind: 'hue', hue: 1, tone: 'light' })
-    expect(decodeHue(560)).toEqual({ kind: 'hue', hue: 200, tone: 'light' })
-    expect(decodeHue(720)).toEqual({ kind: 'hue', hue: 0, tone: 'light' })
-    expect(decodeHue(-361)).toEqual({ kind: 'hue', hue: 1, tone: 'dark' })
-    expect(decodeHue(-560)).toEqual({ kind: 'hue', hue: 200, tone: 'dark' })
-    expect(decodeHue(-720)).toEqual({ kind: 'hue', hue: 0, tone: 'dark' })
+    expect(decodeHue(361)).toEqual({ hue: 1, tone: 'light' })
+    expect(decodeHue(560)).toEqual({ hue: 200, tone: 'light' })
+    expect(decodeHue(720)).toEqual({ hue: 0, tone: 'light' })
+    expect(decodeHue(-361)).toEqual({ hue: 1, tone: 'dark' })
+    expect(decodeHue(-560)).toEqual({ hue: 200, tone: 'dark' })
+    expect(decodeHue(-720)).toEqual({ hue: 0, tone: 'dark' })
   })
 
-  it('has the neutral stops outside the hue bands', () => {
-    expect(NEUTRAL_CODE).toEqual({ darkGray: -721, white: 721, darkGrayOfParent: -722, lightGrayOfParent: 722, lightShadeOfParent: 723 })
-    expect(decodeHue(-721)).toEqual({ kind: 'neutral', neutral: 'darkGray' })
-    expect(decodeHue(723)).toEqual({ kind: 'neutral', neutral: 'lightShadeOfParent' })
-    expect([721, -722, 200, 0].map(isNeutralHue)).toEqual([true, true, false, false])
+  it('reads a code outside the bands (0, or one left from an older scheme) as a plain hue', () => {
+    expect(decodeHue(0)).toEqual({ hue: 0, tone: 'base' })
+    expect(decodeHue(-120)).toEqual({ hue: 240, tone: 'base' })
+    expect(decodeHue(725)).toEqual({ hue: 5, tone: 'base' })
+  })
+
+  it('has three brightnesses: darker, base, lighter', () => {
+    expect(TONES).toEqual(['dark', 'base', 'light'])
+    expect(TONE_NAME).toEqual({ dark: 'Darker', base: 'Base', light: 'Lighter' })
   })
 
   it('encodes every hue in every tone so that it decodes back', () => {
@@ -137,31 +137,28 @@ describe('hue codes', () => {
         const code = encodeHue(hue, tone)
         expect(code).toBeGreaterThanOrEqual(-720)
         expect(code).toBeLessThanOrEqual(720)
-        expect(decodeHue(code)).toEqual({ kind: 'hue', hue, tone })
+        expect(decodeHue(code)).toEqual({ hue, tone })
       }
     }
   })
 
   it('wraps a hue before it encodes it', () => {
-    expect(encodeHue(370, 'saturated')).toBe(10)
+    expect(encodeHue(370, 'base')).toBe(10)
     expect(encodeHue(-10, 'light')).toBe(710)
-    expect(encodeHue(0, 'saturated')).toBe(360) // red is 360: 0 itself is desaturated
+    expect(encodeHue(0, 'base')).toBe(360) // red is 360: 0 is not a hue code
   })
 
   it("keeps a hue's tone when only the hue changes", () => {
     expect(hueInToneOf(100, encodeHue(20, 'dark'))).toBe(encodeHue(100, 'dark'))
-    expect(hueInToneOf(100, NEUTRAL_CODE.white)).toBe(100) // a neutral has no tone: saturated
     expect(hueInToneOf(100, null)).toBe(100)
-    expect([toneOf(encodeHue(5, 'light')), toneOf(721)]).toEqual(['light', null])
-    expect([hueOfCode(encodeHue(40, 'dark')), hueOfCode(722, 90), hueOfCode(721, 90)]).toEqual([40, 90, 0])
+    expect(toneOf(encodeHue(5, 'light'))).toBe('light')
+    expect(hueOfCode(encodeHue(40, 'dark'))).toBe(40)
   })
 
   it('holds a code in a window round its parent hue, keeping the tone', () => {
-    expect(clampCodeToWindow(200, encodeHue(300, 'dark'), 200)).toBe(encodeHue(260, 'dark'))
-    expect(clampCodeToWindow(200, encodeHue(230, 'light'), 200)).toBe(encodeHue(230, 'light'))
-    expect(clampCodeToWindow(200, 722, 150)).toBe(722) // a stop of the parent stays
-    expect(clampCodeToWindow(200, 721, 150)).toBe(150) // a free neutral cannot sit in a window
-    expect(clampCodeToWindow(10, encodeHue(340, 'desaturated'), 10)).toBe(encodeHue(340, 'desaturated')) // across the 0/360 wrap
+    expect(clampCodeToWindow(200, encodeHue(300, 'dark'))).toBe(encodeHue(260, 'dark'))
+    expect(clampCodeToWindow(200, encodeHue(230, 'light'))).toBe(encodeHue(230, 'light'))
+    expect(clampCodeToWindow(10, encodeHue(340, 'base'))).toBe(encodeHue(340, 'base')) // across the 0/360 wrap
   })
 })
 
@@ -170,69 +167,54 @@ describe('tones as colours', () => {
   const day = { s: ZONE_LOOKS.day.themeS, l: ZONE_LOOKS.day.themeL }
   const night = { s: ZONE_LOOKS.night.themeS, l: ZONE_LOOKS.night.themeL }
 
-  it('draws a saturated hue exactly as a plain hue always was', () => {
+  it('draws a base hue exactly as a plain hue always was', () => {
     expect(toneHsl(200, day)).toEqual({ h: 200, s: day.s, l: day.l })
     expect(themeColorCss(200)).toBe('hsl(200, var(--color-theme-s), var(--color-theme-l))')
     expect(accentColorCss(200)).toBe('hsl(200, var(--color-accent-s), var(--color-accent-l))')
     expect(themeColorCss('var(--color-theme-h)')).toBe('hsl(var(--color-theme-h), var(--color-theme-s), var(--color-theme-l))')
   })
 
-  it('steps the other tones from the zone: dark is lower, light is higher, desaturated has less colour', () => {
+  it('has one saturation for every brightness: only the lightness steps from the zone', () => {
     const at = (tone: Tone, basis = day) => toneHsl(encodeHue(200, tone), basis)
-    expect(at('dark').l).toBeLessThan(at('saturated').l)
-    expect(at('light').l).toBeGreaterThan(at('saturated').l)
-    expect(at('desaturated').s).toBeLessThan(at('saturated').s)
-    expect(at('desaturated').l).toBe(at('saturated').l)
+    expect(at('dark').l).toBeLessThan(at('base').l)
+    expect(at('light').l).toBeGreaterThan(at('base').l)
+    expect([at('dark').s, at('base').s, at('light').s]).toEqual([day.s, day.s, day.s])
     // At night the whole set is darker, but never black.
-    expect(at('saturated', night).l).toBeLessThan(at('saturated').l)
+    expect(at('base', night).l).toBeLessThan(at('base').l)
     expect(at('dark', night).l).toBeGreaterThanOrEqual(8)
     expect(at('light').l).toBeLessThanOrEqual(94)
   })
 
-  it('has a neutral with no saturation, whose lightness follows the zone', () => {
-    expect(toneHsl(NEUTRAL_CODE.darkGray, day).s).toBe(0)
-    expect(toneHsl(NEUTRAL_CODE.darkGray, night).l).toBeLessThan(toneHsl(NEUTRAL_CODE.darkGray, day).l)
-    expect(toneHsl(NEUTRAL_CODE.white, night)).toEqual({ h: 0, s: 0, l: 94 })
-    expect(themeColorCss(NEUTRAL_CODE.white)).toBe('hsl(0, 0%, 94%)')
-  })
-
-  it('draws the stops of the parent from the parent hue', () => {
-    expect(toneHsl(NEUTRAL_CODE.darkGrayOfParent, day, 200)).toMatchObject({ h: 200, s: 10 })
-    expect(toneHsl(NEUTRAL_CODE.lightGrayOfParent, day, 200)).toMatchObject({ h: 200, s: 10 })
-    expect(toneHsl(NEUTRAL_CODE.lightShadeOfParent, day, 200)).toMatchObject({ h: 200, s: day.s })
-    expect(toneHsl(NEUTRAL_CODE.lightShadeOfParent, day, 200).l).toBeGreaterThanOrEqual(85)
-    expect(themeColorCss(NEUTRAL_CODE.lightGrayOfParent, 120)).toContain('hsl(120, 10%')
-  })
-
-  it('writes the tones as CSS that follows the zone variables', () => {
+  it('writes the tones as CSS that follows the zone variables, all at the zone saturation', () => {
     expect(themeColorCss(encodeHue(200, 'dark'))).toBe('hsl(200, var(--color-theme-s), clamp(8%, calc(var(--color-theme-l) - 18%), 100%))')
-    expect(themeColorCss(encodeHue(200, 'desaturated'))).toBe('hsl(200, calc(var(--color-theme-s) * 0.45), var(--color-theme-l))')
+    expect(themeColorCss(encodeHue(200, 'base'))).toBe('hsl(200, var(--color-theme-s), var(--color-theme-l))')
     expect(accentColorCss(encodeHue(200, 'light'))).toBe('hsl(200, var(--color-accent-s), clamp(0%, calc(var(--color-accent-l) + 22%), 94%))')
+  })
+
+  it('draws a panel fill at one saturation (a little under the accent) and a step darker, in every brightness', () => {
+    expect(fillColorCss(200)).toBe('hsl(200, calc(var(--color-accent-s) * 0.62), clamp(0%, calc(var(--color-accent-l) - 8%), 100%))')
+    for (const tone of TONES) expect(fillColorCss(encodeHue(200, tone))).toContain('calc(var(--color-accent-s) * 0.62)')
   })
 
   it('draws a cover in the code colour', () => {
     expect(coverColor(DEFAULT_PALETTE, 'day', encodeHue(200, 'light'))).toEqual(toneHsl(encodeHue(200, 'light'), day))
-    expect(coverColor(DEFAULT_PALETTE, 'day', NEUTRAL_CODE.white)).toEqual({ h: 0, s: 0, l: 94 })
   })
 
   it('knows which colours are light enough to need dark text', () => {
-    expect([encodeHue(10, 'light'), 721, 722, 723, 200, encodeHue(10, 'dark'), -721, -722].map(isLightColor))
-      .toEqual([true, true, true, true, false, false, false, false])
+    expect([encodeHue(10, 'light'), 200, encodeHue(10, 'dark')].map(isLightColor)).toEqual([true, false, false])
   })
 
-  it('is a saturated hue for a legacy hex colour, and the default for none', () => {
+  it('is a base hue for a legacy hex colour, and the default for none', () => {
     expect(bookThemeHue({ color: '#ff0000' })).toBe(360) // red is 360, not 0
     expect(bookThemeHue({ color: '#00ff00' })).toBe(120)
     expect(bookThemeHue({ themeHue: -500, color: '#00ff00' })).toBe(-500)
     expect(bookThemeHue({})).toBe(DEFAULT_BOOK_HUE)
   })
 
-  it('tints a book scope with the hue, and takes the saturation away only for the free neutrals', () => {
+  it('tints a book scope with the hue, at the zone saturation whatever the brightness', () => {
     const vars = (code: number) => bookScopeVars(DEFAULT_PALETTE, 'day', 'user', code)
+    const zoneS = deriveTokens(DEFAULT_PALETTE, 'user', 'day')['--color-theme-s']
     expect(vars(encodeHue(200, 'dark'))['--color-theme-h']).toBe('200')
-    expect(vars(encodeHue(200, 'dark'))['--color-theme-s']).toBe(deriveTokens(DEFAULT_PALETTE, 'user', 'day')['--color-theme-s'])
-    expect(vars(NEUTRAL_CODE.darkGray)['--color-theme-s']).toBe('0%')
-    expect(vars(NEUTRAL_CODE.white)['--color-accent-s']).toBe('0%')
-    expect(vars(200)['--color-theme-s']).not.toBe('0%')
+    for (const tone of TONES) expect(vars(encodeHue(200, tone))['--color-theme-s']).toBe(zoneS)
   })
 })

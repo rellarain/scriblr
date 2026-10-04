@@ -565,16 +565,16 @@ awareness that the app above already existed:
   60° of their book and chapters within 60° of their arc (each node's `themeHue`);
   one with no hue shows its parent's, new ones take a hue spread away from their
   siblings', and changing a parent pulls its children back inside their window.
-  A colour is one stored number holding a hue and a tone (`theme/bookColors.ts`, mirrored in
-  `backend/app/storage/schema.py`): 1..360 saturated, -360..0 desaturated, 361..720 light
-  saturated, -720..-361 dark saturated, plus neutral stops -721 dark gray, 721 white and, "of
-  the parent", -722 dark gray, 722 light gray, 723 light shade. The tones are steps from the active
-  time zone's own theme saturation and lightness. The hue slider (`HueSlider.tsx`,
-  `components/ColorRange.tsx`) has two forms: unlimited (project, book, plot category) runs dark
-  gray, four 360° wheels (dark, saturated, desaturated, light) and white; limited (series, arc,
-  chapter, plot subcategory) runs the stops of the parent and the same four tones of the ±60°
-  window round the parent's hue. A parent with no hue (a neutral) gives its children the
-  unlimited slider. Projects saved before the tones (`hueScheme` 1) are converted once on load.
+  A colour is one stored number holding a hue and a brightness (`theme/bookColors.ts`, mirrored in
+  `backend/app/storage/schema.py`): 1..360 base, 361..720 lighter, -720..-361 darker. Every colour
+  has the same saturation (the active time zone's own theme saturation); only the lightness steps
+  from the zone's. The hue slider (`HueSlider.tsx`, `components/ColorRange.tsx`) has three bands,
+  darker, base, lighter, in two forms: unlimited (project, book, plot category) runs the whole
+  360° wheel in each band; limited (series, arc, chapter, plot subcategory) runs the ±60° window
+  round the parent's hue in each. Projects saved with earlier schemes (`hueScheme` 1 and 2: plain
+  hues and swatches, then desaturated and gray/white stops) are converted once on load, before
+  validation: a desaturated hue becomes the same hue at base, and gray, white and the "of the
+  parent" stops go back to no colour of their own (the parent's, or the default).
   A book has just the one colour. The levels are flat, square panels filled with their colour at the accent's
   saturation (a little less loud) and lightness; what sits inside steps one shade deeper each time. At Outline focus the book
   panel bleeds to the top, bottom and right edges; at Draft focus the whole screen is the book's colour (very light by day,

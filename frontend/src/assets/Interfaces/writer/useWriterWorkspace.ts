@@ -19,9 +19,9 @@ import {
 import { awarenessNext } from './awareness'
 import { combineSaveStatus, useAutosave } from '../../../lib/useAutosave'
 import { insertAfter } from '../../../lib/siblingOrder'
-import { DEFAULT_BOOK_HUE, encodeHue, fillColorCss, hueOfCode, isNeutralHue, toneOf } from '../../../theme/bookColors'
+import { DEFAULT_BOOK_HUE, encodeHue, fillColorCss, hueOfCode, toneOf } from '../../../theme/bookColors'
 import { useThemeState } from '../../../theme/useTheme'
-import { autoPickHue, defaultProjectHue, fitToParent, hueCentre, levelColor, levelHue, levelTint, reconcileHues } from './levelHues'
+import { autoPickHue, defaultProjectHue, fitToParent, hueCentre, levelHue, levelTint, reconcileHues } from './levelHues'
 
 type AsyncStatus = 'idle' | 'loading' | 'error'
 
@@ -111,11 +111,11 @@ export function useWriterWorkspace() {
   projectHueRef.current = projectHue
   const hueNodes = useMemo(() => new Map(outlineNodes.map(n => [n.id, n])), [outlineNodes])
   const levelHueOf = (node: OutlineNode): number => levelHue(node, hueNodes, projectHue)
-  // The node's colour as CSS (its tone, and for the stops of the parent the parent's hue).
+  // The node's colour as CSS (its brightness).
   const levelTintOf = (node: OutlineNode): string => levelTint(node, hueNodes, projectHue)
   // The same colour as a panel's flat fill (the accent's saturation and lightness).
-  const levelFillOf = (node: OutlineNode): string => { const c = levelColor(node, hueNodes, projectHue); return fillColorCss(c.code, c.parentHue) }
-  // The hue a node's own hue must stay within 60 degrees of; null for a book (any hue) or a parent with no hue.
+  const levelFillOf = (node: OutlineNode): string => fillColorCss(levelHue(node, hueNodes, projectHue))
+  // The hue a node's own hue must stay within 60 degrees of; null for a book (any hue).
   const hueCentreOf = (node: OutlineNode): number | null => hueCentre(node, hueNodes, projectHue)
 
   const activeConsole: WuiConsole = !hasOpenProject || view === 'shelves' ? 'shelves' : view === 'project' ? 'shelf' : view
@@ -443,13 +443,12 @@ export function useWriterWorkspace() {
       const parent = parentId ? map.get(parentId) : undefined
       const parentCode = parent ? levelHue(parent, map, projectHueRef.current) : projectHueRef.current
       const centre = hueCentre(node, map, projectHueRef.current)
-      // Under a parent with no hue there is nothing to spread round: the new node just shows its parent's.
       if (centre !== null) {
         const siblingHues = prev
-          .filter(n => n.parentId === parentId && n.kind === kind && n.themeHue != null && !isNeutralHue(n.themeHue))
+          .filter(n => n.parentId === parentId && n.kind === kind && n.themeHue != null)
           .map(n => hueOfCode(n.themeHue as number))
-        // It takes the parent's tone, at a hue spread away from its siblings'.
-        node.themeHue = encodeHue(autoPickHue(centre, siblingHues), toneOf(parentCode) ?? 'saturated')
+        // It takes the parent's brightness, at a hue spread away from its siblings'.
+        node.themeHue = encodeHue(autoPickHue(centre, siblingHues), toneOf(parentCode))
       }
     }
     commitOutline(afterId ? insertAfter(prev, node, afterId, n => n.parentId === parentId) : [...prev, node], true)
@@ -468,9 +467,7 @@ export function useWriterWorkspace() {
     const target = prev.find(n => n.id === nodeId)
     if (!target || (target.kind !== 'series' && target.kind !== 'book' && target.kind !== 'arc' && target.kind !== 'chapter')) return
     const map = new Map(prev.map(n => [n.id, n]))
-    const parent = target.parentId ? map.get(target.parentId) : undefined
-    const parentCode = parent ? levelHue(parent, map, projectHueRef.current) : projectHueRef.current
-    const value = fitToParent(Math.round(code), parentCode, hueCentre(target, map, projectHueRef.current))
+    const value = fitToParent(Math.round(code), hueCentre(target, map, projectHueRef.current))
     const next = prev.map(n => (n.id === nodeId ? { ...n, themeHue: value } : n))
     commitOutline(reconcileHues(next, projectHueRef.current), false)
   }
@@ -565,18 +562,17 @@ export function useWriterWorkspace() {
     const target = prev.find(n => n.id === nodeId)
     if (!target || (target.kind !== 'category' && target.kind !== 'subcategory')) return
     const rounded = Math.round(code)
-    const centreOf = (parentCode: number) => (isNeutralHue(parentCode) ? null : hueOfCode(parentCode))
     if (target.kind === 'category') {
       commitPlot(prev.map(n => {
         if (n.id === nodeId) return { ...n, hue: rounded }
-        if (n.parentId === nodeId && n.kind === 'subcategory' && n.hue != null) return { ...n, hue: fitToParent(n.hue, rounded, centreOf(rounded)) }
+        if (n.parentId === nodeId && n.kind === 'subcategory' && n.hue != null) return { ...n, hue: fitToParent(n.hue, hueOfCode(rounded)) }
         return n
       }), false)
       return
     }
     const parent = target.parentId ? prev.find(n => n.id === target.parentId) : undefined
     const parentCode = parent?.hue ?? categoryCode
-    const value = parentCode != null ? fitToParent(rounded, parentCode, centreOf(parentCode)) : rounded
+    const value = parentCode != null ? fitToParent(rounded, hueOfCode(parentCode)) : rounded
     commitPlot(prev.map(n => {
       if (n.id === nodeId) return { ...n, hue: value }
       if (parent && n.id === parent.id && parent.hue == null && parentCode != null) return { ...n, hue: parentCode }

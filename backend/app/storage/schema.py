@@ -14,18 +14,17 @@ def utcnow() -> datetime:
 
 
 # A level colour (OutlineNode.themeHue, ProjectSettings.themeHue, PlotNode.hue) is one number that holds
-# a hue AND a tone (mirrors the frontend's theme/bookColors.ts):
-#    1..360     saturated        (hue = value mod 360)
-#  -360..0      desaturated      (hue = -value)
-#   361..720    light saturated  (hue = value - 360)
-#  -720..-361   dark saturated   (hue = -value - 360)
-# and a few neutral stops that have no hue of their own: -721 dark gray, 721 white, -722 dark gray
-# of the parent, 722 light gray of the parent, 723 light shade of the parent.
-# Projects saved before this (hueScheme 1) held a plain hue 0-360 plus swatches 361-364
-# (brown, black, gray, white); they are converted once on load (see project_store).
-MIN_LEVEL_HUE = -724
-MAX_LEVEL_HUE = 724
-HUE_SCHEME = 2
+# a hue AND a brightness (mirrors the frontend's theme/bookColors.ts). Every colour has the same
+# saturation (the active time-of-day zone's own); only the brightness differs:
+#    1..360     base      (hue = value mod 360)
+#   361..720    lighter   (hue = value - 360)
+#  -720..-361   darker    (hue = -value - 360)
+# Earlier schemes are converted once on load (see project_store): hueScheme 1 held a plain hue 0-360 plus
+# swatches 361-364 (brown, black, gray, white); hueScheme 2 also had a desaturated band (-360..0) and
+# neutral stops (+-721..723), neither of which exists any more.
+MIN_LEVEL_HUE = -720
+MAX_LEVEL_HUE = 720
+HUE_SCHEME = 3
 
 _HEX_COLOR = re.compile(r"^#?([0-9a-fA-F]{6})$")
 
@@ -243,7 +242,7 @@ class OutlineNode(BaseModel):
         if self.themeHue is None:
             hue = hex_to_hue(self.color)
             if hue is not None:
-                # A saturated hue (0 degrees is 360 here: 0 itself is a desaturated red).
+                # A base hue (0 degrees is 360 here: 0 itself is not a hue code).
                 self.themeHue = hue or 360
         return self
 

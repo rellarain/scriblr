@@ -363,6 +363,9 @@ def _load_project_file_locked(root: Path, project_id: str) -> tuple[ProjectFile,
 
     errors: dict[str, ShardCorruptError] = {}
 
+    # Old colour codes are converted before anything is validated: the current bounds would refuse them.
+    _upgrade_raw_hues(raw)
+
     try:
         index = ProjectIndex.model_validate(raw.get("index"))
     except ValidationError as e:
@@ -371,7 +374,7 @@ def _load_project_file_locked(root: Path, project_id: str) -> tuple[ProjectFile,
 
     pf = ProjectFile(
         schemaVersion=raw.get("schemaVersion", SCHEMA_VERSION),
-        hueScheme=raw.get("hueScheme", 1),
+        hueScheme=raw.get("hueScheme", HUE_SCHEME),
         index=index,
         outline=_parse_section_default(raw, "outline", OutlineTree, project_dir, path, errors, OutlineTree()),
         plot=_parse_section_default(raw, "plot", PlotTree, project_dir, path, errors, PlotTree()),
@@ -388,52 +391,70 @@ def _load_project_file_locked(root: Path, project_id: str) -> tuple[ProjectFile,
         ),
         scrap=_parse_section_default(raw, "scrap", ScrapRegistry, project_dir, path, errors, ScrapRegistry()),
     )
-    if pf.hueScheme < HUE_SCHEME:
-        _migrate_hue_scheme(pf)
     return pf, errors
 
 
 # ---------------------------------------------------------------------------
-# One-time migration of the level colours (hueScheme 1 -> 2).
+# One-time migration of the level colours (hueScheme 1 -> 2 -> 3).
 # ---------------------------------------------------------------------------
 
-# Scheme 1 stored a plain hue 0-360 and four neutral swatches. Scheme 2 packs a tone into the number
-# (see schema.py), so 0 (a red) becomes 360, and the swatches move: brown -> a dark saturated orange,
-# black -> dark gray, gray -> a desaturated hue, white -> white.
+# Scheme 1 stored a plain hue 0-360 and four neutral swatches. Scheme 2 packed a tone into the number,
+# so 0 (a red) became 360, and the swatches moved: brown -> a dark orange, black -> dark gray, gray -> a
+# desaturated hue, white -> white.
 _LEGACY_SWATCHES = {361: -388, 362: -721, 363: 0, 364: 721}
+# Scheme 3 has brightness only (darker, base, lighter, all at the zone's one saturation). The neutral
+# stops (dark gray, white, and the three "of the parent" stops) have no hue, so they go back to "no
+# colour of its own" (the parent's, or the default); a desaturated hue becomes the same hue at base.
+_NEUTRALS = {-721, 721, -722, 722, 723}
 
 
-def _upgrade_hue(value):
+def _upgrade_hue(value, scheme: int):
     if not isinstance(value, int) or isinstance(value, bool):
         return value
-    if value in _LEGACY_SWATCHES:
-        return _LEGACY_SWATCHES[value]
-    return 360 if value == 0 else value
+    if scheme < 2:
+        if value in _LEGACY_SWATCHES:
+            value = _LEGACY_SWATCHES[value]
+        elif value == 0:
+            value = 360
+    if scheme < 3:
+        if value in _NEUTRALS or value == 0:  # 0 is the old gray swatch (or a desaturated red at the very start)
+            return None
+        if -360 <= value < 0:  # desaturated: the same hue at base
+            return (-value) % 360 or 360
+    return value
 
 
-def _upgrade_nodes(nodes, key: str) -> None:
+def _upgrade_nodes(nodes, key: str, scheme: int) -> None:
+    if not isinstance(nodes, list):
+        return
     for node in nodes:
         if isinstance(node, dict) and node.get(key) is not None:
-            node[key] = _upgrade_hue(node[key])
+            node[key] = _upgrade_hue(node[key], scheme)
 
 
-def _migrate_hue_scheme(pf: ProjectFile) -> None:
-    """Convert every stored level colour to the current scheme, in memory (the next write keeps it).
-    Idempotent through `hueScheme`: a file already at the current scheme is left alone."""
-    for node in pf.outline.nodes:
-        if node.themeHue is not None:
-            node.themeHue = _upgrade_hue(node.themeHue)
-    for node in pf.plot.nodes:
-        if node.hue is not None:
-            node.hue = _upgrade_hue(node.hue)
-    if pf.index.settings.themeHue is not None:
-        pf.index.settings.themeHue = _upgrade_hue(pf.index.settings.themeHue)
+def _upgrade_raw_hues(raw: dict) -> None:
+    """Convert every stored level colour in a just-read project.json to the current scheme, in place (the
+    next write keeps it). Idempotent through `hueScheme`: a file already at the current scheme is left
+    alone. It works on the raw JSON, ahead of validation, because the current bounds refuse old codes."""
+    scheme = raw.get("hueScheme", 1)
+    if not isinstance(scheme, int) or scheme >= HUE_SCHEME:
+        return
+    index = raw.get("index")
+    settings = index.get("settings") if isinstance(index, dict) else None
+    if isinstance(settings, dict) and settings.get("themeHue") is not None:
+        settings["themeHue"] = _upgrade_hue(settings["themeHue"], scheme)
+    for section, key in (("outline", "themeHue"), ("plot", "hue")):
+        tree = raw.get(section)
+        if isinstance(tree, dict):
+            _upgrade_nodes(tree.get("nodes"), key, scheme)
     # Kept snapshots hold raw nodes: restoring one must not bring old colours back.
-    for snapshot in pf.outlineHistory:
-        _upgrade_nodes(snapshot.nodes, "themeHue")
-    for snapshot in pf.plotHistory:
-        _upgrade_nodes(snapshot.nodes, "hue")
-    pf.hueScheme = HUE_SCHEME
+    for history, key in (("outlineHistory", "themeHue"), ("plotHistory", "hue")):
+        snapshots = raw.get(history)
+        if isinstance(snapshots, list):
+            for snapshot in snapshots:
+                if isinstance(snapshot, dict):
+                    _upgrade_nodes(snapshot.get("nodes"), key, scheme)
+    raw["hueScheme"] = HUE_SCHEME
 
 
 def _mutate(root: Path, project_id: str, fn: Callable[[ProjectFile], None]) -> ProjectFile:

@@ -1,6 +1,7 @@
 import { fireEvent, render, screen } from '@testing-library/react'
 import { describe, expect, it, vi } from 'vitest'
-import { ColorRange, resultColor, toneLayout, toneName, toneTrackGradient, trackGradient } from './ColorRange'
+import { decodeHue, encodeHue } from '../theme/bookColors'
+import { ColorRange, resultColor, toneCodeToPos, toneLayout, toneName, tonePosToCode, toneTrackGradient, trackGradient } from './ColorRange'
 
 const basis = { sat: 40, light: 30 }
 
@@ -67,35 +68,43 @@ describe('ColorRange', () => {
 describe('the tone track', () => {
   const zone = { sat: 30, light: 86 } // the day zone's theme look
 
-  it('lays out the unlimited and the limited tracks end to end', () => {
-    for (const limited of [false, true]) {
-      const layout = toneLayout(limited)
-      expect(layout[0].from).toBe(0)
-      expect(layout.at(-1)!.to).toBe(1)
-      layout.slice(1).forEach((seg, i) => expect(seg.from).toBeCloseTo(layout[i].to, 10))
-    }
-    expect(toneLayout(false)).toHaveLength(6)
-    expect(toneLayout(true)).toHaveLength(7)
+  it('lays out three brightness bands, darker, base, lighter, end to end', () => {
+    const layout = toneLayout()
+    expect(layout.map(s => s.tone)).toEqual(['dark', 'base', 'light'])
+    expect(layout[0].from).toBe(0)
+    expect(layout.at(-1)!.to).toBe(1)
+    layout.slice(1).forEach((seg, i) => expect(seg.from).toBeCloseTo(layout[i].to, 10))
   })
 
-  it('draws a flat dark gray block, then each tone round the wheel starting at orange, then white', () => {
+  it('draws each band round the wheel starting at orange, at one saturation and its own brightness', () => {
     const g = toneTrackGradient(zone, null)
-    expect(g.startsWith('linear-gradient(to right, hsl(0, 0%, 46%) 0.00%, hsl(0, 0%, 46%) 3.00%')).toBe(true) // dark gray at day: 86 - 40
-    expect(g).toContain('hsl(28, 30%, 68%) 3.00%') // the dark wheel starts at orange, 18 points darker
-    expect(g).toContain('hsl(28, 30%, 86%) 26.50%') // the saturated wheel starts at the same orange
-    expect(g).toContain('hsl(28, 14%, 86%)') // the desaturated wheel's colour
-    expect(g.endsWith('hsl(0, 0%, 94%) 100.00%)')).toBe(true)
+    expect(g.startsWith('linear-gradient(to right, hsl(28, 30%, 68%) 0.00%')).toBe(true) // darker: 18 points under the zone
+    expect(g).toContain('hsl(28, 30%, 86%) 33.33%') // base starts at the same orange
+    expect(g).toContain('hsl(28, 30%, 94%) 66.67%') // lighter (22 more, held to 94)
+    expect(g.match(/hsl\(\d+, (\d+)%/g)!.every(c => c.includes(', 30%'))).toBe(true) // never another saturation
   })
 
-  it('draws the limited track round the parent hue, with its stops from that hue', () => {
+  it('draws the limited track as the three windows round the parent hue', () => {
     const g = toneTrackGradient(zone, 210)
-    expect(g).toContain('hsl(210, 10%, 46%) 0.00%') // dark gray of the parent
-    expect(g).toContain('hsl(150, 30%, 86%)') // the window starts 60 degrees before the parent hue
-    expect(g).toContain('hsl(270, 30%, 86%)')
-    expect(g.endsWith('hsl(210, 30%, 94%) 100.00%)')).toBe(true) // light shade of the parent
+    expect(g).toContain('hsl(150, 30%, 68%) 0.00%')
+    expect(g).toContain('hsl(270, 30%, 86%) 66.67%')
+    expect(g).toContain('hsl(210, 30%, 94%)') // the parent hue itself, lighter, in the middle of the last band
+  })
+
+  it('puts every code on the track and reads it back, on both tracks', () => {
+    for (const centre of [null, 210]) {
+      for (const tone of ['dark', 'base', 'light'] as const) {
+        for (const hue of centre === null ? [0, 28, 100, 200, 300, 359] : [150, 180, 210, 240, 270]) {
+          const code = encodeHue(hue, tone)
+          const back = decodeHue(tonePosToCode(toneCodeToPos(code, centre), centre))
+          expect(back.tone).toBe(tone)
+          expect(Math.abs(((back.hue - hue + 540) % 360) - 180)).toBeLessThanOrEqual(2)
+        }
+      }
+    }
   })
 
   it('names a code', () => {
-    expect([toneName(200), toneName(721), toneName(722)]).toEqual(['Saturated, hue 200', 'White', 'Light gray of the parent'])
+    expect([toneName(200), toneName(encodeHue(30, 'dark')), toneName(encodeHue(30, 'light'))]).toEqual(['Base, hue 200', 'Darker, hue 30', 'Lighter, hue 30'])
   })
 })
