@@ -29,3 +29,18 @@ export interface ChapterMeta {
   edited: string | null
   published: string | null
 }
+
+// A chapter's dates: created (its own, else the project's), last edited (when it has draft text),
+// and the newest publication.
+export function chapterDatesOf(
+  chapter: { createdAt?: string | null },
+  project: { createdAt?: string | null } | null | undefined,
+  edited: string | null,
+  publications: Array<{ publishedAt: string }>,
+): ChapterMeta {
+  return {
+    created: chapter.createdAt ?? project?.createdAt ?? null,
+    edited,
+    published: latestOf(publications.map(p => p.publishedAt)),
+  }
+}

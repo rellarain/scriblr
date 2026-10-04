@@ -52,7 +52,6 @@
     &--accent { background: var(--wr-accent); }
     &--light { background: hsl(var(--color-accent-h), 18%, calc(var(--paper-l) - 9% * var(--paper-dir))); color: var(--wr-ink); &:hover:not(:disabled) { background: hsl(var(--color-accent-h), 90%, calc(var(--paper-l) - 11% * var(--paper-dir))); } }
   }
-  .wrLinkBtn { font-size: 11px; opacity: 0.8; &:hover { opacity: 1; } &--title { font-size: 14px; font-weight: 700; opacity: 1; } }
 
   // A quiet trash icon; on confirm the message replaces it in place.
   .wrTrashBtn {
@@ -141,14 +140,6 @@
     .wrSmallBtn { justify-content: center; padding: 8px; }
   }
 
-  // The sidebar's Project / Book / Chapter panels are tiles (components/tiles): raised, rounded, hairline.
-  .wrPanel { background: linear-gradient(160deg, var(--surface-raised-a), var(--surface-raised-b)); border-radius: 10px; box-shadow: inset 0 0 0 1px var(--hairline); }
-  .wrPanelHeaderRow { display: flex; align-items: center; padding-right: 10px; }
-  .wrPanelHeader { display: flex; align-items: center; gap: 8px; flex: 1 1 auto; min-width: 0; padding: 8px 10px; text-align: left; }
-  .wrPanelValue--link { flex: 0 1 auto; min-width: 0; margin-left: auto; padding: 8px 0; &:hover { opacity: 0.8; } }
-  .wrPanelLabel { font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: 1px; opacity: 0.7; }
-  .wrPanelValue { font-size: 12px; font-weight: 600; margin-left: auto; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-  .wrPanelBody { padding: 0 12px 12px 12px; display: flex; flex-direction: column; gap: 5px; font-size: 12px; line-height: 1.4; }
   .wrPanelHead { margin-top: 4px; font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: 1px; opacity: 0.6; }
   .wrPanelText { opacity: 0.9; }
   .wrKv { display: flex; justify-content: space-between; gap: 10px; span:first-child { opacity: 0.6; } span:last-child { text-align: right; } }
@@ -170,6 +161,17 @@
   // the project's, book's or chapter's hue; levelHues.ts).
   .wrLevels { flex: 1 1 auto; min-width: 0; height: 100%; box-sizing: border-box; display: flex; flex-direction: row; gap: 10px; padding: 10px; }
   .wrLevelsSide { flex: 0 0 clamp(280px, 32%, 460px); min-width: 0; min-height: 0; display: flex; flex-direction: column; gap: 10px; }
+  // Draft focus: the open book is the whole Writer. Its left page runs under the Dash, Project and Outline tiles
+  // (the tile column is laid over it), with the chapter beside them, then the crease and the right page.
+  .wrLevels--focus-draft {
+    --wr-side-w: clamp(280px, 32%, 460px);
+    display: grid; grid-template-columns: var(--wr-side-w) minmax(0, 1fr); grid-template-rows: minmax(0, 1fr);
+    > .wrLevelsSide { grid-column: 1; grid-row: 1; position: relative; z-index: 2; }
+    .wrLevel--draft { grid-column: 1 / -1; grid-row: 1; }
+    .wrChapterTile { padding-left: calc(var(--wr-side-w) + 24px); }
+    .wrLevel--draft .wrLevelBody { padding-left: 0; }
+    .wrSpreadLeft { padding-left: calc(var(--wr-side-w) + 30px); }
+  }
   .wrLevels--focus-dash > .wrLevel--dash { flex: 2 1 0; }
   .wrLevels--focus-dash > .wrLevel--project { flex: 1 1 0; }
   .wrLevel {
@@ -194,11 +196,9 @@
   .wrLevelMinBody { padding: 8px 14px 12px; display: flex; flex-direction: column; gap: 12px; overflow-y: auto; scrollbar-width: none; &::-webkit-scrollbar { display: none; } }
   .wrNodeHue { max-width: 360px; margin: 2px 0; }
   .wrOutlineMid { display: flex; flex-direction: column; gap: 5px; font-size: 12px; line-height: 1.4; padding-top: 8px; }
-  // The book editor has no title row of its own; the chapter page and Preview run their paper flush to the right
-  // edge, so the chapter tabs sit against it (like the book cover's).
+  // The Outline and Draft pages run their paper flush to the right edge, so the edge tabs sit against it.
   .wrLevel--outline.wrLevel--max .wrLevelBody { padding: 0 6px 0 10px; }
-  .wrLevel--draft .wrLevelBody { padding: 0 0 14px 10px; > .wrTitleRow { padding-right: 16px; } }
-  .wrLevel--draft .wrPreviewToolbar { padding-right: 16px; }
+  .wrLevel--draft .wrLevelBody { padding: 0 0 14px 10px; }
   .wrConsoleBody--tiles { overflow: hidden; }
   .wrConsoleBody { flex: 1 1 auto; min-height: 0; display: flex; flex-direction: column; overflow-y: auto; scrollbar-width: none; &::-webkit-scrollbar { display: none; } }
 
@@ -383,17 +383,6 @@
   .wrPlotChipX { display: inline-flex; align-items: center; justify-content: center; width: 20px; height: 20px; border-radius: 4px; color: inherit; &:hover { background: var(--ov-lift-2); } }
   .wrOutlinePanel { flex: 1 1 auto; min-height: 0; display: flex; flex-direction: column; gap: 8px; background: rgb(0 0 0 / calc(0.16 * var(--shade-k))); border-radius: 8px; padding: 12px 14px; }
 
-  // ---------------------------------------------------------------- chapter tabs
-  .wrChapterTabs { flex: 0 0 38px; margin-left: -1px; padding-top: 28px; padding-bottom: 8px; box-sizing: border-box; max-height: 100%; display: flex; flex-direction: column; gap: 5px; overflow-y: auto; scrollbar-width: none; &::-webkit-scrollbar { display: none; } }
-  .wrChapterTab {
-    flex: 0 0 auto; width: 34px; height: 44px; border-radius: 0 8px 8px 0; display: flex; align-items: center; justify-content: center; font-size: 15px; font-weight: 700;
-    color: var(--on-accent); background: var(--wr-accent-dark); box-shadow: 1px 1px 3px rgb(0 0 0 / calc(0.3 * var(--shade-k))); margin-left: -1px;
-    &:hover { filter: brightness(1.15); }
-    &--add { height: 34px; background: rgb(0 0 0 / calc(0.25 * var(--shade-k))); box-shadow: none; margin-top: 3px; }
-  }
-  .wrChapterTabs--page .wrChapterTab { background: var(--wr-book); color: var(--ink); box-shadow: 1px 1px 3px rgb(0 0 0 / calc(0.3 * var(--shade-k))), inset 0 0 0 1px var(--ov-lift-2); }
-  .wrChapterTabs--page .wrChapterTab--active { width: 38px; margin-left: 0; background: var(--wr-accent); color: var(--on-accent); }
-  .wrChapterTabs--page .wrChapterTab--add { background: rgb(0 0 0 / calc(0.25 * var(--shade-k))); color: var(--ink); box-shadow: none; }
 
   // Project Editor: time systems.
   .wrTimeSystems { display: flex; flex-direction: column; gap: 14px; max-width: 760px; }
@@ -409,7 +398,6 @@
   .wrIconBtn { display: inline-flex; align-items: center; justify-content: center; width: 28px; height: 28px; border-radius: 4px; background: rgba(0, 0, 0, 0.3); color: white; &:hover { background: var(--wr-accent-light); } }
 
   // ---------------------------------------------------------------- pages
-  .wrPageWrap { flex: 1 1 auto; min-height: 0; display: flex; > .wrPage { flex: 1 1 auto; } }
   // The chapter's plotpoints (assigned to the chapter, not yet to an act, scene or moment), at the left of the Outline page.
   .wrChapterPoints { flex: 0 0 250px; min-width: 0; min-height: 0; display: flex; flex-direction: column; gap: 8px; padding: 26px 12px 16px 16px; border-right: 1px solid var(--wr-page-line); box-sizing: border-box; }
   .wrChapterPointsHead { display: flex; align-items: baseline; justify-content: space-between; font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: 1px; opacity: 0.75; }
@@ -425,7 +413,6 @@
   .wrPointTileTools { display: inline-flex; align-items: center; gap: 2px; flex: 0 0 auto; margin-left: auto; }
   .wrPointTileField { font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: 1.5px; }
   .wrPointTile--highlight { outline: 2px solid var(--wr-accent-light); outline-offset: 2px; }
-  .wrPointTileSep { opacity: 0.6; }
   .wrPointTileTrail { flex: 1 1 auto; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; text-align: left; font-size: 9px; letter-spacing: 0.3px; color: var(--ink-faint); }
   .wrPointTileX { display: inline-flex; align-items: center; justify-content: center; width: 16px; height: 16px; flex: 0 0 auto; border-radius: 3px; opacity: 0.55; &:hover { opacity: 1; background: var(--ov-lift-2); } }
   .wrPointTileLine { font-size: 11px; line-height: 1.35; color: color-mix(in srgb, var(--ink) 80%, transparent); overflow-wrap: anywhere; }
@@ -459,11 +446,8 @@
   .wrPlotNoteHead { align-items: flex-start; }
   .wrPlotNoteBody { flex: 1 1 auto; min-width: 0; display: flex; flex-direction: column; gap: 3px; }
   .wrPageScroll { flex: 1 1 auto; min-width: 0; min-height: 0; overflow-y: auto; padding: 26px 34px; box-sizing: border-box; display: flex; flex-direction: column; gap: 14px; }
-  .wrPageHead { display: flex; flex-direction: column; gap: 6px; border-bottom: 2px solid var(--wr-page-line); padding-bottom: 10px; flex: 0 0 auto; }
   .wrPageMetaRow { display: flex; flex-wrap: wrap; align-items: baseline; font-size: 11px; color: var(--wr-page-muted); > * + *::before { content: '\00b7'; margin: 0 8px; } }
   .wrPageKicker { font-size: 12px; font-weight: 700; text-transform: uppercase; letter-spacing: 1.5px; color: var(--wr-page-muted); }
-  .wrPageTitle { font-family: Georgia, 'Times New Roman', serif; font-size: 24px; font-weight: 700; }
-  .wrPageTitleInput { flex: 1; min-width: 0; background: transparent; border: 0; outline: none; font-family: Georgia, 'Times New Roman', serif; font-size: 24px; font-weight: 700; color: var(--wr-ink); padding: 0; &:focus { box-shadow: inset 0 -1px 0 var(--wr-accent); } &::placeholder { color: color-mix(in srgb, var(--wr-ink) 40%, transparent); } }
   .wrPageMuted { margin: 0; font-size: 13px; color: var(--paper-muted); }
   .wrPageError { margin: 0; font-size: 12px; color: var(--paper-error); }
 
@@ -484,7 +468,7 @@
   .wrChildren > .wrDropGap--open:first-child, .wrChildren > .wrDropGap--open:last-child { height: 12px; }
   .wrChildren > .wrDropGap--open.wrDropGap--empty { height: 30px; outline: 1px dashed var(--wr-accent); outline-offset: -1px; }
   .wrDropGap--over { background: color-mix(in srgb, var(--wr-accent) 30%, transparent); outline: 2px dashed var(--wr-accent); outline-offset: -2px; }
-  .wrOutlineCard { transition: outline-color 0.1s; &--dragging { opacity: 0.35; } &--over { outline: 2px dashed var(--wr-accent); outline-offset: 2px; } }
+  .wrOutlineCard { transition: outline-color 0.1s; &--dragging { opacity: 0.35; } }
   .wrActCard { background: hsl(var(--color-accent-h), 30%, calc(var(--paper-l) - 3% * var(--paper-dir))); border: 1px solid var(--wr-page-line); border-radius: 6px; padding: 12px; display: flex; flex-direction: column; gap: 10px; flex: 0 0 auto; }
   .wrSceneCard { background: hsl(var(--color-accent-h), 30%, calc(var(--paper-l) - 1% * var(--paper-dir))); border: 1px solid hsl(var(--color-accent-h), 18%, calc(var(--paper-l) - 11% * var(--paper-dir))); border-radius: 6px; padding: 10px 12px; display: flex; flex-direction: column; gap: 8px; }
   .wrActHead { display: flex; align-items: center; gap: 10px; }
@@ -530,22 +514,12 @@
   .wrNodeDescription { flex: 1 1 auto; min-width: 0; font-family: Georgia, 'Times New Roman', serif; font-size: 13px; font-style: italic; color: color-mix(in srgb, var(--wr-ink) 75%, transparent); &--empty { color: var(--paper-placeholder); } }
   .wrOutlineCard--readonly { cursor: default; }
 
-  // Draft mode: a moment's footer is a word-count bar that opens into the draft text.
-  .wrDraftFoot { display: flex; flex-direction: column; }
-  .wrDraftFootHead { display: flex; align-items: center; gap: 4px; }
-  .wrGrip--draft { padding: 2px 1px; }
   .wrFreeCard--readonly { display: flex; align-items: center; justify-content: space-between; gap: 10px; padding: 8px 10px; border: 1px dashed var(--wr-page-line); border-radius: 6px; }
   .wrFreeArea { display: flex; flex-direction: column; gap: 6px; }
   .wrPublishConfirm { display: inline-flex; align-items: center; gap: 6px; font-size: 11px; }
-  .wrDraftFootBar { display: flex; align-items: center; gap: 6px; align-self: flex-start; font-size: 11px; color: var(--wr-page-muted); padding: 2px 4px 2px 0; &:hover { color: var(--wr-ink); } }
-  .wrDraftFootBody { display: grid; grid-template-rows: 0fr; transition: grid-template-rows 0.35s ease; }
-  .wrDraftFoot--open .wrDraftFootBody { grid-template-rows: 1fr; }
-  .wrDraftFootInner { min-height: 0; overflow: hidden; padding-top: 0; }
-  .wrDraftFoot--open .wrDraftFootInner { padding-top: 6px; }
 
   // ---------------------------------------------------------------- outline level (Max)
   .wrOutlineMax { flex: 1 1 auto; min-height: 0; display: flex; flex-direction: column; gap: 8px; }
-  .wrOutlineMax > .wrOutlinePage { flex: 1 1 auto; }
 
   // The collapsible book editor.
   .wrBookEd { flex: 0 0 auto; border-radius: 6px; background: rgb(0 0 0 / calc(0.2 * var(--shade-k))); }
@@ -595,8 +569,72 @@
   .wrOutlineMid .wrPanelHead { display: flex; align-items: baseline; }
   .wrMidPoint { padding: 4px 8px 4px 12px; border-radius: 5px; background: var(--wr-cat, var(--wr-card)); box-shadow: inset 4px 0 0 var(--wr-sub, transparent); color: var(--ink); font-size: 12px; overflow-wrap: anywhere; }
 
+  // ---------------------------------------------------------------- draft level (Max): the open book
+  .wrDraftLevel { flex: 1 1 auto; min-height: 0; display: flex; flex-direction: column; gap: 6px; }
+  .wrDraftBody { flex: 1 1 auto; min-height: 0; display: flex; }
+  .wrDraftBody > .wrSpread { flex: 1 1 auto; }
+  .wrSpreadLeft { flex: 0 0 min(68%, calc(var(--wr-side-w, 0px) + 330px)); min-width: 230px; min-height: 0; overflow-y: auto; box-sizing: border-box; padding: 22px 16px 22px 26px; scrollbar-width: none; &::-webkit-scrollbar { display: none; } }
+  // The crease down the middle of the open book.
+  .wrCrease { flex: 0 0 18px; background: linear-gradient(90deg, transparent, rgb(0 0 0 / 0.12) 42%, rgb(0 0 0 / 0.24) 50%, rgb(0 0 0 / 0.12) 58%, transparent); }
+  .wrSpreadRight { flex: 1 1 0; min-width: 0; min-height: 0; display: flex; flex-direction: column; }
+  .wrSpreadScroll { flex: 1 1 auto; min-height: 0; overflow-y: auto; box-sizing: border-box; padding: 22px 26px 22px 6px; }
+  .wrDraftCards { display: flex; flex-direction: column; gap: 12px; }
+  .wrDraftChildren { gap: 10px; }
+  .wrFoldedCount { margin-left: auto; }
+
+  // The chapter title tile across the top of the Draft level: the titles above the chapter in their own colours, the
+  // chapter's title and synopsis (click to edit), its stats and dates, and the page tools at the right.
+  .wrChapterTile {
+    flex: 0 0 auto; display: flex; flex-direction: column; gap: 8px; padding: 10px 16px 12px 14px; box-sizing: border-box;
+    background: rgb(0 0 0 / calc(0.16 * var(--shade-k))); border-left: 5px solid var(--wr-node-tint, var(--wr-accent)); color: var(--ink);
+  }
+  .wrChapterTileTop { display: flex; align-items: center; gap: 12px; min-width: 0; .wrError { flex: 1 1 auto; margin: 0; } }
+  .wrParentStack { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; min-width: 0; margin-right: auto; }
+  .wrParentTag { display: inline-flex; align-items: baseline; gap: 6px; min-width: 0; padding: 2px 10px 2px 8px; border-left: 4px solid var(--wr-node-tint, var(--wr-accent)); border-radius: 3px; background: rgb(0 0 0 / calc(0.14 * var(--shade-k))); font-size: 12px; }
+  .wrParentKind { flex: 0 0 auto; font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: 1px; color: var(--ink-muted); }
+  .wrParentTitle { font-weight: 700; overflow-wrap: anywhere; }
+  .wrChapterTileTools { flex: 0 0 auto; display: flex; align-items: center; gap: 8px; margin-left: auto; }
+  .wrChapterTileMain { display: grid; grid-template-columns: minmax(0, 1fr) minmax(190px, 300px); gap: 8px 24px; align-items: start; }
+  .wrChapterTileName { display: flex; flex-direction: column; gap: 4px; min-width: 0; .wrPageKicker { color: var(--ink-muted); } }
+  .wrChapterTileStats { display: flex; flex-direction: column; gap: 4px; font-size: 12px; .wrPageMetaRow { color: var(--ink-muted); } .wrNodeStats { color: var(--ink-muted); } }
+  .wrChapterTileWords { display: flex; align-items: baseline; justify-content: space-between; gap: 10px; }
+  .wrChapterTileStats .wrStatBar { background: rgb(0 0 0 / calc(0.3 * var(--shade-k))); }
+  .wrChapterTileStats .wrStatBarFill { background: var(--wr-accent-light); }
+  .wrChapterTileStats .wrStatValue { color: var(--ink); }
+  // Text that edits in place when clicked.
+  .wrClickEdit {
+    display: block; width: 100%; box-sizing: border-box; text-align: left; font: inherit; color: var(--ink); background: transparent; border: 0; border-radius: 4px; padding: 2px 4px; margin: -2px -4px; cursor: text; white-space: pre-wrap; overflow-wrap: anywhere;
+    &:hover { background: rgb(255 255 255 / 0.1); }
+    &--empty { color: var(--ink-faint); font-style: italic; }
+    &--editing { background: var(--wr-field); outline: none; box-shadow: inset 0 0 0 1px var(--wr-accent); resize: vertical; cursor: text; &:hover { background: var(--wr-field); } }
+  }
+  .wrChapterTitle { font-family: Georgia, 'Times New Roman', serif; font-size: 22px; font-weight: 700; line-height: 1.25; }
+  .wrChapterSynopsis { font-size: 13px; line-height: 1.45; }
+  // The left page: under the other levels' tiles, and beside them the chapter's plotpoints.
+  .wrLeftPage { display: flex; flex-direction: column; gap: 14px; }
+  .wrLeftPoints { display: flex; flex-direction: column; gap: 8px; .wrDraftStatsHead { display: flex; justify-content: space-between; } .wrPlotNotes { flex: none; padding: 0; overflow: visible; } }
+
+  // The tabs on the right edge (EdgeTabs.tsx): a cluster per arc, a tab per chapter, each in its own colour.
+  .wrEdgeTabs { flex: 0 0 40px; margin-left: -1px; padding-top: 22px; padding-bottom: 8px; box-sizing: border-box; max-height: 100%; display: flex; flex-direction: column; gap: 10px; overflow-y: auto; scrollbar-width: none; &::-webkit-scrollbar { display: none; } }
+  .wrEdgeCluster { display: flex; flex-direction: column; gap: 4px; }
+  .wrEdgeArc, .wrEdgeTab {
+    flex: 0 0 auto; width: 34px; margin-left: -1px; border-radius: 0 8px 8px 0; display: flex; align-items: center; justify-content: center; font-weight: 700; color: var(--ink);
+    background: var(--wr-tab-tint, var(--wr-book)); box-shadow: 1px 1px 3px rgb(0 0 0 / calc(0.3 * var(--shade-k))), inset 0 0 0 1px var(--ov-lift-2);
+    &:hover { filter: brightness(1.12); }
+  }
+  .wrEdgeArc { height: 22px; font-size: 10px; letter-spacing: 0.5px; opacity: 0.92; }
+  .wrEdgeTab { height: 40px; font-size: 15px; }
+  .wrEdgeTab--active { width: 40px; margin-left: 0; box-shadow: inset 0 0 0 2px var(--wr-accent-light), 1px 1px 3px rgb(0 0 0 / calc(0.3 * var(--shade-k))); }
+  .wrEdgeTab--add { height: 34px; background: rgb(0 0 0 / calc(0.25 * var(--shade-k))); box-shadow: none; margin-top: 3px; }
+
+  // The preview, as the right page of the book.
+  .wrPreviewPane { flex: 1 1 auto; min-height: 0; display: flex; flex-direction: column; background: var(--wr-page); color: var(--wr-ink); }
+  .wrPreviewPane > .wrPreviewToolbar { padding: 14px 22px 8px 6px; }
+  .wrPreviewScroll { flex: 1 1 auto; min-height: 0; overflow-y: auto; padding: 8px 20px 24px 0; }
+  .wrOutlineBody { flex: 1 1 auto; min-height: 0; display: flex; }
+  .wrOutlineBody > .wrOutlinePage { flex: 1 1 auto; }
+
   // ---------------------------------------------------------------- preview
-  .wrPagesBody { flex: 1 1 auto; min-height: 0; display: flex; flex-direction: column; gap: 10px; }
   .wrPreviewToolbar { flex: 0 0 auto; display: flex; align-items: center; gap: 12px; min-height: 30px; flex-wrap: wrap; }
   .wrToolGroup { display: flex; align-items: center; gap: 6px; .wrLabel { margin: 0 4px 0 0; } }
   // The preview keeps a readable measure, centred in the wide page.

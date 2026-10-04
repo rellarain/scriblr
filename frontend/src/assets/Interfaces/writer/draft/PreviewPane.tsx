@@ -1,17 +1,16 @@
 import { useLayoutEffect, useMemo, useRef, useState } from 'react'
-import type { OutlineNode } from '../../../api/types'
-import type { WriterWorkspace } from './useWriterWorkspace'
-import { PAGES_COMPONENTS } from './consoleDefs'
-import { ChapterTabs, ConsoleTitleRow, Placeholder, useStoredState } from './shared'
-import { buildChildIndex, descendantsOf } from './outlineTree'
-import { nodeLabel } from './plotTree'
-import { splitParagraphs, splitSentences } from './sentences'
-import { useChapterDraft } from './useChapterDraft'
-import { exportChapterPdf } from '../../../api/export'
-import { HeartHalvedIcon, HeartIcon, MoonIcon, SunIcon } from '../../icons'
-import { ChapterModeButtons, chapterHasDraft } from './PageConsole'
-import { usePublications } from './usePublications'
-import { fullDate, shortDate } from './chapterDates'
+import type { OutlineNode } from '../../../../api/types'
+import type { WriterWorkspace } from '../useWriterWorkspace'
+import { PAGES_COMPONENTS } from '../consoleDefs'
+import { useStoredState } from '../shared'
+import { buildChildIndex, descendantsOf } from '../outlineTree'
+import { nodeLabel } from '../plotTree'
+import { splitParagraphs, splitSentences } from '../sentences'
+import type { useChapterDraft } from '../useChapterDraft'
+import { exportChapterPdf } from '../../../../api/export'
+import { HeartHalvedIcon, HeartIcon, MoonIcon, SunIcon } from '../../../icons'
+import type { usePublications } from '../usePublications'
+import { fullDate, shortDate } from '../chapterDates'
 
 const FLAGS = ['Add', 'Remove', 'Merge', 'Change', 'Simplify', 'Expand'] as const
 type FlagName = (typeof FLAGS)[number]
@@ -110,15 +109,23 @@ function Paragraph({ paragraphKey, sentences, marks, selected, onSelect, onCycle
   )
 }
 
-function PagePreview({ w, chapter, component, label, onComponent }: { w: WriterWorkspace; chapter: OutlineNode; component: string; label: string; onComponent: (key: string) => void }) {
-  const draft = useChapterDraft(w.activeProjectId, chapter.id)
+// The preview as the right page of the open book (it takes the place of the draft cards): the
+// chapter's draft laid out as a reader sees it, a toolbar above it for the version, the page
+// tone and the Reaction / Flag / Export tools.
+export function PreviewPane({ w, chapter, draft, pubs, component, onComponent }: {
+  w: WriterWorkspace
+  chapter: OutlineNode
+  draft: ReturnType<typeof useChapterDraft>
+  pubs: ReturnType<typeof usePublications>
+  component: string
+  onComponent: (key: string) => void
+}) {
   const [marks, setMarks] = useStoredState<Marks>(`scriblr.writer.marks.${w.activeProjectId}.${chapter.id}`, {})
   const [selected, setSelected] = useState<string | null>(null)
   const [exportMessage, setExportMessage] = useState<string | null>(null)
   // Day: a white page with black text; night: a dark page with light text.
   const [tone, setTone] = useStoredState<'day' | 'night'>('scriblr.writer.previewTone', 'day')
   // The current draft, or one of the chapter's kept publications (read-only).
-  const pubs = usePublications(w.activeProjectId, chapter.id)
   const [version, setVersion] = useState<string>('current')
   const published = version === 'current' ? undefined : pubs.publications.find(p => p.id === version)
 
@@ -177,28 +184,19 @@ function PagePreview({ w, chapter, component, label, onComponent }: { w: WriterW
   const selectedFlag = selected ? marks[selected]?.flag : undefined
 
   return (
-    <>
-    <ConsoleTitleRow
-      console="Pages" component={`${label} · Chapter ${chapterNumber}`}
-      right={(
-        <>
-          <div className="wrSegmented" role="group" aria-label="Pages editor">
-            {PAGES_COMPONENTS.map(c => (
-              <button
-                key={c.key} type="button" title={c.label} aria-label={c.label} aria-pressed={c.key === component}
-                className={c.key === component ? 'wrSegBtn wrSegBtn--active' : 'wrSegBtn'} onClick={() => onComponent(c.key)}
-              >
-                <c.Icon size={16} />
-                <span className="wrSegLabel">{c.label}</span>
-              </button>
-            ))}
-          </div>
-          <ChapterModeButtons mode="preview" hasDraft={chapterHasDraft(draft.bodies)} onMode={w.showChapter} onPreview={w.showPreview} />
-        </>
-      )}
-    />
-    <div className="wrPagesBody">
+    <div className={`wrPreviewPane wrPage--${tone}`}>
       <div className="wrPreviewToolbar">
+        <div className="wrSegmented" role="group" aria-label="Pages editor">
+          {PAGES_COMPONENTS.map(c => (
+            <button
+              key={c.key} type="button" title={c.label} aria-label={c.label} aria-pressed={c.key === component}
+              className={c.key === component ? 'wrSegBtn wrSegBtn--active' : 'wrSegBtn'} onClick={() => onComponent(c.key)}
+            >
+              <c.Icon size={16} />
+              <span className="wrSegLabel">{c.label}</span>
+            </button>
+          ))}
+        </div>
         <div className="wrToolGroup">
           <span className="wrLabel">Version</span>
           <select className="wrPreviewSelect" aria-label="Version" value={published ? version : 'current'} onChange={e => setVersion(e.target.value)}>
@@ -246,8 +244,7 @@ function PagePreview({ w, chapter, component, label, onComponent }: { w: WriterW
           <span className="wrHint">Click a sentence, then click the hearts in the left margin. Each click raises the reaction one level; a fourth click clears it.</span>
         )}
       </div>
-      <div className="wrPageWrap">
-      <div className={`wrPage wrPage--preview wrPage--${tone}`}>
+      <div className="wrPreviewScroll">
         <div className="wrPreviewHead">
           <span className="wrPageKicker">Chapter {chapterNumber}</span>
           <span className="wrPreviewTitle">{published ? published.title || nodeLabel(chapter) : nodeLabel(chapter)}</span>
@@ -267,18 +264,8 @@ function PagePreview({ w, chapter, component, label, onComponent }: { w: WriterW
           />
         ))}
       </div>
-      <ChapterTabs variant="page" chapters={w.activeBookChapters} activeId={chapter.id} onSelect={w.selectChapter} />
-      </div>
     </div>
-    </>
   )
 }
 
-function PagesConsole({ w, component, onComponent }: { w: WriterWorkspace; component: string; onComponent: (key: string) => void }) {
-  const chapter = w.activeChapter
-  if (!chapter) return <Placeholder title="Pages" body="Open a chapter to preview it." />
-  const label = PAGES_COMPONENTS.find(c => c.key === component)?.label ?? ''
-  return <PagePreview key={chapter.id} w={w} chapter={chapter} component={component} label={label} onComponent={onComponent} />
-}
-
-export default PagesConsole
+export default PreviewPane

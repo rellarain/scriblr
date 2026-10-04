@@ -8,8 +8,7 @@ import ConsoleCorner from '../../../../components/tiles/ConsoleCorner'
 import ShelvesConsole from '../ShelvesConsole'
 import ProjectConsole from '../ProjectConsole'
 import OutlineMax from '../outline/OutlineMax'
-import PageConsole from '../PageConsole'
-import PagesConsole from '../PagesConsole'
+import DraftLevel from '../draft/DraftLevel'
 import LevelPanel from './LevelPanel'
 import { DashMid, OutlineMid, ProjectMid, ProjectMin, ProjectShelves } from './levelBodies'
 import { LEVELS, focusOf, levelSizes, type Level, type LevelSize, type SizeOverrides } from './levelSizes'
@@ -67,13 +66,12 @@ function WriterLevels({ w, pagesComponent, onPagesComponent }: {
       case 'draft':
         return (
           <LevelPanel
-            key={level} level={level} size="max" title={w.activeChapter ? `Chapter ${chapterNumber} · ${nodeLabel(w.activeChapter)}` : 'Chapter'}
+            key={level} level={level} size="max" headerless title={w.activeChapter ? `Chapter ${chapterNumber} · ${nodeLabel(w.activeChapter)}` : 'Chapter'}
             hue={w.activeChapter ? w.levelHueOf(w.activeChapter) : undefined}
             onPromote={() => {}} onSetSize={setSize(level)}
           >
-            {w.activeConsole === 'pages'
-              ? <><PagesConsole w={w} component={pagesComponent} onComponent={onPagesComponent} /><ConsoleCorner /></>
-              : <><PageConsole w={w} /><ConsoleCorner /></>}
+            <DraftLevel w={w} pagesComponent={pagesComponent} onPagesComponent={onPagesComponent} />
+            <ConsoleCorner />
           </LevelPanel>
         )
     }

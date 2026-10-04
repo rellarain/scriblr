@@ -7,7 +7,7 @@ import { fieldNameOf, textOf } from './plotFields'
 import { nodeLabel } from './plotTree'
 import { plotColors, plotColorVars } from './plotColors'
 
-// A plotpoint on the chapter page, always in its category and subcategory colours.
+// A plotpoint in the Outline level, always in its category and subcategory colours.
 //   'margin'  in the left margin: assigned to the chapter, not yet placed. Shows category >
 //             subcategory, the plotline and field, the title and the description. Its x sends
 //             it back to the plot editor's field list; it drags onto an act, scene or moment.

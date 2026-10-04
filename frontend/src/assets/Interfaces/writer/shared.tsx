@@ -1,9 +1,5 @@
 import { useEffect, useLayoutEffect, useRef, useState, type ReactNode } from 'react'
 import { PlusIcon, TrashIcon } from '../../icons'
-import type { OutlineNode } from '../../../api/types'
-
-import { nodeLabel } from './plotTree'
-
 export { useStoredState } from './storage'
 
 export function ConsoleTitleRow({ console: consoleName, component, right }: {
@@ -69,38 +65,8 @@ export function DeleteControl({ message, onConfirm, tone = 'light', blockedReaso
   )
 }
 
-// The vertical column of chapter-number tabs on a page's right edge.
-export function ChapterTabs({ chapters, activeId, onSelect, onAdd, variant }: {
-  chapters: OutlineNode[]
-  activeId: string | null
-  onSelect: (chapterId: string) => void
-  onAdd?: () => void
-  variant: 'page'
-}) {
-  return (
-    <nav className={`wrChapterTabs wrChapterTabs--${variant}`} aria-label="Chapters">
-      {chapters.map((c, i) => (
-        <button
-          key={c.id} type="button"
-          className={c.id === activeId ? 'wrChapterTab wrChapterTab--active' : 'wrChapterTab'}
-          aria-label={`Chapter ${i + 1}: ${nodeLabel(c)}`} title={`${i + 1} · ${nodeLabel(c)}`}
-          aria-pressed={c.id === activeId}
-          onClick={() => onSelect(c.id)}
-        >
-          {i + 1}
-        </button>
-      ))}
-      {onAdd && (
-        <button type="button" className="wrChapterTab wrChapterTab--add" aria-label="Add chapter" title="Add chapter" onClick={onAdd}>
-          <PlusIcon size={15} />
-        </button>
-      )}
-    </nav>
-  )
-}
-
 // A textarea that grows with its content.
-export function AutoTextarea({ value, onChange, placeholder, className, rows = 2, onKeyDown, keyField }: {
+export function AutoTextarea({ value, onChange, placeholder, className, rows = 2, onKeyDown, keyField, 'aria-label': ariaLabel }: {
   value: string
   onChange: (next: string) => void
   placeholder?: string
@@ -109,6 +75,7 @@ export function AutoTextarea({ value, onChange, placeholder, className, rows = 2
   onKeyDown?: (e: React.KeyboardEvent<HTMLTextAreaElement>) => void
   // Marks it for the node keyboard shortcuts (lib/nodeKeys.ts); 'draft' for writing text.
   keyField?: boolean | 'draft'
+  'aria-label'?: string
 }) {
   const ref = useRef<HTMLTextAreaElement>(null)
   useEffect(() => {
@@ -119,7 +86,7 @@ export function AutoTextarea({ value, onChange, placeholder, className, rows = 2
   }, [value])
   return (
     <textarea
-      ref={ref} rows={rows} className={className} placeholder={placeholder} value={value}
+      ref={ref} rows={rows} className={className} placeholder={placeholder} value={value} aria-label={ariaLabel}
       data-kf={keyField === 'draft' ? 'draft' : keyField ? '' : undefined}
       onChange={e => onChange(e.target.value)} onKeyDown={onKeyDown}
     />

@@ -3,20 +3,16 @@ import type { OutlineNode } from '../../../api/types'
 import type { WriterWorkspace } from './useWriterWorkspace'
 import { moveNodeTo } from './outlineTree'
 
-// Drag-and-drop reordering and reparenting for outline cards (the chapter page's
-// acts, scenes and moments; the book editor's arcs and chapters). A card's grip
-// is the drag handle. Drops land in the GAPS between cards: before the first,
-// between, and after the last child of every container (an empty container has
-// one gap too). Only gaps whose parent may hold the dragged kind take part, and
-// the hovered gap opens up to the dragged card's height.
-//
-// In Draft mode a moment's draft text can also be dropped onto another moment's
-// card (`textDropProps`) to be merged into it.
+// Drag-and-drop reordering and reparenting for the Outline level's cards (arcs,
+// chapters, acts, scenes and moments). A card's grip is the drag handle. Drops land
+// in the GAPS between cards: before the first, between, and after the last child of
+// every container (an empty container has one gap too). Only gaps whose parent may
+// hold the dragged kind take part, and the hovered gap opens up to the dragged card's
+// height.
 // The project's top level (series and loose books) has no parent node.
 const ROOT = '(project)'
 
 export function useNodeDnd(w: WriterWorkspace, opts: {
-  onMergeText?: (sourceId: string, targetId: string) => void
   // A further say in where a dragged node may go, on top of the nesting rule (an editor that shows
   // only some kinds under a parent, say, must not take the rest).
   accepts?: (dragged: OutlineNode, parentId: string | null) => boolean
@@ -74,22 +70,6 @@ export function useNodeDnd(w: WriterWorkspace, opts: {
     )
   }
 
-  // Draft mode: a moment's card accepts another moment's draft text dropped on it.
-  const textDropProps = (id: string) => !opts.onMergeText || !dragId || dragId === id ? {} : {
-    onDragOver: (e: DragEvent) => {
-      e.preventDefault()
-      e.stopPropagation()
-      if (overKey !== id) setOverKey(id)
-    },
-    onDragLeave: () => setOverKey(prev => (prev === id ? null : prev)),
-    onDrop: (e: DragEvent) => {
-      e.preventDefault()
-      e.stopPropagation()
-      opts.onMergeText?.(dragId, id)
-      endDrag()
-    },
-  }
-
   // Spread onto the grip element.
   const gripProps = (id: string) => ({
     draggable: true,
@@ -107,8 +87,7 @@ export function useNodeDnd(w: WriterWorkspace, opts: {
     onDragEnd: endDrag,
   })
 
-  const cardClass = (base: string, id: string) =>
-    `${base}${dragId === id ? ' wrOutlineCard--dragging' : ''}${overKey === id ? ' wrOutlineCard--over' : ''}`
+  const cardClass = (base: string, id: string) => `${base}${dragId === id ? ' wrOutlineCard--dragging' : ''}`
 
-  return { gap, children, gripProps, textDropProps, cardClass, dragId }
+  return { gap, children, gripProps, cardClass, dragId }
 }

@@ -556,8 +556,18 @@ awareness that the app above already existed:
   reorder; Enter, Shift+Enter and Ctrl+Enter add siblings and children). Each card
   shows its draft word count (`ProjectAnalytics.nodeWordCounts`); chapters open and
   close. At Mid it lists the unassigned plotpoints, the book outline and the book
-  details. The Dash, Project and Draft levels still wrap the older consoles' contents
-  (tile grids, chapter page, preview), being reshaped to the four-level design.
+  details. The arcs' and chapters' **edge tabs** (`EdgeTabs.tsx`, tinted by their own
+  hues) sit on the right edge of the Outline and Draft pages and jump to a chapter or an
+  arc. The **Draft level** (`writer/draft/`) at Max is the chapter as an open book: a
+  chapter title tile across the top (the series/book/arc above it, its title and synopsis
+  edited in place, dates, draft stats, and the Save, Publish and Draft | Preview tools);
+  under it the left page, which runs under the Dash, Project and Outline tiles and lists
+  the chapter's plotpoints read-only, a crease, and the right page: the chapter's acts,
+  scenes and moments as read-only cards (fold up, remembered) each around an
+  auto-growing draft input with a live word count, or, from the toggle, the preview with
+  its Reaction / Flag / Export tools. A chapter with no outline is one free draft. The
+  Dash and Project levels still wrap the older consoles' contents (tile grids), being
+  reshaped to the four-level design.
 - **`AUI.tsx`** (`feedback/` subfolder) — an admin "feedback pipeline"
   (channel/vote/tone/integrate/implement/sent/explicate tabs). This isn't a
   duplicate of anything above — it has no committed counterpart, is

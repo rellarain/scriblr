@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import type { OutlineNode, OutlineNodeKind } from '../../../api/types'
 import {
-  booksOf, buildChildIndex, chaptersOfBook, dissolveSeries, inheritedSceneValues, moveNode, moveNodeTo, rollUpWordCounts, sceneChanges, scenesInOrder, shelfGroups,
+  booksOf, buildChildIndex, chaptersOfBook, dissolveSeries, inheritedSceneValues, moveNode, moveNodeTo, rollUpWordCounts, sceneChanges, shelfGroups,
 } from './outlineTree'
 
 function node(id: string, kind: OutlineNodeKind, parentId: string | null, order: number, extra: Partial<OutlineNode> = {}): OutlineNode {
@@ -29,10 +29,9 @@ const parentsOf = (nodes: OutlineNode[], parentId: string) =>
   nodes.filter(n => n.parentId === parentId).sort((a, b) => a.order - b.order).map(n => n.id)
 
 describe('outline queries', () => {
-  it('finds books, chapters (through arcs) and scenes in outline order', () => {
+  it('finds books and chapters (through arcs) in outline order', () => {
     expect(booksOf(tree).map(n => n.id)).toEqual(['b1'])
     expect(chaptersOfBook(tree, 'b1').map(n => n.id)).toEqual(['c1', 'c2'])
-    expect(scenesInOrder(tree, 'c1').map(n => n.id)).toEqual(['s1', 's2'])
   })
 })
 

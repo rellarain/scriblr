@@ -1,4 +1,4 @@
-import { useMemo, useState, type CSSProperties, type DragEvent, type ReactNode } from 'react'
+import { useEffect, useMemo, useRef, useState, type CSSProperties, type DragEvent, type ReactNode } from 'react'
 import type { OutlineNode } from '../../../../api/types'
 import type { WordCounts } from '../../../../api/draftFetch'
 import type { WriterWorkspace } from '../useWriterWorkspace'
@@ -59,6 +59,20 @@ export function OutlineCards({ w, book, counts, plotDrag }: {
   const [openMap, setOpenMap] = useStoredState<Record<string, boolean>>('scriblr.writer.outlineOpen', {})
   const isOpen = (n: OutlineNode) => openMap[n.id] ?? (n.kind === 'chapter' ? n.id === w.activeChapterId : true)
   const setOpen = (id: string, open: boolean) => setOpenMap(prev => ({ ...prev, [id]: open }))
+  // Picking a chapter (from its edge tab, or coming back from its draft) opens its card and brings it into view.
+  const rootRef = useRef<HTMLDivElement>(null)
+  const activeId = w.activeChapterId
+  useEffect(() => {
+    if (!activeId || !nodeById.has(activeId)) return
+    setOpenMap(prev => (prev[activeId] === true ? prev : { ...prev, [activeId]: true }))
+    const frame = requestAnimationFrame(() => {
+      const card = Array.from(rootRef.current?.querySelectorAll<HTMLElement>('[data-node]') ?? []).find(n => n.dataset.node === activeId)
+      card?.scrollIntoView?.({ block: 'start' })
+    })
+    return () => cancelAnimationFrame(frame)
+    // Only a different chapter being picked counts: not the outline changing under it.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [activeId])
   const system = useMemo(() => systemForBook(w.activeProject?.settings.timeSystems ?? [], book), [w.activeProject, book])
   const words = (id: string) => counts.nodes[id] ?? 0
 
@@ -264,7 +278,7 @@ export function OutlineCards({ w, book, counts, plotDrag }: {
               onChange={e => w.updateOutlineNode(node.id, { title: e.target.value })}
             />
             {hue(node, `Chapter ${n}`)}
-            <button type="button" className="wrIconBtn wrIconBtn--light" title="Write" aria-label={`Write chapter ${n}`} onClick={() => w.openChapter(node.id, 'draft')}>
+            <button type="button" className="wrIconBtn wrIconBtn--light" title="Write" aria-label={`Write chapter ${n}`} onClick={() => w.openChapter(node.id)}>
               <PencilIcon size={15} />
             </button>
           </div>
@@ -325,7 +339,7 @@ export function OutlineCards({ w, book, counts, plotDrag }: {
 
   const top = childrenOf(book).filter(k => k.kind === 'arc' || k.kind === 'chapter')
   return (
-    <div className="wrOutlineCards" onKeyDown={keys.onKeyDown}>
+    <div className="wrOutlineCards" ref={rootRef} onKeyDown={keys.onKeyDown}>
       <div className="wrOutlineCardsHead">
         <span>Outline</span>
         <span className="wrOutlineCardsAdd">

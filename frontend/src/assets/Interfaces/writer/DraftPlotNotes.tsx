@@ -6,7 +6,7 @@ import { nodeLabel } from './plotTree'
 import { plotColors, plotColorVars } from './plotColors'
 import type { WriterWorkspace } from './useWriterWorkspace'
 
-// Draft mode: the chapter's placed plotpoints as footnote cards in a column of their own
+// The Draft level: the chapter's plotpoints as footnote cards in a column of their own
 // in the paper's right margin, beside the draft text (never over it). A closed card shows
 // only the plotpoint's title (and its awareness eye on a moment); clicking it opens the card
 // in place to show category > subcategory, plotline and field, title and description.

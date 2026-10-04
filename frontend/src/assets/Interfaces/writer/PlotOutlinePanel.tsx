@@ -54,7 +54,7 @@ export function PlotOutlinePanel({ w, plotline, dragId, onDropChapter }: {
       <span key={p.id} className="wrPlotChip" data-point={p.id} style={look.style}>
         <button
           type="button" className="wrPlotChipTitle" title={`Open ${nodeLabel(chapter)}`}
-          onClick={() => { w.openChapter(chapter.id, 'outline'); w.highlightPlotpoint(p.id) }}
+          onClick={() => { w.openChapter(chapter.id); w.highlightPlotpoint(p.id) }}
         >
           {text.title || 'Untitled'}
         </button>

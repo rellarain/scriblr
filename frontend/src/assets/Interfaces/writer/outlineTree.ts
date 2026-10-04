@@ -3,7 +3,7 @@ import { hasTime, timeChanged } from './timeSystem'
 import { OUTLINE_KIND_ORDER } from '../../../api/types'
 
 // Pure helpers over the flat outline list (parentId + order), shared by the
-// sidebar, the book/chapter consoles and the chapter outline editor.
+// shelves, the Outline level's cards and the Draft level.
 
 export type ChildIndex = Map<string | null, OutlineNode[]>
 
@@ -94,10 +94,6 @@ export function nearestOfKind(nodes: OutlineNode[], id: string, kind: OutlineNod
     current = current.parentId ? byId.get(current.parentId) : undefined
   }
   return undefined
-}
-
-export function scenesInOrder(nodes: OutlineNode[], chapterId: string): OutlineNode[] {
-  return descendantsOf(buildChildIndex(nodes), chapterId).filter(n => n.kind === 'scene')
 }
 
 export interface SceneChanges { location: boolean; time: boolean; action: boolean }

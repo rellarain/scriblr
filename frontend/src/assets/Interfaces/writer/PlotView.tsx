@@ -19,7 +19,7 @@ import { fieldIndex, isScrapField, orderValues, valuesIn } from './plotFields'
 // editor, and the plotline editor: its plotpoints listed unassigned first and
 // then in order of occurrence, dragged onto the books and chapters of the
 // outline. A plotpoint assigned within a chapter (to an act, scene or moment,
-// from the chapter page) is locked here; the others can be unassigned.
+// from the Outline level) is locked here; the others can be unassigned.
 
 function plotlineCount(node: PlotNode, children: Map<string | null, PlotNode[]>): number {
   return (children.get(node.id) ?? []).reduce(

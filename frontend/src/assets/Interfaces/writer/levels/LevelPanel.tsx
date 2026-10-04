@@ -6,7 +6,7 @@ import type { Level, LevelSize } from './levelSizes'
 // One tinted level of the Writer frame. Its header strip is how it changes size:
 // clicking a Min level's strip opens it to Mid, the title promotes it to the focus
 // (Max), and the chevron toggles Min/Mid. The focused (Max) level just shows its title.
-function LevelPanel({ level, size, title, hue, onPromote, onSetSize, locked = false, minBody, children }: {
+function LevelPanel({ level, size, title, hue, onPromote, onSetSize, locked = false, headerless = false, minBody, children }: {
   level: Level
   size: Exclude<LevelSize, 'hidden'>
   title: string
@@ -16,6 +16,8 @@ function LevelPanel({ level, size, title, hue, onPromote, onSetSize, locked = fa
   onSetSize: (size: 'min' | 'mid') => void
   // No Min/Mid toggle (the project shelves beside the Dash have only one size).
   locked?: boolean
+  // No header strip: the body brings its own (the Draft level's chapter tile).
+  headerless?: boolean
   // What a Min level shows under its header strip (the book spines, say).
   minBody?: ReactNode
   children?: ReactNode
@@ -28,7 +30,7 @@ function LevelPanel({ level, size, title, hue, onPromote, onSetSize, locked = fa
       aria-label={`${title} (${size})`} data-level={level} data-size={size}
       style={hue != null ? ({ '--wr-level-h': hue, '--wr-level-tint': themeColorCss(hue) } as CSSProperties) : undefined}
     >
-      <div
+      {!headerless && <div
         className={isMin && !locked ? 'wrLevelHeader wrLevelHeader--min' : 'wrLevelHeader'}
         onClick={isMin && !locked ? () => onSetSize('mid') : undefined}
       >
@@ -48,7 +50,7 @@ function LevelPanel({ level, size, title, hue, onPromote, onSetSize, locked = fa
             {isMin ? <ChevronRightIcon size={14} /> : <ChevronDownIcon size={14} />}
           </button>
         )}
-      </div>
+      </div>}
       {isMin ? minBody : <div className="wrLevelBody">{children}</div>}
     </section>
   )

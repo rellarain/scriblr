@@ -11,8 +11,7 @@ import WriterLevels from './WriterLevels'
 vi.mock('../ShelvesConsole', () => ({ default: () => <div>shelves console</div> }))
 vi.mock('../ProjectConsole', () => ({ default: () => <div>project console</div> }))
 vi.mock('../outline/OutlineMax', () => ({ default: () => <div>book console</div> }))
-vi.mock('../PageConsole', () => ({ default: () => <div>page console</div> }))
-vi.mock('../PagesConsole', () => ({ default: () => <div>pages console</div> }))
+vi.mock('../draft/DraftLevel', () => ({ default: ({ w }: { w: { activeConsole: string } }) => <div>{w.activeConsole === 'pages' ? 'pages console' : 'page console'}</div> }))
 vi.mock('./levelBodies', () => ({
   DashMid: () => <div>dash mid</div>,
   ProjectMid: () => <div>project mid</div>,

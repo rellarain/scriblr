@@ -40,9 +40,10 @@ const PLOT: PlotNode[] = [
   plotNode('pp2', 'plotpoint', 'line', { title: 'A secret', order: 1 }),
 ]
 
-function Harness({ activeChapterId = 'c1', actions }: { activeChapterId?: string | null; actions: { openChapter: (id: string, mode?: string) => void } }) {
+function Harness({ activeChapterId = 'c1', actions }: { activeChapterId?: string | null; actions: { openChapter: (id: string) => void } }) {
   const [outlineNodes, setOutline] = useState<OutlineNode[]>(OUTLINE)
   const [plotNodes, setPlot] = useState<PlotNode[]>(PLOT)
+  const [active, setActive] = useState<string | null>(activeChapterId)
   const counter = useRef(0)
   const outlineRef = useRef(outlineNodes)
   outlineRef.current = outlineNodes
@@ -55,7 +56,7 @@ function Harness({ activeChapterId = 'c1', actions }: { activeChapterId?: string
     activeBook: book, activeProjectId: 'p1', activeProject: { settings: { timeSystems: [], chapterWordCountTarget: 500 } },
     outlineNodes, plotNodes, plotNodeById: new Map(plotNodes.map(n => [n.id, n])),
     activeBookChapters: descendantsOf(buildChildIndex(outlineNodes), 'b').filter(n => n.kind === 'chapter'),
-    activeChapterId, highlightedPointId: null,
+    activeChapterId: active, selectChapter: (id: string) => setActive(id), highlightedPointId: null,
     saveStatus: { dirty: false, saving: false, error: undefined, lastSavedAt: null }, saveNow: vi.fn(async () => {}), restoreSaved: vi.fn(async () => {}),
     levelHueOf: () => 200, hueCentreOf: () => null, setNodeHue: vi.fn(),
     moveOutlineNodeInto: vi.fn(), openChapter: actions.openChapter,
@@ -160,7 +161,7 @@ describe('Outline Max: the cards', () => {
   it('writes a chapter from its pencil', async () => {
     const { user, openChapter } = setup('c1')
     await user.click(within(card('c2')).getByRole('button', { name: 'Write chapter 2' }))
-    expect(openChapter).toHaveBeenCalledWith('c2', 'draft')
+    expect(openChapter).toHaveBeenCalledWith('c2')
   })
 
   it('deletes a chapter after asking, with everything in it', async () => {
@@ -185,6 +186,31 @@ describe('Outline Max: the cards', () => {
     const created = screen.getByLabelText('Chapter 3 title').closest('[data-node]') as HTMLElement
     expect(created.querySelectorAll('.wrActCard')).toHaveLength(1)
     await waitFor(() => expect((document.activeElement as HTMLInputElement).placeholder).toBe('Act title')) // focus follows once the card is on the page
+  })
+})
+
+describe('Outline Max: the edge tabs', () => {
+  it('has a tab for each arc and chapter, the open chapter raised', () => {
+    setup('c1')
+    const tabs = screen.getByRole('navigation', { name: 'Arcs and chapters' })
+    expect(within(tabs).getByRole('button', { name: 'Arc 1: Thaw' })).toBeTruthy()
+    expect(within(tabs).getByRole('button', { name: 'Chapter 1: Ice Out' }).getAttribute('aria-pressed')).toBe('true')
+    expect(within(tabs).getByRole('button', { name: 'Chapter 2: The Harbor Master' }).getAttribute('aria-pressed')).toBe('false')
+  })
+
+  it('opens a chapter card when its tab is clicked', async () => {
+    const { user } = setup('c1')
+    const header = () => within(card('c2')).getByRole('button', { name: /Chapter 2$/ })
+    expect(header().getAttribute('aria-expanded')).toBe('false')
+    await user.click(screen.getByRole('button', { name: 'Chapter 2: The Harbor Master' }))
+    expect(header().getAttribute('aria-expanded')).toBe('true')
+    expect(screen.getByRole('button', { name: 'Chapter 2: The Harbor Master' }).getAttribute('aria-pressed')).toBe('true')
+  })
+
+  it('adds a chapter from its plus tab', async () => {
+    const { user } = setup('c1')
+    await user.click(screen.getByRole('button', { name: 'Add chapter' }))
+    expect(screen.getAllByLabelText(/Chapter \d title/)).toHaveLength(3)
   })
 })
 

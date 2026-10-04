@@ -10,7 +10,7 @@ import { plotColorVars, plotColors } from './plotColors'
 //   unassigned            its category's colour, with its subcategory's edge (--wr-cat / --wr-sub)
 //   assigned to a chapter its book's colour (edge and all)
 //   placed on a moment    the awareness shade of the book's hue (see awareness.ts)
-// (The chapter page keeps the category / subcategory colours: it uses plotColorVars.)
+// (The Draft level's footnotes keep the category / subcategory colours: they use plotColorVars.)
 
 export interface BookHues { book: OutlineNode | undefined; themeHue: number }
 

@@ -17,7 +17,6 @@ import {
   addField, addValue, assignPoint, deleteField, deleteValue, migratePlot, moveField, moveValue, renameField, syncReferences, updateValue,
 } from './plotFields'
 import { awarenessNext } from './awareness'
-import { useStoredState } from './storage'
 import { combineSaveStatus, useAutosave } from '../../../lib/useAutosave'
 import { insertAfter } from '../../../lib/siblingOrder'
 import { DEFAULT_BOOK_HUE, clampHueToWindow, isSwatchHue, normalizeHue, wrapHue } from '../../../theme/bookColors'
@@ -30,8 +29,6 @@ type AsyncStatus = 'idle' | 'loading' | 'error'
 export type WuiConsole = 'shelves' | 'shelf' | 'book' | 'page' | 'pages'
 // 'shelves' keeps the project (and its book/chapter) open while the dashboard has the focus.
 type ProjectView = 'shelves' | 'project' | 'book' | 'page' | 'pages'
-// The two modes of the chapter page (Preview is its own console, 'pages').
-export type ChapterMode = 'outline' | 'draft'
 
 function newId(prefix: string): string {
   return `${prefix}-${Math.random().toString(36).slice(2, 9)}`
@@ -74,9 +71,6 @@ export function useWriterWorkspace() {
   const [view, setView] = useState<ProjectView>('project')
   const [activeBookId, setActiveBookId] = useState<string | null>(null)
   const [activeChapterId, setActiveChapterId] = useState<string | null>(null)
-  // The last-used chapter mode is remembered across sessions.
-  const [storedMode, setChapterMode] = useStoredState<ChapterMode>('scriblr.writer.chapterMode', 'outline')
-  const chapterMode: ChapterMode = storedMode === 'draft' ? 'draft' : 'outline'
 
   // --- plot tree (Shelf console's Project Plot) ---
   const [plotNodes, setPlotNodes] = useState<PlotNode[]>([])
@@ -84,7 +78,7 @@ export function useWriterWorkspace() {
   const [plotStatus, setPlotStatus] = useState<AsyncStatus>('idle')
   const [plotError, setPlotError] = useState<string | undefined>(undefined)
   const [focusedPlotNodeId, setFocusedPlotNodeId] = useState<string | null>(null)
-  // The plotpoint a plot-outline click points at on the chapter page (shown highlighted for a moment).
+  // The plotpoint a plot-outline click points at in the Draft level (shown highlighted for a moment).
   const [highlightedPointId, setHighlightedPointId] = useState<string | null>(null)
 
   const activeProjectIdRef = useRef<string | null>(null)
@@ -394,8 +388,8 @@ export function useWriterWorkspace() {
     setView('book')
   }
 
-  // Selects a chapter without leaving the current console (the chapter tabs
-  // in the Book console pick which chapter's outline shows).
+  // Selects a chapter without leaving the current level (the edge tabs pick which
+  // chapter the Outline and Draft levels show).
   function selectChapter(chapterId: string) {
     flushAll()
     const book = nearestOfKind(outlineNodes, chapterId, 'book')
@@ -403,18 +397,15 @@ export function useWriterWorkspace() {
     setActiveChapterId(chapterId)
   }
 
-  // Opens a chapter on the chapter page (Page console), in the remembered
-  // mode unless one is given.
-  function openChapter(chapterId: string, mode?: ChapterMode) {
+  // Opens a chapter in the Draft level (its draft, not its preview).
+  function openChapter(chapterId: string) {
     selectChapter(chapterId)
-    if (mode) setChapterMode(mode)
     setView('page')
   }
 
-  // Switches the open chapter to Outline or Draft mode.
-  function showChapter(mode: ChapterMode) {
+  // The open chapter's draft (from its preview).
+  function showDraft() {
     flushAll()
-    setChapterMode(mode)
     if (activeChapterId) setView('page')
   }
 
@@ -637,7 +628,7 @@ export function useWriterWorkspace() {
     if (next !== plotNodesRef.current) commitPlot(next, true)
   }
 
-  // Point the chapter page at a plotpoint for a few seconds (a click in the plot outline).
+  // Point the Draft level at a plotpoint for a few seconds (a click in the plot outline).
   function highlightPlotpoint(id: string | null) {
     setHighlightedPointId(id)
     if (id) window.setTimeout(() => setHighlightedPointId(cur => (cur === id ? null : cur)), 4000)
@@ -735,8 +726,7 @@ export function useWriterWorkspace() {
     activeConsole, activeBookId, activeChapterId,
     projectHue, levelHueOf, hueCentreOf, setNodeHue, setProjectHue,
     loadProjects, createProject, openProject, backToShelves, deleteProject,
-    showDash, showProject, openBook, selectChapter, openChapter, showChapter, showPreview, backToBook,
-    chapterMode,
+    showDash, showProject, openBook, selectChapter, openChapter, showDraft, showPreview, backToBook,
     addOutlineNode, updateOutlineNode, deleteOutlineNode, deleteSeries, moveOutlineNodeInto, toggleNodeFlag,
 
     plotNodes, plotStatus, plotError, plotSaving: plotSave.saving, plotSaveError: plotSave.error,
