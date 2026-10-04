@@ -1,7 +1,10 @@
-import { useState } from 'react'
+import { useMemo, useState } from 'react'
 import type { WriterWorkspace } from '../useWriterWorkspace'
 import { buildChildIndex, chaptersOfBook, descendantsOf, shelfGroups } from '../outlineTree'
+import { unassignedPlotpoints } from '../outline/outlineModel'
+import { textOf } from '../plotFields'
 import { nodeLabel } from '../plotTree'
+import { plotColorVars, plotColors } from '../plotColors'
 import { DeleteControl } from '../shared'
 import { Shelf } from '../Shelf'
 import { shelfTiles } from '../tiles/shelfTiles'
@@ -99,20 +102,26 @@ export function ProjectShelves({ w }: { w: WriterWorkspace }) {
   )
 }
 
-// The Outline level at Mid: the open book's facts, and its arcs and chapters as
-// navigation rows.
+// The Outline level at Mid: the plotpoints still to place, the book's arcs and chapters as
+// navigation rows, and the book's facts.
 export function OutlineMid({ w }: { w: WriterWorkspace }) {
   const book = w.activeBook
+  const outlineById = useMemo(() => new Map(w.outlineNodes.map(n => [n.id, n])), [w.outlineNodes])
+  const unassigned = useMemo(() => unassignedPlotpoints(w.plotNodes, outlineById, w.plotNodeById), [w.plotNodes, outlineById, w.plotNodeById])
   if (!book) return <p className="wrMuted">Select a book on the shelf to open it.</p>
   const index = buildChildIndex(w.outlineNodes)
   const bookChapters = w.activeBookChapters
   return (
     <div className="wrOutlineMid">
-      {kv('Title', nodeLabel(book))}
-      {kv('Chapters', book.chapterCountTarget ? `${bookChapters.length} of ${book.chapterCountTarget} target` : bookChapters.length)}
-      {book.wordCountGoal != null && kv('Word goal', book.wordCountGoal.toLocaleString())}
-      {book.synopsis && <div className="wrPanelText">{book.synopsis}</div>}
-      <div className="wrPanelHead">Outline</div>
+      <div className="wrPanelHead">Unassigned plotpoints<span className="wrOutlineMeta">{unassigned.length}</span></div>
+      {unassigned.length === 0 && <div className="wrMuted">Every plotpoint has a place.</div>}
+      {unassigned.map(p => (
+        <div key={p.id} className="wrMidPoint" data-point={p.id} style={plotColorVars(plotColors(p, w.plotNodeById))} title={textOf(p, w.plotNodeById).body || undefined}>
+          {textOf(p, w.plotNodeById).title}
+        </div>
+      ))}
+
+      <div className="wrPanelHead">Book outline</div>
       {descendantsOf(index, book.id)
         .filter(n => n.kind === 'arc' || n.kind === 'chapter')
         .map(n => {
@@ -132,6 +141,12 @@ export function OutlineMid({ w }: { w: WriterWorkspace }) {
           )
         })}
       {chaptersOfBook(w.outlineNodes, book.id).length === 0 && <div className="wrMuted">No chapters yet.</div>}
+
+      <div className="wrPanelHead">Book details</div>
+      {kv('Title', nodeLabel(book))}
+      {kv('Chapters', book.chapterCountTarget ? `${bookChapters.length} of ${book.chapterCountTarget} target` : bookChapters.length)}
+      {book.wordCountGoal != null && kv('Word goal', book.wordCountGoal.toLocaleString())}
+      {book.synopsis && <div className="wrPanelText">{book.synopsis}</div>}
     </div>
   )
 }

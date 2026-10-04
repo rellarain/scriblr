@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react'
 import { getWordCounts, type WordCounts } from '../../../api/draftFetch'
 
-const NONE: WordCounts = { chapters: {}, books: {} }
+const NONE: WordCounts = { chapters: {}, books: {}, nodes: {} }
 
 // Draft word counts for a project's books and chapters, read when the
 // component mounts (or the project changes).

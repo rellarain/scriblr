@@ -94,3 +94,19 @@ def test_analytics_collects_flagged_nodes_from_outline_and_plot(client: TestClie
     plot_flag = next(f for f in flagged if f["nodeId"] == "cat_1")
     assert plot_flag["treeType"] == "plot"
     assert plot_flag["flag"]["type"] == "edit"
+
+
+def test_analytics_reports_a_word_count_for_every_node_above_a_drafted_moment(client: TestClient) -> None:
+    project_id = client.post("/api/projects", json={"title": "Node counts"}).json()["projectId"]
+    book_id, chapter_id, moment_id = _build_book_chapter_moment(client, project_id)
+    client.put(
+        f"/api/projects/{project_id}/draft/chapter/{chapter_id}/moment/{moment_id}",
+        json={"outlineNodeId": moment_id, "body": "Five little words here indeed."},
+    )
+
+    counts = client.get(f"/api/projects/{project_id}/analytics").json()["nodeWordCounts"]
+
+    assert counts[moment_id] == 5
+    assert counts[chapter_id] == 5
+    assert counts[book_id] == 5
+    assert len(counts) == 3  # the project root has no node of its own, and nothing else has text

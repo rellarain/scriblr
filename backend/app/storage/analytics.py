@@ -114,5 +114,6 @@ def get_analytics(root: Path, project_id: str) -> ProjectAnalytics:
         goals=goals,
         perBook=per_book,
         perChapter=per_chapter,
+        nodeWordCounts={node_id: count for node_id, count in rollup.items() if count > 0},
         flaggedNodes=flagged_nodes,
     )

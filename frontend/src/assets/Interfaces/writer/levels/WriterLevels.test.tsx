@@ -10,7 +10,7 @@ import WriterLevels from './WriterLevels'
 // they are stand-ins so this file exercises the frame itself.
 vi.mock('../ShelvesConsole', () => ({ default: () => <div>shelves console</div> }))
 vi.mock('../ProjectConsole', () => ({ default: () => <div>project console</div> }))
-vi.mock('../BookConsole', () => ({ default: () => <div>book console</div> }))
+vi.mock('../outline/OutlineMax', () => ({ default: () => <div>book console</div> }))
 vi.mock('../PageConsole', () => ({ default: () => <div>page console</div> }))
 vi.mock('../PagesConsole', () => ({ default: () => <div>pages console</div> }))
 vi.mock('./levelBodies', () => ({

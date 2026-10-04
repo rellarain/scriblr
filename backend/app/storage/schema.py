@@ -525,6 +525,9 @@ class ProjectAnalytics(BaseModel):
     goals: ProjectAnalyticsGoals
     perBook: list[BookWordCount] = Field(default_factory=list)
     perChapter: list[ChapterWordCount] = Field(default_factory=list)
+    # Every outline node's draft word count (a moment's own; any node above it, the sum of its moments),
+    # keyed by node id: nodes with no draft text are absent.
+    nodeWordCounts: dict[str, int] = Field(default_factory=dict)
     flaggedNodes: list[FlaggedNode] = Field(default_factory=list)
 
 

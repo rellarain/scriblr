@@ -1,4 +1,5 @@
 import { useState, type DragEvent, type ReactNode } from 'react'
+import type { OutlineNode } from '../../../api/types'
 import type { WriterWorkspace } from './useWriterWorkspace'
 import { moveNodeTo } from './outlineTree'
 
@@ -14,7 +15,12 @@ import { moveNodeTo } from './outlineTree'
 // The project's top level (series and loose books) has no parent node.
 const ROOT = '(project)'
 
-export function useNodeDnd(w: WriterWorkspace, opts: { onMergeText?: (sourceId: string, targetId: string) => void } = {}) {
+export function useNodeDnd(w: WriterWorkspace, opts: {
+  onMergeText?: (sourceId: string, targetId: string) => void
+  // A further say in where a dragged node may go, on top of the nesting rule (an editor that shows
+  // only some kinds under a parent, say, must not take the rest).
+  accepts?: (dragged: OutlineNode, parentId: string | null) => boolean
+} = {}) {
   const [dragId, setDragId] = useState<string | null>(null)
   const [dragHeight, setDragHeight] = useState(0)
   const [overKey, setOverKey] = useState<string | null>(null)
@@ -22,8 +28,12 @@ export function useNodeDnd(w: WriterWorkspace, opts: { onMergeText?: (sourceId: 
   function endDrag() { setDragId(null); setOverKey(null) }
 
   // Where a drop into (parentId, beforeId) would put the dragged node, or null when it may not go there.
-  const allowed = (parentId: string | null, beforeId: string | null) =>
-    dragId !== null && moveNodeTo(w.outlineNodes, dragId, parentId, beforeId) !== null
+  const allowed = (parentId: string | null, beforeId: string | null) => {
+    if (dragId === null || moveNodeTo(w.outlineNodes, dragId, parentId, beforeId) === null) return false
+    if (!opts.accepts) return true
+    const dragged = w.outlineNodes.find(n => n.id === dragId)
+    return Boolean(dragged) && opts.accepts(dragged!, parentId)
+  }
 
   // A drop target between the children of `parentId`: just before `beforeId`, or last when null.
   // `empty` marks a container with no children at all, whose only gap gets a taller slot while dragging.

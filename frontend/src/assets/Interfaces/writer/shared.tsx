@@ -69,13 +69,13 @@ export function DeleteControl({ message, onConfirm, tone = 'light', blockedReaso
   )
 }
 
-// The vertical column of chapter-number tabs on a book/page's right edge.
+// The vertical column of chapter-number tabs on a page's right edge.
 export function ChapterTabs({ chapters, activeId, onSelect, onAdd, variant }: {
   chapters: OutlineNode[]
   activeId: string | null
   onSelect: (chapterId: string) => void
   onAdd?: () => void
-  variant: 'page' | 'cover'
+  variant: 'page'
 }) {
   return (
     <nav className={`wrChapterTabs wrChapterTabs--${variant}`} aria-label="Chapters">

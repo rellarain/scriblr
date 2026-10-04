@@ -16,15 +16,21 @@ export async function getChapterDraft(projectId: string, chapterId: string): Pro
   }
 }
 
-export interface WordCounts { chapters: Record<string, number>; books: Record<string, number> }
+export interface WordCounts {
+  chapters: Record<string, number>
+  books: Record<string, number>
+  // Every outline node's count (moments, scenes, acts, arcs too); a node with no draft text is absent.
+  nodes: Record<string, number>
+}
 
-// Every chapter's and book's total draft word count in one call (from the
-// analytics roll-up), keyed by node id.
+// Every node's total draft word count in one call (from the analytics roll-up),
+// keyed by node id.
 export async function getWordCounts(projectId: string): Promise<WordCounts> {
   const analytics = await api.get<ProjectAnalytics>(`/projects/${encodeURIComponent(projectId)}/analytics`)
   return {
     chapters: Object.fromEntries(analytics.perChapter.map(c => [c.nodeId, c.wordCount])),
     books: Object.fromEntries(analytics.perBook.map(b => [b.nodeId, b.wordCount])),
+    nodes: analytics.nodeWordCounts ?? {},
   }
 }
 

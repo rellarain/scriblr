@@ -6,7 +6,6 @@ import { __resetSettingsForTests, getKv } from '../../../../settings/settingsSto
 import TileGrid from '../../../../components/tiles/TileGrid'
 import type { TileDef } from '../../../../components/tiles/tileTypes'
 import type { WriterWorkspace } from '../useWriterWorkspace'
-import { bookLinkTiles } from './bookTiles'
 import { shelfTiles } from './shelfTiles'
 import { shelvesTiles } from './shelvesTiles'
 
@@ -120,18 +119,5 @@ describe('Shelf tiles', () => {
     await user.click(tile('history'))
     await user.click(within(tile('history')).getByRole('button', { name: 'Open History' }))
     expect(within(screen.getByRole('region', { name: 'History' })).getByText(/version and activity/)).toBeTruthy()
-  })
-})
-
-describe('Book link tiles', () => {
-  it('are the outline template and the arc outline, as short link tiles', async () => {
-    const user = userEvent.setup()
-    grid(bookLinkTiles(workspace()), 'book')
-    expect(shapes()).toEqual(['outlineTemplate:mini', 'arcOutline:mini'])
-    expect(tile('arcOutline').getAttribute('aria-label')).toBe('Arc outline')
-    // Restore to mid first (a rail icon is click-only), then open its console.
-    await user.click(tile('arcOutline'))
-    await user.click(within(tile('arcOutline')).getByRole('button', { name: 'Open Arc outline' }))
-    expect(within(screen.getByRole('region', { name: 'Arc outline' })).getByText(/Manage this book/)).toBeTruthy()
   })
 })

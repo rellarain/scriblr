@@ -7,7 +7,7 @@ import BookScope from '../BookScope'
 import ConsoleCorner from '../../../../components/tiles/ConsoleCorner'
 import ShelvesConsole from '../ShelvesConsole'
 import ProjectConsole from '../ProjectConsole'
-import BookConsole from '../BookConsole'
+import OutlineMax from '../outline/OutlineMax'
 import PageConsole from '../PageConsole'
 import PagesConsole from '../PagesConsole'
 import LevelPanel from './LevelPanel'
@@ -61,7 +61,7 @@ function WriterLevels({ w, pagesComponent, onPagesComponent }: {
             key={level} level={level} size={size} title={book ? nodeLabel(book) : 'Book'} hue={book ? bookThemeHue(book) : undefined}
             onPromote={() => { if (book) w.openBook(book.id) }} onSetSize={setSize(level)}
           >
-            {size === 'max' ? <BookConsole w={w} /> : <OutlineMid w={w} />}
+            {size === 'max' ? <OutlineMax w={w} /> : <OutlineMid w={w} />}
           </LevelPanel>
         )
       case 'draft':

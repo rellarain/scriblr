@@ -371,6 +371,8 @@ export interface ProjectAnalytics {
   goals: ProjectAnalyticsGoals
   perBook: BookWordCount[]
   perChapter: ChapterWordCount[]
+  // Every outline node's draft word count (a moment's own, the sum of its moments above it); absent = none.
+  nodeWordCounts?: Record<string, number>
   flaggedNodes: FlaggedNode[]
 }
 

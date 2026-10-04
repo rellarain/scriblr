@@ -14,11 +14,13 @@ import { plotColors, plotColorVars } from './plotColors'
 //   'placed'  boxed inside the act, scene or moment it is placed on. Shows the plotline and
 //             field, the title and the description. Its x returns it to the margin (Outline
 //             mode); on a moment it also carries the awareness eye.
-export function PlotpointTile({ w, point, variant, onUnassign, drag, dragging, onMoment }: {
+export function PlotpointTile({ w, point, variant, onUnassign, unassignTitle, drag, dragging, onMoment }: {
   w: WriterWorkspace
   point: PlotNode
   variant: 'margin' | 'placed'
   onUnassign?: () => void
+  // The x's tooltip, when it is not the variant's usual one.
+  unassignTitle?: string
   drag?: { onDragStart: (e: DragEvent) => void; onDragEnd: () => void }
   dragging?: boolean
   // Placed on a moment: the eye shows.
@@ -48,7 +50,7 @@ export function PlotpointTile({ w, point, variant, onUnassign, drag, dragging, o
           {onUnassign && (
             <button
               type="button" className="wrPointTileX" aria-label={`Unassign ${text.title || 'plotpoint'}`}
-              title={variant === 'margin' ? 'Return to the plot editor' : 'Return to the chapter margin'} onClick={onUnassign}
+              title={unassignTitle ?? (variant === 'margin' ? 'Return to the plot editor' : 'Return to the chapter margin')} onClick={onUnassign}
             >
               <CloseIcon size={12} />
             </button>

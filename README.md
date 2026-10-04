@@ -199,6 +199,7 @@ described, now stale, in `docs/data-model.md`).
   `ActivityLogEntry` log merging tree-history and revision events.
 - **Analytics** — `ProjectAnalytics`: totals (book/chapter/scene/moment
   counts, total words), goal echoes, per-book/per-chapter word rollups,
+  `nodeWordCounts` (the draft words of every outline node, moments up),
   and every flagged outline/plot node.
 - **Schedule** — `ScheduleCompletionLog`: per-date list of completed
   checklist-item ids (derived client-side from routines/priorities/goals/
@@ -546,9 +547,17 @@ awareness that the app above already existed:
   siblings', and changing a parent pulls its children back inside their window.
   The full-range sliders (project, book) end with four neutral swatches, stored in the
   same number as 361 brown, 362 black, 363 gray, 364 white (`HUE_SWATCHES`); a swatch has
-  no hue to stay near, so what sits under one is not windowed. The levels wrap the Shelves/Shelf/Book/Page/Pages consoles' contents
-  (tile grids, book cover, chapter page, preview), still being reshaped to the
-  four-level design.
+  no hue to stay near, so what sits under one is not windowed. A book has just the
+  one colour. The **Outline level** (`writer/outline/`) at Max is the book: a
+  collapsible book editor (title, summary, colour, time system, goals), a column of
+  the **unassigned plotpoints** (drag one onto a chapter, act, scene or moment card to
+  place it; drag it back, or click its x, to unassign), the draft stats, and the book's
+  arcs, chapters, acts, scenes and moments as nested editable cards (drag the grip to
+  reorder; Enter, Shift+Enter and Ctrl+Enter add siblings and children). Each card
+  shows its draft word count (`ProjectAnalytics.nodeWordCounts`); chapters open and
+  close. At Mid it lists the unassigned plotpoints, the book outline and the book
+  details. The Dash, Project and Draft levels still wrap the older consoles' contents
+  (tile grids, chapter page, preview), being reshaped to the four-level design.
 - **`AUI.tsx`** (`feedback/` subfolder) — an admin "feedback pipeline"
   (channel/vote/tone/integrate/implement/sent/explicate tabs). This isn't a
   duplicate of anything above — it has no committed counterpart, is
