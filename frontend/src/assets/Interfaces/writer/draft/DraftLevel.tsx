@@ -88,28 +88,28 @@ function DraftPage({ w, chapter, pagesComponent, onPagesComponent }: {
 
   return (
     <div className="wrDraftLevel">
-      <ChapterTile
-        w={w} chapter={chapter} chapterWords={chapterWords} meta={meta}
-        error={w.saveStatus.error ?? draft.error ?? pubs.error}
-        tools={(
-          <>
-            <SaveControl status={status} onSave={saveAll} onRestore={restoreAll} buttonClassName="wrSmallBtn wrSaveBtn" />
-            <PublishControl
-              disabled={!hasDraft} busy={pubs.publishing}
-              title={hasDraft ? 'Publish this chapter' : 'Write some draft text to publish it'}
-              // Publish what is saved: let any waiting edit land first.
-              onPublish={async () => { await Promise.all([w.saveNow(), draft.flush()]); await pubs.publish() }}
-            />
-            <DraftPreviewToggle preview={preview} hasDraft={hasDraft} onDraft={w.showDraft} onPreview={w.showPreview} />
-            <DraftPanelButtons panel={panel} onPanel={setPanel} />
-          </>
-        )}
-      />
       <div className="wrDraftBody">
         <div className="wrPage wrPage--chapter wrSpread">
           <div className="wrSpreadLeft" aria-hidden="true" />
           <div className="wrCrease" aria-hidden="true" />
           <div className="wrSpreadRight">
+            <ChapterTile
+              w={w} chapter={chapter} chapterWords={chapterWords} meta={meta}
+              error={w.saveStatus.error ?? draft.error ?? pubs.error}
+              tools={(
+                <>
+                  <SaveControl status={status} onSave={saveAll} onRestore={restoreAll} buttonClassName="wrSmallBtn wrSaveBtn" />
+                  <PublishControl
+                    disabled={!hasDraft} busy={pubs.publishing}
+                    title={hasDraft ? 'Publish this chapter' : 'Write some draft text to publish it'}
+                    // Publish what is saved: let any waiting edit land first.
+                    onPublish={async () => { await Promise.all([w.saveNow(), draft.flush()]); await pubs.publish() }}
+                  />
+                  <DraftPreviewToggle preview={preview} hasDraft={hasDraft} onDraft={w.showDraft} onPreview={w.showPreview} />
+                  <DraftPanelButtons panel={panel} onPanel={setPanel} />
+                </>
+              )}
+            />
             {panel === 'settings' && (
               <div className="wrSpreadScroll wrDraftPanel" role="region" aria-label="Chapter settings">
                 <span className="wrLabel">Colour</span>

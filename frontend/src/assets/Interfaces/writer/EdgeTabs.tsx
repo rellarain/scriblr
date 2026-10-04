@@ -5,6 +5,9 @@ import { buildChildIndex } from './outlineTree'
 import { nodeLabel } from './plotTree'
 import type { WriterWorkspace } from './useWriterWorkspace'
 
+// How many page edges show behind the tabs.
+const LEAVES = 6
+
 interface Cluster { arc: OutlineNode | null; chapters: OutlineNode[] }
 
 // The open book's arcs and chapters, grouped as the tabs are: a cluster per arc, and the
@@ -42,39 +45,45 @@ export function EdgeTabs({ w, activeChapterId, onChapter, onArc, onAddChapter }:
   let arcNumber = 0
 
   return (
-    <nav className="wrEdgeTabs" aria-label="Arcs and chapters">
-      {clusters.map(cluster => {
-        const arc = cluster.arc
-        const n = arc ? ++arcNumber : 0
-        return (
-          <div key={arc?.id ?? cluster.chapters[0]?.id} className="wrEdgeCluster">
-            {arc && (
-              <button
-                type="button" className="wrEdgeArc" style={tint(arc)}
-                aria-label={`Arc ${n}: ${nodeLabel(arc)}`} title={`Arc ${n} · ${nodeLabel(arc)}`} onClick={() => onArc(arc.id)}
-              >
-                A{n}
-              </button>
-            )}
-            {cluster.chapters.map(c => (
-              <button
-                key={c.id} type="button" style={tint(c)}
-                className={c.id === activeChapterId ? 'wrEdgeTab wrEdgeTab--active' : 'wrEdgeTab'}
-                aria-label={`Chapter ${numberOf.get(c.id)}: ${nodeLabel(c)}`} title={`${numberOf.get(c.id)} · ${nodeLabel(c)}`}
-                aria-pressed={c.id === activeChapterId} onClick={() => onChapter(c.id)}
-              >
-                {numberOf.get(c.id)}
-              </button>
-            ))}
-          </div>
-        )
-      })}
-      {onAddChapter && (
-        <button type="button" className="wrEdgeTab wrEdgeTab--add" aria-label="Add chapter" title="Add chapter" onClick={onAddChapter}>
-          <PlusIcon size={15} />
-        </button>
-      )}
-    </nav>
+    <div className="wrEdgeRail">
+      {/* The pages behind the open one, their edges stepping out behind the tabs. */}
+      <div className="wrEdgeLeaves" aria-hidden="true">
+        {Array.from({ length: LEAVES }, (_, i) => <i key={i} style={{ '--leaf': i + 1 } as CSSProperties} />)}
+      </div>
+      <nav className="wrEdgeTabs" aria-label="Arcs and chapters">
+        {clusters.map(cluster => {
+          const arc = cluster.arc
+          const n = arc ? ++arcNumber : 0
+          return (
+            <div key={arc?.id ?? cluster.chapters[0]?.id} className="wrEdgeCluster">
+              {arc && (
+                <button
+                  type="button" className="wrEdgeArc" style={tint(arc)}
+                  aria-label={`Arc ${n}: ${nodeLabel(arc)}`} title={`Arc ${n} · ${nodeLabel(arc)}`} onClick={() => onArc(arc.id)}
+                >
+                  A{n}
+                </button>
+              )}
+              {cluster.chapters.map(c => (
+                <button
+                  key={c.id} type="button" style={tint(c)}
+                  className={c.id === activeChapterId ? 'wrEdgeTab wrEdgeTab--active' : 'wrEdgeTab'}
+                  aria-label={`Chapter ${numberOf.get(c.id)}: ${nodeLabel(c)}`} title={`${numberOf.get(c.id)} · ${nodeLabel(c)}`}
+                  aria-pressed={c.id === activeChapterId} onClick={() => onChapter(c.id)}
+                >
+                  {numberOf.get(c.id)}
+                </button>
+              ))}
+            </div>
+          )
+        })}
+        {onAddChapter && (
+          <button type="button" className="wrEdgeTab wrEdgeTab--add" aria-label="Add chapter" title="Add chapter" onClick={onAddChapter}>
+            <PlusIcon size={15} />
+          </button>
+        )}
+      </nav>
+    </div>
   )
 }
 
