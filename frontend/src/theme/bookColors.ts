@@ -89,20 +89,19 @@ export function coverColor(pal: ZonePalette, zone: ZoneKey, hue: number): HSL {
 }
 
 // The theme variables for the subtree of a book's editors: the zone's own
-// palette with the book's theme hue (and accent hue, when set) swapped in.
-// Going through deriveTokens keeps the zone's look (ink, fills, page).
-export function bookScopeVars(pal: ZonePalette, zone: ZoneKey, role: Role, themeHue: number, accentHue: number | null): ThemeVars {
+// palette with the book's hue swapped in for both the theme and the accent hue (a book has
+// the one colour). Going through deriveTokens keeps the zone's look (ink, fills, page).
+export function bookScopeVars(pal: ZonePalette, zone: ZoneKey, role: Role, themeHue: number): ThemeVars {
   // A neutral swatch tints with its nominal hue, then drops the saturation of a gray, black or white
   // (the lightness stays the zone's own, so text keeps its contrast).
   const nominal = (hue: number) => swatchOf(hue)?.color.h ?? hue
   const vars = deriveTokens(
-    { ...pal, theme: { h: nominal(themeHue) }, accent: { h: accentHue != null ? nominal(accentHue) : pal.accent.h } },
+    { ...pal, theme: { h: nominal(themeHue) }, accent: { h: nominal(themeHue) } },
     role,
     zone,
   )
-  const neutral = (hue: number | null) => hue != null && isSwatchHue(hue) && swatchOf(hue)!.color.s === 0
-  if (neutral(themeHue)) vars['--color-theme-s'] = '0%'
-  if (neutral(accentHue)) {
+  if (isSwatchHue(themeHue) && swatchOf(themeHue)!.color.s === 0) {
+    vars['--color-theme-s'] = '0%'
     vars['--color-accent-s'] = '0%'
     if (role !== 'admin') vars['--color-accent2-s'] = '0%'
   }

@@ -63,14 +63,14 @@ export function PlotOutlinePanel({ w, plotline, dragId, onDropChapter }: {
     )
   }
 
-  function chapterCard(chapter: OutlineNode, number: number, hues: { themeHue: number; accentHue: number }) {
+  function chapterCard(chapter: OutlineNode, number: number, hues: { themeHue: number }) {
     const inChapter = points.filter(p => looks.get(p.id)?.chapterId === chapter.id)
     const over = overId === chapter.id
     return (
       <div
         key={chapter.id} data-chapter={chapter.id}
         className={`wrPlotChapter${over ? ' wrPlotChapter--over' : ''}`}
-        style={{ ['--wr-plot-card' as string]: themeColorCss(hues.accentHue) }}
+        style={{ ['--wr-plot-card' as string]: themeColorCss(hues.themeHue) }}
         onDragOver={e => { if (dragId) { e.preventDefault(); setOverId(chapter.id) } }}
         onDragLeave={() => setOverId(prev => (prev === chapter.id ? null : prev))}
         onDrop={e => { e.preventDefault(); setOverId(null); if (dragId) onDropChapter(chapter.id) }}
@@ -85,13 +85,13 @@ export function PlotOutlinePanel({ w, plotline, dragId, onDropChapter }: {
     const kids = (index.get(node.id) ?? []).filter(k => SHOWN.has(k.kind))
     if (node.kind === 'chapter') {
       const themeHue = book ? bookThemeHue(book) : bookThemeHue({})
-      return chapterCard(node, chapterNumbers.get(node.id) ?? 0, { themeHue, accentHue: book?.accentHue ?? themeHue })
+      return chapterCard(node, chapterNumbers.get(node.id) ?? 0, { themeHue })
     }
     const isBook = node.kind === 'book'
     const b = isBook ? node : book
     const themeHue = b ? bookThemeHue(b) : null
     const isOpen = !collapsed.has(node.id)
-    const style = themeHue === null ? undefined : { ['--wr-plot-card' as string]: themeColorCss(themeHue), ['--wr-plot-edge' as string]: accentColorCss(b?.accentHue ?? themeHue) }
+    const style = themeHue === null ? undefined : { ['--wr-plot-card' as string]: themeColorCss(themeHue), ['--wr-plot-edge' as string]: accentColorCss(themeHue) }
     const numbers = isBook ? new Map(chaptersOfBook(w.outlineNodes, node.id).map((c, i) => [c.id, i + 1])) : chapterNumbers
     return (
       <div key={node.id} className={`wrPlotCard wrPlotCard--${node.kind}`} style={style}>

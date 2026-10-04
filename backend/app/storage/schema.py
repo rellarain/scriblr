@@ -13,9 +13,6 @@ def utcnow() -> datetime:
     return datetime.now(timezone.utc)
 
 
-# The hue a book's cover has when it has none of its own (mirrors the frontend's DEFAULT_BOOK_HUE).
-DEFAULT_BOOK_HUE = 28
-
 # A level colour is a hue (0-360), or one of the neutral swatches the full-range colour sliders
 # end with: 361 brown, 362 black, 363 gray, 364 white (mirrors the frontend's HUE_SWATCHES).
 MAX_LEVEL_HUE = 364
@@ -182,15 +179,12 @@ class OutlineNode(BaseModel):
     # OutlineNodes structurally.
     color: Optional[str] = None
     # The Writer's level colours: `themeHue` is also set on series, arcs and chapters (each
-    # within 60 degrees of its parent's hue; none = the parent's hue). On a book:
-    # the book's two hues (0-360). The theme hue is
-    # the cover / spine colour and re-tints the book's editors' surfaces (drawn
-    # with the theme's saturation and brightness); the accent hue re-tints
-    # active items (accent saturation and brightness). Every book has both: a
-    # book with no accent hue gets its theme hue (drawn more saturated), see
-    # below. A legacy hex `color` becomes the theme hue.
+    # within 60 degrees of its parent's hue; none = the parent's hue). On a book it is
+    # the book's one colour (0-360): the cover / spine colour, and the tint of the book's
+    # editors' surfaces and active items. A legacy hex `color` becomes the theme hue.
+    # (Books used to have a second, accent hue; files that still carry one load fine and
+    # drop it when next saved.)
     themeHue: Optional[int] = Field(default=None, ge=0, le=MAX_LEVEL_HUE)
-    accentHue: Optional[int] = Field(default=None, ge=0, le=MAX_LEVEL_HUE)
     chapterCountTarget: Optional[int] = None
     plotlineIds: list[str] = Field(default_factory=list)
     # Book's total word-count ambition -- drives bookshelf spine width/fill.
@@ -224,9 +218,6 @@ class OutlineNode(BaseModel):
             hue = hex_to_hue(self.color)
             if hue is not None:
                 self.themeHue = hue
-        # The secondary colour is required on a book: it starts as the primary hue.
-        if self.kind == "book" and self.accentHue is None:
-            self.accentHue = self.themeHue if self.themeHue is not None else DEFAULT_BOOK_HUE
         return self
 
 

@@ -442,8 +442,6 @@ export function useWriterWorkspace() {
       createdAt: new Date().toISOString(),
       ...patch,
     }
-    // A book's secondary colour is required: it starts as the primary hue.
-    if (kind === 'book' && node.accentHue == null) node.accentHue = node.themeHue ?? DEFAULT_BOOK_HUE
     // A new series, arc or chapter takes a hue in its window, spread away from its siblings'.
     if ((kind === 'series' || kind === 'arc' || kind === 'chapter') && node.themeHue == null) {
       const map = new Map(prev.map(n => [n.id, n]))

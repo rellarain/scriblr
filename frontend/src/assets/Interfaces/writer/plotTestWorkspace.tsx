@@ -18,7 +18,7 @@ export const outlineNode = (id: string, kind: OutlineNode['kind'], parentId: str
 
 export const OUTLINE: OutlineNode[] = [
   outlineNode('series', 'series', null, { title: 'Saga' }),
-  outlineNode('book', 'book', 'series', { title: 'Book One', themeHue: 200, accentHue: 260 }),
+  outlineNode('book', 'book', 'series', { title: 'Book One', themeHue: 200 }),
   outlineNode('arc', 'arc', 'book', { title: 'Setting out' }),
   outlineNode('ch1', 'chapter', 'arc', { title: 'Arrival' }),
   outlineNode('ch2', 'chapter', 'arc', { title: 'Storm', order: 1 }),

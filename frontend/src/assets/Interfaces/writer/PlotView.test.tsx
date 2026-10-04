@@ -207,7 +207,7 @@ describe('the eye', () => {
     toggle(/^Expand Setback/)
     const style = (first.container.querySelector('.wrPlotValue--assigned') as HTMLElement).style
     expect(style.getPropertyValue('--wr-point-bg')).toContain('--color-theme-s') // book primary, from the theme's variables
-    expect(style.getPropertyValue('--wr-point-edge')).toContain('260') // the book's secondary hue
+    expect(style.getPropertyValue('--wr-point-edge')).toContain('200') // the book's one hue
     first.unmount()
     const withEye = render(<Editor start={placed()} />)
     toggle(/^Expand Setback/)

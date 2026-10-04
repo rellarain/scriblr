@@ -8,16 +8,16 @@ import { plotColorVars, plotColors } from './plotColors'
 
 // A plotpoint's colours in the plot editor.
 //   unassigned            its category's colour, with its subcategory's edge (--wr-cat / --wr-sub)
-//   assigned to a chapter its book's primary colour, with the book's secondary as the edge
+//   assigned to a chapter its book's colour (edge and all)
 //   placed on a moment    the awareness shade of the book's hue (see awareness.ts)
 // (The chapter page keeps the category / subcategory colours: it uses plotColorVars.)
 
-export interface BookHues { book: OutlineNode | undefined; themeHue: number; accentHue: number }
+export interface BookHues { book: OutlineNode | undefined; themeHue: number }
 
 export function bookHuesOf(chapterId: string, outlineNodes: OutlineNode[]): BookHues {
   const book = nearestOfKind(outlineNodes, chapterId, 'book')
   const themeHue = book ? bookThemeHue(book) : bookThemeHue({})
-  return { book, themeHue, accentHue: book?.accentHue ?? themeHue }
+  return { book, themeHue }
 }
 
 export interface PointLook {
@@ -33,9 +33,9 @@ export function pointLook(
   const level = assignedLevel(point, outlineById)
   const chapter = chapterOfAssignment(point, outlineById)
   if (level === 'none' || !chapter) return { level: 'none', chapterId: null, style: plotColorVars(plotColors(point, plotById)) }
-  const { themeHue, accentHue } = bookHuesOf(chapter.id, outlineNodes)
+  const { themeHue } = bookHuesOf(chapter.id, outlineNodes)
   const style: Record<string, string> = {
-    '--wr-point-bg': themeColorCss(themeHue), '--wr-point-edge': accentColorCss(accentHue),
+    '--wr-point-bg': themeColorCss(themeHue), '--wr-point-edge': accentColorCss(themeHue),
   }
   const target = point.assignedMomentId ? outlineById.get(point.assignedMomentId) : undefined
   if (target?.kind === 'moment' && point.awareness) Object.assign(style, awarenessStyle(zone, themeHue, point.awareness))

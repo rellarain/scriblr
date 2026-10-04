@@ -27,9 +27,8 @@ export interface OutlineNode {
   draftRef: string | null
   flag: NodeFlag | null
   color: string | null
-  // Book-only: the cover / theme hue and the accent hue (null = the app's accent), 0-360.
+  // A level's own hue, 0-360 (or a neutral swatch): a book's colour, and the series, arc and chapter hues.
   themeHue?: number | null
-  accentHue?: number | null
   chapterCountTarget: number | null
   plotlineIds: string[]
   wordCountGoal: number | null

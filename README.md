@@ -175,7 +175,7 @@ described, now stale, in `docs/data-model.md`).
   nodes) are free-text tags used to detect keyword mentions in prose. The pure
   rules (references, deletion, migration of older plots, assignment) live in
   `frontend/src/assets/Interfaces/writer/plotFields.ts`, and run on load.
-  Book outline nodes always have both hues: `accentHue` defaults to `themeHue`.
+  A book has one colour, its `themeHue` (series, arcs and chapters have their own, within 60 degrees of their parent's).
 - **Keyboard shortcuts** (`frontend/src/lib/nodeKeys.ts`, shared by the
   outline, plot, scratchpad and admin config editors): Enter adds a sibling,
   **Shift+Enter adds a child** (one level down; single-line fields only), Ctrl+Enter

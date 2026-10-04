@@ -91,17 +91,16 @@ describe('colour css and cover colour', () => {
 
 describe('bookScopeVars', () => {
   it('swaps in the theme hue and keeps the zone saturation and lightness', () => {
-    const vars = bookScopeVars(DEFAULT_PALETTE, 'day', 'user', 200, null)
+    const vars = bookScopeVars(DEFAULT_PALETTE, 'day', 'user', 200)
     const base = deriveTokens(DEFAULT_PALETTE, 'user', 'day')
     expect(vars['--color-theme-h']).toBe('200')
     expect(vars['--color-theme-s']).toBe(base['--color-theme-s'])
     expect(vars['--color-theme-l']).toBe(base['--color-theme-l'])
-    expect(vars['--color-accent-h']).toBe(base['--color-accent-h']) // no accent override
+    expect(vars['--color-accent-h']).toBe('200') // a book has the one colour
   })
 
-  it('swaps in the accent hue when there is one', () => {
-    const vars = bookScopeVars(DEFAULT_PALETTE, 'day', 'user', 200, 90)
-    expect(vars['--color-accent-h']).toBe('90')
+  it('draws the accent at the zone accent saturation', () => {
+    const vars = bookScopeVars(DEFAULT_PALETTE, 'day', 'user', 200)
     expect(vars['--color-accent-s']).toBe(`${ZONE_LOOKS.day.accentS}%`)
     expect(vars['--on-accent']).toBeTruthy()
   })
@@ -124,7 +123,7 @@ describe('neutral swatches', () => {
   })
 
   it('tint a book scope with no saturation for gray, black and white, but not for brown', () => {
-    const vars = (hue: number) => bookScopeVars(DEFAULT_PALETTE, 'day', 'user', hue, hue)
+    const vars = (hue: number) => bookScopeVars(DEFAULT_PALETTE, 'day', 'user', hue)
     expect(vars(362)['--color-theme-s']).toBe('0%')
     expect(vars(363)['--color-accent-s']).toBe('0%')
     expect(vars(361)['--color-theme-s']).not.toBe('0%')

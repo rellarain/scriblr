@@ -52,16 +52,13 @@ function BookCover({ w, book }: { w: WriterWorkspace; book: OutlineNode }) {
   const chapters = w.activeBookChapters
   const counts = useWordCounts(w.activeProjectId)
   // The cover is the book's theme colour: its hue at the active zone's theme
-  // saturation and lightness. The accent colour (optional) uses the accent's.
+  // saturation and lightness. A book has just the one colour: its arcs and chapters have their own.
   const { settings, activeZone } = useThemeState()
   const palette = settings.zones[activeZone].palette
   const themeHue = bookThemeHue(book)
   const cover = coverColor(palette, activeZone, themeHue)
   // What the slider's hue track is drawn at (a swatch has its own, so not `cover`).
   const sliderBasis = coverColor(palette, activeZone, 0)
-  const accentFill = derivedShades(palette, 'accent', activeZone)[0].color
-  // The secondary colour is required: a book with none has its primary hue.
-  const accentHue = book.accentHue ?? themeHue
   const timeSystems = w.activeProject?.settings.timeSystems ?? []
 
   return (
@@ -89,14 +86,8 @@ function BookCover({ w, book }: { w: WriterWorkspace; book: OutlineNode }) {
             <div className="wrCoverColors">
               <div className="wrColorRow">
                 <ColorRange
-                  label="Primary colour" value={themeHue} sat={sliderBasis.s} light={sliderBasis.l} swatches
+                  label="Book colour" value={themeHue} sat={sliderBasis.s} light={sliderBasis.l} swatches
                   onChange={hue => w.setNodeHue(book.id, hue)}
-                />
-              </div>
-              <div className="wrColorRow">
-                <ColorRange
-                  label="Secondary colour" value={accentHue} sat={accentFill.s} light={accentFill.l} swatches
-                  onChange={hue => w.updateOutlineNode(book.id, { accentHue: hue })}
                 />
               </div>
             </div>
