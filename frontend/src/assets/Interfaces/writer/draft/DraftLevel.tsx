@@ -53,8 +53,8 @@ function DraftPanelButtons({ panel, onPanel }: { panel: DraftPanel; onPanel: (ne
   const toggle = (which: 'settings' | 'help') => onPanel(panel === which ? null : which)
   return (
     <span className="wrTabBar">
-      <button type="button" className={`wrTabBtn${panel === 'settings' ? ' wrTabBtn--on' : ''}`} aria-label="Settings" title="Settings" aria-pressed={panel === 'settings'} onClick={() => toggle('settings')}><GearIcon size={14} /></button>
-      <button type="button" className={`wrTabBtn${panel === 'help' ? ' wrTabBtn--on' : ''}`} aria-label="Help" title="Help" aria-pressed={panel === 'help'} onClick={() => toggle('help')}><HelpIcon size={14} /></button>
+      <button type="button" className={`wrTabBtn${panel === 'settings' ? ' wrTabBtn--on' : ''}`} aria-label="Settings" title="Settings" aria-pressed={panel === 'settings'} onClick={() => toggle('settings')}><GearIcon size={18} /></button>
+      <button type="button" className={`wrTabBtn${panel === 'help' ? ' wrTabBtn--on' : ''}`} aria-label="Help" title="Help" aria-pressed={panel === 'help'} onClick={() => toggle('help')}><HelpIcon size={18} /></button>
     </span>
   )
 }

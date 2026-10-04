@@ -72,7 +72,7 @@ export function useTabbedLevel({ storageKey, tabs, size, defaultOpen, defaultTab
               key={t.id} type="button" className={`wrTabBtn${on ? ' wrTabBtn--on' : ''}${t.end ? ' wrTabBtn--end' : ''}`}
               aria-label={t.label} title={t.label} aria-pressed={on} onClick={() => pick(t.id)}
             >
-              <t.Icon size={14} />
+              <t.Icon size={18} />
             </button>
           )
         })}
@@ -86,12 +86,12 @@ export function useTabbedLevel({ storageKey, tabs, size, defaultOpen, defaultTab
             type="button" className={`wrTabBtn${searching ? ' wrTabBtn--on' : ''}`} aria-label="Search this tab" title="Search" aria-pressed={searching}
             onClick={() => { setSearching(s => !s); setQuery('') }}
           >
-            <SearchIcon size={14} />
+            <SearchIcon size={18} />
           </button>
         )}
         {current?.newLabel && (
           <button type="button" className="wrTabBtn" aria-label={current.newLabel} title={current.newLabel} onClick={add}>
-            <PlusIcon size={14} />
+            <PlusIcon size={18} />
           </button>
         )}
         {save}

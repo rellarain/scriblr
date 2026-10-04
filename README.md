@@ -540,7 +540,7 @@ awareness that the app above already existed:
   a level's title brings the focus back, its header strip opens a Min level to Mid and
   its chevron toggles Min/Mid (remembered). Beside the Dash the Project level is a green
   tile for every project (its books on a shelf, `levelBodies.tsx` `ProjectTiles`).
-  A level's header carries its **tabs** (`levels/LevelTabs.tsx`, `useTabbedLevel`): 20×20 icon
+  A level's header carries its **tabs** (`levels/LevelTabs.tsx`, `useTabbedLevel`): 30×30 icon
   buttons, ending with Settings and Help, then quick actions (Search, a context-aware New and
   Save). At Mid one tab shows at a time; at Max each tab is a tile that its button opens or
   closes, the open tiles flowing into two columns (open tiles and the current tab are
