@@ -3,25 +3,41 @@
 .saveControl {
   display: inline-flex;
   align-items: center;
-  gap: 10px;
+  gap: 1px;
 }
 
+// The Save button with the state bubble that opens under it on hover or focus.
+.saveHover { position: relative; display: inline-flex; }
+
 .saveState {
+  position: absolute;
+  top: calc(100% + 6px);
+  right: 0;
+  z-index: 30;
+  padding: 4px 9px;
+  border-radius: 4px;
   font-size: 11px;
+  font-weight: 400;
   white-space: nowrap;
-  color: var(--ink-muted);
-  &--unsaved { color: var(--ink); }
-  // The text stays in the readable ink (the alert colour on a theme surface can be
-  // under 30 lightness points from it); the alert colour marks it with an underline.
+  font-variant-numeric: tabular-nums;
+  background: rgb(18 18 24 / 0.94);
+  color: #fff;
+  box-shadow: 0 2px 8px rgb(0 0 0 / 0.35);
+  opacity: 0;
+  visibility: hidden;
+  pointer-events: none;
+  transition: opacity 0.12s ease;
+  // The alert colour marks a failed save with an underline (it can be too close to the ink on a theme surface).
   &--error {
-    color: var(--ink);
     font-weight: 700;
     text-decoration: underline;
-    text-decoration-color: var(--alert);
+    text-decoration-color: var(--alert, #e5484d);
     text-decoration-thickness: 2px;
     text-underline-offset: 3px;
   }
 }
+.saveHover:hover .saveState,
+.saveHover:focus-within .saveState { opacity: 1; visibility: visible; }
 
 .saveBtn {
   border: 0;
@@ -45,8 +61,28 @@
   padding: 6px 9px;
   line-height: 0;
 }
-.saveState { font-variant-numeric: tabular-nums; }
 
 // "Discard unsaved changes?" with its two buttons, in place of the control.
 .saveControl--confirm .saveConfirmBtn { padding: 6px 12px; font-size: 12px; }
 .saveConfirmBtn--quiet { opacity: 0.75; }
+
+// The state dot on the Save button: amber while changes wait or are saving (it pulses), red when a save failed.
+.saveBtnState { position: relative; }
+.saveBtnState--unsaved::after,
+.saveBtnState--saving::after,
+.saveBtnState--error::after {
+  content: '';
+  position: absolute;
+  top: 3px;
+  right: 3px;
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: #f2b01e;
+  box-shadow: 0 0 0 1px rgb(0 0 0 / 0.35);
+  pointer-events: none;
+}
+.saveBtnState--saving::after { animation: saveDotPulse 1s ease-in-out infinite; }
+.saveBtnState--error::after { background: var(--alert, #e5484d); }
+@keyframes saveDotPulse { 50% { opacity: 0.3; } }
+@media (prefers-reduced-motion: reduce) { .saveBtnState--saving::after { animation: none; } }

@@ -8,7 +8,9 @@ export function formatSaveTime(at: number): string {
   return new Date(at).toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', hour12: true })
 }
 
-// A restore icon, the save state, and a floppy-disk Save button. The state is
+// A restore icon and a floppy-disk Save button, joined as one control. The save state is a dot on
+// the Save button (amber while changes wait or are being saved, red when a save failed) and its text
+// shows only while the pointer is over the button. The state text is
 // "Unsaved changes" while an edit is waiting, "Saving…", "Save failed" (the
 // error is its tooltip), or, once everything is saved, the time of the last
 // save (manual or automatic). Whether editors autosave, and how long they wait,
@@ -74,14 +76,17 @@ export function SaveControl({ status, onSave, onRestore, label = 'Save', buttonC
           <RestoreIcon size={16} />
         </button>
       )}
-      <span className={`saveState saveState--${status.state}`} role="status" title={title}>{text}</span>
-      <button
-        type="button" className={`${buttonClassName} saveIconBtn`} aria-label={label} title={label}
-        disabled={saved || busy}
-        onClick={onSave}
-      >
-        <SaveIcon size={16} />
-      </button>
+      {/* The save state (or the time of the last save) shows only while the pointer is over the Save button. */}
+      <span className="saveHover">
+        <span className={`saveState saveState--${status.state}`} role="status" title={title}>{text}</span>
+        <button
+          type="button" className={`${buttonClassName} saveIconBtn saveBtnState saveBtnState--${status.state}`} aria-label={label} title={label}
+          disabled={saved || busy}
+          onClick={onSave}
+        >
+          <SaveIcon size={16} />
+        </button>
+      </span>
       {extra}
     </span>
   )

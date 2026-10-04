@@ -51,6 +51,27 @@ describe('SaveControl', () => {
   })
 })
 
+describe('SaveControl as one control', () => {
+  it('keeps the state text beside the Save button, inside the hover wrapper that reveals it', () => {
+    render(<SaveControl status={status('saved', { lastSavedAt: 1 })} onSave={() => {}} onRestore={() => {}} />)
+    const hover = document.querySelector('.saveHover') as HTMLElement
+    expect(hover.contains(screen.getByRole('status'))).toBe(true)
+    expect(hover.contains(save())).toBe(true)
+    // The restore icon is part of the same control, outside the hover wrapper.
+    expect(hover.contains(screen.getByRole('button', { name: 'Restore last saved version' }))).toBe(false)
+    expect(document.querySelectorAll('.saveControl')).toHaveLength(1)
+  })
+
+  it('marks the Save button with the state, for the dot that stands in for the text', () => {
+    const { rerender } = render(<SaveControl status={status('saved')} onSave={() => {}} />)
+    expect(save().className).toContain('saveBtnState--saved')
+    rerender(<SaveControl status={status('unsaved')} onSave={() => {}} />)
+    expect(save().className).toContain('saveBtnState--unsaved')
+    rerender(<SaveControl status={status('error', { error: 'offline' })} onSave={() => {}} />)
+    expect(save().className).toContain('saveBtnState--error')
+  })
+})
+
 describe('SaveControl restore', () => {
   const restoreBtn = () => screen.getByRole('button', { name: 'Restore last saved version' }) as HTMLButtonElement
 
@@ -63,7 +84,7 @@ describe('SaveControl restore', () => {
     expect(restoreBtn().disabled).toBe(false)
   })
 
-  it('sits on the other side of the time from the Save button', () => {
+  it('puts the restore icon before the Save button, with the state text between in the document', () => {
     render(<SaveControl status={status('saved', { lastSavedAt: 1 })} onSave={() => {}} onRestore={() => {}} />)
     const order = [restoreBtn(), screen.getByRole('status'), save()]
     expect(order[0].compareDocumentPosition(order[1]) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
