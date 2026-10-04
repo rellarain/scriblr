@@ -1,5 +1,4 @@
 import { useCallback } from 'react'
-import { getKv } from '../../settings/settingsStore'
 import { useStoredState } from '../../assets/Interfaces/writer/storage'
 import { applyLayout, type PlacedTile } from './tileLayout'
 import {
@@ -16,13 +15,6 @@ interface SplitState {
 }
 
 const EMPTY_STATE: SplitState = { tree: null, shapes: {}, open: null, maximized: false }
-
-// Whether a grid's console was left maximized, read directly from storage -- for a
-// caller (the Writer) that needs this before the grid itself has mounted, to decide
-// whether its sidebar should start hidden.
-export function readMaximized(gridId: string): boolean {
-  return getKv<SplitState>(`scriblr.tiles.${gridId}`)?.maximized ?? false
-}
 
 // One grid's split-tree layout (each tile's place, and mini/mid state) and its
 // expanded (max) tile, remembered per user with the other saved settings

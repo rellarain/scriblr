@@ -26,7 +26,8 @@ type AsyncStatus = 'idle' | 'loading' | 'error'
 
 // Which of the five Writer consoles is showing.
 export type WuiConsole = 'shelves' | 'shelf' | 'book' | 'page' | 'pages'
-type ProjectView = 'project' | 'book' | 'page' | 'pages'
+// 'shelves' keeps the project (and its book/chapter) open while the dashboard has the focus.
+type ProjectView = 'shelves' | 'project' | 'book' | 'page' | 'pages'
 // The two modes of the chapter page (Preview is its own console, 'pages').
 export type ChapterMode = 'outline' | 'draft'
 
@@ -104,7 +105,7 @@ export function useWriterWorkspace() {
     [outlineNodes, activeChapterId],
   )
 
-  const activeConsole: WuiConsole = !hasOpenProject ? 'shelves' : view === 'project' ? 'shelf' : view
+  const activeConsole: WuiConsole = !hasOpenProject || view === 'shelves' ? 'shelves' : view === 'project' ? 'shelf' : view
 
   // A selected book/chapter that no longer exists (deleted, or the project
   // changed) falls back one level instead of leaving the interface on a
@@ -350,11 +351,16 @@ export function useWriterWorkspace() {
   }
 
   // --- navigation ---
+  // Gives the dashboard the focus without closing the open project: its book and
+  // chapter stay selected (the levels below simply stop showing).
+  function showDash() {
+    flushAll()
+    setView('shelves')
+  }
+
   function showProject() {
     flushAll()
     setView('project')
-    setActiveBookId(null)
-    setActiveChapterId(null)
   }
 
   function openBook(bookId: string) {
@@ -671,7 +677,7 @@ export function useWriterWorkspace() {
     childrenByParentId, projectRoot, books, activeBook, activeBookChapters, activeChapter,
     activeConsole, activeBookId, activeChapterId,
     loadProjects, createProject, openProject, backToShelves, deleteProject,
-    showProject, openBook, selectChapter, openChapter, showChapter, showPreview, backToBook,
+    showDash, showProject, openBook, selectChapter, openChapter, showChapter, showPreview, backToBook,
     chapterMode,
     addOutlineNode, updateOutlineNode, deleteOutlineNode, deleteSeries, moveOutlineNodeInto, toggleNodeFlag,
 

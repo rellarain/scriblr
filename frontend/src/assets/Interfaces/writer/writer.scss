@@ -93,26 +93,7 @@
     &::placeholder { color: var(--ink-faint); }
   }
 
-  // ---------------------------------------------------------------- sidebar
-  .wrSidebar {
-    position: relative;
-    flex: 0 0 264px; width: 264px; height: 100%; box-sizing: border-box; overflow-y: auto; background: var(--wr-side);
-    padding: 14px; display: flex; flex-direction: column; gap: 14px; scrollbar-width: none;
-    &::-webkit-scrollbar { display: none; }
-  }
-  // Dragged from the sidebar's right edge to set its width.
-  .wrSideResize {
-    position: absolute; top: 0; right: -4px; bottom: 0; width: 8px; z-index: 2; cursor: col-resize;
-    &::after { content: ''; position: absolute; top: 0; bottom: 0; left: 3px; width: 2px; border-radius: 1px; background: transparent; }
-    &:hover::after, &:focus-visible::after { background: color-mix(in srgb, var(--ink) 35%, transparent); }
-    &:focus-visible { outline: none; }
-  }
-  // Minimize / show the sidebar. Minimized, it is a slim rail holding the show button.
-  .wrSideToggle { align-self: flex-end; display: inline-flex; align-items: center; justify-content: center; width: 26px; height: 26px; border-radius: 4px; color: var(--ink); background: var(--ov-sink-1); &:hover { background: var(--ov-lift-2); } }
-  .wrSidebar--collapsed { flex: 0 0 40px; width: 40px; padding: 10px 6px; align-items: center; .wrSideToggle { align-self: center; } }
-  .wrSideToggle--minimize { margin: -6px 0 -6px; }
-  .wrBackLink { display: flex; align-items: center; gap: 4px; font-size: 11px; opacity: 0.75; padding: 0 2px; text-align: left; &:hover { opacity: 1; } }
-
+  // ---------------------------------------------------------------- shelves
   .wrShelf { display: flex; flex-direction: column; gap: 5px; }
   .wrShelfHeader { display: flex; align-items: center; gap: 8px; padding: 0 2px; }
   .wrShelfName--link { text-align: left; &:hover { color: var(--ink); } }
@@ -132,12 +113,27 @@
   .wrShelfSeriesLabel { max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 9px; font-weight: 700; text-transform: uppercase; letter-spacing: 1px; color: var(--wr-muted); }
   .wrShelfSeriesBooks { display: flex; align-items: flex-end; gap: 5px; min-width: 16px; min-height: 8px; }
   .wrShelfEmpty { font-size: 11px; opacity: 0.6; align-self: center; }
+  // A book on the shelf. Its spine turns (a 3D flip) into its front cover while it is the selected book.
   .wrSpine {
-    flex: 0 0 auto; width: 30px; border-radius: 0; background: var(--wr-accent-dark); color: white; padding: 8px 2px;
-    display: flex; align-items: center; justify-content: center; writing-mode: vertical-rl; font-size: 11px; font-weight: 700; letter-spacing: 0.3px;
-    box-shadow: 1px 0 3px rgb(0 0 0 / calc(0.35 * var(--shade-k))); overflow: hidden;
-    &:hover { filter: brightness(1.15); }
+    flex: 0 0 auto; position: relative; display: block; perspective: 480px; overflow: visible;
+    transition: width 0.45s ease; background: transparent;
+    &:hover .wrSpineSide, &:hover .wrSpineFront { filter: brightness(1.15); }
   }
+  .wrSpineFlip { position: absolute; inset: 0; display: block; transform-style: preserve-3d; transition: transform 0.45s ease; }
+  .wrSpine--active .wrSpineFlip { transform: rotateY(180deg); }
+  .wrSpineSide, .wrSpineFront {
+    position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; overflow: hidden;
+    background: var(--wr-spine, var(--wr-accent-dark)); color: white; backface-visibility: hidden;
+    box-shadow: 1px 0 3px rgb(0 0 0 / calc(0.35 * var(--shade-k)));
+  }
+  .wrSpineSide { padding: 8px 2px; writing-mode: vertical-rl; font-size: 11px; font-weight: 700; letter-spacing: 0.3px; }
+  .wrSpineFront {
+    transform: rotateY(180deg); padding: 10px 8px; border-radius: 0 3px 3px 0;
+    background: linear-gradient(135deg, var(--wr-spine, var(--wr-accent-dark)), color-mix(in srgb, var(--wr-spine, var(--wr-accent-dark)) 65%, black));
+    box-shadow: inset 4px 0 0 rgb(0 0 0 / 0.25), 1px 0 3px rgb(0 0 0 / calc(0.35 * var(--shade-k)));
+  }
+  .wrSpineFrontTitle { font-family: Georgia, 'Times New Roman', serif; font-size: 9px; font-weight: 700; letter-spacing: 0.4px; text-transform: uppercase; text-align: center; line-height: 1.3; overflow-wrap: break-word; }
+  @media (prefers-reduced-motion: reduce) { .wrSpine, .wrSpineFlip { transition: none; } }
   // With a book open, the other spines on the shelf are darkened.
   .wrShelfBooks--picked .wrSpine:not(.wrSpine--active) { filter: brightness(0.55); &:hover { filter: brightness(0.8); } }
   .wrNewProject {
@@ -165,17 +161,45 @@
   .wrOutlineMeta { margin-left: auto; opacity: 0.6; font-weight: 400; font-size: 10px; white-space: nowrap; }
 
   // ---------------------------------------------------------------- main
-  .wrMain { flex: 1 1 auto; min-width: 0; height: 100%; display: flex; flex-direction: row; }
   // A book's editors (BookScope.tsx): the tokens are re-derived from the book's hues. The
   // page background and icon column behind them stay the user's own theme background.
   .wrBookScope { @include wrAliases; color: var(--ink); }
   .wrBookScope--flow { display: contents; }
-  .wrContent { flex: 1 1 auto; min-width: 0; min-height: 0; height: 100%; box-sizing: border-box; display: flex; flex-direction: column; padding: 0 16px 14px 14px; position: relative; }
-  .wrContent--flush { padding: 0 6px 0 10px; }
-  // Chapter page and Preview: the paper fills the console and the chapter tabs sit flush against its right
-  // edge (like the book cover's); the title row keeps the usual inset.
-  .wrContent--edge { padding: 0 0 14px 10px; > .wrTitleRow { padding-right: 16px; } }
-  .wrContent--edge .wrPreviewToolbar { padding-right: 16px; }
+  // ---------------------------------------------------------------- levels
+  // The Writer's four stacked levels (writer/levels/): Dash, Project, Outline, Draft. Each is a
+  // tinted panel; the tint is the active theme's hue, offset per level (a level's own hue comes later).
+  .wrLevels { flex: 1 1 auto; min-width: 0; height: 100%; box-sizing: border-box; display: flex; flex-direction: row; gap: 10px; padding: 10px; }
+  .wrLevelsSide { flex: 0 0 clamp(280px, 32%, 460px); min-width: 0; min-height: 0; display: flex; flex-direction: column; gap: 10px; }
+  .wrLevels--focus-dash > .wrLevel--dash { flex: 2 1 0; }
+  .wrLevels--focus-dash > .wrLevel--project { flex: 1 1 0; }
+  .wrLevel {
+    --wr-level-h: var(--color-theme-h);
+    display: flex; flex-direction: column; min-width: 0; min-height: 0; overflow: hidden; border-radius: 12px;
+    background: color-mix(in srgb, hsl(var(--wr-level-h) var(--color-theme-s) var(--color-theme-l)) 26%, var(--surface-raised-a));
+    box-shadow: inset 0 0 0 1px var(--hairline);
+    &--project { --wr-level-h: calc(var(--color-theme-h) + 120); }
+    &--draft { --wr-level-h: calc(var(--color-theme-h) + 60); }
+    &--max { flex: 1 1 0; }
+  }
+  .wrLevelsSide > .wrLevel--mid { flex: 1 1 0; }
+  .wrLevelsSide > .wrLevel--min { flex: 0 0 auto; }
+  .wrLevelHeader {
+    flex: 0 0 auto; display: flex; align-items: center; gap: 8px; min-height: 40px; box-sizing: border-box; padding: 6px 14px;
+    background: rgb(0 0 0 / calc(0.16 * var(--shade-k)));
+    &--min { cursor: pointer; &:hover { background: rgb(0 0 0 / calc(0.24 * var(--shade-k))); } }
+  }
+  .wrLevelTitle { margin: 0; flex: 1 1 auto; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; text-align: left; font-size: 15px; font-weight: 700; color: var(--ink); }
+  .wrLevelTitle--link:hover { text-decoration: underline; }
+  .wrLevelToggle { flex: 0 0 auto; display: inline-flex; align-items: center; justify-content: center; width: 24px; height: 24px; border-radius: 4px; color: var(--ink); &:hover { background: var(--ov-lift-2); } }
+  .wrLevelBody { flex: 1 1 auto; min-height: 0; box-sizing: border-box; display: flex; flex-direction: column; position: relative; padding: 0 12px 12px; }
+  .wrLevel--mid .wrLevelBody { overflow-y: auto; scrollbar-width: none; &::-webkit-scrollbar { display: none; } }
+  .wrLevelMinBody { padding: 8px 14px 12px; display: flex; flex-direction: column; gap: 12px; overflow-y: auto; scrollbar-width: none; &::-webkit-scrollbar { display: none; } }
+  .wrOutlineMid { display: flex; flex-direction: column; gap: 5px; font-size: 12px; line-height: 1.4; padding-top: 8px; }
+  // The book editor has no title row of its own; the chapter page and Preview run their paper flush to the right
+  // edge, so the chapter tabs sit against it (like the book cover's).
+  .wrLevel--outline.wrLevel--max .wrLevelBody { padding: 0 6px 0 10px; }
+  .wrLevel--draft .wrLevelBody { padding: 0 0 14px 10px; > .wrTitleRow { padding-right: 16px; } }
+  .wrLevel--draft .wrPreviewToolbar { padding-right: 16px; }
   .wrConsoleBody--tiles { overflow: hidden; }
   .tileScroll > .wrCoverWrap { min-height: 420px; }
   .wrConsoleBody { flex: 1 1 auto; min-height: 0; display: flex; flex-direction: column; overflow-y: auto; scrollbar-width: none; &::-webkit-scrollbar { display: none; } }

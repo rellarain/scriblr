@@ -531,12 +531,17 @@ entire committed frontend described in the previous section — `app/`,
 untracked stack under `frontend/src/assets/Interfaces/`, built without
 awareness that the app above already existed:
 
-- **`WUI.tsx`** (`writer/` subfolder) — a "bookshelf" drill-down editor for
-  projects/outline: one focused node at a time, a read-only ancestry
-  breadcrumb, book-spine/page-thumb visuals. It duplicates a smaller subset
-  of what `outline/` + `workspace/` already do above — no plot tree, no
-  chapter drafting/moments, no revisions, no analytics/schedule/scrap/
-  export.
+- **`WUI.tsx`** (`writer/` subfolder) — the Writer: four stacked, tinted **levels**
+  (`writer/levels/`) — Dash, Project, Outline (the open book) and Draft (the open
+  chapter) — each Min, Mid or Max. One level has the focus (Max); the level above it
+  is Mid and everything further up Min, the levels below it are not shown
+  (`levelSizes.ts`). Opening a project, book or chapter moves the focus down a level;
+  a level's title brings the focus back, its header strip opens a Min level to Mid and
+  its chevron toggles Min/Mid (remembered). Beside the Dash the Project level is the
+  shelf of every project. The selected book's spine swivels into its cover
+  (`Shelf.tsx`). The levels wrap the Shelves/Shelf/Book/Page/Pages consoles' contents
+  (tile grids, book cover, chapter page, preview), still being reshaped to the
+  four-level design.
 - **`AUI.tsx`** (`feedback/` subfolder) — an admin "feedback pipeline"
   (channel/vote/tone/integrate/implement/sent/explicate tabs). This isn't a
   duplicate of anything above — it has no committed counterpart, is

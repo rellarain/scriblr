@@ -1,0 +1,53 @@
+import type { ReactNode } from 'react'
+import { ChevronDownIcon, ChevronRightIcon } from '../../../icons'
+import type { Level, LevelSize } from './levelSizes'
+
+// One tinted level of the Writer frame. Its header strip is how it changes size:
+// clicking a Min level's strip opens it to Mid, the title promotes it to the focus
+// (Max), and the chevron toggles Min/Mid. The focused (Max) level just shows its title.
+function LevelPanel({ level, size, title, onPromote, onSetSize, locked = false, minBody, children }: {
+  level: Level
+  size: Exclude<LevelSize, 'hidden'>
+  title: string
+  onPromote: () => void
+  onSetSize: (size: 'min' | 'mid') => void
+  // No Min/Mid toggle (the project shelves beside the Dash have only one size).
+  locked?: boolean
+  // What a Min level shows under its header strip (the book spines, say).
+  minBody?: ReactNode
+  children?: ReactNode
+}) {
+  const isMin = size === 'min'
+  const canToggle = size !== 'max' && !locked
+  return (
+    <section
+      className={`wrLevel wrLevel--${level} wrLevel--${size}`}
+      aria-label={`${title} (${size})`} data-level={level} data-size={size}
+    >
+      <div
+        className={isMin && !locked ? 'wrLevelHeader wrLevelHeader--min' : 'wrLevelHeader'}
+        onClick={isMin && !locked ? () => onSetSize('mid') : undefined}
+      >
+        {size === 'max' || locked
+          ? <h2 className="wrLevelTitle">{title}</h2>
+          : (
+            <button type="button" className="wrLevelTitle wrLevelTitle--link" title={`Open ${title}`} onClick={e => { e.stopPropagation(); onPromote() }}>
+              {title}
+            </button>
+          )}
+        {canToggle && (
+          <button
+            type="button" className="wrLevelToggle"
+            aria-label={isMin ? `Expand ${title}` : `Minimize ${title}`}
+            onClick={e => { e.stopPropagation(); onSetSize(isMin ? 'mid' : 'min') }}
+          >
+            {isMin ? <ChevronRightIcon size={14} /> : <ChevronDownIcon size={14} />}
+          </button>
+        )}
+      </div>
+      {isMin ? minBody : <div className="wrLevelBody">{children}</div>}
+    </section>
+  )
+}
+
+export default LevelPanel

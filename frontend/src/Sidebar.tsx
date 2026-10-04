@@ -28,8 +28,7 @@ interface SidebarProps {
 }
 
 // Dragged to set AUI's own width: pointer-drag resizes (clamped and snapped to 400px
-// columns by the caller), like the Writer sidebar's own resize handle
-// (assets/Interfaces/writer/WuiSidebar.tsx) but AUI can sit on either screen edge, so
+// columns by the caller). AUI can sit on either screen edge, so
 // the drag direction flips with handedness (AUI is always the outer side -- see
 // .sidebar's DOM-order comment in App.scss).
 function AuiResize({ side, width, onWidthChange }: { side: Handedness; width: number; onWidthChange: (width: number) => void }) {
