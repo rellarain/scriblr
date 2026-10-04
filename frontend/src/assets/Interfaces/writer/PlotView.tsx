@@ -11,6 +11,7 @@ import { plotColors, plotColorVars } from './plotColors'
 import { assignedLevel, nodeLabel, sortByTitle } from './plotTree'
 import { FieldEditor, FieldGroups, type PlotDrag, type PlotUi } from './FieldBlocks'
 import { PlotOutlinePanel } from './PlotOutlinePanel'
+import { PlotOrderToggle, usePlotOrder } from './plotOrder'
 import { fieldIndex, isScrapField, orderValues, valuesIn } from './plotFields'
 
 // Project Plot: a collapsible navigation column (categories > subcategories
@@ -235,6 +236,7 @@ function PlotlineEditor({ w, node, ui }: { w: WriterWorkspace; node: PlotNode; u
               <input type="checkbox" role="switch" checked={showAssigned} onChange={e => setShowAssigned(e.target.checked)} />
               <span>Show assigned</span>
             </label>
+            <PlotOrderToggle />
           </div>
           <FieldGroups w={w} plotline={node} ui={ui} drag={drag} showAssigned={showAssigned} />
         </div>
@@ -253,6 +255,7 @@ function PlotlineEditor({ w, node, ui }: { w: WriterWorkspace; node: PlotNode; u
 const isBlank = (text: string | undefined) => !text || text.trim() === ''
 
 export default function PlotView({ w }: { w: WriterWorkspace }) {
+  const [plotOrder] = usePlotOrder()
   const node = w.focusedPlotNode
   // Kinds of nodes created a moment ago (the workspace maps have not updated yet),
   // so focusing one can also open its editor.
@@ -287,7 +290,7 @@ export default function PlotView({ w }: { w: WriterWorkspace }) {
   const siblingValues = (id: string) => {
     const v = w.plotNodeById.get(id)
     if (!v?.parentId || !v.fieldId) return [id]
-    return orderValues(valuesIn(w.plotNodes, v.parentId, v.fieldId), w.outlineNodes, w.activeProject?.settings.timeSystems ?? []).map(x => x.id)
+    return orderValues(valuesIn(w.plotNodes, v.parentId, v.fieldId), w.outlineNodes, w.activeProject?.settings.timeSystems ?? [], plotOrder).map(x => x.id)
   }
   const keys = useNodeKeys({
     parentOf: id => {

@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import type { PlotNode } from '../../../api/types'
 import { ChevronDownIcon, ChevronRightIcon, GripIcon, PlusIcon } from '../../icons'
+import { usePlotOrder } from './plotOrder'
 import { FIELD_NAME_MAX, fieldGroups, isScrapField, orderValues, valuesIn, canMoveValue, type FieldInfo, type FieldScope } from './plotFields'
 import { PlotValueCard } from './PlotValueCard'
 import { assignedLevel, nodeLabel } from './plotTree'
@@ -47,7 +48,8 @@ export function FieldBlock({ w, info, holder, editable, ui, drag, showAssigned }
   const scrap = isScrapField(def)
   const outlineById = new Map(w.outlineNodes.map(n => [n.id, n]))
   const all = valuesIn(w.plotNodes, holder.id, def.id)
-  const shown = orderValues(all, w.outlineNodes, w.activeProject?.settings.timeSystems ?? [])
+  const [plotOrder] = usePlotOrder()
+  const shown = orderValues(all, w.outlineNodes, w.activeProject?.settings.timeSystems ?? [], plotOrder)
     .filter(v => showAssigned || assignedLevel(v, outlineById) === 'none')
   const open = ui.isOpen(def.id)
   const unassigned = all.filter(v => assignedLevel(v, outlineById) === 'none').length

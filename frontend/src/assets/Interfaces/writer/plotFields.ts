@@ -85,10 +85,10 @@ export function textOf(point: PlotNode, index: Map<string, PlotNode>): { title: 
 }
 
 // Unassigned values first, then the assigned ones by book, then chapter.
-export function orderValues(points: PlotNode[], outlineNodes: OutlineNode[], systems: TimeSystem[]): PlotNode[] {
+export function orderValues(points: PlotNode[], outlineNodes: OutlineNode[], systems: TimeSystem[], mode: 'time' | 'story' = 'time'): PlotNode[] {
   const outlineById = new Map(outlineNodes.map(n => [n.id, n]))
   const open = points.filter(p => assignedLevel(p, outlineById) === 'none').sort((a, b) => a.order - b.order)
-  const placed = orderAssignedPlotpoints(points.filter(p => assignedLevel(p, outlineById) !== 'none'), outlineNodes, systems)
+  const placed = orderAssignedPlotpoints(points.filter(p => assignedLevel(p, outlineById) !== 'none'), outlineNodes, systems, mode)
   return [...open, ...placed]
 }
 

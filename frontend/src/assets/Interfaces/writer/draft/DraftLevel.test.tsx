@@ -84,6 +84,18 @@ const tile = () => document.querySelector<HTMLElement>('.wrChapterTile')!
 const left = () => document.querySelector<HTMLElement>('.wrSpreadLeft')!
 const right = () => document.querySelector<HTMLElement>('.wrSpreadRight')!
 
+describe('Draft level: the plotpoint footnotes', () => {
+  it('have the By time | In story toggle, shared with the other plotpoint lists', async () => {
+    const { user } = setup()
+    const notes = screen.getByRole('region', { name: 'Plotpoints in this chapter' })
+    const toggle = within(notes).getByRole('group', { name: 'Plotpoint order' })
+    expect(within(toggle).getByRole('button', { name: 'By time' }).getAttribute('aria-pressed')).toBe('true')
+    await user.click(within(toggle).getByRole('button', { name: 'In story' }))
+    expect(within(toggle).getByRole('button', { name: 'In story' }).getAttribute('aria-pressed')).toBe('true')
+    expect(within(notes).getByText('They meet')).toBeTruthy()
+  })
+})
+
 describe('Draft level: Settings and Help', () => {
   it("swap the right page for the chapter's colour or the help, and the same button puts the page back", async () => {
     const { user } = setup()
@@ -224,6 +236,24 @@ describe('Draft level: Draft | Preview', () => {
     expect(within(tile()).getByText('Chapter 1')).toBeTruthy()
     await user.click(screen.getByRole('button', { name: 'Draft' }))
     expect(spies.showDraft).toHaveBeenCalled()
+  })
+
+  it("lays the preview out as the book's preview formatting says, and by default as the preview's own look", () => {
+    INITIAL.bodies = { m1: 'Some text' }
+    const first = setup({ console_: 'pages' })
+    const pane = () => document.querySelector<HTMLElement>('.wrPreviewPane')!
+    expect(pane().style.getPropertyValue('--wr-pv-size')).toBe('17px')
+    first.unmount()
+    const book = OUTLINE.findIndex(n => n.id === 'b')
+    const original = OUTLINE[book]
+    OUTLINE[book] = { ...original, previewFormat: { fontFamily: 'mono', fontSize: 22, fontStyle: 'italic', fontWeight: 'bold', textAlign: 'left', lineSpacing: 2, paragraphIndent: 1.5, paragraphSpacing: 0.5 } }
+    try {
+      setup({ console_: 'pages' })
+      expect(pane().style.getPropertyValue('--wr-pv-size')).toBe('22px')
+      expect(pane().style.getPropertyValue('--wr-pv-style')).toBe('italic')
+      expect(pane().style.getPropertyValue('--wr-pv-indent')).toBe('1.5em')
+      expect(pane().style.getPropertyValue('--wr-pv-align')).toBe('left')
+    } finally { OUTLINE[book] = original }
   })
 
   it('keeps the tile and takes the cards away when previewing', () => {

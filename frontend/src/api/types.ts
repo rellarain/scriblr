@@ -17,6 +17,18 @@ export interface NodeFlag {
   note: string
 }
 
+// How a book's chapters are laid out in the preview (backend PreviewFormat).
+export interface PreviewFormat {
+  fontFamily: 'serif' | 'sans' | 'mono'
+  fontSize: number
+  fontStyle: 'normal' | 'italic'
+  fontWeight: 'normal' | 'bold'
+  textAlign: 'left' | 'justify'
+  lineSpacing: number
+  paragraphIndent: number
+  paragraphSpacing: number
+}
+
 export interface OutlineNode {
   id: string
   kind: OutlineNodeKind
@@ -34,6 +46,8 @@ export interface OutlineNode {
   wordCountGoal: number | null
   // Book-only: which of the project's time systems its scenes use.
   timeSystemId?: string | null
+  // Book-only: the preview's layout (none = the defaults).
+  previewFormat?: PreviewFormat | null
   // Scene-only (see backend OutlineNode): where/when/what instead of a
   // title and synopsis. Absent on trees saved before these fields existed.
   // `timeValue` is one number per unit of the book's time system.

@@ -80,8 +80,9 @@ export function chapterOfAssignment(
 //   - assigned to a scene: that scene; to a moment: its scene;
 //   - assigned to an act or chapter: the first scene inside it that has a Time;
 //   - assigned to a book: no scene (sorts by position).
+// In 'story' mode the Time is left out: by book, then outline position only.
 export function orderAssignedPlotpoints(
-  points: PlotNode[], outlineNodes: OutlineNode[], systems: TimeSystem[],
+  points: PlotNode[], outlineNodes: OutlineNode[], systems: TimeSystem[], mode: 'time' | 'story' = 'time',
 ): PlotNode[] {
   const byId = new Map(outlineNodes.map(n => [n.id, n]))
   const index = buildChildIndex(outlineNodes)
@@ -117,7 +118,7 @@ export function orderAssignedPlotpoints(
   const keyed = points.map(p => ({ p, k: keyOf(p) }))
   keyed.sort((a, b) =>
     a.k.book - b.k.book
-    || compareTimeValues(a.k.system, a.k.time, b.k.time)
+    || (mode === 'time' ? compareTimeValues(a.k.system, a.k.time, b.k.time) : 0)
     || a.k.position - b.k.position
     || a.k.order - b.k.order)
   return keyed.map(x => x.p)

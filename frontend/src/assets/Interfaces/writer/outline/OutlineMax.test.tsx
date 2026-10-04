@@ -295,6 +295,32 @@ describe('Outline Max: the book editor and the draft stats', () => {
     expect(within(editor).getByRole('progressbar', { name: 'Word goal progress' }).getAttribute('aria-valuenow')).toBe('1') // 12 of 1,000
   })
 
+  it("edits the book's preview formatting under Settings, and resets it to the defaults", async () => {
+    const { user } = setup('c1')
+    const editor = screen.getByRole('region', { name: 'Book editor' })
+    await user.click(within(editor).getByRole('button', { name: 'Settings' }))
+    const size = within(editor).getByLabelText('Font size') as HTMLInputElement
+    expect(size.value).toBe('17')
+    expect((within(editor).getByRole('button', { name: /Reset to the defaults/ }) as HTMLButtonElement).disabled).toBe(true)
+    await user.clear(size)
+    await user.type(size, '21')
+    expect((within(editor).getByLabelText('Font size') as HTMLInputElement).value).toBe('21')
+    await user.click(within(editor).getByRole('button', { name: 'Italic' }))
+    expect(within(editor).getByRole('button', { name: 'Italic' }).getAttribute('aria-pressed')).toBe('true')
+    await user.selectOptions(within(editor).getByLabelText('Preview font'), 'mono')
+    expect((within(editor).getByLabelText('Preview font') as HTMLSelectElement).value).toBe('mono')
+    // Out-of-range values are held to the limits.
+    const spacing = within(editor).getByLabelText('Line spacing') as HTMLInputElement
+    await user.clear(spacing)
+    await user.type(spacing, '9')
+    await user.tab() // leaving the field holds it to the limits
+    expect(Number((within(editor).getByLabelText('Line spacing') as HTMLInputElement).value)).toBe(3)
+
+    await user.click(within(editor).getByRole('button', { name: /Reset to the defaults/ }))
+    expect((within(editor).getByLabelText('Font size') as HTMLInputElement).value).toBe('17')
+    expect(within(editor).getByRole('button', { name: 'Italic' }).getAttribute('aria-pressed')).toBe('false')
+  })
+
   it('opens and closes the tray, the stats and the cards with their tabs', async () => {
     const { user } = setup('c1')
     const editor = screen.getByRole('region', { name: 'Book editor' })

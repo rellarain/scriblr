@@ -560,6 +560,15 @@
   .wrBookEdMeta { margin-right: auto; font-size: 11px; opacity: 0.7; white-space: nowrap; }
   .wrBookEdBody { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px 16px; padding: 4px 14px 14px; }
   .wrBookEdField { display: flex; flex-direction: column; gap: 2px; min-width: 0; &--wide { grid-column: 1 / -1; } }
+  // By time | In story: two small buttons, the chosen one filled.
+  .wrOrderToggle { display: inline-flex; align-self: flex-start; margin-left: auto; font-size: 10px; }
+  .wrOrderBtn { padding: 2px 8px; font-size: 10px; font-weight: 700; color: inherit; background: color-mix(in srgb, currentColor 10%, transparent); &:hover { background: color-mix(in srgb, currentColor 20%, transparent); } &--on { background: var(--wr-accent); color: var(--on-accent); } }
+  .wrSummary { display: flex; flex-direction: column; gap: 6px; font-size: 12px; line-height: 1.4; }
+  .wrPlacedList { display: flex; flex-direction: column; gap: 5px; margin-top: 8px; }
+  .wrMidPointAt { display: block; font-size: 10px; opacity: 0.7; }
+  .wrFormatFields { border: 0; margin: 0; padding: 0; min-width: 0; display: flex; flex-direction: column; gap: 8px; align-items: flex-start; }
+  .wrFormatGrid { display: grid; grid-template-columns: repeat(auto-fill, minmax(130px, 1fr)); gap: 8px 12px; width: 100%; }
+  .wrFormatStyle { display: flex; gap: 4px; }
   .wrBookEdBody--compact { grid-template-columns: minmax(0, 1fr); padding: 0; }
   .wrBookEdHelp { padding: 4px 14px 14px; max-height: 40vh; overflow-y: auto; }
   .wrDraftPanel { color: var(--wr-ink); display: flex; flex-direction: column; gap: 8px; padding: 22px 26px; }
@@ -678,7 +687,14 @@
   .wrPreviewTitle { font-family: Georgia, 'Times New Roman', serif; font-size: 30px; font-weight: 700; }
   .wrPreviewIndent { padding-left: 56px; }
   .wrPreviewPara { position: relative; padding-left: 56px; flex: 0 0 auto; }
-  .wrPreviewText { margin: 0; font-family: Georgia, 'Times New Roman', serif; font-size: 17px; line-height: 28px; text-align: justify; }
+  // The book's preview formatting (previewFormat.ts) arrives as variables on the pane; these are its defaults.
+  .wrPreviewText {
+    margin: 0; font-family: var(--wr-pv-font, Georgia, 'Times New Roman', serif); font-size: var(--wr-pv-size, 17px); font-style: var(--wr-pv-style, normal);
+    font-weight: var(--wr-pv-weight, normal); line-height: var(--wr-pv-line, 1.65); text-align: var(--wr-pv-align, justify); text-indent: var(--wr-pv-indent, 0);
+  }
+  // The app's element reset sets a font on every span; the sentences take the paragraph's.
+  .wrPreviewText .wrSentence { font: inherit; }
+  .wrPreviewPara + .wrPreviewPara { margin-top: var(--wr-pv-gap, 0); }
   // Day / night: the Preview page is white with black text, or dark with light text.
   .wrPage--day { --wr-page: #fff; --wr-ink: #000; --wr-page-line: #d8d8d8; --wr-page-muted: #555; }
   .wrPage--night {

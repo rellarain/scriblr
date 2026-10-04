@@ -6,7 +6,8 @@ import { buildChildIndex, chaptersOfBook, descendantsOf } from '../outlineTree'
 import BookSettings from '../outline/BookSettings'
 import { unassignedPlotpoints } from '../outline/outlineModel'
 import { textOf } from '../plotFields'
-import { nodeLabel } from '../plotTree'
+import { PlotOrderToggle, usePlotOrder } from '../plotOrder'
+import { assignedLevel, nodeLabel, orderAssignedPlotpoints } from '../plotTree'
 import { plotColorVars, plotColors } from '../plotColors'
 import { Placeholder } from '../shared'
 import { useWordCounts } from '../useWordCounts'
@@ -32,6 +33,35 @@ export function UnassignedList({ w }: { w: WriterWorkspace }) {
       {unassigned.map(p => (
         <div key={p.id} className="wrMidPoint" data-point={p.id} style={plotColorVars(plotColors(p, w.plotNodeById))} title={textOf(p, w.plotNodeById).body || undefined}>
           {textOf(p, w.plotNodeById).title}
+        </div>
+      ))}
+      <PlacedList w={w} />
+    </div>
+  )
+}
+
+// The plotpoints already placed in this book, by the time of their scenes or in story order.
+export function PlacedList({ w }: { w: WriterWorkspace }) {
+  const [order] = usePlotOrder()
+  const book = w.activeBook
+  const placed = useMemo(() => {
+    if (!book) return []
+    const byId = new Map(w.outlineNodes.map(n => [n.id, n]))
+    const inBook = new Set([book.id, ...descendantsOf(buildChildIndex(w.outlineNodes), book.id).map(n => n.id)])
+    const mine = w.plotNodes.filter(p => p.kind === 'plotpoint' && p.assignedMomentId && inBook.has(p.assignedMomentId) && assignedLevel(p, byId) !== 'none')
+    return orderAssignedPlotpoints(mine, w.outlineNodes, w.activeProject?.settings.timeSystems ?? [], order)
+  }, [book, w.outlineNodes, w.plotNodes, w.activeProject, order])
+  if (!book) return null
+  const target = (id: string | null) => w.outlineNodes.find(n => n.id === id)
+  return (
+    <div className="wrPlacedList">
+      <div className="wrPanelHead">Placed plotpoints<span className="wrOutlineMeta">{placed.length}</span></div>
+      <PlotOrderToggle />
+      {placed.length === 0 && <div className="wrMuted">None placed yet.</div>}
+      {placed.map(p => (
+        <div key={p.id} className="wrMidPoint" data-placed={p.id} style={plotColorVars(plotColors(p, w.plotNodeById))} title={textOf(p, w.plotNodeById).body || undefined}>
+          {textOf(p, w.plotNodeById).title}
+          <span className="wrMidPointAt">{nodeLabel(target(p.assignedMomentId) ?? book)}</span>
         </div>
       ))}
     </div>

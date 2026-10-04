@@ -117,4 +117,12 @@ describe('orderAssignedPlotpoints', () => {
     expect(ids([point('two', 's4'), point('one', 's1')])).toEqual(['one', 'two'])
     expect(ids([point('b', 's1', 2), point('a', 's1', 1)])).toEqual(['a', 'b'])
   })
+
+  it("in story order leaves the Time out: by book, then where they sit in the outline", () => {
+    const story = (points: PlotNode[]) => orderAssignedPlotpoints(points, nodes, systems, 'story').map(p => p.id)
+    // s1 comes before s2 in the outline though it is later in time.
+    expect(story([point('late', 's1'), point('early', 's2')])).toEqual(['late', 'early'])
+    expect(ids([point('late', 's1'), point('early', 's2')])).toEqual(['early', 'late'])
+    expect(story([point('two', 's4'), point('one', 's1')])).toEqual(['one', 'two'])
+  })
 })

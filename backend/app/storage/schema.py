@@ -168,6 +168,20 @@ class NodeFlag(BaseModel):
     note: str = ""
 
 
+class PreviewFormat(BaseModel):
+    """How a book's chapters are laid out in the Draft level's preview (all optional: the defaults
+    are the preview's own look). Sizes are bounded so a bad value cannot make the page unreadable."""
+
+    fontFamily: Literal["serif", "sans", "mono"] = "serif"
+    fontSize: int = Field(default=17, ge=10, le=32)  # px
+    fontStyle: Literal["normal", "italic"] = "normal"
+    fontWeight: Literal["normal", "bold"] = "normal"
+    textAlign: Literal["left", "justify"] = "justify"
+    lineSpacing: float = Field(default=1.65, ge=1.0, le=3.0)  # multiple of the font size
+    paragraphIndent: float = Field(default=0.0, ge=0.0, le=4.0)  # em
+    paragraphSpacing: float = Field(default=0.0, ge=0.0, le=3.0)  # em between paragraphs
+
+
 class OutlineNode(BaseModel):
     id: str
     kind: OutlineNodeKind
@@ -202,6 +216,8 @@ class OutlineNode(BaseModel):
     # Set only on "book" nodes: which of the project's time systems this
     # book's scenes use (None = the project's first system).
     timeSystemId: Optional[str] = None
+    # Set only on "book" nodes: the layout of its chapters in the preview (None = the defaults).
+    previewFormat: Optional[PreviewFormat] = None
     # Set only on "scene" nodes: a scene is described by where and when it
     # happens and what happens, rather than by a title/synopsis. Same
     # convention as the book-only fields above (generic OutlineNode, unused

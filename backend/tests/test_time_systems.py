@@ -80,3 +80,24 @@ def test_old_free_text_time_is_dropped(client: TestClient) -> None:
     assert "time" not in scene
     assert scene["timeValue"] == {}
     assert scene["location"] == "Harbor"
+
+
+def test_book_preview_format_round_trips_and_is_bounded(client: TestClient) -> None:
+    project_id = _create_project(client)
+    fmt = {"fontFamily": "sans", "fontSize": 20, "fontStyle": "italic", "fontWeight": "bold", "textAlign": "left",
+           "lineSpacing": 2.0, "paragraphIndent": 1.5, "paragraphSpacing": 0.5}
+    nodes = [_node("b1", "book", None, 0, previewFormat=fmt), _node("b2", "book", None, 1)]
+    assert client.put(f"/api/projects/{project_id}/outline", json={"schemaVersion": 2, "nodes": nodes}).status_code == 200
+    saved = {n["id"]: n for n in client.get(f"/api/projects/{project_id}/outline").json()["nodes"]}
+    assert saved["b1"]["previewFormat"] == fmt
+    assert saved["b2"]["previewFormat"] is None  # none = the preview's own look
+
+    # A partial format fills in the defaults.
+    nodes = [_node("b1", "book", None, 0, previewFormat={"fontSize": 14})]
+    assert client.put(f"/api/projects/{project_id}/outline", json={"schemaVersion": 2, "nodes": nodes}).status_code == 200
+    saved = client.get(f"/api/projects/{project_id}/outline").json()["nodes"][0]
+    assert saved["previewFormat"]["fontSize"] == 14 and saved["previewFormat"]["fontFamily"] == "serif"
+
+    for bad in ({"fontSize": 5}, {"fontSize": 99}, {"lineSpacing": 0.5}, {"paragraphIndent": -1}, {"fontFamily": "comic"}):
+        nodes = [_node("b1", "book", None, 0, previewFormat=bad)]
+        assert client.put(f"/api/projects/{project_id}/outline", json={"schemaVersion": 2, "nodes": nodes}).status_code == 422

@@ -552,7 +552,14 @@ awareness that the app above already existed:
   Outline's (`levels/outlineTabs.tsx`): Unassigned plotpoints, Book outline (New chapter), Book
   details, Settings (the book's fields and colour) and Help; at Max the book editor strip is its
   header and each tab opens or closes that part of the page. The Draft level's Settings (the
-  chapter's colour) and Help are icons in the chapter tile that swap the right page. The selected book's spine swivels into its cover
+  chapter's colour) and Help are icons in the chapter tile that swap the right page.
+  Plotpoints already placed in the outline are listed **By time** (the Time of their scene, in the book's
+  time system) or **In story** (where they sit in the outline): one stored choice
+  (`scriblr.writer.plotOrder`, `writer/plotOrder.tsx`) with a toggle on the Project Plot's plotline
+  editor, the Outline Mid tab's placed list and the Draft footnotes (`orderAssignedPlotpoints`'s `mode`).
+  A book's **preview formatting** (`OutlineNode.previewFormat`, backend `PreviewFormat`: font, size,
+  bold/italic, alignment, line spacing, paragraph indent and spacing, all bounded) is edited in the book's
+  Settings tab and applied to the Draft preview as CSS variables (`writer/previewFormat.ts`). The selected book's spine swivels into its cover
   (`Shelf.tsx`). Levels are tinted by hue (`levelHues.ts`): the project's own
   (`ProjectSettings.themeHue`), series within 60° of it, books any hue, arcs within
   60° of their book and chapters within 60° of their arc (each node's `themeHue`);

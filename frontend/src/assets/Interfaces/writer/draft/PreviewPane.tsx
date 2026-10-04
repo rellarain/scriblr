@@ -11,6 +11,7 @@ import { exportChapterPdf } from '../../../../api/export'
 import { HeartHalvedIcon, HeartIcon, MoonIcon, SunIcon } from '../../../icons'
 import type { usePublications } from '../usePublications'
 import { fullDate, shortDate } from '../chapterDates'
+import { formatOf, formatVars } from '../previewFormat'
 
 const FLAGS = ['Add', 'Remove', 'Merge', 'Change', 'Simplify', 'Expand'] as const
 type FlagName = (typeof FLAGS)[number]
@@ -184,7 +185,7 @@ export function PreviewPane({ w, chapter, draft, pubs, component, onComponent }:
   const selectedFlag = selected ? marks[selected]?.flag : undefined
 
   return (
-    <div className={`wrPreviewPane wrPage--${tone}`}>
+    <div className={`wrPreviewPane wrPage--${tone}`} style={formatVars(formatOf(w.activeBook))}>
       <div className="wrPreviewToolbar">
         <div className="wrSegmented" role="group" aria-label="Pages editor">
           {PAGES_COMPONENTS.map(c => (
