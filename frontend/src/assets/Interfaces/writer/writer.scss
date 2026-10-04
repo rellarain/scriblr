@@ -462,7 +462,7 @@
     --paper-muted: var(--wr-page-muted); --paper-ink2: var(--on-accent); --paper-placeholder: color-mix(in srgb, var(--on-accent) 50%, transparent);
     --wr-frame-1: var(--wr-fill-2); --wr-frame-2: var(--wr-fill-3); --wr-frame-3: var(--wr-fill-4);
     --wr-frame-4: color-mix(in srgb, var(--wr-fill) 50%, black); --wr-frame-5: color-mix(in srgb, var(--wr-fill) 40%, black);
-    --wr-input-bg: rgb(255 255 255 / 0.94); --wr-input-ink: #1b1b1b; --paper-field: var(--wr-input-bg);
+    --wr-input-bg: hsl(var(--color-theme-h) 28% 96%); --wr-input-ink: hsl(var(--color-theme-h) 30% 10%); --paper-field: var(--wr-input-bg);
   }
 
   // Draft mode: the placed plotpoints as footnote cards in a column of their own in the paper's right margin, beside the
@@ -765,7 +765,7 @@
     &--on { opacity: 1; background: rgb(0 0 0 / 0.28); }
     &--end { margin-left: 8px; }
   }
-  .wrQuickSearch { width: 130px; box-sizing: border-box; height: 30px; border: 0; border-radius: 0; padding: 0 6px; font-size: 11px; background: rgb(255 255 255 / 0.94); color: #1b1b1b; outline: none; }
+  .wrQuickSearch { width: 130px; box-sizing: border-box; height: 30px; border: 0; border-radius: 0; padding: 0 6px; font-size: 11px; background: hsl(var(--color-theme-h) 28% 96%); color: hsl(var(--color-theme-h) 30% 10%); outline: none; }
   .wrLevelHeader .wrSmallBtn, .wrLevelHeader .saveIconBtn { color: var(--on-accent); background: rgb(255 255 255 / 0.16); }
   .wrLevelHeader .saveControl { font-size: 11px; }
   .wrTabPane { display: flex; flex-direction: column; gap: 10px; min-height: 0; }
@@ -786,7 +786,7 @@
     .wrNotes { overflow: visible; }
     .wrNotesBare { display: flex; flex-direction: column; gap: 10px; }
     .wrNoteTitle, .wrNoteBody { color: var(--on-accent); &::placeholder { color: color-mix(in srgb, var(--on-accent) 55%, transparent); } }
-    .wrInlineAdd input { background: rgb(255 255 255 / 0.94); color: #1b1b1b; border-radius: 0; &::placeholder { color: #6a6a6a; } }
+    .wrInlineAdd input { background: hsl(var(--color-theme-h) 28% 96%); color: hsl(var(--color-theme-h) 30% 10%); border-radius: 0; &::placeholder { color: hsl(var(--color-theme-h) 12% 42%); } }
     .wrSmallBtn { color: var(--on-accent); background: rgb(255 255 255 / 0.16); &:hover:not(:disabled) { background: rgb(255 255 255 / 0.28); } }
     .wrBarTrack { background: rgb(0 0 0 / 0.3); border-radius: 0; }
     .wrBarFill { background: rgb(255 255 255 / 0.85); }

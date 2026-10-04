@@ -90,10 +90,14 @@ function WriterLevels({ w, pagesComponent, onPagesComponent }: {
     }
   }
 
-  // Outline and Draft are a book's own levels: they take the book's colors.
-  const scoped = (level: Level, node: ReactNode) => (level === 'outline' || level === 'draft'
-    ? <BookScope key={level} book={book} flow>{node}</BookScope>
-    : node)
+  // Every level re-tints what is inside it with its own colour (backgrounds, text, inputs, buttons), except where a
+  // child has a colour of its own: Outline and Draft are a book's own levels (the book's), Project is the project's;
+  // the Dash is the app theme itself.
+  const scoped = (level: Level, node: ReactNode) => {
+    if (level === 'outline' || level === 'draft') return <BookScope key={level} book={book} flow>{node}</BookScope>
+    if (level === 'project') return <BookScope key={level} code={w.projectHue} flow>{node}</BookScope>
+    return node
+  }
 
   const shown = LEVELS.filter(l => sizes[l] !== 'hidden')
   let body: ReactNode

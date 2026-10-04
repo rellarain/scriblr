@@ -3,15 +3,17 @@ import type { OutlineNode } from '../../../api/types'
 import { bookScopeVars, bookThemeHue } from '../../../theme/bookColors'
 import { useThemeState } from '../../../theme/useTheme'
 
-// Re-tints everything inside for one book: the book's theme colour replaces the
+// Re-tints everything inside for one level (a book, or any colour code such as the project's): its colour replaces the
 // app theme's hue (surfaces, cards, backgrounds) and also the accent hue (buttons,
 // highlights, focus, the chapter paper's tint). Saturation and lightness stay the active zone's own, and so do the ink
 // and the fills' ink, so text stays readable.
 //
 // The derived tokens are re-declared for `.wrBookScope` (theme/theme.scss and
 // writer.scss), which is what makes the override reach descendants.
-export function BookScope({ book, className, flow = false, children }: {
-  book: OutlineNode | undefined
+export function BookScope({ book, code, className, flow = false, children }: {
+  book?: OutlineNode | undefined
+  // A colour code to scope to instead of a book's (the project level's own colour).
+  code?: number
   className?: string
   // Lay out as if the wrapper were not there (sidebar panels inside a flex column).
   flow?: boolean
@@ -19,7 +21,7 @@ export function BookScope({ book, className, flow = false, children }: {
 }) {
   const { settings, activeZone, effectiveRole } = useThemeState()
   const palette = settings.zones[activeZone].palette
-  const themeHue = book ? bookThemeHue(book) : null
+  const themeHue = code ?? (book ? bookThemeHue(book) : null)
   // A book has the one colour: its accent is the same hue.
   const vars = useMemo(
     () => (themeHue === null ? null : bookScopeVars(palette, activeZone, effectiveRole, themeHue)),
