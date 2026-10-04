@@ -36,7 +36,7 @@ function workspace(activeConsole: WriterWorkspace['activeConsole'], over: Partia
     activeConsole, hasOpenProject: activeConsole !== 'shelves' || over.hasOpenProject === true,
     activeProject: { title: 'The Ashfall Cycle' }, activeBook: book, activeBookChapters: [chapter], activeChapter: chapter,
     showDash: vi.fn(), showProject: vi.fn(), openBook: vi.fn(),
-    projectHue: 150, levelHueOf: () => 280, levelTintOf: () => 'hsl(280, 30%, 50%)',
+    projectHue: 150, levelHueOf: () => 280, levelTintOf: () => 'hsl(280, 30%, 50%)', levelFillOf: () => 'hsl(280, 60%, 40%)',
     ...over,
   } as unknown as WriterWorkspace
 }
@@ -121,6 +121,15 @@ describe('WriterLevels', () => {
     expect(hueOf('project')).toBe('150')
     expect(hueOf('outline')).toBe('28') // the book's own (here the book default)
     expect(hueOf('draft')).toBe('280')
+  })
+
+  it("gives each tinted level a flat fill, a little less loud than the accent, the Draft's from its chapter", () => {
+    renderLevels(workspace('page', { projectHue: 150 } as Partial<WriterWorkspace>))
+    const fillOf = (level: string) => document.querySelector<HTMLElement>(`[data-level="${level}"]`)!.style.getPropertyValue('--wr-level-fill')
+    expect(fillOf('dash')).toBe('') // the Dash falls back to the theme hue at the same saturation (in the stylesheet)
+    expect(fillOf('project')).toBe('hsl(150, calc(var(--color-accent-s) * 0.62), clamp(0%, calc(var(--color-accent-l) - 8%), 100%))')
+    expect(fillOf('outline')).toContain('hsl(28, calc(var(--color-accent-s) * 0.62)')
+    expect(fillOf('draft')).toBe('hsl(280, 60%, 40%)') // the chapter's own, from the workspace
   })
 
   it('keeps the project shelves beside the Dash with no Min/Mid toggle', () => {

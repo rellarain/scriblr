@@ -69,6 +69,7 @@ function WriterLevels({ w, pagesComponent, onPagesComponent }: {
             key={level} level={level} size="max" headerless title={w.activeChapter ? `Chapter ${chapterNumber} · ${nodeLabel(w.activeChapter)}` : 'Chapter'}
             hue={w.activeChapter ? w.levelHueOf(w.activeChapter) : undefined}
             tint={w.activeChapter ? w.levelTintOf(w.activeChapter) : undefined}
+            fill={w.activeChapter ? w.levelFillOf(w.activeChapter) : undefined}
             onPromote={() => {}} onSetSize={setSize(level)}
           >
             <DraftLevel w={w} pagesComponent={pagesComponent} onPagesComponent={onPagesComponent} />

@@ -555,7 +555,10 @@ awareness that the app above already existed:
   chapter, plot subcategory) runs the stops of the parent and the same four tones of the ±60°
   window round the parent's hue. A parent with no hue (a neutral) gives its children the
   unlimited slider. Projects saved before the tones (`hueScheme` 1) are converted once on load.
-  A book has just the one colour. The **Outline level** (`writer/outline/`) at Max is the book: a
+  A book has just the one colour. The levels are flat, square panels filled with their colour at the accent's
+  saturation (a little less loud) and lightness; what sits inside steps one shade deeper each time. At Outline focus the book
+  panel bleeds to the top, bottom and right edges; at Draft focus the whole screen is the book's colour (very light by day,
+  deeper at night) with the other levels' tiles on its left page. The **Outline level** (`writer/outline/`) at Max is the book: a
   collapsible book editor (title, summary, colour, time system, goals), a column of
   the **unassigned plotpoints** (drag one onto a chapter, act, scene or moment card to
   place it; drag it back, or click its x, to unassign), the draft stats, and the book's

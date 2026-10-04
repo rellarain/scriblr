@@ -1,12 +1,12 @@
 import type { CSSProperties, ReactNode } from 'react'
 import { ChevronDownIcon, ChevronRightIcon } from '../../../icons'
-import { hueOfCode, themeColorCss } from '../../../../theme/bookColors'
+import { fillColorCss, hueOfCode, themeColorCss } from '../../../../theme/bookColors'
 import type { Level, LevelSize } from './levelSizes'
 
 // One tinted level of the Writer frame. Its header strip is how it changes size:
 // clicking a Min level's strip opens it to Mid, the title promotes it to the focus
 // (Max), and the chevron toggles Min/Mid. The focused (Max) level just shows its title.
-function LevelPanel({ level, size, title, hue, tint, onPromote, onSetSize, locked = false, headerless = false, minBody, children }: {
+function LevelPanel({ level, size, title, hue, tint, fill, onPromote, onSetSize, locked = false, headerless = false, minBody, children }: {
   level: Level
   size: Exclude<LevelSize, 'hidden'>
   title: string
@@ -14,6 +14,8 @@ function LevelPanel({ level, size, title, hue, tint, onPromote, onSetSize, locke
   hue?: number
   // The tint as CSS, when the colour code alone cannot say it (a stop of the parent needs the parent's hue).
   tint?: string
+  // The flat fill of the panel as CSS (the colour at the accent's saturation and lightness), likewise.
+  fill?: string
   onPromote: () => void
   onSetSize: (size: 'min' | 'mid') => void
   // No Min/Mid toggle (the project shelves beside the Dash have only one size).
@@ -30,7 +32,7 @@ function LevelPanel({ level, size, title, hue, tint, onPromote, onSetSize, locke
     <section
       className={`wrLevel wrLevel--${level} wrLevel--${size}`}
       aria-label={`${title} (${size})`} data-level={level} data-size={size}
-      style={hue != null ? ({ '--wr-level-h': hueOfCode(hue), '--wr-level-tint': tint ?? themeColorCss(hue) } as CSSProperties) : undefined}
+      style={hue != null ? ({ '--wr-level-h': hueOfCode(hue), '--wr-level-tint': tint ?? themeColorCss(hue), '--wr-level-fill': fill ?? fillColorCss(hue) } as CSSProperties) : undefined}
     >
       {!headerless && <div
         className={isMin && !locked ? 'wrLevelHeader wrLevelHeader--min' : 'wrLevelHeader'}

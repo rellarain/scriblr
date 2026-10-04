@@ -139,6 +139,8 @@ export function tonePartsOf(code: number, parentHue = 0): ToneParts {
 }
 
 const clamp = (n: number, lo: number, hi: number) => Math.max(lo, Math.min(hi, n))
+const FILL_SATURATION = 0.62
+const FILL_DARKEN = 8
 
 // The colour of a code against a zone's own theme saturation and lightness.
 export function toneHsl(code: number, basis: { s: number; l: number }, parentHue = 0): HSL {
@@ -151,8 +153,11 @@ export function toneHsl(code: number, basis: { s: number; l: number }, parentHue
 }
 
 // The same colour as CSS, following the active zone through the theme variables.
-function toneCss(code: number, family: 'theme' | 'accent', parentHue: number): string {
+function toneCss(code: number, family: 'theme' | 'accent', parentHue: number, fill = false): string {
   const p = tonePartsOf(code, parentHue)
+  // A panel fill is the accent's colour a little less loud and a little deeper (the template's flat olive, green, blue).
+  if (fill && p.sMul !== null) p.sMul *= FILL_SATURATION
+  if (fill && p.lAbs === null) { p.lDelta = (p.lDelta ?? 0) - FILL_DARKEN; p.lMin = Math.max(0, p.lMin - FILL_DARKEN) }
   const sVar = `var(--color-${family}-s)`
   const lVar = `var(--color-${family}-l)`
   const s = p.sAbs !== null ? `${p.sAbs}%` : p.sMul === 1 ? sVar : `calc(${sVar} * ${p.sMul})`
@@ -169,6 +174,9 @@ export const themeColorCss = (hue: number | string, parentHue = 0): string =>
   typeof hue === 'number' ? toneCss(hue, 'theme', parentHue) : `hsl(${hue}, var(--color-theme-s), var(--color-theme-l))`
 export const accentColorCss = (hue: number | string, parentHue = 0): string =>
   typeof hue === 'number' ? toneCss(hue, 'accent', parentHue) : `hsl(${hue}, var(--color-accent-s), var(--color-accent-l))`
+
+// A level panel's flat fill: the colour in the accent family, a little less loud and deeper.
+export const fillColorCss = (code: number, parentHue = 0): string => toneCss(code, 'accent', parentHue, true)
 
 // The zone's own theme saturation and lightness: what a hue slider draws a saturated hue at.
 export function zoneBasis(pal: ZonePalette, zone: ZoneKey): { s: number; l: number } {

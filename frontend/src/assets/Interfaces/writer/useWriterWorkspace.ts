@@ -19,9 +19,9 @@ import {
 import { awarenessNext } from './awareness'
 import { combineSaveStatus, useAutosave } from '../../../lib/useAutosave'
 import { insertAfter } from '../../../lib/siblingOrder'
-import { DEFAULT_BOOK_HUE, encodeHue, hueOfCode, isNeutralHue, toneOf } from '../../../theme/bookColors'
+import { DEFAULT_BOOK_HUE, encodeHue, fillColorCss, hueOfCode, isNeutralHue, toneOf } from '../../../theme/bookColors'
 import { useThemeState } from '../../../theme/useTheme'
-import { autoPickHue, defaultProjectHue, fitToParent, hueCentre, levelHue, levelTint, reconcileHues } from './levelHues'
+import { autoPickHue, defaultProjectHue, fitToParent, hueCentre, levelColor, levelHue, levelTint, reconcileHues } from './levelHues'
 
 type AsyncStatus = 'idle' | 'loading' | 'error'
 
@@ -113,6 +113,8 @@ export function useWriterWorkspace() {
   const levelHueOf = (node: OutlineNode): number => levelHue(node, hueNodes, projectHue)
   // The node's colour as CSS (its tone, and for the stops of the parent the parent's hue).
   const levelTintOf = (node: OutlineNode): string => levelTint(node, hueNodes, projectHue)
+  // The same colour as a panel's flat fill (the accent's saturation and lightness).
+  const levelFillOf = (node: OutlineNode): string => { const c = levelColor(node, hueNodes, projectHue); return fillColorCss(c.code, c.parentHue) }
   // The hue a node's own hue must stay within 60 degrees of; null for a book (any hue) or a parent with no hue.
   const hueCentreOf = (node: OutlineNode): number | null => hueCentre(node, hueNodes, projectHue)
 
@@ -732,7 +734,7 @@ export function useWriterWorkspace() {
     saveStatus, saveNow, flushAll, restoreSaved, updateTimeSystems,
     childrenByParentId, projectRoot, books, activeBook, activeBookChapters, activeChapter,
     activeConsole, activeBookId, activeChapterId,
-    projectHue, levelHueOf, levelTintOf, hueCentreOf, setNodeHue, setProjectHue,
+    projectHue, levelHueOf, levelTintOf, levelFillOf, hueCentreOf, setNodeHue, setProjectHue,
     loadProjects, createProject, openProject, backToShelves, deleteProject,
     showDash, showProject, openBook, selectChapter, openChapter, showDraft, showPreview, backToBook,
     addOutlineNode, updateOutlineNode, deleteOutlineNode, deleteSeries, moveOutlineNodeInto, toggleNodeFlag,
