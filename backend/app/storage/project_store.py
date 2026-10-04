@@ -3,6 +3,7 @@ import os
 import shutil
 import tempfile
 import threading
+import time
 import uuid
 from pathlib import Path
 from typing import Callable, Optional, Type, TypeVar
@@ -99,6 +100,24 @@ def new_id(prefix: str) -> str:
 # ---------------------------------------------------------------------------
 
 
+# On Windows a file cannot be replaced while anything else has it open, and a virus scanner or the
+# search indexer can briefly hold a freshly written file: os.replace then fails with PermissionError
+# (WinError 5 or 32). That is momentary, so try again for a moment before giving up.
+_REPLACE_ATTEMPTS = 10
+_REPLACE_PAUSE = 0.03
+
+
+def _replace_with_retry(src: str, dest: Path) -> None:
+    for attempt in range(_REPLACE_ATTEMPTS):
+        try:
+            os.replace(src, dest)
+            return
+        except PermissionError:
+            if attempt == _REPLACE_ATTEMPTS - 1:
+                raise
+            time.sleep(_REPLACE_PAUSE * (attempt + 1))
+
+
 def _atomic_write_json(project_dir: Path, dest_path: Path, data: dict) -> None:
     tmp_dir = project_dir / ".tmp"
     tmp_dir.mkdir(parents=True, exist_ok=True)
@@ -110,7 +129,7 @@ def _atomic_write_json(project_dir: Path, dest_path: Path, data: dict) -> None:
             json.dump(data, f, indent=2)
             f.flush()
             os.fsync(f.fileno())
-        os.replace(tmp_name, dest_path)
+        _replace_with_retry(tmp_name, dest_path)
     except Exception:
         if os.path.exists(tmp_name):
             os.remove(tmp_name)
@@ -320,6 +339,14 @@ def _write_project_file(root: Path, project_id: str, pf: ProjectFile) -> None:
 
 
 def _load_project_file(root: Path, project_id: str) -> tuple[ProjectFile, dict[str, ShardCorruptError]]:
+    # Under the project's lock, like every write: on Windows a save cannot replace project.json while
+    # a reader has it open (PermissionError), so reads and saves take turns. (An RLock: _mutate
+    # holds it already when it loads.)
+    with _lock_for(project_id):
+        return _load_project_file_locked(root, project_id)
+
+
+def _load_project_file_locked(root: Path, project_id: str) -> tuple[ProjectFile, dict[str, ShardCorruptError]]:
     _ensure_migrated(root, project_id)
     project_dir = project_dir_of(root, project_id)
     path = _project_file_path(project_dir)
