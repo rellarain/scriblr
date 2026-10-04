@@ -3,53 +3,79 @@ import { deriveTokens, type ThemeVars } from './tokens'
 import { resolvePalette } from './zoneLooks'
 import type { Role, ZoneKey, ZonePalette } from './types'
 
-// Colours for books and plot categories. A hue is all that is stored; the
-// saturation and lightness come from the active time-of-day zone's look:
-//   theme colours (book cover, categories)   -> the zone's theme saturation and lightness
-//   accent colours (book accent, subcategories) -> the zone's accent saturation and lightness
+// Colours for the Writer's levels (project, series, book, arc, chapter) and plot categories.
+// One stored number holds a hue AND a tone (it mirrors backend/app/storage/schema.py):
+//
+//     1..360     saturated        hue = value mod 360
+//   -360..0      desaturated      hue = -value
+//    361..720    light saturated  hue = value - 360
+//   -720..-361   dark saturated   hue = -value - 360
+//
+// plus neutral stops with no hue of their own: -721 dark gray, 721 white, and three "of the
+// parent" stops (a limited slider's ends): -722 dark gray, 722 light gray, 723 light shade.
+// The tones are steps from the active time-of-day zone's own theme saturation and lightness, so
+// the same code is paler by day and deeper at night -- and "saturated" is exactly what a plain
+// hue always was.
 
 export const DEFAULT_BOOK_HUE = 28
-// A subcategory's hue stays this close (either way) to its category's hue.
+// A limited slider (series, arc, chapter, plot subcategory) runs this far either side of its parent's hue.
 export const SUBCATEGORY_HUE_WINDOW = 60
 
 export const wrapHue = (hue: number): number => ((Math.round(hue) % 360) + 360) % 360
 
-// The full-range colour sliders (project, book) end with four neutral swatches, stored
-// in the same number as a hue: 361 brown, 362 black, 363 gray, 364 white. Unlike a hue a
-// swatch has its own fixed saturation and lightness, so it is not zone-dependent.
-export interface HueSwatch { value: number; name: string; color: HSL }
-export const HUE_SWATCHES: readonly HueSwatch[] = [
-  { value: 361, name: 'Brown', color: { h: 28, s: 45, l: 32 } },
-  { value: 362, name: 'Black', color: { h: 0, s: 0, l: 10 } },
-  { value: 363, name: 'Gray', color: { h: 0, s: 0, l: 48 } },
-  { value: 364, name: 'White', color: { h: 0, s: 0, l: 94 } },
-]
-// A swatch slider is one continuous gradient: it starts at the brown's own hue (orange), runs once
-// round the wheel back to orange, and from there darkens to brown and black, then lightens to gray and white.
-export const SWATCH_START_HUE = HUE_SWATCHES[0].color.h
-export const isSwatchHue = (hue: number): boolean => hue >= 361 && hue <= 364
-export const swatchOf = (hue: number): HueSwatch | undefined => HUE_SWATCHES.find(s => s.value === hue)
-// A slider's value as a stored level colour: a swatch stays itself, anything else wraps round the wheel.
-export const normalizeHue = (hue: number): number => (isSwatchHue(Math.round(hue)) ? Math.round(hue) : wrapHue(hue))
-const hslCss = (c: HSL): string => `hsl(${c.h}, ${c.s}%, ${c.l}%)`
+export type Tone = 'dark' | 'saturated' | 'desaturated' | 'light'
+export const TONES: readonly Tone[] = ['dark', 'saturated', 'desaturated', 'light']
+export const TONE_NAME: Record<Tone, string> = { dark: 'Dark saturated', saturated: 'Saturated', desaturated: 'Desaturated', light: 'Light saturated' }
 
-// Hue (0-359) of a #rrggbb colour, or null for anything else.
-export function hexToHue(hex: string | null | undefined): number | null {
-  const m = /^#?([0-9a-f]{6})$/i.exec((hex ?? '').trim())
-  if (!m) return null
-  const [r, g, b] = [0, 2, 4].map(i => parseInt(m[1].slice(i, i + 2), 16) / 255)
-  const max = Math.max(r, g, b)
-  const min = Math.min(r, g, b)
-  const d = max - min
-  if (d === 0) return 0
-  let h: number
-  if (max === r) h = ((g - b) / d) % 6
-  else if (max === g) h = (b - r) / d + 2
-  else h = (r - g) / d + 4
-  return wrapHue(h * 60)
+export type Neutral = 'darkGray' | 'white' | 'darkGrayOfParent' | 'lightGrayOfParent' | 'lightShadeOfParent'
+export const NEUTRAL_CODE: Record<Neutral, number> = {
+  darkGray: -721, white: 721, darkGrayOfParent: -722, lightGrayOfParent: 722, lightShadeOfParent: 723,
+}
+export const NEUTRAL_NAME: Record<Neutral, string> = {
+  darkGray: 'Dark gray', white: 'White', darkGrayOfParent: 'Dark gray of the parent', lightGrayOfParent: 'Light gray of the parent', lightShadeOfParent: 'Light shade of the parent',
+}
+const NEUTRAL_OF_CODE = new Map<number, Neutral>(Object.entries(NEUTRAL_CODE).map(([name, code]) => [code, name as Neutral]))
+
+export const HUE_CODE_MIN = -724
+export const HUE_CODE_MAX = 724
+
+export type DecodedHue = { kind: 'hue'; hue: number; tone: Tone } | { kind: 'neutral'; neutral: Neutral }
+
+export function decodeHue(code: number): DecodedHue {
+  const c = Math.round(code)
+  const neutral = NEUTRAL_OF_CODE.get(c)
+  if (neutral) return { kind: 'neutral', neutral }
+  if (c >= 1 && c <= 360) return { kind: 'hue', hue: c % 360, tone: 'saturated' }
+  if (c >= 361 && c <= 720) return { kind: 'hue', hue: (c - 360) % 360, tone: 'light' }
+  if (c <= 0 && c >= -360) return { kind: 'hue', hue: Math.abs(c) % 360, tone: 'desaturated' }
+  if (c <= -361 && c >= -720) return { kind: 'hue', hue: (Math.abs(c) - 360) % 360, tone: 'dark' }
+  return { kind: 'hue', hue: wrapHue(c), tone: 'saturated' } // anything else: a plain hue
 }
 
-// The signed shortest way round the colour wheel from one hue to another (-180..180].
+// A hue (any number of degrees) in a tone, as the one stored number.
+export function encodeHue(hue: number, tone: Tone): number {
+  const h = wrapHue(hue)
+  const full = h === 0 ? 360 : h // the top of each band stands for 0 degrees (0 itself is desaturated)
+  if (tone === 'saturated') return full
+  if (tone === 'light') return 360 + full
+  if (tone === 'dark') return -(360 + full)
+  return -h
+}
+
+export const isNeutralHue = (code: number): boolean => decodeHue(code).kind === 'neutral'
+// The tone of a code (a neutral has none).
+export const toneOf = (code: number): Tone | null => { const d = decodeHue(code); return d.kind === 'hue' ? d.tone : null }
+// The hue (0-359) a code stands for; a neutral stands for the hue it was given (its parent's), else red's 0.
+export const hueOfCode = (code: number, parentHue = 0): number => {
+  const d = decodeHue(code)
+  if (d.kind === 'hue') return d.hue
+  return d.neutral === 'darkGray' || d.neutral === 'white' ? 0 : wrapHue(parentHue)
+}
+// A code for a plain hue, kept in the same tone as `like` (saturated when `like` is a neutral or missing).
+export const hueInToneOf = (hue: number, like: number | null | undefined): number =>
+  encodeHue(hue, (like != null ? toneOf(like) : null) ?? 'saturated')
+
+// A signed shortest way round the colour wheel from one hue to another (-180..180].
 export function hueDelta(from: number, to: number): number {
   const d = ((to - from + 540) % 360) - 180
   return d === -180 ? 180 : d
@@ -68,39 +94,135 @@ export function clampHueToWindow(centre: number, hue: number, width = SUBCATEGOR
   return wrapHue(centre + Math.max(-width, Math.min(width, d)))
 }
 
-// A book's cover / theme hue: its own, else the nearest to an old hex colour, else the default.
-export function bookThemeHue(book: { themeHue?: number | null; color?: string | null }): number {
-  return book.themeHue ?? hexToHue(book.color) ?? DEFAULT_BOOK_HUE
+// A colour code held within `width` degrees of a centre hue, keeping its tone. Stops that have a
+// hue only through the parent ("of the parent") stay as they are; the free neutrals (dark gray,
+// white) cannot sit in a window, so they fall back to `fallback`.
+export function clampCodeToWindow(centre: number, code: number, fallback: number, width = SUBCATEGORY_HUE_WINDOW): number {
+  const d = decodeHue(code)
+  if (d.kind === 'neutral') return d.neutral === 'darkGray' || d.neutral === 'white' ? fallback : code
+  return encodeHue(clampHueToWindow(centre, d.hue, width), d.tone)
 }
 
-// CSS for the two colour families, following the active zone through the theme variables.
-// (`hue` may itself be a CSS value such as var(--color-theme-h).)
-export const themeColorCss = (hue: number | string): string =>
-  typeof hue === 'number' && swatchOf(hue) ? hslCss(swatchOf(hue)!.color) : `hsl(${hue}, var(--color-theme-s), var(--color-theme-l))`
-export const accentColorCss = (hue: number | string): string =>
-  typeof hue === 'number' && swatchOf(hue) ? hslCss(swatchOf(hue)!.color) : `hsl(${hue}, var(--color-accent-s), var(--color-accent-l))`
+// ---------------------------------------------------------------- tones as colours
 
-// The colour a book's cover is drawn in for a zone (theme saturation and lightness).
-export function coverColor(pal: ZonePalette, zone: ZoneKey, hue: number): HSL {
-  const swatch = swatchOf(hue)
-  if (swatch) return swatch.color
+// A colour as steps from the zone's theme saturation (S) and lightness (L).
+interface ToneParts {
+  h: number
+  sMul: number | null // saturation = S * sMul
+  sAbs: number | null // or a fixed saturation
+  lDelta: number | null // lightness = clamp(L + lDelta, lMin, lMax)
+  lAbs: number | null // or a fixed lightness
+  lMin: number
+  lMax: number
+}
+
+const parts = (h: number, over: Partial<ToneParts>): ToneParts => ({ h, sMul: 1, sAbs: null, lDelta: 0, lAbs: null, lMin: 0, lMax: 100, ...over })
+
+export function tonePartsOf(code: number, parentHue = 0): ToneParts {
+  const d = decodeHue(code)
+  if (d.kind === 'hue') {
+    switch (d.tone) {
+      case 'dark': return parts(d.hue, { lDelta: -18, lMin: 8 })
+      case 'desaturated': return parts(d.hue, { sMul: 0.45 })
+      case 'light': return parts(d.hue, { lDelta: 22, lMax: 94 })
+      default: return parts(d.hue, {})
+    }
+  }
+  const parent = wrapHue(parentHue)
+  switch (d.neutral) {
+    case 'darkGray': return parts(0, { sMul: null, sAbs: 0, lDelta: -40, lMin: 8, lMax: 60 })
+    case 'white': return parts(0, { sMul: null, sAbs: 0, lDelta: null, lAbs: 94 })
+    case 'darkGrayOfParent': return parts(parent, { sMul: null, sAbs: 10, lDelta: -40, lMin: 8, lMax: 60 })
+    case 'lightGrayOfParent': return parts(parent, { sMul: null, sAbs: 10, lDelta: 8, lMin: 40, lMax: 86 })
+    default: return parts(parent, { lDelta: 22, lMin: 85, lMax: 94 }) // light shade of the parent
+  }
+}
+
+const clamp = (n: number, lo: number, hi: number) => Math.max(lo, Math.min(hi, n))
+
+// The colour of a code against a zone's own theme saturation and lightness.
+export function toneHsl(code: number, basis: { s: number; l: number }, parentHue = 0): HSL {
+  const p = tonePartsOf(code, parentHue)
+  return {
+    h: p.h,
+    s: Math.round(p.sAbs ?? basis.s * (p.sMul ?? 1)),
+    l: Math.round(p.lAbs ?? clamp(basis.l + (p.lDelta ?? 0), p.lMin, p.lMax)),
+  }
+}
+
+// The same colour as CSS, following the active zone through the theme variables.
+function toneCss(code: number, family: 'theme' | 'accent', parentHue: number): string {
+  const p = tonePartsOf(code, parentHue)
+  const sVar = `var(--color-${family}-s)`
+  const lVar = `var(--color-${family}-l)`
+  const s = p.sAbs !== null ? `${p.sAbs}%` : p.sMul === 1 ? sVar : `calc(${sVar} * ${p.sMul})`
+  let l: string
+  if (p.lAbs !== null) l = `${p.lAbs}%`
+  else if (p.lDelta === 0 && p.lMin === 0 && p.lMax === 100) l = lVar
+  else l = `clamp(${p.lMin}%, calc(${lVar} ${(p.lDelta ?? 0) < 0 ? '-' : '+'} ${Math.abs(p.lDelta ?? 0)}%), ${p.lMax}%)`
+  return `hsl(${p.h}, ${s}, ${l})`
+}
+
+// CSS for the two colour families. (`hue` may itself be a CSS value such as var(--color-theme-h), which
+// is the zone's own colour at that hue.) A code with a hue only through its parent needs `parentHue`.
+export const themeColorCss = (hue: number | string, parentHue = 0): string =>
+  typeof hue === 'number' ? toneCss(hue, 'theme', parentHue) : `hsl(${hue}, var(--color-theme-s), var(--color-theme-l))`
+export const accentColorCss = (hue: number | string, parentHue = 0): string =>
+  typeof hue === 'number' ? toneCss(hue, 'accent', parentHue) : `hsl(${hue}, var(--color-accent-s), var(--color-accent-l))`
+
+// The zone's own theme saturation and lightness: what a hue slider draws a saturated hue at.
+export function zoneBasis(pal: ZonePalette, zone: ZoneKey): { s: number; l: number } {
   const { theme } = resolvePalette(pal, zone)
-  return { h: hue, s: theme.s, l: theme.l }
+  return { s: theme.s, l: theme.l }
 }
 
-// The theme variables for the subtree of a book's editors: the zone's own
-// palette with the book's hue swapped in for both the theme and the accent hue (a book has
-// the one colour). Going through deriveTokens keeps the zone's look (ink, fills, page).
+// The colour a book's cover is drawn in for a zone.
+export function coverColor(pal: ZonePalette, zone: ZoneKey, code: number, parentHue = 0): HSL {
+  return toneHsl(code, zoneBasis(pal, zone), parentHue)
+}
+
+// Is the colour light enough that text on it has to be dark?
+export function isLightColor(code: number): boolean {
+  const d = decodeHue(code)
+  if (d.kind === 'hue') return d.tone === 'light'
+  return d.neutral === 'white' || d.neutral === 'lightGrayOfParent' || d.neutral === 'lightShadeOfParent'
+}
+
+// ---------------------------------------------------------------- legacy hex colours
+
+// Hue (0-359) of a #rrggbb colour, or null for anything else.
+export function hexToHue(hex: string | null | undefined): number | null {
+  const m = /^#?([0-9a-f]{6})$/i.exec((hex ?? '').trim())
+  if (!m) return null
+  const [r, g, b] = [0, 2, 4].map(i => parseInt(m[1].slice(i, i + 2), 16) / 255)
+  const max = Math.max(r, g, b)
+  const min = Math.min(r, g, b)
+  const d = max - min
+  if (d === 0) return 0
+  let h: number
+  if (max === r) h = ((g - b) / d) % 6
+  else if (max === g) h = (b - r) / d + 2
+  else h = (r - g) / d + 4
+  return wrapHue(h * 60)
+}
+
+// A book's cover / theme colour: its own, else the nearest to an old hex colour (saturated), else the default.
+export function bookThemeHue(book: { themeHue?: number | null; color?: string | null }): number {
+  if (book.themeHue != null) return book.themeHue
+  const hue = hexToHue(book.color)
+  return hue != null ? encodeHue(hue, 'saturated') : DEFAULT_BOOK_HUE
+}
+
+// The theme variables for the subtree of a book's editors: the zone's own palette with the book's
+// hue swapped in for both the theme and the accent hue (a book has the one colour). Going through
+// deriveTokens keeps the zone's look (ink, fills, page); the tone's own saturation and lightness
+// are in the colours drawn FROM the code (themeColorCss), not in these shared tokens. A free
+// neutral (dark gray, white) has no saturation at all, so it drops the tokens' too.
 export function bookScopeVars(pal: ZonePalette, zone: ZoneKey, role: Role, themeHue: number): ThemeVars {
-  // A neutral swatch tints with its nominal hue, then drops the saturation of a gray, black or white
-  // (the lightness stays the zone's own, so text keeps its contrast).
-  const nominal = (hue: number) => swatchOf(hue)?.color.h ?? hue
-  const vars = deriveTokens(
-    { ...pal, theme: { h: nominal(themeHue) }, accent: { h: nominal(themeHue) } },
-    role,
-    zone,
-  )
-  if (isSwatchHue(themeHue) && swatchOf(themeHue)!.color.s === 0) {
+  const d = decodeHue(themeHue)
+  const hue = d.kind === 'hue' ? d.hue : 0
+  const vars = deriveTokens({ ...pal, theme: { h: hue }, accent: { h: hue } }, role, zone)
+  if (d.kind === 'neutral' && (d.neutral === 'darkGray' || d.neutral === 'white')) {
     vars['--color-theme-s'] = '0%'
     vars['--color-accent-s'] = '0%'
     if (role !== 'admin') vars['--color-accent2-s'] = '0%'

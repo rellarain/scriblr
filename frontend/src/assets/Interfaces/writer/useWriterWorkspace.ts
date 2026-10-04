@@ -19,9 +19,9 @@ import {
 import { awarenessNext } from './awareness'
 import { combineSaveStatus, useAutosave } from '../../../lib/useAutosave'
 import { insertAfter } from '../../../lib/siblingOrder'
-import { DEFAULT_BOOK_HUE, clampHueToWindow, isSwatchHue, normalizeHue, wrapHue } from '../../../theme/bookColors'
+import { DEFAULT_BOOK_HUE, encodeHue, hueOfCode, isNeutralHue, toneOf } from '../../../theme/bookColors'
 import { useThemeState } from '../../../theme/useTheme'
-import { autoPickHue, defaultProjectHue, hueCentre, levelHue, reconcileHues } from './levelHues'
+import { autoPickHue, defaultProjectHue, fitToParent, hueCentre, levelHue, levelTint, reconcileHues } from './levelHues'
 
 type AsyncStatus = 'idle' | 'loading' | 'error'
 
@@ -111,7 +111,9 @@ export function useWriterWorkspace() {
   projectHueRef.current = projectHue
   const hueNodes = useMemo(() => new Map(outlineNodes.map(n => [n.id, n])), [outlineNodes])
   const levelHueOf = (node: OutlineNode): number => levelHue(node, hueNodes, projectHue)
-  // The hue a node's own hue must stay within 60 degrees of; null for a book (any hue).
+  // The node's colour as CSS (its tone, and for the stops of the parent the parent's hue).
+  const levelTintOf = (node: OutlineNode): string => levelTint(node, hueNodes, projectHue)
+  // The hue a node's own hue must stay within 60 degrees of; null for a book (any hue) or a parent with no hue.
   const hueCentreOf = (node: OutlineNode): number | null => hueCentre(node, hueNodes, projectHue)
 
   const activeConsole: WuiConsole = !hasOpenProject || view === 'shelves' ? 'shelves' : view === 'project' ? 'shelf' : view
@@ -437,11 +439,15 @@ export function useWriterWorkspace() {
     if ((kind === 'series' || kind === 'arc' || kind === 'chapter') && node.themeHue == null) {
       const map = new Map(prev.map(n => [n.id, n]))
       const parent = parentId ? map.get(parentId) : undefined
-      const centre = parent ? levelHue(parent, map, projectHueRef.current) : projectHueRef.current
-      // Under a neutral swatch there is no hue to spread round: the new node just shows its parent's.
-      if (!isSwatchHue(centre)) {
-        const siblingHues = prev.filter(n => n.parentId === parentId && n.kind === kind && n.themeHue != null && !isSwatchHue(n.themeHue)).map(n => n.themeHue as number)
-        node.themeHue = autoPickHue(centre, siblingHues)
+      const parentCode = parent ? levelHue(parent, map, projectHueRef.current) : projectHueRef.current
+      const centre = hueCentre(node, map, projectHueRef.current)
+      // Under a parent with no hue there is nothing to spread round: the new node just shows its parent's.
+      if (centre !== null) {
+        const siblingHues = prev
+          .filter(n => n.parentId === parentId && n.kind === kind && n.themeHue != null && !isNeutralHue(n.themeHue))
+          .map(n => hueOfCode(n.themeHue as number))
+        // It takes the parent's tone, at a hue spread away from its siblings'.
+        node.themeHue = encodeHue(autoPickHue(centre, siblingHues), toneOf(parentCode) ?? 'saturated')
       }
     }
     commitOutline(afterId ? insertAfter(prev, node, afterId, n => n.parentId === parentId) : [...prev, node], true)
@@ -452,23 +458,24 @@ export function useWriterWorkspace() {
     commitOutline(outlineNodesRef.current.map(n => (n.id === nodeId ? { ...n, ...patch } : n)), false)
   }
 
-  // Sets a series', book's, arc's or chapter's own hue: held within 60 degrees of its parent's
-  // (a book may be any hue), and its children's own hues are pulled back inside their windows.
-  function setNodeHue(nodeId: string, hue: number) {
+  // Sets a series', book's, arc's or chapter's own colour (a colour code): its hue is held within 60
+  // degrees of its parent's (a book may be any hue), and its children's own hues are pulled back inside
+  // their windows.
+  function setNodeHue(nodeId: string, code: number) {
     const prev = outlineNodesRef.current
     const target = prev.find(n => n.id === nodeId)
     if (!target || (target.kind !== 'series' && target.kind !== 'book' && target.kind !== 'arc' && target.kind !== 'chapter')) return
     const map = new Map(prev.map(n => [n.id, n]))
-    const centre = hueCentre(target, map, projectHueRef.current)
-    const normalized = normalizeHue(hue)
-    const value = centre != null ? clampHueToWindow(centre, normalized) : normalized
+    const parent = target.parentId ? map.get(target.parentId) : undefined
+    const parentCode = parent ? levelHue(parent, map, projectHueRef.current) : projectHueRef.current
+    const value = fitToParent(Math.round(code), parentCode, hueCentre(target, map, projectHueRef.current))
     const next = prev.map(n => (n.id === nodeId ? { ...n, themeHue: value } : n))
     commitOutline(reconcileHues(next, projectHueRef.current), false)
   }
 
-  // Sets the project's own hue, pulling the series' hues (and so their descendants') back inside its window.
-  function setProjectHue(hue: number) {
-    const wrapped = normalizeHue(hue)
+  // Sets the project's own colour, pulling the series' hues (and so their descendants') back inside its window.
+  function setProjectHue(code: number) {
+    const wrapped = Math.round(code)
     projectHueRef.current = wrapped
     updateProjectSettings({ themeHue: wrapped }, false)
     const prev = outlineNodesRef.current
@@ -547,29 +554,30 @@ export function useWriterWorkspace() {
     commitPlot(plotNodesRef.current.map(n => (n.id === nodeId ? { ...n, [field]: value } : n)), false)
   }
 
-  // Set a category's or subcategory's colour hue. A category's new hue pulls its
-  // subcategories' own hues back within 60 degrees of it; a subcategory's stays
-  // within 60 degrees of its category's (`categoryHue`: the category's hue as
-  // shown, which is stored on the category too when it had none of its own).
-  function setPlotHue(nodeId: string, hue: number, categoryHue?: number) {
+  // Set a category's or subcategory's colour (a colour code). A category's new colour pulls its
+  // subcategories' own hues back within 60 degrees of it; a subcategory's hue stays within 60
+  // degrees of its category's (`categoryCode`: the category's colour as shown, which is stored on
+  // the category too when it had none of its own).
+  function setPlotHue(nodeId: string, code: number, categoryCode?: number) {
     const prev = plotNodesRef.current
     const target = prev.find(n => n.id === nodeId)
     if (!target || (target.kind !== 'category' && target.kind !== 'subcategory')) return
-    const wrapped = wrapHue(hue)
+    const rounded = Math.round(code)
+    const centreOf = (parentCode: number) => (isNeutralHue(parentCode) ? null : hueOfCode(parentCode))
     if (target.kind === 'category') {
       commitPlot(prev.map(n => {
-        if (n.id === nodeId) return { ...n, hue: wrapped }
-        if (n.parentId === nodeId && n.kind === 'subcategory' && n.hue != null) return { ...n, hue: clampHueToWindow(wrapped, n.hue) }
+        if (n.id === nodeId) return { ...n, hue: rounded }
+        if (n.parentId === nodeId && n.kind === 'subcategory' && n.hue != null) return { ...n, hue: fitToParent(n.hue, rounded, centreOf(rounded)) }
         return n
       }), false)
       return
     }
     const parent = target.parentId ? prev.find(n => n.id === target.parentId) : undefined
-    const centre = parent?.hue ?? categoryHue
-    const value = centre != null ? clampHueToWindow(centre, wrapped) : wrapped
+    const parentCode = parent?.hue ?? categoryCode
+    const value = parentCode != null ? fitToParent(rounded, parentCode, centreOf(parentCode)) : rounded
     commitPlot(prev.map(n => {
       if (n.id === nodeId) return { ...n, hue: value }
-      if (parent && n.id === parent.id && parent.hue == null && centre != null) return { ...n, hue: wrapHue(centre) }
+      if (parent && n.id === parent.id && parent.hue == null && parentCode != null) return { ...n, hue: parentCode }
       return n
     }), false)
   }
@@ -724,7 +732,7 @@ export function useWriterWorkspace() {
     saveStatus, saveNow, flushAll, restoreSaved, updateTimeSystems,
     childrenByParentId, projectRoot, books, activeBook, activeBookChapters, activeChapter,
     activeConsole, activeBookId, activeChapterId,
-    projectHue, levelHueOf, hueCentreOf, setNodeHue, setProjectHue,
+    projectHue, levelHueOf, levelTintOf, hueCentreOf, setNodeHue, setProjectHue,
     loadProjects, createProject, openProject, backToShelves, deleteProject,
     showDash, showProject, openBook, selectChapter, openChapter, showDraft, showPreview, backToBook,
     addOutlineNode, updateOutlineNode, deleteOutlineNode, deleteSeries, moveOutlineNodeInto, toggleNodeFlag,

@@ -65,7 +65,7 @@ function Harness({ chapterId = 'c1', console_ = 'page', spies }: { chapterId?: s
     outlineNodes, plotNodes: PLOT, plotNodeById: new Map(PLOT.map(n => [n.id, n])),
     activeBook: byId.get('b'), activeChapter: byId.get(chapterId), activeConsole: console_,
     activeBookChapters: descendantsOf(buildChildIndex(outlineNodes), 'b').filter(n => n.kind === 'chapter'),
-    levelHueOf: () => 200, hueCentreOf: () => null, highlightedPointId: null,
+    levelHueOf: () => 200, levelTintOf: () => 'hsl(200, 30%, 50%)', hueCentreOf: () => null, highlightedPointId: null,
     saveStatus: { dirty: false, saving: false, error: undefined, lastSavedAt: null }, saveNow: async () => {}, restoreSaved: async () => {}, flushAll: () => {},
     updateOutlineNode: (id: string, patch: Partial<OutlineNode>) => setOutline(prev => prev.map(n => (n.id === id ? { ...n, ...patch } : n))),
     addOutlineNode: spies.addOutlineNode, selectChapter: spies.selectChapter, showDraft: spies.showDraft, showPreview: spies.showPreview,

@@ -36,7 +36,7 @@ function workspace(activeConsole: WriterWorkspace['activeConsole'], over: Partia
     activeConsole, hasOpenProject: activeConsole !== 'shelves' || over.hasOpenProject === true,
     activeProject: { title: 'The Ashfall Cycle' }, activeBook: book, activeBookChapters: [chapter], activeChapter: chapter,
     showDash: vi.fn(), showProject: vi.fn(), openBook: vi.fn(),
-    projectHue: 150, levelHueOf: () => 280,
+    projectHue: 150, levelHueOf: () => 280, levelTintOf: () => 'hsl(280, 30%, 50%)',
     ...over,
   } as unknown as WriterWorkspace
 }

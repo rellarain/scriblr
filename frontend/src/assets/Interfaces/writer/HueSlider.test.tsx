@@ -1,8 +1,8 @@
 import { fireEvent, render, screen } from '@testing-library/react'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { __resetSettingsForTests } from '../../../settings/settingsStore'
-import { swatchPosToValue, swatchValueToPos } from '../../../components/ColorRange'
-import { HUE_SWATCHES } from '../../../theme/bookColors'
+import { toneCodeToPos, toneLayout, tonePosToCode } from '../../../components/ColorRange'
+import { NEUTRAL_CODE, TONES, decodeHue, encodeHue } from '../../../theme/bookColors'
 import HueSlider from './HueSlider'
 
 beforeEach(() => {
@@ -11,66 +11,78 @@ beforeEach(() => {
   vi.stubGlobal('fetch', vi.fn(async () => ({ ok: true, status: 200, json: async () => ({}) })))
 })
 
-describe('HueSlider', () => {
-  it('runs the whole wheel with no centre, ending with the brown, black, gray and white swatches', () => {
+const posOfMiddle = (index: number, limited: boolean) => { const s = toneLayout(limited)[index]; return Math.round(((s.from + s.to) / 2) * 1000) }
+
+describe('HueSlider: unlimited', () => {
+  it('runs from dark gray through four tones of the whole wheel to white', () => {
     const onChange = vi.fn()
     render(<HueSlider label="Book colour" hue={200} centre={null} onChange={onChange} />)
     const input = screen.getByLabelText('Book colour') as HTMLInputElement
     expect(input.max).toBe('1000')
-    expect(input.getAttribute('aria-valuetext')).toBe('Hue 200')
-    // The last fifth of the track is four equal swatch blocks, in order.
-    for (const [pos, value] of [[810, 361], [860, 362], [910, 363], [990, 364]] as const) {
-      fireEvent.change(input, { target: { value: String(pos) } })
-      expect(onChange).toHaveBeenLastCalledWith(value)
+    expect(input.getAttribute('aria-valuetext')).toBe('Saturated, hue 200')
+    const layout = toneLayout(false)
+    expect(layout.map(s => (s.kind === 'neutral' ? s.neutral : s.tone))).toEqual(['darkGray', 'dark', 'saturated', 'desaturated', 'light', 'white'])
+    fireEvent.change(input, { target: { value: String(posOfMiddle(0, false)) } })
+    expect(onChange).toHaveBeenLastCalledWith(NEUTRAL_CODE.darkGray)
+    fireEvent.change(input, { target: { value: String(posOfMiddle(5, false)) } })
+    expect(onChange).toHaveBeenLastCalledWith(NEUTRAL_CODE.white)
+    // The middle of the saturated wheel is 180 degrees on from its orange start.
+    fireEvent.change(input, { target: { value: String(posOfMiddle(2, false)) } })
+    const middle = decodeHue(onChange.mock.calls.at(-1)![0])
+    expect(middle.kind === 'hue' && middle.tone).toBe('saturated')
+    expect(middle.kind === 'hue' && Math.abs(middle.hue - 208)).toBeLessThanOrEqual(2)
+  })
+
+  it('names a neutral and a tone', () => {
+    const { rerender } = render(<HueSlider label="Book colour" hue={NEUTRAL_CODE.white} centre={null} onChange={() => {}} />)
+    expect(screen.getByLabelText('Book colour').getAttribute('aria-valuetext')).toBe('White')
+    rerender(<HueSlider label="Book colour" hue={encodeHue(30, 'dark')} centre={null} onChange={() => {}} />)
+    expect(screen.getByLabelText('Book colour').getAttribute('aria-valuetext')).toBe('Dark saturated, hue 30')
+  })
+
+  it('puts every hue of every tone on the track and reads it back within a degree or two', () => {
+    for (const tone of TONES) {
+      for (let hue = 0; hue < 360; hue += 7) {
+        const back = decodeHue(tonePosToCode(toneCodeToPos(encodeHue(hue, tone), null), null))
+        expect(back.kind === 'hue' && back.tone).toBe(tone)
+        if (back.kind === 'hue') expect(Math.abs(((back.hue - hue + 540) % 360) - 180)).toBeLessThanOrEqual(2)
+      }
     }
-    // The hues start at orange (28) and run once round the wheel: halfway through them is 180 degrees on.
-    fireEvent.change(input, { target: { value: '400' } })
-    expect(onChange).toHaveBeenLastCalledWith(208)
-    fireEvent.change(input, { target: { value: '0' } })
-    expect(onChange).toHaveBeenLastCalledWith(28)
   })
+})
 
-  it('draws one continuous track: orange round to orange, then brown, black, gray, white', () => {
-    const { container } = render(<HueSlider label="Book colour" hue={200} centre={null} onChange={() => {}} />)
-    const track = (container.firstElementChild as HTMLElement).style.getPropertyValue('--cr-track')
-    const stops = track.match(/hsl\([^)]*\) [\d.]+%/g)!.map(s => s.replace(/, /g, ',').replace(/\) /, ')@'))
-    expect(stops[0].startsWith('hsl(28,')).toBe(true) // starts at orange
-    expect(stops[12].startsWith('hsl(388,')).toBe(true) // and is back at orange where the hues end
-    expect(stops[12].endsWith('@80.00%')).toBe(true)
-    // Then a stop at the centre of each swatch's block (no hard edges), ending on white.
-    expect(stops.slice(13).map(s => s.split('@')[1])).toEqual(['82.50%', '87.50%', '92.50%', '97.50%', '100%'])
-    expect(stops[13].startsWith('hsl(28,45%,32%)')).toBe(true)
-    expect(stops[14].startsWith('hsl(0,0%,10%)')).toBe(true)
-    expect(stops[16].startsWith('hsl(0,0%,94%)')).toBe(true)
-  })
-
-  it('maps every hue to a track position and back', () => {
-    for (let hue = 0; hue < 360; hue++) expect(swatchPosToValue(swatchValueToPos(hue, HUE_SWATCHES), HUE_SWATCHES)).toBe(hue)
-    expect(swatchValueToPos(28, HUE_SWATCHES)).toBe(0) // orange is the start of the track
-  })
-
-  it('shows a swatch as itself, named', () => {
-    render(<HueSlider label="Book colour" hue={363} centre={null} onChange={() => {}} />)
-    expect(screen.getByLabelText('Book colour').getAttribute('aria-valuetext')).toBe('Gray')
-  })
-
-  it('has no swatches in a window (there is no hue to stay near)', () => {
-    render(<HueSlider label="Arc colour" hue={210} centre={210} onChange={() => {}} />)
-    expect((screen.getByLabelText('Arc colour') as HTMLInputElement).max).toBe('270')
-  })
-
-  it('runs only 60 degrees either side of its centre', () => {
-    render(<HueSlider label="Arc colour" hue={230} centre={210} onChange={() => {}} />)
-    const input = screen.getByLabelText('Arc colour') as HTMLInputElement
-    expect([input.min, input.max, input.value]).toEqual(['150', '270', '230'])
-  })
-
-  it('shows a hue across the 0/360 wrap inside the window and reports plain 0-359 hues', () => {
+describe('HueSlider: limited', () => {
+  it('runs the stops of the parent and four tones of the +-60 degree window round its hue', () => {
     const onChange = vi.fn()
-    render(<HueSlider label="Arc colour" hue={10} centre={350} onChange={onChange} />)
+    render(<HueSlider label="Arc colour" hue={230} centre={210} onChange={onChange} />)
     const input = screen.getByLabelText('Arc colour') as HTMLInputElement
-    expect([input.min, input.max, input.value]).toEqual(['290', '410', '370'])
-    fireEvent.change(input, { target: { value: '400' } })
-    expect(onChange).toHaveBeenCalledWith(40)
+    const layout = toneLayout(true)
+    expect(layout.map(s => (s.kind === 'neutral' ? s.neutral : s.tone)))
+      .toEqual(['darkGrayOfParent', 'dark', 'saturated', 'desaturated', 'light', 'lightGrayOfParent', 'lightShadeOfParent'])
+    fireEvent.change(input, { target: { value: String(posOfMiddle(0, true)) } })
+    expect(onChange).toHaveBeenLastCalledWith(NEUTRAL_CODE.darkGrayOfParent)
+    fireEvent.change(input, { target: { value: String(posOfMiddle(6, true)) } })
+    expect(onChange).toHaveBeenLastCalledWith(NEUTRAL_CODE.lightShadeOfParent)
+    // The middle of any window is the parent's own hue; its start and end are 60 degrees either side.
+    fireEvent.change(input, { target: { value: String(posOfMiddle(4, true)) } })
+    expect(decodeHue(onChange.mock.calls.at(-1)![0])).toEqual({ kind: 'hue', hue: 210, tone: 'light' })
+    const sat = layout[2]
+    fireEvent.change(input, { target: { value: String(Math.round(sat.from * 1000) + 1) } })
+    const start = decodeHue(onChange.mock.calls.at(-1)![0])
+    expect(start.kind === 'hue' && Math.abs(start.hue - 150)).toBeLessThanOrEqual(1)
+  })
+
+  it('shows a hue across the 0/360 wrap inside its window', () => {
+    render(<HueSlider label="Arc colour" hue={10} centre={350} onChange={() => {}} />)
+    const pos = Number((screen.getByLabelText('Arc colour') as HTMLInputElement).value)
+    const sat = toneLayout(true)[2]
+    // 10 degrees is 20 degrees past a 350 centre: a third of the way from the middle to the end of the window.
+    const expected = (sat.from + ((20 + 60) / 120) * (sat.to - sat.from)) * 1000
+    expect(Math.abs(pos - expected)).toBeLessThanOrEqual(1)
+  })
+
+  it('names the stops of the parent', () => {
+    render(<HueSlider label="Arc colour" hue={NEUTRAL_CODE.lightGrayOfParent} centre={210} onChange={() => {}} />)
+    expect(screen.getByLabelText('Arc colour').getAttribute('aria-valuetext')).toBe('Light gray of the parent')
   })
 })

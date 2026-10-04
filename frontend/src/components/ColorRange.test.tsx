@@ -1,6 +1,6 @@
 import { fireEvent, render, screen } from '@testing-library/react'
 import { describe, expect, it, vi } from 'vitest'
-import { ColorRange, resultColor, trackGradient } from './ColorRange'
+import { ColorRange, resultColor, toneLayout, toneName, toneTrackGradient, trackGradient } from './ColorRange'
 
 const basis = { sat: 40, light: 30 }
 
@@ -61,5 +61,41 @@ describe('ColorRange', () => {
     expect(document.documentElement.hasAttribute('data-theme-live')).toBe(true)
     fireEvent(window, new Event('pointerup'))
     expect(document.documentElement.hasAttribute('data-theme-live')).toBe(false)
+  })
+})
+
+describe('the tone track', () => {
+  const zone = { sat: 30, light: 86 } // the day zone's theme look
+
+  it('lays out the unlimited and the limited tracks end to end', () => {
+    for (const limited of [false, true]) {
+      const layout = toneLayout(limited)
+      expect(layout[0].from).toBe(0)
+      expect(layout.at(-1)!.to).toBe(1)
+      layout.slice(1).forEach((seg, i) => expect(seg.from).toBeCloseTo(layout[i].to, 10))
+    }
+    expect(toneLayout(false)).toHaveLength(6)
+    expect(toneLayout(true)).toHaveLength(7)
+  })
+
+  it('draws a flat dark gray block, then each tone round the wheel starting at orange, then white', () => {
+    const g = toneTrackGradient(zone, null)
+    expect(g.startsWith('linear-gradient(to right, hsl(0, 0%, 46%) 0.00%, hsl(0, 0%, 46%) 3.00%')).toBe(true) // dark gray at day: 86 - 40
+    expect(g).toContain('hsl(28, 30%, 68%) 3.00%') // the dark wheel starts at orange, 18 points darker
+    expect(g).toContain('hsl(28, 30%, 86%) 26.50%') // the saturated wheel starts at the same orange
+    expect(g).toContain('hsl(28, 14%, 86%)') // the desaturated wheel's colour
+    expect(g.endsWith('hsl(0, 0%, 94%) 100.00%)')).toBe(true)
+  })
+
+  it('draws the limited track round the parent hue, with its stops from that hue', () => {
+    const g = toneTrackGradient(zone, 210)
+    expect(g).toContain('hsl(210, 10%, 46%) 0.00%') // dark gray of the parent
+    expect(g).toContain('hsl(150, 30%, 86%)') // the window starts 60 degrees before the parent hue
+    expect(g).toContain('hsl(270, 30%, 86%)')
+    expect(g.endsWith('hsl(210, 30%, 94%) 100.00%)')).toBe(true) // light shade of the parent
+  })
+
+  it('names a code', () => {
+    expect([toneName(200), toneName(721), toneName(722)]).toEqual(['Saturated, hue 200', 'White', 'Light gray of the parent'])
   })
 })

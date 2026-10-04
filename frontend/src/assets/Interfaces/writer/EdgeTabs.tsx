@@ -1,7 +1,6 @@
 import { useMemo, type CSSProperties } from 'react'
 import type { OutlineNode } from '../../../api/types'
 import { PlusIcon } from '../../icons'
-import { themeColorCss } from '../../../theme/bookColors'
 import { buildChildIndex } from './outlineTree'
 import { nodeLabel } from './plotTree'
 import type { WriterWorkspace } from './useWriterWorkspace'
@@ -39,7 +38,7 @@ export function EdgeTabs({ w, activeChapterId, onChapter, onArc, onAddChapter }:
   const clusters = useMemo(() => (book ? tabClusters(w.outlineNodes, book.id) : []), [w.outlineNodes, book])
   if (!book) return null
   const numberOf = new Map(w.activeBookChapters.map((c, i) => [c.id, i + 1]))
-  const tint = (node: OutlineNode) => ({ '--wr-tab-tint': themeColorCss(w.levelHueOf(node)) } as CSSProperties)
+  const tint = (node: OutlineNode) => ({ '--wr-tab-tint': w.levelTintOf(node) } as CSSProperties)
   let arcNumber = 0
 
   return (

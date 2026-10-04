@@ -1,8 +1,11 @@
 import type { OutlineNode } from '../../../api/types'
-import { bookThemeHue, clampHueToWindow, hueDelta, isSwatchHue, normalizeHue, wrapHue } from '../../../theme/bookColors'
+import {
+  bookThemeHue, clampCodeToWindow, decodeHue, encodeHue, hueDelta, hueOfCode, isNeutralHue, themeColorCss, wrapHue,
+} from '../../../theme/bookColors'
 
-// The Writer's level colours. Each level has a hue (0-360); saturation and lightness
-// always come from the active theme zone.
+// The Writer's level colours. Each level has a colour code (one number holding a hue and a tone, or a
+// neutral stop: see theme/bookColors.ts); the tones' saturation and lightness come from the active
+// theme zone.
 //
 //   project   its own (ProjectSettings.themeHue), else a default off the app theme's hue
 //   series    within LEVEL_HUE_WINDOW of the project's hue
@@ -10,33 +13,49 @@ import { bookThemeHue, clampHueToWindow, hueDelta, isSwatchHue, normalizeHue, wr
 //   arc       within LEVEL_HUE_WINDOW of its book's hue
 //   chapter   within LEVEL_HUE_WINDOW of its arc's hue (its book's, outside any arc)
 //
-// A series, arc or chapter with no hue of its own shows its parent's. Changing a
-// parent pulls its children's own hues back inside their window.
+// "Within a window" is about the HUE: a series, arc or chapter picks any tone round its parent's
+// hue (or one of the stops "of the parent"). A series, arc or chapter with no colour of its own shows
+// its parent's. Changing a parent pulls its children's own hues back inside their window, and a
+// parent with no hue (a neutral) gives its children no window at all.
 export const LEVEL_HUE_WINDOW = 60
 // The project's default hue is this far round the wheel from the app theme's, so the
 // Dash (the theme itself) and the Project level read as different tints.
 const DEFAULT_PROJECT_HUE_OFFSET = 120
 
-export const defaultProjectHue = (appHue: number): number => wrapHue(appHue + DEFAULT_PROJECT_HUE_OFFSET)
+export const defaultProjectHue = (appHue: number): number => encodeHue(appHue + DEFAULT_PROJECT_HUE_OFFSET, 'saturated')
 
 type HueNode = Pick<OutlineNode, 'id' | 'kind' | 'parentId' | 'themeHue' | 'color'>
 export type HueNodes = Map<string, HueNode>
 
-// A node's hue: its own, else its parent's (a book's own, else the book default).
-export function levelHue(node: HueNode, nodes: HueNodes, projectHue: number): number {
-  if (node.kind === 'book') return bookThemeHue(node)
-  if (node.themeHue != null) return normalizeHue(node.themeHue)
+// A node's colour: its own code, else its parent's (a book's own, else the book default). `parentHue`
+// is the hue the stops "of the parent" take (the hue of the node that owns the colour's parent).
+export interface LevelColor { code: number; parentHue: number }
+
+export function levelColor(node: HueNode, nodes: HueNodes, projectHue: number): LevelColor {
   const parent = node.parentId ? nodes.get(node.parentId) : undefined
-  return parent ? levelHue(parent, nodes, projectHue) : projectHue
+  const parentColor: LevelColor = parent ? levelColor(parent, nodes, projectHue) : { code: projectHue, parentHue: 0 }
+  const own = node.kind === 'book' ? bookThemeHue(node) : node.themeHue != null ? Math.round(node.themeHue) : null
+  if (own === null) return parentColor
+  return { code: own, parentHue: hueOfCode(parentColor.code, parentColor.parentHue) }
 }
 
-// The hue a node's own hue must stay near, or null when it may be any hue (a book, or anything
-// under a neutral swatch -- brown, black, gray and white have no hue to stay near).
+// The colour code a node shows.
+export const levelHue = (node: HueNode, nodes: HueNodes, projectHue: number): number => levelColor(node, nodes, projectHue).code
+
+// The node's colour as CSS (the zone's theme saturation and lightness, in the node's tone).
+export function levelTint(node: HueNode, nodes: HueNodes, projectHue: number): string {
+  const { code, parentHue } = levelColor(node, nodes, projectHue)
+  return themeColorCss(code, parentHue)
+}
+
+// The hue a node's own hue must stay near, or null when it may be any hue (a book, or anything under a
+// parent with no hue: dark gray, white and the stops of the parent have none to stay near).
 export function hueCentre(node: HueNode, nodes: HueNodes, projectHue: number): number | null {
   if (node.kind === 'book') return null
   const parent = node.parentId ? nodes.get(node.parentId) : undefined
-  const centre = parent ? levelHue(parent, nodes, projectHue) : projectHue
-  return isSwatchHue(centre) ? null : centre
+  const { code } = parent ? levelColor(parent, nodes, projectHue) : { code: projectHue }
+  const { parentHue } = parent ? levelColor(parent, nodes, projectHue) : { parentHue: 0 }
+  return isNeutralHue(code) ? null : hueOfCode(code, parentHue)
 }
 
 // The hue for a new node among its siblings: the one in its window farthest from the
@@ -54,7 +73,16 @@ export function autoPickHue(centre: number, siblingHues: number[]): number {
   return best
 }
 
-// The tree with every series', arc's and chapter's own hue held inside its window
+// Whether a colour a node holds may stay under its parent's: under a parent with a hue it must have
+// a hue within the window (the free neutrals fall back to the parent's colour); under one without,
+// the stops "of the parent" have no hue to be of, so they fall back too.
+export function fitToParent(code: number, parentCode: number, centre: number | null): number {
+  if (centre !== null) return clampCodeToWindow(centre, code, parentCode)
+  const d = decodeHue(code)
+  return d.kind === 'neutral' && d.neutral !== 'darkGray' && d.neutral !== 'white' ? parentCode : code
+}
+
+// The tree with every series', arc's and chapter's own colour held inside its window
 // (top-down, so a pulled-back arc then pulls its chapters).
 export function reconcileHues(nodes: OutlineNode[], projectHue: number): OutlineNode[] {
   const byId: HueNodes = new Map(nodes.map(n => [n.id, n]))
@@ -68,12 +96,10 @@ export function reconcileHues(nodes: OutlineNode[], projectHue: number): Outline
   const visit = (node: OutlineNode) => {
     let current = node
     if (node.kind !== 'book' && node.themeHue != null) {
-      const centre = hueCentre(node, byId, projectHue)
-      if (centre != null) {
-        // A swatch (left over from a neutral parent) has no place in a window: it takes the parent's hue.
-        const clamped = isSwatchHue(node.themeHue) ? centre : clampHueToWindow(centre, node.themeHue)
-        if (clamped !== node.themeHue) current = { ...node, themeHue: clamped }
-      }
+      const parent = node.parentId ? byId.get(node.parentId) : undefined
+      const parentCode = parent ? levelHue(parent, byId, projectHue) : projectHue
+      const fitted = fitToParent(Math.round(node.themeHue), parentCode, hueCentre(node, byId, projectHue))
+      if (fitted !== node.themeHue) current = { ...node, themeHue: fitted }
     }
     result.set(node.id, current)
     byId.set(node.id, current)

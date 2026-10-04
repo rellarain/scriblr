@@ -58,7 +58,7 @@ function Harness({ activeChapterId = 'c1', actions }: { activeChapterId?: string
     activeBookChapters: descendantsOf(buildChildIndex(outlineNodes), 'b').filter(n => n.kind === 'chapter'),
     activeChapterId: active, selectChapter: (id: string) => setActive(id), highlightedPointId: null,
     saveStatus: { dirty: false, saving: false, error: undefined, lastSavedAt: null }, saveNow: vi.fn(async () => {}), restoreSaved: vi.fn(async () => {}),
-    levelHueOf: () => 200, hueCentreOf: () => null, setNodeHue: vi.fn(),
+    levelHueOf: () => 200, levelTintOf: () => 'hsl(200, 30%, 50%)', hueCentreOf: () => null, setNodeHue: vi.fn(),
     moveOutlineNodeInto: vi.fn(), openChapter: actions.openChapter,
     addOutlineNode: (parentId: string | null, kind: OutlineNode['kind'], patch: Partial<OutlineNode> = {}, afterId?: string) => {
       const id = `new${++counter.current}`

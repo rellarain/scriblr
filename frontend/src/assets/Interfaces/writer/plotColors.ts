@@ -1,5 +1,5 @@
 import type { PlotNode } from '../../../api/types'
-import { accentColorCss, themeColorCss } from '../../../theme/bookColors'
+import { accentColorCss, hueOfCode, themeColorCss } from '../../../theme/bookColors'
 
 // Colour coding for the plot tree. A category has a hue drawn in the theme's
 // (desaturated) colour; a subcategory has a hue drawn in the accent's (saturated)
@@ -28,7 +28,9 @@ export function plotColors(node: PlotNode, byId: Map<string, PlotNode>): PlotCol
   }
   const categoryHue = category?.hue ?? null
   const categoryCss = category ? themeColorCss(categoryHue ?? APP_HUE) : null
-  const subcategoryCss = subcategory ? accentColorCss(subcategory.hue ?? categoryHue ?? APP_HUE) : null
+  // The stops "of the parent" take the category's hue.
+  const parentHue = categoryHue != null ? hueOfCode(categoryHue) : 0
+  const subcategoryCss = subcategory ? accentColorCss(subcategory.hue ?? categoryHue ?? APP_HUE, parentHue) : null
   return { category: categoryCss, subcategory: subcategoryCss }
 }
 

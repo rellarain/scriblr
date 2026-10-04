@@ -545,10 +545,17 @@ awareness that the app above already existed:
   60° of their book and chapters within 60° of their arc (each node's `themeHue`);
   one with no hue shows its parent's, new ones take a hue spread away from their
   siblings', and changing a parent pulls its children back inside their window.
-  The full-range sliders (project, book) end with four neutral swatches, stored in the
-  same number as 361 brown, 362 black, 363 gray, 364 white (`HUE_SWATCHES`); a swatch has
-  no hue to stay near, so what sits under one is not windowed. A book has just the
-  one colour. The **Outline level** (`writer/outline/`) at Max is the book: a
+  A colour is one stored number holding a hue and a tone (`theme/bookColors.ts`, mirrored in
+  `backend/app/storage/schema.py`): 1..360 saturated, -360..0 desaturated, 361..720 light
+  saturated, -720..-361 dark saturated, plus neutral stops -721 dark gray, 721 white and, "of
+  the parent", -722 dark gray, 722 light gray, 723 light shade. The tones are steps from the active
+  time zone's own theme saturation and lightness. The hue slider (`HueSlider.tsx`,
+  `components/ColorRange.tsx`) has two forms: unlimited (project, book, plot category) runs dark
+  gray, four 360° wheels (dark, saturated, desaturated, light) and white; limited (series, arc,
+  chapter, plot subcategory) runs the stops of the parent and the same four tones of the ±60°
+  window round the parent's hue. A parent with no hue (a neutral) gives its children the
+  unlimited slider. Projects saved before the tones (`hueScheme` 1) are converted once on load.
+  A book has just the one colour. The **Outline level** (`writer/outline/`) at Max is the book: a
   collapsible book editor (title, summary, colour, time system, goals), a column of
   the **unassigned plotpoints** (drag one onto a chapter, act, scene or moment card to
   place it; drag it back, or click its x, to unassign), the draft stats, and the book's

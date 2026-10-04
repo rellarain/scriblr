@@ -4,10 +4,9 @@ import type { WriterWorkspace } from './useWriterWorkspace'
 import { ChevronRightIcon, PlusIcon } from '../../icons'
 import { ChipEditor, DeleteControl } from './shared'
 import { focusNodeField, useNodeKeys } from '../../../lib/nodeKeys'
-import { ColorRange } from '../../../components/ColorRange'
-import { coverColor, hueDelta, hueWindow, wrapHue } from '../../../theme/bookColors'
-import { derivedShades } from '../../../theme/palettes'
+import { encodeHue, hueOfCode, isNeutralHue } from '../../../theme/bookColors'
 import { useThemeState } from '../../../theme/useTheme'
+import HueSlider from './HueSlider'
 import { plotColors, plotColorVars } from './plotColors'
 import { assignedLevel, nodeLabel, sortByTitle } from './plotTree'
 import { FieldEditor, FieldGroups, type PlotDrag, type PlotUi } from './FieldBlocks'
@@ -107,37 +106,29 @@ function ChildRows({ w, node, kind, addLabel }: { w: WriterWorkspace; node: Plot
   )
 }
 
-// The hue selector of a category (theme colour) or subcategory (accent colour,
-// within 60 degrees of its category's hue). Saturation and lightness are the
-// active zone's, so what the thumb shows is what the app draws.
+// The colour selector of a category (unlimited: any hue in any tone) or subcategory (limited: the
+// tones round its category's hue, within 60 degrees). Saturation and lightness are the active
+// zone's, so what the thumb shows is what the app draws.
 function HueField({ w, node }: { w: WriterWorkspace; node: PlotNode }) {
   const { settings, activeZone } = useThemeState()
-  const pal = settings.zones[activeZone].palette
+  const appCode = encodeHue(settings.zones[activeZone].palette.theme.h, 'saturated')
   if (node.kind === 'subcategory') {
-    const accentFill = derivedShades(pal, 'accent', activeZone)[0].color
     const category = node.parentId ? w.plotNodeById.get(node.parentId) : undefined
-    const centre = category?.hue ?? pal.theme.h
-    const { min, max } = hueWindow(centre)
-    const shown = centre + hueDelta(centre, node.hue ?? centre) // the same hue, inside the window
+    const categoryCode = category?.hue ?? appCode
     return (
       <div>
         <div className="wrLabel">Colour <span className="wrOutlineMeta">within 60° of its category</span></div>
-        <ColorRange
-          label="Subcategory colour" value={shown} min={min} max={max}
-          sat={accentFill.s} light={accentFill.l}
-          onChange={v => w.setPlotHue(node.id, wrapHue(v), centre)}
+        <HueSlider
+          label="Subcategory colour" hue={node.hue ?? categoryCode} centre={isNeutralHue(categoryCode) ? null : hueOfCode(categoryCode)}
+          onChange={code => w.setPlotHue(node.id, code, categoryCode)}
         />
       </div>
     )
   }
-  const cover = coverColor(pal, activeZone, node.hue ?? pal.theme.h)
   return (
     <div>
       <div className="wrLabel">Colour</div>
-      <ColorRange
-        label="Category colour" value={node.hue ?? pal.theme.h} sat={cover.s} light={cover.l}
-        onChange={v => w.setPlotHue(node.id, v)}
-      />
+      <HueSlider label="Category colour" hue={node.hue ?? appCode} centre={null} onChange={code => w.setPlotHue(node.id, code)} />
     </div>
   )
 }

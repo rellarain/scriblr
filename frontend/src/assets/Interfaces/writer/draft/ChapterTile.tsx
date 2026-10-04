@@ -1,7 +1,6 @@
 import { useMemo, type CSSProperties, type ReactNode } from 'react'
 import type { OutlineNode } from '../../../../api/types'
 import type { WriterWorkspace } from '../useWriterWorkspace'
-import { themeColorCss } from '../../../../theme/bookColors'
 import { fullDate, shortDate, type ChapterMeta } from '../chapterDates'
 import { buildChildIndex, descendantsOf } from '../outlineTree'
 import { nodeLabel } from '../plotTree'
@@ -27,7 +26,7 @@ export function ChapterTile({ w, chapter, chapterWords, meta, tools, error }: {
   const index = useMemo(() => buildChildIndex(w.outlineNodes), [w.outlineNodes])
   const trail = useMemo(() => parentTrail(chapter.id, nodeById), [chapter.id, nodeById])
   const chapterNumber = w.activeBookChapters.findIndex(c => c.id === chapter.id) + 1
-  const tint = (node: OutlineNode) => ({ '--wr-node-tint': themeColorCss(w.levelHueOf(node)) } as CSSProperties)
+  const tint = (node: OutlineNode) => ({ '--wr-node-tint': w.levelTintOf(node) } as CSSProperties)
 
   const inside = useMemo(() => descendantsOf(index, chapter.id).filter(n => !n.freeDraft), [index, chapter.id])
   const count = (kind: OutlineNode['kind'], one: string) => {

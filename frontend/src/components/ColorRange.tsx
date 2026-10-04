@@ -1,5 +1,8 @@
 import type { CSSProperties } from 'react'
-import { HUE_SWATCHES, SWATCH_START_HUE, swatchOf, wrapHue, type HueSwatch } from '../theme/bookColors'
+import {
+  DEFAULT_BOOK_HUE, NEUTRAL_CODE, NEUTRAL_NAME, SUBCATEGORY_HUE_WINDOW, TONES, TONE_NAME, decodeHue, encodeHue, hueDelta, toneHsl,
+  type Neutral, type Tone,
+} from '../theme/bookColors'
 import './colorRange.scss'
 
 // The app's hue selector: a ranged rectangular input whose track shows every
@@ -40,44 +43,94 @@ function liveDrag() {
   window.addEventListener('pointercancel', end)
 }
 
-// With `swatches`, the track is one gradient: the hues, starting and ending at orange (SWATCH_START_HUE),
-// then on from that orange into the fixed colours (brown, black, gray, white). The last fifth of the
-// track is those colours, a block each (the thumb snaps to a block's centre, where the track is exactly
-// that colour). The input then works in track positions (0..POS_MAX) and `value` / `onChange` stay in
-// the colour's own number: a hue 0-360, or a swatch's value.
+// ---------------------------------------------------------------- the tone track
+//
+// With `tones` the input works in track positions (0..POS_MAX) over one gradient, and `value` /
+// `onChange` stay in the colour's own code (see theme/bookColors.ts): a hue in a tone, or a neutral stop.
+//
+//   unlimited (no `centre`): dark gray | dark | saturated | desaturated | light saturated | white
+//   limited (`centre` = the parent's hue): dark gray of the parent | dark | saturated | desaturated |
+//     light saturated windows round the parent's hue (+-60 degrees each) | light gray of the parent |
+//     light shade of the parent
+//
+// Each wheel / window is drawn at its tone's saturation and lightness (the zone's, stepped), and an
+// unlimited wheel starts and ends at orange so a hue sits at the same place in every tone.
 const POS_MAX = 1000
-const HUE_SHARE = 0.8
+const NEUTRAL_SHARE = 0.03 // a neutral stop's block, of the track
+const WHEEL_START_HUE = DEFAULT_BOOK_HUE
 
-export function swatchValueToPos(value: number, swatches: readonly HueSwatch[]): number {
-  const idx = swatches.findIndex(s => s.value === value)
-  if (idx < 0) {
-    const offset = (((value - SWATCH_START_HUE) % 360) + 360) % 360 // degrees on from the start
-    return Math.round((offset / 360) * HUE_SHARE * POS_MAX)
+export type ToneSegment =
+  | { kind: 'neutral'; neutral: Neutral; from: number; to: number }
+  | { kind: 'wheel'; tone: Tone; from: number; to: number }
+
+export function toneLayout(limited: boolean): ToneSegment[] {
+  const lead: Neutral[] = [limited ? 'darkGrayOfParent' : 'darkGray']
+  const tail: Neutral[] = limited ? ['lightGrayOfParent', 'lightShadeOfParent'] : ['white']
+  const wheel = (1 - NEUTRAL_SHARE * (lead.length + tail.length)) / TONES.length
+  const segments: ToneSegment[] = []
+  let at = 0
+  const push = (make: (from: number, to: number) => ToneSegment, width: number) => { segments.push(make(at, at + width)); at += width }
+  for (const neutral of lead) push((from, to) => ({ kind: 'neutral', neutral, from, to }), NEUTRAL_SHARE)
+  for (const tone of TONES) push((from, to) => ({ kind: 'wheel', tone, from, to }), wheel)
+  for (const neutral of tail) push((from, to) => ({ kind: 'neutral', neutral, from, to }), NEUTRAL_SHARE)
+  segments[segments.length - 1].to = 1 // no rounding gap at the end
+  return segments
+}
+
+// A code's place on the track (0..POS_MAX): the middle of a neutral's block, or its hue's place in its tone's wheel.
+export function toneCodeToPos(code: number, centre: number | null): number {
+  const layout = toneLayout(centre !== null)
+  const d = decodeHue(code)
+  if (d.kind === 'neutral') {
+    const seg = layout.find(s => s.kind === 'neutral' && s.neutral === d.neutral)
+    // A stop this track does not have (a free neutral on a limited track): the track's first block.
+    const found = seg ?? layout[0]
+    return Math.round(((found.from + found.to) / 2) * POS_MAX)
   }
-  return Math.round((HUE_SHARE + ((idx + 0.5) / swatches.length) * (1 - HUE_SHARE)) * POS_MAX)
+  const seg = layout.find(s => s.kind === 'wheel' && s.tone === d.tone)!
+  const f = centre !== null
+    ? (Math.max(-SUBCATEGORY_HUE_WINDOW, Math.min(SUBCATEGORY_HUE_WINDOW, hueDelta(centre, d.hue))) + SUBCATEGORY_HUE_WINDOW) / (2 * SUBCATEGORY_HUE_WINDOW)
+    : (((d.hue - WHEEL_START_HUE) % 360) + 360) % 360 / 360
+  return Math.round((seg.from + f * (seg.to - seg.from)) * POS_MAX)
 }
 
-export function swatchPosToValue(pos: number, swatches: readonly HueSwatch[]): number {
-  const f = pos / POS_MAX
-  if (f <= HUE_SHARE) return wrapHue(SWATCH_START_HUE + (f / HUE_SHARE) * 360)
-  const idx = Math.min(swatches.length - 1, Math.floor(((f - HUE_SHARE) / (1 - HUE_SHARE)) * swatches.length))
-  return swatches[idx].value
+// The code at a track position.
+export function tonePosToCode(pos: number, centre: number | null): number {
+  const layout = toneLayout(centre !== null)
+  const f = Math.max(0, Math.min(1, pos / POS_MAX))
+  const seg = layout.find(s => f < s.to) ?? layout[layout.length - 1]
+  if (seg.kind === 'neutral') return NEUTRAL_CODE[seg.neutral]
+  const within = Math.max(0, Math.min(1, (f - seg.from) / (seg.to - seg.from)))
+  const hue = centre !== null ? centre - SUBCATEGORY_HUE_WINDOW + within * 2 * SUBCATEGORY_HUE_WINDOW : WHEEL_START_HUE + within * 360
+  return encodeHue(hue, seg.tone)
 }
 
-// The hue wheel from orange round to orange, then a soft blend through the swatches' colours.
-export function swatchTrackGradient(basis: Basis, swatches: readonly HueSwatch[]): string {
-  const stops = Array.from({ length: HUE_STOPS + 1 }, (_, i) => {
-    const value = SWATCH_START_HUE + (360 * i) / HUE_STOPS
-    return `${resultColor(value, basis)} ${((i / HUE_STOPS) * HUE_SHARE * 100).toFixed(2)}%`
-  })
-  const width = ((1 - HUE_SHARE) * 100) / swatches.length
-  swatches.forEach((sw, k) => {
-    const at = HUE_SHARE * 100 + (k + 0.5) * width
-    stops.push(`${hsl(sw.color.h, sw.color.s, sw.color.l)} ${at.toFixed(2)}%`)
-  })
-  const last = swatches[swatches.length - 1].color
-  stops.push(`${hsl(last.h, last.s, last.l)} 100%`)
+// The continuous track: each wheel through its hues in its tone, each neutral a flat block.
+export function toneTrackGradient(basis: Basis, centre: number | null): string {
+  const zone = { s: basis.sat, l: basis.light }
+  const parent = centre ?? 0
+  const css = (code: number) => { const c = toneHsl(code, zone, parent); return hsl(c.h, c.s, c.l) }
+  const stops: string[] = []
+  const at = (n: number) => `${(n * 100).toFixed(2)}%`
+  for (const seg of toneLayout(centre !== null)) {
+    if (seg.kind === 'neutral') {
+      const colour = css(NEUTRAL_CODE[seg.neutral])
+      stops.push(`${colour} ${at(seg.from)}`, `${colour} ${at(seg.to)}`)
+      continue
+    }
+    for (let i = 0; i <= HUE_STOPS; i += 1) {
+      const t = i / HUE_STOPS
+      const hue = centre !== null ? centre - SUBCATEGORY_HUE_WINDOW + t * 2 * SUBCATEGORY_HUE_WINDOW : WHEEL_START_HUE + t * 360
+      stops.push(`${css(encodeHue(hue, seg.tone))} ${at(seg.from + t * (seg.to - seg.from))}`)
+    }
+  }
   return `linear-gradient(to right, ${stops.join(', ')})`
+}
+
+// What a code is called, for assistive tech.
+export function toneName(code: number): string {
+  const d = decodeHue(code)
+  return d.kind === 'neutral' ? NEUTRAL_NAME[d.neutral] : `${TONE_NAME[d.tone]}, hue ${d.hue}`
 }
 
 export interface ColorRangeProps {
@@ -93,20 +146,22 @@ export interface ColorRangeProps {
   live?: boolean
   disabled?: boolean
   className?: string
-  // End the slider with the neutral swatches (HUE_SWATCHES); only for a full-range (0-360) slider.
-  swatches?: boolean
+  // The tone track (see above); `value` and `onChange` are then colour codes, not hues.
+  tones?: boolean
+  // With `tones`: the parent's hue for a limited track, none for an unlimited one.
+  centre?: number | null
 }
 
 export function ColorRange({
-  label, value, onChange, min = 0, max = 360, sat = 50, light = 50, live = false, disabled = false, className, swatches = false,
+  label, value, onChange, min = 0, max = 360, sat = 50, light = 50, live = false, disabled = false, className, tones = false, centre = null,
 }: ColorRangeProps) {
   const basis: Basis = { sat, light }
-  if (swatches) {
-    const swatch = swatchOf(value)
-    const pos = swatchValueToPos(value, HUE_SWATCHES)
+  if (tones) {
+    const pos = toneCodeToPos(value, centre)
+    const result = toneHsl(value, { s: sat, l: light }, centre ?? 0)
     const style = {
-      '--cr-track': swatchTrackGradient(basis, HUE_SWATCHES),
-      '--cr-result': swatch ? hsl(swatch.color.h, swatch.color.s, swatch.color.l) : resultColor(value, basis),
+      '--cr-track': toneTrackGradient(basis, centre),
+      '--cr-result': hsl(result.h, result.s, result.l),
       '--cr-frac': pos / POS_MAX,
     } as CSSProperties
     return (
@@ -114,8 +169,8 @@ export function ColorRange({
         <span className="colorRangeTrack" />
         <input
           className="colorRangeInput" type="range" min={0} max={POS_MAX} step={1} value={pos}
-          aria-label={label} aria-valuetext={swatch ? swatch.name : `Hue ${Math.round(value)}`} disabled={disabled}
-          onChange={e => onChange(swatchPosToValue(Number(e.target.value), HUE_SWATCHES))}
+          aria-label={label} aria-valuetext={toneName(value)} disabled={disabled}
+          onChange={e => onChange(tonePosToCode(Number(e.target.value), centre))}
           onPointerDown={live ? liveDrag : undefined}
         />
         <span className="colorRangeThumb" aria-hidden="true"><span className="colorRangeSwatch" /></span>

@@ -2,9 +2,8 @@ import type { OutlineNode } from '../../../../api/types'
 import type { WriterWorkspace } from '../useWriterWorkspace'
 import { ChevronDownIcon, ChevronRightIcon } from '../../../icons'
 import { SaveControl } from '../../../../components/SaveControl'
-import { ColorRange } from '../../../../components/ColorRange'
-import { bookThemeHue, coverColor } from '../../../../theme/bookColors'
-import { useThemeState } from '../../../../theme/useTheme'
+import { bookThemeHue } from '../../../../theme/bookColors'
+import HueSlider from '../HueSlider'
 import { useStoredState } from '../storage'
 import { nodeLabel } from '../plotTree'
 import { systemForBook } from '../timeSystem'
@@ -16,10 +15,7 @@ import GoalField from './GoalField'
 // colour, time system and goals.
 export function BookEditor({ w, book, bookWords }: { w: WriterWorkspace; book: OutlineNode; bookWords: number }) {
   const [open, setOpen] = useStoredState<boolean>('scriblr.writer.bookEditorOpen', false)
-  const { settings, activeZone } = useThemeState()
   const themeHue = bookThemeHue(book)
-  // What the slider's hue track is drawn at (a swatch has its own colour, so not the cover's).
-  const sliderBasis = coverColor(settings.zones[activeZone].palette, activeZone, 0)
   const timeSystems = w.activeProject?.settings.timeSystems ?? []
   const chapters = w.activeBookChapters
 
@@ -53,10 +49,7 @@ export function BookEditor({ w, book, bookWords }: { w: WriterWorkspace; book: O
           </label>
           <div className="wrBookEdField">
             <span className="wrLabel">Colour</span>
-            <ColorRange
-              label="Book colour" value={themeHue} sat={sliderBasis.s} light={sliderBasis.l} swatches
-              onChange={hue => w.setNodeHue(book.id, hue)}
-            />
+            <HueSlider label="Book colour" hue={themeHue} centre={null} onChange={code => w.setNodeHue(book.id, code)} />
           </div>
           {timeSystems.length > 1 && (
             <label className="wrBookEdField">

@@ -10,6 +10,7 @@ from typing import Callable, Optional, Type, TypeVar
 from pydantic import BaseModel, ValidationError
 
 from .schema import (
+    HUE_SCHEME,
     SCHEMA_VERSION,
     DailyActivityLog,
     DraftChapter,
@@ -343,6 +344,7 @@ def _load_project_file(root: Path, project_id: str) -> tuple[ProjectFile, dict[s
 
     pf = ProjectFile(
         schemaVersion=raw.get("schemaVersion", SCHEMA_VERSION),
+        hueScheme=raw.get("hueScheme", 1),
         index=index,
         outline=_parse_section_default(raw, "outline", OutlineTree, project_dir, path, errors, OutlineTree()),
         plot=_parse_section_default(raw, "plot", PlotTree, project_dir, path, errors, PlotTree()),
@@ -359,7 +361,52 @@ def _load_project_file(root: Path, project_id: str) -> tuple[ProjectFile, dict[s
         ),
         scrap=_parse_section_default(raw, "scrap", ScrapRegistry, project_dir, path, errors, ScrapRegistry()),
     )
+    if pf.hueScheme < HUE_SCHEME:
+        _migrate_hue_scheme(pf)
     return pf, errors
+
+
+# ---------------------------------------------------------------------------
+# One-time migration of the level colours (hueScheme 1 -> 2).
+# ---------------------------------------------------------------------------
+
+# Scheme 1 stored a plain hue 0-360 and four neutral swatches. Scheme 2 packs a tone into the number
+# (see schema.py), so 0 (a red) becomes 360, and the swatches move: brown -> a dark saturated orange,
+# black -> dark gray, gray -> a desaturated hue, white -> white.
+_LEGACY_SWATCHES = {361: -388, 362: -721, 363: 0, 364: 721}
+
+
+def _upgrade_hue(value):
+    if not isinstance(value, int) or isinstance(value, bool):
+        return value
+    if value in _LEGACY_SWATCHES:
+        return _LEGACY_SWATCHES[value]
+    return 360 if value == 0 else value
+
+
+def _upgrade_nodes(nodes, key: str) -> None:
+    for node in nodes:
+        if isinstance(node, dict) and node.get(key) is not None:
+            node[key] = _upgrade_hue(node[key])
+
+
+def _migrate_hue_scheme(pf: ProjectFile) -> None:
+    """Convert every stored level colour to the current scheme, in memory (the next write keeps it).
+    Idempotent through `hueScheme`: a file already at the current scheme is left alone."""
+    for node in pf.outline.nodes:
+        if node.themeHue is not None:
+            node.themeHue = _upgrade_hue(node.themeHue)
+    for node in pf.plot.nodes:
+        if node.hue is not None:
+            node.hue = _upgrade_hue(node.hue)
+    if pf.index.settings.themeHue is not None:
+        pf.index.settings.themeHue = _upgrade_hue(pf.index.settings.themeHue)
+    # Kept snapshots hold raw nodes: restoring one must not bring old colours back.
+    for snapshot in pf.outlineHistory:
+        _upgrade_nodes(snapshot.nodes, "themeHue")
+    for snapshot in pf.plotHistory:
+        _upgrade_nodes(snapshot.nodes, "hue")
+    pf.hueScheme = HUE_SCHEME
 
 
 def _mutate(root: Path, project_id: str, fn: Callable[[ProjectFile], None]) -> ProjectFile:

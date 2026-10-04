@@ -13,9 +13,19 @@ def utcnow() -> datetime:
     return datetime.now(timezone.utc)
 
 
-# A level colour is a hue (0-360), or one of the neutral swatches the full-range colour sliders
-# end with: 361 brown, 362 black, 363 gray, 364 white (mirrors the frontend's HUE_SWATCHES).
-MAX_LEVEL_HUE = 364
+# A level colour (OutlineNode.themeHue, ProjectSettings.themeHue, PlotNode.hue) is one number that holds
+# a hue AND a tone (mirrors the frontend's theme/bookColors.ts):
+#    1..360     saturated        (hue = value mod 360)
+#  -360..0      desaturated      (hue = -value)
+#   361..720    light saturated  (hue = value - 360)
+#  -720..-361   dark saturated   (hue = -value - 360)
+# and a few neutral stops that have no hue of their own: -721 dark gray, 721 white, -722 dark gray
+# of the parent, 722 light gray of the parent, 723 light shade of the parent.
+# Projects saved before this (hueScheme 1) held a plain hue 0-360 plus swatches 361-364
+# (brown, black, gray, white); they are converted once on load (see project_store).
+MIN_LEVEL_HUE = -724
+MAX_LEVEL_HUE = 724
+HUE_SCHEME = 2
 
 _HEX_COLOR = re.compile(r"^#?([0-9a-fA-F]{6})$")
 
@@ -133,11 +143,11 @@ class ProjectSettings(BaseModel):
     readLevels: list[OutlineNodeKind] = Field(default_factory=lambda: list(OUTLINE_KIND_ORDER))
     # How scenes' Time is structured (see TimeSystem). Books pick one by id.
     timeSystems: list[TimeSystem] = Field(default_factory=default_time_systems)
-    # The project's own colour (a hue, 0-360), the root of the Writer's level colours:
+    # The project's own colour (a hue code, see MIN_LEVEL_HUE), the root of the Writer's level colours:
     # series sit within 60 degrees of it, books anywhere, arcs within 60 of their book and
     # chapters within 60 of their arc (the OutlineNode.themeHue of each). None = the
     # active theme's own colour.
-    themeHue: Optional[int] = Field(default=None, ge=0, le=MAX_LEVEL_HUE)
+    themeHue: Optional[int] = Field(default=None, ge=MIN_LEVEL_HUE, le=MAX_LEVEL_HUE)
 
 
 class ProjectIndex(BaseModel):
@@ -184,7 +194,7 @@ class OutlineNode(BaseModel):
     # editors' surfaces and active items. A legacy hex `color` becomes the theme hue.
     # (Books used to have a second, accent hue; files that still carry one load fine and
     # drop it when next saved.)
-    themeHue: Optional[int] = Field(default=None, ge=0, le=MAX_LEVEL_HUE)
+    themeHue: Optional[int] = Field(default=None, ge=MIN_LEVEL_HUE, le=MAX_LEVEL_HUE)
     chapterCountTarget: Optional[int] = None
     plotlineIds: list[str] = Field(default_factory=list)
     # Book's total word-count ambition -- drives bookshelf spine width/fill.
@@ -217,7 +227,8 @@ class OutlineNode(BaseModel):
         if self.themeHue is None:
             hue = hex_to_hue(self.color)
             if hue is not None:
-                self.themeHue = hue
+                # A saturated hue (0 degrees is 360 here: 0 itself is a desaturated red).
+                self.themeHue = hue or 360
         return self
 
 
@@ -267,7 +278,7 @@ class PlotNode(BaseModel):
     # category is drawn with the theme's saturation/brightness, a subcategory with
     # the accent's and kept within 60 degrees of its category's hue. None = the
     # app theme's hue (categories) or the category's hue (subcategories).
-    hue: Optional[int] = Field(default=None, ge=0, le=360)
+    hue: Optional[int] = Field(default=None, ge=MIN_LEVEL_HUE, le=MAX_LEVEL_HUE)
     # Set only on "plotpoint" nodes, which are the values of fields: the
     # PlotCustomFieldDef.id (defined on a category, subcategory or plotline)
     # this value belongs to. None on plotpoints saved before fields had values;
@@ -649,6 +660,8 @@ class AuiConfigDraft(BaseModel):
 
 class ProjectFile(BaseModel):
     schemaVersion: int = SCHEMA_VERSION
+    # Which scheme the stored level colours use (HUE_SCHEME); a file without it is scheme 1.
+    hueScheme: int = HUE_SCHEME
     index: ProjectIndex
     outline: OutlineTree = Field(default_factory=OutlineTree)
     plot: PlotTree = Field(default_factory=PlotTree)

@@ -3,7 +3,6 @@ import type { OutlineNode } from '../../../../api/types'
 import type { WordCounts } from '../../../../api/draftFetch'
 import type { WriterWorkspace } from '../useWriterWorkspace'
 import { ChevronDownIcon, ChevronRightIcon, GripIcon, PencilIcon, PlusIcon } from '../../../icons'
-import { themeColorCss } from '../../../../theme/bookColors'
 import { useNodeKeys } from '../../../../lib/nodeKeys'
 import { buildChildIndex, descendantsOf } from '../outlineTree'
 import { DeleteControl } from '../shared'
@@ -157,7 +156,7 @@ export function OutlineCards({ w, book, counts, plotDrag }: {
     )
   }
 
-  const tint = (node: OutlineNode) => ({ '--wr-node-tint': themeColorCss(w.levelHueOf(node)) } as CSSProperties)
+  const tint = (node: OutlineNode) => ({ '--wr-node-tint': w.levelTintOf(node) } as CSSProperties)
 
   const chevron = (node: OutlineNode, open: boolean, label: string) => (
     <button
