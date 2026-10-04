@@ -20,7 +20,7 @@ import { awarenessNext } from './awareness'
 import { useStoredState } from './storage'
 import { combineSaveStatus, useAutosave } from '../../../lib/useAutosave'
 import { insertAfter } from '../../../lib/siblingOrder'
-import { DEFAULT_BOOK_HUE, clampHueToWindow, wrapHue } from '../../../theme/bookColors'
+import { DEFAULT_BOOK_HUE, clampHueToWindow, isSwatchHue, normalizeHue, wrapHue } from '../../../theme/bookColors'
 import { useThemeState } from '../../../theme/useTheme'
 import { autoPickHue, defaultProjectHue, hueCentre, levelHue, reconcileHues } from './levelHues'
 
@@ -449,8 +449,11 @@ export function useWriterWorkspace() {
       const map = new Map(prev.map(n => [n.id, n]))
       const parent = parentId ? map.get(parentId) : undefined
       const centre = parent ? levelHue(parent, map, projectHueRef.current) : projectHueRef.current
-      const siblingHues = prev.filter(n => n.parentId === parentId && n.kind === kind && n.themeHue != null).map(n => n.themeHue as number)
-      node.themeHue = autoPickHue(centre, siblingHues)
+      // Under a neutral swatch there is no hue to spread round: the new node just shows its parent's.
+      if (!isSwatchHue(centre)) {
+        const siblingHues = prev.filter(n => n.parentId === parentId && n.kind === kind && n.themeHue != null && !isSwatchHue(n.themeHue)).map(n => n.themeHue as number)
+        node.themeHue = autoPickHue(centre, siblingHues)
+      }
     }
     commitOutline(afterId ? insertAfter(prev, node, afterId, n => n.parentId === parentId) : [...prev, node], true)
     return node.id
@@ -468,15 +471,15 @@ export function useWriterWorkspace() {
     if (!target || (target.kind !== 'series' && target.kind !== 'book' && target.kind !== 'arc' && target.kind !== 'chapter')) return
     const map = new Map(prev.map(n => [n.id, n]))
     const centre = hueCentre(target, map, projectHueRef.current)
-    const wrapped = wrapHue(hue)
-    const value = centre != null ? clampHueToWindow(centre, wrapped) : wrapped
+    const normalized = normalizeHue(hue)
+    const value = centre != null ? clampHueToWindow(centre, normalized) : normalized
     const next = prev.map(n => (n.id === nodeId ? { ...n, themeHue: value } : n))
     commitOutline(reconcileHues(next, projectHueRef.current), false)
   }
 
   // Sets the project's own hue, pulling the series' hues (and so their descendants') back inside its window.
   function setProjectHue(hue: number) {
-    const wrapped = wrapHue(hue)
+    const wrapped = normalizeHue(hue)
     projectHueRef.current = wrapped
     updateProjectSettings({ themeHue: wrapped }, false)
     const prev = outlineNodesRef.current

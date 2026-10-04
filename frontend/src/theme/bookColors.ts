@@ -14,6 +14,22 @@ export const SUBCATEGORY_HUE_WINDOW = 60
 
 export const wrapHue = (hue: number): number => ((Math.round(hue) % 360) + 360) % 360
 
+// The full-range colour sliders (project, book) end with four neutral swatches, stored
+// in the same number as a hue: 361 brown, 362 black, 363 gray, 364 white. Unlike a hue a
+// swatch has its own fixed saturation and lightness, so it is not zone-dependent.
+export interface HueSwatch { value: number; name: string; color: HSL }
+export const HUE_SWATCHES: readonly HueSwatch[] = [
+  { value: 361, name: 'Brown', color: { h: 28, s: 45, l: 32 } },
+  { value: 362, name: 'Black', color: { h: 0, s: 0, l: 10 } },
+  { value: 363, name: 'Gray', color: { h: 0, s: 0, l: 48 } },
+  { value: 364, name: 'White', color: { h: 0, s: 0, l: 94 } },
+]
+export const isSwatchHue = (hue: number): boolean => hue >= 361 && hue <= 364
+export const swatchOf = (hue: number): HueSwatch | undefined => HUE_SWATCHES.find(s => s.value === hue)
+// A slider's value as a stored level colour: a swatch stays itself, anything else wraps round the wheel.
+export const normalizeHue = (hue: number): number => (isSwatchHue(Math.round(hue)) ? Math.round(hue) : wrapHue(hue))
+const hslCss = (c: HSL): string => `hsl(${c.h}, ${c.s}%, ${c.l}%)`
+
 // Hue (0-359) of a #rrggbb colour, or null for anything else.
 export function hexToHue(hex: string | null | undefined): number | null {
   const m = /^#?([0-9a-f]{6})$/i.exec((hex ?? '').trim())
@@ -56,11 +72,15 @@ export function bookThemeHue(book: { themeHue?: number | null; color?: string | 
 
 // CSS for the two colour families, following the active zone through the theme variables.
 // (`hue` may itself be a CSS value such as var(--color-theme-h).)
-export const themeColorCss = (hue: number | string): string => `hsl(${hue}, var(--color-theme-s), var(--color-theme-l))`
-export const accentColorCss = (hue: number | string): string => `hsl(${hue}, var(--color-accent-s), var(--color-accent-l))`
+export const themeColorCss = (hue: number | string): string =>
+  typeof hue === 'number' && swatchOf(hue) ? hslCss(swatchOf(hue)!.color) : `hsl(${hue}, var(--color-theme-s), var(--color-theme-l))`
+export const accentColorCss = (hue: number | string): string =>
+  typeof hue === 'number' && swatchOf(hue) ? hslCss(swatchOf(hue)!.color) : `hsl(${hue}, var(--color-accent-s), var(--color-accent-l))`
 
 // The colour a book's cover is drawn in for a zone (theme saturation and lightness).
 export function coverColor(pal: ZonePalette, zone: ZoneKey, hue: number): HSL {
+  const swatch = swatchOf(hue)
+  if (swatch) return swatch.color
   const { theme } = resolvePalette(pal, zone)
   return { h: hue, s: theme.s, l: theme.l }
 }
@@ -69,9 +89,19 @@ export function coverColor(pal: ZonePalette, zone: ZoneKey, hue: number): HSL {
 // palette with the book's theme hue (and accent hue, when set) swapped in.
 // Going through deriveTokens keeps the zone's look (ink, fills, page).
 export function bookScopeVars(pal: ZonePalette, zone: ZoneKey, role: Role, themeHue: number, accentHue: number | null): ThemeVars {
-  return deriveTokens(
-    { ...pal, theme: { h: themeHue }, accent: { h: accentHue ?? pal.accent.h } },
+  // A neutral swatch tints with its nominal hue, then drops the saturation of a gray, black or white
+  // (the lightness stays the zone's own, so text keeps its contrast).
+  const nominal = (hue: number) => swatchOf(hue)?.color.h ?? hue
+  const vars = deriveTokens(
+    { ...pal, theme: { h: nominal(themeHue) }, accent: { h: accentHue != null ? nominal(accentHue) : pal.accent.h } },
     role,
     zone,
   )
+  const neutral = (hue: number | null) => hue != null && isSwatchHue(hue) && swatchOf(hue)!.color.s === 0
+  if (neutral(themeHue)) vars['--color-theme-s'] = '0%'
+  if (neutral(accentHue)) {
+    vars['--color-accent-s'] = '0%'
+    if (role !== 'admin') vars['--color-accent2-s'] = '0%'
+  }
+  return vars
 }

@@ -4,6 +4,9 @@ import type { ShelfGroup } from './outlineTree'
 import { nodeLabel } from './plotTree'
 import { bookThemeHue, themeColorCss } from '../../../theme/bookColors'
 
+// The title on a white swatch's spine has to be dark.
+const WHITE_SWATCH = 364
+
 const SPINE_HEIGHT = 100
 
 // A spine's width reflects the book's length: 5px for every 40,000 words of
@@ -28,7 +31,7 @@ export function Spine({ book, active, onOpen }: { book: OutlineNode; active: boo
     <button
       type="button"
       className={active ? 'wrSpine wrSpine--active' : 'wrSpine'}
-      style={{ height: SPINE_HEIGHT, width: active ? COVER_WIDTH : width, '--wr-spine': themeColorCss(bookThemeHue(book)) } as CSSProperties}
+      style={{ height: SPINE_HEIGHT, width: active ? COVER_WIDTH : width, '--wr-spine': themeColorCss(bookThemeHue(book)), '--wr-spine-ink': bookThemeHue(book) === WHITE_SWATCH ? '#1a1a1a' : undefined } as CSSProperties}
       onClick={onOpen}
       title={label}
       aria-pressed={active}

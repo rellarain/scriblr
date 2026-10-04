@@ -123,7 +123,7 @@
   .wrSpine--active .wrSpineFlip { transform: rotateY(180deg); }
   .wrSpineSide, .wrSpineFront {
     position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; overflow: hidden;
-    background: var(--wr-spine, var(--wr-accent-dark)); color: white; backface-visibility: hidden;
+    background: var(--wr-spine, var(--wr-accent-dark)); color: var(--wr-spine-ink, white); backface-visibility: hidden;
     box-shadow: 1px 0 3px rgb(0 0 0 / calc(0.35 * var(--shade-k)));
   }
   .wrSpineSide { padding: 8px 2px; writing-mode: vertical-rl; font-size: 11px; font-weight: 700; letter-spacing: 0.3px; }
@@ -176,7 +176,7 @@
   .wrLevel {
     --wr-level-h: var(--color-theme-h);
     display: flex; flex-direction: column; min-width: 0; min-height: 0; overflow: hidden; border-radius: 12px;
-    background: color-mix(in srgb, hsl(var(--wr-level-h) var(--color-theme-s) var(--color-theme-l)) 26%, var(--surface-raised-a));
+    background: color-mix(in srgb, var(--wr-level-tint, hsl(var(--wr-level-h) var(--color-theme-s) var(--color-theme-l))) 26%, var(--surface-raised-a));
     box-shadow: inset 0 0 0 1px var(--hairline);
     &--max { flex: 1 1 0; }
   }

@@ -84,3 +84,19 @@ describe('defaultProjectHue', () => {
     expect(defaultProjectHue(330)).toBe(90)
   })
 })
+
+
+describe('under a neutral swatch', () => {
+  it('has no window: its children may be any hue, and a swatch left on them takes the new parent hue', () => {
+    const nodes = [node('b', 'book', null, 362), node('a', 'arc', 'b', 120), node('c', 'chapter', 'a', 364)]
+    const map = byId(nodes)
+    expect(levelHue(nodes[0], map, PROJECT)).toBe(362)
+    expect(hueCentre(nodes[1], map, PROJECT)).toBeNull()
+    expect(levelHue(node('a2', 'arc', 'b'), new Map([...map, ['a2', node('a2', 'arc', 'b')]]), PROJECT)).toBe(362) // none of its own: shows the book's swatch
+    expect(reconcileHues(nodes, PROJECT).map(n => n.themeHue)).toEqual([362, 120, 120]) // c's own white sits in arc 120's window: becomes 120
+  })
+
+  it('is no centre for a series under a swatch project hue', () => {
+    expect(hueCentre(node('s', 'series', null), byId([]), 363)).toBeNull()
+  })
+})

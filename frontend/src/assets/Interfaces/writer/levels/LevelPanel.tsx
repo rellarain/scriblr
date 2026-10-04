@@ -1,5 +1,6 @@
 import type { CSSProperties, ReactNode } from 'react'
 import { ChevronDownIcon, ChevronRightIcon } from '../../../icons'
+import { themeColorCss } from '../../../../theme/bookColors'
 import type { Level, LevelSize } from './levelSizes'
 
 // One tinted level of the Writer frame. Its header strip is how it changes size:
@@ -25,7 +26,7 @@ function LevelPanel({ level, size, title, hue, onPromote, onSetSize, locked = fa
     <section
       className={`wrLevel wrLevel--${level} wrLevel--${size}`}
       aria-label={`${title} (${size})`} data-level={level} data-size={size}
-      style={hue != null ? ({ '--wr-level-h': hue } as CSSProperties) : undefined}
+      style={hue != null ? ({ '--wr-level-h': hue, '--wr-level-tint': themeColorCss(hue) } as CSSProperties) : undefined}
     >
       <div
         className={isMin && !locked ? 'wrLevelHeader wrLevelHeader--min' : 'wrLevelHeader'}

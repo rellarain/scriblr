@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import {
-  DEFAULT_BOOK_HUE, accentColorCss, bookScopeVars, bookThemeHue, clampHueToWindow, coverColor, hexToHue, hueDelta, hueWindow,
+  DEFAULT_BOOK_HUE, HUE_SWATCHES, accentColorCss, bookScopeVars, bookThemeHue, clampHueToWindow, coverColor, hexToHue, hueDelta, hueWindow,
+  isSwatchHue, normalizeHue,
   themeColorCss, wrapHue,
 } from './bookColors'
 import { DEFAULT_PALETTE } from './defaults'
@@ -103,5 +104,30 @@ describe('bookScopeVars', () => {
     expect(vars['--color-accent-h']).toBe('90')
     expect(vars['--color-accent-s']).toBe(`${ZONE_LOOKS.day.accentS}%`)
     expect(vars['--on-accent']).toBeTruthy()
+  })
+})
+
+
+describe('neutral swatches', () => {
+  it('are the stored numbers after 360 and keep their own colour', () => {
+    expect(HUE_SWATCHES.map(s => [s.value, s.name])).toEqual([[361, 'Brown'], [362, 'Black'], [363, 'Gray'], [364, 'White']])
+    expect(themeColorCss(362)).toBe('hsl(0, 0%, 10%)')
+    expect(accentColorCss(361)).toBe('hsl(28, 45%, 32%)')
+    expect(themeColorCss(200)).toBe('hsl(200, var(--color-theme-s), var(--color-theme-l))')
+    expect(coverColor(DEFAULT_PALETTE, 'day', 364)).toEqual({ h: 0, s: 0, l: 94 })
+  })
+
+  it('normalizeHue wraps a hue but keeps a swatch', () => {
+    expect([normalizeHue(370), normalizeHue(-10), normalizeHue(363), normalizeHue(400)]).toEqual([10, 350, 363, 40])
+    expect(isSwatchHue(360)).toBe(false)
+    expect(isSwatchHue(361)).toBe(true)
+  })
+
+  it('tint a book scope with no saturation for gray, black and white, but not for brown', () => {
+    const vars = (hue: number) => bookScopeVars(DEFAULT_PALETTE, 'day', 'user', hue, hue)
+    expect(vars(362)['--color-theme-s']).toBe('0%')
+    expect(vars(363)['--color-accent-s']).toBe('0%')
+    expect(vars(361)['--color-theme-s']).not.toBe('0%')
+    expect(vars(200)['--color-theme-s']).not.toBe('0%')
   })
 })

@@ -10,10 +10,29 @@ beforeEach(() => {
 })
 
 describe('HueSlider', () => {
-  it('runs the whole wheel with no centre', () => {
-    render(<HueSlider label="Book colour" hue={200} centre={null} onChange={() => {}} />)
+  it('runs the whole wheel with no centre, ending with the brown, black, gray and white swatches', () => {
+    const onChange = vi.fn()
+    render(<HueSlider label="Book colour" hue={200} centre={null} onChange={onChange} />)
     const input = screen.getByLabelText('Book colour') as HTMLInputElement
-    expect([input.min, input.max, input.value]).toEqual(['0', '360', '200'])
+    expect(input.max).toBe('1000')
+    expect(input.getAttribute('aria-valuetext')).toBe('Hue 200')
+    // The last fifth of the track is four equal swatch blocks, in order.
+    for (const [pos, value] of [[810, 361], [860, 362], [910, 363], [990, 364]] as const) {
+      fireEvent.change(input, { target: { value: String(pos) } })
+      expect(onChange).toHaveBeenLastCalledWith(value)
+    }
+    fireEvent.change(input, { target: { value: '400' } })
+    expect(onChange).toHaveBeenLastCalledWith(180)
+  })
+
+  it('shows a swatch as itself, named', () => {
+    render(<HueSlider label="Book colour" hue={363} centre={null} onChange={() => {}} />)
+    expect(screen.getByLabelText('Book colour').getAttribute('aria-valuetext')).toBe('Gray')
+  })
+
+  it('has no swatches in a window (there is no hue to stay near)', () => {
+    render(<HueSlider label="Arc colour" hue={210} centre={210} onChange={() => {}} />)
+    expect((screen.getByLabelText('Arc colour') as HTMLInputElement).max).toBe('270')
   })
 
   it('runs only 60 degrees either side of its centre', () => {

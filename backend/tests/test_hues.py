@@ -112,3 +112,14 @@ def test_series_arc_and_chapter_keep_their_own_theme_hue(client: TestClient) -> 
     assert [saved[i]["themeHue"] for i in ("s1", "b1", "a1", "c1")] == [120, 200, 240, 280]
     # Only a book has an accent hue forced on it.
     assert saved["a1"]["accentHue"] is None and saved["c1"]["accentHue"] is None
+
+
+def test_level_hues_accept_the_neutral_swatches_361_to_364(client: TestClient) -> None:
+    project_id = _create_project(client)
+    assert client.patch(f"/api/projects/{project_id}", json={"themeHue": 362}).json()["settings"]["themeHue"] == 362
+    assert client.patch(f"/api/projects/{project_id}", json={"themeHue": 365}).status_code == 422
+    nodes = [_node("b1", "book", None, 0, themeHue=364, accentHue=361), _node("a1", "arc", "b1", 0, themeHue=363)]
+    client.put(f"/api/projects/{project_id}/outline", json={"schemaVersion": 2, "nodes": nodes})
+    saved = {n["id"]: n for n in client.get(f"/api/projects/{project_id}").json()["outline"]["nodes"]}
+    assert (saved["b1"]["themeHue"], saved["b1"]["accentHue"], saved["a1"]["themeHue"]) == (364, 361, 363)
+    assert client.put(f"/api/projects/{project_id}/outline", json={"schemaVersion": 2, "nodes": [_node("b1", "book", None, 0, themeHue=365)]}).status_code == 422

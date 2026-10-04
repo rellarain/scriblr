@@ -16,6 +16,10 @@ def utcnow() -> datetime:
 # The hue a book's cover has when it has none of its own (mirrors the frontend's DEFAULT_BOOK_HUE).
 DEFAULT_BOOK_HUE = 28
 
+# A level colour is a hue (0-360), or one of the neutral swatches the full-range colour sliders
+# end with: 361 brown, 362 black, 363 gray, 364 white (mirrors the frontend's HUE_SWATCHES).
+MAX_LEVEL_HUE = 364
+
 _HEX_COLOR = re.compile(r"^#?([0-9a-fA-F]{6})$")
 
 
@@ -136,7 +140,7 @@ class ProjectSettings(BaseModel):
     # series sit within 60 degrees of it, books anywhere, arcs within 60 of their book and
     # chapters within 60 of their arc (the OutlineNode.themeHue of each). None = the
     # active theme's own colour.
-    themeHue: Optional[int] = Field(default=None, ge=0, le=360)
+    themeHue: Optional[int] = Field(default=None, ge=0, le=MAX_LEVEL_HUE)
 
 
 class ProjectIndex(BaseModel):
@@ -185,8 +189,8 @@ class OutlineNode(BaseModel):
     # active items (accent saturation and brightness). Every book has both: a
     # book with no accent hue gets its theme hue (drawn more saturated), see
     # below. A legacy hex `color` becomes the theme hue.
-    themeHue: Optional[int] = Field(default=None, ge=0, le=360)
-    accentHue: Optional[int] = Field(default=None, ge=0, le=360)
+    themeHue: Optional[int] = Field(default=None, ge=0, le=MAX_LEVEL_HUE)
+    accentHue: Optional[int] = Field(default=None, ge=0, le=MAX_LEVEL_HUE)
     chapterCountTarget: Optional[int] = None
     plotlineIds: list[str] = Field(default_factory=list)
     # Book's total word-count ambition -- drives bookshelf spine width/fill.

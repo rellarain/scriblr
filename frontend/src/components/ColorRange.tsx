@@ -1,4 +1,5 @@
 import type { CSSProperties } from 'react'
+import { HUE_SWATCHES, swatchOf, type HueSwatch } from '../theme/bookColors'
 import './colorRange.scss'
 
 // The app's hue selector: a ranged rectangular input whose track shows every
@@ -39,6 +40,40 @@ function liveDrag() {
   window.addEventListener('pointercancel', end)
 }
 
+// With `swatches`, the last fifth of the track is a row of fixed colours (brown, black, gray, white)
+// after the hues. The input then works in track positions (0..POS_MAX) and `value` / `onChange` stay
+// in the colour's own number: a hue 0-360, or a swatch's value.
+const POS_MAX = 1000
+const HUE_SHARE = 0.8
+
+export function swatchValueToPos(value: number, swatches: readonly HueSwatch[]): number {
+  const idx = swatches.findIndex(s => s.value === value)
+  if (idx < 0) return Math.round((Math.min(360, Math.max(0, value)) / 360) * HUE_SHARE * POS_MAX)
+  return Math.round((HUE_SHARE + ((idx + 0.5) / swatches.length) * (1 - HUE_SHARE)) * POS_MAX)
+}
+
+export function swatchPosToValue(pos: number, swatches: readonly HueSwatch[]): number {
+  const f = pos / POS_MAX
+  if (f <= HUE_SHARE) return Math.round((f / HUE_SHARE) * 360)
+  const idx = Math.min(swatches.length - 1, Math.floor(((f - HUE_SHARE) / (1 - HUE_SHARE)) * swatches.length))
+  return swatches[idx].value
+}
+
+// The hue track followed by the swatches' hard-edged blocks.
+export function swatchTrackGradient(basis: Basis, swatches: readonly HueSwatch[]): string {
+  const stops = Array.from({ length: HUE_STOPS + 1 }, (_, i) => {
+    const value = (360 * i) / HUE_STOPS
+    return `${resultColor(value, basis)} ${((i / HUE_STOPS) * HUE_SHARE * 100).toFixed(2)}%`
+  })
+  const width = ((1 - HUE_SHARE) * 100) / swatches.length
+  swatches.forEach((sw, k) => {
+    const c = hsl(sw.color.h, sw.color.s, sw.color.l)
+    const from = HUE_SHARE * 100 + k * width
+    stops.push(`${c} ${from.toFixed(2)}%`, `${c} ${(from + width).toFixed(2)}%`)
+  })
+  return `linear-gradient(to right, ${stops.join(', ')})`
+}
+
 export interface ColorRangeProps {
   label: string
   value: number
@@ -52,12 +87,35 @@ export interface ColorRangeProps {
   live?: boolean
   disabled?: boolean
   className?: string
+  // End the slider with the neutral swatches (HUE_SWATCHES); only for a full-range (0-360) slider.
+  swatches?: boolean
 }
 
 export function ColorRange({
-  label, value, onChange, min = 0, max = 360, sat = 50, light = 50, live = false, disabled = false, className,
+  label, value, onChange, min = 0, max = 360, sat = 50, light = 50, live = false, disabled = false, className, swatches = false,
 }: ColorRangeProps) {
   const basis: Basis = { sat, light }
+  if (swatches) {
+    const swatch = swatchOf(value)
+    const pos = swatchValueToPos(value, HUE_SWATCHES)
+    const style = {
+      '--cr-track': swatchTrackGradient(basis, HUE_SWATCHES),
+      '--cr-result': swatch ? hsl(swatch.color.h, swatch.color.s, swatch.color.l) : resultColor(value, basis),
+      '--cr-frac': pos / POS_MAX,
+    } as CSSProperties
+    return (
+      <div className={`colorRange${disabled ? ' colorRange--disabled' : ''}${className ? ` ${className}` : ''}`} style={style}>
+        <span className="colorRangeTrack" />
+        <input
+          className="colorRangeInput" type="range" min={0} max={POS_MAX} step={1} value={pos}
+          aria-label={label} aria-valuetext={swatch ? swatch.name : `Hue ${Math.round(value)}`} disabled={disabled}
+          onChange={e => onChange(swatchPosToValue(Number(e.target.value), HUE_SWATCHES))}
+          onPointerDown={live ? liveDrag : undefined}
+        />
+        <span className="colorRangeThumb" aria-hidden="true"><span className="colorRangeSwatch" /></span>
+      </div>
+    )
+  }
   const clamped = Math.min(max, Math.max(min, value))
   const style = {
     '--cr-track': trackGradient(min, max, basis),

@@ -1,5 +1,5 @@
 import type { OutlineNode } from '../../../api/types'
-import { bookThemeHue, clampHueToWindow, hueDelta, wrapHue } from '../../../theme/bookColors'
+import { bookThemeHue, clampHueToWindow, hueDelta, isSwatchHue, normalizeHue, wrapHue } from '../../../theme/bookColors'
 
 // The Writer's level colours. Each level has a hue (0-360); saturation and lightness
 // always come from the active theme zone.
@@ -25,16 +25,18 @@ export type HueNodes = Map<string, HueNode>
 // A node's hue: its own, else its parent's (a book's own, else the book default).
 export function levelHue(node: HueNode, nodes: HueNodes, projectHue: number): number {
   if (node.kind === 'book') return bookThemeHue(node)
-  if (node.themeHue != null) return wrapHue(node.themeHue)
+  if (node.themeHue != null) return normalizeHue(node.themeHue)
   const parent = node.parentId ? nodes.get(node.parentId) : undefined
   return parent ? levelHue(parent, nodes, projectHue) : projectHue
 }
 
-// The hue a node's own hue must stay near, or null when it may be any hue (a book).
+// The hue a node's own hue must stay near, or null when it may be any hue (a book, or anything
+// under a neutral swatch -- brown, black, gray and white have no hue to stay near).
 export function hueCentre(node: HueNode, nodes: HueNodes, projectHue: number): number | null {
   if (node.kind === 'book') return null
   const parent = node.parentId ? nodes.get(node.parentId) : undefined
-  return parent ? levelHue(parent, nodes, projectHue) : projectHue
+  const centre = parent ? levelHue(parent, nodes, projectHue) : projectHue
+  return isSwatchHue(centre) ? null : centre
 }
 
 // The hue for a new node among its siblings: the one in its window farthest from the
@@ -68,7 +70,8 @@ export function reconcileHues(nodes: OutlineNode[], projectHue: number): Outline
     if (node.kind !== 'book' && node.themeHue != null) {
       const centre = hueCentre(node, byId, projectHue)
       if (centre != null) {
-        const clamped = clampHueToWindow(centre, node.themeHue)
+        // A swatch (left over from a neutral parent) has no place in a window: it takes the parent's hue.
+        const clamped = isSwatchHue(node.themeHue) ? centre : clampHueToWindow(centre, node.themeHue)
         if (clamped !== node.themeHue) current = { ...node, themeHue: clamped }
       }
     }
