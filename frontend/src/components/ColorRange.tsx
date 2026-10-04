@@ -1,5 +1,5 @@
 import type { CSSProperties } from 'react'
-import { HUE_SWATCHES, swatchOf, type HueSwatch } from '../theme/bookColors'
+import { HUE_SWATCHES, SWATCH_START_HUE, swatchOf, wrapHue, type HueSwatch } from '../theme/bookColors'
 import './colorRange.scss'
 
 // The app's hue selector: a ranged rectangular input whose track shows every
@@ -40,37 +40,43 @@ function liveDrag() {
   window.addEventListener('pointercancel', end)
 }
 
-// With `swatches`, the last fifth of the track is a row of fixed colours (brown, black, gray, white)
-// after the hues. The input then works in track positions (0..POS_MAX) and `value` / `onChange` stay
-// in the colour's own number: a hue 0-360, or a swatch's value.
+// With `swatches`, the track is one gradient: the hues, starting and ending at orange (SWATCH_START_HUE),
+// then on from that orange into the fixed colours (brown, black, gray, white). The last fifth of the
+// track is those colours, a block each (the thumb snaps to a block's centre, where the track is exactly
+// that colour). The input then works in track positions (0..POS_MAX) and `value` / `onChange` stay in
+// the colour's own number: a hue 0-360, or a swatch's value.
 const POS_MAX = 1000
 const HUE_SHARE = 0.8
 
 export function swatchValueToPos(value: number, swatches: readonly HueSwatch[]): number {
   const idx = swatches.findIndex(s => s.value === value)
-  if (idx < 0) return Math.round((Math.min(360, Math.max(0, value)) / 360) * HUE_SHARE * POS_MAX)
+  if (idx < 0) {
+    const offset = (((value - SWATCH_START_HUE) % 360) + 360) % 360 // degrees on from the start
+    return Math.round((offset / 360) * HUE_SHARE * POS_MAX)
+  }
   return Math.round((HUE_SHARE + ((idx + 0.5) / swatches.length) * (1 - HUE_SHARE)) * POS_MAX)
 }
 
 export function swatchPosToValue(pos: number, swatches: readonly HueSwatch[]): number {
   const f = pos / POS_MAX
-  if (f <= HUE_SHARE) return Math.round((f / HUE_SHARE) * 360)
+  if (f <= HUE_SHARE) return wrapHue(SWATCH_START_HUE + (f / HUE_SHARE) * 360)
   const idx = Math.min(swatches.length - 1, Math.floor(((f - HUE_SHARE) / (1 - HUE_SHARE)) * swatches.length))
   return swatches[idx].value
 }
 
-// The hue track followed by the swatches' hard-edged blocks.
+// The hue wheel from orange round to orange, then a soft blend through the swatches' colours.
 export function swatchTrackGradient(basis: Basis, swatches: readonly HueSwatch[]): string {
   const stops = Array.from({ length: HUE_STOPS + 1 }, (_, i) => {
-    const value = (360 * i) / HUE_STOPS
+    const value = SWATCH_START_HUE + (360 * i) / HUE_STOPS
     return `${resultColor(value, basis)} ${((i / HUE_STOPS) * HUE_SHARE * 100).toFixed(2)}%`
   })
   const width = ((1 - HUE_SHARE) * 100) / swatches.length
   swatches.forEach((sw, k) => {
-    const c = hsl(sw.color.h, sw.color.s, sw.color.l)
-    const from = HUE_SHARE * 100 + k * width
-    stops.push(`${c} ${from.toFixed(2)}%`, `${c} ${(from + width).toFixed(2)}%`)
+    const at = HUE_SHARE * 100 + (k + 0.5) * width
+    stops.push(`${hsl(sw.color.h, sw.color.s, sw.color.l)} ${at.toFixed(2)}%`)
   })
+  const last = swatches[swatches.length - 1].color
+  stops.push(`${hsl(last.h, last.s, last.l)} 100%`)
   return `linear-gradient(to right, ${stops.join(', ')})`
 }
 

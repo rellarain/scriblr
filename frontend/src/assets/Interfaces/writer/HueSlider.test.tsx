@@ -1,6 +1,8 @@
 import { fireEvent, render, screen } from '@testing-library/react'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { __resetSettingsForTests } from '../../../settings/settingsStore'
+import { swatchPosToValue, swatchValueToPos } from '../../../components/ColorRange'
+import { HUE_SWATCHES } from '../../../theme/bookColors'
 import HueSlider from './HueSlider'
 
 beforeEach(() => {
@@ -21,8 +23,30 @@ describe('HueSlider', () => {
       fireEvent.change(input, { target: { value: String(pos) } })
       expect(onChange).toHaveBeenLastCalledWith(value)
     }
+    // The hues start at orange (28) and run once round the wheel: halfway through them is 180 degrees on.
     fireEvent.change(input, { target: { value: '400' } })
-    expect(onChange).toHaveBeenLastCalledWith(180)
+    expect(onChange).toHaveBeenLastCalledWith(208)
+    fireEvent.change(input, { target: { value: '0' } })
+    expect(onChange).toHaveBeenLastCalledWith(28)
+  })
+
+  it('draws one continuous track: orange round to orange, then brown, black, gray, white', () => {
+    const { container } = render(<HueSlider label="Book colour" hue={200} centre={null} onChange={() => {}} />)
+    const track = (container.firstElementChild as HTMLElement).style.getPropertyValue('--cr-track')
+    const stops = track.match(/hsl\([^)]*\) [\d.]+%/g)!.map(s => s.replace(/, /g, ',').replace(/\) /, ')@'))
+    expect(stops[0].startsWith('hsl(28,')).toBe(true) // starts at orange
+    expect(stops[12].startsWith('hsl(388,')).toBe(true) // and is back at orange where the hues end
+    expect(stops[12].endsWith('@80.00%')).toBe(true)
+    // Then a stop at the centre of each swatch's block (no hard edges), ending on white.
+    expect(stops.slice(13).map(s => s.split('@')[1])).toEqual(['82.50%', '87.50%', '92.50%', '97.50%', '100%'])
+    expect(stops[13].startsWith('hsl(28,45%,32%)')).toBe(true)
+    expect(stops[14].startsWith('hsl(0,0%,10%)')).toBe(true)
+    expect(stops[16].startsWith('hsl(0,0%,94%)')).toBe(true)
+  })
+
+  it('maps every hue to a track position and back', () => {
+    for (let hue = 0; hue < 360; hue++) expect(swatchPosToValue(swatchValueToPos(hue, HUE_SWATCHES), HUE_SWATCHES)).toBe(hue)
+    expect(swatchValueToPos(28, HUE_SWATCHES)).toBe(0) // orange is the start of the track
   })
 
   it('shows a swatch as itself, named', () => {

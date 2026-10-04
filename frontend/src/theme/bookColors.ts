@@ -24,6 +24,9 @@ export const HUE_SWATCHES: readonly HueSwatch[] = [
   { value: 363, name: 'Gray', color: { h: 0, s: 0, l: 48 } },
   { value: 364, name: 'White', color: { h: 0, s: 0, l: 94 } },
 ]
+// A swatch slider is one continuous gradient: it starts at the brown's own hue (orange), runs once
+// round the wheel back to orange, and from there darkens to brown and black, then lightens to gray and white.
+export const SWATCH_START_HUE = HUE_SWATCHES[0].color.h
 export const isSwatchHue = (hue: number): boolean => hue >= 361 && hue <= 364
 export const swatchOf = (hue: number): HueSwatch | undefined => HUE_SWATCHES.find(s => s.value === hue)
 // A slider's value as a stored level colour: a swatch stays itself, anything else wraps round the wheel.
