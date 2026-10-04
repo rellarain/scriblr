@@ -561,9 +561,9 @@ awareness that the app above already existed:
   arc. The **Draft level** (`writer/draft/`) at Max is the chapter as an open book: a
   chapter title tile across the top (the series/book/arc above it, its title and synopsis
   edited in place, dates, draft stats, and the Save, Publish and Draft | Preview tools);
-  under it the left page, which runs under the Dash, Project and Outline tiles and lists
-  the chapter's plotpoints read-only, a crease, and the right page: the chapter's acts,
-  scenes and moments as read-only cards (fold up, remembered) each around an
+  under it the left page, a strip of paper that runs under the Dash, Project and Outline
+  tiles, the crease right beside them, and the right page: the chapter's plotpoints
+  (read-only footnote cards), then its acts, scenes and moments as read-only cards (fold up, remembered) each around an
   auto-growing draft input with a live word count, or, from the toggle, the preview with
   its Reaction / Flag / Export tools. A chapter with no outline is one free draft. The
   Dash and Project levels still wrap the older consoles' contents (tile grids), being

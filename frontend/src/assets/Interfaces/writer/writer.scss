@@ -165,12 +165,14 @@
   // (the tile column is laid over it), with the chapter beside them, then the crease and the right page.
   .wrLevels--focus-draft {
     --wr-side-w: clamp(280px, 32%, 460px);
+    // The same width in pixels for what is inside (cqw is a percentage of this container's width).
+    --wr-side-px: clamp(280px, 32cqw, 460px);
+    container-type: inline-size;
     display: grid; grid-template-columns: var(--wr-side-w) minmax(0, 1fr); grid-template-rows: minmax(0, 1fr);
     > .wrLevelsSide { grid-column: 1; grid-row: 1; position: relative; z-index: 2; }
     .wrLevel--draft { grid-column: 1 / -1; grid-row: 1; }
-    .wrChapterTile { padding-left: calc(var(--wr-side-w) + 24px); }
+    .wrChapterTile { padding-left: calc(var(--wr-side-px) + 24px); }
     .wrLevel--draft .wrLevelBody { padding-left: 0; }
-    .wrSpreadLeft { padding-left: calc(var(--wr-side-w) + 30px); }
   }
   .wrLevels--focus-dash > .wrLevel--dash { flex: 2 1 0; }
   .wrLevels--focus-dash > .wrLevel--project { flex: 1 1 0; }
@@ -573,7 +575,8 @@
   .wrDraftLevel { flex: 1 1 auto; min-height: 0; display: flex; flex-direction: column; gap: 6px; }
   .wrDraftBody { flex: 1 1 auto; min-height: 0; display: flex; }
   .wrDraftBody > .wrSpread { flex: 1 1 auto; }
-  .wrSpreadLeft { flex: 0 0 min(68%, calc(var(--wr-side-w, 0px) + 330px)); min-width: 230px; min-height: 0; overflow-y: auto; box-sizing: border-box; padding: 22px 16px 22px 26px; scrollbar-width: none; &::-webkit-scrollbar { display: none; } }
+  // The left page is the strip of paper under the other levels' tiles: the crease sits right beside them.
+  .wrSpreadLeft { flex: 0 0 calc(var(--wr-side-px, 0px) + 4px); min-height: 0; }
   // The crease down the middle of the open book.
   .wrCrease { flex: 0 0 18px; background: linear-gradient(90deg, transparent, rgb(0 0 0 / 0.12) 42%, rgb(0 0 0 / 0.24) 50%, rgb(0 0 0 / 0.12) 58%, transparent); }
   .wrSpreadRight { flex: 1 1 0; min-width: 0; min-height: 0; display: flex; flex-direction: column; }
@@ -610,9 +613,8 @@
   }
   .wrChapterTitle { font-family: Georgia, 'Times New Roman', serif; font-size: 22px; font-weight: 700; line-height: 1.25; }
   .wrChapterSynopsis { font-size: 13px; line-height: 1.45; }
-  // The left page: under the other levels' tiles, and beside them the chapter's plotpoints.
-  .wrLeftPage { display: flex; flex-direction: column; gap: 14px; }
-  .wrLeftPoints { display: flex; flex-direction: column; gap: 8px; .wrDraftStatsHead { display: flex; justify-content: space-between; } .wrPlotNotes { flex: none; padding: 0; overflow: visible; } }
+  // The chapter's plotpoints, at the top of the right page.
+  .wrRightPoints { display: flex; flex-direction: column; gap: 8px; margin-bottom: 12px; .wrDraftStatsHead { display: flex; justify-content: space-between; } .wrPlotNotes { flex: none; flex-direction: row; flex-wrap: wrap; padding: 0; overflow: visible; } .wrPlotNote { flex: 1 1 200px; max-width: 320px; } }
 
   // The tabs on the right edge (EdgeTabs.tsx): a cluster per arc, a tab per chapter, each in its own colour.
   .wrEdgeTabs { flex: 0 0 40px; margin-left: -1px; padding-top: 22px; padding-bottom: 8px; box-sizing: border-box; max-height: 100%; display: flex; flex-direction: column; gap: 10px; overflow-y: auto; scrollbar-width: none; &::-webkit-scrollbar { display: none; } }

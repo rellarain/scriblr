@@ -81,7 +81,7 @@ function setup(props: { chapterId?: string; console_?: 'page' | 'pages' } = {}) 
 }
 
 const tile = () => document.querySelector<HTMLElement>('.wrChapterTile')!
-const left = () => document.querySelector<HTMLElement>('.wrLeftPage')!
+const left = () => document.querySelector<HTMLElement>('.wrSpreadLeft')!
 const right = () => document.querySelector<HTMLElement>('.wrSpreadRight')!
 
 describe('Draft level: the chapter tile', () => {
@@ -124,14 +124,19 @@ describe('Draft level: the chapter tile', () => {
   })
 })
 
-describe('Draft level: the left page', () => {
-  it('lists the plotpoints in the chapter, read-only, and leaves out the unplaced', () => {
+describe('Draft level: the book pages', () => {
+  it('lists the plotpoints in the chapter at the top of the right page, read-only, and leaves out the unplaced', () => {
     setup()
-    const points = within(left()).getByRole('region', { name: 'Plotpoints in this chapter' })
+    const points = within(right()).getByRole('region', { name: 'Plotpoints in this chapter' })
     expect(within(points).getByText('They meet')).toBeTruthy()
     expect(within(points).getByText('A secret')).toBeTruthy()
     expect(within(points).queryByText('Not placed yet')).toBeNull()
     expect(points.querySelector('[draggable="true"]')).toBeNull()
+  })
+
+  it('leaves the left page as the bare strip of paper under the other levels tiles', () => {
+    setup()
+    expect(left().textContent).toBe('')
   })
 })
 
@@ -200,17 +205,17 @@ describe('Draft level: Draft | Preview', () => {
     const pane = document.querySelector<HTMLElement>('.wrPreviewPane')!
     expect(within(pane).getByText('The ice gave way beneath the pier.')).toBeTruthy()
     expect(within(pane).getByRole('button', { name: 'Reaction' })).toBeTruthy()
-    // The left page stays.
+    // The tile stays.
     expect(within(tile()).getByText('Chapter 1')).toBeTruthy()
     await user.click(screen.getByRole('button', { name: 'Draft' }))
     expect(spies.showDraft).toHaveBeenCalled()
   })
 
-  it('keeps the left page and takes the cards away when previewing', () => {
+  it('keeps the tile and takes the cards away when previewing', () => {
     INITIAL.bodies = { m1: 'Some text' }
     setup({ console_: 'pages' })
     expect(document.querySelector('.wrDraftCards')).toBeNull()
-    expect(document.querySelector('.wrLeftPage')).not.toBeNull()
+    expect(document.querySelector('.wrChapterTile')).not.toBeNull()
   })
 })
 

@@ -11,7 +11,7 @@ import { Placeholder } from '../shared'
 import { useChapterDraft } from '../useChapterDraft'
 import { usePublications } from '../usePublications'
 import { countWords } from '../wordCount'
-import ChapterLeftPage from './ChapterLeftPage'
+import ChapterPoints from './ChapterPoints'
 import ChapterTile from './ChapterTile'
 import DraftCards from './DraftCards'
 import PreviewPane from './PreviewPane'
@@ -43,9 +43,9 @@ export function DraftPreviewToggle({ preview, hasDraft, onDraft, onPreview }: {
 }
 
 // The Draft level at Max: the open chapter as an open book. The chapter title tile runs across the
-// top (what the chapter is, and the page tools); below it the left page, which runs under the other
-// levels' tiles, holds the chapter's plotpoints, and the right page its draft (or, from the toggle,
-// its preview), with the arcs' and chapters' tabs on the edge.
+// top (what the chapter is, and the page tools); below it the left page, which is just the strip of
+// paper under the other levels' tiles, the crease beside them, and the right page: the chapter's
+// plotpoints and its draft (or, from the toggle, its preview), with the arcs' and chapters' tabs on the edge.
 function DraftPage({ w, chapter, pagesComponent, onPagesComponent }: {
   w: WriterWorkspace
   chapter: OutlineNode
@@ -87,12 +87,12 @@ function DraftPage({ w, chapter, pagesComponent, onPagesComponent }: {
       />
       <div className="wrDraftBody">
         <div className="wrPage wrPage--chapter wrSpread">
-          <div className="wrSpreadLeft"><ChapterLeftPage w={w} chapter={chapter} /></div>
+          <div className="wrSpreadLeft" aria-hidden="true" />
           <div className="wrCrease" aria-hidden="true" />
           <div className="wrSpreadRight">
             {preview
               ? <PreviewPane w={w} chapter={chapter} draft={draft} pubs={pubs} component={pagesComponent} onComponent={onPagesComponent} />
-              : <div className="wrSpreadScroll"><DraftCards w={w} chapter={chapter} draft={draft} /></div>}
+              : <div className="wrSpreadScroll"><ChapterPoints w={w} chapter={chapter} /><DraftCards w={w} chapter={chapter} draft={draft} /></div>}
           </div>
         </div>
         <EdgeTabs
