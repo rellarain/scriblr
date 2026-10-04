@@ -213,7 +213,7 @@
   .wrNodeHue { max-width: 360px; margin: 2px 0; }
   .wrOutlineMid { display: flex; flex-direction: column; gap: 5px; font-size: 12px; line-height: 1.4; padding-top: 8px; }
   // The Outline and Draft pages run their paper flush to the right edge, so the edge tabs sit against it.
-  .wrLevel--outline.wrLevel--max .wrLevelBody { padding: 6px 0 0 6px; }
+  .wrLevel--outline.wrLevel--max .wrLevelBody { padding: 0 0 0 6px; }
   .wrLevel--draft .wrLevelBody { padding: 0 0 6px 0; background: transparent; }
   .wrConsoleBody--tiles { overflow: hidden; }
   .wrConsoleBody { flex: 1 1 auto; min-height: 0; display: flex; flex-direction: column; overflow-y: auto; scrollbar-width: none; &::-webkit-scrollbar { display: none; } }

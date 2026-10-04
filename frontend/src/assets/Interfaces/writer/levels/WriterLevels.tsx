@@ -57,7 +57,7 @@ function WriterLevels({ w, pagesComponent, onPagesComponent }: {
       case 'outline':
         return (
           <LevelPanel
-            key={level} level={level} size={size} title={book ? nodeLabel(book) : 'Book'} hue={book ? bookThemeHue(book) : undefined}
+            key={level} level={level} size={size} headerless={size === 'max'} title={book ? nodeLabel(book) : 'Book'} hue={book ? bookThemeHue(book) : undefined}
             onPromote={() => { if (book) w.openBook(book.id) }} onSetSize={setSize(level)}
           >
             {size === 'max' ? <OutlineMax w={w} /> : <OutlineMid w={w} />}

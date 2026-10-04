@@ -20,7 +20,7 @@ function LevelPanel({ level, size, title, hue, tint, fill, onPromote, onSetSize,
   onSetSize: (size: 'min' | 'mid') => void
   // No Min/Mid toggle (the project shelves beside the Dash have only one size).
   locked?: boolean
-  // No header strip: the body brings its own (the Draft level's chapter tile).
+  // No header strip: the body brings its own (the Draft level's chapter tile, the Outline book editor).
   headerless?: boolean
   // What a Min level shows under its header strip (the book spines, say).
   minBody?: ReactNode
