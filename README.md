@@ -544,9 +544,15 @@ awareness that the app above already existed:
   buttons, ending with Settings and Help, then quick actions (Search, a context-aware New and
   Save). At Mid one tab shows at a time; at Max each tab is a tile that its button opens or
   closes, the open tiles flowing into two columns (open tiles and the current tab are
-  remembered). The Dash's tabs (`levels/dashTabs.tsx`) are Schedule (routines), Checklist (tasks),
+  remembered). A lone open tile has the whole width; an editor's tile fills the height and scrolls itself. The Dash's tabs (`levels/dashTabs.tsx`) are Schedule (routines), Checklist (tasks),
   Analytics, Scratchpad, Project template, Settings (the theme panel) and Help (the resource
-  articles written for the level in the Resources builder, `levels/HelpArticles.tsx`). The selected book's spine swivels into its cover
+  articles written for the level in the Resources builder, `levels/HelpArticles.tsx`). The
+  Project's (`levels/projectTabs.tsx`): Plot and Outline (summaries at Mid, the editors at Max),
+  Schedule, History, Analytics, Settings (the project editor and its colour) and Help. The
+  Outline's (`levels/outlineTabs.tsx`): Unassigned plotpoints, Book outline (New chapter), Book
+  details, Settings (the book's fields and colour) and Help; at Max the book editor strip is its
+  header and each tab opens or closes that part of the page. The Draft level's Settings (the
+  chapter's colour) and Help are icons in the chapter tile that swap the right page. The selected book's spine swivels into its cover
   (`Shelf.tsx`). Levels are tinted by hue (`levelHues.ts`): the project's own
   (`ProjectSettings.themeHue`), series within 60° of it, books any hue, arcs within
   60° of their book and chapters within 60° of their arc (each node's `themeHue`);
@@ -582,8 +588,7 @@ awareness that the app above already existed:
   tiles, the crease right beside them, and the right page: the chapter's plotpoints
   (read-only footnote cards), then its acts, scenes and moments as read-only cards (fold up, remembered) each around an
   auto-growing draft input with a live word count, or, from the toggle, the preview with
-  its Reaction / Flag / Export tools. A chapter with no outline is one free draft. The
-  Project level still wraps the older console's tile grid, being reshaped to tabs like the Dash.
+  its Reaction / Flag / Export tools. A chapter with no outline is one free draft.
 - **`AUI.tsx`** (`feedback/` subfolder) — an admin "feedback pipeline"
   (channel/vote/tone/integrate/implement/sent/explicate tabs). This isn't a
   duplicate of anything above — it has no committed counterpart, is

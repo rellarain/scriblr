@@ -4,13 +4,13 @@ import { useStoredState } from '../storage'
 import { nodeLabel } from '../plotTree'
 import { bookThemeHue } from '../../../../theme/bookColors'
 import BookScope from '../BookScope'
-import ConsoleCorner from '../../../../components/tiles/ConsoleCorner'
-import ProjectConsole from '../ProjectConsole'
 import OutlineMax from '../outline/OutlineMax'
 import DraftLevel from '../draft/DraftLevel'
 import LevelPanel from './LevelPanel'
-import { OutlineMid, ProjectMid, ProjectMin, ProjectTiles } from './levelBodies'
+import { ProjectMin, ProjectTiles } from './levelBodies'
 import { useDashTabs } from './dashTabs'
+import { NoBook, useOutlineTabs } from './outlineTabs'
+import { useProjectTabs } from './projectTabs'
 import { LEVELS, focusOf, levelSizes, type Level, type LevelSize, type SizeOverrides } from './levelSizes'
 
 // The Writer: four stacked levels (Dash, Project, Outline, Draft), one of them
@@ -25,7 +25,10 @@ function WriterLevels({ w, pagesComponent, onPagesComponent }: {
   const [overrides, setOverrides] = useStoredState<SizeOverrides>('scriblr.writer.levelSizes', {})
   const focus = focusOf(w.activeConsole)
   const sizes = levelSizes(focus, overrides)
+  // Each level's tabs, in its header (the Outline's, at Max, are in the book editor strip instead).
   const dashTabs = useDashTabs(w, sizes.dash === 'hidden' ? 'min' : sizes.dash)
+  const projectTabs = useProjectTabs(w, sizes.project === 'hidden' ? 'min' : sizes.project)
+  const outlineTabs = useOutlineTabs(w, sizes.outline === 'max' || sizes.outline === 'hidden' ? 'min' : sizes.outline)
 
   const setSize = (level: Level) => (size: 'min' | 'mid') => setOverrides(prev => ({ ...prev, [level]: size }))
   const book = w.activeBook
@@ -52,9 +55,14 @@ function WriterLevels({ w, pagesComponent, onPagesComponent }: {
         return (
           <LevelPanel
             key={level} level={level} size={size} title={w.activeProject?.title ?? 'Project'} hue={w.projectHue}
+            headerExtras={projectTabs.headerExtras}
             onPromote={w.showProject} onSetSize={setSize(level)} minBody={<ProjectMin w={w} />}
           >
-            {size === 'max' ? <ProjectConsole w={w} /> : <ProjectMid w={w} />}
+            {w.outlineStatus === 'loading' && <p className="wrMuted">Loading project…</p>}
+            {w.outlineStatus === 'error' && <p className="wrError">{w.outlineError ?? 'Failed to load the project.'}</p>}
+            {w.saveError && <p className="wrError">{w.saveError}</p>}
+            {w.warnings.length > 0 && <p className="wrMuted">{w.warnings.join(' ')}</p>}
+            {w.outlineStatus !== 'loading' && w.outlineStatus !== 'error' && projectTabs.body}
           </LevelPanel>
         )
       }
@@ -62,9 +70,9 @@ function WriterLevels({ w, pagesComponent, onPagesComponent }: {
         return (
           <LevelPanel
             key={level} level={level} size={size} headerless={size === 'max'} title={book ? nodeLabel(book) : 'Book'} hue={book ? bookThemeHue(book) : undefined}
-            onPromote={() => { if (book) w.openBook(book.id) }} onSetSize={setSize(level)}
+            headerExtras={outlineTabs.headerExtras} onPromote={() => { if (book) w.openBook(book.id) }} onSetSize={setSize(level)}
           >
-            {size === 'max' ? <OutlineMax w={w} /> : <OutlineMid w={w} />}
+            {size === 'max' ? <OutlineMax w={w} /> : book ? outlineTabs.body : <NoBook />}
           </LevelPanel>
         )
       case 'draft':
@@ -77,7 +85,6 @@ function WriterLevels({ w, pagesComponent, onPagesComponent }: {
             onPromote={() => {}} onSetSize={setSize(level)}
           >
             <DraftLevel w={w} pagesComponent={pagesComponent} onPagesComponent={onPagesComponent} />
-            <ConsoleCorner />
           </LevelPanel>
         )
     }

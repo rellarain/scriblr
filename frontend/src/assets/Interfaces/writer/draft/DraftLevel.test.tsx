@@ -84,6 +84,21 @@ const tile = () => document.querySelector<HTMLElement>('.wrChapterTile')!
 const left = () => document.querySelector<HTMLElement>('.wrSpreadLeft')!
 const right = () => document.querySelector<HTMLElement>('.wrSpreadRight')!
 
+describe('Draft level: Settings and Help', () => {
+  it("swap the right page for the chapter's colour or the help, and the same button puts the page back", async () => {
+    const { user } = setup()
+    expect(right().querySelector('.wrDraftPanel')).toBeNull()
+    await user.click(within(tile()).getByRole('button', { name: 'Settings' }))
+    expect(within(right()).getByRole('region', { name: 'Chapter settings' })).toBeTruthy()
+    expect(within(right()).getByLabelText('Chapter colour')).toBeTruthy()
+    await user.click(within(tile()).getByRole('button', { name: 'Help' }))
+    expect(within(right()).getByRole('region', { name: 'Draft help' })).toBeTruthy()
+    expect(right().querySelector('[aria-label="Chapter settings"]')).toBeNull()
+    await user.click(within(tile()).getByRole('button', { name: 'Help' }))
+    expect(right().querySelector('.wrDraftPanel')).toBeNull()
+  })
+})
+
 describe('Draft level: the chapter tile', () => {
   it('stacks the titles above the chapter, outermost first, and names the chapter by its number', () => {
     setup()

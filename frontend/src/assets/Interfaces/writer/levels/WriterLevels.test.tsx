@@ -8,7 +8,6 @@ import WriterLevels from './WriterLevels'
 
 // The consoles inside the levels (tile grids, editors) have their own tests; here
 // they are stand-ins so this file exercises the frame itself.
-vi.mock('../ProjectConsole', () => ({ default: () => <div>project console</div> }))
 vi.mock('../outline/OutlineMax', () => ({ default: () => <div>book console</div> }))
 vi.mock('../draft/DraftLevel', () => ({ default: ({ w }: { w: { activeConsole: string } }) => <div>{w.activeConsole === 'pages' ? 'pages console' : 'page console'}</div> }))
 vi.mock('./dashTabs', () => ({
@@ -17,11 +16,23 @@ vi.mock('./dashTabs', () => ({
     body: size === 'min' ? null : <div>dash body ({size})</div>,
   }),
 }))
+vi.mock('./projectTabs', () => ({
+  useProjectTabs: (_w: unknown, size: string) => ({
+    headerExtras: size === 'min' ? null : <div>project tabs</div>,
+    body: size === 'min' ? null : <div>project console ({size})</div>,
+  }),
+}))
+vi.mock('./outlineTabs', () => ({
+  useOutlineTabs: (_w: unknown, size: string) => ({
+    headerExtras: size === 'min' ? null : <div>outline tabs</div>,
+    body: size === 'min' ? null : <div>outline mid</div>,
+    isOpen: () => true,
+  }),
+  NoBook: () => <div>no book</div>,
+}))
 vi.mock('./levelBodies', () => ({
-  ProjectMid: () => <div>project mid</div>,
   ProjectMin: () => <div>project spines</div>,
   ProjectTiles: () => <div>project tiles</div>,
-  OutlineMid: () => <div>outline mid</div>,
 }))
 
 beforeEach(() => {
@@ -39,6 +50,7 @@ function workspace(activeConsole: WriterWorkspace['activeConsole'], over: Partia
   return {
     activeConsole, hasOpenProject: activeConsole !== 'shelves' || over.hasOpenProject === true,
     activeProject: { title: 'The Ashfall Cycle' }, activeBook: book, activeBookChapters: [chapter], activeChapter: chapter,
+    warnings: [], outlineStatus: 'idle', saveError: undefined,
     showDash: vi.fn(), showProject: vi.fn(), openBook: vi.fn(),
     projectHue: 150, levelHueOf: () => 280, levelTintOf: () => 'hsl(280, 30%, 50%)', levelFillOf: () => 'hsl(280, 60%, 40%)',
     ...over,
@@ -57,7 +69,7 @@ describe('WriterLevels', () => {
 
     const second = renderLevels(workspace('shelf'))
     expect(levelsOf()).toEqual(['dash:mid', 'project:max'])
-    expect(screen.getByText('project console')).toBeTruthy()
+    expect(screen.getByText('project console (max)')).toBeTruthy()
     second.unmount()
 
     const third = renderLevels(workspace('book'))
@@ -103,7 +115,7 @@ describe('WriterLevels', () => {
     const project = screen.getByRole('region', { name: 'The Ashfall Cycle (min)' })
     await user.click(within(project).getByRole('button', { name: 'Expand The Ashfall Cycle' }))
     expect(levelsOf()).toEqual(['dash:min', 'project:mid', 'outline:mid', 'draft:max'])
-    expect(screen.getByText('project mid')).toBeTruthy()
+    expect(screen.getByText('project console (mid)')).toBeTruthy()
 
     await user.click(screen.getByRole('button', { name: 'Minimize The Ashfall Cycle' }))
     expect(levelsOf()).toEqual(['dash:min', 'project:min', 'outline:mid', 'draft:max'])

@@ -66,6 +66,21 @@ describe('useTabbedLevel', () => {
     expect(screen.getByRole('button', { name: 'One' }).getAttribute('aria-pressed')).toBe('false')
   })
 
+  it('gives a lone open tile the whole width, and tells tiles which size they are drawn at', async () => {
+    const user = userEvent.setup()
+    const sized: LevelTab[] = [{ id: 'a', label: 'A', Icon: CalendarIcon, render: c => <div>a at {c.size}</div> }, { id: 'b', label: 'B', Icon: PencilIcon, render: () => <div>b</div> }]
+    function Sized() {
+      const t = useTabbedLevel({ storageKey: 'test.sized', tabs: sized, size: 'max', defaultOpen: ['a'] })
+      return <div><header>{t.headerExtras}</header><main>{t.body}</main></div>
+    }
+    render(<Sized />)
+    expect(document.querySelectorAll('.wrTabColumn').length).toBe(1)
+    expect(document.querySelector('.wrTabColumns--single')).toBeTruthy()
+    expect(screen.getByText('a at max')).toBeTruthy()
+    await user.click(screen.getByRole('button', { name: 'B' }))
+    expect(document.querySelectorAll('.wrTabColumn').length).toBe(2)
+  })
+
   it("tells the current tab that New was pressed, and runs the tab's own action", async () => {
     const user = userEvent.setup()
     render(<Harness size="mid" />)

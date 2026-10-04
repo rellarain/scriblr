@@ -4,7 +4,7 @@ import { useStoredState } from '../storage'
 
 // What a tab's content is told: the header's search text, and a counter that goes up each time the
 // header's New button is pressed on that tab (a tab that has something to add reacts to the change).
-export interface TabContext { query: string; newTick: number }
+export interface TabContext { query: string; newTick: number; size: 'mid' | 'max' }
 
 export interface LevelTab {
   id: string
@@ -16,6 +16,8 @@ export interface LevelTab {
   onNew?: () => void
   // The header's search box filters this tab.
   searchable?: boolean
+  // The tab's tile takes the height that is left (an editor that scrolls itself) instead of the height of its content.
+  fill?: boolean
   // Starts the closing group of tabs (Settings, Help), set a little apart.
   end?: boolean
 }
@@ -23,20 +25,24 @@ export interface LevelTab {
 // The tabs of a level and what they show. At Mid one tab at a time, in one column; at Max each tab is the
 // minimised form of a tile, clicking it opens or closes that tile, and the open tiles flow into two columns.
 // The tab strip and quick actions (New, Search, Save) go in the level's header; the body is the tiles.
-export function useTabbedLevel({ storageKey, tabs, size, defaultOpen, save }: {
+export function useTabbedLevel({ storageKey, tabs, size, defaultOpen, defaultTab, save, customMax = false }: {
   storageKey: string
   tabs: LevelTab[]
   size: 'min' | 'mid' | 'max'
   defaultOpen: string[]
+  // The tab that is current at first (the first one when not given).
+  defaultTab?: string
   save?: ReactNode
-}): { headerExtras: ReactNode; body: ReactNode } {
-  const [active, setActive] = useStoredState<string>(`${storageKey}.tab`, tabs[0].id)
+  // The level lays its Max tiles out itself, by `isOpen`; no two-column body is made.
+  customMax?: boolean
+}): { headerExtras: ReactNode; body: ReactNode; isOpen: (id: string) => boolean } {
+  const [active, setActive] = useStoredState<string>(`${storageKey}.tab`, defaultTab ?? tabs[0].id)
   const [open, setOpen] = useStoredState<string[]>(`${storageKey}.open`, defaultOpen)
   const [query, setQuery] = useState('')
   const [searching, setSearching] = useState(false)
   const [ticks, setTicks] = useState<Record<string, number>>({})
 
-  if (size === 'min') return { headerExtras: null, body: null }
+  if (size === 'min') return { headerExtras: null, body: null, isOpen: () => false }
 
   const max = size === 'max'
   const shown = tabs.filter(t => open.includes(t.id))
@@ -54,7 +60,7 @@ export function useTabbedLevel({ storageKey, tabs, size, defaultOpen, save }: {
     setTicks(prev => ({ ...prev, [current.id]: (prev[current.id] ?? 0) + 1 }))
     current.onNew?.()
   }
-  const ctxOf = (tab: LevelTab): TabContext => ({ query: query.trim().toLowerCase(), newTick: ticks[tab.id] ?? 0 })
+  const ctxOf = (tab: LevelTab): TabContext => ({ query: query.trim().toLowerCase(), newTick: ticks[tab.id] ?? 0, size: max ? 'max' : 'mid' })
 
   const headerExtras = (
     <div className="wrHeaderExtras">
@@ -96,17 +102,20 @@ export function useTabbedLevel({ storageKey, tabs, size, defaultOpen, save }: {
   let body: ReactNode
   if (!max) {
     body = current ? <div className="wrTabPane" role="region" aria-label={current.label}>{current.render(ctxOf(current))}</div> : null
+  } else if (customMax) {
+    body = null
   } else {
+    // One open tile has the whole width; two or more alternate between the columns.
     const columns: LevelTab[][] = [[], []]
     shown.forEach((t, i) => columns[i % 2].push(t))
     body = shown.length === 0
       ? <p className="wrMuted">Pick a tab above to open it.</p>
       : (
-        <div className="wrTabColumns">
-          {columns.map((col, i) => (
+        <div className={`wrTabColumns${shown.length === 1 ? ' wrTabColumns--single' : ''}`}>
+          {columns.filter(col => col.length > 0).map((col, i) => (
             <div key={i} className="wrTabColumn">
               {col.map(t => (
-                <section key={t.id} className="wrTabTile" aria-label={t.label}>
+                <section key={t.id} className={t.fill ? 'wrTabTile wrTabTile--fill' : 'wrTabTile'} aria-label={t.label}>
                   <h3 className="wrTabTileTitle"><t.Icon size={14} /> {t.label}</h3>
                   <div className="wrTabTileBody">{t.render(ctxOf(t))}</div>
                 </section>
@@ -117,5 +126,5 @@ export function useTabbedLevel({ storageKey, tabs, size, defaultOpen, save }: {
       )
   }
 
-  return { headerExtras, body }
+  return { headerExtras, body, isOpen: id => (max ? open.includes(id) : current?.id === id) }
 }

@@ -280,17 +280,43 @@ describe('Outline Max: plotpoints', () => {
 })
 
 describe('Outline Max: the book editor and the draft stats', () => {
-  it('is a strip with the book title, and opens to its fields', async () => {
+  it("is a strip with the book title and the level's tabs, and the Settings tab opens its fields", async () => {
     const { user } = setup('c1')
     const editor = screen.getByRole('region', { name: 'Book editor' })
     expect(within(editor).getByText('Cold Harbor')).toBeTruthy()
     expect(within(editor).queryByLabelText('Book title')).toBeNull()
-    await user.click(within(editor).getByRole('button', { name: /Cold Harbor/ }))
+    const names = within(within(editor).getByRole('toolbar', { name: 'Tabs' })).getAllByRole('button').map(b => b.getAttribute('aria-label'))
+    expect(names).toEqual(['Unassigned plotpoints', 'Book outline', 'Book details', 'Settings', 'Help'])
+    await user.click(within(editor).getByRole('button', { name: 'Settings' }))
     const title = within(editor).getByLabelText('Book title')
     await user.type(title, '!')
     expect(title).toHaveProperty('value', 'Cold Harbor!')
     expect(within(editor).getByLabelText('Book colour')).toBeTruthy()
     expect(within(editor).getByRole('progressbar', { name: 'Word goal progress' }).getAttribute('aria-valuenow')).toBe('1') // 12 of 1,000
+  })
+
+  it('opens and closes the tray, the stats and the cards with their tabs', async () => {
+    const { user } = setup('c1')
+    const editor = screen.getByRole('region', { name: 'Book editor' })
+    expect(screen.getByRole('complementary', { name: 'Unassigned plotpoints' })).toBeTruthy()
+    expect(screen.getByRole('region', { name: 'Draft stats' })).toBeTruthy()
+    expect(document.querySelector('.wrArcCard')).toBeTruthy()
+
+    await user.click(within(editor).getByRole('button', { name: 'Unassigned plotpoints' }))
+    expect(screen.queryByRole('complementary', { name: 'Unassigned plotpoints' })).toBeNull()
+    await user.click(within(editor).getByRole('button', { name: 'Book details' }))
+    expect(screen.queryByRole('region', { name: 'Draft stats' })).toBeNull()
+    await user.click(within(editor).getByRole('button', { name: 'Book outline' }))
+    expect(document.querySelector('.wrArcCard')).toBeNull()
+    await user.click(within(editor).getByRole('button', { name: 'Book outline' }))
+    expect(document.querySelector('.wrArcCard')).toBeTruthy()
+  })
+
+  it("adds a chapter from the header's New button", async () => {
+    const { user } = setup('c1')
+    const before = document.querySelectorAll('.wrChapterCard').length
+    await user.click(within(screen.getByRole('region', { name: 'Book editor' })).getByRole('button', { name: 'New chapter' }))
+    expect(document.querySelectorAll('.wrChapterCard').length).toBe(before + 1)
   })
 
   it("shows the book's words and chapters against their goals, and each chapter's words", () => {

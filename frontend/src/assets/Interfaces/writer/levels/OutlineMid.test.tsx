@@ -5,7 +5,10 @@ import type { OutlineNode, PlotNode } from '../../../../api/types'
 import { __resetSettingsForTests } from '../../../../settings/settingsStore'
 import { outlineNode, plotNode } from '../plotTestWorkspace'
 import type { WriterWorkspace } from '../useWriterWorkspace'
-import { OutlineMid } from './levelBodies'
+import { BookDetails, BookOutlineList, UnassignedList } from './outlineTabs'
+
+// The Outline level's Mid tabs, side by side here.
+const OutlineMid = ({ w }: { w: WriterWorkspace }) => <><UnassignedList w={w} /><BookOutlineList w={w} /><BookDetails w={w} /></>
 
 beforeEach(() => {
   window.localStorage.clear()
@@ -53,7 +56,7 @@ describe('OutlineMid', () => {
     expect(row.className).toContain('wrOutlineRow--active')
     await userEvent.setup().click(screen.getByRole('button', { name: '2 · Signal Fire' }))
     expect(w.openChapter).toHaveBeenCalledWith('c2')
-    expect(within(document.querySelector('.wrOutlineMid') as HTMLElement).getByText('arc')).toBeTruthy()
+    expect(screen.getByText('arc')).toBeTruthy()
   })
 
   it('says so when every plotpoint has a place', () => {
