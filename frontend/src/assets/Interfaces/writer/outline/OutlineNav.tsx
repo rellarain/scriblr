@@ -11,15 +11,21 @@ import { formatWords } from '../wordCount'
 import HueSlider from '../HueSlider'
 import { structureOfBook } from './outlineModel'
 
-// The book's contents, on the book's cover (the Outline level): its arcs and chapters, in one column. Click a
-// chapter to open it: it unfolds its title, colour and trash, and under them its acts, scenes and moments. Arcs carry their own title and colour, and a chapter button. Arcs and chapters
-// are reordered and moved by dragging their grips.
-export function OutlineNav({ w, book, counts, chapterBody }: {
+// What the contents are narrowed to: an arc (it and its chapters, each open) or one chapter.
+export interface OutlineFocus { kind: 'arc' | 'chapter'; id: string }
+
+// The book's contents, on the book's cover (the Outline level): its arcs and chapters, in one column. With a
+// focus (picked by the tabs at the book's edge) only that arc and its chapters, or that one chapter, show;
+// without one, the whole list shows and the open chapter unfolds. An open chapter shows its title, colour and
+// trash, and under them its acts, scenes and moments. Arcs carry their own title and colour, and a chapter
+// button. Arcs and chapters are reordered and moved by dragging their grips (not while focused on their own).
+export function OutlineNav({ w, book, counts, chapterBody, focus = null }: {
   w: WriterWorkspace
   book: OutlineNode
   counts: WordCounts
-  // What unfolds under the open chapter's row (its acts, scenes and moments).
+  // What unfolds under an open chapter's row (its acts, scenes and moments).
   chapterBody?: (chapter: OutlineNode) => ReactNode
+  focus?: OutlineFocus | null
 }) {
   const dnd = useNodeDnd(w, {
     accepts: (dragged, parentId) => {
@@ -66,7 +72,7 @@ export function OutlineNav({ w, book, counts, chapterBody }: {
   })
 
   const tint = (node: OutlineNode) => ({ '--wr-node-tint': w.levelTintOf(node) } as CSSProperties)
-  const grip = (id: string) => (
+  const grip = (id: string) => id === focus?.id ? null : (
     <span className="wrGrip wrGrip--light" aria-label="Drag to reorder" title="Drag to reorder" {...dnd.gripProps(id)}>
       <GripIcon size={14} />
     </span>
@@ -84,7 +90,10 @@ export function OutlineNav({ w, book, counts, chapterBody }: {
 
     if (node.kind === 'chapter') {
       const n = numbers.chapter.get(node.id) ?? 0
-      const active = node.id === w.activeChapterId
+      // The open chapters: the focused arc's all, the focused chapter, else the one open chapter.
+      const active = focus
+        ? focus.kind === 'chapter' ? node.id === focus.id : node.parentId === focus.id
+        : node.id === w.activeChapterId
       const inside = (index.get(node.id) ?? []).length
       return (
         <div key={node.id} {...common} className={dnd.cardClass(`wrCtChapter${active ? ' wrCtChapter--active' : ''}`, node.id)} style={tint(node)}>
@@ -148,6 +157,7 @@ export function OutlineNav({ w, book, counts, chapterBody }: {
     return null
   }
 
+  const focused = focus ? nodeById.get(focus.id) : undefined
   const top = childrenOf(book)
   return (
     <nav className="wrOutlineNav" aria-label="Arcs and chapters contents" onKeyDown={keys.onKeyDown}>
@@ -158,8 +168,9 @@ export function OutlineNav({ w, book, counts, chapterBody }: {
           <button type="button" className="wrSmallBtn" onClick={() => addChapter(book.id)}><PlusIcon size={13} /> Chapter</button>
         </span>
       </div>
-      {top.length === 0 && <p className="wrMuted">Nothing outlined yet. Add an arc or a chapter to begin.</p>}
-      {dnd.children(book.id, top, renderNode)}
+      {!focused && top.length === 0 && <p className="wrMuted">Nothing outlined yet. Add an arc or a chapter to begin.</p>}
+      {/* The focused arc or chapter alone, without drop zones (it has no siblings to move among). */}
+      {focused ? renderNode(focused) : dnd.children(book.id, top, renderNode)}
     </nav>
   )
 }

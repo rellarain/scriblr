@@ -93,6 +93,9 @@ const banner = () => document.querySelector<HTMLElement>('.wrChapterBanner')!
 const card = (id: string) => document.querySelector<HTMLElement>(`[data-node="${id}"]`)!
 // A card's own add button ("+ Act", ...): its text is the kind and nothing else.
 const addButton = (within_: HTMLElement, kind: string) => within(within_).getAllByRole('button').find(b => b.textContent?.trim() === kind)!
+// The chapter tabs at the book's edge (one each), and the arc tab.
+const chapterTabs = () => within(screen.getByRole('navigation', { name: 'Arcs and chapters' })).getAllByRole('button', { name: /^Chapter \d+:/ })
+const arcTab = () => screen.getByRole('button', { name: 'Arc 1: Thaw' })
 const tray = () => screen.getByRole('complementary', { name: 'Unassigned plotpoints' })
 
 // jsdom has no DataTransfer: a stand-in carrying just what the handlers touch.
@@ -106,19 +109,36 @@ function drag(from: Element, to: Element) {
 }
 
 describe('Outline Max: the contents', () => {
-  it('lists the arcs and chapters, and opens the chapter picked', async () => {
+  it("shows only the chapter picked by its tab: its row and its cards, not the arc or the other chapters", async () => {
     const { user } = setup('c1')
     const nav = screen.getByRole('navigation', { name: 'Arcs and chapters contents' })
-    expect(within(nav).getByLabelText('Arc 1 title')).toHaveProperty('value', 'Thaw')
     expect(within(nav).getByRole('button', { name: 'Open chapter 1' }).getAttribute('aria-current')).toBe('true')
-    expect(within(nav).getByRole('button', { name: 'Open chapter 2' }).getAttribute('aria-current')).toBeNull()
-    // The page is the open chapter's: its banner, and its acts, scenes and moments (not the arcs or the other chapters).
+    expect(within(nav).queryByLabelText('Arc 1 title')).toBeNull()
+    expect(within(nav).queryByRole('button', { name: 'Open chapter 2' })).toBeNull()
     expect(document.querySelector('.wrChapterBanner')?.getAttribute('data-node')).toBe('c1')
-    expect(card('a1').closest('.wrOutlineNav')).not.toBeNull()
-    expect(document.querySelector('.wrPageScroll [data-node="a1"]')).toBeNull()
-    await user.click(within(nav).getByRole('button', { name: 'Open chapter 2' }))
+    expect(document.querySelectorAll('.wrChapterBanner')).toHaveLength(1)
+    await user.click(screen.getByRole('button', { name: 'Chapter 2: The Harbor Master' }))
+    expect(within(nav).getByRole('button', { name: 'Open chapter 2' }).getAttribute('aria-current')).toBe('true')
+    expect(within(nav).queryByRole('button', { name: 'Open chapter 1' })).toBeNull()
     expect(document.querySelector('.wrChapterBanner')?.getAttribute('data-node')).toBe('c2')
-    expect(document.querySelector('.wrPageScroll [data-node="m1"]')).toBeNull()
+    expect(document.querySelector('[data-node="m1"]')).toBeNull()
+  })
+
+  it("shows only the arc picked by its tab: the arc and each of its chapters' outlines", async () => {
+    const { user } = setup('c1')
+    await user.click(arcTab())
+    const nav = screen.getByRole('navigation', { name: 'Arcs and chapters contents' })
+    expect(arcTab().getAttribute('aria-pressed')).toBe('true')
+    expect(within(nav).getByLabelText('Arc 1 title')).toHaveProperty('value', 'Thaw')
+    expect(within(nav).getByLabelText('Chapter 1 title')).toBeTruthy()
+    expect(within(nav).getByLabelText('Chapter 2 title')).toBeTruthy()
+    expect(Array.from(document.querySelectorAll('.wrChapterBanner')).map(el => el.getAttribute('data-node'))).toEqual(['c1', 'c2'])
+    // No chapter tab is raised while the arc is: choosing one goes back to that chapter alone.
+    expect(chapterTabs().every(t => t.getAttribute('aria-pressed') === 'false')).toBe(true)
+    await user.click(screen.getByRole('button', { name: 'Chapter 2: The Harbor Master' }))
+    expect(arcTab().getAttribute('aria-pressed')).toBe('false')
+    expect(within(nav).queryByLabelText('Arc 1 title')).toBeNull()
+    expect(document.querySelectorAll('.wrChapterBanner')).toHaveLength(1)
   })
 
   it('opens a book on its first chapter when none is open', () => {
@@ -141,6 +161,7 @@ describe('Outline Max: the contents', () => {
     await user.type(title, 'Low Tide')
     expect(title).toHaveProperty('value', 'Low Tide')
     expect(within(document.querySelector('.wrChapterBanner') as HTMLElement).getByText('Low Tide')).toBeTruthy()
+    await user.click(arcTab())
     const arc = screen.getByLabelText('Arc 1 title')
     await user.type(arc, ' II')
     expect(arc).toHaveProperty('value', 'Thaw II')
@@ -150,10 +171,10 @@ describe('Outline Max: the contents', () => {
     const { user } = setup('c1')
     const head = document.querySelector<HTMLElement>('.wrCtHead')!
     await user.click(addButton(head, 'Chapter'))
-    expect(screen.getAllByRole('button', { name: /^Open chapter \d$/ })).toHaveLength(3)
+    expect(chapterTabs()).toHaveLength(3)
     expect(document.querySelector('.wrChapterBanner')?.getAttribute('data-node')).toBe('new1')
     await user.click(addButton(head, 'Arc'))
-    expect(screen.getAllByLabelText(/Arc \d title/)).toHaveLength(2)
+    expect(screen.getAllByRole('button', { name: /^Arc \d+:/ })).toHaveLength(2)
   })
 
   it('deletes the open chapter after asking, with everything in it', async () => {
@@ -170,7 +191,7 @@ describe('Outline Max: the contents', () => {
     const { user } = setup('c1')
     await user.click(screen.getByLabelText('Chapter 1 title'))
     await user.keyboard('{Enter}')
-    expect(screen.getAllByRole('button', { name: /^Open chapter \d$/ })).toHaveLength(3)
+    expect(chapterTabs()).toHaveLength(3)
     // The new chapter comes after Chapter 1, becomes the open one and has the focus.
     await waitFor(() => expect((document.activeElement as HTMLInputElement).getAttribute('aria-label')).toBe('Chapter 2 title'))
   })
@@ -231,7 +252,7 @@ describe('Outline Max: the page edges and tabs', () => {
     await user.click(screen.getByRole('button', { name: 'Arc 1: Thaw' }))
     expect(document.querySelector('.wrChapterBanner')?.getAttribute('data-node')).toBe('c1')
     await user.click(screen.getByRole('button', { name: 'Add chapter' }))
-    expect(screen.getAllByRole('button', { name: /^Open chapter \d$/ })).toHaveLength(3)
+    expect(chapterTabs()).toHaveLength(3)
     expect(document.querySelector('.wrChapterBanner')?.getAttribute('data-node')).toBe('new1')
   })
 })
@@ -245,14 +266,22 @@ describe('Outline Max: dragging cards', () => {
     expect(openGaps(listOf(banner()))).toBeGreaterThan(0)
   })
 
-  it('opens only the gaps an arc or a chapter belongs in, in the contents: a chapter goes among the book and arc chapters, not into a chapter', () => {
-    setup('c1')
+  it("opens only the gaps a chapter belongs in, in a focused arc: among its chapters, not into a chapter", async () => {
+    const { user } = setup('c1')
+    await user.click(arcTab())
     const grip = card('c2').querySelector('.wrGrip')!
     fireEvent(grip, Object.assign(createEvent.dragStart(grip), { dataTransfer: dataTransfer() }))
     const openGaps = (list: Element | null) => Array.from(list?.children ?? []).filter(el => el.classList.contains('wrDropGap--open')).length
     const listOf = (el: Element) => Array.from(el.children).find(c => c.classList.contains('wrChildren')) ?? null
     expect(openGaps(listOf(card('a1')))).toBeGreaterThan(0)
-    expect(openGaps(document.querySelector('.wrOutlineNav > .wrChildren'))).toBeGreaterThan(0)
+  })
+
+  it("has no grip on the arc or chapter it is focused on (it has no siblings to move among)", async () => {
+    const { user } = setup('c1')
+    expect(card('c1').querySelector('.wrCtRow .wrGrip')).toBeNull()
+    await user.click(arcTab())
+    expect(card('a1').querySelector('.wrCtArcHead .wrGrip')).toBeNull()
+    expect(card('c2').querySelector('.wrCtRow .wrGrip')).not.toBeNull()
   })
 })
 
@@ -361,9 +390,9 @@ describe('Outline Max: the book editor and the draft stats', () => {
 
   it("adds a chapter from the header's New button", async () => {
     const { user } = setup('c1')
-    const before = screen.getAllByRole('button', { name: /^Open chapter \d$/ }).length
+    const before = chapterTabs().length
     await user.click(within(screen.getByRole('complementary', { name: 'Book cover' })).getByRole('button', { name: 'New chapter' }))
-    expect(screen.getAllByRole('button', { name: /^Open chapter \d$/ }).length).toBe(before + 1)
+    expect(chapterTabs().length).toBe(before + 1)
   })
 
   it("shows the book's words and chapters against their goals, and each chapter's words", () => {

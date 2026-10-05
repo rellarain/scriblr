@@ -705,6 +705,8 @@
   .wrEdgeTab--active {
     width: 38px; font-size: 16px; background: var(--wr-tab-tint, var(--wr-book)); box-shadow: 2px 2px 6px rgb(0 0 0 / calc(0.4 * var(--shade-k)));
   }
+  // The focused arc's tab is raised the same way: its own colour as the background.
+  .wrEdgeArc--active { background: var(--wr-tab-tint, var(--wr-book)); color: var(--wr-tab-ink); box-shadow: 2px 2px 6px rgb(0 0 0 / calc(0.4 * var(--shade-k))); &:hover { background: var(--wr-tab-tint, var(--wr-book)); } }
   .wrEdgeTab--add { height: 34px; background: rgb(0 0 0 / calc(0.25 * var(--shade-k))); box-shadow: none; margin-top: 3px; }
 
   // The preview, as the right page of the book.

@@ -35,9 +35,11 @@ export function tabClusters(nodes: OutlineNode[], bookId: string): Cluster[] {
 // vertically, as on a real tabbed book), the arc's and chapters' own colours the accents.
 // Behind the page the edges of the pages beneath show, full height; each arc's cluster juts out
 // of a different one of them. The open chapter's tab is raised. Clicking a tab jumps there.
-export function EdgeTabs({ w, activeChapterId, onChapter, onArc, onAddChapter }: {
+export function EdgeTabs({ w, activeChapterId, activeArcId = null, onChapter, onArc, onAddChapter }: {
   w: WriterWorkspace
   activeChapterId: string | null
+  // The arc whose tab is raised (the Outline focused on it).
+  activeArcId?: string | null
   onChapter: (chapterId: string) => void
   onArc: (arcId: string) => void
   onAddChapter?: () => void
@@ -67,7 +69,7 @@ export function EdgeTabs({ w, activeChapterId, onChapter, onArc, onAddChapter }:
             <div key={arc?.id ?? cluster.chapters[0]?.id} className="wrEdgeCluster" style={{ '--leaf': (clusterIndex % (leaves - 1)) + 2 } as CSSProperties}>
               {arc && (
                 <button
-                  type="button" className="wrEdgeArc" style={tint(arc)}
+                  type="button" className={arc.id === activeArcId ? 'wrEdgeArc wrEdgeArc--active' : 'wrEdgeArc'} style={tint(arc)} aria-pressed={arc.id === activeArcId}
                   aria-label={`Arc ${n}: ${nodeLabel(arc)}`} title={`Arc ${n} · ${nodeLabel(arc)}`} onClick={() => onArc(arc.id)}
                 >
                   A{n}
