@@ -699,10 +699,9 @@
     &:hover { filter: none; background: rgb(255 255 255 / 0.14); }
   }
   .wrEdgeTab { height: 46px; font-size: 14px; }
-  // The open chapter's tab is a little wider and more accented.
+  // The open chapter's tab is a little wider, its background the accent (the chapter's own colour); no outline.
   .wrEdgeTab--active {
-    width: 38px; font-size: 16px; background: color-mix(in srgb, var(--wr-tab-tint, var(--wr-book)) 45%, var(--wr-leaf));
-    box-shadow: inset -9px 0 0 var(--wr-tab-tint, var(--wr-book)), inset 0 0 0 2px var(--wr-accent-light), 2px 2px 6px rgb(0 0 0 / calc(0.4 * var(--shade-k)));
+    width: 38px; font-size: 16px; background: var(--wr-tab-tint, var(--wr-book)); box-shadow: 2px 2px 6px rgb(0 0 0 / calc(0.4 * var(--shade-k)));
   }
   .wrEdgeTab--add { height: 34px; background: rgb(0 0 0 / calc(0.25 * var(--shade-k))); box-shadow: none; margin-top: 3px; }
 
