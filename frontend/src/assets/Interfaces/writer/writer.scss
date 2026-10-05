@@ -217,7 +217,7 @@
   .wrOutlineMid { display: flex; flex-direction: column; gap: 5px; font-size: 12px; line-height: 1.4; padding-top: 8px; }
   // The Outline and Draft pages run their paper flush to the right edge, so the edge tabs sit against it.
   .wrLevel--outline.wrLevel--max .wrLevelBody { padding: 0 0 0 6px; }
-  .wrLevel--draft .wrLevelBody { padding: 0 0 6px 0; background: transparent; }
+  .wrLevel--draft .wrLevelBody { padding: 0; background: transparent; }
   .wrConsoleBody--tiles { overflow: hidden; }
   .wrConsoleBody { flex: 1 1 auto; min-height: 0; display: flex; flex-direction: column; overflow-y: auto; scrollbar-width: none; &::-webkit-scrollbar { display: none; } }
 
@@ -571,7 +571,7 @@
   .wrFormatFields { border: 0; margin: 0; padding: 0; min-width: 0; display: flex; flex-direction: column; gap: 8px; align-items: flex-start; }
   .wrFormatGrid { display: grid; grid-template-columns: repeat(auto-fill, minmax(130px, 1fr)); gap: 8px 12px; width: 100%; }
   .wrFormatStyle { display: flex; gap: 4px; }
-  .wrBookEdBody--compact { grid-template-columns: minmax(0, 1fr); padding: 0; }
+  .wrBookEdBody--compact { grid-template-columns: minmax(0, 1fr); padding: 0; .wrFormatGrid { grid-template-columns: minmax(0, 1fr); } .wrBookEdGoals { flex-direction: column; } }
   .wrBookEdHelp { padding: 4px 14px 14px; max-height: 40vh; overflow-y: auto; }
   .wrDraftPanel { color: var(--wr-ink); display: flex; flex-direction: column; gap: 8px; padding: 22px 26px; }
   .wrBookEdGoals { grid-column: 1 / -1; display: flex; gap: 14px; }
@@ -672,17 +672,17 @@
   // The rail holds the pages behind the open one and the tabs. The page edges are full height and bleed to the top and bottom like the
   // cover; each is a step further out than the one before. An arc's cluster of tabs juts out of its own edge (--leaf), the next arc's
   // out of the next, and so on round.
-  .wrEdgeRail { position: relative; flex: 0 0 calc(12px + var(--leaves, 3) * 5px + 42px); min-height: 0; }
+  .wrEdgeRail { position: relative; flex: 0 0 calc(12px + var(--leaves, 10) * 4px + 42px); min-height: 0; }
   .wrEdgeLeaves { position: absolute; inset: 0; pointer-events: none; }
   // The page edges are the book's own hue (a pale tint of it, paler or deeper with the zone), each leaf a little deeper.
   .wrEdgeRail { --wr-leaf: hsl(var(--color-theme-h), var(--color-theme-s), calc(var(--paper-l) - 4% * var(--paper-dir))); --wr-tab-ink: hsl(var(--color-theme-h), 30%, var(--paper-ink-l)); }
   .wrEdgeLeaves i {
-    position: absolute; left: 0; top: 0; bottom: 0; width: calc(var(--leaf) * 5px + 4px); z-index: calc(10 - var(--leaf));
-    background: color-mix(in srgb, var(--wr-leaf) calc(100% - var(--leaf) * 9%), black); box-shadow: inset -1px 0 0 rgb(0 0 0 / 0.22), 1px 0 2px rgb(0 0 0 / 0.14);
+    position: absolute; left: 0; top: 0; bottom: 0; width: calc(var(--leaf) * 4px + 4px); z-index: calc(100 - var(--leaf));
+    background: color-mix(in srgb, var(--wr-leaf) calc(100% - var(--leaf) * 6%), black); box-shadow: inset -1px 0 0 rgb(0 0 0 / 0.22), 1px 0 2px rgb(0 0 0 / 0.14);
   }
-  .wrEdgeTabs { position: relative; z-index: 11; height: 100%; padding-top: 22px; padding-bottom: 8px; box-sizing: border-box; display: flex; flex-direction: column; gap: 10px; overflow-y: auto; overflow-x: visible; scrollbar-width: none; &::-webkit-scrollbar { display: none; } }
+  .wrEdgeTabs { position: relative; z-index: 200; height: 100%; padding-top: 22px; padding-bottom: 8px; box-sizing: border-box; display: flex; flex-direction: column; gap: 10px; overflow-y: auto; overflow-x: visible; scrollbar-width: none; &::-webkit-scrollbar { display: none; } }
   // A cluster starts at its own page edge.
-  .wrEdgeCluster { display: flex; flex-direction: column; gap: 4px; width: 34px; padding: 6px 0; margin-left: calc(var(--leaf, 1) * 5px + 1px); background: color-mix(in srgb, var(--wr-level-fill, var(--wr-book)) 22%, #0d1b2e); }
+  .wrEdgeCluster { display: flex; flex-direction: column; gap: 4px; width: 34px; padding: 6px 0; margin-left: calc(var(--leaf, 1) * 4px + 1px); background: color-mix(in srgb, var(--wr-level-fill, var(--wr-book)) 22%, #0d1b2e); }
   // A tab is the book's own paper tint with its text running vertically in dark ink; the arc's or chapter's colour is the accent: a bar on the tab's outer edge
   // (and a deeper wash on the open chapter's tab).
   .wrEdgeArc, .wrEdgeTab {
@@ -699,6 +699,7 @@
     &:hover { filter: none; background: rgb(255 255 255 / 0.14); }
   }
   .wrEdgeTab { height: 46px; font-size: 14px; }
+  .wrEdgeArc, .wrEdgeTab { border: 0; outline: none; &:focus, &:focus-visible { outline: none; } }
   // The open chapter's tab is a little wider, its background the accent (the chapter's own colour); no outline.
   .wrEdgeTab--active {
     width: 38px; font-size: 16px; background: var(--wr-tab-tint, var(--wr-book)); box-shadow: 2px 2px 6px rgb(0 0 0 / calc(0.4 * var(--shade-k)));

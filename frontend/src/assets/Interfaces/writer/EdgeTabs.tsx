@@ -5,8 +5,8 @@ import { buildChildIndex } from './outlineTree'
 import { nodeLabel } from './plotTree'
 import type { WriterWorkspace } from './useWriterWorkspace'
 
-// The most page edges that show behind the tabs: each arc group's tabs jut out of one of them in turn.
-const MAX_LEAVES = 5
+// How many page edges show behind the tabs (more with more arcs): each arc group's tabs jut out of one of them in turn, the first from the second edge.
+const MIN_LEAVES = 10
 
 interface Cluster { arc: OutlineNode | null; chapters: OutlineNode[] }
 
@@ -45,7 +45,7 @@ export function EdgeTabs({ w, activeChapterId, onChapter, onArc, onAddChapter }:
   const numberOf = new Map(w.activeBookChapters.map((c, i) => [c.id, i + 1]))
   const tint = (node: OutlineNode) => ({ '--wr-tab-tint': w.levelTintOf(node) } as CSSProperties)
   let arcNumber = 0
-  const leaves = Math.min(MAX_LEAVES, Math.max(2, clusters.length))
+  const leaves = Math.max(MIN_LEAVES, clusters.length)
 
   return (
     <div className="wrEdgeRail" style={{ '--leaves': leaves } as CSSProperties}>
@@ -58,7 +58,7 @@ export function EdgeTabs({ w, activeChapterId, onChapter, onArc, onAddChapter }:
           const arc = cluster.arc
           const n = arc ? ++arcNumber : 0
           return (
-            <div key={arc?.id ?? cluster.chapters[0]?.id} className="wrEdgeCluster" style={{ '--leaf': (clusterIndex % leaves) + 1 } as CSSProperties}>
+            <div key={arc?.id ?? cluster.chapters[0]?.id} className="wrEdgeCluster" style={{ '--leaf': (clusterIndex % (leaves - 1)) + 2 } as CSSProperties}>
               {arc && (
                 <button
                   type="button" className="wrEdgeArc" style={tint(arc)}
