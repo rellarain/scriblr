@@ -214,6 +214,28 @@ describe('Outline Max: the open chapter', () => {
   })
 })
 
+describe('Outline Max: the page edges and tabs', () => {
+  it('stand at the right of the cover: a tab for each arc and chapter, the open chapter raised', () => {
+    setup('c1')
+    const tabs = screen.getByRole('navigation', { name: 'Arcs and chapters' })
+    expect(document.querySelectorAll('.wrEdgeLeaves i').length).toBeGreaterThanOrEqual(10)
+    expect(within(tabs).getByRole('button', { name: 'Arc 1: Thaw' })).toBeTruthy()
+    expect(within(tabs).getByRole('button', { name: 'Chapter 1: Ice Out' }).getAttribute('aria-pressed')).toBe('true')
+    expect(within(tabs).getByRole('button', { name: 'Chapter 2: The Harbor Master' }).getAttribute('aria-pressed')).toBe('false')
+  })
+
+  it("open a chapter from its tab, the first chapter of an arc from the arc tab, and add one from the plus tab", async () => {
+    const { user } = setup('c1')
+    await user.click(screen.getByRole('button', { name: 'Chapter 2: The Harbor Master' }))
+    expect(document.querySelector('.wrChapterBanner')?.getAttribute('data-node')).toBe('c2')
+    await user.click(screen.getByRole('button', { name: 'Arc 1: Thaw' }))
+    expect(document.querySelector('.wrChapterBanner')?.getAttribute('data-node')).toBe('c1')
+    await user.click(screen.getByRole('button', { name: 'Add chapter' }))
+    expect(screen.getAllByRole('button', { name: /^Open chapter \d$/ })).toHaveLength(3)
+    expect(document.querySelector('.wrChapterBanner')?.getAttribute('data-node')).toBe('new1')
+  })
+})
+
 describe('Outline Max: dragging cards', () => {
   it('opens only the gaps a card of that kind belongs in: an act goes among the chapter acts', () => {
     setup('c1')

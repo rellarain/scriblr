@@ -2,6 +2,7 @@ import { useEffect, useMemo } from 'react'
 import type { WriterWorkspace } from '../useWriterWorkspace'
 import { Placeholder } from '../shared'
 import { useWordCounts } from '../useWordCounts'
+import EdgeTabs from '../EdgeTabs'
 import HelpArticles from '../levels/HelpArticles'
 import { OUTLINE_HELP_FALLBACK, OUTLINE_HELP_NAMES, useOutlineTabs } from '../levels/outlineTabs'
 import BookEditor from './BookEditor'
@@ -10,10 +11,11 @@ import DraftStats from './DraftStats'
 import OutlineCards from './OutlineCards'
 import OutlineNav from './OutlineNav'
 
-// The Outline level at Max: the open book, all on its cover, in one column: the book editor strip (title,
+// The Outline level at Max: the open book, all on its cover, in one column (the page edges and the arcs'
+// and chapters' tabs stand at its right, as on the Draft's book): the book editor strip (title,
 // counts, the level's tabs) at its top, then the sections the tabs open (settings, help, draft stats) and the
 // contents (the arcs and chapters), the open chapter unfolding its acts, scenes and moments as editable cards.
-// The book's pages (and their edge tabs) are the Draft level's. The plotpoints still to place are in the
+// The book's pages are the Draft level's. The plotpoints still to place are in the
 // Project level's Plotpoints tab: drag one onto a card.
 function OutlineMax({ w }: { w: WriterWorkspace }) {
   const book = w.activeBook
@@ -31,13 +33,17 @@ function OutlineMax({ w }: { w: WriterWorkspace }) {
   }, [firstId, hasActive])
   if (!book) return <Placeholder title="Book" body="Select a book on the shelf to open it." />
 
+  // An arc's tab opens its first chapter.
+  const firstChapterOf = (arcId: string) => w.outlineNodes
+    .filter(n => n.parentId === arcId && n.kind === 'chapter').sort((a, b) => a.order - b.order)[0]
+
   return (
     <div className="wrOutlineMax">
       <aside className="wrBookCover" aria-label="Book cover">
         <BookEditor w={w} book={book} bookWords={counts.books[book.id] ?? 0} tabs={tabs.headerExtras} />
         {w.saveStatus.error && <p className="wrError">{w.saveStatus.error}</p>}
         {/* The book's cover is the whole Outline, in one column: the sections the tabs open, then the contents, the open
-            chapter unfolding its acts, scenes and moments. (The book's pages, and their edge tabs, are the Draft level's.) */}
+            chapter unfolding its acts, scenes and moments. */}
         <div className="wrCoverScroll">
           <div className="wrCoverColumn">
             {tabs.isOpen('settings') && <BookSettings w={w} book={book} bookWords={counts.books[book.id] ?? 0} compact />}
@@ -52,6 +58,12 @@ function OutlineMax({ w }: { w: WriterWorkspace }) {
           </div>
         </div>
       </aside>
+      <EdgeTabs
+        w={w} activeChapterId={activeId}
+        onChapter={id => w.selectChapter(id)}
+        onArc={arcId => { const first = firstChapterOf(arcId); if (first) w.selectChapter(first.id) }}
+        onAddChapter={() => { w.selectChapter(w.addOutlineNode(book.id, 'chapter')) }}
+      />
     </div>
   )
 }

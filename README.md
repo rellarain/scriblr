@@ -553,8 +553,9 @@ awareness that the app above already existed:
   book's fields and colour) and Help. At Max the Outline is the book's **cover**, in one column: the book editor strip with the
   title and the tabs, then the sections the tabs open (settings, help, draft stats) and the contents
   (`outline/OutlineNav.tsx`: the arcs and chapters), the open chapter unfolding its title, colour and
-  trash and under them its acts, scenes and moments (`OutlineCards.tsx`). The book's pages, with their
-  edge tabs (the book's own hue, the arc and chapter colours as accents), are only the Draft level's. The plotpoints still to place are the Project level's
+  trash and under them its acts, scenes and moments (`OutlineCards.tsx`). The page edges and the arcs'
+  and chapters' tabs (the book's own hue, the arc and chapter colours as accents) stand at its right,
+  as on the Draft level's book, whose pages are the drafting pages. The plotpoints still to place are the Project level's
   **Plotpoints** tab (`levels/PlotpointsTab.tsx`): drag one onto a card in the Outline (the dragged id
   is shared through the workspace, `plotDragId`). Level text is set from its fill (white; dark on a
   lighter-brightness fill) and a fill is held to a lightness white text reads on (`theme/bookColors.ts`
