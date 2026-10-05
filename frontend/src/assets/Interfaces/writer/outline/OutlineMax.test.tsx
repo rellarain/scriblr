@@ -141,6 +141,28 @@ describe('Outline Max: the contents', () => {
     expect(document.querySelectorAll('.wrChapterBanner')).toHaveLength(1)
   })
 
+  it("goes back to the whole book's outline when the focused tab is chosen again, whether a chapter or an arc", async () => {
+    const { user } = setup('c1')
+    const nav = screen.getByRole('navigation', { name: 'Arcs and chapters contents' })
+    const wholeBook = () => {
+      expect(within(nav).getByLabelText('Arc 1 title')).toBeTruthy()
+      expect(Array.from(document.querySelectorAll('.wrChapterBanner')).map(el => el.getAttribute('data-node'))).toEqual(['c1', 'c2'])
+      expect(chapterTabs().every(t => t.getAttribute('aria-pressed') === 'false')).toBe(true)
+      expect(arcTab().getAttribute('aria-pressed')).toBe('false')
+    }
+    await user.click(screen.getByRole('button', { name: 'Chapter 1: Ice Out' })) // already the open chapter
+    wholeBook()
+    // Another tab focuses again, and its own tab chosen again returns to the whole.
+    await user.click(screen.getByRole('button', { name: 'Chapter 2: The Harbor Master' }))
+    expect(document.querySelectorAll('.wrChapterBanner')).toHaveLength(1)
+    await user.click(arcTab())
+    expect(arcTab().getAttribute('aria-pressed')).toBe('true')
+    await user.click(arcTab())
+    wholeBook()
+    await user.click(arcTab())
+    expect(arcTab().getAttribute('aria-pressed')).toBe('true')
+  })
+
   it('opens a book on its first chapter when none is open', () => {
     setup(null)
     expect(document.querySelector('.wrChapterBanner')?.getAttribute('data-node')).toBe('c1')

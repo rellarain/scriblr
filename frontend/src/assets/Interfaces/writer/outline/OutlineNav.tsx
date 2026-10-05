@@ -11,12 +11,13 @@ import { formatWords } from '../wordCount'
 import HueSlider from '../HueSlider'
 import { structureOfBook } from './outlineModel'
 
-// What the contents are narrowed to: an arc (it and its chapters, each open) or one chapter.
-export interface OutlineFocus { kind: 'arc' | 'chapter'; id: string }
+// What the contents are narrowed to: an arc (it and its chapters, each open), one chapter, or the whole book (every
+// arc and chapter, each chapter open).
+export interface OutlineFocus { kind: 'book' | 'arc' | 'chapter'; id: string }
 
 // The book's contents, on the book's cover (the Outline level): its arcs and chapters, in one column. With a
 // focus (picked by the tabs at the book's edge) only that arc and its chapters, or that one chapter, show;
-// without one, the whole list shows and the open chapter unfolds. An open chapter shows its title, colour and
+// with the book as the focus every chapter unfolds; without one, the whole list shows and only the open chapter unfolds. An open chapter shows its title, colour and
 // trash, and under them its acts, scenes and moments. Arcs carry their own title and colour, and a chapter
 // button. Arcs and chapters are reordered and moved by dragging their grips (not while focused on their own).
 export function OutlineNav({ w, book, counts, chapterBody, focus = null }: {
@@ -92,7 +93,7 @@ export function OutlineNav({ w, book, counts, chapterBody, focus = null }: {
       const n = numbers.chapter.get(node.id) ?? 0
       // The open chapters: the focused arc's all, the focused chapter, else the one open chapter.
       const active = focus
-        ? focus.kind === 'chapter' ? node.id === focus.id : node.parentId === focus.id
+        ? focus.kind === 'book' || (focus.kind === 'chapter' ? node.id === focus.id : node.parentId === focus.id)
         : node.id === w.activeChapterId
       const inside = (index.get(node.id) ?? []).length
       return (
@@ -157,7 +158,7 @@ export function OutlineNav({ w, book, counts, chapterBody, focus = null }: {
     return null
   }
 
-  const focused = focus ? nodeById.get(focus.id) : undefined
+  const focused = focus && focus.kind !== 'book' ? nodeById.get(focus.id) : undefined
   const top = childrenOf(book)
   return (
     <nav className="wrOutlineNav" aria-label="Arcs and chapters contents" onKeyDown={keys.onKeyDown}>

@@ -15,7 +15,8 @@ import OutlineNav, { type OutlineFocus } from './OutlineNav'
 // and chapters' tabs stand at its right, as on the Draft's book): the book editor strip (title,
 // counts, the level's tabs) at its top, then the sections the tabs open (settings, help, draft stats) and the
 // contents (the arcs and chapters), the open chapter unfolding its acts, scenes and moments as editable cards.
-// An arc's tab narrows the cover to that arc and its chapters' outlines; a chapter's tab, to that one chapter's.
+// An arc's tab narrows the cover to that arc and its chapters' outlines; a chapter's tab, to that one chapter's; the focused tab
+// again, back to the whole book's.
 // The book's pages are the Draft level's. The plotpoints still to place are in the
 // Project level's Plotpoints tab: drag one onto a card.
 function OutlineMax({ w }: { w: WriterWorkspace }) {
@@ -26,9 +27,12 @@ function OutlineMax({ w }: { w: WriterWorkspace }) {
   const activeId = w.activeChapterId
   // A book opens on a chapter: the first, until another is picked.
   const firstId = chapters[0]?.id ?? null
+  // The whole book, picked by choosing the focused tab again; like the arc, it ends when another chapter is picked.
+  const [allPick, setAllPick] = useState<{ chapterId: string | null } | null>(null)
+  const showAll = allPick !== null && allPick.chapterId === activeId
   // The focused arc, with the chapter that was open when it was picked: picking another chapter (here or elsewhere) ends it.
   const [arcPick, setArcPick] = useState<{ arcId: string; chapterId: string | null } | null>(null)
-  const arcId = arcPick && arcPick.chapterId === activeId && w.outlineNodes.some(n => n.id === arcPick.arcId && n.kind === 'arc') ? arcPick.arcId : null
+  const arcId = !showAll && arcPick && arcPick.chapterId === activeId && w.outlineNodes.some(n => n.id === arcPick.arcId && n.kind === 'arc') ? arcPick.arcId : null
   const hasActive = useMemo(() => chapters.some(c => c.id === activeId), [chapters, activeId])
   useEffect(() => {
     if (firstId && !hasActive) w.selectChapter(firstId)
@@ -37,9 +41,12 @@ function OutlineMax({ w }: { w: WriterWorkspace }) {
   }, [firstId, hasActive])
   if (!book) return <Placeholder title="Book" body="Select a book on the shelf to open it." />
 
-  const focus: OutlineFocus | null = arcId ? { kind: 'arc', id: arcId } : activeId && hasActive ? { kind: 'chapter', id: activeId } : null
+  const focus: OutlineFocus | null = showAll ? { kind: 'book', id: book.id } : arcId ? { kind: 'arc', id: arcId } : activeId && hasActive ? { kind: 'chapter', id: activeId } : null
   // An arc's tab focuses the arc, opening its first chapter (so the page the Draft opens on is in it).
+  // Choosing the tab already focused goes back to the whole book.
   const pickArc = (id: string) => {
+    if (arcId === id) { setAllPick({ chapterId: activeId }); return }
+    setAllPick(null)
     const first = w.outlineNodes.filter(n => n.parentId === id && n.kind === 'chapter').sort((a, b) => a.order - b.order)[0]
     if (first) w.selectChapter(first.id)
     setArcPick({ arcId: id, chapterId: first?.id ?? activeId })
@@ -67,10 +74,15 @@ function OutlineMax({ w }: { w: WriterWorkspace }) {
         </div>
       </aside>
       <EdgeTabs
-        w={w} activeChapterId={arcId ? null : activeId} activeArcId={arcId}
-        onChapter={id => { setArcPick(null); w.selectChapter(id) }}
+        w={w} activeChapterId={arcId || showAll ? null : activeId} activeArcId={arcId}
+        onChapter={id => {
+          setArcPick(null)
+          if (id === activeId && !arcId && !showAll) { setAllPick({ chapterId: activeId }); return }
+          setAllPick(null)
+          w.selectChapter(id)
+        }}
         onArc={pickArc}
-        onAddChapter={() => { w.selectChapter(w.addOutlineNode(book.id, 'chapter')) }}
+        onAddChapter={() => { setAllPick(null); w.selectChapter(w.addOutlineNode(book.id, 'chapter')) }}
       />
     </div>
   )
