@@ -902,11 +902,11 @@
   .wrTabPane .wrLabel, .wrTabTileBody .wrLabel { opacity: 0.95; }
   .wrGoalCurrent { color: inherit; font-weight: 700; }
 
-  // The spine: a strip down the left of the book (the Outline), darker, with the cover inset from the level's edge.
+  // The spine: a flat, darker strip down the left of the book (the Outline), with the cover inset from the level's edge.
   .wrOutlineMax { position: relative; padding-left: 16px; box-sizing: border-box; }
   .wrOutlineMax::before {
     content: ''; position: absolute; left: 0; top: 0; bottom: 0; width: 16px;
-    background: linear-gradient(90deg, rgb(0 0 0 / 0.45), rgb(0 0 0 / 0.22) 55%, rgb(255 255 255 / 0.06) 85%, rgb(0 0 0 / 0.25)), var(--wr-fill-2);
+    background: color-mix(in srgb, var(--wr-fill) 60%, black);
   }
   // The open chapter's page scrolls itself.
   .wrLevel--outline .wrOutlinePage { flex-direction: column; overflow-y: auto; padding: 26px 34px; gap: 14px; scrollbar-width: none; &::-webkit-scrollbar { display: none; } }
