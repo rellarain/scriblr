@@ -1,4 +1,4 @@
-import { BarChartIcon, CalendarIcon, ClockIcon, GearIcon, HelpIcon, ListIcon, PlotIcon } from '../../../icons'
+import { BarChartIcon, CalendarIcon, ClockIcon, GearIcon, HelpIcon, ListIcon, PlotIcon, QueueIcon } from '../../../icons'
 import { DEFAULT_BOOK_HUE } from '../../../../theme/bookColors'
 import { SaveControl } from '../../../../components/SaveControl'
 import { SHELF_COMPONENTS } from '../consoleDefs'
@@ -9,6 +9,7 @@ import ProjectOutline from '../ProjectOutline'
 import type { WriterWorkspace } from '../useWriterWorkspace'
 import { bookRows, categoryRows, plotCounts } from '../tiles/tileData'
 import HelpArticles from './HelpArticles'
+import PlotpointsTab from './PlotpointsTab'
 import { useTabbedLevel, type LevelTab } from './LevelTabs'
 
 export const PROJECT_HELP_NAMES = ['project', 'shelf', 'project console']
@@ -73,10 +74,11 @@ export function projectTabs(w: WriterWorkspace): LevelTab[] {
   return [
     { id: 'plot', label: 'Plot', Icon: PlotIcon, fill: true, render: c => (c.size === 'max' ? <PlotView w={w} /> : <PlotSummary w={w} />) },
     { id: 'outline', label: 'Outline', Icon: ListIcon, fill: true, newLabel: 'New book', onNew: () => { w.addOutlineNode(null, 'book', { themeHue: DEFAULT_BOOK_HUE }) }, render: c => (c.size === 'max' ? <ProjectOutline w={w} /> : <OutlineSummary w={w} />) },
+    { id: 'plotpoints', label: 'Plotpoints', Icon: QueueIcon, render: () => <PlotpointsTab w={w} /> },
     { id: 'schedule', label: 'Schedule', Icon: CalendarIcon, render: () => placeholder('projectSchedule') },
     { id: 'history', label: 'History', Icon: ClockIcon, render: () => placeholder('projectHistory') },
     { id: 'analytics', label: 'Analytics', Icon: BarChartIcon, render: () => <AnalyticsSummary w={w} /> },
-    { id: 'settings', label: 'Settings', Icon: GearIcon, end: true, render: () => <ProjectEditor w={w} /> },
+    { id: 'settings', label: 'Settings', Icon: GearIcon, end: true, surface: true, render: () => <ProjectEditor w={w} /> },
     { id: 'help', label: 'Help', Icon: HelpIcon, render: () => <HelpArticles names={PROJECT_HELP_NAMES} fallback={PROJECT_HELP_FALLBACK} /> },
   ]
 }

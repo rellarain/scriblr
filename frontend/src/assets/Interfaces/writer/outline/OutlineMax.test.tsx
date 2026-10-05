@@ -9,9 +9,10 @@ import { descendantsOf, buildChildIndex } from '../outlineTree'
 import { assignPoint } from '../plotFields'
 import { base, outlineNode, plotNode } from '../plotTestWorkspace'
 import type { WriterWorkspace } from '../useWriterWorkspace'
+import { PlotTray } from '../levels/PlotpointsTab'
 import OutlineMax from './OutlineMax'
 
-// The Outline level against a small stand-in workspace: the outline and plot live in state and the
+// The Outline level (with the Project level's Plotpoints tab beside it, where the tray now is) against a small stand-in workspace: the outline and plot live in state and the
 // plotpoint assignment is the real pure function, so what the cards do is what the app does.
 
 vi.mock('../useWordCounts', () => ({
@@ -44,6 +45,7 @@ function Harness({ activeChapterId = 'c1', actions }: { activeChapterId?: string
   const [outlineNodes, setOutline] = useState<OutlineNode[]>(OUTLINE)
   const [plotNodes, setPlot] = useState<PlotNode[]>(PLOT)
   const [active, setActive] = useState<string | null>(activeChapterId)
+  const [plotDragId, setPlotDragId] = useState<string | null>(null)
   const counter = useRef(0)
   const outlineRef = useRef(outlineNodes)
   outlineRef.current = outlineNodes
@@ -56,7 +58,7 @@ function Harness({ activeChapterId = 'c1', actions }: { activeChapterId?: string
     activeBook: book, activeProjectId: 'p1', activeProject: { settings: { timeSystems: [], chapterWordCountTarget: 500 } },
     outlineNodes, plotNodes, plotNodeById: new Map(plotNodes.map(n => [n.id, n])),
     activeBookChapters: descendantsOf(buildChildIndex(outlineNodes), 'b').filter(n => n.kind === 'chapter'),
-    activeChapterId: active, selectChapter: (id: string) => setActive(id), highlightedPointId: null,
+    activeChapterId: active, selectChapter: (id: string) => setActive(id), highlightedPointId: null, plotDragId, setPlotDragId,
     saveStatus: { dirty: false, saving: false, error: undefined, lastSavedAt: null }, saveNow: vi.fn(async () => {}), restoreSaved: vi.fn(async () => {}),
     levelHueOf: () => 200, levelTintOf: () => 'hsl(200, 30%, 50%)', hueCentreOf: () => null, setNodeHue: vi.fn(),
     moveOutlineNodeInto: vi.fn(), openChapter: actions.openChapter,
@@ -77,7 +79,7 @@ function Harness({ activeChapterId = 'c1', actions }: { activeChapterId?: string
     assignPlotpoint: (id: string, target: string | null) => setPlot(prev => assignPoint(prev, id, target, byId)),
     cyclePlotAwareness: (id: string) => setPlot(prev => prev.map(n => (n.id === id && n.awareness ? { ...n, awareness: awarenessNext(n.awareness) } : n))),
   } as unknown as WriterWorkspace
-  return <OutlineMax w={w} />
+  return <><PlotTray w={w} /><OutlineMax w={w} /></>
 }
 
 const setup = (activeChapterId: string | null = 'c1') => {
@@ -86,6 +88,8 @@ const setup = (activeChapterId: string | null = 'c1') => {
   return { openChapter, user: userEvent.setup(), ...view }
 }
 
+// The open chapter's banner on the page (its row in the contents carries the same data-node, and comes first).
+const banner = () => document.querySelector<HTMLElement>('.wrChapterBanner')!
 const card = (id: string) => document.querySelector<HTMLElement>(`[data-node="${id}"]`)!
 // A card's own add button ("+ Act", ...): its text is the kind and nothing else.
 const addButton = (within_: HTMLElement, kind: string) => within(within_).getAllByRole('button').find(b => b.textContent?.trim() === kind)!
@@ -101,39 +105,93 @@ function drag(from: Element, to: Element) {
   fireEvent(from, Object.assign(createEvent.dragEnd(from), { dataTransfer: dt }))
 }
 
-describe('Outline Max: the cards', () => {
-  it('shows the arcs and chapters, opens only the open chapter, and numbers acts, scenes and moments inside it', () => {
-    setup('c1')
-    expect(within(card('a1')).getByLabelText('Arc 1 title')).toHaveProperty('value', 'Thaw')
-    expect(within(card('c1')).getByLabelText('Chapter 1 title')).toHaveProperty('value', 'Ice Out')
-    // The open chapter shows what is in it; the other is closed down to its header.
-    expect(card('c1').querySelector('[data-node="m1"]')).not.toBeNull()
-    expect(within(card('c1')).getByText('Moment 1')).toBeTruthy()
-    expect(card('c2').querySelector('.wrActCard')).toBeNull()
-    expect(within(card('c2')).getByRole('button', { name: 'Expand Chapter 2' }).getAttribute('aria-expanded')).toBe('false')
-  })
-
-  it('opens and closes a chapter from its chevron', async () => {
+describe('Outline Max: the contents', () => {
+  it('lists the arcs and chapters, and opens the chapter picked', async () => {
     const { user } = setup('c1')
-    await user.click(within(card('c1')).getByRole('button', { name: 'Collapse Chapter 1' }))
-    expect(card('c1').querySelector('.wrActCard')).toBeNull()
-    await user.click(within(card('c1')).getByRole('button', { name: 'Expand Chapter 1' }))
-    expect(card('c1').querySelector('.wrActCard')).not.toBeNull()
+    const nav = screen.getByRole('navigation', { name: 'Arcs and chapters contents' })
+    expect(within(nav).getByLabelText('Arc 1 title')).toHaveProperty('value', 'Thaw')
+    expect(within(nav).getByRole('button', { name: 'Open chapter 1' }).getAttribute('aria-current')).toBe('true')
+    expect(within(nav).getByRole('button', { name: 'Open chapter 2' }).getAttribute('aria-current')).toBeNull()
+    // The page is the open chapter's: its banner, and its acts, scenes and moments (not the arcs or the other chapters).
+    expect(document.querySelector('.wrChapterBanner')?.getAttribute('data-node')).toBe('c1')
+    expect(card('a1').closest('.wrOutlineNav')).not.toBeNull()
+    expect(document.querySelector('.wrPageScroll [data-node="a1"]')).toBeNull()
+    await user.click(within(nav).getByRole('button', { name: 'Open chapter 2' }))
+    expect(document.querySelector('.wrChapterBanner')?.getAttribute('data-node')).toBe('c2')
+    expect(document.querySelector('.wrPageScroll [data-node="m1"]')).toBeNull()
   })
 
-  it("shows each card's draft word count, and the chapter in its header stats", () => {
+  it('opens a book on its first chapter when none is open', () => {
+    setup(null)
+    expect(document.querySelector('.wrChapterBanner')?.getAttribute('data-node')).toBe('c1')
+  })
+
+  it('unfolds the open chapter in the contents: its title, colour and trash', () => {
     setup('c1')
-    expect(within(card('m1')).getByText('12 words')).toBeTruthy()
-    expect(within(card('c1')).getAllByText('12 words').length).toBeGreaterThan(0)
-    expect(within(card('c2')).getByText('0 words')).toBeTruthy()
+    const nav = screen.getByRole('navigation', { name: 'Arcs and chapters contents' })
+    expect(within(nav).getByLabelText('Chapter 1 title')).toHaveProperty('value', 'Ice Out')
+    expect(within(nav).getByLabelText('Chapter 1 colour')).toBeTruthy()
+    expect(within(nav).queryByLabelText('Chapter 2 title')).toBeNull() // the others are rows to click
   })
 
-  it('edits titles and synopses in place', async () => {
+  it('edits the open chapter title and an arc title in place', async () => {
     const { user } = setup('c1')
-    const title = within(card('c2')).getByLabelText('Chapter 2 title')
+    const title = screen.getByLabelText('Chapter 1 title')
     await user.clear(title)
     await user.type(title, 'Low Tide')
     expect(title).toHaveProperty('value', 'Low Tide')
+    expect(within(document.querySelector('.wrChapterBanner') as HTMLElement).getByText('Low Tide')).toBeTruthy()
+    const arc = screen.getByLabelText('Arc 1 title')
+    await user.type(arc, ' II')
+    expect(arc).toHaveProperty('value', 'Thaw II')
+  })
+
+  it('adds arcs and chapters from the contents buttons, a new chapter becoming the open one', async () => {
+    const { user } = setup('c1')
+    const head = document.querySelector<HTMLElement>('.wrCtHead')!
+    await user.click(addButton(head, 'Chapter'))
+    expect(screen.getAllByRole('button', { name: /^Open chapter \d$/ })).toHaveLength(3)
+    expect(document.querySelector('.wrChapterBanner')?.getAttribute('data-node')).toBe('new1')
+    await user.click(addButton(head, 'Arc'))
+    expect(screen.getAllByLabelText(/Arc \d title/)).toHaveLength(2)
+  })
+
+  it('deletes the open chapter after asking, with everything in it', async () => {
+    const { user } = setup('c1')
+    const nav = screen.getByRole('navigation', { name: 'Arcs and chapters contents' })
+    await user.click(within(card('c1')).getByRole('button', { name: 'Delete' }))
+    expect(within(nav).getByText(/Delete Chapter 1 and everything in it\?/)).toBeTruthy()
+    await user.click(within(nav).getByRole('button', { name: 'Confirm' }))
+    expect(card('c1')).toBeNull()
+    expect(card('m1')).toBeNull()
+  })
+
+  it('creates a sibling chapter on Enter in a chapter title', async () => {
+    const { user } = setup('c1')
+    await user.click(screen.getByLabelText('Chapter 1 title'))
+    await user.keyboard('{Enter}')
+    expect(screen.getAllByRole('button', { name: /^Open chapter \d$/ })).toHaveLength(3)
+    // The new chapter comes after Chapter 1, becomes the open one and has the focus.
+    await waitFor(() => expect((document.activeElement as HTMLInputElement).getAttribute('aria-label')).toBe('Chapter 2 title'))
+  })
+})
+
+describe('Outline Max: the open chapter', () => {
+  it('shows what is in it as cards, numbering acts, scenes and moments inside it', () => {
+    setup('c1')
+    expect(banner().querySelector('[data-node="m1"]')).not.toBeNull()
+    expect(within(banner()).getByText('Moment 1')).toBeTruthy()
+    expect(within(banner()).getByText('Chapter 1')).toBeTruthy()
+  })
+
+  it("shows each card's draft word count, and the chapter's in its banner", () => {
+    setup('c1')
+    expect(within(card('m1')).getByText('12 words')).toBeTruthy()
+    expect(within(banner()).getAllByText('12 words').length).toBeGreaterThan(0)
+  })
+
+  it('edits synopses in place', async () => {
+    const { user } = setup('c1')
     const synopsis = within(card('m1')).getByPlaceholderText('Moment synopsis')
     await user.type(synopsis, '!')
     expect(synopsis).toHaveProperty('value', 'The pier freezes!')
@@ -141,51 +199,18 @@ describe('Outline Max: the cards', () => {
 
   it('adds an act, a scene and a moment from the buttons', async () => {
     const { user } = setup('c1')
-    await user.click(addButton(card('c1'), 'Act'))
-    expect(card('c1').querySelectorAll('.wrActCard')).toHaveLength(2)
+    await user.click(addButton(banner(), 'Act'))
+    expect(banner().querySelectorAll('.wrActCard')).toHaveLength(2)
     await user.click(addButton(card('act'), 'Scene'))
     expect(card('act').querySelectorAll('.wrSceneCard')).toHaveLength(2)
     await user.click(addButton(card('scene'), 'Moment'))
     expect(card('scene').querySelectorAll('.wrMomentCard')).toHaveLength(2)
   })
 
-  it('adds arcs and chapters to the book from the head buttons', async () => {
-    const { user } = setup('c1')
-    const head = document.querySelector<HTMLElement>('.wrOutlineCardsHead')!
-    await user.click(addButton(head, 'Chapter'))
-    expect(screen.getAllByLabelText(/Chapter \d title/)).toHaveLength(3)
-    await user.click(addButton(head, 'Arc'))
-    expect(screen.getAllByLabelText(/Arc \d title/)).toHaveLength(2)
-  })
-
-  it('writes a chapter from its pencil', async () => {
+  it('writes the chapter from its pencil', async () => {
     const { user, openChapter } = setup('c1')
-    await user.click(within(card('c2')).getByRole('button', { name: 'Write chapter 2' }))
-    expect(openChapter).toHaveBeenCalledWith('c2')
-  })
-
-  it('deletes a chapter after asking, with everything in it', async () => {
-    const { user } = setup('c1')
-    await user.click(within(card('c1')).getAllByRole('button', { name: 'Delete' }).at(-1)!)
-    expect(within(card('c1')).getByText(/Delete Chapter 1 and everything in it\?/)).toBeTruthy()
-    await user.click(within(card('c1')).getByRole('button', { name: 'Confirm' }))
-    expect(card('c1')).toBeNull()
-    expect(card('m1')).toBeNull()
-    expect(card('c2')).not.toBeNull()
-  })
-
-  it('creates a sibling chapter on Enter and a child act on Shift+Enter', async () => {
-    const { user } = setup('c1')
-    const title = within(card('c2')).getByLabelText('Chapter 2 title')
-    await user.click(title)
-    await user.keyboard('{Enter}')
-    expect(screen.getAllByLabelText(/Chapter \d title/)).toHaveLength(3)
-    // The new chapter comes after Chapter 2 and has the focus.
-    await waitFor(() => expect((document.activeElement as HTMLInputElement).getAttribute('aria-label')).toBe('Chapter 3 title'))
-    await user.keyboard('Thin Ice{Shift>}{Enter}{/Shift}')
-    const created = screen.getByLabelText('Chapter 3 title').closest('[data-node]') as HTMLElement
-    expect(created.querySelectorAll('.wrActCard')).toHaveLength(1)
-    await waitFor(() => expect((document.activeElement as HTMLInputElement).placeholder).toBe('Act title')) // focus follows once the card is on the page
+    await user.click(within(banner()).getByRole('button', { name: 'Write chapter 1' }))
+    expect(openChapter).toHaveBeenCalledWith('c1')
   })
 })
 
@@ -198,36 +223,49 @@ describe('Outline Max: the edge tabs', () => {
     expect(within(tabs).getByRole('button', { name: 'Chapter 2: The Harbor Master' }).getAttribute('aria-pressed')).toBe('false')
   })
 
-  it('opens a chapter card when its tab is clicked', async () => {
+  it('opens a chapter when its tab is clicked', async () => {
     const { user } = setup('c1')
-    const header = () => within(card('c2')).getByRole('button', { name: /Chapter 2$/ })
-    expect(header().getAttribute('aria-expanded')).toBe('false')
     await user.click(screen.getByRole('button', { name: 'Chapter 2: The Harbor Master' }))
-    expect(header().getAttribute('aria-expanded')).toBe('true')
+    expect(document.querySelector('.wrChapterBanner')?.getAttribute('data-node')).toBe('c2')
     expect(screen.getByRole('button', { name: 'Chapter 2: The Harbor Master' }).getAttribute('aria-pressed')).toBe('true')
   })
 
-  it('adds a chapter from its plus tab', async () => {
+  it("opens an arc's first chapter from the arc tab", async () => {
+    const { user } = setup('c2')
+    await user.click(screen.getByRole('button', { name: 'Arc 1: Thaw' }))
+    expect(document.querySelector('.wrChapterBanner')?.getAttribute('data-node')).toBe('c1')
+  })
+
+  it('adds a chapter from its plus tab, and opens it', async () => {
     const { user } = setup('c1')
     await user.click(screen.getByRole('button', { name: 'Add chapter' }))
-    expect(screen.getAllByLabelText(/Chapter \d title/)).toHaveLength(3)
+    expect(screen.getAllByRole('button', { name: /^Open chapter \d$/ })).toHaveLength(3)
+    expect(document.querySelector('.wrChapterBanner')?.getAttribute('data-node')).toBe('new1')
   })
 })
 
 describe('Outline Max: dragging cards', () => {
-  it('opens only the gaps a card of that kind belongs in: an act goes among its chapter acts, not into an arc or the book', () => {
+  it('opens only the gaps a card of that kind belongs in: an act goes among the chapter acts', () => {
     setup('c1')
     fireEvent(card('act').querySelector('.wrGrip')!, Object.assign(createEvent.dragStart(card('act').querySelector('.wrGrip')!), { dataTransfer: dataTransfer() }))
     const openGaps = (list: Element | null) => Array.from(list?.children ?? []).filter(el => el.classList.contains('wrDropGap--open')).length
     const listOf = (el: Element) => Array.from(el.children).find(c => c.classList.contains('wrChildren')) ?? null
-    expect(openGaps(listOf(card('c1')))).toBeGreaterThan(0)
-    expect(openGaps(listOf(card('a1')))).toBe(0)
-    expect(openGaps(document.querySelector('.wrOutlineCards > .wrChildren'))).toBe(0)
+    expect(openGaps(listOf(banner()))).toBeGreaterThan(0)
+  })
+
+  it('opens only the gaps an arc or a chapter belongs in, in the contents: a chapter goes among the book and arc chapters, not into a chapter', () => {
+    setup('c1')
+    const grip = card('c2').querySelector('.wrGrip')!
+    fireEvent(grip, Object.assign(createEvent.dragStart(grip), { dataTransfer: dataTransfer() }))
+    const openGaps = (list: Element | null) => Array.from(list?.children ?? []).filter(el => el.classList.contains('wrDropGap--open')).length
+    const listOf = (el: Element) => Array.from(el.children).find(c => c.classList.contains('wrChildren')) ?? null
+    expect(openGaps(listOf(card('a1')))).toBeGreaterThan(0)
+    expect(openGaps(document.querySelector('.wrOutlineNav > .wrChildren'))).toBeGreaterThan(0)
   })
 })
 
 describe('Outline Max: plotpoints', () => {
-  it('lists the unassigned plotpoints in the tray', () => {
+  it('lists the unassigned plotpoints in the tray (the Project level tab)', () => {
     setup('c1')
     expect(within(tray()).getByText('They meet')).toBeTruthy()
     expect(within(tray()).getByText('A secret')).toBeTruthy()
@@ -243,19 +281,13 @@ describe('Outline Max: plotpoints', () => {
     expect(within(boxed as HTMLElement).getByRole('button', { name: /Front-stage/i })).toBeTruthy() // the awareness eye, on a moment
   })
 
-  it('places one on a chapter (no eye there) and on an act', () => {
+  it('places one on the chapter (no eye there) and on an act', () => {
     setup('c1')
-    drag(tray().querySelector('[data-point="pp1"]')!, card('c2'))
+    drag(tray().querySelector('[data-point="pp1"]')!, banner())
     drag(tray().querySelector('[data-point="pp2"]')!, card('act'))
-    expect(card('c2').querySelector('.wrCardPoints [data-point="pp1"]')).not.toBeNull()
+    expect(banner().querySelector(':scope > .wrCardPoints [data-point="pp1"]')).not.toBeNull()
     expect(card('act').querySelector('.wrCardPoints [data-point="pp2"]')).not.toBeNull()
-    expect(card('c2').querySelector('.wrEye')).toBeNull()
-  })
-
-  it('takes no plotpoint on an arc', () => {
-    setup('c1')
-    drag(tray().querySelector('[data-point="pp1"]')!, card('a1'))
-    expect(tray().querySelector('[data-point="pp1"]')).not.toBeNull()
+    expect(banner().querySelector(':scope > .wrCardPoints .wrEye')).toBeNull()
   })
 
   it('sends a placed plotpoint back to the tray from its x, or when it is dragged there', async () => {
@@ -286,7 +318,7 @@ describe('Outline Max: the book editor and the draft stats', () => {
     expect(within(editor).getByText('Cold Harbor')).toBeTruthy()
     expect(within(editor).queryByLabelText('Book title')).toBeNull()
     const names = within(within(editor).getByRole('toolbar', { name: 'Tabs' })).getAllByRole('button').map(b => b.getAttribute('aria-label'))
-    expect(names).toEqual(['Unassigned plotpoints', 'Book outline', 'Book details', 'Settings', 'Help'])
+    expect(names).toEqual(['Book outline', 'Book details', 'Settings', 'Help'])
     await user.click(within(editor).getByRole('button', { name: 'Settings' }))
     const title = within(editor).getByLabelText('Book title')
     await user.type(title, '!')
@@ -321,28 +353,25 @@ describe('Outline Max: the book editor and the draft stats', () => {
     expect(within(editor).getByRole('button', { name: 'Italic' }).getAttribute('aria-pressed')).toBe('false')
   })
 
-  it('opens and closes the tray, the stats and the cards with their tabs', async () => {
+  it("opens and closes the stats (on the cover) and the chapter's cards with their tabs", async () => {
     const { user } = setup('c1')
     const editor = screen.getByRole('region', { name: 'Book editor' })
-    expect(screen.getByRole('complementary', { name: 'Unassigned plotpoints' })).toBeTruthy()
     expect(screen.getByRole('region', { name: 'Draft stats' })).toBeTruthy()
-    expect(document.querySelector('.wrArcCard')).toBeTruthy()
+    expect(document.querySelector('.wrChapterBanner')).toBeTruthy()
 
-    await user.click(within(editor).getByRole('button', { name: 'Unassigned plotpoints' }))
-    expect(screen.queryByRole('complementary', { name: 'Unassigned plotpoints' })).toBeNull()
     await user.click(within(editor).getByRole('button', { name: 'Book details' }))
     expect(screen.queryByRole('region', { name: 'Draft stats' })).toBeNull()
     await user.click(within(editor).getByRole('button', { name: 'Book outline' }))
-    expect(document.querySelector('.wrArcCard')).toBeNull()
+    expect(document.querySelector('.wrChapterBanner')).toBeNull()
     await user.click(within(editor).getByRole('button', { name: 'Book outline' }))
-    expect(document.querySelector('.wrArcCard')).toBeTruthy()
+    expect(document.querySelector('.wrChapterBanner')).toBeTruthy()
   })
 
   it("adds a chapter from the header's New button", async () => {
     const { user } = setup('c1')
-    const before = document.querySelectorAll('.wrChapterCard').length
+    const before = screen.getAllByRole('button', { name: /^Open chapter \d$/ }).length
     await user.click(within(screen.getByRole('region', { name: 'Book editor' })).getByRole('button', { name: 'New chapter' }))
-    expect(document.querySelectorAll('.wrChapterCard').length).toBe(before + 1)
+    expect(screen.getAllByRole('button', { name: /^Open chapter \d$/ }).length).toBe(before + 1)
   })
 
   it("shows the book's words and chapters against their goals, and each chapter's words", () => {
@@ -352,13 +381,5 @@ describe('Outline Max: the book editor and the draft stats', () => {
     expect(within(stats).getByText('2 of 10')).toBeTruthy()
     const chapters = within(within(stats).getByRole('list', { name: 'Words in each chapter' })).getAllByRole('listitem')
     expect(chapters.map(li => li.textContent)).toEqual(['1 · Ice Out12 words of 500', '2 · The Harbor Master0 words of 500'])
-  })
-})
-
-describe('Outline Max with no chapter open', () => {
-  it('starts every chapter closed', () => {
-    setup(null)
-    expect(document.querySelectorAll('.wrActCard')).toHaveLength(0)
-    expect(base).toBeTruthy()
   })
 })

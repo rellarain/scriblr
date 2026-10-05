@@ -37,10 +37,10 @@ function Harness({ size }: { size: 'mid' | 'max' }) {
 }
 
 describe('the Project tabs', () => {
-  it('are plot, outline, schedule, history and analytics, ending with Settings and Help', () => {
+  it('are plot, outline, plotpoints, schedule, history and analytics, ending with Settings and Help', () => {
     render(<Harness size="max" />)
     const names = within(screen.getByRole('toolbar', { name: 'Tabs' })).getAllByRole('button').map(b => b.getAttribute('aria-label'))
-    expect(names).toEqual(['Plot', 'Outline', 'Schedule', 'History', 'Analytics', 'Settings', 'Help'])
+    expect(names).toEqual(['Plot', 'Outline', 'Plotpoints', 'Schedule', 'History', 'Analytics', 'Settings', 'Help'])
   })
 
   it('open the plot editor, full width, at Max, and the outline beside it from its tab', async () => {

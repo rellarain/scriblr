@@ -90,6 +90,9 @@ const TONE_STEP: Record<Tone, { delta: number; min: number; max: number }> = {
 
 const FILL_SATURATION = 0.62
 const FILL_DARKEN = 8
+// A panel fill that carries white text (every brightness but lighter) is held no lighter than this, so the text stays readable
+// whatever the zone's own lightness (a night palette can be light).
+const FILL_MAX_L = 38
 const clamp = (n: number, lo: number, hi: number) => Math.max(lo, Math.min(hi, n))
 
 // The colour of a code against a zone's own theme saturation and lightness.
@@ -109,9 +112,10 @@ function toneCss(code: number, family: 'theme' | 'accent', fill = false): string
   const s = fill ? `calc(${sVar} * ${FILL_SATURATION})` : sVar
   const delta = step.delta - (fill ? FILL_DARKEN : 0)
   const min = Math.max(0, step.min - (fill ? FILL_DARKEN : 0))
-  const l = delta === 0 && min === 0 && step.max === 100
+  const max = fill && tone !== 'light' ? Math.min(step.max, FILL_MAX_L) : step.max
+  const l = delta === 0 && min === 0 && max === 100
     ? lVar
-    : `clamp(${min}%, calc(${lVar} ${delta < 0 ? '-' : '+'} ${Math.abs(delta)}%), ${step.max}%)`
+    : `clamp(${min}%, calc(${lVar} ${delta < 0 ? '-' : '+'} ${Math.abs(delta)}%), ${max}%)`
   return `hsl(${hue}, ${s}, ${l})`
 }
 

@@ -40,7 +40,11 @@
 .wr {
   // ---------------------------------------------------------------- shared
   .wrMuted { font-size: 12px; opacity: 0.7; margin: 0; }
-  .wrError { font-size: 12px; margin: 0; color: hsl(var(--color-alert-h), var(--color-alert-s), calc(var(--color-alert-l) - 22% * var(--fill-dir))); }
+  // Alert messages: the alert colour as a background with a white outline and white text, so they read on any surface.
+  .wrError, .wrPageError {
+    box-sizing: border-box; margin: 0; padding: 5px 10px; font-size: 12px; font-weight: 700; line-height: 1.4;
+    background: var(--alert, #c9372c); color: #fff; outline: 1px solid #fff; outline-offset: -1px; border-radius: 3px; overflow-wrap: anywhere;
+  }
   .wrHint { font-size: 10px; opacity: 0.6; line-height: 1.4; margin: 0; }
   .wrLabel { font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: 1px; opacity: 0.65; margin-bottom: 4px; display: block; }
 
@@ -181,13 +185,13 @@
   }
   // Outline focus: the book panel runs to the top, bottom and right edges (the tile column keeps its margin).
   .wrLevels--focus-outline { padding: 0 0 0 6px; > .wrLevelsSide { padding: 6px 0; box-sizing: border-box; } }
-  .wrLevels--focus-dash > .wrLevel--dash { flex: 2 1 0; }
-  .wrLevels--focus-dash > .wrLevel--project { flex: 1 1 0; }
+  .wrLevels--focus-dash .wrLevel--dash { flex: 2 1 0; }
+  .wrLevels--focus-dash .wrLevel--project { flex: 1 1 0; }
   .wrLevel {
     --wr-level-h: var(--color-theme-h);
     // Flat and square. The fill is the level's colour at the accent's saturation and lightness (--wr-level-fill, set by
     // LevelPanel); what sits inside it steps one shade deeper each time (--wr-fill-1 .. 4), ending in light inputs.
-    --wr-fill: var(--wr-level-fill, hsl(var(--wr-level-h) calc(var(--color-accent-s) * 0.62) calc(var(--color-accent-l) - 8%)));
+    --wr-fill: var(--wr-level-fill, hsl(var(--wr-level-h) calc(var(--color-accent-s) * 0.62) clamp(0%, calc(var(--color-accent-l) - 8%), 38%)));
     --wr-fill-1: color-mix(in srgb, var(--wr-fill) 90%, black);
     --wr-fill-2: color-mix(in srgb, var(--wr-fill) 80%, black);
     --wr-fill-3: color-mix(in srgb, var(--wr-fill) 70%, black);
@@ -196,8 +200,8 @@
     background: var(--wr-fill); color: var(--on-accent);
     &--max { flex: 1 1 0; }
   }
-  .wrLevelsSide > .wrLevel--mid { flex: 1 1 0; }
-  .wrLevelsSide > .wrLevel--min { flex: 0 0 auto; }
+  .wrLevelsSide .wrLevel--mid { flex: 1 1 0; }
+  .wrLevelsSide .wrLevel--min { flex: 0 0 auto; }
   .wrLevelHeader {
     flex: 0 0 auto; display: flex; align-items: center; gap: 8px; min-height: 40px; box-sizing: border-box; padding: 6px 14px;
     background: var(--wr-fill);
@@ -456,9 +460,9 @@
     flex-direction: row; padding: 0; gap: 0; overflow: hidden;
   }
   // The Outline page is the book's own dark colour, nested the same way, with light inputs.
-  .wrLevel--outline .wrPage--chapter {
+  .wrLevel--outline .wrPage--chapter, .wrLevel--outline .wrBookCover {
     --wr-page: var(--wr-fill-1); --wr-page-line: rgb(255 255 255 / 0.18); --wr-ink: var(--on-accent);
-    --wr-page-muted: color-mix(in srgb, var(--on-accent) 70%, transparent); --paper-label: color-mix(in srgb, var(--on-accent) 75%, transparent);
+    --wr-page-muted: color-mix(in srgb, var(--on-accent) 85%, transparent); --paper-label: color-mix(in srgb, var(--on-accent) 75%, transparent);
     --paper-muted: var(--wr-page-muted); --paper-ink2: var(--on-accent); --paper-placeholder: color-mix(in srgb, var(--on-accent) 50%, transparent);
     --wr-frame-1: var(--wr-fill-2); --wr-frame-2: var(--wr-fill-3); --wr-frame-3: var(--wr-fill-4);
     --wr-frame-4: color-mix(in srgb, var(--wr-fill) 50%, black); --wr-frame-5: color-mix(in srgb, var(--wr-fill) 40%, black);
@@ -480,7 +484,6 @@
   .wrPageMetaRow { display: flex; flex-wrap: wrap; align-items: baseline; font-size: 11px; color: var(--wr-page-muted); > * + *::before { content: '\00b7'; margin: 0 8px; } }
   .wrPageKicker { font-size: 12px; font-weight: 700; text-transform: uppercase; letter-spacing: 1.5px; color: var(--wr-page-muted); }
   .wrPageMuted { margin: 0; font-size: 13px; color: var(--paper-muted); }
-  .wrPageError { margin: 0; font-size: 12px; color: var(--paper-error); }
 
   .wrStripChip { padding: 5px 8px; border-radius: 4px; font-size: 12px; background: var(--wr-page); color: var(--paper-ink2); max-width: 250px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
     &--empty { font-style: italic; opacity: 0.5; }
@@ -561,7 +564,7 @@
   .wrBookEdField { display: flex; flex-direction: column; gap: 2px; min-width: 0; &--wide { grid-column: 1 / -1; } }
   // By time | In story: two small buttons, the chosen one filled.
   .wrOrderToggle { display: inline-flex; align-self: flex-start; margin-left: auto; font-size: 10px; }
-  .wrOrderBtn { padding: 2px 8px; font-size: 10px; font-weight: 700; color: inherit; background: color-mix(in srgb, currentColor 10%, transparent); &:hover { background: color-mix(in srgb, currentColor 20%, transparent); } &--on { background: var(--wr-accent); color: var(--on-accent); } }
+  .wrOrderBtn { padding: 2px 8px; font-size: 10px; font-weight: 700; color: inherit; background: color-mix(in srgb, currentColor 10%, transparent); &:hover { background: color-mix(in srgb, currentColor 20%, transparent); } &--on { background: color-mix(in srgb, currentColor 24%, transparent); box-shadow: inset 0 0 0 1px currentColor; font-weight: 700; } }
   .wrSummary { display: flex; flex-direction: column; gap: 6px; font-size: 12px; line-height: 1.4; }
   .wrPlacedList { display: flex; flex-direction: column; gap: 5px; margin-top: 8px; }
   .wrMidPointAt { display: block; font-size: 10px; opacity: 0.7; }
@@ -666,28 +669,41 @@
 
   // The tabs on the right edge (EdgeTabs.tsx): a cluster per arc, a tab per chapter, each in its own colour.
   // The page's own edge shows as a light strip between the paper and the rails.
-  // The rail holds the pages behind the open one (their edges step out behind the tabs, each a little shorter and darker) and the tabs.
-  .wrEdgeRail { position: relative; flex: 0 0 48px; min-height: 0; }
+  // The rail holds the pages behind the open one and the tabs. The page edges are full height and bleed to the top and bottom like the
+  // cover; each is a step further out than the one before. An arc's cluster of tabs juts out of its own edge (--leaf), the next arc's
+  // out of the next, and so on round.
+  .wrEdgeRail { position: relative; flex: 0 0 calc(12px + var(--leaves, 3) * 5px + 42px); min-height: 0; }
   .wrEdgeLeaves { position: absolute; inset: 0; pointer-events: none; }
+  // The page edges are the book's own hue (a pale tint of it, paler or deeper with the zone), each leaf a little deeper.
+  .wrEdgeRail { --wr-leaf: hsl(var(--color-theme-h), var(--color-theme-s), calc(var(--paper-l) - 4% * var(--paper-dir))); --wr-tab-ink: hsl(var(--color-theme-h), 30%, var(--paper-ink-l)); }
   .wrEdgeLeaves i {
-    position: absolute; left: 0; width: calc(12px + var(--leaf) * 6px); top: calc(var(--leaf) * 4px); bottom: calc(var(--leaf) * 4px); z-index: calc(10 - var(--leaf));
-    background: color-mix(in srgb, var(--wr-page, #eee) calc(100% - var(--leaf) * 7%), black); box-shadow: inset -1px 0 0 rgb(0 0 0 / 0.2), 1px 0 2px rgb(0 0 0 / 0.12);
+    position: absolute; left: 0; top: 0; bottom: 0; width: calc(var(--leaf) * 5px + 4px); z-index: calc(10 - var(--leaf));
+    background: color-mix(in srgb, var(--wr-leaf) calc(100% - var(--leaf) * 9%), black); box-shadow: inset -1px 0 0 rgb(0 0 0 / 0.22), 1px 0 2px rgb(0 0 0 / 0.14);
   }
-  .wrEdgeTabs { position: relative; z-index: 11; height: 100%; box-shadow: -3px 0 0 rgb(255 255 255 / 0.5), -5px 0 0 rgb(255 255 255 / 0.22); padding-top: 22px; padding-bottom: 8px; box-sizing: border-box; display: flex; flex-direction: column; gap: 10px; overflow-y: auto; scrollbar-width: none; &::-webkit-scrollbar { display: none; } }
-  .wrEdgeCluster { display: flex; flex-direction: column; gap: 4px; width: 32px; padding: 6px 0 6px 0; background: color-mix(in srgb, var(--wr-level-fill, var(--wr-book)) 22%, #0d1b2e); }
+  .wrEdgeTabs { position: relative; z-index: 11; height: 100%; padding-top: 22px; padding-bottom: 8px; box-sizing: border-box; display: flex; flex-direction: column; gap: 10px; overflow-y: auto; overflow-x: visible; scrollbar-width: none; &::-webkit-scrollbar { display: none; } }
+  // A cluster starts at its own page edge.
+  .wrEdgeCluster { display: flex; flex-direction: column; gap: 4px; width: 34px; padding: 6px 0; margin-left: calc(var(--leaf, 1) * 5px + 1px); background: color-mix(in srgb, var(--wr-level-fill, var(--wr-book)) 22%, #0d1b2e); }
+  // A tab is the book's own paper tint with its text running vertically in dark ink; the arc's or chapter's colour is the accent: a bar on the tab's outer edge
+  // (and a deeper wash on the open chapter's tab).
   .wrEdgeArc, .wrEdgeTab {
-    flex: 0 0 auto; width: 30px; margin-left: 0; border-radius: 0; display: flex; align-items: center; justify-content: center; font-weight: 700; color: var(--ink);
-    background: var(--wr-tab-tint, var(--wr-book)); box-shadow: 1px 1px 3px rgb(0 0 0 / calc(0.3 * var(--shade-k))), inset 0 0 0 1px var(--ov-lift-2);
-    &:hover { filter: brightness(1.12); }
+    flex: 0 0 auto; width: 30px; margin-left: 0; border-radius: 0; display: flex; align-items: center; justify-content: center; font-weight: 700;
+    writing-mode: vertical-rl; letter-spacing: 0.5px;
+    color: var(--wr-tab-ink); background: var(--wr-leaf);
+    box-shadow: inset -6px 0 0 var(--wr-tab-tint, var(--wr-book)), 1px 1px 3px rgb(0 0 0 / calc(0.3 * var(--shade-k)));
+    &:hover { filter: brightness(1.06); }
   }
-  // The arc button is the cluster's own tab: no fill of its own, just its label on the rail.
+  // The arc's tab names the group: its label on the rail, over a bar in the arc's colour.
   .wrEdgeArc {
-    width: 100%; height: 22px; font-size: 10px; letter-spacing: 0.5px; background: transparent; box-shadow: none; color: rgb(255 255 255 / 0.88);
+    width: 100%; height: 40px; font-size: 11px; background: transparent; color: rgb(255 255 255 / 0.92);
+    box-shadow: inset -4px 0 0 var(--wr-tab-tint, var(--wr-book));
     &:hover { filter: none; background: rgb(255 255 255 / 0.14); }
   }
-  .wrEdgeTab { height: 40px; font-size: 15px; }
+  .wrEdgeTab { height: 46px; font-size: 14px; }
   // The open chapter's tab is a little wider and more accented.
-  .wrEdgeTab--active { width: 37px; font-size: 17px; filter: saturate(1.35) brightness(1.1); box-shadow: inset 4px 0 0 var(--wr-accent-light), inset 0 0 0 2px var(--wr-accent-light), 2px 2px 6px rgb(0 0 0 / calc(0.4 * var(--shade-k))); &:hover { filter: saturate(1.35) brightness(1.18); } }
+  .wrEdgeTab--active {
+    width: 38px; font-size: 16px; background: color-mix(in srgb, var(--wr-tab-tint, var(--wr-book)) 45%, var(--wr-leaf));
+    box-shadow: inset -9px 0 0 var(--wr-tab-tint, var(--wr-book)), inset 0 0 0 2px var(--wr-accent-light), 2px 2px 6px rgb(0 0 0 / calc(0.4 * var(--shade-k)));
+  }
   .wrEdgeTab--add { height: 34px; background: rgb(0 0 0 / calc(0.25 * var(--shade-k))); box-shadow: none; margin-top: 3px; }
 
   // The preview, as the right page of the book.
@@ -778,7 +794,7 @@
   .wrTabTileTitle { margin: 0; display: flex; align-items: center; gap: 6px; padding: 6px 10px; font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 1px; background: var(--wr-fill-3); }
   .wrTabTileBody { padding: 10px; display: flex; flex-direction: column; gap: 10px; min-width: 0; }
   // What the tabs hold, on the level's own colour: cards one step deeper, light inputs.
-  .wrTabPane, .wrTabTileBody {
+  .wrTabPane:not(.wrTabPane--surface), .wrTabTileBody:not(.wrTabTileBody--surface) {
     color: var(--on-accent);
     .wrColumn { overflow: visible; max-width: none; flex: 0 0 auto; }
     .wrCard, .wrNote { background: var(--wr-fill-3); box-shadow: none; border-radius: 0; }
@@ -791,8 +807,11 @@
     .wrBarTrack { background: rgb(0 0 0 / 0.3); border-radius: 0; }
     .wrBarFill { background: rgb(255 255 255 / 0.85); }
     .wrCheckItem input { accent-color: #fff; }
-    .wrMuted, .wrHint { opacity: 0.85; }
+    .wrMuted, .wrHint, .wrOutlineMeta, .wrPanelHead, .wrChapterPointsHead { opacity: 0.9; }
+    .wrEyeLegend, .wrEyeLegend li, .wrEyeLegend span { color: var(--on-accent); opacity: 1; }
   }
+  // An editor's tab: a light surface of the level's hue with the ink colour.
+  .wrTabPane--surface, .wrTabTileBody--surface { color: var(--ink); background: var(--surface-side); padding: 10px; }
   .wrHelp { display: flex; flex-direction: column; gap: 12px; font-size: 12px; line-height: 1.5; }
   .wrHelpArticle { display: flex; flex-direction: column; gap: 6px; h4 { margin: 0; font-size: 12px; text-transform: uppercase; letter-spacing: 1px; } summary { cursor: pointer; font-weight: 700; } }
   .wrHelpText { margin: 0; font-size: 12px; line-height: 1.5; white-space: pre-wrap; }
@@ -807,4 +826,79 @@
     .wrShelfMeta { opacity: 0.8; }
   }
   .wrProjectTiles .wrNewProject { flex: 0 0 auto; }
+
+  // ---------------------------------------------------------------- the Outline as a book
+  // The cover (left): the header with the book's title and tabs, its stats, and the contents. The open chapter's page
+  // (acts, scenes, moments) is beside it, with the tabs on the page edge.
+  .wrLevel--outline.wrLevel--max .wrLevelBody { padding: 0; }
+  .wrOutlineMax { flex-direction: row; gap: 0; }
+  .wrBookCover {
+    flex: 0 0 clamp(270px, 26%, 340px); min-width: 0; min-height: 0; display: flex; flex-direction: column; box-sizing: border-box;
+    background: var(--wr-fill); color: var(--on-accent); position: relative; z-index: 1; box-shadow: 3px 0 8px rgb(0 0 0 / 0.28);
+    // The cover's inputs and buttons are on the book's own colour.
+    .wrField, .wrGoalInput input { color: var(--on-accent); background: rgb(0 0 0 / 0.28); &::placeholder { color: color-mix(in srgb, var(--on-accent) 55%, transparent); } }
+    .wrField option { color: black; }
+    .wrSmallBtn { color: var(--on-accent); background: rgb(255 255 255 / 0.16); &:hover:not(:disabled) { background: rgb(255 255 255 / 0.28); } }
+  }
+  .wrBookEd { background: transparent; }
+  .wrBookEdHead { flex-wrap: wrap; gap: 2px 8px; padding: 12px 14px 8px; align-items: center; }
+  .wrBookEdTitle { flex: 1 1 100%; margin: 0; font-size: 20px; line-height: 1.2; white-space: normal; overflow-wrap: anywhere; }
+  .wrBookEdMeta { margin-right: auto; }
+  .wrBookCover .wrHeaderExtras { flex: 1 1 100%; justify-content: flex-start; margin-left: 0; margin-top: 4px; }
+  .wrBookCover .wrBookEdBody { padding: 4px 14px 14px; }
+  .wrBookCover > .wrError { margin: 0 14px 8px; }
+  .wrCoverScroll { flex: 1 1 auto; min-height: 0; overflow-y: auto; padding: 4px 12px 16px; display: flex; flex-direction: column; gap: 12px; scrollbar-width: none; &::-webkit-scrollbar { display: none; } }
+  .wrBookCover .wrDraftStats { background: rgb(0 0 0 / 0.22); border-color: rgb(255 255 255 / 0.18); }
+
+  // The contents: arcs and chapters to move around in.
+  .wrOutlineNav { display: flex; flex-direction: column; gap: 6px; }
+  .wrCtHead { display: flex; align-items: center; justify-content: space-between; gap: 8px; font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: 1px; opacity: 0.9; }
+  .wrCtAdd { display: flex; gap: 4px; }
+  .wrCtArc { display: flex; flex-direction: column; gap: 6px; padding: 8px 8px 8px 10px; background: rgb(0 0 0 / 0.2); border-left: 5px solid var(--wr-node-tint, var(--wr-accent)); }
+  .wrCtRow { display: flex; align-items: center; gap: 6px; min-width: 0; }
+  .wrCtArcHead .wrOutlineInput { flex: 1 1 auto; }
+  .wrCtArcFoot { display: flex; align-items: center; gap: 8px; justify-content: space-between; font-size: 11px; }
+  .wrCtChapter { display: flex; flex-direction: column; gap: 6px; padding: 2px 4px 2px 2px; border-left: 5px solid var(--wr-node-tint, var(--wr-accent)); background: rgb(255 255 255 / 0.06);
+    &--active { background: rgb(255 255 255 / 0.14); box-shadow: inset 0 0 0 1px rgb(255 255 255 / 0.5); } }
+  .wrCtPick { flex: 1 1 auto; min-width: 0; display: flex; align-items: center; gap: 8px; padding: 6px 4px; text-align: left; color: inherit; &:hover { background: rgb(255 255 255 / 0.1); } }
+  .wrCtChapter--active .wrCtPick { font-weight: 700; }
+  .wrCtNum { flex: 0 0 auto; min-width: 22px; text-align: center; font-size: 12px; font-weight: 700; padding: 1px 4px 3px; background: rgb(0 0 0 / 0.3); color: var(--on-accent); box-shadow: inset 0 -3px 0 var(--wr-node-tint, var(--wr-accent)); }
+  .wrCtTitle { flex: 1 1 auto; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 13px; }
+  .wrCtWords { flex: 0 0 auto; font-size: 10px; opacity: 0.8; }
+  .wrCtDetail { display: flex; flex-direction: column; gap: 6px; padding: 2px 4px 8px 22px; }
+  .wrCtDetailRow { display: flex; align-items: center; justify-content: space-between; gap: 8px; font-size: 11px; .wrOutlineInput { flex: 1 1 auto; } }
+  .wrOutlineNav .wrNodeHue { max-width: none; flex: 0 0 auto; margin: 0; }
+
+  // The open chapter's banner at the head of its page.
+  .wrChapterBanner { min-width: 0; display: flex; flex-direction: column; gap: 8px; padding: 10px 12px; border: 1px solid var(--wr-page-line); border-left: 5px solid var(--wr-node-tint, var(--wr-accent)); background: var(--wr-frame-1); }
+  .wrBannerHead { display: flex; align-items: center; gap: 10px; min-width: 0; }
+  .wrBannerTitle { flex: 1 1 auto; min-width: 0; margin: 0; font-size: 18px; font-family: Georgia, 'Times New Roman', serif; overflow-wrap: anywhere; }
+
+  // The Plotpoints tab of the Project level.
+  .wrPlotpointsTab { display: flex; flex-direction: column; gap: 10px; min-width: 0; }
+  .wrPlotpointsTab .wrPlotTray { flex: none; display: flex; flex-direction: column; gap: 8px; padding: 0; border: 0; .wrChapterPointsList { overflow: visible; } }
+  .wrTabPane .wrChapterPointsHead, .wrTabTileBody .wrChapterPointsHead { opacity: 0.9; }
+
+  // ---------------------------------------------------------------- readability
+  .wrCtArc, .wrCtChapter { color: var(--on-accent); }
+  .wrBookEdMeta { opacity: 0.9; }
+  .wrBookCover .wrSmallBtn { background: rgb(0 0 0 / 0.28); &:hover:not(:disabled) { background: rgb(0 0 0 / 0.42); } }
+  .wrBookCover .wrLabel, .wrBookCover .wrCtHead, .wrBookCover .wrGoalHead { opacity: 1; }
+  .wrBookCover .wrGoalCurrent { color: var(--on-accent); font-weight: 700; }
+  .wrCtWords { opacity: 0.9; }
+  // On the Outline's dark page the "light" buttons and icons are the same wash as the other buttons, not pale paper under white text.
+  .wrLevel--outline .wrSmallBtn--light, .wrLevel--outline .wrIconBtn--light { color: var(--on-accent); background: rgb(0 0 0 / 0.28); &:hover:not(:disabled) { background: rgb(0 0 0 / 0.42); } }
+
+  // Muted text, labels and buttons on the paper (the Draft level and the preview) and in the tabs, held to a readable contrast.
+  .wrPage--chapter { --wr-page-muted: color-mix(in srgb, var(--wr-ink) 80%, transparent); }
+  .wrLevel--outline .wrPage--chapter { --wr-page-muted: color-mix(in srgb, var(--on-accent) 85%, transparent); }
+  .wrSpreadRight > .wrChapterTile {
+    .wrParentKind, .wrChapterTileName .wrPageKicker, .wrChapterTileStats .wrPageMetaRow, .wrChapterTileStats .wrNodeStats, .wrClickEdit--empty, .wrChapterTileStats .wrStatValue { color: color-mix(in srgb, var(--wr-ink) 84%, transparent); }
+    .wrSmallBtn { color: var(--wr-ink); background: rgb(0 0 0 / 0.1); &:hover:not(:disabled) { background: rgb(0 0 0 / 0.2); } }
+  }
+  .wrSegBtn--active { color: var(--on-accent); }
+  .wrPageMuted, .wrPage .wrWordCount { color: color-mix(in srgb, var(--wr-ink) 84%, transparent); }
+  .wrTabPane:not(.wrTabPane--surface) .wrKv span:first-child, .wrTabTileBody:not(.wrTabTileBody--surface) .wrKv span:first-child { opacity: 0.9; }
+  .wrTabPane .wrLabel, .wrTabTileBody .wrLabel { opacity: 0.95; }
+  .wrGoalCurrent { color: inherit; font-weight: 700; }
 }

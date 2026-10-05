@@ -16,6 +16,8 @@ export interface LevelTab {
   onNew?: () => void
   // The header's search box filters this tab.
   searchable?: boolean
+  // The tab shows an editor on a light surface of the level's hue, in the ink colour (not the level's own on-accent text).
+  surface?: boolean
   // The tab's tile takes the height that is left (an editor that scrolls itself) instead of the height of its content.
   fill?: boolean
   // Starts the closing group of tabs (Settings, Help), set a little apart.
@@ -101,7 +103,9 @@ export function useTabbedLevel({ storageKey, tabs, size, defaultOpen, defaultTab
 
   let body: ReactNode
   if (!max) {
-    body = current ? <div className="wrTabPane" role="region" aria-label={current.label}>{current.render(ctxOf(current))}</div> : null
+    body = current
+      ? <div className={`wrTabPane${current.surface ?? current.fill ? ' wrTabPane--surface' : ''}`} role="region" aria-label={current.label}>{current.render(ctxOf(current))}</div>
+      : null
   } else if (customMax) {
     body = null
   } else {
@@ -117,7 +121,7 @@ export function useTabbedLevel({ storageKey, tabs, size, defaultOpen, defaultTab
               {col.map(t => (
                 <section key={t.id} className={t.fill ? 'wrTabTile wrTabTile--fill' : 'wrTabTile'} aria-label={t.label}>
                   <h3 className="wrTabTileTitle"><t.Icon size={14} /> {t.label}</h3>
-                  <div className="wrTabTileBody">{t.render(ctxOf(t))}</div>
+                  <div className={`wrTabTileBody${t.surface ?? t.fill ? ' wrTabTileBody--surface' : ''}`}>{t.render(ctxOf(t))}</div>
                 </section>
               ))}
             </div>

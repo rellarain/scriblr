@@ -1,6 +1,6 @@
 import type { CSSProperties, ReactNode } from 'react'
 import { ChevronDownIcon, ChevronRightIcon } from '../../../icons'
-import { fillColorCss, hueOfCode, themeColorCss } from '../../../../theme/bookColors'
+import { fillColorCss, hueOfCode, isLightColor, themeColorCss } from '../../../../theme/bookColors'
 import type { Level, LevelSize } from './levelSizes'
 
 // One tinted level of the Writer frame. Its header strip is how it changes size:
@@ -35,7 +35,12 @@ function LevelPanel({ level, size, title, hue, tint, fill, onPromote, onSetSize,
     <section
       className={`wrLevel wrLevel--${level} wrLevel--${size}${className ? ` ${className}` : ''}`}
       aria-label={`${title} (${size})`} data-level={level} data-size={size}
-      style={hue != null ? ({ '--wr-level-h': hueOfCode(hue), '--wr-level-tint': tint ?? themeColorCss(hue), '--wr-level-fill': fill ?? fillColorCss(hue) } as CSSProperties) : undefined}
+      // The fill is held dark enough for white text (a lighter-brightness level has a pale fill instead, with dark text), whatever the
+      // zone's own accent: the text on a level is set here, not taken from the zone's on-accent. The Draft level is paper.
+      style={{
+        ...(hue != null ? { '--wr-level-h': hueOfCode(hue), '--wr-level-tint': tint ?? themeColorCss(hue), '--wr-level-fill': fill ?? fillColorCss(hue) } : {}),
+        ...(level !== 'draft' ? { '--on-accent': hue != null && isLightColor(hue) ? '#17120f' : '#ffffff' } : {}),
+      } as CSSProperties}
     >
       {!headerless && <div
         className={isMin && !locked ? 'wrLevelHeader wrLevelHeader--min' : 'wrLevelHeader'}

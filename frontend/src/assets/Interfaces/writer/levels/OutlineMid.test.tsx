@@ -5,12 +5,13 @@ import type { OutlineNode, PlotNode } from '../../../../api/types'
 import { __resetSettingsForTests } from '../../../../settings/settingsStore'
 import { outlineNode, plotNode } from '../plotTestWorkspace'
 import type { WriterWorkspace } from '../useWriterWorkspace'
-import { BookDetails, BookOutlineList, UnassignedList } from './outlineTabs'
+import { BookDetails, BookOutlineList } from './outlineTabs'
+import { PlacedList, PlotTray } from './PlotpointsTab'
 import { PLOT_ORDER_KEY } from '../plotOrder'
 import { setKv } from '../../../../settings/settingsStore'
 
-// The Outline level's Mid tabs, side by side here.
-const OutlineMid = ({ w }: { w: WriterWorkspace }) => <><UnassignedList w={w} /><BookOutlineList w={w} /><BookDetails w={w} /></>
+// The Outline level's Mid tabs and the Project level's Plotpoints tab, side by side here.
+const OutlineMid = ({ w }: { w: WriterWorkspace }) => <><PlotTray w={w} /><PlacedList w={w} /><BookOutlineList w={w} /><BookDetails w={w} /></>
 
 beforeEach(() => {
   window.localStorage.clear()
@@ -40,12 +41,12 @@ function workspace(over: Partial<WriterWorkspace> = {}): WriterWorkspace {
 }
 
 describe('OutlineMid', () => {
-  it('lists the unassigned plotpoints, then the book outline, then the book details', () => {
+  it('lists the unassigned plotpoints and the placed ones, then the book outline, then the book details', () => {
     render(<OutlineMid w={workspace()} />)
-    const heads = Array.from(document.querySelectorAll('.wrPanelHead')).map(h => h.textContent)
-    expect(heads).toEqual(['Unassigned plotpoints1', 'Placed plotpoints1', 'Book outline', 'Book details'])
+    const heads = Array.from(document.querySelectorAll('.wrPanelHead, .wrChapterPointsHead')).map(h => h.textContent)
+    expect(heads).toEqual(['Unassigned plotpoints1', 'Placed in Cold Harbor1', 'Book outline', 'Book details'])
     expect(screen.getByText('They meet')).toBeTruthy()
-    expect(document.querySelector('[data-point="placed"]')).toBeNull() // not among the unassigned
+    expect(document.querySelector('.wrPlotTray [data-point="placed"]')).toBeNull() // not among the unassigned
     expect(document.querySelector('[data-placed="placed"]')).toBeTruthy() // but in the placed list
     expect(screen.getByText('A frozen port.')).toBeTruthy()
     expect(screen.getByText('2 of 12 target')).toBeTruthy()
@@ -89,6 +90,6 @@ describe('OutlineMid', () => {
   it('says so when every plotpoint has a place', () => {
     const placed = PLOT.map(p => (p.id === 'open' ? { ...p, assignedMomentId: 'c2' } : p))
     render(<OutlineMid w={workspace({ plotNodes: placed, plotNodeById: new Map(placed.map(n => [n.id, n])) })} />)
-    expect(screen.getByText('Every plotpoint has a place.')).toBeTruthy()
+    expect(screen.getByText(/Every plotpoint has a place/)).toBeTruthy()
   })
 })

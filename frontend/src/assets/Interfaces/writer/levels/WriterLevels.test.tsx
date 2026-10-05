@@ -143,9 +143,17 @@ describe('WriterLevels', () => {
     renderLevels(workspace('page', { projectHue: 150 } as Partial<WriterWorkspace>))
     const fillOf = (level: string) => document.querySelector<HTMLElement>(`[data-level="${level}"]`)!.style.getPropertyValue('--wr-level-fill')
     expect(fillOf('dash')).toBe('') // the Dash falls back to the theme hue at the same saturation (in the stylesheet)
-    expect(fillOf('project')).toBe('hsl(150, calc(var(--color-accent-s) * 0.62), clamp(0%, calc(var(--color-accent-l) - 8%), 100%))')
+    expect(fillOf('project')).toBe('hsl(150, calc(var(--color-accent-s) * 0.62), clamp(0%, calc(var(--color-accent-l) - 8%), 38%))')
     expect(fillOf('outline')).toContain('hsl(28, calc(var(--color-accent-s) * 0.62)')
     expect(fillOf('draft')).toBe('hsl(280, 60%, 40%)') // the chapter's own, from the workspace
+  })
+
+  it("sets the text colour of each level from its fill: white, and the zone's own on the Draft paper", () => {
+    renderLevels(workspace('page', { projectHue: 150 } as Partial<WriterWorkspace>))
+    const onAccent = (level: string) => document.querySelector<HTMLElement>(`[data-level="${level}"]`)!.style.getPropertyValue('--on-accent')
+    expect(onAccent('project')).toBe('#ffffff')
+    expect(onAccent('dash')).toBe('#ffffff')
+    expect(onAccent('draft')).toBe('')
   })
 
   it('keeps the project shelves beside the Dash with no Min/Mid toggle', () => {

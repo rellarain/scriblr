@@ -5,8 +5,8 @@ import { buildChildIndex } from './outlineTree'
 import { nodeLabel } from './plotTree'
 import type { WriterWorkspace } from './useWriterWorkspace'
 
-// How many page edges show behind the tabs.
-const LEAVES = 6
+// The most page edges that show behind the tabs: each arc group's tabs jut out of one of them in turn.
+const MAX_LEAVES = 5
 
 interface Cluster { arc: OutlineNode | null; chapters: OutlineNode[] }
 
@@ -28,8 +28,10 @@ export function tabClusters(nodes: OutlineNode[], bookId: string): Cluster[] {
 }
 
 // The tabs on the right edge of the Outline and Draft pages while a book is open: one
-// cluster per arc, a small tab for the arc and one for each of its chapters, tinted with
-// their own colours. The open chapter's tab is raised. Clicking a tab jumps there.
+// cluster per arc, a tab for the arc and one for each of its chapters (their text runs
+// vertically, as on a real tabbed book), the arc's and chapters' own colours the accents.
+// Behind the page the edges of the pages beneath show, full height; each arc's cluster juts out
+// of a different one of them. The open chapter's tab is raised. Clicking a tab jumps there.
 export function EdgeTabs({ w, activeChapterId, onChapter, onArc, onAddChapter }: {
   w: WriterWorkspace
   activeChapterId: string | null
@@ -43,19 +45,20 @@ export function EdgeTabs({ w, activeChapterId, onChapter, onArc, onAddChapter }:
   const numberOf = new Map(w.activeBookChapters.map((c, i) => [c.id, i + 1]))
   const tint = (node: OutlineNode) => ({ '--wr-tab-tint': w.levelTintOf(node) } as CSSProperties)
   let arcNumber = 0
+  const leaves = Math.min(MAX_LEAVES, Math.max(2, clusters.length))
 
   return (
-    <div className="wrEdgeRail">
+    <div className="wrEdgeRail" style={{ '--leaves': leaves } as CSSProperties}>
       {/* The pages behind the open one, their edges stepping out behind the tabs. */}
       <div className="wrEdgeLeaves" aria-hidden="true">
-        {Array.from({ length: LEAVES }, (_, i) => <i key={i} style={{ '--leaf': i + 1 } as CSSProperties} />)}
+        {Array.from({ length: leaves }, (_, i) => <i key={i} style={{ '--leaf': i + 1 } as CSSProperties} />)}
       </div>
       <nav className="wrEdgeTabs" aria-label="Arcs and chapters">
-        {clusters.map(cluster => {
+        {clusters.map((cluster, clusterIndex) => {
           const arc = cluster.arc
           const n = arc ? ++arcNumber : 0
           return (
-            <div key={arc?.id ?? cluster.chapters[0]?.id} className="wrEdgeCluster">
+            <div key={arc?.id ?? cluster.chapters[0]?.id} className="wrEdgeCluster" style={{ '--leaf': (clusterIndex % leaves) + 1 } as CSSProperties}>
               {arc && (
                 <button
                   type="button" className="wrEdgeArc" style={tint(arc)}

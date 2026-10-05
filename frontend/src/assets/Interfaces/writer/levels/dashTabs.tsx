@@ -23,7 +23,7 @@ export function dashTabs(w: WriterWorkspace): LevelTab[] {
     { id: 'analytics', label: 'Analytics', Icon: BarChartIcon, newLabel: 'New project', onNew: focusNewProject, render: () => <AnalyticsPanel projects={w.projects} outlines={w.projectOutlines} /> },
     { id: 'scratchpad', label: 'Scratchpad', Icon: PencilIcon, searchable: true, newLabel: 'New note', render: c => <Scratchpad bare query={c.query} newTick={c.newTick} /> },
     { id: 'template', label: 'Project template', Icon: LayoutMiniIcon, render: () => <Placeholder title="Project Template" body="Manage the master project template here." /> },
-    { id: 'settings', label: 'Settings', Icon: GearIcon, end: true, render: () => <ThemeSettingsPanel /> },
+    { id: 'settings', label: 'Settings', Icon: GearIcon, end: true, surface: true, render: () => <ThemeSettingsPanel /> },
     { id: 'help', label: 'Help', Icon: HelpIcon, render: () => <HelpArticles names={DASH_HELP_NAMES} fallback={DASH_HELP_FALLBACK} /> },
   ]
 }

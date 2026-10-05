@@ -192,7 +192,7 @@ describe('tones as colours', () => {
   })
 
   it('draws a panel fill at one saturation (a little under the accent) and a step darker, in every brightness', () => {
-    expect(fillColorCss(200)).toBe('hsl(200, calc(var(--color-accent-s) * 0.62), clamp(0%, calc(var(--color-accent-l) - 8%), 100%))')
+    expect(fillColorCss(200)).toBe('hsl(200, calc(var(--color-accent-s) * 0.62), clamp(0%, calc(var(--color-accent-l) - 8%), 38%))')
     for (const tone of TONES) expect(fillColorCss(encodeHue(200, tone))).toContain('calc(var(--color-accent-s) * 0.62)')
   })
 

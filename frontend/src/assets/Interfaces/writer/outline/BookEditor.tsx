@@ -5,9 +5,9 @@ import { nodeLabel } from '../plotTree'
 import { formatWords } from '../wordCount'
 import BookSettings from './BookSettings'
 
-// The book editor: the strip across the top of the Outline page. It is the level's header: the
-// book's title with its chapters and words, and the level's tabs and quick actions at the right.
-// While the Settings tab is open the book's settings sit under it, and the Help tab's articles.
+// The book editor: the header on the book's cover (the left pane of the Outline level). It is the book's
+// title with its chapters and words, and the level's tabs and quick actions under them. While the Settings
+// tab is open the book's settings sit under it, and the Help tab's articles.
 export function BookEditor({ w, book, bookWords, tabs, settingsOpen, helpOpen, help }: {
   w: WriterWorkspace
   book: OutlineNode
@@ -27,7 +27,7 @@ export function BookEditor({ w, book, bookWords, tabs, settingsOpen, helpOpen, h
         </span>
         {tabs}
       </div>
-      {settingsOpen && <BookSettings w={w} book={book} bookWords={bookWords} />}
+      {settingsOpen && <BookSettings w={w} book={book} bookWords={bookWords} compact />}
       {helpOpen && <div className="wrBookEdHelp">{help}</div>}
     </section>
   )

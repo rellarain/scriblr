@@ -80,6 +80,8 @@ export function useWriterWorkspace() {
   const [focusedPlotNodeId, setFocusedPlotNodeId] = useState<string | null>(null)
   // The plotpoint a plot-outline click points at in the Draft level (shown highlighted for a moment).
   const [highlightedPointId, setHighlightedPointId] = useState<string | null>(null)
+  // The plotpoint being dragged from the Project level's Plotpoints tab onto an Outline card (or back).
+  const [plotDragId, setPlotDragId] = useState<string | null>(null)
 
   const activeProjectIdRef = useRef<string | null>(null)
   const outlineNodesRef = useRef<OutlineNode[]>([])
@@ -741,7 +743,7 @@ export function useWriterWorkspace() {
     addPlotKeyword, removePlotKeyword,
     addPlotField, renamePlotField, movePlotField, removePlotField,
     addPlotValue, updatePlotValue, removePlotValue, movePlotValue, cyclePlotAwareness,
-    assignPlotpoint, highlightedPointId, highlightPlotpoint,
+    assignPlotpoint, highlightedPointId, highlightPlotpoint, plotDragId, setPlotDragId,
   }
 }
 

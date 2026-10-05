@@ -549,9 +549,18 @@ awareness that the app above already existed:
   articles written for the level in the Resources builder, `levels/HelpArticles.tsx`). The
   Project's (`levels/projectTabs.tsx`): Plot and Outline (summaries at Mid, the editors at Max),
   Schedule, History, Analytics, Settings (the project editor and its colour) and Help. The
-  Outline's (`levels/outlineTabs.tsx`): Unassigned plotpoints, Book outline (New chapter), Book
-  details, Settings (the book's fields and colour) and Help; at Max the book editor strip is its
-  header and each tab opens or closes that part of the page. The Draft level's Settings (the
+  Outline's (`levels/outlineTabs.tsx`): Book outline (New chapter), Book details, Settings (the
+  book's fields and colour) and Help. At Max the Outline is laid out as a book: the **cover** on
+  the left (the book editor strip with the title and the tabs, the draft stats, and the contents,
+  `outline/OutlineNav.tsx`: the arcs and chapters to move around in, the open chapter unfolding its
+  title, colour and trash) and the open chapter's **page** beside it (`OutlineCards.tsx`: its banner
+  and its acts, scenes and moments), with the page-edge tabs at the right (the book's own hue, with
+  the arc and chapter colours as accents). The plotpoints still to place are the Project level's
+  **Plotpoints** tab (`levels/PlotpointsTab.tsx`): drag one onto a card in the Outline (the dragged id
+  is shared through the workspace, `plotDragId`). Level text is set from its fill (white; dark on a
+  lighter-brightness fill) and a fill is held to a lightness white text reads on (`theme/bookColors.ts`
+  `FILL_MAX_L`); an editor tab (`surface`) sits on a light surface in the ink colour. Alert messages
+  (`.wrError`) are the alert colour with a white outline and white text. The Draft level's Settings (the
   chapter's colour) and Help are icons in the chapter tile that swap the right page.
   Plotpoints already placed in the outline are listed **By time** (the Time of their scene, in the book's
   time system) or **In story** (where they sit in the outline): one stored choice
