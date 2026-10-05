@@ -11,11 +11,16 @@ import { formatWords } from '../wordCount'
 import HueSlider from '../HueSlider'
 import { structureOfBook } from './outlineModel'
 
-// The book's contents, the navigation pane of the Outline level: its arcs and chapters. Click a chapter to
-// open it (its acts, scenes and moments are the page beside); the open chapter unfolds its title, colour,
-// Write button and trash. Arcs carry their own title and colour, and a chapter button. Arcs and chapters
+// The book's contents, on the book's cover (the Outline level): its arcs and chapters, in one column. Click a
+// chapter to open it: it unfolds its title, colour and trash, and under them its acts, scenes and moments. Arcs carry their own title and colour, and a chapter button. Arcs and chapters
 // are reordered and moved by dragging their grips.
-export function OutlineNav({ w, book, counts }: { w: WriterWorkspace; book: OutlineNode; counts: WordCounts }) {
+export function OutlineNav({ w, book, counts, chapterBody }: {
+  w: WriterWorkspace
+  book: OutlineNode
+  counts: WordCounts
+  // What unfolds under the open chapter's row (its acts, scenes and moments).
+  chapterBody?: (chapter: OutlineNode) => ReactNode
+}) {
   const dnd = useNodeDnd(w, {
     accepts: (dragged, parentId) => {
       const parent = parentId ? w.outlineNodes.find(n => n.id === parentId) : undefined
@@ -105,6 +110,10 @@ export function OutlineNav({ w, book, counts }: { w: WriterWorkspace; book: Outl
                 <DeleteControl message={`Delete Chapter ${n}${inside ? ' and everything in it' : ''}?`} onConfirm={() => w.deleteOutlineNode(node.id)} />
               </div>
             </div>
+          )}
+          {active && chapterBody && (
+            // Its own keys (the cards'), not the contents'.
+            <div className="wrCtBody" onKeyDown={e => e.stopPropagation()}>{chapterBody(node)}</div>
           )}
         </div>
       )

@@ -158,10 +158,10 @@ describe('Outline Max: the contents', () => {
 
   it('deletes the open chapter after asking, with everything in it', async () => {
     const { user } = setup('c1')
-    const nav = screen.getByRole('navigation', { name: 'Arcs and chapters contents' })
-    await user.click(within(card('c1')).getByRole('button', { name: 'Delete' }))
-    expect(within(nav).getByText(/Delete Chapter 1 and everything in it\?/)).toBeTruthy()
-    await user.click(within(nav).getByRole('button', { name: 'Confirm' }))
+    const detail = document.querySelector<HTMLElement>('.wrCtDetail')!
+    await user.click(within(detail).getByRole('button', { name: 'Delete' }))
+    expect(within(detail).getByText(/Delete Chapter 1 and everything in it\?/)).toBeTruthy()
+    await user.click(within(detail).getByRole('button', { name: 'Confirm' }))
     expect(card('c1')).toBeNull()
     expect(card('m1')).toBeNull()
   })
@@ -211,36 +211,6 @@ describe('Outline Max: the open chapter', () => {
     const { user, openChapter } = setup('c1')
     await user.click(within(banner()).getByRole('button', { name: 'Write chapter 1' }))
     expect(openChapter).toHaveBeenCalledWith('c1')
-  })
-})
-
-describe('Outline Max: the edge tabs', () => {
-  it('has a tab for each arc and chapter, the open chapter raised', () => {
-    setup('c1')
-    const tabs = screen.getByRole('navigation', { name: 'Arcs and chapters' })
-    expect(within(tabs).getByRole('button', { name: 'Arc 1: Thaw' })).toBeTruthy()
-    expect(within(tabs).getByRole('button', { name: 'Chapter 1: Ice Out' }).getAttribute('aria-pressed')).toBe('true')
-    expect(within(tabs).getByRole('button', { name: 'Chapter 2: The Harbor Master' }).getAttribute('aria-pressed')).toBe('false')
-  })
-
-  it('opens a chapter when its tab is clicked', async () => {
-    const { user } = setup('c1')
-    await user.click(screen.getByRole('button', { name: 'Chapter 2: The Harbor Master' }))
-    expect(document.querySelector('.wrChapterBanner')?.getAttribute('data-node')).toBe('c2')
-    expect(screen.getByRole('button', { name: 'Chapter 2: The Harbor Master' }).getAttribute('aria-pressed')).toBe('true')
-  })
-
-  it("opens an arc's first chapter from the arc tab", async () => {
-    const { user } = setup('c2')
-    await user.click(screen.getByRole('button', { name: 'Arc 1: Thaw' }))
-    expect(document.querySelector('.wrChapterBanner')?.getAttribute('data-node')).toBe('c1')
-  })
-
-  it('adds a chapter from its plus tab, and opens it', async () => {
-    const { user } = setup('c1')
-    await user.click(screen.getByRole('button', { name: 'Add chapter' }))
-    expect(screen.getAllByRole('button', { name: /^Open chapter \d$/ })).toHaveLength(3)
-    expect(document.querySelector('.wrChapterBanner')?.getAttribute('data-node')).toBe('new1')
   })
 })
 
