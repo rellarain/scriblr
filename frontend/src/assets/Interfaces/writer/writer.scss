@@ -672,7 +672,7 @@
   // The rail holds the pages behind the open one and the tabs. The page edges are full height and bleed to the top and bottom like the
   // cover; each is a step further out than the one before. An arc's cluster of tabs juts out of its own edge (--leaf), the next arc's
   // out of the next, and so on round.
-  .wrEdgeRail { position: relative; flex: 0 0 calc(12px + var(--leaves, 10) * 4px + 42px); min-height: 0; }
+  .wrEdgeRail { position: relative; flex: 0 0 var(--rail-w, 59px); min-height: 0; }
   .wrEdgeLeaves { position: absolute; inset: 0; pointer-events: none; }
   // The page edges are the book's own hue (a pale tint of it, paler or deeper with the zone), each leaf a little deeper.
   .wrEdgeRail { --wr-leaf: hsl(var(--color-theme-h), var(--color-theme-s), calc(var(--paper-l) - 4% * var(--paper-dir))); --wr-tab-ink: hsl(var(--color-theme-h), 30%, var(--paper-ink-l)); }
@@ -682,7 +682,7 @@
   }
   .wrEdgeTabs { position: relative; z-index: 200; height: 100%; padding-top: 22px; padding-bottom: 8px; box-sizing: border-box; display: flex; flex-direction: column; gap: 10px; overflow-y: auto; overflow-x: visible; scrollbar-width: none; &::-webkit-scrollbar { display: none; } }
   // A cluster starts at its own page edge.
-  .wrEdgeCluster { display: flex; flex-direction: column; gap: 4px; width: 34px; padding: 6px 0; margin-left: calc(var(--leaf, 1) * 4px + 1px); background: color-mix(in srgb, var(--wr-level-fill, var(--wr-book)) 22%, #0d1b2e); }
+  .wrEdgeCluster { display: flex; flex-direction: column; gap: 4px; width: 34px; padding: 6px 0; margin-left: calc(var(--leaf, 1) * 4px + 4px); background: color-mix(in srgb, var(--wr-level-fill, var(--wr-book)) 22%, #0d1b2e); }
   // A tab is the book's own paper tint with its text running vertically in dark ink; the arc's or chapter's colour is the accent: a bar on the tab's outer edge
   // (and a deeper wash on the open chapter's tab).
   .wrEdgeArc, .wrEdgeTab {
@@ -901,4 +901,14 @@
   .wrTabPane:not(.wrTabPane--surface) .wrKv span:first-child, .wrTabTileBody:not(.wrTabTileBody--surface) .wrKv span:first-child { opacity: 0.9; }
   .wrTabPane .wrLabel, .wrTabTileBody .wrLabel { opacity: 0.95; }
   .wrGoalCurrent { color: inherit; font-weight: 700; }
+
+  // The spine: a strip down the left of the book (the Outline), darker, with the cover inset from the level's edge.
+  .wrOutlineMax { position: relative; padding-left: 16px; box-sizing: border-box; }
+  .wrOutlineMax::before {
+    content: ''; position: absolute; left: 0; top: 0; bottom: 0; width: 16px;
+    background: linear-gradient(90deg, rgb(0 0 0 / 0.45), rgb(0 0 0 / 0.22) 55%, rgb(255 255 255 / 0.06) 85%, rgb(0 0 0 / 0.25)), var(--wr-fill-2);
+  }
+  // The open chapter's page scrolls itself.
+  .wrLevel--outline .wrOutlinePage { flex-direction: column; overflow-y: auto; padding: 26px 34px; gap: 14px; scrollbar-width: none; &::-webkit-scrollbar { display: none; } }
+  .wrBookCover .wrCoverScroll > .wrBookEdBody, .wrBookCover .wrCoverScroll > .wrBookEdHelp { padding: 4px 2px 8px; max-height: none; }
 }

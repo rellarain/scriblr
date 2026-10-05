@@ -7,6 +7,8 @@ import type { WriterWorkspace } from './useWriterWorkspace'
 
 // How many page edges show behind the tabs (more with more arcs): each arc group's tabs jut out of one of them in turn, the first from the second edge.
 const MIN_LEAVES = 10
+// How far each page edge steps out from the one before (px; the stylesheet's .wrEdgeLeaves uses the same).
+const LEAF_STEP = 4
 
 interface Cluster { arc: OutlineNode | null; chapters: OutlineNode[] }
 
@@ -46,9 +48,12 @@ export function EdgeTabs({ w, activeChapterId, onChapter, onArc, onAddChapter }:
   const tint = (node: OutlineNode) => ({ '--wr-tab-tint': w.levelTintOf(node) } as CSSProperties)
   let arcNumber = 0
   const leaves = Math.max(MIN_LEAVES, clusters.length)
+  // The rail is the stack of page edges and 15px beyond it (wider only if the last group's tabs need it).
+  const furthest = Math.min(leaves, clusters.length + 1)
+  const railWidth = Math.max(leaves * LEAF_STEP + 4 + 15, furthest * LEAF_STEP + 4 + 38)
 
   return (
-    <div className="wrEdgeRail" style={{ '--leaves': leaves } as CSSProperties}>
+    <div className="wrEdgeRail" style={{ '--leaves': leaves, '--rail-w': `${railWidth}px` } as CSSProperties}>
       {/* The pages behind the open one, their edges stepping out behind the tabs. */}
       <div className="wrEdgeLeaves" aria-hidden="true">
         {Array.from({ length: leaves }, (_, i) => <i key={i} style={{ '--leaf': i + 1 } as CSSProperties} />)}

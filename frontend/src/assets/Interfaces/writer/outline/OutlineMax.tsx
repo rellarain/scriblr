@@ -6,6 +6,7 @@ import { useWordCounts } from '../useWordCounts'
 import HelpArticles from '../levels/HelpArticles'
 import { OUTLINE_HELP_FALLBACK, OUTLINE_HELP_NAMES, useOutlineTabs } from '../levels/outlineTabs'
 import BookEditor from './BookEditor'
+import BookSettings from './BookSettings'
 import DraftStats from './DraftStats'
 import OutlineCards from './OutlineCards'
 import OutlineNav from './OutlineNav'
@@ -38,24 +39,21 @@ function OutlineMax({ w }: { w: WriterWorkspace }) {
   return (
     <div className="wrOutlineMax">
       <aside className="wrBookCover" aria-label="Book cover">
-        <BookEditor
-          w={w} book={book} bookWords={counts.books[book.id] ?? 0} tabs={tabs.headerExtras}
-          settingsOpen={tabs.isOpen('settings')} helpOpen={tabs.isOpen('help')}
-          help={<HelpArticles names={OUTLINE_HELP_NAMES} fallback={OUTLINE_HELP_FALLBACK} />}
-        />
+        <BookEditor w={w} book={book} bookWords={counts.books[book.id] ?? 0} tabs={tabs.headerExtras} />
         {w.saveStatus.error && <p className="wrError">{w.saveStatus.error}</p>}
+        {/* One column under the header: the sections the tabs open (settings, help, stats), then the contents. */}
         <div className="wrCoverScroll">
+          {tabs.isOpen('settings') && <BookSettings w={w} book={book} bookWords={counts.books[book.id] ?? 0} compact />}
+          {tabs.isOpen('help') && <div className="wrBookEdHelp"><HelpArticles names={OUTLINE_HELP_NAMES} fallback={OUTLINE_HELP_FALLBACK} /></div>}
           {tabs.isOpen('details') && <DraftStats book={book} chapters={chapters} nodeWords={counts.nodes} settings={w.activeProject?.settings} />}
           <OutlineNav w={w} book={book} counts={counts} />
         </div>
       </aside>
       <div className="wrOutlineBody">
         <div className="wrPage wrPage--chapter wrOutlinePage">
-          <div className="wrPageScroll">
-            {tabs.isOpen('outline') && (
-              <OutlineCards w={w} book={book} counts={counts} chapterId={activeId} plotDrag={{ dragId: w.plotDragId, setDragId: w.setPlotDragId }} />
-            )}
-          </div>
+          {tabs.isOpen('outline') && (
+            <OutlineCards w={w} book={book} counts={counts} chapterId={activeId} plotDrag={{ dragId: w.plotDragId, setDragId: w.setPlotDragId }} />
+          )}
         </div>
         <EdgeTabs
           w={w} activeChapterId={activeId}

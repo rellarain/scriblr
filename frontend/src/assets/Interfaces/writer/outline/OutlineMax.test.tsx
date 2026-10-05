@@ -314,7 +314,7 @@ describe('Outline Max: plotpoints', () => {
 describe('Outline Max: the book editor and the draft stats', () => {
   it("is a strip with the book title and the level's tabs, and the Settings tab opens its fields", async () => {
     const { user } = setup('c1')
-    const editor = screen.getByRole('region', { name: 'Book editor' })
+    const editor = screen.getByRole('complementary', { name: 'Book cover' })
     expect(within(editor).getByText('Cold Harbor')).toBeTruthy()
     expect(within(editor).queryByLabelText('Book title')).toBeNull()
     const names = within(within(editor).getByRole('toolbar', { name: 'Tabs' })).getAllByRole('button').map(b => b.getAttribute('aria-label'))
@@ -329,7 +329,7 @@ describe('Outline Max: the book editor and the draft stats', () => {
 
   it("edits the book's preview formatting under Settings, and resets it to the defaults", async () => {
     const { user } = setup('c1')
-    const editor = screen.getByRole('region', { name: 'Book editor' })
+    const editor = screen.getByRole('complementary', { name: 'Book cover' })
     await user.click(within(editor).getByRole('button', { name: 'Settings' }))
     const size = within(editor).getByLabelText('Font size') as HTMLInputElement
     expect(size.value).toBe('17')
@@ -355,7 +355,7 @@ describe('Outline Max: the book editor and the draft stats', () => {
 
   it("opens and closes the stats (on the cover) and the chapter's cards with their tabs", async () => {
     const { user } = setup('c1')
-    const editor = screen.getByRole('region', { name: 'Book editor' })
+    const editor = screen.getByRole('complementary', { name: 'Book cover' })
     expect(screen.getByRole('region', { name: 'Draft stats' })).toBeTruthy()
     expect(document.querySelector('.wrChapterBanner')).toBeTruthy()
 
@@ -370,7 +370,7 @@ describe('Outline Max: the book editor and the draft stats', () => {
   it("adds a chapter from the header's New button", async () => {
     const { user } = setup('c1')
     const before = screen.getAllByRole('button', { name: /^Open chapter \d$/ }).length
-    await user.click(within(screen.getByRole('region', { name: 'Book editor' })).getByRole('button', { name: 'New chapter' }))
+    await user.click(within(screen.getByRole('complementary', { name: 'Book cover' })).getByRole('button', { name: 'New chapter' }))
     expect(screen.getAllByRole('button', { name: /^Open chapter \d$/ }).length).toBe(before + 1)
   })
 
