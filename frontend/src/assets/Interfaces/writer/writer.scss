@@ -672,7 +672,8 @@
   // The rail holds the pages behind the open one and the tabs. The page edges are full height and bleed to the top and bottom like the
   // cover; each is a step further out than the one before. An arc's cluster of tabs juts out of its own edge (--leaf), the next arc's
   // out of the next, and so on round.
-  .wrEdgeRail { position: relative; flex: 0 0 var(--rail-w, 59px); min-height: 0; }
+  // Past the last page edge is the back of the book's cover: always the cover's own colour.
+  .wrEdgeRail { position: relative; flex: 0 0 var(--rail-w, 59px); min-height: 0; background: var(--wr-cover, var(--wr-fill)); }
   .wrEdgeLeaves { position: absolute; inset: 0; pointer-events: none; }
   // The page edges are the book's own hue (a pale tint of it, paler or deeper with the zone), each leaf a little deeper.
   .wrEdgeRail { --wr-leaf: hsl(var(--color-theme-h), var(--color-theme-s), calc(var(--paper-l) - 4% * var(--paper-dir))); --wr-tab-ink: hsl(var(--color-theme-h), 30%, var(--paper-ink-l)); }
