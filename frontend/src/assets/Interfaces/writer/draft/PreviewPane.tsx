@@ -8,7 +8,7 @@ import { nodeLabel } from '../plotTree'
 import { splitParagraphs, splitSentences } from '../sentences'
 import type { useChapterDraft } from '../useChapterDraft'
 import { exportChapterPdf } from '../../../../api/export'
-import { HeartHalvedIcon, HeartIcon, MoonIcon, SunIcon } from '../../../icons'
+import { MoonIcon, ReactionHeartIcon, SunIcon } from '../../../icons'
 import type { usePublications } from '../usePublications'
 import { fullDate, shortDate } from '../chapterDates'
 import { formatOf, formatVars } from '../previewFormat'
@@ -71,7 +71,6 @@ function Paragraph({ paragraphKey, sentences, marks, selected, onSelect, onCycle
           const cell = (kind: 'like' | 'dislike') => {
             const level = mark[kind]
             if (level === 0 && !isSelected) return null
-            const Heart = kind === 'like' ? HeartIcon : HeartHalvedIcon
             return (
               <button
                 key={kind} type="button"
@@ -81,7 +80,7 @@ function Paragraph({ paragraphKey, sentences, marks, selected, onSelect, onCycle
                 title={kind === 'like' ? 'Like: click to raise the level (three levels, then off)' : 'Dislike: click to raise the level (three levels, then off)'}
                 onClick={() => onCycle(key, kind)}
               >
-                {Array.from({ length: level }, (_, h) => <Heart key={h} size={14} />)}
+                {level > 0 && <ReactionHeartIcon kind={kind} level={level as 1 | 2 | 3} size={16} />}
                 {level === 0 && <span className="wrReactPlus">{kind === 'like' ? '+' : '−'}</span>}
               </button>
             )

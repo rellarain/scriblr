@@ -744,7 +744,7 @@
   .wrSentence { cursor: pointer; border-radius: 2px; &:hover { background: hsl(var(--color-accent-h), 90%, 92%); } &--selected { background: hsl(var(--color-accent-h), 90%, 88%); } &--flagged { border-bottom: 2px solid var(--wr-accent); } }
   .wrReactGutter { position: absolute; left: 0; top: 0; width: 44px; height: 100%; }
   .wrReactBar {
-    position: absolute; width: 20px; border-radius: 4px; display: flex; flex-direction: column; align-items: center; gap: 1px; padding-top: 3px; box-sizing: border-box; overflow: hidden;
+    position: absolute; width: 20px; border-radius: 4px; display: flex; flex-direction: column; align-items: center; padding-top: 3px; box-sizing: border-box; overflow: hidden;
     border: 1px dashed transparent;
     &--like { color: hsl(var(--color-accent-h), 72%, var(--paper-like-l)); }
     &--dislike { color: var(--wr-alert); }

@@ -605,7 +605,9 @@ awareness that the app above already existed:
   tiles, the crease right beside them, and the right page: the chapter's plotpoints
   (read-only footnote cards), then its acts, scenes and moments as read-only cards (fold up, remembered) each around an
   auto-growing draft input with a live word count, or, from the toggle, the preview with
-  its Reaction / Flag / Export tools. A chapter with no outline is one free draft.
+  its Reaction / Flag / Export tools. A sentence's reaction bars show one heart per level, not a stack
+  (`ReactionHeartIcon`): like is an outline, two concentric outlines, a filled heart; dislike is an outline with a
+  line down its middle, two separate outlined halves, two separate filled halves. A chapter with no outline is one free draft.
 - **`AUI.tsx`** (`feedback/` subfolder) — an admin "feedback pipeline"
   (channel/vote/tone/integrate/implement/sent/explicate tabs). This isn't a
   duplicate of anything above — it has no committed counterpart, is

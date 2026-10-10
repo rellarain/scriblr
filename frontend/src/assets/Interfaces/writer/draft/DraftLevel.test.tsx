@@ -256,6 +256,23 @@ describe('Draft level: Draft | Preview', () => {
     } finally { OUTLINE[book] = original }
   })
 
+  it("shows a sentence's reaction as one heart per level: a single glyph in the bar, never a stack", async () => {
+    INITIAL.bodies = { m1: 'The ice gave way beneath the pier.' }
+    const { user } = setup({ console_: 'pages' })
+    await user.click(screen.getByText('The ice gave way beneath the pier.'))
+    const bar = (kind: 'Like' | 'Dislike') => screen.getByRole('button', { name: new RegExp(`^${kind}, level`) })
+    expect(bar('Like').querySelectorAll('svg')).toHaveLength(0) // level 0 is the + / - placeholder
+    for (const level of [1, 2, 3]) {
+      await user.click(bar('Like'))
+      await user.click(bar('Dislike'))
+      expect(bar('Like').getAttribute('aria-label')).toContain(`level ${level}`)
+      expect(bar('Like').querySelectorAll('svg')).toHaveLength(1)
+      expect(bar('Dislike').querySelectorAll('svg')).toHaveLength(1)
+    }
+    await user.click(bar('Like'))
+    expect(bar('Like').querySelectorAll('svg')).toHaveLength(0)
+  })
+
   it('keeps the tile and takes the cards away when previewing', () => {
     INITIAL.bodies = { m1: 'Some text' }
     setup({ console_: 'pages' })

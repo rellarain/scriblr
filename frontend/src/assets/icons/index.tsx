@@ -412,18 +412,32 @@ export function GripIcon(props: IconProps) {
   </IconBase>
 }
 
-// Outlined heart -- a positive reaction (Pages console).
-export function HeartIcon(props: IconProps) {
-  return <IconBase {...props}>
-    <path d="M12 20.5s-8-4.9-8-10.4A4.4 4.4 0 0 1 12 7.6a4.4 4.4 0 0 1 8 2.5c0 5.5-8 10.4-8 10.4z" />
-  </IconBase>
-}
+const HEART = 'M12 20.5s-8-4.9-8-10.4A4.4 4.4 0 0 1 12 7.6a4.4 4.4 0 0 1 8 2.5c0 5.5-8 10.4-8 10.4z'
+// The heart split down its centre line, for the halves.
+const HEART_LEFT = 'M12 7.6a4.4 4.4 0 0 0-8 2.5c0 5.5 8 10.4 8 10.4z'
+const HEART_RIGHT = 'M12 7.6a4.4 4.4 0 0 1 8 2.5c0 5.5-8 10.4-8 10.4z'
+const INNER_SCALE = 0.5
 
-// Outlined heart with a crack down the middle -- a negative reaction.
-export function HeartHalvedIcon(props: IconProps) {
+// A reaction's strength as one heart (a sentence's like or dislike, levels 1 to 3), not a stack of them:
+//   like     1 a heart outline, 2 two concentric outlines, 3 a filled heart;
+//   dislike  1 an outline with a line down the middle, 2 two separate outlined halves, 3 two separate filled halves.
+export function ReactionHeartIcon({ kind, level, ...props }: IconProps & { kind: 'like' | 'dislike'; level: 1 | 2 | 3 }) {
+  if (kind === 'like') {
+    return <IconBase {...props}>
+      <path d={HEART} fill={level === 3 ? 'currentColor' : 'none'} />
+      {level === 2 && <path d={HEART} transform={`translate(12 14.2) scale(${INNER_SCALE}) translate(-12 -14.2)`} strokeWidth={1.8 / INNER_SCALE} />}
+    </IconBase>
+  }
+  if (level === 1) {
+    return <IconBase {...props}>
+      <path d={HEART} />
+      <path d="M12 7.6v12.9" />
+    </IconBase>
+  }
+  const fill = level === 3 ? 'currentColor' : 'none'
   return <IconBase {...props}>
-    <path d="M12 20.5s-8-4.9-8-10.4A4.4 4.4 0 0 1 12 7.6a4.4 4.4 0 0 1 8 2.5c0 5.5-8 10.4-8 10.4z" />
-    <path d="M12 7.6l-2.2 3.8 3.2 2.2-2 3.6" />
+    <path d={HEART_LEFT} transform="translate(-1.6 0)" fill={fill} />
+    <path d={HEART_RIGHT} transform="translate(1.6 0)" fill={fill} />
   </IconBase>
 }
 
