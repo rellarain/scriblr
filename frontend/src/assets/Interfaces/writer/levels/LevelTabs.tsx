@@ -1,6 +1,7 @@
 import { useState, type ComponentType, type ReactNode } from 'react'
 import { PlusIcon, SearchIcon, type IconProps } from '../../../icons'
 import { useStoredState } from '../storage'
+import SplitArea, { columnsTree } from '../SplitArea'
 
 // What a tab's content is told: the header's search text, and a counter that goes up each time the
 // header's New button is pressed on that tab (a tab that has something to add reacts to the change).
@@ -25,7 +26,8 @@ export interface LevelTab {
 }
 
 // The tabs of a level and what they show. At Mid one tab at a time, in one column; at Max each tab is the
-// minimised form of a tile, clicking it opens or closes that tile, and the open tiles flow into two columns.
+// minimised form of a tile, clicking it opens or closes that tile, and the open tiles are laid out on a split
+// grid the user rearranges (drag a title bar to move a tile, a divider to resize).
 // The tab strip and quick actions (New, Search, Save) go in the level's header; the body is the tiles.
 export function useTabbedLevel({ storageKey, tabs, size, defaultOpen, defaultTab, save, customMax = false }: {
   storageKey: string
@@ -109,24 +111,17 @@ export function useTabbedLevel({ storageKey, tabs, size, defaultOpen, defaultTab
   } else if (customMax) {
     body = null
   } else {
-    // One open tile has the whole width; two or more alternate between the columns.
-    const columns: LevelTab[][] = [[], []]
-    shown.forEach((t, i) => columns[i % 2].push(t))
+    // The open tiles on a split grid: drag a title bar to move a tile, a divider to resize (SplitArea.tsx).
     body = shown.length === 0
       ? <p className="wrMuted">Pick a tab above to open it.</p>
       : (
-        <div className={`wrTabColumns${shown.length === 1 ? ' wrTabColumns--single' : ''}`}>
-          {columns.filter(col => col.length > 0).map((col, i) => (
-            <div key={i} className="wrTabColumn">
-              {col.map(t => (
-                <section key={t.id} className={t.fill ? 'wrTabTile wrTabTile--fill' : 'wrTabTile'} aria-label={t.label}>
-                  <h3 className="wrTabTileTitle"><t.Icon size={14} /> {t.label}</h3>
-                  <div className={`wrTabTileBody${t.surface ?? t.fill ? ' wrTabTileBody--surface' : ''}`}>{t.render(ctxOf(t))}</div>
-                </section>
-              ))}
-            </div>
-          ))}
-        </div>
+        <SplitArea
+          gridId={storageKey} label="Tiles" defaultTree={columnsTree(shown.map(t => t.id))}
+          tiles={shown.map(t => ({
+            id: t.id, title: t.label, Icon: t.Icon, children: t.render(ctxOf(t)),
+            bodyClassName: t.fill ? 'wrTabTileBody--surface wrTabTileBody--fill' : t.surface ? 'wrTabTileBody--surface' : undefined,
+          }))}
+        />
       )
   }
 

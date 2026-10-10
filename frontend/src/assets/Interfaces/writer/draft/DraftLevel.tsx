@@ -1,7 +1,8 @@
 import { useMemo, useState } from 'react'
 import type { OutlineNode } from '../../../../api/types'
 import type { WriterWorkspace } from '../useWriterWorkspace'
-import { EyeIcon, GearIcon, HelpIcon, PencilIcon } from '../../../icons'
+import { EyeIcon, GearIcon, HelpIcon, PencilIcon, PlotIcon } from '../../../icons'
+import type { SplitNode } from '../../../../components/tiles/splitTree'
 import { SaveControl } from '../../../../components/SaveControl'
 import { combineSaveStatus } from '../../../../lib/useAutosave'
 import { chapterDatesOf, type ChapterMeta } from '../chapterDates'
@@ -10,6 +11,7 @@ import HueSlider from '../HueSlider'
 import HelpArticles from '../levels/HelpArticles'
 import { PublishControl } from '../PublishControl'
 import { Placeholder } from '../shared'
+import SplitArea from '../SplitArea'
 import { useChapterDraft } from '../useChapterDraft'
 import { usePublications } from '../usePublications'
 import { countWords } from '../wordCount'
@@ -44,6 +46,9 @@ export function DraftPreviewToggle({ preview, hasDraft, onDraft, onPreview }: {
   )
 }
 
+// Where the page's tiles sit until one is moved: the chapter on top, the plotpoints above the draft.
+const DRAFT_LAYOUT: SplitNode = { dir: 'col', ratio: 0.19, a: { id: 'chapter' }, b: { dir: 'col', ratio: 0.18, a: { id: 'points' }, b: { id: 'draft' } } }
+
 const DRAFT_HELP_NAMES = ['draft', 'chapter']
 const DRAFT_HELP_FALLBACK = 'The Draft level is the open chapter as an open book: write each moment in its card, and switch to Preview to read the chapter as it will be published.'
 
@@ -60,10 +65,11 @@ function DraftPanelButtons({ panel, onPanel }: { panel: DraftPanel; onPanel: (ne
 }
 type DraftPanel = 'settings' | 'help' | null
 
-// The Draft level at Max: the open chapter as an open book. The chapter title tile runs across the
-// top (what the chapter is, and the page tools); below it the left page, which is just the strip of
-// paper under the other levels' tiles, the crease beside them, and the right page: the chapter's
-// plotpoints and its draft (or, from the toggle, its preview), with the arcs' and chapters' tabs on the edge.
+// The Draft level at Max: the open chapter as an open book: the left page, which is just the strip of
+// paper under the other levels' tiles, the crease beside it, and the right page, which holds three tiles on a
+// split grid (drag a title bar to move one, a divider to resize; remembered): the chapter title tile (what the
+// chapter is, and the page tools), the chapter's plotpoints and its draft (or, from the toggle, its preview or
+// its settings or help), with the arcs' and chapters' tabs on the edge.
 function DraftPage({ w, chapter, pagesComponent, onPagesComponent }: {
   w: WriterWorkspace
   chapter: OutlineNode
@@ -93,40 +99,63 @@ function DraftPage({ w, chapter, pagesComponent, onPagesComponent }: {
           <div className="wrSpreadLeft" aria-hidden="true" />
           <div className="wrCrease" aria-hidden="true" />
           <div className="wrSpreadRight">
-            <ChapterTile
-              w={w} chapter={chapter} chapterWords={chapterWords} meta={meta}
-              error={w.saveStatus.error ?? draft.error ?? pubs.error}
-              tools={(
-                <>
-                  <SaveControl status={status} onSave={saveAll} onRestore={restoreAll} buttonClassName="wrSmallBtn wrSaveBtn" />
-                  <PublishControl
-                    disabled={!hasDraft} busy={pubs.publishing}
-                    title={hasDraft ? 'Publish this chapter' : 'Write some draft text to publish it'}
-                    // Publish what is saved: let any waiting edit land first.
-                    onPublish={async () => { await Promise.all([w.saveNow(), draft.flush()]); await pubs.publish() }}
-                  />
-                  <DraftPreviewToggle preview={preview} hasDraft={hasDraft} onDraft={w.showDraft} onPreview={w.showPreview} />
-                  <DraftPanelButtons panel={panel} onPanel={setPanel} />
-                </>
-              )}
+            {/* The page's three tiles on a split grid: drag a title bar to move one, a divider to resize. */}
+            <SplitArea
+              gridId="scriblr.writer.draft" label="Chapter tiles" defaultTree={DRAFT_LAYOUT}
+              tiles={[
+                {
+                  id: 'chapter', title: 'Chapter', Icon: PencilIcon, bodyClassName: 'wrDraftTileBody',
+                  children: (
+                    <ChapterTile
+                      w={w} chapter={chapter} chapterWords={chapterWords} meta={meta}
+                      error={w.saveStatus.error ?? draft.error ?? pubs.error}
+                      tools={(
+                        <>
+                          <SaveControl status={status} onSave={saveAll} onRestore={restoreAll} buttonClassName="wrSmallBtn wrSaveBtn" />
+                          <PublishControl
+                            disabled={!hasDraft} busy={pubs.publishing}
+                            title={hasDraft ? 'Publish this chapter' : 'Write some draft text to publish it'}
+                            // Publish what is saved: let any waiting edit land first.
+                            onPublish={async () => { await Promise.all([w.saveNow(), draft.flush()]); await pubs.publish() }}
+                          />
+                          <DraftPreviewToggle preview={preview} hasDraft={hasDraft} onDraft={w.showDraft} onPreview={w.showPreview} />
+                          <DraftPanelButtons panel={panel} onPanel={setPanel} />
+                        </>
+                      )}
+                    />
+                  ),
+                },
+                {
+                  id: 'points', title: 'Plotpoints', Icon: PlotIcon, bodyClassName: 'wrDraftTileBody wrDraftTileBody--padded',
+                  children: <ChapterPoints w={w} chapter={chapter} />,
+                },
+                {
+                  id: 'draft', title: panel === 'settings' ? 'Settings' : panel === 'help' ? 'Help' : preview ? 'Preview' : 'Draft',
+                  Icon: preview && !panel ? EyeIcon : PencilIcon, bodyClassName: 'wrDraftTileBody wrDraftTileBody--flush',
+                  children: (
+                    <>
+                      {panel === 'settings' && (
+                        <div className="wrSpreadScroll wrDraftPanel" role="region" aria-label="Chapter settings">
+                          <span className="wrLabel">Colour</span>
+                          <HueSlider
+                            label="Chapter colour" className="wrNodeHue" hue={w.levelHueOf(chapter)} centre={w.hueCentreOf(chapter)}
+                            onChange={code => w.setNodeHue(chapter.id, code)}
+                          />
+                        </div>
+                      )}
+                      {panel === 'help' && (
+                        <div className="wrSpreadScroll wrDraftPanel" role="region" aria-label="Draft help">
+                          <HelpArticles names={DRAFT_HELP_NAMES} fallback={DRAFT_HELP_FALLBACK} />
+                        </div>
+                      )}
+                      {panel ? null : preview
+                        ? <PreviewPane w={w} chapter={chapter} draft={draft} pubs={pubs} component={pagesComponent} onComponent={onPagesComponent} />
+                        : <div className="wrSpreadScroll"><DraftCards w={w} chapter={chapter} draft={draft} /></div>}
+                    </>
+                  ),
+                },
+              ]}
             />
-            {panel === 'settings' && (
-              <div className="wrSpreadScroll wrDraftPanel" role="region" aria-label="Chapter settings">
-                <span className="wrLabel">Colour</span>
-                <HueSlider
-                  label="Chapter colour" className="wrNodeHue" hue={w.levelHueOf(chapter)} centre={w.hueCentreOf(chapter)}
-                  onChange={code => w.setNodeHue(chapter.id, code)}
-                />
-              </div>
-            )}
-            {panel === 'help' && (
-              <div className="wrSpreadScroll wrDraftPanel" role="region" aria-label="Draft help">
-                <HelpArticles names={DRAFT_HELP_NAMES} fallback={DRAFT_HELP_FALLBACK} />
-              </div>
-            )}
-            {panel ? null : preview
-              ? <PreviewPane w={w} chapter={chapter} draft={draft} pubs={pubs} component={pagesComponent} onComponent={onPagesComponent} />
-              : <div className="wrSpreadScroll"><ChapterPoints w={w} chapter={chapter} /><DraftCards w={w} chapter={chapter} draft={draft} /></div>}
           </div>
         </div>
         <EdgeTabs

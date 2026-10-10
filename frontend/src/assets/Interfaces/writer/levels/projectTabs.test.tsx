@@ -47,10 +47,10 @@ describe('the Project tabs', () => {
     const user = userEvent.setup()
     render(<Harness size="max" />)
     expect(screen.getByText('plot editor')).toBeTruthy()
-    expect(document.querySelector('.wrTabColumns--single')).toBeTruthy()
+    expect(document.querySelector('[role="separator"]')).toBeNull() // one tile, the whole area
     await user.click(screen.getByRole('button', { name: 'Outline' }))
     expect(screen.getByText('outline editor')).toBeTruthy()
-    expect(document.querySelector('.wrTabColumns--single')).toBeNull()
+    expect(document.querySelector('[role="separator"]')).toBeTruthy() // two tiles share it, with a divider
   })
 
   it('summarise the plot at Mid, and open a book from the outline summary', async () => {

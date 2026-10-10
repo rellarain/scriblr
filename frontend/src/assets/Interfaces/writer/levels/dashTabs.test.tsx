@@ -62,7 +62,8 @@ describe('the Dash tabs', () => {
     const first = document.activeElement
     await user.keyboard('Storm scene')
     await user.click(screen.getByRole('button', { name: 'New note' }))
-    await waitFor(() => expect(document.activeElement).not.toBe(first))
+    // The focus moves to the new note's title (not just away from the first: it passes through the body while it moves).
+    await waitFor(() => { expect(document.activeElement).not.toBe(first); expect(document.activeElement?.getAttribute('placeholder')).toBe('Title') })
     await user.keyboard('Harbor map')
     expect(screen.getAllByPlaceholderText('Title').length).toBe(2)
     await user.click(screen.getByRole('button', { name: 'Search this tab' }))

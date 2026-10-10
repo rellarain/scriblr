@@ -543,8 +543,13 @@ awareness that the app above already existed:
   A level's header carries its **tabs** (`levels/LevelTabs.tsx`, `useTabbedLevel`): 30×30 icon
   buttons, ending with Settings and Help, then quick actions (Search, a context-aware New and
   Save). At Mid one tab shows at a time; at Max each tab is a tile that its button opens or
-  closes, the open tiles flowing into two columns (open tiles and the current tab are
-  remembered). A lone open tile has the whole width; an editor's tile fills the height and scrolls itself. The Dash's tabs (`levels/dashTabs.tsx`) are Schedule (routines), Checklist (tasks),
+  closes, the open tiles on a **split grid** (`SplitArea.tsx`, on the `components/tiles` split-tree
+  engine: `splitTree.ts`, `Divider.tsx`, `useSplitLayout.ts`, `tileDrag.ts`): two alternating columns to begin
+  with, and drag a tile's title bar onto another tile to swap, onto its edge to split off a new column or row, or onto a divider to wedge it in;
+  drag a divider (or focus it and use the arrow keys) to resize the two tiles it separates; Alt+arrows on a title bar swap
+  it with its neighbour. The tree always fills the area (a tile that opens is grafted on, one that
+  closes pruned), stacks in one column under 400px, and is remembered per level with the open tiles and the
+  current tab. A lone open tile has the whole area; every tile scrolls its own body. The Dash's tabs (`levels/dashTabs.tsx`) are Schedule (routines), Checklist (tasks),
   Analytics, Scratchpad, Project template, Settings (the theme panel) and Help (the resource
   articles written for the level in the Resources builder, `levels/HelpArticles.tsx`). The
   Project's (`levels/projectTabs.tsx`): Plot and Outline (summaries at Mid, the editors at Max),
@@ -598,12 +603,12 @@ awareness that the app above already existed:
   close. At Mid it lists the unassigned plotpoints, the book outline and the book
   details. The arcs' and chapters' **edge tabs** (`EdgeTabs.tsx`, tinted by their own
   hues) sit on the right edge of the Outline and Draft pages and jump to a chapter or an
-  arc. The **Draft level** (`writer/draft/`) at Max is the chapter as an open book: a
-  chapter title tile across the top (the series/book/arc above it, its title and synopsis
-  edited in place, dates, draft stats, and the Save, Publish and Draft | Preview tools);
-  under it the left page, a strip of paper that runs under the Dash, Project and Outline
-  tiles, the crease right beside them, and the right page: the chapter's plotpoints
-  (read-only footnote cards), then its acts, scenes and moments as read-only cards (fold up, remembered) each around an
+  arc. The **Draft level** (`writer/draft/`) at Max is the chapter as an open book: the left page,
+  a strip of paper that runs under the Dash, Project and Outline tiles, the crease right beside them, and the right
+  page, three tiles on the same split grid (drag a title bar to move one, a divider to resize; remembered): the
+  chapter tile (the series/book/arc above it, its title and synopsis edited in place, dates, draft stats, and the
+  Save, Publish and Draft | Preview tools), the chapter's plotpoints (read-only footnote cards), and the draft:
+  its acts, scenes and moments as read-only cards (fold up, remembered) each around an
   auto-growing draft input with a live word count, or, from the toggle, the preview with
   its Reaction / Flag / Export tools. A sentence's reaction bars show one heart per level, not a stack
   (`ReactionHeartIcon`): like is an outline, two concentric outlines, a filled heart; dislike is an outline with a

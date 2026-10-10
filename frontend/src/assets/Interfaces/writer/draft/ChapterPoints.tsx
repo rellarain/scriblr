@@ -8,9 +8,9 @@ import { orderAssignedPlotpoints } from '../plotTree'
 import { PlotOrderToggle, usePlotOrder } from '../plotOrder'
 import { chapterPlotpoints } from './draftModel'
 
-// The chapter's plotpoints as footnote cards at the top of the right page (read-only: the
+// The chapter's plotpoints as footnote cards in the right page's Plotpoints tile (read-only: the
 // outline is where they are placed): those assigned to the chapter itself, then those on the
-// acts, scenes and moments inside it. Nothing at all when there are none.
+// acts, scenes and moments inside it. A line saying so when there are none.
 export function ChapterPoints({ w, chapter }: { w: WriterWorkspace; chapter: OutlineNode }) {
   const index = useMemo(() => buildChildIndex(w.outlineNodes), [w.outlineNodes])
   const momentIds = useMemo(
@@ -27,7 +27,7 @@ export function ChapterPoints({ w, chapter }: { w: WriterWorkspace; chapter: Out
     return plotOrder === 'time' ? orderAssignedPlotpoints(inOutline, w.outlineNodes, systems, 'time') : inOutline
   }, [w.plotNodes, w.outlineNodes, w.activeProject, chapter.id, index, plotOrder])
 
-  if (points.length === 0) return null
+  if (points.length === 0) return <p className="wrPageMuted">No plotpoints are placed in this chapter yet.</p>
   return (
     <section className="wrRightPoints" aria-label="Plotpoints in this chapter">
       <div className="wrDraftStatsHead"><span>Plotpoints</span><span className="wrOutlineMeta">{points.length}</span><PlotOrderToggle className="wrOrderToggle--paper" /></div>

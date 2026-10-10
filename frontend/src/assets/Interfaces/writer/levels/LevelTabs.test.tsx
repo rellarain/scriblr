@@ -1,4 +1,4 @@
-import { render, screen, within } from '@testing-library/react'
+import { fireEvent, render, screen } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { __resetSettingsForTests } from '../../../../settings/settingsStore'
@@ -51,22 +51,22 @@ describe('useTabbedLevel', () => {
     expect(screen.getByText('two body')).toBeTruthy()
   })
 
-  it('opens the default tiles at Max, in two columns, and toggles a tile with its tab', async () => {
+  it('opens the default tiles at Max, side by side on a split grid, and toggles a tile with its tab', async () => {
     const user = userEvent.setup()
     render(<Harness size="max" />)
-    const columns = document.querySelectorAll<HTMLElement>('.wrTabColumn')
-    expect(columns.length).toBe(2)
-    expect(within(columns[0]).getByRole('region', { name: 'One' })).toBeTruthy()
-    expect(within(columns[1]).getByRole('region', { name: 'Two' })).toBeTruthy()
+    const tile = (name: string) => screen.getByRole('region', { name }) as HTMLElement
+    expect(parseFloat(tile('One').style.left)).toBe(0)
+    expect(parseFloat(tile('Two').style.left)).toBeGreaterThan(0)
+    expect(parseFloat(tile('One').style.top)).toBe(parseFloat(tile('Two').style.top))
 
     await user.click(screen.getByRole('button', { name: 'Settings' }))
-    expect(within(columns[0]).getByRole('region', { name: 'Settings' })).toBeTruthy() // the third tile starts the first column again
+    expect(tile('Settings')).toBeTruthy() // the third tile joins the grid
     await user.click(screen.getByRole('button', { name: 'One' }))
     expect(screen.queryByRole('region', { name: 'One' })).toBeNull()
     expect(screen.getByRole('button', { name: 'One' }).getAttribute('aria-pressed')).toBe('false')
   })
 
-  it('gives a lone open tile the whole width, and tells tiles which size they are drawn at', async () => {
+  it('gives a lone open tile the whole area, and tells tiles which size they are drawn at', async () => {
     const user = userEvent.setup()
     const sized: LevelTab[] = [{ id: 'a', label: 'A', Icon: CalendarIcon, render: c => <div>a at {c.size}</div> }, { id: 'b', label: 'B', Icon: PencilIcon, render: () => <div>b</div> }]
     function Sized() {
@@ -74,11 +74,33 @@ describe('useTabbedLevel', () => {
       return <div><header>{t.headerExtras}</header><main>{t.body}</main></div>
     }
     render(<Sized />)
-    expect(document.querySelectorAll('.wrTabColumn').length).toBe(1)
-    expect(document.querySelector('.wrTabColumns--single')).toBeTruthy()
+    const only = screen.getByRole('region', { name: 'A' }) as HTMLElement
+    expect(parseFloat(only.style.width)).toBe(1000)
+    expect(document.querySelector('[role="separator"]')).toBeNull()
     expect(screen.getByText('a at max')).toBeTruthy()
     await user.click(screen.getByRole('button', { name: 'B' }))
-    expect(document.querySelectorAll('.wrTabColumn').length).toBe(2)
+    expect(parseFloat((screen.getByRole('region', { name: 'A' }) as HTMLElement).style.width)).toBeLessThan(1000)
+    expect(document.querySelector('[role="separator"]')).toBeTruthy()
+  })
+
+  it('lets the open tiles be moved by their title bars and resized by their divider, remembered across a remount', () => {
+    const first = render(<Harness size="max" />)
+    const tile = (name: string) => screen.getByRole('region', { name }) as HTMLElement
+    const twoLeft = parseFloat(tile('Two').style.left)
+    const data = { setData: vi.fn(), setDragImage: vi.fn(), effectAllowed: '' }
+    fireEvent.dragStart(tile('One').querySelector('.wrTabTileTitle')!, { dataTransfer: data })
+    fireEvent.dragOver(tile('Two'), { dataTransfer: data })
+    fireEvent.drop(tile('Two'), { dataTransfer: data })
+    expect(parseFloat(tile('One').style.left)).toBe(twoLeft)
+    expect(parseFloat(tile('Two').style.left)).toBe(0)
+    const divider = document.querySelector('[role="separator"]') as HTMLElement
+    fireEvent.keyDown(divider, { key: 'ArrowRight' })
+    const saved = { oneLeft: parseFloat(tile('One').style.left), twoWidth: parseFloat(tile('Two').style.width) }
+    first.unmount()
+    render(<Harness size="max" />)
+    expect(parseFloat(tile('One').style.left)).toBe(saved.oneLeft)
+    expect(parseFloat(tile('Two').style.left)).toBe(0)
+    expect(parseFloat(tile('Two').style.width)).toBe(saved.twoWidth)
   })
 
   it("tells the current tab that New was pressed, and runs the tab's own action", async () => {

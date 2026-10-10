@@ -624,6 +624,15 @@
   .wrCrease { flex: 0 0 18px; background: linear-gradient(90deg, transparent, rgb(0 0 0 / 0.12) 42%, rgb(0 0 0 / 0.24) 50%, rgb(0 0 0 / 0.12) 58%, transparent); }
   .wrSpreadRight { flex: 1 1 0; min-width: 0; min-height: 0; display: flex; flex-direction: column; }
   .wrSpreadScroll { flex: 1 1 auto; min-height: 0; overflow-y: auto; box-sizing: border-box; padding: 22px 26px 22px 6px; }
+  // The right page's three tiles (SplitArea.tsx) read on the paper: no fill of their own, a quiet title bar to drag them by.
+  .wrSpreadRight .wrSplit { padding: 0 0 0 0; }
+  .wrSpreadRight .wrSplitTile { background: transparent; color: var(--wr-ink); }
+  .wrSpreadRight .wrSplitTile > .wrTabTileTitle { background: var(--wr-frame-1); color: var(--wr-page-muted); padding: 4px 10px; font-size: 10px; }
+  .wrSpreadRight .wrSplit .tileDividerBar { background: var(--wr-page-line); }
+  .wrSpreadRight .wrSplit .tileDivider:hover .tileDividerBar, .wrSpreadRight .wrSplit .tileDivider:focus-visible .tileDividerBar, .wrSpreadRight .wrSplit .tileDivider--drop .tileDividerBar { background: var(--wr-accent); }
+  .wrSpreadRight .wrTabTileBody.wrDraftTileBody { color: var(--wr-ink); padding: 0; gap: 0; background: transparent; }
+  .wrSpreadRight .wrTabTileBody.wrDraftTileBody--padded { padding: 10px 26px 10px 6px; }
+  .wrSpreadRight .wrTabTileBody.wrDraftTileBody--flush { overflow: hidden; }
   .wrDraftCards { display: flex; flex-direction: column; gap: 12px; }
   .wrDraftChildren { gap: 10px; }
   .wrFoldedCount { margin-left: auto; }
@@ -635,7 +644,7 @@
     background: rgb(0 0 0 / calc(0.16 * var(--shade-k))); border-left: 5px solid var(--wr-node-tint, var(--wr-accent)); color: var(--ink);
   }
   // In the right page the tile reads on the paper.
-  .wrSpreadRight > .wrChapterTile {
+  .wrSpreadRight .wrChapterTile {
     color: var(--wr-ink); background: var(--wr-frame-1);
     .wrParentKind, .wrChapterTileName .wrPageKicker, .wrChapterTileStats .wrPageMetaRow, .wrChapterTileStats .wrNodeStats { color: var(--wr-page-muted); }
     .wrClickEdit, .wrChapterTileStats .wrStatValue { color: var(--wr-ink); }
@@ -788,11 +797,23 @@
   .wrLevelHeader .wrSmallBtn, .wrLevelHeader .saveIconBtn { color: var(--on-accent); background: rgb(255 255 255 / 0.16); }
   .wrLevelHeader .saveControl { font-size: 11px; }
   .wrTabPane { display: flex; flex-direction: column; gap: 10px; min-height: 0; }
-  .wrTabColumns { flex: 1 1 auto; min-height: 0; display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); grid-template-rows: minmax(0, 1fr); gap: 6px; &--single { grid-template-columns: minmax(0, 1fr); } }
-  .wrTabColumn { display: flex; flex-direction: column; gap: 6px; min-width: 0; min-height: 0; overflow-y: auto; scrollbar-width: none; &::-webkit-scrollbar { display: none; } }
-  .wrTabTile { flex: 0 0 auto; }
-  // An editor's tile takes the height that is left (two in one column share it, each at least 260px) and the editor scrolls itself.
-  .wrTabTile--fill { flex: 1 1 0; min-height: 260px; > .wrTabTileBody { flex: 1 1 auto; min-height: 0; overflow: auto; padding: 0; color: var(--ink); background: var(--surface-side); scrollbar-width: none; &::-webkit-scrollbar { display: none; } } }
+  // The Max tiles on a split grid (SplitArea.tsx): each tile has a title bar to drag it by and a body that scrolls.
+  .wrSplit { flex: 1 1 auto; min-height: 0; min-width: 0; overflow: auto; scrollbar-width: none; &::-webkit-scrollbar { display: none; } }
+  .wrSplitTile { overflow: hidden; box-sizing: border-box;
+    > .wrTabTileBody { flex: 1 1 auto; min-height: 0; overflow: auto; scrollbar-width: none; &::-webkit-scrollbar { display: none; } }
+    > .wrTabTileTitle { flex: 0 0 auto; cursor: grab; user-select: none; &:active { cursor: grabbing; } &:focus-visible { outline: 2px solid var(--wr-accent-light); outline-offset: -2px; } }
+    &--dragging { opacity: 0.5; }
+    &--drop { box-shadow: inset 0 0 0 2px var(--wr-accent-light); }
+    &--edge-left { box-shadow: inset 4px 0 0 0 var(--wr-accent-light); }
+    &--edge-right { box-shadow: inset -4px 0 0 0 var(--wr-accent-light); }
+    &--edge-top { box-shadow: inset 0 4px 0 0 var(--wr-accent-light); }
+    &--edge-bottom { box-shadow: inset 0 -4px 0 0 var(--wr-accent-light); }
+  }
+  .wrSplit .tileDividerBar { background: rgb(255 255 255 / 0.1); }
+  .wrSplit .tileDivider:hover .tileDividerBar, .wrSplit .tileDivider:focus-visible .tileDividerBar { background: var(--wr-accent-light); }
+  .wrSplit .tileDivider--drop .tileDividerBar { background: var(--wr-accent-light); }
+  // An editor's tile has the editor scroll itself: no padding round it.
+  .wrTabTileBody--surface.wrTabTileBody--fill { padding: 0; }
   .wrTabTile { background: var(--wr-fill-2); display: flex; flex-direction: column; min-width: 0; }
   .wrTabTileTitle { margin: 0; display: flex; align-items: center; gap: 6px; padding: 6px 10px; font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 1px; background: var(--wr-fill-3); }
   .wrTabTileBody { padding: 10px; display: flex; flex-direction: column; gap: 10px; min-width: 0; }
@@ -895,7 +916,7 @@
   // Muted text, labels and buttons on the paper (the Draft level and the preview) and in the tabs, held to a readable contrast.
   .wrPage--chapter { --wr-page-muted: color-mix(in srgb, var(--wr-ink) 80%, transparent); }
   .wrLevel--outline .wrPage--chapter { --wr-page-muted: color-mix(in srgb, var(--on-accent) 85%, transparent); }
-  .wrSpreadRight > .wrChapterTile {
+  .wrSpreadRight .wrChapterTile {
     .wrParentKind, .wrChapterTileName .wrPageKicker, .wrChapterTileStats .wrPageMetaRow, .wrChapterTileStats .wrNodeStats, .wrClickEdit--empty, .wrChapterTileStats .wrStatValue { color: color-mix(in srgb, var(--wr-ink) 84%, transparent); }
     .wrSmallBtn { color: var(--wr-ink); background: rgb(0 0 0 / 0.1); &:hover:not(:disabled) { background: rgb(0 0 0 / 0.2); } }
   }

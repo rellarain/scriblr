@@ -1,11 +1,10 @@
-import { useCallback } from 'react'
+import { useCallback, useRef } from 'react'
 import { useStoredState } from '../../assets/Interfaces/writer/storage'
-import { applyLayout, type PlacedTile } from './tileLayout'
+import { applyLayout, type PlacedTile, type TileMeta } from './tileLayout'
 import {
   insertAtDivider, insertBelowLeaf, insertBesideLeaf, leafIds, reconcile, resizeBranch as resizeBranchAt, setFixed,
   swapLeaves as swapLeavesAt, type Path, type SplitNode,
 } from './splitTree'
-import type { TileDef } from './tileTypes'
 
 interface SplitState {
   tree: SplitNode | null
@@ -19,14 +18,20 @@ const EMPTY_STATE: SplitState = { tree: null, shapes: {}, open: null, maximized:
 // One grid's split-tree layout (each tile's place, and mini/mid state) and its
 // expanded (max) tile, remembered per user with the other saved settings
 // (settings/settingsStore.ts).
-export function useSplitLayout(gridId: string, defs: TileDef[]) {
+// `defaultTree` seeds a grid with nothing saved yet (new or missing tiles are still grafted on).
+export function useSplitLayout<T extends TileMeta>(gridId: string, defs: T[], defaultTree?: SplitNode) {
   const [saved, setSaved] = useStoredState<SplitState>(`scriblr.tiles.${gridId}`, EMPTY_STATE)
+  // The latest tiles and default layout, for `update` below (which lives across renders): a grid whose tiles
+  // come and go (the Writer's open tabs) must not reconcile a move against the tiles of an earlier render.
+  const latest = useRef({ defs, defaultTree })
+  latest.current = { defs, defaultTree }
 
   const resolve = (state: SplitState) => {
+    const { defs, defaultTree } = latest.current
     const order = state.tree ? leafIds(state.tree) : undefined
-    const resolved = applyLayout(defs, { order, shapes: state.shapes as Record<string, PlacedTile<TileDef>['shape']> })
+    const resolved = applyLayout(defs, { order, shapes: state.shapes as Record<string, PlacedTile<T>['shape']> })
     const shaped = resolved.map(p => ({ id: p.def.id, shape: p.shape }))
-    return { placed: resolved, tree: reconcile(state.tree, shaped) }
+    return { placed: resolved, tree: reconcile(state.tree ?? defaultTree ?? null, shaped) }
   }
 
   const { placed, tree } = resolve(saved)
@@ -36,7 +41,7 @@ export function useSplitLayout(gridId: string, defs: TileDef[]) {
       const { tree: current } = resolve(prev)
       return { ...prev, tree: current, ...fn(current, prev) }
     })
-    // resolve/defs change every render (new array identity) -- keying off gridId is what matters.
+    // resolve is re-made every render and reads `latest`, so keying off gridId is what matters.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [gridId, setSaved])
 

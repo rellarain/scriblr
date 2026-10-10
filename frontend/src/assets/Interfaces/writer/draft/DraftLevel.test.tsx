@@ -167,6 +167,39 @@ describe('Draft level: the book pages', () => {
   })
 })
 
+describe('Draft level: the right page tiles', () => {
+  const sectionOf = (id: string) => right().querySelector<HTMLElement>(`[data-tile-id="${id}"]`)!
+  const top = (id: string) => parseFloat(sectionOf(id).style.top)
+
+  it('has the chapter, its plotpoints and the draft as three tiles on a split grid, each with a title bar', () => {
+    setup()
+    expect(['chapter', 'points', 'draft'].map(id => sectionOf(id).querySelector('.wrTabTileTitle')?.textContent?.trim())).toEqual(['Chapter', 'Plotpoints', 'Draft'])
+    expect(top('chapter')).toBeLessThan(top('points'))
+    expect(top('points')).toBeLessThan(top('draft'))
+    expect(right().querySelectorAll('[role="separator"]')).toHaveLength(2)
+  })
+
+  it('moves a tile when its title bar is dragged onto another, and remembers it', () => {
+    const first = setup()
+    const data = { setData: vi.fn(), setDragImage: vi.fn(), effectAllowed: '' }
+    fireEvent.dragStart(sectionOf('draft').querySelector('.wrTabTileTitle')!, { dataTransfer: data })
+    fireEvent.dragOver(sectionOf('chapter'), { dataTransfer: data })
+    fireEvent.drop(sectionOf('chapter'), { dataTransfer: data })
+    expect(top('draft')).toBe(0)
+    expect(top('chapter')).toBeGreaterThan(0)
+    first.unmount()
+    setup()
+    expect(top('draft')).toBe(0)
+  })
+
+  it('names the draft tile for what it shows: Preview, Settings or Help', async () => {
+    const { user } = setup({ console_: 'pages' })
+    expect(sectionOf('draft').querySelector('.wrTabTileTitle')?.textContent?.trim()).toBe('Preview')
+    await user.click(within(tile()).getByRole('button', { name: 'Settings' }))
+    expect(sectionOf('draft').querySelector('.wrTabTileTitle')?.textContent?.trim()).toBe('Settings')
+  })
+})
+
 describe('Draft level: the right page', () => {
   it('shows the acts, scenes and moments as read-only cards around a draft input each', () => {
     setup()
