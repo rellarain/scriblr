@@ -1,8 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import {
-  DEFAULT_BOOK_HUE, TONES, TONE_NAME, accentColorCss, bookScopeVars, bookThemeHue, clampCodeToWindow, clampHueToWindow, coverColor, decodeHue,
-  encodeHue, fillColorCss, hexToHue, hueDelta, hueInToneOf, hueOfCode, hueWindow, isLightColor, themeColorCss, toneHsl, toneOf, wrapHue,
-  type Tone,
+  DEFAULT_BOOK_HUE, HUE_CODE_MAX, HUE_CODE_MIN, accentColorCss, bookScopeVars, bookThemeHue, clampCodeToWindow, clampHueToWindow, coverColor,
+  fillCap, fillColorCss, fillHsl, hexToHue, hueDelta, hueHsl, hueOfCode, hueWindow, themeColorCss, wrapHue,
 } from './bookColors'
 import { DEFAULT_PALETTE } from './defaults'
 import { deriveTokens } from './tokens'
@@ -107,114 +106,51 @@ describe('bookScopeVars', () => {
 })
 
 
-describe('hue codes', () => {
-  it('holds a hue and a brightness in one number', () => {
-    expect([1, 200, 359, 360].map(c => decodeHue(c))).toEqual([
-      { hue: 1, tone: 'base' }, { hue: 200, tone: 'base' }, { hue: 359, tone: 'base' }, { hue: 0, tone: 'base' },
-    ])
-    expect(decodeHue(361)).toEqual({ hue: 1, tone: 'light' })
-    expect(decodeHue(560)).toEqual({ hue: 200, tone: 'light' })
-    expect(decodeHue(720)).toEqual({ hue: 0, tone: 'light' })
-    expect(decodeHue(-361)).toEqual({ hue: 1, tone: 'dark' })
-    expect(decodeHue(-560)).toEqual({ hue: 200, tone: 'dark' })
-    expect(decodeHue(-720)).toEqual({ hue: 0, tone: 'dark' })
-  })
-
-  it('reads a code outside the bands (0, or one left from an older scheme) as a plain hue', () => {
-    expect(decodeHue(0)).toEqual({ hue: 0, tone: 'base' })
-    expect(decodeHue(-120)).toEqual({ hue: 240, tone: 'base' })
-    expect(decodeHue(725)).toEqual({ hue: 5, tone: 'base' })
-  })
-
-  it('has three brightnesses: darker, base, lighter', () => {
-    expect(TONES).toEqual(['dark', 'base', 'light'])
-    expect(TONE_NAME).toEqual({ dark: 'Darker', base: 'Base', light: 'Lighter' })
-  })
-
-  it('encodes every hue in every tone so that it decodes back', () => {
-    for (const tone of TONES) {
-      for (let hue = 0; hue < 360; hue += 1) {
-        const code = encodeHue(hue, tone)
-        expect(code).toBeGreaterThanOrEqual(-720)
-        expect(code).toBeLessThanOrEqual(720)
-        expect(decodeHue(code)).toEqual({ hue, tone })
-      }
-    }
-  })
-
-  it('wraps a hue before it encodes it', () => {
-    expect(encodeHue(370, 'base')).toBe(10)
-    expect(encodeHue(-10, 'light')).toBe(710)
-    expect(encodeHue(0, 'base')).toBe(360) // red is 360: 0 is not a hue code
-  })
-
-  it("keeps a hue's tone when only the hue changes", () => {
-    expect(hueInToneOf(100, encodeHue(20, 'dark'))).toBe(encodeHue(100, 'dark'))
-    expect(hueInToneOf(100, null)).toBe(100)
-    expect(toneOf(encodeHue(5, 'light'))).toBe('light')
-    expect(hueOfCode(encodeHue(40, 'dark'))).toBe(40)
-  })
-
-  it('holds a code in a window round its parent hue, keeping the tone', () => {
-    expect(clampCodeToWindow(200, encodeHue(300, 'dark'))).toBe(encodeHue(260, 'dark'))
-    expect(clampCodeToWindow(200, encodeHue(230, 'light'))).toBe(encodeHue(230, 'light'))
-    expect(clampCodeToWindow(10, encodeHue(340, 'base'))).toBe(encodeHue(340, 'base')) // across the 0/360 wrap
-  })
-})
-
-describe('tones as colours', () => {
-  // The day zone's own theme saturation and lightness
+describe('hue colours', () => {
   const day = { s: ZONE_LOOKS.day.themeS, l: ZONE_LOOKS.day.themeL }
   const night = { s: ZONE_LOOKS.night.themeS, l: ZONE_LOOKS.night.themeL }
 
-  it('draws a base hue exactly as a plain hue always was', () => {
-    expect(toneHsl(200, day)).toEqual({ h: 200, s: day.s, l: day.l })
+  it('is a plain hue in degrees: 0..360, where 360 and 0 are both red', () => {
+    expect([0, 200, 359, 360, 370, -30].map(hueOfCode)).toEqual([0, 200, 359, 0, 10, 330])
+    expect([HUE_CODE_MIN, HUE_CODE_MAX]).toEqual([0, 360])
+  })
+
+  it('holds a hue in a window round its parent hue', () => {
+    expect(clampCodeToWindow(200, 300)).toBe(260)
+    expect(clampCodeToWindow(200, 230)).toBe(230)
+    expect(clampCodeToWindow(10, 340)).toBe(340) // across the 0/360 wrap
+  })
+
+  it('draws a hue at the zone saturation and lightness, whatever it is', () => {
+    expect(hueHsl(200, day)).toEqual({ h: 200, s: day.s, l: day.l })
+    expect(hueHsl(360, night)).toEqual({ h: 0, s: night.s, l: night.l })
     expect(themeColorCss(200)).toBe('hsl(200, var(--color-theme-s), var(--color-theme-l))')
     expect(accentColorCss(200)).toBe('hsl(200, var(--color-accent-s), var(--color-accent-l))')
     expect(themeColorCss('var(--color-theme-h)')).toBe('hsl(var(--color-theme-h), var(--color-theme-s), var(--color-theme-l))')
   })
 
-  it('has one saturation for every brightness: only the lightness steps from the zone', () => {
-    const at = (tone: Tone, basis = day) => toneHsl(encodeHue(200, tone), basis)
-    expect(at('dark').l).toBeLessThan(at('base').l)
-    expect(at('light').l).toBeGreaterThan(at('base').l)
-    expect([at('dark').s, at('base').s, at('light').s]).toEqual([day.s, day.s, day.s])
-    // At night the whole set is darker, but never black.
-    expect(at('base', night).l).toBeLessThan(at('base').l)
-    expect(at('dark', night).l).toBeGreaterThanOrEqual(8)
-    expect(at('light').l).toBeLessThanOrEqual(94)
+  it('draws a panel fill a little under the accent saturation and a step darker, held dark enough for white text', () => {
+    expect(fillColorCss(200)).toBe(`hsl(200, calc(var(--color-accent-s) * 0.62), clamp(0%, calc(var(--color-accent-l) - 8%), ${fillCap(200)}%))`)
+    const fill = fillHsl(200, { s: ZONE_LOOKS.day.accentS, l: ZONE_LOOKS.day.accentL })
+    expect(fill).toEqual({ h: 200, s: ZONE_LOOKS.day.accentS * 0.62, l: Math.min(ZONE_LOOKS.day.accentL - 8, fillCap(200)) })
+    expect(fillHsl(200, { s: 45, l: 62 }).l).toBe(fillCap(200)) // held no lighter than its cap, by contrast (at most 38)
+    expect(fillCap(200)).toBeLessThanOrEqual(38)
   })
 
-  it('writes the tones as CSS that follows the zone variables, all at the zone saturation', () => {
-    expect(themeColorCss(encodeHue(200, 'dark'))).toBe('hsl(200, var(--color-theme-s), clamp(8%, calc(var(--color-theme-l) - 18%), 100%))')
-    expect(themeColorCss(encodeHue(200, 'base'))).toBe('hsl(200, var(--color-theme-s), var(--color-theme-l))')
-    expect(accentColorCss(encodeHue(200, 'light'))).toBe('hsl(200, var(--color-accent-s), clamp(0%, calc(var(--color-accent-l) + 22%), 94%))')
+  it('draws a cover in the hue', () => {
+    expect(coverColor(DEFAULT_PALETTE, 'day', 200)).toEqual(hueHsl(200, day))
   })
 
-  it('draws a panel fill at one saturation (a little under the accent) and a step darker, in every brightness', () => {
-    expect(fillColorCss(200)).toBe('hsl(200, calc(var(--color-accent-s) * 0.62), clamp(0%, calc(var(--color-accent-l) - 8%), 38%))')
-    for (const tone of TONES) expect(fillColorCss(encodeHue(200, tone))).toContain('calc(var(--color-accent-s) * 0.62)')
-  })
-
-  it('draws a cover in the code colour', () => {
-    expect(coverColor(DEFAULT_PALETTE, 'day', encodeHue(200, 'light'))).toEqual(toneHsl(encodeHue(200, 'light'), day))
-  })
-
-  it('knows which colours are light enough to need dark text', () => {
-    expect([encodeHue(10, 'light'), 200, encodeHue(10, 'dark')].map(isLightColor)).toEqual([true, false, false])
-  })
-
-  it('is a base hue for a legacy hex colour, and the default for none', () => {
-    expect(bookThemeHue({ color: '#ff0000' })).toBe(360) // red is 360, not 0
+  it('is the hue for a legacy hex colour, and the default for none', () => {
+    expect(bookThemeHue({ color: '#ff0000' })).toBe(0)
     expect(bookThemeHue({ color: '#00ff00' })).toBe(120)
-    expect(bookThemeHue({ themeHue: -500, color: '#00ff00' })).toBe(-500)
+    expect(bookThemeHue({ themeHue: 360, color: '#00ff00' })).toBe(360)
     expect(bookThemeHue({})).toBe(DEFAULT_BOOK_HUE)
   })
 
-  it('tints a book scope with the hue, at the zone saturation whatever the brightness', () => {
-    const vars = (code: number) => bookScopeVars(DEFAULT_PALETTE, 'day', 'user', code)
-    const zoneS = deriveTokens(DEFAULT_PALETTE, 'user', 'day')['--color-theme-s']
-    expect(vars(encodeHue(200, 'dark'))['--color-theme-h']).toBe('200')
-    for (const tone of TONES) expect(vars(encodeHue(200, tone))['--color-theme-s']).toBe(zoneS)
+  it('tints a book scope with the hue at the zone saturation', () => {
+    const vars = bookScopeVars(DEFAULT_PALETTE, 'day', 'user', 200)
+    expect(vars['--color-theme-h']).toBe('200')
+    expect(vars['--color-theme-s']).toBe(deriveTokens(DEFAULT_PALETTE, 'user', 'day')['--color-theme-s'])
   })
 })

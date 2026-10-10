@@ -1,9 +1,8 @@
 import type { OutlineNode } from '../../../api/types'
-import { bookThemeHue, clampCodeToWindow, encodeHue, hueDelta, hueOfCode, themeColorCss, wrapHue } from '../../../theme/bookColors'
+import { bookThemeHue, clampCodeToWindow, hueDelta, hueOfCode, themeColorCss, wrapHue } from '../../../theme/bookColors'
 
-// The Writer's level colours. Each level has a colour code (one number holding a hue and a brightness,
-// darker / base / lighter: see theme/bookColors.ts); the one saturation and the lightness come from the
-// active theme zone.
+// The Writer's level colours. Each level has a colour (a hue in degrees: see theme/bookColors.ts); the one
+// saturation and the lightness come from the active theme zone.
 //
 //   project   its own (ProjectSettings.themeHue), else a default off the app theme's hue
 //   series    within LEVEL_HUE_WINDOW of the project's hue
@@ -11,20 +10,19 @@ import { bookThemeHue, clampCodeToWindow, encodeHue, hueDelta, hueOfCode, themeC
 //   arc       within LEVEL_HUE_WINDOW of its book's hue
 //   chapter   within LEVEL_HUE_WINDOW of its arc's hue (its book's, outside any arc)
 //
-// "Within a window" is about the HUE: a series, arc or chapter picks any brightness round its parent's
-// hue. A series, arc or chapter with no colour of its own shows its parent's. Changing a parent pulls
+// A series, arc or chapter with no colour of its own shows its parent's. Changing a parent pulls
 // its children's own hues back inside their window.
 export const LEVEL_HUE_WINDOW = 60
 // The project's default hue is this far round the wheel from the app theme's, so the
 // Dash (the theme itself) and the Project level read as different tints.
 const DEFAULT_PROJECT_HUE_OFFSET = 120
 
-export const defaultProjectHue = (appHue: number): number => encodeHue(appHue + DEFAULT_PROJECT_HUE_OFFSET, 'base')
+export const defaultProjectHue = (appHue: number): number => wrapHue(appHue + DEFAULT_PROJECT_HUE_OFFSET)
 
 type HueNode = Pick<OutlineNode, 'id' | 'kind' | 'parentId' | 'themeHue' | 'color'>
 export type HueNodes = Map<string, HueNode>
 
-// A node's colour code: its own, else its parent's (a book's own, else the book default).
+// A node's colour: its own, else its parent's (a book's own, else the book default).
 export function levelHue(node: HueNode, nodes: HueNodes, projectHue: number): number {
   const parent = node.parentId ? nodes.get(node.parentId) : undefined
   const own = node.kind === 'book' ? bookThemeHue(node) : node.themeHue != null ? Math.round(node.themeHue) : null
@@ -32,7 +30,7 @@ export function levelHue(node: HueNode, nodes: HueNodes, projectHue: number): nu
   return parent ? levelHue(parent, nodes, projectHue) : projectHue
 }
 
-// The node's colour as CSS (the zone's theme saturation and lightness, in the node's brightness).
+// The node's colour as CSS (the zone's theme saturation and lightness).
 export const levelTint = (node: HueNode, nodes: HueNodes, projectHue: number): string => themeColorCss(levelHue(node, nodes, projectHue))
 
 // The hue a node's own hue must stay near, or null when it may be any hue (a book).
@@ -58,7 +56,7 @@ export function autoPickHue(centre: number, siblingHues: number[]): number {
 }
 
 // A colour held within its window: its hue brought back to within the window round the parent's hue
-// (`centre`), the brightness kept. A book (no centre) is not held.
+// (`centre`). A book (no centre) is not held.
 export const fitToParent = (code: number, centre: number | null): number => (centre === null ? code : clampCodeToWindow(centre, code))
 
 // The tree with every series', arc's and chapter's own colour held inside its window

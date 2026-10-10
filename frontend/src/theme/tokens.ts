@@ -1,13 +1,13 @@
 import type { HSL } from './contrast'
-import { fillDirection, fillInk, INK_STRENGTH, PAPER_LOOKS, SIDEBAR_SHADE_1, ZONE_LOOKS, resolvePalette, zoneInk } from './zoneLooks'
+import { fillDirection, fillInk, INK_STRENGTH, PAPER_LOOKS, SIDEBAR_SHADE_1, ZONE_LOOKS, paperAccents, resolvePalette, zoneInk } from './zoneLooks'
 import type { Role, ZoneKey, ZonePalette } from './types'
 
 // Turns a zone's hues into the CSS custom properties the app is styled with.
-// Saturation and lightness come from the zone's fixed look (zoneLooks.ts). The
+// Saturation comes from the zone's fixed look (zoneLooks.ts) and lightness starts there too, moved only
+// where a hue needs it for its text to read (WCAG 4.5:1; resolvePalette, readable.ts). The
 // theme has ONE ink (white on a dark zone, near-black on a light one); the text
 // on each accent, alert and admin-accent fill is chosen for that fill (fillInk).
-// The numbers keep every text at least MIN_TEXT_GAP lightness points from its
-// background (zoneLooks.test.ts).
+// contrastAudit.ts checks every documented pair, for every hue.
 
 const hsl = (c: HSL) => `hsl(${c.h}, ${c.s}%, ${c.l}%)`
 
@@ -24,6 +24,7 @@ export function deriveTokens(pal: ZonePalette, role: Role, zone: ZoneKey): Theme
   const onAccent = fillInk(colors.accent, pal.theme.h)
   const onAlert = fillInk(colors.alert, pal.theme.h)
   const onAccent2 = role === 'admin' ? fillInk(colors.accent2, pal.theme.h) : onAccent
+  const accents = paperAccents(zone, { theme: pal.theme.h, accent: pal.accent.h, alert: pal.alert.h })
   const away = (d: 1 | -1) => (d > 0 ? 'hsl(0, 0%, 100%)' : 'hsl(0, 0%, 0%)')
 
   return {
@@ -69,6 +70,15 @@ export function deriveTokens(pal: ZonePalette, role: Role, zone: ZoneKey): Theme
     '--paper-muted-l': `${paper.muted}%`,
     '--paper-placeholder-l': `${paper.placeholder}%`,
     '--paper-react-l': `${paper.react}%`,
-    '--paper-like-l': `${paper.like}%`,
+    // The nested cards' steps from the page (frame 1..5), the page's error text and the two hearts, each fitted to read.
+    '--paper-pg': `${paper.page}%`,
+    '--paper-f1': `${paper.frames[0]}%`,
+    '--paper-f2': `${paper.frames[1]}%`,
+    '--paper-f3': `${paper.frames[2]}%`,
+    '--paper-f4': `${paper.frames[3]}%`,
+    '--paper-f5': `${paper.frames[4]}%`,
+    '--paper-error': hsl(accents.error),
+    '--paper-like': hsl(accents.like),
+    '--paper-dislike': hsl(accents.dislike),
   }
 }

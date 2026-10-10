@@ -1,18 +1,16 @@
 import type { HSL } from './contrast'
+import { worstLevelRatio } from './levelContrast'
+import { TEXT_TARGET, fitLightness, ratioOf } from './readable'
 import { deriveTokens, type ThemeVars } from './tokens'
-import { resolvePalette } from './zoneLooks'
+import { PAPER_LOOKS, ZONE_LOOKS, resolvePalette, themeLightness } from './zoneLooks'
 import type { Role, ZoneKey, ZonePalette } from './types'
 
 // Colours for the Writer's levels (project, series, book, arc, chapter) and plot categories.
-// One stored number holds a hue AND a brightness (it mirrors backend/app/storage/schema.py):
-//
-//     1..360     base      hue = value mod 360
-//    361..720    lighter   hue = value - 360
-//   -720..-361   darker    hue = -value - 360
-//
-// Every colour has the same saturation -- the active time-of-day zone's own -- and the brightness
-// steps from that zone's lightness: darker, base, lighter. So the same code is paler by day and
-// deeper at night, and "base" is exactly what a plain hue always was.
+// A colour is stored as one number, a hue in degrees (0..360; 0 and 360 are both red; it mirrors
+// backend/app/storage/schema.py). Every colour has the same saturation and lightness -- the active
+// time-of-day zone's own -- so the same colour is paler by day and deeper at night. (Earlier versions
+// also stored a brightness, darker / base / lighter, in the same number; the backend converts those to
+// their hue once on load.)
 
 export const DEFAULT_BOOK_HUE = 28
 // A limited slider (series, arc, chapter, plot subcategory) runs this far either side of its parent's hue.
@@ -20,39 +18,11 @@ export const SUBCATEGORY_HUE_WINDOW = 60
 
 export const wrapHue = (hue: number): number => ((Math.round(hue) % 360) + 360) % 360
 
-export type Tone = 'dark' | 'base' | 'light'
-export const TONES: readonly Tone[] = ['dark', 'base', 'light']
-export const TONE_NAME: Record<Tone, string> = { dark: 'Darker', base: 'Base', light: 'Lighter' }
+export const HUE_CODE_MIN = 0
+export const HUE_CODE_MAX = 360
 
-export const HUE_CODE_MIN = -720
-export const HUE_CODE_MAX = 720
-
-export interface DecodedHue { hue: number; tone: Tone }
-
-export function decodeHue(code: number): DecodedHue {
-  const c = Math.round(code)
-  if (c >= 1 && c <= 360) return { hue: c % 360, tone: 'base' }
-  if (c >= 361 && c <= 720) return { hue: (c - 360) % 360, tone: 'light' }
-  if (c <= -361 && c >= -720) return { hue: (Math.abs(c) - 360) % 360, tone: 'dark' }
-  return { hue: wrapHue(c), tone: 'base' } // 0 and anything else: a plain hue
-}
-
-// A hue (any number of degrees) in a tone, as the one stored number.
-export function encodeHue(hue: number, tone: Tone): number {
-  const h = wrapHue(hue)
-  const full = h === 0 ? 360 : h // the top of each band stands for 0 degrees
-  if (tone === 'base') return full
-  if (tone === 'light') return 360 + full
-  return -(360 + full)
-}
-
-// The tone of a code.
-export const toneOf = (code: number): Tone => decodeHue(code).tone
-// The hue (0-359) a code stands for.
-export const hueOfCode = (code: number): number => decodeHue(code).hue
-// A code for a plain hue, kept in the same tone as `like` (base when `like` is missing).
-export const hueInToneOf = (hue: number, like: number | null | undefined): number =>
-  encodeHue(hue, like != null ? toneOf(like) : 'base')
+// The hue (0-359) a stored colour stands for.
+export const hueOfCode = (code: number): number => wrapHue(code)
 
 // A signed shortest way round the colour wheel from one hue to another (-180..180].
 export function hueDelta(from: number, to: number): number {
@@ -73,61 +43,62 @@ export function clampHueToWindow(centre: number, hue: number, width = SUBCATEGOR
   return wrapHue(centre + Math.max(-width, Math.min(width, d)))
 }
 
-// A colour code held within `width` degrees of a centre hue, keeping its tone.
-export function clampCodeToWindow(centre: number, code: number, width = SUBCATEGORY_HUE_WINDOW): number {
-  const d = decodeHue(code)
-  return encodeHue(clampHueToWindow(centre, d.hue, width), d.tone)
-}
+// A colour held within `width` degrees of a centre hue.
+export const clampCodeToWindow = (centre: number, code: number, width = SUBCATEGORY_HUE_WINDOW): number => clampHueToWindow(centre, code, width)
 
-// ---------------------------------------------------------------- tones as colours
-
-// How far each tone's lightness steps from the zone's own, and the limits it stays within.
-const TONE_STEP: Record<Tone, { delta: number; min: number; max: number }> = {
-  dark: { delta: -18, min: 8, max: 100 },
-  base: { delta: 0, min: 0, max: 100 },
-  light: { delta: 22, min: 0, max: 94 },
-}
+// ---------------------------------------------------------------- hues as colours
 
 const FILL_SATURATION = 0.62
 const FILL_DARKEN = 8
-// A panel fill that carries white text (every brightness but lighter) is held no lighter than this, so the text stays readable
-// whatever the zone's own lightness (a night palette can be light).
+// A panel fill carries white text, so it is held no lighter than this at the very most, whatever the zone's own lightness (a night
+// palette can be light); a hue whose colours are brighter than others at the same lightness (yellow, green) is held darker still
+// (fillCap), by contrast.
 const FILL_MAX_L = 38
 const clamp = (n: number, lo: number, hi: number) => Math.max(lo, Math.min(hi, n))
 
-// The colour of a code against a zone's own theme saturation and lightness.
-export function toneHsl(code: number, basis: { s: number; l: number }): HSL {
-  const { hue, tone } = decodeHue(code)
-  const step = TONE_STEP[tone]
-  return { h: hue, s: Math.round(basis.s), l: Math.round(clamp(basis.l + step.delta, step.min, step.max)) }
+// The lightest a level panel's fill of a hue may be for every white text on it to read (levelContrast.ts). It is worked out at the most
+// saturated zone's fill (the brightest the hue gets), so one number holds in every zone.
+const capCache = new Map<number, number>()
+export function fillCap(hue: number): number {
+  const h = wrapHue(hue)
+  let cap = capCache.get(h)
+  if (cap === undefined) {
+    cap = fitLightness(h, ZONE_LOOKS.day.accentS * FILL_SATURATION, FILL_MAX_L, -1, c => worstLevelRatio(c) >= TEXT_TARGET)
+    capCache.set(h, cap)
+  }
+  return cap
+}
+
+// The colour of a hue against a zone's own theme saturation and lightness.
+export function hueHsl(code: number, basis: { s: number; l: number }): HSL {
+  return { h: hueOfCode(code), s: Math.round(basis.s), l: Math.round(basis.l) }
 }
 
 // The same colour as CSS, following the active zone through the theme variables.
-function toneCss(code: number, family: 'theme' | 'accent', fill = false): string {
-  const { hue, tone } = decodeHue(code)
-  const step = TONE_STEP[tone]
+function hueCss(code: number, family: 'theme' | 'accent', fill = false): string {
+  const hue = hueOfCode(code)
   const sVar = `var(--color-${family}-s)`
   const lVar = `var(--color-${family}-l)`
   // A panel fill is the accent's colour a little less loud and a little deeper (the template's flat olive, green, blue).
-  const s = fill ? `calc(${sVar} * ${FILL_SATURATION})` : sVar
-  const delta = step.delta - (fill ? FILL_DARKEN : 0)
-  const min = Math.max(0, step.min - (fill ? FILL_DARKEN : 0))
-  const max = fill && tone !== 'light' ? Math.min(step.max, FILL_MAX_L) : step.max
-  const l = delta === 0 && min === 0 && max === 100
-    ? lVar
-    : `clamp(${min}%, calc(${lVar} ${delta < 0 ? '-' : '+'} ${Math.abs(delta)}%), ${max}%)`
-  return `hsl(${hue}, ${s}, ${l})`
+  if (!fill) return `hsl(${hue}, ${sVar}, ${lVar})`
+  return `hsl(${hue}, calc(${sVar} * ${FILL_SATURATION}), clamp(0%, calc(${lVar} - ${FILL_DARKEN}%), ${fillCap(hue)}%))`
 }
 
 // CSS for the two colour families. (`hue` may itself be a CSS value such as var(--color-theme-h), which
 // is the zone's own colour at that hue.)
 export const themeColorCss = (hue: number | string): string =>
-  typeof hue === 'number' ? toneCss(hue, 'theme') : `hsl(${hue}, var(--color-theme-s), var(--color-theme-l))`
+  typeof hue === 'number' ? hueCss(hue, 'theme') : `hsl(${hue}, var(--color-theme-s), var(--color-theme-l))`
 export const accentColorCss = (hue: number | string): string =>
-  typeof hue === 'number' ? toneCss(hue, 'accent') : `hsl(${hue}, var(--color-accent-s), var(--color-accent-l))`
+  typeof hue === 'number' ? hueCss(hue, 'accent') : `hsl(${hue}, var(--color-accent-s), var(--color-accent-l))`
+
+// The same fill as numbers, for a zone's accent saturation and lightness (what fillColorCss draws in CSS; the contrast audit and the
+// design system's token file use it).
+export function fillHsl(hue: number, accent: { s: number; l: number }): HSL {
+  return { h: hueOfCode(hue), s: accent.s * FILL_SATURATION, l: clamp(accent.l - FILL_DARKEN, 0, fillCap(hue)) }
+}
 
 // A level panel's flat fill: the colour in the accent family, a little less loud and deeper.
-export const fillColorCss = (code: number): string => toneCss(code, 'accent', true)
+export const fillColorCss = (code: number): string => hueCss(code, 'accent', true)
 
 // The zone's own theme saturation and lightness: what a hue slider draws a base hue at.
 export function zoneBasis(pal: ZonePalette, zone: ZoneKey): { s: number; l: number } {
@@ -135,13 +106,19 @@ export function zoneBasis(pal: ZonePalette, zone: ZoneKey): { s: number; l: numb
   return { s: theme.s, l: theme.l }
 }
 
-// The colour a book's cover is drawn in for a zone.
-export function coverColor(pal: ZonePalette, zone: ZoneKey, code: number): HSL {
-  return toneHsl(code, zoneBasis(pal, zone))
+// The colours of an edge tab for a level hue in a zone (EdgeTabs.tsx): the hue at the zone's theme saturation with its lightness moved
+// only as far as the page's ink needs to read on it (the ink is the theme's, as the tab sits inside its book's scope).
+export function tabColors(zone: ZoneKey, hue: number, scopeHue: number): { bg: HSL; ink: HSL } {
+  const look = ZONE_LOOKS[zone]
+  const ink: HSL = { h: scopeHue, s: 30, l: PAPER_LOOKS[look.mode].ink }
+  const l = fitLightness(hueOfCode(hue), look.themeS, themeLightness(hueOfCode(hue), look), look.mode === 'dark' ? -1 : 1, c => ratioOf(ink, c) >= TEXT_TARGET)
+  return { bg: { h: hueOfCode(hue), s: look.themeS, l }, ink }
 }
 
-// Is the colour light enough that text on it has to be dark?
-export const isLightColor = (code: number): boolean => decodeHue(code).tone === 'light'
+// The colour a book's cover is drawn in for a zone.
+export function coverColor(pal: ZonePalette, zone: ZoneKey, code: number): HSL {
+  return hueHsl(code, zoneBasis(pal, zone))
+}
 
 // ---------------------------------------------------------------- legacy hex colours
 
@@ -165,13 +142,12 @@ export function hexToHue(hex: string | null | undefined): number | null {
 export function bookThemeHue(book: { themeHue?: number | null; color?: string | null }): number {
   if (book.themeHue != null) return book.themeHue
   const hue = hexToHue(book.color)
-  return hue != null ? encodeHue(hue, 'base') : DEFAULT_BOOK_HUE
+  return hue != null ? hue : DEFAULT_BOOK_HUE
 }
 
 // The theme variables for the subtree of a book's editors: the zone's own palette with the book's
 // hue swapped in for both the theme and the accent hue (a book has the one colour). Going through
-// deriveTokens keeps the zone's look (ink, fills, page); the tone's own lightness is in the colours
-// drawn FROM the code (themeColorCss), not in these shared tokens.
+// deriveTokens keeps the zone's look (ink, fills, page).
 export function bookScopeVars(pal: ZonePalette, zone: ZoneKey, role: Role, themeHue: number): ThemeVars {
   const hue = hueOfCode(themeHue)
   return deriveTokens({ ...pal, theme: { h: hue }, accent: { h: hue } }, role, zone)

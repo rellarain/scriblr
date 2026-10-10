@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { MIN_TEXT_GAP, ZONE_LOOKS } from '../../../theme/zoneLooks'
+import { TEXT_TARGET } from '../../../theme/readable'
 import { ZONE_KEYS } from '../../../theme/types'
 import { AWARENESS_ORDER, AWARENESS_SHIFT, awarenessNext, awarenessShade, awarenessStyle, awarenessTitle } from './awareness'
 
@@ -20,20 +20,17 @@ describe('awareness', () => {
       expect(s.front.s).toBe(s.back.s)
       expect(s.mid.s).toBe(s.off.s)
       expect(s.front.s).toBeGreaterThan(s.mid.s)
-      expect(s.front.l).toBe(s.mid.l)
-      expect(s.back.l).toBe(s.off.l)
-      expect(s.front.l).toBeGreaterThan(s.back.l)
-      expect(s.front.l - ZONE_LOOKS[zone].accentL).toBe(AWARENESS_SHIFT)
+      expect(s.front.l).toBeGreaterThanOrEqual(s.back.l)
+      expect(s.mid.l).toBeGreaterThanOrEqual(s.off.l)
     }
   })
 
-  it('keeps the text 45+ points from every shade, for any hue, and readable', () => {
+  it('reads the text on every shade, for any hue, in every zone (4.5:1)', () => {
     for (const zone of ZONE_KEYS) {
       for (const state of AWARENESS_ORDER) {
         for (let h = 0; h < 360; h += 10) {
-          const { fill, ink, contrast } = awarenessShade(zone, h, state)
-          expect(Math.abs(ink.l - fill.l)).toBeGreaterThanOrEqual(MIN_TEXT_GAP)
-          expect(contrast).toBeGreaterThanOrEqual(4.2)
+          const { contrast } = awarenessShade(zone, h, state)
+          expect(contrast).toBeGreaterThanOrEqual(TEXT_TARGET)
         }
       }
     }
@@ -41,7 +38,7 @@ describe('awareness', () => {
 
   it('hands the colours to CSS', () => {
     const style = awarenessStyle('day', 200, 'front')
-    expect(style['--wr-point-bg']).toMatch(/^hsl\(200, 80%, 54%\)$/)
+    expect(style['--wr-point-bg']).toMatch(/^hsl\(200, 80%, [\d.]+%\)$/)
     expect(style['--wr-point-ink']).toMatch(/^hsl\(/)
   })
 })

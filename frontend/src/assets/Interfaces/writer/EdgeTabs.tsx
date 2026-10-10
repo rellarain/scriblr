@@ -1,7 +1,8 @@
 import { useMemo, type CSSProperties } from 'react'
 import type { OutlineNode } from '../../../api/types'
 import { PlusIcon } from '../../icons'
-import { bookThemeHue, fillColorCss } from '../../../theme/bookColors'
+import { bookThemeHue, fillColorCss, tabColors } from '../../../theme/bookColors'
+import { useThemeState } from '../../../theme/useTheme'
 import { buildChildIndex } from './outlineTree'
 import { nodeLabel } from './plotTree'
 import type { WriterWorkspace } from './useWriterWorkspace'
@@ -45,10 +46,15 @@ export function EdgeTabs({ w, activeChapterId, activeArcId = null, onChapter, on
   onAddChapter?: () => void
 }) {
   const book = w.activeBook
+  const { activeZone } = useThemeState()
   const clusters = useMemo(() => (book ? tabClusters(w.outlineNodes, book.id) : []), [w.outlineNodes, book])
   if (!book) return null
   const numberOf = new Map(w.activeBookChapters.map((c, i) => [c.id, i + 1]))
-  const tint = (node: OutlineNode) => ({ '--wr-tab-tint': w.levelTintOf(node) } as CSSProperties)
+  // The tab's colour is a stripe on its edge; as the raised tab's background it is fitted for the ink to read on it, whatever the hue.
+  const tint = (node: OutlineNode) => {
+    const c = tabColors(activeZone, w.levelHueOf(node), bookThemeHue(book))
+    return { '--wr-tab-tint': w.levelTintOf(node), '--wr-tab-bg': `hsl(${c.bg.h}, ${c.bg.s}%, ${c.bg.l}%)` } as CSSProperties
+  }
   let arcNumber = 0
   const leaves = Math.max(MIN_LEAVES, clusters.length)
   // The rail is the stack of page edges and 15px beyond it (wider only if the last group's tabs need it).

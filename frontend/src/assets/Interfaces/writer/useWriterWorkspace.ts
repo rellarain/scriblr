@@ -19,7 +19,7 @@ import {
 import { awarenessNext } from './awareness'
 import { combineSaveStatus, useAutosave } from '../../../lib/useAutosave'
 import { insertAfter } from '../../../lib/siblingOrder'
-import { DEFAULT_BOOK_HUE, encodeHue, fillColorCss, hueOfCode, toneOf } from '../../../theme/bookColors'
+import { DEFAULT_BOOK_HUE, fillColorCss, hueOfCode } from '../../../theme/bookColors'
 import { useThemeState } from '../../../theme/useTheme'
 import { autoPickHue, defaultProjectHue, fitToParent, hueCentre, levelHue, levelTint, reconcileHues } from './levelHues'
 
@@ -443,14 +443,13 @@ export function useWriterWorkspace() {
     if ((kind === 'series' || kind === 'arc' || kind === 'chapter') && node.themeHue == null) {
       const map = new Map(prev.map(n => [n.id, n]))
       const parent = parentId ? map.get(parentId) : undefined
-      const parentCode = parent ? levelHue(parent, map, projectHueRef.current) : projectHueRef.current
       const centre = hueCentre(node, map, projectHueRef.current)
       if (centre !== null) {
         const siblingHues = prev
           .filter(n => n.parentId === parentId && n.kind === kind && n.themeHue != null)
           .map(n => hueOfCode(n.themeHue as number))
-        // It takes the parent's brightness, at a hue spread away from its siblings'.
-        node.themeHue = encodeHue(autoPickHue(centre, siblingHues), toneOf(parentCode))
+        // It takes a hue spread away from its siblings'.
+        node.themeHue = autoPickHue(centre, siblingHues)
       }
     }
     commitOutline(afterId ? insertAfter(prev, node, afterId, n => n.parentId === parentId) : [...prev, node], true)

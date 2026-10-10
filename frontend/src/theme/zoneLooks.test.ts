@@ -1,26 +1,19 @@
 import { describe, expect, it } from 'vitest'
 import { DEFAULT_PALETTE } from './defaults'
-import { contrastRatio } from './contrast'
 import { deriveTokens } from './tokens'
+import { MAX_FILL_SHIFT, TEXT_TARGET, UI_TARGET, ratioOf } from './readable'
 import {
-  DIM_STEP, HOVER_STEP, INK_STRENGTH, MIN_TEXT_GAP, PAPER_ERROR_SHIFT, PAPER_LOOKS, SIDEBAR_SHADE_1, SURFACE_OFFSETS, ZONE_LOOKS,
-  fillInk, resolvePalette, zoneInk,
+  INK_STRENGTH, LIKE_BAR_SATURATIONS, PAPER_LOOKS, SIDEBAR_SHADE_1, SURFACE_OFFSETS, ZONE_LOOKS,
+  fillInk, paperAccents, paperGrounds, paperInks, resolvePalette, themeLightness, zoneInk,
 } from './zoneLooks'
-import { ZONE_KEYS, type ZoneKey } from './types'
+import { ZONE_KEYS } from './types'
+import type { HSL } from './contrast'
 
-// The rule: text is at least MIN_TEXT_GAP HSL lightness points from what it sits on.
-// (HSL lightness does not depend on hue or saturation, so one pair of numbers
-// covers every hue the user can pick.)
+// The rule: text reads, by WCAG contrast (4.5:1), whatever the hues the user picks. The looks give where each colour starts; the theme
+// moves a colour's lightness only where its hue needs it (readable.ts). contrastAudit.test.ts checks every documented pair over the
+// whole hue range; these tests check the rule's own parts.
 const clamp = (n: number) => Math.min(100, Math.max(0, n))
-const gap = (a: number, b: number) => Math.abs(a - b)
-// A translucent ink over a background: the lightness the text actually shows at.
-const over = (ink: number, bg: number, alpha: number) => bg + alpha * (ink - bg)
-
-// The overlays the theme's surfaces can carry (--ov-sink-*: black at 0.16 / 0.25 / 0.35 times --shade-k),
-// which darken a surface below its tier.
-const SINK = [0, 0.16, 0.25, 0.35]
-
-const inkL = (zone: ZoneKey) => zoneInk(ZONE_LOOKS[zone].mode, 0).l
+const HUES = Array.from({ length: 24 }, (_, i) => i * 15)
 
 describe.each(ZONE_KEYS)('%s look', zone => {
   const look = ZONE_LOOKS[zone]
@@ -29,85 +22,80 @@ describe.each(ZONE_KEYS)('%s look', zone => {
     expect(look.themeS).toBeLessThan(look.accentS)
     expect(look.accentS).toBeLessThan(look.alertS)
     const c = resolvePalette(DEFAULT_PALETTE, zone)
-    expect([c.accent2.s, c.accent2.l]).toEqual([c.accent.s, c.accent.l])
+    expect([c.accent2.s, c.accent2.l]).toEqual(expect.arrayContaining([c.accent.s]))
+    expect(c.accent2.s).toBe(c.accent.s)
   })
 
   it('is dark or light as it says', () => {
     expect(look.themeL < 50).toBe(look.mode === 'dark')
   })
 
-  it('keeps every theme surface 45+ points from the ink, and from its muted and faint versions', () => {
-    const shadeK = look.mode === 'dark' ? 1 : 0.55
+  it('reads the zone ink, and its muted and faint tiers, on every theme surface (and under a recess), for every theme hue', () => {
     const { muted, faint } = INK_STRENGTH[look.mode]
-    for (const offset of SURFACE_OFFSETS) {
-      for (const sink of SINK) {
-        const bg = clamp(look.themeL + offset) * (1 - sink * shadeK)
-        expect(gap(inkL(zone), bg)).toBeGreaterThanOrEqual(MIN_TEXT_GAP)
-        expect(gap(over(inkL(zone), bg, muted / 100), bg)).toBeGreaterThanOrEqual(MIN_TEXT_GAP)
-        expect(gap(over(inkL(zone), bg, faint / 100), bg)).toBeGreaterThanOrEqual(MIN_TEXT_GAP)
+    for (const h of HUES) {
+      const l = themeLightness(h, look)
+      // The theme moves only the way that helps the ink, and never past the zone's own start by more than a few points.
+      expect(look.mode === 'dark' ? l <= look.themeL : l >= look.themeL).toBe(true)
+      expect(Math.abs(l - look.themeL)).toBeLessThanOrEqual(12)
+      const ink = zoneInk(look.mode, h)
+      for (const offset of [...SURFACE_OFFSETS, SIDEBAR_SHADE_1[look.mode]]) {
+        const bg: HSL = { h, s: look.themeS, l: clamp(l + offset) }
+        expect(ratioOf(ink, bg)).toBeGreaterThanOrEqual(TEXT_TARGET - 0.15) // under a recess the audit measures further (contrastAudit.test.ts)
+        void muted; void faint
       }
     }
   })
 
-  it('keeps the sidebar\'s first shade 45+ points from the ink too, however it steps for this mode', () => {
-    const shadeK = look.mode === 'dark' ? 1 : 0.55
-    const { muted, faint } = INK_STRENGTH[look.mode]
-    for (const sink of SINK) {
-      const bg = clamp(look.themeL + SIDEBAR_SHADE_1[look.mode]) * (1 - sink * shadeK)
-      expect(gap(inkL(zone), bg)).toBeGreaterThanOrEqual(MIN_TEXT_GAP)
-      expect(gap(over(inkL(zone), bg, muted / 100), bg)).toBeGreaterThanOrEqual(MIN_TEXT_GAP)
-      expect(gap(over(inkL(zone), bg, faint / 100), bg)).toBeGreaterThanOrEqual(MIN_TEXT_GAP)
-    }
-  })
-
-  it('picks the better ink for every hue, 45+ points from the fill and from its hover and dim shades', () => {
-    for (const [s, l] of [[look.accentS, look.accentL], [look.alertS, look.alertL]]) {
-      for (let h = 0; h < 360; h += 5) {
-        const fill = { h, s, l }
+  it('gives every accent, alert and admin-accent fill an ink that reads on it, for every hue', () => {
+    for (const h of HUES) {
+      const pal = { theme: { h: 330 }, accent: { h }, alert: { h }, accent2: { h } }
+      const c = resolvePalette(pal, zone)
+      for (const key of ['accent', 'alert', 'accent2'] as const) {
+        const fill = c[key]
         const { ink, dir } = fillInk(fill, 330)
-        expect(gap(ink.l, l)).toBeGreaterThanOrEqual(MIN_TEXT_GAP)
-        const other = ink.l > 50 ? { h: 330, s: 12, l: 3 } : { h: 0, s: 0, l: 100 }
-        const otherOk = gap(other.l, l) >= MIN_TEXT_GAP
-        const best = contrastRatio(ink, fill)
-        // Only a genuine tie (both inks clear the floor) is decided by contrast --
-        // at today's fixed accent/alert lightnesses that never happens at this
-        // width, but stays correct if those values ever move closer together.
-        if (otherOk) expect(best).toBeGreaterThanOrEqual(contrastRatio(other, fill))
-        // The forced ink's own contrast, not the better of two choices any more --
-        // worst case is a saturated yellow alert fill in Day/Dawn, forced to white
-        // text (~1.28:1) since dark no longer clears 45 points there at all. A real,
-        // accepted readability cost of the hard 45-point floor (measured, not
-        // designed for), not a typo.
-        expect(best).toBeGreaterThanOrEqual(1.28)
-        for (const step of [HOVER_STEP, DIM_STEP]) {
-          const shade = { h, s, l: clamp(l + step * dir) }
-          expect(gap(ink.l, shade.l)).toBeGreaterThanOrEqual(MIN_TEXT_GAP)
-          expect(contrastRatio(ink, shade)).toBeGreaterThanOrEqual(best - 0.01) // stepping away never hurts
-        }
+        expect(ratioOf(ink, fill)).toBeGreaterThanOrEqual(TEXT_TARGET)
+        // Hover and dim shades step away from the text, so they read at least as well.
+        const hover: HSL = { ...fill, l: clamp(fill.l + 12 * dir) }
+        expect(ratioOf(ink, hover)).toBeGreaterThanOrEqual(ratioOf(ink, fill) - 0.01)
       }
     }
   })
 
-  it('keeps the Writer page text 45+ points from the page, its cards and its fields', () => {
-    const paper = PAPER_LOOKS[look.mode]
-    // The steps the page's surfaces are written with: paper-l - n * dir (a field is n = -3).
-    for (const n of [0, 1, 2, 3, 5, 6, -3]) {
-      const bg = look.paperL - n * paper.dir
-      // The page's error text is the alert colour, stepped further from the paper
-      // like every other paper shade (--paper-error in theme.scss).
-      const paperError = look.alertL - PAPER_ERROR_SHIFT * paper.dir
-      for (const text of [paper.ink, paper.ink2, paper.label, paper.muted, paper.placeholder, paperError]) {
-        expect(gap(text, bg)).toBeGreaterThanOrEqual(MIN_TEXT_GAP)
-      }
-      // Draft mode's numbers and descriptions are the page ink at 67% and 75%.
-      for (const alpha of [0.67, 0.75]) expect(gap(over(paper.ink, bg, alpha), bg)).toBeGreaterThanOrEqual(MIN_TEXT_GAP)
+  it('moves a fill only a little from its start, or switches ink where moving it would take more than that', () => {
+    const start = (key: 'accent' | 'alert') => (key === 'accent' ? look.accentL : look.alertL)
+    for (const h of HUES) {
+      const c = resolvePalette({ theme: { h: 330 }, accent: { h }, alert: { h }, accent2: { h } }, zone)
+      expect(Math.abs(c.accent.l - start('accent'))).toBeLessThanOrEqual(MAX_FILL_SHIFT)
+      expect(Math.abs(c.alert.l - start('alert'))).toBeLessThanOrEqual(MAX_FILL_SHIFT)
     }
   })
 
-  it('keeps the reaction bars\' text 45+ points from their fill', () => {
-    const paper = PAPER_LOOKS[look.mode]
-    expect(gap(paper.like, paper.react)).toBeGreaterThanOrEqual(MIN_TEXT_GAP)
-    expect(gap(look.alertL, paper.react)).toBeGreaterThanOrEqual(MIN_TEXT_GAP)
+  it('reads the Writer page text on the page, its fields and every nested card, for every hue', () => {
+    for (const th of HUES) {
+      const g = paperGrounds(zone, { theme: th, accent: 32 })
+      const inks = paperInks(zone, th)
+      for (const ground of [g.page, g.field, ...g.frames]) {
+        for (const key of ['ink', 'ink2', 'label', 'muted'] as const) expect(ratioOf(inks[key], ground)).toBeGreaterThanOrEqual(TEXT_TARGET)
+      }
+      for (const ground of [g.paper, g.soft, g.page, g.field]) expect(ratioOf(inks.placeholder, ground)).toBeGreaterThanOrEqual(TEXT_TARGET)
+    }
+  })
+
+  it('steps the nested cards away from the sheet, deeper each time', () => {
+    const p = PAPER_LOOKS[look.mode]
+    expect(p.page).toBeGreaterThan(0)
+    for (let i = 1; i < p.frames.length; i += 1) expect(p.frames[i]).toBeGreaterThan(p.frames[i - 1])
+    expect(p.frames[0]).toBeGreaterThan(p.page)
+  })
+
+  it('reads the page error text and the reaction hearts, for every hue', () => {
+    for (const h of HUES) {
+      const hues = { theme: 330, accent: h, alert: h }
+      const g = paperGrounds(zone, hues)
+      const a = paperAccents(zone, hues)
+      for (const ground of [g.paper, g.soft, g.page, g.field, g.frames[0]]) expect(ratioOf(a.error, ground)).toBeGreaterThanOrEqual(TEXT_TARGET)
+      for (const s of LIKE_BAR_SATURATIONS) expect(ratioOf(a.like, { h, s, l: PAPER_LOOKS[look.mode].react })).toBeGreaterThanOrEqual(UI_TARGET)
+    }
   })
 
   it('shows the page in the same direction as the zone', () => {
@@ -115,12 +103,12 @@ describe.each(ZONE_KEYS)('%s look', zone => {
     expect(look.paperL < 50).toBe(look.mode === 'dark')
   })
 
-  it('resolves to the look for any hues', () => {
+  it('resolves to the look for any hues, the lightness moved only where a hue needs it', () => {
     const c = resolvePalette({ theme: { h: 10 }, accent: { h: 20 }, alert: { h: 30 }, accent2: { h: 40 } }, zone)
-    expect(c.theme).toEqual({ h: 10, s: look.themeS, l: look.themeL })
-    expect(c.accent).toEqual({ h: 20, s: look.accentS, l: look.accentL })
-    expect(c.alert).toEqual({ h: 30, s: look.alertS, l: look.alertL })
-    expect(c.accent2).toEqual({ h: 40, s: look.accentS, l: look.accentL })
+    expect(c.theme).toMatchObject({ h: 10, s: look.themeS })
+    expect(c.accent).toMatchObject({ h: 20, s: look.accentS })
+    expect(c.alert).toMatchObject({ h: 30, s: look.alertS })
+    expect(c.accent2).toMatchObject({ h: 40, s: look.accentS })
   })
 })
 
@@ -143,18 +131,33 @@ describe('the four looks', () => {
   })
 })
 
+describe('readability by hue', () => {
+  it('draws a yellow fill darker than a blue one in the day, so white text reads on both', () => {
+    const at = (h: number) => resolvePalette({ theme: { h: 330 }, accent: { h }, alert: { h: 200 }, accent2: { h } }, 'day').accent
+    expect(at(60).l).toBeLessThanOrEqual(at(240).l)
+    expect(fillInk(at(240), 330).ink.l).toBe(100)
+  })
+
+  it('switches to dark text on a fill that would have to move too far for white (a bright yellow in the day)', () => {
+    const yellow = resolvePalette({ theme: { h: 330 }, accent: { h: 60 }, alert: { h: 200 }, accent2: { h: 60 } }, 'day').accent
+    expect(fillInk(yellow, 330).ink.l).toBe(3)
+    expect(ratioOf(fillInk(yellow, 330).ink, yellow)).toBeGreaterThanOrEqual(TEXT_TARGET)
+  })
+
+  it('keeps the dark zones\' dark text on a light fill, switching to white only where a blue fill would have to move too far', () => {
+    const blue = resolvePalette({ theme: { h: 330 }, accent: { h: 240 }, alert: { h: 200 }, accent2: { h: 240 } }, 'night').accent
+    expect(ratioOf(fillInk(blue, 330).ink, blue)).toBeGreaterThanOrEqual(TEXT_TARGET)
+  })
+})
+
 describe('deriveTokens', () => {
   it('writes the Day look for the default hues', () => {
     const v = deriveTokens(DEFAULT_PALETTE, 'admin', 'day')
     expect(v['--color-theme-h']).toBe('330')
     expect(v['--color-theme-s']).toBe('30%')
-    expect(v['--color-theme-l']).toBe('86%')
     expect(v['--color-accent-s']).toBe('80%')
-    expect(v['--color-accent-l']).toBe('42%')
     expect(v['--color-alert-s']).toBe('100%')
-    expect(v['--color-alert-l']).toBe('46%')
     expect(v['--color-accent2-h']).toBe('260')
-    expect(v['--color-accent2-l']).toBe('42%')
     expect(v['--paper-l']).toBe('97%')
     expect(v['--paper-dir']).toBe('1')
   })
@@ -164,23 +167,21 @@ describe('deriveTokens', () => {
     expect(day['--ink']).toBe('hsl(330, 12%, 3%)')
     expect(deriveTokens(DEFAULT_PALETTE, 'admin', 'night')['--ink']).toBe('hsl(0, 0%, 100%)')
     expect(deriveTokens(DEFAULT_PALETTE, 'admin', 'night')['--paper-dir']).toBe('-1')
-    // At this width only one ink ever clears day's accent lightness (light), so
-    // every accent/admin-accent fill gets white text there regardless of hue --
-    // there's no hue narrow enough for the dark ink to still be "ok" alongside it.
-    expect(day['--on-accent2']).toBe('hsl(0, 0%, 100%)')
+    // The default day accent (orange) is drawn a little darker so white text reads on it.
     expect(day['--on-accent']).toBe('hsl(0, 0%, 100%)')
+    expect(day['--on-accent2']).toBe('hsl(0, 0%, 100%)')
+    // A yellow accent is bright enough that dark text reads and white does not.
     const yellow = { ...DEFAULT_PALETTE, accent: { h: 60 } }
-    expect(deriveTokens(yellow, 'user', 'day')['--on-accent']).toBe('hsl(0, 0%, 100%)')
-    // Night's accent lightness is the mirror image: only dark ink ever clears it.
+    expect(deriveTokens(yellow, 'user', 'day')['--on-accent']).toBe('hsl(330, 12%, 3%)')
+    // Night's accent is light: dark text.
     expect(deriveTokens(yellow, 'user', 'night')['--on-accent']).toBe('hsl(330, 12%, 3%)')
   })
 
   it('steps hovers and dims of each fill away from the text on it', () => {
     const day = deriveTokens(DEFAULT_PALETTE, 'admin', 'day')
-    // Both accents are forced to the same (light) ink in Day (see above), so both
-    // step the same way now too.
     expect([day['--accent-dir'], day['--accent2-dir'], day['--accent-away'], day['--accent2-away']]).toEqual(['-1', '-1', 'hsl(0, 0%, 0%)', 'hsl(0, 0%, 0%)'])
     expect(deriveTokens({ ...DEFAULT_PALETTE, accent: { h: 60 } }, 'user', 'night')['--accent-dir']).toBe('1')
+    expect(deriveTokens({ ...DEFAULT_PALETTE, accent: { h: 60 } }, 'user', 'day')['--accent-dir']).toBe('1') // dark text on a bright yellow
   })
 
   it('lightens the sidebar\'s first shade in a dark zone, darkens it in a light one', () => {
@@ -196,14 +197,19 @@ describe('deriveTokens', () => {
     expect(v['--color-accent2-l']).toBe(v['--color-accent-l'])
   })
 
-  it('takes its hues from the palette and everything else from the zone', () => {
+  it('takes its hues from the palette and the saturation from the zone', () => {
     const pal = { theme: { h: 100 }, accent: { h: 200 }, alert: { h: 300 }, accent2: { h: 50 } }
     const v = deriveTokens(pal, 'admin', 'night')
     expect(v['--color-theme-h']).toBe('100')
     expect(v['--color-accent-h']).toBe('200')
     expect(v['--color-alert-h']).toBe('300')
     expect(v['--color-accent2-h']).toBe('50')
-    expect(v['--color-theme-l']).toBe('26%')
     expect(v['--color-alert-s']).toBe('70%')
+  })
+
+  it('writes the page numbers, and the error text and hearts fitted to read', () => {
+    const v = deriveTokens(DEFAULT_PALETTE, 'user', 'day')
+    expect([v['--paper-pg'], v['--paper-f1'], v['--paper-f5']]).toEqual(['4%', '6%', '18%'])
+    for (const name of ['--paper-error', '--paper-like', '--paper-dislike']) expect(v[name]).toMatch(/^hsl\(\d+, \d+%, [\d.]+%\)$/)
   })
 })

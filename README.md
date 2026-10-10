@@ -472,20 +472,35 @@ past midnight) and four **hues** the user chooses: **theme** (inert/read-only),
 | Dawn | light, dark text | 15 | 45 | 70 | 80 | 42 | 46 |
 
 Saturation always runs theme < accents < alert (the admin accent is the accent's
-twin: same saturation and lightness, only the hue differs), and **text is always
-at least 45 HSL lightness points from what it sits on** (`MIN_TEXT_GAP`; enforced
-for the theme surfaces, the accent/alert fills and their hover/dim shades, the
-muted and faint ink, and the Writer page by `theme/zoneLooks.test.ts`). The
-Writer's page follows the zone too: a light sheet with dark text by day and dawn,
-a dark sheet with light text at dusk and night. Hover and dim shades of a fill
-step *away* from its text. The text on each accent, alert and admin-accent fill is picked per fill (`fillInk` in `zoneLooks.ts`): whichever ink clears the 45-point floor -- only one of the two usually does at this width, so the choice is that one outright; contrast only breaks the tie on the rarer fill where both clear it; its hover/dim direction and wash colour are `--accent-dir`/`--accent-away` (and `alert`/`accent2`), while `--fill-dir`/`--away` are the zone's own for the theme surfaces. Settings saved by older
+twin: same saturation, only the hue differs). **Text is always readable, whatever hues the user
+picks**: WCAG contrast, 4.5:1 for text and 3:1 for icons and the edges of controls
+(`theme/readable.ts`). Lightness is blind to hue (a yellow and a blue at the same lightness differ
+several times over in brightness), so the look's lightnesses are only where each colour *starts*:
+`resolvePalette` (`zoneLooks.ts`) moves a colour's lightness a half point at a time, only as far as
+its hue needs, until text reads on it. The theme's lightness is fitted so the zone's ink (and its
+muted and faint tiers) reads on every surface, recess overlays included; each accent, alert and
+admin-accent fill is fitted for one of the two inks (the zone's preferred one -- white on a light
+zone, dark on a dark one -- if that takes at most `MAX_FILL_SHIFT` points, else the other, which
+may already read) and `fillInk` picks the ink that reads best; its hover/dim direction and wash
+colour are `--accent-dir`/`--accent-away` (and `alert`/`accent2`), while `--fill-dir`/`--away` are
+the zone's own for the theme surfaces. `theme/contrastAudit.ts` lists every documented text/ground
+pair (surfaces, fills, the Writer's paper and its nested cards, the reaction hearts, edge tabs, level
+panels), measures it over the whole hue range (a 30° grid of the palette hues, every 5° of a level
+colour) and `contrastAudit.test.ts` fails if any pair drops under its threshold. The older
+45-lightness-point gap (`MIN_TEXT_GAP`) survives only where the sky toggle and the plotpoint shades
+size their bands. The Writer's page follows the zone too: a light sheet with dark text by day and
+dawn, a dark sheet with light text at dusk and night, with the nested cards' steps (`--paper-pg`,
+`--paper-f1..5`), the page's error text and the two reaction hearts (`--paper-error`,
+`--paper-like`, `--paper-dislike`) fitted the same way. Hover and dim shades of a fill step *away*
+from its text. Settings saved by older
 versions (which also held a saturation per colour and a brightness) still load;
 only the hues are kept.
 
 - **Pure logic** lives in `frontend/src/theme/` with tests: `zones.ts` (which zone
   applies when, enabling/disabling zones), `zoneLooks.ts` (the look table and
-  `resolvePalette`), `paletteRules.ts` (hue clamping), `tokens.ts` (hues + look →
-  CSS variables), `contrast.ts` (ink colours).
+  `resolvePalette`), `readable.ts` (contrast arithmetic and the lightness fitting),
+  `contrastAudit.ts` (the readability audit), `paletteRules.ts` (hue clamping), `tokens.ts` (hues +
+  look → CSS variables), `contrast.ts` (ink colours).
 - **Applying it:** `useThemeEngine()` (mounted in `App.tsx`) writes the variables
   on `<html>`; `theme/theme.scss` registers them with `@property` so a palette
   change cross-fades (~1s), and defines the derived tokens (`--ink`,
@@ -563,10 +578,10 @@ awareness that the app above already existed:
   and chapters' tabs (the book's own hue, the arc and chapter colours as accents) stand at its right,
   as on the Draft level's book, whose pages are the drafting pages. The plotpoints still to place are the Project level's
   **Plotpoints** tab (`levels/PlotpointsTab.tsx`): drag one onto a card in the Outline (the dragged id
-  is shared through the workspace, `plotDragId`). Level text is set from its fill (white; dark on a
-  lighter-brightness fill) and a fill is held to a lightness white text reads on (`theme/bookColors.ts`
-  `FILL_MAX_L`); an editor tab (`surface`) sits on a light surface in the ink colour. Alert messages
-  (`.wrError`) are the alert colour with a white outline and white text. The Draft level's Settings (the
+  is shared through the workspace, `plotDragId`). Level text is white, and a level's fill is held to a lightness white text reads on, by its hue
+  (`theme/bookColors.ts` `fillCap`, from `theme/levelContrast.ts`: yellows and greens come out darker than
+  blues and reds); an editor tab (`surface`) sits on a light surface in the ink colour. Alert messages
+  (`.wrError`) are the alert colour with an outline and text in `--on-alert`, the ink chosen for it in the zone. The Draft level's Settings (the
   chapter's colour) and Help are icons in the chapter tile that swap the right page.
   Plotpoints already placed in the outline are listed **By time** (the Time of their scene, in the book's
   time system) or **In story** (where they sit in the outline): one stored choice
@@ -580,16 +595,16 @@ awareness that the app above already existed:
   60° of their book and chapters within 60° of their arc (each node's `themeHue`);
   one with no hue shows its parent's, new ones take a hue spread away from their
   siblings', and changing a parent pulls its children back inside their window.
-  A colour is one stored number holding a hue and a brightness (`theme/bookColors.ts`, mirrored in
-  `backend/app/storage/schema.py`): 1..360 base, 361..720 lighter, -720..-361 darker. Every colour
-  has the same saturation (the active time zone's own theme saturation); only the lightness steps
-  from the zone's. The hue slider (`HueSlider.tsx`, `components/ColorRange.tsx`) has three bands,
-  darker, base, lighter, in two forms: unlimited (project, book, plot category) runs the whole
-  360° wheel in each band; limited (series, arc, chapter, plot subcategory) runs the ±60° window
-  round the parent's hue in each. Projects saved with earlier schemes (`hueScheme` 1 and 2: plain
-  hues and swatches, then desaturated and gray/white stops) are converted once on load, before
-  validation: a desaturated hue becomes the same hue at base, and gray, white and the "of the
-  parent" stops go back to no colour of their own (the parent's, or the default).
+  A colour is one stored number, a hue in degrees, 0..360 (`theme/bookColors.ts`, mirrored in
+  `backend/app/storage/schema.py`; 0 and 360 are both red). Every colour has the same saturation and lightness
+  (the active time zone's own, kept readable for the hue). The hue slider (`HueSlider.tsx`,
+  `components/ColorRange.tsx`) is one track in two forms: unlimited (project, book, plot category) runs the
+  whole 360° wheel; limited (series, arc, chapter, plot subcategory) runs the ±60° window round the
+  parent's hue. Projects saved with earlier schemes are converted once on load, before validation
+  (`hueScheme` 4): plain hues and swatches (1), the desaturated and gray/white stops (2) and the
+  darker / base / lighter brightnesses (3; a lighter `361..720` or darker `-720..-361` colour becomes its hue).
+  A desaturated hue becomes the same hue, and gray, white and the "of the parent" stops go back to no colour
+  of their own (the parent's, or the default).
   A book has just the one colour. The levels are flat, square panels filled with their colour at the accent's
   saturation (a little less loud) and lightness; what sits inside steps one shade deeper each time. At Outline focus the book
   panel bleeds to the top, bottom and right edges; at Draft focus the whole screen is the book's colour (very light by day,

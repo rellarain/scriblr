@@ -1,7 +1,6 @@
 import { fireEvent, render, screen } from '@testing-library/react'
 import { describe, expect, it, vi } from 'vitest'
-import { decodeHue, encodeHue } from '../theme/bookColors'
-import { ColorRange, resultColor, toneCodeToPos, toneLayout, toneName, tonePosToCode, toneTrackGradient, trackGradient } from './ColorRange'
+import { ColorRange, resultColor, trackGradient } from './ColorRange'
 
 const basis = { sat: 40, light: 30 }
 
@@ -62,49 +61,5 @@ describe('ColorRange', () => {
     expect(document.documentElement.hasAttribute('data-theme-live')).toBe(true)
     fireEvent(window, new Event('pointerup'))
     expect(document.documentElement.hasAttribute('data-theme-live')).toBe(false)
-  })
-})
-
-describe('the tone track', () => {
-  const zone = { sat: 30, light: 86 } // the day zone's theme look
-
-  it('lays out three brightness bands, darker, base, lighter, end to end', () => {
-    const layout = toneLayout()
-    expect(layout.map(s => s.tone)).toEqual(['dark', 'base', 'light'])
-    expect(layout[0].from).toBe(0)
-    expect(layout.at(-1)!.to).toBe(1)
-    layout.slice(1).forEach((seg, i) => expect(seg.from).toBeCloseTo(layout[i].to, 10))
-  })
-
-  it('draws each band round the wheel starting at orange, at one saturation and its own brightness', () => {
-    const g = toneTrackGradient(zone, null)
-    expect(g.startsWith('linear-gradient(to right, hsl(28, 30%, 68%) 0.00%')).toBe(true) // darker: 18 points under the zone
-    expect(g).toContain('hsl(28, 30%, 86%) 33.33%') // base starts at the same orange
-    expect(g).toContain('hsl(28, 30%, 94%) 66.67%') // lighter (22 more, held to 94)
-    expect(g.match(/hsl\(\d+, (\d+)%/g)!.every(c => c.includes(', 30%'))).toBe(true) // never another saturation
-  })
-
-  it('draws the limited track as the three windows round the parent hue', () => {
-    const g = toneTrackGradient(zone, 210)
-    expect(g).toContain('hsl(150, 30%, 68%) 0.00%')
-    expect(g).toContain('hsl(270, 30%, 86%) 66.67%')
-    expect(g).toContain('hsl(210, 30%, 94%)') // the parent hue itself, lighter, in the middle of the last band
-  })
-
-  it('puts every code on the track and reads it back, on both tracks', () => {
-    for (const centre of [null, 210]) {
-      for (const tone of ['dark', 'base', 'light'] as const) {
-        for (const hue of centre === null ? [0, 28, 100, 200, 300, 359] : [150, 180, 210, 240, 270]) {
-          const code = encodeHue(hue, tone)
-          const back = decodeHue(tonePosToCode(toneCodeToPos(code, centre), centre))
-          expect(back.tone).toBe(tone)
-          expect(Math.abs(((back.hue - hue + 540) % 360) - 180)).toBeLessThanOrEqual(2)
-        }
-      }
-    }
-  })
-
-  it('names a code', () => {
-    expect([toneName(200), toneName(encodeHue(30, 'dark')), toneName(encodeHue(30, 'light'))]).toEqual(['Base, hue 200', 'Darker, hue 30', 'Lighter, hue 30'])
   })
 })

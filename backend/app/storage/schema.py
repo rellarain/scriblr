@@ -13,18 +13,16 @@ def utcnow() -> datetime:
     return datetime.now(timezone.utc)
 
 
-# A level colour (OutlineNode.themeHue, ProjectSettings.themeHue, PlotNode.hue) is one number that holds
-# a hue AND a brightness (mirrors the frontend's theme/bookColors.ts). Every colour has the same
-# saturation (the active time-of-day zone's own); only the brightness differs:
-#    1..360     base      (hue = value mod 360)
-#   361..720    lighter   (hue = value - 360)
-#  -720..-361   darker    (hue = -value - 360)
-# Earlier schemes are converted once on load (see project_store): hueScheme 1 held a plain hue 0-360 plus
-# swatches 361-364 (brown, black, gray, white); hueScheme 2 also had a desaturated band (-360..0) and
-# neutral stops (+-721..723), neither of which exists any more.
-MIN_LEVEL_HUE = -720
-MAX_LEVEL_HUE = 720
-HUE_SCHEME = 3
+# A level colour (OutlineNode.themeHue, ProjectSettings.themeHue, PlotNode.hue) is a hue in degrees, 0 to 360
+# (0 and 360 are both red; mirrors the frontend's theme/bookColors.ts). Every colour has the same saturation and
+# lightness (the active time-of-day zone's own, kept readable for the hue). Earlier schemes are converted once on
+# load (see project_store): hueScheme 1 held a plain hue 0-360 plus swatches 361-364 (brown, black, gray, white);
+# hueScheme 2 packed a brightness in as well and had a desaturated band (-360..0) and neutral stops (+-721..723);
+# hueScheme 3 kept the brightness only (1..360 base, 361..720 lighter, -720..-361 darker). Neither the neutrals
+# nor the brightnesses exist any more: a lighter or darker colour is now its plain hue.
+MIN_LEVEL_HUE = 0
+MAX_LEVEL_HUE = 360
+HUE_SCHEME = 4
 
 _HEX_COLOR = re.compile(r"^#?([0-9a-fA-F]{6})$")
 

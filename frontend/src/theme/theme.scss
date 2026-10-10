@@ -46,8 +46,14 @@ $fading: ();
 @property --paper-dir  { syntax: '<number>'; inherits: true; initial-value: 1; }
 $paper-props: (
   paper-l: 97%, paper-ink-l: 17%, paper-ink2-l: 28%, paper-label-l: 38%,
-  paper-muted-l: 42%, paper-placeholder-l: 46%, paper-react-l: 91%, paper-like-l: 38%,
+  paper-muted-l: 42%, paper-placeholder-l: 46%, paper-react-l: 91%,
+  paper-pg: 4%, paper-f1: 6%, paper-f2: 9%, paper-f3: 12%, paper-f4: 15%, paper-f5: 18%,
 );
+// The page's error text and the two reaction hearts: colours fitted for the hue (theme/zoneLooks.ts paperAccents).
+$paper-colors: (paper-error: hsl(200, 100%, 30%), paper-like: hsl(32, 72%, 30%), paper-dislike: hsl(200, 100%, 30%));
+@each $name, $value in $paper-colors {
+  @property --#{$name} { syntax: '<color>'; inherits: true; initial-value: $value; }
+}
 @each $name, $value in $paper-props {
   @property --#{$name} { syntax: '<percentage>'; inherits: true; initial-value: $value; }
 }
@@ -67,6 +73,9 @@ $fading: append($fading, --fill-dir, comma);
 }
 $fading: append($fading, --paper-dir, comma);
 @each $name, $value in $paper-props {
+  $fading: append($fading, --#{$name}, comma);
+}
+@each $name, $value in $paper-colors {
   $fading: append($fading, --#{$name}, comma);
 }
 
@@ -162,9 +171,4 @@ html[data-theme-pending] #root {
   --paper-label: hsl(var(--color-theme-h), 8%, var(--paper-label-l));
   --paper-muted: hsl(var(--color-theme-h), 8%, var(--paper-muted-l));
   --paper-placeholder: hsl(var(--color-theme-h), 6%, var(--paper-placeholder-l));
-  // Stepped 4 points further from the paper (same direction as every other paper
-  // shade) -- the alert colour alone doesn't clear the text/background floor
-  // against the page's own deepest surface, and it's shared by too much else to
-  // move on its own (zoneLooks.ts's PAPER_ERROR_SHIFT).
-  --paper-error: hsl(var(--color-alert-h), var(--color-alert-s), calc(var(--color-alert-l) - 4% * var(--paper-dir)));
 }

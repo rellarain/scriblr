@@ -402,9 +402,11 @@ def _load_project_file_locked(root: Path, project_id: str) -> tuple[ProjectFile,
 # so 0 (a red) became 360, and the swatches moved: brown -> a dark orange, black -> dark gray, gray -> a
 # desaturated hue, white -> white.
 _LEGACY_SWATCHES = {361: -388, 362: -721, 363: 0, 364: 721}
-# Scheme 3 has brightness only (darker, base, lighter, all at the zone's one saturation). The neutral
+# Scheme 3 had brightness only (darker, base, lighter, all at the zone's one saturation). The neutral
 # stops (dark gray, white, and the three "of the parent" stops) have no hue, so they go back to "no
 # colour of its own" (the parent's, or the default); a desaturated hue becomes the same hue at base.
+# Scheme 4 has no brightness: a plain hue 0-360, so a lighter (361..720) or darker (-720..-361) colour
+# becomes its hue.
 _NEUTRALS = {-721, 721, -722, 722, 723}
 
 
@@ -421,6 +423,11 @@ def _upgrade_hue(value, scheme: int):
             return None
         if -360 <= value < 0:  # desaturated: the same hue at base
             return (-value) % 360 or 360
+    if scheme < 4:
+        if value > 360:  # lighter
+            return value - 360
+        if value < 0:  # darker
+            return -value - 360
     return value
 
 

@@ -2,7 +2,7 @@ import { useEffect, useRef, type CSSProperties, type ReactNode } from 'react'
 import type { OutlineNode } from '../../../api/types'
 import type { ShelfGroup } from './outlineTree'
 import { nodeLabel } from './plotTree'
-import { bookThemeHue, fillColorCss, isLightColor } from '../../../theme/bookColors'
+import { bookThemeHue, fillColorCss } from '../../../theme/bookColors'
 
 const SPINE_HEIGHT = 100
 
@@ -28,8 +28,7 @@ export function Spine({ book, active, onOpen }: { book: OutlineNode; active: boo
     <button
       type="button"
       className={active ? 'wrSpine wrSpine--active' : 'wrSpine'}
-      style={{ height: SPINE_HEIGHT, width: active ? COVER_WIDTH : width, '--wr-spine': fillColorCss(bookThemeHue(book)), '--wr-spine-ink': isLightColor(bookThemeHue(book)) ? '#1a1a1a' : undefined // the title on a light spine has to be dark
-       } as CSSProperties}
+      style={{ height: SPINE_HEIGHT, width: active ? COVER_WIDTH : width, '--wr-spine': fillColorCss(bookThemeHue(book)) } as CSSProperties}
       onClick={onOpen}
       title={label}
       aria-pressed={active}

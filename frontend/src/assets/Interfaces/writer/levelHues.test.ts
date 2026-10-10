@@ -1,6 +1,5 @@
 import { describe, expect, it } from 'vitest'
 import type { OutlineNode } from '../../../api/types'
-import { decodeHue, encodeHue } from '../../../theme/bookColors'
 import { autoPickHue, defaultProjectHue, fitToParent, hueCentre, levelHue, levelTint, reconcileHues } from './levelHues'
 
 const node = (id: string, kind: OutlineNode['kind'], parentId: string | null, themeHue?: number): OutlineNode =>
@@ -28,17 +27,11 @@ describe('levelHue', () => {
     expect(levelHue(node('lone', 'book', null), byId([]), PROJECT)).toBe(28)
     expect(levelHue(nodes[1], map, PROJECT)).toBe(210)
   })
-
-  it('keeps the tone a node was given', () => {
-    const dark = encodeHue(230, 'dark')
-    const tree = [node('b', 'book', null, 210), node('a', 'arc', 'b', dark), node('c', 'chapter', 'a')]
-    expect(levelHue(tree[2], byId(tree), PROJECT)).toBe(dark)
-  })
 })
 
 describe('hueCentre', () => {
-  it('is the parent hue (in any tone) for series, arcs and chapters, and none for a book', () => {
-    const nodes = [node('s', 'series', null), node('b', 'book', 's', 210), node('a', 'arc', 'b', encodeHue(250, 'dark')), node('c', 'chapter', 'a')]
+  it('is the parent hue for series, arcs and chapters, and none for a book', () => {
+    const nodes = [node('s', 'series', null), node('b', 'book', 's', 210), node('a', 'arc', 'b', 250), node('c', 'chapter', 'a')]
     const map = byId(nodes)
     expect(hueCentre(nodes[0], map, PROJECT)).toBe(150)
     expect(hueCentre(nodes[1], map, PROJECT)).toBeNull()
@@ -65,24 +58,23 @@ describe('autoPickHue', () => {
 })
 
 describe('fitToParent', () => {
-  it('holds the hue in its window and keeps the tone', () => {
-    expect(fitToParent(encodeHue(300, 'light'), 200)).toBe(encodeHue(260, 'light'))
-    expect(fitToParent(encodeHue(230, 'dark'), 200)).toBe(encodeHue(230, 'dark'))
+  it('holds the hue in its window', () => {
+    expect(fitToParent(300, 200)).toBe(260)
+    expect(fitToParent(230, 200)).toBe(230)
   })
 
   it('does not hold a book (no centre)', () => {
-    expect(fitToParent(encodeHue(300, 'light'), null)).toBe(encodeHue(300, 'light'))
+    expect(fitToParent(300, null)).toBe(300)
   })
 })
 
 describe('reconcileHues', () => {
-  it('pulls children back inside their window when a parent moves, top-down, keeping their tones', () => {
-    const dark = (h: number) => encodeHue(h, 'dark')
-    const nodes = [node('b', 'book', null, 200), node('a', 'arc', 'b', dark(230)), node('c', 'chapter', 'a', encodeHue(280, 'light'))]
-    expect(reconcileHues(nodes, PROJECT).map(n => n.themeHue)).toEqual([200, dark(230), encodeHue(280, 'light')])
+  it('pulls children back inside their window when a parent moves, top-down', () => {
+    const nodes = [node('b', 'book', null, 200), node('a', 'arc', 'b', 230), node('c', 'chapter', 'a', 280)]
+    expect(reconcileHues(nodes, PROJECT).map(n => n.themeHue)).toEqual([200, 230, 280])
     // The book moves to 100: its arc must come within 60 (to 160), then its chapter within 60 of that (to 220).
     const moved = nodes.map(n => (n.id === 'b' ? { ...n, themeHue: 100 } : n))
-    expect(reconcileHues(moved, PROJECT).map(n => n.themeHue)).toEqual([100, dark(160), encodeHue(220, 'light')])
+    expect(reconcileHues(moved, PROJECT).map(n => n.themeHue)).toEqual([100, 160, 220])
   })
 
   it('leaves nodes with no colour of their own, books, and an unchanged tree alone', () => {
@@ -98,8 +90,8 @@ describe('reconcileHues', () => {
 })
 
 describe('defaultProjectHue', () => {
-  it('is a saturated hue offset from the app theme hue, and wraps', () => {
+  it('is a hue offset from the app theme hue, and wraps', () => {
     expect(defaultProjectHue(330)).toBe(90)
-    expect(decodeHue(defaultProjectHue(240))).toEqual({ hue: 0, tone: 'base' }) // 360, not 0
+    expect(defaultProjectHue(240)).toBe(0)
   })
 })

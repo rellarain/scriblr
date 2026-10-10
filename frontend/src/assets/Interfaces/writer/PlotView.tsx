@@ -4,7 +4,7 @@ import type { WriterWorkspace } from './useWriterWorkspace'
 import { ChevronRightIcon, PlusIcon } from '../../icons'
 import { ChipEditor, DeleteControl } from './shared'
 import { focusNodeField, useNodeKeys } from '../../../lib/nodeKeys'
-import { encodeHue, hueOfCode } from '../../../theme/bookColors'
+import { hueOfCode } from '../../../theme/bookColors'
 import { useThemeState } from '../../../theme/useTheme'
 import HueSlider from './HueSlider'
 import { plotColors, plotColorVars } from './plotColors'
@@ -107,12 +107,12 @@ function ChildRows({ w, node, kind, addLabel }: { w: WriterWorkspace; node: Plot
   )
 }
 
-// The colour selector of a category (unlimited: any hue in any brightness) or subcategory (limited: the
-// brightnesses round its category's hue, within 60 degrees). Saturation and lightness are the active
+// The colour selector of a category (unlimited: any hue) or subcategory (limited: within 60 degrees of
+// its category's hue). Saturation and lightness are the active
 // zone's, so what the thumb shows is what the app draws.
 function HueField({ w, node }: { w: WriterWorkspace; node: PlotNode }) {
   const { settings, activeZone } = useThemeState()
-  const appCode = encodeHue(settings.zones[activeZone].palette.theme.h, 'base')
+  const appCode = settings.zones[activeZone].palette.theme.h
   if (node.kind === 'subcategory') {
     const category = node.parentId ? w.plotNodeById.get(node.parentId) : undefined
     const categoryCode = category?.hue ?? appCode

@@ -40,10 +40,11 @@
 .wr {
   // ---------------------------------------------------------------- shared
   .wrMuted { font-size: 12px; opacity: 0.7; margin: 0; }
-  // Alert messages: the alert colour as a background with a white outline and white text, so they read on any surface.
+  // Alert messages: the alert colour as a background with an outline and text in the ink chosen for it (--on-alert: white or dark,
+  // whichever reads on that alert colour in this zone), so they read on any surface.
   .wrError, .wrPageError {
     box-sizing: border-box; margin: 0; padding: 5px 10px; font-size: 12px; font-weight: 700; line-height: 1.4;
-    background: var(--alert, #c9372c); color: #fff; outline: 1px solid #fff; outline-offset: -1px; border-radius: 3px; overflow-wrap: anywhere;
+    background: var(--alert, #c9372c); color: var(--on-alert, #fff); outline: 1px solid var(--on-alert, #fff); outline-offset: -1px; border-radius: 3px; overflow-wrap: anywhere;
   }
   .wrHint { font-size: 10px; opacity: 0.6; line-height: 1.4; margin: 0; }
   .wrLabel { font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: 1px; opacity: 0.65; margin-bottom: 4px; display: block; }
@@ -447,15 +448,15 @@
   // The chapter page (Outline and Draft): a very light tint of the book's theme colour, with
   // the plotpoint column pinned at its left and the outline scrolling beside it.
   .wrPage--chapter {
-    --wr-page: hsl(var(--color-theme-h), var(--color-theme-s), calc(var(--paper-l) - 6% * var(--paper-dir)));
+    --wr-page: hsl(var(--color-theme-h), var(--color-theme-s), calc(var(--paper-l) - var(--paper-pg) * var(--paper-dir)));
     --wr-page-line: hsl(var(--color-theme-h), var(--color-theme-s), calc(var(--paper-l) - 18% * var(--paper-dir)));
     --paper-field: hsl(var(--color-theme-h), var(--color-theme-s), calc(var(--paper-l) + 3% * var(--paper-dir)));
     // Each step in (arc, chapter, act, scene, moment) is one shade deeper, the inputs light.
-    --wr-frame-1: hsl(var(--color-theme-h), var(--color-theme-s), calc(var(--paper-l) - 11% * var(--paper-dir)));
-    --wr-frame-2: hsl(var(--color-theme-h), var(--color-theme-s), calc(var(--paper-l) - 16% * var(--paper-dir)));
-    --wr-frame-3: hsl(var(--color-theme-h), var(--color-theme-s), calc(var(--paper-l) - 21% * var(--paper-dir)));
-    --wr-frame-4: hsl(var(--color-theme-h), var(--color-theme-s), calc(var(--paper-l) - 26% * var(--paper-dir)));
-    --wr-frame-5: hsl(var(--color-theme-h), var(--color-theme-s), calc(var(--paper-l) - 31% * var(--paper-dir)));
+    --wr-frame-1: hsl(var(--color-theme-h), var(--color-theme-s), calc(var(--paper-l) - var(--paper-f1) * var(--paper-dir)));
+    --wr-frame-2: hsl(var(--color-theme-h), var(--color-theme-s), calc(var(--paper-l) - var(--paper-f2) * var(--paper-dir)));
+    --wr-frame-3: hsl(var(--color-theme-h), var(--color-theme-s), calc(var(--paper-l) - var(--paper-f3) * var(--paper-dir)));
+    --wr-frame-4: hsl(var(--color-theme-h), var(--color-theme-s), calc(var(--paper-l) - var(--paper-f4) * var(--paper-dir)));
+    --wr-frame-5: hsl(var(--color-theme-h), var(--color-theme-s), calc(var(--paper-l) - var(--paper-f5) * var(--paper-dir)));
     --wr-input-bg: var(--paper-field); --wr-input-ink: var(--wr-ink);
     flex-direction: row; padding: 0; gap: 0; overflow: hidden;
   }
@@ -712,10 +713,10 @@
   .wrEdgeArc, .wrEdgeTab { border: 0; outline: none; &:focus, &:focus-visible { outline: none; } }
   // The open chapter's tab is a little wider, its background the accent (the chapter's own colour); no outline.
   .wrEdgeTab--active {
-    width: 38px; font-size: 16px; background: var(--wr-tab-tint, var(--wr-book)); box-shadow: 2px 2px 6px rgb(0 0 0 / calc(0.4 * var(--shade-k)));
+    width: 38px; font-size: 16px; background: var(--wr-tab-bg, var(--wr-tab-tint, var(--wr-book))); box-shadow: 2px 2px 6px rgb(0 0 0 / calc(0.4 * var(--shade-k)));
   }
   // The focused arc's tab is raised the same way: its own colour as the background.
-  .wrEdgeArc--active { background: var(--wr-tab-tint, var(--wr-book)); color: var(--wr-tab-ink); box-shadow: 2px 2px 6px rgb(0 0 0 / calc(0.4 * var(--shade-k))); &:hover { background: var(--wr-tab-tint, var(--wr-book)); } }
+  .wrEdgeArc--active { background: var(--wr-tab-bg, var(--wr-tab-tint, var(--wr-book))); color: var(--wr-tab-ink); box-shadow: 2px 2px 6px rgb(0 0 0 / calc(0.4 * var(--shade-k))); &:hover { background: var(--wr-tab-bg, var(--wr-tab-tint, var(--wr-book))); } }
   .wrEdgeTab--add { height: 34px; background: rgb(0 0 0 / calc(0.25 * var(--shade-k))); box-shadow: none; margin-top: 3px; }
 
   // The preview, as the right page of the book.
@@ -755,8 +756,8 @@
   .wrReactBar {
     position: absolute; width: 20px; border-radius: 4px; display: flex; flex-direction: column; align-items: center; padding-top: 3px; box-sizing: border-box; overflow: hidden;
     border: 1px dashed transparent;
-    &--like { color: hsl(var(--color-accent-h), 72%, var(--paper-like-l)); }
-    &--dislike { color: var(--wr-alert); }
+    &--like { color: var(--paper-like); }
+    &--dislike { color: var(--paper-dislike); }
     &--level0 { border-color: hsl(var(--color-accent-h), 18%, calc(var(--paper-l) - 19% * var(--paper-dir))); background: transparent; color: var(--paper-placeholder); &:hover { background: hsl(var(--color-accent-h), 18%, calc(var(--paper-l) - 5% * var(--paper-dir))); } }
     // Same hue and lightness at every level; only saturation rises with the strength of the reaction.
     &--like.wrReactBar--level1 { background: hsl(var(--color-accent-h), 30%, var(--paper-react-l)); }
@@ -914,7 +915,7 @@
   .wrLevel--outline .wrSmallBtn--light, .wrLevel--outline .wrIconBtn--light { color: var(--on-accent); background: rgb(0 0 0 / 0.28); &:hover:not(:disabled) { background: rgb(0 0 0 / 0.42); } }
 
   // Muted text, labels and buttons on the paper (the Draft level and the preview) and in the tabs, held to a readable contrast.
-  .wrPage--chapter { --wr-page-muted: color-mix(in srgb, var(--wr-ink) 80%, transparent); }
+  .wrPage--chapter { --wr-page-muted: color-mix(in srgb, var(--wr-ink) 88%, transparent); }
   .wrLevel--outline .wrPage--chapter { --wr-page-muted: color-mix(in srgb, var(--on-accent) 85%, transparent); }
   .wrSpreadRight .wrChapterTile {
     .wrParentKind, .wrChapterTileName .wrPageKicker, .wrChapterTileStats .wrPageMetaRow, .wrChapterTileStats .wrNodeStats, .wrClickEdit--empty, .wrChapterTileStats .wrStatValue { color: color-mix(in srgb, var(--wr-ink) 84%, transparent); }
