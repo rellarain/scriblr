@@ -111,10 +111,10 @@
     scrollbar-width: none; &::-webkit-scrollbar { display: none; }
   }
   // A series: a lighter section (every one as tall as the row) with its title running up its left edge, beside the books it groups. The
-  // title is turned (vertical-rl, then 180 degrees, so it reads upward) and never widens the section.
+  // title is turned (vertical-rl: it starts at the top and reads downward) and never widens the section.
   .wrShelfLoose { display: flex; align-items: flex-end; gap: 4px; flex: 0 0 auto; }
   .wrShelfSeries { display: flex; flex-direction: row; gap: 6px; flex: 0 0 auto; padding: 6px 8px 0 4px; background: var(--level-wash-lo, var(--ov-lift-1)); }
-  .wrShelfSeriesLabel { flex: 0 0 auto; writing-mode: vertical-rl; transform: rotate(180deg); align-self: stretch; max-height: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 9px; font-weight: 700; text-transform: uppercase; letter-spacing: 1.5px; color: var(--wr-muted); }
+  .wrShelfSeriesLabel { flex: 0 0 auto; writing-mode: vertical-rl; align-self: stretch; max-height: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 9px; font-weight: 700; text-transform: uppercase; letter-spacing: 1.5px; color: var(--wr-muted); }
   .wrShelfSeriesBooks { display: flex; flex: 1 1 auto; align-items: flex-end; gap: 4px; min-width: 16px; }
   .wrShelfEmpty { font-size: 11px; opacity: 0.9; align-self: center; }
   // A book on the shelf. Its spine turns (a 3D flip) into its front cover while it is the selected book.

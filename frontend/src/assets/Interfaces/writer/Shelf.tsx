@@ -90,7 +90,7 @@ export function Spine({ book, number, progress, active, onOpen }: { book: Outlin
   )
 }
 
-// A project's spines, grouped: each series is a lighter section with its title up its left edge, beside the books in it; books outside any
+// A project's spines, grouped: each series is a lighter section with its title down its left edge from the top, beside the books in it; books outside any
 // series stand on the plain shelf. The shelf's board carries the project's title (a link when it opens the project), the book count and
 // the `right` slot.
 export function Shelf({ label, meta, groups, progress, activeBookId, selected, onOpenBook, onOpen, right }: {
