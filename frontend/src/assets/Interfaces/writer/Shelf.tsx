@@ -4,19 +4,23 @@ import type { ShelfGroup } from './outlineTree'
 import { nodeLabel } from './plotTree'
 import { bookThemeHue, fillColorCss } from '../../../theme/bookColors'
 
-// A spine's size follows its book: the width from 20px (no word-count goal) to 64px (220,000 words or more), the height from 110px to
+// A spine's size follows its book: the width from 10px (a goal of 20,000 words or none) to 64px (136,000 words or more), 2px wider for every further 4,000 words, the height from 110px to
 // 140px, so the bars on it have room. The selected book turns from its spine to its front cover, COVER_WIDTH wide.
-export const SPINE_MIN_WIDTH = 20
+export const SPINE_MIN_WIDTH = 10
 export const SPINE_MAX_WIDTH = 64
 export const SPINE_MIN_HEIGHT = 110
 export const SPINE_MAX_HEIGHT = 140
-const WORDS_PER_WIDTH_PX = 5000 // 8px of width for every 40,000 words
+// 10px at a goal of 20,000 words, and 2px wider for every further 4,000 words in the goal (no goal, or less than 20,000: 10px).
+const BASE_GOAL_WORDS = 20000
+const WORDS_PER_WIDTH_STEP = 4000
+const PX_PER_WIDTH_STEP = 2
 const WORDS_PER_HEIGHT_PX = 5000
 export const COVER_WIDTH = 96
 
 const clamp = (n: number, lo: number, hi: number) => Math.max(lo, Math.min(hi, n))
 export function spineWidth(goal: number | null | undefined): number {
-  return clamp(SPINE_MIN_WIDTH + Math.round((goal && goal > 0 ? goal : 0) / WORDS_PER_WIDTH_PX), SPINE_MIN_WIDTH, SPINE_MAX_WIDTH)
+  const steps = goal && goal > BASE_GOAL_WORDS ? Math.floor((goal - BASE_GOAL_WORDS) / WORDS_PER_WIDTH_STEP) : 0
+  return clamp(SPINE_MIN_WIDTH + steps * PX_PER_WIDTH_STEP, SPINE_MIN_WIDTH, SPINE_MAX_WIDTH)
 }
 export function spineHeight(goal: number | null | undefined): number {
   return clamp(SPINE_MIN_HEIGHT + Math.round((goal && goal > 0 ? goal : 0) / WORDS_PER_HEIGHT_PX), SPINE_MIN_HEIGHT, SPINE_MAX_HEIGHT)

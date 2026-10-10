@@ -131,8 +131,8 @@
     box-shadow: 1px 0 3px rgb(0 0 0 / calc(0.35 * var(--shade-k)));
   }
   // The spine: the book's number at the top, bars down it (no title).
-  .wrSpineSide { flex-direction: column; align-items: stretch; justify-content: flex-start; gap: 6px; padding: 8px 6px; box-sizing: border-box; }
-  .wrSpineNumber { flex: 0 0 auto; text-align: center; font-size: 12px; font-weight: 700; line-height: 1; letter-spacing: 0.3px; }
+  .wrSpineSide { flex-direction: column; align-items: stretch; justify-content: flex-start; gap: 6px; padding: 8px max(1px, 12%); box-sizing: border-box; }
+  .wrSpineNumber { flex: 0 0 auto; overflow: hidden; text-align: center; font-size: 11px; font-weight: 700; line-height: 1; }
   .wrSpineBars { flex: 0 0 auto; display: flex; flex-direction: column; gap: 4px; }
   .wrSpineWords { flex: 1 1 0; min-height: 0; display: flex; justify-content: center; }
   // A bar: a dark track of the spine's colour with a lighter fill, the accent colour once complete. Horizontal bars fill from the left, the words
@@ -142,7 +142,7 @@
     background: color-mix(in srgb, var(--wr-spine, var(--wr-accent-dark)) 55%, black);
   }
   .wrSpineBar--h { height: 5px; }
-  .wrSpineBar--v { width: 64%; min-width: 10px; max-width: 30px; height: 100%; }
+  .wrSpineBar--v { width: 64%; min-width: 6px; max-width: 30px; height: 100%; }
   .wrSpineBarFill { position: absolute; left: 0; bottom: 0; display: block; background: color-mix(in srgb, var(--wr-spine, var(--wr-accent-dark)) 55%, white); }
   .wrSpineBar--h .wrSpineBarFill { top: 0; }
   .wrSpineBar--v .wrSpineBarFill { right: 0; }
