@@ -47,7 +47,7 @@ describe('the cards', () => {
   })
 
   it.each(CARDS.map(c => [c.id, c] as const))('%s mounts in every zone', async (_id, card) => {
-    render(<Preview card={{ ...card, defaults: { ...card.defaults, zones: ['dawn', 'day', 'dusk', 'night'], widths: [400] } }} />)
+    render(<Preview card={{ ...card, defaults: { ...card.defaults, zones: ['dawn', 'day', 'dusk', 'night'], width: 400 } }} />)
     await waitFor(() => expect(document.querySelectorAll('.uiPreviewFrame')).toHaveLength(4))
     // Each frame is its own theme scope, drawn for its zone.
     const frames = Array.from(document.querySelectorAll<HTMLElement>('.uiPreviewFrame'))
@@ -60,18 +60,21 @@ describe('the cards', () => {
 describe('the preview frame', () => {
   const card = CARDS.find(c => c.id === 'controls')!
 
-  it('shows the zones chosen side by side, at the widths chosen', () => {
+  it('shows the zones chosen side by side, at the one screen width chosen', () => {
     render(<Preview card={card} />)
     expect(screen.getAllByRole('figure').map(f => f.querySelector('figcaption')?.textContent)).toEqual(['Day · 800px', 'Night · 800px'])
     const bar = screen.getByRole('toolbar', { name: /preview controls/ })
     fireEvent.click(within(bar).getByRole('button', { name: /Dawn/ }))
-    fireEvent.click(within(bar).getByRole('button', { name: '400px' }))
-    expect(screen.getAllByRole('figure').map(f => f.querySelector('figcaption')?.textContent))
-      .toEqual(['Dawn · 400px', 'Dawn · 800px', 'Day · 400px', 'Day · 800px', 'Night · 400px', 'Night · 800px'])
+    fireEvent.click(within(bar).getByRole('button', { name: '1200px' }))
+    expect(screen.getAllByRole('figure').map(f => f.querySelector('figcaption')?.textContent)).toEqual(['Dawn · 1200px', 'Day · 1200px', 'Night · 1200px'])
+    expect(within(bar).getByRole('button', { name: '800px' }).getAttribute('aria-pressed')).toBe('false')
+    // The container grows with the screen.
+    expect(document.querySelector<HTMLElement>('.uiPreview')!.style.getPropertyValue('--pv-w')).toBe('1200px')
+    expect(screen.getAllByRole('figure')[0].style.width).toBe('1200px')
   })
 
-  it('keeps at least one zone and one width on', () => {
-    render(<Preview card={{ ...card, defaults: { zones: ['day'], widths: [800] } }} />)
+  it('keeps at least one zone on, and pressing the chosen width keeps it', () => {
+    render(<Preview card={{ ...card, defaults: { zones: ['day'], width: 800 } }} />)
     const bar = screen.getByRole('toolbar', { name: /preview controls/ })
     fireEvent.click(within(bar).getByRole('button', { name: /Day/ }))
     fireEvent.click(within(bar).getByRole('button', { name: '800px' }))
@@ -79,7 +82,7 @@ describe('the preview frame', () => {
   })
 
   it('recolours the frames when the hue changes', () => {
-    render(<Preview card={{ ...card, defaults: { zones: ['day'], widths: [800] } }} />)
+    render(<Preview card={{ ...card, defaults: { zones: ['day'], width: 800 } }} />)
     const frame = () => document.querySelector<HTMLElement>('.uiPreviewFrame')!
     expect(frame().style.getPropertyValue('--color-theme-h')).toBe('330')
     fireEvent.change(screen.getByLabelText('Theme hue'), { target: { value: '100' } })
@@ -90,7 +93,7 @@ describe('the preview frame', () => {
 
   it('switches the card\'s view', async () => {
     const writer = CARDS.find(c => c.id === 'level-panels')!
-    render(<Preview card={{ ...writer, defaults: { zones: ['day'], widths: [800], view: 'dash' } }} />)
+    render(<Preview card={{ ...writer, defaults: { zones: ['day'], width: 800, view: 'dash' } }} />)
     const bar = screen.getByRole('toolbar', { name: /preview controls/ })
     expect(within(bar).getByRole('button', { name: 'Dash' }).getAttribute('aria-pressed')).toBe('true')
     fireEvent.click(within(bar).getByRole('button', { name: 'Project' }))

@@ -242,9 +242,9 @@ export const CARDS: CardDef[] = [
   card('draft-page', { views: WRITER_VIEWS.slice(3), defaults: { view: 'chapter', zones: ['day'] }, render: ({ view }) => <PreviewWriter key={view} view={view as WriterView} /> }),
   card('controls', { defaults: { zones: ['day', 'night'] }, render: () => <ControlsCard /> }),
   card('hue-slider', { defaults: { zones: ['day', 'night'] }, render: () => <HueCard /> }),
-  card('app-shell', { frame: 'plain', defaults: { zones: ['day'], widths: [1200] }, render: () => <App /> }),
-  card('sky-toggle', { frame: 'plain', defaults: { zones: ['dawn', 'day', 'dusk', 'night'], widths: [400] }, render: () => <SkyCard /> }),
-  card('theme-settings', { frame: 'plain', defaults: { zones: ['day'], widths: [800] }, render: () => <ThemeSettingsCard /> }),
+  card('app-shell', { frame: 'plain', defaults: { zones: ['day'], width: 1200 }, render: () => <App /> }),
+  card('sky-toggle', { frame: 'plain', defaults: { zones: ['dawn', 'day', 'dusk', 'night'], width: 400 }, render: () => <SkyCard /> }),
+  card('theme-settings', { frame: 'plain', defaults: { zones: ['day'], width: 800 }, render: () => <ThemeSettingsCard /> }),
   card('icons', { defaults: { zones: ['day', 'night'] }, render: () => <IconsCard /> }),
 ]
 

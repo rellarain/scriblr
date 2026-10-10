@@ -8,8 +8,8 @@ import { ZONE_LOOKS } from '../theme/zoneLooks'
 import { ZONE_ICON } from '../theme/zoneIcons'
 import './preview.scss'
 
-// The frame every design-system card is shown in: a toolbar (which zones to show side by side, the screen widths, the theme and accent
-// hue, and the card's own views) over a stage of frames, one per zone and width. Each frame is the app's theme scope (`.wrBookScope`
+// The frame every design-system card is shown in: a toolbar (which zones to show side by side, the screen width to show them at, the theme
+// and accent hue, and the card's own views) over a stage of frames, one per zone, each as wide as the chosen screen (the container grows with it). Each frame is the app's theme scope (`.wrBookScope`
 // with the zone's derived tokens) and a ThemeZoneProvider, so the real components inside draw for that zone and palette.
 
 export const SCREEN_WIDTHS = [400, 800, 1200] as const
@@ -26,7 +26,7 @@ export interface CardDef {
   height: number
   // The frame's own element: the Writer's `main.wUI.wr`, or a plain scope (the whole app shell brings its own).
   frame?: 'writer' | 'plain'
-  defaults?: { zones?: ZoneKey[]; widths?: ScreenWidth[]; view?: string }
+  defaults?: { zones?: ZoneKey[]; width?: ScreenWidth; view?: string }
   // A selector for the card's own variants (the Writer's levels, say).
   views?: Array<{ id: string; label: string }>
   render: (ctx: FrameContext) => ReactNode
@@ -57,7 +57,7 @@ function Toggle({ on, onClick, children, title }: { on: boolean; onClick: () => 
 
 export function Preview({ card }: { card: CardDef }) {
   const [zones, setZones] = useState<ZoneKey[]>(card.defaults?.zones ?? ['day', 'night'])
-  const [widths, setWidths] = useState<ScreenWidth[]>(card.defaults?.widths ?? [800])
+  const [width, setWidth] = useState<ScreenWidth>(card.defaults?.width ?? 800)
   const [view, setView] = useState<string>(card.defaults?.view ?? card.views?.[0]?.id ?? '')
   const [palette, setPalette] = useState<ZonePalette>(DEFAULT_PALETTE)
 
@@ -68,7 +68,7 @@ export function Preview({ card }: { card: CardDef }) {
   const hue = (key: 'theme' | 'accent' | 'alert') => (value: number) => setPalette(p => ({ ...p, [key]: { h: value }, ...(key === 'accent' ? { accent2: { h: (value + 228) % 360 } } : {}) }))
 
   return (
-    <div className="uiPreview">
+    <div className="uiPreview" style={{ '--pv-w': `${width}px` } as CSSProperties}>
       <div className="uiPvBar" role="toolbar" aria-label={`${card.title} preview controls`}>
         <div className="uiPvGroup" role="group" aria-label="Zones">
           <span className="uiPvLabel">Zone</span>
@@ -77,9 +77,9 @@ export function Preview({ card }: { card: CardDef }) {
             return <Toggle key={z} on={zones.includes(z)} onClick={() => setZones(list => toggle(list, z, ZONE_KEYS))} title={ZONE_LOOKS[z].summary}><Icon size={14} /> {ZONE_LABEL[z]}</Toggle>
           })}
         </div>
-        <div className="uiPvGroup" role="group" aria-label="Screen widths">
+        <div className="uiPvGroup" role="group" aria-label="Screen width">
           <span className="uiPvLabel">Screen</span>
-          {SCREEN_WIDTHS.map(w => <Toggle key={w} on={widths.includes(w)} onClick={() => setWidths(list => toggle(list, w, SCREEN_WIDTHS))}>{w}px</Toggle>)}
+          {SCREEN_WIDTHS.map(w => <Toggle key={w} on={width === w} onClick={() => setWidth(w)}>{w}px</Toggle>)}
         </div>
         {card.views && (
           <div className="uiPvGroup" role="group" aria-label="View">
@@ -97,14 +97,14 @@ export function Preview({ card }: { card: CardDef }) {
         </div>
       </div>
       <div className="uiPvStage">
-        {zones.map(zone => widths.map(width => (
-          <figure key={`${zone}-${width}-${view}`} className="uiPvFigure" style={{ width: Math.min(width, 1200) }}>
+        {zones.map(zone => (
+          <figure key={`${zone}-${view}`} className="uiPvFigure" style={{ width }}>
             <figcaption>{ZONE_LABEL[zone]} · {width}px</figcaption>
-            <div className="uiPvBox" style={{ width }}>
+            <div className="uiPvBox">
               <Frame card={card} zone={zone} width={width} palette={palette} view={view} />
             </div>
           </figure>
-        )))}
+        ))}
       </div>
     </div>
   )
