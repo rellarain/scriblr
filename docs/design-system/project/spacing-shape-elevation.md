@@ -4,9 +4,9 @@ The Writer is **flat and square**. Depth is a step in colour, not a shadow; pane
 
 ## Shape
 
-- **No radius on a surface or a field** (`radius-none`): levels, tiles (the tile grid, its minimised rail and its console too), tabs, page edges, cards, notes, project cards, the Theme panel and its swatches, and every field on a level. The level and card rules set `border-radius: 0` after their own, so a stray rounded rule does not leak through.
+- **No radius on a surface or a field** (`radius-none`): levels, tiles (the tile grid, its minimised rail and its console too), tabs, page edges, cards, notes, project cards, the Theme panel and its swatches, the helper and admin screens' cards, fields and counts, **chips** (the tag with an x, the chip add box) and every field on a level. The level and card rules set `border-radius: 0` after their own, so a stray rounded rule does not leak through.
 - **Buttons keep their small radius** where they have one (`radius-button`, 4px; the Theme panel's are 6px): the header, a tile's title button, the zone tabs. On a level the **header tab buttons, the tab bar that holds them, and the Undo, Redo and Save buttons with the container that holds them** are rounded (`radius-button`); the other small, icon and toggle buttons on a level are square (`radius-none`).
-- **Rounded only where it reads as a control on paper**: inputs and buttons on the sheet and the segmented switch (`radius-input`, 4px), chips (`radius-chip`, 12px), the toggle switch and its knob.
+- **Rounded only where it reads as a control on paper**: inputs and buttons on the sheet and the segmented switch (`radius-input`, 4px), the toggle switch and its knob.
 - A book is the exception that proves it: the spine front has a 3px right corner, and the page edges are square steps.
 
 ## Depth
@@ -15,7 +15,7 @@ A level is a flat fill. What sits inside steps one shade deeper each time: a lev
 
 Borders are mostly **inset shadows or 1px lines in a token colour**, not drawn borders: a tile's, card's or note's edge is `hairline` (a card is `surface-raised`, one flat colour, with that hairline where it would otherwise merge with its ground); a card on paper has a 1px `paper-line`; an arc or chapter card has a 5px left stripe in its own colour (`--wr-node-tint`). Focus is `outline: 2px solid` in the accent's light shade, offset inside the control.
 
-Shadows are few (`tokens.json`, `shadow-*`) and are for what floats over content or stands in front of it: a page-edge tab, the raised tab, the book cover beside its page edges, a spine, the save bubble (`surface-deeper` with `ink`), the time popover. They are black at a fixed alpha, softened by 0.55 in a light zone (`--shade-k`). A card, a tile and a note have none.
+Shadows are few (`tokens.json`, `shadow-*`) and are for what floats over content or stands in front of it: a page-edge tab, the raised tab, the book cover beside its page edges, a spine, the time popover. They are black at a fixed alpha, softened by 0.55 in a light zone (`--shade-k`). A card, a tile and a note have none.
 
 ## Dragged and disabled
 

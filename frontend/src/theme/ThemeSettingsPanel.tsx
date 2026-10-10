@@ -185,9 +185,11 @@ function ZoneEditor({ zoneKey, role }: { zoneKey: ZoneKey; role: Role }) {
 // its own heading and a shared Save/Restore control (Account > Settings).
 function ThemeSettingsPanel({ showHeader = true }: { showHeader?: boolean } = {}) {
   const { theme, ui } = useSettings()
-  const { effectiveRole } = useThemeState()
+  const { effectiveRole, activeZone } = useThemeState()
   const now = useMinuteClock()
-  const [selected, setSelected] = useState<ZoneKey>('day')
+  // The panel opens on the zone the app is in (when it is one in use), so its swatches and the preview start from the colours on screen,
+  // not from Day.
+  const [selected, setSelected] = useState<ZoneKey>(() => (theme.zones[activeZone].configured ? activeZone : 'day'))
 
   const configured = theme.zones[selected].configured
 

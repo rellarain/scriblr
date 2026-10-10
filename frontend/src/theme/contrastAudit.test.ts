@@ -20,10 +20,10 @@ describe('the contrast audit', () => {
     for (const r of rows) expect(r.min).toBe(MIN_RATIO[r.kind])
   })
 
-  it('covers the theme surfaces, hover and press, the fills, the paper, the preview page, the reactions, the edge tabs, the sky toggle and the level panels in all four zones', () => {
+  it('covers the theme surfaces, hover and press, the fills, the paper, the preview page, the reactions, the edge tabs, the sky toggle, the Inbox tones, the plot colours, the Theme panel and the level panels in all four zones', () => {
     for (const zone of ZONES) {
       const groups = new Set(rows.filter(r => r.zone === zone).map(r => r.group))
-      expect([...groups].sort()).toEqual(['Edge tabs', 'Fills', 'Hover and pressed', 'Level panels', 'Paper', 'Preview page', 'Reactions', 'Sky toggle', 'Theme surfaces'])
+      expect([...groups].sort()).toEqual(['Edge tabs', 'Fills', 'Hover and pressed', 'Inbox tones', 'Level panels', 'Paper', 'Plot colours', 'Preview page', 'Reactions', 'Sky toggle', 'Theme panel', 'Theme surfaces'])
     }
   })
 
@@ -79,4 +79,18 @@ describe('the Writer stylesheet', () => {
       .filter(([, line]) => [...line.matchAll(/opacity: 0\.(\d+)/g)].some(m => Number(`0.${m[1]}`) < 0.8))
     expect(low.map(([n, line]) => `${n}: ${line.trim().slice(0, 70)}`)).toEqual([])
   })
+
+  // A black or white wash written out at a fixed alpha does not follow the zone (white on a light zone is invisible, black does not soften):
+  // recesses are --ov-sink-1..3 and lifts --ov-lift-1..3. Shadows, gradients and the scrim are not washes.
+  it.each(['../assets/Interfaces/writer/writer.scss', '../App.scss', '../assets/Interfaces/admin/resources/resources.scss'])(
+    'writes no black or white wash at a fixed alpha in %s',
+    file => {
+      const css = readFileSync(path.resolve(__dirname, file), 'utf-8')
+      const washes = css.split(String.fromCharCode(10))
+        .map((line, i) => [i + 1, line] as const)
+        .filter(([, line]) => !/box-shadow|linear-gradient|text-shadow/.test(line))
+        .filter(([, line]) => /rgba?\(\s*(0[ ,]+0[ ,]+0|255[ ,]+255[ ,]+255)\b/.test(line))
+      expect(washes.map(([n, line]) => `${n}: ${line.trim().slice(0, 70)}`)).toEqual([])
+    },
+  )
 })

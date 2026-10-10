@@ -20,7 +20,7 @@ Inside a level's body the buttons take `on-accent` text on `level-wash` (the ink
 
 ## Inputs
 
-`.wrField`: a black wash at 25%, 13px, padding 8 / 10, focus = a 1px inset accent. `::placeholder` is `ink-faint`. On a level the Outline's inputs are the **light input** (`level-input`, `level-input-ink`, `level-input-hint` for the placeholder); on paper they are `paper-field` with `paper-ink`, a 1px `paper-line` and a 4px radius. A title input is serif, 13px. A chip (`.wrChip`) is a pill with an optional x.
+`.wrField`: a black wash at 25%, 13px, padding 8 / 10, focus = a 1px inset accent. `::placeholder` is `ink-faint`. On a level the Outline's inputs are the **light input** (`level-input`, `level-input-ink`, `level-input-hint` for the placeholder); on paper they are `paper-field` with `paper-ink`, a 1px `paper-line` and a 4px radius. A title input is serif, 13px. A chip (`.wrChip`) is a flat, square tag with an optional x.
 
 ## Alerts and quiet text
 

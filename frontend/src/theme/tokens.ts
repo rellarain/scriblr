@@ -1,5 +1,6 @@
 import type { HSL } from './contrast'
-import { fillDirection, fillInk, INK_STRENGTH, PAPER_LOOKS, SIDEBAR_SHADE_1, ZONE_LOOKS, pageTone, paperAccents, resolvePalette, zoneInk } from './zoneLooks'
+import { fillDirection, fillInk, INK_STRENGTH, PAPER_LOOKS, SIDEBAR_SHADE_1, ZONE_LOOKS, pageTone, paperAccents, resolvePalette, toneMarks, zoneInk } from './zoneLooks'
+import { fillCap } from './bookColors'
 import type { Role, ZoneKey, ZonePalette } from './types'
 
 // Turns a zone's hues into the CSS custom properties the app is styled with.
@@ -25,12 +26,15 @@ export function deriveTokens(pal: ZonePalette, role: Role, zone: ZoneKey): Theme
   const onAlert = fillInk(colors.alert, pal.theme.h)
   const onAccent2 = role === 'admin' ? fillInk(colors.accent2, pal.theme.h) : onAccent
   const accents = paperAccents(zone, { theme: pal.theme.h, accent: pal.accent.h, alert: pal.alert.h })
+  const tones = toneMarks(zone, colors.theme, accent2, colors.alert)
   const away = (d: 1 | -1) => (d > 0 ? 'hsl(0, 0%, 100%)' : 'hsl(0, 0%, 0%)')
 
   return {
     '--color-theme-h': String(colors.theme.h),
     '--color-theme-s': `${colors.theme.s}%`,
     '--color-theme-l': `${colors.theme.l}%`,
+    // The lightest a level fill drawn in the theme's own hue may be (a hue given as var(--color-theme-h): fillColorCss).
+    '--theme-fill-cap': `${fillCap(pal.theme.h)}%`,
     '--color-accent-h': String(colors.accent.h),
     '--color-accent-s': `${colors.accent.s}%`,
     '--color-accent-l': `${colors.accent.l}%`,
@@ -82,6 +86,10 @@ export function deriveTokens(pal: ZonePalette, role: Role, zone: ZoneKey): Theme
     '--paper-error': hsl(accents.error),
     '--paper-like': hsl(accents.like),
     '--paper-dislike': hsl(accents.dislike),
+    // The Inbox's tones as marks (a glyph, a count, a line of text) on the sidebar's surfaces, each fitted to read there.
+    '--tone-yes-mark': hsl(tones.yes),
+    '--tone-no-mark': hsl(tones.no),
+    '--tone-mid-mark': hsl(tones.mid),
     // The Preview page's day and night tones (writer.scss .wrPage--day, .wrPage--night), themed.
     ...pageTokens('day', pal),
     ...pageTokens('night', pal),
@@ -95,5 +103,7 @@ function pageTokens(tone: 'day' | 'night', pal: ZonePalette): ThemeVars {
     [`--page-${tone}-ink`]: hsl(t.ink),
     [`--page-${tone}-line`]: hsl(t.line),
     [`--page-${tone}-muted`]: hsl(t.muted),
+    [`--page-${tone}-highlight`]: hsl(t.hover),
+    [`--page-${tone}-highlight-selected`]: hsl(t.selected),
   }
 }

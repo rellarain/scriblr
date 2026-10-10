@@ -1,5 +1,5 @@
 import type { PlotNode } from '../../../api/types'
-import { accentColorCss, themeColorCss } from '../../../theme/bookColors'
+import { accentColorCss, fillColorCss, themeColorCss } from '../../../theme/bookColors'
 
 // Colour coding for the plot tree. A category has a hue drawn in the theme's
 // colour; a subcategory has a hue drawn in the accent's colour, kept within 60 degrees of its category's. Saturation and brightness
@@ -15,6 +15,9 @@ const APP_HUE = 'var(--color-theme-h)'
 export interface PlotColors {
   category: string | null
   subcategory: string | null
+  // The subcategory's colour as a surface that carries text (a nav row, a card): the level's fill of its hue, held dark enough for white
+  // text to read whatever the hue (the accent colour at a hue can be too bright). The edge stripe stays the accent colour.
+  subcategoryFill: string | null
 }
 
 export function plotColors(node: PlotNode, byId: Map<string, PlotNode>): PlotColors {
@@ -27,15 +30,18 @@ export function plotColors(node: PlotNode, byId: Map<string, PlotNode>): PlotCol
   }
   const categoryHue = category?.hue ?? null
   const categoryCss = category ? themeColorCss(categoryHue ?? APP_HUE) : null
-  const subcategoryCss = subcategory ? accentColorCss(subcategory.hue ?? categoryHue ?? APP_HUE) : null
-  return { category: categoryCss, subcategory: subcategoryCss }
+  const subcategoryHue = subcategory ? subcategory.hue ?? categoryHue ?? APP_HUE : null
+  const subcategoryCss = subcategoryHue !== null ? accentColorCss(subcategoryHue) : null
+  const subcategoryFill = subcategoryHue !== null ? fillColorCss(subcategoryHue) : null
+  return { category: categoryCss, subcategory: subcategoryCss, subcategoryFill }
 }
 
-// The style that hands a node's colours to its CSS: `var(--wr-cat)` and `var(--wr-sub)`
+// The style that hands a node's colours to its CSS: `var(--wr-cat)`, `var(--wr-sub)` and `var(--wr-sub-fill)`
 // (each set only when the node has that colour, so `var(--wr-sub, transparent)` works).
 export function plotColorVars(colors: PlotColors) {
   const vars: Record<string, string> = {}
   if (colors.category) vars['--wr-cat'] = colors.category
   if (colors.subcategory) vars['--wr-sub'] = colors.subcategory
+  if (colors.subcategoryFill) vars['--wr-sub-fill'] = colors.subcategoryFill
   return Object.keys(vars).length > 0 ? vars : undefined
 }

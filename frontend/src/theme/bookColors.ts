@@ -97,8 +97,12 @@ export function fillHsl(hue: number, accent: { s: number; l: number }): HSL {
   return { h: hueOfCode(hue), s: accent.s * FILL_SATURATION, l: clamp(accent.l - FILL_DARKEN, 0, fillCap(hue)) }
 }
 
-// A level panel's flat fill: the colour in the accent family, a little less loud and deeper.
-export const fillColorCss = (code: number): string => hueCss(code, 'accent', true)
+// A level panel's flat fill: the colour in the accent family, a little less loud and deeper. A hue given as CSS (the app theme's own,
+// var(--color-theme-h)) is held to the theme hue's cap (--theme-fill-cap, tokens.ts).
+export const fillColorCss = (hue: number | string): string =>
+  typeof hue === 'number'
+    ? hueCss(hue, 'accent', true)
+    : `hsl(${hue}, calc(var(--color-accent-s) * ${FILL_SATURATION}), clamp(0%, calc(var(--color-accent-l) - ${FILL_DARKEN}%), var(--theme-fill-cap, ${FILL_MAX_L}%)))`
 
 // The zone's own theme saturation and lightness: what a hue slider draws a base hue at.
 export function zoneBasis(pal: ZonePalette, zone: ZoneKey): { s: number; l: number } {

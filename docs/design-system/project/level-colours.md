@@ -34,4 +34,4 @@ Everything inside a book is re-tinted for it: `BookScope` re-derives the theme t
 - a book's **spine** and cover (`--wr-spine`, the same fill) and the page-edge rail's back cover (`--wr-cover`);
 - an **edge tab**: a stripe in the tab's colour, and, raised, its background (fitted so the tab's ink reads: `tabColors`);
 - a card's left stripe (`--wr-node-tint`), the arc and chapter rows in the contents;
-- a plotpoint's category and subcategory colours (`plotColors.ts`), and a plotpoint's awareness shade (`awareness.ts`), which is fitted to read too.
+- a plotpoint's category and subcategory colours (`plotColors.ts`): a category is the theme's colour at its hue with the zone's ink on it, a subcategory's surface (`--wr-sub-fill`) is the level fill of its hue with white on it, and its 4px stripe (`--wr-sub`) the accent colour; and a plotpoint's awareness shade (`awareness.ts`), which is fitted to read too.

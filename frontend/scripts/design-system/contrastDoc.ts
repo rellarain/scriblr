@@ -4,7 +4,7 @@ import { ZONE_LABEL } from '../../src/theme/types'
 // project/contrast.md: the readability audit as a table per group, for every zone. Each cell is the pair's ratio at the default hues and, in
 // brackets, its worst ratio over every hue a user can pick.
 
-const GROUPS = ['Theme surfaces', 'Fills', 'Paper', 'Reactions', 'Edge tabs', 'Level panels']
+const GROUPS = ['Theme surfaces', 'Hover and pressed', 'Fills', 'Paper', 'Preview page', 'Reactions', 'Edge tabs', 'Level panels', 'Plot colours', 'Inbox tones', 'Theme panel', 'Sky toggle']
 
 const fmt = (n: number) => n.toFixed(1)
 
@@ -19,7 +19,8 @@ export function contrastMarkdown(rows: AuditRow[] = audit()): string {
     'Each cell is the ratio at the default hues (theme 330, accent 32, alert 200) and, in brackets, the worst ratio over a 30-degree grid of all three palette hues (and every 5 degrees of a level colour).',
     '',
   ]
-  for (const group of GROUPS) {
+  // The groups in the order above, then any the audit has gained since (so a new group is never left out of the page).
+  for (const group of [...new Set([...GROUPS, ...rows.map(r => r.group)])]) {
     const inGroup = rows.filter(r => r.group === group)
     if (inGroup.length === 0) continue
     lines.push(`## ${group}`, '', `| Pair | Needs | ${ZONES.map(z => ZONE_LABEL[z]).join(' | ')} |`, `|---|---|${ZONES.map(() => '---').join('|')}|`)

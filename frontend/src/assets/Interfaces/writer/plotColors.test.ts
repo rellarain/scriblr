@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import type { PlotNode } from '../../../api/types'
+import { fillColorCss } from '../../../theme/bookColors'
 import { plotColors, plotColorVars } from './plotColors'
 
 const node = (id: string, kind: PlotNode['kind'], parentId: string | null, hue?: number | null): PlotNode => ({
@@ -10,6 +11,7 @@ const tree = (...nodes: PlotNode[]) => new Map(nodes.map(n => [n.id, n]))
 
 const theme = (h: number | string) => `hsl(${h}, var(--color-theme-s), var(--color-theme-l))`
 const accent = (h: number | string) => `hsl(${h}, var(--color-accent-s), var(--color-accent-l))`
+const fill = (h: number | string) => fillColorCss(h)
 
 describe('plotColors', () => {
   const category = node('c', 'category', null, 200)
@@ -19,18 +21,18 @@ describe('plotColors', () => {
   const all = tree(category, sub, line, point)
 
   it('draws a category in the theme colour and a subcategory in the accent colour', () => {
-    expect(plotColors(category, all)).toEqual({ category: theme(200), subcategory: null })
-    expect(plotColors(sub, all)).toEqual({ category: theme(200), subcategory: accent(230) })
+    expect(plotColors(category, all)).toEqual({ category: theme(200), subcategory: null, subcategoryFill: null })
+    expect(plotColors(sub, all)).toEqual({ category: theme(200), subcategory: accent(230), subcategoryFill: fill(230) })
   })
 
   it('gives plotlines and plotpoints both their category\'s and their subcategory\'s colour', () => {
-    expect(plotColors(line, all)).toEqual({ category: theme(200), subcategory: accent(230) })
-    expect(plotColors(point, all)).toEqual({ category: theme(200), subcategory: accent(230) })
+    expect(plotColors(line, all)).toEqual({ category: theme(200), subcategory: accent(230), subcategoryFill: fill(230) })
+    expect(plotColors(point, all)).toEqual({ category: theme(200), subcategory: accent(230), subcategoryFill: fill(230) })
   })
 
   it('has only the category colour for a plotline directly under a category', () => {
     const direct = node('d', 'plotline', 'c')
-    expect(plotColors(direct, tree(category, direct))).toEqual({ category: theme(200), subcategory: null })
+    expect(plotColors(direct, tree(category, direct))).toEqual({ category: theme(200), subcategory: null, subcategoryFill: null })
   })
 
   it('lets a subcategory without a hue follow its category', () => {
@@ -48,12 +50,12 @@ describe('plotColors', () => {
 
   it('has no colour for something outside the category tree', () => {
     const orphan = node('o', 'plotline', null)
-    expect(plotColors(orphan, tree(orphan))).toEqual({ category: null, subcategory: null })
+    expect(plotColors(orphan, tree(orphan))).toEqual({ category: null, subcategory: null, subcategoryFill: null })
   })
 
   it('hands the colours to CSS as variables, each only when there is one', () => {
-    expect(plotColorVars({ category: theme(10), subcategory: accent(40) })).toEqual({ '--wr-cat': theme(10), '--wr-sub': accent(40) })
-    expect(plotColorVars({ category: theme(10), subcategory: null })).toEqual({ '--wr-cat': theme(10) })
-    expect(plotColorVars({ category: null, subcategory: null })).toBeUndefined()
+    expect(plotColorVars({ category: theme(10), subcategory: accent(40), subcategoryFill: fill(40) })).toEqual({ '--wr-cat': theme(10), '--wr-sub': accent(40), '--wr-sub-fill': fill(40) })
+    expect(plotColorVars({ category: theme(10), subcategory: null, subcategoryFill: null })).toEqual({ '--wr-cat': theme(10) })
+    expect(plotColorVars({ category: null, subcategory: null, subcategoryFill: null })).toBeUndefined()
   })
 })

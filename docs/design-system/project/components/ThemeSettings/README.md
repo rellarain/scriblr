@@ -13,7 +13,7 @@ Code: `theme/ThemeSettingsPanel.tsx`, `SkyZoneTab.tsx`, `palettes.ts`, `paletteR
 5. **Zone tabs**: Dawn, Day, Dusk, Night, each a small painted sky, with its start time (a 10-minute select) and a one-line summary ("Light background, dark text, vivid colours"). Enabling or disabling a zone is on its tab; Day cannot be turned off.
 6. **For the selected zone, four colour sections** (Theme, Accent, Alert, Admin accent): the colour's **derived shades** (the swatches the app really draws: base, side, deep, deeper, sidebars, raised; or fill, hover and dim), an even **tint ladder**, and a **hue range**.
 
-While a zone's editor is open the app previews that zone, unsaved.
+The panel opens on the zone the app is in (when that zone is in use; else Day). While a zone's editor is open the app previews that zone, unsaved. The swatches are the palette of the zone being edited, whatever zone the frame is in; the icons on the day bar's segments are audited.
 
 ## Tokens
 

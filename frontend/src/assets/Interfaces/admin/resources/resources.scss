@@ -4,7 +4,7 @@
 // re-pointed at the admin accent (App.scss), so this needs no colours of
 // its own.
 
-$res-surface: linear-gradient(160deg, var(--surface-raised-a), var(--surface-raised-b));
+$res-surface: var(--surface-raised);
 
 .resConsole { display: flex; flex-direction: column; gap: 10px; min-height: 0; flex: 1 1 auto; }
 .resTopBar { flex: 0 0 auto; }
@@ -16,7 +16,7 @@ $res-surface: linear-gradient(160deg, var(--surface-raised-a), var(--surface-rai
   min-height: 0;
   overflow-y: auto;
   padding: 8px 6px;
-  border-radius: 10px;
+  border-radius: 0;
   background: $res-surface;
   box-shadow: inset 0 0 0 1px var(--hairline);
 }
@@ -33,7 +33,7 @@ $res-surface: linear-gradient(160deg, var(--surface-raised-a), var(--surface-rai
   align-items: center;
   gap: 2px;
   padding: 4px 4px;
-  border-radius: 6px;
+  border-radius: 0;
   cursor: pointer;
   &:hover { background: var(--ov-sink-1); }
   &--selected { background: var(--ov-sink-2); }
@@ -46,7 +46,7 @@ $res-surface: linear-gradient(160deg, var(--surface-raised-a), var(--surface-rai
   color: var(--ink);
   font-size: 12.5px;
   padding: 3px 4px;
-  border-radius: 4px;
+  border-radius: 0;
   &:focus { background: var(--ov-sink-1); outline: none; }
   &::placeholder { color: var(--ink-faint); }
 }
@@ -110,7 +110,7 @@ $res-surface: linear-gradient(160deg, var(--surface-raised-a), var(--surface-rai
   gap: 4px;
   background: var(--ov-sink-1);
   padding: 4px;
-  border-radius: 8px;
+  border-radius: 0;
   &--sub { margin-bottom: 10px; }
 }
 .resPill {
@@ -167,7 +167,7 @@ $res-surface: linear-gradient(160deg, var(--surface-raised-a), var(--surface-rai
   max-width: 720px;
   padding: 12px 14px;
   border: 0;
-  border-radius: 8px;
+  border-radius: 0;
   box-shadow: inset 0 0 0 1px var(--hairline);
   background: var(--surface-base);
   color: var(--ink);
@@ -183,7 +183,7 @@ $res-surface: linear-gradient(160deg, var(--surface-raised-a), var(--surface-rai
   max-width: 720px;
   padding: 14px 18px;
   margin-bottom: 12px;
-  border-radius: 10px;
+  border-radius: 0;
   background: $res-surface;
   box-shadow: inset 0 0 0 1px var(--hairline);
 }
@@ -206,7 +206,7 @@ $res-surface: linear-gradient(160deg, var(--surface-raised-a), var(--surface-rai
   flex: 0 0 auto;
   font-size: 10px;
   padding: 2px 8px;
-  border-radius: 10px;
+  border-radius: 0;
   background: var(--ov-sink-1);
   color: var(--ink-muted);
   font-weight: 700;
@@ -232,7 +232,7 @@ $res-surface: linear-gradient(160deg, var(--surface-raised-a), var(--surface-rai
 .resPreviewCard {
   max-width: 720px;
   padding: 24px 28px;
-  border-radius: 10px;
+  border-radius: 0;
   background: $res-surface;
   box-shadow: inset 0 0 0 1px var(--hairline);
 }
@@ -240,7 +240,7 @@ $res-surface: linear-gradient(160deg, var(--surface-raised-a), var(--surface-rai
 .resBadge {
   font-size: 10px;
   padding: 2px 9px;
-  border-radius: 10px;
+  border-radius: 0;
   background: var(--ov-sink-1);
   color: var(--ink-muted);
   font-weight: 700;
@@ -257,7 +257,7 @@ $res-surface: linear-gradient(160deg, var(--surface-raised-a), var(--surface-rai
   h1, h2, h3 { color: var(--ink); }
   p { margin: 0 0 10px; }
   ul, ol { margin: 0 0 10px; padding-left: 20px; }
-  &--card { max-width: 720px; min-height: 380px; padding: 20px 24px; border-radius: 8px; box-shadow: inset 0 0 0 1px var(--hairline); background: var(--surface-base); }
+  &--card { max-width: 720px; min-height: 380px; padding: 20px 24px; border-radius: 0; box-shadow: inset 0 0 0 1px var(--hairline); background: var(--surface-base); }
 }
 .resTutorialPreview, .resFaqPreview { border-left: 2px solid var(--hairline); padding-left: 12px; margin-bottom: 12px; }
 .resTutorialTitle, .resFaqQ { font-weight: 700; font-size: 13.5px; margin-bottom: 3px; display: flex; align-items: center; gap: 8px; }
@@ -266,7 +266,7 @@ $res-surface: linear-gradient(160deg, var(--surface-raised-a), var(--surface-rai
 .resFeedbackSection { border-top: 1px solid var(--hairline); margin-top: 20px; padding-top: 18px; }
 .resFeedbackSectionHead { display: flex; align-items: center; justify-content: space-between; }
 .resComingSoon { font-size: 11px; color: var(--ink-faint); font-style: italic; }
-.resFeedbackThanks { margin-top: 12px; padding: 12px 14px; background: var(--ov-sink-1); border-radius: 8px; font-size: 13px; color: var(--ink); }
+.resFeedbackThanks { margin-top: 12px; padding: 12px 14px; background: var(--ov-sink-1); border-radius: 0; font-size: 13px; color: var(--ink); }
 .resFeedbackForm { margin-top: 12px; }
 .resFeedbackMeta { font-size: 12px; color: var(--ink-muted); margin-bottom: 6px; }
 .resError { font-size: 12px; color: var(--alert); margin: 6px 0 0; }
@@ -276,7 +276,7 @@ $res-surface: linear-gradient(160deg, var(--surface-raised-a), var(--surface-rai
   flex: 1 1 auto;
   min-width: 0;
   border: 0;
-  border-radius: 6px;
+  border-radius: 0;
   box-shadow: inset 0 0 0 1px var(--hairline);
   background: var(--surface-base);
   color: var(--ink);

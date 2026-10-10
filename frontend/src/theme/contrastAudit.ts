@@ -1,5 +1,5 @@
 import { tabColors, fillCap, fillHsl } from './bookColors'
-import type { HSL } from './contrast'
+import { readableInk, type HSL } from './contrast'
 import { levelPairs } from './levelContrast'
 import { skyLook } from './skyLook'
 import {
@@ -7,7 +7,7 @@ import {
 } from './readable'
 import {
   DISLIKE_BAR_SATURATIONS, INK_STRENGTH, LIFT_ALPHA, LIKE_BAR_SATURATIONS, PAPER_LOOKS, SIDEBAR_SHADE_1, SINK_ALPHAS, SURFACE_OFFSETS, ZONE_LOOKS,
-  fillInk, pageTone, paperAccents, paperGrounds, paperInks, resolvePalette, shadeK, zoneInk,
+  fillInk, pageTone, paperAccents, paperGrounds, paperInks, resolvePalette, shadeK, toneMarks, zoneInk,
 } from './zoneLooks'
 import type { ZoneKey, ZonePalette } from './types'
 
@@ -56,7 +56,7 @@ export function paletteRatios(zone: ZoneKey, hues: AuditHues = DEFAULT_HUES): Pa
   for (const [name, offset] of surfaces) {
     const surface = rgbOf(hsl(hues.theme, colors.theme.s, clamp(colors.theme.l + offset, 0, 100)))
     for (const [suffix, bg] of [['', surface], [' under a recess', over(BLACK, sinkDeepest, surface)]] as Array<[string, RGB]>) {
-      add(`ink/${name}${suffix ? '/sunk' : ''}`, 'Theme surfaces', `Ink on surface-${name}${suffix}`, 'text', ink, bg)
+      add(`ink/${name}${suffix ? '/sunk' : ''}`, 'Theme surfaces', `Ink on surface-${name}${suffix}`, 'ui', ink, bg)
       add(`ink-muted/${name}${suffix ? '/sunk' : ''}`, 'Theme surfaces', `Muted ink on surface-${name}${suffix}`, 'text', over(ink, strength.muted / 100, bg), bg)
       add(`ink-faint/${name}${suffix ? '/sunk' : ''}`, 'Theme surfaces', `Faint ink on surface-${name}${suffix}`, 'text', over(ink, strength.faint / 100, bg), bg)
     }
@@ -120,7 +120,43 @@ export function paletteRatios(zone: ZoneKey, hues: AuditHues = DEFAULT_HUES): Pa
     const t = pageTone(tone, hues.theme, hues.accent)
     add(`page-${tone}-ink`, 'Preview page', `Preview page text, ${tone} tone`, 'text', rgbOf(t.ink), rgbOf(t.page))
     add(`page-${tone}-muted`, 'Preview page', `Preview page quiet text, ${tone} tone`, 'text', rgbOf(t.muted), rgbOf(t.page))
+    for (const [name, highlight] of [['hovered', t.hover], ['selected', t.selected]] as const) {
+      add(`page-${tone}-ink/${name}`, 'Preview page', `Preview page text on a ${name} sentence, ${tone} tone`, 'text', rgbOf(t.ink), rgbOf(highlight))
+      add(`page-${tone}-muted/${name}`, 'Preview page', `Preview page quiet text on a ${name} sentence, ${tone} tone`, 'text', rgbOf(t.muted), rgbOf(highlight))
+    }
   }
+
+  // ---- the admin Inbox's tones (App.scss .inboxSection): yes is the admin accent, no the alert, mid the ink at 34% over sidebar-2. Their ink
+  // on them as a fill is the 'Fills' pairs (and the neutral tone's here); as a mark (a face, a vote's glyph, a check mark: icons, 3:1) each tone is fitted
+  // (toneMarks) to read on the sidebar's two surfaces and under a field's recess.
+  const sidebars: Array<[string, RGB]> = [
+    ['sidebar-1', rgbOf(hsl(hues.theme, colors.theme.s, clamp(colors.theme.l + SIDEBAR_SHADE_1[look.mode], 0, 100)))],
+    ['sidebar-2', rgbOf(hsl(hues.theme, colors.theme.s, clamp(colors.theme.l + SURFACE_OFFSETS[4], 0, 100)))],
+  ]
+  add('tone-mid-ink', 'Inbox tones', 'Ink on the neutral tone', 'text', ink, over(ink, 0.34, sidebars[1][1]))
+  const marks = toneMarks(zone, colors.theme, colors.accent2, colors.alert)
+  for (const [gname, ground] of sidebars) {
+    for (const [suffix, bg] of [['', ground], [' under a recess', over(BLACK, sinkDeepest, ground)]] as Array<[string, RGB]>) {
+      for (const tone of ['yes', 'no', 'mid'] as const) {
+        add(`tone-${tone}-mark/${gname}${suffix ? '/sunk' : ''}`, 'Inbox tones', `${tone} tone as a mark on ${gname}${suffix}`, 'ui', rgbOf(marks[tone]), bg)
+      }
+    }
+  }
+
+  // ---- the plot editor's colours: a category is the theme's colour at its hue (the ink on it), a subcategory's surface the level fill of its hue
+  // (white on it, as on any level); each worst over every hue a plot node can carry, and the subcategory also at the app theme's own hue.
+  let worstCategory = Infinity
+  let worstSubcategory = ratioOfRgb(WHITE, rgbOf(fillHsl(hues.theme, colors.accent)))
+  for (let h = 0; h < 360; h += 5) {
+    worstCategory = Math.min(worstCategory, ratioOfRgb(ink, rgbOf(hsl(h, colors.theme.s, colors.theme.l))))
+    worstSubcategory = Math.min(worstSubcategory, ratioOfRgb(WHITE, rgbOf(fillHsl(h, colors.accent))))
+  }
+  out.push({ id: 'plot-category', group: 'Plot colours', label: 'Ink on a plot category, the worst hue', kind: 'text', ratio: worstCategory })
+  out.push({ id: 'plot-subcategory', group: 'Plot colours', label: 'White on a plot subcategory, the worst hue', kind: 'text', ratio: worstSubcategory })
+
+  // ---- Theme settings: the timeline's icon on its segment (the zone's accent hue at 50% lightness, as ThemeSettingsPanel draws it)
+  const segment = hsl(colors.accent.h, colors.accent.s, 50)
+  add('timeline-icon', 'Theme panel', 'Timeline icon on its zone segment', 'ui', rgbOf(readableInk(segment)), rgbOf(segment))
 
   // ---- the header's sky toggle (and the zone tabs in Theme settings): the time and date, against the worst colour of the sky behind
   const sky = skyLook(zone, palette)

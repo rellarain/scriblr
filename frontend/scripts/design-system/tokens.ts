@@ -50,10 +50,9 @@ const SPACING: Token[] = [
   { name: 'hue-window', value: String(SUBCATEGORY_HUE_WINDOW), usage: 'Degrees: how far a series, arc, chapter or plot subcategory colour may stray from its parent\'s hue.' },
 ]
 const RADIUS: Token[] = [
-  { name: 'radius-none', value: px(0), usage: 'Surfaces and fields are flat and square: levels, tiles (the tile grid and its console too), tabs, cards, notes, fields and the theme panel have no radius; buttons on a level (small and icon buttons) have none either.' },
+  { name: 'radius-none', value: px(0), usage: 'Surfaces, fields and chips are flat and square: levels, tiles (the tile grid and its console too), cards, notes, fields, chips, counts and badges, the theme panel and the helper and admin screens have no radius; buttons on a level (small and icon buttons) have none either.' },
   { name: 'radius-button', value: px(4), usage: 'Buttons keep a small radius where they have one: the header, a tile title button, the theme panel (6px). They are the only rounded things on a surface.' },
   { name: 'radius-input', value: px(4), usage: 'Inputs and buttons on the paper, and the segmented switch.' },
-  { name: 'radius-chip', value: px(12), usage: 'Chips and the chip add box.' },
 ]
 const SHADOW: Token[] = [
   { name: 'shadow-tab', value: '1px 1px 3px rgba(0, 0, 0, 0.3)', usage: 'A page-edge tab (softened by 0.55 in a light zone).' },

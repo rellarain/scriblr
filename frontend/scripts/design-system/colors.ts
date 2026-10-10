@@ -5,7 +5,7 @@ import { BLACK, WHITE, mixRgb, rgbOf, type RGB } from '../../src/theme/readable'
 import type { ZoneKey, ZonePalette } from '../../src/theme/types'
 import {
   DISLIKE_BAR_SATURATIONS, INK_STRENGTH, LIKE_BAR_SATURATIONS, PAPER_LOOKS, SIDEBAR_SHADE_1, SINK_ALPHAS, SURFACE_OFFSETS, ZONE_LOOKS,
-  fillDirection, fillInk, pageTone, paperAccents, paperGrounds, paperInks, resolvePalette, shadeK, zoneInk,
+  LIFT_ALPHA, fillDirection, fillInk, pageTone, paperAccents, paperGrounds, paperInks, resolvePalette, shadeK, toneMarks, zoneInk,
 } from '../../src/theme/zoneLooks'
 
 // The design system's colour tokens for one zone: the theme's own derived colours (theme/tokens.ts, theme.scss, writer.scss) worked out as
@@ -56,6 +56,8 @@ export function zoneColorTokens(zone: ZoneKey, pal: ZonePalette = DEFAULT_PALETT
   add('ink-faint', hexAlpha(ink, strength.faint / 100), `Placeholder and tertiary text: the ink at ${strength.faint}%.`)
   add('hairline', hexAlpha(ink, 0.12), 'Hairline borders: the ink at 12%.')
   for (const [i, alpha] of SINK_ALPHAS.slice(1).entries()) add(`ov-sink-${i + 1}`, hexAlpha(BLACK, alpha * shadeK(look.mode)), `A recess: black at ${Math.round(alpha * 100)}% (softened by ${shadeK(look.mode)} in this zone) over a surface.`)
+
+  for (const [i, alpha] of [0.08, 0.14, LIFT_ALPHA].entries()) add(`ov-lift-${i + 1}`, hexAlpha(ink, alpha), `A lift: the ink at ${Math.round(alpha * 100)}% over a surface (hover, press, a rule on a card).`)
 
   // ---- accent, alert and admin accent (each fitted for the ink that reads on it)
   const fills: Array<[string, HSL, string]> = [['accent', colors.accent, 'Interactive and active things: buttons, the active tab, focus.'], ['alert', colors.alert, 'What needs attention: error messages, alerts.'], ['accent2', colors.accent2, 'The admin accent (admins only; a plain accent for everyone else).']]
@@ -112,6 +114,12 @@ export function zoneColorTokens(zone: ZoneKey, pal: ZonePalette = DEFAULT_PALETT
     add(`page-${tone}-ink`, hexOf(t.ink), `Text on the Preview page, ${tone} tone.`)
     add(`page-${tone}-line`, hexOf(t.line), `Rules on the Preview page, ${tone} tone.`)
     add(`page-${tone}-muted`, hexOf(t.muted), `Quiet text on the Preview page, ${tone} tone.`)
+    add(`page-${tone}-highlight`, hexOf(t.hover), `A hovered sentence on the Preview page, ${tone} tone: the accent's hue, fitted so the page text reads on it.`)
+    add(`page-${tone}-highlight-selected`, hexOf(t.selected), `The selected sentence on the Preview page, ${tone} tone: the accent's hue, fitted so the page text reads on it.`)
   }
+  const marks = toneMarks(zone, colors.theme, colors.accent2, colors.alert)
+  add('tone-yes-mark', hexOf(marks.yes), `The Inbox's yes tone as a mark (a face, a glyph, a check mark; 3:1): the admin accent moved only as far as it needs to read on the sidebar's surfaces.`)
+  add('tone-no-mark', hexOf(marks.no), `The Inbox's no tone as a mark: the alert colour moved only as far as it needs to read on the sidebar's surfaces.`)
+  add('tone-mid-mark', hexOf(marks.mid), `The Inbox's neutral tone as a mark: the theme hue moved only as far as it needs to read on the sidebar's surfaces.`)
   return out
 }

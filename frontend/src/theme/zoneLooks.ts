@@ -234,16 +234,44 @@ export function resolvePalette(pal: ZonePalette, zone: ZoneKey): ResolvedPalette
 
 // The Preview page's own tone (the reader's day or night choice, writer.scss `.wrPage--day` and `--night`): the page, its text, its rules and
 // its quiet text, themed like the paper of the Day or the Night zone whatever zone the app is in. They are the same pairs the audit
-// measures for those zones (the chapter page, `paperInks`), so they read for every hue.
-export function pageTone(tone: 'day' | 'night', theme: number, accent: number): Record<'page' | 'ink' | 'line' | 'muted', HSL> {
+// measures for those zones (the chapter page, `paperInks`), so they read for every hue. The sentence highlights (a hovered and a selected
+// sentence) are the accent's hue, starting where they were drawn (light by day, deep by night) and moved only as far as the page's text
+// and quiet text read on them.
+export type PageTone = Record<'page' | 'ink' | 'line' | 'muted' | 'hover' | 'selected', HSL>
+const HIGHLIGHT_START: Record<'day' | 'night', { hover: [number, number]; selected: [number, number] }> = {
+  day: { hover: [90, 92], selected: [90, 88] },
+  night: { hover: [40, 26], selected: [45, 32] },
+}
+export function pageTone(tone: 'day' | 'night', theme: number, accent: number): PageTone {
   const zone: ZoneKey = tone
   const look = ZONE_LOOKS[zone]
   const p = PAPER_LOOKS[look.mode]
   const inks = paperInks(zone, theme)
+  const toward: 1 | -1 = p.dir === 1 ? 1 : -1 // away from the text: lighter on the Day page, darker on the Night page
+  const highlight = ([s, l]: [number, number]): HSL => ({
+    h: accent, s, l: fitLightness(accent, s, l, toward, c => ratioOf(inks.ink, c) >= TEXT_TARGET && ratioOf(inks.muted, c) >= TEXT_TARGET),
+  })
   return {
     page: paperGrounds(zone, { theme, accent }).page,
     ink: inks.ink,
     line: { h: theme, s: look.themeS, l: look.paperL - 18 * p.dir },
     muted: inks.muted,
+    hover: highlight(HIGHLIGHT_START[tone].hover),
+    selected: highlight(HIGHLIGHT_START[tone].selected),
   }
+}
+
+// The admin Inbox's three tones (yes, no, neutral: App.scss `.inboxSection`) drawn as a mark: a face, a vote's glyph or a check mark in the tone's
+// colour (an icon, held to 3:1), on the sidebar's two surfaces and under the deepest recess. Each is the tone's own hue (the admin accent, the alert,
+// and the theme for neutral), moved only as far as it needs to read there: lighter on a dark zone, darker on a light one. As a fill (a
+// swatch, a bar, a pressed face) a tone is still the colour itself, with its own ink on it (the 'Fills' pairs).
+export function toneMarks(zone: ZoneKey, theme: HSL, yes: HSL, no: HSL): Record<'yes' | 'no' | 'mid', HSL> {
+  const look = ZONE_LOOKS[zone]
+  const grounds = [SIDEBAR_SHADE_1[look.mode], SURFACE_OFFSETS[4]].flatMap(offset => {
+    const surface = rgbOf({ h: theme.h, s: theme.s, l: clamp(theme.l + offset, 0, 100) })
+    return [surface, over(BLACK, SINK_ALPHAS[SINK_ALPHAS.length - 1] * shadeK(look.mode), surface)]
+  })
+  const toward: 1 | -1 = look.mode === 'dark' ? 1 : -1
+  const mark = (c: HSL): HSL => ({ ...c, l: fitLightness(c.h, c.s, c.l, toward, m => grounds.every(g => ratioOfRgb(rgbOf(m), g) >= UI_TARGET)) })
+  return { yes: mark(yes), no: mark(no), mid: mark({ h: theme.h, s: theme.s, l: 50 }) }
 }

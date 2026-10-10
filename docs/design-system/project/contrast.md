@@ -10,66 +10,75 @@ Each cell is the ratio at the default hues (theme 330, accent 32, alert 200) and
 
 | Pair | Needs | Dawn | Day | Dusk | Night |
 |---|---|---|---|---|---|
-| Ink on surface-base | 4.5:1 | 12.6 (12.4) | 13.9 (13.7) | 9.7 (9.7) | 10.7 (9.9) |
+| Ink on surface-base | 3:1 | 12.6 (12.4) | 13.9 (13.7) | 9.7 (9.7) | 10.7 (9.9) |
 | Muted ink on surface-base | 4.5:1 | 12.6 (12.4) | 13.9 (13.7) | 8.2 (8.2) | 9.0 (8.4) |
 | Faint ink on surface-base | 4.5:1 | 12.6 (12.4) | 13.9 (13.7) | 7.4 (7.4) | 8.1 (7.5) |
-| Ink on surface-base under a recess | 4.5:1 | 8.2 (8.0) | 9.0 (8.8) | 13.9 (13.9) | 14.7 (14.0) |
+| Ink on surface-base under a recess | 3:1 | 8.2 (8.0) | 9.0 (8.8) | 13.9 (13.9) | 14.7 (14.0) |
 | Muted ink on surface-base under a recess | 4.5:1 | 8.2 (8.0) | 9.0 (8.8) | 11.6 (11.6) | 12.2 (11.7) |
 | Faint ink on surface-base under a recess | 4.5:1 | 8.2 (8.0) | 9.0 (8.8) | 10.3 (10.3) | 10.8 (10.4) |
-| Ink on surface-side | 4.5:1 | 11.2 (11.1) | 12.4 (12.1) | 11.2 (11.2) | 12.4 (11.7) |
+| Ink on surface-side | 3:1 | 11.2 (11.1) | 12.4 (12.1) | 11.2 (11.2) | 12.4 (11.7) |
 | Muted ink on surface-side | 4.5:1 | 11.2 (11.1) | 12.4 (12.1) | 9.4 (9.4) | 10.4 (9.8) |
 | Faint ink on surface-side | 4.5:1 | 11.2 (11.1) | 12.4 (12.1) | 8.4 (8.4) | 9.2 (8.8) |
-| Ink on surface-side under a recess | 4.5:1 | 7.3 (7.3) | 8.0 (7.9) | 15.1 (15.1) | 15.9 (15.4) |
+| Ink on surface-side under a recess | 3:1 | 7.3 (7.3) | 8.0 (7.9) | 15.1 (15.1) | 15.9 (15.4) |
 | Muted ink on surface-side under a recess | 4.5:1 | 7.3 (7.3) | 8.0 (7.9) | 12.5 (12.5) | 13.1 (12.7) |
 | Faint ink on surface-side under a recess | 4.5:1 | 7.3 (7.3) | 8.0 (7.9) | 11.0 (11.0) | 11.6 (11.3) |
-| Ink on surface-deep | 4.5:1 | 9.4 (9.3) | 10.3 (9.9) | 13.7 (13.5) | 15.1 (14.7) |
+| Ink on surface-deep | 3:1 | 9.4 (9.3) | 10.3 (9.9) | 13.7 (13.5) | 15.1 (14.7) |
 | Muted ink on surface-deep | 4.5:1 | 9.4 (9.3) | 10.3 (9.9) | 11.4 (11.2) | 12.5 (12.1) |
 | Faint ink on surface-deep | 4.5:1 | 9.4 (9.3) | 10.3 (9.9) | 10.1 (10.0) | 11.1 (10.8) |
-| Ink on surface-deep under a recess | 4.5:1 | 6.2 (6.2) | 6.8 (6.5) | 16.8 (16.6) | 17.6 (17.4) |
+| Ink on surface-deep under a recess | 3:1 | 6.2 (6.2) | 6.8 (6.5) | 16.8 (16.6) | 17.6 (17.4) |
 | Muted ink on surface-deep under a recess | 4.5:1 | 6.2 (6.2) | 6.8 (6.5) | 13.8 (13.6) | 14.4 (14.2) |
 | Faint ink on surface-deep under a recess | 4.5:1 | 6.2 (6.2) | 6.8 (6.5) | 12.1 (12.0) | 12.6 (12.5) |
-| Ink on surface-deeper | 4.5:1 | 6.8 (6.8) | 7.4 (6.8) | 18.0 (17.2) | 19.3 (19.2) |
+| Ink on surface-deeper | 3:1 | 6.8 (6.8) | 7.4 (6.8) | 18.0 (17.2) | 19.3 (19.2) |
 | Muted ink on surface-deeper | 4.5:1 | 6.8 (6.8) | 7.4 (6.8) | 14.7 (14.1) | 15.6 (15.5) |
 | Faint ink on surface-deeper | 4.5:1 | 6.8 (6.8) | 7.4 (6.8) | 12.9 (12.4) | 13.6 (13.5) |
-| Ink on surface-deeper under a recess | 4.5:1 | 4.6 (4.6) | 5.0 (4.6) | 19.2 (18.8) | 19.9 (19.8) |
+| Ink on surface-deeper under a recess | 3:1 | 4.6 (4.6) | 5.0 (4.6) | 19.2 (18.8) | 19.9 (19.8) |
 | Muted ink on surface-deeper under a recess | 4.5:1 | 4.6 (4.6) | 5.0 (4.6) | 15.5 (15.2) | 16.0 (16.0) |
 | Faint ink on surface-deeper under a recess | 4.5:1 | 4.6 (4.6) | 5.0 (4.6) | 13.6 (13.3) | 13.9 (13.9) |
-| Ink on surface-sidebar-1 | 4.5:1 | 7.5 (7.5) | 8.2 (7.7) | 7.8 (7.4) | 8.6 (7.6) |
+| Ink on surface-sidebar-1 | 3:1 | 7.5 (7.5) | 8.2 (7.7) | 7.8 (7.4) | 8.6 (7.6) |
 | Muted ink on surface-sidebar-1 | 4.5:1 | 7.5 (7.5) | 8.2 (7.7) | 6.7 (6.3) | 7.3 (6.5) |
 | Faint ink on surface-sidebar-1 | 4.5:1 | 7.5 (7.5) | 8.2 (7.7) | 6.1 (5.8) | 6.6 (6.0) |
-| Ink on surface-sidebar-1 under a recess | 4.5:1 | 5.1 (5.1) | 5.5 (5.2) | 12.3 (11.8) | 12.9 (12.0) |
+| Ink on surface-sidebar-1 under a recess | 3:1 | 5.1 (5.1) | 5.5 (5.2) | 12.3 (11.8) | 12.9 (12.0) |
 | Muted ink on surface-sidebar-1 under a recess | 4.5:1 | 5.1 (5.1) | 5.5 (5.2) | 10.2 (9.9) | 10.8 (10.1) |
 | Faint ink on surface-sidebar-1 under a recess | 4.5:1 | 5.1 (5.1) | 5.5 (5.2) | 9.1 (8.8) | 9.6 (9.0) |
-| Ink on surface-sidebar-2 | 4.5:1 | 9.7 (9.6) | 10.6 (10.2) | 13.3 (13.1) | 14.7 (14.1) |
+| Ink on surface-sidebar-2 | 3:1 | 9.7 (9.6) | 10.6 (10.2) | 13.3 (13.1) | 14.7 (14.1) |
 | Muted ink on surface-sidebar-2 | 4.5:1 | 9.7 (9.6) | 10.6 (10.2) | 11.0 (10.9) | 12.1 (11.7) |
 | Faint ink on surface-sidebar-2 | 4.5:1 | 9.7 (9.6) | 10.6 (10.2) | 9.8 (9.7) | 10.7 (10.4) |
-| Ink on surface-sidebar-2 under a recess | 4.5:1 | 6.4 (6.4) | 7.0 (6.7) | 16.5 (16.4) | 17.4 (17.0) |
+| Ink on surface-sidebar-2 under a recess | 3:1 | 6.4 (6.4) | 7.0 (6.7) | 16.5 (16.4) | 17.4 (17.0) |
 | Muted ink on surface-sidebar-2 under a recess | 4.5:1 | 6.4 (6.4) | 7.0 (6.7) | 13.5 (13.5) | 14.2 (13.9) |
 | Faint ink on surface-sidebar-2 under a recess | 4.5:1 | 6.4 (6.4) | 7.0 (6.7) | 11.9 (11.9) | 12.5 (12.3) |
-| Ink on surface-raised-a | 4.5:1 | 12.2 (12.1) | 13.5 (13.3) | 10.1 (10.1) | 11.1 (10.3) |
+| Ink on surface-raised-a | 3:1 | 12.2 (12.1) | 13.5 (13.3) | 10.1 (10.1) | 11.1 (10.3) |
 | Muted ink on surface-raised-a | 4.5:1 | 12.2 (12.1) | 13.5 (13.3) | 8.5 (8.5) | 9.4 (8.7) |
 | Faint ink on surface-raised-a | 4.5:1 | 12.2 (12.1) | 13.5 (13.3) | 7.7 (7.7) | 8.4 (7.8) |
-| Ink on surface-raised-a under a recess | 4.5:1 | 8.0 (7.8) | 8.7 (8.6) | 14.2 (14.2) | 15.0 (14.4) |
+| Ink on surface-raised-a under a recess | 3:1 | 8.0 (7.8) | 8.7 (8.6) | 14.2 (14.2) | 15.0 (14.4) |
 | Muted ink on surface-raised-a under a recess | 4.5:1 | 8.0 (7.8) | 8.7 (8.6) | 11.8 (11.8) | 12.4 (11.9) |
 | Faint ink on surface-raised-a under a recess | 4.5:1 | 8.0 (7.8) | 8.7 (8.6) | 10.5 (10.5) | 11.0 (10.6) |
-| Ink on surface-raised-b | 4.5:1 | 10.0 (9.9) | 11.0 (10.6) | 12.9 (12.7) | 14.2 (13.6) |
+| Ink on surface-raised-b | 3:1 | 10.0 (9.9) | 11.0 (10.6) | 12.9 (12.7) | 14.2 (13.6) |
 | Muted ink on surface-raised-b | 4.5:1 | 10.0 (9.9) | 11.0 (10.6) | 10.7 (10.6) | 11.8 (11.3) |
 | Faint ink on surface-raised-b | 4.5:1 | 10.0 (9.9) | 11.0 (10.6) | 9.5 (9.5) | 10.4 (10.1) |
-| Ink on surface-raised-b under a recess | 4.5:1 | 6.6 (6.5) | 7.2 (7.0) | 16.2 (16.2) | 17.1 (16.7) |
+| Ink on surface-raised-b under a recess | 3:1 | 6.6 (6.5) | 7.2 (7.0) | 16.2 (16.2) | 17.1 (16.7) |
 | Muted ink on surface-raised-b under a recess | 4.5:1 | 6.6 (6.5) | 7.2 (7.0) | 13.3 (13.3) | 14.0 (13.7) |
 | Faint ink on surface-raised-b under a recess | 4.5:1 | 6.6 (6.5) | 7.2 (7.0) | 11.8 (11.7) | 12.3 (12.1) |
-| Ink on surface-raised-active | 4.5:1 | 13.7 (13.4) | 15.1 (14.9) | 8.7 (8.5) | 9.6 (8.7) |
+| Ink on surface-raised-active | 3:1 | 13.7 (13.4) | 15.1 (14.9) | 8.7 (8.5) | 9.6 (8.7) |
 | Muted ink on surface-raised-active | 4.5:1 | 13.7 (13.4) | 15.1 (14.9) | 7.4 (7.3) | 8.1 (7.4) |
 | Faint ink on surface-raised-active | 4.5:1 | 13.7 (13.4) | 15.1 (14.9) | 6.7 (6.6) | 7.3 (6.7) |
-| Ink on surface-raised-active under a recess | 4.5:1 | 8.8 (8.7) | 9.7 (9.6) | 13.1 (12.9) | 13.8 (13.0) |
+| Ink on surface-raised-active under a recess | 3:1 | 8.8 (8.7) | 9.7 (9.6) | 13.1 (12.9) | 13.8 (13.0) |
 | Muted ink on surface-raised-active under a recess | 4.5:1 | 8.8 (8.7) | 9.7 (9.6) | 10.9 (10.7) | 11.5 (10.9) |
 | Faint ink on surface-raised-active under a recess | 4.5:1 | 8.8 (8.7) | 9.7 (9.6) | 9.7 (9.6) | 10.2 (9.7) |
-| Ink on surface-raised | 4.5:1 | 10.9 (10.8) | 12.0 (11.7) | 11.6 (11.6) | 12.8 (12.2) |
+| Ink on surface-raised | 3:1 | 10.9 (10.8) | 12.0 (11.7) | 11.6 (11.6) | 12.8 (12.2) |
 | Muted ink on surface-raised | 4.5:1 | 10.9 (10.8) | 12.0 (11.7) | 9.7 (9.7) | 10.7 (10.2) |
 | Faint ink on surface-raised | 4.5:1 | 10.9 (10.8) | 12.0 (11.7) | 8.7 (8.7) | 9.5 (9.1) |
-| Ink on surface-raised under a recess | 4.5:1 | 7.2 (7.1) | 7.8 (7.6) | 15.4 (15.4) | 16.2 (15.8) |
+| Ink on surface-raised under a recess | 3:1 | 7.2 (7.1) | 7.8 (7.6) | 15.4 (15.4) | 16.2 (15.8) |
 | Muted ink on surface-raised under a recess | 4.5:1 | 7.2 (7.1) | 7.8 (7.6) | 12.7 (12.7) | 13.3 (13.0) |
 | Faint ink on surface-raised under a recess | 4.5:1 | 7.2 (7.1) | 7.8 (7.6) | 11.2 (11.2) | 11.7 (11.5) |
+
+## Hover and pressed
+
+| Pair | Needs | Dawn | Day | Dusk | Night |
+|---|---|---|---|---|---|
+| Ink on surface-base lifted 22% | 4.5:1 | 7.8 (7.7) | 8.5 (8.4) | 5.2 (5.2) | 5.6 (5.2) |
+| Muted ink on surface-base lifted 22% | 4.5:1 | 7.8 (7.7) | 8.5 (8.4) | 4.6 (4.6) | 4.9 (4.6) |
+| Ink on surface-deep lifted 22% | 4.5:1 | 6.0 (5.9) | 6.5 (6.2) | 6.8 (6.7) | 7.4 (7.2) |
+| Muted ink on surface-deep lifted 22% | 4.5:1 | 6.0 (5.9) | 6.5 (6.2) | 5.9 (5.8) | 6.4 (6.2) |
 
 ## Fills
 
@@ -142,6 +151,23 @@ Each cell is the ratio at the default hues (theme 330, accent 32, alert 200) and
 | Page error text on field | 4.5:1 | 5.8 (5.5) | 5.9 (5.3) | 8.2 (5.6) | 8.7 (5.6) |
 | Page error text on frame-1 | 4.5:1 | 4.6 (4.6) | 4.7 (4.6) | 6.4 (4.6) | 7.0 (4.6) |
 
+## Preview page
+
+| Pair | Needs | Dawn | Day | Dusk | Night |
+|---|---|---|---|---|---|
+| Preview page text, day tone | 4.5:1 | 14.8 (14.7) | 14.8 (14.7) | 14.8 (14.7) | 14.8 (14.7) |
+| Preview page quiet text, day tone | 4.5:1 | 8.0 (7.6) | 8.0 (7.6) | 8.0 (7.6) | 8.0 (7.6) |
+| Preview page text on a hovered sentence, day tone | 4.5:1 | 15.3 (12.3) | 15.3 (12.3) | 15.3 (12.3) | 15.3 (12.3) |
+| Preview page quiet text on a hovered sentence, day tone | 4.5:1 | 8.3 (6.2) | 8.3 (6.2) | 8.3 (6.2) | 8.3 (6.2) |
+| Preview page text on a selected sentence, day tone | 4.5:1 | 14.2 (10.3) | 14.2 (10.3) | 14.2 (10.3) | 14.2 (10.3) |
+| Preview page quiet text on a selected sentence, day tone | 4.5:1 | 7.7 (5.2) | 7.7 (5.2) | 7.7 (5.2) | 7.7 (5.2) |
+| Preview page text, night tone | 4.5:1 | 15.1 (13.6) | 15.1 (13.6) | 15.1 (13.6) | 15.1 (13.6) |
+| Preview page quiet text, night tone | 4.5:1 | 12.2 (11.2) | 12.2 (11.2) | 12.2 (11.2) | 12.2 (11.2) |
+| Preview page text on a hovered sentence, night tone | 4.5:1 | 9.0 (6.9) | 9.0 (6.9) | 9.0 (6.9) | 9.0 (6.9) |
+| Preview page quiet text on a hovered sentence, night tone | 4.5:1 | 7.3 (5.5) | 7.3 (5.5) | 7.3 (5.5) | 7.3 (5.5) |
+| Preview page text on a selected sentence, night tone | 4.5:1 | 6.8 (5.6) | 6.8 (5.6) | 6.8 (5.6) | 6.8 (5.6) |
+| Preview page quiet text on a selected sentence, night tone | 4.5:1 | 5.5 (4.6) | 5.5 (4.6) | 5.5 (4.6) | 5.5 (4.6) |
+
 ## Reactions
 
 | Pair | Needs | Dawn | Day | Dusk | Night |
@@ -181,6 +207,44 @@ Each cell is the ratio at the default hues (theme 330, accent 32, alert 200) and
 | Collapsed header text on its hover | 4.5:1 | 5.4 (5.2) | 5.1 (5.0) | 5.1 (5.0) | 5.4 (5.0) |
 | Text on a cover wash | 4.5:1 | 10.8 (10.4) | 10.2 (10.0) | 10.2 (10.0) | 10.8 (10.0) |
 | Arc tab label (92%) on the cover colour | 4.5:1 | 6.6 (6.3) | 6.1 (5.9) | 6.1 (5.9) | 6.6 (6.0) |
+
+## Plot colours
+
+| Pair | Needs | Dawn | Day | Dusk | Night |
+|---|---|---|---|---|---|
+| Ink on a plot category, the worst hue | 4.5:1 | 12.3 (11.6) | 13.3 (13.2) | 6.2 (5.1) | 8.7 (8.7) |
+| White on a plot subcategory, the worst hue | 4.5:1 | 7.2 (7.1) | 6.6 (6.6) | 6.6 (6.6) | 6.7 (6.7) |
+
+## Inbox tones
+
+| Pair | Needs | Dawn | Day | Dusk | Night |
+|---|---|---|---|---|---|
+| Ink on the neutral tone | 4.5:1 | 4.6 (4.6) | 5.0 (4.8) | 4.6 (4.5) | 4.9 (4.7) |
+| yes tone as a mark on sidebar-1 | 3:1 | 4.8 (4.7) | 4.9 (4.8) | 3.7 (3.2) | 3.6 (3.2) |
+| no tone as a mark on sidebar-1 | 3:1 | 4.8 (4.7) | 4.8 (4.8) | 4.0 (3.2) | 4.1 (3.2) |
+| mid tone as a mark on sidebar-1 | 3:1 | 4.8 (4.8) | 4.8 (4.8) | 3.3 (3.2) | 3.3 (3.2) |
+| yes tone as a mark on sidebar-1 under a recess | 3:1 | 3.3 (3.2) | 3.3 (3.2) | 5.8 (4.9) | 5.4 (4.7) |
+| no tone as a mark on sidebar-1 under a recess | 3:1 | 3.2 (3.2) | 3.2 (3.2) | 6.3 (4.9) | 6.1 (4.7) |
+| mid tone as a mark on sidebar-1 under a recess | 3:1 | 3.2 (3.2) | 3.2 (3.2) | 5.1 (4.9) | 4.9 (4.7) |
+| yes tone as a mark on sidebar-2 | 3:1 | 6.2 (5.9) | 6.3 (5.7) | 6.3 (5.1) | 6.2 (5.3) |
+| no tone as a mark on sidebar-2 | 3:1 | 6.2 (5.9) | 6.2 (5.7) | 6.8 (5.0) | 7.0 (5.3) |
+| mid tone as a mark on sidebar-2 | 3:1 | 6.2 (5.9) | 6.2 (5.8) | 5.5 (5.1) | 5.6 (5.3) |
+| yes tone as a mark on sidebar-2 under a recess | 3:1 | 4.1 (3.8) | 4.1 (3.7) | 7.8 (6.3) | 7.3 (6.1) |
+| no tone as a mark on sidebar-2 under a recess | 3:1 | 4.1 (3.8) | 4.1 (3.7) | 8.5 (6.3) | 8.3 (6.1) |
+| mid tone as a mark on sidebar-2 under a recess | 3:1 | 4.1 (3.9) | 4.1 (3.7) | 6.9 (6.3) | 6.6 (6.2) |
+
+## Theme panel
+
+| Pair | Needs | Dawn | Day | Dusk | Night |
+|---|---|---|---|---|---|
+| Timeline icon on its zone segment | 3:1 | 3.3 (3.4) | 7.5 (3.7) | 7.5 (3.7) | 3.3 (3.4) |
+
+## Sky toggle
+
+| Pair | Needs | Dawn | Day | Dusk | Night |
+|---|---|---|---|---|---|
+| Time and date on the sky | 4.5:1 | 4.7 (4.6) | 4.6 (4.6) | 4.6 (4.6) | 7.5 (4.6) |
+| Time and date on the sky, locked | 4.5:1 | 4.7 (4.6) | 4.6 (4.6) | 4.6 (4.6) | 6.1 (4.6) |
 
 ## Below the threshold
 
