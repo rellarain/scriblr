@@ -1,0 +1,13 @@
+<!doctype html>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Scriblr design system previews</title>
+<link rel="stylesheet" href="project/components/bundle.css">
+<style>body { margin: 0; font: 14px system-ui, sans-serif; } nav ul { display: flex; flex-wrap: wrap; gap: 6px 16px; padding: 12px; margin: 0; list-style: none; }</style>
+<nav><ul><li><a href="?card=level-panels">Level panels, headers and tabs</a></li><li><a href="?card=split-tiles">Tiles, split grid and dividers</a></li><li><a href="?card=dashboard">Dashboard cards and analytics</a></li><li><a href="?card=book-cover">Book cover, page edges and edge tabs</a></li><li><a href="?card=outline-cards">Outline cards</a></li><li><a href="?card=plotpoint-tiles">Plotpoint tiles</a></li><li><a href="?card=shelf">Book shelf and spines</a></li><li><a href="?card=draft-page">Draft page, preview and reactions</a></li><li><a href="?card=controls">Buttons, inputs and alerts</a></li><li><a href="?card=hue-slider">Hue slider and colour range</a></li><li><a href="?card=app-shell">App shell: header, sidebar and sky toggle</a></li><li><a href="?card=sky-toggle">Sky toggle</a></li><li><a href="?card=theme-settings">Theme settings panel</a></li><li><a href="?card=icons">Icons</a></li></ul></nav>
+<div id="root"></div>
+<script src="project/components/bundle.js"></script>
+<script>
+  var id = new URLSearchParams(location.search).get('card');
+  if (id) Scriblr.mountCard(document.getElementById('root'), id);
+</script>

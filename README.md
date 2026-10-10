@@ -453,6 +453,10 @@ and selecting one expands it into its console/editor. The shared system is
   console: `TileGrid` is controlled here (`open` / `onOpenChange`), and Back or a mini
   tile only overrides the choice until the buttons change it again.
 
+## Design system
+
+The Writer's design system is in `docs/design-system/` and published as a Design System artifact: a brand book, tokens in all four zones, the readability audit, icons, and live previews of the real components (the app run against a pretend project). Most of it is generated from the code with `npm run design-system` (in `frontend/`); `docs/design-system/README.md` says how to regenerate and republish it. Read it before UI work.
+
 ## Theming (time-of-day palettes)
 
 The shell (`frontend/src/App.tsx`) is themed by four optional time zones —

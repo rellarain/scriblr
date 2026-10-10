@@ -38,3 +38,7 @@ logs
 npm-debug.log*
 yarn-debug.log*
 yarn-error.log*
+
+# Design system: the previews' bundle is built when it is published (frontend: npm run design-system)
+docs/design-system/project/components/bundle.js
+docs/design-system/project/components/bundle.css

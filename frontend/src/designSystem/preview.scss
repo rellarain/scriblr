@@ -1,0 +1,53 @@
+// The design system's preview frame (designSystem/Preview.tsx): a plain toolbar and a stage of frames. The toolbar and captions follow the
+// viewer's own light or dark theme; what is inside a frame is the app, drawn for its zone.
+
+:root {
+  --pv-bg: #f4f2f0;
+  --pv-fg: #1d1a1c;
+  --pv-muted: #5e5760;
+  --pv-line: #cfc9d1;
+  --pv-on: #1d1a1c;
+  --pv-on-fg: #fff;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme='light']) { --pv-bg: #1b181c; --pv-fg: #f0ecf1; --pv-muted: #b6aebb; --pv-line: #4a434d; --pv-on: #f0ecf1; --pv-on-fg: #1b181c; }
+}
+:root[data-theme='dark'] { --pv-bg: #1b181c; --pv-fg: #f0ecf1; --pv-muted: #b6aebb; --pv-line: #4a434d; --pv-on: #f0ecf1; --pv-on-fg: #1b181c; }
+// The page behind a card is the viewer's own, not the app's.
+html, html body, html #root { background: var(--pv-bg); }
+
+.uiPreview {
+  box-sizing: border-box; display: flex; flex-direction: column; gap: 12px; min-width: 0; padding: 12px; color: var(--pv-fg); background: var(--pv-bg);
+  font: 12px/1.4 system-ui, -apple-system, 'Segoe UI', sans-serif;
+}
+
+.uiPvBar { display: flex; flex-wrap: wrap; align-items: center; gap: 10px 18px; padding-bottom: 10px; border-bottom: 1px solid var(--pv-line); }
+.uiPvGroup { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 6px; min-width: 0; }
+.uiPvGroup--hues { flex: 1 1 340px; gap: 6px 14px; }
+.uiPvLabel { font-size: 10px; font-weight: 700; letter-spacing: 1px; text-transform: uppercase; color: var(--pv-muted); }
+.uiPvHue { display: flex; flex-direction: column; gap: 3px; flex: 1 1 120px; min-width: 110px; }
+.uiPvRange { width: 100%; }
+.uiPvToggle {
+  display: inline-flex; align-items: center; gap: 5px; padding: 4px 9px; border: 1px solid var(--pv-line); border-radius: 0; background: transparent; color: var(--pv-fg); font: inherit; font-weight: 600; cursor: pointer;
+  &:hover { border-color: var(--pv-fg); }
+  &:focus-visible { outline: 2px solid var(--pv-fg); outline-offset: 1px; }
+  &--on { background: var(--pv-on); color: var(--pv-on-fg); border-color: var(--pv-on); }
+}
+
+.uiPvStage { display: flex; flex-wrap: wrap; align-items: flex-start; gap: 16px; min-width: 0; }
+.uiPvFigure { margin: 0; max-width: 100%; display: flex; flex-direction: column; gap: 4px; min-width: 0; }
+.uiPvFigure figcaption { font-size: 10px; font-weight: 700; letter-spacing: 1px; text-transform: uppercase; color: var(--pv-muted); }
+// A frame is as wide as the screen it stands for, scrolling sideways in its box when the page is narrower.
+.uiPvBox { max-width: 100%; overflow-x: auto; border: 1px solid var(--pv-line); }
+
+// The frame itself: a theme scope the size of a screen. The Writer's own root (`.wUI`) is positioned against the app shell, so it is
+// brought back to normal flow here, and `transform` makes anything fixed inside (the app shell) fixed to the frame.
+.uiPreviewFrame {
+  position: relative; inset: auto; box-sizing: border-box; display: flex; overflow: hidden; transform: translateZ(0); contain: layout paint;
+  background: var(--surface-base); color: var(--ink);
+  &.wUI { left: auto; right: auto; top: auto; bottom: auto; }
+  &--plain { display: block; }
+}
+// `.wrBookScope` is display: contents by default (it sits in the middle of a layout); a frame is a real box.
+.wrBookScope.uiPreviewFrame { display: flex; }
+.wrBookScope.uiPreviewFrame--plain { display: block; }
