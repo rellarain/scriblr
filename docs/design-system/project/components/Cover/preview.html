@@ -10,6 +10,7 @@
   .slab { fill: var(--surface-deeper); }
   .board { fill: var(--ov-sink-3); }
   .series { fill: var(--surface-deep); }
+  .acc { fill: var(--accent); } .acc2 { fill: var(--accent2); } .dk { fill: var(--ov-sink-2); } .lt { fill: var(--level-wash-hi); }
   .f30{fill:var(--level-fill-30)} .f150{fill:var(--level-fill-150)} .f210{fill:var(--level-fill-210)} .f330{fill:var(--level-fill-330)} .f60{fill:var(--level-fill-60)} .f270{fill:var(--level-fill-270)} .f0{fill:var(--level-fill-0)} .f180{fill:var(--level-fill-180)} .f120{fill:var(--level-fill-120)} .f300{fill:var(--level-fill-300)}
   .name { font: 700 104px Georgia, 'Times New Roman', serif; fill: var(--ink); }
   .tag { font: 400 14px system-ui, -apple-system, 'Segoe UI', sans-serif; fill: var(--ink-muted); }
@@ -18,6 +19,7 @@
   <!--
     Blocks: level-fill hues 30 150 210 330 60 270 0 180 120 as spines 24 to 64 wide (spacing multiples of 8) and 150 to 208 tall, on a surface-deeper slab with a board a step darker than it (ov-sink-3, the shelf's black board).
     Series dividers: two series sections (the shelf's .wrShelfSeries, drawn as surface-deep, one step lighter than the slab so they show) each group three spines, with 8px of padding inside; both are the same height and taller than every spine (28px from the top of the slab to the board); the other spines stand loose, 8px clear of a section.
+    Title blocks: where a spine's title would run, each spine carries a block (a vertical strip, a few with a small band or label): some in the accent or the admin accent, the rest a darkening (ov-sink-2) or a lightening (level-wash-hi) of the spine's own colour. No text.
     Arrangement: one slab right of x=480, spines standing on its board with 4px gaps, heights and widths unequal; the name bottom-left on the ground.
     Pattern: books on a shelf, the app's own spine motif (Shelf); chosen because the Outline is a book you can see, and the spines are the one place every level colour shows at once.
     Steps and radii: widths, heights and padding are spacing multiples (8), the slab is 24px from the edges, every corner is square (radius-none).
@@ -35,6 +37,25 @@
   <rect class="f0" x="776" y="64" width="56" height="176"/>
   <rect class="f180" x="848" y="84" width="24" height="156"/>
   <rect class="f120" x="876" y="40" width="40" height="200"/>
+  <!-- blocks on the spines -->
+  <rect class="acc" x="504" y="92" width="16" height="72"/>
+  <rect class="dk" x="504" y="212" width="16" height="8"/>
+  <rect class="lt" x="544" y="72" width="24" height="96"/>
+  <rect class="dk" x="538" y="56" width="36" height="8"/>
+  <rect class="acc2" x="590" y="112" width="12" height="64"/>
+  <rect class="lt" x="590" y="216" width="12" height="8"/>
+  <rect class="dk" x="640" y="72" width="24" height="104"/>
+  <rect class="acc" x="632" y="52" width="40" height="8"/>
+  <rect class="lt" x="708" y="100" width="16" height="64"/>
+  <rect class="acc2" x="704" y="212" width="24" height="8"/>
+  <rect class="acc" x="748" y="80" width="16" height="88"/>
+  <rect class="dk" x="748" y="212" width="16" height="8"/>
+  <rect class="dk" x="792" y="88" width="24" height="80"/>
+  <rect class="lt" x="784" y="72" width="40" height="8"/>
+  <rect class="lt" x="854" y="108" width="12" height="72"/>
+  <rect class="acc" x="854" y="216" width="12" height="8"/>
+  <rect class="acc2" x="888" y="72" width="16" height="96"/>
+  <rect class="dk" x="884" y="52" width="24" height="8"/>
   <rect class="board" x="480" y="240" width="440" height="24"/>
   <text class="name" x="48" y="226">Scriblr</text>
   <text class="tag" x="52" y="258">Outline it, draft it, read it back, revise it.</text>
