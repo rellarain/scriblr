@@ -20,9 +20,9 @@ describe('spine size', () => {
     expect(spineWidth(1_000_000)).toBe(SPINE_MAX_WIDTH)
   })
 
-  it('is 160px tall with no goal, and never over 200px', () => {
+  it('is 110px tall with no goal, and never over 140px', () => {
     expect(spineHeight(null)).toBe(SPINE_MIN_HEIGHT)
-    expect(spineHeight(80000)).toBe(176)
+    expect(spineHeight(80000)).toBe(126)
     expect(spineHeight(1_000_000)).toBe(SPINE_MAX_HEIGHT)
   })
 })
@@ -33,7 +33,7 @@ describe('Spine', () => {
     const spine = screen.getByRole('button', { name: 'Cold Harbor' })
     expect(spine.className).toBe('wrSpine')
     expect(spine.style.width).toBe('36px')
-    expect(spine.style.height).toBe('176px')
+    expect(spine.style.height).toBe('126px')
     expect(spine.getAttribute('aria-pressed')).toBe('false')
 
     rerender(<Spine book={book()} number={1} active onOpen={() => {}} />)

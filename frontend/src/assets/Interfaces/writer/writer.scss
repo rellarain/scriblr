@@ -106,7 +106,7 @@
   .wrShelfMeta { font-size: 10px; opacity: 0.9; margin-left: auto; white-space: nowrap; }
   // The books stand in a row that scrolls sideways by touch or the mouse wheel (no scrollbar); the series sections are as tall as the row.
   .wrShelfBooks {
-    display: flex; align-items: stretch; gap: 8px; padding: 8px 8px 0; box-sizing: border-box; min-height: 216px;
+    display: flex; align-items: stretch; gap: 8px; padding: 8px 8px 0; box-sizing: border-box; min-height: 150px;
     overflow-x: auto; overflow-y: hidden; touch-action: pan-x; overscroll-behavior-x: contain; -webkit-overflow-scrolling: touch;
     scrollbar-width: none; &::-webkit-scrollbar { display: none; }
   }

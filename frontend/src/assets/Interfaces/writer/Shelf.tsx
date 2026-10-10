@@ -4,12 +4,12 @@ import type { ShelfGroup } from './outlineTree'
 import { nodeLabel } from './plotTree'
 import { bookThemeHue, fillColorCss } from '../../../theme/bookColors'
 
-// A spine's size follows its book: the width from 20px (no word-count goal) to 64px (220,000 words or more), the height from 160px to
-// 200px, so the bars on it have room. The selected book turns from its spine to its front cover, COVER_WIDTH wide.
+// A spine's size follows its book: the width from 20px (no word-count goal) to 64px (220,000 words or more), the height from 110px to
+// 140px, so the bars on it have room. The selected book turns from its spine to its front cover, COVER_WIDTH wide.
 export const SPINE_MIN_WIDTH = 20
 export const SPINE_MAX_WIDTH = 64
-export const SPINE_MIN_HEIGHT = 160
-export const SPINE_MAX_HEIGHT = 200
+export const SPINE_MIN_HEIGHT = 110
+export const SPINE_MAX_HEIGHT = 140
 const WORDS_PER_WIDTH_PX = 5000 // 8px of width for every 40,000 words
 const WORDS_PER_HEIGHT_PX = 5000
 export const COVER_WIDTH = 96
