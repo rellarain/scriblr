@@ -1,12 +1,13 @@
 import { tabColors, fillCap, fillHsl } from './bookColors'
 import type { HSL } from './contrast'
 import { levelPairs } from './levelContrast'
+import { skyLook } from './skyLook'
 import {
   BLACK, TEXT_TARGET, WHITE, over, ratioOf, ratioOfRgb, rgbOf, type RGB,
 } from './readable'
 import {
-  DISLIKE_BAR_SATURATIONS, INK_STRENGTH, LIKE_BAR_SATURATIONS, PAPER_LOOKS, SIDEBAR_SHADE_1, SINK_ALPHAS, SURFACE_OFFSETS, ZONE_LOOKS,
-  fillInk, paperAccents, paperGrounds, paperInks, resolvePalette, shadeK, zoneInk,
+  DISLIKE_BAR_SATURATIONS, INK_STRENGTH, LIFT_ALPHA, LIKE_BAR_SATURATIONS, PAPER_LOOKS, SIDEBAR_SHADE_1, SINK_ALPHAS, SURFACE_OFFSETS, ZONE_LOOKS,
+  fillInk, pageTone, paperAccents, paperGrounds, paperInks, resolvePalette, shadeK, zoneInk,
 } from './zoneLooks'
 import type { ZoneKey, ZonePalette } from './types'
 
@@ -50,7 +51,7 @@ export function paletteRatios(zone: ZoneKey, hues: AuditHues = DEFAULT_HUES): Pa
   const sinkDeepest = SINK_ALPHAS[SINK_ALPHAS.length - 1] * shadeK(look.mode)
   const surfaces: Array<[string, number]> = [
     ['base', 0], ['side', SURFACE_OFFSETS[1]], ['deep', SURFACE_OFFSETS[2]], ['deeper', SURFACE_OFFSETS[3]], ['sidebar-1', SIDEBAR_SHADE_1[look.mode]],
-    ['sidebar-2', SURFACE_OFFSETS[4]], ['raised-a', SURFACE_OFFSETS[5]], ['raised-b', SURFACE_OFFSETS[6]], ['raised-active', SURFACE_OFFSETS[7]],
+    ['sidebar-2', SURFACE_OFFSETS[4]], ['raised-a', SURFACE_OFFSETS[5]], ['raised-b', SURFACE_OFFSETS[6]], ['raised-active', SURFACE_OFFSETS[7]], ['raised', SURFACE_OFFSETS[8]],
   ]
   for (const [name, offset] of surfaces) {
     const surface = rgbOf(hsl(hues.theme, colors.theme.s, clamp(colors.theme.l + offset, 0, 100)))
@@ -105,6 +106,30 @@ export function paletteRatios(zone: ZoneKey, hues: AuditHues = DEFAULT_HUES): Pa
   const tab = tabColors(zone, hues.theme, hues.theme)
   add('tab-ink/leaf', 'Edge tabs', 'Edge tab text on the page edge', 'text', rgbOf(tab.ink), leaf)
   add('tab-ink/active', 'Edge tabs', 'Edge tab text on its accent', 'text', rgbOf(tab.ink), rgbOf(tab.bg))
+
+  // ---- a hovered or pressed surface: the ink lifts the surface by 8, 14 or 22% (--ov-lift-1..3), the deepest of which is measured
+  const lifted = (surface: RGB) => over(ink, LIFT_ALPHA, surface)
+  for (const [name, offset] of [['base', 0], ['deep', SURFACE_OFFSETS[2]]] as Array<[string, number]>) {
+    const bg = lifted(rgbOf(hsl(hues.theme, colors.theme.s, clamp(colors.theme.l + offset, 0, 100))))
+    add(`ink/lift/${name}`, 'Hover and pressed', `Ink on surface-${name} lifted 22%`, 'text', ink, bg)
+    add(`ink-muted/lift/${name}`, 'Hover and pressed', `Muted ink on surface-${name} lifted 22%`, 'text', over(ink, strength.muted / 100, bg), bg)
+  }
+
+  // ---- the Preview page's day and night tones (theme.scss --page-day, --page-night), themed like the paper of those zones
+  for (const tone of ['day', 'night'] as const) {
+    const t = pageTone(tone, hues.theme, hues.accent)
+    add(`page-${tone}-ink`, 'Preview page', `Preview page text, ${tone} tone`, 'text', rgbOf(t.ink), rgbOf(t.page))
+    add(`page-${tone}-muted`, 'Preview page', `Preview page quiet text, ${tone} tone`, 'text', rgbOf(t.muted), rgbOf(t.page))
+  }
+
+  // ---- the header's sky toggle (and the zone tabs in Theme settings): the time and date, against the worst colour of the sky behind
+  const sky = skyLook(zone, palette)
+  const worstOnSky = (text: string) => {
+    const [h, s, l] = text.slice(4, -1).split(',').map(part => parseFloat(part))
+    return Math.min(...sky.backgrounds.map(bg => ratioOfRgb(rgbOf(hsl(h, s, l)), bg)))
+  }
+  out.push({ id: 'sky-text', group: 'Sky toggle', label: 'Time and date on the sky', kind: 'text', ratio: worstOnSky(sky.text) })
+  out.push({ id: 'sky-text-locked', group: 'Sky toggle', label: 'Time and date on the sky, locked', kind: 'text', ratio: worstOnSky(sky.textLocked) })
   return out
 }
 

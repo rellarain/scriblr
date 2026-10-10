@@ -1,7 +1,7 @@
 import type { Awareness } from '../../../api/types'
 import { inkColor } from '../../../theme/contrast'
 import { fitFill, ratioOf } from '../../../theme/readable'
-import { MIN_TEXT_GAP, ZONE_LOOKS } from '../../../theme/zoneLooks'
+import { ZONE_LOOKS } from '../../../theme/zoneLooks'
 import type { ZoneKey } from '../../../theme/types'
 
 // What a writer knows about a plotpoint placed on a moment: whether the
@@ -28,9 +28,8 @@ export function awarenessNext(state: Awareness | null | undefined): Awareness {
 
 // A plotpoint's shade in the plot editor, from its book's hue. The strengths are
 // the zone's own: saturated is the accent's saturation, desaturated the theme's;
-// bright and dark are the accent's lightness plus and minus AWARENESS_SHIFT (a
-// dark shade stays light enough for either ink to keep its MIN_TEXT_GAP gap, so a
-// hue is never stuck with the worse one). The shade is then fitted so its text reads (4.5:1).
+// bright and dark are the accent's lightness plus and minus AWARENESS_SHIFT. The
+// shade is then fitted so its text reads (4.5:1, readable.ts fitFill).
 //   front  saturated,   bright     back  saturated,   dark
 //   mid    desaturated, bright     off   desaturated, dark
 export const AWARENESS_SHIFT = 12
@@ -43,7 +42,7 @@ export function awarenessShade(zone: ZoneKey, hue: number, state: Awareness) {
   const fill = {
     h: hue,
     s: SATURATED[state] ? look.accentS : look.themeS,
-    l: BRIGHT[state] ? look.accentL + AWARENESS_SHIFT : Math.max(look.accentL - AWARENESS_SHIFT, inkColor('dark', hue).l + MIN_TEXT_GAP),
+    l: look.accentL + (BRIGHT[state] ? AWARENESS_SHIFT : -AWARENESS_SHIFT),
   }
   // The shade is moved only as far as its text needs to read on it (the zone's preferred ink: light on a light zone, dark on a dark one).
   const fitted = fitFill(fill, { h: 0, s: 0, l: 100 }, inkColor('dark', hue), look.mode === 'dark' ? 'dark' : 'light')

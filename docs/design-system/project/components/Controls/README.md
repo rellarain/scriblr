@@ -16,11 +16,11 @@ Code: `writer.scss` (`.wrSmallBtn`, `.wrIconBtn`, `.wrTabBtn`, `.wrSegmented`, `
 | Segmented | `.wrSegmented` + `.wrSegBtn` | two or three options; the selected one expands to show its name |
 | Trash | `.wrTrashBtn` | a quiet 24 x 24 icon; on click, the question and *Confirm* / *Cancel* replace it |
 
-Inside a level's body the buttons take `on-accent` text on a white wash at 16%. A disabled control is 40% opaque.
+Inside a level's body the buttons take `on-accent` text on `level-wash` (the ink at 16%, 28% on hover). A disabled control is 60% opaque.
 
 ## Inputs
 
-`.wrField`: a black wash at 25%, 13px, padding 8 / 10, focus = a 1px inset accent. `::placeholder` is `ink-faint`. On a level the Outline's inputs are the **light input** (`hsl(theme, 28%, 96%)`, dark text); on paper they are `paper-field` with `paper-ink`, a 1px `paper-line` and a 4px radius. A title input is serif, 13px. A chip (`.wrChip`) is a pill with an optional x.
+`.wrField`: a black wash at 25%, 13px, padding 8 / 10, focus = a 1px inset accent. `::placeholder` is `ink-faint`. On a level the Outline's inputs are the **light input** (`level-input`, `level-input-ink`, `level-input-hint` for the placeholder); on paper they are `paper-field` with `paper-ink`, a 1px `paper-line` and a 4px radius. A title input is serif, 13px. A chip (`.wrChip`) is a pill with an optional x.
 
 ## Alerts and quiet text
 

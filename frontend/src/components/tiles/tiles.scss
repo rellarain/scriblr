@@ -1,8 +1,8 @@
 // The tile grid (components/tiles). Colours are the theme tokens (theme/theme.scss),
-// so tiles follow the time-of-day palette and keep its 45-point text gap; inside a
+// so tiles follow the time-of-day palette (flat and square: depth is the raised surface and a hairline); inside a
 // book's scope they take the book's colours.
 
-$tile-surface: linear-gradient(160deg, var(--surface-raised-a), var(--surface-raised-b));
+$tile-surface: var(--surface-raised);
 
 .tileArea {
   position: relative;
@@ -41,7 +41,7 @@ $tile-surface: linear-gradient(160deg, var(--surface-raised-a), var(--surface-ra
   flex-direction: column;
   gap: 6px;
   // A dragged tile hovering here would minimize it, not swap/split it.
-  &--drop { box-shadow: inset 0 0 0 2px var(--accent); border-radius: 6px; }
+  &--drop { box-shadow: inset 0 0 0 2px var(--accent); border-radius: 0; }
 }
 // While a tile is being dragged and nothing is minimized yet, there's no real
 // .tileRail to drop onto -- this stands in for it: a same-size drop zone that
@@ -52,7 +52,7 @@ $tile-surface: linear-gradient(160deg, var(--surface-raised-a), var(--surface-ra
   flex: 0 0 40px; // RAIL_TILE (tileShapes.ts)
   width: 40px;
   align-self: stretch;
-  border-radius: 6px;
+  border-radius: 0;
   box-shadow: inset 0 0 0 2px color-mix(in srgb, var(--ink) 30%, transparent);
   background: color-mix(in srgb, var(--ink) 6%, transparent);
   &--drop { box-shadow: inset 0 0 0 2px var(--accent); background: color-mix(in srgb, var(--accent) 15%, transparent); }
@@ -64,7 +64,7 @@ $tile-surface: linear-gradient(160deg, var(--surface-raised-a), var(--surface-ra
   justify-content: center;
   padding: 0;
   border: 0;
-  border-radius: 10px;
+  border-radius: 0;
   background: $tile-surface;
   box-shadow: inset 0 0 0 1px var(--hairline);
   color: var(--ink-muted);
@@ -91,7 +91,7 @@ $tile-surface: linear-gradient(160deg, var(--surface-raised-a), var(--surface-ra
   &:focus-visible .tileDividerBar { background: var(--accent); }
 }
 .tileDividerBar {
-  border-radius: 2px;
+  border-radius: 0;
   background: transparent;
   transition: background 0.1s;
 }
@@ -112,7 +112,7 @@ $tile-surface: linear-gradient(160deg, var(--surface-raised-a), var(--surface-ra
   box-sizing: border-box;
   padding: 8px 10px;
   overflow: hidden;
-  border-radius: 10px;
+  border-radius: 0;
   background: $tile-surface;
   box-shadow: inset 0 0 0 1px var(--hairline);
   color: var(--ink);
@@ -120,7 +120,7 @@ $tile-surface: linear-gradient(160deg, var(--surface-raised-a), var(--surface-ra
   cursor: grab;
   &:hover { box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--ink) 30%, transparent); }
   &:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
-  &--dragging { opacity: 0.5; }
+  &--dragging { opacity: 0.7; }
   &--drop { box-shadow: inset 0 0 0 2px var(--accent); }
   // Hovering this tile's edge margin while dragging another one over it: a bar at
   // that edge previews the new column/row a drop there would split off.
@@ -217,8 +217,8 @@ $tile-surface: linear-gradient(160deg, var(--surface-raised-a), var(--surface-ra
   cursor: pointer;
   &:hover { text-decoration: underline; }
 }
-.tileBar { height: 6px; border-radius: 3px; background: var(--ov-sink-2); overflow: hidden; > b { display: block; height: 100%; background: var(--accent); } }
-.tileQuick { display: flex; gap: 4px; input { flex: 1; min-width: 0; height: 26px; padding: 0 8px; border: 0; border-radius: 4px; background: var(--ov-sink-2); color: var(--ink); font-size: 12px; outline: none; &::placeholder { color: var(--ink-faint); } } }
+.tileBar { height: 6px; border-radius: 0; background: var(--ov-sink-2); overflow: hidden; > b { display: block; height: 100%; background: var(--accent); } }
+.tileQuick { display: flex; gap: 4px; input { flex: 1; min-width: 0; height: 26px; padding: 0 8px; border: 0; border-radius: 0; background: var(--ov-sink-2); color: var(--ink); font-size: 12px; outline: none; &::placeholder { color: var(--ink-faint); } } }
 .tileCheck { display: flex; align-items: center; gap: 6px; font-size: 12px; padding: 2px 0; input { margin: 0; } }
 
 // ------------------------------------------------------------- expanded console
@@ -229,7 +229,7 @@ $tile-surface: linear-gradient(160deg, var(--surface-raised-a), var(--surface-ra
   display: flex;
   flex-direction: column;
   overflow: hidden;
-  border-radius: 10px;
+  border-radius: 0;
   background: $tile-surface;
   box-shadow: inset 0 0 0 1px var(--hairline);
   color: var(--ink);

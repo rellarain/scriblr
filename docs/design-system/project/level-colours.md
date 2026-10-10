@@ -22,7 +22,7 @@ A series, arc, chapter or subcategory with no colour of its own shows its parent
 
 A level is a **flat fill**: the hue at the accent's saturation times 0.62 (a little less loud), 8 points deeper than the accent's lightness, and **held dark enough that white text reads on it** (`fillCap` in `bookColors.ts`, worked out from every white text a level carries, in `levelContrast.ts`: its title, the nested shades, muted text at 90%, the header button's wash, the Outline's page, label and arc tab). Yellows and greens come out darker than blues and reds: the cap is lower where a hue is brighter at the same lightness. Token: `level-fill-<hue>`.
 
-Text on a level is **always white** (`--on-accent: #fff` is set by `LevelPanel`, whatever the zone's own on-accent). What sits inside steps one shade deeper each time: `level-fill-1` to `-4` are the fill mixed with 10, 20, 30 and 40% black, ending in light inputs (`hsl(theme, 28%, 96%)` with dark text). The Draft level is paper, not a fill.
+Text on a level is **always white** (`--on-accent: #fff` is set by `LevelPanel`, whatever the zone's own on-accent). What sits inside steps one shade deeper each time: `level-fill-1` to `-4` are the fill mixed with 10, 20, 30 and 40% black, ending in light inputs (`level-input`, near-white in the theme hue, with `level-input-ink`). A control on a level is lifted by a wash of the level's ink: `level-wash-lo` 10%, `level-wash` 16%, `level-wash-hi` 28% (hover), a rule is `level-line` 18%, and the softer ink for tab labels and markers is `level-ink-soft` 92%; the Writer's CSS defines them on `.wrLevel` from `--on-accent`. The Draft level is paper, not a fill.
 
 ## Scope
 

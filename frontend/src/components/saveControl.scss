@@ -20,8 +20,8 @@
   font-weight: 400;
   white-space: nowrap;
   font-variant-numeric: tabular-nums;
-  background: rgb(18 18 24 / 0.94);
-  color: #fff;
+  background: var(--surface-deeper);
+  color: var(--ink);
   box-shadow: 0 2px 8px rgb(0 0 0 / 0.35);
   opacity: 0;
   visibility: hidden;
@@ -49,7 +49,7 @@
   background: var(--accent);
   cursor: pointer;
   &:hover:not(:disabled) { background: var(--accent-hover); }
-  &:disabled { opacity: 0.4; cursor: default; }
+  &:disabled { opacity: 0.6; cursor: default; }
 }
 
 // The floppy-disk button: icon only, whichever interface's button style it wears.

@@ -31,9 +31,6 @@ export interface ZoneLook {
   paperL: number
 }
 
-// The older lightness-gap rule (text this many HSL lightness points from its ground). The theme no longer relies on it (see
-// above); the sky toggle and the plotpoint shades still size their bands with it.
-export const MIN_TEXT_GAP = 45
 
 const MUTED = { themeS: 15, accentS: 45, alertS: 70 }
 const VIVID = { themeS: 30, accentS: 80, alertS: 100 }
@@ -76,10 +73,10 @@ export const INK_STRENGTH: Record<ZoneMode, { muted: number; faint: number }> = 
 }
 
 // The theme's surfaces, as lightness offsets from its base (theme.scss):
-// base, side, deep, deeper, the sidebar's second shade, the two raised cards, and
-// the active raised card. The sidebar's first shade isn't a fixed offset -- see
+// base, side, deep, deeper, the sidebar's second shade, the two ends of the older raised gradient, and
+// the active raised card, then the flat raised surface (cards, tiles). The sidebar's first shade isn't a fixed offset -- see
 // SIDEBAR_SHADE_1 below -- so it's checked on its own, not in this list.
-export const SURFACE_OFFSETS = [0, -4, -10, -20, -9, -1, -8, 3]
+export const SURFACE_OFFSETS = [0, -4, -10, -20, -9, -1, -8, 3, -5]
 
 // --surface-sidebar-1's step from --color-theme-l (theme.scss): a light zone's
 // already-bright background can afford a deeper recess, but the same subtraction on
@@ -93,6 +90,9 @@ export const shadeK = (mode: ZoneMode): number => (mode === 'dark' ? 1 : 0.55)
 
 const clamp = (n: number, lo: number, hi: number) => Math.max(lo, Math.min(hi, n))
 
+// The deepest lift overlay (--ov-lift-3: the ink at 22%) a surface carries on hover or press.
+export const LIFT_ALPHA = 0.22
+
 // Does the zone's ink (and its muted and faint tiers) read on every surface of a theme at this lightness?
 function surfacesRead(hue: number, look: ZoneLook, themeL: number): boolean {
   const ink = rgbOf(zoneInk(look.mode, hue))
@@ -105,6 +105,14 @@ function surfacesRead(hue: number, look: ZoneLook, themeL: number): boolean {
       for (const strength of [100, muted, faint]) {
         if (ratioOfRgb(over(ink, strength / 100, bg), bg) < TEXT_TARGET) return false
       }
+    }
+  }
+  // A hovered or pressed surface (the ink lifts it by up to LIFT_ALPHA): measured on the base and the deep surface.
+  for (const offset of [0, SURFACE_OFFSETS[2]]) {
+    const surface = rgbOf({ h: hue, s: look.themeS, l: clamp(themeL + offset, 0, 100) })
+    const bg = over(ink, LIFT_ALPHA, surface)
+    for (const strength of [100, muted]) {
+      if (ratioOfRgb(over(ink, strength / 100, bg), bg) < TEXT_TARGET) return false
     }
   }
   return true
@@ -223,3 +231,19 @@ export function resolvePalette(pal: ZonePalette, zone: ZoneKey): ResolvedPalette
   return resolved
 }
 
+
+// The Preview page's own tone (the reader's day or night choice, writer.scss `.wrPage--day` and `--night`): the page, its text, its rules and
+// its quiet text, themed like the paper of the Day or the Night zone whatever zone the app is in. They are the same pairs the audit
+// measures for those zones (the chapter page, `paperInks`), so they read for every hue.
+export function pageTone(tone: 'day' | 'night', theme: number, accent: number): Record<'page' | 'ink' | 'line' | 'muted', HSL> {
+  const zone: ZoneKey = tone
+  const look = ZONE_LOOKS[zone]
+  const p = PAPER_LOOKS[look.mode]
+  const inks = paperInks(zone, theme)
+  return {
+    page: paperGrounds(zone, { theme, accent }).page,
+    ink: inks.ink,
+    line: { h: theme, s: look.themeS, l: look.paperL - 18 * p.dir },
+    muted: inks.muted,
+  }
+}

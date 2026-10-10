@@ -18,7 +18,7 @@ npx vitest run            # includes the contrast audit and the design-system te
 ## Add a tile or a card
 
 - A tile is a `SplitArea` tile: `{ id, title, Icon, children }`. Give the grid a `gridId` so its layout is remembered, and a `defaultTree` if it should start somewhere other than even columns.
-- A card is a flat box one step deeper than the one it sits in (`--wr-fill-N` on a level, `--wr-frame-N` on paper). Don't give it a radius or a shadow. The last step is a light input.
+- A card is a flat box one step deeper than the one it sits in (`--wr-fill-N` on a level, `--wr-frame-N` on paper). Don't give it a radius or a shadow; a raised card on the theme's own surface is `--surface-raised` with a `hairline`. The last step is a light input.
 
 ## Add a colour
 

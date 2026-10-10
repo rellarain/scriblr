@@ -137,6 +137,8 @@ html[data-theme-pending] #root {
   --surface-sidebar-2: hsl(var(--color-theme-h), var(--color-theme-s), calc(var(--color-theme-l) - 9%));
   --surface-raised-a: hsl(var(--color-theme-h), var(--color-theme-s), calc(var(--color-theme-l) - 1%));
   --surface-raised-b: hsl(var(--color-theme-h), var(--color-theme-s), calc(var(--color-theme-l) - 8%));
+  // The flat raised surface: tiles, cards and notes (depth by colour, no gradient or shadow).
+  --surface-raised: hsl(var(--color-theme-h), var(--color-theme-s), calc(var(--color-theme-l) - 5%));
   --surface-raised-active: hsl(var(--color-theme-h), var(--color-theme-s), calc(var(--color-theme-l) + 3%));
 
   // The three action colors (and the admin one), with their variants.

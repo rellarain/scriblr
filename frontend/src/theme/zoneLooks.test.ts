@@ -36,7 +36,7 @@ describe.each(ZONE_KEYS)('%s look', zone => {
       const l = themeLightness(h, look)
       // The theme moves only the way that helps the ink, and never past the zone's own start by more than a few points.
       expect(look.mode === 'dark' ? l <= look.themeL : l >= look.themeL).toBe(true)
-      expect(Math.abs(l - look.themeL)).toBeLessThanOrEqual(12)
+      expect(Math.abs(l - look.themeL)).toBeLessThanOrEqual(14) // (the lifted surface of a hover reads too)
       const ink = zoneInk(look.mode, h)
       for (const offset of [...SURFACE_OFFSETS, SIDEBAR_SHADE_1[look.mode]]) {
         const bg: HSL = { h, s: look.themeS, l: clamp(l + offset) }

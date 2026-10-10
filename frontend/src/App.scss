@@ -655,7 +655,7 @@ button {border: none; cursor: pointer; border-radius: 4px;}
   overflow-wrap: break-word;
   &--component { background: rgb(0 0 0 / calc(0.1 * var(--shade-k))); }
   &--feature { background: rgb(0 0 0 / calc(0.2 * var(--shade-k))); }
-  &--dragging { opacity: 0.5; }
+  &--dragging { opacity: 0.7; }
 }
 // Handle + title row -- kept separate from .auiConfigNodeChildren (below)
 // so nested cards aren't also pushed right by the handle's width; their
@@ -948,7 +948,7 @@ div.auiConfigReadOnlyIdea {
   font-weight: 700;
   white-space: nowrap;
   cursor: pointer;
-  &:disabled { opacity: 0.4; cursor: default; }
+  &:disabled { opacity: 0.6; cursor: default; }
 }
 .auiSaveDraftBtn {
   color: var(--ink);
@@ -1053,7 +1053,7 @@ div.auiConfigReadOnlyIdea {
   border-radius: 4px;
   &:hover { background: var(--accent-hover); color: var(--on-accent); }
   &--active { background: hsl(var(--color-accent-h), var(--color-accent-s), var(--color-accent-l)); color: var(--on-accent); }
-  &:disabled { opacity: 0.35; cursor: not-allowed; &:hover { background: rgb(0 0 0 / calc(0.25 * var(--shade-k))); } }
+  &:disabled { opacity: 0.6; cursor: not-allowed; &:hover { background: rgb(0 0 0 / calc(0.25 * var(--shade-k))); } }
 }
 .toneBtn {
   display: inline-flex;
@@ -1433,11 +1433,11 @@ div.auiConfigReadOnlyIdea {
 .inboxSection {
   --tone-yes: var(--accent2);
   --tone-yes-ink: var(--on-accent2);
-  --tone-no: var(--accent);
-  --tone-no-ink: var(--on-accent);
+  --tone-no: var(--alert);
+  --tone-no-ink: var(--on-alert);
   --tone-mid: color-mix(in srgb, var(--ink) 34%, var(--surface-sidebar-2));
   --tone-mid-ink: var(--ink);
-  --field-bg: rgb(0 0 0 / calc(0.3 * var(--shade-k)));
+  --field-bg: var(--ov-sink-2);
 }
 
 .dividerToggle { position: relative; }
@@ -1570,7 +1570,7 @@ div.auiConfigReadOnlyIdea {
   color: var(--ink);
   background: var(--field-bg);
   &:hover:not(:disabled) { background: rgb(255 255 255 / 0.14); }
-  &:disabled { opacity: 0.4; cursor: not-allowed; }
+  &:disabled { opacity: 0.6; cursor: not-allowed; }
   &--on { background: hsl(var(--color-accent-h), var(--color-accent-s), var(--color-accent-l)); color: var(--on-accent); &:hover:not(:disabled) { background: hsl(var(--color-accent-h), var(--color-accent-s), var(--color-accent-l)); } }
   &--yes { background: var(--tone-yes); color: var(--tone-yes-ink); &:hover:not(:disabled) { background: var(--tone-yes); filter: brightness(1.1); } }
   &--no { background: var(--tone-no); color: var(--tone-no-ink); &:hover:not(:disabled) { background: var(--tone-no); filter: brightness(1.1); } }
@@ -1646,7 +1646,7 @@ div.auiConfigReadOnlyIdea {
   border-radius: 6px;
   background: var(--field-bg);
   border: 2px solid transparent;
-  &:disabled { opacity: 0.4; cursor: not-allowed; }
+  &:disabled { opacity: 0.6; cursor: not-allowed; }
   &--pleasant { color: var(--tone-yes); &.toneFace--on { background: var(--tone-yes); color: var(--tone-yes-ink); } }
   &--unpleasant { color: var(--tone-no); &.toneFace--on { background: var(--tone-no); color: var(--tone-no-ink); } }
   &--mixed { color: color-mix(in srgb, var(--tone-yes) 50%, var(--tone-no)); &.toneFace--on { background: linear-gradient(90deg, var(--tone-yes) 50%, var(--tone-no) 50%); color: var(--ink); } }
@@ -1680,7 +1680,7 @@ div.auiConfigReadOnlyIdea {
   border: 1px solid transparent;
   &--mine { border-color: var(--ink); background: rgb(255 255 255 / 0.14); font-weight: 700; }
   &--suggest { background: transparent; border: 1px dashed rgb(255 255 255 / 0.4); }
-  &:disabled { opacity: 0.5; cursor: not-allowed; }
+  &:disabled { opacity: 0.6; cursor: not-allowed; }
 }
 .verbCount { margin-left: 5px; font-size: 10px; opacity: 0.7; }
 .subjectField { position: relative; display: flex; flex-direction: column; gap: 2px; }
@@ -1727,7 +1727,7 @@ div.auiConfigReadOnlyIdea {
   &--deny { color: var(--tone-no); }
   &--pass { color: var(--tone-mid); }
   &:hover:not(:disabled) { background: rgb(255 255 255 / 0.12); }
-  &:disabled { opacity: 0.4; cursor: not-allowed; }
+  &:disabled { opacity: 0.6; cursor: not-allowed; }
 }
 .voteNote {
   flex: 1 1 auto;

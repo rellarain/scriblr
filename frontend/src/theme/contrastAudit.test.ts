@@ -20,10 +20,10 @@ describe('the contrast audit', () => {
     for (const r of rows) expect(r.min).toBe(MIN_RATIO[r.kind])
   })
 
-  it('covers the theme surfaces, the fills, the paper, the reactions, the edge tabs and the level panels in all four zones', () => {
+  it('covers the theme surfaces, hover and press, the fills, the paper, the preview page, the reactions, the edge tabs, the sky toggle and the level panels in all four zones', () => {
     for (const zone of ZONES) {
       const groups = new Set(rows.filter(r => r.zone === zone).map(r => r.group))
-      expect([...groups].sort()).toEqual(['Edge tabs', 'Fills', 'Level panels', 'Paper', 'Reactions', 'Theme surfaces'])
+      expect([...groups].sort()).toEqual(['Edge tabs', 'Fills', 'Hover and pressed', 'Level panels', 'Paper', 'Preview page', 'Reactions', 'Sky toggle', 'Theme surfaces'])
     }
   })
 

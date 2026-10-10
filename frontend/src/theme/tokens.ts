@@ -1,5 +1,5 @@
 import type { HSL } from './contrast'
-import { fillDirection, fillInk, INK_STRENGTH, PAPER_LOOKS, SIDEBAR_SHADE_1, ZONE_LOOKS, paperAccents, resolvePalette, zoneInk } from './zoneLooks'
+import { fillDirection, fillInk, INK_STRENGTH, PAPER_LOOKS, SIDEBAR_SHADE_1, ZONE_LOOKS, pageTone, paperAccents, resolvePalette, zoneInk } from './zoneLooks'
 import type { Role, ZoneKey, ZonePalette } from './types'
 
 // Turns a zone's hues into the CSS custom properties the app is styled with.
@@ -80,5 +80,18 @@ export function deriveTokens(pal: ZonePalette, role: Role, zone: ZoneKey): Theme
     '--paper-error': hsl(accents.error),
     '--paper-like': hsl(accents.like),
     '--paper-dislike': hsl(accents.dislike),
+    // The Preview page's day and night tones (writer.scss .wrPage--day, .wrPage--night), themed.
+    ...pageTokens('day', pal),
+    ...pageTokens('night', pal),
+  }
+}
+
+function pageTokens(tone: 'day' | 'night', pal: ZonePalette): ThemeVars {
+  const t = pageTone(tone, pal.theme.h, pal.accent.h)
+  return {
+    [`--page-${tone}`]: hsl(t.page),
+    [`--page-${tone}-ink`]: hsl(t.ink),
+    [`--page-${tone}-line`]: hsl(t.line),
+    [`--page-${tone}-muted`]: hsl(t.muted),
   }
 }

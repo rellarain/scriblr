@@ -36,7 +36,7 @@ So at the default hues Day's accent is drawn at about 37 rather than 42, and its
 
 ## Surfaces and ink
 
-Every surface is the theme hue at the zone's theme saturation, stepped in lightness from the base: `surface-base` 0, `surface-side` -4, `surface-deep` -10, `surface-deeper` -20, `surface-sidebar-2` -9, `surface-raised-a` -1, `surface-raised-b` -8, `surface-raised-active` +3. The sidebar's first shade steps up in a dark zone (+6) and down in a light one (-17) so it never crushes toward black.
+Every surface is the theme hue at the zone's theme saturation, stepped in lightness from the base: `surface-base` 0, `surface-side` -4, `surface-deep` -10, `surface-deeper` -20, `surface-sidebar-2` -9, `surface-raised-a` -1, `surface-raised-b` -8, `surface-raised-active` +3, and `surface-raised` -5: the **one flat surface of a tile, card or note** (the older gradient, `surface-raised-a` to `-b`, remains only in the admin Resources tiles). A hovered or pressed surface is the ink lifted by up to 22% (`ov-lift-3`); the theme's lightness is fitted so the ink and `ink-muted` read on that too. The sidebar's first shade steps up in a dark zone (+6) and down in a light one (-17) so it never crushes toward black.
 
 There is **one ink** per zone: white in Dusk and Night; in Dawn and Day a near-black tinted with the theme hue (`hsl(theme, 12%, 3%)`). `ink-muted` and `ink-faint` are the ink at 90% and 84% in a dark zone; in a light zone they are the ink itself (the ink is already as dark as it can be). The text on each fill is `on-accent`, `on-alert` or `on-accent2`, picked for that fill. `hover` and `dim` shades of a fill step **away from its text**: darker under white, lighter under dark.
 
@@ -44,7 +44,7 @@ Recesses are black overlays (`ov-sink-1..3` at 0.16, 0.25, 0.35, softened by 0.5
 
 ## The Writer's paper
 
-The chapter page and the preview follow the zone: a light sheet by day and dawn (L97), a dark one at dusk and night (L18, L12). Shades step toward the text (`paper-l - n * dir`, where `dir` is 1 on a light sheet and -1 on a dark one); fields step the other way. The chapter page is 4 points off the sheet, and the five nested cards (`frame-1..5`) are 6, 9, 12, 15 and 18 points (a light sheet), or 5, 8, 10, 12 and 14 (a dark one): deep enough to see, shallow enough that the five paper inks (`paper-ink`, `-ink2`, `-label`, `-muted`, `-placeholder`) still read on the deepest card.
+The Preview page's own **day and night tones** (the reader's choice, whatever the zone) are the Day and the Night paper in the theme hue: `page-day`, `page-night` with `-ink`, `-line` and `-muted`; they read like the paper of those zones (the audit's "Preview page" rows). The chapter page and the preview follow the zone: a light sheet by day and dawn (L97), a dark one at dusk and night (L18, L12). Shades step toward the text (`paper-l - n * dir`, where `dir` is 1 on a light sheet and -1 on a dark one); fields step the other way. The chapter page is 4 points off the sheet, and the five nested cards (`frame-1..5`) are 6, 9, 12, 15 and 18 points (a light sheet), or 5, 8, 10, 12 and 14 (a dark one): deep enough to see, shallow enough that the five paper inks (`paper-ink`, `-ink2`, `-label`, `-muted`, `-placeholder`) still read on the deepest card.
 
 `paper-error` (the page's error text) and `paper-like` and `paper-dislike` (the reaction hearts) are the accent and alert hues moved only as far as they need to read on their grounds.
 

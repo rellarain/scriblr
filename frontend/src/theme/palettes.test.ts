@@ -9,7 +9,7 @@ describe('derivedShades', () => {
   it('lists the theme surfaces the app derives, from the zone\'s theme lightness', () => {
     const look = ZONE_LOOKS.day
     const shades = derivedShades(DEFAULT_PALETTE, 'theme', 'day')
-    expect(shades.map(s => s.label)).toEqual(['Base', 'Side', 'Deep', 'Deeper', 'Sidebar 1', 'Sidebar 2', 'Raised a', 'Raised b', 'Raised active'])
+    expect(shades.map(s => s.label)).toEqual(['Base', 'Side', 'Deep', 'Deeper', 'Sidebar 1', 'Sidebar 2', 'Raised a', 'Raised b', 'Raised active', 'Raised'])
     expect(shades[0].color).toEqual({ h: DEFAULT_PALETTE.theme.h, s: look.themeS, l: look.themeL })
     expect(shades[2].color.l).toBe(look.themeL - 10)
     // sidebar and raised surfaces are the theme's own hue and saturation, not accent-tinted

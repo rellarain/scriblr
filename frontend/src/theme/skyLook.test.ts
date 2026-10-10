@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import { readableLightness, skyLook } from './skyLook'
-import { MIN_TEXT_GAP, ZONE_LOOKS, resolvePalette } from './zoneLooks'
+import { TEXT_TARGET, ratioOfRgb, rgbOf } from './readable'
+import { ZONE_LOOKS, resolvePalette } from './zoneLooks'
 import { ZONE_KEYS, type ZonePalette } from './types'
 
 const lightnessOf = (color: string) => Number(color.match(/(\d+(?:\.\d+)?)%\)$/)![1])
@@ -9,15 +10,16 @@ const palette = (h: number): ZonePalette => ({ theme: { h }, accent: { h: (h + 4
 const HUES = Array.from({ length: 36 }, (_, i) => i * 10)
 
 describe('skyLook', () => {
-  it.each(ZONE_KEYS)('%s: the time text is 45+ lightness points from the sky at every hue, locked or not, and a valid colour', zone => {
+  const colorOf = (color: string) => {
+    const [h, s, l] = color.slice(4, -1).split(',').map(part => parseFloat(part))
+    return rgbOf({ h, s, l })
+  }
+
+  it.each(ZONE_KEYS)('%s: the time text reads (4.5:1) on every colour of the sky at every hue, locked or not', zone => {
     for (const h of HUES) {
       const look = skyLook(zone, palette(h))
       for (const text of [look.text, look.textLocked]) {
-        const l = lightnessOf(text)
-        expect(l).toBeGreaterThanOrEqual(0)
-        expect(l).toBeLessThanOrEqual(100)
-        expect(Math.abs(l - look.band.min)).toBeGreaterThanOrEqual(MIN_TEXT_GAP - 1e-6)
-        expect(Math.abs(l - look.band.max)).toBeGreaterThanOrEqual(MIN_TEXT_GAP - 1e-6)
+        for (const bg of look.backgrounds) expect(ratioOfRgb(colorOf(text), bg)).toBeGreaterThanOrEqual(4.5)
       }
     }
   })
@@ -65,10 +67,11 @@ describe('skyLook', () => {
     }
   })
 
-  it('uses the zone accent for the night text and the lightest accent shade for the day text', () => {
+  it('uses the zone accent for the night text and the lightest accent shade for the day text where white reads', () => {
     const p = palette(30)
     expect(lightnessOf(skyLook('night', p).text)).toBe(ZONE_LOOKS.night.accentL)
-    expect(lightnessOf(skyLook('day', p).text)).toBe(95)
+    // Day: the lightest accent shade, or dark where white would not read on the accent (a yellow, a green).
+    expect(lightnessOf(skyLook('day', palette(200)).text)).toBeGreaterThanOrEqual(95)
   })
 
   it('fades clouds as a whole, dimmer at the back', () => {
@@ -81,14 +84,17 @@ describe('skyLook', () => {
 })
 
 describe('readableLightness', () => {
-  it('keeps a wanted lightness that is already far enough away', () => {
-    expect(readableLightness(95, { min: 42, max: 42 })).toBe(95)
-    expect(readableLightness(62, { min: 10, max: 10 })).toBe(62)
+  const sky = (h: number, l: number) => rgbOf({ h, s: 40, l })
+
+  it('keeps a wanted lightness that already reads', () => {
+    expect(readableLightness(200, 40, 95, [sky(200, 20)])).toBe(95)
   })
 
-  it('moves to the nearest side that has room, on the wanted side first', () => {
-    expect(readableLightness(88, { min: 36, max: 61 })).toBeGreaterThanOrEqual(91)
+  it('moves toward the wanted side until the text reads, and to the other side when that side has no room', () => {
+    const mid = readableLightness(200, 40, 80, [sky(200, 28), sky(200, 38)])
+    expect(mid).toBeGreaterThan(80)
     // Light text has no room over a light sky, so it goes dark.
-    expect(readableLightness(88, { min: 66, max: 84 })).toBeLessThanOrEqual(36)
+    expect(readableLightness(200, 40, 88, [sky(200, 84)])).toBeLessThan(40)
+    for (const l of [mid]) expect(ratioOfRgb(rgbOf({ h: 200, s: 40, l }), sky(200, 38))).toBeGreaterThanOrEqual(TEXT_TARGET)
   })
 })

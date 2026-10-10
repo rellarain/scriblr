@@ -5,7 +5,7 @@ import { BLACK, WHITE, mixRgb, rgbOf, type RGB } from '../../src/theme/readable'
 import type { ZoneKey, ZonePalette } from '../../src/theme/types'
 import {
   DISLIKE_BAR_SATURATIONS, INK_STRENGTH, LIKE_BAR_SATURATIONS, PAPER_LOOKS, SIDEBAR_SHADE_1, SINK_ALPHAS, SURFACE_OFFSETS, ZONE_LOOKS,
-  fillDirection, fillInk, paperAccents, paperGrounds, paperInks, resolvePalette, shadeK, zoneInk,
+  fillDirection, fillInk, pageTone, paperAccents, paperGrounds, paperInks, resolvePalette, shadeK, zoneInk,
 } from '../../src/theme/zoneLooks'
 
 // The design system's colour tokens for one zone: the theme's own derived colours (theme/tokens.ts, theme.scss, writer.scss) worked out as
@@ -50,6 +50,7 @@ export function zoneColorTokens(zone: ZoneKey, pal: ZonePalette = DEFAULT_PALETT
   add('surface-raised-a', hexOf(surface(SURFACE_OFFSETS[5])), 'The lighter end of a raised card\'s gradient.')
   add('surface-raised-b', hexOf(surface(SURFACE_OFFSETS[6])), 'The deeper end of a raised card\'s gradient.')
   add('surface-raised-active', hexOf(surface(SURFACE_OFFSETS[7])), 'A raised card that is selected.')
+  add('surface-raised', hexOf(surface(SURFACE_OFFSETS[8])), 'The flat surface of a tile, card or note: 5 points deeper than the base.')
   add('ink', hexOf(inkHsl), `The one text colour of the zone: ${look.mode === 'dark' ? 'white' : 'a near-black tinted with the theme hue'}. Reads at 4.5:1 or more on every surface, for every hue.`)
   add('ink-muted', hexAlpha(ink, strength.muted / 100), `Secondary text: the ink at ${strength.muted}%.`)
   add('ink-faint', hexAlpha(ink, strength.faint / 100), `Placeholder and tertiary text: the ink at ${strength.faint}%.`)
@@ -96,6 +97,20 @@ export function zoneColorTokens(zone: ZoneKey, pal: ZonePalette = DEFAULT_PALETT
   const book = rgbOf(fillHsl(DEFAULT_BOOK_HUE, { s: colors.accent.s, l: colors.accent.l }))
   ;[90, 80, 70, 60].forEach((pct, i) => add(`level-fill-${i + 1}`, hex(mixRgb(book, pct, BLACK)), `What sits inside a level (shown at the default book hue, ${DEFAULT_BOOK_HUE}°): the fill mixed with ${100 - pct}% black, one step deeper each time, ending in light inputs.`))
   add('level-ink', '#ffffff', 'Text on a level panel: always white.')
-  add('level-wash', hexAlpha(WHITE, 0.16), 'A header button on a level: white at 16%.')
+  add('level-ink-soft', hexAlpha(WHITE, 0.92), 'The ink of the level at 92%: arc tab labels, the marker on an edited note, a progress bar fill.')
+  add('level-wash-lo', hexAlpha(WHITE, 0.1), 'The faintest wash on a level: the ink at 10% (a hovered row, a chapter in the draft list).')
+  add('level-wash', hexAlpha(WHITE, 0.16), 'A control on a level: the ink at 16% (header buttons, the level toggle on hover, a tab on hover).')
+  add('level-wash-hi', hexAlpha(WHITE, 0.28), 'A control on a level when hovered: the ink at 28%.')
+  add('level-line', hexAlpha(WHITE, 0.18), 'A rule on a level: the ink at 18%.')
+  add('level-input', hexOf(hsl(pal.theme.h, 28, 96)), 'The light input on a level (the field, the quick search, an inline add): the theme hue, near white.')
+  add('level-input-ink', hexOf(hsl(pal.theme.h, 30, 10)), 'Text in a light input on a level.')
+  add('level-input-hint', hexOf(hsl(pal.theme.h, 12, 42)), 'Placeholder text in a light input on a level.')
+  for (const tone of ['day', 'night'] as const) {
+    const t = pageTone(tone, pal.theme.h, pal.accent.h)
+    add(`page-${tone}`, hexOf(t.page), `The Preview page in its ${tone} tone: the ${tone === 'day' ? 'Day' : 'Night'} paper in the theme hue, whatever zone the app is in.`)
+    add(`page-${tone}-ink`, hexOf(t.ink), `Text on the Preview page, ${tone} tone.`)
+    add(`page-${tone}-line`, hexOf(t.line), `Rules on the Preview page, ${tone} tone.`)
+    add(`page-${tone}-muted`, hexOf(t.muted), `Quiet text on the Preview page, ${tone} tone.`)
+  }
   return out
 }

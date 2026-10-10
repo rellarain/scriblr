@@ -22,9 +22,9 @@ export function contrastRatio(a: HSL, b: HSL): number {
 }
 
 // The two text inks: pure white on dark surfaces (what the app has always
-// used) and a near-black tinted with the theme hue on light ones -- pushed dark
-// enough (not literal black) that it still clears MIN_TEXT_GAP against a light
-// zone's most-recessed, most-shadowed surface (zoneLooks.test.ts).
+// used) and a near-black tinted with the theme hue on light ones, dark enough
+// that it reads (4.5:1) on a light zone's most-recessed, most-shadowed surface
+// (contrastAudit.ts).
 export type InkMode = 'light' | 'dark'
 export const inkColor = (mode: InkMode, themeHue: number): HSL =>
   mode === 'light' ? { h: 0, s: 0, l: 100 } : { h: themeHue, s: 12, l: 3 }

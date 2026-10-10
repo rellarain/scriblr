@@ -12,7 +12,7 @@ Code: `theme/SkyToggle.tsx`, `SkyScene.tsx`, `skyLook.ts`, `sky.ts`, `skyToggle.
 
 ## Tokens
 
-The sky uses `accent` (Day), the theme hue's shades (Dawn, Dusk, Night) and white clouds at 30 to 55%. The time text is placed at the lightness that keeps it clear of the sky behind it.
+The sky uses `accent` (Day), the theme hue's shades (Dawn, Dusk, Night) and white clouds at 30 to 55%. The time text is the accent hue, moved from the lightness the zone wants until it reads (4.5:1) against every colour of the sky behind it; if a bright accent leaves no such colour, the dusk sky is held darker until one does. The audit covers it (`sky-text`). A zone tab that is not in use is desaturated, not faded.
 
 ## Don't
 

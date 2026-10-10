@@ -50,7 +50,8 @@ const SPACING: Token[] = [
   { name: 'hue-window', value: String(SUBCATEGORY_HUE_WINDOW), usage: 'Degrees: how far a series, arc, chapter or plot subcategory colour may stray from its parent\'s hue.' },
 ]
 const RADIUS: Token[] = [
-  { name: 'radius-none', value: px(0), usage: 'The Writer is flat and square: levels, tiles, tabs, cards, buttons and fields have no radius.' },
+  { name: 'radius-none', value: px(0), usage: 'Surfaces and fields are flat and square: levels, tiles (the tile grid and its console too), tabs, cards, notes, fields and the theme panel have no radius; buttons on a level (small and icon buttons) have none either.' },
+  { name: 'radius-button', value: px(4), usage: 'Buttons keep a small radius where they have one: the header, a tile title button, the theme panel (6px). They are the only rounded things on a surface.' },
   { name: 'radius-input', value: px(4), usage: 'Inputs and buttons on the paper, and the segmented switch.' },
   { name: 'radius-chip', value: px(12), usage: 'Chips and the chip add box.' },
 ]
@@ -59,7 +60,7 @@ const SHADOW: Token[] = [
   { name: 'shadow-tab-raised', value: '2px 2px 6px rgba(0, 0, 0, 0.4)', usage: 'The open chapter\'s tab and the focused arc\'s tab.' },
   { name: 'shadow-cover', value: '3px 0 8px rgba(0, 0, 0, 0.28)', usage: 'The book cover beside its page edges.' },
   { name: 'shadow-spine', value: '1px 0 3px rgba(0, 0, 0, 0.35)', usage: 'A book spine on the shelf.' },
-  { name: 'shadow-save-bubble', value: '0 2px 8px rgba(0, 0, 0, 0.35)', usage: 'The save state bubble on hover.' },
+  { name: 'shadow-save-bubble', value: '0 2px 8px rgba(0, 0, 0, 0.35)', usage: 'The save state bubble on hover. Shadows are for what floats over content (this bubble, the time popover, a page-edge tab); a card is a surface colour and a hairline.' },
 ]
 
 export function buildTokens(): unknown {

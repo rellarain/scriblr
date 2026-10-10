@@ -2,7 +2,7 @@
 
 Where the code does not yet follow the rules on the other pages. Each entry says what the code does, what the rule says, and the token to use. Nothing here is hidden: the app is described as it is, and this page is the list of what to fix next. (Items marked **fixed** were drift when this system was written and have been brought into line; they stay as a record of the rule.)
 
-## Fixed while writing this system
+## Fixed
 
 | What it was | Now |
 |---|---|
@@ -11,26 +11,32 @@ Where the code does not yet follow the rules on the other pages. Each entry says
 | Quiet text (`.wrMuted`, `.wrHint`, `.wrLabel`, a panel head, meta and counts) was set at 60 to 70% opacity, under 4.5:1 | 90%; a test (`contrastAudit.test.ts`) fails on any text rule at under 80% |
 | The accent, alert and paper inks were fixed lightnesses, readable only for the default hues | every pair is fitted for the hue in use and audited over every hue ([contrast](contrast.md)) |
 | `--paper-like-l` and a fixed 4-point shift for the page's error text | `--paper-like`, `--paper-dislike`, `--paper-error`, fitted |
+| White washes written out (`rgb(255 255 255 / .16)`, `.28`, `.1`, `.14`, `.18`) on level buttons, the level toggle, tab hover, rows and rules, and a white at `.92`, `.7`, `.5` and `.85` for arc tab labels and markers | the level's ink at a token alpha: `level-wash-lo`, `level-wash`, `level-wash-hi`, `level-line`, `level-ink-soft` (defined on `.wrLevel` from `--on-accent`) |
+| The edge rail's tab cluster mixed the level's colour with a literal navy `#0d1b2e` | the level's colour mixed with black |
+| The save bubble was a literal `rgb(18 18 24 / .94)` with white text | `surface-deeper` with `ink` (it keeps its shadow: it floats) |
+| The light input was written out as `hsl(theme 28% 96%)` with `hsl(... 30% 10%)` text in four places | `level-input`, `level-input-ink`, `level-input-hint` |
+| `.wrCard`, `.wrCardPanel`, `.wrNote`, project cards, plot cards and plot points (rounded 5 to 8px, a drop shadow, a gradient) | square, one flat `surface-raised`, a hairline; fields on a level are square too. Buttons keep their radius |
+| The older tile grid (`tiles.scss`: 10px radius, `linear-gradient(160deg, raised-a, raised-b)`) | square and flat: `surface-raised` and a hairline, the rail, its drop zones and the console too |
+| The Theme settings panel (10px card, rounded segmented control, timeline, chips, swatches, selects) | square (buttons and the toggle switch keep theirs) |
+| The new-project field and the shelf's other fields | square |
+| `.wrPage--day` and `--night` used `#fff`, `#000`, `#d8d8d8`, `#555` and `hsl(theme 10% 11%)` | `page-day`/`page-night` with `-ink`, `-line`, `-muted`: the Day and Night paper in the theme hue, audited |
+| The sky toggle's time and date were sized with the 45-point lightness gap, and not audited | the accent hue, fitted to 4.5:1 against every colour of the sky behind it (a bright dusk accent holds the sky darker), audited as `sky-text` and `sky-text-locked`; the zone tabs of the Theme panel are desaturated, no longer faded |
+| A plotpoint's awareness shade sized its dark band with the 45-point gap | the shade is fitted to read (`fitFill`) and nothing else; `MIN_TEXT_GAP` is gone |
+| Text on a hovered or pressed surface was not measured, and in Dusk and Night `ink-muted` fell to about 3.8 to 4.2:1 | the theme's lightness is fitted for the ink on the lifted surface (the ink at 22%) too; audited as "Hover and pressed" |
+| Disabled controls at 40% and dragged cards at 35 to 50% | 60% and 70% |
+| `style/style.css`: legacy `--accent-light`, `--shelf-wood`, `--page-cream`, a `#f4f2ee` body and a fixed text colour | `surface-raised-active`, `accent-dim`, `paper`, `surface-base` and `ink` (this sheet serves only the older stack in `modes/` and `components/shared/`) |
+| The admin Inbox mapped "no" to the accent and its fields to a hand-written black wash | `--tone-no` is `alert` (text `on-alert`), `--field-bg` is `ov-sink-2` |
 
 ## Open
 
 | Where | What the code does | The rule | Use |
 |---|---|---|---|
-| The older **tile grid** (`components/tiles/TileGrid`, `App.scss` `.tile`) and the helper and admin interfaces | rounded (10px tiles, 8px cards, 4px buttons), gradient surfaces (`linear-gradient(160deg, raised-a, raised-b)`) | the Writer is flat and square | not covered by this system; the Writer's `SplitArea` shares the tile engine but not its look |
-| `.wrCard`, `.wrCardPanel`, `.wrNote` (dashboard cards, plot cards, notes) outside a tab's tile body | 8px (6px for a note) radius and a `0 4px 14px` shadow | no radius, depth by colour | `radius-none`; inside a tile body they are already flat (`.wrTabTileBody .wrCard`) |
-| `.wrSmallBtn`, `.wrIconBtn`, chips, fields | 3 to 4px radius (12px for chips) | flat and square on a level; rounded only for controls on paper | `radius-none` on levels, `radius-input` on paper |
-| `.wrQuickSearch`, `.wrInlineAdd input`, the Outline's inputs | the light input is written `hsl(var(--color-theme-h) 28% 96%)` with `hsl(... 30% 10%)` text | one light-input token | `paper-field` and `paper-ink` (add a `level-input` token when this is next touched) |
-| The edge rail's tab cluster (`.wrEdgeCluster`) | `color-mix(... 22%, #0d1b2e)`, a literal navy | a token | `surface-deeper`, or a mix of the book's cover colour |
-| `.wrLevelHeader .wrSmallBtn`, `.wrLevelToggle`, tab hover | `rgb(255 255 255 / 0.16)` washes written out | one wash | `level-wash` |
-| Arc tabs, the arc tab label | `rgb(255 255 255 / 0.92)` | the level's white at a token alpha | `level-ink` |
-| `.wrPage--day` and `--night` (the preview's own page) | `#fff` / `#000` / `#d8d8d8` / `#555` and `hsl(theme, 10%, 11%)` with `hsl(0 0% 88%)` text | the paper tokens | `paper`, `paper-ink`, `paper-line`, `paper-muted`; the preview's day and night are the preview's own choice, readable (7:1 and better) but not themed |
-| The save bubble (`saveControl.scss`) | `rgb(18 18 24 / 0.94)` with light text | a token | `surface-deeper` of the zone, with `ink` |
-| `style/style.css` | legacy `--accent-light`, `--shelf-wood`, `--page-cream` and a `#f4f2ee` body | the theme's tokens | `surface-base`; these belong to the older project picker |
-| The admin Inbox (`App.scss`) | its own `--tone-yes`, `--tone-no`, `--tone-mid` and `--field-bg` | the accent and alert | `accent2` and `alert` |
-| The **sky toggle** and a **plotpoint's awareness shade** | size their text bands with the older 45-lightness-point gap (`MIN_TEXT_GAP`); the plotpoint shade is also fitted to read (4.5:1), the sky text is not part of the audit | WCAG | the sky text should join `contrastAudit.ts` |
+| The **helper** and **admin** interfaces (`App.scss`, `admin/resources/resources.scss`) | rounded (8px cards, 4px fields), `linear-gradient(160deg, raised-a, raised-b)` tiles in the admin Resources, and their text is not in the audit | the Writer is flat and square | not covered by this system yet; `surface-raised` and `radius-none` when they are next touched. The Inbox's `--tone-mid` ink (the ink on a 34% mix of itself) has not been measured |
+| **Chips** (`.wrChip`, 12px) and the **colour range thumb** | rounded | buttons keep their radius | accepted: `radius-chip`; the thumb is a control |
+| Black washes written out (`rgb(0 0 0 / .22)` on the book cover's stats and buttons, bar tracks, `.wrPreviewSelect`) | literal black at a fixed alpha | one recess | `ov-sink-1` to `ov-sink-3` (they are the same blacks, and read in every zone) |
+| The preview's **sentence highlights** (`.wrSentence`, `.wrPage--night`) | `hsl(accent 90% 92%)`, `hsl(accent 40% 26%)` literal lightnesses | fitted | a `page-*-highlight` token; the text on them is the page ink, which reads |
 | The **Theme settings panel** | its swatches show the user's saved palettes, not the zone of the frame it is in | follow the zone | previews show it in the zone of the app, not per frame |
-| Disabled and dragged states | 40% and 35% opacity | WCAG exempts a disabled control, not a dragged one | acceptable; the dragged card is the same as its drop target |
 
 ## Not covered by the audit
 
-The audit lists text on its ground for the surfaces, the fills, the paper and its nested cards, the reaction hearts, the edge tabs and the level panels. It does not yet include: the sky toggle's text, the theme settings panel's own labels over the swatches, text on a hovered or pressed wash other than the ones in [contrast](contrast.md), the helper and admin interfaces, and the plot editor's category and subcategory colours (a plotpoint's own text is fitted but is not in the table). Add a pair to `frontend/src/theme/contrastAudit.ts` when a new text-on-ground is made; the test then covers it for every hue.
+The audit lists text on its ground for the surfaces (also lifted by hover), the fills, the paper and its nested cards, the Preview page's two tones, the reaction hearts, the edge tabs, the sky toggle and the level panels. It does not yet include: text on the Theme panel's swatches, the helper and admin interfaces, the Inbox's tone colours, and the plot editor's category and subcategory colours (a plotpoint's own text is fitted but is not in the table). Add a pair to `frontend/src/theme/contrastAudit.ts` when a new text-on-ground is made; the test then covers it for every hue.

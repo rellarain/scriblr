@@ -135,7 +135,7 @@ $res-surface: linear-gradient(160deg, var(--surface-raised-a), var(--surface-rai
   font-size: 13px;
   cursor: pointer;
   &:hover { background: var(--accent-hover); }
-  &:disabled { opacity: 0.5; cursor: default; }
+  &:disabled { opacity: 0.6; cursor: default; }
   &--ghost { background: none; color: var(--accent); box-shadow: inset 0 0 0 1px var(--accent); }
 }
 .resDashedBtn {

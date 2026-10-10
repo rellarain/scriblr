@@ -12,7 +12,7 @@ const clamp = (n: number, lo: number, hi: number) => Math.min(hi, Math.max(lo, n
 
 export const hslCss = (c: HSL): string => `hsl(${c.h}, ${c.s}%, ${c.l}%)`
 
-const SURFACE_LABELS = ['Base', 'Side', 'Deep', 'Deeper', 'Sidebar 2', 'Raised a', 'Raised b', 'Raised active']
+const SURFACE_LABELS = ['Base', 'Side', 'Deep', 'Deeper', 'Sidebar 2', 'Raised a', 'Raised b', 'Raised active', 'Raised']
 
 export function derivedShades(pal: ZonePalette, key: PaletteKey, zone: ZoneKey): Swatch[] {
   const colors = resolvePalette(pal, zone)

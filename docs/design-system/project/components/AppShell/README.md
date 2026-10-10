@@ -18,7 +18,7 @@ On the left or the right, as the user prefers (handedness): a 40px **divider** w
 
 ## Tokens
 
-`surface-sidebar-1`, `surface-sidebar-2`, `surface-raised-*`, `ink`, `accent`, `accent2` (the admin panel). The shell is the **rounded** side of the app (rounded tiles and buttons); the Writer inside it is flat ([known-drift](../../known-drift.md)).
+`surface-sidebar-1`, `surface-sidebar-2`, `surface-raised-*`, `ink`, `accent`, `accent2` (the admin panel). The shell keeps rounded **buttons** (the user card, the nav switcher, the zone toggle); its surfaces and fields, like the Writer's, are flat and square ([known-drift](../../known-drift.md)).
 
 ## Don't
 

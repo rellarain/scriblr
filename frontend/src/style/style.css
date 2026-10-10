@@ -12,25 +12,14 @@
   display: none; /* Chrome/Safari/Electron */
 }
 
-:root {
-  /* --accent and --ink come from the time-of-day theme (theme/theme.scss); a
-     fixed value here would override the palette wherever no book scope
-     re-derives it. */
-  --accent-light: #f3e6ec;
-  /* Bookshelf redesign: illustration-only palette, layered on top of the
-     accent tokens above rather than replacing them. */
-  --shelf-wood: #c9a373;
-  --page-cream: #faf6ef;
-}
-
 html,
 body {
   margin: 0;
   padding: 0;
   height: 100%;
   font-family: system-ui, -apple-system, 'Segoe UI', sans-serif;
-  color: #1a1a1a;
-  background-color: #f4f2ee;
+  color: var(--ink);
+  background-color: var(--surface-base);
 }
 
 #root {
@@ -355,7 +344,7 @@ select:focus {
 .project-shell__content {
   overflow-y: auto;
   padding: 2rem;
-  background-color: #f4f2ee;
+  background-color: var(--surface-base);
 }
 
 .project-shell__error {
@@ -440,7 +429,7 @@ select:focus {
 
 .outline-node.is-drop-target {
   outline: 2px dashed var(--accent);
-  background: var(--accent-light);
+  background: var(--surface-raised-active);
 }
 
 .outline-node__plotpoints {
@@ -456,7 +445,7 @@ select:focus {
   gap: 0.3rem;
   padding: 0.15rem 0.3rem;
   border-radius: 3px;
-  background: var(--accent-light);
+  background: var(--surface-raised-active);
   font-size: 0.75rem;
 }
 
@@ -536,7 +525,7 @@ select:focus {
 .outline-node__children {
   margin-left: 1.1rem;
   padding-left: 0.75rem;
-  border-left: 2px solid var(--accent-light);
+  border-left: 2px solid var(--surface-raised-active);
 }
 
 .outline-node__title:focus {
@@ -647,8 +636,8 @@ select:focus {
   gap: 0.5rem;
   flex-wrap: wrap;
   padding: 0.75rem 0.25rem;
-  border-top: 4px solid var(--shelf-wood);
-  border-bottom: 4px solid var(--shelf-wood);
+  border-top: 4px solid var(--accent-dim);
+  border-bottom: 4px solid var(--accent-dim);
   background: linear-gradient(to bottom, transparent 85%, rgba(201, 163, 115, 0.15) 85%);
 }
 
@@ -670,7 +659,7 @@ select:focus {
   height: 130px;
   border: 1px solid rgba(0, 0, 0, 0.25);
   border-radius: 3px 3px 2px 2px;
-  background: var(--book-accent, var(--accent-light));
+  background: var(--book-accent, var(--surface-raised-active));
   opacity: 0.55;
   cursor: pointer;
   overflow: hidden;
@@ -777,7 +766,7 @@ select:focus {
 }
 
 .draft-analytics__tabs button:disabled {
-  opacity: 0.4;
+  opacity: 0.6;
   cursor: default;
 }
 
@@ -834,7 +823,7 @@ select:focus {
 }
 
 .draft-analytics__word-chip {
-  background: var(--accent-light);
+  background: var(--surface-raised-active);
   color: var(--accent);
   border-radius: 3px;
   padding: 0.1rem 0.45rem;
@@ -1120,7 +1109,7 @@ select:focus {
 .plot-node__children {
   margin-left: 0.9rem;
   padding-left: 0.6rem;
-  border-left: 2px solid var(--accent-light);
+  border-left: 2px solid var(--surface-raised-active);
 }
 
 .plot-node__add-toggle {
@@ -1147,7 +1136,7 @@ select:focus {
 
 .plot-node-wrap.is-drop-target {
   outline: 2px dashed var(--accent);
-  background: var(--accent-light);
+  background: var(--surface-raised-active);
   border-radius: 4px;
 }
 
@@ -1302,7 +1291,7 @@ select:focus {
   gap: 0.25rem;
   padding: 0.15rem 0.4rem;
   border-radius: 12px;
-  background: var(--accent-light);
+  background: var(--surface-raised-active);
   font-size: 0.75rem;
 }
 
@@ -1310,7 +1299,7 @@ select:focus {
   font-style: italic;
   opacity: 0.8;
   background: transparent;
-  border: 1px dashed var(--accent-light);
+  border: 1px dashed var(--surface-raised-active);
 }
 
 .plot-node__keyword-remove {
@@ -1386,7 +1375,7 @@ select:focus {
 
 .scene-revisions__snapshot.is-active {
   border-color: var(--accent);
-  background: var(--accent-light);
+  background: var(--surface-raised-active);
 }
 
 .scene-revisions__snapshot-label {
@@ -1632,7 +1621,7 @@ select:focus {
   max-width: 900px;
   width: 100%;
   height: fit-content;
-  background: var(--page-cream);
+  background: var(--paper);
   border-radius: 6px;
   padding: 1.5rem;
   display: flex;
@@ -1803,9 +1792,9 @@ select:focus {
 
 .book-face__page-surface {
   flex: 1;
-  background: var(--page-cream);
+  background: var(--paper);
   border: 1px solid rgba(0, 0, 0, 0.1);
-  border-left: 4px solid var(--book-accent, var(--shelf-wood));
+  border-left: 4px solid var(--book-accent, var(--accent-dim));
   border-radius: 2px 6px 6px 2px;
   box-shadow: 2px 2px 8px rgba(0, 0, 0, 0.1);
   padding: 1.5rem;
@@ -1836,7 +1825,7 @@ select:focus {
   border: 1px solid var(--book-accent, #ddd);
   border-right: none;
   border-radius: 4px 0 0 4px;
-  background: var(--page-cream);
+  background: var(--paper);
   color: var(--ink);
   padding: 0.4rem 0.6rem;
   font-size: 0.85rem;
@@ -1844,7 +1833,7 @@ select:focus {
 }
 
 .book-face__tab:hover {
-  background: var(--book-accent, var(--accent-light));
+  background: var(--book-accent, var(--surface-raised-active));
   color: white;
 }
 
@@ -1893,7 +1882,7 @@ select:focus {
 .chapter-page {
   max-width: 680px;
   margin: 0 auto;
-  background: var(--page-cream);
+  background: var(--paper);
   border: 1px solid rgba(0, 0, 0, 0.1);
   border-radius: 4px;
   box-shadow: 2px 2px 10px rgba(0, 0, 0, 0.08);
@@ -2320,7 +2309,7 @@ select:focus {
 
 .project-stats-panel__entry.is-active {
   border-color: var(--accent);
-  background: var(--accent-light);
+  background: var(--surface-raised-active);
 }
 
 .project-stats-panel__entry-type {
