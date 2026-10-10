@@ -99,8 +99,8 @@
 
   // ---------------------------------------------------------------- shelves
   .wrShelf { display: flex; flex-direction: column; }
-  // The board the books stand on, darker than the shelf, carrying the project's title, its book count and a slot for a control.
-  .wrShelfBoard { display: flex; align-items: center; gap: 8px; min-height: 26px; box-sizing: border-box; padding: 0 10px; background: var(--ov-sink-3); }
+  // The board the books stand on, darker than the shelf and than a series section (two recesses deep), carrying the project's title, its book count and a slot for a control.
+  .wrShelfBoard { display: flex; align-items: center; gap: 8px; min-height: 26px; box-sizing: border-box; padding: 0 10px; background: linear-gradient(var(--ov-sink-3), var(--ov-sink-3)), var(--ov-sink-2); }
   .wrShelfName--link { text-align: left; &:hover { color: var(--ink); } }
   .wrShelfName { font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 1.5px; color: var(--wr-muted); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; &--selected { color: var(--ink); } }
   .wrShelfMeta { font-size: 10px; opacity: 0.9; margin-left: auto; white-space: nowrap; }
@@ -110,10 +110,10 @@
     overflow-x: auto; overflow-y: hidden; touch-action: pan-x; overscroll-behavior-x: contain; -webkit-overflow-scrolling: touch;
     scrollbar-width: none; &::-webkit-scrollbar { display: none; }
   }
-  // A series: a lighter section (every one as tall as the row) with its title running up its left edge, beside the books it groups. The
+  // A series: a darker section (every one as tall as the row) with its title running up its left edge, beside the books it groups. The
   // title is turned (vertical-rl: it starts at the top and reads downward) and never widens the section.
   .wrShelfLoose { display: flex; align-items: flex-end; gap: 4px; flex: 0 0 auto; }
-  .wrShelfSeries { display: flex; flex-direction: row; gap: 6px; flex: 0 0 auto; padding: 6px 8px 0 4px; background: var(--level-wash-lo, var(--ov-lift-1)); }
+  .wrShelfSeries { display: flex; flex-direction: row; gap: 6px; flex: 0 0 auto; padding: 6px 8px 0 4px; background: var(--ov-sink-2); }
   .wrShelfSeriesLabel { flex: 0 0 auto; writing-mode: vertical-rl; align-self: stretch; max-height: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 9px; font-weight: 700; text-transform: uppercase; letter-spacing: 1.5px; color: var(--wr-muted); }
   .wrShelfSeriesBooks { display: flex; flex: 1 1 auto; align-items: flex-end; gap: 4px; min-width: 16px; }
   .wrShelfEmpty { font-size: 11px; opacity: 0.9; align-self: center; }
@@ -897,6 +897,8 @@
     .wrShelfSeriesLabel { color: var(--on-accent); }
     .wrShelfName--link:hover { color: var(--on-accent); text-decoration: underline; }
     .wrShelfMeta { opacity: 0.9; }
+    // The board runs the full width of the shelf, to the tile's edges and its bottom.
+    .wrShelfBoard { margin: 0 -12px -12px; padding: 0 22px; }
   }
   .wrProjectTiles .wrNewProject { flex: 0 0 auto; }
 
