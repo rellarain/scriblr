@@ -10,7 +10,6 @@
   .slab { fill: var(--surface-deeper); }
   .board { fill: var(--surface-raised-b); }
   .series { fill: var(--surface-deep); }
-  .label { font: 700 9px system-ui, -apple-system, 'Segoe UI', sans-serif; letter-spacing: 1px; text-transform: uppercase; fill: var(--ink-muted); }
   .f30{fill:var(--level-fill-30)} .f150{fill:var(--level-fill-150)} .f210{fill:var(--level-fill-210)} .f330{fill:var(--level-fill-330)} .f60{fill:var(--level-fill-60)} .f270{fill:var(--level-fill-270)} .f0{fill:var(--level-fill-0)} .f180{fill:var(--level-fill-180)} .f120{fill:var(--level-fill-120)} .f300{fill:var(--level-fill-300)}
   .name { font: 700 104px Georgia, 'Times New Roman', serif; fill: var(--ink); }
   .tag { font: 400 14px system-ui, -apple-system, 'Segoe UI', sans-serif; fill: var(--ink-muted); }
@@ -18,26 +17,24 @@
 <svg viewBox="0 0 960 288" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Scriblr">
   <!--
     Blocks: level-fill hues 30 150 210 330 60 270 0 180 120 as spines 24 to 64 wide (spacing multiples of 8) and 150 to 208 tall, on a surface-deeper slab with a surface-raised-b board.
-    Series dividers: two darkened series sections (the shelf's .wrShelfSeries, drawn as surface-deep, one step lighter than the slab so the dividers show) each group three spines under a small uppercase label; the other spines stand loose between them.
-    Arrangement: one slab right of x=480, spines standing on its board with 4px gaps (6px inside a series), heights and widths unequal; the name bottom-left on the ground.
+    Series dividers: two series sections (the shelf's .wrShelfSeries, drawn as surface-deep, one step lighter than the slab so they show) each group three spines, with 8px of padding inside; the other spines stand loose, 8px clear of a section.
+    Arrangement: one slab right of x=480, spines standing on its board with 4px gaps, heights and widths unequal; the name bottom-left on the ground.
     Pattern: books on a shelf, the app's own spine motif (Shelf); chosen because the Outline is a book you can see, and the spines are the one place every level colour shows at once.
-    Steps and radii: widths and heights are spacing multiples (8), the slab is 24px from the edges, every corner is square (radius-none).
+    Steps and radii: widths, heights and padding are spacing multiples (8), the slab is 24px from the edges, every corner is square (radius-none).
   -->
   <rect class="ground" width="960" height="288"/>
   <rect class="slab" x="480" y="24" width="440" height="240"/>
-  <rect class="series" x="488" y="26" width="124" height="214"/>
-  <rect class="series" x="676" y="30" width="156" height="210"/>
-  <text class="label" x="494" y="38">Series I</text>
-  <text class="label" x="682" y="44">Series II</text>
-  <rect class="f30" x="494" y="68" width="32" height="172"/>
-  <rect class="f150" x="530" y="44" width="48" height="196"/>
-  <rect class="f210" x="582" y="90" width="24" height="150"/>
-  <rect class="f330" x="616" y="32" width="56" height="208"/>
-  <rect class="f60" x="682" y="76" width="40" height="164"/>
-  <rect class="f270" x="726" y="52" width="32" height="188"/>
-  <rect class="f0" x="762" y="64" width="64" height="176"/>
-  <rect class="f180" x="836" y="84" width="24" height="156"/>
-  <rect class="f120" x="864" y="40" width="40" height="200"/>
+  <rect class="series" x="488" y="36" width="128" height="204"/>
+  <rect class="series" x="688" y="44" width="152" height="196"/>
+  <rect class="f30" x="496" y="68" width="32" height="172"/>
+  <rect class="f150" x="532" y="44" width="48" height="196"/>
+  <rect class="f210" x="584" y="90" width="24" height="150"/>
+  <rect class="f330" x="624" y="32" width="56" height="208"/>
+  <rect class="f60" x="696" y="76" width="40" height="164"/>
+  <rect class="f270" x="740" y="52" width="32" height="188"/>
+  <rect class="f0" x="776" y="64" width="56" height="176"/>
+  <rect class="f180" x="848" y="84" width="24" height="156"/>
+  <rect class="f120" x="876" y="40" width="40" height="200"/>
   <rect class="board" x="480" y="240" width="440" height="24"/>
   <text class="name" x="48" y="226">Scriblr</text>
   <text class="tag" x="52" y="258">Outline it, draft it, read it back, revise it.</text>
