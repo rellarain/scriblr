@@ -1,9 +1,9 @@
-import { useEffect, useLayoutEffect, useMemo, useState, useSyncExternalStore } from 'react'
+import { createContext, useContext, useEffect, useLayoutEffect, useMemo, useState, useSyncExternalStore } from 'react'
 import { CURRENT_USER } from '../userSeed'
 import { useSettings } from '../settings/settingsStore'
 import { applyVars, zoneVars } from './applyTheme'
 import { clockZone, msUntilNextBoundary } from './zones'
-import type { Role, ThemeSettings, ZoneKey } from './types'
+import type { Role, ThemeSettings, ZoneKey, ZonePalette } from './types'
 
 // --- a zone being previewed while its settings are open (not saved) ---
 
@@ -61,18 +61,31 @@ export interface ThemeState {
   activeZone: ZoneKey // what is actually shown: preview > override > clock
 }
 
+// A subtree that shows one zone (and, optionally, its own palette) whatever the app's clock says: components read the zone through
+// useThemeState, so inside a ThemeZoneProvider they draw for that zone. Used by the design system's previews to show several zones
+// side by side; the app itself never mounts one.
+export interface ThemeZoneOverride { zone: ZoneKey; palette?: ZonePalette }
+const ThemeZoneContext = createContext<ThemeZoneOverride | null>(null)
+export const ThemeZoneProvider = ThemeZoneContext.Provider
+
 export function useThemeState(): ThemeState {
   const { theme, ui } = useSettings()
   const previewZone = usePreviewZone()
+  const forced = useContext(ThemeZoneContext)
   const now = useNow(theme)
   const role = CURRENT_USER.role
   const clock = clockZone(theme, now)
+  const activeZone = forced?.zone ?? previewZone ?? theme.override ?? clock
+  const settings = useMemo<ThemeSettings>(() => {
+    if (!forced?.palette) return theme
+    return { ...theme, zones: { ...theme.zones, [forced.zone]: { ...theme.zones[forced.zone], palette: forced.palette } } }
+  }, [theme, forced])
   return {
-    settings: theme,
+    settings,
     role,
     effectiveRole: ui.viewAs ?? role,
     clockZone: clock,
-    activeZone: previewZone ?? theme.override ?? clock,
+    activeZone,
   }
 }
 

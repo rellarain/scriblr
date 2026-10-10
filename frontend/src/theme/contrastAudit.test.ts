@@ -1,3 +1,5 @@
+import { readFileSync } from 'node:fs'
+import path from 'node:path'
 import { describe, expect, it } from 'vitest'
 import { fillCap, fillHsl, tabColors } from './bookColors'
 import { audit, levelRatios, MIN_RATIO, paletteRatios, ZONES } from './contrastAudit'
@@ -63,5 +65,18 @@ describe('edge tab colours', () => {
         expect(ratioOf(t.ink, t.bg)).toBeGreaterThanOrEqual(TEXT_TARGET)
       }
     }
+  })
+})
+
+describe('the Writer stylesheet', () => {
+  // Quiet text is the ink at 90% (the audit measures 90% on a level and 88% on the paper); a rule that sets a size and a lower opacity would
+  // show text the audit does not cover. Icons, disabled and dragged states are not text and have none of this.
+  it('sets no text at an opacity under 0.8', () => {
+    const css = readFileSync(path.resolve(__dirname, '../assets/Interfaces/writer/writer.scss'), 'utf-8')
+    const low = css.split(String.fromCharCode(10))
+      .map((line, i) => [i + 1, line] as const)
+      .filter(([, line]) => /font-size/.test(line) && !/disabled|dragging|hover/.test(line))
+      .filter(([, line]) => [...line.matchAll(/opacity: 0\.(\d+)/g)].some(m => Number(`0.${m[1]}`) < 0.8))
+    expect(low.map(([n, line]) => `${n}: ${line.trim().slice(0, 70)}`)).toEqual([])
   })
 })
