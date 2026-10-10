@@ -8,7 +8,7 @@
   svg { display: block; width: 960px; height: 288px; max-width: none; }
   .ground { fill: var(--surface-base); }
   .slab { fill: var(--surface-deeper); }
-  .board { fill: var(--surface-raised-b); }
+  .board { fill: var(--ov-sink-3); }
   .series { fill: var(--surface-deep); }
   .f30{fill:var(--level-fill-30)} .f150{fill:var(--level-fill-150)} .f210{fill:var(--level-fill-210)} .f330{fill:var(--level-fill-330)} .f60{fill:var(--level-fill-60)} .f270{fill:var(--level-fill-270)} .f0{fill:var(--level-fill-0)} .f180{fill:var(--level-fill-180)} .f120{fill:var(--level-fill-120)} .f300{fill:var(--level-fill-300)}
   .name { font: 700 104px Georgia, 'Times New Roman', serif; fill: var(--ink); }
@@ -16,7 +16,7 @@
 </style>
 <svg viewBox="0 0 960 288" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Scriblr">
   <!--
-    Blocks: level-fill hues 30 150 210 330 60 270 0 180 120 as spines 24 to 64 wide (spacing multiples of 8) and 150 to 208 tall, on a surface-deeper slab with a surface-raised-b board.
+    Blocks: level-fill hues 30 150 210 330 60 270 0 180 120 as spines 24 to 64 wide (spacing multiples of 8) and 150 to 208 tall, on a surface-deeper slab with a board a step darker than it (ov-sink-3, the shelf's black board).
     Series dividers: two series sections (the shelf's .wrShelfSeries, drawn as surface-deep, one step lighter than the slab so they show) each group three spines, with 8px of padding inside; the other spines stand loose, 8px clear of a section.
     Arrangement: one slab right of x=480, spines standing on its board with 4px gaps, heights and widths unequal; the name bottom-left on the ground.
     Pattern: books on a shelf, the app's own spine motif (Shelf); chosen because the Outline is a book you can see, and the spines are the one place every level colour shows at once.
