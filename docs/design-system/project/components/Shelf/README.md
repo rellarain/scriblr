@@ -6,7 +6,7 @@ Code: `writer/Shelf.tsx` (`Shelf`, `Spine`), `outlineTree.ts` (`shelfGroups`), b
 
 ## Anatomy
 
-- **Books** `.wrShelfBooks`: a row (at least 150px tall) that scrolls sideways with the wheel, no scrollbar. Spines stand on the board, 4px apart (8px between a section and what is next to it).
+- **Books** `.wrShelfBooks`: a row (at least 150px tall) that scrolls sideways with the wheel, no scrollbar, across the **full width of the shelf** (the shelf has no padding of its own; the 8px inset is inside the scrolling row). Spines stand on the board, 4px apart (8px between a section and what is next to it).
 - **Board** `.wrShelfBoard`: a 26px strip under the row that runs the **full width of the shelf** (to the tile's edges and bottom), darker than the shelf and than a series section (two recesses deep: `ov-sink-3` over `ov-sink-2`), carrying the **project's title** (11px bold uppercase, 1.5px spacing; a link when it opens the project), the book count and a slot for a control. There is no header row above the shelf.
 - **Series** `.wrShelfSeries`: a darker section (`ov-sink-2`, a step lighter than the board; 8px padding) as tall as the row, with the **series title** up its left edge (9px uppercase, turned so it starts at the top of the section and reads downward, in the full level ink; it never widens the section); books outside a series stand loose between the sections.
 - **Spine** `.wrSpine`: 10 to 64px wide (10px at a goal of 20,000 words or with none, then 2px more for every further 4,000 words, so 40px at 80,000) and 110 to 140px tall. The colour is the book's fill (`--wr-spine`, the same as its level). **No title text**: the **book's number** is at the top (the title is its tooltip and accessible name).

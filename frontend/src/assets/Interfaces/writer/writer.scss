@@ -890,15 +890,14 @@
   // The tiles beside the Dash at Max: one per project, stacked, with empty space beneath.
   .wrProjectsColumn { background: transparent; overflow: visible; }
   .wrProjectTiles { flex: 1 1 auto; min-height: 0; display: flex; flex-direction: column; gap: 6px; overflow-y: auto; scrollbar-width: none; &::-webkit-scrollbar { display: none; } }
+  // The tile has no padding: the books row scrolls, and the board runs, the full width of the shelf.
   .wrProjectTile {
-    flex: 0 0 auto; background: var(--wr-fill); color: var(--on-accent); padding: 10px 12px 12px;
+    flex: 0 0 auto; background: var(--wr-fill); color: var(--on-accent); padding: 0;
     .wrShelfName { color: color-mix(in srgb, var(--on-accent) 80%, transparent); &--selected { color: var(--on-accent); } }
     // The series title sits on a wash of the ink over the fill, so it is the full ink (the 80% fell to 4.1:1 there).
     .wrShelfSeriesLabel { color: var(--on-accent); }
     .wrShelfName--link:hover { color: var(--on-accent); text-decoration: underline; }
     .wrShelfMeta { opacity: 0.9; }
-    // The board runs the full width of the shelf, to the tile's edges and its bottom.
-    .wrShelfBoard { margin: 0 -12px -12px; padding: 0 22px; }
   }
   .wrProjectTiles .wrNewProject { flex: 0 0 auto; }
 
