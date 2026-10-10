@@ -44,6 +44,8 @@ export function deriveTokens(pal: ZonePalette, role: Role, zone: ZoneKey): Theme
     '--ink-muted-a': `${INK_STRENGTH[look.mode].muted}%`,
     '--ink-faint-a': `${INK_STRENGTH[look.mode].faint}%`,
     '--on-accent': hsl(onAccent.ink),
+    // The same ink, for what sits on the accent inside a level (which sets --on-accent to white for the level's own fill).
+    '--zone-on-accent': hsl(onAccent.ink),
     '--on-alert': hsl(onAlert.ink),
     '--on-accent2': hsl(onAccent2.ink),
     // Which way each fill's hover / dim shades step (away from its text), and the

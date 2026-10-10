@@ -28,7 +28,7 @@ const outlineNodes = [outline('b1', 'book', null, { title: 'Book One' }), outlin
 const plotNodes = [plot('cat', 'category', null, { title: 'Romance' }), plot('line', 'plotline', 'cat'), plot('v1', 'plotpoint', 'line'), plot('v2', 'plotpoint', 'line', { assignedMomentId: 'c1' })]
 const w = {
   outlineNodes, plotNodes, openBook: vi.fn(), addOutlineNode: vi.fn(),
-  saveStatus: { dirty: false, saving: false, error: undefined, lastSavedAt: null }, saveNow: async () => {}, restoreSaved: async () => {},
+  saveStatus: { dirty: false, saving: false, error: undefined, lastSavedAt: null }, saveNow: async () => {}, saveCountdown: { nextSaveAt: null, wait: null }, history: { canUndo: () => false, canRedo: () => false, undo: () => {}, redo: () => {} },
 } as unknown as WriterWorkspace
 
 function Harness({ size }: { size: 'mid' | 'max' }) {
@@ -64,12 +64,11 @@ describe('the Project tabs', () => {
     expect(w.openBook).toHaveBeenCalledWith('b1')
   })
 
-  it('add a book from the Outline tab, and show the project editor under Settings', async () => {
+  it('has no New book button in the header, and shows the project editor under Settings', async () => {
     const user = userEvent.setup()
     render(<Harness size="mid" />)
     await user.click(screen.getByRole('button', { name: 'Outline' }))
-    await user.click(screen.getByRole('button', { name: 'New book' }))
-    expect(w.addOutlineNode).toHaveBeenCalledWith(null, 'book', expect.objectContaining({ themeHue: expect.any(Number) }))
+    expect(screen.queryByRole('button', { name: 'New book' })).toBeNull()
     await user.click(screen.getByRole('button', { name: 'Settings' }))
     expect(screen.getByText('project editor')).toBeTruthy()
   })

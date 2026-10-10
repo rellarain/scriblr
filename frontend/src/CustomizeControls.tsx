@@ -1,16 +1,14 @@
 import { SwapIcon } from './assets/icons'
-import { SaveControl } from './components/SaveControl'
-import { restoreSettings, saveSettingsNow, setUi, useSettings, useSettingsSaveStatus } from './settings/settingsStore'
+import { AutosaveToggle } from './components/AutosaveToggle'
+import { SettingsSaveCluster } from './components/SettingsSaveCluster'
+import { setAutosaveMode, setUi, useSettings } from './settings/settingsStore'
 import ThemeSettingsPanel from './theme/ThemeSettingsPanel'
-import { AUTOSAVE_MAX_SECONDS, AUTOSAVE_STEP_SECONDS } from './theme/types'
+import { autosaveModeOf } from './theme/types'
 import './theme/themeSettings.scss'
 
 // UUI Account > Settings: handedness, autosave, and the theme tool (colors,
 // brightness, time-of-day zones), all saved by the one shared Save/Restore
 // control at the top -- they're all the same settings store underneath.
-// 30 seconds up to 10 minutes, in 30-second steps.
-const AUTOSAVE_OPTIONS = Array.from({ length: AUTOSAVE_MAX_SECONDS / AUTOSAVE_STEP_SECONDS }, (_, i) => (i + 1) * AUTOSAVE_STEP_SECONDS)
-
 export function formatInterval(seconds: number): string {
   const minutes = Math.floor(seconds / 60)
   const rest = seconds % 60
@@ -21,13 +19,12 @@ export function formatInterval(seconds: number): string {
 
 function CustomizeControls() {
   const { ui } = useSettings()
-  const saveStatus = useSettingsSaveStatus()
   const handedness = ui.handedness
   return (
     <div className="customize">
       <div className="themeHeader">
         <h2>Customize</h2>
-        <SaveControl status={saveStatus} onSave={() => { void saveSettingsNow() }} onRestore={restoreSettings} buttonClassName="themeBtn themeBtn--primary" />
+        <SettingsSaveCluster buttonClassName="themeBtn themeBtn--primary" />
       </div>
 
       <div className="customizeGroup">
@@ -47,26 +44,10 @@ function CustomizeControls() {
         <div className="customizeGroupHeader">
           <span>Autosave</span>
         </div>
-        <label className="themeSwitch">
-          <input
-            type="checkbox" role="switch" checked={ui.autosaveEnabled}
-            onChange={e => setUi(prev => ({ ...prev, autosaveEnabled: e.target.checked }))}
-          />
-          <span>{ui.autosaveEnabled ? 'Save automatically' : 'Save only when I press Save'}</span>
-        </label>
-        <div className="customizeAutosaveRow">
-          <span>Save after</span>
-          <select
-            value={ui.autosaveSeconds} disabled={!ui.autosaveEnabled} aria-label="Autosave interval"
-            onChange={e => setUi(prev => ({ ...prev, autosaveSeconds: Number(e.target.value) }))}
-          >
-            {AUTOSAVE_OPTIONS.map(sec => <option key={sec} value={sec}>{formatInterval(sec)}</option>)}
-          </select>
-          <span>without changes</span>
-        </div>
+        <AutosaveToggle mode={autosaveModeOf(ui)} onChange={setAutosaveMode} />
         <p className="customizeNote">
-          Editors also save when you leave a page, and changing this saves anything waiting. With autosave off, the floppy disk saves
-          and the arrow beside the time goes back to the last saved version.
+          Off by default. With autosave on, an editor saves once you have stopped changing it for the time you choose, and a timer beside the
+          floppy disk shows how long is left. Editors also save when you leave a page. Undo and Redo step back and forward through your changes.
         </p>
       </div>
 

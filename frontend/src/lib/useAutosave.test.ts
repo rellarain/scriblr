@@ -1,14 +1,16 @@
 import { act, renderHook } from '@testing-library/react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import { combineSaveStatus, useAutosave } from './useAutosave'
+import { combineCountdown, combineSaveStatus, useAutosave, type Autosave } from './useAutosave'
 
 beforeEach(() => { vi.useFakeTimers() })
 afterEach(() => { vi.useRealTimers() })
 
 type Opts = { delay?: number; retryDelay?: number; enabled?: boolean }
 function setup(save: (v: string) => Promise<void>, opts: Opts = {}) {
-  return renderHook((props: Opts) => useAutosave<string>({ save, ...opts, ...props }), { initialProps: {} as Opts })
+  return renderHook((props: Opts) => useAutosave<string>({ save, enabled: true, ...opts, ...props }), { initialProps: {} as Opts })
 }
+// A structural edit, then a Save: saveNow waits like schedule now, so these tests flush it.
+const now = (r: { current: Autosave<string> }, v: string) => { void r.current.saveNow(v); return r.current.flush() }
 
 describe('useAutosave', () => {
   it('debounces: only the latest value is saved, after the delay', async () => {
@@ -25,23 +27,25 @@ describe('useAutosave', () => {
     expect(result.current.lastSavedAt).not.toBeNull()
   })
 
-  it('waits 30 seconds of inactivity by default', async () => {
+  it('waits the chosen interval of inactivity, and another change restarts the wait', async () => {
     const save = vi.fn(async () => {})
-    const { result } = setup(save)
+    const { result } = setup(save, { delay: 60_000 })
     act(() => { result.current.schedule('a') })
-    await act(async () => { await vi.advanceTimersByTimeAsync(29_000) })
+    await act(async () => { await vi.advanceTimersByTimeAsync(59_000) })
     act(() => { result.current.schedule('ab') }) // another change restarts the wait
-    await act(async () => { await vi.advanceTimersByTimeAsync(29_000) })
+    await act(async () => { await vi.advanceTimersByTimeAsync(59_000) })
     expect(save).not.toHaveBeenCalled()
     await act(async () => { await vi.advanceTimersByTimeAsync(1_500) })
     expect(save).toHaveBeenCalledTimes(1)
     expect(save).toHaveBeenCalledWith('ab')
   })
 
-  it('saveNow saves immediately, and flush saves what is waiting', async () => {
+  it('saveNow waits like schedule, and flush saves what is waiting right away', async () => {
     const save = vi.fn(async () => {})
-    const { result } = setup(save)
-    await act(async () => { await result.current.saveNow('now') })
+    const { result } = setup(save, { delay: 500 })
+    act(() => { void result.current.saveNow('now') })
+    expect(save).not.toHaveBeenCalled()
+    await act(async () => { await vi.advanceTimersByTimeAsync(600) })
     expect(save).toHaveBeenLastCalledWith('now')
 
     act(() => { result.current.schedule('later') })
@@ -71,9 +75,9 @@ describe('useAutosave', () => {
     }))
     const { result } = setup(save)
 
-    act(() => { void result.current.saveNow('one') })
+    act(() => { void now(result, 'one') })
     await act(async () => { await vi.advanceTimersByTimeAsync(0) })
-    act(() => { void result.current.saveNow('two') })
+    act(() => { void now(result, 'two') })
     expect(result.current.saving).toBe(true)
     expect(save).toHaveBeenCalledTimes(1) // 'two' waits for 'one'
 
@@ -89,7 +93,7 @@ describe('useAutosave', () => {
     let fail = true
     const save = vi.fn(async () => { if (fail) throw new Error('offline') })
     const { result } = setup(save, { retryDelay: 1000 })
-    await act(async () => { await result.current.saveNow('x') })
+    await act(async () => { await now(result, 'x') })
     expect(result.current.error).toBe('offline')
     expect(result.current.dirty).toBe(true)
     expect(result.current.isPending()).toBe(true)
@@ -112,17 +116,17 @@ describe('useAutosave', () => {
     }))
     const { result } = setup(save)
     api = result.current
-    act(() => { void result.current.saveNow('one') })
+    act(() => { void now(result, 'one') })
     await act(async () => { await vi.advanceTimersByTimeAsync(0) })
-    act(() => { void result.current.saveNow('two') })
+    act(() => { void now(result, 'two') })
     await act(async () => { resolvers[0](); await vi.advanceTimersByTimeAsync(0) })
     await act(async () => { resolvers[1](); await vi.advanceTimersByTimeAsync(0) })
     // While 'one' ran nothing else was queued yet at its start; 'two' ran alone afterwards.
     expect(seen).toEqual([false, false])
     // Queued behind a running save it is reported (checked while 'three' waits for 'four's turn).
-    act(() => { void result.current.saveNow('three') })
+    act(() => { void now(result, 'three') })
     await act(async () => { await vi.advanceTimersByTimeAsync(0) })
-    act(() => { void result.current.saveNow('four') })
+    act(() => { void now(result, 'four') })
     expect(result.current.hasNewer()).toBe(true)
     await act(async () => { resolvers[2](); await vi.advanceTimersByTimeAsync(0) })
     await act(async () => { resolvers[3](); await vi.advanceTimersByTimeAsync(0) })
@@ -133,9 +137,9 @@ describe('useAutosave', () => {
     let fail = true
     const save = vi.fn(async () => { if (fail) throw new Error('nope') })
     const { result } = setup(save, { retryDelay: 1000 })
-    await act(async () => { await result.current.saveNow('old') })
+    await act(async () => { await now(result, 'old') })
     fail = false
-    await act(async () => { await result.current.saveNow('new') })
+    await act(async () => { await now(result, 'new') })
     expect(save).toHaveBeenLastCalledWith('new')
     await act(async () => { await vi.advanceTimersByTimeAsync(2000) })
     expect(save).toHaveBeenCalledTimes(2) // no stale retry of 'old'
@@ -195,7 +199,7 @@ describe("useAutosave: the user's autosave setting", () => {
     let release: () => void = () => {}
     const save = vi.fn((_v: string) => new Promise<void>((_resolve, reject) => { release = () => reject(new Error('late failure')) }))
     const { result } = setup(save, { retryDelay: 500 })
-    act(() => { void result.current.saveNow('inflight') })
+    act(() => { void now(result, 'inflight') })
     await act(async () => { await vi.advanceTimersByTimeAsync(0) })
     let done = false
     act(() => { void result.current.discard().then(() => { done = true }) })
@@ -206,6 +210,51 @@ describe("useAutosave: the user's autosave setting", () => {
     expect(result.current.error).toBeUndefined()
     await act(async () => { await vi.advanceTimersByTimeAsync(5000) })
     expect(save).toHaveBeenCalledTimes(1) // the failed value did not come back to retry
+  })
+})
+
+describe('useAutosave: the countdown', () => {
+  it('reports when the waiting value will save, restarting on each edit and clearing once saved', async () => {
+    vi.setSystemTime(new Date('2026-01-01T00:00:00Z'))
+    const save = vi.fn(async () => {})
+    const { result } = setup(save, { delay: 60_000 })
+    expect(result.current.nextSaveAt).toBeNull()
+    expect(result.current.wait).toBe(60_000)
+    act(() => { result.current.schedule('a') })
+    const first = result.current.nextSaveAt!
+    expect(first).toBe(Date.now() + 60_000)
+    await act(async () => { await vi.advanceTimersByTimeAsync(30_000) })
+    act(() => { result.current.schedule('ab') })
+    expect(result.current.nextSaveAt).toBe(first + 30_000) // refilled by the new edit
+    await act(async () => { await vi.advanceTimersByTimeAsync(61_000) })
+    expect(save).toHaveBeenCalledWith('ab')
+    expect(result.current.nextSaveAt).toBeNull()
+  })
+
+  it('has no countdown while autosave is off', () => {
+    const { result } = setup(vi.fn(async () => {}), { enabled: false })
+    act(() => { result.current.schedule('a') })
+    expect(result.current.nextSaveAt).toBeNull()
+    expect(result.current.wait).toBeNull()
+  })
+
+  it('retries a failed save when the next wait ends', async () => {
+    let fail = true
+    const save = vi.fn(async () => { if (fail) throw new Error('offline') })
+    const { result } = setup(save, { delay: 60_000 })
+    act(() => { void now(result, 'x') })
+    await act(async () => { await vi.advanceTimersByTimeAsync(0) })
+    expect(result.current.error).toBe('offline')
+    expect(result.current.nextSaveAt).not.toBeNull()
+    fail = false
+    await act(async () => { await vi.advanceTimersByTimeAsync(61_000) })
+    expect(save).toHaveBeenCalledTimes(2)
+    expect(result.current.error).toBeUndefined()
+  })
+
+  it('combines several into the soonest save', () => {
+    expect(combineCountdown({ nextSaveAt: null, wait: null }, { nextSaveAt: 5, wait: 60_000 }, { nextSaveAt: 3, wait: 60_000 })).toEqual({ nextSaveAt: 3, wait: 60_000 })
+    expect(combineCountdown({ nextSaveAt: null, wait: null })).toEqual({ nextSaveAt: null, wait: null })
   })
 })
 

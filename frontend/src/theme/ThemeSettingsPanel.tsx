@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'react'
-import { restoreSettings, saveSettingsNow, setTheme, setUi, useSettings, useSettingsSaveStatus } from '../settings/settingsStore'
-import { SaveControl } from '../components/SaveControl'
+import { setTheme, setUi, useSettings } from '../settings/settingsStore'
+import { SettingsSaveCluster } from '../components/SettingsSaveCluster'
 import { ColorRange } from '../components/ColorRange'
 import { CURRENT_USER } from '../userSeed'
 import { ZONE_ICON } from './zoneIcons'
@@ -186,7 +186,6 @@ function ZoneEditor({ zoneKey, role }: { zoneKey: ZoneKey; role: Role }) {
 function ThemeSettingsPanel({ showHeader = true }: { showHeader?: boolean } = {}) {
   const { theme, ui } = useSettings()
   const { effectiveRole } = useThemeState()
-  const saveStatus = useSettingsSaveStatus()
   const now = useMinuteClock()
   const [selected, setSelected] = useState<ZoneKey>('day')
 
@@ -205,7 +204,7 @@ function ThemeSettingsPanel({ showHeader = true }: { showHeader?: boolean } = {}
       {showHeader && (
         <div className="themeHeader">
           <h2>Theme</h2>
-          <SaveControl status={saveStatus} onSave={() => { void saveSettingsNow() }} onRestore={restoreSettings} buttonClassName="themeBtn themeBtn--primary" />
+          <SettingsSaveCluster buttonClassName="themeBtn themeBtn--primary" />
         </div>
       )}
 

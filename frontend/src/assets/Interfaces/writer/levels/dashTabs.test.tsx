@@ -34,13 +34,13 @@ describe('the Dash tabs', () => {
     expect(screen.queryByRole('region', { name: 'Checklist' })).toBeNull()
   })
 
-  it("add a task from the header: New focuses the Checklist tab's add box", async () => {
+  it("add a task from the Checklist tab's own add box (the header has no New button)", async () => {
     const user = userEvent.setup()
     render(<Harness size="mid" />)
     await user.click(screen.getByRole('button', { name: 'Checklist' }))
-    await user.click(screen.getByRole('button', { name: 'New task' }))
+    expect(screen.queryByRole('button', { name: 'New task' })).toBeNull()
     const box = screen.getByRole('textbox', { name: 'Add a task…' })
-    expect(document.activeElement).toBe(box)
+    await user.click(box)
     await user.type(box, 'Draft chapter 3{Enter}')
     expect(getKv<Array<{ label: string }>>('scriblr.writer.tasks')![0].label).toBe('Draft chapter 3')
   })
@@ -57,11 +57,12 @@ describe('the Dash tabs', () => {
     const user = userEvent.setup()
     render(<Harness size="mid" />)
     await user.click(screen.getByRole('button', { name: 'Scratchpad' }))
-    await user.click(screen.getByRole('button', { name: 'New note' }))
+    expect(screen.queryByRole('button', { name: 'New note' })).toBeNull() // the header has no New button
+    await user.click(screen.getByRole('button', { name: 'Note' })) // the tab's own
     await waitFor(() => expect(document.activeElement?.getAttribute('placeholder')).toBe('Title'))
     const first = document.activeElement
     await user.keyboard('Storm scene')
-    await user.click(screen.getByRole('button', { name: 'New note' }))
+    await user.click(screen.getByRole('button', { name: 'Note' }))
     // The focus moves to the new note's title (not just away from the first: it passes through the body while it moves).
     await waitFor(() => { expect(document.activeElement).not.toBe(first); expect(document.activeElement?.getAttribute('placeholder')).toBe('Title') })
     await user.keyboard('Harbor map')

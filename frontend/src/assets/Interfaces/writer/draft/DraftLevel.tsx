@@ -3,8 +3,10 @@ import type { OutlineNode } from '../../../../api/types'
 import type { WriterWorkspace } from '../useWriterWorkspace'
 import { EyeIcon, GearIcon, HelpIcon, PencilIcon, PlotIcon } from '../../../icons'
 import type { SplitNode } from '../../../../components/tiles/splitTree'
-import { SaveControl } from '../../../../components/SaveControl'
-import { combineSaveStatus } from '../../../../lib/useAutosave'
+import { SaveCluster } from '../../../../components/SaveCluster'
+import { combineCountdown, combineSaveStatus } from '../../../../lib/useAutosave'
+import { setAutosaveMode, useSettings } from '../../../../settings/settingsStore'
+import { autosaveModeOf } from '../../../../theme/types'
 import { chapterDatesOf, type ChapterMeta } from '../chapterDates'
 import EdgeTabs from '../EdgeTabs'
 import HueSlider from '../HueSlider'
@@ -86,7 +88,17 @@ function DraftPage({ w, chapter, pagesComponent, onPagesComponent }: {
 
   const status = combineSaveStatus(w.saveStatus, { dirty: draft.dirty, saving: draft.saving, error: draft.saveError, lastSavedAt: draft.lastSavedAt })
   const saveAll = () => { void Promise.all([w.saveNow(), draft.flush()]) }
-  const restoreAll = () => Promise.all([w.restoreSaved(), draft.restore()]).then(() => undefined)
+  const { ui } = useSettings()
+  const countdown = combineCountdown(w.saveCountdown, { nextSaveAt: draft.nextSaveAt, wait: draft.wait })
+  // Undo and Redo act on the tile last used: the draft text, or the chapter's own fields (title, synopsis, dates).
+  const [focusedTile, setFocusedTile] = useState<string>('draft')
+  const onText = focusedTile === 'draft'
+  const history = {
+    canUndo: onText ? draft.canUndo : w.history.canUndo('outline'),
+    canRedo: onText ? draft.canRedo : w.history.canRedo('outline'),
+    onUndo: () => { if (onText) draft.undo(); else w.history.undo('outline') },
+    onRedo: () => { if (onText) draft.redo(); else w.history.redo('outline') },
+  }
 
   // An arc's tab goes to its first chapter.
   const firstChapterOf = (arcId: string) => w.outlineNodes
@@ -101,7 +113,7 @@ function DraftPage({ w, chapter, pagesComponent, onPagesComponent }: {
           <div className="wrSpreadRight">
             {/* The page's three tiles on a split grid: drag a title bar to move one, a divider to resize. */}
             <SplitArea
-              gridId="scriblr.writer.draft" label="Chapter tiles" defaultTree={DRAFT_LAYOUT}
+              gridId="scriblr.writer.draft" label="Chapter tiles" defaultTree={DRAFT_LAYOUT} onFocusTile={setFocusedTile}
               tiles={[
                 {
                   id: 'chapter', title: 'Chapter', Icon: PencilIcon, bodyClassName: 'wrDraftTileBody',
@@ -111,7 +123,10 @@ function DraftPage({ w, chapter, pagesComponent, onPagesComponent }: {
                       error={w.saveStatus.error ?? draft.error ?? pubs.error}
                       tools={(
                         <>
-                          <SaveControl status={status} onSave={saveAll} onRestore={restoreAll} buttonClassName="wrSmallBtn wrSaveBtn" />
+                          <SaveCluster
+                            status={status} onSave={saveAll} buttonClassName="wrSmallBtn wrSaveBtn" history={history}
+                            autosave={{ mode: autosaveModeOf(ui), onChange: setAutosaveMode, nextSaveAt: countdown.nextSaveAt, wait: countdown.wait }}
+                          />
                           <PublishControl
                             disabled={!hasDraft} busy={pubs.publishing}
                             title={hasDraft ? 'Publish this chapter' : 'Write some draft text to publish it'}

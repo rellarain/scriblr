@@ -2,7 +2,7 @@
 
 The small controls of the Writer. They sit inside a level (white text on the level's fill) or on the paper (dark ink on the sheet), and follow it.
 
-Code: `writer.scss` (`.wrSmallBtn`, `.wrIconBtn`, `.wrTabBtn`, `.wrSegmented`, `.wrField`, `.wrOutlineInput`, `.wrChip`, `.wrError`), `components/SaveControl.tsx`, `writer/shared.tsx` (`DeleteControl`).
+Code: `writer.scss` (`.wrSmallBtn`, `.wrIconBtn`, `.wrTabBtn`, `.wrSegmented`, `.wrField`, `.wrOutlineInput`, `.wrChip`, `.wrError`), `components/SaveCluster.tsx`, `components/AutosaveToggle.tsx`, `writer/shared.tsx` (`DeleteControl`).
 
 ## Buttons
 
@@ -27,9 +27,9 @@ Inside a level's body the buttons take `on-accent` text on `level-wash` (the ink
 - **Alert** `.wrError` / `.wrPageError`: the **alert colour as the ground**, text and a 1px inset outline in `on-alert`, 12px bold. Never red text on a coloured ground.
 - **Muted** `.wrMuted` (12px), **hint** `.wrHint` (10px), **label** `.wrLabel`: the ink at 90%.
 
-## Save control
+## Save, undo, redo and autosave
 
-A joined **restore** and **save** button with one dot: `unsaved` amber, `saving` pulsing, `error` red; the text and the last save time appear only on hover. Restoring asks first.
+One rounded container (`.saveCluster`, `radius-button`) of 30 x 30 buttons: **Undo** (when something can be undone), **Redo** (after an Undo) and **Save**, with the **Autosave** toggle revealed under Save on hover, focus or a long press. Saved = a disabled Save (and, on hover, the time of the last save inside it, left of the icon: the only text); unsaved = Save in the accent colour; failed = Save ringed in the alert colour. With autosave on, a 4 x 24 vertical pill (`.autosavePill`) beside Save empties as the save approaches. No bubble, dot or state text. Behaviour: [interaction](../../interaction.md).
 
 ## Tokens
 

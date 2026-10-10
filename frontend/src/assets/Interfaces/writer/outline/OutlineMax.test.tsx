@@ -59,7 +59,7 @@ function Harness({ activeChapterId = 'c1', actions }: { activeChapterId?: string
     outlineNodes, plotNodes, plotNodeById: new Map(plotNodes.map(n => [n.id, n])),
     activeBookChapters: descendantsOf(buildChildIndex(outlineNodes), 'b').filter(n => n.kind === 'chapter'),
     activeChapterId: active, selectChapter: (id: string) => setActive(id), highlightedPointId: null, plotDragId, setPlotDragId,
-    saveStatus: { dirty: false, saving: false, error: undefined, lastSavedAt: null }, saveNow: vi.fn(async () => {}), restoreSaved: vi.fn(async () => {}),
+    saveStatus: { dirty: false, saving: false, error: undefined, lastSavedAt: null }, saveNow: vi.fn(async () => {}), saveCountdown: { nextSaveAt: null, wait: null }, history: { canUndo: () => false, canRedo: () => false, undo: () => {}, redo: () => {} },
     levelHueOf: () => 200, levelTintOf: () => 'hsl(200, 30%, 50%)', hueCentreOf: () => null, setNodeHue: vi.fn(),
     moveOutlineNodeInto: vi.fn(), openChapter: actions.openChapter,
     addOutlineNode: (parentId: string | null, kind: OutlineNode['kind'], patch: Partial<OutlineNode> = {}, afterId?: string) => {
@@ -410,11 +410,9 @@ describe('Outline Max: the book editor and the draft stats', () => {
     expect(document.querySelector('.wrChapterBanner')).toBeTruthy()
   })
 
-  it("adds a chapter from the header's New button", async () => {
-    const { user } = setup('c1')
-    const before = chapterTabs().length
-    await user.click(within(screen.getByRole('complementary', { name: 'Book cover' })).getByRole('button', { name: 'New chapter' }))
-    expect(chapterTabs().length).toBe(before + 1)
+  it('has no New chapter button in the header: chapters are added from the outline itself', () => {
+    setup('c1')
+    expect(within(screen.getByRole('complementary', { name: 'Book cover' })).queryByRole('button', { name: 'New chapter' })).toBeNull()
   })
 
   it("shows the book's words and chapters against their goals, and each chapter's words", () => {

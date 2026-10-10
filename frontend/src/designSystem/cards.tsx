@@ -2,7 +2,7 @@ import { useEffect, useRef, useState, type ReactNode } from 'react'
 import App from '../App'
 import * as Icons from '../assets/icons'
 import { ReactionHeartIcon } from '../assets/icons'
-import { SaveControl } from '../components/SaveControl'
+import { SaveCluster } from '../components/SaveCluster'
 import { ColorRange } from '../components/ColorRange'
 import { PAGES_COMPONENTS } from '../assets/Interfaces/writer/consoleDefs'
 import HueSlider from '../assets/Interfaces/writer/HueSlider'
@@ -127,8 +127,15 @@ function ControlsCard() {
         <p className="wrError">Save failed. Lorem ipsum dolor sit amet.</p>
         <p className="wrHint">Hint text: lorem ipsum dolor sit amet.</p>
         <p className="wrMuted">Muted text: lorem ipsum dolor sit amet.</p>
-        <span className="wrLabel">Save control</span>
-        <div><SaveControl status={{ state: 'unsaved', dirty: true, saving: false, error: undefined, lastSavedAt: null }} onSave={() => {}} onRestore={async () => {}} buttonClassName="wrSmallBtn" /></div>
+        <span className="wrLabel">Save, undo, redo and autosave</span>
+        <div className="wrSaveDemo">
+          <SaveCluster status={{ state: 'saved', dirty: false, saving: false, error: undefined, lastSavedAt: Date.UTC(2026, 0, 15, 15, 42) }} onSave={() => {}} buttonClassName="wrSmallBtn" />
+          <SaveCluster
+            status={{ state: 'unsaved', dirty: true, saving: false, error: undefined, lastSavedAt: null }} onSave={() => {}} buttonClassName="wrSmallBtn"
+            history={{ canUndo: true, canRedo: true, onUndo: () => {}, onRedo: () => {} }}
+            autosave={{ mode: 300, onChange: () => {}, nextSaveAt: Date.now() + 150_000, wait: 300_000 }}
+          />
+        </div>
       </div>
     </LevelFrame>
   )

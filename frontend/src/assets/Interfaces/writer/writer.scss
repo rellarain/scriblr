@@ -216,11 +216,12 @@
   .wrLevelsSide .wrLevel--mid { flex: 1 1 0; }
   .wrLevelsSide .wrLevel--min { flex: 0 0 auto; }
   .wrLevelHeader {
-    flex: 0 0 auto; display: flex; align-items: center; gap: 8px; min-height: 40px; box-sizing: border-box; padding: 6px 14px;
+    flex: 0 0 auto; display: flex; align-items: center; gap: 8px; min-height: 40px; box-sizing: border-box; padding: 8px 22px;
     background: var(--wr-fill);
     &--min { cursor: pointer; &:hover { background: color-mix(in srgb, var(--wr-fill) 88%, white); } }
   }
-  .wrLevelTitle { margin: 0; flex: 1 1 auto; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; text-align: left; font-size: 15px; font-weight: 700; color: inherit; }
+  // The level's title: all caps, spaced out like the tile titles, with room above and below.
+  .wrLevelTitle { margin: 4px 0; line-height: 1.7; flex: 1 1 auto; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; text-align: left; font-size: 14px; font-weight: 700; text-transform: uppercase; letter-spacing: 1.5px; color: inherit; }
   .wrLevelTitle--link:hover { text-decoration: underline; }
   .wrLevelToggle { flex: 0 0 auto; display: inline-flex; align-items: center; justify-content: center; width: 24px; height: 24px; border-radius: 0; color: inherit; &:hover { background: var(--level-wash); } }
   .wrLevelBody { flex: 1 1 auto; min-height: 0; box-sizing: border-box; display: flex; flex-direction: column; position: relative; padding: 8px 12px 12px; background: var(--wr-fill-1); }
@@ -796,19 +797,33 @@
   // The header tab strip: 30x30 icon buttons that switch (Mid) or open and close tiles (Max), then the quick actions.
   // In a narrow header (the Mid level beside a focused one) the title keeps a line of its own and these drop beneath it.
   .wrLevelHeader { flex-wrap: wrap; row-gap: 2px; }
-  .wrLevelTitle { min-width: 130px; }
+  // The title and the size toggle share one line (the toggle at its right end); the tabs wrap beneath them when the header is narrow.
+  .wrLevelTitleRow { flex: 1 1 130px; min-width: 130px; display: flex; align-items: center; gap: 8px; }
   .wrHeaderExtras { flex: 0 1 auto; display: flex; flex-wrap: wrap; align-items: center; justify-content: flex-end; gap: 2px 6px; margin-left: auto; }
   .wrTabBar, .wrQuickActions { flex: 0 0 auto; display: flex; align-items: center; gap: 2px; }
+  // The tab bar is a rounded container (radius-button) holding rounded tab buttons.
+  .wrTabBar { padding: 2px; border-radius: 4px; background: var(--level-wash-lo); }
   .wrQuickActions { margin-left: 6px; gap: 4px; }
   .wrTabBtn {
-    display: inline-flex; align-items: center; justify-content: center; width: 30px; height: 30px; padding: 0; border-radius: 0; color: inherit; opacity: 0.7;
+    display: inline-flex; align-items: center; justify-content: center; width: 30px; height: 30px; padding: 0; border-radius: 4px; color: inherit; opacity: 0.7;
     &:hover { opacity: 1; background: var(--level-wash); }
     &--on { opacity: 1; background: rgb(0 0 0 / 0.28); }
     &--end { margin-left: 8px; }
   }
   .wrQuickSearch { width: 130px; box-sizing: border-box; height: 30px; border: 0; border-radius: 0; padding: 0 6px; font-size: 11px; background: var(--level-input); color: var(--level-input-ink); outline: none; }
   .wrLevelHeader .wrSmallBtn, .wrLevelHeader .saveIconBtn { color: var(--on-accent); background: var(--level-wash); }
-  .wrLevelHeader .saveControl { font-size: 11px; }
+  // The Save component in a header: a rounded container (radius-button) of 30 x 30 rounded buttons, like the tab bar beside it.
+  .wrNotesBareHead { display: flex; margin-bottom: 6px; }
+  .wrSaveDemo { display: flex; align-items: center; flex-wrap: wrap; gap: 12px; }
+  .wrLevelHeader .saveCluster, .wrBookEdHead .saveCluster, .wrChapterTile .saveCluster, .wrSaveDemo .saveCluster {
+    --cluster-bg: var(--level-wash-lo); --pill-fill: var(--level-ink-soft); --pill-track: var(--level-wash); font-size: 11px;
+    .saveIconBtn { box-sizing: border-box; height: 30px; border-radius: 4px; }
+    .saveIconBtn:not(.saveBtnWithTime) { width: 30px; padding: 0; }
+    .saveBtnWithTime { width: auto; min-width: 30px; padding: 0 7px; }
+    // Unsaved: the accent colour (this rule is stronger than the header's wash for its buttons).
+    .saveBtnState--unsaved { color: var(--zone-on-accent); background: var(--accent); &:hover:not(:disabled) { background: var(--accent-hover); } }
+    .autosaveOpt--on { color: var(--on-accent); background: var(--wr-fill); }
+  }
   .wrTabPane { display: flex; flex-direction: column; gap: 10px; min-height: 0; }
   // The Max tiles on a split grid (SplitArea.tsx): each tile has a title bar to drag it by and a body that scrolls.
   .wrSplit { flex: 1 1 auto; min-height: 0; min-width: 0; overflow: auto; scrollbar-width: none; &::-webkit-scrollbar { display: none; } }

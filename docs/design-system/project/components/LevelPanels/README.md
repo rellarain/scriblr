@@ -7,7 +7,7 @@ Code: `writer/levels/LevelPanel.tsx`, `WriterLevels.tsx`, `LevelTabs.tsx`, `leve
 ## Anatomy
 
 - **Panel** `.wrLevel` (`--dash`, `--project`, `--outline`, `--draft`; `--min`, `--mid`, `--max`). Its fill is `--wr-level-fill`: the level's hue at the accent's saturation less a little, a step deeper, held dark enough for white text ([level-colours](../../level-colours.md)). Its text is `--on-accent`, always white. The Dash is the app theme's own colour; the Draft is paper.
-- **Header** `.wrLevelHeader`: min height 40, padding 6 / 14. The **title** (`.wrLevelTitle`, 15px bold) is a button that brings the level to focus; the **tabs** (`.wrTabBar`, 30 x 30 `.wrTabBtn`, icons 18) and **quick actions** (`.wrQuickActions`: Search, New, Save) sit at its right; at Mid a **chevron** (`.wrLevelToggle`) folds it to Min.
+- **Header** `.wrLevelHeader`: min height 40, padding 8 / 22. The **title** (`.wrLevelTitle`, 14px bold, all caps, letter spacing 1.5px, line height 1.7) is a button that brings the level to focus; the title and the size toggle share one line (`.wrLevelTitleRow`), the toggle at its right end; the **tabs** (`.wrTabBar`, 30 x 30 `.wrTabBtn`, icons 18) and **quick actions** (`.wrQuickActions`: Search, Save; no header New button) sit at its right; at Mid a **chevron** (`.wrLevelToggle`) folds it to Min. In a narrow header the tabs and quick actions wrap beneath the title line.
 - **Body** `.wrLevelBody`: `level-fill-1`, padding 8 / 12 / 12. At Min a level shows only its header (and a short body, e.g. book spines).
 
 ## Tabs

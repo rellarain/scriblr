@@ -10,6 +10,7 @@ from typing import Callable, Optional, Type, TypeVar
 
 from pydantic import BaseModel, ValidationError
 
+from . import settings_log
 from .schema import (
     HUE_SCHEME,
     SCHEMA_VERSION,
@@ -23,6 +24,7 @@ from .schema import (
     ProjectIndex,
     Publication,
     RevisionSnapshot,
+    SettingsLogEntry,
     ScheduleCompletionLog,
     ScrapRegistry,
     TreeSnapshot,
@@ -390,6 +392,7 @@ def _load_project_file_locked(root: Path, project_id: str) -> tuple[ProjectFile,
             raw, "schedule", ScheduleCompletionLog, project_dir, path, errors, ScheduleCompletionLog()
         ),
         scrap=_parse_section_default(raw, "scrap", ScrapRegistry, project_dir, path, errors, ScrapRegistry()),
+        settingsLog=_parse_list_section(raw, "settingsLog", SettingsLogEntry, project_dir, path, errors),
     )
     return pf, errors
 
@@ -970,6 +973,19 @@ def consolidate_project_history(root: Path, project_id: str) -> list[str]:
 def load_daily_activity(root: Path, project_id: str) -> DailyActivityLog:
     pf, _errors = _load_project_file(root, project_id)
     return pf.activity
+
+
+def list_settings_log(root: Path, project_id: str) -> list[SettingsLogEntry]:
+    """The project's settings changes still kept, newest first."""
+    pf, _ = _load_project_file(root, project_id)
+    return sorted(pf.settingsLog, key=lambda e: e.createdAt, reverse=True)
+
+
+def append_settings_log(root: Path, project_id: str, entry: SettingsLogEntry) -> None:
+    def _do(pf: ProjectFile) -> None:
+        pf.settingsLog = settings_log.append_pruned(pf.settingsLog, entry)
+
+    _mutate(root, project_id, _do)
 
 
 def save_daily_activity(root: Path, project_id: str, log: DailyActivityLog) -> None:

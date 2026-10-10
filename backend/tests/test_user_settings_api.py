@@ -24,7 +24,7 @@ def test_get_seeds_defaults_and_is_stable(client: TestClient) -> None:
     assert body["theme"]["zones"]["day"]["palette"] == {
         "theme": {"h": 330}, "accent": {"h": 32}, "alert": {"h": 200}, "accent2": {"h": 260},
     }
-    assert body["ui"] == {"viewAs": None, "handedness": "right", "autosaveEnabled": True, "autosaveSeconds": 30}
+    assert body["ui"] == {"viewAs": None, "handedness": "right", "autosaveEnabled": False, "autosaveSeconds": 60}
     assert client.get("/api/user-settings").json() == body
 
 
@@ -86,7 +86,7 @@ def test_put_theme_accepts_and_drops_the_old_saturation_and_brightness(client: T
 def test_put_ui(client: TestClient) -> None:
     resp = client.put("/api/user-settings/ui", json={"viewAs": "user", "handedness": "left"})
     assert resp.status_code == 200
-    assert resp.json()["ui"] == {"viewAs": "user", "handedness": "left", "autosaveEnabled": True, "autosaveSeconds": 30}
+    assert resp.json()["ui"] == {"viewAs": "user", "handedness": "left", "autosaveEnabled": False, "autosaveSeconds": 60}
     assert client.put("/api/user-settings/ui", json={"viewAs": "root", "handedness": "left"}).status_code == 422
 
 

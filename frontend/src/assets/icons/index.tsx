@@ -518,6 +518,21 @@ export function SaveIcon(props: IconProps) {
   </IconBase>
 }
 
+// Undo and redo: a curved arrow turning back, and its mirror.
+export function UndoIcon(props: IconProps) {
+  return <IconBase {...props}>
+    <path d="M9 14 4 9l5-5" />
+    <path d="M4 9h10a6 6 0 0 1 0 12h-3" />
+  </IconBase>
+}
+
+export function RedoIcon(props: IconProps) {
+  return <IconBase {...props}>
+    <path d="m15 14 5-5-5-5" />
+    <path d="M20 9H10a6 6 0 0 0 0 12h3" />
+  </IconBase>
+}
+
 // A counter-clockwise arrow: go back to the last saved version.
 export function RestoreIcon(props: IconProps) {
   return <IconBase {...props}>

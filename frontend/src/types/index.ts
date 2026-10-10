@@ -193,7 +193,8 @@ export interface RevisionComment {
 // "manual" = floppy-disk button, no naming step, label is the save's own
 // formatted date/time. "auto" = fires after 5 minutes of inactivity and
 // overwrites a single rolling slot per chapter rather than appending.
-export type RevisionTrigger = 'manual' | 'auto'
+// 'session': one entry per editing session, kept up to date by each draft save.
+export type RevisionTrigger = 'manual' | 'auto' | 'session'
 
 // Snapshots are chapter-scoped -- a snapshot captures a chapter's whole
 // moments-map at once, consistent with drafts becoming chapter-scoped.
@@ -305,7 +306,16 @@ export interface DailyActivityLog {
   days: Record<string, DailyActivityEntry>
 }
 
-export type ActivityEntryType = 'outline' | 'plot' | 'draft'
+export type ActivityEntryType = 'outline' | 'plot' | 'draft' | 'settings'
+
+// A change to settings (the project's time systems and colour, or the user's theme and UI) with the value it replaced.
+export interface SettingsLogEntry {
+  id: string
+  createdAt: string
+  kind: 'theme' | 'ui' | 'project'
+  label: string
+  before: Record<string, unknown>
+}
 
 export interface ActivityLogEntry {
   id: string

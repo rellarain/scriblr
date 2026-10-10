@@ -26,4 +26,4 @@ export function defaultThemeSettings(): ThemeSettings {
   }
 }
 
-export const DEFAULT_UI_SETTINGS: UiSettings = { viewAs: null, handedness: 'right', autosaveEnabled: true, autosaveSeconds: 30 }
+export const DEFAULT_UI_SETTINGS: UiSettings = { viewAs: null, handedness: 'right', autosaveEnabled: false, autosaveSeconds: 60 }

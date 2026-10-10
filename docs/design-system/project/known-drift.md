@@ -24,6 +24,7 @@ Where the code does not yet follow the rules on the other pages. Each entry says
 | A plotpoint's awareness shade sized its dark band with the 45-point gap | the shade is fitted to read (`fitFill`) and nothing else; `MIN_TEXT_GAP` is gone |
 | Text on a hovered or pressed surface was not measured, and in Dusk and Night `ink-muted` fell to about 3.8 to 4.2:1 | the theme's lightness is fitted for the ink on the lifted surface (the ink at 22%) too; audited as "Hover and pressed" |
 | Disabled controls at 40% and dragged cards at 35 to 50% | 60% and 70% |
+| A level header's tabs, Reset and Save were square, the Save state was a hover bubble with a dot, and the size toggle wrapped below the tabs | the tab bar, its buttons and the Save component (Undo, Redo, Save, Autosave) are rounded `radius-button` containers of 30 x 30 buttons; no bubble, dot or state text (the time of the last save on hover); the toggle is on the title line; the title is all caps ([interaction](interaction.md)) |
 | `style/style.css`: legacy `--accent-light`, `--shelf-wood`, `--page-cream`, a `#f4f2ee` body and a fixed text colour | `surface-raised-active`, `accent-dim`, `paper`, `surface-base` and `ink` (this sheet serves only the older stack in `modes/` and `components/shared/`) |
 | The admin Inbox mapped "no" to the accent and its fields to a hand-written black wash | `--tone-no` is `alert` (text `on-alert`), `--field-bg` is `ov-sink-2` |
 

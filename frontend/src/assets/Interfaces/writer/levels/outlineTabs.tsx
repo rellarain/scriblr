@@ -1,6 +1,6 @@
 import { GearIcon, HelpIcon, InfoIcon, ListIcon } from '../../../icons'
-import { SaveControl } from '../../../../components/SaveControl'
-import type { WriterWorkspace } from '../useWriterWorkspace'
+import WorkspaceSaveCluster from './WorkspaceSaveCluster'
+import type { HistoryScope, WriterWorkspace } from '../useWriterWorkspace'
 import { buildChildIndex, chaptersOfBook, descendantsOf } from '../outlineTree'
 import BookSettings from '../outline/BookSettings'
 import { nodeLabel } from '../plotTree'
@@ -76,8 +76,7 @@ export function outlineTabs(w: WriterWorkspace): LevelTab[] {
   const book = w.activeBook
   return [
     {
-      id: 'outline', label: 'Book outline', Icon: ListIcon, newLabel: 'New chapter',
-      onNew: () => { if (book) w.addOutlineNode(book.id, 'chapter') },
+      id: 'outline', label: 'Book outline', Icon: ListIcon,
       render: () => <BookOutlineList w={w} />,
     },
     { id: 'details', label: 'Book details', Icon: InfoIcon, render: () => <BookDetails w={w} /> },
@@ -86,11 +85,14 @@ export function outlineTabs(w: WriterWorkspace): LevelTab[] {
   ]
 }
 
+// What each Outline tab edits, for Undo and Redo.
+const OUTLINE_SCOPES: Record<string, HistoryScope> = { outline: 'outline', details: 'outline', settings: 'settings' }
+
 export function useOutlineTabs(w: WriterWorkspace, size: 'min' | 'mid' | 'max') {
   return useTabbedLevel({
-    storageKey: 'scriblr.writer.outline', tabs: outlineTabs(w), size, customMax: true,
+    storageKey: 'scriblr.writer.outline', tabs: outlineTabs(w), size, customMax: true, flush: w.flushAll,
     defaultOpen: ['outline', 'details'], defaultTab: 'outline',
-    save: <SaveControl status={w.saveStatus} onSave={() => { void w.saveNow() }} onRestore={w.restoreSaved} buttonClassName="wrSmallBtn wrSaveBtn" />,
+    save: focused => <WorkspaceSaveCluster w={w} scope={focused ? OUTLINE_SCOPES[focused] : undefined} />,
   })
 }
 

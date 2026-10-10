@@ -2,6 +2,7 @@ import { useEffect, useMemo, useRef, useState } from 'react'
 import type {
   FlagType, NodeFlag, OutlineNode, OutlineNodeKind, PlotNode, PlotNodeKind, ProjectIndex, TimeSystem,
 } from '../../../api/types'
+import type { SettingsLogEntry } from '../../../types'
 import {
   createProject as apiCreateProject,
   deleteProject as apiDeleteProject,
@@ -17,7 +18,10 @@ import {
   addField, addValue, assignPoint, deleteField, deleteValue, migratePlot, moveField, moveValue, renameField, syncReferences, updateValue,
 } from './plotFields'
 import { awarenessNext } from './awareness'
-import { combineSaveStatus, useAutosave } from '../../../lib/useAutosave'
+import { combineCountdown, combineSaveStatus, useAutosave } from '../../../lib/useAutosave'
+import { getOutlineSnapshot, getPlotSnapshot, getProjectSettingsLog, listOutlineHistory, listPlotHistory } from '../../../api/historyFetch'
+import { newestFirst, nextSetting, nextSnapshot, sameValue, type LogEntry } from '../../../lib/logUndo'
+import { useUndoHistory } from '../../../lib/useUndoHistory'
 import { insertAfter } from '../../../lib/siblingOrder'
 import { DEFAULT_BOOK_HUE, fillColorCss, hueOfCode } from '../../../theme/bookColors'
 import { useThemeState } from '../../../theme/useTheme'
@@ -179,6 +183,17 @@ export function useWriterWorkspace() {
     },
   })
 
+  // --- undo and redo (lib/useUndoHistory.ts) ---
+  // One history per document, each step a committed edit; Save and autosave stay level-wide. An Undo or Redo is shown as an unsaved
+  // edit (it goes through the same commit and autosave as any change) and is not recorded again. The histories start afresh when
+  // a project is opened and when the book or chapter changes (leaving the page).
+  const outlineHistory = useUndoHistory<OutlineNode[]>()
+  const plotHistory = useUndoHistory<PlotNode[]>()
+  const settingsHistory = useUndoHistory<ProjectSettingsValue>()
+  const applyingHistory = useRef(false)
+  useEffect(() => { outlineHistory.markSaved() }, [outlineSave.lastSavedAt])
+  useEffect(() => { plotHistory.markSaved() }, [plotSave.lastSavedAt])
+
   // The project's settings the Writer edits (time systems, colour): saved like the trees.
   // Each save carries all of them, so a later colour change never drops a waiting time-system edit.
   const settingsSave = useAutosave<{ projectId: string; timeSystems: TimeSystem[]; themeHue: number | null }>({
@@ -188,6 +203,8 @@ export function useWriterWorkspace() {
     },
   })
 
+  useEffect(() => { settingsHistory.markSaved() }, [settingsSave.lastSavedAt])
+
   function updateProjectSettings(patch: { timeSystems?: TimeSystem[]; themeHue?: number }, immediate: boolean) {
     const current = activeProjectRef.current
     const projectId = activeProjectIdRef.current
@@ -196,6 +213,7 @@ export function useWriterWorkspace() {
     const next = { ...current, settings }
     activeProjectRef.current = next
     setActiveProject(next)
+    if (!applyingHistory.current) settingsHistory.record({ timeSystems: settings.timeSystems, themeHue: settings.themeHue ?? null }, { text: !immediate })
     const value = { projectId, timeSystems: settings.timeSystems, themeHue: settings.themeHue ?? null }
     if (immediate) void settingsSave.saveNow(value)
     else settingsSave.schedule(value)
@@ -210,6 +228,7 @@ export function useWriterWorkspace() {
   function commitOutline(next: OutlineNode[], immediate: boolean) {
     outlineNodesRef.current = next
     setOutlineNodes(next)
+    if (!applyingHistory.current) outlineHistory.record(next, { text: !immediate })
     const projectId = activeProjectIdRef.current
     if (!projectId) return
     const value = { projectId, schemaVersion: outlineSchemaVersion, nodes: next }
@@ -222,6 +241,7 @@ export function useWriterWorkspace() {
     const next = syncReferences(changed, new Map(outlineNodesRef.current.map(n => [n.id, n])))
     plotNodesRef.current = next
     setPlotNodes(next)
+    if (!applyingHistory.current) plotHistory.record(next, { text: !immediate })
     const projectId = activeProjectIdRef.current
     if (!projectId) return
     const value = { projectId, schemaVersion: plotSchemaVersion, nodes: next }
@@ -235,27 +255,114 @@ export function useWriterWorkspace() {
   }
   function flushAll() { void saveNow() }
 
-  // Throw away what has not been saved and reload the last saved outline, plot
-  // and project settings (the Save control's restore button).
-  async function restoreSaved(): Promise<void> {
-    const projectId = activeProjectIdRef.current
-    await Promise.all([outlineSave.discard(), plotSave.discard(), settingsSave.discard()])
-    if (!projectId) return
+  // --- today's activity log behind Undo ---
+  // When a document's own history is used up, Undo goes on into what the backend logged today: the outline and plot snapshots, and the
+  // project's settings changes (lib/logUndo.ts). The lists are fetched when a project opens and after each save.
+  const [logs, setLogs] = useState<{ outline: LogEntry[]; plot: LogEntry[]; settings: SettingsLogEntry[] }>({ outline: [], plot: [], settings: [] })
+  const logCursors = useRef<Record<HistoryScope, string | null>>({ outline: null, plot: null, settings: null })
+  async function refreshLogs(projectId: string) {
     try {
-      const summary = await apiGetProject(projectId)
+      const [outline, plot, settings] = await Promise.all([listOutlineHistory(projectId), listPlotHistory(projectId), getProjectSettingsLog(projectId)])
       if (activeProjectIdRef.current !== projectId) return
-      const outline = summary.outline?.nodes ?? []
-      const plot = migratePlot(summary.plot?.nodes ?? [], outline)
-      outlineNodesRef.current = outline
-      plotNodesRef.current = plot
-      setOutlineNodes(outline)
-      setPlotNodes(plot)
-      setActiveProject(summary.index)
-    } catch (err) {
-      setOutlineError(errMessage(err, 'Failed to restore the last saved version'))
+      const entry = (x: { snapshotId: string; createdAt: string }): LogEntry => ({ id: x.snapshotId, createdAt: x.createdAt })
+      setLogs({ outline: newestFirst(outline.map(entry)), plot: newestFirst(plot.map(entry)), settings: newestFirst(settings) })
+    } catch { /* the log is a convenience: Undo then has only the history in memory */ }
+  }
+  useEffect(() => {
+    if (activeProjectId) void refreshLogs(activeProjectId)
+  }, [activeProjectId, outlineSave.lastSavedAt, plotSave.lastSavedAt, settingsSave.lastSavedAt])
+  const logTarget = (scope: HistoryScope, cursor: string | null): { id: string } | null =>
+    scope === 'settings' ? nextSetting(logs.settings, cursor) : nextSnapshot(scope === 'outline' ? logs.outline : logs.plot, cursor)
+  const currentOf = (scope: HistoryScope): unknown =>
+    scope === 'outline' ? outlineNodesRef.current
+      : scope === 'plot' ? plotNodesRef.current
+      : { timeSystems: activeProjectRef.current?.settings.timeSystems ?? [], themeHue: activeProjectRef.current?.settings.themeHue ?? null }
+
+  // Go back into today's log: the next older state that is not the one shown, applied as an unsaved edit (and redoable).
+  async function logUndo(scope: HistoryScope) {
+    const projectId = activeProjectIdRef.current
+    if (!projectId) return
+    let cursor = logCursors.current[scope]
+    for (let guard = 0; guard < 25; guard += 1) {
+      const target = logTarget(scope, cursor)
+      if (!target) break
+      cursor = target.id
+      let value: unknown
+      try {
+        if (scope === 'settings') {
+          const before = logs.settings.find(e => e.id === target.id)?.before as { timeSystems?: TimeSystem[]; themeHue?: number | null } | undefined
+          value = { timeSystems: before?.timeSystems ?? activeProjectRef.current?.settings.timeSystems ?? [], themeHue: before?.themeHue ?? null }
+        } else if (scope === 'outline') {
+          value = (await getOutlineSnapshot(projectId, target.id)).nodes
+        } else {
+          value = (await getPlotSnapshot(projectId, target.id)).nodes
+        }
+      } catch { break }
+      if (activeProjectIdRef.current !== projectId) return
+      if (sameValue(value, currentOf(scope))) continue
+      logCursors.current[scope] = cursor
+      applyingHistory.current = true
+      try {
+        if (scope === 'outline') { outlineHistory.stepBack(value as OutlineNode[]); commitOutline(value as OutlineNode[], false) }
+        else if (scope === 'plot') { plotHistory.stepBack(value as PlotNode[]); commitPlot(value as PlotNode[], false) }
+        else {
+          const v = value as ProjectSettingsValue
+          settingsHistory.stepBack(v)
+          updateProjectSettings({ timeSystems: v.timeSystems, ...(v.themeHue != null ? { themeHue: v.themeHue } : {}) }, false)
+        }
+      } finally {
+        applyingHistory.current = false
+      }
+      return
+    }
+    logCursors.current[scope] = cursor
+  }
+
+  // Undo and Redo of one document (outline, plot or the project's settings): the step is applied as an unsaved edit.
+  function stepHistory(scope: HistoryScope, direction: 'undo' | 'redo') {
+    applyingHistory.current = true
+    try {
+      if (scope === 'outline') {
+        const value = direction === 'undo' ? outlineHistory.undo() : outlineHistory.redo()
+        if (value) commitOutline(value, false)
+      } else if (scope === 'plot') {
+        const value = direction === 'undo' ? plotHistory.undo() : plotHistory.redo()
+        if (value) commitPlot(value, false)
+      } else {
+        const value = direction === 'undo' ? settingsHistory.undo() : settingsHistory.redo()
+        if (value) updateProjectSettings({ timeSystems: value.timeSystems, ...(value.themeHue != null ? { themeHue: value.themeHue } : {}) }, false)
+      }
+    } finally {
+      applyingHistory.current = false
     }
   }
+  const historyOf = (scope: HistoryScope) => (scope === 'outline' ? outlineHistory : scope === 'plot' ? plotHistory : settingsHistory)
+  const history = {
+    // Something in memory to undo, or a change in today's log.
+    canUndo: (scope: HistoryScope) => historyOf(scope).canUndo || logTarget(scope, logCursors.current[scope]) !== null,
+    canRedo: (scope: HistoryScope) => historyOf(scope).canRedo,
+    undo: (scope: HistoryScope) => { if (historyOf(scope).canUndo) stepHistory(scope, 'undo'); else void logUndo(scope) },
+    redo: (scope: HistoryScope) => stepHistory(scope, 'redo'),
+  }
+  // A fresh start for all three: a project was opened, or the page changed.
+  function resetHistories(outline: OutlineNode[], plot: PlotNode[], project: ProjectIndex | null) {
+    logCursors.current = { outline: null, plot: null, settings: null }
+    outlineHistory.reset(outline)
+    plotHistory.reset(plot)
+    if (project) settingsHistory.reset({ timeSystems: project.settings.timeSystems, themeHue: project.settings.themeHue ?? null })
+    else settingsHistory.clear()
+  }
+  // Changing the page (the project, level, book or chapter) saves what is waiting, whatever the autosave setting, and starts the histories afresh.
+  const pageKey = `${activeProjectId ?? ''}/${view}/${activeBookId ?? ''}/${activeChapterId ?? ''}`
+  const firstPage = useRef(true)
+  useEffect(() => {
+    if (firstPage.current) { firstPage.current = false; return }
+    flushAll()
+    resetHistories(outlineNodesRef.current, plotNodesRef.current, activeProjectRef.current)
+  }, [pageKey])
+
   const saveStatus = combineSaveStatus(outlineSave, plotSave, settingsSave)
+  const saveCountdown = combineCountdown(outlineSave, plotSave, settingsSave)
 
   // --- projects ---
   async function loadProjects() {
@@ -322,6 +429,7 @@ export function useWriterWorkspace() {
       setPlotSchemaVersion(summary.plot?.schemaVersion ?? 1)
       setPlotStatus('idle')
       setFocusedPlotNodeId(null)
+      resetHistories(nodes, plot, summary.index)
       if (migrated) void plotSave.saveNow({ projectId: id, schemaVersion: summary.plot?.schemaVersion ?? 1, nodes: plot })
 
       setActiveChapterId(null)
@@ -353,6 +461,7 @@ export function useWriterWorkspace() {
     setPlotStatus('idle')
     setPlotError(undefined)
     setFocusedPlotNodeId(null)
+    resetHistories([], [], null)
 
     setView('project')
     setActiveBookId(null)
@@ -728,7 +837,7 @@ export function useWriterWorkspace() {
     projects, projectsStatus, projectsError, projectOutlines,
     activeProjectId, activeProject, hasOpenProject,
     outlineNodes, outlineStatus, outlineError, warnings, saving: outlineSave.saving, saveError: outlineSave.error,
-    saveStatus, saveNow, flushAll, restoreSaved, updateTimeSystems,
+    saveStatus, saveCountdown, saveNow, flushAll, history, updateTimeSystems,
     childrenByParentId, projectRoot, books, activeBook, activeBookChapters, activeChapter,
     activeConsole, activeBookId, activeChapterId,
     projectHue, levelHueOf, levelTintOf, levelFillOf, hueCentreOf, setNodeHue, setProjectHue,
@@ -747,3 +856,7 @@ export function useWriterWorkspace() {
 }
 
 export type WriterWorkspace = ReturnType<typeof useWriterWorkspace>
+
+// What one Undo / Redo acts on: the outline, the plot, or the project's settings.
+export type HistoryScope = 'outline' | 'plot' | 'settings'
+interface ProjectSettingsValue { timeSystems: TimeSystem[]; themeHue: number | null }

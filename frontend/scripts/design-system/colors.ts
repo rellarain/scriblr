@@ -65,6 +65,7 @@ export function zoneColorTokens(zone: ZoneKey, pal: ZonePalette = DEFAULT_PALETT
     if (name !== 'alert') add(`${name}-hover`, hexOf(hsl(fill.h, fill.s, clamp(fill.l + 12 * d))), `The ${name} on hover: 12 points away from its text.`)
     if (name === 'accent') add('accent-dim', hexOf(hsl(fill.h, fill.s - 20, clamp(fill.l + 14 * d))), 'The accent when dimmed (20 points less saturated, 14 points away from its text).')
     add(`on-${name}`, hexOf(on), `Text on the ${name}: ${on.l >= 50 ? 'white' : 'the dark ink'}, whichever reads better.`)
+    if (name === 'accent') add('zone-on-accent', hexOf(on), 'The same ink for what sits on the accent inside a level (which sets on-accent to white for its own fill): the unsaved Save button.')
   }
 
   // ---- the Writer's paper

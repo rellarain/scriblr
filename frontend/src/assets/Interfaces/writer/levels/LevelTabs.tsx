@@ -1,20 +1,16 @@
 import { useState, type ComponentType, type ReactNode } from 'react'
-import { PlusIcon, SearchIcon, type IconProps } from '../../../icons'
+import { SearchIcon, type IconProps } from '../../../icons'
 import { useStoredState } from '../storage'
 import SplitArea, { columnsTree } from '../SplitArea'
 
-// What a tab's content is told: the header's search text, and a counter that goes up each time the
-// header's New button is pressed on that tab (a tab that has something to add reacts to the change).
-export interface TabContext { query: string; newTick: number; size: 'mid' | 'max' }
+// What a tab's content is told: the header's search text. (The header has no New button: a tab adds things from its own body.)
+export interface TabContext { query: string; size: 'mid' | 'max' }
 
 export interface LevelTab {
   id: string
   label: string
   Icon: ComponentType<IconProps>
   render: (ctx: TabContext) => ReactNode
-  // The header's New button, while this tab is the current one: what it adds, and an optional direct action.
-  newLabel?: string
-  onNew?: () => void
   // The header's search box filters this tab.
   searchable?: boolean
   // The tab shows an editor on a light surface of the level's hue, in the ink colour (not the level's own on-accent text).
@@ -29,14 +25,18 @@ export interface LevelTab {
 // minimised form of a tile, clicking it opens or closes that tile, and the open tiles are laid out on a split
 // grid the user rearranges (drag a title bar to move a tile, a divider to resize).
 // The tab strip and quick actions (New, Search, Save) go in the level's header; the body is the tiles.
-export function useTabbedLevel({ storageKey, tabs, size, defaultOpen, defaultTab, save, customMax = false }: {
+export function useTabbedLevel({ storageKey, tabs, size, defaultOpen, defaultTab, save, flush, customMax = false }: {
   storageKey: string
   tabs: LevelTab[]
   size: 'min' | 'mid' | 'max'
   defaultOpen: string[]
   // The tab that is current at first (the first one when not given).
   defaultTab?: string
-  save?: ReactNode
+  // The quick actions' last item (the Save component). A function is told the focused tab: the tile the pointer or keyboard was last in
+  // (at Max), else the current tab, so Undo and Redo can act on it.
+  save?: ReactNode | ((focusedTab: string | undefined) => ReactNode)
+  // Called when another tab is picked (leaving the tab saves what is waiting).
+  flush?: () => void
   // The level lays its Max tiles out itself, by `isOpen`; no two-column body is made.
   customMax?: boolean
 }): { headerExtras: ReactNode; body: ReactNode; isOpen: (id: string) => boolean } {
@@ -44,7 +44,7 @@ export function useTabbedLevel({ storageKey, tabs, size, defaultOpen, defaultTab
   const [open, setOpen] = useStoredState<string[]>(`${storageKey}.open`, defaultOpen)
   const [query, setQuery] = useState('')
   const [searching, setSearching] = useState(false)
-  const [ticks, setTicks] = useState<Record<string, number>>({})
+  const [focusedTile, setFocusedTile] = useState<string | undefined>(undefined)
 
   if (size === 'min') return { headerExtras: null, body: null, isOpen: () => false }
 
@@ -56,15 +56,13 @@ export function useTabbedLevel({ storageKey, tabs, size, defaultOpen, defaultTab
     : (tabs.find(t => t.id === active && known(active)) ?? tabs[0])
 
   function pick(id: string) {
+    flush?.()
     setActive(id)
+    setFocusedTile(id)
     if (max) setOpen(prev => (prev.includes(id) ? prev.filter(x => x !== id) : [...prev, id]))
   }
-  function add() {
-    if (!current) return
-    setTicks(prev => ({ ...prev, [current.id]: (prev[current.id] ?? 0) + 1 }))
-    current.onNew?.()
-  }
-  const ctxOf = (tab: LevelTab): TabContext => ({ query: query.trim().toLowerCase(), newTick: ticks[tab.id] ?? 0, size: max ? 'max' : 'mid' })
+  const focused = max && focusedTile && shown.some(t => t.id === focusedTile) ? focusedTile : current?.id
+  const ctxOf = (_tab: LevelTab): TabContext => ({ query: query.trim().toLowerCase(), size: max ? 'max' : 'mid' })
 
   const headerExtras = (
     <div className="wrHeaderExtras">
@@ -93,12 +91,7 @@ export function useTabbedLevel({ storageKey, tabs, size, defaultOpen, defaultTab
             <SearchIcon size={18} />
           </button>
         )}
-        {current?.newLabel && (
-          <button type="button" className="wrTabBtn" aria-label={current.newLabel} title={current.newLabel} onClick={add}>
-            <PlusIcon size={18} />
-          </button>
-        )}
-        {save}
+        {typeof save === 'function' ? save(focused) : save}
       </div>
     </div>
   )
@@ -116,7 +109,7 @@ export function useTabbedLevel({ storageKey, tabs, size, defaultOpen, defaultTab
       ? <p className="wrMuted">Pick a tab above to open it.</p>
       : (
         <SplitArea
-          gridId={storageKey} label="Tiles" defaultTree={columnsTree(shown.map(t => t.id))}
+          gridId={storageKey} label="Tiles" defaultTree={columnsTree(shown.map(t => t.id))} onFocusTile={setFocusedTile}
           tiles={shown.map(t => ({
             id: t.id, title: t.label, Icon: t.Icon, children: t.render(ctxOf(t)),
             bodyClassName: t.fill ? 'wrTabTileBody--surface wrTabTileBody--fill' : t.surface ? 'wrTabTileBody--surface' : undefined,

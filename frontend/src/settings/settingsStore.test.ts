@@ -1,10 +1,10 @@
 import { act, renderHook } from '@testing-library/react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { useStoredState } from '../assets/Interfaces/writer/storage'
-import { defaultThemeSettings } from '../theme/defaults'
+import { DEFAULT_UI_SETTINGS, defaultThemeSettings } from '../theme/defaults'
 import {
   __resetSettingsForTests, flushSettings, getAutosavePolicy, getKv, getSettings, initSettings, normalizeAutosaveSeconds, restoreSettings,
-  setKv, setTheme, setUi, useSettingsSaveStatus,
+  redoSettings, setAutosaveMode, setKv, setTheme, setUi, undoSettings, useSettingsCountdown, useSettingsHistory, useSettingsSaveStatus,
 } from './settingsStore'
 
 interface Call { url: string; method: string; body: unknown; keepalive?: boolean }
@@ -13,7 +13,7 @@ function remote(over: Record<string, unknown> = {}) {
   return {
     schemaVersion: 1,
     theme: defaultThemeSettings(),
-    ui: { viewAs: null, handedness: 'right', autosaveEnabled: true, autosaveSeconds: 30 },
+    ui: { viewAs: null, handedness: 'right', autosaveEnabled: true, autosaveSeconds: 60 },
     kv: {},
     migratedFromLocal: true,
     ...over,
@@ -26,6 +26,8 @@ let respond: (call: Call) => unknown
 beforeEach(() => {
   vi.useFakeTimers()
   window.localStorage.clear()
+  // These tests are about autosave, which is off for a user who never chose: start from a user who turned it on.
+  window.localStorage.setItem('scriblr.settings.cache', JSON.stringify({ theme: defaultThemeSettings(), ui: { ...DEFAULT_UI_SETTINGS, autosaveEnabled: true } }))
   __resetSettingsForTests()
   calls = []
   respond = () => remote()
@@ -202,22 +204,32 @@ describe('save status', () => {
 describe('autosave setting', () => {
   const themePuts = () => calls.filter(c => c.method === 'PUT' && c.url.endsWith('/user-settings/theme'))
 
-  it('defaults to on, every 30 seconds, and only allows 30-second steps up to 10 minutes', () => {
-    expect(getAutosavePolicy()).toEqual({ enabled: true, delay: 30_000 })
+  it('allows only 1, 5 or 10 minutes, rounding an older value to the nearest', () => {
+    expect(getAutosavePolicy()).toEqual({ enabled: true, delay: 60_000 })
+    expect(normalizeAutosaveSeconds(30)).toBe(60)
     expect(normalizeAutosaveSeconds(45)).toBe(60)
-    expect(normalizeAutosaveSeconds(0)).toBe(30)
+    expect(normalizeAutosaveSeconds(0)).toBe(60)
+    expect(normalizeAutosaveSeconds(200)).toBe(300)
     expect(normalizeAutosaveSeconds(9999)).toBe(600)
-    expect(normalizeAutosaveSeconds('x')).toBe(30)
+    expect(normalizeAutosaveSeconds('x')).toBe(60)
     act(() => { setUi(u => ({ ...u, autosaveSeconds: 500 })) })
-    expect(getSettings().ui.autosaveSeconds).toBe(510)
+    expect(getSettings().ui.autosaveSeconds).toBe(600)
+  })
+
+  it('is off by default for a user who never chose', () => {
+    window.localStorage.clear()
+    __resetSettingsForTests()
+    expect(getAutosavePolicy().enabled).toBe(false)
+    expect(DEFAULT_UI_SETTINGS.autosaveEnabled).toBe(false)
+    expect(DEFAULT_UI_SETTINGS.autosaveSeconds).toBe(60)
   })
 
   it('sends theme changes after the chosen wait', async () => {
-    act(() => { setUi(u => ({ ...u, autosaveSeconds: 120 })) })
+    act(() => { setUi(u => ({ ...u, autosaveSeconds: 300 })) })
     await act(async () => { await vi.advanceTimersByTimeAsync(1000) })
     calls = []
     act(() => { setTheme(t => ({ ...t, timeBasedEnabled: true })) })
-    await act(async () => { await vi.advanceTimersByTimeAsync(119_000) })
+    await act(async () => { await vi.advanceTimersByTimeAsync(299_000) })
     expect(themePuts()).toHaveLength(0)
     await act(async () => { await vi.advanceTimersByTimeAsync(2000) })
     expect(themePuts()).toHaveLength(1)
@@ -260,5 +272,80 @@ describe('restoreSettings', () => {
     expect(result.current.dirty).toBe(false)
     await act(async () => { await vi.advanceTimersByTimeAsync(60_000) })
     expect(calls.filter(c => c.method === 'PUT')).toHaveLength(0) // the dropped change is never sent
+  })
+})
+
+describe('undo and redo of the settings', () => {
+  const themePuts = () => calls.filter(c => c.method === 'PUT' && c.url.endsWith('/user-settings/theme'))
+
+  it('steps back an unsaved change, shown as an unsaved change, and forward again', async () => {
+    const { result } = renderHook(() => useSettingsHistory())
+    expect(result.current).toEqual({ canUndo: false, canRedo: false })
+    act(() => { setTheme(t => ({ ...t, timeBasedEnabled: !t.timeBasedEnabled })) })
+    const changed = getSettings().theme.timeBasedEnabled
+    expect(result.current.canUndo).toBe(true)
+
+    act(() => { undoSettings() })
+    expect(getSettings().theme.timeBasedEnabled).toBe(!changed)
+    expect(result.current).toEqual({ canUndo: false, canRedo: true })
+
+    act(() => { redoSettings() })
+    expect(getSettings().theme.timeBasedEnabled).toBe(changed)
+    expect(result.current.canRedo).toBe(false)
+    // Each is sent like any other change: the last value is what gets saved.
+    await act(async () => { await flushSettings() })
+    expect(themePuts().at(-1)?.body).toMatchObject({ timeBasedEnabled: changed })
+  })
+
+  it('does not undo the autosave choice, and a new change clears redo', () => {
+    const { result } = renderHook(() => useSettingsHistory())
+    act(() => { setTheme(t => ({ ...t, timeBasedEnabled: !t.timeBasedEnabled })) })
+    act(() => { setAutosaveMode(600) })
+    expect(getSettings().ui.autosaveSeconds).toBe(600)
+    act(() => { undoSettings() })
+    expect(getSettings().ui.autosaveSeconds).toBe(600) // kept
+    expect(result.current.canRedo).toBe(true)
+    act(() => { setTheme(t => ({ ...t, timeBasedEnabled: !t.timeBasedEnabled })) })
+    expect(result.current.canRedo).toBe(false)
+  })
+
+  it("goes on into today's log once the history in memory is used up", async () => {
+    const now = new Date().toISOString()
+    const before = defaultThemeSettings()
+    const earlier = { ...before, timeBasedEnabled: !before.timeBasedEnabled }
+    respond = call => (call.url.endsWith('/user-settings/activity')
+      ? [{ id: 'slog_1', createdAt: now, kind: 'theme', label: 'Theme changed', before: { theme: earlier } }]
+      : remote())
+    const { result } = renderHook(() => useSettingsHistory())
+    await act(async () => { await initSettings() })
+    await act(async () => { await vi.advanceTimersByTimeAsync(0) })
+    expect(result.current.canUndo).toBe(true) // from the log, nothing in memory
+    act(() => { undoSettings() })
+    expect(getSettings().theme.timeBasedEnabled).toBe(earlier.timeBasedEnabled)
+    expect(result.current).toEqual({ canUndo: false, canRedo: true })
+  })
+
+  it('ignores a logged change from an earlier day', async () => {
+    respond = call => (call.url.endsWith('/user-settings/activity')
+      ? [{ id: 'slog_old', createdAt: '2020-01-01T00:00:00Z', kind: 'theme', label: 'Theme changed', before: { theme: defaultThemeSettings() } }]
+      : remote())
+    const { result } = renderHook(() => useSettingsHistory())
+    await act(async () => { await initSettings() })
+    await act(async () => { await vi.advanceTimersByTimeAsync(0) })
+    expect(result.current.canUndo).toBe(false)
+  })
+})
+
+describe('the autosave countdown', () => {
+  it('reports when the waiting changes will be sent, and none when autosave is off', async () => {
+    const { result } = renderHook(() => useSettingsCountdown())
+    expect(result.current).toEqual({ nextSaveAt: null, wait: 60_000 })
+    vi.setSystemTime(new Date('2026-01-01T00:00:00Z'))
+    act(() => { setTheme(t => ({ ...t, timeBasedEnabled: !t.timeBasedEnabled })) })
+    expect(result.current.nextSaveAt).toBe(Date.now() + 60_000)
+    await act(async () => { await vi.advanceTimersByTimeAsync(61_000) })
+    expect(result.current.nextSaveAt).toBeNull()
+    act(() => { setUi(u => ({ ...u, autosaveEnabled: false })) })
+    expect(result.current.wait).toBeNull()
   })
 })

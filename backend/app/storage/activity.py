@@ -54,6 +54,11 @@ def get_activity(root: Path, project_id: str) -> ActivityResponse:
                 )
             )
 
+    for logged in store.list_settings_log(root, project_id):
+        entries.append(
+            ActivityLogEntry(id=logged.id, type="settings", createdAt=logged.createdAt, label=logged.label, trigger=logged.kind)
+        )
+
     index = store.load_index(root, project_id)
     for chapter_id in index.manifest.revisionChapters:
         for revision in store.list_revisions(root, project_id, chapter_id):

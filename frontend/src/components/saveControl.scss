@@ -1,48 +1,46 @@
-// The save state text next to a Save button (components/SaveControl.tsx).
-// Colors come from the theme tokens (theme/theme.scss).
-.saveControl {
+// The Save component (components/SaveCluster.tsx): Undo, Redo, Save and Autosave in one rounded container.
+// Colors come from the theme tokens (theme/theme.scss); a level header sets --cluster-bg and --pill-fill (writer.scss).
+
+.saveCluster {
   display: inline-flex;
   align-items: center;
-  gap: 1px;
+  gap: 4px;
+  padding: 2px;
+  border-radius: 4px; // radius-button
+  background: var(--cluster-bg, var(--ov-sink-1));
 }
 
-// The Save button with the state bubble that opens under it on hover or focus.
-.saveHover { position: relative; display: inline-flex; }
+// The Save button, with the autosave toggle that opens under it on hover or focus (or a long press) and, once autosave is on, the timer pill.
+.saveReveal {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
 
-.saveState {
-  position: absolute;
-  top: calc(100% + 6px);
-  right: 0;
-  z-index: 30;
-  padding: 4px 9px;
-  border-radius: 4px;
+// The save time (or the state): always shown. The alert colour marks a failed save with an underline (it can be too close to the ink).
+// The time of the last save, inside the Save button, left of its icon. Hidden until the button is hovered, focused or held (the wrapper
+// .saveReveal is hovered even when the button is disabled), then it opens up beside the icon.
+.saveTime {
+  max-width: 0;
+  margin-right: 0;
+  overflow: hidden;
+  opacity: 0;
   font-size: 11px;
   font-weight: 400;
   white-space: nowrap;
   font-variant-numeric: tabular-nums;
-  background: var(--surface-deeper);
-  color: var(--ink);
-  box-shadow: 0 2px 8px rgb(0 0 0 / 0.35);
-  opacity: 0;
-  visibility: hidden;
-  pointer-events: none;
-  transition: opacity 0.12s ease;
-  // The alert colour marks a failed save with an underline (it can be too close to the ink on a theme surface).
-  &--error {
-    font-weight: 700;
-    text-decoration: underline;
-    text-decoration-color: var(--alert, #e5484d);
-    text-decoration-thickness: 2px;
-    text-underline-offset: 3px;
-  }
+  color: inherit;
+  transition: max-width 0.15s ease, margin-right 0.15s ease, opacity 0.15s ease;
 }
-.saveHover:hover .saveState,
-.saveHover:focus-within .saveState { opacity: 1; visibility: visible; }
+.saveReveal:hover .saveTime,
+.saveReveal:focus-within .saveTime,
+.saveReveal--open .saveTime { max-width: 90px; margin-right: 6px; opacity: 1; }
 
 .saveBtn {
   border: 0;
   padding: 6px 14px;
-  border-radius: 6px;
+  border-radius: 4px;
   font-size: 12px;
   font-weight: 700;
   color: var(--on-accent);
@@ -52,37 +50,102 @@
   &:disabled { opacity: 0.6; cursor: default; }
 }
 
-// The floppy-disk button: icon only, whichever interface's button style it wears.
+// The icon buttons (Undo, Redo, Save): icon only, whichever interface's button style they wear. A disabled one passes the pointer through to
+// the wrapper, so hovering or holding it still reveals the autosave toggle.
 .saveIconBtn {
   display: inline-flex;
   align-items: center;
   justify-content: center;
+  // Undo, Redo and Save are each 30 x 30, like a header tab.
+  box-sizing: border-box;
+  width: 30px;
+  height: 30px;
   min-width: 0;
-  padding: 6px 9px;
+  padding: 0;
+  border-radius: 4px;
   line-height: 0;
+  &:disabled { pointer-events: none; }
+}
+// The Save button holds the time of the last save (or the state) beside its icon: 30px tall, as wide as that needs. Disabled, only the icon is
+// dimmed, so the time stays readable.
+.saveBtnWithTime {
+  width: auto;
+  min-width: 30px;
+  gap: 0;
+  padding: 0 7px;
+  line-height: normal;
+  &:disabled { opacity: 1; svg { opacity: 0.6; } }
 }
 
-// "Discard unsaved changes?" with its two buttons, in place of the control.
-.saveControl--confirm .saveConfirmBtn { padding: 6px 12px; font-size: 12px; }
-.saveConfirmBtn--quiet { opacity: 0.75; }
-
-// The state dot on the Save button: amber while changes wait or are saving (it pulses), red when a save failed.
-.saveBtnState { position: relative; }
-.saveBtnState--unsaved::after,
-.saveBtnState--saving::after,
-.saveBtnState--error::after {
-  content: '';
+// The autosave toggle: Off / 1 min / 5 min / 10 min.
+.autosavePop {
   position: absolute;
-  top: 3px;
-  right: 3px;
-  width: 7px;
-  height: 7px;
-  border-radius: 50%;
-  background: #f2b01e;
-  box-shadow: 0 0 0 1px rgb(0 0 0 / 0.35);
-  pointer-events: none;
+  top: calc(100% + 6px);
+  right: 0;
+  z-index: 30;
+  padding: 6px;
+  border-radius: 4px;
+  background: var(--surface-deeper);
+  color: var(--ink);
+  box-shadow: 0 2px 8px rgb(0 0 0 / 0.35);
+  opacity: 0;
+  visibility: hidden;
+  transition: opacity 0.12s ease;
+  // Keeps the pointer over the popover while it crosses the gap under the button.
+  &::before { content: ''; position: absolute; top: -8px; left: 0; right: 0; height: 8px; }
 }
-.saveBtnState--saving::after { animation: saveDotPulse 1s ease-in-out infinite; }
-.saveBtnState--error::after { background: var(--alert, #e5484d); }
-@keyframes saveDotPulse { 50% { opacity: 0.3; } }
-@media (prefers-reduced-motion: reduce) { .saveBtnState--saving::after { animation: none; } }
+.saveReveal:hover .autosavePop,
+.saveReveal:focus-within .autosavePop,
+.saveReveal--open .autosavePop { opacity: 1; visibility: visible; }
+
+.autosaveToggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 11px;
+  white-space: nowrap;
+}
+.autosaveToggleLabel { padding: 0 4px 0 2px; font-weight: 700; text-transform: uppercase; letter-spacing: 1px; font-size: 10px; color: var(--ink-muted); }
+.autosaveOpt {
+  border: 0;
+  padding: 4px 8px;
+  border-radius: 4px;
+  font-size: 11px;
+  font-weight: 700;
+  color: var(--ink);
+  background: var(--ov-sink-2);
+  cursor: pointer;
+  &:hover { background: var(--ov-lift-2); }
+  &:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
+  &--on { color: var(--on-accent); background: var(--accent); &:hover { background: var(--accent-hover); } }
+}
+
+// The autosave timer: 4px wide, 24px tall. The fill empties over the wait; a new edit remounts it (a new `nextSaveAt`), so it refills.
+.autosavePill {
+  flex: 0 0 auto;
+  display: inline-flex;
+  align-items: flex-end;
+  width: 4px;
+  height: 24px;
+  border-radius: 2px;
+  overflow: hidden;
+  background: var(--pill-track, var(--ov-lift-2));
+}
+.autosavePillFill {
+  display: block;
+  width: 100%;
+  height: 100%;
+  border-radius: 2px;
+  background: var(--pill-fill, var(--accent));
+}
+.autosavePill--running .autosavePillFill { animation: autosaveDeplete linear forwards; }
+@keyframes autosaveDeplete { from { height: 100%; } to { height: 0; } }
+
+// While something is unsaved the Save button is the accent colour (its ink is the zone's, which reads on the accent).
+.saveBtnState--unsaved {
+  color: var(--zone-on-accent, var(--on-accent));
+  background: var(--accent);
+  &:hover:not(:disabled) { background: var(--accent-hover); }
+}
+// A failed save rings the Save button in the alert colour (no text; the reason is the tooltip).
+.saveBtnState--error { box-shadow: inset 0 0 0 2px var(--alert, #e5484d); }

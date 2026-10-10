@@ -107,7 +107,7 @@ def test_restore_reattaches_draft_and_revision_history(client: TestClient) -> No
     # Draft body and revision history reattach with zero copying.
     draft = client.get(f"/api/projects/{project_id}/draft/chapter/{chapter_id}/moment/{moment_id}").json()
     assert draft["body"] == "Original prose content."
-    revisions = client.get(f"/api/projects/{project_id}/revisions/{chapter_id}").json()
+    revisions = [r for r in client.get(f"/api/projects/{project_id}/revisions/{chapter_id}").json() if r["trigger"] != "session"]
     assert len(revisions) == 1
 
     # Scrap entry is gone.
@@ -158,7 +158,8 @@ def test_permanent_delete_removes_draft_but_keeps_chapter_revisions(client: Test
     assert client.get(f"/api/projects/{project_id}/draft/chapter/{chapter_id}/moment/{moment_id}").status_code == 404
     # The chapter's revision history is untouched -- only this moment's own
     # draft entry is removed; the chapter's revision snapshot still exists.
-    assert len(client.get(f"/api/projects/{project_id}/revisions/{chapter_id}").json()) == 1
+    kept = [r for r in client.get(f"/api/projects/{project_id}/revisions/{chapter_id}").json() if r["trigger"] != "session"]
+    assert len(kept) == 1
 
 
 def test_delete_missing_scrap_entry_404s(client: TestClient) -> None:

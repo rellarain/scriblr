@@ -6,16 +6,19 @@ import { useAutosavePolicy } from '../settings/settingsStore'
 //
 //  - schedule(value): remember the latest value and save it after `delay` ms
 //    of inactivity (each call restarts the wait).
-//  - saveNow(value?): save immediately -- structural edits.
+//  - saveNow(value?): a structural edit; waits like schedule (the wait is the
+//    user's chosen interval), and only the Save button or leaving the page is faster.
 //  - flush(): save whatever is waiting right now (the Save button, navigation,
 //    page hidden, unmount); a no-op when nothing is.
 //  - discard(): forget what is waiting and wait for any save under way -- the
 //    caller then reloads the last saved copy ("restore").
 //
-// The user turns autosave off, or picks the wait (30 seconds to 10 minutes),
-// in the UUI settings (settings/settingsStore.ts). With it off, schedule and
-// saveNow only keep the edit waiting (dirty) until a flush: the Save button, or
-// leaving the page, so an edit is never lost. Changing the setting saves what
+// The user turns autosave off (the default), or picks the wait (1, 5 or 10
+// minutes), in the Save component or UUI settings (settings/settingsStore.ts).
+// With it off, schedule and saveNow only keep the edit waiting (dirty) until a
+// flush: the Save button, or leaving the page, so an edit is never lost. With it
+// on, every edit (saveNow too) saves once the wait has passed without another;
+// `nextSaveAt` says when, for the countdown pill. Changing the setting saves what
 // is waiting straight away.
 //  - dirty: something is not saved yet (waiting, in flight, or failed).
 //    A failed save keeps the value, reports `error`, and retries later.
@@ -48,9 +51,14 @@ export interface Autosave<T> {
   saving: boolean
   error: string | undefined
   lastSavedAt: number | null
+  // When the waiting value will be saved on its own (ms since the epoch), null when none waits or autosave is off.
+  nextSaveAt: number | null
+  // The wait in ms while autosave is on, null when it is off.
+  wait: number | null
 }
 
-export const DEFAULT_RETRY_DELAY = 15_000
+// A failed save is tried again when the next wait ends (unless a test gives a shorter delay).
+export const DEFAULT_RETRY_DELAY: number | undefined = undefined
 
 export function useAutosave<T>({ save, enabled, delay, retryDelay = DEFAULT_RETRY_DELAY }: AutosaveOptions<T>): Autosave<T> {
   const policy = useAutosavePolicy()
@@ -75,10 +83,18 @@ export function useAutosave<T>({ save, enabled, delay, retryDelay = DEFAULT_RETR
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState<string | undefined>(undefined)
   const [lastSavedAt, setLastSavedAt] = useState<number | null>(null)
+  const [nextSaveAt, setNextSaveAt] = useState<number | null>(null)
   const mounted = useRef(true)
 
   const clearTimer = () => {
     if (timer.current) { clearTimeout(timer.current); timer.current = null }
+    if (mounted.current) setNextSaveAt(null)
+  }
+  // Save the waiting value when `ms` have passed (the countdown pill reads `nextSaveAt`).
+  const startTimer = (ms: number, fire: () => void) => {
+    if (timer.current) clearTimeout(timer.current)
+    timer.current = setTimeout(fire, ms)
+    if (mounted.current) setNextSaveAt(Date.now() + ms)
   }
 
   // Save the waiting value (if any), after any save already running.
@@ -100,7 +116,7 @@ export function useAutosave<T>({ save, enabled, delay, retryDelay = DEFAULT_RETR
           // (only while autosave is on; otherwise it waits for a Save).
           if (!pending.current) {
             pending.current = waiting
-            if (mounted.current && autoRef.current) timer.current = setTimeout(() => { void run() }, retryDelay)
+            if (mounted.current && autoRef.current) startTimer(retryDelay ?? waitRef.current, () => { void run() })
           }
           if (mounted.current) setError(err instanceof Error ? err.message : 'Failed to save')
         }
@@ -119,14 +135,16 @@ export function useAutosave<T>({ save, enabled, delay, retryDelay = DEFAULT_RETR
     pending.current = { value }
     if (mounted.current) setDirty(true)
     clearTimer()
-    if (autoRef.current) timer.current = setTimeout(() => { void run() }, waitRef.current)
+    if (autoRef.current) startTimer(waitRef.current, () => { void run() })
   }, [run])
 
+  // A structural edit: kept like a text edit (it saves when the wait ends, on a Save, or on leaving the page).
   const saveNow = useCallback((value?: T): Promise<void> => {
     if (value !== undefined) pending.current = { value }
     if (pending.current && mounted.current) setDirty(true)
-    if (!autoRef.current) { clearTimer(); return chain.current }
-    return run()
+    clearTimer()
+    if (autoRef.current && pending.current) startTimer(waitRef.current, () => { void run() })
+    return chain.current
   }, [run])
 
   const flush = useCallback((): Promise<void> => run(), [run])
@@ -174,8 +192,8 @@ export function useAutosave<T>({ save, enabled, delay, retryDelay = DEFAULT_RETR
   }, [run])
 
   return useMemo(
-    () => ({ schedule, saveNow, flush, isPending, hasNewer, cancel, discard, dirty, saving, error, lastSavedAt }),
-    [schedule, saveNow, flush, isPending, hasNewer, cancel, discard, dirty, saving, error, lastSavedAt],
+    () => ({ schedule, saveNow, flush, isPending, hasNewer, cancel, discard, dirty, saving, error, lastSavedAt, nextSaveAt, wait: auto ? wait : null }),
+    [schedule, saveNow, flush, isPending, hasNewer, cancel, discard, dirty, saving, error, lastSavedAt, nextSaveAt, auto, wait],
   )
 }
 
@@ -198,4 +216,11 @@ export function combineSaveStatus(...parts: Array<Pick<Autosave<unknown>, 'dirty
   const state: SaveState = error ? 'error' : saving ? 'saving' : dirty ? 'unsaved' : 'saved'
   const times = parts.map(p => p.lastSavedAt).filter((t): t is number => t !== null)
   return { state, dirty, saving, error, lastSavedAt: times.length > 0 ? Math.max(...times) : null }
+}
+
+// The countdown of several autosaves: the soonest save, and the wait they share (the user's one setting).
+export interface AutosaveCountdown { nextSaveAt: number | null; wait: number | null }
+export function combineCountdown(...parts: Array<Pick<Autosave<unknown>, 'nextSaveAt' | 'wait'>>): AutosaveCountdown {
+  const times = parts.map(p => p.nextSaveAt).filter((t): t is number => t !== null)
+  return { nextSaveAt: times.length > 0 ? Math.min(...times) : null, wait: parts.find(p => p.wait !== null)?.wait ?? null }
 }

@@ -8,7 +8,7 @@ Four stacked levels, each Min, Mid or Max (`levels/levelSizes.ts`). Exactly one 
 
 ## Tabs
 
-A level's header carries its **tabs**: 30 x 30 icon buttons, ending with Settings and Help, then the quick actions (Search, a context-aware New, Save).
+A level's header carries its **tabs**: 30 x 30 icon buttons, ending with Settings and Help, then the quick actions (Search, and the Save component). There is no New button in the header: a tab adds things from its own body (+ Book, + Category, + Note, an add box). The tab bar and the Save component are rounded containers (`radius-button`) of rounded buttons.
 
 - At **Mid** one tab shows at a time, in one column, and the current tab is remembered.
 - At **Max** each tab is the minimised form of a tile: pressing it opens or closes that tile (`aria-pressed`), and the open tiles sit on a split grid.
@@ -60,7 +60,15 @@ Cards are reordered and moved by dragging their **grip**; the gaps a card could 
 
 ## Saving
 
-Autosave runs after a pause (30 seconds to 10 minutes, a user setting). The **save control** is one joined button: restore and save, with a dot (`unsaved` amber, `saving` pulsing, `error` red). The state text and the time of the last save appear only on hover. A failed save also shows as an alert message in its level, in the alert colour ("Save failed").
+The **Save component** (`components/SaveCluster.tsx`) is one rounded container for Undo, Redo, Save and Autosave; only what applies shows, each button 30 x 30.
+
+- **Saved:** a disabled Save button. Hover (or focus, or a long press on touch) opens the time of the last save inside it, left of the icon; it is the only text. There is no state text, bubble or dot, and nothing before the first save.
+- **Unsaved:** Save is enabled and turns the **accent** colour (ink `zone-on-accent`). A failed save rings it in the alert colour, with the reason as its tooltip, and shows as an alert message in the level ("Save failed").
+- **Undo** appears when there is something to undo: an unsaved edit, or, once those are used up, a change in **today's activity log** (UTC day: outline and plot snapshots, a chapter's editing session, the settings log). Undoing a logged change loads the earlier state as an unsaved edit, so Save is enabled. There is no Reset; Undo is never confirmed.
+- **Redo** appears after an Undo and goes with the next change.
+- Steps are committed edits: a burst of typing is one step, a structural edit is one, and a save is a boundary. The histories start afresh when the project, level, book or chapter changes; after a reload Undo is rebuilt from the log (Redo is not).
+- Undo and Redo act on the **focused tile** (the one last clicked or typed in); Save and autosave are level-wide. Keys: Ctrl+Z, Ctrl+Shift+Z or Ctrl+Y, Ctrl+S (text fields keep the browser's own undo while typing).
+- **Autosave** is off by default and one per-user setting. Hovering (or focusing, or long-pressing) Save reveals Off / 1 / 5 / 10 min; once on, the toggle is a **4 x 24 vertical pill** beside Save that fills on each edit, starts to deplete when input stops and saves at zero. A failed autosave retries when the next wait ends, and leaving the page (tab, level, book) or hiding the tab saves at once.
 
 ## Reactions
 

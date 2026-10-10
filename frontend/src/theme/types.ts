@@ -39,11 +39,16 @@ export type Handedness = 'left' | 'right'
 export interface UiSettings {
   viewAs: Role | null
   handedness: Handedness
-  // Autosave: on/off, and the seconds of inactivity before an editor saves on
-  // its own (30..600, in steps of 30).
+  // Autosave: on/off (off by default), and the seconds of inactivity before an editor saves on
+  // its own: 1, 5 or 10 minutes (AUTOSAVE_SECONDS).
   autosaveEnabled: boolean
   autosaveSeconds: number
 }
 
-export const AUTOSAVE_STEP_SECONDS = 30
-export const AUTOSAVE_MAX_SECONDS = 600
+// The waits an editor can autosave after: 1, 5 or 10 minutes (the Save component's toggle also has Off).
+export const AUTOSAVE_SECONDS = [60, 300, 600] as const
+export type AutosaveSeconds = (typeof AUTOSAVE_SECONDS)[number]
+// What the toggle shows: 0 = off, else the wait in seconds.
+export type AutosaveMode = 0 | AutosaveSeconds
+export const autosaveModeOf = (ui: Pick<UiSettings, 'autosaveEnabled' | 'autosaveSeconds'>): AutosaveMode =>
+  ui.autosaveEnabled ? (ui.autosaveSeconds as AutosaveSeconds) : 0

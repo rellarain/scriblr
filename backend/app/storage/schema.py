@@ -374,7 +374,8 @@ class RevisionComment(BaseModel):
 # time. (Reintroduced deliberately -- unlike the "session-close" trigger
 # value removed earlier as dead code, "auto" here has real, specified
 # behavior and is actually wired up.)
-RevisionTrigger = Literal["manual", "auto"]
+# "session": one entry per editing session, kept up to date by every draft save (see storage/draft_sessions.py).
+RevisionTrigger = Literal["manual", "auto", "session"]
 
 
 # Snapshots moved from per-moment to per-chapter, consistent with drafts
@@ -385,6 +386,8 @@ class RevisionSnapshot(BaseModel):
     snapshotId: str
     chapterId: str
     createdAt: datetime
+    # When a "session" entry was last brought up to date by a save (the session's end so far).
+    updatedAt: Optional[datetime] = None
     label: str = ""
     trigger: RevisionTrigger = "manual"
     moments: dict[str, str] = Field(default_factory=dict)  # momentId -> body, at snapshot time
@@ -480,7 +483,7 @@ class DailyActivityLog(BaseModel):
     days: dict[str, DailyActivityEntry] = Field(default_factory=dict)
 
 
-ActivityEntryType = Literal["outline", "plot", "draft"]
+ActivityEntryType = Literal["outline", "plot", "draft", "settings"]
 
 
 class ActivityLogEntry(BaseModel):
@@ -493,6 +496,22 @@ class ActivityLogEntry(BaseModel):
     # revisions are chapter-scoped; see DraftChapter/RevisionSnapshot).
     chapterId: Optional[str] = None
     wordCount: Optional[int] = None
+
+
+# A change to settings (the project's time systems and colour, or the user's theme and UI), kept with the value it replaced so it can be
+# undone. The log keeps a short history (SETTINGS_LOG_DAYS days, at most SETTINGS_LOG_MAX entries).
+SETTINGS_LOG_DAYS = 7
+SETTINGS_LOG_MAX = 100
+SettingsLogKind = Literal["theme", "ui", "project"]
+
+
+class SettingsLogEntry(BaseModel):
+    id: str
+    createdAt: datetime = Field(default_factory=utcnow)
+    kind: SettingsLogKind
+    label: str
+    # The settings as they were before the change: the fields that kind covers, as JSON.
+    before: dict[str, Any] = Field(default_factory=dict)
 
 
 class ActivityResponse(BaseModel):
@@ -686,6 +705,8 @@ class ProjectFile(BaseModel):
     activity: DailyActivityLog = Field(default_factory=DailyActivityLog)
     schedule: ScheduleCompletionLog = Field(default_factory=ScheduleCompletionLog)
     scrap: ScrapRegistry = Field(default_factory=ScrapRegistry)
+    # Changes to the project's settings (time systems, colour), newest last; see SettingsLogEntry.
+    settingsLog: list[SettingsLogEntry] = Field(default_factory=list)
 
 
 # ---------------------------------------------------------------------------
@@ -752,9 +773,9 @@ class UiSettings(BaseModel):
     viewAs: Optional[Literal["user", "admin"]] = None
     handedness: Literal["left", "right"] = "right"
     # Autosave preference: on/off, and how long the editors wait without a
-    # change before saving (30 seconds up to 10 minutes, in 30-second steps).
-    autosaveEnabled: bool = True
-    autosaveSeconds: int = Field(default=30, ge=30, le=600, multiple_of=30)
+    # change before saving (the app offers 1, 5 or 10 minutes; older values of 30 seconds up to 10 minutes stay valid).
+    autosaveEnabled: bool = False
+    autosaveSeconds: int = Field(default=60, ge=30, le=600, multiple_of=30)
 
 
 class UserSettings(BaseModel):
@@ -763,3 +784,5 @@ class UserSettings(BaseModel):
     ui: UiSettings = Field(default_factory=UiSettings)
     kv: dict[str, Any] = Field(default_factory=dict)
     migratedFromLocal: bool = False
+    # Changes to the theme and UI settings, newest last (see SettingsLogEntry): what Undo reads.
+    activityLog: list[SettingsLogEntry] = Field(default_factory=list)

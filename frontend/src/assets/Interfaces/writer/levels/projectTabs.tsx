@@ -1,12 +1,11 @@
 import { BarChartIcon, CalendarIcon, ClockIcon, GearIcon, HelpIcon, ListIcon, PlotIcon, QueueIcon } from '../../../icons'
-import { DEFAULT_BOOK_HUE } from '../../../../theme/bookColors'
-import { SaveControl } from '../../../../components/SaveControl'
+import WorkspaceSaveCluster from './WorkspaceSaveCluster'
 import { SHELF_COMPONENTS } from '../consoleDefs'
 import { Placeholder } from '../shared'
 import PlotView from '../PlotView'
 import ProjectEditor from '../ProjectEditor'
 import ProjectOutline from '../ProjectOutline'
-import type { WriterWorkspace } from '../useWriterWorkspace'
+import type { HistoryScope, WriterWorkspace } from '../useWriterWorkspace'
 import { bookRows, categoryRows, plotCounts } from '../tiles/tileData'
 import HelpArticles from './HelpArticles'
 import PlotpointsTab from './PlotpointsTab'
@@ -73,7 +72,7 @@ function AnalyticsSummary({ w }: { w: WriterWorkspace }) {
 export function projectTabs(w: WriterWorkspace): LevelTab[] {
   return [
     { id: 'plot', label: 'Plot', Icon: PlotIcon, fill: true, render: c => (c.size === 'max' ? <PlotView w={w} /> : <PlotSummary w={w} />) },
-    { id: 'outline', label: 'Outline', Icon: ListIcon, fill: true, newLabel: 'New book', onNew: () => { w.addOutlineNode(null, 'book', { themeHue: DEFAULT_BOOK_HUE }) }, render: c => (c.size === 'max' ? <ProjectOutline w={w} /> : <OutlineSummary w={w} />) },
+    { id: 'outline', label: 'Outline', Icon: ListIcon, fill: true, render: c => (c.size === 'max' ? <ProjectOutline w={w} /> : <OutlineSummary w={w} />) },
     { id: 'plotpoints', label: 'Plotpoints', Icon: QueueIcon, render: () => <PlotpointsTab w={w} /> },
     { id: 'schedule', label: 'Schedule', Icon: CalendarIcon, render: () => placeholder('projectSchedule') },
     { id: 'history', label: 'History', Icon: ClockIcon, render: () => placeholder('projectHistory') },
@@ -83,10 +82,13 @@ export function projectTabs(w: WriterWorkspace): LevelTab[] {
   ]
 }
 
+// What each Project tab edits, for Undo and Redo (the other tabs have nothing to undo).
+const PROJECT_SCOPES: Record<string, HistoryScope> = { plot: 'plot', plotpoints: 'plot', outline: 'outline', settings: 'settings' }
+
 // The Project level's tabs and quick actions (Save, the project's own).
 export function useProjectTabs(w: WriterWorkspace, size: 'min' | 'mid' | 'max') {
   return useTabbedLevel({
-    storageKey: 'scriblr.writer.project', tabs: projectTabs(w), size, defaultOpen: ['plot'],
-    save: <SaveControl status={w.saveStatus} onSave={() => { void w.saveNow() }} onRestore={w.restoreSaved} buttonClassName="wrSmallBtn wrSaveBtn" />,
+    storageKey: 'scriblr.writer.project', tabs: projectTabs(w), size, defaultOpen: ['plot'], flush: w.flushAll,
+    save: focused => <WorkspaceSaveCluster w={w} scope={focused ? PROJECT_SCOPES[focused] : undefined} />,
   })
 }

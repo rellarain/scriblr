@@ -4,7 +4,7 @@ from fastapi import APIRouter, Depends
 
 from ..deps import get_storage_root
 from ..models import UpsertDraftRequest
-from ..storage import activity, project_store as store
+from ..storage import activity, draft_sessions, project_store as store
 from ..storage.schema import DraftChapter, DraftMoment, utcnow
 
 router = APIRouter(prefix="/api/projects/{project_id}/draft/chapter/{chapter_id}", tags=["draft"])
@@ -38,6 +38,7 @@ def put_draft(
         previous_word_count = store.load_draft(root, project_id, chapter_id, moment_id).wordCount
     except store.MomentNotFoundError:
         previous_word_count = 0
+    before = store.load_draft_chapter(root, project_id, chapter_id)
     draft = DraftMoment(
         momentId=moment_id,
         outlineNodeId=body.outlineNodeId,
@@ -47,6 +48,7 @@ def put_draft(
     )
     store.save_draft(root, project_id, chapter_id, moment_id, draft)
     activity.record_daily_activity(root, project_id, word_count_delta=draft.wordCount - previous_word_count)
+    draft_sessions.record_session(root, project_id, chapter_id, before)
     return draft
 
 

@@ -12,8 +12,8 @@ import threading
 from pathlib import Path
 from typing import Any
 
-from . import project_store
-from .schema import ThemeHue, ThemeSettings, ThemeZones, UiSettings, UserSettings, ZoneConfig, ZonePalette
+from . import project_store, settings_log
+from .schema import SettingsLogEntry, ThemeHue, ThemeSettings, ThemeZones, UiSettings, UserSettings, ZoneConfig, ZonePalette
 
 KV_PREFIX = "scriblr."
 MAX_KEY_LENGTH = 200
@@ -86,17 +86,35 @@ def load_user_settings(root: Path) -> UserSettings:
 def save_theme(root: Path, theme: ThemeSettings) -> UserSettings:
     with _lock:
         settings = _load(root)
+        if settings.theme != theme:
+            entry = settings_log.new_entry("theme", "Theme changed", {"theme": settings.theme.model_dump(mode="json")})
+            settings.activityLog = settings_log.append_pruned(settings.activityLog, entry)
         settings.theme = theme
         _save(root, settings)
         return settings
 
 
+# The autosave choice is a preference about saving, not a change to undo: it is not logged.
+_UNLOGGED_UI_FIELDS = {"autosaveEnabled", "autosaveSeconds"}
+
+
 def save_ui(root: Path, ui: UiSettings) -> UserSettings:
     with _lock:
         settings = _load(root)
+        before = settings.ui.model_dump(mode="json")
+        after = ui.model_dump(mode="json")
+        if {k: v for k, v in before.items() if k not in _UNLOGGED_UI_FIELDS} != {k: v for k, v in after.items() if k not in _UNLOGGED_UI_FIELDS}:
+            entry = settings_log.new_entry("ui", "Settings changed", {"ui": before})
+            settings.activityLog = settings_log.append_pruned(settings.activityLog, entry)
         settings.ui = ui
         _save(root, settings)
         return settings
+
+
+def list_activity(root: Path) -> list[SettingsLogEntry]:
+    """The settings changes still kept, newest first."""
+    with _lock:
+        return sorted(_load(root).activityLog, key=lambda e: e.createdAt, reverse=True)
 
 
 def set_kv(root: Path, key: str, value: Any) -> UserSettings:

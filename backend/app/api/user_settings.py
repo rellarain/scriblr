@@ -6,7 +6,7 @@ from pydantic import BaseModel
 
 from ..deps import get_app_data_storage_root
 from ..storage import user_settings_store as store
-from ..storage.schema import ThemeSettings, UiSettings, UserSettings
+from ..storage.schema import SettingsLogEntry, ThemeSettings, UiSettings, UserSettings
 
 router = APIRouter(prefix="/api/user-settings", tags=["user-settings"])
 
@@ -26,6 +26,12 @@ def _bad_request(exc: store.InvalidKvError) -> HTTPException:
 @router.get("", response_model=UserSettings)
 def get_user_settings(root: Path = Depends(get_app_data_storage_root)) -> UserSettings:
     return store.load_user_settings(root)
+
+
+# The settings changes of the last days with the values they replaced, newest first (Undo reads this).
+@router.get("/activity", response_model=list[SettingsLogEntry])
+def get_activity(root: Path = Depends(get_app_data_storage_root)) -> list[SettingsLogEntry]:
+    return store.list_activity(root)
 
 
 @router.put("/theme", response_model=UserSettings)

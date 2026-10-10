@@ -5,7 +5,9 @@ import type { Level, LevelSize } from './levelSizes'
 
 // One tinted level of the Writer frame. Its header strip is how it changes size:
 // clicking a Min level's strip opens it to Mid, the title promotes it to the focus
-// (Max), and the chevron toggles Min/Mid. The focused (Max) level just shows its title.
+// (Max), and the chevron toggles Min/Mid; the chevron is on the title's own line, at its
+// right end, and the tabs wrap beneath them when the header is narrow. The focused (Max)
+// level just shows its title.
 function LevelPanel({ level, size, title, hue, tint, fill, onPromote, onSetSize, locked = false, headerless = false, headerExtras, className, minBody, children }: {
   level: Level
   size: Exclude<LevelSize, 'hidden'>
@@ -22,7 +24,7 @@ function LevelPanel({ level, size, title, hue, tint, fill, onPromote, onSetSize,
   locked?: boolean
   // No header strip: the body brings its own (the Draft level's chapter tile, the Outline book editor).
   headerless?: boolean
-  // The level's tab strip and quick actions, in its header between the title and the size toggle.
+  // The level's tab strip and quick actions, in its header after the title line (the title and the size toggle).
   headerExtras?: ReactNode
   className?: string
   // What a Min level shows under its header strip (the book spines, say).
@@ -46,23 +48,25 @@ function LevelPanel({ level, size, title, hue, tint, fill, onPromote, onSetSize,
         className={isMin && !locked ? 'wrLevelHeader wrLevelHeader--min' : 'wrLevelHeader'}
         onClick={isMin && !locked ? () => onSetSize('mid') : undefined}
       >
-        {size === 'max' || locked
-          ? <h2 className="wrLevelTitle">{title}</h2>
-          : (
-            <button type="button" className="wrLevelTitle wrLevelTitle--link" title={`Open ${title}`} onClick={e => { e.stopPropagation(); onPromote() }}>
-              {title}
+        <div className="wrLevelTitleRow">
+          {size === 'max' || locked
+            ? <h2 className="wrLevelTitle">{title}</h2>
+            : (
+              <button type="button" className="wrLevelTitle wrLevelTitle--link" title={`Open ${title}`} onClick={e => { e.stopPropagation(); onPromote() }}>
+                {title}
+              </button>
+            )}
+          {canToggle && (
+            <button
+              type="button" className="wrLevelToggle"
+              aria-label={isMin ? `Expand ${title}` : `Minimize ${title}`}
+              onClick={e => { e.stopPropagation(); onSetSize(isMin ? 'mid' : 'min') }}
+            >
+              {isMin ? <ChevronRightIcon size={14} /> : <ChevronDownIcon size={14} />}
             </button>
           )}
+        </div>
         {headerExtras}
-        {canToggle && (
-          <button
-            type="button" className="wrLevelToggle"
-            aria-label={isMin ? `Expand ${title}` : `Minimize ${title}`}
-            onClick={e => { e.stopPropagation(); onSetSize(isMin ? 'mid' : 'min') }}
-          >
-            {isMin ? <ChevronRightIcon size={14} /> : <ChevronDownIcon size={14} />}
-          </button>
-        )}
       </div>}
       {isMin ? minBody : <div className="wrLevelBody">{children}</div>}
     </section>

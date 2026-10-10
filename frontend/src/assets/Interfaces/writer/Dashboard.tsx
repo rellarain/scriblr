@@ -165,10 +165,14 @@ export function Scratchpad({ query = '', newTick = 0, bare = false }: PanelConte
 
   return (
     <div className={bare ? 'wrNotesBare' : 'wrColumn wrColumn--narrow'}>
-      {!bare && (
+      {!bare ? (
         <div className="wrColumnTitle">
           Scratchpad
           <button type="button" className="wrSmallBtn wrColumnAction" onClick={() => focusNodeField(addAfter(null), 'first')}><PlusIcon size={14} /> Note</button>
+        </div>
+      ) : (
+        <div className="wrNotesBareHead">
+          <button type="button" className="wrSmallBtn" onClick={() => focusNodeField(addAfter(null), 'first')}><PlusIcon size={14} /> Note</button>
         </div>
       )}
       <div className="wrNotes" ref={listRef} onKeyDown={keys.onKeyDown}>

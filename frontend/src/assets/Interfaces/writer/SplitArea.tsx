@@ -39,10 +39,12 @@ const ARROWS: Record<string, Direction> = { ArrowLeft: 'left', ArrowRight: 'righ
 // use the arrow keys) to resize the two tiles it separates. Alt+arrows on a focused title bar swap the tile
 // with its neighbour. Where each tile sits is remembered per `gridId` with the other saved settings; a tile
 // that opens is grafted onto the tree and one that closes is pruned from it. Under 400px the tiles stack.
-export function SplitArea({ gridId, tiles, label, defaultTree }: {
+export function SplitArea({ gridId, tiles, label, defaultTree, onFocusTile }: {
   gridId: string
   tiles: SplitTile[]
   label?: string
+  // Told which tile the pointer or keyboard focus last went into (the level's Undo and Redo act on that tile).
+  onFocusTile?: (id: string) => void
   // Where the tiles sit before the user has moved any (otherwise they split the area evenly).
   defaultTree?: SplitNode
 }) {
@@ -159,6 +161,7 @@ export function SplitArea({ gridId, tiles, label, defaultTree }: {
               key={t.id} className={classes} aria-label={t.title} data-tile-id={t.id}
               style={{ position: 'absolute', left: rect.x, top: rect.y, width: rect.w, height: rect.h }}
               onDragOver={e => onDragOver(e, t.id)} onDrop={e => onDrop(e, t.id)}
+              onPointerDownCapture={onFocusTile ? () => onFocusTile(t.id) : undefined} onFocusCapture={onFocusTile ? () => onFocusTile(t.id) : undefined}
             >
               <h3
                 className="wrTabTileTitle" draggable tabIndex={0} title="Drag to move this tile (Alt+arrows to swap it)"

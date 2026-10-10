@@ -8,13 +8,11 @@ import { useTabbedLevel, type LevelTab } from './LevelTabs'
 beforeEach(() => {
   window.localStorage.clear()
   __resetSettingsForTests()
-  onNew.mockClear()
   vi.stubGlobal('fetch', vi.fn(async () => ({ ok: true, status: 200, json: async () => ({}) })))
 })
 
-const onNew = vi.fn()
 const tabs: LevelTab[] = [
-  { id: 'one', label: 'One', Icon: CalendarIcon, newLabel: 'New one', onNew, searchable: true, render: c => <div>one body [{c.query}] #{c.newTick}</div> },
+  { id: 'one', label: 'One', Icon: CalendarIcon, searchable: true, render: c => <div>one body [{c.query}]</div> },
   { id: 'two', label: 'Two', Icon: PencilIcon, render: () => <div>two body</div> },
   { id: 'set', label: 'Settings', Icon: GearIcon, end: true, render: () => <div>settings body</div> },
 ]
@@ -103,22 +101,19 @@ describe('useTabbedLevel', () => {
     expect(parseFloat(tile('Two').style.width)).toBe(saved.twoWidth)
   })
 
-  it("tells the current tab that New was pressed, and runs the tab's own action", async () => {
-    const user = userEvent.setup()
+  it('has no New (add) button in the header: a tab adds things from its own body', () => {
     render(<Harness size="mid" />)
-    await user.click(screen.getByRole('button', { name: 'New one' }))
-    expect(screen.getByText(/#1/)).toBeTruthy()
-    expect(onNew).toHaveBeenCalledOnce()
+    expect(screen.queryByRole('button', { name: /^new\b/i })).toBeNull()
+    expect(document.querySelector('.wrQuickActions .wrTabBtn[aria-label^="New"]')).toBeNull()
   })
 
-  it('offers New and Search only on the tabs that have them, and filters through the search box', async () => {
+  it('offers Search only on the tabs that have it, and filters through the search box', async () => {
     const user = userEvent.setup()
     render(<Harness size="mid" />)
     await user.click(screen.getByRole('button', { name: 'Search this tab' }))
     await user.type(screen.getByRole('textbox', { name: 'Search' }), 'Harbor')
-    expect(screen.getByText('one body [harbor] #0')).toBeTruthy()
+    expect(screen.getByText('one body [harbor]')).toBeTruthy()
     await user.click(screen.getByRole('button', { name: 'Two' }))
-    expect(screen.queryByRole('button', { name: 'New one' })).toBeNull()
     expect(screen.queryByRole('button', { name: 'Search this tab' })).toBeNull()
   })
 

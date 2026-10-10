@@ -1,6 +1,11 @@
 from fastapi.testclient import TestClient
 
 
+def _kept(summaries: list[dict]) -> list[dict]:
+    """The revisions a person made or the app's rolling slot: draft saves also keep an editing-session entry (tests below), left out here."""
+    return [s for s in summaries if s["trigger"] != "session"]
+
+
 def _make_project_with_draft(client: TestClient, body: str) -> tuple[str, str, str]:
     project_id = client.post("/api/projects", json={"title": "Revisions API Test"}).json()["projectId"]
     chapter_id = "chapter_1"
@@ -25,9 +30,9 @@ def test_create_and_list_snapshots(client: TestClient) -> None:
     resp = client.get(f"/api/projects/{project_id}/revisions/{chapter_id}")
     assert resp.status_code == 200
     summaries = resp.json()
-    assert [s["snapshotId"] for s in summaries] == [snapshot_id]
+    assert [s["snapshotId"] for s in _kept(summaries)] == [snapshot_id]
     # Summaries are lightweight and should not include the full moments map.
-    assert "moments" not in summaries[0]
+    assert "moments" not in _kept(summaries)[0]
 
     resp = client.get(f"/api/projects/{project_id}/revisions/{chapter_id}/{snapshot_id}")
     assert resp.status_code == 200
@@ -52,12 +57,12 @@ def test_auto_save_overwrites_a_single_rolling_slot(client: TestClient) -> None:
 
     # Still exactly one auto entry in the timeline -- it was overwritten, not appended.
     summaries = client.get(f"/api/projects/{project_id}/revisions/{chapter_id}").json()
-    assert [s["snapshotId"] for s in summaries] == ["auto"]
+    assert [s["snapshotId"] for s in _kept(summaries)] == ["auto"]
 
     # A manual save creates its own, separate entry alongside the auto slot.
     manual = client.post(f"/api/projects/{project_id}/revisions/{chapter_id}").json()
     summaries = client.get(f"/api/projects/{project_id}/revisions/{chapter_id}").json()
-    assert {s["snapshotId"] for s in summaries} == {"auto", manual["snapshotId"]}
+    assert {s["snapshotId"] for s in _kept(summaries)} == {"auto", manual["snapshotId"]}
 
 
 def test_diff_snapshot_against_current_draft(client: TestClient) -> None:
@@ -98,7 +103,7 @@ def test_revert_creates_safety_snapshot_and_restores_body(client: TestClient) ->
     assert resp.json()["body"] == "Version one."
 
     resp = client.get(f"/api/projects/{project_id}/revisions/{chapter_id}")
-    ids = {s["snapshotId"] for s in resp.json()}
+    ids = {s["snapshotId"] for s in _kept(resp.json())}
     assert ids == {v1_id, safety_snapshot_id}
 
 
