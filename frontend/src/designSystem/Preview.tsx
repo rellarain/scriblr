@@ -9,11 +9,14 @@ import { ZONE_ICON } from '../theme/zoneIcons'
 import './preview.scss'
 
 // The frame every design-system card is shown in: a toolbar (which zones to show side by side, the screen width to show them at, the theme
-// and accent hue, and the card's own views) over a stage of frames, one per zone, each as wide as the chosen screen (the container grows with it). Each frame is the app's theme scope (`.wrBookScope`
+// and accent hue, and the card's own views) over a stage of frames, one per zone, each as wide as the chosen screen (the container grows with it)
+// or, on Fit, as wide as the viewport. Each frame is the app's theme scope (`.wrBookScope`
 // with the zone's derived tokens) and a ThemeZoneProvider, so the real components inside draw for that zone and palette.
 
 export const SCREEN_WIDTHS = [400, 800, 1200] as const
 export type ScreenWidth = (typeof SCREEN_WIDTHS)[number]
+// What the Screen control chooses: a fixed screen, or the whole viewport (the default), which the frames then fill.
+export type ScreenSize = ScreenWidth | 'fit'
 
 export interface FrameContext { view: string; zone: ZoneKey; width: number; palette: ZonePalette }
 
@@ -26,7 +29,7 @@ export interface CardDef {
   height: number
   // The frame's own element: the Writer's `main.wUI.wr`, or a plain scope (the whole app shell brings its own).
   frame?: 'writer' | 'plain'
-  defaults?: { zones?: ZoneKey[]; width?: ScreenWidth; view?: string }
+  defaults?: { zones?: ZoneKey[]; width?: ScreenSize; view?: string }
   // A selector for the card's own variants (the Writer's levels, say).
   views?: Array<{ id: string; label: string }>
   render: (ctx: FrameContext) => ReactNode
@@ -57,7 +60,8 @@ function Toggle({ on, onClick, children, title }: { on: boolean; onClick: () => 
 
 export function Preview({ card }: { card: CardDef }) {
   const [zones, setZones] = useState<ZoneKey[]>(card.defaults?.zones ?? ['day', 'night'])
-  const [width, setWidth] = useState<ScreenWidth>(card.defaults?.width ?? 800)
+  const [size, setSize] = useState<ScreenSize>(card.defaults?.width ?? 'fit')
+  const width = size === 'fit' ? (typeof window === 'undefined' ? 800 : window.innerWidth) : size
   const [view, setView] = useState<string>(card.defaults?.view ?? card.views?.[0]?.id ?? '')
   const [palette, setPalette] = useState<ZonePalette>(DEFAULT_PALETTE)
 
@@ -68,7 +72,7 @@ export function Preview({ card }: { card: CardDef }) {
   const hue = (key: 'theme' | 'accent' | 'alert') => (value: number) => setPalette(p => ({ ...p, [key]: { h: value }, ...(key === 'accent' ? { accent2: { h: (value + 228) % 360 } } : {}) }))
 
   return (
-    <div className="uiPreview" style={{ '--pv-w': `${width}px` } as CSSProperties}>
+    <div className="uiPreview" style={{ '--pv-w': size === 'fit' ? '0px' : `${size}px` } as CSSProperties}>
       <div className="uiPvBar" role="toolbar" aria-label={`${card.title} preview controls`}>
         <div className="uiPvGroup" role="group" aria-label="Zones">
           <span className="uiPvLabel">Zone</span>
@@ -79,7 +83,8 @@ export function Preview({ card }: { card: CardDef }) {
         </div>
         <div className="uiPvGroup" role="group" aria-label="Screen width">
           <span className="uiPvLabel">Screen</span>
-          {SCREEN_WIDTHS.map(w => <Toggle key={w} on={width === w} onClick={() => setWidth(w)}>{w}px</Toggle>)}
+          <Toggle on={size === 'fit'} onClick={() => setSize('fit')} title="Fill the viewport">Fit</Toggle>
+          {SCREEN_WIDTHS.map(w => <Toggle key={w} on={size === w} onClick={() => setSize(w)}>{w}px</Toggle>)}
         </div>
         {card.views && (
           <div className="uiPvGroup" role="group" aria-label="View">
@@ -98,8 +103,8 @@ export function Preview({ card }: { card: CardDef }) {
       </div>
       <div className="uiPvStage">
         {zones.map(zone => (
-          <figure key={`${zone}-${view}`} className="uiPvFigure" style={{ width }}>
-            <figcaption>{ZONE_LABEL[zone]} · {width}px</figcaption>
+          <figure key={`${zone}-${view}`} className="uiPvFigure" style={{ width: size === 'fit' ? '100%' : size }}>
+            <figcaption>{ZONE_LABEL[zone]} · {size === 'fit' ? 'viewport' : `${size}px`}</figcaption>
             <div className="uiPvBox">
               <Frame card={card} zone={zone} width={width} palette={palette} view={view} />
             </div>

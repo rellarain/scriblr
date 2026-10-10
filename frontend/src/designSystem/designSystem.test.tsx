@@ -62,12 +62,15 @@ describe('the preview frame', () => {
 
   it('shows the zones chosen side by side, at the one screen width chosen', () => {
     render(<Preview card={card} />)
-    expect(screen.getAllByRole('figure').map(f => f.querySelector('figcaption')?.textContent)).toEqual(['Day · 800px', 'Night · 800px'])
+    expect(screen.getAllByRole('figure').map(f => f.querySelector('figcaption')?.textContent)).toEqual(['Day · viewport', 'Night · viewport'])
+    // Fit (the default) fills the viewport: the container has no minimum width of its own.
+    expect(document.querySelector<HTMLElement>('.uiPreview')!.style.getPropertyValue('--pv-w')).toBe('0px')
+    expect(screen.getAllByRole('figure')[0].style.width).toBe('100%')
     const bar = screen.getByRole('toolbar', { name: /preview controls/ })
     fireEvent.click(within(bar).getByRole('button', { name: /Dawn/ }))
     fireEvent.click(within(bar).getByRole('button', { name: '1200px' }))
     expect(screen.getAllByRole('figure').map(f => f.querySelector('figcaption')?.textContent)).toEqual(['Dawn · 1200px', 'Day · 1200px', 'Night · 1200px'])
-    expect(within(bar).getByRole('button', { name: '800px' }).getAttribute('aria-pressed')).toBe('false')
+    expect(within(bar).getByRole('button', { name: 'Fit' }).getAttribute('aria-pressed')).toBe('false')
     // The container grows with the screen.
     expect(document.querySelector<HTMLElement>('.uiPreview')!.style.getPropertyValue('--pv-w')).toBe('1200px')
     expect(screen.getAllByRole('figure')[0].style.width).toBe('1200px')

@@ -37,7 +37,7 @@ html, html body, html #root { background: var(--pv-bg); }
 }
 
 .uiPvStage { display: flex; flex-wrap: wrap; align-items: flex-start; gap: 16px; min-width: 0; }
-.uiPvFigure { margin: 0; flex: 0 0 auto; display: flex; flex-direction: column; gap: 4px; min-width: 0; }
+.uiPvFigure { margin: 0; flex: 0 0 auto; max-width: none; display: flex; flex-direction: column; gap: 4px; min-width: 0; }
 .uiPvFigure figcaption { font-size: 10px; font-weight: 700; letter-spacing: 1px; text-transform: uppercase; color: var(--pv-muted); }
 // A frame is as wide as the screen it stands for.
 .uiPvBox { border: 1px solid var(--pv-line); }
