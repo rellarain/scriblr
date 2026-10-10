@@ -19,11 +19,11 @@ html, html body, html #root { background: var(--pv-bg); }
 // The container is at least as wide as the chosen screen (--pv-w), so a wide screen widens the page (it scrolls sideways) instead of
 // squeezing the frame; the toolbar stays as wide as the viewer's window.
 .uiPreview {
-  min-width: calc(var(--pv-w, 800px) + 24px); box-sizing: border-box; display: flex; flex-direction: column; gap: 12px; padding: 12px; color: var(--pv-fg); background: var(--pv-bg);
+  min-width: calc(var(--pv-w, 800px) + 8px); box-sizing: border-box; display: flex; flex-direction: column; gap: 8px; padding: 4px; color: var(--pv-fg); background: var(--pv-bg);
   font: 12px/1.4 system-ui, -apple-system, 'Segoe UI', sans-serif;
 }
 
-.uiPvBar { position: sticky; left: 12px; box-sizing: border-box; max-width: calc(100vw - 24px); display: flex; flex-wrap: wrap; align-items: center; gap: 10px 18px; padding-bottom: 10px; border-bottom: 1px solid var(--pv-line); }
+.uiPvBar { position: sticky; left: 4px; box-sizing: border-box; max-width: calc(100vw - 8px); display: flex; flex-wrap: wrap; align-items: center; gap: 10px 18px; padding-bottom: 10px; border-bottom: 1px solid var(--pv-line); }
 .uiPvGroup { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 6px; min-width: 0; }
 .uiPvGroup--hues { flex: 1 1 340px; gap: 6px 14px; }
 .uiPvLabel { font-size: 10px; font-weight: 700; letter-spacing: 1px; text-transform: uppercase; color: var(--pv-muted); }
