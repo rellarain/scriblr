@@ -130,7 +130,7 @@ describe('Shelf', () => {
     expect(books.compareDocumentPosition(board) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
   })
 
-  it("puts a series' title across the top of its section, and numbers the books across the shelf", () => {
+  it("puts a series' title up the left edge of its section, and numbers the books across the shelf", () => {
     const series = { id: 's1', kind: 'series', parentId: null, order: 0, title: 'The Cycle', synopsis: '' } as OutlineNode
     render(
       <Shelf
