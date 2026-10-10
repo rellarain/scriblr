@@ -8,6 +8,7 @@ from .api import (
     activity,
     admin_config,
     analytics,
+    book_progress,
     draft,
     export,
     feedback,
@@ -87,6 +88,7 @@ def create_app(static_dir: Optional[Path] = None) -> FastAPI:
     app.include_router(publications.router)
     app.include_router(activity.router)
     app.include_router(analytics.router)
+    app.include_router(book_progress.router)
     app.include_router(schedule.router)
     app.include_router(scrap.router)
     app.include_router(export.router)

@@ -277,3 +277,16 @@ export interface AuiConfigDraft {
   schemaVersion: number
   nodes: AuiConfigNode[]
 }
+
+// One progress bar of a book's spine on the shelf: `done` of `total` (a total of 0 = nothing to measure against yet).
+export interface Measure { done: number; total: number }
+
+export interface BookProgress {
+  plotting: Measure // the book's plotlines that have plotpoints
+  outlining: Measure // chapters with acts, scenes or moments below them
+  planning: Measure // synopsis, word-count goal, chapter target and time system set
+  assignment: Measure // plotpoints placed on a moment
+  revision: Measure // chapters with a manual revision
+  published: Measure // chapters published at least once
+  words: Measure // draft words against the word-count goal (total 0 = no goal)
+}

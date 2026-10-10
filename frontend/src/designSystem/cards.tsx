@@ -158,12 +158,19 @@ function HueCard() {
   )
 }
 
+const bar = (done: number, total: number) => ({ done, total })
+// Sample bars for the shelf card: one book part-way, one barely begun, with the second book's planning complete.
+const SHELF_PROGRESS = {
+  [FIXTURE_IDS.book]: { plotting: bar(3, 4), outlining: bar(5, 5), planning: bar(2, 4), assignment: bar(6, 12), revision: bar(1, 5), published: bar(0, 5), words: bar(42000, 80000) },
+  [FIXTURE_IDS.otherBook]: { plotting: bar(1, 4), outlining: bar(2, 5), planning: bar(4, 4), assignment: bar(0, 0), revision: bar(0, 0), published: bar(0, 0), words: bar(3000, 60000) },
+}
+
 function ShelfCard() {
   const nodes = [...createMockBackend().projects.values()][0].outline.nodes
   const [active, setActive] = useState<string | null>(FIXTURE_IDS.book)
   return (
     <LevelFrame level="dash" title="Book shelf">
-      <Shelf label="Lorem ipsum project" meta="2 books" groups={shelfGroups(nodes)} activeBookId={active} onOpenBook={setActive} onOpen={() => {}} />
+      <Shelf label="Lorem ipsum project" meta="2 books" groups={shelfGroups(nodes)} progress={SHELF_PROGRESS} activeBookId={active} onOpenBook={setActive} onOpen={() => {}} />
     </LevelFrame>
   )
 }

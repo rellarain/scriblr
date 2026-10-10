@@ -46,6 +46,7 @@ export function ProjectTiles({ w }: { w: WriterWorkspace }) {
               label={p.title}
               meta={`${bookCount} ${bookCount === 1 ? 'book' : 'books'}`}
               groups={groups}
+              progress={w.projectProgress[p.projectId]}
               activeBookId={open ? w.activeBookId : null}
               selected={open}
               onOpenBook={bookId => void w.openProject(p.projectId, bookId)}

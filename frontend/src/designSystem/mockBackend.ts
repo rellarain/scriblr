@@ -115,6 +115,17 @@ function buildProject(id: string): FixtureProject {
   }
 }
 
+// Sample bars for the shelf: each book a different way along, one complete.
+const m = (done: number, total: number) => ({ done, total })
+function SAMPLE_PROGRESS(nodes: OutlineNode[]): Record<string, unknown> {
+  const samples = [
+    { plotting: m(3, 4), outlining: m(5, 5), planning: m(2, 4), assignment: m(6, 12), revision: m(1, 5), published: m(0, 5), words: m(42000, 80000) },
+    { plotting: m(1, 4), outlining: m(2, 5), planning: m(4, 4), assignment: m(0, 0), revision: m(0, 0), published: m(0, 0), words: m(3000, 60000) },
+    { plotting: m(4, 4), outlining: m(5, 5), planning: m(4, 4), assignment: m(12, 12), revision: m(5, 5), published: m(5, 5), words: m(95000, 90000) },
+  ]
+  return Object.fromEntries(nodes.filter(n => n.kind === 'book').map((b, i) => [b.id, samples[i % samples.length]]))
+}
+
 function analytics(p: FixtureProject): ProjectAnalytics {
   const counts: Record<string, number> = {}
   const parentOf = new Map(p.outline.nodes.map(n => [n.id, n.parentId]))
@@ -170,6 +181,7 @@ export function createMockBackend() {
       return json(project.plot)
     }
     if (rest[0] === 'analytics') return json(analytics(project))
+    if (rest[0] === 'book-progress') return json(SAMPLE_PROGRESS(project.outline.nodes))
     if (rest[0] === 'draft' && rest[1] === 'chapter') {
       const chapterId = rest[2]
       if (rest[3] === 'moment' && method === 'PUT') {

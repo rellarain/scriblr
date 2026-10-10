@@ -1,8 +1,9 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import type {
-  FlagType, NodeFlag, OutlineNode, OutlineNodeKind, PlotNode, PlotNodeKind, ProjectIndex, TimeSystem,
+  BookProgress, FlagType, NodeFlag, OutlineNode, OutlineNodeKind, PlotNode, PlotNodeKind, ProjectIndex, TimeSystem,
 } from '../../../api/types'
 import type { SettingsLogEntry } from '../../../types'
+import { getBookProgress } from '../../../api/bookProgressApi'
 import {
   createProject as apiCreateProject,
   deleteProject as apiDeleteProject,
@@ -58,6 +59,8 @@ export function useWriterWorkspace() {
   // Every project's outline nodes, loaded once for the sidebar shelves and
   // the Shelves dashboard; the open project's entry is kept in sync below.
   const [projectOutlines, setProjectOutlines] = useState<Record<string, OutlineNode[]>>({})
+  // The bars on each project's spines (per project id, then book id).
+  const [projectProgress, setProjectProgress] = useState<Record<string, Record<string, BookProgress>>>({})
 
   const [activeProjectId, setActiveProjectId] = useState<string | null>(null)
   const [activeProject, setActiveProject] = useState<ProjectIndex | null>(null)
@@ -182,6 +185,15 @@ export function useWriterWorkspace() {
       if (activeProjectIdRef.current === projectId && !plotSave.hasNewer()) setPlotNodes(tree.nodes)
     },
   })
+
+  // The open project's bars follow what is saved (the outline, the plot, the draft) and where the user is.
+  useEffect(() => {
+    const id = activeProjectId
+    if (!id) return
+    let cancelled = false
+    getBookProgress(id).then(next => { if (!cancelled) setProjectProgress(prev => ({ ...prev, [id]: next })) }, () => {})
+    return () => { cancelled = true }
+  }, [activeProjectId, view, outlineSave.lastSavedAt, plotSave.lastSavedAt])
 
   // --- undo and redo (lib/useUndoHistory.ts) ---
   // One history per document, each step a committed edit; Save and autosave stay level-wide. An Undo or Redo is shown as an unsaved
@@ -383,6 +395,10 @@ export function useWriterWorkspace() {
         }
       }))
       setProjectOutlines(prev => ({ ...Object.fromEntries(entries), ...prev }))
+      const bars = await Promise.all(list.map(async p => {
+        try { return [p.projectId, await getBookProgress(p.projectId)] as const } catch { return [p.projectId, {} as Record<string, BookProgress>] as const }
+      }))
+      setProjectProgress(prev => ({ ...Object.fromEntries(bars), ...prev }))
     } catch (err) {
       setProjectsStatus('error')
       setProjectsError(errMessage(err, 'Failed to load projects'))
@@ -834,7 +850,7 @@ export function useWriterWorkspace() {
   }
 
   return {
-    projects, projectsStatus, projectsError, projectOutlines,
+    projects, projectsStatus, projectsError, projectOutlines, projectProgress,
     activeProjectId, activeProject, hasOpenProject,
     outlineNodes, outlineStatus, outlineError, warnings, saving: outlineSave.saving, saveError: outlineSave.error,
     saveStatus, saveCountdown, saveNow, flushAll, history, updateTimeSystems,

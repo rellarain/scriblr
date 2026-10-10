@@ -514,6 +514,22 @@ class SettingsLogEntry(BaseModel):
     before: dict[str, Any] = Field(default_factory=dict)
 
 
+# One progress bar of a book's spine: `done` of `total` (a total of 0 = nothing to measure against yet).
+class Measure(BaseModel):
+    done: int = 0
+    total: int = 0
+
+
+class BookProgress(BaseModel):
+    plotting: Measure = Field(default_factory=Measure)  # the book's plotlines that have plotpoints
+    outlining: Measure = Field(default_factory=Measure)  # chapters with acts, scenes or moments below them
+    planning: Measure = Field(default_factory=Measure)  # synopsis, word-count goal, chapter target and time system set
+    assignment: Measure = Field(default_factory=Measure)  # plotpoints placed on a moment
+    revision: Measure = Field(default_factory=Measure)  # chapters with a manual revision
+    published: Measure = Field(default_factory=Measure)  # chapters published at least once
+    words: Measure = Field(default_factory=Measure)  # draft words against the word-count goal (total 0 = no goal)
+
+
 class ActivityResponse(BaseModel):
     daily: DailyActivityLog
     log: list[ActivityLogEntry]
