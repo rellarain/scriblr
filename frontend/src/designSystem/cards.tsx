@@ -1,5 +1,10 @@
 import { useEffect, useRef, useState, type ReactNode } from 'react'
+import { MemoryRouter } from 'react-router-dom'
 import App from '../App'
+import RUI from '../assets/Interfaces/RUI'
+import { BorrowDialog, PlanDialog } from '../assets/Interfaces/reader/ReaderDialogs'
+import type { ReaderCtx } from '../assets/Interfaces/reader/readerContext'
+import { loadReader, useReader } from '../assets/Interfaces/reader/readerStore'
 import * as Icons from '../assets/icons'
 import { ReactionHeartIcon } from '../assets/icons'
 import { SaveCluster } from '../components/SaveCluster'
@@ -226,6 +231,30 @@ function ThemeSettingsCard() {
   return <div className="uiPvPanel" style={{ flex: '1 1 auto', overflow: 'auto', padding: 12 }}><ThemeSettingsPanel /></div>
 }
 
+// The Reader at a page, or one of its dialogs standing over it (the real RUI, run against the mock library).
+const READER_PATHS: Record<string, string> = { nook: '/read', library: '/read/library', catalog: '/read/library/catalog', book: '/read/book/lorem-ipsum/cover' }
+function ReaderDialogHost({ kind }: { kind: 'plan' | 'borrow' }) {
+  const data = useReader()
+  useEffect(() => { void loadReader() }, [])
+  const book = data.bookById('consectetur')
+  const ctx: ReaderCtx = { data, today: new Date().toISOString().slice(0, 10), openBook: () => {}, openLibrary: () => {}, borrow: () => {}, openPlan: () => {} }
+  return (
+    <main className="rUI wr rdRoot">
+      {data.status === 'ready' && kind === 'plan' && <PlanDialog ctx={ctx} onClose={() => {}} />}
+      {data.status === 'ready' && kind === 'borrow' && book && <BorrowDialog ctx={ctx} book={book} onClose={() => {}} />}
+    </main>
+  )
+}
+function ReaderCard({ view }: { view: string }) {
+  return (
+    <div className="uiPvReader">
+      {view === 'plan' || view === 'borrow'
+        ? <ReaderDialogHost kind={view} />
+        : <MemoryRouter key={view} initialEntries={[READER_PATHS[view] ?? '/read']}><RUI /></MemoryRouter>}
+    </div>
+  )
+}
+
 function SkyCard() {
   return (
     <div className="header" style={{ position: 'static', display: 'flex', justifyContent: 'center', alignItems: 'center', height: 70 }}>
@@ -237,6 +266,8 @@ function SkyCard() {
 // ---------------------------------------------------------------- the registry
 
 const WRITER_VIEWS = [{ id: 'dash', label: 'Dash' }, { id: 'project', label: 'Project' }, { id: 'book', label: 'Outline' }, { id: 'chapter', label: 'Draft' }, { id: 'preview', label: 'Preview' }]
+
+const READER_VIEWS = [{ id: 'nook', label: 'Nook' }, { id: 'library', label: 'Library' }, { id: 'catalog', label: 'Catalog' }, { id: 'book', label: 'Book' }, { id: 'plan', label: 'Plan' }, { id: 'borrow', label: 'Borrow' }]
 
 const META = new Map(CARD_META.map(m => [m.id, m]))
 const card = (id: string, rest: Omit<CardDef, 'id' | 'title' | 'group' | 'summary' | 'height'>): CardDef => {
@@ -256,7 +287,8 @@ export const CARDS: CardDef[] = [
   card('draft-page', { views: WRITER_VIEWS.slice(3), defaults: { view: 'chapter', zones: ['day'] }, render: ({ view }) => <PreviewWriter key={view} view={view as WriterView} /> }),
   card('controls', { defaults: { zones: ['day', 'night'] }, render: () => <ControlsCard /> }),
   card('hue-slider', { defaults: { zones: ['day', 'night'] }, render: () => <HueCard /> }),
-  card('app-shell', { frame: 'plain', defaults: { zones: ['day'], width: 1200 }, render: () => <App /> }),
+  card('reader', { frame: 'plain', views: READER_VIEWS, defaults: { view: 'nook', zones: ['day', 'night'], width: 1200 }, render: ({ view }) => <ReaderCard view={view} /> }),
+  card('app-shell', { frame: 'plain', defaults: { zones: ['day'], width: 1200 }, render: () => <MemoryRouter initialEntries={['/write']}><App /></MemoryRouter> }),
   card('sky-toggle', { frame: 'plain', defaults: { zones: ['dawn', 'day', 'dusk', 'night'], width: 400 }, render: () => <SkyCard /> }),
   card('theme-settings', { frame: 'plain', defaults: { zones: ['day'], width: 800 }, render: () => <ThemeSettingsCard /> }),
   card('icons', { defaults: { zones: ['day', 'night'] }, render: () => <IconsCard /> }),

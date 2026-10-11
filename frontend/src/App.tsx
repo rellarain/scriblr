@@ -1,4 +1,5 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
+import { useLocation, useNavigate } from 'react-router-dom'
 import './App.scss'
 import WUI from './assets/Interfaces/WUI'
 import RUI from './assets/Interfaces/RUI'
@@ -19,8 +20,20 @@ const SIDEBAR_PANEL_W = 400
 // AUI's own width snaps to multiples of this (a "column"), at any container size.
 const AUI_COLUMN_W = 400
 
+// The page the URL names: /read is the Reader, /translate the Translator, anything else (/, /write) the Writer.
+const MAIN_PATH: Record<MainInterface, string> = { reader: '/read', translator: '/translate', writer: '/write' }
+export function mainOf(pathname: string): MainInterface {
+  if (pathname === '/read' || pathname.startsWith('/read/')) return 'reader'
+  if (pathname === '/translate' || pathname.startsWith('/translate/')) return 'translator'
+  return 'writer'
+}
+
 function App() {
-  const [activeMain, setActiveMain] = useState<MainInterface>('writer')
+  const location = useLocation()
+  const navigate = useNavigate()
+  const activeMain = mainOf(location.pathname)
+  // The bare address is the Writer's.
+  useEffect(() => { if (location.pathname === '/') navigate(MAIN_PATH.writer, { replace: true }) }, [location.pathname, navigate])
   const [showVUI, setShowVUI] = useState<boolean>(false)
   const { ui } = useSettings()
   const handedness = ui.handedness
@@ -106,7 +119,7 @@ function App() {
       setShowVUI(v => !v)
       return
     }
-    setActiveMain(next)
+    navigate(MAIN_PATH[next])
     setShowVUI(false)
   }
 

@@ -45,6 +45,10 @@ export const CARD_META: CardMeta[] = [
     summary: "The single 0 to 360 track, unlimited or limited to 60 degrees round a parent, drawn at the zone's own saturation and lightness.",
   },
   {
+    id: 'reader', dir: 'Reader', title: 'Reader: pages, rails and consoles', group: 'Reader', height: 760,
+    summary: 'The Nook, the Library and a book: earlier pages as rails, consoles as an icon, a tile or the full console, the credit pill, and the plan and borrow dialogs.',
+  },
+  {
     id: 'app-shell', dir: 'AppShell', title: 'App shell: header, sidebar and sky toggle', group: 'Shell', height: 640,
     summary: 'The whole app: the header with the user card and sky toggle, the page switcher, the Writer and the helper sidebar.',
   },

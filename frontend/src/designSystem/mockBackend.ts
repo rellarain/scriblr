@@ -1,6 +1,8 @@
 import { DEFAULT_UI_SETTINGS, defaultThemeSettings } from '../theme/defaults'
 import type { OutlineNode, OutlineTree, PlotNode, PlotTree, ProjectIndex, ProjectSummaryResponse, Publication } from '../api/types'
 import type { DraftChapter, ProjectAnalytics } from '../types'
+import type { Holding, ReaderState } from '../api/reader'
+import { READER_BOOKS, readerFixture, recommendationsFixture } from './readerFixtures'
 
 // A pretend backend for the design system's previews: the real Writer (useWriterWorkspace and everything under it) talks to
 // `/api/...` with fetch, so the previews run the real app against this in-memory project. The labels are the app's own (a book,
@@ -151,11 +153,40 @@ const notFound = (): Response => json({ detail: 'Not found' }, 404)
 // The in-memory project and the routes the Writer uses. Saves change the copy in memory only.
 export function createMockBackend() {
   const projects = new Map<string, FixtureProject>([[FIXTURE_PROJECT_ID, buildProject(FIXTURE_PROJECT_ID)]])
+  // The Reader's account: borrowing, buying and the plan change it; the rest of its actions answer with it as it stands.
+  let reader: ReaderState = readerFixture()
+
+  function readerRoute(method: string, rest: string[], body: unknown): Response {
+    const b = (body ?? {}) as { bookId?: string; credits?: number; extraCredits?: number }
+    if (method === 'PUT' && rest[0] === 'plan') {
+      const extra = b.extraCredits ?? 0
+      reader = { ...reader, plan: { extraCredits: extra }, planPriceCents: 600 + 200 * extra, creditsPerMonth: 1 + extra }
+    } else if (method === 'POST' && rest[0] === 'borrow' && b.bookId) {
+      const credits = b.credits ?? 1
+      const h: Holding = { id: `h-${reader.holdings.length + 1}`, bookId: b.bookId, kind: 'borrowed', status: 'active', startedAt: new Date().toISOString(), dueAt: new Date(Date.now() + credits * 30 * 86_400_000).toISOString(), endedAt: null, credits, opened: false, openedAt: null, lentTo: null, lentUntil: null }
+      reader = { ...reader, balance: reader.balance - credits, holdings: [...reader.holdings, h], ledger: [{ id: `l-${reader.ledger.length + 1}`, at: h.startedAt, kind: 'borrow', delta: -credits, note: `Borrowed ${credits} month${credits === 1 ? '' : 's'}`, bookId: b.bookId, holdingId: h.id }, ...reader.ledger] }
+    } else if (method === 'POST' && rest[0] === 'buy' && b.bookId) {
+      const h: Holding = { id: `h-${reader.holdings.length + 1}`, bookId: b.bookId, kind: 'owned', status: 'active', startedAt: new Date().toISOString(), dueAt: null, endedAt: null, credits: 0, opened: false, openedAt: null, lentTo: null, lentUntil: null }
+      reader = { ...reader, holdings: [...reader.holdings, h] }
+    }
+    return json(reader)
+  }
 
   async function handle(method: string, path: string, body: unknown): Promise<Response> {
-    const parts = path.split('/').filter(Boolean).map(decodeURIComponent)
+    const [bare, search = ''] = path.split('?')
+    const parts = bare.split('/').filter(Boolean).map(decodeURIComponent)
     if (parts[0] === 'user-settings') return json({ theme: defaultThemeSettings(), ui: DEFAULT_UI_SETTINGS, kv: {}, migratedFromLocal: true })
     if (parts[0] === 'resources') return json({ schemaVersion: 1, nodes: [], content: {} })
+    if (parts[0] === 'reader') return readerRoute(method, parts.slice(1), body)
+    if (parts[0] === 'library') {
+      if (parts[1] === 'recommendations') return json(recommendationsFixture())
+      if (parts[1] === 'books') {
+        const q = (new URLSearchParams(search).get('q') ?? '').toLowerCase()
+        const books = READER_BOOKS.filter(book => !q || `${book.title} ${book.authorName}`.toLowerCase().includes(q))
+        return json({ total: books.length, books })
+      }
+      return notFound()
+    }
     if (parts[0] !== 'projects') return notFound()
     if (parts.length === 1) return method === 'GET' ? json([...projects.values()].map(p => p.index)) : notFound()
     const project = projects.get(parts[1])

@@ -1,17 +1,177 @@
-import type { ReactNode } from 'react'
+import { useCallback, useEffect, useMemo, useState } from 'react'
+import { useLocation, useNavigate } from 'react-router-dom'
+import type { CatalogBook } from '../../api/reader'
+import { BookFaceIcon, CatalogIcon, FeedIcon, HistoryIcon, HomeIcon, JournalIcon, LibraryIcon, PagesIcon, PlayIcon, ShelfIcon, ShelvesIcon, StackIcon, TicketIcon, BarChartIcon } from '../icons'
+import { fillColorCss } from '../../theme/bookColors'
+import { useThemeState } from '../../theme/useTheme'
+import { useStoredState } from './writer/storage'
+import { BookcoverConsole } from './reader/BookConsoles'
+import { anyFull, resolve, withFull, type ConsoleStates } from './reader/consoleStates'
+import { AnalyticsConsole, FeedConsole, JournalConsole, StackConsole } from './reader/NookConsoles'
+import { CatalogConsole, HistoryConsole, ShelfConsole, ShelvesConsole } from './reader/LibraryConsoles'
+import { BorrowDialog, PlanDialog } from './reader/ReaderDialogs'
+import { ReaderPanel, type ConsoleDef } from './reader/ReaderPanel'
+import type { ReaderCtx } from './reader/readerContext'
+import { parseReaderPath, readerPath, type ReaderLocation, type ReaderPage } from './reader/readerRoutes'
+import { loadReader, useReader } from './reader/readerStore'
+import './reader/reader.scss'
 
-function RUI({ children }: { children?: ReactNode }) {
+// The Reader (RUI): four pages that open one from the next, as the Writer's levels do. The Nook (home) holds the Reader's own things (the Stack,
+// the Journal, Analytics, the Feed); the Library the shelves and the catalog; the Book one book and its cover; Pages reads it. The earlier
+// pages stand at the left as narrow rails. Each page's consoles are an icon, a tile or the full console, and the URL names the page, the book
+// and the full console (/read/library/catalog, /read/book/<id>, /read/book/<id>/pages).
 
+const PAGE_LABEL: Record<ReaderPage, string> = { nook: 'Nook', library: 'Library', book: 'Book', pages: 'Pages' }
+const PAGE_ICON = { nook: HomeIcon, library: LibraryIcon, book: BookFaceIcon, pages: PagesIcon }
 
-    return(
+const NOOK_IDS = ['stack', 'journal', 'analytics', 'feed']
+const NOOK_DEFAULTS: ConsoleStates = { stack: 'tile', journal: 'tile', analytics: 'tile' }
+const LIBRARY_IDS = ['catalog', 'shelves', 'shelf', 'history']
+const LIBRARY_DEFAULTS: ConsoleStates = { catalog: 'tile', shelves: 'tile' }
+const BOOK_IDS = ['cover']
+const BOOK_DEFAULTS: ConsoleStates = { cover: 'tile' }
 
-        <main className={'rUI'}>
-            {children}
-            RUI
-        </main>
-
-    )
+// The page's consoles: what is stored for them (and the URL's full console on top), and how a change is stored and written to the URL.
+function usePageStates(loc: ReaderLocation, ids: string[], defaults: ConsoleStates) {
+  const navigate = useNavigate()
+  const [stored, setStored] = useStoredState<ConsoleStates>(`scriblr.reader.consoles.${loc.page}`, {})
+  const states = useMemo(() => withFull(ids, resolve(ids, stored, defaults), loc.console), [ids, stored, defaults, loc.console])
+  const onStates = useCallback((next: ConsoleStates) => {
+    setStored(next)
+    const full = Object.entries(next).find(([, v]) => v === 'full')?.[0] ?? null
+    navigate(readerPath({ ...loc, console: full }), { replace: true })
+  }, [loc, navigate, setStored])
+  return { states, onStates }
 }
 
+function RUI() {
+  const location = useLocation()
+  const navigate = useNavigate()
+  const loc = useMemo(() => parseReaderPath(location.pathname), [location.pathname])
+  const data = useReader()
+  const { settings, activeZone } = useThemeState()
+  const [planOpen, setPlanOpen] = useState(false)
+  const [borrowing, setBorrowing] = useState<CatalogBook | null>(null)
+  const [lastBookId, setLastBookId] = useStoredState<string>('scriblr.reader.lastBook', '')
+  const today = useMemo(() => new Date().toISOString().slice(0, 10), [])
+
+  useEffect(() => { void loadReader() }, [])
+  useEffect(() => { if (loc.bookId) setLastBookId(loc.bookId) }, [loc.bookId, setLastBookId])
+
+  const themeHue = settings.zones[activeZone].palette.theme.h
+  const book = loc.bookId ? data.bookById(loc.bookId) : undefined
+  const colors: Record<ReaderPage, string> = {
+    nook: fillColorCss(themeHue),
+    library: fillColorCss((themeHue + 120) % 360),
+    book: fillColorCss(book?.hue ?? themeHue),
+    pages: fillColorCss(book?.hue ?? themeHue),
+  }
+  const go = (page: ReaderPage, extra: Partial<ReaderLocation> = {}) => navigate(readerPath({ page, bookId: extra.bookId ?? loc.bookId ?? (lastBookId || null), ...extra }))
+  const ctx: ReaderCtx = {
+    data, today,
+    openBook: id => navigate(readerPath({ page: 'book', bookId: id })),
+    openLibrary: console => navigate(readerPath({ page: 'library', console: console ?? null })),
+    borrow: b => setBorrowing(b),
+    openPlan: () => setPlanOpen(true),
+  }
+
+  const order: ReaderPage[] = ['nook', 'library', 'book', 'pages']
+  const before = order.slice(0, order.indexOf(loc.page))
+  const forward = (page: ReaderPage): boolean => (page === 'book' || page === 'pages' ? Boolean(loc.bookId || lastBookId) : true)
+  const after = order.slice(order.indexOf(loc.page) + 1).filter(forward)
+  const pill = data.reader && (
+    <button type="button" className="rdPill" onClick={() => setPlanOpen(true)} title="Your plan and credits">
+      <TicketIcon size={16} />{data.reader.balance} {data.reader.balance === 1 ? 'credit' : 'credits'}
+    </button>
+  )
+  const right = (
+    <>
+      {pill}
+      {after.map(page => {
+        const Icon = PAGE_ICON[page]
+        return <button key={page} type="button" className="rdIconBtn" aria-label={`Open ${PAGE_LABEL[page]}`} title={`Open ${PAGE_LABEL[page]}`} onClick={() => go(page)}><Icon size={20} /></button>
+      })}
+    </>
+  )
+
+  let content
+  if (data.status === 'error') content = <p className="rdEmpty" role="alert">{data.error}</p>
+  else if (data.status !== 'ready') content = <p className="rdEmpty" role="status">Loading the library…</p>
+  else if (loc.page === 'nook') content = <NookPage loc={loc} ctx={ctx} color={colors.nook} right={right} />
+  else if (loc.page === 'library') content = <LibraryPage loc={loc} ctx={ctx} color={colors.library} right={right} />
+  else if (loc.page === 'book') content = <BookPage loc={loc} ctx={ctx} color={colors.book} right={right} book={book} />
+  else content = <PagesPage color={colors.pages} right={right} book={book} onBack={() => go('book')} />
+
+  return (
+    <main className="rUI wr rdRoot">
+      <div className="rdLayout">
+        {before.map(page => {
+          const Icon = PAGE_ICON[page]
+          return (
+            <button key={page} type="button" className="rdRail" style={{ ['--rd-f' as string]: colors[page] }} aria-label={`Back to ${PAGE_LABEL[page]}`} title={PAGE_LABEL[page]} onClick={() => go(page)}>
+              <Icon size={20} /><span>{page === 'book' && book ? book.title : PAGE_LABEL[page]}</span>
+            </button>
+          )
+        })}
+        {content}
+      </div>
+      {planOpen && <PlanDialog ctx={ctx} onClose={() => setPlanOpen(false)} />}
+      {borrowing && <BorrowDialog ctx={ctx} book={borrowing} onClose={() => setBorrowing(null)} />}
+    </main>
+  )
+}
+
+interface PageProps { loc: ReaderLocation; ctx: ReaderCtx; color: string; right: React.ReactNode }
+
+function NookPage({ loc, ctx, color, right }: PageProps) {
+  const { states, onStates } = usePageStates(loc, NOOK_IDS, NOOK_DEFAULTS)
+  const consoles: ConsoleDef[] = [
+    { id: 'stack', label: 'Stack', Icon: StackIcon, render: size => <StackConsole ctx={ctx} size={size} /> },
+    { id: 'journal', label: 'Journal', Icon: JournalIcon, render: size => <JournalConsole ctx={ctx} size={size} /> },
+    { id: 'analytics', label: 'Analytics', Icon: BarChartIcon, render: size => <AnalyticsConsole ctx={ctx} size={size} /> },
+    { id: 'feed', label: 'Feed', Icon: FeedIcon, render: size => <FeedConsole ctx={ctx} size={size} /> },
+  ]
+  return <ReaderPanel title="Nook" Icon={HomeIcon} color={color} consoles={consoles} states={states} onStates={onStates} right={right} />
+}
+
+function LibraryPage({ loc, ctx, color, right }: PageProps) {
+  const { states, onStates } = usePageStates(loc, LIBRARY_IDS, LIBRARY_DEFAULTS)
+  const consoles: ConsoleDef[] = [
+    { id: 'catalog', label: 'Catalog', Icon: CatalogIcon, render: size => <CatalogConsole ctx={ctx} size={size} /> },
+    { id: 'shelves', label: 'Shelves', Icon: ShelvesIcon, render: size => <ShelvesConsole ctx={ctx} size={size} /> },
+    { id: 'shelf', label: 'Shelf', Icon: ShelfIcon, render: size => <ShelfConsole ctx={ctx} size={size} /> },
+    { id: 'history', label: 'History', Icon: HistoryIcon, render: size => <HistoryConsole ctx={ctx} size={size} /> },
+  ]
+  return <ReaderPanel title="Library" Icon={LibraryIcon} color={color} consoles={consoles} states={states} onStates={onStates} right={right} />
+}
+
+function BookPage({ loc, ctx, color, right, book }: PageProps & { book: CatalogBook | undefined }) {
+  const { states, onStates } = usePageStates(loc, BOOK_IDS, BOOK_DEFAULTS)
+  if (!book) return <p className="rdEmpty" role="alert">That book is not in the library.</p>
+  const consoles: ConsoleDef[] = [
+    { id: 'cover', label: 'Bookcover', Icon: BookFaceIcon, render: size => <BookcoverConsole ctx={ctx} book={book} size={size} /> },
+  ]
+  return <ReaderPanel title={book.title} Icon={BookFaceIcon} color={color} consoles={consoles} states={states} onStates={onStates} right={right} className={anyFull(states) ? 'rdLevel--book' : 'rdLevel--book'} />
+}
+
+function PagesPage({ color, right, book, onBack }: { color: string; right: React.ReactNode; book: CatalogBook | undefined; onBack: () => void }) {
+  return (
+    <section className="rdLevel" style={{ ['--rd-f' as string]: color }} aria-label="Pages">
+      <header className="rdLevelHead">
+        <h2 className="rdLevelTitle"><PagesIcon size={20} />Pages</h2>
+        <div className="rdLevelRight">{right}</div>
+      </header>
+      <div className="rdGrid rdGrid--one">
+        <section className="rdCon rdCon--full">
+          <div className="rdConBody">
+            <p>{book ? `${book.title} opens here, on a spread of two pages.` : 'A book opens here.'}</p>
+            <p className="rdMuted">The e-reader (page turning or scrolling, reactions, flags, footnotes and your own notes) arrives in a later release.</p>
+            <button type="button" className="rdBtn" onClick={onBack}><PlayIcon size={16} />Back to the book</button>
+          </div>
+        </section>
+      </div>
+    </section>
+  )
+}
 
 export default RUI

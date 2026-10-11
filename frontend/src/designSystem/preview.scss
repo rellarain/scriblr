@@ -53,3 +53,7 @@ html, html body, html #root { background: var(--pv-bg); }
 // `.wrBookScope` is display: contents by default (it sits in the middle of a layout); a frame is a real box.
 .wrBookScope.uiPreviewFrame { display: flex; }
 .wrBookScope.uiPreviewFrame--plain { display: block; }
+
+// The Reader's page is absolutely placed in the app shell; in a preview it fills the frame.
+.uiPvReader { position: relative; height: 100%; }
+.uiPvReader .rUI { position: absolute; top: 0; left: 0; right: 0; bottom: 0; }

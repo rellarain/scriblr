@@ -1,0 +1,178 @@
+// The Reader (RUI): classes are prefixed `rd` and live under `.rUI.wr` (the Writer's scope, so its shelf and spines draw here too).
+// Colours are the theme's tokens; a page's own fill is `--rd-f`, set inline (the level fill of a hue, white text on it).
+
+.rUI.wr {
+  color: var(--ink);
+  container-type: inline-size;
+  container-name: rd;
+
+  // The app has no global button reset (see the Writer's own).
+  :where(button) { background: transparent; border: 0; padding: 0; margin: 0; color: inherit; font: inherit; cursor: pointer; }
+  :where(button:disabled) { cursor: default; }
+  input, textarea, select { font-family: inherit; }
+}
+
+.rdRoot {
+  .rdLayout { flex: 1 1 auto; min-width: 0; min-height: 0; display: flex; gap: 6px; padding: 8px; align-items: stretch; overflow: auto; }
+
+  // ---------------------------------------------------------------- the earlier pages, as rails
+  .rdRail {
+    flex: 0 0 52px; display: flex; flex-direction: column; align-items: center; gap: 12px; padding: 14px 0;
+    background: var(--rd-f); color: #fff; font-size: 12px; font-weight: 700; letter-spacing: 1.5px; text-transform: uppercase;
+    span { writing-mode: vertical-rl; max-height: 70%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    &:hover { filter: brightness(1.12); }
+  }
+
+  // ---------------------------------------------------------------- a page
+  .rdLevel {
+    --rd-ink: #fff;
+    --rd-wash-lo: color-mix(in srgb, var(--rd-ink) 10%, transparent);
+    --rd-wash: color-mix(in srgb, var(--rd-ink) 16%, transparent);
+    --rd-wash-hi: color-mix(in srgb, var(--rd-ink) 28%, transparent);
+    --rd-line: color-mix(in srgb, var(--rd-ink) 18%, transparent);
+    --rd-f1: color-mix(in srgb, var(--rd-f) 90%, black);
+    --rd-f2: color-mix(in srgb, var(--rd-f) 80%, black);
+    --rd-f3: color-mix(in srgb, var(--rd-f) 70%, black);
+    --rd-input: hsl(var(--color-theme-h), 28%, 96%);
+    --rd-input-ink: hsl(var(--color-theme-h), 30%, 10%);
+    --rd-input-hint: hsl(var(--color-theme-h), 12%, 42%);
+    flex: 1 1 0; min-width: 0; position: relative; background: var(--rd-f); color: var(--rd-ink);
+    display: flex; flex-direction: column;
+    // The Writer's shelf draws with these on a level.
+    --level-wash-lo: var(--rd-wash-lo); --on-accent: var(--rd-ink); --wr-fill: var(--rd-f); --wr-muted: color-mix(in srgb, var(--rd-ink) 90%, transparent);
+  }
+  .rdLevelHead { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 14px; padding: 8px 14px 8px 18px; }
+  .rdLevelTitle { display: flex; align-items: center; gap: 10px; margin: 4px 0; font-size: 14px; font-weight: 700; letter-spacing: 1.5px; text-transform: uppercase; line-height: 1.7; margin-right: 4px; }
+  .rdLevelRight { margin-left: auto; display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
+  .rdBar { display: flex; gap: 2px; padding: 2px; background: var(--rd-wash-lo); }
+
+  // ---------------------------------------------------------------- controls (40px: touch targets)
+  .rdIconBtn {
+    display: inline-grid; place-items: center; width: 40px; height: 40px; border-radius: 4px; background: transparent; color: inherit;
+    &:hover { background: var(--rd-wash); }
+    &:focus-visible { outline: 2px solid var(--accent-hover); outline-offset: -2px; }
+    &--open { background: var(--rd-wash-hi); }
+    &--full { background: var(--accent); color: var(--zone-on-accent, #fff); }
+    &--small { width: 34px; height: 34px; }
+  }
+  .rdLevelRight .rdIconBtn { background: var(--rd-wash-lo); }
+  .rdLevelRight .rdIconBtn:hover { background: var(--rd-wash); }
+  .rdPill { display: inline-flex; align-items: center; gap: 6px; height: 40px; padding: 0 12px; background: var(--rd-wash-lo); font-size: 12px; white-space: nowrap; &:hover { background: var(--rd-wash); } }
+  .rdBtn {
+    display: inline-flex; align-items: center; gap: 8px; height: 40px; padding: 0 14px; border-radius: 4px; background: var(--rd-wash); font-size: 13px; font-weight: 700; white-space: nowrap; color: var(--rd-ink);
+    &:hover:not(:disabled) { background: var(--rd-wash-hi); }
+    &:focus-visible { outline: 2px solid var(--accent-hover); outline-offset: -2px; }
+    &:disabled { opacity: 0.6; }
+    &--pri { background: var(--accent); color: var(--zone-on-accent, #fff); &:hover:not(:disabled) { background: var(--accent-hover); } }
+    &--small { height: 34px; padding: 0 10px; font-size: 12px; }
+  }
+  .rdField {
+    height: 40px; padding: 0 12px; border: 0; border-radius: 0; background: var(--rd-input); color: var(--rd-input-ink); font-size: 14px; min-width: 0;
+    &::placeholder { color: var(--rd-input-hint); }
+    &--num { width: 80px; }
+  }
+  .rdLink { text-align: left; color: inherit; text-decoration: underline; }
+  .rdChip {
+    display: inline-flex; align-items: center; gap: 6px; padding: 5px 10px; background: var(--ov-sink-2); font-size: 12px; color: var(--rd-ink);
+    &--on { background: var(--accent); color: var(--zone-on-accent, #fff); }
+    &--button { cursor: pointer; &:hover { background: var(--ov-sink-3); } &.rdChip--on:hover { background: var(--accent-hover); } }
+  }
+  .rdChipX { display: inline-grid; place-items: center; width: 24px; height: 24px; margin-right: -4px; opacity: 0.9; }
+  .rdCheck { display: flex; align-items: center; gap: 8px; min-height: 32px; font-size: 14px; input { width: 20px; height: 20px; accent-color: var(--accent); } }
+  .rdFieldset { border: 0; padding: 0; margin: 0; display: flex; flex-direction: column; gap: 6px; min-width: 0; legend, .rdLegend { font-size: 11px; font-weight: 700; letter-spacing: 1.5px; text-transform: uppercase; padding: 0; margin-bottom: 4px; } }
+  .rdSearch { display: flex; align-items: center; gap: 8px; flex: 1 1 160px; .rdField { flex: 1; } }
+
+  // ---------------------------------------------------------------- consoles
+  .rdGrid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; padding: 2px 8px 8px; align-items: start; &--one { grid-template-columns: minmax(0, 1fr); } }
+  .rdCon { container-type: inline-size; container-name: rdcon; background: var(--rd-f1); display: flex; flex-direction: column; min-width: 0; }
+  .rdConHead { display: flex; align-items: center; gap: 10px; padding: 0 6px 0 14px; min-height: 46px; background: var(--rd-f3); }
+  .rdConTitle { flex: 1; text-align: left; display: flex; align-items: center; gap: 10px; min-height: 46px; font-size: 12px; font-weight: 700; letter-spacing: 1.5px; text-transform: uppercase; }
+  .rdConBody { padding: 14px; display: flex; flex-direction: column; gap: 12px; min-width: 0; }
+  .rdEmpty { margin: 0; padding: 18px; font-size: 14px; grid-column: 1 / -1; }
+  .rdCard { background: var(--rd-f2); padding: 14px; display: flex; flex-direction: column; gap: 10px; min-width: 0; }
+  .rdCardTitle { margin: 0; display: flex; align-items: center; gap: 8px; font-size: 12px; font-weight: 700; letter-spacing: 1.5px; text-transform: uppercase; }
+  .rdEmptyCard p { margin: 0; }
+  .rdMuted { font-size: 12px; opacity: 0.9; margin: 0; }
+  .rdError { margin: 0; padding: 5px 10px; font-size: 12px; font-weight: 700; background: var(--alert); color: var(--on-alert); }
+  .rdRow { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+  .rdGrow { flex: 1 1 auto; }
+  .rdBig { margin: 0; font: 700 22px Georgia, 'Times New Roman', serif; line-height: 1.1; }
+  .rdQuote { margin: 0; font: 15px/1.6 Georgia, 'Times New Roman', serif; }
+  .rdStars { letter-spacing: 2px; }
+  .rdList { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 8px; }
+  .rdItem { display: flex; gap: 12px; align-items: center; flex-wrap: wrap; padding: 12px; background: var(--rd-f3); min-height: 56px; b { display: block; } }
+  .rdItemMain { flex: 1 1 160px; display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+  .rdGrid2 { display: grid; grid-template-columns: minmax(0, 1.3fr) minmax(0, 1fr); gap: 12px; }
+  .rdGrid3 { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px; }
+  .rdGrid4 { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 12px; }
+  .rdStat b { font-size: 26px; line-height: 1.1; display: block; }
+  .rdMeter { display: block; position: relative; height: 12px; background: var(--ov-sink-3); }
+  .rdMeterFill { position: absolute; left: 0; top: 0; bottom: 0; background: var(--rd-wash-hi); &--accent { background: var(--accent); } }
+  .rdCols { display: flex; align-items: flex-end; gap: 8px; height: 110px; div { flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: flex-end; gap: 4px; height: 100%; font-size: 11px; } i { display: block; width: 100%; background: var(--rd-wash-hi); } }
+  .rdTimeline { list-style: none; margin: 0 0 0 6px; padding: 0; border-left: 2px solid var(--rd-line); display: flex; flex-direction: column; li { position: relative; padding: 4px 0 12px 16px; display: flex; flex-direction: column; &::before { content: ''; position: absolute; left: -8px; top: 9px; width: 14px; height: 14px; background: var(--rd-wash-hi); } } }
+  .rdTable { width: 100%; border-collapse: collapse; font-size: 13px; th { text-align: left; font-size: 11px; letter-spacing: 1.5px; text-transform: uppercase; font-weight: 700; padding: 4px 8px 6px 0; } td { padding: 6px 8px 6px 0; border-top: 1px solid var(--rd-line); } }
+
+  // ---------------------------------------------------------------- the activity calendar
+  .rdCal { display: grid; grid-template-columns: 30px minmax(0, 1fr); gap: 6px; align-items: start; }
+  .rdCalDays { display: grid; grid-template-rows: repeat(7, 14px); gap: 3px; font-size: 11px; line-height: 14px; padding-top: 19px; }
+  .rdCalScroll { overflow-x: auto; }
+  .rdCalMonths { display: grid; column-gap: 3px; font-size: 11px; height: 16px; margin-bottom: 3px; width: max-content; span { white-space: nowrap; } }
+  .rdCalGrid { display: grid; grid-template-rows: repeat(7, 14px); grid-auto-flow: column; grid-auto-columns: 14px; gap: 3px; width: max-content; }
+  .rdCalCell { display: block; width: 14px; height: 14px; background: var(--rd-wash-lo);
+    &--1 { background: color-mix(in srgb, var(--accent) 32%, var(--rd-f2)); }
+    &--2 { background: color-mix(in srgb, var(--accent) 56%, var(--rd-f2)); }
+    &--3 { background: color-mix(in srgb, var(--accent) 80%, var(--rd-f2)); }
+    &--4 { background: var(--accent); }
+    &--x { visibility: hidden; } }
+  .rdCalLegend { margin-left: auto; display: inline-flex; align-items: center; gap: 4px; font-size: 11px; }
+
+  // ---------------------------------------------------------------- the catalog and its books
+  .rdCatalog { display: grid; grid-template-columns: 230px minmax(0, 1fr); gap: 12px; align-items: start; }
+  .rdFilters { gap: 14px; }
+  .rdBooks { display: grid; grid-template-columns: repeat(auto-fill, minmax(130px, 1fr)); gap: 12px; }
+  .rdBookCard { background: var(--rd-f2); padding: 10px; display: flex; flex-direction: column; gap: 6px; min-width: 0; }
+  .rdBookCardOpen { display: flex; flex-direction: column; gap: 4px; text-align: left; &:focus-visible { outline: 2px solid var(--accent-hover); outline-offset: 2px; } }
+  .rdCover { display: flex; flex-direction: column; justify-content: space-between; padding: 10px; color: #fff; font-family: Georgia, 'Times New Roman', serif; b { font-size: 15px; line-height: 1.15; } span { font: 700 10px/1.2 'Segoe UI', system-ui, sans-serif; letter-spacing: 1.2px; text-transform: uppercase; } }
+
+  // ---------------------------------------------------------------- a book: the Writer's cover, with a spine edge and page edges
+  .rdBookHead { display: flex; flex-wrap: wrap; align-items: baseline; gap: 6px 14px; }
+  .rdBookHeadRight { margin-left: auto; display: flex; align-items: center; gap: 10px; }
+  .rdHero { display: grid; grid-template-columns: 190px minmax(0, 1fr); gap: 18px; }
+  .rdHeroBody { display: flex; flex-direction: column; gap: 12px; min-width: 0; }
+  .rdBook3d { position: relative; display: flex; width: 170px; aspect-ratio: 2 / 3; box-shadow: 0 8px 0 -4px var(--ov-sink-3); }
+  .rdBookSpine { flex: 0 0 14px; background: color-mix(in srgb, var(--rd-book) 62%, black); box-shadow: inset -3px 0 0 var(--ov-sink-2); }
+  .rdBookFace { flex: 1; min-width: 0; display: flex; flex-direction: column; justify-content: space-between; padding: 12px 10px; background: var(--rd-book); color: #fff; font-family: Georgia, 'Times New Roman', serif; box-shadow: inset 4px 0 0 var(--ov-sink-3); b { font-size: 20px; line-height: 1.1; } span { font: 700 10px/1.2 'Segoe UI', system-ui, sans-serif; letter-spacing: 1.2px; text-transform: uppercase; } }
+  .rdBookPages { flex: 0 0 12px; border-radius: 0 3px 3px 0; background: repeating-linear-gradient(180deg, #f3ead8 0 2px, #d3c6ab 2px 3px); box-shadow: inset 3px 0 0 var(--ov-sink-2); }
+
+  // ---------------------------------------------------------------- dialogs
+  .rdModalBg { position: absolute; inset: 0; z-index: 50; display: flex; justify-content: center; align-items: flex-start; padding: 40px 12px; overflow: auto; background: var(--scrim); }
+  .rdModal { background: var(--paper); color: var(--paper-ink); width: min(820px, 100%); border: 1px solid var(--paper-line); }
+  .rdModalHead { display: flex; align-items: center; gap: 10px; padding: 8px 8px 8px 16px; background: var(--paper-line); h3 { flex: 1; margin: 0; font-size: 13px; letter-spacing: 1.5px; text-transform: uppercase; display: flex; align-items: center; gap: 8px; } }
+  .rdModalBody { padding: 14px 16px 18px; display: flex; flex-direction: column; gap: 14px; }
+  .rdModal {
+    .rdBtn, .rdIconBtn { background: var(--paper-line); color: var(--paper-ink); &:hover:not(:disabled) { background: var(--paper-soft); } }
+    .rdBtn--pri { background: var(--accent); color: var(--zone-on-accent, #fff); }
+    .rdCard { background: var(--paper-soft); border: 1px solid var(--paper-line); color: var(--paper-ink); }
+    .rdChip { background: var(--paper-line); color: var(--paper-ink); &--on { background: var(--accent); color: var(--zone-on-accent, #fff); } }
+    .rdField { background: var(--paper); color: var(--paper-ink); border: 1px solid var(--paper-line); }
+    .rdMuted { color: var(--paper-muted); opacity: 1; }
+    .rdTable td { border-top-color: var(--paper-line); }
+  }
+  .rdBorrow { display: grid; grid-template-columns: 110px minmax(0, 1fr); gap: 16px; }
+  .rdBorrowBody { display: flex; flex-direction: column; gap: 12px; min-width: 0; }
+}
+
+// ---------------------------------------------------------------- narrow: the rails lie across the top, everything stacks
+@container rd (max-width: 900px) {
+  .rdRoot .rdLayout { flex-direction: column; }
+  .rdRoot .rdRail { flex-direction: row; flex: 0 0 auto; padding: 0 14px; height: 48px; justify-content: flex-start; gap: 10px; span { writing-mode: horizontal-tb; max-height: none; } }
+  .rdRoot .rdGrid { grid-template-columns: minmax(0, 1fr); }
+  .rdRoot .rdGrid2, .rdRoot .rdGrid3, .rdRoot .rdGrid4 { grid-template-columns: minmax(0, 1fr); }
+  .rdRoot .rdCatalog, .rdRoot .rdHero, .rdRoot .rdBorrow { grid-template-columns: minmax(0, 1fr); }
+  .rdRoot .rdLevelHead { padding-left: 12px; }
+}
+@container rdcon (max-width: 620px) {
+  .rdRoot .rdGrid2, .rdRoot .rdGrid3 { grid-template-columns: minmax(0, 1fr); }
+  .rdRoot .rdGrid4 { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .rdRoot .rdCatalog, .rdRoot .rdHero { grid-template-columns: minmax(0, 1fr); }
+}

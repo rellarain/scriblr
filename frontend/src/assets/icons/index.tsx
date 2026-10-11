@@ -566,3 +566,116 @@ export function SearchIcon(props: IconProps) {
     <path d="m16 16 4.5 4.5" />
   </IconBase>
 }
+
+// The Reader's icons (the same 24px stroke set): consoles, actions, reading controls.
+export function HomeIcon(props: IconProps) {
+  return <IconBase {...props}><path d="M3 11l9-7 9 7M5 10v10h14V10M10 20v-6h4v6" /></IconBase>
+}
+export function StackIcon(props: IconProps) {
+  return <IconBase {...props}><path d="M3 8l9-4 9 4-9 4zM3 12l9 4 9-4M3 16l9 4 9-4" /></IconBase>
+}
+export function JournalIcon(props: IconProps) {
+  return <IconBase {...props}><path d="M6 3h12v18H6zM9 8h6M9 12h6M9 16h4" /></IconBase>
+}
+export function FeedIcon(props: IconProps) {
+  return <IconBase {...props}><path d="M4 5a15 15 0 0115 15M4 11a9 9 0 019 9M5 19h.01" /></IconBase>
+}
+export function CatalogIcon(props: IconProps) {
+  return <IconBase {...props}><path d="M4 4h7v7H4zM13 4h7v7h-7zM4 13h7v7H4zM13 13h7v7h-7z" /></IconBase>
+}
+export function ShelvesIcon(props: IconProps) {
+  return <IconBase {...props}><path d="M3 20h18M5 20V9h4v11M11 20V5h4v15M17 20V11h3v9" /></IconBase>
+}
+export function ShelfIcon(props: IconProps) {
+  return <IconBase {...props}><path d="M7 3h6v18H7zM15 6l4 1-3 14-3.5-1M9 8h2M9 16h2" /></IconBase>
+}
+export function SparkleIcon(props: IconProps) {
+  return <IconBase {...props}><path d="M12 3l2.2 5.8L20 11l-5.8 2.2L12 19l-2.2-5.8L4 11l5.8-2.2zM19 17v4M17 19h4" /></IconBase>
+}
+export function HistoryIcon(props: IconProps) {
+  return <IconBase {...props}><path d="M12 7v5l3 2M3 12a9 9 0 109-9M3 4v5h5" /></IconBase>
+}
+export function CoverIcon(props: IconProps) {
+  return <IconBase {...props}><path d="M6 3h12v18H6zM9 7h6M9 11h6" /></IconBase>
+}
+export function FrontIcon(props: IconProps) {
+  return <IconBase {...props}><path d="M5 4h8l4 4v12H5zM13 4v4h4M8 12h6M8 16h6" /></IconBase>
+}
+export function BackIcon(props: IconProps) {
+  return <IconBase {...props}><path d="M7 3h10v18H7zM10 7h4M10 11h4M10 15h2M4 6v12" /></IconBase>
+}
+export function BodyIcon(props: IconProps) {
+  return <IconBase {...props}><path d="M4 6h16M4 10h16M4 14h12M4 18h16" /></IconBase>
+}
+export function HeartIcon(props: IconProps) {
+  return <IconBase {...props}><path d="M12 20s-8-5-8-11a4.5 4.5 0 018-2.5A4.5 4.5 0 0120 9c0 6-8 11-8 11z" /></IconBase>
+}
+export function CrackedHeartIcon(props: IconProps) {
+  return <IconBase {...props}><path d="M12 20s-8-5-8-11a4.5 4.5 0 018-2.5A4.5 4.5 0 0120 9c0 6-8 11-8 11zM12 6.5l-2 3.5 3 2-2 3.5" /></IconBase>
+}
+export function FootnoteIcon(props: IconProps) {
+  return <IconBase {...props}><path d="M12 4v16M5 8l14 8M19 8L5 16" /></IconBase>
+}
+export function NoteIcon(props: IconProps) {
+  return <IconBase {...props}><path d="M4 20l1-4L16 5l3 3L8 19zM14 7l3 3" /></IconBase>
+}
+export function SlidersIcon(props: IconProps) {
+  return <IconBase {...props}><path d="M4 7h10M18 7h2M4 17h2M10 17h10M14 5v4M6 15v4" /></IconBase>
+}
+export function LinkIcon(props: IconProps) {
+  return <IconBase {...props}><path d="M10 14a4 4 0 005.7 0l3-3a4 4 0 00-5.7-5.7l-1 1M14 10a4 4 0 00-5.7 0l-3 3a4 4 0 005.7 5.7l1-1" /></IconBase>
+}
+export function TicketIcon(props: IconProps) {
+  return <IconBase {...props}><path d="M3 8a2 2 0 002-2h14a2 2 0 002 2v8a2 2 0 00-2 2H5a2 2 0 00-2-2zM9 6v12" /></IconBase>
+}
+export function BagIcon(props: IconProps) {
+  return <IconBase {...props}><path d="M5 8h14l-1 12H6zM9 8a3 3 0 016 0" /></IconBase>
+}
+export function FollowIcon(props: IconProps) {
+  return <IconBase {...props}><path d="M9 11a3 3 0 100-6 3 3 0 000 6zM3 20c0-3.5 2.5-6 6-6s6 2.5 6 6M19 8v6M16 11h6" /></IconBase>
+}
+export function StarIcon(props: IconProps) {
+  return <IconBase {...props}><path d="M12 3l2.8 5.7 6.2.9-4.5 4.4 1 6.2L12 17.2 6.5 20.2l1-6.2L3 9.6l6.2-.9z" /></IconBase>
+}
+export function PlayIcon(props: IconProps) {
+  return <IconBase {...props}><path d="M8 5l11 7-11 7z" /></IconBase>
+}
+export function FocusIcon(props: IconProps) {
+  return <IconBase {...props}><path d="M8 3H5a2 2 0 00-2 2v3M16 3h3a2 2 0 012 2v3M8 21H5a2 2 0 01-2-2v-3M16 21h3a2 2 0 002-2v-3" /></IconBase>
+}
+export function ScrollIcon(props: IconProps) {
+  return <IconBase {...props}><path d="M12 3v18M8 7l4-4 4 4M8 17l4 4 4-4" /></IconBase>
+}
+export function TurnIcon(props: IconProps) {
+  return <IconBase {...props}><path d="M5 4h14v16H5zM15 4v16" /></IconBase>
+}
+export function BellIcon(props: IconProps) {
+  return <IconBase {...props}><path d="M6 16v-5a6 6 0 0112 0v5l2 2H4zM10 20a2 2 0 004 0" /></IconBase>
+}
+export function TextSizeIcon(props: IconProps) {
+  return <IconBase {...props}><path d="M4 19l5-14 5 14M6 14h6M16 9h5M18.5 9v10" /></IconBase>
+}
+export function ReturnIcon(props: IconProps) {
+  return <IconBase {...props}><path d="M9 14L4 9l5-5M4 9h10a6 6 0 010 12h-3" /></IconBase>
+}
+export function QuoteIcon(props: IconProps) {
+  return <IconBase {...props}><path d="M5 17c0-5 2-8 5-9M5 17h5v-5H5M14 17c0-5 2-8 5-9M14 17h5v-5h-5" /></IconBase>
+}
+export function GoalIcon(props: IconProps) {
+  return <IconBase {...props}><path d="M12 3a9 9 0 100 18 9 9 0 000-18zM12 8a4 4 0 100 8 4 4 0 000-8zM12 12h.01" /></IconBase>
+}
+export function SpeakIcon(props: IconProps) {
+  return <IconBase {...props}><path d="M4 9v6h4l5 4V5L8 9zM16 9a4 4 0 010 6M18.5 6.5a8 8 0 010 11" /></IconBase>
+}
+export function HighlighterIcon(props: IconProps) {
+  return <IconBase {...props}><path d="M14 4l6 6-8 8-6-6zM4 20h6M6 12l6 6" /></IconBase>
+}
+export function SpoilerIcon(props: IconProps) {
+  return <IconBase {...props}><path d="M12 3l9 16H3zM12 10v4M12 17h.01" /></IconBase>
+}
+export function TreeIcon(props: IconProps) {
+  return <IconBase {...props}><path d="M4 5h6M7 5v14M7 10h8M7 16h8M15 8v4M15 14v4" /></IconBase>
+}
+export function EyeOffIcon(props: IconProps) {
+  return <IconBase {...props}><path d="M3 3l18 18M10 6a9 9 0 0111 6 9 9 0 01-2 3M6 8a9 9 0 00-3 4 9 9 0 007 5" /></IconBase>
+}

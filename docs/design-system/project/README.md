@@ -40,6 +40,7 @@ Each has a guideline page (`components/<Name>/README.md`) and a live preview tha
 | Outline | BookCover, OutlineCards, PlotpointTiles, Shelf |
 | Draft | DraftPage |
 | Controls | Controls, HueSlider |
+| Reader | Reader |
 | Shell | AppShell, SkyToggle, ThemeSettings |
 | Foundations | Icons |
 
