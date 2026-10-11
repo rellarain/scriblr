@@ -151,6 +151,9 @@ def _state(rf: ReaderFile) -> ReaderState:
         joinedClubs=rf.joinedClubs,
         reports=rf.reports,
         blocked=rf.blocked,
+        settings=rf.settings,
+        myFlags=rf.myFlags,
+        positions=rf.positions,
     )
 
 

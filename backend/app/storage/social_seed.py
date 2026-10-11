@@ -173,6 +173,10 @@ def _chapters(book: CatalogBook) -> list[Chapter]:
     return [Chapter(n=i + 1, title=_CHAPTER_TITLES[(i + _h(book.id) % 5) % len(_CHAPTER_TITLES)], words=per) for i in range(total)]
 
 
+# A book's chapters, as its contents list and the e-reader show them.
+chapters = _chapters
+
+
 def book_detail(book: CatalogBook, readers_now: int, club_count: int) -> BookDetail:
     chapters = _chapters(book)
     total = len(chapters)

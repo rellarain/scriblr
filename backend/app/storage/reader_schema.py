@@ -187,14 +187,20 @@ class Review(BaseModel):
     reads: list[ReviewRead] = Field(default_factory=list)
 
 
+NoteKind = Literal["note", "highlight", "bookmark"]
+
+
 class Note(BaseModel):
-    """A highlight or note the reader kept on a book (the e-reader adds them; the Bookcard and Journal list them)."""
+    """A note, highlight or bookmark the reader kept on a book. One made in the e-reader names the chapter and the sentence it is on."""
 
     id: str
     bookId: str
     quote: str = Field(default="", max_length=2000)
     note: str = Field(default="", max_length=2000)
     at: datetime
+    kind: NoteKind = "note"
+    chapter: Optional[int] = None
+    key: Optional[str] = None
 
 
 class ClubPost(BaseModel):
@@ -333,6 +339,109 @@ class BookDetail(BaseModel):
     stats: BookStats
 
 
+class ReaderSettings(BaseModel):
+    """How the reader wants pages shown, kept with the account so every device reads the same way."""
+
+    mode: Literal["turn", "scroll"] = "turn"
+    textSize: int = Field(default=18, ge=12, le=32)
+    font: Literal["serif", "sans", "easy"] = "serif"
+    spacing: Literal["tight", "roomy"] = "roomy"
+    margins: Literal["narrow", "wide"] = "narrow"
+    tone: Literal["day", "night"] = "day"
+    highContrast: bool = False
+    focus: bool = False
+    # Whether the reader's reactions count in the anonymous totals the author sees.
+    shareReactions: bool = True
+    readAloudRate: float = Field(default=1.0, ge=0.5, le=2.0)
+
+
+class Mark(BaseModel):
+    """The reader's reaction to a sentence: how pleasant (like) and how unpleasant (dislike), each 0 to 3, and the flags they put on it."""
+
+    like: int = Field(default=0, ge=0, le=3)
+    dislike: int = Field(default=0, ge=0, le=3)
+    flags: list[str] = Field(default_factory=list)
+
+
+class MyFlag(BaseModel):
+    """A flag the reader made for themselves; like an author's, it takes one of the four classes (set in the User panel)."""
+
+    key: str
+    name: str = Field(max_length=40)
+
+
+class Position(BaseModel):
+    """Where the reader stopped in a book, and on which device (so another device can resume there)."""
+
+    chapter: int = Field(default=1, ge=1)
+    paragraph: int = Field(default=0, ge=0)
+    device: str = "This computer"
+    at: datetime
+
+
+class ChapterRef(BaseModel):
+    n: int
+    title: str
+    words: int
+    available: bool = True
+    reason: str = ""
+
+
+class BookText(BaseModel):
+    bookId: str
+    level: ReaderLevel
+    canRead: bool
+    reason: str = ""
+    chapters: list[ChapterRef]
+
+
+class ChapterFootnote(BaseModel):
+    id: str
+    key: str
+    title: str
+    text: str
+
+
+class FlaggedPassage(BaseModel):
+    """A sentence the author flagged: the flag decides, by the reader's class for it, how the sentence is shown."""
+
+    key: str
+    flagKey: str
+    name: str
+    detail: str = ""
+    defaultClass: FlagClass = "marked"
+
+
+class SentenceTotal(BaseModel):
+    key: str
+    pleasant: int = 0
+    unpleasant: int = 0
+
+
+class ChapterText(BaseModel):
+    bookId: str
+    n: int
+    title: str
+    words: int
+    paragraphs: list[str]
+    footnotes: list[ChapterFootnote] = Field(default_factory=list)
+    flags: list[FlaggedPassage] = Field(default_factory=list)
+    level: ReaderLevel
+    draft: bool = False
+    draftNote: str = ""
+
+
+class ReactionTotals(BaseModel):
+    """Anonymous totals for a chapter: other readers' reactions, and the reader's own when they share them."""
+
+    chapter: int
+    readers: int
+    pleasant: int
+    unpleasant: int
+    top: list[SentenceTotal] = Field(default_factory=list)
+    mine: int = 0
+
+
 class ReaderFile(BaseModel):
     schemaVersion: int = READER_SCHEMA_VERSION
     plan: Plan = Field(default_factory=Plan)
@@ -357,6 +466,11 @@ class ReaderFile(BaseModel):
     clubPosts: list[ClubPost] = Field(default_factory=list)
     reports: list[Report] = Field(default_factory=list)
     blocked: list[str] = Field(default_factory=list)
+    settings: ReaderSettings = Field(default_factory=ReaderSettings)
+    # book id -> sentence key -> the reader's reaction and flags (kept out of the account the pages load, because it can be large).
+    marks: dict[str, dict[str, Mark]] = Field(default_factory=dict)
+    myFlags: list[MyFlag] = Field(default_factory=list)
+    positions: dict[str, Position] = Field(default_factory=dict)
 
 
 class ReaderState(BaseModel):
@@ -382,3 +496,6 @@ class ReaderState(BaseModel):
     joinedClubs: list[str] = Field(default_factory=list)
     reports: list[Report] = Field(default_factory=list)
     blocked: list[str] = Field(default_factory=list)
+    settings: ReaderSettings = Field(default_factory=ReaderSettings)
+    myFlags: list[MyFlag] = Field(default_factory=list)
+    positions: dict[str, Position] = Field(default_factory=dict)

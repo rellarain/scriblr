@@ -6,7 +6,7 @@ from pydantic import BaseModel, Field
 
 from ..deps import get_app_data_storage_root, get_storage_root
 from ..storage import library, reader_social as social, reader_store as store, social_views
-from ..storage.reader_schema import BookCard, ClubView, FeedItem, ReaderLevel, ReaderState, ReportKind
+from ..storage.reader_schema import BookCard, ClubView, FeedItem, NoteKind, ReaderLevel, ReaderState, ReportKind
 
 router = APIRouter(prefix="/api/reader", tags=["reader-social"])
 
@@ -31,6 +31,9 @@ class NoteBody(BaseModel):
     bookId: str
     quote: str = Field(default="", max_length=2000)
     note: str = Field(default="", max_length=2000)
+    kind: NoteKind = "note"
+    chapter: Optional[int] = Field(default=None, ge=1)
+    key: Optional[str] = None
 
 
 class ClubBody(BaseModel):
@@ -119,7 +122,7 @@ def discard_draft(book_id: str, root: Path = Depends(get_app_data_storage_root))
 @router.post("/notes", response_model=ReaderState)
 def add_note(body: NoteBody, root: Path = Depends(get_app_data_storage_root), projects: Path = Depends(get_storage_root)) -> ReaderState:
     _book(body.bookId, projects)
-    return _run(social.add_note, root, body.bookId, body.quote, body.note)
+    return _run(social.add_note, root, body.bookId, body.quote, body.note, body.kind, body.chapter, body.key)
 
 
 @router.delete("/notes/{note_id}", response_model=ReaderState)

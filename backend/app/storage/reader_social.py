@@ -6,12 +6,13 @@ from datetime import datetime
 from pathlib import Path
 from typing import Optional
 
-from . import project_store, social_seed
+from . import project_store, reading_text, social_seed
 from .reader_schema import (
     REPORT_REASONS,
     Club,
     ClubPost,
     Note,
+    NoteKind,
     ReaderFile,
     ReaderLevel,
     ReaderState,
@@ -135,12 +136,15 @@ def discard_draft(root: Path, book_id: str) -> ReaderState:
     return _mutate(root, apply)
 
 
-def add_note(root: Path, book_id: str, quote: str, note: str) -> ReaderState:
-    if not quote.strip() and not note.strip():
+def add_note(root: Path, book_id: str, quote: str, note: str, kind: NoteKind = "note", chapter: Optional[int] = None, key: Optional[str] = None) -> ReaderState:
+    """A note, highlight or bookmark. One made in the e-reader names its chapter and sentence; a bookmark needs no text."""
+    if kind != "bookmark" and not quote.strip() and not note.strip():
         raise InvalidReaderOperationError("a note needs a quote or some text")
+    if key is not None and reading_text.clean_key(key) is None:
+        raise InvalidReaderOperationError("not a sentence key")
 
     def apply(rf: ReaderFile, now: datetime) -> None:
-        rf.notes.append(Note(id=project_store.new_id("note"), bookId=book_id, quote=quote.strip(), note=note.strip(), at=now))
+        rf.notes.append(Note(id=project_store.new_id("note"), bookId=book_id, quote=quote.strip(), note=note.strip(), at=now, kind=kind, chapter=chapter, key=key))
 
     return _mutate(root, apply)
 

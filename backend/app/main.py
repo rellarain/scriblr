@@ -19,6 +19,7 @@ from .api import (
     projects,
     publications,
     reader,
+    reader_reading,
     reader_social,
     resources,
     revisions,
@@ -103,6 +104,7 @@ def create_app(static_dir: Optional[Path] = None) -> FastAPI:
     app.include_router(library.router)
     app.include_router(reader.router)
     app.include_router(reader_social.router)
+    app.include_router(reader_reading.router)
 
     if static_dir is not None:
         # Registered last so it only catches what the routers above didn't --
