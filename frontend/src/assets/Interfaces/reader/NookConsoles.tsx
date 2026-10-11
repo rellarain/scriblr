@@ -2,6 +2,8 @@ import { useMemo, useState } from 'react'
 import type { CatalogBook, Holding } from '../../../api/reader'
 import { BagIcon, BellIcon, BookmarkIcon, EyeOffIcon, FollowIcon, GoalIcon, HeartIcon, HistoryIcon, PencilIcon, PlayIcon, ReturnIcon, SwapIcon, TrashIcon } from '../../icons'
 import { useStoredState } from '../writer/storage'
+import { ActivityCalendar as ActivityCalendarGrid, CalendarLegend } from '../../../components/ActivityCalendar'
+import { NumberInput } from '../../../components/NumberInput'
 import { Shelf } from '../writer/Shelf'
 import { buildActivityGrid, currentStreak, type ActivityMetric } from './activityGrid'
 import { Card, Meter, Stat } from './ReaderBits'
@@ -212,21 +214,11 @@ export function ActivityCalendar({ ctx }: { ctx: ReaderCtx }) {
   const grid = useMemo(() => buildActivityGrid(ctx.data.reader?.activity ?? {}, ctx.today, metric), [ctx.data.reader?.activity, ctx.today, metric])
   return (
     <Card title="Activity, last 12 months" Icon={GoalIcon}>
-      <div className="rdCal">
-        <div className="rdCalDays" aria-hidden="true"><span /><span>Mon</span><span /><span>Wed</span><span /><span>Fri</span><span /></div>
-        <div className="rdCalScroll">
-          <div className="rdCalMonths" style={{ gridTemplateColumns: `repeat(${grid.weeks}, 14px)` }}>
-            {grid.months.map(m => <span key={`${m.label}-${m.col}`} style={{ gridColumn: m.col }}>{m.label}</span>)}
-          </div>
-          <div className="rdCalGrid" role="img" aria-label={`${grid.total} ${metric} on ${grid.activeDays} days`}>
-            {grid.cells.map(c => <i key={c.date} className={`rdCalCell rdCalCell--${c.level < 0 ? 'x' : c.level}`} title={c.title} />)}
-          </div>
-        </div>
-      </div>
+      <ActivityCalendarGrid grid={grid} prefix="rd" unit={metric} />
       <div className="rdRow">
         {METRICS.map(m => <button key={m.key} type="button" className={metric === m.key ? 'rdChip rdChip--on rdChip--button' : 'rdChip rdChip--button'} aria-pressed={metric === m.key} onClick={() => setMetric(m.key)}>{m.label}</button>)}
         <span className="rdMuted">{grid.total.toLocaleString('en-US')} {metric} on {grid.activeDays} days</span>
-        <span className="rdCalLegend" aria-hidden="true">Less{[0, 1, 2, 3, 4].map(l => <i key={l} className={`rdCalCell rdCalCell--${l}`} />)}More</span>
+        <CalendarLegend prefix="rd" />
       </div>
     </Card>
   )
@@ -280,12 +272,12 @@ export function AnalyticsConsole({ ctx, size }: { ctx: ReaderCtx; size: 'tile' |
             </Card>
             <Card title="Goals" Icon={GoalIcon}>
               <label className="rdRow"><span className="rdGrow">Books this year</span>
-                <input className="rdField rdField--num" type="number" min={1} max={500} aria-label="Books to finish this year" value={goals.booksPerYear} onChange={e => setGoals({ ...goals, booksPerYear: Math.max(1, Number(e.target.value) || 1) })} />
+                <NumberInput className="rdField rdField--num" label="Books to finish this year" min={1} max={500} value={goals.booksPerYear} onChange={n => setGoals({ ...goals, booksPerYear: n })} />
               </label>
               <div className="rdRow"><span className="rdGrow">Finished</span><span>{finishedThisYear} of {goals.booksPerYear}</span></div>
               <Meter percent={(finishedThisYear / goals.booksPerYear) * 100} />
               <label className="rdRow"><span className="rdGrow">Pages a day</span>
-                <input className="rdField rdField--num" type="number" min={1} max={2000} aria-label="Pages to read a day" value={goals.pagesPerDay} onChange={e => setGoals({ ...goals, pagesPerDay: Math.max(1, Number(e.target.value) || 1) })} />
+                <NumberInput className="rdField rdField--num" label="Pages to read a day" min={1} max={2000} value={goals.pagesPerDay} onChange={n => setGoals({ ...goals, pagesPerDay: n })} />
               </label>
               <div className="rdRow"><span className="rdGrow">Today</span><span>{reader.activity[ctx.today]?.pages ?? 0} of {goals.pagesPerDay}</span></div>
               <Meter percent={((reader.activity[ctx.today]?.pages ?? 0) / goals.pagesPerDay) * 100} accent />

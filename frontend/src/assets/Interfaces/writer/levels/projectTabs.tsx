@@ -7,6 +7,8 @@ import ProjectEditor from '../ProjectEditor'
 import ProjectOutline from '../ProjectOutline'
 import type { HistoryScope, WriterWorkspace } from '../useWriterWorkspace'
 import { bookRows, categoryRows, plotCounts } from '../tiles/tileData'
+import WritingAnalytics from '../WritingAnalytics'
+import { useWordCounts } from '../useWordCounts'
 import HelpArticles from './HelpArticles'
 import PlotpointsTab from './PlotpointsTab'
 import { useTabbedLevel, type LevelTab } from './LevelTabs'
@@ -52,19 +54,26 @@ function OutlineSummary({ w }: { w: WriterWorkspace }) {
   )
 }
 
+// The project's books by words (against each book's own goal, when it has one), then how much was written each day.
 function AnalyticsSummary({ w }: { w: WriterWorkspace }) {
   const books = bookRows(w.outlineNodes)
-  const max = Math.max(1, ...books.map(b => b.chapters))
+  const counts = useWordCounts(w.activeProjectId)
+  const goalOf = (id: string) => w.outlineNodes.find(n => n.id === id)?.wordCountGoal ?? null
+  const max = Math.max(1, ...books.map(b => Math.max(counts.books[b.id] ?? 0, goalOf(b.id) ?? 0)))
   return (
     <div className="wrSummary">
       {books.length === 0 && <p className="wrMuted">No books yet.</p>}
-      {books.map(b => (
-        <div key={b.id} className="wrBarRow">
-          <div className="wrBarLabel"><span>{b.title}</span><span>{b.chapters} chapters</span></div>
-          <div className="wrBarTrack"><div className="wrBarFill" style={{ width: `${(b.chapters / max) * 100}%` }} /></div>
-        </div>
-      ))}
-      <p className="wrHint">Word counts and progress are coming.</p>
+      {books.map(b => {
+        const words = counts.books[b.id] ?? 0
+        const goal = goalOf(b.id)
+        return (
+          <div key={b.id} className="wrBarRow">
+            <div className="wrBarLabel"><span>{b.title}</span><span>{words.toLocaleString('en-US')}{goal ? ` of ${goal.toLocaleString('en-US')}` : ''} words · {b.chapters} chapters</span></div>
+            <div className="wrBarTrack"><div className="wrBarFill" style={{ width: `${(words / max) * 100}%` }} /></div>
+          </div>
+        )
+      })}
+      {w.activeProjectId && <WritingAnalytics projectIds={[w.activeProjectId]} />}
     </div>
   )
 }

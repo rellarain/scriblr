@@ -4,6 +4,7 @@ import { flushSettings } from '../../../../settings/settingsStore'
 import ThemeSettingsPanel from '../../../../theme/ThemeSettingsPanel'
 import { AnalyticsPanel, RoutinesPanel, Scratchpad, TasksPanel } from '../Dashboard'
 import ReadersPanel from '../ReadersPanel'
+import WritingAnalytics from '../WritingAnalytics'
 import { Placeholder } from '../shared'
 import type { WriterWorkspace } from '../useWriterWorkspace'
 import HelpArticles from './HelpArticles'
@@ -16,7 +17,7 @@ export function dashTabs(w: WriterWorkspace): LevelTab[] {
   return [
     { id: 'schedule', label: 'Schedule', Icon: CalendarIcon, searchable: true, render: c => <RoutinesPanel query={c.query} /> },
     { id: 'checklist', label: 'Checklist', Icon: CheckboxIcon, searchable: true, render: c => <TasksPanel query={c.query} /> },
-    { id: 'analytics', label: 'Analytics', Icon: BarChartIcon, render: () => <AnalyticsPanel projects={w.projects} outlines={w.projectOutlines} /> },
+    { id: 'analytics', label: 'Analytics', Icon: BarChartIcon, render: () => <><AnalyticsPanel projects={w.projects} outlines={w.projectOutlines} /><WritingAnalytics projectIds={w.projects.map(p => p.projectId)} /></> },
     { id: 'readers', label: 'Readers', Icon: PeopleIcon, render: () => <ReadersPanel /> },
     { id: 'scratchpad', label: 'Scratchpad', Icon: PencilIcon, searchable: true, render: c => <Scratchpad bare query={c.query} /> },
     { id: 'template', label: 'Project template', Icon: LayoutMiniIcon, render: () => <Placeholder title="Project Template" body="Manage the master project template here." /> },

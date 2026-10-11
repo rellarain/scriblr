@@ -38,3 +38,14 @@ The **Book level** (Outline) has a **Publish** tab, between Book details and Set
 - **Readers**: loans, sales, the author's share (a loan's first credit pays $3.00 and each more $1.00; a sale 70% of the price), the rating and reviews, and the readers' anonymous reactions by chapter (only from readers who share them). Money is simulated.
 
 The **Dash** has a **Readers** tab listing every published book with its loans, sales, earnings and rating.
+
+## Writing analytics
+
+The **Project level's Analytics tab** and the **Dash's Analytics tab** carry the Reader's analytics, for writing. The Project's tab first shows each book's words against its own goal; both then show (`WritingAnalytics`):
+
+- **This week**: words this week, words a writing day, the streak (days in a row with any writing, edits or revisions; a quiet today does not break it) and the best streak of the year.
+- **Writing, last 12 months** `.wrCal`: the Reader's calendar, a 14px square for each day of 53 weeks, a week to a column, Sunday first, shaded in four steps of the accent by the day's share of the busiest day. Words, Edits and Revisions switch what it counts; a hover says "1,200 words on Oct 11". A day's words are the net change in the drafts that day, so a day that cut more than it wrote is a quiet one. Days are UTC, as the backend records them.
+- **Words per day this week**: a bar for each of the last seven days.
+- **Goals**: words a day and words a week, kept on this machine, each with a meter against today and this week.
+
+At the Project level it is over that project; on the Dash, over every project. The calendar is the same component as the Reader's (`components/ActivityCalendar.tsx`, `lib/activityCalendar.ts`); the Writer draws it with the `wr` classes.
