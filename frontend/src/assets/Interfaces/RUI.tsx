@@ -1,19 +1,23 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { useLocation, useNavigate } from 'react-router-dom'
 import type { CatalogBook } from '../../api/reader'
-import { BookFaceIcon, CatalogIcon, FeedIcon, HistoryIcon, HomeIcon, JournalIcon, LibraryIcon, PagesIcon, PlayIcon, ShelfIcon, ShelvesIcon, StackIcon, TicketIcon, BarChartIcon } from '../icons'
+import { BackIcon, BarChartIcon, BellIcon, BookFaceIcon, CardIcon, CatalogIcon, CoverIcon, FaceIcon, FeedIcon, FrontIcon, GoalIcon, HistoryIcon, HomeIcon, JournalIcon, LibraryIcon, PagesIcon, PlayIcon, PlotIcon, ShelfIcon, ShelvesIcon, StackIcon, TicketIcon, TreeIcon } from '../icons'
 import { fillColorCss } from '../../theme/bookColors'
 import { useThemeState } from '../../theme/useTheme'
 import { useStoredState } from './writer/storage'
-import { BookcoverConsole } from './reader/BookConsoles'
-import { anyFull, resolve, withFull, type ConsoleStates } from './reader/consoleStates'
+import { BookcoverConsole, LevelBadge } from './reader/BookConsoles'
+import { BackmatterConsole, EdgeTabs, FrontmatterConsole, OutlineConsole, PlanConsole, PlotConsole, RevisionsConsole } from './reader/BookMatter'
+import { BookcardConsole, BookfaceConsole } from './reader/BookSocial'
+import { resolve, withFull, type ConsoleStates } from './reader/consoleStates'
 import { AnalyticsConsole, FeedConsole, JournalConsole, StackConsole } from './reader/NookConsoles'
 import { CatalogConsole, HistoryConsole, ShelfConsole, ShelvesConsole } from './reader/LibraryConsoles'
 import { BorrowDialog, PlanDialog } from './reader/ReaderDialogs'
+import { ReviewDialog } from './reader/ReviewDialog'
+import { levelOf } from './reader/readerSocial'
 import { ReaderPanel, type ConsoleDef } from './reader/ReaderPanel'
 import type { ReaderCtx } from './reader/readerContext'
 import { parseReaderPath, readerPath, type ReaderLocation, type ReaderPage } from './reader/readerRoutes'
-import { loadReader, useReader } from './reader/readerStore'
+import { loadBook, loadReader, useReader } from './reader/readerStore'
 import './reader/reader.scss'
 
 // The Reader (RUI): four pages that open one from the next, as the Writer's levels do. The Nook (home) holds the Reader's own things (the Stack,
@@ -28,7 +32,9 @@ const NOOK_IDS = ['stack', 'journal', 'analytics', 'feed']
 const NOOK_DEFAULTS: ConsoleStates = { stack: 'tile', journal: 'tile', analytics: 'tile' }
 const LIBRARY_IDS = ['catalog', 'shelves', 'shelf', 'history']
 const LIBRARY_DEFAULTS: ConsoleStates = { catalog: 'tile', shelves: 'tile' }
-const BOOK_IDS = ['cover']
+const BOOK_IDS = ['cover', 'face', 'card', 'front', 'back']
+// An alpha reader is also given the author's planning, read-only.
+const ALPHA_IDS = [...BOOK_IDS, 'outline', 'plot', 'plan', 'revisions']
 const BOOK_DEFAULTS: ConsoleStates = { cover: 'tile' }
 
 // The page's consoles: what is stored for them (and the URL's full console on top), and how a change is stored and written to the URL.
@@ -52,11 +58,13 @@ function RUI() {
   const { settings, activeZone } = useThemeState()
   const [planOpen, setPlanOpen] = useState(false)
   const [borrowing, setBorrowing] = useState<CatalogBook | null>(null)
+  const [reviewing, setReviewing] = useState<CatalogBook | null>(null)
   const [lastBookId, setLastBookId] = useStoredState<string>('scriblr.reader.lastBook', '')
   const today = useMemo(() => new Date().toISOString().slice(0, 10), [])
 
   useEffect(() => { void loadReader() }, [])
   useEffect(() => { if (loc.bookId) setLastBookId(loc.bookId) }, [loc.bookId, setLastBookId])
+  useEffect(() => { if (loc.bookId && data.status === 'ready') void loadBook(loc.bookId).catch(() => undefined) }, [loc.bookId, data.status])
 
   const themeHue = settings.zones[activeZone].palette.theme.h
   const book = loc.bookId ? data.bookById(loc.bookId) : undefined
@@ -71,8 +79,10 @@ function RUI() {
     data, today,
     openBook: id => navigate(readerPath({ page: 'book', bookId: id })),
     openLibrary: console => navigate(readerPath({ page: 'library', console: console ?? null })),
+    openPages: (id, chapter) => navigate(readerPath({ page: 'pages', bookId: id, chapter: chapter ?? null })),
     borrow: b => setBorrowing(b),
     openPlan: () => setPlanOpen(true),
+    review: b => setReviewing(b),
   }
 
   const order: ReaderPage[] = ['nook', 'library', 'book', 'pages']
@@ -84,8 +94,15 @@ function RUI() {
       <TicketIcon size={16} />{data.reader.balance} {data.reader.balance === 1 ? 'credit' : 'credits'}
     </button>
   )
+  const unread = data.reader?.notifications.filter(n => !n.read).length ?? 0
+  const bell = data.reader && (
+    <button type="button" className="rdIconBtn" aria-label={unread > 0 ? `Notifications, ${unread} new` : 'Notifications'} title="Notifications" onClick={() => navigate(readerPath({ page: 'nook', console: 'feed' }))}>
+      <BellIcon size={20} />{unread > 0 && <span className="rdDot">{unread}</span>}
+    </button>
+  )
   const right = (
     <>
+      {bell}
       {pill}
       {after.map(page => {
         const Icon = PAGE_ICON[page]
@@ -116,6 +133,7 @@ function RUI() {
         {content}
       </div>
       {planOpen && <PlanDialog ctx={ctx} onClose={() => setPlanOpen(false)} />}
+      {reviewing && <ReviewDialog ctx={ctx} book={reviewing} onClose={() => setReviewing(null)} />}
       {borrowing && <BorrowDialog ctx={ctx} book={borrowing} onClose={() => setBorrowing(null)} />}
     </main>
   )
@@ -146,12 +164,28 @@ function LibraryPage({ loc, ctx, color, right }: PageProps) {
 }
 
 function BookPage({ loc, ctx, color, right, book }: PageProps & { book: CatalogBook | undefined }) {
-  const { states, onStates } = usePageStates(loc, BOOK_IDS, BOOK_DEFAULTS)
+  const alpha = Boolean(book && ctx.data.reader && levelOf(ctx.data.reader, book.id) === 'alpha')
+  const { states, onStates } = usePageStates(loc, alpha ? ALPHA_IDS : BOOK_IDS, BOOK_DEFAULTS)
   if (!book) return <p className="rdEmpty" role="alert">That book is not in the library.</p>
   const consoles: ConsoleDef[] = [
-    { id: 'cover', label: 'Bookcover', Icon: BookFaceIcon, render: size => <BookcoverConsole ctx={ctx} book={book} size={size} /> },
+    { id: 'cover', label: 'Bookcover', Icon: CoverIcon, render: size => <BookcoverConsole ctx={ctx} book={book} size={size} /> },
+    { id: 'face', label: 'Bookface', Icon: FaceIcon, render: size => <BookfaceConsole ctx={ctx} book={book} size={size} /> },
+    { id: 'card', label: 'Bookcard', Icon: CardIcon, render: size => <BookcardConsole ctx={ctx} book={book} size={size} /> },
+    { id: 'front', label: 'Frontmatter', Icon: FrontIcon, render: size => <FrontmatterConsole ctx={ctx} book={book} size={size} /> },
+    { id: 'back', label: 'Backmatter', Icon: BackIcon, render: size => <BackmatterConsole ctx={ctx} book={book} size={size} /> },
   ]
-  return <ReaderPanel title={book.title} Icon={BookFaceIcon} color={color} consoles={consoles} states={states} onStates={onStates} right={right} className={anyFull(states) ? 'rdLevel--book' : 'rdLevel--book'} />
+  if (alpha) {
+    consoles.push(
+      { id: 'outline', label: 'Outline', Icon: TreeIcon, render: () => <OutlineConsole ctx={ctx} book={book} /> },
+      { id: 'plot', label: 'Plot', Icon: PlotIcon, render: () => <PlotConsole ctx={ctx} book={book} /> },
+      { id: 'plan', label: 'Plan', Icon: GoalIcon, render: () => <PlanConsole ctx={ctx} book={book} /> },
+      { id: 'revisions', label: 'Revisions', Icon: HistoryIcon, render: () => <RevisionsConsole ctx={ctx} book={book} /> },
+    )
+  }
+  return (
+    <ReaderPanel title={book.title} Icon={BookFaceIcon} color={color} consoles={consoles} states={states} onStates={onStates} right={right}
+      notice={<div className="rdNotice"><LevelBadge ctx={ctx} book={book} /></div>} edge={<EdgeTabs ctx={ctx} book={book} />} className="rdLevel--book" />
+  )
 }
 
 function PagesPage({ color, right, book, onBack }: { color: string; right: React.ReactNode; book: CatalogBook | undefined; onBack: () => void }) {

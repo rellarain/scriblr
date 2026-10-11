@@ -144,6 +144,36 @@
   .rdBookFace { flex: 1; min-width: 0; display: flex; flex-direction: column; justify-content: space-between; padding: 12px 10px; background: var(--rd-book); color: #fff; font-family: Georgia, 'Times New Roman', serif; box-shadow: inset 4px 0 0 var(--ov-sink-3); b { font-size: 20px; line-height: 1.1; } span { font: 700 10px/1.2 'Segoe UI', system-ui, sans-serif; letter-spacing: 1.2px; text-transform: uppercase; } }
   .rdBookPages { flex: 0 0 12px; border-radius: 0 3px 3px 0; background: repeating-linear-gradient(180deg, #f3ead8 0 2px, #d3c6ab 2px 3px); box-shadow: inset 3px 0 0 var(--ov-sink-2); }
 
+  // ---------------------------------------------------------------- the Book page's community: avatars, reviews, clubs, tabs
+  .rdAv { flex: 0 0 auto; display: inline-grid; place-items: center; width: 32px; height: 32px; background: var(--ov-sink-3); font-size: 12px; font-weight: 700; }
+  .rdBadge { display: inline-flex; align-items: center; gap: 8px; padding: 5px 12px; background: var(--accent); color: var(--zone-on-accent, #fff); font-size: 12px; font-weight: 700; letter-spacing: 1px; text-transform: uppercase; }
+  .rdNotice { padding: 0 18px 8px; }
+  .rdDot { position: absolute; top: 2px; right: 2px; min-width: 16px; height: 16px; padding: 0 4px; display: grid; place-items: center; background: var(--alert); color: var(--on-alert); font-size: 10px; font-weight: 700; }
+  .rdIconBtn { position: relative; }
+  .rdBtn--on { background: var(--accent); color: var(--zone-on-accent, #fff); &:hover:not(:disabled) { background: var(--accent-hover); } }
+  .rdItem--review { align-items: flex-start; }
+  .rdItem--nested { margin-left: 28px; }
+  .rdThread { list-style: none; }
+  .rdPostText { margin: 0; font-size: 14px; line-height: 1.5; white-space: pre-wrap; }
+  .rdSpoiler { align-self: flex-start; }
+  .rdSpoilerOpen { cursor: pointer; padding: 8px 10px; background: var(--ov-sink-2); }
+  .rdCompose { display: flex; flex-direction: column; gap: 8px; }
+  .rdText { width: 100%; padding: 10px 12px; border: 0; border-radius: 0; resize: vertical; background: var(--rd-input); color: var(--rd-input-ink); font-size: 14px; line-height: 1.5; box-sizing: border-box; &::placeholder { color: var(--rd-input-hint); } }
+  .rdFieldLabel { display: flex; flex-direction: column; gap: 6px; font-size: 11px; font-weight: 700; letter-spacing: 1.5px; text-transform: uppercase; }
+  .rdBars { display: flex; flex-direction: column; gap: 6px; }
+  .rdBarRow { display: grid; grid-template-columns: 110px minmax(0, 1fr) 36px; gap: 10px; align-items: center; font-size: 13px; b { text-align: right; } }
+
+  // The Writer's edge tabs, down the page's right edge: the chapter the reader has reached stands out.
+  .rdLevel--edge { padding-right: 38px; }
+  .rdEdge { position: absolute; right: 0; top: 70px; z-index: 2; display: flex; flex-direction: column; gap: 2px; max-height: calc(100% - 80px); overflow: auto; }
+  .rdEdgeTab {
+    width: 34px; height: 34px; display: grid; place-items: center; font-size: 12px; font-weight: 700; color: var(--rd-ink);
+    background: color-mix(in srgb, var(--rd-f) calc(60% + var(--rd-tab, 0%)), black); border-radius: 0 4px 4px 0; box-shadow: inset -6px 0 0 var(--ov-sink-2);
+    &:hover { background: color-mix(in srgb, var(--rd-f) calc(60% + var(--rd-tab, 0%)), white); }
+    &:focus-visible { outline: 2px solid var(--accent-hover); outline-offset: -2px; }
+    &--on { width: 40px; background: var(--accent); color: var(--zone-on-accent, #fff); box-shadow: inset -6px 0 0 var(--ov-sink-3); }
+  }
+
   // ---------------------------------------------------------------- dialogs
   .rdModalBg { position: absolute; inset: 0; z-index: 50; display: flex; justify-content: center; align-items: flex-start; padding: 40px 12px; overflow: auto; background: var(--scrim); }
   .rdModal { background: var(--paper); color: var(--paper-ink); width: min(820px, 100%); border: 1px solid var(--paper-line); }
@@ -158,6 +188,16 @@
     .rdMuted { color: var(--paper-muted); opacity: 1; }
     .rdTable td { border-top-color: var(--paper-line); }
   }
+  .rdTabs { display: flex; flex-wrap: wrap; gap: 2px; border-bottom: 3px solid var(--accent); }
+  .rdTab {
+    display: inline-flex; align-items: center; gap: 6px; height: 40px; padding: 0 16px; background: var(--paper-line); color: var(--paper-ink); font-size: 13px; font-weight: 700; border-radius: 6px 6px 0 0;
+    &:hover:not(:disabled) { background: var(--paper-soft); }
+    &:disabled { opacity: 0.6; }
+    &--on { background: var(--accent); color: var(--zone-on-accent, #fff); }
+  }
+  .rdModal .rdFieldLabel { color: var(--paper-muted); }
+  .rdModal .rdText { background: var(--paper); color: var(--paper-ink); border: 1px solid var(--paper-line); }
+  .rdModal .rdBtn--small.rdBtn--pri, .rdModal .rdBtn--on { background: var(--accent); color: var(--zone-on-accent, #fff); }
   .rdBorrow { display: grid; grid-template-columns: 110px minmax(0, 1fr); gap: 16px; }
   .rdBorrowBody { display: flex; flex-direction: column; gap: 12px; min-width: 0; }
 }

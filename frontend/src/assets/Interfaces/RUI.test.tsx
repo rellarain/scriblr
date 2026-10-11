@@ -2,7 +2,7 @@ import { render, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { MemoryRouter, useLocation } from 'react-router-dom'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import type { CatalogBook, ReaderState } from '../../api/reader'
+import type { BookCard, BookDetail, CatalogBook, ClubView, ReaderState } from '../../api/reader'
 import { __resetSettingsForTests } from '../../settings/settingsStore'
 import RUI from './RUI'
 import { __resetReaderForTests } from './reader/readerStore'
@@ -17,8 +17,29 @@ const BOOKS = [book({}), book({ id: 'thaw', title: 'Thaw', hue: 330, wordCount: 
 const state = (over: Partial<ReaderState> = {}): ReaderState => ({
   plan: { extraCredits: 0 }, planPriceCents: 600, creditsPerMonth: 1, balance: 1,
   ledger: [{ id: 'l1', at: '2026-10-01T00:00:00Z', kind: 'grant', delta: 1, note: 'Monthly credits for 2026-10', bookId: null, holdingId: null }],
-  holdings: [], toRead: [], wishlist: [], progress: {}, activity: {}, flagClasses: {}, notifications: [], ...over,
+  holdings: [], toRead: [], wishlist: [], progress: {}, activity: {}, flagClasses: {}, notifications: [], levels: {}, criteriaNames: ['Plot', 'Prose'], reviews: [], notes: [], following: [], joinedClubs: [], reports: [], blocked: [], ...over,
 })
+
+const CARD: BookCard = {
+  bookId: 'cold-harbor', rating: 8.8, ratings: 1208,
+  criteria: [{ name: 'Plot', average: 8.5, count: 3 }],
+  reviews: [
+    { id: 'seed-cold-harbor-0', readerId: 'r-sol', name: 'Sol Marsh', initials: 'SM', score: 9, criteria: { Plot: 9 }, comment: 'A quiet, exact book.', spoilerEssay: 'The ledgers were the plot.', reads: 2, at: '2026-10-05T00:00:00Z', edited: false, mine: false },
+    { id: 'seed-cold-harbor-1', readerId: 'r-rue', name: 'Rue Tanner', initials: 'RT', score: 7, criteria: {}, comment: 'Slow but worth it.', spoilerEssay: '', reads: 1, at: '2026-10-01T00:00:00Z', edited: false, mine: false },
+  ],
+}
+const DETAIL: BookDetail = {
+  bookId: 'cold-harbor', authorNote: 'I wrote this by a harbor.',
+  contents: [{ n: 1, title: 'The harbor at dawn', words: 7000 }, { n: 2, title: 'Two sets of books', words: 7000 }],
+  glossary: [{ title: 'Weir', meta: 'A low dam.', indent: 0 }], bibliography: ['A source.'], index: ['tide 3'], appendix: ['A. Tide table'],
+  planning: { outline: [{ title: 'Act 1', meta: '4 chapters', indent: 0 }], plot: [{ title: 'A secret is shared', meta: 'Placed on chapter 3', indent: 0 }], plotPath: 'Romance', goalWords: 80000, wordsNow: 47000, chaptersOutlined: 5, chaptersTotal: 11, publishTarget: 'Spring', revisions: [{ title: 'Tighten the fog', meta: 'Chapter 3', indent: 0 }] },
+  stats: { readingNow: 312, averageMinutes: 320, finishPercent: 71, leaveBars: [20, 18, 15, 12, 10, 8, 6, 4], clubs: 1 },
+}
+const CLUBS: ClubView[] = [{
+  club: { id: 'slow-burners', name: 'Slow Burners', description: 'Quiet novels.', bookId: 'cold-harbor', meets: 'Sundays', nextMeetingAt: '2026-10-18T19:00:00Z', members: ['r-rue'], mine: false },
+  joined: false, memberCount: 1,
+  posts: [{ id: 'p1', clubId: 'slow-burners', authorId: 'r-rue', text: 'Nothing happens, beautifully.', at: '2026-10-09T00:00:00Z', spoiler: false, replyTo: null }],
+}]
 
 interface Call { method: string; url: string; body: unknown }
 let calls: Call[]
@@ -35,6 +56,28 @@ function stubFetch() {
     if (url === '/api/reader' && method === 'GET') return json(reader)
     if (url.startsWith('/api/library/books?')) return json({ total: BOOKS.length, books: BOOKS })
     if (url.startsWith('/api/library/recommendations')) return json([{ book: BOOKS[1], match: 80, why: ['The next book.'] }])
+    if (url === '/api/library/readers') return json([{ id: 'r-rue', name: 'Rue Tanner', initials: 'RT', bio: '' }, { id: 'r-sol', name: 'Sol Marsh', initials: 'SM', bio: '' }])
+    if (url.endsWith('/detail')) return json(DETAIL)
+    if (url === '/api/reader/books/cold-harbor/card') return json(CARD)
+    if (url === '/api/reader/clubs' && method === 'GET') return json(CLUBS)
+    if (url === '/api/reader/feed') return json([])
+    if (url.startsWith('/api/reader/levels/')) {
+      reader = state({ ...reader, levels: body.level ? { [url.split('/').pop() as string]: { level: body.level, invitedBy: null, override: true } } : {} })
+      return json(reader)
+    }
+    if (url === '/api/reader/following/r-sol' && method === 'PUT') { reader = state({ ...reader, following: ['r-sol'] }); return json(reader) }
+    if (url === '/api/reader/clubs/slow-burners/membership' && method === 'PUT') { reader = state({ ...reader, joinedClubs: ['slow-burners'] }); CLUBS[0] = { ...CLUBS[0], joined: true, memberCount: 2 }; return json(reader) }
+    if (url === '/api/reader/clubs/slow-burners/posts') { CLUBS[0] = { ...CLUBS[0], posts: [...CLUBS[0].posts, { id: 'mine1', clubId: 'slow-burners', authorId: 'me', text: body.text, at: '2026-10-11T00:00:00Z', spoiler: body.spoiler, replyTo: body.replyTo }] }; return json(reader) }
+    if (url === '/api/reader/reports' && method === 'POST') { reader = state({ ...reader, reports: [{ id: 'rep1', kind: body.kind, targetId: body.targetId, reason: body.reason, at: '2026-10-11T00:00:00Z' }] }); return json(reader) }
+    if (url === '/api/reader/reviews/cold-harbor' && method === 'PUT') {
+      const read = { n: 1, status: 'draft' as const, score: body.score, criteria: body.criteria, comment: body.comment, spoilerEssay: body.spoilerEssay, noteIds: body.noteIds, startedAt: '2026-10-11T00:00:00Z', postedAt: null, editedAt: null }
+      reader = state({ ...reader, reviews: [{ bookId: 'cold-harbor', reads: [read] }] })
+      return json(reader)
+    }
+    if (url === '/api/reader/reviews/cold-harbor/post') {
+      reader = state({ ...reader, reviews: reader.reviews.map(r => ({ ...r, reads: r.reads.map(x => ({ ...x, status: 'posted' as const, postedAt: '2026-10-11T01:00:00Z' })) })) })
+      return json(reader)
+    }
     if (url === '/api/reader/borrow') {
       reader = state({
         balance: 0,
@@ -57,6 +100,7 @@ function Where() {
 const open = (path: string) => render(<MemoryRouter initialEntries={[path]}><RUI /><Where /></MemoryRouter>)
 
 beforeEach(() => {
+  CLUBS[0] = { ...CLUBS[0], joined: false, memberCount: 1, posts: CLUBS[0].posts.slice(0, 1) }
   window.localStorage.clear()
   __resetSettingsForTests()
   __resetReaderForTests()
@@ -148,6 +192,113 @@ describe('the Reader', () => {
     expect(screen.getByRole('button', { name: 'Back to Nook' })).toBeTruthy()
     expect(screen.getByRole('button', { name: 'Back to Library' })).toBeTruthy()
     expect(screen.getByText(/Grief · marked/)).toBeTruthy()
+  })
+
+  it('shows the level the author invited the reader to, and a free read for an alpha or delta invitation', async () => {
+    reader = state({ levels: { 'cold-harbor': { level: 'delta', invitedBy: 'Mara Quill', override: false } } })
+    open('/read/book/cold-harbor')
+    expect(await screen.findByText('Reading as Delta')).toBeTruthy()
+    expect(screen.getAllByText(/invited by Mara Quill/).length).toBe(2) // the badge and the free chip
+    expect(screen.queryByRole('button', { name: /Borrow · 1 credit/ })).toBeNull()
+    expect(screen.getByRole('button', { name: /Start reading/ })).toBeTruthy()
+  })
+
+  it('gives an alpha reader the read-only planning consoles', async () => {
+    reader = state({ levels: { 'cold-harbor': { level: 'alpha', invitedBy: 'Mara Quill', override: false } } })
+    open('/read/book/cold-harbor')
+    const bar = await screen.findByRole('toolbar', { name: /consoles/ })
+    for (const name of ['Outline', 'Plot', 'Plan', 'Revisions']) expect(within(bar).getByRole('button', { name })).toBeTruthy()
+  })
+
+  it('has the five book consoles and no planning consoles at the final edition', async () => {
+    open('/read/book/cold-harbor')
+    const bar = await screen.findByRole('toolbar', { name: /consoles/ })
+    for (const name of ['Bookcover', 'Bookface', 'Bookcard', 'Frontmatter', 'Backmatter']) expect(within(bar).getByRole('button', { name })).toBeTruthy()
+    expect(within(bar).queryByRole('button', { name: 'Outline' })).toBeNull()
+  })
+
+  it('switches the level to try every state, from the full Bookcover', async () => {
+    const user = userEvent.setup()
+    open('/read/book/cold-harbor/cover')
+    const group = await screen.findByRole('group', { name: 'Read this book as' })
+    await user.click(within(group).getByRole('button', { name: 'Beta' }))
+    await waitFor(() => expect(calls.find(c => c.url === '/api/reader/levels/cold-harbor')?.body).toEqual({ level: 'beta' }))
+    expect(await screen.findByText('Reading as Beta')).toBeTruthy()
+  })
+
+  it('shows what readers say and hides a review the reader reports', async () => {
+    const user = userEvent.setup()
+    open('/read/book/cold-harbor/card')
+    const list = await screen.findByRole('list', { name: 'Reviews' })
+    expect(within(list).getByText('Sol Marsh')).toBeTruthy()
+    expect(within(list).getByText('Read 2 times')).toBeTruthy()
+    expect(screen.getByText('8.8')).toBeTruthy()
+    await user.click(within(list).getByRole('button', { name: /Hide or report the review by Sol Marsh/ }))
+    await user.click(within(list).getByRole('button', { name: 'Spoiler' }))
+    await waitFor(() => expect(calls.find(c => c.url === '/api/reader/reports')?.body).toEqual({ kind: 'review', targetId: 'seed-cold-harbor-0', reason: 'spoiler' }))
+    await waitFor(() => expect(screen.queryByText('Sol Marsh')).toBeNull())
+    expect(await screen.findByText(/1 hidden by you/)).toBeTruthy()
+  })
+
+  it('keeps a spoiler essay shut until it is tapped, and drops it when spoilers are hidden', async () => {
+    const user = userEvent.setup()
+    open('/read/book/cold-harbor/card')
+    await screen.findByRole('list', { name: 'Reviews' })
+    expect(screen.queryByText('The ledgers were the plot.')).toBeNull()
+    await user.click(screen.getByRole('button', { name: /Spoiler essay · tap to reveal/ }))
+    expect(screen.getByText('The ledgers were the plot.')).toBeTruthy()
+    await user.click(screen.getByRole('button', { name: 'Hide spoilers' }))
+    expect(screen.queryByText('The ledgers were the plot.')).toBeNull()
+    expect(screen.queryByRole('button', { name: /Spoiler essay/ })).toBeNull()
+  })
+
+  it('follows a reviewer from the Bookcard', async () => {
+    const user = userEvent.setup()
+    open('/read/book/cold-harbor/card')
+    await user.click(await screen.findByRole('button', { name: 'Follow Sol Marsh' }))
+    await waitFor(() => expect(calls.some(c => c.url === '/api/reader/following/r-sol' && c.method === 'PUT')).toBe(true))
+    expect(await screen.findByRole('button', { name: 'Unfollow Sol Marsh' })).toBeTruthy()
+  })
+
+  it('joins a club in Bookface and posts in its thread, with a spoiler marked', async () => {
+    const user = userEvent.setup()
+    open('/read/book/cold-harbor/face')
+    expect(await screen.findByText('312')).toBeTruthy()
+    await user.click(screen.getByRole('button', { name: 'Join Slow Burners' }))
+    await waitFor(() => expect(calls.some(c => c.url === '/api/reader/clubs/slow-burners/membership' && c.method === 'PUT')).toBe(true))
+    await user.click(await screen.findByRole('button', { name: 'Slow Burners' }))
+    expect(await screen.findByText('Nothing happens, beautifully.')).toBeTruthy()
+    await user.type(screen.getByLabelText('Write a post'), 'Chapter 4 surprised me.')
+    await user.click(screen.getByRole('checkbox', { name: 'Contains spoilers' }))
+    await user.click(screen.getByRole('button', { name: 'Post' }))
+    await waitFor(() => expect(calls.find(c => c.url === '/api/reader/clubs/slow-burners/posts')?.body).toEqual({ text: 'Chapter 4 surprised me.', spoiler: true, replyTo: null }))
+    expect(await screen.findByRole('button', { name: /Spoiler post · tap to reveal/ })).toBeTruthy()
+  })
+
+  it('autosaves a review draft and posts it from the paper', async () => {
+    const user = userEvent.setup()
+    open('/read/book/cold-harbor/card')
+    await user.click(await screen.findByRole('button', { name: /Open full review/ }))
+    const dialog = await screen.findByRole('dialog', { name: /Review · Cold Harbor/ })
+    expect(within(dialog).getByRole('tab', { name: 'First read' })).toBeTruthy()
+    expect(within(dialog).getByRole('button', { name: /Start a re-read/ }).hasAttribute('disabled')).toBe(true)
+    expect(within(dialog).getByRole('button', { name: /Post review/ }).hasAttribute('disabled')).toBe(true)
+    await user.click(within(dialog).getByRole('button', { name: '9' }))
+    await user.type(within(dialog).getByPlaceholderText(/What stayed with you/), 'Exact and quiet.')
+    await waitFor(() => expect(calls.filter(c => c.url === '/api/reader/reviews/cold-harbor' && c.method === 'PUT').length).toBeGreaterThan(0), { timeout: 3000 })
+    await user.click(within(dialog).getByRole('button', { name: /Post review/ }))
+    await waitFor(() => expect(calls.some(c => c.url === '/api/reader/reviews/cold-harbor/post')).toBe(true))
+    const saved = calls.filter(c => c.url === '/api/reader/reviews/cold-harbor' && c.method === 'PUT').pop()?.body as { score: number; comment: string }
+    expect(saved.score).toBe(9)
+    expect(saved.comment).toBe('Exact and quiet.')
+    expect(await within(dialog).findByText('Posted, public')).toBeTruthy()
+  })
+
+  it('shows the edge tabs of a book, with the chapter reached raised', async () => {
+    open('/read/book/cold-harbor')
+    const tabs = await screen.findByRole('navigation', { name: 'Chapters' })
+    expect(within(tabs).getAllByRole('button')).toHaveLength(2)
+    expect(within(tabs).getByRole('button', { name: /Chapter 1/ }).getAttribute('aria-current')).toBe('true')
   })
 
   it('says so when a book is not in the library', async () => {

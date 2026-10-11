@@ -3,6 +3,7 @@ import { MemoryRouter } from 'react-router-dom'
 import App from '../App'
 import RUI from '../assets/Interfaces/RUI'
 import { BorrowDialog, PlanDialog } from '../assets/Interfaces/reader/ReaderDialogs'
+import { ReviewDialog } from '../assets/Interfaces/reader/ReviewDialog'
 import type { ReaderCtx } from '../assets/Interfaces/reader/readerContext'
 import { loadReader, useReader } from '../assets/Interfaces/reader/readerStore'
 import * as Icons from '../assets/icons'
@@ -232,23 +233,24 @@ function ThemeSettingsCard() {
 }
 
 // The Reader at a page, or one of its dialogs standing over it (the real RUI, run against the mock library).
-const READER_PATHS: Record<string, string> = { nook: '/read', library: '/read/library', catalog: '/read/library/catalog', book: '/read/book/lorem-ipsum/cover' }
-function ReaderDialogHost({ kind }: { kind: 'plan' | 'borrow' }) {
+const READER_PATHS: Record<string, string> = { nook: '/read', library: '/read/library', catalog: '/read/library/catalog', book: '/read/book/lorem-ipsum/cover', face: '/read/book/lorem-ipsum/face', card: '/read/book/lorem-ipsum/card', delta: '/read/book/sit-amet/cover' }
+function ReaderDialogHost({ kind }: { kind: 'plan' | 'borrow' | 'review' }) {
   const data = useReader()
   useEffect(() => { void loadReader() }, [])
-  const book = data.bookById('consectetur')
-  const ctx: ReaderCtx = { data, today: new Date().toISOString().slice(0, 10), openBook: () => {}, openLibrary: () => {}, borrow: () => {}, openPlan: () => {} }
+  const book = data.bookById(kind === 'review' ? 'lorem-ipsum' : 'consectetur')
+  const ctx: ReaderCtx = { data, today: new Date().toISOString().slice(0, 10), openBook: () => {}, openLibrary: () => {}, openPages: () => {}, borrow: () => {}, openPlan: () => {}, review: () => {} }
   return (
     <main className="rUI wr rdRoot">
       {data.status === 'ready' && kind === 'plan' && <PlanDialog ctx={ctx} onClose={() => {}} />}
       {data.status === 'ready' && kind === 'borrow' && book && <BorrowDialog ctx={ctx} book={book} onClose={() => {}} />}
+      {data.status === 'ready' && kind === 'review' && book && <ReviewDialog ctx={ctx} book={book} onClose={() => {}} />}
     </main>
   )
 }
 function ReaderCard({ view }: { view: string }) {
   return (
     <div className="uiPvReader">
-      {view === 'plan' || view === 'borrow'
+      {view === 'plan' || view === 'borrow' || view === 'review'
         ? <ReaderDialogHost kind={view} />
         : <MemoryRouter key={view} initialEntries={[READER_PATHS[view] ?? '/read']}><RUI /></MemoryRouter>}
     </div>
@@ -267,7 +269,7 @@ function SkyCard() {
 
 const WRITER_VIEWS = [{ id: 'dash', label: 'Dash' }, { id: 'project', label: 'Project' }, { id: 'book', label: 'Outline' }, { id: 'chapter', label: 'Draft' }, { id: 'preview', label: 'Preview' }]
 
-const READER_VIEWS = [{ id: 'nook', label: 'Nook' }, { id: 'library', label: 'Library' }, { id: 'catalog', label: 'Catalog' }, { id: 'book', label: 'Book' }, { id: 'plan', label: 'Plan' }, { id: 'borrow', label: 'Borrow' }]
+const READER_VIEWS = [{ id: 'nook', label: 'Nook' }, { id: 'library', label: 'Library' }, { id: 'catalog', label: 'Catalog' }, { id: 'book', label: 'Book' }, { id: 'face', label: 'Bookface' }, { id: 'card', label: 'Bookcard' }, { id: 'delta', label: 'Delta invite' }, { id: 'plan', label: 'Plan' }, { id: 'borrow', label: 'Borrow' }, { id: 'review', label: 'Review' }]
 
 const META = new Map(CARD_META.map(m => [m.id, m]))
 const card = (id: string, rest: Omit<CardDef, 'id' | 'title' | 'group' | 'summary' | 'height'>): CardDef => {

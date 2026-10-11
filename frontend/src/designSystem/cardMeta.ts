@@ -46,7 +46,7 @@ export const CARD_META: CardMeta[] = [
   },
   {
     id: 'reader', dir: 'Reader', title: 'Reader: pages, rails and consoles', group: 'Reader', height: 760,
-    summary: 'The Nook, the Library and a book: earlier pages as rails, consoles as an icon, a tile or the full console, the credit pill, and the plan and borrow dialogs.',
+    summary: 'The Nook, the Library and a book: earlier pages as rails, consoles as an icon, a tile or the full console, the credit pill, the Book page with its level badge, edge tabs, clubs and reviews, and the plan, borrow and review dialogs.',
   },
   {
     id: 'app-shell', dir: 'AppShell', title: 'App shell: header, sidebar and sky toggle', group: 'Shell', height: 640,

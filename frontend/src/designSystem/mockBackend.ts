@@ -2,7 +2,8 @@ import { DEFAULT_UI_SETTINGS, defaultThemeSettings } from '../theme/defaults'
 import type { OutlineNode, OutlineTree, PlotNode, PlotTree, ProjectIndex, ProjectSummaryResponse, Publication } from '../api/types'
 import type { DraftChapter, ProjectAnalytics } from '../types'
 import type { Holding, ReaderState } from '../api/reader'
-import { READER_BOOKS, readerFixture, recommendationsFixture } from './readerFixtures'
+import { createMockSocial } from './mockSocial'
+import { READER_BOOKS, READERS, bookDetailFixture, readerFixture, recommendationsFixture } from './readerFixtures'
 
 // A pretend backend for the design system's previews: the real Writer (useWriterWorkspace and everything under it) talks to
 // `/api/...` with fetch, so the previews run the real app against this in-memory project. The labels are the app's own (a book,
@@ -155,6 +156,7 @@ export function createMockBackend() {
   const projects = new Map<string, FixtureProject>([[FIXTURE_PROJECT_ID, buildProject(FIXTURE_PROJECT_ID)]])
   // The Reader's account: borrowing, buying and the plan change it; the rest of its actions answer with it as it stands.
   let reader: ReaderState = readerFixture()
+  const socialRoute = createMockSocial(() => reader, next => { reader = next })
 
   function readerRoute(method: string, rest: string[], body: unknown): Response {
     const b = (body ?? {}) as { bookId?: string; credits?: number; extraCredits?: number }
@@ -177,9 +179,11 @@ export function createMockBackend() {
     const parts = bare.split('/').filter(Boolean).map(decodeURIComponent)
     if (parts[0] === 'user-settings') return json({ theme: defaultThemeSettings(), ui: DEFAULT_UI_SETTINGS, kv: {}, migratedFromLocal: true })
     if (parts[0] === 'resources') return json({ schemaVersion: 1, nodes: [], content: {} })
-    if (parts[0] === 'reader') return readerRoute(method, parts.slice(1), body)
+    if (parts[0] === 'reader') return socialRoute(method, parts.slice(1), body) ?? readerRoute(method, parts.slice(1), body)
     if (parts[0] === 'library') {
       if (parts[1] === 'recommendations') return json(recommendationsFixture())
+      if (parts[1] === 'readers') return json(READERS)
+      if (parts[1] === 'books' && parts[3] === 'detail') return json(bookDetailFixture(parts[2]))
       if (parts[1] === 'books') {
         const q = (new URLSearchParams(search).get('q') ?? '').toLowerCase()
         const books = READER_BOOKS.filter(book => !q || `${book.title} ${book.authorName}`.toLowerCase().includes(q))

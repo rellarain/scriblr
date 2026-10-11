@@ -1,12 +1,13 @@
 import { useMemo, useState } from 'react'
 import type { CatalogBook, Holding } from '../../../api/reader'
-import { BagIcon, BellIcon, BookmarkIcon, GoalIcon, HeartIcon, HistoryIcon, PlayIcon, ReturnIcon, SwapIcon, TrashIcon } from '../../icons'
+import { BagIcon, BellIcon, BookmarkIcon, EyeOffIcon, FollowIcon, GoalIcon, HeartIcon, HistoryIcon, PencilIcon, PlayIcon, ReturnIcon, SwapIcon, TrashIcon } from '../../icons'
 import { useStoredState } from '../writer/storage'
 import { Shelf } from '../writer/Shelf'
 import { buildActivityGrid, currentStreak, type ActivityMetric } from './activityGrid'
 import { Card, Meter, Stat } from './ReaderBits'
 import type { ReaderCtx } from './readerContext'
 import { dollars, dueText, months, plural, shortDate } from './readerFormat'
+import { latestRead, personName, postedReads, reviewOf } from './readerSocial'
 import { progressMap, shelfGroupsOf, type ShelfSection } from './readerShelf'
 
 // ---------------------------------------------------------------- Stack
@@ -19,7 +20,7 @@ function activeHoldings(ctx: ReaderCtx): Array<{ holding: Holding; book: Catalog
     .flatMap(h => { const book = bookById(h.bookId); return book ? [{ holding: h, book }] : [] })
 }
 
-function LendForm({ ctx, holding }: { ctx: ReaderCtx; holding: Holding }) {
+export function LendForm({ ctx, holding }: { ctx: ReaderCtx; holding: Holding }) {
   const [to, setTo] = useState('')
   const [length, setLength] = useState(1)
   const [error, setError] = useState<string | null>(null)
@@ -147,18 +148,55 @@ export function JournalConsole({ ctx, size }: { ctx: ReaderCtx; size: 'tile' | '
   const { reader } = ctx.data
   if (!reader) return null
   const finished = Object.entries(reader.progress).filter(([, p]) => p.finishedAt)
+  const unreviewed = finished.filter(([id]) => postedReads(reviewOf(reader, id)) === 0)
+  const open = (id: string) => { const b = ctx.data.bookById(id); if (b) ctx.review(b) }
   return (
     <>
       <Card title="Finished" Icon={GoalIcon}>
-        {finished.length === 0 ? <p className="rdMuted">Nothing finished yet. A finished book is ready for a review.</p> : (
+        {unreviewed.length === 0 ? <p className="rdMuted">Nothing waiting for a review. A finished book is ready for one.</p> : (
           <ul className="rdList">
-            {finished.map(([id]) => <li key={id} className="rdItem"><b>{ctx.data.bookById(id)?.title ?? id}</b><span className="rdMuted">Ready for a review</span></li>)}
+            {unreviewed.map(([id]) => (
+              <li key={id} className="rdItem">
+                <div className="rdItemMain"><b>{ctx.data.bookById(id)?.title ?? id}</b><span className="rdMuted">Ready for a review</span></div>
+                <button type="button" className="rdBtn" onClick={() => open(id)}><PencilIcon size={16} />Review</button>
+              </li>
+            ))}
+          </ul>
+        )}
+      </Card>
+      <Card title="My reviews" Icon={PencilIcon}>
+        {reader.reviews.length === 0 ? <p className="rdMuted">You have not written a review yet.</p> : (
+          <ul className="rdList">
+            {reader.reviews.map(r => {
+              const read = latestRead(r)
+              return (
+                <li key={r.bookId} className="rdItem">
+                  <div className="rdItemMain">
+                    <button type="button" className="rdLink" onClick={() => ctx.openBook(r.bookId)}><b>{ctx.data.bookById(r.bookId)?.title ?? r.bookId}</b></button>
+                    <span className="rdMuted">{read?.score ? `${read.score} of 10 · ` : ''}{read?.status === 'posted' ? 'Posted' : 'Draft, private'}{r.reads.length > 1 ? ` · ${r.reads.length} reads` : ''}</span>
+                  </div>
+                  <button type="button" className="rdBtn" aria-label={`Open the review of ${ctx.data.bookById(r.bookId)?.title ?? r.bookId}`} onClick={() => open(r.bookId)}>Open</button>
+                </li>
+              )
+            })}
           </ul>
         )}
       </Card>
       {size === 'full' && (
-        <Card title="Reviews, notes and reactions" Icon={HeartIcon}>
-          <p className="rdMuted">Your reviews, notes and reactions are collected here as you read; they arrive with the Book and Pages pages.</p>
+        <Card title="Notes and highlights" Icon={HeartIcon}>
+          {reader.notes.length === 0 ? <p className="rdMuted">Notes you keep on a book are collected here, with your reactions once the e-reader arrives.</p> : (
+            <ul className="rdList">
+              {reader.notes.map(n => (
+                <li key={n.id} className="rdItem">
+                  <div className="rdItemMain">
+                    <b>{ctx.data.bookById(n.bookId)?.title ?? n.bookId}</b>
+                    {n.quote && <span className="rdQuote">&ldquo;{n.quote}&rdquo;</span>}
+                    {n.note && <span>{n.note}</span>}
+                  </div>
+                </li>
+              ))}
+            </ul>
+          )}
         </Card>
       )}
     </>
@@ -264,16 +302,53 @@ export function AnalyticsConsole({ ctx, size }: { ctx: ReaderCtx; size: 'tile' |
 export function FeedConsole({ ctx, size }: { ctx: ReaderCtx; size: 'tile' | 'full' }) {
   const { reader, books } = ctx.data
   if (!reader) return null
+  const { feed } = ctx.data
   const fresh = [...books].filter(b => b.publishedAt).sort((a, b) => (b.publishedAt ?? '').localeCompare(a.publishedAt ?? '')).slice(0, size === 'full' ? 8 : 4)
+  const mark = (n: { read: boolean }) => (n.read ? '' : ' · new')
+  const hiddenPeople = reader.blocked
   return (
     <>
       {reader.notifications.length > 0 && (
         <Card title="Notifications" Icon={BellIcon}>
-          <ul className="rdList">{reader.notifications.map(n => (
-            <li key={n.id} className="rdItem"><div className="rdItemMain"><b>{n.title}</b><span className="rdMuted">{ctx.data.bookById(n.detail)?.title ?? n.detail}</span></div></li>
+          <ul className="rdList">{reader.notifications.slice(0, size === 'full' ? 20 : 3).map(n => (
+            <li key={n.id} className="rdItem"><div className="rdItemMain"><b>{n.title}{mark(n)}</b><span className="rdMuted">{ctx.data.bookById(n.detail)?.title ?? n.detail}</span></div></li>
           ))}</ul>
           {size === 'full' && <button type="button" className="rdBtn" onClick={() => void ctx.data.actions.readNotifications()}>Mark all read</button>}
         </Card>
+      )}
+      <Card title="From people and clubs you follow" Icon={FollowIcon}>
+        {feed.length === 0 ? <p className="rdMuted">Follow a reader or an author from a book&rsquo;s page, or join a club, and what they do shows here.</p> : (
+          <ul className="rdList" aria-label="Activity feed">
+            {feed.slice(0, size === 'full' ? 20 : 4).map(item => (
+              <li key={item.id} className="rdItem">
+                <div className="rdItemMain">
+                  {item.bookId ? <button type="button" className="rdLink" onClick={() => ctx.openBook(item.bookId as string)}><b>{item.title}</b></button> : <b>{item.title}</b>}
+                  <span className="rdMuted">{item.detail ? `${item.detail} · ` : ''}{shortDate(item.at)}</span>
+                </div>
+              </li>
+            ))}
+          </ul>
+        )}
+      </Card>
+      {size === 'full' && (
+        <div className="rdGrid2">
+          <Card title="Following" Icon={FollowIcon}>
+            {reader.following.length === 0 ? <p className="rdMuted">You are not following anyone yet.</p> : (
+              <div className="rdRow">{reader.following.map(id => (
+                <button key={id} type="button" className="rdChip rdChip--on rdChip--button" aria-label={`Unfollow ${personName(ctx.data, id)}`} onClick={() => void ctx.data.actions.follow(id, false)}>{personName(ctx.data, id)} ×</button>
+              ))}</div>
+            )}
+          </Card>
+          <Card title="Hidden and blocked" Icon={EyeOffIcon}>
+            {reader.reports.length === 0 && hiddenPeople.length === 0 ? <p className="rdMuted">Nothing is hidden. A review or post you hide or report stays out of your sight until you undo it.</p> : (
+              <ul className="rdList">
+                {reader.reports.map(r => <li key={r.id} className="rdItem"><span className="rdGrow">A {r.kind} ({r.reason})</span><button type="button" className="rdBtn rdBtn--small" onClick={() => void ctx.data.actions.undoReport(r.id)}>Undo</button></li>)}
+                {hiddenPeople.map(id => <li key={id} className="rdItem"><span className="rdGrow">{personName(ctx.data, id)} (blocked)</span><button type="button" className="rdBtn rdBtn--small" onClick={() => void ctx.data.actions.block(id, false)}>Unblock</button></li>)}
+              </ul>
+            )}
+            <p className="rdMuted">Reports stay on this machine: nothing is sent to anyone.</p>
+          </Card>
+        </div>
       )}
       <Card title="New in the library" Icon={BellIcon}>
         <ul className="rdList">
@@ -285,7 +360,6 @@ export function FeedConsole({ ctx, size }: { ctx: ReaderCtx; size: 'tile' | 'ful
           ))}
         </ul>
       </Card>
-      {size === 'full' && <p className="rdMuted">Activity from the readers, authors and clubs you follow shows here once you follow someone.</p>}
     </>
   )
 }

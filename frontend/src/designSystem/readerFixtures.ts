@@ -1,4 +1,4 @@
-import type { CatalogBook, Holding, ReaderState, Recommendation } from '../api/reader'
+import type { BookCard, BookDetail, CatalogBook, ClubView, FeedItem, Holding, ReaderProfile, ReaderState, Recommendation } from '../api/reader'
 
 // The Reader's pretend library for the design system's previews: lorem ipsum titles and blurbs, a stack of owned, borrowed and lent books, and a
 // year of reading for the activity calendar (relative to today, so the calendar always has a recent week).
@@ -72,6 +72,11 @@ export function readerFixture(): ReaderState {
     },
     activity: activity(), flagClasses: {},
     notifications: [{ id: 'due-h4', at: iso(0), kind: 'due', title: 'A borrowed book is due soon', detail: 'magna', read: false }],
+    levels: { 'sit-amet': { level: 'delta', invitedBy: 'Lorem Ipsum', override: false } },
+    criteriaNames: ['Plot', 'Prose', 'Characters', 'Pacing'],
+    reviews: [{ bookId: 'adipiscing', reads: [{ n: 1, status: 'posted', score: 9, criteria: { Plot: 9, Prose: 10 }, comment: 'Lorem ipsum dolor sit amet.', spoilerEssay: '', noteIds: [], startedAt: iso(30), postedAt: iso(20), editedAt: null }] }],
+    notes: [{ id: 'n1', bookId: 'lorem-ipsum', quote: 'Ut enim ad minim veniam.', note: 'Remember this.', at: iso(3) }],
+    following: ['r-sol'], joinedClubs: ['slow-burners'], reports: [], blocked: [],
   }
 }
 
@@ -81,5 +86,64 @@ export function recommendationsFixture(): Recommendation[] {
     pick('consectetur', 93, ['The next book of Dolor series, which you are reading.', 'Shares the tropes Slow burn with what you read.']),
     pick('veniam', 81, ['More by Sed Eiusmod, whose book you read.', 'Readers rate it 8.4 of 10.']),
     pick('aliquip', 72, ['It is on your to-read list.']),
+  ]
+}
+
+// The Book page's community, for the previews.
+
+export const READERS: ReaderProfile[] = [
+  { id: 'r-sol', name: 'Sol Marsh', initials: 'SM', bio: 'Reads on the night bus.' },
+  { id: 'r-rue', name: 'Rue Tanner', initials: 'RT', bio: 'Slow burns and long series.' },
+  { id: 'r-jun', name: 'Jun Okafor', initials: 'JO', bio: 'Essays before breakfast.' },
+]
+
+export function bookCardFixture(bookId: string): BookCard {
+  const at = (days: number) => iso(days)
+  return {
+    bookId, rating: 8.8, ratings: 1208,
+    criteria: [{ name: 'Plot', average: 8.5, count: 3 }, { name: 'Prose', average: 9.0, count: 3 }, { name: 'Characters', average: 8.0, count: 3 }, { name: 'Pacing', average: 7.5, count: 3 }],
+    reviews: [
+      { id: `seed-${bookId}-0`, readerId: 'r-sol', name: 'Sol Marsh', initials: 'SM', score: 9, criteria: { Plot: 9, Prose: 9 }, comment: LOREM[0], spoilerEssay: LOREM[1], reads: 2, at: at(4), edited: false, mine: false },
+      { id: `seed-${bookId}-1`, readerId: 'r-rue', name: 'Rue Tanner', initials: 'RT', score: 8, criteria: { Plot: 8, Prose: 9 }, comment: LOREM[2], spoilerEssay: '', reads: 1, at: at(9), edited: false, mine: false },
+      { id: `seed-${bookId}-2`, readerId: 'r-jun', name: 'Jun Okafor', initials: 'JO', score: 10, criteria: { Plot: 9, Prose: 10 }, comment: LOREM[1], spoilerEssay: '', reads: 1, at: at(13), edited: false, mine: false },
+    ],
+  }
+}
+
+export function bookDetailFixture(bookId: string): BookDetail {
+  const titles = ['The harbor at dawn', 'Two sets of books', 'The ledger of tides', 'A name painted over', 'A first winter', 'Salt on the page', 'What the weir keeps', 'The third lamp', 'The early tide', 'A debt in rope', 'Fog for a week']
+  return {
+    bookId,
+    authorNote: 'Lorem ipsum dolor sit amet, consectetur adipiscing elit. The ledgers are invented; the early tides are not.',
+    contents: titles.map((title, i) => ({ n: i + 1, title, words: 7272 })),
+    glossary: [{ title: 'Weir', meta: 'A low dam that raises the river.', indent: 0 }, { title: 'Ledger', meta: 'The book of what is owed.', indent: 0 }, { title: 'Quay', meta: 'The stone wharf.', indent: 0 }],
+    bibliography: ['Lorem Ipsum. A Small History of Tides. Dolor Press, 1998.', 'Sit Amet. Harbors of the North. Consectetur, 2007.'],
+    index: ['harbor master 3, 7', 'ledger 1, 3, 9', 'tide 3, 4, 11'],
+    appendix: ['A. Tide table', 'B. Map of the quay', 'C. Reading list'],
+    planning: {
+      outline: [{ title: 'Act 1', meta: '4 chapters', indent: 0 }, { title: 'Chapter 1: The harbor at dawn', meta: '7,272 words', indent: 18 }, { title: 'Chapter 2: Two sets of books', meta: '7,272 words', indent: 18 }],
+      plot: [{ title: 'A secret is shared', meta: 'Placed on chapter 3', indent: 0 }, { title: 'The first lie is found', meta: 'Placed on chapter 5', indent: 0 }],
+      plotPath: 'Romance › Slow Burn', goalWords: 80000, wordsNow: 47000, chaptersOutlined: 5, chaptersTotal: 11, publishTarget: 'First edition, spring',
+      revisions: [{ title: 'Tighten the fog paragraph', meta: 'Chapter 3 · Oct 6 · -42 words, +58 words', indent: 0 }],
+    },
+    stats: { readingNow: 312, averageMinutes: 320, finishPercent: 71, leaveBars: [26, 22, 19, 15, 12, 9, 7, 5], clubs: 1 },
+  }
+}
+
+export function clubsFixture(): ClubView[] {
+  const club = (id: string, name: string, bookId: string, meets: string, members: string[]) => ({ id, name, description: 'Reads a book in bites and meets to talk it through.', bookId, meets, nextMeetingAt: new Date(Date.now() + 4 * 86_400_000).toISOString(), members, mine: false })
+  return [
+    { club: club('slow-burners', 'Slow Burners', 'lorem-ipsum', 'Sundays: chapters 3 and 4', ['r-rue', 'r-sol']), joined: true, memberCount: 3, posts: [
+      { id: 'p1', clubId: 'slow-burners', authorId: 'r-rue', text: 'Nothing happens for forty pages and I did not want it to stop.', at: iso(3), spoiler: false, replyTo: null },
+      { id: 'p2', clubId: 'slow-burners', authorId: 'r-sol', text: 'The painted name comes back in chapter nine.', at: iso(1), spoiler: true, replyTo: null },
+    ] },
+    { club: club('rope-readers', 'Rope Readers', 'tempor', 'Thursdays: chapters 5 and 6', ['r-sol', 'r-jun']), joined: false, memberCount: 2, posts: [] },
+  ]
+}
+
+export function feedFixture(): FeedItem[] {
+  return [
+    { id: 'f1', at: iso(0), kind: 'finished', who: 'Sol Marsh', whoId: 'r-sol', title: 'Sol Marsh finished Tempor incididunt', detail: '4 stars', bookId: 'tempor' },
+    { id: 'f2', at: iso(1), kind: 'club', who: 'Slow Burners', whoId: 'slow-burners', title: 'Slow Burners: Sundays: chapters 3 and 4', detail: 'Next meeting soon', bookId: 'lorem-ipsum' },
   ]
 }

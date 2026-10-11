@@ -1,10 +1,11 @@
 import type { ComponentType, ReactNode } from 'react'
 import {
   BarChartIcon, CalendarIcon, EnvelopeIcon, UserIcon,
-  BookFaceIcon, GlobeIcon, PencilIcon, BriefcaseIcon, GraduationCapIcon,
+  BookFaceIcon, FlagIcon, GlobeIcon, PencilIcon, BriefcaseIcon, GraduationCapIcon,
   type IconProps,
 } from '../icons'
 import CustomizeControls from '../../CustomizeControls'
+import FlagSettings from './FlagSettings'
 import ThemeSettingsPanel from '../../theme/ThemeSettingsPanel'
 import TileGrid from '../../components/tiles/TileGrid'
 import { TileBig, TileRows, TileSub } from '../../components/tiles/tileParts'
@@ -23,7 +24,8 @@ import type { TileDef } from '../../components/tiles/tileTypes'
 // Mainscreen-layer selectors (.uUI, .rUI, .tUI, .wUI, .aUI), and this UUI is a
 // header-drawer resident, not a Mainscreen member.
 
-interface UuiPage { key: string; label: string; Icon: ComponentType<IconProps>; body: string }
+// A page with a `Console` shows that editor in place of its placeholder text.
+interface UuiPage { key: string; label: string; Icon: ComponentType<IconProps>; body: string; Console?: ComponentType }
 
 interface UuiSection {
   key: 'dashboard' | 'account' | 'training'
@@ -53,6 +55,7 @@ const SECTIONS: UuiSection[] = [
       { key: 'profile', label: 'Profile', Icon: UserIcon, body: 'Manage your profile details here.' },
       { key: 'subscription', label: 'Subscription', Icon: CalendarIcon, body: 'Manage your subscription here.' },
       { key: 'portfolio', label: 'Portfolio', Icon: BarChartIcon, body: 'View your portfolio here.' },
+      { key: 'flags', label: 'Flags', Icon: FlagIcon, body: 'Choose how each content flag is shown to you: hidden, marked, highlight or spoiler.', Console: FlagSettings },
     ],
   },
   {
@@ -86,7 +89,7 @@ export function userTiles(): TileDef[] {
         summary: page.body,
         settings, help,
         render: () => <TileSub>{page.body}</TileSub>,
-        console: () => <div className="uUIPage"><h2>{page.label}</h2><p>{page.body}</p></div>,
+        console: () => (page.Console ? <div className="uUIPage"><h2>{page.label}</h2><page.Console /></div> : <div className="uUIPage"><h2>{page.label}</h2><p>{page.body}</p></div>),
       })),
     }
   })

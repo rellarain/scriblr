@@ -2,7 +2,7 @@
 
 The Reader (RUI) is for readers with a plan who borrow and own books. It has four pages that open one from the next, as the Writer's levels do: the **Nook** (the reader's own things), the **Library** (the shelves and the catalog), the **Book** (one book and its cover) and **Pages** (the e-reader, a later release). Money and lending are simulated: nothing here leaves the machine.
 
-Code: `assets/Interfaces/RUI.tsx` (the shell and the pages), `reader/ReaderPanel.tsx` (a page's header and consoles), `reader/{NookConsoles,LibraryConsoles,BookConsoles,ReaderDialogs}.tsx`, `reader/consoleStates.ts` (icon, tile, full), `reader/readerRoutes.ts` (the URLs), `reader/activityGrid.ts` (the calendar), `reader/readerStore.ts` (the data), `reader/reader.scss`; backend `storage/{reader_store,library,library_seed,reader_schema}.py` (`/api/reader`, `/api/library`). Classes `.rd*`, in the Writer's scope (`.rUI.wr`), so its shelf and spines draw here too.
+Code: `assets/Interfaces/RUI.tsx` (the shell and the pages), `reader/ReaderPanel.tsx` (a page's header and consoles), `reader/{NookConsoles,LibraryConsoles,BookConsoles,BookSocial,BookMatter,ReaderDialogs,ReviewDialog}.tsx`, `assets/Interfaces/FlagSettings.tsx` (the user-level flag classes, in UUI Account > Flags), `reader/consoleStates.ts` (icon, tile, full), `reader/readerRoutes.ts` (the URLs), `reader/activityGrid.ts` (the calendar), `reader/readerStore.ts` (the data), `reader/readerSocial.ts` (levels, reviews, what is hidden), `reader/reader.scss`; backend `storage/{reader_store,reader_social,social_views,social_seed,library,library_seed,reader_schema}.py` (`/api/reader`, `/api/library`). Classes `.rd*`, in the Writer's scope (`.rUI.wr`), so its shelf and spines draw here too.
 
 ## Anatomy
 
@@ -15,13 +15,24 @@ Code: `assets/Interfaces/RUI.tsx` (the shell and the pages), `reader/ReaderPanel
 - **Book cover** `.rdBook3d`: the book's colour as a front with a darker spine edge and a stack of page edges at the right, with the title, meta line, a read-progress bar, the flag chips (each says its class: hidden, marked, highlight or spoiler), and the ways to read it: Borrow (1 credit), Buy, Wishlist, and the due date or owner state.
 - **Dialogs** `.rdModal`: on the paper (`paper`, `paper-ink`, `paper-line`), over a scrim, closed by the x or Escape. The **plan** dialog has the base $6, the extra credits ($2 each, a stepper), the total, where a borrow's money goes (a base borrow: $2 Scriblr, $3 author, $1 the lender or Scriblr; an extra: $0.67, $1.00, $0.33) and the credit ledger. The **borrow** dialog spends 1 to 4 credits (a credit is a month on one book, stacked), says until when, and offers Buy and Wishlist.
 
+## The Book page
+
+A book is read at a **level**, set by the author's invitation: **alpha** (the plan, read-only), **delta** (work-in-progress drafts), **beta** (final-draft chapters as they publish) and **omega** (the final edition). Alpha and delta are free; beta and omega are borrowed or bought. A badge (`.rdBadge`, "Reading as Delta", in the accent) says which, under the page's header, and the full Bookcover has a **Preview as** switcher so every state can be tried without an invitation.
+
+- **Consoles**: Bookcover (the cover with its spine edge and page edges, the flags with their classes, the ways to read it, and for an alpha reader nothing to borrow), **Bookface** (the book's readers, statistics, clubs and their threads, and the author to follow), **Bookcard** (the average and each criterion's average, the reviews with Top, Newest and Hide spoilers, the reader's own review and notes), **Frontmatter** (the author's note, the flags and their classes, the contents), **Backmatter** (glossary, bibliography, index, appendix). An alpha reader also has the read-only **Outline**, **Plot**, **Plan** and **Revisions**.
+- **Edge tabs** `.rdEdge`: a tab for each chapter down the page's right edge, as in the Writer's book; the chapter the reader has reached is wider and in the accent. A click opens the e-reader at it.
+- **Reviews** (`.rdTabs` in a dialog): a general score (1 to 10, the reader's own), criteria the reader defines and reuses, a spoiler-free comment, an optional spoiler essay (shown to others only on a tap) and the notes to include. A draft saves itself and stays private until it is posted; a posted review is public and editable ("edited"). A **re-read** adds a folder tab (First read, Re-read 2) with its own score, criteria, comment and essay, and resets the book's progress; the public view shows the latest read with how many times the book was read.
+- **Clubs and follows**: a club is a thread on a book, with a schedule and members; a reader can join, leave, start one, post, reply and mark a post as a spoiler (shut until it is tapped). Following a reader or an author puts what they do in the Nook's Feed. Posts and replies stay on this machine; the seeded readers do not answer.
+- **Hide, report, block**: a review or post can be hidden or reported (spoiler, abuse, spam) and a reader blocked; the item is out of sight until the reader undoes it in the Feed's Hidden and blocked card. Nothing is sent anywhere.
+- **Flag classes** are the reader's, for every book, and are set in the User panel (Account > Flags), not here; the Book page shows them.
+
 ## Credits
 
 A plan is $6 a month with one credit; each extra credit is $2 (3 extra is $12 for 4 credits a month). A month's credits are granted at its start and never expire. A credit lends one book for one month, and credits stack on one book. Returning a book unopened, or in under 14 days with less than half read, gives its credits back. An extension costs one credit.
 
 ## Tokens
 
-`level-fill-<hue>` (a page and its consoles' steps), `level-ink` (white on a level), `ov-sink-1..3` (chips, bar tracks), `ov-lift-1..3` (washes), `accent` and `zone-on-accent` (the primary button, an open console's icon, a full one, the calendar's days), `paper` / `paper-ink` / `paper-line` / `paper-soft` (dialogs), `alert` and `on-alert` (errors), `scrim`.
+`level-fill-<hue>` (a page and its consoles' steps), `level-ink` (white on a level), `ov-sink-1..3` (chips, bar tracks), `ov-lift-1..3` (washes), `accent` and `zone-on-accent` (the primary button, an open console's icon, a full one, the calendar's days), `paper` / `paper-ink` / `paper-line` / `paper-soft` (dialogs), `alert` and `on-alert` (errors, and the unread count on the bell), `scrim`.
 
 ## You provide
 
@@ -32,4 +43,6 @@ A page is a `ReaderPanel` with a title, an icon, a colour, its `ConsoleDef`s (`i
 - Don't show a scrollbar anywhere; consoles and the calendar scroll by wheel, touch and keyboard.
 - Don't put a console's content at full size in a tile: a tile is simplified, and the rest is one click away.
 - Don't hide the credits: the pill is on every page.
+- Don't set a flag's class on the Book page: it is a user-level choice (UUI Account > Flags).
+- Don't show a spoiler, a spoiler essay or a spoiler post open: they stay shut until tapped.
 - Don't use a colour that is not a token, and keep a button 40px or more.

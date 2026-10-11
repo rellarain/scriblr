@@ -679,3 +679,9 @@ export function TreeIcon(props: IconProps) {
 export function EyeOffIcon(props: IconProps) {
   return <IconBase {...props}><path d="M3 3l18 18M10 6a9 9 0 0111 6 9 9 0 01-2 3M6 8a9 9 0 00-3 4 9 9 0 007 5" /></IconBase>
 }
+export function FaceIcon(props: IconProps) {
+  return <IconBase {...props}><path d="M12 21a9 9 0 100-18 9 9 0 000 18zM8 14a5 5 0 008 0M9 9.5h.01M15 9.5h.01" /></IconBase>
+}
+export function CardIcon(props: IconProps) {
+  return <IconBase {...props}><path d="M4 5h16a1 1 0 011 1v12a1 1 0 01-1 1H4a1 1 0 01-1-1V6a1 1 0 011-1zM7 10h10M7 14h6" /></IconBase>
+}
