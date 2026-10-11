@@ -411,6 +411,99 @@ class Publication(BaseModel):
     sections: list[PublicationSection] = Field(default_factory=list)
 
 
+# ---------------------------------------------------------------------------
+# Publishing a book: its listing in the Reader's library (metadata, numbered editions, who is invited at which
+# level), and the author's footnotes and flagged passages on a chapter's sentences. A sentence is addressed by its
+# paragraph and sentence number in the chapter (the Writer's preview splits text the same way the Reader does).
+# ---------------------------------------------------------------------------
+
+BookTypeName = Literal["novel", "novella", "essays", "magazine", "article"]
+ReaderLevelName = Literal["alpha", "delta", "beta", "omega"]
+FlagClassName = Literal["hidden", "marked", "highlight", "spoiler"]
+
+
+class BookFlagMeta(BaseModel):
+    """A content flag the author puts on a book: a warning with its details, and the class it has by default (a reader may change it)."""
+
+    key: str = Field(min_length=1, max_length=40)
+    name: str = Field(min_length=1, max_length=60)
+    detail: str = Field(default="", max_length=500)
+    defaultClass: FlagClassName = "marked"
+
+
+class BookMeta(BaseModel):
+    type: BookTypeName = "novel"
+    blurb: str = Field(default="", max_length=2000)
+    genres: list[str] = Field(default_factory=list, max_length=8)
+    tags: list[str] = Field(default_factory=list, max_length=12)
+    tropes: list[str] = Field(default_factory=list, max_length=12)
+    flags: list[BookFlagMeta] = Field(default_factory=list, max_length=12)
+    buyPriceCents: int = Field(default=900, ge=100, le=10000)
+    # A cover colour of the book's own; none uses the book's level colour.
+    coverHue: Optional[int] = Field(default=None, ge=0, le=360)
+
+
+class EditionFootnote(BaseModel):
+    id: str
+    key: str
+    title: str
+    text: str
+
+
+class EditionFlagPassage(BaseModel):
+    key: str
+    flagKey: str
+
+
+class EditionChapter(BaseModel):
+    chapterId: str
+    n: int
+    title: str
+    words: int = 0
+    paragraphs: list[str] = Field(default_factory=list)
+    footnotes: list[EditionFootnote] = Field(default_factory=list)
+    flags: list[EditionFlagPassage] = Field(default_factory=list)
+
+
+class BookEdition(BaseModel):
+    """One numbered edition: a frozen copy of the chapters that were published when the book was, with their footnotes and flagged passages."""
+
+    n: int
+    publishedAt: datetime
+    wordCount: int = 0
+    chapters: list[EditionChapter] = Field(default_factory=list)
+
+
+class BookListing(BaseModel):
+    # In the library for sale and loan. Unlisting keeps the editions: copies readers own and loans already made go on working.
+    listed: bool = False
+    editions: list[BookEdition] = Field(default_factory=list)
+    meta: BookMeta = Field(default_factory=BookMeta)
+    # Reader id -> the level the author invited them to (alpha, delta or beta). "me" is this reader account.
+    invites: dict[str, ReaderLevelName] = Field(default_factory=dict)
+
+
+class AuthorFootnote(BaseModel):
+    id: str
+    paragraph: int = Field(ge=0)
+    sentence: int = Field(ge=0)
+    title: str = Field(max_length=120)
+    text: str = Field(default="", max_length=2000)
+    published: bool = True
+
+
+class AuthorFlagPassage(BaseModel):
+    id: str
+    paragraph: int = Field(ge=0)
+    sentence: int = Field(ge=0)
+    flagKey: str
+
+
+class ChapterAuthorNotes(BaseModel):
+    footnotes: list[AuthorFootnote] = Field(default_factory=list, max_length=60)
+    flags: list[AuthorFlagPassage] = Field(default_factory=list, max_length=60)
+
+
 class RevisionSummary(BaseModel):
     snapshotId: str
     createdAt: datetime
@@ -716,6 +809,9 @@ class ProjectFile(BaseModel):
     drafts: dict[str, DraftChapter] = Field(default_factory=dict)
     revisions: dict[str, list[RevisionSnapshot]] = Field(default_factory=dict)
     publications: dict[str, list[Publication]] = Field(default_factory=dict)
+    # Book id -> how it is published in the Reader's library; chapter id -> the author's footnotes and flagged passages.
+    bookListings: dict[str, BookListing] = Field(default_factory=dict)
+    chapterNotes: dict[str, ChapterAuthorNotes] = Field(default_factory=dict)
     outlineHistory: list[TreeSnapshot] = Field(default_factory=list)
     plotHistory: list[TreeSnapshot] = Field(default_factory=list)
     activity: DailyActivityLog = Field(default_factory=DailyActivityLog)

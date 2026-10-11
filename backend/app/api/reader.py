@@ -82,6 +82,8 @@ def borrow(body: BorrowBody, root: Path = Depends(get_app_data_storage_root), pr
     book = _get_book(body.bookId, projects)
     if book.editions < 1:
         raise HTTPException(status_code=422, detail="this book has no edition to borrow yet")
+    if not book.available:
+        raise HTTPException(status_code=422, detail="this book is no longer available to borrow or buy")
     try:
         return store.borrow(root, body.bookId, body.credits)
     except _ERRORS as exc:
@@ -90,8 +92,11 @@ def borrow(body: BorrowBody, root: Path = Depends(get_app_data_storage_root), pr
 
 @router.post("/buy", response_model=ReaderState)
 def buy(body: BuyBody, root: Path = Depends(get_app_data_storage_root), projects: Path = Depends(get_storage_root)) -> ReaderState:
-    if _get_book(body.bookId, projects).editions < 1:
+    book = _get_book(body.bookId, projects)
+    if book.editions < 1:
         raise HTTPException(status_code=422, detail="this book has no edition to buy yet")
+    if not book.available:
+        raise HTTPException(status_code=422, detail="this book is no longer available to borrow or buy")
     try:
         return store.buy(root, body.bookId)
     except _ERRORS as exc:

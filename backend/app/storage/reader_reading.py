@@ -12,8 +12,10 @@ from .reader_schema import (
     ActivityDay,
     BookText,
     CatalogBook,
+    ChapterFootnote,
     ChapterRef,
     ChapterText,
+    FlaggedPassage,
     Mark,
     MyFlag,
     Position,
@@ -54,44 +56,24 @@ def access(rf: ReaderFile, book: CatalogBook, level: ReaderLevel) -> tuple[bool,
     return False, "Borrow or buy this book to read it."
 
 
-def _local_chapters(root: Path, book: CatalogBook) -> list[tuple[ChapterRef, list[str]]]:
-    """The author's chapters of one book in outline order, each with its newest published text (none if it was never published)."""
+def _local_edition(root: Path, book: CatalogBook):
+    """The newest edition of one of the author's books (what readers read), or None."""
     if not book.projectId or not book.bookId:
-        return []
+        return None
     try:
         pf, _errors = project_store._load_project_file(root, book.projectId)
     except (project_store.ProjectNotFoundError, project_store.ShardCorruptError):
-        return []
-    nodes = pf.outline.nodes
-    children: dict[Optional[str], list] = {}
-    for n in nodes:
-        children.setdefault(n.parentId, []).append(n)
-    ordered: list = []
-
-    def walk(parent_id: str) -> None:
-        for n in sorted(children.get(parent_id, []), key=lambda c: c.order):
-            if n.kind == "chapter":
-                ordered.append(n)
-            else:
-                walk(n.id)
-
-    walk(book.bookId)
-    out: list[tuple[ChapterRef, list[str]]] = []
-    for index, chapter in enumerate(ordered, start=1):
-        found = reading_text.local_paragraphs(root, book.projectId, chapter.id)
-        if found is None:
-            out.append((ChapterRef(n=index, title=chapter.title or f"Chapter {index}", words=0, available=False, reason="The author has not published this chapter yet."), []))
-        else:
-            title, paragraphs = found
-            out.append((ChapterRef(n=index, title=title or chapter.title or f"Chapter {index}", words=sum(len(p.split()) for p in paragraphs), available=True), paragraphs))
-    return out
+        return None
+    listing = pf.bookListings.get(book.bookId)
+    return listing.editions[-1] if listing and listing.editions else None
 
 
 def book_text(rf: ReaderFile, root: Path, book: CatalogBook) -> BookText:
     level = level_of(rf, book.id)
     can, reason = access(rf, book, level)
     if book.source == "local":
-        chapters = [ref for ref, _ in _local_chapters(root, book)]
+        edition = _local_edition(root, book)
+        chapters = [ChapterRef(n=c.n, title=c.title, words=c.words, available=True) for c in edition.chapters] if edition else []
     else:
         chapters = reading_text.seeded_refs(book, level)
     if book.editions < 1 and level not in LEVEL_FREE and book.source != "local":
@@ -109,8 +91,23 @@ def chapter_text(rf: ReaderFile, root: Path, book: CatalogBook, n: int) -> Chapt
     if not ref.available:
         raise ReadingError(ref.reason or "This chapter is not available at your level.", 403)
     if book.source == "local":
-        paragraphs = next(p for r, p in _local_chapters(root, book) if r.n == n)
-        return ChapterText(bookId=book.id, n=n, title=ref.title, words=ref.words, paragraphs=paragraphs, level=text.level)
+        edition = _local_edition(root, book)
+        chapter = next(c for c in (edition.chapters if edition else []) if c.n == n)
+        flags = {f.key: f for f in book.flags}
+        return ChapterText(
+            bookId=book.id,
+            n=n,
+            title=chapter.title,
+            words=chapter.words,
+            paragraphs=chapter.paragraphs,
+            footnotes=[ChapterFootnote(id=f.id, key=f.key, title=f.title, text=f.text) for f in chapter.footnotes],
+            flags=[
+                FlaggedPassage(key=f.key, flagKey=f.flagKey, name=flags[f.flagKey].name, detail=flags[f.flagKey].detail, defaultClass=flags[f.flagKey].defaultClass)
+                for f in chapter.flags
+                if f.flagKey in flags
+            ],
+            level=text.level,
+        )
     chapter = reading_text.seeded_chapter(book, n, text.level)
     return chapter
 

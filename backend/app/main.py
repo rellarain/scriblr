@@ -9,6 +9,7 @@ from .api import (
     admin_config,
     analytics,
     book_progress,
+    book_publishing,
     draft,
     export,
     feedback,
@@ -105,6 +106,7 @@ def create_app(static_dir: Optional[Path] = None) -> FastAPI:
     app.include_router(reader.router)
     app.include_router(reader_social.router)
     app.include_router(reader_reading.router)
+    app.include_router(book_publishing.router)
 
     if static_dir is not None:
         # Registered last so it only catches what the routers above didn't --

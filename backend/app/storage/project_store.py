@@ -14,6 +14,8 @@ from . import settings_log
 from .schema import (
     HUE_SCHEME,
     SCHEMA_VERSION,
+    BookListing,
+    ChapterAuthorNotes,
     DailyActivityLog,
     DraftChapter,
     DraftChapterMoment,
@@ -383,6 +385,8 @@ def _load_project_file_locked(root: Path, project_id: str) -> tuple[ProjectFile,
         drafts=_parse_dict_section(raw, "drafts", DraftChapter, project_dir, path, errors),
         revisions=_parse_dict_of_list_section(raw, "revisions", RevisionSnapshot, project_dir, path, errors),
         publications=_parse_dict_of_list_section(raw, "publications", Publication, project_dir, path, errors),
+        bookListings=_parse_dict_section(raw, "bookListings", BookListing, project_dir, path, errors),
+        chapterNotes=_parse_dict_section(raw, "chapterNotes", ChapterAuthorNotes, project_dir, path, errors),
         outlineHistory=_parse_list_section(raw, "outlineHistory", TreeSnapshot, project_dir, path, errors),
         plotHistory=_parse_list_section(raw, "plotHistory", TreeSnapshot, project_dir, path, errors),
         activity=_parse_section_default(

@@ -29,6 +29,8 @@ AUTHOR_NEWS_DAYS = 3
 def effective_levels(rf: ReaderFile) -> dict[str, LevelInfo]:
     """The level of every book the reader was invited to or switched by hand; a book not listed is read at omega (its final edition)."""
     out = {bid: LevelInfo(level=level, invitedBy=by) for bid, (level, by) in social_seed.invites().items()}
+    for bid, level in rf.localInvites.items():
+        out[bid] = LevelInfo(level=level, invitedBy="You")
     for bid, level in rf.levelOverrides.items():
         invited = out.get(bid)
         out[bid] = LevelInfo(level=level, invitedBy=invited.invitedBy if invited else None, override=True)

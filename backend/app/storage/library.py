@@ -5,10 +5,10 @@ from pathlib import Path
 from typing import Optional
 
 from . import project_store as store
-from .book_progress import _ancestor_of_kind
 from .library_seed import seed_authors, seed_books
 from .reader_schema import (
     Author,
+    AuthorFlag,
     AuthorDetail,
     BookPage,
     CatalogBook,
@@ -26,37 +26,40 @@ class BookNotFoundError(Exception):
         self.book_id = book_id
 
 
-def local_books(root: Path) -> list[CatalogBook]:
-    """The author's own books with at least one published chapter."""
+def local_books(root: Path, include_unlisted: bool = False) -> list[CatalogBook]:
+    """The author's own books published to the library (a book with an edition and a listing). An unlisted book stays gettable by id, so the
+    copies readers own and the loans already made keep working, but it is not for sale or loan."""
     out: list[CatalogBook] = []
     for index in store.list_projects(root):
         try:
             pf, _errors = store._load_project_file(root, index.projectId)
         except (store.ProjectNotFoundError, store.ShardCorruptError):
             continue
-        nodes = pf.outline.nodes
-        by_id = {n.id: n for n in nodes}
-        for book in (n for n in nodes if n.kind == "book"):
-            published = []
-            for chapter in (n for n in nodes if n.kind == "chapter" and _ancestor_of_kind(by_id, n.id, "book") == book.id):
-                copies = pf.publications.get(chapter.id) or []
-                if copies:
-                    published.append(max(copies, key=lambda p: p.publishedAt))
-            if not published:
+        for book in (n for n in pf.outline.nodes if n.kind == "book"):
+            listing = pf.bookListings.get(book.id)
+            if listing is None or not listing.editions or (not listing.listed and not include_unlisted):
                 continue
-            latest = max(p.publishedAt for p in published)
+            edition = listing.editions[-1]
+            meta = listing.meta
+            hue = meta.coverHue if meta.coverHue is not None else (book.themeHue if getattr(book, "themeHue", None) is not None else 28)
             out.append(
                 CatalogBook(
                     id=f"local-{index.projectId}-{book.id}",
                     title=book.title or "Untitled",
                     authorId=LOCAL_AUTHOR_ID,
                     authorName=LOCAL_AUTHOR_NAME,
-                    type="novel",
-                    wordCount=sum(p.wordCount for p in published),
-                    hue=book.themeHue if getattr(book, "themeHue", None) is not None else 28,
-                    blurb=book.synopsis,
-                    editions=1,
-                    publishedAt=latest.date().isoformat(),
+                    type=meta.type,
+                    genres=meta.genres,
+                    tags=meta.tags,
+                    tropes=meta.tropes,
+                    flags=[AuthorFlag(key=f.key, name=f.name, detail=f.detail, defaultClass=f.defaultClass) for f in meta.flags],
+                    wordCount=edition.wordCount,
+                    hue=hue,
+                    blurb=meta.blurb or book.synopsis,
+                    buyPriceCents=meta.buyPriceCents,
+                    editions=len(listing.editions),
+                    publishedAt=edition.publishedAt.date().isoformat(),
+                    available=listing.listed,
                     source="local",
                     projectId=index.projectId,
                     bookId=book.id,
@@ -70,7 +73,7 @@ def all_books(root: Path) -> list[CatalogBook]:
 
 
 def get_book(root: Path, book_id: str) -> CatalogBook:
-    for book in all_books(root):
+    for book in seed_books() + local_books(root, include_unlisted=True):
         if book.id == book_id:
             return book
     raise BookNotFoundError(book_id)

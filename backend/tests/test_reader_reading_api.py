@@ -195,6 +195,7 @@ def _own_book(client: TestClient) -> tuple[str, str]:
     client.put(f"/api/projects/{project_id}/outline", json={"schemaVersion": 2, "nodes": nodes})
     client.put(f"/api/projects/{project_id}/draft/chapter/c1/moment/m1", json={"outlineNodeId": "m1", "body": "First paragraph here.\n\nSecond paragraph, two sentences. Here is the second."})
     client.post(f"/api/projects/{project_id}/publications/c1")
+    assert client.post(f"/api/projects/{project_id}/books/b1/publish").status_code == 200
     return project_id, f"local-{project_id}-b1"
 
 
@@ -202,11 +203,10 @@ def test_an_authors_own_book_reads_from_the_chapters_they_published(client: Test
     _project_id, book_id = _own_book(client)
     text = _text(client, book_id)
     assert text["canRead"] is True  # an author needs no loan to read their own book
-    assert [(c["n"], c["title"], c["available"]) for c in text["chapters"]] == [(1, "One", True), (2, "Two", False)]
+    assert [(c["n"], c["title"], c["available"]) for c in text["chapters"]] == [(1, "One", True)]  # an edition holds the chapters that were published
     chapter = client.get(f"/api/reader/books/{book_id}/chapters/1").json()
     assert chapter["paragraphs"] == ["First paragraph here.", "Second paragraph, two sentences. Here is the second."]
-    unpublished = client.get(f"/api/reader/books/{book_id}/chapters/2")
-    assert unpublished.status_code == 403 and "not published" in unpublished.json()["detail"]
+    assert client.get(f"/api/reader/books/{book_id}/chapters/2").status_code == 404  # not in the edition
     totals = client.get(f"/api/reader/books/{book_id}/reactions/1").json()
     assert totals["readers"] == 0
     _mark(client, book_id, key="c1:p1:s0", like=2, dislike=0, flags=[])

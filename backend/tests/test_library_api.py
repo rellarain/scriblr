@@ -96,6 +96,9 @@ def test_the_authors_own_published_book_joins_the_catalog(client: TestClient) ->
 
     client.put(f"/api/projects/{project_id}/draft/chapter/c1/moment/m1", json={"outlineNodeId": "m1", "body": "One two three four"})
     assert client.post(f"/api/projects/{project_id}/publications/c1").status_code == 200
+    # A published chapter alone does not put the book in the library: the book itself is published (an edition, listed).
+    assert not [b for b in _books(client, limit=200)["books"] if b["source"] == "local"]
+    assert client.post(f"/api/projects/{project_id}/books/b1/publish").status_code == 200
 
     local = [b for b in _books(client, limit=200)["books"] if b["source"] == "local"]
     assert len(local) == 1

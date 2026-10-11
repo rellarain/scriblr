@@ -44,6 +44,18 @@ def set_level(root: Path, book_id: str, level: Optional[ReaderLevel]) -> ReaderS
     return _mutate(root, apply)
 
 
+def set_local_invite(root: Path, book_id: str, level: Optional[ReaderLevel]) -> ReaderState:
+    """The author of one of this reader's own books invites this account at a level (or takes the invitation back)."""
+
+    def apply(rf: ReaderFile, now: datetime) -> None:
+        if level is None:
+            rf.localInvites.pop(book_id, None)
+        else:
+            rf.localInvites[book_id] = level
+
+    return _mutate(root, apply)
+
+
 def set_criteria(root: Path, names: list[str]) -> ReaderState:
     cleaned: list[str] = []
     for name in names:

@@ -80,6 +80,8 @@ class CatalogBook(BaseModel):
     # Numbered editions published for sale or borrowing (omega); 0 is a book not yet in its first edition.
     editions: int = 1
     publishedAt: Optional[str] = None
+    # False for one of the author's books they have unlisted: it is not for sale or loan, but copies and loans already made go on working.
+    available: bool = True
     source: Literal["seed", "local"] = "seed"
     projectId: Optional[str] = None
     bookId: Optional[str] = None
@@ -471,6 +473,8 @@ class ReaderFile(BaseModel):
     marks: dict[str, dict[str, Mark]] = Field(default_factory=dict)
     myFlags: list[MyFlag] = Field(default_factory=list)
     positions: dict[str, Position] = Field(default_factory=dict)
+    # Levels the author of one of this reader's own books invited this account to (book id -> level).
+    localInvites: dict[str, ReaderLevel] = Field(default_factory=dict)
 
 
 class ReaderState(BaseModel):
@@ -499,3 +503,49 @@ class ReaderState(BaseModel):
     settings: ReaderSettings = Field(default_factory=ReaderSettings)
     myFlags: list[MyFlag] = Field(default_factory=list)
     positions: dict[str, Position] = Field(default_factory=dict)
+
+
+# ---------------------------------------------------------------------------------------------------------------------- the author's side
+
+
+class ChapterFeedback(BaseModel):
+    """What readers who share their reactions marked in one chapter, anonymously."""
+
+    n: int
+    title: str
+    readers: int = 0
+    pleasant: int = 0
+    unpleasant: int = 0
+    top: list[SentenceTotal] = Field(default_factory=list)
+
+
+class BookFeedback(BaseModel):
+    bookId: str
+    listed: bool
+    editions: int
+    loans: int
+    activeLoans: int
+    sales: int
+    # The author's share, in cents: of loans ($3.00 for a loan's first credit, $1.00 for each more) and of sales (70% of the price).
+    loanShareCents: int
+    saleShareCents: int
+    readers: int
+    rating: float
+    ratings: int
+    reviews: list[PublicReview]
+    chapters: list[ChapterFeedback]
+    invites: dict[str, ReaderLevel] = Field(default_factory=dict)
+
+
+class BookSummary(BaseModel):
+    projectId: str
+    bookId: str
+    title: str
+    listed: bool
+    editions: int
+    loans: int
+    sales: int
+    earningsCents: int
+    rating: float
+    ratings: int
+    reviews: int
