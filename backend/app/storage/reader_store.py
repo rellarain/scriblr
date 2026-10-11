@@ -13,7 +13,7 @@ from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from typing import Optional
 
-from . import project_store
+from . import project_store, social_views
 from .reader_schema import (
     BASE_PRICE_CENTS,
     EXTRA_CREDIT_PRICE_CENTS,
@@ -111,6 +111,10 @@ def _sync(rf: ReaderFile, now: datetime) -> bool:
         if h.lentTo and h.lentUntil is not None and h.lentUntil <= now:
             h.lentTo, h.lentUntil = None, None
             changed = True
+    fresh = social_views.social_notifications(rf, now)
+    if fresh:
+        rf.notifications.extend(fresh)
+        changed = True
     return changed
 
 
@@ -139,6 +143,14 @@ def _state(rf: ReaderFile) -> ReaderState:
         activity=rf.activity,
         flagClasses=rf.flagClasses,
         notifications=list(reversed(sorted(rf.notifications, key=lambda n: n.at))),
+        levels=social_views.effective_levels(rf),
+        criteriaNames=rf.criteriaNames,
+        reviews=rf.reviews,
+        notes=rf.notes,
+        following=rf.following,
+        joinedClubs=rf.joinedClubs,
+        reports=rf.reports,
+        blocked=rf.blocked,
     )
 
 

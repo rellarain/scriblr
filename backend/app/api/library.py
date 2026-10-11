@@ -1,11 +1,12 @@
+from datetime import datetime, timezone
 from pathlib import Path
 from typing import Optional
 
 from fastapi import APIRouter, Depends, HTTPException, Query
 
 from ..deps import get_app_data_storage_root, get_storage_root
-from ..storage import library, reader_store
-from ..storage.reader_schema import AuthorDetail, Author, BookPage, CatalogBook, Recommendation
+from ..storage import library, reader_store, social_seed
+from ..storage.reader_schema import AuthorDetail, Author, BookDetail, BookPage, CatalogBook, ReaderProfile, Recommendation
 
 router = APIRouter(prefix="/api/library", tags=["library"])
 
@@ -76,3 +77,18 @@ def recommendations(
     app_root: Path = Depends(get_app_data_storage_root),
 ) -> list[Recommendation]:
     return library.recommend(root, reader_store.load_file(app_root), limit)
+
+
+@router.get("/books/{book_id}/detail", response_model=BookDetail)
+def get_book_detail(book_id: str, root: Path = Depends(get_storage_root)) -> BookDetail:
+    try:
+        book = library.get_book(root, book_id)
+    except library.BookNotFoundError as exc:
+        raise HTTPException(status_code=404, detail=str(exc)) from exc
+    clubs = sum(1 for c in social_seed.clubs(datetime.now(timezone.utc)) if c.bookId == book_id)
+    return social_seed.book_detail(book, readers_now=max(1, book.readers // 4), club_count=clubs)
+
+
+@router.get("/readers", response_model=list[ReaderProfile])
+def list_readers() -> list[ReaderProfile]:
+    return social_seed.readers()
