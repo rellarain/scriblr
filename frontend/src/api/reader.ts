@@ -57,7 +57,79 @@ export interface Holding {
 }
 export interface ReadingPosition { pct: number; pages: number; updatedAt: string | null; finishedAt: string | null }
 export interface ActivityDay { pages: number; minutes: number; sessions: number }
-export interface ReaderNotification { id: string; at: string; kind: 'due' | 'club' | 'reply' | 'info'; title: string; detail: string; read: boolean }
+export interface ReaderNotification { id: string; at: string; kind: 'due' | 'club' | 'reply' | 'follow' | 'review' | 'info'; title: string; detail: string; read: boolean }
+
+// How far into a book's making a reader is invited: alpha (the plan, read-only), delta (work-in-progress drafts), beta (final-draft chapters as they
+// publish) and omega (final editions). Alpha and delta are free; beta pays like omega.
+export type ReaderLevel = 'alpha' | 'delta' | 'beta' | 'omega'
+export interface LevelInfo { level: ReaderLevel; invitedBy: string | null; override: boolean }
+
+export interface ReviewRead {
+  n: number
+  status: 'draft' | 'posted'
+  score: number | null
+  criteria: Record<string, number>
+  comment: string
+  spoilerEssay: string
+  noteIds: string[]
+  startedAt: string
+  postedAt: string | null
+  editedAt: string | null
+}
+export interface Review { bookId: string; reads: ReviewRead[] }
+export interface Note { id: string; bookId: string; quote: string; note: string; at: string }
+export type ReportKind = 'review' | 'post'
+export interface Report { id: string; kind: ReportKind; targetId: string; reason: string; at: string }
+
+export interface Club { id: string; name: string; description: string; bookId: string | null; meets: string; nextMeetingAt: string | null; members: string[]; mine: boolean }
+export interface ClubPost { id: string; clubId: string; authorId: string; text: string; at: string; spoiler: boolean; replyTo: string | null }
+export interface ClubView { club: Club; joined: boolean; memberCount: number; posts: ClubPost[] }
+export interface ReaderProfile { id: string; name: string; initials: string; bio: string }
+
+export interface PublicReview {
+  id: string
+  readerId: string
+  name: string
+  initials: string
+  score: number
+  criteria: Record<string, number>
+  comment: string
+  spoilerEssay: string
+  reads: number
+  at: string
+  edited: boolean
+  mine: boolean
+}
+export interface CriterionAverage { name: string; average: number; count: number }
+export interface BookCard { bookId: string; rating: number; ratings: number; criteria: CriterionAverage[]; reviews: PublicReview[] }
+
+export interface FeedItem { id: string; at: string; kind: 'finished' | 'reviewed' | 'club' | 'author' | 'followed' | 'mine'; who: string; whoId: string; title: string; detail: string; bookId: string | null }
+
+export interface Chapter { n: number; title: string; words: number }
+export interface PlanRow { title: string; meta: string; indent: number }
+export interface BookPlanning {
+  outline: PlanRow[]
+  plot: PlanRow[]
+  plotPath: string
+  goalWords: number
+  wordsNow: number
+  chaptersOutlined: number
+  chaptersTotal: number
+  publishTarget: string
+  revisions: PlanRow[]
+}
+export interface BookStats { readingNow: number; averageMinutes: number; finishPercent: number; leaveBars: number[]; clubs: number }
+export interface BookDetail {
+  bookId: string
+  authorNote: string
+  contents: Chapter[]
+  glossary: PlanRow[]
+  bibliography: string[]
+  index: string[]
+  appendix: string[]
+  planning: BookPlanning
+  stats: BookStats
+}
 
 export interface ReaderState {
   plan: Plan
@@ -72,6 +144,14 @@ export interface ReaderState {
   activity: Record<string, ActivityDay>
   flagClasses: Record<string, FlagClass>
   notifications: ReaderNotification[]
+  levels: Record<string, LevelInfo>
+  criteriaNames: string[]
+  reviews: Review[]
+  notes: Note[]
+  following: string[]
+  joinedClubs: string[]
+  reports: Report[]
+  blocked: string[]
 }
 
 export interface BookQuery {
@@ -125,3 +205,33 @@ export const putToRead = (bookId: string) => api.put<ReaderState>(`/reader/to-re
 export const deleteToRead = (bookId: string) => api.delete<ReaderState>(`/reader/to-read/${encodeURIComponent(bookId)}`)
 export const putFlagClass = (key: string, flagClass: FlagClass) => api.put<ReaderState>(`/reader/flag-classes/${encodeURIComponent(key)}`, { flagClass })
 export const postNotificationsRead = () => api.post<ReaderState>('/reader/notifications/read')
+
+// ---------------------------------------------------------------------------------------------------------------------- the Book page and the community
+
+export const getBookDetail = (id: string) => api.get<BookDetail>(`/library/books/${encodeURIComponent(id)}/detail`)
+export const getReaders = () => api.get<ReaderProfile[]>('/library/readers')
+export const getBookCard = (id: string) => api.get<BookCard>(`/reader/books/${encodeURIComponent(id)}/card`)
+export const getClubs = () => api.get<ClubView[]>('/reader/clubs')
+export const getFeed = () => api.get<FeedItem[]>('/reader/feed')
+
+export const putLevel = (bookId: string, level: ReaderLevel | null) => api.put<ReaderState>(`/reader/levels/${encodeURIComponent(bookId)}`, { level })
+export const putCriteria = (names: string[]) => api.put<ReaderState>('/reader/criteria', { names })
+export interface ReviewDraft { score: number | null; criteria: Record<string, number>; comment: string; spoilerEssay: string; noteIds: string[] }
+export const putReview = (bookId: string, draft: ReviewDraft) => api.put<ReaderState>(`/reader/reviews/${encodeURIComponent(bookId)}`, draft)
+export const postReview = (bookId: string) => api.post<ReaderState>(`/reader/reviews/${encodeURIComponent(bookId)}/post`)
+export const postReread = (bookId: string) => api.post<ReaderState>(`/reader/reviews/${encodeURIComponent(bookId)}/reread`)
+export const deleteReviewDraft = (bookId: string) => api.delete<ReaderState>(`/reader/reviews/${encodeURIComponent(bookId)}/draft`)
+export const postNote = (bookId: string, quote: string, note: string) => api.post<ReaderState>('/reader/notes', { bookId, quote, note })
+export const deleteNote = (id: string) => api.delete<ReaderState>(`/reader/notes/${encodeURIComponent(id)}`)
+export const putFollowing = (whom: string) => api.put<ReaderState>(`/reader/following/${encodeURIComponent(whom)}`, {})
+export const deleteFollowing = (whom: string) => api.delete<ReaderState>(`/reader/following/${encodeURIComponent(whom)}`)
+export const postClub = (name: string, description: string, bookId: string | null, meets: string) => api.post<ReaderState>('/reader/clubs', { name, description, bookId, meets })
+export const deleteClub = (id: string) => api.delete<ReaderState>(`/reader/clubs/${encodeURIComponent(id)}`)
+export const putMembership = (id: string) => api.put<ReaderState>(`/reader/clubs/${encodeURIComponent(id)}/membership`, {})
+export const deleteMembership = (id: string) => api.delete<ReaderState>(`/reader/clubs/${encodeURIComponent(id)}/membership`)
+export const postClubPost = (id: string, text: string, spoiler: boolean, replyTo: string | null) => api.post<ReaderState>(`/reader/clubs/${encodeURIComponent(id)}/posts`, { text, spoiler, replyTo })
+export const deletePost = (id: string) => api.delete<ReaderState>(`/reader/posts/${encodeURIComponent(id)}`)
+export const postReport = (kind: ReportKind, targetId: string, reason: string) => api.post<ReaderState>('/reader/reports', { kind, targetId, reason })
+export const deleteReport = (id: string) => api.delete<ReaderState>(`/reader/reports/${encodeURIComponent(id)}`)
+export const putBlocked = (readerId: string) => api.put<ReaderState>(`/reader/blocked/${encodeURIComponent(readerId)}`, {})
+export const deleteBlocked = (readerId: string) => api.delete<ReaderState>(`/reader/blocked/${encodeURIComponent(readerId)}`)
