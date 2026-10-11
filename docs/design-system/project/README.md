@@ -48,4 +48,5 @@ Each has a guideline page (`components/<Name>/README.md`) and a live preview tha
 - Take colours from `tokens.json` by name; in the app they are CSS variables set by `theme/tokens.ts` and re-derived inside a book (`.wrBookScope`). Do not hard-code white, black overlays or fixed lightness in new styles.
 - The class names (`wr*`) are the app's own and are in `components/bundle.css`; the Writer's styles live in `frontend/src/assets/Interfaces/writer/writer.scss`.
 - A new text-on-ground pair belongs in `frontend/src/theme/contrastAudit.ts`, so the test keeps it readable.
+- **No visible scrollbars.** Scrolling areas scroll by wheel, trackpad, touch and keyboard with the bar hidden ([interaction](interaction.md), Scrolling).
 - This system describes the Writer, and its surfaces, fields and tones now hold for the older tile grid and the helper and admin interfaces too (square and flat, the same tokens). Where a screen still differs, [known-drift](known-drift.md) says so.

@@ -74,6 +74,13 @@ The **Save component** (`components/SaveCluster.tsx`) is one rounded container f
 
 Click a sentence in the preview, then click the bar in the left margin: each click raises the reaction one level; a fourth click clears it. Likes and dislikes are separate bars.
 
+## Scrolling
+
+- **No scrollbars, anywhere.** A scrolling area (a list, a tile body, the shelf's row, a calendar wider than its box) shows no scrollbar, track or arrows: the app sets `scrollbar-width: none` and hides `::-webkit-scrollbar` on every element, and a new surface does not turn it back on. The area is still scrolled by the wheel, a trackpad, a finger and the keyboard (arrows, Page Up and Down, Space, Home and End).
+- **Show that there is more by the content, not the bar.** Let a row or a card be cut at the edge of the area, keep a header or a tab strip in place above the scrolling part, and never pad the area to make room for a bar.
+- **Wheel and touch both work.** A sideways row (the shelf's books) also turns the vertical wheel into a sideways scroll; it keeps `overscroll-behavior` so the page does not move behind it.
+- **Nothing important only scrolls into view.** An action a reader needs is on screen without scrolling; the scrolling part holds lists, text and data.
+
 ## Focus and hover
 
 - Focus is a 2px outline in the accent's light shade, inside the control, on every button, tab, title bar and divider.

@@ -37,6 +37,9 @@ input{
 }
 iframe {appearance: none;}
 button {border: none; cursor: pointer; border-radius: 4px;}
+// No visible scrollbars anywhere (design system, interaction.md "Scrolling"): every area still scrolls by wheel, touch, trackpad and keyboard.
+* { scrollbar-width: none; } // Firefox
+*::-webkit-scrollbar { display: none; } // Chrome, Safari, Electron
 // --------------------------------------------------------
 
 // Design tokens: the time-of-day theme (see theme/_theme.scss) writes the
