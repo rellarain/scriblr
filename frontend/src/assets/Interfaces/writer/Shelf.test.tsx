@@ -13,13 +13,16 @@ const progress = (over: Partial<BookProgress> = {}): BookProgress => ({
 })
 
 describe('spine size', () => {
-  it('is 10px wide at 20,000 words or with no goal, 2px wider for every further 4,000 words, and never over 64px', () => {
-    expect(SPINE_MIN_WIDTH).toBe(10)
-    expect(spineWidth(null)).toBe(10)
-    expect(spineWidth(20000)).toBe(10)
-    expect(spineWidth(23999)).toBe(10)
-    expect(spineWidth(24000)).toBe(12)
-    expect(spineWidth(80000)).toBe(40)
+  it('is 5px wide at 15,000 words or with no goal, 1px wider for every further 3,000 words, and never over 64px', () => {
+    expect(SPINE_MIN_WIDTH).toBe(5)
+    expect(spineWidth(null)).toBe(5)
+    expect(spineWidth(0)).toBe(5)
+    expect(spineWidth(15000)).toBe(5)
+    expect(spineWidth(17999)).toBe(5)
+    expect(spineWidth(18000)).toBe(6)
+    expect(spineWidth(60000)).toBe(20)
+    expect(spineWidth(80000)).toBe(26)
+    expect(spineWidth(192000)).toBe(SPINE_MAX_WIDTH)
     expect(spineWidth(1_000_000)).toBe(SPINE_MAX_WIDTH)
   })
 
@@ -35,7 +38,7 @@ describe('Spine', () => {
     const { rerender } = render(<Spine book={book()} number={1} active={false} onOpen={() => {}} />)
     const spine = screen.getByRole('button', { name: 'Cold Harbor' })
     expect(spine.className).toBe('wrSpine')
-    expect(spine.style.width).toBe('40px')
+    expect(spine.style.width).toBe('26px')
     expect(spine.style.height).toBe('126px')
     expect(spine.getAttribute('aria-pressed')).toBe('false')
 
