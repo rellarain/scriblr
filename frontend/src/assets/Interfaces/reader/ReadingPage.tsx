@@ -204,7 +204,7 @@ function Margin({ ctx, session }: { ctx: ReaderCtx; session: PagesSession }) {
         <h3><HeartIcon size={14} />This chapter</h3>
         <span>{mine.filter(([, m]) => m.like || m.dislike).length} sentences marked · {mine.filter(([, m]) => m.like).length} pleasant · {mine.filter(([, m]) => m.dislike).length} unpleasant</span>
         {totals && <span className="rdMuted">{totals.readers.toLocaleString('en-US')} readers marked this chapter: {totals.pleasant} pleasant, {totals.unpleasant} unpleasant.</span>}
-        <span className="rdMuted">{ctx.data.reader?.settings.shareReactions ? `Shared with ${book.authorName} without your name.` : 'Not shared: your reactions stay with you.'}</span>
+        <span className="rdMuted">{book.source === 'local' ? 'Your own book: reactions you share are counted in the Readers part of your Writer.' : ctx.data.reader?.settings.shareReactions ? `Shared with ${book.authorName} without your name.` : 'Not shared: your reactions stay with you.'}</span>
       </div>
     </aside>
   )

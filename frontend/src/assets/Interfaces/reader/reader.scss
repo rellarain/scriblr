@@ -84,6 +84,8 @@
 
   // ---------------------------------------------------------------- consoles
   .rdGrid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; padding: 2px 8px 8px; align-items: start; &--one { grid-template-columns: minmax(0, 1fr); } }
+  // A console that stands alone takes the whole row.
+  .rdGrid > .rdCon:only-child { grid-column: 1 / -1; }
   .rdCon { container-type: inline-size; container-name: rdcon; background: var(--rd-f1); display: flex; flex-direction: column; min-width: 0; }
   .rdConHead { display: flex; align-items: center; gap: 10px; padding: 0 6px 0 14px; min-height: 46px; background: var(--rd-f3); }
   .rdConTitle { flex: 1; text-align: left; display: flex; align-items: center; gap: 10px; min-height: 46px; font-size: 12px; font-weight: 700; letter-spacing: 1.5px; text-transform: uppercase; }
@@ -141,7 +143,7 @@
   .rdHeroBody { display: flex; flex-direction: column; gap: 12px; min-width: 0; }
   .rdBook3d { position: relative; display: flex; width: 170px; aspect-ratio: 2 / 3; box-shadow: 0 8px 0 -4px var(--ov-sink-3); }
   .rdBookSpine { flex: 0 0 14px; background: color-mix(in srgb, var(--rd-book) 62%, black); box-shadow: inset -3px 0 0 var(--ov-sink-2); }
-  .rdBookFace { flex: 1; min-width: 0; display: flex; flex-direction: column; justify-content: space-between; padding: 12px 10px; background: var(--rd-book); color: #fff; font-family: Georgia, 'Times New Roman', serif; box-shadow: inset 4px 0 0 var(--ov-sink-3); b { font-size: 20px; line-height: 1.1; } span { font: 700 10px/1.2 'Segoe UI', system-ui, sans-serif; letter-spacing: 1.2px; text-transform: uppercase; } }
+  .rdBookFace { flex: 1; min-width: 0; display: flex; flex-direction: column; justify-content: space-between; padding: 12px 10px; background: var(--rd-book); color: #fff; font-family: Georgia, 'Times New Roman', serif; box-shadow: inset 4px 0 0 var(--ov-sink-3); b { font-family: inherit; font-size: 20px; line-height: 1.1; } span { font: 700 10px/1.2 'Segoe UI', system-ui, sans-serif; letter-spacing: 1.2px; text-transform: uppercase; } }
   .rdBookPages { flex: 0 0 12px; border-radius: 0 3px 3px 0; background: repeating-linear-gradient(180deg, #f3ead8 0 2px, #d3c6ab 2px 3px); box-shadow: inset 3px 0 0 var(--ov-sink-2); }
 
   // ---------------------------------------------------------------- the Book page's community: avatars, reviews, clubs, tabs
@@ -217,6 +219,8 @@
   .rdLegend { display: grid; grid-template-columns: repeat(3, 20px); gap: 5px; margin-bottom: 8px; width: 70px; span { height: 20px; display: grid; place-items: center; color: var(--rd-pmuted); } }
   .rdProw { display: grid; grid-template-columns: var(--rd-pg-track, 86px) minmax(0, 1fr); position: relative; margin-bottom: 14px; }
   .rdPtext { grid-column: 2; min-width: 0; }
+  // The app's element reset sets a font on every paragraph and span; the page's own font (the reader's choice) must reach the text.
+  .rdParagraph, .rdSn { font: inherit; }
   .rdParagraph { margin: 0; text-align: justify; }
   .rdTracks { grid-column: 1; position: relative; width: 70px; }
   .rdReactBar {

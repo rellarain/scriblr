@@ -97,7 +97,7 @@ export function BookcoverConsole({ ctx, book, size }: { ctx: ReaderCtx; book: Ca
               <>
                 {!held && <button type="button" className="rdBtn rdBtn--pri" onClick={() => ctx.borrow(book)}><BagIcon size={16} />Borrow · 1 credit</button>}
                 {!held && <button type="button" className="rdBtn" onClick={() => ctx.borrow(book)}><BagIcon size={16} />Buy · {dollars(book.buyPriceCents)}</button>}
-                {held?.kind === 'borrowed' && <Chip on><TicketIcon size={14} />{dueText(held.dueAt)}{held.dueAt ? ` (${shortDate(held.dueAt)})` : ''}</Chip>}
+                {held?.kind === 'borrowed' && <Chip on><TicketIcon size={14} />{dueText(held.dueAt)}{held.dueAt && /^due (in|today)/.test(dueText(held.dueAt)) ? ` (${shortDate(held.dueAt)})` : ''}</Chip>}
                 {held?.kind === 'owned' && !lent && <Chip on><SwapIcon size={14} />Owned</Chip>}
                 {lent && <Chip on>Lent to {held?.lentTo}</Chip>}
               </>
