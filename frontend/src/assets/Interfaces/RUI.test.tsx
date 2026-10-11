@@ -2,7 +2,7 @@ import { render, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { MemoryRouter, useLocation } from 'react-router-dom'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import type { BookCard, BookDetail, CatalogBook, ClubView, ReaderState } from '../../api/reader'
+import type { BookCard, BookDetail, BookText, CatalogBook, ChapterText, ClubView, Mark, ReaderState } from '../../api/reader'
 import { __resetSettingsForTests } from '../../settings/settingsStore'
 import RUI from './RUI'
 import { __resetReaderForTests } from './reader/readerStore'
@@ -17,7 +17,7 @@ const BOOKS = [book({}), book({ id: 'thaw', title: 'Thaw', hue: 330, wordCount: 
 const state = (over: Partial<ReaderState> = {}): ReaderState => ({
   plan: { extraCredits: 0 }, planPriceCents: 600, creditsPerMonth: 1, balance: 1,
   ledger: [{ id: 'l1', at: '2026-10-01T00:00:00Z', kind: 'grant', delta: 1, note: 'Monthly credits for 2026-10', bookId: null, holdingId: null }],
-  holdings: [], toRead: [], wishlist: [], progress: {}, activity: {}, flagClasses: {}, notifications: [], levels: {}, criteriaNames: ['Plot', 'Prose'], reviews: [], notes: [], following: [], joinedClubs: [], reports: [], blocked: [], ...over,
+  holdings: [], toRead: [], wishlist: [], progress: {}, activity: {}, flagClasses: {}, notifications: [], levels: {}, criteriaNames: ['Plot', 'Prose'], reviews: [], notes: [], following: [], joinedClubs: [], reports: [], blocked: [], settings: { mode: 'turn', textSize: 18, font: 'serif', spacing: 'roomy', margins: 'narrow', tone: 'day', highContrast: false, focus: false, shareReactions: true, readAloudRate: 1 }, myFlags: [], positions: {}, ...over,
 })
 
 const CARD: BookCard = {
@@ -41,6 +41,15 @@ const CLUBS: ClubView[] = [{
   posts: [{ id: 'p1', clubId: 'slow-burners', authorId: 'r-rue', text: 'Nothing happens, beautifully.', at: '2026-10-09T00:00:00Z', spoiler: false, replyTo: null }],
 }]
 
+const TEXT: BookText = { bookId: 'cold-harbor', level: 'omega', canRead: true, reason: '', chapters: [1, 2, 3].map(n => ({ n, title: `Title ${n}`, words: 1000, available: n < 3, reason: n < 3 ? '' : 'Not published yet at your level.' })) }
+const chapterOf = (n: number): ChapterText => ({
+  bookId: 'cold-harbor', n, title: `Title ${n}`, words: 1000, level: 'omega', draft: false, draftNote: '',
+  paragraphs: ['The harbor woke early. Rue counted the boats twice.', 'A gull stood on the weir. She crossed the date out.'],
+  footnotes: [{ id: 'fn1', key: `c${n}:p0:s1`, title: 'The early tide', text: 'The weir makes the tide early.' }],
+  flags: [{ key: `c${n}:p1:s0`, flagKey: 'grief', name: 'Grief', detail: 'A death is remembered.', defaultClass: 'marked' }],
+})
+let marks: Record<string, Mark> = {}
+
 interface Call { method: string; url: string; body: unknown }
 let calls: Call[]
 let reader: ReaderState
@@ -56,6 +65,16 @@ function stubFetch() {
     if (url === '/api/reader' && method === 'GET') return json(reader)
     if (url.startsWith('/api/library/books?')) return json({ total: BOOKS.length, books: BOOKS })
     if (url.startsWith('/api/library/recommendations')) return json([{ book: BOOKS[1], match: 80, why: ['The next book.'] }])
+    if (url === '/api/reader/books/cold-harbor/text') return json(TEXT)
+    if (/\/api\/reader\/books\/cold-harbor\/chapters\/\d+$/.test(url)) return n3(url) >= 3 ? { ok: false, status: 403, json: async () => ({ detail: 'Not published yet at your level.' }) } : json(chapterOf(n3(url)))
+    if (url === '/api/reader/books/cold-harbor/marks') {
+      if (method === 'PUT') { const { key, ...mark } = body; if (mark.like === 0 && mark.dislike === 0 && mark.flags.length === 0) delete marks[key]; else marks[key] = mark }
+      return json(marks)
+    }
+    if (url.startsWith('/api/reader/books/cold-harbor/reactions/')) return json({ chapter: 1, readers: 40, pleasant: 12, unpleasant: 3, top: [], mine: Object.keys(marks).length })
+    if (url === '/api/reader/books/cold-harbor/reading' && method === 'PUT') { reader = state({ ...reader, positions: { 'cold-harbor': { chapter: body.chapter, paragraph: body.paragraph, device: body.device, at: '2026-10-11T00:00:00Z' } } }); return json(reader) }
+    if (url === '/api/reader/settings') { reader = state({ ...reader, settings: body }); return json(reader) }
+    if (url === '/api/reader/notes' && method === 'POST') { reader = state({ ...reader, notes: [{ id: 'n9', bookId: body.bookId, quote: body.quote ?? '', note: body.note ?? '', at: '2026-10-11T00:00:00Z', kind: body.kind ?? 'note', chapter: body.chapter ?? null, key: body.key ?? null }] }); return json(reader) }
     if (url === '/api/library/readers') return json([{ id: 'r-rue', name: 'Rue Tanner', initials: 'RT', bio: '' }, { id: 'r-sol', name: 'Sol Marsh', initials: 'SM', bio: '' }])
     if (url.endsWith('/detail')) return json(DETAIL)
     if (url === '/api/reader/books/cold-harbor/card') return json(CARD)
@@ -97,9 +116,11 @@ function Where() {
   return <span data-testid="where">{useLocation().pathname}</span>
 }
 
+const n3 = (url: string): number => Number(url.split('/').pop())
 const open = (path: string) => render(<MemoryRouter initialEntries={[path]}><RUI /><Where /></MemoryRouter>)
 
 beforeEach(() => {
+  marks = {}
   CLUBS[0] = { ...CLUBS[0], joined: false, memberCount: 1, posts: CLUBS[0].posts.slice(0, 1) }
   window.localStorage.clear()
   __resetSettingsForTests()
@@ -299,6 +320,81 @@ describe('the Reader', () => {
     const tabs = await screen.findByRole('navigation', { name: 'Chapters' })
     expect(within(tabs).getAllByRole('button')).toHaveLength(2)
     expect(within(tabs).getByRole('button', { name: /Chapter 1/ }).getAttribute('aria-current')).toBe('true')
+  })
+
+  it('opens the e-reader at a chapter, with the footnote in the right margin of the page and the chapter tab raised', async () => {
+    open('/read/book/cold-harbor/pages/2')
+    expect(await screen.findByText(/The harbor woke early/)).toBeTruthy()
+    const margin = screen.getByRole('complementary', { name: 'Margin notes' })
+    expect(within(margin).getByText(/1\. The early tide/)).toBeTruthy()
+    const tabs = screen.getByRole('navigation', { name: 'Chapters' })
+    expect(within(tabs).getByRole('button', { name: /Chapter 2/ }).getAttribute('aria-current')).toBe('true')
+    expect(within(tabs).getByRole('button', { name: /Chapter 3/ }).hasAttribute('disabled')).toBe(true) // not open at this level
+  })
+
+  it('saves a pleasant reaction on the selected sentence', async () => {
+    const user = userEvent.setup()
+    open('/read/book/cold-harbor/pages/1')
+    await user.click(await screen.findByText(/Rue counted the boats twice/))
+    await user.click(await screen.findByRole('button', { name: /Pleasant, level 0/ }))
+    await waitFor(() => expect(calls.find(c => c.url === '/api/reader/books/cold-harbor/marks' && c.method === 'PUT')?.body).toEqual({ key: 'c1:p0:s1', like: 1, dislike: 0, flags: [] }))
+    expect(await screen.findByRole('button', { name: /Pleasant reaction, level 1/ })).toBeTruthy()
+  })
+
+  it('keeps a highlight on its sentence as a note that names the chapter', async () => {
+    const user = userEvent.setup()
+    open('/read/book/cold-harbor/pages/1')
+    await user.click(await screen.findByText(/The harbor woke early/))
+    await user.click(await screen.findByRole('button', { name: /Highlight/ }))
+    await waitFor(() => expect(calls.find(c => c.url === '/api/reader/notes')?.body).toMatchObject({ bookId: 'cold-harbor', kind: 'highlight', chapter: 1, key: 'c1:p0:s0' }))
+  })
+
+  it('shows a flag by the class the reader chose: hidden replaces the sentence until it is tapped', async () => {
+    const user = userEvent.setup()
+    reader = state({ flagClasses: { grief: 'hidden' } })
+    open('/read/book/cold-harbor/pages/1')
+    const placeholder = await screen.findByRole('button', { name: /Hidden · Grief · tap to reveal/ })
+    expect(screen.queryByText(/A gull stood on the weir/)).toBeNull()
+    await user.click(placeholder)
+    expect(await screen.findByText(/A gull stood on the weir/)).toBeTruthy()
+  })
+
+  it('shows a highlight flag with its details beside the passage, and a spoiler flag shut until tapped', async () => {
+    const user = userEvent.setup()
+    reader = state({ flagClasses: { grief: 'spoiler' } })
+    open('/read/book/cold-harbor/pages/1')
+    await screen.findByText(/A gull stood on the weir/)
+    expect(screen.queryByText(/A death is remembered/)).toBeNull()
+    await user.click(screen.getByRole('button', { name: /Spoiler description · tap to reveal/ }))
+    expect(await screen.findByText(/A death is remembered/)).toBeTruthy()
+  })
+
+  it('says a paid book needs a loan, and a chapter beyond the level is not opened', async () => {
+    TEXT.canRead = false
+    TEXT.reason = 'Borrow or buy this book to read it.'
+    try {
+      open('/read/book/cold-harbor/pages/1')
+      expect(await screen.findByText('Borrow or buy this book to read it.')).toBeTruthy()
+      expect(screen.getByRole('button', { name: 'Borrow or buy' })).toBeTruthy()
+    } finally { TEXT.canRead = true; TEXT.reason = '' }
+  })
+
+  it('changes the page tone from the reader bar and saves it with the account', async () => {
+    const user = userEvent.setup()
+    open('/read/book/cold-harbor/pages/1')
+    await user.click(await screen.findByRole('button', { name: 'Night page' }))
+    await waitFor(() => expect(calls.find(c => c.url === '/api/reader/settings')?.body).toMatchObject({ tone: 'night', mode: 'turn' }))
+    expect(document.querySelector('.rdReader--night')).toBeTruthy()
+  })
+
+  it('records where the reader stopped when a chapter is open and a page is turned', async () => {
+    const user = userEvent.setup()
+    reader = state({ settings: { ...state().settings, textSize: 32 } }) // big text: more pages
+    open('/read/book/cold-harbor/pages/1')
+    await screen.findByText(/The harbor woke early/)
+    const next = screen.getByRole('button', { name: 'Next page' })
+    await user.click(next)
+    await waitFor(() => expect(calls.find(c => c.url === '/api/reader/books/cold-harbor/reading')?.body).toMatchObject({ chapter: expect.any(Number), newSession: true }), { timeout: 3000 })
   })
 
   it('says so when a book is not in the library', async () => {

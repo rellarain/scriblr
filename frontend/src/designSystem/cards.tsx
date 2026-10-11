@@ -233,7 +233,7 @@ function ThemeSettingsCard() {
 }
 
 // The Reader at a page, or one of its dialogs standing over it (the real RUI, run against the mock library).
-const READER_PATHS: Record<string, string> = { nook: '/read', library: '/read/library', catalog: '/read/library/catalog', book: '/read/book/lorem-ipsum/cover', face: '/read/book/lorem-ipsum/face', card: '/read/book/lorem-ipsum/card', delta: '/read/book/sit-amet/cover' }
+const READER_PATHS: Record<string, string> = { nook: '/read', library: '/read/library', catalog: '/read/library/catalog', book: '/read/book/lorem-ipsum/cover', pages: '/read/book/lorem-ipsum/pages/3', face: '/read/book/lorem-ipsum/face', card: '/read/book/lorem-ipsum/card', delta: '/read/book/sit-amet/cover' }
 function ReaderDialogHost({ kind }: { kind: 'plan' | 'borrow' | 'review' }) {
   const data = useReader()
   useEffect(() => { void loadReader() }, [])
@@ -269,7 +269,7 @@ function SkyCard() {
 
 const WRITER_VIEWS = [{ id: 'dash', label: 'Dash' }, { id: 'project', label: 'Project' }, { id: 'book', label: 'Outline' }, { id: 'chapter', label: 'Draft' }, { id: 'preview', label: 'Preview' }]
 
-const READER_VIEWS = [{ id: 'nook', label: 'Nook' }, { id: 'library', label: 'Library' }, { id: 'catalog', label: 'Catalog' }, { id: 'book', label: 'Book' }, { id: 'face', label: 'Bookface' }, { id: 'card', label: 'Bookcard' }, { id: 'delta', label: 'Delta invite' }, { id: 'plan', label: 'Plan' }, { id: 'borrow', label: 'Borrow' }, { id: 'review', label: 'Review' }]
+const READER_VIEWS = [{ id: 'nook', label: 'Nook' }, { id: 'library', label: 'Library' }, { id: 'catalog', label: 'Catalog' }, { id: 'book', label: 'Book' }, { id: 'face', label: 'Bookface' }, { id: 'card', label: 'Bookcard' }, { id: 'delta', label: 'Delta invite' }, { id: 'pages', label: 'Pages' }, { id: 'plan', label: 'Plan' }, { id: 'borrow', label: 'Borrow' }, { id: 'review', label: 'Review' }]
 
 const META = new Map(CARD_META.map(m => [m.id, m]))
 const card = (id: string, rest: Omit<CardDef, 'id' | 'title' | 'group' | 'summary' | 'height'>): CardDef => {

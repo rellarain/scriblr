@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { useLocation, useNavigate } from 'react-router-dom'
 import type { CatalogBook } from '../../api/reader'
-import { BackIcon, BarChartIcon, BellIcon, BookFaceIcon, CardIcon, CatalogIcon, CoverIcon, FaceIcon, FeedIcon, FrontIcon, GoalIcon, HistoryIcon, HomeIcon, JournalIcon, LibraryIcon, PagesIcon, PlayIcon, PlotIcon, ShelfIcon, ShelvesIcon, StackIcon, TicketIcon, TreeIcon } from '../icons'
+import { BackIcon, BarChartIcon, BellIcon, BodyIcon, BookFaceIcon, CardIcon, CatalogIcon, CoverIcon, FaceIcon, FeedIcon, FlagIcon, FootnoteIcon, FrontIcon, GoalIcon, HeartIcon, HistoryIcon, HomeIcon, JournalIcon, LibraryIcon, NoteIcon, PagesIcon, PlotIcon, ShelfIcon, ShelvesIcon, SlidersIcon, StackIcon, TicketIcon, TreeIcon } from '../icons'
 import { fillColorCss } from '../../theme/bookColors'
 import { useThemeState } from '../../theme/useTheme'
 import { useStoredState } from './writer/storage'
@@ -12,6 +12,9 @@ import { resolve, withFull, type ConsoleStates } from './reader/consoleStates'
 import { AnalyticsConsole, FeedConsole, JournalConsole, StackConsole } from './reader/NookConsoles'
 import { CatalogConsole, HistoryConsole, ShelfConsole, ShelvesConsole } from './reader/LibraryConsoles'
 import { BorrowDialog, PlanDialog } from './reader/ReaderDialogs'
+import { AnnotationsConsole, FlagsConsole, FootnotesConsole, ReactionsConsole, SettingsConsole } from './reader/PagesConsoles'
+import { usePagesSession } from './reader/PagesSession'
+import { ReadingPage } from './reader/ReadingPage'
 import { ReviewDialog } from './reader/ReviewDialog'
 import { levelOf } from './reader/readerSocial'
 import { ReaderPanel, type ConsoleDef } from './reader/ReaderPanel'
@@ -36,6 +39,8 @@ const BOOK_IDS = ['cover', 'face', 'card', 'front', 'back']
 // An alpha reader is also given the author's planning, read-only.
 const ALPHA_IDS = [...BOOK_IDS, 'outline', 'plot', 'plan', 'revisions']
 const BOOK_DEFAULTS: ConsoleStates = { cover: 'tile' }
+const PAGES_IDS = ['flags', 'reactions', 'body', 'footnotes', 'annotations', 'settings']
+const PAGES_DEFAULTS: ConsoleStates = { body: 'tile' }
 
 // The page's consoles: what is stored for them (and the URL's full console on top), and how a change is stored and written to the URL.
 function usePageStates(loc: ReaderLocation, ids: string[], defaults: ConsoleStates) {
@@ -117,7 +122,7 @@ function RUI() {
   else if (loc.page === 'nook') content = <NookPage loc={loc} ctx={ctx} color={colors.nook} right={right} />
   else if (loc.page === 'library') content = <LibraryPage loc={loc} ctx={ctx} color={colors.library} right={right} />
   else if (loc.page === 'book') content = <BookPage loc={loc} ctx={ctx} color={colors.book} right={right} book={book} />
-  else content = <PagesPage color={colors.pages} right={right} book={book} onBack={() => go('book')} />
+  else content = <PagesPage loc={loc} ctx={ctx} color={colors.pages} right={right} book={book} />
 
   return (
     <main className="rUI wr rdRoot">
@@ -188,23 +193,28 @@ function BookPage({ loc, ctx, color, right, book }: PageProps & { book: CatalogB
   )
 }
 
-function PagesPage({ color, right, book, onBack }: { color: string; right: React.ReactNode; book: CatalogBook | undefined; onBack: () => void }) {
+function PagesPage({ loc, ctx, color, right, book }: PageProps & { book: CatalogBook | undefined }) {
+  if (!book) return <p className="rdEmpty" role="alert">That book is not in the library.</p>
+  return <PagesBook loc={loc} ctx={ctx} color={color} right={right} book={book} />
+}
+
+// The e-reader: the page (Body) and the consoles beside it share one reading session.
+function PagesBook({ loc, ctx, color, right, book }: PageProps & { book: CatalogBook }) {
+  const { states, onStates } = usePageStates(loc, PAGES_IDS, PAGES_DEFAULTS)
+  const session = usePagesSession(ctx, book, loc.chapter)
+  const focus = ctx.data.reader?.settings.focus ?? false
+  const consoles: ConsoleDef[] = [
+    { id: 'flags', label: 'Flags', Icon: FlagIcon, render: () => <FlagsConsole ctx={ctx} session={session} /> },
+    { id: 'reactions', label: 'Reactions', Icon: HeartIcon, render: () => <ReactionsConsole ctx={ctx} session={session} /> },
+    { id: 'body', label: 'Body', Icon: BodyIcon, wide: true, render: () => <ReadingPage ctx={ctx} session={session} /> },
+    { id: 'footnotes', label: 'Footnotes', Icon: FootnoteIcon, render: () => <FootnotesConsole ctx={ctx} session={session} /> },
+    { id: 'annotations', label: 'Annotations', Icon: NoteIcon, render: () => <AnnotationsConsole ctx={ctx} session={session} /> },
+    { id: 'settings', label: 'Settings', Icon: SlidersIcon, render: () => <SettingsConsole ctx={ctx} session={session} /> },
+  ]
   return (
-    <section className="rdLevel" style={{ ['--rd-f' as string]: color }} aria-label="Pages">
-      <header className="rdLevelHead">
-        <h2 className="rdLevelTitle"><PagesIcon size={20} />Pages</h2>
-        <div className="rdLevelRight">{right}</div>
-      </header>
-      <div className="rdGrid rdGrid--one">
-        <section className="rdCon rdCon--full">
-          <div className="rdConBody">
-            <p>{book ? `${book.title} opens here, on a spread of two pages.` : 'A book opens here.'}</p>
-            <p className="rdMuted">The e-reader (page turning or scrolling, reactions, flags, footnotes and your own notes) arrives in a later release.</p>
-            <button type="button" className="rdBtn" onClick={onBack}><PlayIcon size={16} />Back to the book</button>
-          </div>
-        </section>
-      </div>
-    </section>
+    <ReaderPanel title={book.title} Icon={PagesIcon} color={color} consoles={consoles} states={states} onStates={onStates} right={right}
+      notice={<div className="rdNotice"><LevelBadge ctx={ctx} book={book} /></div>}
+      edge={<EdgeTabs ctx={ctx} book={book} current={session.n} chapters={session.text?.chapters} />} className={focus ? 'rdLevel--pages rdLevel--focus' : 'rdLevel--pages'} />
   )
 }
 

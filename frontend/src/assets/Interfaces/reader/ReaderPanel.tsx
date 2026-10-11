@@ -9,6 +9,8 @@ export interface ConsoleDef {
   label: string
   Icon: ComponentType<IconProps>
   render: (size: Exclude<ConsoleState, 'min'>) => ReactNode
+  // Takes the whole row of the grid (the e-reader's page).
+  wide?: boolean
 }
 
 interface ReaderPanelProps {
@@ -55,7 +57,7 @@ export function ReaderPanel({ title, Icon, color, consoles, states, onStates, ri
         {open.map(c => {
           const size = states[c.id] as Exclude<ConsoleState, 'min'>
           return (
-            <section key={c.id} className={`rdCon rdCon--${size}`} aria-label={c.label}>
+            <section key={c.id} className={`rdCon rdCon--${size}${c.wide ? ' rdCon--wide' : ''}`} aria-label={c.label}>
               <div className="rdConHead">
                 <button type="button" className="rdConTitle" onClick={() => onStates(grow(states, c.id))}><c.Icon size={20} />{c.label}</button>
                 <button type="button" className="rdIconBtn rdIconBtn--small" aria-label={`Make ${c.label} smaller`} onClick={() => onStates(shrink(states, c.id))}>

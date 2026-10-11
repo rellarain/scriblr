@@ -116,12 +116,13 @@ def seeded_totals(book: CatalogBook, chapter: int, paragraphs: list[str]) -> tup
 def seeded_chapter(book: CatalogBook, n: int, level: ReaderLevel) -> ChapterText:
     paragraphs = seeded_paragraphs(book.id, n)
     total = chapter_count(book)
-    title = next((r.title for r in seeded_refs(book, level) if r.n == n), f"Chapter {n}")
+    ref = next((r for r in seeded_refs(book, level) if r.n == n), None)
     return ChapterText(
         bookId=book.id,
         n=n,
-        title=title,
-        words=sum(len(p.split()) for p in paragraphs),
+        title=ref.title if ref else f"Chapter {n}",
+        # The chapter's length as the book's contents give it (the generated text is only a sample of it).
+        words=ref.words if ref else sum(len(p.split()) for p in paragraphs),
         paragraphs=paragraphs,
         footnotes=seeded_footnotes(book.id, n),
         flags=seeded_flag_passages(book, n, total),

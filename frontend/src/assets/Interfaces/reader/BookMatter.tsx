@@ -142,16 +142,19 @@ export function RevisionsConsole({ ctx, book }: { ctx: ReaderCtx; book: CatalogB
 // ---------------------------------------------------------------------------------------------------------------------- edge tabs
 
 // A tab for each chapter down the page's right edge, as in the Writer's book: the chapter the reader has reached stands out; a click opens it.
-export function EdgeTabs({ ctx, book }: { ctx: ReaderCtx; book: CatalogBook }) {
+// In the e-reader the tabs are the chapters the reader may open (the rest are dimmed) and the open chapter is the one that stands out.
+export function EdgeTabs({ ctx, book, current, chapters }: { ctx: ReaderCtx; book: CatalogBook; current?: number; chapters?: { n: number; title: string; available: boolean }[] }) {
   const detail = ctx.data.details[book.id]
   const position = ctx.data.reader?.progress[book.id]
-  if (!detail) return null
-  const current = currentChapter(position?.pct ?? 0, detail.contents.length)
+  const list = chapters ?? detail?.contents.map(c => ({ n: c.n, title: c.title, available: true }))
+  if (!list) return null
+  const here = current ?? currentChapter(position?.pct ?? 0, list.length)
   return (
     <div className="rdEdge" role="navigation" aria-label="Chapters">
-      {detail.contents.map(c => (
-        <button key={c.n} type="button" className={c.n === current ? 'rdEdgeTab rdEdgeTab--on' : 'rdEdgeTab'} style={{ ['--rd-tab' as string]: `${(c.n % 5) * 6}%` } as CSSProperties}
-          title={`Chapter ${c.n}: ${c.title}`} aria-label={`Chapter ${c.n}: ${c.title}`} aria-current={c.n === current ? 'true' : undefined} onClick={() => ctx.openPages(book.id, c.n)}>
+      {list.map(c => (
+        <button key={c.n} type="button" className={c.n === here ? 'rdEdgeTab rdEdgeTab--on' : 'rdEdgeTab'} style={{ ['--rd-tab' as string]: `${(c.n % 5) * 6}%` } as CSSProperties}
+          title={`Chapter ${c.n}: ${c.title}${c.available ? '' : ' (not open at your level)'}`} aria-label={`Chapter ${c.n}: ${c.title}`} aria-current={c.n === here ? 'true' : undefined}
+          disabled={!c.available} onClick={() => ctx.openPages(book.id, c.n)}>
           {c.n}
         </button>
       ))}

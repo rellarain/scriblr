@@ -1,8 +1,8 @@
 # Reader: pages, rails and consoles
 
-The Reader (RUI) is for readers with a plan who borrow and own books. It has four pages that open one from the next, as the Writer's levels do: the **Nook** (the reader's own things), the **Library** (the shelves and the catalog), the **Book** (one book and its cover) and **Pages** (the e-reader, a later release). Money and lending are simulated: nothing here leaves the machine.
+The Reader (RUI) is for readers with a plan who borrow and own books. It has four pages that open one from the next, as the Writer's levels do: the **Nook** (the reader's own things), the **Library** (the shelves and the catalog), the **Book** (one book and its cover) and **Pages** (the e-reader). Money and lending are simulated: nothing here leaves the machine.
 
-Code: `assets/Interfaces/RUI.tsx` (the shell and the pages), `reader/ReaderPanel.tsx` (a page's header and consoles), `reader/{NookConsoles,LibraryConsoles,BookConsoles,BookSocial,BookMatter,ReaderDialogs,ReviewDialog}.tsx`, `assets/Interfaces/FlagSettings.tsx` (the user-level flag classes, in UUI Account > Flags), `reader/consoleStates.ts` (icon, tile, full), `reader/readerRoutes.ts` (the URLs), `reader/activityGrid.ts` (the calendar), `reader/readerStore.ts` (the data), `reader/readerSocial.ts` (levels, reviews, what is hidden), `reader/reader.scss`; backend `storage/{reader_store,reader_social,social_views,social_seed,library,library_seed,reader_schema}.py` (`/api/reader`, `/api/library`). Classes `.rd*`, in the Writer's scope (`.rUI.wr`), so its shelf and spines draw here too.
+Code: `assets/Interfaces/RUI.tsx` (the shell and the pages), `reader/ReaderPanel.tsx` (a page's header and consoles), `reader/{NookConsoles,LibraryConsoles,BookConsoles,BookSocial,BookMatter,ReaderDialogs,ReviewDialog,ReadingPage,PagesConsoles}.tsx`, `reader/{PagesSession,pagesLogic}.ts` (the reading session and its pure logic), `assets/Interfaces/FlagSettings.tsx` (the user-level flag classes, in UUI Account > Flags), `reader/consoleStates.ts` (icon, tile, full), `reader/readerRoutes.ts` (the URLs), `reader/activityGrid.ts` (the calendar), `reader/readerStore.ts` (the data), `reader/readerSocial.ts` (levels, reviews, what is hidden), `reader/reader.scss`; backend `storage/{reader_store,reader_social,reader_reading,reading_text,social_views,social_seed,library,library_seed,reader_schema}.py` (`/api/reader`, `/api/library`). Classes `.rd*`, in the Writer's scope (`.rUI.wr`), so its shelf and spines draw here too.
 
 ## Anatomy
 
@@ -26,6 +26,17 @@ A book is read at a **level**, set by the author's invitation: **alpha** (the pl
 - **Hide, report, block**: a review or post can be hidden or reported (spoiler, abuse, spam) and a reader blocked; the item is out of sight until the reader undoes it in the Feed's Hidden and blocked card. Nothing is sent anywhere.
 - **Flag classes** are the reader's, for every book, and are set in the User panel (Account > Flags), not here; the Book page shows them.
 
+## Pages: the e-reader
+
+`/read/book/<id>/pages/<chapter>` opens a book's text. Six consoles: **Flags**, **Reactions**, **Body** (the page, always the full row), **Footnotes**, **Annotations** and **Settings**. A tile of a console opens above or below the page; Body is a tile by default.
+
+- **The page** `.rdReader`: one column of text on a Day or Night page (the Writer's page tokens, `page-day` and `page-night`), titled with the book, chapter and level. The **reaction tracks** are three 20px columns at its left (pleasant, unpleasant, my flags; the strength is the fill, in three steps) and the **crease** runs down between them and the copy. The author's **footnotes** and the reader's **notes** stand in the **right margin of the page**, as cards with a coloured stripe and a trail (Footnote › Chapter 3 › paragraph 2, sentence 2). The page's edges are stacked at its outermost right, and the chapter **edge tabs** of the level lie beyond them: a tab for every chapter, the open one raised, the ones closed at the reader's level dimmed.
+- **Turning**: pages are whole paragraphs, cut by the text size and the margins; Previous and Next (or the arrow keys) turn, and the end of a chapter goes on to the next open one. **Scroll** shows the chapter whole. Where the reader stops is saved as they turn (the chapter, the paragraph and the device), so another device resumes there, and the pages and minutes feed the Nook's calendar.
+- **A sentence** is selected by a click; a bar offers **Pleasant** and **Unpleasant** (each click raises the level, three levels, then off), a **flag** (an author's flag of the chapter or one of the reader's own), **Highlight**, **Bookmark** and a **note**. Marks are saved with the account. Other readers' totals (anonymous, seeded) are in Reactions; the reader's own count in them only when they choose to share.
+- **Flags in the text** show by the class the reader gave them in the User panel: **hidden** replaces the sentence with a one-line placeholder (tap to reveal), **marked** puts a flag icon on it, **highlight** shows the flag's details beside it, **spoiler** adds a description that stays shut until tapped.
+- **Settings**: font (serif, sans, easy-read), size, line spacing, margins, turn or scroll, Day or Night, high contrast (no quiet text, strong lines), reading focus (the controls fade while reading), read aloud (the system's voice, at a chosen speed) and the saved position. Annotations exports the book's highlights and notes as Markdown.
+- **What can be read** depends on the level: omega the whole final edition, beta the final-draft chapters published so far, delta the draft chapters in progress (with a draft note), alpha the author's current draft with the plan in the margin. Alpha and delta are free; beta and omega need a loan or a purchase, and an author reads their own book freely.
+
 ## Credits
 
 A plan is $6 a month with one credit; each extra credit is $2 (3 extra is $12 for 4 credits a month). A month's credits are granted at its start and never expire. A credit lends one book for one month, and credits stack on one book. Returning a book unopened, or in under 14 days with less than half read, gives its credits back. An extension costs one credit.
@@ -43,6 +54,8 @@ A page is a `ReaderPanel` with a title, an icon, a colour, its `ConsoleDef`s (`i
 - Don't show a scrollbar anywhere; consoles and the calendar scroll by wheel, touch and keyboard.
 - Don't put a console's content at full size in a tile: a tile is simplified, and the rest is one click away.
 - Don't hide the credits: the pill is on every page.
-- Don't set a flag's class on the Book page: it is a user-level choice (UUI Account > Flags).
+- Don't set a flag's class on the Book page or in Pages: it is a user-level choice (UUI Account > Flags).
+- Don't put the footnotes or notes outside the page, or the tabs and page edges anywhere but its outermost right.
+- Don't split the page into two columns: one column of text, the tracks and crease at its left.
 - Don't show a spoiler, a spoiler essay or a spoiler post open: they stay shut until tapped.
 - Don't use a colour that is not a token, and keep a button 40px or more.

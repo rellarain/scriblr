@@ -1,11 +1,12 @@
-import type { ClubView, ReaderLevel, ReaderState, Review } from '../api/reader'
-import { bookCardFixture, clubsFixture, feedFixture } from './readerFixtures'
+import type { ClubView, Mark, ReaderLevel, ReaderSettings, ReaderState, Review } from '../api/reader'
+import { bookCardFixture, bookTextFixture, chapterFixture, clubsFixture, feedFixture, marksFixture, reactionsFixture } from './readerFixtures'
 
 // The Reader's community in the design system's mock backend: levels, reviews, follows, clubs, notes and reports change the copy in memory, and
 // the account answers with it as it stands. (The real rules, such as the re-read order, are the backend's and are tested there.)
 
 export function createMockSocial(getReader: () => ReaderState, setReader: (next: ReaderState) => void) {
   let clubs: ClubView[] = clubsFixture()
+  const marks: Record<string, Mark> = marksFixture()
   const json = (body: unknown): Response => new Response(JSON.stringify(body), { status: 200, headers: { 'Content-Type': 'application/json' } })
 
   // A response for a social route, or null when the route is not one of these.
@@ -25,6 +26,25 @@ export function createMockSocial(getReader: () => ReaderState, setReader: (next:
       }
       return json(card)
     }
+    // Reading (PAGES): the text, the reader's marks and the totals.
+    if (method === 'GET' && rest[0] === 'books' && rest[2] === 'text') return json(bookTextFixture(id, reader.levels[id]?.level ?? 'omega'))
+    if (method === 'GET' && rest[0] === 'books' && rest[2] === 'chapters') return json(chapterFixture(id, Number(rest[3]), reader.levels[id]?.level ?? 'omega'))
+    if (method === 'GET' && rest[0] === 'books' && rest[2] === 'reactions') return json(reactionsFixture(Number(rest[3])))
+    if (rest[0] === 'books' && rest[2] === 'marks') {
+      if (method === 'PUT') {
+        const { key, like, dislike, flags } = b as { key: string; like: number; dislike: number; flags: string[] }
+        if (like === 0 && dislike === 0 && flags.length === 0) delete marks[key]
+        else marks[key] = { like, dislike, flags }
+      }
+      return json(marks)
+    }
+    if (rest[0] === 'books' && rest[2] === 'reading' && method === 'PUT') {
+      set({ positions: { ...reader.positions, [id]: { chapter: b.chapter as number, paragraph: b.paragraph as number, device: (b.device as string) ?? 'This computer', at: now } } })
+      return json(getReader())
+    }
+    if (rest[0] === 'settings' && method === 'PUT') set({ settings: b as unknown as ReaderSettings })
+    else if (rest[0] === 'my-flags' && method === 'POST') set({ myFlags: [...reader.myFlags, { key: `flag-${reader.myFlags.length + 1}`, name: b.name as string }] })
+    else if (rest[0] === 'my-flags' && method === 'DELETE') set({ myFlags: reader.myFlags.filter(f => f.key !== id) })
     if (method === 'GET' && rest[0] === 'clubs') return json(clubs)
     if (method === 'GET' && rest[0] === 'feed') return json(feedFixture().filter(f => reader.following.includes(f.whoId) || reader.joinedClubs.includes(f.whoId)))
 
@@ -52,7 +72,7 @@ export function createMockSocial(getReader: () => ReaderState, setReader: (next:
     } else if (rest[0] === 'reviews' && rest[2] === 'draft' && method === 'DELETE') {
       set({ reviews: reader.reviews.filter(r => r.bookId !== id || r.reads[r.reads.length - 1].status === 'posted') })
     } else if (rest[0] === 'notes' && method === 'POST') {
-      set({ notes: [...reader.notes, { id: `n${reader.notes.length + 1}`, bookId: b.bookId as string, quote: (b.quote as string) ?? '', note: (b.note as string) ?? '', at: now }] })
+      set({ notes: [...reader.notes, { id: `n${reader.notes.length + 1}`, bookId: b.bookId as string, quote: (b.quote as string) ?? '', note: (b.note as string) ?? '', at: now, kind: (b.kind as 'note' | 'highlight' | 'bookmark') ?? 'note', chapter: (b.chapter as number | undefined) ?? null, key: (b.key as string | undefined) ?? null }] })
     } else if (rest[0] === 'notes' && method === 'DELETE') {
       set({ notes: reader.notes.filter(n => n.id !== id) })
     } else if (rest[0] === 'following') {

@@ -174,6 +174,87 @@
     &--on { width: 40px; background: var(--accent); color: var(--zone-on-accent, #fff); box-shadow: inset -6px 0 0 var(--ov-sink-3); }
   }
 
+  // ---------------------------------------------------------------- the e-reader (PAGES): one column, tracks and crease at the left, notes in the right margin
+  .rdCon--wide { grid-column: 1 / -1; }
+  .rdLevel--pages .rdConBody { padding: 8px; }
+  .rdLevel--focus .rdLevelHead, .rdLevel--focus .rdNotice { opacity: 0.12; transition: opacity 0.3s; &:hover, &:focus-within { opacity: 1; } }
+  .rdReader {
+    --rd-page: var(--page-day); --rd-pink: var(--page-day-ink); --rd-pline: var(--page-day-line); --rd-pmuted: var(--page-day-muted);
+    --rd-phl: var(--page-day-highlight); --rd-phl-sel: var(--page-day-highlight-selected);
+    display: flex; flex-direction: column; gap: 10px; outline: none; background: var(--rd-page); color: var(--rd-pink); padding: 12px var(--rd-pg-pad, 18px) 14px;
+    &:focus-visible { outline: 2px solid var(--accent-hover); outline-offset: -2px; }
+    &--night { --rd-page: var(--page-night); --rd-pink: var(--page-night-ink); --rd-pline: var(--page-night-line); --rd-pmuted: var(--page-night-muted); --rd-phl: var(--page-night-highlight); --rd-phl-sel: var(--page-night-highlight-selected); }
+    // High contrast: no quiet text, strong lines, a heavier weight, and every sentence you can press underlined on hover and focus.
+    &--hc { --rd-pmuted: var(--rd-pink); --rd-pline: var(--rd-pink); font-weight: 600; .rdSn:hover, .rdSn--sel { outline: 2px solid var(--rd-pink); } }
+    &--easy .rdParagraph { letter-spacing: 0.04em; word-spacing: 0.16em; }
+    // The page's own controls are the page's ink on its line colour, not the level's white.
+    .rdBtn { background: var(--rd-pline); color: var(--rd-pink); &:hover:not(:disabled) { background: var(--rd-phl); } &--pri, &--on { background: var(--accent); color: var(--zone-on-accent, #fff); } }
+    .rdBtn[aria-pressed='true'] { background: var(--accent); color: var(--zone-on-accent, #fff); }
+    .rdIconBtn { color: var(--rd-pink); &:hover { background: var(--rd-pline); } }
+    .rdField { background: var(--rd-page); color: var(--rd-pink); border: 1px solid var(--rd-pline); &::placeholder { color: var(--rd-pmuted); } }
+    .rdMuted { color: var(--rd-pmuted); opacity: 1; }
+    .rdMeter { background: var(--rd-pline); }
+    .rdMeterFill--accent { background: var(--accent); }
+    .rdCard { background: var(--rd-page); border: 1px solid var(--rd-pline); color: var(--rd-pink); }
+  }
+  .rdReaderBar { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 14px; }
+  .rdPtitle { flex: 1 1 220px; min-width: 0; display: flex; flex-direction: column; gap: 2px; b { font: 700 20px Georgia, 'Times New Roman', serif; } span { font-size: 12px; color: var(--rd-pmuted); } }
+  .rdDraftNote { margin: 0; padding: 6px 10px; font-size: 12px; border-left: 4px solid var(--accent); outline: 1px solid var(--rd-pline); }
+  .rdSelBar { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 8px; padding: 6px 8px; border: 1px solid var(--rd-pline); }
+  .rdSelText { flex: 1 1 200px; min-width: 0; font: italic 13px Georgia, 'Times New Roman', serif; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .rdSheet {
+    display: grid; grid-template-columns: minmax(0, 1fr) 260px; align-items: stretch; background: var(--rd-page); border: 1px solid var(--rd-pline);
+    // The page's edges, stacked at its outermost right side (the chapter tabs sit beyond them, on the level).
+    box-shadow: 2px 0 0 var(--rd-page), 3px 0 0 var(--rd-pline), 5px 0 0 var(--rd-page), 6px 0 0 var(--rd-pline), 8px 0 0 var(--rd-page), 9px 0 0 var(--rd-pline);
+  }
+  .rdSheetText {
+    position: relative; padding: 22px 20px 14px 12px; min-width: 0; font-family: var(--rd-pg-font, Georgia, 'Times New Roman', serif); font-size: var(--rd-pg-size, 18px); line-height: var(--rd-pg-line, 1.85);
+    // The crease runs down the page between the tracks and the copy.
+    &[data-tracks='true']::before { content: ''; position: absolute; top: 0; bottom: 0; left: 82px; width: 16px; pointer-events: none;
+      background: linear-gradient(90deg, transparent, color-mix(in srgb, var(--rd-pink) 12%, transparent) 42%, color-mix(in srgb, var(--rd-pink) 24%, transparent) 50%, color-mix(in srgb, var(--rd-pink) 12%, transparent) 58%, transparent); }
+  }
+  .rdChapterTitle { margin: 0 0 12px var(--rd-pg-track, 86px); font: 700 12px 'Segoe UI', system-ui, sans-serif; letter-spacing: 2px; text-transform: uppercase; color: var(--rd-pmuted); }
+  .rdLegend { display: grid; grid-template-columns: repeat(3, 20px); gap: 5px; margin-bottom: 8px; width: 70px; span { height: 20px; display: grid; place-items: center; color: var(--rd-pmuted); } }
+  .rdProw { display: grid; grid-template-columns: var(--rd-pg-track, 86px) minmax(0, 1fr); position: relative; margin-bottom: 14px; }
+  .rdPtext { grid-column: 2; min-width: 0; }
+  .rdParagraph { margin: 0; text-align: justify; }
+  .rdTracks { grid-column: 1; position: relative; width: 70px; }
+  .rdReactBar {
+    position: absolute; width: 20px; display: flex; flex-direction: column; align-items: center; padding-top: 3px; box-sizing: border-box; overflow: hidden; border: 1px dashed var(--rd-pline); color: var(--rd-pink); background: transparent;
+    &--level1 { border-color: transparent; background: color-mix(in srgb, var(--accent) 22%, var(--rd-page)); }
+    &--level2 { border-color: transparent; background: color-mix(in srgb, var(--accent) 38%, var(--rd-page)); }
+    &--level3 { border-color: transparent; background: color-mix(in srgb, var(--accent) 56%, var(--rd-page)); }
+    &--dislike.rdReactBar--level1 { background: color-mix(in srgb, var(--alert) 22%, var(--rd-page)); }
+    &--dislike.rdReactBar--level2 { background: color-mix(in srgb, var(--alert) 38%, var(--rd-page)); }
+    &--dislike.rdReactBar--level3 { background: color-mix(in srgb, var(--alert) 56%, var(--rd-page)); }
+    &:hover { background: var(--rd-phl); }
+  }
+  .rdReactPlus { font-size: 12px; font-weight: 700; line-height: 16px; }
+  .rdFlagBar { position: absolute; left: 50px; width: 20px; display: grid; place-items: start center; padding-top: 3px; box-sizing: border-box; background: var(--rd-pline); color: var(--rd-pink); }
+  .rdSn {
+    cursor: pointer; border-radius: 2px; box-decoration-break: clone; -webkit-box-decoration-break: clone;
+    &:hover { background: var(--rd-phl); }
+    &--sel { background: var(--rd-phl-sel); }
+    &--p1 { background: color-mix(in srgb, var(--accent) 12%, transparent); } &--p2 { background: color-mix(in srgb, var(--accent) 18%, transparent); } &--p3 { background: color-mix(in srgb, var(--accent) 24%, transparent); }
+    &--u1 { background: color-mix(in srgb, var(--alert) 12%, transparent); } &--u2 { background: color-mix(in srgb, var(--alert) 18%, transparent); } &--u3 { background: color-mix(in srgb, var(--alert) 24%, transparent); }
+    &--flag { border-bottom: 2px solid var(--rd-pink); }
+  }
+  .rdFlagMark { margin-left: 2px; vertical-align: super; }
+  .rdFn, .rdNt { font: 700 10px 'Segoe UI', system-ui, sans-serif; margin-left: 2px; padding: 0 4px; }
+  .rdFn { color: var(--rd-pink); border: 1px solid var(--rd-pink); }
+  .rdNt { background: var(--accent); color: var(--zone-on-accent, #fff); }
+  .rdHiddenSn, .rdFhid { display: inline-flex; align-items: center; gap: 6px; margin: 2px 0; padding: 2px 10px; background: var(--rd-pline); color: var(--rd-pink); font: 700 12px 'Segoe UI', system-ui, sans-serif; }
+  .rdFbox { margin: 4px 0 8px; padding: 8px 10px; border-left: 4px solid var(--accent); outline: 1px solid var(--rd-pline); font: 13px 'Segoe UI', system-ui, sans-serif; line-height: 1.5; }
+  .rdMargin { display: flex; flex-direction: column; gap: 14px; padding: 22px 14px 14px; border-left: 1px solid var(--rd-pline); min-width: 0; font-family: 'Segoe UI', system-ui, sans-serif; font-size: 13px; line-height: 1.45; }
+  .rdMarginCard { display: flex; flex-direction: column; gap: 8px; h3 { margin: 0; display: flex; align-items: center; gap: 8px; font-size: 11px; letter-spacing: 1.5px; text-transform: uppercase; color: var(--rd-pmuted); } }
+  .rdPnote {
+    display: flex; flex-direction: column; gap: 2px; padding: 8px 10px; text-align: left; border-left: 4px solid var(--st, var(--accent)); outline: 1px solid var(--rd-pline); background: var(--rd-page); color: var(--rd-pink); font-size: 13px;
+    small { font-size: 10px; color: var(--rd-pmuted); }
+    &--mine { --st: var(--rd-pink); }
+  }
+  .rdTurn { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 12px; font-size: 12px; color: var(--rd-pmuted); .rdGrow { min-width: 120px; } }
+  .rdTurnInfo { white-space: nowrap; }
+
   // ---------------------------------------------------------------- dialogs
   .rdModalBg { position: absolute; inset: 0; z-index: 50; display: flex; justify-content: center; align-items: flex-start; padding: 40px 12px; overflow: auto; background: var(--scrim); }
   .rdModal { background: var(--paper); color: var(--paper-ink); width: min(820px, 100%); border: 1px solid var(--paper-line); }
@@ -210,6 +291,10 @@
   .rdRoot .rdGrid2, .rdRoot .rdGrid3, .rdRoot .rdGrid4 { grid-template-columns: minmax(0, 1fr); }
   .rdRoot .rdCatalog, .rdRoot .rdHero, .rdRoot .rdBorrow { grid-template-columns: minmax(0, 1fr); }
   .rdRoot .rdLevelHead { padding-left: 12px; }
+}
+@container rdcon (max-width: 760px) {
+  .rdRoot .rdSheet { grid-template-columns: minmax(0, 1fr); }
+  .rdRoot .rdMargin { border-left: 0; border-top: 1px solid var(--rd-pline); }
 }
 @container rdcon (max-width: 620px) {
   .rdRoot .rdGrid2, .rdRoot .rdGrid3 { grid-template-columns: minmax(0, 1fr); }

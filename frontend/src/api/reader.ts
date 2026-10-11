@@ -77,7 +77,43 @@ export interface ReviewRead {
   editedAt: string | null
 }
 export interface Review { bookId: string; reads: ReviewRead[] }
-export interface Note { id: string; bookId: string; quote: string; note: string; at: string }
+export type NoteKind = 'note' | 'highlight' | 'bookmark'
+export interface Note { id: string; bookId: string; quote: string; note: string; at: string; kind: NoteKind; chapter: number | null; key: string | null }
+
+// Reading (PAGES): how pages are shown, the reader's marks on sentences, and the text of a chapter.
+export interface ReaderSettings {
+  mode: 'turn' | 'scroll'
+  textSize: number
+  font: 'serif' | 'sans' | 'easy'
+  spacing: 'tight' | 'roomy'
+  margins: 'narrow' | 'wide'
+  tone: 'day' | 'night'
+  highContrast: boolean
+  focus: boolean
+  shareReactions: boolean
+  readAloudRate: number
+}
+export interface Mark { like: number; dislike: number; flags: string[] }
+export interface MyFlag { key: string; name: string }
+export interface Position { chapter: number; paragraph: number; device: string; at: string }
+export interface ChapterRef { n: number; title: string; words: number; available: boolean; reason: string }
+export interface BookText { bookId: string; level: ReaderLevel; canRead: boolean; reason: string; chapters: ChapterRef[] }
+export interface ChapterFootnote { id: string; key: string; title: string; text: string }
+export interface FlaggedPassage { key: string; flagKey: string; name: string; detail: string; defaultClass: FlagClass }
+export interface SentenceTotal { key: string; pleasant: number; unpleasant: number }
+export interface ChapterText {
+  bookId: string
+  n: number
+  title: string
+  words: number
+  paragraphs: string[]
+  footnotes: ChapterFootnote[]
+  flags: FlaggedPassage[]
+  level: ReaderLevel
+  draft: boolean
+  draftNote: string
+}
+export interface ReactionTotals { chapter: number; readers: number; pleasant: number; unpleasant: number; top: SentenceTotal[]; mine: number }
 export type ReportKind = 'review' | 'post'
 export interface Report { id: string; kind: ReportKind; targetId: string; reason: string; at: string }
 
@@ -152,6 +188,9 @@ export interface ReaderState {
   joinedClubs: string[]
   reports: Report[]
   blocked: string[]
+  settings: ReaderSettings
+  myFlags: MyFlag[]
+  positions: Record<string, Position>
 }
 
 export interface BookQuery {
@@ -221,7 +260,8 @@ export const putReview = (bookId: string, draft: ReviewDraft) => api.put<ReaderS
 export const postReview = (bookId: string) => api.post<ReaderState>(`/reader/reviews/${encodeURIComponent(bookId)}/post`)
 export const postReread = (bookId: string) => api.post<ReaderState>(`/reader/reviews/${encodeURIComponent(bookId)}/reread`)
 export const deleteReviewDraft = (bookId: string) => api.delete<ReaderState>(`/reader/reviews/${encodeURIComponent(bookId)}/draft`)
-export const postNote = (bookId: string, quote: string, note: string) => api.post<ReaderState>('/reader/notes', { bookId, quote, note })
+export interface NoteInput { quote?: string; note?: string; kind?: NoteKind; chapter?: number; key?: string }
+export const postNote = (bookId: string, input: NoteInput) => api.post<ReaderState>('/reader/notes', { bookId, ...input })
 export const deleteNote = (id: string) => api.delete<ReaderState>(`/reader/notes/${encodeURIComponent(id)}`)
 export const putFollowing = (whom: string) => api.put<ReaderState>(`/reader/following/${encodeURIComponent(whom)}`, {})
 export const deleteFollowing = (whom: string) => api.delete<ReaderState>(`/reader/following/${encodeURIComponent(whom)}`)
@@ -235,3 +275,16 @@ export const postReport = (kind: ReportKind, targetId: string, reason: string) =
 export const deleteReport = (id: string) => api.delete<ReaderState>(`/reader/reports/${encodeURIComponent(id)}`)
 export const putBlocked = (readerId: string) => api.put<ReaderState>(`/reader/blocked/${encodeURIComponent(readerId)}`, {})
 export const deleteBlocked = (readerId: string) => api.delete<ReaderState>(`/reader/blocked/${encodeURIComponent(readerId)}`)
+
+// ---------------------------------------------------------------------------------------------------------------------- reading
+
+export const getBookText = (id: string) => api.get<BookText>(`/reader/books/${encodeURIComponent(id)}/text`)
+export const getChapter = (id: string, n: number) => api.get<ChapterText>(`/reader/books/${encodeURIComponent(id)}/chapters/${n}`)
+export const getMarks = (id: string) => api.get<Record<string, Mark>>(`/reader/books/${encodeURIComponent(id)}/marks`)
+export const putMark = (id: string, key: string, mark: Mark) => api.put<Record<string, Mark>>(`/reader/books/${encodeURIComponent(id)}/marks`, { key, ...mark })
+export const getReactions = (id: string, n: number) => api.get<ReactionTotals>(`/reader/books/${encodeURIComponent(id)}/reactions/${n}`)
+export const putSettings = (settings: ReaderSettings) => api.put<ReaderState>('/reader/settings', settings)
+export const postMyFlag = (name: string) => api.post<ReaderState>('/reader/my-flags', { name })
+export const deleteMyFlag = (key: string) => api.delete<ReaderState>(`/reader/my-flags/${encodeURIComponent(key)}`)
+export interface ReadingUpdate { chapter: number; paragraph: number; pct: number; pages?: number; minutes?: number; newSession?: boolean; device?: string }
+export const putReading = (id: string, update: ReadingUpdate) => api.put<ReaderState>(`/reader/books/${encodeURIComponent(id)}/reading`, update)

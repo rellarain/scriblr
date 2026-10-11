@@ -1,6 +1,6 @@
 import { useSyncExternalStore } from 'react'
 import * as api from '../../../api/reader'
-import type { BookCard, BookDetail, CatalogBook, ClubView, FeedItem, FlagClass, ReaderLevel, ReaderProfile, ReaderState, Recommendation, ReportKind, ReviewDraft } from '../../../api/reader'
+import type { BookCard, BookDetail, CatalogBook, ClubView, FeedItem, FlagClass, ReaderLevel, ReaderProfile, ReaderSettings, ReaderState, Recommendation, ReportKind, ReviewDraft } from '../../../api/reader'
 
 // The Reader's data, shared by every console: the library's books, the reader's account (credits, holdings, wishlist, activity), the Display
 // Case's recommendations, what is said about the books the reader has opened (cards and details), the clubs, the feed and the seeded readers.
@@ -90,7 +90,11 @@ export const readerActions = {
   postReview: (bookId: string) => social(() => api.postReview(bookId)),
   startReread: (bookId: string) => social(() => api.postReread(bookId)),
   discardDraft: (bookId: string) => social(() => api.deleteReviewDraft(bookId)),
-  addNote: (bookId: string, quote: string, note: string) => act(() => api.postNote(bookId, quote, note)),
+  addNote: (bookId: string, quote: string, note: string, extra: Omit<api.NoteInput, 'quote' | 'note'> = {}) => act(() => api.postNote(bookId, { quote, note, ...extra })),
+  setSettings: (settings: ReaderSettings) => act(() => api.putSettings(settings)),
+  addMyFlag: (name: string) => act(() => api.postMyFlag(name)),
+  deleteMyFlag: (key: string) => act(() => api.deleteMyFlag(key)),
+  recordReading: (bookId: string, update: api.ReadingUpdate) => act(() => api.putReading(bookId, update)),
   deleteNote: (id: string) => act(() => api.deleteNote(id)),
   follow: (whom: string, on: boolean) => social(() => (on ? api.putFollowing(whom) : api.deleteFollowing(whom))),
   joinClub: (id: string, on: boolean) => social(() => (on ? api.putMembership(id) : api.deleteMembership(id))),

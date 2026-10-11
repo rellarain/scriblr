@@ -1,4 +1,4 @@
-import type { BookCard, BookDetail, CatalogBook, ClubView, FeedItem, Holding, ReaderProfile, ReaderState, Recommendation } from '../api/reader'
+import type { BookCard, BookDetail, BookText, CatalogBook, ChapterText, ClubView, FeedItem, Holding, Mark, ReactionTotals, ReaderLevel, ReaderProfile, ReaderState, Recommendation } from '../api/reader'
 
 // The Reader's pretend library for the design system's previews: lorem ipsum titles and blurbs, a stack of owned, borrowed and lent books, and a
 // year of reading for the activity calendar (relative to today, so the calendar always has a recent week).
@@ -75,8 +75,9 @@ export function readerFixture(): ReaderState {
     levels: { 'sit-amet': { level: 'delta', invitedBy: 'Lorem Ipsum', override: false } },
     criteriaNames: ['Plot', 'Prose', 'Characters', 'Pacing'],
     reviews: [{ bookId: 'adipiscing', reads: [{ n: 1, status: 'posted', score: 9, criteria: { Plot: 9, Prose: 10 }, comment: 'Lorem ipsum dolor sit amet.', spoilerEssay: '', noteIds: [], startedAt: iso(30), postedAt: iso(20), editedAt: null }] }],
-    notes: [{ id: 'n1', bookId: 'lorem-ipsum', quote: 'Ut enim ad minim veniam.', note: 'Remember this.', at: iso(3) }],
+    notes: [{ id: 'n1', bookId: 'lorem-ipsum', quote: 'Ut enim ad minim veniam.', note: 'Remember this.', at: iso(3), kind: 'note', chapter: 3, key: 'c3:p1:s0' }],
     following: ['r-sol'], joinedClubs: ['slow-burners'], reports: [], blocked: [],
+    settings: { mode: 'turn', textSize: 18, font: 'serif', spacing: 'roomy', margins: 'narrow', tone: 'day', highContrast: false, focus: false, shareReactions: true, readAloudRate: 1 }, myFlags: [{ key: 'flag-simplify', name: 'Simplify' }], positions: { 'lorem-ipsum': { chapter: 3, paragraph: 0, device: 'This computer', at: iso(1) } },
   }
 }
 
@@ -147,3 +148,45 @@ export function feedFixture(): FeedItem[] {
     { id: 'f2', at: iso(1), kind: 'club', who: 'Slow Burners', whoId: 'slow-burners', title: 'Slow Burners: Sundays: chapters 3 and 4', detail: 'Next meeting soon', bookId: 'lorem-ipsum' },
   ]
 }
+
+// The e-reader's text, for the previews: lorem-ipsum chapters of eight paragraphs, a footnote and flagged passages on fixed sentences.
+
+const SENTENCES = [
+  'The harbor woke before the town did, and the tide arrived early again.',
+  'Rue counted the boats twice, because the ledger would count them only once.',
+  'Nobody in the quay office asked why the second set of books was kept in a drawer of salt.',
+  'A gull stood on the weir as if it were waiting to be paid.',
+  'She wrote the date at the top of the page and then crossed it out.',
+  'Fog came in low, took the far wall, and gave it back an hour later.',
+]
+const TITLES = ['The harbor at dawn', 'Two sets of books', 'The ledger of tides', 'A name painted over', 'A first winter', 'Salt on the page', 'What the weir keeps', 'The third lamp', 'The early tide', 'A debt in rope', 'Fog for a week']
+
+export function bookTextFixture(bookId: string, level: ReaderLevel = 'omega'): BookText {
+  const open = level === 'delta' ? 7 : level === 'beta' ? 9 : 11
+  return { bookId, level, canRead: true, reason: '', chapters: TITLES.map((title, i) => ({ n: i + 1, title, words: 7272, available: i + 1 <= open, reason: i + 1 <= open ? '' : 'Not published yet at your level.' })) }
+}
+
+export function chapterFixture(bookId: string, n: number, level: ReaderLevel = 'omega'): ChapterText {
+  const paragraphs = Array.from({ length: 9 }, (_, p) => Array.from({ length: 4 }, (_, s) => SENTENCES[(p + s + n) % SENTENCES.length]).join(' '))
+  return {
+    bookId, n, title: TITLES[n - 1] ?? `Chapter ${n}`, words: 7272, paragraphs,
+    footnotes: [{ id: `fn-${n}`, key: `c${n}:p1:s1`, title: 'The early tide', text: 'In autumn the river weir makes the tide arrive early.' }],
+    flags: [
+      { key: `c${n}:p2:s0`, flagKey: 'grief', name: 'Lorem', detail: 'Lorem ipsum dolor sit amet.', defaultClass: 'marked' },
+      { key: `c${n}:p4:s0`, flagKey: 'ending', name: 'Consectetur', detail: 'Lorem ipsum spoiler.', defaultClass: 'spoiler' },
+    ],
+    level, draft: level === 'alpha' || level === 'delta', draftNote: level === 'delta' || level === 'alpha' ? 'Work in progress: this chapter is a draft and may change before the first edition.' : '',
+  }
+}
+
+export const marksFixture = (): Record<string, Mark> => ({
+  'c3:p0:s1': { like: 3, dislike: 0, flags: [] },
+  'c3:p1:s0': { like: 1, dislike: 0, flags: [] },
+  'c3:p3:s2': { like: 0, dislike: 2, flags: [] },
+  'c3:p5:s0': { like: 0, dislike: 0, flags: ['flag-simplify'] },
+})
+
+export const reactionsFixture = (n: number): ReactionTotals => ({
+  chapter: n, readers: 312, pleasant: 148, unpleasant: 41, mine: 3,
+  top: [{ key: `c${n}:p1:s2`, pleasant: 22, unpleasant: 1 }, { key: `c${n}:p4:s1`, pleasant: 14, unpleasant: 6 }],
+})

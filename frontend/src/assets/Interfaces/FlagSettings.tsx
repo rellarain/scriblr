@@ -17,7 +17,7 @@ export default function FlagSettings() {
   const data = useReader()
   useEffect(() => { void loadReader() }, [])
   const flags = useMemo(() => {
-    const byKey = new Map<string, { key: string; name: string; defaultClass: FlagClass; books: number }>()
+    const byKey = new Map<string, { key: string; name: string; defaultClass: FlagClass; books: number; mine?: boolean }>()
     for (const book of data.books) {
       for (const f of book.flags) {
         const seen = byKey.get(f.key)
@@ -25,21 +25,22 @@ export default function FlagSettings() {
         else byKey.set(f.key, { key: f.key, name: f.name, defaultClass: f.defaultClass, books: 1 })
       }
     }
-    return [...byKey.values()].sort((a, b) => a.name.localeCompare(b.name))
-  }, [data.books])
+    const own = (data.reader?.myFlags ?? []).map(f => ({ key: f.key, name: f.name, defaultClass: 'marked' as FlagClass, books: 0, mine: true }))
+    return [...[...byKey.values()].sort((a, b) => a.name.localeCompare(b.name)), ...own]
+  }, [data.books, data.reader?.myFlags])
 
   if (data.status === 'error') return <p role="alert">{data.error}</p>
   if (!data.reader) return <p role="status">Loading your flags…</p>
   const reader = data.reader
   return (
     <div className="uFlags">
-      <p>Each content flag takes one of four classes, set here for every book. An author&rsquo;s default is used until you choose.</p>
+      <p>Each content flag, the author&rsquo;s and your own, takes one of four classes, set here for every book. An author&rsquo;s default is used until you choose.</p>
       <ul className="uFlagList" aria-label="Flag classes">
         {flags.map(flag => {
           const current = reader.flagClasses[flag.key] ?? flag.defaultClass
           return (
             <li key={flag.key} className="uFlagRow">
-              <span className="uFlagName"><b>{flag.name}</b><small>{flag.books === 1 ? 'on 1 book' : `on ${flag.books} books`}</small></span>
+              <span className="uFlagName"><b>{flag.name}</b><small>{flag.mine ? 'your own flag' : flag.books === 1 ? 'on 1 book' : `on ${flag.books} books`}</small></span>
               <span className="uFlagClasses" role="group" aria-label={`How to treat ${flag.name}`}>
                 {CLASSES.map(c => (
                   <button key={c.key} type="button" className="uFlagBtn" aria-pressed={current === c.key} title={c.text} onClick={() => void data.actions.setFlagClass(flag.key, c.key)}>{c.label}</button>
