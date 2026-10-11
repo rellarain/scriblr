@@ -12,11 +12,13 @@ from .api import (
     draft,
     export,
     feedback,
+    library,
     outline,
     plot,
     presets,
     projects,
     publications,
+    reader,
     resources,
     revisions,
     schedule,
@@ -97,6 +99,8 @@ def create_app(static_dir: Optional[Path] = None) -> FastAPI:
     app.include_router(user_settings.router)
     app.include_router(feedback.router)
     app.include_router(resources.router)
+    app.include_router(library.router)
+    app.include_router(reader.router)
 
     if static_dir is not None:
         # Registered last so it only catches what the routers above didn't --
