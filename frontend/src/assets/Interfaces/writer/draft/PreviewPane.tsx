@@ -12,6 +12,8 @@ import { MoonIcon, ReactionHeartIcon, SunIcon } from '../../../icons'
 import type { usePublications } from '../usePublications'
 import { fullDate, shortDate } from '../chapterDates'
 import { formatOf, formatVars } from '../previewFormat'
+import { useAuthorNotes } from '../useAuthorNotes'
+import { FootnoteTool } from './FootnoteTool'
 
 const FLAGS = ['Add', 'Remove', 'Merge', 'Change', 'Simplify', 'Expand'] as const
 type FlagName = (typeof FLAGS)[number]
@@ -25,9 +27,11 @@ const cycle = (level: number) => (level + 1) % 4
 
 interface Rect { top: number; height: number }
 
-function Paragraph({ paragraphKey, sentences, marks, selected, onSelect, onCycle }: {
+function Paragraph({ paragraphKey, sentences, marks, selected, onSelect, onCycle, markers }: {
   paragraphKey: string
   sentences: string[]
+  // The author's footnotes and flagged passages by sentence key, shown as small markers.
+  markers: Record<string, string>
   marks: Marks
   selected: string | null
   onSelect: (key: string) => void
@@ -101,6 +105,7 @@ function Paragraph({ paragraphKey, sentences, marks, selected, onSelect, onCycle
               onClick={() => onSelect(key)}
             >
               {s}
+              {markers[key] && <sup className="wrFn" title="Footnote or flagged passage">{markers[key]}</sup>}
             </span>
           )
         })}
@@ -122,6 +127,7 @@ export function PreviewPane({ w, chapter, draft, pubs, component, onComponent }:
 }) {
   const [marks, setMarks] = useStoredState<Marks>(`scriblr.writer.marks.${w.activeProjectId}.${chapter.id}`, {})
   const [selected, setSelected] = useState<string | null>(null)
+  const authorNotes = useAuthorNotes(w.activeProjectId, chapter.id, w.activeBook?.id ?? null)
   const [exportMessage, setExportMessage] = useState<string | null>(null)
   // Day: a white page with black text; night: a dark page with light text.
   const [tone, setTone] = useStoredState<'day' | 'night'>('scriblr.writer.previewTone', 'day')
@@ -183,6 +189,13 @@ export function PreviewPane({ w, chapter, draft, pubs, component, onComponent }:
 
   const selectedFlag = selected ? marks[selected]?.flag : undefined
 
+  // The selected sentence as the paragraph and sentence numbers the author's notes use (counted from 0 across the whole chapter), and the markers.
+  const paragraphAt = (key: string) => paragraphs.findIndex(p => key.startsWith(`${p.key}:`))
+  const at = selected && paragraphAt(selected) >= 0 ? { paragraph: paragraphAt(selected), sentence: Number(selected.slice(selected.lastIndexOf(':') + 1)) } : null
+  const markers: Record<string, string> = {}
+  authorNotes.notes.footnotes.forEach((f, i) => { const p = paragraphs[f.paragraph]; if (p) markers[`${p.key}:${f.sentence}`] = String(i + 1) })
+  authorNotes.notes.flags.forEach(f => { const p = paragraphs[f.paragraph]; if (p) markers[`${p.key}:${f.sentence}`] = markers[`${p.key}:${f.sentence}`] ?? '⚑' })
+
   return (
     <div className={`wrPreviewPane wrPage--${tone}`} style={formatVars(formatOf(w.activeBook))}>
       <div className="wrPreviewToolbar">
@@ -240,6 +253,9 @@ export function PreviewPane({ w, chapter, draft, pubs, component, onComponent }:
             {exportMessage && <span className="wrError">{exportMessage}</span>}
           </div>
         )}
+        {component === 'footnote' && (
+          <FootnoteTool at={at} notes={authorNotes.notes} flags={authorNotes.flags} error={authorNotes.error} onSave={next => void authorNotes.save(next)} />
+        )}
         {component === 'reaction' && (
           <span className="wrHint">Click a sentence, then click the hearts in the left margin. Each click raises the reaction one level; a fourth click clears it.</span>
         )}
@@ -259,7 +275,7 @@ export function PreviewPane({ w, chapter, draft, pubs, component, onComponent }:
         ))}
         {!published && paragraphs.map(p => (
           <Paragraph
-            key={p.key} paragraphKey={p.key} sentences={p.sentences} marks={marks}
+            key={p.key} paragraphKey={p.key} sentences={p.sentences} marks={marks} markers={markers}
             selected={selected} onSelect={setSelected} onCycle={cycleMark}
           />
         ))}

@@ -27,3 +27,14 @@ At Mid one tab shows at a time; at Max each tab opens or closes a tile on the sp
 - Don't give a level a radius, a gradient or a shadow.
 - Don't set text colour on a level except `inherit`: white is set once, by the panel.
 - Don't nest more than the steps `level-fill-1..4` provide.
+
+## Publishing a book, and what readers did
+
+The **Book level** (Outline) has a **Publish** tab, between Book details and Settings (at Mid a tab; at Max a section of the book's cover). It puts the book in the Reader's library:
+
+- **Publish the book**: a button that asks first ("Publish edition 2?"). An edition is a frozen copy of the chapters published so far with their published footnotes and flagged passages. Publishing again makes the next edition; **Unpublish** takes the book off sale and loan and keeps copies readers own and loans already made.
+- **Details in the library**: type, buy price, blurb, genres, tags, tropes, an optional cover colour of its own, and the content flags (a name, the details a reader sees and the class it has by default: hidden, marked, highlight or spoiler). Saved with Save details; a new edition takes the saved details.
+- **Invite readers**: a level for this reader account and for each seeded reader (alpha, delta or beta); the level set for this account is the level the Reader shows the book at.
+- **Readers**: loans, sales, the author's share (a loan's first credit pays $3.00 and each more $1.00; a sale 70% of the price), the rating and reviews, and the readers' anonymous reactions by chapter (only from readers who share them). Money is simulated.
+
+The **Dash** has a **Readers** tab listing every published book with its loans, sales, earnings and rating.

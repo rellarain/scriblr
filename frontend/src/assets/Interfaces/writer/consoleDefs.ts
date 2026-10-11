@@ -1,6 +1,6 @@
 import type { ComponentType } from 'react'
 import {
-  CheckboxIcon, PencilIcon, ClockIcon, ListIcon, ReactionIcon, FlagIcon, ExportIcon, CalendarIcon, BarChartIcon, PlotIcon,
+  CheckboxIcon, PencilIcon, ClockIcon, ListIcon, ReactionIcon, FlagIcon, FootnoteIcon, ExportIcon, CalendarIcon, BarChartIcon, PlotIcon,
   type IconProps,
 } from '../../icons'
 
@@ -28,5 +28,6 @@ export const SHELF_COMPONENTS: ComponentDef[] = [
 export const PAGES_COMPONENTS: ComponentDef[] = [
   { key: 'reaction', label: 'Reaction', Icon: ReactionIcon },
   { key: 'flag', label: 'Flag', Icon: FlagIcon },
+  { key: 'footnote', label: 'Footnote', Icon: FootnoteIcon },
   { key: 'export', label: 'Export', Icon: ExportIcon },
 ]

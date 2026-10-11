@@ -995,3 +995,23 @@
   .wrCtBody { padding: 4px 4px 10px 22px; }
   .wrBookCover .wrChapterBanner { background: var(--wr-frame-1); }
 }
+
+// The Book level's Publish tab and the Dash's Readers tab.
+.wr {
+  .wrPublish { display: flex; flex-direction: column; gap: 10px; min-width: 0; }
+  .wrPublishCard { display: flex; flex-direction: column; gap: 8px; }
+  .wrPublishRow { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
+  .wrPublishConfirm { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
+  .wrPublishFlag { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 2fr) 110px 32px; gap: 6px; align-items: center; margin-bottom: 4px; }
+  .wrPublishInvite { display: flex; align-items: center; justify-content: space-between; gap: 10px; }
+  .wrPublishList { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 4px; }
+  .wrPublishChapters { display: flex; flex-direction: column; gap: 2px; }
+  .wrCheckRow { display: flex; align-items: center; gap: 8px; }
+}
+
+// The Preview's Footnote tool, and the marker it leaves on a sentence.
+.wr {
+  .wrFootnoteTool { display: flex; flex-direction: column; gap: 6px; flex: 1 1 100%; }
+  .wrFootnoteList { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 2px; font-size: 12px; li { display: flex; align-items: center; gap: 10px; } }
+  .wrFn { font: 700 10px system-ui, sans-serif; margin-left: 2px; padding: 0 3px; border: 1px solid currentColor; }
+}

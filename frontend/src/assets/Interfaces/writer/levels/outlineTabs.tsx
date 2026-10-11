@@ -1,7 +1,8 @@
-import { GearIcon, HelpIcon, InfoIcon, ListIcon } from '../../../icons'
+import { ExportIcon, GearIcon, HelpIcon, InfoIcon, ListIcon } from '../../../icons'
 import WorkspaceSaveCluster from './WorkspaceSaveCluster'
 import type { HistoryScope, WriterWorkspace } from '../useWriterWorkspace'
 import { buildChildIndex, chaptersOfBook, descendantsOf } from '../outlineTree'
+import BookPublish from '../outline/BookPublish'
 import BookSettings from '../outline/BookSettings'
 import { nodeLabel } from '../plotTree'
 import { Placeholder } from '../shared'
@@ -80,6 +81,7 @@ export function outlineTabs(w: WriterWorkspace): LevelTab[] {
       render: () => <BookOutlineList w={w} />,
     },
     { id: 'details', label: 'Book details', Icon: InfoIcon, render: () => <BookDetails w={w} /> },
+    { id: 'publish', label: 'Publish', Icon: ExportIcon, render: () => <BookPublish w={w} /> },
     { id: 'settings', label: 'Settings', Icon: GearIcon, end: true, render: () => <SettingsPane w={w} /> },
     { id: 'help', label: 'Help', Icon: HelpIcon, render: () => <HelpArticles names={OUTLINE_HELP_NAMES} fallback={OUTLINE_HELP_FALLBACK} /> },
   ]

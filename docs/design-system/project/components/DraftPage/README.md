@@ -13,7 +13,9 @@ Code: `writer/draft/DraftLevel.tsx`, `ChapterTile.tsx`, `ChapterPoints.tsx`, `Dr
 
 ## The preview
 
-The chapter laid out as a reader sees it, in the book's own **preview formatting** (font, size, bold or italic, alignment, line spacing, indent, paragraph spacing), on a day or night page of its own. A toolbar sets the version (the current draft or a published copy) and the tool: **Reaction**, **Flag**, **Export**.
+The chapter laid out as a reader sees it, in the book's own **preview formatting** (font, size, bold or italic, alignment, line spacing, indent, paragraph spacing), on a day or night page of its own. A toolbar sets the version (the current draft or a published copy) and the tool: **Reaction**, **Flag**, **Footnote**, **Export**.
+
+The **Footnote** tool is the author's side of a reader's margin notes: select a sentence, give the footnote a title and text, and it is kept on that sentence (a small numbered marker shows on it); a footnote can be unpublished or deleted. The same tool flags a passage with one of the book's content flags (set in the Book level's Publish tab). Published footnotes and flagged passages are frozen into the next edition of the book; readers see the footnotes in the right margin of the e-reader's page and the flags by the class each reader chose.
 
 ## Reactions
 

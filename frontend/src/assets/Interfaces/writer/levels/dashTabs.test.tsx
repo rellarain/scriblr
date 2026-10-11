@@ -24,7 +24,7 @@ describe('the Dash tabs', () => {
   it('are schedule, checklist, analytics, scratchpad and the project template, ending with Settings and Help', () => {
     render(<Harness size="max" />)
     const names = within(screen.getByRole('toolbar', { name: 'Tabs' })).getAllByRole('button').map(b => b.getAttribute('aria-label'))
-    expect(names).toEqual(['Schedule', 'Checklist', 'Analytics', 'Scratchpad', 'Project template', 'Settings', 'Help'])
+    expect(names).toEqual(['Schedule', 'Checklist', 'Analytics', 'Readers', 'Scratchpad', 'Project template', 'Settings', 'Help'])
   })
 
   it('open the schedule and the scratchpad side by side at Max', () => {

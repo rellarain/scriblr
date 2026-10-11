@@ -1,8 +1,9 @@
-import { BarChartIcon, CalendarIcon, CheckboxIcon, GearIcon, HelpIcon, LayoutMiniIcon, PencilIcon } from '../../../icons'
+import { BarChartIcon, CalendarIcon, CheckboxIcon, GearIcon, HelpIcon, LayoutMiniIcon, PencilIcon, PeopleIcon } from '../../../icons'
 import { SettingsSaveCluster } from '../../../../components/SettingsSaveCluster'
 import { flushSettings } from '../../../../settings/settingsStore'
 import ThemeSettingsPanel from '../../../../theme/ThemeSettingsPanel'
 import { AnalyticsPanel, RoutinesPanel, Scratchpad, TasksPanel } from '../Dashboard'
+import ReadersPanel from '../ReadersPanel'
 import { Placeholder } from '../shared'
 import type { WriterWorkspace } from '../useWriterWorkspace'
 import HelpArticles from './HelpArticles'
@@ -16,6 +17,7 @@ export function dashTabs(w: WriterWorkspace): LevelTab[] {
     { id: 'schedule', label: 'Schedule', Icon: CalendarIcon, searchable: true, render: c => <RoutinesPanel query={c.query} /> },
     { id: 'checklist', label: 'Checklist', Icon: CheckboxIcon, searchable: true, render: c => <TasksPanel query={c.query} /> },
     { id: 'analytics', label: 'Analytics', Icon: BarChartIcon, render: () => <AnalyticsPanel projects={w.projects} outlines={w.projectOutlines} /> },
+    { id: 'readers', label: 'Readers', Icon: PeopleIcon, render: () => <ReadersPanel /> },
     { id: 'scratchpad', label: 'Scratchpad', Icon: PencilIcon, searchable: true, render: c => <Scratchpad bare query={c.query} /> },
     { id: 'template', label: 'Project template', Icon: LayoutMiniIcon, render: () => <Placeholder title="Project Template" body="Manage the master project template here." /> },
     { id: 'settings', label: 'Settings', Icon: GearIcon, end: true, surface: true, render: () => <ThemeSettingsPanel /> },
