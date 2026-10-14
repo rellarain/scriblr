@@ -33,5 +33,5 @@ Everything inside a book is re-tinted for it: `BookScope` re-derives the theme t
 - the level panel's fill, and its header;
 - a book's **spine** and cover (`--wr-spine`, the same fill) and the page-edge rail's back cover (`--wr-cover`);
 - an **edge tab**: a stripe in the tab's colour, and, raised, its background (fitted so the tab's ink reads: `tabColors`);
-- a card's left stripe (`--wr-node-tint`), the arc and chapter rows in the contents;
+- a card's left stripe (`--wr-node-accent`, 7px): the accent colour at the node's hue, lifted 12 points and never under 72% lightness (`stripeColorCss`), so it reads on the level's dark page in every zone (3:1, audited as "Card stripe"); on the book cards, the arc and chapter cards and rows, and the chapter banner;
 - a plotpoint's category and subcategory colours (`plotColors.ts`): a category is the theme's colour at its hue with the zone's ink on it, a subcategory's or cluster's surface (`--wr-sub-fill`, `--wr-cluster-fill`) is the level fill of its hue with white on it, and the 4px left stripe of what is under it (`--wr-edge`) is the subcategory's accent colour, the cluster's, or a gradient from the one to the other; and a plotpoint's awareness shade (`awareness.ts`), which is fitted to read too.

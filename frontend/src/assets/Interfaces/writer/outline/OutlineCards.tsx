@@ -2,6 +2,7 @@ import { useMemo, useState, type CSSProperties, type DragEvent, type ReactNode }
 import type { OutlineNode } from '../../../../api/types'
 import type { WordCounts } from '../../../../api/draftFetch'
 import type { WriterWorkspace } from '../useWriterWorkspace'
+import { stripeColorCss } from '../../../../theme/bookColors'
 import { ChevronDownIcon, ChevronRightIcon, GripIcon, PencilIcon, PlusIcon } from '../../../icons'
 import { useNodeKeys } from '../../../../lib/nodeKeys'
 import { buildChildIndex, descendantsOf } from '../outlineTree'
@@ -141,7 +142,8 @@ export function OutlineCards({ w, book, counts, plotDrag, chapterId }: {
     )
   }
 
-  const tint = (node: OutlineNode) => ({ '--wr-node-tint': w.levelTintOf(node) } as CSSProperties)
+  // The stripe on a card is the level's accent colour lifted brighter than its tint, 7px wide.
+  const tint = (node: OutlineNode) => ({ '--wr-node-tint': w.levelTintOf(node), '--wr-node-accent': stripeColorCss(w.levelHueOf(node)) } as CSSProperties)
 
   const chevron = (node: OutlineNode, open: boolean, label: string) => (
     <button

@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import {
-  DEFAULT_BOOK_HUE, HUE_CODE_MAX, HUE_CODE_MIN, accentColorCss, bookScopeVars, bookThemeHue, clampCodeToWindow, clampHueToWindow, coverColor,
+  DEFAULT_BOOK_HUE, HUE_CODE_MAX, HUE_CODE_MIN, accentColorCss, stripeColorCss, stripeHsl, bookScopeVars, bookThemeHue, clampCodeToWindow, clampHueToWindow, coverColor,
   fillCap, fillColorCss, fillHsl, hexToHue, hueDelta, hueHsl, hueOfCode, hueWindow, themeColorCss, wrapHue,
 } from './bookColors'
 import { DEFAULT_PALETTE } from './defaults'
@@ -152,5 +152,13 @@ describe('hue colours', () => {
     const vars = bookScopeVars(DEFAULT_PALETTE, 'day', 'user', 200)
     expect(vars['--color-theme-h']).toBe('200')
     expect(vars['--color-theme-s']).toBe(deriveTokens(DEFAULT_PALETTE, 'user', 'day')['--color-theme-s'])
+  })
+})
+
+describe('the card stripe', () => {
+  it('is the accent colour lifted 12 points, and never darker than 72% lightness', () => {
+    expect(stripeColorCss(40)).toBe('hsl(40, var(--color-accent-s), max(calc(var(--color-accent-l) + 12%), 72%))')
+    expect(stripeHsl(40, { s: 80, l: 42 })).toEqual({ h: 40, s: 80, l: 72 }) // a light zone: raised to the floor
+    expect(stripeHsl(40, { s: 45, l: 62 })).toEqual({ h: 40, s: 45, l: 74 }) // a dark zone: the 12-point lift
   })
 })

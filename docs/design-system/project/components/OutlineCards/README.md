@@ -8,7 +8,7 @@ Code: `writer/outline/OutlineCards.tsx`, `SceneFields.tsx`, `useNodeDnd.tsx`, `l
 
 | Card | Ground | Padding | Holds |
 |---|---|---|---|
-| Chapter banner | frame-1 / `level-fill-2` | 10 / 12, a 5px left stripe in the chapter's colour | number, title (serif 18), a pencil (*Write chapter 1*), counts, its acts, *+ Act* |
+| Chapter banner | frame-1 / `level-fill-2` | 10 / 12, a 7px left stripe in the chapter's colour (lifted brighter, as every card stripe) | number, title (serif 18), a pencil (*Write chapter 1*), counts, its acts, *+ Act* |
 | Act | frame-3 | 12 | grip, fold chevron, *Act 1*, a title input, its scenes, *+ Scene*, word count, trash |
 | Scene | frame-4 | 10 / 12 | grip, chevron, *Scene 1*, Location / Time / Action chips and fields, its moments, *+ Moment* |
 | Moment | frame-5 | 8 / 10 | grip, *Moment 1*, a one-line synopsis preview, the synopsis input, boxed plotpoints, word count |

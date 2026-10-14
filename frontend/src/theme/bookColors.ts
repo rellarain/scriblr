@@ -91,6 +91,15 @@ export const themeColorCss = (hue: number | string): string =>
 export const accentColorCss = (hue: number | string): string =>
   typeof hue === 'number' ? hueCss(hue, 'accent') : `hsl(${hue}, var(--color-accent-s), var(--color-accent-l))`
 
+// The 7px stripe on a card's edge (an arc, a chapter, a book): the accent colour lifted to be brighter, at least STRIPE_MIN_L light, so it
+// reads against the level's dark page in every zone (3:1; the contrast audit measures it over every hue).
+export const STRIPE_LIFT = 12
+export const STRIPE_MIN_L = 72
+export const stripeColorCss = (hue: number): string =>
+  `hsl(${hueOfCode(hue)}, var(--color-accent-s), max(calc(var(--color-accent-l) + ${STRIPE_LIFT}%), ${STRIPE_MIN_L}%))`
+export const stripeHsl = (hue: number, accent: { s: number; l: number }): HSL =>
+  ({ h: hueOfCode(hue), s: accent.s, l: Math.min(100, Math.max(accent.l + STRIPE_LIFT, STRIPE_MIN_L)) })
+
 // The same fill as numbers, for a zone's accent saturation and lightness (what fillColorCss draws in CSS; the contrast audit and the
 // design system's token file use it).
 export function fillHsl(hue: number, accent: { s: number; l: number }): HSL {

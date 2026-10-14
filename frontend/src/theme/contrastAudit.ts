@@ -1,9 +1,9 @@
-import { tabColors, fillCap, fillHsl } from './bookColors'
+import { tabColors, fillCap, fillHsl, stripeHsl } from './bookColors'
 import { readableInk, type HSL } from './contrast'
 import { levelPairs } from './levelContrast'
 import { skyLook } from './skyLook'
 import {
-  BLACK, TEXT_TARGET, WHITE, over, ratioOf, ratioOfRgb, rgbOf, type RGB,
+  BLACK, TEXT_TARGET, WHITE, mixRgb, over, ratioOf, ratioOfRgb, rgbOf, type RGB,
 } from './readable'
 import {
   DISLIKE_BAR_SATURATIONS, INK_STRENGTH, LIFT_ALPHA, LIKE_BAR_SATURATIONS, PAPER_LOOKS, SIDEBAR_SHADE_1, SINK_ALPHAS, SURFACE_OFFSETS, ZONE_LOOKS,
@@ -177,7 +177,11 @@ export function paletteRatios(zone: ZoneKey, hues: AuditHues = DEFAULT_HUES): Pa
 export function levelRatios(zone: ZoneKey, hue: number): Pair[] {
   const look = ZONE_LOOKS[zone]
   const fill = fillHsl(hue, { s: look.accentS, l: look.accentL })
-  return levelPairs(fill).map(p => ({ id: p.id, group: 'Level panels', label: p.label, kind: 'text' as const, ratio: p.ratio }))
+  const pairs: Pair[] = levelPairs(fill).map(p => ({ id: p.id, group: 'Level panels', label: p.label, kind: 'text' as const, ratio: p.ratio }))
+  // The 7px accent stripe on a card's edge (an arc, a chapter, a book), against the lightest ground it sits on (the level's page, fill-1).
+  const stripe = rgbOf(stripeHsl(hue, { s: look.accentS, l: look.accentL }))
+  pairs.push({ id: 'level/stripe', group: 'Level panels', label: 'Card stripe (the accent colour, lifted) on the level page', kind: 'ui', ratio: ratioOfRgb(stripe, mixRgb(rgbOf(fill), 90, BLACK)) })
+  return pairs
 }
 
 // The edge tab of a level colour in a zone (the tab's background is fitted for the ink: bookColors.tabColors).

@@ -207,6 +207,7 @@ Each cell is the ratio at the default hues (theme 330, accent 32, alert 200) and
 | Collapsed header text on its hover | 4.5:1 | 5.4 (5.2) | 5.1 (5.0) | 5.1 (5.0) | 5.4 (5.0) |
 | Text on a cover wash | 4.5:1 | 10.8 (10.4) | 10.2 (10.0) | 10.2 (10.0) | 10.8 (10.0) |
 | Arc tab label (92%) on the cover colour | 4.5:1 | 6.6 (6.3) | 6.1 (5.9) | 6.1 (5.9) | 6.6 (6.0) |
+| Card stripe (the accent colour, lifted) on the level page | 3:1 | 4.6 (4.0) | 4.6 (3.8) | 4.8 (3.6) | 4.8 (3.8) |
 
 ## Plot colours
 

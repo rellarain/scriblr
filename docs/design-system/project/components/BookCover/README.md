@@ -8,7 +8,7 @@ Code: `writer/outline/OutlineMax.tsx`, `OutlineNav.tsx`, `BookEditor.tsx`, `Book
 
 - **Cover** `.wrBookCover`: the book's flat fill (`--wr-fill`), white text, a soft shadow on its right edge. The title is 20px bold; the tabs row is the Outline's tabs (Book outline, Book details, Settings, Help) and quick actions. The column is at most 860px wide and centred.
 - **Spine** down the left: a flat strip, the fill mixed with 40% black.
-- **Contents** `.wrOutlineNav`: arc rows (a 5px left stripe in the arc's colour, a title input, a colour slider, *+ Chapter*) and chapter rows (number, title, words). The open chapter unfolds its title, colour and trash, and under them its [cards](../OutlineCards/README.md).
+- **Contents** `.wrOutlineNav`: arc rows (a 7px left stripe in the arc's colour, lifted brighter: `stripeColorCss`, a title input, a colour slider, *+ Chapter*) and chapter rows (number, title, words). The open chapter unfolds its title, colour and trash, and under them its [cards](../OutlineCards/README.md).
 - **Page edges** `.wrEdgeLeaves i`: ten or more, each 4px further out and a little deeper than the one before, on the book's back-cover colour (`--wr-cover`). The rail is 15px wider than the last edge.
 - **Tabs** `.wrEdgeTab` (30 wide, vertical text, 46 tall) and arc tabs `.wrEdgeArc` ("A1", "A2"); each arc's cluster starts at its own edge, the first at the second. A tab's stripe is its colour; the **focused** tab is wider (38) with its colour as its background, fitted so its ink reads (`tabColors`). `+` adds a chapter.
 
