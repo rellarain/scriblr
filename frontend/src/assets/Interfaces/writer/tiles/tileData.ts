@@ -1,6 +1,6 @@
 import type { OutlineNode, PlotNode } from '../../../../api/types'
 import { booksOf, chaptersOfBook } from '../outlineTree'
-import { nodeLabel } from '../plotTree'
+import { categoryOf, nodeLabel } from '../plotTree'
 
 // What the read-only tile bodies show, worked out from the outline and plot lists.
 
@@ -47,11 +47,11 @@ export interface CategoryRow { id: string; title: string; plotlines: number }
 
 export function categoryRows(nodes: PlotNode[]): CategoryRow[] {
   const categories = nodes.filter(n => n.kind === 'category').sort((a, b) => a.order - b.order)
-  const subs = new Map<string, string>() // subcategory id -> category id
-  for (const n of nodes) if (n.kind === 'subcategory' && n.parentId) subs.set(n.id, n.parentId)
-  return categories.map(c => ({
-    id: c.id,
-    title: nodeLabel(c),
-    plotlines: nodes.filter(n => n.kind === 'plotline' && (n.parentId === c.id || subs.get(n.parentId ?? '') === c.id)).length,
-  }))
+  const byId = new Map(nodes.map(n => [n.id, n]))
+  const perCategory = new Map<string, number>()
+  for (const n of nodes) {
+    const owner = n.kind === 'plotline' ? categoryOf(n, byId) : undefined
+    if (owner) perCategory.set(owner.id, (perCategory.get(owner.id) ?? 0) + 1)
+  }
+  return categories.map(c => ({ id: c.id, title: nodeLabel(c), plotlines: perCategory.get(c.id) ?? 0 }))
 }

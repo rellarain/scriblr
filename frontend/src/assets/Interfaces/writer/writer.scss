@@ -1,6 +1,13 @@
 // The Writer page (WUI). All classes are prefixed `wr` and scoped under
 // `.wUI.wr`; colors come from the app's theme/accent/alert variables.
 
+// A plot node's left edge: a 4px stripe drawn as a background image (--wr-edge, set from the node's subcategory and
+// cluster colours by plotColors.ts: one colour, or a vertical gradient from the subcategory's to the cluster's).
+// Include it after the rule's own background colour.
+@mixin wrEdge {
+  background-image: var(--wr-edge, none); background-size: 4px 100%; background-repeat: no-repeat; background-position: left top;
+}
+
 // Aliases onto the global theme tokens (theme/theme.scss), so the Writer follows the
 // time-of-day palette. Also declared inside a book's scope (BookScope.tsx), where the
 // tokens are re-derived from the book's hues.
@@ -296,30 +303,33 @@
   .wrPlotNav { flex: 0 0 250px; min-height: 0; display: flex; flex-direction: column; gap: 8px; background: var(--ov-sink-1); border-radius: 6px; padding: 10px; }
   .wrPlotNavHead { display: flex; align-items: center; justify-content: space-between; font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: 1px; span { opacity: 0.9; } }
   .wrPlotNavRows { flex: 1 1 auto; min-height: 0; overflow-y: auto; display: flex; flex-direction: column; gap: 3px; scrollbar-width: none; &::-webkit-scrollbar { display: none; } }
-  // A row wears its node's colour: a category its own (theme) colour, a subcategory its (accent) colour, a plotline its
-  // category's colour with a left edge in its subcategory's. The box itself is indented per kind (right edges stay aligned),
+  // A row wears its node's colour: a category its own (theme) colour, a subcategory and a cluster their own (accent) colours, a plotline its
+  // category's colour with a left edge in its subcategory's and cluster's. The box itself is indented per kind (right edges stay aligned),
   // and the selected row is a brighter shade of its own colour.
   .wrNavRow {
     --wr-row-bg: var(--wr-cat, var(--ov-sink-1)); --wr-row-ink: var(--ink);
     display: flex; align-items: center; gap: 6px; padding: 5px 8px; border-radius: 4px; font-size: 12px;
-    background: var(--wr-row-bg); color: var(--wr-row-ink);
-    &:hover, &--active { background: color-mix(in srgb, var(--wr-row-bg) 85%, var(--away)); }
+    background-color: var(--wr-row-bg); color: var(--wr-row-ink);
+    &:hover, &--active { background-color: color-mix(in srgb, var(--wr-row-bg) 85%, var(--away)); }
     &--active { font-weight: 700; }
     &--subcategory { --wr-row-bg: var(--wr-sub-fill, var(--wr-cat)); --wr-row-ink: var(--on-accent); --away: black; margin-left: 14px; }
-    &--plotline { margin-left: 28px; box-shadow: inset 4px 0 0 var(--wr-sub, transparent); padding-left: 12px; }
+    &--cluster { --wr-row-bg: var(--wr-cluster-fill, var(--wr-sub-fill, var(--wr-cat))); --wr-row-ink: var(--on-accent); --away: black; margin-left: 28px; }
+    &--plotline { margin-left: 42px; @include wrEdge; padding-left: 12px; }
   }
   .wrNavChevron { display: inline-flex; flex: 0 0 auto; transition: transform 0.15s; }
   .wrNavLabel { flex: 1; min-width: 0; text-align: left; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
   .wrNavCount { font-size: 11px; opacity: 0.9; }
-  .wrNavRow--subcategory .wrNavCount { opacity: 1; }
+  .wrNavRow--subcategory .wrNavCount, .wrNavRow--cluster .wrNavCount { opacity: 1; }
   .wrPlotBody { flex: 1 1 auto; min-width: 0; min-height: 0; display: flex; flex-direction: column; gap: 10px; overflow: auto; scrollbar-width: none; &::-webkit-scrollbar { display: none; } }
 
-  // The plot colour coding on the editor cards: a category card is its (theme) colour, a subcategory card its (accent)
-  // colour, a plotline card its category's colour with a left edge in its subcategory's.
+  // The plot colour coding on the editor cards: a category card is its (theme) colour, a subcategory or cluster card its (accent)
+  // colour, a plotline card its category's colour with a left edge in its subcategory's and cluster's.
   .wrCardPanel.wrCardPanel--category, .wrCardPanel.wrCardPanel--plotline { background: var(--wr-cat, var(--wr-card)); }
-  .wrCardPanel.wrCardPanel--plotline { box-shadow: inset 4px 0 0 var(--wr-sub, transparent); }
-  .wrCardPanel.wrCardPanel--subcategory {
-    background: var(--wr-sub-fill, var(--wr-cat, var(--wr-card))); color: var(--on-accent); --away: black; .wrTitleField, .wrField { color: var(--on-accent); }
+  .wrCardPanel.wrCardPanel--plotline { box-shadow: none; @include wrEdge; }
+  .wrCardPanel.wrCardPanel--subcategory { --wr-own-fill: var(--wr-sub-fill); }
+  .wrCardPanel.wrCardPanel--cluster { --wr-own-fill: var(--wr-cluster-fill); }
+  .wrCardPanel.wrCardPanel--subcategory, .wrCardPanel.wrCardPanel--cluster {
+    background: var(--wr-own-fill, var(--wr-cat, var(--wr-card))); color: var(--on-accent); --away: black; .wrTitleField, .wrField { color: var(--on-accent); }
     // On the accent fill only a light dimming keeps text 45 points from it, and the washes lift away from the text.
     .wrLabel, .wrKindBadge, .wrOutlineMeta, .wrMuted, .wrHint { opacity: 0.9; }
     .wrLabel .wrOutlineMeta { opacity: 1; }
@@ -388,7 +398,8 @@
   .wrPlotValue {
     position: relative; display: flex; align-items: center; gap: 8px; padding: 20px 8px 8px 14px; border-radius: 6px; min-width: 0;
     background: var(--wr-point-bg, var(--wr-cat, var(--wr-card))); color: var(--wr-point-ink, var(--ink));
-    box-shadow: inset 4px 0 0 var(--wr-point-edge, var(--wr-sub, transparent)), 0 2px 6px rgb(0 0 0 / calc(0.25 * var(--shade-k)));
+    box-shadow: inset 4px 0 0 var(--wr-point-edge, transparent), 0 2px 6px rgb(0 0 0 / calc(0.25 * var(--shade-k)));
+    @include wrEdge;
     &--dragging { opacity: 0.7; }
     &--highlight { outline: 2px solid var(--wr-accent-light); outline-offset: 2px; }
   }
@@ -455,7 +466,7 @@
   // A plotpoint tile: dark, so it stands out from the (light) card it sits in.
   .wrPointTile {
     display: flex; flex-direction: column; gap: 3px; padding: 5px 5px 5px 9px; border-radius: 0; background: var(--wr-cat, var(--wr-card)); color: var(--ink);
-    box-shadow: inset 4px 0 0 var(--wr-sub, transparent), 0 2px 6px rgb(0 0 0 / calc(0.25 * var(--shade-k))); text-align: left;
+    box-shadow: 0 2px 6px rgb(0 0 0 / calc(0.25 * var(--shade-k))); text-align: left; @include wrEdge;
     &--draggable { cursor: grab; }
     &--dragging { opacity: 0.7; }
   }
@@ -505,7 +516,7 @@
   .wrPlotNotes { flex: 0 0 210px; min-width: 0; display: flex; flex-direction: column; gap: 8px; padding: 26px 14px 16px 0; box-sizing: border-box; overflow-y: auto; scrollbar-width: none; &::-webkit-scrollbar { display: none; } }
   .wrPlotNote {
     display: flex; flex-direction: column; gap: 4px; padding: 6px 8px 6px 12px; border-radius: 6px; text-align: left; color: var(--ink);
-    background: var(--wr-cat, var(--wr-card)); box-shadow: inset 4px 0 0 var(--wr-sub, transparent), 0 2px 6px rgb(0 0 0 / calc(0.25 * var(--shade-k)));
+    background: var(--wr-cat, var(--wr-card)); box-shadow: 0 2px 6px rgb(0 0 0 / calc(0.25 * var(--shade-k))); @include wrEdge;
   }
   .wrPlotNoteHead { display: flex; align-items: center; justify-content: space-between; gap: 6px; width: 100%; text-align: left; color: inherit; }
   .wrPlotNoteTitle { flex: 1 1 auto; min-width: 0; font-size: 12px; font-weight: 700; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
@@ -643,7 +654,7 @@
 
   // The Outline level at Mid: a plotpoint still to place is just its title in its category colour.
   .wrOutlineMid .wrPanelHead { display: flex; align-items: baseline; }
-  .wrMidPoint { padding: 4px 8px 4px 12px; border-radius: 0; background: var(--wr-cat, var(--wr-card)); box-shadow: inset 4px 0 0 var(--wr-sub, transparent); color: var(--ink); font-size: 12px; overflow-wrap: anywhere; }
+  .wrMidPoint { padding: 4px 8px 4px 12px; border-radius: 0; background: var(--wr-cat, var(--wr-card)); @include wrEdge; color: var(--ink); font-size: 12px; overflow-wrap: anywhere; }
 
   // ---------------------------------------------------------------- draft level (Max): the open book
   .wrDraftLevel { flex: 1 1 auto; min-height: 0; display: flex; flex-direction: column; gap: 6px; }

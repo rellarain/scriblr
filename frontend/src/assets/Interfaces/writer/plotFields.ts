@@ -3,9 +3,9 @@ import { insertAfter } from '../../../lib/siblingOrder'
 import { assignedLevel, orderAssignedPlotpoints } from './plotTree'
 
 // Fields and their values. A field (a PlotCustomFieldDef) is defined on a
-// category, a subcategory or a plotline; each value in it is a plotpoint.
+// category, a subcategory, a cluster or a plotline; each value in it is a plotpoint.
 //   - a value defined on a plotline is that plotline's own;
-//   - a value defined on a category or subcategory is shown on every plotline
+//   - a value defined on a category, subcategory or cluster is shown on every plotline
 //     under it as a REFERENCE (a plotpoint with `refId`, whose text is the
 //     original's), which the plotline assigns to its own chapters;
 //   - a plotline can also add its own values to an inherited field.
@@ -20,7 +20,7 @@ export const SCRAP_FIELD_NAME = 'Scrap'
 export type MakeId = (prefix: string) => string
 export const randomId: MakeId = prefix => `${prefix}-${Math.random().toString(36).slice(2, 9)}`
 
-export type FieldScope = 'plotline' | 'subcategory' | 'category'
+export type FieldScope = 'plotline' | 'cluster' | 'subcategory' | 'category'
 export interface FieldInfo { def: PlotCustomFieldDef; owner: PlotNode; scope: FieldScope }
 
 const byId = (nodes: PlotNode[]) => new Map(nodes.map(n => [n.id, n]))
@@ -50,11 +50,11 @@ export function chainOf(node: PlotNode, index: Map<string, PlotNode>): PlotNode[
   return out
 }
 
-const scopeOf = (n: PlotNode): FieldScope | null => (n.kind === 'plotline' ? 'plotline' : n.kind === 'subcategory' ? 'subcategory' : n.kind === 'category' ? 'category' : null)
+const scopeOf = (n: PlotNode): FieldScope | null => (n.kind === 'plotpoint' ? null : n.kind)
 
 // The fields a plotline shows, grouped by where they are defined (Scrap is the plotline's last).
 export function fieldGroups(plotline: PlotNode, index: Map<string, PlotNode>): Record<FieldScope, FieldInfo[]> {
-  const groups: Record<FieldScope, FieldInfo[]> = { plotline: [], subcategory: [], category: [] }
+  const groups: Record<FieldScope, FieldInfo[]> = { plotline: [], cluster: [], subcategory: [], category: [] }
   for (const owner of chainOf(plotline, index)) {
     const scope = scopeOf(owner)
     if (scope) groups[scope].push(...owner.customFieldDefs.map(def => ({ def, owner, scope })))
@@ -200,7 +200,7 @@ function detach(nodes: PlotNode[], refId: string, original: PlotNode | undefined
 const isPlaced = (n: PlotNode, outlineById: Map<string, OutlineNode>) => assignedLevel(n, outlineById) !== 'none'
 
 // Remove a value. An own value goes only while unassigned; a reference never goes
-// from a plotline. Deleting a value defined on a category or subcategory removes
+// from a plotline. Deleting a value defined on a category, subcategory or cluster removes
 // its references, except the assigned ones, which become the plotline's own values
 // in a plotline field of the same name.
 export function deleteValue(nodes: PlotNode[], id: string, outlineById: Map<string, OutlineNode>, makeId: MakeId = randomId): PlotNode[] {
@@ -218,7 +218,7 @@ export function deleteValue(nodes: PlotNode[], id: string, outlineById: Map<stri
   return next.filter(n => n.id !== id)
 }
 
-// Remove a field. On a category or subcategory: every value goes as above, and the
+// Remove a field. On a category, subcategory or cluster: every value goes as above, and the
 // plotlines' own values in it keep only the assigned ones (in a plotline field of the
 // same name). On a plotline: assigned values move to its Scrap field, the rest go.
 export function deleteField(nodes: PlotNode[], ownerId: string, fieldId: string, outlineById: Map<string, OutlineNode>, makeId: MakeId = randomId): PlotNode[] {
@@ -252,8 +252,8 @@ export function deleteField(nodes: PlotNode[], ownerId: string, fieldId: string,
 
 // ---- references ----
 
-// Make every plotline hold exactly one reference per value defined on its category
-// and subcategory. Idempotent; returns the same array when nothing changes. A
+// Make every plotline hold exactly one reference per value defined on its category,
+// subcategory and cluster. Idempotent; returns the same array when nothing changes. A
 // reference whose original is gone (or no longer above its plotline) is kept as the
 // plotline's own value when assigned, and dropped otherwise.
 export function syncReferences(nodes: PlotNode[], outlineById: Map<string, OutlineNode> = new Map(), makeId: MakeId = randomId): PlotNode[] {
@@ -262,7 +262,7 @@ export function syncReferences(nodes: PlotNode[], outlineById: Map<string, Outli
   for (const plotline of nodes.filter(n => n.kind === 'plotline')) {
     const wanted = new Map<string, { original: PlotNode; fieldId: string }>()
     for (const owner of chainOf(plotline, index).slice(1)) {
-      if (owner.kind !== 'category' && owner.kind !== 'subcategory') continue
+      if (owner.kind !== 'category' && owner.kind !== 'subcategory' && owner.kind !== 'cluster') continue
       for (const def of owner.customFieldDefs) {
         for (const original of valuesIn(nodes, owner.id, def.id)) wanted.set(original.id, { original, fieldId: def.id })
       }

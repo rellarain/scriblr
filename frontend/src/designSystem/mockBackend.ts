@@ -70,7 +70,8 @@ function plotNodes(moments: string[]): PlotNode[] {
     p('cat1', 'category', null, 0, { title: 'Category lorem', hue: 200 }),
     p('cat2', 'category', null, 1, { title: 'Category ipsum', hue: 300 }),
     p('sub1', 'subcategory', 'cat1', 0, { title: 'Subcategory dolor', hue: 230 }),
-    p('line1', 'plotline', 'sub1', 0, { title: 'Plotline sit amet' }),
+    p('clu1', 'cluster', 'sub1', 0, { title: 'Cluster elit', hue: 170 }),
+    p('line1', 'plotline', 'clu1', 0, { title: 'Plotline sit amet' }),
     p('line2', 'plotline', 'cat2', 0, { title: 'Plotline consectetur' }),
     p('pp1', 'plotpoint', 'line1', 0, { title: 'Plotpoint lorem ipsum', body: lorem(0) }),
     p('pp2', 'plotpoint', 'line1', 1, { title: 'Plotpoint dolor sit', body: lorem(1), assignedMomentId: moments[0], awareness: 'front' }),
@@ -107,7 +108,7 @@ function buildProject(id: string): FixtureProject {
       settings: {
         wordCountTarget: 120000, bookCountTarget: 3, bookWordCountTarget: 60000, chapterWordCountTarget: 3000,
         priorities: [], routines: [], outlineLevels: ['series', 'book', 'arc', 'chapter', 'act', 'scene', 'moment'],
-        plotLevels: ['category', 'subcategory', 'plotline', 'plotpoint'], readLevels: ['chapter'], timeSystems: [], themeHue: null,
+        plotLevels: ['category', 'subcategory', 'cluster', 'plotline', 'plotpoint'], readLevels: ['chapter'], timeSystems: [], themeHue: null,
       },
       manifest: { outline: 'outline', plot: 'plot', draftMoments: [], revisionChapters: [] },
     },

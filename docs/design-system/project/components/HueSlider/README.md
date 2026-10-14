@@ -7,7 +7,7 @@ Code: `writer/HueSlider.tsx` (a level's colour), `components/ColorRange.tsx` (th
 ## Two forms
 
 - **Unlimited**: the whole wheel. For a project, a book and a plot category.
-- **Limited**: the plus-or-minus **60 degree window** round the parent's hue, for a series, an arc, a chapter and a plot subcategory. The middle of the track is the parent's own hue; its ends are 60 degrees either side, even across red (the window may run past 360). A hue outside its window is held on the nearest end.
+- **Limited**: the plus-or-minus **60 degree window** round the parent's hue, for a series, an arc, a chapter, a plot subcategory and a plot cluster (the last two round their category's hue). The middle of the track is the parent's own hue; its ends are 60 degrees either side, even across red (the window may run past 360). A hue outside its window is held on the nearest end.
 
 `HueSlider` takes `label`, `hue`, `centre` (the parent's hue, or null) and `onChange(hue)`; the value is a plain hue, wrapped to 0..359.
 

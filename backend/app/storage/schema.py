@@ -47,12 +47,12 @@ OutlineNodeKind = Literal["series", "book", "arc", "chapter", "act", "scene", "m
 OUTLINE_KIND_ORDER: list[OutlineNodeKind] = ["series", "book", "arc", "chapter", "act", "scene", "moment"]
 REQUIRED_OUTLINE_LEVELS: list[OutlineNodeKind] = ["book", "chapter"]
 
-# Plot tree: category -> subcategory -> plotline -> plotpoint, mirroring the
+# Plot tree: category -> subcategory -> cluster -> plotline -> plotpoint, mirroring the
 # outline tree's flat-list-with-parentId shape. Plotpoints are the leaf/
 # content unit and may be assigned to a moment (and, optionally, a specific
 # paragraph within that moment's draft) in the outline tree.
-PlotNodeKind = Literal["category", "subcategory", "plotline", "plotpoint"]
-PLOT_KIND_ORDER: list[PlotNodeKind] = ["category", "subcategory", "plotline", "plotpoint"]
+PlotNodeKind = Literal["category", "subcategory", "cluster", "plotline", "plotpoint"]
+PLOT_KIND_ORDER: list[PlotNodeKind] = ["category", "subcategory", "cluster", "plotline", "plotpoint"]
 
 
 class ProjectManifest(BaseModel):
@@ -277,8 +277,8 @@ class PlotNode(BaseModel):
     # the existing mirror plotpoint idempotently on every keystroke rather
     # than creating duplicates. None for ordinary, manually-created plotpoints.
     sourceFieldId: Optional[str] = None
-    # Set only on "category" or "subcategory" nodes: custom field definitions
-    # that plotlines within this category/subcategory can fill in.
+    # Set only on "category", "subcategory" or "cluster" nodes: custom field definitions
+    # that plotlines within this category/subcategory/cluster can fill in.
     customFieldDefs: list[PlotCustomFieldDef] = Field(default_factory=list)
     # Set only on "plotline" nodes: values for the parent category's custom
     # fields, keyed by PlotCustomFieldDef.id.
@@ -287,13 +287,13 @@ class PlotNode(BaseModel):
     keywords: list[str] = Field(default_factory=list)
     # Flags this item for revision (review/edit/add/delete), with an optional note.
     flag: Optional[NodeFlag] = None
-    # Set only on "category" and "subcategory" nodes: the colour hue (0-360). A
-    # category is drawn with the theme's saturation/brightness, a subcategory with
+    # Set only on "category", "subcategory" and "cluster" nodes: the colour hue (0-360). A
+    # category is drawn with the theme's saturation/brightness, a subcategory or cluster with
     # the accent's and kept within 60 degrees of its category's hue. None = the
-    # app theme's hue (categories) or the category's hue (subcategories).
+    # app theme's hue (categories) or the parent's hue (subcategories, clusters).
     hue: Optional[int] = Field(default=None, ge=MIN_LEVEL_HUE, le=MAX_LEVEL_HUE)
     # Set only on "plotpoint" nodes, which are the values of fields: the
-    # PlotCustomFieldDef.id (defined on a category, subcategory or plotline)
+    # PlotCustomFieldDef.id (defined on a category, subcategory, cluster or plotline)
     # this value belongs to. None on plotpoints saved before fields had values;
     # the client moves those into a "Default" plotline field on load.
     fieldId: Optional[str] = None

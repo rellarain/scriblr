@@ -214,6 +214,7 @@ Each cell is the ratio at the default hues (theme 330, accent 32, alert 200) and
 |---|---|---|---|---|---|
 | Ink on a plot category, the worst hue | 4.5:1 | 12.3 (11.6) | 13.3 (13.2) | 6.2 (5.1) | 8.7 (8.7) |
 | White on a plot subcategory, the worst hue | 4.5:1 | 7.2 (7.1) | 6.6 (6.6) | 6.6 (6.6) | 6.7 (6.7) |
+| White on a plot cluster, the worst hue | 4.5:1 | 7.2 (7.1) | 6.6 (6.6) | 6.6 (6.6) | 6.7 (6.7) |
 
 ## Inbox tones
 

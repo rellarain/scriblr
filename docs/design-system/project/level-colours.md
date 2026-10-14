@@ -14,9 +14,9 @@ Every level of the Writer, every book, arc and chapter, and every plot category 
 | Book | any hue; a book with no hue of its own is the default orange (28) |
 | Arc | within 60 degrees of its book's |
 | Chapter | within 60 degrees of its arc's (its book's outside an arc) |
-| Plot category | any hue; a subcategory within 60 degrees of its category's |
+| Plot category | any hue; a subcategory or a cluster within 60 degrees of its category's |
 
-A series, arc, chapter or subcategory with no colour of its own shows its parent's. New ones take a hue in their window, spread away from their siblings'. Changing a parent pulls its children's hues back inside their window. The hue slider is **one track**, 0 to 360: unlimited, or the plus-or-minus 60 degree window round the parent's hue (`HueSlider`, [the preview](components/HueSlider/README.md)).
+A series, arc, chapter, subcategory or cluster with no colour of its own shows its parent's. New ones take a hue in their window, spread away from their siblings'. Changing a parent pulls its children's hues back inside their window. The hue slider is **one track**, 0 to 360: unlimited, or the plus-or-minus 60 degree window round the parent's hue (`HueSlider`, [the preview](components/HueSlider/README.md)).
 
 ## From a hue to a panel
 
@@ -34,4 +34,4 @@ Everything inside a book is re-tinted for it: `BookScope` re-derives the theme t
 - a book's **spine** and cover (`--wr-spine`, the same fill) and the page-edge rail's back cover (`--wr-cover`);
 - an **edge tab**: a stripe in the tab's colour, and, raised, its background (fitted so the tab's ink reads: `tabColors`);
 - a card's left stripe (`--wr-node-tint`), the arc and chapter rows in the contents;
-- a plotpoint's category and subcategory colours (`plotColors.ts`): a category is the theme's colour at its hue with the zone's ink on it, a subcategory's surface (`--wr-sub-fill`) is the level fill of its hue with white on it, and its 4px stripe (`--wr-sub`) the accent colour; and a plotpoint's awareness shade (`awareness.ts`), which is fitted to read too.
+- a plotpoint's category and subcategory colours (`plotColors.ts`): a category is the theme's colour at its hue with the zone's ink on it, a subcategory's or cluster's surface (`--wr-sub-fill`, `--wr-cluster-fill`) is the level fill of its hue with white on it, and the 4px left stripe of what is under it (`--wr-edge`) is the subcategory's accent colour, the cluster's, or a gradient from the one to the other; and a plotpoint's awareness shade (`awareness.ts`), which is fitted to read too.

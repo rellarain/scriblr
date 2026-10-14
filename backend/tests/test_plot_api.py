@@ -112,6 +112,28 @@ def test_assigned_paragraph_index_round_trips(client: TestClient) -> None:
     assert reloaded["pp_1"]["assignedMomentId"] == "moment_1"
 
 
+def test_a_cluster_sits_between_a_subcategory_and_a_plotline_with_its_own_fields(client: TestClient) -> None:
+    project_id = client.post("/api/projects", json={"title": "Cluster Test"}).json()["projectId"]
+    tree = client.get(f"/api/projects/{project_id}/plot").json()
+    tree["nodes"] += [
+        {"id": "cat_1", "kind": "category", "parentId": None, "order": 0, "title": "Betrayal"},
+        {"id": "sub_1", "kind": "subcategory", "parentId": "cat_1", "order": 0, "title": "Early hints"},
+        {"id": "cl_1", "kind": "cluster", "parentId": "sub_1", "order": 0, "title": "The household", "hue": 180,
+         "customFieldDefs": [{"id": "f1", "name": "Motive"}]},
+        {"id": "pl_1", "kind": "plotline", "parentId": "cl_1", "order": 0, "title": "The mole"},
+        {"id": "pl_2", "kind": "plotline", "parentId": "sub_1", "order": 1, "title": "Skips the cluster"},
+    ]
+    resp = client.put(f"/api/projects/{project_id}/plot", json=tree)
+    assert resp.status_code == 200
+    reloaded = {n["id"]: n for n in client.get(f"/api/projects/{project_id}/plot").json()["nodes"]}
+    assert reloaded["cl_1"]["kind"] == "cluster"
+    assert reloaded["cl_1"]["parentId"] == "sub_1"
+    assert reloaded["cl_1"]["hue"] == 180
+    assert reloaded["cl_1"]["customFieldDefs"] == [{"id": "f1", "name": "Motive"}]
+    assert reloaded["pl_1"]["parentId"] == "cl_1"
+    assert reloaded["pl_2"]["parentId"] == "sub_1"
+
+
 def test_source_field_id_round_trips(client: TestClient) -> None:
     project_id = client.post("/api/projects", json={"title": "Source Field Test"}).json()["projectId"]
     tree = client.get(f"/api/projects/{project_id}/plot").json()

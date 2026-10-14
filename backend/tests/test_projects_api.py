@@ -50,7 +50,7 @@ def test_project_defaults_to_all_levels_and_can_be_customized(client: TestClient
     resp = client.get(f"/api/projects/{project_id}")
     settings = resp.json()["index"]["settings"]
     assert settings["outlineLevels"] == ["series", "book", "arc", "chapter", "act", "scene", "moment"]
-    assert settings["plotLevels"] == ["category", "subcategory", "plotline", "plotpoint"]
+    assert settings["plotLevels"] == ["category", "subcategory", "cluster", "plotline", "plotpoint"]
 
     resp = client.patch(
         f"/api/projects/{project_id}",

@@ -4,7 +4,7 @@ import type { PlotNode } from '../../../api/types'
 import { DraftPlotNotes } from './DraftPlotNotes'
 import { PlotpointTile } from './PlotpointTile'
 import PlotView from './PlotView'
-import { startingPlot, useFakeWorkspace } from './plotTestWorkspace'
+import { plotNode, startingPlot, useFakeWorkspace } from './plotTestWorkspace'
 
 function Editor({ start = startingPlot(), focused = 'line', onNodes }: { start?: PlotNode[]; focused?: string; onNodes?: (n: PlotNode[]) => void }) {
   const { w, plotNodes } = useFakeWorkspace(start, focused)
@@ -286,3 +286,55 @@ describe('deleting', () => {
   })
 })
 
+// The starting plot with a cluster ("Household") between the subcategory and the plotline.
+const clustered = () => startingPlot().map(n => (n.id === 'line' ? { ...n, parentId: 'clu' } : n)).concat(
+  plotNode('clu', 'cluster', 'sub', { title: 'Household', hue: 170, customFieldDefs: [{ id: 'fMotive', name: 'Motive' }] }),
+  plotNode('mv', 'plotpoint', 'clu', { title: 'Greed', fieldId: 'fMotive' }),
+)
+
+describe('clusters', () => {
+  it('adds a cluster from the subcategory, and a plotline from the cluster', () => {
+    render(<Editor focused="sub" />)
+    expect(screen.getByText('Clusters')).toBeInTheDocument()
+    fireEvent.click(screen.getByRole('button', { name: /Cluster$/ }))
+    expect(screen.getByPlaceholderText('Cluster title')).toBeInTheDocument() // the new cluster's editor
+    expect(screen.getByText('cluster')).toBeInTheDocument() // its kind badge
+    fireEvent.click(screen.getByRole('button', { name: /Plotline$/ }))
+    expect(screen.getByPlaceholderText('Plotline title')).toBeInTheDocument()
+  })
+
+  it('has no Clusters list on a category, whose plotlines and subcategories sit directly under it', () => {
+    render(<Editor focused="cat" />)
+    expect(screen.queryByText('Clusters')).toBeNull()
+    expect(screen.getByText('Subcategories')).toBeInTheDocument()
+  })
+
+  it('shows a cluster\'s field on the plotlines under it, between the plotline\'s and the category\'s', () => {
+    render(<Editor start={clustered()} />)
+    expect(screen.getAllByRole('region').map(g => g.getAttribute('aria-label'))).toEqual(['Plotline fields', 'From cluster: Household', 'From category: Romance'])
+  })
+
+  it('shows the cluster\'s own fields in its editor, with a colour slider within 60 degrees of the category', () => {
+    render(<Editor start={clustered()} focused="clu" />)
+    expect(screen.getByText('within 60° of its category')).toBeInTheDocument()
+    expect(screen.getByRole('slider', { name: 'Cluster colour' })).toBeInTheDocument()
+    expect(screen.getByDisplayValue('Motive')).toBeInTheDocument()
+  })
+
+  it('nests the cluster in the contents, below its subcategory and above its plotline', () => {
+    const { container } = render(<Editor start={clustered()} />)
+    const rows = [...container.querySelectorAll('.wrNavRow')].map(r => r.className.match(/wrNavRow--(\w+)/)![1])
+    expect(rows).toEqual(['category', 'subcategory', 'cluster', 'plotline'])
+  })
+})
+
+describe('trails with a cluster', () => {
+  it('a margin tile names category > subcategory > cluster', () => {
+    function Tile() {
+      const { w } = useFakeWorkspace(clustered().map(n => (n.id === 'own' ? { ...n, assignedMomentId: 'ch1' } : n)))
+      return <PlotpointTile w={w} point={w.plotNodeById.get('own')!} variant="margin" onUnassign={() => {}} />
+    }
+    const { container } = render(<Tile />)
+    expect(container).toHaveTextContent('Romance › Slow burn › Household')
+  })
+})

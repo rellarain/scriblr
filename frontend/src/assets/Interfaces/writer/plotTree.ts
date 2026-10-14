@@ -2,8 +2,23 @@ import type { OutlineNode, PlotNode, TimeSystem } from '../../../api/types'
 import { booksOf, buildChildIndex, descendantsOf, nearestOfKind } from './outlineTree'
 import { compareTimeValues, hasTime, systemForBook, type TimeValue } from './timeSystem'
 
-// Helpers for the plot tree (categories > subcategories > plotlines >
+// Helpers for the plot tree (categories > subcategories > clusters > plotlines >
 // plotpoints) and the rules around plotpoint assignment.
+
+// The grouping nodes above a node (category, subcategory, cluster: whichever it sits under), outermost first.
+export function plotTrail(node: PlotNode, byId: Map<string, PlotNode>): PlotNode[] {
+  const out: PlotNode[] = []
+  for (let current = node.parentId ? byId.get(node.parentId) : undefined, guard = 0; current && guard < 8; guard += 1) {
+    if (current.kind === 'category' || current.kind === 'subcategory' || current.kind === 'cluster') out.unshift(current)
+    current = current.parentId ? byId.get(current.parentId) : undefined
+  }
+  return out
+}
+
+// The category a node sits under (or is), if any.
+export function categoryOf(node: PlotNode, byId: Map<string, PlotNode>): PlotNode | undefined {
+  return node.kind === 'category' ? node : plotTrail(node, byId).find(n => n.kind === 'category')
+}
 
 // What to show where a node's title appears as text: the title, or a quiet
 // "Untitled <kind>" when it is blank (new nodes are created with no title).

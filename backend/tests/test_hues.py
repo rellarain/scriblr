@@ -83,6 +83,21 @@ def test_category_and_subcategory_hues_round_trip(client: TestClient) -> None:
     assert saved == {"c1": 200, "s1": 230, "c2": None}
 
 
+def test_cluster_hue_round_trips_under_a_subcategory(client: TestClient) -> None:
+    project_id = _create_project(client)
+    nodes = [
+        _plot_node("c1", "category", None, 0, hue=200),
+        _plot_node("s1", "subcategory", "c1", 0, hue=230),
+        _plot_node("k1", "cluster", "s1", 0, hue=170),
+        _plot_node("k2", "cluster", "s1", 1),
+    ]
+    assert client.put(f"/api/projects/{project_id}/plot", json={"schemaVersion": 1, "nodes": nodes}).status_code == 200
+    saved = {n["id"]: n["hue"] for n in client.get(f"/api/projects/{project_id}").json()["plot"]["nodes"]}
+    assert saved == {"c1": 200, "s1": 230, "k1": 170, "k2": None}
+    bad = [_plot_node("k1", "cluster", None, 0, hue=361)]
+    assert client.put(f"/api/projects/{project_id}/plot", json={"schemaVersion": 1, "nodes": bad}).status_code == 422
+
+
 def test_project_theme_hue_is_stored_and_validated(client: TestClient) -> None:
     project_id = _create_project(client)
     assert client.get(f"/api/projects/{project_id}").json()["index"]["settings"]["themeHue"] is None

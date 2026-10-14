@@ -143,7 +143,7 @@ export function paletteRatios(zone: ZoneKey, hues: AuditHues = DEFAULT_HUES): Pa
     }
   }
 
-  // ---- the plot editor's colours: a category is the theme's colour at its hue (the ink on it), a subcategory's surface the level fill of its hue
+  // ---- the plot editor's colours: a category is the theme's colour at its hue (the ink on it), a subcategory's or cluster's surface the level fill of its hue
   // (white on it, as on any level); each worst over every hue a plot node can carry, and the subcategory also at the app theme's own hue.
   let worstCategory = Infinity
   let worstSubcategory = ratioOfRgb(WHITE, rgbOf(fillHsl(hues.theme, colors.accent)))
@@ -153,6 +153,8 @@ export function paletteRatios(zone: ZoneKey, hues: AuditHues = DEFAULT_HUES): Pa
   }
   out.push({ id: 'plot-category', group: 'Plot colours', label: 'Ink on a plot category, the worst hue', kind: 'text', ratio: worstCategory })
   out.push({ id: 'plot-subcategory', group: 'Plot colours', label: 'White on a plot subcategory, the worst hue', kind: 'text', ratio: worstSubcategory })
+  // A cluster's surface is the same fill, over the same hues (within 60 degrees of its category's).
+  out.push({ id: 'plot-cluster', group: 'Plot colours', label: 'White on a plot cluster, the worst hue', kind: 'text', ratio: worstSubcategory })
 
   // ---- Theme settings: the timeline's icon on its segment (the zone's accent hue at 50% lightness, as ThemeSettingsPanel draws it)
   const segment = hsl(colors.accent.h, colors.accent.s, 50)

@@ -4,7 +4,7 @@ import type { WriterWorkspace } from './useWriterWorkspace'
 import { CloseIcon } from '../../icons'
 import { AwarenessEye } from './AwarenessEye'
 import { fieldNameOf, textOf } from './plotFields'
-import { nodeLabel } from './plotTree'
+import { nodeLabel, plotTrail } from './plotTree'
 import { plotColors, plotColorVars } from './plotColors'
 
 // A plotpoint in the Outline level, always in its category and subcategory colours.
@@ -27,10 +27,7 @@ export function PlotpointTile({ w, point, variant, onUnassign, unassignTitle, dr
   onMoment?: boolean
 }) {
   const plotline = point.parentId ? w.plotNodeById.get(point.parentId) : undefined
-  const parent = plotline?.parentId ? w.plotNodeById.get(plotline.parentId) : undefined
-  const category = parent?.kind === 'subcategory' ? (parent.parentId ? w.plotNodeById.get(parent.parentId) : undefined) : parent
-  const subcategory = parent?.kind === 'subcategory' ? parent : undefined
-  const trail = [category, subcategory].filter((n): n is PlotNode => Boolean(n)).map(nodeLabel).join(' › ')
+  const trail = (plotline ? plotTrail(plotline, w.plotNodeById) : []).map(nodeLabel).join(' › ')
   const text = textOf(point, w.plotNodeById)
   const field = fieldNameOf(point, w.plotNodeById)
   const colors = plotColors(point, w.plotNodeById)

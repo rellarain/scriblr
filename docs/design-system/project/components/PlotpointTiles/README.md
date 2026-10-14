@@ -1,14 +1,14 @@
 # Plotpoint tiles
 
-A plotpoint is a value of a plot field: a beat of the story. It is shown as a small tile **in its category and subcategory colours**, in the tray of plotpoints still to place, boxed inside the chapter, act, scene or moment it is placed on, or standing in the Draft's margin.
+A plotpoint is a value of a plot field: a beat of the story. It is shown as a small tile **in its category, subcategory and cluster colours**, in the tray of plotpoints still to place, boxed inside the chapter, act, scene or moment it is placed on, or standing in the Draft's margin.
 
 Code: `writer/PlotpointTile.tsx`, `levels/PlotpointsTab.tsx` (`PlotTray`), `AwarenessEye.tsx`, `plotColors.ts`, `awareness.ts`.
 
 ## Anatomy
 
-`.wrPointTile`: a coloured ground (the category's, with the subcategory's as a 4px left stripe), an ink fitted to read on it, then:
+`.wrPointTile`: a coloured ground (the category's, with a 4px left stripe: the subcategory's colour, the cluster's, or a gradient from the subcategory's to the cluster's when it sits in both), an ink fitted to read on it, then:
 
-- a **trail** (category > subcategory) and the **plotline and field** ("Plotline sit amet · DEFAULT");
+- a **trail** (category > subcategory > cluster, whichever it sits under) and the **plotline and field** ("Plotline sit amet · DEFAULT");
 - the **title** in bold and the **description**;
 - tools at the top right: the **awareness eye** (on a moment only) and an **x** that returns it to the tray (or to the margin);
 - variants: `margin` (in the Draft's left margin, draggable onto an act, scene or moment) and `placed` (boxed inside a card).

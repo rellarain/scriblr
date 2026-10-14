@@ -8,14 +8,14 @@ import { hueOfCode } from '../../../theme/bookColors'
 import { useThemeState } from '../../../theme/useTheme'
 import HueSlider from './HueSlider'
 import { plotColors, plotColorVars } from './plotColors'
-import { assignedLevel, nodeLabel, sortByTitle } from './plotTree'
+import { assignedLevel, categoryOf, nodeLabel, sortByTitle } from './plotTree'
 import { FieldEditor, FieldGroups, type PlotDrag, type PlotUi } from './FieldBlocks'
 import { PlotOutlinePanel } from './PlotOutlinePanel'
 import { PlotOrderToggle, usePlotOrder } from './plotOrder'
 import { fieldIndex, isScrapField, orderValues, valuesIn } from './plotFields'
 
 // Project Plot: a collapsible navigation column (categories > subcategories
-// > plotlines, alphabetized) and two page views -- the category/subcategory
+// > clusters > plotlines, alphabetized) and two page views -- the category/subcategory/cluster
 // editor, and the plotline editor: its plotpoints listed unassigned first and
 // then in order of occurrence, dragged onto the books and chapters of the
 // outline. A plotpoint assigned within a chapter (to an act, scene or moment,
@@ -82,12 +82,12 @@ function PlotNav({ w }: { w: WriterWorkspace }) {
   )
 }
 
-function ChildRows({ w, node, kind, addLabel }: { w: WriterWorkspace; node: PlotNode; kind: 'subcategory' | 'plotline'; addLabel: string }) {
+function ChildRows({ w, node, kind, addLabel }: { w: WriterWorkspace; node: PlotNode; kind: 'subcategory' | 'cluster' | 'plotline'; addLabel: string }) {
   const kids = sortByTitle((w.plotChildrenByParentId.get(node.id) ?? []).filter(c => c.kind === kind))
   return (
     <div className="wrChildRows">
       <div className="wrChildRowsHead">
-        <span className="wrLabel">{kind === 'subcategory' ? 'Subcategories' : 'Plotlines'}</span>
+        <span className="wrLabel">{kind === 'subcategory' ? 'Subcategories' : kind === 'cluster' ? 'Clusters' : 'Plotlines'}</span>
         <button type="button" className="wrSmallBtn" onClick={() => w.focusPlotNode(w.addPlotNode(node.id, kind))}>
           <PlusIcon size={13} /> {addLabel}
         </button>
@@ -99,7 +99,7 @@ function ChildRows({ w, node, kind, addLabel }: { w: WriterWorkspace; node: Plot
           <span className="wrChildRowMeta">
             {k.keywords.slice(0, 3).map(kw => <span key={kw} className="wrChip wrChip--small">{kw}</span>)}
           </span>
-          {k.kind === 'subcategory' && <span className="wrOutlineMeta">{plotlineCount(k, w.plotChildrenByParentId)} plotlines</span>}
+          {(k.kind === 'subcategory' || k.kind === 'cluster') && <span className="wrOutlineMeta">{plotlineCount(k, w.plotChildrenByParentId)} plotlines</span>}
           {k.kind === 'plotline' && <span className="wrOutlineMeta">{(w.plotChildrenByParentId.get(k.id) ?? []).length} plotpoints</span>}
         </button>
       ))}
@@ -107,20 +107,23 @@ function ChildRows({ w, node, kind, addLabel }: { w: WriterWorkspace; node: Plot
   )
 }
 
-// The colour selector of a category (unlimited: any hue) or subcategory (limited: within 60 degrees of
+// The colour selector of a category (unlimited: any hue), subcategory or cluster (limited: within 60 degrees of
 // its category's hue). Saturation and lightness are the active
 // zone's, so what the thumb shows is what the app draws.
 function HueField({ w, node }: { w: WriterWorkspace; node: PlotNode }) {
   const { settings, activeZone } = useThemeState()
   const appCode = settings.zones[activeZone].palette.theme.h
-  if (node.kind === 'subcategory') {
-    const category = node.parentId ? w.plotNodeById.get(node.parentId) : undefined
+  if (node.kind === 'subcategory' || node.kind === 'cluster') {
+    const category = categoryOf(node, w.plotNodeById)
     const categoryCode = category?.hue ?? appCode
+    // A cluster with no colour of its own shows its subcategory's.
+    const parent = node.parentId ? w.plotNodeById.get(node.parentId) : undefined
+    const shown = node.hue ?? (node.kind === 'cluster' && parent?.kind === 'subcategory' ? parent.hue ?? categoryCode : categoryCode)
     return (
       <div>
         <div className="wrLabel">Colour <span className="wrOutlineMeta">within 60° of its category</span></div>
         <HueSlider
-          label="Subcategory colour" hue={node.hue ?? categoryCode} centre={hueOfCode(categoryCode)}
+          label={node.kind === 'cluster' ? 'Cluster colour' : 'Subcategory colour'} hue={shown} centre={hueOfCode(categoryCode)}
           onChange={code => w.setPlotHue(node.id, code, categoryCode)}
         />
       </div>
@@ -146,7 +149,7 @@ function KeywordsField({ w, node }: { w: WriterWorkspace; node: PlotNode }) {
   )
 }
 
-// Dragging does nothing in the category and subcategory editors (their values are not assigned there).
+// Dragging does nothing in the category, subcategory and cluster editors (their values are not assigned there).
 const NO_DRAG: PlotDrag = {
   dragId: null, valueDrag: () => ({ onDragStart: () => {}, onDragEnd: () => {} }), dropIntoField: () => {}, dragFieldId: null, setDragFieldId: () => {},
 }
@@ -159,7 +162,7 @@ function CategoryEditor({ w, node, ui }: { w: WriterWorkspace; node: PlotNode; u
     <div className={`wrCardPanel wrCardPanel--${node.kind}`} data-knode={node.id} style={plotColorVars(colors)}>
       <div className="wrCardPanelHead">
         <span className="wrKindBadge">{node.kind}</span>
-        <input className="wrTitleField" data-kf="" value={node.title} onChange={e => w.updatePlotNodeField(node.id, 'title', e.target.value)} placeholder={`${isCategory ? 'Category' : 'Subcategory'} title`} />
+        <input className="wrTitleField" data-kf="" value={node.title} onChange={e => w.updatePlotNodeField(node.id, 'title', e.target.value)} placeholder={`${node.kind.charAt(0).toUpperCase()}${node.kind.slice(1)} title`} />
         <DeleteControl
           tone="dark" message={`Delete ${nodeLabel(node)}? Its plotlines move to Unassigned.`}
           onConfirm={() => w.deletePlotNode(node.id)}
@@ -176,6 +179,7 @@ function CategoryEditor({ w, node, ui }: { w: WriterWorkspace; node: PlotNode; u
       <KeywordsField w={w} node={node} />
       <FieldEditor w={w} owner={node} ui={ui} drag={{ ...NO_DRAG, dragFieldId, setDragFieldId }} />
       {isCategory && <ChildRows w={w} node={node} kind="subcategory" addLabel="Subcategory" />}
+      {node.kind === 'subcategory' && <ChildRows w={w} node={node} kind="cluster" addLabel="Cluster" />}
       <ChildRows w={w} node={node} kind="plotline" addLabel="Plotline" />
     </div>
   )
@@ -283,7 +287,7 @@ export default function PlotView({ w }: { w: WriterWorkspace }) {
   // separate editors, so a sibling is shown by focusing it. Inside an editor a node's fields
   // are nodes too: a field's parent is the node being edited, a value's parent is its field.
   //   Enter        the next value in its field, or the next field after a field name
-  //   Shift+Enter  a child: category > subcategory > plotline > a value in its first field,
+  //   Shift+Enter  a child: category > subcategory > cluster > plotline > a value in its first field,
   //                a field > a value in it, a value has none
   //   Ctrl+Enter   a value > a new field after its field, a field > a new sibling of the node
   const holderOf = (fieldId: string) => (node?.kind === 'plotline' ? node : fields.get(fieldId)?.owner)
@@ -349,7 +353,7 @@ export default function PlotView({ w }: { w: WriterWorkspace }) {
         ui.setOpen(fieldId, true)
         return w.addPlotValue(n.id, fieldId)
       }
-      const kind = n.kind === 'category' ? 'subcategory' : 'plotline'
+      const kind = n.kind === 'category' ? 'subcategory' : n.kind === 'subcategory' ? 'cluster' : 'plotline'
       const made = w.addPlotNode(n.id, kind)
       created.current.set(made, kind)
       return made

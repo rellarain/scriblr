@@ -47,7 +47,7 @@ const SPACING: Token[] = [
   { name: 'header-min', value: px(40), usage: 'The least height of a level\'s header strip.' },
   { name: 'rail-tile', value: px(40), usage: 'A minimised tile\'s icon square in the older tile grid\'s rail.' },
   { name: 'one-column-below', value: px(ONE_COLUMN_BELOW), usage: 'Below this width a split grid stacks its tiles in one column.' },
-  { name: 'hue-window', value: String(SUBCATEGORY_HUE_WINDOW), usage: 'Degrees: how far a series, arc, chapter or plot subcategory colour may stray from its parent\'s hue.' },
+  { name: 'hue-window', value: String(SUBCATEGORY_HUE_WINDOW), usage: 'Degrees: how far a series, arc, chapter, plot subcategory or plot cluster colour may stray from its parent\'s hue.' },
 ]
 const RADIUS: Token[] = [
   { name: 'radius-none', value: px(0), usage: 'Surfaces, fields and chips are flat and square: levels, tiles (the tile grid and its console too), cards, notes, fields, chips, counts and badges, the theme panel and the helper and admin screens have no radius; buttons on a level (small and icon buttons) have none either.' },

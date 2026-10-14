@@ -157,14 +157,15 @@ described, now stale, in `docs/data-model.md`).
   save). Nodes also carry `flag` (`NodeFlag`: `review|edit|add|delete` +
   note), `color`, `chapterCountTarget`, `plotlineIds`, `wordCountGoal`.
 - **Plot tree** (`PlotNode`/`PlotTree`) — the same flat-list-with-`parentId`
-  shape, four kinds: `category < subcategory < plotline < plotpoint`
-  (`PlotNodeKind`/`PLOT_KIND_ORDER`). **Fields and values:** any category,
-  subcategory or plotline defines fields (`customFieldDefs`); each field
+  shape, five kinds: `category < subcategory < cluster < plotline < plotpoint`
+  (`PlotNodeKind`/`PLOT_KIND_ORDER`; a cluster is an optional grouping under a
+  subcategory, and a plotline may sit under any of the three). **Fields and values:** any category,
+  subcategory, cluster or plotline defines fields (`customFieldDefs`); each field
   holds many **values**, and every value is a plotpoint (`fieldId`; title 1-50
-  characters, description up to 255). A value defined on a category or
-  subcategory is shown on every plotline under it as a **reference** (a
+  characters, description up to 255). A value defined on a category,
+  subcategory or cluster is shown on every plotline under it as a **reference** (a
   plotpoint with `refId`, whose text is the original's), which that plotline
-  assigns to its own chapters; deleting a category/subcategory value or field
+  assigns to its own chapters; deleting a category/subcategory/cluster value or field
   turns its assigned references into the plotline's own values in a plotline
   field of the same name, and deleting a plotline field sends its assigned values to
   the plotline's `Scrap` field. `assignedMomentId` (on `plotpoint` nodes) is a

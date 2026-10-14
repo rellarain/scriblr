@@ -8,7 +8,7 @@ import { assignedLevel, nodeLabel } from './plotTree'
 import { DeleteControl } from './shared'
 import type { WriterWorkspace } from './useWriterWorkspace'
 
-// The fields of a category, subcategory or plotline, and their values.
+// The fields of a category, subcategory, cluster or plotline, and their values.
 //   FieldBlock    one field: a collapsible with its name, a count and its value cards
 //   FieldGroups   the plotline editor: three collapsible groups, from where the fields come
 //                 (the plotline's own on top, the subcategory's, the category's at the bottom)
@@ -140,11 +140,12 @@ export function FieldBlock({ w, info, holder, editable, ui, drag, showAssigned }
 
 const GROUP_TITLE: Record<FieldScope, (owners: PlotNode[]) => string> = {
   plotline: () => 'Plotline fields',
+  cluster: owners => `From cluster: ${owners.map(nodeLabel).join(', ')}`,
   subcategory: owners => `From subcategory: ${owners.map(nodeLabel).join(', ')}`,
   category: owners => `From category: ${owners.map(nodeLabel).join(', ')}`,
 }
 
-// The plotline editor's fields: plotline fields on top, then the subcategory's, then the category's.
+// The plotline editor's fields: plotline fields on top, then the cluster's, the subcategory's, then the category's.
 export function FieldGroups({ w, plotline, ui, drag, showAssigned }: {
   w: WriterWorkspace; plotline: PlotNode; ui: PlotUi; drag: PlotDrag; showAssigned: boolean
 }) {
@@ -154,7 +155,7 @@ export function FieldGroups({ w, plotline, ui, drag, showAssigned }: {
 
   return (
     <div className="wrFieldGroups">
-      {(['plotline', 'subcategory', 'category'] as FieldScope[]).map(scope => {
+      {(['plotline', 'cluster', 'subcategory', 'category'] as FieldScope[]).map(scope => {
         const fields = groups[scope]
         if (scope !== 'plotline' && fields.length === 0) return null
         const owners = [...new Map(fields.map(f => [f.owner.id, f.owner])).values()]
@@ -186,7 +187,7 @@ export function FieldGroups({ w, plotline, ui, drag, showAssigned }: {
   )
 }
 
-// The category and subcategory editors: the node's own fields, with the values every
+// The category, subcategory and cluster editors: the node's own fields, with the values every
 // plotline under it will show.
 export function FieldEditor({ w, owner, ui, drag }: { w: WriterWorkspace; owner: PlotNode; ui: PlotUi; drag: PlotDrag }) {
   return (
@@ -200,7 +201,7 @@ export function FieldEditor({ w, owner, ui, drag }: { w: WriterWorkspace; owner:
         </div>
         <p className="wrHint">Each value here appears on every plotline under this {owner.kind}.</p>
         {owner.customFieldDefs.map(def => (
-          <FieldBlock key={def.id} w={w} info={{ def, owner, scope: owner.kind === 'category' ? 'category' : 'subcategory' }} holder={owner} editable ui={ui} drag={drag} showAssigned />
+          <FieldBlock key={def.id} w={w} info={{ def, owner, scope: owner.kind === 'category' ? 'category' : owner.kind === 'cluster' ? 'cluster' : 'subcategory' }} holder={owner} editable ui={ui} drag={drag} showAssigned />
         ))}
         {owner.customFieldDefs.length === 0 && <p className="wrMuted">No fields yet.</p>}
       </section>

@@ -33,6 +33,42 @@ function world(): PlotNode[] {
   ], outlineById, makeId)
 }
 
+describe('a cluster\'s fields', () => {
+  // A subcategory holding a cluster with a "Motive" field (one value); a plotline inside it, and one beside it.
+  function clustered(): PlotNode[] {
+    return syncReferences([
+      node('cat', 'category', null),
+      node('sub', 'subcategory', 'cat'),
+      node('clu', 'cluster', 'sub', { customFieldDefs: [{ id: 'fMotive', name: 'Motive' }] }),
+      node('mv', 'plotpoint', 'clu', { title: 'Greed', fieldId: 'fMotive' }),
+      node('inside', 'plotline', 'clu'),
+      node('beside', 'plotline', 'sub', { order: 1 }),
+    ], outlineById, makeId)
+  }
+
+  it('shows a cluster\'s values only on the plotlines under it, in a group of their own', () => {
+    const nodes = clustered()
+    expect(valuesIn(nodes, 'inside', 'fMotive')).toHaveLength(1)
+    expect(valuesIn(nodes, 'beside', 'fMotive')).toHaveLength(0)
+    const groups = fieldGroups(find(nodes, 'inside'), new Map(nodes.map(n => [n.id, n])))
+    expect(groups.cluster.map(g => g.def.name)).toEqual(['Motive'])
+    expect(groups.cluster[0].scope).toBe('cluster')
+  })
+
+  it('keeps the assigned references when the cluster\'s field is deleted, and drops the rest', () => {
+    let nodes = clustered()
+    const ref = valuesIn(nodes, 'inside', 'fMotive')[0]
+    nodes = nodes.map(n => (n.id === ref.id ? { ...n, assignedMomentId: 'ch1' } : n))
+    nodes = deleteField(nodes, 'clu', 'fMotive', outlineById, makeId)
+    expect(find(nodes, 'clu').customFieldDefs).toEqual([])
+    expect(nodes.some(n => n.id === 'mv')).toBe(false)
+    const kept = nodes.filter(n => n.kind === 'plotpoint' && n.parentId === 'inside')
+    expect(kept).toHaveLength(1)
+    expect(kept[0].title).toBe('Greed')
+    expect(kept[0].refId).toBeNull()
+  })
+})
+
 describe('references', () => {
   it('gives every plotline one reference per value defined above it, and the text is the original\'s', () => {
     const nodes = world()

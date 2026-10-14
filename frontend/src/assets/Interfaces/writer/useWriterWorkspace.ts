@@ -14,7 +14,7 @@ import {
 import { putOutline as apiPutOutline } from '../../../api/outlineApi'
 import { putPlot as apiPutPlot } from '../../../api/plotApi'
 import { booksOf, buildChildIndex, chaptersOfBook, dissolveSeries, moveNodeTo, nearestOfKind } from './outlineTree'
-import { isAssignedPlotpoint } from './plotTree'
+import { categoryOf, isAssignedPlotpoint } from './plotTree'
 import {
   addField, addValue, assignPoint, deleteField, deleteValue, migratePlot, moveField, moveValue, renameField, syncReferences, updateValue,
 } from './plotFields'
@@ -679,24 +679,25 @@ export function useWriterWorkspace() {
     commitPlot(plotNodesRef.current.map(n => (n.id === nodeId ? { ...n, [field]: value } : n)), false)
   }
 
-  // Set a category's or subcategory's colour (a colour code). A category's new colour pulls its
-  // subcategories' own hues back within 60 degrees of it; a subcategory's hue stays within 60
-  // degrees of its category's (`categoryCode`: the category's colour as shown, which is stored on
+  // Set a category's, subcategory's or cluster's colour (a colour code). A category's new colour pulls its
+  // subcategories' and clusters' own hues back within 60 degrees of it; a subcategory's or cluster's hue stays
+  // within 60 degrees of its category's (`categoryCode`: the category's colour as shown, which is stored on
   // the category too when it had none of its own).
   function setPlotHue(nodeId: string, code: number, categoryCode?: number) {
     const prev = plotNodesRef.current
     const target = prev.find(n => n.id === nodeId)
-    if (!target || (target.kind !== 'category' && target.kind !== 'subcategory')) return
+    if (!target || (target.kind !== 'category' && target.kind !== 'subcategory' && target.kind !== 'cluster')) return
     const rounded = Math.round(code)
+    const byId = new Map(prev.map(n => [n.id, n]))
     if (target.kind === 'category') {
       commitPlot(prev.map(n => {
         if (n.id === nodeId) return { ...n, hue: rounded }
-        if (n.parentId === nodeId && n.kind === 'subcategory' && n.hue != null) return { ...n, hue: fitToParent(n.hue, hueOfCode(rounded)) }
+        if ((n.kind === 'subcategory' || n.kind === 'cluster') && n.hue != null && categoryOf(n, byId)?.id === nodeId) return { ...n, hue: fitToParent(n.hue, hueOfCode(rounded)) }
         return n
       }), false)
       return
     }
-    const parent = target.parentId ? prev.find(n => n.id === target.parentId) : undefined
+    const parent = categoryOf(target, byId)
     const parentCode = parent?.hue ?? categoryCode
     const value = parentCode != null ? fitToParent(rounded, hueOfCode(parentCode)) : rounded
     commitPlot(prev.map(n => {
@@ -797,17 +798,20 @@ export function useWriterWorkspace() {
     return ids
   }
 
-  // Deleting a category/subcategory does NOT cascade-delete its plotlines --
+  // Deleting a category/subcategory/cluster does NOT cascade-delete its plotlines --
   // per scrilbrPlan.md, orphaned plotlines get assigned to an "Unassigned"
-  // category/subcategory instead. Nested subcategories are removed with their
+  // category/subcategory instead. Nested subcategories and clusters are removed with their
   // parent; a plotline keeps its own plotpoints (only its parentId changes).
   function deletePlotNode(nodeId: string) {
     let prev = plotNodesRef.current
     const target = prev.find(n => n.id === nodeId)
     if (!target) return
-    // A category or subcategory goes with its fields: assigned references stay as their plotline's own values.
-    if (target.kind === 'category' || target.kind === 'subcategory') {
-      for (const def of target.customFieldDefs) prev = deleteField(prev, nodeId, def.id, outlineMap())
+    // A category, subcategory or cluster goes with its fields (and so do the ones nested in it): assigned references stay as their plotline's own values.
+    if (target.kind === 'category' || target.kind === 'subcategory' || target.kind === 'cluster') {
+      for (const id of collectPlotDescendantIds(nodeId, prev)) {
+        const owner = prev.find(n => n.id === id)
+        if (owner && owner.kind !== 'plotline' && owner.kind !== 'plotpoint') for (const def of owner.customFieldDefs) prev = deleteField(prev, id, def.id, outlineMap())
+      }
     }
 
     // Only unassigned plotpoints can be deleted, so a plotline holding an

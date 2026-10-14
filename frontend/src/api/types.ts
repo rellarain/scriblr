@@ -65,8 +65,8 @@ export interface OutlineTree {
   nodes: OutlineNode[]
 }
 
-export type PlotNodeKind = 'category' | 'subcategory' | 'plotline' | 'plotpoint'
-export const PLOT_KIND_ORDER: PlotNodeKind[] = ['category', 'subcategory', 'plotline', 'plotpoint']
+export type PlotNodeKind = 'category' | 'subcategory' | 'cluster' | 'plotline' | 'plotpoint'
+export const PLOT_KIND_ORDER: PlotNodeKind[] = ['category', 'subcategory', 'cluster', 'plotline', 'plotpoint']
 
 // Any kind strictly deeper than parentKind -- mirrors childKindOptions above.
 export function plotChildKindOptions(parentKind: PlotNodeKind): PlotNodeKind[] {
