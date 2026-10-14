@@ -1,4 +1,4 @@
-import { useMemo, useRef, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import type { PlotNode } from '../../../api/types'
 import type { WriterWorkspace } from './useWriterWorkspace'
 import { ChevronRightIcon, PlusIcon } from '../../icons'
@@ -26,6 +26,8 @@ function plotlineCount(node: PlotNode, children: Map<string | null, PlotNode[]>)
     (n, c) => n + (c.kind === 'plotline' ? 1 : c.kind === 'plotpoint' ? 0 : plotlineCount(c, children)), 0)
 }
 
+const counted = (n: number, noun: string) => `${n} ${noun}${n === 1 ? '' : 's'}`
+
 function PlotNav({ w }: { w: WriterWorkspace }) {
   const [collapsed, setCollapsed] = useState<Set<string>>(new Set())
   const children = w.plotChildrenByParentId
@@ -38,7 +40,8 @@ function PlotNav({ w }: { w: WriterWorkspace }) {
     return next
   })
 
-  function rows(parentId: string | null): React.ReactNode[] {
+  // Each level of nesting is indented 14px, so a plotline reads as belonging to what it sits directly under.
+  function rows(parentId: string | null, depth: number): React.ReactNode[] {
     return sortByTitle((children.get(parentId) ?? []).filter(n => n.kind !== 'plotpoint'))
       .flatMap(node => {
         const kids = (children.get(node.id) ?? []).filter(c => c.kind !== 'plotpoint')
@@ -49,7 +52,7 @@ function PlotNav({ w }: { w: WriterWorkspace }) {
           <div
             key={node.id}
             className={`wrNavRow wrNavRow--${node.kind}${node.id === w.focusedPlotNodeId ? ' wrNavRow--active' : ''}`}
-            style={plotColorVars(plotColors(node, w.plotNodeById))}
+            style={{ ...plotColorVars(plotColors(node, w.plotNodeById)), marginLeft: depth * 14 }}
           >
             <button
               type="button" className="wrNavChevron" aria-label={open ? 'Collapse' : 'Expand'}
@@ -61,7 +64,7 @@ function PlotNav({ w }: { w: WriterWorkspace }) {
             <button type="button" className="wrNavLabel" onClick={() => w.focusPlotNode(node.id)}>{nodeLabel(node)}</button>
             {!isLine && <span className="wrNavCount">{plotlineCount(node, children)}</span>}
           </div>,
-          ...(open ? rows(node.id) : []),
+          ...(open ? rows(node.id, depth + 1) : []),
         ]
       })
   }
@@ -76,7 +79,7 @@ function PlotNav({ w }: { w: WriterWorkspace }) {
       </div>
       <div className="wrPlotNavRows">
         {w.plotNodes.length === 0 && <p className="wrMuted">No categories yet.</p>}
-        {rows(null)}
+        {rows(null, 0)}
       </div>
     </div>
   )
@@ -99,8 +102,8 @@ function ChildRows({ w, node, kind, addLabel }: { w: WriterWorkspace; node: Plot
           <span className="wrChildRowMeta">
             {k.keywords.slice(0, 3).map(kw => <span key={kw} className="wrChip wrChip--small">{kw}</span>)}
           </span>
-          {(k.kind === 'subcategory' || k.kind === 'cluster') && <span className="wrOutlineMeta">{plotlineCount(k, w.plotChildrenByParentId)} plotlines</span>}
-          {k.kind === 'plotline' && <span className="wrOutlineMeta">{(w.plotChildrenByParentId.get(k.id) ?? []).length} plotpoints</span>}
+          {(k.kind === 'subcategory' || k.kind === 'cluster') && <span className="wrOutlineMeta">{counted(plotlineCount(k, w.plotChildrenByParentId), 'plotline')}</span>}
+          {k.kind === 'plotline' && <span className="wrOutlineMeta">{counted((w.plotChildrenByParentId.get(k.id) ?? []).length, 'plotpoint')}</span>}
         </button>
       ))}
     </div>
@@ -264,6 +267,9 @@ export default function PlotView({ w }: { w: WriterWorkspace }) {
   // Kinds of nodes created a moment ago (the workspace maps have not updated yet),
   // so focusing one can also open its editor.
   const created = useRef(new Map<string, PlotNode['kind']>())
+  // A node opens at the top of its editor, not where the last one was scrolled to.
+  const bodyRef = useRef<HTMLDivElement>(null)
+  useEffect(() => { if (bodyRef.current) { bodyRef.current.scrollTop = 0; bodyRef.current.scrollLeft = 0 } }, [node?.id])
 
   // Which fields are open (collapsed by default), and the value just created (it takes focus).
   const [openFields, setOpenFields] = useState<Set<string>>(new Set())
@@ -414,7 +420,7 @@ export default function PlotView({ w }: { w: WriterWorkspace }) {
   return (
     <div className="wrPlotView">
       <PlotNav w={w} />
-      <div className="wrPlotBody" onKeyDown={keys.onKeyDown}>
+      <div className="wrPlotBody" ref={bodyRef} onKeyDown={keys.onKeyDown}>
         {w.plotSaveError && <p className="wrError">{w.plotSaveError}</p>}
         {w.plotStatus === 'loading' && <p className="wrMuted">Loading plot…</p>}
         {w.plotStatus === 'error' && <p className="wrError">{w.plotError ?? 'Failed to load plot.'}</p>}

@@ -328,6 +328,32 @@ describe('clusters', () => {
   })
 })
 
+describe('the plot contents', () => {
+  const margin = (container: HTMLElement) => [...container.querySelectorAll<HTMLElement>('.wrNavRow')].map(r => [r.className.match(/wrNavRow--(\w+)/)![1], r.style.marginLeft])
+
+  it('indents each row by how deep it sits, so a plotline reads as belonging to what it is directly under', () => {
+    const start = clustered().concat(plotNode('beside', 'plotline', 'sub', { title: 'Beside the cluster', order: 1 }))
+    const { container } = render(<Editor start={start} />)
+    expect(margin(container)).toEqual([
+      ['category', '0px'], ['subcategory', '14px'], ['plotline', '28px'], ['cluster', '28px'], ['plotline', '42px'],
+    ])
+  })
+
+  it('counts "1 plotline" and "1 plotpoint" in the singular', () => {
+    render(<Editor start={clustered()} focused="sub" />)
+    expect(screen.getByText('1 plotline')).toBeInTheDocument() // the cluster
+    expect(screen.queryByText('1 plotlines')).toBeNull()
+  })
+
+  it('scrolls the editor back to the top when another node is opened', () => {
+    const { container } = render(<Editor start={clustered()} focused="sub" />)
+    const body = container.querySelector('.wrPlotBody') as HTMLElement
+    body.scrollTop = 120
+    fireEvent.click(container.querySelector('.wrNavRow--cluster .wrNavLabel') as HTMLElement)
+    expect(body.scrollTop).toBe(0)
+  })
+})
+
 describe('trails with a cluster', () => {
   it('a margin tile names category > subcategory > cluster', () => {
     function Tile() {

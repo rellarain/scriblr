@@ -300,11 +300,11 @@
 
   // ---------------------------------------------------------------- plot
   .wrPlotView { flex: 1 1 auto; min-height: 0; display: flex; gap: 16px; }
-  .wrPlotNav { flex: 0 0 250px; min-height: 0; display: flex; flex-direction: column; gap: 8px; background: var(--ov-sink-1); border-radius: 6px; padding: 10px; }
+  .wrPlotNav { flex: 0 0 250px; min-width: 0; min-height: 0; display: flex; flex-direction: column; gap: 8px; background: var(--ov-sink-1); border-radius: 6px; padding: 10px; }
   .wrPlotNavHead { display: flex; align-items: center; justify-content: space-between; font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: 1px; span { opacity: 0.9; } }
-  .wrPlotNavRows { flex: 1 1 auto; min-height: 0; overflow-y: auto; display: flex; flex-direction: column; gap: 3px; scrollbar-width: none; &::-webkit-scrollbar { display: none; } }
+  .wrPlotNavRows { flex: 1 1 auto; min-width: 0; min-height: 0; overflow-y: auto; display: flex; flex-direction: column; gap: 3px; scrollbar-width: none; &::-webkit-scrollbar { display: none; } }
   // A row wears its node's colour: a category its own (theme) colour, a subcategory and a cluster their own (accent) colours, a plotline its
-  // category's colour with a left edge in its subcategory's and cluster's. The box itself is indented per kind (right edges stay aligned),
+  // category's colour with a left edge in its subcategory's and cluster's. The box itself is indented per level of nesting, 14px each (right edges stay aligned),
   // and the selected row is a brighter shade of its own colour.
   .wrNavRow {
     --wr-row-bg: var(--wr-cat, var(--ov-sink-1)); --wr-row-ink: var(--ink);
@@ -312,9 +312,9 @@
     background-color: var(--wr-row-bg); color: var(--wr-row-ink);
     &:hover, &--active { background-color: color-mix(in srgb, var(--wr-row-bg) 85%, var(--away)); }
     &--active { font-weight: 700; }
-    &--subcategory { --wr-row-bg: var(--wr-sub-fill, var(--wr-cat)); --wr-row-ink: var(--on-accent); --away: black; margin-left: 14px; }
-    &--cluster { --wr-row-bg: var(--wr-cluster-fill, var(--wr-sub-fill, var(--wr-cat))); --wr-row-ink: var(--on-accent); --away: black; margin-left: 28px; }
-    &--plotline { margin-left: 42px; @include wrEdge; padding-left: 12px; }
+    &--subcategory { --wr-row-bg: var(--wr-sub-fill, var(--wr-cat)); --wr-row-ink: var(--on-accent); --away: black; }
+    &--cluster { --wr-row-bg: var(--wr-cluster-fill, var(--wr-sub-fill, var(--wr-cat))); --wr-row-ink: var(--on-accent); --away: black; }
+    &--plotline { @include wrEdge; padding-left: 12px; }
   }
   .wrNavChevron { display: inline-flex; flex: 0 0 auto; transition: transform 0.15s; }
   .wrNavLabel { flex: 1; min-width: 0; text-align: left; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
