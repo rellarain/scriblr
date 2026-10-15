@@ -190,13 +190,15 @@
   // tinted panel: the Dash in the active theme's hue, each other level in its own (--wr-level-h, set from
   // the project's, book's or chapter's hue; levelHues.ts).
   .wrLevels { flex: 1 1 auto; min-width: 0; height: 100%; box-sizing: border-box; display: flex; flex-direction: row; gap: 6px; padding: 6px; }
-  .wrLevelsSide { flex: 0 0 clamp(280px, 32%, 460px); min-width: 0; min-height: 0; display: flex; flex-direction: column; gap: 6px; }
+  // The side column's width is --wr-side-w (the default, or the one dragged: sidebarState.ts); hidden, the column is not drawn.
+  .wrLevelsSide { position: relative; flex: 0 0 var(--wr-side-w, clamp(280px, 32%, 460px)); min-width: 0; min-height: 0; display: flex; flex-direction: column; gap: 6px; }
   // Draft focus: the open book is the whole Writer. Its left page runs under the Dash, Project and Outline tiles
   // (the tile column is laid over it), with the chapter beside them, then the crease and the right page.
   .wrLevels--focus-draft {
     --wr-side-w: clamp(280px, 32%, 460px);
     // The same width in pixels for what is inside (cqw is a percentage of this container's width).
     --wr-side-px: clamp(280px, 32cqw, 460px);
+    &.wrLevels--noside { --wr-side-w: 0px; --wr-side-px: 0px; }
     container-type: inline-size; padding: 0;
     display: grid; grid-template-columns: var(--wr-side-w) minmax(0, 1fr); grid-template-rows: minmax(0, 1fr);
     > .wrLevelsSide { grid-column: 1; grid-row: 1; position: relative; z-index: 2; padding: 6px 0 6px 6px; box-sizing: border-box; }
@@ -208,6 +210,12 @@
       background: var(--wr-canvas);
     }
     .wrLevel--draft .wrLevelBody { padding-left: 0; }
+  }
+  // The drag handle on the column's right edge: a 10px strip over the gap, with a thin accent line on hover and while dragging.
+  .wrSideResizer {
+    position: absolute; top: 0; bottom: 0; right: -8px; width: 10px; z-index: 5; cursor: col-resize; touch-action: none;
+    &::after { content: ''; position: absolute; top: 6px; bottom: 6px; left: 4px; width: 2px; background: var(--wr-accent-light); opacity: 0; transition: opacity 0.15s; }
+    &:hover::after, &--active::after { opacity: 1; }
   }
   // Outline focus: the book panel runs to the top, bottom and right edges (the tile column keeps its margin).
   .wrLevels--focus-outline { padding: 0 0 0 6px; > .wrLevelsSide { padding: 6px 0; box-sizing: border-box; } }

@@ -1,12 +1,14 @@
-import type { ReactNode } from 'react'
+import { useEffect, useState, type ReactNode } from 'react'
 import type { WriterWorkspace } from '../useWriterWorkspace'
 import { useStoredState } from '../storage'
+import { setSideAvailable, sideVars, useSidebar } from '../sidebarState'
 import { nodeLabel } from '../plotTree'
 import { bookThemeHue } from '../../../../theme/bookColors'
 import BookScope from '../BookScope'
 import OutlineMax from '../outline/OutlineMax'
 import DraftLevel from '../draft/DraftLevel'
 import LevelPanel from './LevelPanel'
+import SideResizer from './SideResizer'
 import { ProjectMin, ProjectTiles } from './levelBodies'
 import { useDashTabs } from './dashTabs'
 import { NoBook, useOutlineTabs } from './outlineTabs'
@@ -25,6 +27,15 @@ function WriterLevels({ w, pagesComponent, onPagesComponent }: {
   const [overrides, setOverrides] = useStoredState<SizeOverrides>('scriblr.writer.levelSizes', {})
   const focus = focusOf(w.activeConsole)
   const sizes = levelSizes(focus, overrides)
+  // The side column (the levels beside the focused one): its width, dragged live and kept on release, and whether it is hidden.
+  const side = useSidebar()
+  const [dragWidth, setDragWidth] = useState<number | null>(null)
+  const sideWidth = dragWidth ?? side.width
+  const sideShown = focus !== 'dash' && !side.hidden
+  useEffect(() => {
+    setSideAvailable(focus !== 'dash')
+    return () => setSideAvailable(false)
+  }, [focus])
   // Each level's tabs, in its header (the Outline's, at Max, are in the book editor strip instead).
   const dashTabs = useDashTabs(w, sizes.dash === 'hidden' ? 'min' : sizes.dash)
   const projectTabs = useProjectTabs(w, sizes.project === 'hidden' ? 'min' : sizes.project)
@@ -105,15 +116,26 @@ function WriterLevels({ w, pagesComponent, onPagesComponent }: {
     body = <>{shown.map(l => scoped(l, panel(l, sizes[l] as Exclude<LevelSize, 'hidden'>)))}</>
   } else {
     const above = shown.filter(l => l !== focus)
-    body = (
+    // Hidden, the focused level has the whole width.
+    body = sideShown ? (
       <>
-        <div className="wrLevelsSide">{above.map(l => scoped(l, panel(l, sizes[l] as Exclude<LevelSize, 'hidden'>)))}</div>
+        <div className="wrLevelsSide">
+          {above.map(l => scoped(l, panel(l, sizes[l] as Exclude<LevelSize, 'hidden'>)))}
+          <SideResizer onDrag={setDragWidth} onCommit={width => { side.setWidth(width); setDragWidth(null) }} onReset={() => { side.setWidth(null); setDragWidth(null) }} />
+        </div>
         {scoped(focus, panel(focus, 'max'))}
       </>
-    )
+    ) : scoped(focus, panel(focus, 'max'))
   }
 
-  return <div className={`wrLevels wrLevels--focus-${focus}`} data-focus={focus}>{body}</div>
+  return (
+    <div
+      className={`wrLevels wrLevels--focus-${focus}${focus !== 'dash' && !sideShown ? ' wrLevels--noside' : ''}`} data-focus={focus}
+      style={sideShown && sideWidth !== null ? sideVars(sideWidth) : undefined}
+    >
+      {body}
+    </div>
+  )
 }
 
 export default WriterLevels

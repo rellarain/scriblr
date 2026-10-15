@@ -1,4 +1,4 @@
-import { render, screen, within } from '@testing-library/react'
+import { act, fireEvent, render, screen, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import type { OutlineNode } from '../../../../api/types'
@@ -6,6 +6,7 @@ import { __resetSettingsForTests } from '../../../../settings/settingsStore'
 import { fillColorCss } from '../../../../theme/bookColors'
 import type { WriterWorkspace } from '../useWriterWorkspace'
 import WriterLevels from './WriterLevels'
+import SidebarToggle from '../SidebarToggle'
 
 // The consoles inside the levels (tile grids, editors) have their own tests; here
 // they are stand-ins so this file exercises the frame itself.
@@ -60,6 +61,8 @@ function workspace(activeConsole: WriterWorkspace['activeConsole'], over: Partia
 
 const levelsOf = () => Array.from(document.querySelectorAll<HTMLElement>('[data-level]')).map(el => `${el.dataset.level}:${el.dataset.size}`)
 const renderLevels = (w: WriterWorkspace) => render(<WriterLevels w={w} pagesComponent="reaction" onPagesComponent={() => {}} />)
+const renderWithToggle = (w: WriterWorkspace) => render(<><SidebarToggle /><WriterLevels w={w} pagesComponent="reaction" onPagesComponent={() => {}} /></>)
+const setWindowWidth = (width: number) => { Object.defineProperty(window, 'innerWidth', { configurable: true, value: width }) }
 
 describe('WriterLevels', () => {
   it('shows each focus as its own set of level sizes', () => {
@@ -162,5 +165,78 @@ describe('WriterLevels', () => {
     renderLevels(workspace('shelves', { hasOpenProject: true }))
     const shelves = screen.getByRole('region', { name: 'Project Shelves (min)' })
     expect(within(shelves).queryByRole('button', { name: /Expand|Minimize/ })).toBeNull()
+  })
+})
+
+describe('the side column', () => {
+  beforeEach(() => { setWindowWidth(1280) })
+
+  it('has a drag handle on its edge, and the default width until one is dragged', () => {
+    const { container } = renderLevels(workspace('shelf'))
+    expect(container.querySelector('.wrLevelsSide')).not.toBeNull()
+    expect(screen.getByRole('separator', { name: 'Sidebar width' })).toBeInTheDocument()
+    expect((container.querySelector('.wrLevels') as HTMLElement).style.getPropertyValue('--wr-side-w')).toBe('')
+  })
+
+  it('is hidden and shown again from the header, the focused level taking the whole width while it is hidden', async () => {
+    const user = userEvent.setup()
+    const { container } = renderWithToggle(workspace('shelf'))
+    const toggle = screen.getByRole('button', { name: 'Sidebar' })
+    expect(toggle).toHaveAttribute('aria-pressed', 'true')
+    await user.click(toggle)
+    expect(toggle).toHaveAttribute('aria-pressed', 'false')
+    expect(container.querySelector('.wrLevelsSide')).toBeNull()
+    expect(levelsOf()).toEqual(['project:max'])
+    expect(container.querySelector('.wrLevels')).toHaveClass('wrLevels--noside')
+    await user.click(toggle)
+    expect(container.querySelector('.wrLevelsSide')).not.toBeNull()
+    expect(levelsOf()).toEqual(['dash:mid', 'project:max'])
+  })
+
+  it('remembers a width and a hidden state', () => {
+    window.localStorage.setItem('scriblr.writer.sidebar', JSON.stringify({ width: 400, hidden: false }))
+    __resetSettingsForTests()
+    const { container } = renderLevels(workspace('shelf'))
+    expect((container.querySelector('.wrLevels') as HTMLElement).style.getPropertyValue('--wr-side-w')).toBe('min(max(400px, 200px), 60%)')
+  })
+
+  it('is resized by dragging its handle, within 200px and 60% of the Writer, and the width is kept', () => {
+    const rect = (width: number) => ({ width, height: 600, x: 0, y: 0, top: 0, left: 0, right: width, bottom: 600, toJSON: () => ({}) }) as DOMRect
+    const spy = vi.spyOn(Element.prototype, 'getBoundingClientRect').mockImplementation(function (this: Element) {
+      return rect(this.classList.contains('wrLevelsSide') ? 280 : this.classList.contains('wrLevels') ? 1000 : 0)
+    })
+    const { container } = renderLevels(workspace('shelf'))
+    const widthVar = () => (container.querySelector('.wrLevels') as HTMLElement).style.getPropertyValue('--wr-side-w')
+    fireEvent.mouseDown(screen.getByRole('separator', { name: 'Sidebar width' }), { clientX: 286 })
+    act(() => { fireEvent.mouseMove(window, { clientX: 386 }) })
+    expect(widthVar()).toBe('min(max(380px, 200px), 60%)') // 280 + 100, live
+    act(() => { fireEvent.mouseMove(window, { clientX: 1000 }) })
+    expect(widthVar()).toBe('min(max(600px, 200px), 60%)') // held at 60% of 1000
+    act(() => { fireEvent.mouseUp(window) })
+    expect(JSON.parse(window.localStorage.getItem('scriblr.writer.sidebar') ?? '{}')).toMatchObject({ width: 600 })
+    spy.mockRestore()
+  })
+
+  it('goes back to the default width on a double click on the handle', async () => {
+    const user = userEvent.setup()
+    window.localStorage.setItem('scriblr.writer.sidebar', JSON.stringify({ width: 400, hidden: false }))
+    __resetSettingsForTests()
+    const { container } = renderLevels(workspace('shelf'))
+    await user.dblClick(screen.getByRole('separator', { name: 'Sidebar width' }))
+    expect((container.querySelector('.wrLevels') as HTMLElement).style.getPropertyValue('--wr-side-w')).toBe('')
+  })
+
+  it('is hidden by itself in a narrow window, and the toggle shows it', async () => {
+    setWindowWidth(800)
+    const user = userEvent.setup()
+    const { container } = renderWithToggle(workspace('shelf'))
+    expect(container.querySelector('.wrLevelsSide')).toBeNull()
+    await user.click(screen.getByRole('button', { name: 'Sidebar' }))
+    expect(container.querySelector('.wrLevelsSide')).not.toBeNull()
+  })
+
+  it('has no toggle to press at the Dash, which has no side column', () => {
+    renderWithToggle(workspace('shelves'))
+    expect(screen.getByRole('button', { name: 'Sidebar' })).toBeDisabled()
   })
 })
