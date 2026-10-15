@@ -52,7 +52,21 @@
 }
 
 .themeTimeline { display: flex; flex-direction: column; gap: 4px; }
+// The strip, and over it the handles where each zone begins (they and their time bubbles stand outside the strip's clipped edge).
+.themeTimelineTrack { position: relative; margin-top: 26px; }
 .themeTimelineBar { position: relative; height: 26px; border-radius: 0; overflow: hidden; background: var(--ov-sink-2); }
+.themeTimelineHandle {
+  position: absolute; top: -4px; width: 16px; height: 34px; margin-left: -8px; padding: 0; z-index: 2; cursor: ew-resize; background: transparent; touch-action: none;
+  // A dark bar outlined in white reads on a segment of any hue.
+  &::before { content: ''; position: absolute; top: 0; bottom: 0; left: 5px; width: 6px; border-radius: 3px; background: hsl(0 0% 12%); box-shadow: 0 0 0 1.5px #fff; }
+  &--selected::before { background: hsl(0 0% 4%); }
+  &:focus-visible { outline: none; &::before { box-shadow: 0 0 0 1.5px #fff, 0 0 0 4px var(--accent-hover, #fff); } }
+}
+.themeTimelineBubble {
+  position: absolute; bottom: calc(100% + 4px); left: 50%; transform: translateX(-50%); padding: 2px 7px; border-radius: 3px; white-space: nowrap; pointer-events: none;
+  background: hsl(0 0% 10%); color: #fff; font-size: 11px; font-weight: 700; opacity: 0; transition: opacity 0.12s;
+}
+.themeTimelineHandle:hover .themeTimelineBubble, .themeTimelineHandle:focus-visible .themeTimelineBubble, .themeTimelineHandle--active .themeTimelineBubble { opacity: 1; }
 .themeTimelineSeg {
   position: absolute; top: 0; bottom: 0; display: flex; align-items: center; justify-content: center; overflow: hidden;
   box-shadow: inset 1px 0 0 rgba(0, 0, 0, 0.25); transition: opacity 0.15s;

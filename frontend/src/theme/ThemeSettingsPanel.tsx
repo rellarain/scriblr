@@ -3,15 +3,14 @@ import { setTheme, setUi, useSettings } from '../settings/settingsStore'
 import { SettingsSaveCluster } from '../components/SettingsSaveCluster'
 import { ColorRange } from '../components/ColorRange'
 import { CURRENT_USER } from '../userSeed'
-import { ZONE_ICON } from './zoneIcons'
 import SkyZoneTab from './SkyZoneTab'
+import ThemeTimeline from './ThemeTimeline'
 import { useMinuteClock } from './useMinuteClock'
-import { readableInk } from './contrast'
 import { deriveTokens } from './tokens'
 import { copyPalette, disableZone, enableZone, configuredZones, formatMinute, STEP_MINUTES } from './zones'
 import { editHue } from './paletteRules'
 import { derivedShades, hslCss, tints, type Swatch } from './palettes'
-import { ZONE_LOOKS, resolvePalette } from './zoneLooks'
+import { ZONE_LOOKS } from './zoneLooks'
 import { setPreviewZone, useThemeState } from './useTheme'
 import { ZONE_KEYS, ZONE_LABEL, type PaletteKey, type Role, type ZoneKey, type ZonePalette } from './types'
 import './themeSettings.scss'
@@ -57,49 +56,6 @@ function Palette({ pal, zone, colorKey }: { pal: ZonePalette; zone: ZoneKey; col
 
 function swatchColor(vars: Record<string, string>, key: PaletteKey): string {
   return `hsl(${vars[`--color-${key}-h`]} ${vars[`--color-${key}-s`]} ${vars[`--color-${key}-l`]})`
-}
-
-// 24h strip showing which zone is in effect when. Each segment is a midtone of
-// its zone's accent (its accent hue and saturation at 50% lightness); every
-// zone except the one being edited is a little dimmer.
-function Timeline({ selected }: { selected: ZoneKey }) {
-  const { theme } = useSettings()
-  const order = configuredZones(theme.zones)
-  const segments: Array<{ key: ZoneKey; from: number; to: number }> = []
-  order.forEach((key, i) => {
-    const from = theme.zones[key].startMinute
-    let to = theme.zones[order[(i + 1) % order.length]].startMinute
-    if (order.length === 1) to = from + 1440
-    else if (to <= from) to += 1440
-    if (to > 1440) {
-      segments.push({ key, from, to: 1440 })
-      segments.push({ key, from: 0, to: to - 1440 })
-    } else {
-      segments.push({ key, from, to })
-    }
-  })
-  return (
-    <div className="themeTimeline" role="img" aria-label="Time zones across the day">
-      <div className="themeTimelineBar">
-        {segments.map((seg, i) => {
-          const accent = resolvePalette(theme.zones[seg.key].palette, seg.key).accent
-          const fill = { h: accent.h, s: accent.s, l: 50 }
-          const Icon = ZONE_ICON[seg.key]
-          return (
-            <span
-              key={`${seg.key}-${i}`}
-              className={seg.key === selected ? 'themeTimelineSeg' : 'themeTimelineSeg themeTimelineSeg--dim'}
-              style={{ left: `${(seg.from / 1440) * 100}%`, width: `${((seg.to - seg.from) / 1440) * 100}%`, backgroundColor: hslCss(fill), color: hslCss(readableInk(fill)) }}
-              title={`${ZONE_LABEL[seg.key]}: ${formatMinute(seg.from % 1440)} - ${formatMinute(seg.to % 1440)}`}
-            >
-              <Icon size={14} />
-            </span>
-          )
-        })}
-      </div>
-      <div className="themeTimelineTicks"><span>12 AM</span><span>6 AM</span><span>12 PM</span><span>6 PM</span><span>12 AM</span></div>
-    </div>
-  )
 }
 
 function ZoneEditor({ zoneKey, role }: { zoneKey: ZoneKey; role: Role }) {
@@ -243,7 +199,7 @@ function ThemeSettingsPanel({ showHeader = true }: { showHeader?: boolean } = {}
       </div>
 
       <div className="themeSection">
-        <Timeline selected={selected} />
+        <ThemeTimeline selected={selected} onSelect={setSelected} />
       </div>
 
       <div className="themeSection">

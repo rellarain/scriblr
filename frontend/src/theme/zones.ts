@@ -1,4 +1,4 @@
-import { defaultZone } from './defaults'
+import { DEFAULT_START, defaultZone } from './defaults'
 import { normalizePalette } from './paletteRules'
 import { ZONE_KEYS, type ThemeSettings, type ZoneConfig, type ZoneKey } from './types'
 
@@ -7,6 +7,9 @@ const DAY_MS = DAY_MINUTES * 60_000
 
 export const STEP_MINUTES = 10
 export const MAX_START = DAY_MINUTES - STEP_MINUTES
+// The timeline's handles move by the hour, and keep an hour between zones; the last whole hour a zone can begin is 11 PM.
+export const HOUR = 60
+export const MAX_HOUR_START = DAY_MINUTES - HOUR
 
 // A minute of the day as a 12-hour clock time: 0 -> "12:00 AM", 1430 -> "11:50 PM".
 export function formatMinute(minute: number): string {
@@ -61,6 +64,27 @@ function freeStart(zones: Record<ZoneKey, ZoneConfig>, key: ZoneKey): number {
   for (let i = 0; i < DAY_MINUTES / STEP_MINUTES && taken.has(start); i++) start = (start + STEP_MINUTES) % DAY_MINUTES
   return start
 }
+
+// Move where a zone begins (the timeline's handle). The zones in use keep their order and at least an hour each: a zone that
+// would be run into is pushed along ahead of it (or back, going the other way), and none is carried past midnight. A zone that is
+// the only one in use simply moves (it is in effect all day; the time is where its colours would begin once others are turned on).
+export function moveZoneStart(settings: ThemeSettings, key: ZoneKey, target: number): ThemeSettings {
+  const order = configuredZones(settings.zones)
+  const k = order.indexOf(key)
+  if (k < 0) return settings
+  const n = order.length
+  const starts = order.map(z => settings.zones[z].startMinute)
+  starts[k] = Math.min(Math.max(Math.round(target), HOUR * k), MAX_HOUR_START - HOUR * (n - 1 - k))
+  for (let i = k + 1; i < n; i++) starts[i] = Math.max(starts[i], starts[i - 1] + HOUR)
+  for (let i = k - 1; i >= 0; i--) starts[i] = Math.min(starts[i], starts[i + 1] - HOUR)
+  if (order.every((z, i) => starts[i] === settings.zones[z].startMinute)) return settings
+  const zones = { ...settings.zones }
+  order.forEach((z, i) => { zones[z] = { ...zones[z], startMinute: starts[i] } })
+  return { ...settings, zones }
+}
+
+// Put a zone back to the time it begins at by default (pushing a neighbour along if it is in the way).
+export const resetZoneStart = (settings: ThemeSettings, key: ZoneKey): ThemeSettings => moveZoneStart(settings, key, DEFAULT_START[key])
 
 // Turn a zone on, seeded with a copy of Day's hues.
 export function enableZone(settings: ThemeSettings, key: ZoneKey): ThemeSettings {

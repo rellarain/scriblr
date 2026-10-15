@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest'
 import { defaultThemeSettings } from './defaults'
 import {
   activeZone, clockZone, configuredZones, disableZone, enableZone, formatMinute, msUntilNextBoundary,
-  normalizeTheme, resolveZone,
+  moveZoneStart, normalizeTheme, resetZoneStart, resolveZone,
 } from './zones'
 import type { ThemeSettings } from './types'
 
@@ -150,5 +150,46 @@ describe('formatMinute', () => {
     expect(formatMinute(1080)).toBe('6:00 PM')
     expect(formatMinute(1430)).toBe('11:50 PM')
     expect(formatMinute(1440)).toBe('12:00 AM')
+  })
+})
+
+describe('moveZoneStart', () => {
+  const starts = (s: ThemeSettings) => Object.fromEntries(configuredZones(s.zones).map(k => [k, s.zones[k].startMinute]))
+
+  it('moves a zone to the time, keeping the others where they are', () => {
+    const s = withZones({ day: 420, dusk: 1080, night: 1320 })
+    expect(starts(moveZoneStart(s, 'dusk', 1020))).toEqual({ day: 420, dusk: 1020, night: 1320 })
+  })
+
+  it('pushes the next zones along when it runs into them, an hour apart', () => {
+    const s = withZones({ day: 420, dusk: 1080, night: 1140 })
+    expect(starts(moveZoneStart(s, 'day', 1100))).toEqual({ day: 1100, dusk: 1160, night: 1220 })
+  })
+
+  it('pushes the earlier zones back when moving left into them', () => {
+    const s = withZones({ dawn: 240, day: 600, dusk: 660 })
+    expect(starts(moveZoneStart(s, 'dusk', 200))).toEqual({ dawn: 80, day: 140, dusk: 200 })
+  })
+
+  it('never carries a zone past the ends of the day: each keeps an hour', () => {
+    const s = withZones({ day: 420, dusk: 1080, night: 1320 })
+    expect(starts(moveZoneStart(s, 'day', 1439))).toEqual({ day: 1260, dusk: 1320, night: 1380 })
+    expect(starts(moveZoneStart(s, 'night', -50))).toEqual({ day: 0, dusk: 60, night: 120 })
+  })
+
+  it('moves a lone zone freely, and does nothing for a zone that is off or when nothing changes', () => {
+    const one = defaultThemeSettings()
+    expect(starts(moveZoneStart(one, 'day', 900))).toEqual({ day: 900 })
+    expect(starts(moveZoneStart(one, 'day', 5000))).toEqual({ day: 1380 })
+    const two = withZones({ day: 420, dusk: 1080 })
+    expect(moveZoneStart(two, 'night', 900)).toBe(two)
+    expect(moveZoneStart(two, 'dusk', 1080)).toBe(two)
+  })
+
+  it('puts a zone back to its default time (dawn 4, day 10, dusk 4 PM, night 10 PM), pushing a neighbour if it is in the way', () => {
+    const s = withZones({ dawn: 100, day: 200, dusk: 300, night: 400 })
+    expect(starts(resetZoneStart(s, 'night'))).toEqual({ dawn: 100, day: 200, dusk: 300, night: 1320 })
+    const crowded = withZones({ day: 600, dusk: 900, night: 960 })
+    expect(starts(resetZoneStart(crowded, 'dusk'))).toEqual({ day: 600, dusk: 960, night: 1020 })
   })
 })

@@ -6,10 +6,10 @@ Scriblr changes its look with the time of day, and you choose the colours.
 
 | | Looks like | Starts (you can change it) |
 |---|---|---|
-| **Dawn** | light, with dark text, soft colours | 5:30 AM |
-| **Day** | light, with dark text, vivid colours | 7:00 AM (always on) |
-| **Dusk** | dark, with white text, vivid colours | 6:00 PM |
-| **Night** | dark, with white text, soft colours | 9:00 PM |
+| **Dawn** | light, with dark text, soft colours | 4:00 AM |
+| **Day** | light, with dark text, vivid colours | 10:00 AM (always on) |
+| **Dusk** | dark, with white text, vivid colours | 4:00 PM |
+| **Night** | dark, with white text, soft colours | 10:00 PM |
 
 Day is always on and is the look when time-based theming is off; Dawn, Dusk and Night are yours to switch on. The small painted sky at the top of the window shows where you are: the sun or moon button steps to the next time of day and holds it there; the time and date go back to following the clock.
 

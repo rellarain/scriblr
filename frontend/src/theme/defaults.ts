@@ -8,7 +8,8 @@ export const DEFAULT_PALETTE: ZonePalette = {
   accent2: { h: 260 },
 }
 
-const DEFAULT_START: Record<ZoneKey, number> = { dawn: 330, day: 420, dusk: 1080, night: 1260 }
+// Where each zone begins until the user moves it: dawn 4 AM, day 10 AM, dusk 4 PM, night 10 PM.
+export const DEFAULT_START: Record<ZoneKey, number> = { dawn: 240, day: 600, dusk: 960, night: 1320 }
 
 export function defaultZone(key: ZoneKey): ZoneConfig {
   return {
