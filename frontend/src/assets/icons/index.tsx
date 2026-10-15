@@ -271,13 +271,6 @@ export function LibraryIcon(props: IconProps) {
   </IconBase>
 }
 
-export function SidebarIcon(props: IconProps) {
-  return <IconBase {...props}>
-    <rect x="3" y="4" width="18" height="16" rx="1.5" />
-    <rect x="3" y="4" width="7" height="16" rx="1" fill="currentColor" stroke="none" />
-  </IconBase>
-}
-
 export function LayoutMiniIcon(props: IconProps) {
   return <IconBase {...props}>
     <rect x="3" y="4" width="18" height="16" rx="1.5" />

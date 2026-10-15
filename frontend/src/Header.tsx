@@ -39,9 +39,11 @@ function Header({
     <>
       <header className="header">
         <div className="headerNavRow">
-          <HeaderUserCard user={currentUser} open={drawerOpen} onToggle={onToggleDrawer} />
-          <div className="headerNavRight">
+          <div className="headerNavLeft">
             {active === 'writer' && !vuiOpen && <SidebarToggle />}
+            <HeaderUserCard user={currentUser} open={drawerOpen} onToggle={onToggleDrawer} />
+          </div>
+          <div className="headerNavRight">
             <NavSwitcher active={active} onSelect={onSelect} vuiOpen={vuiOpen} />
             <SkyToggle />
           </div>

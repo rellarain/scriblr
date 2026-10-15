@@ -55,6 +55,6 @@ At the Project level it is over that project; on the Dash, over every project. T
 Beside the focused level, the others sit in a **side column** (`.wrLevelsSide`): 280 to 460px wide (32% of the Writer) by default.
 
 - **Resize**: a 10px handle (`.wrSideResizer`, `role="separator"`) on its right edge; a thin accent line shows on hover and while dragging. The width is held between **200px and 60%** of the Writer, shown live and kept on release; a double click puts it back to the default. At the Draft the column still lies over the page's left side, at the chosen width.
-- **Hide**: the **sidebar button** in the app's header (`SidebarToggle`, icon `sidebar`; pressed = shown) hides it, and the focused level takes the whole width. It is disabled at the Dash, which has no side column.
+- **Hide**: the **sidebar bar** in the app's header (`SidebarToggle`: a plain 6px vertical bar, no icon, left of the user card; lit in the accent colour = shown) hides it, and the focused level takes the whole width. It is disabled at the Dash, which has no side column.
 - **Narrow windows**: until the button is pressed, the column is hidden by itself while the window is narrower than 1000px, and shown again when it grows.
 - Both are kept on this machine (`scriblr.writer.sidebar`: `{ width, hidden }`; `null` = the default, or automatic).

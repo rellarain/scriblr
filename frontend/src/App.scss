@@ -113,6 +113,15 @@ button {border: none; cursor: pointer; border-radius: 4px;}
   background-color: hsl(var(--color-theme-h), var(--color-theme-s), calc(var(--color-theme-l) - 10%));
 }
 
+// Left of the user card on the Writer: the sidebar toggle, a plain vertical bar (lit while the Writer's side column is shown).
+.headerNavLeft { display: flex; align-items: center; gap: 2px; }
+.headerSideBar {
+  flex: 0 0 auto; width: 14px; height: 32px; padding: 0; display: flex; align-items: center; justify-content: center; border-radius: 4px; background: transparent;
+  &::before { content: ''; width: 6px; height: 28px; border-radius: 2px; background: color-mix(in srgb, var(--ink) 60%, transparent); transition: background 0.15s; }
+  &:hover:not(:disabled)::before { background: var(--ink); }
+  &--active::before { background: hsl(var(--color-accent-h), var(--color-accent-s), var(--color-accent-l)); }
+  &:disabled { opacity: 0.35; cursor: default; }
+}
 .headerUserCard {
   display: flex;
   align-items: center;
@@ -158,7 +167,6 @@ button {border: none; cursor: pointer; border-radius: 4px;}
     color: var(--ink);
     background: transparent;
     padding: 6px 10px;
-    &:disabled { opacity: 0.4; cursor: default; &:hover { background: transparent; color: var(--ink); } }
     display: flex;
     align-items: center;
     justify-content: center;
