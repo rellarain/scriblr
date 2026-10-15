@@ -58,3 +58,17 @@ Beside the focused level, the others sit in a **side column** (`.wrLevelsSide`):
 - **Hide**: the **sidebar bar** in the app's header (`SidebarToggle`: a plain 6px vertical bar, no icon, left of the user card with 5px either side of it; lit in the accent colour = shown) hides it, and the focused level takes the whole width. It is disabled at the Dash, which has no side column.
 - **Narrow windows**: until the button is pressed, the column is hidden by itself while the window is narrower than 1000px, and shown again when it grows.
 - Both are kept on this machine (`scriblr.writer.sidebar`: `{ width, hidden }`; `null` = the default, or automatic).
+
+## The Plot tool
+
+The Project level's Plot tab (`PlotView`) follows **its own width**, not the window's (`useElementWidth`, the `data-size` of `.wrPlotFrame`):
+
+| Width | Layout |
+|---|---|
+| wide, 1,040px and up | the contents column (250px) beside the editor; a plotline's fields beside its books-and-chapters panel |
+| medium, 720 to 1,039px | contents beside the editor, but a plotline's chapters panel stands under its fields |
+| compact, under 720px | **one column**: the contents are a bar on top (`.wrPlotBar`: where you are, as a trail, or "Comparing 3 plotlines") that folds down over the editor |
+
+- **Ticking**: every row of the contents has a checkbox (`.wrNavCheck`, drawn by hand: a box, a tick, or a bar for part-ticked). A plotline's ticks that plotline; a category, subcategory or cluster ticks every plotline under it. "Compare (n)" and "Clear" show once any are ticked. The ticks are kept while browsing and reset with the project.
+- **Compare** (`PlotCompare`): two or more ticked plotlines open it in place of the editor. Chips (one per plotline, in its plot colours and gradient stripe) hide or show its cards, and an x unticks it. The plotpoints stand in **one list**, read-only: each card is a plotpoint tile with its trail, plotline and field, title, description and where it is placed ("2 · Storm", or "Not placed yet"); a click opens that plotline's editor. **Group by plotline** gives each plotline a header: side by side as columns from 860px, otherwise as sections that fold. The chapters panel, with every shown plotline's chips (each marked with its plotline's stripe), is beside the list when wide and a fold-out under it otherwise.
+- **Order**: the toggle (`PlotOrderToggle`, shared with the Draft's chapter list and the Plotpoints tab) is two icon buttons: a **clock** for by time, an **open book** (`book-open`) for in story. Unassigned plotpoints come first.

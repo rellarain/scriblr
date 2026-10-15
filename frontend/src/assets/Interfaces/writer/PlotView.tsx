@@ -1,16 +1,19 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import type { PlotNode } from '../../../api/types'
 import type { WriterWorkspace } from './useWriterWorkspace'
-import { ChevronRightIcon, PlusIcon } from '../../icons'
+import { ChevronDownIcon, ChevronRightIcon, PlusIcon } from '../../icons'
 import { ChipEditor, DeleteControl } from './shared'
 import { focusNodeField, useNodeKeys } from '../../../lib/nodeKeys'
 import { hueOfCode } from '../../../theme/bookColors'
 import { useThemeState } from '../../../theme/useTheme'
 import HueSlider from './HueSlider'
 import { plotColors, plotColorVars } from './plotColors'
-import { assignedLevel, categoryOf, nodeLabel, sortByTitle } from './plotTree'
+import { assignedLevel, categoryOf, nodeLabel, plotTrail, sortByTitle } from './plotTree'
 import { FieldEditor, FieldGroups, type PlotDrag, type PlotUi } from './FieldBlocks'
 import { PlotOutlinePanel } from './PlotOutlinePanel'
+import { PlotNav, plotlineCount } from './PlotNav'
+import { PlotCompare } from './PlotCompare'
+import { plotSizeOf, useElementWidth } from './useElementWidth'
 import { PlotOrderToggle, usePlotOrder } from './plotOrder'
 import { fieldIndex, isScrapField, orderValues, valuesIn } from './plotFields'
 
@@ -20,70 +23,12 @@ import { fieldIndex, isScrapField, orderValues, valuesIn } from './plotFields'
 // then in order of occurrence, dragged onto the books and chapters of the
 // outline. A plotpoint assigned within a chapter (to an act, scene or moment,
 // from the Outline level) is locked here; the others can be unassigned.
-
-function plotlineCount(node: PlotNode, children: Map<string | null, PlotNode[]>): number {
-  return (children.get(node.id) ?? []).reduce(
-    (n, c) => n + (c.kind === 'plotline' ? 1 : c.kind === 'plotpoint' ? 0 : plotlineCount(c, children)), 0)
-}
+//
+// The tool follows its own width (useElementWidth.ts): wide, the contents beside the editor; medium, the same but a plotline's
+// chapters under its fields; compact, one column with the contents as a bar on top. Ticking two or more plotlines in the contents
+// opens the compare view (PlotCompare.tsx) in place of the editor.
 
 const counted = (n: number, noun: string) => `${n} ${noun}${n === 1 ? '' : 's'}`
-
-function PlotNav({ w }: { w: WriterWorkspace }) {
-  const [collapsed, setCollapsed] = useState<Set<string>>(new Set())
-  const children = w.plotChildrenByParentId
-
-  // Everything is open by default; the chevron collapses a branch.
-  const toggle = (id: string) => setCollapsed(prev => {
-    const next = new Set(prev)
-    if (next.has(id)) next.delete(id)
-    else next.add(id)
-    return next
-  })
-
-  // Each level of nesting is indented 14px, so a plotline reads as belonging to what it sits directly under.
-  function rows(parentId: string | null, depth: number): React.ReactNode[] {
-    return sortByTitle((children.get(parentId) ?? []).filter(n => n.kind !== 'plotpoint'))
-      .flatMap(node => {
-        const kids = (children.get(node.id) ?? []).filter(c => c.kind !== 'plotpoint')
-        const hasKids = kids.length > 0
-        const open = !collapsed.has(node.id)
-        const isLine = node.kind === 'plotline'
-        return [
-          <div
-            key={node.id}
-            className={`wrNavRow wrNavRow--${node.kind}${node.id === w.focusedPlotNodeId ? ' wrNavRow--active' : ''}`}
-            style={{ ...plotColorVars(plotColors(node, w.plotNodeById)), marginLeft: depth * 14 }}
-          >
-            <button
-              type="button" className="wrNavChevron" aria-label={open ? 'Collapse' : 'Expand'}
-              style={{ visibility: hasKids ? 'visible' : 'hidden', transform: open ? 'rotate(90deg)' : undefined }}
-              onClick={() => toggle(node.id)}
-            >
-              <ChevronRightIcon size={12} />
-            </button>
-            <button type="button" className="wrNavLabel" onClick={() => w.focusPlotNode(node.id)}>{nodeLabel(node)}</button>
-            {!isLine && <span className="wrNavCount">{plotlineCount(node, children)}</span>}
-          </div>,
-          ...(open ? rows(node.id, depth + 1) : []),
-        ]
-      })
-  }
-
-  return (
-    <div className="wrPlotNav">
-      <div className="wrPlotNavHead">
-        <span>Categories</span>
-        <button type="button" className="wrSmallBtn" onClick={() => w.focusPlotNode(w.addPlotNode(null, 'category'))}>
-          <PlusIcon size={13} /> Category
-        </button>
-      </div>
-      <div className="wrPlotNavRows">
-        {w.plotNodes.length === 0 && <p className="wrMuted">No categories yet.</p>}
-        {rows(null, 0)}
-      </div>
-    </div>
-  )
-}
 
 function ChildRows({ w, node, kind, addLabel }: { w: WriterWorkspace; node: PlotNode; kind: 'subcategory' | 'cluster' | 'plotline'; addLabel: string }) {
   const kids = sortByTitle((w.plotChildrenByParentId.get(node.id) ?? []).filter(c => c.kind === kind))
@@ -251,7 +196,7 @@ function PlotlineEditor({ w, node, ui }: { w: WriterWorkspace; node: PlotNode; u
 
       <div className="wrPlotlineRight">
         <PlotOutlinePanel
-          w={w} plotline={node} dragId={dragId}
+          w={w} plotlines={[node]} dragId={dragId}
           onDropChapter={chapterId => { if (dragId) w.assignPlotpoint(dragId, chapterId); setDragId(null) }}
         />
       </div>
@@ -267,9 +212,23 @@ export default function PlotView({ w }: { w: WriterWorkspace }) {
   // Kinds of nodes created a moment ago (the workspace maps have not updated yet),
   // so focusing one can also open its editor.
   const created = useRef(new Map<string, PlotNode['kind']>())
+  // The tool's own width picks its layout; the compare view opens when plotlines are ticked and gives way to a row's editor.
+  const [sizeRef, width] = useElementWidth<HTMLDivElement>()
+  const size = plotSizeOf(width)
+  const [barOpen, setBarOpen] = useState(false)
+  const [compareOpen, setCompareOpen] = useState(false)
+  const selectedLines = w.plotSelection.map(id => w.plotNodeById.get(id)).filter((n): n is PlotNode => n?.kind === 'plotline')
+  const tickedCount = selectedLines.length
+  const lastTicked = useRef(0)
+  useEffect(() => {
+    if (tickedCount < 2) setCompareOpen(false)
+    else if (tickedCount > lastTicked.current) setCompareOpen(true)
+    lastTicked.current = tickedCount
+  }, [tickedCount])
+  const comparing = compareOpen && tickedCount >= 2
   // A node opens at the top of its editor, not where the last one was scrolled to.
   const bodyRef = useRef<HTMLDivElement>(null)
-  useEffect(() => { if (bodyRef.current) { bodyRef.current.scrollTop = 0; bodyRef.current.scrollLeft = 0 } }, [node?.id])
+  useEffect(() => { if (bodyRef.current) { bodyRef.current.scrollTop = 0; bodyRef.current.scrollLeft = 0 } }, [node?.id, comparing])
 
   // Which fields are open (collapsed by default), and the value just created (it takes focus).
   const [openFields, setOpenFields] = useState<Set<string>>(new Set())
@@ -417,19 +376,48 @@ export default function PlotView({ w }: { w: WriterWorkspace }) {
     },
   })
 
+  const nav = (
+    <PlotNav
+      w={w}
+      onOpenNode={() => { setCompareOpen(false); setBarOpen(false) }}
+      onCompare={() => { setCompareOpen(true); setBarOpen(false) }}
+    />
+  )
+  // Compact: the contents are one line (where you are), and fold down over the editor.
+  const barLabel = comparing ? `Comparing ${tickedCount} plotlines`
+    : node ? [...plotTrail(node, w.plotNodeById), node].map(nodeLabel).join(' › ') : 'Contents'
+
   return (
-    <div className="wrPlotView">
-      <PlotNav w={w} />
-      <div className="wrPlotBody" ref={bodyRef} onKeyDown={keys.onKeyDown}>
-        {w.plotSaveError && <p className="wrError">{w.plotSaveError}</p>}
-        {w.plotStatus === 'loading' && <p className="wrMuted">Loading plot…</p>}
-        {w.plotStatus === 'error' && <p className="wrError">{w.plotError ?? 'Failed to load plot.'}</p>}
-        {w.plotStatus === 'idle' && !node && <p className="wrMuted">Select a category or plotline to edit it, or add a category.</p>}
-        {w.plotStatus === 'idle' && node && (node.kind === 'plotline'
-          ? <PlotlineEditor key={node.id} w={w} node={node} ui={ui} />
-          : node.kind === 'plotpoint'
-            ? <p className="wrMuted">Plotpoints are edited from their plotline.</p>
-            : <CategoryEditor key={node.id} w={w} node={node} ui={ui} />)}
+    <div className="wrPlotView" ref={sizeRef}>
+      <div className="wrPlotFrame" data-size={size}>
+        {size === 'compact' ? (
+          <div className="wrPlotBar">
+            <button type="button" className="wrPlotBarToggle" aria-expanded={barOpen} onClick={() => setBarOpen(open => !open)}>
+              {barOpen ? <ChevronDownIcon size={14} /> : <ChevronRightIcon size={14} />}
+              <span className="wrPlotBarLabel">{barLabel}</span>
+              {tickedCount > 0 && !comparing && <span className="wrNavCount">{tickedCount} ticked</span>}
+            </button>
+            {barOpen && <div className="wrPlotBarDrawer">{nav}</div>}
+          </div>
+        ) : nav}
+        <div className="wrPlotBody" ref={bodyRef} onKeyDown={keys.onKeyDown}>
+          {w.plotSaveError && <p className="wrError">{w.plotSaveError}</p>}
+          {w.plotStatus === 'loading' && <p className="wrMuted">Loading plot…</p>}
+          {w.plotStatus === 'error' && <p className="wrError">{w.plotError ?? 'Failed to load plot.'}</p>}
+          {w.plotStatus === 'idle' && comparing && (
+            <PlotCompare
+              w={w} lines={selectedLines} size={size}
+              onOpen={(plotlineId, pointId) => { w.focusPlotNode(plotlineId); setCompareOpen(false); w.highlightPlotpoint(pointId) }}
+              onDeselect={id => w.togglePlotSelection(id, false)}
+            />
+          )}
+          {w.plotStatus === 'idle' && !comparing && !node && <p className="wrMuted">Select a category or plotline to edit it, or add a category.</p>}
+          {w.plotStatus === 'idle' && !comparing && node && (node.kind === 'plotline'
+            ? <PlotlineEditor key={node.id} w={w} node={node} ui={ui} />
+            : node.kind === 'plotpoint'
+              ? <p className="wrMuted">Plotpoints are edited from their plotline.</p>
+              : <CategoryEditor key={node.id} w={w} node={node} ui={ui} />)}
+        </div>
       </div>
     </div>
   )

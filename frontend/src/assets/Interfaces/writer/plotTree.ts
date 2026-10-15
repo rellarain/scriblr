@@ -15,6 +15,21 @@ export function plotTrail(node: PlotNode, byId: Map<string, PlotNode>): PlotNode
   return out
 }
 
+// Every plotline beneath a category, subcategory or cluster (or the plotline itself).
+export function plotlinesUnder(node: PlotNode, childrenByParent: Map<string | null, PlotNode[]>): PlotNode[] {
+  if (node.kind === 'plotline') return [node]
+  if (node.kind === 'plotpoint') return []
+  return (childrenByParent.get(node.id) ?? []).flatMap(child => plotlinesUnder(child, childrenByParent))
+}
+
+// Whether all, some or none of the plotlines under a node are ticked (the state of its checkbox).
+export type SelectionState = 'all' | 'some' | 'none'
+export function selectionState(node: PlotNode, childrenByParent: Map<string | null, PlotNode[]>, selected: ReadonlySet<string>): SelectionState {
+  const lines = plotlinesUnder(node, childrenByParent)
+  const ticked = lines.filter(l => selected.has(l.id)).length
+  return ticked === 0 ? 'none' : ticked === lines.length ? 'all' : 'some'
+}
+
 // The category a node sits under (or is), if any.
 export function categoryOf(node: PlotNode, byId: Map<string, PlotNode>): PlotNode | undefined {
   return node.kind === 'category' ? node : plotTrail(node, byId).find(n => n.kind === 'category')

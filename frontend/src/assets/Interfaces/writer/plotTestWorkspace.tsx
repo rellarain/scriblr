@@ -40,6 +40,7 @@ export function useFakeWorkspace(initial: PlotNode[], focused = 'line', outlineN
   const [plotNodes, setPlotNodes] = useState<PlotNode[]>(initial)
   const [focusedId, setFocusedId] = useState<string | null>(focused)
   const [highlighted, setHighlighted] = useState<string | null>(null)
+  const [selection, setSelection] = useState<string[]>([])
   const ref = useRef(plotNodes)
   const outlineById = new Map(outlineNodes.map(n => [n.id, n]))
   const commit = (next: PlotNode[]) => { const synced = syncReferences(next, outlineById); ref.current = synced; setPlotNodes(synced) }
@@ -54,6 +55,14 @@ export function useFakeWorkspace(initial: PlotNode[], focused = 'line', outlineN
     activeProject: { settings: { timeSystems: [] } },
     focusedPlotNodeId: focusedId, focusedPlotNode: focusedId ? plotNodeById.get(focusedId) : undefined,
     highlightedPointId: highlighted,
+    plotSelection: selection, setPlotSelection: setSelection,
+    togglePlotSelection: (ids: string | string[], on?: boolean) => setSelection(prev => {
+      const list = Array.isArray(ids) ? ids : [ids]
+      const set = new Set(prev)
+      const turnOn = on ?? !list.every(id => set.has(id))
+      for (const id of list) { if (turnOn) set.add(id); else set.delete(id) }
+      return [...set]
+    }),
     highlightPlotpoint: (id: string | null) => setHighlighted(id),
     focusPlotNode: (id: string | null) => setFocusedId(id),
     openChapter: vi.fn(),
@@ -74,7 +83,7 @@ export function useFakeWorkspace(initial: PlotNode[], focused = 'line', outlineN
       return id
     },
     updatePlotNodeField: (id: string, field: 'title' | 'body', value: string) => commit(ref.current.map(n => (n.id === id ? { ...n, [field]: value } : n))),
-    deletePlotNode: (id: string) => commit(ref.current.filter(n => n.id !== id)),
+    deletePlotNode: (id: string) => { commit(ref.current.filter(n => n.id !== id)); setSelection(prev => prev.filter(s => s !== id)) },
     setPlotHue: vi.fn(), addPlotKeyword: vi.fn(), removePlotKeyword: vi.fn(),
   } as unknown as WriterWorkspace
   return { w, plotNodes }

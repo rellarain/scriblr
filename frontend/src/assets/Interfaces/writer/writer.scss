@@ -307,7 +307,28 @@
   .wrNote--editing .wrNoteTitle { padding-right: 26px; }
 
   // ---------------------------------------------------------------- plot
-  .wrPlotView { flex: 1 1 auto; min-height: 0; display: flex; gap: 16px; }
+  .wrPlotView { flex: 1 1 auto; min-width: 0; min-height: 0; display: flex; }
+  // The tool's three layouts follow its own width (data-size, from useElementWidth.ts): wide as drawn above; medium stacks a plotline's
+  // chapters under its fields; compact is one column with the contents as a bar on top.
+  .wrPlotFrame {
+    flex: 1 1 auto; min-width: 0; min-height: 0; display: flex; gap: 16px; position: relative;
+    &[data-size='compact'] { flex-direction: column; gap: 8px; }
+    &:not([data-size='wide']) {
+      .wrPlotlineLayout { flex: 0 0 auto; flex-direction: column; }
+      .wrPlotlineLeft { flex: 0 0 auto; overflow: visible; }
+      .wrPlotlineRight { flex: 0 0 auto; min-width: 0; }
+    }
+  }
+  // Compact: the contents fold down from one line over the editor.
+  .wrPlotBar { position: relative; flex: 0 0 auto; z-index: 3; }
+  .wrPlotBarToggle { width: 100%; display: flex; align-items: center; gap: 8px; padding: 8px 10px; border-radius: 6px; background: var(--ov-sink-1); color: inherit; text-align: left; font-size: 12px; font-weight: 700; }
+  .wrPlotBarToggle .wrNavCount { flex: 0 0 auto; white-space: nowrap; }
+  .wrPlotBarLabel { flex: 1 1 auto; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .wrPlotBarDrawer {
+    position: absolute; left: 0; right: 0; top: calc(100% + 4px); display: flex; max-height: min(60vh, 440px); border-radius: 6px; overflow: hidden;
+    background: var(--wr-fill-2); box-shadow: 0 8px 20px rgb(0 0 0 / calc(0.4 * var(--shade-k)));
+    .wrPlotNav { flex: 1 1 auto; border-radius: 0; background: var(--ov-sink-1); }
+  }
   .wrPlotNav { flex: 0 0 250px; min-width: 0; min-height: 0; display: flex; flex-direction: column; gap: 8px; background: var(--ov-sink-1); border-radius: 6px; padding: 10px; }
   .wrPlotNavHead { display: flex; align-items: center; justify-content: space-between; font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: 1px; span { opacity: 0.9; } }
   .wrPlotNavRows { flex: 1 1 auto; min-width: 0; min-height: 0; overflow-y: auto; display: flex; flex-direction: column; gap: 3px; scrollbar-width: none; &::-webkit-scrollbar { display: none; } }
@@ -325,6 +346,19 @@
     &--plotline { @include wrEdge; padding-left: 12px; }
   }
   .wrNavChevron { display: inline-flex; flex: 0 0 auto; transition: transform 0.15s; }
+  // The app resets native form controls, so the tick is drawn: a box, filled with the accent when ticked (a tick) or part-ticked (a bar).
+  .wrNavCheck {
+    appearance: none; position: relative; flex: 0 0 auto; width: 14px; height: 14px; margin: 0; border-radius: 3px; cursor: pointer; color: inherit;
+    background: color-mix(in srgb, currentColor 14%, transparent); box-shadow: inset 0 0 0 1.5px color-mix(in srgb, currentColor 75%, transparent);
+    &:checked, &:indeterminate { background: var(--wr-accent); box-shadow: inset 0 0 0 1.5px var(--wr-accent); }
+    &:checked::after { content: ''; position: absolute; left: 4px; top: 1px; width: 4px; height: 8px; border: solid var(--on-accent); border-width: 0 2px 2px 0; transform: rotate(45deg); }
+    &:indeterminate::after { content: ''; position: absolute; left: 3px; right: 3px; top: 6px; height: 2px; background: var(--on-accent); }
+    &:focus-visible { outline: 2px solid var(--wr-accent-light); outline-offset: 2px; }
+    &:disabled { opacity: 0.4; cursor: default; }
+  }
+  .wrPlotNavPicked { display: flex; align-items: center; gap: 10px; font-size: 11px; }
+  .wrNavClear { font-size: 11px; color: inherit; text-decoration: underline; opacity: 0.9; &:hover { opacity: 1; } }
+  .wrSmallBtn--accent { background: var(--wr-accent); color: var(--on-accent); &:hover:not(:disabled) { background: var(--wr-accent-light); } }
   .wrNavLabel { flex: 1; min-width: 0; text-align: left; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
   .wrNavCount { font-size: 11px; opacity: 0.9; }
   .wrNavRow--subcategory .wrNavCount, .wrNavRow--cluster .wrNavCount { opacity: 1; }
@@ -448,6 +482,9 @@
     display: inline-flex; align-items: center; gap: 4px; max-width: 100%; padding: 3px 4px 3px 12px; border-radius: 6px; font-size: 12px;
     background: var(--wr-point-bg, var(--wr-card)); color: var(--wr-point-ink, var(--ink)); box-shadow: inset 4px 0 0 var(--wr-point-edge, transparent);
   }
+  .wrPlotChip { position: relative; }
+  .wrPlotChip:has(> .wrPlotChipLine) { padding-right: 10px; }
+  .wrPlotChipLine { position: absolute; top: 0; right: 0; bottom: 0; width: 5px; background: var(--wr-edge, var(--wr-cat, transparent)); }
   .wrPlotChipTitle { text-align: left; font-weight: 700; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 200px; color: inherit; }
   .wrPlotChipX { display: inline-flex; align-items: center; justify-content: center; width: 20px; height: 20px; border-radius: 4px; color: inherit; &:hover { background: var(--ov-lift-2); } }
   .wrOutlinePanel { flex: 1 1 auto; min-height: 0; display: flex; flex-direction: column; gap: 8px; background: var(--ov-sink-1); border-radius: 8px; padding: 12px 14px; }
@@ -472,6 +509,34 @@
   .wrChapterPointsHead { display: flex; align-items: baseline; justify-content: space-between; font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: 1px; opacity: 0.9; }
   .wrChapterPointsList { flex: 1 1 auto; min-height: 0; overflow-y: auto; display: flex; flex-direction: column; gap: 8px; scrollbar-width: none; &::-webkit-scrollbar { display: none; } }
   // A plotpoint tile: dark, so it stands out from the (light) card it sits in.
+  // The compare view (PlotCompare.tsx): chips, the merged list or per-plotline groups, and the chapters panel.
+  .wrCompare { display: flex; flex-direction: column; gap: 10px; min-width: 0; }
+  .wrCompareChips { display: flex; flex-wrap: wrap; gap: 6px; }
+  .wrCompareChip {
+    display: inline-flex; align-items: center; max-width: 100%; padding-left: 8px; border-radius: 0; background-color: var(--wr-cat, var(--ov-sink-2)); color: var(--ink); @include wrEdge;
+    &--off { opacity: 0.55; .wrCompareChipName { text-decoration: line-through; } }
+  }
+  .wrCompareChipName { padding: 4px 6px; max-width: 300px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 11px; font-weight: 700; color: inherit; text-align: left; }
+  .wrCompareChipX { display: inline-flex; align-items: center; padding: 4px 6px; color: inherit; &:hover { background: var(--ov-lift-2); } }
+  .wrCompareControls { display: flex; align-items: center; flex-wrap: wrap; gap: 8px 14px; .wrOrderToggle { margin-left: 0; align-self: center; } }
+  .wrCompareBody { display: flex; align-items: flex-start; gap: 16px; > .wrCompareList, > .wrCompareGroups { flex: 1 1 0; min-width: 0; } }
+  .wrCompareChapters { flex: 0 0 320px; min-width: 0; display: flex; }
+  .wrCompareList, .wrCompareGroups { display: flex; flex-direction: column; gap: 8px; min-width: 0; }
+  .wrCompareGroups--columns { display: grid; grid-auto-flow: column; grid-auto-columns: minmax(260px, 1fr); align-items: start; gap: 12px; overflow-x: auto; scrollbar-width: none; &::-webkit-scrollbar { display: none; } }
+  .wrCompareGroup { display: flex; flex-direction: column; gap: 6px; min-width: 0; }
+  .wrCompareGroupBody { display: flex; flex-direction: column; gap: 8px; }
+  .wrCompareGroupHead {
+    display: flex; align-items: center; gap: 6px; width: 100%; margin: 0; padding: 6px 8px 6px 12px; box-sizing: border-box; text-align: left; font-size: 11px; font-weight: 700;
+    background-color: var(--wr-cat, var(--ov-sink-2)); color: var(--ink); @include wrEdge;
+    > span:first-of-type { flex: 1 1 auto; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  }
+  .wrCompareFold { display: flex; flex-direction: column; gap: 8px; }
+  .wrPointTileWhere { margin-top: 2px; font-size: 10px; font-weight: 700; letter-spacing: 0.5px; text-transform: uppercase; opacity: 0.9; }
+  .wrPointTile[role='button'] {
+    cursor: pointer;
+    &:hover { background-color: color-mix(in srgb, var(--wr-cat, var(--wr-card)) 88%, white); }
+    &:focus-visible { outline: 2px solid var(--wr-accent-light); outline-offset: 2px; }
+  }
   .wrPointTile {
     display: flex; flex-direction: column; gap: 3px; padding: 5px 5px 5px 9px; border-radius: 0; background: var(--wr-cat, var(--wr-card)); color: var(--ink);
     box-shadow: 0 2px 6px rgb(0 0 0 / calc(0.25 * var(--shade-k))); text-align: left; @include wrEdge;
@@ -612,9 +677,9 @@
   .wrBookEdMeta { margin-right: auto; font-size: 11px; opacity: 0.9; white-space: nowrap; }
   .wrBookEdBody { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px 16px; padding: 4px 14px 14px; }
   .wrBookEdField { display: flex; flex-direction: column; gap: 2px; min-width: 0; &--wide { grid-column: 1 / -1; } }
-  // By time | In story: two small buttons, the chosen one filled.
+  // By time | In story: a clock and an open book, the chosen one filled.
   .wrOrderToggle { display: inline-flex; align-self: flex-start; margin-left: auto; font-size: 10px; }
-  .wrOrderBtn { padding: 2px 8px; font-size: 10px; font-weight: 700; color: inherit; background: color-mix(in srgb, currentColor 10%, transparent); &:hover { background: color-mix(in srgb, currentColor 20%, transparent); } &--on { background: color-mix(in srgb, currentColor 24%, transparent); box-shadow: inset 0 0 0 1px currentColor; font-weight: 700; } }
+  .wrOrderBtn { display: inline-flex; align-items: center; justify-content: center; padding: 3px 7px; color: inherit; background: color-mix(in srgb, currentColor 10%, transparent); &:hover { background: color-mix(in srgb, currentColor 20%, transparent); } &--on { background: color-mix(in srgb, currentColor 24%, transparent); box-shadow: inset 0 0 0 1px currentColor; font-weight: 700; } }
   .wrSummary { display: flex; flex-direction: column; gap: 6px; font-size: 12px; line-height: 1.4; }
   .wrPlacedList { display: flex; flex-direction: column; gap: 5px; margin-top: 8px; }
   .wrMidPointAt { display: block; font-size: 10px; opacity: 0.9; }

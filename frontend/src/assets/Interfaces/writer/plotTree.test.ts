@@ -3,7 +3,7 @@ import type { OutlineNode } from '../../../api/types'
 import type { PlotNode } from '../../../api/types'
 import {
   assignedLevel, chapterOfAssignment, compareByTitle, nodeLabel, orderAssignedPlotpoints, plotpointDescriptionAllowed,
-  sortByTitle, titleAfterEdit,
+  plotlinesUnder, selectionState, sortByTitle, titleAfterEdit,
 } from './plotTree'
 import { standardSystem } from './timeSystem'
 
@@ -124,5 +124,28 @@ describe('orderAssignedPlotpoints', () => {
     expect(story([point('late', 's1'), point('early', 's2')])).toEqual(['late', 'early'])
     expect(ids([point('late', 's1'), point('early', 's2')])).toEqual(['early', 'late'])
     expect(story([point('two', 's4'), point('one', 's1')])).toEqual(['one', 'two'])
+  })
+})
+
+describe('ticking plotlines', () => {
+  const n = (id: string, kind: PlotNode['kind'], parentId: string | null): PlotNode =>
+    ({ id, kind, parentId, order: 0, title: id, body: '', assignedMomentId: null, assignedParagraphIndex: null, sourceFieldId: null, customFieldDefs: [], customFieldValues: {}, keywords: [], flag: null }) as PlotNode
+  const nodes = [n('cat', 'category', null), n('sub', 'subcategory', 'cat'), n('clu', 'cluster', 'sub'), n('a', 'plotline', 'clu'), n('b', 'plotline', 'sub'), n('c', 'plotline', 'cat'), n('pp', 'plotpoint', 'a')]
+  const children = new Map<string | null, PlotNode[]>()
+  for (const x of nodes) children.set(x.parentId, [...(children.get(x.parentId) ?? []), x])
+  const by = (id: string) => nodes.find(x => x.id === id)!
+
+  it('finds every plotline under a group, at any depth, and a plotline is its own', () => {
+    expect(plotlinesUnder(by('cat'), children).map(x => x.id).sort()).toEqual(['a', 'b', 'c'])
+    expect(plotlinesUnder(by('sub'), children).map(x => x.id).sort()).toEqual(['a', 'b'])
+    expect(plotlinesUnder(by('a'), children).map(x => x.id)).toEqual(['a'])
+    expect(plotlinesUnder(by('pp'), children)).toEqual([])
+  })
+
+  it('says whether all, some or none of a group is ticked', () => {
+    expect(selectionState(by('sub'), children, new Set())).toBe('none')
+    expect(selectionState(by('sub'), children, new Set(['a']))).toBe('some')
+    expect(selectionState(by('sub'), children, new Set(['a', 'b']))).toBe('all')
+    expect(selectionState(by('cat'), children, new Set(['a', 'b']))).toBe('some')
   })
 })

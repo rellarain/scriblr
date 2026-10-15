@@ -1,4 +1,4 @@
-import type { DragEvent } from 'react'
+import type { DragEvent, KeyboardEvent } from 'react'
 import type { PlotNode } from '../../../api/types'
 import type { WriterWorkspace } from './useWriterWorkspace'
 import { CloseIcon } from '../../icons'
@@ -14,7 +14,7 @@ import { plotColors, plotColorVars } from './plotColors'
 //   'placed'  boxed inside the act, scene or moment it is placed on. Shows the plotline and
 //             field, the title and the description. Its x returns it to the margin (Outline
 //             mode); on a moment it also carries the awareness eye.
-export function PlotpointTile({ w, point, variant, onUnassign, unassignTitle, drag, dragging, onMoment }: {
+export function PlotpointTile({ w, point, variant, onUnassign, unassignTitle, drag, dragging, onMoment, onOpen, where }: {
   w: WriterWorkspace
   point: PlotNode
   variant: 'margin' | 'placed'
@@ -25,6 +25,9 @@ export function PlotpointTile({ w, point, variant, onUnassign, unassignTitle, dr
   dragging?: boolean
   // Placed on a moment: the eye shows.
   onMoment?: boolean
+  // Makes the whole tile a button (the compare view's jump to the plotline's editor), and a line saying where it is placed.
+  onOpen?: () => void
+  where?: string
 }) {
   const plotline = point.parentId ? w.plotNodeById.get(point.parentId) : undefined
   const trail = (plotline ? plotTrail(plotline, w.plotNodeById) : []).map(nodeLabel).join(' › ')
@@ -39,6 +42,7 @@ export function PlotpointTile({ w, point, variant, onUnassign, unassignTitle, dr
       data-point={point.id} style={plotColorVars(colors)}
       draggable={Boolean(drag)}
       onDragStart={drag?.onDragStart} onDragEnd={drag?.onDragEnd}
+      {...(onOpen ? { role: 'button', tabIndex: 0, onClick: onOpen, onKeyDown: (e: KeyboardEvent) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); onOpen() } } } : {})}
     >
       <div className="wrPointTileTop">
         {variant === 'margin' && <span className="wrPointTileTrail" title={trail}>{trail}</span>}
@@ -59,6 +63,7 @@ export function PlotpointTile({ w, point, variant, onUnassign, unassignTitle, dr
       </div>
       <div className="wrPointTileTitle">{text.title || 'Untitled'}</div>
       {text.body.trim() !== '' && <div className="wrPointTileLine wrPointTileBody">{text.body}</div>}
+      {where !== undefined && <div className="wrPointTileWhere">{where}</div>}
     </div>
   )
 }

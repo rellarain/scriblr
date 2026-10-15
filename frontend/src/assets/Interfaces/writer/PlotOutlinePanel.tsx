@@ -7,7 +7,8 @@ import { AwarenessEye } from './AwarenessEye'
 import { buildChildIndex, chaptersOfBook } from './outlineTree'
 import { pointLook } from './plotCardColors'
 import { textOf } from './plotFields'
-import { nodeLabel } from './plotTree'
+import { plotColors, plotColorVars } from './plotColors'
+import { nodeLabel, plotTrail } from './plotTree'
 import type { WriterWorkspace } from './useWriterWorkspace'
 
 // The plotline editor's outline: the project's series, books, arcs and chapters as nested
@@ -15,14 +16,16 @@ import type { WriterWorkspace } from './useWriterWorkspace'
 // wear the book's primary colour, chapters a muted shade of its secondary colour. A chapter
 // lists this plotline's plotpoints assigned to it in one wrapping row of boxes, each with an
 // icon on the right: an x while it is only assigned to the chapter, the awareness eye once it
-// is placed on a moment, a lock on an act or scene.
+// is placed on a moment, a lock on an act or scene. Given several plotlines (the compare view) it lists all their plotpoints, each
+// chip marked with its plotline's colours, and `readOnly` takes away what changes them (the x and the eye's click).
 const SHOWN = new Set(['series', 'book', 'arc', 'chapter'])
 
-export function PlotOutlinePanel({ w, plotline, dragId, onDropChapter }: {
+export function PlotOutlinePanel({ w, plotlines, dragId, onDropChapter, readOnly = false }: {
   w: WriterWorkspace
-  plotline: PlotNode
+  plotlines: PlotNode[]
   dragId: string | null
   onDropChapter: (chapterId: string) => void
+  readOnly?: boolean
 }) {
   const { activeZone } = useThemeState()
   const index = useMemo(() => buildChildIndex(w.outlineNodes), [w.outlineNodes])
@@ -31,27 +34,37 @@ export function PlotOutlinePanel({ w, plotline, dragId, onDropChapter }: {
   const [overId, setOverId] = useState<string | null>(null)
   const toggle = (id: string) => setCollapsed(prev => { const next = new Set(prev); if (next.has(id)) next.delete(id); else next.add(id); return next })
 
-  const points = w.plotNodes.filter(p => p.kind === 'plotpoint' && p.parentId === plotline.id)
+  const lineIds = new Set(plotlines.map(l => l.id))
+  const several = plotlines.length > 1
+  const points = w.plotNodes.filter(p => p.kind === 'plotpoint' && p.parentId !== null && lineIds.has(p.parentId))
   const looks = new Map(points.map(p => [p.id, pointLook(p, w.outlineNodes, outlineById, w.plotNodeById, activeZone)]))
 
   function chip(p: PlotNode, chapter: OutlineNode) {
     const look = looks.get(p.id)!
     const target = p.assignedMomentId ? outlineById.get(p.assignedMomentId) : undefined
     const text = textOf(p, w.plotNodeById)
+    const line = p.parentId ? w.plotNodeById.get(p.parentId) : undefined
     let icon: React.ReactNode
-    if (look.level === 'chapter') {
+    if (readOnly && look.level === 'chapter') {
+      icon = <span className="wrPlotValueLock" title="Open the plotline to change it"><LockIcon size={13} /></span>
+    } else if (look.level === 'chapter') {
       icon = (
         <button type="button" className="wrPlotChipX" aria-label={`Unassign ${text.title || 'plotpoint'}`} title="Remove from the chapter" onClick={() => w.assignPlotpoint(p.id, null)}>
           <CloseIcon size={13} />
         </button>
       )
     } else if (target?.kind === 'moment' && p.awareness) {
-      icon = <AwarenessEye state={p.awareness} size={15} onCycle={() => w.cyclePlotAwareness(p.id)} />
+      icon = <AwarenessEye state={p.awareness} size={15} onCycle={readOnly ? undefined : () => w.cyclePlotAwareness(p.id)} />
     } else {
       icon = <span className="wrPlotValueLock" title="Placed in the chapter outline. Unassign it there first."><LockIcon size={13} /></span>
     }
     return (
-      <span key={p.id} className="wrPlotChip" data-point={p.id} style={look.style}>
+      <span
+        key={p.id} className="wrPlotChip" data-point={p.id}
+        style={several && line ? { ...look.style, ...plotColorVars(plotColors(line, w.plotNodeById)) } : look.style}
+        title={several && line ? [...plotTrail(line, w.plotNodeById), line].map(nodeLabel).join(' › ') : undefined}
+      >
+        {several && line && <i className="wrPlotChipLine" aria-hidden="true" />}
         <button
           type="button" className="wrPlotChipTitle" title={`Open ${nodeLabel(chapter)}`}
           onClick={() => { w.openChapter(chapter.id); w.highlightPlotpoint(p.id) }}
@@ -110,7 +123,7 @@ export function PlotOutlinePanel({ w, plotline, dragId, onDropChapter }: {
     <div className="wrOutlinePanel">
       <div className="wrChildRowsHead">
         <span className="wrLabel">Books and chapters</span>
-        <span className="wrOutlineMeta">Drop a plotpoint on a chapter</span>
+        <span className="wrOutlineMeta">{readOnly ? 'Where each plotpoint sits' : 'Drop a plotpoint on a chapter'}</span>
       </div>
       {roots.length === 0 && <p className="wrMuted">No books yet.</p>}
       <div className="wrPlotOutline">{roots.map(n => card(n, undefined, new Map()))}</div>

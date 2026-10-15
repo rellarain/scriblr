@@ -1,10 +1,12 @@
-import { fireEvent, render, screen, waitFor, within } from '@testing-library/react'
-import { describe, expect, it } from 'vitest'
+import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+import { __resetSettingsForTests } from '../../../settings/settingsStore'
 import type { PlotNode } from '../../../api/types'
 import { DraftPlotNotes } from './DraftPlotNotes'
 import { PlotpointTile } from './PlotpointTile'
 import PlotView from './PlotView'
-import { plotNode, startingPlot, useFakeWorkspace } from './plotTestWorkspace'
+import { OUTLINE, plotNode, startingPlot, useFakeWorkspace } from './plotTestWorkspace'
+import { syncReferences } from './plotFields'
 
 function Editor({ start = startingPlot(), focused = 'line', onNodes }: { start?: PlotNode[]; focused?: string; onNodes?: (n: PlotNode[]) => void }) {
   const { w, plotNodes } = useFakeWorkspace(start, focused)
@@ -362,5 +364,162 @@ describe('trails with a cluster', () => {
     }
     const { container } = render(<Tile />)
     expect(container).toHaveTextContent('Romance › Slow burn › Household')
+  })
+})
+
+// Two plotlines under the same subcategory, with values placed in different chapters.
+const twoLines = () => syncReferences([
+  ...startingPlot().map(n => (n.id === 'own' ? { ...n, assignedMomentId: 'ch2' } : n)),
+  plotNode('line2', 'plotline', 'sub', { title: 'Second thread', order: 1, customFieldDefs: [{ id: 'fTwist', name: 'Twist' }] }),
+  plotNode('twist', 'plotpoint', 'line2', { title: 'Betrayal reveal', fieldId: 'fTwist', assignedMomentId: 'ch1' }),
+  plotNode('loose', 'plotpoint', 'line2', { title: 'Loose end', fieldId: 'fTwist', order: 1 }),
+], new Map(OUTLINE.map(n => [n.id, n])))
+
+const tick = (name: string) => fireEvent.click(screen.getByLabelText(`Select ${name}`))
+const cardTitles = () => [...document.querySelectorAll('.wrCompareList .wrPointTileTitle')].map(e => e.textContent)
+
+// A narrow tile: the tool measures itself through a ResizeObserver.
+function narrow(width: number) {
+  vi.stubGlobal('ResizeObserver', class {
+    constructor(private cb: (entries: unknown[]) => void) {}
+    observe() { this.cb([{ contentRect: { width } }]) }
+    disconnect() {}
+  })
+}
+beforeEach(() => { window.localStorage.clear(); __resetSettingsForTests() })
+afterEach(() => { vi.unstubAllGlobals() })
+// A card in the compare list (a title also shows on the chapters' chips).
+const listCard = (title: string) => [...document.querySelectorAll<HTMLElement>('.wrCompareList .wrPointTile')].find(t => t.textContent?.includes(title))!
+
+describe('ticking plotlines in the contents', () => {
+  it('ticks a plotline, and a group ticks every plotline under it (the group shows some, then all)', () => {
+    render(<Editor start={twoLines()} />)
+    tick('Meet cute')
+    expect(screen.getByText('1 selected')).toBeInTheDocument()
+    expect((screen.getByLabelText('Select Slow burn') as HTMLInputElement).indeterminate).toBe(true)
+    tick('Slow burn')
+    expect((screen.getByLabelText('Select Slow burn') as HTMLInputElement).checked).toBe(true)
+    expect((screen.getByLabelText('Select Second thread') as HTMLInputElement).checked).toBe(true)
+    tick('Slow burn') // all ticked: unticks them all
+    expect((screen.getByLabelText('Select Meet cute') as HTMLInputElement).checked).toBe(false)
+  })
+
+  it('opens the compare view at two ticked plotlines, and a row\'s name goes back to its editor', () => {
+    render(<Editor start={twoLines()} />)
+    tick('Meet cute')
+    expect(screen.queryByRole('group', { name: 'Plotlines being compared' })).toBeNull()
+    tick('Second thread')
+    expect(screen.getByRole('group', { name: 'Plotlines being compared' })).toBeInTheDocument()
+    fireEvent.click(screen.getByRole('button', { name: 'Second thread' })) // the row's name
+    expect(screen.queryByRole('group', { name: 'Plotlines being compared' })).toBeNull()
+    expect(screen.getByDisplayValue('Second thread')).toBeInTheDocument() // its editor
+    fireEvent.click(screen.getByRole('button', { name: 'Compare (2)' }))
+    expect(screen.getByRole('group', { name: 'Plotlines being compared' })).toBeInTheDocument()
+  })
+
+  it('keeps the ticks while browsing, and unticking down to one returns to the editor', () => {
+    render(<Editor start={twoLines()} />)
+    tick('Meet cute'); tick('Second thread')
+    fireEvent.click(screen.getByRole('button', { name: 'Romance' }))
+    expect((screen.getByLabelText('Select Meet cute') as HTMLInputElement).checked).toBe(true)
+    tick('Second thread')
+    expect(screen.queryByRole('group', { name: 'Plotlines being compared' })).toBeNull()
+  })
+
+  it('clears the ticks', () => {
+    render(<Editor start={twoLines()} />)
+    tick('Meet cute'); tick('Second thread')
+    fireEvent.click(screen.getByRole('button', { name: 'Clear' }))
+    expect((screen.getByLabelText('Select Meet cute') as HTMLInputElement).checked).toBe(false)
+    expect(screen.queryByRole('group', { name: 'Plotlines being compared' })).toBeNull()
+  })
+})
+
+describe('the compare view', () => {
+  const open = () => { render(<Editor start={twoLines()} />); tick('Meet cute'); tick('Second thread') }
+
+  it('lists the plotpoints of both plotlines in one list, unassigned first and the placed ones in story order', () => {
+    open()
+    fireEvent.click(screen.getByRole('button', { name: 'In story' }))
+    const titles = cardTitles()
+    expect(titles.indexOf('Betrayal reveal')).toBeLessThan(titles.indexOf('Missed train')) // chapter 1 before chapter 2
+    expect(titles.indexOf('Loose end')).toBeLessThan(titles.indexOf('Betrayal reveal')) // unassigned before placed
+    expect(titles).toContain('Trust') // a reference shows its original's text
+  })
+
+  it('tags each card with its plotline and says where it is placed', () => {
+    open()
+    const card = listCard('Betrayal reveal')
+    expect(card).toHaveTextContent('Romance › Slow burn')
+    expect(card).toHaveTextContent('Second thread · Twist')
+    expect(card).toHaveTextContent('1 · Arrival')
+    expect(listCard('Loose end')).toHaveTextContent('Not placed yet')
+  })
+
+  it('hides a plotline\'s cards from its chip, and takes it out with the x', () => {
+    open()
+    const chip = within(screen.getByRole('group', { name: 'Plotlines being compared' }))
+    fireEvent.click(chip.getByRole('button', { name: 'Romance › Slow burn › Second thread' }))
+    expect(cardTitles()).not.toContain('Betrayal reveal')
+    expect(cardTitles()).toContain('Missed train')
+    fireEvent.click(chip.getByRole('button', { name: 'Deselect Second thread' }))
+    expect(screen.queryByRole('group', { name: 'Plotlines being compared' })).toBeNull() // one left: back to the editor
+  })
+
+  it('opens the plotline\'s editor from a card', () => {
+    open()
+    fireEvent.click(listCard('Betrayal reveal'))
+    expect(screen.queryByRole('group', { name: 'Plotlines being compared' })).toBeNull()
+    expect(screen.getByDisplayValue('Second thread')).toBeInTheDocument()
+  })
+
+  it('is read-only: no unassign button, and cards do not drag', () => {
+    open()
+    expect(screen.queryByRole('button', { name: /^Unassign/ })).toBeNull()
+    expect(document.querySelectorAll('.wrCompareList [draggable="true"]')).toHaveLength(0)
+  })
+
+  it('groups by plotline: a header and the plotline\'s own cards, side by side where there is room', () => {
+    open()
+    fireEvent.click(screen.getByRole('switch', { name: 'Group by plotline' }))
+    expect(document.querySelector('.wrCompareGroups--columns')).not.toBeNull()
+    const group = screen.getByRole('region', { name: 'Romance › Slow burn › Second thread' })
+    expect(group).toHaveTextContent('Betrayal reveal')
+    expect(group).not.toHaveTextContent('Missed train')
+  })
+
+  it('shows the chapters of every plotline beside the list', () => {
+    open()
+    const chips = [...document.querySelectorAll('.wrPlotChip')].map(c => c.textContent)
+    expect(chips.join(' ')).toContain('Betrayal reveal')
+    expect(chips.join(' ')).toContain('Missed train')
+  })
+})
+
+describe('on a narrow tile', () => {
+  it('shows the contents as a bar that folds down, and chooses a row from it', () => {
+    narrow(500)
+    render(<Editor start={twoLines()} />)
+    const bar = screen.getByRole('button', { expanded: false, name: /Romance › Slow burn › Meet cute/ })
+    expect(document.querySelector('.wrPlotNav')).toBeNull()
+    fireEvent.click(bar)
+    expect(document.querySelector('.wrPlotNav')).not.toBeNull()
+    fireEvent.click(screen.getByRole('button', { name: 'Second thread' }))
+    expect(document.querySelector('.wrPlotNav')).toBeNull() // folded again
+    expect(screen.getByDisplayValue('Second thread')).toBeInTheDocument()
+  })
+
+  it('compares in one column, with plotline sections that fold and the chapters folded away', () => {
+    narrow(500)
+    render(<Editor start={twoLines()} />)
+    fireEvent.click(screen.getByRole('button', { name: /Romance › Slow burn › Meet cute/ }))
+    tick('Meet cute'); tick('Second thread')
+    expect(screen.getByRole('button', { name: /Comparing 2 plotlines/ })).toBeInTheDocument()
+    fireEvent.click(screen.getByRole('switch', { name: 'Group by plotline' }))
+    const section = screen.getByRole('button', { name: /Second thread/, expanded: true })
+    fireEvent.click(section)
+    expect(screen.queryByText('Betrayal reveal')).toBeNull()
+    expect(screen.getByRole('button', { name: 'Chapters', expanded: false })).toBeInTheDocument()
+    expect(document.querySelector('.wrPlotChip')).toBeNull()
   })
 })

@@ -85,6 +85,8 @@ export function useWriterWorkspace() {
   const [plotStatus, setPlotStatus] = useState<AsyncStatus>('idle')
   const [plotError, setPlotError] = useState<string | undefined>(undefined)
   const [focusedPlotNodeId, setFocusedPlotNodeId] = useState<string | null>(null)
+  // The plotlines ticked in the Plot tool's contents (for the compare view); kept while browsing, reset with the project.
+  const [plotSelection, setPlotSelection] = useState<string[]>([])
   // The plotpoint a plot-outline click points at in the Draft level (shown highlighted for a moment).
   const [highlightedPointId, setHighlightedPointId] = useState<string | null>(null)
   // The plotpoint being dragged from the Project level's Plotpoints tab onto an Outline card (or back).
@@ -445,6 +447,7 @@ export function useWriterWorkspace() {
       setPlotSchemaVersion(summary.plot?.schemaVersion ?? 1)
       setPlotStatus('idle')
       setFocusedPlotNodeId(null)
+      setPlotSelection([])
       resetHistories(nodes, plot, summary.index)
       if (migrated) void plotSave.saveNow({ projectId: id, schemaVersion: summary.plot?.schemaVersion ?? 1, nodes: plot })
 
@@ -477,6 +480,7 @@ export function useWriterWorkspace() {
     setPlotStatus('idle')
     setPlotError(undefined)
     setFocusedPlotNodeId(null)
+    setPlotSelection([])
     resetHistories([], [], null)
 
     setView('project')
@@ -661,6 +665,17 @@ export function useWriterWorkspace() {
   // --- plot node mutators ---
   function focusPlotNode(nodeId: string | null) {
     setFocusedPlotNodeId(nodeId)
+  }
+
+  // Tick or untick one plotline, or several at once (a group's plotlines): `on` forces the state, else it flips.
+  function togglePlotSelection(ids: string | string[], on?: boolean) {
+    const list = Array.isArray(ids) ? ids : [ids]
+    setPlotSelection(prev => {
+      const set = new Set(prev)
+      const turnOn = on ?? !list.every(id => set.has(id))
+      for (const id of list) { if (turnOn) set.add(id); else set.delete(id) }
+      return [...set]
+    })
   }
 
   function addPlotNode(parentId: string | null, kind: PlotNodeKind, title?: string, afterId?: string) {
@@ -851,6 +866,7 @@ export function useWriterWorkspace() {
     }
     commitPlot(next, true)
     if (focusedPlotNodeId != null && removed.has(focusedPlotNodeId)) setFocusedPlotNodeId(null)
+    setPlotSelection(prev => (prev.some(id => removed.has(id)) ? prev.filter(id => !removed.has(id)) : prev))
   }
 
   return {
@@ -867,6 +883,7 @@ export function useWriterWorkspace() {
 
     plotNodes, plotStatus, plotError, plotSaving: plotSave.saving, plotSaveError: plotSave.error,
     focusedPlotNodeId, focusedPlotNode, plotChildrenByParentId, plotNodeById,
+    plotSelection, setPlotSelection, togglePlotSelection,
     focusPlotNode, addPlotNode, updatePlotNodeField, setPlotHue, deletePlotNode,
     addPlotKeyword, removePlotKeyword,
     addPlotField, renamePlotField, movePlotField, removePlotField,

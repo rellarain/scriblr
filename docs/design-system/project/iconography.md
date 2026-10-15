@@ -19,7 +19,7 @@ An icon is never smaller than 13 (the grip) and never coloured on its own: it ta
 | Group | Icons |
 |---|---|
 | Writing | `book-face`, `pencil`, `plot`, `arc`, `sentence`, `page`, `pages`, `bookmark`, `reaction`, `flag`, `export`, `save`, `restore` |
-| Header tabs | `calendar`, `checkbox`, `bar-chart`, `list`, `clock`, `gear`, `help`, `info`, `layout-mini`, `layout-midi`, `layout-max` |
+| Header tabs | `calendar`, `checkbox`, `bar-chart`, `list`, `clock`, `gear`, `help`, `info`, `layout-mini`, `layout-midi`, `layout-max`, `book-open` |
 | Actions | `plus`, `close`, `search`, `trash`, `grip`, `swap`, `expand`, `chevron-right`, `chevron-down`, `chevron-left`, `check` |
 | Time of day | `sunrise`, `sun`, `sunset`, `moon` |
 | Reading the plot | `eye`, `eye-forward`, `eye-left`, `eye-right`, `eye-closed` (a plotpoint's awareness) |

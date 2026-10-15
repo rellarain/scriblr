@@ -380,6 +380,14 @@ export function PagesIcon(props: IconProps) {
   </IconBase>
 }
 
+// An open book: two pages meeting at the spine -- the story's own order (the plotpoint order toggle).
+export function BookOpenIcon(props: IconProps) {
+  return <IconBase {...props}>
+    <path d="M12 6C9.6 4.4 6.6 4 3.5 4.6v13.2c3.1-.6 6.1-.2 8.5 1.4 2.4-1.6 5.4-2 8.5-1.4V4.6C17.4 4 14.4 4.4 12 6z" />
+    <path d="M12 6v13.2" />
+  </IconBase>
+}
+
 export function TrashIcon(props: IconProps) {
   return <IconBase {...props}>
     <path d="M4 7h16M9 7V4h6v3" />
