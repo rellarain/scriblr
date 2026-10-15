@@ -473,6 +473,12 @@ describe('the compare view', () => {
     expect(screen.getByDisplayValue('Second thread')).toBeInTheDocument()
   })
 
+  it('opens the field of the plotpoint it jumps to, so it can be seen', () => {
+    open()
+    fireEvent.click(listCard('Betrayal reveal'))
+    expect(screen.getAllByLabelText('Twist value title')).toHaveLength(2) // the Twist field is open, not collapsed
+  })
+
   it('is read-only: no unassign button, and cards do not drag', () => {
     open()
     expect(screen.queryByRole('button', { name: /^Unassign/ })).toBeNull()
@@ -507,6 +513,22 @@ describe('on a narrow tile', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Second thread' }))
     expect(document.querySelector('.wrPlotNav')).toBeNull() // folded again
     expect(screen.getByDisplayValue('Second thread')).toBeInTheDocument()
+  })
+
+  it('closes the contents drawer on Escape and on a click outside it', () => {
+    narrow(500)
+    render(<Editor start={twoLines()} />)
+    const bar = screen.getByRole('button', { expanded: false, name: /Romance › Slow burn › Meet cute/ })
+    fireEvent.click(bar)
+    expect(document.querySelector('.wrPlotNav')).not.toBeNull()
+    fireEvent.keyDown(document, { key: 'Escape' })
+    expect(document.querySelector('.wrPlotNav')).toBeNull()
+    fireEvent.click(bar)
+    fireEvent.mouseDown(document.querySelector('.wrPlotBody') as HTMLElement)
+    expect(document.querySelector('.wrPlotNav')).toBeNull()
+    fireEvent.click(bar)
+    fireEvent.mouseDown(document.querySelector('.wrPlotNav') as HTMLElement) // inside the drawer: it stays
+    expect(document.querySelector('.wrPlotNav')).not.toBeNull()
   })
 
   it('compares in one column, with plotline sections that fold and the chapters folded away', () => {

@@ -216,6 +216,15 @@ export default function PlotView({ w }: { w: WriterWorkspace }) {
   const [sizeRef, width] = useElementWidth<HTMLDivElement>()
   const size = plotSizeOf(width)
   const [barOpen, setBarOpen] = useState(false)
+  // The contents drawer closes on Escape or a click outside the bar.
+  useEffect(() => {
+    if (!barOpen) return
+    const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape') setBarOpen(false) }
+    const onDown = (e: MouseEvent) => { if (!(e.target as Element | null)?.closest?.('.wrPlotBar')) setBarOpen(false) }
+    document.addEventListener('keydown', onKey)
+    document.addEventListener('mousedown', onDown)
+    return () => { document.removeEventListener('keydown', onKey); document.removeEventListener('mousedown', onDown) }
+  }, [barOpen])
   const [compareOpen, setCompareOpen] = useState(false)
   const selectedLines = w.plotSelection.map(id => w.plotNodeById.get(id)).filter((n): n is PlotNode => n?.kind === 'plotline')
   const tickedCount = selectedLines.length
@@ -244,6 +253,12 @@ export default function PlotView({ w }: { w: WriterWorkspace }) {
     }),
     newValueId, setNewValueId,
   }
+
+  // A plotpoint pointed at (a click in the compare view or the chapter outline) is brought into view, its field opened.
+  useEffect(() => {
+    if (!w.highlightedPointId) return
+    bodyRef.current?.querySelector(`[data-point="${w.highlightedPointId}"]`)?.scrollIntoView?.({ block: 'center' })
+  }, [w.highlightedPointId, node?.id, openFields])
 
   const fields = useMemo(() => fieldIndex(w.plotNodes), [w.plotNodes])
   const outlineById = useMemo(() => new Map(w.outlineNodes.map(o => [o.id, o])), [w.outlineNodes])
@@ -407,7 +422,11 @@ export default function PlotView({ w }: { w: WriterWorkspace }) {
           {w.plotStatus === 'idle' && comparing && (
             <PlotCompare
               w={w} lines={selectedLines} size={size}
-              onOpen={(plotlineId, pointId) => { w.focusPlotNode(plotlineId); setCompareOpen(false); w.highlightPlotpoint(pointId) }}
+              onOpen={(plotlineId, pointId) => {
+                const fieldId = w.plotNodeById.get(pointId)?.fieldId
+                if (fieldId) ui.setOpen(fieldId, true)
+                w.focusPlotNode(plotlineId); setCompareOpen(false); w.highlightPlotpoint(pointId)
+              }}
               onDeselect={id => w.togglePlotSelection(id, false)}
             />
           )}
