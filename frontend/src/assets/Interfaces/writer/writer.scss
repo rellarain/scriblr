@@ -289,10 +289,10 @@
   .wrCardTitle { font-size: 12px; font-weight: 700; text-transform: uppercase; letter-spacing: 1px; }
   .wrChecklist { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 8px; }
   .wrCheckItem { display: flex; align-items: center; gap: 8px; font-size: 13px; label { display: flex; align-items: center; gap: 10px; flex: 1; min-width: 0; cursor: pointer; } input { accent-color: var(--wr-accent); } &--done span { opacity: 0.8; text-decoration: line-through; } }
-  .wrInlineAdd { display: flex; gap: 6px; input { flex: 1; min-width: 0; background: var(--wr-field); border: 0; border-radius: 0; color: var(--ink); font-size: 12px; padding: 6px 10px; outline: none; &::placeholder { color: var(--ink-faint); } } }
+  .wrInlineAdd { display: flex; flex-wrap: wrap; gap: 6px; input { flex: 1 1 90px; min-width: 0; background: var(--wr-field); border: 0; border-radius: 0; color: var(--ink); font-size: 12px; padding: 6px 10px; outline: none; &::placeholder { color: var(--ink-faint); } } }
   .wrStatRow { display: flex; flex-wrap: wrap; gap: 8px 18px; div { display: flex; flex-direction: column; } strong { font-size: 24px; } span { font-size: 10px; text-transform: uppercase; letter-spacing: 1px; opacity: 0.9; } }
   .wrBarRow { display: flex; flex-direction: column; gap: 4px; }
-  .wrBarLabel { display: flex; justify-content: space-between; font-size: 12px; span:last-child { opacity: 0.9; } }
+  .wrBarLabel { display: flex; flex-wrap: wrap; justify-content: space-between; gap: 0 10px; font-size: 12px; span:last-child { opacity: 0.9; } }
   .wrBarTrack { height: 8px; border-radius: 4px; background: var(--ov-sink-3); overflow: hidden; }
   .wrBarFill { height: 100%; background: var(--wr-accent); }
   .wrNotes { flex: 1 1 auto; min-height: 0; overflow-y: auto; display: flex; flex-direction: column; gap: 10px; scrollbar-width: none; &::-webkit-scrollbar { display: none; } }
@@ -772,7 +772,8 @@
   .wrParentKind { flex: 0 0 auto; font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: 1px; color: var(--ink-muted); }
   .wrParentTitle { font-weight: 700; overflow-wrap: anywhere; }
   .wrChapterTileTools { flex: 0 0 auto; display: flex; align-items: center; gap: 8px; margin-left: auto; }
-  .wrChapterTileMain { display: grid; grid-template-columns: minmax(0, 1fr) minmax(190px, 300px); gap: 8px 24px; align-items: start; }
+  // The title beside its stats; the stats drop under the title when the tile is too narrow for both (about 380px).
+  .wrChapterTileMain { display: flex; flex-wrap: wrap; gap: 8px 24px; align-items: flex-start; > .wrChapterTileName { flex: 1 1 170px; min-width: 0; } > .wrChapterTileStats { flex: 0 1 300px; min-width: min(100%, 190px); } }
   .wrChapterTileName { display: flex; flex-direction: column; gap: 4px; min-width: 0; .wrPageKicker { color: var(--ink-muted); } }
   .wrChapterTileStats { display: flex; flex-direction: column; gap: 4px; font-size: 12px; .wrPageMetaRow { color: var(--ink-muted); } .wrNodeStats { color: var(--ink-muted); } }
   .wrChapterTileWords { display: flex; align-items: baseline; justify-content: space-between; gap: 10px; }
@@ -905,6 +906,8 @@
   .wrLevelTitleRow { flex: 1 1 130px; min-width: 130px; display: flex; align-items: center; gap: 8px; }
   .wrHeaderExtras { flex: 0 1 auto; display: flex; flex-wrap: wrap; align-items: center; justify-content: flex-end; gap: 2px 6px; margin-left: auto; }
   .wrTabBar, .wrQuickActions { flex: 0 0 auto; display: flex; align-items: center; gap: 2px; }
+  // A level's tabs wrap onto a second row when the level is narrow (the side column can be as narrow as 200px).
+  .wrTabBar { flex: 0 1 auto; flex-wrap: wrap; max-width: 100%; }
   // The tab bar is a rounded container (radius-button) holding rounded tab buttons.
   .wrTabBar { padding: 2px; border-radius: 4px; background: var(--level-wash-lo); }
   .wrQuickActions { margin-left: 6px; gap: 4px; }
