@@ -13,6 +13,7 @@ import { FieldEditor, FieldGroups, type PlotDrag, type PlotUi } from './FieldBlo
 import { PlotOutlinePanel } from './PlotOutlinePanel'
 import { PlotNav, plotlineCount } from './PlotNav'
 import { PlotCompare } from './PlotCompare'
+import { PlotParents } from './PlotParents'
 import { plotSizeOf, useElementWidth } from './useElementWidth'
 import { PlotOrderToggle, usePlotOrder } from './plotOrder'
 import { fieldIndex, isScrapField, orderValues, valuesIn } from './plotFields'
@@ -108,6 +109,7 @@ function CategoryEditor({ w, node, ui }: { w: WriterWorkspace; node: PlotNode; u
   const colors = plotColors(node, w.plotNodeById)
   return (
     <div className={`wrCardPanel wrCardPanel--${node.kind}`} data-knode={node.id} style={plotColorVars(colors)}>
+      <PlotParents node={node} byId={w.plotNodeById} onOpen={w.focusPlotNode} />
       <div className="wrCardPanelHead">
         <span className="wrKindBadge">{node.kind}</span>
         <input className="wrTitleField" data-kf="" value={node.title} onChange={e => w.updatePlotNodeField(node.id, 'title', e.target.value)} placeholder={`${node.kind.charAt(0).toUpperCase()}${node.kind.slice(1)} title`} />
@@ -163,6 +165,7 @@ function PlotlineEditor({ w, node, ui }: { w: WriterWorkspace; node: PlotNode; u
     <div className="wrPlotlineLayout">
       <div className="wrPlotlineLeft">
         <div className="wrCardPanel wrCardPanel--plotline" data-knode={node.id} style={plotColorVars(colors)}>
+          <PlotParents node={node} byId={w.plotNodeById} onOpen={w.focusPlotNode} />
           <div className="wrCardPanelHead">
             <span className="wrKindBadge">plotline</span>
             <input className="wrTitleField" data-kf="" value={node.title} onChange={e => w.updatePlotNodeField(node.id, 'title', e.target.value)} placeholder="Plotline title" />
@@ -428,6 +431,7 @@ export default function PlotView({ w }: { w: WriterWorkspace }) {
                 w.focusPlotNode(plotlineId); setCompareOpen(false); w.highlightPlotpoint(pointId)
               }}
               onDeselect={id => w.togglePlotSelection(id, false)}
+              onOpenNode={id => { w.focusPlotNode(id); setCompareOpen(false) }}
             />
           )}
           {w.plotStatus === 'idle' && !comparing && !node && <p className="wrMuted">Select a category or plotline to edit it, or add a category.</p>}

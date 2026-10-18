@@ -545,3 +545,70 @@ describe('on a narrow tile', () => {
     expect(document.querySelector('.wrPlotChip')).toBeNull()
   })
 })
+
+// The parents above an editor's title: read-only chips, top-down, each with its description.
+const described = (nodes: PlotNode[]) => nodes.map(n => (n.id === 'cat' ? { ...n, body: 'Two people, slowly.' } : n.id === 'sub' ? { ...n, body: 'It takes a whole winter.' } : n))
+
+describe('the parent chips', () => {
+  const chips = () => within(screen.getByRole('group', { name: 'Parents' }))
+
+  it('sit above the plotline\'s title, top-down, each with its title and description', () => {
+    render(<Editor start={described(clustered())} />)
+    const group = screen.getByRole('group', { name: 'Parents' })
+    const title = screen.getByPlaceholderText('Plotline title')
+    expect(group.compareDocumentPosition(title) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
+    expect([...group.querySelectorAll('.wrParent')].map(c => c.className.match(/wrParent--(\w+)/)![1])).toEqual(['category', 'subcategory', 'cluster'])
+    expect(chips().getByRole('button', { name: /Romance/ })).toHaveTextContent('Two people, slowly.')
+    expect(chips().getByRole('button', { name: /Romance/ })).toHaveAttribute('title', 'Two people, slowly.') // the whole of it on hover
+    expect(screen.queryByText('plotline', { selector: '.wrKindBadge' })).not.toBeNull() // the editor itself is unchanged
+  })
+
+  it('show only the title for a parent with no description, and the title opens that parent', () => {
+    render(<Editor start={described(clustered())} />)
+    expect(chips().getByRole('button', { name: 'Open Household' })).not.toHaveAttribute('aria-expanded') // nothing to open
+    fireEvent.click(chips().getByRole('button', { name: 'Open Household' }))
+    expect(screen.getByPlaceholderText('Cluster title')).toHaveValue('Household')
+  })
+
+  it('open on a click to the whole description, and the title then opens the parent\'s editor', () => {
+    render(<Editor start={described(clustered())} />)
+    const chip = chips().getByRole('button', { name: /Slow burn/ })
+    expect(chip).toHaveAttribute('aria-expanded', 'false')
+    fireEvent.click(chip)
+    expect(chips().getByText('It takes a whole winter.')).toBeInTheDocument()
+    fireEvent.click(chips().getByRole('button', { name: 'Collapse Slow burn' }))
+    expect(chips().getByRole('button', { name: /Slow burn/ })).toHaveAttribute('aria-expanded', 'false')
+    fireEvent.click(chips().getByRole('button', { name: /Slow burn/ }))
+    fireEvent.click(chips().getByRole('button', { name: 'Open Slow burn' }))
+    expect(screen.getByPlaceholderText('Subcategory title')).toHaveValue('Slow burn')
+  })
+
+  it('are read-only: no input in them, and a description cannot be typed over', () => {
+    render(<Editor start={described(clustered())} />)
+    expect(document.querySelector('.wrParents input, .wrParents textarea')).toBeNull()
+  })
+
+  it('show on a cluster\'s and a subcategory\'s editor, and not on a category\'s', () => {
+    const { unmount } = render(<Editor start={described(clustered())} focused="clu" />)
+    expect([...document.querySelectorAll('.wrParent')].map(c => c.className.match(/wrParent--(\w+)/)![1])).toEqual(['category', 'subcategory'])
+    unmount()
+    const sub = render(<Editor start={described(clustered())} focused="sub" />)
+    expect([...document.querySelectorAll('.wrParent')].map(c => c.className.match(/wrParent--(\w+)/)![1])).toEqual(['category'])
+    sub.unmount()
+    render(<Editor start={described(clustered())} focused="cat" />)
+    expect(screen.queryByRole('group', { name: 'Parents' })).toBeNull()
+  })
+
+  it('head each plotline in the compare view\'s groups, and a title there leaves the comparison for that parent', () => {
+    render(<Editor start={described(twoLines())} />)
+    tick('Meet cute'); tick('Second thread')
+    fireEvent.click(screen.getByRole('switch', { name: 'Group by plotline' }))
+    const group = screen.getByRole('region', { name: 'Romance › Slow burn › Second thread' })
+    const parents = within(within(group).getByRole('group', { name: 'Parents' }))
+    expect(parents.getByRole('button', { name: /Romance/ })).toBeInTheDocument()
+    fireEvent.click(parents.getByRole('button', { name: /Slow burn/ }))
+    fireEvent.click(parents.getByRole('button', { name: 'Open Slow burn' }))
+    expect(document.querySelector('.wrCompare')).toBeNull()
+    expect(screen.getByPlaceholderText('Subcategory title')).toHaveValue('Slow burn')
+  })
+})

@@ -4,6 +4,7 @@ import type { WriterWorkspace } from './useWriterWorkspace'
 import { ChevronDownIcon, ChevronRightIcon, CloseIcon } from '../../icons'
 import { booksOf, chaptersOfBook } from './outlineTree'
 import { PlotOutlinePanel } from './PlotOutlinePanel'
+import { PlotParents } from './PlotParents'
 import { PlotpointTile } from './PlotpointTile'
 import { PlotOrderToggle, usePlotOrder } from './plotOrder'
 import { orderValues } from './plotFields'
@@ -21,13 +22,15 @@ import { useStoredState } from './storage'
 
 const trailOf = (line: PlotNode, byId: Map<string, PlotNode>) => [...plotTrail(line, byId), line].map(nodeLabel).join(' › ')
 
-export function PlotCompare({ w, lines, size, onOpen, onDeselect }: {
+export function PlotCompare({ w, lines, size, onOpen, onOpenNode, onDeselect }: {
   w: WriterWorkspace
   lines: PlotNode[]
   size: PlotSize
   // A card was chosen: open its plotline's editor (and point at the plotpoint).
   onOpen: (plotlineId: string, pointId: string) => void
   onDeselect: (plotlineId: string) => void
+  // A parent chip's title was chosen in a group header: open that category, subcategory or cluster's editor.
+  onOpenNode: (nodeId: string) => void
 }) {
   const [plotOrder] = usePlotOrder()
   const [grouped, setGrouped] = useStoredState<boolean>('scriblr.writer.plotCompareGrouped', false)
@@ -81,6 +84,7 @@ export function PlotCompare({ w, lines, size, onOpen, onDeselect }: {
                     <span>{trailOf(line, w.plotNodeById)}</span><span className="wrOutlineMeta">{mine.length}</span>
                   </button>
                 )}
+              {open && <PlotParents node={line} byId={w.plotNodeById} onOpen={onOpenNode} />}
               {open && <div className="wrCompareGroupBody">{mine.length === 0 ? <p className="wrMuted">No plotpoints yet.</p> : mine.map(card)}</div>}
             </section>
           )
