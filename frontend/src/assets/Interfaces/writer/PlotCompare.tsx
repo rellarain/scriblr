@@ -22,7 +22,7 @@ import { useStoredState } from './storage'
 
 const trailOf = (line: PlotNode, byId: Map<string, PlotNode>) => [...plotTrail(line, byId), line].map(nodeLabel).join(' › ')
 
-export function PlotCompare({ w, lines, size, onOpen, onOpenNode, onDeselect }: {
+export function PlotCompare({ w, lines, size, onOpen, onOpenNode, openParents, onToggleParent, onDeselect }: {
   w: WriterWorkspace
   lines: PlotNode[]
   size: PlotSize
@@ -31,6 +31,9 @@ export function PlotCompare({ w, lines, size, onOpen, onOpenNode, onDeselect }: 
   onDeselect: (plotlineId: string) => void
   // A parent chip's title was chosen in a group header: open that category, subcategory or cluster's editor.
   onOpenNode: (nodeId: string) => void
+  // The parent chips left open (shared with the editors) and the click that opens or closes one.
+  openParents: Set<string>
+  onToggleParent: (parentId: string) => void
 }) {
   const [plotOrder] = usePlotOrder()
   const [grouped, setGrouped] = useStoredState<boolean>('scriblr.writer.plotCompareGrouped', false)
@@ -84,7 +87,7 @@ export function PlotCompare({ w, lines, size, onOpen, onOpenNode, onDeselect }: 
                     <span>{trailOf(line, w.plotNodeById)}</span><span className="wrOutlineMeta">{mine.length}</span>
                   </button>
                 )}
-              {open && <PlotParents node={line} byId={w.plotNodeById} onOpen={onOpenNode} />}
+              {open && <PlotParents node={line} byId={w.plotNodeById} open={openParents} onToggle={onToggleParent} onOpen={onOpenNode} />}
               {open && <div className="wrCompareGroupBody">{mine.length === 0 ? <p className="wrMuted">No plotpoints yet.</p> : mine.map(card)}</div>}
             </section>
           )

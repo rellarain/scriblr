@@ -22,6 +22,9 @@ export interface PlotUi {
   // A value just created, so its title can take focus.
   newValueId: string | null
   setNewValueId: (id: string | null) => void
+  // The parent chips (PlotParents.tsx) left open, by parent id: kept while another node is opened.
+  openParents: Set<string>
+  toggleParent: (parentId: string) => void
 }
 
 // Dragging a value (to a chapter, or into another field) and a field (to reorder).

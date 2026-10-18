@@ -109,7 +109,7 @@ function CategoryEditor({ w, node, ui }: { w: WriterWorkspace; node: PlotNode; u
   const colors = plotColors(node, w.plotNodeById)
   return (
     <div className={`wrCardPanel wrCardPanel--${node.kind}`} data-knode={node.id} style={plotColorVars(colors)}>
-      <PlotParents node={node} byId={w.plotNodeById} onOpen={w.focusPlotNode} />
+      <PlotParents node={node} byId={w.plotNodeById} open={ui.openParents} onToggle={ui.toggleParent} onOpen={w.focusPlotNode} />
       <div className="wrCardPanelHead">
         <span className="wrKindBadge">{node.kind}</span>
         <input className="wrTitleField" data-kf="" value={node.title} onChange={e => w.updatePlotNodeField(node.id, 'title', e.target.value)} placeholder={`${node.kind.charAt(0).toUpperCase()}${node.kind.slice(1)} title`} />
@@ -165,7 +165,7 @@ function PlotlineEditor({ w, node, ui }: { w: WriterWorkspace; node: PlotNode; u
     <div className="wrPlotlineLayout">
       <div className="wrPlotlineLeft">
         <div className="wrCardPanel wrCardPanel--plotline" data-knode={node.id} style={plotColorVars(colors)}>
-          <PlotParents node={node} byId={w.plotNodeById} onOpen={w.focusPlotNode} />
+          <PlotParents node={node} byId={w.plotNodeById} open={ui.openParents} onToggle={ui.toggleParent} onOpen={w.focusPlotNode} />
           <div className="wrCardPanelHead">
             <span className="wrKindBadge">plotline</span>
             <input className="wrTitleField" data-kf="" value={node.title} onChange={e => w.updatePlotNodeField(node.id, 'title', e.target.value)} placeholder="Plotline title" />
@@ -245,7 +245,11 @@ export default function PlotView({ w }: { w: WriterWorkspace }) {
   // Which fields are open (collapsed by default), and the value just created (it takes focus).
   const [openFields, setOpenFields] = useState<Set<string>>(new Set())
   const [newValueId, setNewValueId] = useState<string | null>(null)
+  // The parent chips left open, kept while moving from one node to another.
+  const [openParents, setOpenParents] = useState<Set<string>>(new Set())
+  const toggleParent = (id: string) => setOpenParents(prev => { const next = new Set(prev); if (next.has(id)) next.delete(id); else next.add(id); return next })
   const ui: PlotUi = {
+    openParents, toggleParent,
     isOpen: id => openFields.has(id),
     setOpen: (id, open) => setOpenFields(prev => {
       if (prev.has(id) === open) return prev
@@ -432,6 +436,7 @@ export default function PlotView({ w }: { w: WriterWorkspace }) {
               }}
               onDeselect={id => w.togglePlotSelection(id, false)}
               onOpenNode={id => { w.focusPlotNode(id); setCompareOpen(false) }}
+              openParents={openParents} onToggleParent={toggleParent}
             />
           )}
           {w.plotStatus === 'idle' && !comparing && !node && <p className="wrMuted">Select a category or plotline to edit it, or add a category.</p>}

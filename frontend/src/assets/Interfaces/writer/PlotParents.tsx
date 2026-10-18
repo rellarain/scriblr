@@ -1,4 +1,3 @@
-import { useState } from 'react'
 import type { PlotNode } from '../../../api/types'
 import { ChevronDownIcon, ChevronRightIcon } from '../../icons'
 import { plotColors, plotColorVars } from './plotColors'
@@ -8,11 +7,17 @@ import { nodeLabel, plotTrail } from './plotTree'
 //   a chip shows its title only (its description is the hover text); the stripes at its left are its tree's: category, subcategory, cluster
 //   a chip with a description opens on a click to the whole description; its title then opens that parent's editor
 //   a chip with no description is just its title, and clicking it opens that parent's editor
-export function PlotParents({ node, byId, onOpen }: { node: PlotNode; byId: Map<string, PlotNode>; onOpen: (id: string) => void }) {
-  const [open, setOpen] = useState<Set<string>>(new Set())
+// Which chips are open belongs to the tool (PlotView), by parent: it stays as it was when another plotline under the same parents is opened.
+export function PlotParents({ node, byId, open, onToggle, onOpen }: {
+  node: PlotNode
+  byId: Map<string, PlotNode>
+  open: Set<string>
+  onToggle: (parentId: string) => void
+  onOpen: (id: string) => void
+}) {
   const parents = plotTrail(node, byId)
   if (parents.length === 0) return null
-  const flip = (id: string) => setOpen(prev => { const next = new Set(prev); if (next.has(id)) next.delete(id); else next.add(id); return next })
+  const flip = onToggle
 
   return (
     <div className="wrParents" role="group" aria-label="Parents">

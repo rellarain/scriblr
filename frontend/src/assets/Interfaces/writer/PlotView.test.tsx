@@ -680,3 +680,20 @@ describe('the level fold circles', () => {
     expect(within(flat.container).getAllByRole('button', { name: /all (categories|subcategories|clusters)$/ }).every(b => (b as HTMLButtonElement).disabled)).toBe(true)
   })
 })
+
+describe('the parent chips between pages', () => {
+  it('stay open when another plotline is opened, in the editor and in the compare view\'s groups', () => {
+    render(<Editor start={described(twoLines())} />)
+    const parents = () => within(screen.getByRole('group', { name: 'Parents' }))
+    fireEvent.click(parents().getByRole('button', { name: /Romance/ }))
+    expect(parents().getByRole('button', { name: 'Collapse Romance' })).toBeInTheDocument()
+    fireEvent.click(screen.getAllByRole('button', { name: 'Second thread' })[0]) // its row in the contents
+    expect(screen.getByPlaceholderText('Plotline title')).toHaveValue('Second thread')
+    expect(parents().getByRole('button', { name: 'Collapse Romance' })).toBeInTheDocument() // still open
+    expect(parents().getByRole('button', { name: /Slow burn/ })).toHaveAttribute('aria-expanded', 'false') // the others were never opened
+    tick('Meet cute'); tick('Second thread')
+    fireEvent.click(screen.getByRole('switch', { name: 'Group by plotline' }))
+    const group = screen.getByRole('region', { name: 'Romance › Slow burn › Second thread' })
+    expect(within(group).getByRole('button', { name: 'Collapse Romance' })).toBeInTheDocument()
+  })
+})
