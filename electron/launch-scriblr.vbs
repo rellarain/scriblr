@@ -9,7 +9,8 @@ WshEnv("SCRIBLR_FORCE_PROD") = "1"
 ' electron.exe to run as plain Node instead of launching the app (it
 ' silently crashes with no visible window, since we launch hidden).
 WshEnv.Remove("ELECTRON_RUN_AS_NODE")
-WshShell.CurrentDirectory = "C:\Users\rella\scriblr\scriblr\electron"
+' This file's own folder (electron/), wherever the repository is.
+WshShell.CurrentDirectory = CreateObject("Scripting.FileSystemObject").GetParentFolderName(WScript.ScriptFullName)
 ' Window style 1 (normal), not 0 (hidden) -- Electron's first window on
 ' Windows inherits the launching process's show-state hint, so a hidden
 ' launch suppresses the whole app's window, not just a console flash.

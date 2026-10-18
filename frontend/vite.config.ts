@@ -4,6 +4,13 @@ import react from '@vitejs/plugin-react'
 // https://vitejs.dev/config/
 export default defineConfig({
   plugins: [react()],
+  css: {
+    preprocessorOptions: {
+      // Vite 4 compiles Sass through Sass's legacy JS API and Sass warns about that on every run (in the build and in every test file
+      // that imports a stylesheet); it is the tool's to fix, not the stylesheets'. Other deprecations are still shown.
+      scss: { silenceDeprecations: ['legacy-js-api'] },
+    },
+  },
   build: {
     rollupOptions: {
       output: {

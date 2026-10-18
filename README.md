@@ -45,8 +45,9 @@ backend/
 │       ├── presets_store.py           # global (non-project) plot-preset catalog
 │       ├── user_settings_store.py      # global user settings: time-of-day theme, UI prefs, Writer UI state (kv)
 │       └── pdf_export.py               # fpdf2 book/chapter PDF export
-├── tests/                    # 30 pytest modules, one per feature area (+ conftest.py fixtures)
+├── tests/                    # 38 pytest modules, one per feature area (+ conftest.py fixtures)
 ├── server_main.py            # entrypoint used by Electron / PyInstaller
+├── requirements.lock          # exact dependency versions (what CI installs)
 └── scriblr.spec               # PyInstaller build spec
 
 frontend/
@@ -651,6 +652,17 @@ npm test          # one-shot run
 npm run test:watch
 ```
 
+**Dependencies.** `backend/requirements.lock` pins the exact versions the backend is built and tested with (what CI installs:
+`pip install -r requirements.lock`, then `pip install -e . --no-deps`); `pyproject.toml` keeps the ranges. To refresh it, make a new
+virtual environment, run `pip install -e ".[dev]"`, test, and keep `pip freeze --exclude-editable`. The frontend and the shell pin
+theirs in `package-lock.json`. CI runs `npm audit` and `pip-audit` on what ships, weekly and on every push, as an advisory job (it
+reports and does not fail the build).
+
+**Releasing.** `scripts/release.ps1` runs the whole chain from a checkout: the three versions must agree (`-Version 0.2.0` sets
+them), then ruff, pytest, `tsc`, eslint and vitest, the frontend build, PyInstaller, electron-builder, and a smoke check of the
+packaged backend (started on a free port against a scratch data folder: health, the shelves' overview, a deep route, a refused bad
+id, and no process left behind). `-SkipTests`, `-SkipBuild` and `-SkipSmoke` leave a step out.
+
 ## Running the desktop app
 
 `electron/main.js` opens Scriblr in a native window via
@@ -734,15 +746,16 @@ package, by launching Electron directly against `electron/` in prod mode
 (`--prod`). Create or refresh it with:
 
 ```powershell
+# Run from the repository root (the folder holding backend, electron and frontend).
 $desktop = [Environment]::GetFolderPath('Desktop')
-$electronExe = 'C:\Users\rella\scriblr\scriblr\electron\node_modules\electron\dist\electron.exe'
-$appDir = 'C:\Users\rella\scriblr\scriblr\electron'
+$appDir = (Resolve-Path .\electron).Path
+$electronExe = Join-Path $appDir 'node_modules\electron\dist\electron.exe'
 $shell = New-Object -ComObject WScript.Shell
 $shortcut = $shell.CreateShortcut((Join-Path $desktop 'Scriblr.lnk'))
 $shortcut.TargetPath = $electronExe
 $shortcut.Arguments = "`"$appDir`" --prod"
 $shortcut.WorkingDirectory = $appDir
-$shortcut.IconLocation = 'C:\Users\rella\scriblr\scriblr\backend\icon.ico'
+$shortcut.IconLocation = (Resolve-Path .\backend\icon.ico).Path
 $shortcut.Description = 'Scriblr - offline writing app'
 $shortcut.Save()
 ```

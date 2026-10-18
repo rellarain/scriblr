@@ -24,6 +24,14 @@ HOST = os.environ.get("SCRIBLR_HOST", "127.0.0.1")
 PORT = int(os.environ.get("SCRIBLR_PORT", "8000"))
 
 
+def ensure_std_streams() -> None:
+    """A windowed build started with no console and no redirection has no stdout or stderr (they are None), which uvicorn's
+    logging cannot cope with: the process then stays up without ever listening. Give such a start somewhere to write."""
+    for name in ("stdout", "stderr"):
+        if getattr(sys, name) is None:
+            setattr(sys, name, open(os.devnull, "w", encoding="utf-8"))  # kept open for the life of the process
+
+
 def frontend_dist_path() -> Path:
     """Resolve the built frontend directory.
 
@@ -37,6 +45,7 @@ def frontend_dist_path() -> Path:
 
 
 def main() -> None:
+    ensure_std_streams()
     from app.main import create_app
 
     frontend_dist = frontend_dist_path()
