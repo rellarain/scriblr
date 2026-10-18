@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import {
   DEFAULT_BOOK_HUE, HUE_CODE_MAX, HUE_CODE_MIN, accentColorCss, stripeColorCss, stripeHsl, bookScopeVars, bookThemeHue, clampCodeToWindow, clampHueToWindow, coverColor,
-  fillCap, fillColorCss, fillHsl, hexToHue, hueDelta, hueHsl, hueOfCode, hueWindow, themeColorCss, wrapHue,
+  SAT_LOUD, SAT_MIDDLE, SAT_QUIET, SLIDER_DARKEN, fillCap, fillColorCss, fillHsl, hexToHue, outlineSat, sliderLight, hueDelta, hueHsl, hueOfCode, hueWindow, themeColorCss, wrapHue,
 } from './bookColors'
 import { DEFAULT_PALETTE } from './defaults'
 import { deriveTokens } from './tokens'
@@ -160,5 +160,43 @@ describe('the card stripe', () => {
     expect(stripeColorCss(40)).toBe('hsl(40, var(--color-accent-s), max(calc(var(--color-accent-l) + 12%), 72%))')
     expect(stripeHsl(40, { s: 80, l: 42 })).toEqual({ h: 40, s: 80, l: 72 }) // a light zone: raised to the floor
     expect(stripeHsl(40, { s: 45, l: 62 })).toEqual({ h: 40, s: 45, l: 74 }) // a dark zone: the 12-point lift
+  })
+})
+
+describe('saturation tiers', () => {
+  it('step up from quiet to middle to loud, a factor of the zone\'s saturation', () => {
+    expect([SAT_QUIET, SAT_MIDDLE, SAT_LOUD]).toEqual([0.5, 0.75, 1])
+    expect(themeColorCss(200, SAT_QUIET)).toBe('hsl(200, calc(var(--color-theme-s) * 0.5), var(--color-theme-l))')
+    expect(accentColorCss(200, SAT_MIDDLE)).toBe('hsl(200, calc(var(--color-accent-s) * 0.75), var(--color-accent-l))')
+    expect(stripeColorCss(40, SAT_QUIET)).toBe('hsl(40, calc(var(--color-accent-s) * 0.5), max(calc(var(--color-accent-l) + 12%), 72%))')
+    expect(fillColorCss(200, SAT_MIDDLE)).toBe(`hsl(200, calc(calc(var(--color-accent-s) * 0.75) * 0.62), clamp(0%, calc(var(--color-accent-l) - 8%), ${fillCap(200)}%))`)
+    expect(fillColorCss(200, SAT_LOUD)).toBe(fillColorCss(200))
+  })
+
+  it('apply to the numbers the audit reads too', () => {
+    expect(fillHsl(200, { s: 80, l: 42 }, SAT_QUIET).s).toBeCloseTo(80 * 0.62 * 0.5)
+    expect(stripeHsl(40, { s: 80, l: 42 }, SAT_MIDDLE).s).toBe(60)
+  })
+
+  it('give a series the quietest, a book the middle, and an arc and what is under it the loudest', () => {
+    expect(['series', 'book', 'arc', 'chapter', 'moment'].map(outlineSat)).toEqual([0.5, 0.75, 1, 1, 1])
+  })
+
+  it('hold the fill\'s cap low enough for the quietest tier in every zone', () => {
+    for (let h = 0; h < 360; h += 10) {
+      for (const look of Object.values(ZONE_LOOKS)) {
+        for (const k of [SAT_QUIET, SAT_MIDDLE, SAT_LOUD]) expect(fillHsl(h, { s: look.accentS, l: 99 }, k).l).toBeLessThanOrEqual(fillCap(h))
+      }
+    }
+  })
+})
+
+describe('the hue slider\'s lightness', () => {
+  it('is darker by day and at dawn, and as it was at dusk and night', () => {
+    expect(sliderLight('day', 70)).toBe(70 - SLIDER_DARKEN)
+    expect(sliderLight('dawn', 70)).toBe(70 - SLIDER_DARKEN)
+    expect(sliderLight('dusk', 70)).toBe(70)
+    expect(sliderLight('night', 30)).toBe(30)
+    expect(sliderLight('day', 5)).toBe(0)
   })
 })

@@ -1,7 +1,7 @@
 import { useMemo, type CSSProperties, type ReactNode } from 'react'
 import type { OutlineNode } from '../../../../api/types'
 import type { WriterWorkspace } from '../useWriterWorkspace'
-import { stripeColorCss } from '../../../../theme/bookColors'
+import { outlineSat, stripeColorCss } from '../../../../theme/bookColors'
 import { fullDate, shortDate, type ChapterMeta } from '../chapterDates'
 import { buildChildIndex, descendantsOf } from '../outlineTree'
 import { nodeLabel } from '../plotTree'
@@ -28,7 +28,7 @@ export function ChapterTile({ w, chapter, chapterWords, meta, tools, error }: {
   const trail = useMemo(() => parentTrail(chapter.id, nodeById), [chapter.id, nodeById])
   const chapterNumber = w.activeBookChapters.findIndex(c => c.id === chapter.id) + 1
   // The stripe on a card is the level's accent colour lifted brighter than its tint, 7px wide.
-  const tint = (node: OutlineNode) => ({ '--wr-node-tint': w.levelTintOf(node), '--wr-node-accent': stripeColorCss(w.levelHueOf(node)) } as CSSProperties)
+  const tint = (node: OutlineNode) => ({ '--wr-node-tint': w.levelTintOf(node), '--wr-node-accent': stripeColorCss(w.levelHueOf(node), outlineSat(node.kind)) } as CSSProperties)
 
   const inside = useMemo(() => descendantsOf(index, chapter.id).filter(n => !n.freeDraft), [index, chapter.id])
   const count = (kind: OutlineNode['kind'], one: string) => {

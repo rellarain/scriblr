@@ -612,3 +612,28 @@ describe('the parent chips', () => {
     expect(screen.getByPlaceholderText('Subcategory title')).toHaveValue('Slow burn')
   })
 })
+
+describe('the contents order', () => {
+  it('lists a category\'s own plotlines before its subcategories, and a subcategory\'s before its clusters', () => {
+    const start = clustered().concat(
+      plotNode('direct', 'plotline', 'cat', { title: 'Zzz straight under', order: 5 }),
+      plotNode('late', 'plotline', 'sub', { title: 'Zzz late', order: 6 }),
+    )
+    const { container } = render(<Editor start={start} />)
+    const rows = [...container.querySelectorAll('.wrNavRow')].map(r => [r.className.match(/wrNavRow--(\w+)/)![1], r.querySelector('.wrNavLabel')?.textContent])
+    expect(rows).toEqual([
+      ['category', 'Romance'], ['plotline', 'Zzz straight under'],
+      ['subcategory', 'Slow burn'], ['plotline', 'Zzz late'], ['cluster', 'Household'], ['plotline', 'Meet cute'],
+    ])
+  })
+})
+
+describe('inherited field groups', () => {
+  it('put the parent\'s title first and its kind ("From category") at the far right of the head', () => {
+    render(<Editor />)
+    const head = screen.getByRole('region', { name: 'From category: Romance' }).querySelector('.wrFieldGroupHead') as HTMLElement
+    expect(head.querySelector('.wrFieldGroupName')).toHaveTextContent('Romance')
+    expect(head.lastElementChild).toHaveClass('wrFieldGroupOrigin')
+    expect(head.lastElementChild).toHaveTextContent('From category')
+  })
+})

@@ -191,31 +191,31 @@ Each cell is the ratio at the default hues (theme 330, accent 32, alert 200) and
 
 | Pair | Needs | Dawn | Day | Dusk | Night |
 |---|---|---|---|---|---|
-| Level title on its fill | 4.5:1 | 7.4 (7.1) | 6.8 (6.6) | 6.8 (6.6) | 7.4 (6.7) |
-| Level text on fill-1 | 4.5:1 | 8.5 (8.1) | 7.9 (7.7) | 7.9 (7.7) | 8.5 (7.7) |
-| Muted level text (90%) on fill-1 | 4.5:1 | 7.2 (7.0) | 6.8 (6.6) | 6.8 (6.6) | 7.2 (6.6) |
-| Level text on fill-2 | 4.5:1 | 9.7 (9.3) | 9.1 (8.9) | 9.1 (8.9) | 9.7 (8.9) |
-| Muted level text (90%) on fill-2 | 4.5:1 | 8.2 (7.9) | 7.7 (7.6) | 7.7 (7.6) | 8.2 (7.6) |
-| Level text on fill-3 | 4.5:1 | 11.1 (10.7) | 10.5 (10.3) | 10.5 (10.3) | 11.1 (10.3) |
-| Muted level text (90%) on fill-3 | 4.5:1 | 9.3 (9.0) | 8.9 (8.7) | 8.9 (8.7) | 9.3 (8.7) |
-| Level text on fill-4 | 4.5:1 | 12.6 (12.3) | 12.1 (11.9) | 12.1 (11.9) | 12.6 (11.9) |
+| Level title on its fill | 4.5:1 | 7.4 (7.1) | 6.8 (6.6) | 6.8 (6.6) | 7.4 (6.8) |
+| Level text on fill-1 | 4.5:1 | 8.5 (8.1) | 7.9 (7.7) | 7.9 (7.7) | 8.5 (7.8) |
+| Muted level text (90%) on fill-1 | 4.5:1 | 7.2 (7.0) | 6.8 (6.6) | 6.8 (6.6) | 7.2 (6.7) |
+| Level text on fill-2 | 4.5:1 | 9.7 (9.3) | 9.1 (8.9) | 9.1 (8.9) | 9.7 (9.0) |
+| Muted level text (90%) on fill-2 | 4.5:1 | 8.2 (7.9) | 7.7 (7.6) | 7.7 (7.6) | 8.2 (7.7) |
+| Level text on fill-3 | 4.5:1 | 11.1 (10.7) | 10.5 (10.3) | 10.5 (10.3) | 11.1 (10.4) |
+| Muted level text (90%) on fill-3 | 4.5:1 | 9.3 (9.0) | 8.9 (8.7) | 8.9 (8.7) | 9.3 (8.8) |
+| Level text on fill-4 | 4.5:1 | 12.6 (12.3) | 12.1 (11.9) | 12.1 (11.9) | 12.6 (12.0) |
 | Muted level text (90%) on fill-4 | 4.5:1 | 10.5 (10.3) | 10.1 (9.9) | 10.1 (9.9) | 10.5 (10.0) |
-| Outline page muted text (85%) on the page | 4.5:1 | 6.7 (6.4) | 6.2 (6.1) | 6.2 (6.1) | 6.7 (6.1) |
+| Outline page muted text (85%) on the page | 4.5:1 | 6.7 (6.4) | 6.2 (6.1) | 6.2 (6.1) | 6.7 (6.2) |
 | Outline page label (75%) on the page | 4.5:1 | 5.6 (5.4) | 5.3 (5.1) | 5.3 (5.1) | 5.6 (5.2) |
 | Outline label (75%) on a card | 4.5:1 | 6.3 (6.1) | 5.9 (5.8) | 5.9 (5.8) | 6.3 (5.9) |
 | Header button text on its wash | 4.5:1 | 4.9 (4.8) | 4.7 (4.6) | 4.7 (4.6) | 4.9 (4.6) |
-| Collapsed header text on its hover | 4.5:1 | 5.4 (5.2) | 5.1 (5.0) | 5.1 (5.0) | 5.4 (5.0) |
-| Text on a cover wash | 4.5:1 | 10.8 (10.4) | 10.2 (10.0) | 10.2 (10.0) | 10.8 (10.0) |
+| Collapsed header text on its hover | 4.5:1 | 5.4 (5.2) | 5.1 (5.0) | 5.1 (5.0) | 5.4 (5.1) |
+| Text on a cover wash | 4.5:1 | 10.8 (10.4) | 10.2 (10.0) | 10.2 (10.0) | 10.8 (10.1) |
 | Arc tab label (92%) on the cover colour | 4.5:1 | 6.6 (6.3) | 6.1 (5.9) | 6.1 (5.9) | 6.6 (6.0) |
-| Card stripe (the accent colour, lifted) on the level page | 3:1 | 4.6 (4.0) | 4.6 (3.8) | 4.8 (3.6) | 4.8 (3.8) |
+| Card stripe (the accent colour, lifted) on the level page | 3:1 | 4.6 (4.0) | 4.6 (3.8) | 4.8 (3.7) | 4.8 (3.8) |
 
 ## Plot colours
 
 | Pair | Needs | Dawn | Day | Dusk | Night |
 |---|---|---|---|---|---|
-| Ink on a plot category, the worst hue | 4.5:1 | 12.3 (11.6) | 13.3 (13.2) | 6.2 (5.1) | 8.7 (8.7) |
-| White on a plot subcategory, the worst hue | 4.5:1 | 7.2 (7.1) | 6.6 (6.6) | 6.6 (6.6) | 6.7 (6.7) |
-| White on a plot cluster, the worst hue | 4.5:1 | 7.2 (7.1) | 6.6 (6.6) | 6.6 (6.6) | 6.7 (6.7) |
+| Ink on a plot category, the worst hue | 4.5:1 | 12.6 (12.0) | 13.9 (13.8) | 7.3 (6.1) | 9.3 (9.3) |
+| White on a plot subcategory, the worst hue | 4.5:1 | 7.4 (7.1) | 7.3 (6.9) | 6.8 (6.8) | 6.8 (6.8) |
+| White on a plot cluster, the worst hue | 4.5:1 | 7.2 (7.1) | 6.6 (6.6) | 6.6 (6.6) | 6.8 (6.8) |
 
 ## Inbox tones
 

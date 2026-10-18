@@ -1,7 +1,7 @@
 import { useMemo, type CSSProperties } from 'react'
 import type { OutlineNode } from '../../../api/types'
 import { PlusIcon } from '../../icons'
-import { bookThemeHue, fillColorCss, tabColors } from '../../../theme/bookColors'
+import { SAT_MIDDLE, bookThemeHue, fillColorCss, tabColors } from '../../../theme/bookColors'
 import { useThemeState } from '../../../theme/useTheme'
 import { buildChildIndex } from './outlineTree'
 import { nodeLabel } from './plotTree'
@@ -62,7 +62,7 @@ export function EdgeTabs({ w, activeChapterId, activeArcId = null, onChapter, on
   const railWidth = Math.max(leaves * LEAF_STEP + 4 + 15, furthest * LEAF_STEP + 4 + 38)
 
   return (
-    <div className="wrEdgeRail" style={{ '--leaves': leaves, '--rail-w': `${railWidth}px`, '--wr-cover': fillColorCss(bookThemeHue(book)) } as CSSProperties}>
+    <div className="wrEdgeRail" style={{ '--leaves': leaves, '--rail-w': `${railWidth}px`, '--wr-cover': fillColorCss(bookThemeHue(book), SAT_MIDDLE) } as CSSProperties}>
       {/* The pages behind the open one, their edges stepping out behind the tabs. */}
       <div className="wrEdgeLeaves" aria-hidden="true">
         {Array.from({ length: leaves }, (_, i) => <i key={i} style={{ '--leaf': i + 1 } as CSSProperties} />)}

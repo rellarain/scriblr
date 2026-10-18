@@ -11,6 +11,7 @@ import { copyPalette, disableZone, enableZone, configuredZones, formatMinute, ST
 import { editHue } from './paletteRules'
 import { derivedShades, hslCss, tints, type Swatch } from './palettes'
 import { ZONE_LOOKS } from './zoneLooks'
+import { sliderLight } from './bookColors'
 import { setPreviewZone, useThemeState } from './useTheme'
 import { ZONE_KEYS, ZONE_LABEL, type PaletteKey, type Role, type ZoneKey, type ZonePalette } from './types'
 import './themeSettings.scss'
@@ -105,7 +106,8 @@ function ZoneEditor({ zoneKey, role }: { zoneKey: ZoneKey; role: Role }) {
       <p className="themeLook">{ZONE_LOOKS[zoneKey].summary}</p>
 
       {COLOR_ROWS.filter(row => !row.adminOnly || role === 'admin').map(row => {
-        const { s, l: light } = derivedShades(pal, row.key, zoneKey)[0].color
+        const { s, l } = derivedShades(pal, row.key, zoneKey)[0].color
+        const light = sliderLight(zoneKey, l)
         const { h } = pal[row.key]
         return (
           <section key={row.key} className="themeColor">

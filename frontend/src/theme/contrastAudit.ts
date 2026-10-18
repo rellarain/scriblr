@@ -1,4 +1,4 @@
-import { tabColors, fillCap, fillHsl, stripeHsl } from './bookColors'
+import { tabColors, fillCap, fillHsl, stripeHsl, SAT_LOUD, SAT_MIDDLE, SAT_QUIET, SAT_TIERS } from './bookColors'
 import { readableInk, type HSL } from './contrast'
 import { levelPairs } from './levelContrast'
 import { skyLook } from './skyLook'
@@ -145,16 +145,19 @@ export function paletteRatios(zone: ZoneKey, hues: AuditHues = DEFAULT_HUES): Pa
 
   // ---- the plot editor's colours: a category is the theme's colour at its hue (the ink on it), a subcategory's or cluster's surface the level fill of its hue
   // (white on it, as on any level); each worst over every hue a plot node can carry, and the subcategory also at the app theme's own hue.
+  // Each at its saturation tier: a category the quietest, a subcategory the middle one, a cluster the loudest.
   let worstCategory = Infinity
-  let worstSubcategory = ratioOfRgb(WHITE, rgbOf(fillHsl(hues.theme, colors.accent)))
+  let worstSubcategory = ratioOfRgb(WHITE, rgbOf(fillHsl(hues.theme, colors.accent, SAT_MIDDLE)))
+  let worstCluster = ratioOfRgb(WHITE, rgbOf(fillHsl(hues.theme, colors.accent, SAT_LOUD)))
   for (let h = 0; h < 360; h += 5) {
-    worstCategory = Math.min(worstCategory, ratioOfRgb(ink, rgbOf(hsl(h, colors.theme.s, colors.theme.l))))
-    worstSubcategory = Math.min(worstSubcategory, ratioOfRgb(WHITE, rgbOf(fillHsl(h, colors.accent))))
+    worstCategory = Math.min(worstCategory, ratioOfRgb(ink, rgbOf(hsl(h, colors.theme.s * SAT_QUIET, colors.theme.l))))
+    worstSubcategory = Math.min(worstSubcategory, ratioOfRgb(WHITE, rgbOf(fillHsl(h, colors.accent, SAT_MIDDLE))))
+    worstCluster = Math.min(worstCluster, ratioOfRgb(WHITE, rgbOf(fillHsl(h, colors.accent, SAT_LOUD))))
   }
   out.push({ id: 'plot-category', group: 'Plot colours', label: 'Ink on a plot category, the worst hue', kind: 'text', ratio: worstCategory })
   out.push({ id: 'plot-subcategory', group: 'Plot colours', label: 'White on a plot subcategory, the worst hue', kind: 'text', ratio: worstSubcategory })
-  // A cluster's surface is the same fill, over the same hues (within 60 degrees of its category's).
-  out.push({ id: 'plot-cluster', group: 'Plot colours', label: 'White on a plot cluster, the worst hue', kind: 'text', ratio: worstSubcategory })
+  // A cluster's surface is the same fill at the loudest tier, over the same hues (within 60 degrees of its category's).
+  out.push({ id: 'plot-cluster', group: 'Plot colours', label: 'White on a plot cluster, the worst hue', kind: 'text', ratio: worstCluster })
 
   // ---- Theme settings: the timeline's icon on its segment (the zone's accent hue at 50% lightness, as ThemeSettingsPanel draws it)
   const segment = hsl(colors.accent.h, colors.accent.s, 50)
@@ -174,14 +177,20 @@ export function paletteRatios(zone: ZoneKey, hues: AuditHues = DEFAULT_HUES): Pa
 // ---------------------------------------------------------------- the pairs that depend on a level's colour
 
 // One level's panel: the text on its fill and on the shades nested inside it, in a zone, for a hue.
+// A level's colours come in three saturation tiers (a series quiet, a book middle, the rest loud), so each pair is the worst of the three.
 export function levelRatios(zone: ZoneKey, hue: number): Pair[] {
   const look = ZONE_LOOKS[zone]
-  const fill = fillHsl(hue, { s: look.accentS, l: look.accentL })
-  const pairs: Pair[] = levelPairs(fill).map(p => ({ id: p.id, group: 'Level panels', label: p.label, kind: 'text' as const, ratio: p.ratio }))
-  // The 7px accent stripe on a card's edge (an arc, a chapter, a book), against the lightest ground it sits on (the level's page, fill-1).
-  const stripe = rgbOf(stripeHsl(hue, { s: look.accentS, l: look.accentL }))
-  pairs.push({ id: 'level/stripe', group: 'Level panels', label: 'Card stripe (the accent colour, lifted) on the level page', kind: 'ui', ratio: ratioOfRgb(stripe, mixRgb(rgbOf(fill), 90, BLACK)) })
-  return pairs
+  const accent = { s: look.accentS, l: look.accentL }
+  const worst = new Map<string, Pair>()
+  const keep = (p: Pair) => { const seen = worst.get(p.id); if (!seen || p.ratio < seen.ratio) worst.set(p.id, p) }
+  for (const k of SAT_TIERS) {
+    const fill = fillHsl(hue, accent, k)
+    for (const p of levelPairs(fill)) keep({ id: p.id, group: 'Level panels', label: p.label, kind: 'text', ratio: p.ratio })
+    // The 7px accent stripe on a card's edge (an arc, a chapter, a book), against the lightest ground it sits on (the level's page, fill-1).
+    const stripe = rgbOf(stripeHsl(hue, accent, k))
+    keep({ id: 'level/stripe', group: 'Level panels', label: 'Card stripe (the accent colour, lifted) on the level page', kind: 'ui', ratio: ratioOfRgb(stripe, mixRgb(rgbOf(fill), 90, BLACK)) })
+  }
+  return [...worst.values()]
 }
 
 // The edge tab of a level colour in a zone (the tab's background is fitted for the ink: bookColors.tabColors).

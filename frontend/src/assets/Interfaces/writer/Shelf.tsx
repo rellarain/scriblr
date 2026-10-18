@@ -2,7 +2,7 @@ import { useEffect, useRef, type CSSProperties, type ReactNode } from 'react'
 import type { BookProgress, Measure, OutlineNode } from '../../../api/types'
 import type { ShelfGroup } from './outlineTree'
 import { nodeLabel } from './plotTree'
-import { bookThemeHue, fillColorCss } from '../../../theme/bookColors'
+import { SAT_MIDDLE, bookThemeHue, fillColorCss } from '../../../theme/bookColors'
 
 // A spine's size follows its book: the width from 5px (a goal of 15,000 words or none) to 64px (192,000 words or more), 1px wider for every further 3,000 words, the height from 110px to
 // 140px, so the bars on it have room. The selected book turns from its spine to its front cover, COVER_WIDTH wide.
@@ -69,7 +69,7 @@ export function Spine({ book, number, progress, active, onOpen }: { book: Outlin
     <button
       type="button"
       className={active ? 'wrSpine wrSpine--active' : 'wrSpine'}
-      style={{ height, width: active ? COVER_WIDTH : width, '--wr-spine': fillColorCss(bookThemeHue(book)) } as CSSProperties}
+      style={{ height, width: active ? COVER_WIDTH : width, '--wr-spine': fillColorCss(bookThemeHue(book), SAT_MIDDLE) } as CSSProperties}
       onClick={onOpen}
       aria-label={label}
       title={`${label} (book ${number})`}

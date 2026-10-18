@@ -138,6 +138,8 @@ export function FieldBlock({ w, info, holder, editable, ui, drag, showAssigned }
   )
 }
 
+// The origin of an inherited group, shown at the far right of its head (the title on the left is the parent's own).
+const GROUP_ORIGIN: Partial<Record<FieldScope, string>> = { cluster: 'From cluster', subcategory: 'From subcategory', category: 'From category' }
 const GROUP_TITLE: Record<FieldScope, (owners: PlotNode[]) => string> = {
   plotline: () => 'Plotline fields',
   cluster: owners => `From cluster: ${owners.map(nodeLabel).join(', ')}`,
@@ -163,10 +165,11 @@ export function FieldGroups({ w, plotline, ui, drag, showAssigned }: {
         return (
           <section key={scope} className="wrFieldGroup" aria-label={GROUP_TITLE[scope](owners)}>
             <div className="wrFieldGroupHead">
-              <button type="button" className="wrFieldToggle" aria-expanded={!isClosed} onClick={() => toggle(scope)}>
+              <button type="button" className="wrFieldToggle" aria-expanded={!isClosed} aria-label={GROUP_TITLE[scope](owners)} onClick={() => toggle(scope)}>
                 {isClosed ? <ChevronRightIcon size={14} /> : <ChevronDownIcon size={14} />}
-                <span className="wrFieldGroupName">{GROUP_TITLE[scope](owners)}</span>
+                <span className="wrFieldGroupName">{GROUP_ORIGIN[scope] ? owners.map(nodeLabel).join(', ') : GROUP_TITLE[scope](owners)}</span>
               </button>
+              {GROUP_ORIGIN[scope] && <span className="wrFieldGroupOrigin">{GROUP_ORIGIN[scope]}</span>}
               {scope === 'plotline' && (
                 <button
                   type="button" className="wrSmallBtn"

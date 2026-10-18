@@ -1,5 +1,5 @@
 import type { OutlineNode } from '../../../api/types'
-import { bookThemeHue, clampCodeToWindow, hueDelta, hueOfCode, themeColorCss, wrapHue } from '../../../theme/bookColors'
+import { bookThemeHue, clampCodeToWindow, hueDelta, hueOfCode, outlineSat, themeColorCss, wrapHue } from '../../../theme/bookColors'
 
 // The Writer's level colours. Each level has a colour (a hue in degrees: see theme/bookColors.ts); the one
 // saturation and the lightness come from the active theme zone.
@@ -30,8 +30,8 @@ export function levelHue(node: HueNode, nodes: HueNodes, projectHue: number): nu
   return parent ? levelHue(parent, nodes, projectHue) : projectHue
 }
 
-// The node's colour as CSS (the zone's theme saturation and lightness).
-export const levelTint = (node: HueNode, nodes: HueNodes, projectHue: number): string => themeColorCss(levelHue(node, nodes, projectHue))
+// The node's colour as CSS (the zone's theme saturation, in the node's tier: a series quiet, a book middle, the rest loud, and its lightness).
+export const levelTint = (node: HueNode, nodes: HueNodes, projectHue: number): string => themeColorCss(levelHue(node, nodes, projectHue), outlineSat(node.kind))
 
 // The hue a node's own hue must stay near, or null when it may be any hue (a book).
 export function hueCentre(node: HueNode, nodes: HueNodes, projectHue: number): number | null {

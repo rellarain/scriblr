@@ -24,7 +24,7 @@ import { getOutlineSnapshot, getPlotSnapshot, getProjectSettingsLog, listOutline
 import { newestFirst, nextSetting, nextSnapshot, sameValue, type LogEntry } from '../../../lib/logUndo'
 import { useUndoHistory } from '../../../lib/useUndoHistory'
 import { insertAfter } from '../../../lib/siblingOrder'
-import { DEFAULT_BOOK_HUE, fillColorCss, hueOfCode } from '../../../theme/bookColors'
+import { DEFAULT_BOOK_HUE, fillColorCss, hueOfCode, outlineSat } from '../../../theme/bookColors'
 import { useThemeState } from '../../../theme/useTheme'
 import { autoPickHue, defaultProjectHue, fitToParent, hueCentre, levelHue, levelTint, reconcileHues } from './levelHues'
 
@@ -125,7 +125,7 @@ export function useWriterWorkspace() {
   // The node's colour as CSS (its brightness).
   const levelTintOf = (node: OutlineNode): string => levelTint(node, hueNodes, projectHue)
   // The same colour as a panel's flat fill (the accent's saturation and lightness).
-  const levelFillOf = (node: OutlineNode): string => fillColorCss(levelHue(node, hueNodes, projectHue))
+  const levelFillOf = (node: OutlineNode): string => fillColorCss(levelHue(node, hueNodes, projectHue), outlineSat(node.kind))
   // The hue a node's own hue must stay within 60 degrees of; null for a book (any hue).
   const hueCentreOf = (node: OutlineNode): number | null => hueCentre(node, hueNodes, projectHue)
 

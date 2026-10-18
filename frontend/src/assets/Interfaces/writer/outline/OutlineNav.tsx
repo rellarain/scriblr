@@ -2,7 +2,7 @@ import { useMemo, type CSSProperties, type ReactNode } from 'react'
 import type { OutlineNode } from '../../../../api/types'
 import type { WordCounts } from '../../../../api/draftFetch'
 import type { WriterWorkspace } from '../useWriterWorkspace'
-import { stripeColorCss } from '../../../../theme/bookColors'
+import { outlineSat, stripeColorCss } from '../../../../theme/bookColors'
 import { GripIcon, PlusIcon } from '../../../icons'
 import { useNodeKeys } from '../../../../lib/nodeKeys'
 import { buildChildIndex } from '../outlineTree'
@@ -74,7 +74,7 @@ export function OutlineNav({ w, book, counts, chapterBody, focus = null }: {
   })
 
   // The stripe on a card is the level's accent colour lifted brighter than its tint, 7px wide.
-  const tint = (node: OutlineNode) => ({ '--wr-node-tint': w.levelTintOf(node), '--wr-node-accent': stripeColorCss(w.levelHueOf(node)) } as CSSProperties)
+  const tint = (node: OutlineNode) => ({ '--wr-node-tint': w.levelTintOf(node), '--wr-node-accent': stripeColorCss(w.levelHueOf(node), outlineSat(node.kind)) } as CSSProperties)
   const grip = (id: string) => id === focus?.id ? null : (
     <span className="wrGrip wrGrip--light" aria-label="Drag to reorder" title="Drag to reorder" {...dnd.gripProps(id)}>
       <GripIcon size={14} />

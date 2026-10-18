@@ -9,7 +9,7 @@ import HueSlider from './HueSlider'
 import { useNodeKeys } from '../../../lib/nodeKeys'
 import { useWordCounts } from './useWordCounts'
 import { formatWords } from './wordCount'
-import { DEFAULT_BOOK_HUE, bookThemeHue, stripeColorCss } from '../../../theme/bookColors'
+import { DEFAULT_BOOK_HUE, SAT_MIDDLE, bookThemeHue, stripeColorCss } from '../../../theme/bookColors'
 
 // The project outline: its series and books as nested cards in a single column.
 // A series groups books (the shelf shows each series as a labelled, darkened
@@ -74,7 +74,7 @@ function ProjectOutline({ w }: { w: WriterWorkspace }) {
       <div
         key={book.id} data-node={book.id} data-knode={book.id}
         className={dnd.cardClass('wrProjBook wrOutlineCard', book.id)}
-        style={{ ['--wr-node-color' as string]: stripeColorCss(bookThemeHue(book)) }}
+        style={{ ['--wr-node-color' as string]: stripeColorCss(bookThemeHue(book), SAT_MIDDLE) }}
       >
         <div className="wrProjTop">
           {grip(book.id)}

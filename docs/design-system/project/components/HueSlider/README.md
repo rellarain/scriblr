@@ -13,7 +13,7 @@ Code: `writer/HueSlider.tsx` (a level's colour), `components/ColorRange.tsx` (th
 
 ## Anatomy
 
-`.colorRange` (a 12px track in a gradient of twelve hue stops), an invisible range input over it (keyboard and pointer), and the **thumb**: a 22px square with a 2px white border holding a smaller square of the resulting colour. Arrow keys step one degree; the label is the control's `aria-label`.
+`.colorRange` (a 12px track in a gradient of twelve hue stops, drawn 15 lightness points darker by day and at dawn, whose colours are pale: `sliderLight`), an invisible range input over it (keyboard and pointer), and the **thumb**: a 22px square with a 2px white border holding a smaller square of the resulting colour. Arrow keys step one degree; the label is the control's `aria-label`.
 
 The theme editor's four hue sliders are the same control with `live`, which switches the palette fade off while the thumb is dragged, so the preview tracks it.
 

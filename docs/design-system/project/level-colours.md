@@ -1,6 +1,6 @@
 # Level colours
 
-Every level of the Writer, every book, arc and chapter, and every plot category has a colour. It is **a hue in degrees, 0 to 360** (0 and 360 are both red), stored as one number (`OutlineNode.themeHue`, `ProjectSettings.themeHue`, `PlotNode.hue`). Saturation and lightness are the zone's, so the same colour is paler by day and deeper at night. Code: `frontend/src/theme/bookColors.ts`, `assets/Interfaces/writer/levelHues.ts`; mirrored in `backend/app/storage/schema.py` (`MIN_LEVEL_HUE` 0, `MAX_LEVEL_HUE` 360, `HUE_SCHEME` 4).
+Every level of the Writer, every book, arc and chapter, and every plot category has a colour. It is **a hue in degrees, 0 to 360** (0 and 360 are both red), stored as one number (`OutlineNode.themeHue`, `ProjectSettings.themeHue`, `PlotNode.hue`). Saturation and lightness are the zone's, so the same colour is paler by day and deeper at night; the saturation comes in **three tiers** (below). Code: `frontend/src/theme/bookColors.ts`, `assets/Interfaces/writer/levelHues.ts`; mirrored in `backend/app/storage/schema.py` (`MIN_LEVEL_HUE` 0, `MAX_LEVEL_HUE` 360, `HUE_SCHEME` 4).
 
 (Earlier versions also stored a brightness, darker, base or lighter, in the same number. It is gone: the backend converts those colours to their hue once, on load.)
 
@@ -17,6 +17,18 @@ Every level of the Writer, every book, arc and chapter, and every plot category 
 | Plot category | any hue; a subcategory or a cluster within 60 degrees of its category's |
 
 A series, arc, chapter, subcategory or cluster with no colour of its own shows its parent's. New ones take a hue in their window, spread away from their siblings'. Changing a parent pulls its children's hues back inside their window. The hue slider is **one track**, 0 to 360: unlimited, or the plus-or-minus 60 degree window round the parent's hue (`HueSlider`, [the preview](components/HueSlider/README.md)).
+
+## Saturation tiers
+
+A tree's colours get louder the deeper they go. The tier is a factor of the zone's saturation (`SAT_QUIET` 0.5, `SAT_MIDDLE` 0.75, `SAT_LOUD` 1 in `bookColors.ts`):
+
+| Tier | Plot tree | Outline |
+|---|---|---|
+| quiet, 0.5 | category (surface and stripe) | series |
+| middle, 0.75 | subcategory (fill and stripe) | book (spine, cover, rail, card stripe) |
+| loud, 1 | cluster (fill and stripe) | arc, chapter and everything under them |
+
+The project and the Dash stay at the zone's own saturation. A fill's lightness cap (`fillCap`) holds white text readable at every tier in every zone, and the contrast audit takes the worst of the three.
 
 ## From a hue to a panel
 

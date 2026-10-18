@@ -48,6 +48,16 @@ export const clampCodeToWindow = (centre: number, code: number, width = SUBCATEG
 
 // ---------------------------------------------------------------- hues as colours
 
+// Saturation tiers. A tree's colours get louder the deeper they go: the top of it (a plot category, a series) is the quietest, the middle
+// (a subcategory, a book) a step up, and the deepest (a cluster, an arc and what is under it) the zone's own full saturation. A tier
+// is a factor of the zone's saturation, so the zone's character still shows.
+export const SAT_QUIET = 0.5
+export const SAT_MIDDLE = 0.75
+export const SAT_LOUD = 1
+export const SAT_TIERS = [SAT_QUIET, SAT_MIDDLE, SAT_LOUD]
+// The tier of an outline node's colour: a series quiet, a book middle, an arc and everything under it loud.
+export const outlineSat = (kind: string): number => (kind === 'series' ? SAT_QUIET : kind === 'book' ? SAT_MIDDLE : SAT_LOUD)
+
 const FILL_SATURATION = 0.62
 const FILL_DARKEN = 8
 // A panel fill carries white text, so it is held no lighter than this at the very most, whatever the zone's own lightness (a night
@@ -63,7 +73,10 @@ export function fillCap(hue: number): number {
   const h = wrapHue(hue)
   let cap = capCache.get(h)
   if (cap === undefined) {
-    cap = fitLightness(h, ZONE_LOOKS.day.accentS * FILL_SATURATION, FILL_MAX_L, -1, c => worstLevelRatio(c) >= TEXT_TARGET)
+    // Held for every tier in every zone: a quieter fill of a hue can read brighter (a blue, a red) than a louder one, and a zone's saturation
+    // differs, so the lowest of the lot stands (darker is always safer for white text).
+    const sats = Object.values(ZONE_LOOKS).flatMap(look => SAT_TIERS.map(k => look.accentS * FILL_SATURATION * k))
+    cap = Math.min(...sats.map(s => fitLightness(h, s, FILL_MAX_L, -1, c => worstLevelRatio(c) >= TEXT_TARGET)))
     capCache.set(h, cap)
   }
   return cap
@@ -75,9 +88,10 @@ export function hueHsl(code: number, basis: { s: number; l: number }): HSL {
 }
 
 // The same colour as CSS, following the active zone through the theme variables.
-function hueCss(code: number, family: 'theme' | 'accent', fill = false): string {
+const satCss = (family: 'theme' | 'accent', k: number): string => (k === 1 ? `var(--color-${family}-s)` : `calc(var(--color-${family}-s) * ${k})`)
+function hueCss(code: number, family: 'theme' | 'accent', fill = false, k = 1): string {
   const hue = hueOfCode(code)
-  const sVar = `var(--color-${family}-s)`
+  const sVar = satCss(family, k)
   const lVar = `var(--color-${family}-l)`
   // A panel fill is the accent's colour a little less loud and a little deeper (the template's flat olive, green, blue).
   if (!fill) return `hsl(${hue}, ${sVar}, ${lVar})`
@@ -86,32 +100,37 @@ function hueCss(code: number, family: 'theme' | 'accent', fill = false): string 
 
 // CSS for the two colour families. (`hue` may itself be a CSS value such as var(--color-theme-h), which
 // is the zone's own colour at that hue.)
-export const themeColorCss = (hue: number | string): string =>
-  typeof hue === 'number' ? hueCss(hue, 'theme') : `hsl(${hue}, var(--color-theme-s), var(--color-theme-l))`
-export const accentColorCss = (hue: number | string): string =>
-  typeof hue === 'number' ? hueCss(hue, 'accent') : `hsl(${hue}, var(--color-accent-s), var(--color-accent-l))`
+// `k` is the saturation tier (SAT_QUIET .. SAT_LOUD).
+export const themeColorCss = (hue: number | string, k = 1): string =>
+  typeof hue === 'number' ? hueCss(hue, 'theme', false, k) : `hsl(${hue}, ${satCss('theme', k)}, var(--color-theme-l))`
+export const accentColorCss = (hue: number | string, k = 1): string =>
+  typeof hue === 'number' ? hueCss(hue, 'accent', false, k) : `hsl(${hue}, ${satCss('accent', k)}, var(--color-accent-l))`
 
 // The 7px stripe on a card's edge (an arc, a chapter, a book): the accent colour lifted to be brighter, at least STRIPE_MIN_L light, so it
 // reads against the level's dark page in every zone (3:1; the contrast audit measures it over every hue).
 export const STRIPE_LIFT = 12
 export const STRIPE_MIN_L = 72
-export const stripeColorCss = (hue: number): string =>
-  `hsl(${hueOfCode(hue)}, var(--color-accent-s), max(calc(var(--color-accent-l) + ${STRIPE_LIFT}%), ${STRIPE_MIN_L}%))`
-export const stripeHsl = (hue: number, accent: { s: number; l: number }): HSL =>
-  ({ h: hueOfCode(hue), s: accent.s, l: Math.min(100, Math.max(accent.l + STRIPE_LIFT, STRIPE_MIN_L)) })
+export const stripeColorCss = (hue: number, k = 1): string =>
+  `hsl(${hueOfCode(hue)}, ${satCss('accent', k)}, max(calc(var(--color-accent-l) + ${STRIPE_LIFT}%), ${STRIPE_MIN_L}%))`
+export const stripeHsl = (hue: number, accent: { s: number; l: number }, k = 1): HSL =>
+  ({ h: hueOfCode(hue), s: accent.s * k, l: Math.min(100, Math.max(accent.l + STRIPE_LIFT, STRIPE_MIN_L)) })
 
 // The same fill as numbers, for a zone's accent saturation and lightness (what fillColorCss draws in CSS; the contrast audit and the
 // design system's token file use it).
-export function fillHsl(hue: number, accent: { s: number; l: number }): HSL {
-  return { h: hueOfCode(hue), s: accent.s * FILL_SATURATION, l: clamp(accent.l - FILL_DARKEN, 0, fillCap(hue)) }
+export function fillHsl(hue: number, accent: { s: number; l: number }, k = 1): HSL {
+  return { h: hueOfCode(hue), s: accent.s * FILL_SATURATION * k, l: clamp(accent.l - FILL_DARKEN, 0, fillCap(hue)) }
 }
 
 // A level panel's flat fill: the colour in the accent family, a little less loud and deeper. A hue given as CSS (the app theme's own,
 // var(--color-theme-h)) is held to the theme hue's cap (--theme-fill-cap, tokens.ts).
-export const fillColorCss = (hue: number | string): string =>
+export const fillColorCss = (hue: number | string, k = 1): string =>
   typeof hue === 'number'
-    ? hueCss(hue, 'accent', true)
-    : `hsl(${hue}, calc(var(--color-accent-s) * ${FILL_SATURATION}), clamp(0%, calc(var(--color-accent-l) - ${FILL_DARKEN}%), var(--theme-fill-cap, ${FILL_MAX_L}%)))`
+    ? hueCss(hue, 'accent', true, k)
+    : `hsl(${hue}, calc(${satCss('accent', k)} * ${FILL_SATURATION}), clamp(0%, calc(var(--color-accent-l) - ${FILL_DARKEN}%), var(--theme-fill-cap, ${FILL_MAX_L}%)))`
+
+// A hue slider's track is drawn this much darker by day and at dawn, whose colours are pale, so it reads against its panel.
+export const SLIDER_DARKEN = 15
+export const sliderLight = (zone: ZoneKey, light: number): number => (zone === 'day' || zone === 'dawn' ? Math.max(0, light - SLIDER_DARKEN) : light)
 
 // The zone's own theme saturation and lightness: what a hue slider draws a base hue at.
 export function zoneBasis(pal: ZonePalette, zone: ZoneKey): { s: number; l: number } {

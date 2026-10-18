@@ -34,7 +34,9 @@ export function PlotNav({ w, onOpenNode, onCompare }: {
 
   // Each level of nesting is indented 14px, so a plotline reads as belonging to what it sits directly under.
   function rows(parentId: string | null, depth: number): React.ReactNode[] {
-    return sortByTitle((children.get(parentId) ?? []).filter(n => n.kind !== 'plotpoint'))
+    // What a node holds directly comes first: its plotlines, then its subcategories or clusters, each in title order.
+    const here = (children.get(parentId) ?? []).filter(n => n.kind !== 'plotpoint')
+    return [...sortByTitle(here.filter(n => n.kind === 'plotline')), ...sortByTitle(here.filter(n => n.kind !== 'plotline'))]
       .flatMap(node => {
         const kids = (children.get(node.id) ?? []).filter(c => c.kind !== 'plotpoint')
         const hasKids = kids.length > 0

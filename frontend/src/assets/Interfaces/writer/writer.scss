@@ -399,7 +399,7 @@
     button:focus-visible { outline: 2px solid var(--wr-accent-light); outline-offset: -2px; }
   }
   .wrParentMain { display: flex; align-items: center; justify-content: space-between; gap: 10px; min-width: 0; width: 100%; padding: 6px 10px 6px 10px; &:hover { background: color-mix(in srgb, var(--wr-parent-ink) 10%, transparent); } }
-  .wrParentLabel, .wrParentLink { font-size: 15px; font-weight: 700; text-transform: uppercase; letter-spacing: 1.5px; }
+  .wrParentLabel, .wrParentLink { font-size: 14px; font-weight: 700; text-transform: uppercase; letter-spacing: 1.5px; }
   .wrParentLabel { flex: 0 1 auto; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
   .wrParentLink { padding: 6px 10px; text-decoration: underline; text-underline-offset: 3px; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; &:hover { background: color-mix(in srgb, var(--wr-parent-ink) 10%, transparent); } }
   .wrParentHead { display: flex; align-items: center; justify-content: space-between; gap: 6px; min-width: 0; }
@@ -449,7 +449,8 @@
   .wrFieldGroup { display: flex; flex-direction: column; gap: 6px; background: var(--ov-sink-1); border-radius: 8px; padding: 10px 12px; }
   .wrFieldGroupHead { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
   .wrFieldGroupName { font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 1.5px; }
-  .wrFieldToggle { display: inline-flex; align-items: center; gap: 6px; flex: 0 0 auto; color: inherit; text-align: left; }
+  .wrFieldToggle { display: inline-flex; align-items: center; gap: 6px; flex: 0 1 auto; min-width: 0; color: inherit; text-align: left; }
+  .wrFieldGroupOrigin { flex: 0 0 auto; margin-left: auto; font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 1.5px; opacity: 0.9; }
   .wrFieldBlock { display: flex; flex-direction: column; gap: 6px; border-top: 1px solid var(--hairline); padding-top: 6px; &--over { outline: 2px dashed var(--wr-accent-light); outline-offset: 2px; } &--dragging { opacity: 0.7; } }
   .wrFieldHead { display: flex; align-items: center; gap: 6px; min-height: 26px; }
   .wrFieldName { flex: 1 1 auto; min-width: 0; box-sizing: border-box; background: var(--wr-field); border: 0; border-radius: 0; color: var(--ink); font-size: 12px; font-weight: 700; padding: 5px 8px; outline: none; &:focus { box-shadow: inset 0 0 0 1px var(--wr-accent); } &::placeholder { color: var(--ink-faint); } }

@@ -1,9 +1,10 @@
 import type { PlotNode } from '../../../api/types'
-import { accentColorCss, fillColorCss, themeColorCss } from '../../../theme/bookColors'
+import { SAT_LOUD, SAT_MIDDLE, SAT_QUIET, accentColorCss, fillColorCss, themeColorCss } from '../../../theme/bookColors'
 
 // Colour coding for the plot tree. A category has a hue drawn in the theme's
 // colour; a subcategory and a cluster have a hue drawn in the accent's colour, each kept within 60 degrees of its category's.
-// Saturation and brightness are the active zone's, through CSS variables, so the colours follow the theme.
+// Saturation and brightness are the active zone's, through CSS variables, so the colours follow the theme; the saturation is in tiers,
+// the quietest for a category (half the zone's), a subcategory in the middle (three quarters), a cluster the loudest (all of it).
 //   - a category with no hue of its own shows the app theme's hue
 //   - a subcategory with no hue of its own uses its category's
 //   - a cluster with no hue of its own uses its subcategory's (its category's outside one)
@@ -43,19 +44,19 @@ export function plotColors(node: PlotNode, byId: Map<string, PlotNode>): PlotCol
     current = current.parentId ? byId.get(current.parentId) : undefined
   }
   const categoryHue = category?.hue ?? null
-  const categoryCss = category ? themeColorCss(categoryHue ?? APP_HUE) : null
+  const categoryCss = category ? themeColorCss(categoryHue ?? APP_HUE, SAT_QUIET) : null
   const subcategoryHue = subcategory ? subcategory.hue ?? categoryHue ?? APP_HUE : null
   const clusterHue = cluster ? cluster.hue ?? subcategoryHue ?? categoryHue ?? APP_HUE : null
-  const subcategoryCss = subcategoryHue !== null ? accentColorCss(subcategoryHue) : null
-  const clusterCss = clusterHue !== null ? accentColorCss(clusterHue) : null
-  const stripes = [category ? accentColorCss(categoryHue ?? APP_HUE) : null, subcategoryCss, clusterCss].filter((c): c is string => c !== null)
+  const subcategoryCss = subcategoryHue !== null ? accentColorCss(subcategoryHue, SAT_MIDDLE) : null
+  const clusterCss = clusterHue !== null ? accentColorCss(clusterHue, SAT_LOUD) : null
+  const stripes = [category ? accentColorCss(categoryHue ?? APP_HUE, SAT_QUIET) : null, subcategoryCss, clusterCss].filter((c): c is string => c !== null)
   const edged = stripes.length > 0
   return {
     category: categoryCss,
     subcategory: subcategoryCss,
-    subcategoryFill: subcategoryHue !== null ? fillColorCss(subcategoryHue) : null,
+    subcategoryFill: subcategoryHue !== null ? fillColorCss(subcategoryHue, SAT_MIDDLE) : null,
     cluster: clusterCss,
-    clusterFill: clusterHue !== null ? fillColorCss(clusterHue) : null,
+    clusterFill: clusterHue !== null ? fillColorCss(clusterHue, SAT_LOUD) : null,
     edge: edged ? stripes.map(c => `linear-gradient(${c}, ${c})`).join(', ') : null,
     edgeSize: edged ? stripes.map(() => `${STRIPE_PX}px 100%`).join(', ') : null,
     edgePos: edged ? stripes.map((_, i) => `${i * STRIPE_PX}px 0`).join(', ') : null,
