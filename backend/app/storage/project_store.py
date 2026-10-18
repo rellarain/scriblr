@@ -11,8 +11,10 @@ from typing import Callable, Optional, Type, TypeVar
 from pydantic import BaseModel, ValidationError
 
 from . import settings_log
+from .ids import check_id
 from .schema import (
     HUE_SCHEME,
+    PROJECT_FILE_VERSION,
     SCHEMA_VERSION,
     BookListing,
     ChapterAuthorNotes,
@@ -93,6 +95,17 @@ class ShardCorruptError(Exception):
         super().__init__(f"shard corrupt: {shard_path} ({reason})")
 
 
+class NewerSchemaError(Exception):
+    """project.json was written by a newer build than this one: it can be read, but not written over (that would drop what this build
+    does not know)."""
+
+    def __init__(self, project_id: str, found: int, supported: int) -> None:
+        self.project_id = project_id
+        self.found = found
+        self.supported = supported
+        super().__init__(f"project {project_id} was saved by a newer version of Scriblr (format {found}, this one writes {supported})")
+
+
 def new_id(prefix: str) -> str:
     return f"{prefix}_{uuid.uuid4().hex[:8]}"
 
@@ -150,15 +163,27 @@ def _quarantine(path: Path) -> Path:
     return quarantined
 
 
+# A corrupt section is found again on every read, so a copy of the same value is made once, and only the newest few copies are kept.
+_QUARANTINE_KEEP = 20
+
+
 def _quarantine_value(project_dir: Path, label: str, raw_value: object) -> Path:
     """Section-level quarantine: preserves one corrupt section/entry's raw
     JSON value for forensic recovery, without touching project.json itself
     (unlike _quarantine, which renames the whole file)."""
-    ts = utcnow().strftime("%Y%m%d%H%M%S%f")
     quarantine_dir = project_dir / "quarantine"
     quarantine_dir.mkdir(parents=True, exist_ok=True)
+    for earlier in sorted(quarantine_dir.glob(f"{label}.corrupt-*.json"), reverse=True)[:3]:
+        try:
+            if json.loads(earlier.read_text(encoding="utf-8")) == raw_value:
+                return earlier
+        except (OSError, ValueError):
+            continue
+    ts = utcnow().strftime("%Y%m%d%H%M%S%f")
     dest = quarantine_dir / f"{label}.corrupt-{ts}.json"
     _atomic_write_json(project_dir, dest, raw_value)  # type: ignore[arg-type]
+    for old in sorted(quarantine_dir.glob("*.json"), key=lambda p: p.stat().st_mtime)[:-_QUARANTINE_KEEP]:
+        old.unlink(missing_ok=True)
     return dest
 
 
@@ -201,7 +226,7 @@ def _write_shard(project_dir: Path, path: Path, model: BaseModel) -> None:
 
 
 def project_dir_of(root: Path, project_id: str) -> Path:
-    return root / project_id
+    return root / check_id(project_id, "project id")
 
 
 def _project_file_path(project_dir: Path) -> Path:
@@ -224,7 +249,7 @@ def _legacy_draft_path(project_dir: Path, moment_id: str) -> Path:
     """Old, pre-hierarchy-overhaul shape: one file per moment. No longer
     written, but still read as a one-time migration source (see
     load_draft) -- never deleted automatically, kept as a safety net."""
-    return project_dir / "draft" / f"{moment_id}.json"
+    return project_dir / "draft" / f"{check_id(moment_id, 'moment id')}.json"
 
 
 def _tree_history_dir(project_dir: Path, tree_type: TreeType) -> Path:
@@ -339,7 +364,19 @@ def _parse_list_section(raw, key, model, project_dir, file_path, errors):
 
 def _write_project_file(root: Path, project_id: str, pf: ProjectFile) -> None:
     project_dir = project_dir_of(root, project_id)
-    _atomic_write_json(project_dir, _project_file_path(project_dir), pf.model_dump(mode="json"))
+    path = _project_file_path(project_dir)
+    if pf.schemaVersion > PROJECT_FILE_VERSION:
+        raise NewerSchemaError(project_id, pf.schemaVersion, PROJECT_FILE_VERSION)
+    pf.schemaVersion = PROJECT_FILE_VERSION
+    data = pf.model_dump(mode="json")
+    # A section that could not be read stays as it was stored, unless something has replaced it since it was loaded.
+    for key, (raw, placeholder) in pf._unreadable.items():
+        if getattr(pf, key, None) is placeholder:
+            data[key] = raw
+    # The file being replaced was read successfully a moment ago: keep it as the last good copy.
+    if path.exists():
+        shutil.copyfile(path, path.with_name(path.name + ".bak"))
+    _atomic_write_json(project_dir, path, data)
 
 
 def _load_project_file(root: Path, project_id: str) -> tuple[ProjectFile, dict[str, ShardCorruptError]]:
@@ -376,12 +413,14 @@ def _load_project_file_locked(root: Path, project_id: str) -> tuple[ProjectFile,
         quarantined = _quarantine_value(project_dir, "index", raw.get("index"))
         raise ShardCorruptError(path, quarantined, f"index: {e}") from e
 
+    outline_default, plot_default = OutlineTree(), PlotTree()
+    activity_default, schedule_default, scrap_default = DailyActivityLog(), ScheduleCompletionLog(), ScrapRegistry()
     pf = ProjectFile(
         schemaVersion=raw.get("schemaVersion", SCHEMA_VERSION),
         hueScheme=raw.get("hueScheme", HUE_SCHEME),
         index=index,
-        outline=_parse_section_default(raw, "outline", OutlineTree, project_dir, path, errors, OutlineTree()),
-        plot=_parse_section_default(raw, "plot", PlotTree, project_dir, path, errors, PlotTree()),
+        outline=_parse_section_default(raw, "outline", OutlineTree, project_dir, path, errors, outline_default),
+        plot=_parse_section_default(raw, "plot", PlotTree, project_dir, path, errors, plot_default),
         drafts=_parse_dict_section(raw, "drafts", DraftChapter, project_dir, path, errors),
         revisions=_parse_dict_of_list_section(raw, "revisions", RevisionSnapshot, project_dir, path, errors),
         publications=_parse_dict_of_list_section(raw, "publications", Publication, project_dir, path, errors),
@@ -389,15 +428,16 @@ def _load_project_file_locked(root: Path, project_id: str) -> tuple[ProjectFile,
         chapterNotes=_parse_dict_section(raw, "chapterNotes", ChapterAuthorNotes, project_dir, path, errors),
         outlineHistory=_parse_list_section(raw, "outlineHistory", TreeSnapshot, project_dir, path, errors),
         plotHistory=_parse_list_section(raw, "plotHistory", TreeSnapshot, project_dir, path, errors),
-        activity=_parse_section_default(
-            raw, "activity", DailyActivityLog, project_dir, path, errors, DailyActivityLog()
-        ),
-        schedule=_parse_section_default(
-            raw, "schedule", ScheduleCompletionLog, project_dir, path, errors, ScheduleCompletionLog()
-        ),
-        scrap=_parse_section_default(raw, "scrap", ScrapRegistry, project_dir, path, errors, ScrapRegistry()),
+        activity=_parse_section_default(raw, "activity", DailyActivityLog, project_dir, path, errors, activity_default),
+        schedule=_parse_section_default(raw, "schedule", ScheduleCompletionLog, project_dir, path, errors, schedule_default),
+        scrap=_parse_section_default(raw, "scrap", ScrapRegistry, project_dir, path, errors, scrap_default),
         settingsLog=_parse_list_section(raw, "settingsLog", SettingsLogEntry, project_dir, path, errors),
     )
+    for key, placeholder in (
+        ("outline", outline_default), ("plot", plot_default), ("activity", activity_default), ("schedule", schedule_default), ("scrap", scrap_default),
+    ):
+        if key in errors:
+            pf._unreadable[key] = (raw.get(key), placeholder)
     return pf, errors
 
 
@@ -634,7 +674,7 @@ def list_projects(root: Path) -> list[ProjectIndex]:
         return []
     summaries: list[ProjectIndex] = []
     for entry in sorted(root.iterdir()):
-        if not entry.is_dir():
+        if not entry.is_dir() or entry.name.startswith("."):
             continue
         try:
             summaries.append(load_index(root, entry.name))
@@ -643,13 +683,67 @@ def list_projects(root: Path) -> list[ProjectIndex]:
     return summaries
 
 
+# A deleted project is moved to <projects>/.trash/<id>-<time>/ and only removed for good after this many days.
+TRASH_DAYS = 30
+
+
+def trash_dir_of(root: Path) -> Path:
+    return root / ".trash"
+
+
 def delete_project(root: Path, project_id: str) -> None:
     project_dir = project_dir_of(root, project_id)
     if not project_dir.exists():
         raise ProjectNotFoundError(project_id)
-    shutil.rmtree(project_dir)
+    with _lock_for(project_id):
+        trash = trash_dir_of(root)
+        trash.mkdir(parents=True, exist_ok=True)
+        stamp = utcnow().strftime("%Y%m%d%H%M%S%f")
+        _replace_dir_with_retry(project_dir, trash / f"{project_id}-{stamp}")
     with _project_locks_guard:
         _project_locks.pop(project_id, None)
+    purge_trash(root)
+
+
+def _replace_dir_with_retry(src: Path, dest: Path) -> None:
+    for attempt in range(_REPLACE_ATTEMPTS):
+        try:
+            os.replace(src, dest)
+            return
+        except PermissionError:
+            if attempt == _REPLACE_ATTEMPTS - 1:
+                raise
+            time.sleep(_REPLACE_PAUSE * (attempt + 1))
+
+
+def purge_trash(root: Path, days: int = TRASH_DAYS) -> None:
+    """Remove trashed projects older than `days`."""
+    trash = trash_dir_of(root)
+    if not trash.exists():
+        return
+    cutoff = time.time() - days * 86400
+    for entry in trash.iterdir():
+        try:
+            if entry.stat().st_mtime < cutoff:
+                shutil.rmtree(entry, ignore_errors=True)
+        except OSError:
+            continue
+
+
+def sweep_temp_files(root: Path, older_than_seconds: float = 3600) -> int:
+    """Remove half-written temp files a crash or a killed process left behind (<project>/.tmp). Returns how many were removed."""
+    if not root.exists():
+        return 0
+    removed = 0
+    cutoff = time.time() - older_than_seconds
+    for tmp in root.glob("*/.tmp/*"):
+        try:
+            if tmp.is_file() and tmp.stat().st_mtime < cutoff:
+                tmp.unlink()
+                removed += 1
+        except OSError:
+            continue
+    return removed
 
 
 def update_project_metadata(root: Path, project_id: str, *, title: str | None = None) -> ProjectIndex:
@@ -824,7 +918,7 @@ def migrate_legacy_revisions(root: Path, project_id: str, chapter_id: str, momen
     project_dir = project_dir_of(root, project_id)
     to_add: dict[str, RevisionSnapshot] = {}
     for moment_id in moment_ids:
-        legacy_dir = project_dir / "revisions" / moment_id
+        legacy_dir = project_dir / "revisions" / check_id(moment_id, "moment id")
         if not legacy_dir.exists():
             continue
         for entry in sorted(legacy_dir.glob("*.json")):

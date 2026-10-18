@@ -4,9 +4,12 @@ from typing import Any, Literal, Optional
 import colorsys
 import re
 
-from pydantic import BaseModel, Field, field_validator, model_validator
+from pydantic import BaseModel, Field, PrivateAttr, field_validator, model_validator
 
 SCHEMA_VERSION = 2
+# The version of the project.json file as a whole (ProjectFile.schemaVersion), which a build refuses to write over when the file is newer than it
+# knows (see project_store). 2: one file per project; 3: plot clusters.
+PROJECT_FILE_VERSION = 3
 
 
 def utcnow() -> datetime:
@@ -800,7 +803,7 @@ class AuiConfigDraft(BaseModel):
 
 
 class ProjectFile(BaseModel):
-    schemaVersion: int = SCHEMA_VERSION
+    schemaVersion: int = PROJECT_FILE_VERSION
     # Which scheme the stored level colours use (HUE_SCHEME); a file without it is scheme 1.
     hueScheme: int = HUE_SCHEME
     index: ProjectIndex
@@ -819,6 +822,9 @@ class ProjectFile(BaseModel):
     scrap: ScrapRegistry = Field(default_factory=ScrapRegistry)
     # Changes to the project's settings (time systems, colour), newest last; see SettingsLogEntry.
     settingsLog: list[SettingsLogEntry] = Field(default_factory=list)
+    # Sections that could not be read, as they were stored: key -> (raw value, the default put in their place). Not persisted by itself: the
+    # store writes the raw value back unless the section was replaced, so an unreadable section is kept for a build that can read it.
+    _unreadable: dict[str, tuple[Any, Any]] = PrivateAttr(default_factory=dict)
 
 
 # ---------------------------------------------------------------------------

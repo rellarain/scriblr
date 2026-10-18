@@ -20,6 +20,11 @@ const DEV_FRONTEND_URL = 'http://127.0.0.1:5173'
 const forceProd = process.argv.includes('--prod') || process.env.SCRIBLR_FORCE_PROD === '1'
 const isDev = !app.isPackaged && !forceProd
 
+// One Scriblr at a time: a second launch against the same data directory would start a second backend (the store has no cross-process lock) and
+// could overwrite the first one's saves. The second launch just brings the first window forward. SCRIBLR_ALLOW_MULTIPLE=1 lifts it (dev tooling).
+const gotLock = process.env.SCRIBLR_ALLOW_MULTIPLE === '1' || app.requestSingleInstanceLock()
+if (!gotLock) app.quit()
+
 let backendProcess = null
 let mainWindow = null
 let backendPort = DEV_PORT
@@ -118,7 +123,14 @@ function createWindow() {
   })
 }
 
-app.whenReady().then(async () => {
+app.on('second-instance', () => {
+  if (mainWindow) {
+    if (mainWindow.isMinimized()) mainWindow.restore()
+    mainWindow.focus()
+  }
+})
+
+if (gotLock) app.whenReady().then(async () => {
   if (!isDev) {
     try {
       backendPort = await getFreePort()

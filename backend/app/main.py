@@ -1,3 +1,4 @@
+from contextlib import asynccontextmanager
 from pathlib import Path
 from typing import Optional
 
@@ -28,10 +29,15 @@ from .api import (
     scrap,
     user_settings,
 )
+from .storage.ids import InvalidIdError
+from .storage.paths import get_projects_root
 from .storage.pdf_export import OutlineNodeNotFoundError
 from .storage.project_store import (
     InvalidRestoreParentError,
     MomentNotFoundError,
+    NewerSchemaError,
+    purge_trash,
+    sweep_temp_files,
     ProjectNotFoundError,
     ScrapEntryNotFoundError,
     ShardCorruptError,
@@ -40,11 +46,23 @@ from .storage.project_store import (
 )
 
 
+@asynccontextmanager
+async def _lifespan(_app: FastAPI):
+    """At start-up: clear the temp files a killed process left behind, and the trashed projects that are old enough to go."""
+    try:
+        root = get_projects_root()
+        sweep_temp_files(root)
+        purge_trash(root)
+    except OSError:
+        pass
+    yield
+
+
 def create_app(static_dir: Optional[Path] = None) -> FastAPI:
     """`static_dir`, when given, is the built frontend (`frontend/dist`) to
     serve for the packaged desktop app. Left unset for dev/test, where the
     frontend is served separately by the Vite dev server."""
-    app = FastAPI(title="Scriblr")
+    app = FastAPI(title="Scriblr", lifespan=_lifespan)
 
     @app.get("/api/health")
     def health() -> dict[str, str]:
@@ -73,6 +91,14 @@ def create_app(static_dir: Optional[Path] = None) -> FastAPI:
     @app.exception_handler(InvalidRestoreParentError)
     async def _invalid_restore_parent(_: Request, exc: InvalidRestoreParentError) -> JSONResponse:
         return JSONResponse(status_code=400, content={"detail": str(exc)})
+
+    @app.exception_handler(InvalidIdError)
+    async def _invalid_id(_: Request, exc: InvalidIdError) -> JSONResponse:
+        return JSONResponse(status_code=400, content={"detail": str(exc)})
+
+    @app.exception_handler(NewerSchemaError)
+    async def _newer_schema(_: Request, exc: NewerSchemaError) -> JSONResponse:
+        return JSONResponse(status_code=409, content={"detail": str(exc)})
 
     @app.exception_handler(ShardCorruptError)
     async def _shard_corrupt(_: Request, exc: ShardCorruptError) -> JSONResponse:
@@ -117,8 +143,9 @@ def create_app(static_dir: Optional[Path] = None) -> FastAPI:
         async def spa(full_path: str) -> FileResponse:
             if full_path.startswith("api/"):
                 raise HTTPException(status_code=404)
-            candidate = static_dir / full_path
-            if full_path and candidate.is_file():
+            candidate = (static_dir / full_path).resolve()
+            # Only files inside the built frontend are served; anything else (a path that climbs out with '..') is the app's index.
+            if full_path and candidate.is_file() and candidate.is_relative_to(static_dir.resolve()):
                 return FileResponse(candidate)
             return FileResponse(static_dir / "index.html")
 

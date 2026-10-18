@@ -123,13 +123,35 @@ described, now stale, in `docs/data-model.md`).
     `quarantine/<label>.corrupt-<timestamp>.json`, and `ShardCorruptError`
     is raised (→ HTTP 409, see below).
   - A corrupt `outline` or `plot` section is quarantined and defaulted to an
-    empty tree; the specific loader (`load_outline`/`load_plot`) still
+    empty tree (and `activity`/`schedule`/`scrap` likewise), but **the stored value
+    stays in `project.json`** through every other save until something replaces
+    that section, so a build that can read it later still finds it; the specific loader (`load_outline`/`load_plot`) still
     raises `ShardCorruptError` so its caller (`GET /api/projects/{id}`) can
     surface it as a warning without failing the rest of the request.
   - A corrupt entry within `drafts` (one chapter), `revisions`, or
     `outlineHistory`/`plotHistory` is dropped individually — siblings
     survive untouched.
   - Corrupt `activity`/`schedule`/`scrap` sections default silently.
+- **Guards** (`tests/test_integrity.py`):
+  - Every id that becomes part of a path (a project id, a legacy per-moment file)
+    goes through `storage/ids.check_id` (no `..`, separators, drive letters,
+    leading dots) and is answered with HTTP 400; the SPA fallback serves only
+    files inside the built frontend.
+  - `ProjectFile.schemaVersion` is `PROJECT_FILE_VERSION` (3: plot clusters).
+    A file from a *newer* build is read but never written over
+    (`NewerSchemaError` → HTTP 409); an older one is brought up to date on its
+    next write.
+  - Each write first copies the file it replaces to `project.json.bak` (the last
+    good copy). A section's quarantine copy is made once, and only the newest 20
+    copies are kept.
+  - Deleting a project moves it to `<projects>/.trash/<id>-<time>/`; trash older
+    than 30 days, and temp files a killed process left in `<project>/.tmp/`, are
+    removed at start-up.
+  - `storage/backup.py` (`python -m app.storage.backup`) copies the whole
+    app-data directory beside it (`Scriblr-backups/`, newest 5 kept): run before
+    any bulk migration.
+  - Electron allows one Scriblr at a time (single-instance lock), since the store
+    has no cross-process lock.
 - **Legacy migration** (`_ensure_migrated`/`_migrate_legacy_layout`):
   one-time, idempotent (double-checked-locking), folds the old multi-file
   layout into `project.json` on first touch after upgrade. Old files are
