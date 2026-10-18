@@ -264,7 +264,7 @@ the one project-independent router).
 
 | Router | Prefix | Endpoints |
 |---|---|---|
-| `projects` | `/api/projects` | `GET ""` list · `POST ""` create (seeds a root book node) · `GET "/{id}"` full summary (index+outline+plot+warnings; also triggers auto-compaction) · `PATCH "/{id}"` update title/settings · `DELETE "/{id}"` (204) |
+| `projects` | `/api/projects` | `GET ""` list · `GET "/overview"` every project with its outline nodes and book progress, each read once (the shelves' one request) · `POST ""` create (seeds a root book node) · `GET "/{id}"` full summary (index+outline+plot+warnings; also triggers auto-compaction) · `PATCH "/{id}"` update title/settings · `DELETE "/{id}"` (204) |
 | `outline` | `/api/projects/{id}/outline` | `GET`/`PUT ""` load/replace tree (PUT also detects scrap orphans, auto-snapshots, records activity) · `GET "/history"` · `GET "/history/diff"` (`from`,`to=current`) · `GET "/history/{snapshotId}"` · `POST "/history/{snapshotId}/revert"` |
 | `plot` | `/api/projects/{id}/plot` | same shape as outline (`GET`/`PUT ""`, `/history`, `/history/diff`, `/history/{id}`, `/history/{id}/revert`) |
 | `draft` | `/api/projects/{id}/draft/chapter/{chapterId}` | `GET ""` whole chapter · `GET "/moment/{momentId}"` · `PUT "/moment/{momentId}"` upsert (computes word count, records activity delta) · `DELETE "/moment/{momentId}"` (204) |
