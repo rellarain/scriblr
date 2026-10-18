@@ -629,11 +629,11 @@ describe('the contents order', () => {
 })
 
 describe('inherited field groups', () => {
-  it('put the parent\'s title first and its kind ("From category") at the far right of the head', () => {
+  it('put the parent\'s title first and its kind ("Category") at the far right of the head', () => {
     render(<Editor />)
     const head = screen.getByRole('region', { name: 'From category: Romance' }).querySelector('.wrFieldGroupHead') as HTMLElement
     expect(head.querySelector('.wrFieldGroupName')).toHaveTextContent('Romance')
     expect(head.lastElementChild).toHaveClass('wrFieldGroupOrigin')
-    expect(head.lastElementChild).toHaveTextContent('From category')
+    expect(head.lastElementChild).toHaveTextContent(/^Category$/)
   })
 })

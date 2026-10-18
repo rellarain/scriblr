@@ -139,7 +139,7 @@ export function FieldBlock({ w, info, holder, editable, ui, drag, showAssigned }
 }
 
 // The origin of an inherited group, shown at the far right of its head (the title on the left is the parent's own).
-const GROUP_ORIGIN: Partial<Record<FieldScope, string>> = { cluster: 'From cluster', subcategory: 'From subcategory', category: 'From category' }
+const GROUP_ORIGIN: Partial<Record<FieldScope, string>> = { cluster: 'Cluster', subcategory: 'Subcategory', category: 'Category' }
 const GROUP_TITLE: Record<FieldScope, (owners: PlotNode[]) => string> = {
   plotline: () => 'Plotline fields',
   cluster: owners => `From cluster: ${owners.map(nodeLabel).join(', ')}`,
