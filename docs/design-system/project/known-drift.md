@@ -38,7 +38,14 @@ Where the code does not yet follow the rules on the other pages. Each entry says
 
 ## Open
 
-Nothing is open. The app is described as it is, and where a screen differs from the rules it is on the list above.
+The app is described as it is; where a screen differs from the rules it is here or on the list above.
+
+| What the code does | What the rule says | Fix |
+|---|---|---|
+| Space, radius and type sizes are in `tokens.json` but are not CSS custom properties: `writer.scss` writes the pixel values out (about a thousand literals, some off the scale), so changing a token does not reach it | one scale, used by name | emit `--space-*`, `--radius-*` and the type sizes from the same constants as `tokens.json` and move the literals onto them, a level at a time |
+| `writer.scss` is one file of about 1,160 lines, a few lines over 300 characters, with several overrides of the same button (`.wrSmallBtn`) | a stylesheet per level or foundation | split it into partials, one per level, and fold the button overrides into one rule |
+| The colour sliders (`colorRange.scss`) and the tile container (`tiles.scss`) still remove the browser's focus outline | every control shows keyboard focus | give the sliders a ring on `:focus-visible` (the thumb is drawn by the component, so the ring goes on its track) |
+| Some labels, counts and calendar days are 11px or smaller | readable text, audited | raise them where the layout allows, and add the pair to `contrastAudit.ts` if the colour changes |
 
 ## Not covered by the audit
 

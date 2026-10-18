@@ -41,6 +41,21 @@ Gaps are small and come from a short list (`space-*`): 2, 4, 6, 8, 10, 12, 14, 1
 
 Tiles on a split grid (`SplitArea`) always fill their area exactly: a tree of splits, tiles at the leaves, dividers between. Nothing is ragged and nothing is left over. A divider is a 2px line that shows on hover and is wide enough to grab; dropping a tile on it wedges the tile in as a new column or row. Below **400px** the tiles stack in one column. Layout is remembered per level.
 
+## Breakpoints
+
+The Writer answers to the width of the **element** it is in, not the window, because its tiles are resized by their neighbours. The widths that change a layout:
+
+| Width | Of | What changes |
+|---|---|---|
+| under 1,000px | the window | the side column (the levels beside the focused one) hides itself (`AUTO_HIDE_BELOW`); it can be shown again by hand |
+| 200px to 60% | the side column | the range its drag handle holds it in (`SIDE_MIN_W`, `SIDE_MAX_FRACTION`); the same limits are in the CSS, so a window that shrinks keeps a stored width |
+| under 720px | the Plot tool | one column: the contents become a bar on top (`PLOT_COMPACT_BELOW`) |
+| 720px to 1,040px | the Plot tool | the contents beside the editor, a plotline's chapters panel under its fields; from 1,040px (`PLOT_WIDE_FROM`) the chapters sit beside the fields |
+| 860px and up | the compare view | the plotlines sit side by side in columns (`COMPARE_COLUMNS_FROM`) |
+| under 400px | a split grid | the tiles stack in one column |
+
+The Plot tool and the compare view read their width once per breakpoint crossed, not once per pixel dragged (`useElementWidth(breakpoints)`), so resizing a tile does not redraw them continuously.
+
 ## Page edges
 
 The edge rail beside a book (`EdgeTabs`) is 10 or more stacked page edges, each 4px further out and a little deeper than the one before (`color-mix` of the page edge with black), 15px of back cover beyond the last. Each arc's tabs start at their own edge, the first group from the second.
