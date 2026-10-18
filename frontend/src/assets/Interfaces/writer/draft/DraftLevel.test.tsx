@@ -8,6 +8,8 @@ import { descendantsOf, buildChildIndex } from '../outlineTree'
 import { outlineNode, plotNode } from '../plotTestWorkspace'
 import type { WriterWorkspace } from '../useWriterWorkspace'
 import DraftLevel from './DraftLevel'
+import { mockFetch } from '../../../../test/mockFetch'
+import { makeWorkspace, type WorkspaceOverrides } from '../../../../test/makeWorkspace'
 
 // The chapter's draft is stood in for by state in the hook's place (the real one talks to the backend).
 const INITIAL = vi.hoisted(() => ({ bodies: {} as Record<string, string> }))
@@ -30,7 +32,7 @@ beforeEach(() => {
   __resetSettingsForTests()
   INITIAL.bodies = {}
   vi.stubGlobal('ResizeObserver', class { observe() {} unobserve() {} disconnect() {} })
-  vi.stubGlobal('fetch', vi.fn(async () => ({ ok: true, status: 200, json: async () => ({}) })))
+  mockFetch()
 })
 
 const OUTLINE: OutlineNode[] = [
@@ -60,7 +62,7 @@ function Harness({ chapterId = 'c1', console_ = 'page', spies }: { chapterId?: s
   const ref = useRef(outlineNodes)
   ref.current = outlineNodes
   const byId = new Map(outlineNodes.map(n => [n.id, n]))
-  const w = {
+  const w = makeWorkspace({
     activeProjectId: 'p1', activeProject: { createdAt: '2026-01-01T00:00:00Z', settings: { timeSystems: [], chapterWordCountTarget: 100 } },
     outlineNodes, plotNodes: PLOT, plotNodeById: new Map(PLOT.map(n => [n.id, n])),
     activeBook: byId.get('b'), activeChapter: byId.get(chapterId), activeConsole: console_,
@@ -68,9 +70,9 @@ function Harness({ chapterId = 'c1', console_ = 'page', spies }: { chapterId?: s
     levelHueOf: () => 200, levelTintOf: () => 'hsl(200, 30%, 50%)', hueCentreOf: () => null, highlightedPointId: null,
     saveStatus: { dirty: false, saving: false, error: undefined, lastSavedAt: null }, saveNow: async () => {}, saveCountdown: { nextSaveAt: null, wait: null }, history: { canUndo: () => false, canRedo: () => false, undo: () => {}, redo: () => {} }, flushAll: () => {},
     updateOutlineNode: (id: string, patch: Partial<OutlineNode>) => setOutline(prev => prev.map(n => (n.id === id ? { ...n, ...patch } : n))),
-    addOutlineNode: spies.addOutlineNode, selectChapter: spies.selectChapter, showDraft: spies.showDraft, showPreview: spies.showPreview,
+    addOutlineNode: spies.addOutlineNode as WriterWorkspace['addOutlineNode'], selectChapter: spies.selectChapter, showDraft: spies.showDraft, showPreview: spies.showPreview,
     cyclePlotAwareness: vi.fn(),
-  } as unknown as WriterWorkspace
+  })
   return <DraftLevel w={w} pagesComponent="reaction" onPagesComponent={() => {}} />
 }
 

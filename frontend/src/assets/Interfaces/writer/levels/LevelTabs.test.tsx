@@ -4,11 +4,12 @@ import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { __resetSettingsForTests } from '../../../../settings/settingsStore'
 import { CalendarIcon, PencilIcon, GearIcon } from '../../../icons'
 import { useTabbedLevel, type LevelTab } from './LevelTabs'
+import { mockFetch } from '../../../../test/mockFetch'
 
 beforeEach(() => {
   window.localStorage.clear()
   __resetSettingsForTests()
-  vi.stubGlobal('fetch', vi.fn(async () => ({ ok: true, status: 200, json: async () => ({}) })))
+  mockFetch()
 })
 
 const tabs: LevelTab[] = [

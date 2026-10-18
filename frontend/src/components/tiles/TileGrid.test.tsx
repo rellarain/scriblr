@@ -5,11 +5,12 @@ import { PlotIcon, ListIcon, PencilIcon } from '../../assets/icons'
 import { __resetSettingsForTests } from '../../settings/settingsStore'
 import TileGrid, { useTileHost } from './TileGrid'
 import type { TileDef } from './tileTypes'
+import { mockFetch } from '../../test/mockFetch'
 
 beforeEach(() => {
   window.localStorage.clear()
   __resetSettingsForTests()
-  vi.stubGlobal('fetch', vi.fn(async () => ({ ok: true, status: 200, json: async () => ({}) })))
+  mockFetch()
   // jsdom doesn't implement the Pointer Events capture methods the divider drag uses.
   for (const name of ['setPointerCapture', 'hasPointerCapture', 'releasePointerCapture'] as const) {
     if (!(name in Element.prototype)) Object.defineProperty(Element.prototype, name, { value: vi.fn(() => true), configurable: true })

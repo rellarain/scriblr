@@ -4,6 +4,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest'
 import Sidebar from './Sidebar'
 import { __resetSettingsForTests } from './settings/settingsStore'
 import type { HelperChats } from './assets/Interfaces/helper/useHelperChats'
+import { mockFetch } from './test/mockFetch'
 
 // This file exercises Sidebar's own layout (AUI mounted only for admins, the resize
 // handle's placement and drag direction) -- the panels' own content is covered by
@@ -16,7 +17,7 @@ vi.mock('./SidebarDivider', () => ({ default: () => <div>divider</div> }))
 beforeEach(() => {
   window.localStorage.clear()
   __resetSettingsForTests()
-  vi.stubGlobal('fetch', vi.fn(async () => ({ ok: true, status: 200, json: async () => ({}) })))
+  mockFetch()
   for (const name of ['setPointerCapture', 'hasPointerCapture', 'releasePointerCapture'] as const) {
     if (!(name in Element.prototype)) Object.defineProperty(Element.prototype, name, { value: vi.fn(() => true), configurable: true })
   }

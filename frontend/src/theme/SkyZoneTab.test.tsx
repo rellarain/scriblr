@@ -6,13 +6,14 @@ import { defaultThemeSettings } from './defaults'
 import { enableZone } from './zones'
 import SkyZoneTab from './SkyZoneTab'
 import ThemeSettingsPanel from './ThemeSettingsPanel'
+import { mockFetch } from '../test/mockFetch'
 
 beforeEach(() => {
   vi.useFakeTimers({ shouldAdvanceTime: true })
   vi.setSystemTime(new Date(2026, 8, 20, 9, 5, 10))
   window.localStorage.clear()
   __resetSettingsForTests()
-  vi.stubGlobal('fetch', vi.fn(async () => ({ ok: true, status: 200, json: async () => ({}) })))
+  mockFetch()
 })
 
 afterEach(() => {

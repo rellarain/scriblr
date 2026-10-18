@@ -8,8 +8,6 @@ from typing import Optional
 
 from . import project_store as store
 from .schema import (
-    AuthorFlagPassage,
-    AuthorFootnote,
     BookEdition,
     BookListing,
     BookMeta,

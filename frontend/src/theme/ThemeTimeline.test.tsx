@@ -4,6 +4,7 @@ import { __resetSettingsForTests, getSettings, setTheme } from '../settings/sett
 import { enableZone } from './zones'
 import { ThemeTimeline } from './ThemeTimeline'
 import type { ZoneKey } from './types'
+import { mockFetch } from '../test/mockFetch'
 
 // A strip 1,440px wide from the left edge: one pixel a minute.
 function stubStrip() {
@@ -18,7 +19,7 @@ const handle = (key: string) => screen.getByRole('slider', { name: `${key} start
 beforeEach(() => {
   window.localStorage.clear()
   __resetSettingsForTests()
-  vi.stubGlobal('fetch', vi.fn(async () => ({ ok: true, status: 200, json: async () => ({}) })))
+  mockFetch()
   // Day at 10 AM (the default), Dusk at 4 PM and Night at 10 PM.
   setTheme(prev => enableZone(enableZone(prev, 'dusk'), 'night'))
 })

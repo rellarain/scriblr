@@ -2,6 +2,7 @@ import { act, renderHook } from '@testing-library/react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { useStoredState } from '../assets/Interfaces/writer/storage'
 import { DEFAULT_UI_SETTINGS, defaultThemeSettings } from '../theme/defaults'
+import { mockFetch } from '../test/mockFetch'
 import {
   __resetSettingsForTests, flushSettings, getAutosavePolicy, getKv, getSettings, initSettings, normalizeAutosaveSeconds, restoreSettings,
   redoSettings, setAutosaveMode, setKv, setTheme, setUi, undoSettings, useSettingsCountdown, useSettingsHistory, useSettingsSaveStatus,
@@ -195,7 +196,7 @@ describe('save status', () => {
     expect(result.current.dirty).toBe(true)
 
     // The retry succeeds.
-    vi.stubGlobal('fetch', vi.fn(async () => ({ ok: true, status: 200, json: async () => ({}) })))
+    mockFetch()
     await act(async () => { await vi.advanceTimersByTimeAsync(15_100) })
     expect(result.current.state).toBe('saved')
   })

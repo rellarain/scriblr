@@ -6,6 +6,7 @@ import ReadersPanel from '../ReadersPanel'
 import { FootnoteTool } from '../draft/FootnoteTool'
 import type { WriterWorkspace } from '../useWriterWorkspace'
 import BookPublish from './BookPublish'
+import { makeWorkspace, type WorkspaceOverrides } from '../../../../test/makeWorkspace'
 
 const META = { type: 'novel', blurb: '', genres: [], tags: [], tropes: [], flags: [], buyPriceCents: 900, coverHue: null } as BookListing['meta']
 const FEEDBACK: BookFeedback = {
@@ -13,7 +14,7 @@ const FEEDBACK: BookFeedback = {
   reviews: [{ id: 'mine', readerId: 'me', name: 'You', initials: 'Y', score: 9, criteria: {}, comment: 'Lovely.', spoilerEssay: '', reads: 1, at: '2026-10-11T00:00:00Z', edited: false, mine: true }],
   chapters: [{ n: 1, title: 'One', readers: 1, pleasant: 2, unpleasant: 1, top: [] }], invites: {},
 }
-const w = { activeBook: { id: 'b1' }, activeProjectId: 'p1' } as unknown as WriterWorkspace
+const w = makeWorkspace({ activeBook: { id: 'b1' }, activeProjectId: 'p1' })
 
 interface Call { method: string; url: string; body: unknown }
 let calls: Call[]

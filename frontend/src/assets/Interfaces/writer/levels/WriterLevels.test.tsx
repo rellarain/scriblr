@@ -7,6 +7,8 @@ import { fillColorCss } from '../../../../theme/bookColors'
 import type { WriterWorkspace } from '../useWriterWorkspace'
 import WriterLevels from './WriterLevels'
 import SidebarToggle from '../SidebarToggle'
+import { mockFetch } from '../../../../test/mockFetch'
+import { makeWorkspace, type WorkspaceOverrides } from '../../../../test/makeWorkspace'
 
 // The consoles inside the levels (tile grids, editors) have their own tests; here
 // they are stand-ins so this file exercises the frame itself.
@@ -40,23 +42,23 @@ vi.mock('./levelBodies', () => ({
 beforeEach(() => {
   window.localStorage.clear()
   __resetSettingsForTests()
-  vi.stubGlobal('fetch', vi.fn(async () => ({ ok: true, status: 200, json: async () => ({}) })))
+  mockFetch()
 })
 
 const outline = (id: string, kind: OutlineNode['kind'], parentId: string | null, over: Partial<OutlineNode> = {}): OutlineNode =>
   ({ id, kind, parentId, order: 0, title: id, synopsis: '', draftRef: null, ...over } as OutlineNode)
 
-function workspace(activeConsole: WriterWorkspace['activeConsole'], over: Partial<WriterWorkspace> = {}): WriterWorkspace {
+function workspace(activeConsole: WriterWorkspace['activeConsole'], over: WorkspaceOverrides = {}): WriterWorkspace {
   const book = outline('b1', 'book', null, { title: 'Cold Harbor' })
   const chapter = outline('c1', 'chapter', 'b1', { title: 'The Harbor Master' })
-  return {
+  return makeWorkspace({
     activeConsole, hasOpenProject: activeConsole !== 'shelves' || over.hasOpenProject === true,
     activeProject: { title: 'The Ashfall Cycle' }, activeBook: book, activeBookChapters: [chapter], activeChapter: chapter,
     warnings: [], outlineStatus: 'idle', saveError: undefined,
     showDash: vi.fn(), showProject: vi.fn(), openBook: vi.fn(),
     projectHue: 150, levelHueOf: () => 280, levelTintOf: () => 'hsl(280, 30%, 50%)', levelFillOf: () => 'hsl(280, 60%, 40%)',
     ...over,
-  } as unknown as WriterWorkspace
+  })
 }
 
 const levelsOf = () => Array.from(document.querySelectorAll<HTMLElement>('[data-level]')).map(el => `${el.dataset.level}:${el.dataset.size}`)

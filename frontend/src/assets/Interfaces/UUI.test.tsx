@@ -3,11 +3,12 @@ import userEvent from '@testing-library/user-event'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { __resetSettingsForTests } from '../../settings/settingsStore'
 import UUI from './UUI'
+import { mockFetch } from '../../test/mockFetch'
 
 beforeEach(() => {
   window.localStorage.clear()
   __resetSettingsForTests()
-  vi.stubGlobal('fetch', vi.fn(async () => ({ ok: true, status: 200, json: async () => ({}) })))
+  mockFetch()
 })
 afterEach(() => { vi.unstubAllGlobals() })
 

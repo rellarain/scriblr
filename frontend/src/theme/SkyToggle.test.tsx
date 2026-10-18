@@ -4,13 +4,14 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { __resetSettingsForTests, getSettings, setTheme } from '../settings/settingsStore'
 import { enableZone } from './zones'
 import SkyToggle from './SkyToggle'
+import { mockFetch } from '../test/mockFetch'
 
 beforeEach(() => {
   vi.useFakeTimers({ shouldAdvanceTime: true })
   vi.setSystemTime(new Date(2026, 8, 20, 9, 5, 10)) // Sep 20, 9:05:10 AM
   window.localStorage.clear()
   __resetSettingsForTests()
-  vi.stubGlobal('fetch', vi.fn(async () => ({ ok: true, status: 200, json: async () => ({}) })))
+  mockFetch()
 })
 
 afterEach(() => {

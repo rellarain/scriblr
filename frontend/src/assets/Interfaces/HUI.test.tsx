@@ -4,6 +4,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { __resetSettingsForTests } from '../../settings/settingsStore'
 import type { HelperChats } from './helper/useHelperChats'
 import HUI from './HUI'
+import { mockFetch } from '../../test/mockFetch'
 
 vi.mock('./helper/inbox/InboxSection', () => ({ default: () => <div>inbox console</div> }))
 vi.mock('./helper/ChatsSection', () => ({ default: () => <div>chat console</div> }))
@@ -11,7 +12,7 @@ vi.mock('./helper/ChatsSection', () => ({ default: () => <div>chat console</div>
 beforeEach(() => {
   window.localStorage.clear()
   __resetSettingsForTests()
-  vi.stubGlobal('fetch', vi.fn(async () => ({ ok: true, status: 200, json: async () => ({}) })))
+  mockFetch()
 })
 afterEach(() => { vi.unstubAllGlobals() })
 

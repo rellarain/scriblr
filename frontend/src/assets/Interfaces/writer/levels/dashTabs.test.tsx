@@ -5,15 +5,17 @@ import * as resourcesApi from '../../../../api/resourcesApi'
 import { __resetSettingsForTests, getKv } from '../../../../settings/settingsStore'
 import type { WriterWorkspace } from '../useWriterWorkspace'
 import { useDashTabs } from './dashTabs'
+import { mockFetch } from '../../../../test/mockFetch'
+import { makeWorkspace, type WorkspaceOverrides } from '../../../../test/makeWorkspace'
 
 beforeEach(() => {
   window.localStorage.clear()
   __resetSettingsForTests()
-  vi.stubGlobal('fetch', vi.fn(async () => ({ ok: true, status: 200, json: async () => ({}) })))
+  mockFetch()
   vi.spyOn(resourcesApi, 'getResources').mockResolvedValue({ schemaVersion: 1, nodes: [], content: {}, assessments: {} })
 })
 
-const w = { projects: [{ projectId: 'p1', title: 'Saga' }], projectOutlines: { p1: [] } } as unknown as WriterWorkspace
+const w = makeWorkspace({ projects: [{ projectId: 'p1', title: 'Saga' }], projectOutlines: { p1: [] } })
 
 function Harness({ size }: { size: 'mid' | 'max' }) {
   const t = useDashTabs(w, size)

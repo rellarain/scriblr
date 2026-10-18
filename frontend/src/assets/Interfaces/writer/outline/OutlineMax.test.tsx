@@ -11,6 +11,8 @@ import { base, outlineNode, plotNode } from '../plotTestWorkspace'
 import type { WriterWorkspace } from '../useWriterWorkspace'
 import { PlotTray } from '../levels/PlotpointsTab'
 import OutlineMax from './OutlineMax'
+import { mockFetch } from '../../../../test/mockFetch'
+import { makeWorkspace, type WorkspaceOverrides } from '../../../../test/makeWorkspace'
 
 // The Outline level (with the Project level's Plotpoints tab beside it, where the tray now is) against a small stand-in workspace: the outline and plot live in state and the
 // plotpoint assignment is the real pure function, so what the cards do is what the app does.
@@ -22,7 +24,7 @@ vi.mock('../useWordCounts', () => ({
 beforeEach(() => {
   window.localStorage.clear()
   __resetSettingsForTests()
-  vi.stubGlobal('fetch', vi.fn(async () => ({ ok: true, status: 200, json: async () => ({}) })))
+  mockFetch()
 })
 
 const OUTLINE: OutlineNode[] = [
@@ -54,7 +56,7 @@ function Harness({ activeChapterId = 'c1', actions }: { activeChapterId?: string
   const byId = new Map(outlineNodes.map(n => [n.id, n]))
 
   const book = byId.get('b')!
-  const w = {
+  const w = makeWorkspace({
     activeBook: book, activeProjectId: 'p1', activeProject: { settings: { timeSystems: [], chapterWordCountTarget: 500 } },
     outlineNodes, plotNodes, plotNodeById: new Map(plotNodes.map(n => [n.id, n])),
     activeBookChapters: descendantsOf(buildChildIndex(outlineNodes), 'b').filter(n => n.kind === 'chapter'),
@@ -78,7 +80,7 @@ function Harness({ activeChapterId = 'c1', actions }: { activeChapterId?: string
     }),
     assignPlotpoint: (id: string, target: string | null) => setPlot(prev => assignPoint(prev, id, target, byId)),
     cyclePlotAwareness: (id: string) => setPlot(prev => prev.map(n => (n.id === id && n.awareness ? { ...n, awareness: awarenessNext(n.awareness) } : n))),
-  } as unknown as WriterWorkspace
+  })
   return <><PlotTray w={w} /><OutlineMax w={w} /></>
 }
 

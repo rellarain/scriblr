@@ -9,6 +9,8 @@ import { BookDetails, BookOutlineList } from './outlineTabs'
 import { PlacedList, PlotTray } from './PlotpointsTab'
 import { PLOT_ORDER_KEY } from '../plotOrder'
 import { setKv } from '../../../../settings/settingsStore'
+import { mockFetch } from '../../../../test/mockFetch'
+import { makeWorkspace, type WorkspaceOverrides } from '../../../../test/makeWorkspace'
 
 // The Outline level's Mid tabs and the Project level's Plotpoints tab, side by side here.
 const OutlineMid = ({ w }: { w: WriterWorkspace }) => <><PlotTray w={w} /><PlacedList w={w} /><BookOutlineList w={w} /><BookDetails w={w} /></>
@@ -16,7 +18,7 @@ const OutlineMid = ({ w }: { w: WriterWorkspace }) => <><PlotTray w={w} /><Place
 beforeEach(() => {
   window.localStorage.clear()
   __resetSettingsForTests()
-  vi.stubGlobal('fetch', vi.fn(async () => ({ ok: true, status: 200, json: async () => ({}) })))
+  mockFetch()
 })
 
 const OUTLINE: OutlineNode[] = [
@@ -32,12 +34,12 @@ const PLOT: PlotNode[] = [
   plotNode('placed', 'plotpoint', 'line', { title: 'Already placed', assignedMomentId: 'c1' }),
 ]
 
-function workspace(over: Partial<WriterWorkspace> = {}): WriterWorkspace {
-  return {
+function workspace(over: WorkspaceOverrides = {}): WriterWorkspace {
+  return makeWorkspace({
     activeBook: OUTLINE[0], activeBookChapters: [OUTLINE[2], OUTLINE[3]], activeChapterId: 'c1',
     outlineNodes: OUTLINE, plotNodes: PLOT, plotNodeById: new Map(PLOT.map(n => [n.id, n])), openChapter: vi.fn(),
     ...over,
-  } as unknown as WriterWorkspace
+  })
 }
 
 describe('OutlineMid', () => {
@@ -77,7 +79,7 @@ describe('OutlineMid', () => {
     const w = workspace({
       activeBook: outline[0], outlineNodes: outline, plotNodes: points, plotNodeById: new Map(points.map(n => [n.id, n])),
       activeProject: { settings: { timeSystems: [] } },
-    } as unknown as Partial<WriterWorkspace>)
+    } )
     const placed = () => Array.from(document.querySelectorAll('[data-placed]')).map(el => el.getAttribute('data-placed'))
     const first = render(<OutlineMid w={w} />)
     expect(placed()).toEqual(['early', 'late']) // by time

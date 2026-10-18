@@ -6,6 +6,8 @@ import type { OutlineNode, PlotNode } from '../../../../api/types'
 import { __resetSettingsForTests } from '../../../../settings/settingsStore'
 import type { WriterWorkspace } from '../useWriterWorkspace'
 import { useProjectTabs } from './projectTabs'
+import { mockFetch } from '../../../../test/mockFetch'
+import { makeWorkspace, type WorkspaceOverrides } from '../../../../test/makeWorkspace'
 
 // The big editors are stood in for: they have their own tests.
 vi.mock('../PlotView', () => ({ default: () => <div>plot editor</div> }))
@@ -15,7 +17,7 @@ vi.mock('../ProjectEditor', () => ({ default: () => <div>project editor</div> })
 beforeEach(() => {
   window.localStorage.clear()
   __resetSettingsForTests()
-  vi.stubGlobal('fetch', vi.fn(async () => ({ ok: true, status: 200, json: async () => ({}) })))
+  mockFetch()
   vi.spyOn(resourcesApi, 'getResources').mockResolvedValue({ schemaVersion: 1, nodes: [], content: {}, assessments: {} })
 })
 
@@ -26,10 +28,10 @@ const plot = (id: string, kind: PlotNode['kind'], parentId: string | null, over:
 
 const outlineNodes = [outline('b1', 'book', null, { title: 'Book One' }), outline('c1', 'chapter', 'b1'), outline('c2', 'chapter', 'b1')]
 const plotNodes = [plot('cat', 'category', null, { title: 'Romance' }), plot('line', 'plotline', 'cat'), plot('v1', 'plotpoint', 'line'), plot('v2', 'plotpoint', 'line', { assignedMomentId: 'c1' })]
-const w = {
+const w = makeWorkspace({
   outlineNodes, plotNodes, openBook: vi.fn(), addOutlineNode: vi.fn(),
   saveStatus: { dirty: false, saving: false, error: undefined, lastSavedAt: null }, saveNow: async () => {}, saveCountdown: { nextSaveAt: null, wait: null }, history: { canUndo: () => false, canRedo: () => false, undo: () => {}, redo: () => {} },
-} as unknown as WriterWorkspace
+})
 
 function Harness({ size }: { size: 'mid' | 'max' }) {
   const t = useProjectTabs(w, size)

@@ -2,11 +2,12 @@ import { render, screen } from '@testing-library/react'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { __resetSettingsForTests } from '../settings/settingsStore'
 import { ThemeZoneProvider, useThemeState } from './useTheme'
+import { mockFetch } from '../test/mockFetch'
 
 beforeEach(() => {
   window.localStorage.clear()
   __resetSettingsForTests()
-  vi.stubGlobal('fetch', vi.fn(async () => ({ ok: true, status: 200, json: async () => ({}) })))
+  mockFetch()
 })
 
 function Reading() {

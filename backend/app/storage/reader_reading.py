@@ -5,7 +5,6 @@ demonstration, and the reader's own marks join them only if they choose to share
 
 from datetime import datetime
 from pathlib import Path
-from typing import Optional
 
 from . import library, project_store, reading_text
 from .reader_schema import (
