@@ -1,14 +1,16 @@
 import RoleAssignment from './admin/RoleAssignment'
-import type { ComponentType } from 'react'
+import { Suspense, lazy, type ComponentType } from 'react'
 import {
   BarChartIcon, VotingIcon, LibraryIcon, PeopleIcon, BuildingIcon, BriefcaseIcon,
   EnvelopeIcon, CalendarIcon, HelpIcon, TeamIcon, SortingIcon, ConfigurationIcon, InfoIcon,
   type IconProps,
 } from '../icons'
-import ResourcesConsole from './admin/resources/ResourcesConsole'
 import TileGrid from '../../components/tiles/TileGrid'
 import { TileBig, TileRows, TileSub } from '../../components/tiles/tileParts'
 import type { TileDef } from '../../components/tiles/tileTypes'
+
+// The article and quiz builder (and the Markdown renderer behind it) is loaded when its console is opened.
+const ResourcesConsole = lazy(() => import('./admin/resources/ResourcesConsole'))
 
 // Eight consoles per scrilbrPlan.md's "Admin Page (AUI)" section (this array
 // covers 7 of them; Resources -- not in that doc -- is built separately
@@ -171,7 +173,7 @@ function AUI() {
     summary: 'Article & quiz builder',
     help: RESOURCES_HELP,
     render: () => <TileSub>Author Guides, Tutorials, FAQs and Exam/Test/Quiz content here.</TileSub>,
-    console: () => <ResourcesConsole />,
+    console: () => <Suspense fallback={null}><ResourcesConsole /></Suspense>,
   })
 
   return (

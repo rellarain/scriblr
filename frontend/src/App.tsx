@@ -1,9 +1,7 @@
-import { useEffect, useState } from 'react'
+import { Suspense, lazy, useEffect, useState } from 'react'
 import { useLocation, useNavigate } from 'react-router-dom'
 import './App.scss'
 import WUI from './assets/Interfaces/WUI'
-import RUI from './assets/Interfaces/RUI'
-import TUI from './assets/Interfaces/TUI'
 import VUI from './assets/Interfaces/VUI'
 import Header from './Header'
 import Sidebar from './Sidebar'
@@ -14,6 +12,10 @@ import { CURRENT_USER } from './userSeed'
 import { DAY_ACTIVITY } from './activitySeed'
 import { useSettings } from './settings/settingsStore'
 import { useThemeEngine } from './theme/useTheme'
+
+// The Reader and the Translator are loaded when first opened: the Writer, the page the app starts on, does not carry them.
+const RUI = lazy(() => import('./assets/Interfaces/RUI'))
+const TUI = lazy(() => import('./assets/Interfaces/TUI'))
 
 const SIDEBAR_DIVIDER_W = 40
 const SIDEBAR_PANEL_W = 400
@@ -163,7 +165,7 @@ function App() {
         activity={DAY_ACTIVITY}
       />
 
-      {renderMainscreen()}
+      <Suspense fallback={null}>{renderMainscreen()}</Suspense>
 
       <Sidebar
         side={handedness}
