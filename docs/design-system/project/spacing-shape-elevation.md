@@ -47,4 +47,4 @@ The edge rail beside a book (`EdgeTabs`) is 10 or more stacked page edges, each 
 
 ## Motion
 
-Short and quiet. The theme fades between palettes over 1s (off while a settings slider is dragged, and under `prefers-reduced-motion`). A spine turns to its cover over 0.45s. A drop gap opens in 0.15s, a goal bar fills in 0.3s, a segmented label slides in 0.25s, the save bubble in 0.12s, a divider changes in 0.1s. Nothing bounces. Motion is dropped for `prefers-reduced-motion`.
+Short and quiet. The theme fades between palettes over 1s (off while a settings slider is dragged, and under `prefers-reduced-motion`). A spine turns to its cover over 0.45s. A drop gap opens in 0.15s, a goal bar fills in 0.3s, a segmented label slides in 0.25s, the save bubble in 0.12s, a divider changes in 0.1s. Nothing bounces. Motion is dropped for `prefers-reduced-motion`, everywhere, by one rule in `style/base.css`.

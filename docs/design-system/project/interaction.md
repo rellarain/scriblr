@@ -83,7 +83,7 @@ Click a sentence in the preview, then click the bar in the left margin: each cli
 
 ## Focus and hover
 
-- Focus is a 2px outline in the accent's light shade, inside the control, on every button, tab, title bar and divider.
+- Focus is a 2px outline in the accent's light shade, inside the control, on every button, tab, title bar and divider. In the Writer the buttons, tabs, links and summaries show it with the keyboard (`:focus-visible`: a click shows nothing) as a 2px outline inside the edge, drawn in the control's own text colour, and the fields (inputs, text areas, selects) as a 1.5px inset ring in theirs; the own-text colour is already audited against the control's ground, so the ring reads on every hue. The edge tabs show it too.
 - Hover brightens (a spine by 15%) or washes (a header button by white at 16%); it never moves anything.
 - Pressed is `aria-pressed`, and looks like the pressed-in wash of the same control.
-- Motion stops under `prefers-reduced-motion`.
+- Motion stops under `prefers-reduced-motion`: one rule in `style/base.css` ends every transition and animation in the app at once (the sky toggle and the spine keep their own rules besides).

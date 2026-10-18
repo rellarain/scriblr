@@ -33,6 +33,19 @@ button {
   cursor: pointer;
 }
 
+/* Motion is dropped for anyone who asks for less of it: every transition and animation in the app ends at once. */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    transition-duration: 0.01ms !important;
+    transition-delay: 0s !important;
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    scroll-behavior: auto !important;
+  }
+}
+
 input,
 textarea,
 select {
