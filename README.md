@@ -699,13 +699,17 @@ npm install
 npm run dist
 ```
 
-The PyInstaller step produces the headless backend helper
-(`backend/dist/scriblr-backend.exe`); `electron-builder` (the last step)
-bundles it alongside Electron itself into `electron/dist/`, producing an
+The PyInstaller step produces the headless backend helper as a **one-dir** build
+(`backend/dist/scriblr-backend/`: the exe and an `_internal/` folder, started in under a
+second; a one-file exe re-extracted itself to `%TEMP%` on every launch); `electron-builder`
+(the last step) copies that folder whole to `resources/backend/` (`extraResources`), keeps
+only the `en-US` Chromium locale, and bundles it alongside Electron itself into `electron/dist/`, producing an
 NSIS installer (icon included, from `backend/icon.ico` — regenerate with
 `./.venv/Scripts/python scripts/generate_icon.py` if the design ever
 changes, a build-time-only tool needing Pillow). Closing the window shuts
-the backend down cleanly; no process is left running. Project data is
+the backend down cleanly (`taskkill /T`); no process is left running. Only one Scriblr runs at a time
+(`requestSingleInstanceLock`); a second launch brings the first window forward. The backend's output goes to `<userData>/logs/backend.log`; if it does not answer within 60 s the app shows an
+error with that path instead of a blank window, and a small "Starting…" window covers a slow start. Project data is
 stored per-OS under the standard app-data directory (`%APPDATA%\Scriblr`
 on Windows), independent of wherever the app is installed, so
 rebuilding/reinstalling never touches existing projects.

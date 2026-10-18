@@ -4,15 +4,20 @@ place in this app that isn't dependency-free (see the plan doc's rationale:
 no dependency-free option can lay out paginated text with real internal
 links)."""
 
-import unicodedata
-from pathlib import Path
+from __future__ import annotations
 
-from fpdf import FPDF
-from fpdf.outline import OutlineSection
+import unicodedata
+from functools import lru_cache
+from pathlib import Path
+from typing import TYPE_CHECKING
 
 from . import project_store as store
 from .project_store import MomentNotFoundError
 from .schema import OutlineNode
+
+if TYPE_CHECKING:  # fpdf2 (with its font and image libraries) takes about 300 ms to import: only an export needs it
+    from fpdf import FPDF
+    from fpdf.outline import OutlineSection
 
 # TOC/PDF-outline entries stop at "scene" -- a manuscript can have hundreds
 # of moments, and a TOC entry per moment would make the TOC useless as
@@ -62,9 +67,15 @@ def latin1_text(text: str) -> str:
     return "".join(out)
 
 
-class _ProsePdf(FPDF):
-    def normalize_text(self, text: str) -> str:
-        return super().normalize_text(latin1_text(text))
+@lru_cache(maxsize=1)
+def _pdf_class() -> type:
+    from fpdf import FPDF
+
+    class _ProsePdf(FPDF):
+        def normalize_text(self, text: str) -> str:
+            return super().normalize_text(latin1_text(text))
+
+    return _ProsePdf
 
 
 def _children_by_parent(nodes: list[OutlineNode]) -> dict[str | None, list[OutlineNode]]:
@@ -104,7 +115,7 @@ def _render_pdf(
 ) -> bytes:
     by_parent = _children_by_parent(nodes)
 
-    pdf = _ProsePdf()
+    pdf = _pdf_class()()
     pdf.set_title(title)
 
     pdf.add_page()
