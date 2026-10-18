@@ -29,91 +29,92 @@ def _ancestor_of_kind(nodes_by_id: dict[str, OutlineNode], node_id: str, kind: s
 
 
 def get_analytics(root: Path, project_id: str) -> ProjectAnalytics:
-    index = store.load_index(root, project_id)
-    outline = store.load_outline(root, project_id)
-    plot = store.load_plot(root, project_id)
+    with store.transaction(root, project_id):
+        index = store.load_index(root, project_id)
+        outline = store.load_outline(root, project_id)
+        plot = store.load_plot(root, project_id)
 
-    nodes_by_id = {n.id: n for n in outline.nodes}
+        nodes_by_id = {n.id: n for n in outline.nodes}
 
-    moment_word_counts: dict[str, int] = {}
-    for moment_id in index.manifest.draftMoments:
-        if moment_id not in nodes_by_id:
-            continue  # orphaned (scrapped) -- excluded from the live project total
-        chapter_id = _ancestor_of_kind(nodes_by_id, moment_id, "chapter")
-        if chapter_id is None:
-            continue
-        try:
-            draft = store.load_draft(root, project_id, chapter_id, moment_id)
-        except (store.MomentNotFoundError, store.ShardCorruptError):
-            continue
-        moment_word_counts[moment_id] = draft.wordCount
+        moment_word_counts: dict[str, int] = {}
+        for moment_id in index.manifest.draftMoments:
+            if moment_id not in nodes_by_id:
+                continue  # orphaned (scrapped) -- excluded from the live project total
+            chapter_id = _ancestor_of_kind(nodes_by_id, moment_id, "chapter")
+            if chapter_id is None:
+                continue
+            try:
+                draft = store.load_draft(root, project_id, chapter_id, moment_id)
+            except (store.MomentNotFoundError, store.ShardCorruptError):
+                continue
+            moment_word_counts[moment_id] = draft.wordCount
 
-    # Roll each moment's word count up to every ancestor (book, chapter, etc).
-    rollup: dict[str, int] = {}
-    for moment_id, word_count in moment_word_counts.items():
-        rollup[moment_id] = rollup.get(moment_id, 0) + word_count
-        current = nodes_by_id.get(moment_id)
-        while current is not None and current.parentId:
-            rollup[current.parentId] = rollup.get(current.parentId, 0) + word_count
-            current = nodes_by_id.get(current.parentId)
+        # Roll each moment's word count up to every ancestor (book, chapter, etc).
+        rollup: dict[str, int] = {}
+        for moment_id, word_count in moment_word_counts.items():
+            rollup[moment_id] = rollup.get(moment_id, 0) + word_count
+            current = nodes_by_id.get(moment_id)
+            while current is not None and current.parentId:
+                rollup[current.parentId] = rollup.get(current.parentId, 0) + word_count
+                current = nodes_by_id.get(current.parentId)
 
-    total_word_count = sum(moment_word_counts.values())
+        total_word_count = sum(moment_word_counts.values())
 
-    books = [n for n in outline.nodes if n.kind == "book"]
-    chapters = [n for n in outline.nodes if n.kind == "chapter"]
-    scenes = [n for n in outline.nodes if n.kind == "scene"]
-    moments = [n for n in outline.nodes if n.kind == "moment"]
+        books = [n for n in outline.nodes if n.kind == "book"]
+        chapters = [n for n in outline.nodes if n.kind == "chapter"]
+        scenes = [n for n in outline.nodes if n.kind == "scene"]
+        moments = [n for n in outline.nodes if n.kind == "moment"]
 
-    per_book = [
-        BookWordCount(
-            nodeId=book.id,
-            title=book.title,
-            wordCount=rollup.get(book.id, 0),
-            chapterCount=sum(1 for c in chapters if _ancestor_of_kind(nodes_by_id, c.id, "book") == book.id),
-            chapterCountTarget=book.chapterCountTarget,
-        )
-        for book in books
-    ]
-    per_chapter = [
-        ChapterWordCount(
-            nodeId=chapter.id,
-            title=chapter.title,
-            bookId=_ancestor_of_kind(nodes_by_id, chapter.id, "book"),
-            wordCount=rollup.get(chapter.id, 0),
-        )
-        for chapter in chapters
-    ]
-
-    flagged_nodes: list[FlaggedNode] = []
-    for node in outline.nodes:
-        if node.flag is not None:
-            flagged_nodes.append(
-                FlaggedNode(nodeId=node.id, treeType="outline", kind=node.kind, title=node.title, flag=node.flag)
+        per_book = [
+            BookWordCount(
+                nodeId=book.id,
+                title=book.title,
+                wordCount=rollup.get(book.id, 0),
+                chapterCount=sum(1 for c in chapters if _ancestor_of_kind(nodes_by_id, c.id, "book") == book.id),
+                chapterCountTarget=book.chapterCountTarget,
             )
-    for node in plot.nodes:
-        if node.flag is not None:
-            flagged_nodes.append(
-                FlaggedNode(nodeId=node.id, treeType="plot", kind=node.kind, title=node.title, flag=node.flag)
+            for book in books
+        ]
+        per_chapter = [
+            ChapterWordCount(
+                nodeId=chapter.id,
+                title=chapter.title,
+                bookId=_ancestor_of_kind(nodes_by_id, chapter.id, "book"),
+                wordCount=rollup.get(chapter.id, 0),
             )
+            for chapter in chapters
+        ]
 
-    totals = ProjectAnalyticsTotals(
-        bookCount=len(books),
-        chapterCount=len(chapters),
-        sceneCount=len(scenes),
-        momentCount=len(moments),
-        totalWordCount=total_word_count,
-    )
-    goals = ProjectAnalyticsGoals(
-        wordCountTarget=index.settings.wordCountTarget,
-        bookCountTarget=index.settings.bookCountTarget,
-        bookWordCountTarget=index.settings.bookWordCountTarget,
-        chapterWordCountTarget=index.settings.chapterWordCountTarget,
-    )
-    return ProjectAnalytics(
-        totals=totals,
-        goals=goals,
-        perBook=per_book,
-        perChapter=per_chapter,
-        nodeWordCounts={node_id: count for node_id, count in rollup.items() if count > 0},
-        flaggedNodes=flagged_nodes,
-    )
+        flagged_nodes: list[FlaggedNode] = []
+        for node in outline.nodes:
+            if node.flag is not None:
+                flagged_nodes.append(
+                    FlaggedNode(nodeId=node.id, treeType="outline", kind=node.kind, title=node.title, flag=node.flag)
+                )
+        for node in plot.nodes:
+            if node.flag is not None:
+                flagged_nodes.append(
+                    FlaggedNode(nodeId=node.id, treeType="plot", kind=node.kind, title=node.title, flag=node.flag)
+                )
+
+        totals = ProjectAnalyticsTotals(
+            bookCount=len(books),
+            chapterCount=len(chapters),
+            sceneCount=len(scenes),
+            momentCount=len(moments),
+            totalWordCount=total_word_count,
+        )
+        goals = ProjectAnalyticsGoals(
+            wordCountTarget=index.settings.wordCountTarget,
+            bookCountTarget=index.settings.bookCountTarget,
+            bookWordCountTarget=index.settings.bookWordCountTarget,
+            chapterWordCountTarget=index.settings.chapterWordCountTarget,
+        )
+        return ProjectAnalytics(
+            totals=totals,
+            goals=goals,
+            perBook=per_book,
+            perChapter=per_chapter,
+            nodeWordCounts={node_id: count for node_id, count in rollup.items() if count > 0},
+            flaggedNodes=flagged_nodes,
+        )

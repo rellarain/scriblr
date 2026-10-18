@@ -5,13 +5,14 @@ import tempfile
 import threading
 import time
 import uuid
+from contextlib import contextmanager
 from pathlib import Path
 from typing import Callable, Optional, Type, TypeVar
 
 from pydantic import BaseModel, ValidationError
 
-from . import settings_log
-from .ids import check_id
+from . import settings_log, tree_pack
+from .ids import InvalidIdError, check_id
 from .schema import (
     HUE_SCHEME,
     PROJECT_FILE_VERSION,
@@ -143,7 +144,9 @@ def _atomic_write_json(project_dir: Path, dest_path: Path, data: dict) -> None:
     fd, tmp_name = tempfile.mkstemp(dir=tmp_dir, suffix=".json")
     try:
         with os.fdopen(fd, "w", encoding="utf-8") as f:
-            json.dump(data, f, indent=2)
+            # json.dumps (not dump) takes the C encoder; compact separators and real UTF-8 make the file about 40% smaller.
+            # Reading is indifferent to either layout, so files written before this one still load.
+            f.write(json.dumps(data, separators=(",", ":"), ensure_ascii=False))
             f.flush()
             os.fsync(f.fileno())
         _replace_with_retry(tmp_name, dest_path)
@@ -367,6 +370,13 @@ def _write_project_file(root: Path, project_id: str, pf: ProjectFile) -> None:
     path = _project_file_path(project_dir)
     if pf.schemaVersion > PROJECT_FILE_VERSION:
         raise NewerSchemaError(project_id, pf.schemaVersion, PROJECT_FILE_VERSION)
+    if pf.schemaVersion < 4 and path.exists():
+        # The first write of a file from before the compact history: keep the file as it was, once, and convert the history.
+        once = path.with_name(f"project.json.v{pf.schemaVersion}.bak")
+        if not once.exists():
+            shutil.copyfile(path, once)
+        pf.outlineHistory = tree_pack.repack("outline", pf.outlineHistory)
+        pf.plotHistory = tree_pack.repack("plot", pf.plotHistory)
     pf.schemaVersion = PROJECT_FILE_VERSION
     data = pf.model_dump(mode="json")
     # A section that could not be read stays as it was stored, unless something has replaced it since it was loaded.
@@ -379,7 +389,56 @@ def _write_project_file(root: Path, project_id: str, pf: ProjectFile) -> None:
     _atomic_write_json(project_dir, path, data)
 
 
+# ---------------------------------------------------------------------------
+# Transactions. A request that does several things to one project (save a moment's draft, count it in the day's activity, note it in
+# the session's revision) used to load and rewrite the whole file once for each. `transaction` holds the project's lock, loads it once, lets
+# every store call made inside it (on this thread) work on that one in-memory ProjectFile -- later calls see the earlier calls' changes --
+# and writes it once at the end, only if something changed. If the block raises, nothing is written.
+# ---------------------------------------------------------------------------
+
+_txn_local = threading.local()
+
+
+class _Txn:
+    __slots__ = ("pf", "errors", "dirty")
+
+    def __init__(self, pf: ProjectFile, errors: dict[str, ShardCorruptError]) -> None:
+        self.pf = pf
+        self.errors = errors
+        self.dirty = False
+
+
+def _active_txn(root: Path, project_id: str) -> Optional[_Txn]:
+    active = getattr(_txn_local, "active", None)
+    return active.get((str(root), project_id)) if active else None
+
+
+@contextmanager
+def transaction(root: Path, project_id: str):
+    """One load and at most one write for everything the block does to this project. Nested use joins the outer one."""
+    key = (str(root), project_id)
+    active = getattr(_txn_local, "active", None)
+    if active is None:
+        active = _txn_local.active = {}
+    if key in active:
+        yield active[key].pf
+        return
+    with _lock_for(project_id):
+        pf, errors = _load_project_file_locked(root, project_id)
+        txn = _Txn(pf, errors)
+        active[key] = txn
+        try:
+            yield pf
+            if txn.dirty:
+                _write_project_file(root, project_id, pf)
+        finally:
+            del active[key]
+
+
 def _load_project_file(root: Path, project_id: str) -> tuple[ProjectFile, dict[str, ShardCorruptError]]:
+    txn = _active_txn(root, project_id)
+    if txn is not None:
+        return txn.pf, txn.errors
     # Under the project's lock, like every write: on Windows a save cannot replace project.json while
     # a reader has it open (PermissionError), so reads and saves take turns. (An RLock: _mutate
     # holds it already when it loads.)
@@ -515,6 +574,11 @@ def _mutate(root: Path, project_id: str, fn: Callable[[ProjectFile], None]) -> P
     """Acquire this project's lock, load the whole project.json, let `fn`
     mutate the in-memory ProjectFile, then atomically write the whole file
     back -- all as one critical section. If `fn` raises, nothing is written."""
+    txn = _active_txn(root, project_id)
+    if txn is not None:  # inside a transaction: change the one in-memory file; the transaction writes it
+        fn(txn.pf)
+        txn.dirty = True
+        return txn.pf
     with _lock_for(project_id):
         pf, _errors = _load_project_file(root, project_id)
         fn(pf)
@@ -669,18 +733,22 @@ def save_index(root: Path, index: ProjectIndex) -> None:
     _mutate(root, index.projectId, _do)
 
 
-def list_projects(root: Path) -> list[ProjectIndex]:
+def iter_project_files(root: Path):
+    """Every readable project, parsed once (one that is missing, corrupt or has an unusable id is skipped)."""
     if not root.exists():
-        return []
-    summaries: list[ProjectIndex] = []
+        return
     for entry in sorted(root.iterdir()):
         if not entry.is_dir() or entry.name.startswith("."):
             continue
         try:
-            summaries.append(load_index(root, entry.name))
-        except (ProjectNotFoundError, ShardCorruptError):
+            pf, _errors = _load_project_file(root, entry.name)
+        except (ProjectNotFoundError, ShardCorruptError, InvalidIdError):
             continue
-    return summaries
+        yield pf
+
+
+def list_projects(root: Path) -> list[ProjectIndex]:
+    return [pf.index for pf in iter_project_files(root)]
 
 
 # A deleted project is moved to <projects>/.trash/<id>-<time>/ and only removed for good after this many days.
@@ -956,6 +1024,25 @@ def migrate_legacy_revisions(root: Path, project_id: str, chapter_id: str, momen
     _mutate(root, project_id, _do)
 
 
+def cap_session_revisions(root: Path, project_id: str, chapter_id: str, keep: int) -> int:
+    """Delete the oldest session revisions of a chapter beyond `keep` (manual and automatic ones are never touched). Returns how many went."""
+    removed: list[int] = []
+
+    def _do(pf: ProjectFile) -> None:
+        items = pf.revisions.get(chapter_id, [])
+        sessions = sorted((r for r in items if r.trigger == "session"), key=lambda r: r.createdAt)
+        doomed = {r.snapshotId for r in sessions[: max(0, len(sessions) - keep)]}
+        if doomed:
+            pf.revisions[chapter_id] = [r for r in items if r.snapshotId not in doomed]
+        removed.append(len(doomed))
+
+    pf, _errors = _load_project_file(root, project_id)
+    if sum(1 for r in pf.revisions.get(chapter_id, []) if r.trigger == "session") <= keep:
+        return 0
+    _mutate(root, project_id, _do)
+    return removed[0]
+
+
 def save_revision(root: Path, project_id: str, snapshot: RevisionSnapshot) -> None:
     def _do(pf: ProjectFile) -> None:
         chapter_list = pf.revisions.setdefault(snapshot.chapterId, [])
@@ -1001,25 +1088,49 @@ def save_publication(root: Path, project_id: str, publication: Publication) -> N
 # ---------------------------------------------------------------------------
 
 
+def _history_of(pf: ProjectFile, tree_type: TreeType) -> list[TreeSnapshot]:
+    return pf.outlineHistory if tree_type == "outline" else pf.plotHistory
+
+
 def list_tree_snapshots(root: Path, project_id: str, tree_type: TreeType) -> list[TreeSnapshot]:
+    """Every snapshot with its complete `nodes` (the store keeps them as sparse keyframes and deltas), oldest first."""
     pf, _errors = _load_project_file(root, project_id)
-    hist = pf.outlineHistory if tree_type == "outline" else pf.plotHistory
-    return sorted(hist, key=lambda s: s.createdAt)
+    hist = _history_of(pf, tree_type)
+    dense = tree_pack.dense_all(tree_type, hist)
+    whole = [tree_pack.unpack(s, nodes) for s, nodes in zip(hist, dense) if nodes is not None]
+    return sorted(whole, key=lambda s: s.createdAt)
+
+
+def last_tree_snapshot(root: Path, project_id: str, tree_type: TreeType) -> Optional[TreeSnapshot]:
+    """The newest snapshot, complete, without unpacking the others."""
+    pf, _errors = _load_project_file(root, project_id)
+    hist = _history_of(pf, tree_type)
+    if not hist:
+        return None
+    index = max(range(len(hist)), key=lambda i: (hist[i].createdAt, i))
+    nodes = tree_pack.dense_at(tree_type, hist, index)
+    return tree_pack.unpack(hist[index], nodes) if nodes is not None else None
 
 
 def load_tree_snapshot(root: Path, project_id: str, tree_type: TreeType, snapshot_id: str) -> TreeSnapshot:
     pf, _errors = _load_project_file(root, project_id)
-    hist = pf.outlineHistory if tree_type == "outline" else pf.plotHistory
-    for s in hist:
+    hist = _history_of(pf, tree_type)
+    for i, s in enumerate(hist):
         if s.snapshotId == snapshot_id:
-            return s
+            nodes = tree_pack.dense_at(tree_type, hist, i)
+            if nodes is None:
+                break  # its base is gone: it cannot be read
+            return tree_pack.unpack(s, nodes)
     raise TreeSnapshotNotFoundError(project_id, tree_type, snapshot_id)
 
 
 def save_tree_snapshot(root: Path, project_id: str, snapshot: TreeSnapshot) -> None:
     def _do(pf: ProjectFile) -> None:
-        target = pf.outlineHistory if snapshot.treeType == "outline" else pf.plotHistory
-        target.append(snapshot)
+        target = _history_of(pf, snapshot.treeType)
+        previous = tree_pack.dense_at(snapshot.treeType, target, len(target) - 1) if target else None
+        base_id = target[-1].snapshotId if target else None
+        depth = tree_pack.depth_at(target, len(target) - 1) if target else 0
+        target.append(tree_pack.pack(snapshot.treeType, snapshot, previous, base_id, depth))
 
     _mutate(root, project_id, _do)
 
@@ -1051,9 +1162,15 @@ def consolidate_project_history(root: Path, project_id: str) -> list[str]:
         for attr, label in (("outlineHistory", "outline"), ("plotHistory", "plot")):
             items = getattr(pf2, attr)
             if len(items) > TREE_HISTORY_COMPACT_THRESHOLD:
+                tree_type: TreeType = "outline" if attr == "outlineHistory" else "plot"
                 items = sorted(items, key=lambda s: s.createdAt)
                 pruned = len(items) - TREE_HISTORY_KEEP
-                setattr(pf2, attr, items[-TREE_HISTORY_KEEP:])
+                kept = items[-TREE_HISTORY_KEEP:]
+                # The oldest one kept loses the snapshots it was a delta against, so it becomes a keyframe.
+                if not tree_pack.is_keyframe(kept[0]):
+                    first = tree_pack.dense_at(tree_type, items, pruned)
+                    kept = ([kept[0].model_copy(update={"nodes": tree_pack.sparse_nodes(tree_type, first), "base": None, "ids": None, "changed": []})] if first is not None else []) + kept[1:]
+                setattr(pf2, attr, kept)
                 messages.append(
                     f"Consolidated {pruned} old {label} history snapshots "
                     f"(kept the {TREE_HISTORY_KEEP} most recent)."

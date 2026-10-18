@@ -11,6 +11,8 @@ from . import project_store as store
 from .schema import DraftChapter, RevisionSnapshot, utcnow
 
 SESSION_GAP_MINUTES = 10
+# A chapter keeps this many session revisions (each holds the whole chapter's text); the oldest go first.
+SESSION_KEEP = 100
 
 
 def _snapshot(chapter_id: str, snapshot_id: str, label: str, draft: DraftChapter, created_at, *, session: bool) -> RevisionSnapshot:
@@ -45,3 +47,4 @@ def record_session(root: Path, project_id: str, chapter_id: str, before: DraftCh
             root, project_id, _snapshot(chapter_id, store.new_id("snap"), "Before this session", before, now - timedelta(seconds=1), session=False)
         )
     store.save_revision(root, project_id, _snapshot(chapter_id, store.new_id("snap"), "Editing session", after, now, session=True))
+    store.cap_session_revisions(root, project_id, chapter_id, SESSION_KEEP)

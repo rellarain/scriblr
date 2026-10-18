@@ -8,8 +8,8 @@ from pydantic import BaseModel, Field, PrivateAttr, field_validator, model_valid
 
 SCHEMA_VERSION = 2
 # The version of the project.json file as a whole (ProjectFile.schemaVersion), which a build refuses to write over when the file is newer than it
-# knows (see project_store). 2: one file per project; 3: plot clusters.
-PROJECT_FILE_VERSION = 3
+# knows (see project_store). 2: one file per project; 3: plot clusters; 4: tree history as sparse keyframes and deltas (tree_pack).
+PROJECT_FILE_VERSION = 4
 
 
 def utcnow() -> datetime:
@@ -534,7 +534,12 @@ class TreeSnapshot(BaseModel):
     treeType: TreeType
     createdAt: datetime
     trigger: TreeSnapshotTrigger = "auto"
+    # Outside the store `nodes` is the complete tree. Stored (see tree_pack): a keyframe holds its nodes sparse; a delta holds `base` (the
+    # snapshot it is against), `ids` (every node id, in order) and `changed` (the sparse nodes that are new or differ from the base's).
     nodes: list[dict] = Field(default_factory=list)
+    base: Optional[str] = None
+    ids: Optional[list[str]] = None
+    changed: list[dict] = Field(default_factory=list)
 
 
 class TreeSnapshotSummary(BaseModel):

@@ -30,7 +30,9 @@ from .api import (
     user_settings,
 )
 from .storage.ids import InvalidIdError
-from .storage.paths import get_projects_root
+from .storage.backup import ensure_pre_migration_backup
+from .storage.paths import get_app_data_root, get_projects_root
+from .storage.schema import PROJECT_FILE_VERSION
 from .storage.pdf_export import OutlineNodeNotFoundError
 from .storage.project_store import (
     InvalidRestoreParentError,
@@ -50,6 +52,7 @@ from .storage.project_store import (
 async def _lifespan(_app: FastAPI):
     """At start-up: clear the temp files a killed process left behind, and the trashed projects that are old enough to go."""
     try:
+        ensure_pre_migration_backup(get_app_data_root(), PROJECT_FILE_VERSION)  # before any project is converted to a newer format
         root = get_projects_root()
         sweep_temp_files(root)
         purge_trash(root)

@@ -43,45 +43,46 @@ def get_project(project_id: str, root: Path = Depends(get_storage_root)) -> Proj
 def update_project(
     project_id: str, body: UpdateProjectRequest, root: Path = Depends(get_storage_root)
 ) -> ProjectIndex:
-    index = store.load_index(root, project_id)
-    if body.title is not None:
-        index.title = body.title
-    if body.wordCountTarget is not None:
-        index.settings.wordCountTarget = body.wordCountTarget
-    if body.bookCountTarget is not None:
-        index.settings.bookCountTarget = body.bookCountTarget
-    if body.bookWordCountTarget is not None:
-        index.settings.bookWordCountTarget = body.bookWordCountTarget
-    if body.chapterWordCountTarget is not None:
-        index.settings.chapterWordCountTarget = body.chapterWordCountTarget
-    if body.priorities is not None:
-        index.settings.priorities = body.priorities
-    if body.routines is not None:
-        index.settings.routines = body.routines
-    if body.outlineLevels is not None:
-        index.settings.outlineLevels = body.outlineLevels
-    if body.plotLevels is not None:
-        index.settings.plotLevels = body.plotLevels
-    if body.readLevels is not None:
-        index.settings.readLevels = body.readLevels
-    before = {
-        "timeSystems": [t.model_dump(mode="json") for t in index.settings.timeSystems],
-        "themeHue": index.settings.themeHue,
-    }
-    if body.timeSystems is not None:
-        index.settings.timeSystems = body.timeSystems
-    if body.themeHue is not None:
-        index.settings.themeHue = body.themeHue
-    after = {
-        "timeSystems": [t.model_dump(mode="json") for t in index.settings.timeSystems],
-        "themeHue": index.settings.themeHue,
-    }
-    index.updatedAt = utcnow()
-    store.save_index(root, index)
-    # A change to the time systems or the colour is logged with what it replaced, so it can be undone.
-    if before != after:
-        store.append_settings_log(root, project_id, settings_log.new_entry("project", "Project settings changed", before))
-    return index
+    with store.transaction(root, project_id):
+        index = store.load_index(root, project_id)
+        if body.title is not None:
+            index.title = body.title
+        if body.wordCountTarget is not None:
+            index.settings.wordCountTarget = body.wordCountTarget
+        if body.bookCountTarget is not None:
+            index.settings.bookCountTarget = body.bookCountTarget
+        if body.bookWordCountTarget is not None:
+            index.settings.bookWordCountTarget = body.bookWordCountTarget
+        if body.chapterWordCountTarget is not None:
+            index.settings.chapterWordCountTarget = body.chapterWordCountTarget
+        if body.priorities is not None:
+            index.settings.priorities = body.priorities
+        if body.routines is not None:
+            index.settings.routines = body.routines
+        if body.outlineLevels is not None:
+            index.settings.outlineLevels = body.outlineLevels
+        if body.plotLevels is not None:
+            index.settings.plotLevels = body.plotLevels
+        if body.readLevels is not None:
+            index.settings.readLevels = body.readLevels
+        before = {
+            "timeSystems": [t.model_dump(mode="json") for t in index.settings.timeSystems],
+            "themeHue": index.settings.themeHue,
+        }
+        if body.timeSystems is not None:
+            index.settings.timeSystems = body.timeSystems
+        if body.themeHue is not None:
+            index.settings.themeHue = body.themeHue
+        after = {
+            "timeSystems": [t.model_dump(mode="json") for t in index.settings.timeSystems],
+            "themeHue": index.settings.themeHue,
+        }
+        index.updatedAt = utcnow()
+        store.save_index(root, index)
+        # A change to the time systems or the colour is logged with what it replaced, so it can be undone.
+        if before != after:
+            store.append_settings_log(root, project_id, settings_log.new_entry("project", "Project settings changed", before))
+        return index
 
 
 # The project's settings changes of the last days with the values they replaced, newest first (Undo reads this).

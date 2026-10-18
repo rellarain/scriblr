@@ -30,11 +30,8 @@ def local_books(root: Path, include_unlisted: bool = False) -> list[CatalogBook]
     """The author's own books published to the library (a book with an edition and a listing). An unlisted book stays gettable by id, so the
     copies readers own and the loans already made keep working, but it is not for sale or loan."""
     out: list[CatalogBook] = []
-    for index in store.list_projects(root):
-        try:
-            pf, _errors = store._load_project_file(root, index.projectId)
-        except (store.ProjectNotFoundError, store.ShardCorruptError):
-            continue
+    for pf in store.iter_project_files(root):
+        index = pf.index
         for book in (n for n in pf.outline.nodes if n.kind == "book"):
             listing = pf.bookListings.get(book.id)
             if listing is None or not listing.editions or (not listing.listed and not include_unlisted):

@@ -25,8 +25,7 @@ def maybe_create_snapshot(
     """Creates a new snapshot unless `nodes` is identical to the most
     recently stored snapshot, so repeated saves of unchanged content don't
     spam the history."""
-    existing = store.list_tree_snapshots(root, project_id, tree_type)
-    previous = existing[-1] if existing else None
+    previous = store.last_tree_snapshot(root, project_id, tree_type)
     if previous is not None and previous.nodes == nodes:
         return None
     snapshot = TreeSnapshot(

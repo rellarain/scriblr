@@ -32,21 +32,45 @@ def _tokenize(text: str) -> list[str]:
     return _TOKEN_RE.findall(text)
 
 
+_LINE_RE = re.compile(r"[^\n]*\n|[^\n]+")
+# A replaced stretch longer than this (in words and spaces, either side) is shown as one deletion and one insertion rather than aligned
+# word by word: the alignment is quadratic in its length.
+_WORD_DIFF_LIMIT = 4000
+
+
+def _opcodes(a_items: list[str], b_items: list[str]) -> list[tuple[str, str, str]]:
+    """(tag, a_text, b_text) for each stretch of a SequenceMatcher over two lists of text pieces."""
+    matcher = difflib.SequenceMatcher(None, a_items, b_items, autojunk=False)
+    return [(tag, "".join(a_items[i1:i2]), "".join(b_items[j1:j2])) for tag, i1, i2, j1, j2 in matcher.get_opcodes()]
+
+
 def _diff_texts(a: str, b: str) -> list[DiffOp]:
-    a_tokens = _tokenize(a)
-    b_tokens = _tokenize(b)
-    matcher = difflib.SequenceMatcher(None, a_tokens, b_tokens, autojunk=False)
+    """Lines first (cheap, however long the chapter), then words only inside the stretches of lines that changed."""
     ops: list[DiffOp] = []
-    for tag, i1, i2, j1, j2 in matcher.get_opcodes():
+
+    def add(op: str, text: str) -> None:
+        if not text:
+            return
+        if ops and ops[-1].op == op:
+            ops[-1] = DiffOp(op=op, text=ops[-1].text + text)  # type: ignore[arg-type]
+        else:
+            ops.append(DiffOp(op=op, text=text))  # type: ignore[arg-type]
+
+    for tag, a_text, b_text in _opcodes(_LINE_RE.findall(a), _LINE_RE.findall(b)):
         if tag == "equal":
-            ops.append(DiffOp(op="equal", text="".join(a_tokens[i1:i2])))
-        elif tag == "delete":
-            ops.append(DiffOp(op="delete", text="".join(a_tokens[i1:i2])))
-        elif tag == "insert":
-            ops.append(DiffOp(op="insert", text="".join(b_tokens[j1:j2])))
-        elif tag == "replace":
-            ops.append(DiffOp(op="delete", text="".join(a_tokens[i1:i2])))
-            ops.append(DiffOp(op="insert", text="".join(b_tokens[j1:j2])))
+            add("equal", a_text)
+            continue
+        a_tokens, b_tokens = _tokenize(a_text), _tokenize(b_text)
+        if tag != "replace" or len(a_tokens) > _WORD_DIFF_LIMIT or len(b_tokens) > _WORD_DIFF_LIMIT:
+            add("delete", a_text)
+            add("insert", b_text)
+            continue
+        for word_tag, a_part, b_part in _opcodes(a_tokens, b_tokens):
+            if word_tag == "equal":
+                add("equal", a_part)
+            else:
+                add("delete", a_part)
+                add("insert", b_part)
     return ops
 
 
@@ -141,12 +165,13 @@ def get_revision(
 def create_revision(project_id: str, chapter_id: str, root: Path = Depends(get_storage_root)) -> RevisionSnapshot:
     """Manual save -- a floppy-disk button with no naming step; the label is
     always the save's own formatted date/time."""
-    chapter_draft = store.load_draft_chapter(root, project_id, chapter_id)
-    now = utcnow()
-    snapshot = _snapshot_from_chapter_draft(chapter_id, store.new_id("snap"), _format_label(now), "manual", chapter_draft)
-    store.save_revision(root, project_id, snapshot)
-    activity.record_daily_activity(root, project_id, draft_revisions=1)
-    return snapshot
+    with store.transaction(root, project_id):
+        chapter_draft = store.load_draft_chapter(root, project_id, chapter_id)
+        now = utcnow()
+        snapshot = _snapshot_from_chapter_draft(chapter_id, store.new_id("snap"), _format_label(now), "manual", chapter_draft)
+        store.save_revision(root, project_id, snapshot)
+        activity.record_daily_activity(root, project_id, draft_revisions=1)
+        return snapshot
 
 
 @router.post("/auto", response_model=RevisionSnapshot)
@@ -165,33 +190,34 @@ def save_auto_revision(project_id: str, chapter_id: str, root: Path = Depends(ge
 def revert_to_revision(
     project_id: str, chapter_id: str, snapshot_id: str, root: Path = Depends(get_storage_root)
 ) -> RevisionSnapshot:
-    target = store.load_revision(root, project_id, chapter_id, snapshot_id)
-    current_chapter_draft = store.load_draft_chapter(root, project_id, chapter_id)
+    with store.transaction(root, project_id):
+        target = store.load_revision(root, project_id, chapter_id, snapshot_id)
+        current_chapter_draft = store.load_draft_chapter(root, project_id, chapter_id)
 
-    safety_snapshot = _snapshot_from_chapter_draft(
-        chapter_id,
-        store.new_id("snap"),
-        f"Before revert to {target.label or snapshot_id}",
-        "manual",
-        current_chapter_draft,
-    )
-    store.save_revision(root, project_id, safety_snapshot)
-    activity.record_daily_activity(root, project_id, draft_revisions=1)
-
-    word_count_before = sum(m.wordCount for m in current_chapter_draft.moments.values())
-    for moment_id, body in target.moments.items():
-        draft = DraftMoment(
-            momentId=moment_id,
-            outlineNodeId=moment_id,
-            updatedAt=utcnow(),
-            wordCount=_word_count(body),
-            body=body,
+        safety_snapshot = _snapshot_from_chapter_draft(
+            chapter_id,
+            store.new_id("snap"),
+            f"Before revert to {target.label or snapshot_id}",
+            "manual",
+            current_chapter_draft,
         )
-        store.save_draft(root, project_id, chapter_id, moment_id, draft)
-    updated_chapter_draft = store.load_draft_chapter(root, project_id, chapter_id)
-    word_count_after = sum(m.wordCount for m in updated_chapter_draft.moments.values())
-    activity.record_daily_activity(root, project_id, word_count_delta=word_count_after - word_count_before)
-    return safety_snapshot
+        store.save_revision(root, project_id, safety_snapshot)
+        activity.record_daily_activity(root, project_id, draft_revisions=1)
+
+        word_count_before = sum(m.wordCount for m in current_chapter_draft.moments.values())
+        for moment_id, body in target.moments.items():
+            draft = DraftMoment(
+                momentId=moment_id,
+                outlineNodeId=moment_id,
+                updatedAt=utcnow(),
+                wordCount=_word_count(body),
+                body=body,
+            )
+            store.save_draft(root, project_id, chapter_id, moment_id, draft)
+        updated_chapter_draft = store.load_draft_chapter(root, project_id, chapter_id)
+        word_count_after = sum(m.wordCount for m in updated_chapter_draft.moments.values())
+        activity.record_daily_activity(root, project_id, word_count_delta=word_count_after - word_count_before)
+        return safety_snapshot
 
 
 @router.post("/{snapshot_id}/notes", response_model=RevisionComment)

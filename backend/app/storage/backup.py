@@ -5,6 +5,7 @@ newest few are kept. Run by hand with `python -m app.storage.backup`.
 """
 from __future__ import annotations
 
+import re
 import shutil
 from datetime import datetime, timezone
 from pathlib import Path
@@ -39,6 +40,38 @@ def prune_backups(dest_parent: Path, keep: int = KEEP_BACKUPS) -> list[Path]:
     for folder in doomed:
         shutil.rmtree(folder, ignore_errors=True)
     return doomed
+
+
+_VERSION_RE = re.compile(rb'"schemaVersion"\s*:\s*(\d+)')
+
+
+def project_file_versions(projects_root: Path) -> list[int]:
+    """The format version each project.json declares (it is the first key of the file, so only its start is read)."""
+    versions: list[int] = []
+    for path in projects_root.glob("*/project.json"):
+        try:
+            with path.open("rb") as f:
+                m = _VERSION_RE.search(f.read(512))
+        except OSError:
+            continue
+        if m:
+            versions.append(int(m.group(1)))
+    return versions
+
+
+def ensure_pre_migration_backup(root: Path, current_version: int) -> Path | None:
+    """Once for each format version: if any project is still in an older format, copy the whole data directory before the first write converts
+    it. A marker file (`.backed-up-for-v<N>`) keeps this from repeating on every launch."""
+    marker = root / f".backed-up-for-v{current_version}"
+    if marker.exists():
+        return None
+    versions = project_file_versions(root / "projects")
+    if not versions or min(versions) >= current_version:
+        marker.write_text("", encoding="utf-8")
+        return None
+    dest = backup_app_data(root)
+    marker.write_text(dest.name, encoding="utf-8")
+    return dest
 
 
 if __name__ == "__main__":

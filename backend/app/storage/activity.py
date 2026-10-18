@@ -36,43 +36,44 @@ def record_daily_activity(
 
 
 def get_activity(root: Path, project_id: str) -> ActivityResponse:
-    daily = store.load_daily_activity(root, project_id)
+    with store.transaction(root, project_id):
+        daily = store.load_daily_activity(root, project_id)
 
-    entries: list[ActivityLogEntry] = []
+        entries: list[ActivityLogEntry] = []
 
-    for tree_type in ("outline", "plot"):
-        snapshots = store.list_tree_snapshots(root, project_id, tree_type)
-        summaries = tree_history.summarize_snapshots(snapshots, tree_type)
-        for snapshot, summary in zip(snapshots, summaries):
-            entries.append(
-                ActivityLogEntry(
-                    id=snapshot.snapshotId,
-                    type=tree_type,
-                    createdAt=snapshot.createdAt,
-                    label=summary.summary,
-                    trigger=snapshot.trigger,
+        for tree_type in ("outline", "plot"):
+            snapshots = store.list_tree_snapshots(root, project_id, tree_type)
+            summaries = tree_history.summarize_snapshots(snapshots, tree_type)
+            for snapshot, summary in zip(snapshots, summaries):
+                entries.append(
+                    ActivityLogEntry(
+                        id=snapshot.snapshotId,
+                        type=tree_type,
+                        createdAt=snapshot.createdAt,
+                        label=summary.summary,
+                        trigger=snapshot.trigger,
+                    )
                 )
+
+        for logged in store.list_settings_log(root, project_id):
+            entries.append(
+                ActivityLogEntry(id=logged.id, type="settings", createdAt=logged.createdAt, label=logged.label, trigger=logged.kind)
             )
 
-    for logged in store.list_settings_log(root, project_id):
-        entries.append(
-            ActivityLogEntry(id=logged.id, type="settings", createdAt=logged.createdAt, label=logged.label, trigger=logged.kind)
-        )
-
-    index = store.load_index(root, project_id)
-    for chapter_id in index.manifest.revisionChapters:
-        for revision in store.list_revisions(root, project_id, chapter_id):
-            entries.append(
-                ActivityLogEntry(
-                    id=revision.snapshotId,
-                    type="draft",
-                    createdAt=revision.createdAt,
-                    label=revision.label or "Snapshot",
-                    trigger=revision.trigger,
-                    chapterId=chapter_id,
-                    wordCount=revision.wordCount,
+        index = store.load_index(root, project_id)
+        for chapter_id in index.manifest.revisionChapters:
+            for revision in store.list_revisions(root, project_id, chapter_id):
+                entries.append(
+                    ActivityLogEntry(
+                        id=revision.snapshotId,
+                        type="draft",
+                        createdAt=revision.createdAt,
+                        label=revision.label or "Snapshot",
+                        trigger=revision.trigger,
+                        chapterId=chapter_id,
+                        wordCount=revision.wordCount,
+                    )
                 )
-            )
 
-    entries.sort(key=lambda e: e.createdAt, reverse=True)
-    return ActivityResponse(daily=daily, log=entries)
+        entries.sort(key=lambda e: e.createdAt, reverse=True)
+        return ActivityResponse(daily=daily, log=entries)

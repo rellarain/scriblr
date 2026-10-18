@@ -18,6 +18,7 @@ from .schema import SettingsLogEntry, ThemeHue, ThemeSettings, ThemeZones, UiSet
 KV_PREFIX = "scriblr."
 MAX_KEY_LENGTH = 200
 MAX_VALUE_BYTES = 1_000_000
+MAX_KEYS = 5_000  # the whole map is rewritten on each change, so it cannot grow without end
 
 _lock = threading.RLock()
 
@@ -122,6 +123,8 @@ def set_kv(root: Path, key: str, value: Any) -> UserSettings:
     _check_value(value)
     with _lock:
         settings = _load(root)
+        if key not in settings.kv and len(settings.kv) >= MAX_KEYS:
+            raise InvalidKvError(f"too many saved settings (the limit is {MAX_KEYS})")
         settings.kv[key] = value
         _save(root, settings)
         return settings

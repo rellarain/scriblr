@@ -1,5 +1,7 @@
 import re
+import unicodedata
 from pathlib import Path
+from urllib.parse import quote
 
 from fastapi import APIRouter, Depends, Response
 
@@ -10,8 +12,10 @@ router = APIRouter(prefix="/api/projects/{project_id}/export", tags=["export"])
 
 
 def _content_disposition(title: str) -> str:
-    safe = re.sub(r'[\\/:*?"<>|]', "_", title or "untitled").strip() or "untitled"
-    return f'attachment; filename="{safe}.pdf"'
+    """A header can only carry Latin-1: `filename` is the title folded to ASCII, and `filename*` (RFC 5987) has the real one."""
+    safe = re.sub(r'[\\/:*?"<>|\x00-\x1f]', "_", title or "untitled").strip() or "untitled"
+    ascii_name = unicodedata.normalize("NFKD", safe).encode("ascii", "ignore").decode("ascii").strip() or "download"
+    return f"attachment; filename=\"{ascii_name}.pdf\"; filename*=UTF-8''{quote(safe + '.pdf')}"
 
 
 @router.get("/book/{book_id}")

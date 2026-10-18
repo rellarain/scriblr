@@ -17,12 +17,13 @@ def get_plot(project_id: str, root: Path = Depends(get_storage_root)) -> PlotTre
 
 @router.put("", response_model=PlotTree)
 def put_plot(project_id: str, body: PlotTree, root: Path = Depends(get_storage_root)) -> PlotTree:
-    store.save_plot(root, project_id, body)
-    node_dicts = [n.model_dump() for n in body.nodes]
-    snapshot = tree_history.maybe_create_snapshot(root, project_id, "plot", node_dicts)
-    if snapshot is not None:
-        activity.record_daily_activity(root, project_id, plot_saves=1)
-    return store.load_plot(root, project_id)
+    with store.transaction(root, project_id):
+        store.save_plot(root, project_id, body)
+        node_dicts = [n.model_dump() for n in body.nodes]
+        snapshot = tree_history.maybe_create_snapshot(root, project_id, "plot", node_dicts)
+        if snapshot is not None:
+            activity.record_daily_activity(root, project_id, plot_saves=1)
+        return store.load_plot(root, project_id)
 
 
 @router.get("/history", response_model=list[TreeSnapshotSummary])
@@ -65,13 +66,14 @@ def get_plot_history_snapshot(
 def revert_plot_history(
     project_id: str, snapshot_id: str, root: Path = Depends(get_storage_root)
 ) -> PlotRevertResponse:
-    current_nodes = [n.model_dump() for n in store.load_plot(root, project_id).nodes]
-    safety, target_nodes = tree_history.revert_to_snapshot(
-        root, project_id, "plot", snapshot_id, current_nodes
-    )
-    restored = PlotTree(nodes=[PlotNode.model_validate(n) for n in target_nodes])
-    store.save_plot(root, project_id, restored)
-    return PlotRevertResponse(
-        safetySnapshotId=safety.snapshotId if safety else None,
-        plot=store.load_plot(root, project_id),
-    )
+    with store.transaction(root, project_id):
+        current_nodes = [n.model_dump() for n in store.load_plot(root, project_id).nodes]
+        safety, target_nodes = tree_history.revert_to_snapshot(
+            root, project_id, "plot", snapshot_id, current_nodes
+        )
+        restored = PlotTree(nodes=[PlotNode.model_validate(n) for n in target_nodes])
+        store.save_plot(root, project_id, restored)
+        return PlotRevertResponse(
+            safetySnapshotId=safety.snapshotId if safety else None,
+            plot=store.load_plot(root, project_id),
+        )

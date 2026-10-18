@@ -84,11 +84,8 @@ def book_feedback(rf: ReaderFile, projects_root: Path, project_id: str, book_id:
 
 def all_summaries(rf: ReaderFile, projects_root: Path, now: datetime) -> list[BookSummary]:
     out: list[BookSummary] = []
-    for index in project_store.list_projects(projects_root):
-        try:
-            pf, _errors = project_store._load_project_file(projects_root, index.projectId)
-        except (project_store.ProjectNotFoundError, project_store.ShardCorruptError):
-            continue
+    for pf in project_store.iter_project_files(projects_root):
+        index = pf.index
         for node in (n for n in pf.outline.nodes if n.kind == "book"):
             listing = pf.bookListings.get(node.id)
             if listing is None or not listing.editions:

@@ -34,3 +34,32 @@ def test_a_backup_is_never_pruned_away_entirely(tmp_path):
     _seed(root)
     backup.backup_app_data(root, keep=0)
     assert len(list(backup.backups_root(root).iterdir())) == 1
+
+
+def _project(root: Path, name: str, version: int, indent: bool = False) -> None:
+    import json
+
+    folder = root / "projects" / name
+    folder.mkdir(parents=True)
+    body = {"schemaVersion": version, "index": {}}
+    (folder / "project.json").write_text(json.dumps(body, indent=2 if indent else None), encoding="utf-8")
+
+
+def test_a_backup_is_made_once_before_older_projects_are_converted(tmp_path):
+    root = tmp_path / "Scriblr"
+    _project(root, "prj_old", 2, indent=True)  # an older, indented file
+    _project(root, "prj_new", 4)
+    made = backup.ensure_pre_migration_backup(root, 4)
+    assert made is not None and (made / "projects" / "prj_old" / "project.json").exists()
+    assert backup.ensure_pre_migration_backup(root, 4) is None  # not again for this version
+    assert len(list(backup.backups_root(root).iterdir())) == 1
+
+
+def test_no_backup_when_everything_is_current_or_there_is_nothing(tmp_path):
+    root = tmp_path / "Scriblr"
+    _project(root, "prj_new", 4)
+    assert backup.ensure_pre_migration_backup(root, 4) is None
+    empty = tmp_path / "Empty"
+    (empty / "projects").mkdir(parents=True)
+    assert backup.ensure_pre_migration_backup(empty, 4) is None
+    assert not backup.backups_root(root).exists() and not backup.backups_root(empty).exists()

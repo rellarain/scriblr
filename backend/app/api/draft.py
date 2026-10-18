@@ -34,22 +34,24 @@ def put_draft(
     body: UpsertDraftRequest,
     root: Path = Depends(get_storage_root),
 ) -> DraftMoment:
-    try:
-        previous_word_count = store.load_draft(root, project_id, chapter_id, moment_id).wordCount
-    except store.MomentNotFoundError:
-        previous_word_count = 0
-    before = store.load_draft_chapter(root, project_id, chapter_id)
-    draft = DraftMoment(
-        momentId=moment_id,
-        outlineNodeId=body.outlineNodeId,
-        updatedAt=utcnow(),
-        wordCount=_word_count(body.body),
-        body=body.body,
-    )
-    store.save_draft(root, project_id, chapter_id, moment_id, draft)
-    activity.record_daily_activity(root, project_id, word_count_delta=draft.wordCount - previous_word_count)
-    draft_sessions.record_session(root, project_id, chapter_id, before)
-    return draft
+    # One load and one write for the whole save (the draft, the day's activity, the session's revision).
+    with store.transaction(root, project_id):
+        try:
+            previous_word_count = store.load_draft(root, project_id, chapter_id, moment_id).wordCount
+        except store.MomentNotFoundError:
+            previous_word_count = 0
+        before = store.load_draft_chapter(root, project_id, chapter_id).model_copy(deep=True)
+        draft = DraftMoment(
+            momentId=moment_id,
+            outlineNodeId=body.outlineNodeId,
+            updatedAt=utcnow(),
+            wordCount=_word_count(body.body),
+            body=body.body,
+        )
+        store.save_draft(root, project_id, chapter_id, moment_id, draft)
+        activity.record_daily_activity(root, project_id, word_count_delta=draft.wordCount - previous_word_count)
+        draft_sessions.record_session(root, project_id, chapter_id, before)
+        return draft
 
 
 @router.delete("/moment/{moment_id}", status_code=204)

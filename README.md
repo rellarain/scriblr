@@ -109,7 +109,8 @@ described, now stale, in `docs/data-model.md`).
 
 - **Atomic writes** (`project_store._atomic_write_json`): serialize to a temp
   file in `<project>/.tmp/`, `fsync`, then `os.replace()` onto the
-  destination — atomic on both POSIX and Windows.
+  destination — atomic on both POSIX and Windows. The JSON is compact and real UTF-8 (`json.dumps`, which takes the C encoder; `json.dump` does
+  not), about 40% smaller and several times faster to write than the indented ASCII it used to be; reading accepts either.
 - **Locking**: a per-project-id `threading.RLock` registry
   (`_project_locks`, guarded by a module-level `threading.Lock`). `_mutate()`
   acquires the project's lock, loads the whole file, lets a callback mutate
@@ -117,6 +118,17 @@ described, now stale, in `docs/data-model.md`).
   `_mutate` internally triggers a migration check that itself needs the
   lock. Deliberately single-process/single-user — no cross-process lock,
   since this is a local single-user desktop app.
+- **Transactions** (`project_store.transaction(root, project_id)`): holds the project's lock, loads the file once, lets every store call made inside
+  on that thread work on the one in-memory `ProjectFile` (later calls see earlier changes) and writes it once at the end if anything changed;
+  nothing is written if the block raises. The handlers that did several things per request (`PUT` draft, outline, plot, the reverts, a manual
+  revision, `PATCH` project) and the read-heavy ones (analytics, activity, PDF export) use it, so a draft save is one load and one write, not eight
+  and three.
+- **History storage** (`storage/tree_pack.py`): the outline and plot snapshots are stored *sparse* (a node keeps only the fields that differ from the
+  model's defaults) and as a *keyframe* (every node) or a *delta* (`base` + all node ids in order + the sparse nodes that changed); a keyframe comes
+  at least every 10 snapshots. Outside the store a snapshot always has its complete `nodes` (`list_tree_snapshots`, `load_tree_snapshot`,
+  `last_tree_snapshot` unpack; `save_tree_snapshot` packs). Format 4 converts an older project's history on its first write (keeping the file as
+  `project.json.v<N>.bak`, and, once per format version, a copy of the whole data directory at start-up: `storage/backup.py`). Measured on the
+  largest real project: 10.4 MB to 0.65 MB with identical snapshots.
 - **Corruption isolation** is section-level, not whole-file:
   - Unparseable whole-file JSON, or a corrupt `index` section, is **fatal**
     — the file (or just that raw value) is renamed aside into
@@ -163,7 +175,8 @@ described, now stale, in `docs/data-model.md`).
   app): once `outlineHistory` or `plotHistory` exceeds
   `TREE_HISTORY_COMPACT_THRESHOLD = 75` entries, each is independently
   pruned down to the `TREE_HISTORY_KEEP = 50` most recent (by `createdAt`).
-  Manual chapter `revisions` are **never** pruned. Returns human-readable
+  A compaction makes the oldest snapshot kept a keyframe. Manual chapter `revisions` are **never** pruned; a chapter's automatic *session*
+  revisions are capped at 100 (oldest first), and the saved-settings map at 5,000 keys. Returns human-readable
   messages folded into the same `warnings` list as corruption warnings.
 
 ### Data model
@@ -260,7 +273,7 @@ the one project-independent router).
 | `analytics` | `/api/projects/{id}/analytics` | `GET ""` totals/goals/rollups/flagged nodes |
 | `schedule` | `/api/projects/{id}/schedule` | `GET "/{date}"` · `PUT "/{date}"` replace completed ids |
 | `scrap` | `/api/projects/{id}/scrap` | `GET ""` registry · `POST "/{momentId}/restore"` · `DELETE "/{momentId}"` (204, permanent) |
-| `export` | `/api/projects/{id}/export` | `GET "/book/{bookId}"` PDF · `GET "/chapter/{chapterId}"` PDF |
+| `export` | `/api/projects/{id}/export` | `GET "/book/{bookId}"` PDF · `GET "/chapter/{chapterId}"` PDF (set in a built-in font: typographic punctuation is made plain and anything outside Latin-1 becomes `?` until a Unicode font is bundled; the download name carries the real title in `filename*`) |
 | `presets` | `/api/presets` | `GET ""` / `PUT ""` — global catalog (project-independent) |
 | `feedback` | `/api/feedback` | Helper Inbox (app-level `feedback.json`, acts as the admin in the `X-Admin-Id` header; every call returns the whole anonymous inbox bundle): `GET ""`, `PUT /messages/{id}/validation`, `PUT /cases/{id}/vote` (yes, no, pass), `POST /cases/{id}/solutions`, `PUT /cases/{id}/solutions/{sid}/vote`, `POST /cases/{id}/close` (Planner), `POST /cases/{id}/reopen` (Configurer), `PUT /admins/{id}/roles`, `POST` / `PATCH` / `DELETE /verb-categories[/{id}]` |
 | `user_settings` | `/api/user-settings` | `GET ""` whole doc · `PUT "/theme"` · `PUT "/ui"` · `PUT "/kv/{key}"` / `DELETE "/kv/{key}"` (keys must start `scriblr.`) · `POST "/kv-import"` (one-time localStorage migration; sets only absent keys) — global (`user-settings.json`) |
