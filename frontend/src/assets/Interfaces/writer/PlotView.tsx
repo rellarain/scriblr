@@ -14,7 +14,7 @@ import { PlotOutlinePanel } from './PlotOutlinePanel'
 import { PlotNav, plotlineCount } from './PlotNav'
 import { PlotCompare } from './PlotCompare'
 import { PlotParents } from './PlotParents'
-import { plotSizeOf, useElementWidth } from './useElementWidth'
+import { PLOT_BREAKPOINTS, plotSizeOf, useElementWidth } from './useElementWidth'
 import { PlotOrderToggle, usePlotOrder } from './plotOrder'
 import { fieldIndex, isScrapField, orderValues, valuesIn } from './plotFields'
 
@@ -216,7 +216,7 @@ export default function PlotView({ w }: { w: WriterWorkspace }) {
   // so focusing one can also open its editor.
   const created = useRef(new Map<string, PlotNode['kind']>())
   // The tool's own width picks its layout; the compare view opens when plotlines are ticked and gives way to a row's editor.
-  const [sizeRef, width] = useElementWidth<HTMLDivElement>()
+  const [sizeRef, width] = useElementWidth<HTMLDivElement>(PLOT_BREAKPOINTS)
   const size = plotSizeOf(width)
   const [barOpen, setBarOpen] = useState(false)
   // The contents drawer closes on Escape or a click outside the bar.

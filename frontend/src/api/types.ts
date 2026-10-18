@@ -179,6 +179,13 @@ export interface ProjectSummaryResponse {
   warnings: string[]
 }
 
+// One project as the shelves show it: its index, its outline nodes and the progress bars of its books (GET /projects/overview).
+export interface ProjectOverview {
+  index: ProjectIndex
+  outline: OutlineNode[]
+  progress: Record<string, BookProgress>
+}
+
 export interface CreateProjectRequest {
   title: string
 }

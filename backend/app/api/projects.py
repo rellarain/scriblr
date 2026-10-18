@@ -3,7 +3,8 @@ from pathlib import Path
 from fastapi import APIRouter, Depends
 
 from ..deps import get_storage_root
-from ..models import CreateProjectRequest, ProjectSummaryResponse, UpdateProjectRequest
+from ..models import CreateProjectRequest, ProjectOverview, ProjectSummaryResponse, UpdateProjectRequest
+from ..storage import book_progress
 from ..storage import project_store as store
 from ..storage import settings_log
 from ..storage.schema import ProjectIndex, SettingsLogEntry, utcnow
@@ -14,6 +15,15 @@ router = APIRouter(prefix="/api/projects", tags=["projects"])
 @router.get("", response_model=list[ProjectIndex])
 def list_projects(root: Path = Depends(get_storage_root)) -> list[ProjectIndex]:
     return store.list_projects(root)
+
+
+@router.get("/overview", response_model=list[ProjectOverview])
+def projects_overview(root: Path = Depends(get_storage_root)) -> list[ProjectOverview]:
+    """Every project with its outline and book progress, each read once: the shelves' one request instead of three per project."""
+    return [
+        ProjectOverview(index=pf.index, outline=pf.outline.nodes, progress=book_progress.progress_of(pf))
+        for pf in store.iter_project_files(root)
+    ]
 
 
 @router.post("", response_model=ProjectIndex)

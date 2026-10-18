@@ -5,6 +5,7 @@ from pydantic import BaseModel, Field
 
 from ..storage.schema import (
     MAX_LEVEL_HUE,
+    BookProgress,
     MIN_LEVEL_HUE,
     OutlineNode,
     OutlineNodeKind,
@@ -47,6 +48,14 @@ class ProjectSummaryResponse(BaseModel):
     outline: Optional[OutlineTree] = None
     plot: Optional[PlotTree] = None
     warnings: list[str] = []
+
+
+class ProjectOverview(BaseModel):
+    """What the shelves need of one project: its index, its outline nodes and the progress bars of its books."""
+
+    index: ProjectIndex
+    outline: list[OutlineNode] = []
+    progress: dict[str, BookProgress] = {}
 
 
 class UpsertDraftRequest(BaseModel):

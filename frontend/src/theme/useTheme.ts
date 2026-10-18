@@ -1,6 +1,6 @@
-import { createContext, useContext, useEffect, useLayoutEffect, useMemo, useState, useSyncExternalStore } from 'react'
+import { createContext, useContext, useLayoutEffect, useMemo, useSyncExternalStore } from 'react'
 import { CURRENT_USER } from '../userSeed'
-import { useSettings } from '../settings/settingsStore'
+import { getSettings, subscribeSettings, useSettings } from '../settings/settingsStore'
 import { applyVars, zoneVars } from './applyTheme'
 import { clockZone, msUntilNextBoundary } from './zones'
 import type { Role, ThemeSettings, ZoneKey, ZonePalette } from './types'
@@ -26,31 +26,61 @@ function usePreviewZone(): ZoneKey | null {
 
 // --- the clock ---
 
-// The current time, re-read at each zone boundary, every minute, and whenever
-// the window becomes visible/focused again (sleep, clock changes, timer drift).
-function useNow(settings: ThemeSettings): Date {
-  const [now, setNow] = useState(() => new Date())
-  useEffect(() => {
-    let timer: ReturnType<typeof setTimeout> | undefined
-    const tick = () => {
-      setNow(new Date())
-      const ms = msUntilNextBoundary(settings.zones, new Date())
-      if (timer) clearTimeout(timer)
-      if (ms !== null) timer = setTimeout(tick, ms + 50)
-    }
+// One clock for the whole app (it used to be one timer and four listeners per component that read the theme). It runs while
+// anything is subscribed. The current time is re-read at each zone boundary, every minute, and whenever the window becomes
+// visible/focused again (sleep, clock changes, timer drift); components subscribe to the zone it gives, not to the time, so
+// they render only when the zone changes.
+let clockNow = new Date()
+const clockListeners = new Set<() => void>()
+let stopClock: (() => void) | null = null
+
+function startClock(): () => void {
+  let timer: ReturnType<typeof setTimeout> | undefined
+  let { zones, timeBasedEnabled } = getSettings().theme
+  const tick = () => {
+    clockNow = new Date()
+    clockListeners.forEach(fn => fn())
+    const ms = msUntilNextBoundary(getSettings().theme.zones, clockNow)
+    if (timer) clearTimeout(timer)
+    if (ms !== null) timer = setTimeout(tick, ms + 50)
+  }
+  tick()
+  const interval = setInterval(tick, 60_000)
+  const onVisible = () => { if (document.visibilityState === 'visible') tick() }
+  document.addEventListener('visibilitychange', onVisible)
+  window.addEventListener('focus', tick)
+  // New zone times move the next boundary.
+  const unsubscribe = subscribeSettings(() => {
+    const theme = getSettings().theme
+    if (theme.zones === zones && theme.timeBasedEnabled === timeBasedEnabled) return
+    ;({ zones, timeBasedEnabled } = theme)
     tick()
-    const interval = setInterval(() => setNow(new Date()), 60_000)
-    const onVisible = () => { if (document.visibilityState === 'visible') tick() }
-    document.addEventListener('visibilitychange', onVisible)
-    window.addEventListener('focus', tick)
-    return () => {
-      if (timer) clearTimeout(timer)
-      clearInterval(interval)
-      document.removeEventListener('visibilitychange', onVisible)
-      window.removeEventListener('focus', tick)
-    }
-  }, [settings.zones, settings.timeBasedEnabled])
-  return now
+  })
+  return () => {
+    if (timer) clearTimeout(timer)
+    clearInterval(interval)
+    document.removeEventListener('visibilitychange', onVisible)
+    window.removeEventListener('focus', tick)
+    unsubscribe()
+  }
+}
+
+function subscribeClock(fn: () => void): () => void {
+  clockListeners.add(fn)
+  if (!stopClock) stopClock = startClock()
+  return () => {
+    clockListeners.delete(fn)
+    if (clockListeners.size === 0 && stopClock) { stopClock(); stopClock = null }
+  }
+}
+
+// The zone the schedule is in now. A string, so it is the same value until the zone changes.
+function currentClockZone(): ZoneKey {
+  return clockZone(getSettings().theme, stopClock ? clockNow : new Date())
+}
+
+function useClockZone(): ZoneKey {
+  return useSyncExternalStore(subscribeClock, currentClockZone, currentClockZone)
 }
 
 export interface ThemeState {
@@ -72,9 +102,8 @@ export function useThemeState(): ThemeState {
   const { theme, ui } = useSettings()
   const previewZone = usePreviewZone()
   const forced = useContext(ThemeZoneContext)
-  const now = useNow(theme)
+  const clock = useClockZone()
   const role = CURRENT_USER.role
-  const clock = clockZone(theme, now)
   const activeZone = forced?.zone ?? previewZone ?? theme.override ?? clock
   const settings = useMemo<ThemeSettings>(() => {
     if (!forced?.palette) return theme

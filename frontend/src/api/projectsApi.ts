@@ -1,8 +1,9 @@
 import { api } from './client'
-import type { CreateProjectRequest, ProjectIndex, ProjectSummaryResponse, TimeSystem } from './types'
+import type { CreateProjectRequest, ProjectIndex, ProjectOverview, ProjectSummaryResponse, TimeSystem } from './types'
 
-export function listProjects(): Promise<ProjectIndex[]> {
-  return api.get<ProjectIndex[]>('/projects')
+// Every project with its outline and book progress, in one request.
+export function getProjectsOverview(): Promise<ProjectOverview[]> {
+  return api.get<ProjectOverview[]>('/projects/overview')
 }
 
 export function createProject(title: string): Promise<ProjectIndex> {

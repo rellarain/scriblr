@@ -1,4 +1,4 @@
-import { useEffect, useState, type ReactNode } from 'react'
+import { useEffect, useRef, type ReactNode } from 'react'
 import type { WriterWorkspace } from '../useWriterWorkspace'
 import { useStoredState } from '../storage'
 import { setSideAvailable, sideVars, useSidebar } from '../sidebarState'
@@ -27,10 +27,17 @@ function WriterLevels({ w, pagesComponent, onPagesComponent }: {
   const [overrides, setOverrides] = useStoredState<SizeOverrides>('scriblr.writer.levelSizes', {})
   const focus = focusOf(w.activeConsole)
   const sizes = levelSizes(focus, overrides)
-  // The side column (the levels beside the focused one): its width, dragged live and kept on release, and whether it is hidden.
+  // The side column (the levels beside the focused one): its width, and whether it is hidden. While it is dragged the width goes
+  // straight to the element's CSS variables (no React render per mouse move); the stored width is set on release.
   const side = useSidebar()
-  const [dragWidth, setDragWidth] = useState<number | null>(null)
-  const sideWidth = dragWidth ?? side.width
+  const levelsRef = useRef<HTMLDivElement>(null)
+  const sideWidth = side.width
+  const dragSide = (width: number | null) => {
+    const style = levelsRef.current?.style
+    if (!style) return
+    if (width === null) for (const name of Object.keys(sideVars(0))) style.removeProperty(name)
+    else for (const [name, value] of Object.entries(sideVars(width))) style.setProperty(name, value)
+  }
   const sideShown = focus !== 'dash' && !side.hidden
   useEffect(() => {
     setSideAvailable(focus !== 'dash')
@@ -121,7 +128,7 @@ function WriterLevels({ w, pagesComponent, onPagesComponent }: {
       <>
         <div className="wrLevelsSide">
           {above.map(l => scoped(l, panel(l, sizes[l] as Exclude<LevelSize, 'hidden'>)))}
-          <SideResizer onDrag={setDragWidth} onCommit={width => { side.setWidth(width); setDragWidth(null) }} onReset={() => { side.setWidth(null); setDragWidth(null) }} />
+          <SideResizer onDrag={dragSide} onCommit={side.setWidth} onReset={() => { side.setWidth(null); dragSide(null) }} />
         </div>
         {scoped(focus, panel(focus, 'max'))}
       </>
@@ -130,6 +137,7 @@ function WriterLevels({ w, pagesComponent, onPagesComponent }: {
 
   return (
     <div
+      ref={levelsRef}
       className={`wrLevels wrLevels--focus-${focus}${focus !== 'dash' && !sideShown ? ' wrLevels--noside' : ''}`} data-focus={focus}
       style={sideShown && sideWidth !== null ? sideVars(sideWidth) : undefined}
     >

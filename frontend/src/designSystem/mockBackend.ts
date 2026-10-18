@@ -194,6 +194,9 @@ export function createMockBackend() {
     }
     if (parts[0] !== 'projects') return notFound()
     if (parts.length === 1) return method === 'GET' ? json([...projects.values()].map(p => p.index)) : notFound()
+    if (parts[1] === 'overview') {
+      return json([...projects.values()].map(p => ({ index: p.index, outline: p.outline.nodes, progress: SAMPLE_PROGRESS(p.outline.nodes) })))
+    }
     const project = projects.get(parts[1])
     if (!project) return notFound()
     const rest = parts.slice(2)

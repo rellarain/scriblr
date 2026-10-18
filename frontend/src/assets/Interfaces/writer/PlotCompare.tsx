@@ -10,7 +10,7 @@ import { PlotOrderToggle, usePlotOrder } from './plotOrder'
 import { orderValues } from './plotFields'
 import { plotColors, plotColorVars } from './plotColors'
 import { chapterOfAssignment, nodeLabel, plotTrail } from './plotTree'
-import { COMPARE_COLUMNS_FROM, useElementWidth, type PlotSize } from './useElementWidth'
+import { COMPARE_BREAKPOINTS, COMPARE_COLUMNS_FROM, useElementWidth, type PlotSize } from './useElementWidth'
 import { useStoredState } from './storage'
 
 // The compare view: the plotpoints of the ticked plotlines in one list, read-only (a card opens its plotline's editor).
@@ -40,7 +40,7 @@ export function PlotCompare({ w, lines, size, onOpen, onOpenNode, openParents, o
   const [hidden, setHidden] = useState<Set<string>>(new Set())
   const [folded, setFolded] = useState<Set<string>>(new Set())
   const [chaptersOpen, setChaptersOpen] = useState(false)
-  const [rootRef, width] = useElementWidth<HTMLDivElement>()
+  const [rootRef, width] = useElementWidth<HTMLDivElement>(COMPARE_BREAKPOINTS)
   const columns = grouped && (width === null || width >= COMPARE_COLUMNS_FROM)
 
   const outlineById = useMemo(() => new Map(w.outlineNodes.map(n => [n.id, n])), [w.outlineNodes])

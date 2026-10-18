@@ -8,7 +8,7 @@ import {
   createProject as apiCreateProject,
   deleteProject as apiDeleteProject,
   getProject as apiGetProject,
-  listProjects as apiListProjects,
+  getProjectsOverview as apiGetProjectsOverview,
   updateProject as apiUpdateProject,
 } from '../../../api/projectsApi'
 import { putOutline as apiPutOutline } from '../../../api/outlineApi'
@@ -56,9 +56,9 @@ export function useWriterWorkspace() {
   const [projects, setProjects] = useState<ProjectIndex[]>([])
   const [projectsStatus, setProjectsStatus] = useState<AsyncStatus>('idle')
   const [projectsError, setProjectsError] = useState<string | undefined>(undefined)
-  // Every project's outline nodes, loaded once for the sidebar shelves and
-  // the Shelves dashboard; the open project's entry is kept in sync below.
-  const [projectOutlines, setProjectOutlines] = useState<Record<string, OutlineNode[]>>({})
+  // Every project's outline nodes, loaded once for the sidebar shelves and the Shelves dashboard (the open project's entry is
+  // its live outline, see `projectOutlines` below).
+  const [loadedOutlines, setLoadedOutlines] = useState<Record<string, OutlineNode[]>>({})
   // The bars on each project's spines (per project id, then book id).
   const [projectProgress, setProjectProgress] = useState<Record<string, Record<string, BookProgress>>>({})
 
@@ -147,12 +147,17 @@ export function useWriterWorkspace() {
     }
   }, [hasOpenProject, activeBook, activeBookId, activeChapter, activeChapterId])
 
-  // Keep the sidebar/dashboard copy of the open project's outline current.
-  useEffect(() => {
-    if (activeProjectId && outlineStatus === 'idle') {
-      setProjectOutlines(prev => ({ ...prev, [activeProjectId]: outlineNodes }))
-    }
-  }, [activeProjectId, outlineNodes, outlineStatus])
+  // The sidebar/dashboard copy of every outline, the open project's being the live one (derived, not copied into state by an
+  // effect: that cost a second render of the whole interface after every edit).
+  const projectOutlines = useMemo(
+    () => (activeProjectId && outlineStatus === 'idle' ? { ...loadedOutlines, [activeProjectId]: outlineNodes } : loadedOutlines),
+    [loadedOutlines, activeProjectId, outlineStatus, outlineNodes],
+  )
+  // When the open project is left, the last copy of its outline stays behind for the shelves.
+  function stashOpenOutline() {
+    const id = activeProjectIdRef.current
+    if (id && outlineStatus === 'idle') setLoadedOutlines(prev => ({ ...prev, [id]: outlineNodesRef.current }))
+  }
 
   // --- derived plot data ---
   const plotChildrenByParentId = useMemo(() => {
@@ -274,17 +279,20 @@ export function useWriterWorkspace() {
   // project's settings changes (lib/logUndo.ts). The lists are fetched when a project opens and after each save.
   const [logs, setLogs] = useState<{ outline: LogEntry[]; plot: LogEntry[]; settings: SettingsLogEntry[] }>({ outline: [], plot: [], settings: [] })
   const logCursors = useRef<Record<HistoryScope, string | null>>({ outline: null, plot: null, settings: null })
-  async function refreshLogs(projectId: string) {
+  // Each list is fetched again only when its own document was saved (a save of the outline used to refetch all three).
+  async function refreshLog(projectId: string, scope: HistoryScope) {
     try {
-      const [outline, plot, settings] = await Promise.all([listOutlineHistory(projectId), listPlotHistory(projectId), getProjectSettingsLog(projectId)])
-      if (activeProjectIdRef.current !== projectId) return
       const entry = (x: { snapshotId: string; createdAt: string }): LogEntry => ({ id: x.snapshotId, createdAt: x.createdAt })
-      setLogs({ outline: newestFirst(outline.map(entry)), plot: newestFirst(plot.map(entry)), settings: newestFirst(settings) })
+      const next = scope === 'outline' ? newestFirst((await listOutlineHistory(projectId)).map(entry))
+        : scope === 'plot' ? newestFirst((await listPlotHistory(projectId)).map(entry))
+        : newestFirst(await getProjectSettingsLog(projectId))
+      if (activeProjectIdRef.current !== projectId) return
+      setLogs(prev => ({ ...prev, [scope]: next }))
     } catch { /* the log is a convenience: Undo then has only the history in memory */ }
   }
-  useEffect(() => {
-    if (activeProjectId) void refreshLogs(activeProjectId)
-  }, [activeProjectId, outlineSave.lastSavedAt, plotSave.lastSavedAt, settingsSave.lastSavedAt])
+  useEffect(() => { if (activeProjectId) void refreshLog(activeProjectId, 'outline') }, [activeProjectId, outlineSave.lastSavedAt])
+  useEffect(() => { if (activeProjectId) void refreshLog(activeProjectId, 'plot') }, [activeProjectId, plotSave.lastSavedAt])
+  useEffect(() => { if (activeProjectId) void refreshLog(activeProjectId, 'settings') }, [activeProjectId, settingsSave.lastSavedAt])
   const logTarget = (scope: HistoryScope, cursor: string | null): { id: string } | null =>
     scope === 'settings' ? nextSetting(logs.settings, cursor) : nextSnapshot(scope === 'outline' ? logs.outline : logs.plot, cursor)
   const currentOf = (scope: HistoryScope): unknown =>
@@ -383,24 +391,13 @@ export function useWriterWorkspace() {
     setProjectsStatus('loading')
     setProjectsError(undefined)
     try {
-      const list = await apiListProjects()
-      setProjects(list)
+      // One request fills the list, the sidebar shelves (each project's books), the dashboard's counts and the spines' bars;
+      // a project that cannot be read is left out of it by the backend.
+      const overview = await apiGetProjectsOverview()
+      setProjects(overview.map(o => o.index))
+      setLoadedOutlines(prev => ({ ...Object.fromEntries(overview.map(o => [o.index.projectId, o.outline])), ...prev }))
+      setProjectProgress(prev => ({ ...Object.fromEntries(overview.map(o => [o.index.projectId, o.progress])), ...prev }))
       setProjectsStatus('idle')
-      // One summary per project fills the sidebar shelves (books) and the
-      // dashboard's counts; a project that fails to load just shows empty.
-      const entries = await Promise.all(list.map(async p => {
-        try {
-          const summary = await apiGetProject(p.projectId)
-          return [p.projectId, summary.outline?.nodes ?? []] as const
-        } catch {
-          return [p.projectId, [] as OutlineNode[]] as const
-        }
-      }))
-      setProjectOutlines(prev => ({ ...Object.fromEntries(entries), ...prev }))
-      const bars = await Promise.all(list.map(async p => {
-        try { return [p.projectId, await getBookProgress(p.projectId)] as const } catch { return [p.projectId, {} as Record<string, BookProgress>] as const }
-      }))
-      setProjectProgress(prev => ({ ...Object.fromEntries(bars), ...prev }))
     } catch (err) {
       setProjectsStatus('error')
       setProjectsError(errMessage(err, 'Failed to load projects'))
@@ -423,12 +420,15 @@ export function useWriterWorkspace() {
   // Opens a project at the project level, or straight into one of its books.
   async function openProject(id: string, bookId?: string) {
     flushAll()
+    stashOpenOutline()
     setOutlineStatus('loading')
     setOutlineError(undefined)
     setPlotStatus('loading')
     setPlotError(undefined)
     try {
       const summary = await apiGetProject(id)
+      // At once, not at the next render: a save of the project just left that answers before the render must not be adopted as this one's.
+      activeProjectIdRef.current = id
       setActiveProjectId(id)
       setActiveProject(summary.index)
 
@@ -469,6 +469,8 @@ export function useWriterWorkspace() {
 
   function backToShelves() {
     flushAll()
+    stashOpenOutline()
+    activeProjectIdRef.current = null
     setActiveProjectId(null)
     setActiveProject(null)
     setOutlineNodes([])
@@ -492,7 +494,7 @@ export function useWriterWorkspace() {
     try {
       await apiDeleteProject(id)
       setProjects(prev => prev.filter(p => p.projectId !== id))
-      setProjectOutlines(prev => {
+      setLoadedOutlines(prev => {
         const { [id]: _removed, ...rest } = prev
         return rest
       })

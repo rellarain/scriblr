@@ -4,7 +4,7 @@ plotpoint assignment, revision and publishing (the bottom bars) and the words wr
 from pathlib import Path
 
 from . import project_store as store
-from .schema import BookProgress, Measure, OutlineNode
+from .schema import BookProgress, Measure, OutlineNode, ProjectFile
 
 _BODY_KINDS = ("act", "scene", "moment")
 
@@ -37,6 +37,11 @@ def _has_outline_below(nodes: list[OutlineNode], chapter_id: str) -> bool:
 
 def get_book_progress(root: Path, project_id: str) -> dict[str, BookProgress]:
     pf, _errors = store._load_project_file(root, project_id)
+    return progress_of(pf)
+
+
+def progress_of(pf: ProjectFile) -> dict[str, BookProgress]:
+    """The same, from a project already loaded (the overview computes it for every project from one read each)."""
     nodes = pf.outline.nodes
     by_id = {n.id: n for n in nodes}
     plot_nodes = pf.plot.nodes

@@ -72,3 +72,23 @@ def test_a_book_with_no_goal_has_no_word_total(client: TestClient) -> None:
     assert book["words"] == {"done": 0, "total": 0}
     assert book["outlining"] == {"done": 0, "total": 0}
     assert book["planning"] == {"done": 0, "total": 0}  # no goal: nothing to plan toward yet
+
+
+def test_overview_gives_every_project_with_its_outline_and_progress(client: TestClient) -> None:
+    first = _project(client)
+    second = client.post("/api/projects", json={"title": "Second"}).json()["projectId"]
+
+    overview = client.get("/api/projects/overview")
+    assert overview.status_code == 200
+    by_id = {entry["index"]["projectId"]: entry for entry in overview.json()}
+    assert set(by_id) == {first, second}
+
+    # The same answers the three separate requests gave.
+    for project_id, entry in by_id.items():
+        assert entry["outline"] == client.get(f"/api/projects/{project_id}").json()["outline"]["nodes"]
+        assert entry["progress"] == client.get(f"/api/projects/{project_id}/book-progress").json()
+    assert by_id[first]["progress"]["b1"]["plotting"] == {"done": 1, "total": 2}
+
+
+def test_overview_of_no_projects_is_empty(client: TestClient) -> None:
+    assert client.get("/api/projects/overview").json() == []
