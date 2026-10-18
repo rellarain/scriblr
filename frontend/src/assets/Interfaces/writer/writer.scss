@@ -353,7 +353,8 @@
     &--active { font-weight: 700; }
     &--subcategory { --wr-row-bg: var(--wr-sub-fill, var(--wr-cat)); --wr-row-ink: var(--on-accent); --away: black; }
     &--cluster { --wr-row-bg: var(--wr-cluster-fill, var(--wr-sub-fill, var(--wr-cat))); --wr-row-ink: var(--on-accent); --away: black; }
-    &--plotline { @include wrEdge; padding-left: calc(var(--wr-edge-w, 4px) + 8px); }
+    // A plotline has nothing to fold: no chevron, and its checkbox stands 5px in from its stripes.
+    &--plotline { @include wrEdge; padding-left: var(--wr-edge-w, 4px); .wrNavChevron { display: none; } .wrNavCheck { margin-left: 5px; } }
   }
   .wrNavChevron { display: inline-flex; flex: 0 0 auto; transition: transform 0.15s; }
   // The app resets native form controls, so the tick is drawn: a box, filled with the accent when ticked (a tick) or part-ticked (a bar).
