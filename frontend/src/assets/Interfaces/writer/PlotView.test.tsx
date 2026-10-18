@@ -637,3 +637,46 @@ describe('inherited field groups', () => {
     expect(head.lastElementChild).toHaveTextContent(/^Category$/)
   })
 })
+
+describe('the level fold circles', () => {
+  const dots = () => within(screen.getByRole('group', { name: 'Fold a whole level' }))
+  const rowKinds = (container: HTMLElement) => [...container.querySelectorAll('.wrNavRow')].map(r => r.className.match(/wrNavRow--(\w+)/)![1])
+  const withTwo = () => clustered().concat(plotNode('cat2', 'category', null, { title: 'Action', order: 1 }), plotNode('sub2', 'subcategory', 'cat2', { title: 'Chase' }), plotNode('line2', 'plotline', 'sub2', { title: 'Rooftop' }))
+
+  it('sit at the top right as three, for categories, subcategories and clusters, and "Category" is at the bottom', () => {
+    const { container } = render(<Editor start={clustered()} />)
+    const head = container.querySelector('.wrPlotNavHead') as HTMLElement
+    expect(head.lastElementChild).toHaveClass('wrNavDots')
+    expect(within(head).queryByRole('button', { name: /^\s*Category$/ })).toBeNull()
+    expect([...container.querySelectorAll('.wrNavDot')].map(d => d.getAttribute('aria-label'))).toEqual(['Collapse all categories', 'Collapse all subcategories', 'Collapse all clusters'])
+    expect(container.querySelector('.wrPlotNav')!.lastElementChild).toHaveTextContent('Category')
+  })
+
+  it('are lit while any node of their level is open, and a click folds or opens the whole level', () => {
+    const { container } = render(<Editor start={withTwo()} />)
+    expect(rowKinds(container).filter(k => k === 'category')).toHaveLength(2)
+    expect(dots().getByRole('button', { name: 'Collapse all categories' })).toHaveClass('wrNavDot--on')
+    fireEvent.click(dots().getByRole('button', { name: 'Collapse all categories' }))
+    expect(rowKinds(container)).toEqual(['category', 'category']) // both closed: nothing under them shows
+    expect(dots().getByRole('button', { name: 'Expand all categories' })).not.toHaveClass('wrNavDot--on')
+    fireEvent.click(dots().getByRole('button', { name: 'Expand all categories' }))
+    expect(rowKinds(container)).toContain('plotline')
+  })
+
+  it('fold one level without touching the others', () => {
+    const { container } = render(<Editor start={withTwo()} />)
+    fireEvent.click(dots().getByRole('button', { name: 'Collapse all clusters' }))
+    expect(rowKinds(container)).toEqual(['category', 'subcategory', 'plotline', 'category', 'subcategory', 'cluster'])
+    expect(dots().getByRole('button', { name: 'Collapse all subcategories' })).toHaveClass('wrNavDot--on')
+    expect(dots().getByRole('button', { name: 'Expand all clusters' })).not.toHaveClass('wrNavDot--on')
+  })
+
+  it('light again when one node of the level is opened by its own chevron, and are off when no node of the level has anything under it', () => {
+    const { container } = render(<Editor start={clustered()} />)
+    fireEvent.click(dots().getByRole('button', { name: 'Collapse all categories' }))
+    fireEvent.click(container.querySelector('.wrNavRow--category .wrNavChevron') as HTMLElement)
+    expect(dots().getByRole('button', { name: 'Collapse all categories' })).toHaveClass('wrNavDot--on')
+    const flat = render(<Editor start={[plotNode('only', 'category', null, { title: 'Alone' })]} focused="only" />)
+    expect(within(flat.container).getAllByRole('button', { name: /all (categories|subcategories|clusters)$/ }).every(b => (b as HTMLButtonElement).disabled)).toBe(true)
+  })
+})

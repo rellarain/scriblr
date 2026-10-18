@@ -8,6 +8,10 @@ import { nodeLabel, plotlinesUnder, selectionState, sortByTitle } from './plotTr
 // The Plot tool's contents: categories > subcategories > clusters > plotlines, alphabetized, each with a checkbox. A plotline's
 // checkbox ticks that plotline; a group's ticks (or unticks) every plotline under it and shows "some" when only part of it is
 // ticked. Two or more ticked plotlines open the compare view (PlotCompare.tsx); "Compare (n)" brings it back after browsing.
+// Three small circles at the top right fold a whole level at once (categories, subcategories, clusters, left to right): lit while any node
+// of that level is open, a click closes them all, and a click on an unlit one opens them all. "+ Category" sits at the bottom.
+
+const LEVELS = [['category', 'categories'], ['subcategory', 'subcategories'], ['cluster', 'clusters']] as const
 
 export function plotlineCount(node: PlotNode, children: Map<string | null, PlotNode[]>): number {
   return plotlinesUnder(node, children).length
@@ -29,6 +33,14 @@ export function PlotNav({ w, onOpenNode, onCompare }: {
     const next = new Set(prev)
     if (next.has(id)) next.delete(id)
     else next.add(id)
+    return next
+  })
+
+  // The nodes of a level that have something under them (the ones that can fold), and whether any is open.
+  const foldable = (kind: PlotNode['kind']) => w.plotNodes.filter(n => n.kind === kind && (children.get(n.id) ?? []).some(c => c.kind !== 'plotpoint'))
+  const foldLevel = (kind: PlotNode['kind'], open: boolean) => setCollapsed(prev => {
+    const next = new Set(prev)
+    for (const n of foldable(kind)) { if (open) next.add(n.id); else next.delete(n.id) }
     return next
   })
 
@@ -75,9 +87,19 @@ export function PlotNav({ w, onOpenNode, onCompare }: {
     <div className="wrPlotNav">
       <div className="wrPlotNavHead">
         <span>Categories</span>
-        <button type="button" className="wrSmallBtn" onClick={() => { w.focusPlotNode(w.addPlotNode(null, 'category')); onOpenNode?.() }}>
-          <PlusIcon size={13} /> Category
-        </button>
+        <div className="wrNavDots" role="group" aria-label="Fold a whole level">
+          {LEVELS.map(([kind, plural]) => {
+            const nodes = foldable(kind)
+            const anyOpen = nodes.some(n => !collapsed.has(n.id))
+            return (
+              <button
+                key={kind} type="button" className={anyOpen ? 'wrNavDot wrNavDot--on' : 'wrNavDot'} disabled={nodes.length === 0}
+                aria-label={anyOpen ? `Collapse all ${plural}` : `Expand all ${plural}`} aria-pressed={anyOpen}
+                title={anyOpen ? `Collapse all ${plural}` : `Expand all ${plural}`} onClick={() => foldLevel(kind, anyOpen)}
+              />
+            )
+          })}
+        </div>
       </div>
       {ticked > 0 && (
         <div className="wrPlotNavPicked">
@@ -91,6 +113,9 @@ export function PlotNav({ w, onOpenNode, onCompare }: {
         {w.plotNodes.length === 0 && <p className="wrMuted">No categories yet.</p>}
         {rows(null, 0)}
       </div>
+      <button type="button" className="wrSmallBtn wrPlotNavAdd" onClick={() => { w.focusPlotNode(w.addPlotNode(null, 'category')); onOpenNode?.() }}>
+        <PlusIcon size={13} /> Category
+      </button>
     </div>
   )
 }

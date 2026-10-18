@@ -331,6 +331,16 @@
   }
   .wrPlotNav { flex: 0 0 250px; min-width: 0; min-height: 0; display: flex; flex-direction: column; gap: 8px; background: var(--ov-sink-1); border-radius: 6px; padding: 10px; }
   .wrPlotNavHead { display: flex; align-items: center; justify-content: space-between; font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: 1px; span { opacity: 0.9; } }
+  // The three level-fold circles: 10px, an outline when every node of the level is closed, filled in the accent when any is open.
+  .wrNavDots { display: flex; align-items: center; gap: 8px; }
+  .wrNavDot {
+    position: relative; width: 10px; height: 10px; padding: 0; border-radius: 50%; box-sizing: border-box; border: 2px solid currentColor; background: transparent; color: inherit; cursor: pointer;
+    &::after { content: ''; position: absolute; inset: -6px; }
+    &--on { border-color: var(--wr-accent); background: var(--wr-accent); }
+    &:disabled { opacity: 0.4; cursor: default; }
+    &:focus-visible { outline: 2px solid var(--wr-accent-light); outline-offset: 2px; }
+  }
+  .wrPlotNavAdd { align-self: flex-start; flex: 0 0 auto; }
   .wrPlotNavRows { flex: 1 1 auto; min-width: 0; min-height: 0; overflow-y: auto; display: flex; flex-direction: column; gap: 3px; scrollbar-width: none; &::-webkit-scrollbar { display: none; } }
   // A row wears its node's colour: a category its own (theme) colour, a subcategory and a cluster their own (accent) colours, a plotline its
   // category's colour with a left edge in its subcategory's and cluster's. The box itself is indented per level of nesting, 14px each (right edges stay aligned),
