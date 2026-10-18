@@ -1,0 +1,66 @@
+// The Outline level at Max and Mid: the book editor, draft stats, the arc and chapter cards.
+@use './mixins' as *;
+
+.wr {
+  // ---------------------------------------------------------------- outline level (Max)
+  .wrOutlineMax { flex: 1 1 auto; min-height: 0; display: flex; flex-direction: column; gap: 8px; }
+
+  // The collapsible book editor.
+  .wrBookEd { flex: 0 0 auto; border-radius: 6px; background: var(--ov-sink-2); }
+  .wrBookEdHead { display: flex; align-items: center; gap: var(--space-5); min-height: 40px; padding: var(--space-2) var(--space-4) var(--space-2) var(--space-2); }
+  .wrBookEdTitle { margin: 0 0 0 var(--space-4); min-width: 0; font-size: 16px; font-weight: 700; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .wrBookEdMeta { margin-right: auto; font-size: 11px; opacity: 0.9; white-space: nowrap; }
+  .wrBookEdBody { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: var(--space-4) 16px; padding: var(--space-2) var(--space-6) var(--space-6); }
+  .wrBookEdField { display: flex; flex-direction: column; gap: var(--space-1); min-width: 0; &--wide { grid-column: 1 / -1; } }
+  // By time | In story: a clock and an open book, the chosen one filled.
+  .wrOrderToggle { display: inline-flex; align-self: flex-start; margin-left: auto; font-size: 10px; }
+  .wrOrderBtn { display: inline-flex; align-items: center; justify-content: center; padding: 3px 7px; color: inherit; background: color-mix(in srgb, currentColor 10%, transparent); &:hover { background: color-mix(in srgb, currentColor 20%, transparent); } &--on { background: color-mix(in srgb, currentColor 24%, transparent); box-shadow: inset 0 0 0 1px currentColor; font-weight: 700; } }
+  .wrSummary { display: flex; flex-direction: column; gap: var(--space-3); font-size: 12px; line-height: 1.4; }
+  .wrPlacedList { display: flex; flex-direction: column; gap: 5px; margin-top: 8px; }
+  .wrMidPointAt { display: block; font-size: 10px; opacity: 0.9; }
+  .wrFormatFields { border: 0; margin: 0; padding: 0; min-width: 0; display: flex; flex-direction: column; gap: 8px; align-items: flex-start; }
+  .wrFormatGrid { display: grid; grid-template-columns: repeat(auto-fill, minmax(130px, 1fr)); gap: 8px var(--space-5); width: 100%; }
+  .wrFormatStyle { display: flex; gap: var(--space-2); }
+  .wrBookEdBody--compact { grid-template-columns: minmax(0, 1fr); padding: 0; .wrFormatGrid { grid-template-columns: minmax(0, 1fr); } .wrBookEdGoals { flex-direction: column; } }
+  .wrBookEdHelp { padding: var(--space-2) var(--space-6) var(--space-6); max-height: 40vh; overflow-y: auto; }
+  .wrDraftPanel { color: var(--wr-ink); display: flex; flex-direction: column; gap: 8px; padding: 22px 26px; }
+  .wrBookEdGoals { grid-column: 1 / -1; display: flex; gap: var(--space-6); }
+  .wrGoal { display: flex; flex-direction: column; gap: var(--space-2); flex: 1; min-width: 0; }
+  .wrGoalHead { display: flex; align-items: baseline; justify-content: space-between; gap: 8px; font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: 1px; opacity: 0.9; }
+  .wrGoalCurrent { color: var(--wr-accent-light); letter-spacing: 0.5px; }
+  .wrGoalInput { position: relative; display: block; border-radius: 0; overflow: hidden; input { width: 100%; box-sizing: border-box; padding: 8px var(--space-4) 13px; background: var(--wr-field); border: 0; outline: none; color: var(--ink); font-size: 13px; &:focus { box-shadow: inset 0 0 0 1px var(--wr-accent); } } }
+  .wrGoalBar { position: absolute; left: 0; right: 0; bottom: 0; height: 5px; background: var(--ov-sink-3); }
+  .wrGoalFill { display: block; height: 100%; background: var(--wr-accent-light); transition: width 0.3s ease; }
+
+  // Draft stats: the first card of the page.
+  .wrDraftStats { flex: 0 0 auto; display: flex; flex-direction: column; gap: var(--space-3); padding: var(--space-4) var(--space-5); border: 1px solid var(--wr-page-line); border-radius: 6px; background: var(--paper-field); font-size: 12px; }
+  .wrDraftStatsHead { font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: 1px; color: var(--paper-label); }
+  .wrDraftStatsRow, .wrDraftStatsChapters li { display: grid; grid-template-columns: minmax(0, 1fr) auto; align-items: center; gap: var(--space-2) var(--space-5); > .wrStatBar { grid-column: 1 / -1; } }
+  .wrStatLabel { font-weight: 700; }
+  .wrStatChapter { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .wrStatValue { color: var(--wr-page-muted); white-space: nowrap; }
+  .wrStatBar { height: 5px; border-radius: 3px; background: var(--wr-page-line); overflow: hidden; }
+  .wrStatBarFill { display: block; height: 100%; background: var(--wr-accent); transition: width 0.3s ease; }
+  .wrDraftStatsChapters { list-style: none; margin: var(--space-2) 0 0; padding: var(--space-3) 0 0; border-top: 1px solid var(--wr-page-line); display: flex; flex-direction: column; gap: var(--space-2); }
+
+  // The arc and chapter cards: a stripe in their own colour.
+  .wrOutlineCards { display: flex; flex-direction: column; gap: 8px; }
+  .wrOutlineCardsHead { display: flex; align-items: center; justify-content: space-between; font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: 1px; color: var(--paper-label); }
+  .wrOutlineCardsAdd { display: flex; gap: var(--space-3); }
+  .wrArcCard, .wrChapterCard {
+    min-width: 0; display: flex; flex-direction: column; gap: 8px; padding: var(--space-4) var(--space-5); border: 1px solid var(--wr-page-line); border-left: 7px solid var(--wr-node-accent, var(--wr-accent)); border-radius: 6px;
+  }
+  .wrArcCard { background: var(--wr-frame-1); }
+  .wrChapterCard { background: var(--wr-frame-2); }
+  // The title takes what is left; the colour slider wraps onto its own row when the card is narrow.
+  .wrNodeHead { display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-3) var(--space-4); min-width: 0; }
+  .wrOutlineInput--title { flex: 1 1 130px; font-weight: 700; }
+  .wrNodeHue--inline { flex: 1 1 130px; max-width: 220px; margin: 0; }
+  .wrNodeToggle { display: inline-flex; align-items: center; justify-content: center; width: 20px; height: 20px; flex: 0 0 auto; border-radius: 4px; color: var(--paper-label); &:hover { background: hsl(var(--color-accent-h), 18%, calc(var(--paper-l) - 9% * var(--paper-dir))); } }
+  .wrNodeStats { display: flex; flex-wrap: wrap; gap: var(--space-2) var(--space-5); font-size: 11px; color: var(--wr-page-muted); span + span::before { content: '\00b7'; margin-right: var(--space-5); } }
+  .wrIconBtn--light { background: hsl(var(--color-accent-h), 18%, calc(var(--paper-l) - 9% * var(--paper-dir))); color: var(--wr-ink); &:hover { background: var(--wr-accent-light); color: var(--on-accent); } }
+
+  // The Outline level at Mid: a plotpoint still to place is just its title in its category colour.
+  .wrOutlineMid .wrPanelHead { display: flex; align-items: baseline; }
+  .wrMidPoint { padding: 4px 8px 4px calc(var(--wr-edge-w, 4px) + 8px); border-radius: 0; background: var(--wr-cat, var(--wr-card)); @include wrEdge; color: var(--ink); font-size: 12px; overflow-wrap: anywhere; }
+}

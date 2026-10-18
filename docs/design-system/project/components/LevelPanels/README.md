@@ -2,7 +2,7 @@
 
 Four stacked levels make the Writer: **Dash**, **Project**, **Outline** (the open book) and **Draft** (the open chapter). Each is a `LevelPanel`: a flat fill of its colour, a header strip and a body. One level is the focus (Max); the one above is Mid, the rest Min; the ones below are not shown.
 
-Code: `writer/levels/LevelPanel.tsx`, `WriterLevels.tsx`, `LevelTabs.tsx`, `levelSizes.ts`; styles `.wrLevel*` and `.wrTab*` in `writer.scss`.
+Code: `writer/levels/LevelPanel.tsx`, `WriterLevels.tsx`, `LevelTabs.tsx`, `levelSizes.ts`; styles `.wrLevel*` in `writer/styles/_levels.scss` and `.wrTab*` in `_level-tabs.scss`.
 
 ## Anatomy
 

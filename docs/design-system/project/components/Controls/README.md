@@ -2,7 +2,7 @@
 
 The small controls of the Writer. They sit inside a level (white text on the level's fill) or on the paper (dark ink on the sheet), and follow it.
 
-Code: `writer.scss` (`.wrSmallBtn`, `.wrIconBtn`, `.wrTabBtn`, `.wrSegmented`, `.wrField`, `.wrOutlineInput`, `.wrChip`, `.wrError`), `components/SaveCluster.tsx`, `components/AutosaveToggle.tsx`, `writer/shared.tsx` (`DeleteControl`).
+Code: `writer/styles/` (`.wrSmallBtn`, `.wrChip`, `.wrField` and `.wrError` in `_shared.scss`; `.wrTabBtn` in `_level-tabs.scss`; `.wrSegmented` in `_levels.scss`; `.wrIconBtn`, `.wrOutlineInput`), `components/SaveCluster.tsx`, `components/AutosaveToggle.tsx`, `writer/shared.tsx` (`DeleteControl`).
 
 ## Buttons
 

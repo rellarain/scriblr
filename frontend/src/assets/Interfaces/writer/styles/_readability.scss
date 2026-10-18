@@ -1,0 +1,43 @@
+// Readability: the rules that keep text legible on every hue.
+.wr {
+  // ---------------------------------------------------------------- readability
+  .wrCtArc, .wrCtChapter { color: var(--on-accent); }
+  .wrBookEdMeta { opacity: 0.9; }
+  .wrBookCover .wrSmallBtn { background: var(--ov-sink-2); &:hover:not(:disabled) { background: var(--ov-sink-3); } }
+  .wrBookCover .wrLabel, .wrBookCover .wrCtHead, .wrBookCover .wrGoalHead { opacity: 1; }
+  .wrBookCover .wrGoalCurrent { color: var(--on-accent); font-weight: 700; }
+  .wrCtWords { opacity: 0.9; }
+  // On the Outline's dark page the "light" buttons and icons are the same wash as the other buttons, not pale paper under white text.
+  .wrLevel--outline .wrSmallBtn--light, .wrLevel--outline .wrIconBtn--light { color: var(--on-accent); background: var(--ov-sink-2); &:hover:not(:disabled) { background: var(--ov-sink-3); } }
+
+  // Muted text, labels and buttons on the paper (the Draft level and the preview) and in the tabs, held to a readable contrast.
+  .wrPage--chapter { --wr-page-muted: color-mix(in srgb, var(--wr-ink) 88%, transparent); }
+  .wrLevel--outline .wrPage--chapter { --wr-page-muted: color-mix(in srgb, var(--on-accent) 85%, transparent); }
+  .wrSpreadRight .wrChapterTile {
+    .wrParentKind, .wrChapterTileName .wrPageKicker, .wrChapterTileStats .wrPageMetaRow, .wrChapterTileStats .wrNodeStats, .wrClickEdit--empty, .wrChapterTileStats .wrStatValue { color: color-mix(in srgb, var(--wr-ink) 84%, transparent); }
+    .wrSmallBtn { color: var(--wr-ink); background: var(--ov-sink-1); &:hover:not(:disabled) { background: var(--ov-sink-2); } }
+  }
+  .wrSegBtn--active { color: var(--on-accent); }
+  .wrPageMuted, .wrPage .wrWordCount { color: color-mix(in srgb, var(--wr-ink) 84%, transparent); }
+  .wrTabPane:not(.wrTabPane--surface) .wrKv span:first-child, .wrTabTileBody:not(.wrTabTileBody--surface) .wrKv span:first-child { opacity: 0.9; }
+  .wrTabPane .wrLabel, .wrTabTileBody .wrLabel { opacity: 0.95; }
+  .wrGoalCurrent { color: inherit; font-weight: 700; }
+
+  // The spine: a flat, darker strip down the left of the book (the Outline), with the cover inset from the level's edge.
+  .wrOutlineMax { position: relative; padding-left: 16px; box-sizing: border-box; }
+  .wrOutlineMax::before {
+    content: ''; position: absolute; left: 0; top: 0; bottom: 0; width: 16px;
+    background: color-mix(in srgb, var(--wr-fill) 60%, black);
+  }
+  // The open chapter's page scrolls itself.
+  .wrLevel--outline .wrOutlinePage { flex-direction: column; overflow-y: auto; padding: 26px 34px; gap: var(--space-6); scrollbar-width: none; &::-webkit-scrollbar { display: none; } }
+  .wrBookCover .wrCoverScroll > .wrBookEdBody, .wrBookCover .wrCoverScroll > .wrBookEdHelp { padding: var(--space-2) var(--space-1) 8px; max-height: none; }
+
+  // The whole Outline is the cover, in one column.
+  .wrBookCover { flex: 1 1 auto; box-shadow: none; }
+  .wrBookCover > .wrBookEd, .wrCoverColumn { width: 100%; max-width: 860px; margin-left: auto; margin-right: auto; box-sizing: border-box; }
+  .wrCoverScroll { padding: var(--space-2) var(--space-6) 24px; }
+  .wrCoverColumn { display: flex; flex-direction: column; gap: var(--space-5); min-width: 0; }
+  .wrCtBody { padding: var(--space-2) var(--space-2) var(--space-4) 22px; }
+  .wrBookCover .wrChapterBanner { background: var(--wr-frame-1); }
+}

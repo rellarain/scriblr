@@ -67,3 +67,7 @@
 
 .colorRangeInput:focus-visible ~ .colorRangeThumb { outline: 2px solid var(--accent-hover, #fff); outline-offset: 2px; }
 .colorRange--disabled { opacity: 0.6; }
+
+// Keyboard focus: the input itself is transparent (the thumb is drawn beside it), so the thumb wears the ring: black inside white,
+// which reads on any hue and on any ground.
+.colorRangeInput:focus-visible + .colorRangeThumb { box-shadow: 0 0 0 2px #000, 0 0 0 4px #fff; }

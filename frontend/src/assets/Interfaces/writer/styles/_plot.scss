@@ -1,0 +1,145 @@
+// The Plot tool: its three layouts, the contents tree, the editor cards, the parents' chips.
+@use './mixins' as *;
+
+.wr {
+  // ---------------------------------------------------------------- plot
+  .wrPlotView { flex: 1 1 auto; min-width: 0; min-height: 0; display: flex; }
+  // The tool's three layouts follow its own width (data-size, from useElementWidth.ts): wide as drawn above; medium stacks a plotline's
+  // chapters under its fields; compact is one column with the contents as a bar on top.
+  .wrPlotFrame {
+    flex: 1 1 auto; min-width: 0; min-height: 0; display: flex; gap: 16px; position: relative;
+    &[data-size='compact'] { flex-direction: column; gap: 8px; }
+    &:not([data-size='wide']) {
+      .wrPlotlineLayout { flex: 0 0 auto; flex-direction: column; }
+      .wrPlotlineLeft { flex: 0 0 auto; overflow: visible; }
+      .wrPlotlineRight { flex: 0 0 auto; min-width: 0; }
+    }
+  }
+  // Compact: the contents fold down from one line over the editor.
+  .wrPlotBar { position: relative; flex: 0 0 auto; z-index: 3; }
+  .wrPlotBarToggle { width: 100%; display: flex; align-items: center; gap: 8px; padding: 8px var(--space-4); border-radius: 6px; background: var(--ov-sink-1); color: inherit; text-align: left; font-size: 12px; font-weight: 700; }
+  .wrPlotBarToggle .wrNavCount { flex: 0 0 auto; white-space: nowrap; }
+  .wrPlotBarLabel { flex: 1 1 auto; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .wrPlotBarDrawer {
+    position: absolute; left: 0; right: 0; top: calc(100% + 4px); display: flex; max-height: min(60vh, 440px); border-radius: 6px; overflow: hidden;
+    background: var(--wr-fill-2); box-shadow: 0 8px 20px rgb(0 0 0 / calc(0.4 * var(--shade-k)));
+    .wrPlotNav { flex: 1 1 auto; border-radius: 0; background: var(--ov-sink-1); }
+  }
+  .wrPlotNav { flex: 0 0 250px; min-width: 0; min-height: 0; display: flex; flex-direction: column; gap: 8px; background: var(--ov-sink-1); border-radius: 6px; padding: var(--space-4); }
+  .wrPlotNavHead { display: flex; align-items: center; justify-content: space-between; font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: 1px; span { opacity: 0.9; } }
+  // The three level-fold circles: 10px, an outline when every node of the level is closed, filled in the accent when any is open.
+  .wrNavDots { display: flex; align-items: center; gap: 8px; }
+  .wrNavDot {
+    position: relative; width: 10px; height: 10px; padding: 0; border-radius: 50%; box-sizing: border-box; border: 2px solid currentColor; background: transparent; color: inherit; cursor: pointer;
+    &::after { content: ''; position: absolute; inset: -6px; }
+    &--on { border-color: var(--wr-accent); background: var(--wr-accent); }
+    &:disabled { opacity: 0.4; cursor: default; }
+    &:focus-visible { outline: 2px solid var(--wr-accent-light); outline-offset: 2px; }
+  }
+  .wrPlotNavAdd { align-self: flex-start; flex: 0 0 auto; }
+  .wrPlotNavRows { flex: 1 1 auto; min-width: 0; min-height: 0; overflow-y: auto; display: flex; flex-direction: column; gap: 3px; scrollbar-width: none; &::-webkit-scrollbar { display: none; } }
+  // A row wears its node's colour: a category its own (theme) colour, a subcategory and a cluster their own (accent) colours, a plotline its
+  // category's colour with a left edge in its subcategory's and cluster's. The box itself is indented per level of nesting, 14px each (right edges stay aligned),
+  // and the selected row is a brighter shade of its own colour.
+  .wrNavRow {
+    --wr-row-bg: var(--wr-cat, var(--ov-sink-1)); --wr-row-ink: var(--ink);
+    display: flex; align-items: center; gap: var(--space-3); padding: 5px 8px; border-radius: 4px; font-size: 12px;
+    background-color: var(--wr-row-bg); color: var(--wr-row-ink);
+    &:hover, &--active { background-color: color-mix(in srgb, var(--wr-row-bg) 85%, var(--away)); }
+    &--active { font-weight: 700; }
+    &--subcategory { --wr-row-bg: var(--wr-sub-fill, var(--wr-cat)); --wr-row-ink: var(--on-accent); --away: black; }
+    &--cluster { --wr-row-bg: var(--wr-cluster-fill, var(--wr-sub-fill, var(--wr-cat))); --wr-row-ink: var(--on-accent); --away: black; }
+    // A plotline has nothing to fold: no chevron, and its checkbox stands 5px in from its stripes.
+    &--plotline { @include wrEdge; padding-left: var(--wr-edge-w, 4px); .wrNavChevron { display: none; } .wrNavCheck { margin-left: 5px; } }
+  }
+  .wrNavChevron { display: inline-flex; flex: 0 0 auto; transition: transform 0.15s; }
+  // The app resets native form controls, so the tick is drawn: a box, filled with the accent when ticked (a tick) or part-ticked (a bar).
+  .wrNavCheck {
+    appearance: none; position: relative; flex: 0 0 auto; width: 14px; height: 14px; margin: 0; border-radius: 3px; cursor: pointer; color: inherit;
+    background: color-mix(in srgb, currentColor 14%, transparent); box-shadow: inset 0 0 0 1.5px color-mix(in srgb, currentColor 75%, transparent);
+    &:checked, &:indeterminate { background: var(--wr-accent); box-shadow: inset 0 0 0 1.5px var(--wr-accent); }
+    &:checked::after { content: ''; position: absolute; left: 4px; top: 1px; width: 4px; height: 8px; border: solid var(--on-accent); border-width: 0 2px 2px 0; transform: rotate(45deg); }
+    &:indeterminate::after { content: ''; position: absolute; left: 3px; right: 3px; top: 6px; height: 2px; background: var(--on-accent); }
+    &:focus-visible { outline: 2px solid var(--wr-accent-light); outline-offset: 2px; }
+    &:disabled { opacity: 0.4; cursor: default; }
+  }
+  .wrPlotNavPicked { display: flex; align-items: center; gap: var(--space-4); font-size: 11px; }
+  .wrNavClear { font-size: 11px; color: inherit; text-decoration: underline; opacity: 0.9; &:hover { opacity: 1; } }
+  .wrSmallBtn--accent { background: var(--wr-accent); color: var(--on-accent); &:hover:not(:disabled) { background: var(--wr-accent-light); } }
+  .wrNavLabel { flex: 1; min-width: 0; text-align: left; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .wrNavCount { font-size: 11px; opacity: 0.9; }
+  .wrNavRow--subcategory .wrNavCount, .wrNavRow--cluster .wrNavCount { opacity: 1; }
+  .wrPlotBody { flex: 1 1 auto; min-width: 0; min-height: 0; display: flex; flex-direction: column; gap: var(--space-4); overflow: auto; scrollbar-width: none; &::-webkit-scrollbar { display: none; } }
+
+  // The plot colour coding on the editor cards: a category card is its (theme) colour, a subcategory or cluster card its (accent)
+  // colour, a plotline card its category's colour with a left edge in its subcategory's and cluster's.
+  .wrCardPanel.wrCardPanel--category, .wrCardPanel.wrCardPanel--plotline { background: var(--wr-cat, var(--wr-card)); }
+  .wrCardPanel.wrCardPanel--plotline { box-shadow: none; @include wrEdge; }
+  .wrCardPanel.wrCardPanel--subcategory { --wr-own-fill: var(--wr-sub-fill); }
+  .wrCardPanel.wrCardPanel--cluster { --wr-own-fill: var(--wr-cluster-fill); }
+  .wrCardPanel.wrCardPanel--subcategory, .wrCardPanel.wrCardPanel--cluster {
+    background: var(--wr-own-fill, var(--wr-cat, var(--wr-card))); color: var(--on-accent); --away: black; .wrTitleField, .wrField { color: var(--on-accent); }
+    // On the accent fill only a light dimming keeps text 45 points from it, and the washes lift away from the text.
+    .wrLabel, .wrKindBadge, .wrOutlineMeta, .wrMuted, .wrHint { opacity: 0.9; }
+    .wrLabel .wrOutlineMeta { opacity: 1; }
+    .wrSmallBtn, .wrChildRow { color: var(--on-accent); background: color-mix(in srgb, var(--away) 22%, transparent); &:hover:not(:disabled) { background: color-mix(in srgb, var(--away) 34%, transparent); } }
+    .wrFieldGroup { background: color-mix(in srgb, var(--away) 16%, transparent); }
+    .wrFieldName, .wrFieldNameText { color: var(--on-accent); }
+    .wrFieldName { background: color-mix(in srgb, var(--away) 24%, transparent); &::placeholder { color: color-mix(in srgb, var(--on-accent) 70%, transparent); } }
+  }
+  .wrCardPanel { background: var(--wr-card); border-radius: 0; padding: 16px var(--space-7); box-shadow: inset 0 0 0 1px var(--hairline); display: flex; flex-direction: column; gap: var(--space-5); }
+  .wrCardPanelHead { display: flex; align-items: center; gap: var(--space-4); }
+  // The parents of a node as read-only chips (PlotParents.tsx). Each is in its own plot colour, with the stripes of its place in the tree at its
+  // left (a cluster's chip: category, subcategory, cluster); the text on them is the audited ink on that level's colour (the tile ink on a category,
+  // white on a subcategory's or cluster's fill). The title is in capitals, spaced out.
+  .wrParents { display: flex; flex-wrap: wrap; gap: var(--space-3); min-width: 0; }
+  .wrParent {
+    --wr-parent-bg: var(--wr-cat, var(--ov-sink-2)); --wr-parent-ink: var(--ink);
+    display: flex; flex-direction: column; min-width: 0; max-width: min(100%, 460px); box-sizing: border-box; padding-left: var(--wr-edge-w, 4px); border-radius: 0;
+    background-color: var(--wr-parent-bg); color: var(--wr-parent-ink); font-size: 14px;
+    box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--wr-parent-ink) 30%, transparent);
+    @include wrEdge;
+    &--subcategory { --wr-parent-bg: var(--wr-sub-fill, var(--wr-cat)); --wr-parent-ink: var(--on-accent); }
+    &--cluster { --wr-parent-bg: var(--wr-cluster-fill, var(--wr-sub-fill, var(--wr-cat))); --wr-parent-ink: var(--on-accent); }
+    &--open { flex: 1 1 100%; max-width: 100%; }
+    button { color: inherit; text-align: left; font-size: inherit; font-family: inherit; }
+    button:focus-visible { outline: 2px solid var(--wr-accent-light); outline-offset: -2px; }
+  }
+  .wrParentMain { display: flex; align-items: center; justify-content: space-between; gap: var(--space-4); min-width: 0; width: 100%; padding: var(--space-3) var(--space-4) var(--space-3) var(--space-4); &:hover { background: color-mix(in srgb, var(--wr-parent-ink) 10%, transparent); } }
+  .wrParentLabel, .wrParentLink { font-size: 14px; font-weight: 700; text-transform: uppercase; letter-spacing: 1.5px; }
+  .wrParentLabel { flex: 0 1 auto; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .wrParentLink { padding: var(--space-3) var(--space-4); text-decoration: underline; text-underline-offset: 3px; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; &:hover { background: color-mix(in srgb, var(--wr-parent-ink) 10%, transparent); } }
+  .wrParentHead { display: flex; align-items: center; justify-content: space-between; gap: var(--space-3); min-width: 0; }
+  .wrParentFold { display: inline-flex; align-items: center; padding: var(--space-3) var(--space-4); &:hover { background: color-mix(in srgb, var(--wr-parent-ink) 10%, transparent); } }
+  .wrParentBody { margin: 0; padding: 0 var(--space-4) 8px var(--space-4); font-size: 14px; font-weight: 400; line-height: 1.45; white-space: pre-wrap; overflow-wrap: anywhere; opacity: 0.95; }
+  .wrKindBadge { font-size: 10px; text-transform: uppercase; letter-spacing: 0.5px; opacity: 0.9; flex: 0 0 auto; }
+  .wrTitleField { flex: 1; min-width: 0; background: var(--wr-field); border: 0; border-radius: 0; color: var(--ink); font-size: 13px; font-weight: 700; padding: 8px var(--space-4); outline: none; &:focus { box-shadow: inset 0 0 0 1px var(--wr-accent); } &::placeholder { color: var(--ink-faint); } }
+  .wrChildRows { display: flex; flex-direction: column; gap: var(--space-3); }
+  .wrChildRowsHead { display: flex; align-items: center; justify-content: space-between; gap: var(--space-4); .wrLabel { margin-bottom: 0; } }
+  .wrChildRow { display: flex; align-items: center; gap: var(--space-5); width: 100%; text-align: left; padding: var(--space-4) var(--space-5); border-radius: 4px; background: var(--ov-sink-2); &:hover { background: color-mix(in srgb, var(--ink) 10%, transparent); } }
+  .wrChildRowTitle { font-size: 13px; font-weight: 700; flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .wrChildRowMeta { display: flex; gap: 5px; }
+  .wrProjectOutline { display: flex; flex-direction: column; gap: var(--space-4); max-width: 720px; }
+  .wrProjHead { display: flex; align-items: center; justify-content: space-between; .wrLabel { margin-bottom: 0; } }
+  .wrProjHeadActions { display: flex; gap: var(--space-3); }
+  .wrProjStack { display: flex; flex-direction: column; }
+  .wrProjSeries { background: var(--ov-sink-2); border-radius: 0; padding: var(--space-5) var(--space-6); display: flex; flex-direction: column; gap: var(--space-4); }
+  .wrProjBook { background: var(--wr-card); border-radius: 0; padding: var(--space-4) var(--space-5); display: flex; flex-direction: column; gap: var(--space-3); min-width: 0; box-shadow: inset 7px 0 0 var(--wr-node-color, transparent); }
+  // Two rows: the number over the title; the grip, title input and action buttons share the second row.
+  .wrProjTop {
+    display: grid; grid-template-columns: auto minmax(0, 1fr) auto; grid-template-rows: auto auto; column-gap: var(--space-4); row-gap: 3px; align-items: start;
+    > .wrGrip { grid-column: 1; grid-row: 2; align-self: center; }
+    > .wrProjActions { grid-column: 3; grid-row: 2; align-self: center; }
+  }
+  .wrProjTitle { grid-column: 2; grid-row: 1 / span 2; display: flex; flex-direction: column; gap: 3px; min-width: 0; }
+  .wrProjNumber { font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: 1px; opacity: 0.9; }
+  .wrProjInput { box-sizing: border-box; width: 100%; background: var(--wr-field); border: 0; outline: none; color: var(--ink); font-size: 13px; font-weight: 700; letter-spacing: 1.5px; padding: var(--space-3) var(--space-4); border-radius: 0; &::placeholder { font-weight: 400; letter-spacing: 0; opacity: 0.85; } &:focus { box-shadow: inset 0 0 0 1px var(--wr-accent); } }
+  .wrProjSummary { box-sizing: border-box; width: 100%; background: var(--wr-field); border: 0; outline: none; color: var(--ink); font-size: 12px; padding: var(--space-3) var(--space-4); border-radius: 0; resize: none; &:focus { box-shadow: inset 0 0 0 1px var(--wr-accent); } }
+  .wrProjActions { display: inline-flex; align-items: center; gap: var(--space-2); }
+  .wrProjStats { display: flex; gap: var(--space-4); font-size: 11px; opacity: 0.9; padding-left: 24px; span + span::before { content: '\00b7'; margin-right: var(--space-4); } }
+  .wrProjFoot { display: flex; }
+
+  .wrPlotlineLayout { flex: 1 1 auto; min-height: 0; display: flex; gap: 16px; }
+  .wrPlotlineLeft { flex: 0 0 430px; min-height: 0; display: flex; flex-direction: column; gap: var(--space-6); overflow-y: auto; scrollbar-width: none; &::-webkit-scrollbar { display: none; } }
+  .wrPlotlineRight { flex: 1 1 auto; min-width: 320px; min-height: 0; display: flex; flex-direction: column; gap: var(--space-6); }
+}

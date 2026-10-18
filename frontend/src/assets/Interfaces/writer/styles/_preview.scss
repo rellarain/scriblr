@@ -1,0 +1,48 @@
+// The Preview, as the right page of the book: formatting, day and night paper, sentence highlights.
+.wr {
+  // ---------------------------------------------------------------- preview
+  .wrPreviewToolbar { flex: 0 0 auto; display: flex; align-items: center; gap: var(--space-5); min-height: 30px; flex-wrap: wrap; }
+  .wrToolGroup { display: flex; align-items: center; gap: var(--space-3); .wrLabel { margin: 0 var(--space-2) 0 0; } }
+  // The preview keeps a readable measure, centred in the wide page.
+  .wrPreviewHead, .wrPreviewIndent, .wrPreviewPara { width: 100%; max-width: 900px; margin-left: auto; margin-right: auto; box-sizing: border-box; }
+  .wrPreviewHead { padding-left: 56px; display: flex; flex-direction: column; gap: var(--space-1); margin-bottom: var(--space-3); flex: 0 0 auto; }
+  .wrPreviewTitle { font-family: Georgia, 'Times New Roman', serif; font-size: 30px; font-weight: 700; }
+  .wrPreviewIndent { padding-left: 56px; }
+  .wrPreviewPara { position: relative; padding-left: 56px; flex: 0 0 auto; }
+  // The book's preview formatting (previewFormat.ts) arrives as variables on the pane; these are its defaults.
+  .wrPreviewText {
+    margin: 0; font-family: var(--wr-pv-font, Georgia, 'Times New Roman', serif); font-size: var(--wr-pv-size, 17px); font-style: var(--wr-pv-style, normal);
+    font-weight: var(--wr-pv-weight, normal); line-height: var(--wr-pv-line, 1.65); text-align: var(--wr-pv-align, justify); text-indent: var(--wr-pv-indent, 0);
+  }
+  // The app's element reset sets a font on every span; the sentences take the paragraph's.
+  .wrPreviewText .wrSentence { font: inherit; }
+  .wrPreviewPara + .wrPreviewPara { margin-top: var(--wr-pv-gap, 0); }
+  // Day / night: the Preview page is the Day paper (light, dark text) or the Night paper (dark, light text), in the theme hue.
+  // A hovered and a selected sentence are the accent's hue, fitted so the page's text reads on them (--page-*-highlight).
+  .wrPage--day {
+    --wr-page: var(--page-day); --wr-ink: var(--page-day-ink); --wr-page-line: var(--page-day-line); --wr-page-muted: var(--page-day-muted);
+    --wr-hl: var(--page-day-highlight); --wr-hl-selected: var(--page-day-highlight-selected);
+  }
+  .wrPage--night {
+    --wr-page: var(--page-night); --wr-ink: var(--page-night-ink); --wr-page-line: var(--page-night-line); --wr-page-muted: var(--page-night-muted);
+    --wr-hl: var(--page-night-highlight); --wr-hl-selected: var(--page-night-highlight-selected);
+  }
+  .wrPreviewSelect { background: var(--ov-sink-2); color: var(--ink); border: 0; border-radius: 4px; padding: var(--space-2) 8px; font-size: 11px; font-weight: 700; option { color: black; } }
+  .wrSentence { cursor: pointer; border-radius: 2px; &:hover { background: var(--wr-hl); } &--selected { background: var(--wr-hl-selected); } &--flagged { border-bottom: 2px solid var(--wr-accent); } }
+  .wrReactGutter { position: absolute; left: 0; top: 0; width: 44px; height: 100%; }
+  .wrReactBar {
+    position: absolute; width: 20px; border-radius: 4px; display: flex; flex-direction: column; align-items: center; padding-top: 3px; box-sizing: border-box; overflow: hidden;
+    border: 1px dashed transparent;
+    &--like { color: var(--paper-like); }
+    &--dislike { color: var(--paper-dislike); }
+    &--level0 { border-color: hsl(var(--color-accent-h), 18%, calc(var(--paper-l) - 19% * var(--paper-dir))); background: transparent; color: var(--paper-placeholder); &:hover { background: hsl(var(--color-accent-h), 18%, calc(var(--paper-l) - 5% * var(--paper-dir))); } }
+    // Same hue and lightness at every level; only saturation rises with the strength of the reaction.
+    &--like.wrReactBar--level1 { background: hsl(var(--color-accent-h), 30%, var(--paper-react-l)); }
+    &--like.wrReactBar--level2 { background: hsl(var(--color-accent-h), 62%, var(--paper-react-l)); }
+    &--like.wrReactBar--level3 { background: hsl(var(--color-accent-h), 96%, var(--paper-react-l)); }
+    &--dislike.wrReactBar--level1 { background: hsl(var(--color-alert-h), 26%, var(--paper-react-l)); }
+    &--dislike.wrReactBar--level2 { background: hsl(var(--color-alert-h), 58%, var(--paper-react-l)); }
+    &--dislike.wrReactBar--level3 { background: hsl(var(--color-alert-h), 92%, var(--paper-react-l)); }
+  }
+  .wrReactPlus { font-size: 12px; font-weight: 700; line-height: 16px; }
+}

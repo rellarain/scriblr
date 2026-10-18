@@ -5,7 +5,7 @@ import { ZONE_KEYS } from '../../src/theme/types'
 
 // project/tokens.json: the system's tokens in the shape the Design System page reads (flat lists of { name, value, usage }; colours
 // literal, across the four zones). Colours come from the theme code (colors.ts); the type, spacing, radius and shadow values are the ones
-// the Writer's stylesheet (assets/Interfaces/writer/writer.scss) is written with.
+// the Writer's stylesheet (assets/Interfaces/writer/writer.scss and its partials in styles/) is written with.
 
 const SANS = `system-ui, -apple-system, 'Segoe UI', sans-serif`
 const SERIF = `Georgia, 'Times New Roman', serif`
@@ -34,7 +34,7 @@ const SERIF_STYLES: TypeStyle[] = [
 
 export interface Token { name: string; value: string; usage: string }
 
-const SPACING: Token[] = [
+export const SPACING: Token[] = [
   { name: 'space-1', value: px(2), usage: 'Hairline gaps: a tab\'s inner gap, the gap between quick actions.' },
   { name: 'space-2', value: px(4), usage: 'Tight gaps: between small controls, a page edge\'s step.' },
   { name: 'space-3', value: px(6), usage: 'The gap between levels and between tiles in a column.' },
@@ -49,7 +49,7 @@ const SPACING: Token[] = [
   { name: 'one-column-below', value: px(ONE_COLUMN_BELOW), usage: 'Below this width a split grid stacks its tiles in one column.' },
   { name: 'hue-window', value: String(SUBCATEGORY_HUE_WINDOW), usage: 'Degrees: how far a series, arc, chapter, plot subcategory or plot cluster colour may stray from its parent\'s hue.' },
 ]
-const RADIUS: Token[] = [
+export const RADIUS: Token[] = [
   { name: 'radius-none', value: px(0), usage: 'Surfaces, fields and chips are flat and square: levels, tiles (the tile grid and its console too), cards, notes, fields, chips, counts and badges, the theme panel and the helper and admin screens have no radius; buttons on a level (small and icon buttons) have none either.' },
   { name: 'radius-button', value: px(4), usage: 'Buttons keep a small radius where they have one: the header, a tile title button, the theme panel (6px). They are the only rounded things on a surface.' },
   { name: 'radius-input', value: px(4), usage: 'Inputs and buttons on the paper, and the segmented switch.' },

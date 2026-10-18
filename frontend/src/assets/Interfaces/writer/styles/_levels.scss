@@ -1,0 +1,104 @@
+// A book's scope, and the Writer's four stacked levels (Dash, Project, Outline, Draft): their panels, the side column and its drag handle.
+@use './mixins' as *;
+
+.wr {
+  // ---------------------------------------------------------------- main
+  // A book's editors (BookScope.tsx): the tokens are re-derived from the book's hues. The
+  // page background and icon column behind them stay the user's own theme background.
+  .wrBookScope { @include wrAliases; color: var(--ink); }
+  .wrBookScope--flow { display: contents; }
+  // ---------------------------------------------------------------- levels
+  // The Writer's four stacked levels (writer/levels/): Dash, Project, Outline, Draft. Each is a
+  // tinted panel: the Dash in the active theme's hue, each other level in its own (--wr-level-h, set from
+  // the project's, book's or chapter's hue; levelHues.ts).
+  .wrLevels { flex: 1 1 auto; min-width: 0; height: 100%; box-sizing: border-box; display: flex; flex-direction: row; gap: var(--space-3); padding: var(--space-3); }
+  // The side column's width is --wr-side-w (the default, or the one dragged: sidebarState.ts); hidden, the column is not drawn.
+  .wrLevelsSide { position: relative; flex: 0 0 var(--wr-side-w, clamp(280px, 32%, 460px)); min-width: 0; min-height: 0; display: flex; flex-direction: column; gap: var(--space-3); }
+  // Draft focus: the open book is the whole Writer. Its left page runs under the Dash, Project and Outline tiles
+  // (the tile column is laid over it), with the chapter beside them, then the crease and the right page.
+  .wrLevels--focus-draft {
+    --wr-side-w: clamp(280px, 32%, 460px);
+    // The same width in pixels for what is inside (cqw is a percentage of this container's width).
+    --wr-side-px: clamp(280px, 32cqw, 460px);
+    &.wrLevels--noside { --wr-side-w: 0px; --wr-side-px: 0px; }
+    container-type: inline-size; padding: 0;
+    display: grid; grid-template-columns: var(--wr-side-w) minmax(0, 1fr); grid-template-rows: minmax(0, 1fr);
+    > .wrLevelsSide { grid-column: 1; grid-row: 1; position: relative; z-index: 2; padding: var(--space-3) 0 var(--space-3) var(--space-3); box-sizing: border-box; }
+    // The Draft canvas is the book's colour, very light by day and deeper (never black) at night (the paper tokens follow the
+    // zone); the left page is a step deeper than the right.
+    .wrLevel--draft {
+      grid-column: 1 / -1; grid-row: 1; color: var(--wr-ink);
+      --wr-canvas: hsl(var(--color-theme-h), var(--color-theme-s), calc(var(--paper-l) - 12% * var(--paper-dir)));
+      background: var(--wr-canvas);
+    }
+    .wrLevel--draft .wrLevelBody { padding-left: 0; }
+  }
+  // The drag handle on the column's right edge: a 10px strip over the gap, with a thin accent line on hover and while dragging.
+  .wrSideResizer {
+    position: absolute; top: 0; bottom: 0; right: -8px; width: 10px; z-index: 5; cursor: col-resize; touch-action: none;
+    &::after { content: ''; position: absolute; top: 6px; bottom: 6px; left: 4px; width: 2px; background: var(--wr-accent-light); opacity: 0; transition: opacity 0.15s; }
+    &:hover::after, &--active::after { opacity: 1; }
+  }
+  // Outline focus: the book panel runs to the top, bottom and right edges (the tile column keeps its margin).
+  .wrLevels--focus-outline { padding: 0 0 0 var(--space-3); > .wrLevelsSide { padding: var(--space-3) 0; box-sizing: border-box; } }
+  .wrLevels--focus-dash .wrLevel--dash { flex: 2 1 0; }
+  .wrLevels--focus-dash .wrLevel--project { flex: 1 1 0; }
+  .wrLevel {
+    --wr-level-h: var(--color-theme-h);
+    // Flat and square. The fill is the level's colour at the accent's saturation and lightness (--wr-level-fill, set by
+    // LevelPanel); what sits inside it steps one shade deeper each time (--wr-fill-1 .. 4), ending in light inputs.
+    --wr-fill: var(--wr-level-fill, hsl(var(--wr-level-h) calc(var(--color-accent-s) * 0.62) clamp(0%, calc(var(--color-accent-l) - 8%), 38%)));
+    --wr-fill-1: color-mix(in srgb, var(--wr-fill) 90%, black);
+    --wr-fill-2: color-mix(in srgb, var(--wr-fill) 80%, black);
+    --wr-fill-3: color-mix(in srgb, var(--wr-fill) 70%, black);
+    --wr-fill-4: color-mix(in srgb, var(--wr-fill) 60%, black);
+    // The level's ink (--on-accent: white on a level) and the washes of it that lift a control off the fill.
+    --level-ink: var(--on-accent);
+    --level-ink-soft: color-mix(in srgb, var(--on-accent) 92%, transparent);
+    --level-wash-lo: color-mix(in srgb, var(--on-accent) 10%, transparent);
+    --level-wash: color-mix(in srgb, var(--on-accent) 16%, transparent);
+    --level-wash-hi: color-mix(in srgb, var(--on-accent) 28%, transparent);
+    --level-line: color-mix(in srgb, var(--on-accent) 18%, transparent);
+    // The light input on a level (its field, quick search, inline add): the theme's hue, near-white, with near-black text.
+    --level-input: hsl(var(--color-theme-h) 28% 96%);
+    --level-input-ink: hsl(var(--color-theme-h) 30% 10%);
+    --level-input-hint: hsl(var(--color-theme-h) 12% 42%);
+    display: flex; flex-direction: column; min-width: 0; min-height: 0; overflow: hidden; border-radius: 0;
+    background: var(--wr-fill); color: var(--on-accent);
+    &--max { flex: 1 1 0; }
+  }
+  .wrLevelsSide .wrLevel--mid { flex: 1 1 0; }
+  .wrLevelsSide .wrLevel--min { flex: 0 0 auto; }
+  .wrLevelHeader {
+    flex: 0 0 auto; display: flex; align-items: center; gap: 8px; min-height: 40px; box-sizing: border-box; padding: 8px 22px;
+    background: var(--wr-fill);
+    &--min { cursor: pointer; &:hover { background: color-mix(in srgb, var(--wr-fill) 88%, white); } }
+  }
+  // The level's title: all caps, spaced out like the tile titles, with room above and below.
+  .wrLevelTitle { margin: var(--space-2) 0; line-height: 1.7; flex: 1 1 auto; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; text-align: left; font-size: 14px; font-weight: 700; text-transform: uppercase; letter-spacing: 1.5px; color: inherit; }
+  .wrLevelTitle--link:hover { text-decoration: underline; }
+  .wrLevelToggle { flex: 0 0 auto; display: inline-flex; align-items: center; justify-content: center; width: 24px; height: 24px; border-radius: 0; color: inherit; &:hover { background: var(--level-wash); } }
+  .wrLevelBody { flex: 1 1 auto; min-height: 0; box-sizing: border-box; display: flex; flex-direction: column; position: relative; padding: 8px var(--space-5) var(--space-5); background: var(--wr-fill-1); }
+  .wrLevel--mid .wrLevelBody { overflow-y: auto; scrollbar-width: none; &::-webkit-scrollbar { display: none; } }
+  .wrLevelMinBody { background: var(--wr-fill-1); flex: 1 1 auto; padding: 8px var(--space-6) var(--space-5); display: flex; flex-direction: column; gap: var(--space-5); overflow-y: auto; scrollbar-width: none; &::-webkit-scrollbar { display: none; } }
+  .wrNodeHue { max-width: 360px; margin: var(--space-1) 0; }
+  .wrOutlineMid { display: flex; flex-direction: column; gap: 5px; font-size: 12px; line-height: 1.4; padding-top: 8px; }
+  // The Outline and Draft pages run their paper flush to the right edge, so the edge tabs sit against it.
+  .wrLevel--outline.wrLevel--max .wrLevelBody { padding: 0 0 0 var(--space-3); }
+  .wrLevel--draft .wrLevelBody { padding: 0; background: transparent; }
+  .wrConsoleBody--tiles { overflow: hidden; }
+  .wrConsoleBody { flex: 1 1 auto; min-height: 0; display: flex; flex-direction: column; overflow-y: auto; scrollbar-width: none; &::-webkit-scrollbar { display: none; } }
+
+  .wrTitleRow { flex: 0 0 auto; height: 44px; display: flex; align-items: center; gap: var(--space-5); }
+  .wrConsoleTitle { margin: 0; font-size: 18px; font-weight: 700; text-transform: uppercase; letter-spacing: 1.5px; }
+  .wrComponentName { font-size: 13px; opacity: 0.9; }
+  .wrTitleRight { margin-left: auto; display: flex; align-items: center; gap: var(--space-6); }
+  // The Book editor has no title row: its Save control is pinned to the cover's top-right corner.
+  .wrPlaceholder { padding: var(--space-3) var(--space-1); h2 { font-size: 15px; margin: 0 0 var(--space-3); text-transform: uppercase; letter-spacing: 1px; } p { font-size: 13px; opacity: 0.85; margin: 0; } }
+
+  .wrSegmented { display: flex; padding: 3px; gap: 3px; background: var(--wr-field); border-radius: 0; }
+  .wrSegBtn { display: inline-flex; align-items: center; padding: var(--space-3) 8px; border-radius: 3px; font-size: 12px; font-weight: 700; &--active { background: var(--wr-accent); } &:hover:not(:disabled):not(.wrSegBtn--active) { background: color-mix(in srgb, var(--ink) 10%, transparent); } &:disabled { opacity: 0.6; cursor: default; } }
+  // The label is hidden until its button is selected, then slides open.
+  .wrSegLabel { max-width: 0; margin-left: 0; opacity: 0; overflow: hidden; white-space: nowrap; transition: max-width 0.25s ease, margin-left 0.25s ease, opacity 0.2s ease; }
+  .wrSegBtn--active .wrSegLabel { max-width: 80px; margin-left: var(--space-3); opacity: 1; }
+}

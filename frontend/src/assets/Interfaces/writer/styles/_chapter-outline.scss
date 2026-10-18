@@ -1,0 +1,63 @@
+// The chapter outline (page): drop gaps, cards, the scene time, Draft mode's three strengths.
+.wr {
+  // ---------------------------------------------------------------- chapter outline (page)
+  // Drop gaps between cards (useNodeDnd.tsx): thin spacers at rest, open while a dragged card fits there,
+  // and the hovered one grows to the dragged card's height.
+  .wrChildren { display: flex; flex-direction: column; }
+  .wrDropGap { flex: 0 0 auto; height: 10px; box-sizing: border-box; border-radius: 4px; transition: height 0.15s ease, background-color 0.15s; }
+  .wrChildren > .wrDropGap:first-child, .wrChildren > .wrDropGap:last-child { height: 4px; }
+  .wrChildren > .wrDropGap--empty { height: 0; }
+  .wrDropGap--open { background: color-mix(in srgb, var(--wr-accent) 16%, transparent); }
+  .wrChildren > .wrDropGap--open:first-child, .wrChildren > .wrDropGap--open:last-child { height: 12px; }
+  .wrChildren > .wrDropGap--open.wrDropGap--empty { height: 30px; outline: 1px dashed var(--wr-accent); outline-offset: -1px; }
+  .wrDropGap--over { background: color-mix(in srgb, var(--wr-accent) 30%, transparent); outline: 2px dashed var(--wr-accent); outline-offset: -2px; }
+  .wrOutlineCard { transition: outline-color 0.1s; &--dragging { opacity: 0.7; } }
+  .wrActCard { background: var(--wr-frame-3); border: 1px solid var(--wr-page-line); border-radius: 6px; padding: var(--space-5); display: flex; flex-direction: column; gap: var(--space-4); flex: 0 0 auto; }
+  .wrSceneCard { background: var(--wr-frame-4); border: 1px solid var(--wr-page-line); border-radius: 6px; padding: var(--space-4) var(--space-5); display: flex; flex-direction: column; gap: 8px; }
+  .wrActHead { display: flex; align-items: center; gap: var(--space-4); }
+  .wrSceneHead { display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-3) var(--space-4); }
+  .wrMomentCard { background: var(--wr-frame-5); border: 1px solid var(--wr-page-line); border-radius: 6px; padding: 8px var(--space-4); display: flex; flex-direction: column; gap: var(--space-3); }
+  .wrMomentRow { display: flex; align-items: center; gap: var(--space-4); }
+  // Outline: grip centred down the left; a preview + number row over the synopsis input.
+  .wrMomentCard--outline { flex-direction: row; align-items: center; gap: 8px; }
+  .wrMomentCol { flex: 1 1 auto; min-width: 0; display: flex; flex-direction: column; gap: var(--space-3); }
+  .wrMomentTop { display: flex; align-items: baseline; justify-content: space-between; gap: var(--space-4); min-width: 0; }
+  .wrMomentPreview { flex: 1 1 auto; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-family: Georgia, 'Times New Roman', serif; font-size: 12px; font-style: italic; color: var(--wr-page-muted); }
+  .wrNodeLabel--moment { flex: 0 0 auto; min-width: 0; text-align: right; }
+  .wrNodeHandle { display: inline-flex; align-items: center; gap: var(--space-3); flex: 0 0 auto; }
+  .wrNodeLabel { font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 1px; color: var(--paper-label); min-width: 62px; }
+  .wrOutlineInput { flex: 1 1 0; min-width: 0; box-sizing: border-box; border: 1px solid var(--wr-page-line); outline: none; background: var(--wr-input-bg, var(--paper-field)); color: var(--wr-input-ink, var(--wr-ink)); font-family: Georgia, 'Times New Roman', serif; font-size: 13px; padding: var(--space-3) var(--space-4); border-radius: 4px; &:focus { border-color: var(--wr-accent); } &::placeholder { color: var(--paper-placeholder); } }
+  .wrSceneFields { margin-left: auto; display: flex; flex-wrap: wrap; gap: var(--space-3); min-width: 0; }
+  .wrSceneField {
+    box-sizing: border-box; border: 0; outline: none; border-radius: 4px; padding: var(--space-3) 8px; font-size: 12px; background: var(--wr-page); color: var(--paper-ink2);
+    &--location { width: 140px; } &--time { width: 96px; } &--action { width: 260px; }
+    &::placeholder { font-style: italic; color: var(--paper-placeholder); }
+    &:focus { box-shadow: inset 0 0 0 1px var(--wr-accent); }
+    // Its own value, different from what it inherits: the book's accent colour.
+    &--changed { background: var(--wr-accent); color: var(--on-accent); font-weight: 700; &::placeholder { color: var(--on-accent); } &:focus { box-shadow: inset 0 0 0 1px var(--on-accent); } }
+  }
+  // A scene's Time: a button showing the formatted value; its popover holds one input per time-system unit.
+  .wrTimeWrap { position: relative; display: flex; }
+  .wrTimeBtn { min-width: 96px; width: auto; max-width: 240px; text-align: left; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; cursor: pointer; &--empty { font-style: italic; color: var(--paper-placeholder); font-weight: 400; } }
+  .wrTimePopover {
+    position: absolute; top: calc(100% + 4px); left: 0; z-index: 20; min-width: 230px; padding: var(--space-4) var(--space-5); display: flex; flex-direction: column; gap: 8px;
+    background: var(--paper); border: 1px solid var(--wr-page-line); border-radius: 6px; box-shadow: 0 8px 24px rgb(0 0 0 / 0.3); color: var(--wr-ink);
+  }
+  .wrTimePopoverTitle { font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: 1px; color: var(--wr-page-muted); }
+  .wrTimeRow {
+    display: grid; grid-template-columns: 70px minmax(0, 1fr); align-items: center; gap: 8px; font-size: 12px; font-weight: 700;
+    input, select { box-sizing: border-box; width: 100%; border: 1px solid var(--wr-page-line); border-radius: 4px; padding: 5px 8px; font-size: 12px; background: var(--paper-field); color: var(--wr-ink); outline: none; &:focus { border-color: var(--wr-accent); } }
+  }
+  .wrTimePopoverFoot { display: flex; justify-content: flex-end; gap: var(--space-3); }
+  .wrCardFoot { display: flex; align-items: center; justify-content: space-between; }
+  .wrCardFootLeft { display: flex; align-items: center; gap: var(--space-4); }
+  .wrWordCount { font-size: 11px; color: var(--wr-page-muted); }
+  // Draft mode reads in three strengths: the number faintest, the description in between, the draft text (--wr-ink) strongest.
+  .wrNodeLabel--num { min-width: 0; font-weight: 400; letter-spacing: 0; color: color-mix(in srgb, var(--wr-ink) 67%, transparent); }
+  .wrNodeDescription { flex: 1 1 auto; min-width: 0; font-family: Georgia, 'Times New Roman', serif; font-size: 13px; font-style: italic; color: color-mix(in srgb, var(--wr-ink) 75%, transparent); &--empty { color: var(--paper-placeholder); } }
+  .wrOutlineCard--readonly { cursor: default; }
+
+  .wrFreeCard--readonly { display: flex; align-items: center; justify-content: space-between; gap: var(--space-4); padding: 8px var(--space-4); border: 1px dashed var(--wr-page-line); border-radius: 6px; }
+  .wrFreeArea { display: flex; flex-direction: column; gap: var(--space-3); }
+  .wrPublishConfirm { display: inline-flex; align-items: center; gap: var(--space-3); font-size: 11px; }
+}

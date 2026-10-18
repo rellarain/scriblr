@@ -1,0 +1,22 @@
+// The design system's space, size and radius tokens as CSS custom properties, on :root, so a stylesheet can say `gap: var(--space-3)`
+// where it means "the gap between levels". The values are the ones in docs/design-system/project/tokens.json
+// (scripts/design-system/tokens.ts); a test (scripts/design-system/spaceTokens.test.ts) fails when this file and that list disagree.
+// Off-scale values (8px, 5px, ...) are not tokens and stay as they are written: they are on the list of drift to fix.
+:root {
+  --space-1: 2px;
+  --space-2: 4px;
+  --space-3: 6px;
+  --space-grid: 8px;
+  --space-4: 10px;
+  --space-5: 12px;
+  --space-6: 14px;
+  --space-7: 18px;
+  --tab-size: 30px;
+  --header-min: 40px;
+  --rail-tile: 40px;
+  --one-column-below: 400px;
+  --hue-window: 60;
+  --radius-none: 0px;
+  --radius-button: 4px;
+  --radius-input: 4px;
+}

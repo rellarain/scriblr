@@ -23,7 +23,7 @@ A dragged card or tile is 70% opaque, a disabled control 60%. Text inside stays 
 
 ## Spacing
 
-Gaps are small and come from a short list (`space-*`): 2, 4, 6, 8, 10, 12, 14, 18.
+Gaps are small and come from a short list (`space-*`): 2, 4, 6, 8, 10, 12, 14, 18. They are CSS custom properties on `:root` (`--space-1` to `--space-7`, `--space-grid`, `--tab-size`, `--radius-*`, in `frontend/src/theme/_space.scss`), and a gap, padding or margin in the Writer's stylesheets that is one of the scale's values is written as the token (`gap: var(--space-3)`); a test keeps the file equal to `tokens.json` and fails on a literal. The 8 is `space-grid`, the split grid's gap, and is still written as a number where it is something else's gap.
 
 | Where | Value |
 |---|---|

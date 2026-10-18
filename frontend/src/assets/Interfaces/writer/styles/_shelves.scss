@@ -1,0 +1,77 @@
+// The shelves: the board, series sections, book spines and their bars, the front cover a spine turns into.
+.wr {
+  // ---------------------------------------------------------------- shelves
+  .wrShelf { display: flex; flex-direction: column; }
+  // The board the books stand on, darker than the shelf and than a series section (two recesses deep), carrying the project's title, its book count and a slot for a control.
+  .wrShelfBoard { display: flex; align-items: center; gap: 8px; min-height: 26px; box-sizing: border-box; padding: 0 var(--space-4); background: linear-gradient(var(--ov-sink-3), var(--ov-sink-3)), var(--ov-sink-2); }
+  .wrShelfName--link { text-align: left; &:hover { color: var(--ink); } }
+  .wrShelfName { font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 1.5px; color: var(--wr-muted); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; &--selected { color: var(--ink); } }
+  .wrShelfMeta { font-size: 10px; opacity: 0.9; margin-left: auto; white-space: nowrap; }
+  // The books stand in a row that scrolls sideways by touch or the mouse wheel (no scrollbar); the series sections are as tall as the row.
+  .wrShelfBooks {
+    display: flex; align-items: stretch; gap: 8px; padding: 8px 8px 0; box-sizing: border-box; min-height: 150px;
+    overflow-x: auto; overflow-y: hidden; touch-action: pan-x; overscroll-behavior-x: contain; -webkit-overflow-scrolling: touch;
+    scrollbar-width: none; &::-webkit-scrollbar { display: none; }
+  }
+  // A series: a darker section (every one as tall as the row) with its title running up its left edge, beside the books it groups. The
+  // title is turned (vertical-rl: it starts at the top and reads downward) and never widens the section.
+  .wrShelfLoose { display: flex; align-items: flex-end; gap: var(--space-2); flex: 0 0 auto; }
+  .wrShelfSeries { display: flex; flex-direction: row; gap: var(--space-3); flex: 0 0 auto; padding: var(--space-3) 8px 0 var(--space-2); background: var(--ov-sink-2); }
+  .wrShelfSeriesLabel { flex: 0 0 auto; writing-mode: vertical-rl; align-self: stretch; max-height: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 9px; font-weight: 700; text-transform: uppercase; letter-spacing: 1.5px; color: var(--wr-muted); }
+  .wrShelfSeriesBooks { display: flex; flex: 1 1 auto; align-items: flex-end; gap: var(--space-2); min-width: 16px; }
+  .wrShelfEmpty { font-size: 11px; opacity: 0.9; align-self: center; }
+  // A book on the shelf. Its spine turns (a 3D flip) into its front cover while it is the selected book.
+  .wrSpine {
+    flex: 0 0 auto; position: relative; display: block; perspective: 480px; overflow: visible;
+    transition: width 0.45s ease; background: transparent;
+    &:hover .wrSpineSide, &:hover .wrSpineFront { filter: brightness(1.15); }
+  }
+  .wrSpineFlip { position: absolute; inset: 0; display: block; transform-style: preserve-3d; transition: transform 0.45s ease; }
+  .wrSpine--active .wrSpineFlip { transform: rotateY(180deg); }
+  .wrSpineSide, .wrSpineFront {
+    position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; overflow: hidden;
+    background: var(--wr-spine, var(--wr-accent-dark)); color: var(--wr-spine-ink, white); backface-visibility: hidden;
+    box-shadow: 1px 0 3px rgb(0 0 0 / calc(0.35 * var(--shade-k)));
+  }
+  // The spine: the book's number at the top, bars down it (no title).
+  .wrSpineSide { flex-direction: column; align-items: stretch; justify-content: flex-start; gap: var(--space-3); padding: 8px max(1px, 12%); box-sizing: border-box; }
+  .wrSpineNumber { flex: 0 0 auto; overflow: hidden; text-align: center; font-size: 11px; font-weight: 700; line-height: 1; }
+  .wrSpineBars { flex: 0 0 auto; display: flex; flex-direction: column; gap: var(--space-2); }
+  .wrSpineWords { flex: 1 1 0; min-height: 0; display: flex; justify-content: center; }
+  // A bar: a dark track of the spine's colour with a lighter fill, the accent colour once complete. Horizontal bars fill from the left, the words
+  // bar from the bottom.
+  .wrSpineBar {
+    position: relative; display: block; overflow: hidden; border-radius: 0; flex: 0 0 auto;
+    background: color-mix(in srgb, var(--wr-spine, var(--wr-accent-dark)) 55%, black);
+  }
+  .wrSpineBar--h { height: 5px; }
+  .wrSpineBar--v { width: 64%; min-width: 6px; max-width: 30px; height: 100%; }
+  .wrSpineBarFill { position: absolute; left: 0; bottom: 0; display: block; background: color-mix(in srgb, var(--wr-spine, var(--wr-accent-dark)) 55%, white); }
+  .wrSpineBar--h .wrSpineBarFill { top: 0; }
+  .wrSpineBar--v .wrSpineBarFill { right: 0; }
+  .wrSpineBar--complete .wrSpineBarFill { background: var(--accent); }
+  .wrSpineFront {
+    transform: rotateY(180deg); padding: var(--space-4) 8px; border-radius: 0 3px 3px 0;
+    background: linear-gradient(135deg, var(--wr-spine, var(--wr-accent-dark)), color-mix(in srgb, var(--wr-spine, var(--wr-accent-dark)) 65%, black));
+    box-shadow: inset 4px 0 0 rgb(0 0 0 / 0.25), 1px 0 3px rgb(0 0 0 / calc(0.35 * var(--shade-k)));
+  }
+  .wrSpineFrontTitle { font-family: Georgia, 'Times New Roman', serif; font-size: 11px; font-weight: 700; letter-spacing: 0.4px; text-transform: uppercase; text-align: center; line-height: 1.3; overflow-wrap: break-word; }
+  @media (prefers-reduced-motion: reduce) { .wrSpine, .wrSpineFlip { transition: none; } }
+  // With a book open, the other spines on the shelf are darkened.
+  .wrShelfBooks--picked .wrSpine:not(.wrSpine--active) { filter: brightness(0.55); &:hover { filter: brightness(0.8); } }
+  .wrNewProject {
+    display: flex; flex-direction: column; gap: var(--space-3);
+    input { background: var(--wr-field); border: 0; border-radius: 0; color: var(--ink); font-size: 12px; padding: 8px var(--space-4); outline: none; &::placeholder { color: var(--ink-faint); } }
+    .wrSmallBtn { justify-content: center; padding: 8px; }
+  }
+
+  .wrPanelHead { margin-top: var(--space-2); font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: 1px; opacity: 0.9; }
+  .wrPanelText { opacity: 0.9; }
+  .wrKv { display: flex; justify-content: space-between; gap: var(--space-4); span:first-child { opacity: 0.9; } span:last-child { text-align: right; } }
+  .wrOutlineRow {
+    display: flex; align-items: center; gap: var(--space-3); width: 100%; text-align: left; padding: 3px var(--space-3); border-radius: 3px; font-size: 11px; opacity: 0.88;
+    &:not(.wrOutlineRow--static):hover { background: color-mix(in srgb, var(--ink) 10%, transparent); opacity: 1; }
+    &--active { background: var(--wr-accent); font-weight: 700; opacity: 1; }
+  }
+  .wrOutlineMeta { margin-left: auto; opacity: 0.9; font-weight: 400; font-size: 10px; white-space: nowrap; }
+}

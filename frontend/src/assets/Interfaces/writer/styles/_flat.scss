@@ -1,0 +1,15 @@
+// Flat and square: the Writer's levels have no radius, no shadow, no gradient.
+@use './mixins' as *;
+
+.wr {
+  // ---------------------------------------------------------------- flat and square (the Writer's levels)
+  .wrLevel, .wrBookEd, .wrDraftStats, .wrArcCard, .wrChapterCard, .wrActCard, .wrSceneCard, .wrMomentCard, .wrFreeCard--readonly,
+  .wrPointTile, .wrPlotNote, .wrParentTag, .wrChapterTile, .wrPlotTray, .wrOutlineInput, .wrSceneField, .wrDraftText, .wrField,
+  .wrSmallBtn, .wrClickEdit, .wrIconBtn, .wrDropGap { border-radius: 0; }
+
+  // Fields on the Outline panel's own (dark) colour.
+  .wrLevel--outline .wrField, .wrLevel--outline .wrGoalInput input { color: var(--on-accent); background: var(--ov-sink-2); &::placeholder { color: color-mix(in srgb, var(--on-accent) 55%, transparent); } }
+  .wrLevel--outline .wrField option { color: black; }
+  .wrDraftStats { background: var(--wr-frame-1); }
+  .wrLevel--outline .wrBookEdHead .wrSmallBtn, .wrLevel--outline .wrBookEdHead .saveIconBtn, .wrLevel--outline .wrOutlineCardsHead .wrSmallBtn { @include wrLevelWash; }
+}

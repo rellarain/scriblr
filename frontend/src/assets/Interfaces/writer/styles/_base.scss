@@ -1,0 +1,15 @@
+@use './mixins' as *;
+
+// The Reader (RUI) shares the Writer's aliases and button reset, and so draws its shelf and spines.
+.wUI.wr, .rUI.wr {
+  @include wrAliases;
+
+  flex-direction: row;
+  color: var(--ink);
+
+  // The app has no global button reset; :where() keeps this at zero extra
+  // specificity so every button class below still overrides it.
+  :where(button) { background: transparent; border: 0; padding: 0; margin: 0; color: inherit; font: inherit; cursor: pointer; }
+  :where(button:disabled) { cursor: default; }
+  input, textarea, select { font-family: inherit; }
+}

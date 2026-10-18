@@ -1,6 +1,7 @@
-import { readFileSync } from 'node:fs'
+import { readdirSync } from 'node:fs'
 import path from 'node:path'
 import { describe, expect, it } from 'vitest'
+import { readStyles } from '../test/readStyles'
 import { fillCap, fillHsl, tabColors } from './bookColors'
 import { audit, levelRatios, MIN_RATIO, paletteRatios, ZONES } from './contrastAudit'
 import { worstLevelRatio } from './levelContrast'
@@ -72,7 +73,7 @@ describe('the Writer stylesheet', () => {
   // Quiet text is the ink at 90% (the audit measures 90% on a level and 88% on the paper); a rule that sets a size and a lower opacity would
   // show text the audit does not cover. Icons, disabled and dragged states are not text and have none of this.
   it('sets no text at an opacity under 0.8', () => {
-    const css = readFileSync(path.resolve(__dirname, '../assets/Interfaces/writer/writer.scss'), 'utf-8')
+    const css = readStyles('assets/Interfaces/writer/writer.scss')
     const low = css.split(String.fromCharCode(10))
       .map((line, i) => [i + 1, line] as const)
       .filter(([, line]) => /font-size/.test(line) && !/disabled|dragging|hover/.test(line))
@@ -82,10 +83,10 @@ describe('the Writer stylesheet', () => {
 
   // A black or white wash written out at a fixed alpha does not follow the zone (white on a light zone is invisible, black does not soften):
   // recesses are --ov-sink-1..3 and lifts --ov-lift-1..3. Shadows, gradients and the scrim are not washes.
-  it.each(['../assets/Interfaces/writer/writer.scss', '../App.scss', '../assets/Interfaces/admin/resources/resources.scss'])(
+  it.each(['assets/Interfaces/writer/writer.scss', 'App.scss', 'assets/Interfaces/admin/resources/resources.scss'])(
     'writes no black or white wash at a fixed alpha in %s',
     file => {
-      const css = readFileSync(path.resolve(__dirname, file), 'utf-8')
+      const css = readStyles(file)
       const washes = css.split(String.fromCharCode(10))
         .map((line, i) => [i + 1, line] as const)
         .filter(([, line]) => !/box-shadow|linear-gradient|text-shadow/.test(line))
@@ -93,4 +94,18 @@ describe('the Writer stylesheet', () => {
       expect(washes.map(([n, line]) => `${n}: ${line.trim().slice(0, 70)}`)).toEqual([])
     },
   )
+})
+
+describe('the Writer stylesheet is an index of its partials', () => {
+  it('loads every partial in styles/, and the scanners above read them all', () => {
+    const index = readStyles('assets/Interfaces/writer/writer.scss')
+    const uses = [...index.matchAll(/@use '\.\/styles\/([\w-]+)'/g)].map(m => m[1])
+    const partials = readdirSync(path.resolve(__dirname, '../assets/Interfaces/writer/styles'))
+      .filter(name => name.endsWith('.scss') && name !== '_mixins.scss')
+      .map(name => name.replace(/^_|\.scss$/g, ''))
+    // A partial that is not loaded styles nothing; a load without a partial fails the build.
+    expect([...uses].sort()).toEqual([...partials].sort())
+    // The scan sees the rules, not just the index (the Writer has well over a thousand lines of them).
+    expect(index.split('\n').length).toBeGreaterThan(1000)
+  })
 })

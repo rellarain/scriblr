@@ -7,7 +7,7 @@ Two roles, both system fonts: there are no font files to load.
 | Interface | `system-ui, -apple-system, 'Segoe UI', sans-serif` | everything you operate: labels, buttons, fields, tabs, tiles, headers |
 | Writing | `Georgia, 'Times New Roman', serif` | what you write and read: chapter titles, titles and notes in the outline's inputs, the draft text, the preview, synopses, a book's cover title on its spine |
 
-Buttons, inputs and selects inherit the family (`font-family: inherit`); the app has no global button reset, so `:where(button)` in `writer.scss` zeroes them at no extra specificity.
+Buttons, inputs and selects inherit the family (`font-family: inherit`); the app has no global button reset, so `:where(button)` in `writer/styles/_base.scss` zeroes them at no extra specificity.
 
 ## The scale
 

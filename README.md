@@ -307,6 +307,11 @@ Plus `GET /api/health` (inline in `main.py`, not part of a router).
   plot and settings through `api/` and keeps them in React state with its own autosave and undo history; other interfaces use small stores
   (`settings/settingsStore.ts`, `reader/readerStore.ts`, `helper/inbox/feedbackStore`). `api/client.ts` is a thin JSON `get/post/put/patch/delete`
   wrapper (same-origin `/api`, throwing `ApiError`); `api/export.ts` is the one raw `fetch` + Blob download, since PDF isn't JSON.
+- **Styles** — the Writer's stylesheet, `writer/writer.scss`, is an index of one partial per area in `writer/styles/` (shared, shelves, levels,
+  plot, draft level, preview, level tabs, ...), loaded in the order the rules were written in (a later rule overrides an earlier one at equal
+  specificity); tests that scan the stylesheet read the partials too (`src/test/readStyles.ts`). The space and radius scale is a set of CSS custom
+  properties (`theme/_space.scss`), kept equal to the design system's `tokens.json` by a test. The first load is split: the Reader, the Translator and
+  the admin article builder are `React.lazy` chunks, and React and the router are a vendor chunk of their own.
 - **Testing** — Vitest (jsdom, config in `vite.config.ts`) + React Testing Library + `jest-dom`. `src/test/setup.ts` resets stubbed globals, browser
   storage and the settings store after every test; `mockFetch` stands in for `fetch`; `makeWorkspace` builds a partial Writer workspace whose keys are
   checked against the real `WriterWorkspace` type. `npm run typecheck`, `npm run lint` (the hooks rules) and `npm test` run in CI

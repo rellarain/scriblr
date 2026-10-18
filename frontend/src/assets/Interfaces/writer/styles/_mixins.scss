@@ -1,0 +1,37 @@
+// Mixins shared by the Writer's partials.
+
+// A button on a level's own colour: the level's ink on the level's wash (the hover, where it has one, is `--level-wash-hi`). The
+// level header, the book editor and the tabs' bodies all dress their small buttons this way.
+@mixin wrLevelWash {
+  color: var(--on-accent); background: var(--level-wash);
+}
+
+// A plot node's left edge: stripes side by side, 4px each, drawn as background images (--wr-edge and its size and position lists,
+// set by plotColors.ts from the node's category, subcategory and cluster, left to right; --wr-edge-w is the room they take, for the
+// padding). Include it after the rule's own background colour.
+@mixin wrEdge {
+  background-image: var(--wr-edge, none); background-size: var(--wr-edge-size, 4px 100%); background-repeat: no-repeat; background-position: var(--wr-edge-pos, left top);
+}
+
+// Aliases onto the global theme tokens (theme/theme.scss), so the Writer follows the
+// time-of-day palette. Also declared inside a book's scope (BookScope.tsx), where the
+// tokens are re-derived from the book's hues.
+@mixin wrAliases {
+  --wr-accent: var(--accent);
+  --wr-accent-light: var(--accent-hover);
+  --wr-accent-dark: var(--accent-dim);
+  --wr-alert: var(--alert);
+  --wr-side: var(--surface-side);
+  --wr-deep: hsl(var(--color-theme-h), var(--color-theme-s), calc(var(--color-theme-l) - 12%));
+  --wr-card: var(--surface-raised);
+  --wr-field: var(--ov-sink-2);
+  --wr-muted: var(--ink-muted);
+  // The book's primary colour (the app theme's own colour outside a book).
+  --wr-book: hsl(var(--color-theme-h), var(--color-theme-s), var(--color-theme-l));
+  // The paper (chapter page, preview): follows the palette's paper tokens.
+  --wr-page: var(--paper);
+  --wr-ink: var(--paper-ink);
+  --wr-page-line: var(--paper-line);
+  --wr-page-soft: var(--paper-soft);
+  --wr-page-muted: var(--paper-muted);
+}

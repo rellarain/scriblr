@@ -1,0 +1,98 @@
+// A plotline's fields and their values, the plot editor's outline of chapters, the Project editor's time systems.
+@use './mixins' as *;
+
+.wr {
+  // ---------------------------------------------------------------- fields and their values (plotline editor)
+  .wrFieldsPanel { display: flex; flex-direction: column; gap: var(--space-4); flex: 0 0 auto; }
+  .wrShowAssigned {
+    display: inline-flex; align-items: center; gap: 8px; font-size: 11px; cursor: pointer;
+    input { appearance: none; position: relative; width: 30px; height: 16px; border-radius: 8px; background: var(--ov-sink-3); cursor: pointer; transition: background 0.15s;
+      &::after { content: ''; position: absolute; top: 2px; left: 2px; width: 12px; height: 12px; border-radius: 50%; background: var(--ink); transition: transform 0.15s; }
+      &:checked { background: var(--wr-accent); }
+      &:checked::after { transform: translateX(14px); background: var(--on-accent); } }
+  }
+  .wrFieldGroups { display: flex; flex-direction: column; gap: var(--space-4); }
+  .wrFieldGroup { display: flex; flex-direction: column; gap: var(--space-3); background: var(--ov-sink-1); border-radius: 8px; padding: var(--space-4) var(--space-5); }
+  .wrFieldGroupHead { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+  .wrFieldGroupName { font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 1.5px; }
+  .wrFieldToggle { display: inline-flex; align-items: center; gap: var(--space-3); flex: 0 1 auto; min-width: 0; color: inherit; text-align: left; }
+  .wrFieldGroupOrigin { flex: 0 0 auto; margin-left: auto; font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 1.5px; color: var(--ink-muted); }
+  .wrFieldBlock { display: flex; flex-direction: column; gap: var(--space-3); border-top: 1px solid var(--hairline); padding-top: var(--space-3); &--over { outline: 2px dashed var(--wr-accent-light); outline-offset: 2px; } &--dragging { opacity: 0.7; } }
+  .wrFieldHead { display: flex; align-items: center; gap: var(--space-3); min-height: 26px; }
+  .wrFieldName { flex: 1 1 auto; min-width: 0; box-sizing: border-box; background: var(--wr-field); border: 0; border-radius: 0; color: var(--ink); font-size: 12px; font-weight: 700; padding: 5px 8px; outline: none; &:focus { box-shadow: inset 0 0 0 1px var(--wr-accent); } &::placeholder { color: var(--ink-faint); } }
+  .wrFieldNameText { flex: 1 1 auto; min-width: 0; font-size: 12px; font-weight: 700; }
+  .wrFieldValues { display: flex; flex-direction: column; gap: var(--space-3); padding-left: 20px; }
+
+  // A value: a plain box with rounded corners; the field name small, bold and all caps in its top left
+  // corner, the title and description in the middle, one icon on the right. Unassigned it wears its
+  // category colour with its subcategory as the left edge; assigned to a chapter, its book's primary
+  // colour with the secondary as the edge, shaded by its awareness once it is on a moment.
+  .wrPlotValue {
+    position: relative; display: flex; align-items: center; gap: 8px; padding: 20px 8px 8px calc(var(--wr-edge-w, 4px) + 10px); border-radius: 6px; min-width: 0;
+    background: var(--wr-point-bg, var(--wr-cat, var(--wr-card))); color: var(--wr-point-ink, var(--ink));
+    box-shadow: inset 4px 0 0 var(--wr-point-edge, transparent), 0 2px 6px rgb(0 0 0 / calc(0.25 * var(--shade-k)));
+    @include wrEdge;
+    &--dragging { opacity: 0.7; }
+    &--highlight { outline: 2px solid var(--wr-accent-light); outline-offset: 2px; }
+  }
+  .wrPlotValueField { position: absolute; top: 5px; left: 14px; right: 40px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: 1.5px; pointer-events: none; }
+  .wrPlotValueGrip { flex: 0 0 auto; }
+  .wrPlotValueBody { flex: 1 1 auto; min-width: 0; display: flex; flex-direction: column; gap: var(--space-1); }
+  .wrPlotValueTitle { font-size: 13px; font-weight: 700; overflow-wrap: anywhere; }
+  .wrPlotValueText { font-size: 12px; overflow-wrap: anywhere; }
+  .wrPlotValueIcon { flex: 0 0 auto; display: inline-flex; align-items: center; }
+  .wrPlotValueLock { display: inline-flex; cursor: help; }
+  .wrPlotValueX { display: inline-flex; align-items: center; justify-content: center; width: 22px; height: 22px; border-radius: 4px; color: inherit; &:hover { background: var(--ov-lift-2); } }
+  .wrPointTitle, .wrPointBody { width: 100%; box-sizing: border-box; background: transparent; border: 0; outline: none; color: inherit; padding: 0; &::placeholder { color: color-mix(in srgb, currentColor 70%, transparent); } }
+  .wrPointTitle { font-size: 13px; font-weight: 700; }
+  .wrPointBody { font-size: 12px; }
+  .wrEye { display: inline-flex; align-items: center; justify-content: center; width: 22px; height: 22px; border-radius: 4px; color: inherit; &:hover:not(&--static) { background: var(--ov-lift-2); } &--static { cursor: help; } }
+  .wrEyeLegend {
+    list-style: none; margin: var(--space-2) 0 0; padding: 8px 0 0; border-top: 1px solid var(--wr-page-line); display: grid; grid-template-columns: 1fr 1fr; gap: var(--space-2) 8px; font-size: 10px; color: var(--wr-page-muted);
+    li { display: flex; align-items: center; gap: 5px; cursor: help; }
+    .wrEye { width: 16px; height: 16px; }
+  }
+
+  // The plot editor's outline: nested cards. Book and arc cards wear the book's primary colour, chapters a muted
+  // shade of its secondary; a chapter lists this plotline's plotpoints in a wrapping row of boxes.
+  .wrPlotOutline { flex: 1 1 auto; min-height: 0; overflow-y: auto; display: flex; flex-direction: column; gap: 8px; scrollbar-width: none; &::-webkit-scrollbar { display: none; } }
+  .wrPlotCard {
+    display: flex; flex-direction: column; gap: var(--space-3); border-radius: 8px; padding: 8px var(--space-4); color: var(--ink);
+    background: var(--wr-plot-card, var(--ov-sink-2)); box-shadow: inset 4px 0 0 var(--wr-plot-edge, transparent);
+    &--arc { background: color-mix(in srgb, var(--wr-plot-card, var(--wr-card)) 90%, black); }
+  }
+  .wrPlotCardHead { display: flex; align-items: center; gap: var(--space-3); text-align: left; font-size: 12px; color: inherit; }
+  .wrPlotCardKind { font-size: 10px; text-transform: uppercase; letter-spacing: 1px; }
+  .wrPlotCardName { font-weight: 700; }
+  .wrPlotCardKids { display: flex; flex-direction: column; gap: var(--space-3); }
+  .wrPlotChapter { display: flex; flex-direction: column; gap: var(--space-3); border-radius: 0; padding: var(--space-3) 8px; color: var(--ink); background: var(--wr-plot-card, var(--wr-card)); &--over { outline: 2px dashed var(--wr-accent-light); outline-offset: 1px; } }
+  .wrPlotCardTitle { font-size: 12px; font-weight: 700; }
+  .wrPlotChips { display: flex; flex-wrap: wrap; gap: var(--space-3); }
+  .wrPlotChip {
+    display: inline-flex; align-items: center; gap: var(--space-2); max-width: 100%; padding: 3px var(--space-2) 3px var(--space-5); border-radius: 6px; font-size: 12px;
+    background: var(--wr-point-bg, var(--wr-card)); color: var(--wr-point-ink, var(--ink)); box-shadow: inset 4px 0 0 var(--wr-point-edge, transparent);
+  }
+  .wrPlotChip { position: relative; }
+  .wrPlotChip:has(> .wrPlotChipLine) { padding-right: calc(var(--wr-edge-w, 5px) + 5px); }
+  .wrPlotChipLine {
+    position: absolute; top: 0; right: 0; bottom: 0; width: var(--wr-edge-w, 5px); background-color: var(--wr-cat, transparent);
+    background-image: var(--wr-edge, none); background-size: var(--wr-edge-size, 4px 100%); background-repeat: no-repeat; background-position: var(--wr-edge-pos, left top);
+  }
+  .wrPlotChipTitle { text-align: left; font-weight: 700; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 200px; color: inherit; }
+  .wrPlotChipX { display: inline-flex; align-items: center; justify-content: center; width: 20px; height: 20px; border-radius: 4px; color: inherit; &:hover { background: var(--ov-lift-2); } }
+  .wrOutlinePanel { flex: 1 1 auto; min-height: 0; display: flex; flex-direction: column; gap: 8px; background: var(--ov-sink-1); border-radius: 8px; padding: var(--space-5) var(--space-6); }
+
+
+  // Project Editor: time systems.
+  .wrTimeSystems { display: flex; flex-direction: column; gap: var(--space-6); max-width: 760px; }
+  .wrTimeAdd { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; select { background: var(--wr-field); color: var(--ink); border: 0; border-radius: 0; padding: var(--space-3) 8px; font-size: 12px; } }
+  .wrTimeUnits { display: flex; flex-direction: column; gap: var(--space-3); }
+  .wrTimeUnit { display: flex; align-items: center; flex-wrap: wrap; gap: 8px; }
+  .wrTimeUnit .wrTitleField { flex: 1 1 160px; }
+  .wrTimeUnit .wrTimeNames { flex: 1 1 100%; margin-left: 32px; font-weight: 400; }
+  .wrTimeKind { background: var(--wr-field); color: var(--ink); border: 0; border-radius: 0; padding: 7px 8px; font-size: 12px; }
+  .wrTimeUnitMove { display: inline-flex; flex-direction: column; gap: 1px; button { display: flex; align-items: center; justify-content: center; width: 24px; height: 14px; border-radius: 3px; opacity: 0.6; &:hover:not(:disabled) { opacity: 1; background: var(--ov-lift-2); } &:disabled { opacity: 0.6; cursor: default; } } }
+  .wrFlip { transform: rotate(180deg); }
+  .wrTimeSystemFoot { display: flex; align-items: center; gap: var(--space-5); }
+  .wrIconBtn { display: inline-flex; align-items: center; justify-content: center; width: 28px; height: 28px; border-radius: 4px; background: var(--ov-sink-2); color: white; &:hover { background: var(--wr-accent-light); } }
+}
