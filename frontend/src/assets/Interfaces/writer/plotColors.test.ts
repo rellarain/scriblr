@@ -14,6 +14,14 @@ const accent = (h: number | string) => `hsl(${h}, var(--color-accent-s), var(--c
 const fill = (h: number | string) => fillColorCss(h)
 const flat = (c: string) => `linear-gradient(${c}, ${c})`
 const none = { cluster: null, clusterFill: null }
+// The edge for these stripes (left to right), each 4px wide and the next one 4px further in.
+const edge = (...colours: string[]) => ({
+  edge: colours.map(flat).join(', '),
+  edgeSize: colours.map(() => '4px 100%').join(', '),
+  edgePos: colours.map((_, i) => `${i * 4}px 0`).join(', '),
+  edgeWidth: `${colours.length * 4}px`,
+})
+const noEdge = { edge: null, edgeSize: null, edgePos: null, edgeWidth: null }
 
 describe('plotColors', () => {
   const category = node('c', 'category', null, 200)
@@ -23,18 +31,18 @@ describe('plotColors', () => {
   const all = tree(category, sub, line, point)
 
   it('draws a category in the theme colour and a subcategory in the accent colour', () => {
-    expect(plotColors(category, all)).toEqual({ category: theme(200), subcategory: null, subcategoryFill: null, ...none, edge: null })
-    expect(plotColors(sub, all)).toEqual({ category: theme(200), subcategory: accent(230), subcategoryFill: fill(230), ...none, edge: flat(accent(230)) })
+    expect(plotColors(category, all)).toEqual({ category: theme(200), subcategory: null, subcategoryFill: null, ...none, ...edge(accent(200)) })
+    expect(plotColors(sub, all)).toEqual({ category: theme(200), subcategory: accent(230), subcategoryFill: fill(230), ...none, ...edge(accent(200), accent(230)) })
   })
 
-  it('gives plotlines and plotpoints both their category\'s and their subcategory\'s colour', () => {
-    expect(plotColors(line, all)).toEqual({ category: theme(200), subcategory: accent(230), subcategoryFill: fill(230), ...none, edge: flat(accent(230)) })
-    expect(plotColors(point, all)).toEqual({ category: theme(200), subcategory: accent(230), subcategoryFill: fill(230), ...none, edge: flat(accent(230)) })
+  it('gives plotlines and plotpoints their category\'s and their subcategory\'s colour, and the stripes of both side by side', () => {
+    expect(plotColors(line, all)).toEqual({ category: theme(200), subcategory: accent(230), subcategoryFill: fill(230), ...none, ...edge(accent(200), accent(230)) })
+    expect(plotColors(point, all)).toEqual({ category: theme(200), subcategory: accent(230), subcategoryFill: fill(230), ...none, ...edge(accent(200), accent(230)) })
   })
 
-  it('has only the category colour for a plotline directly under a category', () => {
+  it('has the category\'s stripe alone for a plotline directly under a category', () => {
     const direct = node('d', 'plotline', 'c')
-    expect(plotColors(direct, tree(category, direct))).toEqual({ category: theme(200), subcategory: null, subcategoryFill: null, ...none, edge: null })
+    expect(plotColors(direct, tree(category, direct))).toEqual({ category: theme(200), subcategory: null, subcategoryFill: null, ...none, ...edge(accent(200)) })
   })
 
   it('lets a subcategory without a hue follow its category', () => {
@@ -52,14 +60,17 @@ describe('plotColors', () => {
 
   it('has no colour for something outside the category tree', () => {
     const orphan = node('o', 'plotline', null)
-    expect(plotColors(orphan, tree(orphan))).toEqual({ category: null, subcategory: null, subcategoryFill: null, ...none, edge: null })
+    expect(plotColors(orphan, tree(orphan))).toEqual({ category: null, subcategory: null, subcategoryFill: null, ...none, ...noEdge })
   })
 
   it('hands the colours to CSS as variables, each only when there is one', () => {
-    expect(plotColorVars({ category: theme(10), subcategory: accent(40), subcategoryFill: fill(40), ...none, edge: flat(accent(40)) }))
-      .toEqual({ '--wr-cat': theme(10), '--wr-sub': accent(40), '--wr-sub-fill': fill(40), '--wr-edge': flat(accent(40)) })
-    expect(plotColorVars({ category: theme(10), subcategory: null, subcategoryFill: null, ...none, edge: null })).toEqual({ '--wr-cat': theme(10) })
-    expect(plotColorVars({ category: null, subcategory: null, subcategoryFill: null, ...none, edge: null })).toBeUndefined()
+    expect(plotColorVars({ category: theme(10), subcategory: accent(40), subcategoryFill: fill(40), ...none, ...edge(accent(10), accent(40)) }))
+      .toEqual({
+        '--wr-cat': theme(10), '--wr-sub': accent(40), '--wr-sub-fill': fill(40),
+        '--wr-edge': `${flat(accent(10))}, ${flat(accent(40))}`, '--wr-edge-size': '4px 100%, 4px 100%', '--wr-edge-pos': '0px 0, 4px 0', '--wr-edge-w': '8px',
+      })
+    expect(plotColorVars({ category: theme(10), subcategory: null, subcategoryFill: null, ...none, ...noEdge })).toEqual({ '--wr-cat': theme(10) })
+    expect(plotColorVars({ category: null, subcategory: null, subcategoryFill: null, ...none, ...noEdge })).toBeUndefined()
   })
 
   describe('with a cluster', () => {
@@ -81,20 +92,19 @@ describe('plotColors', () => {
       expect(plotColors(direct, tree(category, direct)).cluster).toBe(accent(200))
     })
 
-    it('gives a plotline in a cluster an edge that runs from its subcategory\'s colour to its cluster\'s', () => {
-      expect(plotColors(inCluster, withCluster).edge).toBe(`linear-gradient(to bottom, ${accent(230)}, ${accent(170)})`)
+    it('stacks a plotline in a cluster\'s stripes left to right: its category\'s, its subcategory\'s, its cluster\'s', () => {
+      expect(plotColors(inCluster, withCluster)).toMatchObject(edge(accent(200), accent(230), accent(170)))
     })
 
-    it('has a flat edge in the cluster\'s colour when there is no subcategory', () => {
+    it('has the category\'s and the cluster\'s stripes when there is no subcategory', () => {
       const direct = node('k4', 'cluster', 'c', 150)
       const line = node('dl', 'plotline', 'k4')
-      expect(plotColors(line, tree(category, direct, line)).edge).toBe(flat(accent(150)))
+      expect(plotColors(line, tree(category, direct, line))).toMatchObject(edge(accent(200), accent(150)))
     })
 
-    it('hands the cluster\'s colours to CSS too', () => {
+    it('hands the cluster\'s colours and its three stripes to CSS too', () => {
       const vars = plotColorVars(plotColors(inCluster, withCluster))
-      expect(vars).toMatchObject({ '--wr-cluster': accent(170), '--wr-cluster-fill': fill(170) })
-      expect(vars?.['--wr-edge']).toContain('linear-gradient(to bottom')
+      expect(vars).toMatchObject({ '--wr-cluster': accent(170), '--wr-cluster-fill': fill(170), '--wr-edge-w': '12px', '--wr-edge-pos': '0px 0, 4px 0, 8px 0' })
     })
   })
 })

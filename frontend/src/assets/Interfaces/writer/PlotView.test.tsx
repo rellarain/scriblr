@@ -552,13 +552,13 @@ const described = (nodes: PlotNode[]) => nodes.map(n => (n.id === 'cat' ? { ...n
 describe('the parent chips', () => {
   const chips = () => within(screen.getByRole('group', { name: 'Parents' }))
 
-  it('sit above the plotline\'s title, top-down, each with its title and description', () => {
+  it('sit above the plotline\'s title, top-down, each with its title', () => {
     render(<Editor start={described(clustered())} />)
     const group = screen.getByRole('group', { name: 'Parents' })
     const title = screen.getByPlaceholderText('Plotline title')
     expect(group.compareDocumentPosition(title) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
     expect([...group.querySelectorAll('.wrParent')].map(c => c.className.match(/wrParent--(\w+)/)![1])).toEqual(['category', 'subcategory', 'cluster'])
-    expect(chips().getByRole('button', { name: /Romance/ })).toHaveTextContent('Two people, slowly.')
+    expect(chips().getByRole('button', { name: /Romance/ })).not.toHaveTextContent('Two people, slowly.') // a closed chip is only its title
     expect(chips().getByRole('button', { name: /Romance/ })).toHaveAttribute('title', 'Two people, slowly.') // the whole of it on hover
     expect(screen.queryByText('plotline', { selector: '.wrKindBadge' })).not.toBeNull() // the editor itself is unchanged
   })

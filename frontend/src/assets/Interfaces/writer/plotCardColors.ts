@@ -36,6 +36,8 @@ export function pointLook(
   const { themeHue } = bookHuesOf(chapter.id, outlineNodes)
   const style: Record<string, string> = {
     '--wr-point-bg': themeColorCss(themeHue), '--wr-point-edge': accentColorCss(themeHue),
+    // The book's edge stands in for the plot's stripes.
+    '--wr-edge': 'none', '--wr-edge-w': '0px',
   }
   const target = point.assignedMomentId ? outlineById.get(point.assignedMomentId) : undefined
   if (target?.kind === 'moment' && point.awareness) Object.assign(style, awarenessStyle(zone, themeHue, point.awareness))

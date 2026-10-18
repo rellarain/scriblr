@@ -8,8 +8,8 @@ import { accentColorCss, fillColorCss, themeColorCss } from '../../../theme/book
 //   - a subcategory with no hue of its own uses its category's
 //   - a cluster with no hue of its own uses its subcategory's (its category's outside one)
 //   - a plotline (and its plotpoints) wears its category's colour as its surface, with a left
-//     edge: a stripe in its subcategory's colour, in its cluster's, or a gradient from the one to the other
-//     (no edge without either)
+//     edge of stripes stacked from the left edge inwards in the order of the tree: its category's, its subcategory's, its cluster's
+//     (one for each it has; each in the accent colour of that level's hue, so the category's reads against its own surface)
 
 // The hue used when nothing is stored: the app theme's own.
 const APP_HUE = 'var(--color-theme-h)'
@@ -22,9 +22,15 @@ export interface PlotColors {
   subcategoryFill: string | null
   cluster: string | null
   clusterFill: string | null
-  // The left edge as a CSS image (a vertical gradient, or the one colour as a flat one), for a 4px stripe.
+  // The left edge: the stripes side by side, each a flat colour drawn as a background image 4px wide. `edge` is the list of images,
+  // `edgeSize` and `edgePos` the matching background-size and -position lists, `edgeWidth` the room the stripes take.
   edge: string | null
+  edgeSize: string | null
+  edgePos: string | null
+  edgeWidth: string | null
 }
+
+export const STRIPE_PX = 4
 
 export function plotColors(node: PlotNode, byId: Map<string, PlotNode>): PlotColors {
   let category: PlotNode | undefined
@@ -42,19 +48,24 @@ export function plotColors(node: PlotNode, byId: Map<string, PlotNode>): PlotCol
   const clusterHue = cluster ? cluster.hue ?? subcategoryHue ?? categoryHue ?? APP_HUE : null
   const subcategoryCss = subcategoryHue !== null ? accentColorCss(subcategoryHue) : null
   const clusterCss = clusterHue !== null ? accentColorCss(clusterHue) : null
+  const stripes = [category ? accentColorCss(categoryHue ?? APP_HUE) : null, subcategoryCss, clusterCss].filter((c): c is string => c !== null)
+  const edged = stripes.length > 0
   return {
     category: categoryCss,
     subcategory: subcategoryCss,
     subcategoryFill: subcategoryHue !== null ? fillColorCss(subcategoryHue) : null,
     cluster: clusterCss,
     clusterFill: clusterHue !== null ? fillColorCss(clusterHue) : null,
-    edge: subcategoryCss && clusterCss ? `linear-gradient(to bottom, ${subcategoryCss}, ${clusterCss})`
-      : subcategoryCss || clusterCss ? `linear-gradient(${subcategoryCss ?? clusterCss}, ${subcategoryCss ?? clusterCss})` : null,
+    edge: edged ? stripes.map(c => `linear-gradient(${c}, ${c})`).join(', ') : null,
+    edgeSize: edged ? stripes.map(() => `${STRIPE_PX}px 100%`).join(', ') : null,
+    edgePos: edged ? stripes.map((_, i) => `${i * STRIPE_PX}px 0`).join(', ') : null,
+    edgeWidth: edged ? `${stripes.length * STRIPE_PX}px` : null,
   }
 }
 
 // The style that hands a node's colours to its CSS: `var(--wr-cat)`, `var(--wr-sub)`, `var(--wr-sub-fill)`, `var(--wr-cluster)`,
-// `var(--wr-cluster-fill)` and `var(--wr-edge)` (each set only when the node has that colour, so `var(--wr-edge, none)` works).
+// `var(--wr-cluster-fill)`, and the edge: `var(--wr-edge)`, `var(--wr-edge-size)`, `var(--wr-edge-pos)` and `var(--wr-edge-w)` (each set only when the
+// node has that colour, so `var(--wr-edge, none)` works).
 export function plotColorVars(colors: PlotColors) {
   const vars: Record<string, string> = {}
   if (colors.category) vars['--wr-cat'] = colors.category
@@ -63,5 +74,8 @@ export function plotColorVars(colors: PlotColors) {
   if (colors.cluster) vars['--wr-cluster'] = colors.cluster
   if (colors.clusterFill) vars['--wr-cluster-fill'] = colors.clusterFill
   if (colors.edge) vars['--wr-edge'] = colors.edge
+  if (colors.edgeSize) vars['--wr-edge-size'] = colors.edgeSize
+  if (colors.edgePos) vars['--wr-edge-pos'] = colors.edgePos
+  if (colors.edgeWidth) vars['--wr-edge-w'] = colors.edgeWidth
   return Object.keys(vars).length > 0 ? vars : undefined
 }

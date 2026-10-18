@@ -6,7 +6,7 @@ Code: `writer/PlotpointTile.tsx`, `levels/PlotpointsTab.tsx` (`PlotTray`), `Awar
 
 ## Anatomy
 
-`.wrPointTile`: a coloured ground (the category's, with a 4px left stripe: the subcategory's colour, the cluster's, or a gradient from the subcategory's to the cluster's when it sits in both), an ink fitted to read on it, then:
+`.wrPointTile`: a coloured ground (the category's, with its left edge as stacked 4px stripes, left to right: the category's accent colour, the subcategory's, the cluster's, one for each it sits in), an ink fitted to read on it, then:
 
 - a **trail** (category > subcategory > cluster, whichever it sits under) and the **plotline and field** ("Plotline sit amet · DEFAULT");
 - the **title** in bold and the **description**;

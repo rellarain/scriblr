@@ -1,11 +1,11 @@
 // The Writer page (WUI). All classes are prefixed `wr` and scoped under
 // `.wUI.wr`; colors come from the app's theme/accent/alert variables.
 
-// A plot node's left edge: a 4px stripe drawn as a background image (--wr-edge, set from the node's subcategory and
-// cluster colours by plotColors.ts: one colour, or a vertical gradient from the subcategory's to the cluster's).
-// Include it after the rule's own background colour.
+// A plot node's left edge: stripes side by side, 4px each, drawn as background images (--wr-edge and its size and position lists,
+// set by plotColors.ts from the node's category, subcategory and cluster, left to right; --wr-edge-w is the room they take, for the
+// padding). Include it after the rule's own background colour.
 @mixin wrEdge {
-  background-image: var(--wr-edge, none); background-size: 4px 100%; background-repeat: no-repeat; background-position: left top;
+  background-image: var(--wr-edge, none); background-size: var(--wr-edge-size, 4px 100%); background-repeat: no-repeat; background-position: var(--wr-edge-pos, left top);
 }
 
 // Aliases onto the global theme tokens (theme/theme.scss), so the Writer follows the
@@ -343,7 +343,7 @@
     &--active { font-weight: 700; }
     &--subcategory { --wr-row-bg: var(--wr-sub-fill, var(--wr-cat)); --wr-row-ink: var(--on-accent); --away: black; }
     &--cluster { --wr-row-bg: var(--wr-cluster-fill, var(--wr-sub-fill, var(--wr-cat))); --wr-row-ink: var(--on-accent); --away: black; }
-    &--plotline { @include wrEdge; padding-left: 12px; }
+    &--plotline { @include wrEdge; padding-left: calc(var(--wr-edge-w, 4px) + 8px); }
   }
   .wrNavChevron { display: inline-flex; flex: 0 0 auto; transition: transform 0.15s; }
   // The app resets native form controls, so the tick is drawn: a box, filled with the accent when ticked (a tick) or part-ticked (a bar).
@@ -382,28 +382,29 @@
   }
   .wrCardPanel { background: var(--wr-card); border-radius: 0; padding: 16px 18px; box-shadow: inset 0 0 0 1px var(--hairline); display: flex; flex-direction: column; gap: 12px; }
   .wrCardPanelHead { display: flex; align-items: center; gap: 10px; }
-  // The parents of a node as read-only chips (PlotParents.tsx), each in its own plot colour with a stripe at its left; the text on them is
-  // the audited ink on that level's colour (the tile ink on a category, white on a subcategory's or cluster's fill).
+  // The parents of a node as read-only chips (PlotParents.tsx). Each is in its own plot colour, with the stripes of its place in the tree at its
+  // left (a cluster's chip: category, subcategory, cluster); the text on them is the audited ink on that level's colour (the tile ink on a category,
+  // white on a subcategory's or cluster's fill). The title is in capitals, spaced out.
   .wrParents { display: flex; flex-wrap: wrap; gap: 6px; min-width: 0; }
   .wrParent {
-    --wr-parent-bg: var(--wr-cat, var(--ov-sink-2)); --wr-parent-ink: var(--ink); --wr-parent-edge: color-mix(in srgb, var(--wr-cat, var(--ink)) 62%, black);
-    display: flex; flex-direction: column; min-width: 0; max-width: min(100%, 440px); box-sizing: border-box; padding-left: 5px; border-radius: 0;
-    background-color: var(--wr-parent-bg); color: var(--wr-parent-ink); font-size: 11px;
-    background-image: linear-gradient(var(--wr-parent-edge), var(--wr-parent-edge)); background-size: 5px 100%; background-repeat: no-repeat; background-position: left top;
+    --wr-parent-bg: var(--wr-cat, var(--ov-sink-2)); --wr-parent-ink: var(--ink);
+    display: flex; flex-direction: column; min-width: 0; max-width: min(100%, 460px); box-sizing: border-box; padding-left: var(--wr-edge-w, 4px); border-radius: 0;
+    background-color: var(--wr-parent-bg); color: var(--wr-parent-ink); font-size: 14px;
     box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--wr-parent-ink) 30%, transparent);
-    &--subcategory { --wr-parent-bg: var(--wr-sub-fill, var(--wr-cat)); --wr-parent-ink: var(--on-accent); --wr-parent-edge: var(--wr-sub, var(--wr-cat)); }
-    &--cluster { --wr-parent-bg: var(--wr-cluster-fill, var(--wr-sub-fill, var(--wr-cat))); --wr-parent-ink: var(--on-accent); --wr-parent-edge: var(--wr-cluster, var(--wr-sub, var(--wr-cat))); }
+    @include wrEdge;
+    &--subcategory { --wr-parent-bg: var(--wr-sub-fill, var(--wr-cat)); --wr-parent-ink: var(--on-accent); }
+    &--cluster { --wr-parent-bg: var(--wr-cluster-fill, var(--wr-sub-fill, var(--wr-cat))); --wr-parent-ink: var(--on-accent); }
     &--open { flex: 1 1 100%; max-width: 100%; }
     button { color: inherit; text-align: left; font-size: inherit; font-family: inherit; }
     button:focus-visible { outline: 2px solid var(--wr-accent-light); outline-offset: -2px; }
   }
-  .wrParentMain { display: flex; align-items: center; gap: 8px; min-width: 0; width: 100%; padding: 4px 8px 4px 7px; &:hover { background: color-mix(in srgb, var(--wr-parent-ink) 10%, transparent); } }
-  .wrParentTitle { flex: 0 1 auto; min-width: 0; font-weight: 700; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-  .wrParentDesc { flex: 1 1 0; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; opacity: 0.9; }
-  .wrParentLink { padding: 4px 8px 4px 7px; font-weight: 700; text-decoration: underline; text-underline-offset: 2px; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; &:hover { background: color-mix(in srgb, var(--wr-parent-ink) 10%, transparent); } }
+  .wrParentMain { display: flex; align-items: center; justify-content: space-between; gap: 10px; min-width: 0; width: 100%; padding: 6px 10px 6px 10px; &:hover { background: color-mix(in srgb, var(--wr-parent-ink) 10%, transparent); } }
+  .wrParentLabel, .wrParentLink { font-size: 15px; font-weight: 700; text-transform: uppercase; letter-spacing: 1.5px; }
+  .wrParentLabel { flex: 0 1 auto; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .wrParentLink { padding: 6px 10px; text-decoration: underline; text-underline-offset: 3px; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; &:hover { background: color-mix(in srgb, var(--wr-parent-ink) 10%, transparent); } }
   .wrParentHead { display: flex; align-items: center; justify-content: space-between; gap: 6px; min-width: 0; }
-  .wrParentFold { display: inline-flex; align-items: center; padding: 4px 8px; &:hover { background: color-mix(in srgb, var(--wr-parent-ink) 10%, transparent); } }
-  .wrParentBody { margin: 0; padding: 0 8px 6px 7px; font-weight: 400; line-height: 1.4; white-space: pre-wrap; overflow-wrap: anywhere; opacity: 0.95; }
+  .wrParentFold { display: inline-flex; align-items: center; padding: 6px 10px; &:hover { background: color-mix(in srgb, var(--wr-parent-ink) 10%, transparent); } }
+  .wrParentBody { margin: 0; padding: 0 10px 8px 10px; font-size: 14px; font-weight: 400; line-height: 1.45; white-space: pre-wrap; overflow-wrap: anywhere; opacity: 0.95; }
   .wrKindBadge { font-size: 10px; text-transform: uppercase; letter-spacing: 0.5px; opacity: 0.9; flex: 0 0 auto; }
   .wrTitleField { flex: 1; min-width: 0; background: var(--wr-field); border: 0; border-radius: 0; color: var(--ink); font-size: 13px; font-weight: 700; padding: 8px 10px; outline: none; &:focus { box-shadow: inset 0 0 0 1px var(--wr-accent); } &::placeholder { color: var(--ink-faint); } }
   .wrChildRows { display: flex; flex-direction: column; gap: 6px; }
@@ -460,7 +461,7 @@
   // category colour with its subcategory as the left edge; assigned to a chapter, its book's primary
   // colour with the secondary as the edge, shaded by its awareness once it is on a moment.
   .wrPlotValue {
-    position: relative; display: flex; align-items: center; gap: 8px; padding: 20px 8px 8px 14px; border-radius: 6px; min-width: 0;
+    position: relative; display: flex; align-items: center; gap: 8px; padding: 20px 8px 8px calc(var(--wr-edge-w, 4px) + 10px); border-radius: 6px; min-width: 0;
     background: var(--wr-point-bg, var(--wr-cat, var(--wr-card))); color: var(--wr-point-ink, var(--ink));
     box-shadow: inset 4px 0 0 var(--wr-point-edge, transparent), 0 2px 6px rgb(0 0 0 / calc(0.25 * var(--shade-k)));
     @include wrEdge;
@@ -505,8 +506,11 @@
     background: var(--wr-point-bg, var(--wr-card)); color: var(--wr-point-ink, var(--ink)); box-shadow: inset 4px 0 0 var(--wr-point-edge, transparent);
   }
   .wrPlotChip { position: relative; }
-  .wrPlotChip:has(> .wrPlotChipLine) { padding-right: 10px; }
-  .wrPlotChipLine { position: absolute; top: 0; right: 0; bottom: 0; width: 5px; background: var(--wr-edge, var(--wr-cat, transparent)); }
+  .wrPlotChip:has(> .wrPlotChipLine) { padding-right: calc(var(--wr-edge-w, 5px) + 5px); }
+  .wrPlotChipLine {
+    position: absolute; top: 0; right: 0; bottom: 0; width: var(--wr-edge-w, 5px); background-color: var(--wr-cat, transparent);
+    background-image: var(--wr-edge, none); background-size: var(--wr-edge-size, 4px 100%); background-repeat: no-repeat; background-position: var(--wr-edge-pos, left top);
+  }
   .wrPlotChipTitle { text-align: left; font-weight: 700; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 200px; color: inherit; }
   .wrPlotChipX { display: inline-flex; align-items: center; justify-content: center; width: 20px; height: 20px; border-radius: 4px; color: inherit; &:hover { background: var(--ov-lift-2); } }
   .wrOutlinePanel { flex: 1 1 auto; min-height: 0; display: flex; flex-direction: column; gap: 8px; background: var(--ov-sink-1); border-radius: 8px; padding: 12px 14px; }
@@ -535,7 +539,7 @@
   .wrCompare { display: flex; flex-direction: column; gap: 10px; min-width: 0; }
   .wrCompareChips { display: flex; flex-wrap: wrap; gap: 6px; }
   .wrCompareChip {
-    display: inline-flex; align-items: center; max-width: 100%; padding-left: 8px; border-radius: 0; background-color: var(--wr-cat, var(--ov-sink-2)); color: var(--ink); @include wrEdge;
+    display: inline-flex; align-items: center; max-width: 100%; padding-left: calc(var(--wr-edge-w, 4px) + 4px); border-radius: 0; background-color: var(--wr-cat, var(--ov-sink-2)); color: var(--ink); @include wrEdge;
     &--off { opacity: 0.55; .wrCompareChipName { text-decoration: line-through; } }
   }
   .wrCompareChipName { padding: 4px 6px; max-width: 300px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 11px; font-weight: 700; color: inherit; text-align: left; }
@@ -548,7 +552,7 @@
   .wrCompareGroup { display: flex; flex-direction: column; gap: 6px; min-width: 0; }
   .wrCompareGroupBody { display: flex; flex-direction: column; gap: 8px; }
   .wrCompareGroupHead {
-    display: flex; align-items: center; gap: 6px; width: 100%; margin: 0; padding: 6px 8px 6px 12px; box-sizing: border-box; text-align: left; font-size: 11px; font-weight: 700;
+    display: flex; align-items: center; gap: 6px; width: 100%; margin: 0; padding: 6px 8px 6px calc(var(--wr-edge-w, 4px) + 8px); box-sizing: border-box; text-align: left; font-size: 11px; font-weight: 700;
     background-color: var(--wr-cat, var(--ov-sink-2)); color: var(--ink); @include wrEdge;
     > span:first-of-type { flex: 1 1 auto; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
   }
@@ -560,7 +564,7 @@
     &:focus-visible { outline: 2px solid var(--wr-accent-light); outline-offset: 2px; }
   }
   .wrPointTile {
-    display: flex; flex-direction: column; gap: 3px; padding: 5px 5px 5px 9px; border-radius: 0; background: var(--wr-cat, var(--wr-card)); color: var(--ink);
+    display: flex; flex-direction: column; gap: 3px; padding: 5px 5px 5px calc(var(--wr-edge-w, 4px) + 5px); border-radius: 0; background: var(--wr-cat, var(--wr-card)); color: var(--ink);
     box-shadow: 0 2px 6px rgb(0 0 0 / calc(0.25 * var(--shade-k))); text-align: left; @include wrEdge;
     &--draggable { cursor: grab; }
     &--dragging { opacity: 0.7; }
@@ -610,7 +614,7 @@
   // draft text. Closed, a card is just its title; opened (click), it grows in place with the full detail.
   .wrPlotNotes { flex: 0 0 210px; min-width: 0; display: flex; flex-direction: column; gap: 8px; padding: 26px 14px 16px 0; box-sizing: border-box; overflow-y: auto; scrollbar-width: none; &::-webkit-scrollbar { display: none; } }
   .wrPlotNote {
-    display: flex; flex-direction: column; gap: 4px; padding: 6px 8px 6px 12px; border-radius: 6px; text-align: left; color: var(--ink);
+    display: flex; flex-direction: column; gap: 4px; padding: 6px 8px 6px calc(var(--wr-edge-w, 4px) + 8px); border-radius: 6px; text-align: left; color: var(--ink);
     background: var(--wr-cat, var(--wr-card)); box-shadow: 0 2px 6px rgb(0 0 0 / calc(0.25 * var(--shade-k))); @include wrEdge;
   }
   .wrPlotNoteHead { display: flex; align-items: center; justify-content: space-between; gap: 6px; width: 100%; text-align: left; color: inherit; }
@@ -749,7 +753,7 @@
 
   // The Outline level at Mid: a plotpoint still to place is just its title in its category colour.
   .wrOutlineMid .wrPanelHead { display: flex; align-items: baseline; }
-  .wrMidPoint { padding: 4px 8px 4px 12px; border-radius: 0; background: var(--wr-cat, var(--wr-card)); @include wrEdge; color: var(--ink); font-size: 12px; overflow-wrap: anywhere; }
+  .wrMidPoint { padding: 4px 8px 4px calc(var(--wr-edge-w, 4px) + 8px); border-radius: 0; background: var(--wr-cat, var(--wr-card)); @include wrEdge; color: var(--ink); font-size: 12px; overflow-wrap: anywhere; }
 
   // ---------------------------------------------------------------- draft level (Max): the open book
   .wrDraftLevel { flex: 1 1 auto; min-height: 0; display: flex; flex-direction: column; gap: 6px; }
