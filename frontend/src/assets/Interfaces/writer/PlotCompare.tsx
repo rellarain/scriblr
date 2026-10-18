@@ -31,9 +31,9 @@ export function PlotCompare({ w, lines, size, onOpen, onOpenNode, openParents, o
   onDeselect: (plotlineId: string) => void
   // A parent chip's title was chosen in a group header: open that category, subcategory or cluster's editor.
   onOpenNode: (nodeId: string) => void
-  // The parent chips left open (shared with the editors) and the click that opens or closes one.
+  // The levels whose parent chips are left open (shared with the editors) and the click that opens or closes one.
   openParents: Set<string>
-  onToggleParent: (parentId: string) => void
+  onToggleParent: (kind: PlotNode['kind']) => void
 }) {
   const [plotOrder] = usePlotOrder()
   const [grouped, setGrouped] = useStoredState<boolean>('scriblr.writer.plotCompareGrouped', false)

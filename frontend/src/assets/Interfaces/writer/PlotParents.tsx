@@ -7,24 +7,24 @@ import { nodeLabel, plotTrail } from './plotTree'
 //   a chip shows its title only (its description is the hover text); the stripes at its left are its tree's: category, subcategory, cluster
 //   a chip with a description opens on a click to the whole description; its title then opens that parent's editor
 //   a chip with no description is just its title, and clicking it opens that parent's editor
-// Which chips are open belongs to the tool (PlotView), by parent: it stays as it was when another plotline under the same parents is opened.
+// Which chips are open belongs to the tool (PlotView), by level: a category chip left open is open on every editor's category chip, and so
+// for subcategory and cluster chips, whichever node is opened next.
 export function PlotParents({ node, byId, open, onToggle, onOpen }: {
   node: PlotNode
   byId: Map<string, PlotNode>
   open: Set<string>
-  onToggle: (parentId: string) => void
+  onToggle: (kind: PlotNode['kind']) => void
   onOpen: (id: string) => void
 }) {
   const parents = plotTrail(node, byId)
   if (parents.length === 0) return null
-  const flip = onToggle
 
   return (
     <div className="wrParents" role="group" aria-label="Parents">
       {parents.map(parent => {
         const label = nodeLabel(parent)
         const body = parent.body.trim()
-        const expanded = body !== '' && open.has(parent.id)
+        const expanded = body !== '' && open.has(parent.kind)
         const cls = `wrParent wrParent--${parent.kind}${expanded ? ' wrParent--open' : ''}`
         const vars = plotColorVars(plotColors(parent, byId))
         if (body === '') {
@@ -37,7 +37,7 @@ export function PlotParents({ node, byId, open, onToggle, onOpen }: {
         if (!expanded) {
           return (
             <div key={parent.id} className={cls} style={vars}>
-              <button type="button" className="wrParentMain" aria-expanded={false} title={body} onClick={() => flip(parent.id)}>
+              <button type="button" className="wrParentMain" aria-expanded={false} title={body} onClick={() => onToggle(parent.kind)}>
                 <span className="wrParentLabel">{label}</span>
                 <ChevronRightIcon size={14} />
               </button>
@@ -48,7 +48,7 @@ export function PlotParents({ node, byId, open, onToggle, onOpen }: {
           <div key={parent.id} className={cls} style={vars}>
             <div className="wrParentHead">
               <button type="button" className="wrParentLink" aria-label={`Open ${label}`} title={`Open ${label}`} onClick={() => onOpen(parent.id)}>{label}</button>
-              <button type="button" className="wrParentFold" aria-expanded aria-label={`Collapse ${label}`} onClick={() => flip(parent.id)}><ChevronDownIcon size={14} /></button>
+              <button type="button" className="wrParentFold" aria-expanded aria-label={`Collapse ${label}`} onClick={() => onToggle(parent.kind)}><ChevronDownIcon size={14} /></button>
             </div>
             <p className="wrParentBody">{body}</p>
           </div>

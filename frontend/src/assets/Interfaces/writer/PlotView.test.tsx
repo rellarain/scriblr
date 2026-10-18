@@ -697,3 +697,40 @@ describe('the parent chips between pages', () => {
     expect(within(group).getByRole('button', { name: 'Collapse Romance' })).toBeInTheDocument()
   })
 })
+
+describe('the parent chips, by level', () => {
+  // A second category with its own subcategory, cluster and plotline.
+  const other = () => described(clustered()).concat(
+    plotNode('cat2', 'category', null, { title: 'Action', body: 'Fast.', order: 1 }),
+    plotNode('sub2', 'subcategory', 'cat2', { title: 'Chase', body: 'On foot.' }),
+    plotNode('clu2', 'cluster', 'sub2', { title: 'Rooftops', body: 'High up.' }),
+    plotNode('line2', 'plotline', 'clu2', { title: 'Leap' }),
+  ).map(n => (n.id === 'clu' ? { ...n, body: 'Under one roof.' } : n))
+  const parents = () => within(screen.getByRole('group', { name: 'Parents' }))
+  const expandedKinds = () => [...document.querySelectorAll('.wrParent--open')].map(c => c.className.match(/wrParent--(category|subcategory|cluster)/)![1])
+
+  it('keep a level open on any other plotline, even under different parents', () => {
+    render(<Editor start={other()} />)
+    fireEvent.click(parents().getByRole('button', { name: /Romance/ })) // category
+    fireEvent.click(parents().getByRole('button', { name: /Slow burn/ })) // subcategory
+    expect(expandedKinds()).toEqual(['category', 'subcategory'])
+    fireEvent.click(screen.getAllByRole('button', { name: 'Leap' })[0])
+    expect(screen.getByPlaceholderText('Plotline title')).toHaveValue('Leap')
+    expect(expandedKinds()).toEqual(['category', 'subcategory']) // Action and Chase are open, Rooftops is not
+    expect(parents().getByRole('button', { name: 'Collapse Action' })).toBeInTheDocument()
+    expect(parents().getByRole('button', { name: 'Collapse Chase' })).toBeInTheDocument()
+    expect(parents().getByRole('button', { name: /Rooftops/ })).toHaveAttribute('aria-expanded', 'false')
+  })
+
+  it('open a cluster chip with a subcategory chip too, and close a level everywhere by closing it once', () => {
+    render(<Editor start={other()} />)
+    fireEvent.click(parents().getByRole('button', { name: /Slow burn/ }))
+    fireEvent.click(parents().getByRole('button', { name: /Household/ }))
+    expect(expandedKinds()).toEqual(['subcategory', 'cluster'])
+    fireEvent.click(screen.getAllByRole('button', { name: 'Leap' })[0])
+    expect(expandedKinds()).toEqual(['subcategory', 'cluster'])
+    fireEvent.click(parents().getByRole('button', { name: 'Collapse Chase' }))
+    fireEvent.click(screen.getAllByRole('button', { name: 'Meet cute' })[0])
+    expect(expandedKinds()).toEqual(['cluster'])
+  })
+})

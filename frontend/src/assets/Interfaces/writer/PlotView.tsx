@@ -245,9 +245,10 @@ export default function PlotView({ w }: { w: WriterWorkspace }) {
   // Which fields are open (collapsed by default), and the value just created (it takes focus).
   const [openFields, setOpenFields] = useState<Set<string>>(new Set())
   const [newValueId, setNewValueId] = useState<string | null>(null)
-  // The parent chips left open, kept while moving from one node to another.
+  // The levels whose parent chips are left open, kept while moving from one node to another (open the category chip once and every editor's
+  // category chip is open).
   const [openParents, setOpenParents] = useState<Set<string>>(new Set())
-  const toggleParent = (id: string) => setOpenParents(prev => { const next = new Set(prev); if (next.has(id)) next.delete(id); else next.add(id); return next })
+  const toggleParent = (kind: string) => setOpenParents(prev => { const next = new Set(prev); if (next.has(kind)) next.delete(kind); else next.add(kind); return next })
   const ui: PlotUi = {
     openParents, toggleParent,
     isOpen: id => openFields.has(id),
