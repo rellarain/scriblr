@@ -1,5 +1,5 @@
 import { createRoot } from 'react-dom/client'
-import '../style/style.css'
+import '../style/base.css'
 import { CARDS, ensureBackend } from './cards'
 import { Preview } from './Preview'
 

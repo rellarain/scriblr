@@ -19,8 +19,8 @@ for reference as a plausible v2 direction, not as active code.
 - [Repo structure](#repo-structure)
 - [Architecture](#architecture)
 - [Backend design](#backend-design)
-- [Frontend design (canonical — git HEAD)](#frontend-design-canonical--git-head)
-- [In-progress / not yet integrated](#in-progress--not-yet-integrated)
+- [Frontend design](#frontend-design)
+- [The Writer and the other interfaces](#the-writer-and-the-other-interfaces-assetsinterfaces)
 - [Known stale docs](#known-stale-docs)
 - [Development](#development)
 - [Running the desktop app](#running-the-desktop-app)
@@ -45,19 +45,22 @@ backend/
 │       ├── presets_store.py           # global (non-project) plot-preset catalog
 │       ├── user_settings_store.py      # global user settings: time-of-day theme, UI prefs, Writer UI state (kv)
 │       └── pdf_export.py               # fpdf2 book/chapter PDF export
-├── tests/                    # 16 pytest modules, one per feature area (+ conftest.py fixtures)
+├── tests/                    # 30 pytest modules, one per feature area (+ conftest.py fixtures)
 ├── server_main.py            # entrypoint used by Electron / PyInstaller
 └── scriblr.spec               # PyInstaller build spec
 
 frontend/
 ├── src/
-│   ├── main.tsx                # entrypoint (imports App from ./app/App at HEAD)
-│   ├── app/                     # App.tsx (QueryClient + BrowserRouter) + routes.tsx (route tree)
-│   ├── components/shared/        # Bookshelf, ProjectPicker, ProjectShell, NodeFlagControl, icon set
-│   ├── modes/                     # one folder per feature area — outline, plan, workspace, draft, revise, dashboard, admin, shelf
-│   ├── lib/                        # nodeTree, paragraphs, sanitizeFilename, textAnalytics (all unit-tested)
-│   ├── api/                         # React Query hooks + fetch client, one module per backend router
-│   └── hooks/                        # small shared hooks (useWindowDimensions)
+│   ├── main.tsx                # entrypoint: applies the cached theme, then renders App in a BrowserRouter
+│   ├── App.tsx / Header.tsx / Sidebar.tsx   # the shell: header, the interface for the URL (/write, /read, /translate), the admin/helper sidebar
+│   ├── assets/Interfaces/       # the interfaces: writer/ (WUI, the Writer), reader/ (RUI), TUI, VUI, admin/ (AUI), helper/ (HUI), UUI
+│   ├── api/                      # fetch client (client.ts) and one module per backend area; types.ts mirrors schema.py
+│   ├── components/               # shared pieces: tiles/ (the split-tree grid), ColorRange, ...
+│   ├── settings/ theme/          # the settings store (backend-backed, cached in localStorage) and the time-of-day theme engine
+│   ├── designSystem/             # the preview app that generates docs/design-system
+│   ├── lib/                       # pure helpers (nodeKeys, ...) with unit tests
+│   └── test/                      # shared test setup and helpers (setup.ts, mockFetch.ts, makeWorkspace.ts)
+├── scripts/design-system/      # generates docs/design-system from the code (npm run design-system)
 └── vite.config.ts             # dev proxy /api → 127.0.0.1:8000; Vitest config lives here too
 
 electron/                    # desktop shell: spawns the backend as a subprocess, opens a native window
@@ -259,94 +262,19 @@ Plus `GET /api/health` (inline in `main.py`, not part of a router).
   (atomic writes, quarantine, compaction) and `test_hierarchy_migration.py`
   (legacy-layout migration).
 
-## Frontend design (canonical — git HEAD)
+## Frontend design
 
-The description below is of the app as currently committed at `HEAD` — see
-[In-progress / not yet integrated](#in-progress--not-yet-integrated) for how
-the working tree currently differs.
-
-- **Routing** (`frontend/src/app/routes.tsx`, React Router):
-  - `/` → `ProjectPicker` — list/create/delete projects, plus an Admin
-    toggle exposing `AdminPresetsPanel`.
-  - `/project/:projectId` → `ProjectShell` — the persistent per-project
-    layout (collapsible `Bookshelf` sidebar, persisted to `localStorage`),
-    hosting nested routes via `<Outlet/>`, plus global overlays for the
-    Plot drawer, Dashboard, Settings, and Scrap bin regardless of which
-    nested route is active.
-    - `book/:bookId` → `BookFaceWorkspace` — the open-book "face": title,
-      word-count/chapter-count goals, a 20-color swatch picker,
-      relevant-plotlines checkboxes, a chapter tab strip, "Manage
-      chapters" (`ScopedOutlineEditor`), Export PDF, delete book.
-    - `book/:bookId/chapter/:chapterId` → `ChapterPageWorkspace` — one
-      continuous scrollable "page" combining every act/scene heading and
-      moment (replacing an earlier tabbed Draft/Read/History editor), with
-      per-project "read levels" config, a Preview toggle (clean markdown,
-      read-only), a Manage-structure toggle, and a `ChapterPlotpoints`
-      side panel.
-  - `App.tsx` wraps all of this in a React Query `QueryClient` (retries
-    disabled) + `BrowserRouter`.
-- **Feature areas** (`frontend/src/modes/`):
-  - **`outline/`** — the structural tree: `outlineTree.ts` (books/chapters/
-    moments operations, escalate-to-child on double-Enter) atop the generic
-    `lib/nodeTree.ts`; `OutlineTreeView`/`OutlineNodeRow` (dnd-kit sortable,
-    keyboard nav, native drag-and-drop for both reparenting and
-    plotpoint→moment assignment).
-  - **`plan/`** — the Plot sidebar (parallel structure to outline):
-    `plotTree.ts` (category→subcategory→plotline→plotpoint operations,
-    custom fields, keywords, moment/paragraph assignment);
-    `PlotSidebar`/`PlotTreeView`/`PlotNodeRow`.
-  - **`plot/`** — `PlotDrawer`: a partial-width slide-over wrapping
-    `PlotSidebar`, so the plot tree can sit alongside a book/chapter view
-    (enabling plotpoint drag-out onto a paragraph).
-  - **`workspace/`** — `BookFaceWorkspace`, `ChapterPageWorkspace`,
-    `ChapterPageParagraph` (click-to-edit paragraphs with separate
-    preview/editing states), `ConfigurationPanel` (goals, outline/plot
-    levels, priorities, routines), `ProjectStatsPanel`, `SchedulePanel`
-    (today's checklist derived from routines/priorities/goals/flags),
-    `ScopedOutlineEditor` (the reusable Tab/Enter/drag/flag editing state
-    machine, parameterized by root + levels, used for both book-scoped and
-    chapter-scoped structure editing), `TreeDiffView`.
-  - **`draft/`** — `ChapterPlotpoints` (read-only reference tree scoped to
-    the current chapter's assigned plotpoints), `DraftAnalyticsPanel`
-    (word/sentence/readability stats, sentence-structure breakdown,
-    plotline-keyword mention counts), `ScrapBinPanel` (orphaned moments:
-    view/restore/permanently-delete), `useAutosaveDraft` (debounced 1.5s
-    autosave, flush-on-unmount).
-  - **`revise/`** — `MomentRevisions` (chapter snapshot list, manual save,
-    diff, revert), `DiffView` (colored equal/insert/delete spans),
-    `CommentsPanel` (select text in a snapshot, attach/list/delete flagged
-    comments).
-  - **`dashboard/`** — `BulletinBoardOverlay` + `BulletinNote`: one screen
-    consolidating goals/activity (`ProjectStatsPanel`), draft analytics,
-    and revision history into pinned cards.
-  - **`admin/`** — `AdminPresetsPanel`: global CRUD editor for the preset
-    plot-category catalog.
-  - **`shelf/`** — `BookSpine` (+ test): one book rendered as a shelf
-    "spine" whose width scales with its word-count goal and whose fill
-    height shows progress toward it.
-- **Shared components** (`components/shared/`) — `Bookshelf` (the sidebar
-  shelf of `BookSpine`s), `ProjectPicker`, `ProjectShell`,
-  `NodeFlagControl` (review/edit/add/delete flag popover), and a small icon
-  set (`DashboardIcon`, `ExportIcon`, `EyeIcon`, `OutlineIcon`, `PlotIcon`,
-  `SaveIcon`, `SettingsIcon`, `TrashIcon`).
-- **Shared libs** (`lib/`, all with matching `.test.ts` files) —
-  `nodeTree.ts` (generic flat-list-with-`parentId` tree ops shared by
-  outline and plot), `paragraphs.ts` (`splitParagraphs`/
-  `clampParagraphIndex`), `sanitizeFilename.ts`, `textAnalytics.ts`
-  (dependency-free readability/sentence-structure heuristics + keyword
-  occurrence counting).
-- **API client layer** (`api/`) — `client.ts` exports a small `api`
-  object (`get/post/put/patch/delete`, JSON-only, `/api`-relative,
-  throwing `ApiError` on non-OK responses) with no hooks of its own; every
-  other module (`projects.ts`, `outline.ts`, `plot.ts`, `draft.ts`,
-  `revisions.ts`, `activity.ts`, `analytics.ts`, `schedule.ts`, `scrap.ts`,
-  `presets.ts`) wraps it in React Query hooks (`useX`/`useSaveX`/etc.),
-  invalidating the relevant query keys on mutation. `export.ts` is the one
-  exception — a raw `fetch` + Blob download, since PDF isn't JSON.
-- **Testing** — Vitest (jsdom environment, config lives directly in
-  `vite.config.ts`) + React Testing Library + `@testing-library/user-event`
-  + `jest-dom` matchers (`src/test/setup.ts`). Covers all four `lib/`
-  modules plus `BookSpine`.
+- **Shell** (`frontend/src/App.tsx`, React Router): `/` redirects to `/write`; `/write` is the Writer (`assets/Interfaces/writer/WUI.tsx`),
+  `/read` the Reader (`RUI`), `/translate` the Translator (`TUI`); the header and the sidebar (Admin `AUI`, Helper `HUI`, user `UUI`) are shared.
+  The Writer is described in the section after next.
+- **State and data**: there is no global query cache. The Writer's workspace hook (`writer/useWriterWorkspace.ts`) loads and saves the project's outline,
+  plot and settings through `api/` and keeps them in React state with its own autosave and undo history; other interfaces use small stores
+  (`settings/settingsStore.ts`, `reader/readerStore.ts`, `helper/inbox/feedbackStore`). `api/client.ts` is a thin JSON `get/post/put/patch/delete`
+  wrapper (same-origin `/api`, throwing `ApiError`); `api/export.ts` is the one raw `fetch` + Blob download, since PDF isn't JSON.
+- **Testing** — Vitest (jsdom, config in `vite.config.ts`) + React Testing Library + `jest-dom`. `src/test/setup.ts` resets stubbed globals, browser
+  storage and the settings store after every test; `mockFetch` stands in for `fetch`; `makeWorkspace` builds a partial Writer workspace whose keys are
+  checked against the real `WriterWorkspace` type. `npm run typecheck`, `npm run lint` (the hooks rules) and `npm test` run in CI
+  (`.github/workflows/ci.yml`, with the backend's ruff and pytest); `npm run test:coverage` reports coverage.
 
 ## Tile grids (consoles as tiles)
 
@@ -539,18 +467,10 @@ only the hues are kept.
   (`useStoredState`: chapter mode, scratchpad, checklists, reactions) uses the same
   store, and is migrated from localStorage once.
 
-## In-progress / not yet integrated
+## The Writer and the other interfaces (`assets/Interfaces/`)
 
-This section is a description of current state, not a decision about what
-to keep, merge, or discard.
-
-The working tree right now has `frontend/src/main.tsx` pointing at
-`./App` instead of the real `./app/App` above, and `git status` shows the
-entire committed frontend described in the previous section — `app/`,
-`components/shared/`, every `modes/*` folder, `lib/`, `api/*.ts`,
-`hooks/useWindowDimensions.ts` — as **deleted**. In its place is a smaller,
-untracked stack under `frontend/src/assets/Interfaces/`, built without
-awareness that the app above already existed:
+This is the live frontend (`main.tsx` renders `./App`, which mounts these). An earlier React Query / `modes/` frontend was removed once nothing
+mounted it; it remains in git history.
 
 - **`WUI.tsx`** (`writer/` subfolder) — the Writer: four stacked, tinted **levels**
   (`writer/levels/`) — Dash, Project, Outline (the open book) and Draft (the open
