@@ -247,6 +247,9 @@ export function OutlineCards({ w, book, counts, plotDrag, chapterId }: {
     if (node.kind === 'chapter') {
       const n = numbers.chapter.get(node.id) ?? 0
       const free = (index.get(node.id) ?? []).find(k => k.freeDraft)
+      // The chapter's tile folds up to its banner (the number, the title, its counts), from the button in its top right corner.
+      const open = isOpen(node)
+      const placed = pointsByNode.get(node.id)?.length ?? 0
       return (
         <div key={node.id} {...common} className={cardClass('wrChapterBanner wrOutlineCard', node.id)} style={tint(node)} {...dropProps(node)}>
           <div className="wrBannerHead">
@@ -255,24 +258,36 @@ export function OutlineCards({ w, book, counts, plotDrag, chapterId }: {
             <button type="button" className="wrIconBtn wrIconBtn--light" title="Write" aria-label={`Write chapter ${n}`} onClick={() => w.openChapter(node.id)}>
               <PencilIcon size={15} />
             </button>
+            <button
+              type="button" className="wrIconBtn wrIconBtn--light wrBannerToggle" aria-expanded={open}
+              aria-label={`${open ? 'Collapse' : 'Expand'} chapter ${n}`} title={open ? 'Collapse the chapter' : 'Expand the chapter'}
+              onClick={() => setOpen(node.id, !open)}
+            >
+              {open ? <ChevronDownIcon size={15} /> : <ChevronRightIcon size={15} />}
+            </button>
           </div>
           <div className="wrNodeStats">
             <span>{stat(countOf(node.id, 'act'), 'act')}</span>
             <span>{stat(countOf(node.id, 'scene'), 'scene')}</span>
             <span>{stat(countOf(node.id, 'moment'), 'moment')}</span>
+            {!open && placed > 0 && <span>{stat(placed, 'plotpoint')}</span>}
             <span>{formatWords(words(node.id))}</span>
           </div>
-          {boxed(node)}
-          {free && words(free.id) > 0 && (
-            <div className="wrFreeCard wrFreeCard--readonly" data-testid="free-draft-card">
-              <span className="wrNodeLabel">Free draft</span>
-              <span className="wrWordCount">{formatWords(words(free.id))}</span>
-            </div>
+          {open && (
+            <>
+              {boxed(node)}
+              {free && words(free.id) > 0 && (
+                <div className="wrFreeCard wrFreeCard--readonly" data-testid="free-draft-card">
+                  <span className="wrNodeLabel">Free draft</span>
+                  <span className="wrWordCount">{formatWords(words(free.id))}</span>
+                </div>
+              )}
+              {dnd.children(node.id, kids, renderNode)}
+              <div className="wrCardFoot">
+                <span className="wrCardFootLeft">{addButton(node, 'act')}</span>
+              </div>
+            </>
           )}
-          {dnd.children(node.id, kids, renderNode)}
-          <div className="wrCardFoot">
-            <span className="wrCardFootLeft">{addButton(node, 'act')}</span>
-          </div>
         </div>
       )
     }

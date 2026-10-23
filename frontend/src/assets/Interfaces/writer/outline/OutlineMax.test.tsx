@@ -335,6 +335,40 @@ describe('Outline Max: plotpoints', () => {
     expect(banner().querySelector(':scope > .wrCardPoints .wrEye')).toBeNull()
   })
 
+  it("folds a chapter's tile up to its banner from the button in its top right corner, and remembers it", async () => {
+    const { user, unmount } = setup('c1')
+    drag(tray().querySelector('[data-point="pp1"]')!, banner())
+    const head = () => banner().querySelector<HTMLElement>('.wrBannerHead')!
+    // The button is the last thing in the banner's head, after the Write pencil: the tile's top right corner.
+    const buttons = within(head()).getAllByRole('button')
+    expect(buttons.map(b => b.getAttribute('aria-label'))).toEqual(['Write chapter 1', 'Collapse chapter 1'])
+    expect(within(banner()).getByDisplayValue('Act title')).toBeTruthy()
+    expect(banner().querySelector(':scope > .wrCardPoints [data-point="pp1"]')).not.toBeNull()
+    expect(addButton(banner(), 'Act')).toBeTruthy()
+
+    await user.click(within(head()).getByRole('button', { name: 'Collapse chapter 1' }))
+    // Only the banner is left: its title and counts (with the plotpoints placed on the chapter), and the button, now to expand.
+    expect(within(banner()).queryByDisplayValue('Act title')).toBeNull()
+    expect(banner().querySelector('.wrCardPoints')).toBeNull()
+    expect(within(banner()).getAllByRole('button').find(b => b.textContent?.trim() === 'Act')).toBeUndefined()
+    expect(within(banner()).getByText('Ice Out')).toBeTruthy()
+    expect(within(banner()).getByText('1 act')).toBeTruthy()
+    expect(within(banner()).getByText('1 plotpoint')).toBeTruthy()
+    expect(within(head()).getByRole('button', { name: 'Expand chapter 1' }).getAttribute('aria-expanded')).toBe('false')
+    // The writing button still works folded.
+    expect(within(head()).getByRole('button', { name: 'Write chapter 1' })).toBeTruthy()
+
+    // It is remembered across a reload of the page.
+    unmount()
+    setup('c1')
+    expect(within(banner()).queryByDisplayValue('Act title')).toBeNull()
+    expect(within(banner()).getByRole('button', { name: 'Expand chapter 1' })).toBeTruthy()
+
+    await user.click(within(banner()).getByRole('button', { name: 'Expand chapter 1' }))
+    expect(within(banner()).getByDisplayValue('Act title')).toBeTruthy()
+    expect(addButton(banner(), 'Act')).toBeTruthy()
+  })
+
   it('sends a placed plotpoint back to the tray from its x, or when it is dragged there', async () => {
     const { user } = setup('c1')
     drag(tray().querySelector('[data-point="pp1"]')!, card('m1'))

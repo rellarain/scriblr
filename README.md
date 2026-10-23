@@ -541,7 +541,8 @@ mounted it; it remains in git history.
   title and the tabs, then the sections the tabs open (settings, help, draft stats) and the contents
   (`outline/OutlineNav.tsx`: the arcs and chapters), narrowed by the edge tabs: an arc's tab shows only
   that arc and each of its chapters' outlines, a chapter's tab only that chapter's (choosing the focused tab again goes back to the whole book, every chapter open), each unfolding its
-  title, colour and trash and under them its acts, scenes and moments (`OutlineCards.tsx`). The page edges and the arcs'
+  title, colour and trash and under them its acts, scenes and moments (`OutlineCards.tsx`; the acts and scenes fold up, and so does the chapter's own
+  tile, from the chevron in its top right corner, down to its banner and counts, all remembered). The page edges and the arcs'
   and chapters' tabs (the book's own hue, the arc and chapter colours as accents) stand at its right,
   as on the Draft level's book, whose pages are the drafting pages. The plotpoints still to place are the Project level's
   **Plotpoints** tab (`levels/PlotpointsTab.tsx`): drag one onto a card in the Outline (the dragged id
