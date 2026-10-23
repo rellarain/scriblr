@@ -66,7 +66,7 @@ function PreviewFormatFields({ w, book }: { w: WriterWorkspace; book: OutlineNod
           </select>
         </label>
         <NumberField label="Line spacing" value={format.lineSpacing} limits={FORMAT_LIMITS.lineSpacing} onChange={n => set({ lineSpacing: n })} />
-        <NumberField label="Paragraph indent (em)" value={format.paragraphIndent} limits={FORMAT_LIMITS.paragraphIndent} onChange={n => set({ paragraphIndent: n })} />
+        <NumberField label="Paragraph indent (spaces)" value={format.paragraphIndentSpaces} limits={FORMAT_LIMITS.paragraphIndentSpaces} onChange={n => set({ paragraphIndentSpaces: Math.round(n) })} />
         <NumberField label="Paragraph spacing (em)" value={format.paragraphSpacing} limits={FORMAT_LIMITS.paragraphSpacing} onChange={n => set({ paragraphSpacing: n })} />
       </div>
       <button type="button" className="wrSmallBtn" disabled={!custom} onClick={() => w.updateOutlineNode(book.id, { previewFormat: null })}>

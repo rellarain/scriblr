@@ -85,7 +85,7 @@ def test_old_free_text_time_is_dropped(client: TestClient) -> None:
 def test_book_preview_format_round_trips_and_is_bounded(client: TestClient) -> None:
     project_id = _create_project(client)
     fmt = {"fontFamily": "sans", "fontSize": 20, "fontStyle": "italic", "fontWeight": "bold", "textAlign": "left",
-           "lineSpacing": 2.0, "paragraphIndent": 1.5, "paragraphSpacing": 0.5}
+           "lineSpacing": 2.0, "paragraphIndentSpaces": 6, "paragraphSpacing": 0.5}
     nodes = [_node("b1", "book", None, 0, previewFormat=fmt), _node("b2", "book", None, 1)]
     assert client.put(f"/api/projects/{project_id}/outline", json={"schemaVersion": 2, "nodes": nodes}).status_code == 200
     saved = {n["id"]: n for n in client.get(f"/api/projects/{project_id}/outline").json()["nodes"]}
@@ -98,6 +98,54 @@ def test_book_preview_format_round_trips_and_is_bounded(client: TestClient) -> N
     saved = client.get(f"/api/projects/{project_id}/outline").json()["nodes"][0]
     assert saved["previewFormat"]["fontSize"] == 14 and saved["previewFormat"]["fontFamily"] == "serif"
 
-    for bad in ({"fontSize": 5}, {"fontSize": 99}, {"lineSpacing": 0.5}, {"paragraphIndent": -1}, {"fontFamily": "comic"}):
+    for bad in ({"fontSize": 5}, {"fontSize": 99}, {"lineSpacing": 0.5}, {"paragraphIndentSpaces": -1}, {"paragraphIndentSpaces": 17},
+                {"paragraphIndentSpaces": 1.5}, {"paragraphIndent": -1}, {"paragraphIndent": 5}, {"paragraphIndent": "wide"}, {"fontFamily": "comic"}):
         nodes = [_node("b1", "book", None, 0, previewFormat=bad)]
         assert client.put(f"/api/projects/{project_id}/outline", json={"schemaVersion": 2, "nodes": nodes}).status_code == 422
+
+
+def test_a_legacy_paragraph_indent_in_em_becomes_the_same_width_in_spaces(client: TestClient) -> None:
+    """Before format 5 the indent was `paragraphIndent` in em; the same visual width is now a number of spaces of the book's font."""
+    project_id = _create_project(client)
+    cases = [
+        ({"fontFamily": "serif", "paragraphIndent": 1.5}, 6),   # 1.5em at 0.25em a space
+        ({"fontFamily": "sans", "paragraphIndent": 1.5}, 5),    # 1.5 / 0.28 = 5.36
+        ({"fontFamily": "mono", "paragraphIndent": 1.5}, 3),    # 1.5 / 0.6 = 2.5, rounded up
+        ({"paragraphIndent": 0}, 0),
+        ({"paragraphIndent": 4}, 16),
+    ]
+    for fmt, spaces in cases:
+        nodes = [_node("b1", "book", None, 0, previewFormat=fmt)]
+        assert client.put(f"/api/projects/{project_id}/outline", json={"schemaVersion": 2, "nodes": nodes}).status_code == 200
+        saved = client.get(f"/api/projects/{project_id}/outline").json()["nodes"][0]["previewFormat"]
+        assert saved["paragraphIndentSpaces"] == spaces, fmt
+        assert "paragraphIndent" not in saved
+
+    # The new field wins when both are sent.
+    nodes = [_node("b1", "book", None, 0, previewFormat={"paragraphIndent": 4, "paragraphIndentSpaces": 2})]
+    assert client.put(f"/api/projects/{project_id}/outline", json={"schemaVersion": 2, "nodes": nodes}).status_code == 200
+    assert client.get(f"/api/projects/{project_id}/outline").json()["nodes"][0]["previewFormat"]["paragraphIndentSpaces"] == 2
+
+
+def test_a_project_file_saved_before_format_5_is_read_and_rewritten_with_spaces(storage_root) -> None:
+    import json
+
+    from app.storage import project_store as store
+
+    index = store.create_project(storage_root, "Old indent")
+    path = storage_root / index.projectId / "project.json"
+    raw = json.loads(path.read_text(encoding="utf-8"))
+    raw["schemaVersion"] = 4
+    book = raw["outline"]["nodes"][0]
+    book["previewFormat"] = {"fontFamily": "serif", "fontSize": 18, "paragraphIndent": 2.0}
+    path.write_text(json.dumps(raw), encoding="utf-8")
+
+    outline = store.load_outline(storage_root, index.projectId)
+    assert outline.nodes[0].previewFormat.paragraphIndentSpaces == 8
+    # The next write saves it in the new form and keeps the format-4 file beside it.
+    store.save_outline(storage_root, index.projectId, outline)
+    rewritten = json.loads(path.read_text(encoding="utf-8"))
+    assert rewritten["schemaVersion"] == 5
+    assert rewritten["outline"]["nodes"][0]["previewFormat"]["paragraphIndentSpaces"] == 8
+    assert "paragraphIndent" not in rewritten["outline"]["nodes"][0]["previewFormat"]
+    assert (storage_root / index.projectId / "project.json.v4.bak").exists()

@@ -150,7 +150,8 @@ described, now stale, in `docs/data-model.md`).
     goes through `storage/ids.check_id` (no `..`, separators, drive letters,
     leading dots) and is answered with HTTP 400; the SPA fallback serves only
     files inside the built frontend.
-  - `ProjectFile.schemaVersion` is `PROJECT_FILE_VERSION` (3: plot clusters).
+  - `ProjectFile.schemaVersion` is `PROJECT_FILE_VERSION` (5: 3 added plot clusters, 4 the packed tree histories, 5 a book's paragraph indent in
+    spaces; the first write of an older file keeps it once as `project.json.v<N>.bak`).
     A file from a *newer* build is read but never written over
     (`NewerSchemaError` → HTTP 409); an older one is brought up to date on its
     next write.
@@ -555,7 +556,8 @@ mounted it; it remains in git history.
   editor, the Outline Mid tab's placed list and the Draft footnotes (`orderAssignedPlotpoints`'s `mode`).
   A book's **preview formatting** (`OutlineNode.previewFormat`, backend `PreviewFormat`: font, size,
   bold/italic, alignment, line spacing, paragraph indent and spacing, all bounded) is edited in the book's
-  Settings tab and applied to the Draft preview as CSS variables (`writer/previewFormat.ts`). The selected book's spine swivels into its cover
+  Settings tab (the paragraph indent is a whole number of **spaces**, 0 to 16, drawn as that many times the width of a space in the book's font:
+  `SPACE_EM`, the same table in `previewFormat.ts` and in the backend, which turns an older book's em indent into spaces on read) and applied to the Draft preview as CSS variables (`writer/previewFormat.ts`). The selected book's spine swivels into its cover
   (`Shelf.tsx`). Levels are tinted by hue (`levelHues.ts`): the project's own
   (`ProjectSettings.themeHue`), series within 60° of it, books any hue, arcs within
   60° of their book and chapters within 60° of their arc (each node's `themeHue`);

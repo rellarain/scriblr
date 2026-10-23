@@ -7,7 +7,7 @@ from pathlib import Path
 
 from app.storage import project_store as store
 from app.storage import tree_history, tree_pack
-from app.storage.schema import OutlineNode, PlotNode, TreeSnapshot, utcnow
+from app.storage.schema import PROJECT_FILE_VERSION, OutlineNode, PlotNode, TreeSnapshot, utcnow
 
 
 def _plot(i: int, **over) -> dict:
@@ -168,7 +168,7 @@ def test_dense_history_from_before_is_converted_on_the_first_write_and_the_old_f
     assert (storage_root / pid / "project.json.v3.bak").stat().st_size == before
     assert path.stat().st_size < before / 3
     assert [s.nodes for s in store.list_tree_snapshots(storage_root, pid, "plot")] == [s.nodes for s in dense]
-    assert json.loads(path.read_text(encoding="utf-8"))["schemaVersion"] == 4
+    assert json.loads(path.read_text(encoding="utf-8"))["schemaVersion"] == PROJECT_FILE_VERSION
 
 
 def test_project_json_is_compact_and_keeps_real_text(storage_root: Path) -> None:

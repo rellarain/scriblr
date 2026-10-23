@@ -393,8 +393,21 @@ describe('Outline Max: the book editor and the draft stats', () => {
     await user.tab() // leaving the field holds it to the limits
     expect(Number((within(editor).getByLabelText('Line spacing') as HTMLInputElement).value)).toBe(3)
 
+    // The paragraph indent is a whole number of spaces, from 0 to 16 (it is measured in em by no label any more).
+    expect(within(editor).queryByLabelText('Paragraph indent (em)')).toBeNull()
+    const indent = within(editor).getByLabelText('Paragraph indent (spaces)') as HTMLInputElement
+    expect(indent.value).toBe('0')
+    await user.clear(indent)
+    await user.type(indent, '5')
+    expect((within(editor).getByLabelText('Paragraph indent (spaces)') as HTMLInputElement).value).toBe('5')
+    await user.clear(indent)
+    await user.type(indent, '40')
+    await user.tab()
+    expect(Number((within(editor).getByLabelText('Paragraph indent (spaces)') as HTMLInputElement).value)).toBe(16)
+
     await user.click(within(editor).getByRole('button', { name: /Reset to the defaults/ }))
     expect((within(editor).getByLabelText('Font size') as HTMLInputElement).value).toBe('17')
+    expect((within(editor).getByLabelText('Paragraph indent (spaces)') as HTMLInputElement).value).toBe('0')
     expect(within(editor).getByRole('button', { name: 'Italic' }).getAttribute('aria-pressed')).toBe('false')
   })
 

@@ -33,6 +33,6 @@ The scale is small: most of the app is 11 to 13px, and **11px is the floor**: no
 - **Section marks are bold uppercase small text with tracking**: 9 to 12px, 700, 1px (1.5px for a console title). Little else is uppercase (a kind badge).
 - **Weights**: 700 for labels, buttons and titles; 400 for everything else. Nothing is lighter.
 - **Muted is a colour, not a size**: use `ink-muted` or `paper-muted`, which are held to 4.5:1. The old habit of lowering opacity for secondary text is kept only where the audit covers it (90% on a level, 88% for the page's muted text).
-- **A book's preview** is its own: font, size, bold or italic, alignment, line spacing, paragraph indent and spacing are the book's `previewFormat` (set in the book's Settings) and applied as `--wr-pv-*` variables on `.wrPreviewPane`.
+- **A book's preview** is its own: font, size, bold or italic, alignment, line spacing, paragraph indent and spacing are the book's `previewFormat` (set in the book's Settings; the paragraph indent is measured in spaces, 0 to 16, each as wide as a space in the book's font) and applied as `--wr-pv-*` variables on `.wrPreviewPane`.
 - **Numbers that line up** (the save time, counts in columns) use tabular numerals.
 - **Vertical text** is for edge tabs and spines only (`writing-mode: vertical-rl`, 0.3 to 0.5px tracking).

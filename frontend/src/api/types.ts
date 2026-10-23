@@ -25,7 +25,8 @@ export interface PreviewFormat {
   fontWeight: 'normal' | 'bold'
   textAlign: 'left' | 'justify'
   lineSpacing: number
-  paragraphIndent: number
+  // The width of this many spaces in the book's font (it was `paragraphIndent`, in em, before project format 5).
+  paragraphIndentSpaces: number
   paragraphSpacing: number
 }
 

@@ -8,8 +8,9 @@ from pydantic import BaseModel, Field, PrivateAttr, field_validator, model_valid
 
 SCHEMA_VERSION = 2
 # The version of the project.json file as a whole (ProjectFile.schemaVersion), which a build refuses to write over when the file is newer than it
-# knows (see project_store). 2: one file per project; 3: plot clusters; 4: tree history as sparse keyframes and deltas (tree_pack).
-PROJECT_FILE_VERSION = 4
+# knows (see project_store). 2: one file per project; 3: plot clusters; 4: tree history as sparse keyframes and deltas (tree_pack);
+# 5: a book's paragraph indent in spaces (PreviewFormat.paragraphIndentSpaces) instead of em.
+PROJECT_FILE_VERSION = 5
 
 
 def utcnow() -> datetime:
@@ -168,6 +169,12 @@ class NodeFlag(BaseModel):
     note: str = ""
 
 
+# How wide one space is in each of the preview's font families, as a fraction of the font size: the paragraph indent is a number of
+# spaces, drawn as that many times this width. The frontend (previewFormat.ts, SPACE_EM) has the same table.
+SPACE_EM = {"serif": 0.25, "sans": 0.28, "mono": 0.6}
+MAX_INDENT_SPACES = 16
+
+
 class PreviewFormat(BaseModel):
     """How a book's chapters are laid out in the Draft level's preview (all optional: the defaults
     are the preview's own look). Sizes are bounded so a bad value cannot make the page unreadable."""
@@ -178,8 +185,21 @@ class PreviewFormat(BaseModel):
     fontWeight: Literal["normal", "bold"] = "normal"
     textAlign: Literal["left", "justify"] = "justify"
     lineSpacing: float = Field(default=1.65, ge=1.0, le=3.0)  # multiple of the font size
-    paragraphIndent: float = Field(default=0.0, ge=0.0, le=4.0)  # em
+    paragraphIndentSpaces: int = Field(default=0, ge=0, le=MAX_INDENT_SPACES)  # the width of this many spaces in the font
     paragraphSpacing: float = Field(default=0.0, ge=0.0, le=3.0)  # em between paragraphs
+
+    @model_validator(mode="before")
+    @classmethod
+    def _indent_in_em(cls, data):
+        """Before format 5 the indent was `paragraphIndent`, in em (0 to 4): it becomes the same width in spaces of the book's font."""
+        if isinstance(data, dict) and "paragraphIndent" in data:
+            data = dict(data)
+            em = data.pop("paragraphIndent")
+            if "paragraphIndentSpaces" not in data:
+                width = SPACE_EM.get(data.get("fontFamily", "serif"), SPACE_EM["serif"])
+                # A value that is not a number is passed on as it is, for the field to refuse.
+                data["paragraphIndentSpaces"] = int(em / width + 0.5) if isinstance(em, (int, float)) and not isinstance(em, bool) else em
+        return data
 
 
 class OutlineNode(BaseModel):

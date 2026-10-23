@@ -281,12 +281,12 @@ describe('Draft level: Draft | Preview', () => {
     first.unmount()
     const book = OUTLINE.findIndex(n => n.id === 'b')
     const original = OUTLINE[book]
-    OUTLINE[book] = { ...original, previewFormat: { fontFamily: 'mono', fontSize: 22, fontStyle: 'italic', fontWeight: 'bold', textAlign: 'left', lineSpacing: 2, paragraphIndent: 1.5, paragraphSpacing: 0.5 } }
+    OUTLINE[book] = { ...original, previewFormat: { fontFamily: 'mono', fontSize: 22, fontStyle: 'italic', fontWeight: 'bold', textAlign: 'left', lineSpacing: 2, paragraphIndentSpaces: 3, paragraphSpacing: 0.5 } }
     try {
       setup({ console_: 'pages' })
       expect(pane().style.getPropertyValue('--wr-pv-size')).toBe('22px')
       expect(pane().style.getPropertyValue('--wr-pv-style')).toBe('italic')
-      expect(pane().style.getPropertyValue('--wr-pv-indent')).toBe('1.5em')
+      expect(pane().style.getPropertyValue('--wr-pv-indent')).toBe('1.8em')
       expect(pane().style.getPropertyValue('--wr-pv-align')).toBe('left')
     } finally { OUTLINE[book] = original }
   })

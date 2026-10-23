@@ -370,11 +370,13 @@ def _write_project_file(root: Path, project_id: str, pf: ProjectFile) -> None:
     path = _project_file_path(project_dir)
     if pf.schemaVersion > PROJECT_FILE_VERSION:
         raise NewerSchemaError(project_id, pf.schemaVersion, PROJECT_FILE_VERSION)
-    if pf.schemaVersion < 4 and path.exists():
-        # The first write of a file from before the compact history: keep the file as it was, once, and convert the history.
+    if pf.schemaVersion < PROJECT_FILE_VERSION and path.exists():
+        # The first write of a file from an earlier format: keep the file as it was, once per format, before it is converted.
         once = path.with_name(f"project.json.v{pf.schemaVersion}.bak")
         if not once.exists():
             shutil.copyfile(path, once)
+    if pf.schemaVersion < 4:
+        # From before the compact history: convert it.
         pf.outlineHistory = tree_pack.repack("outline", pf.outlineHistory)
         pf.plotHistory = tree_pack.repack("plot", pf.plotHistory)
     pf.schemaVersion = PROJECT_FILE_VERSION
