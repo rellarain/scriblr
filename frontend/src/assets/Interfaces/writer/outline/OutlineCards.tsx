@@ -7,7 +7,7 @@ import { ChevronDownIcon, ChevronRightIcon, GripIcon, PencilIcon, PlusIcon } fro
 import { useNodeKeys } from '../../../../lib/nodeKeys'
 import { buildChildIndex, descendantsOf } from '../outlineTree'
 import { DeleteControl } from '../shared'
-import { useStoredState } from '../storage'
+import { useOutlineOpen } from './useOutlineOpen'
 import { PlotpointTile } from '../PlotpointTile'
 import { hasTime, systemForBook } from '../timeSystem'
 import { useNodeDnd } from '../useNodeDnd'
@@ -55,9 +55,9 @@ export function OutlineCards({ w, book, counts, plotDrag, chapterId }: {
   const { numbers, scenesOfChapter, chapterOf } = useMemo(() => structureOfBook(index, book.id), [index, book.id])
   const pointsByNode = useMemo(() => pointsByTarget(w.plotNodes), [w.plotNodes])
   const [plotOverId, setPlotOverId] = useState<string | null>(null)
-  const [openMap, setOpenMap] = useStoredState<Record<string, boolean>>('scriblr.writer.outlineOpen', {})
-  const isOpen = (n: OutlineNode) => openMap[n.id] ?? true
-  const setOpen = (id: string, open: boolean) => setOpenMap(prev => ({ ...prev, [id]: open }))
+  const fold = useOutlineOpen()
+  const isOpen = (n: OutlineNode) => fold.isOpen(n.id)
+  const setOpen = fold.setOpen
   const system = useMemo(() => systemForBook(w.activeProject?.settings.timeSystems ?? [], book), [w.activeProject, book])
   const words = (id: string) => counts.nodes[id] ?? 0
 

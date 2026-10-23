@@ -345,8 +345,15 @@ describe('Outline Max: plotpoints', () => {
     expect(within(banner()).getByDisplayValue('Act title')).toBeTruthy()
     expect(banner().querySelector(':scope > .wrCardPoints [data-point="pp1"]')).not.toBeNull()
     expect(addButton(banner(), 'Act')).toBeTruthy()
+    // Open, the chapter's own row in the contents carries its title, colour and counts above the tile.
+    expect(screen.getByLabelText('Chapter 1 title')).toBeTruthy()
+    expect(document.querySelector('.wrCtDetail')).not.toBeNull()
 
     await user.click(within(head()).getByRole('button', { name: 'Collapse chapter 1' }))
+    // The whole chapter section folds, not only the tile: the row's title, colour and counts go too (the row itself stays).
+    expect(screen.queryByLabelText('Chapter 1 title')).toBeNull()
+    expect(document.querySelector('.wrCtDetail')).toBeNull()
+    expect(document.querySelector('.wrCtChapter .wrCtPick')).not.toBeNull()
     // Only the banner is left: its title and counts (with the plotpoints placed on the chapter), and the button, now to expand.
     expect(within(banner()).queryByDisplayValue('Act title')).toBeNull()
     expect(banner().querySelector('.wrCardPoints')).toBeNull()
@@ -362,11 +369,13 @@ describe('Outline Max: plotpoints', () => {
     unmount()
     setup('c1')
     expect(within(banner()).queryByDisplayValue('Act title')).toBeNull()
+    expect(document.querySelector('.wrCtDetail')).toBeNull()
     expect(within(banner()).getByRole('button', { name: 'Expand chapter 1' })).toBeTruthy()
 
     await user.click(within(banner()).getByRole('button', { name: 'Expand chapter 1' }))
     expect(within(banner()).getByDisplayValue('Act title')).toBeTruthy()
     expect(addButton(banner(), 'Act')).toBeTruthy()
+    expect(screen.getByLabelText('Chapter 1 title')).toBeTruthy()
   })
 
   it('sends a placed plotpoint back to the tray from its x, or when it is dragged there', async () => {

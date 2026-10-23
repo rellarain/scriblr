@@ -8,6 +8,7 @@ import { useNodeKeys } from '../../../../lib/nodeKeys'
 import { buildChildIndex } from '../outlineTree'
 import { DeleteControl } from '../shared'
 import { useNodeDnd } from '../useNodeDnd'
+import { useOutlineOpen } from './useOutlineOpen'
 import { formatWords } from '../wordCount'
 import HueSlider from '../HueSlider'
 import { structureOfBook } from './outlineModel'
@@ -39,6 +40,7 @@ export function OutlineNav({ w, book, counts, chapterBody, focus = null }: {
   const index = useMemo(() => buildChildIndex(w.outlineNodes), [w.outlineNodes])
   const nodeById = useMemo(() => new Map(w.outlineNodes.map(n => [n.id, n])), [w.outlineNodes])
   const { numbers } = useMemo(() => structureOfBook(index, book.id), [index, book.id])
+  const fold = useOutlineOpen()
   const words = (id: string) => counts.nodes[id] ?? 0
   const childrenOf = (node: OutlineNode) => (index.get(node.id) ?? []).filter(k => k.kind === 'arc' || k.kind === 'chapter')
 
@@ -98,6 +100,9 @@ export function OutlineNav({ w, book, counts, chapterBody, focus = null }: {
         ? focus.kind === 'book' || (focus.kind === 'chapter' ? node.id === focus.id : node.parentId === focus.id)
         : node.id === w.activeChapterId
       const inside = (index.get(node.id) ?? []).length
+      // A chapter folded up from its tile's button (OutlineCards) folds its own title, colour and counts with it: only the row and the
+      // tile's banner are left. Without a tile (no chapterBody) there is nothing to fold it from, so it stays open.
+      const folded = Boolean(chapterBody) && !fold.isOpen(node.id)
       return (
         <div key={node.id} {...common} className={dnd.cardClass(`wrCtChapter${active ? ' wrCtChapter--active' : ''}`, node.id)} style={tint(node)}>
           <div className="wrCtRow">
@@ -108,7 +113,7 @@ export function OutlineNav({ w, book, counts, chapterBody, focus = null }: {
               <span className="wrCtWords">{formatWords(words(node.id))}</span>
             </button>
           </div>
-          {active && (
+          {active && !folded && (
             <div className="wrCtDetail">
               <div className="wrCtDetailRow">
                 <input

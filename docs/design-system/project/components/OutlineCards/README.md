@@ -13,7 +13,7 @@ Code: `writer/outline/OutlineCards.tsx`, `SceneFields.tsx`, `useNodeDnd.tsx`, `l
 | Scene | frame-4 | 10 / 12 | grip, chevron, *Scene 1*, Location / Time / Action chips and fields, its moments, *+ Moment* |
 | Moment | frame-5 | 8 / 10 | grip, *Moment 1*, a one-line synopsis preview, the synopsis input, boxed plotpoints, word count |
 
-Every card has a **word count** (the draft's), a quiet trash that asks first, a grip to drag it, and a footer. A scene that repeats the previous scene's place or time shows it faded, as inherited. The count of what a folded card holds shows in its footer. The **chapter banner** folds too, from the chevron in its top right corner (a 30 x 30 light icon button beside the pencil): folded, it is the number, the title, the pencil and its counts (the plotpoints placed on the chapter are counted there, as *2 plotpoints*), and its plotpoints, acts and *+ Act* are hidden; adding an act with the keyboard unfolds it.
+Every card has a **word count** (the draft's), a quiet trash that asks first, a grip to drag it, and a footer. A scene that repeats the previous scene's place or time shows it faded, as inherited. The count of what a folded card holds shows in its footer. The **chapter banner** folds too, from the chevron in its top right corner (a 30 x 30 light icon button beside the pencil): folding it folds the whole chapter section: the chapter's own row in the contents loses its title input, colour slider, counts and trash (the row of number, title and words stays), and the tile is left as the number, the title, the pencil and its counts (the plotpoints placed on the chapter are counted there, as *2 plotpoints*), with its plotpoints, acts and *+ Act* hidden; adding an act with the keyboard unfolds it.
 
 ## States
 
