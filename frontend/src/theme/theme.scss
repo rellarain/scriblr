@@ -84,7 +84,7 @@ $transitions: ();
   $transitions: append($transitions, #{$prop} $fade ease, comma);
 }
 
-@import './space';
+@import './tokens';
 
 html {
   transition: $transitions;

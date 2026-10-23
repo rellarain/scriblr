@@ -7,30 +7,30 @@
   // In a narrow header (the Mid level beside a focused one) the title keeps a line of its own and these drop beneath it.
   .wrLevelHeader { flex-wrap: wrap; row-gap: var(--space-1); }
   // The title and the size toggle share one line (the toggle at its right end); the tabs wrap beneath them when the header is narrow.
-  .wrLevelTitleRow { flex: 1 1 130px; min-width: 130px; display: flex; align-items: center; gap: 8px; }
+  .wrLevelTitleRow { flex: 1 1 130px; min-width: 130px; display: flex; align-items: center; gap: var(--space-base); }
   .wrHeaderExtras { flex: 0 1 auto; display: flex; flex-wrap: wrap; align-items: center; justify-content: flex-end; gap: var(--space-1) var(--space-3); margin-left: auto; }
   .wrTabBar, .wrQuickActions { flex: 0 0 auto; display: flex; align-items: center; gap: var(--space-1); }
   // A level's tabs wrap onto a second row when the level is narrow (the side column can be as narrow as 200px).
   .wrTabBar { flex: 0 1 auto; flex-wrap: wrap; max-width: 100%; }
   // The tab bar is a rounded container (radius-button) holding rounded tab buttons.
-  .wrTabBar { padding: var(--space-1); border-radius: 4px; background: var(--level-wash-lo); }
+  .wrTabBar { padding: var(--space-1); border-radius: var(--radius-button); background: var(--level-wash-lo); }
   .wrQuickActions { margin-left: var(--space-3); gap: var(--space-2); }
   .wrTabBtn {
-    display: inline-flex; align-items: center; justify-content: center; width: 30px; height: 30px; padding: 0; border-radius: 4px; color: inherit; opacity: 0.7;
+    display: inline-flex; align-items: center; justify-content: center; width: 30px; height: 30px; padding: 0; border-radius: var(--radius-button); color: inherit; opacity: 0.7;
     &:hover { opacity: 1; background: var(--level-wash); }
     &--on { opacity: 1; background: var(--ov-sink-2); }
-    &--end { margin-left: 8px; }
+    &--end { margin-left: var(--space-base); }
   }
-  .wrQuickSearch { width: 130px; box-sizing: border-box; height: 30px; border: 0; border-radius: 0; padding: 0 var(--space-3); font-size: 11px; background: var(--level-input); color: var(--level-input-ink); outline: none; }
+  .wrQuickSearch { width: 130px; box-sizing: border-box; height: 30px; border: 0; border-radius: var(--radius-none); padding: 0 var(--space-3); font-size: var(--text-small); background: var(--level-input); color: var(--level-input-ink); outline: none; }
   .wrLevelHeader .wrSmallBtn, .wrLevelHeader .saveIconBtn { @include wrLevelWash; }
   // The Save component in a header: a rounded container (radius-button) of 30 x 30 rounded buttons, like the tab bar beside it.
   .wrNotesBareHead { display: flex; margin-bottom: var(--space-3); }
   .wrSaveDemo { display: flex; align-items: center; flex-wrap: wrap; gap: var(--space-5); }
   .wrLevelHeader .saveCluster, .wrBookEdHead .saveCluster, .wrChapterTile .saveCluster, .wrSaveDemo .saveCluster {
-    --cluster-bg: var(--level-wash-lo); --pill-fill: var(--level-ink-soft); --pill-track: var(--level-wash); font-size: 11px;
-    .saveIconBtn { box-sizing: border-box; height: 30px; border-radius: 4px; }
+    --cluster-bg: var(--level-wash-lo); --pill-fill: var(--level-ink-soft); --pill-track: var(--level-wash); font-size: var(--text-small);
+    .saveIconBtn { box-sizing: border-box; height: 30px; border-radius: var(--radius-button); }
     .saveIconBtn:not(.saveBtnWithTime) { width: 30px; padding: 0; }
-    .saveBtnWithTime { width: auto; min-width: 30px; padding: 0 7px; }
+    .saveBtnWithTime { width: auto; min-width: 30px; padding: 0 var(--space-base); }
     // Unsaved: the accent colour (this rule is stronger than the header's wash for its buttons).
     .saveBtnState--unsaved { color: var(--zone-on-accent); background: var(--accent); &:hover:not(:disabled) { background: var(--accent-hover); } }
     .autosaveOpt--on { color: var(--on-accent); background: var(--wr-fill); }
@@ -52,20 +52,20 @@
   .wrSplit .tileDivider:hover .tileDividerBar, .wrSplit .tileDivider:focus-visible .tileDividerBar { background: var(--wr-accent-light); }
   .wrSplit .tileDivider--drop .tileDividerBar { background: var(--wr-accent-light); }
   .wrTabTile { background: var(--wr-fill-2); display: flex; flex-direction: column; min-width: 0; }
-  .wrTabTileTitle { margin: 0; display: flex; align-items: center; gap: var(--space-3); padding: var(--space-3) var(--space-4); font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 1px; background: var(--wr-fill-3); }
+  .wrTabTileTitle { margin: 0; display: flex; align-items: center; gap: var(--space-3); padding: var(--space-3) var(--space-4); font-size: var(--text-small); font-weight: 700; text-transform: uppercase; letter-spacing: 1px; background: var(--wr-fill-3); }
   .wrTabTileBody { padding: var(--space-4); display: flex; flex-direction: column; gap: var(--space-4); min-width: 0; }
   // What the tabs hold, on the level's own colour: cards one step deeper, light inputs.
   .wrTabPane:not(.wrTabPane--surface), .wrTabTileBody:not(.wrTabTileBody--surface) {
     color: var(--on-accent);
     .wrColumn { overflow: visible; max-width: none; flex: 0 0 auto; }
-    .wrCard, .wrNote { background: var(--wr-fill-3); box-shadow: none; border-radius: 0; }
+    .wrCard, .wrNote { background: var(--wr-fill-3); box-shadow: none; border-radius: var(--radius-none); }
     .wrNote--editing { background: var(--wr-fill-4); box-shadow: inset 3px 0 0 var(--level-ink-soft); }
     .wrNotes { overflow: visible; }
     .wrNotesBare { display: flex; flex-direction: column; gap: var(--space-4); }
     .wrNoteTitle, .wrNoteBody { color: var(--on-accent); &::placeholder { color: color-mix(in srgb, var(--on-accent) 55%, transparent); } }
-    .wrInlineAdd input { background: var(--level-input); color: var(--level-input-ink); border-radius: 0; &::placeholder { color: var(--level-input-hint); } }
+    .wrInlineAdd input { background: var(--level-input); color: var(--level-input-ink); border-radius: var(--radius-none); &::placeholder { color: var(--level-input-hint); } }
     .wrSmallBtn { @include wrLevelWash; &:hover:not(:disabled) { background: var(--level-wash-hi); } }
-    .wrBarTrack { background: var(--ov-sink-3); border-radius: 0; }
+    .wrBarTrack { background: var(--ov-sink-3); border-radius: var(--radius-none); }
     .wrBarFill { background: var(--level-ink-soft); }
     .wrCheckItem input { accent-color: var(--level-ink); }
     .wrMuted, .wrHint, .wrOutlineMeta, .wrPanelHead, .wrChapterPointsHead { opacity: 0.9; }
@@ -73,9 +73,9 @@
   }
   // An editor's tab: a light surface of the level's hue with the ink colour.
   .wrTabPane--surface, .wrTabTileBody--surface { color: var(--ink); background: var(--surface-side); padding: var(--space-4); }
-  .wrHelp { display: flex; flex-direction: column; gap: var(--space-5); font-size: 12px; line-height: 1.5; }
-  .wrHelpArticle { display: flex; flex-direction: column; gap: var(--space-3); h4 { margin: 0; font-size: 12px; text-transform: uppercase; letter-spacing: 1px; } summary { cursor: pointer; font-weight: 700; } }
-  .wrHelpText { margin: 0; font-size: 12px; line-height: 1.5; white-space: pre-wrap; }
+  .wrHelp { display: flex; flex-direction: column; gap: var(--space-5); font-size: var(--text-ui); line-height: 1.5; }
+  .wrHelpArticle { display: flex; flex-direction: column; gap: var(--space-3); h4 { margin: 0; font-size: var(--text-ui); text-transform: uppercase; letter-spacing: 1px; } summary { cursor: pointer; font-weight: 700; } }
+  .wrHelpText { margin: 0; font-size: var(--text-ui); line-height: 1.5; white-space: pre-wrap; }
 
   // The tiles beside the Dash at Max: one per project, stacked, with empty space beneath.
   .wrProjectsColumn { background: transparent; overflow: visible; }

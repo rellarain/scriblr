@@ -63,26 +63,26 @@
     --level-input: hsl(var(--color-theme-h) 28% 96%);
     --level-input-ink: hsl(var(--color-theme-h) 30% 10%);
     --level-input-hint: hsl(var(--color-theme-h) 12% 42%);
-    display: flex; flex-direction: column; min-width: 0; min-height: 0; overflow: hidden; border-radius: 0;
+    display: flex; flex-direction: column; min-width: 0; min-height: 0; overflow: hidden; border-radius: var(--radius-none);
     background: var(--wr-fill); color: var(--on-accent);
     &--max { flex: 1 1 0; }
   }
   .wrLevelsSide .wrLevel--mid { flex: 1 1 0; }
   .wrLevelsSide .wrLevel--min { flex: 0 0 auto; }
   .wrLevelHeader {
-    flex: 0 0 auto; display: flex; align-items: center; gap: 8px; min-height: 40px; box-sizing: border-box; padding: 8px 22px;
+    flex: 0 0 auto; display: flex; align-items: center; gap: var(--space-base); min-height: 40px; box-sizing: border-box; padding: var(--space-base) 22px;
     background: var(--wr-fill);
     &--min { cursor: pointer; &:hover { background: color-mix(in srgb, var(--wr-fill) 88%, white); } }
   }
   // The level's title: all caps, spaced out like the tile titles, with room above and below.
   .wrLevelTitle { margin: var(--space-2) 0; line-height: 1.7; flex: 1 1 auto; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; text-align: left; font-size: 14px; font-weight: 700; text-transform: uppercase; letter-spacing: 1.5px; color: inherit; }
   .wrLevelTitle--link:hover { text-decoration: underline; }
-  .wrLevelToggle { flex: 0 0 auto; display: inline-flex; align-items: center; justify-content: center; width: 24px; height: 24px; border-radius: 0; color: inherit; &:hover { background: var(--level-wash); } }
+  .wrLevelToggle { flex: 0 0 auto; display: inline-flex; align-items: center; justify-content: center; width: 24px; height: 24px; border-radius: var(--radius-none); color: inherit; &:hover { background: var(--level-wash); } }
   .wrLevelBody { flex: 1 1 auto; min-height: 0; box-sizing: border-box; display: flex; flex-direction: column; position: relative; padding: 8px var(--space-5) var(--space-5); background: var(--wr-fill-1); }
   .wrLevel--mid .wrLevelBody { overflow-y: auto; scrollbar-width: none; &::-webkit-scrollbar { display: none; } }
   .wrLevelMinBody { background: var(--wr-fill-1); flex: 1 1 auto; padding: 8px var(--space-6) var(--space-5); display: flex; flex-direction: column; gap: var(--space-5); overflow-y: auto; scrollbar-width: none; &::-webkit-scrollbar { display: none; } }
   .wrNodeHue { max-width: 360px; margin: var(--space-1) 0; }
-  .wrOutlineMid { display: flex; flex-direction: column; gap: 5px; font-size: 12px; line-height: 1.4; padding-top: 8px; }
+  .wrOutlineMid { display: flex; flex-direction: column; gap: var(--space-3); font-size: var(--text-ui); line-height: 1.4; padding-top: var(--space-base); }
   // The Outline and Draft pages run their paper flush to the right edge, so the edge tabs sit against it.
   .wrLevel--outline.wrLevel--max .wrLevelBody { padding: 0 0 0 var(--space-3); }
   .wrLevel--draft .wrLevelBody { padding: 0; background: transparent; }
@@ -90,14 +90,14 @@
   .wrConsoleBody { flex: 1 1 auto; min-height: 0; display: flex; flex-direction: column; overflow-y: auto; scrollbar-width: none; &::-webkit-scrollbar { display: none; } }
 
   .wrTitleRow { flex: 0 0 auto; height: 44px; display: flex; align-items: center; gap: var(--space-5); }
-  .wrConsoleTitle { margin: 0; font-size: 18px; font-weight: 700; text-transform: uppercase; letter-spacing: 1.5px; }
-  .wrComponentName { font-size: 13px; opacity: 0.9; }
+  .wrConsoleTitle { margin: 0; font-size: var(--text-heading); font-weight: 700; text-transform: uppercase; letter-spacing: 1.5px; }
+  .wrComponentName { font-size: var(--text-field); opacity: 0.9; }
   .wrTitleRight { margin-left: auto; display: flex; align-items: center; gap: var(--space-6); }
   // The Book editor has no title row: its Save control is pinned to the cover's top-right corner.
-  .wrPlaceholder { padding: var(--space-3) var(--space-1); h2 { font-size: 15px; margin: 0 0 var(--space-3); text-transform: uppercase; letter-spacing: 1px; } p { font-size: 13px; opacity: 0.85; margin: 0; } }
+  .wrPlaceholder { padding: var(--space-3) var(--space-1); h2 { font-size: var(--text-title); margin: 0 0 var(--space-3); text-transform: uppercase; letter-spacing: 1px; } p { font-size: var(--text-field); opacity: 0.85; margin: 0; } }
 
-  .wrSegmented { display: flex; padding: 3px; gap: 3px; background: var(--wr-field); border-radius: 0; }
-  .wrSegBtn { display: inline-flex; align-items: center; padding: var(--space-3) 8px; border-radius: 3px; font-size: 12px; font-weight: 700; &--active { background: var(--wr-accent); } &:hover:not(:disabled):not(.wrSegBtn--active) { background: color-mix(in srgb, var(--ink) 10%, transparent); } &:disabled { opacity: 0.6; cursor: default; } }
+  .wrSegmented { display: flex; padding: var(--space-2); gap: var(--space-2); background: var(--wr-field); border-radius: var(--radius-none); }
+  .wrSegBtn { display: inline-flex; align-items: center; padding: var(--space-3) 8px; border-radius: var(--radius-button); font-size: var(--text-ui); font-weight: 700; &--active { background: var(--wr-accent); } &:hover:not(:disabled):not(.wrSegBtn--active) { background: color-mix(in srgb, var(--ink) 10%, transparent); } &:disabled { opacity: 0.6; cursor: default; } }
   // The label is hidden until its button is selected, then slides open.
   .wrSegLabel { max-width: 0; margin-left: 0; opacity: 0; overflow: hidden; white-space: nowrap; transition: max-width 0.25s ease, margin-left 0.25s ease, opacity 0.2s ease; }
   .wrSegBtn--active .wrSegLabel { max-width: 80px; margin-left: var(--space-3); opacity: 1; }

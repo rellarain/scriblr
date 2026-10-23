@@ -1,0 +1,38 @@
+// The design system's space, type-size and radius tokens as CSS custom properties, on :root, so a stylesheet can say `gap: var(--space-3)`
+// where it means "the gap between levels". The values are the ones in docs/design-system/project/tokens.json
+// (scripts/design-system/tokens.ts); a test (scripts/design-system/cssTokens.test.ts) fails when this file and that list disagree.
+// What is not on the scale is written as the number it is, and is on the list of drift to fix.
+:root {
+  // Space.
+  --space-1: 2px;
+  --space-2: 4px;
+  --space-3: 6px;
+  --space-base: 8px;
+  --space-grid: 8px;
+  --space-4: 10px;
+  --space-5: 12px;
+  --space-6: 14px;
+  --space-7: 18px;
+  --tab-size: 30px;
+  --header-min: 40px;
+  --rail-tile: 40px;
+  --one-column-below: 400px;
+  --hue-window: 60;
+
+  // Radius.
+  --radius-none: 0px;
+  --radius-button: 4px;
+  --radius-input: 4px;
+
+  // Type sizes, by what they are for: the interface's own (label and button, ui, field, level title, console title) and the writing's
+  // (draft text, preview body, chapter title, preview title).
+  --text-small: 11px;
+  --text-ui: 12px;
+  --text-field: 13px;
+  --text-title: 15px;
+  --text-heading: 18px;
+  --text-draft: 16px;
+  --text-preview: 17px;
+  --text-chapter: 22px;
+  --text-display: 30px;
+}

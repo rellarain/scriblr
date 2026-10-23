@@ -4,58 +4,58 @@
 .wr {
   // ---------------------------------------------------------------- pages
   // The chapter's plotpoints (assigned to the chapter, not yet to an act, scene or moment), at the left of the Outline page.
-  .wrChapterPoints { flex: 0 0 250px; min-width: 0; min-height: 0; display: flex; flex-direction: column; gap: 8px; padding: 26px var(--space-5) 16px 16px; border-right: 1px solid var(--wr-page-line); box-sizing: border-box; }
-  .wrChapterPointsHead { display: flex; align-items: baseline; justify-content: space-between; font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: 1px; opacity: 0.9; }
-  .wrChapterPointsList { flex: 1 1 auto; min-height: 0; overflow-y: auto; display: flex; flex-direction: column; gap: 8px; scrollbar-width: none; &::-webkit-scrollbar { display: none; } }
+  .wrChapterPoints { flex: 0 0 250px; min-width: 0; min-height: 0; display: flex; flex-direction: column; gap: var(--space-base); padding: 26px var(--space-5) 16px 16px; border-right: 1px solid var(--wr-page-line); box-sizing: border-box; }
+  .wrChapterPointsHead { display: flex; align-items: baseline; justify-content: space-between; font-size: var(--text-small); font-weight: 700; text-transform: uppercase; letter-spacing: 1px; opacity: 0.9; }
+  .wrChapterPointsList { flex: 1 1 auto; min-height: 0; overflow-y: auto; display: flex; flex-direction: column; gap: var(--space-base); scrollbar-width: none; &::-webkit-scrollbar { display: none; } }
   // A plotpoint tile: dark, so it stands out from the (light) card it sits in.
   // The compare view (PlotCompare.tsx): chips, the merged list or per-plotline groups, and the chapters panel.
   .wrCompare { display: flex; flex-direction: column; gap: var(--space-4); min-width: 0; }
   .wrCompareChips { display: flex; flex-wrap: wrap; gap: var(--space-3); }
   .wrCompareChip {
-    display: inline-flex; align-items: center; max-width: 100%; padding-left: calc(var(--wr-edge-w, 4px) + 4px); border-radius: 0; background-color: var(--wr-cat, var(--ov-sink-2)); color: var(--ink); @include wrEdge;
+    display: inline-flex; align-items: center; max-width: 100%; padding-left: calc(var(--wr-edge-w, 4px) + 4px); border-radius: var(--radius-none); background-color: var(--wr-cat, var(--ov-sink-2)); color: var(--ink); @include wrEdge;
     &--off { opacity: 0.55; .wrCompareChipName { text-decoration: line-through; } }
   }
-  .wrCompareChipName { padding: var(--space-2) var(--space-3); max-width: 300px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 11px; font-weight: 700; color: inherit; text-align: left; }
+  .wrCompareChipName { padding: var(--space-2) var(--space-3); max-width: 300px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: var(--text-small); font-weight: 700; color: inherit; text-align: left; }
   .wrCompareChipX { display: inline-flex; align-items: center; padding: var(--space-2) var(--space-3); color: inherit; &:hover { background: var(--ov-lift-2); } }
   .wrCompareControls { display: flex; align-items: center; flex-wrap: wrap; gap: 8px var(--space-6); .wrOrderToggle { margin-left: 0; align-self: center; } }
-  .wrCompareBody { display: flex; align-items: flex-start; gap: 16px; > .wrCompareList, > .wrCompareGroups { flex: 1 1 0; min-width: 0; } }
+  .wrCompareBody { display: flex; align-items: flex-start; gap: var(--space-7); > .wrCompareList, > .wrCompareGroups { flex: 1 1 0; min-width: 0; } }
   .wrCompareChapters { flex: 0 0 320px; min-width: 0; display: flex; }
-  .wrCompareList, .wrCompareGroups { display: flex; flex-direction: column; gap: 8px; min-width: 0; }
+  .wrCompareList, .wrCompareGroups { display: flex; flex-direction: column; gap: var(--space-base); min-width: 0; }
   .wrCompareGroups--columns { display: grid; grid-auto-flow: column; grid-auto-columns: minmax(260px, 1fr); align-items: start; gap: var(--space-5); overflow-x: auto; scrollbar-width: none; &::-webkit-scrollbar { display: none; } }
   .wrCompareGroup { display: flex; flex-direction: column; gap: var(--space-3); min-width: 0; }
-  .wrCompareGroupBody { display: flex; flex-direction: column; gap: 8px; }
+  .wrCompareGroupBody { display: flex; flex-direction: column; gap: var(--space-base); }
   .wrCompareGroupHead {
-    display: flex; align-items: center; gap: var(--space-3); width: 100%; margin: 0; padding: 6px 8px 6px calc(var(--wr-edge-w, 4px) + 8px); box-sizing: border-box; text-align: left; font-size: 11px; font-weight: 700;
+    display: flex; align-items: center; gap: var(--space-3); width: 100%; margin: 0; padding: 6px 8px 6px calc(var(--wr-edge-w, 4px) + 8px); box-sizing: border-box; text-align: left; font-size: var(--text-small); font-weight: 700;
     background-color: var(--wr-cat, var(--ov-sink-2)); color: var(--ink); @include wrEdge;
     > span:first-of-type { flex: 1 1 auto; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
   }
-  .wrCompareFold { display: flex; flex-direction: column; gap: 8px; }
-  .wrPointTileWhere { margin-top: var(--space-1); font-size: 10px; font-weight: 700; letter-spacing: 0.5px; text-transform: uppercase; opacity: 0.9; }
+  .wrCompareFold { display: flex; flex-direction: column; gap: var(--space-base); }
+  .wrPointTileWhere { margin-top: var(--space-1); font-size: var(--text-small); font-weight: 700; letter-spacing: 0.5px; text-transform: uppercase; opacity: 0.9; }
   .wrPointTile[role='button'] {
     cursor: pointer;
     &:hover { background-color: color-mix(in srgb, var(--wr-cat, var(--wr-card)) 88%, white); }
     &:focus-visible { outline: 2px solid var(--wr-accent-light); outline-offset: 2px; }
   }
   .wrPointTile {
-    display: flex; flex-direction: column; gap: 3px; padding: 5px 5px 5px calc(var(--wr-edge-w, 4px) + 5px); border-radius: 0; background: var(--wr-cat, var(--wr-card)); color: var(--ink);
+    display: flex; flex-direction: column; gap: var(--space-2); padding: 5px 5px 5px calc(var(--wr-edge-w, 4px) + 5px); border-radius: var(--radius-none); background: var(--wr-cat, var(--wr-card)); color: var(--ink);
     box-shadow: 0 2px 6px rgb(0 0 0 / calc(0.25 * var(--shade-k))); text-align: left; @include wrEdge;
     &--draggable { cursor: grab; }
     &--dragging { opacity: 0.7; }
   }
   .wrPointTileTop { display: flex; align-items: center; justify-content: space-between; gap: var(--space-3); min-height: 14px; }
   .wrPointTileTools { display: inline-flex; align-items: center; gap: var(--space-1); flex: 0 0 auto; margin-left: auto; }
-  .wrPointTileField { font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: 1.5px; }
+  .wrPointTileField { font-size: var(--text-small); font-weight: 700; text-transform: uppercase; letter-spacing: 1.5px; }
   .wrPointTile--highlight { outline: 2px solid var(--wr-accent-light); outline-offset: 2px; }
-  .wrPointTileTrail { flex: 1 1 auto; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; text-align: left; font-size: 9px; letter-spacing: 0.3px; color: var(--ink-faint); }
-  .wrPointTileX { display: inline-flex; align-items: center; justify-content: center; width: 16px; height: 16px; flex: 0 0 auto; border-radius: 3px; opacity: 0.55; &:hover { opacity: 1; background: var(--ov-lift-2); } }
-  .wrPointTileLine { font-size: 11px; line-height: 1.35; color: color-mix(in srgb, var(--ink) 80%, transparent); overflow-wrap: anywhere; }
-  .wrPointTileTitle { font-size: 13px; font-weight: 700; line-height: 1.3; color: var(--ink); overflow-wrap: anywhere; }
+  .wrPointTileTrail { flex: 1 1 auto; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; text-align: left; font-size: var(--text-small); letter-spacing: 0.3px; color: var(--ink-faint); }
+  .wrPointTileX { display: inline-flex; align-items: center; justify-content: center; width: 16px; height: 16px; flex: 0 0 auto; border-radius: var(--radius-button); opacity: 0.55; &:hover { opacity: 1; background: var(--ov-lift-2); } }
+  .wrPointTileLine { font-size: var(--text-small); line-height: 1.35; color: color-mix(in srgb, var(--ink) 80%, transparent); overflow-wrap: anywhere; }
+  .wrPointTileTitle { font-size: var(--text-field); font-weight: 700; line-height: 1.3; color: var(--ink); overflow-wrap: anywhere; }
   .wrPointTileBody { font-style: normal; }
   // Tiles boxed inside an act / scene / moment card.
-  .wrCardPoints { display: flex; flex-direction: column; gap: 5px; }
+  .wrCardPoints { display: flex; flex-direction: column; gap: var(--space-3); }
   .wrOutlineCard--plotOver { outline: 2px dashed var(--wr-accent); outline-offset: 2px; }
   .wrPage {
-    min-width: 0; min-height: 0; background: var(--wr-page); border-radius: 0; color: var(--wr-ink);
+    min-width: 0; min-height: 0; background: var(--wr-page); border-radius: var(--radius-none); color: var(--wr-ink);
     padding: 26px 34px; display: flex; flex-direction: column; gap: var(--space-6); overflow-y: auto; box-sizing: border-box;
   }
   // The chapter page (Outline and Draft): a very light tint of the book's theme colour, with
@@ -85,23 +85,23 @@
 
   // Draft mode: the placed plotpoints as footnote cards in a column of their own in the paper's right margin, beside the
   // draft text. Closed, a card is just its title; opened (click), it grows in place with the full detail.
-  .wrPlotNotes { flex: 0 0 210px; min-width: 0; display: flex; flex-direction: column; gap: 8px; padding: 26px var(--space-6) 16px 0; box-sizing: border-box; overflow-y: auto; scrollbar-width: none; &::-webkit-scrollbar { display: none; } }
+  .wrPlotNotes { flex: 0 0 210px; min-width: 0; display: flex; flex-direction: column; gap: var(--space-base); padding: 26px var(--space-6) 16px 0; box-sizing: border-box; overflow-y: auto; scrollbar-width: none; &::-webkit-scrollbar { display: none; } }
   .wrPlotNote {
-    display: flex; flex-direction: column; gap: var(--space-2); padding: 6px 8px 6px calc(var(--wr-edge-w, 4px) + 8px); border-radius: 6px; text-align: left; color: var(--ink);
+    display: flex; flex-direction: column; gap: var(--space-2); padding: 6px 8px 6px calc(var(--wr-edge-w, 4px) + 8px); border-radius: var(--radius-button); text-align: left; color: var(--ink);
     background: var(--wr-cat, var(--wr-card)); box-shadow: 0 2px 6px rgb(0 0 0 / calc(0.25 * var(--shade-k))); @include wrEdge;
   }
   .wrPlotNoteHead { display: flex; align-items: center; justify-content: space-between; gap: var(--space-3); width: 100%; text-align: left; color: inherit; }
-  .wrPlotNoteTitle { flex: 1 1 auto; min-width: 0; font-size: 12px; font-weight: 700; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .wrPlotNoteTitle { flex: 1 1 auto; min-width: 0; font-size: var(--text-ui); font-weight: 700; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
   .wrPlotNoteHead { align-items: flex-start; }
-  .wrPlotNoteBody { flex: 1 1 auto; min-width: 0; display: flex; flex-direction: column; gap: 3px; }
+  .wrPlotNoteBody { flex: 1 1 auto; min-width: 0; display: flex; flex-direction: column; gap: var(--space-2); }
   .wrPageScroll { flex: 1 1 auto; min-width: 0; min-height: 0; overflow-y: auto; padding: 26px 34px; box-sizing: border-box; display: flex; flex-direction: column; gap: var(--space-6); }
-  .wrPageMetaRow { display: flex; flex-wrap: wrap; align-items: baseline; font-size: 11px; color: var(--wr-page-muted); > * + *::before { content: '\00b7'; margin: 0 8px; } }
-  .wrPageKicker { font-size: 12px; font-weight: 700; text-transform: uppercase; letter-spacing: 1.5px; color: var(--wr-page-muted); }
-  .wrPageMuted { margin: 0; font-size: 13px; color: var(--paper-muted); }
+  .wrPageMetaRow { display: flex; flex-wrap: wrap; align-items: baseline; font-size: var(--text-small); color: var(--wr-page-muted); > * + *::before { content: '\00b7'; margin: 0 var(--space-base); } }
+  .wrPageKicker { font-size: var(--text-ui); font-weight: 700; text-transform: uppercase; letter-spacing: 1.5px; color: var(--wr-page-muted); }
+  .wrPageMuted { margin: 0; font-size: var(--text-field); color: var(--paper-muted); }
 
-  .wrStripChip { padding: 5px 8px; border-radius: 4px; font-size: 12px; background: var(--wr-page); color: var(--paper-ink2); max-width: 250px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+  .wrStripChip { padding: 5px var(--space-base); border-radius: var(--radius-button); font-size: var(--text-ui); background: var(--wr-page); color: var(--paper-ink2); max-width: 250px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
     &--empty { font-style: italic; opacity: 0.85; }
     &--changed { background: var(--wr-accent); color: var(--on-accent); font-weight: 700; opacity: 1; }
   }
-  .wrDraftText { width: 100%; box-sizing: border-box; border-radius: 4px; border: 1px solid hsl(var(--color-accent-h), 18%, calc(var(--paper-l) - 15% * var(--paper-dir))); background: var(--wr-input-bg, var(--paper-field)); padding: var(--space-5) var(--space-6); font-family: Georgia, 'Times New Roman', serif; font-size: 16px; line-height: 1.6; min-height: 70px; color: var(--wr-input-ink, var(--wr-ink)); outline: none; resize: none; overflow: hidden; &:focus { border-color: var(--wr-accent); } &::placeholder { color: var(--paper-placeholder); } }
+  .wrDraftText { width: 100%; box-sizing: border-box; border-radius: var(--radius-button); border: 1px solid hsl(var(--color-accent-h), 18%, calc(var(--paper-l) - 15% * var(--paper-dir))); background: var(--wr-input-bg, var(--paper-field)); padding: var(--space-5) var(--space-6); font-family: Georgia, 'Times New Roman', serif; font-size: var(--text-draft); line-height: 1.6; min-height: 70px; color: var(--wr-input-ink, var(--wr-ink)); outline: none; resize: none; overflow: hidden; &:focus { border-color: var(--wr-accent); } &::placeholder { color: var(--paper-placeholder); } }
 }

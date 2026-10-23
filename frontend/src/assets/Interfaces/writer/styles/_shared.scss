@@ -2,19 +2,19 @@
 .wr {
   // ---------------------------------------------------------------- shared
   // Quiet text (muted, hints, labels, meta) is the ink at 90%: a lower opacity would drop it under 4.5:1 on a level or on the paper.
-  .wrMuted { font-size: 12px; opacity: 0.9; margin: 0; }
+  .wrMuted { font-size: var(--text-ui); opacity: 0.9; margin: 0; }
   // Alert messages: the alert colour as a background with an outline and text in the ink chosen for it (--on-alert: white or dark,
   // whichever reads on that alert colour in this zone), so they read on any surface.
   .wrError, .wrPageError {
-    box-sizing: border-box; margin: 0; padding: 5px var(--space-4); font-size: 12px; font-weight: 700; line-height: 1.4;
-    background: var(--alert, #c9372c); color: var(--on-alert, #fff); outline: 1px solid var(--on-alert, #fff); outline-offset: -1px; border-radius: 3px; overflow-wrap: anywhere;
+    box-sizing: border-box; margin: 0; padding: 5px var(--space-4); font-size: var(--text-ui); font-weight: 700; line-height: 1.4;
+    background: var(--alert, #c9372c); color: var(--on-alert, #fff); outline: 1px solid var(--on-alert, #fff); outline-offset: -1px; border-radius: var(--radius-button); overflow-wrap: anywhere;
   }
-  .wrHint { font-size: 10px; opacity: 0.9; line-height: 1.4; margin: 0; }
-  .wrLabel { font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: 1px; opacity: 0.9; margin-bottom: var(--space-2); display: block; }
+  .wrHint { font-size: var(--text-small); opacity: 0.9; line-height: 1.4; margin: 0; }
+  .wrLabel { font-size: var(--text-small); font-weight: 700; text-transform: uppercase; letter-spacing: 1px; opacity: 0.9; margin-bottom: var(--space-2); display: block; }
 
   .wrSmallBtn {
-    display: inline-flex; align-items: center; gap: var(--space-2); padding: var(--space-2) var(--space-4); border-radius: 4px;
-    font-size: 11px; font-weight: 700; background: var(--ov-sink-2); color: var(--ink); white-space: nowrap;
+    display: inline-flex; align-items: center; gap: var(--space-2); padding: var(--space-2) var(--space-4); border-radius: var(--radius-button);
+    font-size: var(--text-small); font-weight: 700; background: var(--ov-sink-2); color: var(--ink); white-space: nowrap;
     &:hover:not(:disabled) { background: var(--wr-accent-light); }
     &:disabled { opacity: 0.6; cursor: default; }
     &--accent { background: var(--wr-accent); }
@@ -23,15 +23,15 @@
 
   // A quiet trash icon; on confirm the message replaces it in place.
   .wrTrashBtn {
-    display: inline-flex; align-items: center; justify-content: center; width: 24px; height: 24px; border-radius: 4px;
+    display: inline-flex; align-items: center; justify-content: center; width: 24px; height: 24px; border-radius: var(--radius-button);
     opacity: 0.45; flex: 0 0 auto;
     &:hover { opacity: 0.9; }
     &--light { color: var(--paper-muted); }
     &--dark { color: var(--ink); }
     &--blocked { opacity: 0.6; cursor: not-allowed; &:hover { opacity: 0.6; } }
   }
-  .wrConfirm { display: inline-flex; align-items: center; gap: 8px; }
-  .wrConfirmText { font-size: 11px; }
+  .wrConfirm { display: inline-flex; align-items: center; gap: var(--space-base); }
+  .wrConfirmText { font-size: var(--text-small); }
   .wrConfirm--light .wrConfirmText { color: var(--paper-ink2); }
 
   .wrGrip {
@@ -42,19 +42,19 @@
 
   .wrChipRow { display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-3); }
   .wrChip {
-    display: inline-flex; align-items: center; gap: 5px; padding: 3px var(--space-4); border-radius: 0; background: var(--ov-sink-2); font-size: 11px;
-    button { opacity: 0.6; font-size: 13px; line-height: 1; &:hover { opacity: 1; } }
-    &--small { padding: 1px 8px; font-size: 10px; }
+    display: inline-flex; align-items: center; gap: var(--space-3); padding: 3px var(--space-4); border-radius: var(--radius-none); background: var(--ov-sink-2); font-size: var(--text-small);
+    button { opacity: 0.6; font-size: var(--text-field); line-height: 1; &:hover { opacity: 1; } }
+    &--small { padding: 1px var(--space-base); font-size: var(--text-small); }
   }
   .wrChipAdd {
-    display: inline-flex; align-items: center; gap: var(--space-1); border-radius: 0; background: var(--ov-sink-1); padding: 0 var(--space-2) 0 var(--space-4);
-    input { width: 110px; background: transparent; border: 0; outline: none; color: var(--ink); font-size: 11px; padding: var(--space-2) 0; &::placeholder { color: var(--ink-faint); } }
-    button { display: inline-flex; padding: 3px; opacity: 0.7; &:hover:not(:disabled) { opacity: 1; } &:disabled { opacity: 0.6; } }
+    display: inline-flex; align-items: center; gap: var(--space-1); border-radius: var(--radius-none); background: var(--ov-sink-1); padding: 0 var(--space-2) 0 var(--space-4);
+    input { width: 110px; background: transparent; border: 0; outline: none; color: var(--ink); font-size: var(--text-small); padding: var(--space-2) 0; &::placeholder { color: var(--ink-faint); } }
+    button { display: inline-flex; padding: var(--space-2); opacity: 0.7; &:hover:not(:disabled) { opacity: 1; } &:disabled { opacity: 0.6; } }
   }
 
   .wrField {
-    width: 100%; box-sizing: border-box; background: var(--wr-field); border: 0; border-radius: 0; color: var(--ink);
-    font-size: 13px; padding: 8px var(--space-4); outline: none; resize: vertical;
+    width: 100%; box-sizing: border-box; background: var(--wr-field); border: 0; border-radius: var(--radius-none); color: var(--ink);
+    font-size: var(--text-field); padding: 8px var(--space-4); outline: none; resize: vertical;
     &:focus { box-shadow: inset 0 0 0 1px var(--wr-accent); }
     &::placeholder { color: var(--ink-faint); }
   }

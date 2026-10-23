@@ -23,7 +23,7 @@ A dragged card or tile is 70% opaque, a disabled control 60%. Text inside stays 
 
 ## Spacing
 
-Gaps are small and come from a short list (`space-*`): 2, 4, 6, 8, 10, 12, 14, 18. They are CSS custom properties on `:root` (`--space-1` to `--space-7`, `--space-grid`, `--tab-size`, `--radius-*`, in `frontend/src/theme/_space.scss`), and a gap, padding or margin in the Writer's stylesheets that is one of the scale's values is written as the token (`gap: var(--space-3)`); a test keeps the file equal to `tokens.json` and fails on a literal. The 8 is `space-grid`, the split grid's gap, and is still written as a number where it is something else's gap.
+Gaps are small and come from a short list (`space-*`): 2, 4, 6, 8, 10, 12, 14, 18. They are CSS custom properties on `:root` (`--space-1` to `--space-7`, `--space-base`, `--space-grid`, `--tab-size`, `--radius-*` and the `--text-*` sizes, in `frontend/src/theme/_tokens.scss`), and a gap, padding or margin in the Writer's stylesheets that is one of the scale's values is written as the token (`gap: var(--space-3)`); a test keeps the file equal to `tokens.json` and fails on a literal. The 8 is `space-base`, the base unit; the split grid's gap, `space-grid`, is the same 8px under its own name. A value between the scale's steps (3, 5, 7 and 16px) was moved onto the nearest one (4, 6, 8 and 18px); the larger values (20px and up) are page margins and indents, not gaps, and are written as numbers.
 
 | Where | Value |
 |---|---|

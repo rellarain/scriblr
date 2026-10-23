@@ -22,7 +22,7 @@ $res-surface: var(--surface-raised);
 }
 .resTreeHeading {
   padding: 4px 8px 8px;
-  font-size: 10px;
+  font-size: var(--text-small);
   font-weight: 700;
   text-transform: uppercase;
   letter-spacing: 0.05em;
@@ -204,7 +204,7 @@ $res-surface: var(--surface-raised);
 
 .resSourceBadge {
   flex: 0 0 auto;
-  font-size: 10px;
+  font-size: var(--text-small);
   padding: 2px 8px;
   border-radius: 0;
   background: var(--ov-sink-1);
@@ -216,7 +216,7 @@ $res-surface: var(--surface-raised);
 }
 
 .resPromoteCard { max-width: 500px; }
-.resPromoteHeading { font-size: 10.5px; text-transform: uppercase; letter-spacing: 0.04em; color: var(--ink-faint); margin-bottom: 8px; }
+.resPromoteHeading { font-size: var(--text-small); text-transform: uppercase; letter-spacing: 0.04em; color: var(--ink-faint); margin-bottom: 8px; }
 .resPromoteRow {
   display: flex;
   align-items: center;
@@ -238,7 +238,7 @@ $res-surface: var(--surface-raised);
 }
 .resPreviewHead { display: flex; align-items: center; gap: 8px; margin-bottom: 4px; h2 { margin: 0; font-size: 17px; color: var(--ink); } }
 .resBadge {
-  font-size: 10px;
+  font-size: var(--text-small);
   padding: 2px 9px;
   border-radius: 0;
   background: var(--ov-sink-1);

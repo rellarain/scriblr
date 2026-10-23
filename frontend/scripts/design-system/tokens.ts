@@ -10,19 +10,18 @@ import { ZONE_KEYS } from '../../src/theme/types'
 const SANS = `system-ui, -apple-system, 'Segoe UI', sans-serif`
 const SERIF = `Georgia, 'Times New Roman', serif`
 
-interface TypeStyle { name: string; fontSize: string; lineHeight: string; fontWeight: number; letterSpacing?: string; textTransform?: string; fontStyle?: string }
+export interface TypeStyle { name: string; fontSize: string; lineHeight: string; fontWeight: number; letterSpacing?: string; textTransform?: string; fontStyle?: string }
 const px = (n: number) => `${n}px`
 
-const SANS_STYLES: TypeStyle[] = [
-  { name: 'label', fontSize: px(10), lineHeight: px(14), fontWeight: 700, letterSpacing: px(1), textTransform: 'uppercase' },
-  { name: 'label-small', fontSize: px(9), lineHeight: px(12), fontWeight: 700, letterSpacing: px(1), textTransform: 'uppercase' },
+export const SANS_STYLES: TypeStyle[] = [
+  { name: 'label', fontSize: px(11), lineHeight: px(15), fontWeight: 700, letterSpacing: px(1), textTransform: 'uppercase' },
   { name: 'button', fontSize: px(11), lineHeight: px(16), fontWeight: 700 },
   { name: 'ui', fontSize: px(12), lineHeight: px(17), fontWeight: 400 },
   { name: 'field', fontSize: px(13), lineHeight: px(18), fontWeight: 400 },
   { name: 'level-title', fontSize: px(15), lineHeight: px(20), fontWeight: 700 },
   { name: 'console-title', fontSize: px(18), lineHeight: px(24), fontWeight: 700, letterSpacing: '1.5px', textTransform: 'uppercase' },
 ]
-const SERIF_STYLES: TypeStyle[] = [
+export const SERIF_STYLES: TypeStyle[] = [
   { name: 'writing-input', fontSize: px(13), lineHeight: px(18), fontWeight: 400 },
   { name: 'writing-note', fontSize: px(13), lineHeight: px(18), fontWeight: 400, fontStyle: 'italic' },
   { name: 'banner-title', fontSize: px(18), lineHeight: px(23), fontWeight: 400 },
@@ -38,7 +37,8 @@ export const SPACING: Token[] = [
   { name: 'space-1', value: px(2), usage: 'Hairline gaps: a tab\'s inner gap, the gap between quick actions.' },
   { name: 'space-2', value: px(4), usage: 'Tight gaps: between small controls, a page edge\'s step.' },
   { name: 'space-3', value: px(6), usage: 'The gap between levels and between tiles in a column.' },
-  { name: 'space-grid', value: px(GRID_GAP), usage: 'The gap between tiles on the split grid, and the width a divider drags across.' },
+  { name: 'space-base', value: px(8), usage: 'The base unit: the usual gap between controls and padding inside a card or a header.' },
+  { name: 'space-grid', value: px(GRID_GAP), usage: 'The gap between tiles on the split grid, and the width a divider drags across (the same 8px as the base unit).' },
   { name: 'space-4', value: px(10), usage: 'The gap between stacked cards and the padding inside a tile body.' },
   { name: 'space-5', value: px(12), usage: 'A level body\'s side padding; the gap between groups of fields.' },
   { name: 'space-6', value: px(14), usage: 'A level header\'s side padding.' },

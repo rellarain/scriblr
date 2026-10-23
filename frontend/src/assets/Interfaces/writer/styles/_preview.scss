@@ -6,7 +6,7 @@
   // The preview keeps a readable measure, centred in the wide page.
   .wrPreviewHead, .wrPreviewIndent, .wrPreviewPara { width: 100%; max-width: 900px; margin-left: auto; margin-right: auto; box-sizing: border-box; }
   .wrPreviewHead { padding-left: 56px; display: flex; flex-direction: column; gap: var(--space-1); margin-bottom: var(--space-3); flex: 0 0 auto; }
-  .wrPreviewTitle { font-family: Georgia, 'Times New Roman', serif; font-size: 30px; font-weight: 700; }
+  .wrPreviewTitle { font-family: Georgia, 'Times New Roman', serif; font-size: var(--text-display); font-weight: 700; }
   .wrPreviewIndent { padding-left: 56px; }
   .wrPreviewPara { position: relative; padding-left: 56px; flex: 0 0 auto; }
   // The book's preview formatting (previewFormat.ts) arrives as variables on the pane; these are its defaults.
@@ -27,11 +27,11 @@
     --wr-page: var(--page-night); --wr-ink: var(--page-night-ink); --wr-page-line: var(--page-night-line); --wr-page-muted: var(--page-night-muted);
     --wr-hl: var(--page-night-highlight); --wr-hl-selected: var(--page-night-highlight-selected);
   }
-  .wrPreviewSelect { background: var(--ov-sink-2); color: var(--ink); border: 0; border-radius: 4px; padding: var(--space-2) 8px; font-size: 11px; font-weight: 700; option { color: black; } }
+  .wrPreviewSelect { background: var(--ov-sink-2); color: var(--ink); border: 0; border-radius: var(--radius-button); padding: var(--space-2) 8px; font-size: var(--text-small); font-weight: 700; option { color: black; } }
   .wrSentence { cursor: pointer; border-radius: 2px; &:hover { background: var(--wr-hl); } &--selected { background: var(--wr-hl-selected); } &--flagged { border-bottom: 2px solid var(--wr-accent); } }
   .wrReactGutter { position: absolute; left: 0; top: 0; width: 44px; height: 100%; }
   .wrReactBar {
-    position: absolute; width: 20px; border-radius: 4px; display: flex; flex-direction: column; align-items: center; padding-top: 3px; box-sizing: border-box; overflow: hidden;
+    position: absolute; width: 20px; border-radius: var(--radius-button); display: flex; flex-direction: column; align-items: center; padding-top: var(--space-2); box-sizing: border-box; overflow: hidden;
     border: 1px dashed transparent;
     &--like { color: var(--paper-like); }
     &--dislike { color: var(--paper-dislike); }
@@ -44,5 +44,5 @@
     &--dislike.wrReactBar--level2 { background: hsl(var(--color-alert-h), 58%, var(--paper-react-l)); }
     &--dislike.wrReactBar--level3 { background: hsl(var(--color-alert-h), 92%, var(--paper-react-l)); }
   }
-  .wrReactPlus { font-size: 12px; font-weight: 700; line-height: 16px; }
+  .wrReactPlus { font-size: var(--text-ui); font-weight: 700; line-height: 16px; }
 }

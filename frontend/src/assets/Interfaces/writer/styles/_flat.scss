@@ -5,7 +5,7 @@
   // ---------------------------------------------------------------- flat and square (the Writer's levels)
   .wrLevel, .wrBookEd, .wrDraftStats, .wrArcCard, .wrChapterCard, .wrActCard, .wrSceneCard, .wrMomentCard, .wrFreeCard--readonly,
   .wrPointTile, .wrPlotNote, .wrParentTag, .wrChapterTile, .wrPlotTray, .wrOutlineInput, .wrSceneField, .wrDraftText, .wrField,
-  .wrSmallBtn, .wrClickEdit, .wrIconBtn, .wrDropGap { border-radius: 0; }
+  .wrSmallBtn, .wrClickEdit, .wrIconBtn, .wrDropGap { border-radius: var(--radius-none); }
 
   // Fields on the Outline panel's own (dark) colour.
   .wrLevel--outline .wrField, .wrLevel--outline .wrGoalInput input { color: var(--on-accent); background: var(--ov-sink-2); &::placeholder { color: color-mix(in srgb, var(--on-accent) 55%, transparent); } }

@@ -11,12 +11,11 @@ Buttons, inputs and selects inherit the family (`font-family: inherit`); the app
 
 ## The scale
 
-The scale is small: most of the app is 11 to 13px. All styles are in `tokens.json` (`type.groups`).
+The scale is small: most of the app is 11 to 13px, and **11px is the floor**: nothing in the Writer, the helper or the admin screens is set smaller (a test fails on a smaller size). The sizes are CSS custom properties (`--text-small` 11, `--text-ui` 12, `--text-field` 13, `--text-title` 15, `--text-heading` 18, `--text-draft` 16, `--text-preview` 17, `--text-chapter` 22, `--text-display` 30 in `frontend/src/theme/_tokens.scss`), and a `font-size` in the Writer's stylesheets that is one of them is written as the token. All styles are in `tokens.json` (`type.groups`).
 
 | Style | Size / line | Weight | Notes |
 |---|---|---|---|
-| label | 10 / 14 | 700 | uppercase, 1px tracking; section labels, panel heads, stats captions (`.wrLabel`, `.wrPanelHead`, `.wrChapterPointsHead`) |
-| label-small | 9 / 12 | 700 | uppercase, 1px; series labels on the shelf, a spine's title |
+| label | 11 / 15 | 700 | uppercase, 1px tracking; section labels, panel heads, stats captions (`.wrLabel`, `.wrPanelHead`, `.wrChapterPointsHead`), series labels on the shelf, a spine's title (there was a smaller `label-small`, 9px, under the floor) |
 | button | 11 / 16 | 700 | `.wrSmallBtn`, chips |
 | ui | 12 / 17 | 400 | muted text, hints, rows |
 | field | 13 / 18 | 400 | `.wrField`, titles in rows |

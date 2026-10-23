@@ -2,18 +2,18 @@
 .wr {
   --wr-cal-base: color-mix(in srgb, currentColor 14%, transparent);
   .wrCal { display: grid; grid-template-columns: 30px minmax(0, 1fr); gap: var(--space-3); align-items: start; }
-  .wrCalDays { display: grid; grid-template-rows: repeat(7, 14px); gap: 3px; font-size: 11px; line-height: 14px; padding-top: 19px; }
+  .wrCalDays { display: grid; grid-template-rows: repeat(7, 14px); gap: var(--space-2); font-size: var(--text-small); line-height: 14px; padding-top: 20px; }
   .wrCalScroll { overflow-x: auto; }
-  .wrCalMonths { display: grid; column-gap: 3px; font-size: 11px; height: 16px; margin-bottom: 3px; width: max-content; span { white-space: nowrap; } }
-  .wrCalGrid { display: grid; grid-template-rows: repeat(7, 14px); grid-auto-flow: column; grid-auto-columns: 14px; gap: 3px; width: max-content; }
+  .wrCalMonths { display: grid; column-gap: var(--space-2); font-size: var(--text-small); height: 16px; margin-bottom: var(--space-2); width: max-content; span { white-space: nowrap; } }
+  .wrCalGrid { display: grid; grid-template-rows: repeat(7, 14px); grid-auto-flow: column; grid-auto-columns: 14px; gap: var(--space-2); width: max-content; }
   .wrCalCell { display: block; width: 14px; height: 14px; background: var(--wr-cal-base);
     &--1 { background: color-mix(in srgb, var(--accent) 34%, var(--wr-cal-base)); }
     &--2 { background: color-mix(in srgb, var(--accent) 58%, var(--wr-cal-base)); }
     &--3 { background: color-mix(in srgb, var(--accent) 82%, var(--wr-cal-base)); }
     &--4 { background: var(--accent); }
     &--x { visibility: hidden; } }
-  .wrCalLegend { margin-left: auto; display: inline-flex; align-items: center; gap: var(--space-2); font-size: 11px; }
-  .wrCalFoot { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin-top: 8px; }
-  .wrCalCols { display: flex; align-items: flex-end; gap: 8px; height: 100px; div { flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: flex-end; gap: var(--space-2); height: 100%; font-size: 11px; } i { display: block; width: 100%; background: var(--accent); } }
+  .wrCalLegend { margin-left: auto; display: inline-flex; align-items: center; gap: var(--space-2); font-size: var(--text-small); }
+  .wrCalFoot { display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-base); margin-top: var(--space-base); }
+  .wrCalCols { display: flex; align-items: flex-end; gap: var(--space-base); height: 100px; div { flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: flex-end; gap: var(--space-2); height: 100%; font-size: var(--text-small); } i { display: block; width: 100%; background: var(--accent); } }
   .wrCalNum { width: 90px; }
 }

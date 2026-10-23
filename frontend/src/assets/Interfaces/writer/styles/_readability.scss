@@ -24,7 +24,7 @@
   .wrGoalCurrent { color: inherit; font-weight: 700; }
 
   // The spine: a flat, darker strip down the left of the book (the Outline), with the cover inset from the level's edge.
-  .wrOutlineMax { position: relative; padding-left: 16px; box-sizing: border-box; }
+  .wrOutlineMax { position: relative; padding-left: var(--space-7); box-sizing: border-box; }
   .wrOutlineMax::before {
     content: ''; position: absolute; left: 0; top: 0; bottom: 0; width: 16px;
     background: color-mix(in srgb, var(--wr-fill) 60%, black);
