@@ -47,3 +47,6 @@ docs/design-system/project/components/bundle.css
 .coverage
 coverage/
 frontend/coverage/
+
+# Playwright screenshots of the packaged-app check (electron/e2e/smoke.mjs)
+electron/e2e/out/

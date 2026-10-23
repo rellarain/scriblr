@@ -9,8 +9,10 @@
   4. Smoke check, unless -SkipSmoke: the packaged backend is started on a free port against a scratch data
      folder (never your projects), asked for /api/health, the shelves' overview and a deep route, shown a bad
      id, and then stopped; no process may be left behind.
+  5. End-to-end check of the packaged app, unless -SkipE2E: Playwright launches Scriblr.exe (electron/e2e/smoke.mjs) against a scratch
+     data folder and checks its window, its backend, a project on the shelves, the single-instance lock and a clean quit.
 
-  Run it from anywhere:  powershell -File scripts\release.ps1  [-Version 0.2.0] [-SkipTests] [-SkipBuild] [-SkipSmoke]
+  Run it from anywhere:  powershell -File scripts\release.ps1  [-Version 0.2.0] [-SkipTests] [-SkipBuild] [-SkipSmoke] [-SkipE2E]
   Needs the backend's virtual environment (backend\.venv) and `npm install` done in frontend and electron.
   On Windows without Developer Mode, run it from an elevated terminal (see the README's note on electron-builder).
 #>
@@ -18,7 +20,8 @@ param(
   [string]$Version,
   [switch]$SkipTests,
   [switch]$SkipBuild,
-  [switch]$SkipSmoke
+  [switch]$SkipSmoke,
+  [switch]$SkipE2E
 )
 
 $ErrorActionPreference = 'Stop'
@@ -74,7 +77,7 @@ Write-Host "Version $current"
 if (-not $SkipTests) {
   Step 'Backend: ruff and pytest'
   Run $backend $python @('-m', 'ruff', 'check', 'app', 'tests')
-  Run $backend $python @('-m', 'pytest', '-q')
+  Run $backend $python @('-m', 'pytest', '-q', '-n', 'auto')
   Step 'Frontend: typecheck, lint and vitest'
   Run $frontend 'npm.cmd' @('run', 'typecheck')
   Run $frontend 'npm.cmd' @('run', 'lint')
@@ -143,6 +146,12 @@ if (-not $SkipSmoke) {
     throw 'A scriblr-backend process was left running'
   }
   Write-Host 'No process left behind.'
+}
+
+# --- 5. the packaged app, driven through its window ---
+if (-not $SkipE2E) {
+  Step 'End-to-end check of the packaged app'
+  Run $electron 'node' @('e2e/smoke.mjs')
 }
 
 Step 'Done'

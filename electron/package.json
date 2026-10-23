@@ -8,12 +8,14 @@
   "scripts": {
     "start": "electron .",
     "start:prod": "cross-env SCRIBLR_FORCE_PROD=1 electron .",
-    "dist": "electron-builder"
+    "dist": "electron-builder",
+    "e2e": "node e2e/smoke.mjs"
   },
   "devDependencies": {
     "cross-env": "^7.0.3",
     "electron": "^28.3.3",
-    "electron-builder": "^24.13.3"
+    "electron-builder": "^24.13.3",
+    "playwright-core": "^1.49.1"
   },
   "build": {
     "appId": "com.scriblr.app",

@@ -668,7 +668,9 @@ reports and does not fail the build).
 **Releasing.** `scripts/release.ps1` runs the whole chain from a checkout: the three versions must agree (`-Version 0.2.0` sets
 them), then ruff, pytest, `tsc`, eslint and vitest, the frontend build, PyInstaller, electron-builder, and a smoke check of the
 packaged backend (started on a free port against a scratch data folder: health, the shelves' overview, a deep route, a refused bad
-id, and no process left behind). `-SkipTests`, `-SkipBuild` and `-SkipSmoke` leave a step out.
+id, and no process left behind), then an end-to-end check of the packaged app itself (`electron/e2e/smoke.mjs`, `npm run e2e` in `electron/`:
+Playwright launches `Scriblr.exe` against a scratch folder and checks its window, a project on the shelves after a reload, the
+single-instance lock, and that quitting leaves no backend process). `-SkipTests`, `-SkipBuild`, `-SkipSmoke` and `-SkipE2E` leave a step out.
 
 ## Running the desktop app
 

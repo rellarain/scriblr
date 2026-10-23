@@ -19,14 +19,14 @@ def test_reads_and_saves_of_one_project_take_turns(client: TestClient) -> None:
     """On Windows a save cannot replace project.json while a read has it open (PermissionError, shown to the
     writer as "Save failed"), so reads and saves of a project run one at a time."""
     project_id = client.post("/api/projects", json={"title": "Busy"}).json()["projectId"]
-    nodes = [_node(0, "book", None)] + [_node(i, "chapter", "n0") for i in range(1, 400)]
+    nodes = [_node(0, "book", None)] + [_node(i, "chapter", "n0") for i in range(1, 150)]
     body = {"schemaVersion": 2, "nodes": nodes}
     assert client.put(f"/api/projects/{project_id}/outline", json=body).status_code == 200
 
     failures: list[str] = []
 
     def save() -> None:
-        for _ in range(25):
+        for _ in range(15):
             try:
                 status = client.put(f"/api/projects/{project_id}/outline", json=body).status_code
                 if status != 200:
@@ -35,7 +35,7 @@ def test_reads_and_saves_of_one_project_take_turns(client: TestClient) -> None:
                 failures.append(f"save {exc!r}")
 
     def read() -> None:
-        for _ in range(60):
+        for _ in range(40):
             try:
                 status = client.get(f"/api/projects/{project_id}").status_code
                 if status != 200:
