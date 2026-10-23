@@ -14,7 +14,7 @@
   "devDependencies": {
     "cross-env": "^7.0.3",
     "electron": "^28.3.3",
-    "electron-builder": "^24.13.3",
+    "electron-builder": "^26.15.3",
     "playwright-core": "^1.49.1"
   },
   "build": {

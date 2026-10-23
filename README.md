@@ -750,6 +750,10 @@ rebuilding/reinstalling never touches existing projects.
 > `"Uninstall Scriblr.exe" /S`), which spawns the bundled
 > `scriblr-backend.exe` on a fresh dynamic port exactly like the dev-mode
 > and shortcut launches do.
+>
+> The installer is built with electron-builder 26 (its NSIS tools are newer than 24's). Under 24.13 the installer crashed at start (an access
+> violation in NSIS's `System.dll`) on Windows 11 build 26200 (25H2), with or without `/S`; the 26.x one installs and runs natively there. If an
+> installer ever crashes like that again, `$env:__COMPAT_LAYER = 'WIN7RTM'` for that one process gets it through while the tools are updated.
 
 **Desktop shortcut** — works today even without a full `electron-builder`
 package, by launching Electron directly against `electron/` in prod mode
