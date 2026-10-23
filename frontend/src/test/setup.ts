@@ -6,6 +6,7 @@ import { __resetSettingsForTests } from '../settings/settingsStore'
 // and the settings store itself. (React Testing Library unmounts what a test rendered on its own.)
 afterEach(() => {
   vi.unstubAllGlobals()
-  try { window.localStorage.clear(); window.sessionStorage.clear() } catch { /* storage unavailable */ }
+  // (A test that runs in Node has no window or storage.)
+  try { window.localStorage.clear(); window.sessionStorage.clear() } catch { /* storage unavailable, or no window */ }
   __resetSettingsForTests()
 })

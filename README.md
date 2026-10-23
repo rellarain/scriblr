@@ -60,7 +60,7 @@ frontend/
 │   ├── settings/ theme/          # the settings store (backend-backed, cached in localStorage) and the time-of-day theme engine
 │   ├── designSystem/             # the preview app that generates docs/design-system
 │   ├── lib/                       # pure helpers (nodeKeys, ...) with unit tests
-│   └── test/                      # shared test setup and helpers (setup.ts, mockFetch.ts, makeWorkspace.ts)
+│   └── test/                      # shared test setup and helpers (setup.ts, mockFetch.ts, makeWorkspace.ts, workspaceBackend.ts)
 ├── scripts/design-system/      # generates docs/design-system from the code (npm run design-system)
 └── vite.config.ts             # dev proxy /api → 127.0.0.1:8000; Vitest config lives here too
 
@@ -313,9 +313,13 @@ Plus `GET /api/health` (inline in `main.py`, not part of a router).
   specificity); tests that scan the stylesheet read the partials too (`src/test/readStyles.ts`). The space, radius and type-size scale is a set of CSS custom
   properties (`theme/_tokens.scss`), kept equal to the design system's `tokens.json` by a test, with 11px as the floor for text. The first load is split: the Reader, the Translator and
   the admin article builder are `React.lazy` chunks, and React and the router are a vendor chunk of their own.
-- **Testing** — Vitest (jsdom, config in `vite.config.ts`) + React Testing Library + `jest-dom`. `src/test/setup.ts` resets stubbed globals, browser
-  storage and the settings store after every test; `mockFetch` stands in for `fetch`; `makeWorkspace` builds a partial Writer workspace whose keys are
-  checked against the real `WriterWorkspace` type. `npm run typecheck`, `npm run lint` (the hooks rules) and `npm test` run in CI
+- **Testing** — Vitest (config in `vite.config.ts`) + React Testing Library + `jest-dom`. Tests of plain functions (`*.test.ts`) run in Node, which
+  starts much faster than a browser stand-in; the component and hook tests (`*.test.tsx`) run in jsdom, and a `.ts` test that needs a browser says so
+  with `// @vitest-environment jsdom` on its first line. `src/test/setup.ts` resets stubbed globals, browser storage and the settings store after
+  every test; `mockFetch` stands in for `fetch`; `workspaceBackend` answers the routes the Writer workspace uses (and records what was saved), so
+  `useWriterWorkspace` is tested through `renderHook` in files by concern (`.test`: the project list, `.navigation`, `.outline`, `.plot`, `.undo`);
+  `api/` has tests of the JSON client, every route's verb, path and body, and the PDF download; `makeWorkspace` builds a partial Writer workspace
+  whose keys are checked against the real `WriterWorkspace` type. `npm run typecheck`, `npm run lint` (the hooks rules) and `npm test` run in CI
   (`.github/workflows/ci.yml`, with the backend's ruff and pytest); `npm run test:coverage` reports coverage.
 
 ## Tile grids (consoles as tiles)
@@ -656,8 +660,9 @@ Frontend tests:
 
 ```bash
 cd frontend
-npm test          # one-shot run
+npm test                    # one-shot run of everything (what CI runs)
 npm run test:watch
+npm run test:design-system   # just the design system's tests: tokens, contrast, the generated docs' freshness, the page
 ```
 
 **Dependencies.** `backend/requirements.lock` pins the exact versions the backend is built and tested with (what CI installs:

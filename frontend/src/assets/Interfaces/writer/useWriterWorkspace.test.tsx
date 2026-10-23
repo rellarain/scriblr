@@ -1,47 +1,19 @@
 import { act, renderHook, waitFor } from '@testing-library/react'
 import { beforeEach, describe, expect, it } from 'vitest'
-import type { OutlineNode, ProjectIndex } from '../../../api/types'
 import { __resetSettingsForTests } from '../../../settings/settingsStore'
 import { mockFetchBy } from '../../../test/mockFetch'
+import { outlineNode, projectIndex, standInBackend } from '../../../test/workspaceBackend'
 import { useWriterWorkspace } from './useWriterWorkspace'
 
 // The workspace hook against a stand-in backend: what it asks for and what it keeps, which the components built on it rely on.
-
-function node(id: string, kind: OutlineNode['kind'], parentId: string | null, title = id): OutlineNode {
-  return {
-    id, kind, parentId, order: 0, title, synopsis: '', draftRef: null, flag: null, color: null, chapterCountTarget: null,
-    plotlineIds: [], wordCountGoal: null, location: '', timeValue: {}, action: '', createdAt: '2026-01-01T00:00:00Z',
-  } as OutlineNode
-}
-
-function index(projectId: string, title: string): ProjectIndex {
-  return { projectId, title, settings: { timeSystems: [] } } as unknown as ProjectIndex
-}
+// (Navigation, the outline, the plot and Undo have files of their own: useWriterWorkspace.*.test.tsx.)
 
 const PROJECTS = {
-  p1: { index: index('p1', 'First'), outline: [node('b1', 'book', null, 'Book one'), node('c1', 'chapter', 'b1', 'Chapter one')], progress: {} },
-  p2: { index: index('p2', 'Second'), outline: [node('b2', 'book', null, 'Book two')], progress: {} },
+  p1: { index: projectIndex('p1', 'First'), outline: [outlineNode('b1', 'book', null, 'Book one'), outlineNode('c1', 'chapter', 'b1', 'Chapter one')] },
+  p2: { index: projectIndex('p2', 'Second'), outline: [outlineNode('b2', 'book', null, 'Book two')] },
 }
 
-function backend() {
-  const calls: string[] = []
-  const fetchMock = mockFetchBy((url, init) => {
-    const path = url.replace(/^\/api/, '')
-    const method = init?.method ?? 'GET'
-    calls.push(`${method} ${path}`)
-    if (path === '/projects/overview') return Object.values(PROJECTS)
-    const project = /^\/projects\/(p\d)$/.exec(path)
-    if (project) {
-      const p = PROJECTS[project[1] as 'p1' | 'p2']
-      return { index: p.index, outline: { schemaVersion: 2, nodes: p.outline }, plot: { schemaVersion: 1, nodes: [] }, warnings: [] }
-    }
-    if (path.endsWith('/outline') && method === 'PUT') return JSON.parse(String(init?.body))
-    if (/\/(outline|plot)\/history$|\/settings-log$/.test(path)) return []
-    if (path.endsWith('/book-progress')) return {}
-    return {}
-  })
-  return { calls, fetchMock }
-}
+const backend = () => standInBackend(PROJECTS)
 
 beforeEach(() => {
   window.localStorage.clear()

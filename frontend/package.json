@@ -8,6 +8,7 @@
     "build": "tsc && vite build",
     "preview": "vite preview",
     "test": "vitest run",
+    "test:design-system": "vitest run src/designSystem scripts/design-system",
     "test:watch": "vitest",
     "design-system": "vite-node scripts/design-system/main.ts",
     "typecheck": "tsc --noEmit",

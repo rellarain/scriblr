@@ -34,6 +34,9 @@ export default defineConfig({
   },
   test: {
     environment: 'jsdom',
+    // Tests of plain functions (`*.test.ts`) need no browser: they run in Node, which starts much faster than jsdom. A test that does need one
+    // says so in a docblock: `// @vitest-environment jsdom`.
+    environmentMatchGlobs: [['**/*.test.ts', 'node']],
     globals: true,
     setupFiles: './src/test/setup.ts',
   },
