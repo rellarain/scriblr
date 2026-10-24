@@ -32,14 +32,14 @@ While a tile is dragged it is half opaque; a tile it could land on gets a 2px ac
 
 ## The book: contents and tabs
 
-At Outline the **contents** list the arcs and chapters. The **edge tabs** at the right of the cover narrow it:
+At Outline the **contents** list the arcs and chapters, one card each (a header with the number, the title to edit, and a fold chevron, over its counts). The **edge tabs** at the right of the cover narrow it:
 
 - a **chapter tab** shows only that chapter's outline (its acts, scenes and moments);
 - an **arc tab** shows that arc and each of its chapters' outlines;
 - choosing the **focused tab again** goes back to the whole book, every chapter open;
 - the **+ tab** adds a chapter and focuses it.
 
-The focused tab is raised, wider, and takes its colour as its background. A book opens on its first chapter.
+The focused tab is raised, wider, and takes its colour as its background. A book opens on its first chapter. A chapter's or an arc's card folds from the chevron at its top right (remembered); a chapter that is not open opens, as it was left, when its card is clicked.
 
 ## Editing a list of nodes
 

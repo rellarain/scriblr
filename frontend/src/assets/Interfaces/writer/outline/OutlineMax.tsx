@@ -15,7 +15,7 @@ import OutlineNav, { type OutlineFocus } from './OutlineNav'
 // The Outline level at Max: the open book, all on its cover, in one column (the page edges and the arcs'
 // and chapters' tabs stand at its right, as on the Draft's book): the book editor strip (title,
 // counts, the level's tabs) at its top, then the sections the tabs open (settings, help, draft stats) and the
-// contents (the arcs and chapters), the open chapter unfolding its acts, scenes and moments as editable cards.
+// contents (the arcs and chapters, a card each), the open chapter's card unfolding its acts, scenes and moments as editable cards.
 // An arc's tab narrows the cover to that arc and its chapters' outlines; a chapter's tab, to that one chapter's; the focused tab
 // again, back to the whole book's.
 // The book's pages are the Draft level's. The plotpoints still to place are in the
@@ -42,6 +42,7 @@ function OutlineMax({ w }: { w: WriterWorkspace }) {
   }, [firstId, hasActive])
   if (!book) return <Placeholder title="Book" body="Select a book on the shelf to open it." />
 
+  const plotDrag = { dragId: w.plotDragId, setDragId: w.setPlotDragId }
   const focus: OutlineFocus | null = showAll ? { kind: 'book', id: book.id } : arcId ? { kind: 'arc', id: arcId } : activeId && hasActive ? { kind: 'chapter', id: activeId } : null
   // An arc's tab focuses the arc, opening its first chapter (so the page the Draft opens on is in it).
   // Choosing the tab already focused goes back to the whole book.
@@ -67,9 +68,9 @@ function OutlineMax({ w }: { w: WriterWorkspace }) {
             {tabs.isOpen('help') && <div className="wrBookEdHelp"><HelpArticles names={OUTLINE_HELP_NAMES} fallback={OUTLINE_HELP_FALLBACK} /></div>}
             {tabs.isOpen('details') && <DraftStats book={book} chapters={chapters} nodeWords={counts.nodes} settings={w.activeProject?.settings} />}
             <OutlineNav
-              w={w} book={book} counts={counts} focus={focus}
+              w={w} book={book} counts={counts} focus={focus} plotDrag={plotDrag}
               chapterBody={chapter => tabs.isOpen('outline') && (
-                <OutlineCards w={w} book={book} counts={counts} chapterId={chapter.id} plotDrag={{ dragId: w.plotDragId, setDragId: w.setPlotDragId }} />
+                <OutlineCards w={w} book={book} counts={counts} chapterId={chapter.id} plotDrag={plotDrag} />
               )}
             />
           </div>

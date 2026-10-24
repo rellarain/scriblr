@@ -6,14 +6,15 @@ import { fullDate, shortDate, type ChapterMeta } from '../chapterDates'
 import { buildChildIndex, descendantsOf } from '../outlineTree'
 import { nodeLabel } from '../plotTree'
 import { formatWords } from '../wordCount'
+import { NumberBadge, StatsLine } from '../outline/CardHeader'
 import ClickToEdit from './ClickToEdit'
 import { parentTrail } from './draftModel'
 
 const KIND_WORD: Partial<Record<OutlineNode['kind'], string>> = { series: 'Series', book: 'Book', arc: 'Arc', chapter: 'Chapter' }
 
 // The chapter title tile, across the top of the Draft level: the titles above the chapter (series,
-// book, arc, each in its own colour), the chapter's own title and synopsis (click to edit), its dates
-// and draft stats, with the page tools (save, publish, Draft | Preview) at the right.
+// book, arc, each in its own colour), the chapter's number (the badge the Outline's cards have), its own title and synopsis
+// (click to edit), its dates and draft stats, with the page tools (save, publish, Draft | Preview) at the right.
 export function ChapterTile({ w, chapter, chapterWords, meta, tools, error }: {
   w: WriterWorkspace
   chapter: OutlineNode
@@ -55,7 +56,7 @@ export function ChapterTile({ w, chapter, chapterWords, meta, tools, error }: {
 
       <div className="wrChapterTileMain">
         <div className="wrChapterTileName">
-          <span className="wrPageKicker">Chapter {chapterNumber}</span>
+          <NumberBadge n={chapterNumber} label={`Chapter ${chapterNumber}`} />
           <ClickToEdit
             className="wrChapterTitle" label="Chapter title" placeholder="Untitled chapter"
             value={chapter.title} onChange={title => w.updateOutlineNode(chapter.id, { title })}
@@ -76,12 +77,7 @@ export function ChapterTile({ w, chapter, chapterWords, meta, tools, error }: {
               <span className="wrStatBarFill" style={{ width: `${percent}%` }} />
             </span>
           ) : null}
-          <div className="wrNodeStats">
-            <span>{count('act', 'act')}</span>
-            <span>{count('scene', 'scene')}</span>
-            <span>{count('moment', 'moment')}</span>
-            <span>{formatWords(chapterWords)}</span>
-          </div>
+          <StatsLine items={[count('act', 'act'), count('scene', 'scene'), count('moment', 'moment'), formatWords(chapterWords)]} />
           <div className="wrPageMetaRow">
             {meta.created && <span title={fullDate(meta.created)}>Created {shortDate(meta.created)}</span>}
             {meta.edited && <span title={fullDate(meta.edited)}>Edited {shortDate(meta.edited)}</span>}

@@ -90,6 +90,8 @@ export function paletteRatios(zone: ZoneKey, hues: AuditHues = DEFAULT_HUES): Pa
     }
     // The page's own muted text (--wr-page-muted): the ink at 88%.
     add(`paper-ink-88/${gname}`, 'Paper', `Page muted text (ink at 88%) on ${gname}`, 'text', over(inkRgb, 0.88, bg), bg)
+    // The number badge in the Draft level's chapter tile (frame-1): the ink on the recess (--ov-sink-2) the number sits in.
+    if (gname === 'frame-1') add('paper-badge/frame-1', 'Paper', 'Number badge ink on its recess, on frame-1', 'text', inkRgb, over(BLACK, SINK_ALPHAS[2] * shadeK(look.mode), bg))
   }
   const accents = paperAccents(zone, hues)
   for (const [gname, ground] of pg.filter(([n]) => ['paper', 'paper-soft', 'page', 'field', 'frame-1'].includes(n))) {

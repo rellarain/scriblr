@@ -43,17 +43,10 @@
   .wrStatBarFill { display: block; height: 100%; background: var(--wr-accent); transition: width 0.3s ease; }
   .wrDraftStatsChapters { list-style: none; margin: var(--space-2) 0 0; padding: var(--space-3) 0 0; border-top: 1px solid var(--wr-page-line); display: flex; flex-direction: column; gap: var(--space-2); }
 
-  // The arc and chapter cards: a stripe in their own colour.
+  // The cards of an open chapter, and the pieces the headers of the arc and chapter cards share.
   .wrOutlineCards { display: flex; flex-direction: column; gap: var(--space-base); }
   .wrOutlineCardsHead { display: flex; align-items: center; justify-content: space-between; font-size: var(--text-small); font-weight: 700; text-transform: uppercase; letter-spacing: 1px; color: var(--paper-label); }
   .wrOutlineCardsAdd { display: flex; gap: var(--space-3); }
-  .wrArcCard, .wrChapterCard {
-    min-width: 0; display: flex; flex-direction: column; gap: var(--space-base); padding: var(--space-4) var(--space-5); border: 1px solid var(--wr-page-line); border-left: 7px solid var(--wr-node-accent, var(--wr-accent)); border-radius: var(--radius-button);
-  }
-  .wrArcCard { background: var(--wr-frame-1); }
-  .wrChapterCard { background: var(--wr-frame-2); }
-  // The title takes what is left; the colour slider wraps onto its own row when the card is narrow.
-  .wrNodeHead { display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-3) var(--space-4); min-width: 0; }
   .wrOutlineInput--title { flex: 1 1 130px; font-weight: 700; }
   .wrNodeHue--inline { flex: 1 1 130px; max-width: 220px; margin: 0; }
   .wrNodeToggle { display: inline-flex; align-items: center; justify-content: center; width: 20px; height: 20px; flex: 0 0 auto; border-radius: var(--radius-button); color: var(--paper-label); &:hover { background: hsl(var(--color-accent-h), 18%, calc(var(--paper-l) - 9% * var(--paper-dir))); } }

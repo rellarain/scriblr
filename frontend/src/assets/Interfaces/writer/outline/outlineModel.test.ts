@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import type { OutlineNode, PlotNode } from '../../../../api/types'
 import { buildChildIndex } from '../outlineTree'
-import { pointsByTarget, structureOfBook, unassignedPlotpoints } from './outlineModel'
+import { pointsByTarget, stat, structureOfBook, unassignedPlotpoints } from './outlineModel'
 
 const node = (id: string, kind: OutlineNode['kind'], parentId: string | null, order = 0, over: Partial<OutlineNode> = {}): OutlineNode =>
   ({ id, kind, parentId, order, title: id, synopsis: '', draftRef: null, ...over } as OutlineNode)
@@ -36,11 +36,24 @@ describe('structureOfBook', () => {
     expect(numbers.moment.has('free')).toBe(false)
   })
 
+  it('counts the acts, scenes and moments each chapter holds, without the free draft', () => {
+    const { totalsOfChapter } = structureOfBook(buildChildIndex(tree), 'b')
+    expect(totalsOfChapter.get('c1')).toEqual({ act: 1, scene: 1, moment: 2 })
+    expect(totalsOfChapter.get('c3')).toEqual({ act: 1, scene: 1, moment: 1 })
+    expect(totalsOfChapter.get('c2')).toEqual({ act: 0, scene: 0, moment: 0 })
+  })
+
   it('lists the scenes of each chapter and finds the chapter of anything inside one', () => {
     expect(scenesOfChapter.get('c1')!.map(s => s.id)).toEqual(['s1'])
     expect(scenesOfChapter.get('c3')!.map(s => s.id)).toEqual(['s2'])
     expect(scenesOfChapter.get('c2')).toEqual([])
     expect([chapterOf.get('m2'), chapterOf.get('s2'), chapterOf.get('free')]).toEqual(['c1', 'c3', 'c1'])
+  })
+})
+
+describe('stat', () => {
+  it('counts in the singular for one and the plural otherwise', () => {
+    expect([stat(0, 'act'), stat(1, 'act'), stat(2, 'act')]).toEqual(['0 acts', '1 act', '2 acts'])
   })
 })
 

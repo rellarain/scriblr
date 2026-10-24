@@ -1,9 +1,8 @@
-import { useMemo, useState, type CSSProperties, type DragEvent, type ReactNode } from 'react'
+import { useMemo, useState, type DragEvent, type ReactNode } from 'react'
 import type { OutlineNode } from '../../../../api/types'
 import type { WordCounts } from '../../../../api/draftFetch'
 import type { WriterWorkspace } from '../useWriterWorkspace'
-import { outlineSat, stripeColorCss } from '../../../../theme/bookColors'
-import { ChevronDownIcon, ChevronRightIcon, GripIcon, PencilIcon, PlusIcon } from '../../../icons'
+import { ChevronDownIcon, ChevronRightIcon, GripIcon, PlusIcon } from '../../../icons'
 import { useNodeKeys } from '../../../../lib/nodeKeys'
 import { buildChildIndex, descendantsOf } from '../outlineTree'
 import { DeleteControl } from '../shared'
@@ -12,7 +11,7 @@ import { PlotpointTile } from '../PlotpointTile'
 import { hasTime, systemForBook } from '../timeSystem'
 import { useNodeDnd } from '../useNodeDnd'
 import { formatWords } from '../wordCount'
-import { pointsByTarget, structureOfBook } from './outlineModel'
+import { pointsByTarget, stat, structureOfBook } from './outlineModel'
 import { SceneFields } from './SceneFields'
 
 // A plotpoint being dragged from the tray (or from another card) onto a card.
@@ -28,12 +27,11 @@ const TAKES_PLOTPOINTS = new Set<OutlineNode['kind']>(['chapter', 'act', 'scene'
 
 const KIND_WORD: Partial<Record<OutlineNode['kind'], string>> = { arc: 'Arc', chapter: 'Chapter', act: 'Act', scene: 'Scene', moment: 'Moment' }
 
-// The open chapter as nested, editable cards: its acts hold scenes and its scenes hold moments, under
-// a banner with the chapter's number, title and counts (the arcs and chapters themselves are in the
-// navigation pane, OutlineNav). Cards are reordered and moved by dragging their grip; plotpoints
-// dragged from the Project level's Plotpoints tab land in the chapter, an act, a scene or a moment and
-// are boxed inside it; every card has a word count (the draft's) and a quiet trash icon that asks to
-// confirm.
+// What an open chapter holds, as nested, editable cards: its acts hold scenes and its scenes hold moments (the arcs and
+// chapters themselves, with their headers, are in the navigation pane, OutlineNav, which shows this under the open chapter's header).
+// Cards are reordered and moved by dragging their grip; plotpoints dragged from the Project level's Plotpoints tab land in the
+// chapter, an act, a scene or a moment and are boxed inside it; every card has a word count (the draft's) and a quiet trash icon
+// that asks to confirm.
 export function OutlineCards({ w, book, counts, plotDrag, chapterId }: {
   w: WriterWorkspace
   book: OutlineNode
@@ -142,9 +140,6 @@ export function OutlineCards({ w, book, counts, plotDrag, chapterId }: {
     )
   }
 
-  // The stripe on a card is the level's accent colour lifted brighter than its tint, 7px wide.
-  const tint = (node: OutlineNode) => ({ '--wr-node-tint': w.levelTintOf(node), '--wr-node-accent': stripeColorCss(w.levelHueOf(node), outlineSat(node.kind)) } as CSSProperties)
-
   const chevron = (node: OutlineNode, open: boolean, label: string) => (
     <button
       type="button" className="wrNodeToggle" aria-expanded={open} aria-label={`${open ? 'Collapse' : 'Expand'} ${label}`}
@@ -170,9 +165,6 @@ export function OutlineCards({ w, book, counts, plotDrag, chapterId }: {
       <DeleteControl message={deleteMessage} onConfirm={() => w.deleteOutlineNode(node.id)} />
     </div>
   )
-
-  const stat = (n: number, one: string) => `${n} ${one}${n === 1 ? '' : 's'}`
-  const countOf = (id: string, kind: OutlineNode['kind']) => descendantsOf(index, id).filter(x => x.kind === kind && !x.freeDraft).length
 
   const childrenOf = (node: OutlineNode) => (index.get(node.id) ?? []).filter(k => !k.freeDraft)
 
@@ -244,62 +236,31 @@ export function OutlineCards({ w, book, counts, plotDrag, chapterId }: {
       )
     }
 
-    if (node.kind === 'chapter') {
-      const n = numbers.chapter.get(node.id) ?? 0
-      const free = (index.get(node.id) ?? []).find(k => k.freeDraft)
-      // The chapter's tile folds up to its banner (the number, the title, its counts), from the button in its top right corner.
-      const open = isOpen(node)
-      const placed = pointsByNode.get(node.id)?.length ?? 0
-      return (
-        <div key={node.id} {...common} className={cardClass('wrChapterBanner wrOutlineCard', node.id)} style={tint(node)} {...dropProps(node)}>
-          <div className="wrBannerHead">
-            <span className="wrNodeLabel">Chapter {n}</span>
-            <h3 className="wrBannerTitle">{node.title.trim() || 'Untitled chapter'}</h3>
-            <button type="button" className="wrIconBtn wrIconBtn--light" title="Write" aria-label={`Write chapter ${n}`} onClick={() => w.openChapter(node.id)}>
-              <PencilIcon size={15} />
-            </button>
-            <button
-              type="button" className="wrIconBtn wrIconBtn--light wrBannerToggle" aria-expanded={open}
-              aria-label={`${open ? 'Collapse' : 'Expand'} chapter ${n}`} title={open ? 'Collapse the chapter' : 'Expand the chapter'}
-              onClick={() => setOpen(node.id, !open)}
-            >
-              {open ? <ChevronDownIcon size={15} /> : <ChevronRightIcon size={15} />}
-            </button>
-          </div>
-          <div className="wrNodeStats">
-            <span>{stat(countOf(node.id, 'act'), 'act')}</span>
-            <span>{stat(countOf(node.id, 'scene'), 'scene')}</span>
-            <span>{stat(countOf(node.id, 'moment'), 'moment')}</span>
-            {!open && placed > 0 && <span>{stat(placed, 'plotpoint')}</span>}
-            <span>{formatWords(words(node.id))}</span>
-          </div>
-          {open && (
-            <>
-              {boxed(node)}
-              {free && words(free.id) > 0 && (
-                <div className="wrFreeCard wrFreeCard--readonly" data-testid="free-draft-card">
-                  <span className="wrNodeLabel">Free draft</span>
-                  <span className="wrWordCount">{formatWords(words(free.id))}</span>
-                </div>
-              )}
-              {dnd.children(node.id, kids, renderNode)}
-              <div className="wrCardFoot">
-                <span className="wrCardFootLeft">{addButton(node, 'act')}</span>
-              </div>
-            </>
-          )}
-        </div>
-      )
-    }
-
     return null
+  }
+
+  // What the chapter holds: the plotpoints placed on it, its free draft's words, then its acts. (Its header and footer are the contents'.)
+  function renderChapter(chapter: OutlineNode): ReactNode {
+    const free = (index.get(chapter.id) ?? []).find(k => k.freeDraft)
+    return (
+      <>
+        {boxed(chapter)}
+        {free && words(free.id) > 0 && (
+          <div className="wrFreeCard wrFreeCard--readonly" data-testid="free-draft-card">
+            <span className="wrNodeLabel">Free draft</span>
+            <span className="wrWordCount">{formatWords(words(free.id))}</span>
+          </div>
+        )}
+        {dnd.children(chapter.id, childrenOf(chapter), renderNode)}
+      </>
+    )
   }
 
   const chapter = chapterId ? nodeById.get(chapterId) : undefined
   return (
     <div className="wrOutlineCards" onKeyDown={keys.onKeyDown}>
       {chapter && chapter.kind === 'chapter'
-        ? renderNode(chapter)
+        ? renderChapter(chapter)
         : <p className="wrPageMuted">{w.activeBookChapters.length === 0 ? 'No chapters yet. Add one in the contents to begin.' : 'Pick a chapter in the contents to outline it.'}</p>}
     </div>
   )

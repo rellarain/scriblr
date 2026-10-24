@@ -17,8 +17,13 @@ export interface OutlineNumbers {
   moment: Map<string, number>
 }
 
+// What a chapter holds, counted for its card's stats line (the free draft is not counted).
+export interface ChapterTotals { act: number; scene: number; moment: number }
+
 export interface BookStructure {
   numbers: OutlineNumbers
+  // How many acts, scenes and moments each chapter holds.
+  totalsOfChapter: Map<string, ChapterTotals>
   // Each chapter's scenes in order.
   scenesOfChapter: Map<string, OutlineNode[]>
   // The chapter a scene, act or moment sits in.
@@ -28,6 +33,7 @@ export interface BookStructure {
 export function structureOfBook(index: ChildIndex, bookId: string): BookStructure {
   const numbers: OutlineNumbers = { arc: new Map(), chapter: new Map(), act: new Map(), scene: new Map(), moment: new Map() }
   const scenesOfChapter = new Map<string, OutlineNode[]>()
+  const totalsOfChapter = new Map<string, ChapterTotals>()
   const chapterOf = new Map<string, string>()
   let arcs = 0
   let chapters = 0
@@ -45,6 +51,7 @@ export function structureOfBook(index: ChildIndex, bookId: string): BookStructur
     }
     walk(chapter.id)
     scenesOfChapter.set(chapter.id, scenes)
+    totalsOfChapter.set(chapter.id, counters)
   }
   const walkBook = (parentId: string) => {
     for (const n of index.get(parentId) ?? []) {
@@ -53,8 +60,11 @@ export function structureOfBook(index: ChildIndex, bookId: string): BookStructur
     }
   }
   walkBook(bookId)
-  return { numbers, scenesOfChapter, chapterOf }
+  return { numbers, totalsOfChapter, scenesOfChapter, chapterOf }
 }
+
+// "1 act", "2 acts".
+export const stat = (n: number, one: string): string => `${n} ${one}${n === 1 ? '' : 's'}`
 
 // The plotpoints assigned to each outline node (a chapter, act, scene or moment), in plot order.
 export function pointsByTarget(plotNodes: PlotNode[]): Map<string, PlotNode[]> {

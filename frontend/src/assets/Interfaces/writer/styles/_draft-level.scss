@@ -33,7 +33,7 @@
   .wrSpreadRight .wrChapterTile {
     color: var(--wr-ink); background: var(--wr-frame-1);
     .wrParentKind, .wrChapterTileName .wrPageKicker, .wrChapterTileStats .wrPageMetaRow, .wrChapterTileStats .wrNodeStats { color: var(--wr-page-muted); }
-    .wrClickEdit, .wrChapterTileStats .wrStatValue { color: var(--wr-ink); }
+    .wrClickEdit, .wrChapterTileStats .wrStatValue, .wrNumBadge { color: var(--wr-ink); }
     .wrClickEdit--empty { color: var(--wr-page-muted); }
     .wrChapterTileStats .wrStatBarFill { background: var(--wr-accent); }
   }
@@ -45,7 +45,7 @@
   .wrChapterTileTools { flex: 0 0 auto; display: flex; align-items: center; gap: var(--space-base); margin-left: auto; }
   // The title beside its stats; the stats drop under the title when the tile is too narrow for both (about 380px).
   .wrChapterTileMain { display: flex; flex-wrap: wrap; gap: var(--space-base) 24px; align-items: flex-start; > .wrChapterTileName { flex: 1 1 170px; min-width: 0; } > .wrChapterTileStats { flex: 0 1 300px; min-width: min(100%, 190px); } }
-  .wrChapterTileName { display: flex; flex-direction: column; gap: var(--space-2); min-width: 0; .wrPageKicker { color: var(--ink-muted); } }
+  .wrChapterTileName { display: flex; flex-direction: column; gap: var(--space-2); min-width: 0; .wrPageKicker { color: var(--ink-muted); } .wrNumBadge { align-self: flex-start; color: var(--ink); } }
   .wrChapterTileStats { display: flex; flex-direction: column; gap: var(--space-2); font-size: var(--text-ui); .wrPageMetaRow { color: var(--ink-muted); } .wrNodeStats { color: var(--ink-muted); } }
   .wrChapterTileWords { display: flex; align-items: baseline; justify-content: space-between; gap: var(--space-4); }
   .wrChapterTileStats .wrStatBar { background: var(--ov-sink-3); }

@@ -1,12 +1,10 @@
 // Readability: the rules that keep text legible on every hue.
 .wr {
   // ---------------------------------------------------------------- readability
-  .wrCtArc, .wrCtChapter { color: var(--on-accent); }
   .wrBookEdMeta { opacity: 0.9; }
   .wrBookCover .wrSmallBtn { background: var(--ov-sink-2); &:hover:not(:disabled) { background: var(--ov-sink-3); } }
   .wrBookCover .wrLabel, .wrBookCover .wrCtHead, .wrBookCover .wrGoalHead { opacity: 1; }
   .wrBookCover .wrGoalCurrent { color: var(--on-accent); font-weight: 700; }
-  .wrCtWords { opacity: 0.9; }
   // On the Outline's dark page the "light" buttons and icons are the same wash as the other buttons, not pale paper under white text.
   .wrLevel--outline .wrSmallBtn--light, .wrLevel--outline .wrIconBtn--light { color: var(--on-accent); background: var(--ov-sink-2); &:hover:not(:disabled) { background: var(--ov-sink-3); } }
 
@@ -38,6 +36,4 @@
   .wrBookCover > .wrBookEd, .wrCoverColumn { width: 100%; max-width: 860px; margin-left: auto; margin-right: auto; box-sizing: border-box; }
   .wrCoverScroll { padding: var(--space-2) var(--space-6) 24px; }
   .wrCoverColumn { display: flex; flex-direction: column; gap: var(--space-5); min-width: 0; }
-  .wrCtBody { padding: var(--space-2) var(--space-2) var(--space-4) 22px; }
-  .wrBookCover .wrChapterBanner { background: var(--wr-frame-1); }
 }

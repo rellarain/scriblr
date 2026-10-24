@@ -118,7 +118,7 @@ describe('Draft level: the chapter tile', () => {
     setup()
     const stack = Array.from(tile().querySelectorAll('.wrParentTag')).map(t => t.textContent)
     expect(stack).toEqual(['SeriesThe Saga', 'BookCold Harbor', 'ArcThaw'])
-    expect(within(tile()).getByText('Chapter 1')).toBeTruthy()
+    expect(within(tile()).getByLabelText('Chapter 1').textContent).toBe('1') // the number badge
   })
 
   it('edits the chapter title and synopsis in place when clicked', async () => {
@@ -268,7 +268,7 @@ describe('Draft level: Draft | Preview', () => {
     expect(within(pane).getByText('The ice gave way beneath the pier.')).toBeTruthy()
     expect(within(pane).getByRole('button', { name: 'Reaction' })).toBeTruthy()
     // The tile stays.
-    expect(within(tile()).getByText('Chapter 1')).toBeTruthy()
+    expect(within(tile()).getByLabelText('Chapter 1').textContent).toBe('1') // the number badge
     await user.click(screen.getByRole('button', { name: 'Draft' }))
     expect(spies.showDraft).toHaveBeenCalled()
   })

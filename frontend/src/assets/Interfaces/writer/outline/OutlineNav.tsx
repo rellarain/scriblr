@@ -1,4 +1,4 @@
-import { useMemo, type CSSProperties, type ReactNode } from 'react'
+import { useMemo, useState, type CSSProperties, type DragEvent, type ReactNode } from 'react'
 import type { OutlineNode } from '../../../../api/types'
 import type { WordCounts } from '../../../../api/draftFetch'
 import type { WriterWorkspace } from '../useWriterWorkspace'
@@ -11,24 +11,31 @@ import { useNodeDnd } from '../useNodeDnd'
 import { useOutlineOpen } from './useOutlineOpen'
 import { formatWords } from '../wordCount'
 import HueSlider from '../HueSlider'
-import { structureOfBook } from './outlineModel'
+import { CardHeader, StatsLine } from './CardHeader'
+import type { PlotDrag } from './OutlineCards'
+import { pointsByTarget, stat, structureOfBook } from './outlineModel'
 
 // What the contents are narrowed to: an arc (it and its chapters, each open), one chapter, or the whole book (every
 // arc and chapter, each chapter open).
 export interface OutlineFocus { kind: 'book' | 'arc' | 'chapter'; id: string }
 
-// The book's contents, on the book's cover (the Outline level): its arcs and chapters, in one column. With a
-// focus (picked by the tabs at the book's edge) only that arc and its chapters, or that one chapter, show;
-// with the book as the focus every chapter unfolds; without one, the whole list shows and only the open chapter unfolds. An open chapter shows its title, colour and
-// trash, and under them its acts, scenes and moments. Arcs carry their own title and colour, and a chapter
-// button. Arcs and chapters are reordered and moved by dragging their grips (not while focused on their own).
-export function OutlineNav({ w, book, counts, chapterBody, focus = null }: {
+// The book's contents, on the book's cover (the Outline level): its arcs and chapters, in one column, each one card. A card has one header
+// (a grip, the number, the title, and the tools: a Write pencil on a chapter, a fold chevron on both) over a line of its counts. With a focus
+// (picked by the tabs at the book's edge) only that arc and its chapters, or that one chapter, show; with the book as the focus every
+// chapter is open; without one, the whole list shows and only the open chapter is. An open chapter edits its title in its header and
+// unfolds its acts, scenes and moments (the cards of `chapterBody`) with a footer holding + Act, its colour and its trash; a chapter that
+// is not open is a compact card, which a click opens (and a plotpoint can be dropped on). An arc edits its title in its header, folds
+// its chapters up, and has a footer with + Chapter, its colour and its trash. Arcs and chapters are reordered and moved by dragging their
+// grips (not while focused on their own).
+export function OutlineNav({ w, book, counts, chapterBody, focus = null, plotDrag }: {
   w: WriterWorkspace
   book: OutlineNode
   counts: WordCounts
-  // What unfolds under an open chapter's row (its acts, scenes and moments).
+  // What unfolds under an open chapter's header (its acts, scenes and moments).
   chapterBody?: (chapter: OutlineNode) => ReactNode
   focus?: OutlineFocus | null
+  // A plotpoint being dragged onto a chapter's card.
+  plotDrag?: PlotDrag
 }) {
   const dnd = useNodeDnd(w, {
     accepts: (dragged, parentId) => {
@@ -39,7 +46,9 @@ export function OutlineNav({ w, book, counts, chapterBody, focus = null }: {
   })
   const index = useMemo(() => buildChildIndex(w.outlineNodes), [w.outlineNodes])
   const nodeById = useMemo(() => new Map(w.outlineNodes.map(n => [n.id, n])), [w.outlineNodes])
-  const { numbers } = useMemo(() => structureOfBook(index, book.id), [index, book.id])
+  const { numbers, totalsOfChapter } = useMemo(() => structureOfBook(index, book.id), [index, book.id])
+  const pointsByNode = useMemo(() => pointsByTarget(w.plotNodes), [w.plotNodes])
+  const [plotOverId, setPlotOverId] = useState<string | null>(null)
   const fold = useOutlineOpen()
   const words = (id: string) => counts.nodes[id] ?? 0
   const childrenOf = (node: OutlineNode) => (index.get(node.id) ?? []).filter(k => k.kind === 'arc' || k.kind === 'chapter')
@@ -49,6 +58,11 @@ export function OutlineNav({ w, book, counts, chapterBody, focus = null }: {
     const id = w.addOutlineNode(parentId, 'chapter', {}, afterId)
     w.selectChapter(id)
     return id
+  }
+  // A new act unfolds the chapter it goes in.
+  const addAct = (chapterId: string) => {
+    fold.setOpen(chapterId, true)
+    return w.addOutlineNode(chapterId, 'act')
   }
 
   // Keyboard shortcuts (lib/nodeKeys.ts): the book's own arcs and chapters are the top level.
@@ -88,7 +102,22 @@ export function OutlineNav({ w, book, counts, chapterBody, focus = null }: {
       onChange={next => w.setNodeHue(node.id, next)}
     />
   )
-  const stat = (n: number, one: string) => `${n} ${one}${n === 1 ? '' : 's'}`
+
+  // While a plotpoint is being dragged, a chapter's card takes it (assigns it to the chapter), open or not; a card inside it
+  // (an act, a scene, a moment) takes it for itself.
+  const plotDrop = (node: OutlineNode) => {
+    if (!plotDrag?.dragId) return {}
+    return {
+      onDragOver: (e: DragEvent) => { e.preventDefault(); e.stopPropagation(); if (plotOverId !== node.id) setPlotOverId(node.id) },
+      onDragLeave: () => setPlotOverId(prev => (prev === node.id ? null : prev)),
+      onDrop: (e: DragEvent) => {
+        e.preventDefault(); e.stopPropagation()
+        if (plotDrag.dragId) w.assignPlotpoint(plotDrag.dragId, node.id)
+        plotDrag.setDragId(null)
+        setPlotOverId(null)
+      },
+    }
+  }
 
   function renderNode(node: OutlineNode): ReactNode {
     const common = { 'data-node': node.id, 'data-knode': node.id }
@@ -99,38 +128,45 @@ export function OutlineNav({ w, book, counts, chapterBody, focus = null }: {
       const active = focus
         ? focus.kind === 'book' || (focus.kind === 'chapter' ? node.id === focus.id : node.parentId === focus.id)
         : node.id === w.activeChapterId
+      // An open chapter can be folded up to its header (remembered per chapter); one that is not open shows only its header.
+      const open = active && fold.isOpen(node.id)
+      const body = open && chapterBody ? chapterBody(node) : null
+      const totals = totalsOfChapter.get(node.id) ?? { act: 0, scene: 0, moment: 0 }
+      const placed = pointsByNode.get(node.id)?.length ?? 0
       const inside = (index.get(node.id) ?? []).length
-      // A chapter folded up from its tile's button (OutlineCards) folds its own title, colour and counts with it: only the row and the
-      // tile's banner are left. Without a tile (no chapterBody) there is nothing to fold it from, so it stays open.
-      const folded = Boolean(chapterBody) && !fold.isOpen(node.id)
+      const select = () => w.selectChapter(node.id)
       return (
-        <div key={node.id} {...common} className={dnd.cardClass(`wrCtChapter${active ? ' wrCtChapter--active' : ''}`, node.id)} style={tint(node)}>
-          <div className="wrCtRow">
-            {grip(node.id)}
-            <button type="button" className="wrCtPick" aria-current={active ? 'true' : undefined} aria-label={`Open chapter ${n}`} title={node.title.trim() || 'Untitled chapter'} onClick={() => w.selectChapter(node.id)}>
-              <span className="wrCtNum">{n}</span>
-              <span className="wrCtTitle">{node.title.trim() || 'Untitled chapter'}</span>
-              <span className="wrCtWords">{formatWords(words(node.id))}</span>
-            </button>
-          </div>
-          {active && !folded && (
-            <div className="wrCtDetail">
-              <div className="wrCtDetailRow">
-                <input
-                  className="wrOutlineInput wrOutlineInput--title" placeholder="Chapter title" value={node.title} data-kf="" aria-label={`Chapter ${n} title`}
-                  onChange={e => w.updateOutlineNode(node.id, { title: e.target.value })}
-                />
-              </div>
-              {hue(node, `Chapter ${n}`)}
-              <div className="wrCtDetailRow">
-                <span className="wrWordCount">{stat((index.get(node.id) ?? []).filter(k => k.kind === 'act').length, 'act')} · {formatWords(words(node.id))}</span>
-                <DeleteControl message={`Delete Chapter ${n}${inside ? ' and everything in it' : ''}?`} onConfirm={() => w.deleteOutlineNode(node.id)} />
-              </div>
+        <div
+          key={node.id} {...common} aria-current={active ? 'true' : undefined} style={tint(node)} {...plotDrop(node)}
+          className={dnd.cardClass(`wrChapterCard wrOutlineCard${active ? ' wrChapterCard--active' : ''}${plotOverId === node.id ? ' wrOutlineCard--plotOver' : ''}`, node.id)}
+          // Anywhere on a card that is not open opens it (its buttons and inputs do their own).
+          onClick={active ? undefined : e => { if (!(e.target as HTMLElement).closest('button, input, .wrGrip')) select() }}
+        >
+          <CardHeader
+            grip={grip(node.id)} number={n} title={node.title} label={`Chapter ${n} title`} placeholder="Chapter title"
+            onTitle={title => w.updateOutlineNode(node.id, { title })}
+            pick={active ? undefined : { label: `Open chapter ${n}`, untitled: 'Untitled chapter', onClick: select }}
+            write={{ label: `Write chapter ${n}`, onClick: () => w.openChapter(node.id) }}
+            toggle={{ kind: 'chapter', open, onClick: active ? () => fold.setOpen(node.id, !open) : select }}
+          />
+          <StatsLine
+            items={[
+              stat(totals.act, 'act'), stat(totals.scene, 'scene'), stat(totals.moment, 'moment'),
+              // The plotpoints placed on the chapter are boxed in it while it shows its contents, and counted here when it does not.
+              ...(!body && placed > 0 ? [stat(placed, 'plotpoint')] : []),
+              formatWords(words(node.id)),
+            ]}
+          />
+          {/* Its own keys (the cards'), not the contents'. */}
+          {body && <div className="wrCardBody" onKeyDown={e => e.stopPropagation()}>{body}</div>}
+          {open && (
+            <div className="wrCardFoot wrCardFoot--tools">
+              <span className="wrCardFootLeft">
+                {body && <button type="button" className="wrSmallBtn wrSmallBtn--light" onClick={() => addAct(node.id)}><PlusIcon size={13} /> Act</button>}
+                {hue(node, `Chapter ${n}`)}
+              </span>
+              <DeleteControl message={`Delete Chapter ${n}${inside ? ' and everything in it' : ''}?`} onConfirm={() => w.deleteOutlineNode(node.id)} />
             </div>
-          )}
-          {active && chapterBody && (
-            // Its own keys (the cards'), not the contents'.
-            <div className="wrCtBody" onKeyDown={e => e.stopPropagation()}>{chapterBody(node)}</div>
           )}
         </div>
       )
@@ -139,26 +175,29 @@ export function OutlineNav({ w, book, counts, chapterBody, focus = null }: {
     if (node.kind === 'arc') {
       const n = numbers.arc.get(node.id) ?? 0
       const kids = childrenOf(node)
+      // An arc folds its chapters up (remembered per arc).
+      const open = fold.isOpen(node.id)
       return (
-        <div key={node.id} {...common} className={dnd.cardClass('wrCtArc', node.id)} style={tint(node)}>
-          <div className="wrCtRow wrCtArcHead">
-            {grip(node.id)}
-            <span className="wrNodeLabel">Arc {n}</span>
-            <input
-              className="wrOutlineInput wrOutlineInput--title" placeholder="Arc title" value={node.title} data-kf="" aria-label={`Arc ${n} title`}
-              onChange={e => w.updateOutlineNode(node.id, { title: e.target.value })}
-            />
-          </div>
-          {hue(node, `Arc ${n}`)}
-          {dnd.children(node.id, kids, renderNode)}
-          <div className="wrCtArcFoot">
-            <button type="button" className="wrSmallBtn" onClick={() => addChapter(node.id)}><PlusIcon size={13} /> Chapter</button>
-            <span className="wrWordCount">{stat(kids.length, 'chapter')} · {formatWords(words(node.id))}</span>
-            <DeleteControl
-              message={`Delete Arc ${n}${kids.length ? ` and its ${kids.length} ${kids.length === 1 ? 'chapter' : 'chapters'}` : ''}?`}
-              onConfirm={() => w.deleteOutlineNode(node.id)}
-            />
-          </div>
+        <div key={node.id} {...common} className={dnd.cardClass('wrArcCard', node.id)} style={tint(node)}>
+          <CardHeader
+            grip={grip(node.id)} number={n} title={node.title} label={`Arc ${n} title`} placeholder="Arc title"
+            onTitle={title => w.updateOutlineNode(node.id, { title })}
+            toggle={{ kind: 'arc', open, onClick: () => fold.setOpen(node.id, !open) }}
+          />
+          <StatsLine items={[stat(kids.length, 'chapter'), formatWords(words(node.id))]} />
+          {open && dnd.children(node.id, kids, renderNode)}
+          {open && (
+            <div className="wrCardFoot wrCardFoot--tools">
+              <span className="wrCardFootLeft">
+                <button type="button" className="wrSmallBtn wrSmallBtn--light" onClick={() => addChapter(node.id)}><PlusIcon size={13} /> Chapter</button>
+                {hue(node, `Arc ${n}`)}
+              </span>
+              <DeleteControl
+                message={`Delete Arc ${n}${kids.length ? ` and its ${kids.length} ${kids.length === 1 ? 'chapter' : 'chapters'}` : ''}?`}
+                onConfirm={() => w.deleteOutlineNode(node.id)}
+              />
+            </div>
+          )}
         </div>
       )
     }

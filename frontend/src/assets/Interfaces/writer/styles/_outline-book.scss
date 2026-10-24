@@ -29,25 +29,39 @@
   .wrOutlineNav { display: flex; flex-direction: column; gap: var(--space-3); }
   .wrCtHead { display: flex; align-items: center; justify-content: space-between; gap: var(--space-base); font-size: var(--text-small); font-weight: 700; text-transform: uppercase; letter-spacing: 1px; opacity: 0.9; }
   .wrCtAdd { display: flex; gap: var(--space-2); }
-  .wrCtArc { display: flex; flex-direction: column; gap: var(--space-3); padding: 8px 8px 8px var(--space-4); background: var(--ov-sink-2); border-left: 7px solid var(--wr-node-accent, var(--wr-accent)); }
-  .wrCtRow { display: flex; align-items: center; gap: var(--space-3); min-width: 0; }
-  .wrCtArcHead .wrOutlineInput { flex: 1 1 auto; }
-  .wrCtArcFoot { display: flex; align-items: center; gap: var(--space-base); justify-content: space-between; font-size: var(--text-small); }
-  .wrCtChapter { display: flex; flex-direction: column; gap: var(--space-3); padding: var(--space-1) var(--space-2) var(--space-1) var(--space-1); border-left: 7px solid var(--wr-node-accent, var(--wr-accent)); background: var(--level-wash-lo);
-    &--active { background: var(--level-wash); box-shadow: inset 0 0 0 1px var(--level-ink-soft); } }
-  .wrCtPick { flex: 1 1 auto; min-width: 0; display: flex; align-items: center; gap: var(--space-base); padding: var(--space-3) var(--space-2); text-align: left; color: inherit; &:hover { background: var(--level-wash-lo); } }
-  .wrCtChapter--active .wrCtPick { font-weight: 700; }
-  .wrCtNum { flex: 0 0 auto; min-width: 22px; text-align: center; font-size: var(--text-ui); font-weight: 700; padding: 1px var(--space-2) 3px; background: var(--ov-sink-2); color: var(--on-accent); box-shadow: inset 0 -3px 0 var(--wr-node-accent, var(--wr-accent)); }
-  .wrCtTitle { flex: 1 1 auto; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: var(--text-field); }
-  .wrCtWords { flex: 0 0 auto; font-size: var(--text-small); opacity: 0.9; }
-  .wrCtDetail { display: flex; flex-direction: column; gap: var(--space-3); padding: var(--space-1) var(--space-2) 8px 22px; }
-  .wrCtDetailRow { display: flex; align-items: center; justify-content: space-between; gap: var(--space-base); font-size: var(--text-small); .wrOutlineInput { flex: 1 1 auto; } }
-  .wrOutlineNav .wrNodeHue { max-width: none; flex: 0 0 auto; margin: 0; }
-
-  // The open chapter's banner at the head of its page.
-  .wrChapterBanner { min-width: 0; display: flex; flex-direction: column; gap: var(--space-base); padding: var(--space-4) var(--space-5); border: 1px solid var(--wr-page-line); border-left: 7px solid var(--wr-node-accent, var(--wr-accent)); background: var(--wr-frame-1); }
-  .wrBannerHead { display: flex; align-items: center; gap: var(--space-4); min-width: 0; }
-  .wrBannerTitle { flex: 1 1 auto; min-width: 0; margin: 0; font-size: var(--text-heading); font-family: Georgia, 'Times New Roman', serif; overflow-wrap: anywhere; }
+  // A card for each arc and chapter: one header row (grip, number, title, tools) over a line of its counts; an open one adds its
+  // contents and a footer (what it can add, its colour, its trash).
+  .wrArcCard, .wrChapterCard {
+    min-width: 0; display: flex; flex-direction: column; gap: var(--space-base); padding: var(--space-4) var(--space-5);
+    border: 1px solid var(--wr-page-line); border-left: 7px solid var(--wr-node-accent, var(--wr-accent)); color: var(--on-accent);
+  }
+  .wrArcCard { background: var(--ov-sink-2); }
+  .wrChapterCard { background: var(--wr-frame-1); }
+  // The open chapter is ringed; one that is not open is a button as a whole.
+  .wrChapterCard--active { box-shadow: inset 0 0 0 1px var(--level-ink-soft); }
+  .wrChapterCard:not(.wrChapterCard--active) { cursor: pointer; &:hover { background-image: linear-gradient(var(--level-wash-lo), var(--level-wash-lo)); } }
+  .wrCardHead { display: flex; align-items: center; gap: var(--space-4); min-width: 0; }
+  // The number, underlined in the node's own colour.
+  .wrNumBadge { flex: 0 0 auto; min-width: 22px; text-align: center; font-size: var(--text-ui); font-weight: 700; padding: 1px var(--space-2) 3px; background: var(--ov-sink-2); color: var(--on-accent); box-shadow: inset 0 -3px 0 var(--wr-node-accent, var(--wr-accent)); }
+  // The title is the heading: serif, no box. An open card edits it where it stands (a line shows under it on hover and focus).
+  .wrCardTitleBtn, .wrCardTitleInput { flex: 1 1 auto; min-width: 0; margin: 0; color: inherit; font-family: Georgia, 'Times New Roman', serif; font-size: var(--text-heading); line-height: 1.25; }
+  .wrCardTitleBtn { text-align: left; overflow-wrap: anywhere; }
+  .wrCardTitleInput {
+    box-sizing: border-box; padding: 0 0 var(--space-1); border: 0; border-bottom: 1px solid transparent; border-radius: var(--radius-none); outline: none; background: transparent;
+    &:hover { border-bottom-color: var(--level-ink-soft); }
+    &:focus-visible { border-bottom-color: var(--on-accent); box-shadow: 0 1px 0 var(--on-accent); }
+    // The placeholder is the label tint the audit holds to 4.5:1 on a level page (level/page-label, 75%).
+    &::placeholder { color: color-mix(in srgb, var(--on-accent) 75%, transparent); }
+  }
+  .wrCardBody { display: flex; flex-direction: column; gap: var(--space-base); min-width: 0; }
+  // The footer of tools: what the card can add and its colour (which takes what is left, up to a width) at the left, its trash at the right.
+  .wrCardFoot--tools {
+    flex-wrap: wrap; gap: var(--space-3) var(--space-5);
+    .wrCardFootLeft { flex: 1 1 auto; flex-wrap: wrap; min-width: 0; }
+    // The trash stays at the right when the footer wraps on a narrow cover.
+    > :last-child { margin-left: auto; }
+    .wrNodeHue { flex: 1 1 120px; min-width: 100px; max-width: 220px; margin: 0; }
+  }
 
   // The Plotpoints tab of the Project level.
   .wrPlotpointsTab { display: flex; flex-direction: column; gap: var(--space-4); min-width: 0; }

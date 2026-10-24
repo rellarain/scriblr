@@ -125,6 +125,7 @@ Each cell is the ratio at the default hues (theme 330, accent 32, alert 200) and
 | Paper label on frame-1 | 4.5:1 | 9.0 (8.5) | 8.9 (8.7) | 10.6 (7.6) | 12.5 (11.2) |
 | Paper muted on frame-1 | 4.5:1 | 7.7 (7.2) | 7.6 (7.4) | 10.1 (7.3) | 11.9 (10.8) |
 | Page muted text (ink at 88%) on frame-1 | 4.5:1 | 10.5 (10.3) | 10.4 (10.3) | 10.0 (7.3) | 11.7 (10.4) |
+| Number badge ink on its recess, on frame-1 | 4.5:1 | 10.5 (10.5) | 10.3 (10.2) | 14.9 (11.8) | 16.6 (15.4) |
 | Paper ink on frame-2 | 4.5:1 | 13.2 (13.1) | 12.9 (12.7) | 11.2 (7.6) | 13.3 (11.4) |
 | Paper ink2 on frame-2 | 4.5:1 | 10.4 (10.1) | 10.2 (10.1) | 10.2 (7.0) | 12.1 (10.5) |
 | Paper label on frame-2 | 4.5:1 | 8.4 (8.0) | 8.2 (8.1) | 9.5 (6.5) | 11.3 (9.9) |
