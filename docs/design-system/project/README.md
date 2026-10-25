@@ -37,7 +37,7 @@ Each has a guideline page (`components/<Name>/README.md`) and a live preview tha
 | Group | Components |
 |---|---|
 | Layout | LevelPanels, SplitTiles, Dashboard |
-| Outline | BookCover, OutlineCards, PlotpointTiles, Shelf |
+| Outline | BookCover, OutlineCards, PlotpointTiles, PlotPresets, Shelf |
 | Draft | DraftPage |
 | Controls | Controls, HueSlider |
 | Reader | Reader |

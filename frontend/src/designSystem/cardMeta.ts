@@ -29,6 +29,10 @@ export const CARD_META: CardMeta[] = [
     summary: 'The tray of unassigned plotpoints, and plotpoints placed on a moment or standing in the margin, in their category colours.',
   },
   {
+    id: 'plot-presets', dir: 'PlotPresets', title: 'Plot presets', group: 'Outline', height: 700,
+    summary: "Admin > Configuration > Plot, where presets are set up, saved as drafts and published one by one, and the Plot sidebar's + Preset that adds a published preset to a project.",
+  },
+  {
     id: 'shelf', dir: 'Shelf', title: 'Book shelf and spines', group: 'Outline', height: 260,
     summary: 'Spines on a board, grouped by series; the selected book swivels into its cover.',
   },

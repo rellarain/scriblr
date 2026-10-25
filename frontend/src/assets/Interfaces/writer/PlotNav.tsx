@@ -4,12 +4,14 @@ import type { WriterWorkspace } from './useWriterWorkspace'
 import { ChevronRightIcon, PlusIcon } from '../../icons'
 import { plotColors, plotColorVars } from './plotColors'
 import { nodeLabel, plotlinesUnder, selectionState, sortByTitle } from './plotTree'
+import { PresetPicker } from './PresetPicker'
 
 // The Plot tool's contents: categories > subcategories > clusters > plotlines, alphabetized, each with a checkbox. A plotline's
 // checkbox ticks that plotline; a group's ticks (or unticks) every plotline under it and shows "some" when only part of it is
 // ticked. Two or more ticked plotlines open the compare view (PlotCompare.tsx); "Compare (n)" brings it back after browsing.
 // Three small circles at the top right fold a whole level at once (categories, subcategories, clusters, left to right): lit while any node
-// of that level is open, a click closes them all, and a click on an unlit one opens them all. "+ Category" sits at the bottom.
+// of that level is open, a click closes them all, and a click on an unlit one opens them all. "+ Category" and "+ Preset" (a published plot preset, see
+// PresetPicker.tsx) sit at the bottom. A category, subcategory or cluster that has a description shows the start of it under its name.
 
 const LEVELS = [['category', 'categories'], ['subcategory', 'subcategories'], ['cluster', 'clusters']] as const
 
@@ -75,7 +77,14 @@ export function PlotNav({ w, onOpenNode, onCompare }: {
               ref={el => { if (el) el.indeterminate = state === 'some' }}
               onChange={() => w.togglePlotSelection(lines.map(l => l.id), state !== 'all')}
             />
-            <button type="button" className="wrNavLabel" onClick={() => { w.focusPlotNode(node.id); onOpenNode?.() }}>{nodeLabel(node)}</button>
+            {!isLine && node.body.trim() ? (
+              <span className="wrNavText">
+                <button type="button" className="wrNavLabel" onClick={() => { w.focusPlotNode(node.id); onOpenNode?.() }}>{nodeLabel(node)}</button>
+                <span className="wrNavDesc" title={node.body}>{node.body}</span>
+              </span>
+            ) : (
+              <button type="button" className="wrNavLabel" onClick={() => { w.focusPlotNode(node.id); onOpenNode?.() }}>{nodeLabel(node)}</button>
+            )}
             {!isLine && <span className="wrNavCount">{lines.length}</span>}
           </div>,
           ...(open ? rows(node.id, depth + 1) : []),
@@ -113,9 +122,12 @@ export function PlotNav({ w, onOpenNode, onCompare }: {
         {w.plotNodes.length === 0 && <p className="wrMuted">No categories yet.</p>}
         {rows(null, 0)}
       </div>
-      <button type="button" className="wrSmallBtn wrPlotNavAdd" onClick={() => { w.focusPlotNode(w.addPlotNode(null, 'category')); onOpenNode?.() }}>
-        <PlusIcon size={13} /> Category
-      </button>
+      <div className="wrPlotNavAddRow">
+        <button type="button" className="wrSmallBtn wrPlotNavAdd" onClick={() => { w.focusPlotNode(w.addPlotNode(null, 'category')); onOpenNode?.() }}>
+          <PlusIcon size={13} /> Category
+        </button>
+        <PresetPicker onChoose={preset => { w.focusPlotNode(w.addPlotPreset(preset)); onOpenNode?.() }} />
+      </div>
     </div>
   )
 }

@@ -43,7 +43,7 @@ The focused tab is raised, wider, and takes its colour as its background. A book
 
 ## Editing a list of nodes
 
-Every editor that lists nodes (scratchpad notes, arcs and chapters, acts, scenes, moments, plot nodes) shares one set of keys (`lib/nodeKeys.ts`):
+Every editor that lists nodes (scratchpad notes, arcs and chapters, acts, scenes, moments, plot nodes, and the cards of a plot preset in the Admin) shares one set of keys (`lib/nodeKeys.ts`):
 
 | Key | In a field with text | In an empty node |
 |---|---|---|

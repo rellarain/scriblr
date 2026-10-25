@@ -319,3 +319,49 @@ describe('useWriterWorkspace: saving the plot', () => {
     expect(result.current.plotNodes.find(n => n.id === 'line2')?.title).toBe('Edited')
   })
 })
+
+describe('useWriterWorkspace: adding a plot preset', () => {
+  const PRESET = {
+    name: 'Characters', description: 'The cast', keywords: ['cast'], fields: ['Name', 'Role'],
+    subcategories: [{
+      id: 'x', name: 'Heroes', description: 'Those we follow', keywords: [], fields: ['Want'],
+      clusters: [{ id: 'y', name: 'Core', description: '', keywords: [], fields: [] }],
+    }],
+  }
+
+  it('adds the category with its subcategories and clusters, last, and returns the category\'s id', async () => {
+    const { result, get, childIds } = await opened()
+    let id = ''
+    act(() => { id = result.current.addPlotPreset(PRESET) })
+    expect(get(id)).toMatchObject({ kind: 'category', parentId: null, title: 'Characters', body: 'The cast', keywords: ['cast'], order: 1 })
+    expect(get(id)?.customFieldDefs.map(f => f.name)).toEqual(['Name', 'Role'])
+    const [sub] = childIds(id)
+    expect(get(sub)).toMatchObject({ kind: 'subcategory', title: 'Heroes', body: 'Those we follow' })
+    const [cluster] = childIds(sub)
+    expect(get(cluster)).toMatchObject({ kind: 'cluster', title: 'Core' })
+    expect(childIds(null)).toEqual(['cat', id])
+    expect(result.current.plotNodes).toHaveLength(PLOT.length + 3)
+  })
+
+  it('is one step: a single Undo takes the whole preset back, and Redo brings it back', async () => {
+    const { result } = await opened()
+    act(() => { result.current.addPlotPreset(PRESET) })
+    expect(result.current.history.canUndo('plot')).toBe(true)
+    act(() => { result.current.history.undo('plot') })
+    expect(result.current.plotNodes.map(n => n.id)).toEqual(PLOT.map(n => n.id))
+    expect(result.current.history.canUndo('plot')).toBe(false)
+    act(() => { result.current.history.redo('plot') })
+    expect(result.current.plotNodes.filter(n => n.kind === 'category').map(n => n.title)).toEqual(['Category', 'Characters'])
+    expect(result.current.plotNodes).toHaveLength(PLOT.length + 3)
+  })
+
+  it('is saved with the plot, and a preset added twice makes two separate categories', async () => {
+    const { result, backend } = await opened()
+    act(() => { result.current.addPlotPreset(PRESET); result.current.addPlotPreset(PRESET) })
+    await act(async () => { await result.current.saveNow() })
+    expect(backend.saved.plot).toHaveLength(1)
+    const saved = backend.saved.plot[0]
+    expect(saved.filter(n => n.title === 'Characters')).toHaveLength(2)
+    expect(new Set(saved.map(n => n.id)).size).toBe(saved.length)
+  })
+})

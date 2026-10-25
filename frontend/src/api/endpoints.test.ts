@@ -9,6 +9,7 @@ import {
 import { getOutline, putOutline } from './outlineApi'
 import { getPlot, putPlot } from './plotApi'
 import { createProject, deleteProject, getProject, getProjectsOverview, updateProject } from './projectsApi'
+import { discardPresetChanges, getPresets, getPublishedPresets, publishPreset, putPresets, restorePresetVersion, unpublishPreset } from './presetsApi'
 import { listPublications, publishChapter } from './publicationFetch'
 
 // Each call to the backend asks for the route, with the verb and body, the backend expects: a table of them, with an id that needs escaping
@@ -45,6 +46,13 @@ const CASES: Array<[string, () => Promise<unknown>, string, string, unknown?]> =
   ['getUserSettingsLog', () => getUserSettingsLog(), 'GET', '/api/user-settings/activity'],
   ['listPublications', () => listPublications(ID, ID), 'GET', `/api/projects/${ESC}/publications/${ESC}`],
   ['publishChapter', () => publishChapter(ID, ID), 'POST', `/api/projects/${ESC}/publications/${ESC}`, {}],
+  ['getPresets', () => getPresets(), 'GET', '/api/presets'],
+  ['putPresets', () => putPresets({ presets: [] }), 'PUT', '/api/presets', { presets: [] }],
+  ['getPublishedPresets', () => getPublishedPresets(), 'GET', '/api/presets/published'],
+  ['publishPreset', () => publishPreset(ID), 'POST', `/api/presets/${ESC}/publish`],
+  ['unpublishPreset', () => unpublishPreset(ID), 'POST', `/api/presets/${ESC}/unpublish`],
+  ['discardPresetChanges', () => discardPresetChanges(ID), 'POST', `/api/presets/${ESC}/discard`],
+  ['restorePresetVersion', () => restorePresetVersion(ID, 3), 'POST', `/api/presets/${ESC}/restore/3`],
   ['putMomentDraft', () => putMomentDraft(ID, ID, ID, 'Text'), 'PUT', `/api/projects/${ESC}/draft/chapter/${ESC}/moment/${ESC}`, { outlineNodeId: ID, body: 'Text' }],
 ]
 

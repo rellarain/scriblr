@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import type {
-  BookProgress, FlagType, NodeFlag, OutlineNode, OutlineNodeKind, PlotNode, PlotNodeKind, ProjectIndex, TimeSystem,
+  BookProgress, FlagType, NodeFlag, OutlineNode, OutlineNodeKind, PlotNode, PlotNodeKind, PresetContent, ProjectIndex, TimeSystem,
 } from '../../../api/types'
 import type { SettingsLogEntry } from '../../../types'
 import { getBookProgress } from '../../../api/bookProgressApi'
@@ -15,6 +15,7 @@ import { putOutline as apiPutOutline } from '../../../api/outlineApi'
 import { putPlot as apiPutPlot } from '../../../api/plotApi'
 import { booksOf, buildChildIndex, chaptersOfBook, dissolveSeries, moveNodeTo, nearestOfKind } from './outlineTree'
 import { categoryOf, isAssignedPlotpoint } from './plotTree'
+import { nodesFromPreset } from './plotPreset'
 import {
   addField, addValue, assignPoint, deleteField, deleteValue, migratePlot, moveField, moveValue, renameField, syncReferences, updateValue,
 } from './plotFields'
@@ -692,6 +693,14 @@ export function useWriterWorkspace() {
     return id
   }
 
+  // Add a plot preset (see plotPreset.ts): its category, subcategories and clusters are made together as one step, so one Undo takes them all back.
+  // Returns the new category's id.
+  function addPlotPreset(preset: PresetContent): string {
+    const added = nodesFromPreset(plotNodesRef.current, preset, newId)
+    commitPlot(added.nodes, true)
+    return added.id
+  }
+
   function updatePlotNodeField(nodeId: string, field: 'title' | 'body', value: string) {
     commitPlot(plotNodesRef.current.map(n => (n.id === nodeId ? { ...n, [field]: value } : n)), false)
   }
@@ -886,7 +895,7 @@ export function useWriterWorkspace() {
     plotNodes, plotStatus, plotError, plotSaving: plotSave.saving, plotSaveError: plotSave.error,
     focusedPlotNodeId, focusedPlotNode, plotChildrenByParentId, plotNodeById,
     plotSelection, setPlotSelection, togglePlotSelection,
-    focusPlotNode, addPlotNode, updatePlotNodeField, setPlotHue, deletePlotNode,
+    focusPlotNode, addPlotNode, addPlotPreset, updatePlotNodeField, setPlotHue, deletePlotNode,
     addPlotKeyword, removePlotKeyword,
     addPlotField, renamePlotField, movePlotField, removePlotField,
     addPlotValue, updatePlotValue, removePlotValue, movePlotValue, cyclePlotAwareness,

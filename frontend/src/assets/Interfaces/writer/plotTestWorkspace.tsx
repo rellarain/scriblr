@@ -1,7 +1,8 @@
 import { useRef, useState } from 'react'
 import { vi } from 'vitest'
-import type { OutlineNode, PlotNode } from '../../../api/types'
+import type { OutlineNode, PlotNode, PresetContent } from '../../../api/types'
 import { awarenessNext } from './awareness'
+import { nodesFromPreset } from './plotPreset'
 import {
   addField, addValue, assignPoint, deleteField, deleteValue, moveField, moveValue, randomId, renameField, syncReferences, updateValue,
 } from './plotFields'
@@ -81,6 +82,11 @@ export function useFakeWorkspace(initial: PlotNode[], focused = 'line', outlineN
       const order = ref.current.filter(n => n.parentId === parent).length + (after ? 0.5 : 0)
       commit([...ref.current, plotNode(id, kind, parent, { title: '', order })])
       return id
+    },
+    addPlotPreset: (preset: PresetContent) => {
+      const added = nodesFromPreset(ref.current, preset, randomId)
+      commit(added.nodes)
+      return added.id
     },
     updatePlotNodeField: (id: string, field: 'title' | 'body', value: string) => commit(ref.current.map(n => (n.id === id ? { ...n, [field]: value } : n))),
     deletePlotNode: (id: string) => { commit(ref.current.filter(n => n.id !== id)); setSelection(prev => prev.filter(s => s !== id)) },

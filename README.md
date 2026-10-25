@@ -251,12 +251,24 @@ described, now stale, in `docs/data-model.md`).
   be restored under a new parent or permanently deleted (which never
   touches that chapter's revision history — "like git history retaining a
   deleted file").
-- **Presets** — `PresetCatalog`: a global, non-project-scoped catalog of
-  preset plot categories (10 built-ins seeded on first load — Characters,
+- **Presets** — `PresetCatalog` (`presets.json`, schema v2): a global,
+  non-project-scoped catalog of ready-made plot categories. A preset is a
+  category with its description, keywords and fields, its subcategories and
+  their clusters (each with the same). Every `PresetEntry` has a **draft**
+  (what Admin > Configuration > Plot edits; autosaved) and, once published, a
+  numbered **published** copy plus up to 10 earlier versions (`history`).
+  Only published copies are offered by the Plot sidebar's **+ Preset**, which
+  adds one to a project as a plain copy (no link back; later edits on either
+  side never cross). Publish is per preset, refused while the draft is
+  invalid (blank or duplicate name, 422 with the reasons); unpublish keeps
+  the versions; discard returns the draft to the published copy; restore
+  brings a version into the draft. The 10 original built-ins (Characters,
   Settings, Themes, Conflicts, Subplots, World-building, Plot Structure,
-  Relationships, Foreshadowing, Objects and Artifacts), offered when adding
-  a new plot category in any project; editing/deleting a preset only
-  affects future categories, never ones already instantiated from it.
+  Relationships, Foreshadowing, Objects and Artifacts) are seeded on first
+  load as ordinary, published presets (ids `preset-<slug>`): they can be
+  renamed or deleted. A v1 file is upgraded on first load (each preset
+  becomes draft plus published v1; the old file is kept as
+  `presets.v1.json`).
 
 ### API surface
 
@@ -276,7 +288,7 @@ the one project-independent router).
 | `schedule` | `/api/projects/{id}/schedule` | `GET "/{date}"` · `PUT "/{date}"` replace completed ids |
 | `scrap` | `/api/projects/{id}/scrap` | `GET ""` registry · `POST "/{momentId}/restore"` · `DELETE "/{momentId}"` (204, permanent) |
 | `export` | `/api/projects/{id}/export` | `GET "/book/{bookId}"` PDF · `GET "/chapter/{chapterId}"` PDF (set in a built-in font: typographic punctuation is made plain and anything outside Latin-1 becomes `?` until a Unicode font is bundled; the download name carries the real title in `filename*`) |
-| `presets` | `/api/presets` | `GET ""` / `PUT ""` — global catalog (project-independent) |
+| `presets` | `/api/presets` | `GET ""` whole catalog (drafts, published copies, history) · `PUT ""` replace the drafts, in order (published copies and history of the ids kept; an absent id is deleted) · `GET "/published"` what the Plot sidebar offers · `POST "/{id}/publish"` (422 with the reasons if the draft is invalid) · `POST "/{id}/unpublish"` · `POST "/{id}/discard"` · `POST "/{id}/restore/{version}"` — global (`presets.json`, project-independent) |
 | `feedback` | `/api/feedback` | Helper Inbox (app-level `feedback.json`, acts as the admin in the `X-Admin-Id` header; every call returns the whole anonymous inbox bundle): `GET ""`, `PUT /messages/{id}/validation`, `PUT /cases/{id}/vote` (yes, no, pass), `POST /cases/{id}/solutions`, `PUT /cases/{id}/solutions/{sid}/vote`, `POST /cases/{id}/close` (Planner), `POST /cases/{id}/reopen` (Configurer), `PUT /admins/{id}/roles`, `POST` / `PATCH` / `DELETE /verb-categories[/{id}]` |
 | `user_settings` | `/api/user-settings` | `GET ""` whole doc · `PUT "/theme"` · `PUT "/ui"` · `PUT "/kv/{key}"` / `DELETE "/kv/{key}"` (keys must start `scriblr.`) · `POST "/kv-import"` (one-time localStorage migration; sets only absent keys) — global (`user-settings.json`) |
 

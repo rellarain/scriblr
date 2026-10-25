@@ -10,6 +10,8 @@ vi.mock('./admin/RoleAssignment', () => ({ default: () => <div>role assignment</
 // useResources.test.ts and its own component tests -- mocked here so this
 // file only exercises AUI's own section/page tile layout.
 vi.mock('./admin/resources/ResourcesConsole', () => ({ default: () => <div>resources console</div> }))
+// The plot presets page (covered by its own tests) is mocked for the same reason.
+vi.mock('./admin/plot/PlotPresetsConsole', () => ({ default: () => <div>plot presets console</div> }))
 
 beforeEach(() => {
   window.localStorage.clear()
@@ -38,6 +40,19 @@ describe('AUI (the Admin panel as tiles)', () => {
     expect(within(screen.getByRole('region', { name: 'Assignment' })).getByText('role assignment')).toBeTruthy()
     await user.click(within(screen.getByRole('region', { name: 'Assignment' })).getByRole('button', { name: 'Help' }))
     expect(within(screen.getByRole('region', { name: 'Help' })).getByText(/using the Manager console/)).toBeTruthy()
+  })
+
+  it('opens Configuration > Plot into the plot presets page, without a second heading above it', async () => {
+    const user = userEvent.setup()
+    render(<AUI />)
+    expect(within(tile('configuration')).getByText('Plot')).toBeTruthy()
+    expect(within(tile('configuration')).getByText('Overview')).toBeTruthy()
+    await user.click(within(tile('configuration')).getByRole('button', { name: 'Open Configuration' }))
+    const configuration = screen.getByRole('region', { name: 'Configuration' })
+    await user.click(within(configuration).getByRole('button', { name: 'Open Plot' }))
+    const plot = await screen.findByRole('region', { name: 'Plot' })
+    expect(await within(plot).findByText('plot presets console')).toBeTruthy()
+    expect(plot.querySelector('.aUIPage h2')).toBeNull()
   })
 
   it('opens Resources straight into the article/quiz builder, with its own Help text', async () => {

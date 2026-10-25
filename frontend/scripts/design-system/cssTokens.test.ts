@@ -82,11 +82,11 @@ describe('the Writer stylesheets use the tokens', () => {
   })
 
   // The system's floor for text is 11px (the `label` and `button` styles): nothing in the Writer, the app shell (the helper's and admin's
-  // screens) or the admin Resources sheet is set smaller. (The sky toggle's date, the Reader's markers and the theme timeline are still
+  // screens) or the admin Resources and Plot presets sheets is set smaller. (The sky toggle's date, the Reader's markers and the theme timeline are still
   // under it, see known-drift.)
   it('set no text under 11px', () => {
     const small: string[] = []
-    for (const { name, text } of [...files, ...readStyleFiles('App.scss'), ...readStyleFiles('assets/Interfaces/admin/resources/resources.scss')]) {
+    for (const { name, text } of [...files, ...readStyleFiles('App.scss'), ...readStyleFiles('assets/Interfaces/admin/resources/resources.scss'), ...readStyleFiles('assets/Interfaces/admin/plot/plotPresets.scss')]) {
       text.split('\n').forEach((line, i) => {
         for (const m of line.matchAll(/(?<![\w-])font-size:\s*(\d+(?:\.\d+)?)px|(?<![\w-])font:\s*[\w ]*?(\d+(?:\.\d+)?)px/g)) {
           const size = Number(m[1] ?? m[2])

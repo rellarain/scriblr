@@ -1,0 +1,165 @@
+// AUI > Configuration > Plot: the plot presets page (PlotPresetsConsole.tsx, PresetList.tsx, PresetPane.tsx, PresetCards.tsx). Colours are the theme
+// tokens; inside AUI's own scope --accent is already re-pointed at the admin accent (App.scss), so this needs no colours of its own. Type is the
+// text tokens (nothing under 11px) and space the space scale.
+
+.plpPage {
+  container-type: inline-size;
+  display: flex; flex-direction: column; gap: var(--space-5); width: 100%; min-width: 0; color: var(--ink); font-size: var(--text-ui);
+}
+.plpBar { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: var(--space-3) var(--space-6); }
+.plpBarTitle { margin: 0; font-size: var(--text-title); font-weight: 600; text-transform: uppercase; letter-spacing: 1px; }
+.plpNote { display: flex; flex-direction: column; align-items: flex-start; gap: var(--space-4); margin: 0; font-size: var(--text-field); color: var(--ink); }
+.plpSplit { display: flex; align-items: flex-start; gap: var(--space-6); min-width: 0; }
+
+// ---- the list ----
+.plpList {
+  flex: 0 0 248px; min-width: 0; display: flex; flex-direction: column;
+  background: var(--surface-raised); box-shadow: inset 0 0 0 1px var(--hairline);
+}
+.plpListHead { display: flex; align-items: center; justify-content: space-between; gap: var(--space-3); padding: var(--space-4) var(--space-4) var(--space-3); }
+.plpListTitle { font-size: var(--text-small); font-weight: 700; text-transform: uppercase; letter-spacing: 0.05em; color: var(--ink-muted); }
+.plpRows { list-style: none; margin: 0; padding: 0 var(--space-2); display: flex; flex-direction: column; overflow-y: auto; max-height: 420px; }
+.plpRowItem {
+  display: flex; align-items: center; gap: var(--space-1);
+  &--over { box-shadow: inset 0 2px 0 var(--accent); }
+  &--dragging { opacity: 0.5; }
+}
+.plpRow {
+  flex: 1 1 auto; min-width: 0; display: flex; align-items: center; padding: var(--space-3) var(--space-2); border: 0; border-radius: var(--radius-none);
+  background: none; color: inherit; font: inherit; text-align: left; cursor: pointer;
+  &:hover { background: var(--ov-sink-1); }
+  &--on { background: var(--ov-sink-2); box-shadow: inset 3px 0 0 var(--accent); }
+}
+.plpRowText { display: flex; flex-direction: column; min-width: 0; flex: 1 1 auto; gap: var(--space-1); }
+.plpRowName { font-size: var(--text-field); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.plpListFoot { display: flex; flex-wrap: wrap; gap: var(--space-3); padding: var(--space-4); border-top: 1px solid var(--hairline); }
+// The list folds into this one button when the page is narrow.
+.plpPick {
+  display: none; align-items: center; justify-content: space-between; gap: var(--space-4); width: 100%; box-sizing: border-box; padding: var(--space-4) var(--space-5);
+  border: 0; border-radius: var(--radius-none); background: var(--surface-raised); box-shadow: inset 0 0 0 1px var(--hairline); color: inherit; font: inherit; text-align: left; cursor: pointer;
+}
+
+.plpBadge { display: inline-flex; align-items: center; gap: var(--space-2); font-size: var(--text-small); color: var(--ink-muted); white-space: nowrap; &--pending { color: var(--ink); font-weight: 700; } }
+.plpDot { width: 8px; height: 8px; border-radius: 50%; flex: 0 0 auto; background: var(--accent); &--never { background: transparent; box-shadow: inset 0 0 0 1.5px var(--ink-muted); } &--off { background: var(--ink-faint); } }
+
+// ---- the open preset ----
+.plpPane { flex: 1 1 auto; min-width: 0; position: relative; }
+.plpFieldset { border: 0; margin: 0; padding: 0; min-width: 0; display: flex; flex-direction: column; gap: var(--space-5); &:disabled { opacity: 0.7; } }
+.plpTools {
+  display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: var(--space-2) var(--space-5);
+  padding: var(--space-3) var(--space-4); background: var(--ov-sink-1);
+}
+.plpToolGroup { display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-2) var(--space-3); }
+.plpMenuAnchor { position: relative; display: inline-flex; }
+.plpStatus { margin: 0; display: flex; flex-wrap: wrap; align-items: baseline; gap: var(--space-2) var(--space-3); font-size: var(--text-small); color: var(--ink-muted); b { color: var(--ink); } }
+
+.plpBtn {
+  display: inline-flex; align-items: center; justify-content: center; gap: var(--space-2); padding: var(--space-2) 9px; min-height: 28px; box-sizing: border-box;
+  border: 0; border-radius: var(--radius-button); background: var(--ov-sink-2); color: var(--ink); font: inherit; font-size: var(--text-ui); font-weight: 700; white-space: nowrap; cursor: pointer;
+  &:hover:not(:disabled) { background: var(--ov-sink-3); }
+  &:disabled { opacity: 0.6; cursor: not-allowed; }
+  &:focus-visible { outline: 2px solid var(--accent-hover); outline-offset: 1px; }
+  &--primary { background: var(--accent); color: var(--on-accent); &:hover:not(:disabled) { background: var(--accent-hover); } }
+  &--small { padding: var(--space-1) var(--space-base); min-height: 24px; font-size: var(--text-small); }
+}
+.plpIconBtn {
+  display: inline-flex; align-items: center; justify-content: center; width: 24px; height: 24px; padding: 0; border: 0; border-radius: var(--radius-button);
+  background: none; color: var(--ink); opacity: 0.6; cursor: pointer; flex: 0 0 auto;
+  &:hover { opacity: 1; background: var(--ov-sink-1); }
+  &:focus-visible { outline: 2px solid var(--accent-hover); outline-offset: 1px; }
+}
+.plpLink { border: 0; padding: 0; background: none; color: inherit; font: inherit; text-decoration: underline; cursor: pointer; &:focus-visible { outline: 2px solid var(--accent-hover); outline-offset: 1px; } }
+
+// ---- the card tree ----
+.plpTree { display: flex; flex-direction: column; gap: var(--space-4); min-width: 0; }
+.plpCard {
+  display: flex; flex-direction: column; gap: var(--space-4); padding: var(--space-5) var(--space-6); min-width: 0; box-sizing: border-box;
+  border-left: 7px solid var(--accent); background: var(--surface-raised); box-shadow: inset 0 0 0 1px var(--hairline);
+  &--subcategory { background: var(--surface-raised-b); border-left-color: var(--accent-dim); }
+  &--cluster { background: var(--surface-deep); border-left-color: color-mix(in srgb, var(--accent) 50%, transparent); }
+  &--invalid { box-shadow: inset 0 0 0 2px var(--alert); }
+  &--over { box-shadow: inset 0 3px 0 var(--accent); }
+}
+.plpHead { display: flex; align-items: center; flex-wrap: wrap; gap: var(--space-3) var(--space-4); min-width: 0; }
+.plpGrip { display: inline-flex; flex: 0 0 auto; padding: var(--space-1); color: inherit; cursor: grab; opacity: 0.6; &:hover, &:focus-visible { opacity: 1; } &:focus-visible { outline: 2px solid var(--accent-hover); outline-offset: 1px; } &--chip { padding: 0; } }
+.plpKind { flex: 0 0 auto; padding: var(--space-1) var(--space-3); background: var(--ov-sink-2); font-size: var(--text-small); font-weight: 700; text-transform: uppercase; letter-spacing: 0.06em; }
+.plpNameWrap { flex: 1 1 160px; min-width: 0; display: flex; flex-direction: column; gap: var(--space-1); }
+.plpName {
+  flex: 0 0 auto; min-width: 0; box-sizing: border-box; width: 100%; margin: 0; padding: 0 0 var(--space-1); border: 0; border-bottom: 1px solid transparent; border-radius: var(--radius-none);
+  outline: none; background: transparent; color: inherit; font-family: Georgia, 'Times New Roman', serif; font-size: var(--text-heading); line-height: 1.25;
+  &:hover { border-bottom-color: var(--ink-faint); }
+  &:focus-visible { border-bottom-color: var(--ink); box-shadow: 0 1px 0 var(--ink); }
+  &[aria-invalid='true'] { border-bottom-color: var(--alert); }
+  &::placeholder { color: var(--ink-muted); }
+}
+.plpHead > .plpName { flex: 1 1 160px; }
+.plpCount { flex: 0 0 auto; font-size: var(--text-small); color: var(--ink-muted); }
+.plpLabel { display: flex; justify-content: space-between; gap: var(--space-4); margin: 0 0 var(--space-2); font-size: var(--text-small); font-weight: 700; text-transform: uppercase; letter-spacing: 0.05em; color: var(--ink-muted); span { font-weight: 400; text-transform: none; letter-spacing: 0; } }
+.plpField {
+  display: block; width: 100%; box-sizing: border-box; resize: vertical; border: 0; border-radius: var(--radius-none); background: var(--ov-sink-1); color: var(--ink);
+  font: inherit; font-size: var(--text-field); padding: var(--space-3) var(--space-4); outline: none;
+  &:focus-visible { box-shadow: inset 0 0 0 1px var(--accent); }
+  &::placeholder { color: var(--ink-faint); }
+}
+.plpChips { display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-3); }
+.plpChip {
+  display: inline-flex; align-items: center; gap: var(--space-3); padding: 3px var(--space-4); background: var(--ov-sink-2); font-size: var(--text-small);
+  button { border: 0; background: none; color: inherit; opacity: 0.6; font-size: var(--text-field); line-height: 1; padding: 0; cursor: pointer; &:hover, &:focus-visible { opacity: 1; } }
+  &--field { padding-left: var(--space-2); }
+  &--dragging { opacity: 0.5; }
+  &--over { box-shadow: inset 2px 0 0 var(--accent); }
+}
+.plpChipAdd {
+  display: inline-flex; align-items: center; gap: var(--space-1); background: var(--ov-sink-1); padding: 0 var(--space-2) 0 var(--space-4);
+  input { width: 120px; background: transparent; border: 0; outline: none; color: var(--ink); font: inherit; font-size: var(--text-small); padding: var(--space-2) 0; &::placeholder { color: var(--ink-faint); } }
+  button { display: inline-flex; border: 0; background: none; color: inherit; padding: var(--space-2); opacity: 0.7; cursor: pointer; &:disabled { opacity: 0.5; cursor: default; } &:hover:not(:disabled) { opacity: 1; } }
+  &:focus-within { box-shadow: inset 0 0 0 1px var(--accent); }
+}
+.plpFoot { display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-3) var(--space-5); }
+.plpKids { display: flex; flex-direction: column; gap: var(--space-4); }
+.plpDropEnd { padding: var(--space-3); text-align: center; font-size: var(--text-small); color: var(--ink-muted); box-shadow: inset 0 0 0 1px var(--hairline); list-style: none; &--over { box-shadow: inset 0 0 0 2px var(--accent); } }
+.plpErr { margin: 0; font-size: var(--text-small); font-weight: 700; color: var(--ink); }
+.plpConfirm { display: inline-flex; flex-wrap: wrap; align-items: center; gap: var(--space-3); font-size: var(--text-small); }
+.plpConfirmBar {
+  display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-3) var(--space-5); padding: var(--space-4) var(--space-5);
+  background: var(--ov-sink-2); box-shadow: inset 4px 0 0 var(--alert); font-size: var(--text-ui);
+}
+.plpConfirmBtns { display: inline-flex; gap: var(--space-3); }
+.plpEmpty {
+  display: flex; flex-direction: column; align-items: flex-start; gap: var(--space-4); padding: var(--space-6); background: var(--ov-sink-1); box-shadow: inset 0 0 0 1px var(--hairline);
+  h3 { margin: 0; font-size: var(--text-title); }
+  p { margin: 0; max-width: 46ch; font-size: var(--text-field); color: var(--ink-muted); }
+}
+.plpToast {
+  display: flex; flex-direction: column; gap: var(--space-2); align-items: flex-start; padding: var(--space-4) var(--space-5); background: var(--ov-sink-2); box-shadow: inset 4px 0 0 var(--accent); font-size: var(--text-field);
+  p { margin: 0; }
+  small { font-size: var(--text-small); color: var(--ink-muted); }
+  &--error { box-shadow: inset 4px 0 0 var(--alert); }
+}
+
+// ---- the publish dialog and the versions menu ----
+.plpScrim { position: absolute; inset: 0; z-index: 5; display: flex; align-items: flex-start; justify-content: center; padding: var(--space-7) var(--space-6); background: var(--scrim); }
+.plpDialog {
+  display: flex; flex-direction: column; gap: var(--space-5); width: min(100%, 380px); box-sizing: border-box; padding: var(--space-7);
+  background: var(--surface-base); color: var(--ink); box-shadow: inset 0 0 0 1px var(--hairline), 0 8px 24px rgb(0 0 0 / 0.35);
+  h3 { margin: 0; font-family: Georgia, 'Times New Roman', serif; font-size: var(--text-heading); font-weight: 600; }
+  ul { margin: 0; padding: 0 0 0 var(--space-7); display: flex; flex-direction: column; gap: var(--space-2); font-size: var(--text-field); }
+  p { margin: 0; font-size: var(--text-field); color: var(--ink-muted); }
+  .plpFoot { justify-content: flex-end; }
+}
+.plpMenu {
+  position: absolute; z-index: 4; top: calc(100% + 4px); left: 0; width: 300px; max-width: 80vw; display: flex; flex-direction: column; padding: var(--space-3);
+  background: var(--surface-base); color: var(--ink); box-shadow: inset 0 0 0 1px var(--hairline), 0 8px 24px rgb(0 0 0 / 0.35);
+}
+.plpMenuItem {
+  display: flex; align-items: center; justify-content: space-between; gap: var(--space-4); padding: var(--space-3) var(--space-4); font-size: var(--text-field);
+  small { display: block; font-size: var(--text-small); color: var(--ink-muted); }
+  & + & { border-top: 1px solid var(--hairline); }
+}
+
+// ---- a narrow page: the list folds into one picker above the editor ----
+@container (max-width: 639px) {
+  .plpSplit { flex-direction: column; align-items: stretch; }
+  .plpPick { display: flex; }
+  .plpList { display: none; flex: 0 0 auto; &--open { display: flex; } }
+}

@@ -363,6 +363,22 @@ export function ExportIcon(props: IconProps) {
   </IconBase>
 }
 
+// The tray with an arrow going in -- bring a file into the app (Import).
+export function ImportIcon(props: IconProps) {
+  return <IconBase {...props}>
+    <rect x="4" y="14" width="16" height="6" rx="1" />
+    <path d="M12 3v10M8 9l4 4 4-4" />
+  </IconBase>
+}
+
+// Two sheets, one over the other -- make a copy (Duplicate).
+export function CopyIcon(props: IconProps) {
+  return <IconBase {...props}>
+    <rect x="9" y="9" width="11" height="11" rx="1.5" />
+    <path d="M5 15V5a1 1 0 0 1 1-1h10" />
+  </IconBase>
+}
+
 // A single page with text lines -- draft editing (Page Console).
 export function PageIcon(props: IconProps) {
   return <IconBase {...props}>

@@ -284,7 +284,7 @@ class PlotNode(BaseModel):
     parentId: Optional[str] = None
     order: int
     title: str
-    # Plotpoint body text; unused for category/plotline nodes.
+    # The description: a plotpoint's body text, and the description of a category, subcategory or cluster (a plot preset's description fills it).
     body: str = ""
     # Set only on "plotpoint" nodes: the moment (outline node id) this
     # plotpoint is assigned to, if any.
@@ -306,7 +306,7 @@ class PlotNode(BaseModel):
     # Set only on "plotline" nodes: values for the parent category's custom
     # fields, keyed by PlotCustomFieldDef.id.
     customFieldValues: dict[str, str] = Field(default_factory=dict)
-    # Set only on "plotline" nodes: keywords/phrases connected to this plotline.
+    # Keywords/phrases connected to this node (set on a category, subcategory, cluster or plotline).
     keywords: list[str] = Field(default_factory=list)
     # Flags this item for revision (review/edit/add/delete), with an optional note.
     flag: Optional[NodeFlag] = None
@@ -749,24 +749,145 @@ class ScrapRegistry(BaseModel):
 
 
 # ---------------------------------------------------------------------------
-# Presets: a global (not project-scoped) catalog of starter field-name sets
-# for the Plot sidebar's "Add category" picker, editable from the app's admin
-# panel (reachable from the project picker, since presets apply across every
-# project). Lives at %APPDATA%\Scriblr\presets.json, a sibling of the
-# projects/ directory rather than inside any one project. Its own schema
-# version, independent of SCHEMA_VERSION, since it's an unrelated shard.
+# Presets: a global (not project-scoped) catalog of ready-made plot categories
+# for the Plot sidebar's "+ Preset" selector, configured in the admin panel
+# (Configuration > Plot). A preset is a category with its description,
+# keywords, fields, and subcategories and clusters (each with the same).
+# Every preset has a DRAFT (what the admin edits; autosaved) and, once
+# published, a frozen PUBLISHED copy (what the Writer's selector reads) plus
+# the earlier published versions. Adding a preset to a project is a plain copy:
+# nothing here is ever linked to, or changed in, a project.
+# Lives at %APPDATA%\Scriblr\presets.json, a sibling of the projects/
+# directory. Its own schema version, independent of SCHEMA_VERSION, since it's
+# an unrelated shard. Version 1 held only a name and field names per preset.
 # ---------------------------------------------------------------------------
 
+PRESETS_SCHEMA_VERSION = 2
+# The same limits as the Plot editor (frontend plotFields.ts: TITLE_MAX, FIELD_NAME_MAX, BODY_MAX), so a preset never holds anything the
+# Writer would cut off, and generous caps on counts so the file stays small.
+PRESET_NAME_MAX = 50
+PRESET_FIELD_MAX = 30
+PRESET_DESCRIPTION_MAX = 255
+PRESET_KEYWORD_MAX = 50
+PRESET_MAX_PRESETS = 200
+PRESET_MAX_FIELDS = 100
+PRESET_MAX_KEYWORDS = 50
+PRESET_MAX_CHILDREN = 100
+PRESET_HISTORY_MAX = 10
+_PRESET_ID = r"^[A-Za-z0-9_-]{1,80}$"
 
-class PresetCategory(BaseModel):
-    id: str
-    name: str
-    fields: list[str] = Field(default_factory=list)
+
+def _clean_list(values: list[str], limit: int, what: str, *, unique: bool) -> list[str]:
+    """Trim each entry, drop the blank ones (and, for keywords, the repeats), and refuse one that is over `limit`."""
+    out: list[str] = []
+    for value in values:
+        text = value.strip()
+        if not text:
+            continue
+        if len(text) > limit:
+            raise ValueError(f"a {what} is over {limit} characters")
+        if unique and text in out:
+            continue
+        out.append(text)
+    return out
+
+
+class _PresetNode(BaseModel):
+    """What a category, subcategory and cluster of a preset share. A name may be blank in a draft (a new, unfinished card) but not when published."""
+
+    name: str = Field(default="", max_length=PRESET_NAME_MAX)
+    description: str = Field(default="", max_length=PRESET_DESCRIPTION_MAX)
+    keywords: list[str] = Field(default_factory=list, max_length=PRESET_MAX_KEYWORDS)
+    # Field names; each becomes a field (PlotCustomFieldDef) on the node made from this one. Order is kept; a repeat is allowed.
+    fields: list[str] = Field(default_factory=list, max_length=PRESET_MAX_FIELDS)
+
+    @field_validator("name", "description", mode="before")
+    @classmethod
+    def _trim_text(cls, value: Any) -> Any:
+        return value.strip() if isinstance(value, str) else value
+
+    @field_validator("keywords")
+    @classmethod
+    def _clean_keywords(cls, value: list[str]) -> list[str]:
+        return _clean_list(value, PRESET_KEYWORD_MAX, "keyword", unique=True)
+
+    @field_validator("fields")
+    @classmethod
+    def _clean_fields(cls, value: list[str]) -> list[str]:
+        return _clean_list(value, PRESET_FIELD_MAX, "field name", unique=False)
+
+
+class PresetCluster(_PresetNode):
+    id: str = Field(pattern=_PRESET_ID)
+
+
+class PresetSubcategory(_PresetNode):
+    id: str = Field(pattern=_PRESET_ID)
+    clusters: list[PresetCluster] = Field(default_factory=list, max_length=PRESET_MAX_CHILDREN)
+
+
+class PresetContent(_PresetNode):
+    """A preset's category and everything under it (its id is its PresetEntry's)."""
+
+    subcategories: list[PresetSubcategory] = Field(default_factory=list, max_length=PRESET_MAX_CHILDREN)
+
+
+class PublishedPreset(BaseModel):
+    """One numbered, frozen copy of a preset's content."""
+
+    version: int
+    publishedAt: datetime = Field(default_factory=utcnow)
+    content: PresetContent
+
+
+class PresetEntry(BaseModel):
+    id: str = Field(pattern=_PRESET_ID)
+    draft: PresetContent
+    # The copy the Writer offers; None until published, and again after Unpublish.
+    published: Optional[PublishedPreset] = None
+    # Earlier published versions, newest first (the current one is `published`, not here).
+    history: list[PublishedPreset] = Field(default_factory=list, max_length=PRESET_HISTORY_MAX)
+    # The version the next publish gets; it only ever goes up, so an unpublished preset keeps counting.
+    nextVersion: int = 1
 
 
 class PresetCatalog(BaseModel):
-    schemaVersion: int = 1
-    presets: list[PresetCategory] = Field(default_factory=list)
+    schemaVersion: int = PRESETS_SCHEMA_VERSION
+    presets: list[PresetEntry] = Field(default_factory=list, max_length=PRESET_MAX_PRESETS)
+
+
+class PresetDraftIn(BaseModel):
+    id: str = Field(pattern=_PRESET_ID)
+    draft: PresetContent
+
+
+class PresetDraftList(BaseModel):
+    """What the admin page saves: just the drafts, in order. Published copies and history are never touched by a save, and a preset left out is deleted."""
+
+    presets: list[PresetDraftIn] = Field(default_factory=list, max_length=PRESET_MAX_PRESETS)
+
+    @model_validator(mode="after")
+    def _unique(self) -> "PresetDraftList":
+        ids = [p.id for p in self.presets]
+        if len(set(ids)) != len(ids):
+            raise ValueError("two presets share an id")
+        names = [p.draft.name.casefold() for p in self.presets if p.draft.name]
+        if len(set(names)) != len(names):
+            raise ValueError("two presets share a name")
+        return self
+
+
+class PublishedPresetOut(BaseModel):
+    """What the Writer's selector reads: a published preset, with its id."""
+
+    id: str
+    version: int
+    publishedAt: datetime
+    content: PresetContent
+
+
+class PublishedPresetList(BaseModel):
+    presets: list[PublishedPresetOut] = Field(default_factory=list)
 
 
 # ---------------------------------------------------------------------------

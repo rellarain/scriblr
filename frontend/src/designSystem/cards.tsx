@@ -15,6 +15,8 @@ import HueSlider from '../assets/Interfaces/writer/HueSlider'
 import { PlotTray } from '../assets/Interfaces/writer/levels/PlotpointsTab'
 import WriterLevels from '../assets/Interfaces/writer/levels/WriterLevels'
 import { PlotpointTile } from '../assets/Interfaces/writer/PlotpointTile'
+import { PlotNav } from '../assets/Interfaces/writer/PlotNav'
+import PlotPresetsConsole from '../assets/Interfaces/admin/plot/PlotPresetsConsole'
 import { shelfGroups } from '../assets/Interfaces/writer/outlineTree'
 import { Shelf } from '../assets/Interfaces/writer/Shelf'
 import SplitArea from '../assets/Interfaces/writer/SplitArea'
@@ -202,6 +204,29 @@ function PlotpointsCard() {
   )
 }
 
+// The plot presets page as it sits in the admin panel (Configuration > Plot, in the admin accent), or the Plot sidebar with its "+ Category" and
+// "+ Preset" buttons (press + Preset to see the list), which offers the presets published on the page.
+function PlotPresetsCard({ view }: { view: string }) {
+  if (view === 'sidebar') {
+    return (
+      <WithWorkspace>
+        {w => (
+          <LevelFrame level="project" title="Plot" hue="project">
+            <div style={{ maxWidth: 360 }}><PlotNav w={w} /></div>
+          </LevelFrame>
+        )}
+      </WithWorkspace>
+    )
+  }
+  return (
+    <div className="aUI" style={{ position: 'relative', width: '100%', height: '100%', flex: '0 0 auto', ['--aui-w' as string]: '100%' }}>
+      <div className="aUIPanel" style={{ height: '100%', overflow: 'auto', boxSizing: 'border-box', padding: 14 }}>
+        <PlotPresetsConsole />
+      </div>
+    </div>
+  )
+}
+
 function IconsCard() {
   const icons = Object.entries(Icons).filter(([name, v]) => /Icon$/.test(name) && typeof v === 'function' && name !== 'ReactionHeartIcon')
   return (
@@ -285,6 +310,7 @@ export const CARDS: CardDef[] = [
   card('book-cover', { defaults: { zones: ['day'] }, render: writerCard('book') }),
   card('outline-cards', { defaults: { zones: ['day'] }, render: writerCard('book') }),
   card('plotpoint-tiles', { defaults: { zones: ['day'] }, render: () => <PlotpointsCard /> }),
+  card('plot-presets', { frame: 'plain', views: [{ id: 'admin', label: 'Admin page' }, { id: 'sidebar', label: 'Plot sidebar' }], defaults: { view: 'admin', zones: ['day', 'night'], width: 1200 }, render: ({ view }) => <PlotPresetsCard key={view} view={view} /> }),
   card('shelf', { defaults: { zones: ['day', 'night'] }, render: () => <ShelfCard /> }),
   card('draft-page', { views: WRITER_VIEWS.slice(3), defaults: { view: 'chapter', zones: ['day'] }, render: ({ view }) => <PreviewWriter key={view} view={view as WriterView} /> }),
   card('controls', { defaults: { zones: ['day', 'night'] }, render: () => <ControlsCard /> }),

@@ -130,20 +130,6 @@ export interface PlotTree {
   nodes: PlotNode[]
 }
 
-// Global (not project-scoped) catalog of starter field-name sets for the
-// Plot sidebar's "Add category" picker, editable from the admin panel
-// reachable from the project picker.
-export interface PresetCategory {
-  id: string
-  name: string
-  fields: string[]
-}
-
-export interface PresetCatalog {
-  schemaVersion: number
-  presets: PresetCategory[]
-}
-
 // Per-moment draft shape -- still the API request/response unit for a
 // single moment's prose, even though storage moved to one shared file per
 // chapter (see DraftChapter below).

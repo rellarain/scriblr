@@ -286,6 +286,45 @@ export interface AuiConfigDraft {
   nodes: AuiConfigNode[]
 }
 
+// Plot presets: global (not per project) ready-made plot categories, configured in Admin > Configuration > Plot and offered by the Plot
+// sidebar's "+ Preset". A preset is a category with its description, keywords, fields, and subcategories and clusters that have the same.
+export interface PresetNodeBase {
+  name: string
+  description: string
+  keywords: string[]
+  // Field names, in order; each becomes a field on the node made from this one.
+  fields: string[]
+}
+export interface PresetCluster extends PresetNodeBase { id: string }
+export interface PresetSubcategory extends PresetNodeBase { id: string; clusters: PresetCluster[] }
+// A preset's category and what is under it (its id is its PresetEntry's).
+export interface PresetContent extends PresetNodeBase { subcategories: PresetSubcategory[] }
+export type PresetCard = PresetContent | PresetSubcategory | PresetCluster
+
+// One numbered, frozen copy of a preset.
+export interface PublishedPreset { version: number; publishedAt: string; content: PresetContent }
+
+export interface PresetEntry {
+  id: string
+  // What the admin edits (autosaved).
+  draft: PresetContent
+  // What the Writer offers; null until published, and again after Unpublish.
+  published: PublishedPreset | null
+  // Earlier published versions, newest first (the current one is `published`).
+  history: PublishedPreset[]
+  // The version the next publish gets.
+  nextVersion: number
+}
+
+export interface PresetCatalog { schemaVersion: number; presets: PresetEntry[] }
+
+// What a save sends: the drafts in order. Published copies are kept by the server; a preset left out is deleted.
+export interface PresetDraftList { presets: Array<{ id: string; draft: PresetContent }> }
+
+// What the Writer's selector reads.
+export interface PublishedPresetOut { id: string; version: number; publishedAt: string; content: PresetContent }
+export interface PublishedPresetList { presets: PublishedPresetOut[] }
+
 // One progress bar of a book's spine on the shelf: `done` of `total` (a total of 0 = nothing to measure against yet).
 export interface Measure { done: number; total: number }
 
