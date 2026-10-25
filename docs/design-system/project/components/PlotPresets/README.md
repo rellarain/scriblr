@@ -34,7 +34,7 @@ A menu (`.wrPresetPicker`, `role="menu"`) that opens above the buttons and reads
 
 ## Descriptions in the sidebar
 
-A category, subcategory or cluster row in the Plot sidebar shows the start of its description under its name (`.wrNavDesc`, one line, ellipsis, the row's own ink at the small size; the full text is its hover text). A plotline never does, and a row with no description keeps its single line.
+The Plot sidebar's contents have a fourth circle at the top right, beside the three that fold a level (`.wrNavDot--desc`): an outline while descriptions are hidden, **filled in the alert hue** while they are shown. Lit, a category, subcategory or cluster row shows its whole description under its name (`.wrNavDesc`, wrapped, the row's own ink at the small size). A plotline never does, and a row with no description keeps its single line. The circle is dimmed when no row has a description, and its setting is kept on this machine.
 
 ## Tokens
 

@@ -5,13 +5,15 @@ import { ChevronRightIcon, PlusIcon } from '../../icons'
 import { plotColors, plotColorVars } from './plotColors'
 import { nodeLabel, plotlinesUnder, selectionState, sortByTitle } from './plotTree'
 import { PresetPicker } from './PresetPicker'
+import { useStoredState } from './storage'
 
 // The Plot tool's contents: categories > subcategories > clusters > plotlines, alphabetized, each with a checkbox. A plotline's
 // checkbox ticks that plotline; a group's ticks (or unticks) every plotline under it and shows "some" when only part of it is
 // ticked. Two or more ticked plotlines open the compare view (PlotCompare.tsx); "Compare (n)" brings it back after browsing.
 // Three small circles at the top right fold a whole level at once (categories, subcategories, clusters, left to right): lit while any node
-// of that level is open, a click closes them all, and a click on an unlit one opens them all. "+ Category" and "+ Preset" (a published plot preset, see
-// PresetPicker.tsx) sit at the bottom. A category, subcategory or cluster that has a description shows the start of it under its name.
+// of that level is open, a click closes them all, and a click on an unlit one opens them all. A fourth circle, lit in the alert hue, shows the
+// full description of every category, subcategory and cluster under its name (hidden otherwise; kept across restarts). "+ Category" and
+// "+ Preset" (a published plot preset, see PresetPicker.tsx) sit at the bottom.
 
 const LEVELS = [['category', 'categories'], ['subcategory', 'subcategories'], ['cluster', 'clusters']] as const
 
@@ -26,7 +28,10 @@ export function PlotNav({ w, onOpenNode, onCompare }: {
   onCompare?: () => void
 }) {
   const [collapsed, setCollapsed] = useState<Set<string>>(new Set())
+  const [fullDesc, setFullDesc] = useStoredState<boolean>('scriblr.writer.plotNavDescriptions', false)
   const children = w.plotChildrenByParentId
+  // Only a category, subcategory or cluster has a description to show; with none, the toggle has nothing to switch.
+  const described = w.plotNodes.some(n => n.kind !== 'plotline' && n.kind !== 'plotpoint' && n.body.trim() !== '')
   const selected = useMemo(() => new Set(w.plotSelection), [w.plotSelection])
   const ticked = w.plotSelection.filter(id => w.plotNodeById.get(id)?.kind === 'plotline').length
 
@@ -58,10 +63,11 @@ export function PlotNav({ w, onOpenNode, onCompare }: {
         const isLine = node.kind === 'plotline'
         const lines = plotlinesUnder(node, children)
         const state = selectionState(node, children, selected)
+        const withDesc = fullDesc && !isLine && node.body.trim() !== ''
         return [
           <div
             key={node.id}
-            className={`wrNavRow wrNavRow--${node.kind}${node.id === w.focusedPlotNodeId ? ' wrNavRow--active' : ''}`}
+            className={`wrNavRow wrNavRow--${node.kind}${withDesc ? ' wrNavRow--desc' : ''}${node.id === w.focusedPlotNodeId ? ' wrNavRow--active' : ''}`}
             style={{ ...plotColorVars(plotColors(node, w.plotNodeById)), marginLeft: depth * 14 }}
           >
             <button
@@ -77,10 +83,10 @@ export function PlotNav({ w, onOpenNode, onCompare }: {
               ref={el => { if (el) el.indeterminate = state === 'some' }}
               onChange={() => w.togglePlotSelection(lines.map(l => l.id), state !== 'all')}
             />
-            {!isLine && node.body.trim() ? (
+            {withDesc ? (
               <span className="wrNavText">
                 <button type="button" className="wrNavLabel" onClick={() => { w.focusPlotNode(node.id); onOpenNode?.() }}>{nodeLabel(node)}</button>
-                <span className="wrNavDesc" title={node.body}>{node.body}</span>
+                <span className="wrNavDesc">{node.body}</span>
               </span>
             ) : (
               <button type="button" className="wrNavLabel" onClick={() => { w.focusPlotNode(node.id); onOpenNode?.() }}>{nodeLabel(node)}</button>
@@ -96,18 +102,25 @@ export function PlotNav({ w, onOpenNode, onCompare }: {
     <div className="wrPlotNav">
       <div className="wrPlotNavHead">
         <span>Categories</span>
-        <div className="wrNavDots" role="group" aria-label="Fold a whole level">
-          {LEVELS.map(([kind, plural]) => {
-            const nodes = foldable(kind)
-            const anyOpen = nodes.some(n => !collapsed.has(n.id))
-            return (
-              <button
-                key={kind} type="button" className={anyOpen ? 'wrNavDot wrNavDot--on' : 'wrNavDot'} disabled={nodes.length === 0}
-                aria-label={anyOpen ? `Collapse all ${plural}` : `Expand all ${plural}`} aria-pressed={anyOpen}
-                title={anyOpen ? `Collapse all ${plural}` : `Expand all ${plural}`} onClick={() => foldLevel(kind, anyOpen)}
-              />
-            )
-          })}
+        <div className="wrNavTools">
+          <div className="wrNavDots" role="group" aria-label="Fold a whole level">
+            {LEVELS.map(([kind, plural]) => {
+              const nodes = foldable(kind)
+              const anyOpen = nodes.some(n => !collapsed.has(n.id))
+              return (
+                <button
+                  key={kind} type="button" className={anyOpen ? 'wrNavDot wrNavDot--on' : 'wrNavDot'} disabled={nodes.length === 0}
+                  aria-label={anyOpen ? `Collapse all ${plural}` : `Expand all ${plural}`} aria-pressed={anyOpen}
+                  title={anyOpen ? `Collapse all ${plural}` : `Expand all ${plural}`} onClick={() => foldLevel(kind, anyOpen)}
+                />
+              )
+            })}
+          </div>
+          <button
+            type="button" className={fullDesc ? 'wrNavDot wrNavDot--desc wrNavDot--on' : 'wrNavDot wrNavDot--desc'} disabled={!described}
+            aria-label={fullDesc ? 'Hide full descriptions' : 'Show full descriptions'} aria-pressed={fullDesc}
+            title={fullDesc ? 'Hide full descriptions' : 'Show full descriptions'} onClick={() => setFullDesc(!fullDesc)}
+          />
         </div>
       </div>
       {ticked > 0 && (

@@ -1,4 +1,4 @@
-import { fireEvent, render, screen, waitFor, within } from '@testing-library/react'
+import { render, screen, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { describe, expect, it } from 'vitest'
 import type { PlotNode } from '../../../api/types'
@@ -6,7 +6,7 @@ import { mockFetchBy } from '../../../test/mockFetch'
 import { PlotNav } from './PlotNav'
 import { plotNode, startingPlot, useFakeWorkspace } from './plotTestWorkspace'
 
-// The Plot sidebar's contents: its "+ Category" and "+ Preset" buttons, and the description a row shows under its name.
+// The Plot sidebar's contents: its "+ Category" and "+ Preset" buttons, and the toggle that shows each row's full description under its name.
 
 const PUBLISHED = {
   presets: [{
@@ -76,44 +76,71 @@ describe('+ Category and + Preset', () => {
   })
 })
 
-describe('a row\'s description', () => {
+describe('the full descriptions toggle', () => {
   const start = () => [
     plotNode('cat', 'category', null, { title: 'Characters', body: 'The cast of the story.' }),
-    plotNode('sub', 'subcategory', 'cat', { title: 'Heroes', body: 'Those we follow.' }),
+    plotNode('sub', 'subcategory', 'cat', { title: 'Heroes', body: 'Those we follow.\nThey want things.' }),
     plotNode('clu', 'cluster', 'sub', { title: 'Core' }),
     plotNode('line', 'plotline', 'clu', { title: 'Ada', body: 'a plotline has no description row' }),
   ] as PlotNode[]
+  const toggle = () => screen.getByRole('button', { name: /full descriptions$/ })
+  const row = (container: HTMLElement, kind: string) => container.querySelector(`.wrNavRow--${kind}`) as HTMLElement
 
-  it('shows under the name of a category, subcategory or cluster that has one, and in the row\'s own ink', () => {
+  it('is the fourth circle at the top right, after the three that fold a level, and not part of their group', () => {
     const { container } = render(<Nav start={start()} />)
-    const rows = [...container.querySelectorAll('.wrNavRow')]
-    const cat = rows.find(r => r.classList.contains('wrNavRow--category'))!
-    expect(within(cat as HTMLElement).getByText('The cast of the story.')).toHaveClass('wrNavDesc')
-    expect(within(cat as HTMLElement).getByText('The cast of the story.')).toHaveAttribute('title', 'The cast of the story.')
-    expect(within(cat as HTMLElement).getByRole('button', { name: 'Characters' })).toBeInTheDocument()
-    expect(within(rows.find(r => r.classList.contains('wrNavRow--subcategory')) as HTMLElement).getByText('Those we follow.')).toBeInTheDocument()
-    expect(rows.find(r => r.classList.contains('wrNavRow--cluster'))!.querySelector('.wrNavDesc')).toBeNull()
+    const tools = container.querySelector('.wrPlotNavHead')!.lastElementChild as HTMLElement
+    expect(tools).toHaveClass('wrNavTools')
+    expect([...tools.children].map(c => c.className)).toEqual(['wrNavDots', 'wrNavDot wrNavDot--desc'])
+    expect(within(screen.getByRole('group', { name: 'Fold a whole level' })).queryByRole('button', { name: /descriptions/ })).toBeNull()
+    expect(toggle()).toHaveAttribute('aria-pressed', 'false')
+    expect(toggle()).toHaveAttribute('aria-label', 'Show full descriptions')
   })
 
-  it('is never shown for a plotline, and a row without one keeps its plain markup', () => {
+  it('shows no description until it is pressed, then the whole of each, and hides them again', async () => {
     const { container } = render(<Nav start={start()} />)
-    const line = container.querySelector('.wrNavRow--plotline') as HTMLElement
-    expect(line.querySelector('.wrNavDesc')).toBeNull()
-    expect(line.querySelector('.wrNavText')).toBeNull()
-    expect(container.querySelector('.wrNavRow--cluster .wrNavLabel')!.parentElement).toHaveClass('wrNavRow')
+    expect(container.querySelector('.wrNavDesc')).toBeNull()
+    await userEvent.click(toggle())
+    expect(toggle()).toHaveAttribute('aria-pressed', 'true')
+    expect(toggle()).toHaveAttribute('aria-label', 'Hide full descriptions')
+    expect(toggle()).toHaveClass('wrNavDot--desc', 'wrNavDot--on')
+    expect(within(row(container, 'category')).getByText('The cast of the story.')).toHaveClass('wrNavDesc')
+    expect(row(container, 'subcategory').querySelector('.wrNavDesc')!.textContent).toBe('Those we follow.\nThey want things.')
+    await userEvent.click(toggle())
+    expect(container.querySelector('.wrNavDesc')).toBeNull()
+    expect(toggle()).not.toHaveClass('wrNavDot--on')
   })
 
-  it('still opens the node when the name is pressed', async () => {
+  it('shows the whole of a long description, not the start of it', async () => {
+    const long = 'A long description. '.repeat(12).trim()
+    const { container } = render(<Nav start={start().map(n => (n.id === 'cat' ? { ...n, body: long } : n))} />)
+    await userEvent.click(toggle())
+    expect(row(container, 'category').querySelector('.wrNavDesc')!.textContent).toBe(long)
+  })
+
+  it('never shows one for a plotline or for a row without one, and the name still opens the node', async () => {
     let opened = 0
-    render(<Nav start={start()} onOpen={() => { opened += 1 }} />)
+    const { container } = render(<Nav start={start()} onOpen={() => { opened += 1 }} />)
+    await userEvent.click(toggle())
+    expect(row(container, 'plotline').querySelector('.wrNavDesc')).toBeNull()
+    expect(row(container, 'plotline').querySelector('.wrNavText')).toBeNull()
+    expect(row(container, 'cluster').querySelector('.wrNavDesc')).toBeNull()
     await userEvent.click(screen.getByRole('button', { name: 'Heroes' }))
     expect(screen.getByLabelText('focused')).toHaveTextContent('sub')
     expect(opened).toBe(1)
   })
 
-  it('is not shown once the description is blank', async () => {
-    const { container } = render(<Nav start={start().map(n => (n.id === 'cat' ? { ...n, body: '   ' } : n))} />)
-    expect(container.querySelector('.wrNavRow--category .wrNavDesc')).toBeNull()
-    await waitFor(() => expect(fireEvent.click(screen.getByRole('button', { name: 'Characters' }))).toBe(true))
+  it('is dimmed and cannot be pressed while no category, subcategory or cluster has a description', () => {
+    const blank = start().map(n => (n.kind === 'plotline' ? n : { ...n, body: n.id === 'cat' ? '   ' : '' }))
+    render(<Nav start={blank} />)
+    expect(toggle()).toBeDisabled()
+  })
+
+  it('is kept when the contents are opened again', async () => {
+    const first = render(<Nav start={start()} />)
+    await userEvent.click(toggle())
+    first.unmount()
+    const { container } = render(<Nav start={start()} />)
+    expect(toggle()).toHaveAttribute('aria-pressed', 'true')
+    expect(within(row(container, 'category')).getByText('The cast of the story.')).toBeInTheDocument()
   })
 })

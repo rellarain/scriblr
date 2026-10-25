@@ -27,7 +27,9 @@
   }
   .wrPlotNav { flex: 0 0 250px; min-width: 0; min-height: 0; display: flex; flex-direction: column; gap: var(--space-base); background: var(--ov-sink-1); border-radius: var(--radius-button); padding: var(--space-4); }
   .wrPlotNavHead { display: flex; align-items: center; justify-content: space-between; font-size: var(--text-small); font-weight: 700; text-transform: uppercase; letter-spacing: 1px; span { opacity: 0.9; } }
-  // The three level-fold circles: 10px, an outline when every node of the level is closed, filled in the accent when any is open.
+  // The three level-fold circles: 10px, an outline when every node of the level is closed, filled in the accent when any is open. The fourth
+  // circle (full descriptions) stands apart from them and is filled in the alert hue while the descriptions are shown.
+  .wrNavTools { display: flex; align-items: center; gap: var(--space-5); }
   .wrNavDots { display: flex; align-items: center; gap: var(--space-base); }
   .wrNavDot {
     position: relative; width: 10px; height: 10px; padding: 0; border-radius: 50%; box-sizing: border-box; border: 2px solid currentColor; background: transparent; color: inherit; cursor: pointer;
@@ -36,6 +38,7 @@
     &:disabled { opacity: 0.4; cursor: default; }
     &:focus-visible { outline: 2px solid var(--wr-accent-light); outline-offset: 2px; }
   }
+  .wrNavDot--desc.wrNavDot--on { border-color: var(--wr-alert); background: var(--wr-alert); }
   .wrPlotNavAdd { align-self: flex-start; flex: 0 0 auto; }
   // "+ Category" and "+ Preset" side by side; the preset list opens upward from its button over the rows.
   .wrPlotNavAddRow { display: flex; flex-wrap: wrap; align-items: flex-start; gap: var(--space-3); position: relative; }
@@ -63,6 +66,8 @@
     background-color: var(--wr-row-bg); color: var(--wr-row-ink);
     &:hover, &--active { background-color: color-mix(in srgb, var(--wr-row-bg) 85%, var(--away)); }
     &--active { font-weight: 700; }
+    // With its description under the name the row has several lines: the controls stand level with the name, not the middle.
+    &--desc { align-items: flex-start; }
     &--subcategory { --wr-row-bg: var(--wr-sub-fill, var(--wr-cat)); --wr-row-ink: var(--on-accent); --away: black; }
     &--cluster { --wr-row-bg: var(--wr-cluster-fill, var(--wr-sub-fill, var(--wr-cat))); --wr-row-ink: var(--on-accent); --away: black; }
     // A plotline has nothing to fold: no chevron, and its checkbox stands 5px in from its stripes.
@@ -83,9 +88,9 @@
   .wrNavClear { font-size: var(--text-small); color: inherit; text-decoration: underline; opacity: 0.9; &:hover { opacity: 1; } }
   .wrSmallBtn--accent { background: var(--wr-accent); color: var(--on-accent); &:hover:not(:disabled) { background: var(--wr-accent-light); } }
   .wrNavLabel { flex: 1; min-width: 0; text-align: left; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-  // A row's name with the start of its description under it (same ink as the name, so the colour audit of the row covers it).
+  // A row's name with its whole description under it, wrapped (same ink as the name, so the colour audit of the row covers it).
   .wrNavText { flex: 1; min-width: 0; display: flex; flex-direction: column; }
-  .wrNavDesc { font-size: var(--text-small); font-weight: 400; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .wrNavDesc { font-size: var(--text-small); font-weight: 400; white-space: pre-line; overflow-wrap: anywhere; }
   .wrNavCount { font-size: var(--text-small); opacity: 0.9; }
   .wrNavRow--subcategory .wrNavCount, .wrNavRow--cluster .wrNavCount { opacity: 1; }
   .wrPlotBody { flex: 1 1 auto; min-width: 0; min-height: 0; display: flex; flex-direction: column; gap: var(--space-4); overflow: auto; scrollbar-width: none; &::-webkit-scrollbar { display: none; } }

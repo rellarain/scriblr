@@ -326,4 +326,6 @@ export function ensureBackend(): void {
   installMockBackend()
   // Open the tabs the cards talk about: the Project level on its Plot, the Dash with its tiles.
   setKv('scriblr.writer.levelSizes', {})
+  // The Plot contents with the full descriptions shown (the alert-lit circle on), as the Plot presets page describes them.
+  setKv('scriblr.writer.plotNavDescriptions', true)
 }
