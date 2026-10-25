@@ -126,6 +126,8 @@ export function PresetPane({ entry, presets, makeId, onSelect, onRemove, onExpor
   // A draft that is none of its versions would be lost by going back to one.
   const draftWouldBeLost = !versions.some(v => sameContent(v.content, entry.draft))
   const nothingToPublish = status === 'live'
+  // With a published copy Discard goes back to it; without one there is nothing to go back to, so it clears the preset and keeps its name.
+  const canDiscard = entry.published ? status === 'pending' : !sameContent(entry.draft, { ...blankContent(), name: entry.draft.name })
 
   // The Outline's keyboard shortcuts on the cards: Enter a sibling, Shift+Enter a child, Backspace on an empty card removes it.
   const adapter: NodeKeysAdapter = {
@@ -196,7 +198,9 @@ export function PresetPane({ entry, presets, makeId, onSelect, onRemove, onExpor
       ? <>Delete <b>{label}</b>? It also leaves the + Preset list, and its published versions are removed. Categories already in projects stay.</>
       : <>Delete <b>{label}</b>? It was never published, so the Plot sidebar is not affected.</>)
     : confirm?.kind === 'discard'
-      ? <>Discard your changes to <b>{label}</b> and go back to v{entry.published?.version}?</>
+      ? (entry.published
+        ? <>Discard your changes to <b>{label}</b> and go back to v{entry.published.version}?</>
+        : <>Clear <b>{label}</b>? It has no published copy to go back to, so its description, keywords, fields, subcategories and clusters are removed. Its name stays{entry.history.length > 0 ? ', and its earlier versions stay under Versions' : ''}.</>)
       : confirm?.kind === 'restore'
         ? <>Bring v{confirm.version} into the draft? Your unpublished changes to <b>{label}</b> will be replaced.</>
         : null
@@ -222,7 +226,7 @@ export function PresetPane({ entry, presets, makeId, onSelect, onRemove, onExpor
               title={faults.length > 0 ? faults[0].message : nothingToPublish ? `Nothing has changed since v${entry.published?.version}` : undefined}
               onClick={() => setPublishing(true)}
             >Publish v{entry.nextVersion}</button>
-            <button type="button" className="plpBtn" disabled={status !== 'pending'} onClick={() => ask({ kind: 'discard' })}><UndoIcon size={13} /> Discard changes</button>
+            <button type="button" className="plpBtn" disabled={!canDiscard} title={entry.published ? undefined : 'No published copy to go back to: clears the preset'} onClick={() => ask({ kind: 'discard' })}><UndoIcon size={13} /> Discard changes</button>
             <button type="button" className="plpBtn" disabled={!entry.published} onClick={() => void presets.unpublish(entry.id)}><EyeOffIcon size={13} /> Unpublish</button>
             <span className="plpMenuAnchor" ref={menuRoot}>
               <button type="button" className="plpBtn" aria-expanded={versionsOpen} disabled={versions.length === 0} onClick={() => setVersionsOpen(o => !o)}><HistoryIcon size={13} /> Versions</button>

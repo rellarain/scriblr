@@ -25,7 +25,7 @@ def entry_of(body: dict, pid: str) -> dict:
 # --------------------------------------------------------------------------- the catalog and its first load
 
 
-def test_get_presets_seeds_the_built_ins_published_as_version_1(client: TestClient) -> None:
+def test_get_presets_seeds_the_built_ins_as_unpublished_drafts(client: TestClient) -> None:
     resp = client.get("/api/presets")
     assert resp.status_code == 200
     body = resp.json()
@@ -33,10 +33,10 @@ def test_get_presets_seeds_the_built_ins_published_as_version_1(client: TestClie
     assert [p["draft"]["name"] for p in body["presets"]][:2] == ["Characters", "Settings"]
     assert len(body["presets"]) == 10
     for preset in body["presets"]:
-        assert preset["published"]["version"] == 1
-        assert preset["published"]["content"] == preset["draft"]
+        assert preset["published"] is None
         assert preset["history"] == []
-        assert preset["nextVersion"] == 2
+        assert preset["nextVersion"] == 1
+    assert client.get("/api/presets/published").json()["presets"] == []
     characters = entry_of(body, "preset-characters")
     assert characters["draft"]["fields"][:3] == ["Name", "Role", "Physical Description"]
 
@@ -68,16 +68,18 @@ V1 = {
 }
 
 
-def test_a_version_1_file_becomes_published_version_1_and_is_kept(client: TestClient, app_data_root: Path) -> None:
+def test_a_version_1_file_becomes_unpublished_drafts_and_is_kept(client: TestClient, app_data_root: Path) -> None:
     (app_data_root / "presets.json").write_text(json.dumps(V1), encoding="utf-8")
     body = client.get("/api/presets").json()
     assert body["schemaVersion"] == 2
     first, second, nameless, long = body["presets"]
     assert first["id"] == "preset_aaaa1111"
     assert first["draft"]["fields"] == ["Name", "Territory", "Leader"]
-    assert first["published"]["version"] == 1 and first["published"]["content"] == first["draft"]
     assert second["draft"]["name"] == "factions (copy)"  # names are unique now
-    assert nameless["published"] is None and nameless["nextVersion"] == 1
+    for entry in body["presets"]:
+        assert entry["published"] is None and entry["history"] == [] and entry["nextVersion"] == 1
+    assert client.get("/api/presets/published").json()["presets"] == []  # nothing is offered until it is published
+    assert nameless["draft"]["name"] == "" and nameless["draft"]["fields"] == ["Orphan"]
     assert len(long["draft"]["name"]) == 50 and len(long["draft"]["fields"][0]) == 30
     assert long["id"] != "bad id!"
     assert json.loads((app_data_root / "presets.v1.json").read_text(encoding="utf-8")) == V1
@@ -228,8 +230,22 @@ def test_discard_puts_the_draft_back_to_the_published_copy(client: TestClient) -
     save(client, draft("a", "Renamed", fields=["Name", "Role"]))
     body = client.post("/api/presets/a/discard").json()
     assert entry_of(body, "a")["draft"]["name"] == "Cast" and entry_of(body, "a")["draft"]["fields"] == ["Name"]
-    save(client, draft("b", "Never published"))
-    assert client.post("/api/presets/b/discard").status_code == 409
+
+
+def test_discard_clears_a_preset_with_no_published_copy_but_keeps_its_name(client: TestClient) -> None:
+    save(client, draft("b", "Never published", description="d", keywords=["k"], fields=["Name"], subcategories=[
+        {"id": "s", "name": "Sub", "description": "", "keywords": [], "fields": ["x"], "clusters": []},
+    ]))
+    body = client.post("/api/presets/b/discard").json()
+    b = entry_of(body, "b")
+    assert b["draft"] == {"name": "Never published", "description": "", "keywords": [], "fields": [], "subcategories": []}
+    assert b["published"] is None and b["nextVersion"] == 1
+    # An unpublished preset that was published once is cleared the same way, and its versions stay.
+    save(client, draft("c", "Was live", fields=["Name"]))
+    client.post("/api/presets/c/publish")
+    client.post("/api/presets/c/unpublish")
+    c = entry_of(client.post("/api/presets/c/discard").json(), "c")
+    assert c["draft"]["fields"] == [] and c["draft"]["name"] == "Was live" and [h["version"] for h in c["history"]] == [1]
 
 
 def test_restore_brings_an_earlier_version_into_the_draft_without_publishing_it(client: TestClient) -> None:

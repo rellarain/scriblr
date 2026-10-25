@@ -53,8 +53,6 @@ def discard_preset_changes(preset_id: str, root: Path = Depends(get_app_data_sto
         return store.discard_changes(root, preset_id)
     except store.UnknownPresetError as exc:
         raise HTTPException(status_code=404, detail=str(exc)) from exc
-    except store.NotPublishedError as exc:
-        raise HTTPException(status_code=409, detail=str(exc)) from exc
 
 
 @router.post("/{preset_id}/restore/{version}", response_model=PresetCatalog)

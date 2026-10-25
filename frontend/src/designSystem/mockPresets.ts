@@ -51,8 +51,7 @@ export function createMockPresets(initial: PresetEntry[]) {
         entry.history = [entry.published, ...entry.history].slice(0, 10)
         entry.published = null
       } else if (parts[1] === 'discard') {
-        if (!entry.published) return fail(409, 'The preset has no published copy to go back to.')
-        entry.draft = structuredClone(entry.published.content)
+        entry.draft = entry.published ? structuredClone(entry.published.content) : presetContent(entry.draft.name)
       } else if (parts[1] === 'restore') {
         const found = [entry.published, ...entry.history].find(v => v?.version === Number(parts[2]))
         if (!found) return fail(404, 'no such version')

@@ -286,6 +286,21 @@ describe('publishing', () => {
     expect(rowOf('Characters')).toHaveTextContent('Published v1')
   })
 
+  it('clears a preset that was never published, keeping its name, since it has no published copy to go back to', async () => {
+    const { user, backend } = await open()
+    await user.click(rowOf('Heist crew'))
+    expect(screen.getByRole('button', { name: 'Discard changes' })).toBeDisabled()
+    await user.type(screen.getByRole('textbox', { name: 'Preset description' }), 'A crew')
+    await user.click(screen.getByRole('button', { name: 'Discard changes' }))
+    const ask = screen.getByRole('alertdialog', { name: 'Confirm' })
+    expect(ask).toHaveTextContent('Clear Heist crew? It has no published copy to go back to')
+    await user.click(within(ask).getByRole('button', { name: 'Confirm' }))
+    await waitFor(() => expect(screen.getByRole('textbox', { name: 'Preset description' })).toHaveValue(''))
+    expect(screen.getByRole('textbox', { name: 'Preset name' })).toHaveValue('Heist crew')
+    expect(backend.entries.find(e => e.id === 'c')?.draft).toEqual(content('Heist crew'))
+    expect(screen.getByRole('button', { name: 'Discard changes' })).toBeDisabled()
+  })
+
   it('lists the versions and brings an earlier one into the draft, asking first when that would lose edits', async () => {
     const a = liveEntry('a', content('Cast', { description: 'second' }), { nextVersion: 3 })
     a.published = { version: 2, publishedAt: '2026-10-20T09:00:00Z', content: content('Cast', { description: 'second' }) }

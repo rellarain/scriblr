@@ -82,7 +82,7 @@ def default_catalog() -> PresetCatalog:
     entries = []
     for slug, name, fields in _BUILT_INS:
         content = PresetContent(name=name, fields=fields)
-        entries.append(PresetEntry(id=f"preset-{slug}", draft=content, published=_published(1, content), nextVersion=2))
+        entries.append(PresetEntry(id=f"preset-{slug}", draft=content))
     return PresetCatalog(presets=entries)
 
 
@@ -100,8 +100,8 @@ def _unique_name(name: str, taken: set[str]) -> str:
 
 
 def _from_v1(data: dict) -> PresetCatalog:
-    """Version 1 held a name and field names per preset, all live. Each becomes a draft that is also published as version 1 (a preset with no
-    name stays a draft); a repeated name gets a '(copy)' so the names are unique."""
+    """Version 1 held a name and field names per preset, all live. Each becomes a draft that is not published: nothing reaches the Writer's
+    selector until it is published from the admin page. A repeated name gets a '(copy)' so the names are unique."""
     entries: list[PresetEntry] = []
     taken: set[str] = set()
     for item in data.get("presets") or []:
@@ -115,9 +115,7 @@ def _from_v1(data: dict) -> PresetCatalog:
             taken.add(name.casefold())
         fields = [str(f).strip()[:PRESET_FIELD_MAX].strip() for f in (item.get("fields") or []) if str(f).strip()]
         content = PresetContent(name=name, fields=fields)
-        entries.append(PresetEntry(
-            id=pid, draft=content, published=_published(1, content) if name else None, nextVersion=2 if name else 1,
-        ))
+        entries.append(PresetEntry(id=pid, draft=content))
     return PresetCatalog(presets=entries)
 
 
@@ -239,13 +237,15 @@ def unpublish_preset(root: Path, preset_id: str) -> PresetCatalog:
 
 
 def discard_changes(root: Path, preset_id: str) -> PresetCatalog:
-    """Put the draft back to the published copy."""
+    """Put the draft back to the published copy. A preset with no published copy has nothing to go back to, so it is cleared to a blank
+    preset that keeps its name."""
 
     def change(catalog: PresetCatalog) -> None:
         entry = _entry(catalog, preset_id)
-        if not entry.published:
-            raise NotPublishedError("The preset has no published copy to go back to.")
-        entry.draft = entry.published.content.model_copy(deep=True)
+        if entry.published:
+            entry.draft = entry.published.content.model_copy(deep=True)
+        else:
+            entry.draft = PresetContent(name=entry.draft.name)
 
     return _mutate(root, change)
 
