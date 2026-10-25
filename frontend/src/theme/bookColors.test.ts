@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import {
-  DEFAULT_BOOK_HUE, HUE_CODE_MAX, HUE_CODE_MIN, accentColorCss, stripeColorCss, stripeHsl, bookScopeVars, bookThemeHue, clampCodeToWindow, clampHueToWindow, coverColor,
+  DEFAULT_BOOK_HUE, HUE_CODE_MAX, HUE_CODE_MIN, HUE_RANGES, rangeOf, accentColorCss, stripeColorCss, stripeHsl, bookScopeVars, bookThemeHue, clampCodeToWindow, clampHueToWindow, coverColor,
   SAT_LOUD, SAT_MIDDLE, SAT_QUIET, SLIDER_DARKEN, fillCap, fillColorCss, fillHsl, hexToHue, outlineSat, sliderLight, hueDelta, hueHsl, hueOfCode, hueWindow, themeColorCss, wrapHue,
 } from './bookColors'
 import { DEFAULT_PALETTE } from './defaults'
@@ -47,17 +47,17 @@ describe('hue arithmetic', () => {
   })
 
   it('clamps a hue to within 60 degrees of a centre, either way, through 0/360', () => {
-    expect(clampHueToWindow(200, 230)).toBe(230)
-    expect(clampHueToWindow(200, 300)).toBe(260)
-    expect(clampHueToWindow(200, 100)).toBe(140)
-    expect(clampHueToWindow(350, 20)).toBe(20)        // 30 away across the wrap: inside
-    expect(clampHueToWindow(350, 100)).toBe(50)       // 110 away: clamped to centre + 60
-    expect(clampHueToWindow(10, 300)).toBe(310)       // 70 away backwards: clamped to centre - 60
+    expect(clampHueToWindow(200, 230, 60)).toBe(230)
+    expect(clampHueToWindow(200, 300, 60)).toBe(260)
+    expect(clampHueToWindow(200, 100, 60)).toBe(140)
+    expect(clampHueToWindow(350, 20, 60)).toBe(20)        // 30 away across the wrap: inside
+    expect(clampHueToWindow(350, 100, 60)).toBe(50)       // 110 away: clamped to centre + 60
+    expect(clampHueToWindow(10, 300, 60)).toBe(310)       // 70 away backwards: clamped to centre - 60
   })
 
   it('describes the slider window as plain numbers around the centre', () => {
-    expect(hueWindow(200)).toEqual({ min: 140, max: 260 })
-    expect(hueWindow(20)).toEqual({ min: -40, max: 80 })
+    expect(hueWindow(200, 60)).toEqual({ min: 140, max: 260 })
+    expect(hueWindow(20, 60)).toEqual({ min: -40, max: 80 })
     expect(hueWindow(350, 30)).toEqual({ min: 320, max: 380 })
   })
 })
@@ -116,9 +116,9 @@ describe('hue colours', () => {
   })
 
   it('holds a hue in a window round its parent hue', () => {
-    expect(clampCodeToWindow(200, 300)).toBe(260)
-    expect(clampCodeToWindow(200, 230)).toBe(230)
-    expect(clampCodeToWindow(10, 340)).toBe(340) // across the 0/360 wrap
+    expect(clampCodeToWindow(200, 300, 60)).toBe(260)
+    expect(clampCodeToWindow(200, 230, 60)).toBe(230)
+    expect(clampCodeToWindow(10, 340, 60)).toBe(340) // across the 0/360 wrap
   })
 
   it('draws a hue at the zone saturation and lightness, whatever it is', () => {
@@ -198,5 +198,16 @@ describe('the hue slider\'s lightness', () => {
     expect(sliderLight('dusk', 70)).toBe(70)
     expect(sliderLight('night', 30)).toBe(30)
     expect(sliderLight('day', 5)).toBe(0)
+  })
+})
+
+describe('the hue ranges', () => {
+  it('are fixed per level: project 360, book 90, arc 60, chapter 30, category 90, subcategory 60, cluster 30, account 360', () => {
+    expect(HUE_RANGES).toEqual({ project: 360, book: 90, arc: 60, chapter: 30, category: 90, subcategory: 60, cluster: 30, account: 360 })
+  })
+
+  it('are looked up by a node kind, and a kind with none of its own (a series) is the whole wheel', () => {
+    expect(['book', 'arc', 'chapter', 'category', 'subcategory', 'cluster'].map(rangeOf)).toEqual([90, 60, 30, 90, 60, 30])
+    expect(rangeOf('series')).toBe(360)
   })
 })

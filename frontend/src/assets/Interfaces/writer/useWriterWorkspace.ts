@@ -14,7 +14,7 @@ import {
 import { putOutline as apiPutOutline } from '../../../api/outlineApi'
 import { putPlot as apiPutPlot } from '../../../api/plotApi'
 import { booksOf, buildChildIndex, chaptersOfBook, dissolveSeries, moveNodeTo, nearestOfKind } from './outlineTree'
-import { categoryOf, isAssignedPlotpoint } from './plotTree'
+import { isAssignedPlotpoint } from './plotTree'
 import { nodesFromPreset } from './plotPreset'
 import {
   addField, addValue, assignPoint, deleteField, deleteValue, migratePlot, moveField, moveValue, renameField, syncReferences, updateValue,
@@ -25,9 +25,10 @@ import { getOutlineSnapshot, getPlotSnapshot, getProjectSettingsLog, listOutline
 import { newestFirst, nextSetting, nextSnapshot, sameValue, type LogEntry } from '../../../lib/logUndo'
 import { useUndoHistory } from '../../../lib/useUndoHistory'
 import { insertAfter } from '../../../lib/siblingOrder'
-import { DEFAULT_BOOK_HUE, fillColorCss, hueOfCode, outlineSat } from '../../../theme/bookColors'
+import { DEFAULT_BOOK_HUE, fillColorCss, hueOfCode, outlineSat, rangeOf } from '../../../theme/bookColors'
 import { useThemeState } from '../../../theme/useTheme'
-import { autoPickHue, defaultProjectHue, fitToParent, hueCentre, levelHue, levelTint, reconcileHues } from './levelHues'
+import { autoPickHue, defaultProjectHue, dropSeriesHues, fitToParent, hueCentre, levelHue, levelTint, reconcileHues } from './levelHues'
+import { plotParentOf, reconcilePlotHues } from './plotHues'
 
 type AsyncStatus = 'idle' | 'loading' | 'error'
 
@@ -127,7 +128,7 @@ export function useWriterWorkspace() {
   const levelTintOf = (node: OutlineNode): string => levelTint(node, hueNodes, projectHue)
   // The same colour as a panel's flat fill (the accent's saturation and lightness).
   const levelFillOf = (node: OutlineNode): string => fillColorCss(levelHue(node, hueNodes, projectHue), outlineSat(node.kind))
-  // The hue a node's own hue must stay within 60 degrees of; null for a book (any hue).
+  // The hue a node's own hue must stay near (the one its parent shows); null for a series, which has no colour.
   const hueCentreOf = (node: OutlineNode): number | null => hueCentre(node, hueNodes, projectHue)
 
   const activeConsole: WuiConsole = !hasOpenProject || view === 'shelves' ? 'shelves' : view === 'project' ? 'shelf' : view
@@ -245,7 +246,9 @@ export function useWriterWorkspace() {
   // Apply an edit to the outline: `immediate` saves now (structural edits),
   // otherwise after a pause. Computed from the ref so edits in the same tick
   // compose, and kept out of state updaters (which run twice in StrictMode).
-  function commitOutline(next: OutlineNode[], immediate: boolean) {
+  function commitOutline(changed: OutlineNode[], immediate: boolean) {
+    // A series has no colour of its own now: one stored in an older project is cleared the next time the outline is saved.
+    const next = dropSeriesHues(changed)
     outlineNodesRef.current = next
     setOutlineNodes(next)
     if (!applyingHistory.current) outlineHistory.record(next, { text: !immediate })
@@ -571,17 +574,17 @@ export function useWriterWorkspace() {
       createdAt: new Date().toISOString(),
       ...patch,
     }
-    // A new series, arc or chapter takes a hue in its window, spread away from its siblings'.
-    if ((kind === 'series' || kind === 'arc' || kind === 'chapter') && node.themeHue == null) {
+    // A new book starts at the hue it is measured from (the project's); a new arc or chapter takes a hue in its range, spread away from
+    // its siblings'. A series has no colour.
+    if ((kind === 'book' || kind === 'arc' || kind === 'chapter') && node.themeHue == null) {
       const map = new Map(prev.map(n => [n.id, n]))
-      const parent = parentId ? map.get(parentId) : undefined
       const centre = hueCentre(node, map, projectHueRef.current)
-      if (centre !== null) {
+      if (centre !== null && kind === 'book') node.themeHue = centre
+      else if (centre !== null) {
         const siblingHues = prev
           .filter(n => n.parentId === parentId && n.kind === kind && n.themeHue != null)
           .map(n => hueOfCode(n.themeHue as number))
-        // It takes a hue spread away from its siblings'.
-        node.themeHue = autoPickHue(centre, siblingHues)
+        node.themeHue = autoPickHue(centre, siblingHues, rangeOf(kind))
       }
     }
     commitOutline(afterId ? insertAfter(prev, node, afterId, n => n.parentId === parentId) : [...prev, node], true)
@@ -592,20 +595,19 @@ export function useWriterWorkspace() {
     commitOutline(outlineNodesRef.current.map(n => (n.id === nodeId ? { ...n, ...patch } : n)), false)
   }
 
-  // Sets a series', book's, arc's or chapter's own colour (a colour code): its hue is held within 60
-  // degrees of its parent's (a book may be any hue), and its children's own hues are pulled back inside
-  // their windows.
+  // Sets a book's, arc's or chapter's own colour (a colour code): its hue is held within its range of its parent's (a book 90, an arc 60,
+  // a chapter 30), and the own hues under it are pulled back inside their ranges (nothing elsewhere moves).
   function setNodeHue(nodeId: string, code: number) {
     const prev = outlineNodesRef.current
     const target = prev.find(n => n.id === nodeId)
-    if (!target || (target.kind !== 'series' && target.kind !== 'book' && target.kind !== 'arc' && target.kind !== 'chapter')) return
+    if (!target || (target.kind !== 'book' && target.kind !== 'arc' && target.kind !== 'chapter')) return
     const map = new Map(prev.map(n => [n.id, n]))
-    const value = fitToParent(Math.round(code), hueCentre(target, map, projectHueRef.current))
+    const value = fitToParent(Math.round(code), hueCentre(target, map, projectHueRef.current), rangeOf(target.kind))
     const next = prev.map(n => (n.id === nodeId ? { ...n, themeHue: value } : n))
-    commitOutline(reconcileHues(next, projectHueRef.current), false)
+    commitOutline(reconcileHues(next, projectHueRef.current, nodeId), false)
   }
 
-  // Sets the project's own colour, pulling the series' hues (and so their descendants') back inside its window.
+  // Sets the project's own colour, pulling the books' hues (and so their descendants') back inside their ranges.
   function setProjectHue(code: number) {
     const wrapped = Math.round(code)
     projectHueRef.current = wrapped
@@ -688,6 +690,8 @@ export function useWriterWorkspace() {
       id, kind, parentId, order: nextOrderAmong(prev, parentId),
       title: title ?? '', body: '', assignedMomentId: null, assignedParagraphIndex: null,
       sourceFieldId: null, customFieldDefs: [], customFieldValues: {}, keywords: [], flag: null,
+      // A new category starts at the hue it is measured from (the project's); a subcategory or cluster shows its parent's until it has its own.
+      ...(kind === 'category' ? { hue: projectHueRef.current } : {}),
     }
     commitPlot(afterId ? insertAfter(prev, node, afterId, n => n.parentId === parentId) : [...prev, node], true)
     return id
@@ -696,7 +700,7 @@ export function useWriterWorkspace() {
   // Add a plot preset (see plotPreset.ts): its category, subcategories and clusters are made together as one step, so one Undo takes them all back.
   // Returns the new category's id.
   function addPlotPreset(preset: PresetContent): string {
-    const added = nodesFromPreset(plotNodesRef.current, preset, newId)
+    const added = nodesFromPreset(plotNodesRef.current, preset, newId, projectHueRef.current)
     commitPlot(added.nodes, true)
     return added.id
   }
@@ -705,32 +709,29 @@ export function useWriterWorkspace() {
     commitPlot(plotNodesRef.current.map(n => (n.id === nodeId ? { ...n, [field]: value } : n)), false)
   }
 
-  // Set a category's, subcategory's or cluster's colour (a colour code). A category's new colour pulls its
-  // subcategories' and clusters' own hues back within 60 degrees of it; a subcategory's or cluster's hue stays
-  // within 60 degrees of its category's (`categoryCode`: the category's colour as shown, which is stored on
-  // the category too when it had none of its own).
-  function setPlotHue(nodeId: string, code: number, categoryCode?: number) {
+  // Set a category's, subcategory's or cluster's colour (a colour code). A category is held within 90 degrees of the project's hue, a
+  // subcategory within 60 of its category's and a cluster within 30 of its subcategory's (`parentCode`: the parent's hue as shown, which is
+  // stored on the parent too when it had none of its own). Whatever is under the node is then pulled back inside its range, top down.
+  function setPlotHue(nodeId: string, code: number, parentCode?: number) {
     const prev = plotNodesRef.current
     const target = prev.find(n => n.id === nodeId)
     if (!target || (target.kind !== 'category' && target.kind !== 'subcategory' && target.kind !== 'cluster')) return
     const rounded = Math.round(code)
     const byId = new Map(prev.map(n => [n.id, n]))
     if (target.kind === 'category') {
-      commitPlot(prev.map(n => {
-        if (n.id === nodeId) return { ...n, hue: rounded }
-        if ((n.kind === 'subcategory' || n.kind === 'cluster') && n.hue != null && categoryOf(n, byId)?.id === nodeId) return { ...n, hue: fitToParent(n.hue, hueOfCode(rounded)) }
-        return n
-      }), false)
+      const value = fitToParent(rounded, projectHueRef.current, rangeOf('category'))
+      commitPlot(reconcilePlotHues(prev.map(n => (n.id === nodeId ? { ...n, hue: value } : n)), nodeId), false)
       return
     }
-    const parent = categoryOf(target, byId)
-    const parentCode = parent?.hue ?? categoryCode
-    const value = parentCode != null ? fitToParent(rounded, hueOfCode(parentCode)) : rounded
-    commitPlot(prev.map(n => {
+    const parent = plotParentOf(target, byId)
+    const shown = parent?.hue ?? parentCode
+    const value = shown != null ? fitToParent(rounded, hueOfCode(shown), rangeOf(target.kind)) : rounded
+    const next = prev.map(n => {
       if (n.id === nodeId) return { ...n, hue: value }
-      if (parent && n.id === parent.id && parent.hue == null && parentCode != null) return { ...n, hue: parentCode }
+      if (parent && n.id === parent.id && parent.hue == null && shown != null) return { ...n, hue: shown }
       return n
-    }), false)
+    })
+    commitPlot(reconcilePlotHues(next, nodeId), false)
   }
 
   function addPlotKeyword(nodeId: string, keyword: string) {

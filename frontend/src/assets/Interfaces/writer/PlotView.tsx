@@ -4,11 +4,12 @@ import type { WriterWorkspace } from './useWriterWorkspace'
 import { ChevronDownIcon, ChevronRightIcon, PlusIcon } from '../../icons'
 import { ChipEditor, DeleteControl } from './shared'
 import { focusNodeField, useNodeKeys } from '../../../lib/nodeKeys'
-import { hueOfCode } from '../../../theme/bookColors'
+import { hueOfCode, rangeOf } from '../../../theme/bookColors'
 import { useThemeState } from '../../../theme/useTheme'
 import HueSlider from './HueSlider'
 import { plotColors, plotColorVars } from './plotColors'
-import { assignedLevel, categoryOf, nodeLabel, plotTrail, sortByTitle } from './plotTree'
+import { assignedLevel, nodeLabel, plotTrail, sortByTitle } from './plotTree'
+import { plotParentOf, shownPlotHue } from './plotHues'
 import { FieldEditor, FieldGroups, type PlotDrag, type PlotUi } from './FieldBlocks'
 import { PlotOutlinePanel } from './PlotOutlinePanel'
 import { PlotNav, plotlineCount } from './PlotNav'
@@ -56,32 +57,33 @@ function ChildRows({ w, node, kind, addLabel }: { w: WriterWorkspace; node: Plot
   )
 }
 
-// The colour selector of a category (unlimited: any hue), subcategory or cluster (limited: within 60 degrees of
-// its category's hue). Saturation and lightness are the active
+// The colour selector of a category (within 90 degrees of the project's hue), subcategory (within 60 of its category's) or cluster (within 30 of
+// its subcategory's, or of its category's when it sits straight under one). Saturation and lightness are the active
 // zone's, so what the thumb shows is what the app draws.
 function HueField({ w, node }: { w: WriterWorkspace; node: PlotNode }) {
   const { settings, activeZone } = useThemeState()
   const appCode = settings.zones[activeZone].palette.theme.h
   if (node.kind === 'subcategory' || node.kind === 'cluster') {
-    const category = categoryOf(node, w.plotNodeById)
-    const categoryCode = category?.hue ?? appCode
-    // A cluster with no colour of its own shows its subcategory's.
-    const parent = node.parentId ? w.plotNodeById.get(node.parentId) : undefined
-    const shown = node.hue ?? (node.kind === 'cluster' && parent?.kind === 'subcategory' ? parent.hue ?? categoryCode : categoryCode)
+    const parent = plotParentOf(node, w.plotNodeById)
+    // The hue the parent shows; a node with no colour of its own shows it too.
+    const parentCode = shownPlotHue(parent, w.plotNodeById, appCode)
     return (
       <div>
-        <div className="wrLabel">Colour <span className="wrOutlineMeta">within 60° of its category</span></div>
+        <div className="wrLabel">Colour <span className="wrOutlineMeta">within {rangeOf(node.kind)}° of its {parent?.kind ?? 'category'}</span></div>
         <HueSlider
-          label={node.kind === 'cluster' ? 'Cluster colour' : 'Subcategory colour'} hue={shown} centre={hueOfCode(categoryCode)}
-          onChange={code => w.setPlotHue(node.id, code, categoryCode)}
+          label={node.kind === 'cluster' ? 'Cluster colour' : 'Subcategory colour'} hue={node.hue ?? parentCode} centre={hueOfCode(parentCode)} range={rangeOf(node.kind)}
+          onChange={code => w.setPlotHue(node.id, code, parentCode)}
         />
       </div>
     )
   }
   return (
     <div>
-      <div className="wrLabel">Colour</div>
-      <HueSlider label="Category colour" hue={node.hue ?? appCode} centre={null} onChange={code => w.setPlotHue(node.id, code)} />
+      <div className="wrLabel">Colour <span className="wrOutlineMeta">within {rangeOf('category')}° of the project</span></div>
+      <HueSlider
+        label="Category colour" hue={node.hue ?? appCode} centre={w.projectHue} range={rangeOf('category')}
+        onChange={code => w.setPlotHue(node.id, code)}
+      />
     </div>
   )
 }

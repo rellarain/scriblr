@@ -1,6 +1,7 @@
 import { act, renderHook, waitFor } from '@testing-library/react'
 import { beforeEach, describe, expect, it } from 'vitest'
 import { __resetSettingsForTests } from '../../../settings/settingsStore'
+import { hueDelta, wrapHue } from '../../../theme/bookColors'
 import { outlineNode, plotNode, projectIndex, standInBackend } from '../../../test/workspaceBackend'
 import { useWriterWorkspace } from './useWriterWorkspace'
 
@@ -242,5 +243,61 @@ describe('useWriterWorkspace: saving the outline', () => {
     await act(async () => { await result.current.saveNow() })
     expect(result.current.saveError).toBeUndefined()
     expect(backend.saved.outline.at(-1)?.find(n => n.id === 'c1')?.title).toBe('Changed')
+  })
+})
+
+describe('useWriterWorkspace: colour ranges', () => {
+  it('starts a new book at the project\'s hue, a new chapter inside 30 of its book\'s, and gives a series none', async () => {
+    const { result, get } = await opened()
+    let book = ''
+    let chapter = ''
+    let series = ''
+    act(() => { book = result.current.addOutlineNode(null, 'book') })
+    act(() => { chapter = result.current.addOutlineNode('b1', 'chapter') })
+    act(() => { series = result.current.addOutlineNode(null, 'series') })
+    expect(get(book)?.themeHue).toBe(result.current.projectHue)
+    expect(Math.abs(hueDelta(28, get(chapter)?.themeHue as number))).toBeLessThanOrEqual(30) // the book default, 28, as b1 has no colour
+    expect(get(series)?.themeHue).toBeUndefined()
+  })
+
+  it('holds a book within 90 degrees of the project, and a chapter within 30 of its book', async () => {
+    const { result, get } = await opened()
+    const project = result.current.projectHue
+    act(() => { result.current.setNodeHue('b1', project + 180) })
+    expect(get('b1')?.themeHue).toBe(wrapHue(project + 90))
+    act(() => { result.current.setNodeHue('b1', project + 40) })
+    expect(get('b1')?.themeHue).toBe(wrapHue(project + 40))
+    act(() => { result.current.setNodeHue('c1', project + 40 + 100) })
+    expect(get('c1')?.themeHue).toBe(wrapHue(project + 40 + 30))
+  })
+
+  it('does not accept a colour for a series', async () => {
+    const { result } = await opened()
+    const before = result.current.outlineNodes
+    act(() => { result.current.setNodeHue('s1', 200) })
+    expect(result.current.outlineNodes).toBe(before)
+  })
+
+  it('moves only what is under the node it changes: a colour already outside its range elsewhere stays until its parent changes', async () => {
+    const { result, get } = await opened()
+    act(() => { result.current.updateOutlineNode('c2', { themeHue: 200 }) }) // far from its book's colour
+    act(() => { result.current.setNodeHue('c1', 40) })
+    expect(get('c2')?.themeHue).toBe(200)
+    act(() => { result.current.setNodeHue('b1', 50) }) // now its parent changes: c2 is pulled within 30 of it
+    expect(get('c2')?.themeHue).toBe(80)
+  })
+
+  it('clears a series colour saved by an older version the next time the outline is saved', async () => {
+    const withColour = OUTLINE.map(n => (n.id === 's1' ? { ...n, themeHue: 300 } : n))
+    const backend = standInBackend({ p1: { index: projectIndex('p1', 'First'), outline: withColour, plot: PLOT } })
+    const hook = renderHook(() => useWriterWorkspace())
+    await waitFor(() => expect(hook.result.current.projects).toHaveLength(1))
+    await act(async () => { await hook.result.current.openProject('p1') })
+    await waitFor(() => expect(hook.result.current.outlineStatus).toBe('idle'))
+    expect(hook.result.current.outlineNodes.find(n => n.id === 's1')?.themeHue).toBe(300) // loading changes nothing
+    act(() => { hook.result.current.updateOutlineNode('c2', { title: 'Two' }) })
+    await act(async () => { await hook.result.current.saveNow() })
+    expect(backend.saved.outline.at(-1)?.find(n => n.id === 's1')?.themeHue).toBeNull()
+    expect(hook.result.current.levelHueOf(hook.result.current.outlineNodes.find(n => n.id === 's1')!)).toBe(hook.result.current.projectHue)
   })
 })

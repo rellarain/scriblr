@@ -33,6 +33,12 @@ describe('nodesFromPreset', () => {
     expect(nodes[3].customFieldDefs).toEqual([])
   })
 
+  it("starts the category at the project's hue when given one, and gives its subcategories and clusters none (they show their parent's)", () => {
+    const { nodes } = nodesFromPreset([], preset(), counter(), 90)
+    expect(nodes.map(n => n.hue)).toEqual([90, undefined, undefined, undefined, undefined])
+    expect(nodesFromPreset([], preset(), counter()).nodes[0].hue).toBeUndefined()
+  })
+
   it('gives every node and field a new id of its own, and nothing remembers the preset', () => {
     const { nodes } = nodesFromPreset([], preset(), counter())
     const all = [...nodes.map(n => n.id), ...nodes.flatMap(n => n.customFieldDefs.map(f => f.id))]

@@ -71,3 +71,21 @@
 // Keyboard focus: the input itself is transparent (the thumb is drawn beside it), so the thumb wears the ring: black inside white,
 // which reads on any hue and on any ground.
 .colorRangeInput:focus-visible + .colorRangeThumb { box-shadow: 0 0 0 2px #000, 0 0 0 4px #fff; }
+
+// A level colour's slider with its reset button (assets/Interfaces/writer/HueSlider.tsx): a 22px square, the height of the thumb, to the
+// left of the track, filled with the parent's hue and outlined in white like the thumb.
+.hueSliderRow { display: flex; align-items: center; gap: var(--space-3, 6px); min-width: 0; }
+// (More specific than the Writer's button reset, `.wUI.wr :where(button)`, which would otherwise clear the fill and the edge.)
+.hueSliderRow > button.hueReset {
+  flex: 0 0 auto;
+  box-sizing: border-box;
+  width: 22px;
+  height: 22px;
+  padding: 0;
+  border: 2px solid #fff;
+  border-radius: 3px;
+  background: var(--cr-reset);
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.5);
+  cursor: pointer;
+  &:focus-visible { outline: none; box-shadow: 0 0 0 2px #000, 0 0 0 4px #fff; }
+}

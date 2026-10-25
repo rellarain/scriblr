@@ -3,7 +3,8 @@ import { clampBody, clampFieldName, clampTitle, randomId, type MakeId } from './
 
 // Adding a plot preset to a project: a plain copy. The preset's category becomes a category node with its description (body), keywords and
 // fields, and its subcategories and clusters become nodes under it, each with the same. Nothing remembers which preset they came from, and no
-// plotlines, values or colours are made (a category with no colour of its own takes the theme's, as a new one does).
+// plotlines or values are made, and the colours are not the preset's: the category starts at `categoryHue` (the project's hue, as a new category
+// does), and its subcategories and clusters show their parent's.
 
 const nextOrder = (nodes: PlotNode[], parentId: string | null) => {
   const siblings = nodes.filter(n => n.parentId === parentId)
@@ -17,7 +18,7 @@ export interface PresetNodes {
   id: string
 }
 
-export function nodesFromPreset(existing: PlotNode[], preset: PresetContent, makeId: MakeId = randomId): PresetNodes {
+export function nodesFromPreset(existing: PlotNode[], preset: PresetContent, makeId: MakeId = randomId, categoryHue: number | null = null): PresetNodes {
   const made: PlotNode[] = []
   const add = (kind: PlotNode['kind'], parentId: string | null, order: number, card: PresetCard): string => {
     const id = makeId('plot')
@@ -26,6 +27,7 @@ export function nodesFromPreset(existing: PlotNode[], preset: PresetContent, mak
       assignedMomentId: null, assignedParagraphIndex: null, sourceFieldId: null,
       customFieldDefs: card.fields.map(name => clampFieldName(name)).filter(Boolean).map(name => ({ id: makeId('field'), name })),
       customFieldValues: {}, keywords: [...new Set(card.keywords.map(k => k.trim()).filter(Boolean))], flag: null,
+      ...(kind === 'category' && categoryHue !== null ? { hue: categoryHue } : {}),
     })
     return id
   }

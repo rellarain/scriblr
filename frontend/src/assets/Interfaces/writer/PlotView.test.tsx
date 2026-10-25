@@ -316,9 +316,9 @@ describe('clusters', () => {
     expect(screen.getAllByRole('region').map(g => g.getAttribute('aria-label'))).toEqual(['Plotline fields', 'From cluster: Household', 'From category: Romance'])
   })
 
-  it('shows the cluster\'s own fields in its editor, with a colour slider within 60 degrees of the category', () => {
+  it('shows the cluster\'s own fields in its editor, with a colour slider within 30 degrees of its subcategory', () => {
     render(<Editor start={clustered()} focused="clu" />)
-    expect(screen.getByText('within 60° of its category')).toBeInTheDocument()
+    expect(screen.getByText('within 30° of its subcategory')).toBeInTheDocument()
     expect(screen.getByRole('slider', { name: 'Cluster colour' })).toBeInTheDocument()
     expect(screen.getByDisplayValue('Motive')).toBeInTheDocument()
   })

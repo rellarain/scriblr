@@ -2,7 +2,7 @@ import { useMemo, useState, type CSSProperties, type DragEvent, type ReactNode }
 import type { OutlineNode } from '../../../../api/types'
 import type { WordCounts } from '../../../../api/draftFetch'
 import type { WriterWorkspace } from '../useWriterWorkspace'
-import { outlineSat, stripeColorCss } from '../../../../theme/bookColors'
+import { outlineSat, rangeOf, stripeColorCss } from '../../../../theme/bookColors'
 import { GripIcon, PlusIcon } from '../../../icons'
 import { useNodeKeys } from '../../../../lib/nodeKeys'
 import { buildChildIndex } from '../outlineTree'
@@ -98,7 +98,7 @@ export function OutlineNav({ w, book, counts, chapterBody, focus = null, plotDra
   )
   const hue = (node: OutlineNode, label: string) => (
     <HueSlider
-      label={`${label} colour`} className="wrNodeHue wrNodeHue--inline" hue={w.levelHueOf(node)} centre={w.hueCentreOf(node)}
+      label={`${label} colour`} className="wrNodeHue wrNodeHue--inline" hue={w.levelHueOf(node)} centre={w.hueCentreOf(node)} range={rangeOf(node.kind)}
       onChange={next => w.setNodeHue(node.id, next)}
     />
   )

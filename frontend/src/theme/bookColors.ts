@@ -5,7 +5,7 @@ import { deriveTokens, type ThemeVars } from './tokens'
 import { PAPER_LOOKS, ZONE_LOOKS, resolvePalette, themeLightness } from './zoneLooks'
 import type { Role, ZoneKey, ZonePalette } from './types'
 
-// Colours for the Writer's levels (project, series, book, arc, chapter) and plot categories.
+// Colours for the Writer's levels (project, book, arc, chapter) and plot categories.
 // A colour is stored as one number, a hue in degrees (0..360; 0 and 360 are both red; it mirrors
 // backend/app/storage/schema.py). Every colour has the same saturation and lightness -- the active
 // time-of-day zone's own -- so the same colour is paler by day and deeper at night. (Earlier versions
@@ -13,8 +13,13 @@ import type { Role, ZoneKey, ZonePalette } from './types'
 // their hue once on load.)
 
 export const DEFAULT_BOOK_HUE = 28
-// A limited slider (series, arc, chapter, plot subcategory) runs this far either side of its parent's hue.
-export const SUBCATEGORY_HUE_WINDOW = 60
+// How far a level's colour may sit from its parent's hue, in degrees either side (360 = any hue). The same for every project: a book
+// within 90 of the project, an arc 60 of its book, a chapter 30 of its arc; a plot category 90 of the project, a subcategory 60 of its
+// category, a cluster 30 of its subcategory. The project and the account's theme hues have no parent, so they are the whole wheel.
+export const HUE_RANGES = { project: 360, book: 90, arc: 60, chapter: 30, category: 90, subcategory: 60, cluster: 30, account: 360 } as const
+export type HueLevel = keyof typeof HUE_RANGES
+// The range of an outline or plot node's kind (a kind with no range of its own, like a series, is the whole wheel).
+export const rangeOf = (kind: string): number => (HUE_RANGES as Record<string, number>)[kind] ?? 360
 
 export const wrapHue = (hue: number): number => ((Math.round(hue) % 360) + 360) % 360
 
@@ -33,18 +38,18 @@ export function hueDelta(from: number, to: number): number {
 // The window a hue may move in around a centre: [centre - width, centre + width],
 // as plain numbers that may fall outside 0..360 (a slider over it just runs
 // through the wrap-around; hsl() and wrapHue() read them back).
-export function hueWindow(centre: number, width = SUBCATEGORY_HUE_WINDOW): { min: number; max: number } {
+export function hueWindow(centre: number, width: number): { min: number; max: number } {
   return { min: centre - width, max: centre + width }
 }
 
 // Keep a hue within `width` degrees of the centre (either way round the wheel).
-export function clampHueToWindow(centre: number, hue: number, width = SUBCATEGORY_HUE_WINDOW): number {
+export function clampHueToWindow(centre: number, hue: number, width: number): number {
   const d = hueDelta(centre, hue)
   return wrapHue(centre + Math.max(-width, Math.min(width, d)))
 }
 
 // A colour held within `width` degrees of a centre hue.
-export const clampCodeToWindow = (centre: number, code: number, width = SUBCATEGORY_HUE_WINDOW): number => clampHueToWindow(centre, code, width)
+export const clampCodeToWindow = (centre: number, code: number, width: number): number => clampHueToWindow(centre, code, width)
 
 // ---------------------------------------------------------------- hues as colours
 

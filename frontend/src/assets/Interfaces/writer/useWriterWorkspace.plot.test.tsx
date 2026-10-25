@@ -1,6 +1,7 @@
 import { act, renderHook, waitFor } from '@testing-library/react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { __resetSettingsForTests } from '../../../settings/settingsStore'
+import { wrapHue } from '../../../theme/bookColors'
 import { outlineNode, plotNode, projectIndex, standInBackend } from '../../../test/workspaceBackend'
 import { useWriterWorkspace } from './useWriterWorkspace'
 
@@ -363,5 +364,59 @@ describe('useWriterWorkspace: adding a plot preset', () => {
     const saved = backend.saved.plot[0]
     expect(saved.filter(n => n.title === 'Characters')).toHaveLength(2)
     expect(new Set(saved.map(n => n.id)).size).toBe(saved.length)
+  })
+})
+
+describe('useWriterWorkspace: plot colour ranges', () => {
+  it('starts a new category at the project\'s hue, and a subcategory or cluster with none (it shows its parent\'s)', async () => {
+    const { result, get } = await opened()
+    let category = ''
+    let subcategory = ''
+    let cluster = ''
+    act(() => { category = result.current.addPlotNode(null, 'category') })
+    act(() => { subcategory = result.current.addPlotNode(category, 'subcategory') })
+    act(() => { cluster = result.current.addPlotNode(subcategory, 'cluster') })
+    expect(get(category)?.hue).toBe(result.current.projectHue)
+    expect(get(subcategory)?.hue).toBeUndefined()
+    expect(get(cluster)?.hue).toBeUndefined()
+  })
+
+  it('holds a category within 90 degrees of the project, a subcategory within 60 of its category and a cluster within 30 of its subcategory', async () => {
+    const { result, get } = await opened()
+    const project = result.current.projectHue
+    let cluster = ''
+    act(() => { cluster = result.current.addPlotNode('sub', 'cluster') })
+    act(() => { result.current.setPlotHue('cat', project + 180) })
+    expect(get('cat')?.hue).toBe(wrapHue(project + 90))
+    act(() => { result.current.setPlotHue('sub', project + 90 + 100, project + 90) })
+    expect(get('sub')?.hue).toBe(wrapHue(project + 90 + 60))
+    act(() => { result.current.setPlotHue(cluster, project + 90 + 60 + 100, project + 90 + 60) })
+    expect(get(cluster)?.hue).toBe(wrapHue(project + 90 + 60 + 30))
+  })
+
+  it('pulls the subcategories and clusters under a category back inside their ranges when it moves, and nothing outside it', async () => {
+    const { result, get } = await opened()
+    const project = result.current.projectHue
+    let cluster = ''
+    let other = ''
+    act(() => { cluster = result.current.addPlotNode('sub', 'cluster') })
+    act(() => { other = result.current.addPlotNode(null, 'category') })
+    act(() => { result.current.setPlotHue('cat', project) })
+    act(() => { result.current.setPlotHue('sub', project + 60, project) })
+    act(() => { result.current.setPlotHue(cluster, project + 90, project + 60) })
+    expect([get('sub')?.hue, get(cluster)?.hue]).toEqual([wrapHue(project + 60), wrapHue(project + 90)])
+    // The category moves 90 degrees back: its subcategory (150 away now) comes to within 60, then its cluster to within 30 of that.
+    act(() => { result.current.setPlotHue('cat', project - 90) })
+    expect(get('cat')?.hue).toBe(wrapHue(project - 90))
+    expect(get('sub')?.hue).toBe(wrapHue(project - 30))
+    expect(get(cluster)?.hue).toBe(wrapHue(project))
+    expect(get(other)?.hue).toBe(project)
+  })
+
+  it("stores the parent's shown hue on it when the parent had none of its own and a child is coloured", async () => {
+    const { result, get } = await opened()
+    act(() => { result.current.setPlotHue('sub', 130, 120) })
+    expect(get('cat')?.hue).toBe(120)
+    expect(get('sub')?.hue).toBe(130)
   })
 })

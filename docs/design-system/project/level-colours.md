@@ -10,13 +10,17 @@ Every level of the Writer, every book, arc and chapter, and every plot category 
 |---|---|
 | Dash | the app theme's own colour |
 | Project | its own, else the app theme's hue + 120, so the Dash and the Project read as different tints |
-| Series | within 60 degrees of the project's |
-| Book | any hue; a book with no hue of its own is the default orange (28) |
-| Arc | within 60 degrees of its book's |
-| Chapter | within 60 degrees of its arc's (its book's outside an arc) |
-| Plot category | any hue; a subcategory or a cluster within 60 degrees of its category's |
+| Series | none: it shows the project's colour (a colour stored on a series by an older version is ignored, and cleared the next time the outline is saved) |
+| Book | within **90** degrees of the project's hue; a book with no hue of its own is the default orange (28) |
+| Arc | within **60** degrees of its book's |
+| Chapter | within **30** degrees of its arc's (its book's outside an arc) |
+| Plot category | within **90** degrees of the project's hue |
+| Plot subcategory | within **60** degrees of its category's |
+| Plot cluster | within **30** degrees of its subcategory's (its category's when it sits straight under one) |
 
-A series, arc, chapter, subcategory or cluster with no colour of its own shows its parent's. New ones take a hue in their window, spread away from their siblings'. Changing a parent pulls its children's hues back inside their window. The hue slider is **one track**, 0 to 360: unlimited, or the plus-or-minus 60 degree window round the parent's hue (`HueSlider`, [the preview](components/HueSlider/README.md)).
+These ranges are fixed in code (`HUE_RANGES` in `bookColors.ts`, also published as the `hue-range-*` tokens); the project and the account's theme hues have no parent, so they are the whole wheel (360). A range is a **rule**: a colour is held inside it when it, or the colour above it, is changed, and a colour already outside its range (a project saved before the ranges) stays as it is until then, shown on the nearest end of the slider. An arc, chapter, subcategory or cluster with no colour of its own shows its parent's. A new arc or chapter takes a hue in its range, spread away from its siblings'; a **new book or plot category starts at the project's hue**, and a new subcategory or cluster shows its parent's. Changing a parent pulls what is under it back inside its range, and nothing elsewhere.
+
+The hue slider is **one track**: the whole wheel from 0 to 360 for the project, or the range either side of the parent's hue, with a **square button to its left filled with the parent's hue** that sets the colour to exactly that hue (`HueSlider`, [the preview](components/HueSlider/README.md)).
 
 ## Saturation tiers
 

@@ -150,17 +150,24 @@ function ControlsCard() {
 }
 
 function HueCard() {
-  const [book, setBook] = useState(200)
-  const [arc, setArc] = useState(230)
+  const [project, setProject] = useState(200)
+  const [book, setBook] = useState(230)
+  const [arc, setArc] = useState(260)
+  const [chapter, setChapter] = useState(280)
+  const [theme, setTheme] = useState(120)
   return (
     <LevelFrame level="outline" title="Hue slider and colour range" hue={book}>
       <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
-        <span className="wrLabel">Unlimited: a book, a project, a plot category ({book}°)</span>
-        <HueSlider label="Book colour" hue={book} centre={null} onChange={setBook} />
-        <span className="wrLabel">Limited: an arc, within 60° of its book ({arc}°)</span>
-        <HueSlider label="Arc colour" hue={arc} centre={book} onChange={setArc} />
+        <span className="wrLabel">The whole wheel, from 0: the project, no parent hue ({project}°)</span>
+        <HueSlider label="Project colour" hue={project} centre={null} range={360} onChange={setProject} />
+        <span className="wrLabel">A book, within 90° of the project ({book}°)</span>
+        <HueSlider label="Book colour" hue={book} centre={project} range={90} onChange={setBook} />
+        <span className="wrLabel">An arc, within 60° of its book ({arc}°)</span>
+        <HueSlider label="Arc colour" hue={arc} centre={book} range={60} onChange={setArc} />
+        <span className="wrLabel">A chapter, within 30° of its arc ({chapter}°)</span>
+        <HueSlider label="Chapter colour" hue={chapter} centre={arc} range={30} onChange={setChapter} />
         <span className="wrLabel">Colour range (the theme editor: hue 0 to 360)</span>
-        <ColorRange label="Hue" value={arc} onChange={setArc} sat={30} light={50} />
+        <ColorRange label="Hue" value={theme} onChange={setTheme} sat={30} light={50} />
       </div>
     </LevelFrame>
   )

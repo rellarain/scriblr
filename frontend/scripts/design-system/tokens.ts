@@ -1,6 +1,6 @@
 import { zoneColorTokens, ZONE_THEMES, type ColorToken } from './colors'
 import { GRID_GAP, ONE_COLUMN_BELOW, RAIL_TILE } from '../../src/components/tiles/tileShapes'
-import { SUBCATEGORY_HUE_WINDOW } from '../../src/theme/bookColors'
+import { HUE_RANGES } from '../../src/theme/bookColors'
 import { ZONE_KEYS } from '../../src/theme/types'
 
 // project/tokens.json: the system's tokens in the shape the Design System page reads (flat lists of { name, value, usage }; colours
@@ -47,7 +47,12 @@ export const SPACING: Token[] = [
   { name: 'header-min', value: px(40), usage: 'The least height of a level\'s header strip.' },
   { name: 'rail-tile', value: px(40), usage: 'A minimised tile\'s icon square in the older tile grid\'s rail.' },
   { name: 'one-column-below', value: px(ONE_COLUMN_BELOW), usage: 'Below this width a split grid stacks its tiles in one column.' },
-  { name: 'hue-window', value: String(SUBCATEGORY_HUE_WINDOW), usage: 'Degrees: how far a series, arc, chapter, plot subcategory or plot cluster colour may stray from its parent\'s hue.' },
+  ...(Object.entries(HUE_RANGES) as Array<[keyof typeof HUE_RANGES, number]>).map(([level, range]): Token => ({
+    name: `hue-range-${level}`, value: String(range),
+    usage: range >= 360
+      ? `Degrees: a ${level} colour may be any hue (the whole wheel, from 0).`
+      : `Degrees: how far a ${level} colour may stray, either side, from its parent's hue.`,
+  })),
 ]
 export const RADIUS: Token[] = [
   { name: 'radius-none', value: px(0), usage: 'Surfaces, fields and chips are flat and square: levels, tiles (the tile grid and its console too), cards, notes, fields, chips, counts and badges, the theme panel and the helper and admin screens have no radius; buttons on a level (small and icon buttons) have none either.' },

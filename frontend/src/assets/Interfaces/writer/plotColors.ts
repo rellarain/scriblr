@@ -2,7 +2,8 @@ import type { PlotNode } from '../../../api/types'
 import { SAT_LOUD, SAT_MIDDLE, SAT_QUIET, accentColorCss, fillColorCss, themeColorCss } from '../../../theme/bookColors'
 
 // Colour coding for the plot tree. A category has a hue drawn in the theme's
-// colour; a subcategory and a cluster have a hue drawn in the accent's colour, each kept within 60 degrees of its category's.
+// colour; a subcategory and a cluster have a hue drawn in the accent's colour, a subcategory kept within 60 degrees of its category's and a
+// cluster within 30 of its subcategory's (plotHues.ts).
 // Saturation and brightness are the active zone's, through CSS variables, so the colours follow the theme; the saturation is in tiers,
 // the quietest for a category (half the zone's), a subcategory in the middle (three quarters), a cluster the loudest (all of it).
 //   - a category with no hue of its own shows the app theme's hue

@@ -158,7 +158,7 @@ export function paletteRatios(zone: ZoneKey, hues: AuditHues = DEFAULT_HUES): Pa
   }
   out.push({ id: 'plot-category', group: 'Plot colours', label: 'Ink on a plot category, the worst hue', kind: 'text', ratio: worstCategory })
   out.push({ id: 'plot-subcategory', group: 'Plot colours', label: 'White on a plot subcategory, the worst hue', kind: 'text', ratio: worstSubcategory })
-  // A cluster's surface is the same fill at the loudest tier, over the same hues (within 60 degrees of its category's).
+  // A cluster's surface is the same fill at the loudest tier, over the same hues (within 30 degrees of its subcategory's).
   out.push({ id: 'plot-cluster', group: 'Plot colours', label: 'White on a plot cluster, the worst hue', kind: 'text', ratio: worstCluster })
 
   // ---- Theme settings: the timeline's icon on its segment (the zone's accent hue at 50% lightness, as ThemeSettingsPanel draws it)

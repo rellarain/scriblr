@@ -26,7 +26,7 @@ You choose only the hue. The time of day decides how bright and how strong each 
 
 ## Your books have colours too
 
-Each project, series, book, arc and chapter can have its own colour, again a hue from 0 to 360. A series, arc or chapter stays within 60 degrees of the colour above it, so a book's parts look like family. The levels of the Writer are filled with their colour, and everything inside a book (the page edges, the tabs, the spine on the shelf) takes it. A book with no colour of its own is orange.
+Each project, book, arc and chapter can have its own colour, again a hue from 0 to 360 (a series shows the project's). A book stays within 90 degrees of the project's colour, an arc within 60 of its book's and a chapter within 30 of its arc's, so a book's parts look like family; a square button beside the slider sets a colour back to the one above it. The levels of the Writer are filled with their colour, and everything inside a book (the page edges, the tabs, the spine on the shelf) takes it. A book with no colour of its own is orange.
 
 Older projects that used a darker or lighter shade of a colour keep the hue; the shade is gone, because it made text harder to read.
 

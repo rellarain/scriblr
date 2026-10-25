@@ -216,7 +216,7 @@ described, now stale, in `docs/data-model.md`).
   nodes) are free-text tags used to detect keyword mentions in prose. The pure
   rules (references, deletion, migration of older plots, assignment) live in
   `frontend/src/assets/Interfaces/writer/plotFields.ts`, and run on load.
-  A book has one colour, its `themeHue` (series, arcs and chapters have their own, within 60 degrees of their parent's).
+  A book has one colour, its `themeHue` (arcs and chapters have their own, within 60 and 30 degrees of their parent's; a series has none).
 - **Keyboard shortcuts** (`frontend/src/lib/nodeKeys.ts`, shared by the
   outline, plot, scratchpad and admin config editors): Enter adds a sibling,
   **Shift+Enter adds a child** (one level down; single-line fields only), Ctrl+Enter
@@ -577,16 +577,19 @@ mounted it; it remains in git history.
   Settings tab (the paragraph indent is a whole number of **spaces**, 0 to 16, drawn as that many times the width of a space in the book's font:
   `SPACE_EM`, the same table in `previewFormat.ts` and in the backend, which turns an older book's em indent into spaces on read) and applied to the Draft preview as CSS variables (`writer/previewFormat.ts`). The selected book's spine swivels into its cover
   (`Shelf.tsx`). Levels are tinted by hue (`levelHues.ts`): the project's own
-  (`ProjectSettings.themeHue`), series within 60° of it, books any hue, arcs within
-  60° of their book and chapters within 60° of their arc (each node's `themeHue`);
-  one with no hue shows its parent's, new ones take a hue spread away from their
-  siblings', and changing a parent pulls its children back inside their window.
+  (`ProjectSettings.themeHue`, any hue), books within 90° of it, arcs within 60° of
+  their book and chapters within 30° of their arc (each node's `themeHue`; a series has no colour and shows the project's, and one
+  saved by an older version is cleared when the outline is next saved). The plot's categories are within 90° of the project's hue,
+  subcategories within 60° of their category and clusters within 30° of their subcategory (`plotHues.ts`). The ranges are fixed
+  (`HUE_RANGES` in `theme/bookColors.ts`). One with no hue shows its parent's; a new arc or chapter takes a hue spread away from its
+  siblings' and a new book or category starts at the project's hue; changing a parent pulls what is under it back inside its range
+  (a colour already outside its range stays until it, or its parent, is changed).
   A colour is one stored number, a hue in degrees, 0..360 (`theme/bookColors.ts`, mirrored in
   `backend/app/storage/schema.py`; 0 and 360 are both red). Every colour has the same saturation and lightness
   (the active time zone's own, kept readable for the hue). The hue slider (`HueSlider.tsx`,
-  `components/ColorRange.tsx`) is one track in two forms: unlimited (project, book, plot category) runs the
-  whole 360° wheel; limited (series, arc, chapter, plot subcategory) runs the ±60° window round the
-  parent's hue. Projects saved with earlier schemes are converted once on load, before validation
+  `components/ColorRange.tsx`) is one track in two forms: the project runs the whole 360° wheel from 0°; every
+  other level runs its range either side of the parent's hue, with a square button to its left filled with the
+  parent's hue that sets the colour to it. Projects saved with earlier schemes are converted once on load, before validation
   (`hueScheme` 4): plain hues and swatches (1), the desaturated and gray/white stops (2) and the
   darker / base / lighter brightnesses (3; a lighter `361..720` or darker `-720..-361` colour becomes its hue).
   A desaturated hue becomes the same hue, and gray, white and the "of the parent" stops go back to no colour

@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import type { OutlineNode, PreviewFormat } from '../../../../api/types'
 import type { WriterWorkspace } from '../useWriterWorkspace'
-import { bookThemeHue } from '../../../../theme/bookColors'
+import { bookThemeHue, rangeOf } from '../../../../theme/bookColors'
 import HueSlider from '../HueSlider'
 import { systemForBook } from '../timeSystem'
 import { DEFAULT_PREVIEW_FORMAT, FORMAT_LIMITS, formatOf } from '../previewFormat'
@@ -100,7 +100,7 @@ export function BookSettings({ w, book, bookWords, compact = false }: { w: Write
       </label>
       <div className="wrBookEdField">
         <span className="wrLabel">Colour</span>
-        <HueSlider label="Book colour" hue={themeHue} centre={null} onChange={code => w.setNodeHue(book.id, code)} />
+        <HueSlider label="Book colour" hue={themeHue} centre={w.hueCentreOf(book)} range={rangeOf('book')} onChange={code => w.setNodeHue(book.id, code)} />
       </div>
       {timeSystems.length > 1 && (
         <label className="wrBookEdField">
