@@ -20,10 +20,13 @@
   .wrPlotBarToggle { width: 100%; display: flex; align-items: center; gap: var(--space-base); padding: 8px var(--space-4); border-radius: var(--radius-button); background: var(--ov-sink-1); color: inherit; text-align: left; font-size: var(--text-ui); font-weight: 700; }
   .wrPlotBarToggle .wrNavCount { flex: 0 0 auto; white-space: nowrap; }
   .wrPlotBarLabel { flex: 1 1 auto; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  // The drawer is on the level's own fill (the tile around it is a light surface with the dark ink), so what it holds is read in the level's
+  // ink: its label, circles and "n selected" take it from here, and its two add buttons are washes of it, as on any level.
   .wrPlotBarDrawer {
     position: absolute; left: 0; right: 0; top: calc(100% + 4px); display: flex; max-height: min(60vh, 440px); border-radius: var(--radius-button); overflow: hidden;
-    background: var(--wr-fill-2); box-shadow: 0 8px 20px rgb(0 0 0 / calc(0.4 * var(--shade-k)));
+    background: var(--wr-fill-2); color: var(--on-accent); box-shadow: 0 8px 20px rgb(0 0 0 / calc(0.4 * var(--shade-k)));
     .wrPlotNav { flex: 1 1 auto; border-radius: var(--radius-none); background: var(--ov-sink-1); }
+    .wrPlotNavAddRow > .wrSmallBtn, .wrPresetPickerRoot > .wrSmallBtn { @include wrLevelWash; &:hover:not(:disabled) { background: var(--level-wash-hi); } }
   }
   .wrPlotNav { flex: 0 0 250px; min-width: 0; min-height: 0; display: flex; flex-direction: column; gap: var(--space-base); background: var(--ov-sink-1); border-radius: var(--radius-button); padding: var(--space-4); }
   .wrPlotNavHead { display: flex; align-items: center; justify-content: space-between; font-size: var(--text-small); font-weight: 700; text-transform: uppercase; letter-spacing: 1px; span { opacity: 0.9; } }
@@ -38,7 +41,8 @@
     &:disabled { opacity: 0.4; cursor: default; }
     &:focus-visible { outline: 2px solid var(--wr-accent-light); outline-offset: 2px; }
   }
-  .wrNavDot--desc.wrNavDot--on { border-color: var(--wr-alert); background: var(--wr-alert); }
+  // Lit, it is the alert colour with a ring in the ink around it, so it stands out from any ground (the alert hue alone is only about 2:1 on a level's dark fill).
+  .wrNavDot--desc.wrNavDot--on { border-color: var(--wr-alert); background: var(--wr-alert); box-shadow: 0 0 0 1.5px currentColor; }
   .wrPlotNavAdd { align-self: flex-start; flex: 0 0 auto; }
   // "+ Category" and "+ Preset" side by side; the preset list opens upward from its button over the rows.
   .wrPlotNavAddRow { display: flex; flex-wrap: wrap; align-items: flex-start; gap: var(--space-3); position: relative; }

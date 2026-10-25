@@ -81,6 +81,15 @@ describe('the Writer stylesheets use the tokens', () => {
     expect(offences.slice(0, 20)).toEqual([])
   })
 
+  // The Plot contents' drawer (the compact layout) is the level's own dark fill laid over a light tile whose ink is dark: without the level's ink
+  // set on it, its label, circles and buttons were near-black on dark green (about 1.7:1). The audit covers white on that fill.
+  it('give the Plot contents drawer, which stands on a level fill inside a light tile, the level ink', () => {
+    const plot = files.find(f => f.name === 'styles/_plot.scss')!.text
+    const rule = /\.wrPlotBarDrawer\s*\{([\s\S]*?)\n  \}/.exec(plot)?.[1] ?? ''
+    expect(rule).toMatch(/background:\s*var\(--wr-fill-2\)/)
+    expect(rule).toMatch(/(?<![\w-])color:\s*var\(--on-accent\)/)
+  })
+
   // The system's floor for text is 11px (the `label` and `button` styles): nothing in the Writer, the app shell (the helper's and admin's
   // screens) or the admin Resources and Plot presets sheets is set smaller. (The sky toggle's date, the Reader's markers and the theme timeline are still
   // under it, see known-drift.)
