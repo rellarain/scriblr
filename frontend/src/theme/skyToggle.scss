@@ -16,7 +16,8 @@
 .skyToggle { margin: 5px 0; }
 
 // A time-of-day card's header: the whole box is one button (press it to turn the zone on or off), four times as wide as it is tall. The
-// 120x30 sky inside is scaled to the button's width (the scale is its width over 120px, worked out from the container's own width), and
+// 120x30 sky inside is scaled to the button's width (--sky-scale, its width over 120px, which SkyZoneCard measures and sets: the CSS
+// way, tan(atan2(100cqw, 120px)), comes out wrong in Electron's Chromium), and
 // the name and time are real text over it, in the middle band of the sky where the text colour was fitted. A zone that is off is the
 // same sky at a share of its saturation (theme/skyLook.ts); the last zone left on cannot be pressed.
 .zoneCard > button.skyCard {
@@ -45,8 +46,7 @@
   width: 120px;
   height: 30px;
   transform-origin: 0 0;
-  transform: scale(2);
-  transform: scale(tan(atan2(100cqw, 120px)));
+  transform: scale(var(--sky-scale, 2));
   pointer-events: none;
   > * { position: absolute; }
 }

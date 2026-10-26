@@ -61,6 +61,33 @@ describe('SkyZoneCard', () => {
     expect(colour(dim)).not.toBe(colour(on))
   })
 
+  it('scales its 120px sky to the width of the header, and follows it as it is resized', () => {
+    // (Measured, not left to CSS: Electron's Chromium reads atan2(100cqw, 120px) wrongly, which left the sky a small patch in the corner.)
+    let width = 480
+    const offsetWidth = vi.spyOn(HTMLElement.prototype, 'offsetWidth', 'get').mockImplementation(() => width)
+    let resized: () => void = () => {}
+    vi.stubGlobal('ResizeObserver', class {
+      constructor(callback: () => void) { resized = callback }
+      observe() {}
+      unobserve() {}
+      disconnect() {}
+    })
+    try {
+      const { button } = card()
+      expect(button.style.getPropertyValue('--sky-scale')).toBe('4')
+      width = 300
+      resized()
+      expect(button.style.getPropertyValue('--sky-scale')).toBe('2.5')
+    } finally {
+      offsetWidth.mockRestore()
+    }
+  })
+
+  it('leaves the scale to the stylesheet where nothing can be measured', () => {
+    const { button } = card()
+    expect(button.style.getPropertyValue('--sky-scale')).toBe('')
+  })
+
   it('draws the zone\'s own sun, moon and stars', () => {
     card({ zone: 'night' })
     expect(screen.getByTestId('moon')).toBeTruthy()
