@@ -241,6 +241,7 @@ Each cell is the ratio at the default hues (theme 330, accent 32, alert 200) and
 | Pair | Needs | Dawn | Day | Dusk | Night |
 |---|---|---|---|---|---|
 | Timeline icon on its zone segment | 3:1 | 3.3 (3.4) | 7.5 (3.7) | 7.5 (3.7) | 3.3 (3.4) |
+| Uses counted inside a hue swatch | 4.5:1 | 4.6 (4.6) | 4.7 (4.6) | 9.5 (4.6) | 8.5 (4.8) |
 
 ## Sky toggle
 
@@ -248,6 +249,7 @@ Each cell is the ratio at the default hues (theme 330, accent 32, alert 200) and
 |---|---|---|---|---|---|
 | Time and date on the sky | 4.5:1 | 4.7 (4.6) | 4.6 (4.6) | 4.6 (4.6) | 7.5 (4.6) |
 | Time and date on the sky, locked | 4.5:1 | 4.7 (4.6) | 4.6 (4.6) | 4.6 (4.6) | 6.1 (4.6) |
+| Name and time on the sky of a time of day that is off | 4.5:1 | 4.7 (4.6) | 5.6 (4.6) | 4.7 (4.6) | 5.9 (5.4) |
 
 ## Below the threshold
 

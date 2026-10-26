@@ -1,5 +1,6 @@
 import { DEFAULT_START, defaultZone } from './defaults'
 import { normalizePalette } from './paletteRules'
+import { autoLinks, normalizeHues, normalizeLinks, seedHues, syncPalette } from './themeHues'
 import { ZONE_KEYS, type ThemeSettings, type ZoneConfig, type ZoneKey } from './types'
 
 const DAY_MINUTES = 1440
@@ -86,31 +87,49 @@ export function moveZoneStart(settings: ThemeSettings, key: ZoneKey, target: num
 // Put a zone back to the time it begins at by default (pushing a neighbour along if it is in the way).
 export const resetZoneStart = (settings: ThemeSettings, key: ZoneKey): ThemeSettings => moveZoneStart(settings, key, DEFAULT_START[key])
 
-// Turn a zone on, seeded with a copy of Day's hues.
+// The zone a newly turned-on zone takes its colours from: the one before it in the day's order (dawn, day, dusk, night, round to dawn
+// again) that is on, going further back past any that are off. Null when no other zone is on.
+export function previousZone(zones: Record<ZoneKey, ZoneConfig>, key: ZoneKey): ZoneKey | null {
+  const at = ZONE_KEYS.indexOf(key)
+  for (let back = 1; back < ZONE_KEYS.length; back += 1) {
+    const candidate = ZONE_KEYS[(at - back + ZONE_KEYS.length) % ZONE_KEYS.length]
+    if (zones[candidate].configured) return candidate
+  }
+  return null
+}
+
+// Turn a zone on, with a copy of the previous zone's hues (and the swatches they are linked to).
 export function enableZone(settings: ThemeSettings, key: ZoneKey): ThemeSettings {
   if (settings.zones[key].configured) return settings
+  const from = previousZone(settings.zones, key)
+  const source = from ? settings.zones[from] : defaultZone('day')
   const zone: ZoneConfig = {
     configured: true,
     startMinute: freeStart(settings.zones, key),
-    palette: JSON.parse(JSON.stringify(settings.zones.day.palette)),
+    palette: JSON.parse(JSON.stringify(source.palette)),
+    links: { ...source.links },
   }
   return { ...settings, zones: { ...settings.zones, [key]: zone } }
 }
 
-// Turn a zone off (Day cannot be turned off). A forced override on it is dropped.
+// Turn a zone off: it keeps its start time and loses its colours. At least one zone stays on (the last one is not turned off). A forced
+// override on it is dropped.
 export function disableZone(settings: ThemeSettings, key: ZoneKey): ThemeSettings {
-  if (key === 'day' || !settings.zones[key].configured) return settings
+  if (!settings.zones[key].configured || configuredZones(settings.zones).length <= 1) return settings
+  const cleared = defaultZone(key)
   return {
     ...settings,
     override: settings.override === key ? null : settings.override,
-    zones: { ...settings.zones, [key]: { ...settings.zones[key], configured: false } },
+    zones: { ...settings.zones, [key]: { ...settings.zones[key], configured: false, palette: cleared.palette, links: {} } },
   }
 }
 
-// Repair settings read from storage: fill missing zones, keep Day configured,
+// Repair settings read from storage: fill missing zones, keep at least one zone on (Day if none is),
 // snap start times to 10 minutes, keep just the hues of each palette (older
-// saves also held saturation and brightness), drop an override that names no zone.
-// (The header toggle can lock any of the four, configured or not.)
+// saves also held saturation and brightness), drop an override that names no zone that is on.
+// The hue list (up to ten swatches) and each role's link to one are repaired too; an account that has no list yet gets one made of the hues
+// its zones use, and each role linked to the swatch of its hue. A linked role's hue is always its swatch's. A zone that is off has no colours.
+// Whether the app follows the clock is no longer a choice: it does when two or more zones are on.
 export function normalizeTheme(input: Partial<ThemeSettings> | null | undefined): ThemeSettings {
   const zones = {} as Record<ZoneKey, ZoneConfig>
   for (const key of ZONE_KEYS) {
@@ -118,36 +137,37 @@ export function normalizeTheme(input: Partial<ThemeSettings> | null | undefined)
     const given = input?.zones?.[key]
     const start = typeof given?.startMinute === 'number' && Number.isFinite(given.startMinute) ? given.startMinute : fallback.startMinute
     zones[key] = {
-      configured: key === 'day' ? true : Boolean(given?.configured),
+      configured: given ? Boolean(given.configured) : fallback.configured,
       startMinute: Math.min(MAX_START, Math.max(0, Math.round(start / STEP_MINUTES) * STEP_MINUTES)),
       palette: normalizePalette(given?.palette ?? fallback.palette),
+      links: {},
     }
   }
-  const override = input?.override && ZONE_KEYS.includes(input.override) ? input.override : null
-  return { timeBasedEnabled: Boolean(input?.timeBasedEnabled), override, zones }
+  if (!ZONE_KEYS.some(key => zones[key].configured)) zones.day = { ...zones.day, configured: true }
+
+  let hues = normalizeHues(input?.hues)
+  const seeded = hues.length === 0
+  if (seeded) hues = seedHues(zones)
+  for (const key of ZONE_KEYS) {
+    const links = seeded ? autoLinks(zones[key].palette, hues) : normalizeLinks(input?.zones?.[key]?.links, hues)
+    // A zone that is off keeps no links (and, so, no colours of its own).
+    zones[key] = zones[key].configured ? { ...zones[key], links, palette: syncPalette(zones[key].palette, links, hues) } : { ...zones[key], links: {} }
+  }
+
+  const on = ZONE_KEYS.filter(key => zones[key].configured)
+  const override = input?.override && on.includes(input.override) ? input.override : null
+  return { timeBasedEnabled: on.length >= 2, override, zones, hues }
 }
 
-// The zone whose palette is shown: the clock's zone when time-based theming
-// is on, else Day.
+// The zone the clock puts the app in: with two or more zones on, the one the schedule is in now; with one, that zone.
 export function clockZone(settings: ThemeSettings, now: Date): ZoneKey {
-  if (!settings.timeBasedEnabled) return 'day'
+  const on = configuredZones(settings.zones)
+  if (on.length === 0) return 'day'
+  if (on.length === 1) return on[0]
   return resolveZone(settings.zones, minuteOfDay(now))
 }
 
 // A forced override wins over the clock.
 export function activeZone(settings: ThemeSettings, now: Date): ZoneKey {
   return settings.override ?? clockZone(settings, now)
-}
-
-// Give a zone another zone's hues (not its start time; each zone keeps its own
-// look). Both zones must be turned on.
-export function copyPalette(settings: ThemeSettings, from: ZoneKey, to: ZoneKey): ThemeSettings {
-  if (from === to || !settings.zones[from].configured || !settings.zones[to].configured) return settings
-  return {
-    ...settings,
-    zones: {
-      ...settings.zones,
-      [to]: { ...settings.zones[to], palette: JSON.parse(JSON.stringify(settings.zones[from].palette)) },
-    },
-  }
 }

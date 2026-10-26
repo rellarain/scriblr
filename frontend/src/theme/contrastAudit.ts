@@ -1,7 +1,7 @@
 import { tabColors, fillCap, fillHsl, stripeHsl, SAT_LOUD, SAT_MIDDLE, SAT_QUIET, SAT_TIERS } from './bookColors'
 import { readableInk, type HSL } from './contrast'
 import { levelPairs } from './levelContrast'
-import { skyLook } from './skyLook'
+import { OFF_SKY_SATURATION, skyLook } from './skyLook'
 import {
   BLACK, TEXT_TARGET, WHITE, mixRgb, over, ratioOf, ratioOfRgb, rgbOf, type RGB,
 } from './readable'
@@ -165,14 +165,23 @@ export function paletteRatios(zone: ZoneKey, hues: AuditHues = DEFAULT_HUES): Pa
   const segment = hsl(colors.accent.h, colors.accent.s, 50)
   add('timeline-icon', 'Theme panel', 'Timeline icon on its zone segment', 'ui', rgbOf(readableInk(segment)), rgbOf(segment))
 
-  // ---- the header's sky toggle (and the zone tabs in Theme settings): the time and date, against the worst colour of the sky behind
-  const sky = skyLook(zone, palette)
-  const worstOnSky = (text: string) => {
+  // ---- Theme settings: the number of uses inside a hue's swatch (the swatch is the hue at this zone's accent saturation and lightness;
+  // the ink is whichever of the zone's two reads better on it, as for the accent fills)
+  const hueSwatch = hsl(colors.accent.h, colors.accent.s, colors.accent.l)
+  add('hue-swatch-count', 'Theme panel', 'Uses counted inside a hue swatch', 'text', rgbOf(fillInk(hueSwatch, hues.theme).ink), rgbOf(hueSwatch))
+
+  // ---- the header's sky toggle (and the zone cards in Theme settings): the time and date, against the worst colour of the sky behind
+  const worstOn = (look: ReturnType<typeof skyLook>, text: string) => {
     const [h, s, l] = text.slice(4, -1).split(',').map(part => parseFloat(part))
-    return Math.min(...sky.backgrounds.map(bg => ratioOfRgb(rgbOf(hsl(h, s, l)), bg)))
+    return Math.min(...look.backgrounds.map(bg => ratioOfRgb(rgbOf(hsl(h, s, l)), bg)))
   }
-  out.push({ id: 'sky-text', group: 'Sky toggle', label: 'Time and date on the sky', kind: 'text', ratio: worstOnSky(sky.text) })
-  out.push({ id: 'sky-text-locked', group: 'Sky toggle', label: 'Time and date on the sky, locked', kind: 'text', ratio: worstOnSky(sky.textLocked) })
+  const sky = skyLook(zone, palette)
+  out.push({ id: 'sky-text', group: 'Sky toggle', label: 'Time and date on the sky', kind: 'text', ratio: worstOn(sky, sky.text) })
+  out.push({ id: 'sky-text-locked', group: 'Sky toggle', label: 'Time and date on the sky, locked', kind: 'text', ratio: worstOn(sky, sky.textLocked) })
+  // A zone card that is turned off: its sky made of the theme hue alone, at a share of the saturation.
+  const offPalette: ZonePalette = { theme: { h: hues.theme }, accent: { h: hues.theme }, alert: { h: hues.theme }, accent2: { h: hues.theme } }
+  const off = skyLook(zone, offPalette, OFF_SKY_SATURATION)
+  out.push({ id: 'sky-text-off', group: 'Sky toggle', label: 'Name and time on the sky of a time of day that is off', kind: 'text', ratio: worstOn(off, off.text) })
   return out
 }
 

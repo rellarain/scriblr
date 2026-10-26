@@ -4,8 +4,8 @@ The Writer is **flat and square**. Depth is a step in colour, not a shadow; pane
 
 ## Shape
 
-- **No radius on a surface or a field** (`radius-none`): levels, tiles (the tile grid, its minimised rail and its console too), tabs, page edges, cards, notes, project cards, the Theme panel and its swatches, the helper and admin screens' cards, fields and counts, **chips** (the tag with an x, the chip add box) and every field on a level. The level and card rules set `border-radius: 0` after their own, so a stray rounded rule does not leak through.
-- **Buttons keep their small radius** where they have one (`radius-button`, 4px; the Theme panel's are 6px): the header, a tile's title button, the zone tabs. On a level the **header tab buttons, the tab bar that holds them, and the Undo, Redo and Save buttons with the container that holds them** are rounded (`radius-button`); the other small, icon and toggle buttons on a level are square (`radius-none`).
+- **No radius on a surface or a field** (`radius-none`): levels, tiles (the tile grid, its minimised rail and its console too), tabs, page edges, cards, notes, project cards, the Theme panel (its hue swatches and cards are the exception: rounded at `radius-button`), the helper and admin screens' cards, fields and counts, **chips** (the tag with an x, the chip add box) and every field on a level. The level and card rules set `border-radius: 0` after their own, so a stray rounded rule does not leak through.
+- **Buttons keep their small radius** where they have one (`radius-button`, 4px; the Theme panel's are 6px): the header, a tile's title button. On a level the **header tab buttons, the tab bar that holds them, and the Undo, Redo and Save buttons with the container that holds them** are rounded (`radius-button`); the other small, icon and toggle buttons on a level are square (`radius-none`).
 - **Rounded only where it reads as a control on paper**: inputs and buttons on the sheet and the segmented switch (`radius-input`, 4px), the toggle switch and its knob.
 - A book is the exception that proves it: the spine front has a 3px right corner, and the page edges are square steps.
 

@@ -21,14 +21,14 @@ import { shelfGroups } from '../assets/Interfaces/writer/outlineTree'
 import { Shelf } from '../assets/Interfaces/writer/Shelf'
 import SplitArea from '../assets/Interfaces/writer/SplitArea'
 import { useWriterWorkspace, type WriterWorkspace } from '../assets/Interfaces/writer/useWriterWorkspace'
-import { setKv } from '../settings/settingsStore'
+import { setKv, setTheme as setAccountTheme } from '../settings/settingsStore'
 import LevelPanel from '../assets/Interfaces/writer/levels/LevelPanel'
 import { defaultProjectHue } from '../assets/Interfaces/writer/levelHues'
 import { useThemeState } from '../theme/useTheme'
 import SkyToggle from '../theme/SkyToggle'
 import ThemeSettingsPanel from '../theme/ThemeSettingsPanel'
 import { CARD_META } from './cardMeta'
-import { FIXTURE_IDS, FIXTURE_PROJECT_ID, createMockBackend, installMockBackend } from './mockBackend'
+import { FIXTURE_IDS, FIXTURE_PROJECT_ID, createMockBackend, installMockBackend, previewTheme } from './mockBackend'
 import type { CardDef } from './Preview'
 
 // The design system's cards: each one a real part of the app, run against the pretend backend (mockBackend.ts). The labels are the app's
@@ -260,7 +260,13 @@ function IconsCard() {
   )
 }
 
+// The account's saved theme in a preview is the one in mockBackend.ts, with every time of day on (the store is not loaded from the mock backend here).
+function useFourZones() {
+  useEffect(() => { setAccountTheme(previewTheme()) }, [])
+}
+
 function ThemeSettingsCard() {
+  useFourZones()
   return <div className="uiPvPanel" style={{ flex: '1 1 auto', overflow: 'auto', padding: 12 }}><ThemeSettingsPanel /></div>
 }
 
@@ -290,6 +296,7 @@ function ReaderCard({ view }: { view: string }) {
 }
 
 function SkyCard() {
+  useFourZones()
   return (
     <div className="header" style={{ position: 'static', display: 'flex', justifyContent: 'center', alignItems: 'center', height: 70 }}>
       <SkyToggle />

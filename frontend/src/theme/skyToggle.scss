@@ -1,7 +1,6 @@
-// The header's sky toggle (theme/SkyToggle.tsx) and the zone tabs in Theme settings
-// (theme/SkyZoneTab.tsx): 120x30 skies. Everything except the text is painted
-// behind it (theme/SkyScene.tsx); the layers stack sky, stars, sun and moon, clouds
-// (which pass in front of the orbs), then text.
+// The header's sky toggle (theme/SkyToggle.tsx): a 120x30 sky; and the time-of-day cards in the account theme panel (theme/SkyZoneCard.tsx):
+// the same sky scaled up to the card's width. Everything except the text is painted behind it (theme/SkyScene.tsx); the layers stack
+// sky, stars, sun and moon, clouds (which pass in front of the orbs), then text.
 
 .skyBox {
   position: relative;
@@ -16,25 +15,47 @@
 }
 .skyToggle { margin: 5px 0; }
 
-// A zone tab: the whole box is one button. The selected one gets a ring in the
-// accent colour; a zone that is not in use is dimmed but still clickable.
-.skyTab {
-  border: 0;
+// A time-of-day card's header: the whole box is one button (press it to turn the zone on or off), four times as wide as it is tall. The
+// 120x30 sky inside is scaled to the button's width (the scale is its width over 120px, worked out from the container's own width), and
+// the name and time are real text over it, in the middle band of the sky where the text colour was fitted. A zone that is off is the
+// same sky at a share of its saturation (theme/skyLook.ts); the last zone left on cannot be pressed.
+.zoneCard > button.skyCard {
+  position: relative;
+  display: block;
+  width: 100%;
+  margin: 0;
   padding: 0;
+  border: 0;
+  overflow: hidden;
+  isolation: isolate;
+  container-type: inline-size;
+  aspect-ratio: 4 / 1;
   cursor: pointer;
   text-align: left;
-  transition: filter 0.15s, opacity 0.15s;
-  &:hover { filter: brightness(1.1); }
-  &--off { filter: saturate(0.6); &:hover { filter: saturate(0.6) brightness(1.1); } }
-  &--selected { opacity: 1; outline: 2px solid var(--accent); outline-offset: 2px; }
-  &:focus-visible { outline: 2px solid var(--ink); outline-offset: 2px; }
+  transition: filter 0.15s;
+  &:hover { filter: brightness(1.08); }
+  &:focus-visible { outline: 2px solid var(--ink); outline-offset: -3px; }
+  &--stuck { cursor: default; &:hover { filter: none; } }
+  &--paused * { animation-play-state: paused; }
 }
-.skyTabText {
-  left: 30px;
+.skyScaler {
+  position: absolute;
+  left: 0;
   top: 0;
-  width: 90px;
+  width: 120px;
   height: 30px;
-  padding-right: 10px;
+  transform-origin: 0 0;
+  transform: scale(2);
+  transform: scale(tan(atan2(100cqw, 120px)));
+  pointer-events: none;
+  > * { position: absolute; }
+}
+.skyCardText {
+  position: absolute;
+  left: 25%;
+  right: 5%;
+  top: 0;
+  bottom: 0;
   display: flex;
   flex-direction: column;
   align-items: flex-end;
@@ -44,6 +65,8 @@
   font-variant-numeric: tabular-nums;
   pointer-events: none;
 }
+.skyCardName { font-size: clamp(13px, 6cqw, 20px); font-weight: 700; }
+.skyCardTime { font-size: clamp(11px, 3.8cqw, 14px); font-weight: 600; letter-spacing: 0.6px; }
 
 .skySky,
 .skyFade { inset: 0; }
@@ -87,7 +110,7 @@
   &:hover { background: color-mix(in srgb, currentColor 10%, transparent); }
   &:focus-visible { outline: 2px solid currentColor; outline-offset: -3px; }
 }
-.skySunBtn { left: 0; width: 30px; }
+.skySunBtn { left: 0; width: 30px; &[aria-disabled='true'] { cursor: default; opacity: 0.6; &:hover { background: transparent; } } }
 .skyTimeBtn {
   left: 30px;
   width: 90px;

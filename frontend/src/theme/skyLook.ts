@@ -89,9 +89,16 @@ function textReadsOn(accent: { h: number; s: number }, wanted: number, backgroun
   return backgrounds.every(bg => ratioOfRgb(rgbOf({ h: accent.h, s: accent.s, l }), bg) >= TEXT_TARGET)
 }
 
-export function skyLook(zone: ZoneKey, palette: ZonePalette): SkyLook {
-  const pal = resolvePalette(palette, zone)
-  const { theme, accent, alert } = pal
+// A time of day that is turned off is painted subtly (theme settings): the same sky, at this share of its saturation.
+export const OFF_SKY_SATURATION = 0.45
+
+// `saturation` scales the saturation of the zone's colours (1 = as the zone has them); the text is fitted to the sky it makes.
+export function skyLook(zone: ZoneKey, palette: ZonePalette, saturation = 1): SkyLook {
+  const resolved = resolvePalette(palette, zone)
+  const scaled = (c: HSL): HSL => (saturation === 1 ? c : { ...c, s: Math.round(c.s * saturation) })
+  const theme = scaled(resolved.theme)
+  const accent = scaled(resolved.accent)
+  const alert = scaled(resolved.alert)
   const accentAt = (l: number) => hsl(accent.h, accent.s, l)
 
   let sky: string

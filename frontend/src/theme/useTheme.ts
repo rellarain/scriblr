@@ -5,25 +5,6 @@ import { applyVars, zoneVars } from './applyTheme'
 import { clockZone, msUntilNextBoundary } from './zones'
 import type { Role, ThemeSettings, ZoneKey, ZonePalette } from './types'
 
-// --- a zone being previewed while its settings are open (not saved) ---
-
-let preview: ZoneKey | null = null
-const previewListeners = new Set<() => void>()
-
-export function setPreviewZone(zone: ZoneKey | null): void {
-  if (preview === zone) return
-  preview = zone
-  previewListeners.forEach(fn => fn())
-}
-
-function usePreviewZone(): ZoneKey | null {
-  return useSyncExternalStore(
-    fn => { previewListeners.add(fn); return () => { previewListeners.delete(fn) } },
-    () => preview,
-    () => preview,
-  )
-}
-
 // --- the clock ---
 
 // One clock for the whole app (it used to be one timer and four listeners per component that read the theme). It runs while
@@ -87,8 +68,8 @@ export interface ThemeState {
   settings: ThemeSettings
   role: Role // the seeded user's own role
   effectiveRole: Role // role, unless "view as" is set
-  clockZone: ZoneKey // the zone the schedule is in (Day when time-based is off)
-  activeZone: ZoneKey // what is actually shown: preview > override > clock
+  clockZone: ZoneKey // the zone the schedule is in (the only zone that is on, when just one is)
+  activeZone: ZoneKey // what is actually shown: override > clock
 }
 
 // A subtree that shows one zone (and, optionally, its own palette) whatever the app's clock says: components read the zone through
@@ -100,11 +81,10 @@ export const ThemeZoneProvider = ThemeZoneContext.Provider
 
 export function useThemeState(): ThemeState {
   const { theme, ui } = useSettings()
-  const previewZone = usePreviewZone()
   const forced = useContext(ThemeZoneContext)
   const clock = useClockZone()
   const role = CURRENT_USER.role
-  const activeZone = forced?.zone ?? previewZone ?? theme.override ?? clock
+  const activeZone = forced?.zone ?? theme.override ?? clock
   const settings = useMemo<ThemeSettings>(() => {
     if (!forced?.palette) return theme
     return { ...theme, zones: { ...theme.zones, [forced.zone]: { ...theme.zones[forced.zone], palette: forced.palette } } }

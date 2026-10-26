@@ -11,11 +11,11 @@ Scriblr changes its look with the time of day, and you choose the colours.
 | **Dusk** | dark, with white text, vivid colours | 4:00 PM |
 | **Night** | dark, with white text, soft colours | 10:00 PM |
 
-Day is always on and is the look when time-based theming is off; Dawn, Dusk and Night are yours to switch on. The small painted sky at the top of the window shows where you are: the sun or moon button steps to the next time of day and holds it there; the time and date go back to following the clock.
+You choose which times of day to use (at least one): with two or more on the app changes at the times on the day bar; with one on it always looks like it. The small painted sky at the top of the window shows where you are: the sun or moon button steps to the next time of day that is on and holds it there; the time and date go back to following the clock.
 
 ## Four colours
 
-In **Settings** (on the Dash) you choose, for each time of day, four **hues** on a 0 to 360 colour track:
+In **Settings** (on the Dash) you keep a list of up to ten **hues** on a 0 to 360 colour track and drag them onto the four colours of each time of day. Nothing changes in the rest of the app until you save. The four colours are:
 
 - **Theme**: the quiet colour of backgrounds and panels;
 - **Accent**: buttons, the open tab, anything you can press;

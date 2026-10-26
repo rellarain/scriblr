@@ -159,3 +159,38 @@ def test_put_ui_autosave(client: TestClient) -> None:
     assert client.get("/api/user-settings").json()["ui"]["autosaveSeconds"] == 600
     for bad in (0, 15, 45, 630):
         assert client.put("/api/user-settings/ui", json={"autosaveSeconds": bad}).status_code == 422
+
+
+def test_the_hue_list_and_the_zone_links_are_optional_and_start_empty(client: TestClient, app_data_root: Path) -> None:
+    theme = _theme(client)
+    assert theme["hues"] == []
+    assert theme["zones"]["day"]["links"] == {"theme": None, "accent": None, "alert": None, "accent2": None}
+    # A file saved before the hue list existed still loads, with neither.
+    old = {**theme}
+    del old["hues"]
+    old["zones"] = {k: {kk: vv for kk, vv in z.items() if kk != "links"} for k, z in theme["zones"].items()}
+    (app_data_root / "user-settings.json").write_text(
+        json.dumps({"schemaVersion": 1, "theme": old, "ui": {}, "kv": {}, "migratedFromLocal": False}), encoding="utf-8",
+    )
+    loaded = _theme(client)
+    assert loaded["hues"] == [] and loaded["zones"]["night"]["links"]["alert"] is None
+
+
+def test_the_hue_list_and_links_round_trip(client: TestClient) -> None:
+    theme = _theme(client)
+    theme["hues"] = [{"id": "h1", "h": 330}, {"id": "h2", "h": 32}, {"id": "h_3-x", "h": 360}]
+    theme["zones"]["day"]["links"] = {"theme": "h1", "accent": "h2", "alert": None, "accent2": "h_3-x"}
+    resp = client.put("/api/user-settings/theme", json=theme)
+    assert resp.status_code == 200
+    assert resp.json()["theme"] == theme
+    assert _theme(client) == theme
+
+
+def test_the_hue_list_is_bounded(client: TestClient) -> None:
+    theme = _theme(client)
+    ten = [{"id": f"h{i}", "h": i * 30} for i in range(10)]
+    assert client.put("/api/user-settings/theme", json={**theme, "hues": ten}).status_code == 200
+    assert client.put("/api/user-settings/theme", json={**theme, "hues": ten + [{"id": "h10", "h": 5}]}).status_code == 422
+    assert client.put("/api/user-settings/theme", json={**theme, "hues": [{"id": "x", "h": 361}]}).status_code == 422
+    assert client.put("/api/user-settings/theme", json={**theme, "hues": [{"id": "bad id!", "h": 5}]}).status_code == 422
+    assert client.put("/api/user-settings/theme", json={**theme, "hues": [{"id": "", "h": 5}]}).status_code == 422

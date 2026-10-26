@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest'
 import { defaultThemeSettings } from './defaults'
 import {
   activeZone, clockZone, configuredZones, disableZone, enableZone, formatMinute, msUntilNextBoundary,
-  moveZoneStart, normalizeTheme, resetZoneStart, resolveZone,
+  moveZoneStart, normalizeTheme, previousZone, resetZoneStart, resolveZone,
 } from './zones'
 import type { ThemeSettings } from './types'
 
@@ -99,11 +99,51 @@ describe('enable / disable / normalize', () => {
     expect(s.zones.dusk.startMinute).toBe(s.zones.day.startMinute + 10)
   })
 
-  it('does not turn Day off, and drops a stale override when a zone is turned off', () => {
+  it('takes the colours of the zone before it in the day when it is turned on', () => {
+    let s = defaultThemeSettings()
+    s = { ...s, hues: [...s.hues, { id: 'h5', h: 100 }] }
+    s.zones.day = { ...s.zones.day, palette: { ...s.zones.day.palette, accent: { h: 100 } }, links: { ...s.zones.day.links, accent: 'h5' } }
+    const dusk = enableZone(s, 'dusk')
+    expect(dusk.zones.dusk.palette).toEqual(s.zones.day.palette)
+    expect(dusk.zones.dusk.palette).not.toBe(s.zones.day.palette) // a copy
+    expect(dusk.zones.dusk.links).toEqual(s.zones.day.links)
+    expect(dusk.zones.dusk.links).not.toBe(s.zones.day.links)
+    // Night then follows Dusk, which is the nearest one before it that is on.
+    const dusk2 = { ...dusk, zones: { ...dusk.zones, dusk: { ...dusk.zones.dusk, palette: { ...dusk.zones.dusk.palette, alert: { h: 5 } }, links: {} } } }
+    expect(enableZone(dusk2, 'night').zones.night.palette.alert.h).toBe(5)
+    // Dawn comes after Night in the order, so with Day and Dusk on it takes Night's slot: the nearest earlier one, wrapping round.
+    expect(enableZone(dusk2, 'dawn').zones.dawn.palette).toEqual(dusk2.zones.dusk.palette)
+  })
+
+  it('finds the zone before it in the day that is on, round to the end', () => {
+    const s = withZones({ dusk: 960 })
+    expect(previousZone(s.zones, 'night')).toBe('dusk')
+    expect(previousZone(s.zones, 'dawn')).toBe('dusk') // wraps past midnight
+    expect(previousZone(s.zones, 'dusk')).toBe('day')
+    expect(previousZone(defaultThemeSettings().zones, 'day')).toBeNull() // no other zone is on
+  })
+
+  it('turns Day off when another zone is on, but never the last zone', () => {
+    const both = enableZone(defaultThemeSettings(), 'night')
+    const off = disableZone(both, 'day')
+    expect(off.zones.day.configured).toBe(false)
+    expect(configuredZones(off.zones)).toEqual(['night'])
+    expect(disableZone(off, 'night')).toBe(off) // the last one stays
+    const lone = defaultThemeSettings()
+    expect(disableZone(lone, 'day')).toBe(lone)
+    expect(disableZone(lone, 'dusk')).toBe(lone) // already off
+  })
+
+  it('clears a zone\'s colours and links, and a stale override, when it is turned off', () => {
     let s = enableZone(defaultThemeSettings(), 'night')
     s = { ...s, override: 'night' }
-    expect(disableZone(s, 'day')).toBe(s)
-    expect(disableZone(s, 'night').override).toBeNull()
+    s.zones.night = { ...s.zones.night, palette: { ...s.zones.night.palette, accent: { h: 99 } }, links: {} }
+    const next = disableZone(s, 'night')
+    expect(next.override).toBeNull()
+    expect(next.zones.night.links).toEqual({})
+    expect(next.zones.night.palette.accent.h).not.toBe(99)
+    expect(next.zones.night.startMinute).toBe(s.zones.night.startMinute) // the time stays
+    expect(disableZone(s, 'day').override).toBe('night') // an override on another zone stays
   })
 
   it('normalizes bad input', () => {
@@ -111,11 +151,81 @@ describe('enable / disable / normalize', () => {
       override: 'dusk',
       zones: { day: { configured: false, startMinute: 423, palette: defaultThemeSettings().zones.day.palette } },
     } as unknown as ThemeSettings)
-    expect(s.zones.day.configured).toBe(true)
+    expect(s.zones.day.configured).toBe(true) // at least one zone stays on
     expect(s.zones.day.startMinute).toBe(420)
-    expect(s.override).toBe('dusk') // any zone can be locked, configured or not
+    expect(s.override).toBeNull() // Dusk is off, so it cannot be locked
     expect(normalizeTheme({ override: 'noon' } as unknown as ThemeSettings).override).toBeNull()
     expect(normalizeTheme(null)).toEqual(defaultThemeSettings())
+  })
+
+  it('allows Day to be off while another zone is on', () => {
+    const s = normalizeTheme({
+      zones: { day: { configured: false, startMinute: 420 }, night: { configured: true, startMinute: 1260 } },
+    } as unknown as ThemeSettings)
+    expect(configuredZones(s.zones)).toEqual(['night'])
+  })
+
+  it('works out whether the clock is followed from the zones that are on', () => {
+    expect(normalizeTheme({ timeBasedEnabled: true } as unknown as ThemeSettings).timeBasedEnabled).toBe(false) // one zone
+    const two = normalizeTheme({ timeBasedEnabled: false, zones: { night: { configured: true, startMinute: 1260 } } } as unknown as ThemeSettings)
+    expect(two.timeBasedEnabled).toBe(true)
+  })
+
+  it('keeps a lock only on a zone that is on', () => {
+    const base = { zones: { night: { configured: true, startMinute: 1260 } } }
+    expect(normalizeTheme({ ...base, override: 'night' } as unknown as ThemeSettings).override).toBe('night')
+    expect(normalizeTheme({ ...base, override: 'dawn' } as unknown as ThemeSettings).override).toBeNull()
+  })
+
+  it('starts an account with no hue list from the hues its zones use, each role linked to its swatch', () => {
+    const day = { theme: { h: 10 }, accent: { h: 20 }, alert: { h: 10 }, accent2: { h: 40 } }
+    const night = { theme: { h: 20 }, accent: { h: 50 }, alert: { h: 40 }, accent2: { h: 60 } }
+    const s = normalizeTheme({
+      zones: { day: { configured: true, startMinute: 420, palette: day }, night: { configured: true, startMinute: 1260, palette: night } },
+    } as unknown as ThemeSettings)
+    expect(s.hues).toEqual([{ id: 'h1', h: 10 }, { id: 'h2', h: 20 }, { id: 'h3', h: 40 }, { id: 'h4', h: 50 }, { id: 'h5', h: 60 }])
+    expect(s.zones.day.links).toEqual({ theme: 'h1', accent: 'h2', alert: 'h1', accent2: 'h3' })
+    expect(s.zones.night.links).toEqual({ theme: 'h2', accent: 'h4', alert: 'h3', accent2: 'h5' })
+    // Seeding is stable: what was seeded is kept as it is.
+    expect(normalizeTheme(s)).toEqual(s)
+  })
+
+  it('keeps a role whose hue did not fit in the ten as it was, unlinked', () => {
+    const palette = (a: number) => ({ theme: { h: a }, accent: { h: a + 1 }, alert: { h: a + 2 }, accent2: { h: a + 3 } })
+    const s = normalizeTheme({
+      zones: {
+        dawn: { configured: true, startMinute: 240, palette: palette(0) },
+        day: { configured: true, startMinute: 600, palette: palette(10) },
+        dusk: { configured: true, startMinute: 960, palette: palette(20) },
+      },
+    } as unknown as ThemeSettings)
+    expect(s.hues).toHaveLength(10)
+    expect(s.zones.dusk.links.accent2).toBeUndefined()
+    expect(s.zones.dusk.palette.accent2.h).toBe(23)
+  })
+
+  it('repairs the links: a link to a swatch that is gone is dropped, a linked role takes its swatch\'s hue', () => {
+    const given = {
+      hues: [{ id: 'a', h: 77 }, { id: 'b', h: 5 }, { id: 'a', h: 1 }, { id: 'bad id', h: 3 }, { id: 'c', h: 999 }],
+      zones: {
+        day: {
+          configured: true, startMinute: 420,
+          palette: { theme: { h: 1 }, accent: { h: 2 }, alert: { h: 3 }, accent2: { h: 4 } },
+          links: { theme: 'a', accent: 'gone', alert: 'b', accent2: 7 },
+        },
+      },
+    }
+    const s = normalizeTheme(given as unknown as ThemeSettings)
+    expect(s.hues).toEqual([{ id: 'a', h: 77 }, { id: 'b', h: 5 }, { id: 'c', h: 360 }])
+    expect(s.zones.day.links).toEqual({ theme: 'a', alert: 'b' })
+    expect(s.zones.day.palette).toEqual({ theme: { h: 77 }, accent: { h: 2 }, alert: { h: 5 }, accent2: { h: 4 } })
+  })
+
+  it('gives a zone that is off no links', () => {
+    const given = {
+      zones: { day: { configured: true, startMinute: 420 }, dusk: { configured: false, startMinute: 1080, links: { theme: 'h1' } } },
+    }
+    expect(normalizeTheme(given as unknown as ThemeSettings).zones.dusk.links).toEqual({})
   })
 
   it('keeps just the hues of a palette saved by an older version', () => {
@@ -131,13 +241,19 @@ describe('enable / disable / normalize', () => {
 })
 
 describe('activeZone', () => {
-  it('uses Day when time-based theming is off, an override otherwise wins', () => {
-    let s = withZones({ day: 420, night: 1260 })
-    expect(clockZone(s, at(23))).toBe('day')
-    expect(activeZone(s, at(23))).toBe('day')
-    s = { ...s, timeBasedEnabled: true }
+  it('follows the schedule with two zones or more, and an override wins', () => {
+    const s = withZones({ day: 420, night: 1260 })
+    expect(clockZone(s, at(23))).toBe('night')
+    expect(clockZone(s, at(9))).toBe('day')
     expect(activeZone(s, at(23))).toBe('night')
     expect(activeZone({ ...s, override: 'day' }, at(23))).toBe('day')
+  })
+
+  it('is the one zone that is on, whatever the time, even when it is not Day', () => {
+    const s = disableZone(enableZone(defaultThemeSettings(), 'night'), 'day')
+    expect(clockZone(s, at(9))).toBe('night')
+    expect(clockZone(s, at(23))).toBe('night')
+    expect(clockZone(defaultThemeSettings(), at(3))).toBe('day')
   })
 })
 

@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { readableLightness, skyLook } from './skyLook'
+import { OFF_SKY_SATURATION, readableLightness, skyLook } from './skyLook'
 import { TEXT_TARGET, ratioOfRgb, rgbOf } from './readable'
 import { ZONE_LOOKS, resolvePalette } from './zoneLooks'
 import { ZONE_KEYS, type ZonePalette } from './types'
@@ -22,6 +22,19 @@ describe('skyLook', () => {
         for (const bg of look.backgrounds) expect(ratioOfRgb(colorOf(text), bg)).toBeGreaterThanOrEqual(4.5)
       }
     }
+  })
+
+  it.each(ZONE_KEYS)('%s: a sky at a share of its saturation is less colourful, and its text still reads on it', zone => {
+    const theme = (h: number): ZonePalette => ({ theme: { h }, accent: { h }, alert: { h }, accent2: { h } }) // what a zone that is off is painted with
+    expect(OFF_SKY_SATURATION).toBeLessThan(1)
+    for (const h of HUES) {
+      const full = skyLook(zone, theme(h))
+      const muted = skyLook(zone, theme(h), OFF_SKY_SATURATION)
+      for (const bg of muted.backgrounds) expect(ratioOfRgb(colorOf(muted.text), bg)).toBeGreaterThanOrEqual(4.5)
+      // The sky differs from the unscaled one (the day sky is one flat colour of the accent, so it shows plainly).
+      if (zone === 'day') expect(muted.sky).not.toBe(full.sky)
+    }
+    expect(skyLook(zone, palette(40), 1)).toEqual(skyLook(zone, palette(40))) // 1 is the default
   })
 
   it('locked text sits between the text and the sky, never on the far side of either', () => {

@@ -12,6 +12,18 @@ describe('nextZone', () => {
     expect(nextZone('dusk')).toBe('night')
     expect(nextZone('night')).toBe('dawn')
   })
+
+  it('steps over the zones that are not available', () => {
+    expect(nextZone('day', ['day', 'night'])).toBe('night')
+    expect(nextZone('night', ['day', 'night'])).toBe('day')
+    expect(nextZone('dawn', ['dusk'])).toBe('dusk')
+    expect(nextZone('night', ['dusk', 'night'])).toBe('dusk')
+  })
+
+  it('is the zone itself when it is the only one', () => {
+    expect(nextZone('day', ['day'])).toBe('day')
+    expect(nextZone('dusk', [])).toBe('dusk')
+  })
 })
 
 describe('moonPhase', () => {

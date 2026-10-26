@@ -1,4 +1,7 @@
 import { DEFAULT_UI_SETTINGS, defaultThemeSettings } from '../theme/defaults'
+import { addHue, assignHue } from '../theme/themeHues'
+import { ZONE_KEYS, type ThemeSettings } from '../theme/types'
+import { enableZone } from '../theme/zones'
 import type { OutlineNode, OutlineTree, PlotNode, PlotTree, ProjectIndex, ProjectSummaryResponse, Publication } from '../api/types'
 import type { DraftChapter, ProjectAnalytics } from '../types'
 import type { Holding, ReaderState } from '../api/reader'
@@ -22,6 +25,19 @@ const lorem = (i: number, count = 1) => Array.from({ length: count }, (_, k) => 
 const words = (text: string) => text.split(/\s+/).filter(Boolean).length
 
 export const FIXTURE_PROJECT_ID = 'prj-lorem'
+
+// The account theme the previews run on: every time of day on (so the theme panel shows the day bar and four cards), at the times of a
+// typical day, with two more hues in the list and Night and Dusk using them.
+const PREVIEW_STARTS = { dawn: 330, day: 420, dusk: 1080, night: 1260 } as const
+export function previewTheme(): ThemeSettings {
+  let theme = defaultThemeSettings()
+  for (const zone of ['dawn', 'dusk', 'night'] as const) theme = enableZone(theme, zone)
+  theme = addHue(addHue(theme, 120), 60)
+  theme = assignHue(assignHue(theme, 'night', 'accent', 'h5'), 'dusk', 'alert', 'h6')
+  const zones = { ...theme.zones }
+  for (const zone of ZONE_KEYS) zones[zone] = { ...zones[zone], startMinute: PREVIEW_STARTS[zone] }
+  return { ...theme, zones }
+}
 export const FIXTURE_IDS = { series: 's1', book: 'b1', otherBook: 'b2', chapter: 'c1', secondChapter: 'c2' } as const
 
 const NOW = '2026-01-15T09:00:00.000Z'
@@ -181,7 +197,7 @@ export function createMockBackend() {
   async function handle(method: string, path: string, body: unknown): Promise<Response> {
     const [bare, search = ''] = path.split('?')
     const parts = bare.split('/').filter(Boolean).map(decodeURIComponent)
-    if (parts[0] === 'user-settings') return json({ theme: defaultThemeSettings(), ui: DEFAULT_UI_SETTINGS, kv: {}, migratedFromLocal: true })
+    if (parts[0] === 'user-settings') return json({ theme: previewTheme(), ui: DEFAULT_UI_SETTINGS, kv: {}, migratedFromLocal: true })
     if (parts[0] === 'resources') return json({ schemaVersion: 1, nodes: [], content: {} })
     if (parts[0] === 'presets') { const answer = presets.route(method, parts.slice(1), body); return json(answer.body, answer.status) }
     if (parts[0] === 'reader') return socialRoute(method, parts.slice(1), body) ?? readerRoute(method, parts.slice(1), body)

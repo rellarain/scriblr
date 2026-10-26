@@ -1,24 +1,29 @@
 import { useEffect, useRef, useState, type KeyboardEvent, type MouseEvent as ReactMouseEvent } from 'react'
-import { setTheme, useSettings } from '../settings/settingsStore'
 import { ZONE_ICON } from './zoneIcons'
 import { readableInk } from './contrast'
 import { configuredZones, formatMinute, HOUR, MAX_HOUR_START, moveZoneStart, resetZoneStart, STEP_MINUTES } from './zones'
 import { hslCss } from './palettes'
 import { resolvePalette } from './zoneLooks'
-import { ZONE_LABEL, type ZoneKey } from './types'
+import { ZONE_LABEL, type ThemeSettings, type ZoneKey } from './types'
 
 // 24h strip showing which zone is in effect when. Each segment is a midtone of its zone's accent (its accent hue and saturation at 50%
-// lightness); every zone except the one being edited is a little dimmer.
+// lightness); when a zone is `selected`, the others are a little dimmer.
 //
-// Where a zone begins is a handle on the strip (the seam you see, even with Day alone): drag it and it snaps to the nearest hour, the
-// time showing in a bubble above it, and the zone's "Starts at" follows. A handle that meets the next one pushes it along, so zones
-// keep their order and at least an hour each. The arrow keys move it an hour (Shift: 10 minutes); a double click puts the zone back
-// to its default time. Grabbing a handle selects its zone.
+// Where a zone begins is a handle on the strip (the seam you see, even with one zone alone): drag it and it snaps to the nearest hour,
+// the time showing in a bubble above it; it is the only place a zone's start time is set. A handle that meets the next one pushes it
+// along, so zones keep their order and at least an hour each. The arrow keys move it an hour (Shift: 10 minutes); a double click puts
+// the zone back to its default time. Grabbing a handle selects its zone (when the parent listens).
+//
+// It shows and edits the `theme` it is given (the panel's staged draft); every edit goes out through `onChange`.
 
 const snapToHour = (minute: number) => Math.min(MAX_HOUR_START, Math.max(0, Math.round(minute / HOUR) * HOUR))
 
-export function ThemeTimeline({ selected, onSelect }: { selected: ZoneKey; onSelect: (zone: ZoneKey) => void }) {
-  const { theme } = useSettings()
+export function ThemeTimeline({ theme, onChange, selected = null, onSelect }: {
+  theme: ThemeSettings
+  onChange: (change: (theme: ThemeSettings) => ThemeSettings) => void
+  selected?: ZoneKey | null
+  onSelect?: (zone: ZoneKey) => void
+}) {
   const order = configuredZones(theme.zones)
   const barRef = useRef<HTMLDivElement>(null)
   const [dragging, setDragging] = useState<ZoneKey | null>(null)
@@ -46,7 +51,7 @@ export function ThemeTimeline({ selected, onSelect }: { selected: ZoneKey; onSel
       const box = bar.getBoundingClientRect()
       if (box.width <= 0) return
       const minute = snapToHour(((e.clientX - box.left) / box.width) * 1440)
-      setTheme(prev => moveZoneStart(prev, dragging, minute))
+      onChange(prev => moveZoneStart(prev, dragging, minute))
     }
     const end = () => setDragging(null)
     const { userSelect, cursor } = document.body.style
@@ -60,13 +65,13 @@ export function ThemeTimeline({ selected, onSelect }: { selected: ZoneKey; onSel
       document.body.style.userSelect = userSelect
       document.body.style.cursor = cursor
     }
-  }, [dragging])
+  }, [dragging, onChange])
 
   const press = (key: ZoneKey) => (e: ReactMouseEvent<HTMLButtonElement>) => {
     if (e.button !== 0) return
     e.preventDefault()
     e.currentTarget.focus()
-    onSelect(key)
+    onSelect?.(key)
     setDragging(key)
   }
   const keys = (key: ZoneKey) => (e: KeyboardEvent<HTMLButtonElement>) => {
@@ -74,7 +79,7 @@ export function ThemeTimeline({ selected, onSelect }: { selected: ZoneKey; onSel
     if (dir === 0) return
     e.preventDefault()
     const step = e.shiftKey ? STEP_MINUTES : HOUR
-    setTheme(prev => moveZoneStart(prev, key, prev.zones[key].startMinute + dir * step))
+    onChange(prev => moveZoneStart(prev, key, prev.zones[key].startMinute + dir * step))
   }
 
   return (
@@ -88,7 +93,7 @@ export function ThemeTimeline({ selected, onSelect }: { selected: ZoneKey; onSel
             return (
               <span
                 key={`${seg.key}-${i}`}
-                className={seg.key === selected ? 'themeTimelineSeg' : 'themeTimelineSeg themeTimelineSeg--dim'}
+                className={selected === null || seg.key === selected ? 'themeTimelineSeg' : 'themeTimelineSeg themeTimelineSeg--dim'}
                 style={{ left: `${(seg.from / 1440) * 100}%`, width: `${((seg.to - seg.from) / 1440) * 100}%`, backgroundColor: hslCss(fill), color: hslCss(readableInk(fill)) }}
                 title={`${ZONE_LABEL[seg.key]}: ${formatMinute(seg.from % 1440)} - ${formatMinute(seg.to % 1440)}`}
               >
@@ -107,8 +112,8 @@ export function ThemeTimeline({ selected, onSelect }: { selected: ZoneKey; onSel
               aria-label={`${ZONE_LABEL[key]} starts at`} aria-orientation="horizontal"
               aria-valuemin={0} aria-valuemax={MAX_HOUR_START} aria-valuenow={start} aria-valuetext={formatMinute(start)}
               title={`${ZONE_LABEL[key]} starts at ${formatMinute(start)}. Drag to move it; double-click for its default.`}
-              onMouseDown={press(key)} onKeyDown={keys(key)} onFocus={() => onSelect(key)}
-              onDoubleClick={() => setTheme(prev => resetZoneStart(prev, key))}
+              onMouseDown={press(key)} onKeyDown={keys(key)} onFocus={() => onSelect?.(key)}
+              onDoubleClick={() => onChange(prev => resetZoneStart(prev, key))}
             >
               <span className="themeTimelineBubble" aria-hidden="true">{formatMinute(start)}</span>
             </button>

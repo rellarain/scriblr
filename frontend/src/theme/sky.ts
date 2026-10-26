@@ -4,7 +4,16 @@ import { ZONE_KEYS, type ZoneKey } from './types'
 // next, the moon's phase, today's zodiac constellation, the cloud strips and
 // where the sun and moon sit.
 
-export const nextZone = (zone: ZoneKey): ZoneKey => ZONE_KEYS[(ZONE_KEYS.indexOf(zone) + 1) % ZONE_KEYS.length]
+// The zone after `zone` in the day's order (dawn, day, dusk, night, round to dawn), among those in `available` (all four when omitted).
+// With nothing else available it is `zone` itself.
+export function nextZone(zone: ZoneKey, available: readonly ZoneKey[] = ZONE_KEYS): ZoneKey {
+  const at = ZONE_KEYS.indexOf(zone)
+  for (let step = 1; step <= ZONE_KEYS.length; step += 1) {
+    const candidate = ZONE_KEYS[(at + step) % ZONE_KEYS.length]
+    if (available.includes(candidate)) return candidate
+  }
+  return zone
+}
 
 // --- the moon ---
 

@@ -60,9 +60,11 @@ export function normalizeAutosaveSeconds(value: unknown): number {
   return AUTOSAVE_SECONDS.reduce((best, s) => (Math.abs(s - n) < Math.abs(best - n) ? s : best), AUTOSAVE_SECONDS[0]) as number
 }
 
+// "View as" (previewing the other role) had its switch in the theme panel; with the switch gone nothing could turn it off, so a role
+// previewed earlier is let go here (the field stays in the saved file, for the backend's schema).
 function normalizeUi(ui: Partial<UiSettings> | undefined): UiSettings {
   const merged = { ...DEFAULT_UI_SETTINGS, ...(ui ?? {}) }
-  return { ...merged, autosaveEnabled: merged.autosaveEnabled === true, autosaveSeconds: normalizeAutosaveSeconds(merged.autosaveSeconds) }
+  return { ...merged, viewAs: null, autosaveEnabled: merged.autosaveEnabled === true, autosaveSeconds: normalizeAutosaveSeconds(merged.autosaveSeconds) }
 }
 
 function readCache(): { theme: ThemeSettings; ui: UiSettings } {

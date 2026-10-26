@@ -448,10 +448,11 @@ The Writer's design system is in `docs/design-system/` and published as a Design
 ## Theming (time-of-day palettes)
 
 The shell (`frontend/src/App.tsx`) is themed by four optional time zones —
-**Dawn, Day, Dusk, Night**. Day is always on (and is the palette used when
-time-based theming is off); the others are opt-in. Each zone has a start time
-(10-minute steps; a zone runs until the next configured zone starts, wrapping
-past midnight) and four **hues** the user chooses: **theme** (inert/read-only),
+**Dawn, Day, Dusk, Night**. Any zone can be on or off but at least one is on;
+with two or more on the app follows the clock, with one it is always that one.
+Each zone has a start time (10-minute steps, set on the day bar; a zone runs until
+the next one that is on starts, wrapping past midnight) and four **hues** the user
+chooses (from the account's list of up to ten hues, below): **theme** (inert/read-only),
 **accent** (interactive/active), **alert** (needs attention), and an admin-only
 **admin accent** (admin features). Everything else is the zone's fixed **look**
 (`theme/zoneLooks.ts`), so text stays readable:
@@ -501,9 +502,9 @@ only the hues are kept.
   don't hard-code whites/black overlays/fixed lightness in new styles, use those.
 - **UI:** the **sky toggle** (`theme/SkyToggle.tsx`) sits in the header, right of the
   Writer button: 120x30, a painted sky with two buttons. The left one (sun or moon)
-  steps to the next zone (dawn > day > dusk > night, all four, configured or not)
+  steps to the next zone that is on (dawn > day > dusk > night)
   and **locks** it; the right one (time and date, dimmed while locked) goes back to
-  following the clock and turns time-based theming on. The sky per zone is built
+  following the clock. The sky per zone is built
   from the zone's hues in `theme/skyLook.ts` (only the time text is adjusted to keep
   the 45-point gap); `theme/sky.ts` holds the pure parts: the moon's phase (accent-coloured
   and saturated at night; small and muted beside the always-white sun at dawn and dusk), today's zodiac constellation (real star-chart
@@ -512,12 +513,22 @@ only the hues are kept.
   shorter and narrower than the one below, with an occasional circle; gaps 0-100px,
   two layers drifting at 1.5 and 0.8 px/s from a random start; still under reduced motion, paused while the window
   is hidden) and the sun/moon heights; `theme/SkyScene.tsx` draws them. The
-  customization tool is UUI Dashboard > Settings (`theme/ThemeSettingsPanel.tsx`),
-  whose four zone tabs are the same 120x30 sky (`theme/SkyZoneTab.tsx`): each in its
-  own zone's sky, the zone name where the time goes and its start time (or "Off")
-  where the date goes. "View as: User/Admin"
-  there previews the other role (there are no real accounts yet: the role comes
-  from `userSeed.ts`).
+  customization tool is UUI Dashboard > Settings (`theme/ThemeSettingsPanel.tsx`), also
+  embedded in Account > Settings: the account's **list of hues** (up to ten,
+  `ThemeSettings.hues`, `theme/HueList.tsx`), the **day bar** (`ThemeTimeline.tsx`, the only
+  place a start time is set) and a **card per zone** (`ZoneCard.tsx`) whose header is the
+  same sky scaled up (`SkyZoneCard.tsx`; press it to turn the zone on or off, a zone that
+  is off is only its header, painted subtly from the theme hue in use), and, while on, a
+  slot per colour (`RoleSlot.tsx`: theme, accent, alert and, for admins, admin accent)
+  showing ten shades of its hue. A hue is dragged (or clicked, then the colour clicked)
+  onto a slot; each zone's `links` say which swatch each colour uses, and the palette's hue
+  is always kept equal to its swatch's, so nothing that reads a palette knows about links
+  (`theme/themeHues.ts` holds the pure operations: assign, swap within a zone, copy between
+  zones, add, edit, move, remove a hue that is not in use). Turning a zone off clears its
+  colours; turning one on copies the previous zone's. Edits are staged in a shared draft
+  (`theme/themeDraft.ts`) the rest of the app does not see until Save (`SettingsSaveCluster`
+  commits it; Undo steps through it; leaving drops it). "View as" is gone (a role
+  previewed earlier is let go when the settings load; the role comes from `userSeed.ts`).
 - **Persistence:** `user-settings.json` (backend, see the API table) is the source
   of truth; `settings/settingsStore.ts` keeps a synchronous localStorage cache
   (so the first paint is already themed) and writes through, debounced. The

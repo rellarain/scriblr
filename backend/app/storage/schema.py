@@ -988,6 +988,10 @@ class ProjectFile(BaseModel):
 # saturation per colour and a brightness; they still load (extra fields are
 # ignored) and are dropped the next time the settings are saved.
 #
+# The account's hue list (ThemeSettings.hues, up to ten swatches) and each zone's links (which swatch each role uses) are optional with
+# defaults, so a file saved without them still loads; the frontend seeds them from the hues in use (frontend/src/theme/zones.ts).
+# A role's hue in the palette is always kept equal to its linked swatch's, so nothing that reads the palette needs to know about links.
+#
 # Only value RANGES are validated here. A validation failure would quarantine
 # the whole file, so anything subtler is left to the client to normalize on load.
 # ---------------------------------------------------------------------------
@@ -1006,11 +1010,31 @@ class ZonePalette(BaseModel):
     accent2: ThemeHue
 
 
+THEME_HUES_MAX = 10
+
+
+class ThemeSwatch(BaseModel):
+    """A hue in the account's list: roles are dropped onto it, and editing it changes every role that uses it."""
+
+    id: str = Field(pattern=r"^[A-Za-z0-9_-]{1,40}$")
+    h: int = Field(ge=0, le=360)
+
+
+class ZoneLinks(BaseModel):
+    """The id of the swatch each role of a zone uses (None = not linked to one)."""
+
+    theme: Optional[str] = None
+    accent: Optional[str] = None
+    alert: Optional[str] = None
+    accent2: Optional[str] = None
+
+
 class ZoneConfig(BaseModel):
     configured: bool
     # Minutes after midnight, in 10-minute steps.
     startMinute: int = Field(ge=0, le=1430)
     palette: ZonePalette
+    links: ZoneLinks = Field(default_factory=ZoneLinks)
 
     @field_validator("startMinute")
     @classmethod
@@ -1031,6 +1055,7 @@ class ThemeSettings(BaseModel):
     timeBasedEnabled: bool = False
     override: Optional[ZoneKey] = None
     zones: ThemeZones
+    hues: list[ThemeSwatch] = Field(default_factory=list, max_length=THEME_HUES_MAX)
 
 
 class UiSettings(BaseModel):

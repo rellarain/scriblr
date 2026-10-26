@@ -3,6 +3,8 @@ import { act, renderHook } from '@testing-library/react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { useStoredState } from '../assets/Interfaces/writer/storage'
 import { DEFAULT_UI_SETTINGS, defaultThemeSettings } from '../theme/defaults'
+import type { ThemeSettings } from '../theme/types'
+import { disableZone, enableZone } from '../theme/zones'
 import { mockFetch } from '../test/mockFetch'
 import {
   __resetSettingsForTests, flushSettings, getAutosavePolicy, getKv, getSettings, initSettings, normalizeAutosaveSeconds, restoreSettings,
@@ -10,6 +12,12 @@ import {
 } from './settingsStore'
 
 interface Call { url: string; method: string; body: unknown; keepalive?: boolean }
+
+// A sample change to the theme that survives normalizing (whether the app follows the clock is worked out from the zones that are on): Dusk on or off.
+const enableDusk = (t: ThemeSettings) => enableZone(t, 'dusk')
+const disableDusk = (t: ThemeSettings) => disableZone(t, 'dusk')
+const toggleDusk = (t: ThemeSettings) => (t.zones.dusk.configured ? disableDusk(t) : enableDusk(t))
+const duskOn = () => getSettings().theme.zones.dusk.configured
 
 function remote(over: Record<string, unknown> = {}) {
   return {
@@ -70,7 +78,7 @@ describe('kv writes', () => {
 
   it('flushes pending writes immediately with keepalive', () => {
     setKv('scriblr.writer.a', 1)
-    setTheme(t => ({ ...t, timeBasedEnabled: true }))
+    setTheme(enableDusk)
     flushSettings()
     expect(calls.map(c => c.url).sort()).toEqual(['/api/user-settings/kv/scriblr.writer.a', '/api/user-settings/theme'])
     expect(calls.every(c => c.keepalive)).toBe(true)
@@ -93,12 +101,16 @@ describe('kv writes', () => {
 
 describe('theme', () => {
   it('normalizes what is set and caches it', () => {
-    setTheme(t => ({ ...t, override: 'night' })) // any zone can be locked, configured or not
+    setTheme(t => ({ ...t, override: 'night' })) // a zone that is off cannot be locked
+    expect(getSettings().theme.override).toBeNull()
+    setTheme(t => ({ ...enableZone(t, 'night'), override: 'night' }))
     expect(getSettings().theme.override).toBe('night')
     setTheme(t => ({ ...t, override: 'noon' as never }))
     expect(getSettings().theme.override).toBeNull()
-    setTheme(t => ({ ...t, timeBasedEnabled: true }))
+    setTheme(enableDusk)
+    expect(getSettings().theme.timeBasedEnabled).toBe(true) // three zones are on, so the clock is followed
     const cache = JSON.parse(window.localStorage.getItem('scriblr.settings.cache')!)
+    expect(cache.theme.zones.dusk.configured).toBe(true)
     expect(cache.theme.timeBasedEnabled).toBe(true)
   })
 })
@@ -107,7 +119,7 @@ describe('initSettings', () => {
   it('applies the backend copy, and the backend wins for kv', async () => {
     window.localStorage.setItem('scriblr.writer.chapterMode', JSON.stringify('outline'))
     const theme = defaultThemeSettings()
-    theme.zones.day.palette.accent.h = 60
+    theme.hues = theme.hues.map(h => (h.id === 'h2' ? { ...h, h: 60 } : h)) // the swatch Day's accent uses
     respond = () => remote({ theme, kv: { 'scriblr.writer.chapterMode': 'draft' } })
     await initSettings()
     expect(getSettings().loaded).toBe(true)
@@ -184,14 +196,14 @@ describe('save status', () => {
     const { result } = renderHook(() => useSettingsSaveStatus())
     expect(result.current.state).toBe('saved')
 
-    act(() => { setTheme(t => ({ ...t, timeBasedEnabled: true })) })
+    act(() => { setTheme(enableDusk) })
     expect(result.current.state).toBe('unsaved')
 
     await act(async () => { await flushSettings() })
     expect(result.current.state).toBe('saved')
 
     vi.stubGlobal('fetch', vi.fn(async () => ({ ok: false, status: 500, json: async () => ({}) })))
-    act(() => { setTheme(t => ({ ...t, timeBasedEnabled: false })) })
+    act(() => { setTheme(disableDusk) })
     await act(async () => { await flushSettings() })
     expect(result.current.state).toBe('error')
     expect(result.current.dirty).toBe(true)
@@ -230,7 +242,7 @@ describe('autosave setting', () => {
     act(() => { setUi(u => ({ ...u, autosaveSeconds: 300 })) })
     await act(async () => { await vi.advanceTimersByTimeAsync(1000) })
     calls = []
-    act(() => { setTheme(t => ({ ...t, timeBasedEnabled: true })) })
+    act(() => { setTheme(enableDusk) })
     await act(async () => { await vi.advanceTimersByTimeAsync(299_000) })
     expect(themePuts()).toHaveLength(0)
     await act(async () => { await vi.advanceTimersByTimeAsync(2000) })
@@ -242,10 +254,10 @@ describe('autosave setting', () => {
     await act(async () => { await vi.advanceTimersByTimeAsync(1000) }) // the setting itself is saved promptly
     expect(calls.some(c => c.url.endsWith('/user-settings/ui') && (c.body as { autosaveEnabled: boolean }).autosaveEnabled === false)).toBe(true)
     calls = []
-    act(() => { setTheme(t => ({ ...t, timeBasedEnabled: true })) })
+    act(() => { setTheme(enableDusk) })
     await act(async () => { await vi.advanceTimersByTimeAsync(700_000) })
     expect(themePuts()).toHaveLength(0)
-    expect(getSettings().theme.timeBasedEnabled).toBe(true)
+    expect(duskOn()).toBe(true)
     await act(async () => { await flushSettings() })
     expect(themePuts()).toHaveLength(1)
   })
@@ -254,7 +266,7 @@ describe('autosave setting', () => {
     act(() => { setUi(u => ({ ...u, autosaveEnabled: false })) })
     await act(async () => { await vi.advanceTimersByTimeAsync(1000) })
     calls = []
-    act(() => { setTheme(t => ({ ...t, timeBasedEnabled: true })) })
+    act(() => { setTheme(enableDusk) })
     act(() => { setUi(u => ({ ...u, autosaveEnabled: true, autosaveSeconds: 300 })) })
     await act(async () => { await vi.advanceTimersByTimeAsync(0) })
     expect(themePuts()).toHaveLength(1)
@@ -266,11 +278,11 @@ describe('restoreSettings', () => {
     const saved = defaultThemeSettings()
     respond = call => (call.method === 'GET' ? remote({ theme: saved }) : remote())
     const { result } = renderHook(() => useSettingsSaveStatus())
-    act(() => { setTheme(t => ({ ...t, timeBasedEnabled: true })) })
-    expect(getSettings().theme.timeBasedEnabled).toBe(true)
+    act(() => { setTheme(enableDusk) })
+    expect(duskOn()).toBe(true)
     expect(result.current.dirty).toBe(true)
     await act(async () => { await restoreSettings() })
-    expect(getSettings().theme.timeBasedEnabled).toBe(false)
+    expect(duskOn()).toBe(false)
     expect(result.current.dirty).toBe(false)
     await act(async () => { await vi.advanceTimersByTimeAsync(60_000) })
     expect(calls.filter(c => c.method === 'PUT')).toHaveLength(0) // the dropped change is never sent
@@ -283,38 +295,38 @@ describe('undo and redo of the settings', () => {
   it('steps back an unsaved change, shown as an unsaved change, and forward again', async () => {
     const { result } = renderHook(() => useSettingsHistory())
     expect(result.current).toEqual({ canUndo: false, canRedo: false })
-    act(() => { setTheme(t => ({ ...t, timeBasedEnabled: !t.timeBasedEnabled })) })
-    const changed = getSettings().theme.timeBasedEnabled
+    act(() => { setTheme(toggleDusk) })
+    const changed = duskOn()
     expect(result.current.canUndo).toBe(true)
 
     act(() => { undoSettings() })
-    expect(getSettings().theme.timeBasedEnabled).toBe(!changed)
+    expect(duskOn()).toBe(!changed)
     expect(result.current).toEqual({ canUndo: false, canRedo: true })
 
     act(() => { redoSettings() })
-    expect(getSettings().theme.timeBasedEnabled).toBe(changed)
+    expect(duskOn()).toBe(changed)
     expect(result.current.canRedo).toBe(false)
     // Each is sent like any other change: the last value is what gets saved.
     await act(async () => { await flushSettings() })
-    expect(themePuts().at(-1)?.body).toMatchObject({ timeBasedEnabled: changed })
+    expect(themePuts().at(-1)?.body).toMatchObject({ zones: { dusk: { configured: changed } } })
   })
 
   it('does not undo the autosave choice, and a new change clears redo', () => {
     const { result } = renderHook(() => useSettingsHistory())
-    act(() => { setTheme(t => ({ ...t, timeBasedEnabled: !t.timeBasedEnabled })) })
+    act(() => { setTheme(toggleDusk) })
     act(() => { setAutosaveMode(600) })
     expect(getSettings().ui.autosaveSeconds).toBe(600)
     act(() => { undoSettings() })
     expect(getSettings().ui.autosaveSeconds).toBe(600) // kept
     expect(result.current.canRedo).toBe(true)
-    act(() => { setTheme(t => ({ ...t, timeBasedEnabled: !t.timeBasedEnabled })) })
+    act(() => { setTheme(toggleDusk) })
     expect(result.current.canRedo).toBe(false)
   })
 
   it("goes on into today's log once the history in memory is used up", async () => {
     const now = new Date().toISOString()
     const before = defaultThemeSettings()
-    const earlier = { ...before, timeBasedEnabled: !before.timeBasedEnabled }
+    const earlier = enableZone(before, 'dusk')
     respond = call => (call.url.endsWith('/user-settings/activity')
       ? [{ id: 'slog_1', createdAt: now, kind: 'theme', label: 'Theme changed', before: { theme: earlier } }]
       : remote())
@@ -323,7 +335,7 @@ describe('undo and redo of the settings', () => {
     await act(async () => { await vi.advanceTimersByTimeAsync(0) })
     expect(result.current.canUndo).toBe(true) // from the log, nothing in memory
     act(() => { undoSettings() })
-    expect(getSettings().theme.timeBasedEnabled).toBe(earlier.timeBasedEnabled)
+    expect(duskOn()).toBe(earlier.zones.dusk.configured)
     expect(result.current).toEqual({ canUndo: false, canRedo: true })
   })
 
@@ -343,7 +355,7 @@ describe('the autosave countdown', () => {
     const { result } = renderHook(() => useSettingsCountdown())
     expect(result.current).toEqual({ nextSaveAt: null, wait: 60_000 })
     vi.setSystemTime(new Date('2026-01-01T00:00:00Z'))
-    act(() => { setTheme(t => ({ ...t, timeBasedEnabled: !t.timeBasedEnabled })) })
+    act(() => { setTheme(toggleDusk) })
     expect(result.current.nextSaveAt).toBe(Date.now() + 60_000)
     await act(async () => { await vi.advanceTimersByTimeAsync(61_000) })
     expect(result.current.nextSaveAt).toBeNull()

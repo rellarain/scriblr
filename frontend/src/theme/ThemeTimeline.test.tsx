@@ -1,6 +1,7 @@
 import { act, fireEvent, render, screen } from '@testing-library/react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import { __resetSettingsForTests, getSettings, setTheme } from '../settings/settingsStore'
+import { __resetSettingsForTests, setTheme } from '../settings/settingsStore'
+import { discardThemeDraft, editThemeDraft, getThemeDraft, useThemeDraft } from './themeDraft'
 import { enableZone } from './zones'
 import { ThemeTimeline } from './ThemeTimeline'
 import type { ZoneKey } from './types'
@@ -13,12 +14,19 @@ function stubStrip() {
     return { width: wide ? 1440 : 0, height: 26, x: 0, y: 0, top: 0, left: 0, right: wide ? 1440 : 0, bottom: 26, toJSON: () => ({}) } as DOMRect
   })
 }
-const start = (key: ZoneKey) => getSettings().theme.zones[key].startMinute
+const start = (key: ZoneKey) => getThemeDraft().theme.zones[key].startMinute
+
+// The strip as the panel uses it: showing the staged draft and editing it.
+function Strip({ selected, onSelect }: { selected?: ZoneKey | null; onSelect?: (zone: ZoneKey) => void }) {
+  const { theme } = useThemeDraft()
+  return <ThemeTimeline theme={theme} onChange={editThemeDraft} selected={selected} onSelect={onSelect} />
+}
 const handle = (key: string) => screen.getByRole('slider', { name: `${key} starts at` })
 
 beforeEach(() => {
   window.localStorage.clear()
   __resetSettingsForTests()
+  discardThemeDraft()
   mockFetch()
   // Day at 10 AM (the default), Dusk at 4 PM and Night at 10 PM.
   setTheme(prev => enableZone(enableZone(prev, 'dusk'), 'night'))
@@ -27,19 +35,20 @@ afterEach(() => { vi.unstubAllGlobals(); vi.restoreAllMocks() })
 
 describe('the timeline\'s handles', () => {
   it('has one for each zone in use, and one for Day alone (the seam it makes on the strip)', () => {
-    const { unmount } = render(<ThemeTimeline selected="day" onSelect={() => {}} />)
+    const { unmount } = render(<Strip selected="day" onSelect={() => {}} />)
     expect(screen.getAllByRole('slider').map(s => s.getAttribute('aria-valuetext'))).toEqual(['10:00 AM', '4:00 PM', '10:00 PM'])
     unmount()
     window.localStorage.clear()
     __resetSettingsForTests()
-    render(<ThemeTimeline selected="day" onSelect={() => {}} />)
+    discardThemeDraft()
+    render(<Strip selected="day" onSelect={() => {}} />)
     expect(screen.getAllByRole('slider').map(s => s.getAttribute('aria-valuetext'))).toEqual(['10:00 AM'])
   })
 
   it('drags a zone\'s start, snapping to the nearest hour, and selects the zone', () => {
     stubStrip()
     const onSelect = vi.fn()
-    render(<ThemeTimeline selected="day" onSelect={onSelect} />)
+    render(<Strip selected="day" onSelect={onSelect} />)
     fireEvent.mouseDown(handle('Dusk'), { button: 0, clientX: 960 })
     expect(onSelect).toHaveBeenCalledWith('dusk')
     act(() => { fireEvent.mouseMove(window, { clientX: 1043 }) }) // 17:23 -> 5 PM
@@ -54,7 +63,7 @@ describe('the timeline\'s handles', () => {
 
   it('pushes the next zone along when it is dragged into it', () => {
     stubStrip()
-    render(<ThemeTimeline selected="dusk" onSelect={() => {}} />)
+    render(<Strip selected="dusk" onSelect={() => {}} />)
     fireEvent.mouseDown(handle('Dusk'), { button: 0, clientX: 960 })
     act(() => { fireEvent.mouseMove(window, { clientX: 1330 }) }) // 22:10 -> 10 PM, where Night begins
     expect(start('dusk')).toBe(1320)
@@ -63,7 +72,7 @@ describe('the timeline\'s handles', () => {
   })
 
   it('moves an hour with the arrow keys, and ten minutes with Shift', () => {
-    render(<ThemeTimeline selected="day" onSelect={() => {}} />)
+    render(<Strip selected="day" onSelect={() => {}} />)
     fireEvent.keyDown(handle('Day'), { key: 'ArrowRight' })
     expect(start('day')).toBe(660)
     fireEvent.keyDown(handle('Day'), { key: 'ArrowLeft', shiftKey: true })
@@ -74,7 +83,7 @@ describe('the timeline\'s handles', () => {
 
   it('goes back to the zone\'s default time on a double click', () => {
     setTheme(prev => ({ ...prev, zones: { ...prev.zones, dusk: { ...prev.zones.dusk, startMinute: 1100 } } }))
-    render(<ThemeTimeline selected="day" onSelect={() => {}} />)
+    render(<Strip selected="day" onSelect={() => {}} />)
     fireEvent.doubleClick(handle('Dusk'))
     expect(start('dusk')).toBe(960)
   })

@@ -42,6 +42,27 @@ export function derivedShades(pal: ZonePalette, key: PaletteKey, zone: ZoneKey):
 // Even steps from light to dark at the colour's own hue and saturation.
 export const TINT_LIGHTNESS = [90, 80, 70, 60, 50, 40, 30, 20, 10]
 
+// The strip under a role in the account theme panel (display only): ten shades of the role's hue at its zone's saturation, SHADE_STEP
+// points of lightness apart, darkest first, with the role's own colour among them (key 'own') in the sixth place (five darker, four
+// brighter). Near the top or bottom of the range the run moves to stay between SHADE_MIN and SHADE_MAX, the own colour keeping its exact
+// lightness.
+export const SHADE_STEP = 6
+export const SHADE_MIN = 4
+export const SHADE_MAX = 96
+export const SHADE_COUNT = 10
+
+export function shadeStrip(pal: ZonePalette, zone: ZoneKey, key: PaletteKey): Swatch[] {
+  const src = resolvePalette(pal, zone)[key]
+  const room = (from: number, to: number) => Math.max(0, Math.floor((to - from) / SHADE_STEP))
+  const wantBelow = Math.min(5, room(SHADE_MIN, src.l))
+  const above = Math.min(SHADE_COUNT - 1 - wantBelow, room(src.l, SHADE_MAX))
+  const below = SHADE_COUNT - 1 - above
+  return Array.from({ length: SHADE_COUNT }, (_, i) => {
+    const l = i === below ? src.l : clamp(src.l + (i - below) * SHADE_STEP, 0, 100)
+    return { key: i === below ? 'own' : `S${i}`, label: i === below ? 'Own' : `${Math.round(l)}%`, color: { h: src.h, s: src.s, l } }
+  })
+}
+
 export function tints(pal: ZonePalette, key: PaletteKey, zone: ZoneKey): Swatch[] {
   const src = resolvePalette(pal, zone)[key]
   return TINT_LIGHTNESS.map(l => ({ key: `L${l}`, label: `${l}%`, color: { h: src.h, s: src.s, l } }))

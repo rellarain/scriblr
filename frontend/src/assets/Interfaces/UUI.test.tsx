@@ -75,7 +75,8 @@ describe('UUI (the User panel as tiles)', () => {
     await user.click(screen.getByRole('button', { name: 'Settings' }))
     const settings = screen.getByRole('region', { name: 'Settings' })
     expect(within(settings).getByRole('button', { name: /Handedness/ })).toBeTruthy()
-    expect(within(settings).getByText('Change theme by time of day')).toBeTruthy()
+    expect(within(settings).getByRole('list', { name: 'Hues' })).toBeTruthy() // the account theme tool: the list of hues, the day bar and the cards
+    expect(within(settings).getByRole('region', { name: 'Day colours' })).toBeTruthy()
   })
 
   it('has Help text for a section at the corner', async () => {

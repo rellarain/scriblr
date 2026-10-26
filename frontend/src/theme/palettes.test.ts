@@ -1,7 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { DEFAULT_PALETTE, defaultThemeSettings } from './defaults'
-import { TINT_LIGHTNESS, derivedShades, hslCss, tints } from './palettes'
-import { copyPalette, enableZone } from './zones'
+import { SHADE_MAX, SHADE_MIN, SHADE_STEP, TINT_LIGHTNESS, derivedShades, hslCss, shadeStrip, tints } from './palettes'
 import { ZONE_LOOKS, resolvePalette } from './zoneLooks'
 import { PALETTE_KEYS, ZONE_KEYS } from './types'
 
@@ -63,28 +62,38 @@ describe('tints', () => {
   })
 })
 
-describe('copyPalette', () => {
-  const settings = () => {
-    let s = defaultThemeSettings()
-    s = enableZone(s, 'dusk')
-    s = enableZone(s, 'night')
-    s = { ...s, zones: { ...s.zones, dusk: { ...s.zones.dusk, palette: { ...s.zones.dusk.palette, accent: { h: 200 } } } } }
-    return s
-  }
+describe('shadeStrip', () => {
+  const pal = DEFAULT_PALETTE
 
-  it('gives a zone another zone\'s hues, from any zone', () => {
-    const s = settings()
-    const next = copyPalette(s, 'dusk', 'night')
-    expect(next.zones.night.palette).toEqual(s.zones.dusk.palette)
-    expect(next.zones.night.palette).not.toBe(s.zones.dusk.palette) // a deep copy
-    expect(next.zones.night.startMinute).toBe(s.zones.night.startMinute) // the start time stays
-    expect(copyPalette(s, 'dusk', 'day').zones.day.palette.accent.h).toBe(200) // Day can be copied into too
+  it.each(ZONE_KEYS)('%s: ten shades of each role, darkest first, its own colour among them', zone => {
+    for (const role of PALETTE_KEYS) {
+      const strip = shadeStrip(pal, zone, role)
+      const own = resolvePalette(pal, zone)[role]
+      expect(strip).toHaveLength(10)
+      expect(strip.filter(s => s.key === 'own')).toHaveLength(1)
+      const at = strip.findIndex(s => s.key === 'own')
+      expect(strip[at].color).toEqual(own)
+      // The lightness rises step by step and stays inside the range.
+      for (let i = 1; i < strip.length; i += 1) expect(strip[i].color.l - strip[i - 1].color.l).toBeCloseTo(SHADE_STEP, 5)
+      expect(strip[0].color.l).toBeGreaterThanOrEqual(SHADE_MIN - 1e-9)
+      expect(strip[9].color.l).toBeLessThanOrEqual(SHADE_MAX + 1e-9)
+      // The same hue and saturation all the way along.
+      expect(strip.every(s => s.color.h === own.h && s.color.s === own.s)).toBe(true)
+    }
   })
 
-  it('ignores the same zone and zones that are turned off', () => {
-    const s = settings()
-    expect(copyPalette(s, 'day', 'day')).toBe(s)
-    expect(copyPalette(s, 'dawn', 'day')).toBe(s)
-    expect(copyPalette(s, 'day', 'dawn')).toBe(s)
+  it('has five darker and four brighter when there is room, and moves the run when there is not', () => {
+    const mid = shadeStrip(pal, 'night', 'accent')
+    expect(mid.findIndex(s => s.key === 'own')).toBe(5)
+    // Day's theme is very light (86): fewer brighter shades fit, so more are darker.
+    const light = shadeStrip(pal, 'day', 'theme')
+    expect(light.findIndex(s => s.key === 'own')).toBeGreaterThan(5)
+    expect(light[9].color.l).toBeLessThanOrEqual(SHADE_MAX)
+  })
+
+  it('labels the shades by lightness, and the role\'s own colour Own', () => {
+    const strip = shadeStrip(pal, 'day', 'accent')
+    expect(strip.find(s => s.key === 'own')?.label).toBe('Own')
+    expect(strip.filter(s => s.key !== 'own').every(s => /^\d+%$/.test(s.label))).toBe(true)
   })
 })

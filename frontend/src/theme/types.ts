@@ -21,16 +21,26 @@ export interface ZonePalette {
   accent2: Hue
 }
 
+// A hue in the account's list (at most MAX_HUE_SWATCHES): the roles of the zones are dropped onto swatches (theme/themeHues.ts).
+export interface HueSwatch { id: string; h: number }
+export const MAX_HUE_SWATCHES = 10
+
+// Which swatch each role of a zone uses; a role missing here keeps its own hue, unlinked.
+export type RoleLinks = Partial<Record<PaletteKey, string>>
+
 export interface ZoneConfig {
   configured: boolean
   startMinute: number // minutes after midnight, a multiple of 10 (0..1430)
   palette: ZonePalette
+  links: RoleLinks
 }
 
 export interface ThemeSettings {
+  // Whether the app follows the clock. Not chosen by the user any more: it is true when two or more zones are on (see normalizeTheme).
   timeBasedEnabled: boolean
   override: ZoneKey | null
   zones: Record<ZoneKey, ZoneConfig>
+  hues: HueSwatch[]
 }
 
 export type Role = 'user' | 'admin'
