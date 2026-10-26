@@ -45,6 +45,21 @@ describe('the timeline\'s handles', () => {
     expect(screen.getAllByRole('slider').map(s => s.getAttribute('aria-valuetext'))).toEqual(['10:00 AM'])
   })
 
+  it('keeps its handles in the order dawn, day, dusk, night, also when a zone is turned on after Day was moved before its own time', () => {
+    stubStrip()
+    render(<Strip selected="day" onSelect={() => {}} />)
+    fireEvent.keyDown(handle('Day'), { key: 'ArrowLeft' }) // Day to 9 AM ...
+    for (let i = 0; i < 6; i += 1) fireEvent.keyDown(handle('Day'), { key: 'ArrowLeft' }) // ... and on to 3 AM, earlier than Dawn's 4 AM
+    expect(start('day')).toBe(180)
+    act(() => { editThemeDraft(t => enableZone(t, 'dawn')) })
+    const names = () => screen.getAllByRole('slider').map(s => s.getAttribute('aria-label'))
+    expect(names()).toEqual(['Dawn starts at', 'Day starts at', 'Dusk starts at', 'Night starts at'])
+    expect(start('dawn')).toBeLessThan(start('day'))
+    expect(start('day')).toBeLessThan(start('dusk'))
+    expect(start('dusk')).toBeLessThan(start('night'))
+    expect(screen.getAllByRole('slider').map(s => Number(s.getAttribute('aria-valuenow')))).toEqual([start('dawn'), start('day'), start('dusk'), start('night')])
+  })
+
   it('drags a zone\'s start, snapping to the nearest hour, and selects the zone', () => {
     stubStrip()
     const onSelect = vi.fn()

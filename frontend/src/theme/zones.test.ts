@@ -58,6 +58,14 @@ describe('resolveZone', () => {
     const s = withZones({ dawn: 400, day: 400 })
     expect(configuredZones(s.zones)).toEqual(['dawn', 'day'])
   })
+
+  it('is always dawn, day, dusk, night, whatever the start times are', () => {
+    const s = withZones({ dawn: 1200, day: 900, dusk: 300, night: 0 })
+    expect(configuredZones(s.zones)).toEqual(['dawn', 'day', 'dusk', 'night'])
+    // (The clock still reads the start times as they are.)
+    expect(resolveZone(s.zones, 100)).toBe('night')
+    expect(resolveZone(s.zones, 400)).toBe('dusk')
+  })
 })
 
 describe('msUntilNextBoundary', () => {
@@ -92,11 +100,48 @@ describe('enable / disable / normalize', () => {
     expect(s.zones.night.palette).not.toBe(s.zones.day.palette)
   })
 
-  it('bumps a clashing start to the next free slot', () => {
-    let s = defaultThemeSettings()
-    s.zones.dusk.startMinute = s.zones.day.startMinute
-    s = enableZone(s, 'dusk')
-    expect(s.zones.dusk.startMinute).toBe(s.zones.day.startMinute + 10)
+  it('turns a zone on at its default time when that keeps the day\'s order', () => {
+    const s = enableZone(withZones({ day: 600 }), 'dusk')
+    expect(s.zones.dusk.startMinute).toBe(960)
+    expect(configuredZones(enableZone(s, 'night').zones)).toEqual(['day', 'dusk', 'night'])
+  })
+
+  it('turns a zone on where it fits the day\'s order, not at a time left over from when it was last on', () => {
+    // Day was moved to 3 AM while Dawn was off, so Dawn's own 4 AM would come after it: Dawn goes before Day, an hour clear of it.
+    const early = enableZone(withZones({ day: 180 }), 'dawn')
+    expect(early.zones.dawn.startMinute).toBe(120)
+    // A time left over from when Dusk was last on (8 AM) is not used: it begins at its own 4 PM.
+    const stale = withZones({ day: 600 })
+    stale.zones.dusk.startMinute = 480
+    expect(enableZone(stale, 'dusk').zones.dusk.startMinute).toBe(960)
+    // Its default is used only if it is an hour clear of the zone before: with Day at 3:30 PM, Dusk goes an hour after it.
+    expect(enableZone(withZones({ day: 930 }), 'dusk').zones.dusk.startMinute).toBe(990)
+    // A time that does not fit after the last zone is the latest that does.
+    const last = enableZone(withZones({ day: 1380 }), 'night')
+    expect(last.zones.night.startMinute).toBeGreaterThan(1380)
+    expect(last.zones.night.startMinute).toBeLessThanOrEqual(1430)
+  })
+
+  it('turns the zones on in any order at their default times, whatever times the ones that were off had left over', () => {
+    // Only Night is on; the others carry times from an old schedule (Dawn at midnight, Day at 1 AM, Dusk at 8 AM).
+    const only = normalizeTheme({
+      zones: {
+        dawn: { configured: false, startMinute: 0 }, day: { configured: false, startMinute: 60 },
+        dusk: { configured: false, startMinute: 480 }, night: { configured: true, startMinute: 1320 },
+      },
+    } as unknown as ThemeSettings)
+    const times = (s: ThemeSettings) => Object.fromEntries(configuredZones(s.zones).map(k => [k, s.zones[k].startMinute]))
+    const s = (['dusk', 'dawn', 'day'] as const).reduce(enableZone, only)
+    expect(configuredZones(s.zones)).toEqual(['dawn', 'day', 'dusk', 'night'])
+    expect(times(s)).toEqual({ dawn: 240, day: 600, dusk: 960, night: 1320 })
+  })
+
+  it('puts a zone between two that are closer than an hour apart', () => {
+    const tight = withZones({ dawn: 300, night: 330 })
+    tight.zones.day = { ...tight.zones.day, configured: false }
+    const s = enableZone(tight, 'dusk')
+    expect(s.zones.dusk.startMinute).toBeGreaterThan(300)
+    expect(s.zones.dusk.startMinute).toBeLessThan(330)
   })
 
   it('takes the colours of the zone before it in the day when it is turned on', () => {
@@ -142,7 +187,7 @@ describe('enable / disable / normalize', () => {
     expect(next.override).toBeNull()
     expect(next.zones.night.links).toEqual({})
     expect(next.zones.night.palette.accent.h).not.toBe(99)
-    expect(next.zones.night.startMinute).toBe(s.zones.night.startMinute) // the time stays
+    expect(next.zones.night.startMinute).toBe(defaultThemeSettings().zones.night.startMinute) // the time goes back to its default
     expect(disableZone(s, 'day').override).toBe('night') // an override on another zone stays
   })
 
@@ -232,6 +277,32 @@ describe('enable / disable / normalize', () => {
     const old = { theme: { h: 10, s: 30 }, accent: { h: 20, s: 95 }, alert: { h: 30, s: 100 }, accent2: { h: 40, s: 60 }, brightness: 35 }
     const s = normalizeTheme({ zones: { night: { configured: true, startMinute: 1260, palette: old } } } as unknown as ThemeSettings)
     expect(s.zones.night.palette).toEqual({ theme: { h: 10 }, accent: { h: 20 }, alert: { h: 30 }, accent2: { h: 40 } })
+  })
+
+  it('keeps the zones that are on in the order dawn, day, dusk, night', () => {
+    const times = (s: ThemeSettings) => Object.fromEntries(configuredZones(s.zones).map(k => [k, s.zones[k].startMinute]))
+    const given = (starts: Record<string, number>) => normalizeTheme({
+      zones: Object.fromEntries(Object.entries(starts).map(([k, startMinute]) => [k, { configured: true, startMinute }])),
+    } as unknown as ThemeSettings)
+
+    // Times already in order are left alone, even close together.
+    expect(times(given({ dawn: 330, day: 340, dusk: 1080, night: 1260 }))).toEqual({ dawn: 330, day: 340, dusk: 1080, night: 1260 })
+    // One zone out of place (Dawn left at 8 PM) is put between its neighbours, as near its default time as fits.
+    expect(times(given({ dawn: 1200, day: 420, dusk: 1080, night: 1260 }))).toEqual({ dawn: 240, day: 420, dusk: 1080, night: 1260 })
+    // ...and one that is out of place at the end (Night at 3 AM) goes after the last of the others.
+    expect(times(given({ dawn: 240, day: 600, dusk: 960, night: 180 }))).toEqual({ dawn: 240, day: 600, dusk: 960, night: 1320 })
+    // Two or more out of place: every zone goes back to its default time.
+    expect(times(given({ dawn: 1260, day: 1080, dusk: 420, night: 330 }))).toEqual({ dawn: 240, day: 600, dusk: 960, night: 1320 })
+    // Only the zones that are on count: a zone that is off keeps whatever time it has.
+    const off = normalizeTheme({ zones: { day: { configured: true, startMinute: 600 }, dusk: { configured: false, startMinute: 100 } } } as unknown as ThemeSettings)
+    expect(off.zones.dusk.startMinute).toBe(100)
+    expect(times(off)).toEqual({ day: 600 })
+    // Whatever was stored, what comes out is in order and stays put when normalized again.
+    const messy = given({ dawn: 1430, day: 1430, dusk: 1430, night: 1430 })
+    const order = configuredZones(messy.zones).map(k => messy.zones[k].startMinute)
+    expect(order).toEqual([...order].sort((a, b) => a - b))
+    expect(new Set(order).size).toBe(4)
+    expect(normalizeTheme(messy)).toEqual(messy)
   })
 
   it('clamps start times', () => {

@@ -451,7 +451,10 @@ The shell (`frontend/src/App.tsx`) is themed by four optional time zones —
 **Dawn, Day, Dusk, Night**. Any zone can be on or off but at least one is on;
 with two or more on the app follows the clock, with one it is always that one.
 Each zone has a start time (10-minute steps, set on the day bar; a zone runs until
-the next one that is on starts, wrapping past midnight) and four **hues** the user
+the next one that is on starts, wrapping past midnight; the zones that are on always
+begin in the order dawn, day, dusk, night, which `normalizeTheme`, `enableZone` and
+`moveZoneStart` keep; a zone turned on begins at its default time, moved only as far as
+that order needs) and four **hues** the user
 chooses (from the account's list of up to ten hues, below): **theme** (inert/read-only),
 **accent** (interactive/active), **alert** (needs attention), and an admin-only
 **admin accent** (admin features). Everything else is the zone's fixed **look**

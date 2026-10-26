@@ -1,6 +1,6 @@
 # Colour: the four zones
 
-The shell and the Writer follow the time of day. There are four **zones**: Dawn, Day, Dusk, Night. Any zone can be on or off, but **at least one is on**. With two or more on the app follows the clock (each runs from its start time until the next one starts); with one on it is always the palette. Each has a start time in 10-minute steps, set on the day bar. Code: `frontend/src/theme/` (`zones.ts`, `zoneLooks.ts`, `tokens.ts`, `theme.scss`).
+The shell and the Writer follow the time of day. There are four **zones**: Dawn, Day, Dusk, Night. Any zone can be on or off, but **at least one is on**. With two or more on the app follows the clock (each runs from its start time until the next one starts); with one on it is always the palette. Each has a start time in 10-minute steps, set on the day bar. **The order is always Dawn, Day, Dusk, Night**: each begins later in the day than the one before it, so the bar always reads that way. Code: `frontend/src/theme/` (`zones.ts`, `zoneLooks.ts`, `tokens.ts`, `theme.scss`).
 
 ## What a user chooses, and what the zone decides
 
