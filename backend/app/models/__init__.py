@@ -1,10 +1,11 @@
 from datetime import datetime
 from typing import Literal, Optional
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, field_validator
 
 from ..storage.schema import (
     MAX_LEVEL_HUE,
+    PROJECT_TITLE_MAX,
     BookProgress,
     MIN_LEVEL_HUE,
     OutlineNode,
@@ -25,7 +26,7 @@ class CreateProjectRequest(BaseModel):
 
 
 class UpdateProjectRequest(BaseModel):
-    title: Optional[str] = None
+    title: Optional[str] = Field(default=None, max_length=PROJECT_TITLE_MAX)
     wordCountTarget: Optional[int] = None
     bookCountTarget: Optional[int] = None
     bookWordCountTarget: Optional[int] = None
@@ -37,6 +38,17 @@ class UpdateProjectRequest(BaseModel):
     readLevels: Optional[list[OutlineNodeKind]] = None
     timeSystems: Optional[list[TimeSystem]] = None
     themeHue: Optional[int] = Field(default=None, ge=MIN_LEVEL_HUE, le=MAX_LEVEL_HUE)
+
+    @field_validator("title")
+    @classmethod
+    def _title_is_a_name(cls, value: Optional[str]) -> Optional[str]:
+        """A project's name is kept without the spaces round it, and cannot be blank."""
+        if value is None:
+            return None
+        name = value.strip()
+        if not name:
+            raise ValueError("a project needs a name")
+        return name
 
 
 class ScheduleCompletionsRequest(BaseModel):

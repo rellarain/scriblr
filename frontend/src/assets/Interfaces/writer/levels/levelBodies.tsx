@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import type { WriterWorkspace } from '../useWriterWorkspace'
+import { PROJECT_NAME_MAX, type WriterWorkspace } from '../useWriterWorkspace'
 import { shelfGroups } from '../outlineTree'
 import { DeleteControl } from '../shared'
 import { Shelf } from '../Shelf'
@@ -59,7 +59,7 @@ export function ProjectTiles({ w }: { w: WriterWorkspace }) {
       {w.projectsStatus === 'idle' && w.projects.length === 0 && <p className="wrMuted">No projects yet. Create one below.</p>}
       <div className="wrNewProject">
         <input
-          value={newTitle} placeholder="New project title…"
+          value={newTitle} placeholder="New project title…" maxLength={PROJECT_NAME_MAX}
           onChange={e => setNewTitle(e.target.value)}
           onKeyDown={e => { if (e.key === 'Enter') createProject() }}
         />

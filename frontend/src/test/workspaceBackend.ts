@@ -63,7 +63,9 @@ export function standInBackend(
       if (method === 'PUT' && project[2] === '/plot') { saved.plot.push(body.nodes); return body }
       if (method === 'PATCH' && !project[2]) {
         saved.settings.push(body)
-        return { ...found.index, settings: { ...found.index.settings, ...body } }
+        // As the server does: the name belongs to the index itself, the rest to its settings.
+        const { title, ...settings } = body
+        return { ...found.index, ...(title !== undefined ? { title } : {}), settings: { ...found.index.settings, ...settings } }
       }
     }
     if (/\/(outline|plot)\/history$|\/settings-log$/.test(path)) return []

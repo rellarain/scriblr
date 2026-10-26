@@ -3,6 +3,8 @@ from pathlib import Path
 
 from fastapi.testclient import TestClient
 
+from app.storage.schema import PROJECT_TITLE_MAX
+
 
 def test_create_and_list_projects(client: TestClient) -> None:
     resp = client.post("/api/projects", json={"title": "Novel A"})
@@ -35,6 +37,35 @@ def test_update_project_metadata(client: TestClient) -> None:
     body = resp.json()
     assert body["title"] == "Renamed"
     assert body["settings"]["wordCountTarget"] == 50000
+
+
+def test_rename_project_trims_the_name_and_shows_it_in_the_list(client: TestClient) -> None:
+    project_id = client.post("/api/projects", json={"title": "Original"}).json()["projectId"]
+
+    resp = client.patch(f"/api/projects/{project_id}", json={"title": "  A Better Name  "})
+    assert resp.status_code == 200
+    assert resp.json()["title"] == "A Better Name"
+    assert [p["title"] for p in client.get("/api/projects").json()] == ["A Better Name"]
+    assert client.get(f"/api/projects/{project_id}").json()["index"]["title"] == "A Better Name"
+
+
+def test_rename_project_refuses_a_blank_or_overlong_name_and_changes_nothing(client: TestClient) -> None:
+    project_id = client.post("/api/projects", json={"title": "Original"}).json()["projectId"]
+
+    for title in ("", "   ", "x" * (PROJECT_TITLE_MAX + 1)):
+        assert client.patch(f"/api/projects/{project_id}", json={"title": title}).status_code == 422
+    assert client.patch(f"/api/projects/{project_id}", json={"title": "x" * PROJECT_TITLE_MAX}).status_code == 200
+    assert client.get(f"/api/projects/{project_id}").json()["index"]["title"] == "x" * PROJECT_TITLE_MAX
+
+
+def test_rename_project_is_logged_with_the_name_it_replaced(client: TestClient) -> None:
+    project_id = client.post("/api/projects", json={"title": "Original"}).json()["projectId"]
+    assert client.patch(f"/api/projects/{project_id}", json={"title": "Renamed"}).status_code == 200
+    assert client.patch(f"/api/projects/{project_id}", json={"title": "Renamed"}).status_code == 200  # unchanged: not logged again
+    assert client.patch(f"/api/projects/{project_id}", json={"themeHue": 200}).status_code == 200
+
+    log = client.get(f"/api/projects/{project_id}/settings-log").json()
+    assert [entry["before"]["title"] for entry in log] == ["Renamed", "Original"]  # newest first
 
 
 def test_project_wide_chapter_count_target_no_longer_accepted(client: TestClient) -> None:

@@ -3,7 +3,7 @@ import { beforeEach, describe, expect, it } from 'vitest'
 import type { TimeSystem } from '../../../api/types'
 import { __resetSettingsForTests } from '../../../settings/settingsStore'
 import { outlineNode, plotNode, projectIndex, standInBackend } from '../../../test/workspaceBackend'
-import { useWriterWorkspace } from './useWriterWorkspace'
+import { PROJECT_NAME_MAX, useWriterWorkspace } from './useWriterWorkspace'
 
 // Undo and Redo through the workspace hook: one history for each of the outline, the plot and the project's settings, kept in memory
 // while a page is open, and continued into what the backend logged today when that is used up.
@@ -156,6 +156,50 @@ describe('useWriterWorkspace: undo of the project\'s settings', () => {
     expect(backend.saved.settings.at(-1)).toMatchObject({ timeSystems: [MOON], themeHue: 200 })
   })
 
+  it('renames the project: the shelves show it at once, the settings save sends it, and Undo and Redo step through it', async () => {
+    const { result, backend } = await opened()
+    act(() => { result.current.renameProject('  Second Draft  ') })
+    expect(result.current.activeProject?.title).toBe('Second Draft')
+    expect(result.current.projects.map(p => p.title)).toEqual(['Second Draft'])
+    await act(async () => { await result.current.saveNow() })
+    expect(backend.saved.settings.at(-1)).toMatchObject({ title: 'Second Draft' })
+    expect(result.current.projects.map(p => p.title)).toEqual(['Second Draft'])
+
+    act(() => { result.current.history.undo('settings') })
+    expect(result.current.activeProject?.title).toBe('First')
+    expect(result.current.projects.map(p => p.title)).toEqual(['First'])
+    await act(async () => { await result.current.saveNow() })
+    expect(backend.saved.settings.at(-1)).toMatchObject({ title: 'First' })
+
+    act(() => { result.current.history.redo('settings') })
+    expect(result.current.activeProject?.title).toBe('Second Draft')
+  })
+
+  it('sends the name only until the server has it, and keeps one that is waiting when the colour changes', async () => {
+    const { result, backend } = await opened()
+    act(() => { result.current.renameProject('Second Draft') })
+    act(() => { result.current.setProjectHue(200) })
+    await act(async () => { await result.current.saveNow() })
+    expect(backend.saved.settings.at(-1)).toMatchObject({ title: 'Second Draft', themeHue: 200 })
+
+    act(() => { result.current.setProjectHue(90) })
+    await act(async () => { await result.current.saveNow() })
+    expect(backend.saved.settings.at(-1)).toMatchObject({ themeHue: 90 })
+    expect(backend.saved.settings.at(-1)).not.toHaveProperty('title')
+  })
+
+  it('does not rename to a blank name, and cuts a name that is too long', async () => {
+    const { result, backend } = await opened()
+    act(() => { result.current.renameProject('   ') })
+    expect(result.current.activeProject?.title).toBe('First')
+    expect(result.current.history.canUndo('settings')).toBe(false)
+    await act(async () => { await result.current.saveNow() })
+    expect(backend.saved.settings).toEqual([])
+
+    act(() => { result.current.renameProject('x'.repeat(PROJECT_NAME_MAX + 50)) })
+    expect(result.current.activeProject?.title).toBe('x'.repeat(PROJECT_NAME_MAX))
+  })
+
   it('ignores a change when no project is open', async () => {
     standInBackend({ p1: { index: projectIndex('p1', 'First'), outline: OUTLINE } })
     const { result } = renderHook(() => useWriterWorkspace())
@@ -233,5 +277,20 @@ describe('useWriterWorkspace: undo into today\'s log', () => {
     await waitFor(() => expect(result.current.history.canUndo('settings')).toBe(true))
     await act(async () => { result.current.history.undo('settings') })
     await waitFor(() => expect(result.current.activeProject?.settings.timeSystems).toEqual([MOON]))
+    // (An entry from before the name was logged has none: the name stays as it is.)
+    expect(result.current.activeProject?.title).toBe('First')
+  })
+
+  it('restores the name a settings log entry holds from before its change', async () => {
+    const { result } = await opened((path) => {
+      if (path === '/projects/p1/settings-log') {
+        return [{ id: 'e1', createdAt: stamp(5), kind: 'project', label: 'Project settings changed', before: { timeSystems: [], themeHue: null, title: 'Older name' } }]
+      }
+      return undefined
+    })
+    await waitFor(() => expect(result.current.history.canUndo('settings')).toBe(true))
+    await act(async () => { result.current.history.undo('settings') })
+    await waitFor(() => expect(result.current.activeProject?.title).toBe('Older name'))
+    expect(result.current.projects.map(p => p.title)).toEqual(['Older name'])
   })
 })

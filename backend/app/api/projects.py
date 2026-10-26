@@ -55,6 +55,11 @@ def update_project(
 ) -> ProjectIndex:
     with store.transaction(root, project_id):
         index = store.load_index(root, project_id)
+        before = {
+            "timeSystems": [t.model_dump(mode="json") for t in index.settings.timeSystems],
+            "themeHue": index.settings.themeHue,
+            "title": index.title,
+        }
         if body.title is not None:
             index.title = body.title
         if body.wordCountTarget is not None:
@@ -75,10 +80,6 @@ def update_project(
             index.settings.plotLevels = body.plotLevels
         if body.readLevels is not None:
             index.settings.readLevels = body.readLevels
-        before = {
-            "timeSystems": [t.model_dump(mode="json") for t in index.settings.timeSystems],
-            "themeHue": index.settings.themeHue,
-        }
         if body.timeSystems is not None:
             index.settings.timeSystems = body.timeSystems
         if body.themeHue is not None:
@@ -86,10 +87,11 @@ def update_project(
         after = {
             "timeSystems": [t.model_dump(mode="json") for t in index.settings.timeSystems],
             "themeHue": index.settings.themeHue,
+            "title": index.title,
         }
         index.updatedAt = utcnow()
         store.save_index(root, index)
-        # A change to the time systems or the colour is logged with what it replaced, so it can be undone.
+        # A change to the name, the time systems or the colour is logged with what it replaced, so it can be undone.
         if before != after:
             store.append_settings_log(root, project_id, settings_log.new_entry("project", "Project settings changed", before))
         return index

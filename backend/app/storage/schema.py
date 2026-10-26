@@ -26,6 +26,8 @@ def utcnow() -> datetime:
 # nor the brightnesses exist any more: a lighter or darker colour is now its plain hue.
 MIN_LEVEL_HUE = 0
 MAX_LEVEL_HUE = 360
+# The longest name a project can be given when it is renamed (the Writer's Name field stops at the same length).
+PROJECT_TITLE_MAX = 100
 HUE_SCHEME = 4
 
 _HEX_COLOR = re.compile(r"^#?([0-9a-fA-F]{6})$")

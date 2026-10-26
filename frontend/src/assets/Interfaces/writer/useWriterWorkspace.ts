@@ -32,6 +32,9 @@ import { plotParentOf, reconcilePlotHues } from './plotHues'
 
 type AsyncStatus = 'idle' | 'loading' | 'error'
 
+// The longest name a project can have (the backend refuses a longer one; the name fields stop at it).
+export const PROJECT_NAME_MAX = 100
+
 // Which of the five Writer consoles is showing.
 export type WuiConsole = 'shelves' | 'shelf' | 'book' | 'page' | 'pages'
 // 'shelves' keeps the project (and its book/chapter) open while the dashboard has the focus.
@@ -215,33 +218,56 @@ export function useWriterWorkspace() {
   useEffect(() => { outlineHistory.markSaved() }, [outlineSave.lastSavedAt])
   useEffect(() => { plotHistory.markSaved() }, [plotSave.lastSavedAt])
 
-  // The project's settings the Writer edits (time systems, colour): saved like the trees.
+  // The project's settings the Writer edits (name, time systems, colour): saved like the trees.
   // Each save carries all of them, so a later colour change never drops a waiting time-system edit.
-  const settingsSave = useAutosave<{ projectId: string; timeSystems: TimeSystem[]; themeHue: number | null }>({
-    save: async ({ projectId, timeSystems, themeHue }) => {
-      const index = await apiUpdateProject(projectId, { timeSystems, ...(themeHue != null ? { themeHue } : {}) })
-      if (activeProjectIdRef.current === projectId && !settingsSave.hasNewer()) setActiveProject(index)
+  // The name goes only while the server does not have it yet (`pendingName`), so a save of the colour alone never sends one.
+  const pendingName = useRef<{ projectId: string; title: string } | null>(null)
+  const settingsSave = useAutosave<{ projectId: string; timeSystems: TimeSystem[]; themeHue: number | null; title: string | null }>({
+    save: async ({ projectId, timeSystems, themeHue, title }) => {
+      const index = await apiUpdateProject(projectId, { timeSystems, ...(themeHue != null ? { themeHue } : {}), ...(title != null ? { title } : {}) })
+      if (pendingName.current?.projectId === projectId && pendingName.current.title === title) pendingName.current = null
+      if (activeProjectIdRef.current === projectId && !settingsSave.hasNewer()) {
+        setActiveProject(index)
+        setProjects(prev => prev.map(p => (p.projectId === projectId ? { ...p, title: index.title } : p)))
+      }
     },
   })
 
   useEffect(() => { settingsHistory.markSaved() }, [settingsSave.lastSavedAt])
 
-  function updateProjectSettings(patch: { timeSystems?: TimeSystem[]; themeHue?: number }, immediate: boolean) {
+  function updateProjectSettings(patch: { title?: string; timeSystems?: TimeSystem[]; themeHue?: number }, immediate: boolean) {
     const current = activeProjectRef.current
     const projectId = activeProjectIdRef.current
     if (!current || !projectId) return
-    const settings = { ...current.settings, ...patch }
-    const next = { ...current, settings }
+    const { title, ...settingsPatch } = patch
+    const settings = { ...current.settings, ...settingsPatch }
+    const next = { ...current, ...(title !== undefined ? { title } : {}), settings }
     activeProjectRef.current = next
     setActiveProject(next)
-    if (!applyingHistory.current) settingsHistory.record({ timeSystems: settings.timeSystems, themeHue: settings.themeHue ?? null }, { text: !immediate })
-    const value = { projectId, timeSystems: settings.timeSystems, themeHue: settings.themeHue ?? null }
+    if (title !== undefined && title !== current.title) {
+      pendingName.current = { projectId, title }
+      // The shelves show the new name at once, not when the save lands.
+      setProjects(prev => prev.map(p => (p.projectId === projectId ? { ...p, title } : p)))
+    }
+    if (!applyingHistory.current) settingsHistory.record({ timeSystems: settings.timeSystems, themeHue: settings.themeHue ?? null, title: next.title }, { text: !immediate })
+    const pending = pendingName.current
+    const value = { projectId, timeSystems: settings.timeSystems, themeHue: settings.themeHue ?? null, title: pending?.projectId === projectId ? pending.title : null }
     if (immediate) void settingsSave.saveNow(value)
     else settingsSave.schedule(value)
   }
   function updateTimeSystems(next: TimeSystem[], immediate: boolean) {
     updateProjectSettings({ timeSystems: next }, immediate)
   }
+  // Renames the open project: saved after a pause, like the rest of its settings. A name is trimmed and cut to its limit, and a blank one
+  // changes nothing (the name stays what it was).
+  function renameProject(title: string) {
+    const name = title.trim().slice(0, PROJECT_NAME_MAX)
+    if (name) updateProjectSettings({ title: name }, false)
+  }
+  // A step of the settings' history (or a log entry) as the patch that applies it.
+  const settingsPatchOf = (v: ProjectSettingsValue) => ({
+    timeSystems: v.timeSystems, ...(v.themeHue != null ? { themeHue: v.themeHue } : {}), ...(v.title ? { title: v.title } : {}),
+  })
 
   // Apply an edit to the outline: `immediate` saves now (structural edits),
   // otherwise after a pause. Computed from the ref so edits in the same tick
@@ -302,7 +328,7 @@ export function useWriterWorkspace() {
   const currentOf = (scope: HistoryScope): unknown =>
     scope === 'outline' ? outlineNodesRef.current
       : scope === 'plot' ? plotNodesRef.current
-      : { timeSystems: activeProjectRef.current?.settings.timeSystems ?? [], themeHue: activeProjectRef.current?.settings.themeHue ?? null }
+      : { timeSystems: activeProjectRef.current?.settings.timeSystems ?? [], themeHue: activeProjectRef.current?.settings.themeHue ?? null, title: activeProjectRef.current?.title ?? '' }
 
   // Go back into today's log: the next older state that is not the one shown, applied as an unsaved edit (and redoable).
   async function logUndo(scope: HistoryScope) {
@@ -316,8 +342,12 @@ export function useWriterWorkspace() {
       let value: unknown
       try {
         if (scope === 'settings') {
-          const before = logs.settings.find(e => e.id === target.id)?.before as { timeSystems?: TimeSystem[]; themeHue?: number | null } | undefined
-          value = { timeSystems: before?.timeSystems ?? activeProjectRef.current?.settings.timeSystems ?? [], themeHue: before?.themeHue ?? null }
+          // (An entry from before the name was logged has no title: the name stays as it is.)
+          const before = logs.settings.find(e => e.id === target.id)?.before as { timeSystems?: TimeSystem[]; themeHue?: number | null; title?: string } | undefined
+          value = {
+            timeSystems: before?.timeSystems ?? activeProjectRef.current?.settings.timeSystems ?? [], themeHue: before?.themeHue ?? null,
+            title: before?.title ?? activeProjectRef.current?.title ?? '',
+          }
         } else if (scope === 'outline') {
           value = (await getOutlineSnapshot(projectId, target.id)).nodes
         } else {
@@ -334,7 +364,7 @@ export function useWriterWorkspace() {
         else {
           const v = value as ProjectSettingsValue
           settingsHistory.stepBack(v)
-          updateProjectSettings({ timeSystems: v.timeSystems, ...(v.themeHue != null ? { themeHue: v.themeHue } : {}) }, false)
+          updateProjectSettings(settingsPatchOf(v), false)
         }
       } finally {
         applyingHistory.current = false
@@ -356,7 +386,7 @@ export function useWriterWorkspace() {
         if (value) commitPlot(value, false)
       } else {
         const value = direction === 'undo' ? settingsHistory.undo() : settingsHistory.redo()
-        if (value) updateProjectSettings({ timeSystems: value.timeSystems, ...(value.themeHue != null ? { themeHue: value.themeHue } : {}) }, false)
+        if (value) updateProjectSettings(settingsPatchOf(value), false)
       }
     } finally {
       applyingHistory.current = false
@@ -375,7 +405,7 @@ export function useWriterWorkspace() {
     logCursors.current = { outline: null, plot: null, settings: null }
     outlineHistory.reset(outline)
     plotHistory.reset(plot)
-    if (project) settingsHistory.reset({ timeSystems: project.settings.timeSystems, themeHue: project.settings.themeHue ?? null })
+    if (project) settingsHistory.reset({ timeSystems: project.settings.timeSystems, themeHue: project.settings.themeHue ?? null, title: project.title })
     else settingsHistory.clear()
   }
   // Changing the page (the project, level, book or chapter) saves what is waiting, whatever the autosave setting, and starts the histories afresh.
@@ -412,7 +442,7 @@ export function useWriterWorkspace() {
   async function createProject(title: string) {
     if (!title.trim()) return
     try {
-      const created = await apiCreateProject(title.trim())
+      const created = await apiCreateProject(title.trim().slice(0, PROJECT_NAME_MAX))
       setProjects(prev => [...prev, created])
       await openProject(created.projectId)
     } catch (err) {
@@ -885,7 +915,7 @@ export function useWriterWorkspace() {
     projects, projectsStatus, projectsError, projectOutlines, projectProgress,
     activeProjectId, activeProject, hasOpenProject,
     outlineNodes, outlineStatus, outlineError, warnings, saving: outlineSave.saving, saveError: outlineSave.error,
-    saveStatus, saveCountdown, saveNow, flushAll, history, updateTimeSystems,
+    saveStatus, saveCountdown, saveNow, flushAll, history, updateTimeSystems, renameProject,
     childrenByParentId, projectRoot, books, activeBook, activeBookChapters, activeChapter,
     activeConsole, activeBookId, activeChapterId,
     projectHue, levelHueOf, levelTintOf, levelFillOf, hueCentreOf, setNodeHue, setProjectHue,
@@ -908,4 +938,4 @@ export type WriterWorkspace = ReturnType<typeof useWriterWorkspace>
 
 // What one Undo / Redo acts on: the outline, the plot, or the project's settings.
 export type HistoryScope = 'outline' | 'plot' | 'settings'
-interface ProjectSettingsValue { timeSystems: TimeSystem[]; themeHue: number | null }
+interface ProjectSettingsValue { timeSystems: TimeSystem[]; themeHue: number | null; title: string }
