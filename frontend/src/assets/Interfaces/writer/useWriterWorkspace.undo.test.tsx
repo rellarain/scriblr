@@ -188,6 +188,19 @@ describe('useWriterWorkspace: undo of the project\'s settings', () => {
     expect(backend.saved.settings.at(-1)).not.toHaveProperty('title')
   })
 
+  it('gives each project its colour for the shelves: its own, else the default, and the open one follows its colour at once', async () => {
+    const { result } = await opened()
+    const [shelf] = result.current.projects
+    expect(result.current.projectHueOf(shelf)).toBe(result.current.projectHue) // none of its own: the default
+    expect(result.current.projectHueOf({ ...shelf, settings: { ...shelf.settings, themeHue: 40 } })).toBe(40)
+
+    act(() => { result.current.setProjectHue(200) })
+    expect(result.current.projectHue).toBe(200)
+    expect(result.current.projectHueOf(result.current.projects[0])).toBe(200) // the list's entry, not only the open project's
+    await act(async () => { await result.current.saveNow() })
+    expect(result.current.projectHueOf(result.current.projects[0])).toBe(200)
+  })
+
   it('does not rename to a blank name, and cuts a name that is too long', async () => {
     const { result, backend } = await opened()
     act(() => { result.current.renameProject('   ') })

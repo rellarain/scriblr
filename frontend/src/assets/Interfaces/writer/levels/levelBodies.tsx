@@ -1,4 +1,5 @@
-import { useState } from 'react'
+import { useState, type CSSProperties } from 'react'
+import { fillColorCss } from '../../../../theme/bookColors'
 import { PROJECT_NAME_MAX, type WriterWorkspace } from '../useWriterWorkspace'
 import { shelfGroups } from '../outlineTree'
 import { DeleteControl } from '../shared'
@@ -41,7 +42,8 @@ export function ProjectTiles({ w }: { w: WriterWorkspace }) {
         const bookCount = groups.reduce((n, g) => n + g.books.length, 0)
         const open = w.activeProjectId === p.projectId
         return (
-          <div key={p.projectId} className="wrProjectTile" data-project={p.projectId}>
+          // Each shelf is its own project's colour (not the open project's, which is the one this column's panel is tinted with).
+          <div key={p.projectId} className="wrProjectTile" data-project={p.projectId} style={{ '--wr-fill': fillColorCss(w.projectHueOf(p)) } as CSSProperties}>
             <Shelf
               label={p.title}
               meta={`${bookCount} ${bookCount === 1 ? 'book' : 'books'}`}

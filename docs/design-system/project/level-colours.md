@@ -9,7 +9,7 @@ Every level of the Writer, every book, arc and chapter, and every plot category 
 | Level | Hue |
 |---|---|
 | Dash | the app theme's own colour |
-| Project | its own, else the app theme's hue + 120, so the Dash and the Project read as different tints |
+| Project | its own, else the app theme's hue + 120, so the Dash and the Project read as different tints. Its shelf in the column beside the Dash is this colour too: **each project's shelf is its own project's colour**, not the open project's |
 | Series | none: it shows the project's colour (a colour stored on a series by an older version is ignored, and cleared the next time the outline is saved) |
 | Book | within **90** degrees of the project's hue; a book with no hue of its own is the default orange (28) |
 | Arc | within **60** degrees of its book's |

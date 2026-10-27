@@ -1,6 +1,6 @@
 # Dashboard cards and analytics
 
-The Dash level is the writer's desk across every project: schedule, checklist, analytics, a scratchpad, and the project tiles beside them.
+The Dash level is the writer's desk across every project: schedule, checklist, analytics, a scratchpad, and the project tiles beside them (each a shelf in **its own project's colour**, its hue or else the default, so the shelves differ and a colour changed in Project settings shows on its shelf at once).
 
 Code: `writer/Dashboard.tsx` (`RoutinesPanel`, `TasksPanel`, `AnalyticsPanel`, `Scratchpad`), `writer/levels/dashTabs.tsx`, `levelBodies.tsx` (`ProjectTiles`).
 

@@ -122,7 +122,9 @@ export function useWriterWorkspace() {
   // --- level colours (levelHues.ts): hues only; saturation and lightness are the zone's ---
   const { settings: themeSettings, activeZone } = useThemeState()
   const appHue = themeSettings.zones[activeZone].palette.theme.h
-  const projectHue = activeProject?.settings.themeHue ?? defaultProjectHue(appHue)
+  // A project's colour: its own, else the default off the app theme's hue. (The shelves show every project's, not only the open one's.)
+  const projectHueOf = (p: ProjectIndex): number => p.settings.themeHue ?? defaultProjectHue(appHue)
+  const projectHue = activeProject ? projectHueOf(activeProject) : defaultProjectHue(appHue)
   const projectHueRef = useRef(projectHue)
   projectHueRef.current = projectHue
   const hueNodes = useMemo(() => new Map(outlineNodes.map(n => [n.id, n])), [outlineNodes])
@@ -228,7 +230,7 @@ export function useWriterWorkspace() {
       if (pendingName.current?.projectId === projectId && pendingName.current.title === title) pendingName.current = null
       if (activeProjectIdRef.current === projectId && !settingsSave.hasNewer()) {
         setActiveProject(index)
-        setProjects(prev => prev.map(p => (p.projectId === projectId ? { ...p, title: index.title } : p)))
+        setProjects(prev => prev.map(p => (p.projectId === projectId ? index : p)))
       }
     },
   })
@@ -244,11 +246,9 @@ export function useWriterWorkspace() {
     const next = { ...current, ...(title !== undefined ? { title } : {}), settings }
     activeProjectRef.current = next
     setActiveProject(next)
-    if (title !== undefined && title !== current.title) {
-      pendingName.current = { projectId, title }
-      // The shelves show the new name at once, not when the save lands.
-      setProjects(prev => prev.map(p => (p.projectId === projectId ? { ...p, title } : p)))
-    }
+    // The shelves show the new name and colour at once, not when the save lands.
+    setProjects(prev => prev.map(p => (p.projectId === projectId ? next : p)))
+    if (title !== undefined && title !== current.title) pendingName.current = { projectId, title }
     if (!applyingHistory.current) settingsHistory.record({ timeSystems: settings.timeSystems, themeHue: settings.themeHue ?? null, title: next.title }, { text: !immediate })
     const pending = pendingName.current
     const value = { projectId, timeSystems: settings.timeSystems, themeHue: settings.themeHue ?? null, title: pending?.projectId === projectId ? pending.title : null }
@@ -918,7 +918,7 @@ export function useWriterWorkspace() {
     saveStatus, saveCountdown, saveNow, flushAll, history, updateTimeSystems, renameProject,
     childrenByParentId, projectRoot, books, activeBook, activeBookChapters, activeChapter,
     activeConsole, activeBookId, activeChapterId,
-    projectHue, levelHueOf, levelTintOf, levelFillOf, hueCentreOf, setNodeHue, setProjectHue,
+    projectHue, projectHueOf, levelHueOf, levelTintOf, levelFillOf, hueCentreOf, setNodeHue, setProjectHue,
     loadProjects, createProject, openProject, backToShelves, deleteProject,
     showDash, showProject, openBook, selectChapter, openChapter, showDraft, showPreview, backToBook,
     addOutlineNode, updateOutlineNode, deleteOutlineNode, deleteSeries, moveOutlineNodeInto, toggleNodeFlag,
