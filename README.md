@@ -572,7 +572,7 @@ mounted it; it remains in git history.
   book's fields and colour) and Help. At Max the Outline is the book's **cover**, in one column: the book editor strip with the
   title and the tabs, then the sections the tabs open (settings, help, draft stats) and the contents
   (`outline/OutlineNav.tsx`: the arcs and chapters), narrowed by the edge tabs: an arc's tab shows only
-  that arc and each of its chapters' outlines, a chapter's tab only that chapter's (choosing the focused tab again goes back to the whole book, every chapter open), each unfolding its
+  that arc and each of its chapters' outlines, a chapter's tab only that chapter's (choosing the focused tab again goes back to the whole book, every chapter open; adding an arc or chapter, by key, button or the + tab, never focuses it, a narrowed view goes back to the whole book so the new card shows, and only the tabs focus an arc or chapter), each unfolding its
   title, colour and trash and under them its acts, scenes and moments (`OutlineCards.tsx`; the acts and scenes fold up, and so does the whole chapter section, from the chevron in its tile's top right corner: the chapter's
   title, colour and counts in the contents fold with the tile, down to its banner and counts, all remembered). The page edges and the arcs'
   and chapters' tabs (the book's own hue, the arc and chapter colours as accents) stand at its right,

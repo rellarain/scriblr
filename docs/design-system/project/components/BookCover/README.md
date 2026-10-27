@@ -10,11 +10,11 @@ Code: `writer/outline/OutlineMax.tsx`, `OutlineNav.tsx`, `BookEditor.tsx`, `Book
 - **Spine** down the left: a flat strip, the fill mixed with 40% black.
 - **Contents** `.wrOutlineNav`: a card for each arc (`.wrArcCard`) and chapter (`.wrChapterCard`), each with a 7px left stripe in its colour (lifted brighter: `stripeColorCss`), one header row (grip, number badge, title edited in place, a fold chevron, and a Write pencil on a chapter) over its counts. An arc holds its chapter cards and ends in a footer (*+ Chapter*, its colour slider, its trash); the open chapter holds its [cards](../OutlineCards/README.md) and ends in *+ Act*, its colour slider and its trash.
 - **Page edges** `.wrEdgeLeaves i`: ten or more, each 4px further out and a little deeper than the one before, on the book's back-cover colour (`--wr-cover`). The rail is 15px wider than the last edge.
-- **Tabs** `.wrEdgeTab` (30 wide, vertical text, 46 tall) and arc tabs `.wrEdgeArc` ("A1", "A2"); each arc's cluster starts at its own edge, the first at the second. A tab's stripe is its colour; the **focused** tab is wider (38) with its colour as its background, fitted so its ink reads (`tabColors`). `+` adds a chapter.
+- **Tabs** `.wrEdgeTab` (30 wide, vertical text, 46 tall) and arc tabs `.wrEdgeArc` ("A1", "A2"); each arc's cluster starts at its own edge, the first at the second. A tab's stripe is its colour; the **focused** tab is wider (38) with its colour as its background, fitted so its ink reads (`tabColors`). `+` adds a chapter (without focusing it).
 
 ## Behaviour
 
-A chapter tab narrows the cover to that chapter's outline; an arc tab to that arc and its chapters; choosing the focused tab again shows the whole book. See [interaction](../../interaction.md).
+A chapter tab narrows the cover to that chapter's outline; an arc tab to that arc and its chapters; choosing the focused tab again shows the whole book. Adding an arc or chapter (the keys, the buttons, the `+` tab) never focuses it: a narrowed cover goes back to the whole book so the new card shows, and only the tabs focus an arc or a chapter. See [interaction](../../interaction.md).
 
 ## Tokens
 

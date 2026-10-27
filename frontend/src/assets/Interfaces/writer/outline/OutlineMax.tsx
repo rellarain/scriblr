@@ -33,6 +33,12 @@ function OutlineMax({ w }: { w: WriterWorkspace }) {
   const showAll = allPick !== null && allPick.chapterId === activeId
   // The focused arc, with the chapter that was open when it was picked: picking another chapter (here or elsewhere) ends it.
   const [arcPick, setArcPick] = useState<{ arcId: string; chapterId: string | null } | null>(null)
+  // Something was added to the contents: the whole book shows, so the new arc or chapter is on view. The open chapter is not changed
+  // (adding never focuses anything; only the page tabs do), so a view that is the whole book already stays as it is.
+  const showWholeBook = () => {
+    setArcPick(null)
+    setAllPick(prev => (prev && prev.chapterId === activeId ? prev : { chapterId: activeId }))
+  }
   const arcId = !showAll && arcPick && arcPick.chapterId === activeId && w.outlineNodes.some(n => n.id === arcPick.arcId && n.kind === 'arc') ? arcPick.arcId : null
   const hasActive = useMemo(() => chapters.some(c => c.id === activeId), [chapters, activeId])
   useEffect(() => {
@@ -68,7 +74,7 @@ function OutlineMax({ w }: { w: WriterWorkspace }) {
             {tabs.isOpen('help') && <div className="wrBookEdHelp"><HelpArticles names={OUTLINE_HELP_NAMES} fallback={OUTLINE_HELP_FALLBACK} /></div>}
             {tabs.isOpen('details') && <DraftStats book={book} chapters={chapters} nodeWords={counts.nodes} settings={w.activeProject?.settings} />}
             <OutlineNav
-              w={w} book={book} counts={counts} focus={focus} plotDrag={plotDrag}
+              w={w} book={book} counts={counts} focus={focus} plotDrag={plotDrag} onAdded={showWholeBook}
               chapterBody={chapter => tabs.isOpen('outline') && (
                 <OutlineCards w={w} book={book} counts={counts} chapterId={chapter.id} plotDrag={plotDrag} />
               )}
@@ -85,7 +91,7 @@ function OutlineMax({ w }: { w: WriterWorkspace }) {
           w.selectChapter(id)
         }}
         onArc={pickArc}
-        onAddChapter={() => { setAllPick(null); w.selectChapter(w.addOutlineNode(book.id, 'chapter')) }}
+        onAddChapter={() => { w.addOutlineNode(book.id, 'chapter'); showWholeBook() }}
       />
     </div>
   )

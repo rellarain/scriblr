@@ -27,7 +27,10 @@ export interface OutlineFocus { kind: 'book' | 'arc' | 'chapter'; id: string }
 // is not open is a compact card, which a click opens (and a plotpoint can be dropped on). An arc edits its title in its header, folds
 // its chapters up, and has a footer with + Chapter, its colour and its trash. Arcs and chapters are reordered and moved by dragging their
 // grips (not while focused on their own).
-export function OutlineNav({ w, book, counts, chapterBody, focus = null, plotDrag }: {
+//
+// Adding an arc or chapter (the keys, the buttons) never moves the focus or makes the new one the open chapter: `onAdded` tells the level
+// to show the whole book, so the new card is on view, and only the page tabs focus an arc or chapter.
+export function OutlineNav({ w, book, counts, chapterBody, focus = null, plotDrag, onAdded }: {
   w: WriterWorkspace
   book: OutlineNode
   counts: WordCounts
@@ -36,6 +39,8 @@ export function OutlineNav({ w, book, counts, chapterBody, focus = null, plotDra
   focus?: OutlineFocus | null
   // A plotpoint being dragged onto a chapter's card.
   plotDrag?: PlotDrag
+  // An arc or chapter was added to the contents.
+  onAdded?: () => void
 }) {
   const dnd = useNodeDnd(w, {
     accepts: (dragged, parentId) => {
@@ -53,10 +58,15 @@ export function OutlineNav({ w, book, counts, chapterBody, focus = null, plotDra
   const words = (id: string) => counts.nodes[id] ?? 0
   const childrenOf = (node: OutlineNode) => (index.get(node.id) ?? []).filter(k => k.kind === 'arc' || k.kind === 'chapter')
 
-  // The new chapter becomes the open one.
+  // A new chapter or arc is added where it goes and nothing is focused (or opened) for it.
   const addChapter = (parentId: string, afterId?: string) => {
     const id = w.addOutlineNode(parentId, 'chapter', {}, afterId)
-    w.selectChapter(id)
+    onAdded?.()
+    return id
+  }
+  const addArc = (parentId: string | null, afterId?: string) => {
+    const id = w.addOutlineNode(parentId, 'arc', {}, afterId)
+    onAdded?.()
     return id
   }
   // A new act unfolds the chapter it goes in.
@@ -76,12 +86,12 @@ export function OutlineNav({ w, book, counts, chapterBody, focus = null, plotDra
     createSibling: id => {
       const n = nodeById.get(id)
       if (!n) return null
-      return n.kind === 'chapter' ? addChapter(n.parentId ?? book.id, id) : w.addOutlineNode(n.parentId, 'arc', {}, id)
+      return n.kind === 'chapter' ? addChapter(n.parentId ?? book.id, id) : addArc(n.parentId, id)
     },
     // chapter (in an arc) -> a new arc after that arc.
     createParentSibling: id => {
       const parent = nodeById.get(nodeById.get(id)?.parentId ?? '')
-      return parent && parent.kind === 'arc' ? w.addOutlineNode(parent.parentId, 'arc', {}, parent.id) : null
+      return parent && parent.kind === 'arc' ? addArc(parent.parentId, parent.id) : null
     },
     canCreateParentSibling: id => nodeById.get(nodeById.get(id)?.parentId ?? '')?.kind === 'arc',
     createChild: id => (nodeById.get(id)?.kind === 'arc' ? addChapter(id) : null),
@@ -211,7 +221,7 @@ export function OutlineNav({ w, book, counts, chapterBody, focus = null, plotDra
       <div className="wrCtHead">
         <span>Contents</span>
         <span className="wrCtAdd">
-          <button type="button" className="wrSmallBtn" onClick={() => w.addOutlineNode(book.id, 'arc')}><PlusIcon size={13} /> Arc</button>
+          <button type="button" className="wrSmallBtn" onClick={() => addArc(book.id)}><PlusIcon size={13} /> Arc</button>
           <button type="button" className="wrSmallBtn" onClick={() => addChapter(book.id)}><PlusIcon size={13} /> Chapter</button>
         </span>
       </div>

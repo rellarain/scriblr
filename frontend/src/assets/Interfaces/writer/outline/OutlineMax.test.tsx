@@ -43,8 +43,10 @@ const PLOT: PlotNode[] = [
   plotNode('pp2', 'plotpoint', 'line', { title: 'A secret', order: 1 }),
 ]
 
-function Harness({ activeChapterId = 'c1', actions }: { activeChapterId?: string | null; actions: { openChapter: (id: string) => void } }) {
-  const [outlineNodes, setOutline] = useState<OutlineNode[]>(OUTLINE)
+function Harness({ activeChapterId = 'c1', outline = OUTLINE, actions }: {
+  activeChapterId?: string | null; outline?: OutlineNode[]; actions: { openChapter: (id: string) => void; selectChapter: (id: string) => void }
+}) {
+  const [outlineNodes, setOutline] = useState<OutlineNode[]>(outline)
   const [plotNodes, setPlot] = useState<PlotNode[]>(PLOT)
   const [active, setActive] = useState<string | null>(activeChapterId)
   const [plotDragId, setPlotDragId] = useState<string | null>(null)
@@ -60,7 +62,7 @@ function Harness({ activeChapterId = 'c1', actions }: { activeChapterId?: string
     activeBook: book, activeProjectId: 'p1', activeProject: { settings: { timeSystems: [], chapterWordCountTarget: 500 } },
     outlineNodes, plotNodes, plotNodeById: new Map(plotNodes.map(n => [n.id, n])),
     activeBookChapters: descendantsOf(buildChildIndex(outlineNodes), 'b').filter(n => n.kind === 'chapter'),
-    activeChapterId: active, selectChapter: (id: string) => setActive(id), highlightedPointId: null, plotDragId, setPlotDragId,
+    activeChapterId: active, selectChapter: (id: string) => { actions.selectChapter(id); setActive(id) }, highlightedPointId: null, plotDragId, setPlotDragId,
     saveStatus: { dirty: false, saving: false, error: undefined, lastSavedAt: null }, saveNow: vi.fn(async () => {}), saveCountdown: { nextSaveAt: null, wait: null }, history: { canUndo: () => false, canRedo: () => false, undo: () => {}, redo: () => {} },
     levelHueOf: () => 200, levelTintOf: () => 'hsl(200, 30%, 50%)', hueCentreOf: () => null, setNodeHue: vi.fn(),
     moveOutlineNodeInto: vi.fn(), openChapter: actions.openChapter,
@@ -84,10 +86,11 @@ function Harness({ activeChapterId = 'c1', actions }: { activeChapterId?: string
   return <><PlotTray w={w} /><OutlineMax w={w} /></>
 }
 
-const setup = (activeChapterId: string | null = 'c1') => {
+const setup = (activeChapterId: string | null = 'c1', outline?: OutlineNode[]) => {
   const openChapter = vi.fn()
-  const view = render(<Harness activeChapterId={activeChapterId} actions={{ openChapter }} />)
-  return { openChapter, user: userEvent.setup(), ...view }
+  const selectChapter = vi.fn()
+  const view = render(<Harness activeChapterId={activeChapterId} outline={outline} actions={{ openChapter, selectChapter }} />)
+  return { openChapter, selectChapter, user: userEvent.setup(), ...view }
 }
 
 // The open chapter's card in the contents (a chapter that is not open is a card too, without the --active class), and the ids of the open ones.
@@ -102,6 +105,9 @@ const addButton = (within_: HTMLElement, kind: string) => within(within_).getAll
 // The chapter tabs at the book's edge (one each), and the arc tab.
 const chapterTabs = () => within(screen.getByRole('navigation', { name: 'Arcs and chapters' })).getAllByRole('button', { name: /^Chapter \d+:/ })
 const arcTab = () => screen.getByRole('button', { name: 'Arc 1: Thaw' })
+// The tabs raised: one when the view is narrowed to an arc or a chapter, none at the book level (the whole book).
+const tabsRaised = () => within(screen.getByRole('navigation', { name: 'Arcs and chapters' })).queryAllByRole('button', { pressed: true })
+const typingIn = () => (document.activeElement as HTMLInputElement).getAttribute('aria-label')
 const tray = () => screen.getByRole('complementary', { name: 'Unassigned plotpoints' })
 
 // jsdom has no DataTransfer: a stand-in carrying just what the handlers touch.
@@ -197,14 +203,18 @@ describe('Outline Max: the contents', () => {
     expect(arc).toHaveProperty('value', 'Thaw II')
   })
 
-  it('adds arcs and chapters from the contents buttons, a new chapter becoming the open one', async () => {
-    const { user } = setup('c1')
+  it('adds arcs and chapters from the contents buttons without focusing them: the view goes to the whole book', async () => {
+    const { user, selectChapter } = setup('c1')
     const head = document.querySelector<HTMLElement>('.wrCtHead')!
     await user.click(addButton(head, 'Chapter'))
     expect(chapterTabs()).toHaveLength(3)
-    expect(openCards()[0]).toBe('new1')
+    // The new chapter is shown with the others (the book level, no tab raised), not made the open chapter.
+    expect(openCards()).toEqual(['c1', 'c2', 'new1'])
+    expect(tabsRaised()).toHaveLength(0)
     await user.click(addButton(head, 'Arc'))
     expect(screen.getAllByRole('button', { name: /^Arc \d+:/ })).toHaveLength(2)
+    expect(tabsRaised()).toHaveLength(0)
+    expect(selectChapter).not.toHaveBeenCalled()
   })
 
   it('deletes the open chapter after asking, with everything in it', async () => {
@@ -217,13 +227,74 @@ describe('Outline Max: the contents', () => {
     expect(card('m1')).toBeNull()
   })
 
-  it('creates a sibling chapter on Enter in a chapter title', async () => {
-    const { user } = setup('c1')
+  it('creates a sibling chapter on Enter in a chapter title: the cursor goes to it, the book is shown, and nothing is focused', async () => {
+    const { user, selectChapter } = setup('c1')
+    // Narrowed to Chapter 1 (the open chapter) alone: Enter widens the view to the whole book, so the new chapter is on view.
+    expect(card('c2')).toBeNull()
     await user.click(screen.getByLabelText('Chapter 1 title'))
     await user.keyboard('{Enter}')
     expect(chapterTabs()).toHaveLength(3)
-    // The new chapter comes after Chapter 1, becomes the open one and has the focus.
-    await waitFor(() => expect((document.activeElement as HTMLInputElement).getAttribute('aria-label')).toBe('Chapter 2 title'))
+    expect(openCards()).toEqual(['c1', 'new1', 'c2']) // the new chapter comes after Chapter 1
+    expect(tabsRaised()).toHaveLength(0)
+    await waitFor(() => expect(typingIn()).toBe('Chapter 2 title'))
+    expect(selectChapter).not.toHaveBeenCalled()
+  })
+
+  it('keeps the whole book on Enter when it is already shown (a focused tab pressed again)', async () => {
+    const { user, selectChapter } = setup('c1')
+    await user.click(screen.getByRole('button', { name: 'Chapter 1: Ice Out' })) // the focused tab again: the book level
+    expect(tabsRaised()).toHaveLength(0)
+    expect(openCards()).toEqual(['c1', 'c2'])
+    selectChapter.mockClear()
+    await user.click(screen.getByLabelText('Chapter 2 title'))
+    await user.keyboard('{Enter}')
+    expect(openCards()).toEqual(['c1', 'c2', 'new1'])
+    expect(tabsRaised()).toHaveLength(0)
+    await waitFor(() => expect(typingIn()).toBe('Chapter 3 title'))
+    expect(selectChapter).not.toHaveBeenCalled()
+  })
+
+  it('goes back to the whole book when something is added while an arc is focused: a chapter in it, or a new arc', async () => {
+    const { user, selectChapter } = setup('c1')
+    await user.click(arcTab())
+    expect(tabsRaised().map(t => t.getAttribute('aria-label'))).toEqual(['Arc 1: Thaw'])
+    selectChapter.mockClear()
+
+    // Shift+Enter in the arc title: a new chapter in it.
+    await user.click(screen.getByLabelText('Arc 1 title'))
+    await user.keyboard('{Shift>}{Enter}{/Shift}')
+    expect(chapterTabs()).toHaveLength(3)
+    expect(tabsRaised()).toHaveLength(0)
+    await waitFor(() => expect(typingIn()).toBe('Chapter 3 title'))
+
+    // Focus the arc again, then Ctrl+Enter in a chapter of it: a new arc after it.
+    await user.click(arcTab())
+    selectChapter.mockClear()
+    await user.click(screen.getByLabelText('Chapter 1 title'))
+    await user.keyboard('{Control>}{Enter}{/Control}')
+    expect(screen.getAllByRole('button', { name: /^Arc \d+:/ })).toHaveLength(2)
+    expect(tabsRaised()).toHaveLength(0)
+    await waitFor(() => expect(typingIn()).toBe('Arc 2 title'))
+    expect(selectChapter).not.toHaveBeenCalled()
+  })
+
+  it('does the same for the + Chapter button in an arc while the arc is focused', async () => {
+    const { user, selectChapter } = setup('c1')
+    await user.click(arcTab())
+    selectChapter.mockClear()
+    await user.click(addButton(card('a1').querySelector<HTMLElement>(':scope > .wrCardFoot--tools')!, 'Chapter'))
+    expect(chapterTabs()).toHaveLength(3)
+    expect(tabsRaised()).toHaveLength(0)
+    expect(selectChapter).not.toHaveBeenCalled()
+  })
+
+  it('still opens the first chapter added to a book with none (a book always has an open chapter)', async () => {
+    const { user, selectChapter } = setup(null, [OUTLINE[0]])
+    expect(screen.queryAllByRole('button', { name: /^Chapter \d+:/ })).toHaveLength(0)
+    await user.click(addButton(document.querySelector<HTMLElement>('.wrCtHead')!, 'Chapter'))
+    expect(chapterTabs()).toHaveLength(1)
+    expect(selectChapter).toHaveBeenCalledWith('new1')
+    expect(openCards()).toEqual(['new1'])
   })
 })
 
@@ -275,15 +346,19 @@ describe('Outline Max: the page edges and tabs', () => {
     expect(within(tabs).getByRole('button', { name: 'Chapter 2: The Harbor Master' }).getAttribute('aria-pressed')).toBe('false')
   })
 
-  it("open a chapter from its tab, the first chapter of an arc from the arc tab, and add one from the plus tab", async () => {
-    const { user } = setup('c1')
+  it("open a chapter from its tab, the first chapter of an arc from the arc tab; the plus tab adds a chapter without focusing it", async () => {
+    const { user, selectChapter } = setup('c1')
     await user.click(screen.getByRole('button', { name: 'Chapter 2: The Harbor Master' }))
     expect(openCards()[0]).toBe('c2')
     await user.click(screen.getByRole('button', { name: 'Arc 1: Thaw' }))
     expect(openCards()[0]).toBe('c1')
+    selectChapter.mockClear()
     await user.click(screen.getByRole('button', { name: 'Add chapter' }))
     expect(chapterTabs()).toHaveLength(3)
-    expect(openCards()[0]).toBe('new1')
+    // The view goes to the whole book (no tab raised) with the new chapter in it; no chapter was opened for it.
+    expect(openCards()).toEqual(['c1', 'c2', 'new1'])
+    expect(tabsRaised()).toHaveLength(0)
+    expect(selectChapter).not.toHaveBeenCalled()
   })
 })
 
