@@ -736,3 +736,140 @@ describe('the parent chips, by level', () => {
     expect(expandedKinds()).toEqual(['cluster'])
   })
 })
+
+describe('fieldsets', () => {
+  // The category keeps Theme loose and has a set, "Setting", holding Place.
+  const withSet = (): PlotNode[] => startingPlot().map(n => (n.id === 'cat'
+    ? { ...n, customFieldSets: [{ id: 'sSet', name: 'Setting' }], customFieldDefs: [{ id: 'fTheme', name: 'Theme' }, { id: 'fPlace', name: 'Place', setId: 'sSet' }] }
+    : n))
+  const twoSets = (): PlotNode[] => withSet().map(n => (n.id === 'cat'
+    ? { ...n, customFieldSets: [...n.customFieldSets!, { id: 'sMood', name: 'Mood' }], customFieldDefs: [...n.customFieldDefs, { id: 'fTone', name: 'Tone', setId: 'sMood' }] }
+    : n))
+  const set = (name: string) => screen.getByRole('group', { name: `Fieldset ${name}` })
+  const values = (els: HTMLElement[]) => els.map(e => (e as HTMLInputElement).value)
+  const dragData = () => {
+    const data = new Map<string, string>()
+    return { setData: (k: string, v: string) => data.set(k, v), getData: (k: string) => data.get(k) ?? '', effectAllowed: '', setDragImage: () => {} }
+  }
+
+  it('lists the loose fields, then each set with its fields and a count', () => {
+    render(<Editor start={withSet()} focused="cat" />)
+    expect(values(screen.getAllByLabelText('Field name'))).toEqual(['Theme', 'Place'])
+    expect(within(set('Setting')).getByLabelText('Field name')).toHaveValue('Place')
+    expect(within(set('Setting')).getByLabelText('Fieldset name')).toHaveValue('Setting')
+    expect(set('Setting').querySelector('.wrFieldCount')).toHaveTextContent('1')
+  })
+
+  it('folds a set, open at first, and remembers the fold', () => {
+    const { unmount } = render(<Editor start={withSet()} focused="cat" />)
+    fireEvent.click(within(set('Setting')).getByRole('button', { name: 'Collapse Setting' }))
+    expect(within(set('Setting')).queryByLabelText('Field name')).toBeNull()
+    unmount()
+    render(<Editor start={withSet()} focused="cat" />)
+    expect(within(set('Setting')).queryByLabelText('Field name')).toBeNull()
+    fireEvent.click(within(set('Setting')).getByRole('button', { name: 'Expand Setting' }))
+    expect(within(set('Setting')).getByLabelText('Field name')).toHaveValue('Place')
+  })
+
+  it('+ Fieldset makes a set whose name takes focus; left blank and empty it is dropped, named it stays', async () => {
+    render(<Editor focused="cat" />)
+    fireEvent.click(screen.getByRole('button', { name: 'Fieldset' }))
+    const blank = screen.getByLabelText('Fieldset name')
+    await waitFor(() => expect(blank).toHaveFocus())
+    expect((blank as HTMLInputElement).maxLength).toBe(30)
+    fireEvent.blur(blank)
+    expect(screen.queryByLabelText('Fieldset name')).toBeNull()
+    fireEvent.click(screen.getByRole('button', { name: 'Fieldset' }))
+    fireEvent.change(screen.getByLabelText('Fieldset name'), { target: { value: 'Mood' } })
+    fireEvent.blur(screen.getByLabelText('Fieldset name'))
+    expect(screen.getByLabelText('Fieldset name')).toHaveValue('Mood')
+  })
+
+  it('adds a field to a set from its + Field, and the set counts it', () => {
+    render(<Editor start={withSet()} focused="cat" />)
+    fireEvent.click(within(set('Setting')).getByRole('button', { name: 'Add a field to Setting' }))
+    expect(within(set('Setting')).getAllByLabelText('Field name')).toHaveLength(2)
+    expect(set('Setting').querySelector('.wrFieldCount')).toHaveTextContent('2')
+    expect(values(screen.getAllByLabelText('Field name')).slice(0, 1)).toEqual(['Theme'])
+  })
+
+  it('deleting a set says its fields stay, and keeps them as loose fields', async () => {
+    render(<Editor start={withSet()} focused="cat" />)
+    fireEvent.click(within(set('Setting').querySelector<HTMLElement>('.wrFieldSetHead')!).getByRole('button', { name: 'Delete' }))
+    expect(screen.getByText(/Its field stays/)).toBeInTheDocument()
+    fireEvent.click(screen.getByRole('button', { name: 'Confirm' }))
+    await waitFor(() => expect(screen.queryByRole('group', { name: 'Fieldset Setting' })).toBeNull())
+    expect(values(screen.getAllByLabelText('Field name'))).toEqual(['Theme', 'Place'])
+  })
+
+  it('shows a category\'s set on its plotlines, read-only, inside the category\'s group', () => {
+    render(<Editor start={withSet()} />)
+    const group = within(screen.getByRole('region', { name: 'From category: Romance' })).getByRole('group', { name: 'Fieldset Setting' })
+    expect(within(group).queryByLabelText('Fieldset name')).toBeNull()
+    expect(within(group).getByText('Place')).toBeInTheDocument()
+    expect(group.querySelector('.wrFieldSetHead')!.querySelector('.wrTrashBtn')).toBeNull()
+    expect(within(group).queryByRole('button', { name: /Add a field/ })).toBeNull()
+    expect(within(group).queryByLabelText('Drag to reorder fieldsets')).toBeNull()
+  })
+
+  it('lets a plotline make its own set, and put a field in it', () => {
+    render(<Editor />)
+    const own = screen.getByRole('region', { name: 'Plotline fields' })
+    fireEvent.click(within(own).getByRole('button', { name: 'Fieldset' }))
+    fireEvent.change(within(own).getByLabelText('Fieldset name'), { target: { value: 'Clues' } })
+    fireEvent.click(within(own).getByRole('button', { name: 'Add a field to Clues' }))
+    expect(within(set('Clues')).getAllByLabelText('Field name')).toHaveLength(1)
+    expect(values(within(own).getAllByLabelText('Field name'))).toEqual(['Setback', ''])
+  })
+
+  it('drags a field into a set, and out again onto the spot that appears', () => {
+    render(<Editor start={withSet()} focused="cat" />)
+    const dataTransfer = dragData()
+    fireEvent.dragStart(screen.getAllByLabelText('Drag to reorder fields')[0], { dataTransfer })
+    fireEvent.dragOver(set('Setting'), { dataTransfer })
+    fireEvent.drop(set('Setting'), { dataTransfer })
+    expect(values(within(set('Setting')).getAllByLabelText('Field name'))).toEqual(['Place', 'Theme'])
+    expect(document.querySelector('.wrFieldLoose')).toBeNull()
+
+    fireEvent.dragStart(within(set('Setting')).getAllByLabelText('Drag to reorder fields')[1], { dataTransfer })
+    const out = screen.getByText('Drop here to take it out of its set')
+    fireEvent.dragOver(out, { dataTransfer })
+    fireEvent.drop(out, { dataTransfer })
+    expect(values(within(set('Setting')).getAllByLabelText('Field name'))).toEqual(['Place'])
+    expect(values([...document.querySelectorAll<HTMLElement>('.wrFieldLoose [aria-label="Field name"]')])).toEqual(['Theme'])
+  })
+
+  it('drops a field on another field to sit before it, in that field\'s set', () => {
+    render(<Editor start={twoSets()} focused="cat" />)
+    const dataTransfer = dragData()
+    fireEvent.dragStart(screen.getAllByLabelText('Drag to reorder fields')[0], { dataTransfer }) // Theme
+    const tone = within(set('Mood')).getByLabelText('Field name').closest('.wrFieldBlock') as HTMLElement
+    fireEvent.dragOver(tone, { dataTransfer })
+    fireEvent.drop(tone, { dataTransfer })
+    expect(values(within(set('Mood')).getAllByLabelText('Field name'))).toEqual(['Theme', 'Tone'])
+  })
+
+  it('drags a set above another, and to the end', () => {
+    render(<Editor start={twoSets()} focused="cat" />)
+    const names = () => values(screen.getAllByLabelText('Fieldset name'))
+    const dataTransfer = dragData()
+    fireEvent.dragStart(within(set('Mood')).getByLabelText('Drag to reorder fieldsets'), { dataTransfer })
+    fireEvent.dragOver(set('Setting'), { dataTransfer })
+    fireEvent.drop(set('Setting'), { dataTransfer })
+    expect(names()).toEqual(['Mood', 'Setting'])
+
+    fireEvent.dragStart(within(set('Mood')).getByLabelText('Drag to reorder fieldsets'), { dataTransfer })
+    const last = screen.getByText('Drop here to move it last')
+    fireEvent.dragOver(last, { dataTransfer })
+    fireEvent.drop(last, { dataTransfer })
+    expect(names()).toEqual(['Setting', 'Mood'])
+  })
+
+  it('Ctrl+Enter in a value adds the next field into the same set', async () => {
+    const start = syncReferences(withSet().concat(plotNode('pv', 'plotpoint', 'cat', { title: 'Harbour', fieldId: 'fPlace' })), new Map(OUTLINE.map(n => [n.id, n])))
+    render(<Editor start={start} focused="cat" />)
+    toggle(/^Expand Place/)
+    fireEvent.keyDown(screen.getByLabelText('Place value title'), { key: 'Enter', ctrlKey: true })
+    await waitFor(() => expect(within(set('Setting')).getAllByLabelText('Field name')).toHaveLength(2))
+  })
+})

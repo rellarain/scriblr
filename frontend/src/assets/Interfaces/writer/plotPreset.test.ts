@@ -19,6 +19,38 @@ const preset = (over: Partial<PresetContent> = {}): PresetContent => ({
   ...over,
 })
 
+describe('nodesFromPreset: fieldsets', () => {
+  const withSets = () => preset({
+    fieldsets: [{ name: 'Look', fields: ['Hair', 'Eyes'] }, { name: '', fields: ['Quirk'] }],
+    subcategories: [{ id: 'x1', name: 'Heroes', description: '', keywords: [], fields: ['Want'], fieldsets: [{ name: 'Bond', fields: ['Trust'] }], clusters: [] }],
+  })
+
+  it('makes each set on its node, with the loose fields first and then the set\'s fields tied to it', () => {
+    const { nodes } = nodesFromPreset([], withSets(), counter())
+    const category = nodes[0]
+    expect(category.customFieldSets?.map(s => s.name)).toEqual(['Look', 'Untitled set'])
+    const [look, untitled] = category.customFieldSets!
+    expect(category.customFieldDefs.map(f => [f.name, f.setId ?? null])).toEqual([
+      ['Name', null], ['Role', null], ['Hair', look.id], ['Eyes', look.id], ['Quirk', untitled.id],
+    ])
+    expect(nodes[1].customFieldSets?.map(s => s.name)).toEqual(['Bond'])
+    expect(nodes[1].customFieldDefs.map(f => [f.name, f.setId ? 'set' : null])).toEqual([['Want', null], ['Trust', 'set']])
+  })
+
+  it('gives every set and field its own id, and leaves a node with no sets without the key', () => {
+    const { nodes } = nodesFromPreset([], withSets(), counter())
+    const ids = nodes.flatMap(n => [n.id, ...n.customFieldDefs.map(f => f.id), ...(n.customFieldSets ?? []).map(s => s.id)])
+    expect(new Set(ids).size).toBe(ids.length)
+    expect(nodesFromPreset([], preset(), counter()).nodes.every(n => !('customFieldSets' in n))).toBe(true)
+  })
+
+  it('cuts a set\'s name and fields to the Writer\'s limits', () => {
+    const { nodes } = nodesFromPreset([], preset({ fieldsets: [{ name: 'N'.repeat(40), fields: ['F'.repeat(40)] }] }), counter())
+    expect(nodes[0].customFieldSets?.[0].name).toHaveLength(30)
+    expect(nodes[0].customFieldDefs.at(-1)?.name).toHaveLength(30)
+  })
+})
+
 describe('nodesFromPreset', () => {
   it('makes a category with its text, keywords and fields, and its subcategories and clusters under it', () => {
     const { nodes, id } = nodesFromPreset([], preset(), counter())

@@ -1,14 +1,16 @@
 import { useState, type KeyboardEvent, type ReactNode } from 'react'
-import type { PresetCard, PresetCluster, PresetContent, PresetSubcategory } from '../../../../api/types'
-import { GripIcon, PlusIcon, TrashIcon } from '../../../icons'
+import type { PresetCard, PresetCluster, PresetContent, PresetFieldset, PresetSubcategory } from '../../../../api/types'
+import { ChevronDownIcon, ChevronRightIcon, GripIcon, PlusIcon, TrashIcon } from '../../../icons'
 import {
-  DESCRIPTION_MAX, FIELD_MAX, KEYWORD_MAX, NAME_MAX, ROOT, addCluster, addFieldName, addKeyword, addSubcategory, isBlankCard, moveCard,
-  moveFieldTo, nudge, removeCard, removeFieldAt, removeKeyword, updateCard, type CardKind, type MakeId,
+  DESCRIPTION_MAX, FIELDSETS_MAX, FIELDSET_MAX, FIELD_MAX, KEYWORD_MAX, NAME_MAX, ROOT, addCluster, addFieldNameToSet, addFieldName, addFieldset, addKeyword,
+  addSubcategory, fieldTotal, isBlankCard, moveCard, moveFieldTo, moveFieldsetTo, moveSetFieldTo, nudge, removeCard, removeFieldAt, removeFieldsetAt, removeKeyword,
+  removeSetFieldAt, renameFieldsetAt, setsOf, updateCard, type CardKind, type MakeId,
 } from './presetModel'
 import { useReorder } from './useReorder'
 
 // The open preset as a tree of cards: the category, its subcategories and their clusters. Each card has a name edited in place, a description,
-// keywords and field chips; subcategories and clusters can be reordered by their grips, and a field by its chip.
+// keywords, field chips and fieldsets (a named, foldable group of field chips); subcategories and clusters can be reordered by their grips, and
+// a field by its chip, and a fieldset by its grip.
 
 export interface TreeCtx {
   // Change the open preset's draft (a structural change passes `immediate`).
@@ -73,6 +75,78 @@ function ChipList({ items, label, placeholder, maxLength, onAdd, onRemove, onMov
   )
 }
 
+// ---- fieldsets ----
+
+function FieldsetBox({ set, index, cardId, who, ctx, drag }: {
+  set: PresetFieldset
+  index: number
+  cardId: string
+  who: string
+  ctx: TreeCtx
+  drag: ReturnType<typeof useReorder<number>>
+}) {
+  const [open, setOpen] = useState(true)
+  // A set just added (nothing in it yet) takes focus at its name.
+  const [fresh] = useState(set.name === '' && set.fields.length === 0)
+  const label = set.name.trim() || 'without a name'
+  return (
+    <div
+      className={`plpSet${drag.dragId === index ? ' plpSet--dragging' : ''}${drag.overId === index && drag.dragId !== index ? ' plpSet--over' : ''}`}
+      role="group" aria-label={`Fieldset ${label}`} {...drag.target(index)}
+    >
+      <div className="plpSetHead">
+        <button type="button" className="plpIconBtn" aria-expanded={open} aria-label={`${open ? 'Collapse' : 'Expand'} fieldset ${label}`} onClick={() => setOpen(o => !o)}>
+          {open ? <ChevronDownIcon size={14} /> : <ChevronRightIcon size={14} />}
+        </button>
+        <span className="plpGrip" role="button" tabIndex={0} aria-label={`Move fieldset ${label} (Alt+Up or Down)`} {...drag.grip(index)}><GripIcon size={14} /></span>
+        <input
+          className="plpSetName" data-kf="" maxLength={FIELDSET_MAX} aria-label="Fieldset name" placeholder="Fieldset name" autoFocus={fresh}
+          value={set.name} onChange={e => ctx.edit(c => renameFieldsetAt(c, cardId, index, e.target.value))}
+        />
+        <span className="plpCount">{set.fields.length} field{set.fields.length === 1 ? '' : 's'}</span>
+        <button
+          type="button" className="plpIconBtn" aria-label={`Delete fieldset ${label}`} title="Delete (its fields stay)"
+          onClick={() => ctx.edit(c => removeFieldsetAt(c, cardId, index), true)}
+        ><TrashIcon size={14} /></button>
+      </div>
+      {open && (
+        <ChipList
+          items={set.fields} label={`${who} fieldset ${label} fields`} placeholder="Add field to set…" maxLength={FIELD_MAX}
+          onAdd={f => ctx.edit(c => addFieldNameToSet(c, cardId, index, f), true)}
+          onRemove={i => ctx.edit(c => removeSetFieldAt(c, cardId, index, i), true)}
+          onMove={(from, before) => ctx.edit(c => moveSetFieldTo(c, cardId, index, from, before), true)}
+        />
+      )}
+    </div>
+  )
+}
+
+function Fieldsets({ card, cardId, who, noun, ctx }: { card: PresetCard; cardId: string; who: string; noun: string; ctx: TreeCtx }) {
+  const sets = setsOf(card)
+  const drag = useReorder<number>(
+    (from, before) => ctx.edit(c => moveFieldsetTo(c, cardId, from, before), true),
+    (from, dir) => ctx.edit(c => moveFieldsetTo(c, cardId, from, dir < 0 ? from - 1 : from + 2), true),
+  )
+  const full = sets.length >= FIELDSETS_MAX
+  return (
+    <div>
+      <div className="plpLabel">Fieldsets <span>each becomes a named group of fields on the new {noun}</span></div>
+      {sets.length > 0 && (
+        <div className="plpSets">
+          {sets.map((set, i) => <FieldsetBox key={i} set={set} index={i} cardId={cardId} who={who} ctx={ctx} drag={drag} />)}
+          {drag.dragId !== null && <div className={`plpDropEnd${drag.overId === null ? ' plpDropEnd--over' : ''}`} {...drag.target(null)}>Move here to put it last</div>}
+        </div>
+      )}
+      <div className="plpFoot">
+        <button
+          type="button" className="plpBtn plpBtn--small" disabled={full} title={full ? `A card can have ${FIELDSETS_MAX} fieldsets` : undefined}
+          onClick={() => ctx.edit(c => addFieldset(c, cardId), true)}
+        ><PlusIcon size={12} /> Fieldset</button>
+      </div>
+    </div>
+  )
+}
+
 // ---- a card ----
 
 function CardBody({ kind, card, cardId, ctx }: { kind: CardKind; card: PresetCard; cardId: string; ctx: TreeCtx }) {
@@ -105,6 +179,7 @@ function CardBody({ kind, card, cardId, ctx }: { kind: CardKind; card: PresetCar
           onMove={(from, before) => ctx.edit(c => moveFieldTo(c, cardId, from, before), true)}
         />
       </div>
+      <Fieldsets card={card} cardId={cardId} who={who} noun={noun} ctx={ctx} />
     </>
   )
 }
@@ -145,7 +220,7 @@ function Card({ kind, card, cardId, nodeId, ctx, grip, nameInput, onDelete, conf
             value={card.name} onChange={e => ctx.edit(c => updateCard(c, cardId, { name: e.target.value }))}
           />
         )}
-        {card.fields.length > 0 && <span className="plpCount">{card.fields.length} field{card.fields.length === 1 ? '' : 's'}</span>}
+        {fieldTotal(card) > 0 && <span className="plpCount">{fieldTotal(card)} field{fieldTotal(card) === 1 ? '' : 's'}</span>}
         {confirming ? (
           <span className="plpConfirm" role="alertdialog" aria-label={`Delete ${noun} ${label}`}>
             <span>Delete {card.name.trim() || `this ${noun}`} and what is in it?</span>

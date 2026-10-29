@@ -1,5 +1,7 @@
 from fastapi.testclient import TestClient
 
+from app.storage.schema import PLOT_FIELDSET_NAME_MAX, PLOT_MAX_FIELDSETS
+
 
 def test_get_and_replace_plot_tree(client: TestClient) -> None:
     project_id = client.post("/api/projects", json={"title": "Plot API Test"}).json()["projectId"]
@@ -129,9 +131,54 @@ def test_a_cluster_sits_between_a_subcategory_and_a_plotline_with_its_own_fields
     assert reloaded["cl_1"]["kind"] == "cluster"
     assert reloaded["cl_1"]["parentId"] == "sub_1"
     assert reloaded["cl_1"]["hue"] == 180
-    assert reloaded["cl_1"]["customFieldDefs"] == [{"id": "f1", "name": "Motive"}]
+    assert reloaded["cl_1"]["customFieldDefs"] == [{"id": "f1", "name": "Motive", "setId": None}]
     assert reloaded["pl_1"]["parentId"] == "cl_1"
     assert reloaded["pl_2"]["parentId"] == "sub_1"
+
+
+def test_fieldsets_round_trip_with_the_fields_listed_under_them(client: TestClient) -> None:
+    project_id = client.post("/api/projects", json={"title": "Fieldsets"}).json()["projectId"]
+    tree = client.get(f"/api/projects/{project_id}/plot").json()
+    tree["nodes"] += [
+        {"id": "cat_1", "kind": "category", "parentId": None, "order": 0, "title": "Cast",
+         "customFieldSets": [{"id": "set_1", "name": "Looks"}, {"id": "set_2", "name": "Past"}],
+         "customFieldDefs": [{"id": "f1", "name": "Hair", "setId": "set_1"}, {"id": "f2", "name": "Motto"}, {"id": "f3", "name": "Home", "setId": "set_2"}]},
+    ]
+    assert client.put(f"/api/projects/{project_id}/plot", json=tree).status_code == 200
+    cat = {n["id"]: n for n in client.get(f"/api/projects/{project_id}/plot").json()["nodes"]}["cat_1"]
+    assert cat["customFieldSets"] == [{"id": "set_1", "name": "Looks"}, {"id": "set_2", "name": "Past"}]
+    assert [(d["id"], d["setId"]) for d in cat["customFieldDefs"]] == [("f1", "set_1"), ("f2", None), ("f3", "set_2")]
+
+
+def test_a_plot_saved_before_fieldsets_loads_with_no_sets_and_loose_fields(client: TestClient) -> None:
+    project_id = client.post("/api/projects", json={"title": "Old plot"}).json()["projectId"]
+    tree = client.get(f"/api/projects/{project_id}/plot").json()
+    tree["nodes"] += [
+        {"id": "cat_1", "kind": "category", "parentId": None, "order": 0, "title": "Cast", "customFieldDefs": [{"id": "f1", "name": "Hair"}]},
+    ]
+    assert client.put(f"/api/projects/{project_id}/plot", json=tree).status_code == 200
+    cat = {n["id"]: n for n in client.get(f"/api/projects/{project_id}/plot").json()["nodes"]}["cat_1"]
+    assert cat["customFieldSets"] == []
+    assert cat["customFieldDefs"][0]["setId"] is None
+
+
+def test_a_fieldset_name_that_is_too_long_is_cut_not_refused(client: TestClient) -> None:
+    project_id = client.post("/api/projects", json={"title": "Long set"}).json()["projectId"]
+    tree = client.get(f"/api/projects/{project_id}/plot").json()
+    tree["nodes"] += [
+        {"id": "cat_1", "kind": "category", "parentId": None, "order": 0, "title": "Cast", "customFieldSets": [{"id": "s", "name": "N" * 80}]},
+    ]
+    assert client.put(f"/api/projects/{project_id}/plot", json=tree).status_code == 200
+    cat = {n["id"]: n for n in client.get(f"/api/projects/{project_id}/plot").json()["nodes"]}["cat_1"]
+    assert cat["customFieldSets"][0]["name"] == "N" * PLOT_FIELDSET_NAME_MAX
+
+
+def test_more_than_the_most_fieldsets_on_a_node_is_refused(client: TestClient) -> None:
+    project_id = client.post("/api/projects", json={"title": "Too many"}).json()["projectId"]
+    tree = client.get(f"/api/projects/{project_id}/plot").json()
+    sets = [{"id": f"s{i}", "name": f"Set {i}"} for i in range(PLOT_MAX_FIELDSETS + 1)]
+    tree["nodes"] += [{"id": "cat_1", "kind": "category", "parentId": None, "order": 0, "title": "Cast", "customFieldSets": sets}]
+    assert client.put(f"/api/projects/{project_id}/plot", json=tree).status_code == 422
 
 
 def test_source_field_id_round_trips(client: TestClient) -> None:

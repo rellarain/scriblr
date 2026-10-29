@@ -1,4 +1,4 @@
-import type { Awareness, OutlineNode, PlotCustomFieldDef, PlotNode, TimeSystem } from '../../../api/types'
+import type { Awareness, OutlineNode, PlotCustomFieldDef, PlotFieldSet, PlotNode, TimeSystem } from '../../../api/types'
 import { insertAfter } from '../../../lib/siblingOrder'
 import { assignedLevel, orderAssignedPlotpoints } from './plotTree'
 
@@ -9,9 +9,14 @@ import { assignedLevel, orderAssignedPlotpoints } from './plotTree'
 //     under it as a REFERENCE (a plotpoint with `refId`, whose text is the
 //     original's), which the plotline assigns to its own chapters;
 //   - a plotline can also add its own values to an inherited field.
+// A node can also define FIELDSETS (a PlotFieldSet): named groups its fields are listed under (a field has `setId`; none = a loose field,
+// in at most one set). A set shows on every plotline under the node as its fields do; only the node's own editor changes it, and a
+// plotline's own fields go in its own sets. A node lists its loose fields first, then its sets, then (a plotline) its Scrap field.
 // Everything here is pure: the workspace applies the results.
 
 export const FIELD_NAME_MAX = 30
+export const FIELDSET_NAME_MAX = 30
+export const MAX_FIELDSETS = 20
 export const TITLE_MAX = 50
 export const BODY_MAX = 255
 export const DEFAULT_FIELD_NAME = 'Default'
@@ -73,6 +78,65 @@ export function fieldIndex(nodes: PlotNode[]): Map<string, FieldInfo> {
   return out
 }
 
+// ---- fieldsets ----
+
+export const setsOf = (node: PlotNode): PlotFieldSet[] => node.customFieldSets ?? []
+
+// The field with its set changed (none = loose); the key is left out when it is not in one, so a loose field stays `{ id, name }`.
+const withSet = (def: PlotCustomFieldDef, setId: string | null): PlotCustomFieldDef => {
+  const { setId: _old, ...rest } = def
+  return setId ? { ...rest, setId } : rest
+}
+
+// A node's fields as it lists them: the loose ones, then its sets (each with its fields, in order), then (a plotline) its Scrap field.
+// A field that names a set the node does not have is loose.
+export interface FieldLayout {
+  loose: PlotCustomFieldDef[]
+  sets: Array<{ set: PlotFieldSet; fields: PlotCustomFieldDef[] }>
+  scrap: PlotCustomFieldDef | null
+}
+export function fieldLayout(node: PlotNode): FieldLayout {
+  const sets = setsOf(node)
+  const known = new Set(sets.map(s => s.id))
+  const defs = node.customFieldDefs
+  return {
+    loose: defs.filter(d => !isScrapField(d) && !(d.setId && known.has(d.setId))),
+    sets: sets.map(set => ({ set, fields: defs.filter(d => !isScrapField(d) && d.setId === set.id) })),
+    scrap: defs.find(d => isScrapField(d)) ?? null,
+  }
+}
+
+// The same fields in the order they are listed (the order Tab goes through them).
+export function fieldsInOrder(node: PlotNode): PlotCustomFieldDef[] {
+  const layout = fieldLayout(node)
+  return [...layout.loose, ...layout.sets.flatMap(s => s.fields), ...(layout.scrap ? [layout.scrap] : [])]
+}
+
+// What a plotline shows from one place its fields come from (its own, its cluster's, its subcategory's, its category's): the owners that
+// define something there, and their loose fields, sets and Scrap field with where each comes from.
+export interface ScopeLayout {
+  owners: PlotNode[]
+  loose: FieldInfo[]
+  sets: Array<{ set: PlotFieldSet; owner: PlotNode; fields: FieldInfo[] }>
+  scrap: FieldInfo | null
+}
+export function scopeLayouts(plotline: PlotNode, index: Map<string, PlotNode>): Record<FieldScope, ScopeLayout> {
+  const empty = (): ScopeLayout => ({ owners: [], loose: [], sets: [], scrap: null })
+  const out: Record<FieldScope, ScopeLayout> = { plotline: empty(), cluster: empty(), subcategory: empty(), category: empty() }
+  for (const owner of chainOf(plotline, index)) {
+    const scope = scopeOf(owner)
+    if (!scope) continue
+    const layout = fieldLayout(owner)
+    const info = (def: PlotCustomFieldDef): FieldInfo => ({ def, owner, scope })
+    const bucket = out[scope]
+    if (owner.customFieldDefs.length > 0 || setsOf(owner).length > 0) bucket.owners.push(owner)
+    bucket.loose.push(...layout.loose.map(info))
+    bucket.sets.push(...layout.sets.map(s => ({ set: s.set, owner, fields: s.fields.map(info) })))
+    if (layout.scrap) bucket.scrap = info(layout.scrap)
+  }
+  return out
+}
+
 // The values held by a node in one of its fields (own values and references), in stored order.
 export function valuesIn(nodes: PlotNode[], holderId: string, fieldId: string): PlotNode[] {
   return nodes.filter(n => n.kind === 'plotpoint' && n.parentId === holderId && n.fieldId === fieldId).sort((a, b) => a.order - b.order)
@@ -94,14 +158,26 @@ export function orderValues(points: PlotNode[], outlineNodes: OutlineNode[], sys
 
 // ---- fields ----
 
-export function addField(nodes: PlotNode[], ownerId: string, name: string, makeId: MakeId = randomId, afterFieldId?: string): { nodes: PlotNode[]; id: string | null } {
+// A new field goes after `afterFieldId` and joins that field's set; with `setId` (a set of the owner) it goes at the end of that set instead
+// (null: loose).
+export function addField(
+  nodes: PlotNode[], ownerId: string, name: string, makeId: MakeId = randomId, afterFieldId?: string, setId?: string | null,
+): { nodes: PlotNode[]; id: string | null } {
   const clean = clampFieldName(name)
   const owner = nodes.find(n => n.id === ownerId)
   if (!owner || !scopeOf(owner)) return { nodes, id: null }
-  const def = { id: makeId('field'), name: clean }
   const defs = [...owner.customFieldDefs]
-  const at = afterFieldId ? defs.findIndex(d => d.id === afterFieldId) : -1
-  defs.splice(at >= 0 ? at + 1 : defs.length, 0, def)
+  const after = afterFieldId ? defs.find(d => d.id === afterFieldId) : undefined
+  const wanted = setId !== undefined ? setId : after?.setId ?? null
+  const inSet = wanted && setsOf(owner).some(s => s.id === wanted) ? wanted : null
+  const def: PlotCustomFieldDef = { id: makeId('field'), name: clean, ...(inSet ? { setId: inSet } : {}) }
+  let at = afterFieldId && setId === undefined ? defs.findIndex(d => d.id === afterFieldId) : -1
+  if (at >= 0) at += 1
+  else if (inSet) {
+    const last = defs.reduce((found, d, i) => (d.setId === inSet ? i : found), -1)
+    at = last >= 0 ? last + 1 : defs.length
+  } else at = defs.length
+  defs.splice(at, 0, def)
   // The plotline's Scrap stays last.
   defs.sort((a, b) => Number(isScrapField(a)) - Number(isScrapField(b)))
   return { nodes: nodes.map(n => (n.id === ownerId ? { ...n, customFieldDefs: defs } : n)), id: def.id }
@@ -114,15 +190,85 @@ export function renameField(nodes: PlotNode[], ownerId: string, fieldId: string,
   return nodes.map(n => (n.id === ownerId ? { ...n, customFieldDefs: n.customFieldDefs.map(d => (d.id === fieldId ? { ...d, name: kept } : d)) } : n))
 }
 
-// Put a field before another of the same owner (last when `beforeId` is null).
+// Put a field before another of the same owner (last when `beforeId` is null). Before a field it is listed in that field's set (loose if
+// that one is); moved last it keeps its own.
 export function moveField(nodes: PlotNode[], ownerId: string, fieldId: string, beforeId: string | null): PlotNode[] {
   return nodes.map(n => {
     if (n.id !== ownerId) return n
     const moving = n.customFieldDefs.find(d => d.id === fieldId)
     if (!moving || isScrapField(moving) || fieldId === beforeId) return n
+    const target = beforeId ? n.customFieldDefs.find(d => d.id === beforeId) : undefined
+    const placed = target ? withSet(moving, target.setId ?? null) : moving
     const rest = n.customFieldDefs.filter(d => d.id !== fieldId)
     const at = beforeId ? rest.findIndex(d => d.id === beforeId) : -1
+    rest.splice(at >= 0 ? at : rest.length, 0, placed)
+    rest.sort((a, b) => Number(isScrapField(a)) - Number(isScrapField(b)))
+    return { ...n, customFieldDefs: rest }
+  })
+}
+
+// ---- fieldsets: made, named, ordered, deleted, and fields put into them ----
+
+export const clampSetName = (s: string) => s.trim().slice(0, FIELDSET_NAME_MAX)
+
+// A new set after `afterSetId` (last when there is none). A node has at most MAX_FIELDSETS.
+export function addFieldset(
+  nodes: PlotNode[], ownerId: string, name = '', makeId: MakeId = randomId, afterSetId?: string,
+): { nodes: PlotNode[]; id: string | null } {
+  const owner = nodes.find(n => n.id === ownerId)
+  if (!owner || !scopeOf(owner) || setsOf(owner).length >= MAX_FIELDSETS) return { nodes, id: null }
+  const set: PlotFieldSet = { id: makeId('set'), name: name.slice(0, FIELDSET_NAME_MAX) }
+  const sets = [...setsOf(owner)]
+  const at = afterSetId ? sets.findIndex(s => s.id === afterSetId) : -1
+  sets.splice(at >= 0 ? at + 1 : sets.length, 0, set)
+  return { nodes: nodes.map(n => (n.id === ownerId ? { ...n, customFieldSets: sets } : n)), id: set.id }
+}
+
+// The name is kept as typed (up to the limit); the editor trims it and drops a blank set that holds nothing when it is left.
+export function renameFieldset(nodes: PlotNode[], ownerId: string, setId: string, name: string): PlotNode[] {
+  const kept = name.slice(0, FIELDSET_NAME_MAX)
+  return nodes.map(n => (n.id === ownerId ? { ...n, customFieldSets: setsOf(n).map(s => (s.id === setId ? { ...s, name: kept } : s)) } : n))
+}
+
+// Put a set before another of the same owner (last when `beforeId` is null).
+export function moveFieldset(nodes: PlotNode[], ownerId: string, setId: string, beforeId: string | null): PlotNode[] {
+  return nodes.map(n => {
+    if (n.id !== ownerId) return n
+    const moving = setsOf(n).find(s => s.id === setId)
+    if (!moving || setId === beforeId) return n
+    const rest = setsOf(n).filter(s => s.id !== setId)
+    const at = beforeId ? rest.findIndex(s => s.id === beforeId) : -1
     rest.splice(at >= 0 ? at : rest.length, 0, moving)
+    return { ...n, customFieldSets: rest }
+  })
+}
+
+// Delete a set: its fields stay, as loose fields (in the order they had).
+export function deleteFieldset(nodes: PlotNode[], ownerId: string, setId: string): PlotNode[] {
+  return nodes.map(n => {
+    if (n.id !== ownerId || !setsOf(n).some(s => s.id === setId)) return n
+    return { ...n, customFieldSets: setsOf(n).filter(s => s.id !== setId), customFieldDefs: n.customFieldDefs.map(d => (d.setId === setId ? withSet(d, null) : d)) }
+  })
+}
+
+// List a field under a set of its owner (null: take it out, loose), at the end of that group or before `beforeFieldId`. A field is in one
+// set at most; the Scrap field is never in one. A field dropped on the set it is already in stays where it is.
+export function setFieldSet(nodes: PlotNode[], ownerId: string, fieldId: string, setId: string | null, beforeFieldId: string | null = null): PlotNode[] {
+  return nodes.map(n => {
+    if (n.id !== ownerId) return n
+    const moving = n.customFieldDefs.find(d => d.id === fieldId)
+    if (!moving || isScrapField(moving) || fieldId === beforeFieldId) return n
+    if (setId && !setsOf(n).some(s => s.id === setId)) return n
+    if ((moving.setId ?? null) === setId && !beforeFieldId) return n
+    const placed = withSet(moving, setId)
+    const rest = n.customFieldDefs.filter(d => d.id !== fieldId)
+    let at = beforeFieldId ? rest.findIndex(d => d.id === beforeFieldId) : -1
+    if (at < 0) {
+      // The end of the group it goes to; a group with nothing in it yet leaves the field where it is in the list.
+      const last = rest.reduce((found, d, i) => ((d.setId ?? null) === setId && !isScrapField(d) ? i : found), -1)
+      at = last >= 0 ? last + 1 : Math.min(n.customFieldDefs.indexOf(moving), rest.length)
+    }
+    rest.splice(at, 0, placed)
     rest.sort((a, b) => Number(isScrapField(a)) - Number(isScrapField(b)))
     return { ...n, customFieldDefs: rest }
   })
@@ -353,6 +499,13 @@ export function migratePlot(nodes: PlotNode[], outlineNodes: OutlineNode[], make
   next = next.map(n => (n.customFieldDefs.some(d => d.name.trim() === '' && !isScrapField(d) && !next.some(v => v.fieldId === d.id))
     ? { ...n, customFieldDefs: n.customFieldDefs.filter(d => d.name.trim() !== '' || isScrapField(d) || next.some(v => v.fieldId === d.id)) }
     : n))
+
+  // A field that names a set its node does not have is loose.
+  next = next.map(n => {
+    const known = new Set(setsOf(n).map(s => s.id))
+    if (!n.customFieldDefs.some(d => d.setId && !known.has(d.setId))) return n
+    return { ...n, customFieldDefs: n.customFieldDefs.map(d => (d.setId && !known.has(d.setId) ? withSet(d, null) : d)) }
+  })
 
   // Awareness follows placement.
   next = next.map(n => {

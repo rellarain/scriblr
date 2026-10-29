@@ -1,8 +1,9 @@
 import { describe, expect, it } from 'vitest'
 import type { OutlineNode, PlotNode } from '../../../api/types'
 import {
-  BODY_MAX, DEFAULT_FIELD_NAME, SCRAP_FIELD_NAME, TITLE_MAX, addField, addValue, assignPoint, canMoveValue, deleteField, deleteValue,
-  fieldGroups, migratePlot, moveField, moveValue, orderValues, renameField, scrapFieldId, syncReferences, textOf, updateValue, valuesIn,
+  BODY_MAX, DEFAULT_FIELD_NAME, FIELDSET_NAME_MAX, MAX_FIELDSETS, SCRAP_FIELD_NAME, TITLE_MAX, addField, addFieldset, addValue, assignPoint,
+  canMoveValue, deleteField, deleteFieldset, deleteValue, fieldGroups, fieldLayout, fieldsInOrder, migratePlot, moveField, moveFieldset, moveValue,
+  orderValues, renameField, renameFieldset, scopeLayouts, scrapFieldId, setFieldSet, syncReferences, textOf, updateValue, valuesIn,
 } from './plotFields'
 
 let counter = 0
@@ -335,5 +336,175 @@ describe('addField and addValue', () => {
     const mid = addValue(nodes, 'lineA', 'fOwn', makeId, one.id!); nodes = updateValue(mid.nodes, mid.id!, { title: 'mid' })
     expect(valuesIn(nodes, 'lineA', 'fOwn').map(v => v.title)).toEqual(['one', 'mid', 'two'])
     expect(ids(valuesIn(nodes, 'lineA', 'fOwn'))).toHaveLength(3)
+  })
+})
+
+
+describe('fieldsets', () => {
+  const names = (defs: Array<{ name: string }>) => defs.map(d => d.name)
+  // A category with the fields Hair, Eyes, Motto and Home, and the sets Looks and Past (empty at first).
+  function cast(): PlotNode[] {
+    return [node('cat', 'category', null, {
+      customFieldDefs: [{ id: 'hair', name: 'Hair' }, { id: 'eyes', name: 'Eyes' }, { id: 'motto', name: 'Motto' }, { id: 'home', name: 'Home' }],
+      customFieldSets: [{ id: 'looks', name: 'Looks' }, { id: 'past', name: 'Past' }],
+    })]
+  }
+  const layout = (nodes: PlotNode[]) => fieldLayout(find(nodes, 'cat'))
+
+  it("makes a set after another, cuts its name to the limit, and refuses more than the most", () => {
+    let nodes = [node('cat', 'category', null)]
+    const first = addFieldset(nodes, 'cat', 'X'.repeat(FIELDSET_NAME_MAX + 9), makeId)
+    expect(find(first.nodes, 'cat').customFieldSets![0].name).toHaveLength(FIELDSET_NAME_MAX)
+    nodes = first.nodes
+    nodes = addFieldset(nodes, 'cat', 'Last', makeId).nodes
+    const between = addFieldset(nodes, 'cat', 'Between', makeId, first.id!)
+    expect(names(find(between.nodes, 'cat').customFieldSets!).slice(1)).toEqual(['Between', 'Last'])
+    let full = [node('cat', 'category', null)]
+    for (let i = 0; i < MAX_FIELDSETS; i += 1) full = addFieldset(full, 'cat', `Set ${i}`, makeId).nodes
+    expect(addFieldset(full, 'cat', 'One too many', makeId)).toEqual({ nodes: full, id: null })
+    expect(addFieldset([node('pp', 'plotpoint', null)], 'pp', 'No', makeId).id).toBeNull()
+  })
+
+  it("lists a node's loose fields first, then each set with its fields, then Scrap; a field in a set that is gone is loose", () => {
+    let nodes = cast()
+    nodes = setFieldSet(nodes, 'cat', 'eyes', 'looks')
+    nodes = setFieldSet(nodes, 'cat', 'hair', 'looks')
+    nodes = setFieldSet(nodes, 'cat', 'home', 'past')
+    const l = layout(nodes)
+    expect(names(l.loose)).toEqual(['Motto'])
+    expect(l.sets.map(s => [s.set.name, names(s.fields)])).toEqual([['Looks', ['Eyes', 'Hair']], ['Past', ['Home']]]) // in the order they were put in
+    expect(names(fieldsInOrder(find(nodes, 'cat')))).toEqual(['Motto', 'Eyes', 'Hair', 'Home'])
+    // A set that is not the node's own: the field is loose.
+    const stray = [node('cat', 'category', null, { customFieldDefs: [{ id: 'a', name: 'A', setId: 'nope' }] })]
+    expect(names(layout(stray).loose)).toEqual(['A'])
+    // Scrap stays last, outside the sets.
+    const line = node('line', 'plotline', null, { customFieldDefs: [{ id: scrapFieldId('line'), name: SCRAP_FIELD_NAME }, { id: 'own', name: 'Own' }] })
+    expect(fieldLayout(line).scrap?.name).toBe(SCRAP_FIELD_NAME)
+    expect(names(fieldsInOrder(line))).toEqual(['Own', SCRAP_FIELD_NAME])
+  })
+
+  it("puts a field into a set, out of it, and between sets: it is in one set at most", () => {
+    let nodes = cast()
+    nodes = setFieldSet(nodes, 'cat', 'hair', 'looks')
+    expect(find(nodes, 'cat').customFieldDefs.find(d => d.id === 'hair')!.setId).toBe('looks')
+    nodes = setFieldSet(nodes, 'cat', 'hair', 'past')
+    expect(names(layout(nodes).sets[0].fields)).toEqual([])
+    expect(names(layout(nodes).sets[1].fields)).toEqual(['Hair'])
+    nodes = setFieldSet(nodes, 'cat', 'hair', null)
+    expect(names(layout(nodes).loose)).toContain('Hair')
+    // A loose field is a plain { id, name }: no setId key is left behind.
+    expect(find(nodes, 'cat').customFieldDefs.find(d => d.id === 'hair')).toEqual({ id: 'hair', name: 'Hair' })
+  })
+
+  it("puts a field at the end of a set, or before a field in it, and leaves one dropped on its own set where it is", () => {
+    let nodes = cast()
+    nodes = setFieldSet(nodes, 'cat', 'hair', 'looks')
+    nodes = setFieldSet(nodes, 'cat', 'eyes', 'looks')
+    nodes = setFieldSet(nodes, 'cat', 'motto', 'looks', 'hair') // before Hair
+    expect(names(layout(nodes).sets[0].fields)).toEqual(['Motto', 'Hair', 'Eyes'])
+    const same = setFieldSet(nodes, 'cat', 'hair', 'looks')
+    expect(find(same, 'cat')).toBe(find(nodes, 'cat')) // already in it: not moved to the end
+  })
+
+  it("refuses a set the node does not have, a field it does not have, and Scrap", () => {
+    const nodes = cast()
+    expect(setFieldSet(nodes, 'cat', 'hair', 'unknown')).toEqual(nodes)
+    expect(setFieldSet(nodes, 'cat', 'unknown', 'looks')).toEqual(nodes)
+    const line = [node('line', 'plotline', null, { customFieldDefs: [{ id: scrapFieldId('line'), name: SCRAP_FIELD_NAME }], customFieldSets: [{ id: 's', name: 'S' }] })]
+    expect(setFieldSet(line, 'line', scrapFieldId('line'), 's')).toEqual(line)
+  })
+
+  it("moves a field before another and takes that field's set; moved last it keeps its own", () => {
+    let nodes = cast()
+    nodes = setFieldSet(nodes, 'cat', 'eyes', 'looks')
+    nodes = moveField(nodes, 'cat', 'motto', 'eyes')
+    expect(find(nodes, 'cat').customFieldDefs.find(d => d.id === 'motto')!.setId).toBe('looks')
+    nodes = moveField(nodes, 'cat', 'motto', 'home') // before a loose field: loose
+    expect(find(nodes, 'cat').customFieldDefs.find(d => d.id === 'motto')!.setId).toBeUndefined()
+    nodes = setFieldSet(nodes, 'cat', 'hair', 'past')
+    nodes = moveField(nodes, 'cat', 'hair', null) // last, still in Past
+    expect(find(nodes, 'cat').customFieldDefs.at(-1)).toMatchObject({ id: 'hair', setId: 'past' })
+  })
+
+  it("makes a new field in a set: at its end, or next to a field in it", () => {
+    let nodes = cast()
+    nodes = setFieldSet(nodes, 'cat', 'hair', 'looks')
+    nodes = setFieldSet(nodes, 'cat', 'eyes', 'looks')
+    const atEnd = addField(nodes, 'cat', 'Skin', makeId, undefined, 'looks')
+    expect(names(layout(atEnd.nodes).sets[0].fields)).toEqual(['Hair', 'Eyes', 'Skin'])
+    const next = addField(nodes, 'cat', 'Scar', makeId, 'hair') // Enter on a field name: the next one joins its set
+    expect(names(layout(next.nodes).sets[0].fields)).toEqual(['Hair', 'Scar', 'Eyes'])
+    const loose = addField(nodes, 'cat', 'Plain', makeId, 'hair', null)
+    expect(names(layout(loose.nodes).loose)).toContain('Plain')
+    const unknown = addField(nodes, 'cat', 'Odd', makeId, undefined, 'unknown')
+    expect(names(layout(unknown.nodes).loose)).toContain('Odd')
+  })
+
+  it("deletes a set and keeps its fields, loose, in the order they had; renames and reorders sets", () => {
+    let nodes = cast()
+    nodes = setFieldSet(nodes, 'cat', 'hair', 'looks')
+    nodes = setFieldSet(nodes, 'cat', 'eyes', 'looks')
+    nodes = deleteFieldset(nodes, 'cat', 'looks')
+    expect(find(nodes, 'cat').customFieldSets!.map(s => s.id)).toEqual(['past'])
+    expect(names(layout(nodes).loose)).toEqual(['Hair', 'Eyes', 'Motto', 'Home'])
+    expect(deleteFieldset(nodes, 'cat', 'looks')).toEqual(nodes)
+
+    nodes = renameFieldset(nodes, 'cat', 'past', 'P'.repeat(FIELDSET_NAME_MAX + 5))
+    expect(find(nodes, 'cat').customFieldSets![0].name).toHaveLength(FIELDSET_NAME_MAX)
+    nodes = addFieldset(nodes, 'cat', 'Later', makeId).nodes
+    const later = find(nodes, 'cat').customFieldSets![1].id
+    nodes = moveFieldset(nodes, 'cat', later, 'past')
+    expect(find(nodes, 'cat').customFieldSets!.map(s => s.id)).toEqual([later, 'past'])
+    nodes = moveFieldset(nodes, 'cat', later, null)
+    expect(find(nodes, 'cat').customFieldSets!.map(s => s.id)).toEqual(['past', later])
+  })
+
+  it("keeps a set when its last field is deleted", () => {
+    let nodes = cast()
+    nodes = setFieldSet(nodes, 'cat', 'hair', 'looks')
+    nodes = deleteField(nodes, 'cat', 'hair', outlineById, makeId)
+    expect(find(nodes, 'cat').customFieldSets!.map(s => s.id)).toEqual(['looks', 'past'])
+  })
+
+  it("shows a plotline the sets of the nodes above it, with where they come from, and its own sets", () => {
+    let nodes = [
+      node('cat', 'category', null, { customFieldDefs: [{ id: 'hair', name: 'Hair', setId: 'looks' }, { id: 'motto', name: 'Motto' }], customFieldSets: [{ id: 'looks', name: 'Looks' }] }),
+      node('sub', 'subcategory', 'cat', { customFieldDefs: [{ id: 'goal', name: 'Goal', setId: 'aims' }], customFieldSets: [{ id: 'aims', name: 'Aims' }] }),
+      node('line', 'plotline', 'sub', { customFieldDefs: [{ id: 'own', name: 'Own', setId: 'mine' }, { id: 'free', name: 'Free' }], customFieldSets: [{ id: 'mine', name: 'Mine' }] }),
+    ]
+    nodes = syncReferences(nodes, outlineById, makeId)
+    const index = new Map(nodes.map(n => [n.id, n]))
+    const groups = scopeLayouts(find(nodes, 'line'), index)
+    expect(groups.category.sets.map(s => [s.set.name, s.owner.id, names(s.fields.map(f => f.def))])).toEqual([['Looks', 'cat', ['Hair']]])
+    expect(names(groups.category.loose.map(f => f.def))).toEqual(['Motto'])
+    expect(groups.subcategory.sets.map(s => s.set.name)).toEqual(['Aims'])
+    expect(groups.plotline.sets.map(s => [s.set.name, names(s.fields.map(f => f.def))])).toEqual([['Mine', ['Own']]])
+    expect(names(groups.plotline.loose.map(f => f.def))).toEqual(['Free'])
+    expect(groups.category.owners.map(o => o.id)).toEqual(['cat'])
+    expect(groups.cluster.owners).toEqual([])
+    // A set with no fields in it still belongs to its owner.
+    const emptySet = [node('cat', 'category', null, { customFieldSets: [{ id: 's', name: 'Empty' }] }), node('l', 'plotline', 'cat')]
+    expect(scopeLayouts(find(emptySet, 'l'), new Map(emptySet.map(n => [n.id, n]))).category.owners.map(o => o.id)).toEqual(['cat'])
+  })
+
+  it("makes the references of a field in a set as it does for any field", () => {
+    const nodes = syncReferences([
+      node('cat', 'category', null, { customFieldDefs: [{ id: 'hair', name: 'Hair', setId: 'looks' }], customFieldSets: [{ id: 'looks', name: 'Looks' }] }),
+      node('val', 'plotpoint', 'cat', { title: 'Red', fieldId: 'hair' }),
+      node('line', 'plotline', 'cat'),
+    ], outlineById, makeId)
+    expect(valuesIn(nodes, 'line', 'hair').map(v => v.refId)).toEqual(['val'])
+  })
+
+  it("migrates a field that names a set its node does not have to a loose field, and is idempotent", () => {
+    const given = [
+      node('cat', 'category', null, { customFieldDefs: [{ id: 'a', name: 'A', setId: 'gone' }, { id: 'b', name: 'B', setId: 'kept' }], customFieldSets: [{ id: 'kept', name: 'Kept' }] }),
+      node('plain', 'category', null, { order: 1, customFieldDefs: [{ id: 'c', name: 'C' }] }),
+    ]
+    const once = migratePlot(given, outline, makeId)
+    expect(find(once, 'cat').customFieldDefs).toEqual([{ id: 'a', name: 'A' }, { id: 'b', name: 'B', setId: 'kept' }])
+    // A node with no sets stays as it was (no customFieldSets key is made up).
+    expect(find(once, 'plain').customFieldSets).toBeUndefined()
+    expect(migratePlot(once, outline, makeId)).toEqual(once)
   })
 })

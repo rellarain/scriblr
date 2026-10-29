@@ -285,6 +285,52 @@ describe('useWriterWorkspace: fields and values', () => {
   })
 })
 
+describe('useWriterWorkspace: fieldsets', () => {
+  it('makes, names, fills, orders and deletes a set; a deleted set leaves its fields loose', async () => {
+    const { result, get } = await opened()
+    let set: string | null = null
+    let other: string | null = null
+    let field: string | null = null
+    act(() => { set = result.current.addPlotFieldset('line') })
+    act(() => { other = result.current.addPlotFieldset('line', 'Second') })
+    expect(get('line')?.customFieldSets).toEqual([{ id: set, name: '' }, { id: other, name: 'Second' }])
+    act(() => { result.current.renamePlotFieldset('line', set!, 'First') })
+    act(() => { field = result.current.addPlotField('line', 'Beat', undefined, set!) })
+    expect(get('line')?.customFieldDefs).toEqual([{ id: 'f1', name: 'Beats' }, { id: field, name: 'Beat', setId: set }])
+
+    act(() => { result.current.setPlotFieldSet('line', 'f1', other!) })
+    expect(get('line')?.customFieldDefs.find(d => d.id === 'f1')?.setId).toBe(other)
+    act(() => { result.current.movePlotFieldset('line', other!, set!) })
+    expect(get('line')?.customFieldSets?.map(s => s.name)).toEqual(['Second', 'First'])
+
+    act(() => { result.current.removePlotFieldset('line', set!) })
+    expect(get('line')?.customFieldSets).toEqual([{ id: other, name: 'Second' }])
+    expect(get('line')?.customFieldDefs.find(d => d.id === field)).toEqual({ id: field, name: 'Beat' })
+  })
+
+  it('refuses a set on a plotpoint, and a field put in a set the node does not have', async () => {
+    const { result, get } = await opened()
+    let set: string | null = 'unset'
+    act(() => { set = result.current.addPlotFieldset('free') })
+    expect(set).toBeNull()
+    act(() => { result.current.setPlotFieldSet('line', 'f1', 'nope') })
+    expect(get('line')?.customFieldDefs).toEqual([{ id: 'f1', name: 'Beats' }])
+  })
+
+  it('is undone as one step, and saved with the plot', async () => {
+    const { result, get, backend } = await opened()
+    act(() => { result.current.addPlotFieldset('cat', 'Setting') })
+    expect(get('cat')?.customFieldSets).toHaveLength(1)
+    act(() => { result.current.history.undo('plot') })
+    expect(get('cat')?.customFieldSets ?? []).toHaveLength(0)
+    act(() => { result.current.history.redo('plot') })
+    expect(get('cat')?.customFieldSets).toHaveLength(1)
+    await act(async () => { await result.current.saveNow() })
+    expect(backend.saved.plot).toHaveLength(1)
+    expect(backend.saved.plot[0].find(n => n.id === 'cat')?.customFieldSets).toEqual([{ id: expect.any(String), name: 'Setting' }])
+  })
+})
+
 describe('useWriterWorkspace: saving the plot', () => {
   it('holds edits until Save, then sends the plot once, and the outline not at all', async () => {
     const { result, backend } = await opened()

@@ -16,7 +16,7 @@ export function liveEntry(id: string, c: PresetContent, over: Partial<PresetEntr
   return { id, draft: c, published: published(1, c), history: [], nextVersion: 2, ...over }
 }
 export const draftEntry = (id: string, c: PresetContent): PresetEntry => ({ id, draft: c, published: null, history: [], nextVersion: 1 })
-export const presetContent = (name: string, over: Partial<PresetContent> = {}): PresetContent => ({ name, description: '', keywords: [], fields: [], subcategories: [], ...over })
+export const presetContent = (name: string, over: Partial<PresetContent> = {}): PresetContent => ({ name, description: '', keywords: [], fields: [], fieldsets: [], subcategories: [], ...over })
 
 export function createMockPresets(initial: PresetEntry[]) {
   const state = { entries: structuredClone(initial) }
@@ -70,10 +70,11 @@ export function createMockPresets(initial: PresetEntry[]) {
 // The catalog the design system's previews open with: the ten built-ins (with the text of a few filled in), one with changes since it was
 // published, one never published and one unpublished.
 export function previewPresets(): PresetEntry[] {
-  const heroes = { id: 'heroes', name: 'Protagonists', description: 'Lorem ipsum dolor sit amet.', keywords: ['lorem'], fields: ['Want', 'Need', 'Flaw'], clusters: [{ id: 'core', name: 'Consectetur', description: '', keywords: [], fields: ['Dynamic'] }] }
+  const heroes = { id: 'heroes', name: 'Protagonists', description: 'Lorem ipsum dolor sit amet.', keywords: ['lorem'], fields: ['Want', 'Need', 'Flaw'], fieldsets: [{ name: 'Arc', fields: ['Start', 'Turning point', 'End'] }], clusters: [{ id: 'core', name: 'Consectetur', description: '', keywords: [], fields: ['Dynamic'] }] }
   const characters = presetContent('Characters', {
     description: 'Lorem ipsum dolor sit amet, consectetur adipiscing elit.', keywords: ['cast', 'ipsum'],
     fields: ['Name', 'Role', 'Physical Description', 'Personality', 'Backstory', 'Motivation', 'Internal Conflict', 'Relationships', 'Arc'],
+    fieldsets: [{ name: 'Voice', fields: ['Speech', 'Habits'] }, { name: 'Ties', fields: [] }],
     subcategories: [heroes, { id: 'villains', name: 'Antagonists', description: 'Sed do eiusmod tempor.', keywords: [], fields: ['Goal', 'Methods'], clusters: [] }, { id: 'extra', name: 'Supporting', description: '', keywords: [], fields: [], clusters: [] }],
   })
   const changed = liveEntry('characters', { ...characters, description: 'Lorem ipsum dolor sit amet, consectetur adipiscing elit.' }, { nextVersion: 4 })

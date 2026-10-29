@@ -17,7 +17,7 @@ import { PlotCompare } from './PlotCompare'
 import { PlotParents } from './PlotParents'
 import { PLOT_BREAKPOINTS, plotSizeOf, useElementWidth } from './useElementWidth'
 import { PlotOrderToggle, usePlotOrder } from './plotOrder'
-import { fieldIndex, isScrapField, orderValues, valuesIn } from './plotFields'
+import { fieldIndex, fieldsInOrder, isScrapField, orderValues, valuesIn } from './plotFields'
 
 // Project Plot: a collapsible navigation column (categories > subcategories
 // > clusters > plotlines, alphabetized) and two page views -- the category/subcategory/cluster
@@ -103,10 +103,12 @@ function KeywordsField({ w, node }: { w: WriterWorkspace; node: PlotNode }) {
 // Dragging does nothing in the category, subcategory and cluster editors (their values are not assigned there).
 const NO_DRAG: PlotDrag = {
   dragId: null, valueDrag: () => ({ onDragStart: () => {}, onDragEnd: () => {} }), dropIntoField: () => {}, dragFieldId: null, setDragFieldId: () => {},
+  dragSetId: null, setDragSetId: () => {},
 }
 
 function CategoryEditor({ w, node, ui }: { w: WriterWorkspace; node: PlotNode; ui: PlotUi }) {
   const [dragFieldId, setDragFieldId] = useState<string | null>(null)
+  const [dragSetId, setDragSetId] = useState<string | null>(null)
   const isCategory = node.kind === 'category'
   const colors = plotColors(node, w.plotNodeById)
   return (
@@ -129,7 +131,7 @@ function CategoryEditor({ w, node, ui }: { w: WriterWorkspace; node: PlotNode; u
       </div>
       <HueField w={w} node={node} />
       <KeywordsField w={w} node={node} />
-      <FieldEditor w={w} owner={node} ui={ui} drag={{ ...NO_DRAG, dragFieldId, setDragFieldId }} />
+      <FieldEditor w={w} owner={node} ui={ui} drag={{ ...NO_DRAG, dragFieldId, setDragFieldId, dragSetId, setDragSetId }} />
       {isCategory && <ChildRows w={w} node={node} kind="subcategory" addLabel="Subcategory" />}
       {node.kind === 'subcategory' && <ChildRows w={w} node={node} kind="cluster" addLabel="Cluster" />}
       <ChildRows w={w} node={node} kind="plotline" addLabel="Plotline" />
@@ -140,6 +142,7 @@ function CategoryEditor({ w, node, ui }: { w: WriterWorkspace; node: PlotNode; u
 function PlotlineEditor({ w, node, ui }: { w: WriterWorkspace; node: PlotNode; ui: PlotUi }) {
   const [dragId, setDragId] = useState<string | null>(null)
   const [dragFieldId, setDragFieldId] = useState<string | null>(null)
+  const [dragSetId, setDragSetId] = useState<string | null>(null)
   const [showAssigned, setShowAssigned] = useState(true)
 
   const outlineById = useMemo(() => new Map(w.outlineNodes.map(n => [n.id, n])), [w.outlineNodes])
@@ -160,7 +163,7 @@ function PlotlineEditor({ w, node, ui }: { w: WriterWorkspace; node: PlotNode; u
       onDragEnd: () => setDragId(null),
     }),
     dropIntoField: fieldId => { if (dragId) w.movePlotValue(dragId, fieldId); setDragId(null) },
-    dragFieldId, setDragFieldId,
+    dragFieldId, setDragFieldId, dragSetId, setDragSetId,
   }
 
   return (
@@ -296,7 +299,7 @@ export default function PlotView({ w }: { w: WriterWorkspace }) {
     },
     siblingsOf: id => {
       const f = fields.get(id)
-      if (f) return f.owner.customFieldDefs.map(d => d.id)
+      if (f) return fieldsInOrder(f.owner).map(d => d.id)
       const n = w.plotNodeById.get(id)
       if (!n) return [id]
       if (n.kind === 'plotpoint') return siblingValues(id)

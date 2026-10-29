@@ -122,6 +122,40 @@ def test_put_cleans_the_text_it_is_given(client: TestClient) -> None:
     assert saved["fields"] == ["Name", "Role"]
 
 
+def test_put_keeps_fieldsets_cleans_them_and_drops_an_empty_one(client: TestClient) -> None:
+    sets = [
+        {"name": "  Looks ", "fields": [" Hair", "  ", "Eyes "]},
+        {"name": "", "fields": []},  # an unfinished card: left out
+        {"name": "Past", "fields": []},
+    ]
+    body = save(client, draft("a", "Cast", fields=["Motto"], fieldsets=sets)).json()
+    saved = entry_of(body, "a")["draft"]
+    assert saved["fields"] == ["Motto"]
+    assert saved["fieldsets"] == [{"name": "Looks", "fields": ["Hair", "Eyes"]}, {"name": "Past", "fields": []}]
+    # What was saved is what is read back, and a published copy holds the sets too.
+    assert client.get("/api/presets").json() == body
+    published = entry_of(client.post("/api/presets/a/publish").json(), "a")
+    assert published["published"]["content"]["fieldsets"][0]["name"] == "Looks"
+
+
+def test_a_preset_saved_before_fieldsets_has_none(client: TestClient) -> None:
+    body = save(client, {"id": "a", "draft": {"name": "Cast", "description": "", "keywords": [], "fields": ["Name"], "subcategories": []}}).json()
+    assert entry_of(body, "a")["draft"]["fieldsets"] == []
+
+
+def test_put_refuses_fieldsets_the_plot_editor_could_not_hold(client: TestClient) -> None:
+    too_many = [{"name": f"Set {i}", "fields": []} for i in range(21)]
+    for over in (
+        {"fieldsets": [{"name": "S" * 31, "fields": []}]},
+        {"fieldsets": [{"name": "Looks", "fields": ["F" * 31]}]},
+        {"fieldsets": too_many},
+        {"fields": ["f"] * 60, "fieldsets": [{"name": "Looks", "fields": ["g"] * 41}]},  # more than a hundred fields in all
+    ):
+        assert save(client, {"id": "a", "draft": {**content("ok"), **over}}).status_code == 422, over
+    # A hundred in all is the limit, and it is kept.
+    assert save(client, {"id": "a", "draft": {**content("ok"), "fields": ["f"] * 60, "fieldsets": [{"name": "Looks", "fields": ["g"] * 40}]}}).status_code == 200
+
+
 def test_put_refuses_what_the_plot_editor_could_not_hold(client: TestClient) -> None:
     for over in ({"name": "N" * 51}, {"description": "D" * 256}, {"fields": ["F" * 31]}, {"keywords": ["K" * 51]}):
         assert save(client, {"id": "a", "draft": {**content("ok"), **over}}).status_code == 422, over
@@ -238,7 +272,7 @@ def test_discard_clears_a_preset_with_no_published_copy_but_keeps_its_name(clien
     ]))
     body = client.post("/api/presets/b/discard").json()
     b = entry_of(body, "b")
-    assert b["draft"] == {"name": "Never published", "description": "", "keywords": [], "fields": [], "subcategories": []}
+    assert b["draft"] == {"name": "Never published", "description": "", "keywords": [], "fields": [], "fieldsets": [], "subcategories": []}
     assert b["published"] is None and b["nextVersion"] == 1
     # An unpublished preset that was published once is cleared the same way, and its versions stay.
     save(client, draft("c", "Was live", fields=["Name"]))

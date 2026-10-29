@@ -17,7 +17,8 @@ import { booksOf, buildChildIndex, chaptersOfBook, dissolveSeries, moveNodeTo, n
 import { isAssignedPlotpoint } from './plotTree'
 import { nodesFromPreset } from './plotPreset'
 import {
-  addField, addValue, assignPoint, deleteField, deleteValue, migratePlot, moveField, moveValue, renameField, syncReferences, updateValue,
+  addField, addFieldset, addValue, assignPoint, deleteField, deleteFieldset, deleteValue, migratePlot, moveField, moveFieldset, moveValue, renameField,
+  renameFieldset, setFieldSet, syncReferences, updateValue,
 } from './plotFields'
 import { awarenessNext } from './awareness'
 import { combineCountdown, combineSaveStatus, useAutosave } from '../../../lib/useAutosave'
@@ -777,10 +778,30 @@ export function useWriterWorkspace() {
   // --- fields and their values (plotFields.ts) ---
   const outlineMap = () => new Map(outlineNodesRef.current.map(n => [n.id, n]))
 
-  function addPlotField(ownerId: string, name = '', afterFieldId?: string): string | null {
-    const made = addField(plotNodesRef.current, ownerId, name, undefined, afterFieldId)
+  // A new field goes after `afterFieldId` (in its set), or at the end of the set `setId` (null: loose).
+  function addPlotField(ownerId: string, name = '', afterFieldId?: string, setId?: string | null): string | null {
+    const made = addField(plotNodesRef.current, ownerId, name, undefined, afterFieldId, setId)
     if (made.id) commitPlot(made.nodes, true)
     return made.id
+  }
+  // Fieldsets: named groups of a node's fields (a set's fields stay loose if it is deleted).
+  function addPlotFieldset(ownerId: string, name = '', afterSetId?: string): string | null {
+    const made = addFieldset(plotNodesRef.current, ownerId, name, undefined, afterSetId)
+    if (made.id) commitPlot(made.nodes, true)
+    return made.id
+  }
+  function renamePlotFieldset(ownerId: string, setId: string, name: string) {
+    commitPlot(renameFieldset(plotNodesRef.current, ownerId, setId, name), false)
+  }
+  function movePlotFieldset(ownerId: string, setId: string, beforeId: string | null) {
+    commitPlot(moveFieldset(plotNodesRef.current, ownerId, setId, beforeId), true)
+  }
+  function removePlotFieldset(ownerId: string, setId: string) {
+    commitPlot(deleteFieldset(plotNodesRef.current, ownerId, setId), true)
+  }
+  // List a field under a set (null: take it out), at the end of that group or before `beforeFieldId`.
+  function setPlotFieldSet(ownerId: string, fieldId: string, setId: string | null, beforeFieldId: string | null = null) {
+    commitPlot(setFieldSet(plotNodesRef.current, ownerId, fieldId, setId, beforeFieldId), true)
   }
   function renamePlotField(ownerId: string, fieldId: string, name: string) {
     commitPlot(renameField(plotNodesRef.current, ownerId, fieldId, name), false)
@@ -929,6 +950,7 @@ export function useWriterWorkspace() {
     focusPlotNode, addPlotNode, addPlotPreset, updatePlotNodeField, setPlotHue, deletePlotNode,
     addPlotKeyword, removePlotKeyword,
     addPlotField, renamePlotField, movePlotField, removePlotField,
+    addPlotFieldset, renamePlotFieldset, movePlotFieldset, removePlotFieldset, setPlotFieldSet,
     addPlotValue, updatePlotValue, removePlotValue, movePlotValue, cyclePlotAwareness,
     assignPlotpoint, highlightedPointId, highlightPlotpoint, plotDragId, setPlotDragId,
   }

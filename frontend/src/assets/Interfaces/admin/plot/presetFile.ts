@@ -1,12 +1,12 @@
-import type { PresetContent, PresetSubcategory } from '../../../../api/types'
-import { normalizeContent, randomId, type MakeId } from './presetModel'
+import type { PresetContent, PresetFieldset, PresetSubcategory } from '../../../../api/types'
+import { FIELDSETS_MAX, FIELDS_MAX, normalizeContent, randomId, type MakeId } from './presetModel'
 
 // The file Export writes and Import reads: JSON with a marker and a version, and the presets without ids (they get new ones on import).
 export const FILE_MARKER = 'scriblrPlotPresets'
 export const FILE_VERSION = 1
 
 // Caps that keep a preset a size the server accepts.
-const MAX_FIELDS = 100
+const MAX_FIELDS = FIELDS_MAX
 const MAX_KEYWORDS = 50
 const MAX_CHILDREN = 100
 
@@ -19,17 +19,16 @@ export interface ImportResult {
   skipped: string[]
 }
 
-interface FilePreset {
-  name: string
-  description: string
-  keywords: string[]
-  fields: string[]
-  subcategories: Array<{ name: string; description: string; keywords: string[]; fields: string[]; clusters: Array<{ name: string; description: string; keywords: string[]; fields: string[] }> }>
+interface FileCard { name: string; description: string; keywords: string[]; fields: string[]; fieldsets: PresetFieldset[] }
+interface FilePreset extends FileCard {
+  subcategories: Array<FileCard & { clusters: FileCard[] }>
 }
 
 const strip = (c: PresetContent): FilePreset => {
   const n = normalizeContent(c)
-  const base = (x: { name: string; description: string; keywords: string[]; fields: string[] }) => ({ name: x.name, description: x.description, keywords: x.keywords, fields: x.fields })
+  const base = (x: { name: string; description: string; keywords: string[]; fields: string[]; fieldsets?: PresetFieldset[] }): FileCard => (
+    { name: x.name, description: x.description, keywords: x.keywords, fields: x.fields, fieldsets: x.fieldsets ?? [] }
+  )
   return {
     ...base(n),
     subcategories: n.subcategories.map(s => ({ ...base(s), clusters: s.clusters.map(base) })),
@@ -51,8 +50,13 @@ const text = (v: unknown): string => (typeof v === 'string' ? v : '')
 const strings = (v: unknown): string[] => (Array.isArray(v) ? v.filter((x): x is string => typeof x === 'string') : [])
 const list = (v: unknown): unknown[] => (Array.isArray(v) ? v : [])
 
+// The fieldsets of a file card (a file from before fieldsets has none): a name and field names each, anything else left out.
+const sets = (v: unknown): PresetFieldset[] => list(v).filter(isRecord).map(s => ({ name: text(s.name), fields: strings(s.fields) }))
+// How many fields a card lists in all: the loose ones and those in its sets.
+const fieldCount = (v: Record<string, unknown>) => strings(v.fields).length + sets(v.fieldsets).reduce((n, s) => n + s.fields.length, 0)
+
 function readBase(v: Record<string, unknown>) {
-  return { name: text(v.name), description: text(v.description), keywords: strings(v.keywords), fields: strings(v.fields) }
+  return { name: text(v.name), description: text(v.description), keywords: strings(v.keywords), fields: strings(v.fields), fieldsets: sets(v.fieldsets) }
 }
 
 // What is wrong with one preset in the file, or null. A name is required on the preset itself; the cards under it may be unnamed (a draft).
@@ -61,13 +65,17 @@ function problem(v: unknown): string | null {
   if (!text(v.name).trim()) return 'has no name'
   const tooMany = (n: number, max: number, what: string) => (n > max ? `has more than ${max} ${what}` : null)
   const subs = list(v.subcategories)
-  return tooMany(strings(v.fields).length, MAX_FIELDS, 'fields') ?? tooMany(strings(v.keywords).length, MAX_KEYWORDS, 'keywords')
+  return tooMany(fieldCount(v), MAX_FIELDS, 'fields') ?? tooMany(sets(v.fieldsets).length, FIELDSETS_MAX, 'fieldsets')
+    ?? tooMany(strings(v.keywords).length, MAX_KEYWORDS, 'keywords')
     ?? tooMany(subs.length, MAX_CHILDREN, 'subcategories')
     ?? subs.map(s => {
       if (!isRecord(s)) return null
       const clusters = list(s.clusters)
-      return tooMany(strings(s.fields).length, MAX_FIELDS, 'fields on a subcategory') ?? tooMany(clusters.length, MAX_CHILDREN, 'clusters in a subcategory')
-        ?? clusters.map(c => (isRecord(c) ? tooMany(strings(c.fields).length, MAX_FIELDS, 'fields on a cluster') : null)).find(Boolean)
+      return tooMany(fieldCount(s), MAX_FIELDS, 'fields on a subcategory') ?? tooMany(sets(s.fieldsets).length, FIELDSETS_MAX, 'fieldsets on a subcategory')
+        ?? tooMany(clusters.length, MAX_CHILDREN, 'clusters in a subcategory')
+        ?? clusters.map(c => (isRecord(c)
+          ? tooMany(fieldCount(c), MAX_FIELDS, 'fields on a cluster') ?? tooMany(sets(c.fieldsets).length, FIELDSETS_MAX, 'fieldsets on a cluster')
+          : null)).find(Boolean)
         ?? null
     }).find(Boolean) ?? null
 }

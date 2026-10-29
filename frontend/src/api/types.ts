@@ -74,7 +74,10 @@ export function plotChildKindOptions(parentKind: PlotNodeKind): PlotNodeKind[] {
   return PLOT_KIND_ORDER.slice(PLOT_KIND_ORDER.indexOf(parentKind) + 1)
 }
 
-export interface PlotCustomFieldDef { id: string; name: string }
+// A field a node defines. `setId` is the fieldset (a PlotFieldSet of the same node) it is listed under; absent or null = a loose field.
+export interface PlotCustomFieldDef { id: string; name: string; setId?: string | null }
+// A named group of the fields a node defines (on a category, subcategory, cluster or plotline); it shows on every plotline under the node as its fields do.
+export interface PlotFieldSet { id: string; name: string }
 export interface PlotNode {
   id: string
   kind: PlotNodeKind
@@ -86,6 +89,8 @@ export interface PlotNode {
   assignedParagraphIndex: number | null
   sourceFieldId: string | null
   customFieldDefs: PlotCustomFieldDef[]
+  // The fieldsets this node defines, in order (absent in a plot saved before there were fieldsets).
+  customFieldSets?: PlotFieldSet[]
   customFieldValues: Record<string, string>
   keywords: string[]
   flag: NodeFlag | null
@@ -288,12 +293,16 @@ export interface AuiConfigDraft {
 
 // Plot presets: global (not per project) ready-made plot categories, configured in Admin > Configuration > Plot and offered by the Plot
 // sidebar's "+ Preset". A preset is a category with its description, keywords, fields, and subcategories and clusters that have the same.
+// A named group of field names on a preset's node: it becomes a fieldset on the node made from it, holding those fields.
+export interface PresetFieldset { name: string; fields: string[] }
 export interface PresetNodeBase {
   name: string
   description: string
   keywords: string[]
-  // Field names, in order; each becomes a field on the node made from this one.
+  // The loose field names, in order; each becomes a field on the node made from this one.
   fields: string[]
+  // Fieldsets (a name and the field names in it), listed after the loose fields (absent in a preset saved before there were fieldsets).
+  fieldsets?: PresetFieldset[]
 }
 export interface PresetCluster extends PresetNodeBase { id: string }
 export interface PresetSubcategory extends PresetNodeBase { id: string; clusters: PresetCluster[] }

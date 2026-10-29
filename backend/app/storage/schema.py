@@ -275,9 +275,29 @@ class OutlineTree(BaseModel):
     nodes: list[OutlineNode] = Field(default_factory=list)
 
 
+# The longest name of a fieldset, and the most a node can have (the Writer's Plot editor and the presets console stop at the same limits).
+PLOT_FIELDSET_NAME_MAX = 30
+PLOT_MAX_FIELDSETS = 20
+
+
 class PlotCustomFieldDef(BaseModel):
     id: str
     name: str
+    # The fieldset (a PlotFieldSet of the same node) this field is listed under; None = a loose field, outside any set.
+    setId: Optional[str] = None
+
+
+class PlotFieldSet(BaseModel):
+    """A named group of the fields a node defines. A set shows on every plotline under the node, as its fields do."""
+
+    id: str
+    name: str = ""
+
+    @field_validator("name", mode="before")
+    @classmethod
+    def _cut_name(cls, value: Any) -> Any:
+        # Cut, not refused: a name too long must not set the whole plot aside.
+        return value[:PLOT_FIELDSET_NAME_MAX] if isinstance(value, str) else value
 
 
 class PlotNode(BaseModel):
@@ -305,6 +325,9 @@ class PlotNode(BaseModel):
     # Set only on "category", "subcategory" or "cluster" nodes: custom field definitions
     # that plotlines within this category/subcategory/cluster can fill in.
     customFieldDefs: list[PlotCustomFieldDef] = Field(default_factory=list)
+    # The fieldsets this node defines (on a category, subcategory, cluster or plotline), in order: named groups its fields can be listed
+    # under (PlotCustomFieldDef.setId). Absent in a plot saved before there were fieldsets.
+    customFieldSets: list[PlotFieldSet] = Field(default_factory=list, max_length=PLOT_MAX_FIELDSETS)
     # Set only on "plotline" nodes: values for the parent category's custom
     # fields, keyed by PlotCustomFieldDef.id.
     customFieldValues: dict[str, str] = Field(default_factory=dict)
@@ -794,6 +817,23 @@ def _clean_list(values: list[str], limit: int, what: str, *, unique: bool) -> li
     return out
 
 
+class PresetFieldset(BaseModel):
+    """A named group of field names on a preset's node: it becomes a fieldset (PlotFieldSet) holding those fields."""
+
+    name: str = Field(default="", max_length=PLOT_FIELDSET_NAME_MAX)
+    fields: list[str] = Field(default_factory=list, max_length=PRESET_MAX_FIELDS)
+
+    @field_validator("name", mode="before")
+    @classmethod
+    def _trim_name(cls, value: Any) -> Any:
+        return value.strip() if isinstance(value, str) else value
+
+    @field_validator("fields")
+    @classmethod
+    def _clean_fields(cls, value: list[str]) -> list[str]:
+        return _clean_list(value, PRESET_FIELD_MAX, "field name", unique=False)
+
+
 class _PresetNode(BaseModel):
     """What a category, subcategory and cluster of a preset share. A name may be blank in a draft (a new, unfinished card) but not when published."""
 
@@ -802,11 +842,27 @@ class _PresetNode(BaseModel):
     keywords: list[str] = Field(default_factory=list, max_length=PRESET_MAX_KEYWORDS)
     # Field names; each becomes a field (PlotCustomFieldDef) on the node made from this one. Order is kept; a repeat is allowed.
     fields: list[str] = Field(default_factory=list, max_length=PRESET_MAX_FIELDS)
+    # Named groups of field names (each becomes a fieldset on that node, holding those fields). `fields` above are the loose ones, listed
+    # before the sets. Absent in a preset saved before there were fieldsets.
+    fieldsets: list[PresetFieldset] = Field(default_factory=list, max_length=PLOT_MAX_FIELDSETS)
 
     @field_validator("name", "description", mode="before")
     @classmethod
     def _trim_text(cls, value: Any) -> Any:
         return value.strip() if isinstance(value, str) else value
+
+    @field_validator("fieldsets")
+    @classmethod
+    def _clean_fieldsets(cls, value: list[PresetFieldset]) -> list[PresetFieldset]:
+        # A set with no name and no fields is an unfinished card: left out. A set that has fields but no name is kept (a draft).
+        return [s for s in value if s.name or s.fields]
+
+    @model_validator(mode="after")
+    def _fields_in_all(self) -> "_PresetNode":
+        total = len(self.fields) + sum(len(s.fields) for s in self.fieldsets)
+        if total > PRESET_MAX_FIELDS:
+            raise ValueError(f"a node has more than {PRESET_MAX_FIELDS} fields (loose ones and the ones in its fieldsets together)")
+        return self
 
     @field_validator("keywords")
     @classmethod

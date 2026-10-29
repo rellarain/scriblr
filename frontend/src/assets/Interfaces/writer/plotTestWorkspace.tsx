@@ -4,7 +4,8 @@ import type { OutlineNode, PlotNode, PresetContent } from '../../../api/types'
 import { awarenessNext } from './awareness'
 import { nodesFromPreset } from './plotPreset'
 import {
-  addField, addValue, assignPoint, deleteField, deleteValue, moveField, moveValue, randomId, renameField, syncReferences, updateValue,
+  addField, addFieldset, addValue, assignPoint, deleteField, deleteFieldset, deleteValue, moveField, moveFieldset, moveValue, randomId, renameField,
+  renameFieldset, setFieldSet, syncReferences, updateValue,
 } from './plotFields'
 import type { WriterWorkspace } from './useWriterWorkspace'
 
@@ -67,7 +68,12 @@ export function useFakeWorkspace(initial: PlotNode[], focused = 'line', outlineN
     highlightPlotpoint: (id: string | null) => setHighlighted(id),
     focusPlotNode: (id: string | null) => setFocusedId(id),
     openChapter: vi.fn(),
-    addPlotField: (owner: string, name = '', after?: string) => { const r = addField(ref.current, owner, name, randomId, after); if (r.id) commit(r.nodes); return r.id },
+    addPlotField: (owner: string, name = '', after?: string, setId?: string | null) => { const r = addField(ref.current, owner, name, randomId, after, setId); if (r.id) commit(r.nodes); return r.id },
+    addPlotFieldset: (owner: string, name = '', after?: string) => { const r = addFieldset(ref.current, owner, name, randomId, after); if (r.id) commit(r.nodes); return r.id },
+    renamePlotFieldset: (owner: string, id: string, name: string) => commit(renameFieldset(ref.current, owner, id, name)),
+    movePlotFieldset: (owner: string, id: string, before: string | null) => commit(moveFieldset(ref.current, owner, id, before)),
+    removePlotFieldset: (owner: string, id: string) => commit(deleteFieldset(ref.current, owner, id)),
+    setPlotFieldSet: (owner: string, field: string, setId: string | null, before: string | null = null) => commit(setFieldSet(ref.current, owner, field, setId, before)),
     renamePlotField: (owner: string, id: string, name: string) => commit(renameField(ref.current, owner, id, name)),
     movePlotField: (owner: string, id: string, before: string | null) => commit(moveField(ref.current, owner, id, before)),
     removePlotField: (owner: string, id: string) => commit(deleteField(ref.current, owner, id, outlineById)),

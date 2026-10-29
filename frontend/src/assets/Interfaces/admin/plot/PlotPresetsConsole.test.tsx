@@ -8,8 +8,8 @@ import * as presetFile from './presetFile'
 
 vi.mock('./presetFile', async importOriginal => ({ ...(await importOriginal<typeof import('./presetFile')>()), downloadTextFile: vi.fn() }))
 
-const sub = (id: string, name: string, over: Record<string, unknown> = {}) => ({ id, name, description: '', keywords: [], fields: [], clusters: [], ...over })
-const cluster = (id: string, name: string) => ({ id, name, description: '', keywords: [], fields: [] })
+const sub = (id: string, name: string, over: Record<string, unknown> = {}) => ({ id, name, description: '', keywords: [], fields: [], fieldsets: [], clusters: [], ...over })
+const cluster = (id: string, name: string) => ({ id, name, description: '', keywords: [], fields: [], fieldsets: [] })
 
 const characters = content('Characters', {
   description: 'The cast', keywords: ['cast'], fields: ['Name', 'Role'],
@@ -462,5 +462,72 @@ describe('saving', () => {
     await waitFor(() => expect(screen.getByRole('button', { name: 'Save' })).toHaveAttribute('title', 'disk full'))
     await user.click(save())
     await waitFor(() => expect(backend.entries[0].draft.description).toBe('The cast more'))
+  })
+})
+
+describe('fieldsets', () => {
+  const cast = (over: Partial<PresetContent> = {}) => content('Cast', { fields: ['Name'], fieldsets: [{ name: 'Look', fields: ['Hair', 'Eyes'] }, { name: 'Mind', fields: ['Fear'] }], ...over })
+  const names = () => screen.getAllByRole('textbox', { name: 'Fieldset name' }).map(i => (i as HTMLInputElement).value)
+
+  it('adds a set to the preset, names it, puts a field in it, and saves it with the draft', async () => {
+    const { backend, user } = await open()
+    await user.click(rowOf('Settings'))
+    await user.click(screen.getByRole('button', { name: 'Fieldset' }))
+    const name = screen.getByRole('textbox', { name: 'Fieldset name' })
+    expect(name).toHaveAttribute('maxlength', '30')
+    await user.type(name, 'Mood')
+    await user.type(screen.getByRole('textbox', { name: 'Add field to set…' }), 'Tone{Enter}')
+    expect(within(screen.getByRole('group', { name: 'Preset fieldset Mood fields' })).getByText('Tone')).toBeInTheDocument()
+    expect(within(screen.getByRole('group', { name: 'Fieldset Mood' })).getByText('1 field')).toBeInTheDocument()
+    await user.click(save())
+    await waitFor(() => expect(backend.entries[1].draft).toMatchObject({ fields: ['Place'], fieldsets: [{ name: 'Mood', fields: ['Tone'] }] }))
+  })
+
+  it('folds a set to hide its fields, and opens it again', async () => {
+    const { user } = await open([liveEntry('a', cast())])
+    const look = () => screen.getByRole('group', { name: 'Fieldset Look' })
+    expect(within(look()).getByText('Hair')).toBeInTheDocument()
+    await user.click(within(look()).getByRole('button', { name: 'Collapse fieldset Look' }))
+    expect(within(look()).queryByText('Hair')).toBeNull()
+    expect(screen.getByRole('group', { name: 'Preset fieldset Mind fields' })).toBeInTheDocument()
+    await user.click(within(look()).getByRole('button', { name: 'Expand fieldset Look' }))
+    expect(within(look()).getByText('Hair')).toBeInTheDocument()
+  })
+
+  it('removes a field from a set, and deleting the set keeps its fields as the card\'s own', async () => {
+    const { user } = await open([liveEntry('a', cast())])
+    await user.click(within(screen.getByRole('group', { name: 'Preset fieldset Look fields' })).getByRole('button', { name: 'Remove Hair' }))
+    await user.click(screen.getByRole('button', { name: 'Delete fieldset Look' }))
+    expect(screen.queryByRole('group', { name: 'Fieldset Look' })).toBeNull()
+    expect(names()).toEqual(['Mind'])
+    const loose = screen.getByRole('group', { name: 'Preset fields' })
+    expect(loose).toHaveTextContent('Name')
+    expect(loose).toHaveTextContent('Eyes')
+    expect(loose).not.toHaveTextContent('Hair')
+  })
+
+  it('moves a set with Alt+Down on its grip', async () => {
+    await open([liveEntry('a', cast())])
+    fireEvent.keyDown(screen.getByRole('button', { name: 'Move fieldset Look (Alt+Up or Down)' }), { key: 'ArrowDown', altKey: true })
+    expect(names()).toEqual(['Mind', 'Look'])
+  })
+
+  it('counts a set\'s fields in the card\'s count, and gives each card its own sets', async () => {
+    const { user } = await open([liveEntry('a', cast({ subcategories: [{ id: 's1', name: 'Heroes', description: '', keywords: [], fields: [], fieldsets: [], clusters: [] }] }))])
+    const card = screen.getByRole('region', { name: 'preset Cast' })
+    expect(card.querySelector('.plpHead .plpCount')).toHaveTextContent('4 fields')
+    await user.click(within(screen.getByRole('region', { name: 'subcategory Heroes' })).getByRole('button', { name: 'Fieldset' }))
+    expect(names()).toEqual(['Look', 'Mind', ''])
+  })
+
+  it('refuses to publish an unnamed set that holds fields, naming the card', async () => {
+    await open([draftEntry('c', cast({ fieldsets: [{ name: '', fields: ['Hair'] }] }))])
+    expect(screen.getByText('Fieldset 1 on the preset needs a name.', { selector: '.plpErr' })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: /^Publish v1/ })).toBeDisabled()
+  })
+
+  it('stops at 20 sets on a card', async () => {
+    await open([liveEntry('a', cast({ fieldsets: Array.from({ length: 20 }, (_, i) => ({ name: `Set ${i}`, fields: [] })) }))])
+    expect(screen.getByRole('button', { name: 'Fieldset' })).toBeDisabled()
   })
 })

@@ -202,7 +202,13 @@ described, now stale, in `docs/data-model.md`).
   subcategory, and a plotline may sit under any of the three). **Fields and values:** any category,
   subcategory, cluster or plotline defines fields (`customFieldDefs`); each field
   holds many **values**, and every value is a plotpoint (`fieldId`; title 1-50
-  characters, description up to 255). A value defined on a category,
+  characters, description up to 255). **Fieldsets:** a node can group some of its
+  fields in named, collapsible sets (`customFieldSets`, `{ id, name }`, the name up to 30
+  characters, at most 20 per node; a field names its set with `setId`, so it is loose or
+  in one set at most). A node lists its loose fields first, then its sets, then (a
+  plotline) its `Scrap` field. A set passes down to the plotlines like its fields (read-only
+  there, folded or open as the writer left it, remembered per set); a plotline makes its own
+  sets for its own fields; deleting a set keeps its fields, loose. A value defined on a category,
   subcategory or cluster is shown on every plotline under it as a **reference** (a
   plotpoint with `refId`, whose text is the original's), which that plotline
   assigns to its own chapters; deleting a category/subcategory/cluster value or field
@@ -253,8 +259,9 @@ described, now stale, in `docs/data-model.md`).
   deleted file").
 - **Presets** — `PresetCatalog` (`presets.json`, schema v2): a global,
   non-project-scoped catalog of ready-made plot categories. A preset is a
-  category with its description, keywords and fields, its subcategories and
-  their clusters (each with the same). Every `PresetEntry` has a **draft**
+  category with its description, keywords, fields and fieldsets (`fieldsets`: a
+  name and its field names each, at most 20 per card and 100 fields in all), its
+  subcategories and their clusters (each with the same). Every `PresetEntry` has a **draft**
   (what Admin > Configuration > Plot edits; autosaved) and, once published, a
   numbered **published** copy plus up to 10 earlier versions (`history`).
   Only published copies are offered by the Plot sidebar's **+ Preset**, which

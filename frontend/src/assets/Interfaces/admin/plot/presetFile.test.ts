@@ -4,8 +4,8 @@ import type { PresetContent } from '../../../../api/types'
 import { PresetFileError, downloadTextFile, exportFileName, parsePresetFile, serializePresets } from './presetFile'
 
 const preset = (over: Partial<PresetContent> = {}): PresetContent => ({
-  name: 'Characters', description: 'The cast', keywords: ['cast'], fields: ['Name', 'Role'],
-  subcategories: [{ id: 'old-s', name: 'Heroes', description: '', keywords: ['lead'], fields: ['Want'], clusters: [{ id: 'old-c', name: 'Core', description: 'd', keywords: [], fields: ['Dynamic'] }] }],
+  name: 'Characters', description: 'The cast', keywords: ['cast'], fields: ['Name', 'Role'], fieldsets: [],
+  subcategories: [{ id: 'old-s', name: 'Heroes', description: '', keywords: ['lead'], fields: ['Want'], fieldsets: [], clusters: [{ id: 'old-c', name: 'Core', description: 'd', keywords: [], fields: ['Dynamic'], fieldsets: [] }] }],
   ...over,
 })
 const counter = () => { let n = 0; return (prefix: string) => `${prefix}-${(n += 1)}` }
@@ -28,6 +28,52 @@ describe('serializePresets', () => {
     expect(presets).toHaveLength(2)
     expect(presets[0]).toEqual(preset({ subcategories: [{ ...preset().subcategories[0], id: 'sub-1', clusters: [{ ...preset().subcategories[0].clusters[0], id: 'cluster-2' }] }] }))
     expect(presets[1].name).toBe('Settings')
+  })
+})
+
+describe('fieldsets in the file', () => {
+  const withSets = () => preset({
+    fieldsets: [{ name: 'Look', fields: ['Hair', 'Eyes'] }],
+    subcategories: [{ id: 'old-s', name: 'Heroes', description: '', keywords: [], fields: [], fieldsets: [{ name: 'Bond', fields: ['Trust'] }], clusters: [] }],
+  })
+
+  it('writes and reads them back, on the preset and on its cards', () => {
+    const out = JSON.parse(serializePresets([withSets()]))
+    expect(out.presets[0].fieldsets).toEqual([{ name: 'Look', fields: ['Hair', 'Eyes'] }])
+    const { presets } = parsePresetFile(serializePresets([withSets()]), counter())
+    expect(presets[0].fieldsets).toEqual([{ name: 'Look', fields: ['Hair', 'Eyes'] }])
+    expect(presets[0].subcategories[0].fieldsets).toEqual([{ name: 'Bond', fields: ['Trust'] }])
+  })
+
+  it('reads a file from before fieldsets as having none', () => {
+    const { presets } = parsePresetFile(file([{ name: 'Old', fields: ['a'], subcategories: [{ name: 'S', clusters: [{ name: 'C' }] }] }]))
+    expect(presets[0].fieldsets).toEqual([])
+    expect(presets[0].subcategories[0].fieldsets).toEqual([])
+    expect(presets[0].subcategories[0].clusters[0].fieldsets).toEqual([])
+  })
+
+  it('cuts set names and ignores what is not a set, and drops a set with neither a name nor fields', () => {
+    const { presets } = parsePresetFile(file([{ name: 'X', fieldsets: [{ name: 'N'.repeat(40), fields: ['a', 1] }, 5, { name: '', fields: [] }, { fields: ['b'] }] }]))
+    expect(presets[0].fieldsets).toEqual([{ name: 'N'.repeat(30), fields: ['a'] }, { name: '', fields: ['b'] }])
+  })
+
+  it('skips a preset with more than 20 fieldsets or 100 fields in all, on any card', () => {
+    const sets = Array.from({ length: 21 }, (_, i) => ({ name: `s${i}`, fields: [] }))
+    const fifty = Array.from({ length: 50 }, (_, i) => `f${i}`)
+    const { presets, skipped } = parsePresetFile(file([
+      { name: 'Fine' },
+      { name: 'Sets', fieldsets: sets },
+      { name: 'Spread', fields: fifty, fieldsets: [{ name: 'S', fields: [...fifty, 'one more'] }] },
+      { name: 'Deep', subcategories: [{ name: 's', fieldsets: sets }] },
+      { name: 'Deeper', subcategories: [{ name: 's', clusters: [{ name: 'c', fieldsets: sets }] }] },
+    ]))
+    expect(presets.map(p => p.name)).toEqual(['Fine'])
+    expect(skipped).toEqual([
+      'The preset at position 2 has more than 20 fieldsets.',
+      'The preset at position 3 has more than 100 fields.',
+      'The preset at position 4 has more than 20 fieldsets on a subcategory.',
+      'The preset at position 5 has more than 20 fieldsets on a cluster.',
+    ])
   })
 })
 

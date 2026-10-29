@@ -1,9 +1,9 @@
 import { describe, expect, it } from 'vitest'
 import type { PresetContent, PresetEntry } from '../../../../api/types'
 import {
-  ROOT, addCluster, addFieldName, addKeyword, addSubcategory, blankContent, copyName, countOf, describeChanges, findCard, isBlankCard, isEmptyChange,
-  moveBefore, moveCard, moveFieldTo, nameTaken, normalizeContent, nudge, publishFaults, removeCard, removeFieldAt, removeKeyword, sameContent,
-  siblingIds, statusOf, updateCard, withNewIds,
+  FIELDS_MAX, ROOT, addCluster, addFieldName, addFieldNameToSet, addFieldset, addKeyword, addSubcategory, blankContent, copyName, countOf, describeChanges,
+  findCard, isBlankCard, isEmptyChange, moveBefore, moveCard, moveFieldTo, moveFieldsetTo, moveSetFieldTo, nameTaken, normalizeContent, nudge, publishFaults,
+  removeCard, removeFieldAt, removeFieldsetAt, removeKeyword, removeSetFieldAt, renameFieldsetAt, sameContent, siblingIds, statusOf, updateCard, withNewIds,
 } from './presetModel'
 
 const content = (over: Partial<PresetContent> = {}): PresetContent => ({
@@ -34,8 +34,8 @@ describe('finding cards', () => {
   })
 
   it('counts subcategories, clusters and fields across the tree', () => {
-    expect(countOf(content())).toEqual({ subcategories: 2, clusters: 1, fields: 4 })
-    expect(countOf(blankContent())).toEqual({ subcategories: 0, clusters: 0, fields: 0 })
+    expect(countOf(content())).toEqual({ subcategories: 2, clusters: 1, fields: 4, fieldsets: 0 })
+    expect(countOf(blankContent())).toEqual({ subcategories: 0, clusters: 0, fields: 0, fieldsets: 0 })
   })
 
   it('knows a card with nothing in it, nested cards included', () => {
@@ -241,5 +241,92 @@ describe('describeChanges', () => {
     const after = content()
     after.subcategories = [after.subcategories[1], after.subcategories[0]]
     expect(describeChanges(content(), after).changed).toEqual(['subcategory order'])
+  })
+})
+
+describe('fieldsets', () => {
+  const withSets = () => content({ fieldsets: [{ name: 'Look', fields: ['Hair', 'Eyes'] }, { name: 'Mind', fields: ['Fear'] }] })
+
+  it('counts a set\'s fields with the card\'s, and the sets, across the tree', () => {
+    const c = withSets()
+    c.subcategories[0].clusters[0].fieldsets = [{ name: 'Bond', fields: ['Trust', 'Debt'] }]
+    expect(countOf(c)).toEqual({ subcategories: 2, clusters: 1, fields: 9, fieldsets: 3 })
+  })
+
+  it('is not blank with a fieldset in it', () => {
+    expect(isBlankCard({ ...blankContent(), fieldsets: [{ name: '', fields: [] }] })).toBe(false)
+  })
+
+  it('adds an unnamed set last, up to 20, and renames, moves and removes a set by its place', () => {
+    let c = addFieldset(content(), ROOT)
+    expect(c.fieldsets).toEqual([{ name: '', fields: [] }])
+    for (let i = 0; i < 25; i += 1) c = addFieldset(c, ROOT)
+    expect(c.fieldsets).toHaveLength(20)
+
+    const d = withSets()
+    expect(renameFieldsetAt(d, ROOT, 1, 'Heart').fieldsets?.map(s => s.name)).toEqual(['Look', 'Heart'])
+    expect(renameFieldsetAt(d, ROOT, 0, 'L'.repeat(40)).fieldsets?.[0].name).toHaveLength(30)
+    expect(moveFieldsetTo(d, ROOT, 1, 0).fieldsets?.map(s => s.name)).toEqual(['Mind', 'Look'])
+    expect(moveFieldsetTo(d, ROOT, 0, null).fieldsets?.map(s => s.name)).toEqual(['Mind', 'Look'])
+    expect(moveFieldsetTo(d, ROOT, 0, 0)).toBe(d)
+    expect(addFieldset(d, 'c1').subcategories[0].clusters[0].fieldsets).toEqual([{ name: '', fields: [] }])
+  })
+
+  it('deleting a set keeps its fields, added to the card\'s loose fields', () => {
+    const out = removeFieldsetAt(withSets(), ROOT, 0)
+    expect(out.fieldsets).toEqual([{ name: 'Mind', fields: ['Fear'] }])
+    expect(out.fields).toEqual(['Name', 'Role', 'Hair', 'Eyes'])
+    expect(removeFieldsetAt(withSets(), ROOT, 5).fieldsets).toHaveLength(2)
+  })
+
+  it('adds, removes and moves the fields of a set, and counts them against the 100 of the card', () => {
+    const c = withSets()
+    expect(addFieldNameToSet(c, ROOT, 1, ' Hope ').fieldsets?.[1].fields).toEqual(['Fear', 'Hope'])
+    expect(addFieldNameToSet(c, ROOT, 9, 'x')).toBe(c)
+    expect(addFieldNameToSet(c, ROOT, 0, '  ')).toBe(c)
+    expect(removeSetFieldAt(c, ROOT, 0, 0).fieldsets?.[0].fields).toEqual(['Eyes'])
+    expect(moveSetFieldTo(c, ROOT, 0, 0, null).fieldsets?.[0].fields).toEqual(['Eyes', 'Hair'])
+    expect(moveSetFieldTo(c, ROOT, 0, 1, 0).fieldsets?.[0].fields).toEqual(['Eyes', 'Hair'])
+    expect(moveSetFieldTo(c, ROOT, 0, 0, 0)).toBe(c)
+
+    const full = content({ fields: Array.from({ length: FIELDS_MAX - 1 }, (_, i) => `f${i}`), fieldsets: [{ name: 'S', fields: ['one'] }] })
+    expect(addFieldName(full, ROOT, 'more')).toBe(full)
+    expect(addFieldNameToSet(full, ROOT, 0, 'more')).toBe(full)
+  })
+
+  it('cleans sets: names and fields trimmed and cut, a set with neither dropped, one with only fields kept', () => {
+    const out = normalizeContent(content({
+      fieldsets: [{ name: ` ${'S'.repeat(40)} `, fields: [' a ', '', 'F'.repeat(40)] }, { name: '  ', fields: [] }, { name: '', fields: ['kept'] }],
+    }))
+    expect(out.fieldsets).toEqual([{ name: 'S'.repeat(30), fields: ['a', 'F'.repeat(30)] }, { name: '', fields: ['kept'] }])
+    expect(normalizeContent(content()).fieldsets).toEqual([])
+    expect(sameContent(content(), content({ fieldsets: [{ name: ' ', fields: [] }] }))).toBe(true)
+  })
+
+  it('refuses to publish an unnamed set that holds fields, on any card', () => {
+    const c = content({ fieldsets: [{ name: '', fields: ['a'] }, { name: '', fields: [] }] })
+    c.subcategories[0].fieldsets = [{ name: 'Fine', fields: ['x'] }]
+    c.subcategories[0].clusters[0].fieldsets = [{ name: ' ', fields: ['y'] }]
+    expect(publishFaults(c)).toEqual([
+      { id: ROOT, message: 'Fieldset 1 on the preset needs a name.' },
+      { id: 'c1', message: 'Fieldset 1 on cluster Core in subcategory Heroes needs a name.' },
+    ])
+  })
+
+  it('describes a first publish and a change by its fieldsets', () => {
+    const c = withSets()
+    expect(describeChanges(null, c).added).toEqual(['the preset, with 2 subcategories, 1 cluster, 7 fields, 2 fieldsets'])
+
+    const after = withSets()
+    after.fieldsets = [{ name: 'Mind', fields: ['Fear', 'Hope'] }, { name: 'Look', fields: ['Hair', 'Eyes'] }, { name: 'Voice', fields: [] }]
+    expect(describeChanges(c, after).changed).toEqual(['fieldsets (1 added), fieldset Mind: fields (1 added), fieldset order'])
+    after.fieldsets = [{ name: 'Look', fields: ['Hair'] }]
+    expect(describeChanges(c, after).changed).toEqual(['fieldsets (1 removed), fieldset Look: fields (1 removed)'])
+
+    const sub = content()
+    sub.subcategories[1].fieldsets = [{ name: 'Menace', fields: ['Plan', 'Weakness'] }]
+    expect(describeChanges(content(), sub).changed).toEqual(['subcategory Villains: fieldsets (1 added)'])
+    const added = content({ subcategories: [{ ...content().subcategories[0], id: 'new', fieldsets: [{ name: 'A', fields: ['a', 'b'] }] }] })
+    expect(describeChanges(content(), added).added).toEqual(['subcategory Heroes, 3 fields and 1 fieldset on it', 'cluster Core, 1 field on it'])
   })
 })

@@ -1,5 +1,5 @@
-import type { PresetCard, PresetCluster, PresetContent, PresetEntry, PresetSubcategory } from '../../../../api/types'
-import { BODY_MAX, FIELD_NAME_MAX, TITLE_MAX } from '../../writer/plotFields'
+import type { PresetCard, PresetCluster, PresetContent, PresetEntry, PresetFieldset, PresetSubcategory } from '../../../../api/types'
+import { BODY_MAX, FIELD_NAME_MAX, FIELDSET_NAME_MAX, MAX_FIELDSETS, TITLE_MAX } from '../../writer/plotFields'
 
 // The pure side of the Plot presets page: editing a preset's card tree, its limits and checks, how it compares with what was published,
 // and the plain-words summary Publish shows. Nothing here touches the network or React.
@@ -10,6 +10,10 @@ export const FIELD_MAX = FIELD_NAME_MAX
 export const DESCRIPTION_MAX = BODY_MAX
 export const KEYWORD_MAX = 50
 export const HISTORY_MAX = 10
+export const FIELDSET_MAX = FIELDSET_NAME_MAX
+export const FIELDSETS_MAX = MAX_FIELDSETS
+// Loose fields and the fields in fieldsets together, on one card (the server's limit).
+export const FIELDS_MAX = 100
 
 export type MakeId = (prefix: string) => string
 export const randomId: MakeId = prefix => `${prefix}-${Math.random().toString(36).slice(2, 10)}`
@@ -18,9 +22,9 @@ export type CardKind = 'category' | 'subcategory' | 'cluster'
 // The card of the preset itself has no id of its own: it is addressed by this.
 export const ROOT = ''
 
-export const blankContent = (): PresetContent => ({ name: '', description: '', keywords: [], fields: [], subcategories: [] })
-export const blankSubcategory = (id: string): PresetSubcategory => ({ id, name: '', description: '', keywords: [], fields: [], clusters: [] })
-export const blankCluster = (id: string): PresetCluster => ({ id, name: '', description: '', keywords: [], fields: [] })
+export const blankContent = (): PresetContent => ({ name: '', description: '', keywords: [], fields: [], fieldsets: [], subcategories: [] })
+export const blankSubcategory = (id: string): PresetSubcategory => ({ id, name: '', description: '', keywords: [], fields: [], fieldsets: [], clusters: [] })
+export const blankCluster = (id: string): PresetCluster => ({ id, name: '', description: '', keywords: [], fields: [], fieldsets: [] })
 
 // ---- reading ----
 
@@ -43,20 +47,26 @@ export function siblingIds(content: PresetContent, id: string): string[] {
     : content.subcategories.find(s => s.id === found.parentId)?.clusters.map(c => c.id) ?? []
 }
 
-export function countOf(content: PresetContent): { subcategories: number; clusters: number; fields: number } {
+// A card's fieldsets (an older preset has none), and how many fields it lists in all: the loose ones and the ones in its sets.
+export const setsOf = (card: PresetCard): PresetFieldset[] => card.fieldsets ?? []
+export const fieldTotal = (card: PresetCard): number => card.fields.length + setsOf(card).reduce((n, s) => n + s.fields.length, 0)
+
+export function countOf(content: PresetContent): { subcategories: number; clusters: number; fields: number; fieldsets: number } {
   let clusters = 0
-  let fields = content.fields.length
+  let fields = fieldTotal(content)
+  let fieldsets = setsOf(content).length
   for (const sub of content.subcategories) {
     clusters += sub.clusters.length
-    fields += sub.fields.length + sub.clusters.reduce((n, c) => n + c.fields.length, 0)
+    fields += fieldTotal(sub) + sub.clusters.reduce((n, c) => n + fieldTotal(c), 0)
+    fieldsets += setsOf(sub).length + sub.clusters.reduce((n, c) => n + setsOf(c).length, 0)
   }
-  return { subcategories: content.subcategories.length, clusters, fields }
+  return { subcategories: content.subcategories.length, clusters, fields, fieldsets }
 }
 
-// A card with nothing in it: no text, no fields, nothing nested.
+// A card with nothing in it: no text, no fields, no fieldsets, nothing nested.
 export function isBlankCard(card: PresetCard): boolean {
   const nested = 'subcategories' in card ? card.subcategories.length : 'clusters' in card ? card.clusters.length : 0
-  return !card.name.trim() && !card.description.trim() && card.keywords.length === 0 && card.fields.length === 0 && nested === 0
+  return !card.name.trim() && !card.description.trim() && card.keywords.length === 0 && card.fields.length === 0 && setsOf(card).length === 0 && nested === 0
 }
 
 // ---- cleaning ----
@@ -72,11 +82,20 @@ function cleanList(values: string[], max: number, unique: boolean): string[] {
   return out
 }
 
+// A set with no name and no fields is dropped; one with fields is kept even unnamed (a set still being written; Publish is what asks for it).
+function cleanFieldsets(sets: PresetFieldset[]): PresetFieldset[] {
+  return sets
+    .map(set => ({ name: clampText(set.name, FIELDSET_MAX), fields: cleanList(set.fields, FIELD_MAX, false) }))
+    .filter(set => set.name !== '' || set.fields.length > 0)
+    .slice(0, FIELDSETS_MAX)
+}
+
 function cleanBase<T extends PresetCard>(card: T): T {
   return {
     ...card,
     name: clampText(card.name, NAME_MAX), description: clampText(card.description, DESCRIPTION_MAX),
     keywords: cleanList(card.keywords, KEYWORD_MAX, true), fields: cleanList(card.fields, FIELD_MAX, false),
+    fieldsets: cleanFieldsets(setsOf(card)),
   }
 }
 
@@ -95,7 +114,7 @@ export function sameContent(a: PresetContent, b: PresetContent): boolean {
 
 // ---- editing ----
 
-type Patch = Partial<Pick<PresetCard, 'name' | 'description' | 'keywords' | 'fields'>>
+type Patch = Partial<Pick<PresetCard, 'name' | 'description' | 'keywords' | 'fields' | 'fieldsets'>>
 
 // Change one card's own text, keywords or fields.
 export function updateCard(content: PresetContent, id: string, patch: Patch): PresetContent {
@@ -181,7 +200,7 @@ export function removeKeyword(content: PresetContent, id: string, keyword: strin
 export function addFieldName(content: PresetContent, id: string, name: string): PresetContent {
   const text = clampText(name, FIELD_MAX)
   const found = findCard(content, id)
-  if (!text || !found) return content
+  if (!text || !found || fieldTotal(found.card) >= FIELDS_MAX) return content
   return updateCard(content, id, { fields: [...found.card.fields, text] })
 }
 
@@ -191,15 +210,74 @@ export function removeFieldAt(content: PresetContent, id: string, index: number)
   return found ? updateCard(content, id, { fields: found.card.fields.filter((_, i) => i !== index) }) : content
 }
 
+// `list` with the item at `from` moved to just before the one at `before` (last when null); the same list when nothing moves.
+function moveIndex<T>(list: T[], from: number, before: number | null): T[] {
+  if (from < 0 || from >= list.length || from === before) return list
+  const out = [...list]
+  const [moving] = out.splice(from, 1)
+  const target = before === null ? out.length : before > from ? before - 1 : before
+  out.splice(target, 0, moving)
+  return out
+}
+
 // Move the field at `from` to just before the one at `before` (last when null).
 export function moveFieldTo(content: PresetContent, id: string, from: number, before: number | null): PresetContent {
   const found = findCard(content, id)
-  if (!found || from < 0 || from >= found.card.fields.length || from === before) return content
-  const fields = [...found.card.fields]
-  const [moving] = fields.splice(from, 1)
-  const target = before === null ? fields.length : before > from ? before - 1 : before
-  fields.splice(target, 0, moving)
-  return updateCard(content, id, { fields })
+  if (!found) return content
+  const fields = moveIndex(found.card.fields, from, before)
+  return fields === found.card.fields ? content : updateCard(content, id, { fields })
+}
+
+// ---- fieldsets: a card's named groups of field names, addressed by their place like the fields ----
+
+function changeSets(content: PresetContent, id: string, change: (sets: PresetFieldset[], card: PresetCard) => PresetFieldset[]): PresetContent {
+  const found = findCard(content, id)
+  if (!found) return content
+  const before = setsOf(found.card)
+  const after = change(before, found.card)
+  return after === before ? content : updateCard(content, id, { fieldsets: after })
+}
+
+// A new, unnamed set last (a card holds at most FIELDSETS_MAX).
+export function addFieldset(content: PresetContent, id: string): PresetContent {
+  return changeSets(content, id, sets => (sets.length >= FIELDSETS_MAX ? sets : [...sets, { name: '', fields: [] }]))
+}
+
+export function renameFieldsetAt(content: PresetContent, id: string, index: number, name: string): PresetContent {
+  return changeSets(content, id, sets => (sets[index] ? sets.map((s, i) => (i === index ? { ...s, name: name.slice(0, FIELDSET_MAX) } : s)) : sets))
+}
+
+// Delete a set: its fields stay, added to the card's loose fields.
+export function removeFieldsetAt(content: PresetContent, id: string, index: number): PresetContent {
+  const found = findCard(content, id)
+  const set = found && setsOf(found.card)[index]
+  if (!found || !set) return content
+  return updateCard(content, id, { fields: [...found.card.fields, ...set.fields], fieldsets: setsOf(found.card).filter((_, i) => i !== index) })
+}
+
+// Move the set at `from` to just before the one at `before` (last when null).
+export function moveFieldsetTo(content: PresetContent, id: string, from: number, before: number | null): PresetContent {
+  return changeSets(content, id, sets => moveIndex(sets, from, before))
+}
+
+export function addFieldNameToSet(content: PresetContent, id: string, index: number, name: string): PresetContent {
+  const text = clampText(name, FIELD_MAX)
+  return changeSets(content, id, (sets, card) => (
+    !text || !sets[index] || fieldTotal(card) >= FIELDS_MAX ? sets : sets.map((s, i) => (i === index ? { ...s, fields: [...s.fields, text] } : s))
+  ))
+}
+
+export function removeSetFieldAt(content: PresetContent, id: string, index: number, fieldIndex: number): PresetContent {
+  return changeSets(content, id, sets => (sets[index] ? sets.map((s, i) => (i === index ? { ...s, fields: s.fields.filter((_, j) => j !== fieldIndex) } : s)) : sets))
+}
+
+export function moveSetFieldTo(content: PresetContent, id: string, index: number, from: number, before: number | null): PresetContent {
+  return changeSets(content, id, sets => {
+    const set = sets[index]
+    if (!set) return sets
+    const fields = moveIndex(set.fields, from, before)
+    return fields === set.fields ? sets : sets.map((s, i) => (i === index ? { ...s, fields } : s))
+  })
 }
 
 // ---- the list of presets ----
@@ -247,12 +325,21 @@ export interface Fault { id: string; message: string }
 // What stops a draft from being published, with the card at fault (the preset's own is ROOT). A name is required on every card.
 export function publishFaults(content: PresetContent): Fault[] {
   const faults: Fault[] = []
+  // A fieldset that holds fields needs a name (one with neither is dropped when the draft is saved).
+  const unnamedSets = (card: PresetCard, id: string, where: string) => {
+    setsOf(card).forEach((set, i) => {
+      if (!set.name.trim() && set.fields.length > 0) faults.push({ id, message: `Fieldset ${i + 1} on ${where} needs a name.` })
+    })
+  }
   if (!content.name.trim()) faults.push({ id: ROOT, message: 'The preset needs a name.' })
+  unnamedSets(content, ROOT, 'the preset')
   content.subcategories.forEach((sub, i) => {
     const label = sub.name.trim() ? `subcategory ${sub.name.trim()}` : `subcategory ${i + 1}`
     if (!sub.name.trim()) faults.push({ id: sub.id, message: `Subcategory ${i + 1} needs a name.` })
+    unnamedSets(sub, sub.id, label)
     sub.clusters.forEach((c, j) => {
       if (!c.name.trim()) faults.push({ id: c.id, message: `Cluster ${j + 1} in ${label} needs a name.` })
+      unnamedSets(c, c.id, `cluster ${c.name.trim() || j + 1} in ${label}`)
     })
   })
   return faults
@@ -277,7 +364,28 @@ function fieldChange(before: string[], after: string[]): string | null {
   return before.join('\n') !== after.join('\n') ? 'field order' : null
 }
 
-// What differs between two cards' own text, keywords and fields, as short phrases ("name", "description", "fields (2 added)").
+// What differs between two cards' fieldsets, as short phrases: sets added or removed (matched by name), the fields of a set that stays, and the
+// order of the sets that stay.
+function fieldsetChanges(before: PresetFieldset[], after: PresetFieldset[]): string[] {
+  const out: string[] = []
+  const left = [...before]
+  const kept: Array<[PresetFieldset, PresetFieldset]> = []
+  let added = 0
+  for (const set of after) {
+    const at = left.findIndex(s => s.name === set.name)
+    if (at >= 0) { kept.push([left[at], set]); left.splice(at, 1) } else added += 1
+  }
+  if (added || left.length) out.push(`fieldsets (${[added && `${added} added`, left.length && `${left.length} removed`].filter(Boolean).join(', ')})`)
+  for (const [was, now] of kept) {
+    const change = fieldChange(was.fields, now.fields)
+    if (change) out.push(`fieldset ${now.name || 'without a name'}: ${change}`)
+  }
+  const stay = new Set(kept.map(([, now]) => now.name))
+  if (before.filter(s => stay.has(s.name)).map(s => s.name).join('\n') !== after.filter(s => stay.has(s.name)).map(s => s.name).join('\n')) out.push('fieldset order')
+  return out
+}
+
+// What differs between two cards' own text, keywords, fields and fieldsets, as short phrases ("name", "description", "fields (2 added)").
 function cardChanges(before: PresetCard, after: PresetCard): string[] {
   const out: string[] = []
   if (before.name !== after.name) out.push(`name (${before.name || 'blank'} to ${after.name || 'blank'})`)
@@ -285,10 +393,14 @@ function cardChanges(before: PresetCard, after: PresetCard): string[] {
   if (before.keywords.join('\n') !== after.keywords.join('\n')) out.push('keywords')
   const fields = fieldChange(before.fields, after.fields)
   if (fields) out.push(fields)
+  out.push(...fieldsetChanges(setsOf(before), setsOf(after)))
   return out
 }
 
-const describeNew = (card: PresetCard) => (card.fields.length ? `, ${plural(card.fields.length, 'field')} on it` : '')
+function describeNew(card: PresetCard): string {
+  const parts = [fieldTotal(card) && plural(fieldTotal(card), 'field'), setsOf(card).length && plural(setsOf(card).length, 'fieldset')].filter(Boolean)
+  return parts.length ? `, ${parts.join(' and ')} on it` : ''
+}
 
 // What publishing `after` changes against the version now published (`before`; null when there is none).
 export function describeChanges(before: PresetContent | null, after: PresetContent): Changes {
@@ -296,7 +408,10 @@ export function describeChanges(before: PresetContent | null, after: PresetConte
   const out: Changes = { added: [], changed: [], removed: [] }
   if (!before) {
     const n = countOf(next)
-    const parts = [n.subcategories && plural(n.subcategories, 'subcategory'), n.clusters && plural(n.clusters, 'cluster'), n.fields && plural(n.fields, 'field')].filter(Boolean)
+    const parts = [
+      n.subcategories && plural(n.subcategories, 'subcategory'), n.clusters && plural(n.clusters, 'cluster'),
+      n.fields && plural(n.fields, 'field'), n.fieldsets && plural(n.fieldsets, 'fieldset'),
+    ].filter(Boolean)
     out.added.push(parts.length ? `the preset, with ${parts.join(', ')}` : 'the preset')
     return out
   }
