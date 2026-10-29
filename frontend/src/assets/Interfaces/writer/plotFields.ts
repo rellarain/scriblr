@@ -1,13 +1,14 @@
-import type { Awareness, OutlineNode, PlotCustomFieldDef, PlotFieldSet, PlotNode, TimeSystem } from '../../../api/types'
+import type { OutlineNode, PlotCustomFieldDef, PlotFieldSet, PlotNode, TimeSystem } from '../../../api/types'
 import { insertAfter } from '../../../lib/siblingOrder'
-import { assignedLevel, orderAssignedPlotpoints } from './plotTree'
+import { isPlaced, placementsOf, repairPlacements } from './plotPlacement'
+import { orderAssignedPlotpoints } from './plotTree'
 
 // Fields and their values. A field (a PlotCustomFieldDef) is defined on a
 // category, a subcategory, a cluster or a plotline; each value in it is a plotpoint.
 //   - a value defined on a plotline is that plotline's own;
 //   - a value defined on a category, subcategory or cluster is shown on every plotline
 //     under it as a REFERENCE (a plotpoint with `refId`, whose text is the
-//     original's), which the plotline assigns to its own chapters;
+//     original's), which the plotline places on its own chapters, acts, scenes and moments (as many times as it likes: plotPlacement.ts);
 //   - a plotline can also add its own values to an inherited field.
 // A node can also define FIELDSETS (a PlotFieldSet): named groups its fields are listed under (a field has `setId`; none = a loose field,
 // in at most one set). A set shows on every plotline under the node as its fields do; only the node's own editor changes it, and a
@@ -33,7 +34,7 @@ const nextOrder = (nodes: PlotNode[], parentId: string | null) => {
   const siblings = nodes.filter(n => n.parentId === parentId)
   return siblings.length === 0 ? 0 : Math.max(...siblings.map(s => s.order)) + 1
 }
-const blank = { body: '', assignedMomentId: null, assignedParagraphIndex: null, sourceFieldId: null, customFieldDefs: [], customFieldValues: {}, keywords: [], flag: null }
+const blank = { body: '', sourceFieldId: null, customFieldDefs: [], customFieldValues: {}, keywords: [], flag: null }
 
 // A plotline's Scrap field id: it holds the assigned values of fields that were deleted.
 export const scrapFieldId = (plotlineId: string) => `scrap-${plotlineId}`
@@ -148,11 +149,11 @@ export function textOf(point: PlotNode, index: Map<string, PlotNode>): { title: 
   return original ? { title: original.title, body: original.body } : { title: point.title, body: point.body }
 }
 
-// Unassigned values first, then the assigned ones by book, then chapter.
+// Values not placed yet first, then the placed ones by book, then chapter (each at its earliest placement).
 export function orderValues(points: PlotNode[], outlineNodes: OutlineNode[], systems: TimeSystem[], mode: 'time' | 'story' = 'time'): PlotNode[] {
   const outlineById = new Map(outlineNodes.map(n => [n.id, n]))
-  const open = points.filter(p => assignedLevel(p, outlineById) === 'none').sort((a, b) => a.order - b.order)
-  const placed = orderAssignedPlotpoints(points.filter(p => assignedLevel(p, outlineById) !== 'none'), outlineNodes, systems, mode)
+  const open = points.filter(p => !isPlaced(p, outlineById)).sort((a, b) => a.order - b.order)
+  const placed = orderAssignedPlotpoints(points.filter(p => isPlaced(p, outlineById)), outlineNodes, systems, mode)
   return [...open, ...placed]
 }
 
@@ -281,7 +282,7 @@ export function addValue(nodes: PlotNode[], holderId: string, fieldId: string, m
   if (!holder || !scopeOf(holder)) return { nodes, id: null }
   const id = makeId('plot')
   const point: PlotNode = {
-    ...blank, id, kind: 'plotpoint', parentId: holderId, order: nextOrder(nodes, holderId), title: '', fieldId, refId: null, awareness: null,
+    ...blank, id, kind: 'plotpoint', parentId: holderId, order: nextOrder(nodes, holderId), title: '', fieldId, refId: null, placements: [],
   }
   const inField = (n: PlotNode) => n.parentId === holderId && n.kind === 'plotpoint' && n.fieldId === fieldId
   return { nodes: insertAfter(nodes, point, afterId, n => (afterId ? inField(n) : n.parentId === holderId)), id }
@@ -300,9 +301,9 @@ export function updateValue(nodes: PlotNode[], id: string, patch: { title?: stri
 }
 
 // A value can move between the plotline's own fields (and Scrap) while it is
-// its own and unassigned.
+// its own and not placed anywhere.
 export function canMoveValue(point: PlotNode, toFieldId: string, index: Map<string, PlotNode>, outlineById: Map<string, OutlineNode>): boolean {
-  if (point.kind !== 'plotpoint' || point.refId || assignedLevel(point, outlineById) !== 'none') return false
+  if (point.kind !== 'plotpoint' || point.refId || isPlaced(point, outlineById)) return false
   const plotline = point.parentId ? index.get(point.parentId) : undefined
   if (plotline?.kind !== 'plotline') return false
   return plotline.customFieldDefs.some(d => d.id === toFieldId)
@@ -343,11 +344,9 @@ function detach(nodes: PlotNode[], refId: string, original: PlotNode | undefined
     : n))
 }
 
-const isPlaced = (n: PlotNode, outlineById: Map<string, OutlineNode>) => assignedLevel(n, outlineById) !== 'none'
-
-// Remove a value. An own value goes only while unassigned; a reference never goes
+// Remove a value. An own value goes only while it is not placed; a reference never goes
 // from a plotline. Deleting a value defined on a category, subcategory or cluster removes
-// its references, except the assigned ones, which become the plotline's own values
+// its references, except the placed ones, which become the plotline's own values
 // in a plotline field of the same name.
 export function deleteValue(nodes: PlotNode[], id: string, outlineById: Map<string, OutlineNode>, makeId: MakeId = randomId): PlotNode[] {
   const value = nodes.find(n => n.id === id)
@@ -365,8 +364,8 @@ export function deleteValue(nodes: PlotNode[], id: string, outlineById: Map<stri
 }
 
 // Remove a field. On a category, subcategory or cluster: every value goes as above, and the
-// plotlines' own values in it keep only the assigned ones (in a plotline field of the
-// same name). On a plotline: assigned values move to its Scrap field, the rest go.
+// plotlines' own values in it keep only the placed ones (in a plotline field of the
+// same name). On a plotline: placed values move to its Scrap field, the rest go.
 export function deleteField(nodes: PlotNode[], ownerId: string, fieldId: string, outlineById: Map<string, OutlineNode>, makeId: MakeId = randomId): PlotNode[] {
   const owner = nodes.find(n => n.id === ownerId)
   const def = owner?.customFieldDefs.find(d => d.id === fieldId)
@@ -401,7 +400,7 @@ export function deleteField(nodes: PlotNode[], ownerId: string, fieldId: string,
 // Make every plotline hold exactly one reference per value defined on its category,
 // subcategory and cluster. Idempotent; returns the same array when nothing changes. A
 // reference whose original is gone (or no longer above its plotline) is kept as the
-// plotline's own value when assigned, and dropped otherwise.
+// plotline's own value when placed, and dropped otherwise.
 export function syncReferences(nodes: PlotNode[], outlineById: Map<string, OutlineNode> = new Map(), makeId: MakeId = randomId): PlotNode[] {
   let next = nodes
   const index = byId(nodes)
@@ -417,7 +416,7 @@ export function syncReferences(nodes: PlotNode[], outlineById: Map<string, Outli
     for (const ref of refs) {
       if (wanted.has(ref.refId!)) continue
       const original = index.get(ref.refId!)
-      const placed = outlineById.size > 0 ? isPlaced(ref, outlineById) : ref.assignedMomentId != null
+      const placed = outlineById.size > 0 ? isPlaced(ref, outlineById) : placementsOf(ref).length > 0
       const fieldName = original?.parentId ? index.get(original.parentId)?.customFieldDefs.find(d => d.id === original.fieldId)?.name : undefined
       next = placed ? detach(next, ref.id, original, fieldName ?? DEFAULT_FIELD_NAME, makeId) : next.filter(n => n.id !== ref.id)
     }
@@ -426,42 +425,28 @@ export function syncReferences(nodes: PlotNode[], outlineById: Map<string, Outli
       if (have.has(originalId)) continue
       next = [...next, {
         ...blank, id: `${plotline.id}~${originalId}`, kind: 'plotpoint', parentId: plotline.id, order: nextOrder(next, plotline.id),
-        title: '', fieldId, refId: originalId, awareness: null,
+        title: '', fieldId, refId: originalId, placements: [],
       }]
     }
   }
   return next
 }
 
-// ---- assignment ----
-
-// Where a plotpoint may be assigned: a chapter (from the plot editor), or an act,
-// scene or moment of its chapter (from the chapter outline); null unassigns it.
-// Placed on a moment it has an awareness (front-stage at first); anywhere else it has none.
-export function assignPoint(nodes: PlotNode[], pointId: string, targetId: string | null, outlineById: Map<string, OutlineNode>): PlotNode[] {
-  const target = targetId ? outlineById.get(targetId) : undefined
-  if (targetId && (!target || !['chapter', 'act', 'scene', 'moment'].includes(target.kind))) return nodes
-  return nodes.map(n => {
-    if (n.id !== pointId || n.kind !== 'plotpoint') return n
-    const awareness: Awareness | null = target?.kind === 'moment' ? n.awareness ?? 'front' : null
-    return { ...n, assignedMomentId: targetId, assignedParagraphIndex: null, awareness }
-  })
-}
-
 // ---- migration ----
 
 // Bring a plot saved before fields had values into the new shape. Idempotent.
-//   - a plotpoint assigned to a whole book (only chapters take plotpoints now) is unassigned;
+//   - a plotpoint's old single place (assignedMomentId) becomes its first placement, a place on a book, arc or series (only chapters, acts,
+//     scenes and moments take plotpoints) is dropped, there is one placement to a target, and an awareness only on a moment (plotPlacement.ts);
 //   - a plotline's old template-field values become values of that field;
 //   - plotpoints with no field go into a plotline field called "Default";
-//   - titles and descriptions keep to their limits, and a nameless plotpoint is named or dropped;
-//   - a plotpoint placed on a moment has an awareness, and any other has none.
+//   - titles and descriptions keep to their limits, and a nameless plotpoint is named or dropped.
 export function migratePlot(nodes: PlotNode[], outlineNodes: OutlineNode[], makeId: MakeId = randomId): PlotNode[] {
   const outlineById = new Map(outlineNodes.map(n => [n.id, n]))
   const index = byId(nodes)
-  let next: PlotNode[] = nodes.map(n => ({
-    ...n, fieldId: n.fieldId ?? null, refId: n.refId ?? null, awareness: n.awareness ?? null,
-  }))
+  let next: PlotNode[] = nodes.map(n => {
+    const point = { ...n, fieldId: n.fieldId ?? null, refId: n.refId ?? null }
+    return n.kind === 'plotpoint' ? repairPlacements(point, outlineById, () => makeId('pl')) : point
+  })
 
   // Old single values, mirrored (or not yet) as a plotpoint with sourceFieldId.
   for (const plotline of nodes.filter(n => n.kind === 'plotline')) {
@@ -469,15 +454,14 @@ export function migratePlot(nodes: PlotNode[], outlineNodes: OutlineNode[], make
     for (const [fieldId, text] of values) {
       const mirror = next.find(n => n.kind === 'plotpoint' && n.parentId === plotline.id && n.sourceFieldId === fieldId)
       if (mirror) next = next.map(n => (n.id === mirror.id ? { ...n, fieldId } : n))
-      else next = [...next, { ...blank, id: makeId('plot'), kind: 'plotpoint', parentId: plotline.id, order: nextOrder(next, plotline.id), title: text.trim(), fieldId, refId: null, awareness: null }]
+      else next = [...next, { ...blank, id: makeId('plot'), kind: 'plotpoint', parentId: plotline.id, order: nextOrder(next, plotline.id), title: text.trim(), fieldId, refId: null, placements: [] }]
     }
     next = next.map(n => (n.id === plotline.id ? { ...n, customFieldValues: {} } : n))
   }
 
   for (const point of next.filter(n => n.kind === 'plotpoint' && !n.refId)) {
-    const level = assignedLevel(point, outlineById)
-    let patch: Partial<PlotNode> = {}
-    if (level === 'book') patch = { assignedMomentId: null, assignedParagraphIndex: null }
+    const placed = isPlaced(point, outlineById)
+    const patch: Partial<PlotNode> = {}
     const parent = point.parentId ? index.get(point.parentId) ?? next.find(n => n.id === point.parentId) : undefined
     if (!point.fieldId && parent?.kind === 'plotline') {
       const field = plotlineFieldNamed(next, parent.id, DEFAULT_FIELD_NAME, makeId)
@@ -486,7 +470,7 @@ export function migratePlot(nodes: PlotNode[], outlineNodes: OutlineNode[], make
     }
     let title = clampTitle(point.title)
     if (title.trim() === '') {
-      const inUse = point.body.trim() !== '' || (level !== 'none' && level !== 'book')
+      const inUse = point.body.trim() !== '' || placed
       if (!inUse) { next = next.filter(n => n.id !== point.id); continue }
       title = 'Untitled'
     }
@@ -505,14 +489,6 @@ export function migratePlot(nodes: PlotNode[], outlineNodes: OutlineNode[], make
     const known = new Set(setsOf(n).map(s => s.id))
     if (!n.customFieldDefs.some(d => d.setId && !known.has(d.setId))) return n
     return { ...n, customFieldDefs: n.customFieldDefs.map(d => (d.setId && !known.has(d.setId) ? withSet(d, null) : d)) }
-  })
-
-  // Awareness follows placement.
-  next = next.map(n => {
-    if (n.kind !== 'plotpoint') return n
-    const target = n.assignedMomentId ? outlineById.get(n.assignedMomentId) : undefined
-    const want: Awareness | null = target?.kind === 'moment' ? n.awareness ?? 'front' : null
-    return want === (n.awareness ?? null) ? n : { ...n, awareness: want }
   })
 
   return syncReferences(next, outlineById, makeId)

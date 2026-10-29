@@ -5,7 +5,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest'
 import type { OutlineNode, PlotNode } from '../../../../api/types'
 import { __resetSettingsForTests } from '../../../../settings/settingsStore'
 import { descendantsOf, buildChildIndex } from '../outlineTree'
-import { outlineNode, plotNode } from '../plotTestWorkspace'
+import { outlineNode, placing, plotNode } from '../plotTestWorkspace'
 import type { WriterWorkspace } from '../useWriterWorkspace'
 import DraftLevel from './DraftLevel'
 import { mockFetch } from '../../../../test/mockFetch'
@@ -52,8 +52,9 @@ const OUTLINE: OutlineNode[] = [
 const PLOT: PlotNode[] = [
   plotNode('cat', 'category', null, { title: 'Romance', hue: 200 }),
   plotNode('line', 'plotline', 'cat', { title: 'The Smuggler' }),
-  plotNode('onChapter', 'plotpoint', 'line', { title: 'They meet', assignedMomentId: 'c1' }),
-  plotNode('onMoment', 'plotpoint', 'line', { title: 'A secret', assignedMomentId: 'm2', awareness: 'front' }),
+  plotNode('onChapter', 'plotpoint', 'line', { title: 'They meet', placements: [placing('c1')] }),
+  plotNode('onMoment', 'plotpoint', 'line', { title: 'A secret', placements: [placing('m2', 'front')] }),
+  plotNode('twice', 'plotpoint', 'line', { title: 'A refrain', order: 1, placements: [placing('sc1', null, 'twice-sc1'), placing('m1', 'back', 'twice-m1'), placing('c2', null, 'twice-c2')] }),
   plotNode('loose', 'plotpoint', 'line', { title: 'Not placed yet' }),
 ]
 
@@ -161,6 +162,22 @@ describe('Draft level: the book pages', () => {
     expect(within(points).getByText('A secret')).toBeTruthy()
     expect(within(points).queryByText('Not placed yet')).toBeNull()
     expect(points.querySelector('[draggable="true"]')).toBeNull()
+  })
+
+  it('has a footnote for every placement in the chapter: a plotpoint placed twice here has two, each with its own awareness', () => {
+    setup()
+    const points = within(right()).getByRole('region', { name: 'Plotpoints in this chapter' })
+    expect(within(points).getAllByText('A refrain')).toHaveLength(2)
+    // The eye shows on the one placed on a moment.
+    const notes = [...points.querySelectorAll<HTMLElement>('[data-point="twice"]')]
+    expect(notes.map(n => n.querySelector('.wrEye') !== null)).toEqual([false, true])
+  })
+
+  it('lists, in another chapter, only the placements that are in it', () => {
+    setup({ chapterId: 'c2' })
+    const points = within(right()).getByRole('region', { name: 'Plotpoints in this chapter' })
+    expect(within(points).getAllByText('A refrain')).toHaveLength(1)
+    expect(within(points).queryByText('They meet')).toBeNull()
   })
 
   it('leaves the left page as the bare strip of paper under the other levels tiles', () => {

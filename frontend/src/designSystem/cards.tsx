@@ -200,9 +200,11 @@ function PlotpointsCard() {
             <div style={{ display: 'flex', flexDirection: 'column', gap: 12, overflow: 'auto' }}>
               <PlotTray w={w} />
               <span className="wrLabel">Placed on a moment</span>
-              {points.filter(p => p.assignedMomentId).map(p => <PlotpointTile key={p.id} w={w} point={p} variant="placed" onMoment onUnassign={() => {}} />)}
+              {points.flatMap(p => (p.placements ?? []).map((placement, i, all) => (
+                <PlotpointTile key={placement.id} w={w} point={p} placement={placement} variant="placed" position={{ n: i + 1, of: all.length }} onUnassign={() => {}} />
+              )))}
               <span className="wrLabel">In the margin</span>
-              {points.slice(0, 2).map(p => <PlotpointTile key={p.id} w={w} point={p} variant="margin" onUnassign={() => {}} />)}
+              {points.slice(0, 2).map(p => <PlotpointTile key={p.id} w={w} point={p} variant="margin" count={(p.placements ?? []).length} onUnassign={() => {}} />)}
             </div>
           </LevelFrame>
         )

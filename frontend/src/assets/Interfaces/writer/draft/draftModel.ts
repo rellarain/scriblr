@@ -1,4 +1,4 @@
-import type { OutlineNode, PlotNode } from '../../../../api/types'
+import type { OutlineNode } from '../../../../api/types'
 import type { ChildIndex } from '../outlineTree'
 
 // Every moment in the chapter that has any draft text.
@@ -17,12 +17,12 @@ export function parentTrail(chapterId: string, nodeById: Map<string, OutlineNode
   return trail
 }
 
-// The plotpoints of a chapter as the left page lists them: those assigned to the chapter itself
-// first, then those placed on its acts, scenes and moments, in outline order.
-export function chapterPlotpoints(
-  chapterId: string, index: ChildIndex, pointsByNode: Map<string, PlotNode[]>,
-): PlotNode[] {
-  const out: PlotNode[] = [...(pointsByNode.get(chapterId) ?? [])]
+// The plotpoints (or placements) of a chapter as the left page lists them: those placed on the chapter
+// itself first, then those placed on its acts, scenes and moments, in outline order.
+export function chapterPlotpoints<T>(
+  chapterId: string, index: ChildIndex, pointsByNode: Map<string, T[]>,
+): T[] {
+  const out: T[] = [...(pointsByNode.get(chapterId) ?? [])]
   const walk = (id: string) => {
     for (const kid of index.get(id) ?? []) {
       out.push(...(pointsByNode.get(kid.id) ?? []))

@@ -22,7 +22,7 @@ Code: `writer/Shelf.tsx` (`Shelf`, `Spine`), `outlineTree.ts` (`shelfGroups`), b
 | Plotting | the book's plotlines that have plotpoints |
 | Outlining | chapters that have an act, scene or moment below them (a moment made for free drafting does not count) |
 | Words | draft words against the book's word-count goal (no bar without a goal) |
-| Plotpoints placed | the book's plotpoints that are assigned to a moment |
+| Plotpoints placed | the book's plotpoints that are placed at least once |
 | Revision | chapters with a manual revision |
 | Published | chapters published at least once |
 

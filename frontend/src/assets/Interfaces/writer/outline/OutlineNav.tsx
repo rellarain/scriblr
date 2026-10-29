@@ -12,8 +12,9 @@ import { useOutlineOpen } from './useOutlineOpen'
 import { formatWords } from '../wordCount'
 import HueSlider from '../HueSlider'
 import { CardHeader, StatsLine } from './CardHeader'
-import type { PlotDrag } from './OutlineCards'
-import { pointsByTarget, stat, structureOfBook } from './outlineModel'
+import { dropPlotpoint, type PlotDrag } from './OutlineCards'
+import { pointsByTarget } from '../plotPlacement'
+import { stat, structureOfBook } from './outlineModel'
 
 // What the contents are narrowed to: an arc (it and its chapters, each open), one chapter, or the whole book (every
 // arc and chapter, each chapter open).
@@ -113,7 +114,7 @@ export function OutlineNav({ w, book, counts, chapterBody, focus = null, plotDra
     />
   )
 
-  // While a plotpoint is being dragged, a chapter's card takes it (assigns it to the chapter), open or not; a card inside it
+  // While a plotpoint is being dragged, a chapter's card takes it (places it on the chapter), open or not; a card inside it
   // (an act, a scene, a moment) takes it for itself.
   const plotDrop = (node: OutlineNode) => {
     if (!plotDrag?.dragId) return {}
@@ -122,7 +123,7 @@ export function OutlineNav({ w, book, counts, chapterBody, focus = null, plotDra
       onDragLeave: () => setPlotOverId(prev => (prev === node.id ? null : prev)),
       onDrop: (e: DragEvent) => {
         e.preventDefault(); e.stopPropagation()
-        if (plotDrag.dragId) w.assignPlotpoint(plotDrag.dragId, node.id)
+        dropPlotpoint(w, plotDrag, node.id)
         plotDrag.setDragId(null)
         setPlotOverId(null)
       },

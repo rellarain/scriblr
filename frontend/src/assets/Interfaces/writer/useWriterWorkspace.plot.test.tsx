@@ -1,8 +1,9 @@
 import { act, renderHook, waitFor } from '@testing-library/react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+import type { PlotNode } from '../../../api/types'
 import { __resetSettingsForTests } from '../../../settings/settingsStore'
 import { wrapHue } from '../../../theme/bookColors'
-import { outlineNode, plotNode, projectIndex, standInBackend } from '../../../test/workspaceBackend'
+import { outlineNode, placing, plotNode, projectIndex, standInBackend } from '../../../test/workspaceBackend'
 import { useWriterWorkspace } from './useWriterWorkspace'
 
 // The plot's editing actions through the workspace hook: the tree of categories, plotlines and plotpoints, the fields and values on it,
@@ -20,7 +21,7 @@ const PLOT = [
   plotNode('line', 'plotline', 'sub', 'Plotline', { customFieldDefs: [{ id: 'f1', name: 'Beats' }] }),
   plotNode('line2', 'plotline', 'sub', 'Another', { order: 1 }),
   plotNode('free', 'plotpoint', 'line', 'Free point', { fieldId: 'f1' }),
-  plotNode('placed', 'plotpoint', 'line', 'Placed point', { fieldId: 'f1', order: 1, assignedMomentId: 'm1', awareness: 'front' }),
+  plotNode('placed', 'plotpoint', 'line', 'Placed point', { fieldId: 'f1', order: 1, placements: [placing('m1', 'front')] }),
 ]
 
 beforeEach(() => {
@@ -141,11 +142,11 @@ describe('useWriterWorkspace: deleting from the plot', () => {
     expect(get('free')).toBeUndefined()
   })
 
-  it('refuses to delete a plotline that holds a placed plotpoint, until it is unassigned', async () => {
+  it('refuses to delete a plotline that holds a placed plotpoint, until its placements are taken away', async () => {
     const { result, get } = await opened()
     act(() => { result.current.deletePlotNode('line') })
     expect(get('line')).toBeDefined()
-    act(() => { result.current.assignPlotpoint('placed', null) })
+    act(() => { result.current.unplacePlotpoint('placed', 'at-m1') })
     act(() => { result.current.deletePlotNode('line') })
     expect(get('line')).toBeUndefined()
     expect(get('free')).toBeUndefined()
@@ -178,38 +179,61 @@ describe('useWriterWorkspace: deleting from the plot', () => {
 })
 
 describe('useWriterWorkspace: placing plotpoints in the outline', () => {
-  it('assigns to a chapter, to a moment (front-stage), and back to nothing', async () => {
+  const placements = (get: (id: string) => PlotNode | undefined, id: string) => (get(id)?.placements ?? []).map(p => [p.targetId, p.awareness])
+
+  it('places a plotpoint on a chapter, on a moment (front-stage), and many times at once, and takes one placement away at a time', async () => {
     const { result, get } = await opened()
-    act(() => { result.current.assignPlotpoint('free', 'c1') })
-    expect(get('free')).toMatchObject({ assignedMomentId: 'c1', awareness: null })
-    act(() => { result.current.assignPlotpoint('free', 'm1') })
-    expect(get('free')).toMatchObject({ assignedMomentId: 'm1', awareness: 'front' })
-    act(() => { result.current.assignPlotpoint('free', null) })
-    expect(get('free')).toMatchObject({ assignedMomentId: null, awareness: null })
+    act(() => { result.current.placePlotpoint('free', 'c1') })
+    expect(placements(get, 'free')).toEqual([['c1', null]])
+    act(() => { result.current.placePlotpoint('free', 'm1') })
+    expect(placements(get, 'free')).toEqual([['c1', null], ['m1', 'front']])
+    act(() => { result.current.placePlotpoint('free', 'm1') }) // not twice on the same node
+    expect(placements(get, 'free')).toHaveLength(2)
+    const first = get('free')!.placements![0].id
+    act(() => { result.current.unplacePlotpoint('free', first) })
+    expect(placements(get, 'free')).toEqual([['m1', 'front']])
+  })
+
+  it('moves a placement to another node, and undoes each step', async () => {
+    const { result, get } = await opened()
+    act(() => { result.current.placePlotpoint('free', 'm1') })
+    const id = get('free')!.placements![0].id
+    act(() => { result.current.movePlotpointPlacement('free', id, 'c1') })
+    expect(placements(get, 'free')).toEqual([['c1', null]])
+    act(() => { result.current.history.undo('plot') })
+    expect(placements(get, 'free')).toEqual([['m1', 'front']])
+    act(() => { result.current.history.undo('plot') })
+    expect(placements(get, 'free')).toEqual([])
   })
 
   it('refuses a book, and a node that is not in the outline', async () => {
     const { result } = await opened()
     const before = result.current.plotNodes
-    act(() => { result.current.assignPlotpoint('free', 'b1') })
-    act(() => { result.current.assignPlotpoint('free', 'nowhere') })
+    act(() => { result.current.placePlotpoint('free', 'b1') })
+    act(() => { result.current.placePlotpoint('free', 'nowhere') })
     expect(result.current.plotNodes).toBe(before)
   })
 
-  it('steps a placed plotpoint through the four awareness states and round again', async () => {
+  it('steps one placement through the four awareness states and round again, and leaves the others', async () => {
     const { result, get } = await opened()
+    act(() => { result.current.placePlotpoint('placed', 'c1') })
     const seen: Array<string | null | undefined> = []
     for (let i = 0; i < 4; i += 1) {
-      act(() => { result.current.cyclePlotAwareness('placed') })
-      seen.push(get('placed')?.awareness)
+      act(() => { result.current.cyclePlotAwareness('placed', 'at-m1') })
+      seen.push(get('placed')?.placements?.[0].awareness)
     }
     expect(seen).toEqual(['back', 'mid', 'off', 'front'])
+    expect(get('placed')?.placements?.[1]).toMatchObject({ targetId: 'c1', awareness: null })
   })
 
-  it('leaves the awareness of a plotpoint that is not placed alone', async () => {
+  it('leaves a plotpoint that is not placed, and a placement with no awareness, alone', async () => {
     const { result, get } = await opened()
-    act(() => { result.current.cyclePlotAwareness('free') })
-    expect(get('free')?.awareness ?? null).toBeNull()
+    const before = result.current.plotNodes
+    act(() => { result.current.cyclePlotAwareness('free', 'nothing') })
+    act(() => { result.current.placePlotpoint('free', 'c1') })
+    act(() => { result.current.cyclePlotAwareness('free', get('free')!.placements![0].id) }) // on a chapter
+    expect(get('free')?.placements?.[0].awareness).toBeNull()
+    expect(result.current.plotNodes).not.toBe(before)
   })
 
   it('points the Draft level at a plotpoint for a few seconds', async () => {

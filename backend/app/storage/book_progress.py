@@ -84,7 +84,7 @@ def progress_of(pf: ProjectFile) -> dict[str, BookProgress]:
             plotting=Measure(done=sum(1 for pid in lines if plotpoints_by_line.get(pid)), total=len(lines)),
             outlining=Measure(done=sum(1 for c in chapters if _has_outline_below(nodes, c.id)), total=len(chapters)),
             planning=Measure(done=sum(planning_items) if has_goal else 0, total=len(planning_items) if has_goal else 0),
-            assignment=Measure(done=sum(1 for p in points if p.assignedMomentId), total=len(points)),
+            assignment=Measure(done=sum(1 for p in points if p.placements), total=len(points)),
             revision=Measure(
                 done=sum(1 for c in chapters if any(r.trigger == "manual" for r in pf.revisions.get(c.id, []))), total=len(chapters)
             ),

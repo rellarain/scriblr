@@ -3,14 +3,14 @@ import type { OutlineNode } from '../../../../api/types'
 import type { WriterWorkspace } from '../useWriterWorkspace'
 import { DraftPlotNotes } from '../DraftPlotNotes'
 import { buildChildIndex, descendantsOf } from '../outlineTree'
-import { pointsByTarget } from '../outline/outlineModel'
-import { orderAssignedPlotpoints } from '../plotTree'
+import { pointsByTarget } from '../plotPlacement'
+import { orderPlacements } from '../plotTree'
 import { PlotOrderToggle, usePlotOrder } from '../plotOrder'
 import { chapterPlotpoints } from './draftModel'
 
-// The chapter's plotpoints as footnote cards in the right page's Plotpoints tile (read-only: the
-// outline is where they are placed): those assigned to the chapter itself, then those on the
-// acts, scenes and moments inside it. A line saying so when there are none.
+// The chapter's placements as footnote cards in the right page's Plotpoints tile (read-only: the
+// outline is where they are placed): those on the chapter itself, then those on the
+// acts, scenes and moments inside it (a plotpoint placed twice in the chapter has two). A line saying so when there are none.
 export function ChapterPoints({ w, chapter }: { w: WriterWorkspace; chapter: OutlineNode }) {
   const index = useMemo(() => buildChildIndex(w.outlineNodes), [w.outlineNodes])
   const momentIds = useMemo(
@@ -21,10 +21,10 @@ export function ChapterPoints({ w, chapter }: { w: WriterWorkspace; chapter: Out
   const points = useMemo(() => {
     const systems = w.activeProject?.settings.timeSystems ?? []
     const byNode = pointsByTarget(w.plotNodes)
-    const own = orderAssignedPlotpoints(byNode.get(chapter.id) ?? [], w.outlineNodes, systems, plotOrder)
+    const own = orderPlacements(byNode.get(chapter.id) ?? [], w.outlineNodes, systems, plotOrder)
     const inOutline = chapterPlotpoints(chapter.id, index, new Map([...byNode, [chapter.id, own]]))
     // In story order they stand as the outline has them; by time, across the whole chapter.
-    return plotOrder === 'time' ? orderAssignedPlotpoints(inOutline, w.outlineNodes, systems, 'time') : inOutline
+    return plotOrder === 'time' ? orderPlacements(inOutline, w.outlineNodes, systems, 'time') : inOutline
   }, [w.plotNodes, w.outlineNodes, w.activeProject, chapter.id, index, plotOrder])
 
   if (points.length === 0) return <p className="wrPageMuted">No plotpoints are placed in this chapter yet.</p>

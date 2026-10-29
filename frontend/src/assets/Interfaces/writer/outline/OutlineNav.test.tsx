@@ -5,7 +5,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest'
 import type { OutlineNode, PlotNode } from '../../../../api/types'
 import { __resetSettingsForTests, setKv } from '../../../../settings/settingsStore'
 import { makeWorkspace } from '../../../../test/makeWorkspace'
-import { assignPoint } from '../plotFields'
+import { placeValue } from '../plotPlacement'
 import { outlineNode, plotNode } from '../plotTestWorkspace'
 import OutlineNav from './OutlineNav'
 
@@ -42,7 +42,7 @@ function Harness({ open = 'c1', dragging = null, openChapter }: { open?: string 
     outlineNodes: OUTLINE, plotNodes: plot, activeChapterId: active, selectChapter: setActive, openChapter,
     levelHueOf: () => 200, levelTintOf: () => 'hsl(200, 30%, 50%)', hueCentreOf: () => null, setNodeHue: vi.fn(), moveOutlineNodeInto: vi.fn(),
     addOutlineNode: vi.fn(() => 'new'), updateOutlineNode: vi.fn(), deleteOutlineNode: vi.fn(),
-    assignPlotpoint: (id: string, target: string | null) => setPlot(prev => assignPoint(prev, id, target, byId)),
+    placePlotpoint: (id: string, target: string) => setPlot(prev => placeValue(prev, id, target, byId)),
   })
   return (
     <OutlineNav

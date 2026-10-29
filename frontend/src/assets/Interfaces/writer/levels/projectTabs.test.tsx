@@ -24,10 +24,10 @@ beforeEach(() => {
 const outline = (id: string, kind: OutlineNode['kind'], parentId: string | null, over: Partial<OutlineNode> = {}): OutlineNode =>
   ({ id, kind, parentId, order: 0, title: id, synopsis: '', draftRef: null, ...over } as OutlineNode)
 const plot = (id: string, kind: PlotNode['kind'], parentId: string | null, over: Partial<PlotNode> = {}): PlotNode =>
-  ({ id, kind, parentId, order: 0, title: id, body: '', assignedMomentId: null, assignedParagraphIndex: null, customFieldDefs: [], customFieldValues: {}, keywords: [], flag: null, sourceFieldId: null, fieldId: null, refId: null, awareness: null, ...over } as PlotNode)
+  ({ id, kind, parentId, order: 0, title: id, body: '', placements: [], customFieldDefs: [], customFieldValues: {}, keywords: [], flag: null, sourceFieldId: null, fieldId: null, refId: null, awareness: null, ...over } as PlotNode)
 
 const outlineNodes = [outline('b1', 'book', null, { title: 'Book One' }), outline('c1', 'chapter', 'b1'), outline('c2', 'chapter', 'b1')]
-const plotNodes = [plot('cat', 'category', null, { title: 'Romance' }), plot('line', 'plotline', 'cat'), plot('v1', 'plotpoint', 'line'), plot('v2', 'plotpoint', 'line', { assignedMomentId: 'c1' })]
+const plotNodes = [plot('cat', 'category', null, { title: 'Romance' }), plot('line', 'plotline', 'cat'), plot('v1', 'plotpoint', 'line'), plot('v2', 'plotpoint', 'line', { placements: [{ id: 'a', targetId: 'c1', paragraphIndex: null, awareness: null }] })]
 const w = makeWorkspace({
   outlineNodes, plotNodes, openBook: vi.fn(), addOutlineNode: vi.fn(),
   saveStatus: { dirty: false, saving: false, error: undefined, lastSavedAt: null }, saveNow: async () => {}, saveCountdown: { nextSaveAt: null, wait: null }, history: { canUndo: () => false, canRedo: () => false, undo: () => {}, redo: () => {} },

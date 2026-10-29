@@ -5,7 +5,7 @@ import { bookRows, categoryRows, plotCounts, projectRows, projectTotals } from '
 const outline = (id: string, kind: OutlineNode['kind'], parentId: string | null, over: Partial<OutlineNode> = {}): OutlineNode =>
   ({ id, kind, parentId, order: 0, title: id, synopsis: '', draftRef: null, ...over } as OutlineNode)
 const plot = (id: string, kind: PlotNode['kind'], parentId: string | null, over: Partial<PlotNode> = {}): PlotNode =>
-  ({ id, kind, parentId, order: 0, title: id, body: '', assignedMomentId: null, assignedParagraphIndex: null, customFieldDefs: [], customFieldValues: {}, keywords: [], flag: null, sourceFieldId: null, fieldId: null, refId: null, awareness: null, ...over } as PlotNode)
+  ({ id, kind, parentId, order: 0, title: id, body: '', placements: [], customFieldDefs: [], customFieldValues: {}, keywords: [], flag: null, sourceFieldId: null, fieldId: null, refId: null, awareness: null, ...over } as PlotNode)
 
 const nodes = [
   outline('b1', 'book', null, { title: 'One' }), outline('b2', 'book', null, { title: 'Two' }),
@@ -34,7 +34,7 @@ describe('plotCounts and categoryRows', () => {
   const plotNodes = [
     plot('cat', 'category', null, { title: 'Romance' }), plot('cat2', 'category', null, { title: 'Mystery', order: 1 }),
     plot('sub', 'subcategory', 'cat'), plot('line1', 'plotline', 'sub'), plot('line2', 'plotline', 'cat'), plot('line3', 'plotline', 'cat2'),
-    plot('v1', 'plotpoint', 'line1', { fieldId: 'f' }), plot('v2', 'plotpoint', 'line1', { fieldId: 'f', assignedMomentId: 'c1' }),
+    plot('v1', 'plotpoint', 'line1', { fieldId: 'f' }), plot('v2', 'plotpoint', 'line1', { fieldId: 'f', placements: [{ id: 'a', targetId: 'c1', paragraphIndex: null, awareness: null }, { id: 'b', targetId: 'c2', paragraphIndex: null, awareness: null }] }),
     plot('v3', 'plotpoint', 'line2', { fieldId: 'f' }),
   ]
 

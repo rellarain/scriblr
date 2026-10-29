@@ -1,7 +1,7 @@
 import type { OutlineNode, PlotNode } from '../../../../api/types'
 import type { ChildIndex } from '../outlineTree'
 import { textOf } from '../plotFields'
-import { assignedLevel } from '../plotTree'
+import { isPlaced } from '../plotPlacement'
 
 // Pure helpers behind the Outline level's cards: numbering, the scenes of each
 // chapter (a scene inherits its Location / Time / Action from the scenes before
@@ -66,25 +66,12 @@ export function structureOfBook(index: ChildIndex, bookId: string): BookStructur
 // "1 act", "2 acts".
 export const stat = (n: number, one: string): string => `${n} ${one}${n === 1 ? '' : 's'}`
 
-// The plotpoints assigned to each outline node (a chapter, act, scene or moment), in plot order.
-export function pointsByTarget(plotNodes: PlotNode[]): Map<string, PlotNode[]> {
-  const map = new Map<string, PlotNode[]>()
-  for (const p of plotNodes) {
-    if (p.kind !== 'plotpoint' || !p.assignedMomentId) continue
-    const list = map.get(p.assignedMomentId)
-    if (list) list.push(p)
-    else map.set(p.assignedMomentId, [p])
-  }
-  for (const list of map.values()) list.sort((a, b) => a.order - b.order)
-  return map
-}
-
-// The plotpoints still waiting for a place in the outline: assigned to nothing
-// (or to something that no longer exists), and with a title to show.
-export function unassignedPlotpoints(
-  plotNodes: PlotNode[], outlineById: Map<string, OutlineNode>, plotById: Map<string, PlotNode>,
+// The plotpoints in the tray: every one that has a title to show, in plot order (it stays there however often it is placed); with
+// `stillToPlace`, only those placed nowhere yet.
+export function trayPlotpoints(
+  plotNodes: PlotNode[], outlineById: Map<string, OutlineNode>, plotById: Map<string, PlotNode>, stillToPlace: boolean,
 ): PlotNode[] {
   return plotNodes
-    .filter(p => p.kind === 'plotpoint' && assignedLevel(p, outlineById) === 'none' && textOf(p, plotById).title.trim() !== '')
+    .filter(p => p.kind === 'plotpoint' && textOf(p, plotById).title.trim() !== '' && (!stillToPlace || !isPlaced(p, outlineById)))
     .sort((a, b) => a.order - b.order)
 }

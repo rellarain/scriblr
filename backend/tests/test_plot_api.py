@@ -51,7 +51,9 @@ def test_get_and_replace_plot_tree(client: TestClient) -> None:
     resp = client.get(f"/api/projects/{project_id}/plot")
     nodes = resp.json()["nodes"]
     assert [n["id"] for n in nodes] == ["cat_1", "pl_1", "pp_1"]
-    assert nodes[2]["assignedMomentId"] == "moment_1"
+    # A plotpoint saved with its one old place holds it as its first placement, and the old field is left empty.
+    assert nodes[2]["assignedMomentId"] is None
+    assert nodes[2]["placements"] == [{"id": "pp_1@moment_1", "targetId": "moment_1", "paragraphIndex": None, "awareness": None}]
     assert nodes[2]["body"] == "What if the villain is the narrator's future self?"
 
 
@@ -106,12 +108,12 @@ def test_assigned_paragraph_index_round_trips(client: TestClient) -> None:
     nodes_by_id = {n["id"]: n for n in resp.json()["nodes"]}
     assert nodes_by_id["sub_1"]["kind"] == "subcategory"
     assert nodes_by_id["pl_1"]["parentId"] == "sub_1"
-    assert nodes_by_id["pp_1"]["assignedParagraphIndex"] == 2
+    assert nodes_by_id["pp_1"]["placements"][0]["paragraphIndex"] == 2
 
     resp = client.get(f"/api/projects/{project_id}/plot")
     reloaded = {n["id"]: n for n in resp.json()["nodes"]}
-    assert reloaded["pp_1"]["assignedParagraphIndex"] == 2
-    assert reloaded["pp_1"]["assignedMomentId"] == "moment_1"
+    assert reloaded["pp_1"]["placements"] == [{"id": "pp_1@moment_1", "targetId": "moment_1", "paragraphIndex": 2, "awareness": None}]
+    assert reloaded["pp_1"]["assignedMomentId"] is None and reloaded["pp_1"]["assignedParagraphIndex"] is None
 
 
 def test_a_cluster_sits_between_a_subcategory_and_a_plotline_with_its_own_fields(client: TestClient) -> None:
@@ -239,8 +241,11 @@ def test_plotpoint_field_reference_and_awareness_round_trip(client: TestClient) 
     ]
     assert client.put(f"/api/projects/{project_id}/plot", json=tree).status_code == 200
     nodes = {n["id"]: n for n in client.get(f"/api/projects/{project_id}/plot").json()["nodes"]}
-    assert nodes["val"]["fieldId"] == "f1" and nodes["val"]["refId"] is None and nodes["val"]["awareness"] is None
-    assert (nodes["ref"]["refId"], nodes["ref"]["awareness"]) == ("val", "back")
+    assert nodes["val"]["fieldId"] == "f1" and nodes["val"]["refId"] is None and nodes["val"]["placements"] == []
+    # The old awareness went with the old place into a placement.
+    assert nodes["ref"]["refId"] == "val"
+    assert [(p["targetId"], p["awareness"]) for p in nodes["ref"]["placements"]] == [("m1", "back")]
+    assert nodes["ref"]["awareness"] is None
 
 
 def test_plotpoint_awareness_only_takes_the_four_states(client: TestClient) -> None:
@@ -248,6 +253,55 @@ def test_plotpoint_awareness_only_takes_the_four_states(client: TestClient) -> N
     tree = client.get(f"/api/projects/{project_id}/plot").json()
     tree["nodes"] = [{"id": "p", "kind": "plotpoint", "parentId": None, "order": 0, "title": "x", "awareness": "sideways"}]
     assert client.put(f"/api/projects/{project_id}/plot", json=tree).status_code == 422
+    tree["nodes"] = [{"id": "p", "kind": "plotpoint", "parentId": None, "order": 0, "title": "x", "placements": [{"id": "a", "targetId": "m1", "awareness": "sideways"}]}]
+    assert client.put(f"/api/projects/{project_id}/plot", json=tree).status_code == 422
+
+
+def _point(placements: list[dict], **over) -> dict:
+    return {"id": "p", "kind": "plotpoint", "parentId": None, "order": 0, "title": "x", "body": "", "placements": placements, **over}
+
+
+def test_a_plotpoint_keeps_many_placements_each_with_its_own_awareness_and_paragraph(client: TestClient) -> None:
+    project_id = client.post("/api/projects", json={"title": "Many"}).json()["projectId"]
+    tree = client.get(f"/api/projects/{project_id}/plot").json()
+    placements = [
+        {"id": "a", "targetId": "ch1", "paragraphIndex": None, "awareness": None},
+        {"id": "b", "targetId": "m1", "paragraphIndex": 2, "awareness": "back"},
+        {"id": "c", "targetId": "m2", "paragraphIndex": None, "awareness": "off"},
+    ]
+    tree["nodes"] = [_point(placements)]
+    assert client.put(f"/api/projects/{project_id}/plot", json=tree).status_code == 200
+    node = client.get(f"/api/projects/{project_id}/plot").json()["nodes"][0]
+    assert node["placements"] == placements
+    # Saved again as it came back, nothing changes.
+    assert client.put(f"/api/projects/{project_id}/plot", json={"nodes": [node]}).json()["nodes"][0]["placements"] == placements
+
+
+def test_a_plotpoint_is_placed_once_on_a_target_and_at_most_a_hundred_times(client: TestClient) -> None:
+    project_id = client.post("/api/projects", json={"title": "Cut"}).json()["projectId"]
+    tree = client.get(f"/api/projects/{project_id}/plot").json()
+    twice = [{"id": "a", "targetId": "m1", "awareness": "front"}, {"id": "b", "targetId": "m1", "awareness": "off"}, {"id": "c", "targetId": "m2"}]
+    many = [{"id": f"x{i}", "targetId": f"m{i}"} for i in range(130)]
+    tree["nodes"] = [_point(twice), _point(many, id="q")]
+    assert client.put(f"/api/projects/{project_id}/plot", json=tree).status_code == 200
+    nodes = {n["id"]: n for n in client.get(f"/api/projects/{project_id}/plot").json()["nodes"]}
+    assert [(p["id"], p["awareness"]) for p in nodes["p"]["placements"]] == [("a", "front"), ("c", None)]  # the first to a target wins
+    assert len(nodes["q"]["placements"]) == 100 and nodes["q"]["placements"][-1]["id"] == "x99"
+
+
+def test_an_old_place_is_read_into_a_placement_beside_new_ones_and_only_once(client: TestClient) -> None:
+    project_id = client.post("/api/projects", json={"title": "Legacy"}).json()["projectId"]
+    tree = client.get(f"/api/projects/{project_id}/plot").json()
+    old = {"id": "p", "kind": "plotpoint", "parentId": None, "order": 0, "title": "x", "assignedMomentId": "m1", "assignedParagraphIndex": 1, "awareness": "mid"}
+    already = {"id": "q", "kind": "plotpoint", "parentId": None, "order": 1, "title": "y", "assignedMomentId": "m1",
+               "placements": [{"id": "own", "targetId": "m1", "awareness": "front"}]}
+    tree["nodes"] = [old, already]
+    assert client.put(f"/api/projects/{project_id}/plot", json=tree).status_code == 200
+    nodes = {n["id"]: n for n in client.get(f"/api/projects/{project_id}/plot").json()["nodes"]}
+    assert nodes["p"]["placements"] == [{"id": "p@m1", "targetId": "m1", "paragraphIndex": 1, "awareness": "mid"}]
+    assert nodes["q"]["placements"] == [{"id": "own", "targetId": "m1", "paragraphIndex": None, "awareness": "front"}]  # not placed twice
+    for n in nodes.values():
+        assert (n["assignedMomentId"], n["assignedParagraphIndex"], n["awareness"]) == (None, None, None)
 
 
 def test_plots_saved_before_fields_still_load(client: TestClient) -> None:
@@ -256,4 +310,4 @@ def test_plots_saved_before_fields_still_load(client: TestClient) -> None:
     tree["nodes"] = [{"id": "p", "kind": "plotpoint", "parentId": None, "order": 0, "title": "old", "body": ""}]
     client.put(f"/api/projects/{project_id}/plot", json=tree)
     node = client.get(f"/api/projects/{project_id}/plot").json()["nodes"][0]
-    assert (node["fieldId"], node["refId"], node["awareness"]) == (None, None, None)
+    assert (node["fieldId"], node["refId"], node["awareness"], node["placements"]) == (None, None, None, [])

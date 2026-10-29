@@ -80,7 +80,7 @@ function outlineNodes(): OutlineNode[] {
 }
 
 function plotNodes(moments: string[]): PlotNode[] {
-  const base = { body: '', assignedMomentId: null, assignedParagraphIndex: null, sourceFieldId: null, customFieldDefs: [], customFieldValues: {}, keywords: [], flag: null, fieldId: null, refId: null, awareness: null }
+  const base = { body: '', sourceFieldId: null, customFieldDefs: [], customFieldValues: {}, keywords: [], flag: null, fieldId: null, refId: null, placements: [] }
   const p = (id: string, kind: PlotNode['kind'], parentId: string | null, order: number, over: Partial<PlotNode> = {}): PlotNode =>
     ({ ...base, id, kind, parentId, order, title: '', ...over } as PlotNode)
   return [
@@ -91,8 +91,15 @@ function plotNodes(moments: string[]): PlotNode[] {
     p('line1', 'plotline', 'clu1', 0, { title: 'Plotline sit amet' }),
     p('line2', 'plotline', 'cat2', 0, { title: 'Plotline consectetur' }),
     p('pp1', 'plotpoint', 'line1', 0, { title: 'Plotpoint lorem ipsum', body: lorem(0) }),
-    p('pp2', 'plotpoint', 'line1', 1, { title: 'Plotpoint dolor sit', body: lorem(1), assignedMomentId: moments[0], awareness: 'front' }),
-    p('pp3', 'plotpoint', 'line1', 2, { title: 'Plotpoint amet elit', body: lorem(2), assignedMomentId: moments[3], awareness: 'back' }),
+    // Placed twice: on two moments, each with its own awareness.
+    p('pp2', 'plotpoint', 'line1', 1, {
+      title: 'Plotpoint dolor sit', body: lorem(1),
+      placements: [
+        { id: 'pl-pp2a', targetId: moments[0], paragraphIndex: null, awareness: 'front' },
+        { id: 'pl-pp2b', targetId: moments[2], paragraphIndex: null, awareness: 'mid' },
+      ],
+    }),
+    p('pp3', 'plotpoint', 'line1', 2, { title: 'Plotpoint amet elit', body: lorem(2), placements: [{ id: 'pl-pp3a', targetId: moments[3], paragraphIndex: null, awareness: 'back' }] }),
     p('pp4', 'plotpoint', 'line2', 0, { title: 'Plotpoint sed eiusmod', body: lorem(3) }),
   ]
 }

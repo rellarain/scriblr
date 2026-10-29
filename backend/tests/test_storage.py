@@ -109,7 +109,8 @@ def test_plot_round_trip(storage_root: Path) -> None:
 
     reloaded = store.load_plot(storage_root, index.projectId)
     assert [n.id for n in reloaded.nodes] == ["cat_1", "pl_1", "pp_1"]
-    assert reloaded.nodes[2].assignedMomentId == "moment_1"
+    assert [p.targetId for p in reloaded.nodes[2].placements] == ["moment_1"]
+    assert reloaded.nodes[2].assignedMomentId is None
 
 
 def test_draft_save_registers_moment_in_manifest(storage_root: Path) -> None:

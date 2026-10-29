@@ -1,15 +1,18 @@
 import { describe, expect, it } from 'vitest'
 import type { OutlineNode, PlotNode } from '../../../api/types'
 import {
-  BODY_MAX, DEFAULT_FIELD_NAME, FIELDSET_NAME_MAX, MAX_FIELDSETS, SCRAP_FIELD_NAME, TITLE_MAX, addField, addFieldset, addValue, assignPoint,
+  BODY_MAX, DEFAULT_FIELD_NAME, FIELDSET_NAME_MAX, MAX_FIELDSETS, SCRAP_FIELD_NAME, TITLE_MAX, addField, addFieldset, addValue,
   canMoveValue, deleteField, deleteFieldset, deleteValue, fieldGroups, fieldLayout, fieldsInOrder, migratePlot, moveField, moveFieldset, moveValue,
   orderValues, renameField, renameFieldset, scopeLayouts, scrapFieldId, setFieldSet, syncReferences, textOf, updateValue, valuesIn,
 } from './plotFields'
+import { placeValue } from './plotPlacement'
 
 let counter = 0
 const makeId = (prefix: string) => `${prefix}${(counter += 1)}`
 
-const base = { body: '', assignedMomentId: null, assignedParagraphIndex: null, sourceFieldId: null, customFieldDefs: [], customFieldValues: {}, keywords: [], flag: null, fieldId: null, refId: null, awareness: null }
+const base = { body: '', sourceFieldId: null, customFieldDefs: [], customFieldValues: {}, keywords: [], flag: null, fieldId: null, refId: null, placements: [] }
+// A placement on an outline node.
+const at = (targetId: string, awareness: 'front' | 'back' | 'mid' | 'off' | null = null) => ({ id: `at-${targetId}`, targetId, paragraphIndex: null, awareness })
 const node = (id: string, kind: PlotNode['kind'], parentId: string | null, over: Partial<PlotNode> = {}): PlotNode =>
   ({ ...base, id, kind, parentId, order: 0, title: id, ...over } as PlotNode)
 const out = (id: string, kind: OutlineNode['kind'], parentId: string | null, over: Partial<OutlineNode> = {}): OutlineNode =>
@@ -59,7 +62,7 @@ describe('a cluster\'s fields', () => {
   it('keeps the assigned references when the cluster\'s field is deleted, and drops the rest', () => {
     let nodes = clustered()
     const ref = valuesIn(nodes, 'inside', 'fMotive')[0]
-    nodes = nodes.map(n => (n.id === ref.id ? { ...n, assignedMomentId: 'ch1' } : n))
+    nodes = nodes.map(n => (n.id === ref.id ? { ...n, placements: [at('ch1')] } : n))
     nodes = deleteField(nodes, 'clu', 'fMotive', outlineById, makeId)
     expect(find(nodes, 'clu').customFieldDefs).toEqual([])
     expect(nodes.some(n => n.id === 'mv')).toBe(false)
@@ -155,44 +158,21 @@ describe('limits and moving', () => {
     expect(canMoveValue(find(nodes, added.id!), 'fTheme', index, outlineById)).toBe(false)
     const ref = valuesIn(nodes, 'lineA', 'fTheme')[0]
     expect(canMoveValue(ref, other, index, outlineById)).toBe(false)
-    const placed = assignPoint(nodes, added.id!, 'ch1', outlineById)
+    const placed = placeValue(nodes, added.id!, 'ch1', outlineById)
     expect(canMoveValue(find(placed, added.id!), other, new Map(placed.map(n => [n.id, n])), outlineById)).toBe(false)
   })
 })
 
 describe('ordering', () => {
-  it('lists unassigned values first, then the assigned ones by book and chapter', () => {
+  it('lists values not placed yet first, then the placed ones by book and chapter (each at its earliest placement)', () => {
     let nodes = world()
     const values = ['a', 'b', 'c'].map(t => { const r = addValue(nodes, 'lineA', 'fOwn', makeId); nodes = updateValue(r.nodes, r.id!, { title: t }); return r.id! })
-    nodes = assignPoint(assignPoint(nodes, values[0], 'ch2', outlineById), values[2], 'ch1', outlineById)
+    nodes = placeValue(placeValue(nodes, values[0], 'ch2', outlineById), values[2], 'ch1', outlineById)
     const ordered = orderValues(valuesIn(nodes, 'lineA', 'fOwn'), outline, [])
     expect(ordered.map(v => v.title)).toEqual(['b', 'c', 'a'])
-  })
-})
-
-describe('assignment and awareness', () => {
-  const start = () => {
-    const r = addValue(world(), 'lineA', 'fOwn', makeId)
-    return { nodes: updateValue(r.nodes, r.id!, { title: 'P' }), id: r.id! }
-  }
-
-  it('takes a chapter, an act, a scene or a moment, and refuses a book or an unknown target', () => {
-    const { nodes, id } = start()
-    expect(find(assignPoint(nodes, id, 'ch1', outlineById), id).assignedMomentId).toBe('ch1')
-    expect(find(assignPoint(nodes, id, 'act', outlineById), id).assignedMomentId).toBe('act')
-    expect(assignPoint(nodes, id, 'book', outlineById)).toBe(nodes)
-    expect(assignPoint(nodes, id, 'nope', outlineById)).toBe(nodes)
-  })
-
-  it('starts front-stage on a moment, keeps the state between moments, and clears it anywhere else', () => {
-    const { nodes, id } = start()
-    let next = assignPoint(nodes, id, 'm1', outlineById)
-    expect(find(next, id).awareness).toBe('front')
-    next = next.map(n => (n.id === id ? { ...n, awareness: 'mid' as const } : n))
-    expect(find(assignPoint(next, id, 'm1', outlineById), id).awareness).toBe('mid')
-    expect(find(assignPoint(next, id, 'scene', outlineById), id).awareness).toBeNull()
-    expect(find(assignPoint(next, id, 'ch1', outlineById), id).awareness).toBeNull()
-    expect(find(assignPoint(next, id, null, outlineById), id).awareness).toBeNull()
+    // 'b' placed on chapter 2 as well as 'a' being there: 'b' sits where it is first (chapter 2 comes after chapter 1's 'c').
+    const again = placeValue(nodes, values[1], 'ch2', outlineById)
+    expect(orderValues(valuesIn(again, 'lineA', 'fOwn'), outline, []).map(v => v.title)).toEqual(['c', 'a', 'b'])
   })
 })
 
@@ -201,19 +181,23 @@ describe('deleting a value', () => {
     const { nodes, id } = (() => { const r = addValue(world(), 'lineA', 'fOwn', makeId); return { nodes: r.nodes, id: r.id! } })()
     expect(find(nodes, id)).toBeDefined()
     expect(deleteValue(nodes, id, outlineById, makeId).some(n => n.id === id)).toBe(false)
-    const placed = assignPoint(nodes, id, 'ch1', outlineById)
+    const placed = placeValue(nodes, id, 'ch1', outlineById)
     expect(deleteValue(placed, id, outlineById, makeId)).toBe(placed)
+    // Placed twice, then once, it stays; with its last placement taken away it can go.
+    const twice = placeValue(placed, id, 'ch2', outlineById)
+    expect(deleteValue(twice, id, outlineById, makeId)).toBe(twice)
   })
 
   it('a category value: unassigned references vanish, assigned ones become the plotline\'s own values in a field of that name', () => {
     let nodes = world()
     const refA = valuesIn(nodes, 'lineA', 'fTheme')[0]
-    nodes = assignPoint(nodes, refA.id, 'ch1', outlineById)
+    nodes = placeValue(placeValue(nodes, refA.id, 'ch1', outlineById), refA.id, 'ch2', outlineById)
     nodes = deleteValue(nodes, 'val', outlineById, makeId)
     expect(nodes.some(n => n.id === 'val')).toBe(false)
     expect(valuesIn(nodes, 'lineB', 'fTheme')).toEqual([])
     const kept = find(nodes, refA.id)
-    expect([kept.refId, kept.title, kept.assignedMomentId]).toEqual([null, 'Trust', 'ch1'])
+    // It keeps every place it had.
+    expect([kept.refId, kept.title, kept.placements?.map(p => p.targetId)]).toEqual([null, 'Trust', ['ch1', 'ch2']])
     const field = find(nodes, 'lineA').customFieldDefs.find(d => d.id === kept.fieldId)!
     expect(field.name).toBe('Theme')
     expect(find(nodes, 'lineB').customFieldDefs).toEqual([])
@@ -226,7 +210,7 @@ describe('deleting a field', () => {
     const refA = valuesIn(nodes, 'lineA', 'fTheme')[0]
     const own = addValue(nodes, 'lineB', 'fTheme', makeId)
     nodes = updateValue(own.nodes, own.id!, { title: 'B own' })
-    nodes = assignPoint(assignPoint(nodes, refA.id, 'ch1', outlineById), own.id!, 'ch2', outlineById)
+    nodes = placeValue(placeValue(nodes, refA.id, 'ch1', outlineById), own.id!, 'ch2', outlineById)
     nodes = deleteField(nodes, 'cat', 'fTheme', outlineById, makeId)
     expect(find(nodes, 'cat').customFieldDefs).toEqual([])
     expect(nodes.some(n => n.id === 'val')).toBe(false)
@@ -242,7 +226,7 @@ describe('deleting a field', () => {
     let nodes = world()
     const a = addValue(nodes, 'lineA', 'fOwn', makeId); nodes = updateValue(a.nodes, a.id!, { title: 'placed' })
     const b = addValue(nodes, 'lineA', 'fOwn', makeId); nodes = updateValue(b.nodes, b.id!, { title: 'open' })
-    nodes = assignPoint(nodes, a.id!, 'ch1', outlineById)
+    nodes = placeValue(nodes, a.id!, 'ch1', outlineById)
     nodes = deleteField(nodes, 'lineA', 'fOwn', outlineById, makeId)
     const scrap = scrapFieldId('lineA')
     expect(find(nodes, 'lineA').customFieldDefs).toEqual([{ id: scrap, name: SCRAP_FIELD_NAME }])
@@ -252,7 +236,7 @@ describe('deleting a field', () => {
 
   it('never deletes Scrap itself', () => {
     let nodes = world()
-    const a = addValue(nodes, 'lineA', 'fOwn', makeId); nodes = assignPoint(a.nodes, a.id!, 'ch1', outlineById)
+    const a = addValue(nodes, 'lineA', 'fOwn', makeId); nodes = placeValue(a.nodes, a.id!, 'ch1', outlineById)
     nodes = deleteField(nodes, 'lineA', 'fOwn', outlineById, makeId)
     expect(deleteField(nodes, 'lineA', scrapFieldId('lineA'), outlineById, makeId)).toBe(nodes)
   })
@@ -282,12 +266,48 @@ describe('migration from the old shape', () => {
     expect(find(nodes, 'line').customFieldValues).toEqual({})
   })
 
-  it('unassigns book-level plotpoints, keeps act and moment placements, and gives a moment its awareness', () => {
+  it('reads the old single place as the first placement: none on a book, one on an act, front-stage on a moment, and the old fields left empty', () => {
     const nodes = migratePlot(old(), outline, makeId)
-    expect(find(nodes, 'book1').assignedMomentId).toBeNull()
-    expect(find(nodes, 'act1').assignedMomentId).toBe('act')
-    expect(find(nodes, 'act1').awareness).toBeNull()
-    expect(find(nodes, 'placed').awareness).toBe('front')
+    expect(find(nodes, 'book1').placements).toEqual([])
+    expect(find(nodes, 'act1').placements).toEqual([{ id: expect.any(String), targetId: 'act', paragraphIndex: null, awareness: null }])
+    expect(find(nodes, 'placed').placements?.map(p => [p.targetId, p.awareness])).toEqual([['m1', 'front']])
+    for (const id of ['book1', 'act1', 'placed']) {
+      expect([find(nodes, id).assignedMomentId, find(nodes, id).assignedParagraphIndex, find(nodes, id).awareness]).toEqual([null, null, null])
+    }
+  })
+
+  it('keeps the paragraph and the awareness an old place had, and keeps the placements the point already has', () => {
+    const nodes = migratePlot([
+      node('line', 'plotline', null),
+      node('one', 'plotpoint', 'line', { fieldId: 'f', assignedMomentId: 'm1', assignedParagraphIndex: 3, awareness: 'back' }),
+      node('both', 'plotpoint', 'line', { fieldId: 'f', assignedMomentId: 'm1', placements: [at('ch2'), at('m1', 'off')] }),
+    ], outline, makeId)
+    expect(find(nodes, 'one').placements).toEqual([{ id: expect.any(String), targetId: 'm1', paragraphIndex: 3, awareness: 'back' }])
+    // The old place was already one of its placements: not made twice, and the placement keeps its own awareness.
+    expect(find(nodes, 'both').placements?.map(p => [p.targetId, p.awareness])).toEqual([['ch2', null], ['m1', 'off']])
+  })
+
+  it('repairs the placements it holds: one to a target, none on a book, an awareness only on a moment, a hundred at most', () => {
+    const many = Array.from({ length: 130 }, (_, i) => at(`gone${i}`))
+    const nodes = migratePlot([
+      node('line', 'plotline', null),
+      node('p', 'plotpoint', 'line', { fieldId: 'f', placements: [at('ch1'), { ...at('ch1'), id: 'dup' }, at('book'), at('act', 'back'), at('m1')] }),
+      node('q', 'plotpoint', 'line', { fieldId: 'f', placements: many }),
+    ], outline, makeId)
+    expect(find(nodes, 'p').placements?.map(p => [p.targetId, p.awareness])).toEqual([['ch1', null], ['act', null], ['m1', 'front']])
+    expect(find(nodes, 'q').placements).toHaveLength(100)
+  })
+
+  it('leaves a plot that is already in the current shape exactly as it is, and a second pass changes nothing', () => {
+    const current = [
+      node('line', 'plotline', null),
+      node('p', 'plotpoint', 'line', { fieldId: 'f', placements: [at('ch1'), at('m1', 'mid')] }),
+    ]
+    const once = migratePlot(current, outline, makeId)
+    expect(once).toEqual(current)
+    expect(migratePlot(once, outline, makeId)).toEqual(once)
+    // An outline that has not loaded takes no placement away.
+    expect(find(migratePlot(current, [], makeId), 'p').placements).toHaveLength(2)
   })
 
   it('keeps to the limits and drops a blank unassigned plotpoint', () => {

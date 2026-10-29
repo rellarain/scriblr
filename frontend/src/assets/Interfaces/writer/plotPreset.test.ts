@@ -76,7 +76,7 @@ describe('nodesFromPreset', () => {
     const all = [...nodes.map(n => n.id), ...nodes.flatMap(n => n.customFieldDefs.map(f => f.id))]
     expect(new Set(all).size).toBe(all.length)
     expect(all.some(id => ['x1', 'x2', 'x3', 'x4'].includes(id))).toBe(false)
-    for (const n of nodes) expect(Object.keys(n).sort()).toEqual(['assignedMomentId', 'assignedParagraphIndex', 'body', 'customFieldDefs', 'customFieldValues', 'flag', 'id', 'keywords', 'kind', 'order', 'parentId', 'sourceFieldId', 'title'])
+    for (const n of nodes) expect(Object.keys(n).sort()).toEqual(['body', 'customFieldDefs', 'customFieldValues', 'flag', 'id', 'keywords', 'kind', 'order', 'parentId', 'sourceFieldId', 'title'])
   })
 
   it('numbers the siblings in the preset\'s order, and puts the category after the ones already there', () => {

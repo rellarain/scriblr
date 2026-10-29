@@ -3,7 +3,7 @@ import userEvent from '@testing-library/user-event'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import type { OutlineNode, PlotNode } from '../../../../api/types'
 import { __resetSettingsForTests } from '../../../../settings/settingsStore'
-import { outlineNode, plotNode } from '../plotTestWorkspace'
+import { outlineNode, placing, plotNode } from '../plotTestWorkspace'
 import type { WriterWorkspace } from '../useWriterWorkspace'
 import { BookDetails, BookOutlineList } from './outlineTabs'
 import { PlacedList, PlotTray } from './PlotpointsTab'
@@ -31,7 +31,7 @@ const PLOT: PlotNode[] = [
   plotNode('cat', 'category', null, { title: 'Romance' }),
   plotNode('line', 'plotline', 'cat'),
   plotNode('open', 'plotpoint', 'line', { title: 'They meet' }),
-  plotNode('placed', 'plotpoint', 'line', { title: 'Already placed', assignedMomentId: 'c1' }),
+  plotNode('placed', 'plotpoint', 'line', { title: 'Already placed', placements: [placing('c1')] }),
 ]
 
 function workspace(over: WorkspaceOverrides = {}): WriterWorkspace {
@@ -43,13 +43,14 @@ function workspace(over: WorkspaceOverrides = {}): WriterWorkspace {
 }
 
 describe('OutlineMid', () => {
-  it('lists the unassigned plotpoints and the placed ones, then the book outline, then the book details', () => {
+  it('lists the plotpoints (placed ones too) and the placements, then the book outline, then the book details', () => {
     render(<OutlineMid w={workspace()} />)
     const heads = Array.from(document.querySelectorAll('.wrPanelHead, .wrChapterPointsHead')).map(h => h.textContent)
-    expect(heads).toEqual(['Unassigned plotpoints1', 'Placed in Cold Harbor1', 'Book outline', 'Book details'])
+    expect(heads).toEqual(['Plotpoints2', 'Placed in Cold Harbor1', 'Book outline', 'Book details'])
     expect(screen.getByText('They meet')).toBeTruthy()
-    expect(document.querySelector('.wrPlotTray [data-point="placed"]')).toBeNull() // not among the unassigned
-    expect(document.querySelector('[data-placed="placed"]')).toBeTruthy() // but in the placed list
+    expect(document.querySelector('.wrPlotTray [data-point="placed"]')).toBeTruthy() // a placed plotpoint stays in the tray...
+    expect(within(document.querySelector<HTMLElement>('.wrPlotTray [data-point="placed"]')!).getByLabelText('Placed once')).toBeTruthy() // ...with its counter
+    expect(document.querySelector('[data-placed="placed"]')).toBeTruthy() // and is in the placed list
     expect(screen.getByText('A frozen port.')).toBeTruthy()
     expect(screen.getByText('2 of 12 target')).toBeTruthy()
     expect(screen.getByText('80,000')).toBeTruthy()
@@ -73,24 +74,27 @@ describe('OutlineMid', () => {
     ]
     const points = [
       plotNode('cat', 'category', null), plotNode('line', 'plotline', 'cat'),
-      plotNode('late', 'plotpoint', 'line', { title: 'Late one', assignedMomentId: 's1' }),
-      plotNode('early', 'plotpoint', 'line', { title: 'Early one', assignedMomentId: 's2' }),
+      plotNode('late', 'plotpoint', 'line', { title: 'Late one', placements: [placing('s1')] }),
+      plotNode('early', 'plotpoint', 'line', { title: 'Early one', placements: [placing('s2')] }),
+      plotNode('twice', 'plotpoint', 'line', { title: 'Twice', order: 1, placements: [placing('s1', null, 'twice-s1'), placing('s2', null, 'twice-s2')] }),
     ]
     const w = workspace({
       activeBook: outline[0], outlineNodes: outline, plotNodes: points, plotNodeById: new Map(points.map(n => [n.id, n])),
       activeProject: { settings: { timeSystems: [] } },
     } )
+    // One row for every placement: a plotpoint placed twice is listed twice, each at its own place.
     const placed = () => Array.from(document.querySelectorAll('[data-placed]')).map(el => el.getAttribute('data-placed'))
     const first = render(<OutlineMid w={w} />)
-    expect(placed()).toEqual(['early', 'late']) // by time
+    expect(placed()).toEqual(['early', 'twice', 'late', 'twice']) // by time
     first.unmount()
     setKv(PLOT_ORDER_KEY, 'story')
     render(<OutlineMid w={w} />)
-    expect(placed()).toEqual(['late', 'early']) // as the outline has them
+    expect(placed()).toEqual(['late', 'twice', 'early', 'twice']) // as the outline has them
   })
 
-  it('says so when every plotpoint has a place', () => {
-    const placed = PLOT.map(p => (p.id === 'open' ? { ...p, assignedMomentId: 'c2' } : p))
+  it('says so when every plotpoint has a place, with the tray narrowed to what is still to place', () => {
+    setKv('scriblr.writer.trayStillToPlace', true)
+    const placed = PLOT.map(p => (p.id === 'open' ? { ...p, placements: [placing('c2')] } : p))
     render(<OutlineMid w={workspace({ plotNodes: placed, plotNodeById: new Map(placed.map(n => [n.id, n])) })} />)
     expect(screen.getByText(/Every plotpoint has a place/)).toBeTruthy()
   })

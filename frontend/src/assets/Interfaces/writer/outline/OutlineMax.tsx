@@ -48,7 +48,7 @@ function OutlineMax({ w }: { w: WriterWorkspace }) {
   }, [firstId, hasActive])
   if (!book) return <Placeholder title="Book" body="Select a book on the shelf to open it." />
 
-  const plotDrag = { dragId: w.plotDragId, setDragId: w.setPlotDragId }
+  const plotDrag = { dragId: w.plotDragId, placementId: w.plotDragPlacementId, setDragId: w.setPlotDragId }
   const focus: OutlineFocus | null = showAll ? { kind: 'book', id: book.id } : arcId ? { kind: 'arc', id: arcId } : activeId && hasActive ? { kind: 'chapter', id: activeId } : null
   // An arc's tab focuses the arc, opening its first chapter (so the page the Draft opens on is in it).
   // Choosing the tab already focused goes back to the whole book.

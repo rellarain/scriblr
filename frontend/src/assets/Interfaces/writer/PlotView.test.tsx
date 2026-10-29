@@ -1,15 +1,15 @@
 import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { __resetSettingsForTests } from '../../../settings/settingsStore'
-import type { PlotNode } from '../../../api/types'
+import type { OutlineNode, PlotNode } from '../../../api/types'
 import { DraftPlotNotes } from './DraftPlotNotes'
 import { PlotpointTile } from './PlotpointTile'
 import PlotView from './PlotView'
-import { OUTLINE, plotNode, startingPlot, useFakeWorkspace } from './plotTestWorkspace'
+import { OUTLINE, outlineNode, placing, plotNode, startingPlot, useFakeWorkspace } from './plotTestWorkspace'
 import { syncReferences } from './plotFields'
 
-function Editor({ start = startingPlot(), focused = 'line', onNodes }: { start?: PlotNode[]; focused?: string; onNodes?: (n: PlotNode[]) => void }) {
-  const { w, plotNodes } = useFakeWorkspace(start, focused)
+function Editor({ start = startingPlot(), focused = 'line', onNodes, outline }: { start?: PlotNode[]; focused?: string; onNodes?: (n: PlotNode[]) => void; outline?: OutlineNode[] }) {
+  const { w, plotNodes } = useFakeWorkspace(start, focused, outline)
   onNodes?.(plotNodes)
   return <PlotView w={w} />
 }
@@ -38,8 +38,8 @@ describe('the plotline editor: fields and values', () => {
     expect(screen.queryByLabelText('Theme value title')).toBeNull()
   })
 
-  it('hides assigned values with the header toggle', () => {
-    const start = startingPlot().map(n => (n.id === 'own' ? { ...n, assignedMomentId: 'ch1' } : n))
+  it('hides placed values with the header toggle', () => {
+    const start = startingPlot().map(n => (n.id === 'own' ? { ...n, placements: [placing('ch1')] } : n))
     render(<Editor start={start} />)
     toggle(/^Expand Setback/)
     expect(titles()).toEqual(['Missed train'])
@@ -178,75 +178,153 @@ describe('the plot outline', () => {
 })
 
 describe('the eye', () => {
-  const placed = () => startingPlot().map(n => (n.id === 'own' ? { ...n, assignedMomentId: 'm1', awareness: 'front' as const } : n))
+  const placed = () => startingPlot().map(n => (n.id === 'own' ? { ...n, placements: [placing('m1', 'front')] } : n))
 
-  it('shows on a plotpoint placed on a moment, replaces the x, and cycles the four states from both places', () => {
+  it('shows on a placement on a moment, in the chapter\'s box, replaces the x there, and cycles the four states', () => {
     const { container } = render(<Editor start={placed()} />)
     toggle(/^Expand Setback/)
     const eyes = () => [...container.querySelectorAll<HTMLElement>('.wrEye')].map(e => e.dataset.awareness)
-    expect(eyes()).toEqual(['front', 'front']) // the card and the chapter's box
+    // The eye belongs to the placement, not to the plotpoint: the card in its field has none.
+    expect(eyes()).toEqual(['front'])
+    expect(container.querySelector('.wrPlotValue .wrEye')).toBeNull()
     expect(screen.queryByRole('button', { name: /^Unassign/ })).toBeNull()
     fireEvent.click(container.querySelector('.wrPlotChip .wrEye')!)
-    expect(eyes()).toEqual(['back', 'back'])
-    fireEvent.click(container.querySelector('.wrPlotValue .wrEye')!)
-    expect(eyes()).toEqual(['mid', 'mid'])
-    fireEvent.click(container.querySelector('.wrPlotValue .wrEye')!)
-    fireEvent.click(container.querySelector('.wrPlotValue .wrEye')!)
-    expect(eyes()).toEqual(['front', 'front'])
+    expect(eyes()).toEqual(['back'])
+    fireEvent.click(container.querySelector('.wrPlotChip .wrEye')!)
+    fireEvent.click(container.querySelector('.wrPlotChip .wrEye')!)
+    fireEvent.click(container.querySelector('.wrPlotChip .wrEye')!)
+    expect(eyes()).toEqual(['front'])
+  })
+
+  it('gives each placement its own awareness: two on moments cycle on their own', () => {
+    const start = startingPlot().map(n => (n.id === 'own' ? { ...n, placements: [placing('m1', 'front'), placing('m2', 'off')] } : n))
+    const { container } = render(<Editor start={start} outline={[...OUTLINE, outlineMoment2]} />)
+    const eyes = () => [...container.querySelectorAll<HTMLElement>('.wrPlotChip .wrEye')].map(e => e.dataset.awareness)
+    expect(eyes()).toEqual(['front', 'off'])
+    fireEvent.click(container.querySelectorAll('.wrPlotChip .wrEye')[0])
+    expect(eyes()).toEqual(['back', 'off'])
   })
 
   it('shows a lock, not an eye, for a plotpoint placed on an act', () => {
-    const start = placed().map(n => (n.id === 'own' ? { ...n, assignedMomentId: 'act', awareness: null } : n))
+    const start = startingPlot().map(n => (n.id === 'own' ? { ...n, placements: [placing('act')] } : n))
     const { container } = render(<Editor start={start} />)
     toggle(/^Expand Setback/)
     expect(container.querySelector('.wrEye')).toBeNull()
     expect(container.querySelectorAll('.wrPlotValueLock').length).toBeGreaterThan(0)
   })
 
-  it('colours a chapter-only card with its book, and an eye card with its awareness shade', () => {
-    const chapterOnly = startingPlot().map(n => (n.id === 'own' ? { ...n, assignedMomentId: 'ch1' } : n))
+  it('colours a placement\'s box with its book (a chapter) or its awareness shade (a moment), and the card in the field keeps its category colours', () => {
+    const chapterOnly = startingPlot().map(n => (n.id === 'own' ? { ...n, placements: [placing('ch1')] } : n))
     const first = render(<Editor start={chapterOnly} />)
     toggle(/^Expand Setback/)
-    const style = (first.container.querySelector('.wrPlotValue--assigned') as HTMLElement).style
+    const style = (first.container.querySelector('.wrPlotChip') as HTMLElement).style
     expect(style.getPropertyValue('--wr-point-bg')).toContain('--color-theme-s') // book primary, from the theme's variables
     expect(style.getPropertyValue('--wr-point-edge')).toContain('200') // the book's one hue
+    expect((first.container.querySelector('.wrPlotValue--assigned') as HTMLElement).style.getPropertyValue('--wr-point-bg')).toBe('')
     first.unmount()
     const withEye = render(<Editor start={placed()} />)
+    expect((withEye.container.querySelector('.wrPlotChip') as HTMLElement).style.getPropertyValue('--wr-point-bg')).toMatch(/^hsl\(200,/)
+  })
+})
+
+// A second moment under the same scene as the first (OUTLINE has the moment 'm1').
+const outlineMoment2 = outlineNode('m2', 'moment', 'scene', { order: 1 })
+
+describe('placing a value many times', () => {
+  const several = () => startingPlot().map(n => (n.id === 'own' ? { ...n, placements: [placing('ch1'), placing('ch2')] } : n))
+  const dataTransfer = () => { const data = new Map<string, string>(); return { setData: (k: string, v: string) => data.set(k, v), getData: (k: string) => data.get(k) ?? '', effectAllowed: '', setDragImage: () => {} } }
+
+  it('counts the placements on the value card and, added up, on the field\'s heading, and a placed value stays in its field', () => {
+    render(<Editor start={several()} />)
     toggle(/^Expand Setback/)
-    expect((withEye.container.querySelector('.wrPlotValue--assigned') as HTMLElement).style.getPropertyValue('--wr-point-bg')).toMatch(/^hsl\(200,/)
+    const card = screen.getByLabelText('Setback value title').closest('.wrPlotValue') as HTMLElement
+    expect(within(card).getByLabelText('Placed 2 times').textContent).toBe('×2')
+    const head = screen.getByLabelText('Field name').closest('.wrFieldHead') as HTMLElement
+    expect(head.querySelector('.wrFieldCount')).toHaveTextContent('0 / 1') // none left to place
+    expect(within(head).getByTitle('2 placements in all').textContent).toBe('×2')
+    expect(titles()).toEqual(['Missed train'])
+  })
+
+  it('shows a box in each chapter it is placed in, and the x of one takes only that placement away', () => {
+    const { container } = render(<Editor start={several()} />)
+    const chips = () => [...container.querySelectorAll('.wrPlotChapter .wrPlotChip')].map(c => c.closest('.wrPlotChapter')!.querySelector('.wrPlotCardTitle')!.textContent)
+    expect(chips()).toEqual(['1 · Arrival', '2 · Storm'])
+    fireEvent.click(screen.getAllByRole('button', { name: 'Unassign Missed train' })[0])
+    expect(chips()).toEqual(['2 · Storm'])
+    toggle(/^Expand Setback/)
+    expect(screen.getByLabelText('Placed once').textContent).toBe('×1')
+  })
+
+  it('drags a placed value onto another chapter for one more placement, and onto one it is already on for none', () => {
+    const start = startingPlot().map(n => (n.id === 'own' ? { ...n, placements: [placing('ch1')] } : n))
+    const { container } = render(<Editor start={start} />)
+    toggle(/^Expand Setback/)
+    const dt = dataTransfer()
+    const chapters = [...container.querySelectorAll('.wrPlotChapter')]
+    fireEvent.dragStart(screen.getByLabelText('Drag plotpoint'), { dataTransfer: dt }) // a placed value still has its grip
+    fireEvent.dragOver(chapters[1], { dataTransfer: dt })
+    fireEvent.drop(chapters[1], { dataTransfer: dt })
+    expect(container.querySelectorAll('.wrPlotChip')).toHaveLength(2)
+    expect(screen.getByLabelText('Placed 2 times')).toBeInTheDocument()
+    fireEvent.dragStart(screen.getByLabelText('Drag plotpoint'), { dataTransfer: dt })
+    fireEvent.drop(chapters[0], { dataTransfer: dt })
+    expect(container.querySelectorAll('.wrPlotChip')).toHaveLength(2)
+  })
+
+  it('cannot be deleted while it has a placement, and says how many', () => {
+    render(<Editor start={several()} />)
+    toggle(/^Expand Setback/)
+    const card = screen.getByLabelText('Setback value title').closest('.wrPlotValue') as HTMLElement
+    expect(within(card).queryByRole('button', { name: 'Delete' })).toBeNull()
+    expect(card.querySelector('.wrPlotValueLock')).toHaveAttribute('title', expect.stringContaining('Placed 2 times'))
   })
 })
 
 describe('the chapter page tiles', () => {
-  const nodes = startingPlot().map(n => (n.id === 'own' ? { ...n, assignedMomentId: 'ch1' } : n))
-  function Tile(props: { variant: 'margin' | 'placed'; onMoment?: boolean; awareness?: boolean }) {
-    const { w } = useFakeWorkspace(props.awareness ? nodes.map(n => (n.id === 'own' ? { ...n, assignedMomentId: 'm1', awareness: 'front' as const } : n)) : nodes)
+  const nodes = startingPlot().map(n => (n.id === 'own' ? { ...n, placements: [placing('ch1')] } : n))
+  function Tile(props: { variant: 'margin' | 'placed'; onMoment?: boolean; count?: number; position?: { n: number; of: number } }) {
+    const { w } = useFakeWorkspace(props.onMoment ? nodes.map(n => (n.id === 'own' ? { ...n, placements: [placing('m1', 'front')] } : n)) : nodes)
     const point = w.plotNodeById.get('own')!
-    return <PlotpointTile w={w} point={point} variant={props.variant} onMoment={props.onMoment} onUnassign={() => {}} />
+    return <PlotpointTile w={w} point={point} placement={props.variant === 'placed' ? point.placements?.[0] : undefined} variant={props.variant} count={props.count} position={props.position} onUnassign={() => {}} />
   }
 
-  it('a margin tile shows category > subcategory, plotline and field, title and description', () => {
-    const { container } = render(<Tile variant="margin" />)
+  it('a margin tile shows category > subcategory, plotline and field, title and description, and how many times the plotpoint is placed', () => {
+    const { container } = render(<Tile variant="margin" count={3} />)
     expect(container).toHaveTextContent('Romance › Slow burn')
     expect(container).toHaveTextContent('Meet cute · Setback')
     expect(container).toHaveTextContent('Missed train')
-    expect(screen.getByRole('button', { name: 'Unassign Missed train' })).toHaveAttribute('title', 'Return to the plot editor')
+    expect(screen.getByLabelText('Placed 3 times').textContent).toBe('×3')
   })
 
-  it('a placed tile leaves out the trail, and a moment tile has the eye next to the x', () => {
-    const { container } = render(<Tile variant="placed" onMoment awareness />)
+  it('has no counter for a plotpoint placed nowhere, and says "once" for one place', () => {
+    const none = render(<Tile variant="margin" count={0} />)
+    expect(none.container.querySelector('.wrCount')).toBeNull()
+    none.unmount()
+    render(<Tile variant="margin" count={1} />)
+    expect(screen.getByLabelText('Placed once').textContent).toBe('×1')
+  })
+
+  it('a placed tile leaves out the trail, has the eye of its own placement next to the x, and says which of several places it is', () => {
+    const { container } = render(<Tile variant="placed" onMoment position={{ n: 2, of: 3 }} />)
     expect(container).not.toHaveTextContent('Romance › Slow burn')
     expect(container).toHaveTextContent('Meet cute · Setback')
     expect(container.querySelector('.wrEye')).not.toBeNull()
-    expect(screen.getByRole('button', { name: 'Unassign Missed train' })).toHaveAttribute('title', 'Return to the chapter margin')
+    expect(screen.getByText('2 of 3')).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Unassign Missed train' })).toHaveAttribute('title', 'Take this placement away')
+  })
+
+  it('says nothing of its place when it is the only one', () => {
+    render(<Tile variant="placed" position={{ n: 1, of: 1 }} />)
+    expect(screen.queryByText(/ of /)).toBeNull()
   })
 })
 
 describe('draft footnotes', () => {
   function Notes() {
-    const nodes = startingPlot().map(n => (n.id === 'own' ? { ...n, assignedMomentId: 'm1', awareness: 'back' as const, body: 'On a rainy platform' } : n))
+    const nodes = startingPlot().map(n => (n.id === 'own' ? { ...n, placements: [placing('m1', 'back')], body: 'On a rainy platform' } : n))
     const { w } = useFakeWorkspace(nodes)
-    return <DraftPlotNotes w={w} points={[w.plotNodeById.get('own')!]} momentIds={new Set(['m1'])} />
+    const point = w.plotNodeById.get('own')!
+    return <DraftPlotNotes w={w} points={[{ point, placement: point.placements![0] }]} momentIds={new Set(['m1'])} />
   }
 
   it('shows only the title, and the awareness eye, until it is opened', () => {
@@ -273,8 +351,8 @@ describe('draft footnotes', () => {
 })
 
 describe('deleting', () => {
-  it('a plotline with an assigned plotpoint cannot be deleted, and an unassigned own value can', () => {
-    const start = startingPlot().map(n => (n.id === 'own' ? { ...n, assignedMomentId: 'ch1' } : n))
+  it('a plotline with a placed plotpoint cannot be deleted', () => {
+    const start = startingPlot().map(n => (n.id === 'own' ? { ...n, placements: [placing('ch1')] } : n))
     render(<Editor start={start} />)
     expect(screen.getByRole('button', { name: 'Delete (unavailable)' })).toBeDisabled()
   })
@@ -359,7 +437,7 @@ describe('the plot contents', () => {
 describe('trails with a cluster', () => {
   it('a margin tile names category > subcategory > cluster', () => {
     function Tile() {
-      const { w } = useFakeWorkspace(clustered().map(n => (n.id === 'own' ? { ...n, assignedMomentId: 'ch1' } : n)))
+      const { w } = useFakeWorkspace(clustered().map(n => (n.id === 'own' ? { ...n, placements: [placing('ch1')] } : n)))
       return <PlotpointTile w={w} point={w.plotNodeById.get('own')!} variant="margin" onUnassign={() => {}} />
     }
     const { container } = render(<Tile />)
@@ -369,9 +447,9 @@ describe('trails with a cluster', () => {
 
 // Two plotlines under the same subcategory, with values placed in different chapters.
 const twoLines = () => syncReferences([
-  ...startingPlot().map(n => (n.id === 'own' ? { ...n, assignedMomentId: 'ch2' } : n)),
+  ...startingPlot().map(n => (n.id === 'own' ? { ...n, placements: [placing('ch2')] } : n)),
   plotNode('line2', 'plotline', 'sub', { title: 'Second thread', order: 1, customFieldDefs: [{ id: 'fTwist', name: 'Twist' }] }),
-  plotNode('twist', 'plotpoint', 'line2', { title: 'Betrayal reveal', fieldId: 'fTwist', assignedMomentId: 'ch1' }),
+  plotNode('twist', 'plotpoint', 'line2', { title: 'Betrayal reveal', fieldId: 'fTwist', placements: [placing('ch1'), placing('ch2')] }),
   plotNode('loose', 'plotpoint', 'line2', { title: 'Loose end', fieldId: 'fTwist', order: 1 }),
 ], new Map(OUTLINE.map(n => [n.id, n])))
 
@@ -452,8 +530,11 @@ describe('the compare view', () => {
     const card = listCard('Betrayal reveal')
     expect(card).toHaveTextContent('Romance › Slow burn')
     expect(card).toHaveTextContent('Second thread · Twist')
-    expect(card).toHaveTextContent('1 · Arrival')
+    expect(card).toHaveTextContent('1 · Arrival and 1 more') // its first place in story order, and how many more it has
+    expect(listCard('Missed train')).toHaveTextContent('2 · Storm')
+    expect(listCard('Missed train')).not.toHaveTextContent('more')
     expect(listCard('Loose end')).toHaveTextContent('Not placed yet')
+    expect(within(card).getByLabelText('Placed 2 times')).toBeInTheDocument()
   })
 
   it('hides a plotline\'s cards from its chip, and takes it out with the x', () => {

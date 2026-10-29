@@ -8,7 +8,8 @@ import {
   type FieldInfo, type FieldScope,
 } from './plotFields'
 import { PlotValueCard } from './PlotValueCard'
-import { assignedLevel, nodeLabel } from './plotTree'
+import { isPlaced, placedCount } from './plotPlacement'
+import { nodeLabel } from './plotTree'
 import { DeleteControl } from './shared'
 import type { WriterWorkspace } from './useWriterWorkspace'
 
@@ -61,9 +62,10 @@ export function FieldBlock({ w, info, holder, editable, ui, drag, showAssigned }
   const all = valuesIn(w.plotNodes, holder.id, def.id)
   const [plotOrder] = usePlotOrder()
   const shown = orderValues(all, w.outlineNodes, w.activeProject?.settings.timeSystems ?? [], plotOrder)
-    .filter(v => showAssigned || assignedLevel(v, outlineById) === 'none')
+    .filter(v => showAssigned || !isPlaced(v, outlineById))
   const open = ui.isOpen(def.id)
-  const unassigned = all.filter(v => assignedLevel(v, outlineById) === 'none').length
+  const unassigned = all.filter(v => !isPlaced(v, outlineById)).length
+  const placements = all.reduce((n, v) => n + placedCount(v, outlineById), 0)
   const dragged = drag.dragId ? w.plotNodeById.get(drag.dragId) : undefined
   const canDrop = Boolean(dragged && canMoveValue(dragged, def.id, w.plotNodeById, outlineById) && dragged.parentId === holder.id && dragged.fieldId !== def.id)
   const [over, setOver] = useState(false)
@@ -122,9 +124,12 @@ export function FieldBlock({ w, info, holder, editable, ui, drag, showAssigned }
         ) : (
           <span className="wrFieldNameText">{def.name}</span>
         )}
-        <span className="wrOutlineMeta wrFieldCount" title={holder.kind === 'plotline' ? `${unassigned} unassigned of ${all.length}` : `${all.length} values`}>
+        <span className="wrOutlineMeta wrFieldCount" title={holder.kind === 'plotline' ? `${unassigned} not placed yet, of ${all.length}` : `${all.length} values`}>
           {holder.kind === 'plotline' ? `${unassigned} / ${all.length}` : all.length}
         </span>
+        {holder.kind === 'plotline' && placements > 0 && (
+          <span className="wrCount" title={`${placements} ${placements === 1 ? 'placement' : 'placements'} in all`}>×{placements}</span>
+        )}
         {editable && !scrap && (
           <DeleteControl
             tone="dark" message={`Delete ${def.name || 'this field'}?`}
@@ -137,7 +142,7 @@ export function FieldBlock({ w, info, holder, editable, ui, drag, showAssigned }
           {shown.map(v => (
             <PlotValueCard
               key={v.id} w={w} point={v} fieldName={def.name || 'Field'} autoFocus={v.id === ui.newValueId}
-              drag={assignedLevel(v, outlineById) === 'none' ? drag.valueDrag(v.id) : undefined}
+              drag={drag.valueDrag(v.id)}
               dragging={drag.dragId === v.id}
             />
           ))}

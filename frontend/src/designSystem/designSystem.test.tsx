@@ -20,7 +20,7 @@ describe('the pretend backend', () => {
     expect(list.map((p: { projectId: string }) => p.projectId)).toEqual([FIXTURE_PROJECT_ID])
     const summary = await (await f(`/api/projects/${FIXTURE_PROJECT_ID}`)).json()
     expect(summary.outline.nodes.some((n: { kind: string }) => n.kind === 'moment')).toBe(true)
-    expect(summary.plot.nodes.some((n: { assignedMomentId: string | null }) => n.assignedMomentId)).toBe(true)
+    expect(summary.plot.nodes.some((n: { placements?: unknown[] }) => (n.placements ?? []).length > 1)).toBe(true)
     const draft = await (await f(`/api/projects/${FIXTURE_PROJECT_ID}/draft/chapter/c1`)).json()
     expect(Object.keys(draft.moments).length).toBeGreaterThan(0)
     const analytics = await (await f(`/api/projects/${FIXTURE_PROJECT_ID}/analytics`)).json()

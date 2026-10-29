@@ -8,7 +8,8 @@ import { hueOfCode, rangeOf } from '../../../theme/bookColors'
 import { useThemeState } from '../../../theme/useTheme'
 import HueSlider from './HueSlider'
 import { plotColors, plotColorVars } from './plotColors'
-import { assignedLevel, nodeLabel, plotTrail, sortByTitle } from './plotTree'
+import { isPlaced } from './plotPlacement'
+import { nodeLabel, plotTrail, sortByTitle } from './plotTree'
 import { plotParentOf, shownPlotHue } from './plotHues'
 import { FieldEditor, FieldGroups, type PlotDrag, type PlotUi } from './FieldBlocks'
 import { PlotOutlinePanel } from './PlotOutlinePanel'
@@ -147,7 +148,7 @@ function PlotlineEditor({ w, node, ui }: { w: WriterWorkspace; node: PlotNode; u
 
   const outlineById = useMemo(() => new Map(w.outlineNodes.map(n => [n.id, n])), [w.outlineNodes])
   const points = w.plotNodes.filter(p => p.kind === 'plotpoint' && p.parentId === node.id)
-  const hasAssigned = points.some(p => assignedLevel(p, outlineById) !== 'none')
+  const hasAssigned = points.some(p => isPlaced(p, outlineById))
   const colors = plotColors(node, w.plotNodeById)
 
   const drag: PlotDrag = {
@@ -176,7 +177,7 @@ function PlotlineEditor({ w, node, ui }: { w: WriterWorkspace; node: PlotNode; u
             <input className="wrTitleField" data-kf="" value={node.title} onChange={e => w.updatePlotNodeField(node.id, 'title', e.target.value)} placeholder="Plotline title" />
             <DeleteControl
               tone="dark" message={`Delete ${nodeLabel(node)} and its plotpoints?`} onConfirm={() => w.deletePlotNode(node.id)}
-              blockedReason={hasAssigned ? 'Unassign this plotline\'s plotpoints first' : undefined}
+              blockedReason={hasAssigned ? 'Take this plotline\'s plotpoints out of the outline first' : undefined}
             />
           </div>
           <div>
@@ -205,7 +206,7 @@ function PlotlineEditor({ w, node, ui }: { w: WriterWorkspace; node: PlotNode; u
       <div className="wrPlotlineRight">
         <PlotOutlinePanel
           w={w} plotlines={[node]} dragId={dragId}
-          onDropChapter={chapterId => { if (dragId) w.assignPlotpoint(dragId, chapterId); setDragId(null) }}
+          onDropChapter={chapterId => { if (dragId) w.placePlotpoint(dragId, chapterId); setDragId(null) }}
         />
       </div>
     </div>
@@ -310,7 +311,7 @@ export default function PlotView({ w }: { w: WriterWorkspace }) {
       if (f) return isBlank(f.def.name) && !isScrapField(f.def) && !w.plotNodes.some(p => p.fieldId === id)
       const n = w.plotNodeById.get(id)
       if (!n) return true
-      if (n.kind === 'plotpoint') return !n.refId && isBlank(n.title) && isBlank(n.body) && assignedLevel(n, outlineById) === 'none'
+      if (n.kind === 'plotpoint') return !n.refId && isBlank(n.title) && isBlank(n.body) && !isPlaced(n, outlineById)
       if (!isBlank(n.title) || !isBlank(n.body) || n.keywords.length > 0 || n.customFieldDefs.length > 0) return false
       return (w.plotChildrenByParentId.get(id) ?? []).filter(c => !c.refId).length === 0
     },

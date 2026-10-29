@@ -11,18 +11,29 @@ import { PlotpointTile } from '../PlotpointTile'
 import { hasTime, systemForBook } from '../timeSystem'
 import { useNodeDnd } from '../useNodeDnd'
 import { formatWords } from '../wordCount'
-import { pointsByTarget, stat, structureOfBook } from './outlineModel'
+import { pointsByTarget, placementNumber } from '../plotPlacement'
+import { outlinePositions } from '../plotTree'
+import { stat, structureOfBook } from './outlineModel'
 import { SceneFields } from './SceneFields'
 
-// A plotpoint being dragged from the tray (or from another card) onto a card.
+// A plotpoint being dragged from the tray (or one of its placements, from another card) onto a card: a plotpoint dropped on a card is
+// placed there once more; a placement (`placementId`) dropped on a card moves to it.
 export interface PlotDrag {
   dragId: string | null
-  setDragId: (id: string | null) => void
+  placementId?: string | null
+  setDragId: (id: string | null, placementId?: string | null) => void
+}
+
+// Drop what is being dragged on an outline node.
+export function dropPlotpoint(w: WriterWorkspace, plotDrag: PlotDrag, targetId: string) {
+  if (!plotDrag.dragId) return
+  if (plotDrag.placementId) w.movePlotpointPlacement(plotDrag.dragId, plotDrag.placementId, targetId)
+  else w.placePlotpoint(plotDrag.dragId, targetId)
 }
 
 // What a node may hold one level down.
 const CHILD_KIND: Partial<Record<OutlineNode['kind'], OutlineNode['kind']>> = { arc: 'chapter', chapter: 'act', act: 'scene', scene: 'moment' }
-// Only these take a plotpoint (see plotFields.assignPoint).
+// Only these take a plotpoint (see plotPlacement.placeValue).
 const TAKES_PLOTPOINTS = new Set<OutlineNode['kind']>(['chapter', 'act', 'scene', 'moment'])
 
 const KIND_WORD: Partial<Record<OutlineNode['kind'], string>> = { arc: 'Arc', chapter: 'Chapter', act: 'Act', scene: 'Scene', moment: 'Moment' }
@@ -52,6 +63,7 @@ export function OutlineCards({ w, book, counts, plotDrag, chapterId }: {
   const nodeById = useMemo(() => new Map(w.outlineNodes.map(n => [n.id, n])), [w.outlineNodes])
   const { numbers, scenesOfChapter, chapterOf } = useMemo(() => structureOfBook(index, book.id), [index, book.id])
   const pointsByNode = useMemo(() => pointsByTarget(w.plotNodes), [w.plotNodes])
+  const positions = useMemo(() => outlinePositions(w.outlineNodes), [w.outlineNodes])
   const [plotOverId, setPlotOverId] = useState<string | null>(null)
   const fold = useOutlineOpen()
   const isOpen = (n: OutlineNode) => fold.isOpen(n.id)
@@ -105,7 +117,7 @@ export function OutlineCards({ w, book, counts, plotDrag, chapterId }: {
   const cardClass = (base: string, id: string) =>
     `${dnd.cardClass(base, id)}${plotOverId === id ? ' wrOutlineCard--plotOver' : ''}`
 
-  // While a plotpoint is being dragged, a chapter, act, scene or moment card takes it (assigns it here).
+  // While a plotpoint is being dragged, a chapter, act, scene or moment card takes it (places it here).
   const dropProps = (node: OutlineNode) => {
     if (!plotDrag.dragId || !TAKES_PLOTPOINTS.has(node.kind)) return {}
     return {
@@ -113,25 +125,26 @@ export function OutlineCards({ w, book, counts, plotDrag, chapterId }: {
       onDragLeave: () => setPlotOverId(prev => (prev === node.id ? null : prev)),
       onDrop: (e: DragEvent) => {
         e.preventDefault(); e.stopPropagation()
-        if (plotDrag.dragId) w.assignPlotpoint(plotDrag.dragId, node.id)
+        dropPlotpoint(w, plotDrag, node.id)
         plotDrag.setDragId(null)
         setPlotOverId(null)
       },
     }
   }
 
-  // The plotpoints boxed inside a card; the x sends one back to the tray.
+  // The placements boxed inside a card; the x takes one away (the plotpoint stays in the tray).
   const boxed = (node: OutlineNode) => {
     const list = pointsByNode.get(node.id)
     if (!list || list.length === 0) return null
     return (
       <div className="wrCardPoints">
-        {list.map(p => (
+        {list.map(({ point: p, placement }) => (
           <PlotpointTile
-            key={p.id} w={w} point={p} variant="placed" onMoment={node.kind === 'moment'} dragging={plotDrag.dragId === p.id}
-            unassignTitle="Return to the unassigned plotpoints" onUnassign={() => w.assignPlotpoint(p.id, null)}
+            key={placement.id} w={w} point={p} placement={placement} variant="placed" position={placementNumber(p, placement.id, positions)}
+            dragging={plotDrag.dragId === p.id && plotDrag.placementId === placement.id}
+            unassignTitle="Take this placement away" onUnassign={() => w.unplacePlotpoint(p.id, placement.id)}
             drag={{
-              onDragStart: e => { e.dataTransfer.effectAllowed = 'move'; e.dataTransfer.setData('text/plain', p.id); plotDrag.setDragId(p.id) },
+              onDragStart: e => { e.dataTransfer.effectAllowed = 'move'; e.dataTransfer.setData('text/plain', p.id); plotDrag.setDragId(p.id, placement.id) },
               onDragEnd: () => plotDrag.setDragId(null),
             }}
           />

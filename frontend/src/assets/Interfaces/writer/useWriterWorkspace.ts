@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import type {
   BookProgress, FlagType, NodeFlag, OutlineNode, OutlineNodeKind, PlotNode, PlotNodeKind, PresetContent, ProjectIndex, TimeSystem,
 } from '../../../api/types'
@@ -14,13 +14,12 @@ import {
 import { putOutline as apiPutOutline } from '../../../api/outlineApi'
 import { putPlot as apiPutPlot } from '../../../api/plotApi'
 import { booksOf, buildChildIndex, chaptersOfBook, dissolveSeries, moveNodeTo, nearestOfKind } from './outlineTree'
-import { isAssignedPlotpoint } from './plotTree'
+import { cycleAwareness, isPlaced, movePlacement, placeValue, retargetPlacements, unplace } from './plotPlacement'
 import { nodesFromPreset } from './plotPreset'
 import {
-  addField, addFieldset, addValue, assignPoint, deleteField, deleteFieldset, deleteValue, migratePlot, moveField, moveFieldset, moveValue, renameField,
+  addField, addFieldset, addValue, deleteField, deleteFieldset, deleteValue, migratePlot, moveField, moveFieldset, moveValue, renameField,
   renameFieldset, setFieldSet, syncReferences, updateValue,
 } from './plotFields'
-import { awarenessNext } from './awareness'
 import { combineCountdown, combineSaveStatus, useAutosave } from '../../../lib/useAutosave'
 import { getOutlineSnapshot, getPlotSnapshot, getProjectSettingsLog, listOutlineHistory, listPlotHistory } from '../../../api/historyFetch'
 import { newestFirst, nextSetting, nextSnapshot, sameValue, type LogEntry } from '../../../lib/logUndo'
@@ -96,7 +95,10 @@ export function useWriterWorkspace() {
   // The plotpoint a plot-outline click points at in the Draft level (shown highlighted for a moment).
   const [highlightedPointId, setHighlightedPointId] = useState<string | null>(null)
   // The plotpoint being dragged from the Project level's Plotpoints tab onto an Outline card (or back).
-  const [plotDragId, setPlotDragId] = useState<string | null>(null)
+  // The plotpoint being dragged (from the plot editor's field lists, the tray, or a card of the outline), and, when it is one of its placements that is
+  // dragged (a tile in the outline: dropping it moves that placement), which.
+  const [plotDrag, setPlotDragState] = useState<{ pointId: string; placementId: string | null } | null>(null)
+  const setPlotDragId = useCallback((id: string | null, placementId: string | null = null) => setPlotDragState(id ? { pointId: id, placementId } : null), [])
 
   const activeProjectIdRef = useRef<string | null>(null)
   const outlineNodesRef = useRef<OutlineNode[]>([])
@@ -665,15 +667,13 @@ export function useWriterWorkspace() {
     const node = prev.find(n => n.id === nodeId)
     const toRemove = collectDescendantIds(nodeId, prev)
 
-    // Plotpoints assigned to what is being deleted: those inside a chapter fall
-    // back to the chapter (still assigned to it), the rest are unassigned.
+    // Placements on what is being deleted: those inside a chapter fall back to the chapter (the plotpoint is placed there, unless it already
+    // is), the rest are taken away.
     const plots = plotNodesRef.current
-    const affected = (p: PlotNode) => p.kind === 'plotpoint' && p.assignedMomentId != null && toRemove.has(p.assignedMomentId)
-    if (plots.some(affected)) {
-      const inner = node && (node.kind === 'act' || node.kind === 'scene' || node.kind === 'moment')
-      const chapter = inner && node.parentId ? nearestOfKind(prev, node.parentId, 'chapter') : undefined
-      commitPlot(plots.map(p => (affected(p) ? { ...p, assignedMomentId: chapter?.id ?? null, assignedParagraphIndex: null, awareness: null } : p)), true)
-    }
+    const inner = node && (node.kind === 'act' || node.kind === 'scene' || node.kind === 'moment')
+    const chapter = inner && node.parentId ? nearestOfKind(prev, node.parentId, 'chapter') : undefined
+    const retargeted = retargetPlacements(plots, toRemove, chapter?.id ?? null, new Map(prev.map(n => [n.id, n])))
+    if (retargeted !== plots) commitPlot(retargeted, true)
 
     commitOutline(prev.filter(n => !toRemove.has(n.id)), true)
   }
@@ -719,7 +719,7 @@ export function useWriterWorkspace() {
     const prev = plotNodesRef.current
     const node: PlotNode = {
       id, kind, parentId, order: nextOrderAmong(prev, parentId),
-      title: title ?? '', body: '', assignedMomentId: null, assignedParagraphIndex: null,
+      title: title ?? '', body: '',
       sourceFieldId: null, customFieldDefs: [], customFieldValues: {}, keywords: [], flag: null,
       // A new category starts at the hue it is measured from (the project's); a subcategory or cluster shows its parent's until it has its own.
       ...(kind === 'category' ? { hue: projectHueRef.current } : {}),
@@ -826,16 +826,26 @@ export function useWriterWorkspace() {
   function movePlotValue(id: string, toFieldId: string) {
     commitPlot(moveValue(plotNodesRef.current, id, toFieldId, outlineMap()), true)
   }
-  function cyclePlotAwareness(pointId: string) {
-    commitPlot(plotNodesRef.current.map(n => (n.id === pointId && n.awareness ? { ...n, awareness: awarenessNext(n.awareness) } : n)), true)
+  // One placement's awareness, stepped to the next (a placement on a moment has one).
+  function cyclePlotAwareness(pointId: string, placementId: string) {
+    const next = cycleAwareness(plotNodesRef.current, pointId, placementId)
+    if (next !== plotNodesRef.current) commitPlot(next, true)
   }
 
-  // A plotpoint is assigned to a chapter (from the plot editor), or placed on an act, scene
-  // or moment of it (from the chapter outline), by storing that outline node's id in
-  // assignedMomentId (the backend treats it as an opaque id); null unassigns it. Placed on a
-  // moment it gets an awareness (front-stage at first).
-  function assignPlotpoint(pointId: string, outlineNodeId: string | null) {
-    const next = assignPoint(plotNodesRef.current, pointId, outlineNodeId, outlineMap())
+  // A plotpoint is placed on a chapter (from the plot editor), or on an act, scene or moment (from the outline), as many times as it
+  // likes but once to a target: each place is a placement holding that outline node's id (the backend treats it as an opaque id). On a moment
+  // a placement has an awareness (front-stage at first). Dragging a placement's tile to another node moves that placement; the x on a tile takes
+  // it away. The plotpoint itself stays, in the tray.
+  function placePlotpoint(pointId: string, outlineNodeId: string) {
+    const next = placeValue(plotNodesRef.current, pointId, outlineNodeId, outlineMap())
+    if (next !== plotNodesRef.current) commitPlot(next, true)
+  }
+  function movePlotpointPlacement(pointId: string, placementId: string, outlineNodeId: string) {
+    const next = movePlacement(plotNodesRef.current, pointId, placementId, outlineNodeId, outlineMap())
+    if (next !== plotNodesRef.current) commitPlot(next, true)
+  }
+  function unplacePlotpoint(pointId: string, placementId: string) {
+    const next = unplace(plotNodesRef.current, pointId, placementId)
     if (next !== plotNodesRef.current) commitPlot(next, true)
   }
 
@@ -850,7 +860,7 @@ export function useWriterWorkspace() {
   // the subcategory's id -- the landing spot for rescued plotlines.
   function ensureUnassignedBucket(nodes: PlotNode[]): { nodes: PlotNode[]; subcategoryId: string } {
     let working = nodes
-    const blank = { body: '', assignedMomentId: null, assignedParagraphIndex: null, sourceFieldId: null, customFieldDefs: [], customFieldValues: {}, keywords: [], flag: null }
+    const blank = { body: '', sourceFieldId: null, customFieldDefs: [], customFieldValues: {}, keywords: [], flag: null }
     let category = working.find(n => n.parentId === null && n.kind === 'category' && n.title === 'Unassigned')
     if (!category) {
       category = { id: newId('plot'), kind: 'category', parentId: null, order: nextOrderAmong(working, null), title: 'Unassigned', ...blank }
@@ -892,12 +902,12 @@ export function useWriterWorkspace() {
       }
     }
 
-    // Only unassigned plotpoints can be deleted, so a plotline holding an
-    // assigned one cannot be deleted either until it is unassigned.
+    // Only plotpoints that are not placed can be deleted, so a plotline holding a
+    // placed one cannot be deleted either until its placements are taken away.
     const outlineById = new Map(outlineNodesRef.current.map(n => [n.id, n]))
-    if (target.kind === 'plotpoint' && isAssignedPlotpoint(target, outlineById)) return
+    if (target.kind === 'plotpoint' && isPlaced(target, outlineById)) return
     if (target.kind === 'plotline'
-      && prev.some(n => n.parentId === target.id && n.kind === 'plotpoint' && isAssignedPlotpoint(n, outlineById))) return
+      && prev.some(n => n.parentId === target.id && n.kind === 'plotpoint' && isPlaced(n, outlineById))) return
 
     let next: PlotNode[]
     let removed: Set<string>
@@ -952,7 +962,7 @@ export function useWriterWorkspace() {
     addPlotField, renamePlotField, movePlotField, removePlotField,
     addPlotFieldset, renamePlotFieldset, movePlotFieldset, removePlotFieldset, setPlotFieldSet,
     addPlotValue, updatePlotValue, removePlotValue, movePlotValue, cyclePlotAwareness,
-    assignPlotpoint, highlightedPointId, highlightPlotpoint, plotDragId, setPlotDragId,
+    placePlotpoint, movePlotpointPlacement, unplacePlotpoint, highlightedPointId, highlightPlotpoint, plotDragId: plotDrag?.pointId ?? null, plotDragPlacementId: plotDrag?.placementId ?? null, setPlotDragId,
   }
 }
 

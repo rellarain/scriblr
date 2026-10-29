@@ -23,7 +23,7 @@ The words in the app are part of the design. They are short, plain and in the wr
 | A tab at Max | "Pick a tab above to open it." |
 | Project | "Project Shelves"; tabs Plot, Outline, Plotpoints, Schedule, History, Analytics, Settings, Help |
 | Plot, empty | "No plot yet." "No categories yet." "Select a category or plotline to edit it, or add a category." |
-| Plotpoints | "Unassigned plotpoints" · "Every plotpoint has a place. Add more in the Plot." · "None placed yet." |
+| Plotpoints | "Plotpoints" · "Still to place" · "No plotpoints yet. Add some in the Plot." · "Every plotpoint has a place. Add more in the Plot." · "None placed yet." |
 | Outline | "Contents" · "+ Arc" "+ Chapter" · "Nothing outlined yet. Add an arc or a chapter to begin." · "No chapters yet. Add one in the contents to begin." · "Pick a chapter in the contents to outline it." |
 | Cards | "+ Act" "+ Scene" "+ Moment" · "Drag to reorder" · "Moment synopsis" · "Act title" |
 | Draft | "Chapter" · "Publish" · "Write some draft text to publish it" · "Write some draft text to preview it" · "Draft freely, no outline needed…" |

@@ -7,7 +7,7 @@ Code: `writer/draft/DraftLevel.tsx`, `ChapterTile.tsx`, `ChapterPoints.tsx`, `Dr
 ## Anatomy
 
 - **Chapter tile** `.wrChapterTile`: the titles above the chapter as tags (series, book, arc, each in its own colour with a 6px stripe), then the chapter's number badge (the one the Outline's cards have, *Chapter 1* to a screen reader) over the title (serif 22 bold, click to edit) and synopsis, the dates and draft stats, and the tools at the right: Save, Publish, the **Draft | Preview** switch, Settings and Help.
-- **Plotpoints tile**: footnote cards of the plotpoints in this chapter, *By time* or *In story*.
+- **Plotpoints tile**: footnote cards of the placements in this chapter (a plotpoint placed twice here has two, each with the awareness eye of its own place), *By time* or *In story*.
 - **Draft tile**: the acts, scenes and moments as cards (fold up, remembered), each around an auto-growing serif input (16px, line 1.6) with a live word count. Settings (the chapter's colour) and Help swap this tile's content.
 - **Left page and crease**: a bare strip of paper under the other levels, and an 18px crease.
 

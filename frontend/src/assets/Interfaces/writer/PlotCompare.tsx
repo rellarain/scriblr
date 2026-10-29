@@ -9,7 +9,8 @@ import { PlotpointTile } from './PlotpointTile'
 import { PlotOrderToggle, usePlotOrder } from './plotOrder'
 import { orderValues } from './plotFields'
 import { plotColors, plotColorVars } from './plotColors'
-import { chapterOfAssignment, nodeLabel, plotTrail } from './plotTree'
+import { livePlacements, placedCount } from './plotPlacement'
+import { chapterOfTarget, nodeLabel, orderPlacements, plotTrail } from './plotTree'
 import { COMPARE_BREAKPOINTS, COMPARE_COLUMNS_FROM, useElementWidth, type PlotSize } from './useElementWidth'
 import { useStoredState } from './storage'
 
@@ -61,12 +62,16 @@ export function PlotCompare({ w, lines, size, onOpen, onOpenNode, openParents, o
     [w.plotNodes, w.outlineNodes, w.activeProject, plotOrder, shownKey],
   )
 
+  // Where it is placed: its first place in story order ("2 · Storm"), and how many more there are.
   const whereOf = (p: PlotNode): string => {
-    const chapter = chapterOfAssignment(p, outlineById)
-    return chapter ? `${chapterNumber.get(chapter.id) ?? ''} · ${nodeLabel(chapter)}` : 'Not placed yet'
+    const first = orderPlacements(livePlacements(p, outlineById).map(placement => ({ point: p, placement })), w.outlineNodes, [], 'story')[0]
+    const chapter = first ? chapterOfTarget(first.placement.targetId, outlineById) : undefined
+    if (!chapter) return 'Not placed yet'
+    const more = livePlacements(p, outlineById).length - 1
+    return `${chapterNumber.get(chapter.id) ?? ''} · ${nodeLabel(chapter)}${more > 0 ? ` and ${more} more` : ''}`
   }
   const card = (p: PlotNode) => (
-    <PlotpointTile key={p.id} w={w} point={p} variant="margin" where={whereOf(p)} onOpen={() => p.parentId && onOpen(p.parentId, p.id)} />
+    <PlotpointTile key={p.id} w={w} point={p} variant="margin" where={whereOf(p)} count={placedCount(p, outlineById)} onOpen={() => p.parentId && onOpen(p.parentId, p.id)} />
   )
   const toggleIn = (set: Set<string>, id: string) => { const next = new Set(set); if (next.has(id)) next.delete(id); else next.add(id); return next }
 

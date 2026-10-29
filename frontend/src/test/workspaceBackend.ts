@@ -11,10 +11,13 @@ export function outlineNode(id: string, kind: OutlineNode['kind'], parentId: str
   } as OutlineNode
 }
 
+// A placement on an outline node (`placements: [placing('m1', 'front')]` places a plotpoint there).
+export const placing = (targetId: string, awareness: 'front' | 'back' | 'mid' | 'off' | null = null, id = `at-${targetId}`) => ({ id, targetId, paragraphIndex: null, awareness })
+
 export function plotNode(id: string, kind: PlotNode['kind'], parentId: string | null, title = id, extra: Partial<PlotNode> = {}): PlotNode {
   return {
-    id, kind, parentId, order: 0, title, body: '', assignedMomentId: null, assignedParagraphIndex: null, sourceFieldId: null,
-    customFieldDefs: [], customFieldValues: {}, keywords: [], flag: null, fieldId: null, refId: null, awareness: null, ...extra,
+    id, kind, parentId, order: 0, title, body: '', sourceFieldId: null,
+    customFieldDefs: [], customFieldValues: {}, keywords: [], flag: null, fieldId: null, refId: null, placements: [], ...extra,
   }
 }
 

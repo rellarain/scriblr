@@ -1,23 +1,24 @@
 import { useMemo, useState } from 'react'
-import type { OutlineNode, PlotNode } from '../../../api/types'
+import type { OutlineNode, PlotNode, PlotPlacement } from '../../../api/types'
 import { accentColorCss, bookThemeHue, themeColorCss } from '../../../theme/bookColors'
 import { useThemeState } from '../../../theme/useTheme'
 import { ChevronDownIcon, ChevronRightIcon, CloseIcon, LockIcon } from '../../icons'
 import { AwarenessEye } from './AwarenessEye'
 import { buildChildIndex, chaptersOfBook } from './outlineTree'
-import { pointLook } from './plotCardColors'
+import { placementLook, type PlacementLook } from './plotCardColors'
 import { textOf } from './plotFields'
+import { livePlacements } from './plotPlacement'
 import { plotColors, plotColorVars } from './plotColors'
 import { nodeLabel, plotTrail } from './plotTree'
 import type { WriterWorkspace } from './useWriterWorkspace'
 
 // The plotline editor's outline: the project's series, books, arcs and chapters as nested
-// cards. Only chapters take plotpoints (dragged from the field lists). Book and arc cards
-// wear the book's primary colour, chapters a muted shade of its secondary colour. A chapter
-// lists this plotline's plotpoints assigned to it in one wrapping row of boxes, each with an
-// icon on the right: an x while it is only assigned to the chapter, the awareness eye once it
-// is placed on a moment, a lock on an act or scene. Given several plotlines (the compare view) it lists all their plotpoints, each
-// chip marked with its plotline's colours, and `readOnly` takes away what changes them (the x and the eye's click).
+// cards. Only chapters take plotpoints (dragged from the field lists, as many times as a plotpoint is wanted in different chapters). Book
+// and arc cards wear the book's primary colour, chapters a muted shade of its secondary colour. A chapter
+// lists the placements of this plotline's plotpoints in it (on the chapter, or on an act, scene or moment of it) in one wrapping row of
+// boxes, one box for each placement, each with an icon on the right: an x on a placement on the chapter itself (it takes that placement
+// away), the awareness eye on a placement on a moment, a lock on an act or scene. Given several plotlines (the compare view) it lists all
+// their placements, each chip marked with its plotline's colours, and `readOnly` takes away what changes them (the x and the eye's click).
 const SHOWN = new Set(['series', 'book', 'arc', 'chapter'])
 
 export function PlotOutlinePanel({ w, plotlines, dragId, onDropChapter, readOnly = false }: {
@@ -37,11 +38,13 @@ export function PlotOutlinePanel({ w, plotlines, dragId, onDropChapter, readOnly
   const lineIds = new Set(plotlines.map(l => l.id))
   const several = plotlines.length > 1
   const points = w.plotNodes.filter(p => p.kind === 'plotpoint' && p.parentId !== null && lineIds.has(p.parentId))
-  const looks = new Map(points.map(p => [p.id, pointLook(p, w.outlineNodes, outlineById, w.plotNodeById, activeZone)]))
+  // One entry for each placement: the plotpoint, the placement, and how its chip looks.
+  const placed = points.flatMap(point => livePlacements(point, outlineById).map(placement => ({
+    point, placement, look: placementLook(placement, w.outlineNodes, outlineById, activeZone),
+  })))
 
-  function chip(p: PlotNode, chapter: OutlineNode) {
-    const look = looks.get(p.id)!
-    const target = p.assignedMomentId ? outlineById.get(p.assignedMomentId) : undefined
+  function chip({ point: p, placement, look }: { point: PlotNode; placement: PlotPlacement; look: PlacementLook }, chapter: OutlineNode) {
+    const target = outlineById.get(placement.targetId)
     const text = textOf(p, w.plotNodeById)
     const line = p.parentId ? w.plotNodeById.get(p.parentId) : undefined
     let icon: React.ReactNode
@@ -49,18 +52,18 @@ export function PlotOutlinePanel({ w, plotlines, dragId, onDropChapter, readOnly
       icon = <span className="wrPlotValueLock" title="Open the plotline to change it"><LockIcon size={13} /></span>
     } else if (look.level === 'chapter') {
       icon = (
-        <button type="button" className="wrPlotChipX" aria-label={`Unassign ${text.title || 'plotpoint'}`} title="Remove from the chapter" onClick={() => w.assignPlotpoint(p.id, null)}>
+        <button type="button" className="wrPlotChipX" aria-label={`Unassign ${text.title || 'plotpoint'}`} title="Remove from the chapter" onClick={() => w.unplacePlotpoint(p.id, placement.id)}>
           <CloseIcon size={13} />
         </button>
       )
-    } else if (target?.kind === 'moment' && p.awareness) {
-      icon = <AwarenessEye state={p.awareness} size={15} onCycle={readOnly ? undefined : () => w.cyclePlotAwareness(p.id)} />
+    } else if (target?.kind === 'moment' && placement.awareness) {
+      icon = <AwarenessEye state={placement.awareness} size={15} onCycle={readOnly ? undefined : () => w.cyclePlotAwareness(p.id, placement.id)} />
     } else {
-      icon = <span className="wrPlotValueLock" title="Placed in the chapter outline. Unassign it there first."><LockIcon size={13} /></span>
+      icon = <span className="wrPlotValueLock" title="Placed in the chapter outline. Take it away there first."><LockIcon size={13} /></span>
     }
     return (
       <span
-        key={p.id} className="wrPlotChip" data-point={p.id}
+        key={placement.id} className="wrPlotChip" data-point={p.id} data-placement={placement.id}
         style={several && line ? { ...look.style, ...plotColorVars(plotColors(line, w.plotNodeById)) } : look.style}
         title={several && line ? [...plotTrail(line, w.plotNodeById), line].map(nodeLabel).join(' › ') : undefined}
       >
@@ -77,7 +80,7 @@ export function PlotOutlinePanel({ w, plotlines, dragId, onDropChapter, readOnly
   }
 
   function chapterCard(chapter: OutlineNode, number: number, hues: { themeHue: number }) {
-    const inChapter = points.filter(p => looks.get(p.id)?.chapterId === chapter.id)
+    const inChapter = placed.filter(e => e.look.chapterId === chapter.id)
     const over = overId === chapter.id
     return (
       <div
@@ -89,7 +92,7 @@ export function PlotOutlinePanel({ w, plotlines, dragId, onDropChapter, readOnly
         onDrop={e => { e.preventDefault(); setOverId(null); if (dragId) onDropChapter(chapter.id) }}
       >
         <div className="wrPlotCardTitle">{number} · {nodeLabel(chapter)}</div>
-        {inChapter.length > 0 && <div className="wrPlotChips">{inChapter.map(p => chip(p, chapter))}</div>}
+        {inChapter.length > 0 && <div className="wrPlotChips">{inChapter.map(e => chip(e, chapter))}</div>}
       </div>
     )
   }

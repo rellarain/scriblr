@@ -1,5 +1,6 @@
 import type { OutlineNode, PlotNode } from '../../../../api/types'
 import { booksOf, chaptersOfBook } from '../outlineTree'
+import { placementsOf } from '../plotPlacement'
 import { categoryOf, nodeLabel } from '../plotTree'
 
 // What the read-only tile bodies show, worked out from the outline and plot lists.
@@ -30,10 +31,10 @@ export function bookRows(nodes: OutlineNode[]): BookRow[] {
 
 export interface PlotCounts { categories: number; plotlines: number; values: number; placed: number; waiting: number }
 
-// Values are the plotpoints: one that sits on a chapter (or deeper) is placed, the rest are waiting.
+// Values are the plotpoints: one placed on a chapter (or deeper), however often, is placed, the rest are waiting.
 export function plotCounts(nodes: PlotNode[]): PlotCounts {
   const values = nodes.filter(n => n.kind === 'plotpoint')
-  const placed = values.filter(n => n.assignedMomentId !== null).length
+  const placed = values.filter(n => placementsOf(n).length > 0).length
   return {
     categories: nodes.filter(n => n.kind === 'category').length,
     plotlines: nodes.filter(n => n.kind === 'plotline').length,

@@ -1,9 +1,9 @@
-import type { OutlineNode, PlotNode, TimeSystem } from '../../../api/types'
-import { booksOf, buildChildIndex, descendantsOf, nearestOfKind } from './outlineTree'
+import type { OutlineNode, PlotNode, PlotPlacement, TimeSystem } from '../../../api/types'
+import { booksOf, buildChildIndex, descendantsOf } from './outlineTree'
 import { compareTimeValues, hasTime, systemForBook, type TimeValue } from './timeSystem'
 
 // Helpers for the plot tree (categories > subcategories > clusters > plotlines >
-// plotpoints) and the rules around plotpoint assignment.
+// plotpoints) and the rules around where plotpoints are placed.
 
 // The grouping nodes above a node (category, subcategory, cluster: whichever it sits under), outermost first.
 export function plotTrail(node: PlotNode, byId: Map<string, PlotNode>): PlotNode[] {
@@ -69,34 +69,22 @@ export function titleAfterEdit(title: string, body: string): string {
   return title.trim() === '' && body.trim() !== '' ? UNTITLED_PLOTPOINT : title
 }
 
-// Where a plotpoint is assigned in the outline:
-//  - 'none'    unassigned (or its target no longer exists)
-//  - 'book'    a whole book
-//  - 'chapter' a chapter (shown in that chapter's left column)
-//  - 'inner'   an act, scene or moment ("assigned at the chapter level"),
-//              which locks the plotpoint in the plotline editor
-export type AssignedLevel = 'none' | 'book' | 'chapter' | 'inner'
+// Where a placement's target sits in the outline:
+//  - 'none'    it no longer exists, or is something that takes no plotpoints (a series, book or arc)
+//  - 'chapter' a chapter (shown in that chapter's card)
+//  - 'inner'   an act, scene or moment of a chapter ("placed in the chapter outline")
+export type TargetLevel = 'none' | 'chapter' | 'inner'
 
-export function assignedLevel(
-  point: Pick<PlotNode, 'assignedMomentId'>, outlineById: Map<string, OutlineNode>,
-): AssignedLevel {
-  const target = point.assignedMomentId ? outlineById.get(point.assignedMomentId) : undefined
+export function levelOfTarget(targetId: string | null | undefined, outlineById: Map<string, OutlineNode>): TargetLevel {
+  const target = targetId ? outlineById.get(targetId) : undefined
   if (!target) return 'none'
   if (target.kind === 'act' || target.kind === 'scene' || target.kind === 'moment') return 'inner'
-  if (target.kind === 'chapter') return 'chapter'
-  return 'book'
+  return target.kind === 'chapter' ? 'chapter' : 'none'
 }
 
-export const isAssignedPlotpoint = (point: Pick<PlotNode, 'assignedMomentId'>, outlineById: Map<string, OutlineNode>) =>
-  assignedLevel(point, outlineById) !== 'none'
-
-// The chapter an assigned plotpoint belongs to (walking up from an act, scene
-// or moment; the chapter itself for a chapter assignment; undefined for a
-// book-level or missing target).
-export function chapterOfAssignment(
-  point: Pick<PlotNode, 'assignedMomentId'>, outlineById: Map<string, OutlineNode>,
-): OutlineNode | undefined {
-  let current = point.assignedMomentId ? outlineById.get(point.assignedMomentId) : undefined
+// The chapter a placement belongs to (walking up from an act, scene or moment; the chapter itself for a chapter; undefined for anything else).
+export function chapterOfTarget(targetId: string | null | undefined, outlineById: Map<string, OutlineNode>): OutlineNode | undefined {
+  let current = targetId ? outlineById.get(targetId) : undefined
   while (current) {
     if (current.kind === 'chapter') return current
     current = current.parentId ? outlineById.get(current.parentId) : undefined
@@ -104,35 +92,47 @@ export function chapterOfAssignment(
   return undefined
 }
 
-// Assigned plotpoints in order of occurrence: by book, then by the Time of the
-// scene they belong to (compared in that book's time system; a plotpoint with
-// no timed scene sorts after the timed ones), then by outline position.
-//   - assigned to a scene: that scene; to a moment: its scene;
-//   - assigned to an act or chapter: the first scene inside it that has a Time;
-//   - assigned to a book: no scene (sorts by position).
-// In 'story' mode the Time is left out: by book, then outline position only.
-export function orderAssignedPlotpoints(
-  points: PlotNode[], outlineNodes: OutlineNode[], systems: TimeSystem[], mode: 'time' | 'story' = 'time',
-): PlotNode[] {
-  const byId = new Map(outlineNodes.map(n => [n.id, n]))
-  const index = buildChildIndex(outlineNodes)
-  const bookIndex = new Map(booksOf(outlineNodes).map((b, i) => [b.id, i]))
+// One placement of a plotpoint: a plotpoint can be placed many times, and each place stands alone.
+export interface PlacedPoint { point: PlotNode; placement: PlotPlacement }
 
-  // Document order of every node (book, chapter, act, scene, moment...).
+// Every outline node's place in document order (book, chapter, act, scene, moment...).
+export function outlinePositions(outlineNodes: OutlineNode[]): Map<string, number> {
+  const index = buildChildIndex(outlineNodes)
   const position = new Map<string, number>()
   let next = 0
   const walk = (parentId: string | null) => {
     for (const n of index.get(parentId) ?? []) { position.set(n.id, next++); walk(n.id) }
   }
   walk(null)
+  return position
+}
+
+// Placements in order of occurrence: by book, then by the Time of the scene they belong to (compared in that book's time system; one with no
+// timed scene sorts after the timed ones), then by outline position, then by the plotpoint's own order.
+//   - placed on a scene: that scene; on a moment: its scene;
+//   - placed on an act or chapter: the first scene inside it that has a Time.
+// In 'story' mode the Time is left out: by book, then outline position only.
+export function orderPlacements(
+  entries: PlacedPoint[], outlineNodes: OutlineNode[], systems: TimeSystem[], mode: 'time' | 'story' = 'time',
+): PlacedPoint[] {
+  const byId = new Map(outlineNodes.map(n => [n.id, n]))
+  const index = buildChildIndex(outlineNodes)
+  const bookIndex = new Map(booksOf(outlineNodes).map((b, i) => [b.id, i]))
+  const position = outlinePositions(outlineNodes)
+  const ancestorOfKind = (id: string, kind: OutlineNode['kind']): OutlineNode | undefined => {
+    for (let current = byId.get(id); current; current = current.parentId ? byId.get(current.parentId) : undefined) {
+      if (current.kind === kind) return current
+    }
+    return undefined
+  }
 
   interface Key { book: number; system: TimeSystem; time: TimeValue | undefined; position: number; order: number }
-  const keyOf = (p: PlotNode): Key => {
-    const target = p.assignedMomentId ? byId.get(p.assignedMomentId) : undefined
-    const book = target ? nearestOfKind(outlineNodes, target.id, 'book') : undefined
+  const keyOf = ({ point, placement }: PlacedPoint): Key => {
+    const target = byId.get(placement.targetId)
+    const book = target ? ancestorOfKind(target.id, 'book') : undefined
     let scene: OutlineNode | undefined
     if (target?.kind === 'scene') scene = target
-    else if (target?.kind === 'moment') scene = nearestOfKind(outlineNodes, target.id, 'scene')
+    else if (target?.kind === 'moment') scene = ancestorOfKind(target.id, 'scene')
     else if (target && target.kind !== 'book') {
       scene = descendantsOf(index, target.id).find(n => n.kind === 'scene' && hasTime(n.timeValue))
     }
@@ -141,15 +141,28 @@ export function orderAssignedPlotpoints(
       system: systemForBook(systems, book),
       time: scene?.timeValue,
       position: target ? position.get(target.id) ?? Infinity : Infinity,
-      order: p.order,
+      order: point.order,
     }
   }
 
-  const keyed = points.map(p => ({ p, k: keyOf(p) }))
+  const keyed = entries.map(entry => ({ entry, k: keyOf(entry) }))
   keyed.sort((a, b) =>
     a.k.book - b.k.book
     || (mode === 'time' ? compareTimeValues(a.k.system, a.k.time, b.k.time) : 0)
     || a.k.position - b.k.position
     || a.k.order - b.k.order)
-  return keyed.map(x => x.p)
+  return keyed.map(x => x.entry)
+}
+
+// Plotpoints in order of occurrence, each at its earliest placement; those placed nowhere come last, in their own order.
+export function orderAssignedPlotpoints(
+  points: PlotNode[], outlineNodes: OutlineNode[], systems: TimeSystem[], mode: 'time' | 'story' = 'time',
+): PlotNode[] {
+  const entries = points.flatMap(point => (point.placements ?? []).map(placement => ({ point, placement })))
+  const seen = new Set<string>()
+  const out: PlotNode[] = []
+  for (const { point } of orderPlacements(entries, outlineNodes, systems, mode)) {
+    if (!seen.has(point.id)) { seen.add(point.id); out.push(point) }
+  }
+  return [...out, ...points.filter(p => !seen.has(p.id)).sort((a, b) => a.order - b.order)]
 }

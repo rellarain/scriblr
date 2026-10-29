@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest'
 import type { OutlineNode } from '../../../api/types'
 import type { PlotNode } from '../../../api/types'
 import {
-  assignedLevel, chapterOfAssignment, compareByTitle, nodeLabel, orderAssignedPlotpoints, plotpointDescriptionAllowed,
+  chapterOfTarget, compareByTitle, levelOfTarget, nodeLabel, orderAssignedPlotpoints, orderPlacements, outlinePositions, plotpointDescriptionAllowed,
   plotlinesUnder, selectionState, sortByTitle, titleAfterEdit,
 } from './plotTree'
 import { standardSystem } from './timeSystem'
@@ -62,27 +62,29 @@ describe('plotpoint title rules', () => {
   })
 })
 
-describe('assignedLevel', () => {
-  it('classifies the assignment target', () => {
-    expect(assignedLevel({ assignedMomentId: null }, outline)).toBe('none')
-    expect(assignedLevel({ assignedMomentId: 'missing' }, outline)).toBe('none')
-    expect(assignedLevel({ assignedMomentId: 'b1' }, outline)).toBe('book')
-    expect(assignedLevel({ assignedMomentId: 'c1' }, outline)).toBe('chapter')
-    for (const id of ['a1', 's1', 'm1']) expect(assignedLevel({ assignedMomentId: id }, outline)).toBe('inner')
+describe('levelOfTarget', () => {
+  it('classifies a placement target: a chapter, something inside one, or nothing that takes a plotpoint', () => {
+    expect(levelOfTarget(null, outline)).toBe('none')
+    expect(levelOfTarget('missing', outline)).toBe('none')
+    expect(levelOfTarget('b1', outline)).toBe('none') // a book takes no plotpoint
+    expect(levelOfTarget('c1', outline)).toBe('chapter')
+    for (const id of ['a1', 's1', 'm1']) expect(levelOfTarget(id, outline)).toBe('inner')
   })
 
-  it('finds the chapter an assignment belongs to', () => {
-    for (const id of ['c1', 'a1', 's1', 'm1']) expect(chapterOfAssignment({ assignedMomentId: id }, outline)?.id).toBe('c1')
-    expect(chapterOfAssignment({ assignedMomentId: 'b1' }, outline)).toBeUndefined()
-    expect(chapterOfAssignment({ assignedMomentId: null }, outline)).toBeUndefined()
+  it('finds the chapter a target belongs to', () => {
+    for (const id of ['c1', 'a1', 's1', 'm1']) expect(chapterOfTarget(id, outline)?.id).toBe('c1')
+    expect(chapterOfTarget('b1', outline)).toBeUndefined()
+    expect(chapterOfTarget(null, outline)).toBeUndefined()
   })
 })
 
 describe('orderAssignedPlotpoints', () => {
   const on = (id: string, kind: OutlineNode['kind'], parentId: string | null, order: number, extra: Partial<OutlineNode> = {}): OutlineNode =>
     ({ ...node(id, kind, parentId), order, ...extra })
-  const point = (id: string, assignedMomentId: string | null, order = 0): PlotNode => ({
-    id, kind: 'plotpoint', parentId: 'pl', order, title: id, body: '', assignedMomentId, assignedParagraphIndex: null,
+  // A plotpoint placed on each of `targets` (none: placed nowhere).
+  const point = (id: string, targets: string | string[] | null, order = 0): PlotNode => ({
+    id, kind: 'plotpoint', parentId: 'pl', order, title: id, body: '',
+    placements: [targets ?? []].flat().map(targetId => ({ id: `${id}@${targetId}`, targetId, paragraphIndex: null, awareness: null })),
     sourceFieldId: null, customFieldDefs: [], customFieldValues: {}, keywords: [], flag: null,
   })
 
@@ -118,6 +120,25 @@ describe('orderAssignedPlotpoints', () => {
     expect(ids([point('b', 's1', 2), point('a', 's1', 1)])).toEqual(['a', 'b'])
   })
 
+  it('puts a plotpoint at its earliest placement, and one placed nowhere last, in its own order', () => {
+    // 'twice' is on s1 (June) and s2 (February): February is earlier, ahead of 'solo' on s1.
+    expect(ids([point('solo', 's1'), point('twice', ['s1', 's2']), point('nowhere', null, 2), point('nowhere2', [], 1)])).toEqual(['twice', 'solo', 'nowhere2', 'nowhere'])
+  })
+
+  it('orders each placement on its own: one entry for every place, in order of occurrence', () => {
+    const twice = point('twice', ['s1', 's2'])
+    const solo = point('solo', 's3')
+    const placements = [solo, twice].flatMap(p => (p.placements ?? []).map(placement => ({ point: p, placement })))
+    expect(orderPlacements(placements, nodes, systems).map(e => e.placement.id)).toEqual(['twice@s2', 'twice@s1', 'solo@s3'])
+    expect(orderPlacements(placements, nodes, systems, 'story').map(e => e.placement.id)).toEqual(['twice@s1', 'twice@s2', 'solo@s3'])
+  })
+
+  it('numbers the outline in document order', () => {
+    const positions = outlinePositions(nodes)
+    expect([...positions.keys()]).toEqual(['b1', 'c1', 's1', 's2', 'm2', 'c2', 's3', 'b2', 'c3', 's4'])
+    expect(positions.get('s2')).toBeLessThan(positions.get('c2') ?? 0)
+  })
+
   it("in story order leaves the Time out: by book, then where they sit in the outline", () => {
     const story = (points: PlotNode[]) => orderAssignedPlotpoints(points, nodes, systems, 'story').map(p => p.id)
     // s1 comes before s2 in the outline though it is later in time.
@@ -129,7 +150,7 @@ describe('orderAssignedPlotpoints', () => {
 
 describe('ticking plotlines', () => {
   const n = (id: string, kind: PlotNode['kind'], parentId: string | null): PlotNode =>
-    ({ id, kind, parentId, order: 0, title: id, body: '', assignedMomentId: null, assignedParagraphIndex: null, sourceFieldId: null, customFieldDefs: [], customFieldValues: {}, keywords: [], flag: null }) as PlotNode
+    ({ id, kind, parentId, order: 0, title: id, body: '', sourceFieldId: null, customFieldDefs: [], customFieldValues: {}, keywords: [], flag: null }) as PlotNode
   const nodes = [n('cat', 'category', null), n('sub', 'subcategory', 'cat'), n('clu', 'cluster', 'sub'), n('a', 'plotline', 'clu'), n('b', 'plotline', 'sub'), n('c', 'plotline', 'cat'), n('pp', 'plotpoint', 'a')]
   const children = new Map<string | null, PlotNode[]>()
   for (const x of nodes) children.set(x.parentId, [...(children.get(x.parentId) ?? []), x])

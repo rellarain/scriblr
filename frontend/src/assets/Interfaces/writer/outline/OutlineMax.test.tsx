@@ -4,9 +4,8 @@ import { useRef, useState } from 'react'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import type { OutlineNode, PlotNode } from '../../../../api/types'
 import { __resetSettingsForTests } from '../../../../settings/settingsStore'
-import { awarenessNext } from '../awareness'
 import { descendantsOf, buildChildIndex } from '../outlineTree'
-import { assignPoint } from '../plotFields'
+import { cycleAwareness, movePlacement, placeValue, unplace } from '../plotPlacement'
 import { base, outlineNode, plotNode } from '../plotTestWorkspace'
 import type { WriterWorkspace } from '../useWriterWorkspace'
 import { PlotTray } from '../levels/PlotpointsTab'
@@ -15,7 +14,7 @@ import { mockFetch } from '../../../../test/mockFetch'
 import { makeWorkspace, type WorkspaceOverrides } from '../../../../test/makeWorkspace'
 
 // The Outline level (with the Project level's Plotpoints tab beside it, where the tray now is) against a small stand-in workspace: the outline and plot live in state and the
-// plotpoint assignment is the real pure function, so what the cards do is what the app does.
+// plotpoint placements are the real pure functions, so what the cards do is what the app does.
 
 vi.mock('../useWordCounts', () => ({
   useWordCounts: () => ({ chapters: { c1: 12 }, books: { b: 12 }, nodes: { b: 12, c1: 12, act: 12, scene: 12, m1: 12 } }),
@@ -49,7 +48,7 @@ function Harness({ activeChapterId = 'c1', outline = OUTLINE, actions }: {
   const [outlineNodes, setOutline] = useState<OutlineNode[]>(outline)
   const [plotNodes, setPlot] = useState<PlotNode[]>(PLOT)
   const [active, setActive] = useState<string | null>(activeChapterId)
-  const [plotDragId, setPlotDragId] = useState<string | null>(null)
+  const [plotDrag, setPlotDrag] = useState<{ id: string; placementId: string | null } | null>(null)
   const counter = useRef(0)
   const outlineRef = useRef(outlineNodes)
   outlineRef.current = outlineNodes
@@ -62,7 +61,9 @@ function Harness({ activeChapterId = 'c1', outline = OUTLINE, actions }: {
     activeBook: book, activeProjectId: 'p1', activeProject: { settings: { timeSystems: [], chapterWordCountTarget: 500 } },
     outlineNodes, plotNodes, plotNodeById: new Map(plotNodes.map(n => [n.id, n])),
     activeBookChapters: descendantsOf(buildChildIndex(outlineNodes), 'b').filter(n => n.kind === 'chapter'),
-    activeChapterId: active, selectChapter: (id: string) => { actions.selectChapter(id); setActive(id) }, highlightedPointId: null, plotDragId, setPlotDragId,
+    activeChapterId: active, selectChapter: (id: string) => { actions.selectChapter(id); setActive(id) }, highlightedPointId: null,
+    plotDragId: plotDrag?.id ?? null, plotDragPlacementId: plotDrag?.placementId ?? null,
+    setPlotDragId: (id: string | null, placementId: string | null = null) => setPlotDrag(id ? { id, placementId } : null),
     saveStatus: { dirty: false, saving: false, error: undefined, lastSavedAt: null }, saveNow: vi.fn(async () => {}), saveCountdown: { nextSaveAt: null, wait: null }, history: { canUndo: () => false, canRedo: () => false, undo: () => {}, redo: () => {} },
     levelHueOf: () => 200, levelTintOf: () => 'hsl(200, 30%, 50%)', hueCentreOf: () => null, setNodeHue: vi.fn(),
     moveOutlineNodeInto: vi.fn(), openChapter: actions.openChapter,
@@ -80,8 +81,10 @@ function Harness({ activeChapterId = 'c1', outline = OUTLINE, actions }: {
       const gone = new Set([id, ...descendantsOf(buildChildIndex(prev), id).map(n => n.id)])
       return prev.filter(n => !gone.has(n.id))
     }),
-    assignPlotpoint: (id: string, target: string | null) => setPlot(prev => assignPoint(prev, id, target, byId)),
-    cyclePlotAwareness: (id: string) => setPlot(prev => prev.map(n => (n.id === id && n.awareness ? { ...n, awareness: awarenessNext(n.awareness) } : n))),
+    placePlotpoint: (id: string, target: string) => setPlot(prev => placeValue(prev, id, target, byId)),
+    movePlotpointPlacement: (id: string, placementId: string, target: string) => setPlot(prev => movePlacement(prev, id, placementId, target, byId)),
+    unplacePlotpoint: (id: string, placementId: string) => setPlot(prev => unplace(prev, id, placementId)),
+    cyclePlotAwareness: (id: string, placementId: string) => setPlot(prev => cycleAwareness(prev, id, placementId)),
   })
   return <><PlotTray w={w} /><OutlineMax w={w} /></>
 }
@@ -108,7 +111,10 @@ const arcTab = () => screen.getByRole('button', { name: 'Arc 1: Thaw' })
 // The tabs raised: one when the view is narrowed to an arc or a chapter, none at the book level (the whole book).
 const tabsRaised = () => within(screen.getByRole('navigation', { name: 'Arcs and chapters' })).queryAllByRole('button', { pressed: true })
 const typingIn = () => (document.activeElement as HTMLInputElement).getAttribute('aria-label')
-const tray = () => screen.getByRole('complementary', { name: 'Unassigned plotpoints' })
+const tray = () => screen.getByRole('complementary', { name: 'Plotpoints' })
+// A plotpoint's tile in the tray, and the tiles of its placements in the cards.
+const trayTile = (id: string) => tray().querySelector<HTMLElement>(`[data-point="${id}"]`)!
+const boxedIn = (cardId: string, id: string) => card(cardId).querySelector<HTMLElement>(`.wrCardPoints [data-point="${id}"]`)
 
 // jsdom has no DataTransfer: a stand-in carrying just what the handlers touch.
 const dataTransfer = () => ({ effectAllowed: '', setData: vi.fn(), setDragImage: vi.fn() })
@@ -392,26 +398,76 @@ describe('Outline Max: dragging cards', () => {
 })
 
 describe('Outline Max: plotpoints', () => {
-  it('lists the unassigned plotpoints in the tray (the Project level tab)', () => {
+  it('lists the plotpoints in the tray (the Project level tab)', () => {
     setup('c1')
     expect(within(tray()).getByText('They meet')).toBeTruthy()
     expect(within(tray()).getByText('A secret')).toBeTruthy()
     expect(within(tray()).getByText('2')).toBeTruthy()
   })
 
-  it('places a plotpoint dragged from the tray onto a moment, and boxes it in the card with its eye', () => {
+  it('places a plotpoint dragged from the tray onto a moment, boxes it in the card with its eye, and keeps it in the tray with a counter', () => {
     setup('c1')
-    drag(tray().querySelector('[data-point="pp1"]')!, card('m1'))
-    expect(tray().querySelector('[data-point="pp1"]')).toBeNull()
-    const boxed = card('m1').querySelector('.wrCardPoints [data-point="pp1"]')!
+    expect(within(trayTile('pp1')).queryByText('×1')).toBeNull()
+    drag(trayTile('pp1'), card('m1'))
+    expect(trayTile('pp1')).not.toBeNull()
+    expect(within(trayTile('pp1')).getByLabelText('Placed once').textContent).toBe('×1')
+    const boxed = boxedIn('m1', 'pp1')!
     expect(boxed).not.toBeNull()
-    expect(within(boxed as HTMLElement).getByRole('button', { name: /Front-stage/i })).toBeTruthy() // the awareness eye, on a moment
+    expect(within(boxed).getByRole('button', { name: /Front-stage/i })).toBeTruthy() // the awareness eye, on a moment
+    expect(within(boxed).queryByText(/ of /)).toBeNull() // one placement: no "1 of 1"
+  })
+
+  it('places the same plotpoint in several places, each its own tile with its place among them, and counts them', () => {
+    setup('c1')
+    drag(trayTile('pp1'), card('m1'))
+    drag(trayTile('pp1'), openCard())
+    drag(trayTile('pp1'), card('act'))
+    expect(within(trayTile('pp1')).getByLabelText('Placed 3 times').textContent).toBe('×3')
+    // In story order: the chapter, the act, then the moment.
+    expect(within(openCard().querySelector<HTMLElement>(PLACED + ' [data-point="pp1"]')!).getByText('1 of 3')).toBeTruthy()
+    expect(within(boxedIn('act', 'pp1')!).getByText('2 of 3')).toBeTruthy()
+    expect(within(boxedIn('m1', 'pp1')!).getByText('3 of 3')).toBeTruthy()
+    // Each has its own awareness: only the one on the moment has an eye.
+    expect(boxedIn('m1', 'pp1')!.querySelector('.wrEye')).not.toBeNull()
+    expect(boxedIn('act', 'pp1')!.querySelector('.wrEye')).toBeNull()
+  })
+
+  it('is not placed twice on the same node: dropping a plotpoint where it already is changes nothing', () => {
+    setup('c1')
+    drag(trayTile('pp1'), card('m1'))
+    drag(trayTile('pp1'), card('m1'))
+    expect(card('m1').querySelectorAll('.wrCardPoints [data-point="pp1"]')).toHaveLength(1)
+    expect(within(trayTile('pp1')).getByLabelText('Placed once')).toBeTruthy()
+  })
+
+  it('moves a placement dragged from a card to another card, instead of placing the plotpoint again', () => {
+    setup('c1')
+    drag(trayTile('pp1'), card('m1'))
+    drag(boxedIn('m1', 'pp1')!, card('act'))
+    expect(boxedIn('m1', 'pp1')).toBeNull()
+    expect(boxedIn('act', 'pp1')).not.toBeNull()
+    expect(within(trayTile('pp1')).getByLabelText('Placed once')).toBeTruthy()
+    // Moved off a moment, it has no awareness.
+    expect(boxedIn('act', 'pp1')!.querySelector('.wrEye')).toBeNull()
+  })
+
+  it('narrows the tray to what is still to place with its switch, and the choice is remembered', async () => {
+    const { user, unmount } = setup('c1')
+    drag(trayTile('pp1'), card('m1'))
+    expect(within(tray()).getByText('2')).toBeTruthy()
+    await user.click(within(tray()).getByRole('switch', { name: 'Still to place' }))
+    expect(within(tray()).getByText('1')).toBeTruthy()
+    expect(trayTile('pp1')).toBeNull()
+    expect(trayTile('pp2')).not.toBeNull()
+    unmount()
+    setup('c1')
+    expect(within(tray()).getByRole('switch', { name: 'Still to place' })).toHaveProperty('checked', true)
   })
 
   it('places one on the chapter (no eye there) and on an act', () => {
     setup('c1')
-    drag(tray().querySelector('[data-point="pp1"]')!, openCard())
-    drag(tray().querySelector('[data-point="pp2"]')!, card('act'))
+    drag(trayTile('pp1'), openCard())
+    drag(trayTile('pp2'), card('act'))
     expect(openCard().querySelector(':scope > .wrCardBody > .wrOutlineCards > .wrCardPoints [data-point="pp1"]')).not.toBeNull()
     expect(card('act').querySelector('.wrCardPoints [data-point="pp2"]')).not.toBeNull()
     expect(openCard().querySelector(':scope > .wrCardBody > .wrOutlineCards > .wrCardPoints .wrEye')).toBeNull()
@@ -419,7 +475,7 @@ describe('Outline Max: plotpoints', () => {
 
   it("folds a chapter's card up to its header from the chevron in its top right corner, and remembers it", async () => {
     const { user, unmount } = setup('c1')
-    drag(tray().querySelector('[data-point="pp1"]')!, openCard())
+    drag(trayTile('pp1'), openCard())
     const head = () => openCard().querySelector<HTMLElement>(':scope > .wrCardHead')!
     // The chevron is the last thing in the header, after the Write pencil: the card's top right corner.
     expect(within(head()).getAllByRole('button').map(b => b.getAttribute('aria-label'))).toEqual(['Write chapter 1', 'Collapse chapter 1'])
@@ -458,23 +514,31 @@ describe('Outline Max: plotpoints', () => {
     expect(screen.getByLabelText('Chapter 1 colour')).toBeTruthy()
   })
 
-  it('sends a placed plotpoint back to the tray from its x, or when it is dragged there', async () => {
+  it('takes a placement away from its x, or when its tile is dragged back to the tray, and the plotpoint stays in the tray with its other placements', async () => {
     const { user } = setup('c1')
-    drag(tray().querySelector('[data-point="pp1"]')!, card('m1'))
+    drag(trayTile('pp1'), card('m1'))
+    drag(trayTile('pp1'), card('act'))
     await user.click(within(card('m1')).getByRole('button', { name: 'Unassign They meet' }))
-    expect(tray().querySelector('[data-point="pp1"]')).not.toBeNull()
+    expect(boxedIn('m1', 'pp1')).toBeNull()
+    expect(boxedIn('act', 'pp1')).not.toBeNull()
+    expect(within(trayTile('pp1')).getByLabelText('Placed once')).toBeTruthy()
 
-    drag(tray().querySelector('[data-point="pp2"]')!, card('scene'))
-    drag(card('scene').querySelector('[data-point="pp2"]')!, tray())
-    expect(tray().querySelector('[data-point="pp2"]')).not.toBeNull()
-    expect(card('scene').querySelector('[data-point="pp2"]')).toBeNull()
+    drag(trayTile('pp2'), card('scene'))
+    drag(boxedIn('scene', 'pp2')!, tray())
+    expect(trayTile('pp2')).not.toBeNull()
+    expect(boxedIn('scene', 'pp2')).toBeNull()
+    expect(within(trayTile('pp2')).queryByLabelText(/Placed/)).toBeNull()
+    // A plotpoint dragged from the tray and dropped on the tray does nothing.
+    drag(trayTile('pp1'), tray())
+    expect(boxedIn('act', 'pp1')).not.toBeNull()
   })
 
-  it('counts what is left in the tray', () => {
-    setup('c1')
-    drag(tray().querySelector('[data-point="pp1"]')!, card('m1'))
+  it('counts what is left to place with the switch on, and says so when every plotpoint has a place', async () => {
+    const { user } = setup('c1')
+    await user.click(within(tray()).getByRole('switch', { name: 'Still to place' }))
+    drag(trayTile('pp1'), card('m1'))
     expect(within(tray()).getByText('1')).toBeTruthy()
-    drag(tray().querySelector('[data-point="pp2"]')!, card('m1'))
+    drag(trayTile('pp2'), card('m1'))
     expect(within(tray()).getByText(/Every plotpoint has a place/)).toBeTruthy()
   })
 })
@@ -625,8 +689,8 @@ describe('Outline Max: the arc and chapter cards', () => {
   it('takes a plotpoint dropped on any chapter card of the arc, not only the first', async () => {
     const { user } = setup('c1')
     await user.click(arcTab())
-    drag(tray().querySelector('[data-point="pp2"]')!, card('c2'))
+    drag(trayTile('pp2'), card('c2'))
     expect(card('c2').querySelector(PLACED + ' [data-point="pp2"]')).not.toBeNull()
-    expect(tray().querySelector('[data-point="pp2"]')).toBeNull()
+    expect(within(trayTile('pp2')).getByLabelText('Placed once')).toBeTruthy()
   })
 })

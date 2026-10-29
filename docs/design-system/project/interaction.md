@@ -58,7 +58,7 @@ Every editor that lists nodes (scratchpad notes, arcs and chapters, acts, scenes
 
 Draft text is for writing: Enter and Shift + Enter are plain paragraphs there; only Tab is handled.
 
-Cards are reordered and moved by dragging their **grip**; the gaps a card could land in open as it is dragged (`wrDropGap--open`), and only the gaps its kind belongs in. A plotpoint dragged from the Plotpoints tab lands on a chapter, act, scene or moment and is boxed inside it; its x sends it back. Deleting asks first: the quiet trash icon is replaced in place by the question ("Delete Chapter 1 and everything in it?") with Confirm and Cancel.
+Cards are reordered and moved by dragging their **grip**; the gaps a card could land in open as it is dragged (`wrDropGap--open`), and only the gaps its kind belongs in. A plotpoint dragged from the Plotpoints tab lands on a chapter, act, scene or moment and is boxed inside it as one more placement (as often as it is wanted, once to a node); a boxed placement dragged to another card moves, dragged back to the tab it is taken away, and its x takes it away. Deleting asks first: the quiet trash icon is replaced in place by the question ("Delete Chapter 1 and everything in it?") with Confirm and Cancel.
 
 ## Saving
 

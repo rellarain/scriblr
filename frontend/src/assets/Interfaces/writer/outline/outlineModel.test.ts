@@ -1,14 +1,15 @@
 import { describe, expect, it } from 'vitest'
 import type { OutlineNode, PlotNode } from '../../../../api/types'
 import { buildChildIndex } from '../outlineTree'
-import { pointsByTarget, stat, structureOfBook, unassignedPlotpoints } from './outlineModel'
+import { pointsByTarget } from '../plotPlacement'
+import { stat, structureOfBook, trayPlotpoints } from './outlineModel'
 
 const node = (id: string, kind: OutlineNode['kind'], parentId: string | null, order = 0, over: Partial<OutlineNode> = {}): OutlineNode =>
   ({ id, kind, parentId, order, title: id, synopsis: '', draftRef: null, ...over } as OutlineNode)
 const point = (id: string, over: Partial<PlotNode> = {}): PlotNode =>
   ({
-    id, kind: 'plotpoint', parentId: 'line', order: 0, title: id, body: '', assignedMomentId: null, assignedParagraphIndex: null,
-    customFieldDefs: [], customFieldValues: {}, keywords: [], flag: null, sourceFieldId: null, fieldId: null, refId: null, awareness: null, ...over,
+    id, kind: 'plotpoint', parentId: 'line', order: 0, title: id, body: '', placements: [],
+    customFieldDefs: [], customFieldValues: {}, keywords: [], flag: null, sourceFieldId: null, fieldId: null, refId: null, ...over,
   } as PlotNode)
 
 const tree = [
@@ -59,27 +60,34 @@ describe('stat', () => {
 
 describe('plotpoints', () => {
   const outlineById = new Map(tree.map(n => [n.id, n]))
+  const on = (targetId: string, awareness: 'front' | null = null, id = `at-${targetId}`) => ({ id, targetId, paragraphIndex: null, awareness })
   const points = [
     point('loose', { order: 2 }), point('first', { order: 1 }),
-    point('placed', { assignedMomentId: 'm1', awareness: 'front' }), point('inChapter', { assignedMomentId: 'c1' }),
-    point('gone', { assignedMomentId: 'deleted-node', order: 3 }), point('nameless', { title: '' }),
+    point('placed', { placements: [on('m1', 'front')] }), point('inChapter', { placements: [on('c1')] }),
+    point('twice', { placements: [on('c1', null, 'twice1'), on('m1', 'front', 'twice2')], order: 4 }),
+    point('gone', { placements: [on('deleted-node')], order: 3 }), point('nameless', { title: '' }),
   ]
   const plotById = new Map(points.map(p => [p.id, p]))
 
-  it('waits for a place when assigned to nothing (or to a node that is gone) and has a title, in plot order', () => {
-    expect(unassignedPlotpoints(points, outlineById, plotById).map(p => p.id)).toEqual(['first', 'loose', 'gone'])
+  it('keeps every plotpoint with a title in the tray, placed or not, in plot order', () => {
+    expect(trayPlotpoints(points, outlineById, plotById, false).map(p => p.id)).toEqual(['placed', 'inChapter', 'first', 'loose', 'gone', 'twice'])
+  })
+
+  it('narrows the tray to what is still to place: placed nowhere, or only where there is no outline node any more', () => {
+    expect(trayPlotpoints(points, outlineById, plotById, true).map(p => p.id)).toEqual(['first', 'loose', 'gone'])
   })
 
   it('takes a reference title from its original', () => {
     const original = point('orig', { title: 'The original' })
     const ref = point('ref', { title: '', refId: 'orig', order: 1 })
     const all = [original, ref]
-    expect(unassignedPlotpoints(all, outlineById, new Map(all.map(p => [p.id, p]))).map(p => p.id)).toEqual(['orig', 'ref'])
+    expect(trayPlotpoints(all, outlineById, new Map(all.map(p => [p.id, p])), true).map(p => p.id)).toEqual(['orig', 'ref'])
   })
 
-  it('groups the assigned ones by the node they sit on', () => {
+  it('groups the placements by the node they sit on, a plotpoint placed twice standing on both', () => {
     const byNode = pointsByTarget(points)
     expect([...byNode.keys()].sort()).toEqual(['c1', 'deleted-node', 'm1'])
-    expect(byNode.get('m1')!.map(p => p.id)).toEqual(['placed'])
+    expect(byNode.get('m1')!.map(e => e.point.id)).toEqual(['placed', 'twice'])
+    expect(byNode.get('c1')!.map(e => [e.point.id, e.placement.id])).toEqual([['inChapter', 'at-c1'], ['twice', 'twice1']])
   })
 })

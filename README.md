@@ -214,11 +214,19 @@ described, now stale, in `docs/data-model.md`).
   assigns to its own chapters; deleting a category/subcategory/cluster value or field
   turns its assigned references into the plotline's own values in a plotline
   field of the same name, and deleting a plotline field sends its assigned values to
-  the plotline's `Scrap` field. `assignedMomentId` (on `plotpoint` nodes) is a
-  chapter (from the plot editor) or an act/scene/moment of it (from the chapter
-  outline); placed on a moment a plotpoint has an `awareness` (`front` =
-  audience and characters know, `back` = audience only, `mid` = characters only,
-  `off` = neither), changed by clicking its eye. `keywords` (on `plotline`
+  the plotline's `Scrap` field. **Placements:** a plotpoint is put in the outline by
+  its `placements` (`{ id, targetId, paragraphIndex, awareness }`, at most 100, at
+  most one to a target): each is a chapter (from the plot editor) or an act/scene/moment
+  (from the chapter outline), and the plotpoint can have many, each standing alone
+  (removed, moved or stepped on its own; the plotpoint stays in the tray, and a counter
+  says how often it is placed). A plotpoint is *placed* once it has one. Placed on a
+  moment a placement has an `awareness` (`front` = audience and characters know,
+  `back` = audience only, `mid` = characters only, `off` = neither), changed by clicking
+  its eye. A plotpoint saved before this held one place in `assignedMomentId` (with
+  `assignedParagraphIndex` and `awareness`); the backend reads that into a first
+  placement when the file loads (a validator on `PlotNode`, also cutting a second
+  placement on one target and any beyond 100), and the old fields are saved empty.
+  The rules are in `frontend/src/assets/Interfaces/writer/plotPlacement.ts`. `keywords` (on `plotline`
   nodes) are free-text tags used to detect keyword mentions in prose. The pure
   rules (references, deletion, migration of older plots, assignment) live in
   `frontend/src/assets/Interfaces/writer/plotFields.ts`, and run on load.

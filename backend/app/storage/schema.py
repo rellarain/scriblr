@@ -278,6 +278,7 @@ class OutlineTree(BaseModel):
 # The longest name of a fieldset, and the most a node can have (the Writer's Plot editor and the presets console stop at the same limits).
 PLOT_FIELDSET_NAME_MAX = 30
 PLOT_MAX_FIELDSETS = 20
+PLOT_MAX_PLACEMENTS = 100
 
 
 class PlotCustomFieldDef(BaseModel):
@@ -300,6 +301,24 @@ class PlotFieldSet(BaseModel):
         return value[:PLOT_FIELDSET_NAME_MAX] if isinstance(value, str) else value
 
 
+PlotAwareness = Literal["front", "back", "mid", "off"]
+
+
+class PlotPlacement(BaseModel):
+    """One place a plotpoint (a value of a field) is put in the outline: a chapter, act, scene or moment. A plotpoint can have many, each
+    standing alone (its own awareness and paragraph); it is placed once it has at least one."""
+
+    id: str
+    # The outline node it is put on (the backend treats it as an opaque id).
+    targetId: str
+    # Which paragraph (0-indexed, split on blank lines) of the moment's draft this placement is anchored to. Like CommentAnchor below, a
+    # fragile, unreconciled anchor -- clamp out-of-range indices to the last paragraph rather than erroring.
+    paragraphIndex: Optional[int] = None
+    # Set only on a placement on a moment: what the audience and the characters know of it. front = both, back = the audience only, mid =
+    # the characters only, off = neither.
+    awareness: Optional[PlotAwareness] = None
+
+
 class PlotNode(BaseModel):
     id: str
     kind: PlotNodeKind
@@ -316,6 +335,8 @@ class PlotNode(BaseModel):
     # within that moment's draft body this plotpoint is anchored to. Like
     # CommentAnchor below, this is a fragile, unreconciled anchor -- clamp
     # out-of-range indices to the last paragraph rather than erroring.
+    # (Both are the way a plotpoint was placed once, before it could be placed many times: they are read into `placements` when a plot
+    # is loaded, and stored empty.)
     assignedParagraphIndex: Optional[int] = None
     # Set only on "plotpoint" nodes that are a live mirror of a plotline's
     # custom field value: the PlotCustomFieldDef.id it mirrors. Used to find
@@ -350,10 +371,41 @@ class PlotNode(BaseModel):
     # and body are then read from the original. Each plotline assigns its own
     # reference to its own chapters.
     refId: Optional[str] = None
-    # Set only on a plotpoint placed on a moment: what the audience and the
-    # characters know of it. front = both, back = the audience only, mid = the
-    # characters only, off = neither. None = not placed on a moment.
-    awareness: Optional[Literal["front", "back", "mid", "off"]] = None
+    # Set only on a plotpoint placed on a moment, before placements had an awareness each; read into the placement like assignedMomentId.
+    awareness: Optional[PlotAwareness] = None
+    # Set only on "plotpoint" nodes: where the value is put in the outline, in the order they were made. Up to PLOT_MAX_PLACEMENTS, at most one
+    # to a target (the first wins; a surplus is cut, not refused, so one odd node cannot set the whole plot aside). Placed = at least one.
+    placements: list[PlotPlacement] = Field(default_factory=list)
+
+    @field_validator("placements", mode="before")
+    @classmethod
+    def _one_to_a_target(cls, value: Any) -> Any:
+        if not isinstance(value, list):
+            return value
+        seen: set[Any] = set()
+        kept: list[Any] = []
+        for item in value:
+            target = item.get("targetId") if isinstance(item, dict) else getattr(item, "targetId", None)
+            if target in seen:
+                continue
+            seen.add(target)
+            kept.append(item)
+        return kept[:PLOT_MAX_PLACEMENTS]
+
+    @model_validator(mode="after")
+    def _single_placement_to_placements(self) -> "PlotNode":
+        # A plotpoint saved before values could be placed many times holds its one place in assignedMomentId (with its paragraph and
+        # awareness): it becomes the first placement, and the old fields are left empty. Idempotent.
+        target = self.assignedMomentId
+        if target and len(self.placements) < PLOT_MAX_PLACEMENTS and not any(p.targetId == target for p in self.placements):
+            self.placements = [
+                PlotPlacement(id=f"{self.id}@{target}", targetId=target, paragraphIndex=self.assignedParagraphIndex, awareness=self.awareness),
+                *self.placements,
+            ]
+        self.assignedMomentId = None
+        self.assignedParagraphIndex = None
+        self.awareness = None
+        return self
 
 
 class PlotTree(BaseModel):

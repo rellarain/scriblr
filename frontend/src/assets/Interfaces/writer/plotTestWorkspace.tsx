@@ -1,10 +1,10 @@
 import { useRef, useState } from 'react'
 import { vi } from 'vitest'
-import type { OutlineNode, PlotNode, PresetContent } from '../../../api/types'
-import { awarenessNext } from './awareness'
+import type { OutlineNode, PlotNode, PlotPlacement, PresetContent } from '../../../api/types'
+import { cycleAwareness, movePlacement, placeValue, unplace } from './plotPlacement'
 import { nodesFromPreset } from './plotPreset'
 import {
-  addField, addFieldset, addValue, assignPoint, deleteField, deleteFieldset, deleteValue, moveField, moveFieldset, moveValue, randomId, renameField,
+  addField, addFieldset, addValue, deleteField, deleteFieldset, deleteValue, moveField, moveFieldset, moveValue, randomId, renameField,
   renameFieldset, setFieldSet, syncReferences, updateValue,
 } from './plotFields'
 import type { WriterWorkspace } from './useWriterWorkspace'
@@ -12,7 +12,9 @@ import type { WriterWorkspace } from './useWriterWorkspace'
 // A small stand-in for useWriterWorkspace in component tests: the plot lives in state and
 // every mutator is the real pure function, so what the components do is what the app does.
 
-export const base = { body: '', assignedMomentId: null, assignedParagraphIndex: null, sourceFieldId: null, customFieldDefs: [], customFieldValues: {}, keywords: [], flag: null, fieldId: null, refId: null, awareness: null }
+export const base = { body: '', sourceFieldId: null, customFieldDefs: [], customFieldValues: {}, keywords: [], flag: null, fieldId: null, refId: null, placements: [] }
+// A placement on an outline node (a test's way of placing a plotpoint: `placements: [placing('m1', 'back')]`).
+export const placing = (targetId: string, awareness: PlotPlacement['awareness'] = null, id = `at-${targetId}`): PlotPlacement => ({ id, targetId, paragraphIndex: null, awareness })
 export const plotNode = (id: string, kind: PlotNode['kind'], parentId: string | null, over: Partial<PlotNode> = {}): PlotNode =>
   ({ ...base, id, kind, parentId, order: 0, title: id, ...over } as PlotNode)
 export const outlineNode = (id: string, kind: OutlineNode['kind'], parentId: string | null, over: Partial<OutlineNode> = {}): OutlineNode =>
@@ -81,8 +83,10 @@ export function useFakeWorkspace(initial: PlotNode[], focused = 'line', outlineN
     updatePlotValue: (id: string, patch: { title?: string; body?: string }) => commit(updateValue(ref.current, id, patch)),
     removePlotValue: (id: string) => commit(deleteValue(ref.current, id, outlineById)),
     movePlotValue: (id: string, to: string) => commit(moveValue(ref.current, id, to, outlineById)),
-    cyclePlotAwareness: (id: string) => commit(ref.current.map(n => (n.id === id && n.awareness ? { ...n, awareness: awarenessNext(n.awareness) } : n))),
-    assignPlotpoint: (id: string, target: string | null) => commit(assignPoint(ref.current, id, target, outlineById)),
+    cyclePlotAwareness: (id: string, placementId: string) => commit(cycleAwareness(ref.current, id, placementId)),
+    placePlotpoint: (id: string, target: string) => commit(placeValue(ref.current, id, target, outlineById)),
+    movePlotpointPlacement: (id: string, placementId: string, target: string) => commit(movePlacement(ref.current, id, placementId, target, outlineById)),
+    unplacePlotpoint: (id: string, placementId: string) => commit(unplace(ref.current, id, placementId)),
     addPlotNode: (parent: string | null, kind: PlotNode['kind'], _title?: string, after?: string) => {
       const id = randomId('plot')
       const order = ref.current.filter(n => n.parentId === parent).length + (after ? 0.5 : 0)

@@ -1,8 +1,9 @@
 import { act, renderHook, waitFor } from '@testing-library/react'
 import { beforeEach, describe, expect, it } from 'vitest'
+import type { PlotNode } from '../../../api/types'
 import { __resetSettingsForTests } from '../../../settings/settingsStore'
 import { hueDelta, wrapHue } from '../../../theme/bookColors'
-import { outlineNode, plotNode, projectIndex, standInBackend } from '../../../test/workspaceBackend'
+import { outlineNode, placing, plotNode, projectIndex, standInBackend } from '../../../test/workspaceBackend'
 import { useWriterWorkspace } from './useWriterWorkspace'
 
 // The outline's editing actions through the workspace hook: what each one does to the tree, what it does to the plot that points into it,
@@ -19,7 +20,7 @@ const OUTLINE = [
 const PLOT = [
   plotNode('cat', 'category', null),
   plotNode('line', 'plotline', 'cat'),
-  plotNode('point', 'plotpoint', 'line', 'A point', { assignedMomentId: 'm1', awareness: 'front' }),
+  plotNode('point', 'plotpoint', 'line', 'A point', { placements: [placing('m1', 'front')] }),
 ]
 
 beforeEach(() => {
@@ -158,29 +159,56 @@ describe('useWriterWorkspace: colour', () => {
 })
 
 describe('useWriterWorkspace: a plotpoint placed in what is deleted', () => {
-  it('goes back to the chapter when its moment is deleted', async () => {
+  const targets = (point: PlotNode | undefined) => (point?.placements ?? []).map(p => [p.targetId, p.awareness])
+
+  it('has the placement go back to the chapter when its moment is deleted', async () => {
     const { result, point } = await opened()
-    expect(point()?.assignedMomentId).toBe('m1')
+    expect(targets(point())).toEqual([['m1', 'front']])
     act(() => { result.current.deleteOutlineNode('m1') })
-    expect(point()).toMatchObject({ assignedMomentId: 'c1', assignedParagraphIndex: null, awareness: null })
+    expect(targets(point())).toEqual([['c1', null]])
   })
 
-  it('goes back to the chapter when the act around its moment is deleted', async () => {
+  it('has the placement go back to the chapter when the act around its moment is deleted', async () => {
     const { result, point } = await opened()
     act(() => { result.current.deleteOutlineNode('a1') })
-    expect(point()?.assignedMomentId).toBe('c1')
+    expect(targets(point())).toEqual([['c1', null]])
   })
 
-  it('is unassigned when its whole chapter is deleted', async () => {
+  it('has the placement go when its whole chapter is deleted, and the plotpoint stays', async () => {
     const { result, point } = await opened()
     act(() => { result.current.deleteOutlineNode('c1') })
-    expect(point()).toMatchObject({ assignedMomentId: null, awareness: null })
+    expect(point()).toBeDefined()
+    expect(targets(point())).toEqual([])
   })
 
-  it('stays where it is when something else is deleted', async () => {
+  it('leaves the placements where they are when something else is deleted', async () => {
     const { result, point } = await opened()
     act(() => { result.current.deleteOutlineNode('c2') })
-    expect(point()?.assignedMomentId).toBe('m1')
+    expect(targets(point())).toEqual([['m1', 'front']])
+  })
+})
+
+describe('useWriterWorkspace: a plotpoint placed in several places, one of them deleted', () => {
+  async function openedTwice() {
+    const placed = PLOT.map(n => (n.id === 'point' ? { ...n, placements: [placing('m1', 'back'), placing('c1'), placing('c2')] } : n))
+    const backend = standInBackend({ p1: { index: projectIndex('p1', 'First'), outline: OUTLINE, plot: placed } })
+    const hook = renderHook(() => useWriterWorkspace())
+    await waitFor(() => expect(hook.result.current.projects).toHaveLength(1))
+    await act(async () => { await hook.result.current.openProject('p1') })
+    await waitFor(() => expect(hook.result.current.plotStatus).toBe('idle'))
+    return { ...hook, backend, targets: () => (hook.result.current.plotNodes.find(n => n.id === 'point')?.placements ?? []).map(p => p.targetId) }
+  }
+
+  it('is placed on the chapter once when its moment goes and it is already there, and keeps its other places', async () => {
+    const { result, targets } = await openedTwice()
+    act(() => { result.current.deleteOutlineNode('m1') })
+    expect(targets()).toEqual(['c1', 'c2'])
+  })
+
+  it('loses only the placements inside a deleted chapter', async () => {
+    const { result, targets } = await openedTwice()
+    act(() => { result.current.deleteOutlineNode('c1') })
+    expect(targets()).toEqual(['c2'])
   })
 })
 
@@ -223,7 +251,7 @@ describe('useWriterWorkspace: saving the outline', () => {
     await act(async () => { await result.current.saveNow() })
     expect(backend.saved.outline).toHaveLength(2)
     expect(backend.saved.plot).toHaveLength(plotSaves + 1)
-    expect(backend.saved.plot.at(-1)?.find(n => n.id === 'point')?.assignedMomentId).toBe('c1')
+    expect(backend.saved.plot.at(-1)?.find(n => n.id === 'point')?.placements?.map(p => p.targetId)).toEqual(['c1'])
   })
 
   it('reports a failed save and keeps the edit for the next try', async () => {

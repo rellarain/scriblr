@@ -85,8 +85,10 @@ export interface PlotNode {
   order: number
   title: string
   body: string
-  assignedMomentId: string | null
-  assignedParagraphIndex: number | null
+  // How a plotpoint was placed before it could be placed many times: one outline node and a paragraph of it. They are read into
+  // `placements` when a plot opens (and by the backend), and then left empty.
+  assignedMomentId?: string | null
+  assignedParagraphIndex?: number | null
   sourceFieldId: string | null
   customFieldDefs: PlotCustomFieldDef[]
   // The fieldsets this node defines, in order (absent in a plot saved before there were fieldsets).
@@ -100,12 +102,22 @@ export interface PlotNode {
   // Plotpoints are the values of fields. `fieldId` is the field (a PlotCustomFieldDef id, defined
   // on a category, subcategory or plotline) a value belongs to; `refId` marks a plotline's reference
   // to a value defined on its category or subcategory (title and body are read from that original);
-  // `awareness` is set only while placed on a moment.
+  // `placements` are the places it is put in the outline (it is placed once it has one).
   fieldId?: string | null
   refId?: string | null
+  placements?: PlotPlacement[]
+  // Before placements each had their own: set only while placed on a moment (see assignedMomentId).
   awareness?: Awareness | null
 }
 export type Awareness = 'front' | 'back' | 'mid' | 'off'
+// One place a plotpoint is put in the outline: a chapter, act, scene or moment. A plotpoint can have many (at most one to a target), each
+// standing alone. `awareness` is set only on a moment.
+export interface PlotPlacement {
+  id: string
+  targetId: string
+  paragraphIndex: number | null
+  awareness: Awareness | null
+}
 export interface PlotTree {
   schemaVersion: number
   nodes: PlotNode[]

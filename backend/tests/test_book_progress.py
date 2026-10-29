@@ -31,8 +31,9 @@ def _project(client: TestClient) -> str:
         _plot("cat", "category", None),
         _plot("pl1", "plotline", "cat"),
         _plot("pl2", "plotline", "cat", 1),
-        _plot("pp1", "plotpoint", "pl1", assignedMomentId="m1"),
+        _plot("pp1", "plotpoint", "pl1", placements=[{"id": "a", "targetId": "m1"}, {"id": "b", "targetId": "c1"}]),
         _plot("pp2", "plotpoint", "pl1", 1),
+        _plot("pp3", "plotpoint", "pl1", 2, assignedMomentId="m1"),  # saved before values could be placed many times
     ]}
     assert client.put(f"/api/projects/{project_id}/plot", json=plot).status_code == 200
     return project_id
@@ -48,7 +49,7 @@ def test_each_book_reports_its_bars(client: TestClient) -> None:
     assert book["plotting"] == {"done": 1, "total": 2}  # pl1 has plotpoints, pl2 none
     assert book["outlining"] == {"done": 1, "total": 2}  # c1 has a scene; c2 only a free-drafting moment
     assert book["planning"] == {"done": 2, "total": 4}  # synopsis and word-count goal set (a goal exists, so planning is measured)
-    assert book["assignment"] == {"done": 1, "total": 2}
+    assert book["assignment"] == {"done": 2, "total": 3}  # pp1 (two placements) and pp3 (an old single place) are placed; pp2 is not
     assert book["revision"] == {"done": 1, "total": 2}
     assert book["published"] == {"done": 0, "total": 2}
     assert book["words"] == {"done": 5, "total": 1000}

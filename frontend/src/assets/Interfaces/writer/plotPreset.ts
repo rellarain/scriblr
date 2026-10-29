@@ -26,7 +26,7 @@ export function nodesFromPreset(existing: PlotNode[], preset: PresetContent, mak
     const sets = (card.fieldsets ?? []).slice(0, MAX_FIELDSETS).map(set => ({ id: makeId('set'), name: clampSetName(set.name) || 'Untitled set', fields: names(set.fields) }))
     made.push({
       id, kind, parentId, order, title: clampTitle(card.name), body: clampBody(card.description),
-      assignedMomentId: null, assignedParagraphIndex: null, sourceFieldId: null,
+      sourceFieldId: null,
       customFieldDefs: [
         ...names(card.fields).map(name => ({ id: makeId('field'), name })),
         ...sets.flatMap(set => set.fields.map(name => ({ id: makeId('field'), name, setId: set.id }))),

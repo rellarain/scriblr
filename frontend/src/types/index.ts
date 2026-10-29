@@ -101,13 +101,12 @@ export interface PlotNode {
   title: string
   // Plotpoint body text; unused for category/plotline nodes.
   body: string
-  // Set only on "plotpoint" nodes: the moment (outline node id) assigned.
-  assignedMomentId: string | null
-  // Set only on "plotpoint" nodes, and only meaningful alongside
-  // assignedMomentId: which paragraph (0-indexed) within that moment's
-  // draft this plotpoint is anchored to. Fragile to edits, same tradeoff
-  // class as CommentAnchor -- no reconciliation on paragraph insert/delete.
-  assignedParagraphIndex: number | null
+  // Set only on "plotpoint" nodes, as saved before a plotpoint could be placed many times: the moment (outline node id) assigned, and the
+  // paragraph (0-indexed) of its draft it is anchored to (fragile to edits, same tradeoff class as CommentAnchor). Read into `placements`.
+  assignedMomentId?: string | null
+  assignedParagraphIndex?: number | null
+  // Set only on "plotpoint" nodes: where it is placed in the outline (one entry per outline node, each with its own awareness and paragraph).
+  placements?: Array<{ id: string; targetId: string; paragraphIndex: number | null; awareness: 'front' | 'back' | 'mid' | 'off' | null }>
   // Set only on "plotpoint" nodes that are a live mirror of a plotline's
   // custom field value: the PlotCustomFieldDef.id it mirrors. Used to find
   // the existing mirror plotpoint idempotently on every keystroke rather
