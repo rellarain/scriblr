@@ -279,6 +279,25 @@ class OutlineTree(BaseModel):
 PLOT_FIELDSET_NAME_MAX = 30
 PLOT_MAX_FIELDSETS = 20
 PLOT_MAX_PLACEMENTS = 100
+# The longest label of an option of a choice field, and the most a field can have.
+PLOT_OPTION_LABEL_MAX = 30
+PLOT_MAX_OPTIONS = 20
+# The kinds of field other than the usual one (a list of plotpoints, which is what a field without a kind is).
+PlotFieldKind = Literal["multi", "dropdown", "text"]
+_FIELD_KINDS = ("multi", "dropdown", "text")
+
+
+class PlotFieldOption(BaseModel):
+    """One choice of a multi-select or dropdown field. An answer (a plotpoint with this `optionId`) is titled with its label."""
+
+    id: str
+    label: str = ""
+
+    @field_validator("label", mode="before")
+    @classmethod
+    def _cut_label(cls, value: Any) -> Any:
+        # Cut, not refused: a label too long must not set the whole plot aside.
+        return value[:PLOT_OPTION_LABEL_MAX] if isinstance(value, str) else value
 
 
 class PlotCustomFieldDef(BaseModel):
@@ -286,6 +305,33 @@ class PlotCustomFieldDef(BaseModel):
     name: str
     # The fieldset (a PlotFieldSet of the same node) this field is listed under; None = a loose field, outside any set.
     setId: Optional[str] = None
+    # What the field holds. None (or "points") = a list of plotpoints, the usual field. "multi" = any of its options, "dropdown" = one of
+    # them, "text" = a short text; the answer of each plotline (and of the node that defines the field) is then a plotpoint of that node.
+    # A kind this version does not know reads as the usual one, so a field never sets the whole plot aside.
+    kind: Optional[PlotFieldKind] = None
+    # The choices of a "multi" or "dropdown" field, in order (empty otherwise).
+    options: list[PlotFieldOption] = Field(default_factory=list)
+
+    @field_validator("kind", mode="before")
+    @classmethod
+    def _known_kind(cls, value: Any) -> Any:
+        return value if value in _FIELD_KINDS else None
+
+    @field_validator("options", mode="before")
+    @classmethod
+    def _few_distinct_options(cls, value: Any) -> Any:
+        # The first of two options with one id stays; the surplus past the limit is cut, not refused.
+        if not isinstance(value, list):
+            return value
+        seen: set[Any] = set()
+        kept: list[Any] = []
+        for item in value:
+            key = item.get("id") if isinstance(item, dict) else getattr(item, "id", None)
+            if key in seen:
+                continue
+            seen.add(key)
+            kept.append(item)
+        return kept[:PLOT_MAX_OPTIONS]
 
 
 class PlotFieldSet(BaseModel):
@@ -373,6 +419,9 @@ class PlotNode(BaseModel):
     refId: Optional[str] = None
     # Set only on a plotpoint placed on a moment, before placements had an awareness each; read into the placement like assignedMomentId.
     awareness: Optional[PlotAwareness] = None
+    # Set only on a plotpoint that is an answer to a "multi" or "dropdown" field: the option (PlotFieldOption.id of that field) it answers
+    # with. Its title is the option's label. (The answer to a "text" field is a plotpoint whose title is the text.)
+    optionId: Optional[str] = None
     # Set only on "plotpoint" nodes: where the value is put in the outline, in the order they were made. Up to PLOT_MAX_PLACEMENTS, at most one
     # to a target (the first wins; a surplus is cut, not refused, so one odd node cannot set the whole plot aside). Placed = at least one.
     placements: list[PlotPlacement] = Field(default_factory=list)
@@ -854,6 +903,63 @@ PRESET_HISTORY_MAX = 10
 _PRESET_ID = r"^[A-Za-z0-9_-]{1,80}$"
 
 
+class PresetChoiceField(BaseModel):
+    """A field of a preset that is not a plain list of plotpoints: it becomes a multi-select, dropdown or short-text field. (A plain field is
+    just its name.) The options of a choice field are labels; the new field gets an id for each."""
+
+    name: str
+    kind: PlotFieldKind
+    options: list[str] = Field(default_factory=list, max_length=PLOT_MAX_OPTIONS)
+
+    @field_validator("name", mode="before")
+    @classmethod
+    def _trim_name(cls, value: Any) -> Any:
+        return value.strip() if isinstance(value, str) else value
+
+    @field_validator("name")
+    @classmethod
+    def _name_fits(cls, value: str) -> str:
+        if len(value) > PRESET_FIELD_MAX:
+            raise ValueError(f"a field name is over {PRESET_FIELD_MAX} characters")
+        return value
+
+    @field_validator("options")
+    @classmethod
+    def _clean_options(cls, value: list[str]) -> list[str]:
+        # No two options differ only by case (the Plot editor refuses a repeat the same way).
+        out: list[str] = []
+        for text in _clean_list(value, PLOT_OPTION_LABEL_MAX, "option", unique=True):
+            if text.casefold() not in {o.casefold() for o in out}:
+                out.append(text)
+        return out
+
+    @model_validator(mode="after")
+    def _only_choices_have_options(self) -> "PresetChoiceField":
+        if self.kind == "text":
+            self.options = []
+        return self
+
+
+# A field of a preset: its name (a plain field) or a choice field.
+PresetField = str | PresetChoiceField
+
+
+def _clean_field_entries(values: list[PresetField]) -> list[PresetField]:
+    """The same as _clean_list for field names, for fields that can also be choice fields: a blank one is dropped, a repeat is allowed."""
+    out: list[PresetField] = []
+    for value in values:
+        if isinstance(value, str):
+            text = value.strip()
+            if not text:
+                continue
+            if len(text) > PRESET_FIELD_MAX:
+                raise ValueError(f"a field name is over {PRESET_FIELD_MAX} characters")
+            out.append(text)
+        elif value.name:
+            out.append(value)
+    return out
+
+
 def _clean_list(values: list[str], limit: int, what: str, *, unique: bool) -> list[str]:
     """Trim each entry, drop the blank ones (and, for keywords, the repeats), and refuse one that is over `limit`."""
     out: list[str] = []
@@ -873,7 +979,7 @@ class PresetFieldset(BaseModel):
     """A named group of field names on a preset's node: it becomes a fieldset (PlotFieldSet) holding those fields."""
 
     name: str = Field(default="", max_length=PLOT_FIELDSET_NAME_MAX)
-    fields: list[str] = Field(default_factory=list, max_length=PRESET_MAX_FIELDS)
+    fields: list[PresetField] = Field(default_factory=list, max_length=PRESET_MAX_FIELDS)
 
     @field_validator("name", mode="before")
     @classmethod
@@ -882,8 +988,8 @@ class PresetFieldset(BaseModel):
 
     @field_validator("fields")
     @classmethod
-    def _clean_fields(cls, value: list[str]) -> list[str]:
-        return _clean_list(value, PRESET_FIELD_MAX, "field name", unique=False)
+    def _clean_fields(cls, value: list[PresetField]) -> list[PresetField]:
+        return _clean_field_entries(value)
 
 
 class _PresetNode(BaseModel):
@@ -892,8 +998,9 @@ class _PresetNode(BaseModel):
     name: str = Field(default="", max_length=PRESET_NAME_MAX)
     description: str = Field(default="", max_length=PRESET_DESCRIPTION_MAX)
     keywords: list[str] = Field(default_factory=list, max_length=PRESET_MAX_KEYWORDS)
-    # Field names; each becomes a field (PlotCustomFieldDef) on the node made from this one. Order is kept; a repeat is allowed.
-    fields: list[str] = Field(default_factory=list, max_length=PRESET_MAX_FIELDS)
+    # Field names; each becomes a field (PlotCustomFieldDef) on the node made from this one. Order is kept; a repeat is allowed. A field that is
+    # not a plain list of plotpoints (a multi-select, dropdown or short text) is a PresetChoiceField instead of a name.
+    fields: list[PresetField] = Field(default_factory=list, max_length=PRESET_MAX_FIELDS)
     # Named groups of field names (each becomes a fieldset on that node, holding those fields). `fields` above are the loose ones, listed
     # before the sets. Absent in a preset saved before there were fieldsets.
     fieldsets: list[PresetFieldset] = Field(default_factory=list, max_length=PLOT_MAX_FIELDSETS)
@@ -923,8 +1030,8 @@ class _PresetNode(BaseModel):
 
     @field_validator("fields")
     @classmethod
-    def _clean_fields(cls, value: list[str]) -> list[str]:
-        return _clean_list(value, PRESET_FIELD_MAX, "field name", unique=False)
+    def _clean_fields(cls, value: list[PresetField]) -> list[PresetField]:
+        return _clean_field_entries(value)
 
 
 class PresetCluster(_PresetNode):

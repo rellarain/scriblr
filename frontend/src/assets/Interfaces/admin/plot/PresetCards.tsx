@@ -1,16 +1,19 @@
 import { useState, type KeyboardEvent, type ReactNode } from 'react'
-import type { PresetCard, PresetCluster, PresetContent, PresetFieldset, PresetSubcategory } from '../../../../api/types'
+import type { PlotFieldKind, PresetCard, PresetCluster, PresetContent, PresetField, PresetFieldset, PresetSubcategory } from '../../../../api/types'
 import { ChevronDownIcon, ChevronRightIcon, GripIcon, PlusIcon, TrashIcon } from '../../../icons'
+import { FIELD_KINDS, KIND_LABEL as FIELD_KIND_LABEL } from '../../writer/plotKinds'
 import {
-  DESCRIPTION_MAX, FIELDSETS_MAX, FIELDSET_MAX, FIELD_MAX, KEYWORD_MAX, NAME_MAX, ROOT, addCluster, addFieldNameToSet, addFieldName, addFieldset, addKeyword,
-  addSubcategory, fieldTotal, isBlankCard, moveCard, moveFieldTo, moveFieldsetTo, moveSetFieldTo, nudge, removeCard, removeFieldAt, removeFieldsetAt, removeKeyword,
-  removeSetFieldAt, renameFieldsetAt, setsOf, updateCard, type CardKind, type MakeId,
+  DESCRIPTION_MAX, FIELDSETS_MAX, FIELDSET_MAX, FIELD_MAX, KEYWORD_MAX, NAME_MAX, OPTION_MAX, ROOT, addCluster, addFieldNameToSet, addFieldName, addFieldset, addKeyword,
+  addOptionAt, addSubcategory, choosesFrom, fieldKind, fieldName, fieldOptions, fieldTotal, isBlankCard, moveCard, moveFieldTo, moveFieldsetTo, moveOptionTo,
+  moveSetFieldTo, nudge, removeCard, removeFieldAt, removeFieldsetAt, removeKeyword, removeOptionAt, removeSetFieldAt, renameFieldsetAt, setFieldKindAt, setsOf,
+  updateCard, type CardKind, type MakeId,
 } from './presetModel'
 import { useReorder } from './useReorder'
 
 // The open preset as a tree of cards: the category, its subcategories and their clusters. Each card has a name edited in place, a description,
 // keywords, field chips and fieldsets (a named, foldable group of field chips); subcategories and clusters can be reordered by their grips, and
-// a field by its chip, and a fieldset by its grip.
+// a field by its chip, and a fieldset by its grip. A field chip carries the field's kind (plotpoints, multi-select, dropdown or short text); a
+// multi-select or dropdown has a row of option chips under the chips.
 
 export interface TreeCtx {
   // Change the open preset's draft (a structural change passes `immediate`).
@@ -24,7 +27,7 @@ const KIND_LABEL: Record<CardKind, string> = { category: 'Category', subcategory
 
 // ---- chips ----
 
-function ChipList({ items, label, placeholder, maxLength, onAdd, onRemove, onMove }: {
+function ChipList({ items, label, placeholder, maxLength, onAdd, onRemove, onMove, tail }: {
   items: string[]
   label: string
   placeholder: string
@@ -33,6 +36,8 @@ function ChipList({ items, label, placeholder, maxLength, onAdd, onRemove, onMov
   onRemove: (index: number) => void
   // Given, the chips can be reordered (fields): by their grips, or Alt+Left and Alt+Right on a chip's remove button.
   onMove?: (from: number, before: number | null) => void
+  // Something more on a chip, after its text (a field's kind).
+  tail?: (index: number) => ReactNode
 }) {
   const [draft, setDraft] = useState('')
   const drag = useReorder<number>((from, before) => onMove?.(from, before), (from, dir) => onMove?.(from, dir < 0 ? from - 1 : from + 2))
@@ -57,6 +62,7 @@ function ChipList({ items, label, placeholder, maxLength, onAdd, onRemove, onMov
         >
           {onMove && <span className="plpGrip plpGrip--chip" aria-hidden="true" title="Drag to reorder" {...drag.grip(index)}><GripIcon size={12} /></span>}
           {item}
+          {tail?.(index)}
           <button
             type="button" aria-label={`Remove ${item}`} aria-keyshortcuts={onMove ? 'Alt+ArrowLeft Alt+ArrowRight' : undefined}
             onClick={() => onRemove(index)} onKeyDown={e => onChipKey(e, index)}
@@ -72,6 +78,42 @@ function ChipList({ items, label, placeholder, maxLength, onAdd, onRemove, onMov
         <button type="button" aria-label={`Add ${placeholder.replace('…', '')}`} disabled={!draft.trim()} onClick={submit}><PlusIcon size={12} /></button>
       </span>
     </div>
+  )
+}
+
+// ---- fields ----
+
+// A card's (or a fieldset's) fields: the chips of their names, each with its kind, and under them the option chips of each multi-select and
+// dropdown. `set` is the place of the fieldset (null: the card's loose fields).
+function FieldChips({ fields, label, cardId, set, ctx }: { fields: PresetField[]; label: string; cardId: string; set: number | null; ctx: TreeCtx }) {
+  return (
+    <>
+      <ChipList
+        items={fields.map(fieldName)} label={label} placeholder={set === null ? 'Add field…' : 'Add field to set…'} maxLength={FIELD_MAX}
+        onAdd={f => ctx.edit(c => (set === null ? addFieldName(c, cardId, f) : addFieldNameToSet(c, cardId, set, f)), true)}
+        onRemove={i => ctx.edit(c => (set === null ? removeFieldAt(c, cardId, i) : removeSetFieldAt(c, cardId, set, i)), true)}
+        onMove={(from, before) => ctx.edit(c => (set === null ? moveFieldTo(c, cardId, from, before) : moveSetFieldTo(c, cardId, set, from, before)), true)}
+        tail={i => (
+          <select
+            className={`plpKindSelect${fieldKind(fields[i]) === 'points' ? ' plpKindSelect--plain' : ''}`} aria-label={`Kind of ${fieldName(fields[i])}`} value={fieldKind(fields[i])}
+            onChange={e => ctx.edit(c => setFieldKindAt(c, cardId, set, i, e.target.value as PlotFieldKind), true)}
+          >
+            {FIELD_KINDS.map(k => <option key={k} value={k}>{FIELD_KIND_LABEL[k]}</option>)}
+          </select>
+        )}
+      />
+      {fields.map((field, i) => choosesFrom(field) && (
+        <div key={i} className="plpOptions">
+          <span className="plpOptionsFor">{fieldName(field)} options</span>
+          <ChipList
+            items={fieldOptions(field)} label={`${fieldName(field)} options`} placeholder="Add option…" maxLength={OPTION_MAX}
+            onAdd={o => ctx.edit(c => addOptionAt(c, cardId, set, i, o), true)}
+            onRemove={o => ctx.edit(c => removeOptionAt(c, cardId, set, i, o), true)}
+            onMove={(from, before) => ctx.edit(c => moveOptionTo(c, cardId, set, i, from, before), true)}
+          />
+        </div>
+      ))}
+    </>
   )
 }
 
@@ -110,12 +152,7 @@ function FieldsetBox({ set, index, cardId, who, ctx, drag }: {
         ><TrashIcon size={14} /></button>
       </div>
       {open && (
-        <ChipList
-          items={set.fields} label={`${who} fieldset ${label} fields`} placeholder="Add field to set…" maxLength={FIELD_MAX}
-          onAdd={f => ctx.edit(c => addFieldNameToSet(c, cardId, index, f), true)}
-          onRemove={i => ctx.edit(c => removeSetFieldAt(c, cardId, index, i), true)}
-          onMove={(from, before) => ctx.edit(c => moveSetFieldTo(c, cardId, index, from, before), true)}
-        />
+        <FieldChips fields={set.fields} label={`${who} fieldset ${label} fields`} cardId={cardId} set={index} ctx={ctx} />
       )}
     </div>
   )
@@ -172,12 +209,7 @@ function CardBody({ kind, card, cardId, ctx }: { kind: CardKind; card: PresetCar
       </div>
       <div>
         <div className="plpLabel">Fields <span>each becomes a field on the new {noun}</span></div>
-        <ChipList
-          items={card.fields} label={`${who} fields`} placeholder="Add field…" maxLength={FIELD_MAX}
-          onAdd={f => ctx.edit(c => addFieldName(c, cardId, f), true)}
-          onRemove={i => ctx.edit(c => removeFieldAt(c, cardId, i), true)}
-          onMove={(from, before) => ctx.edit(c => moveFieldTo(c, cardId, from, before), true)}
-        />
+        <FieldChips fields={card.fields} label={`${who} fields`} cardId={cardId} set={null} ctx={ctx} />
       </div>
       <Fieldsets card={card} cardId={cardId} who={who} noun={noun} ctx={ctx} />
     </>

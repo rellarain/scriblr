@@ -109,6 +109,11 @@
   &--dragging { opacity: 0.5; }
   &--over { box-shadow: inset 2px 0 0 var(--accent); }
 }
+// A field chip's kind, and the row of option chips under the chips of a multi-select or dropdown.
+.plpKindSelect { background: transparent; border: 0; border-left: 1px solid var(--hairline); color: inherit; font: inherit; font-size: var(--text-small); padding: 0 var(--space-2); cursor: pointer; max-width: 9rem; }
+.plpKindSelect--plain { color: var(--ink-muted); }
+.plpOptions { display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-3); margin: var(--space-3) 0 0 var(--space-5); padding-left: var(--space-4); box-shadow: inset 2px 0 0 var(--hairline); }
+.plpOptionsFor { font-size: var(--text-small); color: var(--ink-muted); }
 .plpChipAdd {
   display: inline-flex; align-items: center; gap: var(--space-1); background: var(--ov-sink-1); padding: 0 var(--space-2) 0 var(--space-4);
   input { width: 120px; background: transparent; border: 0; outline: none; color: var(--ink); font: inherit; font-size: var(--text-small); padding: var(--space-2) 0; &::placeholder { color: var(--ink-faint); } }

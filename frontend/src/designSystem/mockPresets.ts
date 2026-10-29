@@ -73,8 +73,8 @@ export function previewPresets(): PresetEntry[] {
   const heroes = { id: 'heroes', name: 'Protagonists', description: 'Lorem ipsum dolor sit amet.', keywords: ['lorem'], fields: ['Want', 'Need', 'Flaw'], fieldsets: [{ name: 'Arc', fields: ['Start', 'Turning point', 'End'] }], clusters: [{ id: 'core', name: 'Consectetur', description: '', keywords: [], fields: ['Dynamic'] }] }
   const characters = presetContent('Characters', {
     description: 'Lorem ipsum dolor sit amet, consectetur adipiscing elit.', keywords: ['cast', 'ipsum'],
-    fields: ['Name', 'Role', 'Physical Description', 'Personality', 'Backstory', 'Motivation', 'Internal Conflict', 'Relationships', 'Arc'],
-    fieldsets: [{ name: 'Voice', fields: ['Speech', 'Habits'] }, { name: 'Ties', fields: [] }],
+    fields: ['Name', { name: 'Role', kind: 'dropdown', options: ['Lead', 'Support', 'Foil'] }, 'Physical Description', 'Personality', 'Backstory', 'Motivation', 'Internal Conflict', 'Relationships', 'Arc'],
+    fieldsets: [{ name: 'Voice', fields: ['Speech', { name: 'Habits', kind: 'multi', options: ['Nervous', 'Precise'] }] }, { name: 'Ties', fields: [] }],
     subcategories: [heroes, { id: 'villains', name: 'Antagonists', description: 'Sed do eiusmod tempor.', keywords: [], fields: ['Goal', 'Methods'], clusters: [] }, { id: 'extra', name: 'Supporting', description: '', keywords: [], fields: [], clusters: [] }],
   })
   const changed = liveEntry('characters', { ...characters, description: 'Lorem ipsum dolor sit amet, consectetur adipiscing elit.' }, { nextVersion: 4 })

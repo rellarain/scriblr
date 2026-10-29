@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import type { PlotFieldSet, PlotNode } from '../../../api/types'
 import { ChevronDownIcon, ChevronRightIcon, GripIcon, PlusIcon } from '../../icons'
+import { ChoiceBody, KindSelect } from './ChoiceFields'
 import { usePlotOrder } from './plotOrder'
 import { usePlotSetOpen } from './plotSetOpen'
 import {
@@ -8,13 +9,14 @@ import {
   type FieldInfo, type FieldScope,
 } from './plotFields'
 import { PlotValueCard } from './PlotValueCard'
+import { KIND_LABEL, isChoice, kindOf } from './plotKinds'
 import { isPlaced, placedCount } from './plotPlacement'
 import { nodeLabel } from './plotTree'
 import { DeleteControl } from './shared'
 import type { WriterWorkspace } from './useWriterWorkspace'
 
 // The fields of a category, subcategory, cluster or plotline, and their values.
-//   FieldBlock    one field: a collapsible with its name, a count and its value cards
+//   FieldBlock    one field: a collapsible with its name, a count and its value cards (a choice field: its options and answers, ChoiceFields.tsx)
 //   FieldSetBlock a named, collapsible group of fields
 //   FieldList     the fields of one place as it lists them: the loose fields, then the fieldsets, then the Scrap field
 //   FieldGroups   the plotline editor: collapsible groups, from where the fields come
@@ -58,6 +60,7 @@ export function FieldBlock({ w, info, holder, editable, ui, drag, showAssigned }
 }) {
   const { def, owner } = info
   const scrap = isScrapField(def)
+  const choice = isChoice(def)
   const outlineById = new Map(w.outlineNodes.map(n => [n.id, n]))
   const all = valuesIn(w.plotNodes, holder.id, def.id)
   const [plotOrder] = usePlotOrder()
@@ -124,8 +127,14 @@ export function FieldBlock({ w, info, holder, editable, ui, drag, showAssigned }
         ) : (
           <span className="wrFieldNameText">{def.name}</span>
         )}
-        <span className="wrOutlineMeta wrFieldCount" title={holder.kind === 'plotline' ? `${unassigned} not placed yet, of ${all.length}` : `${all.length} values`}>
-          {holder.kind === 'plotline' ? `${unassigned} / ${all.length}` : all.length}
+        {editable && !scrap
+          ? <KindSelect w={w} owner={owner} def={def} ui={ui} />
+          : choice && <span className="wrOutlineMeta wrFieldKind">{KIND_LABEL[kindOf(def)]}</span>}
+        <span
+          className="wrOutlineMeta wrFieldCount"
+          title={choice ? `${all.length} ${all.length === 1 ? 'answer' : 'answers'}` : holder.kind === 'plotline' ? `${unassigned} not placed yet, of ${all.length}` : `${all.length} values`}
+        >
+          {holder.kind === 'plotline' && !choice ? `${unassigned} / ${all.length}` : all.length}
         </span>
         {holder.kind === 'plotline' && placements > 0 && (
           <span className="wrCount" title={`${placements} ${placements === 1 ? 'placement' : 'placements'} in all`}>×{placements}</span>
@@ -137,7 +146,8 @@ export function FieldBlock({ w, info, holder, editable, ui, drag, showAssigned }
           />
         )}
       </div>
-      {open && (
+      {open && choice && <ChoiceBody w={w} info={info} holder={holder} editable={editable} drag={drag} />}
+      {open && !choice && (
         <div className="wrFieldValues">
           {shown.map(v => (
             <PlotValueCard

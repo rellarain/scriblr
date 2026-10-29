@@ -1,6 +1,6 @@
 from fastapi.testclient import TestClient
 
-from app.storage.schema import PLOT_FIELDSET_NAME_MAX, PLOT_MAX_FIELDSETS
+from app.storage.schema import PLOT_FIELDSET_NAME_MAX, PLOT_MAX_FIELDSETS, PLOT_MAX_OPTIONS, PLOT_OPTION_LABEL_MAX
 
 
 def test_get_and_replace_plot_tree(client: TestClient) -> None:
@@ -133,7 +133,7 @@ def test_a_cluster_sits_between_a_subcategory_and_a_plotline_with_its_own_fields
     assert reloaded["cl_1"]["kind"] == "cluster"
     assert reloaded["cl_1"]["parentId"] == "sub_1"
     assert reloaded["cl_1"]["hue"] == 180
-    assert reloaded["cl_1"]["customFieldDefs"] == [{"id": "f1", "name": "Motive", "setId": None}]
+    assert reloaded["cl_1"]["customFieldDefs"] == [{"id": "f1", "name": "Motive", "setId": None, "kind": None, "options": []}]
     assert reloaded["pl_1"]["parentId"] == "cl_1"
     assert reloaded["pl_2"]["parentId"] == "sub_1"
 
@@ -311,3 +311,65 @@ def test_plots_saved_before_fields_still_load(client: TestClient) -> None:
     client.put(f"/api/projects/{project_id}/plot", json=tree)
     node = client.get(f"/api/projects/{project_id}/plot").json()["nodes"][0]
     assert (node["fieldId"], node["refId"], node["awareness"], node["placements"]) == (None, None, None, [])
+
+
+# --------------------------------------------------------------------------- fields of other kinds, and their answers
+
+
+def _plot_with(client: TestClient, title: str, *nodes: dict) -> dict:
+    project_id = client.post("/api/projects", json={"title": title}).json()["projectId"]
+    tree = client.get(f"/api/projects/{project_id}/plot").json()
+    tree["nodes"] += list(nodes)
+    assert client.put(f"/api/projects/{project_id}/plot", json=tree).status_code == 200
+    return {n["id"]: n for n in client.get(f"/api/projects/{project_id}/plot").json()["nodes"]}
+
+
+def test_choice_fields_round_trip_with_their_options_and_the_answers_that_use_them(client: TestClient) -> None:
+    nodes = _plot_with(
+        client, "Choices",
+        {"id": "cat_1", "kind": "category", "parentId": None, "order": 0, "title": "Cast", "customFieldDefs": [
+            {"id": "f1", "name": "Genre", "kind": "multi", "options": [{"id": "o1", "label": "Fantasy"}, {"id": "o2", "label": "Romance"}]},
+            {"id": "f2", "name": "Tone", "kind": "dropdown", "options": [{"id": "o3", "label": "Dark"}]},
+            {"id": "f3", "name": "Motto", "kind": "text"},
+            {"id": "f4", "name": "Notes"},
+        ]},
+        {"id": "pl_1", "kind": "plotline", "parentId": "cat_1", "order": 0, "title": "Line"},
+        {"id": "pp_1", "kind": "plotpoint", "parentId": "pl_1", "order": 0, "title": "Fantasy", "fieldId": "f1", "optionId": "o1"},
+    )
+    defs = {d["id"]: d for d in nodes["cat_1"]["customFieldDefs"]}
+    assert (defs["f1"]["kind"], [(o["id"], o["label"]) for o in defs["f1"]["options"]]) == ("multi", [("o1", "Fantasy"), ("o2", "Romance")])
+    assert (defs["f2"]["kind"], defs["f3"]["kind"], defs["f3"]["options"]) == ("dropdown", "text", [])
+    assert nodes["pp_1"]["optionId"] == "o1"
+
+
+def test_a_plot_saved_before_field_kinds_has_only_the_usual_kind_and_no_answers(client: TestClient) -> None:
+    nodes = _plot_with(
+        client, "Old fields",
+        {"id": "cat_1", "kind": "category", "parentId": None, "order": 0, "title": "Cast", "customFieldDefs": [{"id": "f1", "name": "Hair"}]},
+        {"id": "pp_1", "kind": "plotpoint", "parentId": "cat_1", "order": 0, "title": "Red", "fieldId": "f1"},
+    )
+    assert nodes["cat_1"]["customFieldDefs"][0]["kind"] is None
+    assert nodes["cat_1"]["customFieldDefs"][0]["options"] == []
+    assert nodes["pp_1"]["optionId"] is None
+
+
+def test_a_kind_this_version_does_not_know_is_read_as_the_usual_one_not_refused(client: TestClient) -> None:
+    nodes = _plot_with(
+        client, "Newer file",
+        {"id": "cat_1", "kind": "category", "parentId": None, "order": 0, "title": "Cast",
+         "customFieldDefs": [{"id": "f1", "name": "Mood", "kind": "radio", "options": [{"id": "o1", "label": "Calm"}]}]},
+    )
+    assert nodes["cat_1"]["customFieldDefs"][0]["kind"] is None
+
+
+def test_an_option_label_too_long_is_cut_a_repeated_option_id_and_the_surplus_are_dropped(client: TestClient) -> None:
+    options = [{"id": "o1", "label": "L" * 90}, {"id": "o1", "label": "again"}] + [{"id": f"x{i}", "label": f"Option {i}"} for i in range(PLOT_MAX_OPTIONS + 5)]
+    nodes = _plot_with(
+        client, "Many options",
+        {"id": "cat_1", "kind": "category", "parentId": None, "order": 0, "title": "Cast",
+         "customFieldDefs": [{"id": "f1", "name": "Genre", "kind": "multi", "options": options}]},
+    )
+    kept = nodes["cat_1"]["customFieldDefs"][0]["options"]
+    assert kept[0] == {"id": "o1", "label": "L" * PLOT_OPTION_LABEL_MAX}
+    assert len(kept) == PLOT_MAX_OPTIONS
+    assert [o["id"] for o in kept].count("o1") == 1

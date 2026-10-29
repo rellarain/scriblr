@@ -1,5 +1,6 @@
 import type { OutlineNode, PlotCustomFieldDef, PlotFieldSet, PlotNode, TimeSystem } from '../../../api/types'
 import { insertAfter } from '../../../lib/siblingOrder'
+import { isChoice, repairChoices } from './plotKinds'
 import { isPlaced, placementsOf, repairPlacements } from './plotPlacement'
 import { orderAssignedPlotpoints } from './plotTree'
 
@@ -13,6 +14,9 @@ import { orderAssignedPlotpoints } from './plotTree'
 // A node can also define FIELDSETS (a PlotFieldSet): named groups its fields are listed under (a field has `setId`; none = a loose field,
 // in at most one set). A set shows on every plotline under the node as its fields do; only the node's own editor changes it, and a
 // plotline's own fields go in its own sets. A node lists its loose fields first, then its sets, then (a plotline) its Scrap field.
+// A field can be of another KIND (plotKinds.ts): a multi-select, a dropdown or a short text, whose values are ANSWERS (plotpoints of the node
+// that answers, made by plotAnswers.ts) instead of values written one by one. A choice field makes no references: each plotline answers it
+// itself, and the node that defines it has an answer of its own, which the plotline shows beside its own.
 // Everything here is pure: the workspace applies the results.
 
 export const FIELD_NAME_MAX = 30
@@ -35,6 +39,11 @@ const nextOrder = (nodes: PlotNode[], parentId: string | null) => {
   return siblings.length === 0 ? 0 : Math.max(...siblings.map(s => s.order)) + 1
 }
 const blank = { body: '', sourceFieldId: null, customFieldDefs: [], customFieldValues: {}, keywords: [], flag: null }
+
+// A new plotpoint (a value, or an answer) at the end of what `holderId` holds, in the field `fieldId`.
+export function newPoint(nodes: PlotNode[], holderId: string, fieldId: string, id: string, extra: Partial<PlotNode> = {}): PlotNode {
+  return { ...blank, id, kind: 'plotpoint', parentId: holderId, order: nextOrder(nodes, holderId), title: '', fieldId, refId: null, placements: [], ...extra }
+}
 
 // A plotline's Scrap field id: it holds the assigned values of fields that were deleted.
 export const scrapFieldId = (plotlineId: string) => `scrap-${plotlineId}`
@@ -277,13 +286,23 @@ export function setFieldSet(nodes: PlotNode[], ownerId: string, fieldId: string,
 
 // ---- values ----
 
+// The field `fieldId` as `holder` sees it: its own, or one of the nodes above it.
+function fieldSeenFrom(holder: PlotNode, fieldId: string, index: Map<string, PlotNode>): PlotCustomFieldDef | undefined {
+  for (const owner of chainOf(holder, index)) {
+    const def = owner.customFieldDefs.find(d => d.id === fieldId)
+    if (def) return def
+  }
+  return undefined
+}
+
+// A value written into a field (not an answer: a choice field takes those from plotAnswers.ts).
 export function addValue(nodes: PlotNode[], holderId: string, fieldId: string, makeId: MakeId = randomId, afterId?: string): { nodes: PlotNode[]; id: string | null } {
   const holder = nodes.find(n => n.id === holderId)
   if (!holder || !scopeOf(holder)) return { nodes, id: null }
+  const def = fieldSeenFrom(holder, fieldId, byId(nodes))
+  if (def && isChoice(def)) return { nodes, id: null }
   const id = makeId('plot')
-  const point: PlotNode = {
-    ...blank, id, kind: 'plotpoint', parentId: holderId, order: nextOrder(nodes, holderId), title: '', fieldId, refId: null, placements: [],
-  }
+  const point = newPoint(nodes, holderId, fieldId, id)
   const inField = (n: PlotNode) => n.parentId === holderId && n.kind === 'plotpoint' && n.fieldId === fieldId
   return { nodes: insertAfter(nodes, point, afterId, n => (afterId ? inField(n) : n.parentId === holderId)), id }
 }
@@ -301,12 +320,15 @@ export function updateValue(nodes: PlotNode[], id: string, patch: { title?: stri
 }
 
 // A value can move between the plotline's own fields (and Scrap) while it is
-// its own and not placed anywhere.
+// its own and not placed anywhere. An answer never moves, and nothing moves into a choice field.
 export function canMoveValue(point: PlotNode, toFieldId: string, index: Map<string, PlotNode>, outlineById: Map<string, OutlineNode>): boolean {
-  if (point.kind !== 'plotpoint' || point.refId || isPlaced(point, outlineById)) return false
+  if (point.kind !== 'plotpoint' || point.refId || point.optionId || isPlaced(point, outlineById)) return false
   const plotline = point.parentId ? index.get(point.parentId) : undefined
   if (plotline?.kind !== 'plotline') return false
-  return plotline.customFieldDefs.some(d => d.id === toFieldId)
+  const target = plotline.customFieldDefs.find(d => d.id === toFieldId)
+  if (!target || isChoice(target)) return false
+  const from = point.fieldId ? fieldSeenFrom(plotline, point.fieldId, index) : undefined
+  return !(from && isChoice(from))
 }
 
 export function moveValue(nodes: PlotNode[], id: string, toFieldId: string, outlineById: Map<string, OutlineNode>): PlotNode[] {
@@ -319,7 +341,7 @@ export function moveValue(nodes: PlotNode[], id: string, toFieldId: string, outl
 // The plotline's field with this name (case-insensitive), made when it has none.
 function plotlineFieldNamed(nodes: PlotNode[], plotlineId: string, name: string, makeId: MakeId): { nodes: PlotNode[]; id: string } {
   const plotline = nodes.find(n => n.id === plotlineId)!
-  const found = plotline.customFieldDefs.find(d => !isScrapField(d) && d.name.trim().toLowerCase() === name.trim().toLowerCase())
+  const found = plotline.customFieldDefs.find(d => !isScrapField(d) && !isChoice(d) && d.name.trim().toLowerCase() === name.trim().toLowerCase())
   if (found) return { nodes, id: found.id }
   const added = addField(nodes, plotlineId, name, makeId)
   return { nodes: added.nodes, id: added.id! }
@@ -332,6 +354,9 @@ function scrapFieldOf(nodes: PlotNode[], plotlineId: string): { nodes: PlotNode[
   const defs = [...plotline.customFieldDefs, { id, name: SCRAP_FIELD_NAME }]
   return { nodes: nodes.map(n => (n.id === plotlineId ? { ...n, customFieldDefs: defs } : n)), id }
 }
+
+// A plotpoint kept as a plain value of a plain field: if it answered an option, it keeps its title and places and no longer names the option.
+const plain = (n: PlotNode): PlotNode => (n.optionId ? { ...n, optionId: null } : n)
 
 // A reference whose original is going away, kept as the plotline's own value in a
 // plotline field named like the original's.
@@ -376,7 +401,7 @@ export function deleteField(nodes: PlotNode[], ownerId: string, fieldId: string,
     for (const v of valuesIn(nodes, ownerId, fieldId)) {
       if (isPlaced(v, outlineById)) {
         const scrap = scrapFieldOf(next, ownerId)
-        next = scrap.nodes.map(n => (n.id === v.id ? { ...n, fieldId: scrap.id } : n))
+        next = scrap.nodes.map(n => (n.id === v.id ? plain({ ...n, fieldId: scrap.id }) : n))
       } else next = next.filter(n => n.id !== v.id)
     }
   } else {
@@ -388,7 +413,7 @@ export function deleteField(nodes: PlotNode[], ownerId: string, fieldId: string,
       if (parent?.kind !== 'plotline') continue
       if (isPlaced(own, outlineById)) {
         const field = plotlineFieldNamed(next, parent.id, def.name, makeId)
-        next = field.nodes.map(n => (n.id === own.id ? { ...n, fieldId: field.id } : n))
+        next = field.nodes.map(n => (n.id === own.id ? plain({ ...n, fieldId: field.id }) : n))
       } else next = next.filter(n => n.id !== own.id)
     }
   }
@@ -409,6 +434,7 @@ export function syncReferences(nodes: PlotNode[], outlineById: Map<string, Outli
     for (const owner of chainOf(plotline, index).slice(1)) {
       if (owner.kind !== 'category' && owner.kind !== 'subcategory' && owner.kind !== 'cluster') continue
       for (const def of owner.customFieldDefs) {
+        if (isChoice(def)) continue
         for (const original of valuesIn(nodes, owner.id, def.id)) wanted.set(original.id, { original, fieldId: def.id })
       }
     }
@@ -439,14 +465,15 @@ export function syncReferences(nodes: PlotNode[], outlineById: Map<string, Outli
 //     scenes and moments take plotpoints) is dropped, there is one placement to a target, and an awareness only on a moment (plotPlacement.ts);
 //   - a plotline's old template-field values become values of that field;
 //   - plotpoints with no field go into a plotline field called "Default";
-//   - titles and descriptions keep to their limits, and a nameless plotpoint is named or dropped.
+//   - titles and descriptions keep to their limits, and a nameless plotpoint is named or dropped;
+//   - a choice field has a kind and options this version reads, and its answers name an option of it (plotKinds.ts: repairChoices).
 export function migratePlot(nodes: PlotNode[], outlineNodes: OutlineNode[], makeId: MakeId = randomId): PlotNode[] {
   const outlineById = new Map(outlineNodes.map(n => [n.id, n]))
   const index = byId(nodes)
-  let next: PlotNode[] = nodes.map(n => {
+  let next: PlotNode[] = repairChoices(nodes.map(n => {
     const point = { ...n, fieldId: n.fieldId ?? null, refId: n.refId ?? null }
     return n.kind === 'plotpoint' ? repairPlacements(point, outlineById, () => makeId('pl')) : point
-  })
+  }))
 
   // Old single values, mirrored (or not yet) as a plotpoint with sourceFieldId.
   for (const plotline of nodes.filter(n => n.kind === 'plotline')) {

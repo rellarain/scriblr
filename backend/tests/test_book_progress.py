@@ -93,3 +93,26 @@ def test_overview_gives_every_project_with_its_outline_and_progress(client: Test
 
 def test_overview_of_no_projects_is_empty(client: TestClient) -> None:
     assert client.get("/api/projects/overview").json() == []
+
+
+def test_answers_to_choice_fields_are_not_counted_in_plotting_or_placing(client: TestClient) -> None:
+    project_id = client.post("/api/projects", json={"title": "Answers"}).json()["projectId"]
+    outline = {"schemaVersion": 2, "nodes": [
+        _node("b1", "book", None, plotlineIds=["pl1", "pl2"]), _node("c1", "chapter", "b1", 0),
+    ]}
+    assert client.put(f"/api/projects/{project_id}/outline", json=outline).status_code == 200
+    defs = [{"id": "f-genre", "name": "Genre", "kind": "multi", "options": [{"id": "o1", "label": "Fantasy"}]}, {"id": "f-motto", "name": "Motto", "kind": "text"}]
+    plot = {"schemaVersion": 1, "nodes": [
+        _plot("cat", "category", None, customFieldDefs=defs + [{"id": "f-beats", "name": "Beats"}]),
+        _plot("pl1", "plotline", "cat"),
+        _plot("pl2", "plotline", "cat", 1),
+        # pl1 has a beat (placed) and answers; pl2 has only answers, so it is not plotted
+        _plot("pp1", "plotpoint", "pl1", fieldId="f-beats", placements=[{"id": "a", "targetId": "c1"}]),
+        _plot("an1", "plotpoint", "pl1", 1, fieldId="f-genre", optionId="o1", title="Fantasy"),
+        _plot("an2", "plotpoint", "pl1", 2, fieldId="f-motto", title="Never again"),
+        _plot("an3", "plotpoint", "pl2", fieldId="f-genre", optionId="o1", title="Fantasy", placements=[{"id": "b", "targetId": "c1"}]),
+    ]}
+    assert client.put(f"/api/projects/{project_id}/plot", json=plot).status_code == 200
+    book = client.get(f"/api/projects/{project_id}/book-progress").json()["b1"]
+    assert book["plotting"] == {"done": 1, "total": 2}
+    assert book["assignment"] == {"done": 1, "total": 1}

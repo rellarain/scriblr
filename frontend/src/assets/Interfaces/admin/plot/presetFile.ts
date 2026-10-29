@@ -1,4 +1,4 @@
-import type { PresetContent, PresetFieldset, PresetSubcategory } from '../../../../api/types'
+import type { PresetContent, PresetField, PresetFieldset, PresetSubcategory } from '../../../../api/types'
 import { FIELDSETS_MAX, FIELDS_MAX, normalizeContent, randomId, type MakeId } from './presetModel'
 
 // The file Export writes and Import reads: JSON with a marker and a version, and the presets without ids (they get new ones on import).
@@ -19,14 +19,14 @@ export interface ImportResult {
   skipped: string[]
 }
 
-interface FileCard { name: string; description: string; keywords: string[]; fields: string[]; fieldsets: PresetFieldset[] }
+interface FileCard { name: string; description: string; keywords: string[]; fields: PresetField[]; fieldsets: PresetFieldset[] }
 interface FilePreset extends FileCard {
   subcategories: Array<FileCard & { clusters: FileCard[] }>
 }
 
 const strip = (c: PresetContent): FilePreset => {
   const n = normalizeContent(c)
-  const base = (x: { name: string; description: string; keywords: string[]; fields: string[]; fieldsets?: PresetFieldset[] }): FileCard => (
+  const base = (x: { name: string; description: string; keywords: string[]; fields: PresetField[]; fieldsets?: PresetFieldset[] }): FileCard => (
     { name: x.name, description: x.description, keywords: x.keywords, fields: x.fields, fieldsets: x.fieldsets ?? [] }
   )
   return {
@@ -50,13 +50,28 @@ const text = (v: unknown): string => (typeof v === 'string' ? v : '')
 const strings = (v: unknown): string[] => (Array.isArray(v) ? v.filter((x): x is string => typeof x === 'string') : [])
 const list = (v: unknown): unknown[] => (Array.isArray(v) ? v : [])
 
-// The fieldsets of a file card (a file from before fieldsets has none): a name and field names each, anything else left out.
-const sets = (v: unknown): PresetFieldset[] => list(v).filter(isRecord).map(s => ({ name: text(s.name), fields: strings(s.fields) }))
+// The fields of a file card: a name (a plain field), or a record with a name, a kind (multi, dropdown or text) and the labels of its options
+// (a file from before field kinds has only names). Anything else is left out; a kind it does not know is read as a plain field.
+function fieldsOf(v: unknown): PresetField[] {
+  const out: PresetField[] = []
+  for (const item of list(v)) {
+    if (typeof item === 'string') out.push(item)
+    else if (isRecord(item) && typeof item.name === 'string') {
+      const kind = item.kind
+      if (kind === 'multi' || kind === 'dropdown') out.push({ name: item.name, kind, options: strings(item.options) })
+      else if (kind === 'text') out.push({ name: item.name, kind, options: [] })
+      else out.push(item.name)
+    }
+  }
+  return out
+}
+// The fieldsets of a file card (a file from before fieldsets has none): a name and fields each, anything else left out.
+const sets = (v: unknown): PresetFieldset[] => list(v).filter(isRecord).map(s => ({ name: text(s.name), fields: fieldsOf(s.fields) }))
 // How many fields a card lists in all: the loose ones and those in its sets.
-const fieldCount = (v: Record<string, unknown>) => strings(v.fields).length + sets(v.fieldsets).reduce((n, s) => n + s.fields.length, 0)
+const fieldCount = (v: Record<string, unknown>) => fieldsOf(v.fields).length + sets(v.fieldsets).reduce((n, s) => n + s.fields.length, 0)
 
 function readBase(v: Record<string, unknown>) {
-  return { name: text(v.name), description: text(v.description), keywords: strings(v.keywords), fields: strings(v.fields), fieldsets: sets(v.fieldsets) }
+  return { name: text(v.name), description: text(v.description), keywords: strings(v.keywords), fields: fieldsOf(v.fields), fieldsets: sets(v.fieldsets) }
 }
 
 // What is wrong with one preset in the file, or null. A name is required on the preset itself; the cards under it may be unnamed (a draft).

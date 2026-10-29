@@ -1,5 +1,6 @@
-import type { PresetCard, PresetCluster, PresetContent, PresetEntry, PresetFieldset, PresetSubcategory } from '../../../../api/types'
+import type { PlotFieldKind, PresetCard, PresetCluster, PresetContent, PresetEntry, PresetField, PresetFieldset, PresetSubcategory } from '../../../../api/types'
 import { BODY_MAX, FIELD_NAME_MAX, FIELDSET_NAME_MAX, MAX_FIELDSETS, TITLE_MAX } from '../../writer/plotFields'
+import { MAX_OPTIONS, OPTION_LABEL_MAX } from '../../writer/plotKinds'
 
 // The pure side of the Plot presets page: editing a preset's card tree, its limits and checks, how it compares with what was published,
 // and the plain-words summary Publish shows. Nothing here touches the network or React.
@@ -14,6 +15,9 @@ export const FIELDSET_MAX = FIELDSET_NAME_MAX
 export const FIELDSETS_MAX = MAX_FIELDSETS
 // Loose fields and the fields in fieldsets together, on one card (the server's limit).
 export const FIELDS_MAX = 100
+// The options of a multi-select or dropdown field: a label and how many, as in the Plot editor.
+export const OPTION_MAX = OPTION_LABEL_MAX
+export const OPTIONS_MAX = MAX_OPTIONS
 
 export type MakeId = (prefix: string) => string
 export const randomId: MakeId = prefix => `${prefix}-${Math.random().toString(36).slice(2, 10)}`
@@ -45,6 +49,21 @@ export function siblingIds(content: PresetContent, id: string): string[] {
   return found.kind === 'subcategory'
     ? content.subcategories.map(s => s.id)
     : content.subcategories.find(s => s.id === found.parentId)?.clusters.map(c => c.id) ?? []
+}
+
+// A field of a card: a plain field is its name; a multi-select, dropdown or short text is a name, a kind and the labels of its options.
+export const fieldName = (field: PresetField): string => (typeof field === 'string' ? field : field.name)
+export const fieldKind = (field: PresetField): PlotFieldKind => (typeof field === 'string' ? 'points' : field.kind)
+export const fieldOptions = (field: PresetField): string[] => (typeof field === 'string' ? [] : field.options)
+// Whether the field has options to choose from.
+export const choosesFrom = (field: PresetField): boolean => fieldKind(field) === 'multi' || fieldKind(field) === 'dropdown'
+
+// The field as another kind: a plain one is just its name, a short text has no options, and a multi-select and a dropdown keep theirs.
+export function withKind(field: PresetField, kind: PlotFieldKind): PresetField {
+  if (fieldKind(field) === kind) return field
+  const name = fieldName(field)
+  if (kind === 'points') return name
+  return { name, kind, options: kind === 'text' ? [] : fieldOptions(field) }
 }
 
 // A card's fieldsets (an older preset has none), and how many fields it lists in all: the loose ones and the ones in its sets.
@@ -82,10 +101,33 @@ function cleanList(values: string[], max: number, unique: boolean): string[] {
   return out
 }
 
+// The labels of a field's options, trimmed and cut, without blanks or repeats (compared without case), within their limit.
+function cleanOptions(labels: string[]): string[] {
+  const out: string[] = []
+  for (const label of labels) {
+    const text = clampText(label, OPTION_MAX)
+    if (text && !out.some(o => o.toLocaleLowerCase() === text.toLocaleLowerCase())) out.push(text)
+  }
+  return out.slice(0, OPTIONS_MAX)
+}
+
+// Fields with their names trimmed and cut and the blank ones dropped (a repeat is allowed); the options of a choice field the same, without
+// repeats and within their limit, and a short text has none.
+function cleanFields(fields: PresetField[]): PresetField[] {
+  const out: PresetField[] = []
+  for (const field of fields) {
+    const name = clampText(fieldName(field), FIELD_MAX)
+    if (!name) continue
+    if (typeof field === 'string') { out.push(name); continue }
+    out.push({ name, kind: field.kind, options: field.kind === 'text' ? [] : cleanOptions(field.options) })
+  }
+  return out
+}
+
 // A set with no name and no fields is dropped; one with fields is kept even unnamed (a set still being written; Publish is what asks for it).
 function cleanFieldsets(sets: PresetFieldset[]): PresetFieldset[] {
   return sets
-    .map(set => ({ name: clampText(set.name, FIELDSET_MAX), fields: cleanList(set.fields, FIELD_MAX, false) }))
+    .map(set => ({ name: clampText(set.name, FIELDSET_MAX), fields: cleanFields(set.fields) }))
     .filter(set => set.name !== '' || set.fields.length > 0)
     .slice(0, FIELDSETS_MAX)
 }
@@ -94,7 +136,7 @@ function cleanBase<T extends PresetCard>(card: T): T {
   return {
     ...card,
     name: clampText(card.name, NAME_MAX), description: clampText(card.description, DESCRIPTION_MAX),
-    keywords: cleanList(card.keywords, KEYWORD_MAX, true), fields: cleanList(card.fields, FIELD_MAX, false),
+    keywords: cleanList(card.keywords, KEYWORD_MAX, true), fields: cleanFields(card.fields),
     fieldsets: cleanFieldsets(setsOf(card)),
   }
 }
@@ -280,6 +322,56 @@ export function moveSetFieldTo(content: PresetContent, id: string, index: number
   })
 }
 
+// ---- the kind and the options of a field: addressed by its place, in the loose fields (set = null) or in the fields of a set ----
+
+function changeField(content: PresetContent, id: string, set: number | null, index: number, change: (field: PresetField) => PresetField): PresetContent {
+  const found = findCard(content, id)
+  if (!found) return content
+  if (set === null) {
+    const field = found.card.fields[index]
+    if (field === undefined) return content
+    const next = change(field)
+    return next === field ? content : updateCard(content, id, { fields: found.card.fields.map((f, i) => (i === index ? next : f)) })
+  }
+  return changeSets(content, id, sets => {
+    const field = sets[set]?.fields[index]
+    if (field === undefined) return sets
+    const next = change(field)
+    if (next === field) return sets
+    return sets.map((s, i) => (i === set ? { ...s, fields: s.fields.map((f, j) => (j === index ? next : f)) } : s))
+  })
+}
+
+// The field as another kind (it keeps its name; a multi-select and a dropdown keep their options, any other change drops them).
+export function setFieldKindAt(content: PresetContent, id: string, set: number | null, index: number, kind: PlotFieldKind): PresetContent {
+  return changeField(content, id, set, index, field => withKind(field, kind))
+}
+
+// A new option last: its label trimmed and cut, none when blank, repeated (compared without case) or over the limit.
+export function addOptionAt(content: PresetContent, id: string, set: number | null, index: number, label: string): PresetContent {
+  const text = clampText(label, OPTION_MAX)
+  return changeField(content, id, set, index, field => {
+    if (!choosesFrom(field) || typeof field === 'string') return field
+    if (!text || field.options.length >= OPTIONS_MAX || field.options.some(o => o.toLocaleLowerCase() === text.toLocaleLowerCase())) return field
+    return { ...field, options: [...field.options, text] }
+  })
+}
+
+export function removeOptionAt(content: PresetContent, id: string, set: number | null, index: number, optionIndex: number): PresetContent {
+  return changeField(content, id, set, index, field => (
+    typeof field === 'string' || !field.options[optionIndex] ? field : { ...field, options: field.options.filter((_, i) => i !== optionIndex) }
+  ))
+}
+
+// Move the option at `from` to just before the one at `before` (last when null).
+export function moveOptionTo(content: PresetContent, id: string, set: number | null, index: number, from: number, before: number | null): PresetContent {
+  return changeField(content, id, set, index, field => {
+    if (typeof field === 'string') return field
+    const options = moveIndex(field.options, from, before)
+    return options === field.options ? field : { ...field, options }
+  })
+}
+
 // ---- the list of presets ----
 
 export const nameKey = (name: string) => name.trim().toLocaleLowerCase()
@@ -331,15 +423,25 @@ export function publishFaults(content: PresetContent): Fault[] {
       if (!set.name.trim() && set.fields.length > 0) faults.push({ id, message: `Fieldset ${i + 1} on ${where} needs a name.` })
     })
   }
+  // A multi-select or dropdown with no options has nothing to choose from.
+  const noOptions = (card: PresetCard, id: string, where: string) => {
+    for (const field of [...card.fields, ...setsOf(card).flatMap(s => s.fields)]) {
+      if (choosesFrom(field) && fieldOptions(field).length === 0) faults.push({ id, message: `The ${fieldKind(field) === 'dropdown' ? 'dropdown' : 'multi-select'} ${fieldName(field)} on ${where} needs an option.` })
+    }
+  }
   if (!content.name.trim()) faults.push({ id: ROOT, message: 'The preset needs a name.' })
   unnamedSets(content, ROOT, 'the preset')
+  noOptions(content, ROOT, 'the preset')
   content.subcategories.forEach((sub, i) => {
     const label = sub.name.trim() ? `subcategory ${sub.name.trim()}` : `subcategory ${i + 1}`
     if (!sub.name.trim()) faults.push({ id: sub.id, message: `Subcategory ${i + 1} needs a name.` })
     unnamedSets(sub, sub.id, label)
+    noOptions(sub, sub.id, label)
     sub.clusters.forEach((c, j) => {
+      const where = `cluster ${c.name.trim() || j + 1} in ${label}`
       if (!c.name.trim()) faults.push({ id: c.id, message: `Cluster ${j + 1} in ${label} needs a name.` })
-      unnamedSets(c, c.id, `cluster ${c.name.trim() || j + 1} in ${label}`)
+      unnamedSets(c, c.id, where)
+      noOptions(c, c.id, where)
     })
   })
   return faults
@@ -351,17 +453,24 @@ export interface Changes { added: string[]; changed: string[]; removed: string[]
 
 const plural = (n: number, word: string) => `${n} ${n === 1 ? word : word.endsWith('y') ? `${word.slice(0, -1)}ies` : `${word}s`}`
 
-function fieldChange(before: string[], after: string[]): string | null {
+// What differs between two lists of fields, as short phrases: fields added or removed (matched by name), or none and the order differs; and the
+// fields that stay with another kind or other options.
+function fieldChanges(before: PresetField[], after: PresetField[]): string[] {
   const left = [...before]
   let added = 0
-  for (const name of after) {
-    const at = left.indexOf(name)
-    if (at >= 0) left.splice(at, 1)
-    else added += 1
+  let reshaped = 0
+  for (const field of after) {
+    const at = left.findIndex(f => fieldName(f) === fieldName(field))
+    if (at < 0) { added += 1; continue }
+    if (JSON.stringify(left[at]) !== JSON.stringify(field)) reshaped += 1
+    left.splice(at, 1)
   }
   const removed = left.length
-  if (added || removed) return `fields (${[added && `${added} added`, removed && `${removed} removed`].filter(Boolean).join(', ')})`
-  return before.join('\n') !== after.join('\n') ? 'field order' : null
+  const out: string[] = []
+  if (added || removed) out.push(`fields (${[added && `${added} added`, removed && `${removed} removed`].filter(Boolean).join(', ')})`)
+  else if (before.map(fieldName).join('\n') !== after.map(fieldName).join('\n')) out.push('field order')
+  if (reshaped) out.push(`field kinds or options (${reshaped} changed)`)
+  return out
 }
 
 // What differs between two cards' fieldsets, as short phrases: sets added or removed (matched by name), the fields of a set that stays, and the
@@ -377,8 +486,8 @@ function fieldsetChanges(before: PresetFieldset[], after: PresetFieldset[]): str
   }
   if (added || left.length) out.push(`fieldsets (${[added && `${added} added`, left.length && `${left.length} removed`].filter(Boolean).join(', ')})`)
   for (const [was, now] of kept) {
-    const change = fieldChange(was.fields, now.fields)
-    if (change) out.push(`fieldset ${now.name || 'without a name'}: ${change}`)
+    const change = fieldChanges(was.fields, now.fields)
+    if (change.length) out.push(`fieldset ${now.name || 'without a name'}: ${change.join(', ')}`)
   }
   const stay = new Set(kept.map(([, now]) => now.name))
   if (before.filter(s => stay.has(s.name)).map(s => s.name).join('\n') !== after.filter(s => stay.has(s.name)).map(s => s.name).join('\n')) out.push('fieldset order')
@@ -391,8 +500,7 @@ function cardChanges(before: PresetCard, after: PresetCard): string[] {
   if (before.name !== after.name) out.push(`name (${before.name || 'blank'} to ${after.name || 'blank'})`)
   if (before.description !== after.description) out.push('description')
   if (before.keywords.join('\n') !== after.keywords.join('\n')) out.push('keywords')
-  const fields = fieldChange(before.fields, after.fields)
-  if (fields) out.push(fields)
+  out.push(...fieldChanges(before.fields, after.fields))
   out.push(...fieldsetChanges(setsOf(before), setsOf(after)))
   return out
 }

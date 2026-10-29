@@ -36,6 +36,41 @@
   .wrFieldSetBody { display: flex; flex-direction: column; gap: var(--space-3); }
   .wrFieldDrop { margin: 0; padding: var(--space-3) var(--space-base); border: 2px dashed var(--hairline); border-radius: var(--radius-button); font-size: var(--text-small); color: var(--ink-muted); text-align: center; }
 
+  // A choice field (multi-select, dropdown, short text): its kind, its options (chips on the field's owner) and the answers. An answer wears a
+  // value card's colours (the same audited pair); the light boxes (the select, an option chip, an empty text answer) are the ink on the field colour.
+  .wrFieldKind { flex: 0 0 auto; }
+  .wrSelect { flex: 0 0 auto; max-width: 100%; box-sizing: border-box; background: var(--wr-field); color: var(--ink); border: 0; border-radius: var(--radius-none); padding: 5px var(--space-base); font-size: var(--text-ui); font-weight: 700; &:disabled { opacity: 0.75; cursor: not-allowed; } }
+  .wrOptionsBlock { display: flex; flex-direction: column; align-items: flex-start; gap: var(--space-3); }
+  .wrOptions { display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-3); }
+  .wrOption, .wrOptionAdd { display: inline-flex; align-items: center; gap: var(--space-2); max-width: 100%; padding: var(--space-1) var(--space-2); border-radius: var(--radius-button); background: var(--wr-field); color: var(--ink); }
+  .wrOption--dragging { opacity: 0.7; }
+  .wrOptionInput { min-width: 3ch; max-width: 100%; background: transparent; border: 0; outline: none; color: inherit; font-size: var(--text-ui); font-weight: 700; padding: var(--space-1) 0; }
+  .wrOptionAdd input { width: 14ch; background: transparent; border: 0; outline: none; color: inherit; font-size: var(--text-ui); padding: var(--space-1) 0; &::placeholder { color: var(--ink-faint); } }
+  .wrOptionX, .wrOptionAdd button { display: inline-flex; align-items: center; justify-content: center; width: 20px; height: 20px; border-radius: var(--radius-button); color: inherit; &:hover:not(:disabled) { background: var(--ov-lift-2); } &:disabled { opacity: 0.5; cursor: default; } }
+  .wrChoice { gap: var(--space-4); }
+  .wrChoiceList { display: flex; flex-direction: column; align-items: flex-start; gap: var(--space-3); max-width: 100%; }
+  .wrChoiceRow { display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-3); max-width: 100%; }
+  .wrAnswerLabel {
+    display: inline-flex; align-items: center; gap: var(--space-3); flex: 1 1 auto; min-width: 0; font-size: var(--text-field); font-weight: 700; overflow-wrap: anywhere; cursor: pointer;
+    &--off { flex: 0 1 auto; font-weight: 400; }
+  }
+  // The app resets native controls, so the box is drawn (as the contents' tick boxes are): a ring in the ink; ticked, the box is filled with the
+  // ink and the tick is the card's own colour (the audited ink on the card).
+  .wrAnswerBox {
+    appearance: none; position: relative; flex: 0 0 auto; width: 14px; height: 14px; margin: 0; border-radius: var(--radius-button); cursor: pointer; color: inherit;
+    background: color-mix(in srgb, currentColor 14%, transparent); box-shadow: inset 0 0 0 1.5px color-mix(in srgb, currentColor 75%, transparent);
+    &:checked { background: currentColor; box-shadow: inset 0 0 0 1.5px currentColor; }
+    &:checked::after { content: ''; position: absolute; left: 4px; top: 1px; width: 4px; height: 8px; border: solid var(--wr-point-bg, var(--wr-cat, var(--wr-card))); border-width: 0 2px 2px 0; transform: rotate(45deg); }
+    &:focus-visible { outline: 2px solid currentColor; outline-offset: 2px; }
+  }
+  .wrPlotValue--answer { padding: 5px 8px 5px calc(var(--wr-edge-w, 4px) + 10px); min-width: min(100%, 14rem); max-width: 100%; box-sizing: border-box; }
+  .wrAnswerText {
+    display: flex; align-items: center; gap: var(--space-base); min-width: min(100%, 16rem); max-width: 100%; box-sizing: border-box;
+    &:not(.wrPlotValue) { padding: var(--space-1) var(--space-base); background: var(--wr-field); color: var(--ink); border-radius: var(--radius-button); }
+  }
+  .wrAnswerFrom { display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-3); }
+  .wrAnswerWho { font-size: var(--text-small); font-weight: 700; text-transform: uppercase; letter-spacing: 1.5px; opacity: 0.9; }
+
   // A value: a plain box with rounded corners; the field name small, bold and all caps in its top left
   // corner, the title and description in the middle, one icon on the right. Unassigned it wears its
   // category colour with its subcategory as the left edge; assigned to a chapter, its book's primary

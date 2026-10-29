@@ -74,8 +74,14 @@ export function plotChildKindOptions(parentKind: PlotNodeKind): PlotNodeKind[] {
   return PLOT_KIND_ORDER.slice(PLOT_KIND_ORDER.indexOf(parentKind) + 1)
 }
 
+// What a field holds: 'points' (absent or null: the usual field, a list of plotpoints), 'multi' (any of its options), 'dropdown' (one of them) or
+// 'text' (a short text). Each plotline (and the node that defines the field) answers a choice field with plotpoints of its own: one for each
+// option ticked (title = the option's label, `optionId` set), the one picked, or one whose title is the text.
+export type PlotFieldKind = 'points' | 'multi' | 'dropdown' | 'text'
+// One choice of a multi-select or dropdown field.
+export interface PlotFieldOption { id: string; label: string }
 // A field a node defines. `setId` is the fieldset (a PlotFieldSet of the same node) it is listed under; absent or null = a loose field.
-export interface PlotCustomFieldDef { id: string; name: string; setId?: string | null }
+export interface PlotCustomFieldDef { id: string; name: string; setId?: string | null; kind?: PlotFieldKind | null; options?: PlotFieldOption[] }
 // A named group of the fields a node defines (on a category, subcategory, cluster or plotline); it shows on every plotline under the node as its fields do.
 export interface PlotFieldSet { id: string; name: string }
 export interface PlotNode {
@@ -105,6 +111,8 @@ export interface PlotNode {
   // `placements` are the places it is put in the outline (it is placed once it has one).
   fieldId?: string | null
   refId?: string | null
+  // An answer to a multi-select or dropdown field: the option (a PlotFieldOption id of that field) it answers with.
+  optionId?: string | null
   placements?: PlotPlacement[]
   // Before placements each had their own: set only while placed on a moment (see assignedMomentId).
   awareness?: Awareness | null
@@ -306,13 +314,17 @@ export interface AuiConfigDraft {
 // Plot presets: global (not per project) ready-made plot categories, configured in Admin > Configuration > Plot and offered by the Plot
 // sidebar's "+ Preset". A preset is a category with its description, keywords, fields, and subcategories and clusters that have the same.
 // A named group of field names on a preset's node: it becomes a fieldset on the node made from it, holding those fields.
-export interface PresetFieldset { name: string; fields: string[] }
+export interface PresetFieldset { name: string; fields: PresetField[] }
+// A field of a preset that is not a plain list of plotpoints: a multi-select, dropdown or short-text field, with the labels of its options
+// (none for a short text). A plain field is just its name.
+export interface PresetChoiceField { name: string; kind: 'multi' | 'dropdown' | 'text'; options: string[] }
+export type PresetField = string | PresetChoiceField
 export interface PresetNodeBase {
   name: string
   description: string
   keywords: string[]
-  // The loose field names, in order; each becomes a field on the node made from this one.
-  fields: string[]
+  // The loose fields, in order; each becomes a field on the node made from this one.
+  fields: PresetField[]
   // Fieldsets (a name and the field names in it), listed after the loose fields (absent in a preset saved before there were fieldsets).
   fieldsets?: PresetFieldset[]
 }

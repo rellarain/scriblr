@@ -308,3 +308,34 @@ def test_deleting_a_preset_removes_its_published_copy_too(client: TestClient) ->
     assert client.get("/api/presets/published").json()["presets"] == []
     save(client, draft("a", "Cast"), draft("b", "Crew"))  # the same id again starts over
     assert entry_of(client.get("/api/presets").json(), "a")["published"] is None
+
+
+# --------------------------------------------------------------------------- fields that are not plain lists of plotpoints
+
+
+def test_put_keeps_choice_fields_beside_plain_ones_in_the_loose_fields_and_in_the_sets(client: TestClient) -> None:
+    genre = {"name": " Genre ", "kind": "multi", "options": [" Fantasy", "Romance ", "Fantasy", "romance", "  "]}
+    sets = [{"name": "Tone", "fields": ["Pace", {"name": "Mood", "kind": "dropdown", "options": ["Calm"]}]}]
+    body = save(client, draft("a", "Cast", fields=["Motto", genre, {"name": "Tagline", "kind": "text", "options": ["ignored"]}], fieldsets=sets)).json()
+    saved = entry_of(body, "a")["draft"]
+    assert saved["fields"] == [
+        "Motto",
+        {"name": "Genre", "kind": "multi", "options": ["Fantasy", "Romance"]},
+        {"name": "Tagline", "kind": "text", "options": []},
+    ]
+    assert saved["fieldsets"] == [{"name": "Tone", "fields": ["Pace", {"name": "Mood", "kind": "dropdown", "options": ["Calm"]}]}]
+    assert client.get("/api/presets").json() == body
+    published = entry_of(client.post("/api/presets/a/publish").json(), "a")
+    assert published["published"]["content"]["fields"][1]["kind"] == "multi"
+
+
+def test_put_refuses_choice_fields_the_plot_editor_could_not_hold(client: TestClient) -> None:
+    for over in (
+        {"fields": [{"name": "F" * 31, "kind": "multi", "options": ["a"]}]},
+        {"fields": [{"name": "Genre", "kind": "multi", "options": ["O" * 31]}]},
+        {"fields": [{"name": "Genre", "kind": "multi", "options": [f"o{i}" for i in range(21)]}]},
+        {"fields": [{"name": "Genre", "kind": "radio", "options": ["a"]}]},
+        {"fieldsets": [{"name": "S", "fields": [{"name": "Genre", "kind": "dropdown", "options": ["O" * 31]}]}]},
+    ):
+        assert save(client, {"id": "a", "draft": {**content("ok"), **over}}).status_code == 422, over
+    assert save(client, {"id": "a", "draft": {**content("ok"), "fields": [{"name": "Genre", "kind": "multi", "options": [f"o{i}" for i in range(20)]}]}}).status_code == 200

@@ -1,6 +1,9 @@
 import { useRef, useState } from 'react'
 import { vi } from 'vitest'
-import type { OutlineNode, PlotNode, PlotPlacement, PresetContent } from '../../../api/types'
+import type { OutlineNode, PlotFieldKind, PlotNode, PlotPlacement, PresetContent } from '../../../api/types'
+import {
+  addOption, chooseOption, moveOption, removeAnswer, removeOption, renameOption, setFieldKind, setTextAnswer, toggleOption,
+} from './plotAnswers'
 import { cycleAwareness, movePlacement, placeValue, unplace } from './plotPlacement'
 import { nodesFromPreset } from './plotPreset'
 import {
@@ -79,6 +82,15 @@ export function useFakeWorkspace(initial: PlotNode[], focused = 'line', outlineN
     renamePlotField: (owner: string, id: string, name: string) => commit(renameField(ref.current, owner, id, name)),
     movePlotField: (owner: string, id: string, before: string | null) => commit(moveField(ref.current, owner, id, before)),
     removePlotField: (owner: string, id: string) => commit(deleteField(ref.current, owner, id, outlineById)),
+    setPlotFieldKind: (owner: string, field: string, kind: PlotFieldKind) => commit(setFieldKind(ref.current, owner, field, kind)),
+    addPlotOption: (owner: string, field: string, label: string) => { const r = addOption(ref.current, owner, field, label, randomId); if (r.id) commit(r.nodes); return r.id },
+    renamePlotOption: (owner: string, field: string, option: string, label: string) => commit(renameOption(ref.current, owner, field, option, label)),
+    movePlotOption: (owner: string, field: string, option: string, before: string | null) => commit(moveOption(ref.current, owner, field, option, before)),
+    removePlotOption: (owner: string, field: string, option: string) => commit(removeOption(ref.current, owner, field, option)),
+    togglePlotOption: (holder: string, field: string, option: string, on: boolean) => commit(toggleOption(ref.current, holder, field, option, on, randomId)),
+    choosePlotOption: (holder: string, field: string, option: string | null) => commit(chooseOption(ref.current, holder, field, option, randomId)),
+    setPlotTextAnswer: (holder: string, field: string, text: string) => commit(setTextAnswer(ref.current, holder, field, text, randomId)),
+    removePlotAnswer: (id: string) => commit(removeAnswer(ref.current, id)),
     addPlotValue: (holder: string, field: string, after?: string) => { const r = addValue(ref.current, holder, field, randomId, after); if (r.id) commit(r.nodes); return r.id },
     updatePlotValue: (id: string, patch: { title?: string; body?: string }) => commit(updateValue(ref.current, id, patch)),
     removePlotValue: (id: string) => commit(deleteValue(ref.current, id, outlineById)),

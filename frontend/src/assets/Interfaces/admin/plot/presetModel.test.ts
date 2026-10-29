@@ -3,7 +3,8 @@ import type { PresetContent, PresetEntry } from '../../../../api/types'
 import {
   FIELDS_MAX, ROOT, addCluster, addFieldName, addFieldNameToSet, addFieldset, addKeyword, addSubcategory, blankContent, copyName, countOf, describeChanges,
   findCard, isBlankCard, isEmptyChange, moveBefore, moveCard, moveFieldTo, moveFieldsetTo, moveSetFieldTo, nameTaken, normalizeContent, nudge, publishFaults,
-  removeCard, removeFieldAt, removeFieldsetAt, removeKeyword, removeSetFieldAt, renameFieldsetAt, sameContent, siblingIds, statusOf, updateCard, withNewIds,
+  OPTIONS_MAX, addOptionAt, fieldKind, fieldName, fieldOptions, moveOptionTo, removeCard, removeFieldAt, removeFieldsetAt, removeKeyword, removeOptionAt,
+  removeSetFieldAt, renameFieldsetAt, sameContent, setFieldKindAt, siblingIds, statusOf, updateCard, withKind, withNewIds,
 } from './presetModel'
 
 const content = (over: Partial<PresetContent> = {}): PresetContent => ({
@@ -328,5 +329,90 @@ describe('fieldsets', () => {
     expect(describeChanges(content(), sub).changed).toEqual(['subcategory Villains: fieldsets (1 added)'])
     const added = content({ subcategories: [{ ...content().subcategories[0], id: 'new', fieldsets: [{ name: 'A', fields: ['a', 'b'] }] }] })
     expect(describeChanges(content(), added).added).toEqual(['subcategory Heroes, 3 fields and 1 fieldset on it', 'cluster Core, 1 field on it'])
+  })
+})
+
+describe('fields of other kinds', () => {
+  const genre = { name: 'Genre', kind: 'multi' as const, options: ['Fantasy', 'Crime'] }
+  const mixed = () => content({ fields: ['Name', { ...genre, options: [...genre.options] }, { name: 'Motto', kind: 'text', options: [] }], fieldsets: [{ name: 'Tone', fields: ['Pace', { name: 'Mood', kind: 'dropdown', options: ['Calm'] }] }] })
+
+  it('reads the name, kind and options of a field of any kind', () => {
+    expect([fieldName('Name'), fieldKind('Name'), fieldOptions('Name')]).toEqual(['Name', 'points', []])
+    expect([fieldName(genre), fieldKind(genre), fieldOptions(genre)]).toEqual(['Genre', 'multi', ['Fantasy', 'Crime']])
+  })
+
+  it('changes a field\'s kind: a plain field is its name, a short text has no options, a multi-select and a dropdown keep theirs', () => {
+    expect(withKind('Name', 'multi')).toEqual({ name: 'Name', kind: 'multi', options: [] })
+    expect(withKind(genre, 'dropdown')).toEqual({ name: 'Genre', kind: 'dropdown', options: ['Fantasy', 'Crime'] })
+    expect(withKind(genre, 'text')).toEqual({ name: 'Genre', kind: 'text', options: [] })
+    expect(withKind(genre, 'points')).toBe('Genre')
+    expect(withKind(genre, 'multi')).toBe(genre)
+  })
+
+  it('sets the kind of a loose field and of a field in a set, by its place', () => {
+    const c = setFieldKindAt(mixed(), ROOT, null, 0, 'dropdown')
+    expect(c.fields[0]).toEqual({ name: 'Name', kind: 'dropdown', options: [] })
+    const d = setFieldKindAt(c, ROOT, 0, 0, 'multi')
+    expect(d.fieldsets?.[0].fields[0]).toEqual({ name: 'Pace', kind: 'multi', options: [] })
+    expect(setFieldKindAt(c, ROOT, null, 9, 'text')).toBe(c)
+    expect(setFieldKindAt(c, 'nope', null, 0, 'text')).toBe(c)
+    expect(setFieldKindAt(c, ROOT, null, 0, 'dropdown')).toBe(c)
+  })
+
+  it('adds an option last, trimmed and cut, and refuses a blank, a repeat (without case), a field with no options and a surplus', () => {
+    let c = addOptionAt(mixed(), ROOT, null, 1, `  ${'x'.repeat(40)} `)
+    expect(fieldOptions(c.fields[1]).at(-1)).toBe('x'.repeat(30))
+    expect(addOptionAt(c, ROOT, null, 1, '  ')).toBe(c)
+    expect(addOptionAt(c, ROOT, null, 1, 'fantasy')).toBe(c)
+    expect(addOptionAt(c, ROOT, null, 2, 'Anything')).toBe(c) // a short text has no options
+    expect(addOptionAt(c, ROOT, null, 0, 'Anything')).toBe(c) // a plain field
+    c = addOptionAt(c, ROOT, 0, 1, 'Stormy')
+    expect(fieldOptions(c.fieldsets![0].fields[1])).toEqual(['Calm', 'Stormy'])
+    const full = setFieldKindAt(c, ROOT, null, 0, 'multi')
+    let filled = full
+    for (let i = 0; i < OPTIONS_MAX + 2; i += 1) filled = addOptionAt(filled, ROOT, null, 0, `o${i}`)
+    expect(fieldOptions(filled.fields[0])).toHaveLength(OPTIONS_MAX)
+  })
+
+  it('removes and moves an option by its place', () => {
+    const c = addOptionAt(mixed(), ROOT, null, 1, 'Horror')
+    expect(fieldOptions(removeOptionAt(c, ROOT, null, 1, 0).fields[1])).toEqual(['Crime', 'Horror'])
+    expect(removeOptionAt(c, ROOT, null, 1, 7)).toBe(c)
+    expect(fieldOptions(moveOptionTo(c, ROOT, null, 1, 2, 0).fields[1])).toEqual(['Horror', 'Fantasy', 'Crime'])
+    expect(fieldOptions(moveOptionTo(c, ROOT, null, 1, 0, null).fields[1])).toEqual(['Crime', 'Horror', 'Fantasy'])
+    expect(moveOptionTo(c, ROOT, null, 1, 0, 0)).toBe(c)
+  })
+
+  it('normalises: names trimmed and cut, options without blanks or repeats, a short text without options, a plain field still a name', () => {
+    const out = normalizeContent(content({ fields: [' Name ', '', { name: ` ${'G'.repeat(40)} `, kind: 'multi', options: [' a ', 'A', '', 'b'.repeat(40)] }, { name: 'Motto', kind: 'text', options: ['x'] }, { name: '  ', kind: 'multi', options: ['y'] }] }))
+    expect(out.fields).toEqual(['Name', { name: 'G'.repeat(30), kind: 'multi', options: ['a', 'b'.repeat(30)] }, { name: 'Motto', kind: 'text', options: [] }])
+  })
+
+  it('counts a choice field with the others, and tells a draft that differs only by an option', () => {
+    expect(countOf(mixed()).fields).toBe(5 + 2) // Name, Genre, Motto + Pace, Mood on the preset, and Want and Dynamic below it
+    const other = mixed()
+    ;(other.fields[1] as { options: string[] }).options = ['Fantasy']
+    expect(sameContent(mixed(), other)).toBe(false)
+    expect(sameContent(mixed(), mixed())).toBe(true)
+  })
+
+  it('refuses to publish a multi-select or dropdown with no options, naming the card', () => {
+    const c = content({ fields: [{ name: 'Genre', kind: 'multi', options: [] }, { name: 'Motto', kind: 'text', options: [] }] })
+    c.subcategories[0].fieldsets = [{ name: 'Tone', fields: [{ name: 'Mood', kind: 'dropdown', options: [] }] }]
+    expect(publishFaults(c)).toEqual([
+      { id: ROOT, message: 'The multi-select Genre on the preset needs an option.' },
+      { id: 's1', message: 'The dropdown Mood on subcategory Heroes needs an option.' },
+    ])
+    expect(publishFaults(mixed())).toEqual([])
+  })
+
+  it('says what publishing changes about the kind or options of a field that stays, and about a field added', () => {
+    const before = mixed()
+    const after = mixed()
+    ;(after.fields[1] as { options: string[] }).options = ['Fantasy', 'Crime', 'Horror']
+    after.fieldsets![0].fields[1] = { name: 'Mood', kind: 'multi', options: ['Calm'] }
+    expect(describeChanges(before, after).changed).toEqual(['field kinds or options (1 changed), fieldset Tone: field kinds or options (1 changed)'])
+    after.fields.push({ name: 'Era', kind: 'dropdown', options: ['Past'] })
+    expect(describeChanges(before, after).changed[0]).toBe('fields (1 added), field kinds or options (1 changed), fieldset Tone: field kinds or options (1 changed)')
   })
 })

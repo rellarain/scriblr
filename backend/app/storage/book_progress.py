@@ -45,9 +45,12 @@ def progress_of(pf: ProjectFile) -> dict[str, BookProgress]:
     nodes = pf.outline.nodes
     by_id = {n.id: n for n in nodes}
     plot_nodes = pf.plot.nodes
+    # The answers to a multi-select, dropdown or short-text field describe a plotline rather than being beats of the story to place, so
+    # neither bar counts them (a field of ticked options would otherwise keep "plotpoints placed" low for good).
+    choice_fields = {d.id for n in plot_nodes for d in n.customFieldDefs if d.kind}
     plotpoints_by_line: dict[str, list] = {}
     for p in plot_nodes:
-        if p.kind == "plotpoint" and p.parentId:
+        if p.kind == "plotpoint" and p.parentId and p.fieldId not in choice_fields:
             plotpoints_by_line.setdefault(p.parentId, []).append(p)
     plotline_ids = {p.id for p in plot_nodes if p.kind == "plotline"}
 

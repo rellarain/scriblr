@@ -490,3 +490,90 @@ describe('useWriterWorkspace: plot colour ranges', () => {
     expect(get('sub')?.hue).toBe(130)
   })
 })
+
+describe('useWriterWorkspace: choice fields and their answers', () => {
+  const GENRE = { id: 'fg', name: 'Genre', kind: 'multi' as const, options: [{ id: 'o1', label: 'Fantasy' }, { id: 'o2', label: 'Crime' }] }
+  const TONE = { id: 'ft', name: 'Tone', kind: 'dropdown' as const, options: [{ id: 't1', label: 'Dark' }] }
+  const NOTE = { id: 'fn', name: 'Note', kind: 'text' as const }
+  const CHOICES = [
+    plotNode('cat', 'category', null, 'Category', { customFieldDefs: [GENRE, TONE, NOTE, { id: 'fp', name: 'Beats' }] }),
+    plotNode('sub', 'subcategory', 'cat', 'Subcategory'),
+    plotNode('line', 'plotline', 'sub', 'Plotline'),
+  ]
+
+  async function openedWith(plot: PlotNode[]) {
+    const backend = standInBackend({ p1: { index: projectIndex('p1', 'First'), outline: OUTLINE, plot } })
+    const hook = renderHook(() => useWriterWorkspace())
+    await waitFor(() => expect(hook.result.current.projects).toHaveLength(1))
+    await act(async () => { await hook.result.current.openProject('p1') })
+    await waitFor(() => expect(hook.result.current.plotStatus).toBe('idle'))
+    const of = (holder: string, field: string) => hook.result.current.plotNodes.filter(n => n.kind === 'plotpoint' && n.parentId === holder && n.fieldId === field)
+    const get = (id: string) => hook.result.current.plotNodes.find(n => n.id === id)
+    return { ...hook, backend, of, get }
+  }
+
+  it('ticks, picks and writes answers for a plotline, and takes them away with Undo', async () => {
+    const { result, of } = await openedWith(CHOICES)
+    act(() => { result.current.togglePlotOption('line', 'fg', 'o1', true) })
+    act(() => { result.current.togglePlotOption('line', 'fg', 'o2', true) })
+    act(() => { result.current.choosePlotOption('line', 'ft', 't1') })
+    act(() => { result.current.setPlotTextAnswer('line', 'fn', 'Never again') })
+    expect(of('line', 'fg').map(a => a.title)).toEqual(['Fantasy', 'Crime'])
+    expect(of('line', 'ft').map(a => [a.title, a.optionId])).toEqual([['Dark', 't1']])
+    expect(of('line', 'fn').map(a => a.title)).toEqual(['Never again'])
+    act(() => { result.current.history.undo('plot') })
+    expect(of('line', 'fn')).toEqual([])
+    act(() => { result.current.removePlotAnswer(of('line', 'fg')[0].id) })
+    expect(of('line', 'fg').map(a => a.title)).toEqual(['Crime'])
+  })
+
+  it('places an answer like any plotpoint, and unticking it takes its places along', async () => {
+    const { result, of } = await openedWith(CHOICES)
+    act(() => { result.current.togglePlotOption('line', 'fg', 'o1', true) })
+    const id = of('line', 'fg')[0].id
+    act(() => { result.current.placePlotpoint(id, 'c1') })
+    act(() => { result.current.placePlotpoint(id, 'm1') })
+    expect(of('line', 'fg')[0].placements!.map(p => p.targetId)).toEqual(['c1', 'm1'])
+    act(() => { result.current.togglePlotOption('line', 'fg', 'o1', false) })
+    expect(of('line', 'fg')).toEqual([])
+  })
+
+  it('sets a new field\'s kind and its options, renames one in the answers, and removes one with them', async () => {
+    const { result, of, get } = await openedWith(CHOICES)
+    act(() => { result.current.setPlotFieldKind('cat', 'fp', 'multi') })
+    let added: string | null = null
+    act(() => { added = result.current.addPlotOption('cat', 'fp', 'Slow') })
+    expect(added).not.toBeNull()
+    act(() => { result.current.togglePlotOption('line', 'fp', added!, true) })
+    act(() => { result.current.renamePlotOption('cat', 'fp', added!, 'Slower') })
+    expect(of('line', 'fp').map(a => a.title)).toEqual(['Slower'])
+    // the field keeps its kind once it has answers
+    act(() => { result.current.setPlotFieldKind('cat', 'fp', 'text') })
+    expect(get('cat')!.customFieldDefs.find(d => d.id === 'fp')!.kind).toBe('multi')
+    act(() => { result.current.removePlotOption('cat', 'fp', added!) })
+    expect(of('line', 'fp')).toEqual([])
+    expect(get('cat')!.customFieldDefs.find(d => d.id === 'fp')!.options).toEqual([])
+  })
+
+  it('moves an option, and writes no free value into a choice field', async () => {
+    const { result, get } = await openedWith(CHOICES)
+    act(() => { result.current.movePlotOption('cat', 'fg', 'o2', 'o1') })
+    expect(get('cat')!.customFieldDefs[0].options!.map(o => o.id)).toEqual(['o2', 'o1'])
+    let made: string | null = 'x'
+    act(() => { made = result.current.addPlotValue('line', 'fg') })
+    expect(made).toBeNull()
+  })
+
+  it('repairs a stored plot on opening: an answer to an option that is gone is dropped, and the repair is saved once', async () => {
+    const stale = [...CHOICES, plotNode('lost', 'plotpoint', 'line', 'Gone', { fieldId: 'fg', optionId: 'gone' }), plotNode('ok', 'plotpoint', 'line', 'Old title', { fieldId: 'fg', optionId: 'o1' })]
+    const { result, of } = await openedWith(stale)
+    expect(of('line', 'fg').map(a => [a.id, a.title])).toEqual([['ok', 'Fantasy']])
+    expect(result.current.plotNodes.some(n => n.id === 'lost')).toBe(false)
+  })
+
+  it('leaves a sound plot with choice fields as it is, so opening it saves nothing', async () => {
+    const sound = [...CHOICES, plotNode('a1', 'plotpoint', 'line', 'Fantasy', { fieldId: 'fg', optionId: 'o1' })]
+    const { backend } = await openedWith(sound)
+    expect(backend.saved.plot).toHaveLength(0)
+  })
+})

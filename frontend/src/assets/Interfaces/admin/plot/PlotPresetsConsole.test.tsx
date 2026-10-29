@@ -41,7 +41,9 @@ describe('the list', () => {
     expect(rowOf('Characters')).toHaveAttribute('aria-current', 'true')
     expect(screen.getByRole('textbox', { name: 'Preset name' })).toHaveValue('Characters')
     expect(screen.getByRole('textbox', { name: 'Preset description' })).toHaveValue('The cast')
-    expect(screen.getByRole('group', { name: 'Preset fields' })).toHaveTextContent('Name×Role×')
+    const fields = screen.getByRole('group', { name: 'Preset fields' })
+    expect(within(fields).getByText('Name')).toBeInTheDocument()
+    expect(within(fields).getByText('Role')).toBeInTheDocument()
     expect(screen.getByRole('region', { name: 'subcategory Heroes' })).toBeInTheDocument()
     expect(screen.getByRole('region', { name: 'cluster Core' })).toBeInTheDocument()
   })
@@ -529,5 +531,53 @@ describe('fieldsets', () => {
   it('stops at 20 sets on a card', async () => {
     await open([liveEntry('a', cast({ fieldsets: Array.from({ length: 20 }, (_, i) => ({ name: `Set ${i}`, fields: [] })) }))])
     expect(screen.getByRole('button', { name: 'Fieldset' })).toBeDisabled()
+  })
+})
+
+describe('fields of other kinds', () => {
+  const genre = { name: 'Genre', kind: 'multi' as const, options: ['Fantasy', 'Crime'] }
+  const cast = () => content('Cast', { fields: ['Name', genre], fieldsets: [{ name: 'Tone', fields: [{ name: 'Mood', kind: 'dropdown' as const, options: ['Calm'] }] }] })
+
+  it('shows each field\'s kind on its chip, and the options of a multi-select or dropdown under the chips', async () => {
+    await open([liveEntry('a', cast())])
+    expect(screen.getByRole('combobox', { name: 'Kind of Name' })).toHaveValue('points')
+    expect(screen.getByRole('combobox', { name: 'Kind of Genre' })).toHaveValue('multi')
+    expect(within(screen.getByRole('group', { name: 'Genre options' })).getByText('Fantasy')).toBeInTheDocument()
+    expect(screen.getByRole('combobox', { name: 'Kind of Mood' })).toHaveValue('dropdown')
+    expect(within(screen.getByRole('group', { name: 'Mood options' })).getByText('Calm')).toBeInTheDocument()
+    expect(screen.queryByRole('group', { name: 'Name options' })).toBeNull()
+  })
+
+  it('changes a field to a multi-select, adds options, removes one, and saves them with the draft', async () => {
+    const { backend, user } = await open([liveEntry('a', cast())])
+    await user.selectOptions(screen.getByRole('combobox', { name: 'Kind of Name' }), 'dropdown')
+    const options = () => screen.getByRole('group', { name: 'Name options' })
+    await user.type(within(options()).getByRole('textbox', { name: 'Add option…' }), 'First{Enter}')
+    await user.type(within(options()).getByRole('textbox', { name: 'Add option…' }), 'Second{Enter}')
+    await user.click(within(options()).getByRole('button', { name: 'Remove First' }))
+    await user.click(save())
+    await waitFor(() => expect(backend.entries[0].draft.fields[0]).toEqual({ name: 'Name', kind: 'dropdown', options: ['Second'] }))
+  })
+
+  it('turns a field back into a plain one, which is just its name again', async () => {
+    const { backend, user } = await open([liveEntry('a', cast())])
+    await user.selectOptions(screen.getByRole('combobox', { name: 'Kind of Genre' }), 'points')
+    expect(screen.queryByRole('group', { name: 'Genre options' })).toBeNull()
+    await user.click(save())
+    await waitFor(() => expect(backend.entries[0].draft.fields).toEqual(['Name', 'Genre']))
+  })
+
+  it('gives a field in a set its own kind and options', async () => {
+    const { backend, user } = await open([liveEntry('a', content('Cast', { fieldsets: [{ name: 'Tone', fields: ['Pace'] }] }))])
+    await user.selectOptions(screen.getByRole('combobox', { name: 'Kind of Pace' }), 'multi')
+    await user.type(within(screen.getByRole('group', { name: 'Pace options' })).getByRole('textbox', { name: 'Add option…' }), 'Slow{Enter}')
+    await user.click(save())
+    await waitFor(() => expect(backend.entries[0].draft.fieldsets?.[0].fields).toEqual([{ name: 'Pace', kind: 'multi', options: ['Slow'] }]))
+  })
+
+  it('refuses to publish a multi-select with no options, naming the card', async () => {
+    await open([draftEntry('c', content('Cast', { fields: [{ name: 'Genre', kind: 'multi' as const, options: [] }] }))])
+    expect(screen.getByText('The multi-select Genre on the preset needs an option.', { selector: '.plpErr' })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: /^Publish v1/ })).toBeDisabled()
   })
 })

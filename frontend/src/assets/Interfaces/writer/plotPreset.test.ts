@@ -110,3 +110,29 @@ describe('nodesFromPreset', () => {
     expect(nodes.some(n => n.kind === 'plotline' || n.kind === 'plotpoint')).toBe(false)
   })
 })
+
+describe('nodesFromPreset: fields of other kinds', () => {
+  const choices = () => preset({
+    fields: ['Name', { name: 'Genre', kind: 'multi', options: [' Fantasy ', 'Crime', 'fantasy', ''] }, { name: 'Motto', kind: 'text', options: ['ignored'] }],
+    fieldsets: [{ name: 'Tone', fields: [{ name: 'Mood', kind: 'dropdown', options: ['Calm'] }, '  ', { name: ' ', kind: 'multi', options: ['x'] }] }],
+    subcategories: [],
+  })
+
+  it('makes a multi-select, a dropdown and a short text as that kind, with an id for each option, and a plain field as before', () => {
+    const [category] = nodesFromPreset([], choices(), counter()).nodes
+    const [name, genre, motto, mood] = category.customFieldDefs
+    expect(name).toEqual({ id: expect.any(String), name: 'Name' })
+    expect(genre).toMatchObject({ name: 'Genre', kind: 'multi' })
+    expect(genre.options).toEqual([{ id: expect.any(String), label: 'Fantasy' }, { id: expect.any(String), label: 'Crime' }])
+    expect(motto).toEqual({ id: expect.any(String), name: 'Motto', kind: 'text' })
+    expect(mood).toMatchObject({ name: 'Mood', kind: 'dropdown', setId: category.customFieldSets![0].id })
+    expect(mood.options).toEqual([{ id: expect.any(String), label: 'Calm' }])
+    expect(category.customFieldDefs).toHaveLength(4)
+  })
+
+  it('gives every field and option an id of its own', () => {
+    const [category] = nodesFromPreset([], choices(), counter()).nodes
+    const ids = [...category.customFieldDefs.map(d => d.id), ...category.customFieldDefs.flatMap(d => (d.options ?? []).map(o => o.id))]
+    expect(new Set(ids).size).toBe(ids.length)
+  })
+})

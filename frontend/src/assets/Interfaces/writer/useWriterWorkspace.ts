@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import type {
-  BookProgress, FlagType, NodeFlag, OutlineNode, OutlineNodeKind, PlotNode, PlotNodeKind, PresetContent, ProjectIndex, TimeSystem,
+  BookProgress, FlagType, NodeFlag, OutlineNode, OutlineNodeKind, PlotFieldKind, PlotNode, PlotNodeKind, PresetContent, ProjectIndex, TimeSystem,
 } from '../../../api/types'
 import type { SettingsLogEntry } from '../../../types'
 import { getBookProgress } from '../../../api/bookProgressApi'
@@ -14,6 +14,9 @@ import {
 import { putOutline as apiPutOutline } from '../../../api/outlineApi'
 import { putPlot as apiPutPlot } from '../../../api/plotApi'
 import { booksOf, buildChildIndex, chaptersOfBook, dissolveSeries, moveNodeTo, nearestOfKind } from './outlineTree'
+import {
+  addOption, chooseOption, moveOption, removeAnswer, removeOption, renameOption, setFieldKind, setTextAnswer, toggleOption,
+} from './plotAnswers'
 import { cycleAwareness, isPlaced, movePlacement, placeValue, retargetPlacements, unplace } from './plotPlacement'
 import { nodesFromPreset } from './plotPreset'
 import {
@@ -812,6 +815,43 @@ export function useWriterWorkspace() {
   function removePlotField(ownerId: string, fieldId: string) {
     commitPlot(deleteField(plotNodesRef.current, ownerId, fieldId, outlineMap()), true)
   }
+  // Choice fields (plotAnswers.ts): the kind of a field (while it has no values), its options, and a node's answers.
+  function setPlotFieldKind(ownerId: string, fieldId: string, kind: PlotFieldKind) {
+    const next = setFieldKind(plotNodesRef.current, ownerId, fieldId, kind)
+    if (next !== plotNodesRef.current) commitPlot(next, true)
+  }
+  function addPlotOption(ownerId: string, fieldId: string, label: string): string | null {
+    const made = addOption(plotNodesRef.current, ownerId, fieldId, label)
+    if (made.id) commitPlot(made.nodes, true)
+    return made.id
+  }
+  function renamePlotOption(ownerId: string, fieldId: string, optionId: string, label: string) {
+    commitPlot(renameOption(plotNodesRef.current, ownerId, fieldId, optionId, label), false)
+  }
+  function movePlotOption(ownerId: string, fieldId: string, optionId: string, beforeId: string | null) {
+    commitPlot(moveOption(plotNodesRef.current, ownerId, fieldId, optionId, beforeId), true)
+  }
+  // Takes the answers that use the option with it (the editor asks first when they are placed).
+  function removePlotOption(ownerId: string, fieldId: string, optionId: string) {
+    commitPlot(removeOption(plotNodesRef.current, ownerId, fieldId, optionId), true)
+  }
+  function togglePlotOption(holderId: string, fieldId: string, optionId: string, on: boolean) {
+    const next = toggleOption(plotNodesRef.current, holderId, fieldId, optionId, on)
+    if (next !== plotNodesRef.current) commitPlot(next, true)
+  }
+  function choosePlotOption(holderId: string, fieldId: string, optionId: string | null) {
+    const next = chooseOption(plotNodesRef.current, holderId, fieldId, optionId)
+    if (next !== plotNodesRef.current) commitPlot(next, true)
+  }
+  function setPlotTextAnswer(holderId: string, fieldId: string, text: string) {
+    const next = setTextAnswer(plotNodesRef.current, holderId, fieldId, text)
+    if (next !== plotNodesRef.current) commitPlot(next, false)
+  }
+  // Takes an answer away, with its places (the editor asks first when it is placed).
+  function removePlotAnswer(id: string) {
+    const next = removeAnswer(plotNodesRef.current, id)
+    if (next !== plotNodesRef.current) commitPlot(next, true)
+  }
   function addPlotValue(holderId: string, fieldId: string, afterId?: string): string | null {
     const made = addValue(plotNodesRef.current, holderId, fieldId, undefined, afterId)
     if (made.id) commitPlot(made.nodes, true)
@@ -960,6 +1000,7 @@ export function useWriterWorkspace() {
     focusPlotNode, addPlotNode, addPlotPreset, updatePlotNodeField, setPlotHue, deletePlotNode,
     addPlotKeyword, removePlotKeyword,
     addPlotField, renamePlotField, movePlotField, removePlotField,
+    setPlotFieldKind, addPlotOption, renamePlotOption, movePlotOption, removePlotOption, togglePlotOption, choosePlotOption, setPlotTextAnswer, removePlotAnswer,
     addPlotFieldset, renamePlotFieldset, movePlotFieldset, removePlotFieldset, setPlotFieldSet,
     addPlotValue, updatePlotValue, removePlotValue, movePlotValue, cyclePlotAwareness,
     placePlotpoint, movePlotpointPlacement, unplacePlotpoint, highlightedPointId, highlightPlotpoint, plotDragId: plotDrag?.pointId ?? null, plotDragPlacementId: plotDrag?.placementId ?? null, setPlotDragId,

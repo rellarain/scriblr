@@ -19,6 +19,7 @@ import { PlotParents } from './PlotParents'
 import { PLOT_BREAKPOINTS, plotSizeOf, useElementWidth } from './useElementWidth'
 import { PlotOrderToggle, usePlotOrder } from './plotOrder'
 import { fieldIndex, fieldsInOrder, isScrapField, orderValues, valuesIn } from './plotFields'
+import { isChoice } from './plotKinds'
 
 // Project Plot: a collapsible navigation column (categories > subcategories
 // > clusters > plotlines, alphabetized) and two page views -- the category/subcategory/cluster
@@ -341,7 +342,7 @@ export default function PlotView({ w }: { w: WriterWorkspace }) {
       const n = w.plotNodeById.get(id)
       if (!n || n.kind === 'plotpoint') return null
       if (n.kind === 'plotline') {
-        const first = n.customFieldDefs.find(d => !isScrapField(d)) ?? undefined
+        const first = n.customFieldDefs.find(d => !isScrapField(d) && !isChoice(d)) ?? undefined
         const fieldId = first?.id ?? w.addPlotField(n.id, 'Default')
         if (!fieldId) return null
         ui.setOpen(fieldId, true)

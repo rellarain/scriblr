@@ -154,3 +154,39 @@ describe('downloadTextFile', () => {
     expect(document.querySelector('a[download]')).toBeNull()
   })
 })
+
+describe('fields of other kinds in a file', () => {
+  const genre = { name: 'Genre', kind: 'multi' as const, options: ['Fantasy', 'Crime'] }
+  const withChoices = () => preset({
+    fields: ['Name', genre, { name: 'Motto', kind: 'text', options: [] }],
+    fieldsets: [{ name: 'Tone', fields: ['Pace', { name: 'Mood', kind: 'dropdown', options: ['Calm'] }] }],
+  })
+
+  it('writes a plain field as its name and a field of another kind with its kind and options, and reads both back', () => {
+    const out = JSON.parse(serializePresets([withChoices()]))
+    expect(out.presets[0].fields).toEqual(['Name', genre, { name: 'Motto', kind: 'text', options: [] }])
+    expect(out.presets[0].fieldsets[0].fields).toEqual(['Pace', { name: 'Mood', kind: 'dropdown', options: ['Calm'] }])
+    const { presets } = parsePresetFile(serializePresets([withChoices()]), counter())
+    expect(presets[0].fields).toEqual(withChoices().fields)
+    expect(presets[0].fieldsets).toEqual(withChoices().fieldsets)
+  })
+
+  it('reads a file from before field kinds (names only) and a kind it does not know as a plain field', () => {
+    const old = { name: 'Cast', fields: ['Name', { name: 'Odd', kind: 'radio', options: ['a'] }, { name: 'Item' }, 4, { kind: 'multi' }], subcategories: [] }
+    expect(parsePresetFile(file([old]), counter()).presets[0].fields).toEqual(['Name', 'Odd', 'Item'])
+  })
+
+  it('cuts what is over the limits: a long name or option, repeated options, the surplus options', () => {
+    const wild = { name: 'Cast', fields: [{ name: 'G'.repeat(40), kind: 'multi', options: ['a', 'A', ...Array.from({ length: 30 }, (_, i) => `o${i}`)] }], subcategories: [] }
+    const field = parsePresetFile(file([wild]), counter()).presets[0].fields[0]
+    expect(typeof field === 'string' ? field : field.name).toBe('G'.repeat(30))
+    expect(typeof field === 'string' ? [] : field.options).toHaveLength(20)
+  })
+
+  it('counts a choice field with the others when it checks the size of a preset', () => {
+    const fields = Array.from({ length: 101 }, (_, i) => (i % 2 ? { name: `f${i}`, kind: 'text', options: [] } : `f${i}`))
+    const out = parsePresetFile(file([{ name: 'Big', fields, subcategories: [] }]), counter())
+    expect(out.presets).toEqual([])
+    expect(out.skipped).toEqual(['The preset at position 1 has more than 100 fields.'])
+  })
+})

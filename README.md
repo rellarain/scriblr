@@ -226,7 +226,25 @@ described, now stale, in `docs/data-model.md`).
   `assignedParagraphIndex` and `awareness`); the backend reads that into a first
   placement when the file loads (a validator on `PlotNode`, also cutting a second
   placement on one target and any beyond 100), and the old fields are saved empty.
-  The rules are in `frontend/src/assets/Interfaces/writer/plotPlacement.ts`. `keywords` (on `plotline`
+  The rules are in `frontend/src/assets/Interfaces/writer/plotPlacement.ts`.
+  **Kinds of field:** a field holds plotpoints (no `kind`, the usual one) or is a
+  `multi`-select (any of its `options`), a `dropdown` (one of them) or a short `text`.
+  Its `options` are `{ id, label }` (the label up to 30 characters, at most 20 a
+  field) and are set by the node that defines the field; the kind can be changed only
+  while the field has no values. A choice field's values are **answers**: plotpoints of
+  the node that answers (each plotline, and the category, subcategory or cluster that
+  defines the field, each answer for themselves; a plotline shows the owner's answer
+  read-only beside its own, and a choice field makes no references). An answer to an
+  option has that option's id in `optionId` and its label as its title (renaming the
+  option retitles it, removing the option removes it); an answer to a short text is a
+  plotpoint titled with the text (up to 50 characters). An answer is placed, counted
+  and listed in the tray like any plotpoint; taking one away takes its placements
+  along, so the editor asks first when it is placed. A kind the backend does not know
+  is read as the usual one, labels are cut and repeated option ids dropped (nothing
+  here sets the whole plot aside), and the book's *plotting* and *plotpoints placed*
+  bars leave answers out. The rules are in `.../writer/plotKinds.ts` (reading a kind,
+  repairing what is stored: `repairChoices`, run by `migratePlot`) and `plotAnswers.ts`
+  (options and answers). `keywords` (on `plotline`
   nodes) are free-text tags used to detect keyword mentions in prose. The pure
   rules (references, deletion, migration of older plots, assignment) live in
   `frontend/src/assets/Interfaces/writer/plotFields.ts`, and run on load.
@@ -268,7 +286,9 @@ described, now stale, in `docs/data-model.md`).
 - **Presets** — `PresetCatalog` (`presets.json`, schema v2): a global,
   non-project-scoped catalog of ready-made plot categories. A preset is a
   category with its description, keywords, fields and fieldsets (`fieldsets`: a
-  name and its field names each, at most 20 per card and 100 fields in all), its
+  name and its fields each, at most 20 per card and 100 fields in all; a field is
+  its name, or, for a multi-select, dropdown or short text, `{ name, kind, options }`
+  with the labels of its options, which the new field gets ids for), its
   subcategories and their clusters (each with the same). Every `PresetEntry` has a **draft**
   (what Admin > Configuration > Plot edits; autosaved) and, once published, a
   numbered **published** copy plus up to 10 earlier versions (`history`).
