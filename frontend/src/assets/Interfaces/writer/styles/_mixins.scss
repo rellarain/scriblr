@@ -13,7 +13,8 @@
   background-image: var(--wr-edge, none); background-size: var(--wr-edge-size, 4px 100%); background-repeat: no-repeat; background-position: var(--wr-edge-pos, left top);
 }
 
-// The name of a plot category or subcategory is in capitals, with a little tracking: its row in the plot contents and its title field in its editor.
+// The name of a plot category or subcategory is in capitals, with a little tracking: its row in the plot contents and its title field in its editor; so are the
+// contents' own "+ Category" and "+ Preset" buttons.
 @mixin wrPlotCaps {
   text-transform: uppercase; letter-spacing: 0.04em;
 }

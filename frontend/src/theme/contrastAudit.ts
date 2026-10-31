@@ -6,7 +6,7 @@ import {
   BLACK, TEXT_TARGET, WHITE, mixRgb, over, ratioOf, ratioOfRgb, rgbOf, type RGB,
 } from './readable'
 import {
-  ANSWER_KIND_ALPHA, DISLIKE_BAR_SATURATIONS, INK_STRENGTH, LIFT_ALPHA, LIFT_ALPHA_LIGHTEST, LIKE_BAR_SATURATIONS, PAPER_LOOKS, SIDEBAR_SHADE_1, SINK_ALPHAS, SURFACE_OFFSETS, ZONE_LOOKS,
+  ANSWER_KIND_ALPHA, DISLIKE_BAR_SATURATIONS, INK_STRENGTH, LIFT_ALPHA, LIFT_ALPHA_LIGHTEST, LIKE_BAR_SATURATIONS, NAV_CHIP_INK_ALPHA, PAPER_LOOKS, SIDEBAR_SHADE_1, SINK_ALPHAS, SURFACE_OFFSETS, ZONE_LOOKS,
   fillInk, pageTone, paperAccents, paperGrounds, paperInks, resolvePalette, shadeK, toneMarks, zoneInk,
 } from './zoneLooks'
 import type { ZoneKey, ZonePalette } from './types'
@@ -153,7 +153,22 @@ export function paletteRatios(zone: ZoneKey, hues: AuditHues = DEFAULT_HUES): Pa
   let worstCategoryFill = ratioOfRgb(WHITE, rgbOf(fillHsl(hues.theme, colors.accent, SAT_QUIET)))
   let worstSubcategory = ratioOfRgb(WHITE, rgbOf(fillHsl(hues.theme, colors.accent, SAT_MIDDLE)))
   let worstCluster = ratioOfRgb(WHITE, rgbOf(fillHsl(hues.theme, colors.accent, SAT_LOUD)))
+  // A keyword chip in a row of the contents (on the sink overlay, its text the row's ink a little fainter): on a plotline row (the ink on its category's colour, and the row as hovered or open,
+  // 15% towards the away colour: white under dark text, black under light) and on the category, subcategory and cluster rows (white on their fills).
+  const chipRatio = (rowInk: RGB, rowBg: RGB) => {
+    const chip = over(BLACK, SINK_ALPHAS[1] * shadeK(look.mode), rowBg)
+    return ratioOfRgb(over(rowInk, NAV_CHIP_INK_ALPHA, chip), chip)
+  }
+  const chipOnLine = (h: number | string) => {
+    const bg = rgbOf(hsl(h as number, colors.theme.s * SAT_QUIET, colors.theme.l))
+    return Math.min(chipRatio(ink, bg), chipRatio(ink, over(look.mode === 'light' ? WHITE : BLACK, 0.15, bg)))
+  }
+  const chipOnFills = (h: number) => Math.min(...[SAT_QUIET, SAT_MIDDLE, SAT_LOUD].map(tier => chipRatio(WHITE, rgbOf(fillHsl(h, colors.accent, tier)))))
+  let worstChipLine = chipOnLine(hues.theme)
+  let worstChipFill = chipOnFills(hues.theme)
   for (let h = 0; h < 360; h += 5) {
+    worstChipLine = Math.min(worstChipLine, chipOnLine(h))
+    worstChipFill = Math.min(worstChipFill, chipOnFills(h))
     worstCategory = Math.min(worstCategory, ratioOfRgb(ink, rgbOf(hsl(h, colors.theme.s * SAT_QUIET, colors.theme.l))))
     // The card of an answer inherited from a category (a lift of the ink at 8%) in the node's field group (a recess of black at 16%) on the category's colour.
     const group = over(BLACK, SINK_ALPHAS[1] * shadeK(look.mode), rgbOf(hsl(h, colors.theme.s * SAT_QUIET, colors.theme.l)))
@@ -169,6 +184,8 @@ export function paletteRatios(zone: ZoneKey, hues: AuditHues = DEFAULT_HUES): Pa
   out.push({ id: 'plot-subcategory', group: 'Plot colours', label: 'White on a plot subcategory, the worst hue', kind: 'text', ratio: worstSubcategory })
   // A cluster's surface is the same fill at the loudest tier, over the same hues (within 30 degrees of its subcategory's).
   out.push({ id: 'plot-cluster', group: 'Plot colours', label: 'White on a plot cluster, the worst hue', kind: 'text', ratio: worstCluster })
+  out.push({ id: 'plot-nav-chip-line', group: 'Plot colours', label: 'A keyword chip on a plotline row of the contents (also hovered), the worst hue', kind: 'text', ratio: worstChipLine })
+  out.push({ id: 'plot-nav-chip-fill', group: 'Plot colours', label: 'A keyword chip on a category, subcategory or cluster row, the worst hue', kind: 'text', ratio: worstChipFill })
 
   // ---- Theme settings: the timeline's icon on its segment (the zone's accent hue at 50% lightness, as ThemeSettingsPanel draws it)
   const segment = hsl(colors.accent.h, colors.accent.s, 50)

@@ -96,6 +96,9 @@ export const LIFT_ALPHA = 0.22
 // is fainter than its title (a light zone's muted and faint ink are the ink itself, so it is its own tier). `.wrAnswerFromKind` in _plot-fields.scss says 80%.
 export const LIFT_ALPHA_LIGHTEST = 0.08
 export const ANSWER_KIND_ALPHA = 0.8
+// A keyword chip in a row of the Plot contents sits on the sink overlay (--ov-sink-1) and its text is the row's ink at 72%, fainter than the name and the description (72% is near the
+// least that reads: 65% does not reach 4.5:1). `.wrNavChip` in _plot.scss says 72%.
+export const NAV_CHIP_INK_ALPHA = 0.72
 
 // Does the zone's ink (and its muted and faint tiers) read on every surface of a theme at this lightness?
 function surfacesRead(hue: number, look: ZoneLook, themeL: number): boolean {

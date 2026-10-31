@@ -7,7 +7,7 @@ Code: `admin/plot/` (`PlotPresetsConsole.tsx`, `PresetList.tsx`, `PresetPane.tsx
 ## Two places
 
 - **Admin > Configuration > Plot** (`PlotPresetsConsole`): the list of presets on the left, the open preset as a card tree on the right. Below 640px of its own width the list folds into a single picker button (`.plpPick`) above the preset, as the Plot tool does.
-- **The Plot sidebar** (Project level, Plot tab): two buttons side by side at the foot of the contents, **+ Category** (an empty category) and **+ Preset**, which opens a menu of the **published** presets. Choosing one adds it straight away, as a plain copy (no link back), in one undo step, last in the list, and opens it. A copy is the project's own: later edits to it never touch the preset, and publishing never touches a copy already made.
+- **The Plot sidebar** (Project level, Plot tab): two buttons side by side in the head of the contents (in place of a title), **+ Category** (an empty category) and **+ Preset**, in capitals with 4px rounded corners, which drop to a second line when the circles leave no room beside them; + Preset opens, under the head, a menu of the **published** presets. Choosing one adds it straight away, as a plain copy (no link back), in one undo step, last in the list, and opens it. A copy is the project's own: later edits to it never touch the preset, and publishing never touches a copy already made.
 
 ## The Admin page
 
@@ -36,7 +36,7 @@ A menu (`.wrPresetPicker`, `role="menu"`) that opens above the buttons and reads
 
 ## Descriptions in the sidebar
 
-The Plot sidebar's contents have a fourth circle at the top right, beside the three that fold a level (`.wrNavDot--desc`): an outline while descriptions are hidden, **filled in the alert hue** while they are shown. Lit, a category, subcategory, cluster or plotline row shows its whole description under its name (`.wrNavDesc`, wrapped, the row's own ink at the UI size, 12px, on a 16px line height). A row with no description keeps its single line. The circle is dimmed when no row has a description, and its setting is kept on this machine.
+The Plot sidebar's contents have a fourth circle at the top right, beside the three that fold a level (`.wrNavDot--desc`), and a fifth after it for keywords (`.wrNavDot--keys`, lit in the accent's lighter shade, which shows each row's keywords as read-only chips under its name and description): an outline while descriptions are hidden, **filled in the alert hue** while they are shown. Lit, a category, subcategory, cluster or plotline row shows its whole description under its name (`.wrNavDesc`, wrapped, the row's own ink at the UI size, 12px, on a 16px line height). A row with no description keeps its single line. The circle is dimmed when no row has a description, and its setting is kept on this machine.
 
 ## Tokens
 

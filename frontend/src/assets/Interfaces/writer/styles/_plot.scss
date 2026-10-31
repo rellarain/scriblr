@@ -30,10 +30,13 @@
   }
   // The contents' width is 250px until its handle is dragged (--wr-nav-basis, set on the frame by PlotView.tsx; plotNavWidth.ts); the handle (.wrSideResizer) sits over the gap on its right edge.
   .wrPlotNav { position: relative; flex: 0 0 var(--wr-nav-basis, 250px); min-width: 0; min-height: 0; display: flex; flex-direction: column; gap: var(--space-base); background: var(--ov-sink-1); border-radius: var(--radius-button); padding: var(--space-4); }
-  .wrPlotNavHead { display: flex; align-items: center; justify-content: space-between; font-size: var(--text-small); font-weight: 700; text-transform: uppercase; letter-spacing: 1px; span { opacity: 0.9; } }
+  // The head: "+ Category" and "+ Preset" at the left, the circles at the right. Wrapped in reverse, so when they don't fit on one line the buttons (the first item) drop to the line
+  // under the circles; the preset list anchors to the head and opens under it.
+  .wrPlotNavHead { position: relative; display: flex; flex-wrap: wrap-reverse; align-items: center; gap: var(--space-3); }
+  .wrPlotNavHead .wrSmallBtn { @include wrPlotCaps; border-radius: var(--radius-button); }
   // The three level-fold circles: 10px, an outline when every node of the level is closed, filled in the accent when any is open. The fourth
-  // circle (full descriptions) stands apart from them and is filled in the alert hue while the descriptions are shown.
-  .wrNavTools { display: flex; align-items: center; gap: var(--space-5); }
+  // circle (full descriptions) stands apart from them and is filled in the alert hue while the descriptions are shown, the fifth (keywords) in the accent's lighter shade.
+  .wrNavTools { display: flex; align-items: center; gap: var(--space-5); margin-left: auto; }
   .wrNavDots { display: flex; align-items: center; gap: var(--space-base); }
   .wrNavDot {
     position: relative; width: 10px; height: 10px; padding: 0; border-radius: 50%; box-sizing: border-box; border: 2px solid currentColor; background: transparent; color: inherit; cursor: pointer;
@@ -44,12 +47,13 @@
   }
   // Lit, it is the alert colour with a ring in the ink around it, so it stands out from any ground (the alert hue alone is only about 2:1 on a level's dark fill).
   .wrNavDot--desc.wrNavDot--on { border-color: var(--wr-alert); background: var(--wr-alert); box-shadow: 0 0 0 1.5px currentColor; }
+  .wrNavDot--keys.wrNavDot--on { border-color: var(--wr-accent-light); background: var(--wr-accent-light); box-shadow: 0 0 0 1.5px currentColor; }
   .wrPlotNavAdd { align-self: flex-start; flex: 0 0 auto; }
-  // "+ Category" and "+ Preset" side by side; the preset list opens upward from its button over the rows.
-  .wrPlotNavAddRow { display: flex; flex-wrap: wrap; align-items: flex-start; gap: var(--space-3); position: relative; }
+  // "+ Category" and "+ Preset" side by side; the preset list opens downward from the head over the rows.
+  .wrPlotNavAddRow { display: flex; flex-wrap: wrap; align-items: flex-start; gap: var(--space-3); }
   .wrPresetPickerRoot { position: static; }
   .wrPresetPicker {
-    position: absolute; z-index: 6; left: 0; right: 0; bottom: calc(100% + var(--space-3)); max-height: min(300px, 60vh); overflow-y: auto; display: flex; flex-direction: column;
+    position: absolute; z-index: 6; left: 0; right: 0; top: calc(100% + var(--space-3)); max-height: min(300px, 60vh); overflow-y: auto; display: flex; flex-direction: column;
     background: var(--wr-page); color: var(--wr-ink); box-shadow: inset 0 0 0 1px var(--wr-page-line), 0 8px 24px rgb(0 0 0 / 0.35);
   }
   .wrPresetPickerHead { padding: var(--space-4) var(--space-5) var(--space-3); font-size: var(--text-small); font-weight: 700; text-transform: uppercase; letter-spacing: 0.05em; color: var(--wr-page-muted); }
@@ -70,8 +74,8 @@
     display: flex; align-items: center; gap: var(--space-3); padding: 5px var(--space-base); border-radius: var(--radius-button); font-size: var(--text-field);
     background-color: var(--wr-row-bg); color: var(--wr-row-ink);
     &:hover, &--active { background-color: color-mix(in srgb, var(--wr-row-bg) 85%, var(--away)); }
-    // With its description under the name the row has several lines: the controls stand level with the name (2px down, for the name's own margin), not the middle.
-    &--desc { align-items: flex-start; .wrNavChevron, .wrNavCheck, .wrNavCount { margin-top: var(--space-1); } }
+    // With its description or its keywords under the name the row has several lines: the controls stand level with the name (2px down, for the name's own margin), not the middle.
+    &--stack { align-items: flex-start; .wrNavChevron, .wrNavCheck, .wrNavCount { margin-top: var(--space-1); } }
     // A category, a subcategory and a cluster are flat fills of their hue with white text (a category's the quietest, a cluster's the loudest);
     // a plotline is its category's own, lighter, colour. The names of a category and a subcategory are in capitals.
     &--category { --wr-row-bg: var(--wr-cat-fill, var(--wr-cat)); --wr-row-ink: var(--on-accent); --away: black; }
@@ -101,6 +105,13 @@
   .wrNavText { flex: 1; min-width: 0; display: flex; flex-direction: column; }
   // A description's lines stand 4px further apart than the app's base line height (1, so 12px at this size): 16px.
   .wrNavDesc { font-size: var(--text-ui); font-weight: 400; line-height: calc(1em + 4px); white-space: pre-line; overflow-wrap: anywhere; }
+  // A node's keywords under its name (and its description), read-only: bold small chips with 4px of padding on the sink overlay (a quiet recess, away from the text on every row), their text
+  // the row's own ink fainter than the name and the description (72%; audited as "plot-nav-chip" in theme/contrastAudit.ts, the constant in zoneLooks.ts).
+  .wrNavChips { display: flex; flex-wrap: wrap; gap: var(--space-2); margin: var(--space-2) var(--space-1) var(--space-1); }
+  .wrNavChip {
+    padding: var(--space-2); border-radius: var(--radius-button); font-size: var(--text-small); font-weight: 700; overflow-wrap: anywhere;
+    background: var(--ov-sink-1); color: color-mix(in srgb, var(--wr-row-ink) 72%, transparent);
+  }
   .wrNavCount { font-size: var(--text-small); opacity: 0.9; }
   .wrNavRow--category .wrNavCount, .wrNavRow--subcategory .wrNavCount, .wrNavRow--cluster .wrNavCount { opacity: 1; }
   .wrPlotBody { flex: 1 1 auto; min-width: 0; min-height: 0; display: flex; flex-direction: column; gap: var(--space-4); overflow: auto; scrollbar-width: none; &::-webkit-scrollbar { display: none; } }

@@ -13,11 +13,12 @@ import { useStoredState } from './storage'
 // The Plot tool's contents: categories > subcategories > clusters > plotlines, alphabetized, each with a checkbox. A plotline's
 // checkbox ticks that plotline; a group's ticks (or unticks) every plotline under it and shows "some" when only part of it is
 // ticked. Two or more ticked plotlines open the compare view (PlotCompare.tsx); "Compare (n)" brings it back after browsing.
-// Three small circles at the top right fold a whole level at once (categories, subcategories, clusters, left to right): lit while any node
-// of that level is open, a click closes them all, and a click on an unlit one opens them all. A fourth circle, lit in the alert hue, shows the
-// full description of every category, subcategory, cluster and plotline under its name (hidden otherwise; kept across restarts). "+ Category" and
-// "+ Preset" (a published plot preset, see PresetPicker.tsx) sit at the bottom. Given `resize`, a handle on the panel's right edge sets its width
-// (plotNavWidth.ts); the compact bar, where the contents fold down over the editor, is given none.
+// "+ Category" and "+ Preset" (a published plot preset, see PresetPicker.tsx) head the panel at the left, in capitals; when they don't fit beside the
+// circles they drop to a second line. Three small circles at the top right fold a whole level at once (categories, subcategories, clusters, left to
+// right): lit while any node of that level is open, a click closes them all, and a click on an unlit one opens them all. A fourth circle, lit in the
+// alert hue, shows the full description of every category, subcategory, cluster and plotline under its name, and a fifth, lit in the accent's lighter
+// shade, shows its keywords as read-only chips under that (each hidden otherwise; each kept across restarts). Given `resize`, a handle on the panel's
+// right edge sets its width (plotNavWidth.ts); the compact bar, where the contents fold down over the editor, is given none.
 
 const LEVELS = [['category', 'categories'], ['subcategory', 'subcategories'], ['cluster', 'clusters']] as const
 
@@ -35,9 +36,12 @@ export function PlotNav({ w, onOpenNode, onCompare, resize }: {
 }) {
   const [collapsed, setCollapsed] = useState<Set<string>>(new Set())
   const [fullDesc, setFullDesc] = useStoredState<boolean>('scriblr.writer.plotNavDescriptions', false)
+  const [showKeys, setShowKeys] = useStoredState<boolean>('scriblr.writer.plotNavKeywords', false)
   const children = w.plotChildrenByParentId
   // Every row of the list (a plotpoint is not one) can have a description to show; with none, the toggle has nothing to switch.
   const described = w.plotNodes.some(n => n.kind !== 'plotpoint' && n.body.trim() !== '')
+  // The same for the keywords.
+  const keyed = w.plotNodes.some(n => n.kind !== 'plotpoint' && n.keywords.length > 0)
   const selected = useMemo(() => new Set(w.plotSelection), [w.plotSelection])
   const ticked = w.plotSelection.filter(id => w.plotNodeById.get(id)?.kind === 'plotline').length
 
@@ -70,10 +74,12 @@ export function PlotNav({ w, onOpenNode, onCompare, resize }: {
         const lines = plotlinesUnder(node, children)
         const state = selectionState(node, children, selected)
         const withDesc = fullDesc && node.body.trim() !== ''
+        const keywords = showKeys ? node.keywords : []
+        const stacked = withDesc || keywords.length > 0
         return [
           <div
             key={node.id}
-            className={`wrNavRow wrNavRow--${node.kind}${withDesc ? ' wrNavRow--desc' : ''}${node.id === w.focusedPlotNodeId ? ' wrNavRow--active' : ''}`}
+            className={`wrNavRow wrNavRow--${node.kind}${withDesc ? ' wrNavRow--desc' : ''}${stacked ? ' wrNavRow--stack' : ''}${node.id === w.focusedPlotNodeId ? ' wrNavRow--active' : ''}`}
             style={{ ...plotColorVars(plotColors(node, w.plotNodeById)), marginLeft: depth * 14 }}
           >
             <button
@@ -89,10 +95,15 @@ export function PlotNav({ w, onOpenNode, onCompare, resize }: {
               ref={el => { if (el) el.indeterminate = state === 'some' }}
               onChange={() => w.togglePlotSelection(lines.map(l => l.id), state !== 'all')}
             />
-            {withDesc ? (
+            {stacked ? (
               <span className="wrNavText">
                 <button type="button" className="wrNavLabel" onClick={() => { w.focusPlotNode(node.id); onOpenNode?.() }}>{nodeLabel(node)}</button>
-                <span className="wrNavDesc">{node.body}</span>
+                {withDesc && <span className="wrNavDesc">{node.body}</span>}
+                {keywords.length > 0 && (
+                  <span className="wrNavChips" role="list" aria-label={`Keywords of ${nodeLabel(node)}`}>
+                    {keywords.map(k => <span key={k} className="wrNavChip" role="listitem">{k}</span>)}
+                  </span>
+                )}
               </span>
             ) : (
               <button type="button" className="wrNavLabel" onClick={() => { w.focusPlotNode(node.id); onOpenNode?.() }}>{nodeLabel(node)}</button>
@@ -108,7 +119,12 @@ export function PlotNav({ w, onOpenNode, onCompare, resize }: {
     <div className="wrPlotNav">
       {resize && <SideResizer onDrag={resize.onDrag} onCommit={resize.onCommit} clamp={clampNavWidth} label="Contents width" what="the contents" />}
       <div className="wrPlotNavHead">
-        <span>Categories</span>
+        <div className="wrPlotNavAddRow">
+          <button type="button" className="wrSmallBtn wrPlotNavAdd" onClick={() => { w.focusPlotNode(w.addPlotNode(null, 'category')); onOpenNode?.() }}>
+            <PlusIcon size={13} /> Category
+          </button>
+          <PresetPicker onChoose={preset => { w.focusPlotNode(w.addPlotPreset(preset)); onOpenNode?.() }} />
+        </div>
         <LevelDots
           groupLabel="Fold a whole level"
           levels={LEVELS.map(([kind, plural]) => {
@@ -117,6 +133,7 @@ export function PlotNav({ w, onOpenNode, onCompare, resize }: {
             return { key: kind, plural, foldable: nodes.length, open, onClick: () => foldLevel(kind, open) }
           })}
           desc={{ on: fullDesc, disabled: !described, noun: 'full descriptions', onClick: () => setFullDesc(!fullDesc) }}
+          keys={{ on: showKeys, disabled: !keyed, onClick: () => setShowKeys(!showKeys) }}
         />
       </div>
       {ticked > 0 && (
@@ -130,12 +147,6 @@ export function PlotNav({ w, onOpenNode, onCompare, resize }: {
       <div className="wrPlotNavRows">
         {w.plotNodes.length === 0 && <p className="wrMuted">No categories yet.</p>}
         {rows(null, 0)}
-      </div>
-      <div className="wrPlotNavAddRow">
-        <button type="button" className="wrSmallBtn wrPlotNavAdd" onClick={() => { w.focusPlotNode(w.addPlotNode(null, 'category')); onOpenNode?.() }}>
-          <PlusIcon size={13} /> Category
-        </button>
-        <PresetPicker onChoose={preset => { w.focusPlotNode(w.addPlotPreset(preset)); onOpenNode?.() }} />
       </div>
     </div>
   )

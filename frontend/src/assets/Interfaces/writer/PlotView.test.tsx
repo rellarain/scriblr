@@ -738,15 +738,15 @@ describe('the level fold circles', () => {
   const rowKinds = (container: HTMLElement) => [...container.querySelectorAll('.wrNavRow')].map(r => r.className.match(/wrNavRow--(\w+)/)![1])
   const withTwo = () => clustered().concat(plotNode('cat2', 'category', null, { title: 'Action', order: 1 }), plotNode('sub2', 'subcategory', 'cat2', { title: 'Chase' }), plotNode('line2', 'plotline', 'sub2', { title: 'Rooftop' }))
 
-  it('sit at the top right as three, for categories, subcategories and clusters, with the full descriptions circle after them, and "Category" is at the bottom', () => {
+  it('sit at the top right as three, for categories, subcategories and clusters, with the full descriptions and keywords circles after them, and "Category" is in the head too', () => {
     const { container } = render(<Editor start={clustered()} />)
     const head = container.querySelector('.wrPlotNavHead') as HTMLElement
     expect(head.lastElementChild).toHaveClass('wrNavTools')
     expect(head.lastElementChild!.firstElementChild).toHaveClass('wrNavDots')
-    expect(within(head).queryByRole('button', { name: /^\s*Category$/ })).toBeNull()
+    expect(within(head).getByRole('button', { name: /^\s*Category$/ })).toBeInTheDocument()
     expect([...container.querySelectorAll('.wrPlotNavHead .wrNavDots .wrNavDot')].map(d => d.getAttribute('aria-label'))).toEqual(['Collapse all categories', 'Collapse all subcategories', 'Collapse all clusters'])
-    expect(head.lastElementChild!.lastElementChild).toHaveClass('wrNavDot--desc')
-    expect(container.querySelector('.wrPlotNav')!.lastElementChild).toHaveTextContent('Category')
+    expect([...head.lastElementChild!.children].map(c => c.className)).toEqual(['wrNavDots', 'wrNavDot wrNavDot--desc', 'wrNavDot wrNavDot--keys'])
+    expect(container.querySelector('.wrPlotNav')!.lastElementChild).toHaveClass('wrPlotNavRows')
   })
 
   it('are lit while any node of their level is open, and a click folds or opens the whole level', () => {
