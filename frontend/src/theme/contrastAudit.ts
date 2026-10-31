@@ -3,10 +3,10 @@ import { readableInk, type HSL } from './contrast'
 import { levelPairs } from './levelContrast'
 import { OFF_SKY_SATURATION, skyLook } from './skyLook'
 import {
-  BLACK, TEXT_TARGET, WHITE, mixRgb, over, ratioOf, ratioOfRgb, rgbOf, type RGB,
+  BLACK, TEXT_TARGET, WHITE, mixRgb, oklchHueOf, oklchToRgb, over, ratioOf, ratioOfRgb, rgbOf, type RGB,
 } from './readable'
 import {
-  ANSWER_KIND_ALPHA, BLOCK_MIX, DISLIKE_BAR_SATURATIONS, FACET_COLOR, INK_STRENGTH, LIFT_ALPHA, LIFT_ALPHA_LIGHTEST, LIKE_BAR_SATURATIONS, NAV_CHIP_INK_ALPHA, PAPER_LOOKS, SIDEBAR_SHADE_1, SINK_ALPHAS, SURFACE_OFFSETS, ZONE_LOOKS,
+  ANSWER_KIND_ALPHA, BLOCK_MIX, CAL_STEPS, DISLIKE_BAR_SATURATIONS, FACET_COLOR, INK_STRENGTH, LIFT_ALPHA, LIFT_ALPHA_LIGHTEST, LIKE_BAR_SATURATIONS, NAV_CHIP_INK_ALPHA, PAPER_LOOKS, SIDEBAR_SHADE_1, SINK_ALPHAS, SURFACE_OFFSETS, ZONE_LOOKS,
   fillInk, pageTone, paperAccents, paperGrounds, paperInks, resolvePalette, shadeK, toneMarks, zoneInk,
 } from './zoneLooks'
 import type { ZoneKey, ZonePalette } from './types'
@@ -234,6 +234,12 @@ export function levelRatios(zone: ZoneKey, hue: number): Pair[] {
       line = Math.min(line, ratioOfRgb(f, tile))
       for (const share of Object.values(BLOCK_MIX)) block = Math.min(block, ratioOfRgb(WHITE, over(f, share, card)))
     }
+    let calLow = Infinity
+    for (let h = 0; h < 360; h += FACET_HUE_STEP) {
+      const hue = oklchHueOf(rgbOf({ h, s: CAL_STEPS.source.s, l: CAL_STEPS.source.l }))
+      calLow = Math.min(calLow, ratioOfRgb(oklchToRgb(CAL_STEPS.lightness[0], CAL_STEPS.chroma, hue), tile))
+    }
+    keep({ id: 'schedule/cal-low', group: 'Schedule', label: "The lowest shade of an activity-grid day (the accent hue in OKLCH) on the console's tile, the worst hue", kind: 'ui', ratio: calLow })
     keep({ id: 'schedule/facet-line', group: 'Schedule', label: "A facet's line, dot or bar on the console's tile, the worst facet hue", kind: 'ui', ratio: line })
     keep({ id: 'schedule/block', group: 'Schedule', label: "White on a shift's block (the facet colour mixed into the card), the worst facet hue and state", kind: 'text', ratio: block })
     keep({ id: 'level/stripe', group: 'Level panels', label: 'Card stripe (the accent colour, lifted) on the level page', kind: 'ui', ratio: ratioOfRgb(stripe, mixRgb(rgbOf(fill), 90, BLACK)) })

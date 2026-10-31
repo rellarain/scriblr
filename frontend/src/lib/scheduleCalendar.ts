@@ -33,6 +33,19 @@ export interface MonthBar {
   height: number
   segments: Array<{ facet: Facet; part: number; perDay: number }>
 }
+// The years over the monthly bars: one rectangle for each run of bars of a year, over its columns (col is 1-based).
+export interface YearRect { year: string; col: number; span: number }
+export function barYears(bars: Array<{ key: string }>): YearRect[] {
+  const out: YearRect[] = []
+  bars.forEach((b, i) => {
+    const year = b.key.slice(0, 4)
+    const last = out[out.length - 1]
+    if (last && last.year === year) last.span += 1
+    else out.push({ year, col: i + 1, span: 1 })
+  })
+  return out
+}
+
 export interface FacetGrid {
   cells: FacetCell[]
   months: MonthRect[]

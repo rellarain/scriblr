@@ -288,3 +288,8 @@ export function toneMarks(zone: ZoneKey, theme: HSL, yes: HSL, no: HSL): Record<
   const mark = (c: HSL): HSL => ({ ...c, l: fitLightness(c.h, c.s, c.l, toward, m => grounds.every(g => ratioOfRgb(rgbOf(m), g) >= UI_TARGET)) })
   return { yes: mark(yes), no: mark(no), mid: mark({ h: theme.h, s: theme.s, l: 50 }) }
 }
+
+// The Schedule console's activity grid: a day's shade is one of four steps of the accent hue, in OKLCH so that a step is as light in every hue (a hue's own
+// lightness is not), mid tones at a fair chroma, never white or black. `.wrSchedCalCell--1` to `--4` in _schedule.scss say the same lightnesses and chroma.
+// The lowest step must read against the tile (3:1) in every hue.
+export const CAL_STEPS = { lightness: [0.67, 0.72, 0.77, 0.82], chroma: 0.17, source: { s: 90, l: 50 } }

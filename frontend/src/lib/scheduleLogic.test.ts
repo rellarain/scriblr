@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { buildFacetGrid, monthBars, rowLetters, GRID_WEEKS } from './scheduleCalendar'
+import { barYears, buildFacetGrid, monthBars, rowLetters, GRID_WEEKS } from './scheduleCalendar'
 import { emptyDay, type DayTotals, type MonthTotals, type Recurrence, type Routine, type Shift, type RibbonData, type Goal, FACETS } from './facets'
 import { goalProgress, goalSeries, paceOf, weekOf } from './projection'
 import { addUnits, patternDays, routineWindow, shiftOccurrences } from './recurrence'
@@ -253,5 +253,15 @@ describe('the ribbon', () => {
     const unloaded = ribbonSlots(null, [occ(40, 44)], 86)
     expect(unloaded.slice(40, 44)).toEqual(['sched', 'sched', 'sched', 'sched'])
     expect(unloaded[86]).toBe('now')
+  })
+})
+
+describe('the years over the monthly bars', () => {
+  it('is one rectangle for each run of bars of a year, over its columns', () => {
+    expect(barYears([{ key: '2024-11' }, { key: '2024-12' }, { key: '2025-01' }, { key: '2025-02' }, { key: '2025-03' }])).toEqual([
+      { year: '2024', col: 1, span: 2 },
+      { year: '2025', col: 3, span: 3 },
+    ])
+    expect(barYears([])).toEqual([])
   })
 })

@@ -119,6 +119,16 @@ describe('the Schedule console', () => {
     expect(tile('activity').querySelector('.wrSchedTileBody .wrSchedFacet')).toBeNull()
   })
 
+  it('puts the year over the monthly bars and the month number under each bar', async () => {
+    await open()
+    const years = [...tile('activity').querySelectorAll('.wrSchedCalYear')].map(y => y.textContent)
+    expect(years.length).toBeGreaterThan(0)
+    expect(years.every(y => /^\d{4}$/.test(y ?? ''))).toBe(true)
+    const numbers = [...tile('activity').querySelectorAll('.wrSchedCalBarMonths span')].map(n => Number(n.textContent))
+    expect(numbers.length).toBe(tile('activity').querySelectorAll('.wrSchedCalBar').length)
+    expect(numbers.every(n => n >= 1 && n <= 12)).toBe(true)
+  })
+
   it('shades against the goal or the busiest day, by a toggle', async () => {
     const user = userEvent.setup()
     await open()
