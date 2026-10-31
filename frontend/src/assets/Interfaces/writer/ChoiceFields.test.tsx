@@ -420,7 +420,7 @@ describe('answering on a plotline', () => {
     expect(container.querySelectorAll('.wrPlotChip[data-point="c1"]')).toHaveLength(2)
   })
 
-  it.each([['Genre', 'fGenre'], ['Tone', 'fTone']])('shows no card at all for an inherited %s the category has not answered, nor the caption that sets the plotline\'s own answer apart from it', (name, id) => {
+  it.each([['Genre', 'fGenre'], ['Tone', 'fTone'], ['Motto', 'fMotto']])('shows no card at all for an inherited %s the category has not answered, nor the caption that sets the plotline\'s own answer apart from it', (name, id) => {
     render(<Editor start={world()} />)
     open(name)
     const field = block(id)
@@ -428,9 +428,9 @@ describe('answering on a plotline', () => {
     expect(field.queryByText('No answer')).toBeNull()
     expect(field.queryByText('This plotline')).toBeNull()
     expect(document.querySelector(`[data-field="${id}"] .wrAnswerFrom`)).toBeNull()
-    // the plotline's own answer is still there to give: a tick box for each option, or the select
+    // the plotline's own answer is still there to give: a tick box for each option, the select, or the text box
     if (id === 'fGenre') expect(field.getAllByRole('checkbox')).toHaveLength(3)
-    else expect(field.getByLabelText('Tone answer')).toBeInTheDocument()
+    else expect(field.getByLabelText(`${name} answer`)).toBeInTheDocument()
   })
 
   it('shows the category\'s card for a multi-select it has answered, and the card goes again when that answer does', () => {
@@ -457,11 +457,14 @@ describe('answering on a plotline', () => {
     expect(document.querySelector('[data-field="fTone"] .wrAnswerFrom')).toBeNull()
   })
 
-  it('still says "No answer" for an inherited short text the category has not answered', () => {
-    render(<Editor start={world()} />)
+  it('shows the category\'s card for a short text it has answered, with the caption, and says "No answer" nowhere', () => {
+    render(<Editor start={world([answer('c1', 'cat', 'fMotto', 'Ever after')])} />)
     open('Motto')
-    expect(block('fMotto').getByRole('group', { name: 'Category: Romance' })).toHaveClass('wrAnswerFrom')
-    expect(block('fMotto').getByText('No answer')).toBeInTheDocument()
+    const motto = block('fMotto')
+    expect(motto.getByRole('group', { name: 'Category: Romance' })).toHaveClass('wrAnswerFrom')
+    expect(motto.getByTitle('Answered on Romance. Change it there.')).toHaveTextContent('Ever after')
+    expect(motto.getByText('This plotline')).toBeInTheDocument()
+    expect(screen.queryByText('No answer')).toBeNull()
   })
 
   it('ticks and unticks options of a multi-select; a ticked one is a card with a grip', () => {

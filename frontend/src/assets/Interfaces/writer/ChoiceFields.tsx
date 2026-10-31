@@ -389,10 +389,9 @@ function TextAnswer({ w, def, holder, drag }: { w: WriterWorkspace; def: PlotCus
   )
 }
 
-// What a plotline shows of the answer of the node that defines the field, in a card of its own: the node's title at the top left, its kind at the top
-// right (fainter), the answers below. It cannot be changed here, but is dragged onto a chapter like any answer and counts its places.
-function OwnerAnswers({ w, info, drag }: { w: WriterWorkspace; info: FieldInfo; drag: PlotDrag }) {
-  const answers = valuesIn(w.plotNodes, info.owner.id, info.def.id)
+// What a plotline shows of the answers of the node that defines the field (there is none of this when it has not answered), in a card of its own: the node's
+// title at the top left, its kind at the top right (fainter), the answers below. It cannot be changed here, but is dragged onto a chapter like any answer and counts its places.
+function OwnerAnswers({ w, info, answers, drag }: { w: WriterWorkspace; info: FieldInfo; answers: PlotNode[]; drag: PlotDrag }) {
   const scope = `${info.scope.charAt(0).toUpperCase()}${info.scope.slice(1)}`
   return (
     <div className="wrAnswerFrom" role="group" aria-label={`${scope}: ${nodeLabel(info.owner)}`}>
@@ -401,18 +400,13 @@ function OwnerAnswers({ w, info, drag }: { w: WriterWorkspace; info: FieldInfo; 
         <span className="wrAnswerFromKind">{scope}</span>
       </div>
       <div className="wrAnswerFromBody">
-        {answers.length === 0
-          ? <span className="wrMuted">No answer</span>
-          : answers.map(a => (
-            <AnswerCard key={a.id} w={w} answer={a} drag={valueGrip(drag, a.id)} dragging={drag.dragId === a.id} hint={`Answered on ${nodeLabel(info.owner)}. Change it there.`} />
-          ))}
+        {answers.map(a => (
+          <AnswerCard key={a.id} w={w} answer={a} drag={valueGrip(drag, a.id)} dragging={drag.dragId === a.id} hint={`Answered on ${nodeLabel(info.owner)}. Change it there.`} />
+        ))}
       </div>
     </div>
   )
 }
-
-// The options of a field that the node defining it has answered.
-const answeredOn = (w: WriterWorkspace, owner: PlotNode, def: PlotCustomFieldDef) => new Set(valuesIn(w.plotNodes, owner.id, def.id).flatMap(a => (a.optionId ? [a.optionId] : [])))
 
 export function ChoiceBody({ w, info, holder, editable, drag }: {
   w: WriterWorkspace
@@ -427,9 +421,10 @@ export function ChoiceBody({ w, info, holder, editable, drag }: {
   const kind = kindOf(def)
   const inherited = owner.id !== holder.id
   const noOptions = hasOptions(def) && optionsOf(def).length === 0
-  // An inherited multi-select or dropdown the defining node has not answered has no card to show (no "No answer" card), and so no caption to tell the plotline's own answer from the
-  // card's. A short text still says "No answer".
-  const showOwner = inherited && (kind === 'text' || valuesIn(w.plotNodes, owner.id, def.id).length > 0)
+  // What the node that defines the field has answered, shown above the plotline's own answer in a card. Where it has answered nothing there is no card (no "No answer" card),
+  // and so no caption to tell the plotline's own answer from the card's.
+  const ownerAnswers = inherited ? valuesIn(w.plotNodes, owner.id, def.id) : []
+  const showOwner = ownerAnswers.length > 0
   // Where its options are edited, a multi-select's options and answers are one list.
   if (editable && kind === 'multi') {
     return (
@@ -441,11 +436,11 @@ export function ChoiceBody({ w, info, holder, editable, drag }: {
   return (
     <div className="wrFieldValues wrChoice">
       {editable && hasOptions(def) && <OptionsEditor w={w} owner={owner} def={def} />}
-      {showOwner && <OwnerAnswers w={w} info={info} drag={drag} />}
+      {showOwner && <OwnerAnswers w={w} info={info} answers={ownerAnswers} drag={drag} />}
       {showOwner && <span className="wrAnswerWho">This plotline</span>}
       {noOptions
         ? <p className="wrMuted">{editable ? 'Add the options to choose from.' : 'No options yet. Add them on the node that defines this field.'}</p>
-        : kind === 'multi' ? <MultiAnswer w={w} def={def} holder={holder} drag={drag} answeredAbove={inherited ? answeredOn(w, owner, def) : undefined} />
+        : kind === 'multi' ? <MultiAnswer w={w} def={def} holder={holder} drag={drag} answeredAbove={inherited ? new Set(ownerAnswers.flatMap(a => (a.optionId ? [a.optionId] : []))) : undefined} />
           : kind === 'dropdown' ? <DropdownAnswer w={w} def={def} holder={holder} drag={drag} />
             : <TextAnswer w={w} def={def} holder={holder} drag={drag} />}
     </div>
