@@ -144,6 +144,8 @@
   .wrPlotCardHead { display: flex; align-items: center; gap: var(--space-3); text-align: left; font-size: var(--text-ui); color: inherit; }
   .wrPlotCardKind { font-size: var(--text-small); text-transform: uppercase; letter-spacing: 1px; }
   .wrPlotCardName { font-weight: 700; }
+  // A card's whole synopsis under its name (the same ink as the name, wrapped, line breaks kept), when the circle at the top of the panel is lit.
+  .wrPlotCardDesc { font-size: var(--text-small); font-weight: 400; white-space: pre-line; overflow-wrap: anywhere; }
   .wrPlotCardKids { display: flex; flex-direction: column; gap: var(--space-3); }
   .wrPlotChapter { display: flex; flex-direction: column; gap: var(--space-3); border-radius: var(--radius-none); padding: var(--space-3) 8px; color: var(--ink); background: var(--wr-plot-card, var(--wr-card)); &--over { outline: 2px dashed var(--wr-accent-light); outline-offset: 1px; } }
   .wrPlotCardTitle { font-size: var(--text-ui); font-weight: 700; }

@@ -730,7 +730,7 @@ describe('the level fold circles', () => {
     expect(head.lastElementChild).toHaveClass('wrNavTools')
     expect(head.lastElementChild!.firstElementChild).toHaveClass('wrNavDots')
     expect(within(head).queryByRole('button', { name: /^\s*Category$/ })).toBeNull()
-    expect([...container.querySelectorAll('.wrNavDots .wrNavDot')].map(d => d.getAttribute('aria-label'))).toEqual(['Collapse all categories', 'Collapse all subcategories', 'Collapse all clusters'])
+    expect([...container.querySelectorAll('.wrPlotNavHead .wrNavDots .wrNavDot')].map(d => d.getAttribute('aria-label'))).toEqual(['Collapse all categories', 'Collapse all subcategories', 'Collapse all clusters'])
     expect(head.lastElementChild!.lastElementChild).toHaveClass('wrNavDot--desc')
     expect(container.querySelector('.wrPlotNav')!.lastElementChild).toHaveTextContent('Category')
   })

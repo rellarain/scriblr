@@ -7,10 +7,12 @@ import { AwarenessEye } from './AwarenessEye'
 import { buildChildIndex, chaptersOfBook } from './outlineTree'
 import { placementLook, type PlacementLook } from './plotCardColors'
 import { textOf } from './plotFields'
+import { LevelDots } from './LevelDots'
 import { isChoice } from './plotKinds'
 import { livePlacements } from './plotPlacement'
 import { plotColors, plotColorVars } from './plotColors'
 import { nodeLabel, plotTrail } from './plotTree'
+import { useStoredState } from './storage'
 import type { WriterWorkspace } from './useWriterWorkspace'
 
 // The plotline editor's outline: the project's series, books, arcs and chapters as nested
@@ -20,7 +22,11 @@ import type { WriterWorkspace } from './useWriterWorkspace'
 // boxes, one box for each placement, each with an icon on the right: an x on a placement on the chapter itself (it takes that placement
 // away), the awareness eye on a placement on a moment, a lock on an act or scene. Given several plotlines (the compare view) it lists all
 // their placements, each chip marked with its plotline's colours, and `readOnly` takes away what changes them (the x and the eye's click).
+// Three small circles at the top right of the panel fold a whole level at once (series, books, arcs, left to right), as the Plot contents' do (LevelDots.tsx),
+// and a fourth, lit in the alert hue, shows the whole synopsis of every series, book, arc and chapter under its name (hidden otherwise; kept across
+// restarts, apart from the contents' own circle).
 const SHOWN = new Set(['series', 'book', 'arc', 'chapter'])
+const LEVELS = [['series', 'series'], ['book', 'books'], ['arc', 'arcs']] as const
 
 export function PlotOutlinePanel({ w, plotlines, dragId, onDropChapter, readOnly = false }: {
   w: WriterWorkspace
@@ -35,6 +41,17 @@ export function PlotOutlinePanel({ w, plotlines, dragId, onDropChapter, readOnly
   const [collapsed, setCollapsed] = useState<Set<string>>(new Set())
   const [overId, setOverId] = useState<string | null>(null)
   const toggle = (id: string) => setCollapsed(prev => { const next = new Set(prev); if (next.has(id)) next.delete(id); else next.add(id); return next })
+  const [synopses, setSynopses] = useStoredState<boolean>('scriblr.writer.plotOutlineDescriptions', false)
+  // The cards of a level that have a card under them (the ones that can fold), and whether any is open.
+  const foldable = (kind: OutlineNode['kind']) => w.outlineNodes.filter(n => n.kind === kind && (index.get(n.id) ?? []).some(k => SHOWN.has(k.kind)))
+  const foldLevel = (kind: OutlineNode['kind'], open: boolean) => setCollapsed(prev => {
+    const next = new Set(prev)
+    for (const n of foldable(kind)) { if (open) next.add(n.id); else next.delete(n.id) }
+    return next
+  })
+  // With none of them written, the circle has nothing to switch.
+  const described = w.outlineNodes.some(n => SHOWN.has(n.kind) && n.synopsis.trim() !== '')
+  const synopsisOf = (node: OutlineNode) => (synopses && node.synopsis.trim() !== '' ? <span className="wrPlotCardDesc">{node.synopsis}</span> : null)
 
   const lineIds = new Set(plotlines.map(l => l.id))
   const several = plotlines.length > 1
@@ -98,6 +115,7 @@ export function PlotOutlinePanel({ w, plotlines, dragId, onDropChapter, readOnly
         onDrop={e => { e.preventDefault(); setOverId(null); if (dragId) onDropChapter(chapter.id) }}
       >
         <div className="wrPlotCardTitle">{number} · {nodeLabel(chapter)}</div>
+        {synopsisOf(chapter)}
         {inChapter.length > 0 && <div className="wrPlotChips">{inChapter.map(e => chip(e, chapter))}</div>}
       </div>
     )
@@ -122,6 +140,7 @@ export function PlotOutlinePanel({ w, plotlines, dragId, onDropChapter, readOnly
           <span className="wrPlotCardKind">{node.kind}</span>
           <span className="wrPlotCardName">{nodeLabel(node)}</span>
         </button>
+        {synopsisOf(node)}
         {isOpen && kids.length > 0 && <div className="wrPlotCardKids">{kids.map(k => card(k, b, numbers))}</div>}
       </div>
     )
@@ -131,8 +150,16 @@ export function PlotOutlinePanel({ w, plotlines, dragId, onDropChapter, readOnly
   return (
     <div className="wrOutlinePanel">
       <div className="wrChildRowsHead">
-        <span className="wrLabel">Books and chapters</span>
-        <span className="wrOutlineMeta">{readOnly ? 'Where each plotpoint sits' : 'Drop a plotpoint on a chapter'}</span>
+        <span className="wrLabel" title={readOnly ? 'Where each plotpoint sits' : 'Drop a plotpoint on a chapter'}>Outline</span>
+        <LevelDots
+          groupLabel="Fold a whole level of the outline"
+          levels={LEVELS.map(([kind, plural]) => {
+            const cards = foldable(kind)
+            const open = cards.some(n => !collapsed.has(n.id))
+            return { key: kind, plural, foldable: cards.length, open, onClick: () => foldLevel(kind, open) }
+          })}
+          desc={{ on: synopses, disabled: !described, noun: 'synopses', onClick: () => setSynopses(!synopses) }}
+        />
       </div>
       {roots.length === 0 && <p className="wrMuted">No books yet.</p>}
       <div className="wrPlotOutline">{roots.map(n => card(n, undefined, new Map()))}</div>

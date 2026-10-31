@@ -2,6 +2,7 @@ import { useMemo, useState } from 'react'
 import type { PlotNode } from '../../../api/types'
 import type { WriterWorkspace } from './useWriterWorkspace'
 import { ChevronRightIcon, PlusIcon } from '../../icons'
+import { LevelDots } from './LevelDots'
 import { plotColors, plotColorVars } from './plotColors'
 import { nodeLabel, plotlinesUnder, selectionState, sortByTitle } from './plotTree'
 import { PresetPicker } from './PresetPicker'
@@ -102,26 +103,15 @@ export function PlotNav({ w, onOpenNode, onCompare }: {
     <div className="wrPlotNav">
       <div className="wrPlotNavHead">
         <span>Categories</span>
-        <div className="wrNavTools">
-          <div className="wrNavDots" role="group" aria-label="Fold a whole level">
-            {LEVELS.map(([kind, plural]) => {
-              const nodes = foldable(kind)
-              const anyOpen = nodes.some(n => !collapsed.has(n.id))
-              return (
-                <button
-                  key={kind} type="button" className={anyOpen ? 'wrNavDot wrNavDot--on' : 'wrNavDot'} disabled={nodes.length === 0}
-                  aria-label={anyOpen ? `Collapse all ${plural}` : `Expand all ${plural}`} aria-pressed={anyOpen}
-                  title={anyOpen ? `Collapse all ${plural}` : `Expand all ${plural}`} onClick={() => foldLevel(kind, anyOpen)}
-                />
-              )
-            })}
-          </div>
-          <button
-            type="button" className={fullDesc ? 'wrNavDot wrNavDot--desc wrNavDot--on' : 'wrNavDot wrNavDot--desc'} disabled={!described}
-            aria-label={fullDesc ? 'Hide full descriptions' : 'Show full descriptions'} aria-pressed={fullDesc}
-            title={fullDesc ? 'Hide full descriptions' : 'Show full descriptions'} onClick={() => setFullDesc(!fullDesc)}
-          />
-        </div>
+        <LevelDots
+          groupLabel="Fold a whole level"
+          levels={LEVELS.map(([kind, plural]) => {
+            const nodes = foldable(kind)
+            const open = nodes.some(n => !collapsed.has(n.id))
+            return { key: kind, plural, foldable: nodes.length, open, onClick: () => foldLevel(kind, open) }
+          })}
+          desc={{ on: fullDesc, disabled: !described, noun: 'full descriptions', onClick: () => setFullDesc(!fullDesc) }}
+        />
       </div>
       {ticked > 0 && (
         <div className="wrPlotNavPicked">
