@@ -2,7 +2,7 @@
 // `.wUI.wr`; colors come from the app's theme/accent/alert variables.
 //
 // The stylesheet is in partials under styles/, one per area, loaded in the order the rules were always written in (a later rule
-// overrides an earlier one at equal specificity, so the order is part of the style): base, shared, shelves, levels, dashboard, plot, plot-fields, pages, chapter-outline, outline-level, draft-level, preview, flat, level-tabs, outline-book, readability, publish, footnote, calendar, focus.
+// overrides an earlier one at equal specificity, so the order is part of the style): base, shared, shelves, levels, dashboard, plot, plot-fields, pages, chapter-outline, outline-level, draft-level, preview, flat, level-tabs, outline-book, readability, publish, footnote, schedule, focus.
 // Each partial puts its rules under `.wr` (or `.wUI.wr`), so splitting changed no selector and no specificity.
 
 @use './styles/base';
@@ -23,5 +23,5 @@
 @use './styles/readability';
 @use './styles/publish';
 @use './styles/footnote';
-@use './styles/calendar';
+@use './styles/schedule';
 @use './styles/focus';

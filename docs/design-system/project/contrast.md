@@ -255,6 +255,15 @@ Each cell is the ratio at the default hues (theme 330, accent 32, alert 200) and
 | Time and date on the sky, locked | 4.5:1 | 4.7 (4.6) | 4.6 (4.6) | 4.6 (4.6) | 6.1 (4.6) |
 | Name and time on the sky of a time of day that is off | 4.5:1 | 4.7 (4.6) | 5.6 (4.6) | 4.7 (4.6) | 5.9 (5.4) |
 
+## Schedule
+
+| Pair | Needs | Dawn | Day | Dusk | Night |
+|---|---|---|---|---|---|
+| A facet's line, dot or bar on the tile, the worst hue | 3:1 | 3.4 (3.4) | 3.8 (3.7) | 4.8 (4.8) | 5.3 (5.0) |
+| Ink on a shift's block (the facet colour mixed into the tile), the worst hue and state | 4.5:1 | 5.9 (5.9) | 6.4 (6.3) | 5.2 (5.2) | 5.5 (5.3) |
+| The ring round today's square, on the tile | 3:1 | 10.9 (10.8) | 12.0 (11.7) | 11.6 (11.6) | 12.8 (12.2) |
+| The line graph's axis text (the ink at 85%) on the tile | 4.5:1 | 8.6 (8.5) | 9.2 (9.1) | 8.9 (8.9) | 9.7 (9.3) |
+
 ## Below the threshold
 
 Nothing: every documented pair reads in every zone for every hue.

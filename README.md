@@ -275,8 +275,29 @@ described, now stale, in `docs/data-model.md`).
   `nodeWordCounts` (the draft words of every outline node, moments up),
   and every flagged outline/plot node.
 - **Schedule** — `ScheduleCompletionLog`: per-date list of completed
-  checklist-item ids (derived client-side from routines/priorities/goals/
-  flags; the backend just persists which ids were checked off).
+  checklist-item ids (items and routines; the backend just
+  persists which ids were checked off, and counts a new tick as project
+  activity).
+- **Faceted activity** (`facets`, project file format 6) — `FacetActivity`:
+  every change to the outline, plot, draft, revision flags and project is an
+  `ActivityEvent` (local day and 10-minute slot; one per node per slot, so
+  autosaves merge), kept in detail for 14 days; `daily` totals per facet
+  (outline/plot nodes made, edited or deleted, net draft words and by book,
+  flags applied and resolved, project items) for about a year; whole older
+  months fold into `monthly` totals (kept for good, with their active days);
+  and a 28-day per-slot profile feeds the header ribbon. Opening a project
+  compacts it (no scheduler) and folds the older per-day saves in once.
+  Trees are compared with the ones they replace (`facet_activity.tree_changes`).
+- **Revision flags** — `RevisionFlag`: a flag (review/edit/add/delete, a note)
+  on a passage of a moment's draft (it follows the text as it is edited,
+  `storage/revision_flags.py`, and goes `stale` if the text is cut) or on the
+  project; resolving one (with an outcome note) is activity too.
+- **Planner** — `Planner`: goals (per facet; a project, a book or a chapter;
+  daily, weekly and total targets; a deadline), shifts (a day and 10-minute
+  slots, repeating, paused, skipped, overridden a day at a time, with an
+  aim and a target), routines (daily, weekly or after an interval of days,
+  weeks or months, optionally a range), checklist items, shift templates, rest
+  days and the project's timeline. Dates are local days.
 - **Scrap** — `ScrapRegistry`: any `moment` node removed from the outline
   that had existing draft content becomes a `ScrapEntry` (captures its
   last-known chapter/book ancestry) instead of silently vanishing; it can
@@ -321,7 +342,9 @@ the one project-independent router).
 | `revisions` | `/api/projects/{id}/revisions/{chapterId}` | `GET ""` list (runs a one-time legacy migration first) · `GET "/diff"` (`momentId`,`from`,`to=current`) · `GET "/{snapshotId}"` · `POST ""` manual snapshot · `POST "/auto"` rolling auto-snapshot · `POST "/{snapshotId}/revert"` (safety-snapshots first) · `POST "/{snapshotId}/notes"` · `PATCH "/{snapshotId}/notes/{noteId}"` · `DELETE "/{snapshotId}/notes/{noteId}"` (204) |
 | `activity` | `/api/projects/{id}/activity` | `GET ""` daily aggregate + unified log |
 | `analytics` | `/api/projects/{id}/analytics` | `GET ""` totals/goals/rollups/flagged nodes |
-| `schedule` | `/api/projects/{id}/schedule` | `GET "/{date}"` · `PUT "/{date}"` replace completed ids |
+| `schedule` | `/api/projects/{id}/schedule` | `GET "/{date}"` · `PUT "/{date}"` replace completed ids (a new tick is project activity) |
+| `facets` | `/api/projects/{id}` · `/api/activity` | `GET "/activity/facets"` events, daily and monthly totals (compacts first) · `GET "/planner"` · `PUT "/planner"` (dates and shapes checked) · `GET /api/activity/ribbon` today's events per 10-minute slot across every project, and the 28-day average |
+| `revision-flags` | `/api/projects/{id}/revision-flags` | `GET ""` (`includeResolved`) · `POST ""` · `PATCH "/{flagId}"` · `POST "/{flagId}/resolve"` · `DELETE "/{flagId}"` (204) |
 | `scrap` | `/api/projects/{id}/scrap` | `GET ""` registry · `POST "/{momentId}/restore"` · `DELETE "/{momentId}"` (204, permanent) |
 | `export` | `/api/projects/{id}/export` | `GET "/book/{bookId}"` PDF · `GET "/chapter/{chapterId}"` PDF (set in a built-in font: typographic punctuation is made plain and anything outside Latin-1 becomes `?` until a Unicode font is bundled; the download name carries the real title in `filename*`) |
 | `presets` | `/api/presets` | `GET ""` whole catalog (drafts, published copies, history) · `PUT ""` replace the drafts, in order (published copies and history of the ids kept; an absent id is deleted) · `GET "/published"` what the Plot sidebar offers · `POST "/{id}/publish"` (422 with the reasons if the draft is invalid) · `POST "/{id}/unpublish"` · `POST "/{id}/discard"` (back to the published copy, or cleared when there is none) · `POST "/{id}/restore/{version}"` — global (`presets.json`, project-independent) |
@@ -598,11 +621,11 @@ mounted it; it remains in git history.
   drag a divider (or focus it and use the arrow keys) to resize the two tiles it separates; Alt+arrows on a title bar swap
   it with its neighbour. The tree always fills the area (a tile that opens is grafted on, one that
   closes pruned), stacks in one column under 400px, and is remembered per level with the open tiles and the
-  current tab. A lone open tile has the whole area; every tile scrolls its own body. The Dash's tabs (`levels/dashTabs.tsx`) are Schedule (routines), Checklist (tasks),
-  Analytics, Scratchpad, Project template, Settings (the theme panel) and Help (the resource
+  current tab. A lone open tile has the whole area; every tile scrolls its own body. The Dash's tabs (`levels/dashTabs.tsx`) are Schedule (the console: goals, activity, shifts, backlog, analytics, review; `writer/schedule/`),
+  Readers, Scratchpad, Project template, Settings (the theme panel) and Help (the resource
   articles written for the level in the Resources builder, `levels/HelpArticles.tsx`). The
   Project's (`levels/projectTabs.tsx`): Plot and Outline (summaries at Mid, the editors at Max),
-  Schedule, History, Analytics, Settings (the project editor and its colour) and Help. The
+  Schedule (the same console over the project), History, Settings (the project editor and its colour) and Help. The
   Outline's (`levels/outlineTabs.tsx`): Book outline (New chapter), Book details, Settings (the
   book's fields and colour) and Help. At Max the Outline is the book's **cover**, in one column: the book editor strip with the
   title and the tabs, then the sections the tabs open (settings, help, draft stats) and the contents

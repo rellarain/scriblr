@@ -89,10 +89,10 @@ describe('the activity calendar', () => {
     expect(new Date(`${grid.cells[0].date}T00:00:00Z`).getUTCDay()).toBe(0)
   })
 
-  it('labels a month at its first week, once', () => {
+  it('draws a month over the weeks that begin in it, once', () => {
     const grid = buildActivityGrid({}, TODAY)
-    expect(grid.months[0]).toEqual({ label: 'Oct', col: 1 })
-    expect(grid.months.map(m => m.label)).toEqual(['Oct', 'Nov', 'Dec', 'Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct'])
+    expect(grid.months[0]).toEqual({ label: 'October', col: 1, span: 3 })
+    expect(grid.months.map(m => m.label)).toEqual(['October', 'November', 'December', 'January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October'])
   })
 
   it('shades a day by its share of the busiest day, and totals the year', () => {

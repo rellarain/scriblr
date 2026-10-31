@@ -4,6 +4,7 @@ import { BagIcon, BellIcon, BookmarkIcon, EyeOffIcon, FollowIcon, GoalIcon, Hear
 import { useStoredState } from '../writer/storage'
 import { ActivityCalendar as ActivityCalendarGrid, CalendarLegend } from '../../../components/ActivityCalendar'
 import { NumberInput } from '../../../components/NumberInput'
+import type { WeekStart } from '../../../lib/activityCalendar'
 import { Shelf } from '../writer/Shelf'
 import { buildActivityGrid, currentStreak, type ActivityMetric } from './activityGrid'
 import { Card, Meter, Stat } from './ReaderBits'
@@ -211,10 +212,11 @@ const METRICS: Array<{ key: ActivityMetric; label: string }> = [{ key: 'pages', 
 
 export function ActivityCalendar({ ctx }: { ctx: ReaderCtx }) {
   const [metric, setMetric] = useState<ActivityMetric>('pages')
-  const grid = useMemo(() => buildActivityGrid(ctx.data.reader?.activity ?? {}, ctx.today, metric), [ctx.data.reader?.activity, ctx.today, metric])
+  const [weekStart] = useStoredState<WeekStart>('scriblr.weekStart', 'monday') // the week's first day: set in the Writer's Schedule settings
+  const grid = useMemo(() => buildActivityGrid(ctx.data.reader?.activity ?? {}, ctx.today, metric, weekStart), [ctx.data.reader?.activity, ctx.today, metric, weekStart])
   return (
     <Card title="Activity, last 12 months" Icon={GoalIcon}>
-      <ActivityCalendarGrid grid={grid} prefix="rd" unit={metric} />
+      <ActivityCalendarGrid grid={grid} prefix="rd" unit={metric} weekStart={weekStart} />
       <div className="rdRow">
         {METRICS.map(m => <button key={m.key} type="button" className={metric === m.key ? 'rdChip rdChip--on rdChip--button' : 'rdChip rdChip--button'} aria-pressed={metric === m.key} onClick={() => setMetric(m.key)}>{m.label}</button>)}
         <span className="rdMuted">{grid.total.toLocaleString('en-US')} {metric} on {grid.activeDays} days</span>

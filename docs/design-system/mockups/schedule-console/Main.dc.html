@@ -116,7 +116,7 @@ body{margin:0}
 .blk-missed{background:repeating-linear-gradient(135deg,var(--missed) 0,var(--missed) 6px,var(--deep) 6px,var(--deep) 12px);border-style:dashed;color:var(--ink)}
 .blk-paused{background:transparent;border-style:dashed;color:var(--muted)}
 .nowLine{position:absolute;left:0;right:0;height:0;border-top:2px solid var(--ink)}
-.backlog{flex:1 1 250px;max-width:300px;min-width:0}
+.backlogCard{flex:1 1 260px;max-width:320px}
 .item{display:flex;gap:8px;align-items:flex-start;padding:6px 8px;border-radius:4px;background:var(--side);margin-bottom:4px;font-size:12px}
 .item small{display:block;color:var(--muted);font-size:11px}
 .item input{margin:2px 0 0}
@@ -312,16 +312,18 @@ body{margin:0}
               </sc-for>
             </div>
           </div>
-          <aside class="backlog">
-            <h3 style="margin-top:0">Backlog</h3>
+        </div>
+      </section>
+
+      <section class="card backlogCard">
+        <div class="cardHead"><h2>Backlog</h2></div>
+
             <sc-for list="{{backlog}}" as="grp" hint-placeholder-count="4">
               <div class="bookName">{{grp.name}}</div>
               <sc-for list="{{grp.items}}" as="it" hint-placeholder-count="2">
                 <div class="item"><span class="grip" aria-hidden="true">⋮⋮</span><input type="checkbox" aria-label="{{it.label}}"><span><b>{{it.label}}</b><small>{{it.sub}}</small></span><span class="tag {{it.tagCls}}">{{it.tag}}</span></div>
               </sc-for>
             </sc-for>
-          </aside>
-        </div>
       </section>
 
       <section class="card analyticsCard">

@@ -9,7 +9,6 @@ import type { MainInterface, HuiPanel } from './interfaceShellTypes'
 import { useHelperChats } from './assets/Interfaces/helper/useHelperChats'
 import { useStoredState } from './assets/Interfaces/writer/storage'
 import { CURRENT_USER } from './userSeed'
-import { DAY_ACTIVITY } from './activitySeed'
 import { useSettings } from './settings/settingsStore'
 import { useThemeEngine } from './theme/useTheme'
 
@@ -162,7 +161,6 @@ function App() {
         drawerOpen={drawerOpen}
         onToggleDrawer={() => setDrawerOpen(v => !v)}
         currentUser={CURRENT_USER}
-        activity={DAY_ACTIVITY}
       />
 
       <Suspense fallback={null}>{renderMainscreen()}</Suspense>

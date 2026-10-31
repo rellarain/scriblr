@@ -29,10 +29,24 @@ describe('the calendar', () => {
     expect(g.total).toBe(1200)
   })
 
-  it('labels the months at the first week of each', () => {
+  it('labels each month once', () => {
     const g = buildCalendar({}, TODAY, 'words', 'idle')
-    expect(g.months[g.months.length - 1].label).toBe('Oct')
+    expect(g.months[g.months.length - 1].label).toBe('October')
     expect(g.months.length).toBeGreaterThanOrEqual(12)
+  })
+
+  it('starts the week on Monday when asked, and marks today', () => {
+    const g = buildCalendar({}, '2026-10-14', 'words', 'idle', 'monday') // a Wednesday
+    expect(new Date(`${g.cells[0].date}T00:00:00Z`).getUTCDay()).toBe(1)
+    expect(g.cells.slice(-7).map(c => c.level)).toEqual([0, 0, 0, -1, -1, -1, -1]) // Monday to Wednesday are here
+    expect(g.cells.filter(c => c.today).map(c => c.date)).toEqual(['2026-10-14'])
+  })
+
+  it('draws each month as a rectangle over the weeks that begin in it, its whole name', () => {
+    const g = buildCalendar({}, '2026-10-31', 'words', 'idle', 'monday')
+    expect(g.months.map(m => m.label).slice(0, 3)).toEqual(['October', 'November', 'December'])
+    expect(g.months.reduce((n, m) => n + m.span, 0)).toBe(53)
+    expect(g.months.every((m, i) => i === 0 || m.col === g.months[i - 1].col + g.months[i - 1].span)).toBe(true)
   })
 })
 

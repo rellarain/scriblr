@@ -17,11 +17,11 @@ The words in the app are part of the design. They are short, plain and in the wr
 
 | Where | Text |
 |---|---|
-| Dash | "Writer Dashboard"; tabs Schedule, Checklist, Analytics, Scratchpad, Project template, Settings, Help |
+| Dash | "Writer Dashboard"; tabs Schedule, Readers, Scratchpad, Project template, Settings, Help |
 | Dash, empty | "Nothing here yet." "No projects yet. Create one below." "No notes yet. Add one to jot down a thought." |
 | Search, no match | "Nothing matches." |
 | A tab at Max | "Pick a tab above to open it." |
-| Project | "Project Shelves"; tabs Plot, Outline, Plotpoints, Schedule, History, Analytics, Settings, Help |
+| Project | "Project Shelves"; tabs Plot, Outline, Plotpoints, Schedule, History, Settings, Help |
 | Plot, empty | "No plot yet." "No categories yet." "Select a category or plotline to edit it, or add a category." |
 | Choice fields | "Add option…" · "Add the options to choose from." · "No options yet. Add them on the node that defines this field." · "That option is there already." · "This plotline" · "A field keeps its kind once it has values." · "Untick Fantasy? Its 2 places go too." · "Remove Fantasy? 2 answers use it and 2 places go." |
 | Plotpoints | "Plotpoints" · "Still to place" · "No plotpoints yet. Add some in the Plot." · "Every plotpoint has a place. Add more in the Plot." · "None placed yet." |
@@ -34,7 +34,7 @@ The words in the app are part of the design. They are short, plain and in the wr
 | Tiles | "Drag to move this tile (Alt+arrows to swap it)" |
 | Saving | "Unsaved changes" · "Saving…" · "Save failed" · the time of the last save · "Last saved at 4:12 PM" · "No changes saved yet" · "Restore the last saved version" · "Nothing to restore: no unsaved changes" |
 | Edge tabs | "Arc 1: <title>" · "Chapter 2: <title>" |
-| Help | the level's articles from the Resources builder, else a short default: "The Dash is your desk across every project: schedule, checklist, analytics and a scratchpad. Pick a tab to open it; at full size each tab opens as a tile." |
+| Help | the level's articles from the Resources builder, else a short default: "The Dash is your desk across every project: the schedule (goals, shifts, the backlog, activity and analytics) and a scratchpad. Pick a tab to open it; at full size each tab opens as a tile." |
 
 ## Names that never change
 

@@ -6,7 +6,7 @@ import {
   BLACK, TEXT_TARGET, WHITE, mixRgb, over, ratioOf, ratioOfRgb, rgbOf, type RGB,
 } from './readable'
 import {
-  ANSWER_KIND_ALPHA, DISLIKE_BAR_SATURATIONS, INK_STRENGTH, LIFT_ALPHA, LIFT_ALPHA_LIGHTEST, LIKE_BAR_SATURATIONS, NAV_CHIP_INK_ALPHA, PAPER_LOOKS, SIDEBAR_SHADE_1, SINK_ALPHAS, SURFACE_OFFSETS, ZONE_LOOKS,
+  ANSWER_KIND_ALPHA, BLOCK_MIX, DISLIKE_BAR_SATURATIONS, FACET_COLOR, INK_STRENGTH, LIFT_ALPHA, LIFT_ALPHA_LIGHTEST, LIKE_BAR_SATURATIONS, NAV_CHIP_INK_ALPHA, PAPER_LOOKS, SIDEBAR_SHADE_1, SINK_ALPHAS, SURFACE_OFFSETS, ZONE_LOOKS,
   fillInk, pageTone, paperAccents, paperGrounds, paperInks, resolvePalette, shadeK, toneMarks, zoneInk,
 } from './zoneLooks'
 import type { ZoneKey, ZonePalette } from './types'
@@ -186,6 +186,21 @@ export function paletteRatios(zone: ZoneKey, hues: AuditHues = DEFAULT_HUES): Pa
   out.push({ id: 'plot-cluster', group: 'Plot colours', label: 'White on a plot cluster, the worst hue', kind: 'text', ratio: worstCluster })
   out.push({ id: 'plot-nav-chip-line', group: 'Plot colours', label: 'A keyword chip on a plotline row of the contents (also hovered), the worst hue', kind: 'text', ratio: worstChipLine })
   out.push({ id: 'plot-nav-chip-fill', group: 'Plot colours', label: 'A keyword chip on a category, subcategory or cluster row, the worst hue', kind: 'text', ratio: worstChipFill })
+
+  // ---- the Schedule console: a facet's colour (any hue the user picks) on the tile, and the ink on a shift's block, which is that colour mixed in
+  const tile = rgbOf(hsl(hues.theme, colors.theme.s, clamp(colors.theme.l + SURFACE_OFFSETS[8], 0, 100)))
+  const facet = FACET_COLOR[look.mode]
+  let worstFacetLine = Infinity
+  let worstBlock = Infinity
+  for (let h = 0; h < 360; h += 5) {
+    const f = rgbOf(hsl(h, facet.s, facet.l))
+    worstFacetLine = Math.min(worstFacetLine, ratioOfRgb(f, tile))
+    for (const share of Object.values(BLOCK_MIX)) worstBlock = Math.min(worstBlock, ratioOfRgb(ink, over(f, share, tile)))
+  }
+  out.push({ id: 'schedule-facet-line', group: 'Schedule', label: "A facet's line, dot or bar on the tile, the worst hue", kind: 'ui', ratio: worstFacetLine })
+  out.push({ id: 'schedule-block', group: 'Schedule', label: "Ink on a shift's block (the facet colour mixed into the tile), the worst hue and state", kind: 'text', ratio: worstBlock })
+  add('schedule-today', 'Schedule', "The ring round today's square, on the tile", 'ui', ink, tile)
+  add('schedule-axis', 'Schedule', "The line graph's axis text (the ink at 85%) on the tile", 'text', over(ink, 0.85, tile), tile)
 
   // ---- Theme settings: the timeline's icon on its segment (the zone's accent hue at 50% lightness, as ThemeSettingsPanel draws it)
   const segment = hsl(colors.accent.h, colors.accent.s, 50)

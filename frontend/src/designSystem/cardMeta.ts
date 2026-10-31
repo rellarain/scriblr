@@ -13,8 +13,8 @@ export const CARD_META: CardMeta[] = [
     summary: 'The open tiles on a split grid: drag a title bar to move a tile, a divider to resize. The layout is remembered.',
   },
   {
-    id: 'dashboard', dir: 'Dashboard', title: 'Dashboard cards and analytics', group: 'Layout', height: 620,
-    summary: 'Schedule, checklist, analytics bars, the scratchpad and the project tiles beside them.',
+    id: 'dashboard', dir: 'Dashboard', title: 'Schedule console and Dash', group: 'Layout', height: 760,
+    summary: 'The Schedule: goals, activity as a grid or lines, a week of shifts with the backlog beside it, analytics and a review, each a tile; then the scratchpad and the project tiles.',
   },
   {
     id: 'book-cover', dir: 'BookCover', title: 'Book cover, page edges and edge tabs', group: 'Outline', height: 660,

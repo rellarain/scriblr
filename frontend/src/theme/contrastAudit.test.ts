@@ -24,7 +24,7 @@ describe('the contrast audit', () => {
   it('covers the theme surfaces, hover and press, the fills, the paper, the preview page, the reactions, the edge tabs, the sky toggle, the Inbox tones, the plot colours, the Theme panel and the level panels in all four zones', () => {
     for (const zone of ZONES) {
       const groups = new Set(rows.filter(r => r.zone === zone).map(r => r.group))
-      expect([...groups].sort()).toEqual(['Edge tabs', 'Fills', 'Hover and pressed', 'Inbox tones', 'Level panels', 'Paper', 'Plot colours', 'Preview page', 'Reactions', 'Sky toggle', 'Theme panel', 'Theme surfaces'])
+      expect([...groups].sort()).toEqual(['Edge tabs', 'Fills', 'Hover and pressed', 'Inbox tones', 'Level panels', 'Paper', 'Plot colours', 'Preview page', 'Reactions', 'Schedule', 'Sky toggle', 'Theme panel', 'Theme surfaces'])
     }
   })
 

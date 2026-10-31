@@ -1,23 +1,30 @@
-import { BarChartIcon, CalendarIcon, CheckboxIcon, GearIcon, HelpIcon, LayoutMiniIcon, PencilIcon, PeopleIcon } from '../../../icons'
+import { CalendarIcon, GearIcon, HelpIcon, LayoutMiniIcon, PencilIcon, PeopleIcon } from '../../../icons'
 import { SettingsSaveCluster } from '../../../../components/SettingsSaveCluster'
 import { flushSettings } from '../../../../settings/settingsStore'
 import ThemeSettingsPanel from '../../../../theme/ThemeSettingsPanel'
-import { AnalyticsPanel, RoutinesPanel, Scratchpad, TasksPanel } from '../Dashboard'
+import { Scratchpad } from '../Dashboard'
 import ReadersPanel from '../ReadersPanel'
-import WritingAnalytics from '../WritingAnalytics'
+import ScheduleConsole from '../schedule/ScheduleConsole'
+import { ScheduleSummary } from '../schedule/ScheduleSummary'
 import { Placeholder } from '../shared'
 import type { WriterWorkspace } from '../useWriterWorkspace'
 import HelpArticles from './HelpArticles'
 import { useTabbedLevel, type LevelTab } from './LevelTabs'
 
 export const DASH_HELP_NAMES = ['dashboard', 'dash', 'shelves']
-const DASH_HELP_FALLBACK = 'The Dash is your desk across every project: schedule, checklist, analytics and a scratchpad. Pick a tab to open it; at full size each tab opens as a tile.'
+const DASH_HELP_FALLBACK = 'The Dash is your desk across every project: the schedule (goals, shifts, the backlog, activity and analytics) and a scratchpad. Pick a tab to open it; at full size each tab opens as a tile.'
 
 export function dashTabs(w: WriterWorkspace): LevelTab[] {
   return [
-    { id: 'schedule', label: 'Schedule', Icon: CalendarIcon, searchable: true, render: c => <RoutinesPanel query={c.query} /> },
-    { id: 'checklist', label: 'Checklist', Icon: CheckboxIcon, searchable: true, render: c => <TasksPanel query={c.query} /> },
-    { id: 'analytics', label: 'Analytics', Icon: BarChartIcon, render: () => <><AnalyticsPanel projects={w.projects} outlines={w.projectOutlines} /><WritingAnalytics projectIds={w.projects.map(p => p.projectId)} /></> },
+    {
+      id: 'schedule', label: 'Schedule', Icon: CalendarIcon, fill: true,
+      render: c => {
+        const ids = w.projects.map(p => p.projectId)
+        return c.size === 'max'
+          ? <ScheduleConsole scope="dash" projectIds={ids} titles={Object.fromEntries(w.projects.map(p => [p.projectId, p.title]))} />
+          : <ScheduleSummary projectIds={ids} />
+      },
+    },
     { id: 'readers', label: 'Readers', Icon: PeopleIcon, render: () => <ReadersPanel /> },
     { id: 'scratchpad', label: 'Scratchpad', Icon: PencilIcon, searchable: true, render: c => <Scratchpad bare query={c.query} /> },
     { id: 'template', label: 'Project template', Icon: LayoutMiniIcon, render: () => <Placeholder title="Project Template" body="Manage the master project template here." /> },
@@ -29,7 +36,7 @@ export function dashTabs(w: WriterWorkspace): LevelTab[] {
 // The Dash level's tabs, quick actions (the settings store's Save) and the tiles they open.
 export function useDashTabs(w: WriterWorkspace, size: 'min' | 'mid' | 'max') {
   return useTabbedLevel({
-    storageKey: 'scriblr.writer.dash', tabs: dashTabs(w), size, defaultOpen: ['schedule', 'scratchpad'], flush: () => { void flushSettings() },
+    storageKey: 'scriblr.writer.dash', tabs: dashTabs(w), size, defaultOpen: ['schedule'], flush: () => { void flushSettings() },
     // The Dash's Undo and Redo are for the settings (its Settings tab); the other tabs keep their own things in the scratchpad and lists.
     save: focused => <SettingsSaveCluster buttonClassName="wrSmallBtn wrSaveBtn" showHistory={focused === 'settings'} />,
   })

@@ -6,7 +6,6 @@ import SidebarToggle from './assets/Interfaces/writer/SidebarToggle'
 import UUI from './assets/Interfaces/UUI'
 import type { MainInterface } from './interfaceShellTypes'
 import type { CurrentUser } from './userTypes'
-import type { ActivityInterval } from './activityTypes'
 
 interface HeaderProps {
   active: MainInterface
@@ -15,7 +14,6 @@ interface HeaderProps {
   drawerOpen: boolean
   onToggleDrawer: () => void
   currentUser: CurrentUser
-  activity: ActivityInterval[]
 }
 
 // Two independent layers (see App.scss), not one growing box:
@@ -33,7 +31,7 @@ interface HeaderProps {
 //   at the very bottom of the screen. Collapsing never resizes or
 //   unmounts UUI, just slides it out of the visible window.
 function Header({
-  active, onSelect, vuiOpen, drawerOpen, onToggleDrawer, currentUser, activity,
+  active, onSelect, vuiOpen, drawerOpen, onToggleDrawer, currentUser,
 }: HeaderProps) {
   return (
     <>
@@ -49,7 +47,7 @@ function Header({
           </div>
         </div>
 
-        <HeaderActivityRibbon intervals={activity} />
+        <HeaderActivityRibbon />
       </header>
 
       <div className={drawerOpen ? 'headerDrawerClip headerDrawerClip--open' : 'headerDrawerClip'}>

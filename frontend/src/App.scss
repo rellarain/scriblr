@@ -205,16 +205,23 @@ button {border: none; cursor: pointer; border-radius: 4px;}
   min-width: 0;
   height: 100%;
   transition: height 1s;
-  &--work { background: hsl(var(--color-accent-h), var(--color-accent-s), var(--color-accent-l)); color: var(--on-accent); }
-  &--nonWork { background: hsl(var(--color-theme-h), var(--color-theme-s), calc(var(--color-theme-l) + 20%)); }
-  &--break { background: hsl(var(--color-alert-h), var(--color-alert-s), var(--color-alert-l)); color: var(--on-alert); }
+  // Activity is the accent hue; how much, against the usual for that slot, is its lightness. The ground decides which way: on a light ground (dawn,
+  // day) more is darker, on a dark one (dusk, night) more is lighter.
+  &--low { background: hsl(var(--color-accent-h), var(--color-accent-s), calc(var(--ribbon-base-l) + var(--ribbon-low))); }
+  &--avg { background: hsl(var(--color-accent-h), var(--color-accent-s), var(--ribbon-base-l)); }
+  &--high { background: hsl(var(--color-accent-h), var(--color-accent-s), calc(var(--ribbon-base-l) + var(--ribbon-high))); }
+  // A scheduled slot still to come is a little brighter than the ground (the theme hue); one that passed with nothing logged, a little darker.
+  &--sched { background: hsl(var(--color-theme-h), var(--color-theme-s), calc(var(--color-theme-l) + 9%)); }
+  &--missed { background: hsl(var(--color-theme-h), var(--color-theme-s), calc(var(--color-theme-l) - 12%)); }
   // Inactive -- collapsed to 0 height (rather than just transparent) so
   // it never occupies any space, letting whatever's behind (the footer
   // strip when minimized, UUI itself when open) show through untouched.
   &--idle { height: 0; background: transparent; }
   // The slot the real clock is in right now, regardless of its own kind.
-  &--current { background: var(--ink); }
+  &--now { background: var(--ink); }
 }
+.headerRibbonRow[data-ground='light'] { --ribbon-base-l: var(--color-accent-l); --ribbon-low: 24%; --ribbon-high: -14%; }
+.headerRibbonRow[data-ground='dark'] { --ribbon-base-l: var(--color-accent-l); --ribbon-low: -24%; --ribbon-high: 12%; }
 
 // A fixed clipping window, right under row 1 (top: 40px) -- unlike the
 // content inside it, this box itself never resizes or moves. z-index

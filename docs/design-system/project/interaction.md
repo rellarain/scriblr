@@ -12,7 +12,7 @@ A level's header carries its **tabs**: 30 x 30 icon buttons, ending with Setting
 
 - At **Mid** one tab shows at a time, in one column, and the current tab is remembered.
 - At **Max** each tab is the minimised form of a tile: pressing it opens or closes that tile (`aria-pressed`), and the open tiles sit on a split grid.
-- **New** adds what the current tab holds (a routine, a task, a note, a chapter) and puts the cursor in it. **Search** filters the current tab only, and appears only on tabs that can be searched.
+- **New** adds what the current tab holds (a note, a chapter) and puts the cursor in it. **Search** filters the current tab only, and appears only on tabs that can be searched.
 
 ## Moving and resizing tiles
 
@@ -81,7 +81,7 @@ Click a sentence in the preview, then click the bar in the left margin: each cli
 
 - **No scrollbars, anywhere.** A scrolling area (a list, a tile body, the shelf's row, a calendar wider than its box) shows no scrollbar, track or arrows: the app sets `scrollbar-width: none` and hides `::-webkit-scrollbar` on every element, and a new surface does not turn it back on. The area is still scrolled by the wheel, a trackpad, a finger and the keyboard (arrows, Page Up and Down, Space, Home and End).
 - **Show that there is more by the content, not the bar.** Let a row or a card be cut at the edge of the area, keep a header or a tab strip in place above the scrolling part, and never pad the area to make room for a bar.
-- **Wheel and touch both work.** A sideways row (the shelf's books) also turns the vertical wheel into a sideways scroll; it keeps `overscroll-behavior` so the page does not move behind it.
+- **Wheel and touch both work.** A sideways row (the shelf's books) also turns the vertical wheel into a sideways scroll; it keeps `overscroll-behavior` so the page does not move behind it. The activity grid (`useShiftScrollX`) scrolls sideways by touch or by **Shift + the wheel**, and leaves the plain wheel to the page, since the page scrolls over it.
 - **Nothing important only scrolls into view.** An action a reader needs is on screen without scrolling; the scrolling part holds lists, text and data.
 
 ## Focus and hover

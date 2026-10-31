@@ -1,4 +1,4 @@
-import { BarChartIcon, CalendarIcon, ClockIcon, GearIcon, HelpIcon, ListIcon, PlotIcon, QueueIcon } from '../../../icons'
+import { CalendarIcon, ClockIcon, GearIcon, HelpIcon, ListIcon, PlotIcon, QueueIcon } from '../../../icons'
 import WorkspaceSaveCluster from './WorkspaceSaveCluster'
 import { SHELF_COMPONENTS } from '../consoleDefs'
 import { Placeholder } from '../shared'
@@ -7,8 +7,8 @@ import ProjectEditor from '../ProjectEditor'
 import ProjectOutline from '../ProjectOutline'
 import type { HistoryScope, WriterWorkspace } from '../useWriterWorkspace'
 import { bookRows, categoryRows, plotCounts } from '../tiles/tileData'
-import WritingAnalytics from '../WritingAnalytics'
-import { useWordCounts } from '../useWordCounts'
+import ScheduleConsole from '../schedule/ScheduleConsole'
+import { ScheduleSummary } from '../schedule/ScheduleSummary'
 import HelpArticles from './HelpArticles'
 import PlotpointsTab from './PlotpointsTab'
 import { useTabbedLevel, type LevelTab } from './LevelTabs'
@@ -54,38 +54,20 @@ function OutlineSummary({ w }: { w: WriterWorkspace }) {
   )
 }
 
-// The project's books by words (against each book's own goal, when it has one), then how much was written each day.
-function AnalyticsSummary({ w }: { w: WriterWorkspace }) {
-  const books = bookRows(w.outlineNodes)
-  const counts = useWordCounts(w.activeProjectId)
-  const goalOf = (id: string) => w.outlineNodes.find(n => n.id === id)?.wordCountGoal ?? null
-  const max = Math.max(1, ...books.map(b => Math.max(counts.books[b.id] ?? 0, goalOf(b.id) ?? 0)))
-  return (
-    <div className="wrSummary">
-      {books.length === 0 && <p className="wrMuted">No books yet.</p>}
-      {books.map(b => {
-        const words = counts.books[b.id] ?? 0
-        const goal = goalOf(b.id)
-        return (
-          <div key={b.id} className="wrBarRow">
-            <div className="wrBarLabel"><span>{b.title}</span><span>{words.toLocaleString('en-US')}{goal ? ` of ${goal.toLocaleString('en-US')}` : ''} words · {b.chapters} chapters</span></div>
-            <div className="wrBarTrack"><div className="wrBarFill" style={{ width: `${(words / max) * 100}%` }} /></div>
-          </div>
-        )
-      })}
-      {w.activeProjectId && <WritingAnalytics projectIds={[w.activeProjectId]} />}
-    </div>
-  )
-}
-
 export function projectTabs(w: WriterWorkspace): LevelTab[] {
   return [
     { id: 'plot', label: 'Plot', Icon: PlotIcon, fill: true, render: c => (c.size === 'max' ? <PlotView w={w} /> : <PlotSummary w={w} />) },
     { id: 'outline', label: 'Outline', Icon: ListIcon, fill: true, render: c => (c.size === 'max' ? <ProjectOutline w={w} /> : <OutlineSummary w={w} />) },
     { id: 'plotpoints', label: 'Plotpoints', Icon: QueueIcon, render: () => <PlotpointsTab w={w} /> },
-    { id: 'schedule', label: 'Schedule', Icon: CalendarIcon, render: () => placeholder('projectSchedule') },
+    {
+      id: 'schedule', label: 'Schedule', Icon: CalendarIcon, fill: true,
+      render: c => {
+        const id = w.activeProjectId
+        if (!id) return <p className="wrMuted">Open a project to plan its schedule.</p>
+        return c.size === 'max' ? <ScheduleConsole scope="project" projectIds={[id]} titles={{ [id]: w.activeProject?.title ?? 'Project' }} /> : <ScheduleSummary projectIds={[id]} />
+      },
+    },
     { id: 'history', label: 'History', Icon: ClockIcon, render: () => placeholder('projectHistory') },
-    { id: 'analytics', label: 'Analytics', Icon: BarChartIcon, render: () => <AnalyticsSummary w={w} /> },
     { id: 'settings', label: 'Settings', Icon: GearIcon, end: true, surface: true, render: () => <ProjectEditor w={w} /> },
     { id: 'help', label: 'Help', Icon: HelpIcon, render: () => <HelpArticles names={PROJECT_HELP_NAMES} fallback={PROJECT_HELP_FALLBACK} /> },
   ]

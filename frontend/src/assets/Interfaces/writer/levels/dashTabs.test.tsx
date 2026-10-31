@@ -2,7 +2,7 @@ import { render, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import * as resourcesApi from '../../../../api/resourcesApi'
-import { __resetSettingsForTests, getKv } from '../../../../settings/settingsStore'
+import { __resetSettingsForTests } from '../../../../settings/settingsStore'
 import type { WriterWorkspace } from '../useWriterWorkspace'
 import { useDashTabs } from './dashTabs'
 import { mockFetch } from '../../../../test/mockFetch'
@@ -23,36 +23,38 @@ function Harness({ size }: { size: 'mid' | 'max' }) {
 }
 
 describe('the Dash tabs', () => {
-  it('are schedule, checklist, analytics, scratchpad and the project template, ending with Settings and Help', () => {
+  it('are schedule (the checklist and analytics are in it), readers, scratchpad and the project template, ending with Settings and Help', () => {
     render(<Harness size="max" />)
     const names = within(screen.getByRole('toolbar', { name: 'Tabs' })).getAllByRole('button').map(b => b.getAttribute('aria-label'))
-    expect(names).toEqual(['Schedule', 'Checklist', 'Analytics', 'Readers', 'Scratchpad', 'Project template', 'Settings', 'Help'])
+    expect(names).toEqual(['Schedule', 'Readers', 'Scratchpad', 'Project template', 'Settings', 'Help'])
   })
 
-  it('open the schedule and the scratchpad side by side at Max', () => {
+  it('open the schedule alone at Max, with the full width for its tiles, and the scratchpad beside it from its tab', async () => {
+    const user = userEvent.setup()
     render(<Harness size="max" />)
-    expect(screen.getByRole('region', { name: 'Schedule' })).toBeTruthy()
-    expect(screen.getByRole('region', { name: 'Scratchpad' })).toBeTruthy()
+    expect(screen.getAllByRole('region', { name: 'Schedule' }).length).toBeGreaterThan(0)
+    expect(screen.queryByRole('region', { name: 'Scratchpad' })).toBeNull()
     expect(screen.queryByRole('region', { name: 'Checklist' })).toBeNull()
+    await user.click(screen.getByRole('button', { name: 'Scratchpad' }))
+    expect(screen.getByRole('region', { name: 'Scratchpad' })).toBeTruthy()
   })
 
-  it("add a task from the Checklist tab's own add box (the header has no New button)", async () => {
-    const user = userEvent.setup()
-    render(<Harness size="mid" />)
-    await user.click(screen.getByRole('button', { name: 'Checklist' }))
-    expect(screen.queryByRole('button', { name: 'New task' })).toBeNull()
-    const box = screen.getByRole('textbox', { name: 'Add a task…' })
-    await user.click(box)
-    await user.type(box, 'Draft chapter 3{Enter}')
-    expect(getKv<Array<{ label: string }>>('scriblr.writer.tasks')![0].label).toBe('Draft chapter 3')
+  it('puts goals, activity, the schedule, the backlog, analytics and the review in a tile each at Max', () => {
+    render(<Harness size="max" />)
+    const tiles = Array.from(document.querySelectorAll('[data-tile-id]')).map(t => t.getAttribute('data-tile-id'))
+    expect(tiles).toEqual(expect.arrayContaining(['goals', 'review', 'activity', 'schedule', 'backlog', 'analytics']))
+    // The backlog is its own tile, not part of the schedule's.
+    const schedule = Array.from(document.querySelectorAll('[data-tile-id="schedule"]')).at(-1) as HTMLElement // the console's own (the Dash's tile of that name holds it)
+    const backlog = document.querySelector('[data-tile-id="backlog"]') as HTMLElement
+    expect(within(backlog).getByRole('textbox', { name: 'New task' })).toBeTruthy()
+    expect(within(schedule).queryByRole('textbox', { name: 'New task' })).toBeNull()
+    expect(schedule.contains(backlog)).toBe(false)
   })
 
-  it('keeps tasks and routines apart', async () => {
-    const user = userEvent.setup()
+  it('shows today and the counts at Mid', () => {
     render(<Harness size="mid" />)
-    expect(screen.getByRole('textbox', { name: 'Add a routine…' })).toBeTruthy() // the Schedule tab
-    await user.click(screen.getByRole('button', { name: 'Checklist' }))
-    expect(screen.queryByRole('textbox', { name: 'Add a routine…' })).toBeNull()
+    expect(screen.getByText(/Open this tab at full size/)).toBeTruthy()
+    expect(screen.queryByRole('textbox', { name: 'New task' })).toBeNull()
   })
 
   it('search the scratchpad notes', async () => {

@@ -8,6 +8,8 @@ import type { Holding, ReaderState } from '../api/reader'
 import { createMockSocial } from './mockSocial'
 import { READER_BOOKS, READERS, bookDetailFixture, readerFixture, recommendationsFixture } from './readerFixtures'
 import { createMockPresets, previewPresets } from './mockPresets'
+import { facetsFixture, localDay, plannerFixture, ribbonFixture } from './scheduleFixtures'
+import type { Planner } from '../lib/facets'
 
 // A pretend backend for the design system's previews: the real Writer (useWriterWorkspace and everything under it) talks to
 // `/api/...` with fetch, so the previews run the real app against this in-memory project. The labels are the app's own (a book,
@@ -184,6 +186,8 @@ export function createMockBackend() {
   const socialRoute = createMockSocial(() => reader, next => { reader = next })
   // The plot presets the admin page edits and the Plot sidebar's "+ Preset" offers.
   const presets = createMockPresets(previewPresets())
+  // The Schedule console's planner, which its edits change in memory only.
+  let planner: Planner = plannerFixture(localDay())
 
   function readerRoute(method: string, rest: string[], body: unknown): Response {
     const b = (body ?? {}) as { bookId?: string; credits?: number; extraCredits?: number }
@@ -206,6 +210,7 @@ export function createMockBackend() {
     const parts = bare.split('/').filter(Boolean).map(decodeURIComponent)
     if (parts[0] === 'user-settings') return json({ theme: previewTheme(), ui: DEFAULT_UI_SETTINGS, kv: {}, migratedFromLocal: true })
     if (parts[0] === 'resources') return json({ schemaVersion: 1, nodes: [], content: {} })
+    if (parts[0] === 'activity' && parts[1] === 'ribbon') return json(ribbonFixture(localDay()))
     if (parts[0] === 'presets') { const answer = presets.route(method, parts.slice(1), body); return json(answer.body, answer.status) }
     if (parts[0] === 'reader') return socialRoute(method, parts.slice(1), body) ?? readerRoute(method, parts.slice(1), body)
     if (parts[0] === 'library') {
@@ -247,6 +252,12 @@ export function createMockBackend() {
       return json(project.plot)
     }
     if (rest[0] === 'analytics') return json(analytics(project))
+    if (rest[0] === 'activity' && rest[1] === 'facets') return json(facetsFixture(localDay(), FIXTURE_IDS.book))
+    if (rest[0] === 'planner') {
+      if (method === 'PUT') planner = body as Planner
+      return json(planner)
+    }
+    if (rest[0] === 'schedule') return json([])
     if (rest[0] === 'book-progress') return json(SAMPLE_PROGRESS(project.outline.nodes))
     if (rest[0] === 'draft' && rest[1] === 'chapter') {
       const chapterId = rest[2]

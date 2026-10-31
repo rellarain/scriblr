@@ -1,23 +1,55 @@
-# Dashboard cards and analytics
+# Schedule console and Dash
 
-The Dash level is the writer's desk across every project: schedule, checklist, analytics, a scratchpad, and the project tiles beside them (each a shelf in **its own project's colour**, its hue or else the default, so the shelves differ and a colour changed in Project settings shows on its shelf at once).
+The Dash level is the writer's desk across every project. Its **Schedule** tab is one console for managing a project: goals for every facet, the activity of the last year (a grid or lines), a week of shifts with the backlog beside it, analytics and a review. Beside it sit the scratchpad and the project tiles (each a shelf in **its own project's colour**, its hue or else the default, so the shelves differ and a colour changed in Project settings shows on its shelf at once).
 
-Code: `writer/Dashboard.tsx` (`RoutinesPanel`, `TasksPanel`, `AnalyticsPanel`, `Scratchpad`), `writer/levels/dashTabs.tsx`, `levelBodies.tsx` (`ProjectTiles`).
+The same console is the **Project level's Schedule tab**, over that project alone. (It replaces the Dash's Schedule, Checklist and Analytics tabs and the Project's Schedule placeholder and Analytics tab.)
 
-## Anatomy
+Code: `writer/schedule/` (`ScheduleConsole.tsx` and a file for each tile), `lib/scheduleCalendar.ts`, `lib/projection.ts`, `lib/recurrence.ts`, `lib/shiftEdit.ts`, `lib/timeline.ts`, `writer/Dashboard.tsx` (`Scratchpad`), `writer/levels/dashTabs.tsx`, `levelBodies.tsx` (`ProjectTiles`); `styles/_schedule.scss`. A mockup of the console in the Day and Night zones is kept in [`../../../mockups/schedule-console/`](../../../mockups/schedule-console/).
 
-- **Tabs**: Schedule (routines), Checklist (tasks), Analytics, Scratchpad, Project template, Settings (the theme panel), Help. At Max each is a tile on the [split grid](../SplitTiles/README.md).
-- **Routine and task lists** (`.wrCheckItem`): a checkbox in the accent, the text at 13px; a done item is struck through at 80% opacity. A quick-add field (`.wrInlineAdd`) sits under the list: a light input and an *Add* button.
-- **Analytics** (`.wrStatRow`, `.wrBarRow`): big numbers (24px) over uppercase labels, and goal bars (`.wrBarTrack` black at 30%, `.wrBarFill` white at 85%) with a label and a value on one line.
-- **Notes** (`.wrNote`): a title and a body, one step deeper (`level-fill-3`); the one being edited is `level-fill-4` with a 3px white left stripe. Enter adds a note.
-- **Project tiles** beside the Dash (`.wrProjectsColumn`, `.wrProjectTile`): one flat tile per project in the project's own colour, with the book **shelf** inside.
+## The console's tiles
+
+The console is its own [split grid](../SplitTiles/README.md) inside the tab (saved as `scriblr.writer.schedule.tiles.<dash|project>`), with six tiles, each of which can be dragged by its title bar and resized by a divider. At Mid the tab shows today's shifts and the counts only.
+
+- **Goals** (`GoalsCard`): this week's words, words a writing day, the streak and the best streak, then each goal. A goal is for a **facet** (Outline, Plot, Draft, Revision, Project) and a scope (the project, a book or a chapter), with a daily, a weekly and a total target and an optional **deadline**. It shows its progress as a meter in the facet's colour, today's and the week's share, and a status chip: **▲ Ahead**, **● On track**, **▼ Behind** or **✓ Done**, from the pace of the last 28 days against the pace the deadline needs (the glyph, not only the colour, says which). At the Dash the account's own goals and each project's are listed, each tagged.
+- **Review**: a week or a month of each facet against the one before it, and how many days had any work.
+- **Activity** (`ActivityCard`): the facets to show (several, all on to begin with, at least one stays on), what the shades are measured against (**Vs goal**, or **Vs busiest day**; a facet without a daily goal uses the busiest day), and the chart: **Grid** or **Line graph**.
+- **Schedule** (`ScheduleCard`): Day, Week, Month and Agenda views like a calendar; see below.
+- **Backlog** (`Backlog`): its own tile, beside the schedule. Overdue routines (**Priority**), those due today, those inside their range (low priority), the tasks not on a shift (drag one onto a shift to assign it), the paused routines and, folded, those coming up; and an add box for a task and a routine.
+- **Analytics** (`AnalyticsCard`): words drafted a month by book; the outline's and the plot's growth by kind; revision flags applied and resolved a week; and when in the week the work happens (the days whose events are still kept).
+
+## The activity grid
+
+`.wrSchedCal`. A 14px square for each day of the last **52 weeks**, a week to a column, the week starting on **Monday** (or Sunday: a setting). One letter beside **every** row (M T W T F S S), **between the monthly bars and the grid**. Above the columns each month is a **rectangle** with its whole name, over the columns of the weeks that begin in it. **Today** has a 2px outline in the ink colour (white in Dusk and Night, near-black in Dawn and Day), with a gap.
+
+A cell is shaded in four steps of the accent by the **highest** of the selected facets' levels: against the daily goal where there is one (a goal met is the darkest step and a small ring marks it), else against that facet's busiest day. The hover names each facet's count: "Sat, Oct 31 · Outline 2 nodes · Draft 1,808 words".
+
+Before the 12 months, each older month is a **bar** one column wide and seven rows tall, stacked by facet (each facet scaled by its own busiest month so that words and nodes can share a bar), its height the share of the busiest month's average a day. The grid opens at the latest weeks and scrolls sideways by touch or **Shift + the wheel**; the plain wheel still scrolls the page. The day letters stay at the left edge of what is on view (`position: sticky`).
+
+## The line graph
+
+`.wrSchedLine`. One line per facet that has a **total goal**: the share of that goal done over time, 0 to 100%, with a daily point for the last 12 months and a monthly one before. Past today the line carries on **dotted** at the last 28 days' pace until it reaches 100% or the deadline (a vertical rule). Each facet's end marker has its own shape (circle, square, diamond, triangle, cross), so colour is never the only cue. Hover, or the left and right arrow keys on the focused chart (Shift for a week), read every value on a day.
+
+## Facet colours
+
+`--wr-f-outline`, `-plot`, `-draft`, `-revision`, `-project` are set on the console from five hues the user picks (Settings, in the Schedule tile). The saturation and lightness come from the zone's ground (`FACET_COLOR` in `theme/zoneLooks.ts`: dark and vivid on a light zone, light on a dark one), so a line, a dot or a bar reads on the tile (3:1) whatever hue is picked; the contrast page audits every hue.
+
+## The schedule
+
+- **Shifts** are blocks on a day, snapped to 10 minutes. Drag across empty time to make one; drag a block to move it (across days in the week view) or its top or bottom edge to resize it; click it, or press Enter on it, to edit it; right-click, or press and hold on a touch screen, for **Edit, Duplicate, Skip this day, Delete**.
+- A shift that repeats asks **This day, This and following, or All of them** when it is changed.
+- **Each ten minutes is judged by itself.** A slot is *done* when its shift's facet logged something in it and *missed* when not; a thin strip down the block's right edge shows each slot (solid, or hatched when missed). The block says **Upcoming, In progress, Done, Partly done** or **Missed** in words.
+- The editor sets the title, facet, day, time, an aim (words, nodes, flags or items), what it is on, how it repeats (every N days; on chosen days every N weeks; until a date), pauses, and the **checklist items assigned to it**, ticked per day.
+- **Routines** come round daily, weekly, or after an interval of days, weeks or months. An interval can be a **range** (every 7-10 days): inside it the routine is low priority but can be ticked, and past it the routine goes to the top as **Priority**. A routine can be **paused** for a length of time (skipped, not missed). **Rest days** (Settings) pause the routines and skip the shifts, and do not break a streak.
+- **Deadlines** sit in a strip under the day's name, and on the month.
+- Settings also holds the week's first day, the facet colours, a reminder before each shift (a desktop notification), the project's timeline, **Export shifts (.ics)** and **Print the week**.
 
 ## Tokens
 
-`surface-*` (the Dash is the theme's own colour), `level-fill-1..4`, `ink`, `ink-muted`, `accent`. Counts are `ink` on the tile.
+`surface-raised` (the tile body), `surface-deep`, `surface-side`, `ink`, `ink-muted`, `accent`, `on-accent`, `--wr-f-*`. Every pair is in the [contrast audit](../../contrast.md) (group *Schedule*).
 
 ## Don't
 
-- Don't colour a number: the figure is white on the tile; state is in a bar's length, not its hue.
-- Don't show a chart without its value in text.
-- Don't invent a new card style for a stat: use `.wrStatRow` and `.wrBarRow`.
+- Don't colour a number: the figure is in the ink on the tile; state is in a bar's length, a chip's glyph and word, not only its hue.
+- Don't show a chart without its value in text (a hover, an `aria-label`).
+- Don't write a literal white or black for the today ring or the line axis: use `ink`.
+- Don't put a scrollbar on the grid: it scrolls by touch and Shift + wheel (see [interaction](../../interaction.md)).

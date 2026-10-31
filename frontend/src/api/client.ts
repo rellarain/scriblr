@@ -28,6 +28,8 @@ async function request<T>(path: string, init?: RequestInit): Promise<T> {
     throw new ApiError(response.status, detail)
   }
 
+  // Something changed: the header's activity ribbon looks again a moment after the last change.
+  if (init?.method && init.method !== 'GET' && typeof window !== 'undefined') window.dispatchEvent(new Event('scriblr:changed'))
   if (response.status === 204) {
     return undefined as T
   }

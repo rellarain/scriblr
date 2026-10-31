@@ -1,127 +1,18 @@
 import { useEffect, useRef, useState } from 'react'
-import type { OutlineNode } from '../../../api/types'
 import { PlusIcon, TrashIcon } from '../../icons'
-import { booksOf, chaptersOfBook } from './outlineTree'
 import { AutoTextarea, useStoredState } from './shared'
 import { focusNodeField, useNodeKeys } from '../../../lib/nodeKeys'
 
-// The Dash's panels: tasks, routines, analytics and the scratchpad, each a tab of the Dash level
-// (levels/dashTabs.tsx). Checklists and notes have no backend of their own, so they persist in the
-// user's settings store.
+// The Dash's scratchpad, a tab of the Dash level (levels/dashTabs.tsx). Notes have no backend of their own, so they persist in the
+// user's settings store. (The tasks, routines and analytics that used to be here are the Schedule console, schedule/.)
 
-export interface ChecklistItem { id: string; label: string; done: boolean }
-export const TASKS_KEY = 'scriblr.writer.tasks'
-export const ROUTINES_KEY = 'scriblr.writer.routines'
 export const NOTES_KEY = 'scriblr.writer.scratchpad'
 
 export function newId(): string {
   return Math.random().toString(36).slice(2, 9)
 }
 
-// `query` filters the list by text; each rise of `newTick` (the level header's New button) puts the cursor in the add box.
-function Checklist({ title, storageKey, placeholder, query = '', newTick = 0 }: {
-  title: string; storageKey: string; placeholder: string; query?: string; newTick?: number
-}) {
-  const [items, setItems] = useStoredState<ChecklistItem[]>(storageKey, [])
-  const [draft, setDraft] = useState('')
-  const addRef = useRef<HTMLInputElement>(null)
-  useEffect(() => { if (newTick > 0) addRef.current?.focus() }, [newTick])
-  const shown = query ? items.filter(i => i.label.toLowerCase().includes(query)) : items
-
-  function add() {
-    if (!draft.trim()) return
-    setItems(prev => [...prev, { id: newId(), label: draft.trim(), done: false }])
-    setDraft('')
-  }
-
-  return (
-    <div className="wrCard">
-      <div className="wrCardTitle">{title}</div>
-      {items.length === 0 && <p className="wrMuted">Nothing here yet.</p>}
-      {items.length > 0 && shown.length === 0 && <p className="wrMuted">Nothing matches.</p>}
-      <ul className="wrChecklist">
-        {shown.map(item => (
-          <li key={item.id} className={item.done ? 'wrCheckItem wrCheckItem--done' : 'wrCheckItem'}>
-            <label>
-              <input
-                type="checkbox" checked={item.done}
-                onChange={() => setItems(prev => prev.map(i => (i.id === item.id ? { ...i, done: !i.done } : i)))}
-              />
-              <span>{item.label}</span>
-            </label>
-            <button
-              type="button" className="wrTrashBtn wrTrashBtn--dark" aria-label={`Delete ${item.label}`}
-              onClick={() => setItems(prev => prev.filter(i => i.id !== item.id))}
-            >
-              <TrashIcon size={14} />
-            </button>
-          </li>
-        ))}
-      </ul>
-      <div className="wrInlineAdd">
-        <input
-          ref={addRef} value={draft} placeholder={placeholder} aria-label={placeholder}
-          onChange={e => setDraft(e.target.value)}
-          onKeyDown={e => { if (e.key === 'Enter') add() }}
-        />
-        <button type="button" className="wrSmallBtn" disabled={!draft.trim()} onClick={add}><PlusIcon size={14} /> Add</button>
-      </div>
-    </div>
-  )
-}
-
 export interface PanelContext { query?: string; newTick?: number }
-
-// The Dash's Checklist tab (tasks) and Schedule tab (routines).
-export function TasksPanel({ query, newTick }: PanelContext) {
-  return <Checklist title="Tasks" storageKey={TASKS_KEY} placeholder="Add a task…" query={query} newTick={newTick} />
-}
-
-export function RoutinesPanel({ query, newTick }: PanelContext) {
-  return <Checklist title="Routines" storageKey={ROUTINES_KEY} placeholder="Add a routine…" query={query} newTick={newTick} />
-}
-
-export function AnalyticsPanel({ projects, outlines }: {
-  projects: { projectId: string; title: string }[]
-  outlines: Record<string, OutlineNode[]>
-}) {
-  const rows = projects.map(p => {
-    const nodes = outlines[p.projectId] ?? []
-    const books = booksOf(nodes)
-    const chapters = books.reduce((n, b) => n + chaptersOfBook(nodes, b.id).length, 0)
-    return { id: p.projectId, title: p.title, books: books.length, chapters, moments: nodes.filter(n => n.kind === 'moment' && !n.freeDraft).length }
-  })
-  const maxChapters = Math.max(1, ...rows.map(r => r.chapters))
-  const totals = rows.reduce(
-    (t, r) => ({ books: t.books + r.books, chapters: t.chapters + r.chapters, moments: t.moments + r.moments }),
-    { books: 0, chapters: 0, moments: 0 },
-  )
-
-  return (
-    <div className="wrColumn wrColumn--bare">
-      <div className="wrCard">
-        <div className="wrCardTitle">Across all projects</div>
-        <div className="wrStatRow">
-          <div><strong>{rows.length}</strong><span>projects</span></div>
-          <div><strong>{totals.books}</strong><span>books</span></div>
-          <div><strong>{totals.chapters}</strong><span>chapters</span></div>
-          <div><strong>{totals.moments}</strong><span>moments</span></div>
-        </div>
-      </div>
-      <div className="wrCard">
-        <div className="wrCardTitle">Chapters by project</div>
-        {rows.length === 0 && <p className="wrMuted">No projects yet.</p>}
-        {rows.map(r => (
-          <div key={r.id} className="wrBarRow">
-            <div className="wrBarLabel"><span>{r.title}</span><span>{r.chapters} chapters</span></div>
-            <div className="wrBarTrack"><div className="wrBarFill" style={{ width: `${(r.chapters / maxChapters) * 100}%` }} /></div>
-          </div>
-        ))}
-      </div>
-    </div>
-  )
-}
-
 export interface Note { id: string; title: string; body: string }
 
 // Notes are cards with a title and description. Click one to edit it. The
