@@ -13,6 +13,7 @@ from .api import (
     book_publishing,
     draft,
     export,
+    facets,
     feedback,
     library,
     outline,
@@ -24,6 +25,7 @@ from .api import (
     reader_reading,
     reader_social,
     resources,
+    revision_flags,
     revisions,
     schedule,
     scrap,
@@ -124,6 +126,9 @@ def create_app(static_dir: Optional[Path] = None) -> FastAPI:
     app.include_router(analytics.router)
     app.include_router(book_progress.router)
     app.include_router(schedule.router)
+    app.include_router(facets.project_router)
+    app.include_router(facets.account_router)
+    app.include_router(revision_flags.router)
     app.include_router(scrap.router)
     app.include_router(export.router)
     app.include_router(presets.router)

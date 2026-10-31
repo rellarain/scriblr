@@ -4,7 +4,7 @@ from fastapi import APIRouter, Depends
 
 from ..deps import get_storage_root
 from ..models import ScheduleCompletionsRequest
-from ..storage import project_store as store
+from ..storage import facet_activity, project_store as store
 
 router = APIRouter(prefix="/api/projects/{project_id}/schedule", tags=["schedule"])
 
@@ -24,7 +24,11 @@ def put_schedule_completions(
     body: ScheduleCompletionsRequest,
     root: Path = Depends(get_storage_root),
 ) -> list[str]:
-    log = store.load_schedule_completions(root, project_id)
-    log.days[date] = body.completedItemIds
-    store.save_schedule_completions(root, project_id, log)
-    return log.days[date]
+    with store.transaction(root, project_id):
+        log = store.load_schedule_completions(root, project_id)
+        newly = [i for i in body.completedItemIds if i not in log.days.get(date, [])]
+        log.days[date] = body.completedItemIds
+        store.save_schedule_completions(root, project_id, log)
+        for item_id in newly:  # ticking an item is project activity
+            facet_activity.record(root, project_id, "project", "tick", node_id=f"{date}:{item_id}", kind="item", label=item_id[:60])
+        return log.days[date]

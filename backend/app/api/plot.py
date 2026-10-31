@@ -4,7 +4,7 @@ from fastapi import APIRouter, Depends, Query
 
 from ..deps import get_storage_root
 from ..models import PlotRevertResponse, PlotSnapshotDetail
-from ..storage import activity, project_store as store, tree_history
+from ..storage import activity, facet_activity, project_store as store, tree_history
 from ..storage.schema import PlotNode, PlotTree, TreeDiffResponse, TreeSnapshotSummary
 
 router = APIRouter(prefix="/api/projects/{project_id}/plot", tags=["plot"])
@@ -18,8 +18,13 @@ def get_plot(project_id: str, root: Path = Depends(get_storage_root)) -> PlotTre
 @router.put("", response_model=PlotTree)
 def put_plot(project_id: str, body: PlotTree, root: Path = Depends(get_storage_root)) -> PlotTree:
     with store.transaction(root, project_id):
+        try:
+            old_nodes = [n.model_dump() for n in store.load_plot(root, project_id).nodes]
+        except store.ShardCorruptError:  # saving over an unreadable plot is how it is put right
+            old_nodes = []
         store.save_plot(root, project_id, body)
         node_dicts = [n.model_dump() for n in body.nodes]
+        facet_activity.record_tree_changes(root, project_id, "plot", old_nodes, node_dicts)
         snapshot = tree_history.maybe_create_snapshot(root, project_id, "plot", node_dicts)
         if snapshot is not None:
             activity.record_daily_activity(root, project_id, plot_saves=1)

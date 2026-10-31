@@ -1,0 +1,89 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Header ribbon zones</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<style>
+body{margin:0}
+.wrap{width:1440px;box-sizing:border-box;padding:24px;display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:16px;background:#f3eef0;font:13px/1.35 system-ui,"Segoe UI",sans-serif}
+.wrap *{box-sizing:border-box}
+.zone{border-radius:4px;padding:16px 18px;background:var(--base);color:var(--ink)}
+.dawn{--base:#d7c9d0;--side:#cebdc6;--ink:#090708;--muted:rgba(9,7,8,.8);--lo:hsl(32,45%,74%);--av:hsl(32,45%,56%);--hi:hsl(32,45%,38%);--sched:#dccfd6;--missed:#b9a3af}
+.day{--base:#e6d1db;--side:#dfc3d1;--ink:#090708;--muted:rgba(9,7,8,.8);--lo:hsl(32,80%,68%);--av:hsl(32,80%,50%);--hi:hsl(32,80%,34%);--sched:#ecd9e4;--missed:#c9a0b6}
+.dusk{--base:#63364d;--side:#562e42;--ink:#ffffff;--muted:rgba(255,255,255,.88);--lo:hsl(32,80%,36%);--av:hsl(32,80%,50%);--hi:hsl(32,80%,68%);--sched:#6a3b55;--missed:#3d1f2f}
+.night{--base:#4c3842;--side:#413038;--ink:#ffffff;--muted:rgba(255,255,255,.88);--lo:hsl(32,45%,36%);--av:hsl(32,45%,52%);--hi:hsl(32,45%,70%);--sched:#54424c;--missed:#2a1f25}
+.zone h2{margin:0 0 2px;font-size:15px;font-weight:800}
+.zone p{margin:0 0 12px;color:var(--muted);font-size:12px}
+.axis{position:relative;height:14px;font-size:10px;font-weight:700;color:var(--muted)}
+.axis span{position:absolute;top:0;transform:translateX(-50%)}
+.strip{display:flex;align-items:flex-start;height:40px;background:var(--side);border-radius:2px;overflow:hidden}
+.rs{flex:1 1 0;min-width:0;height:40px}
+.rs-idle{height:0}
+.rs-low{background:var(--lo)}
+.rs-avg{background:var(--av)}
+.rs-high{background:var(--hi)}
+.rs-sched{background:var(--sched)}
+.rs-missed{background:var(--missed)}
+.rs-now{background:var(--ink)}
+.keys{display:flex;flex-wrap:wrap;gap:6px 14px;margin-top:12px;font-size:11px;color:var(--muted)}
+.keys span{display:inline-flex;align-items:center;gap:6px}
+.sw{display:inline-block;width:18px;height:10px;border-radius:2px;border:1px solid var(--muted)}
+.sw.lo{background:var(--lo)}.sw.av{background:var(--av)}.sw.hi{background:var(--hi)}.sw.sc{background:var(--sched)}.sw.mi{background:var(--missed)}.sw.no{background:var(--ink)}.sw.id{background:var(--side)}
+</style>
+</helmet>
+<div class="wrap">
+  <sc-for list="{{zones}}" as="z" hint-placeholder-count="4">
+    <section class="zone {{z.cls}}">
+      <h2>{{z.name}}</h2>
+      <p>{{z.rule}}</p>
+      <div class="axis" aria-hidden="true"><sc-for list="{{ticks}}" as="t" hint-placeholder-count="9"><span style="{{t.style}}">{{t.label}}</span></sc-for></div>
+      <div class="strip" role="img" aria-label="{{z.name}} ribbon, 144 ten-minute slots">
+        <sc-for list="{{slots}}" as="s" hint-placeholder-count="144"><span class="rs rs-{{s.k}}"></span></sc-for>
+      </div>
+      <div class="keys">
+        <span><i class="sw lo"></i>{{z.loLabel}}</span>
+        <span><i class="sw av"></i>Average</span>
+        <span><i class="sw hi"></i>{{z.hiLabel}}</span>
+        <span><i class="sw sc"></i>Scheduled, still to come</span>
+        <span><i class="sw mi"></i>Scheduled, missed</span>
+        <span><i class="sw no"></i>Now</span>
+        <span><i class="sw id"></i>Idle (collapsed to 0 height)</span>
+      </div>
+    </section>
+  </sc-for>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":1440,"height":760}}'>
+class Component extends DCLogic {
+  renderVals() {
+    const kind = new Array(144).fill('idle');
+    const fill = (a, b, k) => { for (let i = a; i <= b; i++) kind[i] = k; };
+    fill(39, 44, 'missed');
+    fill(48, 50, 'low'); fill(51, 57, 'avg'); fill(58, 65, 'high'); fill(66, 71, 'avg');
+    fill(78, 80, 'avg'); fill(81, 84, 'high'); fill(85, 85, 'low');
+    fill(90, 101, 'sched'); fill(117, 122, 'sched');
+    kind[86] = 'now';
+    const ticks = [];
+    for (let h = 0; h <= 24; h += 3) ticks.push({ label: (h % 12 === 0 ? 12 : h % 12) + (h === 24 || h < 12 ? ' AM' : ' PM'), style: 'left:' + (h / 24 * 100) + '%' });
+    const darker = 'More activity = darker. Lower than average is lighter.';
+    const lighter = 'More activity = lighter. Lower than average is darker.';
+    return {
+      slots: kind.map((k) => ({ k })),
+      ticks,
+      zones: [
+        { cls: 'dawn', name: 'Dawn', rule: darker, loLabel: 'Lower than average', hiLabel: 'Higher than average' },
+        { cls: 'day', name: 'Day', rule: darker, loLabel: 'Lower than average', hiLabel: 'Higher than average' },
+        { cls: 'dusk', name: 'Dusk', rule: lighter, loLabel: 'Lower than average', hiLabel: 'Higher than average' },
+        { cls: 'night', name: 'Night', rule: lighter, loLabel: 'Lower than average', hiLabel: 'Higher than average' },
+      ],
+    };
+  }
+}
+</script>
+</body>
+</html>

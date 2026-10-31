@@ -23,11 +23,14 @@ from .schema import (
     DraftChapter,
     DraftChapterMoment,
     DraftMoment,
+    FacetActivity,
     OutlineTree,
+    Planner,
     PlotTree,
     ProjectFile,
     ProjectIndex,
     Publication,
+    RevisionFlag,
     RevisionSnapshot,
     SettingsLogEntry,
     ScheduleCompletionLog,
@@ -476,6 +479,7 @@ def _load_project_file_locked(root: Path, project_id: str) -> tuple[ProjectFile,
 
     outline_default, plot_default = OutlineTree(), PlotTree()
     activity_default, schedule_default, scrap_default = DailyActivityLog(), ScheduleCompletionLog(), ScrapRegistry()
+    facets_default, planner_default = FacetActivity(), Planner()
     pf = ProjectFile(
         schemaVersion=raw.get("schemaVersion", SCHEMA_VERSION),
         hueScheme=raw.get("hueScheme", HUE_SCHEME),
@@ -491,11 +495,15 @@ def _load_project_file_locked(root: Path, project_id: str) -> tuple[ProjectFile,
         plotHistory=_parse_list_section(raw, "plotHistory", TreeSnapshot, project_dir, path, errors),
         activity=_parse_section_default(raw, "activity", DailyActivityLog, project_dir, path, errors, activity_default),
         schedule=_parse_section_default(raw, "schedule", ScheduleCompletionLog, project_dir, path, errors, schedule_default),
+        facets=_parse_section_default(raw, "facets", FacetActivity, project_dir, path, errors, facets_default),
+        revisionFlags=_parse_list_section(raw, "revisionFlags", RevisionFlag, project_dir, path, errors),
+        planner=_parse_section_default(raw, "planner", Planner, project_dir, path, errors, planner_default),
         scrap=_parse_section_default(raw, "scrap", ScrapRegistry, project_dir, path, errors, scrap_default),
         settingsLog=_parse_list_section(raw, "settingsLog", SettingsLogEntry, project_dir, path, errors),
     )
     for key, placeholder in (
         ("outline", outline_default), ("plot", plot_default), ("activity", activity_default), ("schedule", schedule_default), ("scrap", scrap_default),
+        ("facets", facets_default), ("planner", planner_default),
     ):
         if key in errors:
             pf._unreadable[key] = (raw.get(key), placeholder)
@@ -1208,6 +1216,40 @@ def append_settings_log(root: Path, project_id: str, entry: SettingsLogEntry) ->
 def save_daily_activity(root: Path, project_id: str, log: DailyActivityLog) -> None:
     def _do(pf: ProjectFile) -> None:
         pf.activity = log
+
+    _mutate(root, project_id, _do)
+
+
+def mutate(root: Path, project_id: str, fn: Callable[[ProjectFile], None]) -> ProjectFile:
+    """Change the project's whole in-memory file under its lock (inside a transaction, the transaction's), for modules that keep their own sections."""
+    return _mutate(root, project_id, fn)
+
+
+def load_project(root: Path, project_id: str) -> ProjectFile:
+    pf, _errors = _load_project_file(root, project_id)
+    return pf
+
+
+# ---------------------------------------------------------------------------
+# Faceted activity, revision flags and the planner
+# ---------------------------------------------------------------------------
+
+
+def load_facets(root: Path, project_id: str) -> FacetActivity:
+    return load_project(root, project_id).facets
+
+
+def load_revision_flags(root: Path, project_id: str) -> list[RevisionFlag]:
+    return load_project(root, project_id).revisionFlags
+
+
+def load_planner(root: Path, project_id: str) -> Planner:
+    return load_project(root, project_id).planner
+
+
+def save_planner(root: Path, project_id: str, planner: Planner) -> None:
+    def _do(pf: ProjectFile) -> None:
+        pf.planner = planner
 
     _mutate(root, project_id, _do)
 

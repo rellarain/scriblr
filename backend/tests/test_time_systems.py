@@ -131,6 +131,7 @@ def test_a_project_file_saved_before_format_5_is_read_and_rewritten_with_spaces(
     import json
 
     from app.storage import project_store as store
+    from app.storage.schema import PROJECT_FILE_VERSION
 
     index = store.create_project(storage_root, "Old indent")
     path = storage_root / index.projectId / "project.json"
@@ -145,7 +146,7 @@ def test_a_project_file_saved_before_format_5_is_read_and_rewritten_with_spaces(
     # The next write saves it in the new form and keeps the format-4 file beside it.
     store.save_outline(storage_root, index.projectId, outline)
     rewritten = json.loads(path.read_text(encoding="utf-8"))
-    assert rewritten["schemaVersion"] == 5
+    assert rewritten["schemaVersion"] == PROJECT_FILE_VERSION
     assert rewritten["outline"]["nodes"][0]["previewFormat"]["paragraphIndentSpaces"] == 8
     assert "paragraphIndent" not in rewritten["outline"]["nodes"][0]["previewFormat"]
     assert (storage_root / index.projectId / "project.json.v4.bak").exists()

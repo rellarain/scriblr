@@ -4,7 +4,7 @@ from fastapi import APIRouter, Depends, Query
 
 from ..deps import get_storage_root
 from ..models import OutlineRevertResponse, OutlineSnapshotDetail
-from ..storage import activity, project_store as store, scrap, tree_history
+from ..storage import activity, facet_activity, project_store as store, scrap, tree_history
 from ..storage.schema import OutlineNode, OutlineTree, TreeDiffResponse, TreeSnapshotSummary
 
 router = APIRouter(prefix="/api/projects/{project_id}/outline", tags=["outline"])
@@ -24,6 +24,7 @@ def put_outline(
         store.save_outline(root, project_id, body)
         scrap.detect_and_record_orphans(root, project_id, old_outline.nodes, body.nodes)
         node_dicts = [n.model_dump() for n in body.nodes]
+        facet_activity.record_tree_changes(root, project_id, "outline", [n.model_dump() for n in old_outline.nodes], node_dicts)
         snapshot = tree_history.maybe_create_snapshot(root, project_id, "outline", node_dicts)
         if snapshot is not None:
             activity.record_daily_activity(root, project_id, outline_saves=1)

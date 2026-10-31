@@ -4,7 +4,7 @@ from fastapi import APIRouter, Depends
 
 from ..deps import get_storage_root
 from ..models import CreateProjectRequest, ProjectOverview, ProjectSummaryResponse, UpdateProjectRequest
-from ..storage import book_progress
+from ..storage import book_progress, facet_activity
 from ..storage import project_store as store
 from ..storage import settings_log
 from ..storage.schema import ProjectIndex, SettingsLogEntry, utcnow
@@ -36,6 +36,7 @@ def get_project(project_id: str, root: Path = Depends(get_storage_root)) -> Proj
     index = store.load_index(root, project_id)
     warnings: list[str] = []
     warnings.extend(store.consolidate_project_history(root, project_id))
+    facet_activity.compact_project(root, project_id)
     outline = None
     try:
         outline = store.load_outline(root, project_id)
@@ -55,6 +56,7 @@ def update_project(
 ) -> ProjectIndex:
     with store.transaction(root, project_id):
         index = store.load_index(root, project_id)
+        everything_before = (index.title, index.settings.model_dump(mode="json"))
         before = {
             "timeSystems": [t.model_dump(mode="json") for t in index.settings.timeSystems],
             "themeHue": index.settings.themeHue,
@@ -91,6 +93,8 @@ def update_project(
         }
         index.updatedAt = utcnow()
         store.save_index(root, index)
+        if everything_before != (index.title, index.settings.model_dump(mode="json")):
+            facet_activity.record(root, project_id, "project", "setting", node_id="settings", kind="settings", label="Project settings changed")
         # A change to the name, the time systems or the colour is logged with what it replaced, so it can be undone.
         if before != after:
             store.append_settings_log(root, project_id, settings_log.new_entry("project", "Project settings changed", before))

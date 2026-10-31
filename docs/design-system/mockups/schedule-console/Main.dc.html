@@ -1,0 +1,606 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Schedule console</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<style>
+body{margin:0}
+.day{--base:#e6d1db;--side:#dfc3d1;--raised:#ddc0cf;--deep:#d4afc2;--ink:#090708;--muted:rgba(9,7,8,.8);--faint:rgba(9,7,8,.68);--accent:#aa6413;--on-accent:#fff;--cell:rgba(9,7,8,.14);--line:rgba(9,7,8,.22);--f-outline:#2b64a0;--f-plot:#7442a0;--f-draft:#aa6413;--f-revision:#1a7d6e;--f-project:#a93557;--on-f:#fff;--sched:#ecd9e4;--missed:#c9a0b6;--lo:hsl(32,80%,68%);--av:hsl(32,80%,50%);--hi:hsl(32,80%,34%)}
+.night{--base:#4c3842;--side:#413038;--raised:#3e2e36;--deep:#2f2329;--ink:#ffffff;--muted:rgba(255,255,255,.88);--faint:rgba(255,255,255,.78);--accent:#caa173;--on-accent:#090708;--cell:rgba(255,255,255,.14);--line:rgba(255,255,255,.24);--f-outline:#7fb2e0;--f-plot:#b996de;--f-draft:#caa173;--f-revision:#62c9b6;--f-project:#e68aa5;--on-f:#090708;--sched:#54424c;--missed:#2a1f25;--lo:hsl(32,45%,34%);--av:hsl(32,45%,50%);--hi:hsl(32,45%,68%)}
+.root{width:100%;box-sizing:border-box;background:var(--base);color:var(--ink);font:13px/1.35 system-ui,"Segoe UI",sans-serif}
+.root *{box-sizing:border-box}
+.root button{font:inherit;color:inherit;cursor:pointer}
+.nav{height:40px;display:flex;align-items:center;gap:20px;padding:0 16px;background:var(--base)}
+.brand{font-weight:800;letter-spacing:.04em;font-size:15px}
+.navLink{padding:4px 10px;border-radius:4px;color:var(--muted)}
+.navLink.on{background:var(--accent);color:var(--on-accent);font-weight:700}
+.ribbon{height:10px;background:var(--side);display:flex;align-items:flex-start}
+.rs{flex:1 1 0;min-width:0;height:10px}
+.rs-idle{height:0}
+.rs-low{background:var(--lo)}
+.rs-avg{background:var(--av)}
+.rs-high{background:var(--hi)}
+.rs-sched{background:var(--sched)}
+.rs-missed{background:var(--missed)}
+.rs-now{background:var(--ink)}
+.tabs{display:flex;flex-wrap:wrap;gap:4px;padding:10px 16px 0;align-items:flex-end}
+.lvlName{font-weight:700;font-size:15px;margin-right:16px;padding-bottom:6px}
+.tab{padding:6px 12px;border-radius:4px 4px 0 0;background:transparent;border:0;color:var(--muted)}
+.tab.on{background:var(--raised);color:var(--ink);font-weight:700}
+.page{padding:0 16px 24px;background:var(--base)}
+.scope{margin-left:auto;display:flex;gap:4px;padding-bottom:6px}
+.rowFlex{display:flex;flex-wrap:wrap;gap:12px;margin-top:12px;align-items:flex-start}
+.card{background:var(--raised);border-radius:4px;padding:14px 16px;min-width:0}
+.cardHead{display:flex;align-items:center;gap:10px;margin-bottom:10px;flex-wrap:wrap}
+.card h2{margin:0;font-size:15px;font-weight:800}
+.card h3{margin:14px 0 6px;font-size:11px;font-weight:800;letter-spacing:.06em;text-transform:uppercase;color:var(--muted)}
+.btn{background:transparent;border:1px solid var(--line);border-radius:4px;padding:3px 10px;font-size:12px}
+.btn.accent{background:var(--accent);border-color:var(--accent);color:var(--on-accent);font-weight:700}
+.spacer{flex:1 1 auto}
+.seg{display:inline-flex;border:1px solid var(--line);border-radius:4px;overflow:hidden}
+.segBtn{background:transparent;border:0;padding:3px 10px;font-size:12px}
+.segBtn.on{background:var(--accent);color:var(--on-accent);font-weight:700}
+.dot{display:inline-block;width:10px;height:10px;border-radius:50%;flex:none}
+.goalsCard{flex:1 1 380px;max-width:460px}
+.activityCard{flex:999 1 640px}
+.schedCard{flex:999 1 640px}
+.analyticsCard{flex:1 1 380px;max-width:520px}
+.statRow{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:8px;margin-bottom:10px}
+.stat b{display:block;font-size:17px}
+.stat span{font-size:11px;color:var(--muted)}
+.goal{padding:8px 0;border-top:1px solid var(--line)}
+.goalTop{display:flex;align-items:center;gap:8px}
+.goalTop b{font-size:13px}
+.goalPct{margin-left:auto;font-weight:700}
+.chip{font-size:11px;font-weight:700;padding:1px 7px;border-radius:4px;border:1px solid var(--ink)}
+.chip.ahead{background:var(--accent);color:var(--on-accent);border-color:var(--accent)}
+.chip.track{background:transparent}
+.chip.behind{border-style:dashed;background:var(--deep)}
+.meter{height:8px;border-radius:4px;background:var(--cell);margin:6px 0;overflow:hidden}
+.meter i{display:block;height:100%}
+.goalMeta{display:flex;gap:14px;font-size:12px;color:var(--muted);flex-wrap:wrap}
+.goalDue{font-size:12px;color:var(--faint);margin-top:2px}
+.bookRow{display:grid;grid-template-columns:70px 1fr 34px;gap:6px;align-items:center;font-size:12px;margin:3px 0}
+.bookName{font-weight:700;font-size:12px;margin-top:6px}
+.toolbar{display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin-bottom:12px}
+.fChip{display:inline-flex;align-items:center;gap:6px;padding:3px 10px;border-radius:4px;border:1px solid var(--line);background:transparent;font-size:12px}
+.fChip.on{background:var(--deep);border-color:var(--ink);font-weight:700}
+.cal{min-width:0}
+.calDays{display:grid;grid-template-rows:repeat(7,14px);gap:2px;width:14px;text-align:center;font-size:10px;line-height:14px;font-weight:700;color:var(--muted)}
+.topLetters{width:14px;flex:none}
+.scroller{overflow-x:auto;overflow-y:hidden;touch-action:pan-x;overscroll-behavior-x:contain;scrollbar-width:none}
+.calInner{width:max-content}
+.calTop{display:flex;gap:10px;height:20px;margin-bottom:4px}
+.topBars{width:78px;background:var(--deep);border-radius:2px;font-size:11px;font-weight:700;text-align:center;line-height:20px}
+.topMonths{display:grid;grid-template-columns:repeat(52,14px);gap:2px}
+.mRect{background:var(--deep);border-radius:2px;font-size:11px;font-weight:700;line-height:20px;padding:0 4px;overflow:hidden;white-space:nowrap}
+.calRows{display:flex;gap:10px}
+.bars{display:flex;gap:2px;height:110px;align-items:flex-end;padding-right:0}
+.bar{display:flex;flex-direction:column-reverse;width:14px}
+.bar i{display:block;width:14px}
+.weeks{display:grid;grid-auto-flow:column;grid-template-rows:repeat(7,14px);grid-auto-columns:14px;gap:2px}
+.cell{width:14px;height:14px;border-radius:2px;background:var(--cell)}
+.cell.lv1{background:color-mix(in srgb,var(--accent) 34%,var(--cell))}
+.cell.lv2{background:color-mix(in srgb,var(--accent) 58%,var(--cell))}
+.cell.lv3{background:color-mix(in srgb,var(--accent) 82%,var(--cell))}
+.cell.lv4{background:var(--accent)}
+.cell.future{visibility:hidden}
+.cell.today{outline:2px solid var(--ink);outline-offset:1px}
+.calFoot{display:flex;flex-wrap:wrap;gap:12px;align-items:center;margin-top:10px;font-size:12px;color:var(--muted)}
+.legend{display:inline-flex;align-items:center;gap:4px;margin-left:auto}
+.lineWrap{position:relative}
+.lineWrap svg{display:block;width:100%;height:auto}
+.gl{stroke:var(--line);stroke-width:1}
+.ax{fill:var(--muted);font-size:10px;font-weight:700}
+.tip{position:absolute;background:var(--deep);border:1px solid var(--ink);border-radius:4px;padding:6px 10px;font-size:12px;min-width:150px}
+.tip div{display:flex;align-items:center;gap:6px;justify-content:space-between}
+.tipRow{display:flex;gap:6px;align-items:center}
+.wkBar{display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin-bottom:10px}
+.schedBody{display:flex;flex-wrap:wrap;gap:12px;align-items:flex-start}
+.wkWrap{flex:999 1 520px;min-width:0}
+.wk{display:grid;grid-template-columns:42px repeat(7,minmax(0,1fr));gap:2px}
+.wkHead{font-size:11px;font-weight:700;text-align:center;padding:4px 0;border-radius:2px;background:var(--deep)}
+.wkHead.today{background:var(--accent);color:var(--on-accent)}
+.hrs{display:grid;grid-template-rows:repeat(15,26px);font-size:10px;color:var(--muted);text-align:right;padding-right:6px}
+.dcol{position:relative;height:390px;background:repeating-linear-gradient(to bottom,var(--cell) 0,var(--cell) 1px,transparent 1px,transparent 26px);border-radius:2px;background-color:var(--side)}
+.blk{position:absolute;left:2px;right:2px;border-radius:4px;padding:3px 5px;font-size:11px;overflow:hidden;line-height:1.25;border:1.5px solid var(--bc)}
+.blk b{display:block}
+.blk-done{background:var(--bc);color:var(--on-f)}
+.blk-part{background:color-mix(in srgb,var(--bc) 55%,var(--raised));color:var(--ink)}
+.blk-up{background:color-mix(in srgb,var(--bc) 18%,var(--raised));color:var(--ink)}
+.blk-missed{background:repeating-linear-gradient(135deg,var(--missed) 0,var(--missed) 6px,var(--deep) 6px,var(--deep) 12px);border-style:dashed;color:var(--ink)}
+.blk-paused{background:transparent;border-style:dashed;color:var(--muted)}
+.nowLine{position:absolute;left:0;right:0;height:0;border-top:2px solid var(--ink)}
+.backlog{flex:1 1 250px;max-width:300px;min-width:0}
+.item{display:flex;gap:8px;align-items:flex-start;padding:6px 8px;border-radius:4px;background:var(--side);margin-bottom:4px;font-size:12px}
+.item small{display:block;color:var(--muted);font-size:11px}
+.item input{margin:2px 0 0}
+.grip{color:var(--faint);letter-spacing:-2px;cursor:grab;user-select:none}
+.tag{font-size:10px;font-weight:700;padding:0 5px;border-radius:3px;border:1px solid var(--ink)}
+.tag.over{background:var(--accent);color:var(--on-accent);border-color:var(--accent)}
+.anGrid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:14px}
+.chart{min-width:0}
+.chart h4{margin:0 0 6px;font-size:12px;font-weight:800}
+.stackRow{display:flex;gap:4px;align-items:flex-end;height:100px}
+.stackCol{flex:1 1 0;display:flex;flex-direction:column-reverse}
+.stackCol i{display:block}
+.mini{font-size:10px;color:var(--muted);display:flex;gap:8px;flex-wrap:wrap;margin-top:4px}
+.mini span{display:inline-flex;align-items:center;gap:4px}
+.pairRow{display:flex;gap:6px;align-items:flex-end;height:80px}
+.pair{flex:1 1 0;display:flex;gap:2px;align-items:flex-end}
+.pair i{flex:1 1 0;display:block}
+.heat{display:grid;grid-template-columns:34px repeat(7,minmax(0,1fr));gap:2px;font-size:10px;color:var(--muted)}
+.heat .hc{height:14px;border-radius:2px;background:var(--cell)}
+.heat .hc.lv1{background:color-mix(in srgb,var(--accent) 34%,var(--cell))}
+.heat .hc.lv2{background:color-mix(in srgb,var(--accent) 58%,var(--cell))}
+.heat .hc.lv3{background:color-mix(in srgb,var(--accent) 82%,var(--cell))}
+.heat .hc.lv4{background:var(--accent)}
+.heat .hl{line-height:14px;text-align:center}
+</style>
+</helmet>
+<div class="root {{themeClass}}">
+  <div class="nav">
+    <span class="brand">SCRIBLR</span>
+    <span class="navLink on">Write</span>
+    <span class="navLink">Read</span>
+    <span class="navLink">Translate</span>
+    <span class="spacer"></span>
+    <span class="dot" style="background:var(--accent)"></span>
+    <span>Writer</span>
+  </div>
+  <div class="ribbon" role="img" aria-label="Today's activity and scheduled shifts, in 10-minute intervals">
+    <sc-for list="{{slots}}" as="s" hint-placeholder-count="144"><span class="rs rs-{{s.k}}"></span></sc-for>
+  </div>
+
+  <div class="tabs">
+    <span class="lvlName">Sample project</span>
+    <button class="tab">Plot</button>
+    <button class="tab">Outline</button>
+    <button class="tab">Plotpoints</button>
+    <button class="tab on">Schedule</button>
+    <button class="tab">History</button>
+    <button class="tab">Settings</button>
+    <button class="tab">Help</button>
+    <span class="scope">
+      <span class="seg" role="group" aria-label="Scope"><button class="segBtn on">This project</button><button class="segBtn">All projects</button></span>
+    </span>
+  </div>
+
+  <div class="page">
+    <div class="rowFlex">
+      <section class="card goalsCard">
+        <div class="cardHead"><h2>Goals</h2><span class="spacer"></span><button class="btn">Timeline</button><button class="btn accent">+ Goal</button></div>
+        <div class="statRow">
+          <sc-for list="{{stats}}" as="st" hint-placeholder-count="4"><div class="stat"><b>{{st.v}}</b><span>{{st.l}}</span></div></sc-for>
+        </div>
+        <sc-for list="{{goals}}" as="g" hint-placeholder-count="5">
+          <div class="goal">
+            <div class="goalTop"><span class="dot" style="{{g.dot}}"></span><b>{{g.name}}</b><span class="chip {{g.chipCls}}">{{g.chip}}</span><span class="goalPct">{{g.pct}}%</span></div>
+            <div class="meter" role="img" aria-label="{{g.aria}}"><i style="{{g.fill}}"></i></div>
+            <div class="goalMeta"><span>Today {{g.daily}}</span><span>Week {{g.weekly}}</span><span>Total {{g.total}}</span></div>
+            <div class="goalDue">{{g.due}}</div>
+          </div>
+        </sc-for>
+        <h3>By book</h3>
+        <sc-for list="{{books}}" as="bk" hint-placeholder-count="2">
+          <div class="bookName">{{bk.name}}</div>
+          <sc-for list="{{bk.rows}}" as="r" hint-placeholder-count="5">
+            <div class="bookRow"><span>{{r.name}}</span><div class="meter"><i style="{{r.fill}}"></i></div><span>{{r.pct}}%</span></div>
+          </sc-for>
+        </sc-for>
+      </section>
+
+      <section class="card activityCard">
+        <div class="cardHead">
+          <h2>Activity</h2>
+          <span class="spacer"></span>
+          <span class="seg" role="group" aria-label="Chart type">
+            <button class="segBtn {{gridCls}}" onClick="{{showGrid}}" aria-pressed="{{isGrid}}">Grid</button>
+            <button class="segBtn {{lineCls}}" onClick="{{showLine}}" aria-pressed="{{isLine}}">Line graph</button>
+          </span>
+        </div>
+        <div class="toolbar">
+          <sc-for list="{{facets}}" as="f" hint-placeholder-count="5">
+            <button class="fChip {{f.cls}}" onClick="{{f.toggle}}" aria-pressed="{{f.on}}"><span class="dot" style="{{f.dot}}"></span>{{f.name}}</button>
+          </sc-for>
+          <span class="spacer"></span>
+          <sc-if value="{{isGrid}}" hint-placeholder-val="{{true}}">
+            <span class="seg" role="group" aria-label="Shading rule">
+              <button class="segBtn {{goalCls}}" onClick="{{ruleGoal}}" aria-pressed="{{ruleIsGoal}}">Vs goal</button>
+              <button class="segBtn {{busyCls}}" onClick="{{ruleBusy}}" aria-pressed="{{ruleIsBusy}}">Vs busiest day</button>
+            </span>
+          </sc-if>
+        </div>
+
+        <sc-if value="{{isGrid}}" hint-placeholder-val="{{true}}">
+          <div class="cal">
+            <div class="scroller">
+              <div class="calInner">
+                <div class="calTop">
+                  <div class="topBars">2025 · monthly</div>
+                  <div class="topLetters"></div>
+                  <div class="topMonths">
+                    <sc-for list="{{months}}" as="m" hint-placeholder-count="12"><div class="mRect" style="{{m.style}}">{{m.name}}</div></sc-for>
+                  </div>
+                </div>
+                <div class="calRows">
+                  <div class="bars" role="img" aria-label="Monthly totals before the last 12 months, one bar per month">
+                    <sc-for list="{{bars}}" as="b" hint-placeholder-count="5">
+                      <div class="bar" title="{{b.title}}"><sc-for list="{{b.segs}}" as="sg" hint-placeholder-count="3"><i style="{{sg.style}}"></i></sc-for></div>
+                    </sc-for>
+                  </div>
+                  <div class="calDays" aria-hidden="true"><span>M</span><span>T</span><span>W</span><span>T</span><span>F</span><span>S</span><span>S</span></div>
+                  <div class="weeks" role="img" aria-label="{{calAria}}">
+                    <sc-for list="{{cells}}" as="c" hint-placeholder-count="364"><i class="cell {{c.cls}}" title="{{c.title}}"></i></sc-for>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+          <div class="calFoot">
+            <span>{{calSummary}}</span>
+            <span class="legend">Less
+              <i class="cell"></i><i class="cell lv1"></i><i class="cell lv2"></i><i class="cell lv3"></i><i class="cell lv4"></i>
+              More</span>
+            <span class="legend" style="margin-left:0"><i class="cell today"></i> Today</span>
+          </div>
+        </sc-if>
+
+        <sc-if value="{{isLine}}" hint-placeholder-val="{{false}}">
+          <div class="lineWrap">
+            <svg viewBox="0 0 900 230" role="img" aria-label="Goal completion per facet over time, with dotted projections">
+              <sc-for list="{{yTicks}}" as="t" hint-placeholder-count="5"><line class="gl" x1="40" x2="892" y1="{{t.y}}" y2="{{t.y}}"></line><text class="ax" x="34" y="{{t.ty}}" style="text-anchor:end">{{t.label}}</text></sc-for>
+              <sc-for list="{{xTicks}}" as="t" hint-placeholder-count="8"><text class="ax" x="{{t.x}}" y="224" style="text-anchor:middle">{{t.label}}</text></sc-for>
+              <line x1="{{divX}}" x2="{{divX}}" y1="8" y2="200" style="stroke:var(--line);stroke-width:1;stroke-dasharray:3 3"></line>
+              <text class="ax" x="{{divXL}}" y="18" style="text-anchor:end">monthly</text>
+              <text class="ax" x="{{divXR}}" y="18">daily</text>
+              <line x1="{{deadX}}" x2="{{deadX}}" y1="8" y2="200" style="stroke:var(--ink);stroke-width:1.5"></line>
+              <text class="ax" x="{{deadXL}}" y="18" style="text-anchor:end">Deadline Mar 1</text>
+              <line x1="{{todayX}}" x2="{{todayX}}" y1="8" y2="200" style="stroke:var(--ink);stroke-width:1;stroke-dasharray:1 3"></line>
+              <text class="ax" x="{{todayXL}}" y="214" style="text-anchor:end">Today</text>
+              <sc-for list="{{lines}}" as="l" hint-placeholder-count="5">
+                <polyline points="{{l.solid}}" style="{{l.solidStyle}}"></polyline>
+                <polyline points="{{l.dotted}}" style="{{l.dottedStyle}}"></polyline>
+              </sc-for>
+              <line x1="{{hoverX}}" x2="{{hoverX}}" y1="8" y2="200" style="stroke:var(--ink);stroke-width:1"></line>
+              <sc-for list="{{hoverDots}}" as="d" hint-placeholder-count="5"><circle cx="{{d.x}}" cy="{{d.y}}" r="4" style="{{d.style}}"></circle></sc-for>
+            </svg>
+            <div class="tip" style="{{tipStyle}}">
+              <b>Aug 14, 2026</b>
+              <sc-for list="{{tipRows}}" as="t" hint-placeholder-count="5"><div><span class="tipRow"><span class="dot" style="{{t.dot}}"></span>{{t.name}}</span><b>{{t.v}}</b></div></sc-for>
+            </div>
+          </div>
+          <div class="calFoot">
+            <span>Each line is the share of that facet's total goal completed. Solid = logged; dotted = projected at the last 28 days' pace.</span>
+          </div>
+        </sc-if>
+      </section>
+    </div>
+
+    <div class="rowFlex">
+      <section class="card schedCard">
+        <div class="wkBar">
+          <h2>Schedule</h2>
+          <button class="btn">Today</button>
+          <button class="btn" aria-label="Previous week">‹</button>
+          <button class="btn" aria-label="Next week">›</button>
+          <b>Oct 26 – Nov 1, 2026</b>
+          <span class="spacer"></span>
+          <span class="seg" role="group" aria-label="Calendar view">
+            <button class="segBtn">Day</button><button class="segBtn on">Week</button><button class="segBtn">Month</button><button class="segBtn">Agenda</button>
+          </span>
+          <button class="btn accent">+ Shift</button>
+        </div>
+        <div class="schedBody">
+          <div class="wkWrap">
+            <div class="wk">
+              <div></div>
+              <sc-for list="{{wkDays}}" as="d" hint-placeholder-count="7"><div class="wkHead {{d.cls}}">{{d.name}}</div></sc-for>
+              <div class="hrs" aria-hidden="true"><sc-for list="{{hours}}" as="h" hint-placeholder-count="15"><span>{{h}}</span></sc-for></div>
+              <sc-for list="{{wkDays}}" as="d" hint-placeholder-count="7">
+                <div class="dcol">
+                  <sc-for list="{{d.blocks}}" as="b" hint-placeholder-count="2">
+                    <div class="blk blk-{{b.state}}" style="{{b.style}}"><b>{{b.title}}</b>{{b.sub}}<br>{{b.status}}</div>
+                  </sc-for>
+                  <sc-if value="{{d.isToday}}" hint-placeholder-val="{{false}}"><div class="nowLine" style="{{nowStyle}}"></div></sc-if>
+                </div>
+              </sc-for>
+            </div>
+          </div>
+          <aside class="backlog">
+            <h3 style="margin-top:0">Backlog</h3>
+            <sc-for list="{{backlog}}" as="grp" hint-placeholder-count="4">
+              <div class="bookName">{{grp.name}}</div>
+              <sc-for list="{{grp.items}}" as="it" hint-placeholder-count="2">
+                <div class="item"><span class="grip" aria-hidden="true">⋮⋮</span><input type="checkbox" aria-label="{{it.label}}"><span><b>{{it.label}}</b><small>{{it.sub}}</small></span><span class="tag {{it.tagCls}}">{{it.tag}}</span></div>
+              </sc-for>
+            </sc-for>
+          </aside>
+        </div>
+      </section>
+
+      <section class="card analyticsCard">
+        <div class="cardHead"><h2>Analytics</h2><span class="spacer"></span><span class="seg"><button class="segBtn on">12 months</button><button class="segBtn">All time</button></span></div>
+        <div class="anGrid">
+          <div class="chart">
+            <h4>Words drafted by book</h4>
+            <div class="stackRow" role="img" aria-label="Words drafted per month, stacked by book">
+              <sc-for list="{{wordCols}}" as="c" hint-placeholder-count="12"><div class="stackCol" title="{{c.title}}"><sc-for list="{{c.segs}}" as="s" hint-placeholder-count="2"><i style="{{s.style}}"></i></sc-for></div></sc-for>
+            </div>
+            <div class="mini"><span><span class="dot" style="background:var(--f-draft)"></span>Book One</span><span><span class="dot" style="background:color-mix(in srgb,var(--f-draft) 45%,var(--raised))"></span>Book Two</span></div>
+          </div>
+          <div class="chart">
+            <h4>Outline and plot growth</h4>
+            <svg viewBox="0 0 220 100" role="img" aria-label="Nodes added over twelve months by kind">
+              <line class="gl" x1="0" x2="220" y1="99" y2="99"></line>
+              <sc-for list="{{growth}}" as="g" hint-placeholder-count="4"><polyline points="{{g.pts}}" style="{{g.style}}"></polyline></sc-for>
+            </svg>
+            <div class="mini"><sc-for list="{{growth}}" as="g" hint-placeholder-count="4"><span><span class="dot" style="{{g.dot}}"></span>{{g.name}}</span></sc-for></div>
+          </div>
+          <div class="chart">
+            <h4>Flags applied vs resolved</h4>
+            <div class="pairRow" role="img" aria-label="Revision flags applied and resolved per week">
+              <sc-for list="{{flagWeeks}}" as="w" hint-placeholder-count="8"><div class="pair" title="{{w.title}}"><i style="{{w.a}}"></i><i style="{{w.r}}"></i></div></sc-for>
+            </div>
+            <div class="mini"><span><span class="dot" style="background:transparent;border:2px solid var(--f-revision)"></span>Applied</span><span><span class="dot" style="background:var(--f-revision)"></span>Resolved</span><span>31 open</span></div>
+          </div>
+          <div class="chart">
+            <h4>When you work</h4>
+            <div class="heat" role="img" aria-label="Typical activity by weekday and time of day over the last 28 days">
+              <span></span><span class="hl">M</span><span class="hl">T</span><span class="hl">W</span><span class="hl">T</span><span class="hl">F</span><span class="hl">S</span><span class="hl">S</span>
+              <sc-for list="{{heat}}" as="r" hint-placeholder-count="6">
+                <span class="hl" style="text-align:right">{{r.label}}</span>
+                <sc-for list="{{r.cells}}" as="c" hint-placeholder-count="7"><span class="hc {{c.cls}}"></span></sc-for>
+              </sc-for>
+            </div>
+          </div>
+        </div>
+      </section>
+    </div>
+  </div>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"theme":{"editor":"enum","default":"day","options":["day","night"],"section":"Look"},"view":{"editor":"enum","default":"grid","options":["grid","line"],"section":"Look"},"$preview":{"width":1440,"height":1620}}'>
+class Component extends DCLogic {
+  constructor(props) {
+    super(props);
+    this.state = { view: null, rule: 'goal', off: {} };
+  }
+
+  renderVals() {
+    const P = this.props;
+    const night = (P.theme ?? 'day') === 'night';
+    const view = this.state.view ?? P.view ?? 'grid';
+    const rule = this.state.rule;
+    const off = this.state.off;
+    const FAC = [['outline', 'Outline'], ['plot', 'Plot'], ['draft', 'Draft'], ['revision', 'Revision'], ['project', 'Project']];
+    const on = (id) => !off[id];
+    const onCount = FAC.filter(([id]) => on(id)).length;
+    const MONTHS = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
+    const MON3 = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+    const DOW3 = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
+
+    // ---- header ribbon (144 ten-minute slots) ----
+    const kind = new Array(144).fill('idle');
+    const fill = (a, b, k) => { for (let i = a; i <= b; i++) kind[i] = k; };
+    fill(39, 44, 'missed');
+    fill(48, 50, 'low'); fill(51, 57, 'avg'); fill(58, 65, 'high'); fill(66, 71, 'avg');
+    fill(78, 80, 'avg'); fill(81, 84, 'high'); fill(85, 85, 'low');
+    fill(90, 101, 'sched'); fill(117, 122, 'sched');
+    kind[86] = 'now';
+    const slots = kind.map((k) => ({ k }));
+
+    // ---- facet toggles ----
+    const facets = FAC.map(([id, name]) => ({
+      id, name, on: on(id), cls: on(id) ? 'on' : '', dot: 'background:var(--f-' + id + ')',
+      toggle: () => {
+        const o = { ...this.state.off };
+        if (o[id]) delete o[id]; else if (onCount > 1) o[id] = true;
+        this.setState({ off: o });
+      },
+    }));
+
+    // ---- grid ----
+    const DAY = 86400000;
+    const start = Date.UTC(2025, 10, 3);
+    const today = Date.UTC(2026, 9, 31);
+    const rnd = (n, s) => { const x = Math.sin(n * 12.9898 + s * 78.233) * 43758.5453; return x - Math.floor(x); };
+    const PROB = { outline: 0.34, plot: 0.3, draft: 0.82, revision: 0.26, project: 0.55 };
+    const UNIT = { outline: ['node', 8], plot: ['plot point', 6], draft: ['word', 500], revision: ['flag', 5], project: ['item', 6] };
+    const N = 52 * 7;
+    const ratio = {};
+    FAC.forEach(([id], k) => {
+      ratio[id] = [];
+      for (let i = 0; i < N; i++) {
+        const ramp = 0.55 + 0.45 * (i / N);
+        const wk = (i % 7) >= 5 ? (id === 'draft' ? 0.6 : 0.8) : 1;
+        ratio[id].push(rnd(i, k) < PROB[id] * ramp * wk ? 0.12 + rnd(i, k + 9) * 1.35 : 0);
+      }
+    });
+    const maxR = {};
+    FAC.forEach(([id]) => { maxR[id] = Math.max.apply(null, ratio[id]); });
+    const lvGoal = (r) => (r <= 0 ? 0 : r < 0.25 ? 1 : r < 0.5 ? 2 : r < 1 ? 3 : 4);
+    const lvBusy = (r, m) => { const s = m > 0 ? r / m : 0; return r <= 0 ? 0 : s <= 0.25 ? 1 : s <= 0.5 ? 2 : s <= 0.75 ? 3 : 4; };
+    let active = 0;
+    let wordsTotal = 0;
+    const cells = [];
+    for (let i = 0; i < N; i++) {
+      const ms = start + i * DAY;
+      const d = new Date(ms);
+      const future = ms > today;
+      let lv = 0;
+      const parts = [];
+      FAC.forEach(([id, name]) => {
+        if (!on(id)) return;
+        const r = ratio[id][i];
+        const l = rule === 'goal' ? lvGoal(r) : lvBusy(r, maxR[id]);
+        if (l > lv) lv = l;
+        if (r > 0) {
+          const q = Math.round(r * UNIT[id][1]);
+          if (id === 'draft') wordsTotal += q;
+          parts.push(name + ' ' + q + ' ' + UNIT[id][0] + (q === 1 ? '' : 's'));
+        }
+      });
+      if (!future && lv > 0) active++;
+      const label = DOW3[d.getUTCDay()] + ', ' + MON3[d.getUTCMonth()] + ' ' + d.getUTCDate();
+      cells.push({
+        cls: future ? 'future' : (ms === today ? 'today lv' + lv : 'lv' + lv),
+        title: future ? '' : (parts.length ? label + ' · ' + parts.join(' · ') : 'No activity on ' + label),
+      });
+    }
+    // month rectangles: weeks that begin (on a Monday) in the month
+    const months = [];
+    for (let w = 0; w < 52; w++) {
+      const d = new Date(start + w * 7 * DAY);
+      const key = d.getUTCFullYear() * 12 + d.getUTCMonth();
+      const last = months[months.length - 1];
+      if (last && last.key === key) last.span++;
+      else months.push({ key, col: w + 1, span: 1, name: MONTHS[d.getUTCMonth()] });
+    }
+    months.forEach((m) => { m.style = 'grid-column:' + m.col + ' / span ' + m.span; });
+    // older months: stacked monthly bars
+    const OLD = [
+      ['June 2025', { outline: 8, plot: 4, draft: 22, revision: 0, project: 3 }],
+      ['July 2025', { outline: 12, plot: 6, draft: 30, revision: 0, project: 5 }],
+      ['August 2025', { outline: 18, plot: 9, draft: 41, revision: 2, project: 8 }],
+      ['September 2025', { outline: 22, plot: 12, draft: 52, revision: 5, project: 9 }],
+      ['October 2025', { outline: 15, plot: 10, draft: 63, revision: 8, project: 12 }],
+    ];
+    const tot = (v) => FAC.reduce((a, [id]) => a + (on(id) ? v[id] : 0), 0);
+    const maxTot = Math.max.apply(null, OLD.map(([, v]) => tot(v))) || 1;
+    const bars = OLD.map(([name, v]) => ({
+      title: name + ' · ' + tot(v) + ' activity points',
+      segs: FAC.filter(([id]) => on(id) && v[id] > 0).map(([id]) => ({ style: 'height:' + (v[id] / maxTot * 110).toFixed(1) + 'px;background:var(--f-' + id + ')' })),
+    }));
+
+    // ---- line graph ----
+    const T = 16.97, DL = 21;
+    const X = (x) => 40 + (x / 21.6) * 852;
+    const Y = (p) => 10 + (1 - p) * 190;
+    const PAR = { outline: [1, 0.92, 0.9], plot: [2, 0.78, 1.1], draft: [1.5, 0.58, 1.25], revision: [9, 0.52, 1.0], project: [0, 0.8, 1.0] };
+    const prog = (id, x) => { const [s, c, k] = PAR[id]; return x <= s ? 0 : c * Math.pow((x - s) / (T - s), k); };
+    const lines = FAC.filter(([id]) => on(id)).map(([id, name]) => {
+      const [s, c, k] = PAR[id];
+      const slope = c * k / (T - s);
+      const pts = [];
+      for (let x = 0; x <= T + 0.001; x += x < 5 ? 1 : 0.25) pts.push(X(x).toFixed(1) + ',' + Y(prog(id, Math.min(x, T))).toFixed(1));
+      pts.push(X(T).toFixed(1) + ',' + Y(c).toFixed(1));
+      const dot = [X(T).toFixed(1) + ',' + Y(c).toFixed(1)];
+      const hit = T + (1 - c) / slope;
+      const endX = Math.min(hit, 21.5);
+      dot.push(X(endX).toFixed(1) + ',' + Y(Math.min(1, c + slope * (endX - T))).toFixed(1));
+      const col = 'var(--f-' + id + ')';
+      return {
+        solid: pts.join(' '), dotted: dot.join(' '),
+        solidStyle: 'fill:none;stroke:' + col + ';stroke-width:2.5',
+        dottedStyle: 'fill:none;stroke:' + col + ';stroke-width:2.5;stroke-dasharray:2 5;stroke-linecap:round',
+      };
+    });
+    const HX = 14.43;
+    const hoverDots = FAC.filter(([id]) => on(id)).map(([id]) => ({ x: X(HX).toFixed(1), y: Y(prog(id, HX)).toFixed(1), style: 'fill:var(--f-' + id + ');stroke:var(--raised);stroke-width:1.5' }));
+    const tipRows = FAC.filter(([id]) => on(id)).map(([id, name]) => ({ name, dot: 'background:var(--f-' + id + ')', v: Math.round(prog(id, HX) * 100) + '%' }));
+    const yTicks = [0, 0.25, 0.5, 0.75, 1].map((p) => ({ y: Y(p).toFixed(1), ty: (Y(p) + 3).toFixed(1), label: Math.round(p * 100) + '%' }));
+    const xl = [[0, "Jun '25"], [3, 'Sep'], [6, 'Dec'], [9, "Mar '26"], [12, 'Jun'], [15, 'Sep'], [18, 'Dec'], [21, "Mar '27"]];
+    const xTicks = xl.map(([x, label]) => ({ x: X(x).toFixed(1), label }));
+
+    // ---- goals ----
+    const GO = [
+      ['outline', 'Outline', 92, 'ahead', '▲ Ahead', '6 / 8 nodes', '31 / 40', '221 / 240 nodes', 'Due Nov 30 · 30 days left · done at this pace in 11 days'],
+      ['plot', 'Plot', 78, 'track', '● On track', '2 / 3 plot nodes', '9 / 12', '47 / 60 plot points', 'Due Mar 1 · 121 days left · projected Feb 20'],
+      ['draft', 'Draft', 58, 'behind', '▼ Behind', '412 / 500 words', '2,310 / 3,000', '52,200 / 90,000 words', 'Due Mar 1 · 121 days left · needs 312 words/day, pace is 198'],
+      ['revision', 'Revision', 52, 'behind', '▼ Behind', '3 / 5 flags', '14 / 20', '33 / 64 flags resolved', 'Due Mar 15 · 135 days left · needs 0.3 flags/day more'],
+      ['project', 'Project', 80, 'track', '● On track', '4 / 6 items', '19 / 28', '40 / 50 checklist items', 'Timeline Jan 12 → Mar 1 · day 293 of 414'],
+    ];
+    const goals = GO.filter((g) => on(g[0])).map((g) => ({
+      dot: 'background:var(--f-' + g[0] + ')', name: g[1], pct: g[2], chipCls: g[3], chip: g[4], daily: g[5], weekly: g[6], total: g[7], due: g[8],
+      aria: g[1] + ' ' + g[2] + ' percent complete', fill: 'width:' + g[2] + '%;background:var(--f-' + g[0] + ')',
+    }));
+    const stats = [{ v: '2,310', l: 'words this week' }, { v: '6 days', l: 'streak' }, { v: '19 days', l: 'best streak' }, { v: '385', l: 'words per active day' }];
+    const BK = [['Book One', [['Outline', 100], ['Plot', 96], ['Draft', 88], ['Revision', 71], ['Project', 90]]], ['Book Two', [['Outline', 84], ['Plot', 61], ['Draft', 29], ['Revision', 12], ['Project', 70]]]];
+    const books = BK.map(([name, rows]) => ({ name, rows: rows.map(([n, p]) => ({ name: n, pct: p, fill: 'width:' + p + '%;background:var(--f-' + n.toLowerCase() + ')' })) }));
+
+    // ---- schedule ----
+    const HR = 26, H0 = 6;
+    const dayNames = ['Mon 26', 'Tue 27', 'Wed 28', 'Thu 29', 'Fri 30', 'Sat 31', 'Sun 1'];
+    const SH = [
+      [0, 8, 10, 'draft', 'Draft', 'Ch. 12', '4 of 4 ticked', 'done', 'Done'],
+      [0, 19.5, 20.5, 'revision', 'Revise', 'Ch. 3 flags', '3 of 3 ticked', 'done', 'Done'],
+      [1, 8, 10, 'draft', 'Draft', 'Ch. 12', '4 of 4 ticked', 'done', 'Done'],
+      [1, 17, 17.75, 'project', 'Backup', 'Routine', '1 of 1 ticked', 'done', 'Done'],
+      [2, 8, 9.5, 'outline', 'Outline', 'Book Two', '3 of 3 ticked', 'done', 'Done'],
+      [2, 13, 15, 'plot', 'Plot', 'Romance arc', '0 of 3 ticked', 'missed', 'Missed'],
+      [3, 8, 10, 'draft', 'Draft', 'Ch. 13', '2 of 4 ticked', 'part', 'Partly done'],
+      [3, 12, 13, 'project', 'Walk and plot', 'Routine', 'paused to Nov 9', 'paused', 'Paused'],
+      [4, 8, 10, 'draft', 'Draft', 'Ch. 13', '4 of 4 ticked', 'done', 'Done'],
+      [5, 9, 11.5, 'draft', 'Draft', 'Ch. 14', '3 of 3 ticked', 'done', 'Done'],
+      [5, 15, 17, 'revision', 'Revise', 'Ch. 8 flags', '0 of 4 ticked', 'up', 'Upcoming'],
+      [6, 10, 12, 'project', 'Weekly review', 'Goals', '0 of 5 ticked', 'up', 'Upcoming'],
+    ];
+    const nowTop = ((14 + 20 / 60) - H0) * HR;
+    const wkDays = dayNames.map((name, di) => ({
+      name, cls: di === 5 ? 'today' : '', isToday: di === 5,
+      blocks: SH.filter((s) => s[0] === di).map((s) => ({
+        state: s[7], title: s[4], sub: s[5] + ' · ' + s[6], status: s[8],
+        style: 'top:' + ((s[1] - H0) * HR) + 'px;height:' + ((s[2] - s[1]) * HR - 2) + 'px;--bc:var(--f-' + s[3] + ')',
+      })),
+    }));
+    const hours = [];
+    for (let h = H0; h < H0 + 15; h++) hours.push((h % 12 === 0 ? 12 : h % 12) + (h < 12 ? ' AM' : ' PM'));
+    const backlog = [
+      { name: 'Overdue · range passed', items: [{ label: 'Review character sheets', sub: 'Every 2–3 weeks · day 24 · target: Cast', tag: 'Priority', tagCls: 'over' }] },
+      { name: 'In range · low priority', items: [{ label: 'Export a backup', sub: 'Every 7–10 days · day 8 of 7–10', tag: 'Day 8', tagCls: '' }, { label: 'Tidy scratchpad', sub: 'Every 1–2 months · day 19', tag: 'Day 19', tagCls: '' }] },
+      { name: 'Unassigned tasks', items: [{ label: 'Reread Ch. 8 notes', sub: 'Drag onto a shift · Draft', tag: 'Draft', tagCls: '' }, { label: 'Fix Ch. 4 plot point order', sub: 'Drag onto a shift · Plot', tag: 'Plot', tagCls: '' }] },
+      { name: 'Paused', items: [{ label: 'Walk and plot', sub: 'Daily · paused until Nov 9', tag: 'Paused', tagCls: '' }] },
+    ];
+
+    // ---- analytics ----
+    const B1 = [2.0, 3.1, 4.2, 5.0, 5.6, 5.9, 5.2, 4.4, 3.2, 2.4, 1.8, 1.6];
+    const B2 = [0, 0, 0, 0, 0, 0.4, 1.1, 2.2, 3.4, 4.6, 5.2, 4.6];
+    const wMax = 10;
+    const wordCols = B1.map((v, i) => ({
+      title: MON3[(10 + i) % 12] + ': ' + Math.round((v + B2[i]) * 800) + ' words',
+      segs: [{ style: 'height:' + (v / wMax * 100).toFixed(1) + 'px;background:var(--f-draft)' }, { style: 'height:' + (B2[i] / wMax * 100).toFixed(1) + 'px;background:color-mix(in srgb,var(--f-draft) 45%,var(--raised))' }],
+    }));
+    const series = (arr, mx) => arr.map((v, i) => (i / 11 * 218 + 1).toFixed(1) + ',' + (98 - v / mx * 94).toFixed(1)).join(' ');
+    const growth = [
+      { name: 'Chapters', pts: series([2, 5, 9, 13, 18, 22, 26, 29, 32, 34, 36, 37], 143), c: 'outline', dash: '' },
+      { name: 'Scenes', pts: series([8, 19, 31, 48, 66, 81, 97, 110, 122, 131, 138, 143], 143), c: 'outline', dash: 'stroke-dasharray:5 3' },
+      { name: 'Plotlines', pts: series([1, 3, 5, 6, 8, 9, 11, 12, 13, 14, 14, 15], 143), c: 'plot', dash: '' },
+      { name: 'Plot points', pts: series([4, 10, 17, 26, 33, 41, 48, 55, 60, 64, 68, 71], 143), c: 'plot', dash: 'stroke-dasharray:5 3' },
+    ].map((g) => ({ name: g.name, pts: g.pts, style: 'fill:none;stroke-width:2;stroke:var(--f-' + g.c + ');' + g.dash, dot: 'background:var(--f-' + g.c + ')' }));
+    const AP = [6, 9, 4, 11, 7, 5, 8, 6], RS = [2, 4, 5, 6, 8, 7, 9, 8];
+    const flagWeeks = AP.map((a, i) => ({
+      title: 'Week ' + (i + 1) + ': ' + a + ' applied, ' + RS[i] + ' resolved',
+      a: 'height:' + (a / 11 * 78).toFixed(1) + 'px;border:2px solid var(--f-revision)',
+      r: 'height:' + (RS[i] / 11 * 78).toFixed(1) + 'px;background:var(--f-revision)',
+    }));
+    const HEAT = [['6–9', [2, 2, 1, 2, 2, 0, 0]], ['9–12', [4, 4, 3, 3, 4, 3, 1]], ['12–3', [1, 2, 3, 2, 1, 1, 0]], ['3–6', [1, 1, 2, 1, 1, 2, 0]], ['6–9 pm', [3, 2, 1, 2, 0, 0, 0]], ['9–12 pm', [1, 0, 0, 1, 0, 0, 0]]];
+    const heat = HEAT.map(([label, row]) => ({ label, cells: row.map((l) => ({ cls: 'lv' + l })) }));
+
+    return {
+      themeClass: night ? 'night' : 'day',
+      slots, facets, goals, stats, books, months, bars, cells,
+      calAria: 'Activity grid: ' + active + ' active days in the last 12 months',
+      calSummary: wordsTotal.toLocaleString('en-US') + ' words drafted on ' + active + ' active days · shaded ' + (rule === 'goal' ? 'by share of each facet\'s daily goal' : 'by share of the busiest day'),
+      isGrid: view === 'grid', isLine: view === 'line',
+      gridCls: view === 'grid' ? 'on' : '', lineCls: view === 'line' ? 'on' : '',
+      showGrid: () => this.setState({ view: 'grid' }), showLine: () => this.setState({ view: 'line' }),
+      ruleIsGoal: rule === 'goal', ruleIsBusy: rule === 'busy', goalCls: rule === 'goal' ? 'on' : '', busyCls: rule === 'busy' ? 'on' : '',
+      ruleGoal: () => this.setState({ rule: 'goal' }), ruleBusy: () => this.setState({ rule: 'busy' }),
+      lines, hoverDots, tipRows, yTicks, xTicks,
+      hoverX: X(HX).toFixed(1), divX: X(5).toFixed(1), divXL: (X(5) - 4).toFixed(1), divXR: (X(5) + 4).toFixed(1),
+      deadX: X(DL).toFixed(1), deadXL: (X(DL) - 4).toFixed(1), todayX: X(T).toFixed(1), todayXL: (X(T) - 4).toFixed(1),
+      tipStyle: 'left:' + (X(HX) / 900 * 100 + 1.2).toFixed(1) + '%;top:40px',
+      wkDays, hours, nowStyle: 'top:' + nowTop.toFixed(1) + 'px', backlog,
+      wordCols, growth, flagWeeks, heat,
+    };
+  }
+}
+</script>
+</body>
+</html>

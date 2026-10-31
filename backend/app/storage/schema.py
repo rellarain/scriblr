@@ -10,7 +10,8 @@ SCHEMA_VERSION = 2
 # The version of the project.json file as a whole (ProjectFile.schemaVersion), which a build refuses to write over when the file is newer than it
 # knows (see project_store). 2: one file per project; 3: plot clusters; 4: tree history as sparse keyframes and deltas (tree_pack);
 # 5: a book's paragraph indent in spaces (PreviewFormat.paragraphIndentSpaces) instead of em.
-PROJECT_FILE_VERSION = 5
+# 6: the Schedule console: faceted activity (events, daily and monthly totals, a 28-day slot profile), revision flags and the planner.
+PROJECT_FILE_VERSION = 6
 
 
 def utcnow() -> datetime:
@@ -1157,6 +1158,220 @@ class AuiConfigDraft(BaseModel):
 
 
 # ---------------------------------------------------------------------------
+# Faceted activity (the Schedule console and the header ribbon). Every change is an ActivityEvent for FACET_EVENT_DAYS days; daily totals per
+# facet are kept for about a year (DAILY_KEEP_DAYS), whole months older than that fold into monthly totals, which are kept for good. A
+# 28-day profile of how many events fell in each 10-minute slot of the day, per facet, feeds the ribbon's "higher or lower than usual".
+# Days are the machine's local days. See storage/facet_activity.py.
+# ---------------------------------------------------------------------------
+
+Facet = Literal["outline", "plot", "draft", "revision", "project"]
+FACETS: tuple[str, ...] = ("outline", "plot", "draft", "revision", "project")
+SLOTS_PER_DAY = 144
+FACET_EVENT_DAYS = 14
+SLOT_PROFILE_DAYS = 28
+DAILY_KEEP_DAYS = 372
+EventAction = Literal["create", "edit", "delete", "words", "flag", "resolve", "tick", "setting"]
+
+
+class ActivityEvent(BaseModel):
+    ts: str  # ISO 8601 with the machine's UTC offset
+    date: str  # the local day, YYYY-MM-DD
+    slot: int = Field(ge=0, lt=SLOTS_PER_DAY)  # the local 10-minute slot of the day
+    facet: Facet
+    action: EventAction
+    nodeId: Optional[str] = None
+    kind: Optional[str] = None
+    label: Optional[str] = None
+    # Words changed for a "words" event (negative when words were cut); 1 for the rest.
+    amount: int = 1
+
+
+class DayTotals(BaseModel):
+    outline: int = 0
+    plot: int = 0
+    draft: int = 0  # net words
+    revision: int = 0
+    project: int = 0
+    flagsApplied: int = 0
+    flagsResolved: int = 0
+    books: dict[str, int] = Field(default_factory=dict)  # book id -> net words
+    kinds: dict[str, int] = Field(default_factory=dict)  # node kind -> nodes created
+
+
+class MonthTotals(DayTotals):
+    activeDays: int = 0
+
+
+class FacetActivity(BaseModel):
+    schemaVersion: int = SCHEMA_VERSION
+    events: list[ActivityEvent] = Field(default_factory=list)
+    daily: dict[str, DayTotals] = Field(default_factory=dict)
+    monthly: dict[str, MonthTotals] = Field(default_factory=dict)
+    slots: dict[str, dict[str, list[int]]] = Field(default_factory=dict)  # date -> facet -> events per slot
+    # Whether the older DailyActivityLog (saves per day) has been folded into `daily`.
+    legacyFolded: bool = False
+
+
+# ---------------------------------------------------------------------------
+# Revision flags on a draft passage or on the project itself (the outline and plot nodes carry their own NodeFlag).
+# ---------------------------------------------------------------------------
+
+
+class RevisionFlag(BaseModel):
+    id: str
+    scope: Literal["passage", "project"]
+    type: FlagType
+    note: str = ""
+    # A passage flag: the characters [start, end) of the moment's body. `snippet` is the flagged text, kept so the flag can follow it when the
+    # text is edited; `stale` says the text is gone.
+    chapterId: Optional[str] = None
+    momentId: Optional[str] = None
+    start: int = Field(default=0, ge=0)
+    end: int = Field(default=0, ge=0)
+    snippet: str = Field(default="", max_length=2000)
+    stale: bool = False
+    createdAt: datetime = Field(default_factory=utcnow)
+    resolvedAt: Optional[datetime] = None
+    outcome: str = ""
+
+
+# ---------------------------------------------------------------------------
+# The planner: goals, shifts, routines and checklist items. Times are 10-minute slots of the day (0 = midnight, 144 = the next midnight);
+# dates are local YYYY-MM-DD. Which items were ticked on a day is the older ScheduleCompletionLog.
+# ---------------------------------------------------------------------------
+
+RecurrenceKind = Literal["once", "daily", "weekly", "interval"]
+RecurrenceUnit = Literal["day", "week", "month"]
+GoalScope = Literal["project", "book", "chapter"]
+TargetTree = Literal["outline", "plot"]
+
+
+class Recurrence(BaseModel):
+    kind: RecurrenceKind = "once"
+    # weekly: every N weeks (2 = biweekly) on `days`; interval: every N `unit`s counted from the last time it was done (or the anchor).
+    every: int = Field(default=1, ge=1, le=365)
+    unit: RecurrenceUnit = "day"
+    days: list[int] = Field(default_factory=list)  # 0 = Monday .. 6 = Sunday
+    # interval only: an irregular range, `every` to `rangeMax` units. Inside the range the routine is low priority but can be ticked;
+    # past `rangeMax` it is put on the schedule.
+    rangeMax: Optional[int] = Field(default=None, ge=1, le=365)
+    anchor: str  # the first day it applies, YYYY-MM-DD
+    until: Optional[str] = None
+
+    @model_validator(mode="after")
+    def _check(self) -> "Recurrence":
+        if any(d < 0 or d > 6 for d in self.days):
+            raise ValueError("days must be 0 (Monday) to 6 (Sunday)")
+        if self.rangeMax is not None and self.rangeMax < self.every:
+            raise ValueError("rangeMax must not be below every")
+        return self
+
+
+class Pause(BaseModel):
+    start: str
+    end: str
+
+
+class ShiftOverride(BaseModel):
+    """One occurrence of a repeating shift that was changed alone."""
+
+    title: Optional[str] = None
+    startSlot: Optional[int] = Field(default=None, ge=0, lt=SLOTS_PER_DAY)
+    endSlot: Optional[int] = Field(default=None, gt=0, le=SLOTS_PER_DAY)
+
+
+class PlanItem(BaseModel):
+    """A checklist item. `shiftId` assigns it to a shift; with none it waits in the backlog."""
+
+    id: str
+    label: str = Field(max_length=300)
+    facet: Optional[Facet] = None
+    targetNodeId: Optional[str] = None
+    targetTree: Optional[TargetTree] = None
+    shiftId: Optional[str] = None
+    doneOn: Optional[str] = None  # a one-off item, done on this day
+
+
+class Routine(BaseModel):
+    """An item that comes back: on a pattern, or after an interval (optionally a range)."""
+
+    id: str
+    label: str = Field(max_length=300)
+    facet: Optional[Facet] = None
+    targetNodeId: Optional[str] = None
+    targetTree: Optional[TargetTree] = None
+    shiftId: Optional[str] = None
+    recurrence: Recurrence
+    pauses: list[Pause] = Field(default_factory=list)
+    lastDone: Optional[str] = None
+
+
+class Shift(BaseModel):
+    id: str
+    title: str = Field(max_length=200)
+    facet: Facet
+    date: str  # the day of a one-off shift, or the first day of a repeating one
+    startSlot: int = Field(ge=0, lt=SLOTS_PER_DAY)
+    endSlot: int = Field(gt=0, le=SLOTS_PER_DAY)
+    targetNodeId: Optional[str] = None
+    targetTree: Optional[TargetTree] = None
+    # The amount to do inside the block: words for draft, nodes for outline and plot, flags for revision, items for project.
+    target: Optional[int] = Field(default=None, ge=0)
+    recurrence: Optional[Recurrence] = None
+    pauses: list[Pause] = Field(default_factory=list)
+    skipped: list[str] = Field(default_factory=list)  # days of a repeating shift that are not held
+    overrides: dict[str, ShiftOverride] = Field(default_factory=dict)
+
+    @model_validator(mode="after")
+    def _check(self) -> "Shift":
+        if self.endSlot <= self.startSlot:
+            raise ValueError("a shift must end after it starts")
+        return self
+
+
+class ShiftTemplate(BaseModel):
+    id: str
+    name: str = Field(max_length=100)
+    facet: Facet
+    startSlot: int = Field(ge=0, lt=SLOTS_PER_DAY)
+    endSlot: int = Field(gt=0, le=SLOTS_PER_DAY)
+    target: Optional[int] = Field(default=None, ge=0)
+    days: list[int] = Field(default_factory=list)
+
+
+class Goal(BaseModel):
+    id: str
+    facet: Facet
+    scope: GoalScope = "project"
+    nodeId: Optional[str] = None  # the book or chapter of a book/chapter goal
+    kind: Optional[str] = None  # outline/plot: count only nodes of this kind
+    daily: Optional[int] = Field(default=None, ge=0)
+    weekly: Optional[int] = Field(default=None, ge=0)
+    total: Optional[int] = Field(default=None, ge=0)
+    deadline: Optional[str] = None
+
+
+class RestRange(BaseModel):
+    id: str
+    start: str
+    end: str
+    label: str = Field(default="", max_length=100)
+
+
+class Planner(BaseModel):
+    schemaVersion: int = SCHEMA_VERSION
+    timelineStart: Optional[str] = None
+    timelineEnd: Optional[str] = None
+    goals: list[Goal] = Field(default_factory=list)
+    shifts: list[Shift] = Field(default_factory=list)
+    routines: list[Routine] = Field(default_factory=list)
+    items: list[PlanItem] = Field(default_factory=list)
+    templates: list[ShiftTemplate] = Field(default_factory=list)
+    restDays: list[RestRange] = Field(default_factory=list)
+    reminderLeadMinutes: Optional[int] = Field(default=None, ge=0, le=240)
+
+
+# ---------------------------------------------------------------------------
 # ProjectFile: the single on-disk file a project is stored as (project.json),
 # consolidating what used to be ~10 separate shard files (index, outline,
 # plot, per-chapter drafts, per-chapter revisions, outline/plot history,
@@ -1182,6 +1397,9 @@ class ProjectFile(BaseModel):
     plotHistory: list[TreeSnapshot] = Field(default_factory=list)
     activity: DailyActivityLog = Field(default_factory=DailyActivityLog)
     schedule: ScheduleCompletionLog = Field(default_factory=ScheduleCompletionLog)
+    facets: FacetActivity = Field(default_factory=FacetActivity)
+    revisionFlags: list[RevisionFlag] = Field(default_factory=list)
+    planner: Planner = Field(default_factory=Planner)
     scrap: ScrapRegistry = Field(default_factory=ScrapRegistry)
     # Changes to the project's settings (time systems, colour), newest last; see SettingsLogEntry.
     settingsLog: list[SettingsLogEntry] = Field(default_factory=list)
