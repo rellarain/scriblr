@@ -72,8 +72,12 @@
     &--active { font-weight: 700; }
     // With its description under the name the row has several lines: the controls stand level with the name, not the middle.
     &--desc { align-items: flex-start; }
+    // A category, a subcategory and a cluster are flat fills of their hue with white text (a category's the quietest, a cluster's the loudest);
+    // a plotline is its category's own, lighter, colour. The names of a category and a subcategory are in capitals.
+    &--category { --wr-row-bg: var(--wr-cat-fill, var(--wr-cat)); --wr-row-ink: var(--on-accent); --away: black; }
     &--subcategory { --wr-row-bg: var(--wr-sub-fill, var(--wr-cat)); --wr-row-ink: var(--on-accent); --away: black; }
     &--cluster { --wr-row-bg: var(--wr-cluster-fill, var(--wr-sub-fill, var(--wr-cat))); --wr-row-ink: var(--on-accent); --away: black; }
+    &--category .wrNavLabel, &--subcategory .wrNavLabel { text-transform: uppercase; letter-spacing: 0.04em; }
     // A plotline has nothing to fold: no chevron, and its checkbox stands 5px in from its stripes.
     &--plotline { @include wrEdge; padding-left: var(--wr-edge-w, 4px); .wrNavChevron { display: none; } .wrNavCheck { margin-left: var(--space-3); } }
   }
@@ -96,7 +100,7 @@
   .wrNavText { flex: 1; min-width: 0; display: flex; flex-direction: column; }
   .wrNavDesc { font-size: var(--text-small); font-weight: 400; white-space: pre-line; overflow-wrap: anywhere; }
   .wrNavCount { font-size: var(--text-small); opacity: 0.9; }
-  .wrNavRow--subcategory .wrNavCount, .wrNavRow--cluster .wrNavCount { opacity: 1; }
+  .wrNavRow--category .wrNavCount, .wrNavRow--subcategory .wrNavCount, .wrNavRow--cluster .wrNavCount { opacity: 1; }
   .wrPlotBody { flex: 1 1 auto; min-width: 0; min-height: 0; display: flex; flex-direction: column; gap: var(--space-4); overflow: auto; scrollbar-width: none; &::-webkit-scrollbar { display: none; } }
 
   // The plot colour coding on the editor cards: a category card is its (theme) colour, a subcategory or cluster card its (accent)

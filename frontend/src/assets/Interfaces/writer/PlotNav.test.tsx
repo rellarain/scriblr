@@ -176,3 +176,27 @@ describe('the full descriptions toggle', () => {
     expect(row(container, 'plotline').querySelector('.wrNavDesc')).not.toBeNull()
   })
 })
+
+describe('the rows\' colours', () => {
+  const start = () => [
+    plotNode('cat', 'category', null, { title: 'Characters', hue: 200 }),
+    plotNode('sub', 'subcategory', 'cat', { title: 'Heroes', hue: 230 }),
+    plotNode('clu', 'cluster', 'sub', { title: 'Core', hue: 170 }),
+    plotNode('line', 'plotline', 'clu', { title: 'Ada' }),
+  ] as PlotNode[]
+  const row = (container: HTMLElement, kind: string) => container.querySelector(`.wrNavRow--${kind}`) as HTMLElement
+
+  it('gives a category row its fill beside its colour, as a subcategory and a cluster row have theirs', () => {
+    const { container } = render(<Nav start={start()} />)
+    expect(row(container, 'category').style.getPropertyValue('--wr-cat-fill')).not.toBe('')
+    expect(row(container, 'category').style.getPropertyValue('--wr-cat')).not.toBe('')
+    expect(row(container, 'subcategory').style.getPropertyValue('--wr-sub-fill')).not.toBe('')
+    expect(row(container, 'cluster').style.getPropertyValue('--wr-cluster-fill')).not.toBe('')
+  })
+
+  it('keeps the names as they were typed (capitals are drawn by the styles, not typed over)', () => {
+    const { container } = render(<Nav start={start()} />)
+    expect(within(row(container, 'category')).getByRole('button', { name: 'Characters' })).toHaveTextContent('Characters')
+    expect(within(row(container, 'subcategory')).getByRole('button', { name: 'Heroes' })).toHaveTextContent('Heroes')
+  })
+})

@@ -18,6 +18,9 @@ const APP_HUE = 'var(--color-theme-h)'
 
 export interface PlotColors {
   category: string | null
+  // The category's colour as a surface that carries white text (its row in the plot contents): the level fill of its hue at the quietest
+  // tier, as for a subcategory and a cluster. The category's own colour stays what its plotlines and its editor card are drawn on.
+  categoryFill: string | null
   subcategory: string | null
   // The subcategory's colour as a surface that carries text (a nav row, a card): the level's fill of its hue, held dark enough for white
   // text to read whatever the hue (the accent colour at a hue can be too bright). The edge stripe stays the accent colour.
@@ -54,6 +57,7 @@ export function plotColors(node: PlotNode, byId: Map<string, PlotNode>): PlotCol
   const edged = stripes.length > 0
   return {
     category: categoryCss,
+    categoryFill: category ? fillColorCss(categoryHue ?? APP_HUE, SAT_QUIET) : null,
     subcategory: subcategoryCss,
     subcategoryFill: subcategoryHue !== null ? fillColorCss(subcategoryHue, SAT_MIDDLE) : null,
     cluster: clusterCss,
@@ -65,12 +69,13 @@ export function plotColors(node: PlotNode, byId: Map<string, PlotNode>): PlotCol
   }
 }
 
-// The style that hands a node's colours to its CSS: `var(--wr-cat)`, `var(--wr-sub)`, `var(--wr-sub-fill)`, `var(--wr-cluster)`,
+// The style that hands a node's colours to its CSS: `var(--wr-cat)`, `var(--wr-cat-fill)`, `var(--wr-sub)`, `var(--wr-sub-fill)`, `var(--wr-cluster)`,
 // `var(--wr-cluster-fill)`, and the edge: `var(--wr-edge)`, `var(--wr-edge-size)`, `var(--wr-edge-pos)` and `var(--wr-edge-w)` (each set only when the
 // node has that colour, so `var(--wr-edge, none)` works).
 export function plotColorVars(colors: PlotColors) {
   const vars: Record<string, string> = {}
   if (colors.category) vars['--wr-cat'] = colors.category
+  if (colors.categoryFill) vars['--wr-cat-fill'] = colors.categoryFill
   if (colors.subcategory) vars['--wr-sub'] = colors.subcategory
   if (colors.subcategoryFill) vars['--wr-sub-fill'] = colors.subcategoryFill
   if (colors.cluster) vars['--wr-cluster'] = colors.cluster

@@ -33,18 +33,18 @@ describe('plotColors', () => {
   const all = tree(category, sub, line, point)
 
   it('draws a category in the theme colour and a subcategory in the accent colour', () => {
-    expect(plotColors(category, all)).toEqual({ category: theme(200), subcategory: null, subcategoryFill: null, ...none, ...edge(accent(200, 0.5)) })
-    expect(plotColors(sub, all)).toEqual({ category: theme(200), subcategory: accent(230, 0.75), subcategoryFill: fill(230, 0.75), ...none, ...edge(accent(200, 0.5), accent(230, 0.75)) })
+    expect(plotColors(category, all)).toEqual({ category: theme(200), categoryFill: fill(200, 0.5), subcategory: null, subcategoryFill: null, ...none, ...edge(accent(200, 0.5)) })
+    expect(plotColors(sub, all)).toEqual({ category: theme(200), categoryFill: fill(200, 0.5), subcategory: accent(230, 0.75), subcategoryFill: fill(230, 0.75), ...none, ...edge(accent(200, 0.5), accent(230, 0.75)) })
   })
 
   it('gives plotlines and plotpoints their category\'s and their subcategory\'s colour, and the stripes of both side by side', () => {
-    expect(plotColors(line, all)).toEqual({ category: theme(200), subcategory: accent(230, 0.75), subcategoryFill: fill(230, 0.75), ...none, ...edge(accent(200, 0.5), accent(230, 0.75)) })
-    expect(plotColors(point, all)).toEqual({ category: theme(200), subcategory: accent(230, 0.75), subcategoryFill: fill(230, 0.75), ...none, ...edge(accent(200, 0.5), accent(230, 0.75)) })
+    expect(plotColors(line, all)).toEqual({ category: theme(200), categoryFill: fill(200, 0.5), subcategory: accent(230, 0.75), subcategoryFill: fill(230, 0.75), ...none, ...edge(accent(200, 0.5), accent(230, 0.75)) })
+    expect(plotColors(point, all)).toEqual({ category: theme(200), categoryFill: fill(200, 0.5), subcategory: accent(230, 0.75), subcategoryFill: fill(230, 0.75), ...none, ...edge(accent(200, 0.5), accent(230, 0.75)) })
   })
 
   it('has the category\'s stripe alone for a plotline directly under a category', () => {
     const direct = node('d', 'plotline', 'c')
-    expect(plotColors(direct, tree(category, direct))).toEqual({ category: theme(200), subcategory: null, subcategoryFill: null, ...none, ...edge(accent(200, 0.5)) })
+    expect(plotColors(direct, tree(category, direct))).toEqual({ category: theme(200), categoryFill: fill(200, 0.5), subcategory: null, subcategoryFill: null, ...none, ...edge(accent(200, 0.5)) })
   })
 
   it('lets a subcategory without a hue follow its category', () => {
@@ -60,19 +60,27 @@ describe('plotColors', () => {
     expect(plotColors(bareSub, m).subcategory).toBe(accent('var(--color-theme-h)', 0.75))
   })
 
+  it('gives a category a fill that carries white text, the level fill of its hue at the quietest tier, and everything under it the same one', () => {
+    expect(plotColors(category, all).categoryFill).toBe(fill(200, 0.5))
+    expect(plotColors(sub, all).categoryFill).toBe(fill(200, 0.5))
+    expect(plotColors(line, all).categoryFill).toBe(fill(200, 0.5))
+    const bare = node('c2', 'category', null)
+    expect(plotColors(bare, tree(bare)).categoryFill).toBe(fill('var(--color-theme-h)', 0.5))
+  })
+
   it('has no colour for something outside the category tree', () => {
     const orphan = node('o', 'plotline', null)
-    expect(plotColors(orphan, tree(orphan))).toEqual({ category: null, subcategory: null, subcategoryFill: null, ...none, ...noEdge })
+    expect(plotColors(orphan, tree(orphan))).toEqual({ category: null, categoryFill: null, subcategory: null, subcategoryFill: null, ...none, ...noEdge })
   })
 
   it('hands the colours to CSS as variables, each only when there is one', () => {
-    expect(plotColorVars({ category: theme(10), subcategory: accent(40, 0.75), subcategoryFill: fill(40, 0.75), ...none, ...edge(accent(10, 0.5), accent(40, 0.75)) }))
+    expect(plotColorVars({ category: theme(10), categoryFill: fill(10, 0.5), subcategory: accent(40, 0.75), subcategoryFill: fill(40, 0.75), ...none, ...edge(accent(10, 0.5), accent(40, 0.75)) }))
       .toEqual({
-        '--wr-cat': theme(10), '--wr-sub': accent(40, 0.75), '--wr-sub-fill': fill(40, 0.75),
+        '--wr-cat': theme(10), '--wr-cat-fill': fill(10, 0.5), '--wr-sub': accent(40, 0.75), '--wr-sub-fill': fill(40, 0.75),
         '--wr-edge': `${flat(accent(10, 0.5))}, ${flat(accent(40, 0.75))}`, '--wr-edge-size': '4px 100%, 4px 100%', '--wr-edge-pos': '0px 0, 4px 0', '--wr-edge-w': '8px',
       })
-    expect(plotColorVars({ category: theme(10), subcategory: null, subcategoryFill: null, ...none, ...noEdge })).toEqual({ '--wr-cat': theme(10) })
-    expect(plotColorVars({ category: null, subcategory: null, subcategoryFill: null, ...none, ...noEdge })).toBeUndefined()
+    expect(plotColorVars({ category: theme(10), categoryFill: fill(10, 0.5), subcategory: null, subcategoryFill: null, ...none, ...noEdge })).toEqual({ '--wr-cat': theme(10), '--wr-cat-fill': fill(10, 0.5) })
+    expect(plotColorVars({ category: null, categoryFill: null, subcategory: null, subcategoryFill: null, ...none, ...noEdge })).toBeUndefined()
   })
 
   describe('with a cluster', () => {
@@ -81,7 +89,7 @@ describe('plotColors', () => {
     const withCluster = tree(category, sub, cluster, inCluster)
 
     it('draws a cluster in the accent colour of its own hue', () => {
-      expect(plotColors(cluster, withCluster)).toMatchObject({ category: theme(200), subcategory: accent(230, 0.75), cluster: accent(170, 1), clusterFill: fill(170, 1) })
+      expect(plotColors(cluster, withCluster)).toMatchObject({ category: theme(200), categoryFill: fill(200, 0.5), subcategory: accent(230, 0.75), cluster: accent(170, 1), clusterFill: fill(170, 1) })
     })
 
     it('lets a cluster without a hue follow its subcategory, then its category', () => {
