@@ -7,6 +7,7 @@ import { AwarenessEye } from './AwarenessEye'
 import { buildChildIndex, chaptersOfBook } from './outlineTree'
 import { placementLook, type PlacementLook } from './plotCardColors'
 import { textOf } from './plotFields'
+import { isChoice } from './plotKinds'
 import { livePlacements } from './plotPlacement'
 import { plotColors, plotColorVars } from './plotColors'
 import { nodeLabel, plotTrail } from './plotTree'
@@ -37,7 +38,12 @@ export function PlotOutlinePanel({ w, plotlines, dragId, onDropChapter, readOnly
 
   const lineIds = new Set(plotlines.map(l => l.id))
   const several = plotlines.length > 1
-  const points = w.plotNodes.filter(p => p.kind === 'plotpoint' && p.parentId !== null && lineIds.has(p.parentId))
+  // The answers of the category, subcategory or cluster above a plotline are placed from the plotline too (its editor shows them with a grip), so
+  // they are listed with the plotline's own plotpoints.
+  const above = new Set(plotlines.flatMap(l => plotTrail(l, w.plotNodeById).map(n => n.id)))
+  const answerAbove = (p: PlotNode) => p.parentId !== null && above.has(p.parentId)
+    && Boolean(w.plotNodeById.get(p.parentId)?.customFieldDefs.some(d => d.id === p.fieldId && isChoice(d)))
+  const points = w.plotNodes.filter(p => p.kind === 'plotpoint' && p.parentId !== null && (lineIds.has(p.parentId) || answerAbove(p)))
   // One entry for each placement: the plotpoint, the placement, and how its chip looks.
   const placed = points.flatMap(point => livePlacements(point, outlineById).map(placement => ({
     point, placement, look: placementLook(placement, w.outlineNodes, outlineById, activeZone),

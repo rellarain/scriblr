@@ -1,6 +1,6 @@
 import { useState, type CSSProperties, type DragEvent, type KeyboardEvent, type ReactNode } from 'react'
 import type { PlotCustomFieldDef, PlotFieldKind, PlotNode } from '../../../api/types'
-import { GripIcon, LockIcon, PlusIcon } from '../../icons'
+import { GripIcon, PlusIcon } from '../../icons'
 import type { PlotDrag, PlotUi } from './FieldBlocks'
 import { fieldHasValues, optionUse } from './plotAnswers'
 import { valueLook } from './plotCardColors'
@@ -42,14 +42,14 @@ function AskBar({ message, onConfirm, onCancel }: { message: string; onConfirm: 
   )
 }
 
-// One answer as a plotpoint card: a grip (when it can be dragged), what it says, how often it is placed, and a lock when it is read-only.
-function AnswerCard({ w, answer, drag, dragging, lock, children }: {
+// One answer as a plotpoint card: a grip (when it can be dragged), what it says and how often it is placed.
+function AnswerCard({ w, answer, drag, dragging, hint, children }: {
   w: WriterWorkspace
   answer: PlotNode
   drag?: Grip
   dragging?: boolean
-  // Why it cannot be changed here (the answer of the node that defines the field, seen from a plotline).
-  lock?: string
+  // Said on hover: why it cannot be changed here (the answer of the node that defines the field, seen from a plotline).
+  hint?: string
   children?: ReactNode
 }) {
   const placed = placedCount(answer, new Map(w.outlineNodes.map(n => [n.id, n])))
@@ -57,7 +57,7 @@ function AnswerCard({ w, answer, drag, dragging, lock, children }: {
   return (
     <span
       className={`wrPlotValue wrPlotValue--answer${placed === 0 ? '' : ' wrPlotValue--assigned'}${dragging ? ' wrPlotValue--dragging' : ''}${highlighted ? ' wrPlotValue--highlight' : ''}`}
-      data-point={answer.id} style={valueLook(answer, w.plotNodeById)}
+      data-point={answer.id} style={valueLook(answer, w.plotNodeById)} title={hint}
     >
       {drag && (
         <span className="wrGrip wrPlotValueGrip" draggable {...drag} aria-label="Drag plotpoint" title="Drag onto a chapter">
@@ -66,7 +66,6 @@ function AnswerCard({ w, answer, drag, dragging, lock, children }: {
       )}
       {children ?? <span className="wrAnswerLabel">{answer.title}</span>}
       <Counter n={placed} />
-      {lock && <span className="wrPlotValueLock" title={lock}><LockIcon size={14} /></span>}
     </span>
   )
 }
@@ -386,8 +385,9 @@ function TextAnswer({ w, def, holder, drag }: { w: WriterWorkspace; def: PlotCus
   )
 }
 
-// What a plotline shows of the answer of the node that defines the field: read-only, with the answer's counter.
-function OwnerAnswers({ w, info }: { w: WriterWorkspace; info: FieldInfo }) {
+// What a plotline shows of the answer of the node that defines the field: it cannot be changed here, but it is dragged onto a chapter like any
+// answer and counts its places.
+function OwnerAnswers({ w, info, drag }: { w: WriterWorkspace; info: FieldInfo; drag: PlotDrag }) {
   const answers = valuesIn(w.plotNodes, info.owner.id, info.def.id)
   const scope = `${info.scope.charAt(0).toUpperCase()}${info.scope.slice(1)}`
   return (
@@ -395,7 +395,9 @@ function OwnerAnswers({ w, info }: { w: WriterWorkspace; info: FieldInfo }) {
       <span className="wrAnswerWho">{scope}: {nodeLabel(info.owner)}</span>
       {answers.length === 0
         ? <span className="wrMuted">No answer</span>
-        : answers.map(a => <AnswerCard key={a.id} w={w} answer={a} lock={`Answered on ${nodeLabel(info.owner)}. Change it there.`} />)}
+        : answers.map(a => (
+          <AnswerCard key={a.id} w={w} answer={a} drag={valueGrip(drag, a.id)} dragging={drag.dragId === a.id} hint={`Answered on ${nodeLabel(info.owner)}. Change it there.`} />
+        ))}
     </div>
   )
 }
@@ -424,7 +426,7 @@ export function ChoiceBody({ w, info, holder, editable, drag }: {
   return (
     <div className="wrFieldValues wrChoice">
       {editable && hasOptions(def) && <OptionsEditor w={w} owner={owner} def={def} />}
-      {inherited && <OwnerAnswers w={w} info={info} />}
+      {inherited && <OwnerAnswers w={w} info={info} drag={drag} />}
       {inherited && <span className="wrAnswerWho">This plotline</span>}
       {noOptions
         ? <p className="wrMuted">{editable ? 'Add the options to choose from.' : 'No options yet. Add them on the node that defines this field.'}</p>

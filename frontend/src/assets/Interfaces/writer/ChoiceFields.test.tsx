@@ -371,9 +371,23 @@ describe('answering on a plotline', () => {
     expect(genre.getByTitle('Answered on Romance. Change it there.')).toBeInTheDocument()
     expect(genre.getByText('This plotline')).toBeInTheDocument()
     expect(genre.queryByLabelText('Options of Genre')).toBeNull()
-    // the category's answer has no grip and no checkbox: only the plotline's own can be changed or dragged
-    expect(genre.queryAllByLabelText('Drag plotpoint')).toHaveLength(0)
+    // the category's answer has no checkbox (only the plotline's own can be changed) and no lock, but a grip like any answer
     expect(genre.getAllByRole('checkbox')).toHaveLength(3)
+    expect(genre.getByTitle('Answered on Romance. Change it there.').querySelector('.wrPlotValueLock')).toBeNull()
+    expect(genre.getByTitle('Answered on Romance. Change it there.')).toContainElement(genre.getByLabelText('Drag plotpoint'))
+  })
+
+  it("counts the category's answer where it is placed, and drags it onto a chapter from the plotline", () => {
+    const start = world([answer('c1', 'cat', 'fGenre', 'Crime', { optionId: 'o3', placements: [placing('ch1'), placing('ch2')] })])
+    const { container } = render(<Editor start={start} />)
+    open('Genre')
+    const card = block('fGenre').getByTitle('Answered on Romance. Change it there.')
+    expect(within(card).getByLabelText('Placed 2 times')).toHaveTextContent('×2')
+    const dataTransfer = { setData: () => {}, getData: () => '', effectAllowed: '', setDragImage: () => {} }
+    fireEvent.dragStart(within(card).getByLabelText('Drag plotpoint'), { dataTransfer })
+    expect(card).toHaveClass('wrPlotValue--dragging')
+    // it is listed in the plotline's outline too, where its places are
+    expect(container.querySelectorAll('.wrPlotChip[data-point="c1"]')).toHaveLength(2)
   })
 
   it('says so when the category has no answer yet', () => {
