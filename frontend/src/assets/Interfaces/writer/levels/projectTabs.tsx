@@ -60,11 +60,11 @@ export function projectTabs(w: WriterWorkspace): LevelTab[] {
     { id: 'outline', label: 'Outline', Icon: ListIcon, fill: true, render: c => (c.size === 'max' ? <ProjectOutline w={w} /> : <OutlineSummary w={w} />) },
     { id: 'plotpoints', label: 'Plotpoints', Icon: QueueIcon, render: () => <PlotpointsTab w={w} /> },
     {
-      id: 'schedule', label: 'Schedule', Icon: CalendarIcon, fill: true, surface: false,
+      id: 'schedule', label: 'Schedule', Icon: CalendarIcon, fill: true, surface: false, titleSlot: true,
       render: c => {
         const id = w.activeProjectId
         if (!id) return <p className="wrMuted">Open a project to plan its schedule.</p>
-        return c.size === 'max' ? <ScheduleConsole scope="project" projectIds={[id]} titles={{ [id]: w.activeProject?.title ?? 'Project' }} /> : <ScheduleSummary projectIds={[id]} />
+        return c.size === 'max' ? <ScheduleConsole scope="project" titleSlot={c.titleSlot} projectIds={[id]} titles={{ [id]: w.activeProject?.title ?? 'Project' }} /> : <ScheduleSummary projectIds={[id]} />
       },
     },
     { id: 'history', label: 'History', Icon: ClockIcon, render: () => placeholder('projectHistory') },

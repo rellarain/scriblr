@@ -177,11 +177,28 @@ describe('the Schedule console', () => {
   it('starts the week on Sunday from the settings, in the grid and the schedule', async () => {
     const user = userEvent.setup()
     await open()
-    await user.click(within(tile('schedule')).getByRole('button', { name: 'Schedule settings' }))
+    await user.click(screen.getByRole('button', { name: 'Schedule settings' }))
     await user.selectOptions(screen.getByLabelText('Week starts on'), 'sunday')
     expect(Array.from(tile('activity').querySelectorAll('.wrSchedCalLetters span')).map(s => s.textContent)).toEqual(['S', 'M', 'T', 'W', 'T', 'F', 'S'])
     const heads = Array.from(tile('schedule').querySelectorAll('.wrSchedDayHead button')).map(b => b.textContent)
     expect(heads[0]).toMatch(/^Sun/)
+  })
+
+  it('has the settings button in the console header, not in the schedule tile, and the settings open over the console', async () => {
+    const user = userEvent.setup()
+    await open()
+    expect(within(tile('schedule')).queryByRole('button', { name: 'Schedule settings' })).toBeNull()
+    await user.click(screen.getByRole('button', { name: 'Schedule settings' }))
+    expect(screen.getByRole('dialog', { name: 'Schedule settings' }).closest('.wrSchedConsole')).not.toBeNull()
+    expect(tile('schedule').querySelector('.wrSchedPopover')).toBeNull()
+  })
+
+  it('puts the settings button in the slot of the title bar when it is given one', () => {
+    const slot = document.createElement('span')
+    document.body.appendChild(slot)
+    render(<ScheduleConsole scope="project" projectIds={['p1']} titles={{ p1: 'Saga' }} titleSlot={slot} />)
+    expect(within(slot).getByRole('button', { name: 'Schedule settings' })).toBeTruthy()
+    slot.remove()
   })
 
   it('switches the schedule to the day, month and agenda views', async () => {

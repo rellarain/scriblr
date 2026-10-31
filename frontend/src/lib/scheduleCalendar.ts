@@ -22,6 +22,7 @@ export interface FacetCell {
   level: -1 | 0 | 1 | 2 | 3 | 4 // -1 = a day not here yet
   today: boolean
   met: boolean // a daily goal of a selected facet was reached that day
+  facet: Facet | null // the selected facet with the most activity that day (its colour shades the cell)
   title: string
 }
 export interface MonthRect { key: string; name: string; col: number; span: number }
@@ -90,9 +91,11 @@ export function buildFacetGrid(o: GridOptions): FacetGrid {
     const t = start + i * DAY_MS
     const d = new Date(t)
     const label = `${DOW3[d.getUTCDay()]}, ${MON3[d.getUTCMonth()]} ${d.getUTCDate()}`
-    if (t > end) return { date, level: -1, today: false, met: false, title: '' }
+    if (t > end) return { date, level: -1, today: false, met: false, facet: null, title: '' }
     let level: 0 | 1 | 2 | 3 | 4 = 0
     let met = false
+    let lead: Facet | null = null // the facet with the highest level, the larger share of its measure when levels tie (the first of them when those tie too)
+    let leadShare = -1
     const parts: string[] = []
     for (const f of facets) {
       const v = dayValue(o.daily[date], f)
@@ -100,11 +103,13 @@ export function buildFacetGrid(o: GridOptions): FacetGrid {
       const goal = o.dailyGoals[f]
       if (goal && goal > 0 && v >= goal) met = true
       const l = o.rule === 'goal' && goal && goal > 0 ? levelByGoal(v, goal) : levelByBusiest(v, busiest[f] ?? 0)
+      const share = goal && goal > 0 && o.rule === 'goal' ? v / goal : (busiest[f] ?? 0) > 0 ? v / (busiest[f] ?? 1) : 0
+      if (l > 0 && (l > level || (l === level && share > leadShare))) { lead = f; leadShare = share }
       if (l > level) level = l
       if (v > 0) parts.push(`${FACET_LABEL[f]} ${v.toLocaleString('en-US')} ${unitOf(f, v)}`)
     }
     if (level > 0) activeDays += 1
-    return { date, level, today: date === o.today, met, title: parts.length ? `${label} · ${parts.join(' · ')}${met ? ' · goal met' : ''}` : `No activity on ${label}` }
+    return { date, level, today: date === o.today, met, facet: level > 0 ? lead : null, title: parts.length ? `${label} · ${parts.join(' · ')}${met ? ' · goal met' : ''}` : `No activity on ${label}` }
   })
 
   // Month rectangles over the weeks that begin in the month.

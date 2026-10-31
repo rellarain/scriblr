@@ -1,3 +1,4 @@
+import { createPortal } from 'react-dom'
 import { useCallback, useEffect, useMemo, useState, type CSSProperties } from 'react'
 import { bestStreak, streakUntil } from '../../../../lib/activityCalendar'
 import { FACETS, dayValue, emptyPlanner, type Facet, type Goal, type Planner } from '../../../../lib/facets'
@@ -18,7 +19,7 @@ import { Backlog } from './Backlog'
 import { GoalsCard, type OwnedProgress } from './GoalsCard'
 import { ReviewCard } from './ReviewCard'
 import { ScheduleCard, type ScheduleOwner, type TicksApi } from './ScheduleCard'
-import { DEFAULT_HUES, ScheduleSettings, type FacetHues } from './ScheduleSettings'
+import { DEFAULT_HUES, ScheduleSettings, SettingsButton, type FacetHues } from './ScheduleSettings'
 import type { TargetOption } from './ShiftEditor'
 import { getTicks, putTicks } from './scheduleApi'
 import { useProjectFacts } from './useProjectFacts'
@@ -40,9 +41,11 @@ export const DEFAULT_TREE: SplitNode = {
 
 const hueVars = (hues: FacetHues) => Object.fromEntries(FACETS.map(f => [`--wr-f-${f}`, `hsl(${hues[f]}, ${FACET_COLOR.s}%, ${FACET_COLOR.l}%)`]))
 
-export default function ScheduleConsole({ scope, projectIds, titles }: { scope: 'dash' | 'project'; projectIds: string[]; titles: Record<string, string> }) {
+// `titleSlot` is the element in the console's tab-tile title bar where the Settings button goes (null while it is not drawn yet); without one (undefined) the button is the console's first row.
+export default function ScheduleConsole({ scope, projectIds, titles, titleSlot }: { scope: 'dash' | 'project'; projectIds: string[]; titles: Record<string, string>; titleSlot?: HTMLElement | null }) {
   const schedule = useSchedule(projectIds)
   const activity = useActivityState()
+  const [settingsOpen, setSettingsOpen] = useState(false)
   const facts = useProjectFacts(projectIds)
   const [weekStart, setWeekStart] = useStoredState<WeekStart>('scriblr.weekStart', 'monday')
   const [hues, setHues] = useStoredState<FacetHues>('scriblr.writer.facetHues', DEFAULT_HUES)
@@ -159,6 +162,7 @@ export default function ScheduleConsole({ scope, projectIds, titles }: { scope: 
   if (schedule.error) return <p className="wrError" role="alert">{schedule.error}</p>
   if (!goalOwner) return <p className="wrMuted">Open a project to plan its schedule.</p>
 
+  const settingsButton = <SettingsButton open={settingsOpen} onToggle={() => setSettingsOpen(o => !o)} />
   const tiles: SplitTile[] = [
     { id: 'goals', title: 'Goals', children: <GoalsCard owners={owners} progress={progress} stats={stats} nodes={single?.outline ?? []} scoped={scope === 'project'} /> },
     { id: 'review', title: 'Review', children: <ReviewCard daily={daily} today={today} /> },
@@ -168,13 +172,6 @@ export default function ScheduleConsole({ scope, projectIds, titles }: { scope: 
       children: (
         <ScheduleCard
           owners={owners} today={today} nowSlot={nowSlot} events={schedule.facets.events} weekStart={weekStart} targets={targets} ticks={ticks}
-          toolbarExtra={(
-            <ScheduleSettings
-              weekStart={weekStart} onWeekStart={setWeekStart} hues={hues} onHues={setHues} planner={planner} onPlanner={goalOwner.setPlanner}
-              onReminders={lead => { if (lead !== null) void requestReminderPermission() }} onIcs={exportIcs} onPrint={print}
-              scopeLabel={scope === 'dash' ? 'Account' : 'This project'}
-            />
-          )}
         />
       ),
     },
@@ -186,6 +183,14 @@ export default function ScheduleConsole({ scope, projectIds, titles }: { scope: 
   ]
   return (
     <div className="wrSchedConsole" style={hueVars(hues) as CSSProperties}>
+      {titleSlot === undefined ? <div className="wrSchedConsoleBar">{settingsButton}</div> : titleSlot && createPortal(settingsButton, titleSlot)}
+      {settingsOpen && (
+        <ScheduleSettings
+          weekStart={weekStart} onWeekStart={setWeekStart} hues={hues} onHues={setHues} planner={planner} onPlanner={goalOwner.setPlanner}
+          onReminders={lead => { if (lead !== null) void requestReminderPermission() }} onIcs={exportIcs} onPrint={print}
+          scopeLabel={scope === 'dash' ? 'Account' : 'This project'} onClose={() => setSettingsOpen(false)}
+        />
+      )}
       <SplitArea gridId={`scriblr.writer.schedule.tiles.${scope}`} label="Schedule tiles" tiles={tiles.map(t => ({ ...t, bodyClassName: 'wrSchedTileBody' }))} defaultTree={DEFAULT_TREE} />
     </div>
   )

@@ -56,6 +56,18 @@ describe('the facet grid', () => {
     expect(onlyPlot.cells[360].title).toBe('No activity on Thu, Oct 29')
     expect(onlyPlot.total.plot).toBe(5)
   })
+  it('colours a day by the facet with the most activity: the highest level, then the larger share of its measure', () => {
+    const daily = {
+      '2026-10-29': day({ draft: 600, outline: 1 }), // draft is at its goal (level 4), outline only a quarter of its goal
+      '2026-10-30': day({ draft: 300, plot: 3 }), // both at level 3: plot 3 of 4 (0.75) beats draft 300 of 500 (0.6)
+      '2026-10-31': day({ outline: 2 }),
+    }
+    const g = buildFacetGrid({ ...base, daily, rule: 'goal', dailyGoals: { draft: 500, outline: 4, plot: 4 }, today: '2026-10-31' })
+    expect(g.cells[360].facet).toBe('draft')
+    expect(g.cells[361].facet).toBe('plot')
+    expect(g.cells[362].facet).toBe('outline')
+    expect(g.cells[359].facet).toBeNull() // a day with nothing
+  })
   it('marks the days a daily goal was met', () => {
     const daily = { '2026-10-30': day({ draft: 499 }), '2026-10-31': day({ draft: 500 }) }
     const g = buildFacetGrid({ ...base, daily, facets: ['draft'], rule: 'goal', dailyGoals: { draft: 500 }, today: '2026-10-31' })

@@ -17,11 +17,11 @@ const DASH_HELP_FALLBACK = 'The Dash is your desk across every project: the sche
 export function dashTabs(w: WriterWorkspace): LevelTab[] {
   return [
     {
-      id: 'schedule', label: 'Schedule', Icon: CalendarIcon, fill: true, surface: false,
+      id: 'schedule', label: 'Schedule', Icon: CalendarIcon, fill: true, surface: false, titleSlot: true,
       render: c => {
         const ids = w.projects.map(p => p.projectId)
         return c.size === 'max'
-          ? <ScheduleConsole scope="dash" projectIds={ids} titles={Object.fromEntries(w.projects.map(p => [p.projectId, p.title]))} />
+          ? <ScheduleConsole scope="dash" titleSlot={c.titleSlot} projectIds={ids} titles={Object.fromEntries(w.projects.map(p => [p.projectId, p.title]))} />
           : <ScheduleSummary projectIds={ids} />
       },
     },

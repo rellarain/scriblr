@@ -2,13 +2,9 @@
 // Colours are the level's tokens (the console's tiles on fill-3, white ink, cards one shade deeper on fill-4); the facets' own hues are --wr-f-<facet>, set on the console from the user's hues.
 .wr {
   --wr-cal-base: var(--level-wash);
-  // The grid's four shades: the accent hue at a fixed OKLCH lightness (0.67, 0.72, 0.77, 0.82; CAL_STEPS in theme/zoneLooks.ts) and chroma 0.17, mid tones
-  // that read the same in every hue and are neither white nor black.
-  --wr-cal-1: #{'oklch(from hsl(var(--color-accent-h) 90% 50%) 0.67 0.17 h)'};
-  --wr-cal-2: #{'oklch(from hsl(var(--color-accent-h) 90% 50%) 0.72 0.17 h)'};
-  --wr-cal-3: #{'oklch(from hsl(var(--color-accent-h) 90% 50%) 0.77 0.17 h)'};
-  --wr-cal-4: #{'oklch(from hsl(var(--color-accent-h) 90% 50%) 0.82 0.17 h)'};
   --cell: 14px; // a calendar square's side (the Activity grid sets its own to fit the tile)
+  // The grid's colour: the source of a cell's four shades (--cal-src) is the facet with the most activity that day (--wr-f-<facet>), else the accent hue.
+  --cal-src: #{'hsl(var(--color-accent-h) 90% 50%)'};
   .wrSchedConsole { position: relative; width: 100%; height: 100%; min-height: 0; display: flex; flex-direction: column;
     // The split grid takes the console's whole height (it is sized from this box), not the height its tiles would need.
     > .wrSplit { flex: 1 1 0; } }
@@ -68,10 +64,17 @@
   .wrSchedCalGrid { display: grid; grid-template-rows: repeat(7, var(--cell)); grid-auto-flow: column; grid-auto-columns: var(--cell); gap: var(--space-2); }
   // A day is one of four steps of the accent hue: the strongest is a day that met its goal or was the busiest.
   .wrSchedCalCell { display: block; width: var(--cell); height: var(--cell); border-radius: var(--radius-none); background: var(--wr-cal-base);
-    &--1 { background: var(--wr-cal-1); }
-    &--2 { background: var(--wr-cal-2); }
-    &--3 { background: var(--wr-cal-3); }
-    &--4 { background: var(--wr-cal-4); }
+    // The shades: the source's hue at a fixed OKLCH lightness (0.67, 0.72, 0.77, 0.82; CAL_STEPS in theme/zoneLooks.ts) and chroma 0.17, mid tones that read
+    // the same in every hue and are neither white nor black.
+    &--1 { background: #{'oklch(from var(--cal-src) 0.67 0.17 h)'}; }
+    &--2 { background: #{'oklch(from var(--cal-src) 0.72 0.17 h)'}; }
+    &--3 { background: #{'oklch(from var(--cal-src) 0.77 0.17 h)'}; }
+    &--4 { background: #{'oklch(from var(--cal-src) 0.82 0.17 h)'}; }
+    &--f-outline { --cal-src: var(--wr-f-outline); }
+    &--f-plot { --cal-src: var(--wr-f-plot); }
+    &--f-draft { --cal-src: var(--wr-f-draft); }
+    &--f-revision { --cal-src: var(--wr-f-revision); }
+    &--f-project { --cal-src: var(--wr-f-project); }
     &--x { visibility: hidden; }
     // Today: an outline in the level's ink inside the square, with a 2px gap of the tile's colour before the shade, so it shows on the lightest step too.
     &--today { outline: 2px solid var(--level-ink); outline-offset: -2px; box-shadow: inset 0 0 0 4px var(--wr-fill-3); } }
@@ -165,8 +168,14 @@
   .wrSchedHeat { display: grid; grid-template-columns: 56px repeat(7, minmax(0, 1fr)); gap: var(--space-2); font-size: var(--text-ui); i { width: auto; } }
   .wrSchedHeatLabel { text-align: center; line-height: 14px; &--row { text-align: right; padding-right: var(--space-3); white-space: nowrap; } }
   .wrSchedReviewRow { display: grid; grid-template-columns: 14px 1fr auto; gap: var(--space-4); align-items: baseline; small { grid-column: 2 / -1; color: var(--level-ink-soft); } }
-  .wrSchedSettings { position: relative; }
-  .wrSchedPopover { position: absolute; right: 0; top: calc(100% + var(--space-4)); z-index: 30; width: 360px; max-height: 70vh; overflow: auto; display: flex; flex-direction: column; gap: var(--space-4); padding: var(--space-6); background: var(--wr-fill-4); color: var(--level-ink); border: 1px solid var(--level-ink-soft); border-radius: var(--radius-button); }
+  // The settings open over the console, from its top right (the button is in the title bar of the tab's tile).
+  .wrSchedPopover { position: absolute; right: var(--space-4); top: var(--space-4); z-index: 30; width: 360px; max-width: calc(100% - var(--space-6)); max-height: calc(100% - var(--space-6)); overflow: auto; display: flex; flex-direction: column; gap: var(--space-4); padding: var(--space-6); background: var(--wr-fill-4); color: var(--level-ink); border: 1px solid var(--level-ink-soft); border-radius: var(--radius-button); font-size: var(--text-field); }
+  .wrSchedPopover .wrField { background: var(--level-input); color: var(--level-input-ink); border-radius: var(--radius-input); font-size: var(--text-field); &::placeholder { color: var(--level-input-hint); } }
+  .wrSchedPopover .wrSmallBtn { font-size: var(--text-ui); padding: var(--space-3) var(--space-5); }
+  .wrSchedConsoleBar { display: flex; justify-content: flex-end; padding: var(--space-3) var(--space-4); }
+  // A button in a title bar (the Settings of the console, in the tab tile's title): small, in the level's wash.
+  .wrTabTileTitleSlot { margin-left: auto; display: inline-flex; align-items: center; gap: var(--space-2); text-transform: none; letter-spacing: normal; font-weight: 400; }
+  .wrTabTileTitleSlot .wrSmallBtn, .wrSchedConsoleBar .wrSmallBtn { color: var(--level-ink); background: var(--level-wash); border: 0; border-radius: var(--radius-button); padding: 1px var(--space-3); font-size: var(--text-small); cursor: pointer; display: inline-flex; align-items: center; &:hover { background: var(--level-wash-hi); } &[aria-expanded='true'] { background: var(--level-ink); color: var(--wr-fill-4); } }
   .wrSchedHue input { flex: 1 1 auto; }
   .wrSchedRest { display: flex; flex-wrap: wrap; gap: var(--space-4); }
 }
@@ -176,5 +185,5 @@
   body.wrPrintSchedule .wrSchedSchedule, body.wrPrintSchedule .wrSchedSchedule * { visibility: visible; }
   body.wrPrintSchedule .wrSchedSchedule { position: fixed; inset: 0; background: #fff; color: #000; }
   body.wrPrintSchedule .wrSchedGridBox { max-height: none; overflow: visible; }
-  body.wrPrintSchedule .wrSchedHead button, body.wrPrintSchedule .wrSchedSettings, body.wrPrintSchedule .wrSchedSeg { display: none; }
+  body.wrPrintSchedule .wrSchedHead button, body.wrPrintSchedule .wrTabTileTitleSlot, body.wrPrintSchedule .wrSchedConsoleBar, body.wrPrintSchedule .wrSchedSeg { display: none; }
 }

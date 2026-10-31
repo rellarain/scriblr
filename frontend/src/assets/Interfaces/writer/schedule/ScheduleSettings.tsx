@@ -1,16 +1,22 @@
 import { useState } from 'react'
 import { FACETS, FACET_LABEL, type Facet, type Planner } from '../../../../lib/facets'
 import type { WeekStart } from '../../../../lib/scheduleCalendar'
+import { GearIcon } from '../../../icons'
 import { newId } from './ids'
 
-// The console's settings, from the gear in the Schedule tile: the week's first day, the facets' hues, shift reminders, the project's timeline and its
+// The console's settings, from the Settings button in the console's title bar (SettingsButton; the popover, ScheduleSettings, opens over the console): the week's first day, the facets' hues, shift reminders, the project's timeline and its
 // rest days (routines pause and shifts are skipped, not missed, and streaks hold), and the export and print of the week.
 
 export type FacetHues = Record<Facet, number>
 export const DEFAULT_HUES: FacetHues = { outline: 212, plot: 272, draft: 32, revision: 168, project: 340 }
 
+// The gear in the console's title bar that opens and closes the settings.
+export function SettingsButton({ open, onToggle }: { open: boolean; onToggle: () => void }) {
+  return <button type="button" className="wrSmallBtn" aria-expanded={open} aria-haspopup="dialog" aria-label="Schedule settings" title="Schedule settings" onClick={onToggle}><GearIcon size={14} /></button>
+}
+
 export function ScheduleSettings({
-  weekStart, onWeekStart, hues, onHues, planner, onPlanner, onReminders, onIcs, onPrint, scopeLabel,
+  weekStart, onWeekStart, hues, onHues, planner, onPlanner, onReminders, onIcs, onPrint, scopeLabel, onClose,
 }: {
   weekStart: WeekStart
   onWeekStart: (w: WeekStart) => void
@@ -22,14 +28,11 @@ export function ScheduleSettings({
   onIcs: () => void
   onPrint: () => void
   scopeLabel: string
+  onClose: () => void
 }) {
-  const [open, setOpen] = useState(false)
   const [rest, setRest] = useState({ start: '', end: '', label: '' })
   return (
-    <span className="wrSchedSettings">
-      <button type="button" className="wrSmallBtn" aria-expanded={open} aria-haspopup="dialog" aria-label="Schedule settings" onClick={() => setOpen(!open)}>Settings</button>
-      {open && (
-        <div className="wrSchedPopover" role="dialog" aria-label="Schedule settings">
+    <div className="wrSchedPopover" role="dialog" aria-label="Schedule settings" onKeyDown={e => { if (e.key === 'Escape') onClose() }}>
           <label className="wrKv"><span>Week starts on</span>
             <select className="wrField" aria-label="Week starts on" value={weekStart} onChange={e => onWeekStart(e.target.value as WeekStart)}><option value="monday">Monday</option><option value="sunday">Sunday</option></select>
           </label>
@@ -63,8 +66,6 @@ export function ScheduleSettings({
             <button type="button" className="wrSmallBtn" onClick={onIcs}>Export shifts (.ics)</button>
             <button type="button" className="wrSmallBtn" onClick={onPrint}>Print the week</button>
           </div>
-        </div>
-      )}
-    </span>
+    </div>
   )
 }

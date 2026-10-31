@@ -1,10 +1,12 @@
-import { useState, type ComponentType, type ReactNode } from 'react'
+import { useRef, useState, type ComponentType, type ReactNode } from 'react'
 import { SearchIcon, type IconProps } from '../../../icons'
 import { useStoredState } from '../storage'
 import SplitArea, { columnsTree } from '../SplitArea'
 
 // What a tab's content is told: the header's search text. (The header has no New button: a tab adds things from its own body.)
-export interface TabContext { query: string; size: 'mid' | 'max' }
+// `titleSlot` is, for a tab that asks for one (`titleSlot: true`), the element at the right end of its tile's title bar, for what the tab puts there
+// (null until it is drawn); it is undefined for a tab that has none.
+export interface TabContext { query: string; size: 'mid' | 'max'; titleSlot?: HTMLElement | null }
 
 export interface LevelTab {
   id: string
@@ -16,6 +18,8 @@ export interface LevelTab {
   // The tab shows an editor on a light surface of the level's hue, in the ink colour (not the level's own on-accent text). A `fill` tab is on a surface
   // unless it says `surface: false` (the Schedule console is on the level's own fill, like the other consoles).
   surface?: boolean
+  // The tab's tile has a slot at the right end of its title bar (TabContext.titleSlot), where the tab puts its own controls.
+  titleSlot?: boolean
   // The tab's tile takes the height that is left (an editor that scrolls itself) instead of the height of its content.
   fill?: boolean
   // Starts the closing group of tabs (Settings, Help), set a little apart.
@@ -46,6 +50,10 @@ export function useTabbedLevel({ storageKey, tabs, size, defaultOpen, defaultTab
   const [query, setQuery] = useState('')
   const [searching, setSearching] = useState(false)
   const [focusedTile, setFocusedTile] = useState<string | undefined>(undefined)
+  // The title-bar slots of the tabs that ask for one: a callback ref for each (kept, so it is not called again on every render).
+  const [slots, setSlots] = useState<Record<string, HTMLElement | null>>({})
+  const slotRefs = useRef<Record<string, (el: HTMLElement | null) => void>>({})
+  const slotRef = (id: string) => (slotRefs.current[id] ??= el => setSlots(prev => (prev[id] === el ? prev : { ...prev, [id]: el })))
 
   if (size === 'min') return { headerExtras: null, body: null, isOpen: () => false }
 
@@ -63,7 +71,7 @@ export function useTabbedLevel({ storageKey, tabs, size, defaultOpen, defaultTab
     if (max) setOpen(prev => (prev.includes(id) ? prev.filter(x => x !== id) : [...prev, id]))
   }
   const focused = max && focusedTile && shown.some(t => t.id === focusedTile) ? focusedTile : current?.id
-  const ctxOf = (_tab: LevelTab): TabContext => ({ query: query.trim().toLowerCase(), size: max ? 'max' : 'mid' })
+  const ctxOf = (tab: LevelTab): TabContext => ({ query: query.trim().toLowerCase(), size: max ? 'max' : 'mid', ...(tab.titleSlot ? { titleSlot: slots[tab.id] ?? null } : {}) })
 
   const headerExtras = (
     <div className="wrHeaderExtras">
@@ -113,6 +121,7 @@ export function useTabbedLevel({ storageKey, tabs, size, defaultOpen, defaultTab
           gridId={storageKey} label="Tiles" defaultTree={columnsTree(shown.map(t => t.id))} onFocusTile={setFocusedTile}
           tiles={shown.map(t => ({
             id: t.id, title: t.label, Icon: t.Icon, children: t.render(ctxOf(t)),
+            titleExtras: t.titleSlot ? <span ref={slotRef(t.id)} className="wrTabTileTitleSlot" /> : undefined,
             bodyClassName: [(t.surface ?? t.fill) ? 'wrTabTileBody--surface' : '', t.fill ? 'wrTabTileBody--fill' : ''].filter(Boolean).join(' ') || undefined,
           }))}
         />

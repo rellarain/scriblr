@@ -60,7 +60,7 @@ export function FacetCalendar({ grid, weekStart }: { grid: FacetGrid; weekStart:
             <div className="wrSchedCalLetters" aria-hidden="true">{rowLetters(weekStart).map((l, i) => <span key={i}>{l}</span>)}</div>
             <div className="wrSchedCalGrid" role="img" aria-label={summary}>
               {grid.cells.map(c => (
-                <i key={c.date} className={`wrSchedCalCell wrSchedCalCell--${c.level < 0 ? 'x' : c.level}${c.today ? ' wrSchedCalCell--today' : ''}`} title={c.title} />
+                <i key={c.date} className={`wrSchedCalCell wrSchedCalCell--${c.level < 0 ? 'x' : c.level}${c.facet ? ` wrSchedCalCell--f-${c.facet}` : ''}${c.today ? ' wrSchedCalCell--today' : ''}`} title={c.title} />
               ))}
             </div>
           </div>

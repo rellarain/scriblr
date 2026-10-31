@@ -26,8 +26,8 @@ const sinceStart = (d: string, ws: WeekStart): number => { const w = new Date(`$
 const hoursLabel = (h: number): string => `${h % 12 === 0 ? 12 : h % 12} ${h < 12 ? 'AM' : 'PM'}`
 
 export function ScheduleCard({
-  owners, today, nowSlot, events, weekStart, targets, ticks, toolbarExtra,
-}: { owners: ScheduleOwner[]; today: string; nowSlot: number; events: ActivityEvent[]; weekStart: WeekStart; targets: TargetOption[]; ticks: TicksApi; toolbarExtra?: ReactNode }) {
+  owners, today, nowSlot, events, weekStart, targets, ticks,
+}: { owners: ScheduleOwner[]; today: string; nowSlot: number; events: ActivityEvent[]; weekStart: WeekStart; targets: TargetOption[]; ticks: TicksApi }) {
   const [view, setView] = useStoredState<CalView>('scriblr.writer.schedule.calendarView', 'week')
   const [cursor, setCursor] = useState(today)
   const [editing, setEditing] = useState<{ ownerId: string; shift: Shift; occurrence: string; isNew: boolean } | null>(null)
@@ -294,7 +294,6 @@ export function ScheduleCard({
           {(['day', 'week', 'month', 'agenda'] as CalView[]).map(v => <button key={v} type="button" className={view === v ? 'on' : ''} aria-pressed={view === v} onClick={() => setView(v)}>{v[0].toUpperCase() + v.slice(1)}</button>)}
         </div>
         <button type="button" className="wrSmallBtn wrSmallBtn--accent" onClick={() => openNew(view === 'day' ? cursor : today)}>+ Shift</button>
-        {toolbarExtra}
       </div>
       {owners.some(o => o.planner.templates.length > 0) && (
         <div className="wrSchedTools">
