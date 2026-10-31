@@ -81,7 +81,7 @@ describe('the full descriptions toggle', () => {
     plotNode('cat', 'category', null, { title: 'Characters', body: 'The cast of the story.' }),
     plotNode('sub', 'subcategory', 'cat', { title: 'Heroes', body: 'Those we follow.\nThey want things.' }),
     plotNode('clu', 'cluster', 'sub', { title: 'Core' }),
-    plotNode('line', 'plotline', 'clu', { title: 'Ada', body: 'a plotline has no description row' }),
+    plotNode('line', 'plotline', 'clu', { title: 'Ada', body: 'She leaves home.\nShe never writes.' }),
   ] as PlotNode[]
   const toggle = () => screen.getByRole('button', { name: /full descriptions$/ })
   const row = (container: HTMLElement, kind: string) => container.querySelector(`.wrNavRow--${kind}`) as HTMLElement
@@ -117,22 +117,53 @@ describe('the full descriptions toggle', () => {
     expect(row(container, 'category').querySelector('.wrNavDesc')!.textContent).toBe(long)
   })
 
-  it('never shows one for a plotline or for a row without one, and the name still opens the node', async () => {
-    let opened = 0
-    const { container } = render(<Nav start={start()} onOpen={() => { opened += 1 }} />)
+  it('shows a plotline\'s whole description under its name too, line breaks kept', async () => {
+    const { container } = render(<Nav start={start()} />)
+    expect(row(container, 'plotline').querySelector('.wrNavDesc')).toBeNull()
+    await userEvent.click(toggle())
+    expect(row(container, 'plotline')).toHaveClass('wrNavRow--desc')
+    expect(within(row(container, 'plotline')).getByRole('button', { name: 'Ada' })).toBeInTheDocument()
+    expect(row(container, 'plotline').querySelector('.wrNavDesc')!.textContent).toBe('She leaves home.\nShe never writes.')
     await userEvent.click(toggle())
     expect(row(container, 'plotline').querySelector('.wrNavDesc')).toBeNull()
     expect(row(container, 'plotline').querySelector('.wrNavText')).toBeNull()
+  })
+
+  it('shows nothing for a row without one (or with only blanks), and the name still opens the node', async () => {
+    let opened = 0
+    const noLineBody = start().map(n => (n.kind === 'plotline' ? { ...n, body: '  \n ' } : n))
+    const { container } = render(<Nav start={noLineBody} onOpen={() => { opened += 1 }} />)
+    await userEvent.click(toggle())
+    expect(row(container, 'plotline').querySelector('.wrNavDesc')).toBeNull()
+    expect(row(container, 'plotline').querySelector('.wrNavText')).toBeNull()
+    expect(row(container, 'plotline')).not.toHaveClass('wrNavRow--desc')
     expect(row(container, 'cluster').querySelector('.wrNavDesc')).toBeNull()
     await userEvent.click(screen.getByRole('button', { name: 'Heroes' }))
     expect(screen.getByLabelText('focused')).toHaveTextContent('sub')
     expect(opened).toBe(1)
   })
 
-  it('is dimmed and cannot be pressed while no category, subcategory or cluster has a description', () => {
-    const blank = start().map(n => (n.kind === 'plotline' ? n : { ...n, body: n.id === 'cat' ? '   ' : '' }))
+  it('a plotline\'s name still opens it and its checkbox still ticks it while the description shows', async () => {
+    let opened = 0
+    const { container } = render(<Nav start={start()} onOpen={() => { opened += 1 }} />)
+    await userEvent.click(toggle())
+    await userEvent.click(within(row(container, 'plotline')).getByRole('button', { name: 'Ada' }))
+    expect(screen.getByLabelText('focused')).toHaveTextContent('line')
+    expect(opened).toBe(1)
+    await userEvent.click(within(row(container, 'plotline')).getByRole('checkbox', { name: 'Select Ada' }))
+    expect(within(row(container, 'plotline')).getByRole('checkbox', { name: 'Select Ada' })).toBeChecked()
+  })
+
+  it('is dimmed and cannot be pressed while no category, subcategory, cluster or plotline has a description', () => {
+    const blank = start().map(n => ({ ...n, body: n.id === 'cat' ? '   ' : '' }))
     render(<Nav start={blank} />)
     expect(toggle()).toBeDisabled()
+  })
+
+  it('can be pressed when only a plotline has a description', () => {
+    const onlyLine = start().map(n => ({ ...n, body: n.kind === 'plotline' ? n.body : '' }))
+    render(<Nav start={onlyLine} />)
+    expect(toggle()).toBeEnabled()
   })
 
   it('is kept when the contents are opened again', async () => {
@@ -142,5 +173,6 @@ describe('the full descriptions toggle', () => {
     const { container } = render(<Nav start={start()} />)
     expect(toggle()).toHaveAttribute('aria-pressed', 'true')
     expect(within(row(container, 'category')).getByText('The cast of the story.')).toBeInTheDocument()
+    expect(row(container, 'plotline').querySelector('.wrNavDesc')).not.toBeNull()
   })
 })

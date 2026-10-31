@@ -12,7 +12,7 @@ import { useStoredState } from './storage'
 // ticked. Two or more ticked plotlines open the compare view (PlotCompare.tsx); "Compare (n)" brings it back after browsing.
 // Three small circles at the top right fold a whole level at once (categories, subcategories, clusters, left to right): lit while any node
 // of that level is open, a click closes them all, and a click on an unlit one opens them all. A fourth circle, lit in the alert hue, shows the
-// full description of every category, subcategory and cluster under its name (hidden otherwise; kept across restarts). "+ Category" and
+// full description of every category, subcategory, cluster and plotline under its name (hidden otherwise; kept across restarts). "+ Category" and
 // "+ Preset" (a published plot preset, see PresetPicker.tsx) sit at the bottom.
 
 const LEVELS = [['category', 'categories'], ['subcategory', 'subcategories'], ['cluster', 'clusters']] as const
@@ -30,8 +30,8 @@ export function PlotNav({ w, onOpenNode, onCompare }: {
   const [collapsed, setCollapsed] = useState<Set<string>>(new Set())
   const [fullDesc, setFullDesc] = useStoredState<boolean>('scriblr.writer.plotNavDescriptions', false)
   const children = w.plotChildrenByParentId
-  // Only a category, subcategory or cluster has a description to show; with none, the toggle has nothing to switch.
-  const described = w.plotNodes.some(n => n.kind !== 'plotline' && n.kind !== 'plotpoint' && n.body.trim() !== '')
+  // Every row of the list (a plotpoint is not one) can have a description to show; with none, the toggle has nothing to switch.
+  const described = w.plotNodes.some(n => n.kind !== 'plotpoint' && n.body.trim() !== '')
   const selected = useMemo(() => new Set(w.plotSelection), [w.plotSelection])
   const ticked = w.plotSelection.filter(id => w.plotNodeById.get(id)?.kind === 'plotline').length
 
@@ -63,7 +63,7 @@ export function PlotNav({ w, onOpenNode, onCompare }: {
         const isLine = node.kind === 'plotline'
         const lines = plotlinesUnder(node, children)
         const state = selectionState(node, children, selected)
-        const withDesc = fullDesc && !isLine && node.body.trim() !== ''
+        const withDesc = fullDesc && node.body.trim() !== ''
         return [
           <div
             key={node.id}
