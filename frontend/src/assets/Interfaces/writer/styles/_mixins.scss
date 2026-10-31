@@ -13,6 +13,11 @@
   background-image: var(--wr-edge, none); background-size: var(--wr-edge-size, 4px 100%); background-repeat: no-repeat; background-position: var(--wr-edge-pos, left top);
 }
 
+// The name of a plot category or subcategory is in capitals, with a little tracking: its row in the plot contents and its title field in its editor.
+@mixin wrPlotCaps {
+  text-transform: uppercase; letter-spacing: 0.04em;
+}
+
 // Aliases onto the global theme tokens (theme/theme.scss), so the Writer follows the
 // time-of-day palette. Also declared inside a book's scope (BookScope.tsx), where the
 // tokens are re-derived from the book's hues.
