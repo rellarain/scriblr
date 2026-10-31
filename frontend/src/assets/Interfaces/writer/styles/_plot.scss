@@ -148,9 +148,9 @@
   .wrParentBody { margin: 0; padding: 0 var(--space-4) 8px var(--space-4); font-size: 14px; font-weight: 400; line-height: 1.45; white-space: pre-wrap; overflow-wrap: anywhere; opacity: 0.95; }
   .wrKindBadge { font-size: var(--text-small); text-transform: uppercase; letter-spacing: 0.5px; opacity: 0.9; flex: 0 0 auto; }
   .wrTitleField { flex: 1; min-width: 0; background: var(--wr-field); border: 0; border-radius: var(--radius-none); color: var(--ink); font-size: var(--text-field); font-weight: 700; padding: 8px var(--space-4); outline: none; &:focus { box-shadow: inset 0 0 0 1px var(--wr-accent); } &::placeholder { color: var(--ink-faint); } }
-  // A plot editor's title is as bold as its row in the plot contents (700), and in capitals for a category and a subcategory as there, but larger: the title size (15px; the row's is
+  // A plot editor's title is as bold as its row in the plot contents (700), and in capitals for a category and a subcategory as there, but larger: the title size plus 1px (16px; the row's is
   // 13px). The project name and the time systems' fields keep the field size.
-  .wrCardPanel--category, .wrCardPanel--subcategory, .wrCardPanel--cluster, .wrCardPanel--plotline { .wrTitleField { font-size: var(--text-title); } }
+  .wrCardPanel--category, .wrCardPanel--subcategory, .wrCardPanel--cluster, .wrCardPanel--plotline { .wrTitleField { font-size: calc(var(--text-title) + 1px); } }
   .wrCardPanel--category .wrTitleField, .wrCardPanel--subcategory .wrTitleField { @include wrPlotCaps; }
   .wrChildRows { display: flex; flex-direction: column; gap: var(--space-3); }
   .wrChildRowsHead { display: flex; align-items: center; justify-content: space-between; gap: var(--space-4); .wrLabel { margin-bottom: 0; } }
