@@ -66,7 +66,7 @@ export function renameOption(nodes: PlotNode[], ownerId: string, fieldId: string
   return renamed.map(n => (n.kind === 'plotpoint' && n.fieldId === fieldId && n.optionId === optionId ? { ...n, title: kept } : n))
 }
 
-// Put an option before another of the same field (last when `beforeId` is null).
+// Put an option before another of the same field (last when `beforeId` is null). The same nodes back when that leaves it where it is.
 export function moveOption(nodes: PlotNode[], ownerId: string, fieldId: string, optionId: string, beforeId: string | null): PlotNode[] {
   const def = nodes.find(n => n.id === ownerId)?.customFieldDefs.find(d => d.id === fieldId)
   const moving = def && optionsOf(def).find(o => o.id === optionId)
@@ -74,6 +74,7 @@ export function moveOption(nodes: PlotNode[], ownerId: string, fieldId: string, 
   const rest = optionsOf(def).filter(o => o.id !== optionId)
   const at = beforeId ? rest.findIndex(o => o.id === beforeId) : -1
   rest.splice(at >= 0 ? at : rest.length, 0, moving)
+  if (rest.every((o, i) => o.id === optionsOf(def)[i].id)) return nodes
   return withDef(nodes, ownerId, fieldId, d => ({ ...d, options: rest }))
 }
 

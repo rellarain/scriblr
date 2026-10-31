@@ -9,6 +9,7 @@ import { FIELD_KINDS, KIND_LABEL, MAX_OPTIONS, OPTION_LABEL_MAX, hasOptions, kin
 import { placedCount } from './plotPlacement'
 import { nodeLabel } from './plotTree'
 import { DeleteControl } from './shared'
+import { slideStyle, useChipDrop } from './useChipDrop'
 import type { WriterWorkspace } from './useWriterWorkspace'
 
 // The body of a multi-select, dropdown or short-text field (plotKinds.ts, plotAnswers.ts): for the node that defines it, the options to choose
@@ -81,8 +82,8 @@ export function KindSelect({ w, owner, def, ui }: { w: WriterWorkspace; owner: P
   )
 }
 
-// The options of a multi-select or dropdown, as chips: renamed in place, reordered by their grips (or Alt + arrow keys), removed with x (which
-// asks first when answers use the option), and added at the end.
+// The options of a multi-select or dropdown, as chips: renamed in place, reordered by their grips (the chips it passes slide out of the way, and
+// a gap opens where it will land; or Alt + arrow keys), removed with x (which asks first when answers use the option), and added at the end.
 function OptionsEditor({ w, owner, def }: { w: WriterWorkspace; owner: PlotNode; def: PlotCustomFieldDef }) {
   const options = optionsOf(def)
   const [draft, setDraft] = useState('')
@@ -91,6 +92,10 @@ function OptionsEditor({ w, owner, def }: { w: WriterWorkspace; owner: PlotNode;
   const [asking, setAsking] = useState<string | null>(null)
   const outlineById = new Map(w.outlineNodes.map(n => [n.id, n]))
   const full = options.length >= MAX_OPTIONS
+  const group = useChipDrop({
+    draggedId: dragging,
+    onDrop: (id, before) => { w.movePlotOption(owner.id, def.id, id, before); setDragging(null) },
+  })
 
   function add() {
     if (!draft.trim()) return
@@ -111,16 +116,25 @@ function OptionsEditor({ w, owner, def }: { w: WriterWorkspace; owner: PlotNode;
 
   return (
     <div className="wrOptionsBlock">
-      <div className="wrOptions" role="group" aria-label={`Options of ${def.name || 'field'}`}>
+      <div
+        ref={group.ref} className={`wrOptions${group.sliding ? ' wrOptions--sliding' : ''}`} role="group" aria-label={`Options of ${def.name || 'field'}`}
+        {...group.handlers}
+      >
         {options.map((o, i) => (
           <span
-            key={o.id} className={`wrOption${dragging === o.id ? ' wrOption--dragging' : ''}`}
-            onDragOver={e => { if (dragging && dragging !== o.id) e.preventDefault() }}
-            onDrop={e => { if (!dragging) return; e.preventDefault(); w.movePlotOption(owner.id, def.id, dragging, o.id); setDragging(null) }}
+            key={o.id} data-chip={o.id} style={slideStyle(group.slideOf(o.id))}
+            className={`wrOption${dragging === o.id && !group.isLifted(o.id) ? ' wrOption--dragging' : ''}${group.isLifted(o.id) ? ' wrOption--lifted' : ''}`}
           >
             <span
               className="wrGrip" draggable aria-label="Drag to reorder options" title="Drag to reorder"
-              onDragStart={e => { e.dataTransfer.effectAllowed = 'move'; e.dataTransfer.setData('text/plain', o.id); setDragging(o.id) }}
+              onDragStart={e => {
+                e.dataTransfer.effectAllowed = 'move'
+                e.dataTransfer.setData('text/plain', o.id)
+                // the chip is hidden once the drag is over the options, so the pointer carries the whole chip, not just the grip
+                const chip = (e.currentTarget as HTMLElement).closest('[data-chip]')
+                if (chip && e.dataTransfer.setDragImage) e.dataTransfer.setDragImage(chip, 12, 12)
+                setDragging(o.id)
+              }}
               onDragEnd={() => setDragging(null)}
             >
               <GripIcon size={12} />
@@ -138,11 +152,7 @@ function OptionsEditor({ w, owner, def }: { w: WriterWorkspace; owner: PlotNode;
             <button type="button" className="wrOptionX" aria-label={`Remove option ${o.label}`} onClick={() => remove(o.id)}>×</button>
           </span>
         ))}
-        <span
-          className="wrOptionAdd"
-          onDragOver={e => { if (dragging) e.preventDefault() }}
-          onDrop={e => { if (!dragging) return; e.preventDefault(); w.movePlotOption(owner.id, def.id, dragging, null); setDragging(null) }}
-        >
+        <span className="wrOptionAdd" data-chip-tail="" style={slideStyle(group.tailSlide)}>
           <input
             value={draft} placeholder="Add option…" aria-label="Add option" maxLength={OPTION_LABEL_MAX} disabled={full}
             title={full ? `A field can have ${MAX_OPTIONS} options` : undefined}

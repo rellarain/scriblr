@@ -830,7 +830,8 @@ export function useWriterWorkspace() {
     commitPlot(renameOption(plotNodesRef.current, ownerId, fieldId, optionId, label), false)
   }
   function movePlotOption(ownerId: string, fieldId: string, optionId: string, beforeId: string | null) {
-    commitPlot(moveOption(plotNodesRef.current, ownerId, fieldId, optionId, beforeId), true)
+    const next = moveOption(plotNodesRef.current, ownerId, fieldId, optionId, beforeId)
+    if (next !== plotNodesRef.current) commitPlot(next, true)
   }
   // Takes the answers that use the option with it (the editor asks first when they are placed).
   function removePlotOption(ownerId: string, fieldId: string, optionId: string) {

@@ -2,6 +2,7 @@ import { fireEvent, render, screen, waitFor, within } from '@testing-library/rea
 import userEvent from '@testing-library/user-event'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import type { PresetContent, PresetEntry } from '../../../../api/types'
+import { dragAt, layOutChips } from '../../../../test/chips'
 import { content, draftEntry, liveEntry, presetsBackend } from '../../../../test/presetsBackend'
 import PlotPresetsConsole from './PlotPresetsConsole'
 import * as presetFile from './presetFile'
@@ -386,9 +387,11 @@ describe('deleting, duplicating and ordering presets', () => {
     const grips = within(screen.getByRole('group', { name: 'Preset fields' })).getAllByTitle('Drag to reorder')
     const dt = dataTransfer()
     fireEvent.dragStart(grips[1], { dataTransfer: dt })
-    const first = within(screen.getByRole('group', { name: 'Preset fields' })).getByText('Name').closest('.plpChip')!
-    fireEvent.dragOver(first, { dataTransfer: dt })
-    fireEvent.drop(first, { dataTransfer: dt })
+    const group = screen.getByRole('group', { name: 'Preset fields' })
+    const at = layOutChips(group)
+    const first = within(group).getByText('Name').closest('.plpChip')!
+    dragAt('dragOver', first, at.leftHalf(0), dt)
+    dragAt('drop', first, at.leftHalf(0), dt)
     expect(fields()).toEqual(['Role', 'Name'])
 
     within(screen.getByRole('group', { name: 'Preset fields' })).getByRole('button', { name: 'Remove Name' }).focus()
@@ -531,6 +534,77 @@ describe('fieldsets', () => {
   it('stops at 20 sets on a card', async () => {
     await open([liveEntry('a', cast({ fieldsets: Array.from({ length: 20 }, (_, i) => ({ name: `Set ${i}`, fields: [] })) }))])
     expect(screen.getByRole('button', { name: 'Fieldset' })).toBeDisabled()
+  })
+})
+
+describe('dragging a chip: the chips slide out of the way', () => {
+  const cast = () => content('Cast', { fields: ['Name', 'Role', 'Age'] })
+  const stage = async () => {
+    await open([liveEntry('a', cast())])
+    const group = screen.getByRole('group', { name: 'Preset fields' })
+    const at = layOutChips(group)
+    const chip = (name: string) => within(group).getByText(name).closest('.plpChip') as HTMLElement
+    const grip = (name: string) => within(chip(name)).getByTitle('Drag to reorder')
+    const slide = (name: string) => chip(name).style.transform
+    const order = () => within(group).getAllByRole('button', { name: /^Remove/ }).map(b => b.getAttribute('aria-label')?.replace('Remove ', ''))
+    return { group, at, chip, grip, slide, order, dt: dataTransfer(), add: group.querySelector('.plpChipAdd') as HTMLElement }
+  }
+
+  it('opens a gap where the chip will land, the chips it passes taking the places beside them', async () => {
+    const { group, at, chip, grip, slide, dt } = await stage()
+    fireEvent.dragStart(grip('Age'), { dataTransfer: dt })
+    expect(group).not.toHaveClass('plpChips--sliding')
+    dragAt('dragOver', chip('Name'), at.leftHalf(0), dt)
+    expect(group).toHaveClass('plpChips--sliding')
+    expect(chip('Age')).toHaveClass('plpChip--lifted')
+    expect([slide('Name'), slide('Role'), slide('Age')]).toEqual(['translate(60px, 0px)', 'translate(-60px, 30px)', ''])
+  })
+
+  it('drops where the gap is, last below the chips included, and puts the slides away', async () => {
+    const { group, at, chip, grip, slide, order, dt } = await stage()
+    fireEvent.dragStart(grip('Name'), { dataTransfer: dt })
+    dragAt('dragOver', chip('Role'), at.afterAll(), dt)
+    dragAt('drop', chip('Role'), at.afterAll(), dt)
+    expect(order()).toEqual(['Role', 'Age', 'Name'])
+    expect([slide('Role'), slide('Age'), slide('Name')]).toEqual(['', '', ''])
+    expect(group).not.toHaveClass('plpChips--sliding')
+    expect(chip('Name')).not.toHaveClass('plpChip--lifted')
+
+    // one place along: in front of the one after the next (the chips are new elements, as their keys name their places: laid out again)
+    layOutChips(group)
+    fireEvent.dragStart(grip('Role'), { dataTransfer: dt })
+    dragAt('dragOver', chip('Age'), at.rightHalf(1), dt)
+    dragAt('drop', chip('Age'), at.rightHalf(1), dt)
+    expect(order()).toEqual(['Age', 'Role', 'Name'])
+  })
+
+  it('puts the slides away when the pointer leaves the chips or the drag is cancelled', async () => {
+    const { group, at, chip, grip, slide, order, dt } = await stage()
+    fireEvent.dragStart(grip('Age'), { dataTransfer: dt })
+    dragAt('dragOver', chip('Name'), at.leftHalf(0), dt)
+    fireEvent.dragLeave(group, { dataTransfer: dt, relatedTarget: document.body })
+    expect([slide('Name'), slide('Role')]).toEqual(['', ''])
+    dragAt('dragOver', chip('Name'), at.leftHalf(0), dt)
+    fireEvent.dragEnd(grip('Age'), { dataTransfer: dt })
+    expect(group).not.toHaveClass('plpChips--sliding')
+    expect([slide('Name'), slide('Role')]).toEqual(['', ''])
+    expect(order()).toEqual(['Name', 'Role', 'Age'])
+  })
+
+  it('slides the option chips of a multi-select the same way, and leaves the keyword chips alone', async () => {
+    await open([liveEntry('a', content('Cast', { keywords: ['cast', 'crew'], fields: [{ name: 'Genre', kind: 'multi' as const, options: ['Fantasy', 'Romance', 'Crime'] }] }))])
+    const group = screen.getByRole('group', { name: 'Genre options' })
+    const at = layOutChips(group)
+    const chip = (name: string) => within(group).getByText(name).closest('.plpChip') as HTMLElement
+    const dt = dataTransfer()
+    fireEvent.dragStart(within(chip('Crime')).getByTitle('Drag to reorder'), { dataTransfer: dt })
+    dragAt('dragOver', chip('Fantasy'), at.leftHalf(0), dt)
+    expect([chip('Fantasy'), chip('Romance')].map(c => c.style.transform)).toEqual(['translate(60px, 0px)', 'translate(-60px, 30px)'])
+    dragAt('drop', chip('Fantasy'), at.leftHalf(0), dt)
+    expect(within(group).getAllByRole('button', { name: /^Remove/ }).map(b => b.getAttribute('aria-label'))).toEqual(['Remove Crime', 'Remove Fantasy', 'Remove Romance'])
+    // keywords are not reorderable: no grip, no drop handling
+    const keywords = screen.getByRole('group', { name: 'Preset keywords' })
+    expect(within(keywords).queryAllByTitle('Drag to reorder')).toHaveLength(0)
   })
 })
 

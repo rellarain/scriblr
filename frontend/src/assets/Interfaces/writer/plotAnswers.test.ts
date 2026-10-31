@@ -108,6 +108,9 @@ describe('options', () => {
     nodes = moveOption(nodes, 'cat', 'fGenre', 'o3', null)
     expect(find(nodes, 'cat').customFieldDefs[0].options!.map(o => o.id)).toEqual(['o1', 'o2', 'o3'])
     expect(moveOption(nodes, 'cat', 'fGenre', 'o1', 'o1')).toBe(nodes)
+    // where it already stands (in front of the one after it, or last when it is last): the same nodes back
+    expect(moveOption(nodes, 'cat', 'fGenre', 'o1', 'o2')).toBe(nodes)
+    expect(moveOption(nodes, 'cat', 'fGenre', 'o3', null)).toBe(nodes)
   })
 
   it('removes an option with every answer that uses it, and counts them first', () => {

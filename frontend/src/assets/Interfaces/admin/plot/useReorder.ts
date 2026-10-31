@@ -11,6 +11,8 @@ export function useReorder<K extends string | number>(onMove: (id: K, beforeId: 
 
   return {
     dragId, overId,
+    // Ends the drag (a list that takes the drop itself, chips that slide, calls it when the dragged one is let go).
+    end,
     grip: (id: K) => ({
       draggable: true,
       onDragStart: (e: DragEvent) => {

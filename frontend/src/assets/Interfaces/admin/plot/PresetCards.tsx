@@ -1,7 +1,8 @@
-import { useState, type KeyboardEvent, type ReactNode } from 'react'
+import { useState, type DragEvent, type KeyboardEvent, type ReactNode } from 'react'
 import type { PlotFieldKind, PresetCard, PresetCluster, PresetContent, PresetField, PresetFieldset, PresetSubcategory } from '../../../../api/types'
 import { ChevronDownIcon, ChevronRightIcon, GripIcon, PlusIcon, TrashIcon } from '../../../icons'
 import { FIELD_KINDS, KIND_LABEL as FIELD_KIND_LABEL } from '../../writer/plotKinds'
+import { slideStyle, useChipDrop } from '../../writer/useChipDrop'
 import {
   DESCRIPTION_MAX, FIELDSETS_MAX, FIELDSET_MAX, FIELD_MAX, KEYWORD_MAX, NAME_MAX, OPTION_MAX, ROOT, addCluster, addFieldNameToSet, addFieldName, addFieldset, addKeyword,
   addOptionAt, addSubcategory, choosesFrom, fieldKind, fieldName, fieldOptions, fieldTotal, isBlankCard, moveCard, moveFieldTo, moveFieldsetTo, moveOptionTo,
@@ -41,6 +42,23 @@ function ChipList({ items, label, placeholder, maxLength, onAdd, onRemove, onMov
 }) {
   const [draft, setDraft] = useState('')
   const drag = useReorder<number>((from, before) => onMove?.(from, before), (from, dir) => onMove?.(from, dir < 0 ? from - 1 : from + 2))
+  // The chips slide out of the way of the one dragged by its grip, and take it where the pointer lets it go.
+  const group = useChipDrop({
+    draggedId: drag.dragId === null ? null : String(drag.dragId),
+    onDrop: (id, before) => { drag.end(); onMove?.(Number(id), before === null ? null : Number(before)) },
+  })
+  // A chip's grip starts the drag; the chip is hidden once the drag is over the chips, so the pointer carries the whole chip, not just the grip.
+  const gripOf = (index: number) => {
+    const grip = drag.grip(index)
+    return {
+      ...grip,
+      onDragStart: (e: DragEvent) => {
+        grip.onDragStart(e)
+        const chip = (e.currentTarget as HTMLElement).closest('[data-chip]')
+        if (chip && e.dataTransfer.setDragImage) e.dataTransfer.setDragImage(chip, 12, 12)
+      },
+    }
+  }
   const submit = () => {
     if (!draft.trim()) return
     onAdd(draft)
@@ -53,14 +71,13 @@ function ChipList({ items, label, placeholder, maxLength, onAdd, onRemove, onMov
     if (e.key === 'ArrowRight' && index < items.length - 1) onMove(index, index + 2 > items.length - 1 ? null : index + 2)
   }
   return (
-    <div className="plpChips" role="group" aria-label={label}>
+    <div ref={group.ref} className={`plpChips${group.sliding ? ' plpChips--sliding' : ''}`} role="group" aria-label={label} {...(onMove ? group.handlers : {})}>
       {items.map((item, index) => (
         <span
-          key={`${index}-${item}`}
-          className={`plpChip${onMove ? ' plpChip--field' : ''}${drag.dragId === index ? ' plpChip--dragging' : ''}${drag.overId === index && drag.dragId !== index ? ' plpChip--over' : ''}`}
-          {...(onMove ? drag.target(index) : {})}
+          key={`${index}-${item}`} data-chip={index} style={slideStyle(group.slideOf(String(index)))}
+          className={`plpChip${onMove ? ' plpChip--field' : ''}${drag.dragId === index && !group.isLifted(String(index)) ? ' plpChip--dragging' : ''}${group.isLifted(String(index)) ? ' plpChip--lifted' : ''}`}
         >
-          {onMove && <span className="plpGrip plpGrip--chip" aria-hidden="true" title="Drag to reorder" {...drag.grip(index)}><GripIcon size={12} /></span>}
+          {onMove && <span className="plpGrip plpGrip--chip" aria-hidden="true" title="Drag to reorder" {...gripOf(index)}><GripIcon size={12} /></span>}
           {item}
           {tail?.(index)}
           <button
@@ -69,7 +86,7 @@ function ChipList({ items, label, placeholder, maxLength, onAdd, onRemove, onMov
           >×</button>
         </span>
       ))}
-      <span className="plpChipAdd" {...(onMove ? drag.target(null) : {})}>
+      <span className="plpChipAdd" data-chip-tail="" style={slideStyle(group.tailSlide)}>
         <input
           value={draft} placeholder={placeholder} aria-label={placeholder} maxLength={maxLength} data-kf=""
           onChange={e => setDraft(e.target.value)}

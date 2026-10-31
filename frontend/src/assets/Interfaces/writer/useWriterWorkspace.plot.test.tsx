@@ -578,6 +578,10 @@ describe('useWriterWorkspace: choice fields and their answers', () => {
     const { result, get } = await openedWith(CHOICES)
     act(() => { result.current.movePlotOption('cat', 'fg', 'o2', 'o1') })
     expect(get('cat')!.customFieldDefs[0].options!.map(o => o.id)).toEqual(['o2', 'o1'])
+    // let go where it already stands: no step in the history
+    act(() => { result.current.movePlotOption('cat', 'fg', 'o2', 'o1') })
+    act(() => { result.current.history.undo('plot') })
+    expect(get('cat')!.customFieldDefs[0].options!.map(o => o.id)).toEqual(['o1', 'o2'])
     let made: string | null = 'x'
     act(() => { made = result.current.addPlotValue('line', 'fg') })
     expect(made).toBeNull()

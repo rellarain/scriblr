@@ -3,6 +3,7 @@ import { describe, expect, it } from 'vitest'
 import type { PlotNode } from '../../../api/types'
 import PlotView from './PlotView'
 import { placing, plotNode, startingPlot, useFakeWorkspace } from './plotTestWorkspace'
+import { dragAt, layOutChips } from '../../../test/chips'
 
 // The category Romance also has a multi-select (Genre), a dropdown (Tone) and a short text (Motto); the plotline Meet cute is under it.
 const GENRE = { id: 'fGenre', name: 'Genre', kind: 'multi' as const, options: [{ id: 'o1', label: 'Fantasy' }, { id: 'o2', label: 'Romance' }, { id: 'o3', label: 'Crime' }] }
@@ -93,6 +94,97 @@ describe('a choice field on the node that defines it', () => {
     expect(seen.nodes().find(n => n.id === 'cat')!.customFieldDefs.find(d => d.id === 'fGenre')!.options!.map(o => o.id)).toEqual(['o1', 'o3', 'o2'])
     fireEvent.keyDown(screen.getByLabelText('Option 1 of Genre'), { key: 'ArrowRight', altKey: true })
     expect(seen.nodes().find(n => n.id === 'cat')!.customFieldDefs.find(d => d.id === 'fGenre')!.options!.map(o => o.id)).toEqual(['o3', 'o1', 'o2'])
+  })
+
+  describe('dragging an option by its grip: the chips slide out of the way', () => {
+    // Genre has Fantasy, Romance and Crime; laid out two to a line, they are Fantasy and Romance on the first line, Crime and the add chip on the second.
+    const dragData = () => {
+      const data = new Map<string, string>()
+      return { setData: (k: string, v: string) => data.set(k, v), getData: (k: string) => data.get(k) ?? '', effectAllowed: '', setDragImage: () => {} }
+    }
+    const setup = () => {
+      const seen = latest()
+      render(<Editor start={world()} focused="cat" onNodes={seen.onNodes} />)
+      open('Genre')
+      const group = screen.getByRole('group', { name: 'Options of Genre' })
+      const at = layOutChips(group)
+      const chip = (label: string) => within(group).getByDisplayValue(label).closest('[data-chip]') as HTMLElement
+      const grip = (label: string) => within(chip(label)).getByLabelText('Drag to reorder options')
+      const slide = (label: string) => chip(label).style.transform
+      const order = () => seen.nodes().find(n => n.id === 'cat')!.customFieldDefs.find(d => d.id === 'fGenre')!.options!.map(o => o.id)
+      return { group, at, chip, grip, slide, order, dataTransfer: dragData(), add: group.querySelector('[data-chip-tail]') as HTMLElement }
+    }
+
+    it('opens a gap where the option will land: the chips it passes take the places beside them, some on another line', () => {
+      const { group, at, chip, grip, slide, dataTransfer, add } = setup()
+      fireEvent.dragStart(grip('Crime'), { dataTransfer })
+      expect(group).not.toHaveClass('wrOptions--sliding') // nothing moves just because a drag has started
+      expect(chip('Crime')).toHaveClass('wrOption--dragging')
+      dragAt('dragOver', chip('Fantasy'), at.leftHalf(0), dataTransfer)
+      expect(group).toHaveClass('wrOptions--sliding')
+      expect(chip('Crime')).toHaveClass('wrOption--lifted')
+      expect([slide('Fantasy'), slide('Romance'), slide('Crime')]).toEqual(['translate(60px, 0px)', 'translate(-60px, 30px)', ''])
+      expect(add.style.transform).toBe('')
+      // the pointer in the right half of Fantasy: in front of Romance, so only Romance moves
+      dragAt('dragOver', chip('Fantasy'), at.rightHalf(0), dataTransfer)
+      expect([slide('Fantasy'), slide('Romance')]).toEqual(['', 'translate(-60px, 30px)'])
+    })
+
+    it('drops where the gap is: in front of an option, or last, below the last line', () => {
+      const { at, chip, grip, order, dataTransfer } = setup()
+      fireEvent.dragStart(grip('Crime'), { dataTransfer })
+      dragAt('dragOver', chip('Fantasy'), at.leftHalf(0), dataTransfer)
+      dragAt('drop', chip('Fantasy'), at.leftHalf(0), dataTransfer)
+      expect(order()).toEqual(['o3', 'o1', 'o2'])
+      expect([chip('Fantasy'), chip('Romance'), chip('Crime')].map(c => c.style.transform)).toEqual(['', '', '']) // the slides are gone once it has dropped
+      expect(chip('Crime')).not.toHaveClass('wrOption--lifted')
+
+      fireEvent.dragStart(grip('Crime'), { dataTransfer })
+      dragAt('dragOver', chip('Romance'), at.afterAll(), dataTransfer)
+      dragAt('drop', chip('Romance'), at.afterAll(), dataTransfer)
+      expect(order()).toEqual(['o1', 'o2', 'o3'])
+    })
+
+    it('can move an option one place along, which dropping it on the next one never could', () => {
+      const { at, chip, grip, order, dataTransfer } = setup()
+      fireEvent.dragStart(grip('Fantasy'), { dataTransfer })
+      dragAt('dragOver', chip('Romance'), at.rightHalf(1), dataTransfer) // the right half of Romance: in front of Crime
+      expect(chip('Romance').style.transform).toBe('translate(-60px, 0px)')
+      dragAt('drop', chip('Romance'), at.rightHalf(1), dataTransfer)
+      expect(order()).toEqual(['o2', 'o1', 'o3'])
+    })
+
+    it('moves nothing over its own place, and drops there without changing the order', () => {
+      const { at, chip, grip, slide, order, dataTransfer } = setup()
+      fireEvent.dragStart(grip('Romance'), { dataTransfer })
+      dragAt('dragOver', chip('Romance'), at.leftHalf(1), dataTransfer)
+      expect([slide('Fantasy'), slide('Romance'), slide('Crime')]).toEqual(['', '', ''])
+      dragAt('drop', chip('Romance'), at.leftHalf(1), dataTransfer)
+      expect(order()).toEqual(['o1', 'o2', 'o3'])
+    })
+
+    it('puts the slides away when the pointer leaves the options, and when the drag ends', () => {
+      const { group, at, chip, grip, slide, dataTransfer } = setup()
+      fireEvent.dragStart(grip('Crime'), { dataTransfer })
+      dragAt('dragOver', chip('Fantasy'), at.leftHalf(0), dataTransfer)
+      expect(slide('Fantasy')).toBe('translate(60px, 0px)')
+      fireEvent.dragLeave(group, { dataTransfer, relatedTarget: document.body })
+      expect([slide('Fantasy'), slide('Romance')]).toEqual(['', ''])
+      expect(chip('Crime')).not.toHaveClass('wrOption--lifted')
+      dragAt('dragOver', chip('Fantasy'), at.leftHalf(0), dataTransfer)
+      fireEvent.dragEnd(grip('Crime'), { dataTransfer })
+      expect(group).not.toHaveClass('wrOptions--sliding')
+      expect([slide('Fantasy'), slide('Romance')]).toEqual(['', ''])
+    })
+
+    it('takes a drop as the drag enters, and ignores a drag that is not an option', () => {
+      const { group, at, chip, grip, order, dataTransfer } = setup()
+      expect(fireEvent.dragEnter(chip('Fantasy'), { dataTransfer })).toBe(true) // no option is dragged: not a place to drop
+      fireEvent.dragStart(grip('Crime'), { dataTransfer })
+      expect(dragAt('dragEnter', chip('Fantasy'), at.leftHalf(0), dataTransfer)).toBe(false)
+      dragAt('drop', group, at.leftHalf(0), dataTransfer)
+      expect(order()).toEqual(['o3', 'o1', 'o2'])
+    })
   })
 
   it('removes an option at once when nothing uses it, and asks first when answers do', () => {
