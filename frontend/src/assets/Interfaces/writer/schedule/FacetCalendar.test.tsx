@@ -1,0 +1,108 @@
+import { act, render } from '@testing-library/react'
+import { afterEach, describe, expect, it, vi } from 'vitest'
+import { emptyDay, FACETS, type MonthTotals } from '../../../../lib/facets'
+import { buildFacetGrid, portraitRows, weekRows } from '../../../../lib/scheduleCalendar'
+import { FacetCalendar, isPortrait, landscapeCell, portraitCell } from './FacetCalendar'
+
+const month = (draft: number): MonthTotals => ({ ...emptyDay(), draft, activeDays: 10 })
+const grid = buildFacetGrid({
+  daily: { '2026-10-31': { ...emptyDay(), draft: 300 }, '2026-10-26': { ...emptyDay(), outline: 2 } },
+  monthly: { '2024-11': month(9000), '2025-01': month(12000), '2025-02': month(6000) },
+  today: '2026-10-31', facets: FACETS, rule: 'busiest', dailyGoals: {}, weekStart: 'monday',
+})
+
+// A box of this size for every element (jsdom has no layout): what the calendar measures itself against.
+const boxOf = (width: number, height: number) => vi.spyOn(Element.prototype, 'getBoundingClientRect').mockImplementation(
+  () => ({ width, height, x: 0, y: 0, top: 0, left: 0, right: width, bottom: height, toJSON: () => ({}) }) as DOMRect,
+)
+
+afterEach(() => { vi.restoreAllMocks(); vi.unstubAllGlobals() })
+
+describe('the shape of the tile', () => {
+  it('is portrait when the tile is taller than wide or square, landscape when wider, and landscape until measured', () => {
+    expect(isPortrait({ width: 300, height: 600 })).toBe(true)
+    expect(isPortrait({ width: 400, height: 400 })).toBe(true)
+    expect(isPortrait({ width: 600, height: 300 })).toBe(false)
+    expect(isPortrait(null)).toBe(false)
+  })
+})
+
+describe('the cell that keeps the whole calendar in view', () => {
+  it('is square in a landscape tile tall enough, and squished in height, not width, in a shorter one', () => {
+    const tall = landscapeCell(300, true)
+    expect(tall.w).toBe(tall.h)
+    const short = landscapeCell(110, true)
+    expect(short.h).toBeLessThan(8)
+    expect(short.w).toBe(8)
+    // seven rows and their gaps, the months' row and the numbers fit the height
+    expect(short.h * 7 + short.gap * 6 + 28 + 4 + 18).toBeLessThanOrEqual(110)
+    expect(landscapeCell(null).w).toBe(14)
+  })
+  it('fits every week and every older month in the height of a portrait tile, as wide as the columns allow', () => {
+    const rows = 52 + 3
+    const c = portraitCell({ width: 360, height: 700 }, rows, true)
+    expect(c.h * rows + c.gap * (rows - 1) + 18).toBeLessThanOrEqual(700)
+    expect(c.h).toBeGreaterThan(2)
+    expect(c.w).toBeLessThanOrEqual(c.h * 3 + 1) // not flatter than 3 to 1
+    expect(c.w * 7 + c.gap * 6 + 22 + 10 + 30).toBeLessThanOrEqual(360)
+  })
+})
+
+describe('the portrait grid', () => {
+  it('has the weeks as rows, the newest first', () => {
+    const weeks = weekRows(grid.cells)
+    expect(weeks).toHaveLength(52)
+    expect(weeks.every(w => w.length === 7)).toBe(true)
+    expect(weeks[0].some(c => c.today)).toBe(true) // the top row is the current week
+    expect(weeks[0][0].date < weeks[1][0].date).toBe(false) // and the next row is the week before
+  })
+  it('maps a month rectangle over weeks (oldest first) to the rows it covers (newest first)', () => {
+    expect(portraitRows(49, 4, 52)).toEqual({ row: 1, span: 4 }) // the last four weeks are the top four rows
+    expect(portraitRows(1, 4, 52)).toEqual({ row: 49, span: 4 })
+  })
+
+  it('is drawn in a tile taller than wide: the current week on the top row, the years and the month numbers with the older months', () => {
+    boxOf(320, 700)
+    const { container } = render(<FacetCalendar grid={grid} weekStart="monday" />)
+    expect(container.querySelector('.wrSchedCal--portrait')).not.toBeNull()
+    const cells = [...container.querySelectorAll('.wrSchedCalPMain > i')]
+    expect(cells).toHaveLength(52 * 7)
+    expect(cells.slice(0, 7).some(c => c.className.includes('--today'))).toBe(true)
+    expect([...container.querySelectorAll('.wrSchedCalPLetters span')].map(s => s.textContent)).toEqual(['M', 'T', 'W', 'T', 'F', 'S', 'S'])
+    expect([...container.querySelectorAll('.wrSchedCalYear--v')].map(y => y.textContent)).toEqual(['2025', '2024'])
+    expect([...container.querySelectorAll('.wrSchedCalPNums span')].map(n => n.textContent)).toEqual(['2', '1', '11']) // the newest older month first
+    const root = container.querySelector('.wrSchedCal') as HTMLElement
+    expect(Number.parseFloat(root.style.getPropertyValue('--ch'))).toBeGreaterThanOrEqual(2)
+  })
+})
+
+describe('the landscape grid', () => {
+  it('is drawn in a tile wider than tall, with the weeks as columns', () => {
+    boxOf(900, 260)
+    const { container } = render(<FacetCalendar grid={grid} weekStart="monday" />)
+    expect(container.querySelector('.wrSchedCal--portrait')).toBeNull()
+    expect(container.querySelectorAll('.wrSchedCalGrid > i')).toHaveLength(52 * 7)
+    expect([...container.querySelectorAll('.wrSchedCalBarMonths span')].map(n => n.textContent)).toEqual(['11', '1', '2'])
+  })
+
+  it('keeps the current week at the right edge when the tile is resized', () => {
+    let resize: (r: { width: number; height: number }) => void = () => {}
+    vi.stubGlobal('ResizeObserver', class {
+      constructor(cb: ResizeObserverCallback) { resize = r => cb([{ contentRect: r } as ResizeObserverEntry], this as unknown as ResizeObserver) }
+      observe() {}
+      disconnect() {}
+    })
+    boxOf(900, 260)
+    const { container } = render(<FacetCalendar grid={grid} weekStart="monday" />)
+    const scroller = container.querySelector('.wrSchedCalScroll') as HTMLElement
+    Object.defineProperty(scroller, 'scrollWidth', { configurable: true, get: () => 2000 })
+    Object.defineProperty(scroller, 'clientWidth', { configurable: true, get: () => 800 })
+    act(() => resize({ width: 900, height: 200 })) // the tile gets shorter: the cells shrink and the grid is narrower
+    expect(scroller.scrollLeft).toBe(1200) // scrollWidth - clientWidth: still at the right edge, not the left
+    // scrolled away from the edge by 300px, it stays 300px from it
+    scroller.scrollLeft = 900
+    scroller.dispatchEvent(new Event('scroll'))
+    act(() => resize({ width: 900, height: 160 }))
+    expect(scroller.scrollLeft).toBe(900)
+  })
+})

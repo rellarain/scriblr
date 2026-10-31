@@ -2,7 +2,9 @@
 // Colours are the level's tokens (the console's tiles on fill-3, white ink, cards one shade deeper on fill-4); the facets' own hues are --wr-f-<facet>, set on the console from the user's hues.
 .wr {
   --wr-cal-base: var(--level-wash);
-  --cell: 14px; // a calendar square's side (the Activity grid sets its own to fit the tile)
+  // A calendar cell's width and height and the gap between cells: the Activity grid sets its own so that the whole calendar fits the tile (the cells are squished
+  // in height or width where it must).
+  --cw: 14px; --ch: 14px; --cg: var(--space-2);
   // The grid's colour: the source of a cell's four shades (--cal-src) is the facet with the most activity that day (--wr-f-<facet>), else the accent hue.
   --cal-src: #{'hsl(var(--color-accent-h) 90% 50%)'};
   .wrSchedConsole { position: relative; width: 100%; height: 100%; min-height: 0; display: flex; flex-direction: column;
@@ -19,6 +21,8 @@
   // The tab's own tile is the level's fill like every other console's; the console's tiles are one step deeper (fill-3, their title bars and the cards in them fill-4).
   .wrSchedConsole .wrTabTile { background: var(--wr-fill-3); }
   .wrSchedConsole .wrTabTileTitle { background: var(--wr-fill-4); color: var(--level-ink); }
+  // The Activity tile holds a chart that fills it, so it keeps only a 5px margin.
+  .wrSchedTileBody--chart { padding: 5px; }
   .wrSchedCard { display: flex; flex-direction: column; gap: var(--space-5); min-width: 0; }
   // The Activity tile's chart takes the height of the tile: the card grows to it, and the grid or the graph to the card (measured: useElementSize).
   .wrSchedActivity { flex: 1 1 0; min-height: 0; }
@@ -49,21 +53,21 @@
   .wrSchedCalInner { width: max-content; }
   .wrSchedCalTop { display: flex; gap: var(--space-4); height: 22px; margin-bottom: var(--space-3); }
   // The years over the monthly bars, one rectangle over each year's bars, like the months over the weeks.
-  .wrSchedCalYears { display: grid; gap: var(--space-2); flex: none; }
+  .wrSchedCalYears { display: grid; gap: var(--cg); flex: none; }
   .wrSchedCalYear { background: var(--wr-fill-4); border-radius: var(--radius-button); font-size: var(--text-ui); font-weight: 700; line-height: 22px; text-align: center; overflow: hidden; white-space: nowrap; }
-  .wrSchedCalLetterGap { width: var(--cell); flex: none; }
-  .wrSchedCalMonths { display: grid; gap: var(--space-2); }
+  .wrSchedCalLetterGap { width: var(--cw); flex: none; }
+  .wrSchedCalMonths { display: grid; gap: var(--cg); }
   .wrSchedCalMonth { background: var(--wr-fill-4); border-radius: var(--radius-button); font-size: var(--text-ui); font-weight: 700; line-height: 22px; padding: 0 var(--space-3); overflow: hidden; white-space: nowrap; }
   .wrSchedCalRows { display: flex; align-items: flex-start; gap: var(--space-4); }
   .wrSchedCalBarsCol { display: flex; flex-direction: column; gap: var(--space-2); }
   // The month's number under its bar (1 to 12).
-  .wrSchedCalBarMonths { display: grid; gap: var(--space-2); font-size: var(--text-small); line-height: 14px; text-align: center; color: var(--level-ink-soft); span { white-space: nowrap; overflow: visible; } }
-  .wrSchedCalBars { display: flex; align-items: flex-end; gap: var(--space-2); height: calc(7 * var(--cell) + 6 * var(--space-2)); }
-  .wrSchedCalBar { display: flex; flex-direction: column-reverse; width: var(--cell); i { display: block; width: 100%; } }
-  .wrSchedCalLetters { display: grid; grid-template-rows: repeat(7, var(--cell)); gap: var(--space-2); width: var(--cell); text-align: center; font-size: var(--text-ui); line-height: var(--cell); font-weight: 700; position: sticky; left: 0; background: var(--wr-fill-3); z-index: 1; }
-  .wrSchedCalGrid { display: grid; grid-template-rows: repeat(7, var(--cell)); grid-auto-flow: column; grid-auto-columns: var(--cell); gap: var(--space-2); }
+  .wrSchedCalBarMonths { display: grid; gap: var(--cg); font-size: var(--text-small); line-height: 14px; text-align: center; color: var(--level-ink-soft); span { white-space: nowrap; overflow: visible; } }
+  .wrSchedCalBars { display: flex; align-items: flex-end; gap: var(--cg); height: calc(7 * var(--ch) + 6 * var(--cg)); }
+  .wrSchedCalBar { display: flex; flex-direction: column-reverse; width: var(--cw); i { display: block; width: 100%; } }
+  .wrSchedCalLetters { display: grid; grid-template-rows: repeat(7, var(--ch)); gap: var(--cg); width: var(--cw); text-align: center; font-size: var(--text-ui); line-height: var(--ch); font-weight: 700; position: sticky; left: 0; background: var(--wr-fill-3); z-index: 1; }
+  .wrSchedCalGrid { display: grid; grid-template-rows: repeat(7, var(--ch)); grid-auto-flow: column; grid-auto-columns: var(--cw); gap: var(--cg); }
   // A day is one of four steps of the accent hue: the strongest is a day that met its goal or was the busiest.
-  .wrSchedCalCell { display: block; width: var(--cell); height: var(--cell); border-radius: var(--radius-none); background: var(--wr-cal-base);
+  .wrSchedCalCell { display: block; width: var(--cw); height: var(--ch); border-radius: var(--radius-none); background: var(--wr-cal-base);
     // The shades: the source's hue at a fixed OKLCH lightness (0.67, 0.72, 0.77, 0.82; CAL_STEPS in theme/zoneLooks.ts) and chroma 0.17, mid tones that read
     // the same in every hue and are neither white nor black.
     &--1 { background: #{'oklch(from var(--cal-src) 0.67 0.17 h)'}; }
@@ -78,6 +82,21 @@
     &--x { visibility: hidden; }
     // Today: an outline in the level's ink inside the square, with a 2px gap of the tile's colour before the shade, so it shows on the lightest step too.
     &--today { outline: 2px solid var(--level-ink); outline-offset: -2px; box-shadow: inset 0 0 0 4px var(--wr-fill-3); } }
+
+  // ---- the grid, portrait: the tile is taller than wide, so a row is a week (the current week on top) and the columns are the days ----
+  .wrSchedCal--portrait { overflow: hidden; }
+  .wrSchedCalScroll--portrait { height: 100%; overflow-x: hidden; overflow-y: auto; padding-bottom: 0; } // the whole calendar fits (the cells are squished to it); this only holds when it cannot
+  .wrSchedCalPDays { display: flex; gap: var(--space-4); position: sticky; top: 0; z-index: 2; background: var(--wr-fill-3); padding-bottom: var(--space-2); }
+  .wrSchedCalPSide { width: 22px; flex: none; }
+  .wrSchedCalPLetters { display: grid; grid-template-columns: repeat(7, var(--cw)); gap: var(--cg); text-align: center; font-size: var(--text-ui); line-height: 16px; font-weight: 700; }
+  .wrSchedCalPBody { display: flex; gap: var(--space-4); align-items: flex-start; }
+  .wrSchedCalPRects { display: grid; grid-template-columns: 22px; gap: var(--cg); flex: none; }
+  .wrSchedCalPMain { display: grid; grid-template-columns: repeat(7, var(--cw)); grid-auto-rows: var(--ch); gap: var(--cg); }
+  .wrSchedCalPNums { display: grid; grid-template-columns: 20px; gap: var(--cg); flex: none; font-size: var(--text-small); color: var(--level-ink-soft); span { display: flex; align-items: center; justify-content: flex-start; } }
+  // A month before the grid, as a bar across the seven columns: its length is the share of the busiest month's average a day.
+  .wrSchedCalPBar { grid-column: 1 / -1; display: flex; align-items: stretch; span { display: flex; height: 100%; } i { display: block; height: 100%; } }
+  // The month and year rectangles down the left, their names turned to read upwards.
+  .wrSchedCalMonth--v, .wrSchedCalYear--v { writing-mode: vertical-rl; transform: rotate(180deg); line-height: 22px; padding: 0; text-align: center; overflow: hidden; }
 
   // ---- the line graph ----
   .wrSchedLine { position: relative; min-width: 0; svg { position: absolute; inset: 0; width: 100%; height: 100%; } }
@@ -176,7 +195,8 @@
   // A button in a title bar (the Settings of the console, in the tab tile's title): small, in the level's wash.
   .wrTabTileTitleSlot { margin-left: auto; display: inline-flex; align-items: center; gap: var(--space-2); text-transform: none; letter-spacing: normal; font-weight: 400; }
   .wrTabTileTitleSlot .wrSmallBtn, .wrSchedConsoleBar .wrSmallBtn { color: var(--level-ink); background: var(--level-wash); border: 0; border-radius: var(--radius-button); padding: 1px var(--space-3); font-size: var(--text-small); cursor: pointer; display: inline-flex; align-items: center; &:hover { background: var(--level-wash-hi); } &[aria-expanded='true'] { background: var(--level-ink); color: var(--wr-fill-4); } }
-  .wrSchedHue input { flex: 1 1 auto; }
+  // A facet's hue: the app's colour range (a gradient of every hue at the facet colour's own saturation and lightness) beside its name.
+  .wrSchedHue { align-items: center; .colorRange { flex: 1 1 auto; min-width: 140px; } }
   .wrSchedRest { display: flex; flex-wrap: wrap; gap: var(--space-4); }
 }
 

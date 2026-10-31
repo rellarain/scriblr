@@ -2,6 +2,8 @@ import { useState } from 'react'
 import { FACETS, FACET_LABEL, type Facet, type Planner } from '../../../../lib/facets'
 import type { WeekStart } from '../../../../lib/scheduleCalendar'
 import { GearIcon } from '../../../icons'
+import { ColorRange } from '../../../../components/ColorRange'
+import { FACET_COLOR } from '../../../../theme/zoneLooks'
 import { newId } from './ids'
 
 // The console's settings, from the Settings button in the console's title bar (SettingsButton; the popover, ScheduleSettings, opens over the console): the week's first day, the facets' hues, shift reminders, the project's timeline and its
@@ -39,7 +41,7 @@ export function ScheduleSettings({
           <h4 className="wrSchedSub">Facet colours</h4>
           {FACETS.map(f => (
             <label key={f} className="wrKv wrSchedHue"><span><i className="wrSchedDot" style={{ background: `var(--wr-f-${f})` }} />{FACET_LABEL[f]}</span>
-              <input type="range" min={0} max={360} aria-label={`${FACET_LABEL[f]} hue`} value={hues[f]} onChange={e => onHues({ ...hues, [f]: Number(e.target.value) })} />
+              <ColorRange label={`${FACET_LABEL[f]} hue`} value={hues[f]} sat={FACET_COLOR.s} light={FACET_COLOR.l} onChange={h => onHues({ ...hues, [f]: h })} />
             </label>
           ))}
           <h4 className="wrSchedSub">{scopeLabel}</h4>

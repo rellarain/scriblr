@@ -47,6 +47,15 @@ export function barYears(bars: Array<{ key: string }>): YearRect[] {
   return out
 }
 
+// The portrait grid: a row for each week, the newest first (the cells come oldest first, seven to a week).
+export function weekRows<T>(cells: T[]): T[][] {
+  const weeks: T[][] = []
+  for (let i = 0; i < cells.length; i += 7) weeks.push(cells.slice(i, i + 7))
+  return weeks.reverse()
+}
+// A rectangle over weeks col..col+span-1 (1-based, oldest first), as the rows it covers in the portrait grid (1-based, the newest week first).
+export const portraitRows = (col: number, span: number, weeks: number): { row: number; span: number } => ({ row: weeks - (col + span - 1) + 1, span })
+
 export interface FacetGrid {
   cells: FacetCell[]
   months: MonthRect[]

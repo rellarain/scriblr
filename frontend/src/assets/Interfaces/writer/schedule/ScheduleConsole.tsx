@@ -191,7 +191,7 @@ export default function ScheduleConsole({ scope, projectIds, titles, titleSlot }
           scopeLabel={scope === 'dash' ? 'Account' : 'This project'} onClose={() => setSettingsOpen(false)}
         />
       )}
-      <SplitArea gridId={`scriblr.writer.schedule.tiles.${scope}`} label="Schedule tiles" tiles={tiles.map(t => ({ ...t, bodyClassName: 'wrSchedTileBody' }))} defaultTree={DEFAULT_TREE} />
+      <SplitArea gridId={`scriblr.writer.schedule.tiles.${scope}`} label="Schedule tiles" tiles={tiles.map(t => ({ ...t, bodyClassName: `wrSchedTileBody${t.id === 'activity' ? ' wrSchedTileBody--chart' : ''}` }))} defaultTree={DEFAULT_TREE} />
     </div>
   )
 }
