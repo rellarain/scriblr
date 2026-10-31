@@ -6,7 +6,7 @@ import {
   BLACK, TEXT_TARGET, WHITE, mixRgb, over, ratioOf, ratioOfRgb, rgbOf, type RGB,
 } from './readable'
 import {
-  DISLIKE_BAR_SATURATIONS, INK_STRENGTH, LIFT_ALPHA, LIKE_BAR_SATURATIONS, PAPER_LOOKS, SIDEBAR_SHADE_1, SINK_ALPHAS, SURFACE_OFFSETS, ZONE_LOOKS,
+  ANSWER_KIND_ALPHA, DISLIKE_BAR_SATURATIONS, INK_STRENGTH, LIFT_ALPHA, LIFT_ALPHA_LIGHTEST, LIKE_BAR_SATURATIONS, PAPER_LOOKS, SIDEBAR_SHADE_1, SINK_ALPHAS, SURFACE_OFFSETS, ZONE_LOOKS,
   fillInk, pageTone, paperAccents, paperGrounds, paperInks, resolvePalette, shadeK, toneMarks, zoneInk,
 } from './zoneLooks'
 import type { ZoneKey, ZonePalette } from './types'
@@ -149,14 +149,20 @@ export function paletteRatios(zone: ZoneKey, hues: AuditHues = DEFAULT_HUES): Pa
   // (white on it, as on any level); each worst over every hue a plot node can carry, and the subcategory also at the app theme's own hue.
   // Each at its saturation tier: a category the quietest, a subcategory the middle one, a cluster the loudest.
   let worstCategory = Infinity
+  let worstAnswerKind = Infinity
   let worstSubcategory = ratioOfRgb(WHITE, rgbOf(fillHsl(hues.theme, colors.accent, SAT_MIDDLE)))
   let worstCluster = ratioOfRgb(WHITE, rgbOf(fillHsl(hues.theme, colors.accent, SAT_LOUD)))
   for (let h = 0; h < 360; h += 5) {
     worstCategory = Math.min(worstCategory, ratioOfRgb(ink, rgbOf(hsl(h, colors.theme.s * SAT_QUIET, colors.theme.l))))
+    // The card of an answer inherited from a category (a lift of the ink at 8%) in the node's field group (a recess of black at 16%) on the category's colour.
+    const group = over(BLACK, SINK_ALPHAS[1] * shadeK(look.mode), rgbOf(hsl(h, colors.theme.s * SAT_QUIET, colors.theme.l)))
+    const card = over(ink, LIFT_ALPHA_LIGHTEST, group)
+    worstAnswerKind = Math.min(worstAnswerKind, ratioOfRgb(over(ink, ANSWER_KIND_ALPHA, card), card))
     worstSubcategory = Math.min(worstSubcategory, ratioOfRgb(WHITE, rgbOf(fillHsl(h, colors.accent, SAT_MIDDLE))))
     worstCluster = Math.min(worstCluster, ratioOfRgb(WHITE, rgbOf(fillHsl(h, colors.accent, SAT_LOUD))))
   }
   out.push({ id: 'plot-category', group: 'Plot colours', label: 'Ink on a plot category, the worst hue', kind: 'text', ratio: worstCategory })
+  out.push({ id: 'plot-answer-kind', group: 'Plot colours', label: 'The faint kind label on the card of an inherited answer, the worst hue', kind: 'text', ratio: worstAnswerKind })
   out.push({ id: 'plot-subcategory', group: 'Plot colours', label: 'White on a plot subcategory, the worst hue', kind: 'text', ratio: worstSubcategory })
   // A cluster's surface is the same fill at the loudest tier, over the same hues (within 30 degrees of its subcategory's).
   out.push({ id: 'plot-cluster', group: 'Plot colours', label: 'White on a plot cluster, the worst hue', kind: 'text', ratio: worstCluster })

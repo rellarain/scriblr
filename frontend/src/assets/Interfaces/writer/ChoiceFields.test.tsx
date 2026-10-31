@@ -366,7 +366,12 @@ describe('answering on a plotline', () => {
     open('Genre')
     const genre = block('fGenre')
     expect(genre.getByText('Multi-select')).toBeInTheDocument()
-    expect(genre.getByText('Category: Romance')).toBeInTheDocument()
+    // the category's answers are in a card of their own: its title at the top left, its kind at the top right, then the answers
+    const card = genre.getByRole('group', { name: 'Category: Romance' })
+    expect(card).toHaveClass('wrAnswerFrom')
+    const head = card.querySelector('.wrAnswerFromHead')!
+    expect([...head.children].map(el => [el.className, el.textContent])).toEqual([['wrAnswerFromName', 'Romance'], ['wrAnswerFromKind', 'Category']])
+    expect(card.querySelector('.wrAnswerFromBody')).toContainElement(genre.getByText('Crime', { selector: '.wrAnswerLabel' }))
     expect(genre.getByText('Crime', { selector: '.wrAnswerLabel' })).toBeInTheDocument()
     expect(genre.getByTitle('Answered on Romance. Change it there.')).toBeInTheDocument()
     expect(genre.getByText('This plotline')).toBeInTheDocument()

@@ -92,6 +92,10 @@ const clamp = (n: number, lo: number, hi: number) => Math.max(lo, Math.min(hi, n
 
 // The deepest lift overlay (--ov-lift-3: the ink at 22%) a surface carries on hover or press.
 export const LIFT_ALPHA = 0.22
+// The lightest lift (--ov-lift-1: the ink at 8%), which the card of an inherited answer wears; and the strength of the ink of that card's kind label, which
+// is fainter than its title (a light zone's muted and faint ink are the ink itself, so it is its own tier). `.wrAnswerFromKind` in _plot-fields.scss says 80%.
+export const LIFT_ALPHA_LIGHTEST = 0.08
+export const ANSWER_KIND_ALPHA = 0.8
 
 // Does the zone's ink (and its muted and faint tiers) read on every surface of a theme at this lightness?
 function surfacesRead(hue: number, look: ZoneLook, themeL: number): boolean {

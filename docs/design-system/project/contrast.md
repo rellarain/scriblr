@@ -215,6 +215,7 @@ Each cell is the ratio at the default hues (theme 330, accent 32, alert 200) and
 | Pair | Needs | Dawn | Day | Dusk | Night |
 |---|---|---|---|---|---|
 | Ink on a plot category, the worst hue | 4.5:1 | 12.6 (12.0) | 13.9 (13.8) | 7.3 (6.1) | 9.3 (9.3) |
+| The faint kind label on the card of an inherited answer, the worst hue | 4.5:1 | 6.5 (6.2) | 7.0 (6.9) | 5.3 (4.7) | 6.3 (6.3) |
 | White on a plot subcategory, the worst hue | 4.5:1 | 7.4 (7.1) | 7.3 (6.9) | 6.8 (6.8) | 6.8 (6.8) |
 | White on a plot cluster, the worst hue | 4.5:1 | 7.2 (7.1) | 6.6 (6.6) | 6.6 (6.6) | 6.8 (6.8) |
 

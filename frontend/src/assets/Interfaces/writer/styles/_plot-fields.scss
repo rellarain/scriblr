@@ -13,11 +13,11 @@
   }
   .wrFieldGroups { display: flex; flex-direction: column; gap: var(--space-4); }
   .wrFieldGroup { display: flex; flex-direction: column; gap: var(--space-3); background: var(--ov-sink-1); border-radius: var(--radius-button); padding: var(--space-4) var(--space-5); }
-  .wrFieldGroupHead { display: flex; align-items: center; justify-content: space-between; gap: var(--space-base); }
+  .wrFieldGroupHead, .wrAnswerFromHead { display: flex; align-items: center; justify-content: space-between; gap: var(--space-base); }
   .wrFieldGroupActions { display: inline-flex; align-items: center; gap: var(--space-3); }
-  .wrFieldGroupName { font-size: var(--text-small); font-weight: 700; text-transform: uppercase; letter-spacing: 1.5px; }
+  .wrFieldGroupName, .wrAnswerFromName { font-size: var(--text-small); font-weight: 700; text-transform: uppercase; letter-spacing: 1.5px; }
   .wrFieldToggle { display: inline-flex; align-items: center; gap: var(--space-3); flex: 0 1 auto; min-width: 0; color: inherit; text-align: left; }
-  .wrFieldGroupOrigin { flex: 0 0 auto; margin-left: auto; font-size: var(--text-small); font-weight: 700; text-transform: uppercase; letter-spacing: 1.5px; color: var(--ink-muted); }
+  .wrFieldGroupOrigin, .wrAnswerFromKind { flex: 0 0 auto; margin-left: auto; font-size: var(--text-small); font-weight: 700; text-transform: uppercase; letter-spacing: 1.5px; color: var(--ink-muted); }
   .wrFieldBlock { display: flex; flex-direction: column; gap: var(--space-3); border-top: 1px solid var(--hairline); padding-top: var(--space-3); &--over { outline: 2px dashed var(--wr-accent-light); outline-offset: 2px; } &--dragging { opacity: 0.7; } }
   .wrFieldHead { display: flex; align-items: center; gap: var(--space-3); min-height: 26px; }
   .wrFieldName { flex: 1 1 auto; min-width: 0; box-sizing: border-box; background: var(--wr-field); border: 0; border-radius: var(--radius-none); color: var(--ink); font-size: var(--text-ui); font-weight: 700; padding: 5px var(--space-base); outline: none; &:focus { box-shadow: inset 0 0 0 1px var(--wr-accent); } &::placeholder { color: var(--ink-faint); } }
@@ -92,7 +92,12 @@
     display: flex; align-items: center; gap: var(--space-base); min-width: min(100%, 16rem); max-width: 100%; box-sizing: border-box;
     &:not(.wrPlotValue) { padding: var(--space-1) var(--space-base); background: var(--wr-field); color: var(--ink); border-radius: var(--radius-button); }
   }
-  .wrAnswerFrom { display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-3); }
+  // The answer of the node above, in a card (a lift of the group it sits in, which is the audited kind of overlay): its title and kind (the group heads' type
+  // and the muted ink) over its answers.
+  // The kind label (Category) is fainter than the title: the ink at 80% (ANSWER_KIND_ALPHA, audited as 'plot-answer-kind').
+  .wrAnswerFromKind { color: color-mix(in srgb, var(--ink) 80%, transparent); }
+  .wrAnswerFrom { display: flex; flex-direction: column; gap: var(--space-3); background: var(--ov-lift-1); border-radius: var(--radius-button); padding: var(--space-3) var(--space-4); }
+  .wrAnswerFromBody { display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-3); }
   .wrAnswerWho { font-size: var(--text-small); font-weight: 700; text-transform: uppercase; letter-spacing: 1.5px; opacity: 0.9; }
 
   // A value: a plain box with rounded corners; the field name small, bold and all caps in its top left

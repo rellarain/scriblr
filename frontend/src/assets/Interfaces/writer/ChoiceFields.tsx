@@ -389,19 +389,24 @@ function TextAnswer({ w, def, holder, drag }: { w: WriterWorkspace; def: PlotCus
   )
 }
 
-// What a plotline shows of the answer of the node that defines the field: it cannot be changed here, but it is dragged onto a chapter like any
-// answer and counts its places.
+// What a plotline shows of the answer of the node that defines the field, in a card of its own: the node's title at the top left, its kind at the top
+// right (fainter), the answers below. It cannot be changed here, but is dragged onto a chapter like any answer and counts its places.
 function OwnerAnswers({ w, info, drag }: { w: WriterWorkspace; info: FieldInfo; drag: PlotDrag }) {
   const answers = valuesIn(w.plotNodes, info.owner.id, info.def.id)
   const scope = `${info.scope.charAt(0).toUpperCase()}${info.scope.slice(1)}`
   return (
-    <div className="wrAnswerFrom">
-      <span className="wrAnswerWho">{scope}: {nodeLabel(info.owner)}</span>
-      {answers.length === 0
-        ? <span className="wrMuted">No answer</span>
-        : answers.map(a => (
-          <AnswerCard key={a.id} w={w} answer={a} drag={valueGrip(drag, a.id)} dragging={drag.dragId === a.id} hint={`Answered on ${nodeLabel(info.owner)}. Change it there.`} />
-        ))}
+    <div className="wrAnswerFrom" role="group" aria-label={`${scope}: ${nodeLabel(info.owner)}`}>
+      <div className="wrAnswerFromHead">
+        <span className="wrAnswerFromName">{nodeLabel(info.owner)}</span>
+        <span className="wrAnswerFromKind">{scope}</span>
+      </div>
+      <div className="wrAnswerFromBody">
+        {answers.length === 0
+          ? <span className="wrMuted">No answer</span>
+          : answers.map(a => (
+            <AnswerCard key={a.id} w={w} answer={a} drag={valueGrip(drag, a.id)} dragging={drag.dragId === a.id} hint={`Answered on ${nodeLabel(info.owner)}. Change it there.`} />
+          ))}
+      </div>
     </div>
   )
 }
