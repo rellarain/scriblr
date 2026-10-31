@@ -28,7 +28,8 @@
     .wrPlotNav { flex: 1 1 auto; border-radius: var(--radius-none); background: var(--ov-sink-1); }
     .wrPlotNavAddRow > .wrSmallBtn, .wrPresetPickerRoot > .wrSmallBtn { @include wrLevelWash; &:hover:not(:disabled) { background: var(--level-wash-hi); } }
   }
-  .wrPlotNav { flex: 0 0 250px; min-width: 0; min-height: 0; display: flex; flex-direction: column; gap: var(--space-base); background: var(--ov-sink-1); border-radius: var(--radius-button); padding: var(--space-4); }
+  // The contents' width is 250px until its handle is dragged (--wr-nav-basis, set on the frame by PlotView.tsx; plotNavWidth.ts); the handle (.wrSideResizer) sits over the gap on its right edge.
+  .wrPlotNav { position: relative; flex: 0 0 var(--wr-nav-basis, 250px); min-width: 0; min-height: 0; display: flex; flex-direction: column; gap: var(--space-base); background: var(--ov-sink-1); border-radius: var(--radius-button); padding: var(--space-4); }
   .wrPlotNavHead { display: flex; align-items: center; justify-content: space-between; font-size: var(--text-small); font-weight: 700; text-transform: uppercase; letter-spacing: 1px; span { opacity: 0.9; } }
   // The three level-fold circles: 10px, an outline when every node of the level is closed, filled in the accent when any is open. The fourth
   // circle (full descriptions) stands apart from them and is filled in the alert hue while the descriptions are shown.

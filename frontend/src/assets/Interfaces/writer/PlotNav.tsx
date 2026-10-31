@@ -2,7 +2,9 @@ import { useMemo, useState } from 'react'
 import type { PlotNode } from '../../../api/types'
 import type { WriterWorkspace } from './useWriterWorkspace'
 import { ChevronRightIcon, PlusIcon } from '../../icons'
+import SideResizer from './levels/SideResizer'
 import { LevelDots } from './LevelDots'
+import { clampNavWidth } from './plotNavWidth'
 import { plotColors, plotColorVars } from './plotColors'
 import { nodeLabel, plotlinesUnder, selectionState, sortByTitle } from './plotTree'
 import { PresetPicker } from './PresetPicker'
@@ -14,7 +16,8 @@ import { useStoredState } from './storage'
 // Three small circles at the top right fold a whole level at once (categories, subcategories, clusters, left to right): lit while any node
 // of that level is open, a click closes them all, and a click on an unlit one opens them all. A fourth circle, lit in the alert hue, shows the
 // full description of every category, subcategory, cluster and plotline under its name (hidden otherwise; kept across restarts). "+ Category" and
-// "+ Preset" (a published plot preset, see PresetPicker.tsx) sit at the bottom.
+// "+ Preset" (a published plot preset, see PresetPicker.tsx) sit at the bottom. Given `resize`, a handle on the panel's right edge sets its width
+// (plotNavWidth.ts); the compact bar, where the contents fold down over the editor, is given none.
 
 const LEVELS = [['category', 'categories'], ['subcategory', 'subcategories'], ['cluster', 'clusters']] as const
 
@@ -22,11 +25,13 @@ export function plotlineCount(node: PlotNode, children: Map<string | null, PlotN
   return plotlinesUnder(node, children).length
 }
 
-export function PlotNav({ w, onOpenNode, onCompare }: {
+export function PlotNav({ w, onOpenNode, onCompare, resize }: {
   w: WriterWorkspace
   // A row's name was chosen (its editor opens): the contents bar closes its drawer.
   onOpenNode?: () => void
   onCompare?: () => void
+  // The width follows the drag live (`onDrag`) and is kept on release (`onCommit`).
+  resize?: { onDrag: (width: number) => void; onCommit: (width: number) => void }
 }) {
   const [collapsed, setCollapsed] = useState<Set<string>>(new Set())
   const [fullDesc, setFullDesc] = useStoredState<boolean>('scriblr.writer.plotNavDescriptions', false)
@@ -101,6 +106,7 @@ export function PlotNav({ w, onOpenNode, onCompare }: {
 
   return (
     <div className="wrPlotNav">
+      {resize && <SideResizer onDrag={resize.onDrag} onCommit={resize.onCommit} clamp={clampNavWidth} label="Contents width" what="the contents" />}
       <div className="wrPlotNavHead">
         <span>Categories</span>
         <LevelDots

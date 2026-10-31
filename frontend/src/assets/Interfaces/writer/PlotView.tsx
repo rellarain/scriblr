@@ -17,6 +17,8 @@ import { PlotNav, plotlineCount } from './PlotNav'
 import { PlotCompare } from './PlotCompare'
 import { PlotParents } from './PlotParents'
 import { PLOT_BREAKPOINTS, plotSizeOf, useElementWidth } from './useElementWidth'
+import { PLOT_NAV_KEY, PLOT_NAV_W, navBasis } from './plotNavWidth'
+import { useStoredState } from './storage'
 import { PlotOrderToggle, usePlotOrder } from './plotOrder'
 import { fieldIndex, fieldsInOrder, isScrapField, orderValues, valuesIn } from './plotFields'
 import { isChoice } from './plotKinds'
@@ -225,6 +227,9 @@ export default function PlotView({ w }: { w: WriterWorkspace }) {
   // The tool's own width picks its layout; the compare view opens when plotlines are ticked and gives way to a row's editor.
   const [sizeRef, width] = useElementWidth<HTMLDivElement>(PLOT_BREAKPOINTS)
   const size = plotSizeOf(width)
+  // The contents' width: the one kept on this machine, or, while its handle is being dragged, the drag's.
+  const [navWidth, setNavWidth] = useStoredState<number>(PLOT_NAV_KEY, PLOT_NAV_W)
+  const [dragWidth, setDragWidth] = useState<number | null>(null)
   const [barOpen, setBarOpen] = useState(false)
   // The contents drawer closes on Escape or a click outside the bar.
   useEffect(() => {
@@ -411,6 +416,7 @@ export default function PlotView({ w }: { w: WriterWorkspace }) {
       w={w}
       onOpenNode={() => { setCompareOpen(false); setBarOpen(false) }}
       onCompare={() => { setCompareOpen(true); setBarOpen(false) }}
+      resize={size === 'compact' ? undefined : { onDrag: setDragWidth, onCommit: width => { setNavWidth(width); setDragWidth(null) } }}
     />
   )
   // Compact: the contents are one line (where you are), and fold down over the editor.
@@ -419,7 +425,7 @@ export default function PlotView({ w }: { w: WriterWorkspace }) {
 
   return (
     <div className="wrPlotView" ref={sizeRef}>
-      <div className="wrPlotFrame" data-size={size}>
+      <div className="wrPlotFrame" data-size={size} style={size === 'compact' ? undefined : { ['--wr-nav-basis' as string]: navBasis(dragWidth ?? navWidth) }}>
         {size === 'compact' ? (
           <div className="wrPlotBar">
             <button type="button" className="wrPlotBarToggle" aria-expanded={barOpen} onClick={() => setBarOpen(open => !open)}>

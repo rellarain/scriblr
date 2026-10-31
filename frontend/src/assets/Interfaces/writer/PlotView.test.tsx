@@ -1112,3 +1112,80 @@ describe('fieldsets', () => {
     await waitFor(() => expect(within(set('Setting')).getAllByLabelText('Field name')).toHaveLength(2))
   })
 })
+
+describe('the width of the contents', () => {
+  const handle = () => screen.getByRole('separator', { name: 'Contents width' })
+  const basis = (container: HTMLElement) => (container.querySelector('.wrPlotFrame') as HTMLElement).style.getPropertyValue('--wr-nav-basis')
+  const KEY = 'scriblr.writer.plotNavWidth'
+  // The panel is 250px wide in a tool 1000px wide (jsdom has no layout).
+  const lay = () => vi.spyOn(Element.prototype, 'getBoundingClientRect').mockImplementation(function (this: Element) {
+    const width = this.classList.contains('wrPlotNav') ? 250 : this.classList.contains('wrPlotFrame') ? 1000 : 0
+    return { width, height: 600, x: 0, y: 0, top: 0, left: 0, right: width, bottom: 600, toJSON: () => ({}) } as DOMRect
+  })
+
+  it('has a handle on the panel\'s right edge, and is 250px wide until it is dragged', () => {
+    const { container } = render(<Editor />)
+    expect(handle().parentElement).toHaveClass('wrPlotNav')
+    expect(handle()).toHaveAttribute('aria-orientation', 'vertical')
+    expect(handle()).toHaveAttribute('title', 'Drag to resize the contents')
+    expect(basis(container)).toBe('min(max(250px, 200px), 45%)')
+  })
+
+  it('follows the drag, held between 200px and 45% of the tool, and keeps the width on release', () => {
+    const spy = lay()
+    const { container } = render(<Editor />)
+    fireEvent.mouseDown(handle(), { clientX: 255 })
+    act(() => { fireEvent.mouseMove(window, { clientX: 355 }) })
+    expect(basis(container)).toBe('min(max(350px, 200px), 45%)') // 250 + 100, live
+    expect(window.localStorage.getItem(KEY)).toBeNull() // not kept until the release
+    act(() => { fireEvent.mouseMove(window, { clientX: 2000 }) })
+    expect(basis(container)).toBe('min(max(450px, 200px), 45%)') // held at 45% of 1000
+    act(() => { fireEvent.mouseMove(window, { clientX: -500 }) })
+    expect(basis(container)).toBe('min(max(200px, 200px), 45%)') // held at 200px
+    act(() => { fireEvent.mouseMove(window, { clientX: 305 }) })
+    act(() => { fireEvent.mouseUp(window) })
+    expect(JSON.parse(window.localStorage.getItem(KEY) ?? 'null')).toBe(300)
+    expect(basis(container)).toBe('min(max(300px, 200px), 45%)')
+    spy.mockRestore()
+  })
+
+  it('remembers the width when the Plot tab is opened again', () => {
+    const spy = lay()
+    const first = render(<Editor />)
+    fireEvent.mouseDown(handle(), { clientX: 255 })
+    act(() => { fireEvent.mouseMove(window, { clientX: 395 }) })
+    act(() => { fireEvent.mouseUp(window) })
+    first.unmount()
+    const { container } = render(<Editor />)
+    expect(basis(container)).toBe('min(max(390px, 200px), 45%)')
+    spy.mockRestore()
+  })
+
+  it('uses a width kept from before, and holds it between the limits in CSS too', () => {
+    window.localStorage.setItem(KEY, JSON.stringify(400))
+    __resetSettingsForTests()
+    const { container } = render(<Editor />)
+    expect(basis(container)).toBe('min(max(400px, 200px), 45%)')
+  })
+
+  it('does not move the width on a click that is not a drag, and ignores the other mouse buttons', () => {
+    const spy = lay()
+    const { container } = render(<Editor />)
+    fireEvent.mouseDown(handle(), { clientX: 255, button: 2 })
+    act(() => { fireEvent.mouseMove(window, { clientX: 355 }) })
+    expect(basis(container)).toBe('min(max(250px, 200px), 45%)')
+    expect(window.localStorage.getItem(KEY)).toBeNull()
+    spy.mockRestore()
+  })
+
+  it('has no handle and no width in the compact layout, where the contents are a bar', () => {
+    narrow(500)
+    const { container } = render(<Editor />)
+    expect(container.querySelector('.wrPlotFrame')).toHaveAttribute('data-size', 'compact')
+    expect(screen.queryByRole('separator', { name: 'Contents width' })).toBeNull()
+    expect(basis(container)).toBe('')
+    fireEvent.click(container.querySelector('.wrPlotBarToggle')!)
+    expect(container.querySelector('.wrPlotBarDrawer .wrPlotNav')).not.toBeNull()
+    expect(screen.queryByRole('separator', { name: 'Contents width' })).toBeNull()
+  })
+})
