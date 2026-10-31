@@ -1,4 +1,4 @@
-import { useState, type DragEvent, type ReactNode } from 'react'
+import { useState, type CSSProperties, type DragEvent, type KeyboardEvent, type ReactNode } from 'react'
 import type { PlotCustomFieldDef, PlotFieldKind, PlotNode } from '../../../api/types'
 import { GripIcon, LockIcon, PlusIcon } from '../../icons'
 import type { PlotDrag, PlotUi } from './FieldBlocks'
@@ -10,6 +10,7 @@ import { placedCount } from './plotPlacement'
 import { nodeLabel } from './plotTree'
 import { DeleteControl } from './shared'
 import { slideStyle, useChipDrop } from './useChipDrop'
+import { useFieldGroupDrop } from './useFieldGroupDrop'
 import type { WriterWorkspace } from './useWriterWorkspace'
 
 // The body of a multi-select, dropdown or short-text field (plotKinds.ts, plotAnswers.ts): for the node that defines it, the options to choose
@@ -20,6 +21,9 @@ import type { WriterWorkspace } from './useWriterWorkspace'
 const placesGo = (n: number) => (n === 1 ? 'Its place goes too.' : `Its ${n} places go too.`)
 
 type Grip = { onDragStart: (e: DragEvent) => void; onDragEnd: () => void }
+
+// The grip that drags an answer onto a chapter, where that is offered.
+const valueGrip = (drag: PlotDrag, id: string) => (drag.noPlacing ? undefined : drag.valueDrag(id))
 
 function Counter({ n }: { n: number }) {
   if (n === 0) return null
@@ -82,20 +86,14 @@ export function KindSelect({ w, owner, def, ui }: { w: WriterWorkspace; owner: P
   )
 }
 
-// The options of a multi-select or dropdown, as chips: renamed in place, reordered by their grips (the chips it passes slide out of the way, and
-// a gap opens where it will land; or Alt + arrow keys), removed with x (which asks first when answers use the option), and added at the end.
-function OptionsEditor({ w, owner, def }: { w: WriterWorkspace; owner: PlotNode; def: PlotCustomFieldDef }) {
+// What both editors of a field's options do: name one, add one, take one away (asking first when answers use it).
+function useOptionEdits(w: WriterWorkspace, owner: PlotNode, def: PlotCustomFieldDef) {
   const options = optionsOf(def)
   const [draft, setDraft] = useState('')
   const [taken, setTaken] = useState(false)
-  const [dragging, setDragging] = useState<string | null>(null)
   const [asking, setAsking] = useState<string | null>(null)
   const outlineById = new Map(w.outlineNodes.map(n => [n.id, n]))
   const full = options.length >= MAX_OPTIONS
-  const group = useChipDrop({
-    draggedId: dragging,
-    onDrop: (id, before) => { w.movePlotOption(owner.id, def.id, id, before); setDragging(null) },
-  })
 
   function add() {
     if (!draft.trim()) return
@@ -111,8 +109,77 @@ function OptionsEditor({ w, owner, def }: { w: WriterWorkspace; owner: PlotNode;
     if (optionUse(w.plotNodes, def.id, id, outlineById).answers === 0) w.removePlotOption(owner.id, def.id, id)
     else setAsking(id)
   }
+  // Alt and an arrow key moves the option one place along.
+  function nudge(e: KeyboardEvent, i: number) {
+    const step = e.key === 'ArrowLeft' || e.key === 'ArrowUp' ? -1 : e.key === 'ArrowRight' || e.key === 'ArrowDown' ? 1 : 0
+    if (!e.altKey || step === 0) return
+    e.preventDefault()
+    if (step < 0 ? i === 0 : i >= options.length - 1) return
+    w.movePlotOption(owner.id, def.id, options[i].id, (step < 0 ? options[i - 1] : options[i + 2])?.id ?? null)
+  }
   const askedFor = asking ? options.find(o => o.id === asking) : undefined
   const use = askedFor ? optionUse(w.plotNodes, def.id, askedFor.id, outlineById) : null
+  return { options, outlineById, draft, setDraft, taken, setTaken, full, add, blur, remove, nudge, asking, setAsking, askedFor, use }
+}
+type OptionEdits = ReturnType<typeof useOptionEdits>
+
+// The "Add option…" input at the end of the options.
+function AddOption({ edits, tail, style }: { edits: OptionEdits; tail?: boolean; style?: CSSProperties }) {
+  const { draft, setDraft, setTaken, full, add } = edits
+  return (
+    <span className="wrOptionAdd" data-chip-tail={tail ? '' : undefined} style={style}>
+      <input
+        value={draft} placeholder="Add option…" aria-label="Add option" maxLength={OPTION_LABEL_MAX} disabled={full}
+        title={full ? `A field can have ${MAX_OPTIONS} options` : undefined}
+        onChange={e => { setDraft(e.target.value); setTaken(false) }}
+        onKeyDown={e => { if (e.key === 'Enter') { e.preventDefault(); add() } }}
+      />
+      <button type="button" aria-label="Add the option" disabled={full || !draft.trim()} onClick={add}><PlusIcon size={12} /></button>
+    </span>
+  )
+}
+
+// What an option's editor says below its options: that one is there already, and the question before taking away one that answers use.
+function OptionNotes({ w, owner, def, edits }: { w: WriterWorkspace; owner: PlotNode; def: PlotCustomFieldDef; edits: OptionEdits }) {
+  const { taken, askedFor, use, setAsking } = edits
+  return (
+    <>
+      {taken && <p className="wrHint" role="note">That option is there already.</p>}
+      {askedFor && use && (
+        <AskBar
+          message={`Remove ${askedFor.label}? ${use.answers === 1 ? '1 answer uses it' : `${use.answers} answers use it`}${use.placements > 0 ? ` and ${use.placements === 1 ? 'its place goes' : `${use.placements} places go`}` : ''}.`}
+          onConfirm={() => { w.removePlotOption(owner.id, def.id, askedFor.id); setAsking(null) }} onCancel={() => setAsking(null)}
+        />
+      )}
+    </>
+  )
+}
+
+// The grip of an option: it starts the reorder drag, and the pointer carries the whole option, not just the grip, once it is hidden.
+function optionGrip(optionId: string, rowSelector: string, setDragging: (id: string | null) => void) {
+  return {
+    draggable: true,
+    onDragStart: (e: DragEvent) => {
+      e.dataTransfer.effectAllowed = 'move'
+      e.dataTransfer.setData('text/plain', optionId)
+      const row = (e.currentTarget as HTMLElement).closest(rowSelector)
+      if (row && e.dataTransfer.setDragImage) e.dataTransfer.setDragImage(row, 12, 12)
+      setDragging(optionId)
+    },
+    onDragEnd: () => setDragging(null),
+  }
+}
+
+// The options of a dropdown, as chips: renamed in place, reordered by their grips (the chips it passes slide out of the way, and a gap opens
+// where it will land; or Alt + arrow keys), removed with x (which asks first when answers use the option), and added at the end.
+function OptionsEditor({ w, owner, def }: { w: WriterWorkspace; owner: PlotNode; def: PlotCustomFieldDef }) {
+  const edits = useOptionEdits(w, owner, def)
+  const { options, blur, remove, nudge } = edits
+  const [dragging, setDragging] = useState<string | null>(null)
+  const group = useChipDrop({
+    draggedId: dragging,
+    onDrop: (id, before) => { w.movePlotOption(owner.id, def.id, id, before); setDragging(null) },
+  })
 
   return (
     <div className="wrOptionsBlock">
@@ -125,48 +192,90 @@ function OptionsEditor({ w, owner, def }: { w: WriterWorkspace; owner: PlotNode;
             key={o.id} data-chip={o.id} style={slideStyle(group.slideOf(o.id))}
             className={`wrOption${dragging === o.id && !group.isLifted(o.id) ? ' wrOption--dragging' : ''}${group.isLifted(o.id) ? ' wrOption--lifted' : ''}`}
           >
-            <span
-              className="wrGrip" draggable aria-label="Drag to reorder options" title="Drag to reorder"
-              onDragStart={e => {
-                e.dataTransfer.effectAllowed = 'move'
-                e.dataTransfer.setData('text/plain', o.id)
-                // the chip is hidden once the drag is over the options, so the pointer carries the whole chip, not just the grip
-                const chip = (e.currentTarget as HTMLElement).closest('[data-chip]')
-                if (chip && e.dataTransfer.setDragImage) e.dataTransfer.setDragImage(chip, 12, 12)
-                setDragging(o.id)
-              }}
-              onDragEnd={() => setDragging(null)}
-            >
+            <span className="wrGrip" aria-label="Drag to reorder options" title="Drag to reorder" {...optionGrip(o.id, '[data-chip]', setDragging)}>
               <GripIcon size={12} />
             </span>
             <input
               className="wrOptionInput" value={o.label} maxLength={OPTION_LABEL_MAX} size={Math.max(4, o.label.length + 1)} aria-label={`Option ${i + 1} of ${def.name || 'field'}`}
               onChange={e => w.renamePlotOption(owner.id, def.id, o.id, e.target.value)} onBlur={e => blur(o.id, e.target.value)}
-              onKeyDown={e => {
-                if (!e.altKey || (e.key !== 'ArrowLeft' && e.key !== 'ArrowRight')) return
-                e.preventDefault()
-                const before = e.key === 'ArrowLeft' ? options[i - 1]?.id : options[i + 2]?.id ?? null
-                if (e.key === 'ArrowLeft' ? i > 0 : i < options.length - 1) w.movePlotOption(owner.id, def.id, o.id, before ?? null)
-              }}
+              onKeyDown={e => nudge(e, i)}
             />
             <button type="button" className="wrOptionX" aria-label={`Remove option ${o.label}`} onClick={() => remove(o.id)}>×</button>
           </span>
         ))}
-        <span className="wrOptionAdd" data-chip-tail="" style={slideStyle(group.tailSlide)}>
-          <input
-            value={draft} placeholder="Add option…" aria-label="Add option" maxLength={OPTION_LABEL_MAX} disabled={full}
-            title={full ? `A field can have ${MAX_OPTIONS} options` : undefined}
-            onChange={e => { setDraft(e.target.value); setTaken(false) }}
-            onKeyDown={e => { if (e.key === 'Enter') { e.preventDefault(); add() } }}
-          />
-          <button type="button" aria-label="Add the option" disabled={full || !draft.trim()} onClick={add}><PlusIcon size={12} /></button>
-        </span>
+        <AddOption edits={edits} tail style={slideStyle(group.tailSlide)} />
       </div>
-      {taken && <p className="wrHint" role="note">That option is there already.</p>}
-      {askedFor && use && (
+      <OptionNotes w={w} owner={owner} def={def} edits={edits} />
+    </div>
+  )
+}
+
+// The options of a multi-select merged with its answers, in one column: each option is a row with a tick box (ticked, it is the answer: the row
+// wears the answer card's colours, counts how often it is placed and has a grip that drags it onto a chapter), its label edited in place, and an
+// x that takes the option away. The grip at the left reorders the options: the rows it passes slide out of the way.
+function OptionRows({ w, owner, def, holder, drag }: { w: WriterWorkspace; owner: PlotNode; def: PlotCustomFieldDef; holder: PlotNode; drag: PlotDrag }) {
+  const edits = useOptionEdits(w, owner, def)
+  const { options, outlineById, blur, remove, nudge } = edits
+  const [dragging, setDragging] = useState<string | null>(null)
+  const [unticking, setUnticking] = useState<string | null>(null)
+  const mine = valuesIn(w.plotNodes, holder.id, def.id)
+  const group = useFieldGroupDrop({
+    ids: options.map(o => o.id), draggedId: dragging, active: true,
+    onDrop: (id, before) => { w.movePlotOption(owner.id, def.id, id, before); setDragging(null) },
+  })
+  const tick = (optionId: string, answer: PlotNode | undefined, on: boolean) => {
+    if (on) { w.togglePlotOption(holder.id, def.id, optionId, true); return }
+    if (answer && placedCount(answer, outlineById) > 0) setUnticking(optionId)
+    else w.togglePlotOption(holder.id, def.id, optionId, false)
+  }
+  const untickFor = unticking ? options.find(o => o.id === unticking) : undefined
+  const untickAnswer = untickFor ? mine.find(a => a.optionId === untickFor.id) : undefined
+
+  return (
+    <div className="wrOptionsBlock">
+      <div
+        ref={group.ref} className={`wrOptionRows${group.sliding ? ' wrOptionRows--sliding' : ''}`} role="group" aria-label={`Options of ${def.name || 'field'}`}
+        {...group.handlers}
+      >
+        {options.map((o, i) => {
+          const answer = mine.find(a => a.optionId === o.id)
+          const placed = answer ? placedCount(answer, outlineById) : 0
+          const lifted = group.isLifted(o.id)
+          const slide = group.slideOf(o.id)
+          const look = answer ? valueLook(answer, w.plotNodeById) : undefined
+          return (
+            <div
+              key={o.id} data-field={o.id} data-point={answer?.id}
+              className={`wrOptionRow${answer ? ` wrPlotValue wrPlotValue--answer${placed > 0 ? ' wrPlotValue--assigned' : ''}${drag.dragId === answer.id ? ' wrPlotValue--dragging' : ''}` : ''}${dragging === o.id && !lifted ? ' wrOptionRow--dragging' : ''}${lifted ? ' wrOptionRow--lifted' : ''}${answer && w.highlightedPointId === answer.id ? ' wrPlotValue--highlight' : ''}`}
+              style={{ ...look, ...(slide ? { transform: `translateY(${slide}px)` } : {}) }}
+            >
+              <span className="wrGrip" aria-label="Drag to reorder options" title="Drag to reorder" {...optionGrip(o.id, '[data-field]', setDragging)}>
+                <GripIcon size={12} />
+              </span>
+              <input type="checkbox" className="wrAnswerBox" aria-label={o.label} checked={Boolean(answer)} onChange={e => tick(o.id, answer, e.target.checked)} />
+              <input
+                className="wrOptionInput" value={o.label} maxLength={OPTION_LABEL_MAX} aria-label={`Option ${i + 1} of ${def.name || 'field'}`}
+                onChange={e => w.renamePlotOption(owner.id, def.id, o.id, e.target.value)} onBlur={e => blur(o.id, e.target.value)}
+                onKeyDown={e => nudge(e, i)}
+              />
+              {answer && <Counter n={placed} />}
+              {answer && !drag.noPlacing && (
+                <span className="wrGrip wrPlotValueGrip" aria-label="Drag plotpoint" title="Drag onto a chapter" {...drag.valueDrag(answer.id)} draggable>
+                  <GripIcon size={14} />
+                </span>
+              )}
+              <button type="button" className="wrOptionX" aria-label={`Remove option ${o.label}`} onClick={() => remove(o.id)}>×</button>
+            </div>
+          )
+        })}
+        <AddOption edits={edits} />
+      </div>
+      {options.length === 0 && <p className="wrMuted">Add the options to choose from.</p>}
+      <OptionNotes w={w} owner={owner} def={def} edits={edits} />
+      {untickFor && untickAnswer && (
         <AskBar
-          message={`Remove ${askedFor.label}? ${use.answers === 1 ? '1 answer uses it' : `${use.answers} answers use it`}${use.placements > 0 ? ` and ${use.placements === 1 ? 'its place goes' : `${use.placements} places go`}` : ''}.`}
-          onConfirm={() => { w.removePlotOption(owner.id, def.id, askedFor.id); setAsking(null) }} onCancel={() => setAsking(null)}
+          message={`Untick ${untickFor.label}? ${placesGo(placedCount(untickAnswer, outlineById))}`}
+          onConfirm={() => { w.togglePlotOption(holder.id, def.id, untickFor.id, false); setUnticking(null) }} onCancel={() => setUnticking(null)}
         />
       )}
     </div>
@@ -193,7 +302,7 @@ function MultiAnswer({ w, def, holder, drag }: { w: WriterWorkspace; def: PlotCu
         return (
           <div key={o.id} className="wrChoiceRow">
             {answer ? (
-              <AnswerCard w={w} answer={answer} drag={drag.valueDrag(answer.id)} dragging={drag.dragId === answer.id}>
+              <AnswerCard w={w} answer={answer} drag={valueGrip(drag, answer.id)} dragging={drag.dragId === answer.id}>
                 <label className="wrAnswerLabel">{box}<span>{o.label}</span></label>
               </AnswerCard>
             ) : (
@@ -212,30 +321,27 @@ function MultiAnswer({ w, def, holder, drag }: { w: WriterWorkspace; def: PlotCu
   )
 }
 
+// A dropdown answers with a select while it has no answer; once an option is picked the select is replaced by the answer as a chip. Not yet
+// placed, the chip has an x that takes the answer away (and brings the select back); placed, its count stands where the x was.
 function DropdownAnswer({ w, def, holder, drag }: { w: WriterWorkspace; def: PlotCustomFieldDef; holder: PlotNode; drag: PlotDrag }) {
-  // undefined: not asking; null: asking to clear; an id: asking to change to that option.
-  const [asking, setAsking] = useState<string | null | undefined>(undefined)
   const answer = valuesIn(w.plotNodes, holder.id, def.id)[0]
   const placed = answer ? placedCount(answer, new Map(w.outlineNodes.map(n => [n.id, n]))) : 0
-  const change = (value: string) => {
-    const next = value === '' ? null : value
-    if (placed > 0) setAsking(next)
-    else w.choosePlotOption(holder.id, def.id, next)
-  }
-  const target = asking ? optionsOf(def).find(o => o.id === asking) : undefined
+  const label = def.name || 'Field'
   return (
     <div className="wrChoiceList">
-      <select className="wrSelect" aria-label={`${def.name || 'Field'} answer`} value={answer?.optionId ?? ''} onChange={e => change(e.target.value)}>
-        <option value="">None</option>
-        {optionsOf(def).map(o => <option key={o.id} value={o.id}>{o.label}</option>)}
-      </select>
-      {asking !== undefined && (
-        <AskBar
-          message={`${target ? `Change to ${target.label}` : 'Clear the answer'}? ${placesGo(placed)}`}
-          onConfirm={() => { w.choosePlotOption(holder.id, def.id, asking); setAsking(undefined) }} onCancel={() => setAsking(undefined)}
-        />
+      {answer ? (
+        <AnswerCard w={w} answer={answer} drag={valueGrip(drag, answer.id)} dragging={drag.dragId === answer.id}>
+          <span className="wrAnswerLabel">{answer.title}</span>
+          {placed === 0 && (
+            <button type="button" className="wrPlotValueX" aria-label={`Clear the ${label} answer`} title="Clear the answer" onClick={() => w.choosePlotOption(holder.id, def.id, null)}>×</button>
+          )}
+        </AnswerCard>
+      ) : (
+        <select className="wrSelect" aria-label={`${label} answer`} value="" onChange={e => w.choosePlotOption(holder.id, def.id, e.target.value === '' ? null : e.target.value)}>
+          <option value="">None</option>
+          {optionsOf(def).map(o => <option key={o.id} value={o.id}>{o.label}</option>)}
+        </select>
       )}
-      {answer && <AnswerCard w={w} answer={answer} drag={drag.valueDrag(answer.id)} dragging={drag.dragId === answer.id} />}
     </div>
   )
 }
@@ -257,7 +363,7 @@ function TextAnswer({ w, def, holder, drag }: { w: WriterWorkspace; def: PlotCus
     if (typed.trim() === '') { if (answer && placed === 0) w.removePlotAnswer(answer.id); return }
     if (typed !== typed.trim()) w.setPlotTextAnswer(holder.id, def.id, typed.trim())
   }
-  const grip = answer ? drag.valueDrag(answer.id) : undefined
+  const grip = answer ? valueGrip(drag, answer.id) : undefined
   const label = def.name || 'Field'
   return (
     <span
@@ -307,6 +413,14 @@ export function ChoiceBody({ w, info, holder, editable, drag }: {
   const kind = kindOf(def)
   const inherited = owner.id !== holder.id
   const noOptions = hasOptions(def) && optionsOf(def).length === 0
+  // Where its options are edited, a multi-select's options and answers are one list.
+  if (editable && kind === 'multi') {
+    return (
+      <div className="wrFieldValues wrChoice">
+        <OptionRows w={w} owner={owner} def={def} holder={holder} drag={drag} />
+      </div>
+    )
+  }
   return (
     <div className="wrFieldValues wrChoice">
       {editable && hasOptions(def) && <OptionsEditor w={w} owner={owner} def={def} />}

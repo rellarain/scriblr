@@ -46,6 +46,8 @@ export interface PlotDrag {
   setDragFieldId: (id: string | null) => void
   dragSetId: string | null
   setDragSetId: (id: string | null) => void
+  // Answers cannot be dragged onto a chapter here (the category, subcategory and cluster editors): they show no grip for it.
+  noPlacing?: boolean
 }
 
 export function FieldBlock({ w, info, holder, editable, ui, drag, showAssigned, slide, edge, lifted }: {

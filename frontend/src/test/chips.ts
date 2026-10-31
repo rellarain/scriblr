@@ -38,3 +38,19 @@ export function dragAt(type: 'dragOver' | 'dragEnter' | 'drop', el: Element, poi
   Object.defineProperty(event, 'clientY', { value: pointer.clientY })
   return fireEvent(el, event)
 }
+
+// The same for a column of rows (useFieldGroupDrop.ts: the children of `group` that carry `data-field`): each 40px tall with 6px between, so the nth
+// row's top is n * 46. Returns where the pointer is for the nth row: its upper or its lower half.
+export function layOutRows(group: Element) {
+  const box = group as HTMLElement
+  box.style.rowGap = '6px'
+  const rows = [...box.children].filter((el): el is HTMLElement => el instanceof HTMLElement && el.dataset.field !== undefined)
+  rows.forEach((el, n) => {
+    Object.defineProperty(el, 'offsetTop', { value: n * 46, configurable: true })
+    Object.defineProperty(el, 'offsetHeight', { value: 40, configurable: true })
+  })
+  return {
+    upperHalf: (n: number) => ({ clientX: 10, clientY: n * 46 + 5 }),
+    lowerHalf: (n: number) => ({ clientX: 10, clientY: n * 46 + 35 }),
+  }
+}

@@ -60,6 +60,17 @@
   .wrOptionInput { min-width: 3ch; max-width: 100%; background: transparent; border: 0; outline: none; color: inherit; font-size: var(--text-ui); font-weight: 700; padding: var(--space-1) 0; }
   .wrOptionAdd input { width: 14ch; background: transparent; border: 0; outline: none; color: inherit; font-size: var(--text-ui); padding: var(--space-1) 0; &::placeholder { color: var(--ink-faint); } }
   .wrOptionX, .wrOptionAdd button { display: inline-flex; align-items: center; justify-content: center; width: 20px; height: 20px; border-radius: var(--radius-button); color: inherit; &:hover:not(:disabled) { background: var(--ov-lift-2); } &:disabled { opacity: 0.5; cursor: default; } }
+  // The options of a multi-select merged with its answers: one column of rows (ChoiceFields.tsx, OptionRows). A row is ink on the field colour; ticked,
+  // it is an answer card (`wrPlotValue`, the card's colours: the same audited pair). The rows slide out of the way of the one dragged by its grip (a
+  // transform only; see useFieldGroupDrop.ts); `position: relative` makes the rows' offsets measure from the column.
+  .wrOptionRows { display: flex; flex-direction: column; align-items: stretch; gap: var(--space-3); position: relative; width: min(100%, 28rem); max-width: 100%; }
+  .wrOptionRows--sliding > .wrOptionRow { transition: transform 0.16s ease; }
+  .wrOptionRows > .wrOptionAdd { align-self: flex-start; }
+  .wrOptionRow { display: flex; align-items: center; gap: var(--space-2); min-width: 0; padding: var(--space-1) var(--space-2); border-radius: var(--radius-button); background: var(--wr-field); color: var(--ink); }
+  .wrOptionRow.wrPlotValue { padding: var(--space-1) var(--space-2) var(--space-1) calc(var(--wr-edge-w, 4px) + 10px); }
+  .wrOptionRow .wrOptionInput { flex: 1 1 0; min-width: 0; }
+  .wrOptionRow--lifted { visibility: hidden; }
+  .wrOptionRow--dragging { opacity: 0.7; }
   .wrChoice { gap: var(--space-4); }
   .wrChoiceList { display: flex; flex-direction: column; align-items: flex-start; gap: var(--space-3); max-width: 100%; }
   .wrChoiceRow { display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-3); max-width: 100%; }
@@ -76,7 +87,7 @@
     &:checked::after { content: ''; position: absolute; left: 4px; top: 1px; width: 4px; height: 8px; border: solid var(--wr-point-bg, var(--wr-cat, var(--wr-card))); border-width: 0 2px 2px 0; transform: rotate(45deg); }
     &:focus-visible { outline: 2px solid currentColor; outline-offset: 2px; }
   }
-  .wrPlotValue--answer { padding: 5px 8px 5px calc(var(--wr-edge-w, 4px) + 10px); min-width: min(100%, 14rem); max-width: 100%; box-sizing: border-box; }
+  .wrPlotValue--answer { max-width: 100%; box-sizing: border-box; }
   .wrAnswerText {
     display: flex; align-items: center; gap: var(--space-base); min-width: min(100%, 16rem); max-width: 100%; box-sizing: border-box;
     &:not(.wrPlotValue) { padding: var(--space-1) var(--space-base); background: var(--wr-field); color: var(--ink); border-radius: var(--radius-button); }
@@ -98,6 +109,9 @@
   }
   .wrPlotValueField { position: absolute; top: 5px; left: 14px; right: 40px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: var(--text-small); font-weight: 700; text-transform: uppercase; letter-spacing: 1.5px; pointer-events: none; }
   .wrPlotValueGrip { flex: 0 0 auto; }
+  // An answer is one line: no room above it for a field name (a value card has the room), and it must come after `.wrPlotValue` to win its padding.
+  // (An option row, which is an answer too, has its own padding.)
+  .wrPlotValue--answer:not(.wrOptionRow) { padding: var(--space-3) var(--space-base) var(--space-3) calc(var(--wr-edge-w, 4px) + 10px); }
   .wrPlotValueBody { flex: 1 1 auto; min-width: 0; display: flex; flex-direction: column; gap: var(--space-1); }
   .wrPlotValueTitle { font-size: var(--text-field); font-weight: 700; overflow-wrap: anywhere; }
   .wrPlotValueText { font-size: var(--text-ui); overflow-wrap: anywhere; }

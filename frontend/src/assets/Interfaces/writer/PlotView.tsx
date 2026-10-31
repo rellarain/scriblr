@@ -105,7 +105,7 @@ function KeywordsField({ w, node }: { w: WriterWorkspace; node: PlotNode }) {
 // Dragging does nothing in the category, subcategory and cluster editors (their values are not assigned there).
 const NO_DRAG: PlotDrag = {
   dragId: null, valueDrag: () => ({ onDragStart: () => {}, onDragEnd: () => {} }), dropIntoField: () => {}, dragFieldId: null, setDragFieldId: () => {},
-  dragSetId: null, setDragSetId: () => {},
+  dragSetId: null, setDragSetId: () => {}, noPlacing: true,
 }
 
 function CategoryEditor({ w, node, ui }: { w: WriterWorkspace; node: PlotNode; ui: PlotUi }) {
