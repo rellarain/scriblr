@@ -106,6 +106,7 @@ describe('Draft level: Settings and Help', () => {
     await user.click(within(tile()).getByRole('button', { name: 'Settings' }))
     expect(within(right()).getByRole('region', { name: 'Chapter settings' })).toBeTruthy()
     expect(within(right()).getByLabelText('Chapter colour')).toBeTruthy()
+    expect(within(right()).queryByText('Colour')).toBeNull() // the slider has no label over it
     await user.click(within(tile()).getByRole('button', { name: 'Help' }))
     expect(within(right()).getByRole('region', { name: 'Draft help' })).toBeTruthy()
     expect(right().querySelector('[aria-label="Chapter settings"]')).toBeNull()

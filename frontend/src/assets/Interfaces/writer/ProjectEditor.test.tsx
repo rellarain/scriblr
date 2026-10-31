@@ -14,6 +14,18 @@ function editor() {
   return { renameProject, field: screen.getByRole('textbox', { name: 'Project name' }) as HTMLInputElement }
 }
 
+describe('ProjectEditor: the colour', () => {
+  it('is the slider alone in its card: no heading and no hint about the ranges over it', () => {
+    editor()
+    const slider = screen.getByText('colour slider')
+    expect(slider.parentElement).toHaveClass('wrCardPanel')
+    expect(slider.parentElement!.children).toHaveLength(1)
+    expect(screen.queryByText('Colour')).toBeNull()
+    expect(screen.queryByText(/within 90°/)).toBeNull()
+    expect(screen.getByText('Name')).toBeInTheDocument() // the name's card keeps its heading
+  })
+})
+
 describe('ProjectEditor: the project\'s name', () => {
   it('shows the name the project has, in a field that stops at the longest name', () => {
     const { field } = editor()

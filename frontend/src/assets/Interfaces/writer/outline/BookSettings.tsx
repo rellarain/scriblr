@@ -99,7 +99,6 @@ export function BookSettings({ w, book, bookWords, compact = false }: { w: Write
         />
       </label>
       <div className="wrBookEdField">
-        <span className="wrLabel">Colour</span>
         <HueSlider label="Book colour" hue={themeHue} centre={w.hueCentreOf(book)} range={rangeOf('book')} onChange={code => w.setNodeHue(book.id, code)} />
       </div>
       {timeSystems.length > 1 && (

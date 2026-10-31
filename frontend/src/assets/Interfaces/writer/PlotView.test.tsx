@@ -177,6 +177,20 @@ describe('the plot outline', () => {
   })
 })
 
+describe('the colour slider in a plot editor', () => {
+  const unlabelled = (container: HTMLElement) => {
+    expect(container.querySelector('.wrCardPanel .wrLabel')?.textContent).toBe('Description') // the first label is the description's: none over the colour
+    expect([...container.querySelectorAll('.wrLabel')].some(l => /Colour/.test(l.textContent ?? ''))).toBe(false)
+    expect(screen.queryByText(/within \d+°/)).toBeNull()
+  }
+
+  it.each([['cat', 'Category colour'], ['sub', 'Subcategory colour']])('has no label or hint over the %s\'s slider, which keeps its name', (id, name) => {
+    const { container } = render(<Editor focused={id} />)
+    expect(screen.getByRole('slider', { name })).toBeInTheDocument()
+    unlabelled(container)
+  })
+})
+
 describe('the eye', () => {
   const placed = () => startingPlot().map(n => (n.id === 'own' ? { ...n, placements: [placing('m1', 'front')] } : n))
 
@@ -396,8 +410,8 @@ describe('clusters', () => {
 
   it('shows the cluster\'s own fields in its editor, with a colour slider within 30 degrees of its subcategory', () => {
     render(<Editor start={clustered()} focused="clu" />)
-    expect(screen.getByText('within 30° of its subcategory')).toBeInTheDocument()
     expect(screen.getByRole('slider', { name: 'Cluster colour' })).toBeInTheDocument()
+    expect(screen.queryByText(/within 30°/)).toBeNull() // no label or hint over the slider
     expect(screen.getByDisplayValue('Motive')).toBeInTheDocument()
   })
 

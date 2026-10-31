@@ -152,7 +152,6 @@ function DraftPage({ w, chapter, pagesComponent, onPagesComponent }: {
                     <>
                       {panel === 'settings' && (
                         <div className="wrSpreadScroll wrDraftPanel" role="region" aria-label="Chapter settings">
-                          <span className="wrLabel">Colour</span>
                           <HueSlider
                             label="Chapter colour" className="wrNodeHue" hue={w.levelHueOf(chapter)} centre={w.hueCentreOf(chapter)} range={rangeOf('chapter')}
                             onChange={code => w.setNodeHue(chapter.id, code)}

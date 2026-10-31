@@ -24,6 +24,8 @@ A series has no colour and no slider. The ranges are fixed, not a setting.
 
 `HueSlider` takes `label`, `hue`, `centre` (the parent's hue, or null), `range` (degrees either side; 360 = the whole wheel) and `onChange(hue)`; the value is a plain hue, wrapped to 0..359.
 
+**The app draws no visible label or hint over a colour slider** (not "Colour", and not "within 30° of its subcategory"): the slider is the whole control, and `label` is its accessible name ("Book colour", "Cluster colour"). The ranges are in the table above and in the account's colour settings, not on the control. The Project level's Colour card is the slider alone.
+
 ## The reset button
 
 With a parent hue, a **square button, 22px (the height of the thumb), stands to the left of the track** (`.hueReset`, in a `.hueSliderRow`). It is filled with the **parent's hue** at the zone's own saturation and lightness (what the app would draw), outlined in white like the thumb, and gets the thumb's black-in-white ring on keyboard focus. Pressing it sets the colour to exactly the parent's hue; it is named "Reset to parent colour" and its tooltip gives the degrees. It is always enabled.

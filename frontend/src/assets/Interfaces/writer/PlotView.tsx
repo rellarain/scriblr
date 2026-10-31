@@ -72,23 +72,17 @@ function HueField({ w, node }: { w: WriterWorkspace; node: PlotNode }) {
     // The hue the parent shows; a node with no colour of its own shows it too.
     const parentCode = shownPlotHue(parent, w.plotNodeById, appCode)
     return (
-      <div>
-        <div className="wrLabel">Colour <span className="wrOutlineMeta">within {rangeOf(node.kind)}° of its {parent?.kind ?? 'category'}</span></div>
-        <HueSlider
-          label={node.kind === 'cluster' ? 'Cluster colour' : 'Subcategory colour'} hue={node.hue ?? parentCode} centre={hueOfCode(parentCode)} range={rangeOf(node.kind)}
-          onChange={code => w.setPlotHue(node.id, code, parentCode)}
-        />
-      </div>
+      <HueSlider
+        label={node.kind === 'cluster' ? 'Cluster colour' : 'Subcategory colour'} hue={node.hue ?? parentCode} centre={hueOfCode(parentCode)} range={rangeOf(node.kind)}
+        onChange={code => w.setPlotHue(node.id, code, parentCode)}
+      />
     )
   }
   return (
-    <div>
-      <div className="wrLabel">Colour <span className="wrOutlineMeta">within {rangeOf('category')}° of the project</span></div>
-      <HueSlider
-        label="Category colour" hue={node.hue ?? appCode} centre={w.projectHue} range={rangeOf('category')}
-        onChange={code => w.setPlotHue(node.id, code)}
-      />
-    </div>
+    <HueSlider
+      label="Category colour" hue={node.hue ?? appCode} centre={w.projectHue} range={rangeOf('category')}
+      onChange={code => w.setPlotHue(node.id, code)}
+    />
   )
 }
 

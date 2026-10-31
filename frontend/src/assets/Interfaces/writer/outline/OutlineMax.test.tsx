@@ -552,6 +552,7 @@ describe('Outline Max: the book editor and the draft stats', () => {
     await user.type(title, '!')
     expect(title).toHaveProperty('value', 'Cold Harbor!')
     expect(within(editor).getByLabelText('Book colour')).toBeTruthy()
+    expect(within(editor).queryByText('Colour')).toBeNull() // the slider has no label over it
     expect(within(editor).getByRole('progressbar', { name: 'Word goal progress' }).getAttribute('aria-valuenow')).toBe('1') // 12 of 1,000
   })
 
