@@ -427,8 +427,9 @@ export function ChoiceBody({ w, info, holder, editable, drag }: {
   const kind = kindOf(def)
   const inherited = owner.id !== holder.id
   const noOptions = hasOptions(def) && optionsOf(def).length === 0
-  // An inherited dropdown the defining node has not answered has no card to show (no "No answer" card), and so no caption to tell the plotline's own answer from the card's.
-  const showOwner = inherited && (kind !== 'dropdown' || valuesIn(w.plotNodes, owner.id, def.id).length > 0)
+  // An inherited multi-select or dropdown the defining node has not answered has no card to show (no "No answer" card), and so no caption to tell the plotline's own answer from the
+  // card's. A short text still says "No answer".
+  const showOwner = inherited && (kind === 'text' || valuesIn(w.plotNodes, owner.id, def.id).length > 0)
   // Where its options are edited, a multi-select's options and answers are one list.
   if (editable && kind === 'multi') {
     return (

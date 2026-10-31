@@ -420,21 +420,28 @@ describe('answering on a plotline', () => {
     expect(container.querySelectorAll('.wrPlotChip[data-point="c1"]')).toHaveLength(2)
   })
 
-  it('says so when the category has no answer yet', () => {
+  it.each([['Genre', 'fGenre'], ['Tone', 'fTone']])('shows no card at all for an inherited %s the category has not answered, nor the caption that sets the plotline\'s own answer apart from it', (name, id) => {
     render(<Editor start={world()} />)
-    open('Genre')
-    expect(block('fGenre').getByText('No answer')).toBeInTheDocument()
+    open(name)
+    const field = block(id)
+    expect(field.queryByRole('group', { name: 'Category: Romance' })).toBeNull()
+    expect(field.queryByText('No answer')).toBeNull()
+    expect(field.queryByText('This plotline')).toBeNull()
+    expect(document.querySelector(`[data-field="${id}"] .wrAnswerFrom`)).toBeNull()
+    // the plotline's own answer is still there to give: a tick box for each option, or the select
+    if (id === 'fGenre') expect(field.getAllByRole('checkbox')).toHaveLength(3)
+    else expect(field.getByLabelText('Tone answer')).toBeInTheDocument()
   })
 
-  it('shows no card at all for an inherited dropdown the category has not answered, nor the caption that sets the plotline\'s own answer apart from it', () => {
+  it('shows the category\'s card for a multi-select it has answered, and the card goes again when that answer does', () => {
+    const first = render(<Editor start={world([answer('c1', 'cat', 'fGenre', 'Crime', { optionId: 'o3' })])} />)
+    open('Genre')
+    expect(block('fGenre').getByRole('group', { name: 'Category: Romance' })).toHaveClass('wrAnswerFrom')
+    expect(block('fGenre').getByText('This plotline')).toBeInTheDocument()
+    first.unmount()
     render(<Editor start={world()} />)
-    open('Tone')
-    const tone = block('fTone')
-    expect(tone.queryByRole('group', { name: 'Category: Romance' })).toBeNull()
-    expect(tone.queryByText('No answer')).toBeNull()
-    expect(tone.queryByText('This plotline')).toBeNull()
-    expect(document.querySelector('[data-field="fTone"] .wrAnswerFrom')).toBeNull()
-    expect(tone.getByLabelText('Tone answer')).toBeInTheDocument() // the plotline's own answer is still there to pick
+    open('Genre')
+    expect(document.querySelector('[data-field="fGenre"] .wrAnswerFrom')).toBeNull()
   })
 
   it('shows the category\'s card for a dropdown it has answered, with its answer and the caption, and the card goes again when that answer does', () => {
