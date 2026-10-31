@@ -86,14 +86,18 @@ export function FieldBlock({ w, info, holder, editable, ui, drag, showAssigned }
     else w.renamePlotField(owner.id, def.id, 'Untitled field')
   }
 
+  // A drop is accepted as the drag enters as well as while it is over: a drag let go as it arrives, before the browser's next dragover, would
+  // otherwise find nothing to drop on.
+  const allowDrop = (e: React.DragEvent) => {
+    if (drag.dragFieldId && editable && drag.dragFieldId !== def.id) { e.preventDefault(); return }
+    if (canDrop) { e.preventDefault(); setOver(true) }
+  }
+
   return (
     <div
       className={`wrFieldBlock${over && canDrop ? ' wrFieldBlock--over' : ''}${drag.dragFieldId === def.id ? ' wrFieldBlock--dragging' : ''}`}
       data-knode={def.id} data-field={def.id}
-      onDragOver={e => {
-        if (drag.dragFieldId && editable && drag.dragFieldId !== def.id) { e.preventDefault(); return }
-        if (canDrop) { e.preventDefault(); setOver(true) }
-      }}
+      onDragEnter={allowDrop} onDragOver={allowDrop}
       onDragLeave={() => setOver(false)}
       onDrop={e => {
         setOver(false)
@@ -192,6 +196,7 @@ function FieldSetBlock({ w, set, owner, fields, holder, editable, ui, drag, show
   const draggedField = editable && drag.dragFieldId ? owner.customFieldDefs.find(d => d.id === drag.dragFieldId && !isScrapField(d)) : undefined
   const draggedSet = editable && drag.dragSetId && drag.dragSetId !== set.id && setsOf(owner).some(s => s.id === drag.dragSetId) ? drag.dragSetId : null
   const label = set.name || 'fieldset'
+  const allowDrop = (e: React.DragEvent) => { if (draggedField || draggedSet) { e.preventDefault(); setHover(true) } }
 
   // A set left unnamed is dropped when it holds nothing, and named otherwise.
   function nameBlur() {
@@ -205,7 +210,7 @@ function FieldSetBlock({ w, set, owner, fields, holder, editable, ui, drag, show
     <div
       className={`wrFieldSet${over && (draggedField || draggedSet) ? ' wrFieldSet--over' : ''}${drag.dragSetId === set.id ? ' wrFieldSet--dragging' : ''}`}
       role="group" aria-label={`Fieldset ${set.name}`} data-fieldset={set.id}
-      onDragOver={e => { if (draggedField || draggedSet) { e.preventDefault(); setHover(true) } }}
+      onDragEnter={allowDrop} onDragOver={allowDrop}
       onDragLeave={() => setHover(false)}
       onDrop={e => {
         setHover(false)
@@ -272,37 +277,38 @@ function FieldSetBlock({ w, set, owner, fields, holder, editable, ui, drag, show
 }
 
 // One place's fields as it lists them. While one of its own fields is dragged, a spot to take it out of its set; while one of its own
-// sets is dragged, a spot to move it last.
+// sets is dragged, a spot to move it last. The spot stands BELOW the sets: opened above them it would push the rows (the dragged one among
+// them) down in the very event the drag starts, and the browser cancels a drag whose source moves then.
 function FieldList({ w, holder, parts, editable, ui, drag, showAssigned }: {
   w: WriterWorkspace; holder: PlotNode; parts: FieldParts; editable: boolean; ui: PlotUi; drag: PlotDrag; showAssigned: boolean
 }) {
   const block = (info: FieldInfo) => <FieldBlock key={info.def.id} w={w} info={info} holder={holder} editable={editable} ui={ui} drag={drag} showAssigned={showAssigned} />
   const draggedField = editable && drag.dragFieldId ? parts.sets.flatMap(s => s.fields).find(f => f.def.id === drag.dragFieldId) : undefined
   const draggedSet = editable && drag.dragSetId && parts.sets.some(s => s.set.id === drag.dragSetId) ? drag.dragSetId : null
+  // Taking the dragged field out of its set: dropped on the loose fields' area or on the spot below the sets.
+  const takeOut = (e: React.DragEvent) => {
+    if (!draggedField) return
+    e.preventDefault(); e.stopPropagation()
+    w.setPlotFieldSet(holder.id, draggedField.def.id, null)
+    drag.setDragFieldId(null)
+  }
   return (
     <>
-      {(parts.loose.length > 0 || draggedField) && (
-        <div
-          className="wrFieldLoose"
-          onDragOver={e => { if (draggedField) e.preventDefault() }}
-          onDrop={e => {
-            if (!draggedField) return
-            e.preventDefault(); e.stopPropagation()
-            w.setPlotFieldSet(holder.id, draggedField.def.id, null)
-            drag.setDragFieldId(null)
-          }}
-        >
+      {parts.loose.length > 0 && (
+        <div className="wrFieldLoose" onDragEnter={e => { if (draggedField) e.preventDefault() }} onDragOver={e => { if (draggedField) e.preventDefault() }} onDrop={takeOut}>
           {parts.loose.map(block)}
-          {draggedField && <p className="wrFieldDrop">Drop here to take it out of its set</p>}
         </div>
       )}
       {parts.sets.map(s => (
         <FieldSetBlock key={s.set.id} w={w} set={s.set} owner={s.owner} fields={s.fields} holder={holder} editable={editable} ui={ui} drag={drag} showAssigned={showAssigned} />
       ))}
+      {draggedField && (
+        <p className="wrFieldDrop" onDragEnter={e => e.preventDefault()} onDragOver={e => e.preventDefault()} onDrop={takeOut}>Drop here to take it out of its set</p>
+      )}
       {draggedSet && (
         <p
           className="wrFieldDrop"
-          onDragOver={e => e.preventDefault()}
+          onDragEnter={e => e.preventDefault()} onDragOver={e => e.preventDefault()}
           onDrop={e => { e.preventDefault(); e.stopPropagation(); w.movePlotFieldset(holder.id, draggedSet, null); drag.setDragSetId(null) }}
         >
           Drop here to move it last

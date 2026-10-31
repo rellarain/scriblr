@@ -920,6 +920,32 @@ describe('fieldsets', () => {
     expect(values([...document.querySelectorAll<HTMLElement>('.wrFieldLoose [aria-label="Field name"]')])).toEqual(['Theme'])
   })
 
+  it('opens the take-it-out spot below the sets, so no row moves when a drag of a field in a set starts', () => {
+    // The browser cancels a drag whose source moves in the dragstart event, so what a drag opens must not push the rows down. Without layout
+    // in the test, that is the order of things: the spot comes after the last set and in front of nothing the drag was started from.
+    render(<Editor start={twoSets()} focused="cat" />)
+    const rows = () => [...document.querySelectorAll('.wrFieldLoose, .wrFieldSet')]
+    const before = rows()
+    fireEvent.dragStart(within(set('Setting')).getAllByLabelText('Drag to reorder fields')[0], { dataTransfer: dragData() })
+    const out = screen.getByText('Drop here to take it out of its set')
+    expect(rows()).toEqual(before)
+    expect(out.previousElementSibling).toBe(set('Mood'))
+    for (const row of before) expect(row.compareDocumentPosition(out) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
+  })
+
+  it('accepts a dragged field as soon as it enters a field, a set or a spot (a drag let go on arrival still drops)', () => {
+    render(<Editor start={twoSets()} focused="cat" />)
+    const dataTransfer = dragData()
+    fireEvent.dragStart(within(set('Setting')).getAllByLabelText('Drag to reorder fields')[0], { dataTransfer }) // Place
+    const tone = within(set('Mood')).getByLabelText('Field name').closest('.wrFieldBlock') as HTMLElement
+    // fireEvent returns false when the handler cancelled the event, which is what tells the browser the target takes the drop
+    expect(fireEvent.dragEnter(tone, { dataTransfer })).toBe(false)
+    expect(fireEvent.dragEnter(set('Mood'), { dataTransfer })).toBe(false)
+    expect(fireEvent.dragEnter(screen.getByText('Drop here to take it out of its set'), { dataTransfer })).toBe(false)
+    fireEvent.drop(tone, { dataTransfer })
+    expect(values(within(set('Mood')).getAllByLabelText('Field name'))).toEqual(['Place', 'Tone'])
+  })
+
   it('drops a field on another field to sit before it, in that field\'s set', () => {
     render(<Editor start={twoSets()} focused="cat" />)
     const dataTransfer = dragData()
