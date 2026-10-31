@@ -36,10 +36,11 @@ At Outline the **contents** list the arcs and chapters, one card each (a header 
 
 - a **chapter tab** shows only that chapter's outline (its acts, scenes and moments);
 - an **arc tab** shows that arc and each of its chapters' outlines;
-- choosing the **focused tab again** goes back to the whole book, every chapter open;
-- the **+ tab** adds a chapter without focusing it: the cover goes to the whole book, so the new chapter is on view.
+- choosing the **focused tab again** goes back to the whole book, every chapter open.
 
-**Adding never focuses.** Enter, Shift+Enter and Ctrl+Enter in a title, the *+ Chapter* and *+ Arc* buttons and the + tab all leave the open chapter as it is; if the cover is narrowed to one chapter or one arc it goes back to the whole book, so the new card shows (with the cursor in its title, for the keys). **Only the tabs focus an arc or a chapter.** (In a book with no chapter yet, the first one added is the open chapter, as a book always has one.)
+There is no tab for adding: arcs and chapters are added from the contents (*+ Arc*, *+ Chapter*) or by key.
+
+**Adding never focuses.** Enter, Shift+Enter and Ctrl+Enter in a title, and the *+ Chapter* and *+ Arc* buttons all leave the open chapter as it is; if the cover is narrowed to one chapter or one arc it goes back to the whole book, so the new card shows (with the cursor in its title, for the keys). **Only the tabs focus an arc or a chapter.** (In a book with no chapter yet, the first one added is the open chapter, as a book always has one.)
 
 The focused tab is raised, wider, and takes its colour as its background. A book opens on its first chapter. A chapter's or an arc's card folds from the chevron at its top right (remembered); a chapter that is not open opens, as it was left, when its card is clicked.
 

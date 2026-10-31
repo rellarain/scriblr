@@ -103,7 +103,6 @@
   }
   // The focused arc's tab is raised the same way: its own colour as the background.
   .wrEdgeArc--active { background: var(--wr-tab-bg, var(--wr-tab-tint, var(--wr-book))); color: var(--wr-tab-ink); box-shadow: 2px 2px 6px rgb(0 0 0 / calc(0.4 * var(--shade-k))); &:hover { background: var(--wr-tab-bg, var(--wr-tab-tint, var(--wr-book))); } }
-  .wrEdgeTab--add { height: 34px; background: var(--ov-sink-2); box-shadow: none; margin-top: var(--space-2); }
 
   // The preview, as the right page of the book.
   .wrPreviewPane { flex: 1 1 auto; min-height: 0; display: flex; flex-direction: column; background: var(--wr-page); color: var(--wr-ink); }

@@ -1,6 +1,5 @@
 import { useMemo, type CSSProperties } from 'react'
 import type { OutlineNode } from '../../../api/types'
-import { PlusIcon } from '../../icons'
 import { SAT_MIDDLE, bookThemeHue, fillColorCss, tabColors } from '../../../theme/bookColors'
 import { useThemeState } from '../../../theme/useTheme'
 import { buildChildIndex } from './outlineTree'
@@ -36,14 +35,13 @@ export function tabClusters(nodes: OutlineNode[], bookId: string): Cluster[] {
 // vertically, as on a real tabbed book), the arc's and chapters' own colours the accents.
 // Behind the page the edges of the pages beneath show, full height; each arc's cluster juts out
 // of a different one of them. The open chapter's tab is raised. Clicking a tab jumps there.
-export function EdgeTabs({ w, activeChapterId, activeArcId = null, onChapter, onArc, onAddChapter }: {
+export function EdgeTabs({ w, activeChapterId, activeArcId = null, onChapter, onArc }: {
   w: WriterWorkspace
   activeChapterId: string | null
   // The arc whose tab is raised (the Outline focused on it).
   activeArcId?: string | null
   onChapter: (chapterId: string) => void
   onArc: (arcId: string) => void
-  onAddChapter?: () => void
 }) {
   const book = w.activeBook
   const { activeZone } = useThemeState()
@@ -94,11 +92,6 @@ export function EdgeTabs({ w, activeChapterId, activeArcId = null, onChapter, on
             </div>
           )
         })}
-        {onAddChapter && (
-          <button type="button" className="wrEdgeTab wrEdgeTab--add" aria-label="Add chapter" title="Add chapter" onClick={onAddChapter}>
-            <PlusIcon size={15} />
-          </button>
-        )}
       </nav>
     </div>
   )

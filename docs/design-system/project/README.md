@@ -14,7 +14,7 @@ It is **derived from the code**, not drawn beside it. `tokens.json`, `contrast.m
 
 ## Content fundamentals
 
-The app speaks in short labels and plain verbs. A control says what it does: **Write**, **Publish**, **Save**, **New chapter**, **Add chapter**, **Delete**. An empty area says what is missing and the one thing to do: "No notes yet. Add one to jot down a thought." "Nothing outlined yet. Add an arc or a chapter to begin." Counts are plain: "5 chapters · 47 words", "231 words of 3,000". Names are the writer's own terms (series, book, arc, chapter, act, scene, moment, plotpoint), never the system's. There are no exclamation marks and no emoji. [content-voice](content-voice.md) has the strings.
+The app speaks in short labels and plain verbs. A control says what it does: **Write**, **Publish**, **Save**, **New chapter**, **Delete**. An empty area says what is missing and the one thing to do: "No notes yet. Add one to jot down a thought." "Nothing outlined yet. Add an arc or a chapter to begin." Counts are plain: "5 chapters · 47 words", "231 words of 3,000". Names are the writer's own terms (series, book, arc, chapter, act, scene, moment, plotpoint), never the system's. There are no exclamation marks and no emoji. [content-voice](content-voice.md) has the strings.
 
 ## Visual foundations
 

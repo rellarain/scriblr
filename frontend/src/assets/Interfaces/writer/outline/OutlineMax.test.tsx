@@ -352,19 +352,15 @@ describe('Outline Max: the page edges and tabs', () => {
     expect(within(tabs).getByRole('button', { name: 'Chapter 2: The Harbor Master' }).getAttribute('aria-pressed')).toBe('false')
   })
 
-  it("open a chapter from its tab, the first chapter of an arc from the arc tab; the plus tab adds a chapter without focusing it", async () => {
-    const { user, selectChapter } = setup('c1')
+  it("open a chapter from its tab, the first chapter of an arc from the arc tab; the tabs have no plus tab (chapters are added from the contents)", async () => {
+    const { user } = setup('c1')
     await user.click(screen.getByRole('button', { name: 'Chapter 2: The Harbor Master' }))
     expect(openCards()[0]).toBe('c2')
     await user.click(screen.getByRole('button', { name: 'Arc 1: Thaw' }))
     expect(openCards()[0]).toBe('c1')
-    selectChapter.mockClear()
-    await user.click(screen.getByRole('button', { name: 'Add chapter' }))
-    expect(chapterTabs()).toHaveLength(3)
-    // The view goes to the whole book (no tab raised) with the new chapter in it; no chapter was opened for it.
-    expect(openCards()).toEqual(['c1', 'c2', 'new1'])
-    expect(tabsRaised()).toHaveLength(0)
-    expect(selectChapter).not.toHaveBeenCalled()
+    const tabs = screen.getByRole('navigation', { name: 'Arcs and chapters' })
+    expect(within(tabs).queryByRole('button', { name: 'Add chapter' })).toBeNull()
+    expect(within(tabs).getAllByRole('button')).toHaveLength(chapterTabs().length + 1) // the chapters' tabs and the one arc's
   })
 })
 

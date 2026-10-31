@@ -91,7 +91,6 @@ function OutlineMax({ w }: { w: WriterWorkspace }) {
           w.selectChapter(id)
         }}
         onArc={pickArc}
-        onAddChapter={() => { w.addOutlineNode(book.id, 'chapter'); showWholeBook() }}
       />
     </div>
   )
