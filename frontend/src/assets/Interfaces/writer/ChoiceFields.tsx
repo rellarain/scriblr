@@ -283,18 +283,22 @@ function OptionRows({ w, owner, def, holder, drag }: { w: WriterWorkspace; owner
 
 // ---- the answers (any node that answers the field) ----
 
-function MultiAnswer({ w, def, holder, drag }: { w: WriterWorkspace; def: PlotCustomFieldDef; holder: PlotNode; drag: PlotDrag }) {
+// `answeredAbove` are the options the node that defines the field has already ticked (shown above, in OwnerAnswers): they are not offered again
+// here, unless this node already holds an answer for one (so that it can still be unticked).
+function MultiAnswer({ w, def, holder, drag, answeredAbove }: { w: WriterWorkspace; def: PlotCustomFieldDef; holder: PlotNode; drag: PlotDrag; answeredAbove?: Set<string> }) {
   const [asking, setAsking] = useState<string | null>(null)
   const mine = valuesIn(w.plotNodes, holder.id, def.id)
+  const offered = optionsOf(def).filter(o => !answeredAbove?.has(o.id) || mine.some(a => a.optionId === o.id))
   const outlineById = new Map(w.outlineNodes.map(n => [n.id, n]))
   const tick = (optionId: string, answer: PlotNode | undefined, on: boolean) => {
     if (on) { w.togglePlotOption(holder.id, def.id, optionId, true); return }
     if (answer && placedCount(answer, outlineById) > 0) setAsking(optionId)
     else w.togglePlotOption(holder.id, def.id, optionId, false)
   }
+  if (offered.length === 0) return <p className="wrMuted">Every option is answered above.</p>
   return (
     <div className="wrChoiceList" role="group" aria-label={`${def.name || 'Field'} answers`}>
-      {optionsOf(def).map(o => {
+      {offered.map(o => {
         const answer = mine.find(a => a.optionId === o.id)
         const box = <input type="checkbox" className="wrAnswerBox" checked={Boolean(answer)} onChange={e => tick(o.id, answer, e.target.checked)} />
         const placed = answer ? placedCount(answer, outlineById) : 0
@@ -402,6 +406,9 @@ function OwnerAnswers({ w, info, drag }: { w: WriterWorkspace; info: FieldInfo; 
   )
 }
 
+// The options of a field that the node defining it has answered.
+const answeredOn = (w: WriterWorkspace, owner: PlotNode, def: PlotCustomFieldDef) => new Set(valuesIn(w.plotNodes, owner.id, def.id).flatMap(a => (a.optionId ? [a.optionId] : [])))
+
 export function ChoiceBody({ w, info, holder, editable, drag }: {
   w: WriterWorkspace
   info: FieldInfo
@@ -430,7 +437,7 @@ export function ChoiceBody({ w, info, holder, editable, drag }: {
       {inherited && <span className="wrAnswerWho">This plotline</span>}
       {noOptions
         ? <p className="wrMuted">{editable ? 'Add the options to choose from.' : 'No options yet. Add them on the node that defines this field.'}</p>
-        : kind === 'multi' ? <MultiAnswer w={w} def={def} holder={holder} drag={drag} />
+        : kind === 'multi' ? <MultiAnswer w={w} def={def} holder={holder} drag={drag} answeredAbove={inherited ? answeredOn(w, owner, def) : undefined} />
           : kind === 'dropdown' ? <DropdownAnswer w={w} def={def} holder={holder} drag={drag} />
             : <TextAnswer w={w} def={def} holder={holder} drag={drag} />}
     </div>

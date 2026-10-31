@@ -372,9 +372,34 @@ describe('answering on a plotline', () => {
     expect(genre.getByText('This plotline')).toBeInTheDocument()
     expect(genre.queryByLabelText('Options of Genre')).toBeNull()
     // the category's answer has no checkbox (only the plotline's own can be changed) and no lock, but a grip like any answer
-    expect(genre.getAllByRole('checkbox')).toHaveLength(3)
     expect(genre.getByTitle('Answered on Romance. Change it there.').querySelector('.wrPlotValueLock')).toBeNull()
     expect(genre.getByTitle('Answered on Romance. Change it there.')).toContainElement(genre.getByLabelText('Drag plotpoint'))
+    // and Crime, which the category has answered, is not offered again: the other two options are
+    expect(genre.getAllByRole('checkbox')).toHaveLength(2)
+    expect(genre.queryByRole('checkbox', { name: 'Crime' })).toBeNull()
+  })
+
+  it('offers an option again only while the plotline holds its own answer for it, and says when every option is answered above', () => {
+    const own = answer('p1', 'line', 'fGenre', 'Crime', { optionId: 'o3' })
+    const { unmount } = render(<Editor start={world([answer('c1', 'cat', 'fGenre', 'Crime', { optionId: 'o3' }), own])} />)
+    open('Genre')
+    // the plotline answered Crime before the category did: it stays, ticked, so that it can be unticked
+    expect(block('fGenre').getByRole('checkbox', { name: 'Crime' })).toBeChecked()
+    fireEvent.click(block('fGenre').getByRole('checkbox', { name: 'Crime' }))
+    expect(block('fGenre').queryByRole('checkbox', { name: 'Crime' })).toBeNull()
+    unmount()
+
+    const all = world([answer('c1', 'cat', 'fGenre', 'Fantasy', { optionId: 'o1' }), answer('c2', 'cat', 'fGenre', 'Romance', { optionId: 'o2' }), answer('c3', 'cat', 'fGenre', 'Crime', { optionId: 'o3' })])
+    render(<Editor start={all} />)
+    open('Genre')
+    expect(block('fGenre').queryAllByRole('checkbox')).toHaveLength(0)
+    expect(block('fGenre').getByText('Every option is answered above.')).toBeInTheDocument()
+  })
+
+  it('keeps every option on the category itself, whatever it has answered', () => {
+    render(<Editor start={world([answer('c1', 'cat', 'fGenre', 'Crime', { optionId: 'o3' })])} focused="cat" />)
+    open('Genre')
+    expect(block('fGenre').getAllByRole('checkbox')).toHaveLength(3)
   })
 
   it("counts the category's answer where it is placed, and drags it onto a chapter from the plotline", () => {
