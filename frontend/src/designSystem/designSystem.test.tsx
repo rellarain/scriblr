@@ -94,6 +94,37 @@ describe('the preview frame', () => {
     expect(frame().style.getPropertyValue('--color-accent-h')).toBe('200')
   })
 
+  it('gives a view the frame it asks for: the Plot presets\' Admin page a plain one, its Plot sidebar the Writer\'s (the sidebar\'s styles are scoped to .wr)', async () => {
+    const presets = CARDS.find(c => c.id === 'plot-presets')!
+    expect(presets.frame).toBe('plain')
+    expect(presets.views).toEqual([{ id: 'admin', label: 'Admin page' }, { id: 'sidebar', label: 'Plot sidebar', frame: 'writer' }])
+    const first = render(<Preview card={{ ...presets, defaults: { zones: ['day'], width: 800, view: 'admin' } }} />)
+    const frame = () => document.querySelector<HTMLElement>('.uiPreviewFrame')!
+    expect(frame()).toHaveClass('uiPreviewFrame--plain')
+    expect(frame().tagName).toBe('DIV')
+    expect(frame().closest('.wr')).toBeNull()
+    first.unmount()
+    render(<Preview card={{ ...presets, defaults: { zones: ['day'], width: 800, view: 'sidebar' } }} />)
+    await waitFor(() => expect(document.querySelector('.wrPlotNav')).not.toBeNull())
+    expect(frame()).not.toHaveClass('uiPreviewFrame--plain')
+    expect(frame().tagName).toBe('MAIN')
+    expect(frame()).toHaveClass('wUI', 'wr')
+    expect(document.querySelector('.wrPlotNav')!.closest('.wr')).toBe(frame())
+  })
+
+  it('moves a card between its views, each in the frame it asks for', async () => {
+    const presets = CARDS.find(c => c.id === 'plot-presets')!
+    render(<Preview card={{ ...presets, defaults: { zones: ['day'], width: 800, view: 'admin' } }} />)
+    const bar = screen.getByRole('toolbar', { name: /preview controls/ })
+    expect(document.querySelector('.uiPreviewFrame--plain')).not.toBeNull()
+    fireEvent.click(within(bar).getByRole('button', { name: 'Plot sidebar' }))
+    await waitFor(() => expect(document.querySelector('main.wUI.wr .wrPlotNav')).not.toBeNull())
+    expect(document.querySelector('.uiPreviewFrame--plain')).toBeNull()
+    fireEvent.click(within(bar).getByRole('button', { name: 'Admin page' }))
+    expect(document.querySelector('.uiPreviewFrame--plain')).not.toBeNull()
+    expect(document.querySelector('.wrPlotNav')).toBeNull()
+  })
+
   it('switches the card\'s view', async () => {
     const writer = CARDS.find(c => c.id === 'level-panels')!
     render(<Preview card={{ ...writer, defaults: { zones: ['day'], width: 800, view: 'dash' } }} />)

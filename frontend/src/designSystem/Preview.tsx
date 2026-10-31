@@ -27,11 +27,12 @@ export interface CardDef {
   summary: string
   // The height of a frame (px).
   height: number
-  // The frame's own element: the Writer's `main.wUI.wr`, or a plain scope (the whole app shell brings its own).
+  // The frame's own element: the Writer's `main.wUI.wr`, or a plain scope (the whole app shell brings its own). A view can ask for the other one
+  // (`views[].frame`): the Writer's styles are scoped to `.wr`, so a part of the Writer shown in a card that is otherwise plain needs its own.
   frame?: 'writer' | 'plain'
   defaults?: { zones?: ZoneKey[]; width?: ScreenSize; view?: string }
   // A selector for the card's own variants (the Writer's levels, say).
-  views?: Array<{ id: string; label: string }>
+  views?: Array<{ id: string; label: string; frame?: 'writer' | 'plain' }>
   render: (ctx: FrameContext) => ReactNode
 }
 
@@ -41,9 +42,10 @@ function Frame({ card, zone, width, palette, view }: { card: CardDef; zone: Zone
   const vars = useMemo(() => deriveTokens(palette, 'admin', zone), [palette, zone])
   const style = { ...vars, width: '100%', height: card.height } as CSSProperties
   const children = card.render({ view, zone, width, palette })
+  const plain = (card.views?.find(v => v.id === view)?.frame ?? card.frame) === 'plain'
   return (
     <ThemeZoneProvider value={{ zone, palette }}>
-      {card.frame === 'plain'
+      {plain
         ? <div className="wrBookScope uiPreviewFrame uiPreviewFrame--plain" style={style}>{children}</div>
         : <main className="wUI wr wrBookScope uiPreviewFrame" style={style}>{children}</main>}
     </ThemeZoneProvider>

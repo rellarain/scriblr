@@ -33,7 +33,7 @@ Draw it on the 24 grid, 1.8 stroke, round caps, no fill, and add it to `assets/i
 
 ## Add a component to this system
 
-1. Add a card to `frontend/src/designSystem/cardMeta.ts` (id, folder, title, group, summary, height) and to `cards.tsx` (its render, and the zones and views it opens with). The card runs the real component against `mockBackend.ts`; use real labels and lorem ipsum for what is inside.
+1. Add a card to `frontend/src/designSystem/cardMeta.ts` (id, folder, title, group, summary, height) and to `cards.tsx` (its render, and the zones and views it opens with). The card runs the real component against `mockBackend.ts`; use real labels and lorem ipsum for what is inside. A card is drawn in the Writer's own frame (`main.wUI.wr`; the Writer's styles are scoped to `.wr`, so a part of the Writer drawn outside it comes out unstyled) unless it sets `frame: 'plain'`, for the pages that bring their own scope (the app shell, the Admin page); a view of a plain card can ask for the Writer's frame with `views[].frame`, as the Plot presets card's Plot sidebar does.
 2. Write `components/<Name>/README.md`: what it is, its anatomy with class names, the tokens it uses, its states, what the consumer provides, and what not to do.
 3. `npm run design-system` writes its `preview.html`. Open `docs/design-system/dev.html?card=<id>` to see it.
 
