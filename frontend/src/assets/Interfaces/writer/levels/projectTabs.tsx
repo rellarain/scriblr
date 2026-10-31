@@ -60,7 +60,7 @@ export function projectTabs(w: WriterWorkspace): LevelTab[] {
     { id: 'outline', label: 'Outline', Icon: ListIcon, fill: true, render: c => (c.size === 'max' ? <ProjectOutline w={w} /> : <OutlineSummary w={w} />) },
     { id: 'plotpoints', label: 'Plotpoints', Icon: QueueIcon, render: () => <PlotpointsTab w={w} /> },
     {
-      id: 'schedule', label: 'Schedule', Icon: CalendarIcon, fill: true,
+      id: 'schedule', label: 'Schedule', Icon: CalendarIcon, fill: true, surface: false,
       render: c => {
         const id = w.activeProjectId
         if (!id) return <p className="wrMuted">Open a project to plan its schedule.</p>

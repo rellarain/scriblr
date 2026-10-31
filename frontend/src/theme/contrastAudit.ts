@@ -225,8 +225,8 @@ export function levelRatios(zone: ZoneKey, hue: number): Pair[] {
     for (const p of levelPairs(fill)) keep({ id: p.id, group: 'Level panels', label: p.label, kind: 'text', ratio: p.ratio })
     // The 7px accent stripe on a card's edge (an arc, a chapter, a book), against the lightest ground it sits on (the level's page, fill-1).
     const stripe = rgbOf(stripeHsl(hue, accent, k))
-    // The Schedule console sits on the level: a facet's colour (any hue the user picks) on the tile (fill-2), and white on a shift's block, which is that colour mixed into the card behind it (fill-3).
-    const [tile, card] = [mixRgb(rgbOf(fill), 80, BLACK), mixRgb(rgbOf(fill), 70, BLACK)]
+    // The Schedule console sits on the level: a facet's colour (any hue the user picks) on the console's tile (fill-3), and white on a shift's block, which is that colour mixed into the card behind it (fill-4).
+    const [tile, card] = [mixRgb(rgbOf(fill), 70, BLACK), mixRgb(rgbOf(fill), 60, BLACK)]
     let line = Infinity
     let block = Infinity
     for (let h = 0; h < 360; h += FACET_HUE_STEP) {

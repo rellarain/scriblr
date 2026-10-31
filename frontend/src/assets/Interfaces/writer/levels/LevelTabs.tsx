@@ -13,7 +13,8 @@ export interface LevelTab {
   render: (ctx: TabContext) => ReactNode
   // The header's search box filters this tab.
   searchable?: boolean
-  // The tab shows an editor on a light surface of the level's hue, in the ink colour (not the level's own on-accent text).
+  // The tab shows an editor on a light surface of the level's hue, in the ink colour (not the level's own on-accent text). A `fill` tab is on a surface
+  // unless it says `surface: false` (the Schedule console is on the level's own fill, like the other consoles).
   surface?: boolean
   // The tab's tile takes the height that is left (an editor that scrolls itself) instead of the height of its content.
   fill?: boolean
@@ -112,7 +113,7 @@ export function useTabbedLevel({ storageKey, tabs, size, defaultOpen, defaultTab
           gridId={storageKey} label="Tiles" defaultTree={columnsTree(shown.map(t => t.id))} onFocusTile={setFocusedTile}
           tiles={shown.map(t => ({
             id: t.id, title: t.label, Icon: t.Icon, children: t.render(ctxOf(t)),
-            bodyClassName: t.fill ? 'wrTabTileBody--surface wrTabTileBody--fill' : t.surface ? 'wrTabTileBody--surface' : undefined,
+            bodyClassName: [(t.surface ?? t.fill) ? 'wrTabTileBody--surface' : '', t.fill ? 'wrTabTileBody--fill' : ''].filter(Boolean).join(' ') || undefined,
           }))}
         />
       )
