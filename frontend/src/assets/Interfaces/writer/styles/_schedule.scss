@@ -2,7 +2,9 @@
 // Colours are the level's tokens (the console's tiles on fill-3, white ink, cards one shade deeper on fill-4); the facets' own hues are --wr-f-<facet>, set on the console from the user's hues.
 .wr {
   --wr-cal-base: var(--level-wash-lo);
-  .wrSchedConsole { position: relative; width: 100%; height: 100%; min-height: 0; }
+  .wrSchedConsole { position: relative; width: 100%; height: 100%; min-height: 0; display: flex; flex-direction: column;
+    // The split grid takes the console's whole height (it is sized from this box), not the height its tiles would need.
+    > .wrSplit { flex: 1 1 0; } }
   // The console sits on the Dash (or Project) level, so it reads like the rest of the level: the tile's fill, white ink, cards one shade deeper, light fields.
   // The tab-tile rules (level-tabs) already give the tile its ink and a small button its wash; this adds the console's own parts.
   .wrSchedTileBody { padding: var(--space-6); overflow: auto; font-size: var(--text-field); line-height: 1.45;
