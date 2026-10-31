@@ -262,14 +262,17 @@ export function deleteFieldset(nodes: PlotNode[], ownerId: string, setId: string
 }
 
 // List a field under a set of its owner (null: take it out, loose), at the end of that group or before `beforeFieldId`. A field is in one
-// set at most; the Scrap field is never in one. A field dropped on the set it is already in stays where it is.
-export function setFieldSet(nodes: PlotNode[], ownerId: string, fieldId: string, setId: string | null, beforeFieldId: string | null = null): PlotNode[] {
-  return nodes.map(n => {
+// set at most; the Scrap field is never in one. A field dropped on the set it is already in stays where it is, unless `atEnd` says it is to
+// go last there (a drag that was let go below the last field of its own set).
+export function setFieldSet(
+  nodes: PlotNode[], ownerId: string, fieldId: string, setId: string | null, beforeFieldId: string | null = null, atEnd = false,
+): PlotNode[] {
+  const next = nodes.map(n => {
     if (n.id !== ownerId) return n
     const moving = n.customFieldDefs.find(d => d.id === fieldId)
     if (!moving || isScrapField(moving) || fieldId === beforeFieldId) return n
     if (setId && !setsOf(n).some(s => s.id === setId)) return n
-    if ((moving.setId ?? null) === setId && !beforeFieldId) return n
+    if ((moving.setId ?? null) === setId && !beforeFieldId && !atEnd) return n
     const placed = withSet(moving, setId)
     const rest = n.customFieldDefs.filter(d => d.id !== fieldId)
     let at = beforeFieldId ? rest.findIndex(d => d.id === beforeFieldId) : -1
@@ -280,8 +283,12 @@ export function setFieldSet(nodes: PlotNode[], ownerId: string, fieldId: string,
     }
     rest.splice(at, 0, placed)
     rest.sort((a, b) => Number(isScrapField(a)) - Number(isScrapField(b)))
+    // Put where it already stood: nothing changes (so nothing is saved, and Undo has no step for it).
+    if (rest.every((d, i) => d.id === n.customFieldDefs[i]?.id && (d.setId ?? null) === (n.customFieldDefs[i].setId ?? null))) return n
     return { ...n, customFieldDefs: rest }
   })
+  // Nothing changed: the same list back, which is how the caller knows there is nothing to save.
+  return next.every((n, i) => n === nodes[i]) ? nodes : next
 }
 
 // ---- values ----

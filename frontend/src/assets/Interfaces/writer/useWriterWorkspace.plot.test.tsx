@@ -341,6 +341,25 @@ describe('useWriterWorkspace: fieldsets', () => {
     expect(get('line')?.customFieldDefs).toEqual([{ id: 'f1', name: 'Beats' }])
   })
 
+  it('keeps a field dropped where it already stands out of the history, and puts it last when dropped after the last', async () => {
+    const { result, get } = await opened()
+    let set: string | null = null
+    let eyes: string | null = null
+    act(() => { set = result.current.addPlotFieldset('line', 'Looks') })
+    act(() => { eyes = result.current.addPlotField('line', 'Eyes', undefined, set!) })
+    // Beats goes into the set, last in it
+    act(() => { result.current.setPlotFieldSet('line', 'f1', set!) })
+    expect(get('line')?.customFieldDefs.map(d => d.id)).toEqual([eyes, 'f1'])
+    // dropped last when it is last: nothing changes, so the one Undo goes back past the move to the way it was
+    act(() => { result.current.setPlotFieldSet('line', 'f1', set!, null, true) })
+    act(() => { result.current.history.undo('plot') })
+    expect(get('line')?.customFieldDefs.find(d => d.id === 'f1')?.setId ?? null).toBeNull()
+    // Eyes dropped last in its set puts it after Beats
+    act(() => { result.current.history.redo('plot') })
+    act(() => { result.current.setPlotFieldSet('line', eyes!, set!, null, true) })
+    expect(get('line')?.customFieldDefs.map(d => d.id)).toEqual(['f1', eyes])
+  })
+
   it('is undone as one step, and saved with the plot', async () => {
     const { result, get, backend } = await opened()
     act(() => { result.current.addPlotFieldset('cat', 'Setting') })

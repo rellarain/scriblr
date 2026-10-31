@@ -1,4 +1,4 @@
-import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react'
+import { act, createEvent, fireEvent, render, screen, waitFor, within } from '@testing-library/react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { __resetSettingsForTests } from '../../../settings/settingsStore'
 import type { OutlineNode, PlotNode } from '../../../api/types'
@@ -832,6 +832,24 @@ describe('fieldsets', () => {
     const data = new Map<string, string>()
     return { setData: (k: string, v: string) => data.set(k, v), getData: (k: string) => data.get(k) ?? '', effectAllowed: '', setDragImage: () => {} }
   }
+  // jsdom has no layout, so a group's rows are given one (each 40px tall, 46px apart from the top of the group), and the pointer's place is said
+  // by the row it is over: `upperHalf(0)` is the top of the first row, `lowerHalf(2)` the bottom of the third.
+  const layOut = (group: Element) => {
+    [...group.children].filter((el): el is HTMLElement => el instanceof HTMLElement && !!el.dataset.field).forEach((row, i) => {
+      Object.defineProperty(row, 'offsetTop', { value: i * 46, configurable: true })
+      Object.defineProperty(row, 'offsetHeight', { value: 40, configurable: true })
+    })
+    return group
+  }
+  // jsdom has no DragEvent, so the pointer's height is put on the event by hand.
+  const dragAt = (type: 'dragOver' | 'dragEnter' | 'drop', el: Element, pointer: { clientY: number }, dataTransfer: object) => {
+    const event = createEvent[type](el, { dataTransfer })
+    Object.defineProperty(event, 'clientY', { value: pointer.clientY })
+    return fireEvent(el, event)
+  }
+  const upperHalf = (row: number) => ({ clientY: row * 46 + 5 })
+  const lowerHalf = (row: number) => ({ clientY: row * 46 + 35 })
+  const bodyOf = (name: string) => layOut(set(name).querySelector('.wrFieldSetBody')!)
 
   it('lists the loose fields, then each set with its fields and a count', () => {
     render(<Editor start={withSet()} focused="cat" />)
@@ -937,12 +955,13 @@ describe('fieldsets', () => {
     render(<Editor start={twoSets()} focused="cat" />)
     const dataTransfer = dragData()
     fireEvent.dragStart(within(set('Setting')).getAllByLabelText('Drag to reorder fields')[0], { dataTransfer }) // Place
+    bodyOf('Mood')
     const tone = within(set('Mood')).getByLabelText('Field name').closest('.wrFieldBlock') as HTMLElement
     // fireEvent returns false when the handler cancelled the event, which is what tells the browser the target takes the drop
-    expect(fireEvent.dragEnter(tone, { dataTransfer })).toBe(false)
+    expect(dragAt('dragEnter', tone, upperHalf(0), dataTransfer)).toBe(false)
     expect(fireEvent.dragEnter(set('Mood'), { dataTransfer })).toBe(false)
     expect(fireEvent.dragEnter(screen.getByText('Drop here to take it out of its set'), { dataTransfer })).toBe(false)
-    fireEvent.drop(tone, { dataTransfer })
+    dragAt('drop', tone, upperHalf(0), dataTransfer)
     expect(values(within(set('Mood')).getAllByLabelText('Field name'))).toEqual(['Place', 'Tone'])
   })
 
@@ -950,10 +969,123 @@ describe('fieldsets', () => {
     render(<Editor start={twoSets()} focused="cat" />)
     const dataTransfer = dragData()
     fireEvent.dragStart(screen.getAllByLabelText('Drag to reorder fields')[0], { dataTransfer }) // Theme
+    bodyOf('Mood')
     const tone = within(set('Mood')).getByLabelText('Field name').closest('.wrFieldBlock') as HTMLElement
-    fireEvent.dragOver(tone, { dataTransfer })
-    fireEvent.drop(tone, { dataTransfer })
+    dragAt('dragOver', tone, upperHalf(0), dataTransfer)
+    dragAt('drop', tone, upperHalf(0), dataTransfer)
     expect(values(within(set('Mood')).getAllByLabelText('Field name'))).toEqual(['Theme', 'Tone'])
+  })
+
+  describe('sorting a field among its group: the rows slide out of the way', () => {
+    // Setting holds Place, Era and Light, in that order; Theme is loose.
+    const three = (): PlotNode[] => withSet().map(n => (n.id === 'cat'
+      ? { ...n, customFieldDefs: [...n.customFieldDefs, { id: 'fEra', name: 'Era', setId: 'sSet' }, { id: 'fLight', name: 'Light', setId: 'sSet' }] }
+      : n))
+    const rowOf = (name: string) => within(set('Setting')).getByDisplayValue(name).closest('.wrFieldBlock') as HTMLElement
+    const gripOf = (name: string) => within(rowOf(name)).getByLabelText('Drag to reorder fields')
+    const slide = (name: string) => rowOf(name).style.transform
+    const order = () => values(within(set('Setting')).getAllByLabelText('Field name'))
+
+    it('slides the rows a field passes down, into the room it leaves, when it is dragged up, and the field itself leaves its place', () => {
+      render(<Editor start={three()} focused="cat" />)
+      const dataTransfer = dragData()
+      fireEvent.dragStart(gripOf('Light'), { dataTransfer })
+      const body = bodyOf('Setting')
+      expect(body).not.toHaveClass('wrFieldRows--sliding') // nothing moves just because a drag has started
+      expect(rowOf('Light')).toHaveClass('wrFieldBlock--dragging')
+      dragAt('dragOver', rowOf('Place'), upperHalf(0), dataTransfer)
+      expect(body).toHaveClass('wrFieldRows--sliding')
+      expect([slide('Place'), slide('Era'), slide('Light')]).toEqual(['translateY(40px)', 'translateY(40px)', ''])
+      expect(rowOf('Light')).toHaveClass('wrFieldBlock--lifted')
+      // the pointer in the middle: only the row it passes
+      dragAt('dragOver', rowOf('Era'), upperHalf(1), dataTransfer)
+      expect([slide('Place'), slide('Era')]).toEqual(['', 'translateY(40px)'])
+    })
+
+    it('slides the rows it passes up when a field is dragged down, and all below it when it goes last', () => {
+      render(<Editor start={three()} focused="cat" />)
+      const dataTransfer = dragData()
+      fireEvent.dragStart(gripOf('Place'), { dataTransfer })
+      bodyOf('Setting')
+      dragAt('dragOver', rowOf('Light'), upperHalf(2), dataTransfer)
+      expect([slide('Place'), slide('Era'), slide('Light')]).toEqual(['', 'translateY(-40px)', ''])
+      dragAt('dragOver', rowOf('Light'), lowerHalf(2), dataTransfer)
+      expect([slide('Era'), slide('Light')]).toEqual(['translateY(-40px)', 'translateY(-40px)'])
+    })
+
+    it('moves nothing while the pointer holds the field\'s own place', () => {
+      render(<Editor start={three()} focused="cat" />)
+      const dataTransfer = dragData()
+      fireEvent.dragStart(gripOf('Era'), { dataTransfer })
+      bodyOf('Setting')
+      dragAt('dragOver', rowOf('Era'), upperHalf(1), dataTransfer)
+      expect([slide('Place'), slide('Era'), slide('Light')]).toEqual(['', '', ''])
+      dragAt('drop', rowOf('Era'), upperHalf(1), dataTransfer)
+      expect(order()).toEqual(['Place', 'Era', 'Light'])
+    })
+
+    it('drops where the gap is: in front of a row, or last, which used to change nothing in the field\'s own set', () => {
+      render(<Editor start={three()} focused="cat" />)
+      const dataTransfer = dragData()
+      fireEvent.dragStart(gripOf('Light'), { dataTransfer })
+      bodyOf('Setting')
+      dragAt('dragOver', rowOf('Place'), upperHalf(0), dataTransfer)
+      dragAt('drop', rowOf('Place'), upperHalf(0), dataTransfer)
+      expect(order()).toEqual(['Light', 'Place', 'Era'])
+      expect([slide('Place'), slide('Era'), slide('Light')]).toEqual(['', '', '']) // the slides are gone once it has dropped
+
+      fireEvent.dragStart(gripOf('Light'), { dataTransfer })
+      bodyOf('Setting')
+      dragAt('dragOver', rowOf('Era'), lowerHalf(2), dataTransfer)
+      dragAt('drop', rowOf('Era'), lowerHalf(2), dataTransfer)
+      expect(order()).toEqual(['Place', 'Era', 'Light'])
+    })
+
+    it('draws a line, not a slide, over another group, and drops the field there in front of that row', () => {
+      render(<Editor start={three()} focused="cat" />)
+      const dataTransfer = dragData()
+      fireEvent.dragStart(screen.getAllByLabelText('Drag to reorder fields')[0], { dataTransfer }) // Theme, loose
+      bodyOf('Setting')
+      dragAt('dragOver', rowOf('Era'), upperHalf(1), dataTransfer)
+      expect(rowOf('Era')).toHaveClass('wrFieldBlock--before')
+      expect([slide('Place'), slide('Era'), slide('Light')]).toEqual(['', '', ''])
+      dragAt('dragOver', rowOf('Light'), lowerHalf(2), dataTransfer)
+      expect(rowOf('Era')).not.toHaveClass('wrFieldBlock--before')
+      expect(rowOf('Light')).toHaveClass('wrFieldBlock--after')
+      dragAt('dragOver', rowOf('Era'), upperHalf(1), dataTransfer)
+      dragAt('drop', rowOf('Era'), upperHalf(1), dataTransfer)
+      expect(order()).toEqual(['Place', 'Theme', 'Era', 'Light'])
+    })
+
+    it('puts the slides away when the pointer leaves the group, and when the drag ends', () => {
+      render(<Editor start={three()} focused="cat" />)
+      const dataTransfer = dragData()
+      fireEvent.dragStart(gripOf('Light'), { dataTransfer })
+      const body = bodyOf('Setting')
+      dragAt('dragOver', rowOf('Place'), upperHalf(0), dataTransfer)
+      expect(slide('Place')).toBe('translateY(40px)')
+      fireEvent.dragLeave(body, { dataTransfer, relatedTarget: document.body })
+      expect([slide('Place'), slide('Era')]).toEqual(['', ''])
+      expect(rowOf('Light')).not.toHaveClass('wrFieldBlock--lifted')
+      dragAt('dragOver', rowOf('Place'), upperHalf(0), dataTransfer)
+      fireEvent.dragEnd(gripOf('Light'), { dataTransfer })
+      expect(body).not.toHaveClass('wrFieldRows--sliding')
+      expect([slide('Place'), slide('Era')]).toEqual(['', ''])
+    })
+
+    it('sorts the loose fields among themselves too', () => {
+      const loose = three().map(n => (n.id === 'cat' ? { ...n, customFieldDefs: [{ id: 'fTheme', name: 'Theme' }, { id: 'fMood', name: 'Mood' }, ...n.customFieldDefs.slice(1)] } : n))
+      render(<Editor start={loose} focused="cat" />)
+      const dataTransfer = dragData()
+      const group = layOut(document.querySelector('.wrFieldLoose')!)
+      const looseOrder = () => values([...document.querySelectorAll<HTMLElement>('.wrFieldLoose [aria-label="Field name"]')])
+      fireEvent.dragStart(screen.getAllByLabelText('Drag to reorder fields')[0], { dataTransfer }) // Theme
+      const mood = group.querySelector('[data-field="fMood"]') as HTMLElement
+      dragAt('dragOver', mood, lowerHalf(1), dataTransfer)
+      expect((group.querySelector('[data-field="fMood"]') as HTMLElement).style.transform).toBe('translateY(-40px)')
+      dragAt('drop', mood, lowerHalf(1), dataTransfer)
+      expect(looseOrder()).toEqual(['Mood', 'Theme'])
+    })
   })
 
   it('drags a set above another, and to the end', () => {

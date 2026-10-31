@@ -426,6 +426,20 @@ describe('fieldsets', () => {
     expect(find(same, 'cat')).toBe(find(nodes, 'cat')) // already in it: not moved to the end
   })
 
+  it("moves a field to the end of its own set when told to (a drag let go below the last field), and changes nothing when it is already last", () => {
+    let nodes = cast()
+    for (const id of ['hair', 'eyes', 'motto']) nodes = setFieldSet(nodes, 'cat', id, 'looks')
+    expect(names(layout(nodes).sets[0].fields)).toEqual(['Hair', 'Eyes', 'Motto'])
+    const last = setFieldSet(nodes, 'cat', 'hair', 'looks', null, true)
+    expect(names(layout(last).sets[0].fields)).toEqual(['Eyes', 'Motto', 'Hair'])
+    // already last: the same nodes back, so nothing is saved and Undo has no step for it
+    expect(setFieldSet(last, 'cat', 'hair', 'looks', null, true)).toBe(last)
+    // out of a set, last among the loose fields
+    const out = setFieldSet(nodes, 'cat', 'hair', null, null, true)
+    expect(names(layout(out).loose).at(-1)).toBe('Hair')
+    expect(find(out, 'cat').customFieldDefs.find(d => d.id === 'hair')).toEqual({ id: 'hair', name: 'Hair' })
+  })
+
   it("refuses a set the node does not have, a field it does not have, and Scrap", () => {
     const nodes = cast()
     expect(setFieldSet(nodes, 'cat', 'hair', 'unknown')).toEqual(nodes)

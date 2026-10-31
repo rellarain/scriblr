@@ -78,7 +78,7 @@ export function useFakeWorkspace(initial: PlotNode[], focused = 'line', outlineN
     renamePlotFieldset: (owner: string, id: string, name: string) => commit(renameFieldset(ref.current, owner, id, name)),
     movePlotFieldset: (owner: string, id: string, before: string | null) => commit(moveFieldset(ref.current, owner, id, before)),
     removePlotFieldset: (owner: string, id: string) => commit(deleteFieldset(ref.current, owner, id)),
-    setPlotFieldSet: (owner: string, field: string, setId: string | null, before: string | null = null) => commit(setFieldSet(ref.current, owner, field, setId, before)),
+    setPlotFieldSet: (owner: string, field: string, setId: string | null, before: string | null = null, atEnd = false) => commit(setFieldSet(ref.current, owner, field, setId, before, atEnd)),
     renamePlotField: (owner: string, id: string, name: string) => commit(renameField(ref.current, owner, id, name)),
     movePlotField: (owner: string, id: string, before: string | null) => commit(moveField(ref.current, owner, id, before)),
     removePlotField: (owner: string, id: string) => commit(deleteField(ref.current, owner, id, outlineById)),

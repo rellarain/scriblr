@@ -2,6 +2,7 @@ import { useState } from 'react'
 import type { PlotFieldSet, PlotNode } from '../../../api/types'
 import { ChevronDownIcon, ChevronRightIcon, GripIcon, PlusIcon } from '../../icons'
 import { ChoiceBody, KindSelect } from './ChoiceFields'
+import { useFieldGroupDrop } from './useFieldGroupDrop'
 import { usePlotOrder } from './plotOrder'
 import { usePlotSetOpen } from './plotSetOpen'
 import {
@@ -47,7 +48,7 @@ export interface PlotDrag {
   setDragSetId: (id: string | null) => void
 }
 
-export function FieldBlock({ w, info, holder, editable, ui, drag, showAssigned }: {
+export function FieldBlock({ w, info, holder, editable, ui, drag, showAssigned, slide, edge, lifted }: {
   w: WriterWorkspace
   info: FieldInfo
   // The node whose values are listed: the plotline being edited, or the owner itself.
@@ -57,6 +58,11 @@ export function FieldBlock({ w, info, holder, editable, ui, drag, showAssigned }
   ui: PlotUi
   drag: PlotDrag
   showAssigned: boolean
+  // While a field is dragged in this block's group (useFieldGroupDrop.ts): how far it slides out of the way (px), a line drawn at its top or
+  // bottom edge where the dragged field would land, and whether this is the dragged field itself, which has left its place.
+  slide?: number
+  edge?: 'before' | 'after' | null
+  lifted?: boolean
 }) {
   const { def, owner } = info
   const scrap = isScrapField(def)
@@ -86,27 +92,21 @@ export function FieldBlock({ w, info, holder, editable, ui, drag, showAssigned }
     else w.renamePlotField(owner.id, def.id, 'Untitled field')
   }
 
-  // A drop is accepted as the drag enters as well as while it is over: a drag let go as it arrives, before the browser's next dragover, would
-  // otherwise find nothing to drop on.
+  // A value dragged over the field is accepted as it enters as well as while it is over: a drag let go as it arrives, before the browser's next
+  // dragover, would otherwise find nothing to drop on. (A dragged FIELD is the business of the group the block is in, useFieldGroupDrop.ts.)
   const allowDrop = (e: React.DragEvent) => {
-    if (drag.dragFieldId && editable && drag.dragFieldId !== def.id) { e.preventDefault(); return }
     if (canDrop) { e.preventDefault(); setOver(true) }
   }
 
   return (
     <div
-      className={`wrFieldBlock${over && canDrop ? ' wrFieldBlock--over' : ''}${drag.dragFieldId === def.id ? ' wrFieldBlock--dragging' : ''}`}
+      className={`wrFieldBlock${over && canDrop ? ' wrFieldBlock--over' : ''}${drag.dragFieldId === def.id && !lifted ? ' wrFieldBlock--dragging' : ''}${lifted ? ' wrFieldBlock--lifted' : ''}${edge ? ` wrFieldBlock--${edge}` : ''}`}
+      style={slide ? { transform: `translateY(${slide}px)` } : undefined}
       data-knode={def.id} data-field={def.id}
       onDragEnter={allowDrop} onDragOver={allowDrop}
       onDragLeave={() => setOver(false)}
       onDrop={e => {
         setOver(false)
-        if (drag.dragFieldId && editable && drag.dragFieldId !== def.id) {
-          e.preventDefault(); e.stopPropagation()
-          w.movePlotField(owner.id, drag.dragFieldId, def.id)
-          drag.setDragFieldId(null)
-          return
-        }
         if (canDrop) { e.preventDefault(); e.stopPropagation(); drag.dropIntoField(def.id) }
       }}
     >
@@ -197,6 +197,11 @@ function FieldSetBlock({ w, set, owner, fields, holder, editable, ui, drag, show
   const draggedSet = editable && drag.dragSetId && drag.dragSetId !== set.id && setsOf(owner).some(s => s.id === drag.dragSetId) ? drag.dragSetId : null
   const label = set.name || 'fieldset'
   const allowDrop = (e: React.DragEvent) => { if (draggedField || draggedSet) { e.preventDefault(); setHover(true) } }
+  // The rows of the set take a dragged field in the order the pointer asks for.
+  const group = useFieldGroupDrop({
+    ids: fields.map(f => f.def.id), draggedId: editable ? drag.dragFieldId : null, active: editable,
+    onDrop: (id, before) => { w.setPlotFieldSet(owner.id, id, set.id, before, before === null); drag.setDragFieldId(null) },
+  })
 
   // A set left unnamed is dropped when it holds nothing, and named otherwise.
   function nameBlur() {
@@ -265,9 +270,12 @@ function FieldSetBlock({ w, set, owner, fields, holder, editable, ui, drag, show
         )}
       </div>
       {open && (
-        <div className="wrFieldSetBody">
+        <div ref={group.ref} className={`wrFieldSetBody${group.sliding ? ' wrFieldRows--sliding' : ''}${group.overEmpty ? ' wrFieldRows--over' : ''}`} {...group.handlers}>
           {fields.map(info => (
-            <FieldBlock key={info.def.id} w={w} info={info} holder={holder} editable={editable} ui={ui} drag={drag} showAssigned={showAssigned} />
+            <FieldBlock
+              key={info.def.id} w={w} info={info} holder={holder} editable={editable} ui={ui} drag={drag} showAssigned={showAssigned}
+              slide={group.slideOf(info.def.id)} edge={group.edgeOf(info.def.id)} lifted={group.isLifted(info.def.id)}
+            />
           ))}
           {fields.length === 0 && <p className="wrMuted">{editable ? 'No fields yet. Drag one in or add one.' : 'No fields.'}</p>}
         </div>
@@ -285,18 +293,28 @@ function FieldList({ w, holder, parts, editable, ui, drag, showAssigned }: {
   const block = (info: FieldInfo) => <FieldBlock key={info.def.id} w={w} info={info} holder={holder} editable={editable} ui={ui} drag={drag} showAssigned={showAssigned} />
   const draggedField = editable && drag.dragFieldId ? parts.sets.flatMap(s => s.fields).find(f => f.def.id === drag.dragFieldId) : undefined
   const draggedSet = editable && drag.dragSetId && parts.sets.some(s => s.set.id === drag.dragSetId) ? drag.dragSetId : null
-  // Taking the dragged field out of its set: dropped on the loose fields' area or on the spot below the sets.
+  // The loose fields take a dragged field (their own, or one taken out of a set) in the order the pointer asks for.
+  const loose = useFieldGroupDrop({
+    ids: parts.loose.map(f => f.def.id), draggedId: editable ? drag.dragFieldId : null, active: editable,
+    onDrop: (id, before) => { w.setPlotFieldSet(holder.id, id, null, before, before === null); drag.setDragFieldId(null) },
+  })
+  // Taking the dragged field out of its set, last among the loose fields: dropped on the spot below the sets.
   const takeOut = (e: React.DragEvent) => {
     if (!draggedField) return
     e.preventDefault(); e.stopPropagation()
-    w.setPlotFieldSet(holder.id, draggedField.def.id, null)
+    w.setPlotFieldSet(holder.id, draggedField.def.id, null, null, true)
     drag.setDragFieldId(null)
   }
   return (
     <>
       {parts.loose.length > 0 && (
-        <div className="wrFieldLoose" onDragEnter={e => { if (draggedField) e.preventDefault() }} onDragOver={e => { if (draggedField) e.preventDefault() }} onDrop={takeOut}>
-          {parts.loose.map(block)}
+        <div ref={loose.ref} className={`wrFieldLoose${loose.sliding ? ' wrFieldRows--sliding' : ''}`} {...loose.handlers}>
+          {parts.loose.map(info => (
+            <FieldBlock
+              key={info.def.id} w={w} info={info} holder={holder} editable={editable} ui={ui} drag={drag} showAssigned={showAssigned}
+              slide={loose.slideOf(info.def.id)} edge={loose.edgeOf(info.def.id)} lifted={loose.isLifted(info.def.id)}
+            />
+          ))}
         </div>
       )}
       {parts.sets.map(s => (

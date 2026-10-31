@@ -803,8 +803,9 @@ export function useWriterWorkspace() {
     commitPlot(deleteFieldset(plotNodesRef.current, ownerId, setId), true)
   }
   // List a field under a set (null: take it out), at the end of that group or before `beforeFieldId`.
-  function setPlotFieldSet(ownerId: string, fieldId: string, setId: string | null, beforeFieldId: string | null = null) {
-    commitPlot(setFieldSet(plotNodesRef.current, ownerId, fieldId, setId, beforeFieldId), true)
+  function setPlotFieldSet(ownerId: string, fieldId: string, setId: string | null, beforeFieldId: string | null = null, atEnd = false) {
+    const next = setFieldSet(plotNodesRef.current, ownerId, fieldId, setId, beforeFieldId, atEnd)
+    if (next !== plotNodesRef.current) commitPlot(next, true)
   }
   function renamePlotField(ownerId: string, fieldId: string, name: string) {
     commitPlot(renameField(plotNodesRef.current, ownerId, fieldId, name), false)
