@@ -1,7 +1,7 @@
 import { useEffect, useRef, type ReactNode } from 'react'
 import type { WriterWorkspace } from '../useWriterWorkspace'
 import { useStoredState } from '../storage'
-import { setSideAvailable, sideVars, useSidebar } from '../sidebarState'
+import { clampSideWidth, setSideAvailable, shelvesVars, sideVars, useSidebar } from '../sidebarState'
 import { nodeLabel } from '../plotTree'
 import { bookThemeHue } from '../../../../theme/bookColors'
 import BookScope from '../BookScope'
@@ -37,6 +37,14 @@ function WriterLevels({ w, pagesComponent, onPagesComponent }: {
     if (!style) return
     if (width === null) for (const name of Object.keys(sideVars(0))) style.removeProperty(name)
     else for (const [name, value] of Object.entries(sideVars(width))) style.setProperty(name, value)
+  }
+  // The project shelves beside the Dash have a width of their own, dragged the same way (from the shelves' left edge).
+  const [shelvesWidth, setShelvesWidth] = useStoredState<number | null>('scriblr.writer.shelvesWidth', null)
+  const dragShelves = (width: number | null) => {
+    const style = levelsRef.current?.style
+    if (!style) return
+    if (width === null) for (const name of Object.keys(shelvesVars(0))) style.removeProperty(name)
+    else for (const [name, value] of Object.entries(shelvesVars(width))) style.setProperty(name, value)
   }
   const sideShown = focus !== 'dash' && !side.hidden
   useEffect(() => {
@@ -120,7 +128,17 @@ function WriterLevels({ w, pagesComponent, onPagesComponent }: {
   const shown = LEVELS.filter(l => sizes[l] !== 'hidden')
   let body: ReactNode
   if (focus === 'dash') {
-    body = <>{shown.map(l => scoped(l, panel(l, sizes[l] as Exclude<LevelSize, 'hidden'>)))}</>
+    body = <>{shown.map(l => (l === 'project'
+      ? (
+        <div key={l} className="wrLevelsShelves">
+          <SideResizer
+            edge="left" label="Shelves width" what="the project shelves" clamp={clampSideWidth}
+            onDrag={dragShelves} onCommit={setShelvesWidth} onReset={() => { setShelvesWidth(null); dragShelves(null) }}
+          />
+          {scoped(l, panel(l, sizes[l] as Exclude<LevelSize, 'hidden'>))}
+        </div>
+      )
+      : scoped(l, panel(l, sizes[l] as Exclude<LevelSize, 'hidden'>))))}</>
   } else {
     const above = shown.filter(l => l !== focus)
     // Hidden, the focused level has the whole width.
@@ -139,7 +157,7 @@ function WriterLevels({ w, pagesComponent, onPagesComponent }: {
     <div
       ref={levelsRef}
       className={`wrLevels wrLevels--focus-${focus}${focus !== 'dash' && !sideShown ? ' wrLevels--noside' : ''}`} data-focus={focus}
-      style={sideShown && sideWidth !== null ? sideVars(sideWidth) : undefined}
+      style={sideShown ? (sideWidth !== null ? sideVars(sideWidth) : undefined) : (focus === 'dash' && shelvesWidth !== null ? shelvesVars(shelvesWidth) : undefined)}
     >
       {body}
     </div>

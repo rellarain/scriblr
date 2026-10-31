@@ -28,6 +28,11 @@ export function sideVars(width: number): Record<string, string> {
   }
 }
 
+// The Dash's project shelves, on the right: the same limits, and the width as the column's flex (its default is a third of what is left after the Dash).
+export function shelvesVars(width: number): Record<string, string> {
+  return { '--wr-shelves-flex': `0 0 min(max(${width}px, ${SIDE_MIN_W}px), ${SIDE_MAX_FRACTION * 100}%)` }
+}
+
 function useNarrow(): boolean {
   const [narrow, setNarrow] = useState(() => typeof window !== 'undefined' && window.innerWidth < AUTO_HIDE_BELOW)
   useEffect(() => {

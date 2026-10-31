@@ -62,7 +62,8 @@ try {
   check(typeof created.projectId === 'string', 'a project can be created')
 
   await page.reload()
-  await page.waitForSelector('text=E2E smoke project', { timeout: 30_000 })
+  // Visible ones only: the Schedule's pickers list the project names in (hidden) <option>s too.
+  await page.waitForSelector('text=E2E smoke project >> visible=true', { timeout: 30_000 })
   check(true, 'the new project shows on the shelves after a reload')
   await page.screenshot({ path: path.join(shots, 'shelves.png') })
 

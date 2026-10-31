@@ -259,10 +259,8 @@ Each cell is the ratio at the default hues (theme 330, accent 32, alert 200) and
 
 | Pair | Needs | Dawn | Day | Dusk | Night |
 |---|---|---|---|---|---|
-| A facet's line, dot or bar on the tile, the worst hue | 3:1 | 3.4 (3.4) | 3.8 (3.7) | 4.8 (4.8) | 5.3 (5.0) |
-| Ink on a shift's block (the facet colour mixed into the tile), the worst hue and state | 4.5:1 | 5.9 (5.9) | 6.4 (6.3) | 5.2 (5.2) | 5.5 (5.3) |
-| The ring round today's square, on the tile | 3:1 | 10.9 (10.8) | 12.0 (11.7) | 11.6 (11.6) | 12.8 (12.2) |
-| The line graph's axis text (the ink at 85%) on the tile | 4.5:1 | 8.6 (8.5) | 9.2 (9.1) | 8.9 (8.9) | 9.7 (9.3) |
+| A facet's line, dot or bar on the console's tile, the worst facet hue | 3:1 | 4.3 (4.2) | 4.1 (4.0) | 4.1 (4.0) | 4.3 (4.0) |
+| White on a shift's block (the facet colour mixed into the card), the worst facet hue and state | 4.5:1 | 5.7 (5.5) | 5.5 (5.4) | 5.5 (5.4) | 5.7 (5.4) |
 
 ## Below the threshold
 

@@ -170,6 +170,38 @@ describe('WriterLevels', () => {
   })
 })
 
+describe('the project shelves beside the Dash', () => {
+  beforeEach(() => { setWindowWidth(1280) })
+
+  it('are resized by dragging the handle on their left edge, and the width is kept', () => {
+    const rect = (width: number) => ({ width, height: 600, x: 0, y: 0, top: 0, left: 0, right: width, bottom: 600, toJSON: () => ({}) }) as DOMRect
+    const spy = vi.spyOn(Element.prototype, 'getBoundingClientRect').mockImplementation(function (this: Element) {
+      return rect(this.classList.contains('wrLevelsShelves') ? 400 : this.classList.contains('wrLevels') ? 1000 : 0)
+    })
+    const { container } = renderLevels(workspace('shelves'))
+    const flexVar = () => (container.querySelector('.wrLevels') as HTMLElement).style.getPropertyValue('--wr-shelves-flex')
+    expect(flexVar()).toBe('')
+    fireEvent.mouseDown(screen.getByRole('separator', { name: 'Shelves width' }), { clientX: 600 })
+    act(() => { fireEvent.mouseMove(window, { clientX: 500 }) })
+    expect(flexVar()).toBe('0 0 min(max(500px, 200px), 60%)') // dragged 100px left: 400 + 100, live
+    act(() => { fireEvent.mouseMove(window, { clientX: 0 }) })
+    expect(flexVar()).toBe('0 0 min(max(600px, 200px), 60%)') // held at 60% of 1000
+    act(() => { fireEvent.mouseUp(window) })
+    expect(JSON.parse(window.localStorage.getItem('scriblr.writer.shelvesWidth') ?? 'null')).toBe(600)
+    spy.mockRestore()
+  })
+
+  it('go back to the default width on a double click on the handle', async () => {
+    const user = userEvent.setup()
+    window.localStorage.setItem('scriblr.writer.shelvesWidth', JSON.stringify(420))
+    __resetSettingsForTests()
+    const { container } = renderLevels(workspace('shelves'))
+    expect((container.querySelector('.wrLevels') as HTMLElement).style.getPropertyValue('--wr-shelves-flex')).toBe('0 0 min(max(420px, 200px), 60%)')
+    await user.dblClick(screen.getByRole('separator', { name: 'Shelves width' }))
+    expect((container.querySelector('.wrLevels') as HTMLElement).style.getPropertyValue('--wr-shelves-flex')).toBe('')
+  })
+})
+
 describe('the side column', () => {
   beforeEach(() => { setWindowWidth(1280) })
 

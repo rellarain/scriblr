@@ -187,21 +187,6 @@ export function paletteRatios(zone: ZoneKey, hues: AuditHues = DEFAULT_HUES): Pa
   out.push({ id: 'plot-nav-chip-line', group: 'Plot colours', label: 'A keyword chip on a plotline row of the contents (also hovered), the worst hue', kind: 'text', ratio: worstChipLine })
   out.push({ id: 'plot-nav-chip-fill', group: 'Plot colours', label: 'A keyword chip on a category, subcategory or cluster row, the worst hue', kind: 'text', ratio: worstChipFill })
 
-  // ---- the Schedule console: a facet's colour (any hue the user picks) on the tile, and the ink on a shift's block, which is that colour mixed in
-  const tile = rgbOf(hsl(hues.theme, colors.theme.s, clamp(colors.theme.l + SURFACE_OFFSETS[8], 0, 100)))
-  const facet = FACET_COLOR[look.mode]
-  let worstFacetLine = Infinity
-  let worstBlock = Infinity
-  for (let h = 0; h < 360; h += 5) {
-    const f = rgbOf(hsl(h, facet.s, facet.l))
-    worstFacetLine = Math.min(worstFacetLine, ratioOfRgb(f, tile))
-    for (const share of Object.values(BLOCK_MIX)) worstBlock = Math.min(worstBlock, ratioOfRgb(ink, over(f, share, tile)))
-  }
-  out.push({ id: 'schedule-facet-line', group: 'Schedule', label: "A facet's line, dot or bar on the tile, the worst hue", kind: 'ui', ratio: worstFacetLine })
-  out.push({ id: 'schedule-block', group: 'Schedule', label: "Ink on a shift's block (the facet colour mixed into the tile), the worst hue and state", kind: 'text', ratio: worstBlock })
-  add('schedule-today', 'Schedule', "The ring round today's square, on the tile", 'ui', ink, tile)
-  add('schedule-axis', 'Schedule', "The line graph's axis text (the ink at 85%) on the tile", 'text', over(ink, 0.85, tile), tile)
-
   // ---- Theme settings: the timeline's icon on its segment (the zone's accent hue at 50% lightness, as ThemeSettingsPanel draws it)
   const segment = hsl(colors.accent.h, colors.accent.s, 50)
   add('timeline-icon', 'Theme panel', 'Timeline icon on its zone segment', 'ui', rgbOf(readableInk(segment)), rgbOf(segment))
@@ -240,6 +225,17 @@ export function levelRatios(zone: ZoneKey, hue: number): Pair[] {
     for (const p of levelPairs(fill)) keep({ id: p.id, group: 'Level panels', label: p.label, kind: 'text', ratio: p.ratio })
     // The 7px accent stripe on a card's edge (an arc, a chapter, a book), against the lightest ground it sits on (the level's page, fill-1).
     const stripe = rgbOf(stripeHsl(hue, accent, k))
+    // The Schedule console sits on the level: a facet's colour (any hue the user picks) on the tile (fill-2), and white on a shift's block, which is that colour mixed into the card behind it (fill-3).
+    const [tile, card] = [mixRgb(rgbOf(fill), 80, BLACK), mixRgb(rgbOf(fill), 70, BLACK)]
+    let line = Infinity
+    let block = Infinity
+    for (let h = 0; h < 360; h += FACET_HUE_STEP) {
+      const f = rgbOf({ h, s: FACET_COLOR.s, l: FACET_COLOR.l })
+      line = Math.min(line, ratioOfRgb(f, tile))
+      for (const share of Object.values(BLOCK_MIX)) block = Math.min(block, ratioOfRgb(WHITE, over(f, share, card)))
+    }
+    keep({ id: 'schedule/facet-line', group: 'Schedule', label: "A facet's line, dot or bar on the console's tile, the worst facet hue", kind: 'ui', ratio: line })
+    keep({ id: 'schedule/block', group: 'Schedule', label: "White on a shift's block (the facet colour mixed into the card), the worst facet hue and state", kind: 'text', ratio: block })
     keep({ id: 'level/stripe', group: 'Level panels', label: 'Card stripe (the accent colour, lifted) on the level page', kind: 'ui', ratio: ratioOfRgb(stripe, mixRgb(rgbOf(fill), 90, BLACK)) })
   }
   return [...worst.values()]
@@ -259,6 +255,7 @@ export interface AuditRow extends Pair { zone: ZoneKey; min: number; pass: boole
 
 const HUE_STEP = 30
 const LEVEL_HUE_STEP = 5
+const FACET_HUE_STEP = 5
 
 // Every documented pair in every zone: its ratio at the default hues, and its worst ratio across hues (every palette hue on a
 // 30-degree grid; every level hue in 5-degree steps), since a user may choose any hue.

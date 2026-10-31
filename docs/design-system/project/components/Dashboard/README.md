@@ -19,7 +19,7 @@ The console is its own [split grid](../SplitTiles/README.md) inside the tab (sav
 
 ## The activity grid
 
-`.wrSchedCal`. A 14px square for each day of the last **52 weeks**, a week to a column, the week starting on **Monday** (or Sunday: a setting). One letter beside **every** row (M T W T F S S), **between the monthly bars and the grid**. Above the columns each month is a **rectangle** with its whole name, over the columns of the weeks that begin in it. **Today** has a 2px outline in the ink colour (white in Dusk and Night, near-black in Dawn and Day), with a gap.
+`.wrSchedCal`. A 14px square for each day of the last **52 weeks**, a week to a column, the week starting on **Monday** (or Sunday: a setting). One letter beside **every** row (M T W T F S S), **between the monthly bars and the grid**. Above the columns each month is a **rectangle** with its whole name, over the columns of the weeks that begin in it. **Today** has a 2px outline in the level's ink (white), with a gap.
 
 A cell is shaded in four steps of the accent by the **highest** of the selected facets' levels: against the daily goal where there is one (a goal met is the darkest step and a small ring marks it), else against that facet's busiest day. The hover names each facet's count: "Sat, Oct 31 · Outline 2 nodes · Draft 1,808 words".
 
@@ -31,7 +31,7 @@ Before the 12 months, each older month is a **bar** one column wide and seven ro
 
 ## Facet colours
 
-`--wr-f-outline`, `-plot`, `-draft`, `-revision`, `-project` are set on the console from five hues the user picks (Settings, in the Schedule tile). The saturation and lightness come from the zone's ground (`FACET_COLOR` in `theme/zoneLooks.ts`: dark and vivid on a light zone, light on a dark one), so a line, a dot or a bar reads on the tile (3:1) whatever hue is picked; the contrast page audits every hue.
+`--wr-f-outline`, `-plot`, `-draft`, `-revision`, `-project` are set on the console from five hues the user picks (Settings, in the Schedule tile). The saturation and lightness are one pair for every zone (`FACET_COLOR` in `theme/zoneLooks.ts`), light enough to read on the level's dark fill, so a line, a dot or a bar reads on the tile (3:1) whatever hue is picked; the contrast page audits every facet hue on every level hue.
 
 ## The schedule
 
@@ -45,11 +45,11 @@ Before the 12 months, each older month is a **bar** one column wide and seven ro
 
 ## Tokens
 
-`surface-raised` (the tile body), `surface-deep`, `surface-side`, `ink`, `ink-muted`, `accent`, `on-accent`, `--wr-f-*`. Every pair is in the [contrast audit](../../contrast.md) (group *Schedule*).
+The console sits on the level it belongs to, so it uses the **level's tokens** like the other tabs ([level colours](../../level-colours.md)): the tile on `--wr-fill-2`, a card, a day column or a shift's card behind it on `--wr-fill-3`, a header, a chosen button's text and a menu on `--wr-fill-4`; text in `--level-ink` (white) and `--level-ink-soft`; lines in `--level-line`, a button's wash in `--level-wash`; a field in `--level-input`, `--level-input-ink` and `--level-input-hint`; `--wr-f-*` for the facets. A chosen button, today's head and a Priority tag are inverted (`--level-ink` with `--wr-fill-4` for the text). The grid's shades are steps of `--level-ink` over the tile. Text is 12px or 13px; 11px is for a shift's time only. The facet pairs are in the [contrast audit](../../contrast.md) (group *Schedule*), the rest in *Level panels*.
 
 ## Don't
 
 - Don't colour a number: the figure is in the ink on the tile; state is in a bar's length, a chip's glyph and word, not only its hue.
 - Don't show a chart without its value in text (a hover, an `aria-label`).
-- Don't write a literal white or black for the today ring or the line axis: use `ink`.
+- Don't write a literal white or black for the today ring or the line axis: use `--level-ink`. Don't set the tile's own light background or `ink`: the console is on the level's dark fill, and a button or a field not restyled for it turns pale on pale.
 - Don't put a scrollbar on the grid: it scrolls by touch and Shift + wheel (see [interaction](../../interaction.md)).

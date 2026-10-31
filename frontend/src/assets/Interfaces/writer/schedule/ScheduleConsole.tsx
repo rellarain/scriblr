@@ -10,7 +10,6 @@ import { shiftOccurrences } from '../../../../lib/recurrence'
 import { slotOfDate } from '../../../../lib/ribbon'
 import type { WeekStart } from '../../../../lib/scheduleCalendar'
 import { FACET_COLOR } from '../../../../theme/zoneLooks'
-import { useThemeState } from '../../../../theme/useTheme'
 import { SplitArea, type SplitTile } from '../SplitArea'
 import { useStoredState } from '../shared'
 import { ActivityCard, type FacetGoalFacts } from './ActivityCard'
@@ -32,20 +31,18 @@ import type { SplitNode } from '../../../../components/tiles/splitTree'
 // together, with the account's own goals, shifts and routines too.
 
 export const ACCOUNT_OWNER = 'account'
-// Where the tiles sit before any is moved: goals and review on the left of the top row, the activity beside them, then the schedule, the backlog and the analytics.
+// Where the tiles sit before any is moved: the goals beside the activity on top, then the schedule with the backlog, the analytics and the review stacked beside it.
 export const DEFAULT_TREE: SplitNode = {
-  dir: 'col', ratio: 0.46,
-  a: { dir: 'row', ratio: 0.3, a: { dir: 'col', ratio: 0.68, a: { id: 'goals' }, b: { id: 'review' } }, b: { id: 'activity' } },
-  b: { dir: 'row', ratio: 0.58, a: { id: 'schedule' }, b: { dir: 'col', ratio: 0.5, a: { id: 'backlog' }, b: { id: 'analytics' } } },
+  dir: 'col', ratio: 0.5,
+  a: { dir: 'row', ratio: 0.34, a: { id: 'goals' }, b: { id: 'activity' } },
+  b: { dir: 'row', ratio: 0.6, a: { id: 'schedule' }, b: { dir: 'col', ratio: 0.4, a: { id: 'backlog' }, b: { dir: 'col', ratio: 0.62, a: { id: 'analytics' }, b: { id: 'review' } } } },
 }
 
-const hueVars = (hues: FacetHues, light: boolean) => { const c = FACET_COLOR[light ? 'light' : 'dark']; return Object.fromEntries(FACETS.map(f => [`--wr-f-${f}`, `hsl(${hues[f]}, ${c.s}%, ${c.l}%)`])) }
+const hueVars = (hues: FacetHues) => Object.fromEntries(FACETS.map(f => [`--wr-f-${f}`, `hsl(${hues[f]}, ${FACET_COLOR.s}%, ${FACET_COLOR.l}%)`]))
 
 export default function ScheduleConsole({ scope, projectIds, titles }: { scope: 'dash' | 'project'; projectIds: string[]; titles: Record<string, string> }) {
   const schedule = useSchedule(projectIds)
   const facts = useProjectFacts(projectIds)
-  const { activeZone } = useThemeState()
-  const light = activeZone === 'dawn' || activeZone === 'day'
   const [weekStart, setWeekStart] = useStoredState<WeekStart>('scriblr.weekStart', 'monday')
   const [hues, setHues] = useStoredState<FacetHues>('scriblr.writer.facetHues', DEFAULT_HUES)
   const [account, setAccount] = useStoredState<Planner>('scriblr.writer.planner.account', emptyPlanner())
@@ -187,7 +184,7 @@ export default function ScheduleConsole({ scope, projectIds, titles }: { scope: 
     { id: 'analytics', title: 'Analytics', children: <AnalyticsCard data={schedule.facets} today={today} titles={bookTitles} weekStart={weekStart} /> },
   ]
   return (
-    <div className="wrSchedConsole" data-ground={light ? 'light' : 'dark'} style={hueVars(hues, light) as CSSProperties}>
+    <div className="wrSchedConsole" style={hueVars(hues) as CSSProperties}>
       <SplitArea gridId={`scriblr.writer.schedule.tiles.${scope}`} label="Schedule tiles" tiles={tiles.map(t => ({ ...t, bodyClassName: 'wrSchedTileBody' }))} defaultTree={DEFAULT_TREE} />
     </div>
   )

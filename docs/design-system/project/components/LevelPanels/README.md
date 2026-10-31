@@ -52,6 +52,10 @@ Beside the focused level, the others sit in a **side column** (`.wrLevelsSide`):
 - **Narrow windows**: until the button is pressed, the column is hidden by itself while the window is narrower than 1000px, and shown again when it grows.
 - Both are kept on this machine (`scriblr.writer.sidebar`: `{ width, hidden }`; `null` = the default, or automatic).
 
+## The project shelves beside the Dash
+
+At the Dash, the project shelves are a column on the right (`.wrLevelsShelves`), a third of the width by default. A **handle on the column's left edge** (`.wrSideResizer--left`, `role="separator"`, "Shelves width") sets its width: drag left to widen, right to narrow. It is held between **200px and 60%** of the Writer (so the Dash keeps its room), shown live, and **kept on this machine** (`scriblr.writer.shelvesWidth`); a double click puts it back to the default.
+
 ## The Plot tool
 
 The Project level's Plot tab (`PlotView`) follows **its own width**, not the window's (`useElementWidth`, the `data-size` of `.wrPlotFrame`):

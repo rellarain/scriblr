@@ -38,11 +38,14 @@
     position: absolute; top: 0; bottom: 0; right: -8px; width: 10px; z-index: 5; cursor: col-resize; touch-action: none;
     &::after { content: ''; position: absolute; top: 6px; bottom: 6px; left: 4px; width: 2px; background: var(--wr-accent-light); opacity: 0; transition: opacity 0.15s; }
     &:hover::after, &--active::after { opacity: 1; }
+    &--left { right: auto; left: -8px; }
   }
   // Outline focus: the book panel runs to the top, bottom and right edges (the tile column keeps its margin).
   .wrLevels--focus-outline { padding: 0 0 0 var(--space-3); > .wrLevelsSide { padding: var(--space-3) 0; box-sizing: border-box; } }
   .wrLevels--focus-dash .wrLevel--dash { flex: 2 1 0; }
-  .wrLevels--focus-dash .wrLevel--project { flex: 1 1 0; }
+  // The project shelves beside the Dash: a third of the width until the handle on their left edge is dragged (--wr-shelves-flex, sidebarState.ts).
+  .wrLevelsShelves { position: relative; flex: var(--wr-shelves-flex, 1 1 0); min-width: 0; min-height: 0; display: flex; flex-direction: column; }
+  .wrLevels--focus-dash .wrLevelsShelves > .wrLevel--project { flex: 1 1 0; }
   .wrLevel {
     --wr-level-h: var(--color-theme-h);
     // Flat and square. The fill is the level's colour at the accent's saturation and lightness (--wr-level-fill, set by

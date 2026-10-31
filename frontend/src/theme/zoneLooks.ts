@@ -100,11 +100,11 @@ export const ANSWER_KIND_ALPHA = 0.8
 // least that reads: 65% does not reach 4.5:1). `.wrNavChip` in _plot.scss says 72%.
 export const NAV_CHIP_INK_ALPHA = 0.72
 
-// The Schedule console's facet colours: a hue the user picks, at a saturation and lightness the ground sets (a light zone's is darker, a dark zone's lighter),
-// so a line, a dot or a bar reads on the tile (3:1). A shift's block is the facet colour mixed into the tile at these shares (`.wrSchedBlock` in _schedule.scss
-// says 16, 32, 24 and 24%), with the ink as its text.
-export const FACET_COLOR = { light: { s: 62, l: 24 }, dark: { s: 55, l: 76 } }
-export const BLOCK_MIX = { base: 0.16, done: 0.32, partly: 0.24, inProgress: 0.24 }
+// The Schedule console's facet colours: a hue the user picks, at one saturation and lightness, light enough to read on the dark level fill the console sits on
+// (a line, a dot or a bar, 3:1 on the tile). A shift's block is the facet colour mixed into the card behind it at these shares (`.wrSchedBlock` in _schedule.scss
+// says 14, 26, 20 and 20%), with the level's white ink as its text.
+export const FACET_COLOR = { s: 55, l: 78 }
+export const BLOCK_MIX = { base: 0.14, done: 0.26, partly: 0.2, inProgress: 0.2 }
 
 // Does the zone's ink (and its muted and faint tiers) read on every surface of a theme at this lightness?
 function surfacesRead(hue: number, look: ZoneLook, themeL: number): boolean {
