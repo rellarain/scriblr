@@ -17,6 +17,8 @@ export interface SplitTile {
   title: string
   Icon?: ComponentType<IconProps>
   children: ReactNode
+  // Controls at the right end of the title bar (a tile's toggles).
+  titleExtras?: ReactNode
   // Extra classes on the tile and on its body (the level's own look: a surface, a page).
   className?: string
   bodyClassName?: string
@@ -168,6 +170,7 @@ export function SplitArea({ gridId, tiles, label, defaultTree, onFocusTile }: {
                 onDragStart={e => onDragStart(e, t.id)} onDragEnd={endDrag}
               >
                 <GripIcon size={13} />{t.Icon && <t.Icon size={14} />} {t.title}
+                {t.titleExtras && <span className="wrTabTileTitleExtras">{t.titleExtras}</span>}
               </h3>
               <div className={`wrTabTileBody${t.bodyClassName ? ` ${t.bodyClassName}` : ''}`}>{t.children}</div>
             </section>

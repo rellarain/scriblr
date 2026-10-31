@@ -1,7 +1,8 @@
 // The Schedule console: Goals, Activity, the Schedule and its Backlog, Analytics and the Review, each a tile on a split grid (schedule/ScheduleConsole.tsx).
 // Colours are the level's tokens (the console's tiles on fill-3, white ink, cards one shade deeper on fill-4); the facets' own hues are --wr-f-<facet>, set on the console from the user's hues.
 .wr {
-  --wr-cal-base: var(--level-wash-lo);
+  --wr-cal-base: var(--level-wash);
+  --cell: 14px; // a calendar square's side (the Activity grid sets its own to fit the tile)
   .wrSchedConsole { position: relative; width: 100%; height: 100%; min-height: 0; display: flex; flex-direction: column;
     // The split grid takes the console's whole height (it is sized from this box), not the height its tiles would need.
     > .wrSplit { flex: 1 1 0; } }
@@ -17,6 +18,13 @@
   .wrSchedConsole .wrTabTile { background: var(--wr-fill-3); }
   .wrSchedConsole .wrTabTileTitle { background: var(--wr-fill-4); color: var(--level-ink); }
   .wrSchedCard { display: flex; flex-direction: column; gap: var(--space-5); min-width: 0; }
+  // The Activity tile's chart takes the height of the tile: the card grows to it, and the grid or the graph to the card (measured: useElementSize).
+  .wrSchedActivity { flex: 1 1 0; min-height: 0; }
+  .wrSchedActivity > .wrSchedCal, .wrSchedActivity > .wrSchedLine { flex: 1 1 0; min-height: 0; }
+  // The toggles in a tile's title bar, on its right: smaller and closer than a button in the body.
+  .wrTabTileTitleExtras { margin-left: auto; display: inline-flex; flex-wrap: wrap; align-items: center; justify-content: flex-end; gap: var(--space-2); text-transform: none; letter-spacing: normal; font-weight: 400;
+    .wrSchedFacet { padding: 1px var(--space-3); font-size: var(--text-small); }
+    .wrSchedSeg button { display: inline-flex; align-items: center; justify-content: center; padding: 1px var(--space-3); font-size: var(--text-small); min-width: 22px; } }
   .wrSchedHead { display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-4); }
   .wrSchedSpacer { flex: 1 1 auto; }
   .wrSchedSub { margin: var(--space-5) 0 var(--space-3); font-size: var(--text-ui); font-weight: 800; letter-spacing: 0.06em; text-transform: uppercase; color: var(--level-ink-soft); }
@@ -29,39 +37,36 @@
   .wrSchedFacet { display: inline-flex; align-items: center; padding: var(--space-3) var(--space-5); border-radius: var(--radius-button); border: 1px solid var(--level-line); background: transparent; color: var(--level-ink-soft); font: inherit; font-size: var(--text-ui); cursor: pointer;
     &:hover { background: var(--level-wash); }
     &.on { background: var(--level-wash-hi); border-color: var(--level-ink); color: var(--level-ink); font-weight: 700; } }
-  .wrSchedFoot { display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-5); font-size: var(--text-ui); }
-  .wrSchedLegend { margin-left: auto; display: inline-flex; align-items: center; gap: var(--space-3); font-size: var(--text-ui); }
   .wrSchedNum { width: 90px; }
   .wrSchedForm { display: flex; flex-direction: column; gap: var(--space-4); padding: var(--space-5); border-radius: var(--radius-button); background: var(--wr-fill-4); }
   .wrSchedFormActions { display: flex; flex-wrap: wrap; gap: var(--space-4); align-items: center; }
 
   // ---- the grid ----
-  .wrSchedCal { min-width: 0; }
-  .wrSchedCalScroll { overflow-x: auto; overflow-y: hidden; overscroll-behavior-x: contain; padding-bottom: var(--space-2); }
+  .wrSchedCal { min-width: 0; overflow: hidden; --cell: 14px; }
+  .wrSchedCalScroll { overflow-x: auto; overflow-y: hidden; overscroll-behavior-x: contain; padding-bottom: var(--space-2); scrollbar-width: none; &::-webkit-scrollbar { display: none; } }
   .wrSchedCalInner { width: max-content; }
   .wrSchedCalTop { display: flex; gap: var(--space-4); height: 22px; margin-bottom: var(--space-3); }
   .wrSchedCalBarsHead { background: var(--wr-fill-4); border-radius: var(--radius-button); font-size: var(--text-ui); font-weight: 700; text-align: center; line-height: 22px; white-space: nowrap; overflow: hidden; }
-  .wrSchedCalLetterGap { width: 14px; flex: none; }
+  .wrSchedCalLetterGap { width: var(--cell); flex: none; }
   .wrSchedCalMonths { display: grid; gap: var(--space-2); }
   .wrSchedCalMonth { background: var(--wr-fill-4); border-radius: var(--radius-button); font-size: var(--text-ui); font-weight: 700; line-height: 22px; padding: 0 var(--space-3); overflow: hidden; white-space: nowrap; }
   .wrSchedCalRows { display: flex; gap: var(--space-4); }
-  .wrSchedCalBars { display: flex; align-items: flex-end; gap: var(--space-2); height: 110px; }
-  .wrSchedCalBar { display: flex; flex-direction: column-reverse; width: 14px; i { display: block; width: 14px; } }
-  .wrSchedCalLetters { display: grid; grid-template-rows: repeat(7, 14px); gap: var(--space-2); width: 14px; text-align: center; font-size: var(--text-ui); line-height: 14px; font-weight: 700; position: sticky; left: 0; background: var(--wr-fill-3); z-index: 1; }
-  .wrSchedCalGrid { display: grid; grid-template-rows: repeat(7, 14px); grid-auto-flow: column; grid-auto-columns: 14px; gap: var(--space-2); }
+  .wrSchedCalBars { display: flex; align-items: flex-end; gap: var(--space-2); height: calc(7 * var(--cell) + 6 * var(--space-2)); }
+  .wrSchedCalBar { display: flex; flex-direction: column-reverse; width: var(--cell); i { display: block; width: 100%; } }
+  .wrSchedCalLetters { display: grid; grid-template-rows: repeat(7, var(--cell)); gap: var(--space-2); width: var(--cell); text-align: center; font-size: var(--text-ui); line-height: var(--cell); font-weight: 700; position: sticky; left: 0; background: var(--wr-fill-3); z-index: 1; }
+  .wrSchedCalGrid { display: grid; grid-template-rows: repeat(7, var(--cell)); grid-auto-flow: column; grid-auto-columns: var(--cell); gap: var(--space-2); }
   // A day is a step of the level's ink over the tile: the darkest step is a day that met its goal or was the busiest.
-  .wrSchedCalCell { display: block; width: 14px; height: 14px; border-radius: var(--radius-button); background: var(--wr-cal-base);
+  .wrSchedCalCell { display: block; width: var(--cell); height: var(--cell); border-radius: var(--radius-button); background: var(--wr-cal-base);
     &--1 { background: color-mix(in srgb, var(--level-ink) 34%, var(--wr-cal-base)); }
     &--2 { background: color-mix(in srgb, var(--level-ink) 58%, var(--wr-cal-base)); }
     &--3 { background: color-mix(in srgb, var(--level-ink) 80%, var(--wr-cal-base)); }
     &--4 { background: var(--level-ink); }
     &--x { visibility: hidden; }
-    &--met { box-shadow: inset 0 0 0 3px var(--wr-fill-3); }
-    // Today: an outline in the level's ink, set off from the square by a gap.
-    &--today { outline: 2px solid var(--level-ink); outline-offset: 2px; } }
+    // Today: an outline in the level's ink inside the square, with a 2px gap of the tile's colour before the shade, so it shows on the lightest step too.
+    &--today { outline: 2px solid var(--level-ink); outline-offset: -2px; box-shadow: inset 0 0 0 4px var(--wr-fill-3); } }
 
   // ---- the line graph ----
-  .wrSchedLine { position: relative; svg { display: block; width: 100%; height: auto; } }
+  .wrSchedLine { position: relative; min-width: 0; svg { position: absolute; inset: 0; width: 100%; height: 100%; } }
   .wrSchedGrid { stroke: var(--level-line); stroke-width: 1; }
   .wrSchedAxis { fill: var(--level-ink-soft); font-size: var(--text-ui); font-weight: 700; }
   .wrSchedMark { stroke: var(--level-ink); stroke-width: 1; &--deadline { stroke-width: 1.5; } }

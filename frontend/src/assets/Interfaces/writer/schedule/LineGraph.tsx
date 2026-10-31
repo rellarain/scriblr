@@ -3,17 +3,16 @@ import { FACET_LABEL, type Facet } from '../../../../lib/facets'
 import { DAY_MS } from '../../../../lib/activityCalendar'
 import type { GoalSeries, SeriesPoint } from '../../../../lib/projection'
 import { MONTH_NAMES } from '../../../../lib/scheduleCalendar'
+import { useElementSize } from '../useElementSize'
 
 // The line graph: a line for each facet, the share of that facet's goal done over time, with the projection at the last 28 days' pace dotted past
 // today. Daily points for the last 12 months and monthly ones before (that is how the totals are kept). Hover or the arrow keys read every value on a day.
 
 export interface LineSeries { facet: Facet; goal: GoalSeries }
-const W = 900
-const H = 230
+const W_DEFAULT = 900 // until the graph's box is measured
+const H_DEFAULT = 230
 const LEFT = 42
-const RIGHT = 892
 const TOP = 10
-const BOTTOM = 200
 const MARKERS: Record<Facet, (x: number, y: number) => JSX.Element> = {
   outline: (x, y) => <circle cx={x} cy={y} r={4} />,
   plot: (x, y) => <rect x={x - 4} y={y - 4} width={8} height={8} />,
@@ -35,6 +34,12 @@ export function valueAt(points: SeriesPoint[], date: string): number {
 
 export function LineGraph({ series, today, deadline }: { series: LineSeries[]; today: string; deadline: string | null }) {
   const [hover, setHover] = useState<string | null>(null)
+  // The graph is drawn in the pixels of its box (so its text keeps its size), which fills the tile.
+  const [boxRef, box] = useElementSize()
+  const W = box ? Math.max(240, Math.round(box.width)) : W_DEFAULT
+  const H = box ? Math.max(140, Math.round(box.height)) : H_DEFAULT
+  const RIGHT = W - 8
+  const BOTTOM = H - 30
   const domain = useMemo(() => {
     const dates = series.flatMap(s => [...s.goal.points, ...s.goal.projection].map(p => p.date))
     const first = dates.length ? dates.reduce((a, b) => (a < b ? a : b)) : today
@@ -64,7 +69,7 @@ export function LineGraph({ series, today, deadline }: { series: LineSeries[]; t
   }
   const label = hover ? new Date(parse(hover)).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric', timeZone: 'UTC' }) : ''
   return (
-    <div className="wrSchedLine">
+    <div className="wrSchedLine" ref={boxRef}>
       <svg
         viewBox={`0 0 ${W} ${H}`} role="img" tabIndex={0} aria-label="Goal completion by facet over time, with dotted projections. Left and right arrows read a day."
         onPointerMove={onMove} onPointerLeave={() => setHover(null)} onKeyDown={onKey}

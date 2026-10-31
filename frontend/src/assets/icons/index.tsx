@@ -709,3 +709,24 @@ export function FaceIcon(props: IconProps) {
 export function CardIcon(props: IconProps) {
   return <IconBase {...props}><path d="M4 5h16a1 1 0 011 1v12a1 1 0 01-1 1H4a1 1 0 01-1-1V6a1 1 0 011-1zM7 10h10M7 14h6" /></IconBase>
 }
+
+export function GridViewIcon(props: IconProps) {
+  return <IconBase {...props}>
+    <rect x="4" y="4" width="4" height="4" />
+    <rect x="10" y="4" width="4" height="4" />
+    <rect x="16" y="4" width="4" height="4" />
+    <rect x="4" y="10" width="4" height="4" />
+    <rect x="10" y="10" width="4" height="4" />
+    <rect x="16" y="10" width="4" height="4" />
+    <rect x="4" y="16" width="4" height="4" />
+    <rect x="10" y="16" width="4" height="4" />
+    <rect x="16" y="16" width="4" height="4" />
+  </IconBase>
+}
+
+export function LineChartIcon(props: IconProps) {
+  return <IconBase {...props}>
+    <path d="M4 4v16h16" />
+    <path d="M7 15l4-5 3 3 5-7" />
+  </IconBase>
+}

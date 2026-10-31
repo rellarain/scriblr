@@ -12,7 +12,7 @@ import type { WeekStart } from '../../../../lib/scheduleCalendar'
 import { FACET_COLOR } from '../../../../theme/zoneLooks'
 import { SplitArea, type SplitTile } from '../SplitArea'
 import { useStoredState } from '../shared'
-import { ActivityCard, type FacetGoalFacts } from './ActivityCard'
+import { ActivityCard, ActivityControls, useActivityState, type FacetGoalFacts } from './ActivityCard'
 import { AnalyticsCard } from './AnalyticsCard'
 import { Backlog } from './Backlog'
 import { GoalsCard, type OwnedProgress } from './GoalsCard'
@@ -42,6 +42,7 @@ const hueVars = (hues: FacetHues) => Object.fromEntries(FACETS.map(f => [`--wr-f
 
 export default function ScheduleConsole({ scope, projectIds, titles }: { scope: 'dash' | 'project'; projectIds: string[]; titles: Record<string, string> }) {
   const schedule = useSchedule(projectIds)
+  const activity = useActivityState()
   const facts = useProjectFacts(projectIds)
   const [weekStart, setWeekStart] = useStoredState<WeekStart>('scriblr.weekStart', 'monday')
   const [hues, setHues] = useStoredState<FacetHues>('scriblr.writer.facetHues', DEFAULT_HUES)
@@ -161,7 +162,7 @@ export default function ScheduleConsole({ scope, projectIds, titles }: { scope: 
   const tiles: SplitTile[] = [
     { id: 'goals', title: 'Goals', children: <GoalsCard owners={owners} progress={progress} stats={stats} nodes={single?.outline ?? []} scoped={scope === 'project'} /> },
     { id: 'review', title: 'Review', children: <ReviewCard daily={daily} today={today} /> },
-    { id: 'activity', title: 'Activity', children: <ActivityCard data={schedule.facets} today={today} weekStart={weekStart} dailyGoals={dailyGoals} totals={totals} /> },
+    { id: 'activity', title: 'Activity', titleExtras: <ActivityControls state={activity} />, children: <ActivityCard state={activity} data={schedule.facets} today={today} weekStart={weekStart} dailyGoals={dailyGoals} totals={totals} /> },
     {
       id: 'schedule', title: 'Schedule',
       children: (

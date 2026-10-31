@@ -104,9 +104,19 @@ describe('the Schedule console', () => {
     await user.click(activity.getByRole('button', { name: 'Line graph' }))
     expect(activity.getByRole('img', { name: /Goal completion by facet/ })).toBeTruthy()
     expect(tile('activity').querySelectorAll('.wrSchedLineSolid')).toHaveLength(1) // draft is the only facet with a total goal
-    expect(activity.getByText(/No total goal for Outline, Plot, Revision, Project/)).toBeTruthy()
+    expect(tile('activity').querySelector('.wrSchedFoot, .wrSchedLegend')).toBeNull() // no footnote or legend under the chart
     await user.click(activity.getByRole('button', { name: 'Grid' }))
     expect(tile('activity').querySelector('.wrSchedCalGrid')).toBeTruthy()
+  })
+
+  it('has its toggles in the title bar of the tile: the facets, the chart as icons, and % or # for the shades', async () => {
+    await open()
+    const bar = tile('activity').querySelector('.wrTabTileTitle') as HTMLElement
+    const inBar = within(bar)
+    expect(inBar.getAllByRole('button').map(b => b.getAttribute('aria-label') ?? b.textContent)).toEqual(['Outline', 'Plot', 'Draft', 'Revision', 'Project', 'Grid', 'Line graph', 'Vs goal', 'Vs busiest day'])
+    expect(inBar.getByRole('button', { name: 'Vs goal' }).textContent).toBe('%')
+    expect(inBar.getByRole('button', { name: 'Vs busiest day' }).textContent).toBe('#')
+    expect(tile('activity').querySelector('.wrSchedTileBody .wrSchedFacet')).toBeNull()
   })
 
   it('shades against the goal or the busiest day, by a toggle', async () => {
