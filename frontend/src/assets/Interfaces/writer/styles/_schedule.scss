@@ -85,7 +85,7 @@
 
   // ---- the grid, portrait: the tile is taller than wide, so a row is a week (the current week on top) and the columns are the days ----
   .wrSchedCal--portrait { overflow: hidden; }
-  .wrSchedCalScroll--portrait { height: 100%; overflow-x: hidden; overflow-y: auto; padding-bottom: 0; } // the whole calendar fits (the cells are squished to it); this only holds when it cannot
+    .wrSchedCalScroll--portrait { height: 100%; overflow-x: hidden; overflow-y: auto; padding-bottom: 0; overscroll-behavior-y: contain; }
   .wrSchedCalPDays { display: flex; gap: var(--space-4); position: sticky; top: 0; z-index: 2; background: var(--wr-fill-3); padding-bottom: var(--space-2); }
   .wrSchedCalPSide { width: 22px; flex: none; }
   .wrSchedCalPLetters { display: grid; grid-template-columns: repeat(7, var(--cw)); gap: var(--cg); text-align: center; font-size: var(--text-ui); line-height: 16px; font-weight: 700; }

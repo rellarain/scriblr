@@ -27,7 +27,7 @@ describe('the shape of the tile', () => {
   })
 })
 
-describe('the cell that keeps the whole calendar in view', () => {
+describe('the cell that fits the tile', () => {
   it('is square in a landscape tile tall enough, and squished in height, not width, in a shorter one', () => {
     const tall = landscapeCell(300, true)
     expect(tall.w).toBe(tall.h)
@@ -38,13 +38,12 @@ describe('the cell that keeps the whole calendar in view', () => {
     expect(short.h * 7 + short.gap * 6 + 28 + 4 + 18).toBeLessThanOrEqual(110)
     expect(landscapeCell(null).w).toBe(14)
   })
-  it('fits every week and every older month in the height of a portrait tile, as wide as the columns allow', () => {
-    const rows = 52 + 3
-    const c = portraitCell({ width: 360, height: 700 }, rows, true)
-    expect(c.h * rows + c.gap * (rows - 1) + 18).toBeLessThanOrEqual(700)
-    expect(c.h).toBeGreaterThan(2)
-    expect(c.w).toBeLessThanOrEqual(c.h * 3 + 1) // not flatter than 3 to 1
+  it('is square in a portrait tile, the seven columns and what is beside them fitting its width (the weeks scroll down)', () => {
+    const c = portraitCell(360, true)
+    expect(c.w).toBe(c.h)
     expect(c.w * 7 + c.gap * 6 + 22 + 10 + 30).toBeLessThanOrEqual(360)
+    expect(portraitCell(120, true).w).toBe(8) // never under 8px
+    expect(portraitCell(null).w).toBe(14)
   })
 })
 
@@ -72,7 +71,7 @@ describe('the portrait grid', () => {
     expect([...container.querySelectorAll('.wrSchedCalYear--v')].map(y => y.textContent)).toEqual(['2025', '2024'])
     expect([...container.querySelectorAll('.wrSchedCalPNums span')].map(n => n.textContent)).toEqual(['2', '1', '11']) // the newest older month first
     const root = container.querySelector('.wrSchedCal') as HTMLElement
-    expect(Number.parseFloat(root.style.getPropertyValue('--ch'))).toBeGreaterThanOrEqual(2)
+    expect(root.style.getPropertyValue('--ch')).toBe(root.style.getPropertyValue('--cw')) // square
   })
 })
 
