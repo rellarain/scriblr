@@ -427,6 +427,8 @@ export function ChoiceBody({ w, info, holder, editable, drag }: {
   const kind = kindOf(def)
   const inherited = owner.id !== holder.id
   const noOptions = hasOptions(def) && optionsOf(def).length === 0
+  // An inherited dropdown the defining node has not answered has no card to show (no "No answer" card), and so no caption to tell the plotline's own answer from the card's.
+  const showOwner = inherited && (kind !== 'dropdown' || valuesIn(w.plotNodes, owner.id, def.id).length > 0)
   // Where its options are edited, a multi-select's options and answers are one list.
   if (editable && kind === 'multi') {
     return (
@@ -438,8 +440,8 @@ export function ChoiceBody({ w, info, holder, editable, drag }: {
   return (
     <div className="wrFieldValues wrChoice">
       {editable && hasOptions(def) && <OptionsEditor w={w} owner={owner} def={def} />}
-      {inherited && <OwnerAnswers w={w} info={info} drag={drag} />}
-      {inherited && <span className="wrAnswerWho">This plotline</span>}
+      {showOwner && <OwnerAnswers w={w} info={info} drag={drag} />}
+      {showOwner && <span className="wrAnswerWho">This plotline</span>}
       {noOptions
         ? <p className="wrMuted">{editable ? 'Add the options to choose from.' : 'No options yet. Add them on the node that defines this field.'}</p>
         : kind === 'multi' ? <MultiAnswer w={w} def={def} holder={holder} drag={drag} answeredAbove={inherited ? answeredOn(w, owner, def) : undefined} />

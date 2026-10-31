@@ -426,6 +426,37 @@ describe('answering on a plotline', () => {
     expect(block('fGenre').getByText('No answer')).toBeInTheDocument()
   })
 
+  it('shows no card at all for an inherited dropdown the category has not answered, nor the caption that sets the plotline\'s own answer apart from it', () => {
+    render(<Editor start={world()} />)
+    open('Tone')
+    const tone = block('fTone')
+    expect(tone.queryByRole('group', { name: 'Category: Romance' })).toBeNull()
+    expect(tone.queryByText('No answer')).toBeNull()
+    expect(tone.queryByText('This plotline')).toBeNull()
+    expect(document.querySelector('[data-field="fTone"] .wrAnswerFrom')).toBeNull()
+    expect(tone.getByLabelText('Tone answer')).toBeInTheDocument() // the plotline's own answer is still there to pick
+  })
+
+  it('shows the category\'s card for a dropdown it has answered, with its answer and the caption, and the card goes again when that answer does', () => {
+    const start = world([answer('c1', 'cat', 'fTone', 'Dark', { optionId: 't1' })])
+    const first = render(<Editor start={start} />)
+    open('Tone')
+    expect(block('fTone').getByRole('group', { name: 'Category: Romance' })).toHaveClass('wrAnswerFrom')
+    expect(block('fTone').getByTitle('Answered on Romance. Change it there.')).toHaveTextContent('Dark')
+    expect(block('fTone').getByText('This plotline')).toBeInTheDocument()
+    first.unmount()
+    render(<Editor start={world()} />)
+    open('Tone')
+    expect(document.querySelector('[data-field="fTone"] .wrAnswerFrom')).toBeNull()
+  })
+
+  it('still says "No answer" for an inherited short text the category has not answered', () => {
+    render(<Editor start={world()} />)
+    open('Motto')
+    expect(block('fMotto').getByRole('group', { name: 'Category: Romance' })).toHaveClass('wrAnswerFrom')
+    expect(block('fMotto').getByText('No answer')).toBeInTheDocument()
+  })
+
   it('ticks and unticks options of a multi-select; a ticked one is a card with a grip', () => {
     const seen = latest()
     render(<Editor start={world()} onNodes={seen.onNodes} />)
