@@ -5,7 +5,7 @@ import { PAGES_COMPONENTS } from '../consoleDefs'
 import { useStoredState } from '../shared'
 import { buildChildIndex, descendantsOf } from '../outlineTree'
 import { nodeLabel } from '../plotTree'
-import { splitParagraphs, splitSentences } from '../sentences'
+import { sentenceRanges, splitParagraphs, splitSentences } from '../sentences'
 import type { useChapterDraft } from '../useChapterDraft'
 import { exportChapterPdf } from '../../../../api/export'
 import { MoonIcon, ReactionHeartIcon, SunIcon } from '../../../icons'
@@ -14,24 +14,26 @@ import { fullDate, shortDate } from '../chapterDates'
 import { formatOf, formatVars } from '../previewFormat'
 import { useAuthorNotes } from '../useAuthorNotes'
 import { FootnoteTool } from './FootnoteTool'
+import { FlagTool } from './FlagTool'
+import { useRevisionFlags } from '../useRevisionFlags'
 
-const FLAGS = ['Add', 'Remove', 'Merge', 'Change', 'Simplify', 'Expand'] as const
-type FlagName = (typeof FLAGS)[number]
-
-// Reactions and flags are kept per sentence in this browser (no backend
-// model for them yet), keyed by the sentence's position in its moment.
-interface SentenceMark { like: number; dislike: number; flag?: FlagName }
+// Reactions are kept per sentence in this browser (no backend model for them
+// yet), keyed by the sentence's position in its moment. Flags are the
+// project's revision flags (useRevisionFlags.ts).
+interface SentenceMark { like: number; dislike: number }
 type Marks = Record<string, SentenceMark>
 
 const cycle = (level: number) => (level + 1) % 4
 
 interface Rect { top: number; height: number }
 
-function Paragraph({ paragraphKey, sentences, marks, selected, onSelect, onCycle, markers }: {
+function Paragraph({ paragraphKey, sentences, marks, selected, onSelect, onCycle, markers, flagged }: {
   paragraphKey: string
   sentences: string[]
   // The author's footnotes and flagged passages by sentence key, shown as small markers.
   markers: Record<string, string>
+  // The sentences an open revision flag is on, by key, with what to say of them.
+  flagged: Record<string, string>
   marks: Marks
   selected: string | null
   onSelect: (key: string) => void
@@ -95,13 +97,12 @@ function Paragraph({ paragraphKey, sentences, marks, selected, onSelect, onCycle
       <p className="wrPreviewText">
         {sentences.map((s, i) => {
           const key = keyOf(i)
-          const mark = marks[key]
           return (
             <span
-              key={key}
+              key={key} data-sentence={key}
               ref={el => { if (el) spanRefs.current.set(key, el); else spanRefs.current.delete(key) }}
-              className={`wrSentence${selected === key ? ' wrSentence--selected' : ''}${mark?.flag ? ' wrSentence--flagged' : ''}`}
-              title={mark?.flag ? `Flagged: ${mark.flag}` : undefined}
+              className={`wrSentence${selected === key ? ' wrSentence--selected' : ''}${flagged[key] ? ' wrSentence--flagged' : ''}`}
+              title={flagged[key]}
               onClick={() => onSelect(key)}
             >
               {s}
@@ -150,14 +151,6 @@ export function PreviewPane({ w, chapter, draft, pubs, component, onComponent }:
     })
   }
 
-  function toggleFlag(flag: FlagName) {
-    if (!selected) return
-    setMarks(prev => {
-      const current = prev[selected] ?? { like: 0, dislike: 0 }
-      return { ...prev, [selected]: { ...current, flag: current.flag === flag ? undefined : flag } }
-    })
-  }
-
   function exportJson() {
     const payload = {
       chapter: { id: chapter.id, number: chapterNumber, title: chapter.title },
@@ -187,7 +180,42 @@ export function PreviewPane({ w, chapter, draft, pubs, component, onComponent }:
     ? published.sections.flatMap(sec => splitParagraphs(sec.body).map((text, pi) => ({ key: `${sec.momentId}:${pi}`, text })))
     : []
 
-  const selectedFlag = selected ? marks[selected]?.flag : undefined
+  // The revision flags: the project's, and the passage flags of this chapter. The sentence clicked is the text [start, end) of its moment.
+  const revision = useRevisionFlags(w.activeProjectId, component === 'flag')
+  const momentIds = new Set(moments.map(m => m.id))
+  const chapterFlags = revision.flags.filter(f => f.scope === 'project' || (f.chapterId === chapter.id && f.momentId !== null && momentIds.has(f.momentId)))
+  const keyOfRange = (momentId: string, r: { paragraph: number; sentence: number }) => `${momentId}:${r.paragraph}:${r.sentence}`
+  const sentenceAt = (key: string | null) => {
+    if (!key) return null
+    const sentence = Number(key.slice(key.lastIndexOf(':') + 1))
+    const rest = key.slice(0, key.lastIndexOf(':'))
+    const paragraph = Number(rest.slice(rest.lastIndexOf(':') + 1))
+    const momentId = rest.slice(0, rest.lastIndexOf(':'))
+    const range = sentenceRanges(draft.bodies[momentId] ?? '').find(r => r.paragraph === paragraph && r.sentence === sentence)
+    return range ? { momentId, ...range } : null
+  }
+  const flagged: Record<string, string> = {}
+  if (component === 'flag') {
+    for (const f of chapterFlags) {
+      if (f.scope !== 'passage' || f.resolvedAt !== null || f.stale || !f.momentId) continue
+      for (const r of sentenceRanges(draft.bodies[f.momentId] ?? '')) {
+        if (r.start < f.end && r.end > f.start) flagged[keyOfRange(f.momentId, r)] = `Flagged to ${f.type}${f.note ? `: ${f.note}` : ''}`
+      }
+    }
+  }
+  const flagTarget = sentenceAt(selected)
+  function addFlag(scope: 'passage' | 'project', type: 'review' | 'edit' | 'add' | 'delete', note: string) {
+    if (scope === 'project') { void revision.add({ scope, type, note }); return }
+    if (flagTarget) void revision.add({ scope, type, note, chapterId: chapter.id, momentId: flagTarget.momentId, start: flagTarget.start, end: flagTarget.end })
+  }
+  function showFlag(f: { momentId: string | null; start: number }) {
+    if (!f.momentId) return
+    const hit = sentenceRanges(draft.bodies[f.momentId] ?? '').find(r => f.start >= r.start && f.start < r.end + 1)
+    if (!hit) return
+    const key = keyOfRange(f.momentId, hit)
+    setSelected(key)
+    document.querySelector(`[data-sentence="${key}"]`)?.scrollIntoView?.({ block: 'center' })
+  }
 
   // The selected sentence as the paragraph and sentence numbers the author's notes use (counted from 0 across the whole chapter), and the markers.
   const paragraphAt = (key: string) => paragraphs.findIndex(p => key.startsWith(`${p.key}:`))
@@ -230,18 +258,11 @@ export function PreviewPane({ w, chapter, draft, pubs, component, onComponent }:
           ))}
         </div>
         {component === 'flag' && (
-          <div className="wrToolGroup">
-            <span className="wrLabel">Flag</span>
-            {FLAGS.map(f => (
-              <button
-                key={f} type="button" disabled={!selected}
-                className={selectedFlag === f ? 'wrSmallBtn wrSmallBtn--accent' : 'wrSmallBtn'}
-                title={selected ? undefined : 'Click a sentence first'} onClick={() => toggleFlag(f)}
-              >
-                {f}
-              </button>
-            ))}
-          </div>
+          <FlagTool
+            hasSentence={flagTarget !== null} flags={chapterFlags} error={revision.error}
+            onAdd={addFlag} onUpdate={(id, body) => void revision.update(id, body)} onResolve={(id, outcome) => void revision.resolve(id, outcome)}
+            onRemove={id => void revision.remove(id)} onShow={showFlag}
+          />
         )}
         {component === 'export' && (
           <div className="wrToolGroup">
@@ -276,7 +297,7 @@ export function PreviewPane({ w, chapter, draft, pubs, component, onComponent }:
         {!published && paragraphs.map(p => (
           <Paragraph
             key={p.key} paragraphKey={p.key} sentences={p.sentences} marks={marks} markers={markers}
-            selected={selected} onSelect={setSelected} onCycle={cycleMark}
+            selected={selected} onSelect={setSelected} onCycle={cycleMark} flagged={flagged}
           />
         ))}
       </div>

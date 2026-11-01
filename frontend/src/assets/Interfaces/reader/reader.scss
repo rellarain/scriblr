@@ -109,6 +109,15 @@
   .rdMeter { display: block; position: relative; height: 12px; background: var(--ov-sink-3); }
   .rdMeterFill { position: absolute; left: 0; top: 0; bottom: 0; background: var(--rd-wash-hi); &--accent { background: var(--accent); } }
   .rdCols { display: flex; align-items: flex-end; gap: 8px; height: 110px; div { flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: flex-end; gap: 4px; height: 100%; font-size: 11px; } i { display: block; width: 100%; background: var(--rd-wash-hi); } }
+  // The Analytics charts (ReaderCharts.tsx): bars of the months with the goal dashed across them, and a line of the last days with a ring on each day the goal was met.
+  .rdChart { display: block; width: 100%; height: auto; max-width: 720px; }
+  .rdChartAxis { stroke: var(--rd-line); stroke-width: 1; }
+  .rdChartBar { fill: var(--rd-wash-hi); &--met { fill: var(--accent); } }
+  .rdChartValue, .rdChartLabel { fill: var(--rd-ink); font-size: 11px; }
+  .rdChartGoal { stroke: var(--rd-ink); stroke-width: 1.5; stroke-dasharray: 4 4; }
+  .rdChartLine { fill: none; stroke: var(--rd-wash-hi); stroke-width: 2; stroke-linejoin: round; }
+  .rdChartDot { fill: var(--rd-ink); }
+  .rdChartRing { fill: none; stroke: var(--accent); stroke-width: 2.5; }
   .rdTimeline { list-style: none; margin: 0 0 0 6px; padding: 0; border-left: 2px solid var(--rd-line); display: flex; flex-direction: column; li { position: relative; padding: 4px 0 12px 16px; display: flex; flex-direction: column; &::before { content: ''; position: absolute; left: -8px; top: 9px; width: 14px; height: 14px; background: var(--rd-wash-hi); } } }
   .rdTable { width: 100%; border-collapse: collapse; font-size: 13px; th { text-align: left; font-size: 11px; letter-spacing: 1.5px; text-transform: uppercase; font-weight: 700; padding: 4px 8px 6px 0; } td { padding: 6px 8px 6px 0; border-top: 1px solid var(--rd-line); } }
 

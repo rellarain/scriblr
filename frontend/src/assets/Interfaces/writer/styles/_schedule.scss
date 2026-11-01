@@ -122,6 +122,8 @@
   .wrSchedSeries { fill: currentColor; stroke: currentColor; }
   .wrSchedLineSolid { fill: none; stroke: currentColor; stroke-width: 2.5; stroke-linejoin: round; }
   .wrSchedLineProjected { fill: none; stroke: currentColor; stroke-width: 2.5; stroke-dasharray: 2 5; stroke-linecap: round; }
+  // The day a goal was met: a ring in the facet's colour round the line where it reaches 100%.
+  .wrSchedRing { fill: none; stroke: currentColor; stroke-width: 2.5; }
   .wrSchedMarkX { fill: none; stroke: currentColor; stroke-width: 2; }
   .wrSchedHover { stroke: var(--level-ink); stroke-width: 1; }
   .wrSchedHoverDot { stroke: var(--wr-fill-3); stroke-width: 1.5; }

@@ -38,6 +38,8 @@ Before the 12 months, each older month is a **bar**, stacked by facet (each face
 
 `.wrSchedLine`. One line per facet that has a **total goal**: the share of that goal done over time, 0 to 100%, with a daily point for the last 12 months and a monthly one before. Past today the line carries on **dotted** at the last 28 days' pace until it reaches 100% or the deadline (a vertical rule). Each facet's end marker has its own shape (circle, square, diamond, triangle, cross), so colour is never the only cue. Hover, or the left and right arrow keys on the focused chart (Shift for a week), read every value on a day.
 
+A facet's **goal-met ring** (`.wrSchedRing`) circles the line, in the facet's own colour, at the first day it reaches 100% (`goalMetOn`); its hover says "Draft goal met 2026-10-02", and the tooltip of a day from then on ticks the facet's percentage. A facet that has not reached its goal has no ring.
+
 ## Facet colours
 
 `--wr-f-outline`, `-plot`, `-draft`, `-revision`, `-project` are set on the console from five hues the user picks (Settings, in the console's header; each is the app's colour range, a gradient of every hue at the facet colour's own saturation and lightness). The saturation and lightness are one pair for every zone (`FACET_COLOR` in `theme/zoneLooks.ts`), light enough to read on the level's dark fill, so a line, a dot or a bar reads on the tile (3:1) whatever hue is picked; the contrast page audits every facet hue on every level hue.

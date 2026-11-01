@@ -1,20 +1,20 @@
 import { useEffect, useRef } from 'react'
 import type { ActivityGrid, WeekStart } from '../lib/activityCalendar'
 import { rowLetters } from '../lib/scheduleCalendar'
-import { useShiftScrollX } from '../lib/useShiftScrollX'
+import { useWheelScrollX } from '../lib/useWheelScrollX'
 
 // The Reader's calendar of one number a day (lib/activityCalendar.ts): the months as rectangles with their whole names over the weeks that begin in
 // them, one letter beside every row, and today outlined in the ink colour. `prefix` is the class family of the page that draws it (rd for the Reader):
 // <prefix>Cal, <prefix>CalScroll, <prefix>CalInner, <prefix>CalTop, <prefix>CalMonths, <prefix>CalMonth, <prefix>CalRows, <prefix>CalLetters,
-// <prefix>CalGrid, <prefix>CalCell. It opens scrolled to the latest weeks, and scrolls sideways by touch or Shift + the wheel.
+// <prefix>CalGrid, <prefix>CalCell. It opens scrolled to the latest weeks, and scrolls sideways by touch or the plain wheel (at either end the page gets the wheel).
 
 export function ActivityCalendar({ grid, prefix, unit, weekStart = 'monday' }: { grid: ActivityGrid; prefix: 'rd'; unit: string; weekStart?: WeekStart }) {
   const scroller = useRef<HTMLDivElement>(null)
-  useShiftScrollX(scroller)
+  useWheelScrollX(scroller)
   useEffect(() => { if (scroller.current) scroller.current.scrollLeft = scroller.current.scrollWidth }, [grid.weeks])
   return (
     <div className={`${prefix}Cal`}>
-      <div className={`${prefix}CalScroll`} ref={scroller} tabIndex={0} aria-label="Activity calendar; Shift and the wheel scroll it sideways">
+      <div className={`${prefix}CalScroll`} ref={scroller} tabIndex={0} aria-label="Activity calendar; the wheel scrolls it sideways">
         <div className={`${prefix}CalInner`}>
           <div className={`${prefix}CalTop`}>
             <span className={`${prefix}CalLetterGap`} />

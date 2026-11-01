@@ -8,6 +8,8 @@ import type { WeekStart } from '../../../lib/activityCalendar'
 import { Shelf } from '../writer/Shelf'
 import { buildActivityGrid, currentStreak, type ActivityMetric } from './activityGrid'
 import { Card, Meter, Stat } from './ReaderBits'
+import { DayLine, MonthBars } from './ReaderCharts'
+import { lastDays, monthlyAverage, monthlyCount } from './readerAnalytics'
 import type { ReaderCtx } from './readerContext'
 import { dollars, dueText, months, plural, shortDate } from './readerFormat'
 import { latestRead, personName, postedReads, reviewOf } from './readerSocial'
@@ -208,6 +210,12 @@ export function JournalConsole({ ctx, size }: { ctx: ReaderCtx; size: 'tile' | '
 
 // ---------------------------------------------------------------- Analytics
 
+type MonthMetric = 'minutes' | 'pages' | 'club'
+const MONTH_METRICS: Array<{ key: MonthMetric; label: string; title: string; unit: string }> = [
+  { key: 'minutes', label: 'Reading time', title: 'Minutes read a day, the average of each month', unit: 'minutes a day' },
+  { key: 'pages', label: 'Pages', title: 'Pages read a day, the average of each month', unit: 'pages a day' },
+  { key: 'club', label: 'Book club', title: 'Posts you wrote in book clubs, each month', unit: 'posts' },
+]
 const METRICS: Array<{ key: ActivityMetric; label: string }> = [{ key: 'pages', label: 'Pages' }, { key: 'minutes', label: 'Minutes' }, { key: 'sessions', label: 'Sessions' }]
 
 export function ActivityCalendar({ ctx }: { ctx: ReaderCtx }) {
@@ -228,7 +236,9 @@ export function ActivityCalendar({ ctx }: { ctx: ReaderCtx }) {
 
 export function AnalyticsConsole({ ctx, size }: { ctx: ReaderCtx; size: 'tile' | 'full' }) {
   const { reader } = ctx.data
-  const [goals, setGoals] = useStoredState<{ booksPerYear: number; pagesPerDay: number }>('scriblr.reader.goals', { booksPerYear: 24, pagesPerDay: 20 })
+  const [storedGoals, setGoals] = useStoredState<{ booksPerYear: number; pagesPerDay: number; minutesPerDay?: number }>('scriblr.reader.goals', { booksPerYear: 24, pagesPerDay: 20, minutesPerDay: 30 })
+  const goals = { ...storedGoals, minutesPerDay: storedGoals.minutesPerDay ?? 30 }
+  const [monthMetric, setMonthMetric] = useState<MonthMetric>('minutes')
   if (!reader) return null
   const days = Object.entries(reader.activity)
   const weekStart = new Date(Date.parse(`${ctx.today}T00:00:00Z`) - 6 * 86_400_000).toISOString().slice(0, 10)
@@ -266,6 +276,30 @@ export function AnalyticsConsole({ ctx, size }: { ctx: ReaderCtx; size: 'tile' |
               {perDay.map(d => <div key={d.key}><span>{d.pages}</span><i style={{ height: `${Math.max(2, (d.pages / top) * 84)}px` }} /><span>{d.label}</span></div>)}
             </div>
           </Card>
+          <Card title="Pages a day, last 30 days" Icon={GoalIcon}>
+            <DayLine days={lastDays(reader.activity, ctx.today, 'pages', 30)} goal={goals.pagesPerDay} unit="pages" label="Pages a day" />
+            <p className="rdMuted">A ring marks each day you reached your goal of {goals.pagesPerDay} pages: {lastDays(reader.activity, ctx.today, 'pages', 30).filter(d => d.value >= goals.pagesPerDay).length} of the last 30.</p>
+          </Card>
+          <Card title="By month, last 12 months" Icon={GoalIcon}>
+            <div className="rdRow">
+              {MONTH_METRICS.map(m => (
+                <button key={m.key} type="button" className={monthMetric === m.key ? 'rdChip rdChip--on rdChip--button' : 'rdChip rdChip--button'} aria-pressed={monthMetric === m.key} onClick={() => setMonthMetric(m.key)}>{m.label}</button>
+              ))}
+            </div>
+            {(() => {
+              const spec = MONTH_METRICS.find(m => m.key === monthMetric) ?? MONTH_METRICS[0]
+              const bars = monthMetric === 'club'
+                ? monthlyCount(ctx.data.clubs.flatMap(c => c.posts).filter(p => p.authorId === 'me').map(p => p.at), ctx.today)
+                : monthlyAverage(reader.activity, ctx.today, monthMetric)
+              const goal = monthMetric === 'minutes' ? goals.minutesPerDay : monthMetric === 'pages' ? goals.pagesPerDay : 0
+              return (
+                <>
+                  <MonthBars bars={bars} goal={goal} unit={spec.unit} label={spec.title} />
+                  <p className="rdMuted">{spec.title}{goal > 0 ? `; the dashed line is your goal of ${goal}` : ''}.</p>
+                </>
+              )
+            })()}
+          </Card>
           <div className="rdGrid2">
             <Card title="Genres read">
               {genreTotal === 0 ? <p className="rdMuted">Your genres appear as you read.</p> : [...byGenre.entries()].sort((a, b) => b[1] - a[1]).map(([g, w]) => (
@@ -283,6 +317,11 @@ export function AnalyticsConsole({ ctx, size }: { ctx: ReaderCtx; size: 'tile' |
               </label>
               <div className="rdRow"><span className="rdGrow">Today</span><span>{reader.activity[ctx.today]?.pages ?? 0} of {goals.pagesPerDay}</span></div>
               <Meter percent={((reader.activity[ctx.today]?.pages ?? 0) / goals.pagesPerDay) * 100} accent />
+              <label className="rdRow"><span className="rdGrow">Minutes a day</span>
+                <NumberInput className="rdField rdField--num" label="Minutes to read a day" min={1} max={1440} value={goals.minutesPerDay} onChange={n => setGoals({ ...goals, minutesPerDay: n })} />
+              </label>
+              <div className="rdRow"><span className="rdGrow">Today</span><span>{reader.activity[ctx.today]?.minutes ?? 0} of {goals.minutesPerDay}</span></div>
+              <Meter percent={((reader.activity[ctx.today]?.minutes ?? 0) / goals.minutesPerDay) * 100} accent />
             </Card>
           </div>
         </>

@@ -29,3 +29,10 @@ export interface RevisionFlag {
 }
 export const getRevisionFlags = (projectId: string, includeResolved = false) =>
   api.get<RevisionFlag[]>(`/projects/${p(projectId)}/revision-flags${includeResolved ? '?includeResolved=true' : ''}`)
+
+export type RevisionFlagType = RevisionFlag['type']
+export interface NewRevisionFlag { scope: 'passage' | 'project'; type: RevisionFlagType; note?: string; chapterId?: string; momentId?: string; start?: number; end?: number }
+export const createRevisionFlag = (projectId: string, body: NewRevisionFlag) => api.post<RevisionFlag>(`/projects/${p(projectId)}/revision-flags`, body)
+export const updateRevisionFlag = (projectId: string, id: string, body: { type?: RevisionFlagType; note?: string }) => api.patch<RevisionFlag>(`/projects/${p(projectId)}/revision-flags/${p(id)}`, body)
+export const resolveRevisionFlag = (projectId: string, id: string, outcome: string) => api.post<RevisionFlag>(`/projects/${p(projectId)}/revision-flags/${p(id)}/resolve`, { outcome })
+export const deleteRevisionFlag = (projectId: string, id: string) => api.delete<void>(`/projects/${p(projectId)}/revision-flags/${p(id)}`)

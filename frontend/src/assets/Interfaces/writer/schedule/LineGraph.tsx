@@ -6,7 +6,7 @@ import { MONTH_NAMES } from '../../../../lib/scheduleCalendar'
 import { useElementSize } from '../useElementSize'
 
 // The line graph: a line for each facet, the share of that facet's goal done over time, with the projection at the last 28 days' pace dotted past
-// today. Daily points for the last 12 months and monthly ones before (that is how the totals are kept). Hover or the arrow keys read every value on a day.
+// today. Daily points for the last 12 months and monthly ones before (that is how the totals are kept). Hover or the arrow keys read every value on a day. A ring marks the day a facet's goal was met.
 
 export interface LineSeries { facet: Facet; goal: GoalSeries }
 const W_DEFAULT = 900 // until the graph's box is measured
@@ -30,6 +30,11 @@ export function valueAt(points: SeriesPoint[], date: string): number {
     value = p.pct
   }
   return value
+}
+
+// The day a facet's goal was met: the first point at or past all of it (null while it is not).
+export function goalMetOn(points: SeriesPoint[]): SeriesPoint | null {
+  return points.find(p => p.pct >= 1) ?? null
 }
 
 export function LineGraph({ series, today, deadline }: { series: LineSeries[]; today: string; deadline: string | null }) {
@@ -91,6 +96,10 @@ export function LineGraph({ series, today, deadline }: { series: LineSeries[]; t
             <polyline className="wrSchedLineSolid" points={path(s.goal.points)} />
             {s.goal.projection.length > 1 && <polyline className="wrSchedLineProjected" points={path(s.goal.projection)} />}
             {MARKERS[s.facet](x(today), y(valueAt(s.goal.points, today)))}
+            {(() => {
+              const met = goalMetOn(s.goal.points)
+              return met && <circle className="wrSchedRing" cx={x(met.date)} cy={y(1)} r={8}><title>{`${FACET_LABEL[s.facet]} goal met ${met.date}`}</title></circle>
+            })()}
           </g>
         ))}
         {hover && (
@@ -103,7 +112,7 @@ export function LineGraph({ series, today, deadline }: { series: LineSeries[]; t
       {hover && (
         <div className="wrSchedTip" style={{ left: `${Math.min(70, (x(hover) / W) * 100 + 1.5)}%` }} role="status">
           <strong>{label}</strong>
-          {series.map(s => <div key={s.facet}><span><i className="wrSchedDot" style={{ background: `var(--wr-f-${s.facet})` }} />{FACET_LABEL[s.facet]}</span><b>{Math.round(valueAt(s.goal.points, hover) * 100)}%</b></div>)}
+          {series.map(s => <div key={s.facet}><span><i className="wrSchedDot" style={{ background: `var(--wr-f-${s.facet})` }} />{FACET_LABEL[s.facet]}</span><b>{Math.round(valueAt(s.goal.points, hover) * 100)}%{goalMetOn(s.goal.points)?.date !== undefined && goalMetOn(s.goal.points)!.date <= hover ? ' ✓' : ''}</b></div>)}
         </div>
       )}
     </div>
