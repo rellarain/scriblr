@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { barYears, buildFacetGrid, monthBars, rowLetters, GRID_WEEKS } from './scheduleCalendar'
+import { barYears, buildFacetGrid, fitMonthName, monthGroups, yearGroups, monthBars, rowLetters, GRID_WEEKS } from './scheduleCalendar'
 import { emptyDay, type DayTotals, type MonthTotals, type Recurrence, type Routine, type Shift, type RibbonData, type Goal, FACETS } from './facets'
 import { goalProgress, goalSeries, paceOf, weekOf } from './projection'
 import { addUnits, patternDays, routineWindow, shiftOccurrences } from './recurrence'
@@ -275,5 +275,41 @@ describe('the years over the monthly bars', () => {
       { year: '2025', col: 3, span: 3 },
     ])
     expect(barYears([])).toEqual([])
+  })
+})
+
+describe('the portrait calendar', () => {
+  const grid = buildFacetGrid({ ...base, daily: { '2026-10-30': day({ draft: 5 }) }, today: '2026-10-31' })
+  it('groups the days by month, the newest first, each week a row of seven places, a place null where the month has no day', () => {
+    const groups = monthGroups(grid.cells)
+    expect(groups[0].key).toBe('2026-10')
+    expect(groups[0].name).toBe('October')
+    const top = groups[0].rows[0] // the current week: Monday Oct 26 to Saturday Oct 31 (Sunday Nov 1 is not here yet)
+    expect(top.map(c => c?.date.slice(8) ?? null)).toEqual(['26', '27', '28', '29', '30', '31', null])
+    expect(top.find(c => c?.today)?.date).toBe('2026-10-31')
+    // a week that spans two months is a row in both, each holding its own days
+    const september = groups.find(g => g.key === '2026-09')!
+    expect(september.rows[0].map(c => c?.date.slice(8) ?? null)).toEqual(['28', '29', '30', null, null, null, null]) // its newest week ends on Wednesday the 30th
+    expect(groups[0].rows.at(-1)!.map(c => c?.date.slice(8) ?? null)).toEqual([null, null, null, '01', '02', '03', '04']) // and the same week begins October
+    expect(groups.map(g => g.key)).toEqual([...groups.map(g => g.key)].sort().reverse())
+    expect(groups.every(g => g.rows.length > 0)).toBe(true)
+  })
+  it('leaves out a month with no day to show', () => {
+    expect(monthGroups([])).toEqual([])
+  })
+  it('groups the monthly bars by year, keeping their order', () => {
+    expect(yearGroups([{ key: '2025-02' }, { key: '2025-01' }, { key: '2024-11' }]).map(g => [g.year, g.items.map(i => i.key)])).toEqual([
+      ['2025', ['2025-02', '2025-01']],
+      ['2024', ['2024-11']],
+    ])
+  })
+})
+
+describe('a month name in a rectangle', () => {
+  it('is in capitals, whole where it fits, three letters where it does not, and one letter in the narrowest', () => {
+    expect(fitMonthName('September', 200)).toBe('SEPTEMBER')
+    expect(fitMonthName('September', 60)).toBe('SEP')
+    expect(fitMonthName('September', 20)).toBe('S')
+    expect(fitMonthName('May', 60)).toBe('MAY')
   })
 })

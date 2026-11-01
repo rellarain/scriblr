@@ -28,9 +28,15 @@
   .wrSchedActivity { flex: 1 1 0; min-height: 0; }
   .wrSchedActivity > .wrSchedCal, .wrSchedActivity > .wrSchedLine { flex: 1 1 0; min-height: 0; }
   // The toggles in a tile's title bar, on its right: smaller and closer than a button in the body.
-  .wrTabTileTitleExtras { margin-left: auto; display: inline-flex; flex-wrap: wrap; align-items: center; justify-content: flex-end; gap: var(--space-2); text-transform: none; letter-spacing: normal; font-weight: 400;
-    .wrSchedFacet { padding: 1px var(--space-3); font-size: var(--text-small); }
-    .wrSchedSeg button { display: inline-flex; align-items: center; justify-content: center; padding: 1px var(--space-3); font-size: var(--text-small); min-width: 22px; } }
+  // The title bar of a tile with controls: the handle and the title are always the first row; the controls come after them and wrap into rows below when the
+  // bar is narrow (the facets, then the chart and shade toggles, which are squares).
+  .wrSchedConsole .wrTabTileTitle { flex-wrap: wrap; row-gap: var(--space-2); }
+  .wrTabTileTitleMain { display: inline-flex; align-items: center; gap: var(--space-3); flex: 1 1 auto; min-width: 0; }
+  .wrTabTileTitleExtras { display: contents; text-transform: none; letter-spacing: normal; font-weight: 400; }
+  .wrActFacets, .wrActModes { display: inline-flex; flex-wrap: wrap; align-items: center; gap: var(--space-2); }
+  .wrActFacets { flex: 0 1 auto; min-width: 0; }
+  .wrActModes { flex: 0 0 auto; }
+  .wrTabTileTitleExtras .wrSchedFacet { padding: 1px var(--space-3); font-size: var(--text-small); }
   // An icon is never squeezed under 20px square, whatever flex box it is in (the icons are the 24-unit ones; a chart's own svg is not).
   .wrSchedConsole svg[viewBox='0 0 24 24'] { flex: none; min-width: 20px; min-height: 20px; }
   // A button that is an icon (IconBtn): the icon centred in a small square of its own, the label in its tooltip.
@@ -63,7 +69,7 @@
   .wrSchedCalYear { background: var(--wr-fill-4); border-radius: var(--radius-button); font-size: var(--text-ui); font-weight: 700; line-height: 22px; text-align: center; overflow: hidden; white-space: nowrap; }
   .wrSchedCalLetterGap { width: var(--cw); flex: none; }
   .wrSchedCalMonths { display: grid; gap: var(--cg); }
-  .wrSchedCalMonth { background: var(--wr-fill-4); border-radius: var(--radius-button); font-size: var(--text-ui); font-weight: 700; line-height: 22px; padding: 0 var(--space-3); overflow: hidden; white-space: nowrap; }
+  .wrSchedCalMonth { background: var(--wr-fill-4); border-radius: var(--radius-button); font-size: var(--text-ui); font-weight: 700; line-height: 22px; padding: 0 var(--space-3); overflow: hidden; white-space: nowrap; text-transform: uppercase; }
   .wrSchedCalRows { display: flex; align-items: flex-start; gap: var(--space-4); }
   .wrSchedCalBarsCol { display: flex; flex-direction: column; gap: var(--space-2); }
   // The month's number under its bar (1 to 12).
@@ -92,17 +98,15 @@
   // ---- the grid, portrait: the tile is taller than wide, so a row is a week (the current week on top) and the columns are the days ----
   .wrSchedCal--portrait { overflow: hidden; }
     .wrSchedCalScroll--portrait { height: 100%; overflow-x: hidden; overflow-y: auto; padding-bottom: 0; overscroll-behavior-y: contain; }
-  .wrSchedCalPDays { display: flex; gap: var(--space-4); position: sticky; top: 0; z-index: 2; background: var(--wr-fill-3); padding-bottom: var(--space-2); }
-  .wrSchedCalPSide { width: 22px; flex: none; }
+  .wrSchedCalPDays { position: sticky; top: 0; z-index: 2; background: var(--wr-fill-3); padding-bottom: var(--space-2); }
   .wrSchedCalPLetters { display: grid; grid-template-columns: repeat(7, var(--cw)); gap: var(--cg); text-align: center; font-size: var(--text-ui); line-height: 16px; font-weight: 700; }
-  .wrSchedCalPBody { display: flex; gap: var(--space-4); align-items: flex-start; }
-  .wrSchedCalPRects { display: grid; grid-template-columns: 22px; gap: var(--cg); flex: none; }
-  .wrSchedCalPMain { display: grid; grid-template-columns: repeat(7, var(--cw)); grid-auto-rows: var(--ch); gap: var(--cg); }
-  .wrSchedCalPNums { display: grid; grid-template-columns: 20px; gap: var(--cg); flex: none; font-size: var(--text-small); color: var(--level-ink-soft); span { display: flex; align-items: center; justify-content: flex-start; } }
-  // A month before the grid, as a bar across the seven columns: its length is the share of the busiest month's average a day.
-  .wrSchedCalPBar { grid-column: 1 / -1; display: flex; align-items: stretch; span { display: flex; height: 100%; } i { display: block; height: 100%; } }
-  // The month and year rectangles down the left, their names turned to read upwards.
-  .wrSchedCalMonth--v, .wrSchedCalYear--v { writing-mode: vertical-rl; transform: rotate(180deg); line-height: 22px; padding: 0; text-align: center; overflow: hidden; }
+  .wrSchedCalPMain, .wrSchedCalPBars { display: grid; grid-template-columns: repeat(7, var(--cw)); gap: var(--cg); align-items: start; }
+  .wrSchedCalPBars { grid-template-columns: repeat(7, var(--cw)) 20px; margin-top: var(--space-4); }
+  // A month's name (or a year) as a divider over its rows, in capitals.
+  .wrSchedCalPDivider { grid-column: 1 / -1; background: var(--wr-fill-4); border-radius: var(--radius-button); font-size: var(--text-ui); font-weight: 700; line-height: 22px; padding: 0 var(--space-3); text-transform: uppercase; white-space: nowrap; overflow: hidden; &:not(:first-child) { margin-top: var(--space-3); } }
+  // A month before the grid, as a bar across the seven columns: its length is the share of the busiest month's average a day; its number is at its right.
+  .wrSchedCalPBar { grid-column: 1 / 8; display: flex; align-items: stretch; height: var(--ch); span { display: flex; height: 100%; } i { display: block; height: 100%; } }
+  .wrSchedCalPNum { display: flex; align-items: center; height: var(--ch); font-size: var(--text-small); color: var(--level-ink-soft); }
 
   // ---- the line graph ----
   .wrSchedLine { position: relative; min-width: 0; svg { position: absolute; inset: 0; width: 100%; height: 100%; } }

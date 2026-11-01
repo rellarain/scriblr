@@ -72,14 +72,14 @@ describe('the Schedule console', () => {
     expect(goals.getByText('Today 412 of 500')).toBeTruthy()
   })
 
-  it('draws the grid with today outlined, the week from Monday, whole month names and the older months as bars', async () => {
+  it('draws the grid with today outlined, the week from Monday, month names in capitals and the older months as bars', async () => {
     await open()
     const activity = tile('activity')
     const grid = activity.querySelector('.wrSchedCalGrid') as HTMLElement
     expect(grid.querySelectorAll('.wrSchedCalCell--today')).toHaveLength(1)
     expect((grid.querySelector('.wrSchedCalCell--today') as HTMLElement).title).toMatch(/^Sat, Oct 31/)
     expect(Array.from(activity.querySelectorAll('.wrSchedCalLetters span')).map(s => s.textContent)).toEqual(['M', 'T', 'W', 'T', 'F', 'S', 'S'])
-    expect(Array.from(activity.querySelectorAll('.wrSchedCalMonth')).map(s => s.textContent)).toContain('November')
+    expect(Array.from(activity.querySelectorAll('.wrSchedCalMonth')).map(s => s.textContent)).toEqual(expect.arrayContaining(['NOV', 'DECEMBER'])) // in capitals, abbreviated where the rectangle is narrow
     expect(activity.querySelectorAll('.wrSchedCalBar')).toHaveLength(1) // September 2025, before the grid
     expect(within(activity).queryByText(/Writing, last 12 months/)).toBeNull()
   })

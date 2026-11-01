@@ -47,6 +47,52 @@ export function barYears(bars: Array<{ key: string }>): YearRect[] {
   return out
 }
 
+// The portrait grid as a calendar: a group for each month, the newest first, of the weeks it has days in (the newest first), each week a row of seven
+// places in the order of the week with a day in each place the month has and a null in the others. A day not here yet is left out, and so is a month with
+// no day to show.
+export interface MonthGroup { key: string; name: string; rows: Array<Array<FacetCell | null>> }
+export function monthGroups(cells: FacetCell[]): MonthGroup[] {
+  const months = new Map<string, Map<number, Array<FacetCell | null>>>()
+  cells.forEach((c, i) => {
+    if (c.level < 0) return
+    const key = c.date.slice(0, 7)
+    const weeks = months.get(key) ?? new Map<number, Array<FacetCell | null>>()
+    const week = Math.floor(i / 7)
+    const row = weeks.get(week) ?? Array<FacetCell | null>(7).fill(null)
+    row[i % 7] = c
+    weeks.set(week, row)
+    months.set(key, weeks)
+  })
+  return [...months.entries()].sort(([a], [b]) => (a < b ? 1 : -1)).map(([key, weeks]) => ({
+    key,
+    name: MONTH_NAMES[Number(key.slice(5, 7)) - 1],
+    rows: [...weeks.entries()].sort(([a], [b]) => b - a).map(([, row]) => row),
+  }))
+}
+
+// The bars under the portrait grid, grouped by year (the bars come newest first; a group keeps that order).
+export interface YearGroup<T> { year: string; items: T[] }
+export function yearGroups<T extends { key: string }>(bars: T[]): Array<YearGroup<T>> {
+  const out: Array<YearGroup<T>> = []
+  for (const b of bars) {
+    const year = b.key.slice(0, 4)
+    const last = out[out.length - 1]
+    if (last && last.year === year) last.items.push(b)
+    else out.push({ year, items: [b] })
+  }
+  return out
+}
+
+// A month's name in capitals, as long as fits `px` (the rectangle it is in): whole, else three letters, else one.
+const CAP_PX = 8.5 // the width of a capital in the 12px bold type
+const PAD_PX = 8
+export function fitMonthName(name: string, px: number): string {
+  const full = name.toUpperCase()
+  if (full.length * CAP_PX + PAD_PX <= px) return full
+  if (3 * CAP_PX + PAD_PX <= px) return full.slice(0, 3)
+  return full.slice(0, 1)
+}
+
 // The portrait grid: a row for each week, the newest first (the cells come oldest first, seven to a week).
 export function weekRows<T>(cells: T[]): T[][] {
   const weeks: T[][] = []

@@ -173,8 +173,11 @@ export function SplitArea({ gridId, tiles, label, defaultTree, onFocusTile, icon
                 className="wrTabTileTitle" draggable tabIndex={0} title="Drag to move this tile (Alt+arrows to swap it)"
                 onDragStart={e => onDragStart(e, t.id)} onDragEnd={endDrag}
               >
-                <GripIcon size={t.iconSize ?? iconSize ?? 13} />{t.Icon && <t.Icon size={t.iconSize ?? iconSize ?? 14} />} {t.title}
-                {t.titleExtras && <span className="wrTabTileTitleExtras">{t.titleExtras}</span>}
+                {(() => {
+                  const handle = <><GripIcon size={t.iconSize ?? iconSize ?? 13} />{t.Icon && <t.Icon size={t.iconSize ?? iconSize ?? 14} />} {t.title}</>
+                  // With controls, the handle and the title are the first row of the bar and the controls wrap into rows below it when they do not fit.
+                  return t.titleExtras ? <><span className="wrTabTileTitleMain">{handle}</span><span className="wrTabTileTitleExtras">{t.titleExtras}</span></> : handle
+                })()}
               </h3>
               <div className={`wrTabTileBody${t.bodyClassName ? ` ${t.bodyClassName}` : ''}`}>{t.children}</div>
             </section>

@@ -40,11 +40,14 @@ export function ActivityControls({ state }: { state: ActivityState }) {
   const { view, setView, rule, setRule, shown, toggle } = state
   return (
     <>
-      {FACETS.map(f => (
-        <button key={f} type="button" className={`wrSchedFacet${shown.includes(f) ? ' on' : ''}`} aria-pressed={shown.includes(f)} onClick={() => toggle(f)}>
-          <i className="wrSchedDot" style={{ background: `var(--wr-f-${f})` }} />{FACET_LABEL[f]}
-        </button>
-      ))}
+      <div className="wrActFacets" role="group" aria-label="Facets">
+        {FACETS.map(f => (
+          <button key={f} type="button" className={`wrSchedFacet${shown.includes(f) ? ' on' : ''}`} aria-pressed={shown.includes(f)} onClick={() => toggle(f)}>
+            <i className="wrSchedDot" style={{ background: `var(--wr-f-${f})` }} />{FACET_LABEL[f]}
+          </button>
+        ))}
+      </div>
+      <div className="wrActModes">
       <div className="wrSchedSeg" role="group" aria-label="Chart type">
         <button type="button" className={view === 'grid' ? 'on' : ''} aria-pressed={view === 'grid'} aria-label="Grid" title="Grid" onClick={() => setView('grid')}><GridViewIcon size={ICON_PX} /></button>
         <button type="button" className={view === 'line' ? 'on' : ''} aria-pressed={view === 'line'} aria-label="Line graph" title="Line graph" onClick={() => setView('line')}><LineChartIcon size={ICON_PX} /></button>
@@ -55,6 +58,7 @@ export function ActivityControls({ state }: { state: ActivityState }) {
           <button type="button" className={rule === 'busiest' ? 'on' : ''} aria-pressed={rule === 'busiest'} aria-label="Vs busiest day" title="Shade against the busiest day" onClick={() => setRule('busiest')}>#</button>
         </div>
       )}
+      </div>
     </>
   )
 }

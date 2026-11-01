@@ -41,8 +41,8 @@ describe('the cell that fits the tile', () => {
   it('is square in a portrait tile, the seven columns and what is beside them fitting its width (the weeks scroll down)', () => {
     const c = portraitCell(360, true)
     expect(c.w).toBe(c.h)
-    expect(c.w * 7 + c.gap * 6 + 22 + 10 + 30).toBeLessThanOrEqual(360)
-    expect(portraitCell(120, true).w).toBe(8) // never under 8px
+    expect(c.w * 7 + c.gap * 6 + 20 + c.gap).toBeLessThanOrEqual(360)
+    expect(portraitCell(60, true).w).toBe(8) // never under 8px
     expect(portraitCell(null).w).toBe(14)
   })
 })
@@ -60,22 +60,37 @@ describe('the portrait grid', () => {
     expect(portraitRows(1, 4, 52)).toEqual({ row: 49, span: 4 })
   })
 
-  it('is drawn in a tile taller than wide: the current week on the top row, the years and the month numbers with the older months', () => {
+  it('is drawn in a tile taller than wide as a calendar: the months as dividers in capitals, the current week on the top row, the bars grouped by year', () => {
     boxOf(320, 700)
     const { container } = render(<FacetCalendar grid={grid} weekStart="monday" />)
     expect(container.querySelector('.wrSchedCal--portrait')).not.toBeNull()
-    const cells = [...container.querySelectorAll('.wrSchedCalPMain > i')]
-    expect(cells).toHaveLength(52 * 7)
-    expect(cells.slice(0, 7).some(c => c.className.includes('--today'))).toBe(true)
-    expect([...container.querySelectorAll('.wrSchedCalPLetters span')].map(s => s.textContent)).toEqual(['M', 'T', 'W', 'T', 'F', 'S', 'S'])
-    expect([...container.querySelectorAll('.wrSchedCalYear--v')].map(y => y.textContent)).toEqual(['2025', '2024'])
-    expect([...container.querySelectorAll('.wrSchedCalPNums span')].map(n => n.textContent)).toEqual(['2', '1', '11']) // the newest older month first
+    const main = container.querySelector('.wrSchedCalPMain') as HTMLElement
+    const dividers = [...main.querySelectorAll('.wrSchedCalPDivider')].map(d => d.textContent)
+    expect(dividers[0]).toBe('OCTOBER') // the newest month first, in capitals
+    expect(dividers.every(d => d === d?.toUpperCase())).toBe(true)
+    expect(dividers).toHaveLength(12) // November of the year before to October
+    // the first week row after the first divider is the current week: its Mon-to-Sat days are shown (Sunday Nov 1 is not here yet), today among them
+    const afterFirst = [...main.children].slice(1, 8)
+    expect(afterFirst.some(c => c.className.includes('--today'))).toBe(true)
+    expect([...container.querySelectorAll('.wrSchedCalPLetters span')].map(l => l.textContent)).toEqual(['M', 'T', 'W', 'T', 'F', 'S', 'S'])
+    const bars = container.querySelector('.wrSchedCalPBars') as HTMLElement
+    expect([...bars.querySelectorAll('.wrSchedCalPDivider')].map(d => d.textContent)).toEqual(['2025', '2024']) // a divider for each year, the newest first
+    expect([...bars.querySelectorAll('.wrSchedCalPNum')].map(n => n.textContent)).toEqual(['2', '1', '11']) // the newest month first
     const root = container.querySelector('.wrSchedCal') as HTMLElement
     expect(root.style.getPropertyValue('--ch')).toBe(root.style.getPropertyValue('--cw')) // square
   })
 })
 
 describe('the landscape grid', () => {
+  it('writes the months in capitals, abbreviated to fit their rectangles', () => {
+    boxOf(900, 260)
+    const { container } = render(<FacetCalendar grid={grid} weekStart="monday" />)
+    const names = [...container.querySelectorAll('.wrSchedCalMonth')].map(m => m.textContent ?? '')
+    expect(names.length).toBeGreaterThan(8)
+    expect(names.every(n => n === n.toUpperCase())).toBe(true)
+    expect(names.some(n => n.length === 3)).toBe(true) // a four-week month at 14px a week is too narrow for its whole name
+  })
+
   it('is drawn in a tile wider than tall, with the weeks as columns', () => {
     boxOf(900, 260)
     const { container } = render(<FacetCalendar grid={grid} weekStart="monday" />)
