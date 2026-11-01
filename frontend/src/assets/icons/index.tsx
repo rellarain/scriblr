@@ -763,7 +763,7 @@ export function TodayIcon({ day = 31, ...props }: IconProps & { day?: number }) 
 }
 
 // The calendar's views: a year (the header filled, the body open), a month (the header open, the body filled), a week (both open, a stripe across the middle of the
-// body filled) and a day (both open, one square in the body filled).
+// body filled, edge to edge) and a day (both open, one small square in the body filled).
 export function ViewYearIcon(props: IconProps) {
   return <IconBase {...props}>
     <path d={PAGE_HEADER_FILL} fill="currentColor" />
@@ -772,11 +772,12 @@ export function ViewYearIcon(props: IconProps) {
   </IconBase>
 }
 
+// (The month's header is a little wider than the others', so that it reads beside the filled body.)
 export function ViewMonthIcon(props: IconProps) {
   return <IconBase {...props}>
-    <path d={PAGE_BODY_FILL} fill="currentColor" />
+    <path d="M3 8.8h18V18a3 3 0 0 1-3 3H6a3 3 0 0 1-3-3Z" fill="currentColor" />
     <rect {...PAGE} />
-    <path d={PAGE_LINE} />
+    <path d="M3 8.8h18" />
   </IconBase>
 }
 
@@ -784,7 +785,7 @@ export function ViewWeekIcon(props: IconProps) {
   return <IconBase {...props}>
     <rect {...PAGE} />
     <path d={PAGE_LINE} />
-    <rect x="6" y="12.75" width="12" height="3" fill="currentColor" />
+    <rect x="3" y="12.75" width="18" height="3" fill="currentColor" />
   </IconBase>
 }
 
@@ -792,6 +793,6 @@ export function ViewDayIcon(props: IconProps) {
   return <IconBase {...props}>
     <rect {...PAGE} />
     <path d={PAGE_LINE} />
-    <rect x="9.5" y="11.75" width="5" height="5" fill="currentColor" />
+    <rect x="10.5" y="12.75" width="3" height="3" fill="currentColor" />
   </IconBase>
 }

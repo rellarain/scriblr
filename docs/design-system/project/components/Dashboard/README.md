@@ -63,9 +63,9 @@ The icons of the calendar's views, and of Today, are **one calendar page** with 
 | Icon | Header | Body | Mark |
 |---|---|---|---|
 | Year | filled | open | none |
-| Month | open | filled | none |
-| Week | open | open | a filled horizontal stripe across the middle of the body |
-| Day | open | open | one filled square in the body |
+| Month | open (a little wider, 30%) | filled | none |
+| Week | open | open | a filled horizontal stripe across the middle of the body, **edge to edge** |
+| Day | open | open | one **small** filled square (3 of the 18 units) in the body |
 | Today | open | open | the **day of the month** in the body (today's, 31 in the drawings) |
 
 The Review's week and month switch uses the Week and Month icons.
