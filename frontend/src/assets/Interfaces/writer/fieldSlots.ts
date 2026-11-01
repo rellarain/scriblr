@@ -27,6 +27,19 @@ export function slides(ids: string[], draggedId: string, beforeId: string | null
   return out
 }
 
+// The gap a field dragged within its own group opens: its top (from the top of the group) and height, when it goes in front of `beforeId` (null:
+// last). `rows` are all the group's rows with the dragged one, in order, laid out as they are now; `gap` is the space between rows.
+export function gapOf(rows: SlotRow[], draggedId: string, beforeId: string | null, gap: number): { top: number; height: number } | null {
+  const dragged = rows.find(r => r.id === draggedId)
+  if (!dragged || rows.length === 0) return null
+  const rest = rows.filter(r => r.id !== draggedId)
+  const to = beforeId === null ? rest.length : rest.findIndex(r => r.id === beforeId)
+  if (to < 0) return null
+  const origin = Math.min(...rows.map(r => r.top))
+  const above = rest.slice(0, to).reduce((sum, r) => sum + r.height + gap, 0)
+  return { top: origin + above, height: dragged.height }
+}
+
 // Whether dropping in front of `beforeId` leaves the group as it is.
 export function staysPut(ids: string[], draggedId: string, beforeId: string | null): boolean {
   const from = ids.indexOf(draggedId)

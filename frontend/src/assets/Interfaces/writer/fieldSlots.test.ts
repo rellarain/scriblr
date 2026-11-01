@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { beforeAt, slides, staysPut } from './fieldSlots'
+import { beforeAt, gapOf, slides, staysPut } from './fieldSlots'
 
 // Four rows of 40px laid out one under another with 6px between them: tops 0, 46, 92, 138.
 const rows = (...ids: string[]) => ids.map((id, i) => ({ id, top: i * 46, height: 40 }))
@@ -63,5 +63,19 @@ describe('staysPut', () => {
     expect(staysPut(ids, 'a', 'c')).toBe(false)
     expect(staysPut(ids, 'c', 'a')).toBe(false)
     expect(staysPut(ids, 'x', 'a')).toBe(false)
+  })
+})
+
+describe('gapOf', () => {
+  const rows = [{ id: 'a', top: 10, height: 30 }, { id: 'b', top: 50, height: 20 }, { id: 'c', top: 80, height: 40 }]
+  it('puts the gap where the dragged row sits in the new order, going up or down', () => {
+    expect(gapOf(rows, 'c', 'a', 10)).toEqual({ top: 10, height: 40 }) // first
+    expect(gapOf(rows, 'c', 'b', 10)).toEqual({ top: 50, height: 40 }) // after a
+    expect(gapOf(rows, 'a', 'c', 10)).toEqual({ top: 40, height: 30 }) // after b (which slid up)
+    expect(gapOf(rows, 'a', null, 10)).toEqual({ top: 90, height: 30 }) // last
+  })
+  it('is nothing for an unknown row or place', () => {
+    expect(gapOf(rows, 'x', null, 10)).toBeNull()
+    expect(gapOf(rows, 'a', 'x', 10)).toBeNull()
   })
 })

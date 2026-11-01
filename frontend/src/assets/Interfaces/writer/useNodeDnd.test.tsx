@@ -1,7 +1,8 @@
-import { act, fireEvent, render } from '@testing-library/react'
+import { render } from '@testing-library/react'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import type { OutlineNode } from '../../../api/types'
 import { makeWorkspace } from '../../../test/makeWorkspace'
+import { holdTile } from '../../../test/tileDrag'
 import * as outlineTree from './outlineTree'
 import { useNodeDnd } from './useNodeDnd'
 
@@ -36,26 +37,29 @@ describe('useNodeDnd', () => {
     const { getByTestId, container, rerender } = render(<Board nodes={NODES} />)
     expect(moveNodeTo).not.toHaveBeenCalled()
 
-    fireEvent.dragStart(getByTestId('grip-c1'), { dataTransfer: { setData() {}, setDragImage() {}, effectAllowed: '' } })
+    const held = holdTile(getByTestId('grip-c1'), { x: 2000, y: 2000 })
     const gaps = container.querySelectorAll('.wrDropGap').length
     expect(gaps).toBe(4) // before each of the three chapters, and after the last
     expect(moveNodeTo).toHaveBeenCalledTimes(gaps)
 
     // Hovering over gaps and re-rendering asks nothing more.
     const first = container.querySelector('.wrDropGap--open') as HTMLElement
-    act(() => { fireEvent.dragOver(first) })
+    first.getBoundingClientRect = () => ({ left: 0, top: 0, width: 100, height: 10, right: 100, bottom: 10, x: 0, y: 0, toJSON: () => ({}) })
+    held.moveTo(50, 5)
     rerender(<Board nodes={NODES} />)
     expect(moveNodeTo).toHaveBeenCalledTimes(gaps)
+    held.cancel()
   })
 
   it('asks again when the outline changes under the drag', () => {
     const moveNodeTo = vi.spyOn(outlineTree, 'moveNodeTo')
     const { getByTestId, container, rerender } = render(<Board nodes={NODES} />)
-    fireEvent.dragStart(getByTestId('grip-c1'), { dataTransfer: { setData() {}, setDragImage() {}, effectAllowed: '' } })
+    const held = holdTile(getByTestId('grip-c1'), { x: 2000, y: 2000 })
     const before = moveNodeTo.mock.calls.length
     rerender(<Board nodes={[...NODES, node('c4', 'chapter', 'b', 3)]} />)
     expect(container.querySelectorAll('.wrDropGap').length).toBe(5)
     expect(moveNodeTo.mock.calls.length).toBeGreaterThan(before)
+    held.cancel()
   })
 
   it('keeps the drop gaps closed when nothing is being dragged', () => {

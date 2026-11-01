@@ -1,4 +1,6 @@
 import { useState, type CSSProperties, type DragEvent, type KeyboardEvent, type ReactNode } from 'react'
+import DragGap from '../../../components/DragGap'
+import { gripProps } from '../../../lib/pointerDrag'
 import type { PlotCustomFieldDef, PlotFieldKind, PlotNode } from '../../../api/types'
 import { GripIcon, PlusIcon } from '../../icons'
 import type { PlotDrag, PlotUi } from './FieldBlocks'
@@ -154,19 +156,9 @@ function OptionNotes({ w, owner, def, edits }: { w: WriterWorkspace; owner: Plot
   )
 }
 
-// The grip of an option: it starts the reorder drag, and the pointer carries the whole option, not just the grip, once it is hidden.
-function optionGrip(optionId: string, rowSelector: string, setDragging: (id: string | null) => void) {
-  return {
-    draggable: true,
-    onDragStart: (e: DragEvent) => {
-      e.dataTransfer.effectAllowed = 'move'
-      e.dataTransfer.setData('text/plain', optionId)
-      const row = (e.currentTarget as HTMLElement).closest(rowSelector)
-      if (row && e.dataTransfer.setDragImage) e.dataTransfer.setDragImage(row, 12, 12)
-      setDragging(optionId)
-    },
-    onDragEnd: () => setDragging(null),
-  }
+// The grip of an option: it starts the reorder drag (lib/pointerDrag.ts), and the pointer carries the whole option, not just the grip.
+function optionGrip(kind: string, optionId: string, rowSelector: string, setDragging: (id: string | null) => void) {
+  return gripProps(kind, optionId, grip => grip.closest<HTMLElement>(rowSelector), { start: setDragging, end: () => setDragging(null) })
 }
 
 // The options of a dropdown, as chips: renamed in place, reordered by their grips (the chips it passes slide out of the way, and a gap opens
@@ -184,14 +176,14 @@ function OptionsEditor({ w, owner, def }: { w: WriterWorkspace; owner: PlotNode;
     <div className="wrOptionsBlock">
       <div
         ref={group.ref} className={`wrOptions${group.sliding ? ' wrOptions--sliding' : ''}`} role="group" aria-label={`Options of ${def.name || 'field'}`}
-        {...group.handlers}
       >
+        <DragGap rect={group.gap} />
         {options.map((o, i) => (
           <span
             key={o.id} data-chip={o.id} style={slideStyle(group.slideOf(o.id))}
             className={`wrOption${dragging === o.id && !group.isLifted(o.id) ? ' wrOption--dragging' : ''}${group.isLifted(o.id) ? ' wrOption--lifted' : ''}`}
           >
-            <span className="wrGrip" aria-label="Drag to reorder options" title="Drag to reorder" {...optionGrip(o.id, '[data-chip]', setDragging)}>
+            <span className="wrGrip" aria-label="Drag to reorder options" title="Drag to reorder" {...optionGrip(group.kind, o.id, '[data-chip]', setDragging)}>
               <GripIcon size={12} />
             </span>
             <input
@@ -219,7 +211,7 @@ function OptionRows({ w, owner, def, holder, drag }: { w: WriterWorkspace; owner
   const [unticking, setUnticking] = useState<string | null>(null)
   const mine = valuesIn(w.plotNodes, holder.id, def.id)
   const group = useFieldGroupDrop({
-    ids: options.map(o => o.id), draggedId: dragging, active: true,
+    kind: `option:${def.id}`, ids: options.map(o => o.id), draggedId: dragging, active: true,
     onDrop: (id, before) => { w.movePlotOption(owner.id, def.id, id, before); setDragging(null) },
   })
   const tick = (optionId: string, answer: PlotNode | undefined, on: boolean) => {
@@ -234,8 +226,8 @@ function OptionRows({ w, owner, def, holder, drag }: { w: WriterWorkspace; owner
     <div className="wrOptionsBlock">
       <div
         ref={group.ref} className={`wrOptionRows${group.sliding ? ' wrOptionRows--sliding' : ''}`} role="group" aria-label={`Options of ${def.name || 'field'}`}
-        {...group.handlers}
       >
+        <DragGap rect={group.gap} />
         {options.map((o, i) => {
           const answer = mine.find(a => a.optionId === o.id)
           const placed = answer ? placedCount(answer, outlineById) : 0
@@ -248,7 +240,7 @@ function OptionRows({ w, owner, def, holder, drag }: { w: WriterWorkspace; owner
               className={`wrOptionRow${answer ? ` wrPlotValue wrPlotValue--answer${placed > 0 ? ' wrPlotValue--assigned' : ''}${drag.dragId === answer.id ? ' wrPlotValue--dragging' : ''}` : ''}${dragging === o.id && !lifted ? ' wrOptionRow--dragging' : ''}${lifted ? ' wrOptionRow--lifted' : ''}${answer && w.highlightedPointId === answer.id ? ' wrPlotValue--highlight' : ''}`}
               style={{ ...look, ...(slide ? { transform: `translateY(${slide}px)` } : {}) }}
             >
-              <span className="wrGrip" aria-label="Drag to reorder options" title="Drag to reorder" {...optionGrip(o.id, '[data-field]', setDragging)}>
+              <span className="wrGrip" aria-label="Drag to reorder options" title="Drag to reorder" {...optionGrip(`option:${def.id}`, o.id, '[data-field]', setDragging)}>
                 <GripIcon size={12} />
               </span>
               <input type="checkbox" className="wrAnswerBox" aria-label={o.label} checked={Boolean(answer)} onChange={e => tick(o.id, answer, e.target.checked)} />

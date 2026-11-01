@@ -2,6 +2,7 @@ import type { PresetEntry } from '../../../../api/types'
 import { CheckIcon, ChevronDownIcon, GripIcon, ImportIcon, ExportIcon, PlusIcon } from '../../../icons'
 import { nudge, statusOf } from './presetModel'
 import { useReorder } from './useReorder'
+import DragGap from '../../../../components/DragGap'
 
 // Where a preset stands, in words and in a shape (a tick, a filled dot, a hollow dot, a grey dot), so colour is not what tells them apart.
 export function StatusBadge({ entry }: { entry: PresetEntry }) {
@@ -45,12 +46,13 @@ export function PresetList({ entries, current, open, onToggle, onSelect, onNew, 
           <span className="plpListTitle">Presets · {entries.length}</span>
           <button type="button" className="plpBtn plpBtn--small" onClick={onNew}><PlusIcon size={12} /> New</button>
         </div>
-        <ul className="plpRows">
+        <ul className="plpRows" ref={drag.listRef}>
+          <DragGap rect={drag.gap} />
           {entries.map(entry => (
             <li
               key={entry.id}
-              className={`plpRowItem${drag.overId === entry.id && drag.dragId !== entry.id ? ' plpRowItem--over' : ''}${drag.dragId === entry.id ? ' plpRowItem--dragging' : ''}`}
-              {...drag.target(entry.id)}
+              className={`plpRowItem${drag.dragId === entry.id ? ' plpRowItem--dragging' : ''}`}
+              {...drag.item(entry.id)}
             >
               <span className="plpGrip" role="button" tabIndex={0} aria-label={`Move ${presetLabel(entry)} (Alt+Up or Down)`} {...drag.grip(entry.id)}><GripIcon size={12} /></span>
               <button
@@ -61,7 +63,6 @@ export function PresetList({ entries, current, open, onToggle, onSelect, onNew, 
               </button>
             </li>
           ))}
-          {drag.dragId !== null && <li className={`plpDropEnd${drag.overId === null ? ' plpDropEnd--over' : ''}`} {...drag.target(null)}>Move here to put it last</li>}
         </ul>
         <div className="plpListFoot">
           <button type="button" className="plpBtn plpBtn--small" onClick={onImport}><ImportIcon size={12} /> Import</button>

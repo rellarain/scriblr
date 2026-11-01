@@ -451,6 +451,16 @@ last row, like Claude Code's own resizable panes). The shared system is `fronten
   The sidebar divider's buttons choose the open tile (the grid's `minimized` list is controlled here); the tab bar opens
   the others until the buttons change the choice again.
 
+### One pointer drag for lists (`frontend/src/lib/pointerDrag.ts`)
+
+The option and preset chips, the field and option rows, the fieldsets, the outline cards and the Plot presets console's lists are reordered by the same
+pointer drag as the tiles, not the browser's drag and drop (which draws the dragged thing see-through): `beginPointerDrag` (started from a grip by
+`gripProps`) clones the thing as a `dragPicture` that follows the pointer at full opacity, and a list is a **zone** (`zoneRef`): of
+the zones of the dragged kind under the pointer the innermost is told `over` (the pointer's place, from which it works out the slot), `leave` and `drop`.
+The slot maths is unchanged and pure (`chipSlots.ts`, `fieldSlots.ts`, `outlineTree.moveNodeTo`); the hooks are `useChipDrop`, `useFieldGroupDrop`,
+`useNodeDnd` and the preset lists' `useReorder`, and the gap they open is drawn by `components/DragGap.tsx`. A placement drag (a plotpoint onto a chapter, a
+theme hue, a shift block) is a different thing and still uses its own drag. (`@dnd-kit` is now only used by the unmounted `AuiConfigEditor`.)
+
 ## Design system
 
 The Writer's design system is in `docs/design-system/` and published as a Design System artifact: a brand book, tokens in all four zones, the readability audit, icons, and live previews of the real components (the app run against a pretend project). Most of it is generated from the code with `npm run design-system` (in `frontend/`); `docs/design-system/README.md` says how to regenerate and republish it. Read it before UI work.

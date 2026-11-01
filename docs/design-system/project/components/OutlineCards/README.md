@@ -20,7 +20,7 @@ Every card has a **word count** (the draft's), a quiet trash that asks first, a 
 
 ## States
 
-Dragging: the card is 70% opaque and the gaps it can land in open (10px, accent tint); only the gaps its kind belongs in. A plotpoint (or one of its placements) being dragged onto a chapter, act, scene or moment outlines the target with a 2px dashed accent. Folded state is remembered, per card, with the acts' and scenes'.
+Dragging: the card follows the pointer as it is (full opacity) and the gaps it can land in open (10px, accent tint); only the gaps its kind belongs in. A plotpoint (or one of its placements) being dragged onto a chapter, act, scene or moment outlines the target with a 2px dashed accent. Folded state is remembered, per card, with the acts' and scenes'.
 
 ## Tokens
 

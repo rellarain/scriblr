@@ -1,4 +1,6 @@
-import { useState, type DragEvent, type KeyboardEvent, type ReactNode } from 'react'
+import { useState, type KeyboardEvent, type ReactNode } from 'react'
+import DragGap from '../../../../components/DragGap'
+import { gripProps } from '../../../../lib/pointerDrag'
 import type { PlotFieldKind, PresetCard, PresetCluster, PresetContent, PresetField, PresetFieldset, PresetSubcategory } from '../../../../api/types'
 import { ChevronDownIcon, ChevronRightIcon, GripIcon, PlusIcon, TrashIcon } from '../../../icons'
 import { FIELD_KINDS, KIND_LABEL as FIELD_KIND_LABEL } from '../../writer/plotKinds'
@@ -41,24 +43,21 @@ function ChipList({ items, label, placeholder, maxLength, onAdd, onRemove, onMov
   tail?: (index: number) => ReactNode
 }) {
   const [draft, setDraft] = useState('')
-  const drag = useReorder<number>((from, before) => onMove?.(from, before), (from, dir) => onMove?.(from, dir < 0 ? from - 1 : from + 2))
+  const [dragging, setDragging] = useState<number | null>(null)
   // The chips slide out of the way of the one dragged by its grip, and take it where the pointer lets it go.
   const group = useChipDrop({
-    draggedId: drag.dragId === null ? null : String(drag.dragId),
-    onDrop: (id, before) => { drag.end(); onMove?.(Number(id), before === null ? null : Number(before)) },
+    draggedId: dragging === null ? null : String(dragging),
+    onDrop: (id, before) => { setDragging(null); onMove?.(Number(id), before === null ? null : Number(before)) },
   })
-  // A chip's grip starts the drag; the chip is hidden once the drag is over the chips, so the pointer carries the whole chip, not just the grip.
-  const gripOf = (index: number) => {
-    const grip = drag.grip(index)
-    return {
-      ...grip,
-      onDragStart: (e: DragEvent) => {
-        grip.onDragStart(e)
-        const chip = (e.currentTarget as HTMLElement).closest('[data-chip]')
-        if (chip && e.dataTransfer.setDragImage) e.dataTransfer.setDragImage(chip, 12, 12)
-      },
-    }
-  }
+  // A chip's grip starts the drag (lib/pointerDrag.ts): the pointer carries the whole chip, not just the grip; Alt+Up and Alt+Down on it nudge.
+  const gripOf = (index: number) => ({
+    ...gripProps(group.kind, String(index), grip => grip.closest<HTMLElement>('[data-chip]'), { start: id => setDragging(Number(id)), end: () => setDragging(null) }),
+    onKeyDown: (e: KeyboardEvent) => {
+      if (!onMove || !e.altKey || (e.key !== 'ArrowUp' && e.key !== 'ArrowDown')) return
+      e.preventDefault()
+      onMove(index, e.key === 'ArrowUp' ? index - 1 : index + 2)
+    },
+  })
   const submit = () => {
     if (!draft.trim()) return
     onAdd(draft)
@@ -71,11 +70,12 @@ function ChipList({ items, label, placeholder, maxLength, onAdd, onRemove, onMov
     if (e.key === 'ArrowRight' && index < items.length - 1) onMove(index, index + 2 > items.length - 1 ? null : index + 2)
   }
   return (
-    <div ref={group.ref} className={`plpChips${group.sliding ? ' plpChips--sliding' : ''}`} role="group" aria-label={label} {...(onMove ? group.handlers : {})}>
+    <div ref={group.ref} className={`plpChips${group.sliding ? ' plpChips--sliding' : ''}`} role="group" aria-label={label}>
+      <DragGap rect={group.gap} />
       {items.map((item, index) => (
         <span
           key={`${index}-${item}`} data-chip={index} style={slideStyle(group.slideOf(String(index)))}
-          className={`plpChip${onMove ? ' plpChip--field' : ''}${drag.dragId === index && !group.isLifted(String(index)) ? ' plpChip--dragging' : ''}${group.isLifted(String(index)) ? ' plpChip--lifted' : ''}`}
+          className={`plpChip${onMove ? ' plpChip--field' : ''}${dragging === index && !group.isLifted(String(index)) ? ' plpChip--dragging' : ''}${group.isLifted(String(index)) ? ' plpChip--lifted' : ''}`}
         >
           {onMove && <span className="plpGrip plpGrip--chip" aria-hidden="true" title="Drag to reorder" {...gripOf(index)}><GripIcon size={12} /></span>}
           {item}
@@ -150,8 +150,8 @@ function FieldsetBox({ set, index, cardId, who, ctx, drag }: {
   const label = set.name.trim() || 'without a name'
   return (
     <div
-      className={`plpSet${drag.dragId === index ? ' plpSet--dragging' : ''}${drag.overId === index && drag.dragId !== index ? ' plpSet--over' : ''}`}
-      role="group" aria-label={`Fieldset ${label}`} {...drag.target(index)}
+      className={`plpSet${drag.dragId === index ? ' plpSet--dragging' : ''}`}
+      role="group" aria-label={`Fieldset ${label}`} {...drag.item(index)}
     >
       <div className="plpSetHead">
         <button type="button" className="plpIconBtn" aria-expanded={open} aria-label={`${open ? 'Collapse' : 'Expand'} fieldset ${label}`} onClick={() => setOpen(o => !o)}>
@@ -186,9 +186,9 @@ function Fieldsets({ card, cardId, who, noun, ctx }: { card: PresetCard; cardId:
     <div>
       <div className="plpLabel">Fieldsets <span>each becomes a named group of fields on the new {noun}</span></div>
       {sets.length > 0 && (
-        <div className="plpSets">
+        <div className="plpSets" ref={drag.listRef}>
+          <DragGap rect={drag.gap} />
           {sets.map((set, i) => <FieldsetBox key={i} set={set} index={i} cardId={cardId} who={who} ctx={ctx} drag={drag} />)}
-          {drag.dragId !== null && <div className={`plpDropEnd${drag.overId === null ? ' plpDropEnd--over' : ''}`} {...drag.target(null)}>Move here to put it last</div>}
         </div>
       )}
       <div className="plpFoot">
@@ -233,7 +233,7 @@ function CardBody({ kind, card, cardId, ctx }: { kind: CardKind; card: PresetCar
   )
 }
 
-function Card({ kind, card, cardId, nodeId, ctx, grip, nameInput, onDelete, confirmDelete, dropProps, over, children, footer }: {
+function Card({ kind, card, cardId, nodeId, ctx, grip, nameInput, onDelete, confirmDelete, dropProps, children, footer }: {
   kind: CardKind
   card: PresetCard
   cardId: string
@@ -246,7 +246,6 @@ function Card({ kind, card, cardId, nodeId, ctx, grip, nameInput, onDelete, conf
   // Ask first when the card has something in it (the preset asks in the page, so it passes false).
   confirmDelete: boolean
   dropProps?: object
-  over?: boolean
   children?: ReactNode
   footer?: ReactNode
 }) {
@@ -257,7 +256,7 @@ function Card({ kind, card, cardId, nodeId, ctx, grip, nameInput, onDelete, conf
   const askFirst = confirmDelete && !isBlankCard(card)
   return (
     <section
-      className={`plpCard plpCard--${kind}${fault ? ' plpCard--invalid' : ''}${over ? ' plpCard--over' : ''}`}
+      className={`plpCard plpCard--${kind}${fault ? ' plpCard--invalid' : ''}`}
       data-knode={nodeId} aria-label={`${noun} ${label}`} {...dropProps}
     >
       <header className="plpHead">
@@ -296,7 +295,7 @@ function ClusterCard({ cluster, ctx, drag }: { cluster: PresetCluster; ctx: Tree
     <Card
       kind="cluster" card={cluster} cardId={cluster.id} nodeId={cluster.id} ctx={ctx}
       grip={<span className="plpGrip" role="button" tabIndex={0} aria-label={`Move cluster ${cluster.name || 'without a name'} (Alt+Up or Down)`} {...drag.grip(cluster.id)}><GripIcon size={14} /></span>}
-      dropProps={drag.target(cluster.id)} over={drag.overId === cluster.id && drag.dragId !== cluster.id}
+      dropProps={drag.item(cluster.id)}
       confirmDelete onDelete={() => ctx.edit(c => removeCard(c, cluster.id), true)}
     />
   )
@@ -314,14 +313,14 @@ function SubcategoryCard({ sub, ctx, drag }: { sub: PresetSubcategory; ctx: Tree
     <Card
       kind="subcategory" card={sub} cardId={sub.id} nodeId={sub.id} ctx={ctx}
       grip={<span className="plpGrip" role="button" tabIndex={0} aria-label={`Move subcategory ${sub.name || 'without a name'} (Alt+Up or Down)`} {...drag.grip(sub.id)}><GripIcon size={14} /></span>}
-      dropProps={drag.target(sub.id)} over={drag.overId === sub.id && drag.dragId !== sub.id}
+      dropProps={drag.item(sub.id)}
       confirmDelete onDelete={() => ctx.edit(c => removeCard(c, sub.id), true)}
       footer={<div className="plpFoot"><button type="button" className="plpBtn plpBtn--small" onClick={addClusterAfter}><PlusIcon size={12} /> Cluster</button></div>}
     >
       {sub.clusters.length > 0 && (
-        <div className="plpKids">
+        <div className="plpKids" ref={clusterDrag.listRef}>
+          <DragGap rect={clusterDrag.gap} />
           {sub.clusters.map(c => <ClusterCard key={c.id} cluster={c} ctx={ctx} drag={clusterDrag} />)}
-          {clusterDrag.dragId !== null && <div className={`plpDropEnd${clusterDrag.overId === null ? ' plpDropEnd--over' : ''}`} {...clusterDrag.target(null)}>Move here to put it last</div>}
         </div>
       )}
     </Card>
@@ -350,9 +349,9 @@ export function PresetTree({ content, entryId, ctx, nameInput, onDelete }: {
       footer={<div className="plpFoot"><button type="button" className="plpBtn plpBtn--small" onClick={addSub}><PlusIcon size={12} /> Subcategory</button></div>}
     >
       {content.subcategories.length > 0 && (
-        <div className="plpKids">
+        <div className="plpKids" ref={subDrag.listRef}>
+          <DragGap rect={subDrag.gap} />
           {content.subcategories.map(s => <SubcategoryCard key={s.id} sub={s} ctx={ctx} drag={subDrag} />)}
-          {subDrag.dragId !== null && <div className={`plpDropEnd${subDrag.overId === null ? ' plpDropEnd--over' : ''}`} {...subDrag.target(null)}>Move here to put it last</div>}
         </div>
       )}
     </Card>

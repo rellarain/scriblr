@@ -12,6 +12,7 @@ import { PlotTray } from '../levels/PlotpointsTab'
 import OutlineMax from './OutlineMax'
 import { mockFetch } from '../../../../test/mockFetch'
 import { makeWorkspace, type WorkspaceOverrides } from '../../../../test/makeWorkspace'
+import { holdTile } from '../../../../test/tileDrag'
 
 // The Outline level (with the Project level's Plotpoints tab beside it, where the tray now is) against a small stand-in workspace: the outline and plot live in state and the
 // plotpoint placements are the real pure functions, so what the cards do is what the app does.
@@ -367,21 +368,22 @@ describe('Outline Max: the page edges and tabs', () => {
 describe('Outline Max: dragging cards', () => {
   it('opens only the gaps a card of that kind belongs in: an act goes among the chapter acts', () => {
     setup('c1')
-    fireEvent(card('act').querySelector('.wrGrip')!, Object.assign(createEvent.dragStart(card('act').querySelector('.wrGrip')!), { dataTransfer: dataTransfer() }))
+    const held = holdTile(card('act').querySelector<HTMLElement>('.wrGrip')!, { x: 2000, y: 2000 })
     const openGaps = (list: Element | null) => Array.from(list?.children ?? []).filter(el => el.classList.contains('wrDropGap--open')).length
     expect(openGaps(openCard().querySelector(ACTS))).toBeGreaterThan(0)
+    held.cancel()
   })
 
   it("opens only the gaps a chapter belongs in, in a focused arc: among its chapters, not into a chapter", async () => {
     const { user } = setup('c1')
     await user.click(arcTab())
-    const grip = card('c2').querySelector('.wrGrip')!
-    fireEvent(grip, Object.assign(createEvent.dragStart(grip), { dataTransfer: dataTransfer() }))
+    const held = holdTile(card('c2').querySelector<HTMLElement>('.wrGrip')!, { x: 2000, y: 2000 })
     const openGaps = (list: Element | null) => Array.from(list?.children ?? []).filter(el => el.classList.contains('wrDropGap--open')).length
     const listOf = (el: Element) => Array.from(el.children).find(c => c.classList.contains('wrChildren')) ?? null
     expect(openGaps(listOf(card('a1')))).toBeGreaterThan(0)
     // Not into the chapter it is among: its own list of acts takes no chapter.
     expect(openGaps(card('c1').querySelector(ACTS))).toBe(0)
+    held.cancel()
   })
 
   it("has no grip on the arc or chapter it is focused on (it has no siblings to move among)", async () => {

@@ -3,6 +3,8 @@ import type { PlotFieldSet, PlotNode } from '../../../api/types'
 import { ChevronDownIcon, ChevronRightIcon, GripIcon, PlusIcon } from '../../icons'
 import { ChoiceBody, KindSelect } from './ChoiceFields'
 import { useFieldGroupDrop } from './useFieldGroupDrop'
+import DragGap from '../../../components/DragGap'
+import { gripProps, zoneRef, zoneRefs, type DropZone } from '../../../lib/pointerDrag'
 import { usePlotOrder } from './plotOrder'
 import { usePlotSetOpen } from './plotSetOpen'
 import {
@@ -118,9 +120,8 @@ export function FieldBlock({ w, info, holder, editable, ui, drag, showAssigned, 
         </button>
         {editable && !scrap && (
           <span
-            className="wrGrip" draggable aria-label="Drag to reorder fields" title="Drag to reorder"
-            onDragStart={e => { e.dataTransfer.effectAllowed = 'move'; e.dataTransfer.setData('text/plain', def.id); drag.setDragFieldId(def.id) }}
-            onDragEnd={() => drag.setDragFieldId(null)}
+            className="wrGrip" aria-label="Drag to reorder fields" title="Drag to reorder"
+            {...gripProps(`field:${owner.id}`, def.id, grip => grip.closest<HTMLElement>('[data-field]'), { start: drag.setDragFieldId, end: () => drag.setDragFieldId(null) })}
           >
             <GripIcon size={14} />
           </span>
@@ -198,10 +199,29 @@ function FieldSetBlock({ w, set, owner, fields, holder, editable, ui, drag, show
   const draggedField = editable && drag.dragFieldId ? owner.customFieldDefs.find(d => d.id === drag.dragFieldId && !isScrapField(d)) : undefined
   const draggedSet = editable && drag.dragSetId && drag.dragSetId !== set.id && setsOf(owner).some(s => s.id === drag.dragSetId) ? drag.dragSetId : null
   const label = set.name || 'fieldset'
-  const allowDrop = (e: React.DragEvent) => { if (draggedField || draggedSet) { e.preventDefault(); setHover(true) } }
+  // The set itself (its head, away from its rows) takes a dragged field as its last, and a dragged fieldset in front of it.
+  const intoSet: DropZone = {
+    over: () => setHover(true), leave: () => setHover(false),
+    drop: () => {
+      setHover(false)
+      if (!draggedField) return
+      w.setPlotFieldSet(owner.id, draggedField.id, set.id)
+      drag.setDragFieldId(null)
+      setUi.setOpen(set.id, true)
+    },
+  }
+  const beforeSet: DropZone = {
+    over: () => setHover(true), leave: () => setHover(false),
+    drop: () => {
+      setHover(false)
+      if (!draggedSet) return
+      w.movePlotFieldset(owner.id, draggedSet, set.id)
+      drag.setDragSetId(null)
+    },
+  }
   // The rows of the set take a dragged field in the order the pointer asks for.
   const group = useFieldGroupDrop({
-    ids: fields.map(f => f.def.id), draggedId: editable ? drag.dragFieldId : null, active: editable,
+    kind: `field:${owner.id}`, ids: fields.map(f => f.def.id), draggedId: editable ? drag.dragFieldId : null, active: editable,
     onDrop: (id, before) => { w.setPlotFieldSet(owner.id, id, set.id, before, before === null); drag.setDragFieldId(null) },
   })
 
@@ -217,21 +237,7 @@ function FieldSetBlock({ w, set, owner, fields, holder, editable, ui, drag, show
     <div
       className={`wrFieldSet${over && (draggedField || draggedSet) ? ' wrFieldSet--over' : ''}${drag.dragSetId === set.id ? ' wrFieldSet--dragging' : ''}`}
       role="group" aria-label={`Fieldset ${set.name}`} data-fieldset={set.id}
-      onDragEnter={allowDrop} onDragOver={allowDrop}
-      onDragLeave={() => setHover(false)}
-      onDrop={e => {
-        setHover(false)
-        if (draggedField) {
-          e.preventDefault(); e.stopPropagation()
-          w.setPlotFieldSet(owner.id, draggedField.id, set.id)
-          drag.setDragFieldId(null)
-          setUi.setOpen(set.id, true)
-        } else if (draggedSet) {
-          e.preventDefault(); e.stopPropagation()
-          w.movePlotFieldset(owner.id, draggedSet, set.id)
-          drag.setDragSetId(null)
-        }
-      }}
+      ref={zoneRefs(zoneRef(`field:${owner.id}`, intoSet), zoneRef(`set:${owner.id}`, beforeSet))}
     >
       <div className="wrFieldSetHead">
         <button type="button" className="wrFieldToggle" aria-expanded={open} aria-label={`${open ? 'Collapse' : 'Expand'} ${label}`} onClick={() => setUi.setOpen(set.id, !open)}>
@@ -239,9 +245,8 @@ function FieldSetBlock({ w, set, owner, fields, holder, editable, ui, drag, show
         </button>
         {editable && (
           <span
-            className="wrGrip" draggable aria-label="Drag to reorder fieldsets" title="Drag to reorder"
-            onDragStart={e => { e.dataTransfer.effectAllowed = 'move'; e.dataTransfer.setData('text/plain', set.id); drag.setDragSetId(set.id) }}
-            onDragEnd={() => drag.setDragSetId(null)}
+            className="wrGrip" aria-label="Drag to reorder fieldsets" title="Drag to reorder"
+            {...gripProps(`set:${owner.id}`, set.id, grip => grip.closest<HTMLElement>('[data-fieldset]'), { start: drag.setDragSetId, end: () => drag.setDragSetId(null) })}
           >
             <GripIcon size={14} />
           </span>
@@ -272,7 +277,8 @@ function FieldSetBlock({ w, set, owner, fields, holder, editable, ui, drag, show
         )}
       </div>
       {open && (
-        <div ref={group.ref} className={`wrFieldSetBody${group.sliding ? ' wrFieldRows--sliding' : ''}${group.overEmpty ? ' wrFieldRows--over' : ''}`} {...group.handlers}>
+        <div ref={group.ref} className={`wrFieldSetBody${group.sliding ? ' wrFieldRows--sliding' : ''}${group.overEmpty ? ' wrFieldRows--over' : ''}`}>
+          <DragGap rect={group.gap} />
           {fields.map(info => (
             <FieldBlock
               key={info.def.id} w={w} info={info} holder={holder} editable={editable} ui={ui} drag={drag} showAssigned={showAssigned}
@@ -297,20 +303,20 @@ function FieldList({ w, holder, parts, editable, ui, drag, showAssigned }: {
   const draggedSet = editable && drag.dragSetId && parts.sets.some(s => s.set.id === drag.dragSetId) ? drag.dragSetId : null
   // The loose fields take a dragged field (their own, or one taken out of a set) in the order the pointer asks for.
   const loose = useFieldGroupDrop({
-    ids: parts.loose.map(f => f.def.id), draggedId: editable ? drag.dragFieldId : null, active: editable,
+    kind: `field:${holder.id}`, ids: parts.loose.map(f => f.def.id), draggedId: editable ? drag.dragFieldId : null, active: editable,
     onDrop: (id, before) => { w.setPlotFieldSet(holder.id, id, null, before, before === null); drag.setDragFieldId(null) },
   })
   // Taking the dragged field out of its set, last among the loose fields: dropped on the spot below the sets.
-  const takeOut = (e: React.DragEvent) => {
+  const takeOut = () => {
     if (!draggedField) return
-    e.preventDefault(); e.stopPropagation()
     w.setPlotFieldSet(holder.id, draggedField.def.id, null, null, true)
     drag.setDragFieldId(null)
   }
   return (
     <>
       {parts.loose.length > 0 && (
-        <div ref={loose.ref} className={`wrFieldLoose${loose.sliding ? ' wrFieldRows--sliding' : ''}`} {...loose.handlers}>
+        <div ref={loose.ref} className={`wrFieldLoose${loose.sliding ? ' wrFieldRows--sliding' : ''}`}>
+          <DragGap rect={loose.gap} />
           {parts.loose.map(info => (
             <FieldBlock
               key={info.def.id} w={w} info={info} holder={holder} editable={editable} ui={ui} drag={drag} showAssigned={showAssigned}
@@ -323,13 +329,12 @@ function FieldList({ w, holder, parts, editable, ui, drag, showAssigned }: {
         <FieldSetBlock key={s.set.id} w={w} set={s.set} owner={s.owner} fields={s.fields} holder={holder} editable={editable} ui={ui} drag={drag} showAssigned={showAssigned} />
       ))}
       {draggedField && (
-        <p className="wrFieldDrop" onDragEnter={e => e.preventDefault()} onDragOver={e => e.preventDefault()} onDrop={takeOut}>Drop here to take it out of its set</p>
+        <p className="wrFieldDrop" ref={zoneRef(`field:${holder.id}`, { over: () => {}, leave: () => {}, drop: takeOut })}>Drop here to take it out of its set</p>
       )}
       {draggedSet && (
         <p
           className="wrFieldDrop"
-          onDragEnter={e => e.preventDefault()} onDragOver={e => e.preventDefault()}
-          onDrop={e => { e.preventDefault(); e.stopPropagation(); w.movePlotFieldset(holder.id, draggedSet, null); drag.setDragSetId(null) }}
+          ref={zoneRef(`set:${holder.id}`, { over: () => {}, leave: () => {}, drop: () => { w.movePlotFieldset(holder.id, draggedSet, null); drag.setDragSetId(null) } })}
         >
           Drop here to move it last
         </p>

@@ -18,10 +18,9 @@
 }
 .plpListHead { display: flex; align-items: center; justify-content: space-between; gap: var(--space-3); padding: var(--space-4) var(--space-4) var(--space-3); }
 .plpListTitle { font-size: var(--text-small); font-weight: 700; text-transform: uppercase; letter-spacing: 0.05em; color: var(--ink-muted); }
-.plpRows { list-style: none; margin: 0; padding: 0 var(--space-2); display: flex; flex-direction: column; overflow-y: auto; max-height: 420px; }
+.plpRows { position: relative; list-style: none; margin: 0; padding: 0 var(--space-2); display: flex; flex-direction: column; overflow-y: auto; max-height: 420px; }
 .plpRowItem {
   display: flex; align-items: center; gap: var(--space-1);
-  &--over { box-shadow: inset 0 2px 0 var(--accent); }
   &--dragging { opacity: 0.5; }
 }
 .plpRow {
@@ -78,7 +77,6 @@
   &--subcategory { background: var(--surface-raised-b); border-left-color: var(--accent-dim); }
   &--cluster { background: var(--surface-deep); border-left-color: color-mix(in srgb, var(--accent) 50%, transparent); }
   &--invalid { box-shadow: inset 0 0 0 2px var(--alert); }
-  &--over { box-shadow: inset 0 3px 0 var(--accent); }
 }
 .plpHead { display: flex; align-items: center; flex-wrap: wrap; gap: var(--space-3) var(--space-4); min-width: 0; }
 .plpGrip { display: inline-flex; flex: 0 0 auto; padding: var(--space-1); color: inherit; cursor: grab; opacity: 0.6; &:hover, &:focus-visible { opacity: 1; } &:focus-visible { outline: 2px solid var(--accent-hover); outline-offset: 1px; } &--chip { padding: 0; } }
@@ -124,11 +122,10 @@
   &:focus-within { box-shadow: inset 0 0 0 1px var(--accent); }
 }
 // A card's fieldsets: each a box with a head (fold, grip, name, count, delete) over its field chips.
-.plpSets { display: flex; flex-direction: column; gap: var(--space-3); margin-bottom: var(--space-3); }
+.plpSets { position: relative; display: flex; flex-direction: column; gap: var(--space-3); margin-bottom: var(--space-3); }
 .plpSet {
   display: flex; flex-direction: column; gap: var(--space-3); padding: var(--space-3) var(--space-4); background: var(--ov-sink-1); min-width: 0;
   &--dragging { opacity: 0.5; }
-  &--over { box-shadow: inset 0 3px 0 var(--accent); }
 }
 .plpSetHead { display: flex; align-items: center; gap: var(--space-3); min-width: 0; }
 .plpSetName {
@@ -138,8 +135,7 @@
   &::placeholder { color: var(--ink-faint); text-transform: none; letter-spacing: 0; font-weight: 400; }
 }
 .plpFoot { display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-3) var(--space-5); }
-.plpKids { display: flex; flex-direction: column; gap: var(--space-4); }
-.plpDropEnd { padding: var(--space-3); text-align: center; font-size: var(--text-small); color: var(--ink-muted); box-shadow: inset 0 0 0 1px var(--hairline); list-style: none; &--over { box-shadow: inset 0 0 0 2px var(--accent); } }
+.plpKids { position: relative; display: flex; flex-direction: column; gap: var(--space-4); }
 .plpErr { margin: 0; font-size: var(--text-small); font-weight: 700; color: var(--ink); }
 .plpConfirm { display: inline-flex; flex-wrap: wrap; align-items: center; gap: var(--space-3); font-size: var(--text-small); }
 .plpConfirmBar {

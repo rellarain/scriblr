@@ -61,6 +61,17 @@ export function flowOf(sizes: ChipSize[], flow: ChipFlow): Map<string, { x: numb
   return out
 }
 
+// The room the dragged chip would take: where the wrapped new order puts it, and its size (null when it would stay where it is).
+export function chipSlot(chips: ChipSize[], tail: ChipSize | null, draggedId: string, beforeId: string | null, flow: ChipFlow): { x: number; y: number; width: number; height: number } | null {
+  const dragged = chips.find(c => c.id === draggedId)
+  const rest = chips.filter(c => c.id !== draggedId)
+  const to = beforeId === null ? rest.length : rest.findIndex(c => c.id === beforeId)
+  if (!dragged || to < 0) return null
+  const after = tail ? [{ ...tail, id: CHIP_TAIL }] : []
+  const at = flowOf([...rest.slice(0, to), dragged, ...rest.slice(to), ...after], flow).get(draggedId)
+  return at ? { x: at.x, y: at.y, width: dragged.width, height: dragged.height } : null
+}
+
 // How far each chip slides, from its place, when the dragged one goes in front of `beforeId` (null: last): the others move to where the
 // wrapped new order puts them. `tail` is what comes after the chips (the add chip), which moves too when a line breaks differently. No entry =
 // the chip stays, and nothing slides when the dragged chip would stay where it is.

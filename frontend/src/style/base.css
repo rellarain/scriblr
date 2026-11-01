@@ -33,6 +33,23 @@ button {
   cursor: pointer;
 }
 
+/* A dragged thing (a chip, a row, a card: lib/pointerDrag.ts) follows the pointer as it is, and the place it would land is a dashed, accent-tinted
+   gap -- the same as a dragged tile's (components/tiles/tiles.scss). */
+.dragPicture {
+  box-shadow: 0 8px 24px color-mix(in srgb, var(--ink) 28%, transparent);
+  cursor: grabbing;
+}
+.dragGap {
+  position: absolute;
+  z-index: 0;
+  box-sizing: border-box;
+  pointer-events: none;
+  background: color-mix(in srgb, var(--accent) 18%, transparent);
+  outline: 2px dashed var(--accent);
+  outline-offset: -2px;
+  transition: left 0.16s ease, top 0.16s ease, width 0.16s ease, height 0.16s ease;
+}
+
 /* Motion is dropped for anyone who asks for less of it: every transition and animation in the app ends at once. */
 @media (prefers-reduced-motion: reduce) {
   *,

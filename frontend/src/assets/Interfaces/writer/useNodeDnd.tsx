@@ -1,16 +1,20 @@
-import { useMemo, useState, type DragEvent, type ReactNode } from 'react'
+import { useMemo, useState, type ReactNode } from 'react'
+import { gripProps as pointerGrip, zoneRef } from '../../../lib/pointerDrag'
 import type { OutlineNode } from '../../../api/types'
 import type { WriterWorkspace } from './useWriterWorkspace'
 import { moveNodeTo } from './outlineTree'
 
 // Drag-and-drop reordering and reparenting for the Outline level's cards (arcs,
-// chapters, acts, scenes and moments). A card's grip is the drag handle. Drops land
+// chapters, acts, scenes and moments). A card's grip is the drag handle, and the card follows the
+// pointer as it is (lib/pointerDrag.ts). Drops land
 // in the GAPS between cards: before the first, between, and after the last child of
 // every container (an empty container has one gap too). Only gaps whose parent may
 // hold the dragged kind take part, and the hovered gap opens up to the dragged card's
 // height.
 // The project's top level (series and loose books) has no parent node.
 const ROOT = '(project)'
+// What the grips start and the gaps take.
+const KIND = 'outline-card'
 
 export function useNodeDnd(w: WriterWorkspace, opts: {
   // A further say in where a dragged node may go, on top of the nesting rule (an editor that shows
@@ -51,19 +55,15 @@ export function useNodeDnd(w: WriterWorkspace, opts: {
         key={`gap-${key}`}
         className={`wrDropGap${open ? ' wrDropGap--open' : ''}${over ? ' wrDropGap--over' : ''}${empty ? ' wrDropGap--empty' : ''}`}
         style={over ? { height: dragHeight } : undefined}
-        onDragOver={open ? (e: DragEvent) => {
-          e.preventDefault()
-          e.stopPropagation()
-          if (overKey !== key) setOverKey(key)
-        } : undefined}
-        onDragLeave={open ? () => setOverKey(prev => (prev === key ? null : prev)) : undefined}
-        onDrop={open ? (e: DragEvent) => {
-          e.preventDefault()
-          e.stopPropagation()
-          if (!dragId) return
-          w.moveOutlineNodeInto(dragId, parentId, beforeId)
-          endDrag()
-        } : undefined}
+        ref={open ? zoneRef(KIND, {
+          over: () => { if (overKey !== key) setOverKey(key) },
+          leave: () => setOverKey(prev => (prev === key ? null : prev)),
+          drop: () => {
+            if (!dragId) return
+            w.moveOutlineNodeInto(dragId, parentId, beforeId)
+            endDrag()
+          },
+        }) : undefined}
       />
     )
   }
@@ -80,20 +80,13 @@ export function useNodeDnd(w: WriterWorkspace, opts: {
   }
 
   // Spread onto the grip element.
-  const gripProps = (id: string) => ({
-    draggable: true,
-    onDragStart: (e: DragEvent) => {
-      e.stopPropagation()
-      e.dataTransfer.effectAllowed = 'move'
-      e.dataTransfer.setData('text/plain', id)
-      const card = (e.currentTarget as HTMLElement).closest('[data-node]') as HTMLElement | null
-      if (card) {
-        e.dataTransfer.setDragImage(card, 12, 12)
-        setDragHeight(card.offsetHeight)
-      }
-      setDragId(id)
+  const gripProps = (id: string) => pointerGrip(KIND, id, grip => grip.closest<HTMLElement>('[data-node]'), {
+    start: node => {
+      const card = document.querySelector<HTMLElement>(`[data-node="${CSS.escape(node)}"]`)
+      if (card) setDragHeight(card.offsetHeight)
+      setDragId(node)
     },
-    onDragEnd: endDrag,
+    end: endDrag,
   })
 
   const cardClass = (base: string, id: string) => `${base}${dragId === id ? ' wrOutlineCard--dragging' : ''}`

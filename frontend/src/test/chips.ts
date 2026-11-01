@@ -1,7 +1,12 @@
 import { createEvent, fireEvent } from '@testing-library/react'
 
-// jsdom has no layout and no DragEvent, so a drag over a row of chips (useChipDrop.ts) is staged by hand: the chips are given a place, as if
-// they wrapped two to a line, and the pointer's place goes on the event.
+// jsdom has no layout, so a drag over a row of chips (useChipDrop.ts) is staged by hand: the chips are given a place, as if they wrapped two to a
+// line, and the group a box that holds the pointer (the pointer's own place is where the group's top left is, as the group is at 0, 0).
+
+// The box of a group of chips or rows, at 0, 0 and big enough to hold every place the tests put the pointer.
+function boxAtOrigin(el: HTMLElement) {
+  el.getBoundingClientRect = () => ({ left: 0, top: 0, right: 1000, bottom: 1000, width: 1000, height: 1000, x: 0, y: 0, toJSON: () => ({}) })
+}
 
 const WIDTH = 50
 const HEIGHT = 20
@@ -12,6 +17,7 @@ const PER_LINE = 2
 // the pointer is for the nth child (counting the chips and then the add chip): its left or right half.
 export function layOutChips(group: Element) {
   const box = group as HTMLElement
+  boxAtOrigin(box)
   box.style.columnGap = `${GAP}px`
   box.style.rowGap = `${GAP}px`
   Object.defineProperty(box, 'clientWidth', { value: PER_LINE * (WIDTH + GAP), configurable: true })
@@ -43,6 +49,7 @@ export function dragAt(type: 'dragOver' | 'dragEnter' | 'drop', el: Element, poi
 // row's top is n * 46. Returns where the pointer is for the nth row: its upper or its lower half.
 export function layOutRows(group: Element) {
   const box = group as HTMLElement
+  boxAtOrigin(box)
   box.style.rowGap = '6px'
   const rows = [...box.children].filter((el): el is HTMLElement => el instanceof HTMLElement && el.dataset.field !== undefined)
   rows.forEach((el, n) => {
