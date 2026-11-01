@@ -224,6 +224,38 @@ describe('the Schedule console', () => {
     expect(tile('schedule').querySelector('.wrSchedCol')?.getAttribute('style')).toContain(`height: ${144 * 20}px`)
   })
 
+  it('has a year view: twelve small calendars, the days with shifts shaded, a click opening the day', async () => {
+    const user = userEvent.setup()
+    await open()
+    const schedule = within(tile('schedule'))
+    await user.click(schedule.getByRole('button', { name: 'Year' }))
+    const year = tile('schedule').querySelector('.wrSchedYear') as HTMLElement
+    expect(year.getAttribute('aria-label')).toBe('2026')
+    const months = [...year.querySelectorAll('.wrSchedYearMonth')]
+    expect(months).toHaveLength(12)
+    expect(months.map(m => m.querySelector('.wrSchedYearName')?.textContent)).toEqual(['JANUARY', 'FEBRUARY', 'MARCH', 'APRIL', 'MAY', 'JUNE', 'JULY', 'AUGUST', 'SEPTEMBER', 'OCTOBER', 'NOVEMBER', 'DECEMBER'])
+    const october = months[9]
+    expect(october.querySelectorAll('.wrSchedYearDay')).toHaveLength(31)
+    expect(october.querySelector('.wrSchedYearDay--today')?.textContent).toBe('31')
+    expect(october.querySelector('.wrSchedYearDay--has')).not.toBeNull() // the weekday shifts
+    expect(schedule.getByRole('button', { name: 'Next' })).toBeTruthy()
+    await user.click(schedule.getByRole('button', { name: 'Next' }))
+    expect(year.getAttribute('aria-label')).toBe('2027')
+    await user.click(schedule.getByRole('button', { name: 'Previous' }))
+    const again = [...(tile('schedule').querySelector('.wrSchedYear') as HTMLElement).querySelectorAll('.wrSchedYearMonth')][9] // the year was drawn again
+    await user.click(again.querySelectorAll('.wrSchedYearDay')[27] as HTMLElement)
+    expect(schedule.getByRole('button', { name: 'Day' }).getAttribute('aria-pressed')).toBe('true')
+  })
+
+  it('has a different icon for each calendar view, and the Today icon shows the day of the month', async () => {
+    await open()
+    const schedule = within(tile('schedule'))
+    const markup = (name: string) => schedule.getByRole('button', { name }).innerHTML
+    const views = ['Day', 'Week', 'Month', 'Year'].map(markup)
+    expect(new Set(views).size).toBe(4)
+    expect(schedule.getByRole('button', { name: 'Today' }).querySelector('text')?.textContent).toBe('31')
+  })
+
   it('switches the schedule to the day, month and agenda views', async () => {
     const user = userEvent.setup()
     await open()

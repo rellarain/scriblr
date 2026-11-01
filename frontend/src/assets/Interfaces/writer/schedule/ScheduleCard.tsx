@@ -4,22 +4,22 @@ import { addDays } from '../../../../lib/projection'
 import { addUnits, shiftOccurrences, type ShiftOccurrence } from '../../../../lib/recurrence'
 import { editShift, type EditScope, type ShiftPatch } from '../../../../lib/shiftEdit'
 import { dragResult, intervalStates, layoutLanes, rangeOf, shiftStatus, type DragMode, type ShiftStatus } from '../../../../lib/timeline'
-import type { WeekStart } from '../../../../lib/scheduleCalendar'
+import { MONTH_NAMES, rowLetters, type WeekStart } from '../../../../lib/scheduleCalendar'
 import { useStoredState } from '../shared'
 import { DRAG_ITEM } from './Backlog'
 import { newId } from './ids'
 import { ShiftEditor, type TargetOption } from './ShiftEditor'
 import { ICON_PX, IconBtn } from './IconBtn'
-import { ChevronLeftIcon, ChevronRightIcon, CloseIcon, ListIcon, PlusIcon, TodayIcon, ViewDayIcon, ViewMonthIcon, ViewWeekIcon, type IconProps } from '../../../icons'
+import { ChevronLeftIcon, ChevronRightIcon, CloseIcon, ListIcon, PlusIcon, TodayIcon, ViewDayIcon, ViewMonthIcon, ViewWeekIcon, ViewYearIcon, type IconProps } from '../../../icons'
 
 // The Schedule: shifts on a day, a week or a month, or listed as an agenda, like a calendar. Drag across empty time to make a shift, drag a shift to
 // move it or its edges to resize it, click it to edit it, right-click (or press and hold) for its menu. The backlog sits beside it.
 
 export interface ScheduleOwner { id: string; label: string; projectId: string | null; planner: Planner; setPlanner: (p: Planner) => void }
 export interface TicksApi { get: (ownerId: string, date: string) => string[]; load: (ownerId: string, date: string) => void; set: (ownerId: string, date: string, id: string, on: boolean) => void }
-type CalView = 'day' | 'week' | 'month' | 'agenda'
+type CalView = 'day' | 'week' | 'month' | 'year' | 'agenda'
 type Occ = ShiftOccurrence & { ownerId: string }
-const VIEW_ICON: Record<CalView, ComponentType<IconProps>> = { day: ViewDayIcon, week: ViewWeekIcon, month: ViewMonthIcon, agenda: ListIcon }
+const VIEW_ICON: Record<CalView, ComponentType<IconProps>> = { day: ViewDayIcon, week: ViewWeekIcon, month: ViewMonthIcon, year: ViewYearIcon, agenda: ListIcon }
 // A row is one 10-minute slot (SLOTS_PER_DAY a day), tall enough for its time label; an hour is six rows.
 const SLOT_PX = 20
 const HOUR_PX = SLOT_PX * 6
@@ -42,14 +42,14 @@ export function ScheduleCard({
   const box = useRef<HTMLDivElement>(null)
   const press = useRef<ReturnType<typeof setTimeout> | null>(null)
   useEffect(() => { setCursor(today) }, [today])
-  useEffect(() => { if (box.current && view !== 'month') box.current.scrollTop = 6 * HOUR_PX - 4 }, [view])
+  useEffect(() => { if (box.current && (view === 'day' || view === 'week')) box.current.scrollTop = 6 * HOUR_PX - 4 }, [view])
 
   const start = view === 'day' ? cursor : view === 'agenda' ? cursor : addDays(cursor, -sinceStart(cursor, weekStart))
   const monthFirst = `${cursor.slice(0, 8)}01`
-  const from = view === 'month' ? addDays(monthFirst, -sinceStart(monthFirst, weekStart)) : start
+  const from = view === 'year' ? `${cursor.slice(0, 4)}-01-01` : view === 'month' ? addDays(monthFirst, -sinceStart(monthFirst, weekStart)) : start
   const length = view === 'day' ? 1 : view === 'week' ? 7 : view === 'month' ? 42 : 14
-  const to = addDays(from, length - 1)
-  const days = Array.from({ length: view === 'month' ? 42 : view === 'agenda' ? 14 : length }, (_, i) => addDays(from, i))
+  const to = view === 'year' ? `${cursor.slice(0, 4)}-12-31` : addDays(from, length - 1)
+  const days = view === 'year' ? [] : Array.from({ length: view === 'month' ? 42 : view === 'agenda' ? 14 : length }, (_, i) => addDays(from, i))
   const occs: Occ[] = useMemo(
     () => owners.flatMap(o => shiftOccurrences(o.planner.shifts, o.planner.restDays, from, to).map(x => ({ ...x, ownerId: o.id }))),
     [owners, from, to],
@@ -68,8 +68,8 @@ export function ScheduleCard({
   const owner = (id: string) => owners.find(o => o.id === id) as ScheduleOwner
   const shiftOf = (o: Occ): Shift | undefined => owner(o.ownerId)?.planner.shifts.find(s => s.id === o.shiftId)
 
-  const label = view === 'day' ? dayName(cursor, true) : view === 'month' ? monthTitle(cursor) : `${dayName(from)} – ${dayName(to)}`
-  const step = (dir: 1 | -1) => setCursor(c => (view === 'month' ? addUnits(c, dir, 'month') : addDays(c, dir * (view === 'day' ? 1 : 7))))
+  const label = view === 'day' ? dayName(cursor, true) : view === 'month' ? monthTitle(cursor) : view === 'year' ? cursor.slice(0, 4) : `${dayName(from)} – ${dayName(to)}`
+  const step = (dir: 1 | -1) => setCursor(c => (view === 'year' ? addUnits(c, dir * 12, 'month') : view === 'month' ? addUnits(c, dir, 'month') : addDays(c, dir * (view === 'day' ? 1 : 7))))
 
   // ---- editing ----
   const openNew = (date: string, startSlot = 48, endSlot = 60, template?: ShiftTemplate) => {
@@ -258,6 +258,43 @@ export function ScheduleCard({
     </div>
   )
 
+  // The year: a small calendar for each month, a day shaded in the colour of its first shift (and underlined at the foot when it has more, and marked when a goal
+  // or the timeline is due), a click opening that day.
+  const yearGrid = (() => {
+    const year = cursor.slice(0, 4)
+    const byDay = new Map<string, Occ[]>()
+    for (const o of occs) byDay.set(o.date, [...(byDay.get(o.date) ?? []), o])
+    return (
+      <div className="wrSchedYear" role="grid" aria-label={year}>
+        {Array.from({ length: 12 }, (_, m) => {
+          const first = `${year}-${String(m + 1).padStart(2, '0')}-01`
+          const count = new Date(Date.UTC(Number(year), m + 1, 0)).getUTCDate()
+          return (
+            <section key={first} className="wrSchedYearMonth" aria-label={monthTitle(first)}>
+              <h4 className="wrSchedYearName">{MONTH_NAMES[m].toUpperCase()}</h4>
+              <div className="wrSchedYearDays">
+                {rowLetters(weekStart).map((l, i) => <span key={i} className="wrSchedYearLetter" aria-hidden="true">{l}</span>)}
+                {Array.from({ length: sinceStart(first, weekStart) }, (_, i) => <i key={`b${i}`} />)}
+                {Array.from({ length: count }, (_, i) => {
+                  const d = addDays(first, i)
+                  const mine = byDay.get(d) ?? []
+                  const due = deadlines.get(d) ?? []
+                  const cls = ['wrSchedYearDay', mine.length > 0 ? 'wrSchedYearDay--has' : '', mine.length > 1 ? 'wrSchedYearDay--many' : '', due.length > 0 ? 'wrSchedYearDay--due' : '', d === today ? 'wrSchedYearDay--today' : ''].filter(Boolean).join(' ')
+                  return (
+                    <button
+                      key={d} type="button" role="gridcell" className={cls} style={mine[0] ? { ['--wr-bc' as string]: `var(--wr-f-${mine[0].facet})` } : undefined}
+                      title={`${dayName(d, true)}${[...mine.map(o => o.title), ...due].map(t => ` · ${t}`).join('')}`} onClick={() => { setCursor(d); setView('day') }}
+                    >{i + 1}</button>
+                  )
+                })}
+              </div>
+            </section>
+          )
+        })}
+      </div>
+    )
+  })()
+
   const agenda = (
     <div className="wrSchedAgenda">
       {days.map(d => {
@@ -288,13 +325,13 @@ export function ScheduleCard({
   return (
     <div className="wrSchedCard wrSchedSchedule">
       <div className="wrSchedHead">
-        <IconBtn Icon={TodayIcon} label="Today" onClick={() => setCursor(today)} />
+        <IconBtn Icon={TodayIcon} iconProps={{ day: Number(today.slice(8)) }} label="Today" onClick={() => setCursor(today)} />
         <IconBtn Icon={ChevronLeftIcon} label="Previous" onClick={() => step(-1)} />
         <IconBtn Icon={ChevronRightIcon} label="Next" onClick={() => step(1)} />
         <strong>{label}</strong>
         <span className="wrSchedSpacer" />
         <div className="wrSchedSeg" role="group" aria-label="Calendar view">
-          {(['day', 'week', 'month', 'agenda'] as CalView[]).map(v => {
+          {(['day', 'week', 'month', 'year', 'agenda'] as CalView[]).map(v => {
             const name = v[0].toUpperCase() + v.slice(1)
             const Icon = VIEW_ICON[v]
             return <button key={v} type="button" className={view === v ? 'on' : ''} aria-pressed={view === v} aria-label={name} title={name} onClick={() => setView(v)}><Icon size={ICON_PX} /></button>
@@ -308,7 +345,7 @@ export function ScheduleCard({
           {owners.flatMap(o => o.planner.templates).map(t => <button key={t.id} type="button" className="wrSmallBtn" onClick={() => openNew(today, 48, 60, t)}>{t.name}</button>)}
         </div>
       )}
-      <div className="wrSchedBody"><div className="wrSchedMain">{view === 'month' ? monthGrid : view === 'agenda' ? agenda : timeGrid}</div></div>
+      <div className="wrSchedBody"><div className="wrSchedMain">{view === 'month' ? monthGrid : view === 'year' ? yearGrid : view === 'agenda' ? agenda : timeGrid}</div></div>
       {editing && editingOwner && (
         <ShiftEditor
           key={`${editing.shift.id}${editing.occurrence}`}

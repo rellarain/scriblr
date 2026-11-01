@@ -170,6 +170,20 @@
   .wrSchedMonthDay { display: flex; flex-direction: column; align-items: flex-start; gap: var(--space-2); min-height: 84px; padding: var(--space-3); border: 0; border-radius: var(--radius-button); background: var(--wr-fill-4); color: inherit; font: inherit; font-size: var(--text-ui); text-align: left; cursor: pointer; overflow: hidden;
     &:hover { background: var(--wr-fill-4); }
     &--out { color: var(--level-ink-soft); } &--today { outline: 2px solid var(--level-ink); outline-offset: -2px; } }
+  // The year: twelve small calendars, a day shaded in the colour of its first shift (the mix is the shift block's, audited), a bar at its foot when it has more,
+  // underlined when something is due, outlined when it is today.
+  .wrSchedMain > .wrSchedYear { flex: 1 1 0; min-height: 0; overflow: auto; scrollbar-width: none; &::-webkit-scrollbar { display: none; } }
+  .wrSchedYear { display: grid; grid-template-columns: repeat(auto-fill, minmax(168px, 1fr)); gap: var(--space-4); align-content: start; }
+  .wrSchedYearMonth { background: var(--wr-fill-4); border-radius: var(--radius-button); padding: var(--space-4); }
+  .wrSchedYearName { margin: 0 0 var(--space-3); font-size: var(--text-ui); font-weight: 800; text-transform: uppercase; }
+  .wrSchedYearDays { display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); gap: var(--space-1); text-align: center; font-size: var(--text-small); }
+  .wrSchedYearLetter { color: var(--level-ink-soft); font-weight: 700; }
+  .wrSchedYearDay { aspect-ratio: 1; display: flex; align-items: center; justify-content: center; padding: 0; border: 0; border-radius: var(--radius-none); background: transparent; color: inherit; font: inherit; cursor: pointer;
+    &:hover { background: var(--level-wash); }
+    &--has { background: color-mix(in srgb, var(--wr-bc) 26%, var(--wr-fill-4)); }
+    &--many { box-shadow: inset 0 -3px 0 var(--wr-bc); }
+    &--due { text-decoration: underline; font-weight: 700; }
+    &--today { outline: 2px solid var(--level-ink); outline-offset: -2px; } }
   .wrSchedMonthShift { display: flex; align-items: center; white-space: nowrap; }
   .wrSchedAgenda { display: flex; flex-direction: column; gap: var(--space-3); }
   .wrSchedAgendaRow { display: flex; gap: var(--space-4); align-items: flex-start; width: 100%; padding: var(--space-4); border: 0; border-radius: var(--radius-button); background: var(--wr-fill-4); color: inherit; font: inherit; text-align: left; cursor: pointer; &:hover { background: var(--wr-fill-4); } small { display: block; color: var(--level-ink-soft); } }

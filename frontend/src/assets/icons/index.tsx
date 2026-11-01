@@ -746,33 +746,47 @@ export function PrintIcon(props: IconProps) {
   </IconBase>
 }
 
-// A calendar page with one day marked: back to today.
-export function TodayIcon(props: IconProps) {
+// The calendar page the views and today share: a narrow header rectangle over a body rectangle where the days would be. Each icon fills or outlines them differently.
+const PAGE_HEADER = { x: 3, y: 3, width: 18, height: 4.5, rx: 1 }
+const PAGE_BODY = { x: 3, y: 9.5, width: 18, height: 11.5, rx: 1 }
+
+// Today: the page with the day of the month in its body (the day is today's where the icon is used; 31 is the widest, for the drawings).
+export function TodayIcon({ day = 31, ...props }: IconProps & { day?: number }) {
   return <IconBase {...props}>
-    <rect x="4" y="5" width="16" height="15" rx="1.5" />
-    <path d="M8 3v4M16 3v4M4 10h16" />
-    <circle cx="12" cy="15" r="2" />
+    <rect {...PAGE_HEADER} />
+    <rect {...PAGE_BODY} />
+    <text x="12" y="18.2" textAnchor="middle" fontSize="8.5" fontWeight="700" fill="currentColor" stroke="none">{day}</text>
   </IconBase>
 }
 
-// The calendar's views: a day (one column), a week (seven), a month (a grid of days).
-export function ViewDayIcon(props: IconProps) {
+// The calendar's views: a year (the header filled, the body outlined), a month (the header outlined, the body filled), a week (both outlined, a stripe across the
+// middle of the body filled) and a day (both outlined, one square in the body filled).
+export function ViewYearIcon(props: IconProps) {
   return <IconBase {...props}>
-    <rect x="4" y="5" width="16" height="15" rx="1.5" />
-    <path d="M4 10h16M12 10v10" />
-  </IconBase>
-}
-
-export function ViewWeekIcon(props: IconProps) {
-  return <IconBase {...props}>
-    <rect x="3" y="5" width="18" height="15" rx="1.5" />
-    <path d="M3 10h18M6.5 10v10M10 10v10M14 10v10M17.5 10v10" />
+    <rect {...PAGE_HEADER} fill="currentColor" />
+    <rect {...PAGE_BODY} />
   </IconBase>
 }
 
 export function ViewMonthIcon(props: IconProps) {
   return <IconBase {...props}>
-    <rect x="3" y="4" width="18" height="16" rx="1.5" />
-    <path d="M3 8.5h18M3 12.5h18M3 16.5h18M9 8.5v11.5M15 8.5v11.5" />
+    <rect {...PAGE_HEADER} />
+    <rect {...PAGE_BODY} fill="currentColor" />
+  </IconBase>
+}
+
+export function ViewWeekIcon(props: IconProps) {
+  return <IconBase {...props}>
+    <rect {...PAGE_HEADER} />
+    <rect {...PAGE_BODY} />
+    <rect x="5.5" y="13.75" width="13" height="3" fill="currentColor" />
+  </IconBase>
+}
+
+export function ViewDayIcon(props: IconProps) {
+  return <IconBase {...props}>
+    <rect {...PAGE_HEADER} />
+    <rect {...PAGE_BODY} />
+    <rect x="9.5" y="12.75" width="5" height="5" fill="currentColor" />
   </IconBase>
 }

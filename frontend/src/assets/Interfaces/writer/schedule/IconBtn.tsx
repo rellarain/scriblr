@@ -5,8 +5,10 @@ import type { IconProps } from '../../../icons'
 export const ICON_PX = 20
 
 // A button that is an icon: its name is the accessible label and the tooltip (the app's buttons are icons wherever one says it).
-export function IconBtn({ Icon, label, title, size = ICON_PX, className = 'wrSmallBtn', ...rest }: {
-  Icon: ComponentType<IconProps>
+export function IconBtn<P extends object = object>({ Icon, iconProps, label, title, size = ICON_PX, className = 'wrSmallBtn', ...rest }: {
+  Icon: ComponentType<IconProps & P>
+  // What the icon is given besides its size (the day on the Today icon).
+  iconProps?: P
   label: string
   title?: string
   size?: number
@@ -14,7 +16,7 @@ export function IconBtn({ Icon, label, title, size = ICON_PX, className = 'wrSma
 } & Omit<ButtonHTMLAttributes<HTMLButtonElement>, 'title' | 'aria-label' | 'children'>) {
   return (
     <button type="button" {...rest} className={`${className} wrIconBtn`} aria-label={label} title={title ?? label}>
-      <Icon size={size} />
+      <Icon {...(iconProps as P)} size={size} />
     </button>
   )
 }

@@ -13,7 +13,7 @@ The console is its own [split grid](../SplitTiles/README.md) inside the tab (sav
 - **Goals** (`GoalsCard`): this week's words, words a writing day, the streak and the best streak, then each goal. A goal is for a **facet** (Outline, Plot, Draft, Revision, Project) and a scope (the project, a book or a chapter), with a daily, a weekly and a total target and an optional **deadline**. It shows its progress as a meter in the facet's colour, today's and the week's share, and a status chip: **▲ Ahead**, **● On track**, **▼ Behind** or **✓ Done**, from the pace of the last 28 days against the pace the deadline needs (the glyph, not only the colour, says which). At the Dash the account's own goals and each project's are listed, each tagged.
 - **Review**: a week or a month of each facet against the one before it, and how many days had any work.
 - **Activity** (`ActivityCard`, `ActivityControls`): the chart takes the whole height of the tile. Its toggles are in the **title bar**, in **up to three rows**: the **handle and the title are always the top row**; the **facet toggles wrap into a row below them** when the bar is too narrow to hold them beside the title; and the **chart and shade toggles wrap into a third row** below those, as **squares** (the same 26px squares as every icon button). In a wide tile they all sit on the top row, on the right. The toggles are smaller and closer than a button in a tile's body: the facets to show (several, all on to begin with, at least one stays on), the chart as two icons (**Grid**, **Line graph**) and, for the grid, what the shades are measured against: **%** of the daily goal or **#** against the busiest day (a facet without a daily goal uses the busiest day). There is no legend and no footnote under the chart.
-- **Schedule** (`ScheduleCard`): Day, Week, Month and Agenda views like a calendar; see below.
+- **Schedule** (`ScheduleCard`): Day, Week, Month, **Year** and Agenda views like a calendar; see below.
 - **Backlog** (`Backlog`): its own tile, beside the schedule. Overdue routines (**Priority**), those due today, those inside their range (low priority), the tasks not on a shift (drag one onto a shift to assign it), the paused routines and, folded, those coming up; and an add box for a task and a routine.
 - **Analytics** (`AnalyticsCard`): words drafted a month by book; the outline's and the plot's growth by kind; revision flags applied and resolved a week; and when in the week the work happens (the days whose events are still kept).
 
@@ -43,6 +43,7 @@ Before the 12 months, each older month is a **bar**, stacked by facet (each face
 
 - **The tile is full height.** The day and week timeline (and the month grid) stretch to the height of the Schedule tile and scroll inside it; there is no fixed height. The timeline has **a row for every 10-minute slot** (144 a day, 20px each), each labelled with its time ("6:10 AM") on **one line**, never wrapped; the whole hours are brighter and bold, with a stronger line above them. It opens at 6 AM.
 
+- **The year view** is twelve small calendars (their names in capitals), the days of the week as letters and each day a button: a day with a shift is **shaded in the colour of its first shift** (the same 26% mix as a shift's block, so it reads), has a **bar at its foot** when it has more than one, is **underlined** when a goal or the timeline is due, and is **outlined** when it is today. A click opens that day; Previous and Next move a year.
 - **Shifts** are blocks on a day, snapped to 10 minutes. Drag across empty time to make one; drag a block to move it (across days in the week view) or its top or bottom edge to resize it; click it, or press Enter on it, to edit it; right-click, or press and hold on a touch screen, for **Edit, Duplicate, Skip this day, Delete**.
 - A shift that repeats asks **This day, This and following, or All of them** when it is changed.
 - **Each ten minutes is judged by itself.** A slot is *done* when its shift's facet logged something in it and *missed* when not; a thin strip down the block's right edge shows each slot (solid, or hatched when missed). The block says **Upcoming, In progress, Done, Partly done** or **Missed** in words.
@@ -54,6 +55,20 @@ Before the 12 months, each older month is a **bar**, stacked by facet (each face
 ## Tokens
 
 The console sits on the level it belongs to, so it uses the **level's tokens** like the other tabs ([level colours](../../level-colours.md)): the Schedule tab itself is on the level's fill like every other console (never the light surface), the console's tiles are one step deeper on `--wr-fill-3`, and a card, a day column, a shift's card behind it, a tile's title bar, a header, a chosen button's text and a menu are on `--wr-fill-4`; text in `--level-ink` (white) and `--level-ink-soft`; lines in `--level-line`, a button's wash in `--level-wash`; a field in `--level-input`, `--level-input-ink` and `--level-input-hint`; `--wr-f-*` for the facets. A chosen button, today's head and a Priority tag are inverted (`--level-ink` with `--wr-fill-4` for the text). The grid's shades are four OKLCH steps of `--cal-src` (the day's leading facet colour, else the accent hue); the lowest is audited at 3:1 on the tile in every hue. Text is 12px or 13px; 11px is for a shift's time only. The facet pairs are in the [contrast audit](../../contrast.md) (group *Schedule*), the rest in *Level panels*.
+
+## The calendar icons
+
+The icons of the calendar's views, and of Today, are **one calendar page** with slight differences: a **narrow header rectangle** over a **body rectangle** where the days would be (`PAGE_HEADER` and `PAGE_BODY` in `assets/icons/index.tsx`).
+
+| Icon | Header | Body | Mark |
+|---|---|---|---|
+| Year | filled | outlined | none |
+| Month | outlined | filled | none |
+| Week | outlined | outlined | a filled horizontal stripe across the middle of the body |
+| Day | outlined | outlined | one filled square in the body |
+| Today | outlined | outlined | the **day of the month** in the body (today's, 31 in the drawings) |
+
+The Review's week and month switch uses the Week and Month icons.
 
 ## Buttons are icons
 
