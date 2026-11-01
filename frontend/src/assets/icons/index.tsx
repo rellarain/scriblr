@@ -291,6 +291,23 @@ export function LayoutMaxIcon(props: IconProps) {
   </IconBase>
 }
 
+// Minimise a tile: it shrinks to its icon in the console's tab bar.
+export function MinimizeIcon(props: IconProps) {
+  return <IconBase {...props}>
+    <path d="M5 19h14" />
+  </IconBase>
+}
+
+// The four corners pointing in: a maximised tile, shrunk back to its place.
+export function ShrinkIcon(props: IconProps) {
+  return <IconBase {...props}>
+    <path d="M3 9h6V3" />
+    <path d="M21 9h-6V3" />
+    <path d="M3 15h6v6" />
+    <path d="M21 15h-6v6" />
+  </IconBase>
+}
+
 export function ExpandIcon(props: IconProps) {
   return <IconBase {...props}>
     <path d="M9 3H3v6" />

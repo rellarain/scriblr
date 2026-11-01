@@ -2,6 +2,8 @@ import { useRef, useState, type ComponentType, type ReactNode } from 'react'
 import { SearchIcon, type IconProps } from '../../../icons'
 import { useStoredState } from '../storage'
 import SplitArea, { columnsTree } from '../SplitArea'
+import { dragJustEnded, startBarDrag } from '../../../../components/tiles/tileDragBus'
+import { moveTab, orderTabs } from '../../../../components/tiles/tabOrder'
 
 // What a tab's content is told: the header's search text. (The header has no New button: a tab adds things from its own body.)
 // `titleSlot` is, for a tab that asks for one (`titleSlot: true`), the element at the right end of its tile's title bar, for what the tab puts there
@@ -49,6 +51,8 @@ export function useTabbedLevel({ storageKey, tabs, size, defaultOpen, defaultTab
 }): { headerExtras: ReactNode; body: ReactNode; isOpen: (id: string) => boolean } {
   const [active, setActive] = useStoredState<string>(`${storageKey}.tab`, defaultTab ?? tabs[0].id)
   const [open, setOpen] = useStoredState<string[]>(`${storageKey}.open`, defaultOpen)
+  // The order of the tab icons, when the user has dragged one (at Max).
+  const [order, setOrder] = useStoredState<string[]>(`${storageKey}.order`, [])
   const [query, setQuery] = useState('')
   const [searching, setSearching] = useState(false)
   const [focusedTile, setFocusedTile] = useState<string | undefined>(undefined)
@@ -67,6 +71,7 @@ export function useTabbedLevel({ storageKey, tabs, size, defaultOpen, defaultTab
     : (tabs.find(t => t.id === active && known(active)) ?? tabs[0])
 
   function pick(id: string) {
+    if (dragJustEnded()) return
     flush?.()
     setActive(id)
     setFocusedTile(id)
@@ -77,13 +82,15 @@ export function useTabbedLevel({ storageKey, tabs, size, defaultOpen, defaultTab
 
   const headerExtras = (
     <div className="wrHeaderExtras">
-      <div className="wrTabBar" role="toolbar" aria-label="Tabs">
-        {tabs.map(t => {
+      {/* At Max the bar is where a tile is dropped to minimize it, and the icons are dragged out to put a tile back (TileArea.tsx). */}
+      <div className="wrTabBar" role="toolbar" aria-label="Tabs" data-tile-bar={max ? storageKey : undefined}>
+        {orderTabs(tabs.map(t => t.id), order).map(id => tabs.find(t => t.id === id)!).map(t => {
           const on = max ? open.includes(t.id) : current?.id === t.id
           return (
             <button
-              key={t.id} type="button" className={`wrTabBtn${on ? ' wrTabBtn--on' : ''}${t.end ? ' wrTabBtn--end' : ''}`}
+              key={t.id} type="button" data-tab-id={t.id} className={`wrTabBtn${on ? ' wrTabBtn--on' : ''}${t.end ? ' wrTabBtn--end' : ''}`}
               aria-label={t.label} title={t.label} aria-pressed={on} onClick={() => pick(t.id)}
+              onPointerDown={max ? e => { if (e.button === 0) startBarDrag(storageKey, t.id, e) } : undefined}
             >
               <t.Icon size={18} />
             </button>
@@ -115,14 +122,17 @@ export function useTabbedLevel({ storageKey, tabs, size, defaultOpen, defaultTab
   } else if (customMax) {
     body = null
   } else {
-    // The open tiles on a split grid: drag a title bar to move a tile, a divider to resize (SplitArea.tsx).
+    // The tiles on a split grid: drag a title bar to move a tile, a divider to resize (TileArea.tsx). A closed tab is a minimized tile: it keeps its slot.
     body = shown.length === 0
       ? <p className="wrMuted">Pick a tab above to open it.</p>
       : (
         <SplitArea
           gridId={storageKey} label="Tiles" defaultTree={columnsTree(shown.map(t => t.id))} onFocusTile={setFocusedTile}
-          tiles={shown.map(t => ({
-            id: t.id, title: t.label, Icon: t.Icon, children: t.render(ctxOf(t)),
+          minimized={tabs.filter(t => !open.includes(t.id)).map(t => t.id)}
+          onReorderTabs={(id, beforeId) => setOrder(moveTab(orderTabs(tabs.map(t => t.id), order), id, beforeId))}
+          onMinimizedChange={(id, minimized) => setOpen(prev => (minimized ? prev.filter(x => x !== id) : prev.includes(id) ? prev : [...prev, id]))}
+          tiles={tabs.map(t => ({
+            id: t.id, title: t.label, Icon: t.Icon, children: open.includes(t.id) ? t.render(ctxOf(t)) : null,
             titleExtras: t.titleSlot ? <span ref={slotRef(t.id)} className="wrTabTileTitleSlot" /> : undefined,
             iconSize: t.iconSize,
             bodyClassName: [(t.surface ?? t.fill) ? 'wrTabTileBody--surface' : '', t.fill ? 'wrTabTileBody--fill' : ''].filter(Boolean).join(' ') || undefined,

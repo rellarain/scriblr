@@ -7,17 +7,13 @@ import {
 import CustomizeControls from '../../CustomizeControls'
 import FlagSettings from './FlagSettings'
 import ThemeSettingsPanel from '../../theme/ThemeSettingsPanel'
-import TileGrid from '../../components/tiles/TileGrid'
-import { TileBig, TileRows, TileSub } from '../../components/tiles/tileParts'
-import type { TileDef } from '../../components/tiles/tileTypes'
+import TileArea, { type AreaTile } from '../../components/tiles/TileArea'
 
 // The User panel (in the header drawer), per scrilbrPlan.md's "User Page (UUI)"
-// section, as tiles: Dashboard, Account and Training are section tiles; expanding
-// one shows its pages as child tiles, which expand into their editors in turn.
-// Settings and Help are the round buttons at a console's bottom right: Dashboard's
-// Settings is the theme customization tool on its own; Account's carries
-// handedness and autosave plus that same theme tool, embedded inline. Everything
-// else is placeholder text until built.
+// section, as tiles: Dashboard, Account and Training, each showing its pages, its settings and its help
+// directly (the global tile, components/tiles/TileArea.tsx). Dashboard's settings are the theme
+// customization tool on its own; Account's carry handedness and autosave plus that same theme tool,
+// embedded inline. Everything else is placeholder text until built.
 //
 // The root class is "uUIPanel"/"uUIContent", deliberately NOT "uUI" -- that class
 // already exists in App.scss as one of the shared, absolutely-positioned
@@ -71,28 +67,22 @@ const SECTIONS: UuiSection[] = [
   },
 ]
 
-export function userTiles(): TileDef[] {
-  return SECTIONS.map(section => {
-    const settings = section.settings?.()
-    const help = <p>{section.help}</p>
-    return {
-      id: section.key, title: section.label, Icon: section.Icon,
-      defaultShape: 'mid',
-      summary: `${section.pages.length} pages`,
-      settings, help,
-      render: ({ height }) => (height < 140
-        ? <TileBig value={section.pages.length} label="pages" />
-        : <TileRows rows={section.pages.map(p => ({ key: p.key, label: p.label }))} />),
-      children: section.pages.map<TileDef>(page => ({
-        id: page.key, title: page.label, Icon: page.Icon,
-        defaultShape: 'mid',
-        summary: page.body,
-        settings, help,
-        render: () => <TileSub>{page.body}</TileSub>,
-        console: () => (page.Console ? <div className="uUIPage"><h2>{page.label}</h2><page.Console /></div> : <div className="uUIPage"><h2>{page.label}</h2><p>{page.body}</p></div>),
-      })),
-    }
-  })
+export function userTiles(): AreaTile[] {
+  return SECTIONS.map(section => ({
+    id: section.key, title: section.label, Icon: section.Icon,
+    children: (
+      <div className="uUISection">
+        {section.pages.map(page => (
+          <section key={page.key} className="uUIPage" aria-label={page.label}>
+            <h2>{page.label}</h2>
+            {page.Console ? <page.Console /> : <p>{page.body}</p>}
+          </section>
+        ))}
+        {section.settings && <section className="uUIPage" aria-label="Settings"><h2>Settings</h2>{section.settings()}</section>}
+        <section className="uUIPage" aria-label="Help"><h2>Help</h2><p>{section.help}</p></section>
+      </div>
+    ),
+  }))
 }
 
 function UUI() {
@@ -102,7 +92,7 @@ function UUI() {
         <div className="uUIConsoleTitleRow">
           <h1 className="uUIConsoleTitle">User</h1>
         </div>
-        <TileGrid gridId="uui" label="User panel tiles" tiles={userTiles()} crumbs={[{ label: 'User' }]} />
+        <TileArea gridId="uui" label="User panel tiles" bar tiles={userTiles()} />
       </div>
     </section>
   )

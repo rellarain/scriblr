@@ -395,109 +395,61 @@ Plus `GET /api/health` (inline in `main.py`, not part of a router).
 
 ## Tile grids (consoles as tiles)
 
-Sub-pages are **read-only tiles** in a grid that always **fills its own container
-exactly** -- no gaps, no ragged last row, like Claude Code's own resizable panes --
-and selecting one expands it into its console/editor. The shared system is
-`frontend/src/components/tiles/`:
+Every console -- the Writer's levels, the Draft page, the Schedule console, the Reader's pages and the User, Admin and
+Helper panels -- is **one global tile** on a grid that always **fills its own container exactly** (no gaps, no ragged
+last row, like Claude Code's own resizable panes). The shared system is `frontend/src/components/tiles/`:
 
-- **A binary split tree** (`splitTree.ts`), not a CSS grid: every branch divides its
-  rect into two along one axis at a ratio, so dragging a divider resizes only its two
-  neighbours and the tiles together always tile the container's exact area. A leaf
-  can be **fixed** (minimized): a fully-fixed subtree (`isAllFixed`) contributes no
-  size at all to the geometry -- its sibling absorbs all of it, recursively, however
-  deep the fixed subtree nests or however it's shaped -- since a minimized tile
-  doesn't render on the stage at all; it renders in the grid's own icon rail instead
-  (see below). `fixedLeafIds` walks the tree in a stable pre-order to give the rail
-  its order, independent of which branch each fixed leaf actually lives under.
-  `buildTree` still groups mini leaves together when seeding a fresh grid (just a
-  convenient initial shape, not load-bearing); `reconcile` grafts new tiles onto an
-  existing tree the same way, pruning removed ones; `computeGeometry` turns a tree
-  plus a pixel rect into every non-fixed tile's and divider's rect in one pass.
-- **Container-based:** a grid measures its own width and height
-  (`useContainerSize`), reserves a fixed-width strip for its icon rail when it has
-  any minimized tiles, and reflows the rest to full-width rows (`flattenOneColumn`)
-  below 400px of *remaining* container width, without touching the saved tree --
-  widening the container returns to the saved split. A grid with trailing content
-  below it (the book face under its link tiles) sizes itself to its content instead
-  of stretching to fill the container; a tile-only grid fills the container's height.
-- **Three states, not five shapes:** a tile is **mini** (collapsed to a plain
-  icon-only square, `RAIL_TILE` = 40px, in the grid's shared left-edge rail --
-  `RailTile.tsx`, a `splitTree.ts` fixed leaf), **mid** (a normal, resizable leaf
-  showing the tile's own `render`, which scales continuously with its actual
-  measured width/height -- there's no separate size-tier label to store), or **max**
-  (the console it expands into, `TileConsole`). A mid tile's header opens it into
-  max, when it has something to open (a console, child tiles, or `onOpen`); clicking
-  its body does nothing. There is no corner button any more -- the header itself is
-  the one clickable part of the tile. `TileDef` carries a `defaultShape: 'mini' |
-  'mid'` and no shape list -- every tile supports both.
-- **`TileGrid`** shows the tiles and their dividers (plus the icon rail, when any
-  tile is minimized), expands one into a `TileConsole` (FLIP animation over the
-  grid's area, back button and breadcrumb, Settings and Help as round buttons at the
-  bottom right via `ConsoleCorner`), and can nest: a tile with `children` expands
-  into a grid of tiles that expand in turn. Keyboard: arrows move focus between
-  tiles, Enter opens the focused tile (when it has something to open), Escape
-  collapses an open console, Alt+arrows swap the focused tile with its neighbour; a
-  divider can be dragged or focused and nudged with the arrow keys. The whole tile
-  (not just its header) is the drag handle -- a plain click still opens it (a click
-  never involves movement, so the two don't conflict). Dragging it onto another tile
-  swaps their places, each area keeping its own size; dragging it onto a **divider**
-  instead (when there's room -- `canInsertAt`) wedges the tile in as a new side
-  right there rather than swapping -- a divider between side-by-side tiles gains a
-  new column, one between stacked tiles a new row (`insertAtDivider`). Dragging it
-  onto another tile's own **edge margin** (25% of that tile's own box, on whichever
-  axis the pointer is closer to an edge on) instead splits off a new column beside
-  it (left/right, `canInsertBeside`/`insertBesideLeaf`) or a new row above/below it
-  (top/bottom, `canInsertBelow`/`insertBelowLeaf`), localized to just that one
-  target tile rather than the whole grid. Dragging it into the grid's shared icon
-  rail minimizes it instead -- a thin drop-zone placeholder appears there for the
-  duration of any drag if nothing is minimized yet, so there's always somewhere to
-  drop it; clicking a rail icon restores it to mid. A few quick actions (tick a
-  task, add a note or task, open an item) work without expanding. There is no
-  "reset layout" control -- a mis-dragged grid is put back by hand.
-- **Remembered per user** (`useSplitLayout`, stored with `useStoredState` in the
-  user-settings kv as `scriblr.tiles.<gridId>`): the tree, each tile's mini/mid state,
-  the open tile, and whether its console is maximized. Pure logic in `tileLayout.ts`
-  (`applyLayout`) and `tileNav.ts` (`nextFocus`, reused for Alt+arrow's
-  nearest-neighbour swap).
-- **Maximize** (Writer only so far): double-clicking an expanded console's header
-  hides the Writer's own sidebar so the console spans the full width; it's
-  remembered with the grid's layout and clears on Back/Escape. `TileGrid`'s
-  `onMaximizeChange` prop is the hook other panels can wire up the same way later.
-- **Writer:** the Shelves and Shelf screens are tile grids (`writer/tiles/shelvesTiles.tsx`,
-  `shelfTiles.tsx`; previews come from `tileData.ts`); the Book screen keeps the book
-  face under two link tiles (`bookTiles.tsx`); the Page and Pages screens keep their
-  editors (Pages' Reaction / Flag / Export are buttons in its title row). The sidebar
-  stays, with its Project, Book and Chapter panels as tiles (chapters stay rows); it
-  scrolls independently of the main screen, is **resizable from its right edge**
-  (drag, double-click to reset, or the arrow keys with a focused handle;
-  `scriblr.writer.sidebarWidth`), and can be **minimized** to a slim rail while the
-  main screen has two columns or fewer. Settings and Help sit at the bottom right
-  of every console.
-- **User panel** (`assets/Interfaces/UUI.tsx`): Dashboard, Account and Training are
-  section tiles; each expands into its pages as child tiles, which expand into their
-  editors. Dashboard's Settings (corner button) is the theme tool on its own
-  (`ThemeSettingsPanel`, own heading and Save/Restore); Account's Settings
-  (`CustomizeControls`) is handedness and autosave plus that same theme tool
-  embedded inline (`showHeader={false}`, its heading and Save/Restore replaced by
-  one shared pair covering all three groups, since they're the same settings
-  store). `useTileHost()` (a nested grid handing a tile it does not have to the
-  grid it is in) is still there for other cross-tile jumps, just not this one any
-  more.
-- **Admin panel** (`AUI.tsx`): its eight sections as tiles with their pages as child
-  tiles; a Resources config page keeps its publish badge, Save draft / Publish and
-  lock inside its console and saves when it is left. AUI's own width is no longer a
-  handful of preset sizes -- it's dragged from its outer edge (`Sidebar.tsx`'s
-  `AuiResize`, next to the sidebar divider; the drag direction flips with
-  handedness), snapping to 400px columns and remembered as `scriblr.admin.width`;
-  `min()` in the CSS (`--aui-w`, `App.tsx`) keeps it from exceeding the rest of the
-  screen even if the window shrinks. Its panel matches the sidebar divider's own
-  background rather than the desaturated-accent tone the rest of the sidebar uses, so
-  the two read as one continuous surface. Below 400px of its own width every tile is
-  a row, same as any other grid.
-- **Helper panel** (`HUI.tsx`): Inbox, Queue and Settings tiles (plus the open chat's
-  Conversation) in the 400px panel. The sidebar divider's buttons still choose the open
-  console: `TileGrid` is controlled here (`open` / `onOpenChange`), and Back or a mini
-  tile only overrides the choice until the buttons change it again.
+- **A binary split tree** (`splitTree.ts`), not a CSS grid: every branch divides its rect into two along one axis at a
+  ratio, so dragging a divider resizes only its two neighbours. A leaf can be **fixed** (minimized): a fully-fixed
+  subtree (`isAllFixed`) takes no room -- its sibling absorbs all of it -- but it **keeps its slot** in the tree, so
+  restoring it puts it back where it was. `syncFixed` makes the tree's flags say which tiles are minimized (the grid, or
+  the console, decides that; the saved flags are only what was last written). `reconcile` grafts new tiles onto an
+  existing tree and prunes removed ones; `computeGeometry` turns a tree plus a pixel rect into every visible tile's and
+  divider's rect in one pass.
+- **`TileArea`** (`TileArea.tsx`; the Writer imports it as `writer/SplitArea.tsx`) draws the tiles, their dividers and,
+  with `bar`, a tab bar. Every tile has the same **title bar**: a grip, the tile's icon, its name in capitals, the tile's
+  own controls (`titleExtras`), then a **Minimize** button (and **Maximize** where a tile asks, `maximizable`). The title
+  bar is the drag handle (a tile's body holds fields and text). A tile's colours are the `--gt-*` variables a console sets
+  (`--gt-fill`, `--gt-title-fill`, `--gt-ink`, `--gt-accent`); otherwise the theme's.
+- **Dropping (`tileDrop.ts`)**: the tile under the pointer is cut into a 3x3 grid. The middle **swaps** the two tiles; the
+  four edge cells put the tile **above, below, left or right** of it; a corner takes whichever of its two edges the
+  pointer is nearer (the cell's own diagonal), and when the hovered tile touches that outer edge of the grid it is a **new
+  row or column across the whole grid** (`insertAtGridEdge`, the new tile taking 30%), otherwise it is the edge cell
+  beside it. A divider is a wedge (`insertAtDivider`). Where there is no room (`canInsertBeside`, `canInsertBelow`,
+  `canInsertAt`, `canInsertAtGridEdge`) nothing is offered; in one-column mode nothing goes beside.
+- **The preview**: the drag is pointer-driven (`useTileDrag` is inside `TileArea`): the dragged tile follows the pointer
+  at full opacity, and the tree the drop would make (`applyDrop`, pure) is laid out *while dragging*, so the other tiles
+  **slide** (0.16s) to open a **dashed, accent-tinted gap** where it will land. Hit-testing uses the layout as it was when
+  the drag began, so the sliding never moves the target out from under the pointer. Escape cancels. There is no keyboard
+  way to rearrange tiles; arrows move focus between title bars, and a divider is nudged with the arrow keys.
+- **Minimize**: the Minimize button, dropping a tile on the console's **tab bar**, or (the Writer) pressing an open tab
+  all minimize a tile into **an icon in the bar** (`TileTabBar`, `data-tile-bar=<gridId>`; the Writer draws its own bar in
+  the level's header with the same attributes, `levels/LevelTabs.tsx`). Pressing the icon restores the tile to its old
+  slot; **dragging the icon out** into the layout (`tileDragBus.ts` lets a bar anywhere start the drag in its area)
+  restores it where it is dropped. For a grid that does not decide it itself, minimized tiles are remembered with the layout.
+- **Container-based:** a grid measures its own width and height (`useContainerSize`) and reflows to one column below
+  400px (`flattenOneColumn`) without touching the saved tree -- widening it returns to the saved split.
+- **Remembered per user** (`useSplitLayout`, stored with `useStoredState` in the user-settings kv as
+  `scriblr.tiles.<gridId>`): the tree, which tiles are minimized (`shapes`) and the maximized tile. A console can control
+  minimizing (`minimized` / `onMinimizedChange`) and maximizing (`maximized` / `onMaximizedChange`) itself: the Writer's
+  tabs do the first, the Reader the second. Pure logic in `tileLayout.ts` (`applyLayout`) and `tileNav.ts` (`nextFocus`).
+- **Writer:** the level tabs (`useTabbedLevel`) are a tile each; a closed tab is a minimized tile. Draft's three tiles and
+  the Schedule console's six are on the same area, each with a tab bar above it. The Shelves and Shelf screens, the
+  Book screen (`writer/tiles/`) and the sidebar's Project, Book and Chapter panels are their own thing; the sidebar is
+  **resizable from its right edge** (`scriblr.writer.sidebarWidth`).
+- **Reader** (`reader/ReaderPanel.tsx`): a page's consoles are tiles; an icon in the header bar is a minimized console, an
+  open one a tile, and Maximize makes it the full console (the others become icons; the URL names it).
+- **User panel** (`assets/Interfaces/UUI.tsx`): Dashboard, Account and Training are tiles showing their pages, their
+  settings and their help directly. Dashboard's settings are the theme tool on its own (`ThemeSettingsPanel`); Account's
+  (`CustomizeControls`) are handedness and autosave plus that same theme tool embedded inline (`showHeader={false}`).
+- **Admin panel** (`AUI.tsx`): its eight sections and Resources as tiles; a Resources config page keeps its publish
+  badge, Save draft / Publish and lock inside its tile and saves when it is left. AUI's own width is dragged from its outer
+  edge (`Sidebar.tsx`'s `AuiResize`, next to the sidebar divider; the drag direction flips with handedness), snapping to
+  400px columns and remembered as `scriblr.admin.width`; `min()` in the CSS (`--aui-w`, `App.tsx`) keeps it from exceeding
+  the rest of the screen. Below 400px of its own width every tile is a row.
+- **Helper panel** (`HUI.tsx`): Inbox, Queue and Settings tiles (plus the open chat's Conversation) in the 400px panel.
+  The sidebar divider's buttons choose the open tile (the grid's `minimized` list is controlled here); the tab bar opens
+  the others until the buttons change the choice again.
 
 ## Design system
 
@@ -615,12 +567,10 @@ mounted it; it remains in git history.
   A level's header carries its **tabs** (`levels/LevelTabs.tsx`, `useTabbedLevel`): 30×30 icon
   buttons, ending with Settings and Help, then quick actions (Search, a context-aware New and
   Save). At Mid one tab shows at a time; at Max each tab is a tile that its button opens or
-  closes, the open tiles on a **split grid** (`SplitArea.tsx`, on the `components/tiles` split-tree
-  engine: `splitTree.ts`, `Divider.tsx`, `useSplitLayout.ts`, `tileDrag.ts`): two alternating columns to begin
-  with, and drag a tile's title bar onto another tile to swap, onto its edge to split off a new column or row, or onto a divider to wedge it in;
-  drag a divider (or focus it and use the arrow keys) to resize the two tiles it separates; Alt+arrows on a title bar swap
-  it with its neighbour. The tree always fills the area (a tile that opens is grafted on, one that
-  closes pruned), stacks in one column under 400px, and is remembered per level with the open tiles and the
+  closes (it is minimized, and keeps its slot), the tiles on a **split grid** (`SplitArea.tsx`, the global tile area on the `components/tiles`
+  split-tree engine, see Tile grids): two alternating columns to begin
+  with; drag a tile's title bar onto another tile (its 3x3 zones: the middle swaps, the edges put it beside, above or below, a corner a new row or column across
+  the whole grid), onto a divider to wedge it in, or onto the tab bar to minimize it, with the others sliding aside to show the gap; drag a divider (or focus it and use the arrow keys) to resize the two tiles it separates. The tree always fills the area (a tile that opens is grafted on), stacks in one column under 400px, and is remembered per level with the open tiles and the
   current tab. A lone open tile has the whole area; every tile scrolls its own body. The Dash's tabs (`levels/dashTabs.tsx`) are Schedule (the console: goals, activity, shifts, backlog, analytics, review; `writer/schedule/`),
   Readers, Scratchpad, Project template, Settings (the theme panel) and Help (the resource
   articles written for the level in the Resources builder, `levels/HelpArticles.tsx`). The

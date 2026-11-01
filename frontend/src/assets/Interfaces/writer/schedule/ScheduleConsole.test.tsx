@@ -113,7 +113,7 @@ describe('the Schedule console', () => {
     await open()
     const bar = tile('activity').querySelector('.wrTabTileTitle') as HTMLElement
     const inBar = within(bar)
-    expect(inBar.getAllByRole('button').map(b => b.getAttribute('aria-label') ?? b.textContent)).toEqual(['Outline', 'Plot', 'Draft', 'Revision', 'Project', 'Grid', 'Line graph', 'Vs goal', 'Vs busiest day'])
+    expect(inBar.getAllByRole('button').map(b => b.getAttribute('aria-label') ?? b.textContent)).toEqual(['Outline', 'Plot', 'Draft', 'Revision', 'Project', 'Grid', 'Line graph', 'Vs goal', 'Vs busiest day', 'Minimize Activity'])
     expect(inBar.getByRole('button', { name: 'Vs goal' }).textContent).toBe('%')
     expect(inBar.getByRole('button', { name: 'Vs busiest day' }).textContent).toBe('#')
     expect(tile('activity').querySelector('.wrSchedTileBody .wrSchedFacet')).toBeNull()

@@ -20,46 +20,48 @@ const helper = (selectedChatId: string | null = null) => ({ selectedChatId } as 
 const tile = (id: string) => document.querySelector(`[data-tile-id="${id}"]`) as HTMLElement
 
 describe('HUI (the Helper panel as tiles)', () => {
-  it('opens the console the sidebar buttons chose, and a chosen chat wins', () => {
+  it('opens the tile the sidebar buttons chose, and a chosen chat wins', () => {
     const { rerender } = render(<HUI side="right" helper={helper()} panel="settings" />)
-    expect(screen.getByRole('region', { name: 'Settings' })).toBeTruthy()
+    expect(tile('settings')).toBeTruthy()
+    expect(tile('inbox')).toBeNull()
     rerender(<HUI side="right" helper={helper()} panel="inbox" />)
     expect(screen.getByRole('region', { name: 'Inbox' })).toBeTruthy()
     expect(screen.getByText('inbox console')).toBeTruthy()
+    expect(tile('settings')).toBeNull()
     rerender(<HUI side="right" helper={helper('chat-1')} panel="inbox" />)
     expect(screen.getByRole('region', { name: 'Conversation' })).toBeTruthy()
     expect(screen.getByText('chat console')).toBeTruthy()
+    expect(tile('inbox')).toBeNull()
   })
 
-  it('shows Inbox, Queue and Settings tiles after Back, Settings collapsed into the rail', async () => {
+  it('opens the other tiles from the tab bar, which keeps the others where they were', async () => {
     const user = userEvent.setup()
     render(<HUI side="right" helper={helper()} panel="inbox" />)
-    await user.click(screen.getByRole('button', { name: 'Back to tiles' }))
-    expect(document.querySelector('.tileConsole')).toBeNull()
-    expect(['inbox', 'queue', 'settings'].map(id => tile(id).getAttribute('data-shape'))).toEqual(['mid', 'mid', 'mini'])
-    expect(tile('settings').closest('.tileRail')).toBeTruthy()
-    expect(tile('chat')).toBeNull()
-    await user.click(within(tile('queue')).getByRole('button', { name: 'Open Queue' }))
-    expect(screen.getByRole('region', { name: 'Queue' })).toBeTruthy()
-    // Reaching a minimized tile's console: back to the grid, restore it from the
-    // rail, then its own corner button (no more in-console tile-switch strip).
-    await user.click(screen.getByRole('button', { name: 'Back to tiles' }))
-    await user.click(tile('settings'))
-    await user.click(within(tile('settings')).getByRole('button', { name: 'Open Settings' }))
-    expect(screen.getByRole('region', { name: 'Settings' })).toBeTruthy()
+    const bar = screen.getByRole('toolbar', { name: 'Helper tiles tabs' })
+    expect(within(bar).getAllByRole('button').map(b => [b.getAttribute('aria-label'), b.getAttribute('aria-pressed')])).toEqual([['Inbox', 'true'], ['Queue', 'false'], ['Settings', 'false']])
+    await user.click(within(bar).getByRole('button', { name: 'Queue' }))
+    expect(tile('inbox')).toBeTruthy()
+    expect(tile('queue')).toBeTruthy()
+    await user.click(within(tile('inbox')).getByRole('button', { name: 'Minimize Inbox' }))
+    expect(tile('inbox')).toBeNull()
+    expect(tile('queue')).toBeTruthy()
   })
 
-  it('follows the sidebar again when its choice changes after the user went back', async () => {
+  it('follows the sidebar again when its choice changes after the user opened another tile', async () => {
     const user = userEvent.setup()
     const { rerender } = render(<HUI side="right" helper={helper()} panel="inbox" />)
-    await user.click(screen.getByRole('button', { name: 'Back to tiles' }))
-    expect(document.querySelector('.tileConsole')).toBeNull()
+    await user.click(within(screen.getByRole('toolbar', { name: 'Helper tiles tabs' })).getByRole('button', { name: 'Settings' }))
+    expect(tile('settings')).toBeTruthy()
     rerender(<HUI side="right" helper={helper()} panel="queue" />)
-    expect(screen.getByRole('region', { name: 'Queue' })).toBeTruthy()
+    expect(tile('queue')).toBeTruthy()
+    expect(tile('settings')).toBeNull()
+    expect(tile('inbox')).toBeNull()
   })
 
   it('lists the conversation tile only while a chat is selected', () => {
-    render(<HUI side="right" helper={helper('chat-1')} panel="inbox" />)
-    for (const id of ['inbox', 'queue', 'settings', 'chat']) expect(tile(id)).toBeTruthy()
+    const { rerender } = render(<HUI side="right" helper={helper()} panel="inbox" />)
+    expect(screen.queryByRole('button', { name: 'Conversation' })).toBeNull()
+    rerender(<HUI side="right" helper={helper('chat-1')} panel="inbox" />)
+    expect(screen.getByRole('button', { name: 'Conversation' })).toBeTruthy()
   })
 })

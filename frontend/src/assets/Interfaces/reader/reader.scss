@@ -44,7 +44,6 @@
   .rdLevelHead { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 14px; padding: 8px 14px 8px 18px; }
   .rdLevelTitle { display: flex; align-items: center; gap: 10px; margin: 4px 0; font-size: 14px; font-weight: 700; letter-spacing: 1.5px; text-transform: uppercase; line-height: 1.7; margin-right: 4px; }
   .rdLevelRight { margin-left: auto; display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
-  .rdBar { display: flex; gap: 2px; padding: 2px; background: var(--rd-wash-lo); }
 
   // ---------------------------------------------------------------- controls (40px: touch targets)
   .rdIconBtn {
@@ -83,14 +82,13 @@
   .rdSearch { display: flex; align-items: center; gap: 8px; flex: 1 1 160px; .rdField { flex: 1; } }
 
   // ---------------------------------------------------------------- consoles
-  .rdGrid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; padding: 2px 8px 8px; align-items: start; &--one { grid-template-columns: minmax(0, 1fr); } }
-  // A console that stands alone takes the whole row.
-  .rdGrid > .rdCon:only-child { grid-column: 1 / -1; }
-  .rdCon { container-type: inline-size; container-name: rdcon; background: var(--rd-f1); display: flex; flex-direction: column; min-width: 0; }
-  .rdConHead { display: flex; align-items: center; gap: 10px; padding: 0 6px 0 14px; min-height: 46px; background: var(--rd-f3); }
-  .rdConTitle { flex: 1; text-align: left; display: flex; align-items: center; gap: 10px; min-height: 46px; font-size: 12px; font-weight: 700; letter-spacing: 1.5px; text-transform: uppercase; }
+  // The consoles are the global tile (components/tiles/TileArea.tsx) in the page's own colours; each is a size container for what it holds.
+  .rdLevel { --gt-fill: var(--rd-f1); --gt-title-fill: var(--rd-f3); --gt-ink: var(--rd-ink); --gt-accent: var(--accent-hover); }
+  .rdLevel .gtScroll { min-height: 520px; padding: 2px 8px 8px; }
+  .rdCon { container-type: inline-size; container-name: rdcon; }
   .rdConBody { padding: 14px; display: flex; flex-direction: column; gap: 12px; min-width: 0; }
-  .rdEmpty { margin: 0; padding: 18px; font-size: 14px; grid-column: 1 / -1; }
+  .rdBar { background: var(--rd-wash-lo); .tileTabBar { padding: 2px; gap: 2px; background: transparent; } .tileTabBtn { width: 40px; height: 40px; border-radius: 4px; opacity: 1; &:hover { background: var(--rd-wash); } &--on { background: var(--rd-wash-hi); } } }
+  .rdEmpty { margin: 0; padding: 18px; font-size: 14px; }
   .rdCard { background: var(--rd-f2); padding: 14px; display: flex; flex-direction: column; gap: 10px; min-width: 0; }
   .rdCardTitle { margin: 0; display: flex; align-items: center; gap: 8px; font-size: 12px; font-weight: 700; letter-spacing: 1.5px; text-transform: uppercase; }
   .rdEmptyCard p { margin: 0; }
@@ -184,7 +182,6 @@
   }
 
   // ---------------------------------------------------------------- the e-reader (PAGES): one column, tracks and crease at the left, notes in the right margin
-  .rdCon--wide { grid-column: 1 / -1; }
   .rdLevel--pages .rdConBody { padding: 8px; }
   .rdLevel--focus .rdLevelHead, .rdLevel--focus .rdNotice { opacity: 0.12; transition: opacity 0.3s; &:hover, &:focus-within { opacity: 1; } }
   .rdReader {
@@ -298,7 +295,6 @@
 @container rd (max-width: 900px) {
   .rdRoot .rdLayout { flex-direction: column; }
   .rdRoot .rdRail { flex-direction: row; flex: 0 0 auto; padding: 0 14px; height: 48px; justify-content: flex-start; gap: 10px; span { writing-mode: horizontal-tb; max-height: none; } }
-  .rdRoot .rdGrid { grid-template-columns: minmax(0, 1fr); }
   .rdRoot .rdGrid2, .rdRoot .rdGrid3, .rdRoot .rdGrid4 { grid-template-columns: minmax(0, 1fr); }
   .rdRoot .rdCatalog, .rdRoot .rdHero, .rdRoot .rdBorrow { grid-template-columns: minmax(0, 1fr); }
   .rdRoot .rdLevelHead { padding-left: 12px; }

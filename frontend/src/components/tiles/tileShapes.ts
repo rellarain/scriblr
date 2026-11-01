@@ -1,28 +1,16 @@
-// A tile's two read-only states in the split-tree grid (components/tiles/
-// splitTree.ts) -- a third, "max", is the console it expands into (TileConsole),
-// not a grid state at all.
+// How tiles share a grid (components/tiles/splitTree.ts).
 //
-//   mini   collapsed to a plain icon-only square in the grid's shared left-edge rail
-//   mid    a normal (resizable) leaf: full content that scales with its measured size
+//   mini   minimized: takes no room, shown as an icon in the console's tab bar, and keeps its slot in the layout
+//   mid    open: a normal (resizable) leaf
 //
-// The grid is measured by its own size (not the window's), so a narrow sidebar or a
-// 400px panel goes to one column even on a wide monitor.
+// The grid is measured by its own size (not the window's), so a narrow sidebar or a 400px panel goes to one column even
+// on a wide monitor.
 export type TileShape = 'mini' | 'mid'
 
 export const ROW_UNIT = 46
 export const GRID_GAP = 8
 export const MIN_COLUMN = 140
-// A minimized tile's icon square, in the grid's shared left-edge rail.
-export const RAIL_TILE = 40
 // Below this container width every tile stacks edge to edge in one column.
 export const ONE_COLUMN_BELOW = 400
 
 export const isOneColumn = (width: number): boolean => width < ONE_COLUMN_BELOW
-
-// How many columns of at least MIN_COLUMN fit in a container `width` px wide. Used
-// where a whole-number column count still matters (the Writer's narrow-sidebar
-// check), not by the split-tree layout itself.
-export function columnsFor(width: number): number {
-  if (isOneColumn(width)) return 1
-  return Math.max(1, Math.floor((width + GRID_GAP) / (MIN_COLUMN + GRID_GAP)))
-}

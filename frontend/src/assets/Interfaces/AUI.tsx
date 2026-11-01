@@ -5,9 +5,7 @@ import {
   EnvelopeIcon, CalendarIcon, HelpIcon, TeamIcon, SortingIcon, ConfigurationIcon, InfoIcon, PlotIcon,
   type IconProps,
 } from '../icons'
-import TileGrid from '../../components/tiles/TileGrid'
-import { TileBig, TileRows, TileSub } from '../../components/tiles/tileParts'
-import type { TileDef } from '../../components/tiles/tileTypes'
+import TileArea, { type AreaTile } from '../../components/tiles/TileArea'
 
 // The article and quiz builder (and the Markdown renderer behind it) is loaded when its console is opened.
 const ResourcesConsole = lazy(() => import('./admin/resources/ResourcesConsole'))
@@ -136,50 +134,35 @@ const SECTIONS: AuiSectionDef[] = [
   },
 ]
 
-// Not one of the Section/subSection page-editor tiles above: Resources is a
-// single console, the article/quiz builder (admin/resources/ResourcesConsole.tsx)
-// -- real backend persistence, its own Interface > Console > Component >
-// Feature tree, not a per-page settings editor.
-const RESOURCES_HELP = <p>Author Guides, Tutorials, FAQs, feedback and an Exam/Test/Quiz bank for every interface, console, component and feature here.</p>
+// Not one of the Section/subSection tiles above: Resources is a single tile, the article/quiz builder
+// (admin/resources/ResourcesConsole.tsx) -- real backend persistence, its own Interface > Console >
+// Component > Feature tree, not a per-page settings editor.
 
 function AUI() {
-  // Each section is a tile; its pages are child tiles that expand into their editors.
-  // A section's Help sub-tab is the Help button at its console's corner.
-  const tiles: TileDef[] = SECTIONS.map(section => {
+  // Each section is a tile showing its pages directly; a section's Help sub-page is a paragraph at its foot.
+  const tiles: AreaTile[] = SECTIONS.map(section => {
     const pages = section.subSections.filter(s => s.label !== 'Help')
-    const help = <p>{section.subSections.find(s => s.label === 'Help')?.body}</p>
+    const help = section.subSections.find(s => s.label === 'Help')?.body
     return {
       id: section.key, title: section.label, Icon: section.Icon,
-      defaultShape: 'mid',
-      summary: `${pages.length} ${pages.length === 1 ? 'page' : 'pages'}`,
-      help,
-      render: ({ height }) => (height < 140
-        ? <TileBig value={pages.length} label={pages.length === 1 ? 'page' : 'pages'} />
-        : <TileRows rows={pages.map(p => ({ key: p.key, label: p.label }))} />),
-      children: pages.map<TileDef>(page => ({
-        id: page.key, title: page.label, Icon: page.Icon,
-        defaultShape: 'mid',
-        summary: page.body,
-        help,
-        render: () => <TileSub>{page.body}</TileSub>,
-        console: () => (
-          <div className="aUIPage">
-            {page.key !== 'configPlot' && <h2>{page.label}</h2>}
-            {page.key === 'assignment' ? <RoleAssignment />
-              : page.key === 'configPlot' ? <Suspense fallback={null}><PlotPresetsConsole /></Suspense>
-              : <p>{page.body}</p>}
-          </div>
-        ),
-      })),
+      children: (
+        <div className="aUISection">
+          {pages.map(page => (
+            <section key={page.key} className="aUIPage" aria-label={page.label}>
+              {page.key !== 'configPlot' && <h2>{page.label}</h2>}
+              {page.key === 'assignment' ? <RoleAssignment />
+                : page.key === 'configPlot' ? <Suspense fallback={null}><PlotPresetsConsole /></Suspense>
+                : <p>{page.body}</p>}
+            </section>
+          ))}
+          {help && <section className="aUIPage" aria-label="Help"><h2>Help</h2><p>{help}</p></section>}
+        </div>
+      ),
     }
   })
   tiles.push({
     id: 'resources', title: 'Resources', Icon: InfoIcon,
-    defaultShape: 'mid',
-    summary: 'Article & quiz builder',
-    help: RESOURCES_HELP,
-    render: () => <TileSub>Author Guides, Tutorials, FAQs and Exam/Test/Quiz content here.</TileSub>,
-    console: () => <Suspense fallback={null}><ResourcesConsole /></Suspense>,
+    children: <Suspense fallback={null}><ResourcesConsole /></Suspense>,
   })
 
   return (
@@ -189,7 +172,7 @@ function AUI() {
           <div className="aUIConsoleTitleRow">
             <h1 className="aUIConsoleTitle">Admin</h1>
           </div>
-          <TileGrid gridId="aui" label="Admin panel tiles" tiles={tiles} crumbs={[{ label: 'Admin' }]} />
+          <TileArea gridId="aui" label="Admin panel tiles" bar tiles={tiles} />
         </div>
       </div>
     </section>

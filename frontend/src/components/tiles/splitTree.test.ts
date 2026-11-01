@@ -1,8 +1,8 @@
 import { describe, expect, it } from 'vitest'
 import {
-  MIN_LEAF_H, MIN_LEAF_W, buildTree, canInsertAt, canInsertBeside, canInsertBelow, computeGeometry, fixedLeafIds, fixup,
+  MIN_LEAF_H, MIN_LEAF_W, buildTree, canInsertAt, canInsertBeside, canInsertBelow, computeGeometry, fixedLeafIds,
   flattenOneColumn, insertAtDivider, insertBelowLeaf, insertBesideLeaf, isAllFixed, isLeaf, leafIds, minSize, rectAtPath,
-  reconcile, resizeBranch, setFixed, swapLeaves,
+  reconcile, resizeBranch, setFixed, swapLeaves, syncFixed,
 } from './splitTree'
 import type { SplitNode } from './splitTree'
 
@@ -158,16 +158,25 @@ describe('swapLeaves', () => {
   })
 })
 
-describe('setFixed and fixup', () => {
-  it('straightens a row branch to col when one side becomes fixed', () => {
+describe('setFixed and syncFixed', () => {
+  it('keeps the branch direction when a side becomes fixed (a minimized tile takes no room wherever it sits)', () => {
     const tree: SplitNode = { dir: 'row', ratio: 0.5, a: { id: 'a' }, b: { id: 'b' } }
     const fixed = setFixed(tree, 'a', true)
-    expect(isLeaf(fixed) ? undefined : fixed.dir).toBe('col')
+    expect(isLeaf(fixed) ? undefined : fixed.dir).toBe('row')
+    expect(fixedLeafIds(fixed)).toEqual(['a'])
+    expect(computeGeometry(fixed, { x: 0, y: 0, w: 400, h: 300 }).tiles).toEqual([{ id: 'b', rect: { x: 0, y: 0, w: 400, h: 300 } }])
   })
 
-  it('fixup is a no-op on an already-straight tree', () => {
-    const tree = buildTree([P('a', 'mini'), P('b', 'mid')])!
-    expect(fixup(tree)).toEqual(tree)
+  it('restores a tile to the slot it had', () => {
+    const tree: SplitNode = { dir: 'row', ratio: 0.3, a: { id: 'a' }, b: { id: 'b' } }
+    const back = setFixed(setFixed(tree, 'a', true), 'a', false)
+    expect(back).toEqual(tree)
+  })
+
+  it('syncFixed sets and clears the flags from a set of ids, leaving the tree alone when nothing changes', () => {
+    const tree = buildTree([P('a', 'mini'), P('b', 'mid'), P('c', 'mid')])!
+    expect(syncFixed(tree, new Set(['a']))).toBe(tree)
+    expect(fixedLeafIds(syncFixed(tree, new Set(['b', 'c'])))).toEqual(['b', 'c'])
   })
 })
 

@@ -24,18 +24,6 @@ const leaf = (id: string): SplitLeaf => ({ id })
 const row = (a: SplitNode, b: SplitNode, ratio = 0.5): SplitBranch => ({ dir: 'row', ratio, a, b })
 const col = (a: SplitNode, b: SplitNode, ratio = 0.5): SplitBranch => ({ dir: 'col', ratio, a, b })
 
-// A fixed leaf must be a direct child of a `col` branch (stacked, not side by side) so
-// it always reports a short, fixed height. Run after any edit that could place one
-// under a `row` branch.
-export function fixup(node: SplitNode): SplitNode {
-  if (isLeaf(node)) return node
-  const a = fixup(node.a)
-  const b = fixup(node.b)
-  const needsCol = (isLeaf(a) && a.fixed) || (isLeaf(b) && b.fixed)
-  const dir = needsCol ? 'col' : node.dir
-  return dir === node.dir && a === node.a && b === node.b ? node : { ...node, dir, a, b }
-}
-
 export function leafIds(node: SplitNode): string[] {
   return isLeaf(node) ? [node.id] : [...leafIds(node.a), ...leafIds(node.b)]
 }
@@ -66,8 +54,8 @@ function setAtPath(node: SplitNode, path: Path, fn: (n: SplitBranch) => SplitBra
 
 // A leaf's minimum size, and a branch's (its children's, combined along the split
 // axis). A fully-fixed subtree (every leaf in it minimized) contributes nothing --
-// it lives in the grid's own icon rail, not in this geometry, so it costs no space
-// and no gap.
+// it is an icon in the console's tab bar, not in this geometry, so it costs no space
+// and no gap (its slot in the tree is kept, to restore it to).
 export function minSize(node: SplitNode): { w: number; h: number } {
   if (isAllFixed(node)) return { w: 0, h: 0 }
   if (isLeaf(node)) return { w: MIN_LEAF_W, h: MIN_LEAF_H }
@@ -82,7 +70,7 @@ export function minSize(node: SplitNode): { w: number; h: number } {
 }
 
 // Whether a subtree is nothing but minimized (fixed) tiles -- such a subtree lives
-// only in the grid's shared icon rail (TileGrid.tsx), never on the stage, so it
+// only in the console's tab bar, never on the stage, so it
 // takes no on-screen space at all and its sibling in every enclosing branch
 // absorbs the space it would have used.
 export function isAllFixed(node: SplitNode): boolean {
@@ -130,7 +118,7 @@ export interface DividerGeometry { path: Path; dir: SplitDir; rect: Rect }
 // One measuring pass: every (non-fixed) tile's rect and every divider's rect and
 // drag axis, laid out to fill `rect` exactly (or overflow it when below the tree's
 // minimum, so the container can scroll). A fixed (minimized) leaf gets no rect at
-// all here -- it lives in the grid's own icon rail instead (see fixedLeafIds).
+// all here -- it is an icon in the console's tab bar instead (see fixedLeafIds).
 export function computeGeometry(node: SplitNode, rect: Rect, path: Path = []): { tiles: TileGeometry[]; dividers: DividerGeometry[] } {
   if (isLeaf(node)) return node.fixed ? { tiles: [], dividers: [] } : { tiles: [{ id: node.id, rect }], dividers: [] }
   const [aRect, bRect] = splitRect(node, rect)
@@ -163,7 +151,7 @@ export function rectAtPath(node: SplitNode, rect: Rect, path: Path): Rect {
 }
 
 // Every fixed (minimized) leaf's id, in a stable pre-order walk of the whole tree --
-// the order the grid's shared icon rail stacks them in, independent of which
+// a stable order for them, independent of which
 // branch each one actually lives under.
 export function fixedLeafIds(node: SplitNode): string[] {
   return isLeaf(node) ? (node.fixed ? [node.id] : []) : [...fixedLeafIds(node.a), ...fixedLeafIds(node.b)]
@@ -264,7 +252,7 @@ export function insertAtDivider(tree: SplitNode, id: string, path: Path): SplitN
     const newBranch: SplitBranch = { dir, ratio, a: origA, b: { dir, ratio: 0.5, a: newLeaf, b: origB } }
     result = replaceRef(withoutId, origBranch, newBranch)
   }
-  return fixup(result)
+  return result
 }
 
 // Whether a leaf's own rect has room to split into two side-by-side minimum-width
@@ -291,7 +279,7 @@ export function insertBesideLeaf(tree: SplitNode, draggedId: string, targetId: s
   const newBranch: SplitBranch = side === 'left'
     ? { dir: 'row', ratio: 0.5, a: newLeaf, b: target }
     : { dir: 'row', ratio: 0.5, a: target, b: newLeaf }
-  return fixup(replaceRef(withoutId, target, newBranch))
+  return replaceRef(withoutId, target, newBranch)
 }
 
 // Whether a leaf's own rect has room to split into two side-by-side minimum-height
@@ -314,19 +302,29 @@ export function insertBelowLeaf(tree: SplitNode, draggedId: string, targetId: st
   const newBranch: SplitBranch = side === 'top'
     ? { dir: 'col', ratio: 0.5, a: newLeaf, b: target }
     : { dir: 'col', ratio: 0.5, a: target, b: newLeaf }
-  return fixup(replaceRef(withoutId, target, newBranch))
+  return replaceRef(withoutId, target, newBranch)
 }
 
-// A leaf's fixed (mini) flag, changed in place; the branch that directly holds it is
-// straightened out by `fixup`. This is what toggling a tile between mini and mid does.
+// A leaf's fixed (minimized) flag, changed in place: the leaf keeps its slot in the tree, takes no room
+// while it is fixed and gets the same slot back when it is not.
 export function setFixed(tree: SplitNode, id: string, fixed: boolean): SplitNode {
+  return syncFixed(tree, new Set(fixed ? [...fixedLeafIds(tree), id] : fixedLeafIds(tree).filter(x => x !== id)))
+}
+
+// Every leaf's fixed flag made to say whether its id is in `minimized` (the tree's own flags are only what
+// was last saved; which tiles are minimized is decided by the grid -- stored with it, or by the level).
+export function syncFixed(tree: SplitNode, minimized: ReadonlySet<string>): SplitNode {
   function map(node: SplitNode): SplitNode {
-    if (isLeaf(node)) return node.id === id ? { ...node, fixed } : node
+    if (isLeaf(node)) {
+      const want = minimized.has(node.id)
+      if (want === Boolean(node.fixed)) return node
+      return want ? { ...node, fixed: true } : { id: node.id }
+    }
     const a = map(node.a)
     const b = map(node.b)
     return a === node.a && b === node.b ? node : { ...node, a, b }
   }
-  return fixup(map(tree))
+  return map(tree)
 }
 
 // Every branch stacked vertically instead of split -- the one-column rule (below
@@ -357,18 +355,14 @@ export function buildTree(placed: Array<{ id: string; shape: TileShape }>): Spli
     return { dir, ratio: 0.5, a, b }
   }
 
-  if (rest.length === 0) {
-    // Every tile is mini (e.g. the short link tiles above a book face): all
-    // stay their fixed, short height -- nothing stretches to fill leftover space.
-    return fixup(miniStack(minis))
-  }
-  if (minis.length === 0) return fixup(build(rest, 'row'))
-  return fixup(col(build(rest, 'row'), miniStack(minis)))
+  if (rest.length === 0) return miniStack(minis)
+  if (minis.length === 0) return build(rest, 'row')
+  return col(build(rest, 'row'), miniStack(minis))
 }
 
 // Groups mini leaves together in the tree (a `col` chain) -- just a convenient
 // initial shape; they take no on-screen space here either way (isAllFixed), and
-// render in the grid's shared icon rail, ordered by fixedLeafIds, not by this tree.
+// are icons in the console's tab bar, not placed by this tree.
 function miniStack(minis: Array<{ id: string }>): SplitNode {
   let stack: SplitNode = fixedLeaf(minis[minis.length - 1].id)
   for (const mini of minis.slice(0, -1).reverse()) stack = col(fixedLeaf(mini.id), stack)
@@ -401,7 +395,48 @@ export function reconcile(tree: SplitNode | null, placed: Array<{ id: string; sh
   for (const id of missing) {
     const shape = shapeOf.get(id) ?? 'mid'
     if (!cur) { cur = shape === 'mini' ? fixedLeaf(id) : leaf(id); continue }
-    cur = shape === 'mini' ? col(cur, fixedLeaf(id), 0.5) : row(leaf(id), cur, 0.32)
+    // A minimized tile is grafted in the slot it will have when it is restored.
+    cur = row(shape === 'mini' ? fixedLeaf(id) : leaf(id), cur, 0.32)
   }
-  return cur ? fixup(cur) : (buildTree(placed) ?? leaf(placed[0]?.id ?? ''))
+  return cur ?? buildTree(placed) ?? leaf(placed[0]?.id ?? '')
+}
+
+// Wraps the whole tree in a new row or column along one outer edge of the grid: the tile (pulled out of
+// wherever it was) takes the full width (left, right) or height (top, bottom) of the grid there, about 30% of it.
+export const GRID_EDGE_RATIO = 0.3
+export type EdgeSide = 'left' | 'right' | 'top' | 'bottom'
+
+export function insertAtGridEdge(tree: SplitNode, id: string, side: EdgeSide): SplitNode {
+  const dragged = findLeaf(tree, id)
+  if (!dragged) return tree
+  const rest = removeLeaf(tree, id)
+  if (!rest) return tree
+  const newLeaf: SplitLeaf = dragged.fixed ? { id, fixed: true } : { id }
+  const r = GRID_EDGE_RATIO
+  switch (side) {
+    case 'left': return { dir: 'row', ratio: r, a: newLeaf, b: rest }
+    case 'right': return { dir: 'row', ratio: 1 - r, a: rest, b: newLeaf }
+    case 'top': return { dir: 'col', ratio: r, a: newLeaf, b: rest }
+    case 'bottom': return { dir: 'col', ratio: 1 - r, a: rest, b: newLeaf }
+  }
+}
+
+// Whether the tree, with the tile pulled out and wrapped in a new row/column at an edge, still fits the grid's area
+// (its minimum sizes along both axes, gaps included).
+export function canInsertAtGridEdge(tree: SplitNode, id: string, side: EdgeSide, stage: Rect): boolean {
+  const next = insertAtGridEdge(tree, id, side)
+  if (next === tree) return false
+  const min = minSize(next)
+  return min.w <= stage.w + 0.5 && min.h <= stage.h + 0.5
+}
+
+// Whether a tile's rect sits against an outer edge of the grid's area.
+export function touchesStageEdge(rect: Rect, stage: Rect, side: EdgeSide): boolean {
+  const tol = 1.5
+  switch (side) {
+    case 'left': return Math.abs(rect.x - stage.x) <= tol
+    case 'right': return Math.abs(rect.x + rect.w - (stage.x + stage.w)) <= tol
+    case 'top': return Math.abs(rect.y - stage.y) <= tol
+    case 'bottom': return Math.abs(rect.y + rect.h - (stage.y + stage.h)) <= tol
+  }
 }

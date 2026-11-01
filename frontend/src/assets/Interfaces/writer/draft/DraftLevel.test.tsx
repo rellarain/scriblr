@@ -9,6 +9,7 @@ import { outlineNode, placing, plotNode } from '../plotTestWorkspace'
 import type { WriterWorkspace } from '../useWriterWorkspace'
 import DraftLevel from './DraftLevel'
 import { mockFetch } from '../../../../test/mockFetch'
+import { dragTile } from '../../../../test/tileDrag'
 import { makeWorkspace, type WorkspaceOverrides } from '../../../../test/makeWorkspace'
 
 // The chapter's draft is stood in for by state in the hook's place (the real one talks to the backend).
@@ -201,10 +202,8 @@ describe('Draft level: the right page tiles', () => {
 
   it('moves a tile when its title bar is dragged onto another, and remembers it', () => {
     const first = setup()
-    const data = { setData: vi.fn(), setDragImage: vi.fn(), effectAllowed: '' }
-    fireEvent.dragStart(sectionOf('draft').querySelector('.wrTabTileTitle')!, { dataTransfer: data })
-    fireEvent.dragOver(sectionOf('chapter'), { dataTransfer: data })
-    fireEvent.drop(sectionOf('chapter'), { dataTransfer: data })
+    const chapter = sectionOf('chapter')
+    dragTile(sectionOf('draft').querySelector<HTMLElement>('.wrTabTileTitle')!, { x: 10, y: 400 }, { x: parseFloat(chapter.style.width) / 2, y: parseFloat(chapter.style.height) / 2 })
     expect(top('draft')).toBe(0)
     expect(top('chapter')).toBeGreaterThan(0)
     first.unmount()
@@ -269,7 +268,7 @@ describe('Draft level: Draft | Preview', () => {
   it('has Preview off until there is something to preview', () => {
     setup()
     expect((screen.getByRole('button', { name: 'Preview' }) as HTMLButtonElement).disabled).toBe(true)
-    expect(screen.getByRole('button', { name: 'Draft' }).getAttribute('aria-pressed')).toBe('true')
+    expect(within(screen.getByRole('group', { name: 'Chapter view' })).getByRole('button', { name: 'Draft' }).getAttribute('aria-pressed')).toBe('true')
   })
 
   it('asks for the preview from its button once there is draft text', async () => {
@@ -287,7 +286,7 @@ describe('Draft level: Draft | Preview', () => {
     expect(within(pane).getByRole('button', { name: 'Reaction' })).toBeTruthy()
     // The tile stays.
     expect(within(tile()).getByLabelText('Chapter 1').textContent).toBe('1') // the number badge
-    await user.click(screen.getByRole('button', { name: 'Draft' }))
+    await user.click(within(screen.getByRole('group', { name: 'Chapter view' })).getByRole('button', { name: 'Draft' }))
     expect(spies.showDraft).toHaveBeenCalled()
   })
 

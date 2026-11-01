@@ -1,5 +1,5 @@
 import { zoneColorTokens, ZONE_THEMES, type ColorToken } from './colors'
-import { GRID_GAP, ONE_COLUMN_BELOW, RAIL_TILE } from '../../src/components/tiles/tileShapes'
+import { GRID_GAP, ONE_COLUMN_BELOW } from '../../src/components/tiles/tileShapes'
 import { HUE_RANGES } from '../../src/theme/bookColors'
 import { ZONE_KEYS } from '../../src/theme/types'
 
@@ -45,7 +45,6 @@ export const SPACING: Token[] = [
   { name: 'space-7', value: px(18), usage: 'Dashboard column gaps.' },
   { name: 'tab-size', value: px(30), usage: 'A header tab and quick action: a 30x30 icon button, its icon 18px.' },
   { name: 'header-min', value: px(40), usage: 'The least height of a level\'s header strip.' },
-  { name: 'rail-tile', value: px(40), usage: 'A minimised tile\'s icon square in the older tile grid\'s rail.' },
   { name: 'one-column-below', value: px(ONE_COLUMN_BELOW), usage: 'Below this width a split grid stacks its tiles in one column.' },
   ...(Object.entries(HUE_RANGES) as Array<[keyof typeof HUE_RANGES, number]>).map(([level, range]): Token => ({
     name: `hue-range-${level}`, value: String(range),

@@ -154,7 +154,7 @@ function NookPage({ loc, ctx, color, right }: PageProps) {
     { id: 'analytics', label: 'Analytics', Icon: BarChartIcon, render: size => <AnalyticsConsole ctx={ctx} size={size} /> },
     { id: 'feed', label: 'Feed', Icon: FeedIcon, render: size => <FeedConsole ctx={ctx} size={size} /> },
   ]
-  return <ReaderPanel title="Nook" Icon={HomeIcon} color={color} consoles={consoles} states={states} onStates={onStates} right={right} />
+  return <ReaderPanel gridId="reader.nook" title="Nook" Icon={HomeIcon} color={color} consoles={consoles} states={states} onStates={onStates} right={right} />
 }
 
 function LibraryPage({ loc, ctx, color, right }: PageProps) {
@@ -165,7 +165,7 @@ function LibraryPage({ loc, ctx, color, right }: PageProps) {
     { id: 'shelf', label: 'Shelf', Icon: ShelfIcon, render: size => <ShelfConsole ctx={ctx} size={size} /> },
     { id: 'history', label: 'History', Icon: HistoryIcon, render: size => <HistoryConsole ctx={ctx} size={size} /> },
   ]
-  return <ReaderPanel title="Library" Icon={LibraryIcon} color={color} consoles={consoles} states={states} onStates={onStates} right={right} />
+  return <ReaderPanel gridId="reader.library" title="Library" Icon={LibraryIcon} color={color} consoles={consoles} states={states} onStates={onStates} right={right} />
 }
 
 function BookPage({ loc, ctx, color, right, book }: PageProps & { book: CatalogBook | undefined }) {
@@ -188,7 +188,7 @@ function BookPage({ loc, ctx, color, right, book }: PageProps & { book: CatalogB
     )
   }
   return (
-    <ReaderPanel title={book.title} Icon={BookFaceIcon} color={color} consoles={consoles} states={states} onStates={onStates} right={right}
+    <ReaderPanel gridId="reader.book" title={book.title} Icon={BookFaceIcon} color={color} consoles={consoles} states={states} onStates={onStates} right={right}
       notice={<div className="rdNotice"><LevelBadge ctx={ctx} book={book} /></div>} edge={<EdgeTabs ctx={ctx} book={book} />} className="rdLevel--book" />
   )
 }
@@ -212,7 +212,7 @@ function PagesBook({ loc, ctx, color, right, book }: PageProps & { book: Catalog
     { id: 'settings', label: 'Settings', Icon: SlidersIcon, render: () => <SettingsConsole ctx={ctx} session={session} /> },
   ]
   return (
-    <ReaderPanel title={book.title} Icon={PagesIcon} color={color} consoles={consoles} states={states} onStates={onStates} right={right}
+    <ReaderPanel gridId="reader.pages" title={book.title} Icon={PagesIcon} color={color} consoles={consoles} states={states} onStates={onStates} right={right}
       notice={<div className="rdNotice"><LevelBadge ctx={ctx} book={book} /></div>}
       edge={<EdgeTabs ctx={ctx} book={book} current={session.n} chapters={session.text?.chapters} />} className={focus ? 'rdLevel--pages rdLevel--focus' : 'rdLevel--pages'} />
   )

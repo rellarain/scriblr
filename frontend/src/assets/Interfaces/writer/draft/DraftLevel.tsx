@@ -114,7 +114,7 @@ function DraftPage({ w, chapter, pagesComponent, onPagesComponent }: {
           <div className="wrSpreadRight">
             {/* The page's three tiles on a split grid: drag a title bar to move one, a divider to resize. */}
             <SplitArea
-              gridId="scriblr.writer.draft" label="Chapter tiles" defaultTree={DRAFT_LAYOUT} onFocusTile={setFocusedTile}
+              gridId="scriblr.writer.draft" label="Chapter tiles" bar defaultTree={DRAFT_LAYOUT} onFocusTile={setFocusedTile}
               tiles={[
                 {
                   id: 'chapter', title: 'Chapter', Icon: PencilIcon, bodyClassName: 'wrDraftTileBody',

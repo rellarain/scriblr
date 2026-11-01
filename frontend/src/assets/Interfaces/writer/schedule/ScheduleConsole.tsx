@@ -12,6 +12,7 @@ import { slotOfDate } from '../../../../lib/ribbon'
 import type { WeekStart } from '../../../../lib/scheduleCalendar'
 import { FACET_COLOR } from '../../../../theme/zoneLooks'
 import { SplitArea, type SplitTile } from '../SplitArea'
+import { BarChartIcon, CalendarIcon, GoalIcon, GridViewIcon, HistoryIcon, ListIcon } from '../../../icons'
 import { useStoredState } from '../shared'
 import { ActivityCard, ActivityControls, useActivityState, type FacetGoalFacts } from './ActivityCard'
 import { AnalyticsCard } from './AnalyticsCard'
@@ -165,11 +166,11 @@ export default function ScheduleConsole({ scope, projectIds, titles, titleSlot }
 
   const settingsButton = <SettingsButton open={settingsOpen} onToggle={() => setSettingsOpen(o => !o)} />
   const tiles: SplitTile[] = [
-    { id: 'goals', title: 'Goals', children: <GoalsCard owners={owners} progress={progress} stats={stats} nodes={single?.outline ?? []} scoped={scope === 'project'} /> },
-    { id: 'review', title: 'Review', children: <ReviewCard daily={daily} today={today} /> },
-    { id: 'activity', title: 'Activity', titleExtras: <ActivityControls state={activity} />, children: <ActivityCard state={activity} data={schedule.facets} today={today} weekStart={weekStart} dailyGoals={dailyGoals} totals={totals} /> },
+    { id: 'goals', title: 'Goals', Icon: GoalIcon, children: <GoalsCard owners={owners} progress={progress} stats={stats} nodes={single?.outline ?? []} scoped={scope === 'project'} /> },
+    { id: 'review', title: 'Review', Icon: HistoryIcon, children: <ReviewCard daily={daily} today={today} /> },
+    { id: 'activity', title: 'Activity', Icon: GridViewIcon, titleExtras: <ActivityControls state={activity} />, children: <ActivityCard state={activity} data={schedule.facets} today={today} weekStart={weekStart} dailyGoals={dailyGoals} totals={totals} /> },
     {
-      id: 'schedule', title: 'Schedule',
+      id: 'schedule', title: 'Schedule', Icon: CalendarIcon,
       children: (
         <ScheduleCard
           owners={owners} today={today} nowSlot={nowSlot} events={schedule.facets.events} weekStart={weekStart} targets={targets} ticks={ticks}
@@ -177,10 +178,10 @@ export default function ScheduleConsole({ scope, projectIds, titles, titleSlot }
       ),
     },
     {
-      id: 'backlog', title: 'Backlog',
+      id: 'backlog', title: 'Backlog', Icon: ListIcon,
       children: <Backlog owners={owners} today={today} todayTicks={Object.fromEntries(owners.map(o => [o.id, ticks.get(o.id, today)]))} onPlanner={(id, next) => owners.find(o => o.id === id)?.setPlanner(next)} onTick={(id, item, on) => ticks.set(id, today, item, on)} />,
     },
-    { id: 'analytics', title: 'Analytics', children: <AnalyticsCard data={schedule.facets} today={today} titles={bookTitles} weekStart={weekStart} /> },
+    { id: 'analytics', title: 'Analytics', Icon: BarChartIcon, children: <AnalyticsCard data={schedule.facets} today={today} titles={bookTitles} weekStart={weekStart} /> },
   ]
   return (
     <div className="wrSchedConsole" style={hueVars(hues) as CSSProperties}>
@@ -192,7 +193,7 @@ export default function ScheduleConsole({ scope, projectIds, titles, titleSlot }
           scopeLabel={scope === 'dash' ? 'Account' : 'This project'} onClose={() => setSettingsOpen(false)}
         />
       )}
-      <SplitArea iconSize={ICON_PX} gridId={`scriblr.writer.schedule.tiles.${scope}`} label="Schedule tiles" tiles={tiles.map(t => ({ ...t, bodyClassName: `wrSchedTileBody${t.id === 'activity' ? ' wrSchedTileBody--chart' : ''}` }))} defaultTree={DEFAULT_TREE} />
+      <SplitArea iconSize={ICON_PX} gridId={`scriblr.writer.schedule.tiles.${scope}`} label="Schedule tiles" bar tiles={tiles.map(t => ({ ...t, bodyClassName: `wrSchedTileBody${t.id === 'activity' ? ' wrSchedTileBody--chart' : ''}` }))} defaultTree={DEFAULT_TREE} />
     </div>
   )
 }

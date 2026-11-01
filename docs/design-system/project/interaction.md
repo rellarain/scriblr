@@ -16,19 +16,23 @@ A level's header carries its **tabs**: 30 x 30 icon buttons, ending with Setting
 
 ## Moving and resizing tiles
 
-Tiles on a split grid (`SplitArea`) are moved by their **title bar**, not their body, so what is typed in a tile is never dragged.
+Tiles on a split grid (`TileArea`) are moved by their **title bar**, not their body, so what is typed in a tile is never dragged.
 
-| Gesture | Result |
+| gesture | result |
 |---|---|
-| drag a title bar onto another tile's middle | the two swap places, each area keeping its size |
-| drop on a tile's edge (the outer quarter) | a new column or row splits off beside or below it; the edge shows a bar where it will go |
-| drop on a divider | the tile is wedged in as a new side there |
+| drag a title bar onto a tile's middle cell | the two swap places, each area keeping its size |
+| onto a tile's top, bottom, left or right middle cell | inserted above, below, left or right of it |
+| onto a tile's corner | a new row or column across the whole grid at the nearer outer edge (when the tile touches it; else the edge cell beside it) |
+| onto a divider | the tile is wedged in as a new side there |
+| onto the console's tab bar | the tile is minimized to its icon |
+| press a tab icon (or the Minimize button) | a tile is minimized or restored to its old slot |
+| drag a tab icon into the grid | the tile is restored where it is dropped |
 | drag a divider | the two tiles it separates resize; nothing else moves |
-| arrow keys on a focused divider (Shift: bigger steps) | the same, by 2% (8%) |
+| arrow keys on a focused divider | resize it (Shift for bigger steps) |
 | arrow keys on a focused title bar | focus moves to the neighbouring tile |
-| Alt + arrow on a title bar | the tile swaps with its neighbour, and keeps the focus |
+| Escape while dragging | the drag is cancelled |
 
-While a tile is dragged it is half opaque; a tile it could land on gets a 2px accent outline, a divider it could wedge into thickens to 4px.
+While a tile is dragged it follows the pointer at full opacity and the other tiles slide aside (0.16s) to open an accent-tinted gap with a dashed outline where it will land. There is no keyboard way to rearrange tiles.
 
 ## The book: contents and tabs
 

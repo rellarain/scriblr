@@ -5,6 +5,7 @@ import { __resetSettingsForTests } from '../../../../settings/settingsStore'
 import { CalendarIcon, PencilIcon, GearIcon } from '../../../icons'
 import { useTabbedLevel, type LevelTab } from './LevelTabs'
 import { mockFetch } from '../../../../test/mockFetch'
+import { dragTile, holdTile } from '../../../../test/tileDrag'
 
 beforeEach(() => {
   window.localStorage.clear()
@@ -86,10 +87,7 @@ describe('useTabbedLevel', () => {
     const first = render(<Harness size="max" />)
     const tile = (name: string) => screen.getByRole('region', { name }) as HTMLElement
     const twoLeft = parseFloat(tile('Two').style.left)
-    const data = { setData: vi.fn(), setDragImage: vi.fn(), effectAllowed: '' }
-    fireEvent.dragStart(tile('One').querySelector('.wrTabTileTitle')!, { dataTransfer: data })
-    fireEvent.dragOver(tile('Two'), { dataTransfer: data })
-    fireEvent.drop(tile('Two'), { dataTransfer: data })
+    dragTile(tile('One').querySelector<HTMLElement>('.wrTabTileTitle')!, { x: 10, y: 10 }, { x: twoLeft + parseFloat(tile('Two').style.width) / 2, y: 300 })
     expect(parseFloat(tile('One').style.left)).toBe(twoLeft)
     expect(parseFloat(tile('Two').style.left)).toBe(0)
     const divider = document.querySelector('[role="separator"]') as HTMLElement
@@ -100,6 +98,26 @@ describe('useTabbedLevel', () => {
     expect(parseFloat(tile('One').style.left)).toBe(saved.oneLeft)
     expect(parseFloat(tile('Two').style.left)).toBe(0)
     expect(parseFloat(tile('Two').style.width)).toBe(saved.twoWidth)
+  })
+
+  it('lets the tab icons be dragged into another order at Max, remembered across a remount', () => {
+    vi.spyOn(HTMLElement.prototype, 'getBoundingClientRect').mockImplementation(function (this: HTMLElement) {
+      const index = ['one', 'two', 'set'].indexOf(this.dataset.tabId ?? '')
+      if (index >= 0) return { width: 30, height: 30, top: -45, left: index * 40, right: index * 40 + 30, bottom: -15, x: index * 40, y: -45, toJSON: () => ({}) }
+      const bar = this.hasAttribute('data-tile-bar')
+      return { width: 1000, height: bar ? 40 : 0, top: bar ? -50 : 0, left: 0, right: 1000, bottom: bar ? -10 : 0, x: 0, y: bar ? -50 : 0, toJSON: () => ({}) }
+    })
+    const first = render(<Harness size="max" />)
+    const order = () => Array.from(screen.getByRole('toolbar', { name: 'Tabs' }).querySelectorAll('button')).map(b => b.getAttribute('aria-label'))
+    expect(order()).toEqual(['One', 'Two', 'Settings'])
+    const held = holdTile(screen.getByRole('button', { name: 'Two' }), { x: 50, y: -30 })
+    held.moveTo(5, -30)
+    held.drop()
+    expect(order()).toEqual(['Two', 'One', 'Settings'])
+    expect(screen.getByRole('button', { name: 'Two' }).getAttribute('aria-pressed')).toBe('true') // dragging an icon along the bar does not close its tile
+    first.unmount()
+    render(<Harness size="max" />)
+    expect(order()).toEqual(['Two', 'One', 'Settings'])
   })
 
   it('has no New (add) button in the header: a tab adds things from its own body', () => {

@@ -103,7 +103,7 @@ function SplitGridCard() {
   return (
     <LevelFrame level="dash" title="Tiles on a split grid">
       <SplitArea
-        gridId="design-system.split" label="Tiles"
+        gridId="design-system.split" label="Tiles" bar
         tiles={TILES.map(t => ({ ...t, children: <p className="wrMuted" style={{ opacity: 0.9 }}>{LOREM}</p> }))}
       />
     </LevelFrame>

@@ -1,40 +1,60 @@
 import { useCallback, useRef } from 'react'
 import { useStoredState } from '../../assets/Interfaces/writer/storage'
 import { applyLayout, type PlacedTile, type TileMeta } from './tileLayout'
-import {
-  insertAtDivider, insertBelowLeaf, insertBesideLeaf, leafIds, reconcile, resizeBranch as resizeBranchAt, setFixed,
-  swapLeaves as swapLeavesAt, type Path, type SplitNode,
-} from './splitTree'
+import { applyDrop, type DropPlan } from './tileDrop'
+import { moveTab, orderTabs } from './tabOrder'
+import { leafIds, reconcile, resizeBranch as resizeBranchAt, syncFixed, type Path, type SplitNode } from './splitTree'
 
 interface SplitState {
   tree: SplitNode | null
+  // 'mini' for a minimized tile (when the grid keeps that itself); anything else is open.
   shapes: Record<string, string>
-  open: string | null
-  maximized: boolean
+  // The tile shown alone over the whole area, if any (older layouts stored a boolean here).
+  maximized: string | boolean | null
+  // The order of the tab-bar icons, when the user has moved one.
+  order?: string[]
 }
 
-const EMPTY_STATE: SplitState = { tree: null, shapes: {}, open: null, maximized: false }
+const EMPTY_STATE: SplitState = { tree: null, shapes: {}, maximized: null }
 
-// One grid's split-tree layout (each tile's place, and mini/mid state) and its
-// expanded (max) tile, remembered per user with the other saved settings
-// (settings/settingsStore.ts).
-// `defaultTree` seeds a grid with nothing saved yet (new or missing tiles are still grafted on).
-export function useSplitLayout<T extends TileMeta>(gridId: string, defs: T[], defaultTree?: SplitNode) {
+export interface SplitLayoutOptions {
+  // Where the tiles sit before the user has moved any (new or missing tiles are still grafted on).
+  defaultTree?: SplitNode
+  // The tiles that are minimized, when the level decides that itself (the Writer's closed tabs). Without it the grid
+  // keeps it: a tile is minimized when its `defaultShape` says so until the user moves it, and from then on as saved.
+  minimized?: readonly string[]
+  // Told when a tile is minimized or restored (so a level that decides it can keep its own list).
+  onMinimizedChange?: (id: string, minimized: boolean) => void
+  // The tile shown alone over the whole area, when the console decides that itself (null: none); `onMaximizedChange` hears the user's changes.
+  maximized?: string | null
+  onMaximizedChange?: (id: string | null) => void
+}
+
+// One grid's split-tree layout -- each tile's place, which tiles are minimized and which one is maximized --
+// remembered per user with the other saved settings (settings/settingsStore.ts). A minimized tile keeps its slot
+// in the tree (it only takes no room), so restoring it puts it back where it was.
+export function useSplitLayout<T extends TileMeta>(gridId: string, defs: T[], options: SplitLayoutOptions = {}) {
   const [saved, setSaved] = useStoredState<SplitState>(`scriblr.tiles.${gridId}`, EMPTY_STATE)
-  // The latest tiles and default layout, for `update` below (which lives across renders): a grid whose tiles
-  // come and go (the Writer's open tabs) must not reconcile a move against the tiles of an earlier render.
-  const latest = useRef({ defs, defaultTree })
-  latest.current = { defs, defaultTree }
+  // The latest tiles and options, for `update` below (which lives across renders): a grid whose tiles come and go
+  // must not reconcile a move against the tiles of an earlier render.
+  const latest = useRef({ defs, options })
+  latest.current = { defs, options }
 
   const resolve = (state: SplitState) => {
-    const { defs, defaultTree } = latest.current
+    const { defs, options } = latest.current
     const order = state.tree ? leafIds(state.tree) : undefined
     const resolved = applyLayout(defs, { order, shapes: state.shapes as Record<string, PlacedTile<T>['shape']> })
-    const shaped = resolved.map(p => ({ id: p.def.id, shape: p.shape }))
-    return { placed: resolved, tree: reconcile(state.tree ?? defaultTree ?? null, shaped) }
+    const minimized = new Set(options.minimized ?? resolved.filter(p => p.shape === 'mini').map(p => p.def.id))
+    const placed = resolved.map(p => ({ def: p.def, shape: minimized.has(p.def.id) ? 'mini' as const : 'mid' as const }))
+    const tree = syncFixed(reconcile(state.tree ?? options.defaultTree ?? null, placed.map(p => ({ id: p.def.id, shape: p.shape }))), minimized)
+    return { placed, tree, minimized }
   }
 
-  const { placed, tree } = resolve(saved)
+  const { placed, tree, minimized } = resolve(saved)
+  const wantMax = options.maximized !== undefined ? options.maximized : saved.maximized
+  const maximizedId = typeof wantMax === 'string' && placed.some(p => p.def.id === wantMax && !minimized.has(p.def.id)) ? wantMax : null
+
+  const tabOrder = orderTabs(defs.map(d => d.id), saved.order)
 
   const update = useCallback((fn: (tree: SplitNode, prev: SplitState) => Partial<SplitState>) => {
     setSaved(prev => {
@@ -45,34 +65,31 @@ export function useSplitLayout<T extends TileMeta>(gridId: string, defs: T[], de
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [gridId, setSaved])
 
+  // Minimizes a tile (it keeps its slot, and takes no room) or restores it.
+  const setMinimized = useCallback((id: string, on: boolean) => {
+    const { options } = latest.current
+    if (options.minimized) options.onMinimizedChange?.(id, on)
+    else update((_t, prev) => ({ shapes: { ...prev.shapes, [id]: on ? 'mini' : 'mid' } }))
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [update])
+
   return {
     placed,
     tree,
-    openId: saved.open && leafIds(tree).includes(saved.open) ? saved.open : null,
-    maximized: saved.maximized,
-    setOpen: (id: string | null) => setSaved(prev => ({ ...prev, open: id })),
-    setMaximized: (on: boolean) => setSaved(prev => ({ ...prev, maximized: on })),
+    minimized,
+    maximizedId,
+    tabOrder,
+    reorderTabs: (id: string, beforeId: string | null) => update((_t, prev) => ({ order: moveTab(orderTabs(latest.current.defs.map(d => d.id), prev.order), id, beforeId) })),
+    setMaximized: (id: string | null) => {
+      if (options.maximized !== undefined) options.onMaximizedChange?.(id)
+      else setSaved(prev => ({ ...prev, maximized: id }))
+    },
+    setMinimized,
     resize: (path: Path, ratio: number) => update(t => ({ tree: resizeBranchAt(t, path, ratio) })),
-    swap: (idA: string, idB: string) => update(t => ({ tree: swapLeavesAt(t, idA, idB) })),
-    // Drops a dragged tile onto a divider instead of another tile: a new column or
-    // row for it, wedged in right at that divider, rather than swapping places.
-    insertAt: (id: string, path: Path) => update(t => ({ tree: insertAtDivider(t, id, path) })),
-    // Drops a dragged tile onto another tile's left/right edge margin: a new column
-    // beside it, rather than swapping places with it.
-    insertBeside: (draggedId: string, targetId: string, side: 'left' | 'right') =>
-      update(t => ({ tree: insertBesideLeaf(t, draggedId, targetId, side) })),
-    // Drops a dragged tile onto another tile's top/bottom edge margin: a new row
-    // above/below it, rather than swapping places with it.
-    insertBelow: (draggedId: string, targetId: string, side: 'top' | 'bottom') =>
-      update(t => ({ tree: insertBelowLeaf(t, draggedId, targetId, side) })),
-    // Toggles a tile between mini (a plain icon in the grid's shared rail) and mid
-    // (its own full, resizable render). Dragging a mid tile into the rail, or
-    // clicking a rail icon, does this.
-    toggleTier: (id: string) => {
-      const item = placed.find(p => p.def.id === id)
-      if (!item) return
-      const next = item.shape === 'mini' ? 'mid' : 'mini'
-      update((t, prev) => ({ shapes: { ...prev.shapes, [id]: next }, tree: setFixed(t, id, next === 'mini') }))
+    // A dropped tile: laid out where the plan says (tileDrop.ts), and restored first when it was minimized.
+    apply: (id: string, plan: DropPlan) => {
+      if (minimized.has(id)) setMinimized(id, false)
+      update(t => ({ tree: applyDrop(t, id, plan) }))
     },
   }
 }

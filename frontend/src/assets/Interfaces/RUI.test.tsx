@@ -158,10 +158,10 @@ describe('the Reader', () => {
     await user.click(within(bar).getByRole('button', { name: 'Feed' }))
     expect(within(bar).getByRole('button', { name: 'Feed' }).getAttribute('aria-pressed')).toBe('true')
 
-    await user.click(within(screen.getByRole('region', { name: 'Analytics' })).getByRole('button', { name: 'Analytics' }))
+    await user.click(within(screen.getByRole('region', { name: 'Analytics' })).getByRole('button', { name: 'Maximize Analytics' }))
     expect(screen.getByTestId('where').textContent).toBe('/read/nook/analytics')
     expect(within(bar).getByRole('button', { name: 'Stack' }).getAttribute('aria-pressed')).toBe('false') // the others shrink to icons
-    await user.click(screen.getByRole('button', { name: 'Make Analytics smaller' }))
+    await user.click(screen.getByRole('button', { name: 'Restore Analytics' }))
     expect(screen.getByTestId('where').textContent).toBe('/read')
   })
 

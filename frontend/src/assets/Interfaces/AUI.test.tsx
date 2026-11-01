@@ -24,45 +24,37 @@ const tile = (id: string) => document.querySelector(`[data-tile-id="${id}"]`) as
 const SECTIONS = ['dashboard', 'processor', 'organizer', 'manager', 'director', 'office', 'configuration', 'resources']
 
 describe('AUI (the Admin panel as tiles)', () => {
-  it('shows the eight sections as tiles listing their pages, without Help pages', () => {
+  it('shows the eight sections as tiles with their pages, and each section Help text in it', () => {
     render(<AUI />)
     expect(SECTIONS.map(id => tile(id)?.getAttribute('data-tile-id'))).toEqual(SECTIONS)
     expect(within(tile('manager')).getByText('Assignment')).toBeTruthy()
-    expect(within(tile('manager')).queryByText('Help')).toBeNull()
+    expect(within(tile('manager')).getByText(/using the Manager console/)).toBeTruthy()
   })
 
-  it('opens a page: its text, the role assignment editor, and Help at the corner', async () => {
-    const user = userEvent.setup()
+  it('shows the role assignment editor in the Manager tile', () => {
     render(<AUI />)
-    await user.click(within(tile('manager')).getByRole('button', { name: 'Open Manager' }))
-    const manager = screen.getByRole('region', { name: 'Manager' })
-    await user.click(within(manager).getByRole('button', { name: 'Open Assignment' }))
-    expect(within(screen.getByRole('region', { name: 'Assignment' })).getByText('role assignment')).toBeTruthy()
-    await user.click(within(screen.getByRole('region', { name: 'Assignment' })).getByRole('button', { name: 'Help' }))
-    expect(within(screen.getByRole('region', { name: 'Help' })).getByText(/using the Manager console/)).toBeTruthy()
+    expect(within(tile('manager')).getByText('role assignment')).toBeTruthy()
   })
 
-  it('opens Configuration > Plot into the plot presets page, without a second heading above it', async () => {
-    const user = userEvent.setup()
+  it('shows Configuration > Plot as the plot presets page, without a second heading above it', async () => {
     render(<AUI />)
-    expect(within(tile('configuration')).getByText('Plot')).toBeTruthy()
     expect(within(tile('configuration')).getByText('Overview')).toBeTruthy()
-    await user.click(within(tile('configuration')).getByRole('button', { name: 'Open Configuration' }))
-    const configuration = screen.getByRole('region', { name: 'Configuration' })
-    await user.click(within(configuration).getByRole('button', { name: 'Open Plot' }))
-    const plot = await screen.findByRole('region', { name: 'Plot' })
+    const plot = within(tile('configuration')).getByRole('region', { name: 'Plot' })
     expect(await within(plot).findByText('plot presets console')).toBeTruthy()
-    expect(plot.querySelector('.aUIPage h2')).toBeNull()
+    expect(plot.querySelector('h2')).toBeNull()
   })
 
-  it('opens Resources straight into the article/quiz builder, with its own Help text', async () => {
+  it('shows Resources as the article/quiz builder', async () => {
+    render(<AUI />)
+    expect(await within(tile('resources')).findByText('resources console')).toBeTruthy()
+  })
+
+  it('has a tab bar with an icon per tile, to minimize and bring back a tile', async () => {
     const user = userEvent.setup()
     render(<AUI />)
-    expect(within(tile('resources')).getByText(/Exam\/Test\/Quiz/)).toBeTruthy()
-    await user.click(within(tile('resources')).getByRole('button', { name: 'Open Resources' }))
-    const resources = screen.getByRole('region', { name: 'Resources' })
-    expect(within(resources).getByText('resources console')).toBeTruthy()
-    await user.click(within(resources).getByRole('button', { name: 'Help' }))
-    expect(within(screen.getByRole('region', { name: 'Help' })).getByText(/Guides, Tutorials, FAQs/)).toBeTruthy()
+    const bar = screen.getByRole('toolbar', { name: 'Admin panel tiles tabs' })
+    expect(within(bar).getAllByRole('button')).toHaveLength(SECTIONS.length)
+    await user.click(within(bar).getByRole('button', { name: 'Office' }))
+    expect(tile('office')).toBeNull()
   })
 })
