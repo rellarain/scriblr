@@ -746,47 +746,52 @@ export function PrintIcon(props: IconProps) {
   </IconBase>
 }
 
-// The calendar page the views and today share: a narrow header rectangle over a body rectangle where the days would be. Each icon fills or outlines them differently.
-const PAGE_HEADER = { x: 3, y: 3, width: 18, height: 4.5, rx: 1 }
-const PAGE_BODY = { x: 3, y: 9.5, width: 18, height: 11.5, rx: 1 }
+// The calendar page the views and today share: one rounded square, a line across it 25% down dividing a narrow header (the top quarter) from the body (the
+// rest) where the days would be. Each icon fills or leaves open the two parts differently.
+const PAGE = { x: 3, y: 3, width: 18, height: 18, rx: 3 }
+const PAGE_LINE = 'M3 7.5h18'
+const PAGE_HEADER_FILL = 'M3 7.5V6a3 3 0 0 1 3-3h12a3 3 0 0 1 3 3v1.5Z'
+const PAGE_BODY_FILL = 'M3 7.5h18V18a3 3 0 0 1-3 3H6a3 3 0 0 1-3-3Z'
 
 // Today: the page with the day of the month in its body (the day is today's where the icon is used; 31 is the widest, for the drawings).
 export function TodayIcon({ day = 31, ...props }: IconProps & { day?: number }) {
   return <IconBase {...props}>
-    <rect {...PAGE_HEADER} />
-    <rect {...PAGE_BODY} />
-    <text x="12" y="18.2" textAnchor="middle" fontSize="8.5" fontWeight="700" fill="currentColor" stroke="none">{day}</text>
+    <rect {...PAGE} />
+    <path d={PAGE_LINE} />
+    <text x="12" y="18.3" textAnchor="middle" fontSize="8.5" fontWeight="700" fill="currentColor" stroke="none">{day}</text>
   </IconBase>
 }
 
-// The calendar's views: a year (the header filled, the body outlined), a month (the header outlined, the body filled), a week (both outlined, a stripe across the
-// middle of the body filled) and a day (both outlined, one square in the body filled).
+// The calendar's views: a year (the header filled, the body open), a month (the header open, the body filled), a week (both open, a stripe across the middle of the
+// body filled) and a day (both open, one square in the body filled).
 export function ViewYearIcon(props: IconProps) {
   return <IconBase {...props}>
-    <rect {...PAGE_HEADER} fill="currentColor" />
-    <rect {...PAGE_BODY} />
+    <path d={PAGE_HEADER_FILL} fill="currentColor" />
+    <rect {...PAGE} />
+    <path d={PAGE_LINE} />
   </IconBase>
 }
 
 export function ViewMonthIcon(props: IconProps) {
   return <IconBase {...props}>
-    <rect {...PAGE_HEADER} />
-    <rect {...PAGE_BODY} fill="currentColor" />
+    <path d={PAGE_BODY_FILL} fill="currentColor" />
+    <rect {...PAGE} />
+    <path d={PAGE_LINE} />
   </IconBase>
 }
 
 export function ViewWeekIcon(props: IconProps) {
   return <IconBase {...props}>
-    <rect {...PAGE_HEADER} />
-    <rect {...PAGE_BODY} />
-    <rect x="5.5" y="13.75" width="13" height="3" fill="currentColor" />
+    <rect {...PAGE} />
+    <path d={PAGE_LINE} />
+    <rect x="6" y="12.75" width="12" height="3" fill="currentColor" />
   </IconBase>
 }
 
 export function ViewDayIcon(props: IconProps) {
   return <IconBase {...props}>
-    <rect {...PAGE_HEADER} />
-    <rect {...PAGE_BODY} />
-    <rect x="9.5" y="12.75" width="5" height="5" fill="currentColor" />
+    <rect {...PAGE} />
+    <path d={PAGE_LINE} />
+    <rect x="9.5" y="11.75" width="5" height="5" fill="currentColor" />
   </IconBase>
 }
