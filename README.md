@@ -298,8 +298,13 @@ described, now stale, in `docs/data-model.md`).
   daily, weekly and total targets; a deadline), shifts (a day and 10-minute
   slots, repeating, paused, skipped, overridden a day at a time, with an
   aim and a target), routines (daily, weekly or after an interval of days,
-  weeks or months, optionally a range), checklist items, shift templates, rest
-  days and the project's timeline. Dates are local days.
+  weeks or months, optionally a range), tasks (`PlanItem`: a label, a `priority`
+  of `high`, `medium`, `low` or `none` (a task saved before priorities reads as
+  medium), a `dueDate`, notes, an estimate in minutes, subtasks, an optional
+  facet and node with an `aim` counted from `addedOn`, the shift it is on and
+  the day it was done; `carried` marks one that came back from a shift that
+  ended with it undone), shift templates, rest days and the project's
+  timeline. Dates are local days.
 - **Scrap** — `ScrapRegistry`: any `moment` node removed from the outline
   that had existing draft content becomes a `ScrapEntry` (captures its
   last-known chapter/book ancestry) instead of silently vanishing; it can
@@ -592,7 +597,7 @@ mounted it; it remains in git history.
   split-tree engine, see Tile grids): two alternating columns to begin
   with; drag a tile's title bar onto another tile (its 3x3 zones: the middle swaps, the edges put it beside, above or below, a corner a new row or column across
   the whole grid), onto a divider to wedge it in, or onto the tab bar to minimize it, with the others sliding aside to show the gap; drag a divider (or focus it and use the arrow keys) to resize the two tiles it separates. The tree always fills the area (a tile that opens is grafted on), stacks in one column under 400px, and is remembered per level with the open tiles and the
-  current tab. A lone open tile has the whole area; every tile scrolls its own body. The Dash's tabs (`levels/dashTabs.tsx`) are Schedule (the console: goals, activity, shifts, backlog, analytics, review; `writer/schedule/`),
+  current tab. A lone open tile has the whole area; every tile scrolls its own body. The Dash's tabs (`levels/dashTabs.tsx`) are Schedule (the console: goals, activity, shifts, backlog, analytics, review; `writer/schedule/`; the **Backlog** tile, `Backlog.tsx`, lists Today (the tasks on today's shifts, the one running now first, and the routines due), Overdue, then the tasks by priority (High, Medium, Low, and None in a fold that opens by itself when nothing else waits) and the routines; its order, search, facet and project filters, sorts (priority, due date, newest, manual) and done choices are `lib/backlog.ts`, the quick-add line `Revise ch 3 !high ~2h fri @chapter 3` is `lib/quickAdd.ts`, a task's progress (its subtasks, or the words and nodes done on its node since it was added) is `lib/taskProgress.ts`, and a one-off shift that ends with tasks undone sends them back, marked carried, `lib/carryForward.ts`; how a routine or shift comes round is the shared `RepeatPicker.tsx`),
   Readers, Scratchpad, Project template, Settings (the theme panel) and Help (the resource
   articles written for the level in the Resources builder, `levels/HelpArticles.tsx`). The
   Project's (`levels/projectTabs.tsx`): Plot and Outline (summaries at Mid, the editors at Max),

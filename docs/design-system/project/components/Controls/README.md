@@ -22,6 +22,15 @@ Inside a level's body the buttons take `on-accent` text on `level-wash` (the ink
 
 `.wrField`: a black wash at 25%, 13px, padding 8 / 10, focus = a 1px inset accent. `::placeholder` is `ink-faint`. On a level the Outline's inputs are the **light input** (`level-input`, `level-input-ink`, `level-input-hint` for the placeholder); on paper they are `paper-field` with `paper-ink`, a 1px `paper-line` and a 4px radius. A title input is serif, 13px. A chip (`.wrChip`) is a flat, square tag with an optional x.
 
+## In the Schedule console
+
+The app resets native form controls, so the console draws its own.
+
+- **Tick** (`.wrSchedConsole input[type='checkbox']`): a 16px box outlined in the level's soft ink, filled with the level's ink and a tick in the card's colour when ticked; disabled = 40% opaque.
+- **Day chips** (`DayChips`, `.wrSchedDays`): seven 28px circles, Monday first, M T W T F S S; a day that is on is filled with the level's ink. One stays on.
+- **Repeat picker** (`RepeatPicker`, `.wrRepeat`): a segmented choice (Does not repeat, Every day, Weekdays, Weekly, Custom, After an interval; the first only for a shift, the last only for a routine) and under it only what the choice needs: the day chips for Weekly, "Every N days or weeks" for Custom, "Every N to M days, weeks or months" for After an interval, and an end date. Its fields are `.wrField`.
+- **Priority flag** (`.wrPrio`): a flag drawn by shape (filled High, half-filled Medium, dashed Low, faint None); pressed it opens into the four choices as a small segmented control.
+
 ## Alerts and quiet text
 
 - **Alert** `.wrError` / `.wrPageError`: the **alert colour as the ground**, text and a 1px inset outline in `on-alert`, 12px bold. Never red text on a coloured ground.

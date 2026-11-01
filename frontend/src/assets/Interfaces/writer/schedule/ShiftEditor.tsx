@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { FACETS, FACET_LABEL, FACET_UNIT, SLOTS_PER_DAY, slotTime, type Facet, type PlanItem, type Shift } from '../../../../lib/facets'
+import { FACETS, FACET_LABEL, FACET_UNIT, SLOTS_PER_DAY, newTask, slotTime, type Facet, type PlanItem, type Shift } from '../../../../lib/facets'
 import type { EditScope } from '../../../../lib/shiftEdit'
 import { newId } from './ids'
 import { IconBtn } from './IconBtn'
@@ -52,7 +52,7 @@ export function ShiftEditor({ shift, occurrence, isNew, items, ticks, targets, o
   const add = () => {
     const label = added.trim()
     if (!label) return
-    setList([...list, { id: newId('item'), label, facet: s.facet, targetNodeId: s.targetNodeId, targetTree: s.targetTree, shiftId: s.id, doneOn: null }])
+    setList([...list, newTask(newId('item'), label, occurrence, { facet: s.facet, targetNodeId: s.targetNodeId, targetTree: s.targetTree, shiftId: s.id, priority: 'medium' })])
     setAdded('')
   }
   const unit = FACET_UNIT[s.facet].many

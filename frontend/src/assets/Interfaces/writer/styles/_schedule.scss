@@ -18,6 +18,12 @@
     .wrSmallBtn { font-size: var(--text-ui); padding: var(--space-3) var(--space-5); }
     .wrMuted, .wrHint { opacity: 1; color: var(--level-ink-soft); }
     button:focus-visible, [tabindex]:focus-visible { outline: 2px solid var(--level-ink); outline-offset: 2px; } }
+  // The app resets native form controls, so a tick in the console is drawn: a box in the level's ink, filled with it (and a tick in the card's colour) when ticked.
+  .wrSchedConsole input[type='checkbox'] { appearance: none; position: relative; flex: none; width: 16px; height: 16px; margin: 0; border-radius: var(--radius-button); cursor: pointer; background: transparent; box-shadow: inset 0 0 0 2px var(--level-ink-soft);
+    &:checked { background: var(--level-ink); box-shadow: inset 0 0 0 2px var(--level-ink); }
+    &:checked::after { content: ''; position: absolute; left: 5px; top: 1px; width: 4px; height: 9px; border: solid var(--wr-fill-4); border-width: 0 2px 2px 0; transform: rotate(45deg); }
+    &:focus-visible { outline: 2px solid var(--level-ink); outline-offset: 2px; }
+    &:disabled { opacity: 0.4; cursor: default; } }
   // The tab's own tile is the level's fill like every other console's; the console's tiles are one step deeper (fill-3, their title bars and the cards in them fill-4).
   .wrSchedConsole .wrTabTile { background: var(--wr-fill-3); }
   .wrSchedConsole .wrTabTileTitle { background: var(--wr-fill-4); color: var(--level-ink); }
@@ -204,6 +210,54 @@
   .wrSchedGrip { color: var(--level-ink-soft); letter-spacing: -2px; cursor: grab; user-select: none; }
   .wrSchedTag { font-size: var(--text-ui); font-weight: 700; padding: 0 var(--space-4); border: 1px solid var(--level-ink); border-radius: var(--radius-button); white-space: nowrap; &--priority { background: var(--level-ink); color: var(--wr-fill-4); } }
   .wrSchedBacklogAdd { display: flex; flex-direction: column; gap: var(--space-4); }
+  .wrSchedFold { display: inline-flex; align-items: center; gap: var(--space-3); margin: var(--space-5) 0 var(--space-3); padding: 0; background: transparent; border: 0; color: var(--level-ink-soft); font: inherit; font-size: var(--text-ui); font-weight: 800; letter-spacing: 0.06em; text-transform: uppercase; cursor: pointer; }
+  .wrBacklogBar { display: flex; flex-direction: column; gap: var(--space-4); margin-bottom: var(--space-5); }
+  .wrBacklogSearch { display: flex; align-items: center; gap: var(--space-3); .wrField { flex: 1 1 auto; min-width: 0; } }
+  .wrBacklogChoices { display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-4); > .wrField { flex: 1 1 8em; min-width: 0; } }
+  .wrPrioTitle { &--high { font-weight: 900; } }
+  .wrQuickParse { display: flex; flex-wrap: wrap; gap: var(--space-4); font-size: var(--text-ui); color: var(--level-ink-soft); }
+
+  // A task of the backlog: a line that opens in place into its details.
+  .wrSchedTask { margin-bottom: var(--space-3); border-radius: var(--radius-button); background: var(--wr-fill-4); font-size: var(--text-field);
+    &--done .wrTaskMain b { text-decoration: line-through; color: var(--level-ink-soft); }
+    &--overdue { box-shadow: inset 3px 0 0 var(--level-ink); }
+    &--running { box-shadow: inset 3px 0 0 var(--user-accent, var(--level-ink)); } }
+  .wrTaskLine { display: flex; flex-wrap: wrap; align-items: flex-start; gap: var(--space-3) var(--space-4); padding: var(--space-4); input[type='checkbox'] { margin: var(--space-2) 0 0; flex: none; } }
+  .wrTaskMain { flex: 1 1 8em; min-width: 8em; display: flex; flex-direction: column; gap: var(--space-2); padding: 0; background: transparent; border: 0; color: inherit; font: inherit; text-align: left; cursor: pointer;
+    b { overflow-wrap: anywhere; }
+    small { display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-3) var(--space-4); color: var(--level-ink-soft); font-size: var(--text-ui); } }
+  .wrTaskFact { white-space: nowrap; }
+  .wrTaskBar { display: block; height: 4px; border-radius: 2px; background: var(--level-line); overflow: hidden; i { display: block; height: 100%; background: var(--level-ink); } }
+  .wrTaskChevron { display: inline-flex; color: var(--level-ink-soft); }
+  .wrTaskDetail { display: flex; flex-direction: column; gap: var(--space-4); padding: 0 var(--space-4) var(--space-4); }
+  .wrTaskDetail textarea { resize: vertical; }
+  .wrTaskGrid { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: var(--space-4);
+    label { display: flex; flex-direction: column; gap: var(--space-2); font-size: var(--text-ui); color: var(--level-ink-soft); } }
+  .wrTaskInline { display: flex; align-items: center; gap: var(--space-3); .wrField { flex: 1 1 auto; min-width: 0; } }
+  .wrTaskSubs { display: flex; flex-direction: column; gap: var(--space-3); }
+  .wrTaskSub { display: flex; align-items: center; gap: var(--space-3); .wrField { flex: 1 1 auto; min-width: 0; } }
+  .wrTaskActions { display: flex; justify-content: flex-end; }
+  .wrTaskNode { align-self: flex-start; display: inline-flex; align-items: center; gap: var(--space-3); }
+  .wrTaskList { position: relative; display: flex; flex-direction: column; }
+  .wrTaskDragging { opacity: 0.6; }
+
+  // The priority marker: a flag, filled for High, half-filled for Medium, dashed for Low and faint for None; pressed it opens into the four to pick from.
+  .wrPrio { display: inline-flex; align-items: center; justify-content: center; padding: 0; background: transparent; border: 0; color: var(--level-ink); line-height: 0; cursor: pointer; flex: none;
+    &--high svg { fill: currentColor; }
+    &--medium svg { fill: color-mix(in srgb, currentColor 35%, transparent); }
+    &--low svg { stroke-dasharray: 3 2; }
+    &--none { color: var(--level-ink-soft); } }
+  .wrPrioPick { display: inline-flex; border: 1px solid var(--level-ink-soft); border-radius: var(--radius-button); overflow: hidden;
+    .wrPrio { padding: var(--space-2) var(--space-4); font: inherit; font-size: var(--text-ui); line-height: normal; color: inherit; &:hover { background: var(--level-wash); } &.wrPrio--on { background: var(--level-ink); color: var(--wr-fill-4); font-weight: 700; } } }
+
+  // How a routine comes round: the presets, and what each opens into.
+  .wrRepeat { display: flex; flex-direction: column; gap: var(--space-4); }
+  .wrRepeatPresets { flex-wrap: wrap; align-self: flex-start; }
+  .wrRepeatRow { display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-3); font-size: var(--text-ui); }
+  .wrSchedDays { display: inline-flex; gap: var(--space-2);
+    button { width: 28px; height: 28px; padding: 0; border-radius: 50%; border: 1px solid var(--level-line); background: transparent; color: var(--level-ink-soft); font: inherit; font-size: var(--text-ui); cursor: pointer;
+      &:hover { background: var(--level-wash); }
+      &.on { background: var(--level-ink); border-color: var(--level-ink); color: var(--wr-fill-4); font-weight: 700; } } }
 
   // ---- analytics, review, settings ----
   .wrSchedCharts { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: var(--space-6); }

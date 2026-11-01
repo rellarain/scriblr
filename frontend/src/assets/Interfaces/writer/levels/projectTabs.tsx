@@ -5,6 +5,7 @@ import { Placeholder } from '../shared'
 import PlotView from '../PlotView'
 import ProjectEditor from '../ProjectEditor'
 import ProjectOutline from '../ProjectOutline'
+import { nearestOfKind } from '../outlineTree'
 import type { HistoryScope, WriterWorkspace } from '../useWriterWorkspace'
 import { bookRows, categoryRows, plotCounts } from '../tiles/tileData'
 import ScheduleConsole from '../schedule/ScheduleConsole'
@@ -54,6 +55,15 @@ function OutlineSummary({ w }: { w: WriterWorkspace }) {
   )
 }
 
+// Opens the node a task is about: an outline chapter (or a scene or act in one) in the Draft level, a book in its outline, a plot node focused in the plot.
+function openNode(w: WriterWorkspace, tree: 'outline' | 'plot', id: string) {
+  if (tree === 'plot') { w.focusPlotNode(id); return }
+  const node = w.outlineNodes.find(n => n.id === id)
+  if (node?.kind === 'book') { w.openBook(id); return }
+  const chapter = nearestOfKind(w.outlineNodes, id, 'chapter')
+  if (chapter) w.openChapter(chapter.id)
+}
+
 export function projectTabs(w: WriterWorkspace): LevelTab[] {
   return [
     { id: 'plot', label: 'Plot', Icon: PlotIcon, fill: true, render: c => (c.size === 'max' ? <PlotView w={w} /> : <PlotSummary w={w} />) },
@@ -64,7 +74,7 @@ export function projectTabs(w: WriterWorkspace): LevelTab[] {
       render: c => {
         const id = w.activeProjectId
         if (!id) return <p className="wrMuted">Open a project to plan its schedule.</p>
-        return c.size === 'max' ? <ScheduleConsole scope="project" titleSlot={c.titleSlot} projectIds={[id]} titles={{ [id]: w.activeProject?.title ?? 'Project' }} /> : <ScheduleSummary projectIds={[id]} />
+        return c.size === 'max' ? <ScheduleConsole scope="project" titleSlot={c.titleSlot} projectIds={[id]} titles={{ [id]: w.activeProject?.title ?? 'Project' }} onOpenNode={(tree, node) => openNode(w, tree, node)} /> : <ScheduleSummary projectIds={[id]} />
       },
     },
     { id: 'history', label: 'History', Icon: ClockIcon, render: () => placeholder('projectHistory') },

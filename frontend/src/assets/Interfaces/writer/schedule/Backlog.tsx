@@ -1,17 +1,28 @@
-import { useState, type DragEvent } from 'react'
-import { type Planner, type PlanItem, type Recurrence, type Routine } from '../../../../lib/facets'
-import { addUnits, routineWindow, type RoutineWindow } from '../../../../lib/recurrence'
+import { useMemo, useState, type ReactNode } from 'react'
+import { newTask, PRIORITY_LABEL, type ActivityEvent, type PlanItem, type Planner, type Recurrence, type Routine } from '../../../../lib/facets'
+import { DEFAULT_FILTER, moveItem, organise, type BacklogFilter, type Entry, type RoutineEntry, type TaskEntry } from '../../../../lib/backlog'
+import { formatEstimate, parseQuickAdd, type QuickTarget } from '../../../../lib/quickAdd'
+import { addUnits, type RoutineWindow } from '../../../../lib/recurrence'
 import { addDays } from '../../../../lib/projection'
+import { progressOf, withDescendants } from '../../../../lib/taskProgress'
+import DragGap from '../../../../components/DragGap'
+import { useStoredState } from '../shared'
+import { useReorder } from '../../admin/plot/useReorder'
 import { newId } from './ids'
 import { IconBtn } from './IconBtn'
-import { CheckIcon, CloseIcon, PauseIcon, PlayIcon, PlusIcon, RestoreIcon } from '../../../icons'
+import { BacklogToolbar } from './BacklogToolbar'
+import { RepeatPicker } from './RepeatPicker'
+import { DRAG_ITEM, TaskRow } from './TaskRow'
+import { CheckIcon, ChevronDownIcon, ChevronRightIcon, PauseIcon, PlayIcon, PlusIcon, RestoreIcon } from '../../../icons'
 
-// Everything waiting for a place: tasks not on a shift (drag one onto a shift to assign it) and the routines, grouped by where they stand today. A
-// routine that comes round after an interval with a range (every 7-10 days) is low priority and tickable inside its range, and goes to the top once
-// the range is past.
+// Everything waiting for a place. Today comes first (the tasks on today's shifts, the one running now first, and the routines due), then what is overdue,
+// then the tasks by priority (High, Medium, Low), the routines, and the tasks with no priority in a fold that opens by itself when nothing else is
+// waiting. A task opens in place to its notes, subtasks, estimate, due day and node; drag one by its grip onto a shift in the Planner to put it there.
+// A routine that comes round after an interval with a range (every 7-10 days) is low priority and tickable inside its range, and goes to the top once
+// the range is past. (The order and the filters are lib/backlog.ts.)
 
 export interface BacklogOwner { id: string; label: string; planner: Planner }
-export const DRAG_ITEM = 'application/x-scriblr-item'
+export { DRAG_ITEM }
 const dayLabel = (d: string): string => new Date(`${d}T00:00:00Z`).toLocaleDateString('en-US', { month: 'short', day: 'numeric', timeZone: 'UTC' })
 
 function describe(r: Routine, w: RoutineWindow): string {
@@ -23,120 +34,185 @@ function describe(r: Routine, w: RoutineWindow): string {
   return `Every ${span} ${unit} · ${w.state === 'upcoming' ? `next ${dayLabel(w.from)}` : `day ${w.day}`}`
 }
 
-interface Row { ownerId: string; routine: Routine; w: RoutineWindow }
+export interface TreeNode { id: string; parentId: string | null; title: string }
+type Remembered = Pick<BacklogFilter, 'facet' | 'project' | 'sort' | 'done'>
 
 export function Backlog({
-  owners, today, todayTicks, onPlanner, onTick,
+  owners, today, nowSlot, todayTicks, onPlanner, onTick, events, targets, nodes, onOpenNode,
 }: {
   owners: BacklogOwner[]
   today: string
+  nowSlot: number
   todayTicks: Record<string, string[]>
   onPlanner: (ownerId: string, next: Planner) => void
   onTick: (ownerId: string, id: string, on: boolean) => void
+  // The work done on the project's nodes, for a task's progress, and the nodes a task can be about (a project's own).
+  events: ActivityEvent[]
+  targets: QuickTarget[]
+  nodes: TreeNode[]
+  onOpenNode?: (tree: 'outline' | 'plot', id: string) => void
 }) {
+  const [remembered, setRemembered] = useStoredState<Remembered>('scriblr.writer.backlog.view', { facet: DEFAULT_FILTER.facet, project: DEFAULT_FILTER.project, sort: DEFAULT_FILTER.sort, done: DEFAULT_FILTER.done })
+  const [search, setSearch] = useState('')
+  const filter: BacklogFilter = { ...DEFAULT_FILTER, ...remembered, search }
+  const [openId, setOpenId] = useState<string | null>(null)
+  const [noneToggle, setNoneToggle] = useState<boolean | null>(null)
   const [text, setText] = useState('')
   const [owner, setOwner] = useState(owners[0]?.id ?? '')
   const [adding, setAdding] = useState(false)
-  const [routine, setRoutine] = useState<{ label: string; kind: Recurrence['kind']; every: number; unit: Recurrence['unit']; rangeMax: string }>({ label: '', kind: 'daily', every: 1, unit: 'day', rangeMax: '' })
-  const target = owners.find(o => o.id === owner) ?? owners[0]
-  const update = (id: string, fn: (p: Planner) => Planner) => { const o = owners.find(x => x.id === id); if (o) onPlanner(id, fn(o.planner)) }
-
-  const rows: Row[] = owners.flatMap(o => o.planner.routines.map(r => ({ ownerId: o.id, routine: r, w: routineWindow(r, today, o.planner.restDays) })))
-  const tasks = owners.flatMap(o => o.planner.items.filter(i => !i.shiftId && !i.doneOn).map(i => ({ ownerId: o.id, item: i })))
-  const group = (state: RoutineWindow['state']) => rows.filter(r => r.w.state === state)
-  const ticked = (r: Row): boolean => (r.routine.recurrence.kind === 'interval' ? r.routine.lastDone === today : (todayTicks[r.ownerId] ?? []).includes(r.routine.id))
+  const [routineLabel, setRoutineLabel] = useState('')
+  const [routineRec, setRoutineRec] = useState<Recurrence | null>(null)
   const multi = owners.length > 1
+  const target = owners.find(o => o.id === owner) ?? owners[0]
+  const labelOf = (id: string) => owners.find(o => o.id === id)?.label ?? ''
+  const update = (id: string, fn: (p: Planner) => Planner) => { const o = owners.find(x => x.id === id); if (o) onPlanner(id, fn(o.planner)) }
+  const titles = useMemo(() => new Map(nodes.map(n => [n.id, n.title])), [nodes])
+  const nodeTitle = (id: string | null) => (id ? titles.get(id) : undefined)
 
-  const check = (r: Row, on: boolean) => {
+  const sections = useMemo(() => organise({
+    owners, today, nowSlot, filter, ticked: (o, id) => (todayTicks[o] ?? []).includes(id), nodeTitle: id => titles.get(id),
+  }), [owners, today, nowSlot, remembered, search, todayTicks, titles]) // eslint-disable-line react-hooks/exhaustive-deps
+  const noneOpen = noneToggle ?? sections.noneOpen
+
+  // ---- changes ----
+  const patch = (ownerId: string, id: string, change: Partial<PlanItem>) => update(ownerId, p => ({ ...p, items: p.items.map(x => (x.id === id ? { ...x, ...change } : x)) }))
+  const remove = (ownerId: string, id: string) => update(ownerId, p => ({ ...p, items: p.items.filter(x => x.id !== id) }))
+  const reorder = useReorder<string>(
+    (id, before) => { const o = owners.find(x => x.planner.items.some(i => i.id === id)); if (o) onPlanner(o.id, { ...o.planner, items: moveItem(o.planner.items, id, before) }) },
+    (id, dir) => {
+      const o = owners.find(x => x.planner.items.some(i => i.id === id))
+      if (!o) return
+      const at = o.planner.items.findIndex(i => i.id === id)
+      const before = dir < 0 ? o.planner.items[at - 1]?.id : o.planner.items[at + 2]?.id ?? null
+      if (before !== undefined) onPlanner(o.id, { ...o.planner, items: moveItem(o.planner.items, id, before) })
+    },
+  )
+  const check = (r: RoutineEntry, on: boolean) => {
     onTick(r.ownerId, r.routine.id, on)
     if (r.routine.recurrence.kind === 'interval') update(r.ownerId, p => ({ ...p, routines: p.routines.map(x => (x.id === r.routine.id ? { ...x, lastDone: on ? today : null } : x)) }))
   }
-  const pause = (r: Row, weeks: number) => update(r.ownerId, p => ({ ...p, routines: p.routines.map(x => (x.id === r.routine.id ? { ...x, pauses: [...x.pauses, { start: today, end: addDays(addUnits(today, weeks, 'week'), -1) }] } : x)) }))
-  const resume = (r: Row) => update(r.ownerId, p => ({ ...p, routines: p.routines.map(x => (x.id === r.routine.id ? { ...x, pauses: x.pauses.filter(q => !(today >= q.start && today <= q.end)) } : x)) }))
-  const drag = (e: DragEvent, ownerId: string, item: PlanItem) => { e.dataTransfer.setData(DRAG_ITEM, JSON.stringify({ ownerId, itemId: item.id })); e.dataTransfer.effectAllowed = 'move' }
+  const pause = (r: RoutineEntry, weeks: number) => update(r.ownerId, p => ({ ...p, routines: p.routines.map(x => (x.id === r.routine.id ? { ...x, pauses: [...x.pauses, { start: today, end: addDays(addUnits(today, weeks, 'week'), -1) }] } : x)) }))
+  const resume = (r: RoutineEntry) => update(r.ownerId, p => ({ ...p, routines: p.routines.map(x => (x.id === r.routine.id ? { ...x, pauses: x.pauses.filter(q => !(today >= q.start && today <= q.end)) } : x)) }))
 
+  const quick = parseQuickAdd(text, today, targets)
   const addTask = () => {
-    const label = text.trim()
-    if (!label || !target) return
-    update(target.id, p => ({ ...p, items: [...p.items, { id: newId('item'), label, facet: null, targetNodeId: null, targetTree: null, shiftId: null, doneOn: null }] }))
+    if (!quick.label || !target) return
+    const node = quick.target
+    update(target.id, p => ({
+      ...p,
+      items: [...p.items, newTask(newId('item'), quick.label, today, {
+        priority: quick.priority ?? 'none', dueDate: quick.dueDate, estimateMinutes: quick.estimateMinutes,
+        targetNodeId: node?.id ?? null, targetTree: node?.tree ?? null, facet: node ? (node.tree === 'plot' ? 'plot' : 'draft') : null,
+      })],
+    }))
     setText('')
   }
   const addRoutine = () => {
-    const label = routine.label.trim()
+    const label = routineLabel.trim()
+    const rec = routineRec ?? { kind: 'daily' as const, every: 1, unit: 'day' as const, days: [], rangeMax: null, anchor: today, until: null }
     if (!label || !target) return
-    const range = routine.kind === 'interval' && routine.rangeMax ? Math.max(routine.every, Number(routine.rangeMax)) : null
-    const rec: Recurrence = { kind: routine.kind, every: routine.every, unit: routine.kind === 'interval' ? routine.unit : 'day', days: [], rangeMax: range, anchor: today, until: null }
     update(target.id, p => ({ ...p, routines: [...p.routines, { id: newId('routine'), label, facet: null, targetNodeId: null, targetTree: null, shiftId: null, recurrence: rec, pauses: [], lastDone: null }] }))
-    setRoutine({ ...routine, label: '' })
+    setRoutineLabel('')
+    setRoutineRec(null)
     setAdding(false)
   }
 
-  const section = (title: string, list: Row[], tag?: (r: Row) => string) => list.length > 0 && (
-    <div className="wrSchedBacklogGroup">
-      <h4 className="wrSchedSub">{title}</h4>
-      {list.map(r => (
-        <div className="wrSchedItem" key={`${r.ownerId}-${r.routine.id}`}>
-          <label>
-            <input type="checkbox" checked={ticked(r)} disabled={r.w.state === 'paused'} onChange={e => check(r, e.target.checked)} aria-label={r.routine.label} />
-            <span><b>{r.routine.label}</b><small>{describe(r.routine, r.w)}{multi ? ` · ${owners.find(o => o.id === r.ownerId)?.label}` : ''}</small></span>
-          </label>
-          {tag && <span className={`wrSchedTag${r.w.state === 'overdue' ? ' wrSchedTag--priority' : ''}`}>{tag(r)}</span>}
-          {r.w.state === 'paused'
-            ? <IconBtn Icon={PlayIcon} label={`Resume ${r.routine.label}`} onClick={() => resume(r)} />
-            : <IconBtn Icon={PauseIcon} label={`Pause ${r.routine.label} for a week`} onClick={() => pause(r, 1)} />}
-        </div>
-      ))}
+  // ---- rows ----
+  const covered = (i: PlanItem) => (i.aim && i.targetNodeId ? withDescendants(nodes, i.targetNodeId) : null)
+  const taskRow = (e: TaskEntry, more: { done?: boolean; overdue?: boolean; onShift?: string; running?: boolean; manual?: boolean } = {}) => (
+    <TaskRow
+      key={e.item.id} ownerId={e.ownerId} item={e.item} today={today} done={more.done ?? !!e.item.doneOn} overdue={more.overdue} from={multi ? labelOf(e.ownerId) : undefined}
+      onShift={more.onShift} running={more.running} progress={progressOf(e.item, events, covered(e.item))} targets={targets} nodeTitle={nodeTitle(e.item.targetNodeId)}
+      open={openId === e.item.id} onOpen={open => setOpenId(open ? e.item.id : null)} onChange={change => patch(e.ownerId, e.item.id, change)}
+      onTick={on => onTick(e.ownerId, e.item.id, on)} onDelete={() => remove(e.ownerId, e.item.id)} onOpenNode={onOpenNode}
+      reorderGrip={more.manual ? reorder.grip(e.item.id) : undefined} placeable={!e.item.shiftId && !e.item.doneOn}
+    />
+  )
+  const routineRow = (r: RoutineEntry, tag?: string) => (
+    <div className="wrSchedItem" key={`${r.ownerId}-${r.routine.id}`}>
+      <label>
+        <input type="checkbox" checked={r.ticked} disabled={r.w.state === 'paused'} onChange={e => check(r, e.target.checked)} aria-label={r.routine.label} />
+        <span><b>{r.routine.label}</b><small>{describe(r.routine, r.w)}{multi ? ` · ${labelOf(r.ownerId)}` : ''}</small></span>
+      </label>
+      {tag && <span className={`wrSchedTag${r.w.state === 'overdue' ? ' wrSchedTag--priority' : ''}`}>{tag}</span>}
+      {r.w.state === 'paused'
+        ? <IconBtn Icon={PlayIcon} label={`Resume ${r.routine.label}`} onClick={() => resume(r)} />
+        : <IconBtn Icon={PauseIcon} label={`Pause ${r.routine.label} for a week`} onClick={() => pause(r, 1)} />}
     </div>
   )
+  const entryRow = (e: Entry) => (e.kind === 'task' ? taskRow(e, { overdue: true }) : routineRow(e, 'Priority'))
+  const group = (title: ReactNode, list: ReactNode[], key: string, name = typeof title === 'string' ? title : key) => list.length > 0 && (
+    <section className="wrSchedBacklogGroup" key={key} aria-label={name}>
+      <h4 className="wrSchedSub">{title}</h4>
+      {list}
+    </section>
+  )
+  const flagged = (label: string, level: 'high' | 'medium' | 'low') => <span className={`wrPrioTitle wrPrioTitle--${level}`}>{label}</span>
+
+  const todayRows = sections.today.map(e => (e.kind === 'task' ? taskRow(e, { done: e.done, onShift: e.shiftTitle, running: e.running }) : routineRow(e)))
+  const manual = filter.sort === 'manual'
+  const none = sections.groups.none
+  const comingUp = [...sections.routines.upcoming]
 
   return (
     <div className="wrSchedCard wrSchedBacklog">
-      {section('Overdue', group('overdue'), () => 'Priority')}
-      {section('Due today', group('due'))}
-      {section('In range · low priority', group('inRange'), r => `${dayLabel(r.w.from)}-${dayLabel(r.w.to)}`)}
-      {tasks.length > 0 && (
-        <div className="wrSchedBacklogGroup">
-          <h4 className="wrSchedSub">Tasks</h4>
-          {tasks.map(({ ownerId, item }) => (
-            <div className="wrSchedItem" key={item.id} draggable onDragStart={e => drag(e, ownerId, item)}>
-              <span className="wrSchedGrip" aria-hidden="true">⋮⋮</span>
-              <label>
-                <input type="checkbox" aria-label={item.label} onChange={e => { if (e.target.checked) { update(ownerId, p => ({ ...p, items: p.items.map(x => (x.id === item.id ? { ...x, doneOn: today } : x)) })); onTick(ownerId, item.id, true) } }} />
-                <span><b>{item.label}</b><small>Drag onto a shift{multi ? ` · ${owners.find(o => o.id === ownerId)?.label}` : ''}</small></span>
-              </label>
-              <IconBtn Icon={CloseIcon} label={`Delete ${item.label}`} onClick={() => update(ownerId, p => ({ ...p, items: p.items.filter(x => x.id !== item.id) }))} />
-            </div>
-          ))}
-        </div>
+      <BacklogToolbar filter={filter} owners={owners} onChange={next => { setSearch(next.search); setRemembered({ facet: next.facet, project: next.project, sort: next.sort, done: next.done }) }} />
+      {group(`Today · ${todayRows.length}`, todayRows, 'today')}
+      {group(`Overdue · ${sections.overdue.length}`, sections.overdue.map(entryRow), 'overdue')}
+      {filter.sort === 'priority' ? (
+        <>
+          {group(flagged(`High · ${sections.groups.high.length}`, 'high'), sections.groups.high.map(e => taskRow(e)), 'high', `High · ${sections.groups.high.length}`)}
+          {group(flagged(`Medium · ${sections.groups.medium.length}`, 'medium'), sections.groups.medium.map(e => taskRow(e)), 'medium', `Medium · ${sections.groups.medium.length}`)}
+          {group(flagged(`Low · ${sections.groups.low.length}`, 'low'), sections.groups.low.map(e => taskRow(e)), 'low', `Low · ${sections.groups.low.length}`)}
+        </>
+      ) : sections.flat.length > 0 && (
+        <section className="wrSchedBacklogGroup" aria-label="Tasks">
+          <h4 className="wrSchedSub">Tasks · {sections.flat.length}</h4>
+          <div className="wrTaskList" ref={manual ? reorder.listRef : undefined}>
+            {manual && <DragGap rect={reorder.gap} />}
+            {sections.flat.map(e => (manual ? <div key={e.item.id} className={reorder.dragId === e.item.id ? 'wrTaskDragging' : undefined} {...reorder.item(e.item.id)}>{taskRow(e, { manual: true, overdue: false })}</div> : taskRow(e)))}
+          </div>
+        </section>
       )}
-      {section('Paused', group('paused'))}
-      {group('upcoming').length + group('resting').length > 0 && (
-        <details className="wrSchedBacklogGroup"><summary>Coming up ({group('upcoming').length + group('resting').length})</summary>{section('', [...group('upcoming'), ...group('resting')])}</details>
+      {group('In range · low priority', sections.routines.inRange.map(r => routineRow(r, `${dayLabel(r.w.from)}-${dayLabel(r.w.to)}`)), 'inRange')}
+      {group('Paused', sections.routines.paused.map(r => routineRow(r)), 'paused')}
+      {comingUp.length > 0 && <details className="wrSchedBacklogGroup"><summary>Coming up ({comingUp.length})</summary>{comingUp.map(r => routineRow(r))}</details>}
+      {filter.sort === 'priority' && none.length > 0 && (
+        <section className="wrSchedBacklogGroup" aria-label="No priority">
+          <button type="button" className="wrSchedFold" aria-expanded={noneOpen} onClick={() => setNoneToggle(!noneOpen)}>
+            {noneOpen ? <ChevronDownIcon size={20} /> : <ChevronRightIcon size={20} />} {PRIORITY_LABEL.none} priority · {none.length}
+          </button>
+          {noneOpen && none.map(e => taskRow(e))}
+        </section>
       )}
-      {rows.length === 0 && tasks.length === 0 && <p className="wrMuted">Nothing waiting. Add a task, or a routine that comes round on its own.</p>}
+      {sections.done.length > 0 && group(`Done · ${sections.done.length}`, sections.done.map(e => taskRow(e)), 'done')}
+      {sections.empty && <p className="wrMuted">{search || filter.facet || filter.project ? 'Nothing matches.' : 'Nothing waiting. Add a task, or a routine that comes round on its own.'}</p>}
+
       <div className="wrSchedBacklogAdd">
         {multi && (
           <select className="wrField" aria-label="Add to" value={owner} onChange={e => setOwner(e.target.value)}>{owners.map(o => <option key={o.id} value={o.id}>{o.label}</option>)}</select>
         )}
         <div className="wrKv">
-          <input className="wrField" aria-label="New task" placeholder="Add a task…" value={text} onChange={e => setText(e.target.value)} onKeyDown={e => { if (e.key === 'Enter') addTask() }} />
-          <IconBtn Icon={PlusIcon} label="Add task" onClick={addTask} disabled={!text.trim()} />
+          <input
+            className="wrField" aria-label="New task" placeholder="Add a task…  try  Revise ch 3 !high ~2h fri @chapter 3" value={text}
+            onChange={e => setText(e.target.value)} onKeyDown={e => { if (e.key === 'Enter') addTask() }}
+          />
+          <IconBtn Icon={PlusIcon} label="Add task" onClick={addTask} disabled={!quick.label} />
         </div>
+        {text.trim() && (quick.priority || quick.dueDate || quick.estimateMinutes || quick.target) && (
+          <div className="wrQuickParse" aria-label="What the line says">
+            {quick.priority && <span className={`wrPrioTitle wrPrioTitle--${quick.priority}`}>{PRIORITY_LABEL[quick.priority]}</span>}
+            {quick.dueDate && <span className="wrTaskFact">due {quick.dueDate === today ? 'today' : dayLabel(quick.dueDate)}</span>}
+            {quick.estimateMinutes && <span className="wrTaskFact">{formatEstimate(quick.estimateMinutes)}</span>}
+            {quick.target && <span className="wrTaskFact">{quick.target.title}</span>}
+          </div>
+        )}
         <IconBtn Icon={RestoreIcon} label="Add a routine" aria-expanded={adding} onClick={() => setAdding(!adding)} />
         {adding && (
           <form className="wrSchedForm" aria-label="New routine" onSubmit={e => { e.preventDefault(); addRoutine() }}>
-            <input className="wrField" aria-label="Routine" placeholder="Back up the project…" value={routine.label} onChange={e => setRoutine({ ...routine, label: e.target.value })} />
-            <select className="wrField" aria-label="Comes round" value={routine.kind} onChange={e => setRoutine({ ...routine, kind: e.target.value as Recurrence['kind'], every: 1 })}>
-              <option value="daily">Every day</option><option value="weekly">Every week</option><option value="interval">After an interval</option>
-            </select>
-            {routine.kind === 'interval' && (
-              <div className="wrKv">
-                <span>every</span><input className="wrField wrSchedNum" type="number" min={1} aria-label="Every" value={routine.every} onChange={e => setRoutine({ ...routine, every: Math.max(1, Number(e.target.value) || 1) })} />
-                <span>to</span><input className="wrField wrSchedNum" type="number" min={1} aria-label="Up to" placeholder="same" value={routine.rangeMax} onChange={e => setRoutine({ ...routine, rangeMax: e.target.value })} />
-                <select className="wrField" aria-label="Unit" value={routine.unit} onChange={e => setRoutine({ ...routine, unit: e.target.value as Recurrence['unit'] })}><option value="day">days</option><option value="week">weeks</option><option value="month">months</option></select>
-              </div>
-            )}
-            <IconBtn type="submit" Icon={CheckIcon} label="Add routine" className="wrSmallBtn wrSmallBtn--accent" disabled={!routine.label.trim()} />
+            <input className="wrField" aria-label="Routine" placeholder="Back up the project…" value={routineLabel} onChange={e => setRoutineLabel(e.target.value)} />
+            <RepeatPicker value={routineRec ?? { kind: 'daily', every: 1, unit: 'day', days: [], rangeMax: null, anchor: today, until: null }} anchor={today} allowInterval label="Comes round" onChange={setRoutineRec} />
+            <IconBtn type="submit" Icon={CheckIcon} label="Add routine" className="wrSmallBtn wrSmallBtn--accent" disabled={!routineLabel.trim()} />
           </form>
         )}
       </div>

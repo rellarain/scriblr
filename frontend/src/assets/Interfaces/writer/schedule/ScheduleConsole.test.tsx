@@ -3,7 +3,7 @@ import userEvent from '@testing-library/user-event'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { __resetSettingsForTests } from '../../../../settings/settingsStore'
 import { mockFetchBy } from '../../../../test/mockFetch'
-import { emptyDay, emptyPlanner, type Planner } from '../../../../lib/facets'
+import { emptyDay, emptyPlanner, newTask, type Planner } from '../../../../lib/facets'
 import ScheduleConsole from './ScheduleConsole'
 import { DRAG_ITEM } from './Backlog'
 
@@ -19,7 +19,7 @@ function planner(): Planner {
       id: 's1', title: 'Morning draft', facet: 'draft', date: TODAY, startSlot: 54, endSlot: 66, targetNodeId: null, targetTree: null, target: 800,
       recurrence: null, pauses: [], skipped: [], overrides: {},
     }],
-    items: [{ id: 'i1', label: 'Reread Ch. 8', facet: 'draft', targetNodeId: null, targetTree: null, shiftId: null, doneOn: null }],
+    items: [newTask('i1', 'Reread Ch. 8', null, { facet: 'draft', priority: 'medium' })],
   }
 }
 
@@ -188,8 +188,12 @@ describe('the Schedule console', () => {
     await open()
     const block = await within(tile('schedule')).findByRole('button', { name: /^Morning draft/ })
     fireEvent.drop(block, { dataTransfer: { getData: (type: string) => (type === DRAG_ITEM ? JSON.stringify({ ownerId: 'p1', itemId: 'i1' }) : '') } })
-    await waitFor(() => expect(within(tile('backlog')).queryByText('Reread Ch. 8')).toBeNull())
     await waitFor(() => expect(saved.at(-1)?.items[0].shiftId).toBe('s1'), { timeout: 3000 })
+    // It is on a shift of today now: in the Backlog's Today list, no longer waiting in Medium.
+    const backlog = within(tile('backlog'))
+    expect(backlog.getByRole('region', { name: /^Today/ })).toBeTruthy()
+    expect(within(backlog.getByRole('region', { name: /^Today/ })).getByText('Reread Ch. 8')).toBeTruthy()
+    expect(backlog.queryByRole('region', { name: /^Medium/ })).toBeNull()
   })
 
   it('starts the week on Sunday from the settings, in the grid and the schedule', async () => {
@@ -307,7 +311,7 @@ describe('the Schedule console', () => {
     const backlog = within(tile('backlog'))
     expect(await backlog.findByText('Review character sheets')).toBeTruthy()
     expect(backlog.getByText('Priority')).toBeTruthy() // 30 days since, past its 3-week range
-    expect(backlog.getByText('Overdue')).toBeTruthy()
+    expect(backlog.getByText(/^Overdue/)).toBeTruthy()
     // 8 days since, in its 7-10 day range: low priority, and can be ticked
     expect(backlog.getByText('In range · low priority')).toBeTruthy()
     expect(backlog.getByRole('checkbox', { name: 'Export a backup' })).toBeTruthy()

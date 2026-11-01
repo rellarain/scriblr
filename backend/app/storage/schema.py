@@ -1313,8 +1313,17 @@ class ShiftOverride(BaseModel):
     endSlot: Optional[int] = Field(default=None, gt=0, le=SLOTS_PER_DAY)
 
 
+TaskPriority = Literal["high", "medium", "low", "none"]
+
+
+class Subtask(BaseModel):
+    id: str
+    label: str = Field(max_length=300)
+    done: bool = False
+
+
 class PlanItem(BaseModel):
-    """A checklist item. `shiftId` assigns it to a shift; with none it waits in the backlog."""
+    """A task. `shiftId` assigns it to a shift; with none it waits in the backlog."""
 
     id: str
     label: str = Field(max_length=300)
@@ -1323,6 +1332,24 @@ class PlanItem(BaseModel):
     targetTree: Optional[TargetTree] = None
     shiftId: Optional[str] = None
     doneOn: Optional[str] = None  # a one-off item, done on this day
+    # How soon it matters: high comes first in the backlog, none waits in a fold. A task saved before priorities existed is medium.
+    priority: TaskPriority = "none"
+    dueDate: Optional[str] = None  # YYYY-MM-DD
+    notes: str = Field(default="", max_length=2000)
+    estimateMinutes: Optional[int] = Field(default=None, ge=1, le=24 * 60)
+    # An amount of the facet's work the task is for (words for a draft chapter, nodes for an outline or plot node), counted from `addedOn`.
+    aim: Optional[int] = Field(default=None, ge=1)
+    subtasks: list[Subtask] = Field(default_factory=list)
+    addedOn: Optional[str] = None  # YYYY-MM-DD
+    # It was on a shift that ended with it undone, and came back to the backlog.
+    carried: bool = False
+
+    @model_validator(mode="before")
+    @classmethod
+    def _legacy_priority(cls, data: Any) -> Any:
+        if isinstance(data, dict) and "priority" not in data:
+            return {**data, "priority": "medium"}
+        return data
 
 
 class Routine(BaseModel):

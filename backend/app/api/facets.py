@@ -65,6 +65,10 @@ def _check_dates(planner: Planner) -> None:
     for item in planner.items:
         if item.doneOn:
             days.append(item.doneOn)
+        if item.dueDate:
+            days.append(item.dueDate)
+        if item.addedOn:
+            days.append(item.addedOn)
     for rest in planner.restDays:
         days.extend([rest.start, rest.end])
     for day in days:

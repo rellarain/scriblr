@@ -16,7 +16,7 @@ import { ChevronLeftIcon, ChevronRightIcon, CloseIcon, ListIcon, PlusIcon, Today
 // move it or its edges to resize it, click it to edit it, right-click (or press and hold) for its menu. The backlog sits beside it.
 
 export interface ScheduleOwner { id: string; label: string; projectId: string | null; planner: Planner; setPlanner: (p: Planner) => void }
-export interface TicksApi { get: (ownerId: string, date: string) => string[]; load: (ownerId: string, date: string) => void; set: (ownerId: string, date: string, id: string, on: boolean) => void }
+export interface TicksApi { get: (ownerId: string, date: string) => string[]; loaded: (ownerId: string, date: string) => boolean; load: (ownerId: string, date: string) => void; set: (ownerId: string, date: string, id: string, on: boolean) => void }
 type CalView = 'day' | 'week' | 'month' | 'year' | 'agenda'
 type Occ = ShiftOccurrence & { ownerId: string }
 const VIEW_ICON: Record<CalView, ComponentType<IconProps>> = { day: ViewDayIcon, week: ViewWeekIcon, month: ViewMonthIcon, year: ViewYearIcon, agenda: ListIcon }

@@ -1,7 +1,7 @@
 // What the Schedule console shows in the design system: a year of activity, a few months before it, goals with a deadline, shifts, routines and
 // today's slots. All of it is relative to today, so the page always looks lived in; none of it is real.
 
-import { emptyDay, emptyPlanner, FACETS, type DayTotals, type FacetActivityData, type Planner, type RibbonData } from '../lib/facets'
+import { emptyDay, emptyPlanner, FACETS, newTask, type DayTotals, type FacetActivityData, type Planner, type RibbonData } from '../lib/facets'
 import { addDays } from '../lib/projection'
 
 const noise = (n: number, s: number): number => { const x = Math.sin(n * 12.9898 + s * 78.233) * 43758.5453; return x - Math.floor(x) }
@@ -53,8 +53,9 @@ export function plannerFixture(today: string): Planner {
       { id: 'r2', label: 'Review character sheets', facet: null, targetNodeId: null, targetTree: null, shiftId: null, pauses: [], lastDone: addDays(today, -30), recurrence: { kind: 'interval', every: 2, unit: 'week', days: [], rangeMax: 3, anchor: addDays(today, -90), until: null } },
     ],
     items: [
-      { id: 'i1', label: 'Reread Ch. 8 notes', facet: 'draft', targetNodeId: null, targetTree: null, shiftId: null, doneOn: null },
-      { id: 'i2', label: 'Fix Ch. 4 plot point order', facet: 'plot', targetNodeId: null, targetTree: null, shiftId: null, doneOn: null },
+      newTask('i1', 'Reread Ch. 8 notes', today, { facet: 'draft', priority: 'high', dueDate: addDays(today, 1), estimateMinutes: 45, subtasks: [{ id: 'st1', label: 'Chapter 8', done: true }, { id: 'st2', label: 'Chapter 9', done: false }] }),
+      newTask('i2', 'Fix Ch. 4 plot point order', today, { facet: 'plot', priority: 'medium' }),
+      newTask('i3', 'Sketch the harbour map', today),
     ],
   }
 }

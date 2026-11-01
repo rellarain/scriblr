@@ -1,7 +1,8 @@
 import { createPortal } from 'react-dom'
-import { useCallback, useEffect, useMemo, useState, type CSSProperties } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState, type CSSProperties } from 'react'
 import { bestStreak, streakUntil } from '../../../../lib/activityCalendar'
 import { FACETS, dayValue, emptyPlanner, type Facet, type Goal, type Planner } from '../../../../lib/facets'
+import { carryForward, endedItems } from '../../../../lib/carryForward'
 import { currentOf } from '../../../../lib/goalFacts'
 import { toIcs } from '../../../../lib/ics'
 import { migrateLegacy } from '../../../../lib/legacySchedule'
@@ -44,7 +45,8 @@ export const DEFAULT_TREE: SplitNode = {
 const hueVars = (hues: FacetHues) => Object.fromEntries(FACETS.map(f => [`--wr-f-${f}`, `hsl(${hues[f]}, ${FACET_COLOR.s}%, ${FACET_COLOR.l}%)`]))
 
 // `titleSlot` is the element in the console's tab-tile title bar where the Settings button and the rail of the console's tiles go (null while it is not drawn yet); without one (undefined) the button is the console's first row, with the rail above the tiles.
-export default function ScheduleConsole({ scope, projectIds, titles, titleSlot }: { scope: 'dash' | 'project'; projectIds: string[]; titles: Record<string, string>; titleSlot?: HTMLElement | null }) {
+// `onOpenNode` opens a node a task is about in the Writer (a project's own console passes it).
+export default function ScheduleConsole({ scope, projectIds, titles, titleSlot, onOpenNode }: { scope: 'dash' | 'project'; projectIds: string[]; titles: Record<string, string>; titleSlot?: HTMLElement | null; onOpenNode?: (tree: 'outline' | 'plot', id: string) => void }) {
   const schedule = useSchedule(projectIds)
   const activity = useActivityState()
   const [settingsOpen, setSettingsOpen] = useState(false)
@@ -80,8 +82,10 @@ export default function ScheduleConsole({ scope, projectIds, titles, titleSlot }
   }, [scope, moved, schedule.loading]) // eslint-disable-line react-hooks/exhaustive-deps
 
   // ---- ticks, a day at a time ----
+  const ownersRef = useRef<ScheduleOwner[]>([])
   const ticks: TicksApi = useMemo(() => ({
     get: (ownerId, date) => (ownerId === ACCOUNT_OWNER ? accountTicks[date] ?? [] : projectTicks[`${ownerId}|${date}`] ?? []),
+    loaded: (ownerId, date) => ownerId === ACCOUNT_OWNER || projectTicks[`${ownerId}|${date}`] !== undefined,
     load: (ownerId, date) => {
       if (ownerId === ACCOUNT_OWNER || projectTicks[`${ownerId}|${date}`]) return
       getTicks(ownerId, date).then(ids => setProjectTicks(prev => ({ ...prev, [`${ownerId}|${date}`]: ids })), () => {})
@@ -91,9 +95,30 @@ export default function ScheduleConsole({ scope, projectIds, titles, titleSlot }
       const next = on ? [...new Set([...current, id])] : current.filter(x => x !== id)
       if (ownerId === ACCOUNT_OWNER) setAccountTicks({ ...accountTicks, [date]: next })
       else { setProjectTicks(prev => ({ ...prev, [`${ownerId}|${date}`]: next })); putTicks(ownerId, date, next).catch(() => {}) }
+      // A task that is in the backlog, or on a one-off shift, is done once and for all: ticking it says so on the task too (a task of a repeating shift is ticked a day at a time).
+      const o = ownersRef.current.find(x => x.id === ownerId)
+      const item = o?.planner.items.find(i => i.id === id)
+      if (o && item) {
+        const shift = item.shiftId ? o.planner.shifts.find(s => s.id === item.shiftId) : null
+        if (!shift || !shift.recurrence) o.setPlanner({ ...o.planner, items: o.planner.items.map(i => (i.id === id ? { ...i, doneOn: on ? date : null } : i)) })
+      }
     },
   }), [accountTicks, projectTicks, setAccountTicks])
   useEffect(() => { for (const o of owners) ticks.load(o.id, today) }, [owners.map(o => o.id).join(','), today]) // eslint-disable-line react-hooks/exhaustive-deps
+  ownersRef.current = owners
+
+  // ---- tasks left on a shift that has ended go back to the backlog (those ticked on the day count as done) ----
+  useEffect(() => {
+    if (schedule.loading) return
+    for (const o of owners) {
+      const ended = endedItems(o.planner, today, nowSlot)
+      if (ended.length === 0) continue
+      // What was ticked on those days has to be known first.
+      const unknown = [...new Set(ended.map(e => e.date))].filter(d => !ticks.loaded(o.id, d))
+      if (unknown.length) { for (const d of unknown) ticks.load(o.id, d); continue }
+      o.setPlanner(carryForward(o.planner, today, nowSlot, (date, id) => ticks.get(o.id, date).includes(id)))
+    }
+  }, [owners, today, nowSlot, schedule.loading, ticks])
 
   // ---- goals ----
   const { daily } = schedule.facets
@@ -144,6 +169,8 @@ export default function ScheduleConsole({ scope, projectIds, titles, titleSlot }
     ...(single?.outline ?? []).filter(n => ['book', 'arc', 'chapter', 'act', 'scene'].includes(n.kind)).map(n => ({ id: n.id, title: n.title, tree: 'outline' as const, kind: n.kind })),
     ...(single?.plot ?? []).filter(n => ['category', 'plotline'].includes(n.kind)).map(n => ({ id: n.id, title: n.title, tree: 'plot' as const, kind: n.kind })),
   ], [single])
+  // Every node of the projects in the console (a task's node name, and what its progress is counted over).
+  const nodes = useMemo(() => facts.flatMap(f => [...f.outline, ...f.plot]).map(n => ({ id: n.id, parentId: n.parentId, title: n.title })), [facts])
   const bookTitles = useMemo(() => Object.fromEntries(facts.flatMap(f => f.outline.filter(n => n.kind === 'book').map(n => [n.id, n.title]))), [facts])
 
   // ---- reminders, export, print ----
@@ -181,7 +208,13 @@ export default function ScheduleConsole({ scope, projectIds, titles, titleSlot }
     },
     {
       id: 'backlog', title: 'Backlog', Icon: ListIcon,
-      children: <Backlog owners={owners} today={today} todayTicks={Object.fromEntries(owners.map(o => [o.id, ticks.get(o.id, today)]))} onPlanner={(id, next) => owners.find(o => o.id === id)?.setPlanner(next)} onTick={(id, item, on) => ticks.set(id, today, item, on)} />,
+      children: (
+        <Backlog
+          owners={owners} today={today} nowSlot={nowSlot} todayTicks={Object.fromEntries(owners.map(o => [o.id, ticks.get(o.id, today)]))}
+          onPlanner={(id, next) => owners.find(o => o.id === id)?.setPlanner(next)} onTick={(id, item, on) => ticks.set(id, today, item, on)}
+          events={schedule.facets.events} targets={targets} nodes={nodes} onOpenNode={onOpenNode}
+        />
+      ),
     },
     { id: 'analytics', title: 'Analytics', Icon: BarChartIcon, children: <AnalyticsCard data={schedule.facets} today={today} titles={bookTitles} weekStart={weekStart} /> },
   ]

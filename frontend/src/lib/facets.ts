@@ -73,6 +73,11 @@ export interface Recurrence {
 }
 export interface Pause { start: string; end: string }
 export interface ShiftOverride { title?: string | null; startSlot?: number | null; endSlot?: number | null }
+// How soon a task matters: high comes first in the backlog, none waits in a fold.
+export type TaskPriority = 'high' | 'medium' | 'low' | 'none'
+export const PRIORITIES: TaskPriority[] = ['high', 'medium', 'low', 'none']
+export const PRIORITY_LABEL: Record<TaskPriority, string> = { high: 'High', medium: 'Medium', low: 'Low', none: 'None' }
+export interface Subtask { id: string; label: string; done: boolean }
 export interface PlanItem {
   id: string
   label: string
@@ -81,7 +86,22 @@ export interface PlanItem {
   targetTree: 'outline' | 'plot' | null
   shiftId: string | null
   doneOn: string | null
+  priority: TaskPriority
+  dueDate: string | null
+  notes: string
+  estimateMinutes: number | null
+  // An amount of the facet's work the task is for (words for a draft chapter, nodes for an outline or plot node), counted from `addedOn`.
+  aim: number | null
+  subtasks: Subtask[]
+  addedOn: string | null
+  // It was on a shift that ended with it undone, and came back to the backlog.
+  carried: boolean
 }
+// A new task: waiting in the backlog with no priority until it is given one.
+export const newTask = (id: string, label: string, today: string | null, patch: Partial<PlanItem> = {}): PlanItem => ({
+  id, label, facet: null, targetNodeId: null, targetTree: null, shiftId: null, doneOn: null,
+  priority: 'none', dueDate: null, notes: '', estimateMinutes: null, aim: null, subtasks: [], addedOn: today, carried: false, ...patch,
+})
 export interface Routine {
   id: string
   label: string
