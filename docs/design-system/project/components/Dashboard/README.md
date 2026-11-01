@@ -58,7 +58,7 @@ The console sits on the level it belongs to, so it uses the **level's tokens** l
 
 ## The calendar icons
 
-The icons of the calendar's views, and of Today, are **one calendar page** with slight differences: a **single rounded square** with a **line across it 25% of the way down**, dividing a **narrow header** (the top quarter) from the **body** where the days would be (`PAGE` and `PAGE_LINE` in `assets/icons/index.tsx`).
+The icons of the calendar's views are **one calendar page** with slight differences: a **single rounded square** with a **line across it 25% of the way down**, dividing a **narrow header** (the top quarter) from the **body** where the days would be (`PAGE` and `PAGE_LINE` in `assets/icons/index.tsx`).
 
 | Icon | Header | Body | Mark |
 |---|---|---|---|
@@ -66,9 +66,9 @@ The icons of the calendar's views, and of Today, are **one calendar page** with 
 | Month | open (a little wider, 30%) | filled | none |
 | Week | open | open | a filled horizontal stripe across the middle of the body, **edge to edge** |
 | Day | open | open | one **small** filled square (3 of the 18 units) in the body |
-| Today | open | open | the **day of the month** in the body (today's, 31 in the drawings) |
+| Today | none | none | no divider: just the rounded square with **today's day of the month** in it (31 in the drawings) |
 
-The Review's week and month switch uses the Week and Month icons.
+Today is the same rounded square without the line. The Review's week and month switch uses the Week and Month icons.
 
 ## Buttons are icons
 

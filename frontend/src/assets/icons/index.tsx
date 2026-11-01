@@ -753,12 +753,11 @@ const PAGE_LINE = 'M3 7.5h18'
 const PAGE_HEADER_FILL = 'M3 7.5V6a3 3 0 0 1 3-3h12a3 3 0 0 1 3 3v1.5Z'
 const PAGE_BODY_FILL = 'M3 7.5h18V18a3 3 0 0 1-3 3H6a3 3 0 0 1-3-3Z'
 
-// Today: the page with the day of the month in its body (the day is today's where the icon is used; 31 is the widest, for the drawings).
+// Today: a rounded square with the day of the month in it (the day is today's where the icon is used; 31 is the widest, for the drawings).
 export function TodayIcon({ day = 31, ...props }: IconProps & { day?: number }) {
   return <IconBase {...props}>
     <rect {...PAGE} />
-    <path d={PAGE_LINE} />
-    <text x="12" y="18.3" textAnchor="middle" fontSize="8.5" fontWeight="700" fill="currentColor" stroke="none">{day}</text>
+    <text x="12" y="15.7" textAnchor="middle" fontSize="10.5" fontWeight="700" fill="currentColor" stroke="none">{day}</text>
   </IconBase>
 }
 
