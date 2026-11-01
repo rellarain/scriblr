@@ -65,7 +65,7 @@ export function PlotValueCard({ w, point, fieldName, drag, dragging, autoFocus }
   return (
     <div
       className={`wrPlotValue${placed === 0 ? '' : ' wrPlotValue--assigned'}${dragging ? ' wrPlotValue--dragging' : ''}${highlighted ? ' wrPlotValue--highlight' : ''}`}
-      data-knode={point.id} data-point={point.id} style={valueLook(point, w.plotNodeById)} onBlur={onBlur}
+      data-knode={point.id} data-point={point.id} style={valueLook(point, w.plotNodeById, w.projectHue)} onBlur={onBlur}
     >
       <span className="wrPlotValueField">{fieldName}</span>
       {drag && (

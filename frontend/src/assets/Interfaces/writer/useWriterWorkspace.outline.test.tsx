@@ -284,7 +284,7 @@ describe('useWriterWorkspace: colour ranges', () => {
     act(() => { chapter = result.current.addOutlineNode('b1', 'chapter') })
     act(() => { series = result.current.addOutlineNode(null, 'series') })
     expect(get(book)?.themeHue).toBe(result.current.projectHue)
-    expect(Math.abs(hueDelta(28, get(chapter)?.themeHue as number))).toBeLessThanOrEqual(30) // the book default, 28, as b1 has no colour
+    expect(Math.abs(hueDelta(result.current.projectHue, get(chapter)?.themeHue as number))).toBeLessThanOrEqual(30) // b1 has no colour: it shows the project's
     expect(get(series)?.themeHue).toBeUndefined()
   })
 
@@ -327,5 +327,140 @@ describe('useWriterWorkspace: colour ranges', () => {
     await act(async () => { await hook.result.current.saveNow() })
     expect(backend.saved.outline.at(-1)?.find(n => n.id === 's1')?.themeHue).toBeNull()
     expect(hook.result.current.levelHueOf(hook.result.current.outlineNodes.find(n => n.id === 's1')!)).toBe(hook.result.current.projectHue)
+  })
+})
+
+describe('useWriterWorkspace: the range and inherit of a colour', () => {
+  it('records the range a node chose, held to its parent\'s, and lowers the ranges under a parent that is narrowed', async () => {
+    const { result, get } = await opened()
+    const project = result.current.projectHue
+    act(() => { result.current.setNodeHueRange('c1', 120) })
+    expect(get('c1')?.hueRange).toBe(90) // the book's own range is 90 until it chooses another
+    act(() => { result.current.setNodeHueRange('b1', 180) })
+    expect(get('b1')?.hueRange).toBe(180)
+    act(() => { result.current.setNodeHueRange('c1', 120) })
+    expect(get('c1')?.hueRange).toBe(120)
+    act(() => { result.current.setNodeHue('c1', project + 110) })
+    expect(get('c1')?.themeHue).toBe(wrapHue(project + 110))
+    act(() => { result.current.setNodeHueRange('b1', 60) })
+    expect(get('c1')?.hueRange).toBe(60)
+    expect(get('c1')?.themeHue).toBe(wrapHue(project + 60))
+    expect(result.current.levelRangeOf(get('c1')!)).toBe(60)
+  })
+
+  it('pulls a node\'s own hue into a narrower window of its parent, and never moves it for a wider one', async () => {
+    const { result, get } = await opened()
+    const project = result.current.projectHue
+    act(() => { result.current.setNodeHueRange('b1', 120) })
+    act(() => { result.current.setNodeHue('b1', project + 100) })
+    expect(get('b1')?.themeHue).toBe(wrapHue(project + 100))
+    act(() => { result.current.setNodeHueRange('b1', 60) })
+    expect(get('b1')?.themeHue).toBe(wrapHue(project + 60))
+    act(() => { result.current.setNodeHueRange('b1', 180) })
+    expect(get('b1')?.themeHue).toBe(wrapHue(project + 60))
+  })
+
+  it('does not move a child of a node with a range of 180 or 360 when the parent changes', async () => {
+    const { result, get } = await opened()
+    const project = result.current.projectHue
+    act(() => { result.current.setNodeHueRange('b1', 360) })
+    act(() => { result.current.setNodeHueRange('c1', 180) })
+    act(() => { result.current.setNodeHue('c1', project + 170) })
+    act(() => { result.current.setNodeHue('b1', project + 60) })
+    expect(get('c1')?.themeHue).toBe(wrapHue(project + 170))
+  })
+
+  it('turns Inherit on (no own colour, it follows the parent) and off (the hue it showed becomes its own)', async () => {
+    const { result, get } = await opened()
+    const project = result.current.projectHue
+    act(() => { result.current.setNodeHue('c1', project + 20) })
+    expect(result.current.hueSliderOf(get('c1')!).inherit).toBe(false)
+    act(() => { result.current.setNodeInherit('c1', true) })
+    expect(get('c1')?.themeHue).toBeNull()
+    expect(result.current.hueSliderOf(get('c1')!)).toMatchObject({ inherit: true, hue: result.current.levelHueOf(get('b1')!) })
+    act(() => { result.current.setNodeHue('b1', project + 40) })
+    expect(result.current.levelHueOf(get('c1')!)).toBe(wrapHue(project + 40)) // it follows
+    act(() => { result.current.setNodeInherit('c1', false) })
+    expect(get('c1')?.themeHue).toBe(wrapHue(project + 40))
+  })
+
+  it('lets a book inherit the project\'s colour too, and clears an old hex colour so it does not come back', async () => {
+    const { result, get } = await opened()
+    act(() => { result.current.setNodeHue('b1', 10) })
+    act(() => { result.current.setNodeInherit('b1', true) })
+    expect(get('b1')?.themeHue).toBeNull()
+    expect(get('b1')?.color).toBeNull()
+    expect(result.current.levelHueOf(get('b1')!)).toBe(result.current.projectHue)
+  })
+
+  it('has no Inherit at a range of 360 (it keeps the hue it showed as its own), and refuses it', async () => {
+    const { result, get } = await opened()
+    act(() => { result.current.setNodeHueRange('b1', 360) })
+    expect(get('b1')?.themeHue).toBe(result.current.projectHue)
+    act(() => { result.current.setNodeInherit('b1', true) })
+    expect(get('b1')?.themeHue).toBe(result.current.projectHue)
+    expect(result.current.hueSliderOf(get('b1')!)).toMatchObject({ inherit: false, range: 360 })
+  })
+
+  it('offers a node the ranges up to its parent\'s', async () => {
+    const { result, get } = await opened()
+    act(() => { result.current.setNodeHueRange('b1', 120) })
+    expect(result.current.hueSliderOf(get('c1')!).maxRange).toBe(120)
+    expect(result.current.hueSliderOf(get('b1')!).maxRange).toBe(360)
+  })
+})
+
+describe('useWriterWorkspace: the project\'s own range and inherit', () => {
+  it('follows the app theme\'s hue while it inherits, and holds a hue it chooses within its range of that', async () => {
+    const { result } = await opened()
+    const app = result.current.appHue
+    act(() => { result.current.setProjectHueRange(60) })
+    expect(result.current.projectRange).toBe(60)
+    expect(Math.abs(hueDelta(app, result.current.projectHue))).toBeLessThanOrEqual(60)
+    act(() => { result.current.setProjectHue(app + 170) })
+    expect(result.current.projectHue).toBe(wrapHue(app + 60))
+    act(() => { result.current.setProjectInherit(true) })
+    expect(result.current.activeProject?.settings.hueInherit).toBe(true)
+    expect(result.current.projectHue).toBe(app)
+    expect(result.current.projectHueSlider()).toMatchObject({ inherit: true, hue: app, centre: app, range: 60 })
+    act(() => { result.current.setProjectInherit(false) })
+    expect(result.current.activeProject?.settings.hueInherit).toBe(false)
+    expect(result.current.activeProject?.settings.themeHue).toBe(app)
+  })
+
+  it('starts at 360, which has no Inherit; picking a colour turns it off', async () => {
+    const { result } = await opened()
+    act(() => { result.current.setProjectInherit(true) })
+    expect(result.current.activeProject?.settings.hueInherit).toBeFalsy() // the project starts at 360: nothing to follow
+    act(() => { result.current.setProjectHueRange(180) })
+    act(() => { result.current.setProjectInherit(true) })
+    expect(result.current.activeProject?.settings.hueInherit).toBe(true)
+    act(() => { result.current.setProjectHue(result.current.appHue + 100) })
+    expect(result.current.activeProject?.settings.hueInherit).toBe(false)
+    act(() => { result.current.setProjectInherit(true) })
+    expect(result.current.activeProject?.settings.hueInherit).toBe(true)
+    act(() => { result.current.setProjectHueRange(360) })
+    expect(result.current.activeProject?.settings.hueInherit).toBe(false) // 360 keeps the hue it showed as its own
+    act(() => { result.current.setProjectInherit(true) })
+    expect(result.current.activeProject?.settings.hueInherit).toBe(false) // and cannot inherit
+  })
+
+  it('holds the books under it to its range', async () => {
+    const { result, get } = await opened()
+    const app = result.current.appHue
+    act(() => { result.current.setProjectHue(app) })
+    act(() => { result.current.setNodeHueRange('b1', 90) })
+    act(() => { result.current.setNodeHue('b1', app + 90) })
+    act(() => { result.current.setProjectHueRange(30) })
+    expect(get('b1')?.hueRange).toBe(30)
+    expect(get('b1')?.themeHue).toBe(wrapHue(app + 30))
+  })
+
+  it('saves the range and the inherit flag with the project\'s settings', async () => {
+    const { result, backend } = await opened()
+    act(() => { result.current.setProjectHueRange(90) })
+    act(() => { result.current.setProjectInherit(true) })
+    await act(async () => { await result.current.saveNow() })
+    expect(backend.saved.settings.at(-1)).toMatchObject({ hueRange: 90, hueInherit: true })
   })
 })

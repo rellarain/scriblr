@@ -72,20 +72,74 @@
 // which reads on any hue and on any ground.
 .colorRangeInput:focus-visible + .colorRangeThumb { box-shadow: 0 0 0 2px #000, 0 0 0 4px #fff; }
 
-// A level colour's slider with its reset button (assets/Interfaces/writer/HueSlider.tsx): a 22px square, the height of the thumb, to the
-// left of the track, filled with the parent's hue and outlined in white like the thumb.
+// A level colour's slider row (assets/Interfaces/writer/HueSlider.tsx): the Inherit toggle, the degree chip, the slider and the range button.
+// The toggle is a 22px square, the height of the thumb, filled with the parent's hue; it is outlined in white only while it is on.
 .hueSliderRow { display: flex; align-items: center; gap: var(--space-3, 6px); min-width: 0; }
 // (More specific than the Writer's button reset, `.wUI.wr :where(button)`, which would otherwise clear the fill and the edge.)
-.hueSliderRow > button.hueReset {
+.hueSliderRow > button.hueInherit {
   flex: 0 0 auto;
   box-sizing: border-box;
   width: 22px;
   height: 22px;
   padding: 0;
-  border: 2px solid #fff;
+  border: 2px solid transparent;
   border-radius: 3px;
   background: var(--cr-reset);
-  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.5);
   cursor: pointer;
+  &--on { border-color: #fff; box-shadow: 0 1px 3px rgba(0, 0, 0, 0.5); }
+  &:disabled { opacity: 0.4; cursor: default; }
   &:focus-visible { outline: none; box-shadow: 0 0 0 2px #000, 0 0 0 4px #fff; }
 }
+// The hue's degrees, read-only: in the colour itself, white text and a white outline like the thumb's.
+.hueSliderRow > .hueChip {
+  flex: 0 0 auto;
+  box-sizing: border-box;
+  height: 22px;
+  min-width: 40px;
+  padding: 0 6px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border: 2px solid #fff;
+  border-radius: 3px;
+  background: var(--cr-chip);
+  color: #fff;
+  font-size: 11px;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  line-height: 1;
+  text-shadow: 0 1px 1px rgba(0, 0, 0, 0.45);
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.5);
+  cursor: default;
+  user-select: none;
+}
+// The range button: the chosen range as text; open, every range on offer in a row (the slider gives up the room).
+.hueSliderRow > .hueRange {
+  flex: 0 0 auto;
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+  padding: 1px;
+  border-radius: var(--radius-button, 4px);
+  background: color-mix(in srgb, currentColor 10%, transparent);
+  button.hueRangeBtn {
+    box-sizing: border-box;
+    min-width: 40px;
+    height: 20px;
+    padding: 0 6px;
+    border: 0;
+    border-radius: 3px;
+    background: transparent;
+    color: inherit;
+    font-size: 11px;
+    font-weight: 700;
+    font-variant-numeric: tabular-nums;
+    line-height: 1;
+    white-space: nowrap;
+    cursor: pointer;
+    &:hover { background: color-mix(in srgb, currentColor 14%, transparent); }
+    &--on { background: color-mix(in srgb, currentColor 24%, transparent); }
+    &:focus-visible { outline: 2px solid currentColor; outline-offset: -2px; }
+  }
+}
+.colorRange--noThumb .colorRangeInput { cursor: default; }

@@ -50,7 +50,7 @@ export function EdgeTabs({ w, activeChapterId, activeArcId = null, onChapter, on
   const numberOf = new Map(w.activeBookChapters.map((c, i) => [c.id, i + 1]))
   // The tab's colour is a stripe on its edge; as the raised tab's background it is fitted for the ink to read on it, whatever the hue.
   const tint = (node: OutlineNode) => {
-    const c = tabColors(activeZone, w.levelHueOf(node), bookThemeHue(book))
+    const c = tabColors(activeZone, w.levelHueOf(node), w.levelHueOf(book))
     return { '--wr-tab-tint': w.levelTintOf(node), '--wr-tab-bg': `hsl(${c.bg.h}, ${c.bg.s}%, ${c.bg.l}%)` } as CSSProperties
   }
   let arcNumber = 0
@@ -60,7 +60,7 @@ export function EdgeTabs({ w, activeChapterId, activeArcId = null, onChapter, on
   const railWidth = Math.max(leaves * LEAF_STEP + 4 + 15, furthest * LEAF_STEP + 4 + 38)
 
   return (
-    <div className="wrEdgeRail" style={{ '--leaves': leaves, '--rail-w': `${railWidth}px`, '--wr-cover': fillColorCss(bookThemeHue(book), SAT_MIDDLE) } as CSSProperties}>
+    <div className="wrEdgeRail" style={{ '--leaves': leaves, '--rail-w': `${railWidth}px`, '--wr-cover': fillColorCss(w.levelHueOf(book), SAT_MIDDLE) } as CSSProperties}>
       {/* The pages behind the open one, their edges stepping out behind the tabs. */}
       <div className="wrEdgeLeaves" aria-hidden="true">
         {Array.from({ length: leaves }, (_, i) => <i key={i} style={{ '--leaf': i + 1 } as CSSProperties} />)}

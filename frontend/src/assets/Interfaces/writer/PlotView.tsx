@@ -4,13 +4,10 @@ import type { WriterWorkspace } from './useWriterWorkspace'
 import { ChevronDownIcon, ChevronRightIcon, PlusIcon } from '../../icons'
 import { ChipEditor, DeleteControl } from './shared'
 import { focusNodeField, useNodeKeys } from '../../../lib/nodeKeys'
-import { hueOfCode, rangeOf } from '../../../theme/bookColors'
-import { useThemeState } from '../../../theme/useTheme'
 import HueSlider from './HueSlider'
 import { plotColors, plotColorVars } from './plotColors'
 import { isPlaced } from './plotPlacement'
 import { nodeLabel, plotTrail, sortByTitle } from './plotTree'
-import { plotParentOf, shownPlotHue } from './plotHues'
 import { FieldEditor, FieldGroups, type PlotDrag, type PlotUi } from './FieldBlocks'
 import { PlotOutlinePanel } from './PlotOutlinePanel'
 import { PlotNav, plotlineCount } from './PlotNav'
@@ -61,29 +58,12 @@ function ChildRows({ w, node, kind, addLabel }: { w: WriterWorkspace; node: Plot
   )
 }
 
-// The colour selector of a category (within 90 degrees of the project's hue), subcategory (within 60 of its category's) or cluster (within 30 of
-// its subcategory's, or of its category's when it sits straight under one). Saturation and lightness are the active
-// zone's, so what the thumb shows is what the app draws.
+// The colour selector of a category (measured from the project's hue), subcategory (from its category's) or cluster (from its subcategory's, or of its
+// category's when it sits straight under one): each node's own range, 30 to 360 degrees either side (its kind's default until it is chosen), or Inherit.
+// Saturation and lightness are the active zone's, so what the thumb shows is what the app draws.
 function HueField({ w, node }: { w: WriterWorkspace; node: PlotNode }) {
-  const { settings, activeZone } = useThemeState()
-  const appCode = settings.zones[activeZone].palette.theme.h
-  if (node.kind === 'subcategory' || node.kind === 'cluster') {
-    const parent = plotParentOf(node, w.plotNodeById)
-    // The hue the parent shows; a node with no colour of its own shows it too.
-    const parentCode = shownPlotHue(parent, w.plotNodeById, appCode)
-    return (
-      <HueSlider
-        label={node.kind === 'cluster' ? 'Cluster colour' : 'Subcategory colour'} hue={node.hue ?? parentCode} centre={hueOfCode(parentCode)} range={rangeOf(node.kind)}
-        onChange={code => w.setPlotHue(node.id, code, parentCode)}
-      />
-    )
-  }
-  return (
-    <HueSlider
-      label="Category colour" hue={node.hue ?? appCode} centre={w.projectHue} range={rangeOf('category')}
-      onChange={code => w.setPlotHue(node.id, code)}
-    />
-  )
+  const label = node.kind === 'cluster' ? 'Cluster colour' : node.kind === 'subcategory' ? 'Subcategory colour' : 'Category colour'
+  return <HueSlider label={label} {...w.plotHueSliderOf(node)} />
 }
 
 function KeywordsField({ w, node }: { w: WriterWorkspace; node: PlotNode }) {
@@ -108,10 +88,10 @@ function CategoryEditor({ w, node, ui }: { w: WriterWorkspace; node: PlotNode; u
   const [dragFieldId, setDragFieldId] = useState<string | null>(null)
   const [dragSetId, setDragSetId] = useState<string | null>(null)
   const isCategory = node.kind === 'category'
-  const colors = plotColors(node, w.plotNodeById)
+  const colors = plotColors(node, w.plotNodeById, w.projectHue)
   return (
     <div className={`wrCardPanel wrCardPanel--${node.kind}`} data-knode={node.id} style={plotColorVars(colors)}>
-      <PlotParents node={node} byId={w.plotNodeById} open={ui.openParents} onToggle={ui.toggleParent} onOpen={w.focusPlotNode} />
+      <PlotParents node={node} byId={w.plotNodeById} projectHue={w.projectHue} open={ui.openParents} onToggle={ui.toggleParent} onOpen={w.focusPlotNode} />
       <div className="wrCardPanelHead">
         <span className="wrKindBadge">{node.kind}</span>
         <input className="wrTitleField" data-kf="" value={node.title} onChange={e => w.updatePlotNodeField(node.id, 'title', e.target.value)} placeholder={`${node.kind.charAt(0).toUpperCase()}${node.kind.slice(1)} title`} />
@@ -146,7 +126,7 @@ function PlotlineEditor({ w, node, ui }: { w: WriterWorkspace; node: PlotNode; u
   const outlineById = useMemo(() => new Map(w.outlineNodes.map(n => [n.id, n])), [w.outlineNodes])
   const points = w.plotNodes.filter(p => p.kind === 'plotpoint' && p.parentId === node.id)
   const hasAssigned = points.some(p => isPlaced(p, outlineById))
-  const colors = plotColors(node, w.plotNodeById)
+  const colors = plotColors(node, w.plotNodeById, w.projectHue)
 
   const drag: PlotDrag = {
     dragId,
@@ -168,7 +148,7 @@ function PlotlineEditor({ w, node, ui }: { w: WriterWorkspace; node: PlotNode; u
     <div className="wrPlotlineLayout">
       <div className="wrPlotlineLeft">
         <div className="wrCardPanel wrCardPanel--plotline" data-knode={node.id} style={plotColorVars(colors)}>
-          <PlotParents node={node} byId={w.plotNodeById} open={ui.openParents} onToggle={ui.toggleParent} onOpen={w.focusPlotNode} />
+          <PlotParents node={node} byId={w.plotNodeById} projectHue={w.projectHue} open={ui.openParents} onToggle={ui.toggleParent} onOpen={w.focusPlotNode} />
           <div className="wrCardPanelHead">
             <span className="wrKindBadge">plotline</span>
             <input className="wrTitleField" data-kf="" value={node.title} onChange={e => w.updatePlotNodeField(node.id, 'title', e.target.value)} placeholder="Plotline title" />

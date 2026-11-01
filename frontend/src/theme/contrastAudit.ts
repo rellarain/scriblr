@@ -1,4 +1,4 @@
-import { tabColors, fillCap, fillHsl, stripeHsl, SAT_LOUD, SAT_MIDDLE, SAT_QUIET, SAT_TIERS } from './bookColors'
+import { chipLight, sliderLight, tabColors, fillCap, fillHsl, stripeHsl, SAT_LOUD, SAT_MIDDLE, SAT_QUIET, SAT_TIERS } from './bookColors'
 import { readableInk, type HSL } from './contrast'
 import { levelPairs } from './levelContrast'
 import { OFF_SKY_SATURATION, skyLook } from './skyLook'
@@ -244,6 +244,9 @@ export function levelRatios(zone: ZoneKey, hue: number): Pair[] {
     keep({ id: 'schedule/block', group: 'Schedule', label: "White on a shift's block (the facet colour mixed into the card), the worst facet hue and state", kind: 'text', ratio: block })
     keep({ id: 'level/stripe', group: 'Level panels', label: 'Card stripe (the accent colour, lifted) on the level page', kind: 'ui', ratio: ratioOfRgb(stripe, mixRgb(rgbOf(fill), 90, BLACK)) })
   }
+  // The degree chip of a colour slider: white on the slider's colour for the hue, deepened as far as the white needs (bookColors.chipLight).
+  const chip = hsl(hue, look.themeS, chipLight(hue, look.themeS, sliderLight(zone, look.themeL)))
+  worst.set('hue-chip', { id: 'hue-chip', group: 'Hue slider', label: "White on the degree chip (the slider's colour for the hue, deepened as far as white needs)", kind: 'text', ratio: ratioOfRgb(WHITE, rgbOf(chip)) })
   return [...worst.values()]
 }
 

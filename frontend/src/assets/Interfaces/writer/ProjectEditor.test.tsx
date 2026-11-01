@@ -10,7 +10,7 @@ vi.mock('./TimeSystemEditor', () => ({ default: () => <div>time systems</div> })
 
 function editor() {
   const renameProject = vi.fn()
-  render(<ProjectEditor w={makeWorkspace({ activeProject: { projectId: 'p1', title: 'First' }, projectHue: 200, renameProject })} />)
+  render(<ProjectEditor w={makeWorkspace({ activeProject: { projectId: 'p1', title: 'First' }, projectHue: 200, projectHueSlider: () => ({ hue: 200, centre: null, range: 360, onChange: vi.fn() }), renameProject })} />)
   return { renameProject, field: screen.getByRole('textbox', { name: 'Project name' }) as HTMLInputElement }
 }
 

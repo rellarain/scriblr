@@ -10,7 +10,6 @@ import { setAutosaveMode, useSettings } from '../../../../settings/settingsStore
 import { autosaveModeOf } from '../../../../theme/types'
 import { chapterDatesOf, type ChapterMeta } from '../chapterDates'
 import EdgeTabs from '../EdgeTabs'
-import { rangeOf } from '../../../../theme/bookColors'
 import HueSlider from '../HueSlider'
 import HelpArticles from '../levels/HelpArticles'
 import { PublishControl } from '../PublishControl'
@@ -163,10 +162,7 @@ function DraftPage({ w, chapter, pagesComponent, onPagesComponent }: {
                   id: 'settings', title: 'Settings', Icon: GearIcon, railless: true, bodyClassName: 'wrDraftTileBody wrDraftTileBody--flush',
                   children: (
                     <div className="wrSpreadScroll wrDraftPanel" role="region" aria-label="Chapter settings">
-                      <HueSlider
-                        label="Chapter colour" className="wrNodeHue" hue={w.levelHueOf(chapter)} centre={w.hueCentreOf(chapter)} range={rangeOf('chapter')}
-                        onChange={code => w.setNodeHue(chapter.id, code)}
-                      />
+                      <HueSlider label="Chapter colour" className="wrNodeHue" {...w.hueSliderOf(chapter)} />
                     </div>
                   ),
                 },

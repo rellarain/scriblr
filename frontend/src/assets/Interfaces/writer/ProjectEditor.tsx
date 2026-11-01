@@ -1,6 +1,5 @@
 import { useState } from 'react'
 import { PROJECT_NAME_MAX, type WriterWorkspace } from './useWriterWorkspace'
-import { rangeOf } from '../../../theme/bookColors'
 import HueSlider from './HueSlider'
 import TimeSystemEditor from './TimeSystemEditor'
 
@@ -35,7 +34,7 @@ export default function ProjectEditor({ w }: { w: WriterWorkspace }) {
         <ProjectName w={w} />
       </div>
       <div className="wrCardPanel">
-        <HueSlider label="Project colour" className="wrNodeHue" hue={w.projectHue} centre={null} range={rangeOf('project')} onChange={w.setProjectHue} />
+        <HueSlider label="Project colour" className="wrNodeHue" {...w.projectHueSlider()} />
       </div>
       <TimeSystemEditor w={w} />
     </div>

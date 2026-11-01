@@ -1,9 +1,9 @@
 import { describe, expect, it } from 'vitest'
 import type { OutlineNode } from '../../../api/types'
-import { autoPickHue, defaultProjectHue, dropSeriesHues, fitToParent, hueCentre, levelHue, levelTint, reconcileHues } from './levelHues'
+import { autoPickHue, defaultProjectHue, dropSeriesHues, fitToParent, hueCentre, levelHue, levelRange, levelTint, rangeCapOf, reconcileHues } from './levelHues'
 
-const node = (id: string, kind: OutlineNode['kind'], parentId: string | null, themeHue?: number): OutlineNode =>
-  ({ id, kind, parentId, order: 0, title: id, synopsis: '', draftRef: null, themeHue } as OutlineNode)
+const node = (id: string, kind: OutlineNode['kind'], parentId: string | null, themeHue?: number, hueRange?: number): OutlineNode =>
+  ({ id, kind, parentId, order: 0, title: id, synopsis: '', draftRef: null, themeHue, hueRange } as OutlineNode)
 const byId = (nodes: OutlineNode[]) => new Map(nodes.map(n => [n.id, n]))
 
 const PROJECT = 150
@@ -23,8 +23,8 @@ describe('levelHue', () => {
     expect(levelHue(nodes[6], map, PROJECT)).toBe(190) // and its own over that
   })
 
-  it("keeps a book's own colour (or the book default) whatever its series is", () => {
-    expect(levelHue(node('lone', 'book', null), byId([]), PROJECT)).toBe(28)
+  it("keeps a book's own colour (a book with none inherits the project's) whatever its series is", () => {
+    expect(levelHue(node('lone', 'book', null), byId([]), PROJECT)).toBe(PROJECT)
     expect(levelHue(nodes[1], map, PROJECT)).toBe(210)
   })
 
@@ -131,5 +131,54 @@ describe('defaultProjectHue', () => {
   it('is a hue offset from the app theme hue, and wraps', () => {
     expect(defaultProjectHue(330)).toBe(90)
     expect(defaultProjectHue(240)).toBe(0)
+  })
+})
+
+describe('levelRange', () => {
+  it('is the range a node chose, else its kind default, never wider than its parent', () => {
+    const nodes = [node('s', 'series', null), node('b', 'book', 's', 210), node('a', 'arc', 'b'), node('c', 'chapter', 'a'), node('c2', 'chapter', 'a', 200, 120)]
+    const map = byId(nodes)
+    expect(levelRange(nodes[1], map, 360)).toBe(90) // a book, the default
+    expect(levelRange(nodes[2], map, 360)).toBe(60)
+    expect(levelRange(nodes[3], map, 360)).toBe(30)
+    expect(levelRange(nodes[4], map, 360)).toBe(60) // chose 120 under an arc of 60
+    expect(rangeCapOf(nodes[3], map, 360)).toBe(60)
+    expect(rangeCapOf(nodes[1], map, 360)).toBe(360) // a book's parent is a series with no colour: the project's
+    expect(rangeCapOf(nodes[1], map, 60)).toBe(60)
+    expect(levelRange(nodes[1], map, 60)).toBe(60) // the project's range holds a book of 90 to 60
+  })
+})
+
+describe('reconcileHues with ranges of their own', () => {
+  it('holds an own hue in the range the node chose, not the default', () => {
+    const nodes = [node('b', 'book', null, 200, 120), node('a', 'arc', 'b', 330, 120)]
+    // The arc may reach 120 either side of 200 only if its parent allows: the book's 120 holds
+    expect(reconcileHues(nodes, PROJECT, 'b').map(n => n.themeHue)).toEqual([200, 320])
+  })
+
+  it('lowers a stored range wider than its parent, and the hue with it', () => {
+    const nodes = [node('b', 'book', null, 200, 30), node('a', 'arc', 'b', 260, 90)]
+    const [book, arc] = reconcileHues(nodes, PROJECT, 'b')
+    expect(book.hueRange).toBe(30)
+    expect(arc.hueRange).toBe(30)
+    expect(arc.themeHue).toBe(230)
+  })
+
+  it('never moves a node whose range is 180 or 360, whatever the parent does', () => {
+    const wide = [node('b', 'book', null, 10, 180), node('a', 'arc', 'b', 190, 180), node('c', 'chapter', 'a', 20, 180)]
+    expect(reconcileHues(wide, PROJECT, 'b').map(n => n.themeHue)).toEqual([10, 190, 20])
+    const whole = [node('b', 'book', null, 10, 360), node('a', 'arc', 'b', 190, 360)]
+    expect(reconcileHues(whole, PROJECT).map(n => n.themeHue)).toEqual([10, 190])
+  })
+
+  it('holds the books to the range of the project', () => {
+    const nodes = [node('b', 'book', null, 200, 90)]
+    expect(reconcileHues(nodes, PROJECT, undefined, 30)[0].hueRange).toBe(30)
+    expect(reconcileHues(nodes, PROJECT, undefined, 30)[0].themeHue).toBe(180)
+  })
+
+  it('leaves an inheriting node alone (it follows the parent live)', () => {
+    const nodes = [node('b', 'book', null), node('a', 'arc', 'b')]
+    expect(reconcileHues(nodes, PROJECT)).toEqual(nodes)
   })
 })

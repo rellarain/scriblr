@@ -42,6 +42,8 @@ export interface OutlineNode {
   color: string | null
   // A level's own hue, 0-360 (or a neutral swatch): a book's colour, and the series, arc and chapter hues.
   themeHue?: number | null
+  // How far (degrees either side of its parent's hue) the colour may sit: 30, 60, 90, 120, 180 or 360; none = the kind's default.
+  hueRange?: number | null
   chapterCountTarget: number | null
   plotlineIds: string[]
   wordCountGoal: number | null
@@ -105,6 +107,8 @@ export interface PlotNode {
   // Category and subcategory only: the colour hue, 0-360 (null = the theme's hue for a
   // category, its category's hue for a subcategory).
   hue?: number | null
+  // How far (degrees either side of its parent's hue) the colour may sit (30, 60, 90, 120, 180 or 360); none = the kind's default.
+  hueRange?: number | null
   // Plotpoints are the values of fields. `fieldId` is the field (a PlotCustomFieldDef id, defined
   // on a category, subcategory or plotline) a value belongs to; `refId` marks a plotline's reference
   // to a value defined on its category or subcategory (title and body are read from that original);
@@ -186,6 +190,9 @@ export interface ProjectSettings {
   timeSystems: TimeSystem[]
   // The project's own colour (a hue, 0-360), the root of the Writer's level colours; null = the app theme's default.
   themeHue?: number | null
+  // The project's colour follows the app theme's hue (its own themeHue is kept, not shown), and how far from that hue (degrees either side) it may sit.
+  hueInherit?: boolean
+  hueRange?: number | null
 }
 
 export interface ProjectIndex {

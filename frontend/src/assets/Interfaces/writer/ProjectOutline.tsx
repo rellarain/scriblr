@@ -73,7 +73,7 @@ function ProjectOutline({ w }: { w: WriterWorkspace }) {
       <div
         key={book.id} data-node={book.id} data-knode={book.id}
         className={dnd.cardClass('wrProjBook wrOutlineCard', book.id)}
-        style={{ ['--wr-node-color' as string]: stripeColorCss(bookThemeHue(book), SAT_MIDDLE) }}
+        style={{ ['--wr-node-color' as string]: stripeColorCss(w.levelHueOf(book), SAT_MIDDLE) }}
       >
         <div className="wrProjTop">
           {grip(book.id)}

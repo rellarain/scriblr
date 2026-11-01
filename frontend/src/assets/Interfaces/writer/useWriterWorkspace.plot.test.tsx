@@ -502,11 +502,12 @@ describe('useWriterWorkspace: plot colour ranges', () => {
     expect(get(other)?.hue).toBe(project)
   })
 
-  it("stores the parent's shown hue on it when the parent had none of its own and a child is coloured", async () => {
+  it("measures a child from the hue its parent shows, and leaves a parent that has no colour of its own inheriting", async () => {
     const { result, get } = await opened()
-    act(() => { result.current.setPlotHue('sub', 130, 120) })
-    expect(get('cat')?.hue).toBe(120)
-    expect(get('sub')?.hue).toBe(130)
+    const project = result.current.projectHue
+    act(() => { result.current.setPlotHue('sub', project + 20, 120) })
+    expect(get('cat')?.hue).toBeUndefined() // it still inherits the project's
+    expect(get('sub')?.hue).toBe(wrapHue(project + 20))
   })
 })
 
@@ -598,5 +599,70 @@ describe('useWriterWorkspace: choice fields and their answers', () => {
     const sound = [...CHOICES, plotNode('a1', 'plotpoint', 'line', 'Fantasy', { fieldId: 'fg', optionId: 'o1' })]
     const { backend } = await openedWith(sound)
     expect(backend.saved.plot).toHaveLength(0)
+  })
+})
+
+describe('useWriterWorkspace: the range and inherit of a plot colour', () => {
+  it('records a range held to the parent\'s and lowers the ranges under a node that is narrowed', async () => {
+    const { result, get } = await opened()
+    const project = result.current.projectHue
+    let cluster = ''
+    act(() => { cluster = result.current.addPlotNode('sub', 'cluster') })
+    act(() => { result.current.setPlotHueRange('cat', 180) })
+    act(() => { result.current.setPlotHueRange('sub', 120) })
+    act(() => { result.current.setPlotHueRange(cluster, 90) })
+    expect([get('cat')?.hueRange, get('sub')?.hueRange, get(cluster)?.hueRange]).toEqual([180, 120, 90])
+    act(() => { result.current.setPlotHue('cat', project) })
+    act(() => { result.current.setPlotHue('sub', project + 110, project) })
+    expect(get('sub')?.hue).toBe(wrapHue(project + 110))
+    act(() => { result.current.setPlotHueRange('cat', 60) })
+    expect(get('sub')?.hueRange).toBe(60)
+    expect(get(cluster)?.hueRange).toBe(60)
+    expect(get('sub')?.hue).toBe(wrapHue(project + 60))
+  })
+
+  it('has a category inherit the project\'s colour: none of its own, shown as the project\'s', async () => {
+    const { result, get } = await opened()
+    act(() => { result.current.setPlotHue('cat', result.current.projectHue + 40) })
+    expect(result.current.plotHueSliderOf(get('cat')!).inherit).toBe(false)
+    act(() => { result.current.setPlotInherit('cat', true) })
+    expect(get('cat')?.hue).toBeNull()
+    expect(result.current.plotHueSliderOf(get('cat')!)).toMatchObject({ inherit: true, hue: result.current.projectHue, centre: result.current.projectHue })
+    act(() => { result.current.setPlotInherit('cat', false) })
+    expect(get('cat')?.hue).toBe(result.current.projectHue)
+  })
+
+  it('has a subcategory follow its category, and lose Inherit at a range of 360', async () => {
+    const { result, get } = await opened()
+    const project = result.current.projectHue
+    act(() => { result.current.setPlotHue('cat', project + 30) })
+    act(() => { result.current.setPlotInherit('sub', true) })
+    expect(result.current.plotHueSliderOf(get('sub')!).hue).toBe(wrapHue(project + 30))
+    act(() => { result.current.setPlotHueRange('sub', 360) })
+    expect(get('sub')?.hueRange).toBe(90) // held to the category's 90: still inheriting
+    expect(get('sub')?.hue).toBeNull()
+    act(() => { result.current.setPlotHueRange('cat', 360) })
+    act(() => { result.current.setPlotHueRange('sub', 360) })
+    expect(get('sub')?.hue).toBe(wrapHue(project + 30)) // keeps the hue it showed as its own
+    expect(get('sub')?.hueRange).toBe(360)
+    act(() => { result.current.setPlotInherit('sub', true) })
+    expect(get('sub')?.hue).toBe(wrapHue(project + 30)) // no Inherit at 360
+  })
+
+  it('offers a node the ranges up to its parent\'s', async () => {
+    const { result, get } = await opened()
+    act(() => { result.current.setPlotHueRange('cat', 120) })
+    expect(result.current.plotHueSliderOf(get('sub')!).maxRange).toBe(120)
+    expect(result.current.plotHueSliderOf(get('cat')!).maxRange).toBe(360)
+  })
+
+  it('holds the categories to the project\'s range when it is narrowed', async () => {
+    const { result, get } = await opened()
+    const project = result.current.projectHue
+    act(() => { result.current.setPlotHueRange('cat', 90) })
+    act(() => { result.current.setPlotHue('cat', project + 90) })
+    act(() => { result.current.setProjectHueRange(30) })
+    expect(get('cat')?.hueRange).toBe(30)
+    expect(get('cat')?.hue).toBe(wrapHue(result.current.projectHue + 30))
   })
 })

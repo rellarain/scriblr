@@ -9,9 +9,11 @@ import { nodeLabel, plotTrail } from './plotTree'
 //   a chip with no description is just its title, and clicking it opens that parent's editor
 // Which chips are open belongs to the tool (PlotView), by level: a category chip left open is open on every editor's category chip, and so
 // for subcategory and cluster chips, whichever node is opened next.
-export function PlotParents({ node, byId, open, onToggle, onOpen }: {
+export function PlotParents({ node, byId, projectHue, open, onToggle, onOpen }: {
   node: PlotNode
   byId: Map<string, PlotNode>
+  // What a category with no colour of its own shows.
+  projectHue?: number
   open: Set<string>
   onToggle: (kind: PlotNode['kind']) => void
   onOpen: (id: string) => void
@@ -26,7 +28,7 @@ export function PlotParents({ node, byId, open, onToggle, onOpen }: {
         const body = parent.body.trim()
         const expanded = body !== '' && open.has(parent.kind)
         const cls = `wrParent wrParent--${parent.kind}${expanded ? ' wrParent--open' : ''}`
-        const vars = plotColorVars(plotColors(parent, byId))
+        const vars = plotColorVars(plotColors(parent, byId, projectHue))
         if (body === '') {
           return (
             <div key={parent.id} className={cls} style={vars}>

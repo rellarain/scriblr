@@ -60,6 +60,8 @@ def update_project(
         before = {
             "timeSystems": [t.model_dump(mode="json") for t in index.settings.timeSystems],
             "themeHue": index.settings.themeHue,
+            "hueInherit": index.settings.hueInherit,
+            "hueRange": index.settings.hueRange,
             "title": index.title,
         }
         if body.title is not None:
@@ -86,9 +88,15 @@ def update_project(
             index.settings.timeSystems = body.timeSystems
         if body.themeHue is not None:
             index.settings.themeHue = body.themeHue
+        if body.hueInherit is not None:
+            index.settings.hueInherit = body.hueInherit
+        if body.hueRange is not None:
+            index.settings.hueRange = body.hueRange
         after = {
             "timeSystems": [t.model_dump(mode="json") for t in index.settings.timeSystems],
             "themeHue": index.settings.themeHue,
+            "hueInherit": index.settings.hueInherit,
+            "hueRange": index.settings.hueRange,
             "title": index.title,
         }
         index.updatedAt = utcnow()

@@ -21,6 +21,15 @@ export type HueLevel = keyof typeof HUE_RANGES
 // The range of an outline or plot node's kind (a kind with no range of its own, like a series, is the whole wheel).
 export const rangeOf = (kind: string): number => (HUE_RANGES as Record<string, number>)[kind] ?? 360
 
+// The ranges a colour's reach can be set to (a node's own `hueRange`, mirrors backend/app/storage/schema.py HUE_RANGE_OPTIONS). HUE_RANGES above are the
+// defaults of each kind; the choice is per node, held to the parent's range (a child never reaches further from its parent than the parent does from its own).
+export const HUE_RANGE_OPTIONS = [30, 60, 90, 120, 180, 360] as const
+export const isHueRange = (n: unknown): n is number => typeof n === 'number' && (HUE_RANGE_OPTIONS as readonly number[]).includes(n)
+// A node's range as it works: the one it chose, else its kind's default, never wider than `cap` (its parent's range).
+export const effectiveRange = (own: number | null | undefined, kind: string, cap = 360): number => Math.min(isHueRange(own) ? own : rangeOf(kind), cap)
+// The ranges a node may choose between, given its parent's range: none wider (a 180 parent offers up to 180, never 360).
+export const rangeOptions = (cap = 360): number[] => HUE_RANGE_OPTIONS.filter(o => o <= cap)
+
 export const wrapHue = (hue: number): number => ((Math.round(hue) % 360) + 360) % 360
 
 export const HUE_CODE_MIN = 0
@@ -137,6 +146,11 @@ export const fillColorCss = (hue: number | string, k = 1): string =>
 export const SLIDER_DARKEN = 15
 export const sliderLight = (zone: ZoneKey, light: number): number => (zone === 'day' || zone === 'dawn' ? Math.max(0, light - SLIDER_DARKEN) : light)
 
+// The lightness of a level colour's degree chip (HueSlider.tsx): the slider's own colour for the hue, deepened only as far as its white text needs to read
+// (by day and at dawn the slider's colours are pale, and white on them is about 2:1); in the dark zones the slider's colour is already deep enough.
+export const chipLight = (hue: number, saturation: number, light: number): number =>
+  fitLightness(wrapHue(hue), saturation, light, -1, c => ratioOf(c, { h: 0, s: 0, l: 100 }) >= TEXT_TARGET)
+
 // The zone's own theme saturation and lightness: what a hue slider draws a base hue at.
 export function zoneBasis(pal: ZonePalette, zone: ZoneKey): { s: number; l: number } {
   const { theme } = resolvePalette(pal, zone)
@@ -175,11 +189,15 @@ export function hexToHue(hex: string | null | undefined): number | null {
   return wrapHue(h * 60)
 }
 
-// A book's cover / theme colour: its own, else the nearest to an old hex colour (base), else the default.
-export function bookThemeHue(book: { themeHue?: number | null; color?: string | null }): number {
+// A book's own colour: the one it has, else the nearest to an old hex colour; null when it has none (it takes the project's: inherit).
+export function ownBookHue(book: { themeHue?: number | null; color?: string | null }): number | null {
   if (book.themeHue != null) return book.themeHue
-  const hue = hexToHue(book.color)
-  return hue != null ? hue : DEFAULT_BOOK_HUE
+  return hexToHue(book.color) ?? null
+}
+
+// A book's cover / theme colour: its own, else `fallback` (the project's hue where it is known, else the default).
+export function bookThemeHue(book: { themeHue?: number | null; color?: string | null }, fallback: number = DEFAULT_BOOK_HUE): number {
+  return ownBookHue(book) ?? fallback
 }
 
 // The theme variables for the subtree of a book's editors: the zone's own palette with the book's

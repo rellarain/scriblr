@@ -83,7 +83,7 @@ export function PlotCompare({ w, lines, size, onOpen, onOpenNode, openParents, o
           const mine = ordered.filter(p => p.parentId === line.id)
           const open = columns || !folded.has(line.id)
           return (
-            <section key={line.id} className="wrCompareGroup" style={plotColorVars(plotColors(line, w.plotNodeById))} aria-label={trailOf(line, w.plotNodeById)}>
+            <section key={line.id} className="wrCompareGroup" style={plotColorVars(plotColors(line, w.plotNodeById, w.projectHue))} aria-label={trailOf(line, w.plotNodeById)}>
               {columns
                 ? <h4 className="wrCompareGroupHead"><span>{trailOf(line, w.plotNodeById)}</span><span className="wrOutlineMeta">{mine.length}</span></h4>
                 : (
@@ -92,7 +92,7 @@ export function PlotCompare({ w, lines, size, onOpen, onOpenNode, openParents, o
                     <span>{trailOf(line, w.plotNodeById)}</span><span className="wrOutlineMeta">{mine.length}</span>
                   </button>
                 )}
-              {open && <PlotParents node={line} byId={w.plotNodeById} open={openParents} onToggle={onToggleParent} onOpen={onOpenNode} />}
+              {open && <PlotParents node={line} byId={w.plotNodeById} projectHue={w.projectHue} open={openParents} onToggle={onToggleParent} onOpen={onOpenNode} />}
               {open && <div className="wrCompareGroupBody">{mine.length === 0 ? <p className="wrMuted">No plotpoints yet.</p> : mine.map(card)}</div>}
             </section>
           )
@@ -108,7 +108,7 @@ export function PlotCompare({ w, lines, size, onOpen, onOpenNode, openParents, o
         {lines.map(line => {
           const off = hidden.has(line.id)
           return (
-            <span key={line.id} className={off ? 'wrCompareChip wrCompareChip--off' : 'wrCompareChip'} style={plotColorVars(plotColors(line, w.plotNodeById))}>
+            <span key={line.id} className={off ? 'wrCompareChip wrCompareChip--off' : 'wrCompareChip'} style={plotColorVars(plotColors(line, w.plotNodeById, w.projectHue))}>
               <button
                 type="button" className="wrCompareChipName" aria-pressed={!off} title={off ? 'Show its plotpoints' : 'Hide its plotpoints'}
                 onClick={() => setHidden(prev => toggleIn(prev, line.id))}

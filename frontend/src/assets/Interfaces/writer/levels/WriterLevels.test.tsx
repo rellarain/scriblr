@@ -141,7 +141,7 @@ describe('WriterLevels', () => {
     const hueOf = (level: string) => document.querySelector<HTMLElement>(`[data-level="${level}"]`)!.style.getPropertyValue('--wr-level-h')
     expect(hueOf('dash')).toBe('')
     expect(hueOf('project')).toBe('150')
-    expect(hueOf('outline')).toBe('28') // the book's own (here the book default)
+    expect(hueOf('outline')).toBe('280') // the book's, as the workspace works it out (its own, else the project's)
     expect(hueOf('draft')).toBe('280')
   })
 
@@ -151,7 +151,7 @@ describe('WriterLevels', () => {
     expect(fillOf('dash')).toBe('') // the Dash falls back to the theme hue at the same saturation (in the stylesheet)
     expect(fillOf('project')).toBe(fillColorCss(150))
     expect(fillOf('project')).toMatch(/^hsl\(150, calc\(var\(--color-accent-s\) \* 0\.62\), clamp\(0%, calc\(var\(--color-accent-l\) - 8%\), [\d.]+%\)\)$/)
-    expect(fillOf('outline')).toContain('hsl(28, calc(var(--color-accent-s) * 0.62)')
+    expect(fillOf('outline')).toContain('hsl(280, calc(var(--color-accent-s) * 0.62)')
     expect(fillOf('draft')).toBe('hsl(280, 60%, 40%)') // the chapter's own, from the workspace
   })
 

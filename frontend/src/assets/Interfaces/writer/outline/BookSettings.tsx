@@ -1,7 +1,6 @@
 import { useState } from 'react'
 import type { OutlineNode, PreviewFormat } from '../../../../api/types'
 import type { WriterWorkspace } from '../useWriterWorkspace'
-import { bookThemeHue, rangeOf } from '../../../../theme/bookColors'
 import HueSlider from '../HueSlider'
 import { systemForBook } from '../timeSystem'
 import { DEFAULT_PREVIEW_FORMAT, FORMAT_LIMITS, formatOf } from '../previewFormat'
@@ -79,7 +78,6 @@ function PreviewFormatFields({ w, book }: { w: WriterWorkspace; book: OutlineNod
 // The book's own settings (the Outline level's Settings tab): its title, summary, colour,
 // time system, goals and how its chapters are formatted in the preview.
 export function BookSettings({ w, book, bookWords, compact = false }: { w: WriterWorkspace; book: OutlineNode; bookWords: number; compact?: boolean }) {
-  const themeHue = bookThemeHue(book)
   const timeSystems = w.activeProject?.settings.timeSystems ?? []
   const chapters = w.activeBookChapters
   return (
@@ -99,7 +97,7 @@ export function BookSettings({ w, book, bookWords, compact = false }: { w: Write
         />
       </label>
       <div className="wrBookEdField">
-        <HueSlider label="Book colour" hue={themeHue} centre={w.hueCentreOf(book)} range={rangeOf('book')} onChange={code => w.setNodeHue(book.id, code)} />
+        <HueSlider label="Book colour" {...w.hueSliderOf(book)} />
       </div>
       {timeSystems.length > 1 && (
         <label className="wrBookEdField">

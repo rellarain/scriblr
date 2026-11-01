@@ -60,7 +60,7 @@ function Bar({ measure, label, unit, vertical = false }: { measure: Measure; lab
 // book. The spine has the book's number at the top and no title; its bars show how far the book has come, and a bar appears only where there
 // is a goal or something to measure against (the backend gives a total of 0 otherwise): planning, plotting and outlining across the top, the
 // draft's words against the book's word-count goal up the middle, and plotpoint assignment, revision and publishing across the bottom. A bar is a dark track of the spine's colour with a lighter fill; when it is complete it turns accent.
-export function Spine({ book, number, progress, active, onOpen }: { book: OutlineNode; number: number; progress?: BookProgress; active: boolean; onOpen: () => void }) {
+export function Spine({ book, number, progress, active, onOpen, projectHue }: { book: OutlineNode; number: number; progress?: BookProgress; active: boolean; onOpen: () => void; projectHue?: number }) {
   const width = spineWidth(book.wordCountGoal)
   const height = spineHeight(book.wordCountGoal)
   const label = nodeLabel(book)
@@ -69,7 +69,7 @@ export function Spine({ book, number, progress, active, onOpen }: { book: Outlin
     <button
       type="button"
       className={active ? 'wrSpine wrSpine--active' : 'wrSpine'}
-      style={{ height, width: active ? COVER_WIDTH : width, '--wr-spine': fillColorCss(bookThemeHue(book), SAT_MIDDLE) } as CSSProperties}
+      style={{ height, width: active ? COVER_WIDTH : width, '--wr-spine': fillColorCss(bookThemeHue(book, projectHue), SAT_MIDDLE) } as CSSProperties}
       onClick={onOpen}
       aria-label={label}
       title={`${label} (book ${number})`}
@@ -97,7 +97,9 @@ export function Spine({ book, number, progress, active, onOpen }: { book: Outlin
 // A project's spines, grouped: each series is a darker section with its title down its left edge from the top, beside the books in it; books outside any
 // series stand on the plain shelf. The shelf's board carries the project's title (a link when it opens the project), the book count and
 // the `right` slot.
-export function Shelf({ label, meta, groups, progress, activeBookId, selected, onOpenBook, onOpen, right }: {
+export function Shelf({ label, meta, groups, progress, activeBookId, selected, onOpenBook, onOpen, right, projectHue }: {
+  // What a book with no colour of its own shows.
+  projectHue?: number
   label: string
   meta: string
   groups: ShelfGroup[]
@@ -135,7 +137,7 @@ export function Shelf({ label, meta, groups, progress, activeBookId, selected, o
         {groups.map((g, i) => {
           const spines = g.books.map(b => {
             counted += 1
-            return <Spine key={b.id} book={b} number={counted} progress={progress?.[b.id]} active={b.id === activeBookId} onOpen={() => onOpenBook(b.id)} />
+            return <Spine key={b.id} book={b} projectHue={projectHue} number={counted} progress={progress?.[b.id]} active={b.id === activeBookId} onOpen={() => onOpenBook(b.id)} />
           })
           if (!g.series) return <div key={`loose-${i}`} className="wrShelfLoose">{spines}</div>
           return (

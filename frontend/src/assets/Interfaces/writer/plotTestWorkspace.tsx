@@ -112,7 +112,8 @@ export function useFakeWorkspace(initial: PlotNode[], focused = 'line', outlineN
     },
     updatePlotNodeField: (id: string, field: 'title' | 'body', value: string) => commit(ref.current.map(n => (n.id === id ? { ...n, [field]: value } : n))),
     deletePlotNode: (id: string) => { commit(ref.current.filter(n => n.id !== id)); setSelection(prev => prev.filter(s => s !== id)) },
-    setPlotHue: vi.fn(), addPlotKeyword: vi.fn(), removePlotKeyword: vi.fn(),
+    setPlotHue: vi.fn(), setPlotHueRange: vi.fn(), setPlotInherit: vi.fn(), addPlotKeyword: vi.fn(), removePlotKeyword: vi.fn(),
+    plotHueSliderOf: (node: PlotNode) => ({ hue: node.hue ?? 120, centre: 120, range: 60, maxRange: 360, inherit: node.hue == null, onChange: vi.fn(), onRange: vi.fn(), onInherit: vi.fn() }),
   } as unknown as WriterWorkspace
   return { w, plotNodes }
 }

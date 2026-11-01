@@ -95,7 +95,7 @@ function WriterLevels({ w, pagesComponent, onPagesComponent }: {
       case 'outline':
         return (
           <LevelPanel
-            key={level} level={level} size={size} headerless={size === 'max'} title={book ? nodeLabel(book) : 'Book'} hue={book ? bookThemeHue(book) : undefined}
+            key={level} level={level} size={size} headerless={size === 'max'} title={book ? nodeLabel(book) : 'Book'} hue={book ? w.levelHueOf(book) : undefined}
             headerExtras={outlineTabs.headerExtras} onPromote={() => { if (book) w.openBook(book.id) }} onSetSize={setSize(level)}
           >
             {size === 'max' ? <OutlineMax w={w} /> : book ? outlineTabs.body : <NoBook />}
@@ -120,7 +120,7 @@ function WriterLevels({ w, pagesComponent, onPagesComponent }: {
   // child has a colour of its own: Outline and Draft are a book's own levels (the book's), Project is the project's;
   // the Dash is the app theme itself.
   const scoped = (level: Level, node: ReactNode) => {
-    if (level === 'outline' || level === 'draft') return <BookScope key={level} book={book} flow>{node}</BookScope>
+    if (level === 'outline' || level === 'draft') return <BookScope key={level} book={book} code={book ? w.levelHueOf(book) : undefined} flow>{node}</BookScope>
     if (level === 'project') return <BookScope key={level} code={w.projectHue} flow>{node}</BookScope>
     return node
   }

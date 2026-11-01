@@ -7,6 +7,7 @@ from ..storage.schema import (
     MAX_LEVEL_HUE,
     PROJECT_TITLE_MAX,
     BookProgress,
+    HUE_RANGE_OPTIONS,
     MIN_LEVEL_HUE,
     OutlineNode,
     OutlineNodeKind,
@@ -38,6 +39,15 @@ class UpdateProjectRequest(BaseModel):
     readLevels: Optional[list[OutlineNodeKind]] = None
     timeSystems: Optional[list[TimeSystem]] = None
     themeHue: Optional[int] = Field(default=None, ge=MIN_LEVEL_HUE, le=MAX_LEVEL_HUE)
+    hueInherit: Optional[bool] = None
+    hueRange: Optional[int] = None
+
+    @field_validator("hueRange")
+    @classmethod
+    def _hue_range_is_an_option(cls, value: Optional[int]) -> Optional[int]:
+        if value is not None and value not in HUE_RANGE_OPTIONS:
+            raise ValueError(f"a hue range is one of {', '.join(str(o) for o in HUE_RANGE_OPTIONS)}")
+        return value
 
     @field_validator("title")
     @classmethod

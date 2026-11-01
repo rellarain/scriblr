@@ -12,6 +12,7 @@ import { SaveCluster } from '../components/SaveCluster'
 import { ColorRange } from '../components/ColorRange'
 import { PAGES_COMPONENTS } from '../assets/Interfaces/writer/consoleDefs'
 import HueSlider from '../assets/Interfaces/writer/HueSlider'
+import { clampHueToWindow } from '../theme/bookColors'
 import { PlotTray } from '../assets/Interfaces/writer/levels/PlotpointsTab'
 import WriterLevels from '../assets/Interfaces/writer/levels/WriterLevels'
 import { PlotpointTile } from '../assets/Interfaces/writer/PlotpointTile'
@@ -149,23 +150,40 @@ function ControlsCard() {
   )
 }
 
+// One colour in the hue card: its own hue, the range it chose and whether it inherits.
+interface DemoHue { hue: number; range: number; inherit: boolean }
+
 function HueCard() {
-  const [project, setProject] = useState(200)
-  const [book, setBook] = useState(230)
-  const [arc, setArc] = useState(260)
-  const [chapter, setChapter] = useState(280)
+  const app = 300
+  const [project, setProject] = useState<DemoHue>({ hue: 200, range: 180, inherit: false })
+  const [book, setBook] = useState<DemoHue>({ hue: 230, range: 90, inherit: false })
+  const [arc, setArc] = useState<DemoHue>({ hue: 260, range: 60, inherit: true })
+  const [chapter, setChapter] = useState<DemoHue>({ hue: 280, range: 30, inherit: false })
   const [theme, setTheme] = useState(120)
+  const shown = (v: DemoHue, centre: number) => (v.inherit ? centre : v.hue)
+  const projectHue = shown(project, app)
+  const bookHue = shown(book, projectHue)
+  const arcHue = shown(arc, bookHue)
+  // A colour in the card: the hue it shows, its range (held to the parent's: `max`), the Inherit toggle and the range button.
+  const row = (label: string, v: DemoHue, set: (next: DemoHue) => void, centre: number, max: number) => (
+    <HueSlider
+      label={label} hue={shown(v, centre)} centre={centre} range={Math.min(v.range, max)} maxRange={max} inherit={v.inherit}
+      onChange={hue => set({ ...v, hue, inherit: false })}
+      onRange={range => set({ ...v, range, hue: clampHueToWindow(centre, shown(v, centre), range), inherit: range >= 360 ? false : v.inherit })}
+      onInherit={on => set({ ...v, hue: on ? v.hue : centre, inherit: on })}
+    />
+  )
   return (
-    <LevelFrame level="outline" title="Hue slider and colour range" hue={book}>
+    <LevelFrame level="outline" title="Hue slider and colour range" hue={bookHue}>
       <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
-        <span className="wrLabel">The whole wheel, from 0: the project, no parent hue ({project}°)</span>
-        <HueSlider label="Project colour" hue={project} centre={null} range={360} onChange={setProject} />
-        <span className="wrLabel">A book, within 90° of the project ({book}°)</span>
-        <HueSlider label="Book colour" hue={book} centre={project} range={90} onChange={setBook} />
-        <span className="wrLabel">An arc, within 60° of its book ({arc}°)</span>
-        <HueSlider label="Arc colour" hue={arc} centre={book} range={60} onChange={setArc} />
-        <span className="wrLabel">A chapter, within 30° of its arc ({chapter}°)</span>
-        <HueSlider label="Chapter colour" hue={chapter} centre={arc} range={30} onChange={setChapter} />
+        <span className="wrLabel">The project, measured from the app theme's hue ({app}°): up to 180° either side</span>
+        {row('Project colour', project, setProject, app, 360)}
+        <span className="wrLabel">A book, within 90° of the project (its range goes up to 180°, the project's)</span>
+        {row('Book colour', book, setBook, projectHue, project.range)}
+        <span className="wrLabel">An arc that inherits its book's colour: no thumb</span>
+        {row('Arc colour', arc, setArc, bookHue, Math.min(book.range, project.range))}
+        <span className="wrLabel">A chapter, within 30° of its arc</span>
+        {row('Chapter colour', chapter, setChapter, arcHue, Math.min(arc.range, book.range, project.range))}
         <span className="wrLabel">Colour range (the theme editor: hue 0 to 360)</span>
         <ColorRange label="Hue" value={theme} onChange={setTheme} sat={30} light={50} />
       </div>

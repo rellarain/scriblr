@@ -40,7 +40,7 @@ function Harness({ open = 'c1', dragging = null, openChapter }: { open?: string 
   const byId = new Map(OUTLINE.map(n => [n.id, n]))
   const w = makeWorkspace({
     outlineNodes: OUTLINE, plotNodes: plot, activeChapterId: active, selectChapter: setActive, openChapter,
-    levelHueOf: () => 200, levelTintOf: () => 'hsl(200, 30%, 50%)', hueCentreOf: () => null, setNodeHue: vi.fn(), moveOutlineNodeInto: vi.fn(),
+    levelHueOf: () => 200, levelTintOf: () => 'hsl(200, 30%, 50%)', hueCentreOf: () => null, hueSliderOf: () => ({ hue: 200, centre: null, range: 360, onChange: vi.fn() }), setNodeHue: vi.fn(), moveOutlineNodeInto: vi.fn(),
     addOutlineNode: vi.fn(() => 'new'), updateOutlineNode: vi.fn(), deleteOutlineNode: vi.fn(),
     placePlotpoint: (id: string, target: string) => setPlot(prev => placeValue(prev, id, target, byId)),
   })

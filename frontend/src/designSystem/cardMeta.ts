@@ -46,7 +46,7 @@ export const CARD_META: CardMeta[] = [
   },
   {
     id: 'hue-slider', dir: 'HueSlider', title: 'Hue slider and colour range', group: 'Controls', height: 420,
-    summary: "The single track for a level's colour: the whole wheel from 0, or 90, 60 or 30 degrees round the parent's hue, with a square button that resets it to the parent hue, drawn at the zone's own saturation and lightness.",
+    summary: "A level's colour as one row: an Inherit toggle, the hue's degrees in a chip, the track (30 to 180 degrees round the parent's hue, or the whole wheel at 360) and a range button, drawn at the zone's own saturation and lightness.",
   },
   {
     id: 'reader', dir: 'Reader', title: 'Reader: pages, rails and consoles', group: 'Reader', height: 760,

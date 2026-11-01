@@ -51,11 +51,13 @@ export interface ColorRangeProps {
   // Turn off the theme fade while dragging (the theme editor's own colours).
   live?: boolean
   disabled?: boolean
+  // No thumb is drawn (the colour is not chosen here: it is inherited).
+  hideThumb?: boolean
   className?: string
 }
 
 export function ColorRange({
-  label, value, onChange, min = 0, max = 360, sat = 50, light = 50, live = false, disabled = false, className,
+  label, value, onChange, min = 0, max = 360, sat = 50, light = 50, live = false, disabled = false, hideThumb = false, className,
 }: ColorRangeProps) {
   const basis: Basis = { sat, light }
   const clamped = Math.min(max, Math.max(min, value))
@@ -66,7 +68,7 @@ export function ColorRange({
     '--cr-frac': max === min ? 1 : (clamped - min) / (max - min),
   } as CSSProperties
   return (
-    <div className={`colorRange${disabled ? ' colorRange--disabled' : ''}${className ? ` ${className}` : ''}`} style={style}>
+    <div className={`colorRange${disabled ? ' colorRange--disabled' : ''}${hideThumb ? ' colorRange--noThumb' : ''}${className ? ` ${className}` : ''}`} style={style}>
       <span className="colorRangeTrack" />
       <input
         className="colorRangeInput" type="range" min={min} max={max} step={1} value={clamped}
@@ -74,7 +76,7 @@ export function ColorRange({
         onChange={e => onChange(Number(e.target.value))}
         onPointerDown={live ? liveDrag : undefined}
       />
-      <span className="colorRangeThumb" aria-hidden="true"><span className="colorRangeSwatch" /></span>
+      {!hideThumb && <span className="colorRangeThumb" aria-hidden="true"><span className="colorRangeSwatch" /></span>}
     </div>
   )
 }

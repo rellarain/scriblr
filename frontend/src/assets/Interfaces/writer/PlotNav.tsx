@@ -80,7 +80,7 @@ export function PlotNav({ w, onOpenNode, onCompare, resize }: {
           <div
             key={node.id}
             className={`wrNavRow wrNavRow--${node.kind}${withDesc ? ' wrNavRow--desc' : ''}${stacked ? ' wrNavRow--stack' : ''}${node.id === w.focusedPlotNodeId ? ' wrNavRow--active' : ''}`}
-            style={{ ...plotColorVars(plotColors(node, w.plotNodeById)), marginLeft: depth * 14 }}
+            style={{ ...plotColorVars(plotColors(node, w.plotNodeById, w.projectHue)), marginLeft: depth * 14 }}
           >
             <button
               type="button" className="wrNavChevron" aria-label={open ? 'Collapse' : 'Expand'}

@@ -6,7 +6,7 @@ import { SAT_LOUD, SAT_MIDDLE, SAT_QUIET, accentColorCss, fillColorCss, themeCol
 // cluster within 30 of its subcategory's (plotHues.ts).
 // Saturation and brightness are the active zone's, through CSS variables, so the colours follow the theme; the saturation is in tiers,
 // the quietest for a category (half the zone's), a subcategory in the middle (three quarters), a cluster the loudest (all of it).
-//   - a category with no hue of its own shows the app theme's hue
+//   - a category with no hue of its own shows the project's hue (the app theme's when the project's is not given)
 //   - a subcategory with no hue of its own uses its category's
 //   - a cluster with no hue of its own uses its subcategory's (its category's outside one)
 //   - a plotline (and its plotpoints) wears its category's colour as its surface, with a left
@@ -37,7 +37,9 @@ export interface PlotColors {
 
 export const STRIPE_PX = 4
 
-export function plotColors(node: PlotNode, byId: Map<string, PlotNode>): PlotColors {
+// `projectHue` is what a category with no hue of its own shows (it inherits the project's); without it, the app theme's.
+export function plotColors(node: PlotNode, byId: Map<string, PlotNode>, projectHue?: number): PlotColors {
+  const inherited: number | string = projectHue ?? APP_HUE
   let category: PlotNode | undefined
   let subcategory: PlotNode | undefined
   let cluster: PlotNode | undefined
@@ -48,16 +50,16 @@ export function plotColors(node: PlotNode, byId: Map<string, PlotNode>): PlotCol
     current = current.parentId ? byId.get(current.parentId) : undefined
   }
   const categoryHue = category?.hue ?? null
-  const categoryCss = category ? themeColorCss(categoryHue ?? APP_HUE, SAT_QUIET) : null
-  const subcategoryHue = subcategory ? subcategory.hue ?? categoryHue ?? APP_HUE : null
-  const clusterHue = cluster ? cluster.hue ?? subcategoryHue ?? categoryHue ?? APP_HUE : null
+  const categoryCss = category ? themeColorCss(categoryHue ?? inherited, SAT_QUIET) : null
+  const subcategoryHue = subcategory ? subcategory.hue ?? categoryHue ?? inherited : null
+  const clusterHue = cluster ? cluster.hue ?? subcategoryHue ?? categoryHue ?? inherited : null
   const subcategoryCss = subcategoryHue !== null ? accentColorCss(subcategoryHue, SAT_MIDDLE) : null
   const clusterCss = clusterHue !== null ? accentColorCss(clusterHue, SAT_LOUD) : null
-  const stripes = [category ? accentColorCss(categoryHue ?? APP_HUE, SAT_QUIET) : null, subcategoryCss, clusterCss].filter((c): c is string => c !== null)
+  const stripes = [category ? accentColorCss(categoryHue ?? inherited, SAT_QUIET) : null, subcategoryCss, clusterCss].filter((c): c is string => c !== null)
   const edged = stripes.length > 0
   return {
     category: categoryCss,
-    categoryFill: category ? fillColorCss(categoryHue ?? APP_HUE, SAT_QUIET) : null,
+    categoryFill: category ? fillColorCss(categoryHue ?? inherited, SAT_QUIET) : null,
     subcategory: subcategoryCss,
     subcategoryFill: subcategoryHue !== null ? fillColorCss(subcategoryHue, SAT_MIDDLE) : null,
     cluster: clusterCss,

@@ -263,6 +263,12 @@ Each cell is the ratio at the default hues (theme 330, accent 32, alert 200) and
 | A facet's line, dot or bar on the console's tile, the worst facet hue | 3:1 | 5.0 (4.8) | 4.7 (4.6) | 4.7 (4.6) | 5.0 (4.7) |
 | White on a shift's block (the facet colour mixed into the card), the worst facet hue and state | 4.5:1 | 6.2 (6.1) | 6.1 (6.0) | 6.1 (6.0) | 6.2 (6.0) |
 
+## Hue slider
+
+| Pair | Needs | Dawn | Day | Dusk | Night |
+|---|---|---|---|---|---|
+| White on the degree chip (the slider's colour for the hue, deepened as far as white needs) | 4.5:1 | 4.6 (4.6) | 4.7 (4.6) | 6.6 (5.1) | 9.7 (8.7) |
+
 ## Below the threshold
 
 Nothing: every documented pair reads in every zone for every hue.

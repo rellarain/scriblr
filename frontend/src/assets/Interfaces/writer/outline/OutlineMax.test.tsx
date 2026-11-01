@@ -66,7 +66,7 @@ function Harness({ activeChapterId = 'c1', outline = OUTLINE, actions }: {
     plotDragId: plotDrag?.id ?? null, plotDragPlacementId: plotDrag?.placementId ?? null,
     setPlotDragId: (id: string | null, placementId: string | null = null) => setPlotDrag(id ? { id, placementId } : null),
     saveStatus: { dirty: false, saving: false, error: undefined, lastSavedAt: null }, saveNow: vi.fn(async () => {}), saveCountdown: { nextSaveAt: null, wait: null }, history: { canUndo: () => false, canRedo: () => false, undo: () => {}, redo: () => {} },
-    levelHueOf: () => 200, levelTintOf: () => 'hsl(200, 30%, 50%)', hueCentreOf: () => null, setNodeHue: vi.fn(),
+    levelHueOf: () => 200, levelTintOf: () => 'hsl(200, 30%, 50%)', hueCentreOf: () => null, hueSliderOf: () => ({ hue: 200, centre: null, range: 360, onChange: vi.fn() }), setNodeHue: vi.fn(),
     moveOutlineNodeInto: vi.fn(), openChapter: actions.openChapter,
     addOutlineNode: (parentId: string | null, kind: OutlineNode['kind'], patch: Partial<OutlineNode> = {}, afterId?: string) => {
       const id = `new${++counter.current}`

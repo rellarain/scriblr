@@ -621,13 +621,18 @@ mounted it; it remains in git history.
   Settings tab (the paragraph indent is a whole number of **spaces**, 0 to 16, drawn as that many times the width of a space in the book's font:
   `SPACE_EM`, the same table in `previewFormat.ts` and in the backend, which turns an older book's em indent into spaces on read) and applied to the Draft preview as CSS variables (`writer/previewFormat.ts`). The selected book's spine swivels into its cover
   (`Shelf.tsx`). Levels are tinted by hue (`levelHues.ts`): the project's own
-  (`ProjectSettings.themeHue`, any hue), books within 90° of it, arcs within 60° of
+  (`ProjectSettings.themeHue`, any hue unless it inherits the app theme's: `hueInherit`), books within 90° of it, arcs within 60° of
   their book and chapters within 30° of their arc (each node's `themeHue`; a series has no colour and shows the project's, and one
   saved by an older version is cleared when the outline is next saved). The plot's categories are within 90° of the project's hue,
-  subcategories within 60° of their category and clusters within 30° of their subcategory (`plotHues.ts`). The ranges are fixed
-  (`HUE_RANGES` in `theme/bookColors.ts`). One with no hue shows its parent's; a new arc or chapter takes a hue spread away from its
-  siblings' and a new book or category starts at the project's hue; changing a parent pulls what is under it back inside its range
-  (a colour already outside its range stays until it, or its parent, is changed).
+  subcategories within 60° of their category and clusters within 30° of their subcategory (`plotHues.ts`). Those are the **defaults**
+  (`HUE_RANGES` in `theme/bookColors.ts`): each node can choose its own range (`hueRange`: 30, 60, 90, 120, 180 or 360, held to its
+  parent's range; the project's is measured from the app theme's hue), and a node can **inherit** (no hue of its own: it shows, and
+  follows, its parent's; not at 360). The slider (`writer/HueSlider.tsx`) is the Inherit toggle, a chip with the hue's degrees, the
+  track and the range button; the workspace hands out each one's values (`hueSliderOf`, `plotHueSliderOf`, `projectHueSlider`) and the
+  setters that keep the rest in line (`setNodeHueRange`, `setNodeInherit`, `setPlotHueRange`, `setPlotInherit`, `setProjectHueRange`,
+  `setProjectInherit`). A new arc or chapter takes a hue spread away from its
+  siblings' and a new book or category starts at the project's hue; changing a parent, or a node's own range, pulls what is under it
+  back inside its range (a colour already outside its range stays until it, or its parent, is changed).
   A colour is one stored number, a hue in degrees, 0..360 (`theme/bookColors.ts`, mirrored in
   `backend/app/storage/schema.py`; 0 and 360 are both red). Every colour has the same saturation and lightness
   (the active time zone's own, kept readable for the hue). The hue slider (`HueSlider.tsx`,

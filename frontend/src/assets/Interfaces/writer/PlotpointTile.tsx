@@ -38,7 +38,7 @@ export function PlotpointTile({ w, point, placement, variant, onUnassign, unassi
   const trail = (plotline ? plotTrail(plotline, w.plotNodeById) : []).map(nodeLabel).join(' › ')
   const text = textOf(point, w.plotNodeById)
   const field = fieldNameOf(point, w.plotNodeById)
-  const colors = plotColors(point, w.plotNodeById)
+  const colors = plotColors(point, w.plotNodeById, w.projectHue)
   const highlighted = w.highlightedPointId === point.id
 
   return (

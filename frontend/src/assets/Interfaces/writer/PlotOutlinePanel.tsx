@@ -63,7 +63,7 @@ export function PlotOutlinePanel({ w, plotlines, dragId, onDropChapter, readOnly
   const points = w.plotNodes.filter(p => p.kind === 'plotpoint' && p.parentId !== null && (lineIds.has(p.parentId) || answerAbove(p)))
   // One entry for each placement: the plotpoint, the placement, and how its chip looks.
   const placed = points.flatMap(point => livePlacements(point, outlineById).map(placement => ({
-    point, placement, look: placementLook(placement, w.outlineNodes, outlineById, activeZone),
+    point, placement, look: placementLook(placement, w.outlineNodes, outlineById, activeZone, w.projectHue),
   })))
 
   function chip({ point: p, placement, look }: { point: PlotNode; placement: PlotPlacement; look: PlacementLook }, chapter: OutlineNode) {
@@ -87,7 +87,7 @@ export function PlotOutlinePanel({ w, plotlines, dragId, onDropChapter, readOnly
     return (
       <span
         key={placement.id} className="wrPlotChip" data-point={p.id} data-placement={placement.id}
-        style={several && line ? { ...look.style, ...plotColorVars(plotColors(line, w.plotNodeById)) } : look.style}
+        style={several && line ? { ...look.style, ...plotColorVars(plotColors(line, w.plotNodeById, w.projectHue)) } : look.style}
         title={several && line ? [...plotTrail(line, w.plotNodeById), line].map(nodeLabel).join(' › ') : undefined}
       >
         {several && line && <i className="wrPlotChipLine" aria-hidden="true" />}
@@ -124,12 +124,12 @@ export function PlotOutlinePanel({ w, plotlines, dragId, onDropChapter, readOnly
   function card(node: OutlineNode, book: OutlineNode | undefined, chapterNumbers: Map<string, number>): React.ReactNode {
     const kids = (index.get(node.id) ?? []).filter(k => SHOWN.has(k.kind))
     if (node.kind === 'chapter') {
-      const themeHue = book ? bookThemeHue(book) : bookThemeHue({})
+      const themeHue = book ? bookThemeHue(book, w.projectHue) : bookThemeHue({}, w.projectHue)
       return chapterCard(node, chapterNumbers.get(node.id) ?? 0, { themeHue })
     }
     const isBook = node.kind === 'book'
     const b = isBook ? node : book
-    const themeHue = b ? bookThemeHue(b) : null
+    const themeHue = b ? bookThemeHue(b, w.projectHue) : null
     const isOpen = !collapsed.has(node.id)
     const style = themeHue === null ? undefined : { ['--wr-plot-card' as string]: themeColorCss(themeHue), ['--wr-plot-edge' as string]: accentColorCss(themeHue) }
     const numbers = isBook ? new Map(chaptersOfBook(w.outlineNodes, node.id).map((c, i) => [c.id, i + 1])) : chapterNumbers

@@ -28,10 +28,11 @@ import { getOutlineSnapshot, getPlotSnapshot, getProjectSettingsLog, listOutline
 import { newestFirst, nextSetting, nextSnapshot, sameValue, type LogEntry } from '../../../lib/logUndo'
 import { useUndoHistory } from '../../../lib/useUndoHistory'
 import { insertAfter } from '../../../lib/siblingOrder'
-import { DEFAULT_BOOK_HUE, fillColorCss, hueOfCode, outlineSat, rangeOf } from '../../../theme/bookColors'
+import { effectiveRange, fillColorCss, hueOfCode, outlineSat, ownBookHue } from '../../../theme/bookColors'
 import { useThemeState } from '../../../theme/useTheme'
-import { autoPickHue, defaultProjectHue, dropSeriesHues, fitToParent, hueCentre, levelHue, levelTint, reconcileHues } from './levelHues'
-import { plotParentOf, reconcilePlotHues } from './plotHues'
+import { autoPickHue, defaultProjectHue, dropSeriesHues, fitToParent, hueCentre, levelHue, levelRange, levelTint, rangeCapOf, reconcileHues } from './levelHues'
+import type { HueSliderValue } from './HueSlider'
+import { plotParentOf, plotRange, plotRangeCap, reconcilePlotHues, shownPlotHue } from './plotHues'
 
 type AsyncStatus = 'idle' | 'loading' | 'error'
 
@@ -128,11 +129,18 @@ export function useWriterWorkspace() {
   // --- level colours (levelHues.ts): hues only; saturation and lightness are the zone's ---
   const { settings: themeSettings, activeZone } = useThemeState()
   const appHue = themeSettings.zones[activeZone].palette.theme.h
-  // A project's colour: its own, else the default off the app theme's hue. (The shelves show every project's, not only the open one's.)
-  const projectHueOf = (p: ProjectIndex): number => p.settings.themeHue ?? defaultProjectHue(appHue)
+  // A project's colour: the app theme's own hue when it inherits, else its own, else the default off the app theme's hue. (The shelves show every
+  // project's, not only the open one's.)
+  const projectHueOf = (p: ProjectIndex): number => (p.settings.hueInherit ? appHue : p.settings.themeHue ?? defaultProjectHue(appHue))
   const projectHue = activeProject ? projectHueOf(activeProject) : defaultProjectHue(appHue)
   const projectHueRef = useRef(projectHue)
   projectHueRef.current = projectHue
+  // How far the project's colour may sit from the app theme's hue (degrees either side), and what its children's ranges are held to.
+  const projectRange = effectiveRange(activeProject?.settings.hueRange, 'project')
+  const projectRangeRef = useRef(projectRange)
+  projectRangeRef.current = projectRange
+  const appHueRef = useRef(appHue)
+  appHueRef.current = appHue
   const hueNodes = useMemo(() => new Map(outlineNodes.map(n => [n.id, n])), [outlineNodes])
   const levelHueOf = (node: OutlineNode): number => levelHue(node, hueNodes, projectHue)
   // The node's colour as CSS (its brightness).
@@ -141,6 +149,31 @@ export function useWriterWorkspace() {
   const levelFillOf = (node: OutlineNode): string => fillColorCss(levelHue(node, hueNodes, projectHue), outlineSat(node.kind))
   // The hue a node's own hue must stay near (the one its parent shows); null for a series, which has no colour.
   const hueCentreOf = (node: OutlineNode): number | null => hueCentre(node, hueNodes, projectHue)
+  // How far a node's colour may sit from its parent's hue, in degrees either side (its own choice, else its kind's default, held to its parent's).
+  const levelRangeOf = (node: OutlineNode): number => levelRange(node, hueNodes, projectRange)
+  // What a colour selector (HueSlider.tsx) needs for a book, arc or chapter, for a plot category, subcategory or cluster, and for the project.
+  function hueSliderOf(node: OutlineNode): HueSliderValue {
+    const own = node.kind === 'book' ? ownBookHue(node) : node.themeHue ?? null
+    return {
+      hue: levelHue(node, hueNodes, projectHue), centre: hueCentre(node, hueNodes, projectHue), range: levelRange(node, hueNodes, projectRange),
+      maxRange: rangeCapOf(node, hueNodes, projectRange), inherit: own === null,
+      onChange: code => setNodeHue(node.id, code), onRange: range => setNodeHueRange(node.id, range), onInherit: on => setNodeInherit(node.id, on),
+    }
+  }
+  function plotHueSliderOf(node: PlotNode): HueSliderValue {
+    const parent = plotParentOf(node, plotNodeById)
+    const centre = parent ? shownPlotHue(parent, plotNodeById, projectHue) : projectHue
+    return {
+      hue: shownPlotHue(node, plotNodeById, projectHue), centre, range: plotRange(node, plotNodeById, projectRange), maxRange: plotRangeCap(node, plotNodeById, projectRange),
+      inherit: node.hue == null, onChange: code => setPlotHue(node.id, code, centre), onRange: range => setPlotHueRange(node.id, range), onInherit: on => setPlotInherit(node.id, on),
+    }
+  }
+  function projectHueSlider(): HueSliderValue {
+    return {
+      hue: projectHue, centre: appHue, range: projectRange, maxRange: 360, inherit: activeProject?.settings.hueInherit ?? false,
+      onChange: setProjectHue, onRange: setProjectHueRange, onInherit: setProjectInherit,
+    }
+  }
 
   const activeConsole: WuiConsole = !hasOpenProject || view === 'shelves' ? 'shelves' : view === 'project' ? 'shelf' : view
 
@@ -230,9 +263,9 @@ export function useWriterWorkspace() {
   // Each save carries all of them, so a later colour change never drops a waiting time-system edit.
   // The name goes only while the server does not have it yet (`pendingName`), so a save of the colour alone never sends one.
   const pendingName = useRef<{ projectId: string; title: string } | null>(null)
-  const settingsSave = useAutosave<{ projectId: string; timeSystems: TimeSystem[]; themeHue: number | null; title: string | null }>({
-    save: async ({ projectId, timeSystems, themeHue, title }) => {
-      const index = await apiUpdateProject(projectId, { timeSystems, ...(themeHue != null ? { themeHue } : {}), ...(title != null ? { title } : {}) })
+  const settingsSave = useAutosave<{ projectId: string; timeSystems: TimeSystem[]; themeHue: number | null; hueInherit: boolean; hueRange: number | null; title: string | null }>({
+    save: async ({ projectId, timeSystems, themeHue, hueInherit, hueRange, title }) => {
+      const index = await apiUpdateProject(projectId, { timeSystems, hueInherit, ...(themeHue != null ? { themeHue } : {}), ...(hueRange != null ? { hueRange } : {}), ...(title != null ? { title } : {}) })
       if (pendingName.current?.projectId === projectId && pendingName.current.title === title) pendingName.current = null
       if (activeProjectIdRef.current === projectId && !settingsSave.hasNewer()) {
         setActiveProject(index)
@@ -243,7 +276,7 @@ export function useWriterWorkspace() {
 
   useEffect(() => { settingsHistory.markSaved() }, [settingsSave.lastSavedAt])
 
-  function updateProjectSettings(patch: { title?: string; timeSystems?: TimeSystem[]; themeHue?: number }, immediate: boolean) {
+  function updateProjectSettings(patch: { title?: string; timeSystems?: TimeSystem[]; themeHue?: number; hueInherit?: boolean; hueRange?: number }, immediate: boolean) {
     const current = activeProjectRef.current
     const projectId = activeProjectIdRef.current
     if (!current || !projectId) return
@@ -255,9 +288,11 @@ export function useWriterWorkspace() {
     // The shelves show the new name and colour at once, not when the save lands.
     setProjects(prev => prev.map(p => (p.projectId === projectId ? next : p)))
     if (title !== undefined && title !== current.title) pendingName.current = { projectId, title }
-    if (!applyingHistory.current) settingsHistory.record({ timeSystems: settings.timeSystems, themeHue: settings.themeHue ?? null, title: next.title }, { text: !immediate })
+    const hueInherit = settings.hueInherit ?? false
+    const hueRange = settings.hueRange ?? null
+    if (!applyingHistory.current) settingsHistory.record({ timeSystems: settings.timeSystems, themeHue: settings.themeHue ?? null, hueInherit, hueRange, title: next.title }, { text: !immediate })
     const pending = pendingName.current
-    const value = { projectId, timeSystems: settings.timeSystems, themeHue: settings.themeHue ?? null, title: pending?.projectId === projectId ? pending.title : null }
+    const value = { projectId, timeSystems: settings.timeSystems, themeHue: settings.themeHue ?? null, hueInherit, hueRange, title: pending?.projectId === projectId ? pending.title : null }
     if (immediate) void settingsSave.saveNow(value)
     else settingsSave.schedule(value)
   }
@@ -272,7 +307,8 @@ export function useWriterWorkspace() {
   }
   // A step of the settings' history (or a log entry) as the patch that applies it.
   const settingsPatchOf = (v: ProjectSettingsValue) => ({
-    timeSystems: v.timeSystems, ...(v.themeHue != null ? { themeHue: v.themeHue } : {}), ...(v.title ? { title: v.title } : {}),
+    timeSystems: v.timeSystems, ...(v.themeHue != null ? { themeHue: v.themeHue } : {}), hueInherit: v.hueInherit ?? false,
+    ...(v.hueRange != null ? { hueRange: v.hueRange } : {}), ...(v.title ? { title: v.title } : {}),
   })
 
   // Apply an edit to the outline: `immediate` saves now (structural edits),
@@ -411,7 +447,7 @@ export function useWriterWorkspace() {
     logCursors.current = { outline: null, plot: null, settings: null }
     outlineHistory.reset(outline)
     plotHistory.reset(plot)
-    if (project) settingsHistory.reset({ timeSystems: project.settings.timeSystems, themeHue: project.settings.themeHue ?? null, title: project.title })
+    if (project) settingsHistory.reset({ timeSystems: project.settings.timeSystems, themeHue: project.settings.themeHue ?? null, hueInherit: project.settings.hueInherit ?? false, hueRange: project.settings.hueRange ?? null, title: project.title })
     else settingsHistory.clear()
   }
   // Changing the page (the project, level, book or chapter) saves what is waiting, whatever the autosave setting, and starts the histories afresh.
@@ -620,7 +656,7 @@ export function useWriterWorkspace() {
         const siblingHues = prev
           .filter(n => n.parentId === parentId && n.kind === kind && n.themeHue != null)
           .map(n => hueOfCode(n.themeHue as number))
-        node.themeHue = autoPickHue(centre, siblingHues, rangeOf(kind))
+        node.themeHue = autoPickHue(centre, siblingHues, effectiveRange(null, kind, rangeCapOf(node, map, projectRangeRef.current)))
       }
     }
     commitOutline(afterId ? insertAfter(prev, node, afterId, n => n.parentId === parentId) : [...prev, node], true)
@@ -631,26 +667,102 @@ export function useWriterWorkspace() {
     commitOutline(outlineNodesRef.current.map(n => (n.id === nodeId ? { ...n, ...patch } : n)), false)
   }
 
-  // Sets a book's, arc's or chapter's own colour (a colour code): its hue is held within its range of its parent's (a book 90, an arc 60,
-  // a chapter 30), and the own hues under it are pulled back inside their ranges (nothing elsewhere moves).
+  // Sets a book's, arc's or chapter's own colour (a colour code): its hue is held within its range of its parent's (the node's own choice, 30 to 360, else
+  // its kind's default: a book 90, an arc 60, a chapter 30; never wider than its parent's), and the own hues under it are pulled back inside
+  // their ranges (nothing elsewhere moves).
   function setNodeHue(nodeId: string, code: number) {
     const prev = outlineNodesRef.current
     const target = prev.find(n => n.id === nodeId)
     if (!target || (target.kind !== 'book' && target.kind !== 'arc' && target.kind !== 'chapter')) return
     const map = new Map(prev.map(n => [n.id, n]))
-    const value = fitToParent(Math.round(code), hueCentre(target, map, projectHueRef.current), rangeOf(target.kind))
+    const value = fitToParent(Math.round(code), hueCentre(target, map, projectHueRef.current), levelRange(target, map, projectRangeRef.current))
     const next = prev.map(n => (n.id === nodeId ? { ...n, themeHue: value } : n))
-    commitOutline(reconcileHues(next, projectHueRef.current, nodeId), false)
+    commitOutline(reconcileHues(next, projectHueRef.current, nodeId, projectRangeRef.current), false)
   }
 
-  // Sets the project's own colour, pulling the books' hues (and so their descendants') back inside their ranges.
-  function setProjectHue(code: number) {
-    const wrapped = Math.round(code)
-    projectHueRef.current = wrapped
-    updateProjectSettings({ themeHue: wrapped }, false)
+  // Sets how far a book's, arc's or chapter's colour may sit from its parent's hue (30, 60, 90, 120, 180 or 360 degrees either side; held to its
+  // parent's range). Its own hue is pulled into the new window, and what is under it follows. At 360 there is no parent to follow: a node that was
+  // inheriting keeps the hue it was showing as its own.
+  function setNodeHueRange(nodeId: string, range: number) {
     const prev = outlineNodesRef.current
-    const next = reconcileHues(prev, wrapped)
+    const target = prev.find(n => n.id === nodeId)
+    if (!target || (target.kind !== 'book' && target.kind !== 'arc' && target.kind !== 'chapter')) return
+    const map = new Map(prev.map(n => [n.id, n]))
+    const value = Math.min(range, rangeCapOf(target, map, projectRangeRef.current))
+    const own = target.kind === 'book' ? ownBookHue(target) : target.themeHue ?? null
+    const hue = own != null ? fitToParent(Math.round(own), hueCentre(target, map, projectHueRef.current), value) : value >= 360 ? Math.round(levelHue(target, map, projectHueRef.current)) : null
+    const next = prev.map(n => (n.id === nodeId ? { ...n, hueRange: value, themeHue: hue } : n))
+    commitOutline(reconcileHues(next, projectHueRef.current, nodeId, projectRangeRef.current), false)
+  }
+
+  // Turns Inherit on (the node has no colour of its own: it shows, and follows, its parent's) or off (the hue it was showing becomes its own).
+  function setNodeInherit(nodeId: string, on: boolean) {
+    const prev = outlineNodesRef.current
+    const target = prev.find(n => n.id === nodeId)
+    if (!target || (target.kind !== 'book' && target.kind !== 'arc' && target.kind !== 'chapter')) return
+    const map = new Map(prev.map(n => [n.id, n]))
+    // At 360 there is no parent hue to follow.
+    if (on && levelRange(target, map, projectRangeRef.current) >= 360) return
+    const patch = on ? { themeHue: null, color: null } : { themeHue: Math.round(levelHue(target, map, projectHueRef.current)) }
+    const next = prev.map(n => (n.id === nodeId ? { ...n, ...patch } : n))
+    commitOutline(reconcileHues(next, projectHueRef.current, nodeId, projectRangeRef.current), false)
+  }
+
+  // After the project's colour or range changed: the plot categories' own hues are held inside their ranges of it, and what is under them follows.
+  function reconcilePlotFromProject() {
+    const prev = plotNodesRef.current
+    const next = reconcilePlotHues(prev, null, projectRangeRef.current, projectHueRef.current)
+    if (next.some((n, i) => n !== prev[i])) commitPlot(next, false)
+  }
+
+  // Sets the project's own colour (held within its range of the app theme's hue), pulling the books' hues (and so their descendants') and the plot
+  // categories' back inside their ranges. Picking a colour is not inheriting.
+  function setProjectHue(code: number) {
+    const wrapped = fitToParent(Math.round(code), appHueRef.current, projectRangeRef.current)
+    projectHueRef.current = wrapped
+    updateProjectSettings({ themeHue: wrapped, hueInherit: false }, false)
+    const prev = outlineNodesRef.current
+    const next = reconcileHues(prev, wrapped, undefined, projectRangeRef.current)
     if (next.some((n, i) => n !== prev[i])) commitOutline(next, false)
+    reconcilePlotFromProject()
+  }
+
+  // Sets how far the project's colour may sit from the app theme's hue. Its own hue is pulled into the new window; at 360 a project that was
+  // inheriting keeps the hue it was showing as its own. What is under it is held to the new range.
+  function setProjectHueRange(range: number) {
+    const settings = activeProjectRef.current?.settings
+    if (!settings) return
+    const inheriting = settings.hueInherit ?? false
+    const shown = projectHueRef.current
+    projectRangeRef.current = range
+    if (range >= 360 && inheriting) {
+      updateProjectSettings({ hueRange: range, hueInherit: false, themeHue: Math.round(shown) }, false)
+    } else if (!inheriting) {
+      const hue = fitToParent(Math.round(shown), appHueRef.current, range)
+      projectHueRef.current = hue
+      updateProjectSettings({ hueRange: range, themeHue: hue }, false)
+    } else {
+      updateProjectSettings({ hueRange: range }, false)
+    }
+    const prev = outlineNodesRef.current
+    const next = reconcileHues(prev, projectHueRef.current, undefined, range)
+    if (next.some((n, i) => n !== prev[i])) commitOutline(next, false)
+    reconcilePlotFromProject()
+  }
+
+  // Turns the project's Inherit on (its colour is the app theme's own hue, whichever time of day it is) or off (the hue it was showing becomes its own).
+  function setProjectInherit(on: boolean) {
+    if (on && projectRangeRef.current >= 360) return
+    if (on) {
+      projectHueRef.current = appHueRef.current
+      updateProjectSettings({ hueInherit: true }, false)
+    } else {
+      updateProjectSettings({ hueInherit: false, themeHue: Math.round(projectHueRef.current) }, false)
+    }
+    const prev = outlineNodesRef.current
+    const next = reconcileHues(prev, projectHueRef.current, undefined, projectRangeRef.current)
+    if (next.some((n, i) => n !== prev[i])) commitOutline(next, false)
+    reconcilePlotFromProject()
   }
 
   function collectDescendantIds(nodeId: string, nodes: OutlineNode[]): Set<string> {
@@ -743,29 +855,45 @@ export function useWriterWorkspace() {
     commitPlot(plotNodesRef.current.map(n => (n.id === nodeId ? { ...n, [field]: value } : n)), false)
   }
 
-  // Set a category's, subcategory's or cluster's colour (a colour code). A category is held within 90 degrees of the project's hue, a
-  // subcategory within 60 of its category's and a cluster within 30 of its subcategory's (`parentCode`: the parent's hue as shown, which is
-  // stored on the parent too when it had none of its own). Whatever is under the node is then pulled back inside its range, top down.
+  // Set a category's, subcategory's or cluster's colour (a colour code). It is held within its range of its parent's hue (the node's own choice, 30 to 360,
+  // else its kind's default: 90, 60, 30; never wider than its parent's): a category's parent is the project, a subcategory's its category
+  // and a cluster's its subcategory (`parentCode`: the parent's hue as shown). Whatever is under the node is then pulled back inside its range, top down.
   function setPlotHue(nodeId: string, code: number, parentCode?: number) {
     const prev = plotNodesRef.current
     const target = prev.find(n => n.id === nodeId)
     if (!target || (target.kind !== 'category' && target.kind !== 'subcategory' && target.kind !== 'cluster')) return
     const rounded = Math.round(code)
     const byId = new Map(prev.map(n => [n.id, n]))
-    if (target.kind === 'category') {
-      const value = fitToParent(rounded, projectHueRef.current, rangeOf('category'))
-      commitPlot(reconcilePlotHues(prev.map(n => (n.id === nodeId ? { ...n, hue: value } : n)), nodeId), false)
-      return
-    }
+    const range = plotRange(target, byId, projectRangeRef.current)
     const parent = plotParentOf(target, byId)
-    const shown = parent?.hue ?? parentCode
-    const value = shown != null ? fitToParent(rounded, hueOfCode(shown), rangeOf(target.kind)) : rounded
-    const next = prev.map(n => {
-      if (n.id === nodeId) return { ...n, hue: value }
-      if (parent && n.id === parent.id && parent.hue == null && shown != null) return { ...n, hue: shown }
-      return n
-    })
-    commitPlot(reconcilePlotHues(next, nodeId), false)
+    const shown = target.kind === 'category' ? projectHueRef.current : parent ? shownPlotHue(parent, byId, projectHueRef.current) : parentCode
+    const value = shown != null ? fitToParent(rounded, hueOfCode(shown), range) : rounded
+    commitPlot(reconcilePlotHues(prev.map(n => (n.id === nodeId ? { ...n, hue: value } : n)), nodeId, projectRangeRef.current, projectHueRef.current), false)
+  }
+
+  // Sets how far a category's, subcategory's or cluster's colour may sit from its parent's hue (held to its parent's range). Its own hue is pulled into
+  // the new window and what is under it follows. At 360 a node that was inheriting keeps the hue it was showing as its own.
+  function setPlotHueRange(nodeId: string, range: number) {
+    const prev = plotNodesRef.current
+    const target = prev.find(n => n.id === nodeId)
+    if (!target || (target.kind !== 'category' && target.kind !== 'subcategory' && target.kind !== 'cluster')) return
+    const byId = new Map(prev.map(n => [n.id, n]))
+    const value = Math.min(range, plotRangeCap(target, byId, projectRangeRef.current))
+    const parent = plotParentOf(target, byId)
+    const centre = parent ? shownPlotHue(parent, byId, projectHueRef.current) : projectHueRef.current
+    const hue = target.hue != null ? fitToParent(target.hue, hueOfCode(centre), value) : value >= 360 ? Math.round(shownPlotHue(target, byId, projectHueRef.current)) : null
+    commitPlot(reconcilePlotHues(prev.map(n => (n.id === nodeId ? { ...n, hueRange: value, hue } : n)), nodeId, projectRangeRef.current, projectHueRef.current), false)
+  }
+
+  // Turns Inherit on (no colour of its own: it shows, and follows, its parent's) or off (the hue it was showing becomes its own).
+  function setPlotInherit(nodeId: string, on: boolean) {
+    const prev = plotNodesRef.current
+    const target = prev.find(n => n.id === nodeId)
+    if (!target || (target.kind !== 'category' && target.kind !== 'subcategory' && target.kind !== 'cluster')) return
+    const byId = new Map(prev.map(n => [n.id, n]))
+    if (on && plotRange(target, byId, projectRangeRef.current) >= 360) return
+    const hue = on ? null : Math.round(shownPlotHue(target, byId, projectHueRef.current))
+    commitPlot(reconcilePlotHues(prev.map(n => (n.id === nodeId ? { ...n, hue } : n)), nodeId, projectRangeRef.current, projectHueRef.current), false)
   }
 
   function addPlotKeyword(nodeId: string, keyword: string) {
@@ -991,7 +1119,8 @@ export function useWriterWorkspace() {
     saveStatus, saveCountdown, saveNow, flushAll, history, updateTimeSystems, renameProject,
     childrenByParentId, projectRoot, books, activeBook, activeBookChapters, activeChapter,
     activeConsole, activeBookId, activeChapterId,
-    projectHue, projectHueOf, levelHueOf, levelTintOf, levelFillOf, hueCentreOf, setNodeHue, setProjectHue,
+    projectHue, projectHueOf, projectRange, appHue, levelHueOf, levelTintOf, levelFillOf, levelRangeOf, hueSliderOf, plotHueSliderOf, projectHueSlider, hueCentreOf, setNodeHue, setNodeHueRange, setNodeInherit,
+    setProjectHue, setProjectHueRange, setProjectInherit, setPlotHueRange, setPlotInherit,
     loadProjects, createProject, openProject, backToShelves, deleteProject,
     showDash, showProject, openBook, selectChapter, openChapter, showDraft, showPreview, backToBook,
     addOutlineNode, updateOutlineNode, deleteOutlineNode, deleteSeries, moveOutlineNodeInto, toggleNodeFlag,
@@ -1013,4 +1142,4 @@ export type WriterWorkspace = ReturnType<typeof useWriterWorkspace>
 
 // What one Undo / Redo acts on: the outline, the plot, or the project's settings.
 export type HistoryScope = 'outline' | 'plot' | 'settings'
-interface ProjectSettingsValue { timeSystems: TimeSystem[]; themeHue: number | null; title: string }
+interface ProjectSettingsValue { timeSystems: TimeSystem[]; themeHue: number | null; hueInherit?: boolean; hueRange?: number | null; title: string }

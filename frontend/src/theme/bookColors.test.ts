@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import {
-  DEFAULT_BOOK_HUE, HUE_CODE_MAX, HUE_CODE_MIN, HUE_RANGES, rangeOf, accentColorCss, stripeColorCss, stripeHsl, bookScopeVars, bookThemeHue, clampCodeToWindow, clampHueToWindow, coverColor,
+  DEFAULT_BOOK_HUE, HUE_CODE_MAX, HUE_CODE_MIN, HUE_RANGES, HUE_RANGE_OPTIONS, effectiveRange, isHueRange, ownBookHue, rangeOptions, rangeOf, accentColorCss, stripeColorCss, stripeHsl, bookScopeVars, bookThemeHue, clampCodeToWindow, clampHueToWindow, coverColor,
   SAT_LOUD, SAT_MIDDLE, SAT_QUIET, SLIDER_DARKEN, fillCap, fillColorCss, fillHsl, hexToHue, outlineSat, sliderLight, hueDelta, hueHsl, hueOfCode, hueWindow, themeColorCss, wrapHue,
 } from './bookColors'
 import { DEFAULT_PALETTE } from './defaults'
@@ -209,5 +209,42 @@ describe('the hue ranges', () => {
   it('are looked up by a node kind, and a kind with none of its own (a series) is the whole wheel', () => {
     expect(['book', 'arc', 'chapter', 'category', 'subcategory', 'cluster'].map(rangeOf)).toEqual([90, 60, 30, 90, 60, 30])
     expect(rangeOf('series')).toBe(360)
+  })
+})
+
+describe('hue ranges as a choice', () => {
+  it('are 30, 60, 90, 120, 180 and 360 degrees, and nothing else', () => {
+    expect([...HUE_RANGE_OPTIONS]).toEqual([30, 60, 90, 120, 180, 360])
+    expect([30, 60, 90, 120, 180, 360].every(isHueRange)).toBe(true)
+    expect([0, 45, 361, null, undefined, '30'].some(isHueRange)).toBe(false)
+  })
+
+  it('work as the one chosen, else the kind default, never wider than the cap (the parent range)', () => {
+    expect(effectiveRange(null, 'chapter')).toBe(30)
+    expect(effectiveRange(undefined, 'book')).toBe(90)
+    expect(effectiveRange(120, 'chapter')).toBe(120)
+    expect(effectiveRange(120, 'chapter', 60)).toBe(60)
+    expect(effectiveRange(null, 'arc', 30)).toBe(30) // the default 60 under a parent of 30
+    expect(effectiveRange(45, 'arc')).toBe(60) // not an option: the default
+    expect(effectiveRange(null, 'project')).toBe(360)
+  })
+
+  it('are offered up to the parent range: a 180 parent never offers 360, a 360 parent all six', () => {
+    expect(rangeOptions()).toEqual([30, 60, 90, 120, 180, 360])
+    expect(rangeOptions(360)).toEqual([30, 60, 90, 120, 180, 360])
+    expect(rangeOptions(180)).toEqual([30, 60, 90, 120, 180])
+    expect(rangeOptions(90)).toEqual([30, 60, 90])
+    expect(rangeOptions(30)).toEqual([30])
+  })
+})
+
+describe('a book\'s own colour', () => {
+  it('is its theme hue, else the one of an old hex colour, else none (it inherits the project\'s)', () => {
+    expect(ownBookHue({ themeHue: 40 })).toBe(40)
+    expect(ownBookHue({ themeHue: null, color: '#00ff00' })).toBe(120)
+    expect(ownBookHue({})).toBeNull()
+    expect(bookThemeHue({})).toBe(DEFAULT_BOOK_HUE)
+    expect(bookThemeHue({}, 200)).toBe(200)
+    expect(bookThemeHue({ themeHue: 40 }, 200)).toBe(40)
   })
 })

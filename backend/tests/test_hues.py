@@ -227,3 +227,30 @@ def test_a_project_with_brightness_codes_becomes_plain_hues_once_on_load(client:
 def test_a_new_project_is_already_in_the_current_hue_scheme(client: TestClient, storage_root: Path) -> None:
     project_id = _create_project(client)
     assert json.loads(_legacy_file(storage_root, project_id).read_text(encoding="utf-8"))["hueScheme"] == 4
+
+
+def test_a_hue_range_is_kept_per_node_and_an_unknown_one_reads_as_the_default(client: TestClient) -> None:
+    project_id = _create_project(client)
+    nodes = [_node("b1", "book", None, 0, themeHue=40, hueRange=120), _node("a1", "arc", "b1", 0, hueRange=45), _node("a2", "arc", "b1", 1)]
+    assert client.put(f"/api/projects/{project_id}/outline", json={"schemaVersion": 2, "nodes": nodes}).status_code == 200
+    got = {n["id"]: n["hueRange"] for n in client.get(f"/api/projects/{project_id}").json()["outline"]["nodes"]}
+    assert got == {"b1": 120, "a1": None, "a2": None}  # 45 is not an option: no range of its own (not a rejected node)
+    plot = [_plot_node("c1", "category", None, 0, hue=200, hueRange=180), _plot_node("s1", "subcategory", "c1", 0, hueRange=60)]
+    assert client.put(f"/api/projects/{project_id}/plot", json={"schemaVersion": 1, "nodes": plot}).status_code == 200
+    got = {n["id"]: n["hueRange"] for n in client.get(f"/api/projects/{project_id}").json()["plot"]["nodes"]}
+    assert got == {"c1": 180, "s1": 60}
+
+
+def test_the_project_colour_can_follow_the_app_theme_and_has_a_range(client: TestClient) -> None:
+    project_id = _create_project(client)
+    settings = client.get(f"/api/projects/{project_id}").json()["index"]["settings"]
+    assert settings["hueInherit"] is False
+    assert settings["hueRange"] is None
+    resp = client.patch(f"/api/projects/{project_id}", json={"hueInherit": True, "hueRange": 90})
+    assert resp.status_code == 200
+    assert resp.json()["settings"]["hueInherit"] is True
+    assert resp.json()["settings"]["hueRange"] == 90
+    assert client.patch(f"/api/projects/{project_id}", json={"hueRange": 45}).status_code == 422
+    assert client.get(f"/api/projects/{project_id}").json()["index"]["settings"]["hueRange"] == 90
+    # Turning it off again.
+    assert client.patch(f"/api/projects/{project_id}", json={"hueInherit": False}).json()["settings"]["hueInherit"] is False

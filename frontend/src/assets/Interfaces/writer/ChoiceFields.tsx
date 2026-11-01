@@ -59,7 +59,7 @@ function AnswerCard({ w, answer, drag, dragging, hint, children }: {
   return (
     <span
       className={`wrPlotValue wrPlotValue--answer${placed === 0 ? '' : ' wrPlotValue--assigned'}${dragging ? ' wrPlotValue--dragging' : ''}${highlighted ? ' wrPlotValue--highlight' : ''}`}
-      data-point={answer.id} style={valueLook(answer, w.plotNodeById)} title={hint}
+      data-point={answer.id} style={valueLook(answer, w.plotNodeById, w.projectHue)} title={hint}
     >
       {drag && (
         <span className="wrGrip wrPlotValueGrip" draggable {...drag} aria-label="Drag plotpoint" title="Drag onto a chapter">
@@ -233,7 +233,7 @@ function OptionRows({ w, owner, def, holder, drag }: { w: WriterWorkspace; owner
           const placed = answer ? placedCount(answer, outlineById) : 0
           const lifted = group.isLifted(o.id)
           const slide = group.slideOf(o.id)
-          const look = answer ? valueLook(answer, w.plotNodeById) : undefined
+          const look = answer ? valueLook(answer, w.plotNodeById, w.projectHue) : undefined
           return (
             <div
               key={o.id} data-field={o.id} data-point={answer?.id}
@@ -363,7 +363,7 @@ function TextAnswer({ w, def, holder, drag }: { w: WriterWorkspace; def: PlotCus
   return (
     <span
       className={`wrAnswerText${answer ? ' wrPlotValue wrPlotValue--answer' : ''}${answer && placed > 0 ? ' wrPlotValue--assigned' : ''}${answer && drag.dragId === answer.id ? ' wrPlotValue--dragging' : ''}`}
-      style={answer ? valueLook(answer, w.plotNodeById) : undefined} data-point={answer?.id}
+      style={answer ? valueLook(answer, w.plotNodeById, w.projectHue) : undefined} data-point={answer?.id}
     >
       {grip && <span className="wrGrip wrPlotValueGrip" draggable {...grip} aria-label="Drag plotpoint" title="Drag onto a chapter"><GripIcon size={14} /></span>}
       <input

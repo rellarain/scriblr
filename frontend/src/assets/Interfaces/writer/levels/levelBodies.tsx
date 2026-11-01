@@ -13,7 +13,7 @@ export function ProjectMin({ w }: { w: WriterWorkspace }) {
     <div className="wrLevelMinBody">
       <Shelf
         label="Books" meta={`${w.books.length} ${w.books.length === 1 ? 'book' : 'books'}`}
-        groups={groups} activeBookId={w.activeBookId} onOpenBook={w.openBook}
+        groups={groups} activeBookId={w.activeBookId} onOpenBook={w.openBook} projectHue={w.projectHue}
       />
     </div>
   )
@@ -48,6 +48,7 @@ export function ProjectTiles({ w }: { w: WriterWorkspace }) {
               label={p.title}
               meta={`${bookCount} ${bookCount === 1 ? 'book' : 'books'}`}
               groups={groups}
+              projectHue={w.projectHueOf(p)}
               progress={w.projectProgress[p.projectId]}
               activeBookId={open ? w.activeBookId : null}
               selected={open}

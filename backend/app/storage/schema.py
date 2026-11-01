@@ -27,6 +27,14 @@ def utcnow() -> datetime:
 # nor the brightnesses exist any more: a lighter or darker colour is now its plain hue.
 MIN_LEVEL_HUE = 0
 MAX_LEVEL_HUE = 360
+# How far (degrees either side of its parent's hue) a level's colour may sit, as the user picks it: one of these. None = the level's own default
+# (book 90, arc 60, chapter 30, category 90, subcategory 60, cluster 30; the project 360). A child's range is held to its parent's.
+HUE_RANGE_OPTIONS = (30, 60, 90, 120, 180, 360)
+
+
+def _hue_range_or_none(value: Optional[int]) -> Optional[int]:
+    """A stored hue range that is not one of the options is read as none (the default) rather than dropping the node that holds it."""
+    return value if value in HUE_RANGE_OPTIONS else None
 # The longest name a project can be given when it is renamed (the Writer's Name field stops at the same length).
 PROJECT_TITLE_MAX = 100
 HUE_SCHEME = 4
@@ -148,10 +156,19 @@ class ProjectSettings(BaseModel):
     # How scenes' Time is structured (see TimeSystem). Books pick one by id.
     timeSystems: list[TimeSystem] = Field(default_factory=default_time_systems)
     # The project's own colour (a hue code, see MIN_LEVEL_HUE), the root of the Writer's level colours:
-    # series sit within 60 degrees of it, books anywhere, arcs within 60 of their book and
-    # chapters within 60 of their arc (the OutlineNode.themeHue of each). None = the
-    # active theme's own colour.
+    # a book sits within its own range of it (OutlineNode.hueRange, 90 until another is chosen), an arc within its range of
+    # its book and a chapter within its range of its arc (the OutlineNode.themeHue of each). None = the active theme's own
+    # colour (plus 120 degrees: the default), unless hueInherit says it follows the app theme's hue.
     themeHue: Optional[int] = Field(default=None, ge=MIN_LEVEL_HUE, le=MAX_LEVEL_HUE)
+    # The project's colour follows the app theme's hue (it has no "none" for that: None in themeHue is the default, the theme's plus 120).
+    hueInherit: bool = False
+    # How far (degrees either side of the app theme's hue) the project's colour may sit; one of HUE_RANGE_OPTIONS, None = 360.
+    hueRange: Optional[int] = None
+
+    @field_validator("hueRange")
+    @classmethod
+    def _hue_range_is_an_option(cls, value: Optional[int]) -> Optional[int]:
+        return _hue_range_or_none(value)
 
 
 class ProjectIndex(BaseModel):
@@ -232,6 +249,14 @@ class OutlineNode(BaseModel):
     # (Books used to have a second, accent hue; files that still carry one load fine and
     # drop it when next saved.)
     themeHue: Optional[int] = Field(default=None, ge=MIN_LEVEL_HUE, le=MAX_LEVEL_HUE)
+    # How far (degrees either side of its parent's hue) this colour may sit: one of HUE_RANGE_OPTIONS, None = the kind's default.
+    hueRange: Optional[int] = None
+
+    @field_validator("hueRange")
+    @classmethod
+    def _hue_range_is_an_option(cls, value: Optional[int]) -> Optional[int]:
+        return _hue_range_or_none(value)
+
     chapterCountTarget: Optional[int] = None
     plotlineIds: list[str] = Field(default_factory=list)
     # Book's total word-count ambition -- drives bookshelf spine width/fill.
@@ -408,6 +433,14 @@ class PlotNode(BaseModel):
     # the accent's and kept within 60 degrees of its category's hue. None = the
     # app theme's hue (categories) or the parent's hue (subcategories, clusters).
     hue: Optional[int] = Field(default=None, ge=MIN_LEVEL_HUE, le=MAX_LEVEL_HUE)
+    # How far (degrees either side of its parent's hue) the colour may sit: one of HUE_RANGE_OPTIONS, None = the kind's default.
+    hueRange: Optional[int] = None
+
+    @field_validator("hueRange")
+    @classmethod
+    def _hue_range_is_an_option(cls, value: Optional[int]) -> Optional[int]:
+        return _hue_range_or_none(value)
+
     # Set only on "plotpoint" nodes, which are the values of fields: the
     # PlotCustomFieldDef.id (defined on a category, subcategory, cluster or plotline)
     # this value belongs to. None on plotpoints saved before fields had values;

@@ -70,7 +70,7 @@ export function PlacedList({ w }: { w: WriterWorkspace }) {
       <PlotOrderToggle />
       {placed.length === 0 && <div className="wrMuted">None placed yet.</div>}
       {placed.map(({ point: p, placement }) => (
-        <div key={placement.id} className="wrMidPoint" data-placed={p.id} style={plotColorVars(plotColors(p, w.plotNodeById))} title={textOf(p, w.plotNodeById).body || undefined}>
+        <div key={placement.id} className="wrMidPoint" data-placed={p.id} style={plotColorVars(plotColors(p, w.plotNodeById, w.projectHue))} title={textOf(p, w.plotNodeById).body || undefined}>
           {textOf(p, w.plotNodeById).title}
           <span className="wrMidPointAt">{nodeLabel(target(placement.targetId) ?? book)}</span>
         </div>

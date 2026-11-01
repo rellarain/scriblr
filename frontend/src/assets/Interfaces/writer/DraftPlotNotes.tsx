@@ -21,7 +21,7 @@ export function DraftPlotNotes({ w, points, momentIds }: { w: WriterWorkspace; p
         const field = fieldNameOf(p, w.plotNodeById)
         const open = openId === placement.id
         return (
-          <div key={placement.id} className={`wrPlotNote${open ? ' wrPlotNote--open' : ''}`} data-point={p.id} style={plotColorVars(plotColors(p, w.plotNodeById))}>
+          <div key={placement.id} className={`wrPlotNote${open ? ' wrPlotNote--open' : ''}`} data-point={p.id} style={plotColorVars(plotColors(p, w.plotNodeById, w.projectHue))}>
             <button type="button" className="wrPlotNoteHead" aria-expanded={open} onClick={() => setOpenId(open ? null : placement.id)}>
               {open ? (
                 <span className="wrPlotNoteBody">

@@ -15,15 +15,16 @@ import { plotColorVars, plotColors } from './plotColors'
 
 export interface BookHues { book: OutlineNode | undefined; themeHue: number }
 
-export function bookHuesOf(chapterId: string, outlineNodes: OutlineNode[]): BookHues {
+// A book with no colour of its own shows the project's (`projectHue`).
+export function bookHuesOf(chapterId: string, outlineNodes: OutlineNode[], projectHue?: number): BookHues {
   const book = nearestOfKind(outlineNodes, chapterId, 'book')
-  const themeHue = book ? bookThemeHue(book) : bookThemeHue({})
+  const themeHue = book ? bookThemeHue(book, projectHue) : bookThemeHue({}, projectHue)
   return { book, themeHue }
 }
 
 // The plotpoint's own card.
-export const valueLook = (point: PlotNode, plotById: Map<string, PlotNode>): Record<string, string> | undefined =>
-  plotColorVars(plotColors(point, plotById))
+export const valueLook = (point: PlotNode, plotById: Map<string, PlotNode>, projectHue?: number): Record<string, string> | undefined =>
+  plotColorVars(plotColors(point, plotById, projectHue))
 
 export interface PlacementLook {
   level: TargetLevel
@@ -34,12 +35,12 @@ export interface PlacementLook {
 
 // One placement's chip or tile.
 export function placementLook(
-  placement: PlotPlacement, outlineNodes: OutlineNode[], outlineById: Map<string, OutlineNode>, zone: ZoneKey,
+  placement: PlotPlacement, outlineNodes: OutlineNode[], outlineById: Map<string, OutlineNode>, zone: ZoneKey, projectHue?: number,
 ): PlacementLook {
   const level = levelOfTarget(placement.targetId, outlineById)
   const chapter = chapterOfTarget(placement.targetId, outlineById)
   if (level === 'none' || !chapter) return { level: 'none', chapterId: null, style: undefined }
-  const { themeHue } = bookHuesOf(chapter.id, outlineNodes)
+  const { themeHue } = bookHuesOf(chapter.id, outlineNodes, projectHue)
   const style: Record<string, string> = {
     '--wr-point-bg': themeColorCss(themeHue), '--wr-point-edge': accentColorCss(themeHue),
     // The book's edge stands in for the plot's stripes.

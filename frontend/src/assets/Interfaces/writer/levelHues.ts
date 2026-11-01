@@ -1,30 +1,31 @@
 import type { OutlineNode } from '../../../api/types'
-import { bookThemeHue, clampCodeToWindow, hueDelta, hueOfCode, outlineSat, rangeOf, themeColorCss, wrapHue } from '../../../theme/bookColors'
+import { clampCodeToWindow, effectiveRange, hueDelta, hueOfCode, outlineSat, ownBookHue, themeColorCss, wrapHue } from '../../../theme/bookColors'
 
 // The Writer's level colours. Each level has a colour (a hue in degrees: see theme/bookColors.ts); the one
 // saturation and the lightness come from the active theme zone.
 //
 //   project   its own (ProjectSettings.themeHue), else a default off the app theme's hue; any hue
 //   series    none: it shows the project's colour
-//   book      within HUE_RANGES.book (90) of the project's hue (its own themeHue; see bookThemeHue)
-//   arc       within HUE_RANGES.arc (60) of its book's hue
-//   chapter   within HUE_RANGES.chapter (30) of its arc's hue (its book's, outside any arc)
+//   book      within its range (90 until another is chosen) of the project's hue (its own themeHue; see ownBookHue)
+//   arc       within its range (60) of its book's hue
+//   chapter   within its range (30) of its arc's hue (its book's, outside any arc)
 //
-// An arc or chapter with no colour of its own shows its parent's. Changing a parent pulls its children's own hues back inside
-// their ranges (reconcileHues); a colour already outside its range is left alone until it, or its parent, is changed.
+// A range is the node's own `hueRange` (30, 60, 90, 120, 180 or 360), else its kind's default (HUE_RANGES), and never wider than its parent's
+// (levelRange). A book, arc or chapter with no colour of its own shows its parent's (it inherits). Changing a parent pulls its children's own
+// hues back inside their ranges (reconcileHues); a colour already outside its range is left alone until it, or its parent, is changed.
 // The project's default hue is this far round the wheel from the app theme's, so the
 // Dash (the theme itself) and the Project level read as different tints.
 const DEFAULT_PROJECT_HUE_OFFSET = 120
 
 export const defaultProjectHue = (appHue: number): number => wrapHue(appHue + DEFAULT_PROJECT_HUE_OFFSET)
 
-type HueNode = Pick<OutlineNode, 'id' | 'kind' | 'parentId' | 'themeHue' | 'color'>
+type HueNode = Pick<OutlineNode, 'id' | 'kind' | 'parentId' | 'themeHue' | 'color'> & { hueRange?: number | null }
 export type HueNodes = Map<string, HueNode>
 
-// A node's colour: its own, else its parent's (a book's own, else the book default). A series has no colour: it shows its parent's.
+// A node's colour: its own, else its parent's (a book's own, else the project's). A series has no colour: it shows its parent's.
 export function levelHue(node: HueNode, nodes: HueNodes, projectHue: number): number {
   const parent = node.parentId ? nodes.get(node.parentId) : undefined
-  const own = node.kind === 'series' ? null : node.kind === 'book' ? bookThemeHue(node) : node.themeHue != null ? Math.round(node.themeHue) : null
+  const own = node.kind === 'series' ? null : node.kind === 'book' ? ownBookHue(node) : node.themeHue != null ? Math.round(node.themeHue) : null
   if (own !== null) return own
   return parent ? levelHue(parent, nodes, projectHue) : projectHue
 }
@@ -38,6 +39,19 @@ export function hueCentre(node: HueNode, nodes: HueNodes, projectHue: number): n
   if (node.kind === 'series') return null
   const parent = node.parentId ? nodes.get(node.parentId) : undefined
   return hueOfCode(parent ? levelHue(parent, nodes, projectHue) : projectHue)
+}
+
+// How far a node's colour may sit from its parent's hue, in degrees either side: its own range, else its kind's default, never wider than its parent's
+// (the project's `projectRange` for what hangs from the project; a series has no colour, so its children look past it).
+export function levelRange(node: HueNode, nodes: HueNodes, projectRange: number): number {
+  return effectiveRange(node.hueRange, node.kind, rangeCapOf(node, nodes, projectRange))
+}
+
+// The widest a node's range may be: its parent's range (the project's when it has no coloured parent).
+export function rangeCapOf(node: HueNode, nodes: HueNodes, projectRange: number): number {
+  const parent = node.parentId ? nodes.get(node.parentId) : undefined
+  if (!parent) return projectRange
+  return parent.kind === 'series' ? rangeCapOf(parent, nodes, projectRange) : levelRange(parent, nodes, projectRange)
 }
 
 // The hue for a new node among its siblings: the one in its range farthest from the
@@ -67,7 +81,8 @@ export function dropSeriesHues(nodes: OutlineNode[]): OutlineNode[] {
 // The tree with every book's, arc's and chapter's own colour held inside its range (top-down, so a pulled-back arc then pulls its
 // chapters), and any series colour cleared. With `fromId`, only what is under that node is held (the node itself is already where
 // it should be): changing one chapter never moves a colour elsewhere.
-export function reconcileHues(nodes: OutlineNode[], projectHue: number, fromId?: string): OutlineNode[] {
+// A node's own range above its parent's is lowered to it, so a parent set narrower pulls the ranges (and so the hues) of what is under it in.
+export function reconcileHues(nodes: OutlineNode[], projectHue: number, fromId?: string, projectRange = 360): OutlineNode[] {
   const byId: HueNodes = new Map(nodes.map(n => [n.id, n]))
   const children = new Map<string | null, OutlineNode[]>()
   for (const n of nodes) {
@@ -80,9 +95,13 @@ export function reconcileHues(nodes: OutlineNode[], projectHue: number, fromId?:
     let current = node
     if (node.kind === 'series') {
       if (node.themeHue != null) current = { ...node, themeHue: null }
-    } else if (inScope && node.themeHue != null) {
-      const fitted = fitToParent(Math.round(node.themeHue), hueCentre(node, byId, projectHue), rangeOf(node.kind))
-      if (fitted !== node.themeHue) current = { ...node, themeHue: fitted }
+    } else if (inScope) {
+      const cap = rangeCapOf(node, byId, projectRange)
+      if (node.hueRange != null && node.hueRange > cap) current = { ...current, hueRange: cap }
+      if (node.themeHue != null) {
+        const fitted = fitToParent(Math.round(node.themeHue), hueCentre(node, byId, projectHue), effectiveRange(current.hueRange, node.kind, cap))
+        if (fitted !== node.themeHue) current = { ...current, themeHue: fitted }
+      }
     }
     result.set(node.id, current)
     byId.set(node.id, current)
