@@ -1,4 +1,4 @@
-import { ExportIcon, GearIcon, HelpIcon, InfoIcon, ListIcon } from '../../../icons'
+import { ExportIcon, GearIcon, HelpIcon, InfoIcon, OutlineIcon } from '../../../icons'
 import WorkspaceSaveCluster from './WorkspaceSaveCluster'
 import type { HistoryScope, WriterWorkspace } from '../useWriterWorkspace'
 import { buildChildIndex, chaptersOfBook, descendantsOf } from '../outlineTree'
@@ -77,7 +77,7 @@ export function outlineTabs(w: WriterWorkspace): LevelTab[] {
   const book = w.activeBook
   return [
     {
-      id: 'outline', label: 'Book outline', Icon: ListIcon,
+      id: 'outline', label: 'Book outline', Icon: OutlineIcon,
       render: () => <BookOutlineList w={w} />,
     },
     { id: 'details', label: 'Book details', Icon: InfoIcon, render: () => <BookDetails w={w} /> },

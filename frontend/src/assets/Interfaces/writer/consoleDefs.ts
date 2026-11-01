@@ -1,6 +1,6 @@
 import type { ComponentType } from 'react'
 import {
-  CheckboxIcon, PencilIcon, ClockIcon, ListIcon, ReactionIcon, FlagIcon, FootnoteIcon, ExportIcon, CalendarIcon, BarChartIcon, PlotIcon,
+  CheckboxIcon, PencilIcon, ClockIcon, OutlineIcon, ReactionIcon, FlagIcon, FootnoteIcon, ExportIcon, CalendarIcon, BarChartIcon, PlotIcon,
   type IconProps,
 } from '../../icons'
 
@@ -19,7 +19,7 @@ export const SHELF_COMPONENTS: ComponentDef[] = [
   { key: 'projectHistory', label: 'Project History', Icon: ClockIcon, body: 'Preserves and condenses this project’s version and activity information here.' },
   { key: 'projectAnalytics', label: 'Project Analytics', Icon: BarChartIcon, body: 'View analytics for this project here.' },
   { key: 'projectSchedule', label: 'Project Schedule', Icon: CalendarIcon, body: 'Goals, routines, checklists and revisions for this project.' },
-  { key: 'projectOutline', label: 'Project Outline', Icon: ListIcon },
+  { key: 'projectOutline', label: 'Project Outline', Icon: OutlineIcon },
   { key: 'projectPlot', label: 'Project Plot', Icon: PlotIcon },
   { key: 'projectEditor', label: 'Project Editor', Icon: PencilIcon, body: 'Edit this project’s time systems here (its summary and description are coming).' },
   { key: 'outlineTemplate', label: 'Outline Template', Icon: CheckboxIcon, body: 'Manage book templates here.' },

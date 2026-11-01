@@ -2,7 +2,7 @@ import { useMemo, useState } from 'react'
 import { useStoredState } from '../storage'
 import type { OutlineNode } from '../../../../api/types'
 import type { WriterWorkspace } from '../useWriterWorkspace'
-import { EyeIcon, GearIcon, HelpIcon, PencilIcon, PlotIcon } from '../../../icons'
+import { DraftIcon, EyeIcon, GearIcon, HelpIcon, PencilIcon, PlotIcon } from '../../../icons'
 import type { SplitNode } from '../../../../components/tiles/splitTree'
 import { SaveCluster } from '../../../../components/SaveCluster'
 import { combineCountdown, combineSaveStatus } from '../../../../lib/useAutosave'
@@ -36,7 +36,7 @@ export function DraftPreviewToggle({ preview, hasDraft, onDraft, onPreview }: {
   return (
     <div className="wrSegmented" role="group" aria-label="Chapter view">
       <button type="button" title="Draft" aria-label="Draft" aria-pressed={!preview} className={!preview ? 'wrSegBtn wrSegBtn--active' : 'wrSegBtn'} onClick={onDraft}>
-        <PencilIcon size={16} /><span className="wrSegLabel">Draft</span>
+        <DraftIcon size={16} /><span className="wrSegLabel">Draft</span>
       </button>
       <button
         type="button" disabled={!hasDraft && !preview} aria-label="Preview" aria-pressed={preview}
@@ -153,7 +153,7 @@ function DraftPage({ w, chapter, pagesComponent, onPagesComponent }: {
                   children: <ChapterPoints w={w} chapter={chapter} />,
                 },
                 {
-                  id: 'draft', title: preview ? 'Preview' : 'Draft', Icon: preview ? EyeIcon : PencilIcon, bodyClassName: 'wrDraftTileBody wrDraftTileBody--flush',
+                  id: 'draft', title: preview ? 'Preview' : 'Draft', Icon: preview ? EyeIcon : DraftIcon, bodyClassName: 'wrDraftTileBody wrDraftTileBody--flush',
                   children: preview
                     ? <PreviewPane w={w} chapter={chapter} draft={draft} pubs={pubs} component={pagesComponent} onComponent={onPagesComponent} />
                     : <div className="wrSpreadScroll"><DraftCards w={w} chapter={chapter} draft={draft} /></div>,

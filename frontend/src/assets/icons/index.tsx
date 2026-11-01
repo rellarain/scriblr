@@ -357,13 +357,40 @@ export function InfoIcon(props: IconProps) {
 
 // A trunk splitting into two branches, each ending in a node -- for
 // Plot's category/subcategory/plotline branching structure.
+// Plot: its levels, indented (a category, then what hangs from it).
 export function PlotIcon(props: IconProps) {
+  return <IconBase {...props}><path d="M4 5h8M9 10h11M9 15h11M4 20h8" /></IconBase>
+}
+
+// Outline: boxes in boxes (a book, an arc, a chapter, each inside the one above).
+export function OutlineIcon(props: IconProps) {
   return <IconBase {...props}>
-    <circle cx="12" cy="4" r="2" />
-    <path d="M12 6v3M12 9l-6 5M12 9l6 5" />
-    <circle cx="6" cy="16" r="2" />
-    <circle cx="18" cy="16" r="2" />
+    <rect x="3" y="4" width="18" height="16" rx="2" />
+    <rect x="6.5" y="8" width="11" height="8" rx="1.2" />
+    <path d="M9.5 12h5" />
   </IconBase>
+}
+
+// Draft: a quill.
+export function DraftIcon(props: IconProps) {
+  return <IconBase {...props}>
+    <path d="M19 4C12 4 7 9 7 16C13 16 18 11 19 4Z" />
+    <path d="M7 16L4 20M10.5 12.5L15 8" />
+  </IconBase>
+}
+
+// Revision: pages stacked as versions, the top one with a text caret at the end of its line.
+export function RevisionIcon(props: IconProps) {
+  return <IconBase {...props}>
+    <path d="M8 7V5a2 2 0 012-2h7a2 2 0 012 2v10a2 2 0 01-2 2h-1" />
+    <rect x="4" y="7" width="12" height="14" rx="2" />
+    <path d="M7.5 11.5h5M7.5 16.5h3.5M13.3 14.5v4" />
+  </IconBase>
+}
+
+// Project: a folder.
+export function FolderIcon(props: IconProps) {
+  return <IconBase {...props}><path d="M3 7a2 2 0 012-2h4l2 2h8a2 2 0 012 2v8a2 2 0 01-2 2H5a2 2 0 01-2-2z" /></IconBase>
 }
 
 export function BookmarkIcon(props: IconProps) {

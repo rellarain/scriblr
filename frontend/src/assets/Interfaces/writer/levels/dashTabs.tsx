@@ -1,4 +1,4 @@
-import { CalendarIcon, GearIcon, HelpIcon, LayoutMiniIcon, PencilIcon, PeopleIcon } from '../../../icons'
+import { CalendarIcon, FolderIcon, GearIcon, HelpIcon, PencilIcon, PeopleIcon } from '../../../icons'
 import { SettingsSaveCluster } from '../../../../components/SettingsSaveCluster'
 import { flushSettings } from '../../../../settings/settingsStore'
 import ThemeSettingsPanel from '../../../../theme/ThemeSettingsPanel'
@@ -27,7 +27,7 @@ export function dashTabs(w: WriterWorkspace): LevelTab[] {
     },
     { id: 'readers', label: 'Readers', Icon: PeopleIcon, render: () => <ReadersPanel /> },
     { id: 'scratchpad', label: 'Scratchpad', Icon: PencilIcon, searchable: true, render: c => <Scratchpad bare query={c.query} /> },
-    { id: 'template', label: 'Project template', Icon: LayoutMiniIcon, render: () => <Placeholder title="Project Template" body="Manage the master project template here." /> },
+    { id: 'template', label: 'Project template', Icon: FolderIcon, render: () => <Placeholder title="Project Template" body="Manage the master project template here." /> },
     { id: 'settings', label: 'Settings', Icon: GearIcon, end: true, surface: true, render: () => <ThemeSettingsPanel /> },
     { id: 'help', label: 'Help', Icon: HelpIcon, render: () => <HelpArticles names={DASH_HELP_NAMES} fallback={DASH_HELP_FALLBACK} /> },
   ]

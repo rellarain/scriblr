@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { useLocation, useNavigate } from 'react-router-dom'
 import type { CatalogBook } from '../../api/reader'
-import { BackIcon, BarChartIcon, BellIcon, BodyIcon, BookFaceIcon, CardIcon, CatalogIcon, CoverIcon, FaceIcon, FeedIcon, FlagIcon, FootnoteIcon, FrontIcon, GoalIcon, HeartIcon, HistoryIcon, HomeIcon, JournalIcon, LibraryIcon, NoteIcon, PagesIcon, PlotIcon, ShelfIcon, ShelvesIcon, SlidersIcon, StackIcon, TicketIcon, TreeIcon } from '../icons'
+import { BackIcon, BarChartIcon, BellIcon, BodyIcon, BookFaceIcon, CardIcon, CatalogIcon, CoverIcon, FaceIcon, FeedIcon, FlagIcon, FootnoteIcon, FrontIcon, GoalIcon, HeartIcon, HistoryIcon, HomeIcon, JournalIcon, LibraryIcon, NoteIcon, PagesIcon, PlotIcon, RevisionIcon, ShelfIcon, ShelvesIcon, SlidersIcon, StackIcon, TicketIcon, TreeIcon } from '../icons'
 import { fillColorCss } from '../../theme/bookColors'
 import { useThemeState } from '../../theme/useTheme'
 import { useStoredState } from './writer/storage'
@@ -184,7 +184,7 @@ function BookPage({ loc, ctx, color, right, book }: PageProps & { book: CatalogB
       { id: 'outline', label: 'Outline', Icon: TreeIcon, render: () => <OutlineConsole ctx={ctx} book={book} /> },
       { id: 'plot', label: 'Plot', Icon: PlotIcon, render: () => <PlotConsole ctx={ctx} book={book} /> },
       { id: 'plan', label: 'Plan', Icon: GoalIcon, render: () => <PlanConsole ctx={ctx} book={book} /> },
-      { id: 'revisions', label: 'Revisions', Icon: HistoryIcon, render: () => <RevisionsConsole ctx={ctx} book={book} /> },
+      { id: 'revisions', label: 'Revisions', Icon: RevisionIcon, render: () => <RevisionsConsole ctx={ctx} book={book} /> },
     )
   }
   return (

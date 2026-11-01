@@ -1,4 +1,4 @@
-import { CalendarIcon, ClockIcon, GearIcon, HelpIcon, ListIcon, PlotIcon, QueueIcon } from '../../../icons'
+import { CalendarIcon, ClockIcon, GearIcon, HelpIcon, OutlineIcon, PlotIcon, QueueIcon } from '../../../icons'
 import WorkspaceSaveCluster from './WorkspaceSaveCluster'
 import { SHELF_COMPONENTS } from '../consoleDefs'
 import { Placeholder } from '../shared'
@@ -57,7 +57,7 @@ function OutlineSummary({ w }: { w: WriterWorkspace }) {
 export function projectTabs(w: WriterWorkspace): LevelTab[] {
   return [
     { id: 'plot', label: 'Plot', Icon: PlotIcon, fill: true, render: c => (c.size === 'max' ? <PlotView w={w} /> : <PlotSummary w={w} />) },
-    { id: 'outline', label: 'Outline', Icon: ListIcon, fill: true, render: c => (c.size === 'max' ? <ProjectOutline w={w} /> : <OutlineSummary w={w} />) },
+    { id: 'outline', label: 'Outline', Icon: OutlineIcon, fill: true, render: c => (c.size === 'max' ? <ProjectOutline w={w} /> : <OutlineSummary w={w} />) },
     { id: 'plotpoints', label: 'Plotpoints', Icon: QueueIcon, render: () => <PlotpointsTab w={w} /> },
     {
       id: 'schedule', label: 'Schedule', Icon: CalendarIcon, fill: true, surface: false, titleSlot: true, iconSize: 20,
