@@ -205,5 +205,7 @@ export function bookThemeHue(book: { themeHue?: number | null; color?: string | 
 // deriveTokens keeps the zone's look (ink, fills, page).
 export function bookScopeVars(pal: ZonePalette, zone: ZoneKey, role: Role, themeHue: number): ThemeVars {
   const hue = hueOfCode(themeHue)
-  return deriveTokens({ ...pal, theme: { h: hue }, accent: { h: hue } }, role, zone)
+  // The user's own accent (and its ink) is not the level's to change.
+  const { '--user-accent': _accent, '--user-on-accent': _ink, ...scoped } = deriveTokens({ ...pal, theme: { h: hue }, accent: { h: hue } }, role, zone)
+  return scoped
 }

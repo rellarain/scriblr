@@ -50,6 +50,10 @@ export function deriveTokens(pal: ZonePalette, role: Role, zone: ZoneKey): Theme
     '--on-accent': hsl(onAccent.ink),
     // The same ink, for what sits on the accent inside a level (which sets --on-accent to white for the level's own fill).
     '--zone-on-accent': hsl(onAccent.ink),
+    // The user's own accent colour and the ink on it, which a level keeps (bookScopeVars drops them from its re-derived tokens, so inside a level
+    // --accent is the level's colour and these stay the user's): the active tab's fill.
+    '--user-accent': `hsl(${colors.accent.h}, ${colors.accent.s}%, ${colors.accent.l}%)`,
+    '--user-on-accent': hsl(onAccent.ink),
     '--on-alert': hsl(onAlert.ink),
     '--on-accent2': hsl(onAccent2.ink),
     // Which way each fill's hover / dim shades step (away from its text), and the

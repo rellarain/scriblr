@@ -12,7 +12,7 @@ Code: `writer/levels/LevelPanel.tsx`, `WriterLevels.tsx`, `LevelTabs.tsx`, `leve
 
 ## Tabs
 
-At Mid one tab shows at a time; at Max each tab opens or closes a tile on the split grid ([SplitTiles](../SplitTiles/README.md)). The tab strip ends with **Settings** and **Help**. A pressed tab (`.wrTabBtn--on`) is a darker wash of the header, `aria-pressed`. Tab bodies on a light **surface** (editors) use `--surface-side` with the ink, not the level's white.
+At Mid one tab shows at a time; at Max each tab opens or closes a tile on the split grid ([SplitTiles](../SplitTiles/README.md)). The tab strip ends with **Settings** and **Help**. A pressed tab (`.wrTabBtn--on`) is filled with **the user's own accent** (`--user-accent`, ink `--user-on-accent`; the same pair as text on the accent, so the contrast audit's `on-accent/accent` covers it), `aria-pressed`: a level re-derives `--accent` from its own colour, so the level keeps the user's accent in these two variables (`bookScopeVars` leaves them out). Tab bodies on a light **surface** (editors) use `--surface-side` with the ink, not the level's white.
 
 ## Tokens
 

@@ -87,7 +87,7 @@
   .rdLevel .gtScroll { min-height: 520px; padding: 2px 8px 8px; }
   .rdCon { container-type: inline-size; container-name: rdcon; }
   .rdConBody { padding: 14px; display: flex; flex-direction: column; gap: 12px; min-width: 0; }
-  .rdBar { background: var(--rd-wash-lo); .tileTabBar { padding: 2px; gap: 2px; background: transparent; } .tileTabBtn { width: 40px; height: 40px; border-radius: 4px; opacity: 1; &:hover { background: var(--rd-wash); } &--on { background: var(--rd-wash-hi); } } }
+  .rdBar { background: var(--rd-wash-lo); .tileTabBar { padding: 2px; gap: 2px; background: transparent; } .tileTabBtn { width: 40px; height: 40px; border-radius: 4px; opacity: 1; &:hover { background: var(--rd-wash); } &--on { background: var(--user-accent, var(--accent)); color: var(--user-on-accent, var(--zone-on-accent, #fff)); } } }
   .rdEmpty { margin: 0; padding: 18px; font-size: 14px; }
   .rdCard { background: var(--rd-f2); padding: 14px; display: flex; flex-direction: column; gap: 10px; min-width: 0; }
   .rdCardTitle { margin: 0; display: flex; align-items: center; gap: 8px; font-size: 12px; font-weight: 700; letter-spacing: 1.5px; text-transform: uppercase; }

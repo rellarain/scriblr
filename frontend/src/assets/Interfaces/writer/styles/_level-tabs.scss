@@ -18,7 +18,8 @@
   .wrTabBtn {
     display: inline-flex; align-items: center; justify-content: center; width: 30px; height: 30px; padding: 0; border-radius: var(--radius-button); color: inherit; opacity: 0.7;
     &:hover { opacity: 1; background: var(--level-wash); }
-    &--on { opacity: 1; background: var(--ov-sink-2); }
+    // The tab that is open wears the user's own accent (a level keeps it: --user-accent), the ink that reads on it.
+    &--on { opacity: 1; background: var(--user-accent, var(--accent)); color: var(--user-on-accent, var(--zone-on-accent, #fff)); &:hover { background: var(--user-accent, var(--accent)); } }
     &--end { margin-left: var(--space-base); }
     // Where a dragged tab would go.
     &--before { box-shadow: inset 3px 0 0 var(--wr-accent-light); }
