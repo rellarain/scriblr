@@ -27,6 +27,13 @@ export function plotRange(node: PlotNode, byId: Map<string, PlotNode>, projectRa
   return effectiveRange(node.hueRange, node.kind, plotRangeCap(node, byId, projectRange))
 }
 
+// The siblings of a node as far as colour goes: the nodes of its kind measured from the same parent (the categories of a project), the node itself
+// included. A range chosen on one is the range of all of them.
+export function plotHueSiblings(node: PlotNode, byId: Map<string, PlotNode>): PlotNode[] {
+  const parent = plotParentOf(node, byId)?.id ?? null
+  return [...byId.values()].filter(n => n.kind === node.kind && (plotParentOf(n, byId)?.id ?? null) === parent)
+}
+
 // The widest a node's range may be: its parent's range.
 export function plotRangeCap(node: PlotNode, byId: Map<string, PlotNode>, projectRange: number): number {
   const parent = plotParentOf(node, byId)

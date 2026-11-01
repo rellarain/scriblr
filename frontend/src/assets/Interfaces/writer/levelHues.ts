@@ -54,6 +54,20 @@ export function rangeCapOf(node: HueNode, nodes: HueNodes, projectRange: number)
   return parent.kind === 'series' ? rangeCapOf(parent, nodes, projectRange) : levelRange(parent, nodes, projectRange)
 }
 
+// The node a colour is measured from: its nearest ancestor that has a colour (a series has none), or null for what hangs from the project.
+function hueParentId(node: HueNode, nodes: HueNodes): string | null {
+  let parent = node.parentId ? nodes.get(node.parentId) : undefined
+  for (let guard = 0; parent && parent.kind === 'series' && guard < 8; guard += 1) parent = parent.parentId ? nodes.get(parent.parentId) : undefined
+  return parent ? parent.id : null
+}
+
+// The siblings of a node as far as colour goes: the nodes of its kind measured from the same parent (the books of a project, whatever series
+// they stand in), the node itself included. A range chosen on one is the range of all of them.
+export function hueSiblings<T extends HueNode>(node: T, nodes: Map<string, T>): T[] {
+  const parent = hueParentId(node, nodes)
+  return [...nodes.values()].filter(n => n.kind === node.kind && hueParentId(n, nodes) === parent)
+}
+
 // The hue for a new node among its siblings: the one in its range farthest from the
 // siblings' hues (and the centre, when it has none yet), so siblings stay distinct.
 export function autoPickHue(centre: number, siblingHues: number[], range: number): number {

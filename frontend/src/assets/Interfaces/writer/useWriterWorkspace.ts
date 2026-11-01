@@ -30,9 +30,9 @@ import { useUndoHistory } from '../../../lib/useUndoHistory'
 import { insertAfter } from '../../../lib/siblingOrder'
 import { effectiveRange, fillColorCss, hueOfCode, outlineSat, ownBookHue } from '../../../theme/bookColors'
 import { useThemeState } from '../../../theme/useTheme'
-import { autoPickHue, defaultProjectHue, dropSeriesHues, fitToParent, hueCentre, levelHue, levelRange, levelTint, rangeCapOf, reconcileHues } from './levelHues'
+import { autoPickHue, defaultProjectHue, dropSeriesHues, fitToParent, hueCentre, hueSiblings, levelHue, levelRange, levelTint, rangeCapOf, reconcileHues } from './levelHues'
 import type { HueSliderValue } from './HueSlider'
-import { plotParentOf, plotRange, plotRangeCap, reconcilePlotHues, shownPlotHue } from './plotHues'
+import { plotHueSiblings, plotParentOf, plotRange, plotRangeCap, reconcilePlotHues, shownPlotHue } from './plotHues'
 
 type AsyncStatus = 'idle' | 'loading' | 'error'
 
@@ -681,18 +681,24 @@ export function useWriterWorkspace() {
   }
 
   // Sets how far a book's, arc's or chapter's colour may sit from its parent's hue (30, 60, 90, 120, 180 or 360 degrees either side; held to its
-  // parent's range). Its own hue is pulled into the new window, and what is under it follows. At 360 there is no parent to follow: a node that was
-  // inheriting keeps the hue it was showing as its own.
+  // parent's range), for it and all its siblings (the nodes of its kind under the same parent). Each one's own hue is pulled into the new window,
+  // and what is under it follows. At 360 there is no parent to follow: a node that was inheriting keeps the hue it was showing as its own.
   function setNodeHueRange(nodeId: string, range: number) {
     const prev = outlineNodesRef.current
     const target = prev.find(n => n.id === nodeId)
     if (!target || (target.kind !== 'book' && target.kind !== 'arc' && target.kind !== 'chapter')) return
     const map = new Map(prev.map(n => [n.id, n]))
+    // (The siblings share a parent, so one cap holds for all.)
     const value = Math.min(range, rangeCapOf(target, map, projectRangeRef.current))
-    const own = target.kind === 'book' ? ownBookHue(target) : target.themeHue ?? null
-    const hue = own != null ? fitToParent(Math.round(own), hueCentre(target, map, projectHueRef.current), value) : value >= 360 ? Math.round(levelHue(target, map, projectHueRef.current)) : null
-    const next = prev.map(n => (n.id === nodeId ? { ...n, hueRange: value, themeHue: hue } : n))
-    commitOutline(reconcileHues(next, projectHueRef.current, nodeId, projectRangeRef.current), false)
+    const siblings = new Set(hueSiblings(target, map).map(n => n.id))
+    const next = prev.map(n => {
+      if (!siblings.has(n.id)) return n
+      const own = n.kind === 'book' ? ownBookHue(n) : n.themeHue ?? null
+      const hue = own != null ? fitToParent(Math.round(own), hueCentre(n, map, projectHueRef.current), value) : value >= 360 ? Math.round(levelHue(n, map, projectHueRef.current)) : null
+      return { ...n, hueRange: value, themeHue: hue }
+    })
+    // What is under each of them is held in its turn (nothing else is touched).
+    commitOutline([...siblings].reduce((nodes, id) => reconcileHues(nodes, projectHueRef.current, id, projectRangeRef.current), next), false)
   }
 
   // Turns Inherit on (the node has no colour of its own: it shows, and follows, its parent's) or off (the hue it was showing becomes its own).
@@ -871,8 +877,9 @@ export function useWriterWorkspace() {
     commitPlot(reconcilePlotHues(prev.map(n => (n.id === nodeId ? { ...n, hue: value } : n)), nodeId, projectRangeRef.current, projectHueRef.current), false)
   }
 
-  // Sets how far a category's, subcategory's or cluster's colour may sit from its parent's hue (held to its parent's range). Its own hue is pulled into
-  // the new window and what is under it follows. At 360 a node that was inheriting keeps the hue it was showing as its own.
+  // Sets how far a category's, subcategory's or cluster's colour may sit from its parent's hue (held to its parent's range), for it and all its siblings
+  // (the nodes of its kind under the same parent). Each one's own hue is pulled into the new window and what is under it follows. At 360 a node that
+  // was inheriting keeps the hue it was showing as its own.
   function setPlotHueRange(nodeId: string, range: number) {
     const prev = plotNodesRef.current
     const target = prev.find(n => n.id === nodeId)
@@ -881,8 +888,13 @@ export function useWriterWorkspace() {
     const value = Math.min(range, plotRangeCap(target, byId, projectRangeRef.current))
     const parent = plotParentOf(target, byId)
     const centre = parent ? shownPlotHue(parent, byId, projectHueRef.current) : projectHueRef.current
-    const hue = target.hue != null ? fitToParent(target.hue, hueOfCode(centre), value) : value >= 360 ? Math.round(shownPlotHue(target, byId, projectHueRef.current)) : null
-    commitPlot(reconcilePlotHues(prev.map(n => (n.id === nodeId ? { ...n, hueRange: value, hue } : n)), nodeId, projectRangeRef.current, projectHueRef.current), false)
+    const siblings = new Set(plotHueSiblings(target, byId).map(n => n.id))
+    const next = prev.map(n => {
+      if (!siblings.has(n.id)) return n
+      const hue = n.hue != null ? fitToParent(n.hue, hueOfCode(centre), value) : value >= 360 ? Math.round(shownPlotHue(n, byId, projectHueRef.current)) : null
+      return { ...n, hueRange: value, hue }
+    })
+    commitPlot([...siblings].reduce((nodes, id) => reconcilePlotHues(nodes, id, projectRangeRef.current, projectHueRef.current), next), false)
   }
 
   // Turns Inherit on (no colour of its own: it shows, and follows, its parent's) or off (the hue it was showing becomes its own).

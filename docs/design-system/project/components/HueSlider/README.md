@@ -29,7 +29,7 @@ A range is how far from its parent's hue (degrees either side) a colour may go: 
 | Account theme hues | 360, **locked** | none |
 
 - **Never wider than the parent's range.** The range button offers none above it: a 180 parent offers up to 180 and never 360; a 360 parent offers all six. Narrowing a parent **lowers its descendants' ranges** to at most that, and pulls their own hues inside the new windows, top down.
-- **Changing a node's range refits its own hue** into the new window (widening never moves anything).
+- **A range is the range of every sibling**: choosing it on one node sets it on all the nodes of its kind measured from the same parent (the chapters of an arc, the arcs of a book, the books of a project, the categories, the subcategories of a category). Each one's own hue is refitted into the new window (widening never moves anything).
 - **At 180 the track is centred on the parent's hue** (the parent in the middle, running through the wrap); **at 360 it runs from 0 (red)**. A node with a range of 180 or 360 is never moved when its parent changes (the window already covers every hue). Choosing 360 while inheriting turns Inherit off first, keeping the hue it showed.
 - A series has no colour and no slider. The **account's theme hues** (the theme editor) are the bare track: locked at 360, no toggle, chip or range button.
 

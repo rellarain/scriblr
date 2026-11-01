@@ -666,3 +666,36 @@ describe('useWriterWorkspace: the range and inherit of a plot colour', () => {
     expect(get('cat')?.hue).toBe(wrapHue(result.current.projectHue + 30))
   })
 })
+
+describe('useWriterWorkspace: a plot range is the range of every sibling', () => {
+  it('sets the range of a category on the other categories, and of a cluster on the clusters of its subcategory only', async () => {
+    const { result, get } = await opened()
+    let other = ''
+    let c1 = ''
+    let c2 = ''
+    let c3 = ''
+    act(() => { other = result.current.addPlotNode(null, 'category') })
+    act(() => { c1 = result.current.addPlotNode('sub', 'cluster') })
+    act(() => { c2 = result.current.addPlotNode('sub', 'cluster') })
+    act(() => { c3 = result.current.addPlotNode(other, 'cluster') })
+    act(() => { result.current.setPlotHueRange('cat', 120) })
+    expect([get('cat')?.hueRange, get(other)?.hueRange]).toEqual([120, 120])
+    act(() => { result.current.setPlotHueRange(c1, 30) })
+    expect([get(c1)?.hueRange, get(c2)?.hueRange]).toEqual([30, 30])
+    expect(get(c3)?.hueRange).toBeUndefined() // under another category
+    expect(get('sub')?.hueRange).toBeUndefined() // a subcategory is not a cluster's sibling
+  })
+
+  it('pulls each sibling\'s own hue into the narrower window', async () => {
+    const { result, get } = await opened()
+    const project = result.current.projectHue
+    let other = ''
+    act(() => { other = result.current.addPlotNode(null, 'category') })
+    act(() => { result.current.setPlotHueRange('cat', 90) })
+    act(() => { result.current.setPlotHue('cat', project + 90) })
+    act(() => { result.current.setPlotHue(other, project - 90) })
+    act(() => { result.current.setPlotHueRange(other, 30) })
+    expect(get('cat')?.hue).toBe(wrapHue(project + 30))
+    expect(get(other)?.hue).toBe(wrapHue(project - 30))
+  })
+})

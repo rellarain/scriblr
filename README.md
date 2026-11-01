@@ -626,7 +626,7 @@ mounted it; it remains in git history.
   saved by an older version is cleared when the outline is next saved). The plot's categories are within 90° of the project's hue,
   subcategories within 60° of their category and clusters within 30° of their subcategory (`plotHues.ts`). Those are the **defaults**
   (`HUE_RANGES` in `theme/bookColors.ts`): each node can choose its own range (`hueRange`: 30, 60, 90, 120, 180 or 360, held to its
-  parent's range; the project's is measured from the app theme's hue), and a node can **inherit** (no hue of its own: it shows, and
+  parent's range, and set on all its siblings at once, `hueSiblings` / `plotHueSiblings`; the project's is measured from the app theme's hue), and a node can **inherit** (no hue of its own: it shows, and
   follows, its parent's; not at 360). The slider (`writer/HueSlider.tsx`) is the Inherit toggle, a chip with the hue's degrees, the
   track and the range button; the workspace hands out each one's values (`hueSliderOf`, `plotHueSliderOf`, `projectHueSlider`) and the
   setters that keep the rest in line (`setNodeHueRange`, `setNodeInherit`, `setPlotHueRange`, `setPlotInherit`, `setProjectHueRange`,

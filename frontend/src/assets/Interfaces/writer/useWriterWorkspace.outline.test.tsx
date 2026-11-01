@@ -464,3 +464,49 @@ describe('useWriterWorkspace: the project\'s own range and inherit', () => {
     expect(backend.saved.settings.at(-1)).toMatchObject({ hueRange: 90, hueInherit: true })
   })
 })
+
+describe('useWriterWorkspace: a range is the range of every sibling', () => {
+  it('sets the range of a chapter on the chapters beside it, and pulls their own hues into the new window', async () => {
+    const { result, get } = await opened()
+    const project = result.current.projectHue
+    act(() => { result.current.setNodeHueRange('b1', 360) })
+    act(() => { result.current.setNodeHueRange('c1', 120) })
+    expect([get('c1')?.hueRange, get('c2')?.hueRange]).toEqual([120, 120])
+    act(() => { result.current.setNodeHue('c1', project + 100) })
+    act(() => { result.current.setNodeHue('c2', project - 100) })
+    act(() => { result.current.setNodeHueRange('c2', 30) })
+    expect([get('c1')?.hueRange, get('c2')?.hueRange]).toEqual([30, 30])
+    expect(get('c1')?.themeHue).toBe(wrapHue(project + 30))
+    expect(get('c2')?.themeHue).toBe(wrapHue(project - 30))
+  })
+
+  it('touches no node that is not a sibling: another kind, another parent', async () => {
+    const outline = [
+      outlineNode('b1', 'book', null, 'Book one'), outlineNode('b2', 'book', null, 'Book two', 1),
+      outlineNode('a1', 'arc', 'b1', 'Arc'), outlineNode('c1', 'chapter', 'a1', 'In the arc'),
+      outlineNode('c2', 'chapter', 'b1', 'Straight under the book', 1), outlineNode('c3', 'chapter', 'b2', 'Other book'),
+    ]
+    const backend = standInBackend({ p1: { index: projectIndex('p1', 'First'), outline, plot: [] } })
+    const hook = renderHook(() => useWriterWorkspace())
+    await waitFor(() => expect(hook.result.current.projects).toHaveLength(1))
+    await act(async () => { await hook.result.current.openProject('p1') })
+    await waitFor(() => expect(hook.result.current.outlineStatus).toBe('idle'))
+    expect(backend).toBeTruthy()
+    const get = (id: string) => hook.result.current.outlineNodes.find(n => n.id === id)
+    act(() => { hook.result.current.setNodeHueRange('b2', 30) })
+    expect([get('b1')?.hueRange, get('b2')?.hueRange]).toEqual([30, 30]) // the books of the project
+    act(() => { hook.result.current.setNodeHueRange('a1', 30) })
+    expect(get('a1')?.hueRange).toBe(30)
+    expect(get('c1')?.hueRange).toBeUndefined() // under the arc: not its sibling
+    expect(get('c2')?.hueRange).toBeUndefined() // under the book, a different kind of node from the arc
+    act(() => { hook.result.current.setNodeHueRange('c2', 30) })
+    expect(get('c3')?.hueRange).toBeUndefined() // another book's chapter
+  })
+
+  it('has every sibling inherit at 360 keep the hue it showed as its own', async () => {
+    const { result, get } = await opened()
+    act(() => { result.current.setNodeHueRange('b1', 360) })
+    act(() => { result.current.setNodeHueRange('c1', 360) })
+    expect([get('c1')?.themeHue, get('c2')?.themeHue]).toEqual([result.current.projectHue, result.current.projectHue])
+  })
+})
