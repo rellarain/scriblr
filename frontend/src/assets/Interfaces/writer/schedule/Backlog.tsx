@@ -3,6 +3,8 @@ import { type Planner, type PlanItem, type Recurrence, type Routine } from '../.
 import { addUnits, routineWindow, type RoutineWindow } from '../../../../lib/recurrence'
 import { addDays } from '../../../../lib/projection'
 import { newId } from './ids'
+import { IconBtn } from './IconBtn'
+import { CheckIcon, CloseIcon, PauseIcon, PlayIcon, PlusIcon, RestoreIcon } from '../../../icons'
 
 // Everything waiting for a place: tasks not on a shift (drag one onto a shift to assign it) and the routines, grouped by where they stand today. A
 // routine that comes round after an interval with a range (every 7-10 days) is low priority and tickable inside its range, and goes to the top once
@@ -80,8 +82,8 @@ export function Backlog({
           </label>
           {tag && <span className={`wrSchedTag${r.w.state === 'overdue' ? ' wrSchedTag--priority' : ''}`}>{tag(r)}</span>}
           {r.w.state === 'paused'
-            ? <button type="button" className="wrSmallBtn" onClick={() => resume(r)} aria-label={`Resume ${r.routine.label}`}>Resume</button>
-            : <button type="button" className="wrSmallBtn" onClick={() => pause(r, 1)} aria-label={`Pause ${r.routine.label} for a week`}>Pause 1 wk</button>}
+            ? <IconBtn Icon={PlayIcon} label={`Resume ${r.routine.label}`} onClick={() => resume(r)} />
+            : <IconBtn Icon={PauseIcon} label={`Pause ${r.routine.label} for a week`} onClick={() => pause(r, 1)} />}
         </div>
       ))}
     </div>
@@ -102,7 +104,7 @@ export function Backlog({
                 <input type="checkbox" aria-label={item.label} onChange={e => { if (e.target.checked) { update(ownerId, p => ({ ...p, items: p.items.map(x => (x.id === item.id ? { ...x, doneOn: today } : x)) })); onTick(ownerId, item.id, true) } }} />
                 <span><b>{item.label}</b><small>Drag onto a shift{multi ? ` · ${owners.find(o => o.id === ownerId)?.label}` : ''}</small></span>
               </label>
-              <button type="button" className="wrSmallBtn" aria-label={`Delete ${item.label}`} onClick={() => update(ownerId, p => ({ ...p, items: p.items.filter(x => x.id !== item.id) }))}>×</button>
+              <IconBtn Icon={CloseIcon} label={`Delete ${item.label}`} onClick={() => update(ownerId, p => ({ ...p, items: p.items.filter(x => x.id !== item.id) }))} />
             </div>
           ))}
         </div>
@@ -118,9 +120,9 @@ export function Backlog({
         )}
         <div className="wrKv">
           <input className="wrField" aria-label="New task" placeholder="Add a task…" value={text} onChange={e => setText(e.target.value)} onKeyDown={e => { if (e.key === 'Enter') addTask() }} />
-          <button type="button" className="wrSmallBtn" onClick={addTask} disabled={!text.trim()}>Add</button>
+          <IconBtn Icon={PlusIcon} label="Add task" onClick={addTask} disabled={!text.trim()} />
         </div>
-        <button type="button" className="wrSmallBtn" aria-expanded={adding} onClick={() => setAdding(!adding)}>+ Routine</button>
+        <IconBtn Icon={RestoreIcon} label="Add a routine" aria-expanded={adding} onClick={() => setAdding(!adding)} />
         {adding && (
           <form className="wrSchedForm" aria-label="New routine" onSubmit={e => { e.preventDefault(); addRoutine() }}>
             <input className="wrField" aria-label="Routine" placeholder="Back up the project…" value={routine.label} onChange={e => setRoutine({ ...routine, label: e.target.value })} />
@@ -134,7 +136,7 @@ export function Backlog({
                 <select className="wrField" aria-label="Unit" value={routine.unit} onChange={e => setRoutine({ ...routine, unit: e.target.value as Recurrence['unit'] })}><option value="day">days</option><option value="week">weeks</option><option value="month">months</option></select>
               </div>
             )}
-            <button type="submit" className="wrSmallBtn wrSmallBtn--accent" disabled={!routine.label.trim()}>Add routine</button>
+            <IconBtn type="submit" Icon={CheckIcon} label="Add routine" className="wrSmallBtn wrSmallBtn--accent" disabled={!routine.label.trim()} />
           </form>
         )}
       </div>

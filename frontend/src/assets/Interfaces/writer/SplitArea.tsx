@@ -19,6 +19,8 @@ export interface SplitTile {
   children: ReactNode
   // Controls at the right end of the title bar (a tile's toggles).
   titleExtras?: ReactNode
+  // The size of this tile's grip and icon in its title bar, when not the area's.
+  iconSize?: number
   // Extra classes on the tile and on its body (the level's own look: a surface, a page).
   className?: string
   bodyClassName?: string
@@ -41,7 +43,7 @@ const ARROWS: Record<string, Direction> = { ArrowLeft: 'left', ArrowRight: 'righ
 // use the arrow keys) to resize the two tiles it separates. Alt+arrows on a focused title bar swap the tile
 // with its neighbour. Where each tile sits is remembered per `gridId` with the other saved settings; a tile
 // that opens is grafted onto the tree and one that closes is pruned from it. Under 400px the tiles stack.
-export function SplitArea({ gridId, tiles, label, defaultTree, onFocusTile }: {
+export function SplitArea({ gridId, tiles, label, defaultTree, onFocusTile, iconSize }: {
   gridId: string
   tiles: SplitTile[]
   label?: string
@@ -49,6 +51,8 @@ export function SplitArea({ gridId, tiles, label, defaultTree, onFocusTile }: {
   onFocusTile?: (id: string) => void
   // Where the tiles sit before the user has moved any (otherwise they split the area evenly).
   defaultTree?: SplitNode
+  // The size of the grip and the tab's icon in a title bar (13 and 14 until a console wants them larger).
+  iconSize?: number
 }) {
   const layout = useSplitLayout(gridId, tiles.map(t => ({ id: t.id, defaultShape: 'mid' as const })), defaultTree)
   const [scrollRef, size] = useContainerSize<HTMLDivElement>()
@@ -169,7 +173,7 @@ export function SplitArea({ gridId, tiles, label, defaultTree, onFocusTile }: {
                 className="wrTabTileTitle" draggable tabIndex={0} title="Drag to move this tile (Alt+arrows to swap it)"
                 onDragStart={e => onDragStart(e, t.id)} onDragEnd={endDrag}
               >
-                <GripIcon size={13} />{t.Icon && <t.Icon size={14} />} {t.title}
+                <GripIcon size={t.iconSize ?? iconSize ?? 13} />{t.Icon && <t.Icon size={t.iconSize ?? iconSize ?? 14} />} {t.title}
                 {t.titleExtras && <span className="wrTabTileTitleExtras">{t.titleExtras}</span>}
               </h3>
               <div className={`wrTabTileBody${t.bodyClassName ? ` ${t.bodyClassName}` : ''}`}>{t.children}</div>

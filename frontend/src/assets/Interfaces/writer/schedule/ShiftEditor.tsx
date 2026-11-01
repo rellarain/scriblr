@@ -2,6 +2,8 @@ import { useState } from 'react'
 import { FACETS, FACET_LABEL, FACET_UNIT, SLOTS_PER_DAY, slotTime, type Facet, type PlanItem, type Shift } from '../../../../lib/facets'
 import type { EditScope } from '../../../../lib/shiftEdit'
 import { newId } from './ids'
+import { IconBtn } from './IconBtn'
+import { BookmarkIcon, CheckIcon, CloseIcon, PauseIcon, PlusIcon, TrashIcon } from '../../../icons'
 
 // The editor for one shift: its title, facet, time, target, what it repeats on, pauses, and the checklist items assigned to it (ticked for the day it
 // is opened on). A shift that repeats asks whether a change is for this day, this and the following, or all of them.
@@ -63,7 +65,7 @@ export function ShiftEditor({ shift, occurrence, isNew, items, ticks, targets, o
       className="wrSchedEditor" aria-label={isNew ? 'New shift' : 'Edit shift'}
       onSubmit={e => { e.preventDefault(); if (valid) onSave({ ...s, title: s.title.trim() }, list, scope) }}
     >
-      <div className="wrSchedHead"><h3 className="wrSchedSub">{isNew ? 'New shift' : 'Shift'}</h3><span className="wrSchedSpacer" /><button type="button" className="wrSmallBtn" onClick={onClose}>Close</button></div>
+      <div className="wrSchedHead"><h3 className="wrSchedSub">{isNew ? 'New shift' : 'Shift'}</h3><span className="wrSchedSpacer" /><IconBtn Icon={CloseIcon} label="Close" onClick={onClose} /></div>
       <label className="wrKv"><span>Title</span><input className="wrField" aria-label="Title" value={s.title} onChange={e => set({ title: e.target.value })} autoFocus /></label>
       <label className="wrKv"><span>Facet</span>
         <select className="wrField" aria-label="Facet" value={s.facet} onChange={e => set({ facet: e.target.value as Facet })}>{FACETS.map(f => <option key={f} value={f}>{FACET_LABEL[f]}</option>)}</select>
@@ -103,10 +105,10 @@ export function ShiftEditor({ shift, occurrence, isNew, items, ticks, targets, o
           <label className="wrKv"><span>Until</span><input className="wrField" type="date" aria-label="Until" value={s.recurrence.until ?? ''} onChange={e => set({ recurrence: { ...(s.recurrence as NonNullable<Shift['recurrence']>), until: e.target.value || null } })} /></label>
           <div className="wrSchedPauses">
             <span className="wrMuted">Paused</span>
-            {s.pauses.map((p, i) => <span key={`${p.start}${i}`} className="wrSchedPause">{p.start} to {p.end}<button type="button" aria-label={`Remove pause ${p.start}`} onClick={() => set({ pauses: s.pauses.filter((_, j) => j !== i) })}>×</button></span>)}
+            {s.pauses.map((p, i) => <span key={`${p.start}${i}`} className="wrSchedPause">{p.start} to {p.end}<IconBtn Icon={CloseIcon} className="" label={`Remove pause ${p.start}`} onClick={() => set({ pauses: s.pauses.filter((_, j) => j !== i) })} /></span>)}
             <input className="wrField" type="date" aria-label="Pause from" value={pause.start} onChange={e => setPause({ ...pause, start: e.target.value })} />
             <input className="wrField" type="date" aria-label="Pause to" value={pause.end} onChange={e => setPause({ ...pause, end: e.target.value })} />
-            <button type="button" className="wrSmallBtn" disabled={!pause.start || !pause.end || pause.end < pause.start} onClick={() => { set({ pauses: [...s.pauses, pause] }); setPause({ start: '', end: '' }) }}>Pause</button>
+            <IconBtn Icon={PauseIcon} label="Add pause" disabled={!pause.start || !pause.end || pause.end < pause.start} onClick={() => { set({ pauses: [...s.pauses, pause] }); setPause({ start: '', end: '' }) }} />
           </div>
         </>
       )}
@@ -114,7 +116,7 @@ export function ShiftEditor({ shift, occurrence, isNew, items, ticks, targets, o
       {mine.map(i => (
         <div key={i.id} className="wrSchedCheck">
           <label><input type="checkbox" checked={ticks.includes(i.id)} onChange={e => onTick(i.id, e.target.checked)} /> {i.label}</label>
-          <button type="button" className="wrSmallBtn" aria-label={`Unassign ${i.label}`} onClick={() => setList(list.map(x => (x.id === i.id ? { ...x, shiftId: null } : x)))}>Unassign</button>
+          <IconBtn Icon={CloseIcon} label={`Unassign ${i.label}`} onClick={() => setList(list.map(x => (x.id === i.id ? { ...x, shiftId: null } : x)))} />
         </div>
       ))}
       {free.length > 0 && (
@@ -126,7 +128,7 @@ export function ShiftEditor({ shift, occurrence, isNew, items, ticks, targets, o
       )}
       <div className="wrKv">
         <input className="wrField" aria-label="New checklist item" placeholder="Add an item…" value={added} onChange={e => setAdded(e.target.value)} onKeyDown={e => { if (e.key === 'Enter') { e.preventDefault(); add() } }} />
-        <button type="button" className="wrSmallBtn" onClick={add} disabled={!added.trim()}>Add</button>
+        <IconBtn Icon={PlusIcon} label="Add item" onClick={add} disabled={!added.trim()} />
       </div>
       {repeating && (
         <fieldset className="wrSchedScope"><legend>Change</legend>
@@ -136,10 +138,10 @@ export function ShiftEditor({ shift, occurrence, isNew, items, ticks, targets, o
         </fieldset>
       )}
       <div className="wrSchedFormActions">
-        {!isNew && <button type="button" className="wrSmallBtn" onClick={() => onDelete(scope)}>{repeating && scope === 'this' ? 'Skip this day' : 'Delete'}</button>}
-        <button type="button" className="wrSmallBtn" onClick={() => onTemplate(s)}>Save as template</button>
+        {!isNew && <IconBtn Icon={TrashIcon} label={repeating && scope === 'this' ? 'Skip this day' : 'Delete'} onClick={() => onDelete(scope)} />}
+        <IconBtn Icon={BookmarkIcon} label="Save as template" onClick={() => onTemplate(s)} />
         <span className="wrSchedSpacer" />
-        <button type="submit" className="wrSmallBtn wrSmallBtn--accent" disabled={!valid}>Save shift</button>
+        <IconBtn type="submit" Icon={CheckIcon} label="Save shift" className="wrSmallBtn wrSmallBtn--accent" disabled={!valid} />
       </div>
     </form>
   )

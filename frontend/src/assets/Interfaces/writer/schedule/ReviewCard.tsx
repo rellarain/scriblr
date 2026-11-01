@@ -2,6 +2,8 @@ import { FACET_LABEL, unitOf } from '../../../../lib/facets'
 import type { DayTotals } from '../../../../lib/facets'
 import { review, type ReviewPeriod } from '../../../../lib/review'
 import { useStoredState } from '../shared'
+import { ViewMonthIcon, ViewWeekIcon } from '../../../icons'
+import { ICON_PX } from './IconBtn'
 
 // A week or a month in review: each facet's total against the period before, and how many days had any work.
 
@@ -13,8 +15,8 @@ export function ReviewCard({ daily, today }: { daily: Record<string, DayTotals>;
       <div className="wrSchedHead">
         <span className="wrSchedSpacer" />
         <div className="wrSchedSeg" role="group" aria-label="Review period">
-          <button type="button" className={period === 'week' ? 'on' : ''} aria-pressed={period === 'week'} onClick={() => setPeriod('week')}>Week</button>
-          <button type="button" className={period === 'month' ? 'on' : ''} aria-pressed={period === 'month'} onClick={() => setPeriod('month')}>Month</button>
+          <button type="button" className={period === 'week' ? 'on' : ''} aria-pressed={period === 'week'} aria-label="Week" title="Week" onClick={() => setPeriod('week')}><ViewWeekIcon size={ICON_PX} /></button>
+          <button type="button" className={period === 'month' ? 'on' : ''} aria-pressed={period === 'month'} aria-label="Month" title="Month" onClick={() => setPeriod('month')}><ViewMonthIcon size={ICON_PX} /></button>
         </div>
       </div>
       <p className="wrMuted">{r.from} to {r.to} · worked on {r.activeDays} {r.activeDays === 1 ? 'day' : 'days'}</p>

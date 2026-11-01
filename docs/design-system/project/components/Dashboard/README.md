@@ -41,6 +41,8 @@ Before the 12 months, each older month is a **bar**, stacked by facet (each face
 
 ## The schedule
 
+- **The tile is full height.** The day and week timeline (and the month grid) stretch to the height of the Schedule tile and scroll inside it; there is no fixed height. The timeline has **a row for every 10-minute slot** (144 a day, 20px each), each labelled with its time ("6:10 AM") on **one line**, never wrapped; the whole hours are brighter and bold, with a stronger line above them. It opens at 6 AM.
+
 - **Shifts** are blocks on a day, snapped to 10 minutes. Drag across empty time to make one; drag a block to move it (across days in the week view) or its top or bottom edge to resize it; click it, or press Enter on it, to edit it; right-click, or press and hold on a touch screen, for **Edit, Duplicate, Skip this day, Delete**.
 - A shift that repeats asks **This day, This and following, or All of them** when it is changed.
 - **Each ten minutes is judged by itself.** A slot is *done* when its shift's facet logged something in it and *missed* when not; a thin strip down the block's right edge shows each slot (solid, or hatched when missed). The block says **Upcoming, In progress, Done, Partly done** or **Missed** in words.
@@ -52,6 +54,10 @@ Before the 12 months, each older month is a **bar**, stacked by facet (each face
 ## Tokens
 
 The console sits on the level it belongs to, so it uses the **level's tokens** like the other tabs ([level colours](../../level-colours.md)): the Schedule tab itself is on the level's fill like every other console (never the light surface), the console's tiles are one step deeper on `--wr-fill-3`, and a card, a day column, a shift's card behind it, a tile's title bar, a header, a chosen button's text and a menu are on `--wr-fill-4`; text in `--level-ink` (white) and `--level-ink-soft`; lines in `--level-line`, a button's wash in `--level-wash`; a field in `--level-input`, `--level-input-ink` and `--level-input-hint`; `--wr-f-*` for the facets. A chosen button, today's head and a Priority tag are inverted (`--level-ink` with `--wr-fill-4` for the text). The grid's shades are four OKLCH steps of `--cal-src` (the day's leading facet colour, else the accent hue); the lowest is audited at 3:1 on the tile in every hue. Text is 12px or 13px; 11px is for a shift's time only. The facet pairs are in the [contrast audit](../../contrast.md) (group *Schedule*), the rest in *Level panels*.
+
+## Buttons are icons
+
+Every button in the console is an **icon** (`IconBtn`: the icon at **20px, never smaller**, in a **26px square**, its name as the accessible label and the tooltip). **All icon buttons are the same square**, in the title bars and the tiles alike (the `%` and `#` of the shade rule too); an icon is never squeezed under 20px by a flex box, and the grips and icons of the title bars of the console's own tiles and of the Schedule tab's tile are 20px as well: the gear for Settings; plus for a new goal, shift, task or rest days; a calendar page for Today; chevrons for Previous and Next; day, week, month and list icons for the calendar's views and week and month icons for the Review's; a pencil, a trash can, a tick and a cross for edit, remove, save and cancel; play and pause for a routine; an export arrow and a printer for the settings' export and print. Only a **choice that has no picture** stays text: the three answers to "Change which shifts?" (This day, This and following, All of them), the weekday letters, the context menu's items, the facet toggles (a colour dot and the facet's name) and a shift template's own name.
 
 ## Don't
 

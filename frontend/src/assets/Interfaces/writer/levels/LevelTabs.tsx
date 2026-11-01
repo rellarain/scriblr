@@ -18,6 +18,8 @@ export interface LevelTab {
   // The tab shows an editor on a light surface of the level's hue, in the ink colour (not the level's own on-accent text). A `fill` tab is on a surface
   // unless it says `surface: false` (the Schedule console is on the level's own fill, like the other consoles).
   surface?: boolean
+  // The size of the grip and the icon in the tab's tile title bar (13 and 14 when not given).
+  iconSize?: number
   // The tab's tile has a slot at the right end of its title bar (TabContext.titleSlot), where the tab puts its own controls.
   titleSlot?: boolean
   // The tab's tile takes the height that is left (an editor that scrolls itself) instead of the height of its content.
@@ -122,6 +124,7 @@ export function useTabbedLevel({ storageKey, tabs, size, defaultOpen, defaultTab
           tiles={shown.map(t => ({
             id: t.id, title: t.label, Icon: t.Icon, children: t.render(ctxOf(t)),
             titleExtras: t.titleSlot ? <span ref={slotRef(t.id)} className="wrTabTileTitleSlot" /> : undefined,
+            iconSize: t.iconSize,
             bodyClassName: [(t.surface ?? t.fill) ? 'wrTabTileBody--surface' : '', t.fill ? 'wrTabTileBody--fill' : ''].filter(Boolean).join(' ') || undefined,
           }))}
         />

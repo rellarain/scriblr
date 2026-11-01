@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState, type DragEvent, type PointerEvent as ReactPointerEvent, type ReactNode } from 'react'
+import { useEffect, useMemo, useRef, useState, type DragEvent, type PointerEvent as ReactPointerEvent, type ComponentType } from 'react'
 import { FACET_LABEL, SLOTS_PER_DAY, slotTime, type ActivityEvent, type Facet, type PlanItem, type Planner, type Shift, type ShiftTemplate } from '../../../../lib/facets'
 import { addDays } from '../../../../lib/projection'
 import { addUnits, shiftOccurrences, type ShiftOccurrence } from '../../../../lib/recurrence'
@@ -9,6 +9,8 @@ import { useStoredState } from '../shared'
 import { DRAG_ITEM } from './Backlog'
 import { newId } from './ids'
 import { ShiftEditor, type TargetOption } from './ShiftEditor'
+import { ICON_PX, IconBtn } from './IconBtn'
+import { ChevronLeftIcon, ChevronRightIcon, CloseIcon, ListIcon, PlusIcon, TodayIcon, ViewDayIcon, ViewMonthIcon, ViewWeekIcon, type IconProps } from '../../../icons'
 
 // The Schedule: shifts on a day, a week or a month, or listed as an agenda, like a calendar. Drag across empty time to make a shift, drag a shift to
 // move it or its edges to resize it, click it to edit it, right-click (or press and hold) for its menu. The backlog sits beside it.
@@ -17,13 +19,14 @@ export interface ScheduleOwner { id: string; label: string; projectId: string | 
 export interface TicksApi { get: (ownerId: string, date: string) => string[]; load: (ownerId: string, date: string) => void; set: (ownerId: string, date: string, id: string, on: boolean) => void }
 type CalView = 'day' | 'week' | 'month' | 'agenda'
 type Occ = ShiftOccurrence & { ownerId: string }
-const HOUR_PX = 30
-const SLOT_PX = HOUR_PX / 6
+const VIEW_ICON: Record<CalView, ComponentType<IconProps>> = { day: ViewDayIcon, week: ViewWeekIcon, month: ViewMonthIcon, agenda: ListIcon }
+// A row is one 10-minute slot (SLOTS_PER_DAY a day), tall enough for its time label; an hour is six rows.
+const SLOT_PX = 20
+const HOUR_PX = SLOT_PX * 6
 const STATUS_LABEL: Record<ShiftStatus, string> = { upcoming: 'Upcoming', inProgress: 'In progress', done: 'Done', partly: 'Partly done', missed: 'Missed', past: '' }
 const dayName = (d: string, long = false): string => new Date(`${d}T00:00:00Z`).toLocaleDateString('en-US', { weekday: long ? 'long' : 'short', month: 'short', day: 'numeric', timeZone: 'UTC' })
 const monthTitle = (d: string): string => new Date(`${d}T00:00:00Z`).toLocaleDateString('en-US', { month: 'long', year: 'numeric', timeZone: 'UTC' })
 const sinceStart = (d: string, ws: WeekStart): number => { const w = new Date(`${d}T00:00:00Z`).getUTCDay(); return ws === 'monday' ? (w + 6) % 7 : w }
-const hoursLabel = (h: number): string => `${h % 12 === 0 ? 12 : h % 12} ${h < 12 ? 'AM' : 'PM'}`
 
 export function ScheduleCard({
   owners, today, nowSlot, events, weekStart, targets, ticks,
@@ -212,8 +215,8 @@ export function ScheduleCard({
   }
 
   const timeGrid = (
-    <div className="wrSchedGridBox" ref={box}>
-      <div className="wrSchedWeek" style={{ gridTemplateColumns: `44px repeat(${days.length}, minmax(0, 1fr))` }}>
+    <div className="wrSchedGridBox" ref={box} style={{ ['--slot' as string]: `${SLOT_PX}px` }}>
+      <div className="wrSchedWeek" style={{ gridTemplateColumns: `max-content repeat(${days.length}, minmax(0, 1fr))` }}>
         <div />
         {days.map(d => (
           <div key={d} className={`wrSchedDayHead${d === today ? ' wrSchedDayHead--today' : ''}`}>
@@ -221,12 +224,12 @@ export function ScheduleCard({
             {(deadlines.get(d) ?? []).map(t => <span key={t} className="wrSchedDeadline">{t}</span>)}
           </div>
         ))}
-        <div className="wrSchedHours" aria-hidden="true">{Array.from({ length: 24 }, (_, h) => <span key={h} style={{ height: HOUR_PX }}>{h === 0 ? '' : hoursLabel(h)}</span>)}</div>
+        <div className="wrSchedHours" aria-hidden="true">{Array.from({ length: SLOTS_PER_DAY }, (_, i) => <span key={i} className={i % 6 === 0 ? 'wrSchedHour' : undefined}>{slotTime(i)}</span>)}</div>
         {days.map(d => {
           const mine = layoutLanes(occs.filter(o => o.date === d))
           return (
             <div
-              key={d} className="wrSchedCol" ref={el => { cols.current[d] = el }} data-date={d} style={{ height: 24 * HOUR_PX }}
+              key={d} className="wrSchedCol" ref={el => { cols.current[d] = el }} data-date={d} style={{ height: SLOTS_PER_DAY * SLOT_PX }}
               onPointerDown={e => { if (e.target === e.currentTarget && e.button === 0) { const s = slotAt(d, e.clientY); setDragNew({ date: d, a: s, b: s }) } }}
             >
               {dragNew?.date === d && (() => { const r = rangeOf(dragNew.a, dragNew.b); return <div className="wrSchedGhost" style={{ top: r.startSlot * SLOT_PX, height: (r.endSlot - r.startSlot) * SLOT_PX }} /> })()}
@@ -285,15 +288,19 @@ export function ScheduleCard({
   return (
     <div className="wrSchedCard wrSchedSchedule">
       <div className="wrSchedHead">
-        <button type="button" className="wrSmallBtn" onClick={() => setCursor(today)}>Today</button>
-        <button type="button" className="wrSmallBtn" aria-label="Previous" onClick={() => step(-1)}>‹</button>
-        <button type="button" className="wrSmallBtn" aria-label="Next" onClick={() => step(1)}>›</button>
+        <IconBtn Icon={TodayIcon} label="Today" onClick={() => setCursor(today)} />
+        <IconBtn Icon={ChevronLeftIcon} label="Previous" onClick={() => step(-1)} />
+        <IconBtn Icon={ChevronRightIcon} label="Next" onClick={() => step(1)} />
         <strong>{label}</strong>
         <span className="wrSchedSpacer" />
         <div className="wrSchedSeg" role="group" aria-label="Calendar view">
-          {(['day', 'week', 'month', 'agenda'] as CalView[]).map(v => <button key={v} type="button" className={view === v ? 'on' : ''} aria-pressed={view === v} onClick={() => setView(v)}>{v[0].toUpperCase() + v.slice(1)}</button>)}
+          {(['day', 'week', 'month', 'agenda'] as CalView[]).map(v => {
+            const name = v[0].toUpperCase() + v.slice(1)
+            const Icon = VIEW_ICON[v]
+            return <button key={v} type="button" className={view === v ? 'on' : ''} aria-pressed={view === v} aria-label={name} title={name} onClick={() => setView(v)}><Icon size={ICON_PX} /></button>
+          })}
         </div>
-        <button type="button" className="wrSmallBtn wrSmallBtn--accent" onClick={() => openNew(view === 'day' ? cursor : today)}>+ Shift</button>
+        <IconBtn Icon={PlusIcon} label="New shift" className="wrSmallBtn wrSmallBtn--accent" onClick={() => openNew(view === 'day' ? cursor : today)} />
       </div>
       {owners.some(o => o.planner.templates.length > 0) && (
         <div className="wrSchedTools">
@@ -326,7 +333,7 @@ export function ScheduleCard({
           {([['this', 'This day'], ['following', 'This and following'], ['all', 'All of them']] as const).map(([scope, text]) => (
             <button key={scope} type="button" className="wrSmallBtn" onClick={() => { const s = shiftOf(pending.occ); if (s) commit(pending.occ.ownerId, s, pending.occ.date, { ...s, ...pending.patch, date: pending.patch.date ?? pending.occ.date } as Shift, null, scope) }}>{text}</button>
           ))}
-          <button type="button" className="wrSmallBtn" onClick={() => setPending(null)}>Cancel</button>
+          <IconBtn Icon={CloseIcon} label="Cancel" onClick={() => setPending(null)} />
         </div>
       )}
     </div>

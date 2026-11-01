@@ -1,7 +1,8 @@
 import { useState } from 'react'
 import { FACETS, FACET_LABEL, type Facet, type Planner } from '../../../../lib/facets'
 import type { WeekStart } from '../../../../lib/scheduleCalendar'
-import { GearIcon } from '../../../icons'
+import { CloseIcon, ExportIcon, GearIcon, PlusIcon, PrintIcon } from '../../../icons'
+import { ICON_PX, IconBtn } from './IconBtn'
 import { ColorRange } from '../../../../components/ColorRange'
 import { FACET_COLOR } from '../../../../theme/zoneLooks'
 import { newId } from './ids'
@@ -14,7 +15,7 @@ export const DEFAULT_HUES: FacetHues = { outline: 212, plot: 272, draft: 32, rev
 
 // The gear in the console's title bar that opens and closes the settings.
 export function SettingsButton({ open, onToggle }: { open: boolean; onToggle: () => void }) {
-  return <button type="button" className="wrSmallBtn" aria-expanded={open} aria-haspopup="dialog" aria-label="Schedule settings" title="Schedule settings" onClick={onToggle}><GearIcon size={14} /></button>
+  return <button type="button" className="wrSmallBtn" aria-expanded={open} aria-haspopup="dialog" aria-label="Schedule settings" title="Schedule settings" onClick={onToggle}><GearIcon size={ICON_PX} /></button>
 }
 
 export function ScheduleSettings({
@@ -55,18 +56,18 @@ export function ScheduleSettings({
           <h4 className="wrSchedSub">Rest days</h4>
           {planner.restDays.map(r => (
             <div key={r.id} className="wrSchedCheck"><span>{r.label || 'Rest'} · {r.start} to {r.end}</span>
-              <button type="button" className="wrSmallBtn" aria-label={`Remove rest days ${r.start}`} onClick={() => onPlanner({ ...planner, restDays: planner.restDays.filter(x => x.id !== r.id) })}>×</button>
+              <IconBtn Icon={CloseIcon} label={`Remove rest days ${r.start}`} onClick={() => onPlanner({ ...planner, restDays: planner.restDays.filter(x => x.id !== r.id) })} />
             </div>
           ))}
           <div className="wrSchedRest">
             <input className="wrField" aria-label="Rest from" type="date" value={rest.start} onChange={e => setRest({ ...rest, start: e.target.value })} />
             <input className="wrField" aria-label="Rest to" type="date" value={rest.end} onChange={e => setRest({ ...rest, end: e.target.value })} />
             <input className="wrField" aria-label="Rest label" placeholder="Holiday…" value={rest.label} onChange={e => setRest({ ...rest, label: e.target.value })} />
-            <button type="button" className="wrSmallBtn" disabled={!rest.start || !rest.end || rest.end < rest.start} onClick={() => { onPlanner({ ...planner, restDays: [...planner.restDays, { id: newId('rest'), start: rest.start, end: rest.end, label: rest.label }] }); setRest({ start: '', end: '', label: '' }) }}>Add rest days</button>
+            <IconBtn Icon={PlusIcon} label="Add rest days" disabled={!rest.start || !rest.end || rest.end < rest.start} onClick={() => { onPlanner({ ...planner, restDays: [...planner.restDays, { id: newId('rest'), start: rest.start, end: rest.end, label: rest.label }] }); setRest({ start: '', end: '', label: '' }) }} />
           </div>
           <div className="wrSchedFormActions">
-            <button type="button" className="wrSmallBtn" onClick={onIcs}>Export shifts (.ics)</button>
-            <button type="button" className="wrSmallBtn" onClick={onPrint}>Print the week</button>
+            <IconBtn Icon={ExportIcon} label="Export shifts (.ics)" onClick={onIcs} />
+            <IconBtn Icon={PrintIcon} label="Print the week" onClick={onPrint} />
           </div>
     </div>
   )

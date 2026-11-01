@@ -730,3 +730,49 @@ export function LineChartIcon(props: IconProps) {
     <path d="M7 15l4-5 3 3 5-7" />
   </IconBase>
 }
+
+export function PauseIcon(props: IconProps) {
+  return <IconBase {...props}>
+    <rect x="6" y="5" width="4" height="14" />
+    <rect x="14" y="5" width="4" height="14" />
+  </IconBase>
+}
+
+export function PrintIcon(props: IconProps) {
+  return <IconBase {...props}>
+    <path d="M7 9V4h10v5" />
+    <rect x="4" y="9" width="16" height="8" rx="1" />
+    <rect x="7" y="14" width="10" height="6" />
+  </IconBase>
+}
+
+// A calendar page with one day marked: back to today.
+export function TodayIcon(props: IconProps) {
+  return <IconBase {...props}>
+    <rect x="4" y="5" width="16" height="15" rx="1.5" />
+    <path d="M8 3v4M16 3v4M4 10h16" />
+    <circle cx="12" cy="15" r="2" />
+  </IconBase>
+}
+
+// The calendar's views: a day (one column), a week (seven), a month (a grid of days).
+export function ViewDayIcon(props: IconProps) {
+  return <IconBase {...props}>
+    <rect x="4" y="5" width="16" height="15" rx="1.5" />
+    <path d="M4 10h16M12 10v10" />
+  </IconBase>
+}
+
+export function ViewWeekIcon(props: IconProps) {
+  return <IconBase {...props}>
+    <rect x="3" y="5" width="18" height="15" rx="1.5" />
+    <path d="M3 10h18M6.5 10v10M10 10v10M14 10v10M17.5 10v10" />
+  </IconBase>
+}
+
+export function ViewMonthIcon(props: IconProps) {
+  return <IconBase {...props}>
+    <rect x="3" y="4" width="18" height="16" rx="1.5" />
+    <path d="M3 8.5h18M3 12.5h18M3 16.5h18M9 8.5v11.5M15 8.5v11.5" />
+  </IconBase>
+}

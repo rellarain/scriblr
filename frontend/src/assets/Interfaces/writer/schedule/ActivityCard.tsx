@@ -6,6 +6,7 @@ import { useStoredState } from '../shared'
 import { GridViewIcon, LineChartIcon } from '../../../icons'
 import { FacetCalendar } from './FacetCalendar'
 import { LineGraph } from './LineGraph'
+import { ICON_PX } from './IconBtn'
 
 // Activity, as the grid or as lines: the facets to show (several), what the shades are measured against, and the view. The controls are in the tile's
 // title bar (ActivityControls); the chart takes the height of the tile.
@@ -45,8 +46,8 @@ export function ActivityControls({ state }: { state: ActivityState }) {
         </button>
       ))}
       <div className="wrSchedSeg" role="group" aria-label="Chart type">
-        <button type="button" className={view === 'grid' ? 'on' : ''} aria-pressed={view === 'grid'} aria-label="Grid" title="Grid" onClick={() => setView('grid')}><GridViewIcon size={14} /></button>
-        <button type="button" className={view === 'line' ? 'on' : ''} aria-pressed={view === 'line'} aria-label="Line graph" title="Line graph" onClick={() => setView('line')}><LineChartIcon size={14} /></button>
+        <button type="button" className={view === 'grid' ? 'on' : ''} aria-pressed={view === 'grid'} aria-label="Grid" title="Grid" onClick={() => setView('grid')}><GridViewIcon size={ICON_PX} /></button>
+        <button type="button" className={view === 'line' ? 'on' : ''} aria-pressed={view === 'line'} aria-label="Line graph" title="Line graph" onClick={() => setView('line')}><LineChartIcon size={ICON_PX} /></button>
       </div>
       {view === 'grid' && (
         <div className="wrSchedSeg" role="group" aria-label="Shade against">

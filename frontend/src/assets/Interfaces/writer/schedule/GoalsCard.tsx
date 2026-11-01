@@ -3,6 +3,8 @@ import { FACETS, FACET_LABEL, FACET_UNIT, unitOf, type Facet, type Goal, type Pl
 import type { TreeNodeFact } from '../../../../lib/goalFacts'
 import type { GoalProgress, GoalStatus } from '../../../../lib/projection'
 import { newId } from './ids'
+import { IconBtn } from './IconBtn'
+import { CheckIcon, CloseIcon, PencilIcon, PlusIcon, TrashIcon } from '../../../icons'
 
 // Goals for each facet: a daily and a weekly target, a total (with a deadline), for the whole project, a book or a chapter. Each shows how far it
 // is, today's and the week's progress, and whether the pace of the last 28 days makes the deadline.
@@ -65,8 +67,8 @@ function GoalEditor({ goal, nodes, scoped, onSave, onCancel }: { goal: Goal; nod
         <input className="wrField" type="date" aria-label="Deadline" value={g.deadline ?? ''} onChange={e => set({ deadline: e.target.value || null })} />
       </label>
       <div className="wrSchedFormActions">
-        <button type="button" className="wrSmallBtn" onClick={onCancel}>Cancel</button>
-        <button type="submit" className="wrSmallBtn wrSmallBtn--accent" disabled={scoped && g.scope !== 'project' && !g.nodeId}>Save goal</button>
+        <IconBtn Icon={CloseIcon} label="Cancel" onClick={onCancel} />
+        <IconBtn type="submit" Icon={CheckIcon} label="Save goal" className="wrSmallBtn wrSmallBtn--accent" disabled={scoped && g.scope !== 'project' && !g.nodeId} />
       </div>
     </form>
   )
@@ -90,7 +92,7 @@ export function GoalsCard({
     <div className="wrSchedCard wrSchedGoals">
       <div className="wrSchedHead">
         <span className="wrSchedSpacer" />
-        <button type="button" className="wrSmallBtn wrSmallBtn--accent" onClick={() => setEditing({ goal: fresh(), ownerId: owners[0].id, isNew: true })}>+ Goal</button>
+        <IconBtn Icon={PlusIcon} label="New goal" className="wrSmallBtn wrSmallBtn--accent" onClick={() => setEditing({ goal: fresh(), ownerId: owners[0].id, isNew: true })} />
       </div>
       <div className="wrStatRow">{stats.map(s => <div key={s.label}><strong>{s.value}</strong><span>{s.label}</span></div>)}</div>
       {editing && (
@@ -129,8 +131,8 @@ export function GoalsCard({
             )}
             {!p.deadline && p.finishes && p.status !== 'done' && <div className="wrSchedGoalDue wrMuted">At the last 28 days&rsquo; pace: {dateLabel(p.finishes)}</div>}
             <div className="wrSchedGoalActions">
-              <button type="button" className="wrSmallBtn" onClick={() => setEditing({ goal: p.goal, ownerId, isNew: false })}>Edit</button>
-              <button type="button" className="wrSmallBtn" onClick={() => owner(ownerId).setPlanner({ ...owner(ownerId).planner, goals: owner(ownerId).planner.goals.filter(x => x.id !== p.goal.id) })}>Remove</button>
+              <IconBtn Icon={PencilIcon} label="Edit goal" onClick={() => setEditing({ goal: p.goal, ownerId, isNew: false })} />
+              <IconBtn Icon={TrashIcon} label="Remove goal" onClick={() => owner(ownerId).setPlanner({ ...owner(ownerId).planner, goals: owner(ownerId).planner.goals.filter(x => x.id !== p.goal.id) })} />
             </div>
           </div>
         )

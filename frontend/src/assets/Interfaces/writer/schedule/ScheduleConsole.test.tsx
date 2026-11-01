@@ -153,7 +153,7 @@ describe('the Schedule console', () => {
   it('makes a shift from + Shift, repeating on chosen days, and saves the planner', async () => {
     const user = userEvent.setup()
     await open()
-    await user.click(within(tile('schedule')).getByRole('button', { name: '+ Shift' }))
+    await user.click(within(tile('schedule')).getByRole('button', { name: 'New shift' }))
     await user.type(screen.getByLabelText('Title'), 'Evening plot')
     await user.selectOptions(screen.getByLabelText('Facet'), 'plot')
     await user.selectOptions(screen.getByLabelText('Repeats'), 'weekly')
@@ -199,6 +199,29 @@ describe('the Schedule console', () => {
     render(<ScheduleConsole scope="project" projectIds={['p1']} titles={{ p1: 'Saga' }} titleSlot={slot} />)
     expect(within(slot).getByRole('button', { name: 'Schedule settings' })).toBeTruthy()
     slot.remove()
+  })
+
+  it('has no icon smaller than 20px square, in the tiles, their title bars and the settings', async () => {
+    const user = userEvent.setup()
+    await open()
+    await user.click(screen.getByRole('button', { name: 'Schedule settings' }))
+    const icons = [...document.querySelectorAll('.wrSchedConsole svg[viewBox="0 0 24 24"]')]
+    expect(icons.length).toBeGreaterThan(20)
+    for (const icon of icons) {
+      expect(Number(icon.getAttribute('width'))).toBeGreaterThanOrEqual(20)
+      expect(Number(icon.getAttribute('height'))).toBeGreaterThanOrEqual(20)
+    }
+  })
+
+  it('has a row for every 10-minute slot of the day in the timeline, each labelled with its time, the whole hours marked', async () => {
+    await open()
+    const labels = [...tile('schedule').querySelectorAll('.wrSchedHours span')]
+    expect(labels).toHaveLength(144)
+    expect(labels[0].textContent).toBe('12:00 AM')
+    expect(labels[1].textContent).toBe('12:10 AM')
+    expect(labels[75].textContent).toBe('12:30 PM')
+    expect(labels.filter(l => l.classList.contains('wrSchedHour'))).toHaveLength(24)
+    expect(tile('schedule').querySelector('.wrSchedCol')?.getAttribute('style')).toContain(`height: ${144 * 20}px`)
   })
 
   it('switches the schedule to the day, month and agenda views', async () => {

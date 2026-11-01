@@ -31,6 +31,12 @@
   .wrTabTileTitleExtras { margin-left: auto; display: inline-flex; flex-wrap: wrap; align-items: center; justify-content: flex-end; gap: var(--space-2); text-transform: none; letter-spacing: normal; font-weight: 400;
     .wrSchedFacet { padding: 1px var(--space-3); font-size: var(--text-small); }
     .wrSchedSeg button { display: inline-flex; align-items: center; justify-content: center; padding: 1px var(--space-3); font-size: var(--text-small); min-width: 22px; } }
+  // An icon is never squeezed under 20px square, whatever flex box it is in (the icons are the 24-unit ones; a chart's own svg is not).
+  .wrSchedConsole svg[viewBox='0 0 24 24'] { flex: none; min-width: 20px; min-height: 20px; }
+  // A button that is an icon (IconBtn): the icon centred in a small square of its own, the label in its tooltip.
+  .wrIconBtn { display: inline-flex; align-items: center; justify-content: center; padding: var(--space-2); line-height: 0; min-width: 20px; min-height: 20px; }
+  .wrSchedSeg button { display: inline-flex; align-items: center; justify-content: center; }
+  .wrSchedPause .wrIconBtn { background: transparent; border: 0; padding: 0; color: inherit; cursor: pointer; }
   .wrSchedHead { display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-4); }
   .wrSchedSpacer { flex: 1 1 auto; }
   .wrSchedSub { margin: var(--space-5) 0 var(--space-3); font-size: var(--text-ui); font-weight: 800; letter-spacing: 0.06em; text-transform: uppercase; color: var(--level-ink-soft); }
@@ -125,16 +131,23 @@
   .wrSchedBookRow { display: grid; grid-template-columns: minmax(70px, 1fr) 2fr 40px; gap: var(--space-4); align-items: center; margin: var(--space-3) 0; }
 
   // ---- the schedule ----
-  .wrSchedBody { display: flex; min-width: 0; }
-  .wrSchedMain { flex: 1 1 auto; min-width: 0; }
-  .wrSchedGridBox { max-height: 440px; overflow: auto; position: relative; }
+  // The schedule stretches to the height of its tile: the card grows to it, the body to the card, and the timeline (or the month) to the body, scrolling inside it.
+  .wrSchedSchedule { flex: 1 0 auto; }
+  .wrSchedBody { display: flex; min-width: 0; flex: 1 1 auto; min-height: 280px; }
+  .wrSchedMain { flex: 1 1 auto; min-width: 0; display: flex; flex-direction: column; }
+  .wrSchedMain > .wrSchedMonth { flex: 1 1 0; grid-auto-rows: minmax(84px, 1fr); }
+  .wrSchedMain > .wrSchedAgenda { flex: 1 1 0; min-height: 0; overflow: auto; scrollbar-width: none; &::-webkit-scrollbar { display: none; } }
+  .wrSchedGridBox { flex: 1 1 0; min-height: 0; overflow: auto; position: relative; scrollbar-width: none; &::-webkit-scrollbar { display: none; } }
   .wrSchedWeek { display: grid; gap: var(--space-2); }
   .wrSchedDayHead { display: flex; flex-direction: column; align-items: center; gap: 1px; padding: var(--space-3) 0; border-radius: var(--radius-button); background: var(--wr-fill-4); position: sticky; top: 0; z-index: 3; font-size: var(--text-ui);
     button { background: transparent; border: 0; color: inherit; font: inherit; font-size: var(--text-ui); font-weight: 700; cursor: pointer; }
     &--today { background: var(--level-ink); color: var(--wr-fill-4); } }
   .wrSchedDeadline { font-size: var(--text-ui); font-weight: 700; padding: 0 var(--space-4); border: 1px solid var(--level-ink); border-radius: var(--radius-button); }
-  .wrSchedHours { display: flex; flex-direction: column; font-size: var(--text-ui); color: var(--level-ink-soft); text-align: right; padding-right: var(--space-4); span { display: block; transform: translateY(-7px); } }
-  .wrSchedCol { position: relative; touch-action: pan-y; background-color: var(--wr-fill-4); background-image: repeating-linear-gradient(to bottom, var(--level-line) 0, var(--level-line) 1px, transparent 1px, transparent 30px); border-radius: var(--radius-button); }
+  // A label for every 10-minute row, on one line (it never wraps); the whole hours are brighter.
+  .wrSchedHours { display: flex; flex-direction: column; font-size: var(--text-small); color: var(--level-ink-soft); text-align: right; padding-right: var(--space-4); white-space: nowrap;
+    span { display: block; height: var(--slot); line-height: var(--slot); white-space: nowrap; }
+    .wrSchedHour { color: var(--level-ink); font-weight: 700; } }
+  .wrSchedCol { position: relative; touch-action: pan-y; background-color: var(--wr-fill-4); background-image: repeating-linear-gradient(to bottom, var(--level-ink-soft) 0, var(--level-ink-soft) 1px, transparent 1px, transparent calc(var(--slot) * 6)), repeating-linear-gradient(to bottom, var(--level-line) 0, var(--level-line) 1px, transparent 1px, transparent var(--slot)); border-radius: var(--radius-button); }
   .wrSchedGhost { position: absolute; left: 2px; right: 2px; background: var(--level-wash-hi); border: 1px dashed var(--level-ink); border-radius: var(--radius-button); pointer-events: none; }
   .wrSchedNow { position: absolute; left: 0; right: 0; border-top: 2px solid var(--level-ink); pointer-events: none; z-index: 2; }
   // A shift: the facet colour (--wr-bc) as its edge and mixed into the card behind it (14, 26, 20 and 20%; BLOCK_MIX in theme/zoneLooks.ts), white text.
@@ -198,12 +211,19 @@
   // A facet's hue: the app's colour range (a gradient of every hue at the facet colour's own saturation and lightness) beside its name.
   .wrSchedHue { align-items: center; .colorRange { flex: 1 1 auto; min-width: 140px; } }
   .wrSchedRest { display: flex; flex-wrap: wrap; gap: var(--space-4); }
+
+  // Every icon button is the same square: the 20px icon (or the % and # of the shade rule) centred in --btn-sq, in the title bars and the tiles alike.
+  // Last, so that it wins over the buttons' own padding wherever they sit.
+  --btn-sq: 26px;
+  .wrIconBtn, .wrSchedSeg button, .wrTabTileTitleExtras .wrSchedSeg button, .wrTabTileTitleSlot .wrSmallBtn, .wrSchedConsoleBar .wrSmallBtn {
+    box-sizing: border-box; width: var(--btn-sq); height: var(--btn-sq); min-width: var(--btn-sq); min-height: var(--btn-sq); padding: 0;
+    display: inline-flex; align-items: center; justify-content: center; line-height: 1; }
 }
 
 @media print {
   body.wrPrintSchedule { visibility: hidden; }
   body.wrPrintSchedule .wrSchedSchedule, body.wrPrintSchedule .wrSchedSchedule * { visibility: visible; }
   body.wrPrintSchedule .wrSchedSchedule { position: fixed; inset: 0; background: #fff; color: #000; }
-  body.wrPrintSchedule .wrSchedGridBox { max-height: none; overflow: visible; }
+  body.wrPrintSchedule .wrSchedGridBox { max-height: none; overflow: visible; flex: none; }
   body.wrPrintSchedule .wrSchedHead button, body.wrPrintSchedule .wrTabTileTitleSlot, body.wrPrintSchedule .wrSchedConsoleBar, body.wrPrintSchedule .wrSchedSeg { display: none; }
 }

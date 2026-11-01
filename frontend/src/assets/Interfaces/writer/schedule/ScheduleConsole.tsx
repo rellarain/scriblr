@@ -19,6 +19,7 @@ import { Backlog } from './Backlog'
 import { GoalsCard, type OwnedProgress } from './GoalsCard'
 import { ReviewCard } from './ReviewCard'
 import { ScheduleCard, type ScheduleOwner, type TicksApi } from './ScheduleCard'
+import { ICON_PX } from './IconBtn'
 import { DEFAULT_HUES, ScheduleSettings, SettingsButton, type FacetHues } from './ScheduleSettings'
 import type { TargetOption } from './ShiftEditor'
 import { getTicks, putTicks } from './scheduleApi'
@@ -191,7 +192,7 @@ export default function ScheduleConsole({ scope, projectIds, titles, titleSlot }
           scopeLabel={scope === 'dash' ? 'Account' : 'This project'} onClose={() => setSettingsOpen(false)}
         />
       )}
-      <SplitArea gridId={`scriblr.writer.schedule.tiles.${scope}`} label="Schedule tiles" tiles={tiles.map(t => ({ ...t, bodyClassName: `wrSchedTileBody${t.id === 'activity' ? ' wrSchedTileBody--chart' : ''}` }))} defaultTree={DEFAULT_TREE} />
+      <SplitArea iconSize={ICON_PX} gridId={`scriblr.writer.schedule.tiles.${scope}`} label="Schedule tiles" tiles={tiles.map(t => ({ ...t, bodyClassName: `wrSchedTileBody${t.id === 'activity' ? ' wrSchedTileBody--chart' : ''}` }))} defaultTree={DEFAULT_TREE} />
     </div>
   )
 }
