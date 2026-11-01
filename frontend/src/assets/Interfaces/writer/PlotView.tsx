@@ -1,35 +1,40 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
+import { createPortal } from 'react-dom'
 import type { PlotNode } from '../../../api/types'
 import type { WriterWorkspace } from './useWriterWorkspace'
-import { ChevronDownIcon, ChevronRightIcon, PlusIcon } from '../../icons'
+import { GridViewIcon, OutlineIcon, PencilIcon, PlusIcon, QueueIcon, TreeIcon } from '../../icons'
 import { ChipEditor, DeleteControl } from './shared'
 import { focusNodeField, useNodeKeys } from '../../../lib/nodeKeys'
 import HueSlider from './HueSlider'
 import { plotColors, plotColorVars } from './plotColors'
 import { isPlaced } from './plotPlacement'
-import { nodeLabel, plotTrail, sortByTitle } from './plotTree'
+import { nodeLabel, sortByTitle } from './plotTree'
 import { FieldEditor, FieldGroups, type PlotDrag, type PlotUi } from './FieldBlocks'
 import { PlotOutlinePanel } from './PlotOutlinePanel'
 import { PlotNav, plotlineCount } from './PlotNav'
 import { PlotCompare } from './PlotCompare'
 import { PlotParents } from './PlotParents'
+import PlotpointsTab from './levels/PlotpointsTab'
+import { SplitArea, type SplitTile } from './SplitArea'
+import type { SplitNode } from '../../../components/tiles/splitTree'
+import { ICON_PX } from './schedule/IconBtn'
 import { PLOT_BREAKPOINTS, plotSizeOf, useElementWidth } from './useElementWidth'
-import { PLOT_NAV_KEY, PLOT_NAV_W, navBasis } from './plotNavWidth'
 import { useStoredState } from './storage'
 import { PlotOrderToggle, usePlotOrder } from './plotOrder'
 import { fieldIndex, fieldsInOrder, isScrapField, orderValues, valuesIn } from './plotFields'
 import { isChoice } from './plotKinds'
 
-// Project Plot: a collapsible navigation column (categories > subcategories
-// > clusters > plotlines, alphabetized) and two page views -- the category/subcategory/cluster
-// editor, and the plotline editor: its plotpoints listed unassigned first and
-// then in order of occurrence, dragged onto the books and chapters of the
-// outline. A plotpoint assigned within a chapter (to an act, scene or moment,
-// from the Outline level) is locked here; the others can be unassigned.
-//
-// The tool follows its own width (useElementWidth.ts): wide, the contents beside the editor; medium, the same but a plotline's
-// chapters under its fields; compact, one column with the contents as a bar on top. Ticking two or more plotlines in the contents
-// opens the compare view (PlotCompare.tsx) in place of the editor.
+// The Plot console: five tiles on a split grid (drag a title bar to move one, a divider to resize), with a rail of tile tabs in its tile's title bar
+// to turn each on and off.
+//   Contents    categories > subcategories > clusters > plotlines, alphabetized, each with a tick box (PlotNav.tsx)
+//   Editor      the category/subcategory/cluster editor, or the plotline editor: its fields and their plotpoints. Above its title the parents
+//               (category, subcategory, cluster) are collapsibles by level, each opening onto its own fields to change in place
+//   Chapters    the open plotline's books and chapters (PlotOutlinePanel.tsx): a plotpoint is dragged from the Editor onto a chapter. A plotpoint
+//               assigned within a chapter (to an act, scene or moment, from the Outline level) is locked here; the others can be unassigned
+//   Compare     the ticked plotlines side by side (PlotCompare.tsx); it opens by itself when a second plotline is ticked
+//   Plotpoints  the tray of every plotpoint, to drag onto the Outline's cards, and what is placed in the open book (levels/PlotpointsTab.tsx)
+// Compare and Plotpoints start turned off. The layout and which tiles are off are kept per user. Each tile follows its own width, so the Compare
+// tile's columns and its chapters panel come and go with the tile.
 
 const counted = (n: number, noun: string) => `${n} ${noun}${n === 1 ? '' : 's'}`
 
@@ -78,6 +83,25 @@ function KeywordsField({ w, node }: { w: WriterWorkspace; node: PlotNode }) {
   )
 }
 
+// What a parent chip opens onto in an editor (PlotParents.tsx): the parent's own title, description, colour and keywords, changed in place.
+function ParentFields({ w, node }: { w: WriterWorkspace; node: PlotNode }) {
+  const kind = `${node.kind.charAt(0).toUpperCase()}${node.kind.slice(1)}`
+  return (
+    <div className="wrParentEdit">
+      <input
+        className="wrField" aria-label={`${kind} title`} placeholder={`${kind} title`} value={node.title}
+        onChange={e => w.updatePlotNodeField(node.id, 'title', e.target.value)}
+      />
+      <textarea
+        className="wrField" aria-label={`${kind} description`} rows={2} placeholder="Description" value={node.body}
+        onChange={e => w.updatePlotNodeField(node.id, 'body', e.target.value)}
+      />
+      <HueField w={w} node={node} />
+      <KeywordsField w={w} node={node} />
+    </div>
+  )
+}
+
 // Dragging does nothing in the category, subcategory and cluster editors (their values are not assigned there).
 const NO_DRAG: PlotDrag = {
   dragId: null, valueDrag: () => ({ onDragStart: () => {}, onDragEnd: () => {} }), dropIntoField: () => {}, dragFieldId: null, setDragFieldId: () => {},
@@ -91,7 +115,7 @@ function CategoryEditor({ w, node, ui }: { w: WriterWorkspace; node: PlotNode; u
   const colors = plotColors(node, w.plotNodeById, w.projectHue)
   return (
     <div className={`wrCardPanel wrCardPanel--${node.kind}`} data-knode={node.id} style={plotColorVars(colors)}>
-      <PlotParents node={node} byId={w.plotNodeById} projectHue={w.projectHue} open={ui.openParents} onToggle={ui.toggleParent} onOpen={w.focusPlotNode} />
+      <PlotParents node={node} byId={w.plotNodeById} projectHue={w.projectHue} open={ui.openParents} onToggle={ui.toggleParent} onOpen={w.focusPlotNode} renderEditor={p => <ParentFields w={w} node={p} />} />
       <div className="wrCardPanelHead">
         <span className="wrKindBadge">{node.kind}</span>
         <input className="wrTitleField" data-kf="" value={node.title} onChange={e => w.updatePlotNodeField(node.id, 'title', e.target.value)} placeholder={`${node.kind.charAt(0).toUpperCase()}${node.kind.slice(1)} title`} />
@@ -117,8 +141,8 @@ function CategoryEditor({ w, node, ui }: { w: WriterWorkspace; node: PlotNode; u
   )
 }
 
-function PlotlineEditor({ w, node, ui }: { w: WriterWorkspace; node: PlotNode; ui: PlotUi }) {
-  const [dragId, setDragId] = useState<string | null>(null)
+// `dragId` is the plotpoint being dragged to a chapter in the Chapters tile (the console holds it, being the tile's parent as well).
+function PlotlineEditor({ w, node, ui, dragId, setDragId }: { w: WriterWorkspace; node: PlotNode; ui: PlotUi; dragId: string | null; setDragId: (id: string | null) => void }) {
   const [dragFieldId, setDragFieldId] = useState<string | null>(null)
   const [dragSetId, setDragSetId] = useState<string | null>(null)
   const [showAssigned, setShowAssigned] = useState(true)
@@ -145,46 +169,37 @@ function PlotlineEditor({ w, node, ui }: { w: WriterWorkspace; node: PlotNode; u
   }
 
   return (
-    <div className="wrPlotlineLayout">
-      <div className="wrPlotlineLeft">
-        <div className="wrCardPanel wrCardPanel--plotline" data-knode={node.id} style={plotColorVars(colors)}>
-          <PlotParents node={node} byId={w.plotNodeById} projectHue={w.projectHue} open={ui.openParents} onToggle={ui.toggleParent} onOpen={w.focusPlotNode} />
-          <div className="wrCardPanelHead">
-            <span className="wrKindBadge">plotline</span>
-            <input className="wrTitleField" data-kf="" value={node.title} onChange={e => w.updatePlotNodeField(node.id, 'title', e.target.value)} placeholder="Plotline title" />
-            <DeleteControl
-              tone="dark" message={`Delete ${nodeLabel(node)} and its plotpoints?`} onConfirm={() => w.deletePlotNode(node.id)}
-              blockedReason={hasAssigned ? 'Take this plotline\'s plotpoints out of the outline first' : undefined}
-            />
-          </div>
-          <div>
-            <div className="wrLabel">Description</div>
-            <textarea
-              className="wrField" data-kf="" rows={2} placeholder="Description" value={node.body}
-              onChange={e => w.updatePlotNodeField(node.id, 'body', e.target.value)}
-            />
-          </div>
-          <KeywordsField w={w} node={node} />
+    <div className="wrPlotlineEditor">
+      <div className="wrCardPanel wrCardPanel--plotline" data-knode={node.id} style={plotColorVars(colors)}>
+        <PlotParents node={node} byId={w.plotNodeById} projectHue={w.projectHue} open={ui.openParents} onToggle={ui.toggleParent} onOpen={w.focusPlotNode} renderEditor={p => <ParentFields w={w} node={p} />} />
+        <div className="wrCardPanelHead">
+          <span className="wrKindBadge">plotline</span>
+          <input className="wrTitleField" data-kf="" value={node.title} onChange={e => w.updatePlotNodeField(node.id, 'title', e.target.value)} placeholder="Plotline title" />
+          <DeleteControl
+            tone="dark" message={`Delete ${nodeLabel(node)} and its plotpoints?`} onConfirm={() => w.deletePlotNode(node.id)}
+            blockedReason={hasAssigned ? 'Take this plotline\'s plotpoints out of the outline first' : undefined}
+          />
         </div>
-
-        <div className="wrFieldsPanel">
-          <div className="wrChildRowsHead">
-            <span className="wrLabel">Fields</span>
-            <label className="wrShowAssigned">
-              <input type="checkbox" role="switch" checked={showAssigned} onChange={e => setShowAssigned(e.target.checked)} />
-              <span>Show assigned</span>
-            </label>
-            <PlotOrderToggle />
-          </div>
-          <FieldGroups w={w} plotline={node} ui={ui} drag={drag} showAssigned={showAssigned} />
+        <div>
+          <div className="wrLabel">Description</div>
+          <textarea
+            className="wrField" data-kf="" rows={2} placeholder="Description" value={node.body}
+            onChange={e => w.updatePlotNodeField(node.id, 'body', e.target.value)}
+          />
         </div>
+        <KeywordsField w={w} node={node} />
       </div>
 
-      <div className="wrPlotlineRight">
-        <PlotOutlinePanel
-          w={w} plotlines={[node]} dragId={dragId}
-          onDropChapter={chapterId => { if (dragId) w.placePlotpoint(dragId, chapterId); setDragId(null) }}
-        />
+      <div className="wrFieldsPanel">
+        <div className="wrChildRowsHead">
+          <span className="wrLabel">Fields</span>
+          <label className="wrShowAssigned">
+            <input type="checkbox" role="switch" checked={showAssigned} onChange={e => setShowAssigned(e.target.checked)} />
+            <span>Show assigned</span>
+          </label>
+          <PlotOrderToggle />
+        </div>
+        <FieldGroups w={w} plotline={node} ui={ui} drag={drag} showAssigned={showAssigned} />
       </div>
     </div>
   )
@@ -192,41 +207,57 @@ function PlotlineEditor({ w, node, ui }: { w: WriterWorkspace; node: PlotNode; u
 
 const isBlank = (text: string | undefined) => !text || text.trim() === ''
 
-export default function PlotView({ w }: { w: WriterWorkspace }) {
+// Where the tiles sit before any is moved: the contents beside the editor, the chapters beside that, the compare and the plotpoints under the chapters
+// (both turned off until wanted, so the others take their room).
+export const PLOT_TREE: SplitNode = {
+  dir: 'row', ratio: 0.24,
+  a: { id: 'contents' },
+  b: { dir: 'row', ratio: 0.55, a: { id: 'editor' }, b: { dir: 'col', ratio: 0.5, a: { id: 'chapters' }, b: { dir: 'col', ratio: 0.5, a: { id: 'compare' }, b: { id: 'plotpoints' } } } },
+}
+const MINIMIZED_KEY = 'scriblr.writer.plot.minimized'
+const STARTS_OFF = ['compare', 'plotpoints']
+
+// The compare tile's body: the view lays itself out by this tile's own width.
+function CompareBody({ w, lines, onOpen, onOpenNode, onDeselect, ui }: {
+  w: WriterWorkspace; lines: PlotNode[]; ui: PlotUi
+  onOpen: (plotlineId: string, pointId: string) => void; onOpenNode: (id: string) => void; onDeselect: (id: string) => void
+}) {
+  const [ref, width] = useElementWidth<HTMLDivElement>(PLOT_BREAKPOINTS)
+  return (
+    <div className="wrPlotBody" ref={ref}>
+      {lines.length < 2
+        ? <p className="wrMuted">Tick two or more plotlines in the contents to compare them.</p>
+        : <PlotCompare w={w} lines={lines} size={plotSizeOf(width)} onOpen={onOpen} onOpenNode={onOpenNode} onDeselect={onDeselect} openParents={ui.openParents} onToggleParent={ui.toggleParent} />}
+    </div>
+  )
+}
+
+// `titleSlot` is the element in the console's tab-tile title bar where the rail of the console's tiles goes (null while it is not drawn yet); without
+// one (undefined) the rail is a bar above the tiles.
+export default function PlotView({ w, titleSlot }: { w: WriterWorkspace; titleSlot?: HTMLElement | null }) {
   const [plotOrder] = usePlotOrder()
   const node = w.focusedPlotNode
   // Kinds of nodes created a moment ago (the workspace maps have not updated yet),
   // so focusing one can also open its editor.
   const created = useRef(new Map<string, PlotNode['kind']>())
-  // The tool's own width picks its layout; the compare view opens when plotlines are ticked and gives way to a row's editor.
-  const [sizeRef, width] = useElementWidth<HTMLDivElement>(PLOT_BREAKPOINTS)
-  const size = plotSizeOf(width)
-  // The contents' width: the one kept on this machine, or, while its handle is being dragged, the drag's.
-  const [navWidth, setNavWidth] = useStoredState<number>(PLOT_NAV_KEY, PLOT_NAV_W)
-  const [dragWidth, setDragWidth] = useState<number | null>(null)
-  const [barOpen, setBarOpen] = useState(false)
-  // The contents drawer closes on Escape or a click outside the bar.
-  useEffect(() => {
-    if (!barOpen) return
-    const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape') setBarOpen(false) }
-    const onDown = (e: MouseEvent) => { if (!(e.target as Element | null)?.closest?.('.wrPlotBar')) setBarOpen(false) }
-    document.addEventListener('keydown', onKey)
-    document.addEventListener('mousedown', onDown)
-    return () => { document.removeEventListener('keydown', onKey); document.removeEventListener('mousedown', onDown) }
-  }, [barOpen])
-  const [compareOpen, setCompareOpen] = useState(false)
+  // The tiles that are turned off, and the element in the title bar that holds the rail of tile tabs.
+  const [minimized, setMinimized] = useStoredState<string[]>(MINIMIZED_KEY, STARTS_OFF)
+  const [railHost, setRailHost] = useState<HTMLElement | null>(null)
+  const showTile = (id: string) => setMinimized(prev => (prev.includes(id) ? prev.filter(x => x !== id) : prev))
+  // The plotpoint being dragged from a field to a chapter (the Editor's fields to the Chapters tile).
+  const [dragId, setDragId] = useState<string | null>(null)
+  useEffect(() => setDragId(null), [node?.id])
+  // Ticking a second plotline turns the compare tile on.
   const selectedLines = w.plotSelection.map(id => w.plotNodeById.get(id)).filter((n): n is PlotNode => n?.kind === 'plotline')
   const tickedCount = selectedLines.length
   const lastTicked = useRef(0)
   useEffect(() => {
-    if (tickedCount < 2) setCompareOpen(false)
-    else if (tickedCount > lastTicked.current) setCompareOpen(true)
+    if (tickedCount >= 2 && tickedCount > lastTicked.current) setMinimized(prev => (prev.includes('compare') ? prev.filter(x => x !== 'compare') : prev))
     lastTicked.current = tickedCount
-  }, [tickedCount])
-  const comparing = compareOpen && tickedCount >= 2
+  }, [tickedCount, setMinimized])
   // A node opens at the top of its editor, not where the last one was scrolled to.
   const bodyRef = useRef<HTMLDivElement>(null)
-  useEffect(() => { if (bodyRef.current) { bodyRef.current.scrollTop = 0; bodyRef.current.scrollLeft = 0 } }, [node?.id, comparing])
+  useEffect(() => { if (bodyRef.current) { bodyRef.current.scrollTop = 0; bodyRef.current.scrollLeft = 0 } }, [node?.id])
 
   // Which fields are open (collapsed by default), and the value just created (it takes focus).
   const [openFields, setOpenFields] = useState<Set<string>>(new Set())
@@ -385,56 +416,62 @@ export default function PlotView({ w }: { w: WriterWorkspace }) {
     },
   })
 
-  const nav = (
-    <PlotNav
-      w={w}
-      onOpenNode={() => { setCompareOpen(false); setBarOpen(false) }}
-      onCompare={() => { setCompareOpen(true); setBarOpen(false) }}
-      resize={size === 'compact' ? undefined : { onDrag: setDragWidth, onCommit: width => { setNavWidth(width); setDragWidth(null) } }}
-    />
-  )
-  // Compact: the contents are one line (where you are), and fold down over the editor.
-  const barLabel = comparing ? `Comparing ${tickedCount} plotlines`
-    : node ? [...plotTrail(node, w.plotNodeById), node].map(nodeLabel).join(' › ') : 'Contents'
-
-  return (
-    <div className="wrPlotView" ref={sizeRef}>
-      <div className="wrPlotFrame" data-size={size} style={size === 'compact' ? undefined : { ['--wr-nav-basis' as string]: navBasis(dragWidth ?? navWidth) }}>
-        {size === 'compact' ? (
-          <div className="wrPlotBar">
-            <button type="button" className="wrPlotBarToggle" aria-expanded={barOpen} onClick={() => setBarOpen(open => !open)}>
-              {barOpen ? <ChevronDownIcon size={14} /> : <ChevronRightIcon size={14} />}
-              <span className="wrPlotBarLabel">{barLabel}</span>
-              {tickedCount > 0 && !comparing && <span className="wrNavCount">{tickedCount} ticked</span>}
-            </button>
-            {barOpen && <div className="wrPlotBarDrawer">{nav}</div>}
-          </div>
-        ) : nav}
-        <div className="wrPlotBody" ref={bodyRef} onKeyDown={keys.onKeyDown}>
+  // Opening a node from anywhere (the contents, a compare card) brings the editor back if it was turned off.
+  const nav = <PlotNav w={w} onOpenNode={() => showTile('editor')} onCompare={() => showTile('compare')} />
+  const tiles: SplitTile[] = [
+    { id: 'contents', title: 'Contents', Icon: TreeIcon, children: nav },
+    {
+      id: 'editor', title: 'Editor', Icon: PencilIcon,
+      children: (
+        <div className="wrPlotBody wrPlotBody--editor" ref={bodyRef} onKeyDown={keys.onKeyDown}>
           {w.plotSaveError && <p className="wrError">{w.plotSaveError}</p>}
           {w.plotStatus === 'loading' && <p className="wrMuted">Loading plot…</p>}
           {w.plotStatus === 'error' && <p className="wrError">{w.plotError ?? 'Failed to load plot.'}</p>}
-          {w.plotStatus === 'idle' && comparing && (
-            <PlotCompare
-              w={w} lines={selectedLines} size={size}
-              onOpen={(plotlineId, pointId) => {
-                const fieldId = w.plotNodeById.get(pointId)?.fieldId
-                if (fieldId) ui.setOpen(fieldId, true)
-                w.focusPlotNode(plotlineId); setCompareOpen(false); w.highlightPlotpoint(pointId)
-              }}
-              onDeselect={id => w.togglePlotSelection(id, false)}
-              onOpenNode={id => { w.focusPlotNode(id); setCompareOpen(false) }}
-              openParents={openParents} onToggleParent={toggleParent}
-            />
-          )}
-          {w.plotStatus === 'idle' && !comparing && !node && <p className="wrMuted">Select a category or plotline to edit it, or add a category.</p>}
-          {w.plotStatus === 'idle' && !comparing && node && (node.kind === 'plotline'
-            ? <PlotlineEditor key={node.id} w={w} node={node} ui={ui} />
+          {w.plotStatus === 'idle' && !node && <p className="wrMuted">Select a category or plotline to edit it, or add a category.</p>}
+          {w.plotStatus === 'idle' && node && (node.kind === 'plotline'
+            ? <PlotlineEditor key={node.id} w={w} node={node} ui={ui} dragId={dragId} setDragId={setDragId} />
             : node.kind === 'plotpoint'
               ? <p className="wrMuted">Plotpoints are edited from their plotline.</p>
               : <CategoryEditor key={node.id} w={w} node={node} ui={ui} />)}
         </div>
-      </div>
+      ),
+    },
+    {
+      id: 'chapters', title: 'Chapters', Icon: OutlineIcon,
+      children: (
+        <div className="wrPlotBody">
+          {w.plotStatus === 'idle' && node?.kind === 'plotline'
+            ? <PlotOutlinePanel key={node.id} w={w} plotlines={[node]} dragId={dragId} onDropChapter={chapterId => { if (dragId) w.placePlotpoint(dragId, chapterId); setDragId(null) }} />
+            : <p className="wrMuted">Open a plotline to place its plotpoints in the chapters.</p>}
+        </div>
+      ),
+    },
+    {
+      id: 'compare', title: 'Compare', Icon: GridViewIcon,
+      children: (
+        <CompareBody
+          w={w} lines={selectedLines} ui={ui}
+          onOpen={(plotlineId, pointId) => {
+            const fieldId = w.plotNodeById.get(pointId)?.fieldId
+            if (fieldId) ui.setOpen(fieldId, true)
+            showTile('editor'); w.focusPlotNode(plotlineId); w.highlightPlotpoint(pointId)
+          }}
+          onDeselect={id => w.togglePlotSelection(id, false)}
+          onOpenNode={id => { showTile('editor'); w.focusPlotNode(id) }}
+        />
+      ),
+    },
+    { id: 'plotpoints', title: 'Plotpoints', Icon: QueueIcon, children: <div className="wrPlotBody"><PlotpointsTab w={w} /></div> },
+  ]
+
+  return (
+    <div className="wrPlotConsole">
+      {titleSlot && createPortal(<span ref={setRailHost} className="wrPlotRail" />, titleSlot)}
+      <SplitArea
+        iconSize={ICON_PX} gridId="scriblr.writer.plot.tiles" label="Plot tiles" bar barHost={titleSlot === undefined ? undefined : railHost}
+        minimized={minimized} onMinimizedChange={(id, off) => setMinimized(prev => (off ? (prev.includes(id) ? prev : [...prev, id]) : prev.filter(x => x !== id)))}
+        tiles={tiles.map(t => ({ ...t, bodyClassName: 'wrTabTileBody--surface wrPlotTileBody' }))} defaultTree={PLOT_TREE}
+      />
     </div>
   )
 }

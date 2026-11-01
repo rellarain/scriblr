@@ -19,11 +19,15 @@ const field = (name: string) => screen.getByLabelText(new RegExp(`^${name}$`)) a
 const toggle = (name: RegExp) => fireEvent.click(screen.getByRole('button', { name }))
 const titles = () => screen.queryAllByLabelText(/value title$/).map(i => (i as HTMLInputElement).value)
 const openAll = () => screen.queryAllByRole('button', { expanded: false, name: /^Expand/ }).forEach(b => fireEvent.click(b))
+// The console's tiles are regions too; the field groups are the others.
+const TILES = ['Contents', 'Editor', 'Chapters', 'Compare', 'Plotpoints']
+const fieldGroups = () => screen.getAllByRole('region').map(g => g.getAttribute('aria-label')).filter(l => !TILES.includes(l ?? ''))
+const tile = (name: string) => within(screen.getByRole('region', { name }))
 
 describe('the plotline editor: fields and values', () => {
   it('groups the fields: the plotline\'s on top, the category\'s at the bottom, each group open and each field collapsed', () => {
     render(<Editor />)
-    const groups = screen.getAllByRole('region').map(g => g.getAttribute('aria-label'))
+    const groups = fieldGroups()
     expect(groups).toEqual(['Plotline fields', 'From category: Romance'])
     expect(screen.getByDisplayValue('Setback')).toBeInTheDocument()
     expect(titles()).toEqual([]) // fields start collapsed
@@ -406,7 +410,7 @@ describe('clusters', () => {
 
   it('shows a cluster\'s field on the plotlines under it, between the plotline\'s and the category\'s', () => {
     render(<Editor start={clustered()} />)
-    expect(screen.getAllByRole('region').map(g => g.getAttribute('aria-label'))).toEqual(['Plotline fields', 'From cluster: Household', 'From category: Romance'])
+    expect(fieldGroups()).toEqual(['Plotline fields', 'From cluster: Household', 'From category: Romance'])
   })
 
   it('shows the cluster\'s own fields in its editor, with a colour slider within 30 degrees of its subcategory', () => {
@@ -442,7 +446,7 @@ describe('the plot contents', () => {
 
   it('scrolls the editor back to the top when another node is opened', () => {
     const { container } = render(<Editor start={clustered()} focused="sub" />)
-    const body = container.querySelector('.wrPlotBody') as HTMLElement
+    const body = container.querySelector('.wrPlotBody--editor') as HTMLElement
     body.scrollTop = 120
     fireEvent.click(container.querySelector('.wrNavRow--cluster .wrNavLabel') as HTMLElement)
     expect(body.scrollTop).toBe(0)
@@ -497,26 +501,33 @@ describe('ticking plotlines in the contents', () => {
     expect((screen.getByLabelText('Select Meet cute') as HTMLInputElement).checked).toBe(false)
   })
 
-  it('opens the compare view at two ticked plotlines, and a row\'s name goes back to its editor', () => {
+  it('turns the compare tile on at two ticked plotlines, and a row\'s name opens its editor beside it', () => {
     render(<Editor start={twoLines()} />)
     tick('Meet cute')
-    expect(screen.queryByRole('group', { name: 'Plotlines being compared' })).toBeNull()
+    expect(screen.queryByRole('region', { name: 'Compare' })).toBeNull()
     tick('Second thread')
     expect(screen.getByRole('group', { name: 'Plotlines being compared' })).toBeInTheDocument()
-    fireEvent.click(screen.getByRole('button', { name: 'Second thread' })) // the row's name
-    expect(screen.queryByRole('group', { name: 'Plotlines being compared' })).toBeNull()
+    fireEvent.click(tile('Contents').getByRole('button', { name: 'Second thread' })) // the row's name
     expect(screen.getByDisplayValue('Second thread')).toBeInTheDocument() // its editor
+    expect(screen.getByRole('group', { name: 'Plotlines being compared' })).toBeInTheDocument() // the comparison stays
+  })
+
+  it('brings the compare tile back with Compare (n) after it is turned off', () => {
+    render(<Editor start={twoLines()} />)
+    tick('Meet cute'); tick('Second thread')
+    fireEvent.click(screen.getByRole('button', { name: 'Compare', pressed: true })) // its tab in the rail
+    expect(screen.queryByRole('region', { name: 'Compare' })).toBeNull()
     fireEvent.click(screen.getByRole('button', { name: 'Compare (2)' }))
     expect(screen.getByRole('group', { name: 'Plotlines being compared' })).toBeInTheDocument()
   })
 
-  it('keeps the ticks while browsing, and unticking down to one returns to the editor', () => {
+  it('keeps the ticks while browsing, and unticking down to one leaves the compare tile empty', () => {
     render(<Editor start={twoLines()} />)
     tick('Meet cute'); tick('Second thread')
-    fireEvent.click(screen.getByRole('button', { name: 'Romance' }))
+    fireEvent.click(tile('Contents').getByRole('button', { name: 'Romance' }))
     expect((screen.getByLabelText('Select Meet cute') as HTMLInputElement).checked).toBe(true)
     tick('Second thread')
-    expect(screen.queryByRole('group', { name: 'Plotlines being compared' })).toBeNull()
+    expect(screen.queryByRole('group', { name: 'Plotlines being compared' })).toBeNull() // the tile asks for two
   })
 
   it('clears the ticks', () => {
@@ -533,7 +544,7 @@ describe('the compare view', () => {
 
   it('lists the plotpoints of both plotlines in one list, unassigned first and the placed ones in story order', () => {
     open()
-    fireEvent.click(screen.getByRole('button', { name: 'In story' }))
+    fireEvent.click(tile('Compare').getByRole('button', { name: 'In story' }))
     const titles = cardTitles()
     expect(titles.indexOf('Betrayal reveal')).toBeLessThan(titles.indexOf('Missed train')) // chapter 1 before chapter 2
     expect(titles.indexOf('Loose end')).toBeLessThan(titles.indexOf('Betrayal reveal')) // unassigned before placed
@@ -559,14 +570,15 @@ describe('the compare view', () => {
     expect(cardTitles()).not.toContain('Betrayal reveal')
     expect(cardTitles()).toContain('Missed train')
     fireEvent.click(chip.getByRole('button', { name: 'Deselect Second thread' }))
-    expect(screen.queryByRole('group', { name: 'Plotlines being compared' })).toBeNull() // one left: back to the editor
+    expect(screen.queryByRole('group', { name: 'Plotlines being compared' })).toBeNull() // one left: the tile asks for another
+    expect(tile('Compare').getByText(/Tick two or more plotlines/)).toBeInTheDocument()
   })
 
   it('opens the plotline\'s editor from a card', () => {
     open()
     fireEvent.click(listCard('Betrayal reveal'))
-    expect(screen.queryByRole('group', { name: 'Plotlines being compared' })).toBeNull()
     expect(screen.getByDisplayValue('Second thread')).toBeInTheDocument()
+    expect(screen.getByRole('group', { name: 'Plotlines being compared' })).toBeInTheDocument() // the comparison stays open beside it
   })
 
   it('opens the field of the plotpoint it jumps to, so it can be seen', () => {
@@ -577,7 +589,7 @@ describe('the compare view', () => {
 
   it('is read-only: no unassign button, and cards do not drag', () => {
     open()
-    expect(screen.queryByRole('button', { name: /^Unassign/ })).toBeNull()
+    expect(tile('Compare').queryByRole('button', { name: /^Unassign/ })).toBeNull()
     expect(document.querySelectorAll('.wrCompareList [draggable="true"]')).toHaveLength(0)
   })
 
@@ -592,53 +604,24 @@ describe('the compare view', () => {
 
   it('shows the chapters of every plotline beside the list', () => {
     open()
-    const chips = [...document.querySelectorAll('.wrPlotChip')].map(c => c.textContent)
+    const chips = [...screen.getByRole('region', { name: 'Compare' }).querySelectorAll('.wrPlotChip')].map(c => c.textContent)
     expect(chips.join(' ')).toContain('Betrayal reveal')
     expect(chips.join(' ')).toContain('Missed train')
   })
 })
 
 describe('on a narrow tile', () => {
-  it('shows the contents as a bar that folds down, and chooses a row from it', () => {
-    narrow(500)
-    render(<Editor start={twoLines()} />)
-    const bar = screen.getByRole('button', { expanded: false, name: /Romance › Slow burn › Meet cute/ })
-    expect(document.querySelector('.wrPlotNav')).toBeNull()
-    fireEvent.click(bar)
-    expect(document.querySelector('.wrPlotNav')).not.toBeNull()
-    fireEvent.click(screen.getByRole('button', { name: 'Second thread' }))
-    expect(document.querySelector('.wrPlotNav')).toBeNull() // folded again
-    expect(screen.getByDisplayValue('Second thread')).toBeInTheDocument()
-  })
-
-  it('closes the contents drawer on Escape and on a click outside it', () => {
-    narrow(500)
-    render(<Editor start={twoLines()} />)
-    const bar = screen.getByRole('button', { expanded: false, name: /Romance › Slow burn › Meet cute/ })
-    fireEvent.click(bar)
-    expect(document.querySelector('.wrPlotNav')).not.toBeNull()
-    fireEvent.keyDown(document, { key: 'Escape' })
-    expect(document.querySelector('.wrPlotNav')).toBeNull()
-    fireEvent.click(bar)
-    fireEvent.mouseDown(document.querySelector('.wrPlotBody') as HTMLElement)
-    expect(document.querySelector('.wrPlotNav')).toBeNull()
-    fireEvent.click(bar)
-    fireEvent.mouseDown(document.querySelector('.wrPlotNav') as HTMLElement) // inside the drawer: it stays
-    expect(document.querySelector('.wrPlotNav')).not.toBeNull()
-  })
-
   it('compares in one column, with plotline sections that fold and the chapters folded away', () => {
     narrow(500)
     render(<Editor start={twoLines()} />)
-    fireEvent.click(screen.getByRole('button', { name: /Romance › Slow burn › Meet cute/ }))
     tick('Meet cute'); tick('Second thread')
-    expect(screen.getByRole('button', { name: /Comparing 2 plotlines/ })).toBeInTheDocument()
-    fireEvent.click(screen.getByRole('switch', { name: 'Group by plotline' }))
-    const section = screen.getByRole('button', { name: /Second thread/, expanded: true })
+    const compare = tile('Compare')
+    fireEvent.click(compare.getByRole('switch', { name: 'Group by plotline' }))
+    const section = compare.getByRole('button', { name: /Second thread/, expanded: true })
     fireEvent.click(section)
-    expect(screen.queryByText('Betrayal reveal')).toBeNull()
-    expect(screen.getByRole('button', { name: 'Chapters', expanded: false })).toBeInTheDocument()
-    expect(document.querySelector('.wrPlotChip')).toBeNull()
+    expect(compare.queryByText('Betrayal reveal')).toBeNull()
+    expect(compare.getByRole('button', { name: 'Chapters', expanded: false })).toBeInTheDocument()
+    expect(screen.getByRole('region', { name: 'Compare' }).querySelector('.wrPlotChip')).toBeNull()
   })
 })
 
@@ -659,19 +642,21 @@ describe('the parent chips', () => {
     expect(screen.queryByText('plotline', { selector: '.wrKindBadge' })).not.toBeNull() // the editor itself is unchanged
   })
 
-  it('show only the title for a parent with no description, and the title opens that parent', () => {
+  it('fold open for a parent with no description too, and the title then opens that parent', () => {
     render(<Editor start={described(clustered())} />)
-    expect(chips().getByRole('button', { name: 'Open Household' })).not.toHaveAttribute('aria-expanded') // nothing to open
+    expect(chips().getByRole('button', { name: /Household/ })).toHaveAttribute('aria-expanded', 'false') // a description can be written in it
+    fireEvent.click(chips().getByRole('button', { name: /Household/ }))
+    expect(chips().getByLabelText('Cluster title')).toHaveValue('Household')
     fireEvent.click(chips().getByRole('button', { name: 'Open Household' }))
     expect(screen.getByPlaceholderText('Cluster title')).toHaveValue('Household')
   })
 
-  it('open on a click to the whole description, and the title then opens the parent\'s editor', () => {
+  it('open on a click to the parent\'s own fields, and the title then opens the parent\'s editor', () => {
     render(<Editor start={described(clustered())} />)
     const chip = chips().getByRole('button', { name: /Slow burn/ })
     expect(chip).toHaveAttribute('aria-expanded', 'false')
     fireEvent.click(chip)
-    expect(chips().getByText('It takes a whole winter.')).toBeInTheDocument()
+    expect(chips().getByLabelText('Subcategory description')).toHaveValue('It takes a whole winter.')
     fireEvent.click(chips().getByRole('button', { name: 'Collapse Slow burn' }))
     expect(chips().getByRole('button', { name: /Slow burn/ })).toHaveAttribute('aria-expanded', 'false')
     fireEvent.click(chips().getByRole('button', { name: /Slow burn/ }))
@@ -679,9 +664,25 @@ describe('the parent chips', () => {
     expect(screen.getByPlaceholderText('Subcategory title')).toHaveValue('Slow burn')
   })
 
-  it('are read-only: no input in them, and a description cannot be typed over', () => {
+  it('are closed with no input in them, and open onto the title, description, colour and keywords to change in place', () => {
     render(<Editor start={described(clustered())} />)
     expect(document.querySelector('.wrParents input, .wrParents textarea')).toBeNull()
+    fireEvent.click(chips().getByRole('button', { name: /Romance/ }))
+    expect(chips().getByRole('slider', { name: 'Category colour' })).toBeInTheDocument()
+    expect(chips().getByPlaceholderText('Add keyword…')).toBeInTheDocument()
+    fireEvent.change(chips().getByLabelText('Category title'), { target: { value: 'Love stories' } })
+    fireEvent.change(chips().getByLabelText('Category description'), { target: { value: 'Always two people.' } })
+    expect(tile('Contents').getByRole('button', { name: 'Love stories' })).toBeInTheDocument() // the contents follow
+    expect(chips().getByLabelText('Category description')).toHaveValue('Always two people.')
+  })
+
+  it('open the grandparent and the parent together, each onto its own fields', () => {
+    render(<Editor start={described(clustered())} />)
+    fireEvent.click(chips().getByRole('button', { name: /Romance/ }))
+    fireEvent.click(chips().getByRole('button', { name: /Slow burn/ }))
+    fireEvent.change(chips().getByLabelText('Subcategory title'), { target: { value: 'Long winter' } })
+    expect(chips().getByLabelText('Category title')).toHaveValue('Romance') // the other one is unchanged
+    expect(tile('Contents').getByRole('button', { name: 'Long winter' })).toBeInTheDocument()
   })
 
   it('show on a cluster\'s and a subcategory\'s editor, and not on a category\'s', () => {
@@ -695,7 +696,7 @@ describe('the parent chips', () => {
     expect(screen.queryByRole('group', { name: 'Parents' })).toBeNull()
   })
 
-  it('head each plotline in the compare view\'s groups, and a title there leaves the comparison for that parent', () => {
+  it('head each plotline in the compare view\'s groups, and a title there opens that parent in the editor', () => {
     render(<Editor start={described(twoLines())} />)
     tick('Meet cute'); tick('Second thread')
     fireEvent.click(screen.getByRole('switch', { name: 'Group by plotline' }))
@@ -704,8 +705,7 @@ describe('the parent chips', () => {
     expect(parents.getByRole('button', { name: /Romance/ })).toBeInTheDocument()
     fireEvent.click(parents.getByRole('button', { name: /Slow burn/ }))
     fireEvent.click(parents.getByRole('button', { name: 'Open Slow burn' }))
-    expect(document.querySelector('.wrCompare')).toBeNull()
-    expect(screen.getByPlaceholderText('Subcategory title')).toHaveValue('Slow burn')
+    expect(screen.getByPlaceholderText('Subcategory title')).toHaveValue('Slow burn') // the editor goes to the parent; the comparison stays
   })
 })
 
@@ -726,7 +726,7 @@ describe('the contents order', () => {
 
 describe('fields inherited down the tree', () => {
   // The starting plot: Romance (Theme) > Slow burn > Meet cute. Clustered: Household (Motive) sits between Slow burn and Meet cute.
-  const regions = () => screen.getAllByRole('region').map(g => g.getAttribute('aria-label')).filter(l => /^(Fields|From )/.test(l ?? ''))
+  const regions = () => fieldGroups().filter(l => /^(Fields|From )/.test(l ?? ''))
 
   it('shows the fields of a category as its own only', () => {
     render(<Editor focused="cat" />)
@@ -1144,79 +1144,44 @@ describe('fieldsets', () => {
   })
 })
 
-describe('the width of the contents', () => {
-  const handle = () => screen.getByRole('separator', { name: 'Contents width' })
-  const basis = (container: HTMLElement) => (container.querySelector('.wrPlotFrame') as HTMLElement).style.getPropertyValue('--wr-nav-basis')
-  const KEY = 'scriblr.writer.plotNavWidth'
-  // The panel is 250px wide in a tool 1000px wide (jsdom has no layout).
-  const lay = () => vi.spyOn(Element.prototype, 'getBoundingClientRect').mockImplementation(function (this: Element) {
-    const width = this.classList.contains('wrPlotNav') ? 250 : this.classList.contains('wrPlotFrame') ? 1000 : 0
-    return { width, height: 600, x: 0, y: 0, top: 0, left: 0, right: width, bottom: 600, toJSON: () => ({}) } as DOMRect
+describe('the Plot console\'s tiles', () => {
+  const rail = () => within(screen.getByRole('toolbar', { name: 'Plot tiles tabs' }))
+
+  it('has a tab for each tile, the contents, editor and chapters on and the compare and plotpoints off', () => {
+    render(<Editor />)
+    expect(rail().getAllByRole('button').map(b => [b.getAttribute('aria-label'), b.getAttribute('aria-pressed')])).toEqual([
+      ['Contents', 'true'], ['Editor', 'true'], ['Chapters', 'true'], ['Compare', 'false'], ['Plotpoints', 'false'],
+    ])
+    expect(screen.getAllByRole('region').map(r => r.getAttribute('aria-label')).filter(l => TILES.includes(l ?? ''))).toEqual(expect.arrayContaining(['Contents', 'Editor', 'Chapters']))
+    expect(screen.queryByRole('region', { name: 'Plotpoints' })).toBeNull()
   })
 
-  it('has a handle on the panel\'s right edge, and is 250px wide until it is dragged', () => {
-    const { container } = render(<Editor />)
-    expect(handle().parentElement).toHaveClass('wrPlotNav')
-    expect(handle()).toHaveAttribute('aria-orientation', 'vertical')
-    expect(handle()).toHaveAttribute('title', 'Drag to resize the contents')
-    expect(basis(container)).toBe('min(max(250px, 200px), 45%)')
-  })
-
-  it('follows the drag, held between 200px and 45% of the tool, and keeps the width on release', () => {
-    const spy = lay()
-    const { container } = render(<Editor />)
-    fireEvent.mouseDown(handle(), { clientX: 255 })
-    act(() => { fireEvent.mouseMove(window, { clientX: 355 }) })
-    expect(basis(container)).toBe('min(max(350px, 200px), 45%)') // 250 + 100, live
-    expect(window.localStorage.getItem(KEY)).toBeNull() // not kept until the release
-    act(() => { fireEvent.mouseMove(window, { clientX: 2000 }) })
-    expect(basis(container)).toBe('min(max(450px, 200px), 45%)') // held at 45% of 1000
-    act(() => { fireEvent.mouseMove(window, { clientX: -500 }) })
-    expect(basis(container)).toBe('min(max(200px, 200px), 45%)') // held at 200px
-    act(() => { fireEvent.mouseMove(window, { clientX: 305 }) })
-    act(() => { fireEvent.mouseUp(window) })
-    expect(JSON.parse(window.localStorage.getItem(KEY) ?? 'null')).toBe(300)
-    expect(basis(container)).toBe('min(max(300px, 200px), 45%)')
-    spy.mockRestore()
-  })
-
-  it('remembers the width when the Plot tab is opened again', () => {
-    const spy = lay()
+  it('turns a tile on and off from its tab, and keeps the choice', () => {
     const first = render(<Editor />)
-    fireEvent.mouseDown(handle(), { clientX: 255 })
-    act(() => { fireEvent.mouseMove(window, { clientX: 395 }) })
-    act(() => { fireEvent.mouseUp(window) })
+    fireEvent.click(rail().getByRole('button', { name: 'Plotpoints' }))
+    expect(tile('Plotpoints').getByRole('complementary', { name: 'Plotpoints' })).toBeInTheDocument() // the tray
+    fireEvent.click(rail().getByRole('button', { name: 'Chapters' }))
+    expect(screen.queryByRole('region', { name: 'Chapters' })).toBeNull()
     first.unmount()
-    const { container } = render(<Editor />)
-    expect(basis(container)).toBe('min(max(390px, 200px), 45%)')
-    spy.mockRestore()
+    render(<Editor />)
+    expect(screen.getByRole('region', { name: 'Plotpoints' })).toBeInTheDocument()
+    expect(screen.queryByRole('region', { name: 'Chapters' })).toBeNull()
   })
 
-  it('uses a width kept from before, and holds it between the limits in CSS too', () => {
-    window.localStorage.setItem(KEY, JSON.stringify(400))
-    __resetSettingsForTests()
-    const { container } = render(<Editor />)
-    expect(basis(container)).toBe('min(max(400px, 200px), 45%)')
+  it('shows the open plotline\'s chapters in their own tile, and asks for a plotline when a category is open', () => {
+    const line = render(<Editor />)
+    expect(tile('Chapters').getByText('Outline')).toBeInTheDocument()
+    expect(tile('Editor').queryByText('Outline')).toBeNull() // no longer under the fields
+    line.unmount()
+    render(<Editor focused="cat" />)
+    expect(tile('Chapters').getByText(/Open a plotline/)).toBeInTheDocument()
   })
 
-  it('does not move the width on a click that is not a drag, and ignores the other mouse buttons', () => {
-    const spy = lay()
-    const { container } = render(<Editor />)
-    fireEvent.mouseDown(handle(), { clientX: 255, button: 2 })
-    act(() => { fireEvent.mouseMove(window, { clientX: 355 }) })
-    expect(basis(container)).toBe('min(max(250px, 200px), 45%)')
-    expect(window.localStorage.getItem(KEY)).toBeNull()
-    spy.mockRestore()
-  })
-
-  it('has no handle and no width in the compact layout, where the contents are a bar', () => {
-    narrow(500)
-    const { container } = render(<Editor />)
-    expect(container.querySelector('.wrPlotFrame')).toHaveAttribute('data-size', 'compact')
-    expect(screen.queryByRole('separator', { name: 'Contents width' })).toBeNull()
-    expect(basis(container)).toBe('')
-    fireEvent.click(container.querySelector('.wrPlotBarToggle')!)
-    expect(container.querySelector('.wrPlotBarDrawer .wrPlotNav')).not.toBeNull()
-    expect(screen.queryByRole('separator', { name: 'Contents width' })).toBeNull()
+  it('brings the editor back when a row is chosen in the contents', () => {
+    render(<Editor focused="cat" />)
+    fireEvent.click(rail().getByRole('button', { name: 'Editor' }))
+    expect(screen.queryByRole('region', { name: 'Editor' })).toBeNull()
+    fireEvent.click(tile('Contents').getByRole('button', { name: 'Meet cute' }))
+    expect(screen.getByDisplayValue('Meet cute')).toBeInTheDocument()
   })
 })

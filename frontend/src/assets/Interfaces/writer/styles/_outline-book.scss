@@ -63,7 +63,7 @@
     .wrNodeHue { flex: 1 1 120px; min-width: 100px; max-width: 220px; margin: 0; }
   }
 
-  // The Plotpoints tab of the Project level.
+  // The Plotpoints tile of the Project level's Plot console.
   .wrPlotpointsTab { display: flex; flex-direction: column; gap: var(--space-4); min-width: 0; }
   .wrPlotpointsTab .wrPlotTray { flex: none; display: flex; flex-direction: column; gap: var(--space-base); padding: 0; border: 0; .wrChapterPointsList { overflow: visible; } }
   .wrTabPane .wrChapterPointsHead, .wrTabTileBody .wrChapterPointsHead { opacity: 0.9; }

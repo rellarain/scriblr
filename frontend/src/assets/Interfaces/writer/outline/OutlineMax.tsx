@@ -19,7 +19,7 @@ import OutlineNav, { type OutlineFocus } from './OutlineNav'
 // An arc's tab narrows the cover to that arc and its chapters' outlines; a chapter's tab, to that one chapter's; the focused tab
 // again, back to the whole book's.
 // The book's pages are the Draft level's. The plotpoints still to place are in the
-// Project level's Plotpoints tab: drag one onto a card.
+// Project level's Plot tab, in its Plotpoints tile: drag one onto a card.
 function OutlineMax({ w }: { w: WriterWorkspace }) {
   const book = w.activeBook
   const counts = useWordCounts(w.activeProjectId)

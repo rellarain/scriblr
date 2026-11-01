@@ -11,7 +11,7 @@ import HelpArticles from './HelpArticles'
 import { useTabbedLevel, type LevelTab } from './LevelTabs'
 
 export const OUTLINE_HELP_NAMES = ['outline', 'book']
-export const OUTLINE_HELP_FALLBACK = 'The Outline level is the open book: its arcs and chapters to move around in, the open chapter’s acts, scenes and moments as cards, the book’s draft stats and its own settings. Plotpoints still to place are in the Project’s Plotpoints tab: drag one onto a card.'
+export const OUTLINE_HELP_FALLBACK = 'The Outline level is the open book: its arcs and chapters to move around in, the open chapter’s acts, scenes and moments as cards, the book’s draft stats and its own settings. Plotpoints still to place are in the Project’s Plot tab, in its Plotpoints tile: drag one onto a card.'
 
 const kv = (k: string, v: React.ReactNode) => (
   <div className="wrKv"><span>{k}</span><span>{v}</span></div>

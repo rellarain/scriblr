@@ -40,7 +40,7 @@ const KIND_WORD: Partial<Record<OutlineNode['kind'], string>> = { arc: 'Arc', ch
 
 // What an open chapter holds, as nested, editable cards: its acts hold scenes and its scenes hold moments (the arcs and
 // chapters themselves, with their headers, are in the navigation pane, OutlineNav, which shows this under the open chapter's header).
-// Cards are reordered and moved by dragging their grip; plotpoints dragged from the Project level's Plotpoints tab land in the
+// Cards are reordered and moved by dragging their grip; plotpoints dragged from the Plot tab's Plotpoints tile land in the
 // chapter, an act, a scene or a moment and are boxed inside it; every card has a word count (the draft's) and a quiet trash icon
 // that asks to confirm.
 export function OutlineCards({ w, book, counts, plotDrag, chapterId }: {

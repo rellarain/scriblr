@@ -1,35 +1,18 @@
-// The Plot tool: its three layouts, the contents tree, the editor cards, the parents' chips.
+// The Plot console: its tiles, the contents tree, the editor cards, the parents' chips.
 @use './mixins' as *;
 
 .wr {
   // ---------------------------------------------------------------- plot
-  .wrPlotView { flex: 1 1 auto; min-width: 0; min-height: 0; display: flex; }
-  // The tool's three layouts follow its own width (data-size, from useElementWidth.ts): wide as drawn above; medium stacks a plotline's
-  // chapters under its fields; compact is one column with the contents as a bar on top.
-  .wrPlotFrame {
-    flex: 1 1 auto; min-width: 0; min-height: 0; display: flex; gap: var(--space-7); position: relative;
-    &[data-size='compact'] { flex-direction: column; gap: var(--space-base); }
-    &:not([data-size='wide']) {
-      .wrPlotlineLayout { flex: 0 0 auto; flex-direction: column; }
-      .wrPlotlineLeft { flex: 0 0 auto; overflow: visible; }
-      .wrPlotlineRight { flex: 0 0 auto; min-width: 0; }
-    }
-  }
-  // Compact: the contents fold down from one line over the editor.
-  .wrPlotBar { position: relative; flex: 0 0 auto; z-index: 3; }
-  .wrPlotBarToggle { width: 100%; display: flex; align-items: center; gap: var(--space-base); padding: 8px var(--space-4); border-radius: var(--radius-button); background: var(--ov-sink-1); color: inherit; text-align: left; font-size: var(--text-ui); font-weight: 700; }
-  .wrPlotBarToggle .wrNavCount { flex: 0 0 auto; white-space: nowrap; }
-  .wrPlotBarLabel { flex: 1 1 auto; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-  // The drawer is on the level's own fill (the tile around it is a light surface with the dark ink), so what it holds is read in the level's
-  // ink: its label, circles and "n selected" take it from here, and its two add buttons are washes of it, as on any level.
-  .wrPlotBarDrawer {
-    position: absolute; left: 0; right: 0; top: calc(100% + 4px); display: flex; max-height: min(60vh, 440px); border-radius: var(--radius-button); overflow: hidden;
-    background: var(--wr-fill-2); color: var(--on-accent); box-shadow: 0 8px 20px rgb(0 0 0 / calc(0.4 * var(--shade-k)));
-    .wrPlotNav { flex: 1 1 auto; border-radius: var(--radius-none); background: var(--ov-sink-1); }
-    .wrPlotNavAddRow > .wrSmallBtn, .wrPresetPickerRoot > .wrSmallBtn { @include wrLevelWash; &:hover:not(:disabled) { background: var(--level-wash-hi); } }
-  }
-  // The contents' width is 250px until its handle is dragged (--wr-nav-basis, set on the frame by PlotView.tsx; plotNavWidth.ts); the handle (.wrSideResizer) sits over the gap on its right edge.
-  .wrPlotNav { position: relative; flex: 0 0 var(--wr-nav-basis, 250px); min-width: 0; min-height: 0; display: flex; flex-direction: column; gap: var(--space-base); background: var(--ov-sink-1); border-radius: var(--radius-button); padding: var(--space-4); }
+  // The Plot console: five tiles on a split grid (PlotView.tsx), as the Schedule console's are. The console fills its tab's tile; the grid takes its whole height.
+  .wrPlotConsole { position: relative; width: 100%; height: 100%; min-height: 0; display: flex; flex-direction: column; > .wrSplit { flex: 1 1 0; } }
+  // Its tiles are one step deeper than the tab's tile (fill-3, their title bars fill-4), as the Schedule console's. The icons in a title bar are 20px at least.
+  .wrPlotConsole .wrTabTile { background: var(--wr-fill-3); }
+  .wrPlotConsole .wrTabTileTitle { background: var(--wr-fill-4); color: var(--level-ink); }
+  .wrPlotRail { display: contents; }
+  .wrPlotConsole .wrTabTileTitle svg[viewBox='0 0 24 24'] { flex: none; min-width: 20px; min-height: 20px; }
+  // A tile is a light surface in the ink colour that holds one tool, which scrolls itself (.wrPlotBody) or, for the contents, holds its rows.
+  .wrPlotConsole .wrSplitTile > .wrPlotTileBody { overflow: hidden; display: flex; flex-direction: column; }
+  .wrPlotNav { position: relative; flex: 1 1 auto; min-width: 0; min-height: 0; display: flex; flex-direction: column; gap: var(--space-base); background: var(--ov-sink-1); border-radius: var(--radius-button); padding: var(--space-4); }
   // The head: "+ Category" and "+ Preset" at the left, the circles at the right. Wrapped in reverse, so when they don't fit on one line the buttons (the first item) drop to the line
   // under the circles; the preset list anchors to the head and opens under it.
   .wrPlotNavHead { position: relative; display: flex; flex-wrap: wrap-reverse; align-items: center; gap: var(--space-3); }
@@ -188,7 +171,12 @@
   .wrProjStats { display: flex; gap: var(--space-4); font-size: var(--text-small); opacity: 0.9; padding-left: 24px; span + span::before { content: '\00b7'; margin-right: var(--space-4); } }
   .wrProjFoot { display: flex; }
 
-  .wrPlotlineLayout { flex: 1 1 auto; min-height: 0; display: flex; gap: var(--space-7); }
-  .wrPlotlineLeft { flex: 0 0 430px; min-height: 0; display: flex; flex-direction: column; gap: var(--space-6); overflow-y: auto; scrollbar-width: none; &::-webkit-scrollbar { display: none; } }
-  .wrPlotlineRight { flex: 1 1 auto; min-width: 320px; min-height: 0; display: flex; flex-direction: column; gap: var(--space-6); }
+  .wrPlotlineEditor { display: flex; flex-direction: column; gap: var(--space-6); min-width: 0; }
+  // A parent chip opened onto its own fields: the title and description, the colour and the keywords, in the chip's colour.
+  // Its text is the chip's own ink (white on a subcategory's or cluster's fill, the tile's ink on a category's), in the fields and the labels too.
+  .wrParentEdit {
+    display: flex; flex-direction: column; gap: var(--space-4); padding: var(--space-2) var(--space-4) var(--space-5); cursor: auto; color: var(--wr-parent-ink);
+    .wrLabel, .wrField, input, textarea { color: var(--wr-parent-ink); }
+    .wrField::placeholder, input::placeholder, textarea::placeholder { color: color-mix(in srgb, var(--wr-parent-ink) 70%, transparent); }
+  }
 }

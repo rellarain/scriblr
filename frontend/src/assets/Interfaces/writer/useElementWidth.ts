@@ -33,10 +33,9 @@ export function useElementWidth<T extends HTMLElement = HTMLDivElement>(breakpoi
   return [ref, width] as const
 }
 
-// The Plot tool's three layouts, by its own width:
-//   wide     the contents column beside the editor, a plotline's fields beside its chapters (about 1,040px and up)
-//   medium   contents beside the editor, but a plotline's chapters panel under its fields
-//   compact  one column: the contents are a bar on top (under about 720px)
+// The compare tile's layouts, by its own width (PlotCompare.tsx):
+//   wide     the chapters panel beside the list (about 1,040px and up)
+//   medium, compact   the chapters in a fold-out under the list (the groups stand as columns from COMPARE_COLUMNS_FROM)
 export type PlotSize = 'wide' | 'medium' | 'compact'
 export const PLOT_COMPACT_BELOW = 720
 export const PLOT_WIDE_FROM = 1040

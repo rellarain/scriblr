@@ -1,4 +1,4 @@
-import { CalendarIcon, ClockIcon, GearIcon, HelpIcon, OutlineIcon, PlotIcon, QueueIcon } from '../../../icons'
+import { CalendarIcon, ClockIcon, GearIcon, HelpIcon, OutlineIcon, PlotIcon } from '../../../icons'
 import WorkspaceSaveCluster from './WorkspaceSaveCluster'
 import { SHELF_COMPONENTS } from '../consoleDefs'
 import { Placeholder } from '../shared'
@@ -11,7 +11,6 @@ import { bookRows, categoryRows, plotCounts } from '../tiles/tileData'
 import ScheduleConsole from '../schedule/ScheduleConsole'
 import { ScheduleSummary } from '../schedule/ScheduleSummary'
 import HelpArticles from './HelpArticles'
-import PlotpointsTab from './PlotpointsTab'
 import { useTabbedLevel, type LevelTab } from './LevelTabs'
 
 export const PROJECT_HELP_NAMES = ['project', 'shelf', 'project console']
@@ -66,9 +65,8 @@ function openNode(w: WriterWorkspace, tree: 'outline' | 'plot', id: string) {
 
 export function projectTabs(w: WriterWorkspace): LevelTab[] {
   return [
-    { id: 'plot', label: 'Plot', Icon: PlotIcon, fill: true, render: c => (c.size === 'max' ? <PlotView w={w} /> : <PlotSummary w={w} />) },
+    { id: 'plot', label: 'Plot', Icon: PlotIcon, fill: true, surface: false, titleSlot: true, iconSize: 20, render: c => (c.size === 'max' ? <PlotView w={w} titleSlot={c.titleSlot} /> : <PlotSummary w={w} />) },
     { id: 'outline', label: 'Outline', Icon: OutlineIcon, fill: true, render: c => (c.size === 'max' ? <ProjectOutline w={w} /> : <OutlineSummary w={w} />) },
-    { id: 'plotpoints', label: 'Plotpoints', Icon: QueueIcon, render: () => <PlotpointsTab w={w} /> },
     {
       id: 'schedule', label: 'Schedule', Icon: CalendarIcon, fill: true, surface: false, titleSlot: true, iconSize: 20,
       render: c => {
@@ -84,7 +82,7 @@ export function projectTabs(w: WriterWorkspace): LevelTab[] {
 }
 
 // What each Project tab edits, for Undo and Redo (the other tabs have nothing to undo).
-const PROJECT_SCOPES: Record<string, HistoryScope> = { plot: 'plot', plotpoints: 'plot', outline: 'outline', settings: 'settings' }
+const PROJECT_SCOPES: Record<string, HistoryScope> = { plot: 'plot', outline: 'outline', settings: 'settings' }
 
 // The Project level's tabs and quick actions (Save, the project's own).
 export function useProjectTabs(w: WriterWorkspace, size: 'min' | 'mid' | 'max') {

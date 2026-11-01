@@ -98,7 +98,7 @@ export function useWriterWorkspace() {
   const [plotSelection, setPlotSelection] = useState<string[]>([])
   // The plotpoint a plot-outline click points at in the Draft level (shown highlighted for a moment).
   const [highlightedPointId, setHighlightedPointId] = useState<string | null>(null)
-  // The plotpoint being dragged from the Project level's Plotpoints tab onto an Outline card (or back).
+  // The plotpoint being dragged from the Plot tab's Plotpoints tile onto an Outline card (or back).
   // The plotpoint being dragged (from the plot editor's field lists, the tray, or a card of the outline), and, when it is one of its placements that is
   // dragged (a tile in the outline: dropping it moves that placement), which.
   const [plotDrag, setPlotDragState] = useState<{ pointId: string; placementId: string | null } | null>(null)

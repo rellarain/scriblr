@@ -11,7 +11,7 @@ import { allPlacements, placedCount } from '../plotPlacement'
 import { levelOfTarget, nodeLabel, orderPlacements } from '../plotTree'
 import { useStoredState } from '../storage'
 
-// The Project level's Plotpoints tab: the tray of every plotpoint, as tiles to drag onto a chapter, act, scene or moment card in the
+// The Plotpoints tile of the Project level's Plot console: the tray of every plotpoint, as tiles to drag onto a chapter, act, scene or moment card in the
 // Outline (a plotpoint can be placed as many times as it likes; each tile says how many times, and a plotpoint stays in the tray); drop a
 // placement's tile back here to take that placement away. A switch narrows the tray to the plotpoints still to place. Under it
 // come the placements already in the open book, by the time of their scenes or in story order.
