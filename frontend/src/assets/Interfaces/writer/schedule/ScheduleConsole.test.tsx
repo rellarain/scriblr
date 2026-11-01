@@ -1,6 +1,6 @@
 import { fireEvent, render, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
-import { beforeEach, describe, expect, it, vi } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { __resetSettingsForTests } from '../../../../settings/settingsStore'
 import { mockFetchBy } from '../../../../test/mockFetch'
 import { emptyDay, emptyPlanner, newTask, type Planner } from '../../../../lib/facets'
@@ -24,7 +24,11 @@ function planner(): Planner {
 }
 
 let saved: Planner[]
+// The clock is the day of the fixture, at eight in the morning: the shift (9 to 11) is still to come, so a task put on it is not sent back to the backlog.
+afterEach(() => { vi.useRealTimers() })
 beforeEach(() => {
+  vi.useFakeTimers({ toFake: ['Date'] })
+  vi.setSystemTime(new Date(2026, 9, 31, 8, 0))
   window.localStorage.clear()
   __resetSettingsForTests()
   saved = []
@@ -168,17 +172,19 @@ describe('the Schedule console', () => {
     expect((screen.getByLabelText('Title') as HTMLInputElement).value).toBe('Morning draft')
   })
 
-  it('makes a shift from + Shift, repeating on chosen days, and saves the planner', async () => {
+  it('makes a shift from + Shift in the side panel, repeating on chosen days, and saves the planner as it goes', async () => {
     const user = userEvent.setup()
     await open()
     await user.click(within(tile('schedule')).getByRole('button', { name: 'New shift' }))
-    await user.type(screen.getByLabelText('Title'), 'Evening plot')
-    await user.selectOptions(screen.getByLabelText('Facet'), 'plot')
-    await user.selectOptions(screen.getByLabelText('Repeats'), 'weekly')
-    await user.click(screen.getByRole('button', { name: 'Saturday' }))
-    await user.click(screen.getByRole('button', { name: 'Save shift' }))
+    const panel = screen.getByRole('form', { name: 'New shift' })
+    await user.type(within(panel).getByLabelText('Title'), 'Evening plot')
+    await user.click(within(panel).getByRole('button', { name: 'Plot' }))
+    await user.click(within(panel).getByRole('button', { name: /^Repeat/ }))
+    await user.click(within(panel).getByRole('radio', { name: 'Weekdays' }))
+    await user.click(within(panel).getByRole('button', { name: 'Saturday' }))
     expect(await within(tile('schedule')).findByRole('button', { name: /^Evening plot/ })).toBeTruthy()
     await waitFor(() => expect(saved.length).toBeGreaterThan(0), { timeout: 3000 })
+    await waitFor(() => expect(saved.at(-1)!.shifts.find(s => s.title === 'Evening plot')?.recurrence?.days).toEqual([0, 1, 2, 3, 4, 5]), { timeout: 3000 })
     const shift = saved.at(-1)!.shifts.find(s => s.title === 'Evening plot')!
     expect(shift).toMatchObject({ facet: 'plot', date: TODAY })
     expect(shift.recurrence).toMatchObject({ kind: 'weekly', days: [0, 1, 2, 3, 4, 5] })

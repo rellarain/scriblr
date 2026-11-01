@@ -29,6 +29,9 @@ The app resets native form controls, so the console draws its own.
 - **Tick** (`.wrSchedConsole input[type='checkbox']`): a 16px box outlined in the level's soft ink, filled with the level's ink and a tick in the card's colour when ticked; disabled = 40% opaque.
 - **Day chips** (`DayChips`, `.wrSchedDays`): seven 28px circles, Monday first, M T W T F S S; a day that is on is filled with the level's ink. One stays on.
 - **Repeat picker** (`RepeatPicker`, `.wrRepeat`): a segmented choice (Does not repeat, Every day, Weekdays, Weekly, Custom, After an interval; the first only for a shift, the last only for a routine) and under it only what the choice needs: the day chips for Weekly, "Every N days or weeks" for Custom, "Every N to M days, weeks or months" for After an interval, and an end date. Its fields are `.wrField`.
+- **Choice chips** (`.wrChoice`): a choice of one among several words, as chips that wrap in a narrow panel (a change's scope, how a shift repeats); the chosen chip is inverted (the level's ink with the card's colour for the text). A short choice that always fits stays a joined segmented control (`.wrSchedSeg`).
+- **Time range** (`TimeRange`, `.wrTimeRange`): two `.wrField` pickers of 10-minute times with the length beside them; moving the start moves the end with it.
+- **Fold** (`.wrFold`): a row with a chevron, a name and its summary on the right, opening into its fields; the panel's less-used fields are folded.
 - **Priority flag** (`.wrPrio`): a flag drawn by shape (filled High, half-filled Medium, dashed Low, faint None); pressed it opens into the four choices as a small segmented control.
 
 ## Alerts and quiet text

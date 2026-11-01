@@ -196,8 +196,28 @@
   .wrSchedMenu { position: fixed; z-index: 20; display: flex; flex-direction: column; min-width: 170px; padding: var(--space-2); background: var(--wr-fill-4); color: var(--level-ink); border: 1px solid var(--level-ink-soft); border-radius: var(--radius-button);
     button { background: transparent; border: 0; padding: var(--space-4) var(--space-5); text-align: left; color: inherit; font: inherit; font-size: var(--text-ui); cursor: pointer; &:hover, &:focus-visible { background: var(--level-ink); color: var(--wr-fill-4); } } }
   .wrSchedScopeAsk { display: flex; flex-wrap: wrap; gap: var(--space-4); align-items: center; padding: var(--space-5); border: 1px solid var(--level-ink-soft); border-radius: var(--radius-button); background: var(--wr-fill-4); p { margin: 0; font-weight: 700; } }
-  .wrSchedEditor { display: flex; flex-direction: column; gap: var(--space-4); padding: var(--space-5); border-radius: var(--radius-button); background: var(--wr-fill-4); }
-  .wrSchedDays { display: inline-flex; gap: var(--space-3); button { width: 28px; height: 28px; border-radius: 50%; border: 1px solid var(--level-ink-soft); background: transparent; color: inherit; font: inherit; font-size: var(--text-ui); font-weight: 700; cursor: pointer; &.on { background: var(--level-ink); color: var(--wr-fill-4); border-color: var(--level-ink); } } }
+  // The shift's side panel, beside the calendar inside the Planner tile (a narrow tile gives it the whole tile, and lists the days as an agenda).
+  .wrSchedBody { gap: var(--space-5); }
+  .wrSchedPanel { flex: 0 0 min(320px, 46%); min-width: 0; display: flex; flex-direction: column; gap: var(--space-4); padding: var(--space-5); border-radius: var(--radius-button); background: var(--wr-fill-4); align-self: flex-start; max-height: 100%; overflow: auto; scrollbar-width: none; &::-webkit-scrollbar { display: none; } }
+  .wrSchedSchedule--narrow .wrSchedPanel { flex: 1 1 auto; align-self: stretch; }
+  // A choice of one among several words that wraps in a narrow panel (the scope of a change, how a shift repeats): chips, the chosen one inverted.
+  .wrChoice { display: flex; flex-wrap: wrap; gap: var(--space-3);
+    button { padding: var(--space-3) var(--space-5); border: 1px solid var(--level-line); border-radius: var(--radius-button); background: transparent; color: var(--level-ink-soft); font: inherit; font-size: var(--text-ui); cursor: pointer; white-space: nowrap;
+      &:hover { background: var(--level-wash); }
+      &.on { background: var(--level-ink); border-color: var(--level-ink); color: var(--wr-fill-4); font-weight: 700; } } }
+  .wrTimeRange { display: flex; align-items: center; gap: var(--space-3); .wrField { flex: 1 1 0; min-width: 0; } }
+  .wrTimeLength { color: var(--level-ink-soft); font-size: var(--text-ui); white-space: nowrap; }
+  .wrFold { border-top: 1px solid var(--level-line); }
+  .wrFoldHead { display: flex; align-items: center; gap: var(--space-3); width: 100%; padding: var(--space-4) 0; background: transparent; border: 0; color: inherit; font: inherit; font-size: var(--text-ui); font-weight: 700; text-align: left; cursor: pointer;
+    small { margin-left: auto; color: var(--level-ink-soft); font-weight: 400; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; } }
+  .wrFoldBody { display: flex; flex-direction: column; gap: var(--space-4); padding: 0 0 var(--space-4); }
+  .wrFoldField { display: flex; flex-direction: column; gap: var(--space-2); font-size: var(--text-ui); color: var(--level-ink-soft); }
+  // A block that is open in the panel, its title being changed in place, and the bar of quick actions that shows on hover.
+  .wrSchedBlock--selected { outline: 2px solid var(--level-ink); outline-offset: 1px; z-index: 3; }
+  .wrSchedRename { width: calc(100% - 6px); padding: var(--space-1) var(--space-3); font-size: var(--text-ui); }
+  .wrSchedBlockBar { position: absolute; z-index: 5; display: flex; gap: var(--space-1); margin-left: -64px; opacity: 0; pointer-events: none; transition: opacity 0.12s;
+    .wrSmallBtn { background: var(--wr-fill-4); color: var(--level-ink); border: 1px solid var(--level-line); } }
+  .wrSchedBlock:hover + .wrSchedBlockBar, .wrSchedBlockBar:hover, .wrSchedBlockBar:focus-within, .wrSchedBlock:focus-visible + .wrSchedBlockBar { opacity: 1; pointer-events: auto; }
   .wrSchedPauses { display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-4); }
   .wrSchedPause { display: inline-flex; gap: var(--space-3); padding: 0 var(--space-4); border: 1px dashed var(--level-ink-soft); border-radius: var(--radius-button); button { background: transparent; border: 0; color: inherit; cursor: pointer; } }
   .wrSchedCheck { display: flex; align-items: center; justify-content: space-between; gap: var(--space-4); }
@@ -252,8 +272,7 @@
 
   // How a routine comes round: the presets, and what each opens into.
   .wrRepeat { display: flex; flex-direction: column; gap: var(--space-4); }
-  .wrRepeatPresets { flex-wrap: wrap; align-self: flex-start; }
-  .wrRepeatRow { display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-3); font-size: var(--text-ui); }
+    .wrRepeatRow { display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-3); font-size: var(--text-ui); }
   .wrSchedDays { display: inline-flex; gap: var(--space-2);
     button { width: 28px; height: 28px; padding: 0; border-radius: 50%; border: 1px solid var(--level-line); background: transparent; color: var(--level-ink-soft); font: inherit; font-size: var(--text-ui); cursor: pointer;
       &:hover { background: var(--level-wash); }

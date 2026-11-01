@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
-import type { Shift } from './facets'
-import { editShift } from './shiftEdit'
+import { newTask, type Shift } from './facets'
+import { diffPatch, editShift, shiftForTask, slotsForTask } from './shiftEdit'
 import { shiftOccurrences } from './recurrence'
 
 const weekdays: Shift = {
@@ -60,5 +60,27 @@ describe('editing a shift that repeats', () => {
     const once: Shift = { ...weekdays, recurrence: null }
     const out = editShift(once, '2026-10-05', { date: '2026-10-09', startSlot: 50 }, 'this', id)
     expect(out).toEqual([{ ...once, date: '2026-10-09', startSlot: 50 }])
+  })
+})
+
+describe('diffPatch', () => {
+  it('holds only the fields that changed, so a day override never carries the others', () => {
+    expect(diffPatch(weekdays, { ...weekdays, title: 'Evening', endSlot: 66 })).toEqual({ title: 'Evening', endSlot: 66 })
+    expect(diffPatch(weekdays, { ...weekdays })).toEqual({})
+    expect(diffPatch(weekdays, { ...weekdays, target: null })).toEqual({ target: null })
+  })
+})
+
+describe('shiftForTask', () => {
+  it('makes a one-off shift for a task at the slot it was dropped on, as long as its estimate', () => {
+    const task = newTask('t', 'Revise ch 3', null, { facet: 'plot', estimateMinutes: 45, targetNodeId: 'n', targetTree: 'outline' })
+    expect(slotsForTask(task)).toBe(5)
+    expect(shiftForTask(task, 'new', '2026-11-04', 54)).toMatchObject({ id: 'new', title: 'Revise ch 3', facet: 'plot', date: '2026-11-04', startSlot: 54, endSlot: 59, targetNodeId: 'n', targetTree: 'outline', recurrence: null })
+  })
+  it('is an hour of drafting without an estimate or a facet, and stays inside the day', () => {
+    const task = newTask('t', 'Plain', null)
+    expect(slotsForTask(task)).toBe(6)
+    expect(shiftForTask(task, 'new', '2026-11-04', 143)).toMatchObject({ facet: 'draft', startSlot: 138, endSlot: 144 })
+    expect(slotsForTask(newTask('t', 'Quick', null, { estimateMinutes: 5 }))).toBe(3) // never shorter than a shift can be
   })
 })

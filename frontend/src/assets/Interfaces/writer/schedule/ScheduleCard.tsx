@@ -1,16 +1,17 @@
-import { useEffect, useMemo, useRef, useState, type DragEvent, type PointerEvent as ReactPointerEvent, type ComponentType } from 'react'
+import { Fragment, useEffect, useMemo, useRef, useState, type DragEvent, type PointerEvent as ReactPointerEvent, type ComponentType } from 'react'
 import { FACET_LABEL, SLOTS_PER_DAY, slotTime, type ActivityEvent, type Facet, type PlanItem, type Planner, type Shift, type ShiftTemplate } from '../../../../lib/facets'
 import { addDays } from '../../../../lib/projection'
 import { addUnits, shiftOccurrences, type ShiftOccurrence } from '../../../../lib/recurrence'
-import { editShift, type EditScope, type ShiftPatch } from '../../../../lib/shiftEdit'
+import { diffPatch, editShift, shiftForTask, type EditScope, type ShiftPatch } from '../../../../lib/shiftEdit'
 import { dragResult, intervalStates, layoutLanes, rangeOf, shiftStatus, type DragMode, type ShiftStatus } from '../../../../lib/timeline'
 import { MONTH_NAMES, rowLetters, type WeekStart } from '../../../../lib/scheduleCalendar'
 import { useStoredState } from '../shared'
 import { DRAG_ITEM } from './Backlog'
 import { newId } from './ids'
-import { ShiftEditor, type TargetOption } from './ShiftEditor'
+import { ShiftPanel, type TargetOption } from './ShiftPanel'
+import { useElementWidth } from '../useElementWidth'
 import { ICON_PX, IconBtn } from './IconBtn'
-import { ChevronLeftIcon, ChevronRightIcon, CloseIcon, ListIcon, PlusIcon, TodayIcon, ViewDayIcon, ViewMonthIcon, ViewWeekIcon, ViewYearIcon, type IconProps } from '../../../icons'
+import { ChevronLeftIcon, ChevronRightIcon, CloseIcon, CopyIcon, ListIcon, PlusIcon, TodayIcon, TrashIcon, ViewDayIcon, ViewMonthIcon, ViewWeekIcon, ViewYearIcon, type IconProps } from '../../../icons'
 
 // The Schedule: shifts on a day, a week or a month, or listed as an agenda, like a calendar. Drag across empty time to make a shift, drag a shift to
 // move it or its edges to resize it, click it to edit it, right-click (or press and hold) for its menu. The backlog sits beside it.
@@ -18,10 +19,12 @@ import { ChevronLeftIcon, ChevronRightIcon, CloseIcon, ListIcon, PlusIcon, Today
 export interface ScheduleOwner { id: string; label: string; projectId: string | null; planner: Planner; setPlanner: (p: Planner) => void }
 export interface TicksApi { get: (ownerId: string, date: string) => string[]; loaded: (ownerId: string, date: string) => boolean; load: (ownerId: string, date: string) => void; set: (ownerId: string, date: string, id: string, on: boolean) => void }
 type CalView = 'day' | 'week' | 'month' | 'year' | 'agenda'
+interface Editing { ownerId: string; orig: Shift; base: Shift; draft: Shift; occurrence: string; isNew: boolean; scope: EditScope; tailId: string }
 type Occ = ShiftOccurrence & { ownerId: string }
 const VIEW_ICON: Record<CalView, ComponentType<IconProps>> = { day: ViewDayIcon, week: ViewWeekIcon, month: ViewMonthIcon, year: ViewYearIcon, agenda: ListIcon }
 // A row is one 10-minute slot (SLOTS_PER_DAY a day), tall enough for its time label; an hour is six rows.
 const SLOT_PX = 20
+const NARROW_PX = 480
 const HOUR_PX = SLOT_PX * 6
 const STATUS_LABEL: Record<ShiftStatus, string> = { upcoming: 'Upcoming', inProgress: 'In progress', done: 'Done', partly: 'Partly done', missed: 'Missed', past: '' }
 const dayName = (d: string, long = false): string => new Date(`${d}T00:00:00Z`).toLocaleDateString('en-US', { weekday: long ? 'long' : 'short', month: 'short', day: 'numeric', timeZone: 'UTC' })
@@ -33,7 +36,11 @@ export function ScheduleCard({
 }: { owners: ScheduleOwner[]; today: string; nowSlot: number; events: ActivityEvent[]; weekStart: WeekStart; targets: TargetOption[]; ticks: TicksApi }) {
   const [view, setView] = useStoredState<CalView>('scriblr.writer.schedule.calendarView', 'week')
   const [cursor, setCursor] = useState(today)
-  const [editing, setEditing] = useState<{ ownerId: string; shift: Shift; occurrence: string; isNew: boolean } | null>(null)
+  const [editing, setEditing] = useState<Editing | null>(null)
+  const [renaming, setRenaming] = useState<string | null>(null)
+  // Below this width the Planner lists its days as an agenda (the view that is kept is not changed).
+  const [wrap, width] = useElementWidth<HTMLDivElement>([NARROW_PX])
+  const narrow = width === 0
   const [menu, setMenu] = useState<{ x: number; y: number; occ: Occ } | null>(null)
   const [pending, setPending] = useState<{ occ: Occ; patch: ShiftPatch } | null>(null)
   const [dragNew, setDragNew] = useState<{ date: string; a: number; b: number } | null>(null)
@@ -42,14 +49,15 @@ export function ScheduleCard({
   const box = useRef<HTMLDivElement>(null)
   const press = useRef<ReturnType<typeof setTimeout> | null>(null)
   useEffect(() => { setCursor(today) }, [today])
-  useEffect(() => { if (box.current && (view === 'day' || view === 'week')) box.current.scrollTop = 6 * HOUR_PX - 4 }, [view])
+  const shown: CalView = narrow && (view === 'day' || view === 'week') ? 'agenda' : view
+  useEffect(() => { if (box.current && (shown === 'day' || shown === 'week')) box.current.scrollTop = 6 * HOUR_PX - 4 }, [shown])
 
-  const start = view === 'day' ? cursor : view === 'agenda' ? cursor : addDays(cursor, -sinceStart(cursor, weekStart))
+  const start = shown === 'day' ? cursor : shown === 'agenda' ? cursor : addDays(cursor, -sinceStart(cursor, weekStart))
   const monthFirst = `${cursor.slice(0, 8)}01`
-  const from = view === 'year' ? `${cursor.slice(0, 4)}-01-01` : view === 'month' ? addDays(monthFirst, -sinceStart(monthFirst, weekStart)) : start
-  const length = view === 'day' ? 1 : view === 'week' ? 7 : view === 'month' ? 42 : 14
-  const to = view === 'year' ? `${cursor.slice(0, 4)}-12-31` : addDays(from, length - 1)
-  const days = view === 'year' ? [] : Array.from({ length: view === 'month' ? 42 : view === 'agenda' ? 14 : length }, (_, i) => addDays(from, i))
+  const from = shown === 'year' ? `${cursor.slice(0, 4)}-01-01` : shown === 'month' ? addDays(monthFirst, -sinceStart(monthFirst, weekStart)) : start
+  const length = shown === 'day' ? 1 : shown === 'week' ? 7 : shown === 'month' ? 42 : 14
+  const to = shown === 'year' ? `${cursor.slice(0, 4)}-12-31` : addDays(from, length - 1)
+  const days = shown === 'year' ? [] : Array.from({ length: shown === 'month' ? 42 : shown === 'agenda' ? 14 : length }, (_, i) => addDays(from, i))
   const occs: Occ[] = useMemo(
     () => owners.flatMap(o => shiftOccurrences(o.planner.shifts, o.planner.restDays, from, to).map(x => ({ ...x, ownerId: o.id }))),
     [owners, from, to],
@@ -68,10 +76,37 @@ export function ScheduleCard({
   const owner = (id: string) => owners.find(o => o.id === id) as ScheduleOwner
   const shiftOf = (o: Occ): Shift | undefined => owner(o.ownerId)?.planner.shifts.find(s => s.id === o.shiftId)
 
-  const label = view === 'day' ? dayName(cursor, true) : view === 'month' ? monthTitle(cursor) : view === 'year' ? cursor.slice(0, 4) : `${dayName(from)} – ${dayName(to)}`
-  const step = (dir: 1 | -1) => setCursor(c => (view === 'year' ? addUnits(c, dir * 12, 'month') : view === 'month' ? addUnits(c, dir, 'month') : addDays(c, dir * (view === 'day' ? 1 : 7))))
+  const label = shown === 'day' ? dayName(cursor, true) : shown === 'month' ? monthTitle(cursor) : shown === 'year' ? cursor.slice(0, 4) : `${dayName(from)} – ${dayName(to)}`
+  const step = (dir: 1 | -1) => setCursor(c => (shown === 'year' ? addUnits(c, dir * 12, 'month') : shown === 'month' ? addUnits(c, dir, 'month') : addDays(c, dir * (view === 'day' ? 1 : 7))))
 
   // ---- editing ----
+  // What the side panel is changing: the shift as it was (`orig`), as the day was opened (`base`) and as it is now (`draft`), for the days `scope` says. Every
+  // change is applied again from `orig`, so the scope can be changed after a field and a split into "this and following" is never made twice (`tailId` is the
+  // id the second half of a split takes).
+  const blankNew = editing?.isNew && !editing.draft.title.trim() ? editing.orig.id : null
+  const applyEdit = (e: Editing, dropId: string | null = null) => {
+    const o = owner(e.ownerId)
+    let out: Shift[]
+    if (!e.orig.recurrence) out = [e.draft]
+    else {
+      out = editShift(e.orig, e.occurrence, diffPatch(e.base, e.draft), e.scope, () => e.tailId)
+      // How it repeats and its pauses are the pattern's: they go to the whole of what the scope covers (a day's own change is only a title and a time).
+      if (e.scope !== 'this') {
+        const i = e.scope === 'following' ? out.length - 1 : 0
+        const first = out[i]
+        out[i] = { ...first, pauses: e.draft.pauses, recurrence: e.draft.recurrence ? { ...e.draft.recurrence, anchor: first.recurrence?.anchor ?? e.draft.recurrence.anchor } : null }
+      }
+    }
+    const rest = o.planner.shifts.filter(x => x.id !== e.orig.id && x.id !== e.tailId && x.id !== dropId)
+    o.setPlanner({ ...o.planner, shifts: [...rest, ...out] })
+  }
+  // A shift made at the drag and never given a name is taken away again when the panel is closed (or another shift is opened).
+  const dropBlank = () => {
+    if (!editing || !blankNew) return
+    const o = owner(editing.ownerId)
+    o.setPlanner({ ...o.planner, shifts: o.planner.shifts.filter(x => x.id !== blankNew), items: o.planner.items.map(i => (i.shiftId === blankNew ? { ...i, shiftId: null } : i)) })
+  }
+  const closeEditing = () => { dropBlank(); setEditing(null) }
   const openNew = (date: string, startSlot = 48, endSlot = 60, template?: ShiftTemplate) => {
     const o = owners[0]
     if (!o) return
@@ -81,43 +116,61 @@ export function ScheduleCard({
       recurrence: template?.days.length ? { kind: 'weekly', every: 1, unit: 'day', days: template.days, rangeMax: null, anchor: date, until: null } : null,
       pauses: [], skipped: [], overrides: {},
     }
-    setEditing({ ownerId: o.id, shift, occurrence: date, isNew: true })
+    // The shift is made now (the panel changes it as it goes): what it starts as is a one-off, and a template's pattern is the first change to it.
+    const plain: Shift = { ...shift, recurrence: null, pauses: [] }
+    const next: Editing = { ownerId: o.id, orig: plain, base: plain, draft: shift, occurrence: date, isNew: true, scope: 'all', tailId: newId('shift') }
+    setEditing(next)
+    applyEdit(next, blankNew)
   }
   const openOcc = (occ: Occ) => {
     const s = shiftOf(occ)
     if (!s) return
     ticks.load(occ.ownerId, occ.date)
-    setEditing({ ownerId: occ.ownerId, shift: { ...s, date: occ.date, startSlot: occ.startSlot, endSlot: occ.endSlot, title: occ.title }, occurrence: occ.date, isNew: false })
+    const base: Shift = { ...s, date: occ.date, startSlot: occ.startSlot, endSlot: occ.endSlot, title: occ.title }
+    dropBlank()
+    setEditing({ ownerId: occ.ownerId, orig: s, base, draft: base, occurrence: occ.date, isNew: false, scope: 'this', tailId: newId('shift') })
   }
-  const commit = (ownerId: string, orig: Shift | null, occurrence: string, s: Shift, items: PlanItem[] | null, scope: EditScope) => {
+  const change = (patch: Partial<Shift>) => {
+    if (!editing) return
+    const draft = { ...editing.draft, ...patch }
+    // A pattern never starts after the day it is set on.
+    if (patch.date && draft.recurrence && !editing.orig.recurrence && draft.recurrence.anchor > patch.date) draft.recurrence = { ...draft.recurrence, anchor: patch.date }
+    const next = { ...editing, draft }
+    setEditing(next)
+    applyEdit(next)
+  }
+  const changeScope = (scope: EditScope) => {
+    if (!editing) return
+    const next = { ...editing, scope }
+    setEditing(next)
+    applyEdit(next)
+  }
+  const changeItems = (items: PlanItem[]) => { if (editing) { const o = owner(editing.ownerId); o.setPlanner({ ...o.planner, items }) } }
+  // A change made to a shift outside the panel (a drag, a new name on its block) makes the panel's picture of it stale: the panel closes.
+  const patchShift = (ownerId: string, s: Shift, occurrence: string, patch: ShiftPatch, scope: EditScope) => {
     const o = owner(ownerId)
-    let out: Shift[]
-    if (!orig || !orig.recurrence) out = [s]
-    else {
-      const patch: ShiftPatch = { title: s.title, facet: s.facet, date: s.date, startSlot: s.startSlot, endSlot: s.endSlot, target: s.target, targetNodeId: s.targetNodeId, targetTree: s.targetTree }
-      out = editShift(orig, occurrence, patch, scope, () => newId('shift'))
-      if (scope !== 'this') {
-        const i = scope === 'following' ? out.length - 1 : 0
-        const base = out[i]
-        out[i] = { ...base, pauses: s.pauses, recurrence: s.recurrence ? { ...s.recurrence, anchor: base.recurrence?.anchor ?? s.recurrence.anchor } : null }
-      }
-    }
-    const rest = o.planner.shifts.filter(x => x.id !== (orig?.id ?? s.id))
-    o.setPlanner({ ...o.planner, shifts: [...rest, ...out], items: items ?? o.planner.items })
-    setEditing(null)
+    const out = editShift(s, occurrence, patch, scope, () => newId('shift'))
+    o.setPlanner({ ...o.planner, shifts: [...o.planner.shifts.filter(x => x.id !== s.id), ...out] })
+    if (editing?.orig.id === s.id) setEditing(null)
     setPending(null)
   }
-  const remove = (ownerId: string, shift: Shift, occurrence: string, scope: EditScope) => {
+  const remove = (ownerId: string, shift: Shift, occurrence: string, scope: EditScope, alsoGone: string[] = []) => {
     const o = owner(ownerId)
-    let shifts = o.planner.shifts
+    let shifts = o.planner.shifts.filter(x => !alsoGone.includes(x.id))
     let items = o.planner.items
     const gone = () => { shifts = shifts.filter(x => x.id !== shift.id); items = items.map(i => (i.shiftId === shift.id ? { ...i, shiftId: null } : i)) }
     if (!shift.recurrence || scope === 'all' || (shift.recurrence && occurrence <= shift.recurrence.anchor && scope === 'following')) gone()
     else if (scope === 'this') shifts = shifts.map(x => (x.id === shift.id ? { ...x, skipped: [...x.skipped, occurrence] } : x))
     else shifts = shifts.map(x => (x.id === shift.id && x.recurrence ? { ...x, recurrence: { ...x.recurrence, until: addDays(occurrence, -1) } } : x))
     o.setPlanner({ ...o.planner, shifts, items })
-    setEditing(null)
+    if (editing?.orig.id === shift.id) setEditing(null)
     setMenu(null)
+  }
+  const deleteEditing = () => {
+    if (!editing) return
+    const current = owner(editing.ownerId).planner.shifts.find(x => x.id === editing.orig.id) ?? editing.orig
+    // Put back what the panel has done to the pattern first: what is removed is the shift as it was.
+    remove(editing.ownerId, editing.isNew ? current : editing.orig, editing.occurrence, editing.isNew ? 'all' : editing.scope, [editing.tailId])
   }
   const duplicate = (occ: Occ) => {
     const s = shiftOf(occ)
@@ -134,22 +187,53 @@ export function ScheduleCard({
     const s = shiftOf(occ)
     if (!s) return
     if (s.recurrence) setPending({ occ, patch })
-    else commit(occ.ownerId, s, occ.date, { ...s, ...patch, date: patch.date ?? s.date } as Shift, null, 'this')
+    else patchShift(occ.ownerId, s, occ.date, patch, 'this')
   }
-  const dropItem = (e: DragEvent, occ: Occ) => {
-    const raw = e.dataTransfer.getData(DRAG_ITEM)
-    if (!raw) return
-    e.preventDefault()
+  const rename = (occ: Occ, title: string) => {
+    setRenaming(null)
+    const s = shiftOf(occ)
+    const next = title.trim()
+    if (s && next && next !== occ.title) patchShift(occ.ownerId, s, occ.date, { title: next }, 'this')
+  }
+  // ---- dropping a task from the Backlog ----
+  const droppedItem = (e: DragEvent): { owner: ScheduleOwner; item: PlanItem } | null => {
+    const raw = e.dataTransfer?.getData(DRAG_ITEM)
+    if (!raw) return null
     const { ownerId, itemId } = JSON.parse(raw) as { ownerId: string; itemId: string }
-    if (ownerId !== occ.ownerId) return
-    const o = owner(ownerId)
-    o.setPlanner({ ...o.planner, items: o.planner.items.map(i => (i.id === itemId ? { ...i, shiftId: occ.shiftId } : i)) })
+    const o = owners.find(x => x.id === ownerId)
+    const item = o?.planner.items.find(i => i.id === itemId)
+    return o && item ? { owner: o, item } : null
   }
+  // On a shift: the task goes on it.
+  const dropItem = (e: DragEvent, occ: Occ) => {
+    const hit = droppedItem(e)
+    if (!hit) return
+    e.preventDefault()
+    e.stopPropagation()
+    if (hit.owner.id !== occ.ownerId) return
+    hit.owner.setPlanner({ ...hit.owner.planner, items: hit.owner.planner.items.map(i => (i.id === hit.item.id ? { ...i, shiftId: occ.shiftId } : i)) })
+  }
+  // On an empty slot of a day: a shift is made for the task (its facet and node, as long as its estimate), starting where it was dropped.
+  const dropOnSlot = (e: DragEvent, date: string) => {
+    const hit = droppedItem(e)
+    if (!hit) return
+    e.preventDefault()
+    const shift = shiftForTask(hit.item, newId('shift'), date, slotAt(date, e.clientY))
+    hit.owner.setPlanner({ ...hit.owner.planner, shifts: [...hit.owner.planner.shifts, shift], items: hit.owner.planner.items.map(i => (i.id === hit.item.id ? { ...i, shiftId: shift.id } : i)) })
+  }
+  // On a day of the month or the year: that day is the task's due day.
+  const dropOnDay = (e: DragEvent, date: string) => {
+    const hit = droppedItem(e)
+    if (!hit) return
+    e.preventDefault()
+    hit.owner.setPlanner({ ...hit.owner.planner, items: hit.owner.planner.items.map(i => (i.id === hit.item.id ? { ...i, dueDate: date } : i)) })
+  }
+  const dropTarget = { onDragOver: (e: DragEvent) => e.preventDefault() }
 
   // ---- dragging ----
   const slotAt = (date: string, clientY: number): number => {
     const el = cols.current[date]
-    return el ? Math.max(0, Math.min(SLOTS_PER_DAY - 1, Math.floor((clientY - el.getBoundingClientRect().top) / SLOT_PX))) : 0
+    return el ? Math.max(0, Math.min(SLOTS_PER_DAY - 1, Math.floor(((Number.isFinite(clientY) ? clientY : 0) - el.getBoundingClientRect().top) / SLOT_PX))) : 0
   }
   const dateAtX = (clientX: number, fallback: string): string => {
     for (const d of days) { const r = cols.current[d]?.getBoundingClientRect(); if (r && clientX >= r.left && clientX < r.right) return d }
@@ -159,12 +243,14 @@ export function ScheduleCard({
     if (!dragNew && !dragShift) return undefined
     const move = (e: PointerEvent) => {
       if (dragNew) setDragNew({ ...dragNew, b: slotAt(dragNew.date, e.clientY) })
-      else if (dragShift) setDragShift({ ...dragShift, dSlots: Math.round((e.clientY - dragShift.y) / SLOT_PX), dDays: dragShift.mode === 'move' && view === 'week' ? Math.round((new Date(`${dateAtX(e.clientX, dragShift.occ.date)}T00:00:00Z`).getTime() - new Date(`${dragShift.occ.date}T00:00:00Z`).getTime()) / 86_400_000) : 0 })
+      else if (dragShift) setDragShift({ ...dragShift, dSlots: Math.round((e.clientY - dragShift.y) / SLOT_PX), dDays: dragShift.mode === 'move' && shown === 'week' ? Math.round((new Date(`${dateAtX(e.clientX, dragShift.occ.date)}T00:00:00Z`).getTime() - new Date(`${dragShift.occ.date}T00:00:00Z`).getTime()) / 86_400_000) : 0 })
     }
     const up = () => {
       if (dragNew) {
         const r = rangeOf(dragNew.a, dragNew.b)
         setDragNew(null)
+        // A press that did not move on empty time only closes the panel, when one is open.
+        if (dragNew.a === dragNew.b && editing) { closeEditing(); return }
         openNew(dragNew.date, r.startSlot, r.endSlot)
       } else if (dragShift) {
         const { occ, mode, dSlots, dDays } = dragShift
@@ -192,25 +278,48 @@ export function ScheduleCard({
     const r = live ? dragResult(live.mode, occ.startSlot, occ.endSlot, live.dSlots) : { startSlot: occ.startSlot, endSlot: occ.endSlot }
     const states = intervalStates({ ...occ, ...r }, events, today, nowSlot, keptFrom)
     const status = shiftStatus(states, { ...occ, ...r }, today, nowSlot)
+    const key = `${occ.ownerId}${occ.shiftId}${occ.date}`
+    const name = occ.title || 'New shift'
+    const selected = editing !== null && editing.ownerId === occ.ownerId && editing.occurrence === occ.date && (occ.shiftId === editing.orig.id || occ.shiftId === editing.tailId)
+    const stop = { onPointerDown: (e: ReactPointerEvent) => e.stopPropagation(), onDoubleClick: (e: React.MouseEvent) => e.stopPropagation() }
     return (
-      <div
-        key={`${occ.ownerId}${occ.shiftId}${occ.date}`}
-        className={`wrSchedBlock wrSchedBlock--${status}${live ? ' wrSchedBlock--drag' : ''}`}
-        style={{ top: r.startSlot * SLOT_PX, height: Math.max(SLOT_PX * 3, (r.endSlot - r.startSlot) * SLOT_PX - 1), left: `${(occ.lane / occ.lanes) * 100}%`, width: `${100 / occ.lanes}%`, ['--wr-bc' as string]: `var(--wr-f-${occ.facet})` }}
-        role="button" tabIndex={0} aria-label={`${occ.title}, ${slotTime(r.startSlot)} to ${slotTime(r.endSlot)}${STATUS_LABEL[status] ? `, ${STATUS_LABEL[status]}` : ''}`}
-        onKeyDown={e => { if (e.key === 'Enter') openOcc(occ) }}
-        onContextMenu={e => { e.preventDefault(); setMenu({ x: e.clientX, y: e.clientY, occ }) }}
-        onPointerDown={e => { if (e.button !== 0) return; holdOpen(e, occ); setDragShift({ occ, mode: 'move', y: e.clientY, dSlots: 0, dDays: 0 }) }}
-        onPointerUp={cancelHold} onPointerLeave={cancelHold}
-        onDragOver={e => e.preventDefault()} onDrop={e => dropItem(e, occ)}
-      >
-        <span className="wrSchedHandle wrSchedHandle--top" onPointerDown={e => { e.stopPropagation(); setDragShift({ occ, mode: 'top', y: e.clientY, dSlots: 0, dDays: 0 }) }} />
-        <b>{occ.title}</b>
-        <small>{slotTime(r.startSlot)} – {slotTime(r.endSlot)}</small>
-        {STATUS_LABEL[status] && <small>{STATUS_LABEL[status]}</small>}
-        <span className="wrSchedIntervals" aria-hidden="true">{states.map((st, i) => <i key={i} className={`wrSchedInterval wrSchedInterval--${st}`} />)}</span>
-        <span className="wrSchedHandle wrSchedHandle--bottom" onPointerDown={e => { e.stopPropagation(); setDragShift({ occ, mode: 'bottom', y: e.clientY, dSlots: 0, dDays: 0 }) }} />
-      </div>
+      <Fragment key={key}>
+        <div
+          className={`wrSchedBlock wrSchedBlock--${status}${live ? ' wrSchedBlock--drag' : ''}${selected ? ' wrSchedBlock--selected' : ''}`}
+          style={{ top: r.startSlot * SLOT_PX, height: Math.max(SLOT_PX * 3, (r.endSlot - r.startSlot) * SLOT_PX - 1), left: `${(occ.lane / occ.lanes) * 100}%`, width: `${100 / occ.lanes}%`, ['--wr-bc' as string]: `var(--wr-f-${occ.facet})` }}
+          role="button" tabIndex={0} aria-label={`${name}, ${slotTime(r.startSlot)} to ${slotTime(r.endSlot)}${STATUS_LABEL[status] ? `, ${STATUS_LABEL[status]}` : ''}`} aria-pressed={selected}
+          onKeyDown={e => { if (e.key === 'Enter' && e.target === e.currentTarget) openOcc(occ); if (e.key === 'F2' && e.target === e.currentTarget) setRenaming(key) }}
+          onDoubleClick={() => setRenaming(key)}
+          onContextMenu={e => { e.preventDefault(); setMenu({ x: e.clientX, y: e.clientY, occ }) }}
+          onPointerDown={e => { if (e.button !== 0) return; holdOpen(e, occ); setDragShift({ occ, mode: 'move', y: e.clientY, dSlots: 0, dDays: 0 }) }}
+          onPointerUp={cancelHold} onPointerLeave={cancelHold}
+          onDragOver={e => e.preventDefault()} onDrop={e => dropItem(e, occ)}
+        >
+          <span className="wrSchedHandle wrSchedHandle--top" onPointerDown={e => { e.stopPropagation(); setDragShift({ occ, mode: 'top', y: e.clientY, dSlots: 0, dDays: 0 }) }} />
+          {renaming === key
+            ? (
+              <input
+                className="wrField wrSchedRename" aria-label="Shift title" defaultValue={occ.title} autoFocus {...stop}
+                onFocus={e => e.currentTarget.select()} onBlur={e => rename(occ, e.currentTarget.value)}
+                onKeyDown={e => { e.stopPropagation(); if (e.key === 'Enter') e.currentTarget.blur(); if (e.key === 'Escape') { e.currentTarget.value = occ.title; setRenaming(null) } }}
+              />
+            )
+            : <b>{name}</b>}
+          <small>{slotTime(r.startSlot)} – {slotTime(r.endSlot)}</small>
+          {STATUS_LABEL[status] && <small>{STATUS_LABEL[status]}</small>}
+          <span className="wrSchedIntervals" aria-hidden="true">{states.map((st, i) => <i key={i} className={`wrSchedInterval wrSchedInterval--${st}`} />)}</span>
+          <span className="wrSchedHandle wrSchedHandle--bottom" onPointerDown={e => { e.stopPropagation(); setDragShift({ occ, mode: 'bottom', y: e.clientY, dSlots: 0, dDays: 0 }) }} />
+        </div>
+        {!live && (
+          <div className="wrSchedBlockBar" style={{ top: r.startSlot * SLOT_PX + 2, left: `${((occ.lane + 1) / occ.lanes) * 100}%` }}>
+            <IconBtn Icon={CopyIcon} label={`Duplicate ${name}`} {...stop} onClick={() => duplicate(occ)} />
+            <IconBtn
+              Icon={TrashIcon} label={occ.repeats ? `Skip ${name} on this day` : `Delete ${name}`} {...stop}
+              onClick={() => { const s = shiftOf(occ); if (s) remove(occ.ownerId, s, occ.date, occ.repeats ? 'this' : 'all') }}
+            />
+          </div>
+        )}
+      </Fragment>
     )
   }
 
@@ -229,7 +338,7 @@ export function ScheduleCard({
           const mine = layoutLanes(occs.filter(o => o.date === d))
           return (
             <div
-              key={d} className="wrSchedCol" ref={el => { cols.current[d] = el }} data-date={d} style={{ height: SLOTS_PER_DAY * SLOT_PX }}
+              key={d} className="wrSchedCol" ref={el => { cols.current[d] = el }} data-date={d} style={{ height: SLOTS_PER_DAY * SLOT_PX }} {...dropTarget} onDrop={e => dropOnSlot(e, d)}
               onPointerDown={e => { if (e.target === e.currentTarget && e.button === 0) { const s = slotAt(d, e.clientY); setDragNew({ date: d, a: s, b: s }) } }}
             >
               {dragNew?.date === d && (() => { const r = rangeOf(dragNew.a, dragNew.b); return <div className="wrSchedGhost" style={{ top: r.startSlot * SLOT_PX, height: (r.endSlot - r.startSlot) * SLOT_PX }} /> })()}
@@ -247,10 +356,10 @@ export function ScheduleCard({
       {days.map(d => {
         const mine = occs.filter(o => o.date === d)
         return (
-          <button key={d} type="button" role="gridcell" className={`wrSchedMonthDay${d === today ? ' wrSchedMonthDay--today' : ''}${d.slice(0, 7) !== cursor.slice(0, 7) ? ' wrSchedMonthDay--out' : ''}`} onClick={() => { setCursor(d); setView('day') }}>
+          <button key={d} type="button" role="gridcell" className={`wrSchedMonthDay${d === today ? ' wrSchedMonthDay--today' : ''}${d.slice(0, 7) !== cursor.slice(0, 7) ? ' wrSchedMonthDay--out' : ''}`} {...dropTarget} onDrop={e => dropOnDay(e, d)} onClick={() => { setCursor(d); setView('day') }}>
             <b>{Number(d.slice(8))}</b>
             {(deadlines.get(d) ?? []).map(t => <span key={t} className="wrSchedDeadline">{t}</span>)}
-            {mine.slice(0, 3).map(o => <span key={o.shiftId} className="wrSchedMonthShift"><i className="wrSchedDot" style={{ background: `var(--wr-f-${o.facet})` }} />{o.title}</span>)}
+            {mine.slice(0, 3).map(o => <span key={o.shiftId} className="wrSchedMonthShift"><i className="wrSchedDot" style={{ background: `var(--wr-f-${o.facet})` }} />{o.title || 'New shift'}</span>)}
             {mine.length > 3 && <span className="wrMuted">+{mine.length - 3} more</span>}
           </button>
         )
@@ -283,7 +392,7 @@ export function ScheduleCard({
                   return (
                     <button
                       key={d} type="button" role="gridcell" className={cls} style={mine[0] ? { ['--wr-bc' as string]: `var(--wr-f-${mine[0].facet})` } : undefined}
-                      title={`${dayName(d, true)}${[...mine.map(o => o.title), ...due].map(t => ` · ${t}`).join('')}`} onClick={() => { setCursor(d); setView('day') }}
+                      title={`${dayName(d, true)}${[...mine.map(o => o.title), ...due].map(t => ` · ${t}`).join('')}`} {...dropTarget} onDrop={e => dropOnDay(e, d)} onClick={() => { setCursor(d); setView('day') }}
                     >{i + 1}</button>
                   )
                 })}
@@ -310,7 +419,7 @@ export function ScheduleCard({
               return (
                 <button type="button" key={`${o.shiftId}${o.date}`} className="wrSchedAgendaRow" onClick={() => openOcc(o)}>
                   <i className="wrSchedDot" style={{ background: `var(--wr-f-${o.facet})` }} />
-                  <span><b>{o.title}</b> <small>{slotTime(o.startSlot)} – {slotTime(o.endSlot)}{s?.target ? ` · aim ${s.target}` : ''}</small>{items.length > 0 && <small>{items.map(i => i.label).join(' · ')}</small>}</span>
+                  <span><b>{o.title || 'New shift'}</b> <small>{slotTime(o.startSlot)} – {slotTime(o.endSlot)}{s?.target ? ` · aim ${s.target}` : ''}</small>{items.length > 0 && <small>{items.map(i => i.label).join(' · ')}</small>}</span>
                 </button>
               )
             })}
@@ -323,7 +432,7 @@ export function ScheduleCard({
 
   const editingOwner = editing ? owner(editing.ownerId) : null
   return (
-    <div className="wrSchedCard wrSchedSchedule">
+    <div className={`wrSchedCard wrSchedSchedule${narrow ? ' wrSchedSchedule--narrow' : ''}`} ref={wrap}>
       <div className="wrSchedHead">
         <IconBtn Icon={TodayIcon} iconProps={{ day: Number(today.slice(8)) }} label="Today" onClick={() => setCursor(today)} />
         <IconBtn Icon={ChevronLeftIcon} label="Previous" onClick={() => step(-1)} />
@@ -345,17 +454,18 @@ export function ScheduleCard({
           {owners.flatMap(o => o.planner.templates).map(t => <button key={t.id} type="button" className="wrSmallBtn" onClick={() => openNew(today, 48, 60, t)}>{t.name}</button>)}
         </div>
       )}
-      <div className="wrSchedBody"><div className="wrSchedMain">{view === 'month' ? monthGrid : view === 'year' ? yearGrid : view === 'agenda' ? agenda : timeGrid}</div></div>
-      {editing && editingOwner && (
-        <ShiftEditor
-          key={`${editing.shift.id}${editing.occurrence}`}
-          shift={editing.shift} occurrence={editing.occurrence} isNew={editing.isNew} items={editingOwner.planner.items} ticks={ticks.get(editing.ownerId, editing.occurrence)} targets={targets}
-          onTick={(id, on) => ticks.set(editing.ownerId, editing.occurrence, id, on)}
-          onSave={(s, items, scope) => commit(editing.ownerId, editing.isNew ? null : (editingOwner.planner.shifts.find(x => x.id === editing.shift.id) ?? null), editing.occurrence, s, items, scope)}
-          onDelete={scope => remove(editing.ownerId, editingOwner.planner.shifts.find(x => x.id === editing.shift.id) ?? editing.shift, editing.occurrence, scope)}
-          onTemplate={s => saveTemplate(editing.ownerId, s)} onClose={() => setEditing(null)}
-        />
-      )}
+      <div className="wrSchedBody">
+        {!(narrow && editing) && <div className="wrSchedMain">{shown === 'month' ? monthGrid : shown === 'year' ? yearGrid : shown === 'agenda' ? agenda : timeGrid}</div>}
+        {editing && editingOwner && (
+          <ShiftPanel
+            key={`${editing.orig.id}${editing.occurrence}`}
+            shift={editing.draft} itemsShiftId={editing.orig.id} occurrence={editing.occurrence} isNew={editing.isNew} repeating={Boolean(editing.orig.recurrence) && !editing.isNew}
+            scope={editing.scope} onScope={changeScope} items={editingOwner.planner.items} ticks={ticks.get(editing.ownerId, editing.occurrence)} targets={targets}
+            onChange={change} onItems={changeItems} onTick={(id, on) => ticks.set(editing.ownerId, editing.occurrence, id, on)}
+            onDelete={deleteEditing} onTemplate={() => saveTemplate(editing.ownerId, editing.draft)} onClose={closeEditing}
+          />
+        )}
+      </div>
       {menu && (
         <div className="wrSchedMenu" role="menu" style={{ left: menu.x, top: menu.y }} onPointerLeave={() => setMenu(null)}>
           <button type="button" role="menuitem" onClick={() => { openOcc(menu.occ); setMenu(null) }}>Edit</button>
@@ -368,7 +478,7 @@ export function ScheduleCard({
         <div className="wrSchedScopeAsk" role="dialog" aria-label="Change which shifts?">
           <p>Change which shifts?</p>
           {([['this', 'This day'], ['following', 'This and following'], ['all', 'All of them']] as const).map(([scope, text]) => (
-            <button key={scope} type="button" className="wrSmallBtn" onClick={() => { const s = shiftOf(pending.occ); if (s) commit(pending.occ.ownerId, s, pending.occ.date, { ...s, ...pending.patch, date: pending.patch.date ?? pending.occ.date } as Shift, null, scope) }}>{text}</button>
+            <button key={scope} type="button" className="wrSmallBtn" onClick={() => { const s = shiftOf(pending.occ); if (s) patchShift(pending.occ.ownerId, s, pending.occ.date, pending.patch, scope) }}>{text}</button>
           ))}
           <IconBtn Icon={CloseIcon} label="Cancel" onClick={() => setPending(null)} />
         </div>

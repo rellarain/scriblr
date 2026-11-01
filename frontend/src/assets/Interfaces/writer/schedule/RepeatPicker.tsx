@@ -15,6 +15,9 @@ const sameDays = (a: number[], b: number[]) => a.length === b.length && a.every(
 // Monday = 0 (the day an anchor falls on).
 const weekdayOf = (date: string): number => (new Date(`${date}T00:00:00Z`).getUTCDay() + 6) % 7
 
+// The name of the preset a recurrence reads as.
+export const presetLabel = (rec: Recurrence | null): string => LABEL[presetOf(rec)]
+
 // The preset a recurrence reads as.
 export function presetOf(rec: Recurrence | null): RepeatPreset {
   if (!rec || rec.kind === 'once') return 'none'
@@ -54,12 +57,12 @@ export function RepeatPicker({ value, anchor, onChange, allowNone = false, allow
 
   return (
     <div className="wrRepeat" role="group" aria-label={label}>
-      <div className="wrSchedSeg wrRepeatPresets" role="radiogroup" aria-label={`${label} how often`}>
+      <div className="wrChoice" role="radiogroup" aria-label={`${label} how often`}>
         {presets.map(p => (
           <button key={p} type="button" role="radio" aria-checked={preset === p} className={preset === p ? 'on' : ''} onClick={() => choose(p)}>{LABEL[p]}</button>
         ))}
       </div>
-      {(preset === 'weekly' || (preset === 'custom' && value?.kind === 'weekly')) && (
+      {(preset === 'weekly' || preset === 'weekdays' || (preset === 'custom' && value?.kind === 'weekly')) && (
         <DayChips days={value?.days ?? []} label="On these days" onChange={days => set({ days })} />
       )}
       {preset === 'custom' && value && (
