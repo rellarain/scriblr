@@ -410,8 +410,8 @@ last row, like Claude Code's own resizable panes). The shared system is `fronten
   divider's rect in one pass.
 - **`TileArea`** (`TileArea.tsx`; the Writer imports it as `writer/SplitArea.tsx`) draws the tiles, their dividers and,
   with `bar`, a tab bar. Every tile has the same **title bar**: a grip, the tile's icon, its name in capitals, the tile's
-  own controls (`titleExtras`), then a **Minimize** button (and **Maximize** where a tile asks, `maximizable`). The title
-  bar is the drag handle (a tile's body holds fields and text). A tile's colours are the `--gt-*` variables a console sets
+  own controls (`titleExtras`), then **Maximize** where a tile asks (`maximizable`). A tile has **no Minimize button**: its
+  icon in the area's rail turns it off and on. The title bar is the drag handle (a tile's body holds fields and text). A tile's colours are the `--gt-*` variables a console sets
   (`--gt-fill`, `--gt-title-fill`, `--gt-ink`, `--gt-accent`); otherwise the theme's.
 - **Dropping (`tileDrop.ts`)**: the tile under the pointer is cut into a 3x3 grid. The middle **swaps** the two tiles; the
   four edge cells put the tile **above, below, left or right** of it; a corner takes whichever of its two edges the
@@ -424,7 +424,13 @@ last row, like Claude Code's own resizable panes). The shared system is `fronten
   **slide** (0.16s) to open a **dashed, accent-tinted gap** where it will land. Hit-testing uses the layout as it was when
   the drag began, so the sliding never moves the target out from under the pointer. Escape cancels. There is no keyboard
   way to rearrange tiles; arrows move focus between title bars, and a divider is nudged with the arrow keys.
-- **Minimize**: the Minimize button, dropping a tile on the console's **tab bar**, or (the Writer) pressing an open tab
+- **Two rails, console tabs and tile tabs** (`consoleTiles.tsx`): a panel or level has a rail of **console tabs** (one icon
+  per console; **Settings and Help are always consoles, always last**, never tabs of a tile rail). A console that has tiles of
+  its own has a rail of **tile tabs in its tile's title bar** (`TileArea`'s `barHost`, the slot `useRailSlots` hands out;
+  `consoleTile()` builds such a console). A tile area always has a rail: inline above the tiles (`bar`), in a title bar
+  (`barHost`), or in the level's header. A tile that its console turns on and off itself (the Draft level's Settings and Help)
+  is `railless`.
+- **Turning a tile off**: pressing its icon in the rail, dropping the tile on the **rail**, or (the Writer) pressing an open tab
   all minimize a tile into **an icon in the bar** (`TileTabBar`, `data-tile-bar=<gridId>`; the Writer draws its own bar in
   the level's header with the same attributes, `levels/LevelTabs.tsx`). Pressing the icon restores the tile to its old
   slot; **dragging the icon out** into the layout (`tileDragBus.ts` lets a bar anywhere start the drag in its area)
@@ -435,21 +441,24 @@ last row, like Claude Code's own resizable panes). The shared system is `fronten
   `scriblr.tiles.<gridId>`): the tree, which tiles are minimized (`shapes`) and the maximized tile. A console can control
   minimizing (`minimized` / `onMinimizedChange`) and maximizing (`maximized` / `onMaximizedChange`) itself: the Writer's
   tabs do the first, the Reader the second. Pure logic in `tileLayout.ts` (`applyLayout`) and `tileNav.ts` (`nextFocus`).
-- **Writer:** the level tabs (`useTabbedLevel`) are a tile each; a closed tab is a minimized tile. Draft's three tiles and
-  the Schedule console's six are on the same area, each with a tab bar above it. The Shelves and Shelf screens, the
+- **Writer:** the level tabs (`useTabbedLevel`) are console tabs, a tile each; a closed tab is a minimized tile, and Settings and
+  Help are last. The Schedule console's six tiles (Goals, Review, Activity, Planner, Backlog, Analytics) have their rail in
+  the console tile's title bar. Draft's three tiles have a rail above them; its Settings and Help are `railless` tiles that the
+  two console buttons in the chapter tile turn on and off. The Shelves and Shelf screens, the
   Book screen (`writer/tiles/`) and the sidebar's Project, Book and Chapter panels are their own thing; the sidebar is
   **resizable from its right edge** (`scriblr.writer.sidebarWidth`).
 - **Reader** (`reader/ReaderPanel.tsx`): a page's consoles are tiles; an icon in the header bar is a minimized console, an
   open one a tile, and Maximize makes it the full console (the others become icons; the URL names it).
-- **User panel** (`assets/Interfaces/UUI.tsx`): Dashboard, Account and Training are tiles showing their pages, their
-  settings and their help directly. Dashboard's settings are the theme tool on its own (`ThemeSettingsPanel`); Account's
+- **User panel** (`assets/Interfaces/UUI.tsx`): the consoles are Dashboard, Account and Training (each holds its pages as tiles,
+  the rail in its title bar), then Settings and Help, one of each for the panel (every section's under its own name). Dashboard's settings are the theme tool on its own (`ThemeSettingsPanel`); Account's
   (`CustomizeControls`) are handedness and autosave plus that same theme tool embedded inline (`showHeader={false}`).
-- **Admin panel** (`AUI.tsx`): its eight sections and Resources as tiles; a Resources config page keeps its publish
+- **Admin panel** (`AUI.tsx`): its seven sections (pages as tiles, the rail in the title bar), Resources and a Help console
+  (every section's help under its name); a Resources config page keeps its publish
   badge, Save draft / Publish and lock inside its tile and saves when it is left. AUI's own width is dragged from its outer
   edge (`Sidebar.tsx`'s `AuiResize`, next to the sidebar divider; the drag direction flips with handedness), snapping to
   400px columns and remembered as `scriblr.admin.width`; `min()` in the CSS (`--aui-w`, `App.tsx`) keeps it from exceeding
   the rest of the screen. Below 400px of its own width every tile is a row.
-- **Helper panel** (`HUI.tsx`): Inbox, Queue and Settings tiles (plus the open chat's Conversation) in the 400px panel.
+- **Helper panel** (`HUI.tsx`): Inbox, Queue and Settings consoles (plus the open chat's Conversation; Settings stays last) in the 400px panel.
   The sidebar divider's buttons choose the open tile (the grid's `minimized` list is controlled here); the tab bar opens
   the others until the buttons change the choice again.
 

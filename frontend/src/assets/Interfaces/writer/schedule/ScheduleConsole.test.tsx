@@ -62,6 +62,24 @@ describe('the Schedule console', () => {
     expect(within(tile('backlog')).getByText('Reread Ch. 8')).toBeTruthy()
   })
 
+  it('names the calendar tile Planner, and has the rail of its tiles (no minimize buttons) above them', async () => {
+    await open()
+    expect(screen.queryByRole('button', { name: /^Minimize/ })).toBeNull()
+    expect(within(tile('schedule').querySelector('.wrTabTileTitle') as HTMLElement).getByText('Planner')).toBeTruthy()
+    const rail = screen.getByRole('toolbar', { name: 'Schedule tiles tabs' })
+    expect(within(rail).getAllByRole('button').map(b => b.getAttribute('aria-label'))).toEqual(['Goals', 'Review', 'Activity', 'Planner', 'Backlog', 'Analytics'])
+  })
+
+  it('puts the rail in the title bar of the console tile when it is given a slot there', async () => {
+    const slot = document.body.appendChild(document.createElement('span'))
+    render(<ScheduleConsole scope="project" projectIds={['p1']} titles={{ p1: 'Saga' }} titleSlot={slot} />)
+    await screen.findByText('Reread Ch. 8')
+    const rail = within(slot).getByRole('toolbar', { name: 'Schedule tiles tabs' })
+    fireEvent.click(within(rail).getByRole('button', { name: 'Backlog', pressed: true }))
+    expect(tile('backlog')).toBeNull()
+    slot.remove()
+  })
+
   it('shows each goal with its progress, the pace against the deadline and its status', async () => {
     await open()
     const goals = within(tile('goals'))
@@ -113,7 +131,7 @@ describe('the Schedule console', () => {
     await open()
     const bar = tile('activity').querySelector('.wrTabTileTitle') as HTMLElement
     const inBar = within(bar)
-    expect(inBar.getAllByRole('button').map(b => b.getAttribute('aria-label') ?? b.textContent)).toEqual(['Outline', 'Plot', 'Draft', 'Revision', 'Project', 'Grid', 'Line graph', 'Vs goal', 'Vs busiest day', 'Minimize Activity'])
+    expect(inBar.getAllByRole('button').map(b => b.getAttribute('aria-label') ?? b.textContent)).toEqual(['Outline', 'Plot', 'Draft', 'Revision', 'Project', 'Grid', 'Line graph', 'Vs goal', 'Vs busiest day'])
     expect(inBar.getByRole('button', { name: 'Vs goal' }).textContent).toBe('%')
     expect(inBar.getByRole('button', { name: 'Vs busiest day' }).textContent).toBe('#')
     expect(tile('activity').querySelector('.wrSchedTileBody .wrSchedFacet')).toBeNull()

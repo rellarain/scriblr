@@ -1,11 +1,12 @@
 import RoleAssignment from './admin/RoleAssignment'
-import { Suspense, lazy, type ComponentType } from 'react'
+import { Suspense, lazy, useState, type ComponentType } from 'react'
 import {
   BarChartIcon, VotingIcon, LibraryIcon, PeopleIcon, BuildingIcon, BriefcaseIcon,
   EnvelopeIcon, CalendarIcon, HelpIcon, TeamIcon, SortingIcon, ConfigurationIcon, InfoIcon, PlotIcon,
   type IconProps,
 } from '../icons'
 import TileArea, { type AreaTile } from '../../components/tiles/TileArea'
+import { consoleTile, useRailSlots } from '../../components/tiles/consoleTiles'
 
 // The article and quiz builder (and the Markdown renderer behind it) is loaded when its console is opened.
 const ResourcesConsole = lazy(() => import('./admin/resources/ResourcesConsole'))
@@ -139,30 +140,35 @@ const SECTIONS: AuiSectionDef[] = [
 // Component > Feature tree, not a per-page settings editor.
 
 function AUI() {
-  // Each section is a tile showing its pages directly; a section's Help sub-page is a paragraph at its foot.
-  const tiles: AreaTile[] = SECTIONS.map(section => {
-    const pages = section.subSections.filter(s => s.label !== 'Help')
-    const help = section.subSections.find(s => s.label === 'Help')?.body
-    return {
-      id: section.key, title: section.label, Icon: section.Icon,
-      children: (
-        <div className="aUISection">
-          {pages.map(page => (
-            <section key={page.key} className="aUIPage" aria-label={page.label}>
-              {page.key !== 'configPlot' && <h2>{page.label}</h2>}
-              {page.key === 'assignment' ? <RoleAssignment />
-                : page.key === 'configPlot' ? <Suspense fallback={null}><PlotPresetsConsole /></Suspense>
-                : <p>{page.body}</p>}
-            </section>
-          ))}
-          {help && <section className="aUIPage" aria-label="Help"><h2>Help</h2><p>{help}</p></section>}
-        </div>
-      ),
-    }
-  })
+  const slots = useRailSlots()
+  const [rail, setRail] = useState<HTMLElement | null>(null)
+  // Each section is a console holding its pages as tiles (their rail is in its title bar). Help is a console of its own, last in the panel's rail,
+  // with each section's help under its name (the sections' own Help sub-pages).
+  const tiles: AreaTile[] = SECTIONS.map(section => consoleTile(slots, {
+    panel: 'aui', id: section.key, title: section.label, Icon: section.Icon,
+    pages: section.subSections.filter(s => s.label !== 'Help').map(page => ({
+      id: page.key, label: page.label, Icon: page.Icon,
+      children: page.key === 'assignment' ? <RoleAssignment />
+        : page.key === 'configPlot' ? <Suspense fallback={null}><PlotPresetsConsole /></Suspense>
+        : <p>{page.body}</p>,
+    })),
+  }))
   tiles.push({
     id: 'resources', title: 'Resources', Icon: InfoIcon,
     children: <Suspense fallback={null}><ResourcesConsole /></Suspense>,
+  })
+  tiles.push({
+    id: 'help', title: 'Help', Icon: HelpIcon,
+    children: (
+      <div className="aUISection">
+        {SECTIONS.map(section => (
+          <section key={section.key} className="aUIPage" aria-label={`${section.label} help`}>
+            <h2>{section.label}</h2>
+            <p>{section.subSections.find(s => s.label === 'Help')?.body}</p>
+          </section>
+        ))}
+      </div>
+    ),
   })
 
   return (
@@ -171,8 +177,9 @@ function AUI() {
         <div className="aUIContent aUIContent--tiles">
           <div className="aUIConsoleTitleRow">
             <h1 className="aUIConsoleTitle">Admin</h1>
+            <span ref={setRail} className="gtRailSlot" />
           </div>
-          <TileArea gridId="aui" label="Admin panel tiles" bar tiles={tiles} />
+          <TileArea gridId="aui" label="Admin panel consoles" bar barHost={rail} tiles={tiles} />
         </div>
       </div>
     </section>

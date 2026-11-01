@@ -48,11 +48,11 @@ describe('SplitArea', () => {
     expect(document.querySelector('[role="separator"]')).toBeNull()
   })
 
-  it('has a title bar on each tile (its icon and name) to drag it by, with a minimize button, and the body is its own', () => {
+  it('has a title bar on each tile (its icon and name) to drag it by, with no minimize button, and the body is its own', () => {
     render(<Harness />)
+    expect(screen.queryByRole('button', { name: /^Minimize/ })).toBeNull()
     for (const id of ['x', 'y', 'z']) {
       expect(handle(id).textContent).toContain(id.toUpperCase())
-      expect(screen.getByRole('button', { name: `Minimize ${id.toUpperCase()}` })).toBeTruthy()
       expect(tile(id).querySelector('.wrTabTileBody')?.textContent).toContain(`${id} body`)
     }
   })
@@ -107,9 +107,9 @@ describe('SplitArea', () => {
   })
 
   it('does not start a drag from a control in the title bar', () => {
-    render(<Harness ids={['x', 'y']} />)
+    render(<SplitArea gridId="ctrl" tiles={tiles(['x', 'y']).map(t => ({ ...t, maximizable: true }))} />)
     const before = px(tile('x'), 'left')
-    const held = holdTile(screen.getByRole('button', { name: 'Minimize X' }), { x: 10, y: 10 })
+    const held = holdTile(screen.getByRole('button', { name: 'Maximize X' }), { x: 10, y: 10 })
     held.moveTo(750, 300)
     held.drop()
     expect(px(tile('x'), 'left')).toBe(before)
@@ -207,14 +207,14 @@ describe('SplitArea', () => {
     expect(document.activeElement).toBe(handle('y'))
   })
 
-  it('minimizes a tile with its button: it gives up its room but keeps its slot, and is remembered', () => {
-    const first = render(<Harness ids={['x', 'y']} />)
-    fireEvent.click(screen.getByRole('button', { name: 'Minimize X' }))
+  it('turns a tile off with its icon in the rail: it gives up its room but keeps its slot, and is remembered', () => {
+    const first = render(<Harness ids={['x', 'y']} bar />)
+    fireEvent.click(screen.getByRole('button', { name: 'X', pressed: true }))
     expect(tile('x')).toBeNull()
     expect(px(tile('y'), 'width')).toBe(1000)
     expect(document.querySelector('[role="separator"]')).toBeNull()
     first.unmount()
-    render(<Harness ids={['x', 'y']} />)
+    render(<Harness ids={['x', 'y']} bar />)
     expect(tile('x')).toBeNull()
   })
 
@@ -271,9 +271,9 @@ describe('SplitArea', () => {
 
   it('lets a console decide itself which tiles are minimized, and tells it when the user minimizes or restores one', () => {
     const changed = vi.fn()
-    render(<SplitArea gridId="ctl" tiles={tiles(['x', 'y'])} minimized={['y']} onMinimizedChange={changed} />)
+    render(<SplitArea gridId="ctl" bar tiles={tiles(['x', 'y'])} minimized={['y']} onMinimizedChange={changed} />)
     expect(tile('y')).toBeNull()
-    fireEvent.click(screen.getByRole('button', { name: 'Minimize X' }))
+    fireEvent.click(screen.getByRole('button', { name: 'X', pressed: true }))
     expect(changed).toHaveBeenCalledWith('x', true)
     expect(tile('x')).toBeTruthy() // the console has not (yet) changed its list
   })

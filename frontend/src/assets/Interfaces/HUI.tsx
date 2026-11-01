@@ -14,13 +14,13 @@ interface HUIProps {
   panel: HuiPanel
 }
 
-// The Helper panel (400px wide) as tiles: Inbox, Queue and Settings, plus the selected chat's conversation
-// while one is open (the global tile, components/tiles/TileArea.tsx). The sidebar divider's buttons choose
+// The Helper panel (400px wide) as tiles, each a console of its own: Inbox, Queue, the selected chat's conversation
+// while one is open, and Settings last (the global tile, components/tiles/TileArea.tsx). The sidebar divider's buttons choose
 // which tile is open (a selected chat head always wins); the tab bar opens the others.
 function HUI({ side, helper, panel }: HUIProps) {
   const chatOpen = helper.selectedChatId != null
   const wanted: string = chatOpen ? 'chat' : panel
-  const ids = chatOpen ? ['inbox', 'queue', 'settings', 'chat'] : ['inbox', 'queue', 'settings']
+  const ids = chatOpen ? ['inbox', 'queue', 'chat', 'settings'] : ['inbox', 'queue', 'settings']
   // What the user opened or minimized inside the panel; it gives way whenever the sidebar buttons change the choice.
   const [minimized, setMinimized] = useState<string[] | null>(null)
   useEffect(() => { setMinimized(null) }, [wanted])
@@ -29,9 +29,10 @@ function HUI({ side, helper, panel }: HUIProps) {
   const tiles: AreaTile[] = [
     { id: 'inbox', title: 'Inbox', Icon: InboxIcon, children: <InboxSection /> },
     { id: 'queue', title: 'Queue', Icon: QueueIcon, children: <QueueSection /> },
-    { id: 'settings', title: 'Settings', Icon: GearIcon, children: <SettingsSection /> },
   ]
   if (chatOpen) tiles.push({ id: 'chat', title: 'Conversation', Icon: ChatBubblesIcon, children: <ChatsSection helper={helper} /> })
+  // Settings is a console like the others, and always the last in the rail.
+  tiles.push({ id: 'settings', title: 'Settings', Icon: GearIcon, children: <SettingsSection /> })
 
   return (
     <section className="hUI" aria-label={`Helper panel (${side})`}>

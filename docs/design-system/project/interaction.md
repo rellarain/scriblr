@@ -25,7 +25,7 @@ Tiles on a split grid (`TileArea`) are moved by their **title bar**, not their b
 | onto a tile's corner | a new row or column across the whole grid at the nearer outer edge (when the tile touches it; else the edge cell beside it) |
 | onto a divider | the tile is wedged in as a new side there |
 | onto the console's tab bar | the tile is minimized to its icon |
-| press a tab icon (or the Minimize button) | a tile is minimized or restored to its old slot |
+| press a tab icon in the rail (a tile has no Minimize button) | a tile is turned off or on, in its old slot |
 | drag a tab icon into the grid | the tile is restored where it is dropped |
 | drag a divider | the two tiles it separates resize; nothing else moves |
 | arrow keys on a focused divider | resize it (Shift for bigger steps) |

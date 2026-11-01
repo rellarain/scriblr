@@ -1,4 +1,4 @@
-import { fireEvent, render, screen, within } from '@testing-library/react'
+import { cleanup, fireEvent, render, screen, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { useRef, useState } from 'react'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
@@ -87,6 +87,7 @@ function setup(props: { chapterId?: string; console_?: 'page' | 'pages' } = {}) 
 const tile = () => document.querySelector<HTMLElement>('.wrChapterTile')!
 const left = () => document.querySelector<HTMLElement>('.wrSpreadLeft')!
 const right = () => document.querySelector<HTMLElement>('.wrSpreadRight')!
+const sectionOf = (id: string) => right().querySelector<HTMLElement>(`[data-tile-id="${id}"]`)!
 
 describe('Draft level: the plotpoint footnotes', () => {
   it('have the By time | In story toggle, shared with the other plotpoint lists', async () => {
@@ -101,18 +102,25 @@ describe('Draft level: the plotpoint footnotes', () => {
 })
 
 describe('Draft level: Settings and Help', () => {
-  it("swap the right page for the chapter's colour or the help, and the same button puts the page back", async () => {
+  it('are tiles of their own that the Settings and Help buttons turn on and off, and are not in the rail of the page tiles', async () => {
     const { user } = setup()
-    expect(right().querySelector('.wrDraftPanel')).toBeNull()
+    expect(sectionOf('settings')).toBeNull()
+    expect(sectionOf('help')).toBeNull()
+    const rail = screen.getByRole('toolbar', { name: 'Chapter tiles tabs' })
+    expect(within(rail).getAllByRole('button').map(b => b.getAttribute('aria-label'))).toEqual(['Chapter', 'Plotpoints', 'Draft'])
     await user.click(within(tile()).getByRole('button', { name: 'Settings' }))
-    expect(within(right()).getByRole('region', { name: 'Chapter settings' })).toBeTruthy()
-    expect(within(right()).getByLabelText('Chapter colour')).toBeTruthy()
-    expect(within(right()).queryByText('Colour')).toBeNull() // the slider has no label over it
+    expect(within(sectionOf('settings')).getByRole('region', { name: 'Chapter settings' })).toBeTruthy()
+    expect(within(sectionOf('settings')).getByLabelText('Chapter colour')).toBeTruthy()
+    expect(within(sectionOf('settings')).queryByText('Colour')).toBeNull() // the slider has no label over it
+    expect(sectionOf('draft')).toBeTruthy() // the draft stays beside it
     await user.click(within(tile()).getByRole('button', { name: 'Help' }))
-    expect(within(right()).getByRole('region', { name: 'Draft help' })).toBeTruthy()
-    expect(right().querySelector('[aria-label="Chapter settings"]')).toBeNull()
+    expect(within(sectionOf('help')).getByRole('region', { name: 'Draft help' })).toBeTruthy()
+    expect(sectionOf('settings')).toBeTruthy()
+    expect(within(rail).getAllByRole('button')).toHaveLength(3)
     await user.click(within(tile()).getByRole('button', { name: 'Help' }))
-    expect(right().querySelector('.wrDraftPanel')).toBeNull()
+    expect(sectionOf('help')).toBeNull()
+    await user.click(within(tile()).getByRole('button', { name: 'Settings' }))
+    expect(sectionOf('settings')).toBeNull()
   })
 })
 
@@ -189,7 +197,6 @@ describe('Draft level: the book pages', () => {
 })
 
 describe('Draft level: the right page tiles', () => {
-  const sectionOf = (id: string) => right().querySelector<HTMLElement>(`[data-tile-id="${id}"]`)!
   const top = (id: string) => parseFloat(sectionOf(id).style.top)
 
   it('has the chapter, its plotpoints and the draft as three tiles on a split grid, each with a title bar', () => {
@@ -211,11 +218,12 @@ describe('Draft level: the right page tiles', () => {
     expect(top('draft')).toBe(0)
   })
 
-  it('names the draft tile for what it shows: Preview, Settings or Help', async () => {
-    const { user } = setup({ console_: 'pages' })
+  it('names the draft tile for what it shows: Draft or Preview', () => {
+    setup()
+    expect(sectionOf('draft').querySelector('.wrTabTileTitle')?.textContent?.trim()).toBe('Draft')
+    cleanup()
+    setup({ console_: 'pages' })
     expect(sectionOf('draft').querySelector('.wrTabTileTitle')?.textContent?.trim()).toBe('Preview')
-    await user.click(within(tile()).getByRole('button', { name: 'Settings' }))
-    expect(sectionOf('draft').querySelector('.wrTabTileTitle')?.textContent?.trim()).toBe('Settings')
   })
 })
 

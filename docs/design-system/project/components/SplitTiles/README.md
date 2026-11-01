@@ -7,8 +7,8 @@ Code: `components/tiles/TileArea.tsx` (the Writer imports it as `writer/SplitAre
 ## Anatomy
 
 - **Area** `.gtScroll` (`.wrSplit` in the Writer): a stage the size of its container; tiles and dividers are positioned from a **split tree** (rows and columns, tiles at the leaves).
-- **Tile** `section.gtTile` (`.wrTabTile.wrSplitTile` in the Writer): a `level-fill-2` ground in the Writer, the raised surface elsewhere. A **title bar** `.gtTitle` (11px bold uppercase, 1px tracking, `level-fill-3`) holds a grip, the tile's icon at 14 and its name, the tile's own controls, then the **Minimize** icon button (and **Maximize** where a tile asks). It is the **drag handle**. The **body** `.gtBody` scrolls on its own.
-- **Tab bar** `.tileTabBar`: 30px icon buttons, one per tile, pressed while the tile is open. A minimized tile is an icon here that is not pressed.
+- **Tile** `section.gtTile` (`.wrTabTile.wrSplitTile` in the Writer): a `level-fill-2` ground in the Writer, the raised surface elsewhere. A **title bar** `.gtTitle` (11px bold uppercase, 1px tracking, `level-fill-3`) holds a grip, the tile's icon at 14 and its name, the tile's own controls, then **Maximize** where a tile asks. There is **no Minimize button**: a tile is turned off and on in its rail. It is the **drag handle**. The **body** `.gtBody` scrolls on its own.
+- **Rails** `.tileTabBar`: 30px icon buttons (24px in a title bar), one per tile, pressed while the tile is open. A minimized tile is an icon here that is not pressed. There are two tiers: the **console tabs** of a panel or level (Settings and Help always among them, last, never in a tile rail) and the **tile tabs** of a console, which sit in the console tile's own title bar (`barHost`); a tile area always has a rail.
 - **Gap** `.gtGap`: the dashed, accent-tinted slot a dragged tile would land in.
 - **Divider** `.tileDivider` between two tiles: a 2px line, shown on hover and focus; row dividers resize columns, column dividers rows.
 - **Spacing** 8px between tiles, nowhere else (`space-grid`).
@@ -26,7 +26,7 @@ Drag a title bar. The tile under the pointer is cut into nine zones:
 | a divider | wedged in as a new side there |
 | the tab bar | minimized |
 
-While dragging, the others **slide** (0.16s, none under reduced motion) to open the gap, and the dragged tile follows the pointer at full opacity; Escape puts everything back. Minimize with the button, by dropping on the tab bar or by un-pressing the tab; press its icon to restore it to its old slot, or drag the icon into the grid to put it where it is dropped; icons can be dragged to reorder where a console allows. Where there is no room nothing is offered. Below 400px the tiles stack in one column. The layout is remembered per console. There is **no keyboard shortcut for rearranging**: arrows move focus between title bars, and a focused divider is nudged with the arrow keys. See [interaction](../../interaction.md).
+While dragging, the others **slide** (0.16s, none under reduced motion) to open the gap, and the dragged tile follows the pointer at full opacity; Escape puts everything back. Turn a tile off by un-pressing its icon in the rail or by dropping it on the rail; press its icon to restore it to its old slot, or drag the icon into the grid to put it where it is dropped; icons can be dragged to reorder where a console allows. Where there is no room nothing is offered. Below 400px the tiles stack in one column. The layout is remembered per console. There is **no keyboard shortcut for rearranging**: arrows move focus between title bars, and a focused divider is nudged with the arrow keys. See [interaction](../../interaction.md).
 
 ## Tokens
 
@@ -34,7 +34,7 @@ While dragging, the others **slide** (0.16s, none under reduced motion) to open 
 
 ## You provide
 
-`gridId` (the key the layout is remembered under), `tiles` (`id`, `title`, `Icon`, `children`; `bodyClassName` for a surface or flush body; `titleExtras`; `maximizable`), `bar` for the inline tab bar, and optionally `defaultTree`, a split tree to start from (`columnsTree(ids)` makes two alternating columns), and `minimized` / `onMinimizedChange`, `maximized` / `onMaximizedChange` when the console decides those itself.
+`gridId` (the key the layout is remembered under), `tiles` (`id`, `title`, `Icon`, `children`; `bodyClassName` for a surface or flush body; `titleExtras`; `maximizable`; `railless` for a tile its console turns on and off), `bar` for the inline rail and `barHost` to put it in a title bar, and optionally `defaultTree`, a split tree to start from (`columnsTree(ids)` makes two alternating columns), and `minimized` / `onMinimizedChange`, `maximized` / `onMaximizedChange` when the console decides those itself.
 
 ## Don't
 

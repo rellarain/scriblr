@@ -28,7 +28,7 @@
 
 
 // ------------------------------------------------------------- the global tile (TileArea.tsx)
-// One look for every console: a title bar (grip, icon, name, the tile's own controls, Minimize) over a body. A console
+// One look for every console: a title bar (grip, icon, name, the tile's own controls) over a body. A console
 // sets the --gt-* variables for its own colours (the Writer's levels do); otherwise they are the theme's.
 
 .gtArea { flex: 1 1 auto; min-width: 0; min-height: 0; display: flex; flex-direction: column; gap: var(--space-3); }
@@ -87,3 +87,13 @@
   &--before { box-shadow: inset 3px 0 0 var(--gt-accent, var(--accent)); }
   &--after { box-shadow: inset -3px 0 0 var(--gt-accent, var(--accent)); }
 }
+
+// The rail of a console's tiles in the console tile's own title bar: small icons on the bar, no plate of their own.
+.gtTitle .tileTabBar {
+  background: transparent; padding: 0; align-self: center; flex-wrap: nowrap;
+  .tileTabBtn { width: 24px; height: 24px; opacity: 0.8; &:hover { background: color-mix(in srgb, currentColor 14%, transparent); } &--on { opacity: 1; background: color-mix(in srgb, currentColor 22%, transparent); } }
+}
+
+// A console tile that holds an area of tiles: the area fills its body, and the rail of those tiles is in the title bar.
+.gtBody--area { padding: 0; gap: 0; overflow: hidden; }
+.gtRailSlot { margin-left: auto; display: inline-flex; align-items: center; min-width: 0; }

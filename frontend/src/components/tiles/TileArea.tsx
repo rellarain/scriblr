@@ -1,6 +1,7 @@
 import { useEffect, useLayoutEffect, useRef, useState, type ComponentType, type KeyboardEvent, type PointerEvent, type ReactNode } from 'react'
+import { createPortal } from 'react-dom'
 import type { IconProps } from '../../assets/icons'
-import { GripIcon, MinimizeIcon, ExpandIcon, ShrinkIcon } from '../../assets/icons'
+import { GripIcon, ExpandIcon, ShrinkIcon } from '../../assets/icons'
 import Divider from './Divider'
 import TileTabBar from './TileTabBar'
 import { GRID_GAP, isOneColumn } from './tileShapes'
@@ -29,6 +30,8 @@ export interface AreaTile {
   bodyClassName?: string
   // The tile starts minimized (until the user has moved it).
   defaultMinimized?: boolean
+  // The tile has no icon in this area's rail: the console it belongs to turns it on and off itself (a level's Settings and Help buttons).
+  railless?: boolean
   // The title bar has a button that fills the whole area with this tile (and puts it back).
   maximizable?: boolean
 }
@@ -58,14 +61,14 @@ interface Session {
 }
 
 // The tiles of one console on a split tree (splitTree.ts): they always fill the area exactly, with no gaps. Every tile has
-// the same title bar -- grip, icon and name, its own controls, then Minimize (and Maximize, where a tile asks for it) --
-// and it is the handle: drag a tile by it and the others slide aside to open a highlighted gap where it would land. The
+// the same title bar -- grip, icon and name, its own controls, then Maximize where a tile asks for it. A tile has no
+// Minimize button: it is turned off and on by its icon in the area's rail, the bar of tile tabs. The title bar is the handle: drag a tile by it and the others slide aside to open a highlighted gap where it would land. The
 // tile under the pointer is cut into a 3x3 grid (tileDrop.ts): the middle swaps, the edges put the tile beside or
 // above/below, a corner makes a new row or column across the whole grid. Drop it on the console's tab bar to minimize
 // it (the bar shows one icon per tile; press one to bring the tile back, or drag it out into the layout). Drag a divider
 // (or focus it and use the arrow keys) to resize the two tiles it separates. Where each tile sits, and which are minimized,
 // is remembered per `gridId` with the other saved settings. Under 400px the tiles stack.
-export function TileArea({ gridId, tiles, label, defaultTree, onFocusTile, iconSize, minimized, onMinimizedChange, maximized, onMaximizedChange, onReorderTabs, bar = false }: {
+export function TileArea({ gridId, tiles, label, defaultTree, onFocusTile, iconSize, minimized, onMinimizedChange, maximized, onMaximizedChange, onReorderTabs, bar = false, barHost }: {
   gridId: string
   tiles: AreaTile[]
   label?: string
@@ -85,6 +88,8 @@ export function TileArea({ gridId, tiles, label, defaultTree, onFocusTile, iconS
   onReorderTabs?: (id: string, beforeId: string | null) => void
   // Draws the tab bar above the tiles (a console whose header has none of its own).
   bar?: boolean
+  // Where the bar goes when it is not above the tiles: the slot in the title bar of the console tile that holds this area (null until drawn).
+  barHost?: HTMLElement | null
 }) {
   const layout = useSplitLayout(gridId, tiles.map(t => ({ id: t.id, defaultShape: t.defaultMinimized ? 'mini' as const : 'mid' as const })), { defaultTree, minimized, onMinimizedChange, maximized, onMaximizedChange })
   const [scrollRef, size] = useContainerSize<HTMLDivElement>()
@@ -299,9 +304,6 @@ export function TileArea({ gridId, tiles, label, defaultTree, onFocusTile, iconS
                       {maxId === t.id ? <ShrinkIcon size={sz ?? 14} /> : <ExpandIcon size={sz ?? 14} />}
                     </button>
                   )}
-                  <button type="button" className="gtTitleBtn" aria-label={`Minimize ${t.title}`} title="Minimize" onClick={() => toggle(t.id)}>
-                    <MinimizeIcon size={sz ?? 14} />
-                  </button>
                 </span>
               </h3>
               <div className={`gtBody wrTabTileBody${t.bodyClassName ? ` ${t.bodyClassName}` : ''}`}>{t.children}</div>
@@ -326,15 +328,15 @@ export function TileArea({ gridId, tiles, label, defaultTree, onFocusTile, iconS
     </div>
   )
   if (!bar) return area
-  return (
-    <div className="gtArea">
-      <TileTabBar
-        gridId={gridId} label={label ? `${label} tabs` : 'Tile tabs'} isOpen={isOpen} onToggle={toggle} size={iconSize ?? 18}
-        tiles={layout.tabOrder.map(id => tiles.find(t => t.id === id)).filter((t): t is AreaTile => Boolean(t && t.Icon)).map(t => ({ id: t.id, label: t.title, Icon: t.Icon! }))}
-      />
-      {area}
-    </div>
+  const rail = (
+    <TileTabBar
+      gridId={gridId} label={label ? `${label} tabs` : 'Tile tabs'} isOpen={isOpen} onToggle={toggle} size={barHost === undefined ? iconSize ?? 18 : 18}
+      tiles={layout.tabOrder.map(id => tiles.find(t => t.id === id)).filter((t): t is AreaTile => Boolean(t && t.Icon && !t.railless)).map(t => ({ id: t.id, label: t.title, Icon: t.Icon! }))}
+    />
   )
+  // In the title bar of the console tile that holds the area: the rail goes there (nowhere until the bar has drawn its slot).
+  if (barHost !== undefined) return <>{barHost && createPortal(rail, barHost)}{area}</>
+  return <div className="gtArea">{rail}{area}</div>
 }
 
 export default TileArea

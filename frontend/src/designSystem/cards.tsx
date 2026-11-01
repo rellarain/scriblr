@@ -91,7 +91,7 @@ function LevelFrame({ level, title, hue, children }: { level: 'dash' | 'project'
 }
 
 const TILES = [
-  { id: 'schedule', title: 'Schedule', Icon: Icons.CalendarIcon },
+  { id: 'schedule', title: 'Planner', Icon: Icons.CalendarIcon },
   { id: 'checklist', title: 'Checklist', Icon: Icons.CheckboxIcon },
   { id: 'analytics', title: 'Analytics', Icon: Icons.BarChartIcon },
   { id: 'scratchpad', title: 'Scratchpad', Icon: Icons.PencilIcon },

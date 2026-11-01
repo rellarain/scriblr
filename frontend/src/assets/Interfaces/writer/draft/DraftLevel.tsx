@@ -1,4 +1,5 @@
 import { useMemo, useState } from 'react'
+import { useStoredState } from '../storage'
 import type { OutlineNode } from '../../../../api/types'
 import type { WriterWorkspace } from '../useWriterWorkspace'
 import { EyeIcon, GearIcon, HelpIcon, PencilIcon, PlotIcon } from '../../../icons'
@@ -50,23 +51,27 @@ export function DraftPreviewToggle({ preview, hasDraft, onDraft, onPreview }: {
 }
 
 // Where the page's tiles sit until one is moved: the chapter on top, the plotpoints above the draft.
-const DRAFT_LAYOUT: SplitNode = { dir: 'col', ratio: 0.19, a: { id: 'chapter' }, b: { dir: 'col', ratio: 0.18, a: { id: 'points' }, b: { id: 'draft' } } }
+// Settings and Help sit beside the draft, and take no room until they are turned on.
+const DRAFT_LAYOUT: SplitNode = {
+  dir: 'col', ratio: 0.19, a: { id: 'chapter' },
+  b: { dir: 'col', ratio: 0.18, a: { id: 'points' }, b: { dir: 'row', ratio: 0.62, a: { id: 'draft' }, b: { dir: 'col', ratio: 0.5, a: { id: 'settings' }, b: { id: 'help' } } } },
+}
 
 const DRAFT_HELP_NAMES = ['draft', 'chapter']
 const DRAFT_HELP_FALLBACK = 'The Draft level is the open chapter as an open book: write each moment in its card, and switch to Preview to read the chapter as it will be published.'
 
-// Settings and Help, the last two tabs of the Draft level: icons in the chapter tile's tools that
-// swap the right page for that panel (the same button puts the page back).
-function DraftPanelButtons({ panel, onPanel }: { panel: DraftPanel; onPanel: (next: DraftPanel) => void }) {
-  const toggle = (which: 'settings' | 'help') => onPanel(panel === which ? null : which)
+// Settings and Help, the last two console tabs of the Draft level: icons in the chapter tile's tools that turn the Settings tile and the Help tile
+// on and off. They are tiles of their own, never tabs in the rail of the page's tiles (the chapter, the plotpoints and the draft).
+const PANELS = ['settings', 'help']
+function DraftPanelButtons({ closed, onToggle }: { closed: string[]; onToggle: (id: string) => void }) {
+  const on = (id: string) => !closed.includes(id)
   return (
     <span className="wrTabBar">
-      <button type="button" className={`wrTabBtn${panel === 'settings' ? ' wrTabBtn--on' : ''}`} aria-label="Settings" title="Settings" aria-pressed={panel === 'settings'} onClick={() => toggle('settings')}><GearIcon size={18} /></button>
-      <button type="button" className={`wrTabBtn${panel === 'help' ? ' wrTabBtn--on' : ''}`} aria-label="Help" title="Help" aria-pressed={panel === 'help'} onClick={() => toggle('help')}><HelpIcon size={18} /></button>
+      <button type="button" className={`wrTabBtn${on('settings') ? ' wrTabBtn--on' : ''}`} aria-label="Settings" title="Settings" aria-pressed={on('settings')} onClick={() => onToggle('settings')}><GearIcon size={18} /></button>
+      <button type="button" className={`wrTabBtn${on('help') ? ' wrTabBtn--on' : ''}`} aria-label="Help" title="Help" aria-pressed={on('help')} onClick={() => onToggle('help')}><HelpIcon size={18} /></button>
     </span>
   )
 }
-type DraftPanel = 'settings' | 'help' | null
 
 // The Draft level at Max: the open chapter as an open book: the left page, which is just the strip of
 // paper under the other levels' tiles, the crease beside it, and the right page, which holds three tiles on a
@@ -79,7 +84,9 @@ function DraftPage({ w, chapter, pagesComponent, onPagesComponent }: {
   pagesComponent: string
   onPagesComponent: (key: string) => void
 }) {
-  const [panel, setPanel] = useState<DraftPanel>(null)
+  // The tiles that are off: Settings and Help until their console tabs are pressed, then whatever the user turns off in the rail.
+  const [closed, setClosed] = useStoredState<string[]>('scriblr.writer.draft.closed', PANELS)
+  const setClosedTile = (id: string, off: boolean) => setClosed(prev => (off ? (prev.includes(id) ? prev : [...prev, id]) : prev.filter(x => x !== id)))
   const draft = useChapterDraft(w.activeProjectId, chapter.id)
   const pubs = usePublications(w.activeProjectId, chapter.id)
   const preview = w.activeConsole === 'pages'
@@ -115,6 +122,7 @@ function DraftPage({ w, chapter, pagesComponent, onPagesComponent }: {
             {/* The page's three tiles on a split grid: drag a title bar to move one, a divider to resize. */}
             <SplitArea
               gridId="scriblr.writer.draft" label="Chapter tiles" bar defaultTree={DRAFT_LAYOUT} onFocusTile={setFocusedTile}
+              minimized={closed} onMinimizedChange={setClosedTile}
               tiles={[
                 {
                   id: 'chapter', title: 'Chapter', Icon: PencilIcon, bodyClassName: 'wrDraftTileBody',
@@ -135,7 +143,7 @@ function DraftPage({ w, chapter, pagesComponent, onPagesComponent }: {
                             onPublish={async () => { await Promise.all([w.saveNow(), draft.flush()]); await pubs.publish() }}
                           />
                           <DraftPreviewToggle preview={preview} hasDraft={hasDraft} onDraft={w.showDraft} onPreview={w.showPreview} />
-                          <DraftPanelButtons panel={panel} onPanel={setPanel} />
+                          <DraftPanelButtons closed={closed} onToggle={id => setClosedTile(id, !closed.includes(id))} />
                         </>
                       )}
                     />
@@ -146,27 +154,28 @@ function DraftPage({ w, chapter, pagesComponent, onPagesComponent }: {
                   children: <ChapterPoints w={w} chapter={chapter} />,
                 },
                 {
-                  id: 'draft', title: panel === 'settings' ? 'Settings' : panel === 'help' ? 'Help' : preview ? 'Preview' : 'Draft',
-                  Icon: preview && !panel ? EyeIcon : PencilIcon, bodyClassName: 'wrDraftTileBody wrDraftTileBody--flush',
+                  id: 'draft', title: preview ? 'Preview' : 'Draft', Icon: preview ? EyeIcon : PencilIcon, bodyClassName: 'wrDraftTileBody wrDraftTileBody--flush',
+                  children: preview
+                    ? <PreviewPane w={w} chapter={chapter} draft={draft} pubs={pubs} component={pagesComponent} onComponent={onPagesComponent} />
+                    : <div className="wrSpreadScroll"><DraftCards w={w} chapter={chapter} draft={draft} /></div>,
+                },
+                {
+                  id: 'settings', title: 'Settings', Icon: GearIcon, railless: true, bodyClassName: 'wrDraftTileBody wrDraftTileBody--flush',
                   children: (
-                    <>
-                      {panel === 'settings' && (
-                        <div className="wrSpreadScroll wrDraftPanel" role="region" aria-label="Chapter settings">
-                          <HueSlider
-                            label="Chapter colour" className="wrNodeHue" hue={w.levelHueOf(chapter)} centre={w.hueCentreOf(chapter)} range={rangeOf('chapter')}
-                            onChange={code => w.setNodeHue(chapter.id, code)}
-                          />
-                        </div>
-                      )}
-                      {panel === 'help' && (
-                        <div className="wrSpreadScroll wrDraftPanel" role="region" aria-label="Draft help">
-                          <HelpArticles names={DRAFT_HELP_NAMES} fallback={DRAFT_HELP_FALLBACK} />
-                        </div>
-                      )}
-                      {panel ? null : preview
-                        ? <PreviewPane w={w} chapter={chapter} draft={draft} pubs={pubs} component={pagesComponent} onComponent={onPagesComponent} />
-                        : <div className="wrSpreadScroll"><DraftCards w={w} chapter={chapter} draft={draft} /></div>}
-                    </>
+                    <div className="wrSpreadScroll wrDraftPanel" role="region" aria-label="Chapter settings">
+                      <HueSlider
+                        label="Chapter colour" className="wrNodeHue" hue={w.levelHueOf(chapter)} centre={w.hueCentreOf(chapter)} range={rangeOf('chapter')}
+                        onChange={code => w.setNodeHue(chapter.id, code)}
+                      />
+                    </div>
+                  ),
+                },
+                {
+                  id: 'help', title: 'Help', Icon: HelpIcon, railless: true, bodyClassName: 'wrDraftTileBody wrDraftTileBody--flush',
+                  children: (
+                    <div className="wrSpreadScroll wrDraftPanel" role="region" aria-label="Draft help">
+                      <HelpArticles names={DRAFT_HELP_NAMES} fallback={DRAFT_HELP_FALLBACK} />
+                    </div>
                   ),
                 },
               ]}

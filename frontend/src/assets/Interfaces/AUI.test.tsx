@@ -24,11 +24,13 @@ const tile = (id: string) => document.querySelector(`[data-tile-id="${id}"]`) as
 const SECTIONS = ['dashboard', 'processor', 'organizer', 'manager', 'director', 'office', 'configuration', 'resources']
 
 describe('AUI (the Admin panel as tiles)', () => {
-  it('shows the eight sections as tiles with their pages, and each section Help text in it', () => {
+  it('shows the eight sections as consoles with their pages as tiles, and every section Help text in the Help console', () => {
     render(<AUI />)
     expect(SECTIONS.map(id => tile(id)?.getAttribute('data-tile-id'))).toEqual(SECTIONS)
     expect(within(tile('manager')).getByText('Assignment')).toBeTruthy()
-    expect(within(tile('manager')).getByText(/using the Manager console/)).toBeTruthy()
+    // Help is a console of its own, not a tile of a section.
+    expect(within(tile('manager')).queryByText(/using the Manager console/)).toBeNull()
+    expect(within(tile('help')).getByText(/using the Manager console/)).toBeTruthy()
   })
 
   it('shows the role assignment editor in the Manager tile', () => {
@@ -49,11 +51,16 @@ describe('AUI (the Admin panel as tiles)', () => {
     expect(await within(tile('resources')).findByText('resources console')).toBeTruthy()
   })
 
-  it('has a tab bar with an icon per tile, to minimize and bring back a tile', async () => {
+  it('has a rail of consoles in the header (Help last) and a rail of tiles in each console title bar, to turn a tile off and on', async () => {
     const user = userEvent.setup()
     render(<AUI />)
-    const bar = screen.getByRole('toolbar', { name: 'Admin panel tiles tabs' })
-    expect(within(bar).getAllByRole('button')).toHaveLength(SECTIONS.length)
+    const bar = screen.getByRole('toolbar', { name: 'Admin panel consoles tabs' })
+    expect(within(bar).getAllByRole('button')).toHaveLength(SECTIONS.length + 1)
+    expect(within(bar).getAllByRole('button').at(-1)?.getAttribute('aria-label')).toBe('Help')
+    const pages = within(tile('manager').querySelector('.gtTitle') as HTMLElement).getByRole('toolbar', { name: 'Manager tiles tabs' })
+    expect(within(pages).getAllByRole('button').map(b => b.getAttribute('aria-label'))).toEqual(['Allotment', 'Assignment', 'Team Schedule'])
+    await user.click(within(pages).getByRole('button', { name: 'Assignment' }))
+    expect(tile('assignment')).toBeNull()
     await user.click(within(bar).getByRole('button', { name: 'Office' }))
     expect(tile('office')).toBeNull()
   })

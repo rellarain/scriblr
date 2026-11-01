@@ -19,3 +19,4 @@ export function startBarDrag(gridId: string, id: string, e: DragStart): void {
 let ended = false
 export const markDragEnded = (): void => { ended = true; setTimeout(() => { ended = false }, 0) }
 export const dragJustEnded = (): boolean => ended
+export const __resetDragEndedForTests = (): void => { ended = false }

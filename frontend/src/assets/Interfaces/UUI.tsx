@@ -1,19 +1,20 @@
-import type { ComponentType, ReactNode } from 'react'
+import { useState, type ComponentType, type ReactNode } from 'react'
 import {
   BarChartIcon, CalendarIcon, EnvelopeIcon, UserIcon,
-  BookFaceIcon, FlagIcon, GlobeIcon, PencilIcon, BriefcaseIcon, GraduationCapIcon,
+  BookFaceIcon, FlagIcon, GearIcon, GlobeIcon, HelpIcon, PencilIcon, BriefcaseIcon, GraduationCapIcon,
   type IconProps,
 } from '../icons'
 import CustomizeControls from '../../CustomizeControls'
 import FlagSettings from './FlagSettings'
 import ThemeSettingsPanel from '../../theme/ThemeSettingsPanel'
 import TileArea, { type AreaTile } from '../../components/tiles/TileArea'
+import { consoleTile, useRailSlots } from '../../components/tiles/consoleTiles'
 
 // The User panel (in the header drawer), per scrilbrPlan.md's "User Page (UUI)"
-// section, as tiles: Dashboard, Account and Training, each showing its pages, its settings and its help
-// directly (the global tile, components/tiles/TileArea.tsx). Dashboard's settings are the theme
-// customization tool on its own; Account's carry handedness and autosave plus that same theme tool,
-// embedded inline. Everything else is placeholder text until built.
+// section, as tiles (the global tile, components/tiles/TileArea.tsx): the consoles are Dashboard, Account and Training, each holding
+// its pages as tiles (their rail is in its title bar), then Settings and Help, which are consoles of their own (last in the panel's
+// rail) and never tiles of a section. Dashboard's settings are the theme customization tool on its own; Account's carry
+// handedness and autosave plus that same theme tool, embedded inline. Everything else is placeholder text until built.
 //
 // The root class is "uUIPanel"/"uUIContent", deliberately NOT "uUI" -- that class
 // already exists in App.scss as one of the shared, absolutely-positioned
@@ -67,32 +68,40 @@ const SECTIONS: UuiSection[] = [
   },
 ]
 
-export function userTiles(): AreaTile[] {
-  return SECTIONS.map(section => ({
-    id: section.key, title: section.label, Icon: section.Icon,
-    children: (
-      <div className="uUISection">
-        {section.pages.map(page => (
-          <section key={page.key} className="uUIPage" aria-label={page.label}>
-            <h2>{page.label}</h2>
-            {page.Console ? <page.Console /> : <p>{page.body}</p>}
-          </section>
-        ))}
-        {section.settings && <section className="uUIPage" aria-label="Settings"><h2>Settings</h2>{section.settings()}</section>}
-        <section className="uUIPage" aria-label="Help"><h2>Help</h2><p>{section.help}</p></section>
-      </div>
-    ),
-  }))
-}
-
 function UUI() {
+  const slots = useRailSlots()
+  const [rail, setRail] = useState<HTMLElement | null>(null)
+  // The consoles: each section holds its pages as tiles (their rail in its title bar); Settings and Help are consoles too, last in the panel's rail.
+  const tiles: AreaTile[] = [
+    ...SECTIONS.map(section => consoleTile(slots, {
+      panel: 'uui', id: section.key, title: section.label, Icon: section.Icon,
+      pages: section.pages.map(page => ({ id: page.key, label: page.label, Icon: page.Icon, children: page.Console ? <page.Console /> : <p>{page.body}</p> })),
+    })),
+    {
+      id: 'settings', title: 'Settings', Icon: GearIcon,
+      children: (
+        <div className="uUISection">
+          {SECTIONS.filter(s => s.settings).map(s => <section key={s.key} className="uUIPage" aria-label={`${s.label} settings`}><h2>{s.label}</h2>{s.settings!()}</section>)}
+        </div>
+      ),
+    },
+    {
+      id: 'help', title: 'Help', Icon: HelpIcon,
+      children: (
+        <div className="uUISection">
+          {SECTIONS.map(s => <section key={s.key} className="uUIPage" aria-label={`${s.label} help`}><h2>{s.label}</h2><p>{s.help}</p></section>)}
+        </div>
+      ),
+    },
+  ]
   return (
     <section className="uUIPanel" aria-label="User panel">
       <div className="uUIContent uUIContent--tiles">
         <div className="uUIConsoleTitleRow">
           <h1 className="uUIConsoleTitle">User</h1>
+          <span ref={setRail} className="gtRailSlot" />
         </div>
-        <TileArea gridId="uui" label="User panel tiles" bar tiles={userTiles()} />
+        <TileArea gridId="uui" label="User panel consoles" bar barHost={rail} tiles={tiles} />
       </div>
     </section>
   )

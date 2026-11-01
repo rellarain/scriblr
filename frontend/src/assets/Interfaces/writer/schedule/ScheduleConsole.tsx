@@ -29,7 +29,7 @@ import { requestReminderPermission, useShiftReminders } from './useShiftReminder
 import { localToday, useSchedule } from './useSchedule'
 import type { SplitNode } from '../../../../components/tiles/splitTree'
 
-// The Schedule console: Goals, Activity (the grid or lines), the Schedule, the Backlog beside it, Analytics and a Review, each its own tile on a split
+// The Schedule console: Goals, Activity (the grid or lines), the Planner, the Backlog beside it, Analytics and a Review, each its own tile on a split
 // grid (drag a title bar to move one, a divider to resize). At the Project level it is that project's; at the Dash it is every project's added
 // together, with the account's own goals, shifts and routines too.
 
@@ -43,11 +43,13 @@ export const DEFAULT_TREE: SplitNode = {
 
 const hueVars = (hues: FacetHues) => Object.fromEntries(FACETS.map(f => [`--wr-f-${f}`, `hsl(${hues[f]}, ${FACET_COLOR.s}%, ${FACET_COLOR.l}%)`]))
 
-// `titleSlot` is the element in the console's tab-tile title bar where the Settings button goes (null while it is not drawn yet); without one (undefined) the button is the console's first row.
+// `titleSlot` is the element in the console's tab-tile title bar where the Settings button and the rail of the console's tiles go (null while it is not drawn yet); without one (undefined) the button is the console's first row, with the rail above the tiles.
 export default function ScheduleConsole({ scope, projectIds, titles, titleSlot }: { scope: 'dash' | 'project'; projectIds: string[]; titles: Record<string, string>; titleSlot?: HTMLElement | null }) {
   const schedule = useSchedule(projectIds)
   const activity = useActivityState()
   const [settingsOpen, setSettingsOpen] = useState(false)
+  // Where the rail of the console's tiles goes, in the title bar of the tile that holds the console (the slot beside the Settings button).
+  const [railHost, setRailHost] = useState<HTMLElement | null>(null)
   const facts = useProjectFacts(projectIds)
   const [weekStart, setWeekStart] = useStoredState<WeekStart>('scriblr.weekStart', 'monday')
   const [hues, setHues] = useStoredState<FacetHues>('scriblr.writer.facetHues', DEFAULT_HUES)
@@ -170,7 +172,7 @@ export default function ScheduleConsole({ scope, projectIds, titles, titleSlot }
     { id: 'review', title: 'Review', Icon: HistoryIcon, children: <ReviewCard daily={daily} today={today} /> },
     { id: 'activity', title: 'Activity', Icon: GridViewIcon, titleExtras: <ActivityControls state={activity} />, children: <ActivityCard state={activity} data={schedule.facets} today={today} weekStart={weekStart} dailyGoals={dailyGoals} totals={totals} /> },
     {
-      id: 'schedule', title: 'Schedule', Icon: CalendarIcon,
+      id: 'schedule', title: 'Planner', Icon: CalendarIcon,
       children: (
         <ScheduleCard
           owners={owners} today={today} nowSlot={nowSlot} events={schedule.facets.events} weekStart={weekStart} targets={targets} ticks={ticks}
@@ -185,7 +187,7 @@ export default function ScheduleConsole({ scope, projectIds, titles, titleSlot }
   ]
   return (
     <div className="wrSchedConsole" style={hueVars(hues) as CSSProperties}>
-      {titleSlot === undefined ? <div className="wrSchedConsoleBar">{settingsButton}</div> : titleSlot && createPortal(settingsButton, titleSlot)}
+      {titleSlot === undefined ? <div className="wrSchedConsoleBar">{settingsButton}</div> : titleSlot && createPortal(<><span ref={setRailHost} className="wrSchedRail" />{settingsButton}</>, titleSlot)}
       {settingsOpen && (
         <ScheduleSettings
           weekStart={weekStart} onWeekStart={setWeekStart} hues={hues} onHues={setHues} planner={planner} onPlanner={goalOwner.setPlanner}
@@ -193,7 +195,7 @@ export default function ScheduleConsole({ scope, projectIds, titles, titleSlot }
           scopeLabel={scope === 'dash' ? 'Account' : 'This project'} onClose={() => setSettingsOpen(false)}
         />
       )}
-      <SplitArea iconSize={ICON_PX} gridId={`scriblr.writer.schedule.tiles.${scope}`} label="Schedule tiles" bar tiles={tiles.map(t => ({ ...t, bodyClassName: `wrSchedTileBody${t.id === 'activity' ? ' wrSchedTileBody--chart' : ''}` }))} defaultTree={DEFAULT_TREE} />
+      <SplitArea iconSize={ICON_PX} gridId={`scriblr.writer.schedule.tiles.${scope}`} label="Schedule tiles" bar barHost={titleSlot === undefined ? undefined : railHost} tiles={tiles.map(t => ({ ...t, bodyClassName: `wrSchedTileBody${t.id === 'activity' ? ' wrSchedTileBody--chart' : ''}` }))} defaultTree={DEFAULT_TREE} />
     </div>
   )
 }
