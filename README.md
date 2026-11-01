@@ -209,7 +209,9 @@ described, now stale, in `docs/data-model.md`).
   plotline) its `Scrap` field. A set passes down to the plotlines like its fields (read-only
   there, folded or open as the writer left it, remembered per set); a plotline makes its own
   sets for its own fields; deleting a set keeps its fields, loose. A value defined on a category,
-  subcategory or cluster is shown on every plotline under it as a **reference** (a
+  subcategory or cluster (in its own fields or in ones it **inherits**: a subcategory has its
+  category's fields, a cluster its subcategory's and its category's, shown read-only in its editor
+  under its own, `FieldBlocks.tsx`'s `InheritedGroups`) is shown on every plotline under it as a **reference** (a
   plotpoint with `refId`, whose text is the original's), which that plotline
   assigns to its own chapters; deleting a category/subcategory/cluster value or field
   turns its assigned references into the plotline's own values in a plotline

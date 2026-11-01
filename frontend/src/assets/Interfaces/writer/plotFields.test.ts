@@ -89,6 +89,15 @@ describe('references', () => {
     expect(syncReferences(nodes, outlineById, makeId)).toBe(nodes)
   })
 
+  it('passes down the values a subcategory or cluster holds in a field it inherits, to the plotlines under it', () => {
+    let nodes = world()
+    const added = addValue(nodes, 'sub', 'fTheme', makeId) // the subcategory answers the category's field
+    nodes = syncReferences(updateValue(added.nodes, added.id!, { title: 'Duty' }), outlineById, makeId)
+    const refs = (line: string) => valuesIn(nodes, line, 'fTheme').filter(v => v.refId).map(v => v.refId)
+    expect(refs('lineA')).toContain(added.id)
+    expect(refs('lineB')).toContain(added.id)
+  })
+
   it('gives a plotline made later every reference, and a value added later to every plotline', () => {
     let nodes = [...world(), node('lineC', 'plotline', 'cat', { order: 2 })]
     nodes = syncReferences(nodes, outlineById, makeId)

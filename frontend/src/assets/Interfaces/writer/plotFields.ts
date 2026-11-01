@@ -429,8 +429,8 @@ export function deleteField(nodes: PlotNode[], ownerId: string, fieldId: string,
 
 // ---- references ----
 
-// Make every plotline hold exactly one reference per value defined on its category,
-// subcategory and cluster. Idempotent; returns the same array when nothing changes. A
+// Make every plotline hold exactly one reference per value held by its category,
+// subcategory and cluster (in their own fields or the ones they inherit). Idempotent; returns the same array when nothing changes. A
 // reference whose original is gone (or no longer above its plotline) is kept as the
 // plotline's own value when placed, and dropped otherwise.
 export function syncReferences(nodes: PlotNode[], outlineById: Map<string, OutlineNode> = new Map(), makeId: MakeId = randomId): PlotNode[] {
@@ -438,13 +438,14 @@ export function syncReferences(nodes: PlotNode[], outlineById: Map<string, Outli
   const index = byId(nodes)
   for (const plotline of nodes.filter(n => n.kind === 'plotline')) {
     const wanted = new Map<string, { original: PlotNode; fieldId: string }>()
-    for (const owner of chainOf(plotline, index).slice(1)) {
-      if (owner.kind !== 'category' && owner.kind !== 'subcategory' && owner.kind !== 'cluster') continue
-      for (const def of owner.customFieldDefs) {
+    const above = chainOf(plotline, index).slice(1).filter(n => n.kind === 'category' || n.kind === 'subcategory' || n.kind === 'cluster')
+    // A node holds values of its own fields and of the fields it inherits (a subcategory's of its category's, a cluster's of its subcategory's and its category's).
+    above.forEach((owner, at) => {
+      for (const def of above.slice(at).flatMap(n => n.customFieldDefs)) {
         if (isChoice(def)) continue
         for (const original of valuesIn(nodes, owner.id, def.id)) wanted.set(original.id, { original, fieldId: def.id })
       }
-    }
+    })
     const refs = next.filter(n => n.kind === 'plotpoint' && n.parentId === plotline.id && n.refId)
     for (const ref of refs) {
       if (wanted.has(ref.refId!)) continue

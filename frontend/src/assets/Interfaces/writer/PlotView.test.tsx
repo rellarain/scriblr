@@ -724,6 +724,45 @@ describe('the contents order', () => {
   })
 })
 
+describe('fields inherited down the tree', () => {
+  // The starting plot: Romance (Theme) > Slow burn > Meet cute. Clustered: Household (Motive) sits between Slow burn and Meet cute.
+  const regions = () => screen.getAllByRole('region').map(g => g.getAttribute('aria-label')).filter(l => /^(Fields|From )/.test(l ?? ''))
+
+  it('shows the fields of a category as its own only', () => {
+    render(<Editor focused="cat" />)
+    expect(regions()).toEqual(['Fields'])
+  })
+
+  it('gives a subcategory the fields of its category, read-only, under its own', () => {
+    render(<Editor focused="sub" />)
+    expect(regions()).toEqual(['Fields', 'From category: Romance'])
+    const group = screen.getByRole('region', { name: 'From category: Romance' })
+    expect(group.querySelector('.wrFieldGroupOrigin')).toHaveTextContent(/^Category$/)
+    expect(within(group).getByText('Theme')).toBeInTheDocument()
+    expect(within(group).queryByLabelText('Field name')).toBeNull() // defined above: not renamed here
+  })
+
+  it('gives a cluster the fields of its subcategory and its category, nearest first', () => {
+    const sub = clustered().map(n => (n.id === 'sub' ? { ...n, customFieldDefs: [{ id: 'fPace', name: 'Pace' }] } : n))
+    render(<Editor start={sub} focused="clu" />)
+    expect(regions()).toEqual(['Fields', 'From subcategory: Slow burn', 'From category: Romance'])
+    expect(within(screen.getByRole('region', { name: 'From subcategory: Slow burn' })).getByText('Pace')).toBeInTheDocument()
+  })
+
+  it('lets a subcategory answer an inherited field with values of its own, which its plotlines then show as references', () => {
+    const seen: { nodes: PlotNode[] } = { nodes: [] }
+    render(<Editor focused="sub" onNodes={n => { seen.nodes = n }} />)
+    const group = screen.getByRole('region', { name: 'From category: Romance' })
+    expect(within(group).queryByText('Trust')).toBeNull() // the category's own value is the category's
+    fireEvent.click(within(group).getByRole('button', { name: /^Expand Theme/ }))
+    fireEvent.click(within(group).getByRole('button', { name: /Value/ }))
+    const held = seen.nodes.filter(n => n.kind === 'plotpoint' && n.fieldId === 'fTheme' && n.parentId === 'sub' && !n.refId)
+    expect(held).toHaveLength(1)
+    // the plotline under it holds a reference to that value as well as to the category's
+    expect(seen.nodes.filter(n => n.parentId === 'line' && n.fieldId === 'fTheme' && n.refId).map(n => n.refId).sort()).toEqual([held[0].id, 'val'].sort())
+  })
+})
+
 describe('inherited field groups', () => {
   it('put the parent\'s title first and its kind ("Category") at the far right of the head', () => {
     render(<Editor />)

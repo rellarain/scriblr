@@ -371,19 +371,24 @@ const GROUP_TITLE: Record<FieldScope, (owners: PlotNode[]) => string> = {
   category: owners => `From category: ${owners.map(nodeLabel).join(', ')}`,
 }
 
-// The plotline editor's fields: plotline fields on top, then the cluster's, the subcategory's, then the category's.
-export function FieldGroups({ w, plotline, ui, drag, showAssigned }: {
-  w: WriterWorkspace; plotline: PlotNode; ui: PlotUi; drag: PlotDrag; showAssigned: boolean
+// The scopes a node's fields come from above its own, nearest first: a cluster has its subcategory's and its category's, a subcategory its category's,
+// a plotline all three.
+const INHERITED: Record<PlotNode['kind'], FieldScope[]> = {
+  plotpoint: [], category: [], subcategory: ['category'], cluster: ['subcategory', 'category'], plotline: ['cluster', 'subcategory', 'category'],
+}
+
+// The groups of fields a node inherits, each collapsible and read-only: the values are the node's own, the fields are defined above it.
+function InheritedGroups({ w, holder, scopes, ui, drag, showAssigned, empty }: {
+  w: WriterWorkspace; holder: PlotNode; scopes: FieldScope[]; ui: PlotUi; drag: PlotDrag; showAssigned: boolean; empty?: string
 }) {
-  const layouts = scopeLayouts(plotline, w.plotNodeById)
+  const layouts = scopeLayouts(holder, w.plotNodeById)
   const [closed, setClosed] = useState<Set<FieldScope>>(new Set())
   const toggle = (scope: FieldScope) => setClosed(prev => { const next = new Set(prev); if (next.has(scope)) next.delete(scope); else next.add(scope); return next })
-
   return (
-    <div className="wrFieldGroups">
-      {(['plotline', 'cluster', 'subcategory', 'category'] as FieldScope[]).map(scope => {
+    <>
+      {scopes.map(scope => {
         const parts = layouts[scope]
-        if (scope !== 'plotline' && parts.owners.length === 0) return null
+        if (parts.owners.length === 0) return null
         const owners = parts.owners
         const isClosed = closed.has(scope)
         return (
@@ -391,16 +396,39 @@ export function FieldGroups({ w, plotline, ui, drag, showAssigned }: {
             <div className="wrFieldGroupHead">
               <button type="button" className="wrFieldToggle" aria-expanded={!isClosed} aria-label={GROUP_TITLE[scope](owners)} onClick={() => toggle(scope)}>
                 {isClosed ? <ChevronRightIcon size={14} /> : <ChevronDownIcon size={14} />}
-                <span className="wrFieldGroupName">{GROUP_ORIGIN[scope] ? owners.map(nodeLabel).join(', ') : GROUP_TITLE[scope](owners)}</span>
+                <span className="wrFieldGroupName">{owners.map(nodeLabel).join(', ')}</span>
               </button>
-              {GROUP_ORIGIN[scope] && <span className="wrFieldGroupOrigin">{GROUP_ORIGIN[scope]}</span>}
-              {scope === 'plotline' && <AddButtons w={w} owner={plotline} ui={ui} />}
+              <span className="wrFieldGroupOrigin">{GROUP_ORIGIN[scope]}</span>
             </div>
-            {!isClosed && <FieldList w={w} holder={plotline} parts={parts} editable={scope === 'plotline'} ui={ui} drag={drag} showAssigned={showAssigned} />}
-            {!isClosed && !hasFields(parts) && <p className="wrMuted">No fields yet. Add one to start listing plotpoints.</p>}
+            {!isClosed && <FieldList w={w} holder={holder} parts={parts} editable={false} ui={ui} drag={drag} showAssigned={showAssigned} />}
+            {!isClosed && !hasFields(parts) && empty && <p className="wrMuted">{empty}</p>}
           </section>
         )
       })}
+    </>
+  )
+}
+
+// The plotline editor's fields: plotline fields on top, then the cluster's, the subcategory's, then the category's.
+export function FieldGroups({ w, plotline, ui, drag, showAssigned }: {
+  w: WriterWorkspace; plotline: PlotNode; ui: PlotUi; drag: PlotDrag; showAssigned: boolean
+}) {
+  const own = scopeLayouts(plotline, w.plotNodeById).plotline
+  const [closed, setClosed] = useState(false)
+  return (
+    <div className="wrFieldGroups">
+      <section className="wrFieldGroup" aria-label={GROUP_TITLE.plotline([])}>
+        <div className="wrFieldGroupHead">
+          <button type="button" className="wrFieldToggle" aria-expanded={!closed} aria-label={GROUP_TITLE.plotline([])} onClick={() => setClosed(c => !c)}>
+            {closed ? <ChevronRightIcon size={14} /> : <ChevronDownIcon size={14} />}
+            <span className="wrFieldGroupName">{GROUP_TITLE.plotline([])}</span>
+          </button>
+          <AddButtons w={w} owner={plotline} ui={ui} />
+        </div>
+        {!closed && <FieldList w={w} holder={plotline} parts={own} editable ui={ui} drag={drag} showAssigned={showAssigned} />}
+        {!closed && !hasFields(own) && <p className="wrMuted">No fields yet. Add one to start listing plotpoints.</p>}
+      </section>
+      <InheritedGroups w={w} holder={plotline} scopes={INHERITED.plotline} ui={ui} drag={drag} showAssigned={showAssigned} empty="No fields yet. Add one to start listing plotpoints." />
     </div>
   )
 }
@@ -427,6 +455,8 @@ export function FieldEditor({ w, owner, ui, drag }: { w: WriterWorkspace; owner:
         <FieldList w={w} holder={owner} parts={parts} editable ui={ui} drag={drag} showAssigned />
         {!hasFields(parts) && <p className="wrMuted">No fields yet.</p>}
       </section>
+      {/* A subcategory has its category's fields and a cluster its subcategory's and its category's: shown here, read-only, with the node's own values. */}
+      <InheritedGroups w={w} holder={owner} scopes={INHERITED[owner.kind]} ui={ui} drag={drag} showAssigned />
     </div>
   )
 }
