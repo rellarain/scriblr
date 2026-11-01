@@ -35,10 +35,10 @@ function describe(r: Routine, w: RoutineWindow): string {
 }
 
 export interface TreeNode { id: string; parentId: string | null; title: string }
-type Remembered = Pick<BacklogFilter, 'facet' | 'project' | 'sort' | 'done'>
+type Remembered = Pick<BacklogFilter, 'facet' | 'sort' | 'done'>
 
 export function Backlog({
-  owners, today, nowSlot, todayTicks, onPlanner, onTick, events, targets, nodes, onOpenNode,
+  owners, today, nowSlot, todayTicks, onPlanner, onTick, events, targets, nodes, onOpenNode, project = null, onProject = () => {}, addTo, onAddTo = () => {}, colors = {},
 }: {
   owners: BacklogOwner[]
   today: string
@@ -51,18 +51,24 @@ export function Backlog({
   targets: QuickTarget[]
   nodes: TreeNode[]
   onOpenNode?: (tree: 'outline' | 'plot', id: string) => void
+  // The project shown (shared with the Planner), where a new task goes (the last one one was made for) and each project's colour.
+  project?: string | null
+  onProject?: (id: string | null) => void
+  addTo?: string
+  onAddTo?: (id: string) => void
+  colors?: Record<string, string>
 }) {
-  const [remembered, setRemembered] = useStoredState<Remembered>('scriblr.writer.backlog.view', { facet: DEFAULT_FILTER.facet, project: DEFAULT_FILTER.project, sort: DEFAULT_FILTER.sort, done: DEFAULT_FILTER.done })
+  const [remembered, setRemembered] = useStoredState<Remembered>('scriblr.writer.backlog.view', { facet: DEFAULT_FILTER.facet, sort: DEFAULT_FILTER.sort, done: DEFAULT_FILTER.done })
   const [search, setSearch] = useState('')
-  const filter: BacklogFilter = { ...DEFAULT_FILTER, ...remembered, search }
+  const filter: BacklogFilter = { ...DEFAULT_FILTER, ...remembered, project, search }
   const [openId, setOpenId] = useState<string | null>(null)
   const [noneToggle, setNoneToggle] = useState<boolean | null>(null)
   const [text, setText] = useState('')
-  const [owner, setOwner] = useState(owners[0]?.id ?? '')
   const [adding, setAdding] = useState(false)
   const [routineLabel, setRoutineLabel] = useState('')
   const [routineRec, setRoutineRec] = useState<Recurrence | null>(null)
   const multi = owners.length > 1
+  const owner = addTo ?? owners[0]?.id ?? ''
   const target = owners.find(o => o.id === owner) ?? owners[0]
   const labelOf = (id: string) => owners.find(o => o.id === id)?.label ?? ''
   const update = (id: string, fn: (p: Planner) => Planner) => { const o = owners.find(x => x.id === id); if (o) onPlanner(id, fn(o.planner)) }
@@ -71,7 +77,7 @@ export function Backlog({
 
   const sections = useMemo(() => organise({
     owners, today, nowSlot, filter, ticked: (o, id) => (todayTicks[o] ?? []).includes(id), nodeTitle: id => titles.get(id),
-  }), [owners, today, nowSlot, remembered, search, todayTicks, titles]) // eslint-disable-line react-hooks/exhaustive-deps
+  }), [owners, today, nowSlot, remembered, project, search, todayTicks, titles]) // eslint-disable-line react-hooks/exhaustive-deps
   const noneOpen = noneToggle ?? sections.noneOpen
 
   // ---- changes ----
@@ -121,7 +127,7 @@ export function Backlog({
   const covered = (i: PlanItem) => (i.aim && i.targetNodeId ? withDescendants(nodes, i.targetNodeId) : null)
   const taskRow = (e: TaskEntry, more: { done?: boolean; overdue?: boolean; onShift?: string; running?: boolean; manual?: boolean } = {}) => (
     <TaskRow
-      key={e.item.id} ownerId={e.ownerId} item={e.item} today={today} done={more.done ?? !!e.item.doneOn} overdue={more.overdue} from={multi ? labelOf(e.ownerId) : undefined}
+      key={e.item.id} ownerId={e.ownerId} item={e.item} today={today} done={more.done ?? !!e.item.doneOn} overdue={more.overdue} from={multi ? labelOf(e.ownerId) : undefined} fromColor={colors[e.ownerId]}
       onShift={more.onShift} running={more.running} progress={progressOf(e.item, events, covered(e.item))} targets={targets} nodeTitle={nodeTitle(e.item.targetNodeId)}
       open={openId === e.item.id} onOpen={open => setOpenId(open ? e.item.id : null)} onChange={change => patch(e.ownerId, e.item.id, change)}
       onTick={on => onTick(e.ownerId, e.item.id, on)} onDelete={() => remove(e.ownerId, e.item.id)} onOpenNode={onOpenNode}
@@ -132,7 +138,7 @@ export function Backlog({
     <div className="wrSchedItem" key={`${r.ownerId}-${r.routine.id}`}>
       <label>
         <input type="checkbox" checked={r.ticked} disabled={r.w.state === 'paused'} onChange={e => check(r, e.target.checked)} aria-label={r.routine.label} />
-        <span><b>{r.routine.label}</b><small>{describe(r.routine, r.w)}{multi ? ` · ${labelOf(r.ownerId)}` : ''}</small></span>
+        <span><b>{r.routine.label}</b><small>{describe(r.routine, r.w)}{multi ? <> · {colors[r.ownerId] && <i className="wrSchedDot" style={{ background: colors[r.ownerId] }} />}{labelOf(r.ownerId)}</> : ''}</small></span>
       </label>
       {tag && <span className={`wrSchedTag${r.w.state === 'overdue' ? ' wrSchedTag--priority' : ''}`}>{tag}</span>}
       {r.w.state === 'paused'
@@ -156,7 +162,7 @@ export function Backlog({
 
   return (
     <div className="wrSchedCard wrSchedBacklog">
-      <BacklogToolbar filter={filter} owners={owners} onChange={next => { setSearch(next.search); setRemembered({ facet: next.facet, project: next.project, sort: next.sort, done: next.done }) }} />
+      <BacklogToolbar filter={filter} owners={owners} onChange={next => { setSearch(next.search); onProject(next.project); setRemembered({ facet: next.facet, sort: next.sort, done: next.done }) }} />
       {group(`Today · ${todayRows.length}`, todayRows, 'today')}
       {group(`Overdue · ${sections.overdue.length}`, sections.overdue.map(entryRow), 'overdue')}
       {filter.sort === 'priority' ? (
@@ -190,7 +196,7 @@ export function Backlog({
 
       <div className="wrSchedBacklogAdd">
         {multi && (
-          <select className="wrField" aria-label="Add to" value={owner} onChange={e => setOwner(e.target.value)}>{owners.map(o => <option key={o.id} value={o.id}>{o.label}</option>)}</select>
+          <select className="wrField" aria-label="Add to" value={owner} onChange={e => onAddTo(e.target.value)}>{owners.map(o => <option key={o.id} value={o.id}>{o.label}</option>)}</select>
         )}
         <div className="wrKv">
           <input

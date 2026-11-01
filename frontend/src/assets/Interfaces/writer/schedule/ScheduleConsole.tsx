@@ -26,7 +26,7 @@ import { DEFAULT_HUES, ScheduleSettings, SettingsButton, type FacetHues } from '
 import type { TargetOption } from './ShiftPanel'
 import { getTicks, putTicks } from './scheduleApi'
 import { useProjectFacts } from './useProjectFacts'
-import { requestReminderPermission, useShiftReminders } from './useShiftReminders'
+import { requestReminderPermission, useShiftEndReminders, useShiftReminders } from './useShiftReminders'
 import { localToday, useSchedule } from './useSchedule'
 import type { SplitNode } from '../../../../components/tiles/splitTree'
 
@@ -42,11 +42,14 @@ export const DEFAULT_TREE: SplitNode = {
   b: { dir: 'row', ratio: 0.6, a: { id: 'schedule' }, b: { dir: 'col', ratio: 0.4, a: { id: 'backlog' }, b: { dir: 'col', ratio: 0.62, a: { id: 'analytics' }, b: { id: 'review' } } } },
 }
 
+// A project's colour: its hue at the facet colours' own saturation and lightness (so it reads on the tile for every hue, as they do).
+const projectColor = (hue: number): string => `hsl(${hue}, ${FACET_COLOR.s}%, ${FACET_COLOR.l}%)`
 const hueVars = (hues: FacetHues) => Object.fromEntries(FACETS.map(f => [`--wr-f-${f}`, `hsl(${hues[f]}, ${FACET_COLOR.s}%, ${FACET_COLOR.l}%)`]))
 
 // `titleSlot` is the element in the console's tab-tile title bar where the Settings button and the rail of the console's tiles go (null while it is not drawn yet); without one (undefined) the button is the console's first row, with the rail above the tiles.
 // `onOpenNode` opens a node a task is about in the Writer (a project's own console passes it).
-export default function ScheduleConsole({ scope, projectIds, titles, titleSlot, onOpenNode }: { scope: 'dash' | 'project'; projectIds: string[]; titles: Record<string, string>; titleSlot?: HTMLElement | null; onOpenNode?: (tree: 'outline' | 'plot', id: string) => void }) {
+// `hues` is each project's own colour (a hue), which tells the projects apart at the Dash: on a shift's block and beside a task.
+export default function ScheduleConsole({ scope, projectIds, titles, titleSlot, onOpenNode, hues: projectHues }: { scope: 'dash' | 'project'; projectIds: string[]; titles: Record<string, string>; titleSlot?: HTMLElement | null; onOpenNode?: (tree: 'outline' | 'plot', id: string) => void; hues?: Record<string, number> }) {
   const schedule = useSchedule(projectIds)
   const activity = useActivityState()
   const [settingsOpen, setSettingsOpen] = useState(false)
@@ -68,6 +71,15 @@ export default function ScheduleConsole({ scope, projectIds, titles, titleSlot, 
     return scope === 'dash' ? [{ id: ACCOUNT_OWNER, label: 'Account', projectId: null, planner: { ...emptyPlanner(), ...account }, setPlanner: setAccount }, ...list] : list
   }, [scope, projectIds, titles, schedule.planners, schedule.setPlanner, account, setAccount])  // eslint-disable-line react-hooks/exhaustive-deps
   const goalOwner = owners[0]
+  // The one project shown (in the Planner and the Backlog together), and where a new shift or task goes: the last one it was made for.
+  const [shownRaw, setShown] = useStoredState<string | null>(`scriblr.writer.schedule.project.${scope}`, null)
+  const [addToRaw, setAddTo] = useStoredState<string>(`scriblr.writer.schedule.addTo.${scope}`, '')
+  const shownProject = owners.some(o => o.id === shownRaw) ? shownRaw : null
+  const addTo = owners.some(o => o.id === addToRaw) ? addToRaw : shownProject ?? owners[0]?.id ?? ''
+  const colors = useMemo(
+    () => (scope === 'dash' ? Object.fromEntries(owners.filter(o => o.id !== ACCOUNT_OWNER && projectHues?.[o.id] !== undefined).map(o => [o.id, projectColor(projectHues?.[o.id] as number)])) : {}),
+    [scope, owners, projectHues],
+  )
   const planner = goalOwner?.planner ?? emptyPlanner()
 
   // The old task list, routine list and word goals (kept in the settings store) become the account's planner, once.
@@ -171,11 +183,24 @@ export default function ScheduleConsole({ scope, projectIds, titles, titleSlot, 
   ], [single])
   // Every node of the projects in the console (a task's node name, and what its progress is counted over).
   const nodes = useMemo(() => facts.flatMap(f => [...f.outline, ...f.plot]).map(n => ({ id: n.id, parentId: n.parentId, title: n.title })), [facts])
+  const nodeTitles = useMemo(() => new Map(nodes.map(n => [n.id, n.title])), [nodes])
   const bookTitles = useMemo(() => Object.fromEntries(facts.flatMap(f => f.outline.filter(n => n.kind === 'book').map(n => [n.id, n.title]))), [facts])
 
   // ---- reminders, export, print ----
   const upcoming = useMemo(() => owners.flatMap(o => shiftOccurrences(o.planner.shifts, o.planner.restDays, today, today)), [owners, today])
   useShiftReminders(upcoming, planner.reminderLeadMinutes, today)
+  // At the end of each of today's shifts, a reminder when tasks of it are not ticked off (counted then).
+  const ticksRef = useRef(ticks)
+  ticksRef.current = ticks
+  const endings = useMemo(() => owners.flatMap(o => shiftOccurrences(o.planner.shifts, o.planner.restDays, today, today).map(occ => ({
+    key: `${o.id}:${occ.shiftId}`, title: occ.title, date: occ.date, endSlot: occ.endSlot,
+    pending: () => {
+      const now = ownersRef.current.find(x => x.id === o.id)
+      const ticked = ticksRef.current.get(o.id, occ.date)
+      return (now?.planner.items ?? []).filter(i => i.shiftId === occ.shiftId && !i.doneOn && !ticked.includes(i.id)).length
+    },
+  }))), [owners, today])
+  useShiftEndReminders(endings, planner.reminderLeadMinutes !== null, today)
   const exportIcs = useCallback(() => {
     const from = addDays(today, -7)
     const to = addDays(today, 120)
@@ -203,6 +228,7 @@ export default function ScheduleConsole({ scope, projectIds, titles, titleSlot, 
       children: (
         <ScheduleCard
           owners={owners} today={today} nowSlot={nowSlot} events={schedule.facets.events} weekStart={weekStart} targets={targets} ticks={ticks}
+          projects={{ project: shownProject, onProject: setShown, addTo, onAddTo: setAddTo, colors }} nodeTitle={id => nodeTitles.get(id)}
         />
       ),
     },
@@ -213,6 +239,7 @@ export default function ScheduleConsole({ scope, projectIds, titles, titleSlot, 
           owners={owners} today={today} nowSlot={nowSlot} todayTicks={Object.fromEntries(owners.map(o => [o.id, ticks.get(o.id, today)]))}
           onPlanner={(id, next) => owners.find(o => o.id === id)?.setPlanner(next)} onTick={(id, item, on) => ticks.set(id, today, item, on)}
           events={schedule.facets.events} targets={targets} nodes={nodes} onOpenNode={onOpenNode}
+          project={shownProject} onProject={setShown} addTo={addTo} onAddTo={setAddTo} colors={colors}
         />
       ),
     },

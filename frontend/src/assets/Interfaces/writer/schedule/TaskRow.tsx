@@ -19,8 +19,9 @@ export interface TaskRowProps {
   // Done for today: ticked on a shift, or done (a task of the backlog).
   done: boolean
   overdue?: boolean
-  // Where it is from (a project's name), shown when more than one is listed.
+  // Where it is from (a project's name), shown when more than one is listed, with the project's colour where there is one.
   from?: string
+  fromColor?: string
   // Where it sits today ("Morning draft"), for a task on today's shift.
   onShift?: string
   running?: boolean
@@ -81,7 +82,7 @@ export function TaskRow(p: TaskRowProps) {
   if (item.dueDate) facts.push(<span key="due" className="wrTaskFact" title="Due">due {item.dueDate === today ? 'today' : dayLabel(item.dueDate)}</span>)
   if (item.estimateMinutes) facts.push(<span key="est" className="wrTaskFact" title="Estimate">{formatEstimate(item.estimateMinutes)}</span>)
   if (p.onShift) facts.push(<span key="shift" className="wrTaskFact">{p.running ? 'now · ' : ''}{p.onShift}</span>)
-  if (p.from) facts.push(<span key="from" className="wrTaskFact">{p.from}</span>)
+  if (p.from) facts.push(<span key="from" className="wrTaskFact">{p.fromColor && <i className="wrSchedDot" style={{ background: p.fromColor }} />}{p.from}</span>)
 
   return (
     <div className={`wrSchedTask${open ? ' wrSchedTask--open' : ''}${p.done ? ' wrSchedTask--done' : ''}${p.overdue ? ' wrSchedTask--overdue' : ''}${p.running ? ' wrSchedTask--running' : ''}`}>

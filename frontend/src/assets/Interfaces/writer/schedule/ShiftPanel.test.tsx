@@ -2,7 +2,7 @@ import { useRef, useState } from 'react'
 import { fireEvent, render, screen, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { afterEach, describe, expect, it, vi } from 'vitest'
-import { emptyPlanner, newTask, type Planner, type Shift } from '../../../../lib/facets'
+import { emptyPlanner, newTask, type ActivityEvent, type Planner, type Shift } from '../../../../lib/facets'
 import { DRAG_ITEM } from './Backlog'
 import { ScheduleCard, type ScheduleOwner, type TicksApi } from './ScheduleCard'
 
@@ -15,7 +15,7 @@ const repeating = (over: Partial<Shift> = {}) => shift({ recurrence: { kind: 'da
 const withShifts = (shifts: Shift[], items = [newTask('i1', 'Reread Ch. 8', null, { priority: 'medium', estimateMinutes: 30 })]): Planner => ({ ...emptyPlanner(), shifts, items })
 
 let latest: Planner
-function Harness({ start }: { start: Planner }) {
+function Harness({ start, events = [], nowSlot = 60, nodeTitle }: { start: Planner; events?: ActivityEvent[]; nowSlot?: number; nodeTitle?: (id: string) => string | undefined }) {
   const [planner, setPlanner] = useState(start)
   const ticked = useRef<Record<string, string[]>>({})
   const [, force] = useState(0)
@@ -25,9 +25,9 @@ function Harness({ start }: { start: Planner }) {
     get: (_o, d) => ticked.current[d] ?? [], loaded: () => true, load: () => {},
     set: (_o, d, id, on) => { ticked.current[d] = on ? [...(ticked.current[d] ?? []), id] : (ticked.current[d] ?? []).filter(x => x !== id); force(n => n + 1) },
   }
-  return <ScheduleCard owners={[owner]} today={TODAY} nowSlot={60} events={[]} weekStart="monday" targets={[]} ticks={ticks} />
+  return <ScheduleCard owners={[owner]} today={TODAY} nowSlot={nowSlot} events={events} weekStart="monday" targets={[]} ticks={ticks} nodeTitle={nodeTitle} />
 }
-const show = (p: Planner) => render(<Harness start={p} />)
+const show = (p: Planner, extra: Omit<Parameters<typeof Harness>[0], 'start'> = {}) => render(<Harness start={p} {...extra} />)
 const blockOf = (name: RegExp) => within(document.querySelector(`[data-date="${TODAY}"]`) as HTMLElement).getByRole('button', { name })
 // A click is a press and a release in one place, which opens the shift.
 const pick = (el: HTMLElement) => userEvent.setup().click(el)
@@ -187,7 +187,7 @@ describe('the Planner in a narrow tile', () => {
     expect(document.querySelector('.wrSchedAgenda')).toBeTruthy()
     expect(document.querySelector('.wrSchedWeek')).toBeNull()
     expect(screen.getByRole('button', { name: 'Week' }).getAttribute('aria-pressed')).toBe('true')
-    fireEvent.click(screen.getByText('Morning draft').closest('button') as HTMLElement)
+    fireEvent.click(screen.getByText('Morning draft', { selector: '.wrSchedAgendaRow b' }).closest('button') as HTMLElement)
     expect(screen.getByRole('form')).toBeTruthy()
     expect(document.querySelector('.wrSchedMain')).toBeNull()
   })
@@ -225,5 +225,64 @@ describe('dropping a task on the calendar', () => {
     const cell = within(screen.getByRole('grid')).getAllByRole('gridcell').find(c => c.textContent?.startsWith('5')) as HTMLElement
     drop(cell)
     expect(latest.items[0].dueDate).toMatch(/^2026-1[01]-05$/)
+  })
+})
+
+describe('the Planner keeps you aware of the day', () => {
+  const task = (id: string, over = {}) => newTask(id, `Task ${id}`, null, { shiftId: 's1', priority: 'medium', ...over })
+  const word = (slot: number, amount: number): ActivityEvent => ({ ts: '', date: TODAY, slot, facet: 'draft', action: 'words', nodeId: 'm', kind: 'moment', label: null, amount })
+
+  it('has a bar for the shift running now, with the time left and its tasks, which opens the shift', async () => {
+    const user = userEvent.setup()
+    show(withShifts([shift()], [task('a'), task('b', { doneOn: TODAY })]))
+    const bar = screen.getByRole('button', { name: /^Now: Morning draft, 1 h left, 1 of 2 tasks ticked/ })
+    expect(bar.textContent).toContain('1 h left · 1/2 tasks')
+    await user.click(bar)
+    expect(screen.getByRole('form', { name: 'Edit shift' })).toBeTruthy()
+  })
+
+  it('has a bar for the next shift, and the time until it, when none is running', () => {
+    show(withShifts([shift({ startSlot: 90, endSlot: 100 })]), { nowSlot: 60 })
+    expect(screen.getByRole('button', { name: /^Next: Morning draft, in 5 h/ })).toBeTruthy()
+  })
+
+  it('has no bar when no shift is left', () => {
+    show(withShifts([shift({ date: '2026-10-20' })]))
+    expect(document.querySelector('.wrNextUp')).toBeNull()
+  })
+
+  it('shows on a block how far the aim is, the node it is on and how many tasks are ticked', () => {
+    show(withShifts([shift({ targetNodeId: 'n1', targetTree: 'outline' })], [task('a'), task('b', { doneOn: TODAY })]), { events: [word(55, 200), word(60, 200)], nodeTitle: id => (id === 'n1' ? 'Chapter 3' : undefined) })
+    const block = blockOf(/^Morning draft/)
+    expect(within(block).getByText(/1\/2/)).toBeTruthy()
+    expect(within(block).getByText('Chapter 3')).toBeTruthy()
+    const bar = within(block).getByRole('progressbar', { name: 'Morning draft aim' })
+    expect(bar.getAttribute('aria-valuenow')).toBe('400')
+    expect(bar.getAttribute('aria-valuemax')).toBe('800')
+  })
+
+  it('marks the days that tasks and routines fall due on, with their names', () => {
+    const p = withShifts([], [newTask('i1', 'Send pages', null, { dueDate: '2026-10-28' })])
+    show(p)
+    const mark = screen.getByLabelText(/1 due on .*: Send pages/)
+    expect(mark.textContent).toBe('1 due')
+    expect(mark.getAttribute('title')).toBe('Due: Send pages')
+  })
+
+  it('shows a Now button while the now line is scrolled out of sight, which brings it back', async () => {
+    const user = userEvent.setup()
+    Object.defineProperty(HTMLElement.prototype, 'clientHeight', { configurable: true, get: () => 300 })
+    try {
+      show(withShifts([]))
+      const box = document.querySelector('.wrSchedGridBox') as HTMLElement
+      expect(screen.queryByRole('button', { name: 'Now' })).toBeNull() // it opened on the now line
+      box.scrollTop = 0
+      fireEvent.scroll(box)
+      await user.click(await screen.findByRole('button', { name: 'Now' }))
+      expect(box.scrollTop).toBeGreaterThan(900)
+      expect(screen.queryByRole('button', { name: 'Now' })).toBeNull()
+    } finally {
+      delete (HTMLElement.prototype as unknown as Record<string, unknown>).clientHeight
+    }
   })
 })

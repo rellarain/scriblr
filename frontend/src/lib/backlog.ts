@@ -1,5 +1,5 @@
 import { PRIORITIES, type Facet, type PlanItem, type Planner, type Routine, type TaskPriority } from './facets'
-import { routineWindow, shiftOccurrences, type RoutineWindow } from './recurrence'
+import { isPaused, isRest, patternDays, routineWindow, shiftOccurrences, type RoutineWindow } from './recurrence'
 
 // What the Backlog shows and in what order. Pure: the tile gives it the planners and the day and draws what comes back.
 //   Today     the tasks on today's shifts (the shift running now first) and the routines due today
@@ -155,4 +155,25 @@ export function moveItem(items: PlanItem[], id: string, beforeId: string | null)
   const rest = items.filter(i => i.id !== id)
   const at = beforeId === null ? rest.length : rest.findIndex(i => i.id === beforeId)
   return [...rest.slice(0, at), moving, ...rest.slice(at)]
+}
+
+// The days in a range something falls due, for the markers on the calendar: a task on its due day, a routine on each day it comes round (or, one that comes
+// round after an interval, on the last day of its range; today once it is overdue).
+export interface DueMark { ownerId: string; label: string; kind: 'task' | 'routine' }
+export function dueDays(owners: { id: string; planner: Planner }[], from: string, to: string, today: string): Map<string, DueMark[]> {
+  const out = new Map<string, DueMark[]>()
+  const add = (day: string, mark: DueMark) => { if (day >= from && day <= to) out.set(day, [...(out.get(day) ?? []), mark]) }
+  for (const o of owners) {
+    for (const i of o.planner.items) if (!i.doneOn && i.dueDate) add(i.dueDate, { ownerId: o.id, label: i.label, kind: 'task' })
+    for (const r of o.planner.routines) {
+      if (r.recurrence.kind === 'interval') {
+        const w = routineWindow(r, today, o.planner.restDays)
+        if (w.state === 'paused') continue
+        add(w.state === 'overdue' ? today : w.to, { ownerId: o.id, label: r.label, kind: 'routine' })
+      } else {
+        for (const d of patternDays(r.recurrence, from, to)) if (!isPaused(r.pauses, d) && !isRest(o.planner.restDays, d)) add(d, { ownerId: o.id, label: r.label, kind: 'routine' })
+      }
+    }
+  }
+  return out
 }

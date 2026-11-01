@@ -41,6 +41,10 @@ export interface ShiftPanelProps {
   items: PlanItem[]
   ticks: string[]
   targets: TargetOption[]
+  // The projects (and the account) a new shift can be given to; with only one there is no choice.
+  projects?: Array<{ id: string; label: string }>
+  projectId?: string
+  onProject?: (id: string) => void
   onChange: (patch: Partial<Shift>) => void
   onItems: (items: PlanItem[]) => void
   onTick: (itemId: string, on: boolean) => void
@@ -83,6 +87,11 @@ export function ShiftPanel(p: ShiftPanelProps) {
         <div className="wrChoice" role="radiogroup" aria-label="Change which shifts?">
           {SCOPES.map(([v, text]) => <button key={v} type="button" role="radio" aria-checked={p.scope === v} className={p.scope === v ? 'on' : ''} onClick={() => p.onScope(v)}>{text}</button>)}
         </div>
+      )}
+      {p.isNew && p.projects && p.projects.length > 1 && (
+        <select className="wrField" aria-label="Project" value={p.projectId} onChange={e => p.onProject?.(e.target.value)}>
+          {p.projects.map(o => <option key={o.id} value={o.id}>{o.label}</option>)}
+        </select>
       )}
       <input className="wrField" aria-label="Title" placeholder="What is this shift for?" value={s.title} onChange={e => p.onChange({ title: e.target.value })} autoFocus={p.isNew} />
       <div className="wrSchedTools" role="group" aria-label="Facet">

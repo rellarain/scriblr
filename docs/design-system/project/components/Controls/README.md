@@ -32,6 +32,7 @@ The app resets native form controls, so the console draws its own.
 - **Choice chips** (`.wrChoice`): a choice of one among several words, as chips that wrap in a narrow panel (a change's scope, how a shift repeats); the chosen chip is inverted (the level's ink with the card's colour for the text). A short choice that always fits stays a joined segmented control (`.wrSchedSeg`).
 - **Time range** (`TimeRange`, `.wrTimeRange`): two `.wrField` pickers of 10-minute times with the length beside them; moving the start moves the end with it.
 - **Fold** (`.wrFold`): a row with a chevron, a name and its summary on the right, opening into its fields; the panel's less-used fields are folded.
+- **Project colour** (`--wr-pc`): a project's hue at the facet colours' saturation and lightness (`FACET_COLOR`), drawn as a 4px inset edge or a dot beside the text, never behind it; it is audited with the facet lines (3:1 on the tile, every hue).
 - **Priority flag** (`.wrPrio`): a flag drawn by shape (filled High, half-filled Medium, dashed Low, faint None); pressed it opens into the four choices as a small segmented control.
 
 ## Alerts and quiet text

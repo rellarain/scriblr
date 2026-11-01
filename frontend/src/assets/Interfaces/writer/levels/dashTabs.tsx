@@ -21,7 +21,7 @@ export function dashTabs(w: WriterWorkspace): LevelTab[] {
       render: c => {
         const ids = w.projects.map(p => p.projectId)
         return c.size === 'max'
-          ? <ScheduleConsole scope="dash" titleSlot={c.titleSlot} projectIds={ids} titles={Object.fromEntries(w.projects.map(p => [p.projectId, p.title]))} />
+          ? <ScheduleConsole scope="dash" titleSlot={c.titleSlot} projectIds={ids} titles={Object.fromEntries(w.projects.map(p => [p.projectId, p.title]))} hues={Object.fromEntries(w.projects.map(p => [p.projectId, w.projectHueOf(p)]))} />
           : <ScheduleSummary projectIds={ids} />
       },
     },

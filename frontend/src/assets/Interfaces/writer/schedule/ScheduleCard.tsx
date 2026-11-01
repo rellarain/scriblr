@@ -2,16 +2,20 @@ import { Fragment, useEffect, useMemo, useRef, useState, type DragEvent, type Po
 import { FACET_LABEL, SLOTS_PER_DAY, slotTime, type ActivityEvent, type Facet, type PlanItem, type Planner, type Shift, type ShiftTemplate } from '../../../../lib/facets'
 import { addDays } from '../../../../lib/projection'
 import { addUnits, shiftOccurrences, type ShiftOccurrence } from '../../../../lib/recurrence'
+import { dueDays, type DueMark } from '../../../../lib/backlog'
+import { nextUp } from '../../../../lib/nextUp'
+import { shiftProgress } from '../../../../lib/shiftProgress'
 import { diffPatch, editShift, shiftForTask, type EditScope, type ShiftPatch } from '../../../../lib/shiftEdit'
 import { dragResult, intervalStates, layoutLanes, rangeOf, shiftStatus, type DragMode, type ShiftStatus } from '../../../../lib/timeline'
 import { MONTH_NAMES, rowLetters, type WeekStart } from '../../../../lib/scheduleCalendar'
 import { useStoredState } from '../shared'
 import { DRAG_ITEM } from './Backlog'
 import { newId } from './ids'
+import { NextUpBar } from './NextUpBar'
 import { ShiftPanel, type TargetOption } from './ShiftPanel'
 import { useElementWidth } from '../useElementWidth'
 import { ICON_PX, IconBtn } from './IconBtn'
-import { ChevronLeftIcon, ChevronRightIcon, CloseIcon, CopyIcon, ListIcon, PlusIcon, TodayIcon, TrashIcon, ViewDayIcon, ViewMonthIcon, ViewWeekIcon, ViewYearIcon, type IconProps } from '../../../icons'
+import { ChevronLeftIcon, ChevronRightIcon, ClockIcon, CloseIcon, CopyIcon, ListIcon, PlusIcon, TodayIcon, TrashIcon, ViewDayIcon, ViewMonthIcon, ViewWeekIcon, ViewYearIcon, type IconProps } from '../../../icons'
 
 // The Schedule: shifts on a day, a week or a month, or listed as an agenda, like a calendar. Drag across empty time to make a shift, drag a shift to
 // move it or its edges to resize it, click it to edit it, right-click (or press and hold) for its menu. The backlog sits beside it.
@@ -31,9 +35,27 @@ const dayName = (d: string, long = false): string => new Date(`${d}T00:00:00Z`).
 const monthTitle = (d: string): string => new Date(`${d}T00:00:00Z`).toLocaleDateString('en-US', { month: 'long', year: 'numeric', timeZone: 'UTC' })
 const sinceStart = (d: string, ws: WeekStart): number => { const w = new Date(`${d}T00:00:00Z`).getUTCDay(); return ws === 'monday' ? (w + 6) % 7 : w }
 
+// What the Dash adds to the Planner: the project each shift belongs to (its colour on the block, a choice of which to show, and where a new shift goes).
+export interface PlannerProjects {
+  // The project shown (an owner id), or null for all of them.
+  project: string | null
+  onProject: (id: string | null) => void
+  // Where a new shift goes: the last owner one was made for.
+  addTo: string
+  onAddTo: (id: string) => void
+  // An owner's colour (a css colour), where the owners are told apart by one.
+  colors: Record<string, string>
+}
+const NO_PROJECTS: PlannerProjects = { project: null, onProject: () => {}, addTo: '', onAddTo: () => {}, colors: {} }
+
 export function ScheduleCard({
-  owners, today, nowSlot, events, weekStart, targets, ticks,
-}: { owners: ScheduleOwner[]; today: string; nowSlot: number; events: ActivityEvent[]; weekStart: WeekStart; targets: TargetOption[]; ticks: TicksApi }) {
+  owners, today, nowSlot, events, weekStart, targets, ticks, projects = NO_PROJECTS, nodeTitle = () => undefined,
+}: {
+  owners: ScheduleOwner[]; today: string; nowSlot: number; events: ActivityEvent[]; weekStart: WeekStart; targets: TargetOption[]; ticks: TicksApi
+  projects?: PlannerProjects
+  // The name of a node a shift is working on, for its block.
+  nodeTitle?: (id: string) => string | undefined
+}) {
   const [view, setView] = useStoredState<CalView>('scriblr.writer.schedule.calendarView', 'week')
   const [cursor, setCursor] = useState(today)
   const [editing, setEditing] = useState<Editing | null>(null)
@@ -50,7 +72,8 @@ export function ScheduleCard({
   const press = useRef<ReturnType<typeof setTimeout> | null>(null)
   useEffect(() => { setCursor(today) }, [today])
   const shown: CalView = narrow && (view === 'day' || view === 'week') ? 'agenda' : view
-  useEffect(() => { if (box.current && (shown === 'day' || shown === 'week')) box.current.scrollTop = 6 * HOUR_PX - 4 }, [shown])
+  const [nowOut, setNowOut] = useState(false)
+  const shownOwners = useMemo(() => owners.filter(o => !projects.project || o.id === projects.project), [owners, projects.project])
 
   const start = shown === 'day' ? cursor : shown === 'agenda' ? cursor : addDays(cursor, -sinceStart(cursor, weekStart))
   const monthFirst = `${cursor.slice(0, 8)}01`
@@ -59,21 +82,57 @@ export function ScheduleCard({
   const to = shown === 'year' ? `${cursor.slice(0, 4)}-12-31` : addDays(from, length - 1)
   const days = shown === 'year' ? [] : Array.from({ length: shown === 'month' ? 42 : shown === 'agenda' ? 14 : length }, (_, i) => addDays(from, i))
   const occs: Occ[] = useMemo(
-    () => owners.flatMap(o => shiftOccurrences(o.planner.shifts, o.planner.restDays, from, to).map(x => ({ ...x, ownerId: o.id }))),
-    [owners, from, to],
+    () => shownOwners.flatMap(o => shiftOccurrences(o.planner.shifts, o.planner.restDays, from, to).map(x => ({ ...x, ownerId: o.id }))),
+    [shownOwners, from, to],
   )
+  // The now line is kept in view: the day and the week open on it, and a Now button shows while it is scrolled out of sight.
+  const nowY = nowSlot * SLOT_PX
+  const checkNow = () => {
+    const el = box.current
+    setNowOut(!!el && el.clientHeight > 0 && days.includes(today) && (nowY < el.scrollTop || nowY > el.scrollTop + el.clientHeight - SLOT_PX))
+  }
+  const scrollToNow = () => { if (box.current) { box.current.scrollTop = Math.max(0, nowY - box.current.clientHeight / 3); checkNow() } }
+  useEffect(() => {
+    const el = box.current
+    if (!el || !(shown === 'day' || shown === 'week')) return
+    if (days.includes(today)) scrollToNow()
+    else { el.scrollTop = 6 * HOUR_PX - 4; checkNow() }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [shown, cursor, today])
+  useEffect(checkNow) // eslint-disable-line react-hooks/exhaustive-deps
   const deadlines = useMemo(() => {
     const map = new Map<string, string[]>()
     const add = (d: string | null, label: string) => { if (d) map.set(d, [...(map.get(d) ?? []), label]) }
-    for (const o of owners) {
+    for (const o of shownOwners) {
       for (const g of o.planner.goals) add(g.deadline, `${FACET_LABEL[g.facet]} goal due`)
       add(o.planner.timelineStart, 'Timeline starts')
       add(o.planner.timelineEnd, 'Timeline ends')
     }
     return map
-  }, [owners])
+  }, [shownOwners])
+  // What falls due in the view (a task on its day, a routine on the days it comes round), as a count on the day with its names in the tooltip.
+  const due = useMemo(() => dueDays(shownOwners, from, to, today), [shownOwners, from, to, today])
+  const dueText = (marks: DueMark[]) => marks.map(m => `${m.kind === 'task' ? 'Due' : 'Routine'}: ${m.label}`).join('\n')
+  const dueMarker = (d: string) => {
+    const marks = due.get(d) ?? []
+    return marks.length > 0 ? <span className="wrSchedDue" title={dueText(marks)} aria-label={`${marks.length} due on ${dayName(d)}: ${marks.map(m => m.label).join(', ')}`}>{marks.length} due</span> : null
+  }
   const keptFrom = addDays(today, -14)
   const owner = (id: string) => owners.find(o => o.id === id) as ScheduleOwner
+  // The tasks of a shift on a day, and how many are ticked off (a task of a shift that happens once is done once).
+  const taskCount = (occ: { ownerId: string; shiftId: string; date: string; repeats: boolean }) => {
+    const mine = owner(occ.ownerId).planner.items.filter(i => i.shiftId === occ.shiftId)
+    const ticked = ticks.get(occ.ownerId, occ.date)
+    return { done: mine.filter(i => ticked.includes(i.id) || (!occ.repeats && i.doneOn !== null)).length, total: mine.length }
+  }
+  useEffect(() => { for (const o of occs) if (owner(o.ownerId).planner.items.some(i => i.shiftId === o.shiftId)) ticks.load(o.ownerId, o.date) }, [occs]) // eslint-disable-line react-hooks/exhaustive-deps
+  // The shift to point at: the one running now, else the next to start.
+  const upcoming: Occ[] = useMemo(
+    () => shownOwners.flatMap(o => shiftOccurrences(o.planner.shifts, o.planner.restDays, today, addDays(today, 14)).map(x => ({ ...x, ownerId: o.id }))),
+    [shownOwners, today],
+  )
+  const up = nextUp(upcoming, today, nowSlot)
+  useEffect(() => { if (up) ticks.load(up.occ.ownerId, up.occ.date) }, [up?.occ.shiftId, up?.occ.date]) // eslint-disable-line react-hooks/exhaustive-deps
   const shiftOf = (o: Occ): Shift | undefined => owner(o.ownerId)?.planner.shifts.find(s => s.id === o.shiftId)
 
   const label = shown === 'day' ? dayName(cursor, true) : shown === 'month' ? monthTitle(cursor) : shown === 'year' ? cursor.slice(0, 4) : `${dayName(from)} – ${dayName(to)}`
@@ -108,7 +167,7 @@ export function ScheduleCard({
   }
   const closeEditing = () => { dropBlank(); setEditing(null) }
   const openNew = (date: string, startSlot = 48, endSlot = 60, template?: ShiftTemplate) => {
-    const o = owners[0]
+    const o = owners.find(x => x.id === projects.addTo) ?? shownOwners[0] ?? owners[0]
     if (!o) return
     const shift: Shift = {
       id: newId('shift'), title: template?.name ?? '', facet: (template?.facet ?? 'draft') as Facet, date, startSlot: template?.startSlot ?? startSlot, endSlot: template?.endSlot ?? endSlot,
@@ -138,6 +197,16 @@ export function ScheduleCard({
     const next = { ...editing, draft }
     setEditing(next)
     applyEdit(next)
+  }
+  // A new shift can be given to another project (or the account) while it is being made: it moves with what it has been given so far.
+  const moveNew = (ownerId: string) => {
+    if (!editing || !editing.isNew || ownerId === editing.ownerId) return
+    const from = owner(editing.ownerId)
+    const to = owner(ownerId)
+    from.setPlanner({ ...from.planner, shifts: from.planner.shifts.filter(x => x.id !== editing.orig.id), items: from.planner.items.map(i => (i.shiftId === editing.orig.id ? { ...i, shiftId: null } : i)) })
+    to.setPlanner({ ...to.planner, shifts: [...to.planner.shifts.filter(x => x.id !== editing.orig.id), editing.draft] })
+    projects.onAddTo(ownerId)
+    setEditing({ ...editing, ownerId })
   }
   const changeScope = (scope: EditScope) => {
     if (!editing) return
@@ -280,13 +349,18 @@ export function ScheduleCard({
     const status = shiftStatus(states, { ...occ, ...r }, today, nowSlot)
     const key = `${occ.ownerId}${occ.shiftId}${occ.date}`
     const name = occ.title || 'New shift'
+    const tall = r.endSlot - r.startSlot
+    const prog = tall >= 4 ? shiftProgress({ ...occ, ...r }, events) : null
+    const node = tall >= 5 ? nodeTitle(shiftOf(occ)?.targetNodeId ?? '') : undefined
+    const count = taskCount(occ)
+    const color = projects.colors[occ.ownerId]
     const selected = editing !== null && editing.ownerId === occ.ownerId && editing.occurrence === occ.date && (occ.shiftId === editing.orig.id || occ.shiftId === editing.tailId)
     const stop = { onPointerDown: (e: ReactPointerEvent) => e.stopPropagation(), onDoubleClick: (e: React.MouseEvent) => e.stopPropagation() }
     return (
       <Fragment key={key}>
         <div
-          className={`wrSchedBlock wrSchedBlock--${status}${live ? ' wrSchedBlock--drag' : ''}${selected ? ' wrSchedBlock--selected' : ''}`}
-          style={{ top: r.startSlot * SLOT_PX, height: Math.max(SLOT_PX * 3, (r.endSlot - r.startSlot) * SLOT_PX - 1), left: `${(occ.lane / occ.lanes) * 100}%`, width: `${100 / occ.lanes}%`, ['--wr-bc' as string]: `var(--wr-f-${occ.facet})` }}
+          className={`wrSchedBlock wrSchedBlock--${status}${live ? ' wrSchedBlock--drag' : ''}${selected ? ' wrSchedBlock--selected' : ''}${color ? ' wrSchedBlock--proj' : ''}`}
+          style={{ top: r.startSlot * SLOT_PX, height: Math.max(SLOT_PX * 3, (r.endSlot - r.startSlot) * SLOT_PX - 1), left: `${(occ.lane / occ.lanes) * 100}%`, width: `${100 / occ.lanes}%`, ['--wr-bc' as string]: `var(--wr-f-${occ.facet})`, ...(color ? { ['--wr-pc' as string]: color } : {}) }}
           role="button" tabIndex={0} aria-label={`${name}, ${slotTime(r.startSlot)} to ${slotTime(r.endSlot)}${STATUS_LABEL[status] ? `, ${STATUS_LABEL[status]}` : ''}`} aria-pressed={selected}
           onKeyDown={e => { if (e.key === 'Enter' && e.target === e.currentTarget) openOcc(occ); if (e.key === 'F2' && e.target === e.currentTarget) setRenaming(key) }}
           onDoubleClick={() => setRenaming(key)}
@@ -305,8 +379,10 @@ export function ScheduleCard({
               />
             )
             : <b>{name}</b>}
-          <small>{slotTime(r.startSlot)} – {slotTime(r.endSlot)}</small>
+          <small>{slotTime(r.startSlot)} – {slotTime(r.endSlot)}{count.total > 0 ? ` · ${count.done}/${count.total}` : ''}</small>
+          {node && <small className="wrSchedNode">{node}</small>}
           {STATUS_LABEL[status] && <small>{STATUS_LABEL[status]}</small>}
+          {prog && <span className="wrSchedProg" role="progressbar" aria-label={`${name} aim`} aria-valuemin={0} aria-valuemax={prog.aim} aria-valuenow={prog.done} title={`${prog.done} of ${prog.aim}`}><i style={{ width: `${prog.pct * 100}%` }} /></span>}
           <span className="wrSchedIntervals" aria-hidden="true">{states.map((st, i) => <i key={i} className={`wrSchedInterval wrSchedInterval--${st}`} />)}</span>
           <span className="wrSchedHandle wrSchedHandle--bottom" onPointerDown={e => { e.stopPropagation(); setDragShift({ occ, mode: 'bottom', y: e.clientY, dSlots: 0, dDays: 0 }) }} />
         </div>
@@ -324,13 +400,14 @@ export function ScheduleCard({
   }
 
   const timeGrid = (
-    <div className="wrSchedGridBox" ref={box} style={{ ['--slot' as string]: `${SLOT_PX}px` }}>
+    <div className="wrSchedGridBox" ref={box} onScroll={checkNow} style={{ ['--slot' as string]: `${SLOT_PX}px` }}>
       <div className="wrSchedWeek" style={{ gridTemplateColumns: `max-content repeat(${days.length}, minmax(0, 1fr))` }}>
         <div />
         {days.map(d => (
           <div key={d} className={`wrSchedDayHead${d === today ? ' wrSchedDayHead--today' : ''}`}>
             <button type="button" onClick={() => { setCursor(d); setView('day') }}>{dayName(d)}</button>
             {(deadlines.get(d) ?? []).map(t => <span key={t} className="wrSchedDeadline">{t}</span>)}
+            {dueMarker(d)}
           </div>
         ))}
         <div className="wrSchedHours" aria-hidden="true">{Array.from({ length: SLOTS_PER_DAY }, (_, i) => <span key={i} className={i % 6 === 0 ? 'wrSchedHour' : undefined}>{slotTime(i)}</span>)}</div>
@@ -359,6 +436,7 @@ export function ScheduleCard({
           <button key={d} type="button" role="gridcell" className={`wrSchedMonthDay${d === today ? ' wrSchedMonthDay--today' : ''}${d.slice(0, 7) !== cursor.slice(0, 7) ? ' wrSchedMonthDay--out' : ''}`} {...dropTarget} onDrop={e => dropOnDay(e, d)} onClick={() => { setCursor(d); setView('day') }}>
             <b>{Number(d.slice(8))}</b>
             {(deadlines.get(d) ?? []).map(t => <span key={t} className="wrSchedDeadline">{t}</span>)}
+            {dueMarker(d)}
             {mine.slice(0, 3).map(o => <span key={o.shiftId} className="wrSchedMonthShift"><i className="wrSchedDot" style={{ background: `var(--wr-f-${o.facet})` }} />{o.title || 'New shift'}</span>)}
             {mine.length > 3 && <span className="wrMuted">+{mine.length - 3} more</span>}
           </button>
@@ -387,12 +465,12 @@ export function ScheduleCard({
                 {Array.from({ length: count }, (_, i) => {
                   const d = addDays(first, i)
                   const mine = byDay.get(d) ?? []
-                  const due = deadlines.get(d) ?? []
-                  const cls = ['wrSchedYearDay', mine.length > 0 ? 'wrSchedYearDay--has' : '', mine.length > 1 ? 'wrSchedYearDay--many' : '', due.length > 0 ? 'wrSchedYearDay--due' : '', d === today ? 'wrSchedYearDay--today' : ''].filter(Boolean).join(' ')
+                  const goals = [...(deadlines.get(d) ?? []), ...(due.get(d) ?? []).map(m => `${m.kind === 'task' ? 'Due' : 'Routine'}: ${m.label}`)]
+                  const cls = ['wrSchedYearDay', mine.length > 0 ? 'wrSchedYearDay--has' : '', mine.length > 1 ? 'wrSchedYearDay--many' : '', goals.length > 0 ? 'wrSchedYearDay--due' : '', d === today ? 'wrSchedYearDay--today' : ''].filter(Boolean).join(' ')
                   return (
                     <button
                       key={d} type="button" role="gridcell" className={cls} style={mine[0] ? { ['--wr-bc' as string]: `var(--wr-f-${mine[0].facet})` } : undefined}
-                      title={`${dayName(d, true)}${[...mine.map(o => o.title), ...due].map(t => ` · ${t}`).join('')}`} {...dropTarget} onDrop={e => dropOnDay(e, d)} onClick={() => { setCursor(d); setView('day') }}
+                      title={`${dayName(d, true)}${[...mine.map(o => o.title), ...goals].map(t => ` · ${t}`).join('')}`} {...dropTarget} onDrop={e => dropOnDay(e, d)} onClick={() => { setCursor(d); setView('day') }}
                     >{i + 1}</button>
                   )
                 })}
@@ -413,11 +491,12 @@ export function ScheduleCard({
           <div key={d} className="wrSchedAgendaDay">
             <h4 className="wrSchedSub">{dayName(d, true)}{d === today ? ' · Today' : ''}</h4>
             {(deadlines.get(d) ?? []).map(t => <div key={t} className="wrSchedDeadline">{t}</div>)}
+            {dueMarker(d)}
             {mine.map(o => {
               const s = shiftOf(o)
               const items = owner(o.ownerId).planner.items.filter(i => i.shiftId === o.shiftId)
               return (
-                <button type="button" key={`${o.shiftId}${o.date}`} className="wrSchedAgendaRow" onClick={() => openOcc(o)}>
+                <button type="button" key={`${o.shiftId}${o.date}`} className={`wrSchedAgendaRow${projects.colors[o.ownerId] ? ' wrSchedAgendaRow--proj' : ''}`} style={projects.colors[o.ownerId] ? { ['--wr-pc' as string]: projects.colors[o.ownerId] } : undefined} onClick={() => openOcc(o)}>
                   <i className="wrSchedDot" style={{ background: `var(--wr-f-${o.facet})` }} />
                   <span><b>{o.title || 'New shift'}</b> <small>{slotTime(o.startSlot)} – {slotTime(o.endSlot)}{s?.target ? ` · aim ${s.target}` : ''}</small>{items.length > 0 && <small>{items.map(i => i.label).join(' · ')}</small>}</span>
                 </button>
@@ -433,12 +512,20 @@ export function ScheduleCard({
   const editingOwner = editing ? owner(editing.ownerId) : null
   return (
     <div className={`wrSchedCard wrSchedSchedule${narrow ? ' wrSchedSchedule--narrow' : ''}`} ref={wrap}>
+      {up && <NextUpBar up={up} tasks={taskCount(up.occ)} color={projects.colors[up.occ.ownerId]} onOpen={() => { setCursor(up.occ.date); openOcc(up.occ) }} />}
       <div className="wrSchedHead">
         <IconBtn Icon={TodayIcon} iconProps={{ day: Number(today.slice(8)) }} label="Today" onClick={() => setCursor(today)} />
         <IconBtn Icon={ChevronLeftIcon} label="Previous" onClick={() => step(-1)} />
         <IconBtn Icon={ChevronRightIcon} label="Next" onClick={() => step(1)} />
         <strong>{label}</strong>
+        {nowOut && <IconBtn Icon={ClockIcon} label="Now" onClick={scrollToNow} />}
         <span className="wrSchedSpacer" />
+        {owners.length > 1 && (
+          <select className="wrField wrSchedProject" aria-label="Show project" value={projects.project ?? ''} onChange={e => projects.onProject(e.target.value || null)}>
+            <option value="">All projects</option>
+            {owners.map(o => <option key={o.id} value={o.id}>{o.label}</option>)}
+          </select>
+        )}
         <div className="wrSchedSeg" role="group" aria-label="Calendar view">
           {(['day', 'week', 'month', 'year', 'agenda'] as CalView[]).map(v => {
             const name = v[0].toUpperCase() + v.slice(1)
@@ -462,6 +549,7 @@ export function ScheduleCard({
             shift={editing.draft} itemsShiftId={editing.orig.id} occurrence={editing.occurrence} isNew={editing.isNew} repeating={Boolean(editing.orig.recurrence) && !editing.isNew}
             scope={editing.scope} onScope={changeScope} items={editingOwner.planner.items} ticks={ticks.get(editing.ownerId, editing.occurrence)} targets={targets}
             onChange={change} onItems={changeItems} onTick={(id, on) => ticks.set(editing.ownerId, editing.occurrence, id, on)}
+            projects={owners.map(o => ({ id: o.id, label: o.label }))} projectId={editing.ownerId} onProject={moveNew}
             onDelete={deleteEditing} onTemplate={() => saveTemplate(editing.ownerId, editing.draft)} onClose={closeEditing}
           />
         )}

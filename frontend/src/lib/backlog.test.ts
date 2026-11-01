@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { emptyPlanner, newTask, type PlanItem, type Planner, type Routine, type Shift } from './facets'
-import { DEFAULT_FILTER, moveItem, organise, type BacklogFilter } from './backlog'
+import { DEFAULT_FILTER, dueDays, moveItem, organise, type BacklogFilter } from './backlog'
 
 const TODAY = '2026-11-04'
 const routine = (id: string, over: Partial<Routine> = {}): Routine => ({
@@ -113,5 +113,31 @@ describe('moveItem', () => {
   it('leaves the list alone for an unknown task or place', () => {
     expect(moveItem(items, 'x', 'a')).toBe(items)
     expect(moveItem(items, 'a', 'x')).toBe(items)
+  })
+})
+
+describe('dueDays', () => {
+  const interval = { kind: 'interval' as const, every: 7, unit: 'day' as const, days: [], rangeMax: 10, anchor: '2026-09-01', until: null }
+  const owners = [{
+    id: 'p',
+    planner: planner(
+      [newTask('a', 'Send pages', null, { dueDate: '2026-11-06' }), newTask('done', 'Done one', null, { dueDate: '2026-11-06', doneOn: TODAY }), newTask('far', 'Far off', null, { dueDate: '2027-01-01' })],
+      {
+        routines: [
+          routine('weekly', { recurrence: { kind: 'weekly', every: 1, unit: 'day', days: [4], rangeMax: null, anchor: '2026-10-01', until: null } }),
+          routine('interval', { lastDone: '2026-11-01', recurrence: interval }),
+          routine('late', { lastDone: '2026-10-01', recurrence: interval }),
+        ],
+      },
+    ),
+  }]
+  it('marks a task on its due day, a pattern routine on its days, an interval routine on the end of its range, and an overdue one today', () => {
+    const days = dueDays(owners, '2026-11-02', '2026-11-15', TODAY)
+    const names = (d: string) => (days.get(d) ?? []).map(m => m.label).sort()
+    expect(names('2026-11-06')).toEqual(['Send pages', 'weekly']) // 2026-11-06 is a Friday
+    expect(names('2026-11-13')).toEqual(['weekly'])
+    expect(names('2026-11-11')).toEqual(['interval']) // 2026-11-01 plus 10 days
+    expect(names(TODAY)).toEqual(['late'])
+    expect([...days.values()].flat().some(m => m.label === 'Done one' || m.label === 'Far off')).toBe(false)
   })
 })

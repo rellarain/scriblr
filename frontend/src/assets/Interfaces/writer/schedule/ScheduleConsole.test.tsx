@@ -289,7 +289,7 @@ describe('the Schedule console', () => {
     await open()
     const schedule = within(tile('schedule'))
     await user.click(schedule.getByRole('button', { name: 'Agenda' }))
-    expect(schedule.getByText('Morning draft')).toBeTruthy()
+    expect(within(schedule.getByText('Morning draft', { selector: '.wrSchedAgendaRow b' }).closest('button') as HTMLElement).getByText(/9:00 AM/)).toBeTruthy()
     await user.click(schedule.getByRole('button', { name: 'Month' }))
     expect(schedule.getByRole('grid', { name: 'October 2026' })).toBeTruthy()
     await user.click(schedule.getByRole('button', { name: 'Day' }))

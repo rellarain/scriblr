@@ -15,7 +15,7 @@ beforeEach(() => {
   vi.spyOn(resourcesApi, 'getResources').mockResolvedValue({ schemaVersion: 1, nodes: [], content: {}, assessments: {} })
 })
 
-const w = makeWorkspace({ projects: [{ projectId: 'p1', title: 'Saga' }], projectOutlines: { p1: [] } })
+const w = makeWorkspace({ projects: [{ projectId: 'p1', title: 'Saga' }], projectOutlines: { p1: [] }, projectHueOf: () => 200 })
 
 function Harness({ size }: { size: 'mid' | 'max' }) {
   const t = useDashTabs(w, size)

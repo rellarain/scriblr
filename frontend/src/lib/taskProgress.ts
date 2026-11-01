@@ -23,7 +23,7 @@ export function withDescendants(nodes: { id: string; parentId: string | null }[]
 }
 
 // What counts as one unit of a facet's work in the activity: words written, or nodes added, or flags resolved.
-const COUNTED: Record<Facet, ActivityEvent['action']> = { draft: 'words', outline: 'create', plot: 'create', revision: 'resolve', project: 'create' }
+export const COUNTED: Record<Facet, ActivityEvent['action']> = { draft: 'words', outline: 'create', plot: 'create', revision: 'resolve', project: 'create' }
 
 // The facet a task counts its node's work in: its own, or the writing of an outline node and the adding of a plot node.
 export const facetOfTask = (item: PlanItem): Facet => item.facet ?? (item.targetTree === 'plot' ? 'plot' : 'draft')
