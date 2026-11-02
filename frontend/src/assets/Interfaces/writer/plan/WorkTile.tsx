@@ -12,6 +12,7 @@ import { PlusIcon, TrashIcon } from '../../../icons'
 import { ExerciseCard } from './ExerciseCard'
 import { PhaseSelect, PlanGrip } from './fields'
 import { ProcessCard } from './ProcessCard'
+import { TEMPLATE_OWNER } from './useTemplate'
 
 // The Work tile: what a project does to get its results, in four folds: the processes (recipes of steps), the exercises (writing drills), the routines
 // (what comes round) and the tasks (what is waiting). Each is tagged with the phase it builds to; each opens in place and every change is made at once.
@@ -119,7 +120,7 @@ export function WorkTile({ ownerId, planner, setPlanner, today }: { ownerId: str
             key={item.id} ownerId={ownerId} item={item} today={today} done={!!item.doneOn} progress={null} targets={[]}
             open={openId === item.id} onOpen={o => setOpenId(o ? item.id : null)} onChange={change => patch('items', item.id, change)}
             onTick={on => patch('items', item.id, { doneOn: on ? today : null })} onDelete={() => setPlanner({ ...planner, items: planner.items.filter(x => x.id !== item.id) })}
-            placeable={!item.shiftId && !item.doneOn} phases={planner.phases} phaseTitle={planner.phases.find(x => x.id === item.phaseId)?.title}
+            placeable={ownerId !== TEMPLATE_OWNER && !item.shiftId && !item.doneOn} phases={planner.phases} phaseTitle={planner.phases.find(x => x.id === item.phaseId)?.title}
           />
         ))}
       </Fold>

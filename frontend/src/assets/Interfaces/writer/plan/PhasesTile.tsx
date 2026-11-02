@@ -12,17 +12,21 @@ import { PhaseTimeline } from './PhaseTimeline'
 // how far it is (what is tagged with it, done over all: tasks, milestones and goals) and opens in place to be edited; every change is made at once.
 
 const dayLabel = (d: string): string => new Date(`${d}T00:00:00Z`).toLocaleDateString('en-US', { month: 'short', day: 'numeric', timeZone: 'UTC' })
+// In the template a phase starts a number of days after the project's start and lasts a number of days.
+const relativeRange = (p: Phase): string => (p.offsetDays === null && p.lengthDays === null ? 'no days' : `from day ${(p.offsetDays ?? 0) + 1}${p.lengthDays ? `, ${p.lengthDays} ${p.lengthDays === 1 ? 'day' : 'days'}` : ''}`)
 const range = (p: Phase): string => (p.start && p.end ? `${dayLabel(p.start)} to ${dayLabel(p.end)}` : p.start ? `from ${dayLabel(p.start)}` : p.end ? `until ${dayLabel(p.end)}` : 'no dates')
 
-function MilestoneRow({ m, phases, today, onChange, onTick, onDelete, showPhase }: {
-  m: Milestone; phases: Phase[]; today: string; showPhase: boolean
+function MilestoneRow({ m, phases, today, onChange, onTick, onDelete, showPhase, relative }: {
+  m: Milestone; phases: Phase[]; today: string; showPhase: boolean; relative: boolean
   onChange: (patch: Partial<Milestone>) => void; onTick: (on: boolean) => void; onDelete: () => void
 }) {
   return (
     <div className="wrPlanMilestone">
-      <input type="checkbox" checked={m.done} aria-label={`${m.title || 'Milestone'} done`} onChange={e => onTick(e.target.checked)} />
+      {!relative && <input type="checkbox" checked={m.done} aria-label={`${m.title || 'Milestone'} done`} onChange={e => onTick(e.target.checked)} />}
       <input className="wrField" aria-label="Milestone title" placeholder="Milestone" value={m.title} onChange={e => onChange({ title: e.target.value })} />
-      <input className="wrField" type="date" aria-label={`${m.title || 'Milestone'} date`} value={m.date ?? ''} onChange={e => onChange({ date: e.target.value || null })} />
+      {relative
+        ? <input className="wrField wrSchedNum" type="number" min={1} max={3651} placeholder="day" aria-label={`${m.title || 'Milestone'} day of the project`} value={m.offsetDays === null ? '' : m.offsetDays + 1} onChange={e => onChange({ offsetDays: e.target.value === '' ? null : Math.min(3650, Math.max(0, Math.floor(Number(e.target.value)) - 1 || 0)) })} />
+        : <input className="wrField" type="date" aria-label={`${m.title || 'Milestone'} date`} value={m.date ?? ''} onChange={e => onChange({ date: e.target.value || null })} />}
       {showPhase && <PhaseSelect label={`Phase of ${m.title || 'milestone'}`} phases={phases} value={m.phaseId} onChange={phaseId => onChange({ phaseId })} />}
       {m.done && m.doneOn && <small className="wrMuted" title="Done on">{m.doneOn === today ? 'today' : dayLabel(m.doneOn)}</small>}
       <IconBtn Icon={TrashIcon} label={`Delete ${m.title || 'milestone'}`} onClick={onDelete} />
@@ -30,7 +34,8 @@ function MilestoneRow({ m, phases, today, onChange, onTick, onDelete, showPhase 
   )
 }
 
-export function PhasesTile({ planner, setPlanner, today, metGoals }: { planner: Planner; setPlanner: (p: Planner) => void; today: string; metGoals: ReadonlySet<string> }) {
+// `relative` is the template's: days counted from the project's start instead of dates, and nothing to tick or progress to show.
+export function PhasesTile({ planner, setPlanner, today, metGoals, relative = false }: { planner: Planner; setPlanner: (p: Planner) => void; today: string; metGoals: ReadonlySet<string>; relative?: boolean }) {
   const [openId, setOpenId] = useState<string | null>(null)
   const phaseOf = (id: string) => planner.phases.find(p => p.id === id)
   const patchPhase = (id: string, patch: Partial<Phase>) => setPlanner({ ...planner, phases: planner.phases.map(p => (p.id === id ? { ...p, ...patch } : p)) })
@@ -43,7 +48,7 @@ export function PhasesTile({ planner, setPlanner, today, metGoals }: { planner: 
   const addMilestone = (phaseId: string | null) => setPlanner({ ...planner, milestones: [...planner.milestones, newMilestone(newId('ms'), 'New milestone', { phaseId })] })
   const milestoneRow = (m: Milestone, showPhase: boolean) => (
     <MilestoneRow
-      key={m.id} m={m} phases={planner.phases} today={today} showPhase={showPhase} onChange={patch => patchMilestone(m.id, patch)}
+      key={m.id} m={m} phases={planner.phases} today={today} showPhase={showPhase} relative={relative} onChange={patch => patchMilestone(m.id, patch)}
       onTick={on => setPlanner(tickMilestone(planner, m.id, on, today))} onDelete={() => setPlanner(removeMilestone(planner, m.id))}
     />
   )
@@ -56,7 +61,7 @@ export function PhasesTile({ planner, setPlanner, today, metGoals }: { planner: 
         <IconBtn Icon={FlagIcon} label="New milestone" onClick={() => addMilestone(null)} />
         <IconBtn Icon={PlusIcon} label="New phase" className="wrSmallBtn wrSmallBtn--accent" onClick={addPhase} />
       </div>
-      <PhaseTimeline planner={planner} setPlanner={setPlanner} today={today} />
+      {!relative && <PhaseTimeline planner={planner} setPlanner={setPlanner} today={today} />}
       {planner.phases.length === 0 && <p className="wrMuted">No phases yet. A phase is a stage of the project, defined by the result it builds to; the routines, processes, tasks and goals that build to it are tagged with it.</p>}
       {planner.phases.map(ph => {
         const prog = phaseProgress(planner, ph.id, metGoals)
@@ -66,32 +71,39 @@ export function PhasesTile({ planner, setPlanner, today, metGoals }: { planner: 
           <section key={ph.id} className={`wrPlanCard wrPlanCard--${ph.status}${open ? ' wrPlanCard--open' : ''}`} aria-label={ph.title || 'Untitled phase'}>
             <button type="button" className="wrPlanHead" aria-expanded={open} aria-label={`${ph.title || 'Untitled phase'} details`} onClick={() => setOpenId(open ? null : ph.id)}>
               <ArcIcon size={20} />
-              <span className="wrPlanTitle"><b>{ph.title || 'Untitled phase'}</b><small>{ph.result || range(ph)}</small></span>
-              <span className={`wrSchedTag wrPlanStatus wrPlanStatus--${ph.status}`}>{PHASE_STATUS_LABEL[ph.status]}</span>
-              {prog.pct !== null && <span className="wrPlanPct" title={`${prog.done} of ${prog.total} done`}>{prog.pct}%</span>}
+              <span className="wrPlanTitle"><b>{ph.title || 'Untitled phase'}</b><small>{ph.result || (relative ? relativeRange(ph) : range(ph))}</small></span>
+              {!relative && <span className={`wrSchedTag wrPlanStatus wrPlanStatus--${ph.status}`}>{PHASE_STATUS_LABEL[ph.status]}</span>}
+              {!relative && prog.pct !== null && <span className="wrPlanPct" title={`${prog.done} of ${prog.total} done`}>{prog.pct}%</span>}
               {open ? <ChevronDownIcon size={20} /> : <ChevronRightIcon size={20} />}
             </button>
-            {prog.pct !== null && <span className="wrTaskBar" role="progressbar" aria-label={`${ph.title} progress`} aria-valuemin={0} aria-valuemax={100} aria-valuenow={prog.pct}><i style={{ width: `${prog.pct}%` }} /></span>}
+            {!relative && prog.pct !== null && <span className="wrTaskBar" role="progressbar" aria-label={`${ph.title} progress`} aria-valuemin={0} aria-valuemax={100} aria-valuenow={prog.pct}><i style={{ width: `${prog.pct}%` }} /></span>}
             {open && (
               <div className="wrPlanBody">
                 <input className="wrField" aria-label="Phase title" value={ph.title} onChange={e => patchPhase(ph.id, { title: e.target.value })} />
                 <textarea className="wrField" aria-label="Result" placeholder="The result this phase builds to…" rows={2} maxLength={1000} value={ph.result} onChange={e => patchPhase(ph.id, { result: e.target.value })} />
                 <textarea className="wrField" aria-label="Description" placeholder="Description…" rows={2} maxLength={2000} value={ph.description} onChange={e => patchPhase(ph.id, { description: e.target.value })} />
-                <div className="wrChoice" role="radiogroup" aria-label="Status">
+                {!relative && <div className="wrChoice" role="radiogroup" aria-label="Status">
                   {PHASE_STATUSES.map(s => <button key={s} type="button" role="radio" aria-checked={ph.status === s} className={ph.status === s ? 'on' : ''} onClick={() => patchPhase(ph.id, { status: s as PhaseStatus })}>{PHASE_STATUS_LABEL[s]}</button>)}
-                </div>
+                </div>}
                 <div className="wrTaskGrid">
+                  {relative ? (
+                    <>
+                      <label>Starts on day<input className="wrField" type="number" min={1} max={3651} placeholder="no start" aria-label="Phase starts on day" value={ph.offsetDays === null ? '' : ph.offsetDays + 1} onChange={e => patchPhase(ph.id, { offsetDays: e.target.value === '' ? null : Math.min(3650, Math.max(0, Math.floor(Number(e.target.value)) - 1 || 0)) })} /></label>
+                      <label>Lasts (days)<input className="wrField" type="number" min={1} max={3650} placeholder="no length" aria-label="Phase lasts days" value={ph.lengthDays ?? ''} onChange={e => patchPhase(ph.id, { lengthDays: e.target.value === '' ? null : Math.min(3650, Math.max(1, Math.floor(Number(e.target.value)) || 1)) })} /></label>
+                    </>
+                  ) : (<>
                   <label>Starts<input className="wrField" type="date" aria-label="Phase starts" value={ph.start ?? ''} onChange={e => patchPhase(ph.id, { start: e.target.value || null })} /></label>
                   <label>Ends<input className="wrField" type="date" aria-label="Phase ends" value={ph.end ?? ''} min={ph.start ?? undefined} onChange={e => patchPhase(ph.id, { end: e.target.value || null })} /></label>
+                  </>)}
                 </div>
                 <div className="wrPlanMilestones">
-                  <span className="wrLabel">Milestones{mine.length > 0 ? ` · ${mine.filter(m => m.done).length}/${mine.length}` : ''}</span>
+                  <span className="wrLabel">Milestones{mine.length > 0 && !relative ? ` · ${mine.filter(m => m.done).length}/${mine.length}` : ''}</span>
                   {mine.map(m => milestoneRow(m, false))}
                   <IconBtn Icon={PlusIcon} label={`New milestone on ${ph.title || 'the phase'}`} onClick={() => addMilestone(ph.id)} />
                 </div>
-                {prog.total > 0 && <p className="wrHint">{prog.done} of {prog.total} done: {prog.tasks[0]}/{prog.tasks[1]} tasks, {prog.milestones[0]}/{prog.milestones[1]} milestones, {prog.goals[0]}/{prog.goals[1]} goals.</p>}
+                {!relative && prog.total > 0 && <p className="wrHint">{prog.done} of {prog.total} done: {prog.tasks[0]}/{prog.tasks[1]} tasks, {prog.milestones[0]}/{prog.milestones[1]} milestones, {prog.goals[0]}/{prog.goals[1]} goals.</p>}
                 <div className="wrSchedFormActions">
-                  {prog.pct === 100 && ph.status !== 'done' && <IconBtn Icon={CheckIcon} label="Mark the phase done" className="wrSmallBtn wrSmallBtn--accent" onClick={() => patchPhase(ph.id, { status: 'done' })} />}
+                  {!relative && prog.pct === 100 && ph.status !== 'done' && <IconBtn Icon={CheckIcon} label="Mark the phase done" className="wrSmallBtn wrSmallBtn--accent" onClick={() => patchPhase(ph.id, { status: 'done' })} />}
                   <IconBtn Icon={TrashIcon} label={`Delete ${ph.title || 'the phase'}`} onClick={() => { setPlanner(removePhase(planner, ph.id)); setOpenId(null) }} />
                 </div>
               </div>

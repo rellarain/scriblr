@@ -312,8 +312,10 @@ described, now stale, in `docs/data-model.md`).
   phases and facets, required milestones, and links to other processes that
   come before, after or go with it) and **exercises** (`Exercise`: a prompt, a
   length, a times-a-week pace and a log); goals and routines can carry a
-  `phaseId` too. A phase or milestone in the template has an offset and a
-  length in days instead of dates. All of it is additive: a planner saved before
+  `phaseId` too. A phase or milestone in the **project template** (an account-level planner kept
+  in the settings store as `scriblr.writer.projectTemplate`; `lib/template.ts`
+  copies picked items into a project, dated from a start day, or saves a project's
+  into it) has an offset and a length in days instead of dates. All of it is additive: a planner saved before
   has none, and loads with empty lists. Dates are local days.
 - **Scrap** — `ScrapRegistry`: any `moment` node removed from the outline
   that had existing draft content becomes a `ScrapEntry` (captures its

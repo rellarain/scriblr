@@ -1,8 +1,14 @@
 import { useState, type CSSProperties } from 'react'
 import { fillColorCss } from '../../../../theme/bookColors'
+import { emptyPlanner } from '../../../../lib/facets'
+import { copyIntoPlanner, isEmptyPlan, selectAll } from '../../../../lib/template'
 import { PROJECT_NAME_MAX, type WriterWorkspace } from '../useWriterWorkspace'
 import { shelfGroups } from '../outlineTree'
-import { DeleteControl } from '../shared'
+import { DeleteControl, useStoredState } from '../shared'
+import { useTemplate } from '../plan/useTemplate'
+import { newId } from '../schedule/ids'
+import { planStore } from '../schedule/planStore'
+import { localToday } from '../schedule/useSchedule'
 import { Shelf } from '../Shelf'
 import { PlusIcon } from '../../../icons'
 
@@ -23,9 +29,13 @@ export function ProjectMin({ w }: { w: WriterWorkspace }) {
 // with the way to start a new project beneath them.
 export function ProjectTiles({ w }: { w: WriterWorkspace }) {
   const [newTitle, setNewTitle] = useState('')
+  const { template } = useTemplate()
+  const [fromTemplate, setFromTemplate] = useStoredState<boolean>('scriblr.writer.newProject.fromTemplate', true)
+  const seeded = fromTemplate && !isEmptyPlan(template)
   function createProject() {
     if (!newTitle.trim()) return
-    void w.createProject(newTitle.trim())
+    // A project from the template takes copies of all of it, dated from today.
+    void w.createProject(newTitle.trim(), seeded ? id => planStore.set(id, copyIntoPlanner(template, selectAll(template), emptyPlanner(), localToday(), newId).planner) : undefined)
     setNewTitle('')
   }
   return (
@@ -66,6 +76,9 @@ export function ProjectTiles({ w }: { w: WriterWorkspace }) {
           onChange={e => setNewTitle(e.target.value)}
           onKeyDown={e => { if (e.key === 'Enter') createProject() }}
         />
+        {!isEmptyPlan(template) && (
+          <label className="wrShowAssigned" title="Give the new project a copy of the template, from today"><input type="checkbox" role="switch" checked={fromTemplate} onChange={e => setFromTemplate(e.target.checked)} /><span>From the template</span></label>
+        )}
         <button type="button" className="wrSmallBtn" disabled={!newTitle.trim()} onClick={createProject}>
           <PlusIcon size={14} /> New project
         </button>

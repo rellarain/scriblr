@@ -305,6 +305,14 @@
   .wrStepRow { display: flex; align-items: center; gap: var(--space-3); .wrField { flex: 1 1 auto; min-width: 0; } .wrSchedNum { flex: 0 0 5em; width: 5em; } }
   .wrStepNo { flex: 0 0 1.4em; text-align: center; color: var(--level-ink-soft); font-size: var(--text-ui); }
   .wrWork > .wrFold { padding: 0 var(--space-3); }
+  // The Toolkit tile: what can be picked from a plan (a group for each kind, with a box for all of it and a box for each item), the start day of a copy and its buttons.
+  .wrToolkit > .wrFold { padding: 0 var(--space-3); }
+  .wrPicker { display: flex; flex-direction: column; gap: var(--space-4); }
+  .wrPickerGroup { display: flex; flex-direction: column; gap: var(--space-2); }
+  .wrPickerAll, .wrPickerItem { display: flex; align-items: center; gap: var(--space-3); cursor: pointer; }
+  .wrPickerAll { padding-bottom: var(--space-2); border-bottom: 1px solid var(--level-line); small { margin-left: auto; color: var(--level-ink-soft); } }
+  .wrPickerItem { padding-left: var(--space-5); font-size: var(--text-field); span { min-width: 0; overflow-wrap: anywhere; } }
+  .wrPickerBar { display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-4); .wrKv { flex: 1 1 12em; align-items: center; } }
   // The phase timeline: a chart across the project's days (a ruler of months, a bar for each phase, a flag for each milestone, the rest days shaded, a line for
   // today). A bar is the level's ink on the card: dashed while planned, filled while active, a wash while done (the same pairs as the chosen button of a choice).
   .wrPlanTimeline { display: flex; flex-direction: column; gap: var(--space-3); margin-bottom: var(--space-4); }

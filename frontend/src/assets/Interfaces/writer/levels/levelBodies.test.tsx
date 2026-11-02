@@ -1,5 +1,10 @@
-import { render } from '@testing-library/react'
-import { describe, expect, it } from 'vitest'
+import { render, screen, waitFor } from '@testing-library/react'
+import userEvent from '@testing-library/user-event'
+import { afterEach, describe, expect, it, vi } from 'vitest'
+import { emptyPlanner, newPhase, type Planner } from '../../../../lib/facets'
+import { setKv } from '../../../../settings/settingsStore'
+import { mockFetchBy } from '../../../../test/mockFetch'
+import { TEMPLATE_KEY } from '../plan/useTemplate'
 import { fillColorCss } from '../../../../theme/bookColors'
 import { makeWorkspace, type WorkspaceOverrides } from '../../../../test/makeWorkspace'
 import { ProjectTiles } from './levelBodies'
@@ -35,5 +40,48 @@ describe('ProjectTiles: the colour of each shelf', () => {
     const { rerender } = render(<ProjectTiles w={tiles([project('a', 'Alpha', 200), project('b', 'Beta', 10)])} />)
     rerender(<ProjectTiles w={tiles([project('a', 'Alpha', 90), project('b', 'Beta', 10)])} />)
     expect(fills()).toEqual([fillColorCss(90), fillColorCss(10)])
+  })
+})
+
+describe('ProjectTiles: a new project from the template', () => {
+  const template = (): Planner => ({ ...emptyPlanner(), phases: [newPhase('ph', 'Outlining', { offsetDays: 0, lengthDays: 30 }), newPhase('ph2', 'Draft', { offsetDays: 30, lengthDays: 60 })] })
+  afterEach(() => { vi.useRealTimers() })
+
+  function setup(withTemplate: boolean) {
+    vi.useFakeTimers({ toFake: ['Date'] })
+    vi.setSystemTime(new Date(2026, 10, 1, 12, 0))
+    const fetchMock = mockFetchBy(() => ({}))
+    if (withTemplate) setKv(TEMPLATE_KEY, template())
+    const createProject = vi.fn(async (_title: string, onCreated?: (id: string) => void) => { onCreated?.('new1') })
+    render(<ProjectTiles w={tiles([], { createProject })} />)
+    const sent = () => fetchMock.mock.calls.filter(c => (c[1] as RequestInit | undefined)?.method === 'PUT' && String(c[0]).endsWith('/planner')).map(c => ({ url: String(c[0]), body: JSON.parse(String((c[1] as RequestInit).body)) as Planner }))
+    return { createProject, sent }
+  }
+
+  it('offers it only when the template has something in it', () => {
+    setup(false)
+    expect(screen.queryByRole('switch', { name: 'From the template' })).toBeNull()
+  })
+
+  it('gives the new project a copy of the template, dated from today, before it is opened', async () => {
+    const user = userEvent.setup({ advanceTimers: () => {} })
+    const { createProject, sent } = setup(true)
+    expect((screen.getByRole('switch', { name: 'From the template' }) as HTMLInputElement).checked).toBe(true)
+    await user.type(screen.getByPlaceholderText('New project title…'), 'Saga')
+    await user.click(screen.getByRole('button', { name: /New project/ }))
+    expect(createProject).toHaveBeenCalledWith('Saga', expect.any(Function))
+    await waitFor(() => expect(sent()).toHaveLength(1), { timeout: 3000 })
+    expect(sent()[0].url).toMatch(/\/projects\/new1\/planner$/)
+    expect(sent()[0].body.phases.map(p => [p.title, p.start, p.end])).toEqual([['Outlining', '2026-11-01', '2026-11-30'], ['Draft', '2026-12-01', '2027-01-29']])
+  })
+
+  it('makes an empty project when the switch is off', async () => {
+    const user = userEvent.setup({ advanceTimers: () => {} })
+    const { createProject, sent } = setup(true)
+    await user.click(screen.getByRole('switch', { name: 'From the template' }))
+    await user.type(screen.getByPlaceholderText('New project title…'), 'Saga')
+    await user.click(screen.getByRole('button', { name: /New project/ }))
+    expect(createProject).toHaveBeenCalledWith('Saga', undefined)
+    expect(sent()).toHaveLength(0)
   })
 })

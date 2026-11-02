@@ -481,11 +481,13 @@ export function useWriterWorkspace() {
   }
   useEffect(() => { void loadProjects() }, [])
 
-  async function createProject(title: string) {
+  // `onCreated` is told the new project's id before it is opened (to give it a plan from the template, say).
+  async function createProject(title: string, onCreated?: (projectId: string) => void) {
     if (!title.trim()) return
     try {
       const created = await apiCreateProject(title.trim().slice(0, PROJECT_NAME_MAX))
       setProjects(prev => [...prev, created])
+      onCreated?.(created.projectId)
       await openProject(created.projectId)
     } catch (err) {
       setProjectsStatus('error')

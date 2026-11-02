@@ -5,6 +5,7 @@ import { newId } from '../schedule/ids'
 import { IconBtn } from '../schedule/IconBtn'
 import { ChevronDownIcon, ChevronRightIcon, CloseIcon, LockIcon, PlusIcon, StackIcon, TrashIcon } from '../../../icons'
 import { ChipSet, FacetChips, PlanGrip, wholeOrNull } from './fields'
+import { TEMPLATE_OWNER } from './useTemplate'
 
 // One process: a titled, described recipe of steps. The steps are in groups, each done in order (one then the next) or in any order, and a process may mix
 // both. It is for several phases and facets, may need milestones to be done first (until they are, it is blocked), and can be linked to other processes:
@@ -25,7 +26,8 @@ export function ProcessCard({ ownerId, process, processes, phases, milestones, s
   onDelete: () => void
 }) {
   const [step, setStep] = useState<Record<string, string>>({})
-  const unmet = unmetMilestones(process, milestones)
+  // (the template has no milestones done, so nothing in it is blocked)
+  const unmet = ownerId === TEMPLATE_OWNER ? [] : unmetMilestones(process, milestones)
   const needs = unmet.map(id => milestones.find(m => m.id === id)?.title || 'a milestone that is gone')
   const steps = process.groups.reduce((n, g) => n + g.steps.length, 0)
   const patchGroup = (id: string, patch: Partial<StepGroup>) => onChange({ groups: process.groups.map(g => (g.id === id ? { ...g, ...patch } : g)) })
