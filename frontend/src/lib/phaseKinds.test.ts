@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { emptyPlanner, newMilestone, newPhase, newPhaseKind, newTask, type Planner } from './facets'
-import { applyToRows, editMilestone, editPhase, newPass, passNumbers, removeKind, repeatPhase, resetMilestoneField, resetPhaseField, syncKind } from './phaseKinds'
+import { applyToRows, editMilestone, editPhase, kindFromPhase, newPass, passNumbers, removeKind, repeatPhase, resetMilestoneField, resetPhaseField, syncKind } from './phaseKinds'
 import { milestonesOf } from './planSequence'
 
 let n = 0
@@ -118,6 +118,36 @@ describe('applyToRows', () => {
   it('does nothing for a phase that is gone', () => {
     const p = base()
     expect(applyToRows(p, 'nope', [book], id)).toBe(p)
+  })
+})
+
+describe('dating from today', () => {
+  it('dates a row that has no start from the day given', () => {
+    const none = { ...emptyPlanner(), phaseKinds: [revision] }
+    expect(newPass(none, revision, book, id).phases[0].start).toBeNull()
+    expect(newPass(none, revision, book, id, '2026-11-02').phases[0]).toMatchObject({ start: '2026-11-02', end: '2026-11-15' })
+    const p = newPass(none, revision, book, id, '2026-11-02')
+    expect(repeatPhase(p, p.phases[0].id, id, '2026-11-02').phases[1].start).toBe('2026-11-16')
+    expect(syncKind(p, { ...revision, lengthDays: 7 }, '2026-11-02').phases[0].end).toBe('2026-11-08')
+  })
+})
+
+describe('kindFromPhase', () => {
+  it('keeps a phase as a kind, and the phase becomes the first pass of it', () => {
+    const phase = newPhase('ph', 'Polish', { result: 'Shiny', description: 'Sand it', lengthDays: 9, level: 'book', nodeId: 'b1', start: '2026-11-01', end: '2026-11-09' })
+    const p = { ...emptyPlanner(), phases: [phase], milestones: [newMilestone('m1', 'Sanded', { phaseId: 'ph', result: 'Smooth', lengthDays: 3 }), newMilestone('m2', 'Varnished', { phaseId: 'ph', order: 1 })] }
+    const r = kindFromPhase(p, 'ph', id)
+    expect(r?.kind).toMatchObject({ title: 'Polish', result: 'Shiny', description: 'Sand it', lengthDays: 9 })
+    expect(r?.kind.milestones.map(m => [m.title, m.result, m.lengthDays])).toEqual([['Sanded', 'Smooth', 3], ['Varnished', '', null]])
+    expect(r?.planner.phases[0]).toMatchObject({ kindId: r?.kind.id, overrides: [] })
+    expect(r?.planner.milestones.map(m => m.kindMilestoneId)).toEqual(r?.kind.milestones.map(m => m.id))
+    // A pass made from it now follows it.
+    const next = r ? syncKind(r.planner, { ...r.kind, result: 'Brilliant' }) : p
+    expect(next.phases[0].result).toBe('Brilliant')
+  })
+
+  it('is nothing for a phase that is gone', () => {
+    expect(kindFromPhase(emptyPlanner(), 'nope', id)).toBeNull()
   })
 })
 

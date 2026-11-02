@@ -1,7 +1,7 @@
 import { newMilestone, newPhase, type Milestone, type Phase, type PhaseKind, type PhaseLevel, type Planner } from './facets'
 import { removeMilestone } from './planEdit'
 import { phasesOnRow, rowKey, rowOfPhase } from './planRows'
-import { milestonesOf, reflowRow, rowStart } from './planSequence'
+import { milestonesOf, phaseLength, reflowRow, rowStart } from './planSequence'
 
 // A kind of phase is a recipe for one that comes round (a Revision pass): a result, a length and the milestones along it. A new pass starts from it, and a pass
 // follows the kind in every field it has not changed itself (`overrides` names the ones it has). Each pass is its own card, with its own dates, status and work.
@@ -29,14 +29,15 @@ export function passNumbers(planner: Planner): Map<string, number> {
 }
 
 const nextOrder = (planner: Planner, key: string): number => phasesOnRow(planner, key).reduce((n, p) => Math.max(n, p.order + 1), 0)
-const reflow = (planner: Planner, key: string): Planner => reflowRow(planner, key, rowStart(planner, key))
+// A row is dated from its start, else from `today` when one is given.
+const reflow = (planner: Planner, key: string, today: string | null = null): Planner => reflowRow(planner, key, rowStart(planner, key) ?? today)
 
 // A new pass of a kind, last on a row: its result, description and length from the kind, and a section for each of the kind's milestones.
-export function newPass(planner: Planner, kind: PhaseKind, row: { level: PhaseLevel; nodeId: string | null }, newId: Id): Planner {
+export function newPass(planner: Planner, kind: PhaseKind, row: { level: PhaseLevel; nodeId: string | null }, newId: Id, today: string | null = null): Planner {
   const key = rowKey(row.level, row.nodeId)
   const phase = newPhase(newId('phase'), kind.title, { result: kind.result, description: kind.description, lengthDays: kind.lengthDays, level: row.level, nodeId: row.level === 'project' ? null : row.nodeId, kindId: kind.id, order: nextOrder(planner, key) })
   const milestones = kind.milestones.map((km, i) => newMilestone(newId('ms'), km.title, { result: km.result, lengthDays: km.lengthDays, phaseId: phase.id, order: i, kindMilestoneId: km.id }))
-  return reflow({ ...planner, phases: [...planner.phases, phase], milestones: [...planner.milestones, ...milestones] }, key)
+  return reflow({ ...planner, phases: [...planner.phases, phase], milestones: [...planner.milestones, ...milestones] }, key, today)
 }
 
 const sameValue = (a: unknown, b: unknown): boolean => (a ?? null) === (b ?? null)
@@ -97,7 +98,7 @@ export function resetMilestoneField(planner: Planner, id: string, field: Milesto
 
 // A kind saved, and every pass brought along in the fields it has not changed: its title, result, description and length, and its sections (a section the kind
 // gained is added to each pass; one it lost is taken out, with whatever was placed in it let go). Each row that holds a pass is re-dated.
-export function syncKind(planner: Planner, kind: PhaseKind): Planner {
+export function syncKind(planner: Planner, kind: PhaseKind, today: string | null = null): Planner {
   const exists = planner.phaseKinds.some(k => k.id === kind.id)
   let next: Planner = { ...planner, phaseKinds: exists ? planner.phaseKinds.map(k => (k.id === kind.id ? kind : k)) : [...planner.phaseKinds, kind] }
   const passes = next.phases.filter(p => p.kindId === kind.id)
@@ -115,7 +116,7 @@ export function syncKind(planner: Planner, kind: PhaseKind): Planner {
       next = { ...next, milestones: next.milestones.map(m => (m.id === mine.id ? { ...m, ...f('title'), ...f('result'), ...f('lengthDays'), order: i } : m)) }
     })
   }
-  for (const key of rows) next = reflow(next, key)
+  for (const key of rows) next = reflow(next, key, today)
   return next
 }
 
@@ -142,22 +143,41 @@ function stamp(planner: Planner, source: Phase, row: { level: PhaseLevel; nodeId
 }
 
 // Repeat: the phase again, next in its own row.
-export function repeatPhase(planner: Planner, id: string, newId: Id): Planner {
+export function repeatPhase(planner: Planner, id: string, newId: Id, today: string | null = null): Planner {
   const phase = planner.phases.find(p => p.id === id)
   if (!phase) return planner
   const key = rowOfPhase(phase)
-  return reflow(stamp(planner, phase, { level: phase.level, nodeId: phase.nodeId }, false, newId), key)
+  return reflow(stamp(planner, phase, { level: phase.level, nodeId: phase.nodeId }, false, newId), key, today)
 }
 
 // Apply to all: the phase stamped onto each of the rows given (a phase already on one of them is not stamped there again), still a pass of its kind.
-export function applyToRows(planner: Planner, id: string, rows: Array<{ level: PhaseLevel; nodeId: string | null }>, newId: Id): Planner {
+export function applyToRows(planner: Planner, id: string, rows: Array<{ level: PhaseLevel; nodeId: string | null }>, newId: Id, today: string | null = null): Planner {
   const phase = planner.phases.find(p => p.id === id)
   if (!phase) return planner
   let next = planner
   for (const row of rows) {
     const key = rowKey(row.level, row.nodeId)
     if (key === rowOfPhase(phase)) continue
-    next = reflow(stamp(next, phase, row, true, newId), key)
+    next = reflow(stamp(next, phase, row, true, newId), key, today)
   }
   return next
+}
+
+// A phase kept as a kind: its result, description, length and sections become the recipe, and the phase becomes the first pass of it.
+export function kindFromPhase(planner: Planner, phaseId: string, newId: Id): { planner: Planner; kind: PhaseKind } | null {
+  const phase = planner.phases.find(p => p.id === phaseId)
+  if (!phase) return null
+  const sections = milestonesOf(planner, phaseId)
+  const recipe = sections.map(m => ({ id: newId('km'), title: m.title, result: m.result, lengthDays: m.lengthDays }))
+  const kind: PhaseKind = { id: newId('kind'), title: phase.title, result: phase.result, description: phase.description, lengthDays: phaseLength(phase), milestones: recipe }
+  const link = new Map(sections.map((m, i) => [m.id, recipe[i].id]))
+  return {
+    kind,
+    planner: {
+      ...planner,
+      phaseKinds: [...planner.phaseKinds, kind],
+      phases: planner.phases.map(p => (p.id === phaseId ? { ...p, kindId: kind.id, overrides: [], lengthDays: kind.lengthDays } : p)),
+      milestones: planner.milestones.map(m => (link.has(m.id) ? { ...m, kindMilestoneId: link.get(m.id) as string, overrides: [] } : m)),
+    },
+  }
 }

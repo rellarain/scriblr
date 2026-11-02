@@ -1,14 +1,14 @@
 import { useState, type DragEvent } from 'react'
 import type { Milestone, Planner } from '../../../../lib/facets'
 import { milestoneState, milestoneWork, type WorkEntry } from '../../../../lib/milestoneProgress'
-import { editMilestone } from '../../../../lib/phaseKinds'
-import { deleteMilestone, nudgeMilestone, setMilestoneDate, setMilestoneLength, toggleMilestonePin } from '../../../../lib/planActions'
+import { MILESTONE_KIND_FIELDS, editMilestone } from '../../../../lib/phaseKinds'
+import { deleteMilestone, nudgeMilestone, resetMilestone, setMilestoneDate, setMilestoneLength, toggleMilestonePin } from '../../../../lib/planActions'
 import { tickMilestone } from '../../../../lib/planEdit'
 import { DRAG_PLAN, type PlanDrag } from '../../../../lib/planDrop'
 import { milestonesOf, moveMilestone, placeWork, type Moved, type WorkKind } from '../../../../lib/planSequence'
 import { IconBtn } from '../schedule/IconBtn'
 import { DRAG_ITEM } from '../schedule/TaskRow'
-import { CheckIcon, ChevronLeftIcon, ChevronRightIcon, GripIcon, LockIcon, PencilIcon, QueueIcon, ListIcon, TrashIcon, UnlockIcon, WrenchIcon } from '../../../icons'
+import { CheckIcon, ChevronLeftIcon, ChevronRightIcon, GripIcon, LockIcon, PencilIcon, QueueIcon, ListIcon, RestoreIcon, TrashIcon, UnlockIcon, WrenchIcon } from '../../../icons'
 import { OUTSIDE_ROW, beginSeqDrag, endSeqDrag, seqDrag } from './dragSeq'
 
 // A section of a phase: a milestone, a deliverable reached by finishing the work placed in it (tasks, processes, exercises, routines). It has its result, its date
@@ -50,6 +50,8 @@ export function MilestoneSection({ planner, setPlanner, today, milestone: m, row
   const siblings = m.phaseId ? milestonesOf(planner, m.phaseId) : []
   const at = siblings.findIndex(x => x.id === m.id)
   const name = m.title || 'Untitled milestone'
+  const kind = planner.phaseKinds.find(k => k.id === planner.phases.find(p => p.id === m.phaseId)?.kindId)
+  const own = kind && m.kindMilestoneId ? MILESTONE_KIND_FIELDS.filter(f => m.overrides.includes(f)) : []
   const apply = (r: Moved) => { if (r.ok) setPlanner(r.planner); else onRefuse(r.reason) }
 
   const accepts = (e: DragEvent): boolean => {
@@ -104,6 +106,7 @@ export function MilestoneSection({ planner, setPlanner, today, milestone: m, row
         {m.date && <small className="wrMuted" title="The day it ends on">{dayLabel(m.date)}</small>}
         <IconBtn Icon={ChevronLeftIcon} label={`Move ${name} earlier`} disabled={at <= 0} onClick={() => apply(nudgeMilestone(planner, m.id, -1))} />
         <IconBtn Icon={ChevronRightIcon} label={`Move ${name} later`} disabled={at < 0 || at >= siblings.length - 1} onClick={() => apply(nudgeMilestone(planner, m.id, 1))} />
+        {own.map(f => <IconBtn key={f} Icon={RestoreIcon} label={`Reset the ${f === 'lengthDays' ? 'length' : f} of ${name} to ${kind?.title}`} onClick={() => setPlanner(resetMilestone(planner, m.id, f, today))} />)}
         <IconBtn Icon={TrashIcon} label={`Delete ${name}`} onClick={() => setPlanner(deleteMilestone(planner, m.id, today))} />
       </div>
       <div className="wrSectionBody">

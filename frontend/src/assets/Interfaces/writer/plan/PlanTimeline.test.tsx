@@ -3,7 +3,7 @@ import userEvent from '@testing-library/user-event'
 import { useState } from 'react'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { __resetSettingsForTests } from '../../../../settings/settingsStore'
-import { emptyPlanner, newExercise, newMilestone, newPhase, newProcess, newTask, type Planner } from '../../../../lib/facets'
+import { emptyPlanner, newExercise, newMilestone, newPhase, newPhaseKind, newProcess, newTask, type Planner } from '../../../../lib/facets'
 import { DRAG_PLAN } from '../../../../lib/planDrop'
 import { planRows } from '../../../../lib/planRows'
 import { DRAG_SEQ } from './dragSeq'
@@ -263,5 +263,134 @@ describe('the sections', () => {
     fireEvent.dragStart(grip('Drag Beats set to reorder it within this row'), { dataTransfer: data })
     drop(screen.getByRole('region', { name: 'Milestone Outline done' }), data)
     expect(latest.milestones.filter(m => m.phaseId === 'plan').sort((a, b) => a.order - b.order).map(m => m.id)).toEqual(['m2', 'm1'])
+  })
+})
+
+describe('the kinds of phase', () => {
+  const revision = newPhaseKind('k', 'Revision', {
+    result: 'A cleaner draft', lengthDays: 14,
+    milestones: [{ id: 'km1', title: 'Marked up', result: 'Every page marked', lengthDays: 5 }, { id: 'km2', title: 'Fixed', result: '', lengthDays: null }],
+  })
+  const withKind = (): Planner => ({ ...fixture(), phaseKinds: [revision] })
+  const openKind = async (user: ReturnType<typeof userEvent.setup>) => {
+    await user.click(screen.getByRole('button', { name: /^Phase kinds/ }))
+    await user.click(screen.getByRole('button', { name: 'Revision kind details' }))
+  }
+
+  it('are listed in a fold, with how many passes follow each, and one can be made', async () => {
+    const user = userEvent.setup()
+    render(<Harness />)
+    await user.click(screen.getByRole('button', { name: /^Phase kinds/ }))
+    await user.click(screen.getByRole('button', { name: 'New phase kind' }))
+    expect(latest.phaseKinds).toHaveLength(1)
+    expect(latest.phaseKinds[0].title).toBe('New kind')
+    const title = screen.getByRole('textbox', { name: 'Kind title' })
+    await user.clear(title)
+    await user.type(title, 'Polish')
+    await user.click(screen.getByRole('button', { name: 'New milestone in Polish' }))
+    expect(latest.phaseKinds[0].title).toBe('Polish')
+    expect(latest.phaseKinds[0].milestones).toHaveLength(1)
+    expect(screen.getByText('No pass follows it yet.')).toBeTruthy()
+  })
+
+  it('give a row a pass from a choice on its head, numbered, with the sections of the kind', async () => {
+    const user = userEvent.setup()
+    render(<Harness initial={withKind()} />)
+    await user.selectOptions(screen.getByRole('combobox', { name: 'New pass on Saga' }), 'k')
+    await user.selectOptions(screen.getByRole('combobox', { name: 'New pass on Saga' }), 'k')
+    const passes = latest.phases.filter(p => p.kindId === 'k')
+    expect(passes).toHaveLength(2)
+    expect(passes.map(p => [p.title, p.result, p.start])).toEqual([['Revision', 'A cleaner draft', '2026-12-02'], ['Revision', 'A cleaner draft', '2026-12-16']])
+    expect(latest.milestones.filter(m => m.phaseId === passes[0].id).map(m => m.title)).toEqual(['Marked up', 'Fixed'])
+    expect(screen.getAllByText(/^Revision · [12]$/)).toHaveLength(2)
+  })
+
+  it('carry an edit of the kind to the passes that have not changed that field, and show which have', async () => {
+    const user = userEvent.setup()
+    render(<Harness initial={withKind()} />)
+    const pick = screen.getByRole('combobox', { name: 'New pass on Saga' })
+    await user.selectOptions(pick, 'k')
+    await user.selectOptions(pick, 'k')
+    const [a, b] = latest.phases.filter(p => p.kindId === 'k')
+    // The second pass is given a result of its own.
+    await user.click(screen.getAllByRole('button', { name: 'Revision details' })[1])
+    const result = screen.getByRole('textbox', { name: 'Result' })
+    await user.clear(result)
+    await user.type(result, 'Mine')
+    expect(latest.phases.find(p => p.id === b.id)?.overrides).toEqual(['result'])
+    expect(screen.getByRole('button', { name: 'Reset the result of Revision to Revision' })).toBeTruthy()
+    // The kind is changed.
+    await openKind(user)
+    const kindResult = screen.getByRole('textbox', { name: 'Kind result' })
+    await user.clear(kindResult)
+    await user.type(kindResult, 'Spotless')
+    expect(latest.phases.find(p => p.id === a.id)?.result).toBe('Spotless')
+    expect(latest.phases.find(p => p.id === b.id)?.result).toBe('Mine')
+    // And the pass is put back to follow it.
+    await user.click(screen.getByRole('button', { name: 'Reset the result of Revision to Revision' }))
+    expect(latest.phases.find(p => p.id === b.id)).toMatchObject({ result: 'Spotless', overrides: [] })
+    expect(screen.getByText(/2 passes follow it/)).toBeTruthy()
+  })
+
+  it('are left as plain phases when deleted', async () => {
+    const user = userEvent.setup()
+    render(<Harness initial={withKind()} />)
+    await user.selectOptions(screen.getByRole('combobox', { name: 'New pass on Saga' }), 'k')
+    await openKind(user)
+    await user.click(screen.getByRole('button', { name: 'Delete the Revision kind' }))
+    expect(latest.phaseKinds).toEqual([])
+    expect(latest.phases.find(p => p.title === 'Revision')).toMatchObject({ kindId: null, overrides: [] })
+  })
+
+  it('can be made from a phase, which becomes its first pass', async () => {
+    const user = userEvent.setup()
+    render(<Harness />)
+    await user.click(screen.getByRole('button', { name: 'Planning details' }))
+    await user.click(screen.getByRole('button', { name: 'Keep Planning as a kind' }))
+    expect(latest.phaseKinds.map(k => [k.title, k.lengthDays, k.milestones.map(m => m.title)])).toEqual([['Planning', 10, ['Outline done', 'Beats set']]])
+    expect(latest.phases.find(p => p.id === 'plan')?.kindId).toBe(latest.phaseKinds[0].id)
+    expect(screen.queryByRole('button', { name: 'Keep Planning as a kind' })).toBeNull()
+    expect(screen.getByRole('status').textContent).toMatch(/Planning is kept as a kind/)
+  })
+})
+
+describe('repeating a phase and applying it to rows', () => {
+  it('repeat puts the same phase again, next in its row, as a plain card with its sections', async () => {
+    const user = userEvent.setup()
+    render(<Harness />)
+    await user.click(screen.getByRole('button', { name: 'Planning details' }))
+    await user.click(screen.getByRole('button', { name: 'Repeat Planning' }))
+    const copies = latest.phases.filter(p => p.title === 'Planning')
+    expect(copies).toHaveLength(2)
+    expect(copies[1]).toMatchObject({ kindId: null, status: 'planned', level: 'project', order: 2 })
+    expect(latest.milestones.filter(m => m.phaseId === copies[1].id).map(m => m.title)).toEqual(['Outline done', 'Beats set'])
+    expect(latest.items.filter(i => latest.milestones.find(m => m.id === i.milestoneId)?.phaseId === copies[1].id)).toEqual([])
+  })
+
+  it('apply stamps it onto the books and chapters under the row that are picked, leaving out a row that has one', async () => {
+    const user = userEvent.setup()
+    const base = fixture()
+    render(<Harness initial={{ ...base, phases: [...base.phases, newPhase('own', 'Planning', { level: 'book', nodeId: 'b1', order: 5 })] }} />)
+    await user.click(screen.getAllByRole('button', { name: 'Planning details' })[0])
+    await user.click(screen.getByRole('button', { name: 'Apply Planning to other rows' }))
+    const panel = within(screen.getByRole('group', { name: 'Apply Planning to' }))
+    expect((panel.getByRole('checkbox', { name: /^Book One/ }) as HTMLInputElement).disabled).toBe(true) // it has a Planning already
+    expect(panel.getByText('Book One (has one)')).toBeTruthy()
+    expect((panel.getByRole('checkbox', { name: 'Opening' }) as HTMLInputElement).checked).toBe(true)
+    await user.click(screen.getByRole('button', { name: 'Apply Planning to the checked rows' }))
+    const onChapter = latest.phases.find(p => p.level === 'chapter')
+    expect(onChapter).toMatchObject({ nodeId: 'c1', title: 'Planning', status: 'planned', start: '2026-11-02' })
+    expect(latest.milestones.filter(m => m.phaseId === onChapter?.id)).toHaveLength(2)
+    expect(screen.getByRole('status').textContent).toMatch(/Planning was applied to 1 row\./)
+    expect(latest.phases.filter(p => p.level === 'book')).toHaveLength(2) // the book was not stamped again
+  })
+
+  it('has nothing to apply a chapter phase to', async () => {
+    const user = userEvent.setup()
+    const base = fixture()
+    render(<Harness initial={{ ...base, phases: [...base.phases, newPhase('c', 'Scene pass', { level: 'chapter', nodeId: 'c1' })] }} />)
+    await user.click(screen.getByRole('button', { name: 'Show every chapter' }))
+    await user.click(screen.getByRole('button', { name: 'Scene pass details' }))
+    expect(screen.queryByRole('button', { name: 'Apply Scene pass to other rows' })).toBeNull()
   })
 })

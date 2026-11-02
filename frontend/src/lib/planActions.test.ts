@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import { emptyPlanner, newExercise, newMilestone, newPhase, newPhaseKind, newTask, type Planner } from './facets'
-import { addMilestone, addPhase, deleteMilestone, deletePhase, nudgeMilestone, setMilestoneDate, setMilestoneLength, setPhaseLength, setPhaseStart, toggleMilestonePin, togglePhasePin } from './planActions'
+import { addMilestone, addPhase, deleteMilestone, deletePhase, nudgeMilestone, resetMilestone, resetPhase, setMilestoneDate, setMilestoneLength, setPhaseLength, setPhaseStart, toggleMilestonePin, togglePhasePin } from './planActions'
+import { newPass } from './phaseKinds'
 import { milestonesOf } from './planSequence'
 
 let n = 0
@@ -70,6 +71,28 @@ describe('sections', () => {
     expect(out.milestones).toEqual([])
     expect(out.items[0].milestoneId).toBeNull()
     expect(out.exercises[0].milestoneIds).toEqual([])
+  })
+})
+
+describe('resetting a pass to its kind', () => {
+  const kind = newPhaseKind('k', 'Revision', { lengthDays: 14, result: 'Clean', milestones: [{ id: 'km', title: 'Marked', result: '', lengthDays: 5 }] })
+  const start = () => newPass({ ...emptyPlanner(), phaseKinds: [kind] }, kind, project, id, TODAY)
+
+  it('puts a length back and the row is dated again', () => {
+    const p0 = start()
+    const p = setPhaseLength(p0, p0.phases[0].id, 4, TODAY)
+    const pass = p.phases[0]
+    expect(pass).toMatchObject({ lengthDays: 4, end: '2026-11-05', overrides: ['lengthDays'] })
+    expect(resetPhase(p, pass.id, 'lengthDays', TODAY).phases[0]).toMatchObject({ lengthDays: 14, end: '2026-11-15', overrides: [] })
+  })
+
+  it('puts a section\'s length back, dating the sections again', () => {
+    const p0 = start()
+    const m = p0.milestones[0].id
+    const p = setMilestoneLength(p0, m, 9, TODAY)
+    expect(p.milestones[0]).toMatchObject({ lengthDays: 9, overrides: ['lengthDays'] })
+    const back = resetMilestone(p, m, 'lengthDays', TODAY)
+    expect(back.milestones[0]).toMatchObject({ lengthDays: 5, overrides: [], date: '2026-11-06' })
   })
 })
 

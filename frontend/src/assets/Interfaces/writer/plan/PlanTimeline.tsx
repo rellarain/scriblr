@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState, type ReactNode, type UIEvent } from 'react'
 import type { Phase, PhaseLevel, Planner } from '../../../../lib/facets'
-import { passNumbers } from '../../../../lib/phaseKinds'
+import { newPass, passNumbers } from '../../../../lib/phaseKinds'
 import { addPhase, deletePhase } from '../../../../lib/planActions'
 import { phasesOffRows, phasesOnRow, type PlanRow } from '../../../../lib/planRows'
 import { PX_PER_DAY, ZOOMS, ZOOM_LABEL, rulerMarks, timelineRange, type Zoom, pct } from '../../../../lib/planTimeline'
@@ -11,6 +11,7 @@ import { IconBtn } from '../schedule/IconBtn'
 import { BookFaceIcon, CalendarIcon, ChevronDownIcon, ChevronRightIcon, CloseIcon, FolderIcon, ListIcon, PageIcon, PlusIcon, TrashIcon, ViewDayIcon, ViewMonthIcon, ViewWeekIcon } from '../../../icons'
 import { PhaseCard } from './PhaseCard'
 import { PlanLane } from './PlanLane'
+import { KindsPanel } from './KindsPanel'
 import { ProjectDates } from './ProjectDates'
 
 // The Plan tile: the project's phases on rows, a row for the project, for each of its books and for their chapters. In the Dates view each row has a lane on a
@@ -65,6 +66,10 @@ export function PlanTimeline({ ownerId, planner, setPlanner, today, metGoals, ro
   const toggleRow = (key: string) => setCollapsed(collapsed.includes(key) ? collapsed.filter(k => k !== key) : [...collapsed, key])
   const create = (row: PlanRow) => { const r = addPhase(planner, row, 'New phase', today, newId); setPlanner(r.planner); setOpenId(r.id) }
   const open = (id: string) => setOpenId(cur => (cur === id ? null : id))
+  const pass = (row: PlanRow, kindId: string) => {
+    const kind = planner.phaseKinds.find(k => k.id === kindId)
+    if (kind) setPlanner(newPass(planner, kind, row, newId, today))
+  }
 
   return (
     <div className="wrSchedCard wrPlan">
@@ -108,6 +113,12 @@ export function PlanTimeline({ ownerId, planner, setPlanner, today, metGoals, ro
                 <b>{row.title}</b>
                 <small>{phases.length === 0 ? 'no phases' : `${phases.length} ${phases.length === 1 ? 'phase' : 'phases'}`}</small>
               </button>
+              {planner.phaseKinds.length > 0 && (
+                <select className="wrField wrPassPick" aria-label={`New pass on ${row.title}`} value="" onChange={e => { if (e.target.value) pass(row, e.target.value) }}>
+                  <option value="">New pass of…</option>
+                  {planner.phaseKinds.map(k => <option key={k.id} value={k.id}>{k.title || 'Untitled kind'}</option>)}
+                </select>
+              )}
               <IconBtn Icon={PlusIcon} label={`New phase on ${row.title}`} className="wrSmallBtn wrSmallBtn--accent" onClick={() => create(row)} />
             </div>
             {!folded && (
@@ -119,7 +130,7 @@ export function PlanTimeline({ ownerId, planner, setPlanner, today, metGoals, ro
                 )}
                 {phases.map(ph => (
                   <PhaseCard
-                    key={ph.id} planner={planner} setPlanner={setPlanner} today={today} phase={ph} metGoals={metGoals} rowKey={row.key} ownerId={ownerId}
+                    key={ph.id} planner={planner} setPlanner={setPlanner} today={today} phase={ph} metGoals={metGoals} rowKey={row.key} rows={rows} ownerId={ownerId}
                     passNo={numbers.get(ph.id)} open={openId === ph.id} onOpen={o => setOpenId(o ? ph.id : null)} showSections={view === 'sequence'} onRefuse={setMessage}
                   />
                 ))}
@@ -142,6 +153,7 @@ export function PlanTimeline({ ownerId, planner, setPlanner, today, metGoals, ro
           ))}
         </section>
       )}
+      <KindsPanel planner={planner} setPlanner={setPlanner} today={today} />
       <ProjectDates planner={planner} setPlanner={setPlanner} />
     </div>
   )

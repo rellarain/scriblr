@@ -1,5 +1,5 @@
 import { newMilestone, newPhase, type Milestone, type Phase, type PhaseLevel, type Planner } from './facets'
-import { editMilestone, editPhase } from './phaseKinds'
+import { editMilestone, editPhase, resetMilestoneField, resetPhaseField, type MilestoneKindField, type PhaseKindField } from './phaseKinds'
 import { removeMilestone, removePhase } from './planEdit'
 import { phasesOnRow, rowKey, rowOfPhase } from './planRows'
 import { milestonesOf, moveMilestone, phaseLength, reflowRow, rowStart, type Moved } from './planSequence'
@@ -91,6 +91,19 @@ export function nudgeMilestone(planner: Planner, id: string, by: -1 | 1): Moved 
   const to = at + by
   if (at < 0 || to < 0 || to >= milestonesOf(planner, m.phaseId).length) return { ok: true, planner }
   return moveMilestone(planner, id, m.phaseId, to)
+}
+
+// A field of a pass put back to what its kind says (a length changes the dates, so the row is dated again).
+export function resetPhase(planner: Planner, id: string, field: PhaseKindField, today: string): Planner {
+  const phase = planner.phases.find(p => p.id === id)
+  return phase ? reflow(resetPhaseField(planner, id, field), rowOfPhase(phase), today) : planner
+}
+
+export function resetMilestone(planner: Planner, id: string, field: MilestoneKindField, today: string): Planner {
+  const m = planner.milestones.find(x => x.id === id)
+  const key = rowOf(planner, m?.phaseId ?? null)
+  const next = resetMilestoneField(planner, id, field)
+  return key ? reflow(next, key, today) : next
 }
 
 // A section taken out; nothing stays placed in it.
