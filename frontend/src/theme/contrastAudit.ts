@@ -240,7 +240,7 @@ export function levelRatios(zone: ZoneKey, hue: number): Pair[] {
       calLow = Math.min(calLow, ratioOfRgb(oklchToRgb(CAL_STEPS.lightness[0], CAL_STEPS.chroma, hue), tile))
     }
     keep({ id: 'schedule/cal-low', group: 'Schedule', label: "The lowest shade of an activity-grid day (the accent hue in OKLCH) on the console's tile, the worst hue", kind: 'ui', ratio: calLow })
-    keep({ id: 'schedule/facet-line', group: 'Schedule', label: "A facet's line, dot or bar on the console's tile, the worst facet hue", kind: 'ui', ratio: line })
+    keep({ id: 'schedule/facet-line', group: 'Schedule', label: "A facet's line, dot, icon or bar on the console's tile, the worst facet hue", kind: 'ui', ratio: line })
     keep({ id: 'schedule/block', group: 'Schedule', label: "White on a shift's block (the facet colour mixed into the card), the worst facet hue and state", kind: 'text', ratio: block })
     keep({ id: 'level/stripe', group: 'Level panels', label: 'Card stripe (the accent colour, lifted) on the level page', kind: 'ui', ratio: ratioOfRgb(stripe, mixRgb(rgbOf(fill), 90, BLACK)) })
   }

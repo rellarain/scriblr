@@ -1,5 +1,6 @@
 import { useMemo, useState, type KeyboardEvent, type PointerEvent } from 'react'
 import { FACET_LABEL, type Facet } from '../../../../lib/facets'
+import { FacetIcon } from './FacetIcon'
 import { DAY_MS } from '../../../../lib/activityCalendar'
 import type { GoalSeries, SeriesPoint } from '../../../../lib/projection'
 import { MONTH_NAMES } from '../../../../lib/scheduleCalendar'
@@ -112,7 +113,7 @@ export function LineGraph({ series, today, deadline }: { series: LineSeries[]; t
       {hover && (
         <div className="wrSchedTip" style={{ left: `${Math.min(70, (x(hover) / W) * 100 + 1.5)}%` }} role="status">
           <strong>{label}</strong>
-          {series.map(s => <div key={s.facet}><span><i className="wrSchedDot" style={{ background: `var(--wr-f-${s.facet})` }} />{FACET_LABEL[s.facet]}</span><b>{Math.round(valueAt(s.goal.points, hover) * 100)}%{goalMetOn(s.goal.points)?.date !== undefined && goalMetOn(s.goal.points)!.date <= hover ? ' ✓' : ''}</b></div>)}
+          {series.map(s => <div key={s.facet}><span><FacetIcon facet={s.facet} />{FACET_LABEL[s.facet]}</span><b>{Math.round(valueAt(s.goal.points, hover) * 100)}%{goalMetOn(s.goal.points)?.date !== undefined && goalMetOn(s.goal.points)!.date <= hover ? ' ✓' : ''}</b></div>)}
         </div>
       )}
     </div>

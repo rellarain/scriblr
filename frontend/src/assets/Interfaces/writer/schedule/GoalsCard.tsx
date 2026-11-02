@@ -3,6 +3,7 @@ import { FACETS, FACET_LABEL, FACET_UNIT, unitOf, type Facet, type Goal, type Pl
 import type { TreeNodeFact } from '../../../../lib/goalFacts'
 import type { GoalProgress, GoalStatus } from '../../../../lib/projection'
 import { newId } from './ids'
+import { FacetIcon } from './FacetIcon'
 import { IconBtn } from './IconBtn'
 import { CheckIcon, CloseIcon, PencilIcon, PlusIcon, TrashIcon } from '../../../icons'
 
@@ -112,7 +113,7 @@ export function GoalsCard({
         return (
           <div className="wrSchedGoal" key={p.goal.id}>
             <div className="wrSchedGoalTop">
-              <i className="wrSchedDot" style={{ background: `var(--wr-f-${p.goal.facet})` }} />
+              <FacetIcon facet={p.goal.facet} />
               <strong>{goalTitle(p.goal, nodes)}{many ? ` · ${owner(ownerId).label}` : ''}</strong>
               {s && <span className={`wrSchedChip wrSchedChip--${p.status}`}>{s.glyph} {s.label}</span>}
               {p.pct !== null && <span className="wrSchedPct">{p.pct}%</span>}

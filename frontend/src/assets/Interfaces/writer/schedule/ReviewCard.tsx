@@ -3,6 +3,7 @@ import type { DayTotals } from '../../../../lib/facets'
 import { review, type ReviewPeriod } from '../../../../lib/review'
 import { useStoredState } from '../shared'
 import { ViewMonthIcon, ViewWeekIcon } from '../../../icons'
+import { FacetIcon } from './FacetIcon'
 import { ICON_PX } from './IconBtn'
 
 // A week or a month in review: each facet's total against the period before, and how many days had any work.
@@ -24,7 +25,7 @@ export function ReviewCard({ daily, today }: { daily: Record<string, DayTotals>;
         const diff = row.now - row.before
         return (
           <div key={row.facet} className="wrSchedReviewRow">
-            <i className="wrSchedDot" style={{ background: `var(--wr-f-${row.facet})` }} />
+            <FacetIcon facet={row.facet} />
             <span>{FACET_LABEL[row.facet]}</span>
             <b>{row.now.toLocaleString('en-US')} {unitOf(row.facet, row.now)}</b>
             <small className="wrMuted">{diff === 0 ? 'same as before' : `${diff > 0 ? '▲' : '▼'} ${Math.abs(diff).toLocaleString('en-US')} ${diff > 0 ? 'more' : 'fewer'} than the ${period} before`}</small>

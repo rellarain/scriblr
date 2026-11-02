@@ -53,6 +53,8 @@
   .wrSchedSpacer { flex: 1 1 auto; }
   .wrSchedSub { margin: var(--space-5) 0 var(--space-3); font-size: var(--text-ui); font-weight: 800; letter-spacing: 0.06em; text-transform: uppercase; color: var(--level-ink-soft); }
   .wrSchedDot { display: inline-block; width: 10px; height: 10px; border-radius: 50%; margin-right: var(--space-3); flex: none; &--ring { background: transparent; border: 2px solid var(--wr-f-revision); } }
+  // A facet's icon in its colour (FacetIcon), where the facet's name stands beside it: a chip or a legend row.
+  .wrFacetIcon { display: inline-flex; align-items: center; line-height: 0; margin-right: var(--space-3); flex: none; color: var(--facet); }
   // A choice of one (Grid / Line graph, Day / Week / Month / Agenda): the chosen button is inverted (white with the deep fill's colour).
   .wrSchedSeg { display: inline-flex; border: 1px solid var(--level-ink-soft); border-radius: var(--radius-button); overflow: hidden;
     button { background: transparent; border: 0; padding: var(--space-3) var(--space-5); font: inherit; font-size: var(--text-ui); color: inherit; cursor: pointer; &:hover { background: var(--level-wash); }

@@ -5,6 +5,7 @@ import { buildFacetGrid, type ShadeRule, type WeekStart } from '../../../../lib/
 import { useStoredState } from '../shared'
 import { GridViewIcon, LineChartIcon } from '../../../icons'
 import { FacetCalendar } from './FacetCalendar'
+import { FacetIcon } from './FacetIcon'
 import { LineGraph } from './LineGraph'
 import { ICON_PX } from './IconBtn'
 
@@ -43,7 +44,7 @@ export function ActivityControls({ state }: { state: ActivityState }) {
       <div className="wrActFacets" role="group" aria-label="Facets">
         {FACETS.map(f => (
           <button key={f} type="button" className={`wrSchedFacet${shown.includes(f) ? ' on' : ''}`} aria-pressed={shown.includes(f)} onClick={() => toggle(f)}>
-            <i className="wrSchedDot" style={{ background: `var(--wr-f-${f})` }} />{FACET_LABEL[f]}
+            <FacetIcon facet={f} />{FACET_LABEL[f]}
           </button>
         ))}
       </div>

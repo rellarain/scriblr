@@ -2,6 +2,7 @@ import { useState, type ReactNode } from 'react'
 import { FACETS, FACET_LABEL, FACET_UNIT, newTask, type Facet, type PlanItem, type Shift } from '../../../../lib/facets'
 import type { EditScope } from '../../../../lib/shiftEdit'
 import { newId } from './ids'
+import { FacetIcon } from './FacetIcon'
 import { IconBtn } from './IconBtn'
 import { RepeatPicker, presetLabel } from './RepeatPicker'
 import { TimeRange } from './TimeRange'
@@ -97,7 +98,7 @@ export function ShiftPanel(p: ShiftPanelProps) {
       <div className="wrSchedTools" role="group" aria-label="Facet">
         {FACETS.map(f => (
           <button key={f} type="button" className={`wrSchedFacet${s.facet === f ? ' on' : ''}`} aria-pressed={s.facet === f} onClick={() => p.onChange({ facet: f as Facet })}>
-            <i className="wrSchedDot" style={{ background: `var(--wr-f-${f})` }} />{FACET_LABEL[f]}
+            <FacetIcon facet={f} />{FACET_LABEL[f]}
           </button>
         ))}
       </div>

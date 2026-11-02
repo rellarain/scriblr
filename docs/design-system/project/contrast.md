@@ -260,7 +260,7 @@ Each cell is the ratio at the default hues (theme 330, accent 32, alert 200) and
 | Pair | Needs | Dawn | Day | Dusk | Night |
 |---|---|---|---|---|---|
 | The lowest shade of an activity-grid day (the accent hue in OKLCH) on the console's tile, the worst hue | 3:1 | 3.4 (3.3) | 3.2 (3.1) | 3.2 (3.1) | 3.4 (3.2) |
-| A facet's line, dot or bar on the console's tile, the worst facet hue | 3:1 | 5.0 (4.8) | 4.7 (4.6) | 4.7 (4.6) | 5.0 (4.7) |
+| A facet's line, dot, icon or bar on the console's tile, the worst facet hue | 3:1 | 5.0 (4.8) | 4.7 (4.6) | 4.7 (4.6) | 5.0 (4.7) |
 | White on a shift's block (the facet colour mixed into the card), the worst facet hue and state | 4.5:1 | 6.2 (6.1) | 6.1 (6.0) | 6.1 (6.0) | 6.2 (6.0) |
 
 ## Hue slider

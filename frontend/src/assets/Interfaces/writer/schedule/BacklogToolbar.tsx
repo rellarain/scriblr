@@ -1,7 +1,8 @@
 import { FACETS, FACET_LABEL } from '../../../../lib/facets'
 import { DONE_LABEL, DONE_MODES, SORT_LABEL, SORT_MODES, type BacklogFilter, type DoneMode, type SortMode } from '../../../../lib/backlog'
-import { IconBtn } from './IconBtn'
-import { CloseIcon, SearchIcon } from '../../../icons'
+import { FacetIcon } from './FacetIcon'
+import { ICON_PX, IconBtn } from './IconBtn'
+import { CloseIcon, SearchIcon, StackIcon } from '../../../icons'
 
 // The Backlog's search, facet chips, project choice, sort and done choices. The choices (not the search) are remembered by the tile.
 export function BacklogToolbar({ filter, owners, onChange }: {
@@ -20,10 +21,12 @@ export function BacklogToolbar({ filter, owners, onChange }: {
       </div>
       <div className="wrBacklogChoices">
         <div className="wrSchedTools" role="group" aria-label="Filter by facet">
-          <button type="button" className={`wrSchedFacet${filter.facet === null ? ' on' : ''}`} aria-pressed={filter.facet === null} onClick={() => set({ facet: null })}>All</button>
+          <button type="button" className={`wrSchedFacet${filter.facet === null ? ' on' : ''}`} aria-pressed={filter.facet === null} onClick={() => set({ facet: null })}>
+            <span className="wrFacetIcon" aria-hidden="true"><StackIcon size={ICON_PX} /></span>All
+          </button>
           {FACETS.map(f => (
             <button key={f} type="button" className={`wrSchedFacet${filter.facet === f ? ' on' : ''}`} aria-pressed={filter.facet === f} onClick={() => set({ facet: filter.facet === f ? null : f })}>
-              <i className="wrSchedDot" style={{ background: `var(--wr-f-${f})` }} />{FACET_LABEL[f]}
+              <FacetIcon facet={f} />{FACET_LABEL[f]}
             </button>
           ))}
         </div>

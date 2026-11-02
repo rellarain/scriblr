@@ -2,6 +2,7 @@ import { useState } from 'react'
 import { FACETS, FACET_LABEL, type Facet, type Planner } from '../../../../lib/facets'
 import type { WeekStart } from '../../../../lib/scheduleCalendar'
 import { CloseIcon, ExportIcon, GearIcon, PlusIcon, PrintIcon } from '../../../icons'
+import { FacetIcon } from './FacetIcon'
 import { ICON_PX, IconBtn } from './IconBtn'
 import { ColorRange } from '../../../../components/ColorRange'
 import { FACET_COLOR } from '../../../../theme/zoneLooks'
@@ -41,7 +42,7 @@ export function ScheduleSettings({
           </label>
           <h4 className="wrSchedSub">Facet colours</h4>
           {FACETS.map(f => (
-            <label key={f} className="wrKv wrSchedHue"><span><i className="wrSchedDot" style={{ background: `var(--wr-f-${f})` }} />{FACET_LABEL[f]}</span>
+            <label key={f} className="wrKv wrSchedHue"><span><FacetIcon facet={f} />{FACET_LABEL[f]}</span>
               <ColorRange label={`${FACET_LABEL[f]} hue`} value={hues[f]} sat={FACET_COLOR.s} light={FACET_COLOR.l} onChange={h => onHues({ ...hues, [f]: h })} />
             </label>
           ))}
