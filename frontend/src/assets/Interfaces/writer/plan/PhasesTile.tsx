@@ -6,6 +6,7 @@ import { newId } from '../schedule/ids'
 import { IconBtn } from '../schedule/IconBtn'
 import { ArcIcon, CheckIcon, ChevronDownIcon, ChevronRightIcon, FlagIcon, PlusIcon, TrashIcon } from '../../../icons'
 import { PhaseSelect } from './fields'
+import { PhaseTimeline } from './PhaseTimeline'
 
 // The Phases tile: each phase is a stage of the project, defined by the result it builds to, with a status, dates, and the milestones along it. A phase shows
 // how far it is (what is tagged with it, done over all: tasks, milestones and goals) and opens in place to be edited; every change is made at once.
@@ -55,6 +56,7 @@ export function PhasesTile({ planner, setPlanner, today, metGoals }: { planner: 
         <IconBtn Icon={FlagIcon} label="New milestone" onClick={() => addMilestone(null)} />
         <IconBtn Icon={PlusIcon} label="New phase" className="wrSmallBtn wrSmallBtn--accent" onClick={addPhase} />
       </div>
+      <PhaseTimeline planner={planner} setPlanner={setPlanner} today={today} />
       {planner.phases.length === 0 && <p className="wrMuted">No phases yet. A phase is a stage of the project, defined by the result it builds to; the routines, processes, tasks and goals that build to it are tagged with it.</p>}
       {planner.phases.map(ph => {
         const prog = phaseProgress(planner, ph.id, metGoals)

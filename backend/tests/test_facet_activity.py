@@ -385,6 +385,7 @@ def _plan() -> dict:
         "exercises": [{"id": "ex1", "title": "Ten-minute sprint", "description": "Write without stopping.", "durationMinutes": 10, "facets": ["draft"], "perWeek": 3, "timesDone": 4, "lastDone": "2026-10-30"}],
     })
     base["items"][0].update({"phaseId": "ph2", "processId": "pr1"})
+    base["items"].append({"id": "i2", "label": "Mark", "processId": "pr1", "afterId": "i1", "shiftId": "s1"})
     base["goals"][0]["phaseId"] = "ph2"
     base["routines"][0]["phaseId"] = "ph2"
     return base
@@ -402,6 +403,7 @@ def test_a_planner_keeps_phases_milestones_processes_and_exercises(client: TestC
     assert [g["ordered"] for g in process["groups"]] == [True, False] and process["links"] == [{"otherId": "pr2", "relation": "before"}]
     assert got["exercises"][0]["perWeek"] == 3 and got["exercises"][0]["timesDone"] == 4
     assert got["items"][0]["phaseId"] == "ph2" and got["items"][0]["processId"] == "pr1"
+    assert got["items"][1]["afterId"] == "i1" and got["items"][0]["afterId"] is None
     assert got["goals"][0]["phaseId"] == "ph2" and got["routines"][0]["phaseId"] == "ph2"
 
 

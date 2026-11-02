@@ -10,7 +10,7 @@ import { RepeatPicker } from '../schedule/RepeatPicker'
 import { TaskRow } from '../schedule/TaskRow'
 import { PlusIcon, TrashIcon } from '../../../icons'
 import { ExerciseCard } from './ExerciseCard'
-import { PhaseSelect } from './fields'
+import { PhaseSelect, PlanGrip } from './fields'
 import { ProcessCard } from './ProcessCard'
 
 // The Work tile: what a project does to get its results, in four folds: the processes (recipes of steps), the exercises (writing drills), the routines
@@ -18,14 +18,17 @@ import { ProcessCard } from './ProcessCard'
 
 type Section = 'processes' | 'exercises' | 'routines' | 'tasks'
 
-function RoutineRow({ routine, phases, today, open, onOpen, onChange, onDelete }: {
-  routine: Routine; phases: Planner['phases']; today: string; open: boolean; onOpen: (o: boolean) => void; onChange: (patch: Partial<Routine>) => void; onDelete: () => void
+function RoutineRow({ ownerId, routine, phases, today, open, onOpen, onChange, onDelete }: {
+  ownerId: string; routine: Routine; phases: Planner['phases']; today: string; open: boolean; onOpen: (o: boolean) => void; onChange: (patch: Partial<Routine>) => void; onDelete: () => void
 }) {
   return (
     <section className={`wrPlanCard${open ? ' wrPlanCard--open' : ''}`} aria-label={routine.label || 'Untitled routine'}>
+      <div className="wrPlanTop">
       <button type="button" className="wrPlanHead" aria-expanded={open} aria-label={`${routine.label || 'Untitled routine'} details`} onClick={() => onOpen(!open)}>
         <span className="wrPlanTitle"><b>{routine.label || 'Untitled routine'}</b><small>{routine.facet ? FACET_LABEL[routine.facet] : 'Any facet'}{routine.lastDone ? ` · last ${routine.lastDone}` : ''}</small></span>
       </button>
+      <PlanGrip ownerId={ownerId} kind="routine" id={routine.id} name={routine.label || 'the routine'} />
+      </div>
       {open && (
         <div className="wrPlanBody">
           <input className="wrField" aria-label="Routine" value={routine.label} onChange={e => onChange({ label: e.target.value })} />
@@ -85,7 +88,7 @@ export function WorkTile({ ownerId, planner, setPlanner, today }: { ownerId: str
         {stages.cyclic.length > 0 && <p className="wrHint">These processes are linked in a circle, so they have no place in the sequence: {stages.cyclic.map(id => planner.processes.find(p => p.id === id)?.title).join(', ')}.</p>}
         {planner.processes.map((p: Process) => (
           <ProcessCard
-            key={p.id} process={p} processes={planner.processes} phases={planner.phases} milestones={planner.milestones} stage={stageOf(p.id)}
+            key={p.id} ownerId={ownerId} process={p} processes={planner.processes} phases={planner.phases} milestones={planner.milestones} stage={stageOf(p.id)}
             open={openId === p.id} onOpen={o => setOpenId(o ? p.id : null)} onChange={change => patch('processes', p.id, change)}
             onLink={(other, relation) => setPlanner(linkProcesses(planner, p.id, other, relation))} onDelete={() => setPlanner(removeProcess(planner, p.id))}
           />
@@ -95,7 +98,7 @@ export function WorkTile({ ownerId, planner, setPlanner, today }: { ownerId: str
         {adder('exercises', 'New exercise', 'A writing drill…', addExercise)}
         {planner.exercises.map((x: Exercise) => (
           <ExerciseCard
-            key={x.id} exercise={x} phases={planner.phases} today={today} open={openId === x.id} onOpen={o => setOpenId(o ? x.id : null)}
+            key={x.id} ownerId={ownerId} exercise={x} phases={planner.phases} today={today} open={openId === x.id} onOpen={o => setOpenId(o ? x.id : null)}
             onChange={change => patch('exercises', x.id, change)} onDelete={() => setPlanner({ ...planner, exercises: planner.exercises.filter(e => e.id !== x.id) })}
           />
         ))}
@@ -104,7 +107,7 @@ export function WorkTile({ ownerId, planner, setPlanner, today }: { ownerId: str
         {adder('routines', 'New routine', 'Something that comes round…', addRoutine)}
         {planner.routines.map((r: Routine) => (
           <RoutineRow
-            key={r.id} routine={r} phases={planner.phases} today={today} open={openId === r.id} onOpen={o => setOpenId(o ? r.id : null)}
+            key={r.id} ownerId={ownerId} routine={r} phases={planner.phases} today={today} open={openId === r.id} onOpen={o => setOpenId(o ? r.id : null)}
             onChange={change => patch('routines', r.id, change)} onDelete={() => setPlanner({ ...planner, routines: planner.routines.filter(x => x.id !== r.id) })}
           />
         ))}

@@ -1,6 +1,8 @@
-import type { ReactNode } from 'react'
+import type { DragEvent, ReactNode } from 'react'
 import { FACETS, FACET_LABEL, type Facet, type Phase } from '../../../../lib/facets'
+import { DRAG_PLAN, type PlanDrag, type PlanKind } from '../../../../lib/planDrop'
 import { FacetIcon } from '../schedule/FacetIcon'
+import { GripIcon, LockIcon } from '../../../icons'
 
 // Small fields the Project console's editors share.
 
@@ -41,3 +43,17 @@ export function PhaseSelect({ label, phases, value, onChange }: { label: string;
 
 // A whole number of one or more, or nothing: an emptied field is none.
 export const wholeOrNull = (v: string, max: number): number | null => (v === '' ? null : Math.min(max, Math.max(1, Math.floor(Number(v)) || 1)))
+
+// The grip a card is dragged by onto the Agenda (see lib/planDrop.ts for what each makes there). A process that needs milestones not yet done cannot be dragged:
+// its grip is a lock, and says why.
+export function PlanGrip({ ownerId, kind, id, name, blockedBy }: { ownerId: string; kind: PlanKind; id: string; name: string; blockedBy?: string }) {
+  if (blockedBy) return <span className="wrSchedGrip wrSchedGrip--locked" role="img" aria-label={`${name} cannot go on the Agenda yet: ${blockedBy}`} title={blockedBy}><LockIcon size={20} /></span>
+  const drag = (e: DragEvent<HTMLElement>) => {
+    const payload: PlanDrag = { ownerId, kind, id }
+    e.dataTransfer.setData(DRAG_PLAN, JSON.stringify(payload))
+    e.dataTransfer.effectAllowed = 'move'
+    const card = (e.currentTarget as HTMLElement).closest('.wrPlanCard')
+    if (card) e.dataTransfer.setDragImage(card, 12, 12)
+  }
+  return <span className="wrSchedGrip" draggable onDragStart={drag} role="img" aria-label={`Drag ${name} onto the Agenda`} title="Drag onto the Agenda"><GripIcon size={20} /></span>
+}

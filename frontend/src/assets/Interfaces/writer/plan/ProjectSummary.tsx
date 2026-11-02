@@ -1,5 +1,6 @@
 import { useMemo } from 'react'
-import { phaseProgress, currentPhase, daysBetween, nextMilestone } from '../../../../lib/phaseProgress'
+import { phaseProgress, currentPhase, nextMilestone } from '../../../../lib/phaseProgress'
+import { daysBetween } from '../../../../lib/projection'
 import { emptyPlanner } from '../../../../lib/facets'
 import { localToday, useSchedule } from '../schedule/useSchedule'
 

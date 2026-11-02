@@ -3,6 +3,7 @@ import { newTask, PRIORITY_LABEL, type ActivityEvent, type PlanItem, type Planne
 import { DEFAULT_FILTER, moveItem, organise, type BacklogFilter, type Entry, type RoutineEntry, type TaskEntry } from '../../../../lib/backlog'
 import { formatEstimate, parseQuickAdd, type QuickTarget } from '../../../../lib/quickAdd'
 import { addUnits, type RoutineWindow } from '../../../../lib/recurrence'
+import { isLocked } from '../../../../lib/planDrop'
 import { addDays } from '../../../../lib/projection'
 import { progressOf, withDescendants } from '../../../../lib/taskProgress'
 import DragGap from '../../../../components/DragGap'
@@ -135,6 +136,7 @@ export function Backlog({
       open={openId === e.item.id} onOpen={open => setOpenId(open ? e.item.id : null)} onChange={change => patch(e.ownerId, e.item.id, change)}
       onTick={on => onTick(e.ownerId, e.item.id, on)} onDelete={() => remove(e.ownerId, e.item.id)} onOpenNode={onOpenNode}
       reorderGrip={more.manual ? reorder.grip(e.item.id) : undefined} placeable={!e.item.shiftId && !e.item.doneOn}
+      locked={isLocked(e.item, owners.find(o => o.id === e.ownerId)?.planner.items ?? [], x => !!x.doneOn || (todayTicks[e.ownerId] ?? []).includes(x.id))}
       phases={ownerPhases(e.ownerId)} phaseTitle={ownerPhases(e.ownerId).find(x => x.id === e.item.phaseId)?.title}
     />
   )

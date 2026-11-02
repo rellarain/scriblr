@@ -33,8 +33,3 @@ export function nextMilestone(milestones: Milestone[], today: string): Milestone
   const open = milestones.filter(m => !m.done)
   return open.filter(m => m.date && m.date >= today).sort((a, b) => (a.date as string).localeCompare(b.date as string))[0] ?? open.find(m => !m.date) ?? null
 }
-
-// Whole days from `from` to `to` (YYYY-MM-DD, both UTC days).
-export function daysBetween(from: string, to: string): number {
-  return Math.round((Date.parse(`${to}T00:00:00Z`) - Date.parse(`${from}T00:00:00Z`)) / 86_400_000)
-}

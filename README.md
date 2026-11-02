@@ -304,7 +304,7 @@ described, now stale, in `docs/data-model.md`).
   facet and node with an `aim` counted from `addedOn`, the shift it is on and
   the day it was done; `carried` marks one that came back from a shift that
   ended with it undone; `phaseId` tags the phase it builds to and `processId`
-  the process it is a step of), shift templates, rest days and the project's
+  the process it is a step of, `afterId` the step it follows in an ordered group), shift templates, rest days and the project's
   timeline. A project is also made of **phases** (`Phase`: a title, the
   `result` it builds to, a status of planned, active or done, and dates), the
   **milestones** along them (`Milestone`: tickable, optionally on a phase),

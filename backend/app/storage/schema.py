@@ -1346,6 +1346,8 @@ class PlanItem(BaseModel):
     # The phase it builds to, and the process it is a step of (a task made from a process when it is put on the Agenda).
     phaseId: Optional[str] = None
     processId: Optional[str] = None
+    # The step it follows, in an ordered group of a process: it can be ticked once that one is.
+    afterId: Optional[str] = None
 
     @model_validator(mode="before")
     @classmethod

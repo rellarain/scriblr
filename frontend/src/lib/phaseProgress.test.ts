@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { emptyPlanner, newMilestone, newPhase, newTask } from './facets'
-import { currentPhase, daysBetween, nextMilestone, phaseProgress } from './phaseProgress'
+import { currentPhase, nextMilestone, phaseProgress } from './phaseProgress'
 
 const goal = (id: string, phaseId: string) => ({ id, facet: 'draft' as const, scope: 'project' as const, nodeId: null, kind: null, daily: null, weekly: null, total: 1000, deadline: null, phaseId })
 
@@ -38,8 +38,4 @@ describe('nextMilestone', () => {
     expect(nextMilestone([newMilestone('x', 'X')], '2026-11-01')?.id).toBe('x')
     expect(nextMilestone([newMilestone('d', 'D', { done: true })], '2026-11-01')).toBeNull()
   })
-})
-
-describe('daysBetween', () => {
-  it('counts whole days across a month end', () => { expect(daysBetween('2026-10-30', '2026-11-02')).toBe(3) })
 })

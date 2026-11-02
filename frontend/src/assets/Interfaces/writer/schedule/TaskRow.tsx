@@ -39,6 +39,8 @@ export interface TaskRowProps {
   reorderGrip?: HTMLAttributes<HTMLElement>
   // The task can be dragged onto a shift (a task that is not on one yet).
   placeable?: boolean
+  // A step that follows another, which is not done yet: it cannot be ticked.
+  locked?: boolean
   // The phase the task builds to: its name beside the task, and the phases to choose from when it is opened.
   phaseTitle?: string
   phases?: Phase[]
@@ -92,7 +94,7 @@ export function TaskRow(p: TaskRowProps) {
     <div className={`wrSchedTask${open ? ' wrSchedTask--open' : ''}${p.done ? ' wrSchedTask--done' : ''}${p.overdue ? ' wrSchedTask--overdue' : ''}${p.running ? ' wrSchedTask--running' : ''}`}>
       <div className="wrTaskLine">
         <PriorityMark value={item.priority} name={item.label} onPick={priority => p.onChange({ priority })} />
-        <input type="checkbox" checked={p.done} aria-label={item.label} onChange={e => p.onTick(e.target.checked)} />
+        <input type="checkbox" checked={p.done} aria-label={item.label} disabled={p.locked} title={p.locked ? 'Do the step before it first' : undefined} onChange={e => p.onTick(e.target.checked)} />
         <button type="button" className="wrTaskMain" aria-expanded={open} aria-label={`${item.label} details`} onClick={() => p.onOpen(!open)}>
           <b>{item.label}</b>
           {(facts.length > 0 || item.facet || item.targetNodeId || p.progress) && (

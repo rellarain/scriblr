@@ -287,8 +287,10 @@
     &--active { box-shadow: inset 3px 0 0 var(--level-ink); }
     &--blocked { box-shadow: inset 3px 0 0 var(--level-ink-soft); }
     > .wrTaskBar { margin: 0 var(--space-4) var(--space-4); } }
-  .wrPlanHead { display: flex; align-items: center; gap: var(--space-4); width: 100%; padding: var(--space-4); background: transparent; border: 0; color: inherit; font: inherit; text-align: left; cursor: pointer; &:hover { background: var(--level-wash); } }
-  .wrPlanTitle { flex: 1 1 auto; min-width: 0; display: flex; flex-direction: column; gap: var(--space-2); b { overflow-wrap: anywhere; }
+  .wrPlanTop { display: flex; align-items: center; > .wrPlanHead { flex: 1 1 auto; min-width: 0; width: auto; } > .wrSchedGrip { margin-right: var(--space-4); } }
+  .wrSchedGrip--locked { color: var(--level-ink-soft); cursor: not-allowed; }
+  .wrPlanHead { display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-3) var(--space-4); width: 100%; padding: var(--space-4); background: transparent; border: 0; color: inherit; font: inherit; text-align: left; cursor: pointer; &:hover { background: var(--level-wash); } }
+  .wrPlanTitle { flex: 1 1 7em; min-width: 7em; display: flex; flex-direction: column; gap: var(--space-2); b { overflow-wrap: anywhere; }
     small { color: var(--level-ink-soft); font-size: var(--text-ui); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; } }
   .wrPlanStatus { &--done { background: var(--level-ink); color: var(--wr-fill-4); } &--planned { border-style: dashed; } }
   .wrPlanPct { font-size: var(--text-ui); font-weight: 700; color: var(--level-ink-soft); }
@@ -303,6 +305,26 @@
   .wrStepRow { display: flex; align-items: center; gap: var(--space-3); .wrField { flex: 1 1 auto; min-width: 0; } .wrSchedNum { flex: 0 0 5em; width: 5em; } }
   .wrStepNo { flex: 0 0 1.4em; text-align: center; color: var(--level-ink-soft); font-size: var(--text-ui); }
   .wrWork > .wrFold { padding: 0 var(--space-3); }
+  // The phase timeline: a chart across the project's days (a ruler of months, a bar for each phase, a flag for each milestone, the rest days shaded, a line for
+  // today). A bar is the level's ink on the card: dashed while planned, filled while active, a wash while done (the same pairs as the chosen button of a choice).
+  .wrPlanTimeline { display: flex; flex-direction: column; gap: var(--space-3); margin-bottom: var(--space-4); }
+  .wrTimeline { position: relative; padding-bottom: var(--space-3); border-radius: var(--radius-button); background: var(--wr-fill-4); overflow: hidden; touch-action: none; user-select: none; }
+  .wrTimelineRest { position: absolute; inset: 0; pointer-events: none; i { position: absolute; top: 0; bottom: 0; background: var(--level-wash); } }
+  .wrTimelineNow { position: absolute; top: 0; bottom: 0; width: 2px; background: var(--level-ink); z-index: 2; pointer-events: none; }
+  .wrTimelineRuler { position: relative; height: 20px; border-bottom: 1px solid var(--level-line);
+    span { position: absolute; top: 0; height: 20px; padding-left: var(--space-2); border-left: 1px solid var(--level-line); font-size: var(--text-small); line-height: 20px; color: var(--level-ink-soft); white-space: nowrap; } }
+  .wrTimelineRow { position: relative; height: 28px; &--ms { height: 26px; } }
+  .wrTimelineMs { position: absolute; top: 1px; transform: translateX(-50%); display: inline-flex; padding: 0; background: transparent; border: 0; color: var(--level-ink); cursor: pointer; z-index: 1;
+    &--done svg { fill: currentColor; } &:focus-visible { outline: 2px solid var(--level-ink); outline-offset: 2px; } }
+  .wrTimelineBar { position: absolute; top: 4px; height: 20px; box-sizing: border-box; display: flex; align-items: center; border: 2px solid var(--level-ink); border-radius: var(--radius-button); color: var(--level-ink); cursor: grab; z-index: 1;
+    &--planned { background: transparent; border-style: dashed; }
+    &--active { background: var(--level-ink); color: var(--wr-fill-4); }
+    &--done { background: var(--level-wash-hi); }
+    &--drag { cursor: grabbing; }
+    &:focus-visible { outline: 2px solid var(--level-ink); outline-offset: 2px; } }
+  .wrTimelineName { flex: 1 1 auto; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: var(--text-small); font-weight: 700; }
+  .wrTimelineEdge { flex: none; align-self: stretch; width: 8px; cursor: ew-resize; }
+  .wrSchedNotice { display: flex; align-items: center; gap: var(--space-3); margin-bottom: var(--space-4); padding: var(--space-3) var(--space-4); border-left: 4px solid var(--level-ink); border-radius: var(--radius-button); background: var(--wr-fill-4); font-size: var(--text-field); }
   .wrTaskDragging { opacity: 0.6; }
 
   // The priority marker: a flag, filled for High, half-filled for Medium, dashed for Low and faint for None; pressed it opens into the four to pick from.

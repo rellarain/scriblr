@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import { FACETS, FACET_LABEL, FACET_UNIT, newTask, type Facet, type PlanItem, type Shift } from '../../../../lib/facets'
 import type { EditScope } from '../../../../lib/shiftEdit'
+import { isLocked } from '../../../../lib/planDrop'
 import { newId } from './ids'
 import { FacetIcon } from './FacetIcon'
 import { Fold } from './Fold'
@@ -53,6 +54,8 @@ export function ShiftPanel(p: ShiftPanelProps) {
   const unit = FACET_UNIT[s.facet].many
   const node = p.targets.find(t => t.id === s.targetNodeId)
   const ticked = mine.filter(i => p.ticks.includes(i.id)).length
+  // A step of a process that follows another is ticked once that one is (on the day, or once and for all on a shift that happens once).
+  const locked = (i: PlanItem) => isLocked(i, mine, x => p.ticks.includes(x.id) || (!p.repeating && x.doneOn !== null))
   // How it repeats is the pattern's, so it is changed for the days after this one or for all of them, not for one day.
   const patternLocked = p.repeating && p.scope === 'this'
 
@@ -132,7 +135,7 @@ export function ShiftPanel(p: ShiftPanelProps) {
         <small className="wrMuted">For {p.occurrence}</small>
         {mine.map(i => (
           <div key={i.id} className="wrSchedCheck">
-            <label><input type="checkbox" checked={p.ticks.includes(i.id)} onChange={e => p.onTick(i.id, e.target.checked)} /> {i.label}</label>
+            <label title={locked(i) ? 'Do the step before it first' : undefined}><input type="checkbox" checked={p.ticks.includes(i.id)} disabled={locked(i)} onChange={e => p.onTick(i.id, e.target.checked)} /> {i.label}</label>
             <IconBtn Icon={CloseIcon} label={`Unassign ${i.label}`} onClick={() => p.onItems(items.map(x => (x.id === i.id ? { ...x, shiftId: null } : x)))} />
           </div>
         ))}

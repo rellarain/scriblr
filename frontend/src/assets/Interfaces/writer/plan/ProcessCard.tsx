@@ -4,13 +4,14 @@ import { unmetMilestones } from '../../../../lib/processOrder'
 import { newId } from '../schedule/ids'
 import { IconBtn } from '../schedule/IconBtn'
 import { ChevronDownIcon, ChevronRightIcon, CloseIcon, LockIcon, PlusIcon, StackIcon, TrashIcon } from '../../../icons'
-import { ChipSet, FacetChips, wholeOrNull } from './fields'
+import { ChipSet, FacetChips, PlanGrip, wholeOrNull } from './fields'
 
 // One process: a titled, described recipe of steps. The steps are in groups, each done in order (one then the next) or in any order, and a process may mix
 // both. It is for several phases and facets, may need milestones to be done first (until they are, it is blocked), and can be linked to other processes:
 // before or after one (ordered), or with one (unordered: related, or done at the same time before whatever comes next).
 
-export function ProcessCard({ process, processes, phases, milestones, stage, open, onOpen, onChange, onLink, onDelete }: {
+export function ProcessCard({ ownerId, process, processes, phases, milestones, stage, open, onOpen, onChange, onLink, onDelete }: {
+  ownerId: string
   process: Process
   processes: Process[]
   phases: Phase[]
@@ -39,6 +40,7 @@ export function ProcessCard({ process, processes, phases, milestones, stage, ope
 
   return (
     <section className={`wrPlanCard${open ? ' wrPlanCard--open' : ''}${unmet.length ? ' wrPlanCard--blocked' : ''}`} aria-label={process.title || 'Untitled process'}>
+      <div className="wrPlanTop">
       <button type="button" className="wrPlanHead" aria-expanded={open} aria-label={`${process.title || 'Untitled process'} details`} onClick={() => onOpen(!open)}>
         <StackIcon size={20} />
         <span className="wrPlanTitle"><b>{process.title || 'Untitled process'}</b><small>{steps} {steps === 1 ? 'step' : 'steps'}{process.description ? ` · ${process.description}` : ''}</small></span>
@@ -46,6 +48,8 @@ export function ProcessCard({ process, processes, phases, milestones, stage, ope
         {unmet.length > 0 && <span className="wrSchedTag wrSchedTag--priority" title={`Needs: ${needs.join(', ')}`}><LockIcon size={20} /> Blocked</span>}
         {open ? <ChevronDownIcon size={20} /> : <ChevronRightIcon size={20} />}
       </button>
+      <PlanGrip ownerId={ownerId} kind="process" id={process.id} name={process.title || 'the process'} blockedBy={unmet.length ? `Needs ${needs.join(', ')} done first` : undefined} />
+      </div>
       {open && (
         <div className="wrPlanBody">
           <input className="wrField" aria-label="Process title" value={process.title} onChange={e => onChange({ title: e.target.value })} />

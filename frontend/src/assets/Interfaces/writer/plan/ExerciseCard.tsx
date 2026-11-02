@@ -1,11 +1,12 @@
 import type { Exercise, Phase } from '../../../../lib/facets'
 import { IconBtn } from '../schedule/IconBtn'
 import { CheckIcon, ChevronDownIcon, ChevronRightIcon, PencilIcon, TrashIcon } from '../../../icons'
-import { ChipSet, FacetChips, wholeOrNull } from './fields'
+import { ChipSet, FacetChips, PlanGrip, wholeOrNull } from './fields'
 
 // One exercise: a writing drill with a prompt (its description), a length, how often it is suggested and a log of how often it has been done.
 
-export function ExerciseCard({ exercise, phases, today, open, onOpen, onChange, onDelete }: {
+export function ExerciseCard({ ownerId, exercise, phases, today, open, onOpen, onChange, onDelete }: {
+  ownerId: string
   exercise: Exercise
   phases: Phase[]
   today: string
@@ -17,6 +18,7 @@ export function ExerciseCard({ exercise, phases, today, open, onOpen, onChange, 
   const title = exercise.title || 'Untitled exercise'
   return (
     <section className={`wrPlanCard${open ? ' wrPlanCard--open' : ''}`} aria-label={title}>
+      <div className="wrPlanTop">
       <button type="button" className="wrPlanHead" aria-expanded={open} aria-label={`${title} details`} onClick={() => onOpen(!open)}>
         <PencilIcon size={20} />
         <span className="wrPlanTitle">
@@ -25,6 +27,8 @@ export function ExerciseCard({ exercise, phases, today, open, onOpen, onChange, 
         </span>
         {open ? <ChevronDownIcon size={20} /> : <ChevronRightIcon size={20} />}
       </button>
+      <PlanGrip ownerId={ownerId} kind="exercise" id={exercise.id} name={title} />
+      </div>
       {open && (
         <div className="wrPlanBody">
           <input className="wrField" aria-label="Exercise title" value={exercise.title} onChange={e => onChange({ title: e.target.value })} />

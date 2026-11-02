@@ -3,6 +3,7 @@ import { FACET_LABEL, SLOTS_PER_DAY, slotTime, type ActivityEvent, type Facet, t
 import { addDays } from '../../../../lib/projection'
 import { addUnits, shiftOccurrences, type ShiftOccurrence } from '../../../../lib/recurrence'
 import { dueDays, type DueMark } from '../../../../lib/backlog'
+import { DAY_DROP_SLOT, DRAG_PLAN, dropExercise, dropProcess, dropRoutine, type DropResult, type PlanDrag } from '../../../../lib/planDrop'
 import { nextUp } from '../../../../lib/nextUp'
 import { shiftProgress } from '../../../../lib/shiftProgress'
 import { diffPatch, editShift, shiftForTask, type EditScope, type ShiftPatch } from '../../../../lib/shiftEdit'
@@ -62,6 +63,8 @@ export function ScheduleCard({
   const [cursor, setCursor] = useState(today)
   const [editing, setEditing] = useState<Editing | null>(null)
   const [renaming, setRenaming] = useState<string | null>(null)
+  // Why something dragged from the Project tab was not put on the Agenda (a process that needs a milestone not yet done).
+  const [notice, setNotice] = useState<string | null>(null)
   // Below this width the Agenda lists its days as a checklist (the view that is kept is not changed).
   const [wrap, width] = useElementWidth<HTMLDivElement>([NARROW_PX])
   const narrow = width === 0
@@ -109,6 +112,8 @@ export function ScheduleCard({
       for (const g of o.planner.goals) add(g.deadline, `${FACET_LABEL[g.facet]} goal due`)
       add(o.planner.timelineStart, 'Timeline starts')
       add(o.planner.timelineEnd, 'Timeline ends')
+      for (const m of o.planner.milestones) add(m.date, `${m.done ? 'Done: ' : 'Milestone: '}${m.title || 'Untitled milestone'}`)
+      for (const ph of o.planner.phases) { add(ph.start, `Phase starts: ${ph.title || 'Untitled phase'}`); if (ph.end && ph.end !== ph.start) add(ph.end, `Phase ends: ${ph.title || 'Untitled phase'}`) }
     }
     return map
   }, [shownOwners])
@@ -275,8 +280,32 @@ export function ScheduleCard({
     const item = o?.planner.items.find(i => i.id === itemId)
     return o && item ? { owner: o, item } : null
   }
+  // A routine, a process or an exercise dragged from the Project tab (lib/planDrop.ts says what each makes).
+  const droppedPlan = (e: DragEvent): (PlanDrag & { owner: ScheduleOwner }) | null => {
+    const raw = e.dataTransfer?.getData(DRAG_PLAN)
+    if (!raw) return null
+    const drag = JSON.parse(raw) as PlanDrag
+    const o = owners.find(x => x.id === drag.ownerId)
+    return o ? { ...drag, owner: o } : null
+  }
+  const applyPlan = (plan: PlanDrag & { owner: ScheduleOwner }, at: { date: string; slot: number } | { shiftId: string }) => {
+    const p = plan.owner.planner
+    const mk = () => newId('plan')
+    let r: DropResult = { ok: false, reason: 'That is no longer in the plan.' }
+    if (plan.kind === 'routine') { const x = p.routines.find(y => y.id === plan.id); if (x) r = dropRoutine(p, x, at, mk) }
+    else if (plan.kind === 'process') { const x = p.processes.find(y => y.id === plan.id); if (x) r = dropProcess(p, x, at, today, mk) }
+    else { const x = p.exercises.find(y => y.id === plan.id); if (x) r = dropExercise(p, x, at, today, mk) }
+    if (r.ok) { plan.owner.setPlanner(r.planner); setNotice(null) } else setNotice(r.reason)
+  }
   // On a shift: the task goes on it.
   const dropItem = (e: DragEvent, occ: Occ) => {
+    const plan = droppedPlan(e)
+    if (plan) {
+      e.preventDefault()
+      e.stopPropagation()
+      if (plan.owner.id === occ.ownerId) applyPlan(plan, { shiftId: occ.shiftId })
+      return
+    }
     const hit = droppedItem(e)
     if (!hit) return
     e.preventDefault()
@@ -286,6 +315,8 @@ export function ScheduleCard({
   }
   // On an empty slot of a day: a shift is made for the task (its facet and node, as long as its estimate), starting where it was dropped.
   const dropOnSlot = (e: DragEvent, date: string) => {
+    const plan = droppedPlan(e)
+    if (plan) { e.preventDefault(); applyPlan(plan, { date, slot: slotAt(date, e.clientY) }); return }
     const hit = droppedItem(e)
     if (!hit) return
     e.preventDefault()
@@ -294,6 +325,8 @@ export function ScheduleCard({
   }
   // On a day of the month or the year: that day is the task's due day.
   const dropOnDay = (e: DragEvent, date: string) => {
+    const plan = droppedPlan(e)
+    if (plan) { e.preventDefault(); applyPlan(plan, { date, slot: DAY_DROP_SLOT }); return }
     const hit = droppedItem(e)
     if (!hit) return
     e.preventDefault()
@@ -514,6 +547,7 @@ export function ScheduleCard({
   const editingOwner = editing ? owner(editing.ownerId) : null
   return (
     <div className={`wrSchedCard wrSchedSchedule${narrow ? ' wrSchedSchedule--narrow' : ''}`} ref={wrap}>
+      {notice && <p className="wrSchedNotice" role="status">{notice}<IconBtn Icon={CloseIcon} label="Dismiss" onClick={() => setNotice(null)} /></p>}
       {up && <NextUpBar up={up} tasks={taskCount(up.occ)} color={projects.colors[up.occ.ownerId]} onOpen={() => { setCursor(up.occ.date); openOcc(up.occ) }} />}
       <div className="wrSchedHead">
         <IconBtn Icon={TodayIcon} iconProps={{ day: Number(today.slice(8)) }} label="Today" onClick={() => setCursor(today)} />

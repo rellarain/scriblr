@@ -99,6 +99,8 @@ export interface PlanItem {
   // The phase it builds to, and the process it is a step of (a task made from a process when it is put on the Agenda).
   phaseId?: string | null
   processId?: string | null
+  // The step it follows, in an ordered group of a process: it can be ticked once that one is.
+  afterId?: string | null
 }
 // A new task: waiting in the backlog with no priority until it is given one.
 export const newTask = (id: string, label: string, today: string | null, patch: Partial<PlanItem> = {}): PlanItem => ({

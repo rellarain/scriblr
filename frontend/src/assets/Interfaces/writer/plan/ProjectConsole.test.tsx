@@ -1,9 +1,10 @@
-import { render, screen, waitFor, within } from '@testing-library/react'
+import { fireEvent, render, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { __resetSettingsForTests } from '../../../../settings/settingsStore'
 import { mockFetchBy } from '../../../../test/mockFetch'
 import { emptyDay, emptyPlanner, newExercise, newMilestone, newPhase, newProcess, newTask, type Planner } from '../../../../lib/facets'
+import { DRAG_PLAN } from '../../../../lib/planDrop'
 import ProjectConsole from './ProjectConsole'
 
 const TODAY = '2026-10-31'
@@ -42,7 +43,7 @@ beforeEach(() => {
 
 const open = async () => {
   render(<ProjectConsole scope="project" projectIds={['p1']} titles={{ p1: 'Saga' }} />)
-  await screen.findByText('Outlining')
+  await screen.findByRole('region', { name: 'Outlining' })
 }
 const tile = (id: string) => document.querySelector(`[data-tile-id="${id}"]`) as HTMLElement
 const lastSaved = async (check: (p: Planner) => boolean) => { await waitFor(() => expect(saved.some(check)).toBe(true)); return saved.filter(check).at(-1) as Planner }
@@ -166,10 +167,31 @@ describe('the Project console', () => {
     expect(got.items[1].phaseId).toBe('ph2')
   })
 
+  it('has a grip on a process, an exercise and a routine to drag them onto the Agenda, and a lock instead on a process that is blocked', async () => {
+    const user = userEvent.setup()
+    await open()
+    const work = within(tile('work'))
+    expect(work.getByRole('img', { name: 'Revise a chapter cannot go on the Agenda yet: Needs Outline locked done first' })).toBeTruthy()
+    const free = work.getByRole('img', { name: 'Drag Proof a chapter onto the Agenda' })
+    expect(free.getAttribute('draggable')).toBe('true')
+    await user.click(work.getByRole('button', { name: /^Exercises/, expanded: false }))
+    const setData = vi.fn()
+    fireEvent.dragStart(work.getByRole('img', { name: 'Drag Ten-minute sprint onto the Agenda' }), { dataTransfer: { setData, setDragImage: () => {}, effectAllowed: '' } })
+    expect(setData).toHaveBeenCalledWith(DRAG_PLAN, JSON.stringify({ ownerId: 'p1', kind: 'exercise', id: 'ex1' }))
+  })
+
+  it('shows the timeline of the phases at the top of the Phases tile', async () => {
+    await open()
+    const phases = within(tile('phases'))
+    expect(phases.getByRole('group', { name: 'Phase timeline' })).toBeTruthy()
+    expect(phases.getByRole('button', { name: /^First draft, Oct 21 to Feb 28/ })).toBeTruthy()
+    expect(phases.getByRole('button', { name: 'Half way, Dec 15, not done' })).toBeTruthy()
+  })
+
   it('lets the Dash choose between the account and a project, each with its own plan', async () => {
     const user = userEvent.setup()
     render(<ProjectConsole scope="dash" projectIds={['p1']} titles={{ p1: 'Saga' }} />)
-    await screen.findByText('Outlining')
+    await screen.findByRole('region', { name: 'Outlining' })
     const pick = screen.getByRole('combobox', { name: 'Plan for' })
     expect(within(pick).getAllByRole('option').map(o => o.textContent)).toEqual(['Account', 'Saga'])
     await user.selectOptions(pick, 'account')
