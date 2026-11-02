@@ -360,6 +360,80 @@ def test_a_planner_with_a_bad_date_or_shape_is_refused(client: TestClient) -> No
     assert client.get(f"/api/projects/{pid}/planner").json()["goals"] == []  # nothing was kept
 
 
+def _plan() -> dict:
+    """A planner with what a project is made of: phases with milestones, a process with step groups and links, an exercise, and items tagged with a phase."""
+    base = _planner()
+    base.update({
+        "phases": [
+            {"id": "ph1", "title": "Outline", "result": "A chapter list I trust", "status": "done", "start": "2026-10-01", "end": "2026-11-15"},
+            {"id": "ph2", "title": "First draft", "result": "80,000 words", "status": "active", "start": "2026-11-16", "end": "2027-02-28"},
+            {"id": "ph3", "title": "Template phase", "offsetDays": 30, "lengthDays": 60},
+        ],
+        "milestones": [{"id": "m1", "title": "Outline locked", "date": "2026-11-15", "phaseId": "ph1", "done": True, "doneOn": "2026-11-14"}],
+        "processes": [
+            {
+                "id": "pr1", "title": "Revise a chapter", "description": "Read, mark, rewrite", "phaseIds": ["ph1", "ph2"], "facets": ["revision", "draft"],
+                "requiredMilestoneIds": ["m1"],
+                "groups": [
+                    {"id": "gr1", "ordered": True, "steps": [{"id": "st1", "label": "Reread", "estimateMinutes": 30}, {"id": "st2", "label": "Mark"}]},
+                    {"id": "gr2", "ordered": False, "steps": [{"id": "st3", "label": "Fix dialogue", "facet": "draft"}]},
+                ],
+                "links": [{"otherId": "pr2", "relation": "before"}],
+            },
+            {"id": "pr2", "title": "Proof a chapter", "links": [{"otherId": "pr1", "relation": "after"}]},
+        ],
+        "exercises": [{"id": "ex1", "title": "Ten-minute sprint", "description": "Write without stopping.", "durationMinutes": 10, "facets": ["draft"], "perWeek": 3, "timesDone": 4, "lastDone": "2026-10-30"}],
+    })
+    base["items"][0].update({"phaseId": "ph2", "processId": "pr1"})
+    base["goals"][0]["phaseId"] = "ph2"
+    base["routines"][0]["phaseId"] = "ph2"
+    return base
+
+
+def test_a_planner_keeps_phases_milestones_processes_and_exercises(client: TestClient) -> None:
+    pid = _project(client)
+    assert client.put(f"/api/projects/{pid}/planner", json=_plan()).status_code == 200
+    got = client.get(f"/api/projects/{pid}/planner").json()
+    assert [p["title"] for p in got["phases"]] == ["Outline", "First draft", "Template phase"]
+    assert got["phases"][2]["offsetDays"] == 30 and got["phases"][2]["start"] is None
+    assert got["milestones"][0]["done"] is True and got["milestones"][0]["phaseId"] == "ph1"
+    process = got["processes"][0]
+    assert process["requiredMilestoneIds"] == ["m1"] and process["facets"] == ["revision", "draft"]
+    assert [g["ordered"] for g in process["groups"]] == [True, False] and process["links"] == [{"otherId": "pr2", "relation": "before"}]
+    assert got["exercises"][0]["perWeek"] == 3 and got["exercises"][0]["timesDone"] == 4
+    assert got["items"][0]["phaseId"] == "ph2" and got["items"][0]["processId"] == "pr1"
+    assert got["goals"][0]["phaseId"] == "ph2" and got["routines"][0]["phaseId"] == "ph2"
+
+
+def test_a_planner_saved_before_phases_loads_with_none(client: TestClient) -> None:
+    pid = _project(client)
+    client.put(f"/api/projects/{pid}/planner", json=_planner())
+    got = client.get(f"/api/projects/{pid}/planner").json()
+    assert got["phases"] == [] and got["milestones"] == [] and got["processes"] == [] and got["exercises"] == []
+    assert got["items"][0]["phaseId"] is None
+
+
+def test_a_plan_with_a_bad_phase_milestone_process_or_exercise_is_refused(client: TestClient) -> None:
+    pid = _project(client)
+
+    def refused(change) -> None:
+        body = _plan()
+        change(body)
+        assert client.put(f"/api/projects/{pid}/planner", json=body).status_code == 422
+
+    refused(lambda b: b["phases"][0].update(end="2026-09-01"))  # ends before it starts
+    refused(lambda b: b["phases"][0].update(start="soon"))
+    refused(lambda b: b["phases"][0].update(status="finished"))
+    refused(lambda b: b["milestones"][0].update(date="31/10"))
+    refused(lambda b: b["processes"][0]["links"].append({"otherId": "pr1", "relation": "with"}))  # to itself
+    refused(lambda b: b["processes"][0]["links"].append({"otherId": "pr2", "relation": "next"}))
+    refused(lambda b: b["processes"][0]["groups"][0]["steps"][0].update(estimateMinutes=0))
+    refused(lambda b: b["exercises"][0].update(durationMinutes=0))
+    refused(lambda b: b["exercises"][0].update(lastDone="yesterday"))
+    refused(lambda b: b["phases"].append({"id": "ph1", "title": "Same id"}))  # two phases share an id
+    assert client.get(f"/api/projects/{pid}/planner").json()["phases"] == []  # nothing was kept
+
+
 def test_a_project_is_written_in_format_six(client: TestClient, storage_root) -> None:
     import json
 

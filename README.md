@@ -303,8 +303,18 @@ described, now stale, in `docs/data-model.md`).
   medium), a `dueDate`, notes, an estimate in minutes, subtasks, an optional
   facet and node with an `aim` counted from `addedOn`, the shift it is on and
   the day it was done; `carried` marks one that came back from a shift that
-  ended with it undone), shift templates, rest days and the project's
-  timeline. Dates are local days.
+  ended with it undone; `phaseId` tags the phase it builds to and `processId`
+  the process it is a step of), shift templates, rest days and the project's
+  timeline. A project is also made of **phases** (`Phase`: a title, the
+  `result` it builds to, a status of planned, active or done, and dates), the
+  **milestones** along them (`Milestone`: tickable, optionally on a phase),
+  **processes** (`Process`: step groups done in order or in any order, several
+  phases and facets, required milestones, and links to other processes that
+  come before, after or go with it) and **exercises** (`Exercise`: a prompt, a
+  length, a times-a-week pace and a log); goals and routines can carry a
+  `phaseId` too. A phase or milestone in the template has an offset and a
+  length in days instead of dates. All of it is additive: a planner saved before
+  has none, and loads with empty lists. Dates are local days.
 - **Scrap** — `ScrapRegistry`: any `moment` node removed from the outline
   that had existing draft content becomes a `ScrapEntry` (captures its
   last-known chapter/book ancestry) instead of silently vanishing; it can
@@ -598,7 +608,7 @@ mounted it; it remains in git history.
   with; drag a tile's title bar onto another tile (its 3x3 zones: the middle swaps, the edges put it beside, above or below, a corner a new row or column across
   the whole grid), onto a divider to wedge it in, or onto the tab bar to minimize it, with the others sliding aside to show the gap; drag a divider (or focus it and use the arrow keys) to resize the two tiles it separates. The tree always fills the area (a tile that opens is grafted on), stacks in one column under 400px, and is remembered per level with the open tiles and the
   current tab. A lone open tile has the whole area; every tile scrolls its own body. The Dash's tabs (`levels/dashTabs.tsx`) are Schedule (the console: goals, the agenda, the backlog, analytics (activity, review, charts); `writer/schedule/`; the **Backlog** tile, `Backlog.tsx`, lists Today (the tasks on today's shifts, the one running now first, and the routines due), Overdue, then the tasks by priority (High, Medium, Low, and None in a fold that opens by itself when nothing else waits) and the routines; its order, search, facet and project filters, sorts (priority, due date, newest, manual) and done choices are `lib/backlog.ts`, the quick-add line `Revise ch 3 !high ~2h fri @chapter 3` is `lib/quickAdd.ts`, a task's progress (its subtasks, or the words and nodes done on its node since it was added) is `lib/taskProgress.ts`, and a one-off shift that ends with tasks undone sends them back, marked carried, `lib/carryForward.ts`; how a routine or shift comes round is the shared `RepeatPicker.tsx`; the **Agenda** tile edits a shift in a side panel inside the tile (`ShiftPanel.tsx`: the days a change is for are asked first, every field is applied as it is set from the shift as it was opened, `diffPatch` and `editShift` in `lib/shiftEdit.ts`), a title on its block, with a hover bar of quick actions, lists its days as a checklist below 480px, and takes a task dropped on a shift, an empty slot (`shiftForTask`) or a day of the month or year (its due day); it opens with the next-up bar (`NextUpBar.tsx`, `lib/nextUp.ts`), keeps the now line in view, shows on a block its progress (`lib/shiftProgress.ts`), node and checklist count and marks what is due on the calendar (`dueDays` in `lib/backlog.ts`); at the Dash a project has its colour, one shared project choice and a choice of project for a new shift, and a shift that ends with tasks unticked sends a reminder (`useShiftEndReminders`)),
-  Readers, Scratchpad, Project template, Settings (the theme panel) and Help (the resource
+  Readers, Scratchpad, **Project** (`writer/plan/ProjectConsole.tsx`: where a project's plan is defined, see the design system's Dashboard page; the same console is the Project level's **Project** tab), Settings (the theme panel) and Help (the resource
   articles written for the level in the Resources builder, `levels/HelpArticles.tsx`). The
   Project's (`levels/projectTabs.tsx`): Plot and Outline (summaries at Mid, the editors at Max; the Plot is a console of five tiles, `PlotView.tsx`: Contents, Editor,
   Chapters, Compare and Plotpoints, on a split grid with its rail of tile tabs in the tab's title bar, Compare and Plotpoints off until wanted, the layout

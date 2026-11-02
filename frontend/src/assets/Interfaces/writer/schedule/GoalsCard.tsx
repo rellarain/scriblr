@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { FACETS, FACET_LABEL, FACET_UNIT, unitOf, type Facet, type Goal, type Planner } from '../../../../lib/facets'
+import { FACETS, FACET_LABEL, FACET_UNIT, unitOf, type Facet, type Goal, type Phase, type Planner } from '../../../../lib/facets'
 import type { TreeNodeFact } from '../../../../lib/goalFacts'
 import type { GoalProgress, GoalStatus } from '../../../../lib/projection'
 import { newId } from './ids'
@@ -36,7 +36,7 @@ function OptionalNumber({ label, value, onChange }: { label: string; value: numb
   )
 }
 
-function GoalEditor({ goal, nodes, scoped, onSave, onCancel }: { goal: Goal; nodes: TreeNodeFact[]; scoped: boolean; onSave: (g: Goal) => void; onCancel: () => void }) {
+function GoalEditor({ goal, nodes, scoped, phases, onSave, onCancel }: { goal: Goal; nodes: TreeNodeFact[]; scoped: boolean; phases: Phase[]; onSave: (g: Goal) => void; onCancel: () => void }) {
   const [g, setG] = useState(goal)
   const pickable = nodes.filter(x => (g.scope === 'book' ? x.kind === 'book' : x.kind === 'chapter'))
   const set = (patch: Partial<Goal>) => setG(prev => ({ ...prev, ...patch }))
@@ -67,6 +67,13 @@ function GoalEditor({ goal, nodes, scoped, onSave, onCancel }: { goal: Goal; nod
       <label className="wrKv"><span>Deadline</span>
         <input className="wrField" type="date" aria-label="Deadline" value={g.deadline ?? ''} onChange={e => set({ deadline: e.target.value || null })} />
       </label>
+      {phases.length > 0 && (
+        <label className="wrKv"><span>Phase</span>
+          <select className="wrField" aria-label="Phase" value={g.phaseId && phases.some(x => x.id === g.phaseId) ? g.phaseId : ''} onChange={e => set({ phaseId: e.target.value || null })}>
+            <option value="">No phase</option>{phases.map(x => <option key={x.id} value={x.id}>{x.title || 'Untitled phase'}</option>)}
+          </select>
+        </label>
+      )}
       <div className="wrSchedFormActions">
         <IconBtn Icon={CloseIcon} label="Cancel" onClick={onCancel} />
         <IconBtn type="submit" Icon={CheckIcon} label="Save goal" className="wrSmallBtn wrSmallBtn--accent" disabled={scoped && g.scope !== 'project' && !g.nodeId} />
@@ -103,7 +110,7 @@ export function GoalsCard({
               <select className="wrField" aria-label="Goal for" value={editing.ownerId} onChange={e => setEditing({ ...editing, ownerId: e.target.value })}>{owners.map(o => <option key={o.id} value={o.id}>{o.label}</option>)}</select>
             </label>
           )}
-          <GoalEditor key={editing.goal.id} goal={editing.goal} nodes={nodes} scoped={scoped && !(many && editing.ownerId === owners[0].id)} onSave={g => save(g, editing.ownerId)} onCancel={() => setEditing(null)} />
+          <GoalEditor key={editing.goal.id} goal={editing.goal} nodes={nodes} scoped={scoped && !(many && editing.ownerId === owners[0].id)} phases={owner(editing.ownerId).planner.phases} onSave={g => save(g, editing.ownerId)} onCancel={() => setEditing(null)} />
         </>
       )}
       {progress.length === 0 && !editing && <p className="wrMuted">No goals yet. Add a daily, weekly or total goal for any facet, with a deadline if it has one.</p>}

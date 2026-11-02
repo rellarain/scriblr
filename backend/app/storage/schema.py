@@ -1343,6 +1343,9 @@ class PlanItem(BaseModel):
     addedOn: Optional[str] = None  # YYYY-MM-DD
     # It was on a shift that ended with it undone, and came back to the backlog.
     carried: bool = False
+    # The phase it builds to, and the process it is a step of (a task made from a process when it is put on the Agenda).
+    phaseId: Optional[str] = None
+    processId: Optional[str] = None
 
     @model_validator(mode="before")
     @classmethod
@@ -1364,6 +1367,7 @@ class Routine(BaseModel):
     recurrence: Recurrence
     pauses: list[Pause] = Field(default_factory=list)
     lastDone: Optional[str] = None
+    phaseId: Optional[str] = None
 
 
 class Shift(BaseModel):
@@ -1409,6 +1413,7 @@ class Goal(BaseModel):
     weekly: Optional[int] = Field(default=None, ge=0)
     total: Optional[int] = Field(default=None, ge=0)
     deadline: Optional[str] = None
+    phaseId: Optional[str] = None
 
 
 class RestRange(BaseModel):
@@ -1416,6 +1421,91 @@ class RestRange(BaseModel):
     start: str
     end: str
     label: str = Field(default="", max_length=100)
+
+
+PhaseStatus = Literal["planned", "active", "done"]
+ProcessRelation = Literal["before", "after", "with"]
+
+
+class Phase(BaseModel):
+    """A stage of the project, defined by the result it builds to. In a project it has real dates; in the template, an offset from the start and a length."""
+
+    id: str
+    title: str = Field(max_length=200)
+    result: str = Field(default="", max_length=1000)
+    description: str = Field(default="", max_length=2000)
+    status: PhaseStatus = "planned"
+    start: Optional[str] = None
+    end: Optional[str] = None
+    offsetDays: Optional[int] = Field(default=None, ge=0, le=3650)
+    lengthDays: Optional[int] = Field(default=None, ge=1, le=3650)
+
+
+class Milestone(BaseModel):
+    """A dated marker, tickable, optionally on a phase."""
+
+    id: str
+    title: str = Field(max_length=200)
+    date: Optional[str] = None
+    offsetDays: Optional[int] = Field(default=None, ge=0, le=3650)
+    phaseId: Optional[str] = None
+    done: bool = False
+    doneOn: Optional[str] = None
+
+
+class ProcessStep(BaseModel):
+    id: str
+    label: str = Field(max_length=300)
+    estimateMinutes: Optional[int] = Field(default=None, ge=1, le=24 * 60)
+    facet: Optional[Facet] = None
+
+
+class StepGroup(BaseModel):
+    """Steps done in order (one then the next) or in any order (a set to tick off)."""
+
+    id: str
+    ordered: bool = True
+    steps: list[ProcessStep] = Field(default_factory=list)
+
+
+class ProcessLink(BaseModel):
+    """How a process relates to another: this one comes `before` or `after` it (ordered), or `with` it (unordered: related, or done at the same time)."""
+
+    otherId: str
+    relation: ProcessRelation
+
+
+class Process(BaseModel):
+    """A repeatable recipe of steps, for several phases and facets, which may need milestones first."""
+
+    id: str
+    title: str = Field(max_length=200)
+    description: str = Field(default="", max_length=2000)
+    phaseIds: list[str] = Field(default_factory=list)
+    facets: list[Facet] = Field(default_factory=list)
+    requiredMilestoneIds: list[str] = Field(default_factory=list)
+    groups: list[StepGroup] = Field(default_factory=list)
+    links: list[ProcessLink] = Field(default_factory=list)
+
+    @model_validator(mode="after")
+    def _check(self) -> "Process":
+        if any(link.otherId == self.id for link in self.links):
+            raise ValueError("a process cannot be linked to itself")
+        return self
+
+
+class Exercise(BaseModel):
+    """A writing drill: a prompt, a length, how often it is suggested and how often it has been done."""
+
+    id: str
+    title: str = Field(max_length=200)
+    description: str = Field(default="", max_length=2000)  # the prompt
+    durationMinutes: int = Field(default=15, ge=1, le=24 * 60)
+    facets: list[Facet] = Field(default_factory=list)
+    phaseIds: list[str] = Field(default_factory=list)
+    perWeek: Optional[int] = Field(default=None, ge=1, le=21)
+    timesDone: int = Field(default=0, ge=0)
+    lastDone: Optional[str] = None
 
 
 class Planner(BaseModel):
@@ -1429,6 +1519,11 @@ class Planner(BaseModel):
     templates: list[ShiftTemplate] = Field(default_factory=list)
     restDays: list[RestRange] = Field(default_factory=list)
     reminderLeadMinutes: Optional[int] = Field(default=None, ge=0, le=240)
+    # What the project is made of: the phases that build to its results, the milestones along them, the processes and exercises it uses.
+    phases: list[Phase] = Field(default_factory=list)
+    milestones: list[Milestone] = Field(default_factory=list)
+    processes: list[Process] = Field(default_factory=list)
+    exercises: list[Exercise] = Field(default_factory=list)
 
 
 # ---------------------------------------------------------------------------

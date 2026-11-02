@@ -13,6 +13,8 @@ import { newId } from './ids'
 
 export type FacetHues = Record<Facet, number>
 export const DEFAULT_HUES: FacetHues = { outline: 212, plot: 272, draft: 32, revision: 168, project: 340 }
+// The CSS variables a console sets for the facets' colours (--wr-f-<facet>): each hue at the facet colours' own saturation and lightness.
+export const facetHueVars = (hues: FacetHues): Record<string, string> => Object.fromEntries(FACETS.map(f => [`--wr-f-${f}`, `hsl(${hues[f]}, ${FACET_COLOR.s}%, ${FACET_COLOR.l}%)`]))
 
 // The gear in the console's title bar that opens and closes the settings.
 export function SettingsButton({ open, onToggle }: { open: boolean; onToggle: () => void }) {

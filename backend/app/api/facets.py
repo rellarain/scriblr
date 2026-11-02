@@ -71,11 +71,23 @@ def _check_dates(planner: Planner) -> None:
             days.append(item.addedOn)
     for rest in planner.restDays:
         days.extend([rest.start, rest.end])
+    for phase in planner.phases:
+        days.extend(d for d in (phase.start, phase.end) if d)
+    for milestone in planner.milestones:
+        days.extend(d for d in (milestone.date, milestone.doneOn) if d)
+    days.extend(e.lastDone for e in planner.exercises if e.lastDone)
     for day in days:
         try:
             date.fromisoformat(day)
         except ValueError:
             raise HTTPException(status_code=422, detail=f"not a date (YYYY-MM-DD): {day}")
+    for phase in planner.phases:
+        if phase.start and phase.end and phase.end < phase.start:
+            raise HTTPException(status_code=422, detail=f"phase {phase.title!r} ends before it starts")
+    for kind, items in (('phase', planner.phases), ('milestone', planner.milestones), ('process', planner.processes), ('exercise', planner.exercises)):
+        ids = [i.id for i in items]
+        if len(ids) != len(set(ids)):
+            raise HTTPException(status_code=422, detail=f"two {kind}s share an id")
 
 
 @project_router.get("/planner", response_model=Planner)

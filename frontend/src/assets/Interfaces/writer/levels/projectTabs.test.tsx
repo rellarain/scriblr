@@ -42,7 +42,7 @@ describe('the Project tabs', () => {
   it('are plot, outline, schedule (with the analytics) and history, ending with Settings and Help', () => {
     render(<Harness size="max" />)
     const names = within(screen.getByRole('toolbar', { name: 'Tabs' })).getAllByRole('button').map(b => b.getAttribute('aria-label'))
-    expect(names).toEqual(['Plot', 'Outline', 'Schedule', 'History', 'Settings', 'Help'])
+    expect(names).toEqual(['Plot', 'Outline', 'Schedule', 'Project', 'History', 'Settings', 'Help'])
   })
 
   it('open the plot editor, full width, at Max, and the outline beside it from its tab', async () => {

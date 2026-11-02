@@ -17,7 +17,7 @@ The words in the app are part of the design. They are short, plain and in the wr
 
 | Where | Text |
 |---|---|
-| Dash | "Writer Dashboard"; tabs Schedule, Readers, Scratchpad, Project template, Settings, Help |
+| Dash | "Writer Dashboard"; tabs Schedule, Readers, Scratchpad, Project, Settings, Help |
 | Dash, empty | "Nothing here yet." "No projects yet. Create one below." "No notes yet. Add one to jot down a thought." |
 | Search, no match | "Nothing matches." |
 | A tab at Max | "Pick a tab above to open it." |

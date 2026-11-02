@@ -280,6 +280,29 @@
   .wrTaskActions { display: flex; justify-content: flex-end; }
   .wrTaskNode { align-self: flex-start; display: inline-flex; align-items: center; gap: var(--space-3); }
   .wrTaskList { position: relative; display: flex; flex-direction: column; }
+  // The Project console (plan/): a phase, a process, an exercise or a routine is a card that opens in place (like a task), on the tile's fill-4 card colour.
+  .wrPlanOwner { flex: 0 1 12em; min-width: 6em; }
+  .wrPlanCard { margin-bottom: var(--space-3); border-radius: var(--radius-button); background: var(--wr-fill-4); font-size: var(--text-field); display: flex; flex-direction: column;
+    &--done .wrPlanTitle b { text-decoration: line-through; color: var(--level-ink-soft); }
+    &--active { box-shadow: inset 3px 0 0 var(--level-ink); }
+    &--blocked { box-shadow: inset 3px 0 0 var(--level-ink-soft); }
+    > .wrTaskBar { margin: 0 var(--space-4) var(--space-4); } }
+  .wrPlanHead { display: flex; align-items: center; gap: var(--space-4); width: 100%; padding: var(--space-4); background: transparent; border: 0; color: inherit; font: inherit; text-align: left; cursor: pointer; &:hover { background: var(--level-wash); } }
+  .wrPlanTitle { flex: 1 1 auto; min-width: 0; display: flex; flex-direction: column; gap: var(--space-2); b { overflow-wrap: anywhere; }
+    small { color: var(--level-ink-soft); font-size: var(--text-ui); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; } }
+  .wrPlanStatus { &--done { background: var(--level-ink); color: var(--wr-fill-4); } &--planned { border-style: dashed; } }
+  .wrPlanPct { font-size: var(--text-ui); font-weight: 700; color: var(--level-ink-soft); }
+  .wrPlanBody { display: flex; flex-direction: column; gap: var(--space-4); padding: 0 var(--space-4) var(--space-4); textarea { resize: vertical; } }
+  .wrPlanMilestones, .wrPlanGroups, .wrPlanLinks, .wrPlanRequires { display: flex; flex-direction: column; gap: var(--space-3); }
+  .wrPlanMilestone { display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-3); .wrField { flex: 1 1 9em; min-width: 0; } input[type='date'] { flex: 0 1 11em; } }
+  .wrPlanLoose { margin-top: var(--space-4); }
+  .wrPlanAdd { display: flex; align-items: center; gap: var(--space-3); .wrField { flex: 1 1 auto; min-width: 0; } }
+  .wrPlanSummaryRow { display: flex; flex-direction: column; gap: var(--space-2); padding-bottom: var(--space-4); }
+  .wrStepGroup { display: flex; flex-direction: column; gap: var(--space-3); padding: var(--space-4); border: 1px solid var(--level-line); border-radius: var(--radius-button); }
+  .wrStepGroupHead { display: flex; align-items: center; justify-content: space-between; gap: var(--space-3); }
+  .wrStepRow { display: flex; align-items: center; gap: var(--space-3); .wrField { flex: 1 1 auto; min-width: 0; } .wrSchedNum { flex: 0 0 5em; width: 5em; } }
+  .wrStepNo { flex: 0 0 1.4em; text-align: center; color: var(--level-ink-soft); font-size: var(--text-ui); }
+  .wrWork > .wrFold { padding: 0 var(--space-3); }
   .wrTaskDragging { opacity: 0.6; }
 
   // The priority marker: a flag, filled for High, half-filled for Medium, dashed for Low and faint for None; pressed it opens into the four to pick from.

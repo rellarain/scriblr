@@ -1,4 +1,4 @@
-import { CalendarIcon, ClockIcon, GearIcon, HelpIcon, OutlineIcon, PlotIcon } from '../../../icons'
+import { CalendarIcon, ClockIcon, FolderIcon, GearIcon, HelpIcon, OutlineIcon, PlotIcon } from '../../../icons'
 import WorkspaceSaveCluster from './WorkspaceSaveCluster'
 import { SHELF_COMPONENTS } from '../consoleDefs'
 import { Placeholder } from '../shared'
@@ -8,13 +8,15 @@ import ProjectOutline from '../ProjectOutline'
 import { nearestOfKind } from '../outlineTree'
 import type { HistoryScope, WriterWorkspace } from '../useWriterWorkspace'
 import { bookRows, categoryRows, plotCounts } from '../tiles/tileData'
+import ProjectConsole from '../plan/ProjectConsole'
+import { ProjectSummary } from '../plan/ProjectSummary'
 import ScheduleConsole from '../schedule/ScheduleConsole'
 import { ScheduleSummary } from '../schedule/ScheduleSummary'
 import HelpArticles from './HelpArticles'
 import { useTabbedLevel, type LevelTab } from './LevelTabs'
 
 export const PROJECT_HELP_NAMES = ['project', 'shelf', 'project console']
-const PROJECT_HELP_FALLBACK = 'The Project level is everything about the open project as a whole: its plot, its outline of series and books, schedule, history and analytics, and its own settings.'
+const PROJECT_HELP_FALLBACK = 'The Project level is everything about the open project as a whole: its plot, its outline of series and books, schedule, its project plan (phases, goals, processes, exercises, routines and tasks), history and analytics, and its own settings.'
 
 const body = (key: string) => SHELF_COMPONENTS.find(c => c.key === key)?.body
 const label = (key: string) => SHELF_COMPONENTS.find(c => c.key === key)?.label ?? ''
@@ -73,6 +75,15 @@ export function projectTabs(w: WriterWorkspace): LevelTab[] {
         const id = w.activeProjectId
         if (!id) return <p className="wrMuted">Open a project to plan its schedule.</p>
         return c.size === 'max' ? <ScheduleConsole scope="project" titleSlot={c.titleSlot} projectIds={[id]} titles={{ [id]: w.activeProject?.title ?? 'Project' }} onOpenNode={(tree, node) => openNode(w, tree, node)} /> : <ScheduleSummary projectIds={[id]} />
+      },
+    },
+    {
+      id: 'plan', label: 'Project', Icon: FolderIcon, fill: true, surface: false, titleSlot: true, iconSize: 20,
+      render: c => {
+        const id = w.activeProjectId
+        if (!id) return <p className="wrMuted">Open a project to plan it.</p>
+        const titles = { [id]: w.activeProject?.title ?? 'Project' }
+        return c.size === 'max' ? <ProjectConsole scope="project" titleSlot={c.titleSlot} projectIds={[id]} titles={titles} /> : <ProjectSummary projectIds={[id]} titles={titles} />
       },
     },
     { id: 'history', label: 'History', Icon: ClockIcon, render: () => placeholder('projectHistory') },

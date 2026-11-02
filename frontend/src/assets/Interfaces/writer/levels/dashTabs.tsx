@@ -4,15 +4,16 @@ import { flushSettings } from '../../../../settings/settingsStore'
 import ThemeSettingsPanel from '../../../../theme/ThemeSettingsPanel'
 import { Scratchpad } from '../Dashboard'
 import ReadersPanel from '../ReadersPanel'
+import ProjectConsole from '../plan/ProjectConsole'
+import { ProjectSummary } from '../plan/ProjectSummary'
 import ScheduleConsole from '../schedule/ScheduleConsole'
 import { ScheduleSummary } from '../schedule/ScheduleSummary'
-import { Placeholder } from '../shared'
 import type { WriterWorkspace } from '../useWriterWorkspace'
 import HelpArticles from './HelpArticles'
 import { useTabbedLevel, type LevelTab } from './LevelTabs'
 
 export const DASH_HELP_NAMES = ['dashboard', 'dash', 'shelves']
-const DASH_HELP_FALLBACK = 'The Dash is your desk across every project: the schedule (goals, the agenda, the backlog and analytics) and a scratchpad. Pick a tab to open it; at full size each tab opens as a tile.'
+const DASH_HELP_FALLBACK = 'The Dash is your desk across every project: the schedule (goals, the agenda, the backlog and analytics), the project (its phases, goals and work, and the template) and a scratchpad. Pick a tab to open it; at full size each tab opens as a tile.'
 
 export function dashTabs(w: WriterWorkspace): LevelTab[] {
   return [
@@ -27,7 +28,14 @@ export function dashTabs(w: WriterWorkspace): LevelTab[] {
     },
     { id: 'readers', label: 'Readers', Icon: PeopleIcon, render: () => <ReadersPanel /> },
     { id: 'scratchpad', label: 'Scratchpad', Icon: PencilIcon, searchable: true, render: c => <Scratchpad bare query={c.query} /> },
-    { id: 'template', label: 'Project template', Icon: FolderIcon, render: () => <Placeholder title="Project Template" body="Manage the master project template here." /> },
+    {
+      id: 'project', label: 'Project', Icon: FolderIcon, fill: true, surface: false, titleSlot: true, iconSize: 20,
+      render: c => {
+        const ids = w.projects.map(p => p.projectId)
+        const titles = Object.fromEntries(w.projects.map(p => [p.projectId, p.title]))
+        return c.size === 'max' ? <ProjectConsole scope="dash" titleSlot={c.titleSlot} projectIds={ids} titles={titles} /> : <ProjectSummary projectIds={ids} titles={titles} />
+      },
+    },
     { id: 'settings', label: 'Settings', Icon: GearIcon, end: true, surface: true, render: () => <ThemeSettingsPanel /> },
     { id: 'help', label: 'Help', Icon: HelpIcon, render: () => <HelpArticles names={DASH_HELP_NAMES} fallback={DASH_HELP_FALLBACK} /> },
   ]

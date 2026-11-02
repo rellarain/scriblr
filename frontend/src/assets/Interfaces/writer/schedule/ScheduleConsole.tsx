@@ -3,11 +3,10 @@ import { useCallback, useEffect, useMemo, useRef, useState, type CSSProperties }
 import { bestStreak, streakUntil } from '../../../../lib/activityCalendar'
 import { FACETS, dayValue, emptyPlanner, type Facet, type Goal, type Planner } from '../../../../lib/facets'
 import { carryForward, endedItems } from '../../../../lib/carryForward'
-import { currentOf } from '../../../../lib/goalFacts'
 import { toIcs } from '../../../../lib/ics'
 import { migrateLegacy } from '../../../../lib/legacySchedule'
 import { getKv } from '../../../../settings/settingsStore'
-import { goalProgress, addDays, weekOf } from '../../../../lib/projection'
+import { addDays, weekOf } from '../../../../lib/projection'
 import { shiftOccurrences } from '../../../../lib/recurrence'
 import { slotOfDate } from '../../../../lib/ribbon'
 import type { WeekStart } from '../../../../lib/scheduleCalendar'
@@ -21,9 +20,10 @@ import { Backlog } from './Backlog'
 import { GoalsCard, type OwnedProgress } from './GoalsCard'
 import { ScheduleCard, type ScheduleOwner, type TicksApi } from './ScheduleCard'
 import { ICON_PX } from './IconBtn'
-import { DEFAULT_HUES, ScheduleSettings, SettingsButton, type FacetHues } from './ScheduleSettings'
+import { DEFAULT_HUES, ScheduleSettings, SettingsButton, facetHueVars, type FacetHues } from './ScheduleSettings'
 import type { TargetOption } from './ShiftPanel'
 import { getTicks, putTicks } from './scheduleApi'
+import { ACCOUNT_OWNER, ownedProgress, useOwners } from './useOwners'
 import { useProjectFacts } from './useProjectFacts'
 import { requestReminderPermission, useShiftEndReminders, useShiftReminders } from './useShiftReminders'
 import { localToday, useSchedule } from './useSchedule'
@@ -33,7 +33,7 @@ import type { SplitNode } from '../../../../components/tiles/splitTree'
 // grid (drag a title bar to move one, a divider to resize). At the Project level it is that project's; at the Dash it is every project's added
 // together, with the account's own goals, shifts and routines too.
 
-export const ACCOUNT_OWNER = 'account'
+export { ACCOUNT_OWNER }
 // Where the tiles sit before any is moved: the goals beside the analytics on top, then the agenda with the backlog beside it.
 export const DEFAULT_TREE: SplitNode = {
   dir: 'col', ratio: 0.5,
@@ -43,7 +43,6 @@ export const DEFAULT_TREE: SplitNode = {
 
 // A project's colour: its hue at the facet colours' own saturation and lightness (so it reads on the tile for every hue, as they do).
 const projectColor = (hue: number): string => `hsl(${hue}, ${FACET_COLOR.s}%, ${FACET_COLOR.l}%)`
-const hueVars = (hues: FacetHues) => Object.fromEntries(FACETS.map(f => [`--wr-f-${f}`, `hsl(${hues[f]}, ${FACET_COLOR.s}%, ${FACET_COLOR.l}%)`]))
 
 // `titleSlot` is the element in the console's tab-tile title bar where the Settings button and the rail of the console's tiles go (null while it is not drawn yet); without one (undefined) the button is the console's first row, with the rail above the tiles.
 // `onOpenNode` opens a node a task is about in the Writer (a project's own console passes it).
@@ -57,7 +56,6 @@ export default function ScheduleConsole({ scope, projectIds, titles, titleSlot, 
   const facts = useProjectFacts(projectIds)
   const [weekStart, setWeekStart] = useStoredState<WeekStart>('scriblr.weekStart', 'monday')
   const [hues, setHues] = useStoredState<FacetHues>('scriblr.writer.facetHues', DEFAULT_HUES)
-  const [account, setAccount] = useStoredState<Planner>('scriblr.writer.planner.account', emptyPlanner())
   const [accountTicks, setAccountTicks] = useStoredState<Record<string, string[]>>('scriblr.writer.ticks.account', {})
   const [projectTicks, setProjectTicks] = useState<Record<string, string[]>>({})
   const [nowSlot, setNowSlot] = useState(() => slotOfDate(new Date()))
@@ -65,10 +63,7 @@ export default function ScheduleConsole({ scope, projectIds, titles, titleSlot, 
   const today = schedule.loading ? localToday() : schedule.facets.today
 
   // ---- who owns what ----
-  const owners: ScheduleOwner[] = useMemo(() => {
-    const list: ScheduleOwner[] = projectIds.map(id => ({ id, label: titles[id] ?? 'Project', projectId: id, planner: schedule.planners[id] ?? emptyPlanner(), setPlanner: (p: Planner) => schedule.setPlanner(id, p) }))
-    return scope === 'dash' ? [{ id: ACCOUNT_OWNER, label: 'Account', projectId: null, planner: { ...emptyPlanner(), ...account }, setPlanner: setAccount }, ...list] : list
-  }, [scope, projectIds, titles, schedule.planners, schedule.setPlanner, account, setAccount])  // eslint-disable-line react-hooks/exhaustive-deps
+  const { owners, account, setAccount } = useOwners(scope, projectIds, titles, schedule)
   const goalOwner = owners[0]
   // The one project shown (in the Agenda and the Backlog together), and where a new shift or task goes: the last one it was made for.
   const [shownRaw, setShown] = useStoredState<string | null>(`scriblr.writer.schedule.project.${scope}`, null)
@@ -88,7 +83,7 @@ export default function ScheduleConsole({ scope, projectIds, titles, titleSlot, 
     setMoved(true)
     const m = migrateLegacy(getKv('scriblr.writer.tasks'), getKv('scriblr.writer.routines'), getKv('scriblr.writer.goals'), schedule.facets.today)
     if (!m) return
-    setAccount({ ...emptyPlanner(), ...account, items: [...account.items, ...m.planner.items], routines: [...account.routines, ...m.planner.routines], goals: [...account.goals, ...m.planner.goals] })
+    setAccount({ ...account, items: [...account.items, ...m.planner.items], routines: [...account.routines, ...m.planner.routines], goals: [...account.goals, ...m.planner.goals] })
     if (m.ticked.length) setAccountTicks({ ...accountTicks, [schedule.facets.today]: m.ticked })
   }, [scope, moved, schedule.loading]) // eslint-disable-line react-hooks/exhaustive-deps
 
@@ -134,13 +129,7 @@ export default function ScheduleConsole({ scope, projectIds, titles, titleSlot, 
   // ---- goals ----
   const { daily } = schedule.facets
   // Every owner's goals: at the Dash, the account's and each project's, each read against its own project (the account's against them all).
-  const progress: OwnedProgress[] = useMemo(
-    () => owners.flatMap(o => o.planner.goals.map(g => ({
-      ownerId: o.id,
-      p: goalProgress(g, { current: currentOf(g, o.id === ACCOUNT_OWNER ? facts : facts.filter(f => f.projectId === o.id), schedule.facets), daily, today, fallbackDeadline: o.planner.timelineEnd }),
-    }))),
-    [owners, facts, schedule.facets, daily, today],
-  )
+  const progress: OwnedProgress[] = useMemo(() => ownedProgress(owners, facts, schedule.facets, today), [owners, facts, schedule.facets, today])
   // A line per facet: the account's own total goal for it, or else the project goals' totals added together.
   const totals = useMemo(() => {
     const out: Partial<Record<Facet, FacetGoalFacts>> = {}
@@ -252,7 +241,7 @@ export default function ScheduleConsole({ scope, projectIds, titles, titleSlot, 
     },
   ]
   return (
-    <div className="wrSchedConsole" style={hueVars(hues) as CSSProperties}>
+    <div className="wrSchedConsole" style={facetHueVars(hues) as CSSProperties}>
       {titleSlot === undefined ? <div className="wrSchedConsoleBar">{settingsButton}</div> : titleSlot && createPortal(<><span ref={setRailHost} className="wrSchedRail" />{settingsButton}</>, titleSlot)}
       {settingsOpen && (
         <ScheduleSettings

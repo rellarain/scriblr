@@ -1,5 +1,5 @@
 import { useState, type DragEvent, type HTMLAttributes, type ReactNode } from 'react'
-import { FACETS, FACET_LABEL, PRIORITIES, PRIORITY_LABEL, type Facet, type PlanItem, type TaskPriority } from '../../../../lib/facets'
+import { FACETS, FACET_LABEL, PRIORITIES, PRIORITY_LABEL, type Facet, type Phase, type PlanItem, type TaskPriority } from '../../../../lib/facets'
 import { formatEstimate, type QuickTarget } from '../../../../lib/quickAdd'
 import type { Progress } from '../../../../lib/taskProgress'
 import { newId } from './ids'
@@ -39,6 +39,9 @@ export interface TaskRowProps {
   reorderGrip?: HTMLAttributes<HTMLElement>
   // The task can be dragged onto a shift (a task that is not on one yet).
   placeable?: boolean
+  // The phase the task builds to: its name beside the task, and the phases to choose from when it is opened.
+  phaseTitle?: string
+  phases?: Phase[]
 }
 
 function PriorityMark({ value, name, onPick }: { value: TaskPriority; name: string; onPick: (p: TaskPriority) => void }) {
@@ -81,6 +84,7 @@ export function TaskRow(p: TaskRowProps) {
   if (item.carried) facts.push(<span key="carried" className="wrSchedTag">Carried</span>)
   if (item.dueDate) facts.push(<span key="due" className="wrTaskFact" title="Due">due {item.dueDate === today ? 'today' : dayLabel(item.dueDate)}</span>)
   if (item.estimateMinutes) facts.push(<span key="est" className="wrTaskFact" title="Estimate">{formatEstimate(item.estimateMinutes)}</span>)
+  if (p.phaseTitle) facts.push(<span key="phase" className="wrTaskFact" title="Phase">{p.phaseTitle}</span>)
   if (p.onShift) facts.push(<span key="shift" className="wrTaskFact">{p.running ? 'now · ' : ''}{p.onShift}</span>)
   if (p.from) facts.push(<span key="from" className="wrTaskFact">{p.fromColor && <i className="wrSchedDot" style={{ background: p.fromColor }} />}{p.from}</span>)
 
@@ -131,6 +135,16 @@ export function TaskRow(p: TaskRowProps) {
               </select>
             </label>
           </div>
+          {p.phases && p.phases.length > 0 && (
+            <div className="wrTaskGrid">
+              <label>Phase
+                <select className="wrField" value={item.phaseId && p.phases.some(x => x.id === item.phaseId) ? item.phaseId : ''} onChange={e => p.onChange({ phaseId: e.target.value || null })}>
+                  <option value="">No phase</option>
+                  {p.phases.map(x => <option key={x.id} value={x.id}>{x.title || 'Untitled phase'}</option>)}
+                </select>
+              </label>
+            </div>
+          )}
           {p.targets.length > 0 && (
             <div className="wrTaskGrid">
               <label>Node
