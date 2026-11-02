@@ -4,12 +4,15 @@ import { PHASE_KIND_FIELDS, applyToRows, editPhase, kindFromPhase, repeatPhase }
 import { phaseProgress } from '../../../../lib/phaseProgress'
 import { addMilestone, deletePhase, resetPhase, setPhaseLength, setPhaseStart, togglePhasePin } from '../../../../lib/planActions'
 import { rowsBelow, type PlanRow } from '../../../../lib/planRows'
+import { isDrafting, wordsCheck, type PhaseProjection } from '../../../../lib/planProjection'
+import type { GoalProgress } from '../../../../lib/projection'
 import { milestonesOf, moveMilestone, movePhase, phasesOnRowIndex } from '../../../../lib/planSequence'
 import { newId } from '../schedule/ids'
 import { IconBtn } from '../schedule/IconBtn'
 import { ArcIcon, BookmarkIcon, CheckIcon, ChevronDownIcon, ChevronRightIcon, CopyIcon, FlagIcon, GripIcon, LockIcon, RestoreIcon, StackIcon, TrashIcon, UnlockIcon } from '../../../icons'
 import { OUTSIDE_ROW, beginSeqDrag, endSeqDrag, seqDrag } from './dragSeq'
 import { MilestoneSection } from './MilestoneSection'
+import { ProjectionChip, wordsText } from './ProjectionChip'
 
 // A phase on a row: a card with its title, how far it is and its dates, which opens to be edited (its result, status, length, start) and holds its sections, the
 // milestones that are reached by the work placed in them. Drag it by its grip to put it in another place in its row; a section dropped on it goes last in it.
@@ -19,7 +22,7 @@ const range = (p: Phase): string => (p.start && p.end ? `${dayLabel(p.start)} to
 
 const FIELD_NAME: Record<string, string> = { title: 'title', result: 'result', description: 'description', lengthDays: 'length' }
 
-export function PhaseCard({ planner, setPlanner, today, phase, metGoals, rowKey, rows, ownerId, passNo, open, onOpen, showSections, onRefuse }: {
+export function PhaseCard({ planner, setPlanner, today, phase, metGoals, rowKey, rows, ownerId, passNo, projection, goals = [], open, onOpen, showSections, onRefuse }: {
   planner: Planner
   setPlanner: (p: Planner) => void
   today: string
@@ -31,6 +34,9 @@ export function PhaseCard({ planner, setPlanner, today, phase, metGoals, rowKey,
   ownerId: string
   // "Revision 2": the pass number among the phases of its kind on its row.
   passNo?: number
+  // When the work left in it would be done, and (for a drafting phase) the goals to read the words left from.
+  projection?: PhaseProjection
+  goals?: GoalProgress[]
   open: boolean
   onOpen: (open: boolean) => void
   // The sections are always shown (the Sequence view), or only while the card is open.
@@ -44,6 +50,7 @@ export function PhaseCard({ planner, setPlanner, today, phase, metGoals, rowKey,
   const sections = milestonesOf(planner, phase.id)
   const kind = planner.phaseKinds.find(k => k.id === phase.kindId)
   const title = phase.title || 'Untitled phase'
+  const words = isDrafting(planner, phase.id) ? wordsCheck(goals, phase) : null
   const patch = (change: Partial<Phase>) => setPlanner(editPhase(planner, phase.id, change))
   // The rows under this phase's row that it can be stamped onto (a project phase: the books and the chapters; a book phase: its chapters), without the ones that have a phase of this name already.
   const targets = phase.level === 'chapter' ? [] : (['book', 'chapter'] as const).flatMap(l => rowsBelow(rows, rowKey, l))
@@ -93,6 +100,8 @@ export function PhaseCard({ planner, setPlanner, today, phase, metGoals, rowKey,
           {open ? <ChevronDownIcon size={20} /> : <ChevronRightIcon size={20} />}
         </button>
       </div>
+      {(projection?.projection.minutes ?? 0) > 0 && <div className="wrPlanProj"><ProjectionChip p={projection?.projection} /></div>}
+      {words && <p className="wrHint wrPlanWords">{wordsText(words)}</p>}
       {prog.pct !== null && <span className="wrTaskBar" role="progressbar" aria-label={`${title} progress`} aria-valuemin={0} aria-valuemax={100} aria-valuenow={prog.pct}><i style={{ width: `${prog.pct}%` }} /></span>}
       {open && (
         <div className="wrPlanBody">
@@ -148,7 +157,7 @@ export function PhaseCard({ planner, setPlanner, today, phase, metGoals, rowKey,
       )}
       {(open || showSections) && (
         <div className="wrSections">
-          {sections.map(m => <MilestoneSection key={m.id} planner={planner} setPlanner={setPlanner} today={today} milestone={m} rowKey={rowKey} ownerId={ownerId} onRefuse={onRefuse} />)}
+          {sections.map(m => <MilestoneSection key={m.id} planner={planner} setPlanner={setPlanner} today={today} milestone={m} rowKey={rowKey} ownerId={ownerId} onRefuse={onRefuse} projection={projection?.milestones.find(x => x.milestone.id === m.id)?.projection} />)}
           <IconBtn Icon={FlagIcon} label={`New milestone on ${title}`} onClick={() => setPlanner(addMilestone(planner, phase.id, 'New milestone', today, newId).planner)} />
         </div>
       )}

@@ -394,3 +394,60 @@ describe('repeating a phase and applying it to rows', () => {
     expect(screen.queryByRole('button', { name: 'Apply Scene pass to other rows' })).toBeNull()
   })
 })
+
+describe('the projection', () => {
+  // Two hours every weekday from today (a Monday), for the drafting.
+  const weekdays = { kind: 'weekly' as const, every: 1, unit: 'week' as const, days: [0, 1, 2, 3, 4], rangeMax: null, anchor: TODAY, until: null }
+  const shift = { id: 's1', title: 'Writing', facet: 'draft' as const, date: TODAY, startSlot: 54, endSlot: 66, targetNodeId: null, targetTree: null, target: null, recurrence: weekdays, pauses: [], skipped: [], overrides: {} }
+  const scheduled = (): Planner => ({
+    ...fixture(),
+    shifts: [shift],
+    items: [
+      newTask('t1', 'Write the outline', null, { milestoneId: 'm1', phaseId: 'plan', estimateMinutes: 240, facet: 'draft' }),
+      newTask('t2', 'Loose task', null),
+    ],
+  })
+
+  it('says on a milestone, a phase and a row what is left to do and when it would be done', async () => {
+    const user = userEvent.setup()
+    render(<Harness initial={scheduled()} />)
+    await user.click(screen.getByRole('button', { name: 'Sequence view' }))
+    // Four hours is two shifts of two hours: Monday and Tuesday, ending on the 3rd, before the milestone's 6th.
+    const milestone = within(screen.getByRole('region', { name: 'Milestone Outline done' }))
+    expect(milestone.getByText('4 h · 0.4 wk · ends Nov 3 · ▲ Ahead 3d')).toBeTruthy()
+    expect(within(screen.getByRole('region', { name: 'Planning' })).getAllByText(/^4 h · /).length).toBe(2) // the phase's, and its milestone's
+    expect(within(screen.getByRole('region', { name: 'Saga row' })).getAllByText(/^4 h · /).length).toBeGreaterThan(0)
+    expect(milestone.getByText('4 h · 0.4 wk · ends Nov 3 · ▲ Ahead 3d').getAttribute('aria-label')).toMatch(/4 h of work left; 0.4 wk of the time scheduled in a week; 2 working days and 2 shifts of the schedule; it ends on Nov 3; 3 days before the plan's Nov 6\./)
+  })
+
+  it('shows work with no estimate by the average, and no shifts scheduled when there are none', async () => {
+    const user = userEvent.setup()
+    render(<Harness />)
+    await user.click(screen.getByRole('button', { name: 'Sequence view' }))
+    expect(within(screen.getByRole('region', { name: 'Milestone Outline done' })).getByText('30 min · no shifts scheduled')).toBeTruthy()
+  })
+
+  it('says behind when the work runs past the day the plan gives it, and draws the tail on the chart', () => {
+    const heavy = scheduled()
+    render(<Harness initial={{ ...heavy, items: [newTask('t1', 'Big', null, { milestoneId: 'm1', phaseId: 'plan', estimateMinutes: 2400, facet: 'draft' })] }} />)
+    // Twenty hours is ten shifts: two weeks, ending on the 13th against the phase's 11th.
+    expect(screen.getAllByText(/▼ Behind/).length).toBeGreaterThan(0)
+    expect(document.querySelector('.wrTimelineTail')).toBeTruthy()
+  })
+
+  it('gives a drafting phase the words left against the recent pace as a line of its own', () => {
+    const goals = [{
+      goal: { id: 'g', facet: 'draft' as const, scope: 'project' as const, nodeId: null, kind: null, daily: null, weekly: null, total: 80000, deadline: null },
+      current: 30000, pct: 38, today: 0, week: 0, pace: 600, deadline: null, daysLeft: null, needed: null, finishes: '2027-01-24', status: null,
+    }]
+    const planner = scheduled()
+    function WithGoals() {
+      const [p, set] = useState(planner)
+      latest = p
+      return <PlanTimeline ownerId="p1" planner={p} setPlanner={set} today={TODAY} metGoals={new Set()} goals={goals} rows={rows} />
+    }
+    render(<WithGoals />)
+    expect(screen.getByText('50,000 words left of 80,000; at 600 a day, about Jan 24.')).toBeTruthy() // the Planning phase has Draft work
+    expect(screen.queryAllByText(/words left of/)).toHaveLength(1) // the Writing phase has none
+  })
+})

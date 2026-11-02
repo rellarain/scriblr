@@ -2,6 +2,8 @@ import { useEffect, useMemo, useRef, useState, type ReactNode, type UIEvent } fr
 import type { Phase, PhaseLevel, Planner } from '../../../../lib/facets'
 import { newPass, passNumbers } from '../../../../lib/phaseKinds'
 import { addPhase, deletePhase } from '../../../../lib/planActions'
+import { projectPlan } from '../../../../lib/planProjection'
+import type { GoalProgress } from '../../../../lib/projection'
 import { phasesOffRows, phasesOnRow, type PlanRow } from '../../../../lib/planRows'
 import { PX_PER_DAY, ZOOMS, ZOOM_LABEL, rulerMarks, timelineRange, type Zoom, pct } from '../../../../lib/planTimeline'
 import { useWheelScrollX } from '../../../../lib/useWheelScrollX'
@@ -12,6 +14,7 @@ import { BookFaceIcon, CalendarIcon, ChevronDownIcon, ChevronRightIcon, CloseIco
 import { PhaseCard } from './PhaseCard'
 import { PlanLane } from './PlanLane'
 import { KindsPanel } from './KindsPanel'
+import { ProjectionChip } from './ProjectionChip'
 import { ProjectDates } from './ProjectDates'
 
 // The Plan tile: the project's phases on rows, a row for the project, for each of its books and for their chapters. In the Dates view each row has a lane on a
@@ -29,12 +32,14 @@ function PlanScroll({ track, follow, children }: { track: (el: HTMLElement | nul
 const ZOOM_ICON = { month: ViewMonthIcon, week: ViewWeekIcon, day: ViewDayIcon }
 const LEVEL_ICON: Record<PhaseLevel, typeof FolderIcon> = { project: FolderIcon, book: BookFaceIcon, chapter: PageIcon }
 
-export function PlanTimeline({ ownerId, planner, setPlanner, today, metGoals, rows }: {
+export function PlanTimeline({ ownerId, planner, setPlanner, today, metGoals, goals = [], rows }: {
   ownerId: string
   planner: Planner
   setPlanner: (p: Planner) => void
   today: string
   metGoals: ReadonlySet<string>
+  // The goals with their progress, for the words left in a drafting phase.
+  goals?: GoalProgress[]
   rows: PlanRow[]
 }) {
   const [view, setView] = useStoredState<View>('scriblr.writer.plan.view', 'dates')
@@ -46,6 +51,8 @@ export function PlanTimeline({ ownerId, planner, setPlanner, today, metGoals, ro
   const scrollers = useRef(new Set<HTMLElement>())
   const numbers = useMemo(() => passNumbers(planner), [planner])
   const range = timelineRange(planner)
+  // When it would be done, from the work left and the time scheduled for it (the plan itself is not changed).
+  const projection = useMemo(() => projectPlan(planner, rows, today), [planner, rows, today])
   const width = range ? Math.max(120, range.days * PX_PER_DAY[zoom]) : 0
 
   // Every lane scrolls with the ruler: one chart, a lane for each row.
@@ -113,6 +120,7 @@ export function PlanTimeline({ ownerId, planner, setPlanner, today, metGoals, ro
                 <b>{row.title}</b>
                 <small>{phases.length === 0 ? 'no phases' : `${phases.length} ${phases.length === 1 ? 'phase' : 'phases'}`}</small>
               </button>
+              <ProjectionChip p={projection.get(row.key)?.projection} />
               {planner.phaseKinds.length > 0 && (
                 <select className="wrField wrPassPick" aria-label={`New pass on ${row.title}`} value="" onChange={e => { if (e.target.value) pass(row, e.target.value) }}>
                   <option value="">New pass of…</option>
@@ -125,13 +133,13 @@ export function PlanTimeline({ ownerId, planner, setPlanner, today, metGoals, ro
               <>
                 {view === 'dates' && range && phases.length > 0 && (
                   <PlanScroll track={track} follow={follow}>
-                    <PlanLane planner={planner} setPlanner={setPlanner} today={today} phases={phases} range={range} width={width} rowTitle={row.title} onOpen={open} />
+                    <PlanLane planner={planner} setPlanner={setPlanner} today={today} phases={phases} range={range} width={width} rowTitle={row.title} onOpen={open} projected={projection.get(row.key)} />
                   </PlanScroll>
                 )}
                 {phases.map(ph => (
                   <PhaseCard
                     key={ph.id} planner={planner} setPlanner={setPlanner} today={today} phase={ph} metGoals={metGoals} rowKey={row.key} rows={rows} ownerId={ownerId}
-                    passNo={numbers.get(ph.id)} open={openId === ph.id} onOpen={o => setOpenId(o ? ph.id : null)} showSections={view === 'sequence'} onRefuse={setMessage}
+                    projection={projection.get(row.key)?.phases.find(x => x.phase.id === ph.id)} goals={goals} passNo={numbers.get(ph.id)} open={openId === ph.id} onOpen={o => setOpenId(o ? ph.id : null)} showSections={view === 'sequence'} onRefuse={setMessage}
                   />
                 ))}
               </>

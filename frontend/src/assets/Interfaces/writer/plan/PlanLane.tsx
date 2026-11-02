@@ -2,7 +2,8 @@ import { useEffect, useRef, useState, type KeyboardEvent, type PointerEvent as R
 import type { Phase, Planner } from '../../../../lib/facets'
 import { tickMilestone } from '../../../../lib/planEdit'
 import { setPhaseLength } from '../../../../lib/planActions'
-import { barOf, daysForPx, dropIndex, pct, restBars, todayPct, type TimelineRange } from '../../../../lib/planTimeline'
+import type { RowProjection } from '../../../../lib/planProjection'
+import { barOf, daysForPx, dropIndex, pct, restBars, todayPct, widthPct, type TimelineRange } from '../../../../lib/planTimeline'
 import { milestonesOf, movePhase } from '../../../../lib/planSequence'
 import { addDays, daysBetween } from '../../../../lib/projection'
 import { FlagIcon } from '../../../icons'
@@ -15,7 +16,7 @@ const dayLabel = (d: string): string => new Date(`${d}T00:00:00Z`).toLocaleDateS
 
 interface Drag { id: string; edge: 'move' | 'end'; x: number; delta: number }
 
-export function PlanLane({ planner, setPlanner, today, phases, range, width, rowTitle, onOpen }: {
+export function PlanLane({ planner, setPlanner, today, phases, range, width, rowTitle, onOpen, projected }: {
   planner: Planner
   setPlanner: (p: Planner) => void
   today: string
@@ -25,6 +26,8 @@ export function PlanLane({ planner, setPlanner, today, phases, range, width, row
   width: number
   rowTitle: string
   onOpen: (id: string) => void
+  // Where each phase of the row is projected to end.
+  projected?: RowProjection
 }) {
   const box = useRef<HTMLDivElement>(null)
   const [drag, setDrag] = useState<Drag | null>(null)
@@ -82,6 +85,13 @@ export function PlanLane({ planner, setPlanner, today, phases, range, width, row
         ))}
       </div>
       <div className="wrTimelineRow">
+        {projected?.phases.map(({ phase: p, projection }) => {
+          const end = p.end ?? p.start
+          if (!end || !projection.finish || projection.finish <= end || p.status === 'done') return null
+          const to = projection.finish > range.to ? range.to : projection.finish
+          if (end >= range.to) return null
+          return <i key={`tail-${p.id}`} className="wrTimelineTail" aria-hidden="true" title={`Projected to end on ${dayLabel(projection.finish)}`} style={{ left: `${pct(addDays(end, 1), range)}%`, width: `${widthPct(daysBetween(end, to), range)}%` }} />
+        })}
         {phases.map(p => {
           const start = p.start ?? p.end
           const stretched = drag?.id === p.id && drag.edge === 'end' && start ? addDays(p.end ?? start, drag.delta) : null

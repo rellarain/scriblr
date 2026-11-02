@@ -59,7 +59,7 @@ export default function ProjectConsole({ scope, projectIds, titles, titleSlot, c
       id: 'phases', title: 'Plan', Icon: ArcIcon,
       children: isTemplate
         ? <PhasesTile planner={planner} setPlanner={owner.setPlanner} today={today} metGoals={metGoals} relative />
-        : <PlanTimeline ownerId={owner.id} planner={planner} setPlanner={owner.setPlanner} today={today} metGoals={metGoals} rows={rows} />,
+        : <PlanTimeline ownerId={owner.id} planner={planner} setPlanner={owner.setPlanner} today={today} metGoals={metGoals} goals={progress.map(x => x.p)} rows={rows} />,
     },
     {
       id: 'goals', title: 'Goals', Icon: GoalIcon,

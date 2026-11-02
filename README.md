@@ -315,7 +315,7 @@ described, now stale, in `docs/data-model.md`).
   deliverable (`result`) reached by finishing the work placed in it, which is
   an item's or routine's `milestoneId` and a process's or exercise's
   `milestoneIds`; tickable by hand too; pure logic in `lib/planRows.ts`,
-  `planSequence.ts`, `planActions.ts`, `phaseKinds.ts` and `milestoneProgress.ts`; the Project console's **Plan** tile, `plan/PlanTimeline.tsx`, draws the rows, the phase cards and their milestone sections, with the kinds in `plan/KindsPanel.tsx`),
+  `planSequence.ts`, `planActions.ts`, `phaseKinds.ts` and `milestoneProgress.ts`; the Project console's **Plan** tile, `plan/PlanTimeline.tsx`, draws the rows, the phase cards and their milestone sections, with the kinds in `plan/KindsPanel.tsx`; `lib/planProjection.ts` projects when the work left would be done, from the time of each piece of work and the shifts scheduled for it),
   **processes** (`Process`: step groups done in order or in any order, several
   phases and facets, required milestones, and links to other processes that
   come before, after or go with it) and **exercises** (`Exercise`: a prompt, a

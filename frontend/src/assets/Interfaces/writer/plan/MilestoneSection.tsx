@@ -9,7 +9,9 @@ import { milestonesOf, moveMilestone, placeWork, type Moved, type WorkKind } fro
 import { IconBtn } from '../schedule/IconBtn'
 import { DRAG_ITEM } from '../schedule/TaskRow'
 import { CheckIcon, ChevronLeftIcon, ChevronRightIcon, GripIcon, LockIcon, PencilIcon, QueueIcon, ListIcon, RestoreIcon, TrashIcon, UnlockIcon, WrenchIcon } from '../../../icons'
+import type { Projection } from '../../../../lib/planProjection'
 import { OUTSIDE_ROW, beginSeqDrag, endSeqDrag, seqDrag } from './dragSeq'
+import { ProjectionChip } from './ProjectionChip'
 
 // A section of a phase: a milestone, a deliverable reached by finishing the work placed in it (tasks, processes, exercises, routines). It has its result, its date
 // (the days it ends on, which flow from the order and the lengths until it is pinned) and the work in it, which can be dragged to another section of the same row.
@@ -35,7 +37,7 @@ function WorkChip({ w, rowKey, from, onTake }: { w: WorkEntry; rowKey: string; f
   )
 }
 
-export function MilestoneSection({ planner, setPlanner, today, milestone: m, rowKey, ownerId, onRefuse }: {
+export function MilestoneSection({ planner, setPlanner, today, milestone: m, rowKey, ownerId, onRefuse, projection }: {
   planner: Planner
   setPlanner: (p: Planner) => void
   today: string
@@ -43,6 +45,8 @@ export function MilestoneSection({ planner, setPlanner, today, milestone: m, row
   rowKey: string
   ownerId: string
   onRefuse: (why: string) => void
+  // When the work left in it would be done.
+  projection?: Projection
 }) {
   const [over, setOver] = useState<'ok' | 'refuse' | null>(null)
   const work = milestoneWork(planner, m.id)
@@ -127,6 +131,7 @@ export function MilestoneSection({ planner, setPlanner, today, milestone: m, row
             {work.map(w => <WorkChip key={`${w.kind}:${w.id}`} w={w} rowKey={rowKey} from={m.id} onTake={() => apply(placeWork(planner, w.kind, w.id, null, m.id))} />)}
           </ul>
         ) : <p className="wrHint">Drag processes, exercises, routines or tasks here, or place them from the Work tile.</p>}
+        <ProjectionChip p={projection} />
         {state.total > 0 && <span className="wrTaskBar" role="progressbar" aria-label={`${name} progress`} aria-valuemin={0} aria-valuemax={100} aria-valuenow={Math.round((state.done / state.total) * 100)}><i style={{ width: `${(state.done / state.total) * 100}%` }} /></span>}
       </div>
     </section>

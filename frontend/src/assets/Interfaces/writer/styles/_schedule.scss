@@ -345,6 +345,13 @@
   .wrPlanRowName { flex: 1 1 auto; min-width: 0; display: flex; align-items: center; gap: var(--space-3); padding: var(--space-2) 0; background: transparent; border: 0; color: inherit; font: inherit; text-align: left; cursor: pointer;
     b { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; } small { color: var(--level-ink-soft); white-space: nowrap; } &:focus-visible { outline: 2px solid var(--level-ink); outline-offset: 2px; } }
   .wrPhaseCard { margin-bottom: 0; &--ok { outline: 2px dashed var(--level-ink); outline-offset: -2px; } &--refuse { outline: 2px dashed var(--level-ink-soft); outline-offset: -2px; opacity: 0.6; cursor: no-drop; } }
+  // What the projection says: a chip of the time, the weeks, the day it ends on and how that is against the plan; and, in the lane, a hatched tail where a phase is
+  // projected to run past its end. The glyph (up, dot, down) says ahead, on track or behind, so the colour is not all there is to it.
+  .wrProj { display: inline-block; max-width: 100%; white-space: normal; font-size: var(--text-small); &--behind { font-weight: 700; } &--ahead, &--track { font-weight: 400; } }
+  .wrPlanProj { padding: 0 var(--space-4) var(--space-3); }
+  .wrPlanWords { margin: 0; padding: 0 var(--space-4) var(--space-3); }
+  .wrTimelineTail { position: absolute; top: 4px; height: 20px; box-sizing: border-box; border: 2px dashed var(--level-ink-soft); border-left: 0; border-radius: 0 var(--radius-button) var(--radius-button) 0; pointer-events: none;
+    background: repeating-linear-gradient(135deg, transparent 0 4px, var(--level-line) 4px 6px); }
   .wrPassPick { flex: 0 1 9em; min-width: 0; }
   .wrKindNote { display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-3); .wrHint { flex: 1 1 14em; } }
   .wrApply { display: flex; flex-direction: column; gap: var(--space-2); margin: 0; padding: var(--space-3) var(--space-4); border: 1px solid var(--level-line); border-radius: var(--radius-button); legend { padding: 0 var(--space-2); font-weight: 700; } }
