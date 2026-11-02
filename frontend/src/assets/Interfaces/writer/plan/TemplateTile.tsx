@@ -1,5 +1,6 @@
 import { useState } from 'react'
 import { FACET_LABEL, type Planner } from '../../../../lib/facets'
+import { rowsBelow, PROJECT_ROW, type PlanRow } from '../../../../lib/planRows'
 import {
   KIND_LABEL, PLAN_KINDS, copyIntoPlanner, describeCounts, emptySelection, isEmptyPlan, saveToTemplate, selectAll, selectionSize, withDependencies,
   type CopyResult, type PlanKindKey, type PlanSelection,
@@ -58,17 +59,23 @@ function Picker({ planner, value, onChange, label, onlyOpenTasks }: { planner: P
   )
 }
 
-export function TemplateTile({ owner, template, setTemplate, today }: { owner: ScheduleOwner; template: Planner; setTemplate: (p: Planner) => void; today: string }) {
+export function TemplateTile({ owner, template, setTemplate, today, rows = [] }: { owner: ScheduleOwner; template: Planner; setTemplate: (p: Planner) => void; today: string; rows?: PlanRow[] }) {
   const editingTemplate = owner.id === TEMPLATE_OWNER
   const [open, setOpen] = useState<'from' | 'to' | null>('from')
   const [fromSel, setFromSel] = useState<PlanSelection>(emptySelection)
   const [toSel, setToSel] = useState<PlanSelection>(emptySelection)
   const [start, setStart] = useState('')
   const [said, setSaid] = useState<string | null>(null)
+  // The books and chapters of this project that a book or chapter phase is not put on (all of them are, to begin with).
+  const [left, setLeft] = useState<string[]>([])
   // The plan as it was before the last copy and as it was left, so that the copy can be taken back while nothing else has changed it.
   const [undo, setUndo] = useState<{ before: Planner; after: Planner } | null>(null)
   const startDay = start || owner.planner.timelineStart || today
   const mk = (prefix: string) => newId(prefix)
+  const books = rowsBelow(rows, PROJECT_ROW, 'book')
+  const chapters = rowsBelow(rows, PROJECT_ROW, 'chapter')
+  const picked = withDependencies(template, fromSel)
+  const levels = new Set(template.phases.filter(p => picked.phases.includes(p.id)).map(p => p.level))
 
   if (editingTemplate) {
     return (
@@ -79,10 +86,11 @@ export function TemplateTile({ owner, template, setTemplate, today }: { owner: S
   }
 
   const copy = () => {
-    const r: CopyResult = copyIntoPlanner(template, fromSel, owner.planner, startDay, mk)
+    const targets = { books: books.filter(r => !left.includes(r.key)).map(r => r.nodeId as string), chapters: chapters.filter(r => !left.includes(r.key)).map(r => r.nodeId as string) }
+    const r: CopyResult = copyIntoPlanner(template, fromSel, owner.planner, startDay, mk, targets)
     setUndo({ before: owner.planner, after: r.planner })
     owner.setPlanner(r.planner)
-    setSaid(`Copied ${describeCounts(r.counts)} into ${owner.label}, from ${startDay}.`)
+    setSaid(`Copied ${describeCounts(r.counts)} into ${owner.label}, from ${startDay}.${r.skipped > 0 ? ` ${r.skipped} ${r.skipped === 1 ? 'phase was' : 'phases were'} left out: no book or chapter was chosen for ${r.skipped === 1 ? 'it' : 'them'}.` : ''}`)
     setFromSel(emptySelection())
   }
   const save = () => {
@@ -113,6 +121,18 @@ export function TemplateTile({ owner, template, setTemplate, today }: { owner: S
               <IconBtn Icon={CheckboxIcon} label="Pick everything" onClick={() => setFromSel(selectAll(template))} />
             </div>
             <span className="wrHint">{selectionSize(fromSel)} picked</span>
+            {(levels.has('book') || levels.has('chapter')) && (
+              <fieldset className="wrApply">
+                <legend>The phases for each book and chapter go on</legend>
+                {[...(levels.has('book') ? books : []), ...(levels.has('chapter') ? chapters : [])].map(r => (
+                  <label key={r.key} className="wrPickerItem">
+                    <input type="checkbox" aria-label={`${r.level === 'book' ? 'Book' : 'Chapter'} ${r.title}`} checked={!left.includes(r.key)} onChange={e => setLeft(e.target.checked ? left.filter(k => k !== r.key) : [...left, r.key])} />
+                    <span>{r.title}</span><small>{r.level}</small>
+                  </label>
+                ))}
+                {(levels.has('book') ? books : []).length + (levels.has('chapter') ? chapters : []).length === 0 && <span className="wrHint">{owner.label} has no {[levels.has('book') ? 'books' : '', levels.has('chapter') ? 'chapters' : ''].filter(Boolean).join(' or ')} yet: those phases are left out.</span>}
+              </fieldset>
+            )}
           </>
         )}
       </Fold>

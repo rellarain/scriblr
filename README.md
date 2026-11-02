@@ -320,7 +320,7 @@ described, now stale, in `docs/data-model.md`).
   phases and facets, required milestones, and links to other processes that
   come before, after or go with it) and **exercises** (`Exercise`: a prompt, a
   length, a times-a-week pace and a log); goals and routines can carry a
-  `phaseId` too. A phase or milestone in the **project template** (an account-level planner kept
+  `phaseId` too. A phase in the **project template** has a level (the project, each book or each chapter) and a copy puts a book or chapter phase onto each book or chapter chosen (`lib/template.ts`). A phase or milestone in the **project template** (an account-level planner kept
   in the settings store as `scriblr.writer.projectTemplate`; `lib/template.ts`
   copies picked items into a project, dated from a start day, or saves a project's
   into it) has an offset and a length in days instead of dates. All of it is additive: a planner saved before

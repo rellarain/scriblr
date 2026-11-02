@@ -66,7 +66,7 @@ export default function ProjectConsole({ scope, projectIds, titles, titleSlot, c
       children: <GoalsCard owners={[owner]} progress={progress} stats={[]} nodes={scope === 'project' ? facts[0]?.outline ?? [] : []} scoped={scope === 'project'} />,
     },
     { id: 'work', title: 'Work', Icon: QueueIcon, children: <WorkTile ownerId={owner.id} planner={planner} setPlanner={owner.setPlanner} today={today} /> },
-    { id: 'template', title: 'Template', Icon: FolderPlusIcon, children: <TemplateTile owner={owner} template={template} setTemplate={setTemplate} today={today} /> },
+    { id: 'template', title: 'Template', Icon: FolderPlusIcon, children: <TemplateTile owner={owner} template={template} setTemplate={setTemplate} today={today} rows={rows} /> },
   ]
   const choice = scope === 'dash' && choices.length > 1 && (
     <select className="wrField wrPlanOwner" aria-label="Plan for" value={owner.id} onChange={e => setChosen(e.target.value)}>

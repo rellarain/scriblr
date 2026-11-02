@@ -10,7 +10,9 @@ export interface RowNode { id: string; kind: string; parentId: string | null; ti
 
 export interface PlanRow { key: string; level: PhaseLevel; nodeId: string | null; title: string; parentKey: string | null }
 
-export const rowKey = (level: PhaseLevel, nodeId: string | null): string => (level === 'project' || !nodeId ? PROJECT_ROW : `${level}:${nodeId}`)
+// A project's own phases are on its row; a book's or chapter's on the row of that book or chapter. (A template's book and chapter phases are for each book or chapter, which no
+// node names: their rows are `book:` and `chapter:`.)
+export const rowKey = (level: PhaseLevel, nodeId: string | null): string => (level === 'project' ? PROJECT_ROW : `${level}:${nodeId ?? ''}`)
 export const rowOfPhase = (p: Pick<Phase, 'level' | 'nodeId'>): string => rowKey(p.level, p.nodeId)
 
 // The project's row, then each book in outline order with the chapters under it (a chapter that is in no book hangs from the project).

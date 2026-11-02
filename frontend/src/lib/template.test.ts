@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest'
-import { emptyPlanner, newExercise, newMilestone, newPhase, newProcess, newTask, type Planner } from './facets'
+import { emptyPlanner, newExercise, newMilestone, newPhase, newPhaseKind, newProcess, newTask, type Planner } from './facets'
+import { rowOfPhase } from './planRows'
 import { copyIntoPlanner, describeCounts, emptySelection, isEmptyPlan, saveToTemplate, selectAll, selectionSize, withDependencies } from './template'
 
 const counter = () => { let n = 0; return (prefix: string) => `${prefix}${++n}` }
@@ -66,14 +67,89 @@ describe('copyIntoPlanner', () => {
     expect(planner.milestones.map(m => [m.title, m.date, m.done, m.doneOn])).toEqual([['Outline locked', '2026-12-01', false, null], ['Half way', '2027-01-16', false, null]])
   })
 
-  it('copies a phase onto the project row as a plain card, and remaps where work was placed', () => {
-    const t = template()
-    const src = { ...t, phases: t.phases.map(x => ({ ...x, level: 'book' as const, nodeId: 'gone', kindId: 'k', overrides: ['result'] })), milestones: t.milestones.map(x => ({ ...x, kindMilestoneId: 'km', overrides: ['title'] })), processes: [newProcess('pr', 'P', { milestoneIds: [t.milestones[0].id, 'missing'] })], items: [newTask('t', 'T', null, { milestoneId: t.milestones[0].id })] }
-    const { planner } = copyIntoPlanner(src, { ...emptySelection(), phases: [t.phases[0].id], milestones: [t.milestones[0].id], processes: ['pr'], items: ['t'] }, emptyPlanner(), '2026-11-02', counter())
-    expect(planner.phases[0]).toMatchObject({ level: 'project', nodeId: null, kindId: null, overrides: [] })
-    expect(planner.milestones[0]).toMatchObject({ kindMilestoneId: null, overrides: [] })
-    expect(planner.processes[0].milestoneIds).toEqual([planner.milestones[0].id])
-    expect(planner.items[0].milestoneId).toBe(planner.milestones[0].id)
+  describe('phases of a level', () => {
+    const levelled = (): Planner => {
+      const t = template()
+      return {
+        ...t,
+        phaseKinds: [newPhaseKind('k', 'Revision', { result: 'Clean', milestones: [{ id: 'km', title: 'Marked up', result: '', lengthDays: 5 }] })],
+        phases: [
+          newPhase('book1', 'Book pass', { level: 'book', offsetDays: 10, lengthDays: 14, kindId: 'k', overrides: ['result'], order: 1 }),
+          newPhase('chap1', 'Chapter pass', { level: 'chapter', offsetDays: 20, lengthDays: 7, order: 2 }),
+          newPhase('proj1', 'Project pass', { offsetDays: 0, lengthDays: 5, order: 0 }),
+        ],
+        milestones: [newMilestone('bm', 'Marked up', { phaseId: 'book1', offsetDays: 15, lengthDays: 5, kindMilestoneId: 'km', overrides: ['title'] }), newMilestone('cm', 'Read aloud', { phaseId: 'chap1', offsetDays: 25 })],
+        processes: [newProcess('pr', 'Mark a chapter', { phaseIds: ['book1'], milestoneIds: ['bm'] })],
+        items: [newTask('bt', 'Mark the book', null, { phaseId: 'book1', milestoneId: 'bm', estimateMinutes: 60 })],
+        routines: [], goals: [], exercises: [],
+      }
+    }
+    const pickAll = (p: Planner) => ({ ...emptySelection(), phases: p.phases.map(x => x.id), processes: ['pr'], items: ['bt'] })
+
+    it('are put on each of the books and chapters chosen, with their sections, dated alike', () => {
+      const p = levelled()
+      const { planner, counts } = copyIntoPlanner(p, pickAll(p), emptyPlanner(), '2026-11-02', counter(), { books: ['b1', 'b2'], chapters: ['c1', 'c2', 'c3'] })
+      expect(planner.phases.map(x => [x.title, x.level, x.nodeId, x.start])).toEqual([
+        ['Project pass', 'project', null, '2026-11-02'],
+        ['Book pass', 'book', 'b1', '2026-11-12'], ['Book pass', 'book', 'b2', '2026-11-12'],
+        ['Chapter pass', 'chapter', 'c1', '2026-11-22'], ['Chapter pass', 'chapter', 'c2', '2026-11-22'], ['Chapter pass', 'chapter', 'c3', '2026-11-22'],
+      ])
+      expect(planner.milestones.filter(m => m.title === 'Marked up')).toHaveLength(2)
+      expect(planner.milestones.filter(m => m.title === 'Read aloud').map(m => m.date)).toEqual(['2026-11-27', '2026-11-27', '2026-11-27'])
+      expect(counts).toMatchObject({ phases: 6, milestones: 5 })
+    })
+
+    it('make the work placed in a milestone again for each copy of it, and place a process in all of them', () => {
+      const p = levelled()
+      const { planner } = copyIntoPlanner(p, pickAll(p), emptyPlanner(), '2026-11-02', counter(), { books: ['b1', 'b2'], chapters: [] })
+      const marked = planner.milestones.filter(m => m.title === 'Marked up')
+      expect(planner.items.map(i => i.milestoneId)).toEqual(marked.map(m => m.id))
+      expect(planner.items.map(i => i.phaseId)).toEqual(marked.map(m => m.phaseId))
+      expect(planner.processes[0].milestoneIds).toEqual(marked.map(m => m.id))
+      expect(planner.processes[0].phaseIds).toEqual(planner.phases.filter(x => x.level === 'book').map(x => x.id))
+    })
+
+    it('are left out, and counted, when there is no book or chapter to put them on', () => {
+      const p = levelled()
+      const r = copyIntoPlanner(p, pickAll(p), emptyPlanner(), '2026-11-02', counter())
+      expect(r.planner.phases.map(x => x.title)).toEqual(['Project pass'])
+      expect(r.skipped).toBe(2)
+      expect(r.planner.milestones).toEqual([]) // their sections went with them
+      expect(r.planner.items.map(i => [i.label, i.milestoneId])).toEqual([['Mark the book', null]]) // the task is left with no place
+    })
+
+    it('bring the kind of a pass, once, and keep what the pass had changed', () => {
+      const p = levelled()
+      const { planner } = copyIntoPlanner(p, pickAll(p), emptyPlanner(), '2026-11-02', counter(), { books: ['b1', 'b2'], chapters: [] })
+      expect(planner.phaseKinds).toHaveLength(1)
+      const books = planner.phases.filter(x => x.level === 'book')
+      expect(books.every(x => x.kindId === planner.phaseKinds[0].id && x.overrides.join() === 'result')).toBe(true)
+      const km = planner.phaseKinds[0].milestones[0].id
+      expect(planner.milestones.filter(m => m.title === 'Marked up').every(m => m.kindMilestoneId === km && m.overrides.join() === 'title')).toBe(true)
+    })
+
+    it('go on the rows after the phases that are there already, in the order they had', () => {
+      const p = levelled()
+      const target = { ...emptyPlanner(), phases: [newPhase('mine', 'Mine', { order: 4 })] }
+      const { planner } = copyIntoPlanner(p, pickAll(p), target, '2026-11-02', counter(), { books: ['b1'], chapters: [] })
+      expect(planner.phases.find(x => x.title === 'Project pass')?.order).toBe(5)
+      expect(planner.phases.find(x => x.level === 'book')?.order).toBe(0)
+    })
+
+    it('keep their level when saved, not the book or chapter, and bring the kind', () => {
+      const proj = { ...emptyPlanner(), timelineStart: '2026-11-01', phaseKinds: [newPhaseKind('k', 'Revision')], phases: [newPhase('p', 'Pass', { level: 'chapter', nodeId: 'c9', kindId: 'k', start: '2026-11-11', end: '2026-11-20' })] }
+      const { planner } = saveToTemplate(proj, { ...emptySelection(), phases: ['p'] }, emptyPlanner(), counter())
+      expect(planner.phases[0]).toMatchObject({ level: 'chapter', nodeId: null, offsetDays: 10, lengthDays: 10 })
+      expect(planner.phaseKinds).toHaveLength(1)
+      expect(planner.phases[0].kindId).toBe(planner.phaseKinds[0].id)
+      expect(rowOfPhase(planner.phases[0])).toBe('chapter:')
+    })
+  })
+
+  it('brings the sections of a phase that is picked', () => {
+    const { planner, counts } = into({ phases: ['ph1'] })
+    expect(planner.milestones.map(m => m.title)).toEqual(['Outline locked'])
+    expect(counts.milestones).toBe(1)
   })
 
   it('gives everything new ids and keeps the tags between the copies', () => {
@@ -105,7 +181,7 @@ describe('copyIntoPlanner', () => {
     expect(p.groups[0].id).not.toBe('g')
     expect(p.groups[0].steps[0]).toMatchObject({ label: 'Reread', estimateMinutes: 30 })
     expect(p.groups[0].steps[0].id).not.toBe('s1')
-    expect(counts).toMatchObject({ phases: 1, milestones: 1, processes: 1 })
+    expect(counts).toMatchObject({ phases: 1, milestones: 2, processes: 1 }) // m2 is the section of the phase picked
   })
 
   it('keeps a link between two processes that were both copied, read from each side', () => {

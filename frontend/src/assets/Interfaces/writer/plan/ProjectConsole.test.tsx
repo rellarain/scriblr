@@ -3,7 +3,7 @@ import userEvent from '@testing-library/user-event'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { __resetSettingsForTests, getKv, setKv } from '../../../../settings/settingsStore'
 import { mockFetchBy } from '../../../../test/mockFetch'
-import { emptyDay, emptyPlanner, newExercise, newMilestone, newPhase, newProcess, newTask, type Planner } from '../../../../lib/facets'
+import { emptyDay, emptyPlanner, newExercise, newMilestone, newPhase, newPhaseKind, newProcess, newTask, type Planner } from '../../../../lib/facets'
 import { DRAG_PLAN } from '../../../../lib/planDrop'
 import { TEMPLATE_KEY } from './useTemplate'
 import ProjectConsole from './ProjectConsole'
@@ -216,7 +216,7 @@ describe('the Project console', () => {
       await user.selectOptions(screen.getByRole('combobox', { name: 'Plan for' }), 'template')
       const phases = within(tile('phases'))
       const drafting = await phases.findByRole('region', { name: 'Drafting' })
-      expect(within(drafting).getByText('from day 31, 60 days')).toBeTruthy()
+      expect(within(drafting).getByText('The project · from day 31, 60 days')).toBeTruthy()
       expect(phases.queryByRole('group', { name: 'Phase timeline' })).toBeNull() // no dates to draw
       await user.click(within(drafting).getByRole('button', { name: 'Drafting details' }))
       expect(within(drafting).queryByRole('radiogroup', { name: 'Status' })).toBeNull()
@@ -252,6 +252,46 @@ describe('the Project console', () => {
       expect(tpl.getByRole('status').textContent).toBe('Took the copy back.')
     })
 
+    it('gives each template phase a level, a kind and sections with a result and a length', async () => {
+      const user = userEvent.setup()
+      setKv(TEMPLATE_KEY, { ...template(), phaseKinds: [newPhaseKind('k', 'Revision')] })
+      render(<ProjectConsole scope="dash" projectIds={['p1']} titles={{ p1: 'Saga' }} />)
+      await screen.findByRole('region', { name: 'Outlining' })
+      await user.selectOptions(screen.getByRole('combobox', { name: 'Plan for' }), 'template')
+      const phases = within(tile('phases'))
+      await user.click(await phases.findByRole('button', { name: 'Drafting details' }))
+      await user.click(phases.getByRole('radio', { name: 'Each chapter' }))
+      await user.selectOptions(phases.getByRole('combobox', { name: 'Kind of phase' }), 'k')
+      expect((getKv<Planner>(TEMPLATE_KEY) as Planner).phases[1]).toMatchObject({ level: 'chapter', nodeId: null, kindId: 'k' })
+      expect(phases.getByText('Each chapter · from day 31, 60 days')).toBeTruthy()
+      await user.click(phases.getByRole('button', { name: 'Outlining details' }))
+      fireEvent.change(phases.getByLabelText('Outline locked result'), { target: { value: 'A chapter list' } })
+      fireEvent.change(phases.getByLabelText('Outline locked length in days'), { target: { value: '5' } })
+      expect((getKv<Planner>(TEMPLATE_KEY) as Planner).milestones[0]).toMatchObject({ result: 'A chapter list', lengthDays: 5 })
+      await user.click(phases.getByRole('button', { name: /^Phase kinds/ }))
+      expect(phases.getByRole('button', { name: 'Revision kind details' })).toBeTruthy()
+    })
+
+    it('puts a book phase onto each book chosen, and says when one is left out', async () => {
+      const user = userEvent.setup()
+      setKv(TEMPLATE_KEY, { ...emptyPlanner(), phases: [newPhase('bp', 'Book pass', { level: 'book', offsetDays: 3, lengthDays: 10 }), newPhase('cp', 'Chapter pass', { level: 'chapter', offsetDays: 0, lengthDays: 4 }), newPhase('pp', 'Whole project', { offsetDays: 0, lengthDays: 30 })] })
+      await open()
+      const tpl = within(tile('template'))
+      await user.click(tpl.getByRole('checkbox', { name: 'Book pass' }))
+      const where = within(tpl.getByRole('group', { name: 'The phases for each book and chapter go on' }))
+      expect((where.getByRole('checkbox', { name: 'Book Book One' }) as HTMLInputElement).checked).toBe(true)
+      expect(where.queryByRole('checkbox', { name: /^Chapter / })).toBeNull() // no chapter phase is picked
+      fireEvent.change(tpl.getByLabelText('Start day of the copy'), { target: { value: '2026-12-01' } })
+      await user.click(tpl.getByRole('button', { name: 'Copy into Saga' }))
+      const got = await lastSaved(p => p.phases.some(x => x.title === 'Book pass'))
+      expect(got.phases.find(x => x.title === 'Book pass')).toMatchObject({ level: 'book', nodeId: 'b1', start: '2026-12-04', end: '2026-12-13' })
+      // The chapter phase has no chapter to go onto (this book has none), so it is left out and counted.
+      await user.click(tpl.getByRole('checkbox', { name: 'Chapter pass' }))
+      expect(tpl.getByText(/has no chapters yet: those phases are left out/)).toBeTruthy()
+      await user.click(tpl.getByRole('button', { name: 'Copy into Saga' }))
+      expect((await tpl.findByRole('status')).textContent).toMatch(/1 phase was left out: no book or chapter was chosen for it\./)
+    })
+
     it('says so when the template is empty, and saves picked items from the project into it, as days from the start', async () => {
       const user = userEvent.setup()
       await open()
@@ -260,7 +300,7 @@ describe('the Project console', () => {
       await user.click(tpl.getByRole('button', { name: /^Save to the template/ }))
       await user.click(tpl.getByRole('checkbox', { name: 'First draft' }))
       await user.click(tpl.getByRole('button', { name: 'Add to the template' }))
-      expect(tpl.getByRole('status').textContent).toBe('Saved 1 phase to the template.')
+      expect(tpl.getByRole('status').textContent).toBe('Saved 1 phase and 1 milestone to the template.') // (its section came with it)
       const saved = getKv<Planner>(TEMPLATE_KEY) as Planner
       expect(saved.phases).toHaveLength(1)
       expect(saved.phases[0]).toMatchObject({ title: 'First draft', start: null, end: null, offsetDays: 20, lengthDays: 131 }) // 21 Oct to 28 Feb, counted from the project's earliest date, 1 Oct

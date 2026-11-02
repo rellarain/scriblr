@@ -1,11 +1,13 @@
 import { useState } from 'react'
-import { PHASE_STATUSES, PHASE_STATUS_LABEL, newMilestone, newPhase, type Milestone, type Phase, type PhaseStatus, type Planner } from '../../../../lib/facets'
+import { PHASE_LEVELS, PHASE_STATUSES, PHASE_STATUS_LABEL, newMilestone, newPhase, type Milestone, type Phase, type PhaseStatus, type Planner } from '../../../../lib/facets'
+import { TEMPLATE_ROWS } from '../../../../lib/template'
 import { removeMilestone, removePhase, tickMilestone } from '../../../../lib/planEdit'
 import { phaseProgress } from '../../../../lib/phaseProgress'
 import { newId } from '../schedule/ids'
 import { IconBtn } from '../schedule/IconBtn'
 import { ArcIcon, CheckIcon, ChevronDownIcon, ChevronRightIcon, FlagIcon, PlusIcon, TrashIcon } from '../../../icons'
-import { PhaseSelect } from './fields'
+import { PhaseSelect, wholeOrNull } from './fields'
+import { KindsPanel } from './KindsPanel'
 
 // The template's phases (the project's own are the Plan tile, `PlanTimeline`): each phase is a stage of the project, defined by the result it builds to, with a status, dates, and the milestones along it. A phase shows
 // how far it is (what is tagged with it, done over all: tasks, milestones and goals) and opens in place to be edited; every change is made at once.
@@ -13,6 +15,8 @@ import { PhaseSelect } from './fields'
 const dayLabel = (d: string): string => new Date(`${d}T00:00:00Z`).toLocaleDateString('en-US', { month: 'short', day: 'numeric', timeZone: 'UTC' })
 // In the template a phase starts a number of days after the project's start and lasts a number of days.
 const relativeRange = (p: Phase): string => (p.offsetDays === null && p.lengthDays === null ? 'no days' : `from day ${(p.offsetDays ?? 0) + 1}${p.lengthDays ? `, ${p.lengthDays} ${p.lengthDays === 1 ? 'day' : 'days'}` : ''}`)
+// In the template a phase is for the project, for each book or for each chapter.
+const LEVEL_WORDS = Object.fromEntries(TEMPLATE_ROWS.map(r => [r.level, r.title])) as Record<Phase['level'], string>
 const range = (p: Phase): string => (p.start && p.end ? `${dayLabel(p.start)} to ${dayLabel(p.end)}` : p.start ? `from ${dayLabel(p.start)}` : p.end ? `until ${dayLabel(p.end)}` : 'no dates')
 
 function MilestoneRow({ m, phases, today, onChange, onTick, onDelete, showPhase, relative }: {
@@ -26,6 +30,8 @@ function MilestoneRow({ m, phases, today, onChange, onTick, onDelete, showPhase,
       {relative
         ? <input className="wrField wrSchedNum" type="number" min={1} max={3651} placeholder="day" aria-label={`${m.title || 'Milestone'} day of the project`} value={m.offsetDays === null ? '' : m.offsetDays + 1} onChange={e => onChange({ offsetDays: e.target.value === '' ? null : Math.min(3650, Math.max(0, Math.floor(Number(e.target.value)) - 1 || 0)) })} />
         : <input className="wrField" type="date" aria-label={`${m.title || 'Milestone'} date`} value={m.date ?? ''} onChange={e => onChange({ date: e.target.value || null })} />}
+      {relative && <input className="wrField" aria-label={`${m.title || 'Milestone'} result`} placeholder="What it delivers…" maxLength={1000} value={m.result} onChange={e => onChange({ result: e.target.value })} />}
+      {relative && <input className="wrField wrSchedNum" type="number" min={1} max={3650} placeholder="days" aria-label={`${m.title || 'Milestone'} length in days`} value={m.lengthDays ?? ''} onChange={e => onChange({ lengthDays: wholeOrNull(e.target.value, 3650) })} />}
       {showPhase && <PhaseSelect label={`Phase of ${m.title || 'milestone'}`} phases={phases} value={m.phaseId} onChange={phaseId => onChange({ phaseId })} />}
       {m.done && m.doneOn && <small className="wrMuted" title="Done on">{m.doneOn === today ? 'today' : dayLabel(m.doneOn)}</small>}
       <IconBtn Icon={TrashIcon} label={`Delete ${m.title || 'milestone'}`} onClick={onDelete} />
@@ -40,7 +46,7 @@ export function PhasesTile({ planner, setPlanner, today, metGoals, relative = fa
   const patchPhase = (id: string, patch: Partial<Phase>) => setPlanner({ ...planner, phases: planner.phases.map(p => (p.id === id ? { ...p, ...patch } : p)) })
   const patchMilestone = (id: string, patch: Partial<Milestone>) => setPlanner({ ...planner, milestones: planner.milestones.map(m => (m.id === id ? { ...m, ...patch } : m)) })
   const addPhase = () => {
-    const phase = newPhase(newId('phase'), 'New phase', { status: planner.phases.length === 0 ? 'active' : 'planned' })
+    const phase = newPhase(newId('phase'), 'New phase', { status: planner.phases.length === 0 ? 'active' : 'planned', order: planner.phases.reduce((n, p) => Math.max(n, p.order + 1), 0) })
     setPlanner({ ...planner, phases: [...planner.phases, phase] })
     setOpenId(phase.id)
   }
@@ -69,7 +75,7 @@ export function PhasesTile({ planner, setPlanner, today, metGoals, relative = fa
           <section key={ph.id} className={`wrPlanCard wrPlanCard--${ph.status}${open ? ' wrPlanCard--open' : ''}`} aria-label={ph.title || 'Untitled phase'}>
             <button type="button" className="wrPlanHead" aria-expanded={open} aria-label={`${ph.title || 'Untitled phase'} details`} onClick={() => setOpenId(open ? null : ph.id)}>
               <ArcIcon size={20} />
-              <span className="wrPlanTitle"><b>{ph.title || 'Untitled phase'}</b><small>{ph.result || (relative ? relativeRange(ph) : range(ph))}</small></span>
+              <span className="wrPlanTitle"><b>{ph.title || 'Untitled phase'}</b><small>{relative ? `${LEVEL_WORDS[ph.level]} · ${ph.result || relativeRange(ph)}` : ph.result || range(ph)}</small></span>
               {!relative && <span className={`wrSchedTag wrPlanStatus wrPlanStatus--${ph.status}`}>{PHASE_STATUS_LABEL[ph.status]}</span>}
               {!relative && prog.pct !== null && <span className="wrPlanPct" title={`${prog.done} of ${prog.total} done`}>{prog.pct}%</span>}
               {open ? <ChevronDownIcon size={20} /> : <ChevronRightIcon size={20} />}
@@ -78,6 +84,19 @@ export function PhasesTile({ planner, setPlanner, today, metGoals, relative = fa
             {open && (
               <div className="wrPlanBody">
                 <input className="wrField" aria-label="Phase title" value={ph.title} onChange={e => patchPhase(ph.id, { title: e.target.value })} />
+                {relative && (
+                  <>
+                    <div className="wrChoice" role="radiogroup" aria-label="Phase is for">
+                      {PHASE_LEVELS.map(l => <button key={l} type="button" role="radio" aria-checked={ph.level === l} className={ph.level === l ? 'on' : ''} onClick={() => patchPhase(ph.id, { level: l, nodeId: null })}>{LEVEL_WORDS[l]}</button>)}
+                    </div>
+                    {planner.phaseKinds.length > 0 && (
+                      <select className="wrField" aria-label="Kind of phase" value={planner.phaseKinds.some(k => k.id === ph.kindId) ? ph.kindId ?? '' : ''} onChange={e => patchPhase(ph.id, { kindId: e.target.value || null, overrides: [] })}>
+                        <option value="">No kind</option>
+                        {planner.phaseKinds.map(k => <option key={k.id} value={k.id}>{k.title || 'Untitled kind'}</option>)}
+                      </select>
+                    )}
+                  </>
+                )}
                 <textarea className="wrField" aria-label="Result" placeholder="The result this phase builds to…" rows={2} maxLength={1000} value={ph.result} onChange={e => patchPhase(ph.id, { result: e.target.value })} />
                 <textarea className="wrField" aria-label="Description" placeholder="Description…" rows={2} maxLength={2000} value={ph.description} onChange={e => patchPhase(ph.id, { description: e.target.value })} />
                 {!relative && <div className="wrChoice" role="radiogroup" aria-label="Status">
@@ -109,6 +128,7 @@ export function PhasesTile({ planner, setPlanner, today, metGoals, relative = fa
           </section>
         )
       })}
+      {relative && <KindsPanel planner={planner} setPlanner={setPlanner} today={today} />}
       {loose.length > 0 && (
         <section className="wrPlanLoose" aria-label="Milestones on no phase">
           <h4 className="wrSchedSub">Not on a phase · {loose.length}</h4>
