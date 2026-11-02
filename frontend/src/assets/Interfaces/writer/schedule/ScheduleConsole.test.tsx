@@ -59,19 +59,34 @@ const open = async () => {
 const tile = (id: string) => document.querySelector(`[data-tile-id="${id}"]`) as HTMLElement
 
 describe('the Schedule console', () => {
-  it('lays out goals, review, activity, schedule, backlog and analytics as tiles of their own', async () => {
+  it('lays out goals, the agenda, the backlog and analytics as tiles of their own', async () => {
     await open()
-    expect(Array.from(document.querySelectorAll('[data-tile-id]')).map(t => t.getAttribute('data-tile-id')).sort()).toEqual(['activity', 'analytics', 'backlog', 'goals', 'review', 'schedule'])
+    expect(Array.from(document.querySelectorAll('[data-tile-id]')).map(t => t.getAttribute('data-tile-id')).sort()).toEqual(['analytics', 'backlog', 'goals', 'schedule'])
     expect(tile('schedule').contains(tile('backlog'))).toBe(false)
     expect(within(tile('backlog')).getByText('Reread Ch. 8')).toBeTruthy()
   })
 
-  it('names the calendar tile Planner, and has the rail of its tiles (no minimize buttons) above them', async () => {
+  it('names the calendar tile Agenda, and has the rail of its tiles (no minimize buttons) above them', async () => {
     await open()
     expect(screen.queryByRole('button', { name: /^Minimize/ })).toBeNull()
-    expect(within(tile('schedule').querySelector('.wrTabTileTitle') as HTMLElement).getByText('Planner')).toBeTruthy()
+    expect(within(tile('schedule').querySelector('.wrTabTileTitle') as HTMLElement).getByText('Agenda')).toBeTruthy()
     const rail = screen.getByRole('toolbar', { name: 'Schedule tiles tabs' })
-    expect(within(rail).getAllByRole('button').map(b => b.getAttribute('aria-label'))).toEqual(['Goals', 'Review', 'Activity', 'Planner', 'Backlog', 'Analytics'])
+    expect(within(rail).getAllByRole('button').map(b => b.getAttribute('aria-label'))).toEqual(['Goals', 'Agenda', 'Backlog', 'Analytics'])
+  })
+
+  it('holds the activity chart in the Analytics tile with the review and the charts folded under it', async () => {
+    const user = userEvent.setup()
+    await open()
+    const analytics = within(tile('analytics'))
+    expect(tile('analytics').querySelector('.wrSchedCalGrid')).toBeTruthy() // the Activity chart is always open
+    expect(analytics.getByRole('button', { name: 'Review' }).getAttribute('aria-expanded')).toBe('false')
+    expect(analytics.queryByText(/worked on/)).toBeNull()
+    await user.click(analytics.getByRole('button', { name: 'Review' }))
+    expect(analytics.getByText(/worked on/)).toBeTruthy()
+    expect(analytics.queryByText('Words drafted by book')).toBeNull()
+    await user.click(analytics.getByRole('button', { name: 'Charts' }))
+    expect(analytics.getByText('Words drafted by book')).toBeTruthy()
+    expect(tile('analytics').querySelector('.wrSchedCalGrid')).toBeTruthy() // still there with both folds open
   })
 
   it('puts the rail in the title bar of the console tile when it is given a slot there', async () => {
@@ -96,7 +111,7 @@ describe('the Schedule console', () => {
 
   it('draws the grid with today outlined, the week from Monday, month names in capitals and the older months as bars', async () => {
     await open()
-    const activity = tile('activity')
+    const activity = tile('analytics')
     const grid = activity.querySelector('.wrSchedCalGrid') as HTMLElement
     expect(grid.querySelectorAll('.wrSchedCalCell--today')).toHaveLength(1)
     expect((grid.querySelector('.wrSchedCalCell--today') as HTMLElement).title).toMatch(/^Sat, Oct 31/)
@@ -109,52 +124,52 @@ describe('the Schedule console', () => {
   it('has a toggle for each facet, all on, and keeps at least one on', async () => {
     const user = userEvent.setup()
     await open()
-    const facets = within(tile('activity'))
+    const facets = within(tile('analytics'))
     for (const name of ['Outline', 'Plot', 'Draft', 'Revision', 'Project']) expect(facets.getByRole('button', { name }).getAttribute('aria-pressed')).toBe('true')
     for (const name of ['Outline', 'Plot', 'Revision', 'Project']) await user.click(facets.getByRole('button', { name }))
     expect(facets.getByRole('button', { name: 'Draft' }).getAttribute('aria-pressed')).toBe('true')
     await user.click(facets.getByRole('button', { name: 'Draft' })) // the last one stays on
     expect(facets.getByRole('button', { name: 'Draft' }).getAttribute('aria-pressed')).toBe('true')
-    const cell = (tile('activity').querySelector('.wrSchedCalGrid') as HTMLElement).querySelectorAll('i')[362] as HTMLElement
+    const cell = (tile('analytics').querySelector('.wrSchedCalGrid') as HTMLElement).querySelectorAll('i')[362] as HTMLElement
     expect(cell.title).toBe('Sat, Oct 31 · Draft 412 words')
   })
 
   it('switches between the grid and the line graph, which draws a line for each facet that has a total goal', async () => {
     const user = userEvent.setup()
     await open()
-    const activity = within(tile('activity'))
+    const activity = within(tile('analytics'))
     await user.click(activity.getByRole('button', { name: 'Line graph' }))
     expect(activity.getByRole('img', { name: /Goal completion by facet/ })).toBeTruthy()
-    expect(tile('activity').querySelectorAll('.wrSchedLineSolid')).toHaveLength(1) // draft is the only facet with a total goal
-    expect(tile('activity').querySelector('.wrSchedFoot, .wrSchedLegend')).toBeNull() // no footnote or legend under the chart
+    expect(tile('analytics').querySelectorAll('.wrSchedLineSolid')).toHaveLength(1) // draft is the only facet with a total goal
+    expect(tile('analytics').querySelector('.wrSchedFoot, .wrSchedLegend')).toBeNull() // no footnote or legend under the chart
     await user.click(activity.getByRole('button', { name: 'Grid' }))
-    expect(tile('activity').querySelector('.wrSchedCalGrid')).toBeTruthy()
+    expect(tile('analytics').querySelector('.wrSchedCalGrid')).toBeTruthy()
   })
 
   it('has its toggles in the title bar of the tile: the facets, the chart as icons, and % or # for the shades', async () => {
     await open()
-    const bar = tile('activity').querySelector('.wrTabTileTitle') as HTMLElement
+    const bar = tile('analytics').querySelector('.wrTabTileTitle') as HTMLElement
     const inBar = within(bar)
     expect(inBar.getAllByRole('button').map(b => b.getAttribute('aria-label') ?? b.textContent)).toEqual(['Outline', 'Plot', 'Draft', 'Revision', 'Project', 'Grid', 'Line graph', 'Vs goal', 'Vs busiest day'])
     expect(inBar.getByRole('button', { name: 'Vs goal' }).textContent).toBe('%')
     expect(inBar.getByRole('button', { name: 'Vs busiest day' }).textContent).toBe('#')
-    expect(tile('activity').querySelector('.wrSchedTileBody .wrSchedFacet')).toBeNull()
+    expect(tile('analytics').querySelector('.wrSchedTileBody .wrSchedFacet')).toBeNull()
   })
 
   it('puts the year over the monthly bars and the month number under each bar', async () => {
     await open()
-    const years = [...tile('activity').querySelectorAll('.wrSchedCalYear')].map(y => y.textContent)
+    const years = [...tile('analytics').querySelectorAll('.wrSchedCalYear')].map(y => y.textContent)
     expect(years.length).toBeGreaterThan(0)
     expect(years.every(y => /^\d{4}$/.test(y ?? ''))).toBe(true)
-    const numbers = [...tile('activity').querySelectorAll('.wrSchedCalBarMonths span')].map(n => Number(n.textContent))
-    expect(numbers.length).toBe(tile('activity').querySelectorAll('.wrSchedCalBar').length)
+    const numbers = [...tile('analytics').querySelectorAll('.wrSchedCalBarMonths span')].map(n => Number(n.textContent))
+    expect(numbers.length).toBe(tile('analytics').querySelectorAll('.wrSchedCalBar').length)
     expect(numbers.every(n => n >= 1 && n <= 12)).toBe(true)
   })
 
   it('shades against the goal or the busiest day, by a toggle', async () => {
     const user = userEvent.setup()
     await open()
-    const activity = within(tile('activity'))
+    const activity = within(tile('analytics'))
     expect(activity.getByRole('button', { name: 'Vs goal' }).getAttribute('aria-pressed')).toBe('true')
     await user.click(activity.getByRole('button', { name: 'Vs busiest day' }))
     expect(activity.getByRole('button', { name: 'Vs busiest day' }).getAttribute('aria-pressed')).toBe('true')
@@ -207,7 +222,7 @@ describe('the Schedule console', () => {
     await open()
     await user.click(screen.getByRole('button', { name: 'Schedule settings' }))
     await user.selectOptions(screen.getByLabelText('Week starts on'), 'sunday')
-    expect(Array.from(tile('activity').querySelectorAll('.wrSchedCalLetters span')).map(s => s.textContent)).toEqual(['S', 'M', 'T', 'W', 'T', 'F', 'S'])
+    expect(Array.from(tile('analytics').querySelectorAll('.wrSchedCalLetters span')).map(s => s.textContent)).toEqual(['S', 'M', 'T', 'W', 'T', 'F', 'S'])
     const heads = Array.from(tile('schedule').querySelectorAll('.wrSchedDayHead button')).map(b => b.textContent)
     expect(heads[0]).toMatch(/^Sun/)
   })
@@ -284,11 +299,11 @@ describe('the Schedule console', () => {
     expect(schedule.getByRole('button', { name: 'Today' }).querySelector('text')?.textContent).toBe('31')
   })
 
-  it('switches the schedule to the day, month and agenda views', async () => {
+  it('switches the agenda to the day, month and checklist views', async () => {
     const user = userEvent.setup()
     await open()
     const schedule = within(tile('schedule'))
-    await user.click(schedule.getByRole('button', { name: 'Agenda' }))
+    await user.click(schedule.getByRole('button', { name: 'Checklist' }))
     expect(within(schedule.getByText('Morning draft', { selector: '.wrSchedAgendaRow b' }).closest('button') as HTMLElement).getByText(/9:00 AM/)).toBeTruthy()
     await user.click(schedule.getByRole('button', { name: 'Month' }))
     expect(schedule.getByRole('grid', { name: 'October 2026' })).toBeTruthy()

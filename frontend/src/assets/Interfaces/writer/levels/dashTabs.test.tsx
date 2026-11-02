@@ -39,10 +39,10 @@ describe('the Dash tabs', () => {
     expect(screen.getByRole('region', { name: 'Scratchpad' })).toBeTruthy()
   })
 
-  it('puts goals, activity, the schedule, the backlog, analytics and the review in a tile each at Max', () => {
+  it('puts goals, the agenda, the backlog and analytics (with the activity and the review in it) in a tile each at Max', () => {
     render(<Harness size="max" />)
     const tiles = Array.from(document.querySelectorAll('[data-tile-id]')).map(t => t.getAttribute('data-tile-id'))
-    expect(tiles).toEqual(expect.arrayContaining(['goals', 'review', 'activity', 'schedule', 'backlog', 'analytics']))
+    expect(tiles).toEqual(expect.arrayContaining(['goals', 'schedule', 'backlog', 'analytics']))
     // The backlog is its own tile, not part of the schedule's.
     const schedule = Array.from(document.querySelectorAll('[data-tile-id="schedule"]')).at(-1) as HTMLElement // the console's own (the Dash's tile of that name holds it)
     const backlog = document.querySelector('[data-tile-id="backlog"]') as HTMLElement

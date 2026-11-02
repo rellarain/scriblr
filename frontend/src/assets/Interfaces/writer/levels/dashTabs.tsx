@@ -12,7 +12,7 @@ import HelpArticles from './HelpArticles'
 import { useTabbedLevel, type LevelTab } from './LevelTabs'
 
 export const DASH_HELP_NAMES = ['dashboard', 'dash', 'shelves']
-const DASH_HELP_FALLBACK = 'The Dash is your desk across every project: the schedule (goals, shifts, the backlog, activity and analytics) and a scratchpad. Pick a tab to open it; at full size each tab opens as a tile.'
+const DASH_HELP_FALLBACK = 'The Dash is your desk across every project: the schedule (goals, the agenda, the backlog and analytics) and a scratchpad. Pick a tab to open it; at full size each tab opens as a tile.'
 
 export function dashTabs(w: WriterWorkspace): LevelTab[] {
   return [

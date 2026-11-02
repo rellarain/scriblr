@@ -180,8 +180,8 @@ describe('the shift panel', () => {
   })
 })
 
-describe('the Planner in a narrow tile', () => {
-  it('lists the days as an agenda below 480px, with the stored view still the week, and gives the panel the whole tile', () => {
+describe('the Agenda in a narrow tile', () => {
+  it('lists the days as a checklist below 480px, with the stored view still the week, and gives the panel the whole tile', () => {
     vi.spyOn(Element.prototype, 'getBoundingClientRect').mockReturnValue({ width: 320, height: 600, top: 0, left: 0, right: 320, bottom: 600, x: 0, y: 0, toJSON: () => ({}) })
     show(withShifts([shift()]))
     expect(document.querySelector('.wrSchedAgenda')).toBeTruthy()
@@ -228,7 +228,7 @@ describe('dropping a task on the calendar', () => {
   })
 })
 
-describe('the Planner keeps you aware of the day', () => {
+describe('the Agenda keeps you aware of the day', () => {
   const task = (id: string, over = {}) => newTask(id, `Task ${id}`, null, { shiftId: 's1', priority: 'medium', ...over })
   const word = (slot: number, amount: number): ActivityEvent => ({ ts: '', date: TODAY, slot, facet: 'draft', action: 'words', nodeId: 'm', kind: 'moment', label: null, amount })
 

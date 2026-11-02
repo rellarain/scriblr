@@ -17,7 +17,7 @@ import { CheckIcon, ChevronDownIcon, ChevronRightIcon, PauseIcon, PlayIcon, Plus
 
 // Everything waiting for a place. Today comes first (the tasks on today's shifts, the one running now first, and the routines due), then what is overdue,
 // then the tasks by priority (High, Medium, Low), the routines, and the tasks with no priority in a fold that opens by itself when nothing else is
-// waiting. A task opens in place to its notes, subtasks, estimate, due day and node; drag one by its grip onto a shift in the Planner to put it there.
+// waiting. A task opens in place to its notes, subtasks, estimate, due day and node; drag one by its grip onto a shift in the Agenda to put it there.
 // A routine that comes round after an interval with a range (every 7-10 days) is low priority and tickable inside its range, and goes to the top once
 // the range is past. (The order and the filters are lib/backlog.ts.)
 
@@ -51,7 +51,7 @@ export function Backlog({
   targets: QuickTarget[]
   nodes: TreeNode[]
   onOpenNode?: (tree: 'outline' | 'plot', id: string) => void
-  // The project shown (shared with the Planner), where a new task goes (the last one one was made for) and each project's colour.
+  // The project shown (shared with the Agenda), where a new task goes (the last one one was made for) and each project's colour.
   project?: string | null
   onProject?: (id: string | null) => void
   addTo?: string

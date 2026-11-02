@@ -33,6 +33,10 @@
   // The Activity tile's chart takes the height of the tile: the card grows to it, and the grid or the graph to the card (measured: useElementSize).
   .wrSchedActivity { flex: 1 1 0; min-height: 0; }
   .wrSchedActivity > .wrSchedCal, .wrSchedActivity > .wrSchedLine { flex: 1 1 0; min-height: 0; }
+  // The Analytics tile: the Activity chart (never under 260px, taking whatever the folds below it leave) and the Review and the Charts as folds; the tile scrolls when they are open.
+  .wrAnalytics { flex: 1 0 auto; display: flex; flex-direction: column; gap: var(--space-3); min-width: 0; min-height: 0;
+    > .wrSchedActivity { flex: 1 0 260px; }
+    > .wrFold { padding: 0 var(--space-5); } }
   // The toggles in a tile's title bar, on its right: smaller and closer than a button in the body.
   // The title bar of a tile with controls: the handle and the title are always the first row; the controls come after them and wrap into rows below when the
   // bar is narrow (the facets, then the chart and shade toggles, which are squares).
@@ -200,7 +204,7 @@
   .wrSchedMenu { position: fixed; z-index: 20; display: flex; flex-direction: column; min-width: 170px; padding: var(--space-2); background: var(--wr-fill-4); color: var(--level-ink); border: 1px solid var(--level-ink-soft); border-radius: var(--radius-button);
     button { background: transparent; border: 0; padding: var(--space-4) var(--space-5); text-align: left; color: inherit; font: inherit; font-size: var(--text-ui); cursor: pointer; &:hover, &:focus-visible { background: var(--level-ink); color: var(--wr-fill-4); } } }
   .wrSchedScopeAsk { display: flex; flex-wrap: wrap; gap: var(--space-4); align-items: center; padding: var(--space-5); border: 1px solid var(--level-ink-soft); border-radius: var(--radius-button); background: var(--wr-fill-4); p { margin: 0; font-weight: 700; } }
-  // The shift's side panel, beside the calendar inside the Planner tile (a narrow tile gives it the whole tile, and lists the days as an agenda).
+  // The shift's side panel, beside the calendar inside the Agenda tile (a narrow tile gives it the whole tile, and lists the days as a checklist).
   .wrSchedBody { gap: var(--space-5); }
   .wrSchedPanel { flex: 0 0 min(320px, 46%); min-width: 0; display: flex; flex-direction: column; gap: var(--space-4); padding: var(--space-5); border-radius: var(--radius-button); background: var(--wr-fill-4); align-self: flex-start; max-height: 100%; overflow: auto; scrollbar-width: none; &::-webkit-scrollbar { display: none; } }
   .wrSchedSchedule--narrow .wrSchedPanel { flex: 1 1 auto; align-self: stretch; }
@@ -217,7 +221,7 @@
   .wrFoldBody { display: flex; flex-direction: column; gap: var(--space-4); padding: 0 0 var(--space-4); }
   .wrFoldField { display: flex; flex-direction: column; gap: var(--space-2); font-size: var(--text-ui); color: var(--level-ink-soft); }
   // A block that is open in the panel, its title being changed in place, and the bar of quick actions that shows on hover.
-  // The bar at the top of the Planner (the shift now, or the next), a block's progress and node, the marker of what falls due on a day, and a project's colour
+  // The bar at the top of the Agenda (the shift now, or the next), a block's progress and node, the marker of what falls due on a day, and a project's colour
   // (an edge on its blocks and agenda rows, a dot beside its tasks): the colour is a mark beside the text, never behind it.
   .wrNextUp { display: flex; align-items: baseline; flex-wrap: wrap; gap: var(--space-3) var(--space-4); width: 100%; padding: var(--space-4) var(--space-5); margin-bottom: var(--space-4); border: 0; border-left: 4px solid var(--wr-bc, var(--level-ink)); border-radius: var(--radius-button); background: var(--wr-fill-4); color: inherit; font: inherit; font-size: var(--text-field); text-align: left; cursor: pointer;
     small { color: var(--level-ink-soft); font-size: var(--text-ui); }

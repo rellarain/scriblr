@@ -1,7 +1,7 @@
 import type { ShiftOccurrence } from './recurrence'
 import { daysBetween } from './projection'
 
-// The shift to point at in the Planner: the one running now, else the next to start (today or after).
+// The shift to point at in the Agenda: the one running now, else the next to start (today or after).
 
 export type NextUp<T extends ShiftOccurrence> =
   | { kind: 'running'; occ: T; minutes: number }

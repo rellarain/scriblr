@@ -1,32 +1,20 @@
-import { useState, type ReactNode } from 'react'
+import { useState } from 'react'
 import { FACETS, FACET_LABEL, FACET_UNIT, newTask, type Facet, type PlanItem, type Shift } from '../../../../lib/facets'
 import type { EditScope } from '../../../../lib/shiftEdit'
 import { newId } from './ids'
 import { FacetIcon } from './FacetIcon'
+import { Fold } from './Fold'
 import { IconBtn } from './IconBtn'
 import { RepeatPicker, presetLabel } from './RepeatPicker'
 import { TimeRange } from './TimeRange'
-import { BookmarkIcon, ChevronDownIcon, ChevronRightIcon, CloseIcon, PauseIcon, PlusIcon, TrashIcon } from '../../../icons'
+import { BookmarkIcon, CloseIcon, PauseIcon, PlusIcon, TrashIcon } from '../../../icons'
 
-// The side panel of a shift, inside the Planner tile beside the calendar. It is the shift as it is being changed: every field is applied as it is set (there
+// The side panel of a shift, inside the Agenda tile beside the calendar. It is the shift as it is being changed: every field is applied as it is set (there
 // is no Save), for the days chosen at the top ("This day", "This and following", "All of them", asked first, for a shift that repeats). Always shown: the
 // title, the facet, the day and the time. Folded: the aim and what it is on, how it repeats, the pauses and the checklist.
 
 export interface TargetOption { id: string; title: string; tree: 'outline' | 'plot'; kind: string }
 const SCOPES: Array<[EditScope, string]> = [['this', 'This day'], ['following', 'This and following'], ['all', 'All of them']]
-
-function Fold({ title, summary, open, onToggle, children }: { title: string; summary?: string; open: boolean; onToggle: () => void; children: ReactNode }) {
-  return (
-    <section className="wrFold" aria-label={title}>
-      <button type="button" className="wrFoldHead" aria-expanded={open} onClick={onToggle}>
-        {open ? <ChevronDownIcon size={20} /> : <ChevronRightIcon size={20} />}
-        <span>{title}</span>
-        {summary && !open && <small>{summary}</small>}
-      </button>
-      {open && <div className="wrFoldBody">{children}</div>}
-    </section>
-  )
-}
 
 export interface ShiftPanelProps {
   // The shift as it is now (for the day opened): the panel shows it and reports changes to it.

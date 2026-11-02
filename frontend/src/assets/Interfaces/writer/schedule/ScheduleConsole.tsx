@@ -13,13 +13,12 @@ import { slotOfDate } from '../../../../lib/ribbon'
 import type { WeekStart } from '../../../../lib/scheduleCalendar'
 import { FACET_COLOR } from '../../../../theme/zoneLooks'
 import { SplitArea, type SplitTile } from '../SplitArea'
-import { BarChartIcon, CalendarIcon, GoalIcon, GridViewIcon, HistoryIcon, ListIcon } from '../../../icons'
+import { BarChartIcon, CalendarIcon, GoalIcon, ListIcon } from '../../../icons'
 import { useStoredState } from '../shared'
-import { ActivityCard, ActivityControls, useActivityState, type FacetGoalFacts } from './ActivityCard'
-import { AnalyticsCard } from './AnalyticsCard'
+import { ActivityControls, useActivityState, type FacetGoalFacts } from './ActivityCard'
+import { AnalyticsPanel } from './AnalyticsPanel'
 import { Backlog } from './Backlog'
 import { GoalsCard, type OwnedProgress } from './GoalsCard'
-import { ReviewCard } from './ReviewCard'
 import { ScheduleCard, type ScheduleOwner, type TicksApi } from './ScheduleCard'
 import { ICON_PX } from './IconBtn'
 import { DEFAULT_HUES, ScheduleSettings, SettingsButton, type FacetHues } from './ScheduleSettings'
@@ -30,16 +29,16 @@ import { requestReminderPermission, useShiftEndReminders, useShiftReminders } fr
 import { localToday, useSchedule } from './useSchedule'
 import type { SplitNode } from '../../../../components/tiles/splitTree'
 
-// The Schedule console: Goals, Activity (the grid or lines), the Planner, the Backlog beside it, Analytics and a Review, each its own tile on a split
+// The Schedule console: Goals, the Agenda, the Backlog beside it and Analytics (the activity chart, with the review and the charts folded under it), each its own tile on a split
 // grid (drag a title bar to move one, a divider to resize). At the Project level it is that project's; at the Dash it is every project's added
 // together, with the account's own goals, shifts and routines too.
 
 export const ACCOUNT_OWNER = 'account'
-// Where the tiles sit before any is moved: the goals beside the activity on top, then the schedule with the backlog, the analytics and the review stacked beside it.
+// Where the tiles sit before any is moved: the goals beside the analytics on top, then the agenda with the backlog beside it.
 export const DEFAULT_TREE: SplitNode = {
   dir: 'col', ratio: 0.5,
-  a: { dir: 'row', ratio: 0.34, a: { id: 'goals' }, b: { id: 'activity' } },
-  b: { dir: 'row', ratio: 0.6, a: { id: 'schedule' }, b: { dir: 'col', ratio: 0.4, a: { id: 'backlog' }, b: { dir: 'col', ratio: 0.62, a: { id: 'analytics' }, b: { id: 'review' } } } },
+  a: { dir: 'row', ratio: 0.34, a: { id: 'goals' }, b: { id: 'analytics' } },
+  b: { dir: 'row', ratio: 0.6, a: { id: 'schedule' }, b: { id: 'backlog' } },
 }
 
 // A project's colour: its hue at the facet colours' own saturation and lightness (so it reads on the tile for every hue, as they do).
@@ -71,7 +70,7 @@ export default function ScheduleConsole({ scope, projectIds, titles, titleSlot, 
     return scope === 'dash' ? [{ id: ACCOUNT_OWNER, label: 'Account', projectId: null, planner: { ...emptyPlanner(), ...account }, setPlanner: setAccount }, ...list] : list
   }, [scope, projectIds, titles, schedule.planners, schedule.setPlanner, account, setAccount])  // eslint-disable-line react-hooks/exhaustive-deps
   const goalOwner = owners[0]
-  // The one project shown (in the Planner and the Backlog together), and where a new shift or task goes: the last one it was made for.
+  // The one project shown (in the Agenda and the Backlog together), and where a new shift or task goes: the last one it was made for.
   const [shownRaw, setShown] = useStoredState<string | null>(`scriblr.writer.schedule.project.${scope}`, null)
   const [addToRaw, setAddTo] = useStoredState<string>(`scriblr.writer.schedule.addTo.${scope}`, '')
   const shownProject = owners.some(o => o.id === shownRaw) ? shownRaw : null
@@ -221,10 +220,8 @@ export default function ScheduleConsole({ scope, projectIds, titles, titleSlot, 
   const settingsButton = <SettingsButton open={settingsOpen} onToggle={() => setSettingsOpen(o => !o)} />
   const tiles: SplitTile[] = [
     { id: 'goals', title: 'Goals', Icon: GoalIcon, children: <GoalsCard owners={owners} progress={progress} stats={stats} nodes={single?.outline ?? []} scoped={scope === 'project'} /> },
-    { id: 'review', title: 'Review', Icon: HistoryIcon, children: <ReviewCard daily={daily} today={today} /> },
-    { id: 'activity', title: 'Activity', Icon: GridViewIcon, titleExtras: <ActivityControls state={activity} />, children: <ActivityCard state={activity} data={schedule.facets} today={today} weekStart={weekStart} dailyGoals={dailyGoals} totals={totals} /> },
     {
-      id: 'schedule', title: 'Planner', Icon: CalendarIcon,
+      id: 'schedule', title: 'Agenda', Icon: CalendarIcon,
       children: (
         <ScheduleCard
           owners={owners} today={today} nowSlot={nowSlot} events={schedule.facets.events} weekStart={weekStart} targets={targets} ticks={ticks}
@@ -243,7 +240,16 @@ export default function ScheduleConsole({ scope, projectIds, titles, titleSlot, 
         />
       ),
     },
-    { id: 'analytics', title: 'Analytics', Icon: BarChartIcon, children: <AnalyticsCard data={schedule.facets} today={today} titles={bookTitles} weekStart={weekStart} /> },
+    {
+      id: 'analytics', title: 'Analytics', Icon: BarChartIcon, titleExtras: <ActivityControls state={activity} />,
+      children: (
+        <AnalyticsPanel
+          activity={{ state: activity, data: schedule.facets, today, weekStart, dailyGoals, totals }}
+          review={{ daily, today }}
+          charts={{ data: schedule.facets, today, titles: bookTitles, weekStart }}
+        />
+      ),
+    },
   ]
   return (
     <div className="wrSchedConsole" style={hueVars(hues) as CSSProperties}>
@@ -255,7 +261,7 @@ export default function ScheduleConsole({ scope, projectIds, titles, titleSlot, 
           scopeLabel={scope === 'dash' ? 'Account' : 'This project'} onClose={() => setSettingsOpen(false)}
         />
       )}
-      <SplitArea iconSize={ICON_PX} gridId={`scriblr.writer.schedule.tiles.${scope}`} label="Schedule tiles" bar barHost={titleSlot === undefined ? undefined : railHost} tiles={tiles.map(t => ({ ...t, bodyClassName: `wrSchedTileBody${t.id === 'activity' ? ' wrSchedTileBody--chart' : ''}` }))} defaultTree={DEFAULT_TREE} />
+      <SplitArea iconSize={ICON_PX} gridId={`scriblr.writer.schedule.tiles.${scope}`} label="Schedule tiles" bar barHost={titleSlot === undefined ? undefined : railHost} tiles={tiles.map(t => ({ ...t, bodyClassName: `wrSchedTileBody${t.id === 'analytics' ? ' wrSchedTileBody--chart' : ''}` }))} defaultTree={DEFAULT_TREE} />
     </div>
   )
 }

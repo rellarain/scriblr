@@ -35,7 +35,7 @@ function Dash({ onAddTo = () => {} }: { onAddTo?: (id: string) => void }) {
 }
 const block = (name: RegExp) => within(document.querySelector(`[data-date="${TODAY}"]`) as HTMLElement).queryByRole('button', { name })
 
-describe('the Planner at the Dash', () => {
+describe('the Agenda at the Dash', () => {
   it('shows every project\'s shifts, a project\'s in its colour and the account\'s with none', () => {
     render(<Dash />)
     expect(block(/^Taxes/)).toBeTruthy()

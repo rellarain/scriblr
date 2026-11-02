@@ -26,6 +26,8 @@ type CalView = 'day' | 'week' | 'month' | 'year' | 'agenda'
 interface Editing { ownerId: string; orig: Shift; base: Shift; draft: Shift; occurrence: string; isNew: boolean; scope: EditScope; tailId: string }
 type Occ = ShiftOccurrence & { ownerId: string }
 const VIEW_ICON: Record<CalView, ComponentType<IconProps>> = { day: ViewDayIcon, week: ViewWeekIcon, month: ViewMonthIcon, year: ViewYearIcon, agenda: ListIcon }
+// The list of days is called the Checklist (the tile itself is the Agenda); its stored view value stays `agenda`.
+const VIEW_LABEL: Record<CalView, string> = { day: 'Day', week: 'Week', month: 'Month', year: 'Year', agenda: 'Checklist' }
 // A row is one 10-minute slot (SLOTS_PER_DAY a day), tall enough for its time label; an hour is six rows.
 const SLOT_PX = 20
 const NARROW_PX = 480
@@ -35,7 +37,7 @@ const dayName = (d: string, long = false): string => new Date(`${d}T00:00:00Z`).
 const monthTitle = (d: string): string => new Date(`${d}T00:00:00Z`).toLocaleDateString('en-US', { month: 'long', year: 'numeric', timeZone: 'UTC' })
 const sinceStart = (d: string, ws: WeekStart): number => { const w = new Date(`${d}T00:00:00Z`).getUTCDay(); return ws === 'monday' ? (w + 6) % 7 : w }
 
-// What the Dash adds to the Planner: the project each shift belongs to (its colour on the block, a choice of which to show, and where a new shift goes).
+// What the Dash adds to the Agenda: the project each shift belongs to (its colour on the block, a choice of which to show, and where a new shift goes).
 export interface PlannerProjects {
   // The project shown (an owner id), or null for all of them.
   project: string | null
@@ -60,7 +62,7 @@ export function ScheduleCard({
   const [cursor, setCursor] = useState(today)
   const [editing, setEditing] = useState<Editing | null>(null)
   const [renaming, setRenaming] = useState<string | null>(null)
-  // Below this width the Planner lists its days as an agenda (the view that is kept is not changed).
+  // Below this width the Agenda lists its days as a checklist (the view that is kept is not changed).
   const [wrap, width] = useElementWidth<HTMLDivElement>([NARROW_PX])
   const narrow = width === 0
   const [menu, setMenu] = useState<{ x: number; y: number; occ: Occ } | null>(null)
@@ -528,7 +530,7 @@ export function ScheduleCard({
         )}
         <div className="wrSchedSeg" role="group" aria-label="Calendar view">
           {(['day', 'week', 'month', 'year', 'agenda'] as CalView[]).map(v => {
-            const name = v[0].toUpperCase() + v.slice(1)
+            const name = VIEW_LABEL[v]
             const Icon = VIEW_ICON[v]
             return <button key={v} type="button" className={view === v ? 'on' : ''} aria-pressed={view === v} aria-label={name} title={name} onClick={() => setView(v)}><Icon size={ICON_PX} /></button>
           })}

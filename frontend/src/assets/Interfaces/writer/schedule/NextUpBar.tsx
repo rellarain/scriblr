@@ -2,7 +2,7 @@ import type { ShiftOccurrence } from '../../../../lib/recurrence'
 import { durationText, type NextUp } from '../../../../lib/nextUp'
 import { slotTime } from '../../../../lib/facets'
 
-// The bar at the top of the Planner: the shift running now (what is left of it and how many of its tasks are ticked off) or else the next one to start and
+// The bar at the top of the Agenda: the shift running now (what is left of it and how many of its tasks are ticked off) or else the next one to start and
 // the time until it. Pressing it opens the shift.
 
 const dayName = (d: string): string => new Date(`${d}T00:00:00Z`).toLocaleDateString('en-US', { weekday: 'long', timeZone: 'UTC' })
