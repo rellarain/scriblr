@@ -1,6 +1,7 @@
 import { useMemo, useState } from 'react'
 import { FACETS, FACET_LABEL, newExercise, newProcess, newTask, type Exercise, type Facet, type PlanItem, type Planner, type Process, type Recurrence, type Routine } from '../../../../lib/facets'
 import { linkProcesses, removeProcess } from '../../../../lib/planEdit'
+import { setPlacements } from '../../../../lib/planSequence'
 import { processStages } from '../../../../lib/processOrder'
 import { useStoredState } from '../shared'
 import { Fold } from '../schedule/Fold'
@@ -10,7 +11,7 @@ import { RepeatPicker } from '../schedule/RepeatPicker'
 import { TaskRow } from '../schedule/TaskRow'
 import { PlusIcon, TrashIcon } from '../../../icons'
 import { ExerciseCard } from './ExerciseCard'
-import { PhaseSelect, PlanGrip } from './fields'
+import { MilestoneSelect, PhaseSelect, PlanGrip } from './fields'
 import { ProcessCard } from './ProcessCard'
 import { TEMPLATE_OWNER } from './useTemplate'
 
@@ -19,8 +20,8 @@ import { TEMPLATE_OWNER } from './useTemplate'
 
 type Section = 'processes' | 'exercises' | 'routines' | 'tasks'
 
-function RoutineRow({ ownerId, routine, phases, today, open, onOpen, onChange, onDelete }: {
-  ownerId: string; routine: Routine; phases: Planner['phases']; today: string; open: boolean; onOpen: (o: boolean) => void; onChange: (patch: Partial<Routine>) => void; onDelete: () => void
+function RoutineRow({ ownerId, routine, phases, milestones, today, open, onOpen, onChange, onDelete }: {
+  ownerId: string; routine: Routine; phases: Planner['phases']; milestones: Planner['milestones']; today: string; open: boolean; onOpen: (o: boolean) => void; onChange: (patch: Partial<Routine>) => void; onDelete: () => void
 }) {
   return (
     <section className={`wrPlanCard${open ? ' wrPlanCard--open' : ''}`} aria-label={routine.label || 'Untitled routine'}>
@@ -42,6 +43,11 @@ function RoutineRow({ ownerId, routine, phases, today, open, onOpen, onChange, o
             </label>
             <label>Phase<PhaseSelect label={`Phase of ${routine.label || 'the routine'}`} phases={phases} value={routine.phaseId} onChange={phaseId => onChange({ phaseId })} /></label>
           </div>
+          {milestones.length > 0 && (
+            <label>Milestone
+              <MilestoneSelect label={`Milestone of ${routine.label || 'the routine'}`} milestones={milestones} phases={phases} value={routine.milestoneId} onChange={milestoneId => onChange({ milestoneId, ...(milestoneId ? { phaseId: milestones.find(m => m.id === milestoneId)?.phaseId ?? routine.phaseId } : {}) })} />
+            </label>
+          )}
           <RepeatPicker value={routine.recurrence} anchor={routine.recurrence.anchor || today} allowInterval onChange={(rec: Recurrence | null) => { if (rec) onChange({ recurrence: rec }) }} />
           <div className="wrSchedFormActions"><IconBtn Icon={TrashIcon} label={`Delete ${routine.label || 'the routine'}`} onClick={onDelete} /></div>
         </div>
@@ -90,7 +96,7 @@ export function WorkTile({ ownerId, planner, setPlanner, today }: { ownerId: str
         {planner.processes.map((p: Process) => (
           <ProcessCard
             key={p.id} ownerId={ownerId} process={p} processes={planner.processes} phases={planner.phases} milestones={planner.milestones} stage={stageOf(p.id)}
-            open={openId === p.id} onOpen={o => setOpenId(o ? p.id : null)} onChange={change => patch('processes', p.id, change)}
+            open={openId === p.id} onOpen={o => setOpenId(o ? p.id : null)} onChange={change => patch('processes', p.id, change)} onPlace={ids => setPlanner(setPlacements(planner, 'process', p.id, ids))}
             onLink={(other, relation) => setPlanner(linkProcesses(planner, p.id, other, relation))} onDelete={() => setPlanner(removeProcess(planner, p.id))}
           />
         ))}
@@ -99,8 +105,8 @@ export function WorkTile({ ownerId, planner, setPlanner, today }: { ownerId: str
         {adder('exercises', 'New exercise', 'A writing drill…', addExercise)}
         {planner.exercises.map((x: Exercise) => (
           <ExerciseCard
-            key={x.id} ownerId={ownerId} exercise={x} phases={planner.phases} today={today} open={openId === x.id} onOpen={o => setOpenId(o ? x.id : null)}
-            onChange={change => patch('exercises', x.id, change)} onDelete={() => setPlanner({ ...planner, exercises: planner.exercises.filter(e => e.id !== x.id) })}
+            key={x.id} ownerId={ownerId} exercise={x} phases={planner.phases} milestones={planner.milestones} today={today} open={openId === x.id} onOpen={o => setOpenId(o ? x.id : null)}
+            onChange={change => patch('exercises', x.id, change)} onPlace={ids => setPlanner(setPlacements(planner, 'exercise', x.id, ids))} onDelete={() => setPlanner({ ...planner, exercises: planner.exercises.filter(e => e.id !== x.id) })}
           />
         ))}
       </Fold>
@@ -108,7 +114,7 @@ export function WorkTile({ ownerId, planner, setPlanner, today }: { ownerId: str
         {adder('routines', 'New routine', 'Something that comes round…', addRoutine)}
         {planner.routines.map((r: Routine) => (
           <RoutineRow
-            key={r.id} ownerId={ownerId} routine={r} phases={planner.phases} today={today} open={openId === r.id} onOpen={o => setOpenId(o ? r.id : null)}
+            key={r.id} ownerId={ownerId} routine={r} phases={planner.phases} milestones={planner.milestones} today={today} open={openId === r.id} onOpen={o => setOpenId(o ? r.id : null)}
             onChange={change => patch('routines', r.id, change)} onDelete={() => setPlanner({ ...planner, routines: planner.routines.filter(x => x.id !== r.id) })}
           />
         ))}
@@ -121,6 +127,7 @@ export function WorkTile({ ownerId, planner, setPlanner, today }: { ownerId: str
             open={openId === item.id} onOpen={o => setOpenId(o ? item.id : null)} onChange={change => patch('items', item.id, change)}
             onTick={on => patch('items', item.id, { doneOn: on ? today : null })} onDelete={() => setPlanner({ ...planner, items: planner.items.filter(x => x.id !== item.id) })}
             placeable={ownerId !== TEMPLATE_OWNER && !item.shiftId && !item.doneOn} phases={planner.phases} phaseTitle={planner.phases.find(x => x.id === item.phaseId)?.title}
+            milestones={planner.milestones} milestoneTitle={planner.milestones.find(x => x.id === item.milestoneId)?.title}
           />
         ))}
       </Fold>

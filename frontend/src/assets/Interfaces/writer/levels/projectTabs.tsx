@@ -1,4 +1,4 @@
-import { CalendarIcon, ClockIcon, FolderPlusIcon, GearIcon, HelpIcon, OutlineIcon, PlotIcon } from '../../../icons'
+import { CalendarIcon, ClockIcon, FolderIcon, GearIcon, HelpIcon, OutlineIcon, PlotIcon } from '../../../icons'
 import WorkspaceSaveCluster from './WorkspaceSaveCluster'
 import { SHELF_COMPONENTS } from '../consoleDefs'
 import { Placeholder } from '../shared'
@@ -60,7 +60,7 @@ export function projectTabs(w: WriterWorkspace): LevelTab[] {
       },
     },
     {
-      id: 'plan', label: 'Project', Icon: FolderPlusIcon, fill: true, surface: false, titleSlot: true, iconSize: 20, console: true,
+      id: 'plan', label: 'Project', Icon: FolderIcon, fill: true, surface: false, titleSlot: true, iconSize: 20, console: true,
       render: c => {
         const id = w.activeProjectId
         if (!id) return <p className="wrMuted">Open a project to plan it.</p>

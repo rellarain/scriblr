@@ -39,6 +39,7 @@ export interface TreeNode { id: string; parentId: string | null; title: string }
 type Remembered = Pick<BacklogFilter, 'facet' | 'sort' | 'done'>
 
 const NO_PHASES: never[] = []
+const NO_MILESTONES: never[] = []
 
 export function Backlog({
   owners, today, nowSlot, todayTicks, onPlanner, onTick, events, targets, nodes, onOpenNode, project = null, onProject = () => {}, addTo, onAddTo = () => {}, colors = {},
@@ -75,6 +76,7 @@ export function Backlog({
   const target = owners.find(o => o.id === owner) ?? owners[0]
   const labelOf = (id: string) => owners.find(o => o.id === id)?.label ?? ''
   const ownerPhases = (id: string) => owners.find(o => o.id === id)?.planner.phases ?? NO_PHASES
+  const ownerMilestones = (id: string) => owners.find(o => o.id === id)?.planner.milestones ?? NO_MILESTONES
   const update = (id: string, fn: (p: Planner) => Planner) => { const o = owners.find(x => x.id === id); if (o) onPlanner(id, fn(o.planner)) }
   const titles = useMemo(() => new Map(nodes.map(n => [n.id, n.title])), [nodes])
   const nodeTitle = (id: string | null) => (id ? titles.get(id) : undefined)
@@ -138,6 +140,7 @@ export function Backlog({
       reorderGrip={more.manual ? reorder.grip(e.item.id) : undefined} placeable={!e.item.shiftId && !e.item.doneOn}
       locked={isLocked(e.item, owners.find(o => o.id === e.ownerId)?.planner.items ?? [], x => !!x.doneOn || (todayTicks[e.ownerId] ?? []).includes(x.id))}
       phases={ownerPhases(e.ownerId)} phaseTitle={ownerPhases(e.ownerId).find(x => x.id === e.item.phaseId)?.title}
+      milestones={ownerMilestones(e.ownerId)} milestoneTitle={ownerMilestones(e.ownerId).find(x => x.id === e.item.milestoneId)?.title}
     />
   )
   const routineRow = (r: RoutineEntry, tag?: string) => (

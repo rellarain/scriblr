@@ -56,3 +56,47 @@ export function dragPhase(phase: Phase, edge: BarEdge, delta: number): Pick<Phas
   const next = addDays(end, delta)
   return { start, end: next < start ? start : next }
 }
+
+// ---- zoom: the chart in months, weeks or days ----
+
+export type Zoom = 'month' | 'week' | 'day'
+export const ZOOMS: Zoom[] = ['month', 'week', 'day']
+export const ZOOM_LABEL: Record<Zoom, string> = { month: 'Months', week: 'Weeks', day: 'Days' }
+// How wide a day is on the chart at each zoom, in pixels.
+export const PX_PER_DAY: Record<Zoom, number> = { month: 4, week: 14, day: 44 }
+
+const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec']
+const parts = (d: string) => ({ y: Number(d.slice(0, 4)), m: Number(d.slice(5, 7)), day: Number(d.slice(8, 10)), dow: new Date(`${d}T00:00:00Z`).getUTCDay() })
+
+export interface RulerMark { date: string; label: string; major: boolean }
+
+// The marks of the ruler: the first of each month (months), each Monday (weeks), each day (days). A major mark starts a month (or a week, at the days zoom).
+export function rulerMarks(r: TimelineRange, zoom: Zoom): RulerMark[] {
+  const out: RulerMark[] = []
+  for (let i = 0; i < r.days; i++) {
+    const d = addDays(r.from, i)
+    const { m, day, dow, y } = parts(d)
+    if (zoom === 'month') {
+      if (day === 1 || i === 0) out.push({ date: d, label: `${MONTHS[m - 1]}${m === 1 ? ` ${y}` : ''}`, major: day === 1 })
+    } else if (zoom === 'week') {
+      if (dow === 1 || i === 0) out.push({ date: d, label: `${MONTHS[m - 1]} ${day}`, major: day <= 7 && dow === 1 })
+    } else {
+      out.push({ date: d, label: day === 1 || i === 0 ? `${MONTHS[m - 1]} ${day}` : String(day), major: dow === 1 || day === 1 })
+    }
+  }
+  return out
+}
+
+// The place a phase dragged to the day `midDay` (a day number counted from the range's start, may be a half) takes among the others of its row: after as many of them as
+// lie before it.
+export function dropIndex(others: Phase[], midDay: number, r: TimelineRange): number {
+  let n = 0
+  for (const p of others) {
+    const start = p.start ?? p.end
+    const end = p.end ?? p.start
+    if (!start || !end) { n += 1; continue }
+    const mid = daysBetween(r.from, start) + (daysBetween(start, end) + 1) / 2
+    if (mid < midDay) n += 1
+  }
+  return n
+}

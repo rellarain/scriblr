@@ -29,7 +29,7 @@ export function buildIcons(): Record<string, string> {
 
 export const ICONS_README = `# Icons
 
-Every icon the app draws, as SVG: a 24 by 24 grid, a 1.8 stroke, round caps and joins, no fill (the reaction hearts fill their solid levels, and the project's folder is filled, with a plus cut out of it).
+Every icon the app draws, as SVG: a 24 by 24 grid, a 1.8 stroke, round caps and joins, no fill (the reaction hearts fill their solid levels, and the template's folder is filled, with a plus cut out of it).
 In the app they take the current text colour (\`stroke="currentColor"\`); these files are drawn in one ink, \`#2b2430\`, because an image cannot inherit a colour (they show only through an \`<img>\`).
 
 Sizes in use: 14 (tile titles), 16 (small buttons, segmented switch), 18 (header tabs and quick actions), 21 (the default).

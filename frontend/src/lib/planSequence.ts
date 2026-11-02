@@ -87,6 +87,12 @@ export function movePhase(planner: Planner, id: string, toIndex: number): Moved 
   return { ok: true, planner: reflowRow(next, key, rowStart(next, key)) }
 }
 
+// Where a phase stands in its row's sequence (0 first); -1 for a phase that is not there.
+export function phasesOnRowIndex(planner: Planner, id: string): number {
+  const phase = planner.phases.find(p => p.id === id)
+  return phase ? phasesOnRow(planner, rowOfPhase(phase)).findIndex(p => p.id === id) : -1
+}
+
 // A milestone moved to a place in a phase's sections. It can only go to a phase on its own row.
 export function moveMilestone(planner: Planner, id: string, toPhaseId: string, toIndex: number): Moved {
   const m = planner.milestones.find(x => x.id === id)
@@ -108,6 +114,13 @@ export function placedIn(planner: Planner, kind: WorkKind, id: string): string[]
   if (kind === 'task') { const m = planner.items.find(x => x.id === id)?.milestoneId; return m ? [m] : [] }
   if (kind === 'routine') { const m = planner.routines.find(x => x.id === id)?.milestoneId; return m ? [m] : [] }
   return (kind === 'process' ? planner.processes : planner.exercises).find(x => x.id === id)?.milestoneIds ?? []
+}
+
+// A process's or an exercise's milestones set to a list: each one's phase is added to the phases it is for (a phase it was for stays).
+export function setPlacements(planner: Planner, kind: 'process' | 'exercise', id: string, milestoneIds: string[]): Planner {
+  const phases = milestoneIds.map(m => planner.milestones.find(x => x.id === m)?.phaseId).filter((p): p is string => !!p)
+  const set = <T extends { id: string; milestoneIds: string[]; phaseIds: string[] }>(x: T): T => (x.id === id ? { ...x, milestoneIds, phaseIds: [...new Set([...x.phaseIds, ...phases])] } : x)
+  return kind === 'process' ? { ...planner, processes: planner.processes.map(set) } : { ...planner, exercises: planner.exercises.map(set) }
 }
 
 // Work placed in a milestone (or taken out of every milestone with `to` null). Placing something that is not placed yet goes anywhere; moving something that is

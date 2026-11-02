@@ -1,5 +1,7 @@
 import { useMemo } from 'react'
+import { milestoneState } from '../../../../lib/milestoneProgress'
 import { phaseProgress, currentPhase, nextMilestone } from '../../../../lib/phaseProgress'
+import { PROJECT_ROW, rowOfPhase } from '../../../../lib/planRows'
 import { daysBetween } from '../../../../lib/projection'
 import { emptyPlanner } from '../../../../lib/facets'
 import { localToday, useSchedule } from '../schedule/useSchedule'
@@ -13,9 +15,12 @@ export function ProjectSummary({ projectIds, titles }: { projectIds: string[]; t
   const today = schedule.loading ? localToday() : schedule.facets.today
   const rows = useMemo(() => projectIds.map(id => {
     const p = schedule.planners[id] ?? emptyPlanner()
-    const phase = currentPhase(p.phases, today)
+    // The project's own row: the phase it is in, and the next milestone along its phases (the books' and chapters' rows are in the Plan tile).
+    const own = p.phases.filter(x => rowOfPhase(x) === PROJECT_ROW)
+    const ownIds = new Set(own.map(x => x.id))
+    const phase = currentPhase(own, today)
     const prog = phase ? phaseProgress(p, phase.id) : null
-    const next = nextMilestone(p.milestones, today)
+    const next = nextMilestone(p.milestones.filter(m => (!m.phaseId || ownIds.has(m.phaseId)) && !milestoneState(p, m.id).achieved), today)
     return { id, phase, pct: prog?.pct ?? null, next, counts: [plural(p.phases.length, 'phase'), plural(p.processes.length, 'process', 'processes'), plural(p.exercises.length, 'exercise')].join(' · ') }
   }), [projectIds, schedule.planners, today])
   if (projectIds.length === 0) return <p className="wrMuted">Open a project to plan it.</p>

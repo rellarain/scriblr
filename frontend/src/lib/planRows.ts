@@ -1,4 +1,3 @@
-import type { OutlineNode } from '../api/types'
 import type { Phase, PhaseLevel, Planner } from './facets'
 
 // The rows of the plan: the project, then each book with its chapters under it. A phase is on one row (its `level` and the book or chapter it is `nodeId`),
@@ -6,16 +5,19 @@ import type { Phase, PhaseLevel, Planner } from './facets'
 
 export const PROJECT_ROW = 'project'
 
+// What the rows need of an outline node (an outline's nodes, or the lighter facts read for the goals; without an order they stay in the order they came).
+export interface RowNode { id: string; kind: string; parentId: string | null; title: string; order?: number }
+
 export interface PlanRow { key: string; level: PhaseLevel; nodeId: string | null; title: string; parentKey: string | null }
 
 export const rowKey = (level: PhaseLevel, nodeId: string | null): string => (level === 'project' || !nodeId ? PROJECT_ROW : `${level}:${nodeId}`)
 export const rowOfPhase = (p: Pick<Phase, 'level' | 'nodeId'>): string => rowKey(p.level, p.nodeId)
 
 // The project's row, then each book in outline order with the chapters under it (a chapter that is in no book hangs from the project).
-export function planRows(outline: OutlineNode[], projectTitle: string): PlanRow[] {
-  const children = new Map<string | null, OutlineNode[]>()
+export function planRows(outline: RowNode[], projectTitle: string): PlanRow[] {
+  const children = new Map<string | null, RowNode[]>()
   for (const n of outline) children.set(n.parentId, [...(children.get(n.parentId) ?? []), n])
-  for (const list of children.values()) list.sort((a, b) => a.order - b.order)
+  for (const list of children.values()) list.sort((a, b) => (a.order ?? 0) - (b.order ?? 0))
   const rows: PlanRow[] = [{ key: PROJECT_ROW, level: 'project', nodeId: null, title: projectTitle || 'Project', parentKey: null }]
   const walk = (parentId: string | null, bookKey: string) => {
     for (const child of children.get(parentId) ?? []) {

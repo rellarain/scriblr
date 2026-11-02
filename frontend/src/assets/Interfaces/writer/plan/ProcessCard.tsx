@@ -4,14 +4,14 @@ import { unmetMilestones } from '../../../../lib/processOrder'
 import { newId } from '../schedule/ids'
 import { IconBtn } from '../schedule/IconBtn'
 import { ChevronDownIcon, ChevronRightIcon, CloseIcon, LockIcon, PlusIcon, StackIcon, TrashIcon } from '../../../icons'
-import { ChipSet, FacetChips, PlanGrip, wholeOrNull } from './fields'
+import { ChipSet, FacetChips, PlanGrip, wholeOrNull, milestoneLabel } from './fields'
 import { TEMPLATE_OWNER } from './useTemplate'
 
 // One process: a titled, described recipe of steps. The steps are in groups, each done in order (one then the next) or in any order, and a process may mix
 // both. It is for several phases and facets, may need milestones to be done first (until they are, it is blocked), and can be linked to other processes:
 // before or after one (ordered), or with one (unordered: related, or done at the same time before whatever comes next).
 
-export function ProcessCard({ ownerId, process, processes, phases, milestones, stage, open, onOpen, onChange, onLink, onDelete }: {
+export function ProcessCard({ ownerId, process, processes, phases, milestones, stage, open, onOpen, onChange, onPlace, onLink, onDelete }: {
   ownerId: string
   process: Process
   processes: Process[]
@@ -22,6 +22,8 @@ export function ProcessCard({ ownerId, process, processes, phases, milestones, s
   open: boolean
   onOpen: (open: boolean) => void
   onChange: (patch: Partial<Process>) => void
+  // The milestones it is placed in, chosen.
+  onPlace: (milestoneIds: string[]) => void
   onLink: (otherId: string, relation: ProcessRelation | null) => void
   onDelete: () => void
 }) {
@@ -57,6 +59,7 @@ export function ProcessCard({ ownerId, process, processes, phases, milestones, s
           <input className="wrField" aria-label="Process title" value={process.title} onChange={e => onChange({ title: e.target.value })} />
           <textarea className="wrField" aria-label="Process description" placeholder="Description…" rows={2} maxLength={2000} value={process.description} onChange={e => onChange({ description: e.target.value })} />
           <FacetChips label="Process facets" value={process.facets} onChange={facets => onChange({ facets })} />
+          {milestones.length > 0 && <ChipSet label="Placed in milestones" value={process.milestoneIds} onChange={onPlace} options={milestones.map(m => ({ id: m.id, label: milestoneLabel(m, phases) }))} />}
           {phases.length > 0 && <ChipSet label="Process phases" value={process.phaseIds} onChange={phaseIds => onChange({ phaseIds })} options={phases.map(p => ({ id: p.id, label: p.title || 'Untitled phase' }))} />}
           {milestones.length > 0 && (
             <div className="wrPlanRequires">

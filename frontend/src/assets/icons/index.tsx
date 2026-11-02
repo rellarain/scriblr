@@ -393,7 +393,7 @@ export function FolderIcon(props: IconProps) {
   return <IconBase {...props}><path d="M3 7a2 2 0 012-2h4l2 2h8a2 2 0 012 2v8a2 2 0 01-2 2H5a2 2 0 01-2-2z" /></IconBase>
 }
 
-// The project (and its template): a filled folder with a plus cut out of it (the background shows through the plus).
+// The project template: a filled folder with a plus cut out of it (the background shows through the plus).
 export function FolderPlusIcon(props: IconProps) {
   return <IconBase {...props}>
     <path

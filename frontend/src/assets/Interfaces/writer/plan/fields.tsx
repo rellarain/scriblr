@@ -1,5 +1,5 @@
 import type { DragEvent, ReactNode } from 'react'
-import { FACETS, FACET_LABEL, type Facet, type Phase } from '../../../../lib/facets'
+import { FACETS, FACET_LABEL, type Facet, type Milestone, type Phase } from '../../../../lib/facets'
 import { DRAG_PLAN, type PlanDrag, type PlanKind } from '../../../../lib/planDrop'
 import { FacetIcon } from '../schedule/FacetIcon'
 import { TEMPLATE_OWNER } from './useTemplate'
@@ -38,6 +38,22 @@ export function PhaseSelect({ label, phases, value, onChange }: { label: string;
     <select className="wrField" aria-label={label} value={value && phases.some(p => p.id === value) ? value : ''} onChange={e => onChange(e.target.value || null)}>
       <option value="">No phase</option>
       {phases.map(p => <option key={p.id} value={p.id}>{p.title || 'Untitled phase'}</option>)}
+    </select>
+  )
+}
+
+// "Revision · Marked up": a milestone with the phase it is a section of.
+export const milestoneLabel = (m: Milestone, phases: Phase[]): string => {
+  const ph = phases.find(p => p.id === m.phaseId)
+  return `${ph ? `${ph.title || 'Untitled phase'} · ` : ''}${m.title || 'Untitled milestone'}`
+}
+
+// One milestone from the list (or none), for work that is placed in a milestone to reach it.
+export function MilestoneSelect({ label, milestones, phases, value, onChange }: { label: string; milestones: Milestone[]; phases: Phase[]; value: string | null | undefined; onChange: (id: string | null) => void }) {
+  return (
+    <select className="wrField" aria-label={label} value={value && milestones.some(m => m.id === value) ? value : ''} onChange={e => onChange(e.target.value || null)}>
+      <option value="">No milestone</option>
+      {milestones.map(m => <option key={m.id} value={m.id}>{milestoneLabel(m, phases)}</option>)}
     </select>
   )
 }

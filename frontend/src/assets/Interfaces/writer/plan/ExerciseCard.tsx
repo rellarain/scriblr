@@ -1,18 +1,20 @@
-import type { Exercise, Phase } from '../../../../lib/facets'
+import type { Exercise, Milestone, Phase } from '../../../../lib/facets'
 import { IconBtn } from '../schedule/IconBtn'
 import { CheckIcon, ChevronDownIcon, ChevronRightIcon, PencilIcon, TrashIcon } from '../../../icons'
-import { ChipSet, FacetChips, PlanGrip, wholeOrNull } from './fields'
+import { ChipSet, FacetChips, PlanGrip, milestoneLabel, wholeOrNull } from './fields'
 
 // One exercise: a writing drill with a prompt (its description), a length, how often it is suggested and a log of how often it has been done.
 
-export function ExerciseCard({ ownerId, exercise, phases, today, open, onOpen, onChange, onDelete }: {
+export function ExerciseCard({ ownerId, exercise, phases, milestones, today, open, onOpen, onChange, onPlace, onDelete }: {
   ownerId: string
   exercise: Exercise
   phases: Phase[]
+  milestones: Milestone[]
   today: string
   open: boolean
   onOpen: (open: boolean) => void
   onChange: (patch: Partial<Exercise>) => void
+  onPlace: (milestoneIds: string[]) => void
   onDelete: () => void
 }) {
   const title = exercise.title || 'Untitled exercise'
@@ -42,6 +44,7 @@ export function ExerciseCard({ ownerId, exercise, phases, today, open, onOpen, o
             </label>
           </div>
           <FacetChips label="Exercise facets" value={exercise.facets} onChange={facets => onChange({ facets })} />
+          {milestones.length > 0 && <ChipSet label="Placed in milestones" value={exercise.milestoneIds} onChange={onPlace} options={milestones.map(m => ({ id: m.id, label: milestoneLabel(m, phases) }))} />}
           {phases.length > 0 && <ChipSet label="Exercise phases" value={exercise.phaseIds} onChange={phaseIds => onChange({ phaseIds })} options={phases.map(p => ({ id: p.id, label: p.title || 'Untitled phase' }))} />}
           <div className="wrSchedFormActions">
             <span className="wrHint">{exercise.timesDone ? `Done ${exercise.timesDone} ${exercise.timesDone === 1 ? 'time' : 'times'}${exercise.lastDone ? `, last on ${exercise.lastDone}` : ''}.` : 'Not done yet.'}</span>

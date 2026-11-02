@@ -11,7 +11,7 @@ import type { ScheduleOwner } from '../schedule/ScheduleCard'
 import { CheckboxIcon, CopyIcon, ExportIcon, UndoIcon } from '../../../icons'
 import { TEMPLATE_OWNER } from './useTemplate'
 
-// The Toolkit tile: the project template as a toolkit. **From the template** picks phases, milestones, processes, exercises, routines, tasks and goals from it and
+// The Template tile: the project template, a toolkit to copy from. **From the template** picks phases, milestones, processes, exercises, routines, tasks and goals from it and
 // copies them into the plan being edited, dated from a start day that is asked (a copy is its own, never a link). **Save to the template** does it the other way,
 // from this plan into the template. While the template itself is being edited there is nothing to copy between, and the tile says so.
 
@@ -58,7 +58,7 @@ function Picker({ planner, value, onChange, label, onlyOpenTasks }: { planner: P
   )
 }
 
-export function ToolkitTile({ owner, template, setTemplate, today }: { owner: ScheduleOwner; template: Planner; setTemplate: (p: Planner) => void; today: string }) {
+export function TemplateTile({ owner, template, setTemplate, today }: { owner: ScheduleOwner; template: Planner; setTemplate: (p: Planner) => void; today: string }) {
   const editingTemplate = owner.id === TEMPLATE_OWNER
   const [open, setOpen] = useState<'from' | 'to' | null>('from')
   const [fromSel, setFromSel] = useState<PlanSelection>(emptySelection)
@@ -72,7 +72,7 @@ export function ToolkitTile({ owner, template, setTemplate, today }: { owner: Sc
 
   if (editingTemplate) {
     return (
-      <div className="wrSchedCard wrToolkit">
+      <div className="wrSchedCard wrTemplate">
         <p className="wrHint">You are editing the template. Its phases and milestones are counted in days from the start of whatever project they are copied into. Pick a project or the account above to copy from it, or to save its items here.</p>
       </div>
     )
@@ -94,7 +94,7 @@ export function ToolkitTile({ owner, template, setTemplate, today }: { owner: Sc
   const canUndo = undo !== null && owner.planner === undo.after
 
   return (
-    <div className="wrSchedCard wrToolkit">
+    <div className="wrSchedCard wrTemplate">
       {said && (
         <p className="wrSchedNotice" role="status">
           {said}

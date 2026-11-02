@@ -1,5 +1,5 @@
 import { useState, type DragEvent, type HTMLAttributes, type ReactNode } from 'react'
-import { FACETS, FACET_LABEL, PRIORITIES, PRIORITY_LABEL, type Facet, type Phase, type PlanItem, type TaskPriority } from '../../../../lib/facets'
+import { FACETS, FACET_LABEL, PRIORITIES, PRIORITY_LABEL, type Facet, type Phase, type PlanItem, type TaskPriority, type Milestone } from '../../../../lib/facets'
 import { formatEstimate, type QuickTarget } from '../../../../lib/quickAdd'
 import type { Progress } from '../../../../lib/taskProgress'
 import { newId } from './ids'
@@ -44,6 +44,9 @@ export interface TaskRowProps {
   // The phase the task builds to: its name beside the task, and the phases to choose from when it is opened.
   phaseTitle?: string
   phases?: Phase[]
+  // The milestone it is placed in (a section of a phase, reached by finishing it), and the milestones to choose from.
+  milestoneTitle?: string
+  milestones?: Milestone[]
 }
 
 function PriorityMark({ value, name, onPick }: { value: TaskPriority; name: string; onPick: (p: TaskPriority) => void }) {
@@ -87,6 +90,7 @@ export function TaskRow(p: TaskRowProps) {
   if (item.dueDate) facts.push(<span key="due" className="wrTaskFact" title="Due">due {item.dueDate === today ? 'today' : dayLabel(item.dueDate)}</span>)
   if (item.estimateMinutes) facts.push(<span key="est" className="wrTaskFact" title="Estimate">{formatEstimate(item.estimateMinutes)}</span>)
   if (p.phaseTitle) facts.push(<span key="phase" className="wrTaskFact" title="Phase">{p.phaseTitle}</span>)
+  if (p.milestoneTitle) facts.push(<span key="milestone" className="wrTaskFact" title="Milestone">{p.milestoneTitle}</span>)
   if (p.onShift) facts.push(<span key="shift" className="wrTaskFact">{p.running ? 'now · ' : ''}{p.onShift}</span>)
   if (p.from) facts.push(<span key="from" className="wrTaskFact">{p.fromColor && <i className="wrSchedDot" style={{ background: p.fromColor }} />}{p.from}</span>)
 
@@ -143,6 +147,16 @@ export function TaskRow(p: TaskRowProps) {
                 <select className="wrField" value={item.phaseId && p.phases.some(x => x.id === item.phaseId) ? item.phaseId : ''} onChange={e => p.onChange({ phaseId: e.target.value || null })}>
                   <option value="">No phase</option>
                   {p.phases.map(x => <option key={x.id} value={x.id}>{x.title || 'Untitled phase'}</option>)}
+                </select>
+              </label>
+            </div>
+          )}
+          {p.milestones && p.milestones.length > 0 && (
+            <div className="wrTaskGrid">
+              <label>Milestone
+                <select className="wrField" value={item.milestoneId && p.milestones.some(x => x.id === item.milestoneId) ? item.milestoneId : ''} onChange={e => { const id = e.target.value || null; p.onChange({ milestoneId: id, ...(id ? { phaseId: p.milestones?.find(x => x.id === id)?.phaseId ?? item.phaseId } : {}) }) }}>
+                  <option value="">No milestone</option>
+                  {p.milestones.map(x => <option key={x.id} value={x.id}>{x.title || 'Untitled milestone'}</option>)}
                 </select>
               </label>
             </div>

@@ -50,11 +50,11 @@ const tile = (id: string) => document.querySelector(`[data-tile-id="${id}"]`) as
 const lastSaved = async (check: (p: Planner) => boolean) => { await waitFor(() => expect(saved.some(check)).toBe(true)); return saved.filter(check).at(-1) as Planner }
 
 describe('the Project console', () => {
-  it('has the phases, the goals, the work and the toolkit as tiles, with the rail of them above', async () => {
+  it('has the plan, the goals, the work and the template as tiles, with the rail of them above', async () => {
     await open()
-    expect(Array.from(document.querySelectorAll('[data-tile-id]')).map(t => t.getAttribute('data-tile-id')).sort()).toEqual(['goals', 'phases', 'toolkit', 'work'])
+    expect(Array.from(document.querySelectorAll('[data-tile-id]')).map(t => t.getAttribute('data-tile-id')).sort()).toEqual(['goals', 'phases', 'template', 'work'])
     const rail = screen.getByRole('toolbar', { name: 'Project tiles tabs' })
-    expect(within(rail).getAllByRole('button').map(b => b.getAttribute('aria-label'))).toEqual(['Phases', 'Goals', 'Work', 'Toolkit'])
+    expect(within(rail).getAllByRole('button').map(b => b.getAttribute('aria-label'))).toEqual(['Plan', 'Goals', 'Work', 'Template'])
   })
 
   it('lists the phases with their result, status and how far each is (what is tagged with it, done over all)', async () => {
@@ -84,10 +84,10 @@ describe('the Project console', () => {
     const user = userEvent.setup()
     await open()
     const phases = within(tile('phases'))
-    await user.click(phases.getByRole('button', { name: 'New phase' }))
+    await user.click(phases.getByRole('button', { name: 'New phase on Saga' }))
     expect(phases.getByRole('textbox', { name: 'Phase title' })).toBeTruthy() // opened for editing
     await user.click(phases.getByRole('button', { name: 'New milestone on New phase' }))
-    await user.click(phases.getByRole('checkbox', { name: 'New milestone done' }))
+    await user.click(phases.getByRole('checkbox', { name: 'New milestone achieved' }))
     const ticked = await lastSaved(p => p.milestones.some(m => m.done && m.title === 'New milestone'))
     expect(ticked.milestones.find(m => m.title === 'New milestone')?.doneOn).toBe(TODAY)
     await user.click(phases.getByRole('button', { name: 'First draft details' }))
@@ -103,7 +103,7 @@ describe('the Project console', () => {
     const phases = within(tile('phases'))
     await user.click(phases.getByRole('button', { name: 'First draft details' }))
     expect(phases.queryByRole('button', { name: 'Mark the phase done' })).toBeNull() // two tasks and a milestone: one of three is done
-    await user.click(phases.getByRole('checkbox', { name: 'Half way done' }))
+    await user.click(phases.getByRole('checkbox', { name: 'Half way achieved' }))
     const work = within(tile('work'))
     await user.click(work.getByRole('button', { name: /^Tasks/, expanded: false }))
     await user.click(work.getByRole('checkbox', { name: 'Draft chapter 2' }))
@@ -142,7 +142,7 @@ describe('the Project console', () => {
     expect(within(revise).getByText('Stage 1')).toBeTruthy()
     expect(within(work.getByRole('region', { name: 'Proof a chapter' })).getByText('Stage 2')).toBeTruthy()
     await user.click(within(phases()).getByRole('button', { name: 'Outlining details' })) // its milestones show while it is open
-    await user.click(within(phases()).getByRole('checkbox', { name: 'Outline locked done' }))
+    await user.click(within(phases()).getByRole('checkbox', { name: 'Outline locked achieved' }))
     await waitFor(() => expect(within(revise).queryByText(/Blocked/)).toBeNull())
   })
 
@@ -181,12 +181,23 @@ describe('the Project console', () => {
     expect(setData).toHaveBeenCalledWith(DRAG_PLAN, JSON.stringify({ ownerId: 'p1', kind: 'exercise', id: 'ex1' }))
   })
 
-  it('shows the timeline of the phases at the top of the Phases tile', async () => {
+  it('shows the chart of the project row, with a bar for each phase and a flag for each milestone', async () => {
     await open()
     const phases = within(tile('phases'))
-    expect(phases.getByRole('group', { name: 'Phase timeline' })).toBeTruthy()
+    expect(phases.getByRole('group', { name: 'Saga on the timeline' })).toBeTruthy()
     expect(phases.getByRole('button', { name: /^First draft, Oct 21 to Feb 28/ })).toBeTruthy()
-    expect(phases.getByRole('button', { name: 'Half way, Dec 15, not done' })).toBeTruthy()
+    expect(phases.getByRole('button', { name: 'Half way, Dec 15, not achieved' })).toBeTruthy()
+  })
+
+  it('has a row for each book of the outline, to put a phase of its own on', async () => {
+    const user = userEvent.setup()
+    await open()
+    const phases = within(tile('phases'))
+    expect(phases.getByRole('region', { name: 'Saga row' })).toBeTruthy()
+    await user.click(phases.getByRole('button', { name: 'New phase on Book One' }))
+    const got = await lastSaved(p => p.phases.some(x => x.level === 'book' && x.nodeId === 'b1'))
+    expect(got.phases.find(x => x.nodeId === 'b1')).toMatchObject({ level: 'book', title: 'New phase', status: 'active' })
+    expect(within(phases.getByRole('region', { name: 'Book One row' })).getByRole('region', { name: 'New phase' })).toBeTruthy()
   })
 
   describe('the template', () => {
@@ -213,7 +224,7 @@ describe('the Project console', () => {
       await user.clear(lasts)
       await user.type(lasts, '90')
       expect((getKv<Planner>(TEMPLATE_KEY) as Planner).phases[1]).toMatchObject({ offsetDays: 30, lengthDays: 90 })
-      expect(within(tile('toolkit')).getByText(/You are editing the template/)).toBeTruthy()
+      expect(within(tile('template')).getByText(/You are editing the template/)).toBeTruthy()
       // Its cards are not dragged onto the Agenda, and nothing in it is blocked.
       expect(within(tile('work')).queryByRole('img', { name: /onto the Agenda/ })).toBeNull()
     })
@@ -222,13 +233,13 @@ describe('the Project console', () => {
       const user = userEvent.setup()
       setKv(TEMPLATE_KEY, template())
       await open()
-      const toolkit = within(tile('toolkit'))
-      await user.click(toolkit.getByRole('checkbox', { name: 'Drafting' }))
-      await user.click(toolkit.getByRole('checkbox', { name: 'Revise a chapter' })) // it brings the milestone it needs
-      expect((toolkit.getByRole('checkbox', { name: 'Outline locked' }) as HTMLInputElement).checked).toBe(true)
-      fireEvent.change(toolkit.getByLabelText('Start day of the copy'), { target: { value: '2026-12-01' } })
-      await user.click(toolkit.getByRole('button', { name: 'Copy into Saga' }))
-      expect((await toolkit.findByRole('status')).textContent).toMatch(/Copied 1 phase, 1 milestone and 1 process into Saga, from 2026-12-01\./)
+      const tpl = within(tile('template'))
+      await user.click(tpl.getByRole('checkbox', { name: 'Drafting' }))
+      await user.click(tpl.getByRole('checkbox', { name: 'Revise a chapter' })) // it brings the milestone it needs
+      expect((tpl.getByRole('checkbox', { name: 'Outline locked' }) as HTMLInputElement).checked).toBe(true)
+      fireEvent.change(tpl.getByLabelText('Start day of the copy'), { target: { value: '2026-12-01' } })
+      await user.click(tpl.getByRole('button', { name: 'Copy into Saga' }))
+      expect((await tpl.findByRole('status')).textContent).toMatch(/Copied 1 phase, 1 milestone and 1 process into Saga, from 2026-12-01\./)
       const got = await lastSaved(p => p.phases.some(x => x.title === 'Drafting'))
       expect(got.phases.find(x => x.title === 'Drafting')).toMatchObject({ start: '2026-12-31', end: '2027-02-28', status: 'planned', offsetDays: null })
       const copied = got.milestones.find(x => x.title === 'Outline locked' && x.id !== 'm1') // (the project has one of its own with that name)
@@ -236,20 +247,20 @@ describe('the Project console', () => {
       expect(got.processes.find(x => x.title === 'Revise a chapter' && x.id !== 'pr1')?.requiredMilestoneIds).toEqual([copied?.id])
       // The template is untouched, and the copy can be taken back while nothing else has changed the plan.
       expect((getKv<Planner>(TEMPLATE_KEY) as Planner).phases).toHaveLength(2)
-      await user.click(toolkit.getByRole('button', { name: 'Undo the copy' }))
+      await user.click(tpl.getByRole('button', { name: 'Undo the copy' }))
       await lastSaved(p => !p.phases.some(x => x.title === 'Drafting') && p.phases.length === 2)
-      expect(toolkit.getByRole('status').textContent).toBe('Took the copy back.')
+      expect(tpl.getByRole('status').textContent).toBe('Took the copy back.')
     })
 
     it('says so when the template is empty, and saves picked items from the project into it, as days from the start', async () => {
       const user = userEvent.setup()
       await open()
-      const toolkit = within(tile('toolkit'))
-      expect(toolkit.getByText(/The template is empty/)).toBeTruthy()
-      await user.click(toolkit.getByRole('button', { name: /^Save to the template/ }))
-      await user.click(toolkit.getByRole('checkbox', { name: 'First draft' }))
-      await user.click(toolkit.getByRole('button', { name: 'Add to the template' }))
-      expect(toolkit.getByRole('status').textContent).toBe('Saved 1 phase to the template.')
+      const tpl = within(tile('template'))
+      expect(tpl.getByText(/The template is empty/)).toBeTruthy()
+      await user.click(tpl.getByRole('button', { name: /^Save to the template/ }))
+      await user.click(tpl.getByRole('checkbox', { name: 'First draft' }))
+      await user.click(tpl.getByRole('button', { name: 'Add to the template' }))
+      expect(tpl.getByRole('status').textContent).toBe('Saved 1 phase to the template.')
       const saved = getKv<Planner>(TEMPLATE_KEY) as Planner
       expect(saved.phases).toHaveLength(1)
       expect(saved.phases[0]).toMatchObject({ title: 'First draft', start: null, end: null, offsetDays: 20, lengthDays: 131 }) // 21 Oct to 28 Feb, counted from the project's earliest date, 1 Oct

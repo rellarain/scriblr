@@ -305,8 +305,8 @@
   .wrStepRow { display: flex; align-items: center; gap: var(--space-3); .wrField { flex: 1 1 auto; min-width: 0; } .wrSchedNum { flex: 0 0 5em; width: 5em; } }
   .wrStepNo { flex: 0 0 1.4em; text-align: center; color: var(--level-ink-soft); font-size: var(--text-ui); }
   .wrWork > .wrFold { padding: 0 var(--space-3); }
-  // The Toolkit tile: what can be picked from a plan (a group for each kind, with a box for all of it and a box for each item), the start day of a copy and its buttons.
-  .wrToolkit > .wrFold { padding: 0 var(--space-3); }
+  // The Template tile: what can be picked from a plan (a group for each kind, with a box for all of it and a box for each item), the start day of a copy and its buttons.
+  .wrTemplate > .wrFold { padding: 0 var(--space-3); }
   .wrPicker { display: flex; flex-direction: column; gap: var(--space-4); }
   .wrPickerGroup { display: flex; flex-direction: column; gap: var(--space-2); }
   .wrPickerAll, .wrPickerItem { display: flex; align-items: center; gap: var(--space-3); cursor: pointer; }
@@ -332,6 +332,29 @@
     &:focus-visible { outline: 2px solid var(--level-ink); outline-offset: 2px; } }
   .wrTimelineName { flex: 1 1 auto; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: var(--text-small); font-weight: 700; }
   .wrTimelineEdge { flex: none; align-self: stretch; width: 8px; cursor: ew-resize; }
+  // The Plan tile: rows (the project, its books, their chapters), each a head, a lane on the shared chart of days (the Dates view) and the cards of its phases;
+  // a phase card holds its sections, the milestones, each with the work placed in it. A drag over a row it did not come from is shown as refused.
+  .wrPlan { gap: var(--space-4); }
+  .wrPlanScroll { overflow-x: auto; overflow-y: hidden; }
+  .wrPlanRuler { height: 22px; background: var(--wr-fill-4); border-radius: var(--radius-button) var(--radius-button) 0 0;
+    span { font-size: var(--text-small); &.major { font-weight: 700; color: var(--level-ink); } } }
+  .wrLane { position: relative; height: 62px; background: var(--wr-fill-4); border-radius: var(--radius-button); touch-action: none; user-select: none; overflow: hidden; }
+  .wrPlanRow { display: flex; flex-direction: column; gap: var(--space-3); padding-top: var(--space-3); border-top: 1px solid var(--level-line);
+    &--book { margin-left: var(--space-4); } &--chapter { margin-left: var(--space-6); } }
+  .wrPlanRowHead { display: flex; align-items: center; gap: var(--space-3); }
+  .wrPlanRowName { flex: 1 1 auto; min-width: 0; display: flex; align-items: center; gap: var(--space-3); padding: var(--space-2) 0; background: transparent; border: 0; color: inherit; font: inherit; text-align: left; cursor: pointer;
+    b { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; } small { color: var(--level-ink-soft); white-space: nowrap; } &:focus-visible { outline: 2px solid var(--level-ink); outline-offset: 2px; } }
+  .wrPhaseCard { margin-bottom: 0; &--ok { outline: 2px dashed var(--level-ink); outline-offset: -2px; } &--refuse { outline: 2px dashed var(--level-ink-soft); outline-offset: -2px; opacity: 0.6; cursor: no-drop; } }
+  .wrSections { display: flex; flex-direction: column; gap: var(--space-3); padding: 0 var(--space-4) var(--space-4); }
+  .wrSection { display: flex; flex-direction: column; gap: var(--space-3); padding: var(--space-3) var(--space-4); border-left: 4px solid var(--level-line); border-radius: var(--radius-button); background: var(--level-wash);
+    &--achieved { border-left-color: var(--level-ink); } &--ok { outline: 2px dashed var(--level-ink); outline-offset: -2px; } &--refuse { outline: 2px dashed var(--level-ink-soft); outline-offset: -2px; opacity: 0.6; cursor: no-drop; } }
+  .wrSectionHead { display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-3); .wrField { flex: 1 1 9em; min-width: 0; } }
+  .wrSectionBody { display: flex; flex-direction: column; gap: var(--space-3); }
+  .wrSectionDate { display: flex; align-items: center; gap: var(--space-2); .wrField { flex: 1 1 auto; min-width: 0; } }
+  .wrWorkChips { display: flex; flex-direction: column; gap: var(--space-2); margin: 0; padding: 0; list-style: none; }
+  .wrWorkChip { display: flex; align-items: center; gap: var(--space-3); padding: var(--space-2) var(--space-3); border: 1px solid var(--level-line); border-radius: var(--radius-button); background: var(--wr-fill-4);
+    &--done .wrWorkChipLabel { text-decoration: line-through; color: var(--level-ink-soft); } }
+  .wrWorkChipLabel { flex: 1 1 auto; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
   .wrSchedNotice { display: flex; align-items: center; gap: var(--space-3); margin-bottom: var(--space-4); padding: var(--space-3) var(--space-4); border-left: 4px solid var(--level-ink); border-radius: var(--radius-button); background: var(--wr-fill-4); font-size: var(--text-field); }
   .wrTaskDragging { opacity: 0.6; }
 
