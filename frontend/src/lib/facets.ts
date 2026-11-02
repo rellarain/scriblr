@@ -96,8 +96,9 @@ export interface PlanItem {
   addedOn: string | null
   // It was on a shift that ended with it undone, and came back to the backlog.
   carried: boolean
-  // The phase it builds to, and the process it is a step of (a task made from a process when it is put on the Agenda).
+  // The phase it builds to, the milestone (a section of that phase) it is placed in, and the process it is a step of (a task made from a process when it is put on the Agenda).
   phaseId?: string | null
+  milestoneId?: string | null
   processId?: string | null
   // The step it follows, in an ordered group of a process: it can be ticked once that one is.
   afterId?: string | null
@@ -118,6 +119,7 @@ export interface Routine {
   pauses: Pause[]
   lastDone: string | null
   phaseId?: string | null
+  milestoneId?: string | null
 }
 export interface Shift {
   id: string
@@ -148,6 +150,11 @@ export interface Goal {
   phaseId?: string | null
 }
 // A stage of the project, defined by the result it builds to. In a project it has real dates; in the template, an offset from the start and a length.
+// It is on one row of the plan: the project's, or one of its books' or chapters' (`level`, and the book or chapter as `nodeId`). It sits in a sequence on its row
+// (`order`), may be a pass of a kind of phase (`kindId`), and has its start pinned to its date when `fixed`. `overrides` are the fields of the kind it has changed.
+export type PhaseLevel = 'project' | 'book' | 'chapter'
+export const PHASE_LEVELS: PhaseLevel[] = ['project', 'book', 'chapter']
+export const PHASE_LEVEL_LABEL: Record<PhaseLevel, string> = { project: 'Project', book: 'Book', chapter: 'Chapter' }
 export type PhaseStatus = 'planned' | 'active' | 'done'
 export const PHASE_STATUSES: PhaseStatus[] = ['planned', 'active', 'done']
 export const PHASE_STATUS_LABEL: Record<PhaseStatus, string> = { planned: 'Planned', active: 'Active', done: 'Done' }
@@ -161,9 +168,33 @@ export interface Phase {
   end: string | null
   offsetDays: number | null
   lengthDays: number | null
+  level: PhaseLevel
+  nodeId: string | null
+  kindId: string | null
+  order: number
+  fixed: boolean
+  overrides: string[]
 }
-// A dated marker, tickable, optionally on a phase.
-export interface Milestone { id: string; title: string; date: string | null; offsetDays: number | null; phaseId: string | null; done: boolean; doneOn: string | null }
+// A section of a phase, reached by finishing the work placed in it: a deliverable (`result`), with a date or, in the sequence, a length; tickable by hand too.
+// `kindMilestoneId` is the section of a kind it came from, and `overrides` the fields of it that were changed.
+export interface Milestone {
+  id: string
+  title: string
+  result: string
+  date: string | null
+  offsetDays: number | null
+  phaseId: string | null
+  done: boolean
+  doneOn: string | null
+  order: number
+  lengthDays: number | null
+  fixed: boolean
+  kindMilestoneId: string | null
+  overrides: string[]
+}
+// A recipe for a phase that comes round (a Revision pass): a pass starts from it and follows it in the fields it has not changed.
+export interface PhaseKindMilestone { id: string; title: string; result: string; lengthDays: number | null }
+export interface PhaseKind { id: string; title: string; result: string; description: string; lengthDays: number | null; milestones: PhaseKindMilestone[] }
 export interface ProcessStep { id: string; label: string; estimateMinutes: number | null; facet: Facet | null }
 // Steps done in order (one then the next) or in any order (a set to tick off).
 export interface StepGroup { id: string; ordered: boolean; steps: ProcessStep[] }
@@ -178,6 +209,8 @@ export interface Process {
   title: string
   description: string
   phaseIds: string[]
+  // The milestones it is placed in.
+  milestoneIds: string[]
   facets: Facet[]
   requiredMilestoneIds: string[]
   groups: StepGroup[]
@@ -191,6 +224,7 @@ export interface Exercise {
   durationMinutes: number
   facets: Facet[]
   phaseIds: string[]
+  milestoneIds: string[]
   perWeek: number | null
   timesDone: number
   lastDone: string | null
@@ -212,17 +246,33 @@ export interface Planner {
   milestones: Milestone[]
   processes: Process[]
   exercises: Exercise[]
+  // The recipes for phases that come round.
+  phaseKinds: PhaseKind[]
 }
 export const emptyPlanner = (): Planner => ({
   timelineStart: null, timelineEnd: null, goals: [], shifts: [], routines: [], items: [], templates: [], restDays: [], reminderLeadMinutes: null,
-  phases: [], milestones: [], processes: [], exercises: [],
+  phases: [], milestones: [], processes: [], exercises: [], phaseKinds: [],
 })
-// A planner as it was saved before phases and the rest existed (or the account's, kept as free JSON) has none of them: fill them in.
-export const normalizePlanner = (p: Partial<Planner> | null | undefined): Planner => ({ ...emptyPlanner(), ...p })
-export const newPhase = (id: string, title: string, patch: Partial<Phase> = {}): Phase => ({ id, title, result: '', description: '', status: 'planned', start: null, end: null, offsetDays: null, lengthDays: null, ...patch })
-export const newMilestone = (id: string, title: string, patch: Partial<Milestone> = {}): Milestone => ({ id, title, date: null, offsetDays: null, phaseId: null, done: false, doneOn: null, ...patch })
-export const newProcess = (id: string, title: string, patch: Partial<Process> = {}): Process => ({ id, title, description: '', phaseIds: [], facets: [], requiredMilestoneIds: [], groups: [], links: [], ...patch })
-export const newExercise = (id: string, title: string, patch: Partial<Exercise> = {}): Exercise => ({ id, title, description: '', durationMinutes: 15, facets: [], phaseIds: [], perWeek: null, timesDone: 0, lastDone: null, ...patch })
+export const newPhase = (id: string, title: string, patch: Partial<Phase> = {}): Phase => ({
+  id, title, result: '', description: '', status: 'planned', start: null, end: null, offsetDays: null, lengthDays: null, level: 'project', nodeId: null, kindId: null, order: 0, fixed: false, overrides: [], ...patch,
+})
+export const newMilestone = (id: string, title: string, patch: Partial<Milestone> = {}): Milestone => ({
+  id, title, result: '', date: null, offsetDays: null, phaseId: null, done: false, doneOn: null, order: 0, lengthDays: null, fixed: false, kindMilestoneId: null, overrides: [], ...patch,
+})
+export const newProcess = (id: string, title: string, patch: Partial<Process> = {}): Process => ({ id, title, description: '', phaseIds: [], milestoneIds: [], facets: [], requiredMilestoneIds: [], groups: [], links: [], ...patch })
+export const newExercise = (id: string, title: string, patch: Partial<Exercise> = {}): Exercise => ({ id, title, description: '', durationMinutes: 15, facets: [], phaseIds: [], milestoneIds: [], perWeek: null, timesDone: 0, lastDone: null, ...patch })
+export const newPhaseKind = (id: string, title: string, patch: Partial<PhaseKind> = {}): PhaseKind => ({ id, title, result: '', description: '', lengthDays: null, milestones: [], ...patch })
+// A planner as it was saved before phases, their levels and the rest existed (or the account's, kept as free JSON) lacks them: fill in what is missing.
+export function normalizePlanner(p: Partial<Planner> | null | undefined): Planner {
+  const base = { ...emptyPlanner(), ...p }
+  return {
+    ...base,
+    phases: base.phases.map((x, i) => newPhase(x.id, x.title, { ...x, order: x.order ?? i })),
+    milestones: base.milestones.map(x => newMilestone(x.id, x.title, x)),
+    processes: base.processes.map(x => newProcess(x.id, x.title, x)),
+    exercises: base.exercises.map(x => newExercise(x.id, x.title, x)),
+  }
+}
 
 // 10-minute slots of the day.
 export const SLOTS_PER_DAY = 144

@@ -1345,6 +1345,8 @@ class PlanItem(BaseModel):
     carried: bool = False
     # The phase it builds to, and the process it is a step of (a task made from a process when it is put on the Agenda).
     phaseId: Optional[str] = None
+    # The milestone it is placed in (a section of a phase), which it helps to achieve.
+    milestoneId: Optional[str] = None
     processId: Optional[str] = None
     # The step it follows, in an ordered group of a process: it can be ticked once that one is.
     afterId: Optional[str] = None
@@ -1370,6 +1372,7 @@ class Routine(BaseModel):
     pauses: list[Pause] = Field(default_factory=list)
     lastDone: Optional[str] = None
     phaseId: Optional[str] = None
+    milestoneId: Optional[str] = None
 
 
 class Shift(BaseModel):
@@ -1426,6 +1429,7 @@ class RestRange(BaseModel):
 
 
 PhaseStatus = Literal["planned", "active", "done"]
+PhaseLevel = Literal["project", "book", "chapter"]
 ProcessRelation = Literal["before", "after", "with"]
 
 
@@ -1441,18 +1445,52 @@ class Phase(BaseModel):
     end: Optional[str] = None
     offsetDays: Optional[int] = Field(default=None, ge=0, le=3650)
     lengthDays: Optional[int] = Field(default=None, ge=1, le=3650)
+    # Which row of the plan it is on: the project, or one of its books or chapters (`nodeId`). A phase saved before levels existed is the project's.
+    level: PhaseLevel = "project"
+    nodeId: Optional[str] = None
+    # The kind of phase it is a pass of ("Revision"), the place in its row's sequence, whether its start is pinned to its date, and which of the kind's
+    # fields it has changed on its own (the others follow the kind).
+    kindId: Optional[str] = None
+    order: int = Field(default=0, ge=0)
+    fixed: bool = False
+    overrides: list[str] = Field(default_factory=list)
 
 
 class Milestone(BaseModel):
-    """A dated marker, tickable, optionally on a phase."""
+    """A section of a phase, reached by finishing the work placed in it: a deliverable, with a date (or a length in the sequence), tickable."""
 
     id: str
     title: str = Field(max_length=200)
+    # What is delivered when the milestone is achieved.
+    result: str = Field(default="", max_length=1000)
     date: Optional[str] = None
     offsetDays: Optional[int] = Field(default=None, ge=0, le=3650)
     phaseId: Optional[str] = None
     done: bool = False
     doneOn: Optional[str] = None
+    order: int = Field(default=0, ge=0)
+    lengthDays: Optional[int] = Field(default=None, ge=1, le=3650)
+    fixed: bool = False
+    kindMilestoneId: Optional[str] = None
+    overrides: list[str] = Field(default_factory=list)
+
+
+class PhaseKindMilestone(BaseModel):
+    id: str
+    title: str = Field(max_length=200)
+    result: str = Field(default="", max_length=1000)
+    lengthDays: Optional[int] = Field(default=None, ge=1, le=3650)
+
+
+class PhaseKind(BaseModel):
+    """A recipe for a phase that comes round (a Revision pass): its result, length and milestones. A pass starts from it and follows it in what it has not changed."""
+
+    id: str
+    title: str = Field(max_length=200)
+    result: str = Field(default="", max_length=1000)
+    description: str = Field(default="", max_length=2000)
+    lengthDays: Optional[int] = Field(default=None, ge=1, le=3650)
+    milestones: list[PhaseKindMilestone] = Field(default_factory=list)
 
 
 class ProcessStep(BaseModel):
@@ -1484,6 +1522,7 @@ class Process(BaseModel):
     title: str = Field(max_length=200)
     description: str = Field(default="", max_length=2000)
     phaseIds: list[str] = Field(default_factory=list)
+    milestoneIds: list[str] = Field(default_factory=list)  # the milestones it is placed in
     facets: list[Facet] = Field(default_factory=list)
     requiredMilestoneIds: list[str] = Field(default_factory=list)
     groups: list[StepGroup] = Field(default_factory=list)
@@ -1505,6 +1544,7 @@ class Exercise(BaseModel):
     durationMinutes: int = Field(default=15, ge=1, le=24 * 60)
     facets: list[Facet] = Field(default_factory=list)
     phaseIds: list[str] = Field(default_factory=list)
+    milestoneIds: list[str] = Field(default_factory=list)
     perWeek: Optional[int] = Field(default=None, ge=1, le=21)
     timesDone: int = Field(default=0, ge=0)
     lastDone: Optional[str] = None
@@ -1526,6 +1566,8 @@ class Planner(BaseModel):
     milestones: list[Milestone] = Field(default_factory=list)
     processes: list[Process] = Field(default_factory=list)
     exercises: list[Exercise] = Field(default_factory=list)
+    # The recipes for phases that come round.
+    phaseKinds: list[PhaseKind] = Field(default_factory=list)
 
 
 # ---------------------------------------------------------------------------

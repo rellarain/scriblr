@@ -1,4 +1,4 @@
-import { CalendarIcon, FolderIcon, GearIcon, HelpIcon, PencilIcon, PeopleIcon } from '../../../icons'
+import { CalendarIcon, FolderPlusIcon, GearIcon, HelpIcon, PencilIcon, PeopleIcon } from '../../../icons'
 import { SettingsSaveCluster } from '../../../../components/SettingsSaveCluster'
 import { flushSettings } from '../../../../settings/settingsStore'
 import ThemeSettingsPanel from '../../../../theme/ThemeSettingsPanel'
@@ -25,7 +25,7 @@ export function dashTabs(w: WriterWorkspace): LevelTab[] {
     { id: 'readers', label: 'Readers', Icon: PeopleIcon, render: () => <ReadersPanel /> },
     { id: 'scratchpad', label: 'Scratchpad', Icon: PencilIcon, searchable: true, render: c => <Scratchpad bare query={c.query} /> },
     {
-      id: 'project', label: 'Project', Icon: FolderIcon, fill: true, surface: false, titleSlot: true, iconSize: 20, console: true,
+      id: 'project', label: 'Project', Icon: FolderPlusIcon, fill: true, surface: false, titleSlot: true, iconSize: 20, console: true,
       render: c => {
         const ids = w.projects.map(p => p.projectId)
         const titles = Object.fromEntries(w.projects.map(p => [p.projectId, p.title]))

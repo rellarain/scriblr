@@ -84,7 +84,12 @@ def _check_dates(planner: Planner) -> None:
     for phase in planner.phases:
         if phase.start and phase.end and phase.end < phase.start:
             raise HTTPException(status_code=422, detail=f"phase {phase.title!r} ends before it starts")
-    for kind, items in (('phase', planner.phases), ('milestone', planner.milestones), ('process', planner.processes), ('exercise', planner.exercises)):
+    for phase in planner.phases:
+        if phase.level == 'project' and phase.nodeId:
+            raise HTTPException(status_code=422, detail=f"phase {phase.title!r} is the project's, so it has no book or chapter")
+        if phase.level != 'project' and not phase.nodeId:
+            raise HTTPException(status_code=422, detail=f"phase {phase.title!r} is a {phase.level} phase, so it needs the {phase.level} it is for")
+    for kind, items in (('phase', planner.phases), ('milestone', planner.milestones), ('process', planner.processes), ('exercise', planner.exercises), ('phase kind', planner.phaseKinds)):
         ids = [i.id for i in items]
         if len(ids) != len(set(ids)):
             raise HTTPException(status_code=422, detail=f"two {kind}s share an id")

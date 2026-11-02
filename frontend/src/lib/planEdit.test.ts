@@ -29,6 +29,14 @@ describe('removing from the plan', () => {
     expect(p.processes[0].requiredMilestoneIds).toEqual([])
   })
 
+  it('lets go of the work placed in a milestone that is gone', () => {
+    const placed = { ...base(), items: [newTask('t', 'Write', null, { milestoneId: 'm' })], processes: [newProcess('pr', 'P', { milestoneIds: ['m', 'k'] })], exercises: [newExercise('ex', 'E', { milestoneIds: ['m'] })] }
+    const p = removeMilestone(placed, 'm')
+    expect(p.items[0].milestoneId).toBeNull()
+    expect(p.processes[0].milestoneIds).toEqual(['k'])
+    expect(p.exercises[0].milestoneIds).toEqual([])
+  })
+
   it('drops a process, the links to it and the mark on the tasks it made', () => {
     const p = removeProcess(base(), 'pr')
     expect(p.processes.map(x => x.id)).toEqual(['pr2'])

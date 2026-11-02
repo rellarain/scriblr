@@ -66,6 +66,16 @@ describe('copyIntoPlanner', () => {
     expect(planner.milestones.map(m => [m.title, m.date, m.done, m.doneOn])).toEqual([['Outline locked', '2026-12-01', false, null], ['Half way', '2027-01-16', false, null]])
   })
 
+  it('copies a phase onto the project row as a plain card, and remaps where work was placed', () => {
+    const t = template()
+    const src = { ...t, phases: t.phases.map(x => ({ ...x, level: 'book' as const, nodeId: 'gone', kindId: 'k', overrides: ['result'] })), milestones: t.milestones.map(x => ({ ...x, kindMilestoneId: 'km', overrides: ['title'] })), processes: [newProcess('pr', 'P', { milestoneIds: [t.milestones[0].id, 'missing'] })], items: [newTask('t', 'T', null, { milestoneId: t.milestones[0].id })] }
+    const { planner } = copyIntoPlanner(src, { ...emptySelection(), phases: [t.phases[0].id], milestones: [t.milestones[0].id], processes: ['pr'], items: ['t'] }, emptyPlanner(), '2026-11-02', counter())
+    expect(planner.phases[0]).toMatchObject({ level: 'project', nodeId: null, kindId: null, overrides: [] })
+    expect(planner.milestones[0]).toMatchObject({ kindMilestoneId: null, overrides: [] })
+    expect(planner.processes[0].milestoneIds).toEqual([planner.milestones[0].id])
+    expect(planner.items[0].milestoneId).toBe(planner.milestones[0].id)
+  })
+
   it('gives everything new ids and keeps the tags between the copies', () => {
     const { planner } = into({ phases: ['ph1'], milestones: ['m1'] })
     expect(planner.phases[0].id).not.toBe('ph1')

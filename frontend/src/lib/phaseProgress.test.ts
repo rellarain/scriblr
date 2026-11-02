@@ -16,6 +16,17 @@ describe('phaseProgress', () => {
     expect(r).toMatchObject({ done: 3, total: 5, pct: 60, tasks: [1, 2], milestones: [1, 1], goals: [1, 2] })
   })
 
+  it('counts the work placed in its milestones, a milestone being achieved when its work is done', () => {
+    const p = {
+      ...emptyPlanner(),
+      phases: [newPhase('ph', 'P')],
+      milestones: [newMilestone('m1', 'One', { phaseId: 'ph' }), newMilestone('m2', 'Two', { phaseId: 'ph' })],
+      items: [newTask('a', 'A', null, { milestoneId: 'm1', doneOn: '2026-10-01' }), newTask('b', 'B', null, { milestoneId: 'm2' }), newTask('c', 'C', null, { phaseId: 'ph', milestoneId: 'm2', doneOn: '2026-10-01' })],
+    }
+    // Task c is tagged with the phase and placed in a milestone: counted once.
+    expect(phaseProgress(p, 'ph')).toMatchObject({ tasks: [2, 3], milestones: [1, 2], done: 3, total: 5 })
+  })
+
   it('has no progress for a phase with nothing tagged', () => {
     expect(phaseProgress(emptyPlanner(), 'ph').pct).toBeNull()
   })

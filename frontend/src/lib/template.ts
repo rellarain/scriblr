@@ -52,21 +52,23 @@ function clone(source: Planner, sel: PlanSelection, dating: Dating, newId: (pref
   const processId = new Map(processes.map(x => [x.id, newId('process')]))
   const mapped = (ids: string[], by: Map<string, string>): string[] => ids.filter(id => by.has(id)).map(id => by.get(id) as string)
   const tag = (id: string | null | undefined): string | null => (id ? phaseId.get(id) ?? null : null)
+  const tagMs = (id: string | null | undefined): string | null => (id ? milestoneId.get(id) ?? null : null)
 
-  const outPhases: Phase[] = phases.map(x => ({ ...x, id: phaseId.get(x.id) as string, status: 'planned', ...dating.phase(x) }))
-  const outMilestones: Milestone[] = milestones.map(x => ({ ...x, id: milestoneId.get(x.id) as string, phaseId: tag(x.phaseId), done: false, doneOn: null, ...dating.milestone(x) }))
+  // A copy is a plain card on the project's own row (it takes a book or chapter only when it is put on one), with no kind to follow.
+  const outPhases: Phase[] = phases.map(x => ({ ...x, id: phaseId.get(x.id) as string, status: 'planned', level: 'project', nodeId: null, kindId: null, overrides: [], fixed: false, ...dating.phase(x) }))
+  const outMilestones: Milestone[] = milestones.map(x => ({ ...x, id: milestoneId.get(x.id) as string, phaseId: tag(x.phaseId), done: false, doneOn: null, kindMilestoneId: null, overrides: [], fixed: false, ...dating.milestone(x) }))
   const outProcesses: Process[] = processes.map(x => ({
-    ...x, id: processId.get(x.id) as string, phaseIds: mapped(x.phaseIds, phaseId), requiredMilestoneIds: mapped(x.requiredMilestoneIds, milestoneId),
+    ...x, id: processId.get(x.id) as string, phaseIds: mapped(x.phaseIds, phaseId), milestoneIds: mapped(x.milestoneIds, milestoneId), requiredMilestoneIds: mapped(x.requiredMilestoneIds, milestoneId),
     groups: x.groups.map(g => ({ ...g, id: newId('group'), steps: g.steps.map(st => ({ ...st, id: newId('step') })) })),
     links: x.links.filter(l => processId.has(l.otherId)).map(l => ({ ...l, otherId: processId.get(l.otherId) as string })),
   }))
-  const outExercises: Exercise[] = pick(source.exercises, s.exercises).map(x => ({ ...x, id: newId('exercise'), phaseIds: mapped(x.phaseIds, phaseId), timesDone: 0, lastDone: null }))
+  const outExercises: Exercise[] = pick(source.exercises, s.exercises).map(x => ({ ...x, id: newId('exercise'), phaseIds: mapped(x.phaseIds, phaseId), milestoneIds: mapped(x.milestoneIds, milestoneId), timesDone: 0, lastDone: null }))
   const outRoutines: Routine[] = pick(source.routines, s.routines).map(x => ({
-    ...x, id: newId('routine'), shiftId: null, lastDone: null, pauses: [], phaseId: tag(x.phaseId), targetNodeId: null, targetTree: null,
+    ...x, id: newId('routine'), shiftId: null, lastDone: null, pauses: [], phaseId: tag(x.phaseId), milestoneId: tagMs(x.milestoneId), targetNodeId: null, targetTree: null,
     recurrence: { ...x.recurrence, anchor: dating.anchor ?? x.recurrence.anchor, until: null },
   }))
   const outItems: PlanItem[] = pick(source.items, s.items).map(x => ({
-    ...x, id: newId('item'), shiftId: null, doneOn: null, dueDate: null, addedOn: dating.anchor, carried: false, processId: null, afterId: null, phaseId: tag(x.phaseId),
+    ...x, id: newId('item'), shiftId: null, doneOn: null, dueDate: null, addedOn: dating.anchor, carried: false, processId: null, afterId: null, phaseId: tag(x.phaseId), milestoneId: tagMs(x.milestoneId),
     targetNodeId: null, targetTree: null, aim: null, subtasks: x.subtasks.map(st => ({ ...st, id: newId('sub'), done: false })),
   }))
   const outGoals: Goal[] = pick(source.goals, s.goals).map(x => ({ ...x, id: newId('goal'), scope: 'project', nodeId: null, deadline: null, phaseId: tag(x.phaseId) }))

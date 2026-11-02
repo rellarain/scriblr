@@ -306,8 +306,16 @@ described, now stale, in `docs/data-model.md`).
   ended with it undone; `phaseId` tags the phase it builds to and `processId`
   the process it is a step of, `afterId` the step it follows in an ordered group), shift templates, rest days and the project's
   timeline. A project is also made of **phases** (`Phase`: a title, the
-  `result` it builds to, a status of planned, active or done, and dates), the
-  **milestones** along them (`Milestone`: tickable, optionally on a phase),
+  `result` it builds to, a status of planned, active or done, and dates; it is
+  on one row of the plan: the project's, or a book's or chapter's, as `level`
+  and `nodeId`, in the sequence `order`, with its start pinned when `fixed`, and
+  possibly a pass of a **kind** (`PhaseKind`: a recipe with a result, length and
+  milestones, which a pass follows in every field not in its `overrides`)), the
+  **milestones** along them (`Milestone`: the sections of a phase, each a
+  deliverable (`result`) reached by finishing the work placed in it, which is
+  an item's or routine's `milestoneId` and a process's or exercise's
+  `milestoneIds`; tickable by hand too; pure logic in `lib/planRows.ts`,
+  `planSequence.ts`, `phaseKinds.ts` and `milestoneProgress.ts`),
   **processes** (`Process`: step groups done in order or in any order, several
   phases and facets, required milestones, and links to other processes that
   come before, after or go with it) and **exercises** (`Exercise`: a prompt, a

@@ -17,8 +17,17 @@ export function removePhase(p: Planner, id: string): Planner {
   }
 }
 
+// A milestone taken out: nothing stays placed in it, and no process still needs it.
 export function removeMilestone(p: Planner, id: string): Planner {
-  return { ...p, milestones: p.milestones.filter(x => x.id !== id), processes: p.processes.map(x => ({ ...x, requiredMilestoneIds: x.requiredMilestoneIds.filter(v => v !== id) })) }
+  const out = (x: { milestoneId?: string | null }) => (x.milestoneId === id ? { milestoneId: null } : {})
+  return {
+    ...p,
+    milestones: p.milestones.filter(x => x.id !== id),
+    items: p.items.map(x => ({ ...x, ...out(x) })),
+    routines: p.routines.map(x => ({ ...x, ...out(x) })),
+    processes: p.processes.map(x => ({ ...x, requiredMilestoneIds: x.requiredMilestoneIds.filter(v => v !== id), milestoneIds: x.milestoneIds.filter(v => v !== id) })),
+    exercises: p.exercises.map(x => ({ ...x, milestoneIds: x.milestoneIds.filter(v => v !== id) })),
+  }
 }
 
 export function removeProcess(p: Planner, id: string): Planner {

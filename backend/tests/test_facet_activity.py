@@ -436,6 +436,42 @@ def test_a_plan_with_a_bad_phase_milestone_process_or_exercise_is_refused(client
     assert client.get(f"/api/projects/{pid}/planner").json()["phases"] == []  # nothing was kept
 
 
+def test_an_old_phase_is_the_projects_and_a_plan_keeps_levels_kinds_and_sections(client: TestClient) -> None:
+    pid = _project(client)
+    client.put(f"/api/projects/{pid}/planner", json=_plan())
+    old = client.get(f"/api/projects/{pid}/planner").json()
+    assert all(p["level"] == "project" and p["nodeId"] is None and p["kindId"] is None and p["overrides"] == [] and p["fixed"] is False for p in old["phases"])
+    assert old["milestones"][0]["result"] == "" and old["milestones"][0]["order"] == 0 and old["phaseKinds"] == []
+    assert old["processes"][0]["milestoneIds"] == [] and old["items"][0]["milestoneId"] is None
+
+    body = _plan()
+    body["phaseKinds"] = [{"id": "k1", "title": "Revision", "result": "A cleaner draft", "lengthDays": 14, "milestones": [{"id": "km1", "title": "Marked up", "lengthDays": 5}]}]
+    body["phases"].append({"id": "ph4", "title": "Revision", "level": "chapter", "nodeId": "ch1", "kindId": "k1", "order": 2, "fixed": True, "overrides": ["result"]})
+    body["milestones"].append({"id": "m2", "title": "Marked up", "result": "Every page marked", "phaseId": "ph4", "order": 0, "lengthDays": 5, "kindMilestoneId": "km1"})
+    body["items"][0]["milestoneId"] = "m2"
+    body["processes"][0]["milestoneIds"] = ["m2"]
+    assert client.put(f"/api/projects/{pid}/planner", json=body).status_code == 200
+    got = client.get(f"/api/projects/{pid}/planner").json()
+    assert got["phaseKinds"][0]["milestones"][0]["lengthDays"] == 5
+    assert got["phases"][-1]["level"] == "chapter" and got["phases"][-1]["nodeId"] == "ch1" and got["phases"][-1]["overrides"] == ["result"]
+    assert got["milestones"][-1]["kindMilestoneId"] == "km1" and got["items"][0]["milestoneId"] == "m2" and got["processes"][0]["milestoneIds"] == ["m2"]
+
+
+def test_a_phase_level_needs_its_node_and_a_project_phase_has_none(client: TestClient) -> None:
+    pid = _project(client)
+
+    def refused(change) -> None:
+        body = _plan()
+        change(body)
+        assert client.put(f"/api/projects/{pid}/planner", json=body).status_code == 422
+
+    refused(lambda b: b["phases"][0].update(level="book"))  # a book phase with no book
+    refused(lambda b: b["phases"][0].update(level="chapter", nodeId=None))
+    refused(lambda b: b["phases"][0].update(nodeId="b1"))  # the project's phase with a book
+    refused(lambda b: b["phases"][0].update(level="series"))
+    refused(lambda b: b.update(phaseKinds=[{"id": "k", "title": "A"}, {"id": "k", "title": "B"}]))  # two kinds share an id
+
+
 def test_a_project_is_written_in_format_six(client: TestClient, storage_root) -> None:
     import json
 

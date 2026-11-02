@@ -393,6 +393,16 @@ export function FolderIcon(props: IconProps) {
   return <IconBase {...props}><path d="M3 7a2 2 0 012-2h4l2 2h8a2 2 0 012 2v8a2 2 0 01-2 2H5a2 2 0 01-2-2z" /></IconBase>
 }
 
+// The project (and its template): a filled folder with a plus cut out of it (the background shows through the plus).
+export function FolderPlusIcon(props: IconProps) {
+  return <IconBase {...props}>
+    <path
+      fill="currentColor" stroke="none" fillRule="evenodd"
+      d="M2.5 7A2.5 2.5 0 015 4.5h4.2l2 2.2H19A2.5 2.5 0 0121.5 9.2v8.3A2.5 2.5 0 0119 20H5a2.5 2.5 0 01-2.5-2.5zM11.1 10.2v2.4H8.7v1.8h2.4v2.4h1.8v-2.4h2.4v-1.8h-2.4v-2.4z"
+    />
+  </IconBase>
+}
+
 export function BookmarkIcon(props: IconProps) {
   return <IconBase {...props}>
     <path d="M6 3h12v18l-6-4-6 4V3Z" />
