@@ -234,7 +234,7 @@ function CompareBody({ w, lines, onOpen, onOpenNode, onDeselect, ui }: {
 
 // `titleSlot` is the element in the console's tab-tile title bar where the rail of the console's tiles goes (null while it is not drawn yet); without
 // one (undefined) the rail is a bar above the tiles.
-export default function PlotView({ w, titleSlot }: { w: WriterWorkspace; titleSlot?: HTMLElement | null }) {
+export default function PlotView({ w, titleSlot, columns }: { w: WriterWorkspace; titleSlot?: HTMLElement | null; columns?: 'auto' | 'one' }) {
   const [plotOrder] = usePlotOrder()
   const node = w.focusedPlotNode
   // Kinds of nodes created a moment ago (the workspace maps have not updated yet),
@@ -468,7 +468,7 @@ export default function PlotView({ w, titleSlot }: { w: WriterWorkspace; titleSl
     <div className="wrPlotConsole">
       {titleSlot && createPortal(<span ref={setRailHost} className="wrPlotRail" />, titleSlot)}
       <SplitArea
-        iconSize={ICON_PX} gridId="scriblr.writer.plot.tiles" label="Plot tiles" bar barHost={titleSlot === undefined ? undefined : railHost}
+        iconSize={ICON_PX} gridId="scriblr.writer.plot.tiles" columns={columns} label="Plot tiles" bar barHost={titleSlot === undefined ? undefined : railHost}
         minimized={minimized} onMinimizedChange={(id, off) => setMinimized(prev => (off ? (prev.includes(id) ? prev : [...prev, id]) : prev.filter(x => x !== id)))}
         tiles={tiles.map(t => ({ ...t, bodyClassName: 'wrTabTileBody--surface wrPlotTileBody' }))} defaultTree={PLOT_TREE}
       />

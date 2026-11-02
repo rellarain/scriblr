@@ -10,6 +10,7 @@ import DraftLevel from '../draft/DraftLevel'
 import LevelPanel from './LevelPanel'
 import SideResizer from './SideResizer'
 import { ProjectMin, ProjectTiles } from './levelBodies'
+import { DashMin, OutlineMin } from './levelMins'
 import { useDashTabs } from './dashTabs'
 import { NoBook, useOutlineTabs } from './outlineTabs'
 import { useProjectTabs } from './projectTabs'
@@ -64,7 +65,7 @@ function WriterLevels({ w, pagesComponent, onPagesComponent }: {
     switch (level) {
       case 'dash':
         return (
-          <LevelPanel key={level} level={level} size={size} title="Writer Dashboard" headerExtras={dashTabs.headerExtras} onPromote={w.showDash} onSetSize={setSize(level)}>
+          <LevelPanel key={level} level={level} size={size} title="Writer Dashboard" headerExtras={dashTabs.headerExtras} onPromote={w.showDash} onSetSize={setSize(level)} minBody={<DashMin w={w} />}>
             {dashTabs.body}
           </LevelPanel>
         )
@@ -97,6 +98,7 @@ function WriterLevels({ w, pagesComponent, onPagesComponent }: {
           <LevelPanel
             key={level} level={level} size={size} headerless={size === 'max'} title={book ? nodeLabel(book) : 'Book'} hue={book ? w.levelHueOf(book) : undefined}
             headerExtras={outlineTabs.headerExtras} onPromote={() => { if (book) w.openBook(book.id) }} onSetSize={setSize(level)}
+            minBody={book ? <OutlineMin w={w} /> : undefined}
           >
             {size === 'max' ? <OutlineMax w={w} /> : book ? outlineTabs.body : <NoBook />}
           </LevelPanel>

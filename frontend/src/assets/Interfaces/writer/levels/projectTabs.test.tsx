@@ -55,12 +55,11 @@ describe('the Project tabs', () => {
     expect(document.querySelector('[role="separator"]')).toBeTruthy() // two tiles share it, with a divider
   })
 
-  it('summarise the plot at Mid, and open a book from the outline summary', async () => {
+  it('show the plot console in one column at Mid, and open a book from the outline summary', async () => {
     const user = userEvent.setup()
     render(<Harness size="mid" />)
-    expect(screen.queryByText('plot editor')).toBeNull()
-    expect(screen.getByText('Romance')).toBeTruthy()
-    expect(screen.getByText('1 of 2')).toBeTruthy()
+    expect(screen.getByText('plot editor')).toBeTruthy()
+    expect(document.querySelector('.wrTabPane--console')).toBeTruthy()
     await user.click(screen.getByRole('button', { name: 'Outline' }))
     await user.click(screen.getByRole('button', { name: /Book One/ }))
     expect(w.openBook).toHaveBeenCalledWith('b1')

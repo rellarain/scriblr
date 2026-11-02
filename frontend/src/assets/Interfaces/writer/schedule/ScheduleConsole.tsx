@@ -45,9 +45,9 @@ export const DEFAULT_TREE: SplitNode = {
 const projectColor = (hue: number): string => `hsl(${hue}, ${FACET_COLOR.s}%, ${FACET_COLOR.l}%)`
 
 // `titleSlot` is the element in the console's tab-tile title bar where the Settings button and the rail of the console's tiles go (null while it is not drawn yet); without one (undefined) the button is the console's first row, with the rail above the tiles.
-// `onOpenNode` opens a node a task is about in the Writer (a project's own console passes it).
+// `onOpenNode` opens a node a task is about in the Writer (a project's own console passes it). `columns` is 'one' for the console in a level beside the focused one.
 // `hues` is each project's own colour (a hue), which tells the projects apart at the Dash: on a shift's block and beside a task.
-export default function ScheduleConsole({ scope, projectIds, titles, titleSlot, onOpenNode, hues: projectHues }: { scope: 'dash' | 'project'; projectIds: string[]; titles: Record<string, string>; titleSlot?: HTMLElement | null; onOpenNode?: (tree: 'outline' | 'plot', id: string) => void; hues?: Record<string, number> }) {
+export default function ScheduleConsole({ scope, projectIds, titles, titleSlot, onOpenNode, hues: projectHues, columns }: { scope: 'dash' | 'project'; projectIds: string[]; titles: Record<string, string>; titleSlot?: HTMLElement | null; onOpenNode?: (tree: 'outline' | 'plot', id: string) => void; hues?: Record<string, number>; columns?: 'auto' | 'one' }) {
   const schedule = useSchedule(projectIds)
   const activity = useActivityState()
   const [settingsOpen, setSettingsOpen] = useState(false)
@@ -250,7 +250,7 @@ export default function ScheduleConsole({ scope, projectIds, titles, titleSlot, 
           scopeLabel={scope === 'dash' ? 'Account' : 'This project'} onClose={() => setSettingsOpen(false)}
         />
       )}
-      <SplitArea iconSize={ICON_PX} gridId={`scriblr.writer.schedule.tiles.${scope}`} label="Schedule tiles" bar barHost={titleSlot === undefined ? undefined : railHost} tiles={tiles.map(t => ({ ...t, bodyClassName: `wrSchedTileBody${t.id === 'analytics' ? ' wrSchedTileBody--chart' : ''}` }))} defaultTree={DEFAULT_TREE} />
+      <SplitArea iconSize={ICON_PX} gridId={`scriblr.writer.schedule.tiles.${scope}`} columns={columns} label="Schedule tiles" bar barHost={titleSlot === undefined ? undefined : railHost} tiles={tiles.map(t => ({ ...t, bodyClassName: `wrSchedTileBody${t.id === 'analytics' ? ' wrSchedTileBody--chart' : ''}` }))} defaultTree={DEFAULT_TREE} />
     </div>
   )
 }

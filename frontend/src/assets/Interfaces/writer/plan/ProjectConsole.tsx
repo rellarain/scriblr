@@ -29,7 +29,7 @@ export const PLAN_TREE: SplitNode = {
 }
 
 // `titleSlot` is the element in the console's tab-tile title bar for the choice of what is planned and the rail of tiles (null while it is not drawn yet).
-export default function ProjectConsole({ scope, projectIds, titles, titleSlot }: { scope: 'dash' | 'project'; projectIds: string[]; titles: Record<string, string>; titleSlot?: HTMLElement | null }) {
+export default function ProjectConsole({ scope, projectIds, titles, titleSlot, columns }: { scope: 'dash' | 'project'; projectIds: string[]; titles: Record<string, string>; titleSlot?: HTMLElement | null; columns?: 'auto' | 'one' }) {
   const schedule = useSchedule(projectIds)
   const facts = useProjectFacts(projectIds)
   const [hues] = useStoredState<FacetHues>('scriblr.writer.facetHues', DEFAULT_HUES)
@@ -66,7 +66,7 @@ export default function ProjectConsole({ scope, projectIds, titles, titleSlot }:
     <div className="wrSchedConsole wrPlanConsole" style={facetHueVars(hues) as CSSProperties}>
       {titleSlot === undefined ? <div className="wrSchedConsoleBar">{choice}</div> : titleSlot && createPortal(<>{choice}<span ref={setRailHost} className="wrSchedRail" /></>, titleSlot)}
       <SplitArea
-        iconSize={ICON_PX} gridId={`scriblr.writer.plan.tiles.${scope}`} label="Project tiles" bar barHost={titleSlot === undefined ? undefined : railHost}
+        iconSize={ICON_PX} gridId={`scriblr.writer.plan.tiles.${scope}`} columns={columns} label="Project tiles" bar barHost={titleSlot === undefined ? undefined : railHost}
         tiles={tiles.map(t => ({ ...t, bodyClassName: 'wrSchedTileBody wrPlanTileBody' }))} defaultTree={PLAN_TREE}
       />
     </div>

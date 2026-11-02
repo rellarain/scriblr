@@ -34,6 +34,10 @@ vi.mock('./outlineTabs', () => ({
   }),
   NoBook: () => <div>no book</div>,
 }))
+vi.mock('./levelMins', () => ({
+  DashMin: () => <div>dash min</div>,
+  OutlineMin: () => <div>outline min</div>,
+}))
 vi.mock('./levelBodies', () => ({
   ProjectMin: () => <div>project spines</div>,
   ProjectTiles: () => <div>project tiles</div>,

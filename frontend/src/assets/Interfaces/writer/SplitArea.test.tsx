@@ -342,4 +342,10 @@ describe('SplitArea', () => {
     render(<Harness />)
     expect(['x', 'y', 'z'].every(id => px(tile(id), 'left') === 0 && px(tile(id), 'width') === 300)).toBe(true)
   })
+
+  it('stacks the tiles in one column at any width when asked for columns="one"', () => {
+    render(<SplitArea gridId="one" tiles={tiles()} columns="one" />)
+    expect(['x', 'y', 'z'].every(id => px(tile(id), 'left') === 0 && px(tile(id), 'width') === 1000)).toBe(true)
+    expect(px(tile('x'), 'top')).toBeLessThan(px(tile('y'), 'top'))
+  })
 })

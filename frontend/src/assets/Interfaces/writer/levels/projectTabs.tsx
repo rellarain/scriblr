@@ -7,11 +7,9 @@ import ProjectEditor from '../ProjectEditor'
 import ProjectOutline from '../ProjectOutline'
 import { nearestOfKind } from '../outlineTree'
 import type { HistoryScope, WriterWorkspace } from '../useWriterWorkspace'
-import { bookRows, categoryRows, plotCounts } from '../tiles/tileData'
+import { bookRows } from '../tiles/tileData'
 import ProjectConsole from '../plan/ProjectConsole'
-import { ProjectSummary } from '../plan/ProjectSummary'
 import ScheduleConsole from '../schedule/ScheduleConsole'
-import { ScheduleSummary } from '../schedule/ScheduleSummary'
 import HelpArticles from './HelpArticles'
 import { useTabbedLevel, type LevelTab } from './LevelTabs'
 
@@ -24,23 +22,7 @@ const placeholder = (key: string) => <Placeholder title={label(key)} body={body(
 
 const plural = (n: number, one: string, many = `${one}s`) => `${n} ${n === 1 ? one : many}`
 
-// At Mid the Plot and Outline tabs summarise; the editors themselves are the Max tiles.
-function PlotSummary({ w }: { w: WriterWorkspace }) {
-  const counts = plotCounts(w.plotNodes)
-  const cats = categoryRows(w.plotNodes)
-  return (
-    <div className="wrSummary">
-      <div className="wrBarRow">
-        <div className="wrBarLabel"><span>Placed</span><span>{counts.placed} of {counts.values}</span></div>
-        <div className="wrBarTrack"><div className="wrBarFill" style={{ width: `${counts.values ? (counts.placed / counts.values) * 100 : 0}%` }} /></div>
-      </div>
-      {cats.length === 0 && <p className="wrMuted">No plot yet.</p>}
-      {cats.map(c => <div key={c.id} className="wrKv"><span>{c.title}</span><span>{plural(c.plotlines, 'plotline')}</span></div>)}
-      <p className="wrHint">{plural(counts.plotlines, 'plotline')} · {counts.waiting} waiting. Open the Project to edit the plot.</p>
-    </div>
-  )
-}
-
+// At Mid the Outline tab summarises; its editor is the Max tile. (The consoles, Plot, Schedule and Project, are shown in one column.)
 function OutlineSummary({ w }: { w: WriterWorkspace }) {
   const books = bookRows(w.outlineNodes)
   return (
@@ -67,23 +49,22 @@ function openNode(w: WriterWorkspace, tree: 'outline' | 'plot', id: string) {
 
 export function projectTabs(w: WriterWorkspace): LevelTab[] {
   return [
-    { id: 'plot', label: 'Plot', Icon: PlotIcon, fill: true, surface: false, titleSlot: true, iconSize: 20, render: c => (c.size === 'max' ? <PlotView w={w} titleSlot={c.titleSlot} /> : <PlotSummary w={w} />) },
+    { id: 'plot', label: 'Plot', Icon: PlotIcon, fill: true, surface: false, titleSlot: true, iconSize: 20, console: true, render: c => <PlotView w={w} titleSlot={c.titleSlot} columns={c.size === 'max' ? 'auto' : 'one'} /> },
     { id: 'outline', label: 'Outline', Icon: OutlineIcon, fill: true, render: c => (c.size === 'max' ? <ProjectOutline w={w} /> : <OutlineSummary w={w} />) },
     {
-      id: 'schedule', label: 'Schedule', Icon: CalendarIcon, fill: true, surface: false, titleSlot: true, iconSize: 20,
+      id: 'schedule', label: 'Schedule', Icon: CalendarIcon, fill: true, surface: false, titleSlot: true, iconSize: 20, console: true,
       render: c => {
         const id = w.activeProjectId
         if (!id) return <p className="wrMuted">Open a project to plan its schedule.</p>
-        return c.size === 'max' ? <ScheduleConsole scope="project" titleSlot={c.titleSlot} projectIds={[id]} titles={{ [id]: w.activeProject?.title ?? 'Project' }} onOpenNode={(tree, node) => openNode(w, tree, node)} /> : <ScheduleSummary projectIds={[id]} />
+        return <ScheduleConsole scope="project" titleSlot={c.titleSlot} columns={c.size === 'max' ? 'auto' : 'one'} projectIds={[id]} titles={{ [id]: w.activeProject?.title ?? 'Project' }} onOpenNode={(tree, node) => openNode(w, tree, node)} />
       },
     },
     {
-      id: 'plan', label: 'Project', Icon: FolderIcon, fill: true, surface: false, titleSlot: true, iconSize: 20,
+      id: 'plan', label: 'Project', Icon: FolderIcon, fill: true, surface: false, titleSlot: true, iconSize: 20, console: true,
       render: c => {
         const id = w.activeProjectId
         if (!id) return <p className="wrMuted">Open a project to plan it.</p>
-        const titles = { [id]: w.activeProject?.title ?? 'Project' }
-        return c.size === 'max' ? <ProjectConsole scope="project" titleSlot={c.titleSlot} projectIds={[id]} titles={titles} /> : <ProjectSummary projectIds={[id]} titles={titles} />
+        return <ProjectConsole scope="project" titleSlot={c.titleSlot} columns={c.size === 'max' ? 'auto' : 'one'} projectIds={[id]} titles={{ [id]: w.activeProject?.title ?? 'Project' }} />
       },
     },
     { id: 'history', label: 'History', Icon: ClockIcon, render: () => placeholder('projectHistory') },

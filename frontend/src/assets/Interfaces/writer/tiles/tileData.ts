@@ -1,7 +1,6 @@
-import type { OutlineNode, PlotNode } from '../../../../api/types'
+import type { OutlineNode } from '../../../../api/types'
 import { booksOf, chaptersOfBook } from '../outlineTree'
-import { placementsOf } from '../plotPlacement'
-import { categoryOf, nodeLabel } from '../plotTree'
+import { nodeLabel } from '../plotTree'
 
 // What the read-only tile bodies show, worked out from the outline and plot lists.
 
@@ -27,32 +26,4 @@ export interface BookRow { id: string; title: string; chapters: number }
 
 export function bookRows(nodes: OutlineNode[]): BookRow[] {
   return booksOf(nodes).map(b => ({ id: b.id, title: nodeLabel(b), chapters: chaptersOfBook(nodes, b.id).length }))
-}
-
-export interface PlotCounts { categories: number; plotlines: number; values: number; placed: number; waiting: number }
-
-// Values are the plotpoints: one placed on a chapter (or deeper), however often, is placed, the rest are waiting.
-export function plotCounts(nodes: PlotNode[]): PlotCounts {
-  const values = nodes.filter(n => n.kind === 'plotpoint')
-  const placed = values.filter(n => placementsOf(n).length > 0).length
-  return {
-    categories: nodes.filter(n => n.kind === 'category').length,
-    plotlines: nodes.filter(n => n.kind === 'plotline').length,
-    values: values.length,
-    placed,
-    waiting: values.length - placed,
-  }
-}
-
-export interface CategoryRow { id: string; title: string; plotlines: number }
-
-export function categoryRows(nodes: PlotNode[]): CategoryRow[] {
-  const categories = nodes.filter(n => n.kind === 'category').sort((a, b) => a.order - b.order)
-  const byId = new Map(nodes.map(n => [n.id, n]))
-  const perCategory = new Map<string, number>()
-  for (const n of nodes) {
-    const owner = n.kind === 'plotline' ? categoryOf(n, byId) : undefined
-    if (owner) perCategory.set(owner.id, (perCategory.get(owner.id) ?? 0) + 1)
-  }
-  return categories.map(c => ({ id: c.id, title: nodeLabel(c), plotlines: perCategory.get(c.id) ?? 0 }))
 }

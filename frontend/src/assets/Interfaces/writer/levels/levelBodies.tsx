@@ -5,6 +5,7 @@ import { copyIntoPlanner, isEmptyPlan, selectAll } from '../../../../lib/templat
 import { PROJECT_NAME_MAX, type WriterWorkspace } from '../useWriterWorkspace'
 import { shelfGroups } from '../outlineTree'
 import { DeleteControl, useStoredState } from '../shared'
+import { ProjectSummary } from '../plan/ProjectSummary'
 import { useTemplate } from '../plan/useTemplate'
 import { newId } from '../schedule/ids'
 import { planStore } from '../schedule/planStore'
@@ -12,15 +13,17 @@ import { localToday } from '../schedule/useSchedule'
 import { Shelf } from '../Shelf'
 import { PlusIcon } from '../../../icons'
 
-// The Project level at Min: the open project's book spines.
+// The Project level at Min: the open project's book spines, with their progress bars, and under them the phase it is in and the next milestone.
 export function ProjectMin({ w }: { w: WriterWorkspace }) {
   const groups = shelfGroups(w.outlineNodes)
+  const id = w.activeProjectId
   return (
     <div className="wrLevelMinBody">
       <Shelf
         label="Books" meta={`${w.books.length} ${w.books.length === 1 ? 'book' : 'books'}`}
-        groups={groups} activeBookId={w.activeBookId} onOpenBook={w.openBook} projectHue={w.projectHue}
+        groups={groups} activeBookId={w.activeBookId} onOpenBook={w.openBook} projectHue={w.projectHue} progress={id ? w.projectProgress[id] : undefined}
       />
+      {id && <ProjectSummary projectIds={[id]} titles={{ [id]: w.activeProject?.title ?? 'Project' }} />}
     </div>
   )
 }

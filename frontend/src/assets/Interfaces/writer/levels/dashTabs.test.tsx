@@ -51,10 +51,12 @@ describe('the Dash tabs', () => {
     expect(schedule.contains(backlog)).toBe(false)
   })
 
-  it('shows today and the counts at Mid', () => {
+  it('shows the schedule console in one column at Mid, with its tiles stacked', () => {
     render(<Harness size="mid" />)
-    expect(screen.getByText(/Open this tab at full size/)).toBeTruthy()
-    expect(screen.queryByRole('textbox', { name: 'New task' })).toBeNull()
+    expect(screen.queryByText(/Open this tab at full size/)).toBeNull()
+    expect(document.querySelector('.wrTabPane--console')).toBeTruthy()
+    expect(within(document.querySelector('[data-tile-id="backlog"]') as HTMLElement).getByRole('textbox', { name: 'New task' })).toBeTruthy()
+    expect(Array.from(document.querySelectorAll('[role="separator"]')).every(d => d.getAttribute('aria-orientation') === 'horizontal')).toBe(true) // stacked: only dividers between rows
   })
 
   it('search the scratchpad notes', async () => {

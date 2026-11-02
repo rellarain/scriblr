@@ -7,7 +7,7 @@ import { moveTab, orderTabs } from '../../../../components/tiles/tabOrder'
 
 // What a tab's content is told: the header's search text. (The header has no New button: a tab adds things from its own body.)
 // `titleSlot` is, for a tab that asks for one (`titleSlot: true`), the element at the right end of its tile's title bar, for what the tab puts there
-// (null until it is drawn); it is undefined for a tab that has none.
+// (null until it is drawn); it is undefined for a tab that has none, and at Mid (the tab has no tile title bar there, so a console draws its own bar above its tiles).
 export interface TabContext { query: string; size: 'mid' | 'max'; titleSlot?: HTMLElement | null }
 
 export interface LevelTab {
@@ -26,6 +26,8 @@ export interface LevelTab {
   titleSlot?: boolean
   // The tab's tile takes the height that is left (an editor that scrolls itself) instead of the height of its content.
   fill?: boolean
+  // The tab is a console of tiles: at Mid (the level beside the focused one) it is the same console, in one column, in a pane of its own height.
+  console?: boolean
   // Starts the closing group of tabs (Settings, Help), set a little apart.
   end?: boolean
 }
@@ -78,7 +80,7 @@ export function useTabbedLevel({ storageKey, tabs, size, defaultOpen, defaultTab
     if (max) setOpen(prev => (prev.includes(id) ? prev.filter(x => x !== id) : [...prev, id]))
   }
   const focused = max && focusedTile && shown.some(t => t.id === focusedTile) ? focusedTile : current?.id
-  const ctxOf = (tab: LevelTab): TabContext => ({ query: query.trim().toLowerCase(), size: max ? 'max' : 'mid', ...(tab.titleSlot ? { titleSlot: slots[tab.id] ?? null } : {}) })
+  const ctxOf = (tab: LevelTab): TabContext => ({ query: query.trim().toLowerCase(), size: max ? 'max' : 'mid', ...(max && tab.titleSlot ? { titleSlot: slots[tab.id] ?? null } : {}) })
 
   const headerExtras = (
     <div className="wrHeaderExtras">
@@ -117,7 +119,7 @@ export function useTabbedLevel({ storageKey, tabs, size, defaultOpen, defaultTab
   let body: ReactNode
   if (!max) {
     body = current
-      ? <div className={`wrTabPane${current.surface ?? current.fill ? ' wrTabPane--surface' : ''}`} role="region" aria-label={current.label}>{current.render(ctxOf(current))}</div>
+      ? <div className={`wrTabPane${current.surface ?? current.fill ? ' wrTabPane--surface' : ''}${current.console ? ' wrTabPane--console' : ''}`} role="region" aria-label={current.label}>{current.render(ctxOf(current))}</div>
       : null
   } else if (customMax) {
     body = null

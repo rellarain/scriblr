@@ -13,4 +13,7 @@ export const MIN_COLUMN = 140
 // Below this container width every tile stacks edge to edge in one column.
 export const ONE_COLUMN_BELOW = 400
 
+// The least height of a tile in a console held to one column (a level beside the focused one): room to use what is in it.
+export const STACKED_TILE_H = 300
+
 export const isOneColumn = (width: number): boolean => width < ONE_COLUMN_BELOW

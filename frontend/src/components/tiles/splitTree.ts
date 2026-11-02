@@ -338,6 +338,22 @@ export function flattenOneColumn(node: SplitNode): SplitNode {
   return { dir: 'col', ratio: node.ratio, a, b }
 }
 
+// The tiles in one column, each open tile with the same height (a console held to one column: the saved ratios belong to the
+// arrangement it has when it is wide). Like flattenOneColumn it is made for that render only; minimized tiles keep their place.
+export function evenColumn(node: SplitNode): SplitNode {
+  const leaves: SplitLeaf[] = []
+  const walk = (n: SplitNode) => { if (isLeaf(n)) leaves.push(n); else { walk(n.a); walk(n.b) } }
+  walk(node)
+  const open = (l: SplitLeaf) => (l.fixed ? 0 : 1)
+  const chain = (from: number): SplitNode => {
+    if (from === leaves.length - 1) return leaves[from]
+    const rest = leaves.slice(from + 1).reduce((n, l) => n + open(l), 0)
+    const here = open(leaves[from])
+    return { dir: 'col', ratio: here + rest > 0 ? here / (here + rest) : 0.5, a: leaves[from], b: chain(from + 1) }
+  }
+  return chain(0)
+}
+
 // Builds an initial tree from a grid's placed tiles (order + shape), used to seed a
 // fresh grid. Mini tiles are grouped together (their actual on-screen order comes
 // from fixedLeafIds -- a pre-order walk -- not from where they sit in this tree);

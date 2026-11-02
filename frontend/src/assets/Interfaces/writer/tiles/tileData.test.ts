@@ -1,11 +1,9 @@
 import { describe, expect, it } from 'vitest'
-import type { OutlineNode, PlotNode } from '../../../../api/types'
-import { bookRows, categoryRows, plotCounts, projectRows, projectTotals } from './tileData'
+import type { OutlineNode } from '../../../../api/types'
+import { bookRows, projectRows, projectTotals } from './tileData'
 
 const outline = (id: string, kind: OutlineNode['kind'], parentId: string | null, over: Partial<OutlineNode> = {}): OutlineNode =>
   ({ id, kind, parentId, order: 0, title: id, synopsis: '', draftRef: null, ...over } as OutlineNode)
-const plot = (id: string, kind: PlotNode['kind'], parentId: string | null, over: Partial<PlotNode> = {}): PlotNode =>
-  ({ id, kind, parentId, order: 0, title: id, body: '', placements: [], customFieldDefs: [], customFieldValues: {}, keywords: [], flag: null, sourceFieldId: null, fieldId: null, refId: null, awareness: null, ...over } as PlotNode)
 
 const nodes = [
   outline('b1', 'book', null, { title: 'One' }), outline('b2', 'book', null, { title: 'Two' }),
@@ -27,26 +25,5 @@ describe('projectRows and projectTotals', () => {
 describe('bookRows', () => {
   it('lists each book with its chapter count', () => {
     expect(bookRows(nodes)).toEqual([{ id: 'b1', title: 'One', chapters: 2 }, { id: 'b2', title: 'Two', chapters: 1 }])
-  })
-})
-
-describe('plotCounts and categoryRows', () => {
-  const plotNodes = [
-    plot('cat', 'category', null, { title: 'Romance' }), plot('cat2', 'category', null, { title: 'Mystery', order: 1 }),
-    plot('sub', 'subcategory', 'cat'), plot('line1', 'plotline', 'sub'), plot('line2', 'plotline', 'cat'), plot('line3', 'plotline', 'cat2'),
-    plot('v1', 'plotpoint', 'line1', { fieldId: 'f' }), plot('v2', 'plotpoint', 'line1', { fieldId: 'f', placements: [{ id: 'a', targetId: 'c1', paragraphIndex: null, awareness: null }, { id: 'b', targetId: 'c2', paragraphIndex: null, awareness: null }] }),
-    plot('v3', 'plotpoint', 'line2', { fieldId: 'f' }),
-  ]
-
-  it('counts the plot and splits the values into placed and waiting', () => {
-    expect(plotCounts(plotNodes)).toEqual({ categories: 2, plotlines: 3, values: 3, placed: 1, waiting: 2 })
-    expect(plotCounts([])).toEqual({ categories: 0, plotlines: 0, values: 0, placed: 0, waiting: 0 })
-  })
-
-  it('counts the plotlines under each category, through its subcategories', () => {
-    expect(categoryRows(plotNodes)).toEqual([
-      { id: 'cat', title: 'Romance', plotlines: 2 },
-      { id: 'cat2', title: 'Mystery', plotlines: 1 },
-    ])
   })
 })

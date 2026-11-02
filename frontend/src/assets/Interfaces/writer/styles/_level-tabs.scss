@@ -40,6 +40,8 @@
     .autosaveOpt--on { color: var(--on-accent); background: var(--wr-fill); }
   }
   .wrTabPane { display: flex; flex-direction: column; gap: var(--space-4); min-height: 0; }
+  // A console at Mid (the level beside the focused one) is the same console in one column: a pane tall enough for its tiles, which the level scrolls over.
+  .wrTabPane--console { flex: none; height: clamp(480px, 75vh, 760px); padding: 0; gap: 0; }
   // The Max tiles on a split grid (SplitArea.tsx): each tile has a title bar to drag it by and a body that scrolls.
   // The Writer's colours for the global tile (components/tiles/tiles.scss): the level's own fills and accent.
   .wrSplit { --gt-accent: var(--wr-accent-light); flex: 1 1 auto; min-height: 0; min-width: 0; overflow: auto; scrollbar-width: none; &::-webkit-scrollbar { display: none; } }

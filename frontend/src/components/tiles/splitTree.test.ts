@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import {
   MIN_LEAF_H, MIN_LEAF_W, buildTree, canInsertAt, canInsertBeside, canInsertBelow, computeGeometry, fixedLeafIds,
-  flattenOneColumn, insertAtDivider, insertBelowLeaf, insertBesideLeaf, isAllFixed, isLeaf, leafIds, minSize, rectAtPath,
+  evenColumn, flattenOneColumn, insertAtDivider, insertBelowLeaf, insertBesideLeaf, isAllFixed, isLeaf, leafIds, minSize, rectAtPath,
   reconcile, resizeBranch, setFixed, swapLeaves, syncFixed,
 } from './splitTree'
 import type { SplitNode } from './splitTree'
@@ -193,6 +193,24 @@ describe('flattenOneColumn', () => {
     const tree = buildTree([P('a', 'mid'), P('b', 'mid')])!
     flattenOneColumn(tree)
     expect(isLeaf(tree) ? undefined : tree.dir).toBe('row')
+  })
+})
+
+describe('evenColumn', () => {
+  it('stacks the tiles in one column, each open tile the same height, and the minimized ones taking none', () => {
+    const tree: SplitNode = { dir: 'row', ratio: 0.2, a: { id: 'a' }, b: { dir: 'col', ratio: 0.7, a: { id: 'm', fixed: true }, b: { dir: 'row', ratio: 0.9, a: { id: 'b' }, b: { id: 'c' } } } }
+    const flat = evenColumn(tree)
+    expect(leafIds(flat)).toEqual(['a', 'm', 'b', 'c'])
+    const geo = computeGeometry(flat, { x: 0, y: 0, w: 400, h: 900 }).tiles
+    const heights = Object.fromEntries(geo.map(t => [t.id, Math.round(t.rect.h)]))
+    expect(Math.abs(heights.a - heights.b)).toBeLessThanOrEqual(4) // (the gaps between them are shared out by ratio)
+    expect(Math.abs(heights.b - heights.c)).toBeLessThanOrEqual(4)
+    expect(heights.m).toBeUndefined()
+    expect(geo.every(t => t.rect.w === 400)).toBe(true)
+  })
+
+  it('is just the tile when there is one', () => {
+    expect(evenColumn({ id: 'a' })).toEqual({ id: 'a' })
   })
 })
 

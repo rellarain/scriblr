@@ -7,7 +7,7 @@ import { mockFetchBy } from '../../../../test/mockFetch'
 import { TEMPLATE_KEY } from '../plan/useTemplate'
 import { fillColorCss } from '../../../../theme/bookColors'
 import { makeWorkspace, type WorkspaceOverrides } from '../../../../test/makeWorkspace'
-import { ProjectTiles } from './levelBodies'
+import { ProjectMin, ProjectTiles } from './levelBodies'
 
 // The project shelves beside the Dash: one tile per project.
 
@@ -83,5 +83,19 @@ describe('ProjectTiles: a new project from the template', () => {
     await user.click(screen.getByRole('button', { name: /New project/ }))
     expect(createProject).toHaveBeenCalledWith('Saga', undefined)
     expect(sent()).toHaveLength(0)
+  })
+})
+
+describe('ProjectMin: the open project at Min', () => {
+  it('shows its books on a shelf with their progress, and the phase and milestones under them', async () => {
+    const planner: Planner = { ...emptyPlanner(), phases: [{ ...newPhase('ph', 'Outlining', { start: '2026-10-01', end: '2026-12-01' }), status: 'active' }] }
+    mockFetchBy(url => (url.endsWith('/planner') ? planner : {}))
+    const book = { id: 'b1', kind: 'book', parentId: null, order: 0, title: 'Cold Harbor', synopsis: '', draftRef: null }
+    render(<ProjectMin w={makeWorkspace({
+      activeProjectId: 'p1', activeProject: { title: 'Saga' }, activeBookId: 'b1', books: [book], outlineNodes: [book],
+      projectProgress: { p1: { b1: 0.5 } }, projectHue: 200, openBook: vi.fn(),
+    } as unknown as WorkspaceOverrides)} />)
+    expect(screen.getByRole('button', { name: /Cold Harbor/ })).toBeTruthy()
+    expect((await screen.findAllByText(/Outlining/)).length).toBeGreaterThan(0)
   })
 })

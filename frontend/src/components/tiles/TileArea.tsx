@@ -4,13 +4,13 @@ import type { IconProps } from '../../assets/icons'
 import { GripIcon, ExpandIcon, ShrinkIcon } from '../../assets/icons'
 import Divider from './Divider'
 import TileTabBar from './TileTabBar'
-import { GRID_GAP, isOneColumn } from './tileShapes'
+import { GRID_GAP, isOneColumn, STACKED_TILE_H } from './tileShapes'
 import { nextFocus, type Direction } from './tileNav'
 import { applyDrop, planAt, samePlan, type DropPlan } from './tileDrop'
 import { markDragEnded, registerArea, type DragStart } from './tileDragBus'
 import { tabDropAt } from './tabOrder'
 import {
-  computeGeometry, flattenOneColumn, getAtPath, minSize, rectAtPath, syncFixed, type Path, type Rect, type SplitNode,
+  computeGeometry, evenColumn, fixedLeafIds, flattenOneColumn, getAtPath, leafIds, minSize, rectAtPath, syncFixed, type Path, type Rect, type SplitNode,
 } from './splitTree'
 import { useContainerSize } from './useContainerWidth'
 import { useSplitLayout } from './useSplitLayout'
@@ -68,7 +68,7 @@ interface Session {
 // it (the bar shows one icon per tile; press one to bring the tile back, or drag it out into the layout). Drag a divider
 // (or focus it and use the arrow keys) to resize the two tiles it separates. Where each tile sits, and which are minimized,
 // is remembered per `gridId` with the other saved settings. Under 400px the tiles stack.
-export function TileArea({ gridId, tiles, label, defaultTree, onFocusTile, iconSize, minimized, onMinimizedChange, maximized, onMaximizedChange, onReorderTabs, bar = false, barHost }: {
+export function TileArea({ gridId, tiles, label, defaultTree, onFocusTile, iconSize, minimized, onMinimizedChange, maximized, onMaximizedChange, onReorderTabs, bar = false, barHost, columns = 'auto' }: {
   gridId: string
   tiles: AreaTile[]
   label?: string
@@ -90,6 +90,8 @@ export function TileArea({ gridId, tiles, label, defaultTree, onFocusTile, iconS
   bar?: boolean
   // Where the bar goes when it is not above the tiles: the slot in the title bar of the console tile that holds this area (null until drawn).
   barHost?: HTMLElement | null
+  // 'one' stacks the tiles in one column at any width (the console in a level beside the focused one); 'auto' does so only when the area is narrow.
+  columns?: 'auto' | 'one'
 }) {
   const layout = useSplitLayout(gridId, tiles.map(t => ({ id: t.id, defaultShape: t.defaultMinimized ? 'mini' as const : 'mid' as const })), { defaultTree, minimized, onMinimizedChange, maximized, onMaximizedChange })
   const [scrollRef, size] = useContainerSize<HTMLDivElement>()
@@ -97,13 +99,16 @@ export function TileArea({ gridId, tiles, label, defaultTree, onFocusTile, iconS
   const refocus = useRef<string | null>(null)
   const [session, setSession] = useState<Session | null>(null)
 
-  const oneColumn = isOneColumn(size.width)
+  const oneColumn = columns === 'one' || isOneColumn(size.width)
   const maxId = layout.maximizedId
   const stored: SplitNode | null = tiles.length > 0 ? (maxId ? { id: maxId } : layout.tree) : null
-  const flat = (t: SplitNode) => (oneColumn ? flattenOneColumn(t) : t)
+  const flat = (t: SplitNode) => (columns === 'one' ? evenColumn(t) : oneColumn ? flattenOneColumn(t) : t)
   const baseTree = stored ? flat(stored) : null
   const min = baseTree ? minSize(baseTree) : { w: 0, h: 0 }
-  const stage: Rect = { x: 0, y: 0, w: Math.max(size.width, min.w), h: Math.max(size.height, min.h) }
+  // A console held to one column keeps each open tile tall enough to use (the area scrolls when they do not all fit).
+  const stacked = baseTree && columns === 'one' ? leafIds(baseTree).length - fixedLeafIds(baseTree).length : 0
+  const minHeight = Math.max(min.h, stacked > 0 ? stacked * STACKED_TILE_H + (stacked - 1) * GRID_GAP : 0)
+  const stage: Rect = { x: 0, y: 0, w: Math.max(size.width, min.w), h: Math.max(size.height, minHeight) }
   const baseGeometry = baseTree ? computeGeometry(baseTree, stage) : { tiles: [], dividers: [] }
 
   // While a tile is dragged, the tree it would make: laid out in place of the real one so the others slide aside.

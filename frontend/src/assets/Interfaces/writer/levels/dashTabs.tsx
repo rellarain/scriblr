@@ -5,9 +5,7 @@ import ThemeSettingsPanel from '../../../../theme/ThemeSettingsPanel'
 import { Scratchpad } from '../Dashboard'
 import ReadersPanel from '../ReadersPanel'
 import ProjectConsole from '../plan/ProjectConsole'
-import { ProjectSummary } from '../plan/ProjectSummary'
 import ScheduleConsole from '../schedule/ScheduleConsole'
-import { ScheduleSummary } from '../schedule/ScheduleSummary'
 import type { WriterWorkspace } from '../useWriterWorkspace'
 import HelpArticles from './HelpArticles'
 import { useTabbedLevel, type LevelTab } from './LevelTabs'
@@ -18,22 +16,20 @@ const DASH_HELP_FALLBACK = 'The Dash is your desk across every project: the sche
 export function dashTabs(w: WriterWorkspace): LevelTab[] {
   return [
     {
-      id: 'schedule', label: 'Schedule', Icon: CalendarIcon, fill: true, surface: false, titleSlot: true, iconSize: 20,
+      id: 'schedule', label: 'Schedule', Icon: CalendarIcon, fill: true, surface: false, titleSlot: true, iconSize: 20, console: true,
       render: c => {
         const ids = w.projects.map(p => p.projectId)
-        return c.size === 'max'
-          ? <ScheduleConsole scope="dash" titleSlot={c.titleSlot} projectIds={ids} titles={Object.fromEntries(w.projects.map(p => [p.projectId, p.title]))} hues={Object.fromEntries(w.projects.map(p => [p.projectId, w.projectHueOf(p)]))} />
-          : <ScheduleSummary projectIds={ids} />
+        return <ScheduleConsole scope="dash" titleSlot={c.titleSlot} columns={c.size === 'max' ? 'auto' : 'one'} projectIds={ids} titles={Object.fromEntries(w.projects.map(p => [p.projectId, p.title]))} hues={Object.fromEntries(w.projects.map(p => [p.projectId, w.projectHueOf(p)]))} />
       },
     },
     { id: 'readers', label: 'Readers', Icon: PeopleIcon, render: () => <ReadersPanel /> },
     { id: 'scratchpad', label: 'Scratchpad', Icon: PencilIcon, searchable: true, render: c => <Scratchpad bare query={c.query} /> },
     {
-      id: 'project', label: 'Project', Icon: FolderIcon, fill: true, surface: false, titleSlot: true, iconSize: 20,
+      id: 'project', label: 'Project', Icon: FolderIcon, fill: true, surface: false, titleSlot: true, iconSize: 20, console: true,
       render: c => {
         const ids = w.projects.map(p => p.projectId)
         const titles = Object.fromEntries(w.projects.map(p => [p.projectId, p.title]))
-        return c.size === 'max' ? <ProjectConsole scope="dash" titleSlot={c.titleSlot} projectIds={ids} titles={titles} /> : <ProjectSummary projectIds={ids} titles={titles} />
+        return <ProjectConsole scope="dash" titleSlot={c.titleSlot} columns={c.size === 'max' ? 'auto' : 'one'} projectIds={ids} titles={titles} />
       },
     },
     { id: 'settings', label: 'Settings', Icon: GearIcon, end: true, surface: true, render: () => <ThemeSettingsPanel /> },
