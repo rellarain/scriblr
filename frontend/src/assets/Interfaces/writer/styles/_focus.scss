@@ -1,7 +1,7 @@
 // Keyboard focus is always visible. Fields drop the browser's outline for their own flat look, so they get an inset ring instead, and
 // buttons, tabs and links an outline drawn inside their edge, both in the control's own text colour (which is audited against its
 // ground, so the ring reads wherever the control sits). A pointer press on a button shows nothing: only :focus-visible does.
-.wUI.wr {
+.wUI.wr, .tUI.wr {
   input:not([type='checkbox']):not([type='radio']):not([type='range']):focus-visible,
   textarea:focus-visible,
   select:focus-visible { box-shadow: inset 0 0 0 1.5px currentColor; }

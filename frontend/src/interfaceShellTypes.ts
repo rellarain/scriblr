@@ -1,4 +1,4 @@
-export type MainInterface = 'reader' | 'translator' | 'writer'
+export type MainInterface = 'reader' | 'training' | 'writer'
 export type Handedness = 'left' | 'right'
 
 // Which content HUI's main panel shows when no chat head is selected

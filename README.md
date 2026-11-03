@@ -53,8 +53,8 @@ backend/
 frontend/
 ├── src/
 │   ├── main.tsx                # entrypoint: applies the cached theme, then renders App in a BrowserRouter
-│   ├── App.tsx / Header.tsx / Sidebar.tsx   # the shell: header, the interface for the URL (/write, /read, /translate), the admin/helper sidebar
-│   ├── assets/Interfaces/       # the interfaces: writer/ (WUI, the Writer), reader/ (RUI), TUI, VUI, admin/ (AUI), helper/ (HUI), UUI
+│   ├── App.tsx / Header.tsx / Sidebar.tsx   # the shell: header, the interface for the URL (/write, /read, /train), the admin/helper sidebar
+│   ├── assets/Interfaces/       # the interfaces: writer/ (WUI, the Writer), reader/ (RUI), TUI (Training; training/), VUI, admin/ (AUI), helper/ (HUI), UUI
 │   ├── api/                      # fetch client (client.ts) and one module per backend area; types.ts mirrors schema.py
 │   ├── components/               # shared pieces: tiles/ (the split-tree grid), ColorRange, ...
 │   ├── settings/ theme/          # the settings store (backend-backed, cached in localStorage) and the time-of-day theme engine
@@ -400,7 +400,7 @@ Plus `GET /api/health` (inline in `main.py`, not part of a router).
 ## Frontend design
 
 - **Shell** (`frontend/src/App.tsx`, React Router): `/` redirects to `/write`; `/write` is the Writer (`assets/Interfaces/writer/WUI.tsx`),
-  `/read` the Reader (`RUI`), `/translate` the Translator (`TUI`); the header and the sidebar (Admin `AUI`, Helper `HUI`, user `UUI`) are shared.
+  `/read` the Reader (`RUI`), `/train` Training (`TUI`, below); the header and the sidebar (Admin `AUI`, Helper `HUI`, user `UUI`) are shared.
   The Writer is described in the section after next.
 - **State and data**: there is no global query cache. The Writer's workspace hook (`writer/useWriterWorkspace.ts`) loads and saves the project's outline,
   plot and settings through `api/` and keeps them in React state with its own autosave and undo history; other interfaces use small stores
@@ -409,7 +409,7 @@ Plus `GET /api/health` (inline in `main.py`, not part of a router).
 - **Styles** — the Writer's stylesheet, `writer/writer.scss`, is an index of one partial per area in `writer/styles/` (shared, shelves, levels,
   plot, draft level, preview, level tabs, ...), loaded in the order the rules were written in (a later rule overrides an earlier one at equal
   specificity); tests that scan the stylesheet read the partials too (`src/test/readStyles.ts`). The space, radius and type-size scale is a set of CSS custom
-  properties (`theme/_tokens.scss`), kept equal to the design system's `tokens.json` by a test, with 11px as the floor for text. The first load is split: the Reader, the Translator and
+  properties (`theme/_tokens.scss`), kept equal to the design system's `tokens.json` by a test, with 11px as the floor for text. The first load is split: the Reader, Training and
   the admin article builder are `React.lazy` chunks, and React and the router are a vendor chunk of their own.
 - **Testing** — Vitest (config in `vite.config.ts`) + React Testing Library + `jest-dom`. Tests of plain functions (`*.test.ts`) run in Node, which
   starts much faster than a browser stand-in; the component and hook tests (`*.test.tsx`) run in jsdom, and a `.ts` test that needs a browser says so
@@ -474,7 +474,12 @@ last row, like Claude Code's own resizable panes). The shared system is `fronten
   **resizable from its right edge** (`scriblr.writer.sidebarWidth`).
 - **Reader** (`reader/ReaderPanel.tsx`): a page's consoles are tiles; an icon in the header bar is a minimized console, an
   open one a tile, and Maximize makes it the full console (the others become icons; the URL names it).
-- **User panel** (`assets/Interfaces/UUI.tsx`): the consoles are Dashboard, Account and Training (each holds its pages as tiles,
+- **Training** (`assets/Interfaces/TUI.tsx`, `training/`, `/train`; it replaced the Translator, and it was the User panel's Training console): five stacked levels like the Writer's (`TrainingLevels.tsx`, `trainingPath.ts`):
+  the **Desk** (tabs Courses, the ones enrolled in, and Catalog, every course grouped by **curriculum**, a curriculum being a collection of courses; Settings, Help), the open **Course**
+  (Modules, Exams, Projects), its **Module** (Lessons, Tests), the **Lesson** (Material, Quizzes, Exercises) and, deepest, the **Practice** (an exercise or a project; a project from the course skips the
+  module and lesson levels). The deepest level on the path has the focus (Max), the one above it is Mid and the rest Min, in a side column; a level's title closes what is below it. Where you are, what you enrolled in and the
+  Min/Mid toggles are kept (`scriblr.training.*`). There is no data model yet: the five curricula (User, Reader, Translator, Writer, Admin) and their one placeholder course each are constants in `trainingSeed.ts`.
+- **User panel** (`assets/Interfaces/UUI.tsx`): the consoles are Dashboard and Account (each holds its pages as tiles,
   the rail in its title bar), then Settings and Help, one of each for the panel (every section's under its own name). Dashboard's settings are the theme tool on its own (`ThemeSettingsPanel`); Account's
   (`CustomizeControls`) are handedness and autosave plus that same theme tool embedded inline (`showHeader={false}`).
 - **Admin panel** (`AUI.tsx`): its seven sections (pages as tiles, the rail in the title bar), Resources and a Help console

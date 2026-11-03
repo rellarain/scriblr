@@ -17,7 +17,6 @@ export const QUEUE_DEPARTMENTS: QueueDepartment[] = [
     consoles: [
       { name: 'Dashboard Console', components: ['Activity Log Component', 'Schedule Component', 'Notifications Component', 'Settings Component', 'Help Component'] },
       { name: 'Account Console', components: ['Profile Component', 'Subscription Component', 'Portfolio Component', 'Settings Component', 'Help Component'] },
-      { name: 'Training Console', components: ['User Training Component', 'Reader Training Component', 'Translator Training Component', 'Writer Training Component', 'Admin Training Component', 'Settings Component', 'Help Component'] },
     ],
   },
   {
@@ -30,8 +29,13 @@ export const QUEUE_DEPARTMENTS: QueueDepartment[] = [
     ],
   },
   {
-    name: 'Translator Page (TUI)',
-    consoles: [],
+    name: 'Training Page (TUI)',
+    consoles: [
+      { name: 'Desk Console', components: ['Courses Component', 'Catalog Component', 'Settings Component', 'Help Component'] },
+      { name: 'Course Console', components: ['Modules Component', 'Exams Component', 'Projects Component'] },
+      { name: 'Module Console', components: ['Lessons Component', 'Tests Component'] },
+      { name: 'Lesson Console', components: ['Material Component', 'Quizzes Component', 'Exercises Component'] },
+    ],
   },
   {
     name: 'Writer Page (WUI)',
@@ -74,7 +78,7 @@ export const QUEUE_DEPARTMENTS: QueueDepartment[] = [
         name: 'Configuration Console',
         components: [
           'Project Plan Component', 'Visitor Configuration Component', 'User Configuration Component', 'Reader Configuration Component',
-          'Translator Configuration Component', 'Writer Configuration Component', 'Helper Configuration Component', 'Admin Configuration Component',
+          'Training Configuration Component', 'Writer Configuration Component', 'Helper Configuration Component', 'Admin Configuration Component',
           'Configuration Settings Component', 'Configuration Help Component',
         ],
       },

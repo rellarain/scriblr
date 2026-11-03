@@ -1,7 +1,7 @@
 import type { CSSProperties, ReactNode } from 'react'
 import { ChevronDownIcon, ChevronRightIcon } from '../../../icons'
 import { fillColorCss, hueOfCode, themeColorCss } from '../../../../theme/bookColors'
-import type { Level, LevelSize } from './levelSizes'
+import type { LevelSize } from './levelSizes'
 
 // One tinted level of the Writer frame. Its header strip is how it changes size:
 // clicking a Min level's strip opens it to Mid, the title promotes it to the focus
@@ -9,7 +9,8 @@ import type { Level, LevelSize } from './levelSizes'
 // right end, and the tabs wrap beneath them when the header is narrow. The focused (Max)
 // level just shows its title.
 function LevelPanel({ level, size, title, hue, tint, fill, onPromote, onSetSize, locked = false, headerless = false, headerExtras, className, minBody, children }: {
-  level: Level
+  // The level's name: the Writer's (dash, project, outline, draft) or Training's (desk, course, module, lesson, practice); it makes the class wrLevel--<level>.
+  level: string
   size: Exclude<LevelSize, 'hidden'>
   title: string
   // The level's hue (0-360) tinting the panel; none = the app theme's own.

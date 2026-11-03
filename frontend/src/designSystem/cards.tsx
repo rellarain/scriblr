@@ -2,6 +2,8 @@ import { useEffect, useRef, useState, type ReactNode } from 'react'
 import { MemoryRouter } from 'react-router-dom'
 import App from '../App'
 import RUI from '../assets/Interfaces/RUI'
+import TUI from '../assets/Interfaces/TUI'
+import { DESK, openCourse, openExercise, openLesson, openModule, openProject, type TrainingPath } from '../assets/Interfaces/training/trainingPath'
 import { BorrowDialog, PlanDialog } from '../assets/Interfaces/reader/ReaderDialogs'
 import { ReviewDialog } from '../assets/Interfaces/reader/ReviewDialog'
 import type { ReaderCtx } from '../assets/Interfaces/reader/readerContext'
@@ -328,6 +330,13 @@ function SkyCard() {
 
 const WRITER_VIEWS = [{ id: 'dash', label: 'Dash' }, { id: 'project', label: 'Project' }, { id: 'book', label: 'Outline' }, { id: 'chapter', label: 'Draft' }, { id: 'preview', label: 'Preview' }]
 
+const TRAINING_COURSE = openCourse('writer-c1')
+const TRAINING_LESSON = openLesson(openModule(TRAINING_COURSE, 'writer-c1-m1'), 'writer-c1-m1-l1')
+const TRAINING_PATHS: Record<string, TrainingPath> = {
+  desk: DESK, course: TRAINING_COURSE, lesson: TRAINING_LESSON, practice: openExercise(TRAINING_LESSON, 'writer-c1-m1-l1-e1'), project: openProject(TRAINING_COURSE, 'writer-c1-p1'),
+}
+const TRAINING_VIEWS = [{ id: 'desk', label: 'Desk' }, { id: 'course', label: 'Course' }, { id: 'lesson', label: 'Lesson' }, { id: 'practice', label: 'Exercise' }, { id: 'project', label: 'Project' }]
+
 const READER_VIEWS = [{ id: 'nook', label: 'Nook' }, { id: 'library', label: 'Library' }, { id: 'catalog', label: 'Catalog' }, { id: 'book', label: 'Book' }, { id: 'face', label: 'Bookface' }, { id: 'card', label: 'Bookcard' }, { id: 'delta', label: 'Delta invite' }, { id: 'pages', label: 'Pages' }, { id: 'plan', label: 'Plan' }, { id: 'borrow', label: 'Borrow' }, { id: 'review', label: 'Review' }]
 
 const META = new Map(CARD_META.map(m => [m.id, m]))
@@ -350,6 +359,7 @@ export const CARDS: CardDef[] = [
   card('controls', { defaults: { zones: ['day', 'night'] }, render: () => <ControlsCard /> }),
   card('hue-slider', { defaults: { zones: ['day', 'night'] }, render: () => <HueCard /> }),
   card('reader', { frame: 'plain', views: READER_VIEWS, defaults: { view: 'nook', zones: ['day', 'night'], width: 1200 }, render: ({ view }) => <ReaderCard view={view} /> }),
+  card('training', { frame: 'plain', views: TRAINING_VIEWS, defaults: { view: 'lesson', zones: ['day', 'night'], width: 1200 }, render: ({ view }) => <div className="uiPvTraining"><TUI key={view} startAt={TRAINING_PATHS[view]} /></div> }),
   card('app-shell', { frame: 'plain', defaults: { zones: ['day'], width: 1200 }, render: () => <MemoryRouter initialEntries={['/write']}><App /></MemoryRouter> }),
   card('sky-toggle', { frame: 'plain', defaults: { zones: ['dawn', 'day', 'dusk', 'night'], width: 400 }, render: () => <SkyCard /> }),
   card('theme-settings', { frame: 'plain', defaults: { zones: ['day'], width: 800 }, render: () => <ThemeSettingsCard /> }),

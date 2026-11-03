@@ -1144,7 +1144,7 @@ class PublishedPresetList(BaseModel):
 # ---------------------------------------------------------------------------
 # AUI Configuration: a global (not project-scoped), admin-editable outline of
 # Console -> Component -> Feature ideas for each of AUI's Configuration
-# sub-tabs (Project Plan, Visitor, User, Reader, Translator, Writer, Helper,
+# sub-tabs (Project Plan, Visitor, User, Reader, Training, Writer, Helper,
 # Admin). One flat list for all 8 tabs combined, partitioned by `tab` and
 # nested via `parentId`/`order` -- the same shape as OutlineNode, just with
 # `kind` narrowed to 3 values and `title`/`synopsis` replaced by `name`/

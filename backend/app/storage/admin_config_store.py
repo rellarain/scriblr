@@ -66,7 +66,7 @@ _SEED_OUTLINE: dict[str, list[_ConsoleSeed]] = {
             ]},
             {"name": "Writer Services", "features": [
                 {"name": "Subscription Info Editor", "idea": "Same, for writer-facing marketing copy."},
-                {"name": "Preview Tool Picker", "idea": "Choose which Project/Plotting/Outline/Drafting/Translator/Revision tool screenshots appear as previews."},
+                {"name": "Preview Tool Picker", "idea": "Choose which Project/Plotting/Outline/Drafting/Training/Revision tool screenshots appear as previews."},
             ]},
             {"name": "Service Reviews", "features": [
                 {"name": "Review Moderation Queue", "idea": "Approve/hide testimonials before they go public."},
@@ -115,12 +115,6 @@ _SEED_OUTLINE: dict[str, list[_ConsoleSeed]] = {
                 {"name": "Public Portfolio Toggle", "idea": "Control whether a portfolio is publicly linkable or account-only."},
             ]},
         ]},
-        {"name": "Training", "components": [
-            {"name": "Per-Page Curriculum (User/Reader/Translator/Writer/Admin)", "features": [
-                {"name": "Curriculum Editor", "idea": "Author/reorder each page’s lesson list."},
-                {"name": "Completion Requirements", "idea": "Gate specific features behind required lessons (e.g. finish \"Plot Tree Basics\" before Plot tools unlock)."},
-            ]},
-        ]},
     ],
     "readerPageConfig": [
         {"name": "Nook", "components": [
@@ -159,25 +153,28 @@ _SEED_OUTLINE: dict[str, list[_ConsoleSeed]] = {
             ]},
         ]},
     ],
-    "translatorPageConfig": [
-        {"name": "Language Pairs", "components": [
-            {"name": "Supported Languages", "features": [
-                {"name": "Language Pair Manager", "idea": "Enable/disable which source→target language pairs are offered."},
-                {"name": "MT Provider Config", "idea": "Set which machine-translation engine backs each pair, with fallback ordering."},
+    "trainingPageConfig": [
+        {"name": "Desk", "components": [
+            {"name": "Enrolled Courses", "features": [
+                {"name": "Enrolment Limit", "idea": "Cap how many courses a user can be enrolled in at once."},
             ]},
         ]},
-        {"name": "Translation Workspace", "components": [
-            {"name": "Side-by-Side Editor", "features": [
-                {"name": "Segment Length Limit", "idea": "Cap characters per submitted segment for quality control."},
-            ]},
-            {"name": "Glossary", "features": [
-                {"name": "Shared Term Bank", "idea": "Curate book-specific or app-wide terms/names that must translate consistently."},
+        {"name": "Catalog", "components": [
+            {"name": "Course Listing", "features": [
+                {"name": "Course Visibility", "idea": "Choose which courses the catalog lists, and to whom."},
+                {"name": "Course Order", "idea": "Set the order the courses appear in."},
             ]},
         ]},
-        {"name": "Review Queue", "components": [
-            {"name": "Translation QA", "features": [
-                {"name": "Reviewer Assignment Rules", "idea": "Auto-assign submissions to a reviewer based on language pair."},
-                {"name": "Approval Threshold", "idea": "Require N approvals before a translated chapter publishes."},
+        {"name": "Course", "components": [
+            {"name": "Curriculum", "features": [
+                {"name": "Curriculum Editor", "idea": "Author/reorder each course’s modules and lessons."},
+            ]},
+            {"name": "Assessments", "features": [
+                {"name": "Completion Requirements", "idea": "Gate specific features behind required lessons (e.g. finish \"Plot Tree Basics\" before Plot tools unlock)."},
+                {"name": "Pass Marks", "idea": "Set the pass mark of quizzes, tests and exams."},
+            ]},
+            {"name": "Projects", "features": [
+                {"name": "Project Templates", "idea": "Define the exercises that make up a course’s project."},
             ]},
         ]},
     ],
@@ -317,7 +314,31 @@ def load_admin_config(root: Path) -> AuiConfig:
         config = AuiConfig(nodes=DEFAULT_ADMIN_CONFIG)
         save_admin_config(root, config)
         return config
-    return project_store._read_shard(path, AuiConfig)
+    config = project_store._read_shard(path, AuiConfig)
+    if _rename_legacy_tabs(config):
+        save_admin_config(root, config)
+    return config
+
+
+# Tabs renamed since a config was first written: the Translator page is Training now (the Translator interface was replaced by Training).
+_RENAMED_TABS = {"translatorPageConfig": "trainingPageConfig"}
+
+
+def _rename_legacy_tabs(config: AuiConfig) -> bool:
+    """Move the nodes and the published copy of a renamed tab to its new name. True when anything moved."""
+    changed = False
+    for node in config.nodes:
+        if node.tab in _RENAMED_TABS:
+            node.tab = _RENAMED_TABS[node.tab]
+            changed = True
+    for old, new in _RENAMED_TABS.items():
+        published = config.published.pop(old, None)
+        if published is not None:
+            for node in published.nodes:
+                node.tab = new
+            config.published.setdefault(new, published)
+            changed = True
+    return changed
 
 
 def save_admin_config(root: Path, config: AuiConfig) -> None:

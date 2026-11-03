@@ -46,7 +46,7 @@ jobs:
       # Includes the design-system freshness test: the generated docs under docs/design-system must be committed up to date
       # (run `npm run design-system` after a change to the Writer's look).
       - run: npm test
-      # The production build must work, and its entry chunk stays small (the Reader, the Translator and the article builder are split off).
+      # The production build must work, and its entry chunk stays small (the Reader, Training and the article builder are split off).
       - run: npm run build
 
   # Known vulnerabilities in what ships. Advisory: it reports and does not fail the build, since a fix may not exist yet

@@ -31,16 +31,16 @@ afterEach(() => { vi.unstubAllGlobals() })
 const tile = (id: string) => document.querySelector(`[data-tile-id="${id}"]`) as HTMLElement
 
 describe('UUI (the User panel as tiles)', () => {
-  it('shows Dashboard, Account and Training as consoles holding their pages as tiles, with Settings and Help as consoles of their own', () => {
+  it('shows Dashboard and Account as consoles holding their pages as tiles, with Settings and Help as consoles of their own', () => {
     render(<UUI />)
     const top = Array.from(document.querySelectorAll('[data-tile-id]')).map(t => t.getAttribute('data-tile-id')).filter(id => ['dashboard', 'account', 'training', 'settings', 'help'].includes(id!))
-    expect(top).toEqual(['dashboard', 'account', 'training', 'settings', 'help'])
+    expect(top).toEqual(['dashboard', 'account', 'settings', 'help']) // Training is an interface of its own now (TUI)
     expect(within(tile('dashboard')).getByText('Activity Log')).toBeTruthy()
     expect(within(tile('account')).getByText('Manage your profile details here.')).toBeTruthy()
-    expect(within(tile('training')).getByText('Access admin training resources here.')).toBeTruthy()
     // Settings and Help are not tiles of a section: they are the panel's own consoles.
-    expect(within(tile('training')).queryByText(/using the Training console/)).toBeNull()
-    expect(within(tile('help')).getByText(/using the Training console/)).toBeTruthy()
+    expect(within(tile('dashboard')).queryByText(/using the Dashboard console/)).toBeNull()
+    expect(within(tile('help')).getByText(/using the Dashboard console/)).toBeTruthy()
+    expect(within(tile('help')).queryByText(/Training/)).toBeNull()
     expect(within(tile('settings')).getByRole('heading', { name: 'Account' })).toBeTruthy()
   })
 
@@ -48,20 +48,20 @@ describe('UUI (the User panel as tiles)', () => {
     const user = userEvent.setup()
     render(<UUI />)
     const consoles = screen.getByRole('toolbar', { name: 'User panel consoles tabs' })
-    expect(within(consoles).getAllByRole('button').map(b => b.getAttribute('aria-label'))).toEqual(['Dashboard', 'Account', 'Training', 'Settings', 'Help'])
-    const pages = within(tile('training').querySelector('.gtTitle') as HTMLElement).getByRole('toolbar', { name: 'Training tiles tabs' })
-    expect(within(pages).getAllByRole('button').map(b => b.getAttribute('aria-label'))).toEqual(['User Training', 'Reader Training', 'Translator Training', 'Writer Training', 'Admin Training'])
+    expect(within(consoles).getAllByRole('button').map(b => b.getAttribute('aria-label'))).toEqual(['Dashboard', 'Account', 'Settings', 'Help'])
+    const pages = within(tile('dashboard').querySelector('.gtTitle') as HTMLElement).getByRole('toolbar', { name: 'Dashboard tiles tabs' })
+    expect(within(pages).getAllByRole('button').map(b => b.getAttribute('aria-label'))).toEqual(['Activity Log', 'Schedule', 'Notifications'])
     // A tile has no minimize button; its icon in the rail turns it off and on.
     expect(screen.queryByRole('button', { name: /^Minimize/ })).toBeNull()
-    await user.click(within(pages).getByRole('button', { name: 'Reader Training' }))
-    expect(tile('readerTraining')).toBeNull()
-    await user.click(within(pages).getByRole('button', { name: 'Reader Training' }))
-    expect(tile('readerTraining')).toBeTruthy()
-    await user.click(within(consoles).getByRole('button', { name: 'Training' }))
-    expect(tile('training')).toBeNull()
-    expect(within(consoles).getByRole('button', { name: 'Training' }).getAttribute('aria-pressed')).toBe('false')
-    await user.click(within(consoles).getByRole('button', { name: 'Training' }))
-    expect(tile('training')).toBeTruthy()
+    await user.click(within(pages).getByRole('button', { name: 'Notifications' }))
+    expect(tile('notifications')).toBeNull()
+    await user.click(within(pages).getByRole('button', { name: 'Notifications' }))
+    expect(tile('notifications')).toBeTruthy()
+    await user.click(within(consoles).getByRole('button', { name: 'Account' }))
+    expect(tile('account')).toBeNull()
+    expect(within(consoles).getByRole('button', { name: 'Account' }).getAttribute('aria-pressed')).toBe('false')
+    await user.click(within(consoles).getByRole('button', { name: 'Account' }))
+    expect(tile('account')).toBeTruthy()
   })
 
   it('classifies each content flag at the user level, in Account > Flags', async () => {

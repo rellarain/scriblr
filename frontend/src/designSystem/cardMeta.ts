@@ -9,6 +9,10 @@ export const CARD_META: CardMeta[] = [
     summary: 'The four stacked levels (Dash, Project, Outline, Draft) at Min, Mid and Max, each with its header, 30x30 icon tabs and quick actions.',
   },
   {
+    id: 'training', dir: 'TrainingLevels', title: 'Training: five stacked levels', group: 'Layout', height: 640,
+    summary: 'The Training interface: the Desk, the open Course, its Module, the Lesson and the Practice as stacked levels, each with its tabs, the deepest focused and the others in a side column.',
+  },
+  {
     id: 'split-tiles', dir: 'SplitTiles', title: 'Tiles, split grid and dividers', group: 'Layout', height: 520,
     summary: 'The open tiles on a split grid: drag a title bar to move a tile, a divider to resize. The layout is remembered.',
   },

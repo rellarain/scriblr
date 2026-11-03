@@ -1,7 +1,7 @@
 @use './mixins' as *;
 
-// The Reader (RUI) shares the Writer's aliases and button reset, and so draws its shelf and spines.
-.wUI.wr, .rUI.wr {
+// The Reader (RUI) shares the Writer's aliases and button reset, and so draws its shelf and spines; Training (TUI) shares them for its levels.
+.wUI.wr, .rUI.wr, .tUI.wr {
   @include wrAliases;
 
   flex-direction: row;

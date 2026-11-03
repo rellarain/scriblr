@@ -12,7 +12,7 @@ import { CURRENT_USER } from './userSeed'
 import { useSettings } from './settings/settingsStore'
 import { useThemeEngine } from './theme/useTheme'
 
-// The Reader and the Translator are loaded when first opened: the Writer, the page the app starts on, does not carry them.
+// The Reader and Training are loaded when first opened: the Writer, the page the app starts on, does not carry them.
 const RUI = lazy(() => import('./assets/Interfaces/RUI'))
 const TUI = lazy(() => import('./assets/Interfaces/TUI'))
 
@@ -21,11 +21,11 @@ const SIDEBAR_PANEL_W = 400
 // AUI's own width snaps to multiples of this (a "column"), at any container size.
 const AUI_COLUMN_W = 400
 
-// The page the URL names: /read is the Reader, /translate the Translator, anything else (/, /write) the Writer.
-const MAIN_PATH: Record<MainInterface, string> = { reader: '/read', translator: '/translate', writer: '/write' }
+// The page the URL names: /read is the Reader, /train Training, anything else (/, /write) the Writer.
+const MAIN_PATH: Record<MainInterface, string> = { reader: '/read', training: '/train', writer: '/write' }
 export function mainOf(pathname: string): MainInterface {
   if (pathname === '/read' || pathname.startsWith('/read/')) return 'reader'
-  if (pathname === '/translate' || pathname.startsWith('/translate/')) return 'translator'
+  if (pathname === '/train' || pathname.startsWith('/train/')) return 'training'
   return 'writer'
 }
 
@@ -128,7 +128,7 @@ function App() {
     if (showVUI) return null
     switch (activeMain) {
       case 'reader': return <RUI />
-      case 'translator': return <TUI />
+      case 'training': return <TUI />
       case 'writer': return <WUI />
     }
   }

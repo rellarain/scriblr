@@ -1,6 +1,6 @@
 import type { ComponentType } from 'react'
 import type { MainInterface } from './interfaceShellTypes'
-import { BookFaceIcon, GlobeIcon, PencilIcon, type IconProps } from './assets/icons'
+import { BookFaceIcon, GraduationCapIcon, PencilIcon, type IconProps } from './assets/icons'
 
 interface NavSwitcherProps {
   active: MainInterface
@@ -10,12 +10,12 @@ interface NavSwitcherProps {
 
 const OPTIONS: Array<{ key: MainInterface; label: string; Icon: ComponentType<IconProps> }> = [
   { key: 'reader', label: 'Reader', Icon: BookFaceIcon },
-  { key: 'translator', label: 'Translator', Icon: GlobeIcon },
+  { key: 'training', label: 'Training', Icon: GraduationCapIcon },
   { key: 'writer', label: 'Writer', Icon: PencilIcon },
 ]
 
 // The Customize/user toggle button that used to lead this row now lives in
-// HeaderUserCard instead -- this is just the 4 page-switch buttons.
+// HeaderUserCard instead -- this is just the 3 page-switch buttons.
 function NavSwitcher({ active, onSelect, vuiOpen }: NavSwitcherProps) {
   return (
     <nav className="navSwitcher">

@@ -1,7 +1,7 @@
 import { useState, type ComponentType, type ReactNode } from 'react'
 import {
   BarChartIcon, CalendarIcon, EnvelopeIcon, UserIcon,
-  BookFaceIcon, FlagIcon, GearIcon, GlobeIcon, HelpIcon, PencilIcon, BriefcaseIcon, GraduationCapIcon,
+  FlagIcon, GearIcon, HelpIcon,
   type IconProps,
 } from '../icons'
 import CustomizeControls from '../../CustomizeControls'
@@ -11,7 +11,7 @@ import TileArea, { type AreaTile } from '../../components/tiles/TileArea'
 import { consoleTile, useRailSlots } from '../../components/tiles/consoleTiles'
 
 // The User panel (in the header drawer), per scrilbrPlan.md's "User Page (UUI)"
-// section, as tiles (the global tile, components/tiles/TileArea.tsx): the consoles are Dashboard, Account and Training, each holding
+// section, as tiles (the global tile, components/tiles/TileArea.tsx): the consoles are Dashboard and Account, each holding
 // its pages as tiles (their rail is in its title bar), then Settings and Help, which are consoles of their own (last in the panel's
 // rail) and never tiles of a section. Dashboard's settings are the theme customization tool on its own; Account's carry
 // handedness and autosave plus that same theme tool, embedded inline. Everything else is placeholder text until built.
@@ -25,7 +25,7 @@ import { consoleTile, useRailSlots } from '../../components/tiles/consoleTiles'
 interface UuiPage { key: string; label: string; Icon: ComponentType<IconProps>; body: string; Console?: ComponentType }
 
 interface UuiSection {
-  key: 'dashboard' | 'account' | 'training'
+  key: 'dashboard' | 'account'
   label: string
   Icon: ComponentType<IconProps>
   pages: UuiPage[]
@@ -53,17 +53,6 @@ const SECTIONS: UuiSection[] = [
       { key: 'subscription', label: 'Subscription', Icon: CalendarIcon, body: 'Manage your subscription here.' },
       { key: 'portfolio', label: 'Portfolio', Icon: BarChartIcon, body: 'View your portfolio here.' },
       { key: 'flags', label: 'Flags', Icon: FlagIcon, body: 'Choose how each content flag is shown to you: hidden, marked, highlight or spoiler.', Console: FlagSettings },
-    ],
-  },
-  {
-    key: 'training', label: 'Training', Icon: GraduationCapIcon,
-    help: 'Resources and assistance using the Training console here.',
-    pages: [
-      { key: 'userTraining', label: 'User Training', Icon: UserIcon, body: 'Access user training resources here.' },
-      { key: 'readerTraining', label: 'Reader Training', Icon: BookFaceIcon, body: 'Access reader training resources here.' },
-      { key: 'translatorTraining', label: 'Translator Training', Icon: GlobeIcon, body: 'Access translator training resources here.' },
-      { key: 'writerTraining', label: 'Writer Training', Icon: PencilIcon, body: 'Access writer training resources here.' },
-      { key: 'adminTraining', label: 'Admin Training', Icon: BriefcaseIcon, body: 'Access admin training resources here.' },
     ],
   },
 ]

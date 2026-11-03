@@ -10,7 +10,7 @@ def test_get_admin_config_seeds_defaults_on_first_load(client: TestClient) -> No
     tabs = {n["tab"] for n in body["nodes"]}
     assert tabs == {
         "projectPlan", "visitorConfig", "userPageConfig", "readerPageConfig",
-        "translatorPageConfig", "writerPageConfig", "helperPageConfig", "adminPageConfig",
+        "trainingPageConfig", "writerPageConfig", "helperPageConfig", "adminPageConfig",
     }
     kinds = {n["kind"] for n in body["nodes"]}
     assert kinds == {"console", "component", "feature"}
@@ -120,3 +120,24 @@ def test_a_config_file_from_before_publishing_still_loads(client: TestClient, ap
     body = client.get("/api/admin-config").json()
     assert body["published"] == {}
     assert body["nodes"][0]["name"] == "Old"
+
+
+def test_a_config_written_before_the_rename_moves_its_translator_tab_to_training(client: TestClient, app_data_root) -> None:
+    import json
+
+    node = {"id": "auiNode_old", "tab": "translatorPageConfig", "kind": "console", "parentId": None, "order": 0, "name": "Language Pairs", "idea": ""}
+    (app_data_root / "admin-config.json").write_text(json.dumps({
+        "schemaVersion": 1,
+        "nodes": [node, {**node, "id": "auiNode_other", "tab": "writerPageConfig", "name": "Shelves"}],
+        "published": {"translatorPageConfig": {"version": 2, "publishedAt": "2026-01-01T00:00:00Z", "nodes": [node]}},
+    }), encoding="utf-8")
+
+    body = client.get("/api/admin-config").json()
+    assert {n["id"]: n["tab"] for n in body["nodes"]} == {"auiNode_old": "trainingPageConfig", "auiNode_other": "writerPageConfig"}
+    assert set(body["published"]) == {"trainingPageConfig"}
+    assert body["published"]["trainingPageConfig"]["version"] == 2
+    assert body["published"]["trainingPageConfig"]["nodes"][0]["tab"] == "trainingPageConfig"
+    # It is written back, so the next load has nothing to move.
+    assert "translatorPageConfig" not in (app_data_root / "admin-config.json").read_text(encoding="utf-8")
+    # And the renamed tab publishes like any other.
+    assert client.post("/api/admin-config/publish/trainingPageConfig").json()["published"]["trainingPageConfig"]["version"] == 3

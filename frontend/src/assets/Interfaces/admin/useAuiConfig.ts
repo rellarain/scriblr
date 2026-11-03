@@ -15,7 +15,7 @@ export type ConfigView = 'draft' | 'published'
 // literals so no new key vocabulary is introduced.
 export type AuiConfigTabKey =
   | 'projectPlan' | 'visitorConfig' | 'userPageConfig' | 'readerPageConfig'
-  | 'translatorPageConfig' | 'writerPageConfig' | 'helperPageConfig' | 'adminPageConfig'
+  | 'trainingPageConfig' | 'writerPageConfig' | 'helperPageConfig' | 'adminPageConfig'
 
 function newId(prefix: string): string {
   return `${prefix}-${Math.random().toString(36).slice(2, 9)}`
