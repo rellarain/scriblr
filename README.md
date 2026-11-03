@@ -44,6 +44,7 @@ backend/
 │       ├── scrap.py                  # orphaned-moment detect/restore/permanent-delete
 │       ├── presets_store.py           # global (non-project) plot-preset catalog
 │       ├── user_settings_store.py      # global user settings: time-of-day theme, UI prefs, Writer UI state (kv)
+│       ├── training_schema.py / training_store.py   # Training: the courses (training.json) and one learner's progress (training-progress.json)
 │       └── pdf_export.py               # fpdf2 book/chapter PDF export
 ├── tests/                    # 38 pytest modules, one per feature area (+ conftest.py fixtures)
 ├── server_main.py            # entrypoint used by Electron / PyInstaller
@@ -331,6 +332,15 @@ described, now stale, in `docs/data-model.md`).
   be restored under a new parent or permanently deleted (which never
   touches that chapter's revision history — "like git history retaining a
   deleted file").
+- **Training** — two global files (`training_schema.py`, `training_store.py`), a **curriculum being a collection of courses**. `training.json`
+  (`TrainingContent`, schema v1) holds the authored courses and is seeded on the first load (the five curricula User, Reader, Translator, Writer and Admin, each with a
+  placeholder course, with fixed ids): `curricula` (title, description, hue, an ordered `courseIds`; a course may be in several curricula or none) and `courses` (a course has
+  `modules` > `lessons` > `exercises`, `projects` that name exercises of the course, and `exams`; a module has `tests` and a lesson `quizzes`; a lesson's `body` is Markdown). A quiz,
+  test and exam are an `Assessment` with a pass mark (no question content yet). Ids are unique across the whole document and are checked on save (`curricula` name existing courses,
+  a project names exercises of its own course, the caps and lengths); list order is display order. `training-progress.json` (`TrainingProgress`) is one learner's state and is
+  separate, so saving the courses never wipes it (it only drops what names something now gone): `enrolled` (course id -> date), `completed` (a course, module, lesson,
+  exercise or project id -> date) and `attempts` (an assessment id -> its latest 20 results, `passed` = the score reaches the pass mark; a pass marks the lesson, module or
+  course it checks complete). A corrupt file is quarantined (409) and a file from a newer version is refused (409).
 - **Presets** — `PresetCatalog` (`presets.json`, schema v2): a global,
   non-project-scoped catalog of ready-made plot categories. A preset is a
   category with its description, keywords, fields and fieldsets (`fieldsets`: a
@@ -374,6 +384,7 @@ the one project-independent router).
 | `revision-flags` | `/api/projects/{id}/revision-flags` | `GET ""` (`includeResolved`) · `POST ""` · `PATCH "/{flagId}"` · `POST "/{flagId}/resolve"` · `DELETE "/{flagId}"` (204) (the Preview's Flag tool, `draft/FlagTool.tsx` and `useRevisionFlags.ts`, is their UI: flag a clicked sentence, `sentenceRanges`, or the project; edit, resolve with an outcome, delete) |
 | `scrap` | `/api/projects/{id}/scrap` | `GET ""` registry · `POST "/{momentId}/restore"` · `DELETE "/{momentId}"` (204, permanent) |
 | `export` | `/api/projects/{id}/export` | `GET "/book/{bookId}"` PDF · `GET "/chapter/{chapterId}"` PDF (set in a built-in font: typographic punctuation is made plain and anything outside Latin-1 becomes `?` until a Unicode font is bundled; the download name carries the real title in `filename*`) |
+| `training` | `/api/training` | `GET ""` the courses and the progress · `PUT "/content"` replace the curricula and courses (progress kept, minus what is gone; 422 on a broken id/reference/limit) · `PUT` / `DELETE "/enrolments/{courseId}"` · `PUT` / `DELETE "/completions/{itemId}"` (a course, module, lesson, exercise or project; an assessment is refused, 422) · `POST "/attempts/{assessmentId}"` `{score}` (0-100). Every route returns the whole state; unknown id 404 |
 | `presets` | `/api/presets` | `GET ""` whole catalog (drafts, published copies, history) · `PUT ""` replace the drafts, in order (published copies and history of the ids kept; an absent id is deleted) · `GET "/published"` what the Plot sidebar offers · `POST "/{id}/publish"` (422 with the reasons if the draft is invalid) · `POST "/{id}/unpublish"` · `POST "/{id}/discard"` (back to the published copy, or cleared when there is none) · `POST "/{id}/restore/{version}"` — global (`presets.json`, project-independent) |
 | `feedback` | `/api/feedback` | Helper Inbox (app-level `feedback.json`, acts as the admin in the `X-Admin-Id` header; every call returns the whole anonymous inbox bundle): `GET ""`, `PUT /messages/{id}/validation`, `PUT /cases/{id}/vote` (yes, no, pass), `POST /cases/{id}/solutions`, `PUT /cases/{id}/solutions/{sid}/vote`, `POST /cases/{id}/close` (Planner), `POST /cases/{id}/reopen` (Configurer), `PUT /admins/{id}/roles`, `POST` / `PATCH` / `DELETE /verb-categories[/{id}]` |
 | `user_settings` | `/api/user-settings` | `GET ""` whole doc · `PUT "/theme"` · `PUT "/ui"` · `PUT "/kv/{key}"` / `DELETE "/kv/{key}"` (keys must start `scriblr.`) · `POST "/kv-import"` (one-time localStorage migration; sets only absent keys) — global (`user-settings.json`) |

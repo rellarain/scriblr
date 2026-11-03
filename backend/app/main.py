@@ -29,6 +29,7 @@ from .api import (
     revisions,
     schedule,
     scrap,
+    training,
     user_settings,
 )
 from .storage.ids import InvalidIdError
@@ -136,6 +137,7 @@ def create_app(static_dir: Optional[Path] = None) -> FastAPI:
     app.include_router(user_settings.router)
     app.include_router(feedback.router)
     app.include_router(resources.router)
+    app.include_router(training.router)
     app.include_router(library.router)
     app.include_router(reader.router)
     app.include_router(reader_social.router)
