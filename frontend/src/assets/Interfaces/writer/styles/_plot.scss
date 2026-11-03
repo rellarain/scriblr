@@ -140,6 +140,11 @@
   .wrParentHead { display: flex; align-items: center; justify-content: space-between; gap: var(--space-3); min-width: 0; }
   .wrParentFold { display: inline-flex; align-items: center; padding: var(--space-3) var(--space-4); &:hover { background: color-mix(in srgb, var(--wr-parent-ink) 10%, transparent); } }
   .wrParentBody { margin: 0; padding: 0 var(--space-4) 8px var(--space-4); font-size: 14px; font-weight: 400; line-height: 1.45; white-space: pre-wrap; overflow-wrap: anywhere; opacity: 0.95; }
+  // A folded parent chip's description is clamped to three lines (the whole is its hover text); its keywords sit under it as small chips, a faint tint of the chip's own ink on its fill.
+  .wrParentBody--folded { padding-bottom: 0; margin-bottom: var(--space-base); display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; overflow: hidden; }
+  .wrParentChips { display: flex; flex-wrap: wrap; gap: var(--space-2); padding: 0 var(--space-4) var(--space-3) var(--space-4); }
+  .wrParentLink + .wrParentChips { padding-top: 0; }
+  .wrParentChip { padding: var(--space-2); border-radius: var(--radius-button); font-size: var(--text-small); font-weight: 700; overflow-wrap: anywhere; background: color-mix(in srgb, var(--wr-parent-ink) 10%, transparent); }
   .wrKindBadge { font-size: var(--text-small); text-transform: uppercase; letter-spacing: 0.5px; opacity: 0.9; flex: 0 0 auto; }
   .wrTitleField { flex: 1; min-width: 0; background: var(--wr-field); border: 0; border-radius: var(--radius-none); color: var(--ink); font-size: var(--text-field); font-weight: 700; padding: 8px var(--space-4); outline: none; &:focus { box-shadow: inset 0 0 0 1px var(--wr-accent); } &::placeholder { color: var(--ink-faint); } }
   // A plot editor's title is as bold as its row in the plot contents (700), and in capitals for a category and a subcategory as there, but larger: the title size plus 1px (16px; the row's is

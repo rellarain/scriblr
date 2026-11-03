@@ -642,6 +642,20 @@ describe('the parent chips', () => {
     expect(screen.queryByText('plotline', { selector: '.wrKindBadge' })).not.toBeNull() // the editor itself is unchanged
   })
 
+  it('show a folded chip description and keywords under its title, and not once it is open', () => {
+    const start = described(clustered()).map(n => (n.id === 'cat' ? { ...n, keywords: ['love', 'slow'] } : n))
+    render(<Editor start={start} />)
+    const cat = document.querySelector('.wrParent--category') as HTMLElement
+    expect(within(cat).getByText('Two people, slowly.')).toHaveClass('wrParentBody--folded')
+    expect(within(within(cat).getByRole('list', { name: 'Keywords of Romance' })).getAllByRole('listitem').map(i => i.textContent)).toEqual(['love', 'slow'])
+    const clu = document.querySelector('.wrParent--cluster') as HTMLElement
+    expect(clu.querySelector('.wrParentBody')).toBeNull() // no description, no keywords: only its title
+    expect(within(clu).queryByRole('list')).toBeNull()
+    fireEvent.click(within(cat).getByRole('button', { name: /Romance/ }))
+    expect(cat.querySelector('.wrParentBody--folded')).toBeNull() // open: the editor's own fields take over
+    expect(within(cat).queryByRole('list', { name: 'Keywords of Romance' })).toBeNull()
+  })
+
   it('fold open for a parent with no description too, and the title then opens that parent', () => {
     render(<Editor start={described(clustered())} />)
     expect(chips().getByRole('button', { name: /Household/ })).toHaveAttribute('aria-expanded', 'false') // a description can be written in it

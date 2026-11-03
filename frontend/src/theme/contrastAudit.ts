@@ -164,11 +164,19 @@ export function paletteRatios(zone: ZoneKey, hues: AuditHues = DEFAULT_HUES): Pa
     return Math.min(chipRatio(ink, bg), chipRatio(ink, over(look.mode === 'light' ? WHITE : BLACK, 0.15, bg)))
   }
   const chipOnFills = (h: number) => Math.min(...[SAT_QUIET, SAT_MIDDLE, SAT_LOUD].map(tier => chipRatio(WHITE, rgbOf(fillHsl(h, colors.accent, tier)))))
+  // A keyword chip on a folded parent chip of the Plot editor: the chip's own ink (the tile ink on a category, white on a subcategory's or cluster's fill) on a 10% tint of that ink over its fill.
+  const parentChip = (fg: RGB, bg: RGB) => ratioOfRgb(fg, over(fg, 0.10, bg))
+  const parentChipAt = (h: number) => Math.min(
+    parentChip(ink, rgbOf(hsl(h, colors.theme.s * SAT_QUIET, colors.theme.l))),
+    ...[SAT_MIDDLE, SAT_LOUD].map(tier => parentChip(WHITE, rgbOf(fillHsl(h, colors.accent, tier)))),
+  )
+  let worstParentChip = parentChipAt(hues.theme)
   let worstChipLine = chipOnLine(hues.theme)
   let worstChipFill = chipOnFills(hues.theme)
   for (let h = 0; h < 360; h += 5) {
     worstChipLine = Math.min(worstChipLine, chipOnLine(h))
     worstChipFill = Math.min(worstChipFill, chipOnFills(h))
+    worstParentChip = Math.min(worstParentChip, parentChipAt(h))
     worstCategory = Math.min(worstCategory, ratioOfRgb(ink, rgbOf(hsl(h, colors.theme.s * SAT_QUIET, colors.theme.l))))
     // The card of an answer inherited from a category (a lift of the ink at 8%) in the node's field group (a recess of black at 16%) on the category's colour.
     const group = over(BLACK, SINK_ALPHAS[1] * shadeK(look.mode), rgbOf(hsl(h, colors.theme.s * SAT_QUIET, colors.theme.l)))
@@ -185,6 +193,7 @@ export function paletteRatios(zone: ZoneKey, hues: AuditHues = DEFAULT_HUES): Pa
   // A cluster's surface is the same fill at the loudest tier, over the same hues (within 30 degrees of its subcategory's).
   out.push({ id: 'plot-cluster', group: 'Plot colours', label: 'White on a plot cluster, the worst hue', kind: 'text', ratio: worstCluster })
   out.push({ id: 'plot-nav-chip-line', group: 'Plot colours', label: 'A keyword chip on a plotline row of the contents (also hovered), the worst hue', kind: 'text', ratio: worstChipLine })
+  out.push({ id: 'plot-parent-chip', group: 'Plot colours', label: 'A keyword chip on a folded parent chip of the Plot editor, the worst hue', kind: 'text', ratio: worstParentChip })
   out.push({ id: 'plot-nav-chip-fill', group: 'Plot colours', label: 'A keyword chip on a category, subcategory or cluster row, the worst hue', kind: 'text', ratio: worstChipFill })
 
   // ---- Theme settings: the timeline's icon on its segment (the zone's accent hue at 50% lightness, as ThemeSettingsPanel draws it)

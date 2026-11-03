@@ -220,6 +220,7 @@ Each cell is the ratio at the default hues (theme 330, accent 32, alert 200) and
 | White on a plot subcategory, the worst hue | 4.5:1 | 7.4 (7.1) | 7.3 (6.9) | 6.8 (6.8) | 6.8 (6.8) |
 | White on a plot cluster, the worst hue | 4.5:1 | 7.2 (7.1) | 6.6 (6.6) | 6.6 (6.6) | 6.8 (6.8) |
 | A keyword chip on a plotline row of the contents (also hovered), the worst hue | 4.5:1 | 6.0 (5.7) | 6.3 (6.2) | 5.6 (5.0) | 6.7 (6.7) |
+| A keyword chip on a folded parent chip of the Plot editor, the worst hue | 4.5:1 | 5.6 (5.5) | 5.3 (5.3) | 5.3 (4.8) | 5.3 (5.3) |
 | A keyword chip on a category, subcategory or cluster row, the worst hue | 4.5:1 | 5.2 (5.1) | 4.8 (4.8) | 5.2 (5.2) | 5.3 (5.3) |
 
 ## Inbox tones

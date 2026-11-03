@@ -5,13 +5,22 @@ import { plotColors, plotColorVars } from './plotColors'
 import { nodeLabel, plotTrail } from './plotTree'
 
 // The parents of a plot node as chips, top-down (category, subcategory, cluster), each in its own plot colour.
-//   a chip shows its title only (its description is the hover text); the stripes at its left are its tree's: category, subcategory, cluster
+//   a folded chip shows its title, then its description (three lines of it; the whole is the hover text) and its keywords as small chips; the stripes at its left are its tree's: category, subcategory, cluster
 //   a chip with a description opens on a click to the whole description; its title then opens that parent's editor
 //   a chip with no description is just its title, and clicking it opens that parent's editor
 // Given `renderEditor` (the editors of the Plot console) every chip folds open, description or not, onto the parent's own fields to change in place,
 // so a parent or a grandparent is adjusted without leaving the node being edited.
 // Which chips are open belongs to the tool (PlotView), by level: a category chip left open is open on every editor's category chip, and so
 // for subcategory and cluster chips, whichever node is opened next.
+function ParentKeywords({ parent, label }: { parent: PlotNode; label: string }) {
+  if (parent.keywords.length === 0) return null
+  return (
+    <span className="wrParentChips" role="list" aria-label={`Keywords of ${label}`}>
+      {parent.keywords.map(k => <span key={k} className="wrParentChip" role="listitem">{k}</span>)}
+    </span>
+  )
+}
+
 export function PlotParents({ node, byId, projectHue, open, onToggle, onOpen, renderEditor }: {
   node: PlotNode
   byId: Map<string, PlotNode>
@@ -38,6 +47,7 @@ export function PlotParents({ node, byId, projectHue, open, onToggle, onOpen, re
           return (
             <div key={parent.id} className={cls} style={vars}>
               <button type="button" className="wrParentLink" aria-label={`Open ${label}`} title={`Open ${label}`} onClick={() => onOpen(parent.id)}>{label}</button>
+              <ParentKeywords parent={parent} label={label} />
             </div>
           )
         }
@@ -48,6 +58,8 @@ export function PlotParents({ node, byId, projectHue, open, onToggle, onOpen, re
                 <span className="wrParentLabel">{label}</span>
                 <ChevronRightIcon size={14} />
               </button>
+              {body !== '' && <p className="wrParentBody wrParentBody--folded" title={body}>{body}</p>}
+              <ParentKeywords parent={parent} label={label} />
             </div>
           )
         }
@@ -57,7 +69,7 @@ export function PlotParents({ node, byId, projectHue, open, onToggle, onOpen, re
               <button type="button" className="wrParentLink" aria-label={`Open ${label}`} title={`Open ${label}`} onClick={() => onOpen(parent.id)}>{label}</button>
               <button type="button" className="wrParentFold" aria-expanded aria-label={`Collapse ${label}`} onClick={() => onToggle(parent.kind)}><ChevronDownIcon size={14} /></button>
             </div>
-            {renderEditor ? renderEditor(parent) : <p className="wrParentBody">{body}</p>}
+            {renderEditor ? renderEditor(parent) : <><p className="wrParentBody">{body}</p><ParentKeywords parent={parent} label={label} /></>}
           </div>
         )
       })}

@@ -623,7 +623,7 @@ mounted it; it remains in git history.
   Project's (`levels/projectTabs.tsx`): Plot and Outline (at Mid the Plot is its console in one column and the Outline a summary; the editors at Max; the Plot is a console of five tiles, `PlotView.tsx`: Contents, Editor,
   Chapters, Compare and Plotpoints, on a split grid with its rail of tile tabs in the tab's title bar, Compare and Plotpoints off until wanted, the layout
   and what is off kept per user as `scriblr.writer.plot.tiles` and `scriblr.writer.plot.minimized`; Compare turns itself on when a second plotline is ticked;
-  in the Editor the parents above a title are collapsibles by level, each opening onto its own title, description, colour and keywords to change in place),
+  in the Editor the parents above a title are collapsibles by level, each showing its description and keywords while folded and opening onto its own title, description, colour and keywords to change in place),
   Schedule (the same console over the project), History, Settings (the project editor and its colour) and Help. The
   Outline's (`levels/outlineTabs.tsx`): Book outline (New chapter), Book details, Settings (the
   book's fields and colour) and Help. At Max the Outline is the book's **cover**, in one column: the book editor strip with the
