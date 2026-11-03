@@ -377,3 +377,32 @@ export interface BookProgress {
   published: Measure // chapters published at least once
   words: Measure // draft words against the word-count goal (total 0 = no goal)
 }
+
+// ---- Training: the courses (authored; training.json) and one learner's progress (training-progress.json); mirrors backend/app/storage/training_schema.py
+// A curriculum is a collection of courses. A quiz (in a lesson), a test (in a module) and an exam (in a course) are an assessment with a pass mark.
+export interface TrainingAssessment { id: string; title: string; description: string; passMark: number }
+export interface TrainingExercise { id: string; title: string; description: string }
+export interface TrainingLesson { id: string; title: string; description: string; body: string; exercises: TrainingExercise[]; quizzes: TrainingAssessment[] }
+export interface TrainingModule { id: string; title: string; description: string; lessons: TrainingLesson[]; tests: TrainingAssessment[] }
+export interface TrainingProject { id: string; title: string; description: string; exerciseIds: string[] }
+export interface TrainingCourse {
+  id: string; title: string; description: string
+  // Its own colour (a hue); null = its first curriculum's.
+  hue: number | null
+  modules: TrainingModule[]; projects: TrainingProject[]; exams: TrainingAssessment[]
+}
+export interface TrainingCurriculum { id: string; title: string; description: string; hue: number | null; courseIds: string[] }
+export interface TrainingContent { schemaVersion: number; curricula: TrainingCurriculum[]; courses: TrainingCourse[] }
+// What a save of the courses sends.
+export type TrainingContentDraft = Pick<TrainingContent, 'curricula' | 'courses'>
+export interface TrainingAttempt { score: number; passed: boolean; at: string }
+export interface TrainingProgress {
+  schemaVersion: number
+  // Course id -> when enrolled.
+  enrolled: Record<string, string>
+  // Course, module, lesson, exercise or project id -> when marked complete.
+  completed: Record<string, string>
+  // Assessment id -> its latest results, oldest first.
+  attempts: Record<string, TrainingAttempt[]>
+}
+export interface TrainingState { content: TrainingContent; progress: TrainingProgress }

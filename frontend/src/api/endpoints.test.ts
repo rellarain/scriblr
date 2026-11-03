@@ -11,6 +11,7 @@ import { getPlot, putPlot } from './plotApi'
 import { createProject, deleteProject, getProject, getProjectsOverview, updateProject } from './projectsApi'
 import { discardPresetChanges, getPresets, getPublishedPresets, publishPreset, putPresets, restorePresetVersion, unpublishPreset } from './presetsApi'
 import { listPublications, publishChapter } from './publicationFetch'
+import { clearCompleted, enrol, getTraining, leave, recordAttempt, saveTrainingContent, setCompleted } from './trainingApi'
 
 // Each call to the backend asks for the route, with the verb and body, the backend expects: a table of them, with an id that needs escaping
 // so that a path never changes shape (an id such as "a/b c" must stay one path segment).
@@ -26,6 +27,13 @@ function answerWith(body: unknown = {}, init: { ok?: boolean; status?: number } 
 
 const TREE = { schemaVersion: 2, nodes: [] }
 const CASES: Array<[string, () => Promise<unknown>, string, string, unknown?]> = [
+  ['getTraining', () => getTraining(), 'GET', '/api/training'],
+  ['saveTrainingContent', () => saveTrainingContent({ curricula: [], courses: [] }), 'PUT', '/api/training/content', { curricula: [], courses: [] }],
+  ['enrol', () => enrol(ID), 'PUT', `/api/training/enrolments/${ESC}`],
+  ['leave', () => leave(ID), 'DELETE', `/api/training/enrolments/${ESC}`],
+  ['setCompleted', () => setCompleted(ID), 'PUT', `/api/training/completions/${ESC}`],
+  ['clearCompleted', () => clearCompleted(ID), 'DELETE', `/api/training/completions/${ESC}`],
+  ['recordAttempt', () => recordAttempt(ID, 80), 'POST', `/api/training/attempts/${ESC}`, { score: 80 }],
   ['getProjectsOverview', () => getProjectsOverview(), 'GET', '/api/projects/overview'],
   ['createProject', () => createProject('Title'), 'POST', '/api/projects', { title: 'Title' }],
   ['getProject', () => getProject(ID), 'GET', `/api/projects/${ESC}`],

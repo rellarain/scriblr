@@ -1,6 +1,8 @@
 import { describe, expect, it } from 'vitest'
+import { seedContent } from '../../../designSystem/mockTraining'
 import { DESK, focusOf, levelsOf, openCourse, openExercise, openLesson, openModule, openProject, promote, resolvePath, sizesFor } from './trainingPath'
 
+const content = seedContent()
 const lesson = () => openLesson(openModule(openCourse('writer-c1'), 'writer-c1-m1'), 'writer-c1-m1-l1')
 
 describe('the levels on the path', () => {
@@ -45,18 +47,18 @@ describe('the size of each level', () => {
 })
 
 describe('resolving a stored path', () => {
-  it('cuts the path where an id is not a course, module, lesson, exercise or project', () => {
-    expect(resolvePath({ ...DESK, courseId: 'nope' })).toEqual(DESK)
-    expect(resolvePath({ courseId: 'writer-c1', moduleId: 'nope', lessonId: 'writer-c1-m1-l1', work: null })).toEqual(openCourse('writer-c1'))
-    expect(resolvePath({ courseId: 'writer-c1', moduleId: 'writer-c1-m1', lessonId: 'nope', work: null })).toEqual(openModule(openCourse('writer-c1'), 'writer-c1-m1'))
-    expect(resolvePath({ ...lesson(), work: { kind: 'exercise', id: 'nope' } })).toEqual(lesson())
-    expect(resolvePath({ ...lesson(), work: { kind: 'project', id: 'reader-c1-p1' } })).toEqual(lesson())
+  it('cuts the path where an id is not a course, module, lesson, exercise or project of the courses', () => {
+    expect(resolvePath({ ...DESK, courseId: 'nope' }, content)).toEqual(DESK)
+    expect(resolvePath({ courseId: 'writer-c1', moduleId: 'nope', lessonId: 'writer-c1-m1-l1', work: null }, content)).toEqual(openCourse('writer-c1'))
+    expect(resolvePath({ courseId: 'writer-c1', moduleId: 'writer-c1-m1', lessonId: 'nope', work: null }, content)).toEqual(openModule(openCourse('writer-c1'), 'writer-c1-m1'))
+    expect(resolvePath({ ...lesson(), work: { kind: 'exercise', id: 'nope' } }, content)).toEqual(lesson())
+    expect(resolvePath({ ...lesson(), work: { kind: 'project', id: 'reader-c1-p1' } }, content)).toEqual(lesson())
   })
 
   it('keeps a good path as it is', () => {
     const deep = openExercise(lesson(), 'writer-c1-m1-l1-e1')
-    expect(resolvePath(deep)).toEqual(deep)
+    expect(resolvePath(deep, content)).toEqual(deep)
     const project = openProject(openCourse('admin-c1'), 'admin-c1-p1')
-    expect(resolvePath(project)).toEqual(project)
+    expect(resolvePath(project, content)).toEqual(project)
   })
 })

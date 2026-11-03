@@ -1,4 +1,5 @@
-import { courseById, lessonOf, moduleOf } from './trainingSeed'
+import type { TrainingContent } from '../../../api/types'
+import { courseById, lessonOf, moduleOf } from './trainingContent'
 
 // Where the user is in Training: the open course, module, lesson and, deepest, the exercise or project being worked on. Training is
 // stacked levels (Desk, Course, Module, Lesson, Practice) like the Writer's; the levels shown are the ones on this path, the deepest
@@ -18,9 +19,9 @@ export type SizeOverrides = Partial<Record<TrainingLevel, 'min' | 'mid'>>
 export const DESK: TrainingPath = { courseId: null, moduleId: null, lessonId: null, work: null }
 export const LEVELS: TrainingLevel[] = ['desk', 'course', 'module', 'lesson', 'practice']
 
-// The path cut to what exists: a module with no course, or an id the courses do not have, ends the path where it stops making sense.
-export function resolvePath(p: TrainingPath): TrainingPath {
-  const course = courseById(p.courseId)
+// The path cut to what exists in the courses: a module with no course, or an id the courses do not have, ends the path where it stops making sense.
+export function resolvePath(p: TrainingPath, content: TrainingContent): TrainingPath {
+  const course = courseById(content, p.courseId)
   if (!course) return DESK
   const mod = moduleOf(course, p.moduleId)
   const lesson = mod ? lessonOf(mod, p.lessonId) : undefined

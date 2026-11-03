@@ -7,6 +7,13 @@
   .trPageTitle { margin: 0; font-size: 14px; font-weight: 700; text-transform: uppercase; letter-spacing: 1.5px; }
   .trPageDefinition { margin: 0; font-size: var(--text-ui); line-height: 1.45; opacity: 0.92; }
   .trEmpty { margin: 0; }
+  .trAbout { margin: 0; font-size: var(--text-ui); line-height: 1.45; }
+  .trStatus { margin: 0; display: flex; align-items: center; gap: var(--space-4); }
+  .trPageTitleRow { display: flex; align-items: center; justify-content: space-between; gap: var(--space-3); }
+  .trRow--static { padding: var(--space-3) var(--space-4); }
+  .trRowText--static { padding: 0; }
+  // A lesson's material (Markdown), in the level's own ink.
+  .trMarkdown { font-size: var(--text-ui); line-height: 1.5; overflow-wrap: anywhere; h1, h2, h3, h4 { margin: var(--space-4) 0 var(--space-2); font-size: var(--text-ui); font-weight: 700; } > :first-child { margin-top: 0; } p, ul, ol, pre, blockquote { margin: 0 0 var(--space-3); } ul, ol { padding-left: var(--space-7); } code { font-family: ui-monospace, monospace; font-size: 0.92em; background: var(--level-wash-lo); padding: 0 var(--space-1); } pre { overflow-x: auto; padding: var(--space-3); background: var(--level-wash-lo); code { background: none; padding: 0; } } a { color: inherit; text-decoration: underline; } }
   // A curriculum in the Catalog: its name, what it is, and its courses.
   .trGroup { display: flex; flex-direction: column; gap: var(--space-3); }
   .trGroupTitle { margin: 0; font-size: var(--text-ui); font-weight: 700; text-transform: uppercase; letter-spacing: 1px; }
