@@ -1,17 +1,20 @@
 import type { ReactNode } from 'react'
 import type { PlotNode } from '../../../api/types'
-import { ChevronDownIcon, ChevronRightIcon } from '../../icons'
+import { ChevronDownIcon, ChevronRightIcon, PencilIcon } from '../../icons'
 import { plotColors, plotColorVars } from './plotColors'
 import { nodeLabel, plotTrail } from './plotTree'
 
-// The parents of a plot node as chips, top-down (category, subcategory, cluster), each in its own plot colour.
-//   a folded chip shows its title, then its description (three lines of it; the whole is the hover text) and its keywords as small chips; the stripes at its left are its tree's: category, subcategory, cluster
-//   a chip with a description opens on a click to the whole description; its title then opens that parent's editor
-//   a chip with no description is just its title, and clicking it opens that parent's editor
-// Given `renderEditor` (the editors of the Plot console) every chip folds open, description or not, onto the parent's own fields to change in place,
-// so a parent or a grandparent is adjusted without leaving the node being edited.
-// Which chips are open belongs to the tool (PlotView), by level: a category chip left open is open on every editor's category chip, and so
+// The parents of a plot node as chips, top-down (category, subcategory, cluster), each in its own plot colour. A chip has three states:
+//   minimized: the title and the keywords (small chips); a click on it expands it
+//   expanded:  the title (a link to that parent's own editor), the keywords and the whole description; a pencil opens the editor, the chevron minimizes it
+//   editor:    the parent's own fields to change in place (given `renderEditor`, the editors of the Plot console), reached only from expanded
+// The stripes at a chip's left are its tree's: category, subcategory, cluster.
+// Without `renderEditor` (Compare's group headers) there is no editor state, and a chip with no description is only a link to the parent.
+// The state belongs to the tool (PlotView), by level: a category chip left expanded is expanded on every editor's category chip, and so
 // for subcategory and cluster chips, whichever node is opened next.
+export type ParentState = 'minimized' | 'expanded' | 'editor'
+export type ParentStates = ReadonlyMap<string, ParentState>
+
 function ParentKeywords({ parent, label }: { parent: PlotNode; label: string }) {
   if (parent.keywords.length === 0) return null
   return (
@@ -21,13 +24,13 @@ function ParentKeywords({ parent, label }: { parent: PlotNode; label: string }) 
   )
 }
 
-export function PlotParents({ node, byId, projectHue, open, onToggle, onOpen, renderEditor }: {
+export function PlotParents({ node, byId, projectHue, states, onState, onOpen, renderEditor }: {
   node: PlotNode
   byId: Map<string, PlotNode>
   // What a category with no colour of its own shows.
   projectHue?: number
-  open: Set<string>
-  onToggle: (kind: PlotNode['kind']) => void
+  states: ParentStates
+  onState: (kind: PlotNode['kind'], state: ParentState) => void
   onOpen: (id: string) => void
   renderEditor?: (parent: PlotNode) => ReactNode
 }) {
@@ -40,8 +43,10 @@ export function PlotParents({ node, byId, projectHue, open, onToggle, onOpen, re
         const label = nodeLabel(parent)
         const body = parent.body.trim()
         const foldable = renderEditor !== undefined || body !== ''
-        const expanded = foldable && open.has(parent.kind)
-        const cls = `wrParent wrParent--${parent.kind}${expanded ? ' wrParent--open' : ''}`
+        const asked = states.get(parent.kind) ?? 'minimized'
+        // The editor is only there where there is one to show.
+        const state: ParentState = !foldable ? 'minimized' : asked === 'editor' && renderEditor === undefined ? 'expanded' : asked
+        const cls = `wrParent wrParent--${parent.kind}${state !== 'minimized' ? ' wrParent--open' : ''}${state === 'editor' ? ' wrParent--editing' : ''}`
         const vars = plotColorVars(plotColors(parent, byId, projectHue))
         if (!foldable) {
           return (
@@ -51,25 +56,34 @@ export function PlotParents({ node, byId, projectHue, open, onToggle, onOpen, re
             </div>
           )
         }
-        if (!expanded) {
+        if (state === 'minimized') {
           return (
             <div key={parent.id} className={cls} style={vars}>
-              <button type="button" className="wrParentMain" aria-expanded={false} title={body || undefined} onClick={() => onToggle(parent.kind)}>
+              <button type="button" className="wrParentMain" aria-expanded={false} aria-label={`Expand ${label}`} title={`Expand ${label}`} onClick={() => onState(parent.kind, 'expanded')}>
                 <span className="wrParentLabel">{label}</span>
                 <ChevronRightIcon size={14} />
               </button>
-              {body !== '' && <p className="wrParentBody wrParentBody--folded" title={body}>{body}</p>}
               <ParentKeywords parent={parent} label={label} />
             </div>
           )
         }
+        const editing = state === 'editor'
         return (
           <div key={parent.id} className={cls} style={vars}>
             <div className="wrParentHead">
               <button type="button" className="wrParentLink" aria-label={`Open ${label}`} title={`Open ${label}`} onClick={() => onOpen(parent.id)}>{label}</button>
-              <button type="button" className="wrParentFold" aria-expanded aria-label={`Collapse ${label}`} onClick={() => onToggle(parent.kind)}><ChevronDownIcon size={14} /></button>
+              {renderEditor && (
+                <button type="button" className="wrParentFold" aria-pressed={editing} aria-label={editing ? `Stop editing ${label}` : `Edit ${label}`} title={editing ? `Stop editing ${label}` : `Edit ${label}`}
+                  onClick={() => onState(parent.kind, editing ? 'expanded' : 'editor')}><PencilIcon size={14} /></button>
+              )}
+              <button type="button" className="wrParentFold" aria-expanded aria-label={`Collapse ${label}`} title={`Collapse ${label}`} onClick={() => onState(parent.kind, 'minimized')}><ChevronDownIcon size={14} /></button>
             </div>
-            {renderEditor ? renderEditor(parent) : <><p className="wrParentBody">{body}</p><ParentKeywords parent={parent} label={label} /></>}
+            {editing && renderEditor ? renderEditor(parent) : (
+              <>
+                <ParentKeywords parent={parent} label={label} />
+                {body !== '' && <p className="wrParentBody">{body}</p>}
+              </>
+            )}
           </div>
         )
       })}

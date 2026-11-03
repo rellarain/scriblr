@@ -631,57 +631,80 @@ const described = (nodes: PlotNode[]) => nodes.map(n => (n.id === 'cat' ? { ...n
 describe('the parent chips', () => {
   const chips = () => within(screen.getByRole('group', { name: 'Parents' }))
 
-  it('sit above the plotline\'s title, top-down, each with its title', () => {
+  it('sit above the plotline\'s title, top-down, each minimized to its title', () => {
     render(<Editor start={described(clustered())} />)
     const group = screen.getByRole('group', { name: 'Parents' })
     const title = screen.getByPlaceholderText('Plotline title')
     expect(group.compareDocumentPosition(title) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
     expect([...group.querySelectorAll('.wrParent')].map(c => c.className.match(/wrParent--(\w+)/)![1])).toEqual(['category', 'subcategory', 'cluster'])
-    expect(chips().getByRole('button', { name: /Romance/ })).not.toHaveTextContent('Two people, slowly.') // a closed chip is only its title
-    expect(chips().getByRole('button', { name: /Romance/ })).toHaveAttribute('title', 'Two people, slowly.') // the whole of it on hover
+    expect(chips().getByRole('button', { name: 'Expand Romance' })).toHaveAttribute('aria-expanded', 'false')
+    expect(group).not.toHaveTextContent('Two people, slowly.') // minimized: no description
     expect(screen.queryByText('plotline', { selector: '.wrKindBadge' })).not.toBeNull() // the editor itself is unchanged
   })
 
-  it('show a folded chip description and keywords under its title, and not once it is open', () => {
+  it('show the keywords when minimized, and the whole description besides when expanded', () => {
     const start = described(clustered()).map(n => (n.id === 'cat' ? { ...n, keywords: ['love', 'slow'] } : n))
     render(<Editor start={start} />)
     const cat = document.querySelector('.wrParent--category') as HTMLElement
-    expect(within(cat).getByText('Two people, slowly.')).toHaveClass('wrParentBody--folded')
     expect(within(within(cat).getByRole('list', { name: 'Keywords of Romance' })).getAllByRole('listitem').map(i => i.textContent)).toEqual(['love', 'slow'])
     const clu = document.querySelector('.wrParent--cluster') as HTMLElement
     expect(clu.querySelector('.wrParentBody')).toBeNull() // no description, no keywords: only its title
     expect(within(clu).queryByRole('list')).toBeNull()
-    fireEvent.click(within(cat).getByRole('button', { name: /Romance/ }))
-    expect(cat.querySelector('.wrParentBody--folded')).toBeNull() // open: the editor's own fields take over
-    expect(within(cat).queryByRole('list', { name: 'Keywords of Romance' })).toBeNull()
+    fireEvent.click(within(cat).getByRole('button', { name: 'Expand Romance' }))
+    expect(cat).toHaveClass('wrParent--open')
+    expect(within(cat).getByText('Two people, slowly.')).toHaveClass('wrParentBody') // the whole of it
+    expect(within(cat).getByRole('list', { name: 'Keywords of Romance' })).toBeInTheDocument() // the keywords stay
+    expect(within(cat).queryByLabelText('Category title')).toBeNull() // not the editor yet
+    fireEvent.click(within(cat).getByRole('button', { name: 'Collapse Romance' }))
+    expect(within(cat).queryByText('Two people, slowly.')).toBeNull()
+    expect(within(cat).getByRole('list', { name: 'Keywords of Romance' })).toBeInTheDocument()
   })
 
-  it('fold open for a parent with no description too, and the title then opens that parent', () => {
+  it('open the editor only from the expanded state, and the pencil goes back to it', () => {
     render(<Editor start={described(clustered())} />)
-    expect(chips().getByRole('button', { name: /Household/ })).toHaveAttribute('aria-expanded', 'false') // a description can be written in it
-    fireEvent.click(chips().getByRole('button', { name: /Household/ }))
+    expect(chips().queryByRole('button', { name: 'Edit Romance' })).toBeNull() // minimized: there is no pencil
+    fireEvent.click(chips().getByRole('button', { name: 'Expand Romance' }))
+    expect(chips().queryByLabelText('Category title')).toBeNull()
+    fireEvent.click(chips().getByRole('button', { name: 'Edit Romance' }))
+    expect(chips().getByLabelText('Category title')).toHaveValue('Romance')
+    expect(document.querySelector('.wrParent--category')).toHaveClass('wrParent--editing')
+    fireEvent.click(chips().getByRole('button', { name: 'Stop editing Romance' }))
+    expect(chips().queryByLabelText('Category title')).toBeNull()
+    expect(chips().getByText('Two people, slowly.')).toBeInTheDocument() // back to expanded
+    fireEvent.click(chips().getByRole('button', { name: 'Edit Romance' }))
+    fireEvent.click(chips().getByRole('button', { name: 'Collapse Romance' })) // the chevron minimizes from the editor too
+    expect(chips().getByRole('button', { name: 'Expand Romance' })).toBeInTheDocument()
+    expect(chips().queryByLabelText('Category title')).toBeNull()
+  })
+
+  it('expand for a parent with no description too, and the title then opens that parent', () => {
+    render(<Editor start={described(clustered())} />)
+    fireEvent.click(chips().getByRole('button', { name: 'Expand Household' })) // a description can be written in the editor
+    expect(chips().queryByLabelText('Cluster title')).toBeNull()
+    fireEvent.click(chips().getByRole('button', { name: 'Edit Household' }))
     expect(chips().getByLabelText('Cluster title')).toHaveValue('Household')
     fireEvent.click(chips().getByRole('button', { name: 'Open Household' }))
     expect(screen.getByPlaceholderText('Cluster title')).toHaveValue('Household')
   })
 
-  it('open on a click to the parent\'s own fields, and the title then opens the parent\'s editor', () => {
+  it('open the parent\'s editor from the pencil, and the title then opens the parent\'s own editor', () => {
     render(<Editor start={described(clustered())} />)
-    const chip = chips().getByRole('button', { name: /Slow burn/ })
-    expect(chip).toHaveAttribute('aria-expanded', 'false')
-    fireEvent.click(chip)
+    fireEvent.click(chips().getByRole('button', { name: 'Expand Slow burn' }))
+    fireEvent.click(chips().getByRole('button', { name: 'Edit Slow burn' }))
     expect(chips().getByLabelText('Subcategory description')).toHaveValue('It takes a whole winter.')
     fireEvent.click(chips().getByRole('button', { name: 'Collapse Slow burn' }))
-    expect(chips().getByRole('button', { name: /Slow burn/ })).toHaveAttribute('aria-expanded', 'false')
-    fireEvent.click(chips().getByRole('button', { name: /Slow burn/ }))
+    expect(chips().getByRole('button', { name: 'Expand Slow burn' })).toHaveAttribute('aria-expanded', 'false')
+    fireEvent.click(chips().getByRole('button', { name: 'Expand Slow burn' }))
     fireEvent.click(chips().getByRole('button', { name: 'Open Slow burn' }))
     expect(screen.getByPlaceholderText('Subcategory title')).toHaveValue('Slow burn')
   })
 
-  it('are closed with no input in them, and open onto the title, description, colour and keywords to change in place', () => {
+  it('are closed with no input in them, and the editor has the title, description, colour and keywords to change in place', () => {
     render(<Editor start={described(clustered())} />)
     expect(document.querySelector('.wrParents input, .wrParents textarea')).toBeNull()
-    fireEvent.click(chips().getByRole('button', { name: /Romance/ }))
+    fireEvent.click(chips().getByRole('button', { name: 'Expand Romance' }))
+    expect(document.querySelector('.wrParents input, .wrParents textarea')).toBeNull() // expanded is still only reading
+    fireEvent.click(chips().getByRole('button', { name: 'Edit Romance' }))
     expect(chips().getByRole('slider', { name: 'Category colour' })).toBeInTheDocument()
     expect(chips().getByPlaceholderText('Add keyword…')).toBeInTheDocument()
     fireEvent.change(chips().getByLabelText('Category title'), { target: { value: 'Love stories' } })
@@ -692,8 +715,10 @@ describe('the parent chips', () => {
 
   it('open the grandparent and the parent together, each onto its own fields', () => {
     render(<Editor start={described(clustered())} />)
-    fireEvent.click(chips().getByRole('button', { name: /Romance/ }))
-    fireEvent.click(chips().getByRole('button', { name: /Slow burn/ }))
+    fireEvent.click(chips().getByRole('button', { name: 'Expand Romance' }))
+    fireEvent.click(chips().getByRole('button', { name: 'Edit Romance' }))
+    fireEvent.click(chips().getByRole('button', { name: 'Expand Slow burn' }))
+    fireEvent.click(chips().getByRole('button', { name: 'Edit Slow burn' }))
     fireEvent.change(chips().getByLabelText('Subcategory title'), { target: { value: 'Long winter' } })
     expect(chips().getByLabelText('Category title')).toHaveValue('Romance') // the other one is unchanged
     expect(tile('Contents').getByRole('button', { name: 'Long winter' })).toBeInTheDocument()
@@ -718,6 +743,8 @@ describe('the parent chips', () => {
     const parents = within(within(group).getByRole('group', { name: 'Parents' }))
     expect(parents.getByRole('button', { name: /Romance/ })).toBeInTheDocument()
     fireEvent.click(parents.getByRole('button', { name: /Slow burn/ }))
+    expect(parents.getByText('It takes a whole winter.')).toBeInTheDocument() // expanded: the description
+    expect(parents.queryByRole('button', { name: /^Edit / })).toBeNull() // and no editor in Compare
     fireEvent.click(parents.getByRole('button', { name: 'Open Slow burn' }))
     expect(screen.getByPlaceholderText('Subcategory title')).toHaveValue('Slow burn') // the editor goes to the parent; the comparison stays
   })

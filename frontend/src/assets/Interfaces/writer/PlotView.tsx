@@ -13,7 +13,7 @@ import { FieldEditor, FieldGroups, type PlotDrag, type PlotUi } from './FieldBlo
 import { PlotOutlinePanel } from './PlotOutlinePanel'
 import { PlotNav, plotlineCount } from './PlotNav'
 import { PlotCompare } from './PlotCompare'
-import { PlotParents } from './PlotParents'
+import { PlotParents, type ParentState, type ParentStates } from './PlotParents'
 import PlotpointsTab from './levels/PlotpointsTab'
 import { SplitArea, type SplitTile } from './SplitArea'
 import type { SplitNode } from '../../../components/tiles/splitTree'
@@ -115,7 +115,7 @@ function CategoryEditor({ w, node, ui }: { w: WriterWorkspace; node: PlotNode; u
   const colors = plotColors(node, w.plotNodeById, w.projectHue)
   return (
     <div className={`wrCardPanel wrCardPanel--${node.kind}`} data-knode={node.id} style={plotColorVars(colors)}>
-      <PlotParents node={node} byId={w.plotNodeById} projectHue={w.projectHue} open={ui.openParents} onToggle={ui.toggleParent} onOpen={w.focusPlotNode} renderEditor={p => <ParentFields w={w} node={p} />} />
+      <PlotParents node={node} byId={w.plotNodeById} projectHue={w.projectHue} states={ui.parentStates} onState={ui.setParentState} onOpen={w.focusPlotNode} renderEditor={p => <ParentFields w={w} node={p} />} />
       <div className="wrCardPanelHead">
         <span className="wrKindBadge">{node.kind}</span>
         <input className="wrTitleField" data-kf="" value={node.title} onChange={e => w.updatePlotNodeField(node.id, 'title', e.target.value)} placeholder={`${node.kind.charAt(0).toUpperCase()}${node.kind.slice(1)} title`} />
@@ -171,7 +171,7 @@ function PlotlineEditor({ w, node, ui, dragId, setDragId }: { w: WriterWorkspace
   return (
     <div className="wrPlotlineEditor">
       <div className="wrCardPanel wrCardPanel--plotline" data-knode={node.id} style={plotColorVars(colors)}>
-        <PlotParents node={node} byId={w.plotNodeById} projectHue={w.projectHue} open={ui.openParents} onToggle={ui.toggleParent} onOpen={w.focusPlotNode} renderEditor={p => <ParentFields w={w} node={p} />} />
+        <PlotParents node={node} byId={w.plotNodeById} projectHue={w.projectHue} states={ui.parentStates} onState={ui.setParentState} onOpen={w.focusPlotNode} renderEditor={p => <ParentFields w={w} node={p} />} />
         <div className="wrCardPanelHead">
           <span className="wrKindBadge">plotline</span>
           <input className="wrTitleField" data-kf="" value={node.title} onChange={e => w.updatePlotNodeField(node.id, 'title', e.target.value)} placeholder="Plotline title" />
@@ -227,7 +227,7 @@ function CompareBody({ w, lines, onOpen, onOpenNode, onDeselect, ui }: {
     <div className="wrPlotBody" ref={ref}>
       {lines.length < 2
         ? <p className="wrMuted">Tick two or more plotlines in the contents to compare them.</p>
-        : <PlotCompare w={w} lines={lines} size={plotSizeOf(width)} onOpen={onOpen} onOpenNode={onOpenNode} onDeselect={onDeselect} openParents={ui.openParents} onToggleParent={ui.toggleParent} />}
+        : <PlotCompare w={w} lines={lines} size={plotSizeOf(width)} onOpen={onOpen} onOpenNode={onOpenNode} onDeselect={onDeselect} parentStates={ui.parentStates} onParentState={ui.setParentState} />}
     </div>
   )
 }
@@ -262,12 +262,12 @@ export default function PlotView({ w, titleSlot, columns }: { w: WriterWorkspace
   // Which fields are open (collapsed by default), and the value just created (it takes focus).
   const [openFields, setOpenFields] = useState<Set<string>>(new Set())
   const [newValueId, setNewValueId] = useState<string | null>(null)
-  // The levels whose parent chips are left open, kept while moving from one node to another (open the category chip once and every editor's
-  // category chip is open).
-  const [openParents, setOpenParents] = useState<Set<string>>(new Set())
-  const toggleParent = (kind: string) => setOpenParents(prev => { const next = new Set(prev); if (next.has(kind)) next.delete(kind); else next.add(kind); return next })
+  // The state of the parent chips by level, kept while moving from one node to another (expand the category chip once and every editor's
+  // category chip is expanded). A level not in the map is minimized.
+  const [parentStates, setParentStates] = useState<ParentStates>(new Map())
+  const setParentState = (kind: string, state: ParentState) => setParentStates(prev => { const next = new Map(prev); if (state === 'minimized') next.delete(kind); else next.set(kind, state); return next })
   const ui: PlotUi = {
-    openParents, toggleParent,
+    parentStates, setParentState,
     isOpen: id => openFields.has(id),
     setOpen: (id, open) => setOpenFields(prev => {
       if (prev.has(id) === open) return prev

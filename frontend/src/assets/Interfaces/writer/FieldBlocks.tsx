@@ -11,6 +11,7 @@ import {
   FIELD_NAME_MAX, FIELDSET_NAME_MAX, MAX_FIELDSETS, fieldLayout, isScrapField, orderValues, scopeLayouts, setsOf, valuesIn, canMoveValue,
   type FieldInfo, type FieldScope,
 } from './plotFields'
+import type { ParentState, ParentStates } from './PlotParents'
 import { PlotValueCard } from './PlotValueCard'
 import { KIND_LABEL, isChoice, kindOf } from './plotKinds'
 import { isPlaced, placedCount } from './plotPlacement'
@@ -34,9 +35,9 @@ export interface PlotUi {
   // A value just created, so its title can take focus.
   newValueId: string | null
   setNewValueId: (id: string | null) => void
-  // The parent chips (PlotParents.tsx) left open, by level (category, subcategory, cluster): kept while another node is opened.
-  openParents: Set<string>
-  toggleParent: (kind: PlotNode['kind']) => void
+  // The state of the parent chips (PlotParents.tsx: minimized, expanded, editor), by level (category, subcategory, cluster): kept while another node is opened.
+  parentStates: ParentStates
+  setParentState: (kind: PlotNode['kind'], state: ParentState) => void
 }
 
 // Dragging a value (to a chapter, or into another field), a field (to reorder, or into or out of a set) and a fieldset (to reorder).

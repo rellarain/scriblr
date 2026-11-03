@@ -137,11 +137,11 @@
   .wrParentLabel, .wrParentLink { font-size: 14px; font-weight: 700; text-transform: uppercase; letter-spacing: 1.5px; }
   .wrParentLabel { flex: 0 1 auto; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
   .wrParentLink { padding: var(--space-3) var(--space-4); text-decoration: underline; text-underline-offset: 3px; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; &:hover { background: color-mix(in srgb, var(--wr-parent-ink) 10%, transparent); } }
+  .wrParentHead .wrParentLink { margin-right: auto; }
   .wrParentHead { display: flex; align-items: center; justify-content: space-between; gap: var(--space-3); min-width: 0; }
   .wrParentFold { display: inline-flex; align-items: center; padding: var(--space-3) var(--space-4); &:hover { background: color-mix(in srgb, var(--wr-parent-ink) 10%, transparent); } }
   .wrParentBody { margin: 0; padding: 0 var(--space-4) 8px var(--space-4); font-size: 14px; font-weight: 400; line-height: 1.45; white-space: pre-wrap; overflow-wrap: anywhere; opacity: 0.95; }
-  // A folded parent chip's description is clamped to three lines (the whole is its hover text); its keywords sit under it as small chips, a faint tint of the chip's own ink on its fill.
-  .wrParentBody--folded { padding-bottom: 0; margin-bottom: var(--space-base); display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; overflow: hidden; }
+  // A minimized or expanded parent chip's keywords sit under its title as small chips, a faint tint of the chip's own ink on its fill; the pencil and the chevron of an open chip sit at the right of its head.
   .wrParentChips { display: flex; flex-wrap: wrap; gap: var(--space-2); padding: 0 var(--space-4) var(--space-3) var(--space-4); }
   .wrParentLink + .wrParentChips { padding-top: 0; }
   .wrParentChip { padding: var(--space-2); border-radius: var(--radius-button); font-size: var(--text-small); font-weight: 700; overflow-wrap: anywhere; background: color-mix(in srgb, var(--wr-parent-ink) 10%, transparent); }
