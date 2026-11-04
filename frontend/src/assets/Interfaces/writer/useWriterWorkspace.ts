@@ -17,6 +17,7 @@ import { booksOf, buildChildIndex, chaptersOfBook, dissolveSeries, moveNodeTo, n
 import {
   addOption, chooseOption, moveOption, removeAnswer, removeOption, renameOption, setFieldKind, setTextAnswer, toggleOption,
 } from './plotAnswers'
+import { linkNodes, syncLinks, unlinkNodes } from './plotLinks'
 import { cycleAwareness, isPlaced, movePlacement, placeValue, retargetPlacements, unplace } from './plotPlacement'
 import { nodesFromPreset } from './plotPreset'
 import {
@@ -328,8 +329,9 @@ export function useWriterWorkspace() {
   }
 
   function commitPlot(changed: PlotNode[], immediate: boolean) {
-    // Every plotline keeps one reference per value defined on its category and subcategory.
-    const next = syncReferences(changed, new Map(outlineNodesRef.current.map(n => [n.id, n])))
+    // Every plotline keeps one reference per value defined on its category and subcategory, and every link is on both of its ends (and none is left
+    // to a node that is gone).
+    const next = syncLinks(syncReferences(changed, new Map(outlineNodesRef.current.map(n => [n.id, n]))))
     plotNodesRef.current = next
     setPlotNodes(next)
     if (!applyingHistory.current) plotHistory.record(next, { text: !immediate })
@@ -920,6 +922,15 @@ export function useWriterWorkspace() {
     commitPlot(plotNodesRef.current.map(n => (n.id === nodeId ? { ...n, keywords: n.keywords.filter(k => k !== keyword) } : n)), true)
   }
 
+  // Link two plot nodes, or take the link away: both ends change (plotLinks.ts).
+  function addPlotLink(nodeId: string, otherId: string) {
+    commitPlot(linkNodes(plotNodesRef.current, nodeId, otherId), true)
+  }
+
+  function removePlotLink(nodeId: string, otherId: string) {
+    commitPlot(unlinkNodes(plotNodesRef.current, nodeId, otherId), true)
+  }
+
   // --- fields and their values (plotFields.ts) ---
   const outlineMap = () => new Map(outlineNodesRef.current.map(n => [n.id, n]))
 
@@ -1143,7 +1154,7 @@ export function useWriterWorkspace() {
     focusedPlotNodeId, focusedPlotNode, plotChildrenByParentId, plotNodeById,
     plotSelection, setPlotSelection, togglePlotSelection,
     focusPlotNode, addPlotNode, addPlotPreset, updatePlotNodeField, setPlotHue, deletePlotNode,
-    addPlotKeyword, removePlotKeyword,
+    addPlotKeyword, removePlotKeyword, addPlotLink, removePlotLink,
     addPlotField, renamePlotField, movePlotField, removePlotField,
     setPlotFieldKind, addPlotOption, renamePlotOption, movePlotOption, removePlotOption, togglePlotOption, choosePlotOption, setPlotTextAnswer, removePlotAnswer,
     addPlotFieldset, renamePlotFieldset, movePlotFieldset, removePlotFieldset, setPlotFieldSet,

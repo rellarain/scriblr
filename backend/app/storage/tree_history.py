@@ -8,7 +8,7 @@ from typing import Optional
 from . import project_store as store
 from .schema import TreeDiffEntry, TreeSnapshot, TreeSnapshotSummary, TreeSnapshotTrigger, TreeType, utcnow
 
-_COMPARE_FIELDS = ("title", "parentId", "flag")
+_COMPARE_FIELDS = ("title", "parentId", "flag", "links")
 
 
 def _content_field_for(tree_type: TreeType) -> str:
@@ -53,7 +53,8 @@ def diff_snapshots(nodes_from: list[dict], nodes_to: list[dict], tree_type: Tree
             )
             continue
         to_node = to_by_id[node_id]
-        changed = [f for f in compare_fields if from_node.get(f) != to_node.get(f)]
+        # An empty value and an absent one are the same (the packed nodes leave defaults out).
+        changed = [f for f in compare_fields if (from_node.get(f) or None) != (to_node.get(f) or None)]
         entries.append(
             TreeDiffEntry(
                 nodeId=node_id,

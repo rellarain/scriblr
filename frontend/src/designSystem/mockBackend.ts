@@ -88,11 +88,11 @@ function plotNodes(moments: string[]): PlotNode[] {
     ({ ...base, id, kind, parentId, order, title: '', ...over } as PlotNode)
   return [
     p('cat1', 'category', null, 0, { title: 'Category lorem', hue: 200, body: lorem(2), keywords: ['lorem', 'ipsum'] }),
-    p('cat2', 'category', null, 1, { title: 'Category ipsum', hue: 300 }),
-    p('sub1', 'subcategory', 'cat1', 0, { title: 'Subcategory dolor', hue: 230, keywords: ['dolor'] }),
-    p('clu1', 'cluster', 'sub1', 0, { title: 'Cluster elit', hue: 170 }),
-    p('line1', 'plotline', 'clu1', 0, { title: 'Plotline sit amet', body: lorem(3), keywords: ['amet', 'elit', 'tempor'] }),
-    p('line2', 'plotline', 'cat2', 0, { title: 'Plotline consectetur' }),
+    p('cat2', 'category', null, 1, { title: 'Category ipsum', hue: 300, keywords: ['ipsum', 'labore', 'dolore'] }),
+    p('sub1', 'subcategory', 'cat1', 0, { title: 'Subcategory dolor', hue: 230, links: ['line1'], body: lorem(1), keywords: ['dolor', 'sit', 'amet', 'tempor', 'magna'] }),
+    p('clu1', 'cluster', 'sub1', 0, { title: 'Cluster elit', hue: 170, body: lorem(0), keywords: ['elit', 'sed', 'do', 'eiusmod'] }),
+    p('line1', 'plotline', 'clu1', 0, { title: 'Plotline sit amet', body: lorem(3), keywords: ['amet', 'elit', 'tempor'], links: ['line2', 'sub1'] }),
+    p('line2', 'plotline', 'cat2', 0, { title: 'Plotline consectetur', body: lorem(0), keywords: ['consectetur', 'adipiscing'], links: ['line1'] }),
     p('pp1', 'plotpoint', 'line1', 0, { title: 'Plotpoint lorem ipsum', body: lorem(0) }),
     // Placed twice: on two moments, each with its own awareness.
     p('pp2', 'plotpoint', 'line1', 1, {

@@ -305,6 +305,7 @@ class OutlineTree(BaseModel):
 PLOT_FIELDSET_NAME_MAX = 30
 PLOT_MAX_FIELDSETS = 20
 PLOT_MAX_PLACEMENTS = 100
+PLOT_MAX_LINKS = 100
 # The longest label of an option of a choice field, and the most a field can have.
 PLOT_OPTION_LABEL_MAX = 30
 PLOT_MAX_OPTIONS = 20
@@ -459,6 +460,21 @@ class PlotNode(BaseModel):
     # Set only on "plotpoint" nodes: where the value is put in the outline, in the order they were made. Up to PLOT_MAX_PLACEMENTS, at most one
     # to a target (the first wins; a surplus is cut, not refused, so one odd node cannot set the whole plot aside). Placed = at least one.
     placements: list[PlotPlacement] = Field(default_factory=list)
+    # Set on a category, subcategory, cluster or plotline: the ids of the other plot nodes (of any of those kinds) it is linked to, for a jump from
+    # either end. The client keeps a link on both ends; the server keeps what it is given, cut not refused (a non-text id, a repeat and a surplus
+    # beyond PLOT_MAX_LINKS are dropped), so one odd node cannot set the whole plot aside.
+    links: list[str] = Field(default_factory=list)
+
+    @field_validator("links", mode="before")
+    @classmethod
+    def _few_distinct_links(cls, value: Any) -> Any:
+        if not isinstance(value, list):
+            return []
+        kept: list[str] = []
+        for item in value:
+            if isinstance(item, str) and item and item not in kept:
+                kept.append(item)
+        return kept[:PLOT_MAX_LINKS]
 
     @field_validator("placements", mode="before")
     @classmethod

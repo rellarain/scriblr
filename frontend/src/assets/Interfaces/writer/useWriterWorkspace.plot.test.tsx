@@ -699,3 +699,50 @@ describe('useWriterWorkspace: a plot range is the range of every sibling', () =>
     expect(get(other)?.hue).toBe(wrapHue(project - 30))
   })
 })
+
+describe('useWriterWorkspace: links between plot nodes', () => {
+  const links = (get: (id: string) => PlotNode | undefined, id: string) => get(id)?.links ?? []
+
+  it('links two nodes on both ends, and takes the link away from both', async () => {
+    const { result, get } = await opened()
+    act(() => { result.current.addPlotLink('line', 'line2') })
+    expect(links(get, 'line')).toEqual(['line2'])
+    expect(links(get, 'line2')).toEqual(['line'])
+    act(() => { result.current.removePlotLink('line2', 'line') })
+    expect(links(get, 'line')).toEqual([])
+    expect(links(get, 'line2')).toEqual([])
+  })
+
+  it('links a plotline to a category, and never a plotpoint', async () => {
+    const { result, get } = await opened()
+    act(() => { result.current.addPlotLink('line', 'cat') })
+    expect(links(get, 'cat')).toEqual(['line'])
+    act(() => { result.current.addPlotLink('line', 'free') })
+    expect(links(get, 'line')).toEqual(['cat'])
+    expect(links(get, 'free')).toEqual([])
+  })
+
+  it('leaves the other end clean when a linked node is deleted, and undoes each step', async () => {
+    const { result, get } = await opened()
+    act(() => { result.current.addPlotLink('line', 'line2') })
+    act(() => { result.current.deletePlotNode('line2') })
+    expect(links(get, 'line')).toEqual([])
+    act(() => { result.current.history.undo('plot') })
+    expect(get('line2')).toBeDefined()
+    expect(links(get, 'line')).toEqual(['line2'])
+    act(() => { result.current.history.undo('plot') })
+    expect(links(get, 'line')).toEqual([])
+    expect(links(get, 'line2')).toEqual([])
+  })
+
+  it('mends a plot saved with a link on one end only, and with a link to nothing, when it opens', async () => {
+    standInBackend({ p1: { index: projectIndex('p1', 'First'), outline: OUTLINE, plot: PLOT.map(n => (n.id === 'line' ? { ...n, links: ['line2', 'gone'] } : n)) } })
+    const hook = renderHook(() => useWriterWorkspace())
+    await waitFor(() => expect(hook.result.current.projects).toHaveLength(1))
+    await act(async () => { await hook.result.current.openProject('p1') })
+    await waitFor(() => expect(hook.result.current.plotStatus).toBe('idle'))
+    const get = (id: string) => hook.result.current.plotNodes.find(n => n.id === id)
+    expect(links(get, 'line')).toEqual(['line2'])
+    expect(links(get, 'line2')).toEqual(['line'])
+  })
+})

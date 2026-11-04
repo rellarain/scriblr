@@ -110,7 +110,7 @@
     // On the accent fill only a light dimming keeps text 45 points from it, and the washes lift away from the text.
     .wrLabel, .wrKindBadge, .wrOutlineMeta, .wrMuted, .wrHint { opacity: 0.9; }
     .wrLabel .wrOutlineMeta { opacity: 1; }
-    .wrSmallBtn, .wrChildRow { color: var(--on-accent); background: color-mix(in srgb, var(--away) 22%, transparent); &:hover:not(:disabled) { background: color-mix(in srgb, var(--away) 34%, transparent); } }
+    .wrSmallBtn { color: var(--on-accent); background: color-mix(in srgb, var(--away) 22%, transparent); &:hover:not(:disabled) { background: color-mix(in srgb, var(--away) 34%, transparent); } }
     .wrFieldGroup { background: color-mix(in srgb, var(--away) 16%, transparent); }
     .wrFieldName, .wrFieldNameText, .wrAnswerWho, .wrAnswerLabel--off { color: var(--on-accent); }
     .wrFieldName { background: color-mix(in srgb, var(--away) 24%, transparent); &::placeholder { color: color-mix(in srgb, var(--on-accent) 70%, transparent); } }
@@ -153,9 +153,31 @@
   .wrCardPanel--category .wrTitleField, .wrCardPanel--subcategory .wrTitleField { @include wrPlotCaps; }
   .wrChildRows { display: flex; flex-direction: column; gap: var(--space-3); }
   .wrChildRowsHead { display: flex; align-items: center; justify-content: space-between; gap: var(--space-4); .wrLabel { margin-bottom: 0; } }
-  .wrChildRow { display: flex; align-items: center; gap: var(--space-5); width: 100%; text-align: left; padding: var(--space-4) var(--space-5); border-radius: var(--radius-button); background: var(--ov-sink-2); &:hover { background: color-mix(in srgb, var(--ink) 10%, transparent); } }
-  .wrChildRowTitle { font-size: var(--text-field); font-weight: 700; flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-  .wrChildRowMeta { display: flex; gap: var(--space-3); }
+  // A node shown under another (PlotNodeChip.tsx: the child rows of an editor, and a node's links): in the colour the node has in the plot, as a parent
+  // chip is, with the audited ink on it (the tile ink on a category's colour, white on a subcategory's or cluster's fill), its keywords as small chips and its
+  // whole description. A plotline has no colour of its own: it wears its category's, with the stripes of its place at the left.
+  .wrChildRow {
+    --wr-parent-bg: var(--wr-cat, var(--ov-sink-2)); --wr-parent-ink: var(--ink);
+    display: flex; flex-direction: column; min-width: 0; box-sizing: border-box; width: 100%; padding-left: var(--wr-edge-w, 4px); border-radius: var(--radius-none);
+    background-color: var(--wr-parent-bg); color: var(--wr-parent-ink); font-size: 14px; text-align: left;
+    box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--wr-parent-ink) 30%, transparent);
+    @include wrEdge;
+    &--subcategory { --wr-parent-bg: var(--wr-sub-fill, var(--wr-cat)); --wr-parent-ink: var(--on-accent); }
+    &--cluster { --wr-parent-bg: var(--wr-cluster-fill, var(--wr-sub-fill, var(--wr-cat))); --wr-parent-ink: var(--on-accent); }
+    button { color: inherit; font: inherit; text-align: left; }
+    button:focus-visible { outline: 2px solid var(--wr-accent-light); outline-offset: -2px; }
+  }
+  .wrChildRowHead { display: flex; align-items: center; gap: var(--space-3); min-width: 0; }
+  .wrChildRowOpen { flex: 1 1 auto; min-width: 0; display: flex; align-items: baseline; gap: var(--space-4); padding: var(--space-3) var(--space-4); &:hover { background: color-mix(in srgb, var(--wr-parent-ink) 10%, transparent); } }
+  .wrChildRowTitle { font-size: var(--text-field); font-weight: 700; flex: 0 1 auto; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; text-decoration: underline; text-underline-offset: 3px; }
+  .wrChildRowKind { flex: 0 0 auto; font-size: var(--text-small); font-weight: 700; text-transform: uppercase; letter-spacing: 0.5px; opacity: 0.9; }
+  .wrChildRowMeta { flex: 0 0 auto; font-size: var(--text-small); opacity: 0.9; padding-right: var(--space-4); }
+  .wrChildRowPlace { padding: 0 var(--space-4) var(--space-2); font-size: var(--text-small); opacity: 0.9; overflow-wrap: anywhere; }
+  .wrChildRowTool { display: inline-flex; align-items: center; padding: var(--space-3) var(--space-4); &:hover { background: color-mix(in srgb, var(--wr-parent-ink) 10%, transparent); } }
+  .wrChildRow .wrParentChips { padding-top: var(--space-1); }
+  .wrChildRow .wrConfirm { margin: 0 var(--space-4) var(--space-3) var(--space-4); }
+  .wrLinked { display: flex; flex-direction: column; gap: var(--space-3); }
+  .wrLinkedList { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: var(--space-3); }
   .wrProjectOutline { display: flex; flex-direction: column; gap: var(--space-4); max-width: 720px; }
   .wrProjHead { display: flex; align-items: center; justify-content: space-between; .wrLabel { margin-bottom: 0; } }
   .wrProjHeadActions { display: flex; gap: var(--space-3); }

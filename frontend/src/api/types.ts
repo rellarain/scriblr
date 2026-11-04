@@ -103,6 +103,8 @@ export interface PlotNode {
   customFieldSets?: PlotFieldSet[]
   customFieldValues: Record<string, string>
   keywords: string[]
+  // Category, subcategory, cluster and plotline: the ids of the other such nodes it is linked to (kept on both ends: plotLinks.ts).
+  links?: string[]
   flag: NodeFlag | null
   // Category and subcategory only: the colour hue, 0-360 (null = the theme's hue for a
   // category, its category's hue for a subcategory).

@@ -15,7 +15,8 @@ import { nodeLabel, plotTrail } from './plotTree'
 export type ParentState = 'minimized' | 'expanded' | 'editor'
 export type ParentStates = ReadonlyMap<string, ParentState>
 
-function ParentKeywords({ parent, label }: { parent: PlotNode; label: string }) {
+// The keywords of a node as small read-only chips (all of them), tinted from the ink of the surface they sit on.
+export function ParentKeywords({ parent, label }: { parent: PlotNode; label: string }) {
   if (parent.keywords.length === 0) return null
   return (
     <span className="wrParentChips" role="list" aria-label={`Keywords of ${label}`}>

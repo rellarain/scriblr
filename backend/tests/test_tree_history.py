@@ -129,3 +129,22 @@ def test_plot_history_dedup_diff_and_revert(client: TestClient) -> None:
     resp = client.post(f"/api/projects/{project_id}/plot/history/{v1_id}/revert")
     assert resp.status_code == 200
     assert resp.json()["plot"]["nodes"][0]["title"] == "Themes"
+
+
+def test_plot_history_diff_reports_a_link_only_change(client: TestClient) -> None:
+    project_id = client.post("/api/projects", json={"title": "Plot Link History"}).json()["projectId"]
+    plot = client.get(f"/api/projects/{project_id}/plot").json()
+    plot["nodes"] += [
+        {"id": "cat_1", "kind": "category", "parentId": None, "order": 0, "title": "Themes"},
+        {"id": "pl_1", "kind": "plotline", "parentId": "cat_1", "order": 0, "title": "Mole"},
+    ]
+    client.put(f"/api/projects/{project_id}/plot", json=plot)
+    v1_id = client.get(f"/api/projects/{project_id}/plot/history").json()[0]["snapshotId"]
+
+    plot["nodes"][0]["links"] = ["pl_1"]
+    plot["nodes"][1]["links"] = ["cat_1"]
+    client.put(f"/api/projects/{project_id}/plot", json=plot)
+
+    entries = client.get(f"/api/projects/{project_id}/plot/history/diff", params={"from": v1_id, "to": "current"}).json()["entries"]
+    assert {e["nodeId"]: e["changedFields"] for e in entries} == {"cat_1": ["links"], "pl_1": ["links"]}
+    assert client.get(f"/api/projects/{project_id}/plot/history").json()[0]["summary"]

@@ -1,3 +1,4 @@
+import { linkNodes, syncLinks, unlinkNodes } from './plotLinks'
 import { useRef, useState } from 'react'
 import { vi } from 'vitest'
 import type { OutlineNode, PlotFieldKind, PlotNode, PlotPlacement, PresetContent } from '../../../api/types'
@@ -50,7 +51,7 @@ export function useFakeWorkspace(initial: PlotNode[], focused = 'line', outlineN
   const [selection, setSelection] = useState<string[]>([])
   const ref = useRef(plotNodes)
   const outlineById = new Map(outlineNodes.map(n => [n.id, n]))
-  const commit = (next: PlotNode[]) => { const synced = syncReferences(next, outlineById); ref.current = synced; setPlotNodes(synced) }
+  const commit = (next: PlotNode[]) => { const synced = syncLinks(syncReferences(next, outlineById)); ref.current = synced; setPlotNodes(synced) }
 
   const plotNodeById = new Map(plotNodes.map(n => [n.id, n]))
   const children = new Map<string | null, PlotNode[]>()
@@ -113,6 +114,8 @@ export function useFakeWorkspace(initial: PlotNode[], focused = 'line', outlineN
     updatePlotNodeField: (id: string, field: 'title' | 'body', value: string) => commit(ref.current.map(n => (n.id === id ? { ...n, [field]: value } : n))),
     deletePlotNode: (id: string) => { commit(ref.current.filter(n => n.id !== id)); setSelection(prev => prev.filter(s => s !== id)) },
     setPlotHue: vi.fn(), setPlotHueRange: vi.fn(), setPlotInherit: vi.fn(), addPlotKeyword: vi.fn(), removePlotKeyword: vi.fn(),
+    addPlotLink: (id: string, other: string) => commit(linkNodes(ref.current, id, other)),
+    removePlotLink: (id: string, other: string) => commit(unlinkNodes(ref.current, id, other)),
     plotHueSliderOf: (node: PlotNode) => ({ hue: node.hue ?? 120, centre: 120, range: 60, maxRange: 360, inherit: node.hue == null, onChange: vi.fn(), onRange: vi.fn(), onInherit: vi.fn() }),
   } as unknown as WriterWorkspace
   return { w, plotNodes }

@@ -1226,3 +1226,101 @@ describe('the Plot console\'s tiles', () => {
     expect(screen.getByDisplayValue('Meet cute')).toBeInTheDocument()
   })
 })
+
+// A node's links, kept on both ends (plotLinks.ts), and what the editors show of them.
+describe('linked plot nodes', () => {
+  const linked = () => within(screen.getByRole('list', { name: /^Linked to / }))
+  const withLink = (a: string, b: string) => (nodes: PlotNode[]) =>
+    nodes.map(n => (n.id === a ? { ...n, links: [b] } : n.id === b ? { ...n, links: [a] } : n))
+
+  it('has a Linked section in a plotline details, empty to begin with, whose picker leaves out its own parents', () => {
+    render(<Editor start={clustered()} />)
+    expect(screen.getByText('Linked')).toBeInTheDocument()
+    expect(screen.getByText('Nothing linked yet.')).toBeInTheDocument()
+    const picker = screen.getByRole('combobox', { name: 'Add link' })
+    expect(picker).toBeDisabled()
+    expect(picker.querySelectorAll('optgroup')).toHaveLength(0)
+  })
+
+  it('links the plotline to a cluster of another category and lists it, in that node colour, with its keywords and description', () => {
+    const start = startingPlot().concat(
+      plotNode('cat2', 'category', null, { title: 'Heist', hue: 20 }),
+      plotNode('crew', 'cluster', 'cat2', { title: 'Crew', hue: 40, body: 'The team.', keywords: ['a', 'b', 'c', 'd', 'e'] }),
+    )
+    render(<Editor start={start} />)
+    const picker = screen.getByRole('combobox', { name: 'Add link' })
+    expect([...picker.querySelectorAll('optgroup')].map(g => g.getAttribute('label'))).toEqual(['Categories', 'Clusters'])
+    fireEvent.change(picker, { target: { value: 'crew' } })
+    const chip = within(screen.getByRole('list', { name: 'Linked to Meet cute' })).getByRole('button', { name: 'Open Crew' }).closest('.wrChildRow') as HTMLElement
+    expect(chip).toHaveClass('wrChildRow--cluster')
+    expect(chip.style.getPropertyValue('--wr-cluster-fill')).not.toBe('')
+    expect(within(chip).getByText('cluster')).toBeInTheDocument()
+    expect(within(chip).getByText('Heist')).toBeInTheDocument()
+    expect(within(chip).getByText('The team.')).toBeInTheDocument()
+    expect(within(within(chip).getByRole('list', { name: 'Keywords of Crew' })).getAllByRole('listitem')).toHaveLength(5)
+    expect(screen.queryByText('Nothing linked yet.')).toBeNull()
+  })
+
+  it('shows the link from the other end, and a click on it opens that node', () => {
+    render(<Editor start={withLink('line', 'sub')(startingPlot())} focused="sub" />)
+    fireEvent.click(linked().getByRole('button', { name: 'Open Meet cute' }))
+    expect(screen.getByPlaceholderText('Plotline title')).toHaveValue('Meet cute')
+    expect(linked().getByRole('button', { name: 'Open Slow burn' })).toBeInTheDocument()
+  })
+
+  it('asks before removing a link, and removes it from both ends', () => {
+    const start = withLink('line', 'cold')(startingPlot().concat(plotNode('cold', 'plotline', 'cat', { title: 'Cold open' })))
+    render(<Editor start={start} />)
+    fireEvent.click(screen.getByRole('button', { name: 'Remove the link to Cold open' }))
+    fireEvent.click(within(screen.getByRole('group', { name: 'Remove the link to Cold open?' })).getByRole('button', { name: 'Cancel' }))
+    expect(linked().getByRole('button', { name: 'Open Cold open' })).toBeInTheDocument()
+    fireEvent.click(screen.getByRole('button', { name: 'Remove the link to Cold open' }))
+    fireEvent.click(within(screen.getByRole('group', { name: 'Remove the link to Cold open?' })).getByRole('button', { name: 'Confirm' }))
+    expect(screen.queryByRole('list', { name: /^Linked to / })).toBeNull()
+    expect(screen.getByText('Nothing linked yet.')).toBeInTheDocument()
+  })
+
+  it('has the section in a category, a subcategory and a cluster editor too', () => {
+    for (const id of ['cat', 'sub', 'clu']) {
+      const { unmount } = render(<Editor start={clustered()} focused={id} />)
+      expect(screen.getByText('Linked')).toBeInTheDocument()
+      expect(screen.getByRole('combobox', { name: 'Add link' })).toBeInTheDocument()
+      unmount()
+    }
+  })
+})
+
+// The child rows of an editor: every keyword, the whole description, and the colour of the node itself.
+describe('the child rows of an editor', () => {
+  const rich = (nodes: PlotNode[]) => nodes.map(n => (n.id === 'sub'
+    ? { ...n, body: 'It takes a whole winter.', keywords: ['k1', 'k2', 'k3', 'k4', 'k5'], hue: 250 }
+    : n.id === 'line' ? { ...n, body: 'They meet.', keywords: ['m1', 'm2', 'm3', 'm4'] } : n))
+  const row = (name: string) => screen.getByRole('button', { name: `Open ${name}` }).closest('.wrChildRow') as HTMLElement
+
+  it('show all the keywords and the description of a subcategory under a category', () => {
+    render(<Editor start={rich(startingPlot())} focused="cat" />)
+    const sub = row('Slow burn')
+    expect(within(within(sub).getByRole('list', { name: 'Keywords of Slow burn' })).getAllByRole('listitem').map(i => i.textContent)).toEqual(['k1', 'k2', 'k3', 'k4', 'k5'])
+    expect(within(sub).getByText('It takes a whole winter.')).toBeInTheDocument()
+    expect(within(sub).getByText('1 plotline')).toBeInTheDocument()
+  })
+
+  it('wear the colour of the node, not of the parent: a subcategory own fill, set on the row', () => {
+    render(<Editor start={rich(startingPlot())} focused="cat" />)
+    const sub = row('Slow burn')
+    const parentCard = document.querySelector('.wrCardPanel--category') as HTMLElement
+    expect(sub).toHaveClass('wrChildRow--subcategory')
+    expect(sub.style.getPropertyValue('--wr-sub-fill')).not.toBe('')
+    expect(parentCard.style.getPropertyValue('--wr-sub-fill')).toBe('') // a category has no subcategory colour of its own to hand down
+  })
+
+  it('list a plotline keywords and description under a subcategory, and open it from its title', () => {
+    render(<Editor start={rich(startingPlot())} focused="sub" />)
+    const line = row('Meet cute')
+    expect(line).toHaveClass('wrChildRow--plotline')
+    expect(within(line).getAllByRole('listitem').map(i => i.textContent)).toEqual(['m1', 'm2', 'm3', 'm4'])
+    expect(within(line).getByText('They meet.')).toBeInTheDocument()
+    fireEvent.click(within(line).getByRole('button', { name: 'Open Meet cute' }))
+    expect(screen.getByPlaceholderText('Plotline title')).toHaveValue('Meet cute')
+  })
+})

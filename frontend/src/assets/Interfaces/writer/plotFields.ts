@@ -1,3 +1,4 @@
+import { syncLinks } from './plotLinks'
 import type { OutlineNode, PlotCustomFieldDef, PlotFieldSet, PlotNode, TimeSystem } from '../../../api/types'
 import { insertAfter } from '../../../lib/siblingOrder'
 import { isChoice, repairChoices } from './plotKinds'
@@ -526,7 +527,7 @@ export function migratePlot(nodes: PlotNode[], outlineNodes: OutlineNode[], make
     return { ...n, customFieldDefs: n.customFieldDefs.map(d => (d.setId && !known.has(d.setId) ? withSet(d, null) : d)) }
   })
 
-  return syncReferences(next, outlineById, makeId)
+  return syncLinks(syncReferences(next, outlineById, makeId))
 }
 
 // The name of the field a plotpoint belongs to (looked up on its plotline and the nodes above it).

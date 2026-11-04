@@ -14,6 +14,9 @@ import { PlotOutlinePanel } from './PlotOutlinePanel'
 import { PlotNav, plotlineCount } from './PlotNav'
 import { PlotCompare } from './PlotCompare'
 import { PlotParents, type ParentState, type ParentStates } from './PlotParents'
+import { PlotNodeChip } from './PlotNodeChip'
+import { LinkedSection } from './LinkedSection'
+import { linksOf } from './plotLinks'
 import PlotpointsTab from './levels/PlotpointsTab'
 import { SplitArea, type SplitTile } from './SplitArea'
 import type { SplitNode } from '../../../components/tiles/splitTree'
@@ -50,14 +53,10 @@ function ChildRows({ w, node, kind, addLabel }: { w: WriterWorkspace; node: Plot
       </div>
       {kids.length === 0 && <p className="wrMuted">None yet.</p>}
       {kids.map(k => (
-        <button key={k.id} type="button" className="wrChildRow" onClick={() => w.focusPlotNode(k.id)}>
-          <span className="wrChildRowTitle">{nodeLabel(k)}</span>
-          <span className="wrChildRowMeta">
-            {k.keywords.slice(0, 3).map(kw => <span key={kw} className="wrChip wrChip--small">{kw}</span>)}
-          </span>
-          {(k.kind === 'subcategory' || k.kind === 'cluster') && <span className="wrOutlineMeta">{counted(plotlineCount(k, w.plotChildrenByParentId), 'plotline')}</span>}
-          {k.kind === 'plotline' && <span className="wrOutlineMeta">{counted((w.plotChildrenByParentId.get(k.id) ?? []).length, 'plotpoint')}</span>}
-        </button>
+        <PlotNodeChip
+          key={k.id} w={w} node={k}
+          meta={k.kind === 'plotline' ? counted((w.plotChildrenByParentId.get(k.id) ?? []).length, 'plotpoint') : counted(plotlineCount(k, w.plotChildrenByParentId), 'plotline')}
+        />
       ))}
     </div>
   )
@@ -133,6 +132,7 @@ function CategoryEditor({ w, node, ui }: { w: WriterWorkspace; node: PlotNode; u
       </div>
       <HueField w={w} node={node} />
       <KeywordsField w={w} node={node} />
+      <LinkedSection w={w} node={node} />
       <FieldEditor w={w} owner={node} ui={ui} drag={{ ...NO_DRAG, dragFieldId, setDragFieldId, dragSetId, setDragSetId }} />
       {isCategory && <ChildRows w={w} node={node} kind="subcategory" addLabel="Subcategory" />}
       {node.kind === 'subcategory' && <ChildRows w={w} node={node} kind="cluster" addLabel="Cluster" />}
@@ -188,6 +188,7 @@ function PlotlineEditor({ w, node, ui, dragId, setDragId }: { w: WriterWorkspace
           />
         </div>
         <KeywordsField w={w} node={node} />
+        <LinkedSection w={w} node={node} />
       </div>
 
       <div className="wrFieldsPanel">
@@ -323,7 +324,7 @@ export default function PlotView({ w, titleSlot, columns }: { w: WriterWorkspace
       const n = w.plotNodeById.get(id)
       if (!n) return true
       if (n.kind === 'plotpoint') return !n.refId && isBlank(n.title) && isBlank(n.body) && !isPlaced(n, outlineById)
-      if (!isBlank(n.title) || !isBlank(n.body) || n.keywords.length > 0 || n.customFieldDefs.length > 0) return false
+      if (!isBlank(n.title) || !isBlank(n.body) || n.keywords.length > 0 || linksOf(n).length > 0 || n.customFieldDefs.length > 0) return false
       return (w.plotChildrenByParentId.get(id) ?? []).filter(c => !c.refId).length === 0
     },
     createSibling: id => {

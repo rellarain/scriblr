@@ -373,3 +373,26 @@ def test_an_option_label_too_long_is_cut_a_repeated_option_id_and_the_surplus_ar
     assert kept[0] == {"id": "o1", "label": "L" * PLOT_OPTION_LABEL_MAX}
     assert len(kept) == PLOT_MAX_OPTIONS
     assert [o["id"] for o in kept].count("o1") == 1
+
+
+def test_links_between_plot_nodes_round_trip_and_odd_values_are_cut_not_refused(client: TestClient) -> None:
+    project_id = client.post("/api/projects", json={"title": "Links Test"}).json()["projectId"]
+    tree = client.get(f"/api/projects/{project_id}/plot").json()
+    tree["nodes"] += [
+        {"id": "cat_1", "kind": "category", "parentId": None, "order": 0, "title": "Betrayal", "links": ["pl_1"]},
+        {"id": "pl_1", "kind": "plotline", "parentId": "cat_1", "order": 0, "title": "The mole", "links": ["cat_1", "cat_1", "", 7, None]},
+        {"id": "pl_2", "kind": "plotline", "parentId": "cat_1", "order": 1, "title": "Plain"},
+    ]
+    assert client.put(f"/api/projects/{project_id}/plot", json=tree).status_code == 200
+    reloaded = {n["id"]: n for n in client.get(f"/api/projects/{project_id}/plot").json()["nodes"]}
+    assert reloaded["cat_1"]["links"] == ["pl_1"]
+    assert reloaded["pl_1"]["links"] == ["cat_1"]
+    assert reloaded["pl_2"]["links"] == []
+
+
+def test_a_links_value_that_is_not_a_list_is_cut_not_refused(client: TestClient) -> None:
+    project_id = client.post("/api/projects", json={"title": "Links Odd"}).json()["projectId"]
+    tree = client.get(f"/api/projects/{project_id}/plot").json()
+    tree["nodes"].append({"id": "cat_1", "kind": "category", "parentId": None, "order": 0, "title": "A", "links": "pl_1"})
+    assert client.put(f"/api/projects/{project_id}/plot", json=tree).status_code == 200
+    assert client.get(f"/api/projects/{project_id}/plot").json()["nodes"][0]["links"] == []
