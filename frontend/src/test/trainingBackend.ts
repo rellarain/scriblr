@@ -12,14 +12,14 @@ export interface TrainingBackend {
   fetch: ReturnType<typeof vi.fn>
   readonly state: TrainingState
   calls: string[]
-  failNext(path: string, status: number, detail: string): void
+  failNext(path: string, status: number, detail: unknown): void
   hold(): void
   release(): void
 }
 
 export function trainingBackend(initial?: TrainingContent, progress?: TrainingProgress): TrainingBackend {
   const mock = createMockTraining(initial, progress)
-  const failures = new Map<string, { status: number; detail: string }>()
+  const failures = new Map<string, { status: number; detail: unknown }>()
   const calls: string[] = []
   let gate: Promise<void> | null = null
   let open: (() => void) | null = null

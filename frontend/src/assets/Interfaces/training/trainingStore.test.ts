@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import { getKv, setKv } from '../../../settings/settingsStore'
 import { emptyProgress, seedContent, trainingBackend } from '../../../test/trainingBackend'
-import { __resetTrainingForTests, enrol, getTrainingData, leave, loadTraining, recordAttempt, saveContent, setCompleted } from './trainingStore'
+import { __resetTrainingForTests, adoptTraining, enrol, getTrainingData, leave, loadTraining, recordAttempt, saveContent, setCompleted } from './trainingStore'
 
 describe('the Training store', () => {
   it('starts idle, loads once (calls in flight share one request) and keeps what it loaded', async () => {
@@ -26,6 +26,16 @@ describe('the Training store', () => {
     await loadTraining(true)
     expect(getTrainingData().status).toBe('ready')
     expect(getTrainingData().error).toBeNull()
+  })
+
+  it('adopts a state handed to it, as ready, clearing an error', async () => {
+    const backend = trainingBackend()
+    backend.failNext('/training', 500, 'down')
+    await loadTraining()
+    expect(getTrainingData().status).toBe('error')
+    adoptTraining({ content: seedContent(), progress: emptyProgress() })
+    expect(getTrainingData()).toMatchObject({ status: 'ready', error: null, actionError: null })
+    expect(getTrainingData().training?.content.curricula).toHaveLength(5)
   })
 
   it('takes the state each action answers with: enrol, leave, mark complete and not, and a result', async () => {

@@ -37,6 +37,10 @@ export const CARD_META: CardMeta[] = [
     summary: "Admin > Configuration > Plot, where presets are set up, saved as drafts and published one by one, and the Plot sidebar's + Preset that adds a published preset to a project.",
   },
   {
+    id: 'instructor', dir: 'Instructor', title: 'Instructor: the Training builder', group: 'Outline', height: 700,
+    summary: 'Admin > Instructor, where the Training curricula and courses are written: a tree of courses, modules, lessons and assessments beside the open item, with the Save cluster.',
+  },
+  {
     id: 'shelf', dir: 'Shelf', title: 'Book shelf and spines', group: 'Outline', height: 260,
     summary: 'Spines on a board, grouped by series; the selected book swivels into its cover.',
   },

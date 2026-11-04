@@ -1,0 +1,103 @@
+// AUI > Instructor: the Training builder (InstructorConsole.tsx, InstructorTree.tsx, InstructorEditor.tsx). Colours are the theme tokens; inside AUI's
+// own scope --accent is already re-pointed at the admin accent (App.scss), so this needs no colours of its own. Type is the text tokens (nothing
+// under 11px) and space the space scale. Flat and square, like the presets page.
+
+.instPage {
+  container-type: inline-size;
+  display: flex; flex-direction: column; gap: var(--space-5); width: 100%; min-width: 0; color: var(--ink); font-size: var(--text-ui);
+}
+.instBar { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: var(--space-3) var(--space-6); }
+.instBarTitle { margin: 0; font-size: var(--text-title); font-weight: 600; text-transform: uppercase; letter-spacing: 1px; }
+.instNote {
+  display: flex; flex-direction: column; align-items: flex-start; gap: var(--space-4); margin: 0; font-size: var(--text-field); color: var(--ink);
+  &--error { padding: var(--space-4) var(--space-5); background: var(--ov-sink-2); box-shadow: inset 4px 0 0 var(--alert); font-size: var(--text-ui); }
+}
+.instSplit { display: flex; align-items: flex-start; gap: var(--space-6); min-width: 0; }
+
+.instIconBtn {
+  display: inline-flex; align-items: center; justify-content: center; gap: 1px; min-width: 26px; height: 26px; padding: 0 var(--space-2); box-sizing: border-box; border: 0;
+  border-radius: var(--radius-button); background: none; color: var(--ink); opacity: 0.75; cursor: pointer; flex: 0 0 auto;
+  &:hover:not(:disabled) { opacity: 1; background: var(--ov-sink-1); }
+  &[aria-pressed='true'] { opacity: 1; background: var(--ov-sink-2); }
+  &:disabled { opacity: 0.35; cursor: not-allowed; }
+  &:focus-visible { outline: 2px solid var(--accent-hover); outline-offset: 1px; }
+}
+.instTools { display: inline-flex; flex-wrap: wrap; align-items: center; gap: var(--space-2); }
+
+// ---- the tree ----
+.instTree {
+  flex: 0 0 300px; min-width: 0; display: flex; flex-direction: column; background: var(--surface-raised); box-shadow: inset 0 0 0 1px var(--hairline);
+}
+.instTreeHead { display: flex; align-items: center; justify-content: space-between; gap: var(--space-3); padding: var(--space-4) var(--space-4) var(--space-3); }
+.instTreeTitle { font-size: var(--text-small); font-weight: 700; text-transform: uppercase; letter-spacing: 0.05em; color: var(--ink-muted); }
+.instTreeBody { display: flex; flex-direction: column; padding: 0 var(--space-2) var(--space-4); max-height: 560px; overflow-y: auto; }
+.instGroupTitle { margin: var(--space-4) var(--space-3) var(--space-2); font-size: var(--text-small); font-weight: 700; text-transform: uppercase; letter-spacing: 0.05em; color: var(--ink-muted); }
+// A list: the items are its direct children; a list under an item is indented.
+.instList { position: relative; list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; }
+.instItem { display: flex; flex-direction: column; &--dragging { opacity: 0.5; } }
+.instItem > .instList { margin-left: var(--space-6); }
+.instRow {
+  display: flex; align-items: center; flex-wrap: wrap; gap: var(--space-1); min-width: 0;
+  &:hover { background: var(--ov-sink-1); }
+  &--on { background: var(--ov-sink-2); box-shadow: inset 3px 0 0 var(--accent); }
+  &--invalid { box-shadow: inset 3px 0 0 var(--alert); }
+}
+.instGrip { display: inline-flex; flex: 0 0 auto; padding: var(--space-1); color: inherit; cursor: grab; opacity: 0.6; &:hover, &:focus-visible { opacity: 1; } &:focus-visible { outline: 2px solid var(--accent-hover); outline-offset: 1px; } }
+.instCaret {
+  display: inline-flex; align-items: center; justify-content: center; width: 20px; height: 20px; flex: 0 0 auto; padding: 0; border: 0; background: none; color: inherit; cursor: pointer;
+  &--none { cursor: default; }
+  &:focus-visible { outline: 2px solid var(--accent-hover); outline-offset: 1px; }
+}
+.instRowMain {
+  flex: 1 1 0; min-width: 0; display: flex; align-items: center; gap: var(--space-3); padding: var(--space-3) var(--space-2); border: 0; border-radius: var(--radius-none);
+  background: none; color: inherit; font: inherit; text-align: left; cursor: pointer;
+  &:focus-visible { outline: 2px solid var(--accent-hover); outline-offset: -2px; }
+}
+.instRowTitle { font-size: var(--text-field); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.instFault { flex: 1 0 100%; margin: 0 0 var(--space-2) var(--space-7); font-size: var(--text-small); font-weight: 700; color: var(--ink); }
+
+// ---- the open item ----
+.instEditor { flex: 1 1 auto; min-width: 0; display: flex; flex-direction: column; gap: var(--space-5); padding: var(--space-5) var(--space-6); background: var(--surface-raised); box-shadow: inset 0 0 0 1px var(--hairline); }
+.instEdHead { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: var(--space-3) var(--space-5); }
+.instKind { display: inline-flex; align-items: center; gap: var(--space-3); padding: var(--space-1) var(--space-3); background: var(--ov-sink-2); font-size: var(--text-small); font-weight: 700; text-transform: uppercase; letter-spacing: 0.06em; }
+.instConfirm { display: inline-flex; flex-wrap: wrap; align-items: center; gap: var(--space-3); padding: var(--space-2) var(--space-3); background: var(--ov-sink-2); box-shadow: inset 3px 0 0 var(--alert); font-size: var(--text-small); }
+.instField { display: flex; flex-direction: column; gap: var(--space-2); min-width: 0; margin: 0; padding: 0; border: 0; &--short { max-width: 140px; } }
+.instFieldHead { display: flex; align-items: center; justify-content: space-between; gap: var(--space-3); }
+.instLabel { padding: 0; font-size: var(--text-small); font-weight: 700; text-transform: uppercase; letter-spacing: 0.05em; color: var(--ink-muted); }
+.instInput, .instText, .instSelect {
+  display: block; width: 100%; box-sizing: border-box; border: 0; border-radius: var(--radius-none); background: var(--ov-sink-1); color: var(--ink);
+  font: inherit; font-size: var(--text-field); padding: var(--space-3) var(--space-4); outline: none;
+  &:focus-visible { box-shadow: inset 0 0 0 1px var(--accent); }
+  &[aria-invalid='true'] { box-shadow: inset 0 0 0 1px var(--alert); }
+}
+.instText { resize: vertical; &--body { min-height: 220px; font-family: ui-monospace, Consolas, monospace; font-size: var(--text-ui); line-height: 1.5; } }
+.instSelect { cursor: pointer; }
+.instHint { margin: 0; font-size: var(--text-small); color: var(--ink-muted); }
+.instHueNone { display: flex; align-items: center; gap: var(--space-3); margin: 0; font-size: var(--text-field); color: var(--ink-muted); }
+.instHueSet { display: flex; align-items: center; gap: var(--space-3); min-width: 0; > :first-child { flex: 1 1 auto; } }
+.instChecks { gap: var(--space-3); }
+.instCheck { display: flex; align-items: center; gap: var(--space-3); font-size: var(--text-field); cursor: pointer; input { margin: 0; } }
+
+// What a curriculum or a project names, in order.
+.instRefs { position: relative; list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: var(--space-1); }
+.instRef { display: flex; align-items: center; gap: var(--space-2); padding: var(--space-1) var(--space-2); background: var(--ov-sink-1); }
+.instRefName { flex: 1 1 auto; min-width: 0; font-size: var(--text-field); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+// A lesson's material, rendered: the Markdown on the panel's own surface.
+.instMarkdown {
+  padding: var(--space-4) var(--space-5); background: var(--ov-sink-1); font-size: var(--text-field); line-height: 1.5; overflow-wrap: anywhere;
+  h1, h2, h3, h4 { margin: var(--space-5) 0 var(--space-2); font-size: var(--text-heading); font-weight: 700; }
+  > :first-child { margin-top: 0; }
+  p, ul, ol, pre, blockquote { margin: 0 0 var(--space-4); }
+  ul, ol { padding-left: var(--space-7); }
+  code { font-family: ui-monospace, Consolas, monospace; font-size: var(--text-ui); background: var(--ov-sink-2); padding: 0 var(--space-1); }
+  pre { overflow-x: auto; padding: var(--space-4); background: var(--ov-sink-2); code { background: none; padding: 0; } }
+  a { color: inherit; text-decoration: underline; }
+}
+
+// ---- a narrow page: the tree stacks above the editor ----
+@container (max-width: 639px) {
+  .instSplit { flex-direction: column; align-items: stretch; }
+  .instTree { flex: 0 0 auto; }
+  .instTreeBody { max-height: 260px; }
+}

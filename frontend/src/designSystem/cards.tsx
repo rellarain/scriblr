@@ -20,6 +20,7 @@ import WriterLevels from '../assets/Interfaces/writer/levels/WriterLevels'
 import { PlotpointTile } from '../assets/Interfaces/writer/PlotpointTile'
 import { PlotNav } from '../assets/Interfaces/writer/PlotNav'
 import PlotPresetsConsole from '../assets/Interfaces/admin/plot/PlotPresetsConsole'
+import InstructorConsole from '../assets/Interfaces/admin/instructor/InstructorConsole'
 import { shelfGroups } from '../assets/Interfaces/writer/outlineTree'
 import { Shelf } from '../assets/Interfaces/writer/Shelf'
 import SplitArea from '../assets/Interfaces/writer/SplitArea'
@@ -256,6 +257,17 @@ function PlotPresetsCard({ view }: { view: string }) {
   )
 }
 
+// The Instructor console as it sits in the admin panel (in the admin accent), against the pretend Training API.
+function InstructorCard() {
+  return (
+    <div className="aUI" style={{ position: 'relative', width: '100%', height: '100%', flex: '0 0 auto', ['--aui-w' as string]: '100%' }}>
+      <div className="aUIPanel" style={{ height: '100%', overflow: 'auto', boxSizing: 'border-box', padding: 14 }}>
+        <InstructorConsole />
+      </div>
+    </div>
+  )
+}
+
 function IconsCard() {
   const icons = Object.entries(Icons).filter(([name, v]) => /Icon$/.test(name) && typeof v === 'function' && name !== 'ReactionHeartIcon')
   return (
@@ -354,6 +366,7 @@ export const CARDS: CardDef[] = [
   card('outline-cards', { defaults: { zones: ['day'] }, render: writerCard('book') }),
   card('plotpoint-tiles', { defaults: { zones: ['day'] }, render: () => <PlotpointsCard /> }),
   card('plot-presets', { frame: 'plain', views: [{ id: 'admin', label: 'Admin page' }, { id: 'sidebar', label: 'Plot sidebar', frame: 'writer' }], defaults: { view: 'admin', zones: ['day', 'night'], width: 1200 }, render: ({ view }) => <PlotPresetsCard key={view} view={view} /> }),
+  card('instructor', { frame: 'plain', defaults: { zones: ['day', 'night'], width: 1200 }, render: () => <InstructorCard /> }),
   card('shelf', { defaults: { zones: ['day', 'night'] }, render: () => <ShelfCard /> }),
   card('draft-page', { views: WRITER_VIEWS.slice(3), defaults: { view: 'chapter', zones: ['day'] }, render: ({ view }) => <PreviewWriter key={view} view={view as WriterView} /> }),
   card('controls', { defaults: { zones: ['day', 'night'] }, render: () => <ControlsCard /> }),

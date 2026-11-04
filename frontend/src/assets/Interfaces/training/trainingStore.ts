@@ -68,6 +68,12 @@ async function act(call: () => Promise<TrainingState>): Promise<void> {
   }
 }
 
+// The courses as the server has them after something other than an action here saved them (the Instructor console's save): replaces the state, and
+// the Training page shows it at once.
+export function adoptTraining(training: TrainingState): void {
+  set({ status: 'ready', error: null, training, actionError: null })
+}
+
 export const enrol = (courseId: string) => act(() => api.enrol(courseId))
 export const leave = (courseId: string) => act(() => api.leave(courseId))
 export const setCompleted = (itemId: string, done: boolean) => act(() => (done ? api.setCompleted(itemId) : api.clearCompleted(itemId)))

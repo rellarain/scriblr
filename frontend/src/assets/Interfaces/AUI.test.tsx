@@ -11,6 +11,7 @@ vi.mock('./admin/RoleAssignment', () => ({ default: () => <div>role assignment</
 // file only exercises AUI's own section/page tile layout.
 vi.mock('./admin/resources/ResourcesConsole', () => ({ default: () => <div>resources console</div> }))
 // The plot presets page (covered by its own tests) is mocked for the same reason.
+vi.mock('./admin/instructor/InstructorConsole', () => ({ default: () => <div>instructor console</div> }))
 vi.mock('./admin/plot/PlotPresetsConsole', () => ({ default: () => <div>plot presets console</div> }))
 
 beforeEach(() => {
@@ -21,10 +22,10 @@ beforeEach(() => {
 afterEach(() => { vi.unstubAllGlobals() })
 
 const tile = (id: string) => document.querySelector(`[data-tile-id="${id}"]`) as HTMLElement
-const SECTIONS = ['dashboard', 'processor', 'organizer', 'manager', 'director', 'office', 'configuration', 'resources']
+const SECTIONS = ['dashboard', 'processor', 'organizer', 'manager', 'director', 'office', 'configuration', 'resources', 'instructor']
 
 describe('AUI (the Admin panel as tiles)', () => {
-  it('shows the eight sections as consoles with their pages as tiles, and every section Help text in the Help console', () => {
+  it('shows the nine sections as consoles with their pages as tiles, and every section Help text in the Help console', () => {
     render(<AUI />)
     expect(SECTIONS.map(id => tile(id)?.getAttribute('data-tile-id'))).toEqual(SECTIONS)
     expect(within(tile('manager')).getByText('Assignment')).toBeTruthy()
@@ -49,6 +50,11 @@ describe('AUI (the Admin panel as tiles)', () => {
   it('shows Resources as the article/quiz builder', async () => {
     render(<AUI />)
     expect(await within(tile('resources')).findByText('resources console')).toBeTruthy()
+  })
+
+  it('shows Instructor as the Training builder', async () => {
+    render(<AUI />)
+    expect(await within(tile('instructor')).findByText('instructor console')).toBeTruthy()
   })
 
   it('has a rail of consoles in the header (Help last) and a rail of tiles in each console title bar, to turn a tile off and on', async () => {

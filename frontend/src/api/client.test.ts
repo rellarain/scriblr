@@ -97,6 +97,27 @@ describe('api: a failure', () => {
     expect(error).toMatchObject({ status: 502, message: 'Bad Gateway' })
   })
 
+  it('reads a list of problems (a 422) as text: the field and what is wrong, a rule message plainly, the first few and a count of the rest', async () => {
+    reply({
+      ok: false, status: 422, statusText: 'Unprocessable Entity',
+      json: async () => ({ detail: [
+        { type: 'string_too_short', loc: ['body', 'courses', 0, 'title'], msg: 'String should have at least 1 character', input: '' },
+        { type: 'value_error', loc: ['body'], msg: "Value error, id 'x' is used twice", input: {} },
+      ] }),
+    })
+    const error = await failure(api.put('/training/content', {}))
+    expect(error).toMatchObject({ status: 422, message: "title: String should have at least 1 character; id 'x' is used twice" })
+    reply({ ok: false, status: 422, statusText: 'x', json: async () => ({ detail: Array.from({ length: 5 }, (_, i) => ({ loc: ['body'], msg: `Problem ${i}` })) }) })
+    expect((await failure(api.put('/x', {}))).message).toBe('Problem 0; Problem 1; Problem 2 (and 2 more)')
+  })
+
+  it('falls back to the status text for a list with nothing readable in it, and reads one problem that is not in a list', async () => {
+    reply({ ok: false, status: 422, statusText: 'Unprocessable Entity', json: async () => ({ detail: [{ type: 'x' }, 7] }) })
+    expect(await failure(api.get('/x'))).toMatchObject({ message: 'Unprocessable Entity' })
+    reply({ ok: false, status: 422, statusText: 'x', json: async () => ({ detail: { msg: 'Value error, one thing' } }) })
+    expect(await failure(api.get('/x'))).toMatchObject({ message: 'one thing' })
+  })
+
   it('does not hide a request that never got an answer', async () => {
     vi.stubGlobal('fetch', vi.fn(async () => { throw new TypeError('Failed to fetch') }))
     const error = await failure(api.get('/x'))

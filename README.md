@@ -493,7 +493,7 @@ last row, like Claude Code's own resizable panes). The shared system is `fronten
 - **User panel** (`assets/Interfaces/UUI.tsx`): the consoles are Dashboard and Account (each holds its pages as tiles,
   the rail in its title bar), then Settings and Help, one of each for the panel (every section's under its own name). Dashboard's settings are the theme tool on its own (`ThemeSettingsPanel`); Account's
   (`CustomizeControls`) are handedness and autosave plus that same theme tool embedded inline (`showHeader={false}`).
-- **Admin panel** (`AUI.tsx`): its seven sections (pages as tiles, the rail in the title bar), Resources and a Help console
+- **Admin panel** (`AUI.tsx`): its seven sections (pages as tiles, the rail in the title bar), Resources, an Instructor console (the Training builder: a tree of curricula, courses, modules, lessons and assessments beside the open item, saved whole with `PUT /api/training/content`; code in `admin/instructor/`) and a Help console
   (every section's help under its name); a Resources config page keeps its publish
   badge, Save draft / Publish and lock inside its tile and saves when it is left. AUI's own width is dragged from its outer
   edge (`Sidebar.tsx`'s `AuiResize`, next to the sidebar divider; the drag direction flips with handedness), snapping to

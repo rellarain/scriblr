@@ -2,7 +2,7 @@ import RoleAssignment from './admin/RoleAssignment'
 import { Suspense, lazy, useState, type ComponentType } from 'react'
 import {
   BarChartIcon, VotingIcon, LibraryIcon, PeopleIcon, BuildingIcon, BriefcaseIcon,
-  EnvelopeIcon, CalendarIcon, HelpIcon, TeamIcon, SortingIcon, ConfigurationIcon, InfoIcon, PlotIcon,
+  EnvelopeIcon, CalendarIcon, HelpIcon, TeamIcon, SortingIcon, ConfigurationIcon, InfoIcon, PlotIcon, GraduationCapIcon,
   type IconProps,
 } from '../icons'
 import TileArea, { type AreaTile } from '../../components/tiles/TileArea'
@@ -10,6 +10,8 @@ import { consoleTile, useRailSlots } from '../../components/tiles/consoleTiles'
 
 // The article and quiz builder (and the Markdown renderer behind it) is loaded when its console is opened.
 const ResourcesConsole = lazy(() => import('./admin/resources/ResourcesConsole'))
+// The Training builder, loaded when the Instructor console is opened.
+const InstructorConsole = lazy(() => import('./admin/instructor/InstructorConsole'))
 // The plot presets page, loaded when Configuration > Plot is opened.
 const PlotPresetsConsole = lazy(() => import('./admin/plot/PlotPresetsConsole'))
 
@@ -156,6 +158,12 @@ function AUI() {
   tiles.push({
     id: 'resources', title: 'Resources', Icon: InfoIcon,
     children: <Suspense fallback={null}><ResourcesConsole /></Suspense>,
+  })
+  // The Instructor console is the Training builder (admin/instructor/InstructorConsole.tsx): the curricula, courses, modules, lessons and what Training
+  // shows, saved through /api/training.
+  tiles.push({
+    id: 'instructor', title: 'Instructor', Icon: GraduationCapIcon,
+    children: <Suspense fallback={null}><InstructorConsole /></Suspense>,
   })
   tiles.push({
     id: 'help', title: 'Help', Icon: HelpIcon,
