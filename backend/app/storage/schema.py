@@ -1595,6 +1595,153 @@ class Planner(BaseModel):
 # ---------------------------------------------------------------------------
 
 
+# ---------------------------------------------------------------------------
+# Maps (the setting): a map is a grid of terrain cells (painted, run-length encoded) with layers; maps nest (a place on a map opens a child map).
+# Like every section, a bad value is cut or repaired, never refused, so one odd map cannot take the project's other maps down with it.
+# ---------------------------------------------------------------------------
+
+MAP_MAX_SIDE = 512
+MAP_MAX_TERRAINS = 64
+MAP_MAX_LAYERS = 30
+MAP_MAX_PER_PROJECT = 500
+MapKind = Literal["world", "town", "interior"]
+MapLayerKind = Literal["terrain", "shapes", "symbols", "labels", "notes"]
+_MAP_HEX_COLOR = re.compile(r"^#[0-9a-fA-F]{6}$")
+
+# The terrain a new map starts with, by kind (the first is what a new map is filled with). Copied into the map, so a map keeps its own palette.
+MAP_TERRAIN_SETS: dict[str, list[tuple[str, str, str]]] = {
+    "world": [
+        ("ocean", "Ocean", "#3b6ea5"), ("plains", "Plains", "#a8c66c"), ("forest", "Forest", "#4f8a4a"), ("hills", "Hills", "#c9a36a"),
+        ("mountains", "Mountains", "#8a8f98"), ("desert", "Desert", "#e3c77a"), ("snow", "Snow", "#eef3f7"), ("swamp", "Swamp", "#5f7d62"),
+    ],
+    "town": [("ground", "Ground", "#d8cfb4"), ("road", "Road", "#8a8076"), ("building", "Building", "#b5654a"), ("park", "Park", "#7fb069"), ("water", "Water", "#4a86b8")],
+    "interior": [("void", "Outside", "#2a2330"), ("floor", "Floor", "#d9c8a8"), ("wall", "Wall", "#5a4a42"), ("door", "Door", "#9a6a3a"), ("water", "Water", "#4a86b8")],
+}
+# The layers a new map starts with, bottom to top.
+MAP_DEFAULT_LAYERS: list[tuple[str, str, str]] = [
+    ("terrain", "Terrain", "terrain"), ("shapes", "Regions and lines", "shapes"), ("symbols", "Symbols", "symbols"), ("labels", "Labels", "labels"), ("notes", "Notes", "notes"),
+]
+
+
+class MapTerrain(BaseModel):
+    id: str = Field(min_length=1, max_length=40)
+    name: str = Field(default="", max_length=40)
+    color: str = "#888888"
+    builtIn: bool = False
+
+    @field_validator("name", mode="before")
+    @classmethod
+    def _cut_name(cls, value: Any) -> Any:
+        return value.strip()[:40] if isinstance(value, str) else ""
+
+    @field_validator("color", mode="before")
+    @classmethod
+    def _color_or_grey(cls, value: Any) -> Any:
+        return value if isinstance(value, str) and _MAP_HEX_COLOR.match(value) else "#888888"
+
+
+class MapLayer(BaseModel):
+    id: str = Field(min_length=1, max_length=40)
+    name: str = Field(default="", max_length=40)
+    kind: MapLayerKind = "shapes"
+    visible: bool = True
+    locked: bool = False
+
+    @field_validator("name", mode="before")
+    @classmethod
+    def _cut_layer_name(cls, value: Any) -> Any:
+        return value.strip()[:40] if isinstance(value, str) else ""
+
+
+def repair_map_runs(runs: Any, total: int, terrains: int) -> list[int]:
+    """The painted cells as run pairs [terrain index, count, ...] that cover exactly `total` cells: a bad pair is dropped, an index past the palette
+    becomes the first terrain, a surplus is cut and a shortfall is filled with the first terrain; neighbouring runs of one terrain are joined."""
+    pairs: list[tuple[int, int]] = []
+    left = total
+    items = runs if isinstance(runs, list) else []
+    for i in range(0, len(items) - 1, 2):
+        value, count = items[i], items[i + 1]
+        if not (isinstance(value, int) and isinstance(count, int)) or isinstance(value, bool) or isinstance(count, bool) or count < 1 or value < 0:
+            continue
+        count = min(count, left)
+        if count < 1:
+            break
+        pairs.append((value if 0 <= value < terrains else 0, count))
+        left -= count
+    if left > 0:
+        pairs.append((0, left))
+    out: list[int] = []
+    for value, count in pairs:
+        if out and out[-2] == value:
+            out[-1] += count
+        else:
+            out.extend((value, count))
+    return out
+
+
+class MapDoc(BaseModel):
+    schemaVersion: int = SCHEMA_VERSION
+    id: str = Field(min_length=1, max_length=80)
+    title: str = Field(default="Untitled map", max_length=120)
+    kind: MapKind = "world"
+    # The map this one is inside (a place on the parent opens this map), and its place among its siblings.
+    parentId: Optional[str] = None
+    order: int = 0
+    width: int = Field(default=32, ge=1, le=MAP_MAX_SIDE)
+    height: int = Field(default=24, ge=1, le=MAP_MAX_SIDE)
+    # What one cell is, in `unit` (miles, paces, feet ...).
+    cellSize: float = Field(default=1.0, gt=0, le=1_000_000)
+    unit: str = Field(default="cells", max_length=20)
+    terrains: list[MapTerrain] = Field(default_factory=list)
+    layers: list[MapLayer] = Field(default_factory=list)
+    # The terrain of every cell, row by row, as run pairs [index into `terrains`, how many cells, ...].
+    cells: list[int] = Field(default_factory=list)
+    updatedAt: datetime = Field(default_factory=utcnow)
+
+    @field_validator("cells", mode="before")
+    @classmethod
+    def _cells_as_numbers(cls, value: Any) -> Any:
+        # Anything that is not a whole number becomes -1, which repair_map_runs drops with its pair, so a stray value cannot refuse the whole map.
+        if not isinstance(value, list):
+            return []
+        return [v if isinstance(v, int) and not isinstance(v, bool) else -1 for v in value]
+
+    @field_validator("title", mode="before")
+    @classmethod
+    def _title_or_default(cls, value: Any) -> Any:
+        text = value.strip()[:120] if isinstance(value, str) else ""
+        return text or "Untitled map"
+
+    @field_validator("unit", mode="before")
+    @classmethod
+    def _unit_or_default(cls, value: Any) -> Any:
+        text = value.strip()[:20] if isinstance(value, str) else ""
+        return text or "cells"
+
+    @model_validator(mode="after")
+    def _repair(self) -> "MapDoc":
+        seen: set[str] = set()
+        terrains: list[MapTerrain] = []
+        for t in self.terrains[:MAP_MAX_TERRAINS]:
+            if t.id not in seen:
+                seen.add(t.id)
+                terrains.append(t)
+        if not terrains:
+            terrains = [MapTerrain(id=i, name=n, color=c, builtIn=True) for i, n, c in MAP_TERRAIN_SETS[self.kind]]
+        self.terrains = terrains
+        layers: list[MapLayer] = []
+        seen = set()
+        for layer in self.layers[:MAP_MAX_LAYERS]:
+            if layer.id not in seen:
+                seen.add(layer.id)
+                layers.append(layer)
+        if not any(layer.kind == "terrain" for layer in layers):
+            layers.insert(0, MapLayer(id="terrain", name="Terrain", kind="terrain", locked=False))
+        self.layers = layers
+        self.cells = repair_map_runs(self.cells, self.width * self.height, len(terrains))
+        return self
+
+
 class ProjectFile(BaseModel):
     schemaVersion: int = PROJECT_FILE_VERSION
     # Which scheme the stored level colours use (HUE_SCHEME); a file without it is scheme 1.
@@ -1615,6 +1762,8 @@ class ProjectFile(BaseModel):
     facets: FacetActivity = Field(default_factory=FacetActivity)
     revisionFlags: list[RevisionFlag] = Field(default_factory=list)
     planner: Planner = Field(default_factory=Planner)
+    # Map id -> the map. A map that cannot be read is dropped from here (and kept in quarantine), so the other maps still load.
+    maps: dict[str, MapDoc] = Field(default_factory=dict)
     scrap: ScrapRegistry = Field(default_factory=ScrapRegistry)
     # Changes to the project's settings (time systems, colour), newest last; see SettingsLogEntry.
     settingsLog: list[SettingsLogEntry] = Field(default_factory=list)

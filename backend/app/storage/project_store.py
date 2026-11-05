@@ -26,6 +26,7 @@ from .schema import (
     DraftChapterMoment,
     DraftMoment,
     FacetActivity,
+    MapDoc,
     OutlineTree,
     Planner,
     PlotTree,
@@ -617,6 +618,7 @@ def _load_project_file_locked(root: Path, project_id: str) -> tuple[ProjectFile,
         facets=_parse_section_default(raw, "facets", FacetActivity, project_dir, path, errors, facets_default),
         revisionFlags=_parse_list_section(raw, "revisionFlags", RevisionFlag, project_dir, path, errors),
         planner=_parse_section_default(raw, "planner", Planner, project_dir, path, errors, planner_default),
+        maps=_parse_dict_section(raw, "maps", MapDoc, project_dir, path, errors),
         scrap=_parse_section_default(raw, "scrap", ScrapRegistry, project_dir, path, errors, scrap_default),
         settingsLog=_parse_list_section(raw, "settingsLog", SettingsLogEntry, project_dir, path, errors),
     )
@@ -1416,3 +1418,73 @@ def save_scrap_registry(root: Path, project_id: str, registry: ScrapRegistry) ->
         pf.scrap = registry
 
     _mutate(root, project_id, _do)
+
+
+# ---------------------------------------------------------------------------
+# Maps
+# ---------------------------------------------------------------------------
+
+
+class MapNotFoundError(Exception):
+    def __init__(self, project_id: str, map_id: str) -> None:
+        self.project_id = project_id
+        self.map_id = map_id
+        super().__init__(f"map {map_id} not found in project {project_id}")
+
+
+def list_maps(root: Path, project_id: str) -> list[MapDoc]:
+    """Every readable map, whole (each is a copy)."""
+    return _read(root, project_id, lambda pf, _errors: sorted(pf.maps.values(), key=lambda m: (m.order, m.title.lower(), m.id)))
+
+
+def load_map(root: Path, project_id: str, map_id: str) -> MapDoc:
+    def pick(pf: ProjectFile, errors: dict[str, ShardCorruptError]) -> Optional[MapDoc]:
+        key = f"maps.{map_id}"
+        if key in errors:
+            raise errors[key]
+        return pf.maps.get(map_id)
+
+    found = _read(root, project_id, pick)
+    if found is None:
+        raise MapNotFoundError(project_id, map_id)
+    return found
+
+
+def save_map(root: Path, project_id: str, doc: MapDoc) -> None:
+    def _do(pf: ProjectFile) -> None:
+        pf.maps[doc.id] = doc
+        pf.index.updatedAt = utcnow()
+
+    _mutate(root, project_id, _do)
+
+
+def delete_map(root: Path, project_id: str, map_id: str) -> None:
+    """Delete a map; the maps inside it move up to its parent."""
+
+    def _do(pf: ProjectFile) -> None:
+        gone = pf.maps.pop(map_id, None)
+        if gone is None:
+            raise MapNotFoundError(project_id, map_id)
+        for child in pf.maps.values():
+            if child.parentId == map_id:
+                child.parentId = gone.parentId
+        pf.index.updatedAt = utcnow()
+
+    _mutate(root, project_id, _do)
+
+
+def list_map_summaries(root: Path, project_id: str) -> list[dict]:
+    """Every readable map without its cells (id, title, kind, parentId, order, size, updatedAt), in tree order within each parent."""
+    return _read(
+        root, project_id,
+        lambda pf, _errors: [
+            {"id": m.id, "title": m.title, "kind": m.kind, "parentId": m.parentId, "order": m.order, "width": m.width, "height": m.height, "updatedAt": m.updatedAt}
+            for m in sorted(pf.maps.values(), key=lambda m: (m.order, m.title.lower(), m.id))
+        ],
+        copy_result=False,
+    )
+
+
+def map_parents(root: Path, project_id: str) -> dict[str, Optional[str]]:
+    """Map id -> the id of the map it is inside."""
+    return _read(root, project_id, lambda pf, _errors: {m.id: m.parentId for m in pf.maps.values()}, copy_result=False)

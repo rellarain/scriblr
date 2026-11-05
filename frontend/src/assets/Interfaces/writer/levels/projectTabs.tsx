@@ -1,4 +1,4 @@
-import { CalendarIcon, ClockIcon, FolderIcon, GearIcon, HelpIcon, OutlineIcon, PlotIcon } from '../../../icons'
+import { CalendarIcon, ClockIcon, FolderIcon, GearIcon, HelpIcon, MapIcon, OutlineIcon, PlotIcon } from '../../../icons'
 import WorkspaceSaveCluster from './WorkspaceSaveCluster'
 import { SHELF_COMPONENTS } from '../consoleDefs'
 import { Placeholder } from '../shared'
@@ -8,6 +8,7 @@ import ProjectOutline from '../ProjectOutline'
 import { nearestOfKind } from '../outlineTree'
 import type { HistoryScope, WriterWorkspace } from '../useWriterWorkspace'
 import { bookRows } from '../tiles/tileData'
+import MapsConsole from '../maps/MapsConsole'
 import ProjectConsole from '../plan/ProjectConsole'
 import ScheduleConsole from '../schedule/ScheduleConsole'
 import HelpArticles from './HelpArticles'
@@ -65,6 +66,14 @@ export function projectTabs(w: WriterWorkspace): LevelTab[] {
         const id = w.activeProjectId
         if (!id) return <p className="wrMuted">Open a project to plan it.</p>
         return <ProjectConsole scope="project" titleSlot={c.titleSlot} columns={c.size === 'max' ? 'auto' : 'one'} projectIds={[id]} titles={{ [id]: w.activeProject?.title ?? 'Project' }} />
+      },
+    },
+    {
+      id: 'maps', label: 'Maps', Icon: MapIcon, fill: true, console: true,
+      render: () => {
+        const id = w.activeProjectId
+        if (!id) return <p className="wrMuted">Open a project to map its setting.</p>
+        return <MapsConsole key={id} projectId={id} />
       },
     },
     { id: 'history', label: 'History', Icon: ClockIcon, render: () => placeholder('projectHistory') },

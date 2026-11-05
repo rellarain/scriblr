@@ -6,6 +6,7 @@ import {
   getOutlineSnapshot, getPlotSnapshot, getProjectSettingsLog, getRevisionSnapshot, getUserSettingsLog, listOutlineHistory, listPlotHistory,
   listRevisionSummaries,
 } from './historyFetch'
+import { createMap, deleteMap, getMap, listMaps, putMap } from './mapsApi'
 import { getOutline, putOutline } from './outlineApi'
 import { getPlot, putPlot } from './plotApi'
 import { createProject, deleteProject, getProject, getProjectsOverview, updateProject } from './projectsApi'
@@ -26,6 +27,7 @@ function answerWith(body: unknown = {}, init: { ok?: boolean; status?: number } 
 }
 
 const TREE = { schemaVersion: 2, nodes: [] }
+const MAP = { schemaVersion: 2, id: ID, title: 'W', kind: 'world' as const, parentId: null, order: 0, width: 2, height: 2, cellSize: 1, unit: 'cells', terrains: [], layers: [], cells: [0, 4], updatedAt: '2026-01-01T00:00:00Z' }
 const CASES: Array<[string, () => Promise<unknown>, string, string, unknown?]> = [
   ['getTraining', () => getTraining(), 'GET', '/api/training'],
   ['saveTrainingContent', () => saveTrainingContent({ curricula: [], courses: [] }), 'PUT', '/api/training/content', { curricula: [], courses: [] }],
@@ -43,6 +45,11 @@ const CASES: Array<[string, () => Promise<unknown>, string, string, unknown?]> =
   ['putOutline', () => putOutline(ID, TREE), 'PUT', `/api/projects/${ESC}/outline`, TREE],
   ['getPlot', () => getPlot(ID), 'GET', `/api/projects/${ESC}/plot`],
   ['putPlot', () => putPlot(ID, TREE), 'PUT', `/api/projects/${ESC}/plot`, TREE],
+  ['listMaps', () => listMaps(ID), 'GET', `/api/projects/${ESC}/maps`],
+  ['createMap', () => createMap(ID, { title: 'W' }), 'POST', `/api/projects/${ESC}/maps`, { title: 'W' }],
+  ['getMap', () => getMap(ID, ID), 'GET', `/api/projects/${ESC}/maps/${ESC}`],
+  ['putMap', () => putMap(ID, MAP), 'PUT', `/api/projects/${ESC}/maps/${ESC}`, MAP],
+  ['deleteMap', () => deleteMap(ID, ID), 'DELETE', `/api/projects/${ESC}/maps/${ESC}`],
   ['getBookProgress', () => getBookProgress(ID), 'GET', `/api/projects/${ESC}/book-progress`],
   ['listOutlineHistory', () => listOutlineHistory(ID), 'GET', `/api/projects/${ESC}/outline/history`],
   ['getOutlineSnapshot', () => getOutlineSnapshot(ID, ID), 'GET', `/api/projects/${ESC}/outline/history/${ESC}`],

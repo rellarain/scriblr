@@ -849,3 +849,88 @@ export function ViewDayIcon(props: IconProps) {
     <rect x="10.5" y="12.75" width="3" height="3" fill="currentColor" />
   </IconBase>
 }
+
+// ---- the map builder ----
+
+// A folded map with a pin.
+export function MapIcon(props: IconProps) {
+  return <IconBase {...props}>
+    <path d="M3 6l6-2 6 2 6-2v14l-6 2-6-2-6 2Z" />
+    <path d="M9 4v14M15 6v14" />
+  </IconBase>
+}
+
+export function BrushIcon(props: IconProps) {
+  return <IconBase {...props}>
+    <path d="M18.5 3.5a2 2 0 0 1 2 2c0 .8-.4 1.4-1 2L12 14.5 9.5 12 17 4.5c.4-.5 1-1 1.5-1Z" />
+    <path d="M9 13c-2.2 0-3.5 1.6-3.5 3.5 0 1-.6 2-2 3 3.5.8 8-.3 8-4" />
+  </IconBase>
+}
+
+// A tilted pot tipping paint: the fill tool.
+export function BucketIcon(props: IconProps) {
+  return <IconBase {...props}>
+    <path d="M4.5 12.5l7-7 7 7-6.2 6.2a2 2 0 0 1-2.8 0Z" />
+    <path d="M9 3.5l3 3" />
+    <path d="M20 15c0 1.2-.9 2.2-.9 3.1a.9.9 0 0 0 1.8 0C20.9 17.2 20 16.2 20 15Z" fill="currentColor" />
+  </IconBase>
+}
+
+// A dropper: pick up the terrain under the pointer.
+export function PipetteIcon(props: IconProps) {
+  return <IconBase {...props}>
+    <path d="M14.5 5.5l4 4" />
+    <path d="M16 4a2.1 2.1 0 0 1 3 3l-2 2-3-3Z" />
+    <path d="M13.5 8l-8 8L4 20l4-1.5 8-8" />
+  </IconBase>
+}
+
+// An open hand: drag the view.
+export function HandIcon(props: IconProps) {
+  return <IconBase {...props}>
+    <path d="M8 12V6a1.5 1.5 0 0 1 3 0v5M11 11V4.5a1.5 1.5 0 0 1 3 0V11M14 11V6a1.5 1.5 0 0 1 3 0v8" />
+    <path d="M8 12.5l-1.4-1.9a1.5 1.5 0 0 0-2.3 1.9L7 18a5 5 0 0 0 4 2h2.5a4.5 4.5 0 0 0 4.5-4.5V10.5a1.5 1.5 0 0 0-3 0" />
+  </IconBase>
+}
+
+export function ZoomInIcon(props: IconProps) {
+  return <IconBase {...props}>
+    <circle cx="10.5" cy="10.5" r="6.5" />
+    <path d="M15.5 15.5L20 20M10.5 7.5v6M7.5 10.5h6" />
+  </IconBase>
+}
+
+export function ZoomOutIcon(props: IconProps) {
+  return <IconBase {...props}>
+    <circle cx="10.5" cy="10.5" r="6.5" />
+    <path d="M15.5 15.5L20 20M7.5 10.5h6" />
+  </IconBase>
+}
+
+// Four corners: fit the whole thing in view.
+export function FitIcon(props: IconProps) {
+  return <IconBase {...props}>
+    <path d="M4 9V5a1 1 0 0 1 1-1h4M15 4h4a1 1 0 0 1 1 1v4M20 15v4a1 1 0 0 1-1 1h-4M9 20H5a1 1 0 0 1-1-1v-4" />
+    <rect x="9" y="9" width="6" height="6" />
+  </IconBase>
+}
+
+// Stacked sheets.
+export function LayersIcon(props: IconProps) {
+  return <IconBase {...props}>
+    <path d="M12 3l9 5-9 5-9-5Z" />
+    <path d="M3 12.5l9 5 9-5M3 16.5l9 5 9-5" />
+  </IconBase>
+}
+
+export function ChevronUpIcon(props: IconProps) {
+  return <IconBase {...props}><path d="M6 15l6-6 6 6" /></IconBase>
+}
+
+// A square grid, for the grid overlay.
+export function GridLinesIcon(props: IconProps) {
+  return <IconBase {...props}>
+    <rect x="4" y="4" width="16" height="16" />
+    <path d="M9.3 4v16M14.7 4v16M4 9.3h16M4 14.7h16" />
+  </IconBase>
+}

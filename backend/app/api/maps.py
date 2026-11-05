@@ -1,0 +1,107 @@
+from datetime import datetime
+from pathlib import Path
+from typing import Optional
+
+from fastapi import APIRouter, Depends, HTTPException
+from pydantic import BaseModel, Field
+
+from ..deps import get_storage_root
+from ..storage import project_store as store
+from ..storage.schema import (
+    MAP_DEFAULT_LAYERS,
+    MAP_MAX_PER_PROJECT,
+    MAP_MAX_SIDE,
+    MAP_TERRAIN_SETS,
+    MapDoc,
+    MapKind,
+    MapLayer,
+    MapTerrain,
+    utcnow,
+)
+
+router = APIRouter(prefix="/api/projects/{project_id}/maps", tags=["maps"])
+
+
+class MapSummary(BaseModel):
+    id: str
+    title: str
+    kind: MapKind
+    parentId: Optional[str] = None
+    order: int
+    width: int
+    height: int
+    updatedAt: datetime
+
+
+class MapCreate(BaseModel):
+    title: str = Field(default="Untitled map", max_length=120)
+    kind: MapKind = "world"
+    width: int = Field(default=32, ge=1, le=MAP_MAX_SIDE)
+    height: int = Field(default=24, ge=1, le=MAP_MAX_SIDE)
+    cellSize: float = Field(default=1.0, gt=0, le=1_000_000)
+    unit: str = Field(default="cells", max_length=20)
+    parentId: Optional[str] = None
+
+
+def _is_inside(parents: dict[str, Optional[str]], map_id: str, ancestor: str) -> bool:
+    """Whether `map_id` is `ancestor` or somewhere inside it."""
+    seen: set[str] = set()
+    current: Optional[str] = map_id
+    while current is not None and current not in seen:
+        if current == ancestor:
+            return True
+        seen.add(current)
+        current = parents.get(current)
+    return False
+
+
+@router.get("", response_model=list[MapSummary])
+def list_maps(project_id: str, root: Path = Depends(get_storage_root)) -> list[dict]:
+    """The project's maps, without their cells."""
+    return store.list_map_summaries(root, project_id)
+
+
+@router.post("", response_model=MapDoc, status_code=201)
+def create_map(project_id: str, body: MapCreate, root: Path = Depends(get_storage_root)) -> MapDoc:
+    with store.transaction(root, project_id):
+        parents = store.map_parents(root, project_id)
+        if len(parents) >= MAP_MAX_PER_PROJECT:
+            raise HTTPException(status_code=422, detail=f"a project holds at most {MAP_MAX_PER_PROJECT} maps")
+        if body.parentId is not None and body.parentId not in parents:
+            raise HTTPException(status_code=422, detail=f"no map '{body.parentId}' to put this one in")
+        siblings = [m for m in store.list_map_summaries(root, project_id) if m["parentId"] == body.parentId]
+        doc = MapDoc(
+            id=store.new_id("map"), title=body.title, kind=body.kind, parentId=body.parentId, order=max((m["order"] for m in siblings), default=-1) + 1,
+            width=body.width, height=body.height, cellSize=body.cellSize, unit=body.unit,
+            terrains=[MapTerrain(id=i, name=n, color=c, builtIn=True) for i, n, c in MAP_TERRAIN_SETS[body.kind]],
+            layers=[MapLayer(id=i, name=n, kind=k) for i, n, k in MAP_DEFAULT_LAYERS],
+        )
+        store.save_map(root, project_id, doc)
+    return doc
+
+
+@router.get("/{map_id}", response_model=MapDoc)
+def get_map(project_id: str, map_id: str, root: Path = Depends(get_storage_root)) -> MapDoc:
+    return store.load_map(root, project_id, map_id)
+
+
+@router.put("/{map_id}", response_model=MapDoc)
+def put_map(project_id: str, map_id: str, body: MapDoc, root: Path = Depends(get_storage_root)) -> MapDoc:
+    """Replace a map (its cells, palette, layers, place in the tree). The id in the body must be the one in the path."""
+    if body.id != map_id:
+        raise HTTPException(status_code=422, detail="the map's id does not match the address")
+    with store.transaction(root, project_id):
+        parents = store.map_parents(root, project_id)
+        if map_id not in parents:
+            raise store.MapNotFoundError(project_id, map_id)
+        if body.parentId is not None and (body.parentId not in parents or _is_inside(parents, body.parentId, map_id)):
+            raise HTTPException(status_code=422, detail="a map cannot be put inside itself or inside a map it holds")
+        body.updatedAt = utcnow()
+        store.save_map(root, project_id, body)
+    return body
+
+
+@router.delete("/{map_id}", status_code=204)
+def delete_map(project_id: str, map_id: str, root: Path = Depends(get_storage_root)) -> None:
+    """Delete a map; the maps inside it move up to its parent."""
+    store.delete_map(root, project_id, map_id)

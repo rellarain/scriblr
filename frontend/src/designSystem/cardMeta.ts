@@ -41,6 +41,10 @@ export const CARD_META: CardMeta[] = [
     summary: 'Admin > Instructor, where the Training curricula and courses are written: a tree of courses, modules, lessons and assessments beside the open item, with the Save cluster.',
   },
   {
+    id: 'maps', dir: 'Maps', title: 'Maps: the setting builder', group: 'Outline', height: 700,
+    summary: 'Project > Maps, where the setting is mapped: the list of maps (nested ones under their map), the canvas to paint terrain on, and the terrains, layers and fields beside it, with the Save cluster.',
+  },
+  {
     id: 'shelf', dir: 'Shelf', title: 'Book shelf and spines', group: 'Outline', height: 260,
     summary: 'Spines on a board, grouped by series; the selected book swivels into its cover.',
   },

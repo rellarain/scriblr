@@ -408,3 +408,31 @@ export interface TrainingProgress {
   attempts: Record<string, TrainingAttempt[]>
 }
 export interface TrainingState { content: TrainingContent; progress: TrainingProgress }
+
+// ---- Maps (the setting) ----
+export type MapKind = 'world' | 'town' | 'interior'
+export type MapLayerKind = 'terrain' | 'shapes' | 'symbols' | 'labels' | 'notes'
+export interface MapTerrain { id: string; name: string; color: string; builtIn: boolean }
+export interface MapLayer { id: string; name: string; kind: MapLayerKind; visible: boolean; locked: boolean }
+// A map: a grid of terrain cells (painted), its palette and layers, and its place among the maps (a map can be inside another one).
+// `cells` is the terrain of every cell, row by row, as run pairs [index into `terrains`, how many cells, ...].
+export interface MapDoc {
+  schemaVersion: number
+  id: string
+  title: string
+  kind: MapKind
+  parentId: string | null
+  order: number
+  width: number
+  height: number
+  // What one cell is, in `unit` (miles, paces, feet ...).
+  cellSize: number
+  unit: string
+  terrains: MapTerrain[]
+  layers: MapLayer[]
+  cells: number[]
+  updatedAt: string
+}
+export interface MapSummary { id: string; title: string; kind: MapKind; parentId: string | null; order: number; width: number; height: number; updatedAt: string }
+export interface MapCreate { title?: string; kind?: MapKind; width?: number; height?: number; cellSize?: number; unit?: string; parentId?: string | null }
+export const MAP_MAX_SIDE = 512

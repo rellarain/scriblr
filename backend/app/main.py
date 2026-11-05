@@ -16,6 +16,7 @@ from .api import (
     facets,
     feedback,
     library,
+    maps,
     outline,
     plot,
     presets,
@@ -39,6 +40,7 @@ from .storage.schema import PROJECT_FILE_VERSION
 from .storage.pdf_export import OutlineNodeNotFoundError
 from .storage.project_store import (
     InvalidRestoreParentError,
+    MapNotFoundError,
     MomentNotFoundError,
     NewerSchemaError,
     purge_trash,
@@ -113,6 +115,10 @@ def create_app(static_dir: Optional[Path] = None) -> FastAPI:
             content={"detail": f"shard corrupt and quarantined: {exc.reason}"},
         )
 
+    @app.exception_handler(MapNotFoundError)
+    async def _map_not_found(_: Request, exc: MapNotFoundError) -> JSONResponse:
+        return JSONResponse(status_code=404, content={"detail": str(exc)})
+
     @app.exception_handler(OutlineNodeNotFoundError)
     async def _outline_node_not_found(_: Request, exc: OutlineNodeNotFoundError) -> JSONResponse:
         return JSONResponse(status_code=404, content={"detail": str(exc)})
@@ -120,6 +126,7 @@ def create_app(static_dir: Optional[Path] = None) -> FastAPI:
     app.include_router(projects.router)
     app.include_router(outline.router)
     app.include_router(plot.router)
+    app.include_router(maps.router)
     app.include_router(draft.router)
     app.include_router(revisions.router)
     app.include_router(publications.router)
