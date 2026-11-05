@@ -3,8 +3,20 @@ from pathlib import Path
 import pytest
 from fastapi.testclient import TestClient
 
+from app.storage import project_store
 from app.deps import get_app_data_storage_root, get_storage_root
 from app.main import create_app
+
+
+@pytest.fixture(autouse=True)
+def checked_project_cache():
+    """Every read that the in-memory project cache answers is checked against a fresh read of the file, so a test fails if anything changes a kept
+    ProjectFile on the side. The cache starts empty for each test."""
+    project_store._cache.clear()
+    project_store._VERIFY_CACHE = True
+    yield
+    project_store._VERIFY_CACHE = False
+    project_store._cache.clear()
 
 
 @pytest.fixture

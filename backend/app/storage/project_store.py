@@ -1,3 +1,4 @@
+import copy
 import json
 import os
 import shutil
@@ -5,6 +6,7 @@ import tempfile
 import threading
 import time
 import uuid
+from collections import OrderedDict
 from contextlib import contextmanager
 from pathlib import Path
 from typing import Callable, Optional, Type, TypeVar
@@ -41,6 +43,7 @@ from .schema import (
 )
 
 M = TypeVar("M", bound=BaseModel)
+T = TypeVar("T")
 
 
 class ProjectNotFoundError(Exception):
@@ -298,6 +301,111 @@ def _lock_for(project_id: str) -> threading.RLock:
 
 
 # ---------------------------------------------------------------------------
+# The parsed project, kept in memory. Reading project.json means parsing the JSON and validating every node of it (about 130 ms for a 5 MB, 100,000
+# word project, and the same again before every save), though the app is single-user and one process: the file only changes through this module. So the
+# last few projects used keep their parsed ProjectFile, and a read or a save starts from it instead of from the file.
+#
+#   * An entry is good while project.json still has the size and modification time it had when the entry was made (made from a read, or from our own
+#     save), so a file changed behind our back (a restore, a hand edit, a test) is read again.
+#   * Only a project with nothing unreadable in it is kept: one with a quarantined section takes the slow path, as before.
+#   * The kept ProjectFile is changed in place, only by `_mutate` and `transaction`, and only under the project's lock. If a change, or the write after
+#     it, fails, the entry is dropped (it may be half-changed), so the next read starts from the file again.
+#   * Nothing outside the lock may hold a part of it, so a read made outside a transaction returns a copy of what it hands out (`_read`), and the
+#     readers that have not been taught to share still get a ProjectFile of their own, read from the file (`_load_project_file`). Inside a transaction
+#     everything is the transaction's one live ProjectFile, as it always was.
+# ---------------------------------------------------------------------------
+
+_CACHE_PROJECTS = 3
+_cache: "OrderedDict[tuple[str, str], tuple[tuple[int, int], ProjectFile]]" = OrderedDict()
+_cache_guard = threading.Lock()
+# Tests turn this on: a hit is checked against a fresh read of the file, and a difference (something changed a kept ProjectFile on the side) fails.
+_VERIFY_CACHE = os.environ.get("SCRIBLR_VERIFY_CACHE") == "1"
+
+
+def _file_signature(path: Path) -> Optional[tuple[int, int]]:
+    try:
+        st = path.stat()
+    except OSError:
+        return None
+    return (st.st_mtime_ns, st.st_size)
+
+
+def _cache_drop(root: Path, project_id: str) -> None:
+    with _cache_guard:
+        _cache.pop((str(root), project_id), None)
+
+
+def _cache_get(root: Path, project_id: str, path: Path) -> Optional[ProjectFile]:
+    key = (str(root), project_id)
+    with _cache_guard:
+        hit = _cache.get(key)
+        if hit is None:
+            return None
+        if hit[0] != _file_signature(path):
+            del _cache[key]
+            return None
+        _cache.move_to_end(key)
+        return hit[1]
+
+
+def _cache_put(root: Path, project_id: str, path: Path, pf: ProjectFile, signature: Optional[tuple[int, int]]) -> None:
+    if signature is None:
+        return
+    key = (str(root), project_id)
+    with _cache_guard:
+        _cache[key] = (signature, pf)
+        _cache.move_to_end(key)
+        while len(_cache) > _CACHE_PROJECTS:
+            _cache.popitem(last=False)
+
+
+def _remember(root: Path, project_id: str, pf: ProjectFile, errors: dict[str, ShardCorruptError]) -> None:
+    """Keep `pf` as the project's parsed file, right after it was written (a project with something unreadable in it is not kept)."""
+    path = _project_file_path(project_dir_of(root, project_id))
+    if errors or pf._unreadable:
+        _cache_drop(root, project_id)
+    else:
+        _cache_put(root, project_id, path, pf, _file_signature(path))
+
+
+def _load_shared(root: Path, project_id: str) -> tuple[ProjectFile, dict[str, ShardCorruptError]]:
+    """The project's parsed file, the one kept in memory when there is one. The caller holds the project's lock and neither keeps the result past it
+    nor lets any part of it out; only `_mutate` and `transaction` change it."""
+    txn = _active_txn(root, project_id)
+    if txn is not None:
+        return txn.pf, txn.errors
+    _ensure_migrated(root, project_id)
+    path = _project_file_path(project_dir_of(root, project_id))
+    kept = _cache_get(root, project_id, path)
+    if kept is not None:
+        if _VERIFY_CACHE:
+            fresh, _fresh_errors = _load_project_file_locked(root, project_id)
+            assert kept.model_dump(mode="json") == fresh.model_dump(mode="json"), f"the kept copy of {project_id} differs from its file"
+        return kept, {}
+    signature = _file_signature(path)
+    pf, errors = _load_project_file_locked(root, project_id)
+    if not errors and not pf._unreadable:
+        _cache_put(root, project_id, path, pf, signature)
+    return pf, errors
+
+
+def _read(root: Path, project_id: str, pick: Callable[[ProjectFile, dict[str, ShardCorruptError]], T], *, copy_result: bool = True) -> T:
+    """`pick(pf, errors)` on the project's parsed file, under its lock. The result is a copy (or fresh data: `copy_result=False`) unless this is inside
+    a transaction, where it is the transaction's live ProjectFile, as before."""
+    if _active_txn(root, project_id) is not None:
+        return pick(*_load_shared(root, project_id))
+    with _lock_for(project_id):
+        pf, errors = _load_shared(root, project_id)
+        value = pick(pf, errors)
+        return copy.deepcopy(value) if copy_result else value
+
+
+def read_project(root: Path, project_id: str, pick: Callable[[ProjectFile], T]) -> T:
+    """What `pick` makes of the project's parsed file, which it must only read; whatever it returns is copied, so it can be kept and changed."""
+    return _read(root, project_id, lambda pf, _errors: pick(pf))
+
+
+# ---------------------------------------------------------------------------
 # Section-level parsing -- a bad section/entry is isolated (quarantined +
 # defaulted/dropped) rather than taking down the whole file, reproducing
 # every shard's existing corruption policy exactly (see module docstring in
@@ -369,6 +477,7 @@ def _parse_list_section(raw, key, model, project_dir, file_path, errors):
 
 
 def _write_project_file(root: Path, project_id: str, pf: ProjectFile) -> None:
+    _cache_drop(root, project_id)  # whatever the write does to the file, the kept copy is only good again once `_remember` says so
     project_dir = project_dir_of(root, project_id)
     path = _project_file_path(project_dir)
     if pf.schemaVersion > PROJECT_FILE_VERSION:
@@ -405,12 +514,14 @@ _txn_local = threading.local()
 
 
 class _Txn:
-    __slots__ = ("pf", "errors", "dirty")
+    __slots__ = ("pf", "errors", "dirty", "tainted")
 
     def __init__(self, pf: ProjectFile, errors: dict[str, ShardCorruptError]) -> None:
         self.pf = pf
         self.errors = errors
         self.dirty = False
+        # A change made inside the block failed part-way: the ProjectFile may be half changed, and must not be kept unless it is written.
+        self.tainted = False
 
 
 def _active_txn(root: Path, project_id: str) -> Optional[_Txn]:
@@ -429,18 +540,26 @@ def transaction(root: Path, project_id: str):
         yield active[key].pf
         return
     with _lock_for(project_id):
-        pf, errors = _load_project_file_locked(root, project_id)
+        pf, errors = _load_shared(root, project_id)
         txn = _Txn(pf, errors)
         active[key] = txn
         try:
             yield pf
             if txn.dirty:
                 _write_project_file(root, project_id, pf)
+                _remember(root, project_id, pf, errors)
+            elif txn.tainted:
+                _cache_drop(root, project_id)
+        except BaseException:
+            _cache_drop(root, project_id)  # the block raised: nothing is written, and the ProjectFile may be part-changed
+            raise
         finally:
             del active[key]
 
 
 def _load_project_file(root: Path, project_id: str) -> tuple[ProjectFile, dict[str, ShardCorruptError]]:
+    """A ProjectFile of the caller's own, read from the file (inside a transaction, the transaction's live one). Readers that are made to share the
+    kept one use `_read` instead."""
     txn = _active_txn(root, project_id)
     if txn is not None:
         return txn.pf, txn.errors
@@ -580,20 +699,27 @@ def _upgrade_raw_hues(raw: dict) -> None:
     raw["hueScheme"] = HUE_SCHEME
 
 
-def _mutate(root: Path, project_id: str, fn: Callable[[ProjectFile], None]) -> ProjectFile:
-    """Acquire this project's lock, load the whole project.json, let `fn`
-    mutate the in-memory ProjectFile, then atomically write the whole file
-    back -- all as one critical section. If `fn` raises, nothing is written."""
+def _mutate(root: Path, project_id: str, fn: Callable[[ProjectFile], None]) -> None:
+    """Acquire this project's lock, take the project's parsed file (kept in memory between saves), let `fn` mutate it, then atomically write the
+    whole file back -- all as one critical section. If `fn` raises, nothing is written and the kept copy is dropped."""
     txn = _active_txn(root, project_id)
     if txn is not None:  # inside a transaction: change the one in-memory file; the transaction writes it
-        fn(txn.pf)
+        try:
+            fn(txn.pf)
+        except BaseException:
+            txn.tainted = True
+            raise
         txn.dirty = True
-        return txn.pf
+        return
     with _lock_for(project_id):
-        pf, _errors = _load_project_file(root, project_id)
-        fn(pf)
-        _write_project_file(root, project_id, pf)
-        return pf
+        pf, errors = _load_shared(root, project_id)
+        try:
+            fn(pf)
+            _write_project_file(root, project_id, pf)
+        except BaseException:
+            _cache_drop(root, project_id)
+            raise
+        _remember(root, project_id, pf, errors)
 
 
 # ---------------------------------------------------------------------------
@@ -732,8 +858,7 @@ def create_project(root: Path, title: str) -> ProjectIndex:
 
 
 def load_index(root: Path, project_id: str) -> ProjectIndex:
-    pf, _errors = _load_project_file(root, project_id)
-    return pf.index
+    return _read(root, project_id, lambda pf, _errors: pf.index)
 
 
 def save_index(root: Path, index: ProjectIndex) -> None:
@@ -778,6 +903,7 @@ def delete_project(root: Path, project_id: str) -> None:
         trash.mkdir(parents=True, exist_ok=True)
         stamp = utcnow().strftime("%Y%m%d%H%M%S%f")
         _replace_dir_with_retry(project_dir, trash / f"{project_id}-{stamp}")
+        _cache_drop(root, project_id)
     with _project_locks_guard:
         _project_locks.pop(project_id, None)
     purge_trash(root)
@@ -839,10 +965,12 @@ def update_project_metadata(root: Path, project_id: str, *, title: str | None = 
 
 
 def load_outline(root: Path, project_id: str) -> OutlineTree:
-    pf, errors = _load_project_file(root, project_id)
-    if "outline" in errors:
-        raise errors["outline"]
-    return pf.outline
+    def pick(pf: ProjectFile, errors: dict[str, ShardCorruptError]) -> OutlineTree:
+        if "outline" in errors:
+            raise errors["outline"]
+        return pf.outline
+
+    return _read(root, project_id, pick)
 
 
 def save_outline(root: Path, project_id: str, outline: OutlineTree) -> None:
@@ -862,10 +990,12 @@ def save_outline(root: Path, project_id: str, outline: OutlineTree) -> None:
 
 
 def load_plot(root: Path, project_id: str) -> PlotTree:
-    pf, errors = _load_project_file(root, project_id)
-    if "plot" in errors:
-        raise errors["plot"]
-    return pf.plot
+    def pick(pf: ProjectFile, errors: dict[str, ShardCorruptError]) -> PlotTree:
+        if "plot" in errors:
+            raise errors["plot"]
+        return pf.plot
+
+    return _read(root, project_id, pick)
 
 
 def save_plot(root: Path, project_id: str, plot: PlotTree) -> None:
@@ -883,20 +1013,24 @@ def save_plot(root: Path, project_id: str, plot: PlotTree) -> None:
 
 
 def load_draft_chapter(root: Path, project_id: str, chapter_id: str) -> DraftChapter:
-    pf, errors = _load_project_file(root, project_id)
-    key = f"drafts.{chapter_id}"
-    if key in errors:
-        raise errors[key]
-    return pf.drafts.get(chapter_id) or DraftChapter(chapterId=chapter_id, updatedAt=utcnow())
+    def pick(pf: ProjectFile, errors: dict[str, ShardCorruptError]) -> DraftChapter:
+        key = f"drafts.{chapter_id}"
+        if key in errors:
+            raise errors[key]
+        return pf.drafts.get(chapter_id) or DraftChapter(chapterId=chapter_id, updatedAt=utcnow())
+
+    return _read(root, project_id, pick)
 
 
 def load_draft(root: Path, project_id: str, chapter_id: str, moment_id: str) -> DraftMoment:
-    pf, errors = _load_project_file(root, project_id)
-    key = f"drafts.{chapter_id}"
-    if key in errors:
-        raise errors[key]
-    chapter = pf.drafts.get(chapter_id)
-    entry = chapter.moments.get(moment_id) if chapter else None
+    def pick(pf: ProjectFile, errors: dict[str, ShardCorruptError]) -> Optional[DraftChapterMoment]:
+        key = f"drafts.{chapter_id}"
+        if key in errors:
+            raise errors[key]
+        chapter = pf.drafts.get(chapter_id)
+        return chapter.moments.get(moment_id) if chapter else None
+
+    entry = _read(root, project_id, pick)
     if entry is None:
         # One-time migration: fold in an old-shape per-moment file if one
         # exists, then persist it into project.json's drafts section so this
@@ -972,16 +1106,17 @@ def delete_draft(root: Path, project_id: str, chapter_id: str, moment_id: str) -
 
 
 def list_revisions(root: Path, project_id: str, chapter_id: str) -> list[RevisionSnapshot]:
-    pf, _errors = _load_project_file(root, project_id)
-    return sorted(pf.revisions.get(chapter_id, []), key=lambda s: s.createdAt)
+    return _read(root, project_id, lambda pf, _errors: sorted(pf.revisions.get(chapter_id, []), key=lambda s: s.createdAt))
 
 
 def load_revision(root: Path, project_id: str, chapter_id: str, snapshot_id: str) -> RevisionSnapshot:
-    pf, _errors = _load_project_file(root, project_id)
-    for s in pf.revisions.get(chapter_id, []):
-        if s.snapshotId == snapshot_id:
-            return s
-    raise SnapshotNotFoundError(project_id, chapter_id, snapshot_id)
+    def pick(pf: ProjectFile, _errors: dict[str, ShardCorruptError]) -> Optional[RevisionSnapshot]:
+        return next((s for s in pf.revisions.get(chapter_id, []) if s.snapshotId == snapshot_id), None)
+
+    found = _read(root, project_id, pick)
+    if found is None:
+        raise SnapshotNotFoundError(project_id, chapter_id, snapshot_id)
+    return found
 
 
 def migrate_legacy_revisions(root: Path, project_id: str, chapter_id: str, moment_ids: list[str]) -> None:
@@ -1046,8 +1181,7 @@ def cap_session_revisions(root: Path, project_id: str, chapter_id: str, keep: in
             pf.revisions[chapter_id] = [r for r in items if r.snapshotId not in doomed]
         removed.append(len(doomed))
 
-    pf, _errors = _load_project_file(root, project_id)
-    if sum(1 for r in pf.revisions.get(chapter_id, []) if r.trigger == "session") <= keep:
+    if _read(root, project_id, lambda pf, _errors: sum(1 for r in pf.revisions.get(chapter_id, []) if r.trigger == "session"), copy_result=False) <= keep:
         return 0
     _mutate(root, project_id, _do)
     return removed[0]
@@ -1079,8 +1213,7 @@ MAX_PUBLICATIONS = 3
 
 def list_publications(root: Path, project_id: str, chapter_id: str) -> list[Publication]:
     """Newest first."""
-    pf, _errors = _load_project_file(root, project_id)
-    return sorted(pf.publications.get(chapter_id, []), key=lambda p: p.publishedAt, reverse=True)
+    return _read(root, project_id, lambda pf, _errors: sorted(pf.publications.get(chapter_id, []), key=lambda p: p.publishedAt, reverse=True))
 
 
 def save_publication(root: Path, project_id: str, publication: Publication) -> None:
@@ -1160,9 +1293,10 @@ def consolidate_project_history(root: Path, project_id: str) -> list[str]:
     most recent by createdAt. Never touches `revisions` (manual chapter
     save-points, explicitly permanent). Cheap no-op when under threshold.
     Returns human-readable messages for the caller to surface as warnings."""
-    pf, _errors = _load_project_file(root, project_id)
-    if not any(
-        len(getattr(pf, attr)) > TREE_HISTORY_COMPACT_THRESHOLD for attr in ("outlineHistory", "plotHistory")
+    if not _read(
+        root, project_id,
+        lambda pf, _errors: any(len(getattr(pf, attr)) > TREE_HISTORY_COMPACT_THRESHOLD for attr in ("outlineHistory", "plotHistory")),
+        copy_result=False,
     ):
         return []
 
@@ -1196,14 +1330,12 @@ def consolidate_project_history(root: Path, project_id: str) -> list[str]:
 
 
 def load_daily_activity(root: Path, project_id: str) -> DailyActivityLog:
-    pf, _errors = _load_project_file(root, project_id)
-    return pf.activity
+    return _read(root, project_id, lambda pf, _errors: pf.activity)
 
 
 def list_settings_log(root: Path, project_id: str) -> list[SettingsLogEntry]:
     """The project's settings changes still kept, newest first."""
-    pf, _ = _load_project_file(root, project_id)
-    return sorted(pf.settingsLog, key=lambda e: e.createdAt, reverse=True)
+    return _read(root, project_id, lambda pf, _errors: sorted(pf.settingsLog, key=lambda e: e.createdAt, reverse=True))
 
 
 def append_settings_log(root: Path, project_id: str, entry: SettingsLogEntry) -> None:
@@ -1220,9 +1352,9 @@ def save_daily_activity(root: Path, project_id: str, log: DailyActivityLog) -> N
     _mutate(root, project_id, _do)
 
 
-def mutate(root: Path, project_id: str, fn: Callable[[ProjectFile], None]) -> ProjectFile:
+def mutate(root: Path, project_id: str, fn: Callable[[ProjectFile], None]) -> None:
     """Change the project's whole in-memory file under its lock (inside a transaction, the transaction's), for modules that keep their own sections."""
-    return _mutate(root, project_id, fn)
+    _mutate(root, project_id, fn)
 
 
 def load_project(root: Path, project_id: str) -> ProjectFile:
@@ -1236,15 +1368,15 @@ def load_project(root: Path, project_id: str) -> ProjectFile:
 
 
 def load_facets(root: Path, project_id: str) -> FacetActivity:
-    return load_project(root, project_id).facets
+    return _read(root, project_id, lambda pf, _errors: pf.facets)
 
 
 def load_revision_flags(root: Path, project_id: str) -> list[RevisionFlag]:
-    return load_project(root, project_id).revisionFlags
+    return _read(root, project_id, lambda pf, _errors: pf.revisionFlags)
 
 
 def load_planner(root: Path, project_id: str) -> Planner:
-    return load_project(root, project_id).planner
+    return _read(root, project_id, lambda pf, _errors: pf.planner)
 
 
 def save_planner(root: Path, project_id: str, planner: Planner) -> None:
@@ -1260,8 +1392,7 @@ def save_planner(root: Path, project_id: str, planner: Planner) -> None:
 
 
 def load_schedule_completions(root: Path, project_id: str) -> ScheduleCompletionLog:
-    pf, _errors = _load_project_file(root, project_id)
-    return pf.schedule
+    return _read(root, project_id, lambda pf, _errors: pf.schedule)
 
 
 def save_schedule_completions(root: Path, project_id: str, log: ScheduleCompletionLog) -> None:
@@ -1277,8 +1408,7 @@ def save_schedule_completions(root: Path, project_id: str, log: ScheduleCompleti
 
 
 def load_scrap_registry(root: Path, project_id: str) -> ScrapRegistry:
-    pf, _errors = _load_project_file(root, project_id)
-    return pf.scrap
+    return _read(root, project_id, lambda pf, _errors: pf.scrap)
 
 
 def save_scrap_registry(root: Path, project_id: str, registry: ScrapRegistry) -> None:

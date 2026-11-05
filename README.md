@@ -125,6 +125,14 @@ described, now stale, in `docs/data-model.md`).
   nothing is written if the block raises. The handlers that did several things per request (`PUT` draft, outline, plot, the reverts, a manual
   revision, `PATCH` project) and the read-heavy ones (analytics, activity, PDF export) use it, so a draft save is one load and one write, not eight
   and three.
+- **The parsed project is kept in memory** (`project_store._cache`, the last 3 projects used): parsing and validating a 5 MB `project.json` costs about
+  130 ms, so a read or a save starts from the kept `ProjectFile` instead of the file. An entry is good while the file has the size and modification
+  time it had when the entry was made (from a read or from our own save), so a file changed behind the app's back is read again; a project with a
+  quarantined section is never kept. Only `_mutate` and `transaction` change the kept copy, under the project's lock, and if a change or its write
+  fails the entry is dropped. A read made outside a transaction (`_read`) returns a copy of what it hands out, so nothing outside the lock holds a
+  part of it; readers not taught to share still get a `ProjectFile` of their own from the file (`_load_project_file`). At 108,000 words a draft save
+  went from about 290 ms to 175 ms, `GET` outline and plot from about 190 ms to 45 ms. The test suite switches on `_VERIFY_CACHE`
+  (`tests/conftest.py`; the `SCRIBLR_VERIFY_CACHE=1` environment variable does the same): every hit is compared with a fresh read, so a test fails if anything changes a kept copy on the side.
 - **History storage** (`storage/tree_pack.py`): the outline and plot snapshots are stored *sparse* (a node keeps only the fields that differ from the
   model's defaults) and as a *keyframe* (every node) or a *delta* (`base` + all node ids in order + the sparse nodes that changed); a keyframe comes
   at least every 10 snapshots. Outside the store a snapshot always has its complete `nodes` (`list_tree_snapshots`, `load_tree_snapshot`,
