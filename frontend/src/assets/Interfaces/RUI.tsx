@@ -1,11 +1,12 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { useLocation, useNavigate } from 'react-router-dom'
 import type { CatalogBook } from '../../api/reader'
-import { BackIcon, BarChartIcon, BellIcon, BodyIcon, BookFaceIcon, CardIcon, CatalogIcon, CoverIcon, FaceIcon, FeedIcon, FlagIcon, FootnoteIcon, FrontIcon, GoalIcon, HeartIcon, HistoryIcon, HomeIcon, JournalIcon, LibraryIcon, NoteIcon, PagesIcon, PlotIcon, RevisionIcon, ShelfIcon, ShelvesIcon, SlidersIcon, StackIcon, TicketIcon, TreeIcon } from '../icons'
+import { BackIcon, BarChartIcon, BellIcon, BodyIcon, BookFaceIcon, CardIcon, CatalogIcon, CoverIcon, FaceIcon, FeedIcon, FlagIcon, FootnoteIcon, FrontIcon, GoalIcon, HeartIcon, HistoryIcon, HomeIcon, JournalIcon, LibraryIcon, MapIcon, NoteIcon, PagesIcon, PlotIcon, RevisionIcon, ShelfIcon, ShelvesIcon, SlidersIcon, StackIcon, TeamIcon, TicketIcon, TreeIcon } from '../icons'
 import { fillColorCss } from '../../theme/bookColors'
 import { useThemeState } from '../../theme/useTheme'
 import { useStoredState } from './writer/storage'
 import { BookcoverConsole, LevelBadge } from './reader/BookConsoles'
+import { CastConsole, MapsConsole } from './reader/WorldConsoles'
 import { BackmatterConsole, EdgeTabs, FrontmatterConsole, OutlineConsole, PlanConsole, PlotConsole, RevisionsConsole } from './reader/BookMatter'
 import { BookcardConsole, BookfaceConsole } from './reader/BookSocial'
 import { resolve, withFull, type ConsoleStates } from './reader/consoleStates'
@@ -35,7 +36,7 @@ const NOOK_IDS = ['stack', 'journal', 'analytics', 'feed']
 const NOOK_DEFAULTS: ConsoleStates = { stack: 'tile', journal: 'tile', analytics: 'tile' }
 const LIBRARY_IDS = ['catalog', 'shelves', 'shelf', 'history']
 const LIBRARY_DEFAULTS: ConsoleStates = { catalog: 'tile', shelves: 'tile' }
-const BOOK_IDS = ['cover', 'face', 'card', 'front', 'back']
+const BOOK_IDS = ['cover', 'face', 'card', 'front', 'back', 'maps', 'cast']
 // An alpha reader is also given the author's planning, read-only.
 const ALPHA_IDS = [...BOOK_IDS, 'outline', 'plot', 'plan', 'revisions']
 const BOOK_DEFAULTS: ConsoleStates = { cover: 'tile' }
@@ -178,6 +179,8 @@ function BookPage({ loc, ctx, color, right, book }: PageProps & { book: CatalogB
     { id: 'card', label: 'Bookcard', Icon: CardIcon, render: size => <BookcardConsole ctx={ctx} book={book} size={size} /> },
     { id: 'front', label: 'Frontmatter', Icon: FrontIcon, render: size => <FrontmatterConsole ctx={ctx} book={book} size={size} /> },
     { id: 'back', label: 'Backmatter', Icon: BackIcon, render: size => <BackmatterConsole ctx={ctx} book={book} size={size} /> },
+    { id: 'maps', label: 'Maps', Icon: MapIcon, render: () => <MapsConsole ctx={ctx} book={book} /> },
+    { id: 'cast', label: 'Cast', Icon: TeamIcon, render: () => <CastConsole ctx={ctx} book={book} /> },
   ]
   if (alpha) {
     consoles.push(

@@ -8,6 +8,8 @@ import {
 } from './historyFetch'
 import { emptyStory } from '../assets/Interfaces/writer/characters/story'
 import { defaultLook } from '../assets/Interfaces/writer/characters/art/defaults'
+import { getExtrasPreview, getReaderExtras } from './bookPublishing'
+import { getBookExtras } from './reader'
 import { createCharacter, deleteCharacter, getCharacter, listAllCharacters, listCharacters, putCharacter } from './charactersApi'
 import { createMap, deleteMap, getMap, listMaps, listPlaces, putMap } from './mapsApi'
 import { getOutline, putOutline } from './outlineApi'
@@ -61,6 +63,9 @@ const CASES: Array<[string, () => Promise<unknown>, string, string, unknown?]> =
   ['getCharacter', () => getCharacter(ID, ID), 'GET', `/api/projects/${ESC}/characters/${ESC}`],
   ['putCharacter', () => putCharacter(ID, CHARACTER), 'PUT', `/api/projects/${ESC}/characters/${ESC}`, CHARACTER],
   ['deleteCharacter', () => deleteCharacter(ID, ID), 'DELETE', `/api/projects/${ESC}/characters/${ESC}`],
+  ['getReaderExtras', () => getReaderExtras(ID), 'GET', `/api/projects/${ESC}/reader-extras`],
+  ['getExtrasPreview', () => getExtrasPreview(ID, ID, 3), 'GET', `/api/projects/${ESC}/books/${ESC}/extras-preview?chapter=3`],
+  ['getBookExtras', () => getBookExtras(ID), 'GET', `/api/reader/books/${ESC}/extras`],
   ['getBookProgress', () => getBookProgress(ID), 'GET', `/api/projects/${ESC}/book-progress`],
   ['listOutlineHistory', () => listOutlineHistory(ID), 'GET', `/api/projects/${ESC}/outline/history`],
   ['getOutlineSnapshot', () => getOutlineSnapshot(ID, ID), 'GET', `/api/projects/${ESC}/outline/history/${ESC}`],

@@ -2,11 +2,11 @@
 
 The **Maps** console is where the book's setting is mapped. It is a tab of the Writer's **Project** level (after Project, before History), with the folded-map icon. A map is a grid of terrain cells painted with the pointer; maps nest (a town inside a world map), and each has layers.
 
-Code: `writer/maps/` (`MapsConsole.tsx`, `MapList.tsx`, `MapCanvas.tsx`, `MapSide.tsx`, `MapFields.tsx`, `useMaps.ts`, `mapModel.ts`, `mapItems.ts`, `mapSymbols.ts`, `mapThemes.ts`, `mapView.ts`, `mapRender.ts`, `mapDrawItems.ts`, `mapShapes.ts`, `mapDrawShapes.ts`, `mapExport.ts`, `mapFile.ts`, `placesStore.ts`, `PlacePicker.tsx`, `maps.scss`). Storage: the project's `maps` section (`project.json`), one entry per map; the API is `/api/projects/{id}/maps`.
+Code: `writer/maps/` (`MapsConsole.tsx`, `MapList.tsx`, `MapCanvas.tsx`, `MapSide.tsx`, `MapFields.tsx`, `useMaps.ts`, `mapModel.ts`, `mapItems.ts`, `mapSymbols.ts`, `mapThemes.ts`, `mapView.ts`, `mapRender.ts`, `mapDrawItems.ts`, `mapShapes.ts`, `mapDrawShapes.ts`, `mapExport.ts`, `mapFile.ts`, `placesStore.ts`, `PlacePicker.tsx`, `ForReadersPanel.tsx`, `maps.scss`). Storage: the project's `maps` section (`project.json`), one entry per map; the API is `/api/projects/{id}/maps`.
 
 ## Anatomy
 
-`.mapPage` holds a bar (the title, the **tools**, the **Save cluster**) and `.mapSplit`: the **list** (`.mapList`, 220px), the **stage** (`.mapStage`: the canvas and a status line) and the **side** (`.mapSide`, 280px: the chosen thing, Terrain, Symbols, Lines and regions, Layers, Map). Below 860px of its own width the parts stack. The console sits on the tab's surface in the ink colour.
+`.mapPage` holds a bar (the title, the **tools**, the **Save cluster**) and `.mapSplit`: the **list** (`.mapList`, 220px), the **stage** (`.mapStage`: the canvas and a status line) and the **side** (`.mapSide`, 280px: the chosen thing, Terrain, Symbols, Lines and regions, Layers, Map, Image, For readers). Below 860px of its own width the parts stack. The console sits on the tab's surface in the ink colour.
 
 - **Tools** (icon buttons, `aria-pressed`): **Select and move** (the pointer), **Paint** (brush), **Fill an area**, **Pick up a terrain** (the dropper), **Stamp a symbol**, **Place a label**, **Draw a line**, **Draw a region**, **Measure a distance** (the ruler) and **Move the view** (the hand); then the brush width (1, 2 or 3 cells) and the **grid** toggle. The middle or right mouse button pans with any tool; the wheel zooms at the pointer; the view buttons at the canvas corner zoom in and out and **fit** the map.
 - **List**: each map with the maps inside it under it (indented), its size, and a delete that asks first (the maps inside move up). The plus opens the **New map** form: title, kind (world or region, town or city, interior), a size (Small 32×24, Medium 64×48, Large 128×96, Huge 256×192, Largest 512×512, or any width and height up to 512), what one cell is (a number and a unit: miles, paces, feet ...), and the map it is inside.
@@ -31,6 +31,18 @@ A bitmap of one pixel per cell is scaled up without smoothing, so each cell is a
 - **Image**: the *Image* panel saves the map as a **PNG** at 1x, 2x or 4x (a cell is 16, 32 or 64 pixels, held to 8192 on the longest side) with the layers that are checked; the grid and the editing marks are left out.
 - **Files**: the export button on a map row writes the map **and the maps inside it** as `*.scriblr-map.json`; the import button on the list reads one and asks, for each map the project already has under the same id, whether to **keep both**, **replace the one here** or **leave it out**. Links to maps that are not in the file are dropped.
 - The **Characters** and **Settings** built-in plot presets no longer appear in the Plot's preset list.
+
+## For readers
+
+What readers see of the setting and the cast is the author's choice, and it is only ever what the author has published. The shared pieces live in `writer/readers/` (`ReaderControls.tsx`, `WorldViews.tsx`, `readers.scss`); the Reader's two consoles in `reader/WorldConsoles.tsx`.
+
+- **Publish switch** (a checkbox, "Show this map to readers" or "Show Ada to readers"): nothing is shown until it is ticked, and nothing leaves the project until the **book is published**: publishing a book copies the published maps and the public side of the published characters into the new edition, as it copies the chapters, so a later change waits for the next edition. (Backend: `ReaderShare` on the map and the character, `EditionMap` and `EditionCharacter` on `BookEdition`, `world_publishing.py`.)
+- **Reveal at a chapter** (`.rvSelect`, "From the start" or "Chapter n: title"): the chapters are the ones of the published edition, so the numbers are the ones readers see. A chapter the edition has not got yet is kept and marked "(not published yet)". When the project has several books, a select names the book whose chapters count.
+- **Parts**: a map's symbol, label or line can be revealed later than the map (choose it, then its own "shown from"); a character's fields are ticked one by one (the look is always shown, the rest of the profile never is), each with its own chapter; relationships show only between published characters.
+- **Spoiler warnings** (`.rvWarn`, a list named "Spoiler warnings"): a scene that uses a place of a map, or a character, in a chapter before the chapter where it is revealed. Fetched again after each save.
+- **Preview as a reader** ("A reader who has reached"): the saved map or character as a reader who has reached a chapter sees it (the preview is of what is saved, and says so).
+- **In the Reader**: the Book page gets two consoles, **Maps** (the maps, the ones inside another listed under it, the named places) and **Cast** (a card for each character: close-up, name, public fields, links). What is still to be revealed is only counted ("2 more maps to discover as you read"), never named. The chapter a reader has reached is where they last stopped (or the whole book once finished).
+- Checkboxes use the browser's own, sized 16px (`appearance: auto`: the global input reset hides them otherwise), in the accent colour.
 
 ## Saving
 

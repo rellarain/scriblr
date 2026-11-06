@@ -125,7 +125,10 @@ def _build_edition(pf: ProjectFile, book_id: str, listing: BookListing, n: int) 
         )
     if not chapters:
         raise NothingToPublishError("publish at least one chapter before publishing the book")
-    return BookEdition(n=n, publishedAt=utcnow(), wordCount=sum(c.words for c in chapters), chapters=chapters)
+    from .world_publishing import freeze_world
+
+    maps, characters = freeze_world(pf)
+    return BookEdition(n=n, publishedAt=utcnow(), wordCount=sum(c.words for c in chapters), chapters=chapters, maps=maps, characters=characters)
 
 
 def get_listing(root: Path, project_id: str, book_id: str) -> BookListing:

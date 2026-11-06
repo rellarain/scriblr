@@ -1,4 +1,5 @@
 import { api } from './client'
+import type { BookExtras } from './types'
 
 // The Reader's library and account (backend: storage/reader_schema.py, api/library.py, api/reader.py). Money and lending are simulated.
 
@@ -288,3 +289,6 @@ export const postMyFlag = (name: string) => api.post<ReaderState>('/reader/my-fl
 export const deleteMyFlag = (key: string) => api.delete<ReaderState>(`/reader/my-flags/${encodeURIComponent(key)}`)
 export interface ReadingUpdate { chapter: number; paragraph: number; pct: number; pages?: number; minutes?: number; newSession?: boolean; device?: string }
 export const putReading = (id: string, update: ReadingUpdate) => api.put<ReaderState>(`/reader/books/${encodeURIComponent(id)}/reading`, update)
+
+// The maps and characters the author published with a book, as far as the reader has read.
+export const getBookExtras = (bookId: string) => api.get<BookExtras>(`/reader/books/${encodeURIComponent(bookId)}/extras`)

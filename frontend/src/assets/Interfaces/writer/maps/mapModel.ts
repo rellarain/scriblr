@@ -1,5 +1,5 @@
-import type { MapDoc, MapLayer, MapLayerKind, MapSummary, MapTerrain } from '../../../../api/types'
-import { MAP_MAX_SIDE } from '../../../../api/types'
+import type { MapDoc, MapLayer, MapLayerKind, MapSummary, MapTerrain, ReaderShare } from '../../../../api/types'
+import { MAP_MAX_SIDE, NO_SHARE, shareOf } from '../../../../api/types'
 
 // Maps, as pure functions: the working copy of a map (its cells decoded, one terrain index per cell, so painting is direct), the run-length coding of
 // the cells the backend keeps, the brush and flood fill, terrain and layer changes, and the undo log. The server's MapDoc repairs what is odd (schema.py),
@@ -221,6 +221,13 @@ export function setTheme(draft: MapDraft, theme: MapDraft['theme']): Change {
 
 export function setOverlay(draft: MapDraft, field: 'scaleBar' | 'compass' | 'legend', on: boolean): Change {
   return draft[field] === on ? null : change(draft, { [field]: on })
+}
+
+// What readers may see of the map (see ReaderShare).
+export function setShare(draft: MapDraft, share: ReaderShare): Change {
+  if (JSON.stringify(shareOf(draft)) === JSON.stringify(share)) return null
+  // A map from before readers existed has no share: it is given the empty one first, so an undo has something to go back to.
+  return change(draft.reader ? draft : { ...draft, reader: NO_SHARE }, { reader: share })
 }
 
 // A new size: what the old cells cover is kept (from the top left), the new cells are the first terrain.

@@ -153,6 +153,7 @@
   // ---------------------------------------------------------------- a book: the Writer's cover, with a spine edge and page edges
   .rdBookHead { display: flex; flex-wrap: wrap; align-items: baseline; gap: 6px 14px; }
   .rdBookHeadRight { margin-left: auto; display: flex; align-items: center; gap: 10px; }
+  .rdCast { display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 12px; }
   .rdHero { display: grid; grid-template-columns: 190px minmax(0, 1fr); gap: 18px; }
   .rdHeroBody { display: flex; flex-direction: column; gap: 12px; min-width: 0; }
   .rdBook3d { position: relative; display: flex; width: 170px; aspect-ratio: 2 / 3; box-shadow: 0 8px 0 -4px var(--ov-sink-3); }

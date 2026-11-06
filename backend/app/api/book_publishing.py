@@ -1,10 +1,10 @@
 from pathlib import Path
 
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Query
 from pydantic import BaseModel
 
 from ..deps import get_app_data_storage_root, get_storage_root
-from ..storage import author_feedback, book_publishing as publishing, reader_social, reader_store
+from ..storage import author_feedback, book_publishing as publishing, project_store, reader_social, reader_store, world_publishing
 from ..storage.reader_schema import BookFeedback, BookSummary
 from ..storage.schema import BookListing, BookMeta, ChapterAuthorNotes, ReaderLevelName
 
@@ -110,3 +110,23 @@ def put_author_notes(project_id: str, chapter_id: str, body: ChapterAuthorNotes,
         return publishing.put_chapter_notes(root, project_id, chapter_id, body)
     except _ERRORS as exc:
         raise _translate(exc) from exc
+
+
+@router.get("/api/projects/{project_id}/reader-extras", response_model=list[world_publishing.BookExtrasInfo])
+def get_reader_extras(project_id: str, root: Path = Depends(get_storage_root)) -> list[world_publishing.BookExtrasInfo]:
+    """For each book of the project: the chapters of the next edition (the numbers a reveal uses) and the scenes that come before a reveal."""
+    try:
+        return world_publishing.project_infos(root, project_id)
+    except project_store.ProjectNotFoundError as exc:
+        raise HTTPException(status_code=404, detail=str(exc)) from exc
+
+
+@router.get(f"{_BOOK}/extras-preview", response_model=world_publishing.BookExtras)
+def get_extras_preview(project_id: str, book_id: str, chapter: int = Query(default=0, ge=0, le=10000), root: Path = Depends(get_storage_root)) -> world_publishing.BookExtras:
+    """The published maps and characters as a reader who has reached `chapter` would see them (the author's preview; 0 = a reader who has not started)."""
+    try:
+        return world_publishing.project_preview(root, project_id, book_id, chapter)
+    except _ERRORS as exc:
+        raise _translate(exc) from exc
+    except project_store.ProjectNotFoundError as exc:
+        raise HTTPException(status_code=404, detail=str(exc)) from exc

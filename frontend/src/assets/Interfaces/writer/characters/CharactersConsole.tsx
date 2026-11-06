@@ -3,7 +3,7 @@ import type { OutlineNode } from '../../../../api/types'
 import { SaveCluster } from '../../../../components/SaveCluster'
 import { setAutosaveMode, useSettings } from '../../../../settings/settingsStore'
 import { autosaveModeOf } from '../../../../theme/types'
-import { ImageIcon, TeamIcon } from '../../../icons'
+import { ExportIcon, ImageIcon, TeamIcon } from '../../../icons'
 import { BagIcon, BodyIcon, BrushIcon, ChevronLeftIcon, ChevronRightIcon, ClockIcon, EyeIcon, FaceIcon, HandIcon, LinkIcon, ListIcon, MixedFaceIcon, NeutralFaceIcon, PencilIcon, RedoIcon, TurnIcon } from '../../../icons'
 import { CharacterArt } from './art/CharacterArt'
 import { EXPRESSIONS } from './art/library'
@@ -12,6 +12,7 @@ import { CharacterList } from './CharacterList'
 import { BodyDrawer, ClothesDrawer, EyesDrawer, HairDrawer, HeadDrawer, MarksDrawer, NoseMouthDrawer, PoseDrawer, type DrawerCtx } from './Drawers'
 import { CommitText, Field } from './CharFields'
 import { CastSection } from './CastSection'
+import { ForReadersSection } from './ForReadersSection'
 import { useCast } from './castStore'
 import { exportSheet } from './sheet'
 import { ProfileSection } from './ProfileSection'
@@ -21,13 +22,14 @@ import { storyPoints } from './story'
 import { useCharacters } from './useCharacters'
 import './characters.scss'
 
-type Section = 'look' | 'profile' | 'relationships' | 'story' | 'cast'
+type Section = 'look' | 'profile' | 'relationships' | 'story' | 'cast' | 'readers'
 const SECTIONS: Array<{ section: Section; label: string; Icon: typeof FaceIcon }> = [
   { section: 'look', label: 'Look', Icon: BrushIcon },
   { section: 'profile', label: 'Profile', Icon: ListIcon },
   { section: 'relationships', label: 'Relationships', Icon: LinkIcon },
   { section: 'story', label: 'Story', Icon: ClockIcon },
   { section: 'cast', label: 'The cast', Icon: TeamIcon },
+  { section: 'readers', label: 'For readers', Icon: ExportIcon },
 ]
 type Mode = 'closeup' | 'full' | 'turnaround' | 'expressions'
 const MODES: Array<{ mode: Mode; label: string; Icon: typeof FaceIcon }> = [
@@ -130,6 +132,7 @@ export default function CharactersConsole({ projectId, outline = [] }: { project
         {doc && section === 'profile' && <ProfileSection doc={doc} edit={c.edit} />}
         {doc && section === 'relationships' && <RelationshipsSection projectId={projectId} c={c} doc={doc} points={points} />}
         {doc && section === 'cast' && <CastSection c={c} cast={all} doc={doc} onOpen={id => { void c.open(id) }} />}
+        {doc && section === 'readers' && <ForReadersSection projectId={projectId} doc={doc} edit={c.edit} savedAt={c.saveStatus.lastSavedAt} />}
         {doc && section === 'story' && <StorySection doc={doc} edit={c.edit} points={points} />}
         {doc && ctx && section === 'look' ? (
           <>

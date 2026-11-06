@@ -185,7 +185,7 @@ export default function MapsConsole({ projectId, scenes = [], onSetLocation }: {
               <p className="mapStatus" aria-live="off">{tool === 'measure' && measured !== null ? `${measured} · click to add a point, Backspace takes one back, Esc clears` : `${statusText} · ${formatDistance(draft.width * draft.cellSize, draft.unit)} wide${tool === 'measure' ? ' · click to start measuring' : hint}`}</p>
             </div>
             <MapSide
-              m={m} draft={draft} terrain={chosen} onTerrain={i => { setTerrain(i); if (tool !== 'brush' && tool !== 'fill') setTool('brush') }}
+              projectId={projectId} m={m} draft={draft} terrain={chosen} onTerrain={i => { setTerrain(i); if (tool !== 'brush' && tool !== 'fill') setTool('brush') }}
               symbolKind={symbolKind} onSymbolKind={id => { setSymbolKind(id); setTool('symbol') }} symbolSize={symbolSize} onSymbolSize={setSymbolSize}
               pen={pen} penType={penType}
               onPen={patch => (penType === 'region' ? setRegionPen : setLinePen)(old => ({ ...old, ...patch }))}

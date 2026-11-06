@@ -2,7 +2,7 @@
 
 The **Characters** console is where the book's cast is built. It is a tab of the Writer's **Project** level (after Maps, before History), with the people icon. A character is only its **look**: a handful of choices (ids of the part library), numbers (sliders), colours, marks and an outfit. No image is stored; the art is drawn from the look by code, in any view.
 
-Code: `writer/characters/` (`CharactersConsole.tsx`, `CharacterList.tsx`, `Drawers.tsx`, `CharFields.tsx`, `CastSection.tsx`, `SceneCast.tsx`, `castStore.ts`, `age.ts`, `charFile.ts`, `sheet.tsx`, `ProfileSection.tsx`, `RelationshipsSection.tsx`, `StorySection.tsx`, `story.ts`, `useCharacters.ts`, `characters.scss`) and the art engine in `writer/characters/art/` (`CharacterArt.tsx`, `head.tsx`, `body.tsx`, `marks.tsx`, `space.ts`, `library.ts`, `wardrobe.ts`, `defaults.ts`, `colour.ts`). Storage: the project's `characters` section (`project.json`), one entry per character; the API is `/api/projects/{id}/characters`.
+Code: `writer/characters/` (`CharactersConsole.tsx`, `CharacterList.tsx`, `Drawers.tsx`, `CharFields.tsx`, `ForReadersSection.tsx`, `CastSection.tsx`, `SceneCast.tsx`, `castStore.ts`, `age.ts`, `charFile.ts`, `sheet.tsx`, `ProfileSection.tsx`, `RelationshipsSection.tsx`, `StorySection.tsx`, `story.ts`, `useCharacters.ts`, `characters.scss`) and the art engine in `writer/characters/art/` (`CharacterArt.tsx`, `head.tsx`, `body.tsx`, `marks.tsx`, `space.ts`, `library.ts`, `wardrobe.ts`, `defaults.ts`, `colour.ts`). Storage: the project's `characters` section (`project.json`), one entry per character; the API is `/api/projects/{id}/characters`.
 
 ## Anatomy
 
@@ -21,7 +21,7 @@ The figure is a skeleton of joints in 3D (a head is 100 units high): the pose gi
 
 ## Profile, relationships and story
 
-The bar has five **sections** (icon buttons, `aria-pressed`, in a toolbar named "What to work on"): **Look** (everything above), **Profile**, **Relationships**, **Story** and **The cast**. The last three replace the stage and the drawers with a sheet (`.charSheet`, a grid of panels) beside the cast list. Every keystroke goes into the character, and typing in one field is one undo step.
+The bar has six **sections** (icon buttons, `aria-pressed`, in a toolbar named "What to work on"): **Look** (everything above), **Profile**, **Relationships**, **Story**, **The cast** and **For readers**. The last three replace the stage and the drawers with a sheet (`.charSheet`, a grid of panels) beside the cast list. Every keystroke goes into the character, and typing in one field is one undo step.
 
 - **Profile**: identity (role, age, occupation, other names, a sentence), personality and psychology (personality, what they want, why, what they fear, their flaw and strength), background, **fields of your own** (a label and a text, up to 30) and **possessions** (a name and a line each).
 - **Relationships**: typed links to the other characters (family, friend, ally, rival, enemy, romance, mentor, other) with a label and a description; a family link says who the other is (parent, child, spouse, sibling). Each link keeps **changes over the story** (a new label and note from a chapter or scene on), and the list can be read **as it stands at** a point. A character can see who has a link to them. The **web** draws the whole cast in a ring, a line for each link; the kinds differ by the **dash** of the line, not by colour, with a key. The **family tree** of the open character puts parents above, children below, siblings and spouses beside, from the family links of either character.
@@ -34,6 +34,8 @@ The bar has five **sections** (icon buttons, `aria-pressed`, in a toolbar named 
 - **Where they appear**: the Story section lists the chapters and scenes the character is tagged on (kept on the character). In the **Outline**, a scene card shows the heads and names of the characters tagged on it, with a select to tag another and a x to take one off (saved at once with the character); in the **Draft**, the scene's chips show the same, read only (`.charTags`).
 - **Files**: each row of the list has a save-to-file button, and the list one for the whole cast, writing `*.scriblr-characters.json`; the import button reads one and asks, for each character the project has under the same id, whether to **keep both**, **replace the one here** or **leave out**. Links to characters that are not in the file are dropped, and the tags on the outline are left out (they belong to the project).
 - **The character sheet**: the image button in the bar saves a **PNG** of the open character: the name and role, the figure, a close-up, three more views and the profile in words, on white paper in the character's own colours. It is an SVG document drawn from the same art as the console.
+
+- **For readers** (a sixth section, the export icon): the character's publish switch, the chapter it is revealed at, which fields are public and each field's own chapter, spoiler warnings and a preview as a reader. See Maps, "For readers", which describes the pieces both consoles share; the card a reader sees is `CharacterArt` close-up, the name and the public fields (`.wvCard`).
 
 ## Saving
 

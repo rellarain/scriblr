@@ -671,6 +671,9 @@ class BookEdition(BaseModel):
     publishedAt: datetime
     wordCount: int = 0
     chapters: list[EditionChapter] = Field(default_factory=list)
+    # The published maps and characters as they were when the book was published (frozen, like the chapters).
+    maps: list["EditionMap"] = Field(default_factory=list)
+    characters: list["EditionCharacter"] = Field(default_factory=list)
 
 
 class BookListing(BaseModel):
@@ -1862,6 +1865,62 @@ def _valid_items(value: Any, model: Any) -> list[Any]:
     return out
 
 
+READER_MAX_CHAPTER = 10000
+READER_MAX_REVEALS = 2000
+READER_MAX_FIELDS = 60
+# The parts of a character's profile that can be shown to readers (a field of the author's own is "field:<its id>"). The look is always shown with a published character.
+CHARACTER_SHARE_FIELDS = (
+    "role", "age", "occupation", "aliases", "summary", "personality", "goal", "motivation", "fear", "flaw", "strength", "background", "possessions", "relationships",
+)
+
+
+class ReaderShare(BaseModel):
+    """What the author lets readers see of a map or a character. Nothing is shown until `published`. `revealAt` is the chapter, by the numbers of the published edition,
+    from which it is shown (none = from the start). `reveals` holds the same for a part of it: a map's symbols, labels and shapes (by id), a character's fields (by key).
+    `fields` (a character) are the fields shown."""
+
+    published: bool = False
+    revealAt: Optional[int] = None
+    reveals: dict[str, int] = Field(default_factory=dict)
+    fields: list[str] = Field(default_factory=list)
+
+    @field_validator("published", mode="before")
+    @classmethod
+    def _published(cls, value: Any) -> Any:
+        return value is True
+
+    @field_validator("revealAt", mode="before")
+    @classmethod
+    def _reveal_or_none(cls, value: Any) -> Any:
+        return value if isinstance(value, int) and not isinstance(value, bool) and 1 <= value <= READER_MAX_CHAPTER else None
+
+    @field_validator("reveals", mode="before")
+    @classmethod
+    def _reveals(cls, value: Any) -> Any:
+        out: dict[str, int] = {}
+        for key, chapter in (value.items() if isinstance(value, dict) else []):
+            if isinstance(key, str) and 0 < len(key) <= 80 and isinstance(chapter, int) and not isinstance(chapter, bool) and 1 <= chapter <= READER_MAX_CHAPTER:
+                out[key] = chapter
+            if len(out) >= READER_MAX_REVEALS:
+                break
+        return out
+
+    @field_validator("fields", mode="before")
+    @classmethod
+    def _fields(cls, value: Any) -> Any:
+        out: list[str] = []
+        for item in value if isinstance(value, list) else []:
+            if isinstance(item, str) and 0 < len(item) <= 60 and item not in out:
+                out.append(item)
+            if len(out) >= READER_MAX_FIELDS:
+                break
+        return out
+
+
+def _share_of(value: Any) -> Any:
+    return value if isinstance(value, (dict, ReaderShare)) else {}
+
+
 class MapDoc(BaseModel):
     schemaVersion: int = SCHEMA_VERSION
     id: str = Field(min_length=1, max_length=80)
@@ -1891,7 +1950,14 @@ class MapDoc(BaseModel):
     scaleBar: bool = True
     compass: bool = True
     legend: bool = False
+    # What readers may see of this map (see ReaderShare); `reveals` is keyed by the ids of its symbols, labels and shapes.
+    reader: ReaderShare = Field(default_factory=ReaderShare)
     updatedAt: datetime = Field(default_factory=utcnow)
+
+    @field_validator("reader", mode="before")
+    @classmethod
+    def _reader_share(cls, value: Any) -> Any:
+        return _share_of(value)
 
     @field_validator("pace", mode="before")
     @classmethod
@@ -2516,7 +2582,14 @@ class CharacterDoc(BaseModel):
     events: list[LifeEvent] = Field(default_factory=list)
     # The chapters and scenes of the outline the author has tagged this character on (outline node ids, in the order they were tagged).
     appearances: list[str] = Field(default_factory=list)
+    # What readers may see of this character (see ReaderShare); `fields` and `reveals` are keyed by CHARACTER_SHARE_FIELDS and "field:<id>".
+    reader: ReaderShare = Field(default_factory=ReaderShare)
     updatedAt: datetime = Field(default_factory=utcnow)
+
+    @field_validator("reader", mode="before")
+    @classmethod
+    def _reader_share(cls, value: Any) -> Any:
+        return _share_of(value)
 
     @field_validator("name", mode="before")
     @classmethod
@@ -2570,6 +2643,42 @@ class CharacterDoc(BaseModel):
     @classmethod
     def _look(cls, value: Any) -> Any:
         return value if isinstance(value, (dict, CharacterLook)) else {}
+
+
+class EditionMap(BaseModel):
+    """A published map as it was when the edition was made; `doc.reader` says what is shown from which chapter."""
+
+    mapId: str
+    doc: MapDoc
+
+
+class EditionCharacterField(BaseModel):
+    key: str
+    label: str
+    value: str
+    revealAt: Optional[int] = None
+
+
+class EditionRelationship(BaseModel):
+    targetId: str
+    label: str
+    description: str = ""
+
+
+class EditionCharacter(BaseModel):
+    """A published character as it was when the edition was made: the look, the public fields only (not the rest of the profile) and the links."""
+
+    characterId: str
+    name: str
+    revealAt: Optional[int] = None
+    look: CharacterLook
+    fields: list[EditionCharacterField] = Field(default_factory=list)
+    relationships: list[EditionRelationship] = Field(default_factory=list)
+    relationshipsRevealAt: Optional[int] = None
+
+
+BookEdition.model_rebuild()
+BookListing.model_rebuild()
 
 
 class ProjectFile(BaseModel):

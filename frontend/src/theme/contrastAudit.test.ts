@@ -83,7 +83,7 @@ describe('the Writer stylesheet', () => {
 
   // A black or white wash written out at a fixed alpha does not follow the zone (white on a light zone is invisible, black does not soften):
   // recesses are --ov-sink-1..3 and lifts --ov-lift-1..3. Shadows, gradients and the scrim are not washes.
-  it.each(['assets/Interfaces/writer/writer.scss', 'App.scss', 'assets/Interfaces/admin/resources/resources.scss', 'assets/Interfaces/admin/instructor/instructor.scss', 'assets/Interfaces/writer/maps/maps.scss'])(
+  it.each(['assets/Interfaces/writer/writer.scss', 'App.scss', 'assets/Interfaces/admin/resources/resources.scss', 'assets/Interfaces/admin/instructor/instructor.scss', 'assets/Interfaces/writer/maps/maps.scss', 'assets/Interfaces/writer/readers/readers.scss'])(
     'writes no black or white wash at a fixed alpha in %s',
     file => {
       const css = readStyles(file)

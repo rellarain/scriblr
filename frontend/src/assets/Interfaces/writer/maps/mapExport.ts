@@ -13,7 +13,7 @@ export const MAX_SIDE_PX = 8192
 const MARGIN = 2
 
 // How many pixels a cell is, and how big the image is, for a map at a scale.
-export function exportSize(width: number, height: number, scale: ExportScale): { cell: number; width: number; height: number } {
+export function exportSize(width: number, height: number, scale: number): { cell: number; width: number; height: number } {
   const cell = Math.max(1, Math.min(BASE_CELL_PX * scale, Math.floor((MAX_SIDE_PX - MARGIN * 2) / Math.max(width, height))))
   return { cell, width: Math.round(width * cell) + MARGIN * 2, height: Math.round(height * cell) + MARGIN * 2 }
 }
@@ -24,7 +24,7 @@ export function withLayers(draft: MapDraft, chosen: Set<string>): MapDraft {
 }
 
 // Draw the map on a new canvas (null when there is no 2D context to draw on).
-export function renderMapImage(draft: MapDraft, scale: ExportScale, chosenLayers: Set<string>, makeCanvas: () => HTMLCanvasElement = () => document.createElement('canvas')): HTMLCanvasElement | null {
+export function renderMapImage(draft: MapDraft, scale: number, chosenLayers: Set<string>, makeCanvas: () => HTMLCanvasElement = () => document.createElement('canvas')): HTMLCanvasElement | null {
   const size = exportSize(draft.width, draft.height, scale)
   const shown = withLayers(draft, chosenLayers)
   const bitmap = renderTerrain(shown, null)

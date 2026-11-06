@@ -27,6 +27,7 @@ from .reader_schema import (
     SentenceTotal,
 )
 from .reader_store import InvalidReaderOperationError, _mutate
+from .world_publishing import BookExtras
 from .social_views import effective_levels
 
 MAX_MY_FLAGS = 20
@@ -109,6 +110,32 @@ def chapter_text(rf: ReaderFile, root: Path, book: CatalogBook, n: int) -> Chapt
         )
     chapter = reading_text.seeded_chapter(book, n, text.level)
     return chapter
+
+
+def reach_of(rf: ReaderFile, book_id: str, chapters: int) -> int:
+    """The last chapter the reader has got to: where they stopped, or all of them once they have finished the book (0 = not started)."""
+    position = rf.progress.get(book_id)
+    if position is not None and position.finishedAt is not None:
+        return chapters
+    stopped = rf.positions.get(book_id)
+    return min(chapters, stopped.chapter) if stopped is not None else 0
+
+
+def book_extras(rf: ReaderFile, root: Path, book: CatalogBook) -> BookExtras:
+    """The maps and characters of one of the author's books that the reader may see, up to the chapter they have reached (nothing for a book they cannot read yet)."""
+
+    from .world_publishing import extras_view
+
+    empty = BookExtras(bookId=book.id)
+    if book.source != "local":
+        return empty
+    level = level_of(rf, book.id)
+    if not access(rf, book, level)[0]:
+        return empty
+    edition = _local_edition(root, book)
+    if edition is None:
+        return empty
+    return extras_view(book.id, edition.maps, edition.characters, reach_of(rf, book.id, len(edition.chapters)))
 
 
 def reaction_totals(rf: ReaderFile, root: Path, book: CatalogBook, n: int) -> ReactionTotals:

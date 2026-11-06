@@ -14,6 +14,7 @@ import {
   descendantIds, setOverlay, setPace, setParent, setTheme, toggleLayer, type MapDraft,
 } from './mapModel'
 import type { Maps } from './useMaps'
+import { ForReadersPanel } from './ForReadersPanel'
 
 // What a pen and a drawn shape have in common: how they are drawn.
 type ShapeLook = Pick<MapShape, 'style' | 'color' | 'width' | 'fill' | 'opacity' | 'pattern'>
@@ -23,6 +24,7 @@ const LAYER_KINDS: Array<Exclude<MapLayerKind, 'terrain'>> = ['shapes', 'symbols
 const KIND_NAMES = { world: 'World or region', town: 'Town or city', interior: 'Interior' } as const
 
 export interface MapSideProps {
+  projectId: string
   m: Maps
   draft: MapDraft
   terrain: number
@@ -47,7 +49,7 @@ export interface MapSideProps {
 }
 
 // The right-hand side of the Maps console: what is chosen on the map, the terrains to paint with, the symbols to stamp, the layers, and the map's own fields.
-export function MapSide({ m, draft, terrain, onTerrain, symbolKind, onSymbolKind, symbolSize, onSymbolSize, pen, penType, onPen, onPreset, selected, fresh, onDeleted, scenes, onSetLocation }: MapSideProps) {
+export function MapSide({ projectId, m, draft, terrain, onTerrain, symbolKind, onSymbolKind, symbolSize, onSymbolSize, pen, penType, onPen, onPreset, selected, fresh, onDeleted, scenes, onSetLocation }: MapSideProps) {
   return (
     <aside className="mapSide" aria-label="Map details">
       {selected && <InspectorPanel m={m} draft={draft} selected={selected} fresh={fresh} onDeleted={onDeleted} scenes={scenes} />}
@@ -58,6 +60,7 @@ export function MapSide({ m, draft, terrain, onTerrain, symbolKind, onSymbolKind
       <LayerPanel m={m} draft={draft} />
       <MapFieldsPanel m={m} draft={draft} />
       <ExportPanel draft={draft} />
+      <ForReadersPanel projectId={projectId} m={m} draft={draft} selected={selected} />
     </aside>
   )
 }

@@ -5,6 +5,7 @@ from pydantic import BaseModel, Field
 
 from ..deps import get_app_data_storage_root, get_storage_root
 from ..storage import library, reader_reading as reading, reader_store as store
+from ..storage.world_publishing import BookExtras
 from ..storage.reader_schema import BookText, ChapterText, Mark, ReactionTotals, ReaderSettings, ReaderState
 
 router = APIRouter(prefix="/api/reader", tags=["reader-reading"])
@@ -48,6 +49,12 @@ def _run(fn, *args) -> ReaderState:
 @router.get("/books/{book_id}/text", response_model=BookText)
 def get_book_text(book_id: str, root: Path = Depends(get_app_data_storage_root), projects: Path = Depends(get_storage_root)) -> BookText:
     return reading.book_text(store.load_file(root), projects, _book(book_id, projects))
+
+
+@router.get("/books/{book_id}/extras", response_model=BookExtras)
+def get_book_extras(book_id: str, root: Path = Depends(get_app_data_storage_root), projects: Path = Depends(get_storage_root)) -> BookExtras:
+    """The maps and characters the author published with the book, as far as the reader has read."""
+    return reading.book_extras(store.load_file(root), projects, _book(book_id, projects))
 
 
 @router.get("/books/{book_id}/chapters/{n}", response_model=ChapterText)

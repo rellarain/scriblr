@@ -1,5 +1,6 @@
 import { api } from './client'
 import type { PublicReview, ReaderLevel, SentenceTotal } from './reader'
+import type { BookExtras, BookExtrasInfo } from './types'
 
 // Publishing a book to the Reader's library, and what the author sees of it (backend: api/book_publishing.py). Money is simulated.
 
@@ -57,3 +58,8 @@ export const getPublishedBooks = () => api.get<BookSummary[]>('/author/books')
 const chapter = (projectId: string, chapterId: string) => `/projects/${encodeURIComponent(projectId)}/chapters/${encodeURIComponent(chapterId)}/author-notes`
 export const getAuthorNotes = (projectId: string, chapterId: string) => api.get<ChapterAuthorNotes>(chapter(projectId, chapterId))
 export const putAuthorNotes = (projectId: string, chapterId: string, notes: ChapterAuthorNotes) => api.put<ChapterAuthorNotes>(chapter(projectId, chapterId), notes)
+
+// The chapters of the next edition (the numbers a reveal uses) and the scenes that come before a reveal, for each book of the project; and a preview of the published
+// maps and characters as a reader who has reached a chapter would see them (0 = not started).
+export const getReaderExtras = (projectId: string) => api.get<BookExtrasInfo[]>(`/projects/${encodeURIComponent(projectId)}/reader-extras`)
+export const getExtrasPreview = (projectId: string, bookId: string, chapter: number) => api.get<BookExtras>(`${book(projectId, bookId)}/extras-preview?chapter=${chapter}`)

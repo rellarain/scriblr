@@ -106,7 +106,7 @@
   &:focus-visible { outline: 2px solid var(--accent-hover); outline-offset: 1px; }
 }
 .mapChecks { display: flex; flex-wrap: wrap; gap: var(--space-3) var(--space-5); }
-.mapCheck { display: inline-flex; align-items: center; gap: var(--space-2); font-size: var(--text-field); cursor: pointer; input { margin: 0; } }
+.mapCheck { display: inline-flex; align-items: center; gap: var(--space-2); font-size: var(--text-field); cursor: pointer; input { flex: 0 0 auto; appearance: auto; -webkit-appearance: checkbox; width: 16px; height: 16px; margin: 0; accent-color: var(--accent); cursor: pointer; } }
 .mapSubTitle { margin: var(--space-2) 0 0; font-size: var(--text-small); font-weight: 700; color: var(--ink); }
 
 // ---- places, the way up, the old locations, the files ----

@@ -409,6 +409,24 @@ export interface TrainingProgress {
 }
 export interface TrainingState { content: TrainingContent; progress: TrainingProgress }
 
+// ---- what readers see of maps and characters ----
+// `revealAt` is a chapter number of the published edition (null = from the start). `reveals` holds the same for a part: a map's symbols, labels and shapes (by id), a
+// character's fields (by key). `fields` are the fields of a character that are shown: CHARACTER_SHARE_FIELDS, and "field:<id>" for a field of the author's own.
+export interface ReaderShare { published: boolean; revealAt: number | null; reveals: Record<string, number>; fields: string[] }
+export const NO_SHARE: ReaderShare = { published: false, revealAt: null, reveals: {}, fields: [] }
+export const shareOf = (doc: { reader?: ReaderShare }): ReaderShare => doc.reader ?? NO_SHARE
+export const CHARACTER_SHARE_FIELDS = [
+  ['role', 'Role'], ['age', 'Age'], ['occupation', 'Occupation'], ['aliases', 'Other names'], ['summary', 'In a sentence'], ['personality', 'Personality'], ['goal', 'What they want'],
+  ['motivation', 'Why they want it'], ['fear', 'What they fear'], ['flaw', 'Their flaw'], ['strength', 'Their strength'], ['background', 'History'], ['possessions', 'Possessions'], ['relationships', 'Relationships'],
+] as const
+export interface ExtrasChapter { n: number; chapterId: string; title: string }
+export interface ExtrasWarning { kind: 'map' | 'place' | 'character'; targetId: string; name: string; revealAt: number; sceneId: string; sceneTitle: string; chapter: number }
+export interface BookExtrasInfo { bookId: string; title: string; chapters: ExtrasChapter[]; warnings: ExtrasWarning[] }
+export interface ReaderCharacterField { key: string; label: string; value: string }
+export interface ReaderCharacterLink { targetId: string; targetName: string; label: string; description: string }
+export interface ReaderCharacter { id: string; name: string; look: CharacterLook; fields: ReaderCharacterField[]; relationships: ReaderCharacterLink[] }
+export interface BookExtras { bookId: string; reach: number; maps: MapDoc[]; characters: ReaderCharacter[]; lockedMaps: number; lockedCharacters: number }
+
 // ---- Maps (the setting) ----
 export type MapKind = 'world' | 'town' | 'interior'
 export type MapLayerKind = 'terrain' | 'shapes' | 'symbols' | 'labels' | 'notes'
@@ -461,6 +479,8 @@ export interface MapDoc {
   scaleBar: boolean
   compass: boolean
   legend: boolean
+  // What readers may see of the map (absent = nothing).
+  reader?: ReaderShare
   updatedAt: string
 }
 export interface MapSummary { id: string; title: string; kind: MapKind; parentId: string | null; order: number; width: number; height: number; updatedAt: string }
@@ -527,6 +547,8 @@ export interface CharacterDoc {
   profile: CharacterProfile; possessions: CharacterPossession[]; relationships: CharacterRelationship[]; states: CharacterState[]; arc: ArcStage[]; events: LifeEvent[]
   // The chapters and scenes of the outline the character is tagged on.
   appearances: string[]
+  // What readers may see of the character (absent = nothing).
+  reader?: ReaderShare
 }
 export interface CharacterSummary { id: string; name: string; order: number; updatedAt: string }
 export interface CharacterCreate { name?: string; look?: CharacterLook }
