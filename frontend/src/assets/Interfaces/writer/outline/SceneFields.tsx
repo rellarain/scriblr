@@ -2,6 +2,7 @@ import type { OutlineNode, TimeSystem } from '../../../../api/types'
 import type { WriterWorkspace } from '../useWriterWorkspace'
 import { inheritedSceneValues, sceneChanges } from '../outlineTree'
 import { PlacePicker } from '../maps/PlacePicker'
+import { SceneCast } from '../characters/SceneCast'
 import { SceneTime } from '../SceneTime'
 import { formatTime } from '../timeSystem'
 
@@ -40,6 +41,7 @@ export function SceneFields({ w, scene, scenes, system }: {
     />
   )
   return (
+    <>
     <div className="wrSceneFields">
       {place}
       <SceneTime
@@ -48,6 +50,8 @@ export function SceneFields({ w, scene, scenes, system }: {
       />
       {field('action')}
     </div>
+    <SceneCast projectId={w.activeProjectId} nodeId={scene.id} editable />
+    </>
   )
 }
 

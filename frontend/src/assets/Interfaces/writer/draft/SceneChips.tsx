@@ -1,6 +1,7 @@
 import type { OutlineNode, TimeSystem } from '../../../../api/types'
 import { inheritedSceneValues, sceneChanges } from '../outlineTree'
 import { useLocationText } from '../maps/PlacePicker'
+import { SceneCast } from '../characters/SceneCast'
 import { formatTime } from '../timeSystem'
 
 const LABEL = { location: 'Location', time: 'Time', action: 'Action' } as const
@@ -32,7 +33,12 @@ export function SceneChips({ scene, scenes, system, projectId = null }: { scene:
     chip('time', formatTime(system, scene.timeValue), inherited.timeValue ? formatTime(system, inherited.timeValue) : ''),
     chip('action', scene.action?.trim() ? scene.action : '', inherited.action ?? ''),
   ].filter(Boolean)
-  return chips.length > 0 ? <div className="wrSceneFields">{chips}</div> : null
+  return (
+    <>
+      {chips.length > 0 && <div className="wrSceneFields">{chips}</div>}
+      <SceneCast projectId={projectId} nodeId={scene.id} />
+    </>
+  )
 }
 
 export default SceneChips

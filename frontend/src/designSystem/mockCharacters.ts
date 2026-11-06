@@ -34,6 +34,7 @@ export function createMockCharacters(initial: CharacterDoc[] = []) {
       }
       return fail(405, 'Method not allowed')
     }
+    if (rest[0] === 'all' && method === 'GET') return ok([...cast.values()].sort((a, b) => a.order - b.order || a.name.localeCompare(b.name)))
     const id = rest[0]
     const found = cast.get(id)
     if (method === 'GET') return found ? ok(found) : fail(404, 'Character not found')

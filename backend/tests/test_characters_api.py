@@ -165,3 +165,21 @@ def test_deleting_a_character_removes_the_relationships_that_point_at_it(client:
     client.put(f"/api/projects/{pid}/characters/{a['id']}", json=a)
     assert client.delete(f"/api/projects/{pid}/characters/{b['id']}").status_code == 204
     assert client.get(f"/api/projects/{pid}/characters/{a['id']}").json()["relationships"] == []
+
+
+# ---- where the character appears, and the whole cast ----
+
+def test_appearances_are_kept_once_each_and_cut() -> None:
+    doc = CharacterDoc.model_validate({"id": "c1", "appearances": ["ch1", "ch1", "  ", 3, "s" * 200, "sc2"]})
+    assert doc.appearances == ["ch1", "s" * 80, "sc2"]
+    assert CharacterDoc.model_validate({"id": "c1", "appearances": "no"}).appearances == []
+
+
+def test_the_whole_cast_is_one_request_and_keeps_appearances(client: TestClient) -> None:
+    pid = _project(client)
+    a, b = _new(client, pid, name="A"), _new(client, pid, name="B")
+    a["appearances"] = ["ch1", "sc1"]
+    client.put(f"/api/projects/{pid}/characters/{a['id']}", json=a)
+    rows = client.get(f"/api/projects/{pid}/characters/all").json()
+    assert [r["name"] for r in rows] == ["A", "B"] and rows[0]["appearances"] == ["ch1", "sc1"] and "look" in rows[1]
+    assert client.get(f"/api/projects/{pid}/characters/{b['id']}").status_code == 200

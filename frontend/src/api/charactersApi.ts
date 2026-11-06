@@ -8,6 +8,11 @@ export function listCharacters(projectId: string): Promise<CharacterSummary[]> {
   return api.get<CharacterSummary[]>(base(projectId))
 }
 
+// Every character of the project, whole (what the Outline and the Draft read to show who is in a scene).
+export function listAllCharacters(projectId: string): Promise<CharacterDoc[]> {
+  return api.get<CharacterDoc[]>(`${base(projectId)}/all`)
+}
+
 export function createCharacter(projectId: string, body: CharacterCreate): Promise<CharacterDoc> {
   return api.post<CharacterDoc>(base(projectId), body)
 }

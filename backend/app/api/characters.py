@@ -30,6 +30,12 @@ def list_characters(project_id: str, root: Path = Depends(get_storage_root)) -> 
     return [{"id": c.id, "name": c.name, "order": c.order, "updatedAt": c.updatedAt} for c in store.list_characters(root, project_id)]
 
 
+@router.get("/all", response_model=list[CharacterDoc])
+def all_characters(project_id: str, root: Path = Depends(get_storage_root)) -> list[CharacterDoc]:
+    """Every character, whole, in order: what the Outline and the Draft read to show who is in a scene."""
+    return store.list_characters(root, project_id)
+
+
 @router.post("", response_model=CharacterDoc, status_code=201)
 def create_character(project_id: str, body: CharacterCreate, root: Path = Depends(get_storage_root)) -> CharacterDoc:
     with store.transaction(root, project_id):

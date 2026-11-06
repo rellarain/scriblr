@@ -525,6 +525,8 @@ export interface LifeEvent { id: string; when: string; title: string; note: stri
 export interface CharacterDoc {
   schemaVersion: number; id: string; name: string; order: number; look: CharacterLook; updatedAt: string
   profile: CharacterProfile; possessions: CharacterPossession[]; relationships: CharacterRelationship[]; states: CharacterState[]; arc: ArcStage[]; events: LifeEvent[]
+  // The chapters and scenes of the outline the character is tagged on.
+  appearances: string[]
 }
 export interface CharacterSummary { id: string; name: string; order: number; updatedAt: string }
 export interface CharacterCreate { name?: string; look?: CharacterLook }

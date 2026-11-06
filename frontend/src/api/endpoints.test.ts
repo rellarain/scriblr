@@ -8,7 +8,7 @@ import {
 } from './historyFetch'
 import { emptyStory } from '../assets/Interfaces/writer/characters/story'
 import { defaultLook } from '../assets/Interfaces/writer/characters/art/defaults'
-import { createCharacter, deleteCharacter, getCharacter, listCharacters, putCharacter } from './charactersApi'
+import { createCharacter, deleteCharacter, getCharacter, listAllCharacters, listCharacters, putCharacter } from './charactersApi'
 import { createMap, deleteMap, getMap, listMaps, listPlaces, putMap } from './mapsApi'
 import { getOutline, putOutline } from './outlineApi'
 import { getPlot, putPlot } from './plotApi'
@@ -56,6 +56,7 @@ const CASES: Array<[string, () => Promise<unknown>, string, string, unknown?]> =
   ['listPlaces', () => listPlaces(ID), 'GET', `/api/projects/${ESC}/maps/places/all`],
   ['deleteMap', () => deleteMap(ID, ID), 'DELETE', `/api/projects/${ESC}/maps/${ESC}`],
   ['listCharacters', () => listCharacters(ID), 'GET', `/api/projects/${ESC}/characters`],
+  ['listAllCharacters', () => listAllCharacters(ID), 'GET', `/api/projects/${ESC}/characters/all`],
   ['createCharacter', () => createCharacter(ID, { name: 'Ada' }), 'POST', `/api/projects/${ESC}/characters`, { name: 'Ada' }],
   ['getCharacter', () => getCharacter(ID, ID), 'GET', `/api/projects/${ESC}/characters/${ESC}`],
   ['putCharacter', () => putCharacter(ID, CHARACTER), 'PUT', `/api/projects/${ESC}/characters/${ESC}`, CHARACTER],

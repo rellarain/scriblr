@@ -3,6 +3,7 @@ import type { OutlineNode } from '../../../../api/types'
 import { SaveCluster } from '../../../../components/SaveCluster'
 import { setAutosaveMode, useSettings } from '../../../../settings/settingsStore'
 import { autosaveModeOf } from '../../../../theme/types'
+import { ImageIcon, TeamIcon } from '../../../icons'
 import { BagIcon, BodyIcon, BrushIcon, ChevronLeftIcon, ChevronRightIcon, ClockIcon, EyeIcon, FaceIcon, HandIcon, LinkIcon, ListIcon, MixedFaceIcon, NeutralFaceIcon, PencilIcon, RedoIcon, TurnIcon } from '../../../icons'
 import { CharacterArt } from './art/CharacterArt'
 import { EXPRESSIONS } from './art/library'
@@ -10,6 +11,9 @@ import { VIEWS, type View } from './art/space'
 import { CharacterList } from './CharacterList'
 import { BodyDrawer, ClothesDrawer, EyesDrawer, HairDrawer, HeadDrawer, MarksDrawer, NoseMouthDrawer, PoseDrawer, type DrawerCtx } from './Drawers'
 import { CommitText, Field } from './CharFields'
+import { CastSection } from './CastSection'
+import { useCast } from './castStore'
+import { exportSheet } from './sheet'
 import { ProfileSection } from './ProfileSection'
 import { RelationshipsSection } from './RelationshipsSection'
 import { StorySection } from './StorySection'
@@ -17,12 +21,13 @@ import { storyPoints } from './story'
 import { useCharacters } from './useCharacters'
 import './characters.scss'
 
-type Section = 'look' | 'profile' | 'relationships' | 'story'
+type Section = 'look' | 'profile' | 'relationships' | 'story' | 'cast'
 const SECTIONS: Array<{ section: Section; label: string; Icon: typeof FaceIcon }> = [
   { section: 'look', label: 'Look', Icon: BrushIcon },
   { section: 'profile', label: 'Profile', Icon: ListIcon },
   { section: 'relationships', label: 'Relationships', Icon: LinkIcon },
   { section: 'story', label: 'Story', Icon: ClockIcon },
+  { section: 'cast', label: 'The cast', Icon: TeamIcon },
 ]
 type Mode = 'closeup' | 'full' | 'turnaround' | 'expressions'
 const MODES: Array<{ mode: Mode; label: string; Icon: typeof FaceIcon }> = [
@@ -55,6 +60,13 @@ export default function CharactersConsole({ projectId, outline = [] }: { project
   const [facing, setFacing] = useState<'left' | 'right'>('right')
   const [drawer, setDrawer] = useState<string>('body')
   const { doc } = c
+  const store = useCast(projectId)
+  // The whole cast, with the open character as it is being edited.
+  const all = useMemo(() => {
+    const rest = store.cast.map(d => (doc && d.id === doc.id ? doc : d))
+    return doc && !rest.some(d => d.id === doc.id) ? [...rest, doc] : rest
+  }, [store.cast, doc])
+  const [sheetNote, setSheetNote] = useState('')
 
   // The first character opens by itself.
   useEffect(() => {
@@ -98,6 +110,12 @@ export default function CharactersConsole({ projectId, outline = [] }: { project
             ))}
           </div>
         )}
+        {doc && (
+          <button
+            type="button" className="charIconBtn" aria-label="Save the character sheet as an image" title="Save the character sheet as an image (a PNG with the figure and the profile)"
+            onClick={() => { setSheetNote(''); void exportSheet(doc).then(r => { if (r === 'unavailable') setSheetNote('The sheet could not be made.') }) }}
+          ><ImageIcon size={18} /></button>
+        )}
         <SaveCluster
           status={c.saveStatus} onSave={() => { void c.saveNow() }} scope=".charPage"
           history={{ canUndo: c.canUndo, canRedo: c.canRedo, onUndo: c.undo, onRedo: c.redo }}
@@ -105,11 +123,13 @@ export default function CharactersConsole({ projectId, outline = [] }: { project
         />
       </div>
       {c.saveStatus.error && <p className="charNote charNote--error" role="alert">{c.saveStatus.error}</p>}
+      {sheetNote && <p className="charNote charNote--error" role="alert">{sheetNote}</p>}
       {c.notice && <p className="charNote charNote--error" role="alert">{c.notice}</p>}
       <div className="charSplit">
         <CharacterList c={c} />
         {doc && section === 'profile' && <ProfileSection doc={doc} edit={c.edit} />}
         {doc && section === 'relationships' && <RelationshipsSection projectId={projectId} c={c} doc={doc} points={points} />}
+        {doc && section === 'cast' && <CastSection c={c} cast={all} doc={doc} onOpen={id => { void c.open(id) }} />}
         {doc && section === 'story' && <StorySection doc={doc} edit={c.edit} points={points} />}
         {doc && ctx && section === 'look' ? (
           <>

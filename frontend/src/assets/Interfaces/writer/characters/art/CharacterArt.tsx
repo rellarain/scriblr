@@ -24,13 +24,16 @@ export interface CharacterArtProps {
   crop?: ArtBox
   className?: string
   marks?: boolean
+  // The prefix of the ids inside the drawing (clip paths): give one when several drawings are put in one document, so their ids do not meet.
+  idPrefix?: string
 }
 
 // The frame that holds the tallest figure the sliders allow, standing, with some air.
 const FIXED: ArtBox = { x: -300, y: -1000, w: 600, h: 1040 }
 
-export function CharacterArt({ look, mode = 'full', view = 'front', facing = 'right', label, frame = 'fit', crop, className, marks = true }: CharacterArtProps) {
-  const uid = useId().replace(/[^A-Za-z0-9]/g, '')
+export function CharacterArt({ look, mode = 'full', view = 'front', facing = 'right', label, frame = 'fit', crop, className, marks = true, idPrefix }: CharacterArtProps) {
+  const generated = useId().replace(/[^A-Za-z0-9]/g, '')
+  const uid = idPrefix ?? generated
   const scene = useMemo(() => {
     if (mode === 'head') {
       const t = turnOf(view)

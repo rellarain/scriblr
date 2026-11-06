@@ -1,6 +1,8 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import { createCharacter, deleteCharacter, getCharacter, listCharacters, putCharacter } from '../../../../api/charactersApi'
+import { createCharacter, deleteCharacter, getCharacter, listAllCharacters, listCharacters, putCharacter } from '../../../../api/charactersApi'
 import type { CharacterDoc, CharacterLook, CharacterSummary } from '../../../../api/types'
+import { notifyCastChanged } from './castStore'
+import { buildCharacterFile, importCharacters, type CharacterChoice, type CharacterFile, type CharacterImportResult } from './charFile'
 import { combineCountdown, combineSaveStatus, useAutosave } from '../../../../lib/useAutosave'
 
 // The Characters console's state: the cast (a list of names), the open character as a document, and an undo log for each character that has been opened (kept while
@@ -31,6 +33,7 @@ export function useCharacters(projectId: string | null) {
       if (!projectId) return
       const saved = await putCharacter(projectId, d)
       setCast(list => list.map(c => (c.id === saved.id ? summaryOf(saved) : c)))
+      notifyCastChanged()
     },
   })
   const autosaveRef = useRef(autosave)
@@ -122,6 +125,37 @@ export function useCharacters(projectId: string | null) {
     }
   }, [projectId, create])
 
+  // The file of some characters (all of them when `ids` is null): what is waiting is saved first. Null when it cannot be made.
+  const exportFile = useCallback(async (ids: string[] | null): Promise<CharacterFile | null> => {
+    if (!projectId) return null
+    setNotice(undefined)
+    try {
+      await autosaveRef.current.flush()
+      return buildCharacterFile(await listAllCharacters(projectId), ids)
+    } catch (err) {
+      setNotice(message(err, 'The characters could not be exported.'))
+      return null
+    }
+  }, [projectId])
+
+  // Bring the characters of a file in (see charFile.ts); the list is read again.
+  const importFile = useCallback(async (file: CharacterFile, choices: Map<string, CharacterChoice>): Promise<CharacterImportResult | null> => {
+    if (!projectId) return null
+    setNotice(undefined)
+    await autosaveRef.current.flush()
+    const result = await importCharacters(file, choices, await listCharacters(projectId), {
+      create: body => createCharacter(projectId, body),
+      put: d => putCharacter(projectId, d),
+    })
+    // What was written over is read again when it is next opened.
+    for (const id of result.replaced) sessions.current.delete(id)
+    setCast(await listCharacters(projectId))
+    if (result.replaced.includes(openId ?? '')) { token.current += 1; show(null, null) }
+    notifyCastChanged()
+    if (result.error) setNotice(result.error)
+    return result
+  }, [projectId, openId, show])
+
   // Delete a character.
   const remove = useCallback(async (id: string) => {
     if (!projectId) return
@@ -132,6 +166,7 @@ export function useCharacters(projectId: string | null) {
       sessions.current.delete(id)
       if (openId === id) { token.current += 1; show(null, null) }
       setCast(await listCharacters(projectId))
+      notifyCastChanged()
     } catch (err) {
       setNotice(message(err, 'The character could not be deleted.'))
     }
@@ -190,11 +225,11 @@ export function useCharacters(projectId: string | null) {
 
   return useMemo(() => ({
     status, loadError, reload: load, cast, openId, doc, rev, notice,
-    open, create, duplicate, remove, edit, setLook, rename, undo, redo, canUndo, canRedo,
+    open, create, duplicate, remove, exportFile, importFile, edit, setLook, rename, undo, redo, canUndo, canRedo,
     saveStatus: combineSaveStatus(autosave),
     saveCountdown: combineCountdown(autosave),
     saveNow: autosave.flush,
-  }), [status, loadError, load, cast, openId, doc, rev, notice, open, create, duplicate, remove, edit, setLook, rename, undo, redo, canUndo, canRedo, autosave])
+  }), [status, loadError, load, cast, openId, doc, rev, notice, open, create, duplicate, remove, exportFile, importFile, edit, setLook, rename, undo, redo, canUndo, canRedo, autosave])
 }
 
 export type Characters = ReturnType<typeof useCharacters>

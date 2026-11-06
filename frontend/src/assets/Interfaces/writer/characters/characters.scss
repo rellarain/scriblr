@@ -153,3 +153,26 @@
 .charTreePeople { list-style: none; margin: 0; padding: 0; display: flex; flex-wrap: wrap; gap: var(--space-4); }
 .charTreeUnit { display: flex; align-items: center; gap: var(--space-2); }
 .charGaps { margin: 0; padding-left: var(--space-5); display: flex; flex-direction: column; gap: var(--space-3); font-size: var(--text-field); ul { margin: var(--space-1) 0 0; padding-left: var(--space-5); } }
+
+// ---- the cast, compare, files and who is in a scene ----
+.charOverview { list-style: none; margin: 0; padding: 0; display: grid; grid-template-columns: repeat(auto-fill, minmax(120px, 1fr)); gap: var(--space-3); }
+.charCard {
+  width: 100%; display: flex; flex-direction: column; align-items: center; gap: var(--space-1); padding: var(--space-2); border: 0; background: var(--ov-sink-1); color: var(--ink); font: inherit; cursor: pointer;
+  .charArt { aspect-ratio: 1; height: auto; background: var(--surface-raised); }
+  &:hover { background: var(--ov-sink-2); }
+  &[aria-pressed='true'] { box-shadow: inset 0 -3px 0 var(--accent); }
+  &:focus-visible { outline: 2px solid var(--accent-hover); outline-offset: 1px; }
+}
+.charCardName { font-size: var(--text-field); font-weight: 700; max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.charCompare { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: var(--space-3); }
+.charCompareItem { margin: 0; display: flex; flex-direction: column; background: var(--surface-raised); min-width: 0; .charArt { height: 320px; } }
+.charDiffs { font-size: var(--text-field); ul { margin: 0; padding-left: var(--space-5); } }
+.charFileInput { position: absolute; width: 1px; height: 1px; opacity: 0; pointer-events: none; }
+.charImport { display: flex; flex-direction: column; gap: var(--space-3); padding: var(--space-3); background: var(--ov-sink-1); }
+
+// Who is in a scene: small heads on its card and its chips.
+.charTags { display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-2); min-width: 0; }
+.charTag { display: inline-flex; align-items: center; gap: var(--space-1); padding: 0; border: 0; background: none; color: inherit; font: inherit; font-size: var(--text-small); cursor: default; }
+.charTagHead { width: 26px; height: 26px; background: var(--surface-raised); box-shadow: inset 0 0 0 1px var(--hairline); .charArt { width: 100%; height: 100%; } }
+.charTagRemove { padding: 0 var(--space-1); border: 0; background: none; color: inherit; cursor: pointer; opacity: 0.7; &:hover { opacity: 1; } &:focus-visible { outline: 2px solid var(--accent-hover); } }
+.charTagAdd { max-width: 140px; font-size: var(--text-small); }

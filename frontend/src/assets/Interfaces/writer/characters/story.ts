@@ -9,8 +9,8 @@ import { BROWS, EARS, EYES, EXPRESSIONS, FACIAL_HAIR, HAIR, HEAD_SHAPES, MOUTHS,
 export const emptyProfile = (): CharacterProfile => ({
   role: '', age: '', occupation: '', aliases: '', summary: '', personality: '', goal: '', motivation: '', fear: '', flaw: '', strength: '', background: '', fields: [],
 })
-export type StoryFields = Pick<CharacterDoc, 'profile' | 'possessions' | 'relationships' | 'states' | 'arc' | 'events'>
-export const emptyStory = (): StoryFields => ({ profile: emptyProfile(), possessions: [], relationships: [], states: [], arc: [], events: [] })
+export type StoryFields = Pick<CharacterDoc, 'profile' | 'possessions' | 'relationships' | 'states' | 'arc' | 'events' | 'appearances'>
+export const emptyStory = (): StoryFields => ({ profile: emptyProfile(), possessions: [], relationships: [], states: [], arc: [], events: [], appearances: [] })
 
 // The smallest id with this prefix that the list does not have (a, b, c ... of one kind of thing).
 export function nextId(list: Array<{ id: string }>, prefix: string): string {

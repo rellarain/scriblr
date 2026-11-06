@@ -2246,6 +2246,7 @@ CHARACTER_MAX_STATES = 300
 CHARACTER_MAX_STAGES = 20
 CHARACTER_MAX_EVENTS = 100
 CHARACTER_MAX_POSSESSIONS = 80
+CHARACTER_MAX_APPEARANCES = 600
 RelationshipKind = Literal["family", "friend", "ally", "rival", "enemy", "romance", "mentor", "other"]
 FamilyRole = Literal["parent", "child", "spouse", "sibling"]
 
@@ -2513,6 +2514,8 @@ class CharacterDoc(BaseModel):
     states: list[CharacterState] = Field(default_factory=list)
     arc: list[ArcStage] = Field(default_factory=list)
     events: list[LifeEvent] = Field(default_factory=list)
+    # The chapters and scenes of the outline the author has tagged this character on (outline node ids, in the order they were tagged).
+    appearances: list[str] = Field(default_factory=list)
     updatedAt: datetime = Field(default_factory=utcnow)
 
     @field_validator("name", mode="before")
@@ -2550,6 +2553,18 @@ class CharacterDoc(BaseModel):
     @classmethod
     def _events(cls, value: Any) -> Any:
         return _unique_items(value, LifeEvent, CHARACTER_MAX_EVENTS)
+
+    @field_validator("appearances", mode="before")
+    @classmethod
+    def _appearances(cls, value: Any) -> Any:
+        out: list[str] = []
+        for item in value if isinstance(value, list) else []:
+            text = _cut(item, 80)
+            if text and text not in out:
+                out.append(text)
+            if len(out) >= CHARACTER_MAX_APPEARANCES:
+                break
+        return out
 
     @field_validator("look", mode="before")
     @classmethod

@@ -90,6 +90,24 @@ export function StorySection({ doc, edit, points }: { doc: CharacterDoc; edit: (
           </ol>
         )}
       </section>
+      <section className="charPanel" aria-label="Where they appear">
+        <h3 className="charPanelTitle">Where they appear</h3>
+        {doc.appearances.length === 0 && <p className="charHint">The chapters and scenes this character is in. A scene shows them on its card.</p>}
+        <ul className="charList2">
+          {doc.appearances.map(id => (
+            <li key={id} className="charRow">
+              <span className="charRowName">{pointName(id)}</span>
+              <button type="button" className="charIconBtn" aria-label={`Take them out of ${pointName(id)}`} title="Take them out of this" onClick={() => edit(d => ({ ...d, appearances: d.appearances.filter(x => x !== id) }), 'appearances')}><TrashIcon size={16} /></button>
+            </li>
+          ))}
+        </ul>
+        {points.length > 0 && (
+          <select className="charSelect charSelect--auto" aria-label="Put them in a chapter or scene" value="" onChange={e => { const v = e.target.value; if (v) edit(d => (d.appearances.includes(v) ? d : { ...d, appearances: [...d.appearances, v] }), 'appearances') }}>
+            <option value="">Put them in a chapter or scene</option>
+            {points.filter(p => !doc.appearances.includes(p.id)).map(p => <option key={p.id} value={p.id}>{p.label}</option>)}
+          </select>
+        )}
+      </section>
       <section className="charPanel" aria-label="Arc">
         <header className="charPanelHead">
           <h3 className="charPanelTitle">Arc</h3>
