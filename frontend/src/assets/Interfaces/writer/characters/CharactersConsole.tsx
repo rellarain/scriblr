@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react'
-import type { OutlineNode } from '../../../../api/types'
+import type { OutlineNode, PlotNode } from '../../../../api/types'
 import { SaveCluster } from '../../../../components/SaveCluster'
 import { setAutosaveMode, useSettings } from '../../../../settings/settingsStore'
 import { autosaveModeOf } from '../../../../theme/types'
@@ -12,6 +12,8 @@ import { CharacterList } from './CharacterList'
 import { BodyDrawer, ClothesDrawer, EyesDrawer, HairDrawer, HeadDrawer, MarksDrawer, NoseMouthDrawer, PoseDrawer, type DrawerCtx } from './Drawers'
 import { CommitText, Field } from './CharFields'
 import { CastSection } from './CastSection'
+import { WorldLinks } from '../links/WorldLinks'
+import { hasPending, usePendingOpen } from '../links/worldNav'
 import { ForReadersSection } from './ForReadersSection'
 import { useCast } from './castStore'
 import { exportSheet } from './sheet'
@@ -52,7 +54,7 @@ const DRAWERS: Array<{ id: string; name: string; Icon: typeof FaceIcon }> = [
 // Project > Characters: the cast. A list of characters, the open one drawn as a close-up, a full figure, a turnaround of four views or a strip of expressions, and beside it
 // the drawers where its parts are chosen (build, head, eyes, nose and mouth, hair, marks, clothes, pose). A character is only its look, a handful of choices and
 // numbers; the art is drawn from them in any view. Edits save the way the Writer's do: the Save button, and autosave when the user has turned it on.
-export default function CharactersConsole({ projectId, outline = [] }: { projectId: string; outline?: OutlineNode[] }) {
+export default function CharactersConsole({ projectId, outline = [], plotNodes = [], onOpenPlot }: { projectId: string; outline?: OutlineNode[]; plotNodes?: PlotNode[]; onOpenPlot?: (nodeId: string) => void }) {
   const c = useCharacters(projectId)
   const { ui } = useSettings()
   const [section, setSection] = useState<Section>('look')
@@ -72,10 +74,13 @@ export default function CharactersConsole({ projectId, outline = [] }: { project
 
   // The first character opens by itself.
   useEffect(() => {
-    if (c.status === 'ready' && c.openId === null && c.cast.length > 0) void c.open(c.cast[0].id)
+    if (c.status === 'ready' && c.openId === null && c.cast.length > 0 && !hasPending('char')) void c.open(c.cast[0].id)
     // Only when the list has loaded (opening is not repeated after a character is closed by deleting it).
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [c.status])
+
+  // A link from another console asked for a character.
+  usePendingOpen('char', c.status === 'ready', id => { void c.open(id) })
 
   if (c.status === 'error') {
     return (
@@ -133,7 +138,7 @@ export default function CharactersConsole({ projectId, outline = [] }: { project
         {doc && section === 'relationships' && <RelationshipsSection projectId={projectId} c={c} doc={doc} points={points} />}
         {doc && section === 'cast' && <CastSection c={c} cast={all} doc={doc} onOpen={id => { void c.open(id) }} />}
         {doc && section === 'readers' && <ForReadersSection projectId={projectId} doc={doc} edit={c.edit} savedAt={c.saveStatus.lastSavedAt} />}
-        {doc && section === 'story' && <StorySection doc={doc} edit={c.edit} points={points} />}
+        {doc && section === 'story' && <StorySection doc={doc} edit={c.edit} points={points} links={<WorldLinks projectId={projectId} self={`char:${doc.id}`} plotNodes={plotNodes} onOpenPlot={onOpenPlot} />} />}
         {doc && ctx && section === 'look' ? (
           <>
             <div className="charStage">

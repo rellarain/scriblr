@@ -5,6 +5,7 @@ import { CloseIcon } from '../../icons'
 import { PlotNodeChip } from './PlotNodeChip'
 import { linkChoices, linksOf } from './plotLinks'
 import { nodeLabel } from './plotTree'
+import { WorldLinks } from './links/WorldLinks'
 
 // One link of the node: the other node as a row (PlotNodeChip), opened by its title, with a button to take the link away that asks first, in place.
 // Taking it away is from both ends, which the confirmation says.
@@ -56,6 +57,7 @@ export function LinkedSection({ w, node }: { w: WriterWorkspace; node: PlotNode 
           </optgroup>
         ))}
       </select>
+      <WorldLinks projectId={w.activeProjectId} self={`plot:${node.id}`} plotNodes={w.plotNodes} onOpenPlot={w.focusPlotNode} heading="Characters and places" />
     </div>
   )
 }

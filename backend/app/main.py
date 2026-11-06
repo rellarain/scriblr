@@ -17,6 +17,7 @@ from .api import (
     feedback,
     library,
     characters,
+    world_links,
     maps,
     outline,
     plot,
@@ -134,6 +135,7 @@ def create_app(static_dir: Optional[Path] = None) -> FastAPI:
     app.include_router(plot.router)
     app.include_router(maps.router)
     app.include_router(characters.router)
+    app.include_router(world_links.router)
     app.include_router(draft.router)
     app.include_router(revisions.router)
     app.include_router(publications.router)

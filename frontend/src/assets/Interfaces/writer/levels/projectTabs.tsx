@@ -79,7 +79,7 @@ export function projectTabs(w: WriterWorkspace): LevelTab[] {
       render: () => {
         const id = w.activeProjectId
         if (!id) return <p className="wrMuted">Open a project to map its setting.</p>
-        return <MapsConsole key={id} projectId={id} scenes={scenesOf(w.outlineNodes)} onSetLocation={(sceneId, location) => w.updateOutlineNode(sceneId, { location })} />
+        return <MapsConsole key={id} projectId={id} scenes={scenesOf(w.outlineNodes)} onSetLocation={(sceneId, location) => w.updateOutlineNode(sceneId, { location })} plotNodes={w.plotNodes} onOpenPlot={w.focusPlotNode} />
       },
     },
     {
@@ -87,7 +87,7 @@ export function projectTabs(w: WriterWorkspace): LevelTab[] {
       render: () => {
         const id = w.activeProjectId
         if (!id) return <p className="wrMuted">Open a project to build its cast.</p>
-        return <CharactersConsole key={id} projectId={id} outline={w.outlineNodes} />
+        return <CharactersConsole key={id} projectId={id} outline={w.outlineNodes} plotNodes={w.plotNodes} onOpenPlot={w.focusPlotNode} />
       },
     },
     { id: 'history', label: 'History', Icon: ClockIcon, render: () => placeholder('projectHistory') },

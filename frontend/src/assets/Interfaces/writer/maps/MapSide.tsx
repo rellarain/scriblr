@@ -1,5 +1,5 @@
 import { useMemo, useState } from 'react'
-import { MAP_MAX_SIDE, type MapSummary, type MapLayerKind, type MapLineStyle, type MapPattern, type MapShape, type MapShapeType } from '../../../../api/types'
+import { MAP_MAX_SIDE, type PlotNode, type MapSummary, type MapLayerKind, type MapLineStyle, type MapPattern, type MapShape, type MapShapeType } from '../../../../api/types'
 import { ChevronDownIcon, ChevronUpIcon, CheckIcon, CloseIcon, EyeClosedIcon, EyeIcon, FolderPlusIcon, ImageIcon, LockIcon, MapIcon, PlusIcon, RestoreIcon, TrashIcon, UnlockIcon } from '../../../icons'
 import { ColourInput, CommitNumber, CommitText, Field } from './MapFields'
 import { EXPORT_SCALES, exportMapImage, exportSize, type ExportScale } from './mapExport'
@@ -15,6 +15,7 @@ import {
 } from './mapModel'
 import type { Maps } from './useMaps'
 import { ForReadersPanel } from './ForReadersPanel'
+import { WorldLinks } from '../links/WorldLinks'
 
 // What a pen and a drawn shape have in common: how they are drawn.
 type ShapeLook = Pick<MapShape, 'style' | 'color' | 'width' | 'fill' | 'opacity' | 'pattern'>
@@ -25,6 +26,8 @@ const KIND_NAMES = { world: 'World or region', town: 'Town or city', interior: '
 
 export interface MapSideProps {
   projectId: string
+  plotNodes: PlotNode[]
+  onOpenPlot?: (nodeId: string) => void
   m: Maps
   draft: MapDraft
   terrain: number
@@ -49,10 +52,10 @@ export interface MapSideProps {
 }
 
 // The right-hand side of the Maps console: what is chosen on the map, the terrains to paint with, the symbols to stamp, the layers, and the map's own fields.
-export function MapSide({ projectId, m, draft, terrain, onTerrain, symbolKind, onSymbolKind, symbolSize, onSymbolSize, pen, penType, onPen, onPreset, selected, fresh, onDeleted, scenes, onSetLocation }: MapSideProps) {
+export function MapSide({ projectId, plotNodes, onOpenPlot, m, draft, terrain, onTerrain, symbolKind, onSymbolKind, symbolSize, onSymbolSize, pen, penType, onPen, onPreset, selected, fresh, onDeleted, scenes, onSetLocation }: MapSideProps) {
   return (
     <aside className="mapSide" aria-label="Map details">
-      {selected && <InspectorPanel m={m} draft={draft} selected={selected} fresh={fresh} onDeleted={onDeleted} scenes={scenes} />}
+      {selected && <InspectorPanel projectId={projectId} plotNodes={plotNodes} onOpenPlot={onOpenPlot} m={m} draft={draft} selected={selected} fresh={fresh} onDeleted={onDeleted} scenes={scenes} />}
       <OldLocations m={m} draft={draft} scenes={scenes} onSetLocation={onSetLocation} />
       <TerrainPanel m={m} draft={draft} terrain={terrain} onTerrain={onTerrain} />
       <SymbolPanel kind={symbolKind} onKind={onSymbolKind} size={symbolSize} onSize={onSymbolSize} />
@@ -130,7 +133,7 @@ function PenPanel({ pen, penType, onPen, onPreset }: { pen: Pen; penType: MapSha
 }
 
 // A symbol that has a name is a place: a scene can happen there, and the maps that open from it are listed (the town's map, the floors of a building).
-function PlaceFields({ m, draft, symbolId, scenes }: { m: Maps; draft: MapDraft; symbolId: string; scenes: ScenePlace[] }) {
+function PlaceFields({ projectId, plotNodes, onOpenPlot, m, draft, symbolId, scenes }: { projectId: string; plotNodes: PlotNode[]; onOpenPlot?: (nodeId: string) => void; m: Maps; draft: MapDraft; symbolId: string; scenes: ScenePlace[] }) {
   const s = draft.symbols.find(y => y.id === symbolId)!
   const linked = s.mapIds.map(id => m.maps.find(x => x.id === id)).filter((x): x is MapSummary => !!x)
   const free = m.maps.filter(x => x.id !== draft.id && !s.mapIds.includes(x.id))
@@ -174,6 +177,7 @@ function PlaceFields({ m, draft, symbolId, scenes }: { m: Maps; draft: MapDraft;
           </div>
           <h4 className="mapSubTitle">Scenes here</h4>
           {here.length === 0 ? <p className="mapHint">No scene is set here. Choose it as a scene's Location in the Outline.</p> : <ul className="mapScenes">{here.map(sc => <li key={sc.id}>{sc.title || 'Untitled scene'}</li>)}</ul>}
+          <WorldLinks projectId={projectId} self={`place:${key}`} plotNodes={plotNodes} onOpenPlot={onOpenPlot} />
         </div>
       )}
     </>
@@ -308,7 +312,7 @@ function SymbolPanel({ kind, onKind, size, onSize }: { kind: string; onKind: (id
 }
 
 // What is chosen on the map: a symbol (its width and colour), a label (its text and height) or a line or region (how it is drawn), and a delete.
-function InspectorPanel({ m, draft, selected, fresh, onDeleted, scenes }: { m: Maps; draft: MapDraft; selected: ItemRef; fresh: boolean; onDeleted: () => void; scenes: ScenePlace[] }) {
+function InspectorPanel({ projectId, plotNodes, onOpenPlot, m, draft, selected, fresh, onDeleted, scenes }: { projectId: string; plotNodes: PlotNode[]; onOpenPlot?: (nodeId: string) => void; m: Maps; draft: MapDraft; selected: ItemRef; fresh: boolean; onDeleted: () => void; scenes: ScenePlace[] }) {
   const item = findItem(draft, selected)
   if (!item) return null
   const remove = () => { m.apply(removeItem(draft, selected)); onDeleted() }
@@ -350,7 +354,7 @@ function InspectorPanel({ m, draft, selected, fresh, onDeleted, scenes }: { m: M
             </span>
           </Field>
         </div>
-        <PlaceFields m={m} draft={draft} symbolId={s.id} scenes={scenes} />
+        <PlaceFields projectId={projectId} plotNodes={plotNodes} onOpenPlot={onOpenPlot} m={m} draft={draft} symbolId={s.id} scenes={scenes} />
         <p className="mapHint">Drag it with the Select tool, or move it with the arrow keys (Shift for a quarter cell).</p>
       </section>
     )

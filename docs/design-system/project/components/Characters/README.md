@@ -35,6 +35,7 @@ The bar has six **sections** (icon buttons, `aria-pressed`, in a toolbar named "
 - **Files**: each row of the list has a save-to-file button, and the list one for the whole cast, writing `*.scriblr-characters.json`; the import button reads one and asks, for each character the project has under the same id, whether to **keep both**, **replace the one here** or **leave out**. Links to characters that are not in the file are dropped, and the tags on the outline are left out (they belong to the project).
 - **The character sheet**: the image button in the bar saves a **PNG** of the open character: the name and role, the figure, a close-up, three more views and the profile in words, on white paper in the character's own colours. It is an SVG document drawn from the same art as the console.
 
+- **Links**: the Story section ends with "Linked to": the plot nodes and places this character is linked to, and a picker to add one (see Maps, "Links to other things of the story").
 - **For readers** (a sixth section, the export icon): the character's publish switch, the chapter it is revealed at, which fields are public and each field's own chapter, spoiler warnings and a preview as a reader. See Maps, "For readers", which describes the pieces both consoles share; the card a reader sees is `CharacterArt` close-up, the name and the public fields (`.wvCard`).
 
 ## Saving

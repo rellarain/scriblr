@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useState, type ReactNode } from 'react'
 import type { ArcStage, CharacterDoc, CharacterState, LifeEvent } from '../../../../api/types'
 import { CHARACTER_MAX_EVENTS, CHARACTER_MAX_STAGES, CHARACTER_MAX_STATES } from '../../../../api/types'
 import { PlusIcon, TrashIcon } from '../../../icons'
@@ -16,7 +16,7 @@ function ListField({ label, items, onChange }: { label: string; items: string[];
 
 // The story of a character: their arc in stages, what is true of them from point to point of the book (a state carries forward until the next one), how they look at
 // those points and what changed between, and a life timeline in story time.
-export function StorySection({ doc, edit, points }: { doc: CharacterDoc; edit: (change: (d: CharacterDoc) => CharacterDoc, group?: string) => void; points: StoryPoint[] }) {
+export function StorySection({ doc, edit, points, links }: { doc: CharacterDoc; edit: (change: (d: CharacterDoc) => CharacterDoc, group?: string) => void; points: StoryPoint[]; links?: ReactNode }) {
   const [at, setAt] = useState('')
   const ordered = statesInOrder(doc.states, points)
   const gaps = appearanceGaps(doc.states, points)
@@ -146,6 +146,7 @@ export function StorySection({ doc, edit, points }: { doc: CharacterDoc; edit: (
           ))}
         </ul>
       </section>
+      {links && <section className="charPanel" aria-label="Links">{links}</section>}
     </div>
   )
 }

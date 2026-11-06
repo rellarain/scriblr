@@ -6,6 +6,8 @@ import { __resetPlanStoreForTests } from '../assets/Interfaces/writer/schedule/p
 import { __resetTrainingForTests } from '../assets/Interfaces/training/trainingStore'
 import { __resetCastForTests } from '../assets/Interfaces/writer/characters/castStore'
 import { __resetPlacesForTests } from '../assets/Interfaces/writer/maps/placesStore'
+import { __resetWorldLinksForTests } from '../assets/Interfaces/writer/links/linkStore'
+import { __resetWorldNavForTests } from '../assets/Interfaces/writer/links/worldNav'
 
 // What one test leaves behind must not reach the next: stubbed globals (fetch, ResizeObserver, ...), the browser storage the stores read,
 // and the settings store itself. (React Testing Library unmounts what a test rendered on its own.)
@@ -19,4 +21,6 @@ afterEach(() => {
   __resetTrainingForTests()
   __resetPlacesForTests()
   __resetCastForTests()
+  __resetWorldLinksForTests()
+  __resetWorldNavForTests()
 })

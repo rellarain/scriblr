@@ -32,6 +32,15 @@ A bitmap of one pixel per cell is scaled up without smoothing, so each cell is a
 - **Files**: the export button on a map row writes the map **and the maps inside it** as `*.scriblr-map.json`; the import button on the list reads one and asks, for each map the project already has under the same id, whether to **keep both**, **replace the one here** or **leave it out**. Links to maps that are not in the file are dropped.
 - The **Characters** and **Settings** built-in plot presets no longer appear in the Plot's preset list.
 
+## Links to other things of the story
+
+A plot node, a character and a place can be linked to each other (not to their own kind: plot nodes have their own links, characters their relationships). The pieces are in `writer/links/` (`WorldLinks.tsx`, `linkStore.ts`, `worldNav.ts`, `links.scss`); a link is one record in the project (`worldLinks`, backend `world_links.py`), so it reads the same from both ends.
+
+- **Chips** (`.wlList`): each link is a row with the kind ("Plot", "Character", "Place") and the other end's name (a plot node by its place in the plot, a place by the maps it is inside); the row opens the other end, the x beside it takes the link away from both ends.
+- **Picker** (`.wlSelect`, "Link to…"): grouped by kind (Plot nodes, Characters, Places), without what is linked already and without the thing's own kind.
+- **Where**: in the Characters console under Story ("Linked to"), in the Maps console under the chosen named symbol, and under the plot node's Linked list ("Characters and places"). A link to something that is deleted (a character, a place that lost its name) is simply not shown.
+- **Opening**: a plot node opens in the Plot; a character or a place opens in its own console when that console is on screen (else when its tab is next opened): the Maps console opens the map and chooses the place.
+
 ## For readers
 
 What readers see of the setting and the cast is the author's choice, and it is only ever what the author has published. The shared pieces live in `writer/readers/` (`ReaderControls.tsx`, `WorldViews.tsx`, `readers.scss`); the Reader's two consoles in `reader/WorldConsoles.tsx`.

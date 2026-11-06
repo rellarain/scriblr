@@ -2681,6 +2681,26 @@ BookEdition.model_rebuild()
 BookListing.model_rebuild()
 
 
+WORLD_LINK_REF = re.compile(r"^(plot|char|place):[A-Za-z0-9_/-]{1,160}$")
+WORLD_MAX_LINKS = 2000
+
+
+class WorldLink(BaseModel):
+    """A link between two things of different kinds: a plot node (`plot:<id>`), a character (`char:<id>`) or a place, a named symbol of a map (`place:<mapId>/<symbolId>`).
+    It is one record for both ends, so it reads the same from either."""
+
+    a: str
+    b: str
+
+    @model_validator(mode="after")
+    def _refs(self) -> "WorldLink":
+        if not WORLD_LINK_REF.match(self.a) or not WORLD_LINK_REF.match(self.b) or self.a.split(":")[0] == self.b.split(":")[0]:
+            raise ValueError("a link joins two refs of different kinds")
+        if self.a > self.b:
+            self.a, self.b = self.b, self.a
+        return self
+
+
 class ProjectFile(BaseModel):
     schemaVersion: int = PROJECT_FILE_VERSION
     # Which scheme the stored level colours use (HUE_SCHEME); a file without it is scheme 1.
@@ -2705,6 +2725,8 @@ class ProjectFile(BaseModel):
     maps: dict[str, MapDoc] = Field(default_factory=dict)
     # Character id -> the character (the cast). Read the way the maps are: one that cannot be read is dropped and kept in quarantine.
     characters: dict[str, CharacterDoc] = Field(default_factory=dict)
+    # Links between plot nodes, characters and places (see WorldLink); one that points at something that is gone is not shown and goes at the next change.
+    worldLinks: list[WorldLink] = Field(default_factory=list)
     scrap: ScrapRegistry = Field(default_factory=ScrapRegistry)
     # Changes to the project's settings (time systems, colour), newest last; see SettingsLogEntry.
     settingsLog: list[SettingsLogEntry] = Field(default_factory=list)

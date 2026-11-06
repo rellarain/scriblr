@@ -1,4 +1,6 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
+import type { PlotNode } from '../../../../api/types'
+import { hasPending, usePendingOpen } from '../links/worldNav'
 import { SaveCluster } from '../../../../components/SaveCluster'
 import { setAutosaveMode, useSettings } from '../../../../settings/settingsStore'
 import { autosaveModeOf } from '../../../../theme/types'
@@ -35,9 +37,12 @@ const NEW_LABEL_SIZE = 1.5
 // A scene of the project, for the places: its location is the key of a place (or old text, from before there were places).
 export interface ScenePlace { id: string; title: string; location: string }
 
-export default function MapsConsole({ projectId, scenes = [], onSetLocation }: {
+export default function MapsConsole({ projectId, scenes = [], onSetLocation, plotNodes = [], onOpenPlot }: {
   projectId: string
   scenes?: ScenePlace[]
+  // The plot's nodes, to link a place to, and how to open one.
+  plotNodes?: PlotNode[]
+  onOpenPlot?: (nodeId: string) => void
   // Give a scene another location (a place key, or '' for none): what the old-locations tool changes.
   onSetLocation?: (sceneId: string, location: string) => void
 }) {
@@ -63,11 +68,25 @@ export default function MapsConsole({ projectId, scenes = [], onSetLocation }: {
 
   // The first map opens by itself.
   useEffect(() => {
-    if (m.status === 'ready' && m.openId === null && m.maps.length > 0) void m.open(m.maps[0].id)
+    if (m.status === 'ready' && m.openId === null && m.maps.length > 0 && !hasPending('place')) void m.open(m.maps[0].id)
     // Only when the list has loaded (opening is not repeated after a map is closed by deleting it).
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [m.status])
   useEffect(() => { setBlocked(false); setPicked(null); setFresh(null); setMeasured(null) }, [m.openId])
+  // A link from another console asked for a place: its map opens, and the place is chosen on it.
+  const wanted = useRef<{ mapId: string; symbolId: string } | null>(null)
+  usePendingOpen('place', m.status === 'ready', key => {
+    const [mapId, symbolId] = key.split('/')
+    wanted.current = { mapId, symbolId }
+    if (m.openId === mapId) setPicked({ kind: 'symbol', id: symbolId })
+    else void m.open(mapId)
+  })
+  useEffect(() => {
+    const want = wanted.current
+    if (!want || !m.draft || m.draft.id !== want.mapId) return
+    wanted.current = null
+    if (m.draft.symbols.some(s => s.id === want.symbolId)) setPicked({ kind: 'symbol', id: want.symbolId })
+  }, [m.openId, m.draft])
   // The chosen terrain stays one the map has, and the chosen item one that is still on it (an undo can take it away).
   const chosen = draft ? Math.min(terrain, draft.terrains.length - 1) : 0
   const selected = draft && picked && findItem(draft, picked) ? picked : null
@@ -185,7 +204,7 @@ export default function MapsConsole({ projectId, scenes = [], onSetLocation }: {
               <p className="mapStatus" aria-live="off">{tool === 'measure' && measured !== null ? `${measured} · click to add a point, Backspace takes one back, Esc clears` : `${statusText} · ${formatDistance(draft.width * draft.cellSize, draft.unit)} wide${tool === 'measure' ? ' · click to start measuring' : hint}`}</p>
             </div>
             <MapSide
-              projectId={projectId} m={m} draft={draft} terrain={chosen} onTerrain={i => { setTerrain(i); if (tool !== 'brush' && tool !== 'fill') setTool('brush') }}
+              projectId={projectId} plotNodes={plotNodes} onOpenPlot={onOpenPlot} m={m} draft={draft} terrain={chosen} onTerrain={i => { setTerrain(i); if (tool !== 'brush' && tool !== 'fill') setTool('brush') }}
               symbolKind={symbolKind} onSymbolKind={id => { setSymbolKind(id); setTool('symbol') }} symbolSize={symbolSize} onSymbolSize={setSymbolSize}
               pen={pen} penType={penType}
               onPen={patch => (penType === 'region' ? setRegionPen : setLinePen)(old => ({ ...old, ...patch }))}

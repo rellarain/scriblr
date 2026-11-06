@@ -419,6 +419,8 @@ export const CHARACTER_SHARE_FIELDS = [
   ['role', 'Role'], ['age', 'Age'], ['occupation', 'Occupation'], ['aliases', 'Other names'], ['summary', 'In a sentence'], ['personality', 'Personality'], ['goal', 'What they want'],
   ['motivation', 'Why they want it'], ['fear', 'What they fear'], ['flaw', 'Their flaw'], ['strength', 'Their strength'], ['background', 'History'], ['possessions', 'Possessions'], ['relationships', 'Relationships'],
 ] as const
+// A link between a plot node ("plot:<id>"), a character ("char:<id>") and a place ("place:<mapId>/<symbolId>"): one record for both ends.
+export interface WorldLink { a: string; b: string }
 export interface ExtrasChapter { n: number; chapterId: string; title: string }
 export interface ExtrasWarning { kind: 'map' | 'place' | 'character'; targetId: string; name: string; revealAt: number; sceneId: string; sceneTitle: string; chapter: number }
 export interface BookExtrasInfo { bookId: string; title: string; chapters: ExtrasChapter[]; warnings: ExtrasWarning[] }
