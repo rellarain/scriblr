@@ -29,3 +29,8 @@ export function deleteMap(projectId: string, mapId: string): Promise<void> {
 export function listPlaces(projectId: string): Promise<MapPlace[]> {
   return api.get<MapPlace[]>(`${base(projectId)}/places/all`)
 }
+
+// A version of a map as it is now, to change for a later point of the story (`appliesFrom` is an outline chapter or scene).
+export function createMapVersion(projectId: string, mapId: string, body: { title?: string; appliesFrom?: string | null }): Promise<MapDoc> {
+  return api.post<MapDoc>(`${base(projectId)}/${encodeURIComponent(mapId)}/versions`, body)
+}

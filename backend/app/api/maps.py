@@ -11,6 +11,7 @@ from ..storage.schema import (
     MAP_DEFAULT_LAYERS,
     MAP_MAX_PER_PROJECT,
     MAP_MAX_SIDE,
+    MAP_MAX_VERSIONS,
     MAP_TERRAIN_SETS,
     MapDoc,
     MapKind,
@@ -32,6 +33,8 @@ class MapSummary(BaseModel):
     width: int
     height: int
     updatedAt: datetime
+    versionOf: Optional[str] = None
+    appliesFrom: Optional[str] = None
 
 
 class MapCreate(BaseModel):
@@ -69,7 +72,7 @@ def create_map(project_id: str, body: MapCreate, root: Path = Depends(get_storag
         parents = store.map_parents(root, project_id)
         if len(parents) >= MAP_MAX_PER_PROJECT:
             raise HTTPException(status_code=422, detail=f"a project holds at most {MAP_MAX_PER_PROJECT} maps")
-        if body.parentId is not None and body.parentId not in parents:
+        if body.parentId is not None and (body.parentId not in parents or store.load_map(root, project_id, body.parentId).versionOf):
             raise HTTPException(status_code=422, detail=f"no map '{body.parentId}' to put this one in")
         siblings = [m for m in store.list_map_summaries(root, project_id) if m["parentId"] == body.parentId]
         doc = MapDoc(
@@ -113,6 +116,8 @@ def list_places(project_id: str, root: Path = Depends(get_storage_root)) -> list
     maps = {m.id: m for m in store.list_maps(root, project_id)}
     out: list[Place] = []
     for m in maps.values():
+        if m.versionOf:
+            continue  # a version's symbols are the first map's places again
         above = _titles_above(maps, m.id)
         for s in m.symbols:
             if s.name:
@@ -136,7 +141,12 @@ def put_map(project_id: str, map_id: str, body: MapDoc, root: Path = Depends(get
         parents = store.map_parents(root, project_id)
         if map_id not in parents:
             raise store.MapNotFoundError(project_id, map_id)
-        if body.parentId is not None and (body.parentId not in parents or _is_inside(parents, body.parentId, map_id)):
+        before = store.load_map(root, project_id, map_id)
+        # Whether a map is a version, and of which, is not for a save to change; a version is not in the tree.
+        body.versionOf = before.versionOf
+        if body.versionOf:
+            body.parentId = None
+        if body.parentId is not None and (body.parentId not in parents or _is_inside(parents, body.parentId, map_id) or store.load_map(root, project_id, body.parentId).versionOf):
             raise HTTPException(status_code=422, detail="a map cannot be put inside itself or inside a map it holds")
         # A place opens maps that are there, and not this one.
         for symbol in body.symbols:
@@ -150,3 +160,34 @@ def put_map(project_id: str, map_id: str, body: MapDoc, root: Path = Depends(get
 def delete_map(project_id: str, map_id: str, root: Path = Depends(get_storage_root)) -> None:
     """Delete a map; the maps inside it move up to its parent."""
     store.delete_map(root, project_id, map_id)
+
+
+class VersionCreate(BaseModel):
+    title: str = Field(default="", max_length=120)
+    # The outline chapter or scene from which the new version is the one that is true.
+    appliesFrom: Optional[str] = Field(default=None, max_length=80)
+
+
+@router.post("/{map_id}/versions", response_model=MapDoc, status_code=201)
+def create_version(project_id: str, map_id: str, body: VersionCreate, root: Path = Depends(get_storage_root)) -> MapDoc:
+    """Make a version of a map as it is now (a copy: cells, symbols, lines, journeys), to change for a later point of the story. A version of a version is a version of the first map."""
+    with store.transaction(root, project_id):
+        source = store.load_map(root, project_id, map_id)
+        base_id = source.versionOf or source.id
+        siblings = [m for m in store.list_maps(root, project_id) if m.versionOf == base_id]
+        if len(siblings) >= MAP_MAX_VERSIONS:
+            raise HTTPException(status_code=422, detail=f"a map has at most {MAP_MAX_VERSIONS} versions")
+        if len(store.map_parents(root, project_id)) >= MAP_MAX_PER_PROJECT:
+            raise HTTPException(status_code=422, detail=f"a project holds at most {MAP_MAX_PER_PROJECT} maps")
+        base = source if source.id == base_id else store.load_map(root, project_id, base_id)
+        doc = source.model_copy(deep=True)
+        doc.id = store.new_id("map")
+        doc.title = (body.title.strip() or f"{base.title}, later")[:120]
+        doc.versionOf = base_id
+        doc.appliesFrom = body.appliesFrom.strip() if body.appliesFrom and body.appliesFrom.strip() else None
+        doc.parentId = None
+        doc.order = max((m.order for m in siblings), default=-1) + 1
+        doc.reader = doc.reader.model_copy(update={"published": False})
+        doc.updatedAt = utcnow()
+        store.save_map(root, project_id, doc)
+    return doc

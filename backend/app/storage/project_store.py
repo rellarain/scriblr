@@ -1469,6 +1469,9 @@ def delete_map(root: Path, project_id: str, map_id: str) -> None:
         gone = pf.maps.pop(map_id, None)
         if gone is None:
             raise MapNotFoundError(project_id, map_id)
+        # The versions of a map go with it.
+        for version in [m for m in pf.maps.values() if m.versionOf == map_id]:
+            del pf.maps[version.id]
         for child in pf.maps.values():
             if child.parentId == map_id:
                 child.parentId = gone.parentId
@@ -1486,7 +1489,8 @@ def list_map_summaries(root: Path, project_id: str) -> list[dict]:
     return _read(
         root, project_id,
         lambda pf, _errors: [
-            {"id": m.id, "title": m.title, "kind": m.kind, "parentId": m.parentId, "order": m.order, "width": m.width, "height": m.height, "updatedAt": m.updatedAt}
+            {"id": m.id, "title": m.title, "kind": m.kind, "parentId": m.parentId, "order": m.order, "width": m.width, "height": m.height, "updatedAt": m.updatedAt,
+             "versionOf": m.versionOf, "appliesFrom": m.appliesFrom}
             for m in sorted(pf.maps.values(), key=lambda m: (m.order, m.title.lower(), m.id))
         ],
         copy_result=False,

@@ -1,5 +1,6 @@
 import { drawMeasure, drawLabel, drawOverlays, drawSelection, drawSymbol, type MeasureState } from './mapDrawItems'
 import { drawPending, drawShape, drawShapeEditor, type PendingShape } from './mapDrawShapes'
+import { drawJourneys, type JourneyView } from './mapDrawJourneys'
 import type { MapShape } from '../../../../api/types'
 import { findItem, type ItemRef, type LegendEntry } from './mapItems'
 import type { MapDraft } from './mapModel'
@@ -48,6 +49,8 @@ export interface RenderOptions {
   measure: MeasureState | null
   // What the legend lists (null = the legend is off).
   legend: LegendEntry[] | null
+  // The journeys of characters over the map (none when not given).
+  journeys?: JourneyView
 }
 
 export function drawMap(ctx: CanvasRenderingContext2D, o: RenderOptions) {
@@ -83,6 +86,14 @@ export function drawMap(ctx: CanvasRenderingContext2D, o: RenderOptions) {
     }
   }
   ctx.restore()
+  if (o.journeys) {
+    ctx.save()
+    ctx.beginPath()
+    ctx.rect(view.x, view.y, w, h)
+    ctx.clip()
+    drawJourneys(ctx, o.journeys, view, theme)
+    ctx.restore()
+  }
 
   if (o.showGrid && view.zoom >= GRID_MIN_ZOOM) {
     ctx.save()

@@ -3,11 +3,12 @@ import type { MapShape } from '../../../../api/types'
 import { FitIcon, ZoomInIcon, ZoomOutIcon } from '../../../icons'
 import { findItem, hitItem, legendEntries, movedItem, snapPoint, withShape, type ItemRef } from './mapItems'
 import { brushCells, cellIndex, terrainCounts, type MapDraft, type Stroke } from './mapModel'
+import type { JourneyView } from './mapDrawJourneys'
 import { drawMap, renderTerrain } from './mapRender'
 import { MIN_POINTS, insertPoint, movePoint, nearestOnShape, outVector, removePoint, setHandle, snapVertex, toggleSmooth, translateShape, type Pen } from './mapShapes'
 import { cellAt, fitView, measureText, nearestCell, panBy, pathLength, zoomAt, type MapView } from './mapView'
 
-export type MapTool = 'select' | 'brush' | 'fill' | 'pick' | 'symbol' | 'label' | 'line' | 'region' | 'measure' | 'hand'
+export type MapTool = 'select' | 'brush' | 'fill' | 'pick' | 'symbol' | 'label' | 'line' | 'region' | 'measure' | 'hand' | 'journey'
 
 export interface MapCanvasProps {
   draft: MapDraft
@@ -46,6 +47,9 @@ export interface MapCanvasProps {
   onHover: (cell: [number, number] | null) => void
   // A try to paint or place where nothing can be put (the layer is hidden or locked).
   onBlocked: () => void
+  // The journeys to draw, and a click of the Journey tool: a stop at a cell centre of the chosen journey (false when there is no journey chosen).
+  journeys?: JourneyView
+  onAddStop?: (x: number, y: number) => boolean
 }
 
 const FALLBACK_SIZE = { width: 800, height: 520 }
@@ -161,7 +165,7 @@ export default function MapCanvas(p: MapCanvasProps) {
       const draws = d.tool === 'line' || d.tool === 'region'
       drawMap(ctx, {
         width: size.width, height: size.height, dpr: window.devicePixelRatio || 1, view: viewRef.current, draft: d.draft, bitmap: bitmap.current,
-        showGrid: d.showGrid, ink, selected: d.selected, selectedNode: nodeRef.current,
+        showGrid: d.showGrid, ink, selected: d.selected, selectedNode: nodeRef.current, journeys: d.journeys,
         measure: d.tool === 'measure' && measureRef.current.points.length > 0 ? { points: measureRef.current.points, cursor: measureRef.current.cursor, text: measureText(pathLength(measureRef.current.cursor ? [...measureRef.current.points, measureRef.current.cursor] : measureRef.current.points), d.draft.cellSize, d.draft.unit, d.draft.pace) } : null,
         pending: draws && pendingRef.current.points.length > 0 ? { type: d.tool as 'line' | 'region', points: pendingRef.current.points, cursor: pendingRef.current.cursor, pen: d.pen } : null,
         legend: d.draft.legend ? legendEntries(d.draft, counts.current) : null,
@@ -171,7 +175,7 @@ export default function MapCanvas(p: MapCanvasProps) {
   }, [size])
   // (The legend counts terrain, so it is counted when the legend is turned on; the symbols it lists are read at every draw.)
   useEffect(() => { if (draft.legend) stale.current = true }, [draft.legend])
-  useEffect(() => { draw() }, [draw, view, rev, draft, p.showGrid, p.tool, p.brushSize, p.selected, p.pen, hover, node, pending, cursor, measure, measureCursor])
+  useEffect(() => { draw() }, [draw, view, rev, draft, p.showGrid, p.tool, p.brushSize, p.selected, p.pen, p.journeys, hover, node, pending, cursor, measure, measureCursor])
   useEffect(() => () => { if (frame.current) { cancelAnimationFrame(frame.current); frame.current = 0 } }, [])
 
   // The wheel zooms at the pointer (a listener of its own: React's wheel handler cannot stop the page scrolling).
@@ -292,6 +296,10 @@ export default function MapCanvas(p: MapCanvasProps) {
       return
     }
     if (!cell) return
+    if (p.tool === 'journey') {
+      if (!p.onAddStop?.(cell[0] + 0.5, cell[1] + 0.5)) p.onBlocked()
+      return
+    }
     if (p.tool === 'symbol' || p.tool === 'label') {
       const [sx, sy] = snapPoint(fx, fy, e.altKey)
       if (!p.onPlace(p.tool, sx, sy)) p.onBlocked()

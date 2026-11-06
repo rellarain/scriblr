@@ -28,9 +28,15 @@ function useExtras(ctx: ReaderCtx, book: CatalogBook): Loaded {
 
 const more = (n: number, what: string) => (n > 0 ? <p className="rdMuted">{n === 1 ? `One more ${what} to discover as you read.` : `${n} more ${what}s to discover as you read.`}</p> : null)
 
+// The versions of a map that are shown, in the order the author made them, and the one a reader sees first: the latest revealed.
+const versionsShown = (maps: MapDoc[], baseId: string) => maps.filter(m => m.versionOf === baseId).sort((a, b) => a.order - b.order)
+const latestOf = (family: MapDoc[]) => family.reduce((best, m) => ((m.reader?.revealAt ?? 0) >= (best.reader?.revealAt ?? 0) ? m : best), family[0])
+
 // A map and the maps inside it, outermost first, each indented by how deep it is.
 function mapOrder(maps: MapDoc[]): Array<{ map: MapDoc; depth: number }> {
   const ids = new Set(maps.map(m => m.id))
+  // A version of a map that is shown is not a map of its own here: it is one of the versions of that map.
+  maps = maps.filter(m => !(m.versionOf && ids.has(m.versionOf)))
   const out: Array<{ map: MapDoc; depth: number }> = []
   const walk = (parent: string | null, depth: number) => {
     maps.filter(m => (parent === null ? m.parentId === null || !ids.has(m.parentId) : m.parentId === parent)).sort((a, b) => a.order - b.order || a.title.localeCompare(b.title))
@@ -43,11 +49,15 @@ function mapOrder(maps: MapDoc[]): Array<{ map: MapDoc; depth: number }> {
 export function MapsConsole({ ctx, book }: { ctx: ReaderCtx; book: CatalogBook }) {
   const loaded = useExtras(ctx, book)
   const [picked, setPicked] = useState<string | null>(null)
+  // The version of the open map the reader has chosen (none = the latest).
+  const [pickedVersion, setPickedVersion] = useState<string | null>(null)
   const maps = loaded.state === 'ready' ? loaded.extras.maps : []
   const ordered = useMemo(() => mapOrder(maps), [maps])
   if (loaded.state === 'loading') return <p className="rdMuted" role="status">Loading the maps…</p>
   if (loaded.state === 'failed') return <p className="rdMuted" role="alert">The maps could not be loaded.</p>
-  const open = maps.find(m => m.id === picked) ?? ordered[0]?.map ?? null
+  const base = maps.find(m => m.id === picked) ?? ordered[0]?.map ?? null
+  const family = base ? [base, ...versionsShown(maps, base.id)] : []
+  const open = family.find(m => m.id === pickedVersion) ?? (family.length > 0 ? latestOf(family) : null)
   return (
     <>
       {!open && <p className="rdMuted">{loaded.extras.lockedMaps > 0 ? 'Nothing is drawn yet. Keep reading.' : 'The author has not published a map for this book.'}</p>}
@@ -56,7 +66,14 @@ export function MapsConsole({ ctx, book }: { ctx: ReaderCtx; book: CatalogBook }
           {ordered.length > 1 && (
             <div className="rdRow" role="group" aria-label="Maps">
               {ordered.map(({ map, depth }) => (
-                <button key={map.id} type="button" className={map.id === open.id ? 'rdChip rdChip--on rdChip--button' : 'rdChip rdChip--button'} aria-pressed={map.id === open.id} style={{ marginLeft: depth * 8 }} onClick={() => setPicked(map.id)}>{map.title}</button>
+                <button key={map.id} type="button" className={map.id === base?.id ? 'rdChip rdChip--on rdChip--button' : 'rdChip rdChip--button'} aria-pressed={map.id === base?.id} style={{ marginLeft: depth * 8 }} onClick={() => { setPicked(map.id); setPickedVersion(null) }}>{map.title}</button>
+              ))}
+            </div>
+          )}
+          {family.length > 1 && (
+            <div className="rdRow" role="group" aria-label="Versions of this map">
+              {family.map(v => (
+                <button key={v.id} type="button" className={v.id === open.id ? 'rdChip rdChip--on rdChip--button' : 'rdChip rdChip--button'} aria-pressed={v.id === open.id} onClick={() => setPickedVersion(v.id)}>{v.title}</button>
               ))}
             </div>
           )}

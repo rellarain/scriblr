@@ -11,10 +11,12 @@ import { SYMBOL_SETS, symbolName } from './mapSymbols'
 import { MAP_THEMES } from './mapThemes'
 import {
   LAYER_NAMES, MAP_TITLE_MAX, addLayer, addTerrain, editTerrain, moveLayer, removeLayer, removeTerrain, renameLayer, resize, setScale, setTitle, terrainCounts,
-  descendantIds, setOverlay, setPace, setParent, setTheme, toggleLayer, type MapDraft,
+  descendantIds, setAppliesFrom, setOverlay, setPace, setParent, setTheme, toggleLayer, type MapDraft,
 } from './mapModel'
 import type { Maps } from './useMaps'
 import { ForReadersPanel } from './ForReadersPanel'
+import { JourneysPanel, type JourneyState } from './JourneysPanel'
+import type { StoryPoint } from '../characters/story'
 import { WorldLinks } from '../links/WorldLinks'
 
 // What a pen and a drawn shape have in common: how they are drawn.
@@ -26,6 +28,12 @@ const KIND_NAMES = { world: 'World or region', town: 'Town or city', interior: '
 
 export interface MapSideProps {
   projectId: string
+  // The chapters and scenes of the outline in book order, the characters of the project, and the state of the journeys drawn on the map.
+  points: StoryPoint[]
+  cast: Array<{ id: string; name: string }>
+  journey: JourneyState
+  onJourney: (patch: Partial<JourneyState>) => void
+  onJourneyTool: () => void
   plotNodes: PlotNode[]
   onOpenPlot?: (nodeId: string) => void
   m: Maps
@@ -52,7 +60,7 @@ export interface MapSideProps {
 }
 
 // The right-hand side of the Maps console: what is chosen on the map, the terrains to paint with, the symbols to stamp, the layers, and the map's own fields.
-export function MapSide({ projectId, plotNodes, onOpenPlot, m, draft, terrain, onTerrain, symbolKind, onSymbolKind, symbolSize, onSymbolSize, pen, penType, onPen, onPreset, selected, fresh, onDeleted, scenes, onSetLocation }: MapSideProps) {
+export function MapSide({ projectId, points, cast, journey, onJourney, onJourneyTool, plotNodes, onOpenPlot, m, draft, terrain, onTerrain, symbolKind, onSymbolKind, symbolSize, onSymbolSize, pen, penType, onPen, onPreset, selected, fresh, onDeleted, scenes, onSetLocation }: MapSideProps) {
   return (
     <aside className="mapSide" aria-label="Map details">
       {selected && <InspectorPanel projectId={projectId} plotNodes={plotNodes} onOpenPlot={onOpenPlot} m={m} draft={draft} selected={selected} fresh={fresh} onDeleted={onDeleted} scenes={scenes} />}
@@ -61,7 +69,8 @@ export function MapSide({ projectId, plotNodes, onOpenPlot, m, draft, terrain, o
       <SymbolPanel kind={symbolKind} onKind={onSymbolKind} size={symbolSize} onSize={onSymbolSize} />
       <PenPanel pen={pen} penType={penType} onPen={onPen} onPreset={onPreset} />
       <LayerPanel m={m} draft={draft} />
-      <MapFieldsPanel m={m} draft={draft} />
+      <JourneysPanel m={m} draft={draft} points={points} cast={cast} state={journey} onState={onJourney} onTool={onJourneyTool} />
+      <MapFieldsPanel m={m} draft={draft} points={points} />
       <ExportPanel draft={draft} />
       <ForReadersPanel projectId={projectId} m={m} draft={draft} selected={selected} />
     </aside>
@@ -136,7 +145,7 @@ function PenPanel({ pen, penType, onPen, onPreset }: { pen: Pen; penType: MapSha
 function PlaceFields({ projectId, plotNodes, onOpenPlot, m, draft, symbolId, scenes }: { projectId: string; plotNodes: PlotNode[]; onOpenPlot?: (nodeId: string) => void; m: Maps; draft: MapDraft; symbolId: string; scenes: ScenePlace[] }) {
   const s = draft.symbols.find(y => y.id === symbolId)!
   const linked = s.mapIds.map(id => m.maps.find(x => x.id === id)).filter((x): x is MapSummary => !!x)
-  const free = m.maps.filter(x => x.id !== draft.id && !s.mapIds.includes(x.id))
+  const free = m.maps.filter(x => x.id !== draft.id && !x.versionOf && !s.mapIds.includes(x.id))
   const [pick, setPick] = useState('')
   const key = placeKey(draft.id, s.id)
   const here = scenes.filter(sc => sc.location === key)
@@ -480,7 +489,7 @@ function LayerPanel({ m, draft }: { m: Maps; draft: MapDraft }) {
   )
 }
 
-function MapFieldsPanel({ m, draft }: { m: Maps; draft: MapDraft }) {
+function MapFieldsPanel({ m, draft, points }: { m: Maps; draft: MapDraft; points: StoryPoint[] }) {
   return (
     <section className="mapPanel" aria-label="Map">
       <header className="mapPanelHead"><h3 className="mapPanelTitle">Map</h3></header>
@@ -495,12 +504,22 @@ function MapFieldsPanel({ m, draft }: { m: Maps; draft: MapDraft }) {
           <Field label="One cell is" short><CommitNumber label="Size of one cell" value={draft.cellSize} min={0.001} max={1_000_000} step="any" onCommit={s => m.apply(setScale(draft, s, draft.unit))} /></Field>
           <Field label="Unit" short><CommitText label="Unit of a cell" value={draft.unit} max={20} className="mapInput mapInput--unit" onCommit={u => m.apply(setScale(draft, draft.cellSize, u))} /></Field>
         </div>
-        <Field label="Inside">
-          <select className="mapSelect" aria-label="Inside which map" value={draft.parentId ?? ''} onChange={e => m.apply(setParent(draft, e.target.value || null))}>
-            <option value="">No map (a top-level map)</option>
-            {m.maps.filter(x => x.id !== draft.id && !descendantIds(m.maps, draft.id).has(x.id)).map(x => <option key={x.id} value={x.id}>{x.title}</option>)}
-          </select>
-        </Field>
+        {draft.versionOf ? (
+          <Field label="True from">
+            <select className="mapSelect" aria-label="This version is true from" value={draft.appliesFrom ?? ''} onChange={e => m.apply(setAppliesFrom(draft, e.target.value || null))}>
+              <option value="">Not placed yet</option>
+              {draft.appliesFrom && !points.some(p => p.id === draft.appliesFrom) && <option value={draft.appliesFrom}>A part of the book that is gone</option>}
+              {points.map(p => <option key={p.id} value={p.id}>{p.label}</option>)}
+            </select>
+          </Field>
+        ) : (
+          <Field label="Inside">
+            <select className="mapSelect" aria-label="Inside which map" value={draft.parentId ?? ''} onChange={e => m.apply(setParent(draft, e.target.value || null))}>
+              <option value="">No map (a top-level map)</option>
+              {m.maps.filter(x => x.id !== draft.id && !x.versionOf && !descendantIds(m.maps, draft.id).has(x.id)).map(x => <option key={x.id} value={x.id}>{x.title}</option>)}
+            </select>
+          </Field>
+        )}
         <Field label="A day's travel" short>
           <span className="mapRow">
             <CommitNumber label="How far a traveller goes in a day" value={draft.pace ?? 0} min={0} max={1_000_000} step="any" onCommit={n => m.apply(setPace(draft, n > 0 ? n : null))} />

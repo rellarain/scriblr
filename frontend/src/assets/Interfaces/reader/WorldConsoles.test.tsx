@@ -51,6 +51,22 @@ describe('the Maps console of a book', () => {
     expect(group.getByRole('button', { name: 'Veyra' })).toHaveAttribute('aria-pressed', 'false')
   })
 
+  it('shows the latest revealed version of a map first, with the earlier ones one click away, and keeps versions out of the list of maps', async () => {
+    const shared = (revealAt: number | null) => ({ published: true, revealAt, reveals: {}, fields: [] })
+    serve(extras({ maps: [
+      map('m1', 'Veyra', { reader: shared(null) }), map('m2', 'Veyra after the fire', { versionOf: 'm1', order: 1, reader: shared(3) }),
+      map('m3', 'The Inn', { parentId: 'm1', kind: 'interior', reader: shared(null) }),
+    ] }))
+    const user = userEvent.setup()
+    render(<MapsConsole ctx={ctx()} book={book} />)
+    const versions = within(await screen.findByRole('group', { name: 'Versions of this map' }))
+    expect(versions.getByRole('button', { name: 'Veyra after the fire' })).toHaveAttribute('aria-pressed', 'true')
+    expect(within(screen.getByRole('group', { name: 'Maps' })).getAllByRole('button').map(b => b.textContent)).toEqual(['Veyra', 'The Inn'])
+    await user.click(versions.getByRole('button', { name: 'Veyra' }))
+    expect(versions.getByRole('button', { name: 'Veyra' })).toHaveAttribute('aria-pressed', 'true')
+    expect(versions.getByRole('button', { name: 'Veyra after the fire' })).toHaveAttribute('aria-pressed', 'false')
+  })
+
   it('only counts what is still to be revealed, never names it', async () => {
     serve(extras({ lockedMaps: 2 }))
     render(<MapsConsole ctx={ctx()} book={book} />)

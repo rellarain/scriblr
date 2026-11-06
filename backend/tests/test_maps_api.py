@@ -69,7 +69,7 @@ def test_the_list_has_summaries_without_cells_in_tree_order(client: TestClient) 
     rows = client.get(f"/api/projects/{pid}/maps").json()
     assert [r["title"] for r in rows] == ["First", "Inside", "Second"]  # order 0, 0, 1
     assert second["order"] == 1 and inner["order"] == 0
-    assert set(rows[0]) == {"id", "title", "kind", "parentId", "order", "width", "height", "updatedAt"}
+    assert set(rows[0]) == {"id", "title", "kind", "parentId", "order", "width", "height", "updatedAt", "versionOf", "appliesFrom"}
 
 
 def test_a_map_can_be_made_only_inside_a_map_that_exists_and_a_project_for_one_that_exists(client: TestClient) -> None:

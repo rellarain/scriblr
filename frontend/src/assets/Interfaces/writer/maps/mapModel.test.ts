@@ -344,6 +344,6 @@ describe('the tree of maps', () => {
   })
 
   it('makes a summary without the cells', () => {
-    expect(Object.keys(summaryOf(doc())).sort()).toEqual(['height', 'id', 'kind', 'order', 'parentId', 'title', 'updatedAt', 'width'])
+    expect(Object.keys(summaryOf(doc())).sort()).toEqual(['appliesFrom', 'height', 'id', 'kind', 'order', 'parentId', 'title', 'updatedAt', 'versionOf', 'width'])
   })
 })

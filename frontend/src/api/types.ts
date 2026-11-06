@@ -483,9 +483,19 @@ export interface MapDoc {
   legend: boolean
   // What readers may see of the map (absent = nothing).
   reader?: ReaderShare
+  // A version of another map as it is later in the story: the map it is a version of, and the outline chapter or scene from which it is the true one (absent = not a version).
+  versionOf?: string | null
+  appliesFrom?: string | null
+  // The paths of characters over the map.
+  journeys?: MapJourney[]
   updatedAt: string
 }
-export interface MapSummary { id: string; title: string; kind: MapKind; parentId: string | null; order: number; width: number; height: number; updatedAt: string }
+// Where a character is from a point of the story (an outline chapter or scene, `at`; '' = not placed yet), in cells.
+export interface MapJourneyStop { id: string; x: number; y: number; at: string; note: string }
+export interface MapJourney { id: string; characterId: string; color: string | null; stops: MapJourneyStop[] }
+export const MAP_MAX_JOURNEYS = 40
+export const MAP_MAX_STOPS = 200
+export interface MapSummary { id: string; title: string; kind: MapKind; parentId: string | null; order: number; width: number; height: number; updatedAt: string; versionOf?: string | null; appliesFrom?: string | null }
 export interface MapCreate { title?: string; kind?: MapKind; width?: number; height?: number; cellSize?: number; unit?: string; parentId?: string | null; theme?: MapThemeName }
 export const MAP_MAX_SIDE = 512
 

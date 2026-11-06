@@ -79,7 +79,7 @@ export function projectTabs(w: WriterWorkspace): LevelTab[] {
       render: () => {
         const id = w.activeProjectId
         if (!id) return <p className="wrMuted">Open a project to map its setting.</p>
-        return <MapsConsole key={id} projectId={id} scenes={scenesOf(w.outlineNodes)} onSetLocation={(sceneId, location) => w.updateOutlineNode(sceneId, { location })} plotNodes={w.plotNodes} onOpenPlot={w.focusPlotNode} />
+        return <MapsConsole key={id} projectId={id} scenes={scenesOf(w.outlineNodes)} onSetLocation={(sceneId, location) => w.updateOutlineNode(sceneId, { location })} plotNodes={w.plotNodes} onOpenPlot={w.focusPlotNode} outline={w.outlineNodes} />
       },
     },
     {

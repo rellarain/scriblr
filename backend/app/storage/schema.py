@@ -1921,6 +1921,56 @@ def _share_of(value: Any) -> Any:
     return value if isinstance(value, (dict, ReaderShare)) else {}
 
 
+MAP_MAX_JOURNEYS = 40
+MAP_MAX_STOPS = 200
+MAP_MAX_VERSIONS = 12
+
+
+class MapJourneyStop(BaseModel):
+    """Where a character is at a point of the story: a cell position (`x`, `y`), `at` the outline chapter or scene from which they are there, and a note."""
+
+    id: str = Field(min_length=1, max_length=40)
+    x: float = 0.0
+    y: float = 0.0
+    at: str = Field(default="", max_length=80)
+    note: str = Field(default="", max_length=200)
+
+    @field_validator("x", "y", mode="before")
+    @classmethod
+    def _coordinate(cls, value: Any) -> Any:
+        return _finite(value, 0.0, -1.0, 100000.0)
+
+    @field_validator("at", "note", mode="before")
+    @classmethod
+    def _text(cls, value: Any) -> Any:
+        return value.strip()[:200] if isinstance(value, str) else ""
+
+
+class MapJourney(BaseModel):
+    """The path of a character over the map: stops in the order of the story. `color` draws it (none = a colour from the map look's palette)."""
+
+    id: str = Field(min_length=1, max_length=40)
+    characterId: str = Field(min_length=1, max_length=80)
+    color: Optional[str] = None
+    stops: list[MapJourneyStop] = Field(default_factory=list)
+
+    @field_validator("color", mode="before")
+    @classmethod
+    def _color_or_none(cls, value: Any) -> Any:
+        return value if isinstance(value, str) and _MAP_HEX_COLOR.match(value) else None
+
+    @field_validator("stops", mode="before")
+    @classmethod
+    def _stops(cls, value: Any) -> Any:
+        seen: set[str] = set()
+        out: list[MapJourneyStop] = []
+        for item in _valid_items(value, MapJourneyStop):
+            if item.id not in seen:
+                seen.add(item.id)
+                out.append(item)
+        return out[:MAP_MAX_STOPS]
+
+
 class MapDoc(BaseModel):
     schemaVersion: int = SCHEMA_VERSION
     id: str = Field(min_length=1, max_length=80)
@@ -1952,7 +2002,29 @@ class MapDoc(BaseModel):
     legend: bool = False
     # What readers may see of this map (see ReaderShare); `reveals` is keyed by the ids of its symbols, labels and shapes.
     reader: ReaderShare = Field(default_factory=ReaderShare)
+    # A version of another map as it is later in the story: `versionOf` is the map it is a version of (the first one, never a version itself), `appliesFrom` the outline
+    # chapter or scene from which it is the map that is true. A version is not in the tree of maps and its symbols are not places (the first map's are).
+    versionOf: Optional[str] = None
+    appliesFrom: Optional[str] = None
+    # The paths of characters over the map (never shown to readers).
+    journeys: list[MapJourney] = Field(default_factory=list)
     updatedAt: datetime = Field(default_factory=utcnow)
+
+    @field_validator("versionOf", "appliesFrom", mode="before")
+    @classmethod
+    def _id_or_none(cls, value: Any) -> Any:
+        return value.strip()[:80] if isinstance(value, str) and value.strip() else None
+
+    @field_validator("journeys", mode="before")
+    @classmethod
+    def _journeys(cls, value: Any) -> Any:
+        seen: set[str] = set()
+        out: list[MapJourney] = []
+        for item in _valid_items(value, MapJourney):
+            if item.id not in seen:
+                seen.add(item.id)
+                out.append(item)
+        return out[:MAP_MAX_JOURNEYS]
 
     @field_validator("reader", mode="before")
     @classmethod

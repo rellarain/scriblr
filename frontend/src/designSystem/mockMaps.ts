@@ -23,7 +23,7 @@ const LAYERS: Array<[string, string]> = [['terrain', 'Terrain'], ['shapes', 'Reg
 const side = (n: number | undefined, fallback: number) => Math.min(MAP_MAX_SIDE, Math.max(1, Math.round(n ?? fallback)))
 
 export function summaryOf(m: MapDoc): MapSummary {
-  return { id: m.id, title: m.title, kind: m.kind, parentId: m.parentId, order: m.order, width: m.width, height: m.height, updatedAt: m.updatedAt }
+  return { id: m.id, title: m.title, kind: m.kind, parentId: m.parentId, order: m.order, width: m.width, height: m.height, updatedAt: m.updatedAt, versionOf: m.versionOf ?? null, appliesFrom: m.appliesFrom ?? null }
 }
 
 export function newMap(id: string, body: MapCreate, order: number): MapDoc {
@@ -65,7 +65,7 @@ export function createMockMaps(initial: MapDoc[] = []) {
       for (let cur: string | null = id, n = 0; cur && maps.has(cur) && n < 50; cur = maps.get(cur)!.parentId, n += 1) out.unshift(maps.get(cur)!.title)
       return out
     }
-    return [...maps.values()]
+    return [...maps.values()].filter(m => !m.versionOf)
       .flatMap(m => m.symbols.filter(sy => sy.name).map(sy => ({
         key: `${m.id}/${sy.id}`, mapId: m.id, placeId: sy.id, name: sy.name, path: [...titles(m.id), sy.name].join(' > '), kind: sy.kind, mapTitle: m.title, mapIds: [...sy.mapIds],
       })))
@@ -87,6 +87,17 @@ export function createMockMaps(initial: MapDoc[] = []) {
       return fail(405, 'Method not allowed')
     }
     if (rest[0] === 'places' && rest[1] === 'all' && method === 'GET') return ok(places())
+    if (rest[1] === 'versions' && method === 'POST') {
+      const source = maps.get(rest[0])
+      if (!source) return fail(404, 'Map not found')
+      const b = (body ?? {}) as { title?: string; appliesFrom?: string | null }
+      const baseId = source.versionOf ?? source.id
+      const made = [...maps.values()].filter(m => m.versionOf === baseId)
+      if (made.length >= 12) return fail(422, 'Too many versions.')
+      const doc: MapDoc = { ...JSON.parse(JSON.stringify(source)) as MapDoc, id: `map_mock${next++}`, title: (b.title ?? '').trim() || `${maps.get(baseId)!.title}, later`, versionOf: baseId, appliesFrom: b.appliesFrom || null, parentId: null, order: made.length, reader: { published: false, revealAt: null, reveals: {}, fields: [] }, updatedAt: AT }
+      maps.set(doc.id, doc)
+      return ok(doc, 201)
+    }
     const id = rest[0]
     const found = maps.get(id)
     if (method === 'GET') return found ? ok(found) : fail(404, 'Map not found')
@@ -103,6 +114,7 @@ export function createMockMaps(initial: MapDoc[] = []) {
     if (method === 'DELETE') {
       if (!found) return fail(404, 'Map not found')
       maps.delete(id)
+      for (const v of [...maps.values()]) if (v.versionOf === id) maps.delete(v.id)
       for (const m of maps.values()) {
         if (m.parentId === id) m.parentId = found.parentId
         for (const sym of m.symbols) sym.mapIds = (sym.mapIds ?? []).filter(x => x !== id)

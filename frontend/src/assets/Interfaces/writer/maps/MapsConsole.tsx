@@ -1,12 +1,18 @@
-import { useEffect, useRef, useState } from 'react'
-import type { PlotNode } from '../../../../api/types'
+import { useEffect, useMemo, useRef, useState } from 'react'
+import { storyPoints } from '../characters/story'
+import { useCast } from '../characters/castStore'
+import type { JourneyState } from './JourneysPanel'
+import type { OutlineNode, PlotNode } from '../../../../api/types'
 import { hasPending, usePendingOpen } from '../links/worldNav'
 import { SaveCluster } from '../../../../components/SaveCluster'
 import { setAutosaveMode, useSettings } from '../../../../settings/settingsStore'
 import { autosaveModeOf } from '../../../../theme/types'
-import { BrushIcon, BucketIcon, ChevronLeftIcon, CursorIcon, GridLinesIcon, HandIcon, PathIcon, PipetteIcon, PolygonIcon, RedoIcon, RulerIcon, StampIcon, TextSizeIcon } from '../../../icons'
+import { FollowIcon, BrushIcon, BucketIcon, ChevronLeftIcon, CursorIcon, GridLinesIcon, HandIcon, PathIcon, PipetteIcon, PolygonIcon, RedoIcon, RulerIcon, StampIcon, TextSizeIcon } from '../../../icons'
 import MapCanvas, { type MapTool } from './MapCanvas'
 import { MapList } from './MapList'
+import { VersionBar } from './VersionBar'
+import { addStop, journeysOf, whereAt } from './mapJourneys'
+import type { JourneyView } from './mapDrawJourneys'
 import { MapSide } from './MapSide'
 import { addLabel, addShape, addSymbol, findItem, removeItem, replaceShape, type ItemRef } from './mapItems'
 import { cellIndex, BRUSH_SIZES, mapPath } from './mapModel'
@@ -26,6 +32,7 @@ const TOOLS: Array<{ tool: MapTool; label: string; Icon: typeof BrushIcon }> = [
   { tool: 'line', label: 'Draw a line', Icon: PathIcon },
   { tool: 'region', label: 'Draw a region', Icon: PolygonIcon },
   { tool: 'measure', label: 'Measure a distance', Icon: RulerIcon },
+  { tool: 'journey', label: 'Add a stop to a journey', Icon: FollowIcon },
   { tool: 'hand', label: 'Move the view', Icon: HandIcon },
 ]
 const NEW_LABEL_SIZE = 1.5
@@ -37,8 +44,10 @@ const NEW_LABEL_SIZE = 1.5
 // A scene of the project, for the places: its location is the key of a place (or old text, from before there were places).
 export interface ScenePlace { id: string; title: string; location: string }
 
-export default function MapsConsole({ projectId, scenes = [], onSetLocation, plotNodes = [], onOpenPlot }: {
+export default function MapsConsole({ projectId, scenes = [], onSetLocation, plotNodes = [], onOpenPlot, outline = [] }: {
   projectId: string
+  // The outline, for the points of the story that versions and journeys are tied to.
+  outline?: OutlineNode[]
   scenes?: ScenePlace[]
   // The plot's nodes, to link a place to, and how to open one.
   plotNodes?: PlotNode[]
@@ -47,6 +56,9 @@ export default function MapsConsole({ projectId, scenes = [], onSetLocation, plo
   onSetLocation?: (sceneId: string, location: string) => void
 }) {
   const m = useMaps(projectId)
+  const points = useMemo(() => storyPoints(outline), [outline])
+  const { cast } = useCast(projectId)
+  const [journey, setJourney] = useState<JourneyState>({ journeyId: null, showPaths: true, atPoint: '', stopPoint: '' })
   const { ui } = useSettings()
   const [tool, setTool] = useState<MapTool>('brush')
   const [terrain, setTerrain] = useState(1)
@@ -72,7 +84,7 @@ export default function MapsConsole({ projectId, scenes = [], onSetLocation, plo
     // Only when the list has loaded (opening is not repeated after a map is closed by deleting it).
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [m.status])
-  useEffect(() => { setBlocked(false); setPicked(null); setFresh(null); setMeasured(null) }, [m.openId])
+  useEffect(() => { setBlocked(false); setPicked(null); setFresh(null); setMeasured(null); setJourney(j => ({ ...j, journeyId: null })) }, [m.openId])
   // A link from another console asked for a place: its map opens, and the place is chosen on it.
   const wanted = useRef<{ mapId: string; symbolId: string } | null>(null)
   usePendingOpen('place', m.status === 'ready', key => {
@@ -91,6 +103,14 @@ export default function MapsConsole({ projectId, scenes = [], onSetLocation, plo
   const chosen = draft ? Math.min(terrain, draft.terrains.length - 1) : 0
   const selected = draft && picked && findItem(draft, picked) ? picked : null
 
+  // The journeys as the canvas draws them, and a click of the Journey tool: a stop at a cell of the chosen journey, from the point new stops are from.
+  const journeyView = useMemo<JourneyView | undefined>(() => {
+    if (!draft || (journeysOf(draft).length === 0)) return undefined
+    return {
+      list: journeysOf(draft), names: new Map(cast.map(c => [c.id, c.name])), selectedId: journey.journeyId, showPaths: journey.showPaths,
+      at: journey.atPoint ? whereAt(journeysOf(draft), points, journey.atPoint) : null,
+    }
+  }, [draft, cast, journey, points])
   if (m.status === 'error') {
     return (
       <div className="mapNote" role="alert">
@@ -141,6 +161,12 @@ export default function MapsConsole({ projectId, scenes = [], onSetLocation, plo
     setPicked(null)
   }
 
+  function addJourneyStop(x: number, y: number): boolean {
+    if (!draft || !journey.journeyId) return false
+    const made = addStop(draft, journey.journeyId, x, y, journey.stopPoint, points)
+    return made !== null && m.apply(made.change)
+  }
+
   const path = draft ? mapPath(m.maps, draft.id) : []
   const hint = tool === 'line' || tool === 'region' ? ' · click to add points, double-click or Enter to finish, Esc to cancel' : ''
   const statusText = hover
@@ -179,7 +205,7 @@ export default function MapsConsole({ projectId, scenes = [], onSetLocation, plo
       {m.notice && <p className="mapNote mapNote--error" role="alert">{m.notice}</p>}
       {blocked && <p className="mapNote mapNote--error" role="status">There is no shown, unlocked layer to put that on: show or unlock one in Layers.</p>}
       <div className="mapSplit">
-        <MapList m={m} />
+        <MapList m={m} points={points} />
         {draft ? (
           <>
             <div className="mapStage">
@@ -193,6 +219,7 @@ export default function MapsConsole({ projectId, scenes = [], onSetLocation, plo
                   </ol>
                 </nav>
               )}
+              <VersionBar m={m} draft={draft} points={points} />
               <MapCanvas
                 draft={draft} rev={m.rev} tool={tool} terrain={chosen} brushSize={brush} showGrid={grid} pen={pen} selected={selected} onSelect={setPicked}
                 onBeginStroke={(t, size) => { setBlocked(false); return m.beginStroke(t, size) }} onEndStroke={m.endStroke}
@@ -200,6 +227,7 @@ export default function MapsConsole({ projectId, scenes = [], onSetLocation, plo
                 onPlace={place} onFinishShape={finishShape} onPreview={m.preview} onCommitMove={m.commitMove} onChangeShape={shape => { m.apply(replaceShape(draft, shape)) }} onDelete={removeChosen}
                 onOpenPlace={id => { void m.open(id) }} onMeasure={setMeasured}
                 onHover={setHover} onBlocked={() => setBlocked(true)}
+                journeys={journeyView} onAddStop={addJourneyStop}
               />
               <p className="mapStatus" aria-live="off">{tool === 'measure' && measured !== null ? `${measured} · click to add a point, Backspace takes one back, Esc clears` : `${statusText} · ${formatDistance(draft.width * draft.cellSize, draft.unit)} wide${tool === 'measure' ? ' · click to start measuring' : hint}`}</p>
             </div>
@@ -211,6 +239,7 @@ export default function MapsConsole({ projectId, scenes = [], onSetLocation, plo
               onPreset={(type, next) => { (type === 'region' ? setRegionPen : setLinePen)(next); setTool(type) }}
               selected={selected} fresh={selected !== null && fresh === selected.id} onDeleted={() => setPicked(null)}
               scenes={scenes} onSetLocation={onSetLocation}
+              points={points} cast={cast} journey={journey} onJourney={patch => setJourney(j => ({ ...j, ...patch }))} onJourneyTool={() => setTool('journey')}
             />
           </>
         ) : (

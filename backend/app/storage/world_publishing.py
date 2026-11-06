@@ -161,6 +161,7 @@ def _visible_map(frozen: EditionMap, reach: int, public_ids: set[str]) -> MapDoc
             "shapes": [s for s in doc.shapes if shown(reveals.get(s.id), reach)],
             "parentId": doc.parentId if doc.parentId in public_ids else None,
             "pace": None,
+            "journeys": [],
             "reader": ReaderShare(published=True, revealAt=doc.reader.revealAt),
         }
     )

@@ -20,7 +20,7 @@ def _exists(pf: ProjectFile, ref: str) -> bool:
         return key in pf.characters
     map_id, _, symbol_id = key.partition("/")
     doc = pf.maps.get(map_id)
-    return doc is not None and any(s.id == symbol_id and s.name for s in doc.symbols)
+    return doc is not None and not doc.versionOf and any(s.id == symbol_id and s.name for s in doc.symbols)
 
 
 def _live(pf: ProjectFile) -> list[WorldLink]:

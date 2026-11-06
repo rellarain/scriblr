@@ -223,6 +223,13 @@ export function setOverlay(draft: MapDraft, field: 'scaleBar' | 'compass' | 'leg
   return draft[field] === on ? null : change(draft, { [field]: on })
 }
 
+// The outline chapter or scene from which a version is the map that is true (null = not placed yet).
+export function setAppliesFrom(draft: MapDraft, at: string | null): Change {
+  const next = at || null
+  if ((draft.appliesFrom ?? null) === next) return null
+  return change({ ...draft, appliesFrom: draft.appliesFrom ?? null }, { appliesFrom: next })
+}
+
 // What readers may see of the map (see ReaderShare).
 export function setShare(draft: MapDraft, share: ReaderShare): Change {
   if (JSON.stringify(shareOf(draft)) === JSON.stringify(share)) return null
@@ -339,7 +346,8 @@ export interface MapRow { map: MapSummary; depth: number; hasChildren: boolean }
 export function mapRows(maps: MapSummary[]): MapRow[] {
   const ids = new Set(maps.map(m => m.id))
   const kids = new Map<string | null, MapSummary[]>()
-  for (const m of maps) {
+  // A version is not in the tree: it is listed under the map it is a version of.
+  for (const m of maps.filter(x => !x.versionOf)) {
     const parent = m.parentId !== null && ids.has(m.parentId) ? m.parentId : null
     kids.set(parent, [...(kids.get(parent) ?? []), m])
   }
@@ -358,6 +366,7 @@ export function mapRows(maps: MapSummary[]): MapRow[] {
 
 export const summaryOf = (doc: MapDoc | MapDraft): MapSummary => ({
   id: doc.id, title: doc.title, kind: doc.kind, parentId: doc.parentId, order: doc.order, width: doc.width, height: doc.height, updatedAt: doc.updatedAt,
+  versionOf: doc.versionOf ?? null, appliesFrom: doc.appliesFrom ?? null,
 })
 
 // The maps a map is inside, outermost first, and the map itself last (a loop in the data is cut).

@@ -1,6 +1,8 @@
-import { useMemo, useRef, useState } from 'react'
+import { Fragment, useMemo, useRef, useState } from 'react'
 import { MAP_MAX_SIDE, type MapKind, type MapSummary, type MapThemeName } from '../../../../api/types'
-import { CheckIcon, ChevronRightIcon, CloseIcon, ExportIcon, MapIcon, PlusIcon, TrashIcon, ImportIcon } from '../../../icons'
+import { CheckIcon, ChevronRightIcon, CloseIcon, CopyIcon, ExportIcon, HistoryIcon, MapIcon, PlusIcon, TrashIcon, ImportIcon } from '../../../icons'
+import type { StoryPoint } from '../characters/story'
+import { appliesLabel, versionsOf } from './mapVersions'
 import { CommitNumber, CommitText, Field } from './MapFields'
 import { importRows, mapFileName, parseMapFile, type Choice, type MapFile } from './mapFile'
 import { saveBlob } from './mapExport'
@@ -19,10 +21,12 @@ export const MAP_SIZES = [
 ]
 
 // The list of maps (each with the maps inside it under it) and the form that makes a new one.
-export function MapList({ m }: { m: Maps }) {
+export function MapList({ m, points = [] }: { m: Maps; points?: StoryPoint[] }) {
   const rows = useMemo(() => mapRows(m.maps), [m.maps])
   const [making, setMaking] = useState(false)
   const [confirming, setConfirming] = useState<string | null>(null)
+  // The map a version is being made of.
+  const [versioning, setVersioning] = useState<string | null>(null)
   const open = m.openId
   const [incoming, setIncoming] = useState<MapFile | null>(null)
   const [problem, setProblem] = useState('')
@@ -56,12 +60,14 @@ export function MapList({ m }: { m: Maps }) {
       {rows.length === 0 && !making && <p className="mapHint">No maps yet. Make the first one with the plus.</p>}
       <ul className="mapRows">
         {rows.map(({ map, depth, hasChildren }) => (
-          <li key={map.id} className={`mapRowItem${map.id === open ? ' mapRowItem--on' : ''}`} style={{ paddingLeft: `calc(${depth} * var(--space-6))` }}>
+          <Fragment key={map.id}>
+          <li className={`mapRowItem${map.id === open ? ' mapRowItem--on' : ''}`} style={{ paddingLeft: `calc(${depth} * var(--space-6))` }}>
             <button type="button" className="mapRowMain" aria-label={`Open ${map.title}`} aria-current={map.id === open ? 'true' : undefined} title={`Open ${map.title}`} onClick={() => { void m.open(map.id) }}>
               {depth > 0 ? <ChevronRightIcon size={14} /> : <MapIcon size={14} />}
               <span className="mapRowTitle">{map.title}</span>
               <span className="mapRowMeta">{map.width}×{map.height}</span>
             </button>
+            <button type="button" className="mapIconBtn mapRowDelete" aria-label={`Make a version of ${map.title}`} title={`Make a version of ${map.title}, to change for a later point of the story`} aria-expanded={versioning === map.id} onClick={() => setVersioning(v => (v === map.id ? null : map.id))}><CopyIcon size={16} /></button>
             <button type="button" className="mapIconBtn mapRowDelete" aria-label={`Export ${map.title} to a file`} title={hasChildren ? `Export ${map.title} and the maps inside it to a file` : `Export ${map.title} to a file`} onClick={() => { void exportOne(map.id, map.title) }}><ExportIcon size={16} /></button>
             {confirming === map.id ? (
               <span className="mapConfirm" role="group" aria-label={`Delete ${map.title}?`}>
@@ -72,9 +78,57 @@ export function MapList({ m }: { m: Maps }) {
               <button type="button" className="mapIconBtn mapRowDelete" aria-label={`Delete ${map.title}`} title={hasChildren ? `Delete ${map.title} (the maps inside it move up)` : `Delete ${map.title}`} onClick={() => setConfirming(map.id)}><TrashIcon size={16} /></button>
             )}
           </li>
+          {versionsOf(m.maps, map.id).map(v => (
+            <li key={v.id} className={`mapRowItem mapRowItem--version${v.id === open ? ' mapRowItem--on' : ''}`} style={{ paddingLeft: `calc(${depth + 1} * var(--space-6))` }}>
+              <button type="button" className="mapRowMain" aria-label={`Open ${v.title}`} aria-current={v.id === open ? 'true' : undefined} title={`Open ${v.title}`} onClick={() => { void m.open(v.id) }}>
+                <HistoryIcon size={14} />
+                <span className="mapRowTitle">{v.title}</span>
+                <span className="mapRowMeta">{appliesLabel(v, points)}</span>
+              </button>
+              {confirming === v.id ? (
+                <span className="mapConfirm" role="group" aria-label={`Delete ${v.title}?`}>
+                  <button type="button" className="mapIconBtn" aria-label="Confirm delete" title="Confirm delete" onClick={() => { setConfirming(null); void m.remove(v.id) }}><CheckIcon size={16} /></button>
+                  <button type="button" className="mapIconBtn" aria-label="Cancel delete" title="Cancel" onClick={() => setConfirming(null)}><CloseIcon size={16} /></button>
+                </span>
+              ) : (
+                <button type="button" className="mapIconBtn mapRowDelete" aria-label={`Delete ${v.title}`} title={`Delete ${v.title}`} onClick={() => setConfirming(v.id)}><TrashIcon size={16} /></button>
+              )}
+            </li>
+          ))}
+          {versioning === map.id && <li className="mapRowItem"><VersionForm m={m} sourceId={map.id} points={points} onDone={() => setVersioning(null)} /></li>}
+          </Fragment>
         ))}
       </ul>
     </nav>
+  )
+}
+
+// The form that makes a version: a title, and the chapter or scene from which it is the map that is true.
+function VersionForm({ m, sourceId, points, onDone }: { m: Maps; sourceId: string; points: StoryPoint[]; onDone: () => void }) {
+  const [title, setTitle] = useState('')
+  const [from, setFrom] = useState('')
+  const [busy, setBusy] = useState(false)
+  async function make() {
+    setBusy(true)
+    const id = await m.createVersion(sourceId, title, from || null)
+    setBusy(false)
+    if (id) onDone()
+  }
+  return (
+    <form className="mapNew" aria-label="New version" noValidate onSubmit={e => { e.preventDefault(); void make() }}>
+      <Field label="Title of the version"><CommitText label="Title of the new version" value={title} max={MAP_TITLE_MAX} onCommit={setTitle} live /></Field>
+      <Field label="True from">
+        <select className="mapSelect" aria-label="The version is true from" value={from} onChange={e => setFrom(e.target.value)}>
+          <option value="">Not placed yet</option>
+          {points.map(p => <option key={p.id} value={p.id}>{p.label}</option>)}
+        </select>
+      </Field>
+      <p className="mapHint">A copy of the map as it is now, to change for a later point of the story. Its places stay the first map&apos;s.</p>
+      <div className="mapRow">
+        <button type="submit" className="mapIconBtn" aria-label="Make the version" title="Make the version" disabled={busy}><CheckIcon size={16} /></button>
+        <button type="button" className="mapIconBtn" aria-label="Cancel the version" title="Cancel" onClick={onDone}><CloseIcon size={16} /></button>
+      </div>
+    </form>
   )
 }
 

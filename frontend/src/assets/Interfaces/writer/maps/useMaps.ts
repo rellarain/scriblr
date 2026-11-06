@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import { createMap, deleteMap, getMap, listMaps, putMap } from '../../../../api/mapsApi'
+import { createMap, createMapVersion, deleteMap, getMap, listMaps, putMap } from '../../../../api/mapsApi'
 import type { MapCreate, MapDoc, MapSummary } from '../../../../api/types'
 import { combineCountdown, combineSaveStatus, useAutosave } from '../../../../lib/useAutosave'
 import { buildMapFile, importMaps, type Choice, type ImportResult, type MapFile } from './mapFile'
@@ -107,6 +107,25 @@ export function useMaps(projectId: string | null) {
       return doc.id
     } catch (err) {
       setNotice(message(err, 'The map could not be made.'))
+      return null
+    }
+  }, [projectId, show])
+
+  // A version of a map as it is now (what is waiting is saved first), from a point of the story; it is opened. Null when it could not be made.
+  const createVersion = useCallback(async (sourceId: string, title: string, appliesFrom: string | null): Promise<string | null> => {
+    if (!projectId) return null
+    setNotice(undefined)
+    try {
+      await autosaveRef.current.flush()
+      const doc = await createMapVersion(projectId, sourceId, { title: title.trim() || undefined, appliesFrom })
+      setMaps(list => [...list, summaryOf(doc)])
+      const mine = ++token.current
+      const session: Session = { draft: draftOf(doc), history: new MapHistory() }
+      sessions.current.set(doc.id, session)
+      if (mine === token.current) show(doc.id, session)
+      return doc.id
+    } catch (err) {
+      setNotice(message(err, 'The version could not be made.'))
       return null
     }
   }, [projectId, show])
@@ -234,12 +253,12 @@ export function useMaps(projectId: string | null) {
 
   return useMemo(() => ({
     status, loadError, reload: load, maps, openId, draft, rev, notice,
-    open, create, remove, exportFile, importFile, apply, beginStroke, endStroke, fill, preview, commitMove, undo, redo,
+    open, create, createVersion, remove, exportFile, importFile, apply, beginStroke, endStroke, fill, preview, commitMove, undo, redo,
     canUndo, canRedo,
     saveStatus: combineSaveStatus(autosave),
     saveCountdown: combineCountdown(autosave),
     saveNow: autosave.flush,
-  }), [status, loadError, load, maps, openId, draft, rev, notice, open, create, remove, exportFile, importFile, apply, beginStroke, endStroke, fill, preview, commitMove, undo, redo, canUndo, canRedo, autosave])
+  }), [status, loadError, load, maps, openId, draft, rev, notice, open, create, createVersion, remove, exportFile, importFile, apply, beginStroke, endStroke, fill, preview, commitMove, undo, redo, canUndo, canRedo, autosave])
 }
 
 export type Maps = ReturnType<typeof useMaps>
