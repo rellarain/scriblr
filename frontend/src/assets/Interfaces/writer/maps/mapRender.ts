@@ -1,19 +1,18 @@
-import { GRID_MIN_ZOOM, type MapView } from './mapView'
+import { drawLabel, drawOverlays, drawSelection, drawSymbol } from './mapDrawItems'
+import { findItem, type ItemRef, type LegendEntry } from './mapItems'
 import type { MapDraft } from './mapModel'
+import { hexToRgb, themeDef, themeRgb } from './mapThemes'
+import { GRID_MIN_ZOOM, type MapView } from './mapView'
 
 // Drawing a map on a canvas: the terrain as a bitmap of one pixel per cell (made when the cells change), scaled up without smoothing so each cell is a
-// crisp square, then the grid and the brush outline over it. The colours of the map are data (the author's terrain colours); the chrome around it
-// (the frame, the grid, the brush) takes the ink colour of the page it is on.
+// crisp square, then the layers above it in their order (symbols, labels), the grid, the scale bar, compass and legend, and the brush outline.
+// The colours of the map are data (the author's terrain colours, shown through the map's look, mapThemes.ts); the frame round it takes the ink colour
+// of the page it is on.
 
-export function hexToRgb(hex: string): [number, number, number] {
-  const m = /^#([0-9a-f]{2})([0-9a-f]{2})([0-9a-f]{2})$/i.exec(hex)
-  return m ? [parseInt(m[1], 16), parseInt(m[2], 16), parseInt(m[3], 16)] : [136, 136, 136]
-}
-
-// The pixels of the terrain: one 32-bit value per cell (R, G, B, opaque, in memory order).
-export function terrainPixels(draft: Pick<MapDraft, 'cells' | 'terrains'>): Uint32Array {
+// The pixels of the terrain: one 32-bit value per cell (R, G, B, opaque, in memory order), in the colours of the map's look.
+export function terrainPixels(draft: Pick<MapDraft, 'cells' | 'terrains' | 'theme'>): Uint32Array {
   const palette = draft.terrains.map(t => {
-    const [r, g, b] = hexToRgb(t.color)
+    const [r, g, b] = themeRgb(t.color, draft.theme)
     return ((255 << 24) | (b << 16) | (g << 8) | r) >>> 0
   })
   const out = new Uint32Array(draft.cells.length)
@@ -21,6 +20,8 @@ export function terrainPixels(draft: Pick<MapDraft, 'cells' | 'terrains'>): Uint
   for (let i = 0; i < out.length; i += 1) out[i] = palette[draft.cells[i]] ?? fallback
   return out
 }
+
+export { hexToRgb }
 
 export interface RenderOptions {
   // CSS pixels of the canvas and the device pixel ratio it is drawn at.
@@ -31,35 +32,53 @@ export interface RenderOptions {
   draft: MapDraft
   // The terrain bitmap (one pixel per cell), null when it is not made yet.
   bitmap: HTMLCanvasElement | null
-  showTerrain: boolean
   showGrid: boolean
-  // The page's ink colour, for the frame, grid and brush.
+  // The page's ink colour, for the frame.
   ink: string
   // The cells under the brush, to outline.
   brush: Array<[number, number]>
+  // The chosen symbol or label.
+  selected: ItemRef | null
+  // What the legend lists (null = the legend is off).
+  legend: LegendEntry[] | null
 }
 
 export function drawMap(ctx: CanvasRenderingContext2D, o: RenderOptions) {
   const { width, height, dpr, view, draft } = o
+  const theme = themeDef(draft.theme)
   ctx.setTransform(dpr, 0, 0, dpr, 0, 0)
   ctx.clearRect(0, 0, width, height)
   const w = draft.width * view.zoom, h = draft.height * view.zoom
 
-  if (o.showTerrain && o.bitmap) {
-    ctx.imageSmoothingEnabled = false
-    ctx.drawImage(o.bitmap, view.x, view.y, w, h)
-  } else {
-    ctx.save()
-    ctx.globalAlpha = 0.08
-    ctx.fillStyle = o.ink
-    ctx.fillRect(view.x, view.y, w, h)
-    ctx.restore()
+  // The layers, bottom to top. Terrain is the bitmap (a hidden terrain layer leaves a faint wash so the map's size still shows).
+  ctx.save()
+  ctx.beginPath()
+  ctx.rect(view.x, view.y, w, h)
+  ctx.clip()
+  for (const layer of draft.layers) {
+    if (layer.kind === 'terrain') {
+      if (layer.visible && o.bitmap) {
+        ctx.imageSmoothingEnabled = false
+        ctx.drawImage(o.bitmap, view.x, view.y, w, h)
+      } else if (!layer.visible) {
+        ctx.save()
+        ctx.globalAlpha = 0.08
+        ctx.fillStyle = o.ink
+        ctx.fillRect(view.x, view.y, w, h)
+        ctx.restore()
+      }
+    } else if (layer.kind === 'symbols' && layer.visible) {
+      for (const s of draft.symbols) if (s.layerId === layer.id) drawSymbol(ctx, s, view, theme)
+    } else if (layer.kind === 'labels' && layer.visible) {
+      for (const l of draft.labels) if (l.layerId === layer.id) drawLabel(ctx, l, view, theme)
+    }
   }
+  ctx.restore()
 
   if (o.showGrid && view.zoom >= GRID_MIN_ZOOM) {
     ctx.save()
     ctx.globalAlpha = 0.22
-    ctx.strokeStyle = o.ink
+    ctx.strokeStyle = theme.ink
     ctx.lineWidth = 1
     ctx.beginPath()
     // Only the lines that are on the canvas.
@@ -77,6 +96,10 @@ export function drawMap(ctx: CanvasRenderingContext2D, o: RenderOptions) {
     ctx.restore()
   }
 
+  drawOverlays(ctx, {
+    x: view.x, y: view.y, w, h, theme, zoom: view.zoom, cellSize: draft.cellSize, unit: draft.unit, scaleBar: draft.scaleBar, compass: draft.compass, legend: o.legend,
+  })
+
   ctx.save()
   ctx.strokeStyle = o.ink
   ctx.globalAlpha = 0.6
@@ -84,9 +107,14 @@ export function drawMap(ctx: CanvasRenderingContext2D, o: RenderOptions) {
   ctx.strokeRect(Math.round(view.x) - 0.5, Math.round(view.y) - 0.5, Math.round(w) + 1, Math.round(h) + 1)
   ctx.restore()
 
+  if (o.selected) {
+    const item = findItem(draft, o.selected)
+    if (item) drawSelection(ctx, item, o.selected, view, theme)
+  }
+
   if (o.brush.length > 0) {
     ctx.save()
-    ctx.strokeStyle = o.ink
+    ctx.strokeStyle = theme.ink
     ctx.lineWidth = 2
     for (const [x, y] of o.brush) ctx.strokeRect(view.x + x * view.zoom + 1, view.y + y * view.zoom + 1, Math.max(1, view.zoom - 2), Math.max(1, view.zoom - 2))
     ctx.restore()

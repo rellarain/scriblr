@@ -3,7 +3,7 @@ import { createMap, deleteMap, getMap, listMaps, putMap } from '../../../../api/
 import type { MapCreate, MapDoc, MapSummary } from '../../../../api/types'
 import { combineCountdown, combineSaveStatus, useAutosave } from '../../../../lib/useAutosave'
 import * as model from './mapModel'
-import { MapHistory, Stroke, docOf, draftOf, floodFill, summaryOf, type Change, type MapDraft, type MapEdit } from './mapModel'
+import { MapHistory, Stroke, docOf, draftOf, floodFill, metaEdit, summaryOf, type Change, type MapDraft, type MapEdit } from './mapModel'
 
 // The Maps console's state: the project's maps (a list without cells), the open map as a draft (its cells decoded, so painting is direct), and an undo
 // log for each map that has been opened (a stroke is one step; kept while the project is open, so going to another map and back keeps its undo).
@@ -167,6 +167,22 @@ export function useMaps(projectId: string | null) {
     return true
   }, [touched])
 
+  // A drag of something on the map is shown as it goes (no undo entry, nothing saved) ...
+  const preview = useCallback((next: MapDraft) => {
+    const session = current.current
+    if (!session) return
+    session.draft = next
+    setDraft(next)
+    setRev(r => r + 1)
+  }, [])
+  // ... and, when it ends, is one undo step (a change of what was there before) that waits to be saved.
+  const commitMove = useCallback((before: MapDraft, after: MapDraft) => {
+    const session = current.current
+    if (!session) return
+    session.history.push(metaEdit(before, after))
+    touched(after)
+  }, [touched])
+
   const undo = useCallback(() => {
     const session = current.current
     const next = session?.history.undo(session.draft)
@@ -184,12 +200,12 @@ export function useMaps(projectId: string | null) {
 
   return useMemo(() => ({
     status, loadError, reload: load, maps, openId, draft, rev, notice,
-    open, create, remove, apply, beginStroke, endStroke, fill, undo, redo,
+    open, create, remove, apply, beginStroke, endStroke, fill, preview, commitMove, undo, redo,
     canUndo, canRedo,
     saveStatus: combineSaveStatus(autosave),
     saveCountdown: combineCountdown(autosave),
     saveNow: autosave.flush,
-  }), [status, loadError, load, maps, openId, draft, rev, notice, open, create, remove, apply, beginStroke, endStroke, fill, undo, redo, canUndo, canRedo, autosave])
+  }), [status, loadError, load, maps, openId, draft, rev, notice, open, create, remove, apply, beginStroke, endStroke, fill, preview, commitMove, undo, redo, canUndo, canRedo, autosave])
 }
 
 export type Maps = ReturnType<typeof useMaps>

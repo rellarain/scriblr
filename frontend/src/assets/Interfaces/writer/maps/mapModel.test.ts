@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest'
 import type { MapDoc, MapSummary } from '../../../../api/types'
 import {
   MAP_MAX_LAYERS, MAP_MAX_TERRAINS, MapHistory, Stroke, addLayer, addTerrain, brushCells, decodeCells, docOf, draftOf, editTerrain, encodeCells, floodFill,
-  lineBetween, mapRows, moveLayer, removeLayer, removeTerrain, renameLayer, resize, setScale, setTitle, summaryOf, terrainCounts, terrainEditable, toggleLayer,
+  lineBetween, mapRows, moveLayer, removeLayer, removeTerrain, renameLayer, resize, setScale, setTitle, summaryOf, terrainCounts, terrainEditable, toggleLayer, setOverlay, setTheme,
   type MapDraft,
 } from './mapModel'
 
@@ -19,7 +19,8 @@ const LAYERS = [
 function doc(width = 4, height = 3, cells?: number[]): MapDoc {
   return {
     schemaVersion: 2, id: 'map_1', title: 'World', kind: 'world', parentId: null, order: 0, width, height, cellSize: 10, unit: 'miles',
-    terrains: TERRAINS, layers: LAYERS, cells: cells ?? [0, width * height], updatedAt: '2026-01-01T00:00:00Z',
+    terrains: TERRAINS, layers: LAYERS, cells: cells ?? [0, width * height], symbols: [], labels: [], theme: 'modern', scaleBar: true, compass: true, legend: false,
+    updatedAt: '2026-01-01T00:00:00Z',
   }
 }
 const draft = (w = 4, h = 3, cells?: number[]): MapDraft => draftOf(doc(w, h, cells))
@@ -210,6 +211,25 @@ describe('the map\'s fields', () => {
     expect(resize(d, 3, 2)).toBeNull()
     const big = resize(d, 9999, 0)!.draft
     expect([big.width, big.height]).toEqual([512, 1])
+  })
+})
+
+describe('the look and the overlays', () => {
+  it('changes the look and says nothing changed when it is the same', () => {
+    const d = draft()
+    expect(setTheme(d, 'night')!.draft.theme).toBe('night')
+    expect(setTheme(d, 'modern')).toBeNull()
+  })
+
+  it('turns the scale bar, compass and legend on and off, each an undo step', () => {
+    const d = draft()
+    expect(setOverlay(d, 'legend', true)!.draft.legend).toBe(true)
+    expect(setOverlay(d, 'scaleBar', false)!.draft.scaleBar).toBe(false)
+    expect(setOverlay(d, 'compass', true)).toBeNull()
+    const r = setOverlay(d, 'legend', true)!
+    const h = new MapHistory()
+    h.push(r.edit)
+    expect(h.undo(r.draft)!.legend).toBe(false)
   })
 })
 

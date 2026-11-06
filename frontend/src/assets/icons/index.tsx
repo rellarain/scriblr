@@ -934,3 +934,18 @@ export function GridLinesIcon(props: IconProps) {
     <path d="M9.3 4v16M14.7 4v16M4 9.3h16M4 14.7h16" />
   </IconBase>
 }
+
+// An arrow pointer: pick things and move them.
+export function CursorIcon(props: IconProps) {
+  return <IconBase {...props}>
+    <path d="M5 3l14 8-6 1.500L10 19Z" />
+  </IconBase>
+}
+
+// A rubber stamp: put a symbol on the map.
+export function StampIcon(props: IconProps) {
+  return <IconBase {...props}>
+    <path d="M9 3h6v6l2 3H7l2-3Z" />
+    <path d="M5 15h14v2H5ZM6 20h12" />
+  </IconBase>
+}

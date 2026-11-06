@@ -1,10 +1,13 @@
 import { useMemo, useState } from 'react'
 import { MAP_MAX_SIDE, type MapLayerKind } from '../../../../api/types'
-import { ChevronDownIcon, ChevronUpIcon, CheckIcon, CloseIcon, EyeClosedIcon, EyeIcon, LockIcon, PlusIcon, TrashIcon, UnlockIcon } from '../../../icons'
+import { ChevronDownIcon, ChevronUpIcon, CheckIcon, CloseIcon, EyeClosedIcon, EyeIcon, LockIcon, PlusIcon, RestoreIcon, TrashIcon, UnlockIcon } from '../../../icons'
 import { ColourInput, CommitNumber, CommitText, Field } from './MapFields'
+import { LABEL_SIZE_RANGE, SYMBOL_SIZE_RANGE, editLabel, editSymbol, findItem, removeItem, type ItemRef } from './mapItems'
+import { SYMBOL_SETS, symbolName } from './mapSymbols'
+import { MAP_THEMES } from './mapThemes'
 import {
   LAYER_NAMES, MAP_TITLE_MAX, addLayer, addTerrain, editTerrain, moveLayer, removeLayer, removeTerrain, renameLayer, resize, setScale, setTitle, terrainCounts,
-  toggleLayer, type MapDraft,
+  setOverlay, setTheme, toggleLayer, type MapDraft,
 } from './mapModel'
 import type { Maps } from './useMaps'
 
@@ -12,14 +15,103 @@ const NEW_TERRAIN_COLOURS = ['#c06c84', '#6c9bd2', '#d9a441', '#7a5c8e', '#4fa89
 const LAYER_KINDS: Array<Exclude<MapLayerKind, 'terrain'>> = ['shapes', 'symbols', 'labels', 'notes']
 const KIND_NAMES = { world: 'World or region', town: 'Town or city', interior: 'Interior' } as const
 
-// The right-hand side of the Maps console: the terrains to paint with, the layers, and the map's own fields.
-export function MapSide({ m, draft, terrain, onTerrain }: { m: Maps; draft: MapDraft; terrain: number; onTerrain: (index: number) => void }) {
+export interface MapSideProps {
+  m: Maps
+  draft: MapDraft
+  terrain: number
+  onTerrain: (index: number) => void
+  // The symbol that the Symbol tool stamps, and how wide a new one is.
+  symbolKind: string
+  onSymbolKind: (id: string) => void
+  symbolSize: number
+  onSymbolSize: (size: number) => void
+  // The chosen symbol or label (null = none); `fresh` is true for one that was just made (its text takes the cursor).
+  selected: ItemRef | null
+  fresh: boolean
+  onDeleted: () => void
+}
+
+// The right-hand side of the Maps console: what is chosen on the map, the terrains to paint with, the symbols to stamp, the layers, and the map's own fields.
+export function MapSide({ m, draft, terrain, onTerrain, symbolKind, onSymbolKind, symbolSize, onSymbolSize, selected, fresh, onDeleted }: MapSideProps) {
   return (
     <aside className="mapSide" aria-label="Map details">
+      {selected && <InspectorPanel m={m} draft={draft} selected={selected} fresh={fresh} onDeleted={onDeleted} />}
       <TerrainPanel m={m} draft={draft} terrain={terrain} onTerrain={onTerrain} />
+      <SymbolPanel kind={symbolKind} onKind={onSymbolKind} size={symbolSize} onSize={onSymbolSize} />
       <LayerPanel m={m} draft={draft} />
       <MapFieldsPanel m={m} draft={draft} />
     </aside>
+  )
+}
+
+// The symbols: four sets, and the one the Symbol tool stamps.
+function SymbolPanel({ kind, onKind, size, onSize }: { kind: string; onKind: (id: string) => void; size: number; onSize: (size: number) => void }) {
+  const [setId, setSetId] = useState(() => SYMBOL_SETS.find(s => s.symbols.some(y => y.id === kind))?.id ?? SYMBOL_SETS[0].id)
+  const set = SYMBOL_SETS.find(s => s.id === setId) ?? SYMBOL_SETS[0]
+  return (
+    <section className="mapPanel" aria-label="Symbols">
+      <header className="mapPanelHead"><h3 className="mapPanelTitle">Symbols</h3></header>
+      <div className="mapSizes" role="group" aria-label="Sets of symbols">
+        {SYMBOL_SETS.map(s => <button key={s.id} type="button" className="mapChip" aria-pressed={s.id === set.id} onClick={() => setSetId(s.id)}>{s.name}</button>)}
+      </div>
+      <ul className="mapSymbols">
+        {set.symbols.map(def => (
+          <li key={def.id}>
+            <button
+              type="button" className={`mapSymbolBtn${def.id === kind ? ' mapSymbolBtn--on' : ''}`} aria-pressed={def.id === kind} aria-label={`Stamp ${def.name}`} title={`Stamp ${def.name}`}
+              onClick={() => onKind(def.id)}
+            ><svg width="26" height="26" viewBox="0 0 24 24" aria-hidden="true"><path d={def.path} fill="currentColor" fillRule="evenodd" /></svg></button>
+          </li>
+        ))}
+      </ul>
+      <div className="mapRow">
+        <Field label="New symbols are" short><CommitNumber label="Width of a new symbol in cells" value={size} min={SYMBOL_SIZE_RANGE.min} max={SYMBOL_SIZE_RANGE.max} step={0.25} onCommit={onSize} /></Field>
+        <span className="mapHint">cells wide. Alt while placing: no snapping.</span>
+      </div>
+    </section>
+  )
+}
+
+// What is chosen on the map: a symbol (its width and colour) or a label (its text and height), and a delete.
+function InspectorPanel({ m, draft, selected, fresh, onDeleted }: { m: Maps; draft: MapDraft; selected: ItemRef; fresh: boolean; onDeleted: () => void }) {
+  const item = findItem(draft, selected)
+  if (!item) return null
+  const remove = () => { m.apply(removeItem(draft, selected)); onDeleted() }
+  if (selected.kind === 'symbol') {
+    const s = draft.symbols.find(y => y.id === selected.id)!
+    return (
+      <section className="mapPanel" aria-label="Chosen symbol">
+        <header className="mapPanelHead">
+          <h3 className="mapPanelTitle">{symbolName(s.kind)}</h3>
+          <button type="button" className="mapIconBtn" aria-label={`Delete ${symbolName(s.kind)}`} title="Delete (Delete key)" onClick={remove}><TrashIcon size={16} /></button>
+        </header>
+        <div className="mapRow">
+          <Field label="Cells wide" short><CommitNumber label="Width of the symbol in cells" value={s.size} min={SYMBOL_SIZE_RANGE.min} max={SYMBOL_SIZE_RANGE.max} step={0.25} onCommit={size => m.apply(editSymbol(draft, s.id, { size }))} /></Field>
+          <Field label="Colour" short>
+            <span className="mapRow">
+              <ColourInput label="Colour of the symbol" value={s.color ?? '#22262c'} onCommit={color => m.apply(editSymbol(draft, s.id, { color }))} />
+              <button
+                type="button" className="mapIconBtn" aria-label="Use the colour of the look" title="Use the colour of the look" disabled={s.color === null}
+                onClick={() => m.apply(editSymbol(draft, s.id, { color: null }))}
+              ><RestoreIcon size={16} /></button>
+            </span>
+          </Field>
+        </div>
+        <p className="mapHint">Drag it with the Select tool, or move it with the arrow keys (Shift for a quarter cell).</p>
+      </section>
+    )
+  }
+  const l = draft.labels.find(y => y.id === selected.id)!
+  return (
+    <section className="mapPanel" aria-label="Chosen label">
+      <header className="mapPanelHead">
+        <h3 className="mapPanelTitle">Label</h3>
+        <button type="button" className="mapIconBtn" aria-label="Delete the label" title="Delete (Delete key)" onClick={remove}><TrashIcon size={16} /></button>
+      </header>
+      <Field label="Text"><CommitText label="Text of the label" value={l.text} max={120} autoFocus={fresh} onCommit={text => m.apply(editLabel(draft, l.id, { text }))} /></Field>
+      <Field label="Cells tall" short><CommitNumber label="Height of the label in cells" value={l.size} min={LABEL_SIZE_RANGE.min} max={LABEL_SIZE_RANGE.max} step={0.25} onCommit={size => m.apply(editLabel(draft, l.id, { size }))} /></Field>
+      <p className="mapHint">Drag it with the Select tool, or move it with the arrow keys.</p>
+    </section>
   )
 }
 
@@ -125,7 +217,7 @@ function LayerPanel({ m, draft }: { m: Maps; draft: MapDraft }) {
           </li>
         ))}
       </ul>
-      <p className="mapHint">Symbols, labels and shapes arrive in the next updates; the layers are ready for them.</p>
+      <p className="mapHint">Things are placed on the top layer of their kind that is shown and not locked. Regions and lines arrive in a later update.</p>
     </section>
   )
 }
@@ -144,6 +236,16 @@ function MapFieldsPanel({ m, draft }: { m: Maps; draft: MapDraft }) {
         <div className="mapRow">
           <Field label="One cell is" short><CommitNumber label="Size of one cell" value={draft.cellSize} min={0.001} max={1_000_000} step="any" onCommit={s => m.apply(setScale(draft, s, draft.unit))} /></Field>
           <Field label="Unit" short><CommitText label="Unit of a cell" value={draft.unit} max={20} className="mapInput mapInput--unit" onCommit={u => m.apply(setScale(draft, draft.cellSize, u))} /></Field>
+        </div>
+        <Field label="Look">
+          <select className="mapSelect" aria-label="Look of the map" value={draft.theme} onChange={e => m.apply(setTheme(draft, e.target.value as MapDraft['theme']))}>
+            {MAP_THEMES.map(t => <option key={t.id} value={t.id}>{t.name}</option>)}
+          </select>
+        </Field>
+        <div className="mapChecks" role="group" aria-label="Drawn over the map">
+          {([['scaleBar', 'Scale bar'], ['compass', 'Compass'], ['legend', 'Legend']] as const).map(([field, label]) => (
+            <label key={field} className="mapCheck"><input type="checkbox" checked={draft[field]} onChange={e => m.apply(setOverlay(draft, field, e.target.checked))} />{label}</label>
+          ))}
         </div>
         <p className="mapHint">The map covers {draft.width * draft.cellSize} × {draft.height * draft.cellSize} {draft.unit}. A new size keeps the painted cells from the top left.</p>
       </div>

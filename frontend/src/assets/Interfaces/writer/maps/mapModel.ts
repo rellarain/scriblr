@@ -42,7 +42,7 @@ export function encodeCells(cells: Uint16Array): number[] {
 
 export const draftOf = (doc: MapDoc): MapDraft => ({ ...doc, cells: decodeCells(doc.cells, doc.width * doc.height) })
 export const docOf = (draft: MapDraft): MapDoc => ({ ...draft, cells: encodeCells(draft.cells) })
-const metaOf = ({ cells: _cells, updatedAt: _updatedAt, ...meta }: MapDraft): MapMeta => meta
+export const metaOf = ({ cells: _cells, updatedAt: _updatedAt, ...meta }: MapDraft): MapMeta => meta
 
 export const cellIndex = (width: number, x: number, y: number) => y * width + x
 export const inside = (draft: Pick<MapDraft, 'width' | 'height'>, x: number, y: number) => x >= 0 && y >= 0 && x < draft.width && y < draft.height
@@ -183,7 +183,7 @@ function applyEdit(draft: MapDraft, edit: MapEdit, way: 'undo' | 'redo'): MapDra
 }
 
 // A change of the map's own fields as an undo entry (and the new draft).
-function change(draft: MapDraft, fields: Partial<MapMeta>, cells?: Uint16Array): { draft: MapDraft; edit: MapEdit } {
+export function change(draft: MapDraft, fields: Partial<MapMeta>, cells?: Uint16Array): { draft: MapDraft; edit: MapEdit } {
   const next: MapDraft = { ...draft, ...fields, cells: cells ?? draft.cells }
   return { draft: next, edit: { kind: 'meta', before: metaOf(draft), after: metaOf(next), ...(cells ? { cellsBefore: draft.cells, cellsAfter: cells } : {}) } }
 }
@@ -201,6 +201,15 @@ export function setScale(draft: MapDraft, cellSize: number, unit: string): Chang
   const size = Number.isFinite(cellSize) && cellSize > 0 ? Math.min(cellSize, 1_000_000) : draft.cellSize
   const name = unit.trim().slice(0, 20) || draft.unit
   return size === draft.cellSize && name === draft.unit ? null : change(draft, { cellSize: size, unit: name })
+}
+
+// The map's look (how its terrain colours and text are drawn), and what is drawn over it.
+export function setTheme(draft: MapDraft, theme: MapDraft['theme']): Change {
+  return theme === draft.theme ? null : change(draft, { theme })
+}
+
+export function setOverlay(draft: MapDraft, field: 'scaleBar' | 'compass' | 'legend', on: boolean): Change {
+  return draft[field] === on ? null : change(draft, { [field]: on })
 }
 
 // A new size: what the old cells cover is kept (from the top left), the new cells are the first terrain.
@@ -270,6 +279,9 @@ export function renameLayer(draft: MapDraft, id: string, name: string): Change {
   return change(draft, { layers: draft.layers.map(l => (l.id === id ? { ...l, name: next } : l)) })
 }
 
+// An undo entry for a change that was made without one (a drag that was shown as it went): the fields before and after.
+export const metaEdit = (before: MapDraft, after: MapDraft): MapEdit => ({ kind: 'meta', before: metaOf(before), after: metaOf(after) })
+
 // A layer one place up (+1, drawn later) or down (-1).
 export function moveLayer(draft: MapDraft, id: string, dir: -1 | 1): Change {
   const from = draft.layers.findIndex(l => l.id === id)
@@ -292,7 +304,7 @@ export function addLayer(draft: MapDraft, kind: Exclude<MapLayerKind, 'terrain'>
 export function removeLayer(draft: MapDraft, id: string): Change {
   const layer = draft.layers.find(l => l.id === id)
   if (!layer || layer.kind === 'terrain') return null
-  return change(draft, { layers: draft.layers.filter(l => l.id !== id) })
+  return change(draft, { layers: draft.layers.filter(l => l.id !== id), symbols: draft.symbols.filter(i => i.layerId !== id), labels: draft.labels.filter(i => i.layerId !== id) })
 }
 
 // Whether the terrain can be painted now: its layer is shown and not locked.

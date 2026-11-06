@@ -96,3 +96,14 @@
   .mapStage { flex: 0 0 auto; }
   .mapBox { min-height: 360px; }
 }
+
+// ---- symbols, the chosen thing and the look ----
+.mapSymbols { list-style: none; margin: 0; padding: 0; display: grid; grid-template-columns: repeat(auto-fill, minmax(38px, 1fr)); gap: var(--space-1); }
+.mapSymbolBtn {
+  display: flex; align-items: center; justify-content: center; width: 100%; aspect-ratio: 1; padding: 0; border: 0; border-radius: var(--radius-button); background: var(--ov-sink-1); color: var(--ink); cursor: pointer;
+  &:hover { background: var(--ov-sink-2); }
+  &--on { background: var(--ov-sink-2); box-shadow: inset 0 -2px 0 var(--accent); }
+  &:focus-visible { outline: 2px solid var(--accent-hover); outline-offset: 1px; }
+}
+.mapChecks { display: flex; flex-wrap: wrap; gap: var(--space-3) var(--space-5); }
+.mapCheck { display: inline-flex; align-items: center; gap: var(--space-2); font-size: var(--text-field); cursor: pointer; input { margin: 0; } }

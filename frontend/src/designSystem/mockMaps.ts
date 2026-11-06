@@ -34,7 +34,7 @@ export function newMap(id: string, body: MapCreate, order: number): MapDoc {
     cellSize: body.cellSize ?? 1, unit: body.unit?.trim() || 'cells',
     terrains: SETS[kind].map(([tid, name, color]) => ({ id: tid, name, color, builtIn: true })),
     layers: LAYERS.map(([lid, name]) => ({ id: lid, name, kind: lid as MapDoc['layers'][number]['kind'], visible: true, locked: false })),
-    cells: [0, width * height], updatedAt: AT,
+    cells: [0, width * height], symbols: [], labels: [], theme: body.theme ?? 'modern', scaleBar: true, compass: true, legend: false, updatedAt: AT,
   }
 }
 
@@ -115,6 +115,18 @@ export function seedMaps(): MapDoc[] {
   const cells: number[] = []
   for (const v of flat) { if (cells.length > 0 && cells[cells.length - 2] === v) cells[cells.length - 1] += 1; else cells.push(v, 1) }
   world.cells = cells
+  world.theme = 'parchment'
+  world.legend = true
+  const stamp = (id: string, kind: string, x: number, y: number, size = 2) => ({ id, layerId: 'symbols', kind, x, y, size, color: null })
+  world.symbols = [
+    stamp('sym_a', 'city', 11.5, 8.5, 2.5), stamp('sym_b', 'castle', 7.5, 6.5), stamp('sym_c', 'mountain', 22.5, 4.5, 3), stamp('sym_d', 'mountain', 20.5, 6.5, 2),
+    stamp('sym_e', 'tree', 9.5, 11.5, 1.5), stamp('sym_f', 'pine', 13.5, 11.5, 1.5), stamp('sym_g', 'harbour', 4.5, 9.5), stamp('sym_h', 'ship', 3.5, 13.5, 1.5),
+  ]
+  world.labels = [
+    { id: 'lbl_a', layerId: 'labels', text: 'Port Veyra', x: 11.5, y: 6.7, size: 1.2 },
+    { id: 'lbl_b', layerId: 'labels', text: 'The Spine', x: 21.5, y: 8.8, size: 1.1 },
+    { id: 'lbl_c', layerId: 'labels', text: 'Sea of Glass', x: 4.5, y: 3.2, size: 1.3 },
+  ]
   const town = newMap('map_town', { title: 'Port Veyra', kind: 'town', width: 24, height: 16, cellSize: 10, unit: 'paces', parentId: 'map_world' }, 0)
   return [world, town]
 }

@@ -1679,6 +1679,84 @@ def repair_map_runs(runs: Any, total: int, terrains: int) -> list[int]:
     return out
 
 
+MAP_MAX_SYMBOLS = 5000
+MAP_MAX_LABELS = 1000
+MapThemeName = Literal["parchment", "modern", "night", "blueprint"]
+
+
+def _finite(value: Any, default: float, low: float, high: float) -> float:
+    """A number held to a range; anything that is not a finite number is the default."""
+    if isinstance(value, bool) or not isinstance(value, (int, float)) or value != value or value in (float("inf"), float("-inf")):
+        return default
+    return min(high, max(low, float(value)))
+
+
+class MapSymbol(BaseModel):
+    """A stamp on a map (a town, a tree, a door ...): `kind` names a symbol of the front end's library, `x` and `y` are its centre in cells."""
+
+    id: str = Field(min_length=1, max_length=40)
+    layerId: str = Field(min_length=1, max_length=40)
+    kind: str = Field(min_length=1, max_length=40)
+    x: float = 0.0
+    y: float = 0.0
+    # How many cells wide it is drawn.
+    size: float = 2.0
+    # Its own colour (#rrggbb); none = the map theme's symbol colour.
+    color: Optional[str] = None
+
+    @field_validator("x", "y", mode="before")
+    @classmethod
+    def _coordinate(cls, value: Any) -> Any:
+        return _finite(value, 0.0, -1.0, 100000.0)
+
+    @field_validator("size", mode="before")
+    @classmethod
+    def _size(cls, value: Any) -> Any:
+        return _finite(value, 2.0, 0.25, 16.0)
+
+    @field_validator("color", mode="before")
+    @classmethod
+    def _color_or_none(cls, value: Any) -> Any:
+        return value if isinstance(value, str) and _MAP_HEX_COLOR.match(value) else None
+
+
+class MapLabel(BaseModel):
+    """A line of text on a map, centred on `x`, `y` (cells); `size` is its height in cells."""
+
+    id: str = Field(min_length=1, max_length=40)
+    layerId: str = Field(min_length=1, max_length=40)
+    text: str = Field(default="", max_length=120)
+    x: float = 0.0
+    y: float = 0.0
+    size: float = 1.0
+
+    @field_validator("text", mode="before")
+    @classmethod
+    def _cut_text(cls, value: Any) -> Any:
+        return value.strip()[:120] if isinstance(value, str) else ""
+
+    @field_validator("x", "y", mode="before")
+    @classmethod
+    def _coordinate(cls, value: Any) -> Any:
+        return _finite(value, 0.0, -1.0, 100000.0)
+
+    @field_validator("size", mode="before")
+    @classmethod
+    def _size(cls, value: Any) -> Any:
+        return _finite(value, 1.0, 0.25, 16.0)
+
+
+def _valid_items(value: Any, model: Any) -> list[Any]:
+    """The items of a list that read as `model`; one that does not is dropped, so it cannot refuse the whole map."""
+    out: list[Any] = []
+    for item in value if isinstance(value, list) else []:
+        try:
+            out.append(model.model_validate(item))
+        except ValueError:
+            continue
+    return out
+
+
 class MapDoc(BaseModel):
     schemaVersion: int = SCHEMA_VERSION
     id: str = Field(min_length=1, max_length=80)
@@ -1696,7 +1774,35 @@ class MapDoc(BaseModel):
     layers: list[MapLayer] = Field(default_factory=list)
     # The terrain of every cell, row by row, as run pairs [index into `terrains`, how many cells, ...].
     cells: list[int] = Field(default_factory=list)
+    # The stamps and the text on the map, each on a layer of the matching kind (symbols, labels).
+    symbols: list[MapSymbol] = Field(default_factory=list)
+    labels: list[MapLabel] = Field(default_factory=list)
+    # The look of the map (how the terrain colours and the text are drawn) and what is drawn over it.
+    theme: MapThemeName = "modern"
+    scaleBar: bool = True
+    compass: bool = True
+    legend: bool = False
     updatedAt: datetime = Field(default_factory=utcnow)
+
+    @field_validator("symbols", mode="before")
+    @classmethod
+    def _symbols_read(cls, value: Any) -> Any:
+        return _valid_items(value, MapSymbol)
+
+    @field_validator("labels", mode="before")
+    @classmethod
+    def _labels_read(cls, value: Any) -> Any:
+        return _valid_items(value, MapLabel)
+
+    @field_validator("theme", mode="before")
+    @classmethod
+    def _theme_or_modern(cls, value: Any) -> Any:
+        return value if value in ("parchment", "modern", "night", "blueprint") else "modern"
+
+    @field_validator("scaleBar", "compass", "legend", mode="before")
+    @classmethod
+    def _flag(cls, value: Any, info: Any) -> Any:
+        return value if isinstance(value, bool) else info.field_name != "legend"
 
     @field_validator("cells", mode="before")
     @classmethod
@@ -1739,7 +1845,25 @@ class MapDoc(BaseModel):
             layers.insert(0, MapLayer(id="terrain", name="Terrain", kind="terrain", locked=False))
         self.layers = layers
         self.cells = repair_map_runs(self.cells, self.width * self.height, len(terrains))
+        self.symbols = self._kept(self.symbols, "symbols", MAP_MAX_SYMBOLS)
+        self.labels = self._kept(self.labels, "labels", MAP_MAX_LABELS)
         return self
+
+    def _kept(self, items: list[Any], kind: str, limit: int) -> list[Any]:
+        """The items that sit on a layer of their kind, each id once, at most `limit`, held to the map."""
+        layer_ids = {layer.id for layer in self.layers if layer.kind == kind}
+        seen: set[str] = set()
+        out: list[Any] = []
+        for item in items:
+            if item.layerId not in layer_ids or item.id in seen:
+                continue
+            seen.add(item.id)
+            item.x = min(float(self.width), max(0.0, item.x))
+            item.y = min(float(self.height), max(0.0, item.y))
+            out.append(item)
+            if len(out) >= limit:
+                break
+        return out
 
 
 class ProjectFile(BaseModel):

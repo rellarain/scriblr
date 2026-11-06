@@ -3,7 +3,7 @@ import { useEffect, useRef, useState } from 'react'
 // Small inputs for the map panels. Typing is kept in the field and handed over when the field is left or Enter is pressed (one undo step for a title,
 // not one per letter); a value that does not fit is put back.
 
-export function CommitText({ label, value, onCommit, max, className = 'mapInput', live = false }: {
+export function CommitText({ label, value, onCommit, max, className = 'mapInput', live = false, autoFocus = false }: {
   label: string
   value: string
   onCommit: (value: string) => void
@@ -11,8 +11,12 @@ export function CommitText({ label, value, onCommit, max, className = 'mapInput'
   className?: string
   // Hand over every keystroke (a form that is submitted with Enter), not just the finished text.
   live?: boolean
+  // Take the cursor, with the text selected, when it appears (a thing that was just made).
+  autoFocus?: boolean
 }) {
   const [text, setText] = useState(value)
+  const input = useRef<HTMLInputElement | null>(null)
+  useEffect(() => { if (autoFocus) { input.current?.focus(); input.current?.select() } }, [autoFocus])
   useEffect(() => { setText(value) }, [value])
   const done = () => {
     if (text !== value) onCommit(text)
@@ -20,7 +24,7 @@ export function CommitText({ label, value, onCommit, max, className = 'mapInput'
   }
   return (
     <input
-      type="text" className={className} aria-label={label} title={label} value={text} maxLength={max}
+      ref={input} type="text" className={className} aria-label={label} title={label} value={text} maxLength={max}
       onChange={e => { setText(e.target.value); if (live) onCommit(e.target.value) }} onBlur={done}
       onKeyDown={e => { if (e.key === 'Enter') { if (!live) e.currentTarget.blur() } else if (e.key === 'Escape') { setText(value); e.currentTarget.blur() } }}
     />

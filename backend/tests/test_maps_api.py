@@ -201,3 +201,82 @@ def test_maps_are_stored_in_project_json_and_survive_a_cold_read(client: TestCli
     raw = json.loads((storage_root / pid / "project.json").read_text(encoding="utf-8"))
     assert raw["maps"][doc["id"]]["cells"] == [1, 10, 2, 15]
     assert client.get(f"/api/projects/{pid}/maps/{doc['id']}").json()["cells"] == [1, 10, 2, 15]
+
+
+# ---- symbols, labels, the look and what is drawn over the map ----
+
+def _item(**over) -> dict:
+    return {"id": "s1", "layerId": "symbols", "kind": "castle", "x": 3.5, "y": 2.5, "size": 2.0, "color": None, **over}
+
+
+def test_a_new_map_has_the_modern_look_and_the_scale_and_compass_on(client: TestClient) -> None:
+    pid = _project(client)
+    doc = _new(client, pid)
+    assert (doc["theme"], doc["scaleBar"], doc["compass"], doc["legend"], doc["symbols"], doc["labels"]) == ("modern", True, True, False, [], [])
+    assert _new(client, pid, theme="night")["theme"] == "night"
+    assert client.post(f"/api/projects/{pid}/maps", json={"theme": "neon"}).status_code == 422
+
+
+def test_symbols_and_labels_round_trip(client: TestClient) -> None:
+    pid = _project(client)
+    doc = _new(client, pid, width=10, height=8)
+    doc["symbols"] = [_item(), _item(id="s2", kind="tree", color="#336699", x=1, y=1)]
+    doc["labels"] = [{"id": "l1", "layerId": "labels", "text": "Port Veyra", "x": 4, "y": 3, "size": 1.5}]
+    doc.update(theme="blueprint", scaleBar=False, compass=False, legend=True)
+    assert client.put(f"/api/projects/{pid}/maps/{doc['id']}", json=doc).status_code == 200
+    again = client.get(f"/api/projects/{pid}/maps/{doc['id']}").json()
+    assert [(s["id"], s["kind"], s["color"]) for s in again["symbols"]] == [("s1", "castle", None), ("s2", "tree", "#336699")]
+    assert again["labels"] == [{"id": "l1", "layerId": "labels", "text": "Port Veyra", "x": 4.0, "y": 3.0, "size": 1.5}]
+    assert (again["theme"], again["scaleBar"], again["compass"], again["legend"]) == ("blueprint", False, False, True)
+
+
+def test_odd_items_are_repaired_or_dropped_not_refused(client: TestClient) -> None:
+    pid = _project(client)
+    doc = _new(client, pid, width=10, height=8)
+    doc["symbols"] = [
+        _item(id="ok", x=99, y=-5, size=99, color="red"),   # held to the map and the sizes, a bad colour is none
+        _item(id="ok"),                                      # a repeat id
+        _item(id="lost", layerId="labels"),                  # on a layer of another kind
+        _item(id="ghost", layerId="nope"),                   # on a layer that is not there
+        "not an item", {"id": "x"}, {"id": "y", "layerId": "symbols"},  # unreadable or missing its kind
+        _item(id="nan", x="far", size="big"),
+    ]
+    doc["labels"] = [{"id": "l", "layerId": "labels", "text": "  " + "x" * 300, "x": 1, "y": 1, "size": 0}, 5]
+    doc.update(theme="neon", scaleBar="yes", legend=None)
+    resp = client.put(f"/api/projects/{pid}/maps/{doc['id']}", json=doc)
+    assert resp.status_code == 200, resp.text
+    saved = resp.json()
+    by_id = {s["id"]: s for s in saved["symbols"]}
+    assert set(by_id) == {"ok", "nan"}
+    assert (by_id["ok"]["x"], by_id["ok"]["y"], by_id["ok"]["size"], by_id["ok"]["color"]) == (10.0, 0.0, 16.0, None)
+    assert (by_id["nan"]["x"], by_id["nan"]["size"]) == (0.0, 2.0)
+    assert len(saved["labels"]) == 1 and len(saved["labels"][0]["text"]) == 120 and saved["labels"][0]["size"] == 0.25
+    assert (saved["theme"], saved["scaleBar"], saved["legend"]) == ("modern", True, False)
+
+
+def test_items_on_a_layer_that_is_gone_go_with_it_and_the_map_holds_at_most_so_many(client: TestClient) -> None:
+    from app.storage.schema import MAP_MAX_LABELS, MAP_MAX_SYMBOLS
+
+    pid = _project(client)
+    doc = _new(client, pid, width=4, height=4)
+    doc["symbols"] = [_item(id=f"s{i}") for i in range(MAP_MAX_SYMBOLS + 5)]
+    doc["labels"] = [{"id": f"l{i}", "layerId": "labels", "text": "x", "x": 1, "y": 1, "size": 1} for i in range(MAP_MAX_LABELS + 5)]
+    saved = client.put(f"/api/projects/{pid}/maps/{doc['id']}", json=doc).json()
+    assert (len(saved["symbols"]), len(saved["labels"])) == (MAP_MAX_SYMBOLS, MAP_MAX_LABELS)
+    doc["layers"] = [layer for layer in doc["layers"] if layer["id"] != "symbols"]
+    assert client.put(f"/api/projects/{pid}/maps/{doc['id']}", json=doc).json()["symbols"] == []
+
+
+def test_a_map_saved_before_these_fields_loads_with_the_defaults(client: TestClient, storage_root: Path) -> None:
+    pid = _project(client)
+    doc = _new(client, pid)
+    path = storage_root / pid / "project.json"
+    raw = json.loads(path.read_text(encoding="utf-8"))
+    for key in ("symbols", "labels", "theme", "scaleBar", "compass", "legend"):
+        raw["maps"][doc["id"]].pop(key, None)
+    path.write_text(json.dumps(raw), encoding="utf-8")
+    from app.storage import project_store
+
+    project_store._cache.clear()
+    again = client.get(f"/api/projects/{pid}/maps/{doc['id']}").json()
+    assert (again["theme"], again["scaleBar"], again["compass"], again["legend"], again["symbols"], again["labels"]) == ("modern", True, True, False, [], [])

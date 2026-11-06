@@ -1,8 +1,9 @@
 import { useMemo, useState } from 'react'
-import { MAP_MAX_SIDE, type MapKind, type MapSummary } from '../../../../api/types'
+import { MAP_MAX_SIDE, type MapKind, type MapSummary, type MapThemeName } from '../../../../api/types'
 import { CheckIcon, ChevronRightIcon, CloseIcon, MapIcon, PlusIcon, TrashIcon } from '../../../icons'
 import { CommitNumber, CommitText, Field } from './MapFields'
 import { MAP_TITLE_MAX, mapRows } from './mapModel'
+import { MAP_THEMES } from './mapThemes'
 import type { Maps } from './useMaps'
 
 const KINDS: Array<{ kind: MapKind; name: string; cell: number; unit: string }> = [
@@ -60,6 +61,7 @@ function NewMapForm({ m, maps, onDone }: { m: Maps; maps: MapSummary[]; onDone: 
   const [height, setHeight] = useState(48)
   const [cell, setCell] = useState(10)
   const [unit, setUnit] = useState('miles')
+  const [theme, setTheme] = useState<MapThemeName>('parchment')
   const [parent, setParent] = useState('')
   const [busy, setBusy] = useState(false)
 
@@ -69,7 +71,7 @@ function NewMapForm({ m, maps, onDone }: { m: Maps; maps: MapSummary[]; onDone: 
   }
   async function make() {
     setBusy(true)
-    const id = await m.create({ title: title.trim() || undefined, kind, width, height, cellSize: cell, unit, parentId: parent || null })
+    const id = await m.create({ title: title.trim() || undefined, kind, width, height, cellSize: cell, unit, theme, parentId: parent || null })
     setBusy(false)
     if (id) onDone()
   }
@@ -100,6 +102,11 @@ function NewMapForm({ m, maps, onDone }: { m: Maps; maps: MapSummary[]; onDone: 
         <Field label="One cell is" short><CommitNumber label="Size of one cell" value={cell} min={0.001} max={1_000_000} step="any" onCommit={setCell} live /></Field>
         <Field label="Unit" short><CommitText label="Unit of a cell" value={unit} max={20} className="mapInput mapInput--unit" onCommit={setUnit} live /></Field>
       </div>
+      <Field label="Look">
+        <select className="mapSelect" aria-label="Look of the new map" value={theme} onChange={e => setTheme(e.target.value as MapThemeName)}>
+          {MAP_THEMES.map(t => <option key={t.id} value={t.id}>{t.name}</option>)}
+        </select>
+      </Field>
       {maps.length > 0 && (
         <Field label="Inside">
           <select className="mapSelect" aria-label="Inside which map" value={parent} onChange={e => setParent(e.target.value)}>

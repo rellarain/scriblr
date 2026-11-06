@@ -416,6 +416,11 @@ export interface MapTerrain { id: string; name: string; color: string; builtIn: 
 export interface MapLayer { id: string; name: string; kind: MapLayerKind; visible: boolean; locked: boolean }
 // A map: a grid of terrain cells (painted), its palette and layers, and its place among the maps (a map can be inside another one).
 // `cells` is the terrain of every cell, row by row, as run pairs [index into `terrains`, how many cells, ...].
+export type MapThemeName = 'parchment' | 'modern' | 'night' | 'blueprint'
+// A stamp (`kind` is a symbol of the library, mapSymbols.ts): its centre in cells, how many cells wide, its own colour (null = the theme's).
+export interface MapSymbol { id: string; layerId: string; kind: string; x: number; y: number; size: number; color: string | null }
+// A line of text centred on a point; `size` is its height in cells.
+export interface MapLabel { id: string; layerId: string; text: string; x: number; y: number; size: number }
 export interface MapDoc {
   schemaVersion: number
   id: string
@@ -431,8 +436,14 @@ export interface MapDoc {
   terrains: MapTerrain[]
   layers: MapLayer[]
   cells: number[]
+  symbols: MapSymbol[]
+  labels: MapLabel[]
+  theme: MapThemeName
+  scaleBar: boolean
+  compass: boolean
+  legend: boolean
   updatedAt: string
 }
 export interface MapSummary { id: string; title: string; kind: MapKind; parentId: string | null; order: number; width: number; height: number; updatedAt: string }
-export interface MapCreate { title?: string; kind?: MapKind; width?: number; height?: number; cellSize?: number; unit?: string; parentId?: string | null }
+export interface MapCreate { title?: string; kind?: MapKind; width?: number; height?: number; cellSize?: number; unit?: string; parentId?: string | null; theme?: MapThemeName }
 export const MAP_MAX_SIDE = 512

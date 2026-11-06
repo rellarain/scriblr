@@ -16,6 +16,7 @@ from ..storage.schema import (
     MapKind,
     MapLayer,
     MapTerrain,
+    MapThemeName,
     utcnow,
 )
 
@@ -41,6 +42,7 @@ class MapCreate(BaseModel):
     cellSize: float = Field(default=1.0, gt=0, le=1_000_000)
     unit: str = Field(default="cells", max_length=20)
     parentId: Optional[str] = None
+    theme: MapThemeName = "modern"
 
 
 def _is_inside(parents: dict[str, Optional[str]], map_id: str, ancestor: str) -> bool:
@@ -72,7 +74,7 @@ def create_map(project_id: str, body: MapCreate, root: Path = Depends(get_storag
         siblings = [m for m in store.list_map_summaries(root, project_id) if m["parentId"] == body.parentId]
         doc = MapDoc(
             id=store.new_id("map"), title=body.title, kind=body.kind, parentId=body.parentId, order=max((m["order"] for m in siblings), default=-1) + 1,
-            width=body.width, height=body.height, cellSize=body.cellSize, unit=body.unit,
+            width=body.width, height=body.height, cellSize=body.cellSize, unit=body.unit, theme=body.theme,
             terrains=[MapTerrain(id=i, name=n, color=c, builtIn=True) for i, n, c in MAP_TERRAIN_SETS[body.kind]],
             layers=[MapLayer(id=i, name=n, kind=k) for i, n, k in MAP_DEFAULT_LAYERS],
         )
