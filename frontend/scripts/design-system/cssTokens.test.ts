@@ -86,7 +86,7 @@ describe('the Writer stylesheets use the tokens', () => {
   // under it, see known-drift.)
   it('set no text under 11px', () => {
     const small: string[] = []
-    for (const { name, text } of [...files, ...readStyleFiles('App.scss'), ...readStyleFiles('assets/Interfaces/admin/resources/resources.scss'), ...readStyleFiles('assets/Interfaces/admin/plot/plotPresets.scss'), ...readStyleFiles('assets/Interfaces/admin/instructor/instructor.scss'), ...readStyleFiles('assets/Interfaces/writer/maps/maps.scss')]) {
+    for (const { name, text } of [...files, ...readStyleFiles('App.scss'), ...readStyleFiles('assets/Interfaces/admin/resources/resources.scss'), ...readStyleFiles('assets/Interfaces/admin/plot/plotPresets.scss'), ...readStyleFiles('assets/Interfaces/admin/instructor/instructor.scss'), ...readStyleFiles('assets/Interfaces/writer/maps/maps.scss'), ...readStyleFiles('assets/Interfaces/writer/characters/characters.scss')]) {
       text.split('\n').forEach((line, i) => {
         for (const m of line.matchAll(/(?<![\w-])font-size:\s*(\d+(?:\.\d+)?)px|(?<![\w-])font:\s*[\w ]*?(\d+(?:\.\d+)?)px/g)) {
           const size = Number(m[1] ?? m[2])

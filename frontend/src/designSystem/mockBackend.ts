@@ -8,6 +8,7 @@ import type { Holding, ReaderState } from '../api/reader'
 import { createMockSocial } from './mockSocial'
 import { READER_BOOKS, READERS, bookDetailFixture, readerFixture, recommendationsFixture } from './readerFixtures'
 import { createMockPresets, previewPresets } from './mockPresets'
+import { createMockCharacters, seedCharacters } from './mockCharacters'
 import { createMockMaps, seedMaps } from './mockMaps'
 import { createMockTraining, emptyProgress } from './mockTraining'
 import { facetsFixture, localDay, plannerFixture, ribbonFixture } from './scheduleFixtures'
@@ -192,6 +193,8 @@ export function createMockBackend() {
   const training = createMockTraining(undefined, { ...emptyProgress(), enrolled: { 'writer-c1': '2026-11-02T12:00:00.000Z' } })
   // The Maps console's maps, which its edits change in memory only.
   const maps = createMockMaps(seedMaps())
+  // The Characters console's cast, which its edits change in memory only.
+  const cast = createMockCharacters(seedCharacters())
   // The Schedule console's planner, which its edits change in memory only.
   let planner: Planner = plannerFixture(localDay())
 
@@ -259,6 +262,7 @@ export function createMockBackend() {
       return json(project.plot)
     }
     if (rest[0] === 'maps') { const answer = maps.route(method, rest.slice(1), body); return answer.body === undefined ? new Response(null, { status: answer.status }) : json(answer.body, answer.status) }
+    if (rest[0] === 'characters') { const answer = cast.route(method, rest.slice(1), body); return answer.body === undefined ? new Response(null, { status: answer.status }) : json(answer.body, answer.status) }
     if (rest[0] === 'analytics') return json(analytics(project))
     if (rest[0] === 'activity' && rest[1] === 'facets') return json(facetsFixture(localDay(), FIXTURE_IDS.book))
     if (rest[0] === 'planner') {

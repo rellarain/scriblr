@@ -21,6 +21,7 @@ import { PlotpointTile } from '../assets/Interfaces/writer/PlotpointTile'
 import { PlotNav } from '../assets/Interfaces/writer/PlotNav'
 import PlotPresetsConsole from '../assets/Interfaces/admin/plot/PlotPresetsConsole'
 import InstructorConsole from '../assets/Interfaces/admin/instructor/InstructorConsole'
+import CharactersConsole from '../assets/Interfaces/writer/characters/CharactersConsole'
 import MapsConsole from '../assets/Interfaces/writer/maps/MapsConsole'
 import { shelfGroups } from '../assets/Interfaces/writer/outlineTree'
 import { Shelf } from '../assets/Interfaces/writer/Shelf'
@@ -278,6 +279,15 @@ function MapsCard() {
   )
 }
 
+// The Characters console as it sits in the Project level's Characters tab (on the tab's surface), against the pretend Characters API.
+function CharactersCard() {
+  return (
+    <div style={{ width: '100%', height: '100%', boxSizing: 'border-box', padding: 'var(--space-4)', background: 'var(--surface-side)', color: 'var(--ink)', overflow: 'hidden' }}>
+      <CharactersConsole projectId={FIXTURE_PROJECT_ID} />
+    </div>
+  )
+}
+
 function IconsCard() {
   const icons = Object.entries(Icons).filter(([name, v]) => /Icon$/.test(name) && typeof v === 'function' && name !== 'ReactionHeartIcon')
   return (
@@ -377,6 +387,7 @@ export const CARDS: CardDef[] = [
   card('plotpoint-tiles', { defaults: { zones: ['day'] }, render: () => <PlotpointsCard /> }),
   card('plot-presets', { frame: 'plain', views: [{ id: 'admin', label: 'Admin page' }, { id: 'sidebar', label: 'Plot sidebar', frame: 'writer' }], defaults: { view: 'admin', zones: ['day', 'night'], width: 1200 }, render: ({ view }) => <PlotPresetsCard key={view} view={view} /> }),
   card('instructor', { frame: 'plain', defaults: { zones: ['day', 'night'], width: 1200 }, render: () => <InstructorCard /> }),
+  card('characters', { frame: 'plain', defaults: { zones: ['day', 'night'], width: 1200 }, render: () => <CharactersCard /> }),
   card('maps', { frame: 'plain', defaults: { zones: ['day', 'night'], width: 1200 }, render: () => <MapsCard /> }),
   card('shelf', { defaults: { zones: ['day', 'night'] }, render: () => <ShelfCard /> }),
   card('draft-page', { views: WRITER_VIEWS.slice(3), defaults: { view: 'chapter', zones: ['day'] }, render: ({ view }) => <PreviewWriter key={view} view={view as WriterView} /> }),

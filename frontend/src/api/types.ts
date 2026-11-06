@@ -466,3 +466,36 @@ export interface MapDoc {
 export interface MapSummary { id: string; title: string; kind: MapKind; parentId: string | null; order: number; width: number; height: number; updatedAt: string }
 export interface MapCreate { title?: string; kind?: MapKind; width?: number; height?: number; cellSize?: number; unit?: string; parentId?: string | null; theme?: MapThemeName }
 export const MAP_MAX_SIDE = 512
+
+// ---- characters (the cast) ----
+// A character is its look: the parameters the figure is drawn from (ids of the part library, colours, sliders, marks, an outfit and a pose). No images are stored.
+export const CHARACTER_MAX_MARKS = 40
+export const CHARACTER_MAX_STROKES = 12
+export const CHARACTER_MAX_ACCESSORIES = 8
+export type CharacterMarkKind = 'freckles' | 'mole' | 'scar' | 'birthmark' | 'tattoo' | 'blush' | 'makeup' | 'paint'
+// A mark on an area of the body: (x, y) place it on the area (0 to 1 across and down); `strokes` are the lines of a tattoo the author drew (points 0 to 1 on the area).
+export interface CharacterMark {
+  id: string; kind: CharacterMarkKind; design: string; area: string
+  x: number; y: number; size: number; color: string | null; strokes: Array<Array<[number, number]>>
+}
+export interface CharacterOutfit {
+  top: string | null; bottom: string | null; shoes: string | null; outer: string | null
+  accessories: string[]
+  // A colour for each slot (top, bottom, shoes, outer, accessory).
+  colors: Record<string, string>
+}
+export interface CharacterLook {
+  skin: string; build: string; height: number; width: number; shoulders: number
+  headShape: string; headWidth: number; ears: string; earSize: number
+  eyes: string; eyeColor: string; eyeSize: number; eyeSpacing: number; eyeTilt: number
+  brows: string; browColor: string; browThickness: number; browTilt: number
+  nose: string; noseSize: number; noseWidth: number
+  mouth: string; mouthSize: number; lipColor: string
+  facialHair: string; facialHairColor: string
+  hair: string; hairColor: string; hairLength: number; streakColor: string | null; streakAmount: number
+  expression: string; pose: string; heldLeft: string | null; heldRight: string | null
+  outfit: CharacterOutfit; marks: CharacterMark[]
+}
+export interface CharacterDoc { schemaVersion: number; id: string; name: string; order: number; look: CharacterLook; updatedAt: string }
+export interface CharacterSummary { id: string; name: string; order: number; updatedAt: string }
+export interface CharacterCreate { name?: string; look?: CharacterLook }

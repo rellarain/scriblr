@@ -26,6 +26,7 @@ from .schema import (
     DraftChapterMoment,
     DraftMoment,
     FacetActivity,
+    CharacterDoc,
     MapDoc,
     OutlineTree,
     Planner,
@@ -619,6 +620,7 @@ def _load_project_file_locked(root: Path, project_id: str) -> tuple[ProjectFile,
         revisionFlags=_parse_list_section(raw, "revisionFlags", RevisionFlag, project_dir, path, errors),
         planner=_parse_section_default(raw, "planner", Planner, project_dir, path, errors, planner_default),
         maps=_parse_dict_section(raw, "maps", MapDoc, project_dir, path, errors),
+        characters=_parse_dict_section(raw, "characters", CharacterDoc, project_dir, path, errors),
         scrap=_parse_section_default(raw, "scrap", ScrapRegistry, project_dir, path, errors, scrap_default),
         settingsLog=_parse_list_section(raw, "settingsLog", SettingsLogEntry, project_dir, path, errors),
     )
@@ -1492,3 +1494,54 @@ def list_map_summaries(root: Path, project_id: str) -> list[dict]:
 def map_parents(root: Path, project_id: str) -> dict[str, Optional[str]]:
     """Map id -> the id of the map it is inside."""
     return _read(root, project_id, lambda pf, _errors: {m.id: m.parentId for m in pf.maps.values()}, copy_result=False)
+
+
+# ---------------------------------------------------------------------------
+# Characters (the cast)
+# ---------------------------------------------------------------------------
+
+
+class CharacterNotFoundError(Exception):
+    def __init__(self, project_id: str, character_id: str) -> None:
+        self.project_id = project_id
+        self.character_id = character_id
+        super().__init__(f"character {character_id} not found in project {project_id}")
+
+
+def list_characters(root: Path, project_id: str) -> list[CharacterDoc]:
+    """Every readable character, whole (each is a copy), in order."""
+    return _read(root, project_id, lambda pf, _errors: sorted(pf.characters.values(), key=lambda c: (c.order, c.name.lower(), c.id)))
+
+
+def load_character(root: Path, project_id: str, character_id: str) -> CharacterDoc:
+    def pick(pf: ProjectFile, errors: dict[str, ShardCorruptError]) -> Optional[CharacterDoc]:
+        key = f"characters.{character_id}"
+        if key in errors:
+            raise errors[key]
+        return pf.characters.get(character_id)
+
+    found = _read(root, project_id, pick)
+    if found is None:
+        raise CharacterNotFoundError(project_id, character_id)
+    return found
+
+
+def save_character(root: Path, project_id: str, doc: CharacterDoc) -> None:
+    def _do(pf: ProjectFile) -> None:
+        pf.characters[doc.id] = doc
+        pf.index.updatedAt = utcnow()
+
+    _mutate(root, project_id, _do)
+
+
+def delete_character(root: Path, project_id: str, character_id: str) -> None:
+    def _do(pf: ProjectFile) -> None:
+        if pf.characters.pop(character_id, None) is None:
+            raise CharacterNotFoundError(project_id, character_id)
+        pf.index.updatedAt = utcnow()
+
+    _mutate(root, project_id, _do)
+
+
+def character_count(root: Path, project_id: str) -> int:
+    return _read(root, project_id, lambda pf, _errors: len(pf.characters), copy_result=False)

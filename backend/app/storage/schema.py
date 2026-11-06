@@ -2005,6 +2005,258 @@ class MapDoc(BaseModel):
         return out
 
 
+# ---------------------------------------------------------------------------
+# Characters (the cast): a character is its look (the parameters the front end draws it from: part ids, colours, sliders, marks, an outfit and a pose; no
+# images are stored). The ids name entries of the front end's part library, which falls back to a default for one it does not know, so a look from a newer
+# build still draws. Like every section, a bad value is cut or repaired, never refused.
+# ---------------------------------------------------------------------------
+
+CHARACTER_MAX_PER_PROJECT = 300
+CHARACTER_MAX_MARKS = 40
+CHARACTER_MAX_STROKES = 12
+CHARACTER_MAX_STROKE_POINTS = 48
+CHARACTER_MAX_ACCESSORIES = 8
+CharacterMarkKind = Literal["freckles", "mole", "scar", "birthmark", "tattoo", "blush", "makeup", "paint"]
+
+
+def _part_id(value: Any, default: Optional[str]) -> Optional[str]:
+    """The id of an entry of the part library: a short trimmed string (the default when it is not one)."""
+    text = value.strip()[:40] if isinstance(value, str) else ""
+    return text or default
+
+
+def _hex_or(value: Any, default: Optional[str]) -> Optional[str]:
+    return value if isinstance(value, str) and _MAP_HEX_COLOR.match(value) else default
+
+
+class CharacterMark(BaseModel):
+    """A mark on the body: freckles, a mole, a scar, a birthmark, a tattoo, blush, make-up or face paint, `design` from the library, on an `area`.
+
+    `x` and `y` place it on the area (0 to 1 across and down); `strokes` are the lines of a tattoo the author drew (points 0 to 1 on the area)."""
+
+    id: str = Field(min_length=1, max_length=40)
+    kind: CharacterMarkKind = "freckles"
+    design: str = Field(default="", max_length=40)
+    area: str = Field(default="cheeks", max_length=40)
+    x: float = 0.5
+    y: float = 0.5
+    size: float = 1.0
+    color: Optional[str] = None
+    strokes: list[list[list[float]]] = Field(default_factory=list)
+
+    @field_validator("design", "area", mode="before")
+    @classmethod
+    def _ids(cls, value: Any) -> Any:
+        return _part_id(value, "")
+
+    @field_validator("x", "y", mode="before")
+    @classmethod
+    def _unit(cls, value: Any) -> Any:
+        return _finite(value, 0.5, 0.0, 1.0)
+
+    @field_validator("size", mode="before")
+    @classmethod
+    def _size(cls, value: Any) -> Any:
+        return _finite(value, 1.0, 0.2, 3.0)
+
+    @field_validator("color", mode="before")
+    @classmethod
+    def _color(cls, value: Any) -> Any:
+        return _hex_or(value, None)
+
+    @field_validator("strokes", mode="before")
+    @classmethod
+    def _strokes(cls, value: Any) -> Any:
+        out: list[list[list[float]]] = []
+        for stroke in value if isinstance(value, list) else []:
+            points: list[list[float]] = []
+            for pt in stroke if isinstance(stroke, list) else []:
+                if isinstance(pt, (list, tuple)) and len(pt) == 2:
+                    points.append([_finite(pt[0], 0.5, 0.0, 1.0), _finite(pt[1], 0.5, 0.0, 1.0)])
+                if len(points) >= CHARACTER_MAX_STROKE_POINTS:
+                    break
+            if len(points) >= 2:
+                out.append(points)
+            if len(out) >= CHARACTER_MAX_STROKES:
+                break
+        return out
+
+
+class CharacterOutfit(BaseModel):
+    """What the character wears: one garment for each slot (none = nothing), the accessories, and a colour for each slot."""
+
+    top: Optional[str] = "tee"
+    bottom: Optional[str] = "trousers"
+    shoes: Optional[str] = "shoes"
+    outer: Optional[str] = None
+    accessories: list[str] = Field(default_factory=list)
+    colors: dict[str, str] = Field(default_factory=lambda: {"top": "#4a6fa5", "bottom": "#3b3f4a", "shoes": "#4a3a30", "outer": "#6b5b4a", "accessory": "#c9a227"})
+
+    @field_validator("top", "bottom", "shoes", "outer", mode="before")
+    @classmethod
+    def _slot(cls, value: Any) -> Any:
+        return _part_id(value, None)
+
+    @field_validator("accessories", mode="before")
+    @classmethod
+    def _accessories(cls, value: Any) -> Any:
+        out: list[str] = []
+        for item in value if isinstance(value, list) else []:
+            text = _part_id(item, None)
+            if text and text not in out:
+                out.append(text)
+            if len(out) >= CHARACTER_MAX_ACCESSORIES:
+                break
+        return out
+
+    @field_validator("colors", mode="before")
+    @classmethod
+    def _colors(cls, value: Any) -> Any:
+        out: dict[str, str] = {}
+        for key, color in (value.items() if isinstance(value, dict) else []):
+            if isinstance(key, str) and 0 < len(key) <= 20 and isinstance(color, str) and _MAP_HEX_COLOR.match(color):
+                out[key] = color
+            if len(out) >= 12:
+                break
+        return out
+
+
+class CharacterLook(BaseModel):
+    """Everything the figure is drawn from. A slider is a number within a range; an id names an entry of the part library; a colour is #rrggbb."""
+
+    skin: str = "#e0b08a"
+    build: str = "average"
+    height: float = 1.0
+    width: float = 1.0
+    shoulders: float = 1.0
+    headShape: str = "oval"
+    headWidth: float = 1.0
+    ears: str = "small"
+    earSize: float = 1.0
+    eyes: str = "round"
+    eyeColor: str = "#5b3a29"
+    eyeSize: float = 1.0
+    eyeSpacing: float = 1.0
+    eyeTilt: float = 0.0
+    brows: str = "soft"
+    browColor: str = "#3b2a20"
+    browThickness: float = 1.0
+    browTilt: float = 0.0
+    nose: str = "straight"
+    noseSize: float = 1.0
+    noseWidth: float = 1.0
+    mouth: str = "medium"
+    mouthSize: float = 1.0
+    lipColor: str = "#b5655a"
+    facialHair: str = "none"
+    facialHairColor: str = "#3b2a20"
+    hair: str = "short"
+    hairColor: str = "#3b2a20"
+    hairLength: float = 0.5
+    streakColor: Optional[str] = None
+    streakAmount: float = 0.3
+    expression: str = "neutral"
+    pose: str = "standing"
+    # An item in a hand (an id of the library), or none.
+    heldLeft: Optional[str] = None
+    heldRight: Optional[str] = None
+    outfit: CharacterOutfit = Field(default_factory=CharacterOutfit)
+    marks: list[CharacterMark] = Field(default_factory=list)
+
+    @field_validator(
+        "build", "headShape", "ears", "eyes", "brows", "nose", "mouth", "facialHair", "hair", "expression", "pose", mode="before",
+    )
+    @classmethod
+    def _ids(cls, value: Any, info: Any) -> Any:
+        return _part_id(value, CharacterLook.model_fields[info.field_name].default)
+
+    @field_validator("heldLeft", "heldRight", mode="before")
+    @classmethod
+    def _held(cls, value: Any) -> Any:
+        return _part_id(value, None)
+
+    @field_validator("skin", "eyeColor", "browColor", "lipColor", "facialHairColor", "hairColor", mode="before")
+    @classmethod
+    def _colors(cls, value: Any, info: Any) -> Any:
+        return _hex_or(value, CharacterLook.model_fields[info.field_name].default)
+
+    @field_validator("streakColor", mode="before")
+    @classmethod
+    def _streak(cls, value: Any) -> Any:
+        return _hex_or(value, None)
+
+    @field_validator("height", "width", mode="before")
+    @classmethod
+    def _body(cls, value: Any, info: Any) -> Any:
+        return _finite(value, 1.0, 0.7, 1.3 if info.field_name == "height" else 1.4)
+
+    @field_validator("shoulders", mode="before")
+    @classmethod
+    def _shoulders(cls, value: Any) -> Any:
+        return _finite(value, 1.0, 0.8, 1.3)
+
+    @field_validator("headWidth", mode="before")
+    @classmethod
+    def _head_width(cls, value: Any) -> Any:
+        return _finite(value, 1.0, 0.8, 1.2)
+
+    @field_validator("earSize", "eyeSize", "eyeSpacing", "noseSize", "noseWidth", "mouthSize", mode="before")
+    @classmethod
+    def _feature(cls, value: Any, info: Any) -> Any:
+        low, high = {"earSize": (0.6, 1.6), "eyeSize": (0.6, 1.5), "eyeSpacing": (0.7, 1.4)}.get(info.field_name, (0.6, 1.5))
+        return _finite(value, 1.0, low, high)
+
+    @field_validator("browThickness", mode="before")
+    @classmethod
+    def _brow_thickness(cls, value: Any) -> Any:
+        return _finite(value, 1.0, 0.5, 2.0)
+
+    @field_validator("eyeTilt", "browTilt", mode="before")
+    @classmethod
+    def _tilt(cls, value: Any) -> Any:
+        return _finite(value, 0.0, -20.0, 20.0)
+
+    @field_validator("hairLength", "streakAmount", mode="before")
+    @classmethod
+    def _unit(cls, value: Any, info: Any) -> Any:
+        return _finite(value, 0.5 if info.field_name == "hairLength" else 0.3, 0.0, 1.0)
+
+    @field_validator("marks", mode="before")
+    @classmethod
+    def _marks(cls, value: Any) -> Any:
+        marks = _valid_items(value, CharacterMark)
+        seen: set[str] = set()
+        out: list[CharacterMark] = []
+        for mark in marks:
+            if mark.id in seen:
+                continue
+            seen.add(mark.id)
+            out.append(mark)
+            if len(out) >= CHARACTER_MAX_MARKS:
+                break
+        return out
+
+
+class CharacterDoc(BaseModel):
+    schemaVersion: int = SCHEMA_VERSION
+    id: str = Field(min_length=1, max_length=80)
+    name: str = Field(default="Unnamed character", max_length=120)
+    order: int = 0
+    look: CharacterLook = Field(default_factory=CharacterLook)
+    updatedAt: datetime = Field(default_factory=utcnow)
+
+    @field_validator("name", mode="before")
+    @classmethod
+    def _name_or_default(cls, value: Any) -> Any:
+        text = value.strip()[:120] if isinstance(value, str) else ""
+        return text or "Unnamed character"
+
+    @field_validator("look", mode="before")
+    @classmethod
+    def _look(cls, value: Any) -> Any:
+        return value if isinstance(value, (dict, CharacterLook)) else {}
+
+
 class ProjectFile(BaseModel):
     schemaVersion: int = PROJECT_FILE_VERSION
     # Which scheme the stored level colours use (HUE_SCHEME); a file without it is scheme 1.
@@ -2027,6 +2279,8 @@ class ProjectFile(BaseModel):
     planner: Planner = Field(default_factory=Planner)
     # Map id -> the map. A map that cannot be read is dropped from here (and kept in quarantine), so the other maps still load.
     maps: dict[str, MapDoc] = Field(default_factory=dict)
+    # Character id -> the character (the cast). Read the way the maps are: one that cannot be read is dropped and kept in quarantine.
+    characters: dict[str, CharacterDoc] = Field(default_factory=dict)
     scrap: ScrapRegistry = Field(default_factory=ScrapRegistry)
     # Changes to the project's settings (time systems, colour), newest last; see SettingsLogEntry.
     settingsLog: list[SettingsLogEntry] = Field(default_factory=list)

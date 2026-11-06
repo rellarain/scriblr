@@ -1,4 +1,4 @@
-import { CalendarIcon, ClockIcon, FolderIcon, GearIcon, HelpIcon, MapIcon, OutlineIcon, PlotIcon } from '../../../icons'
+import { CalendarIcon, ClockIcon, FolderIcon, GearIcon, HelpIcon, MapIcon, OutlineIcon, PeopleIcon, PlotIcon } from '../../../icons'
 import WorkspaceSaveCluster from './WorkspaceSaveCluster'
 import { SHELF_COMPONENTS } from '../consoleDefs'
 import { Placeholder } from '../shared'
@@ -8,6 +8,7 @@ import ProjectOutline from '../ProjectOutline'
 import { nearestOfKind } from '../outlineTree'
 import type { HistoryScope, WriterWorkspace } from '../useWriterWorkspace'
 import { bookRows } from '../tiles/tileData'
+import CharactersConsole from '../characters/CharactersConsole'
 import MapsConsole from '../maps/MapsConsole'
 import ProjectConsole from '../plan/ProjectConsole'
 import ScheduleConsole from '../schedule/ScheduleConsole'
@@ -79,6 +80,14 @@ export function projectTabs(w: WriterWorkspace): LevelTab[] {
         const id = w.activeProjectId
         if (!id) return <p className="wrMuted">Open a project to map its setting.</p>
         return <MapsConsole key={id} projectId={id} scenes={scenesOf(w.outlineNodes)} onSetLocation={(sceneId, location) => w.updateOutlineNode(sceneId, { location })} />
+      },
+    },
+    {
+      id: 'characters', label: 'Characters', Icon: PeopleIcon, fill: true, console: true,
+      render: () => {
+        const id = w.activeProjectId
+        if (!id) return <p className="wrMuted">Open a project to build its cast.</p>
+        return <CharactersConsole key={id} projectId={id} />
       },
     },
     { id: 'history', label: 'History', Icon: ClockIcon, render: () => placeholder('projectHistory') },

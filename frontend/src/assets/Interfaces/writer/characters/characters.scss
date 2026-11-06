@@ -1,0 +1,136 @@
+// Project > Characters (CharactersConsole.tsx and its parts). On the tab's light surface, in the ink colour. Colours are the theme tokens; the colours of a character
+// itself (skin, hair, clothes) are the author's data and are set inline or inside the drawing. Type is the text tokens and space the space scale. Flat and square.
+
+.charPage {
+  container-type: inline-size;
+  display: flex; flex-direction: column; gap: var(--space-4); width: 100%; height: 100%; min-height: 560px; min-width: 0; color: var(--ink); font-size: var(--text-ui);
+}
+.charBar { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: var(--space-3) var(--space-6); }
+.charBarTitle { margin: 0; font-size: var(--text-title); font-weight: 600; text-transform: uppercase; letter-spacing: 1px; }
+.charNote {
+  display: flex; flex-direction: column; align-items: flex-start; gap: var(--space-4); margin: 0; font-size: var(--text-field); color: var(--ink);
+  &--error { flex-direction: row; padding: var(--space-3) var(--space-5); background: var(--ov-sink-2); box-shadow: inset 4px 0 0 var(--alert); font-size: var(--text-ui); }
+}
+.charEmpty { flex: 1 1 auto; align-items: center; justify-content: center; text-align: center; color: var(--ink-muted); }
+.charSplit { flex: 1 1 auto; display: flex; align-items: stretch; gap: var(--space-5); min-height: 0; min-width: 0; }
+
+// ---- buttons and fields ----
+.charIconBtn {
+  display: inline-flex; align-items: center; justify-content: center; gap: var(--space-2); min-width: 28px; height: 28px; padding: 0 var(--space-2); box-sizing: border-box; border: 0;
+  border-radius: var(--radius-button); background: none; color: var(--ink); opacity: 0.8; cursor: pointer; flex: 0 0 auto; font: inherit;
+  &:hover:not(:disabled) { opacity: 1; background: var(--ov-sink-1); }
+  &[aria-pressed='true'] { opacity: 1; background: var(--ov-sink-2); box-shadow: inset 0 -2px 0 var(--accent); }
+  &:disabled { opacity: 0.35; cursor: not-allowed; }
+  &:focus-visible { outline: 2px solid var(--accent-hover); outline-offset: 1px; }
+}
+.charTools { display: inline-flex; flex-wrap: wrap; align-items: center; gap: var(--space-1); }
+.charInput, .charSelect {
+  display: block; width: 100%; min-width: 0; box-sizing: border-box; border: 0; border-radius: var(--radius-none); background: var(--ov-sink-1); color: var(--ink);
+  font: inherit; font-size: var(--text-field); padding: var(--space-2) var(--space-3); outline: none;
+  &:focus-visible { box-shadow: inset 0 0 0 1px var(--accent); }
+}
+.charSelect { cursor: pointer; }
+.charField { display: flex; flex-direction: column; gap: var(--space-1); min-width: 0; flex: 1 1 auto; &--short { flex: 0 1 auto; } }
+.charLabel { font-size: var(--text-small); font-weight: 700; text-transform: uppercase; letter-spacing: 0.05em; color: var(--ink-muted); }
+.charHint { margin: 0; font-size: var(--text-small); color: var(--ink-muted); }
+.charRow { display: flex; align-items: center; gap: var(--space-3); min-width: 0; flex-wrap: wrap; }
+.charChip {
+  padding: var(--space-1) var(--space-3); border: 0; border-radius: var(--radius-button); background: var(--ov-sink-1); color: var(--ink); font: inherit; font-size: var(--text-small); cursor: pointer;
+  &[aria-pressed='true'] { background: var(--ov-sink-2); box-shadow: inset 0 -2px 0 var(--accent); font-weight: 700; }
+  &:focus-visible { outline: 2px solid var(--accent-hover); outline-offset: 1px; }
+}
+.charSlider { display: grid; grid-template-columns: 1fr minmax(0, 1.4fr) 44px; align-items: center; gap: var(--space-3); }
+.charRange { width: 100%; min-width: 0; margin: 0; accent-color: var(--accent); cursor: pointer; }
+.charValue { font-size: var(--text-small); color: var(--ink-muted); text-align: right; }
+
+// A colour: quick swatches (the colours are the author's data, so they are inline) and the browser's picker.
+.charColour { display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-2); }
+.charSwatch {
+  width: 22px; height: 22px; padding: 0; border: 0; border-radius: var(--radius-none); cursor: pointer; box-shadow: inset 0 0 0 1px var(--hairline);
+  &[aria-pressed='true'] { box-shadow: inset 0 0 0 2px var(--ink), 0 0 0 2px var(--surface-raised); }
+  &--none { background: linear-gradient(135deg, transparent 46%, var(--ink-muted) 46% 54%, transparent 54%), var(--ov-sink-1); }
+  &:focus-visible { outline: 2px solid var(--accent-hover); outline-offset: 2px; }
+}
+.charPicker { flex: 0 0 auto; width: 28px; height: 28px; padding: 0; border: 0; background: none; cursor: pointer; }
+
+// A grid of choices, with a small picture of the part when there is one.
+.charOptions { display: flex; flex-wrap: wrap; gap: var(--space-2); &--thumbs { display: grid; grid-template-columns: repeat(auto-fill, minmax(72px, 1fr)); } }
+.charOpt {
+  display: flex; flex-direction: column; align-items: center; justify-content: center; gap: var(--space-1); padding: var(--space-1) var(--space-3); border: 0; border-radius: var(--radius-button);
+  background: var(--ov-sink-1); color: var(--ink); font: inherit; font-size: var(--text-small); cursor: pointer; min-width: 0;
+  &:hover { background: var(--ov-sink-2); }
+  &[aria-pressed='true'] { background: var(--ov-sink-2); box-shadow: inset 0 -2px 0 var(--accent); font-weight: 700; }
+  &:focus-visible { outline: 2px solid var(--accent-hover); outline-offset: 1px; }
+  .charOptions--thumbs & { padding: var(--space-1); }
+}
+.charOptName { max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.charThumbBox { display: block; width: 100%; aspect-ratio: 1; background: var(--surface-raised); }
+.charThumb { display: block; width: 100%; height: 100%; &--tall { aspect-ratio: 1; } }
+
+// ---- the list ----
+.charList { flex: 0 0 200px; min-width: 0; display: flex; flex-direction: column; gap: var(--space-3); background: var(--surface-raised); box-shadow: inset 0 0 0 1px var(--hairline); padding: var(--space-3); overflow-y: auto; }
+.charPanelHead { display: flex; align-items: center; justify-content: space-between; gap: var(--space-3); }
+.charPanelTitle { margin: 0; font-size: var(--text-small); font-weight: 700; text-transform: uppercase; letter-spacing: 0.05em; color: var(--ink-muted); }
+.charRows { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; }
+.charRowItem { display: flex; align-items: center; &:hover { background: var(--ov-sink-1); } &--on { background: var(--ov-sink-2); box-shadow: inset 3px 0 0 var(--accent); } }
+.charRowMain {
+  flex: 1 1 0; min-width: 0; display: flex; align-items: center; gap: var(--space-2); padding: var(--space-2); border: 0; background: none; color: inherit; font: inherit; text-align: left; cursor: pointer;
+  &:focus-visible { outline: 2px solid var(--accent-hover); outline-offset: -2px; }
+}
+.charRowName { flex: 1 1 auto; min-width: 0; font-size: var(--text-field); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.charRowTool { opacity: 0; .charRowItem:hover &, &:focus-visible { opacity: 0.8; } }
+.charConfirm { display: inline-flex; align-items: center; gap: var(--space-1); padding: 0 var(--space-2); background: var(--ov-sink-2); box-shadow: inset 3px 0 0 var(--alert); }
+
+// ---- the stage ----
+.charStage { flex: 1 1 auto; min-width: 0; display: flex; flex-direction: column; gap: var(--space-2); }
+.charViews { display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-2); }
+.charBox { position: relative; flex: 1 1 auto; min-height: 360px; overflow: hidden; background: var(--ov-sink-2); display: flex; align-items: stretch; justify-content: center; }
+.charArt { display: block; width: 100%; height: 100%; min-height: 0; }
+.charTurn { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: var(--space-3); width: 100%; padding: var(--space-3); box-sizing: border-box; }
+.charTurnItem { margin: 0; display: flex; flex-direction: column; min-width: 0; min-height: 0; .charArt { flex: 1 1 auto; } }
+.charCaption { text-align: center; font-size: var(--text-small); color: var(--ink-muted); }
+.charExpressions { display: grid; grid-template-columns: repeat(auto-fill, minmax(120px, 1fr)); gap: var(--space-3); width: 100%; padding: var(--space-3); box-sizing: border-box; align-content: start; }
+.charExpr {
+  display: flex; flex-direction: column; gap: var(--space-1); padding: var(--space-2); border: 0; background: var(--surface-raised); color: var(--ink); font: inherit; cursor: pointer;
+  .charArt { aspect-ratio: 1; height: auto; }
+  &:hover { background: var(--ov-sink-1); }
+  &[aria-pressed='true'] { box-shadow: inset 0 -3px 0 var(--accent); }
+  &:focus-visible { outline: 2px solid var(--accent-hover); outline-offset: 1px; }
+}
+
+// ---- the side: the drawers ----
+.charSide { flex: 0 0 300px; min-width: 0; display: flex; flex-direction: column; gap: var(--space-3); overflow-y: auto; }
+.charPanel { display: flex; flex-direction: column; gap: var(--space-3); padding: var(--space-3); background: var(--surface-raised); box-shadow: inset 0 0 0 1px var(--hairline); }
+.charDrawer { padding: 0; gap: 0; }
+.charDrawerHead { margin: 0; font-size: inherit; }
+.charDrawerBtn {
+  width: 100%; display: flex; align-items: center; gap: var(--space-3); padding: var(--space-3); border: 0; background: none; color: var(--ink); font: inherit; font-size: var(--text-small); font-weight: 700;
+  text-transform: uppercase; letter-spacing: 0.05em; text-align: left; cursor: pointer;
+  &:hover { background: var(--ov-sink-1); }
+  &[aria-expanded='true'] { box-shadow: inset 3px 0 0 var(--accent); }
+  &:focus-visible { outline: 2px solid var(--accent-hover); outline-offset: -2px; }
+}
+.charDrawerBody { display: flex; flex-direction: column; gap: var(--space-4); padding: var(--space-3); }
+.charSlot { display: flex; flex-direction: column; gap: var(--space-2); }
+
+// ---- marks ----
+.charMarks { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: var(--space-1); }
+.charMarkRow { display: flex; align-items: center; gap: var(--space-1); }
+.charMarkOpen {
+  flex: 1 1 0; min-width: 0; padding: var(--space-1) var(--space-3); border: 0; background: var(--ov-sink-1); color: var(--ink); font: inherit; font-size: var(--text-field); text-align: left; cursor: pointer;
+  &[aria-pressed='true'] { background: var(--ov-sink-2); box-shadow: inset 3px 0 0 var(--accent); }
+  &:focus-visible { outline: 2px solid var(--accent-hover); outline-offset: 1px; }
+}
+.charMarkEdit { display: flex; flex-direction: column; gap: var(--space-3); padding: var(--space-3); background: var(--ov-sink-1); }
+.charPad { display: flex; flex-direction: column; gap: var(--space-2); }
+.charPadBox { display: block; width: 140px; height: 140px; background: var(--surface-raised); box-shadow: inset 0 0 0 1px var(--hairline); touch-action: none; cursor: crosshair; color: var(--ink); &:focus-visible { outline: 2px solid var(--accent-hover); } }
+.charPadTools { display: flex; align-items: center; gap: var(--space-2); }
+
+// ---- a narrow console: the parts stack ----
+@container (max-width: 859px) {
+  .charSplit { flex-direction: column; }
+  .charList, .charSide { flex: 0 0 auto; max-height: 300px; }
+  .charStage { flex: 0 0 auto; }
+  .charBox { min-height: 420px; }
+  .charTurn { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}
