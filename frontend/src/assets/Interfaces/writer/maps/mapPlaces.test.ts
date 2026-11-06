@@ -3,7 +3,7 @@ import { describe, expect, it, vi } from 'vitest'
 import type { MapDoc, MapSummary } from '../../../../api/types'
 import { mapsBackend } from '../../../../test/mapsBackend'
 import { newMap } from '../../../../designSystem/mockMaps'
-import { createMap, getMap, listMaps, putMap } from '../../../../api/mapsApi'
+import { createMap, createMapVersion, getMap, listMaps, putMap } from '../../../../api/mapsApi'
 import { addPlaces, addSymbol, editSymbol, isPlace, placeKey } from './mapItems'
 import { MAP_FILE_FORMAT, buildMapFile, importMaps, importRows, mapFileName, parseMapFile, type Choice } from './mapFile'
 import { MapHistory, descendantIds, draftOf, mapPath, setPace, setParent, toggleLayer } from './mapModel'
@@ -128,7 +128,7 @@ describe('the map file', () => {
 
   it('holds the map and the maps inside it, and cuts what points outside', () => {
     const f = buildMapFile('map_a', [root, child, sibling, outside], new Date('2026-11-06T00:00:00Z'))!
-    expect(f).toMatchObject({ format: MAP_FILE_FORMAT, version: 1, rootId: 'map_a', exportedAt: '2026-11-06T00:00:00.000Z' })
+    expect(f).toMatchObject({ format: MAP_FILE_FORMAT, version: 2, rootId: 'map_a', exportedAt: '2026-11-06T00:00:00.000Z' })
     expect(f.maps.map(m => m.id)).toEqual(['map_a', 'map_b'])
     expect(f.maps[0].symbols[0].mapIds).toEqual(['map_b'])
     // The root is a map of its own in the file, and the maps of the project are not changed.
@@ -212,6 +212,35 @@ describe('the map file', () => {
       const f = buildMapFile('map_a', [root])!
       await importMaps(f, new Map([['map_a', 'replace' as Choice]]), await listMaps('p1'), null, api)
       expect(backend.maps.get('map_a')!.parentId).toBe('map_up')
+    })
+
+    it('brings the versions of a map with it, as versions of the new map, and leaves out the journeys of characters the project does not have', async () => {
+      const journeys = [{ id: 'j1', characterId: 'chr_a', color: null, stops: [] }, { id: 'j2', characterId: 'chr_gone', color: null, stops: [] }]
+      const base = doc('map_a', { journeys })
+      const later = doc('map_v', { versionOf: 'map_a', appliesFrom: 'c2', title: 'After the war', journeys })
+      const file = buildMapFile('map_a', [base, later, doc('map_other', { versionOf: 'map_zzz' })])!
+      expect(file.maps.map(m => m.id)).toEqual(['map_a', 'map_v'])
+      expect(file.maps[1].parentId).toBeNull()
+      expect(importRows(file, []).map(r => r.map.id)).toEqual(['map_a'])
+      const { backend, api } = open()
+      const r = await importMaps(file, new Map(), [], null, { ...api, createVersion: (id, body) => createMapVersion('p1', id, body), characterIds: new Set(['chr_a']) })
+      expect(r.error).toBeUndefined()
+      expect(r.made).toHaveLength(1)
+      expect(r.versions).toBe(1)
+      const made = backend.maps.get(r.made[0])!
+      const version = [...backend.maps.values()].find(m => m.versionOf === made.id)!
+      expect(version).toMatchObject({ title: 'After the war', appliesFrom: 'c2', parentId: null })
+      expect(made.journeys!.map(j => j.characterId)).toEqual(['chr_a'])
+      expect(version.journeys!.map(j => j.characterId)).toEqual(['chr_a'])
+    })
+
+    it('leaves the versions out when it cannot make them', async () => {
+      const file = buildMapFile('map_a', [root, doc('map_v', { versionOf: 'map_a' })])!
+      const { backend, api } = open()
+      const r = await importMaps(file, new Map(), [], null, api)
+      expect(r.made).toHaveLength(1)
+      expect(r.versions).toBeUndefined()
+      expect(backend.maps.size).toBe(1)
     })
 
     it('says what went wrong and stops', async () => {

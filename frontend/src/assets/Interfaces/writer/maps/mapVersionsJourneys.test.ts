@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest'
 import type { MapSummary } from '../../../../api/types'
 import { newMap } from '../../../../designSystem/mockMaps'
 import type { StoryPoint } from '../characters/story'
-import { JOURNEY_COLOURS, addJourney, addStop, colourOf, editStop, journeysOf, orderStops, removeJourney, removeStop, setJourneyColour, whereAt } from './mapJourneys'
+import { JOURNEY_COLOURS, addJourney, addStop, colourOf, editStop, journeysOf, moveStop, orderStops, removeJourney, removeStop, setJourneyColour, stopNear, whereAt } from './mapJourneys'
 import { MapHistory, draftOf, mapRows, setAppliesFrom, summaryOf } from './mapModel'
 import { appliesLabel, baseIdOf, familyOf, isVersion, versionAt, versionsOf } from './mapVersions'
 
@@ -79,6 +79,23 @@ describe('journeys', () => {
     expect(colourOf(list[1], 1)).toBe(JOURNEY_COLOURS[1])
     expect(colourOf({ ...list[0], color: '#123456' }, 0)).toBe('#123456')
     expect(colourOf(list[0], JOURNEY_COLOURS.length)).toBe(JOURNEY_COLOURS[0])
+  })
+
+  it('move a stop where it is dragged without changing the order, and find the stop nearest a place', () => {
+    const id = mk()
+    let d = addJourney(draft, 'chr_a', id)!.change.draft
+    d = addStop(d, 'id1', 3.5, 4.5, 'c3', POINTS, id)!.change.draft
+    d = addStop(d, 'id1', 6.5, 2.5, 'c1', POINTS, id)!.change.draft
+    const before = journeysOf(d)[0]
+    expect(before.stops.map(s => s.id)).toEqual(['id3', 'id2'])
+    const moved = moveStop(d, 'id1', 'id3', 7, 8)!
+    expect(journeysOf(moved.draft)[0].stops.map(s => [s.id, s.x, s.y])).toEqual([['id3', 7, 8], ['id2', 3.5, 4.5]])
+    expect(moveStop(d, 'id1', 'id3', 6.5, 2.5)).toBeNull()
+    expect(moveStop(d, 'id1', 'nope', 1, 1)).toBeNull()
+    expect(moveStop(d, 'none', 'id3', 1, 1)).toBeNull()
+    expect(stopNear(before, 3.6, 4.4, 0.5)?.id).toBe('id2')
+    expect(stopNear(before, 5, 5, 0.5)).toBeNull()
+    expect(stopNear(undefined, 1, 1, 5)).toBeNull()
   })
 
   it('keep the stops in the order of the story, those with no point last', () => {

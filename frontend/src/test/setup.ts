@@ -5,6 +5,7 @@ import { __resetDragEndedForTests } from '../components/tiles/tileDragBus'
 import { __resetPlanStoreForTests } from '../assets/Interfaces/writer/schedule/planStore'
 import { __resetTrainingForTests } from '../assets/Interfaces/training/trainingStore'
 import { __resetCastForTests } from '../assets/Interfaces/writer/characters/castStore'
+import { __resetItemsForTests } from '../assets/Interfaces/writer/items/itemStore'
 import { __resetPlacesForTests } from '../assets/Interfaces/writer/maps/placesStore'
 import { __resetWorldLinksForTests } from '../assets/Interfaces/writer/links/linkStore'
 import { __resetWorldNavForTests } from '../assets/Interfaces/writer/links/worldNav'
@@ -21,6 +22,7 @@ afterEach(() => {
   __resetTrainingForTests()
   __resetPlacesForTests()
   __resetCastForTests()
+  __resetItemsForTests()
   __resetWorldLinksForTests()
   __resetWorldNavForTests()
 })

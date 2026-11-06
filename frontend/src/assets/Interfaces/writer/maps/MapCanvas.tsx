@@ -7,6 +7,7 @@ import type { JourneyView } from './mapDrawJourneys'
 import { drawMap, renderTerrain } from './mapRender'
 import { MIN_POINTS, insertPoint, movePoint, nearestOnShape, outVector, removePoint, setHandle, snapVertex, toggleSmooth, translateShape, type Pen } from './mapShapes'
 import { cellAt, fitView, measureText, nearestCell, panBy, pathLength, zoomAt, type MapView } from './mapView'
+import { moveStop, stopNear } from './mapJourneys'
 
 export type MapTool = 'select' | 'brush' | 'fill' | 'pick' | 'symbol' | 'label' | 'line' | 'region' | 'measure' | 'hand' | 'journey'
 
@@ -63,6 +64,7 @@ type Drag =
   | { kind: 'shape'; id: string; before: MapDraft; current: MapDraft; fx: number; fy: number }
   | { kind: 'node'; id: string; i: number; before: MapDraft; current: MapDraft }
   | { kind: 'handle'; id: string; i: number; sign: 1 | -1; before: MapDraft; current: MapDraft }
+  | { kind: 'stop'; journeyId: string; stopId: string; before: MapDraft; current: MapDraft }
   | null
 
 const clampTo = (draft: Pick<MapDraft, 'width' | 'height'>, x: number, y: number): [number, number] => [Math.min(draft.width, Math.max(0, x)), Math.min(draft.height, Math.max(0, y))]
@@ -297,6 +299,15 @@ export default function MapCanvas(p: MapCanvasProps) {
     }
     if (!cell) return
     if (p.tool === 'journey') {
+      // A stop of the chosen journey is taken and dragged; anywhere else a click makes a new stop.
+      const jv = p.journeys
+      const chosen = jv?.list.find(j => j.id === jv.selectedId)
+      const near = jv && jv.showPaths ? stopNear(chosen, fx, fy, GRAB_PX / view.zoom) : null
+      if (chosen && near) {
+        drag.current = { kind: 'stop', journeyId: chosen.id, stopId: near.id, before: draft, current: draft }
+        e.currentTarget.setPointerCapture?.(e.pointerId)
+        return
+      }
       if (!p.onAddStop?.(cell[0] + 0.5, cell[1] + 0.5)) p.onBlocked()
       return
     }
@@ -342,6 +353,13 @@ export default function MapCanvas(p: MapCanvasProps) {
       const [fx, fy] = placeOf(px, py)
       const [sx, sy] = snapPoint(fx - d.dx, fy - d.dy, e.altKey)
       d.current = movedItem(d.before, d.ref, sx, sy)
+      p.onPreview(d.current)
+      return
+    }
+    if (d?.kind === 'stop') {
+      const [fx, fy] = placeOf(px, py)
+      const [sx, sy] = clampTo(draft, e.altKey ? fx : Math.round(fx * 2) / 2, e.altKey ? fy : Math.round(fy * 2) / 2)
+      d.current = moveStop(d.before, d.journeyId, d.stopId, sx, sy)?.draft ?? d.before
       p.onPreview(d.current)
       return
     }

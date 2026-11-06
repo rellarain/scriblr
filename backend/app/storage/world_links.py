@@ -18,6 +18,10 @@ def _exists(pf: ProjectFile, ref: str) -> bool:
         return any(n.id == key for n in pf.plot.nodes)
     if kind == "char":
         return key in pf.characters
+    if kind == "item":
+        return key in pf.items
+    if kind == "scene":
+        return any(n.id == key for n in pf.outline.nodes)
     map_id, _, symbol_id = key.partition("/")
     doc = pf.maps.get(map_id)
     return doc is not None and not doc.versionOf and any(s.id == symbol_id and s.name for s in doc.symbols)

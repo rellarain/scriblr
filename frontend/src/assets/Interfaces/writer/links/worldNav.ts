@@ -3,7 +3,7 @@ import { useEffect, useRef, useSyncExternalStore } from 'react'
 // A jump from a link to a character or a place that lives in another console: the request waits here until the console that shows that kind is on screen
 // (it is, when its tile is open beside; else when its tab is next opened) and then opens the thing. A plot node is opened through the workspace instead.
 
-export type NavKind = 'char' | 'place'
+export type NavKind = 'char' | 'place' | 'item'
 let pending: { kind: NavKind; id: string } | null = null
 let version = 0
 const listeners = new Set<() => void>()

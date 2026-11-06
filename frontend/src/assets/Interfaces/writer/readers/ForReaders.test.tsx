@@ -82,7 +82,7 @@ describe('the views a reader gets', () => {
     expect(article.getByRole('img', { name: 'Ada, close-up' })).toBeInTheDocument()
     expect(article.getByText('Navigator')).toBeInTheDocument()
     expect(article.getByText(/Old friend: Sailed together\./)).toBeInTheDocument()
-    await userEvent.setup().click(article.getByRole('button', { name: 'Bram' }))
+    await userEvent.setup().click(article.getByRole('button', { name: 'Go to Bram' }))
     expect(onOpen).toHaveBeenCalledWith('chr_b')
   })
 

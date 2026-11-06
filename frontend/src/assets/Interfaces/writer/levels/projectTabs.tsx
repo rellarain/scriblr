@@ -1,4 +1,4 @@
-import { CalendarIcon, ClockIcon, FolderIcon, GearIcon, HelpIcon, MapIcon, OutlineIcon, PeopleIcon, PlotIcon } from '../../../icons'
+import { BagIcon, CalendarIcon, ClockIcon, FolderIcon, GearIcon, HelpIcon, MapIcon, OutlineIcon, PeopleIcon, PlotIcon } from '../../../icons'
 import WorkspaceSaveCluster from './WorkspaceSaveCluster'
 import { SHELF_COMPONENTS } from '../consoleDefs'
 import { Placeholder } from '../shared'
@@ -9,6 +9,7 @@ import { nearestOfKind } from '../outlineTree'
 import type { HistoryScope, WriterWorkspace } from '../useWriterWorkspace'
 import { bookRows } from '../tiles/tileData'
 import CharactersConsole from '../characters/CharactersConsole'
+import ItemsConsole from '../items/ItemsConsole'
 import MapsConsole from '../maps/MapsConsole'
 import ProjectConsole from '../plan/ProjectConsole'
 import ScheduleConsole from '../schedule/ScheduleConsole'
@@ -79,7 +80,7 @@ export function projectTabs(w: WriterWorkspace): LevelTab[] {
       render: () => {
         const id = w.activeProjectId
         if (!id) return <p className="wrMuted">Open a project to map its setting.</p>
-        return <MapsConsole key={id} projectId={id} scenes={scenesOf(w.outlineNodes)} onSetLocation={(sceneId, location) => w.updateOutlineNode(sceneId, { location })} plotNodes={w.plotNodes} onOpenPlot={w.focusPlotNode} outline={w.outlineNodes} />
+        return <MapsConsole key={id} projectId={id} scenes={scenesOf(w.outlineNodes)} onSetLocation={(sceneId, location) => w.updateOutlineNode(sceneId, { location })} plotNodes={w.plotNodes} onOpenPlot={w.focusPlotNode} outline={w.outlineNodes} onOpenScene={sceneId => openNode(w, 'outline', sceneId)} />
       },
     },
     {
@@ -87,7 +88,15 @@ export function projectTabs(w: WriterWorkspace): LevelTab[] {
       render: () => {
         const id = w.activeProjectId
         if (!id) return <p className="wrMuted">Open a project to build its cast.</p>
-        return <CharactersConsole key={id} projectId={id} outline={w.outlineNodes} plotNodes={w.plotNodes} onOpenPlot={w.focusPlotNode} />
+        return <CharactersConsole key={id} projectId={id} outline={w.outlineNodes} plotNodes={w.plotNodes} onOpenPlot={w.focusPlotNode} onOpenScene={sceneId => openNode(w, 'outline', sceneId)} />
+      },
+    },
+    {
+      id: 'items', label: 'Items', Icon: BagIcon, fill: true, console: true,
+      render: () => {
+        const id = w.activeProjectId
+        if (!id) return <p className="wrMuted">Open a project to keep its items.</p>
+        return <ItemsConsole key={id} projectId={id} outline={w.outlineNodes} plotNodes={w.plotNodes} onOpenPlot={w.focusPlotNode} onOpenScene={sceneId => openNode(w, 'outline', sceneId)} />
       },
     },
     { id: 'history', label: 'History', Icon: ClockIcon, render: () => placeholder('projectHistory') },

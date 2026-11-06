@@ -57,6 +57,24 @@ export function editStop(draft: MapDraft, journeyId: string, stopId: string, pat
   return edit(draft, journeyId, j => ({ ...j, stops: orderStops(j.stops.map(s => (s.id === stopId ? { ...s, ...patch } : s)), points) }))
 }
 
+// A stop moved to a place on the map (dragged), the order of the stops left as it is. Null when it did not move or is not there.
+export function moveStop(draft: MapDraft, journeyId: string, stopId: string, x: number, y: number): Change {
+  const stop = journeysOf(draft).find(j => j.id === journeyId)?.stops.find(s => s.id === stopId)
+  if (!stop || (stop.x === x && stop.y === y)) return null
+  return edit(draft, journeyId, j => ({ ...j, stops: j.stops.map(s => (s.id === stopId ? { ...s, x, y } : s)) }))
+}
+
+// The stop of a journey nearest to a place that lies within `reach` cells of it (the later stop wins a tie, being drawn on top).
+export function stopNear(journey: MapJourney | undefined, x: number, y: number, reach: number): MapJourneyStop | null {
+  let found: MapJourneyStop | null = null
+  let best = reach
+  for (const s of journey?.stops ?? []) {
+    const d = Math.hypot(s.x - x, s.y - y)
+    if (d <= best) { found = s; best = d }
+  }
+  return found
+}
+
 export const removeStop = (draft: MapDraft, journeyId: string, stopId: string): Change => edit(draft, journeyId, j => ({ ...j, stops: j.stops.filter(s => s.id !== stopId) }))
 
 export interface Whereabouts { journeyId: string; characterId: string; x: number; y: number; stopId: string }

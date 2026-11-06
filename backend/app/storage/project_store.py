@@ -27,6 +27,7 @@ from .schema import (
     DraftMoment,
     FacetActivity,
     CharacterDoc,
+    ItemDoc,
     WorldLink,
     MapDoc,
     OutlineTree,
@@ -623,6 +624,7 @@ def _load_project_file_locked(root: Path, project_id: str) -> tuple[ProjectFile,
         maps=_parse_dict_section(raw, "maps", MapDoc, project_dir, path, errors),
         characters=_parse_dict_section(raw, "characters", CharacterDoc, project_dir, path, errors),
         worldLinks=_parse_list_section(raw, "worldLinks", WorldLink, project_dir, path, errors),
+        items=_parse_dict_section(raw, "items", ItemDoc, project_dir, path, errors),
         scrap=_parse_section_default(raw, "scrap", ScrapRegistry, project_dir, path, errors, scrap_default),
         settingsLog=_parse_list_section(raw, "settingsLog", SettingsLogEntry, project_dir, path, errors),
     )
@@ -1547,6 +1549,11 @@ def delete_character(root: Path, project_id: str, character_id: str) -> None:
         # No relationship points at a character that is gone.
         for other in pf.characters.values():
             other.relationships = [r for r in other.relationships if r.targetId != character_id]
+        # An item that was with them is with nobody known from then on.
+        for item in pf.items.values():
+            for h in item.holdings:
+                if h.holder == f"char:{character_id}":
+                    h.holder = ""
         pf.index.updatedAt = utcnow()
 
     _mutate(root, project_id, _do)
@@ -1554,3 +1561,50 @@ def delete_character(root: Path, project_id: str, character_id: str) -> None:
 
 def character_count(root: Path, project_id: str) -> int:
     return _read(root, project_id, lambda pf, _errors: len(pf.characters), copy_result=False)
+
+
+# ---------------------------------------------------------------------------
+# Items (the library of things that change hands)
+# ---------------------------------------------------------------------------
+
+
+class ItemNotFoundError(Exception):
+    def __init__(self, project_id: str, item_id: str) -> None:
+        self.project_id = project_id
+        self.item_id = item_id
+        super().__init__(f"item {item_id} not found in project {project_id}")
+
+
+def list_items(root: Path, project_id: str) -> list[ItemDoc]:
+    """Every readable item, whole (each is a copy), in order."""
+    return _read(root, project_id, lambda pf, _errors: sorted(pf.items.values(), key=lambda i: (i.order, i.name.lower(), i.id)))
+
+
+def load_item(root: Path, project_id: str, item_id: str) -> ItemDoc:
+    def pick(pf: ProjectFile, errors: dict[str, ShardCorruptError]) -> Optional[ItemDoc]:
+        key = f"items.{item_id}"
+        if key in errors:
+            raise errors[key]
+        return pf.items.get(item_id)
+
+    found = _read(root, project_id, pick)
+    if found is None:
+        raise ItemNotFoundError(project_id, item_id)
+    return found
+
+
+def save_item(root: Path, project_id: str, doc: ItemDoc) -> None:
+    def _do(pf: ProjectFile) -> None:
+        pf.items[doc.id] = doc
+        pf.index.updatedAt = utcnow()
+
+    _mutate(root, project_id, _do)
+
+
+def delete_item(root: Path, project_id: str, item_id: str) -> None:
+    def _do(pf: ProjectFile) -> None:
+        if pf.items.pop(item_id, None) is None:
+            raise ItemNotFoundError(project_id, item_id)
+        pf.index.updatedAt = utcnow()
+
+    _mutate(root, project_id, _do)

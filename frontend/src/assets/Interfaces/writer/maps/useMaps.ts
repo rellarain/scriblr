@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { listCharacters } from '../../../../api/charactersApi'
 import { createMap, createMapVersion, deleteMap, getMap, listMaps, putMap } from '../../../../api/mapsApi'
 import type { MapCreate, MapDoc, MapSummary } from '../../../../api/types'
 import { combineCountdown, combineSaveStatus, useAutosave } from '../../../../lib/useAutosave'
@@ -136,8 +137,12 @@ export function useMaps(projectId: string | null) {
     setNotice(undefined)
     try {
       await autosaveRef.current.flush()
-      const inside = model.descendantIds(await listMaps(projectId), rootId)
-      const docs = await Promise.all([rootId, ...inside].map(id => getMap(projectId, id)))
+      const list = await listMaps(projectId)
+      const inside = model.descendantIds(list, rootId)
+      // The versions of those maps come with them.
+      const kept = new Set([rootId, ...inside])
+      const versions = list.filter(m => m.versionOf && kept.has(m.versionOf)).map(m => m.id)
+      const docs = await Promise.all([rootId, ...inside, ...versions].map(id => getMap(projectId, id)))
       return buildMapFile(rootId, docs)
     } catch (err) {
       setNotice(message(err, 'The map could not be exported.'))
@@ -150,9 +155,13 @@ export function useMaps(projectId: string | null) {
     if (!projectId) return null
     setNotice(undefined)
     await autosaveRef.current.flush()
+    // The characters the project has: a journey of another is left out of the import.
+    const characterIds = await listCharacters(projectId).then(rows => (Array.isArray(rows) ? new Set(rows.map(c => c.id)) : undefined), () => undefined)
     const result = await importMaps(file, choices, await listMaps(projectId), parentId, {
       create: body => createMap(projectId, body),
       put: doc => putMap(projectId, doc),
+      createVersion: (mapId, body) => createMapVersion(projectId, mapId, body),
+      characterIds,
     })
     // What was written over is read again when it is next opened.
     for (const id of result.replaced) sessions.current.delete(id)

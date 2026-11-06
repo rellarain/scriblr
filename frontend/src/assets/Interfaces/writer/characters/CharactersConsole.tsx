@@ -13,6 +13,7 @@ import { BodyDrawer, ClothesDrawer, EyesDrawer, HairDrawer, HeadDrawer, MarksDra
 import { CommitText, Field } from './CharFields'
 import { CastSection } from './CastSection'
 import { WorldLinks } from '../links/WorldLinks'
+import { CarriedItems } from '../items/CarriedItems'
 import { hasPending, usePendingOpen } from '../links/worldNav'
 import { ForReadersSection } from './ForReadersSection'
 import { useCast } from './castStore'
@@ -54,7 +55,7 @@ const DRAWERS: Array<{ id: string; name: string; Icon: typeof FaceIcon }> = [
 // Project > Characters: the cast. A list of characters, the open one drawn as a close-up, a full figure, a turnaround of four views or a strip of expressions, and beside it
 // the drawers where its parts are chosen (build, head, eyes, nose and mouth, hair, marks, clothes, pose). A character is only its look, a handful of choices and
 // numbers; the art is drawn from them in any view. Edits save the way the Writer's do: the Save button, and autosave when the user has turned it on.
-export default function CharactersConsole({ projectId, outline = [], plotNodes = [], onOpenPlot }: { projectId: string; outline?: OutlineNode[]; plotNodes?: PlotNode[]; onOpenPlot?: (nodeId: string) => void }) {
+export default function CharactersConsole({ projectId, outline = [], plotNodes = [], onOpenPlot, onOpenScene }: { projectId: string; outline?: OutlineNode[]; plotNodes?: PlotNode[]; onOpenPlot?: (nodeId: string) => void; onOpenScene?: (nodeId: string) => void }) {
   const c = useCharacters(projectId)
   const { ui } = useSettings()
   const [section, setSection] = useState<Section>('look')
@@ -138,7 +139,7 @@ export default function CharactersConsole({ projectId, outline = [], plotNodes =
         {doc && section === 'relationships' && <RelationshipsSection projectId={projectId} c={c} doc={doc} points={points} />}
         {doc && section === 'cast' && <CastSection c={c} cast={all} doc={doc} onOpen={id => { void c.open(id) }} />}
         {doc && section === 'readers' && <ForReadersSection projectId={projectId} doc={doc} edit={c.edit} savedAt={c.saveStatus.lastSavedAt} />}
-        {doc && section === 'story' && <StorySection doc={doc} edit={c.edit} points={points} links={<WorldLinks projectId={projectId} self={`char:${doc.id}`} plotNodes={plotNodes} onOpenPlot={onOpenPlot} />} />}
+        {doc && section === 'story' && <StorySection doc={doc} edit={c.edit} points={points} links={<><CarriedItems projectId={projectId} characterId={doc.id} outline={outline} /><WorldLinks projectId={projectId} self={`char:${doc.id}`} plotNodes={plotNodes} onOpenPlot={onOpenPlot} outline={outline} onOpenScene={onOpenScene} /></>} />}
         {doc && ctx && section === 'look' ? (
           <>
             <div className="charStage">

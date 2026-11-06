@@ -17,6 +17,7 @@ from .api import (
     feedback,
     library,
     characters,
+    items,
     world_links,
     maps,
     outline,
@@ -43,6 +44,7 @@ from .storage.pdf_export import OutlineNodeNotFoundError
 from .storage.project_store import (
     InvalidRestoreParentError,
     CharacterNotFoundError,
+    ItemNotFoundError,
     MapNotFoundError,
     MomentNotFoundError,
     NewerSchemaError,
@@ -122,6 +124,10 @@ def create_app(static_dir: Optional[Path] = None) -> FastAPI:
     async def _character_not_found(_: Request, exc: CharacterNotFoundError) -> JSONResponse:
         return JSONResponse(status_code=404, content={"detail": str(exc)})
 
+    @app.exception_handler(ItemNotFoundError)
+    async def _item_not_found(_: Request, exc: ItemNotFoundError) -> JSONResponse:
+        return JSONResponse(status_code=404, content={"detail": str(exc)})
+
     @app.exception_handler(MapNotFoundError)
     async def _map_not_found(_: Request, exc: MapNotFoundError) -> JSONResponse:
         return JSONResponse(status_code=404, content={"detail": str(exc)})
@@ -135,6 +141,7 @@ def create_app(static_dir: Optional[Path] = None) -> FastAPI:
     app.include_router(plot.router)
     app.include_router(maps.router)
     app.include_router(characters.router)
+    app.include_router(items.router)
     app.include_router(world_links.router)
     app.include_router(draft.router)
     app.include_router(revisions.router)

@@ -148,7 +148,7 @@ describe('the links of a plot node', () => {
     const w = makeWorkspace({ activeProjectId: 'p1', plotNodes: PLOT, plotNodeById: new Map(PLOT.map(n => [n.id, n])), focusPlotNode, projectHue: 200 })
     const user = userEvent.setup()
     render(<LinkedSection w={w} node={PLOT[1]} />)
-    const group = within(await screen.findByRole('group', { name: 'Characters and places' }))
+    const group = within(await screen.findByRole('group', { name: 'Characters, places, items and scenes' }))
     expect(await group.findByRole('button', { name: 'Open Known World > Port Veyra' })).toBeInTheDocument()
     await user.selectOptions(group.getByRole('combobox', { name: 'Link to' }), 'char:chr_a')
     await waitFor(() => expect(api.links).toContainEqual({ a: 'char:chr_a', b: 'plot:line1' }))

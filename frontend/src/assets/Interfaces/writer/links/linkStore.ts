@@ -2,19 +2,19 @@ import { useEffect, useSyncExternalStore } from 'react'
 import { addWorldLink, listWorldLinks, removeWorldLink } from '../../../../api/worldLinksApi'
 import type { WorldLink } from '../../../../api/types'
 
-// Links between a plot node, a character and a place. A link is one record for both ends (backend: storage/world_links.py), so it reads the same from either; a ref
-// names the end: "plot:<node id>", "char:<character id>" or "place:<map id>/<symbol id>". The links of the open project are held in an external store, loaded when
+// Links between a plot node, a character, a place, an item and a chapter or scene. A link is one record for both ends (backend: storage/world_links.py), so it reads the same from either; a ref
+// names the end: "plot:<node id>", "char:<character id>", "place:<map id>/<symbol id>", "item:<item id>" or "scene:<outline node id>". The links of the open project are held in an external store, loaded when
 // something that shows them appears and again a moment after anything is saved (a character or a place may have gone), like the places (maps/placesStore.ts).
 
-export type LinkKind = 'plot' | 'char' | 'place'
-export const LINK_KINDS: LinkKind[] = ['plot', 'char', 'place']
-export const KIND_NAME: Record<LinkKind, string> = { plot: 'Plot', char: 'Character', place: 'Place' }
-export const KIND_HEADING: Record<LinkKind, string> = { plot: 'Plot nodes', char: 'Characters', place: 'Places' }
+export type LinkKind = 'plot' | 'char' | 'place' | 'item' | 'scene'
+export const LINK_KINDS: LinkKind[] = ['plot', 'char', 'place', 'item', 'scene']
+export const KIND_NAME: Record<LinkKind, string> = { plot: 'Plot', char: 'Character', place: 'Place', item: 'Item', scene: 'Scene' }
+export const KIND_HEADING: Record<LinkKind, string> = { plot: 'Plot nodes', char: 'Characters', place: 'Places', item: 'Items', scene: 'Chapters and scenes' }
 
 export const refOf = (kind: LinkKind, id: string) => `${kind}:${id}`
 export function kindOf(ref: string): LinkKind {
   const kind = ref.slice(0, ref.indexOf(':'))
-  return kind === 'plot' || kind === 'char' ? kind : 'place'
+  return kind === 'plot' || kind === 'char' || kind === 'item' || kind === 'scene' ? kind : 'place'
 }
 export const idOf = (ref: string) => ref.slice(ref.indexOf(':') + 1)
 

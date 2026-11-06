@@ -563,4 +563,19 @@ export interface CharacterDoc {
   reader?: ReaderShare
 }
 export interface CharacterSummary { id: string; name: string; order: number; updatedAt: string }
+
+// ---- items (the library of things that change hands) ----
+export const ITEM_KINDS = ['weapon', 'tool', 'clothing', 'jewel', 'document', 'vehicle', 'treasure', 'other'] as const
+export const ITEM_MAX_HOLDINGS = 200
+// Who has an item from a point of the story: a character ("char:<id>"), a place ("place:<mapId>/<symbolId>") or nobody known (empty); `at` is an outline chapter or scene (empty: from the start).
+export interface ItemHolding { id: string; holder: string; at: string; note: string }
+export interface ItemDoc {
+  schemaVersion: number; id: string; name: string; order: number; kind: string; description: string; notes: string
+  // A colour for the item's tag, "#rrggbb" or empty.
+  color: string
+  holdings: ItemHolding[]
+  updatedAt: string
+}
+export interface ItemSummary { id: string; name: string; kind: string; order: number; updatedAt: string }
+export interface ItemCreate { name?: string; kind?: string }
 export interface CharacterCreate { name?: string; look?: CharacterLook }

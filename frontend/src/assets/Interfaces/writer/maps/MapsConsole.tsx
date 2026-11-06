@@ -44,7 +44,7 @@ const NEW_LABEL_SIZE = 1.5
 // A scene of the project, for the places: its location is the key of a place (or old text, from before there were places).
 export interface ScenePlace { id: string; title: string; location: string }
 
-export default function MapsConsole({ projectId, scenes = [], onSetLocation, plotNodes = [], onOpenPlot, outline = [] }: {
+export default function MapsConsole({ projectId, scenes = [], onSetLocation, plotNodes = [], onOpenPlot, outline = [], onOpenScene }: {
   projectId: string
   // The outline, for the points of the story that versions and journeys are tied to.
   outline?: OutlineNode[]
@@ -52,6 +52,7 @@ export default function MapsConsole({ projectId, scenes = [], onSetLocation, plo
   // The plot's nodes, to link a place to, and how to open one.
   plotNodes?: PlotNode[]
   onOpenPlot?: (nodeId: string) => void
+  onOpenScene?: (nodeId: string) => void
   // Give a scene another location (a place key, or '' for none): what the old-locations tool changes.
   onSetLocation?: (sceneId: string, location: string) => void
 }) {
@@ -232,7 +233,7 @@ export default function MapsConsole({ projectId, scenes = [], onSetLocation, plo
               <p className="mapStatus" aria-live="off">{tool === 'measure' && measured !== null ? `${measured} · click to add a point, Backspace takes one back, Esc clears` : `${statusText} · ${formatDistance(draft.width * draft.cellSize, draft.unit)} wide${tool === 'measure' ? ' · click to start measuring' : hint}`}</p>
             </div>
             <MapSide
-              projectId={projectId} plotNodes={plotNodes} onOpenPlot={onOpenPlot} m={m} draft={draft} terrain={chosen} onTerrain={i => { setTerrain(i); if (tool !== 'brush' && tool !== 'fill') setTool('brush') }}
+              projectId={projectId} plotNodes={plotNodes} onOpenPlot={onOpenPlot} outline={outline} onOpenScene={onOpenScene} m={m} draft={draft} terrain={chosen} onTerrain={i => { setTerrain(i); if (tool !== 'brush' && tool !== 'fill') setTool('brush') }}
               symbolKind={symbolKind} onSymbolKind={id => { setSymbolKind(id); setTool('symbol') }} symbolSize={symbolSize} onSymbolSize={setSymbolSize}
               pen={pen} penType={penType}
               onPen={patch => (penType === 'region' ? setRegionPen : setLinePen)(old => ({ ...old, ...patch }))}

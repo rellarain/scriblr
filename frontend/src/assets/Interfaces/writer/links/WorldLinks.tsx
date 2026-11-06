@@ -1,8 +1,10 @@
 import { useMemo, useState } from 'react'
-import type { MapPlace, PlotNode } from '../../../../api/types'
+import type { MapPlace, OutlineNode, PlotNode } from '../../../../api/types'
 import { CloseIcon, LinkIcon } from '../../../icons'
 import { usePlaces } from '../maps/placesStore'
 import { useCast } from '../characters/castStore'
+import { storyPoints } from '../characters/story'
+import { useItemStore } from '../items/itemStore'
 import { pathLabel } from '../plotLinks'
 import { KIND_HEADING, KIND_NAME, LINK_KINDS, idOf, kindOf, linkedTo, refOf, useWorldLinks, type LinkKind } from './linkStore'
 import { requestOpen } from './worldNav'
@@ -10,31 +12,38 @@ import './links.scss'
 
 interface Target { ref: string; kind: LinkKind; label: string }
 
-// Every thing a link can end at: the project's plot nodes (by their place in the plot), characters and places (by the maps they are inside).
-export function useLinkTargets(projectId: string | null, plotNodes: PlotNode[]): Target[] {
+// Every thing a link can end at: the project's plot nodes (by their place in the plot), characters, places (by the maps they are inside), items and, when the outline is
+// given, chapters and scenes (by where they are in the book).
+export function useLinkTargets(projectId: string | null, plotNodes: PlotNode[], outline: OutlineNode[] = []): Target[] {
   const { cast } = useCast(projectId)
   const { places } = usePlaces(projectId)
+  const { items } = useItemStore(projectId)
   return useMemo(() => {
     const byId = new Map(plotNodes.map(n => [n.id, n]))
     return [
       ...plotNodes.map(n => ({ ref: refOf('plot', n.id), kind: 'plot' as const, label: pathLabel(n, byId) })),
       ...cast.map(c => ({ ref: refOf('char', c.id), kind: 'char' as const, label: c.name })),
       ...places.map((p: MapPlace) => ({ ref: refOf('place', p.key), kind: 'place' as const, label: p.path || p.name })),
+      ...items.map(i => ({ ref: refOf('item', i.id), kind: 'item' as const, label: i.name })),
+      ...storyPoints(outline).map(p => ({ ref: refOf('scene', p.id), kind: 'scene' as const, label: p.label })),
     ]
-  }, [plotNodes, cast, places])
+  }, [plotNodes, cast, places, items, outline])
 }
 
 // What a thing is linked to, as chips that open the other end, and a picker, grouped by kind, to link it to something else. A link is on both ends: the other
 // end lists this one too. Things of its own kind are not offered (plot nodes have their own links, characters their relationships).
-export function WorldLinks({ projectId, self, plotNodes, onOpenPlot, heading = 'Linked to' }: {
+export function WorldLinks({ projectId, self, plotNodes, onOpenPlot, outline, onOpenScene, heading = 'Linked to' }: {
   projectId: string | null
   self: string
   plotNodes: PlotNode[]
   onOpenPlot?: (nodeId: string) => void
+  // The outline, to offer its chapters and scenes as things to link to, and a way to open one.
+  outline?: OutlineNode[]
+  onOpenScene?: (nodeId: string) => void
   heading?: string
 }) {
   const store = useWorldLinks(projectId)
-  const targets = useLinkTargets(projectId, plotNodes)
+  const targets = useLinkTargets(projectId, plotNodes, outline)
   const [failed, setFailed] = useState(false)
   if (!projectId) return null
   const selfKind = kindOf(self)
@@ -45,6 +54,7 @@ export function WorldLinks({ projectId, self, plotNodes, onOpenPlot, heading = '
 
   const open = (t: Target) => {
     if (t.kind === 'plot') onOpenPlot?.(idOf(t.ref))
+    else if (t.kind === 'scene') onOpenScene?.(idOf(t.ref))
     else requestOpen(t.kind, idOf(t.ref))
   }
   const act = (run: () => Promise<boolean>) => { setFailed(false); void run().then(ok => { if (!ok) setFailed(true) }) }

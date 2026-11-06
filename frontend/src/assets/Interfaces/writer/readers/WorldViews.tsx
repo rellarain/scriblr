@@ -30,10 +30,11 @@ export function MapView({ doc }: { doc: MapDoc }) {
   return <canvas ref={ref} className="wvMap" role="img" aria-label={`Map: ${doc.title}`} />
 }
 
-// A character card: a close-up, the name, the fields the author made public and the links to other published characters.
-export function CharacterCard({ card, onOpen }: { card: ReaderCharacter; onOpen?: (id: string) => void }) {
+// A character card: a close-up, the name, the fields the author made public and the links to other published characters. With `onOpen`, a link to a character
+// that is `shown` (a card is on the page for them) jumps to that card; one to a character not shown (not revealed yet) is only named. `focused` marks the card jumped to.
+export function CharacterCard({ card, onOpen, shown, focused = false }: { card: ReaderCharacter; onOpen?: (id: string) => void; shown?: ReadonlySet<string>; focused?: boolean }) {
   return (
-    <article className="wvCard" aria-label={card.name}>
+    <article className={focused ? 'wvCard wvCard--focus' : 'wvCard'} id={`wvCard-${card.id}`} aria-label={card.name}>
       <div className="wvCardArt"><CharacterArt look={card.look} mode="closeup" label={`${card.name}, close-up`} className="wvArt" /></div>
       <div className="wvCardBody">
         <h4 className="wvCardName">{card.name}</h4>
@@ -50,7 +51,7 @@ export function CharacterCard({ card, onOpen }: { card: ReaderCharacter; onOpen?
           <ul className="wvLinks" aria-label={`${card.name}, relationships`}>
             {card.relationships.map(r => (
               <li key={r.targetId}>
-                {onOpen ? <button type="button" className="wvLink" onClick={() => onOpen(r.targetId)}>{r.targetName}</button> : <b>{r.targetName}</b>}
+                {onOpen && (!shown || shown.has(r.targetId)) ? <button type="button" className="wvLink" aria-label={`Go to ${r.targetName}`} onClick={() => onOpen(r.targetId)}>{r.targetName}</button> : <b>{r.targetName}</b>}
                 <span className="rvHint"> · {r.label}{r.description ? `: ${r.description}` : ''}</span>
               </li>
             ))}

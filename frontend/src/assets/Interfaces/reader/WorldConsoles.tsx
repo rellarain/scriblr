@@ -81,7 +81,18 @@ export function MapsConsole({ ctx, book }: { ctx: ReaderCtx; book: CatalogBook }
             <MapView doc={open} />
             {open.symbols.some(s => s.name) && (
               <ul className="rdList" aria-label="Places on this map">
-                {open.symbols.filter(s => s.name).map(s => <li key={s.id} className="rdItem"><div className="rdItemMain"><b>{s.name}</b>{s.mapIds.length > 0 && <span className="rdMuted">has a map of its own</span>}</div></li>)}
+                {open.symbols.filter(s => s.name).map(s => {
+                  // A place that has a map of its own opens it when that map is one the reader can see.
+                  const inside = s.mapIds.map(id => maps.find(m => m.id === id)).find((m): m is MapDoc => m !== undefined)
+                  return (
+                    <li key={s.id} className="rdItem">
+                      <div className="rdItemMain">
+                        <b>{s.name}</b>
+                        {inside ? <button type="button" className="wvLink" aria-label={`Open ${inside.title}, the map of ${s.name}`} onClick={() => { setPicked(inside.id); setPickedVersion(null) }}>{inside.title}</button> : s.mapIds.length > 0 && <span className="rdMuted">has a map of its own</span>}
+                      </div>
+                    </li>
+                  )
+                })}
               </ul>
             )}
           </Card>
@@ -94,13 +105,20 @@ export function MapsConsole({ ctx, book }: { ctx: ReaderCtx; book: CatalogBook }
 
 export function CastConsole({ ctx, book }: { ctx: ReaderCtx; book: CatalogBook }) {
   const loaded = useExtras(ctx, book)
+  const [focused, setFocused] = useState<string | null>(null)
   if (loaded.state === 'loading') return <p className="rdMuted" role="status">Loading the cast…</p>
   if (loaded.state === 'failed') return <p className="rdMuted" role="alert">The cast could not be loaded.</p>
   const { characters, lockedCharacters } = loaded.extras
+  const shown = new Set(characters.map(c => c.id))
+  // A link between characters jumps to the other card, which is marked for a moment.
+  const goTo = (id: string) => {
+    setFocused(id)
+    document.getElementById(`wvCard-${id}`)?.scrollIntoView?.({ block: 'center', behavior: 'smooth' })
+  }
   return (
     <>
       {characters.length === 0 && <p className="rdMuted">{lockedCharacters > 0 ? 'Nobody to meet yet. Keep reading.' : 'The author has not published any characters for this book.'}</p>}
-      <div className="rdCast">{characters.map(c => <CharacterCard key={c.id} card={c} />)}</div>
+      <div className="rdCast">{characters.map(c => <CharacterCard key={c.id} card={c} onOpen={goTo} shown={shown} focused={focused === c.id} />)}</div>
       {more(lockedCharacters, 'character')}
     </>
   )

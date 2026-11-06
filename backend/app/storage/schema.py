@@ -2753,12 +2753,87 @@ BookEdition.model_rebuild()
 BookListing.model_rebuild()
 
 
-WORLD_LINK_REF = re.compile(r"^(plot|char|place):[A-Za-z0-9_/-]{1,160}$")
+ITEM_MAX_PER_PROJECT = 400
+ITEM_MAX_HOLDINGS = 200
+ITEM_KINDS = ("weapon", "tool", "clothing", "jewel", "document", "vehicle", "treasure", "other")
+ITEM_HOLDER = re.compile(r"^(char|place):[A-Za-z0-9_/-]{1,160}$")
+
+
+class ItemHolding(BaseModel):
+    """Who has an item from a point of the story: a character (`char:<id>`), a place (`place:<mapId>/<symbolId>`) or nobody known (empty: lost, hidden or not yet made).
+    `at` is the outline chapter or scene the item changes hands at (empty: from the start of the story). The last holding of the list is the item's current holder."""
+
+    id: str = Field(min_length=1, max_length=40)
+    holder: str = ""
+    at: str = Field(default="", max_length=80)
+    note: str = Field(default="", max_length=500)
+
+    @field_validator("holder", mode="before")
+    @classmethod
+    def _holder(cls, value: Any) -> Any:
+        return value if isinstance(value, str) and ITEM_HOLDER.match(value) else ""
+
+    @field_validator("at", mode="before")
+    @classmethod
+    def _at(cls, value: Any) -> Any:
+        return _cut(value, 80)
+
+    @field_validator("note", mode="before")
+    @classmethod
+    def _note(cls, value: Any) -> Any:
+        return _cut(value, 500)
+
+
+class ItemDoc(BaseModel):
+    """A thing of the story that can pass from hand to hand: a sword, a letter, a ring. The library is shared by the whole cast; who has it, and when, is its `holdings`."""
+
+    schemaVersion: int = SCHEMA_VERSION
+    id: str = Field(min_length=1, max_length=80)
+    name: str = Field(default="Unnamed item", max_length=120)
+    order: int = 0
+    kind: str = "other"
+    description: str = Field(default="", max_length=4000)
+    notes: str = Field(default="", max_length=4000)
+    # A colour for its tag, `#rrggbb` (the author's own; empty = none).
+    color: str = ""
+    holdings: list[ItemHolding] = Field(default_factory=list)
+    updatedAt: datetime = Field(default_factory=utcnow)
+
+    @field_validator("name", mode="before")
+    @classmethod
+    def _name_or_default(cls, value: Any) -> Any:
+        text = value.strip()[:120] if isinstance(value, str) else ""
+        return text or "Unnamed item"
+
+    @field_validator("kind", mode="before")
+    @classmethod
+    def _kind(cls, value: Any) -> Any:
+        text = value.strip().lower() if isinstance(value, str) else ""
+        return text if text in ITEM_KINDS else "other"
+
+    @field_validator("description", "notes", mode="before")
+    @classmethod
+    def _long(cls, value: Any) -> Any:
+        return _cut(value, 4000)
+
+    @field_validator("color", mode="before")
+    @classmethod
+    def _color(cls, value: Any) -> Any:
+        return value.lower() if isinstance(value, str) and re.match(r"^#[0-9a-fA-F]{6}$", value) else ""
+
+    @field_validator("holdings", mode="before")
+    @classmethod
+    def _holdings(cls, value: Any) -> Any:
+        return _unique_items(value, ItemHolding, ITEM_MAX_HOLDINGS)
+
+
+WORLD_LINK_REF = re.compile(r"^(plot|char|place|item|scene):[A-Za-z0-9_/-]{1,160}$")
 WORLD_MAX_LINKS = 2000
 
 
 class WorldLink(BaseModel):
-    """A link between two things of different kinds: a plot node (`plot:<id>`), a character (`char:<id>`) or a place, a named symbol of a map (`place:<mapId>/<symbolId>`).
+    """A link between two things of different kinds: a plot node (`plot:<id>`), a character (`char:<id>`), a place, a named symbol of a map (`place:<mapId>/<symbolId>`),
+    an item of the library (`item:<id>`) or a chapter or scene of the outline (`scene:<id>`).
     It is one record for both ends, so it reads the same from either."""
 
     a: str
@@ -2799,6 +2874,8 @@ class ProjectFile(BaseModel):
     characters: dict[str, CharacterDoc] = Field(default_factory=dict)
     # Links between plot nodes, characters and places (see WorldLink); one that points at something that is gone is not shown and goes at the next change.
     worldLinks: list[WorldLink] = Field(default_factory=list)
+    # Item id -> the item (the library of things that pass from hand to hand). Read the way the characters are.
+    items: dict[str, ItemDoc] = Field(default_factory=dict)
     scrap: ScrapRegistry = Field(default_factory=ScrapRegistry)
     # Changes to the project's settings (time systems, colour), newest last; see SettingsLogEntry.
     settingsLog: list[SettingsLogEntry] = Field(default_factory=list)

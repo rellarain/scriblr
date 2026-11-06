@@ -51,6 +51,17 @@ describe('the Maps console of a book', () => {
     expect(group.getByRole('button', { name: 'Veyra' })).toHaveAttribute('aria-pressed', 'false')
   })
 
+  it('opens the map of a place from the place, when that map is one the reader can see', async () => {
+    const symbol = { id: 's1', layerId: 'l', kind: 'town', x: 1, y: 1, size: 2, color: null, name: 'Port Veyra', mapIds: ['m2'] }
+    serve(extras({ maps: [map('m1', 'Veyra', { symbols: [symbol] }), map('m2', 'The Harbour Inn', { parentId: 'm1', kind: 'interior' })] }))
+    const user = userEvent.setup()
+    render(<MapsConsole ctx={ctx()} book={book} />)
+    const places = within(await screen.findByRole('list', { name: 'Places on this map' }))
+    expect(places.queryByText('has a map of its own')).not.toBeInTheDocument()
+    await user.click(places.getByRole('button', { name: 'Open The Harbour Inn, the map of Port Veyra' }))
+    expect(within(screen.getByRole('group', { name: 'Maps' })).getByRole('button', { name: 'The Harbour Inn' })).toHaveAttribute('aria-pressed', 'true')
+  })
+
   it('shows the latest revealed version of a map first, with the earlier ones one click away, and keeps versions out of the list of maps', async () => {
     const shared = (revealAt: number | null) => ({ published: true, revealAt, reveals: {}, fields: [] })
     serve(extras({ maps: [
@@ -107,6 +118,19 @@ describe('the Cast console of a book', () => {
     render(<CastConsole ctx={ctx()} book={book} />)
     expect(await screen.findByText('Nobody to meet yet. Keep reading.')).toBeInTheDocument()
     expect(screen.getByText('One more character to discover as you read.')).toBeInTheDocument()
+  })
+
+  it('jumps from a relationship to the card of the other character, and only names one who is not shown yet', async () => {
+    const rel = (targetId: string, targetName: string) => ({ targetId, targetName, label: 'Ally', description: '' })
+    serve(extras({ characters: [card('a', 'Ada', { relationships: [rel('b', 'Bram'), rel('z', 'Zed')] }), card('b', 'Bram')] }))
+    const user = userEvent.setup()
+    render(<CastConsole ctx={ctx()} book={book} />)
+    const ada = within(await screen.findByRole('article', { name: 'Ada' }))
+    expect(ada.queryByRole('button', { name: 'Go to Zed' })).not.toBeInTheDocument()
+    expect(ada.getByText('Zed')).toBeInTheDocument()
+    expect(screen.getByRole('article', { name: 'Bram' })).not.toHaveClass('wvCard--focus')
+    await user.click(ada.getByRole('button', { name: 'Go to Bram' }))
+    expect(screen.getByRole('article', { name: 'Bram' })).toHaveClass('wvCard--focus')
   })
 
   it('says so when the author published no character, and when it could not be loaded', async () => {

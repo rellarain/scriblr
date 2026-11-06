@@ -49,6 +49,10 @@ export const CARD_META: CardMeta[] = [
     summary: 'Project > Characters, where the cast is built: the list of characters, the figure drawn as a close-up, a full body, a turnaround or a strip of expressions, and the drawers beside it where its parts are chosen.',
   },
   {
+    id: 'items', dir: 'Items', title: 'Items: the library of things that change hands', group: 'Outline', height: 700,
+    summary: 'Project > Items, where the things that pass from hand to hand are kept: the library list, the open item with who has it from which chapter or scene on, and the links it belongs to, with the Save cluster.',
+  },
+  {
     id: 'shelf', dir: 'Shelf', title: 'Book shelf and spines', group: 'Outline', height: 260,
     summary: 'Spines on a board, grouped by series; the selected book swivels into its cover.',
   },

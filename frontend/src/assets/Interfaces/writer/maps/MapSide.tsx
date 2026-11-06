@@ -1,5 +1,5 @@
 import { useMemo, useState } from 'react'
-import { MAP_MAX_SIDE, type PlotNode, type MapSummary, type MapLayerKind, type MapLineStyle, type MapPattern, type MapShape, type MapShapeType } from '../../../../api/types'
+import { MAP_MAX_SIDE, type OutlineNode, type PlotNode, type MapSummary, type MapLayerKind, type MapLineStyle, type MapPattern, type MapShape, type MapShapeType } from '../../../../api/types'
 import { ChevronDownIcon, ChevronUpIcon, CheckIcon, CloseIcon, EyeClosedIcon, EyeIcon, FolderPlusIcon, ImageIcon, LockIcon, MapIcon, PlusIcon, RestoreIcon, TrashIcon, UnlockIcon } from '../../../icons'
 import { ColourInput, CommitNumber, CommitText, Field } from './MapFields'
 import { EXPORT_SCALES, exportMapImage, exportSize, type ExportScale } from './mapExport'
@@ -36,6 +36,9 @@ export interface MapSideProps {
   onJourneyTool: () => void
   plotNodes: PlotNode[]
   onOpenPlot?: (nodeId: string) => void
+  // The outline and a way to open a chapter or scene, for the links of a place.
+  outline?: OutlineNode[]
+  onOpenScene?: (nodeId: string) => void
   m: Maps
   draft: MapDraft
   terrain: number
@@ -60,10 +63,10 @@ export interface MapSideProps {
 }
 
 // The right-hand side of the Maps console: what is chosen on the map, the terrains to paint with, the symbols to stamp, the layers, and the map's own fields.
-export function MapSide({ projectId, points, cast, journey, onJourney, onJourneyTool, plotNodes, onOpenPlot, m, draft, terrain, onTerrain, symbolKind, onSymbolKind, symbolSize, onSymbolSize, pen, penType, onPen, onPreset, selected, fresh, onDeleted, scenes, onSetLocation }: MapSideProps) {
+export function MapSide({ projectId, points, cast, journey, onJourney, onJourneyTool, plotNodes, onOpenPlot, outline, onOpenScene, m, draft, terrain, onTerrain, symbolKind, onSymbolKind, symbolSize, onSymbolSize, pen, penType, onPen, onPreset, selected, fresh, onDeleted, scenes, onSetLocation }: MapSideProps) {
   return (
     <aside className="mapSide" aria-label="Map details">
-      {selected && <InspectorPanel projectId={projectId} plotNodes={plotNodes} onOpenPlot={onOpenPlot} m={m} draft={draft} selected={selected} fresh={fresh} onDeleted={onDeleted} scenes={scenes} />}
+      {selected && <InspectorPanel projectId={projectId} plotNodes={plotNodes} onOpenPlot={onOpenPlot} outline={outline} onOpenScene={onOpenScene} m={m} draft={draft} selected={selected} fresh={fresh} onDeleted={onDeleted} scenes={scenes} />}
       <OldLocations m={m} draft={draft} scenes={scenes} onSetLocation={onSetLocation} />
       <TerrainPanel m={m} draft={draft} terrain={terrain} onTerrain={onTerrain} />
       <SymbolPanel kind={symbolKind} onKind={onSymbolKind} size={symbolSize} onSize={onSymbolSize} />
@@ -142,7 +145,7 @@ function PenPanel({ pen, penType, onPen, onPreset }: { pen: Pen; penType: MapSha
 }
 
 // A symbol that has a name is a place: a scene can happen there, and the maps that open from it are listed (the town's map, the floors of a building).
-function PlaceFields({ projectId, plotNodes, onOpenPlot, m, draft, symbolId, scenes }: { projectId: string; plotNodes: PlotNode[]; onOpenPlot?: (nodeId: string) => void; m: Maps; draft: MapDraft; symbolId: string; scenes: ScenePlace[] }) {
+function PlaceFields({ projectId, plotNodes, onOpenPlot, outline, onOpenScene, m, draft, symbolId, scenes }: { projectId: string; plotNodes: PlotNode[]; onOpenPlot?: (nodeId: string) => void; outline?: OutlineNode[]; onOpenScene?: (nodeId: string) => void; m: Maps; draft: MapDraft; symbolId: string; scenes: ScenePlace[] }) {
   const s = draft.symbols.find(y => y.id === symbolId)!
   const linked = s.mapIds.map(id => m.maps.find(x => x.id === id)).filter((x): x is MapSummary => !!x)
   const free = m.maps.filter(x => x.id !== draft.id && !x.versionOf && !s.mapIds.includes(x.id))
@@ -186,7 +189,7 @@ function PlaceFields({ projectId, plotNodes, onOpenPlot, m, draft, symbolId, sce
           </div>
           <h4 className="mapSubTitle">Scenes here</h4>
           {here.length === 0 ? <p className="mapHint">No scene is set here. Choose it as a scene's Location in the Outline.</p> : <ul className="mapScenes">{here.map(sc => <li key={sc.id}>{sc.title || 'Untitled scene'}</li>)}</ul>}
-          <WorldLinks projectId={projectId} self={`place:${key}`} plotNodes={plotNodes} onOpenPlot={onOpenPlot} />
+          <WorldLinks projectId={projectId} self={`place:${key}`} plotNodes={plotNodes} onOpenPlot={onOpenPlot} outline={outline} onOpenScene={onOpenScene} />
         </div>
       )}
     </>
@@ -321,7 +324,7 @@ function SymbolPanel({ kind, onKind, size, onSize }: { kind: string; onKind: (id
 }
 
 // What is chosen on the map: a symbol (its width and colour), a label (its text and height) or a line or region (how it is drawn), and a delete.
-function InspectorPanel({ projectId, plotNodes, onOpenPlot, m, draft, selected, fresh, onDeleted, scenes }: { projectId: string; plotNodes: PlotNode[]; onOpenPlot?: (nodeId: string) => void; m: Maps; draft: MapDraft; selected: ItemRef; fresh: boolean; onDeleted: () => void; scenes: ScenePlace[] }) {
+function InspectorPanel({ projectId, plotNodes, onOpenPlot, outline, onOpenScene, m, draft, selected, fresh, onDeleted, scenes }: { projectId: string; plotNodes: PlotNode[]; onOpenPlot?: (nodeId: string) => void; outline?: OutlineNode[]; onOpenScene?: (nodeId: string) => void; m: Maps; draft: MapDraft; selected: ItemRef; fresh: boolean; onDeleted: () => void; scenes: ScenePlace[] }) {
   const item = findItem(draft, selected)
   if (!item) return null
   const remove = () => { m.apply(removeItem(draft, selected)); onDeleted() }
@@ -363,7 +366,7 @@ function InspectorPanel({ projectId, plotNodes, onOpenPlot, m, draft, selected, 
             </span>
           </Field>
         </div>
-        <PlaceFields projectId={projectId} plotNodes={plotNodes} onOpenPlot={onOpenPlot} m={m} draft={draft} symbolId={s.id} scenes={scenes} />
+        <PlaceFields projectId={projectId} plotNodes={plotNodes} onOpenPlot={onOpenPlot} outline={outline} onOpenScene={onOpenScene} m={m} draft={draft} symbolId={s.id} scenes={scenes} />
         <p className="mapHint">Drag it with the Select tool, or move it with the arrow keys (Shift for a quarter cell).</p>
       </section>
     )
