@@ -93,12 +93,28 @@ export function headParts(look: CharacterLook, t: Turn, uid: string, opts: { mar
   const sil = Math.sqrt(t.c * t.c + 0.81 * t.s * t.s)
   const outline: V2[] = [...right.map(([x, y]): V2 => [x * sil, y]), ...right.slice(1, -1).reverse().map(([x, y]): V2 => [-x * sil, y])]
   const headD = smoothPath(outline, true, 1)
-  add(0, (
-    <g key={key()}>
-      <path d={headD} fill={skinDark} />
-      <path d={headD} fill={skin} transform={`translate(${num(-2.4)} ${num(-1)}) scale(0.94 0.97)`} />
-    </g>
-  ))
+  // The planes of the face, lit from the upper left: the skull in the colour of the light, a plane of shade down the side away from the light (from the temple past the
+  // cheekbone to the jaw), a light forehead and cheekbone, and a shadow under the lip. All are kept inside the skull by a clip path.
+  {
+    const rr = (y: number) => R(y) * sil
+    const cut = (y: number, f: number): V2 => [rr(y) * f, y]
+    const shadeLine: V2[] = [cut(-52, 0.5), cut(-34, 0.46), cut(-12, 0.3), cut(8, 0.38), cut(28, 0.26), cut(44, 0.08), cut(chinY, 0)]
+    const wide = A0 * sil + 8
+    const shadeRegion = smoothPath([...shadeLine, [wide, chinY + 2], [wide, -54]], true, 0.5)
+    const cid = `${uid}skull`
+    add(0, (
+      <g key={key()}>
+        <clipPath id={cid}><path d={headD} /></clipPath>
+        <path d={headD} fill={skin} />
+        <g clipPath={`url(#${cid})`}>
+          <path d={shadeRegion} fill={skinDark} />
+          <ellipse cx={num(-rr(-30) * 0.28)} cy={-31} rx={num(rr(-30) * 0.42)} ry={9} fill={light(skin, 0.1)} />
+          <ellipse cx={num(-rr(10) * 0.5)} cy={9} rx={num(rr(10) * 0.26)} ry={7} fill={light(skin, 0.08)} />
+          <ellipse cx={0} cy={39} rx={num(Math.max(4, 9 * sil))} ry={3} fill={mix(skin, '#2a1c3a', 0.14)} />
+        </g>
+      </g>
+    ))
+  }
 
   // ---- ears ----
   const ear = pick(EARS, look.ears)
@@ -180,6 +196,7 @@ export function headParts(look: CharacterLook, t: Turn, uid: string, opts: { mar
             <path d={white} fill="none" stroke={skinDark} strokeWidth={2.4} opacity={0.35} />
           </g>
           <path d={lid} fill="none" stroke={lineInk} strokeWidth={eye.lash * (open < 0.5 ? 1.5 : 1)} strokeLinecap="round" />
+          <path d={`M${num(inner[0] * 0.8)} ${num(-2.6 - top)}Q0 ${num(midY - 2 * top - 3.4)} ${num(outer[0] * 0.95)} ${num(outer[1] - 2.6)}`} fill="none" stroke={skinDark} strokeWidth={0.8} strokeLinecap="round" opacity={0.55} />
           <path d={`M${num(inner[0] * 0.9)} ${num(1.2)}Q0 ${num(midY + 2 * bot + 1)} ${num(outer[0] * 0.9)} ${num(outer[1] + 1.2)}`} fill="none" stroke={skinDark} strokeWidth={0.8} opacity={0.6} strokeLinecap="round" />
         </g>
       )
@@ -222,13 +239,14 @@ export function headParts(look: CharacterLook, t: Turn, uid: string, opts: { mar
       const d = smoothPath(pts3.map(scr), true, 0.9)
       const nl = turn(t, [-w * 0.55, tipY + 1, D(tipY) + nose.z * ns * 0.5])
       const nr = turn(t, [w * 0.55, tipY + 1, D(tipY) + nose.z * ns * 0.5])
+      const planeShade = mix(skin, '#2a1c3a', 0.2)
       add(tip[2] * 0.01 + 0.4, (
         <g key={key()}>
           <path d={d} fill={skin} stroke={sideLook > 0.3 ? skinDark : 'none'} strokeWidth={0.9} strokeLinejoin="round" />
-          <path d={`M${num(pts3[0][0])} ${num(pts3[0][1])}Q${num(lerp(pts3[0][0], pts3[7][0], 0.8))} ${num(lerp(pts3[0][1], pts3[7][1], 0.5))} ${num(pts3[6][0])} ${num(pts3[6][1])}`} fill="none" stroke={skinDark} strokeWidth={1.2} opacity={0.5} strokeLinecap="round" />
-          {nl[2] > 0 && <ellipse cx={num(nl[0])} cy={num(nl[1] + 1.4)} rx={num(Math.max(0.6, 2.2 * Math.abs(t.c)))} ry={1.3} fill={mix(skin, INK, 0.55)} opacity={0.75} />}
-          {nr[2] > 0 && <ellipse cx={num(nr[0])} cy={num(nr[1] + 1.4)} rx={num(Math.max(0.6, 2.2 * Math.abs(t.c)))} ry={1.3} fill={mix(skin, INK, 0.55)} opacity={0.75} />}
-          <ellipse cx={num(tip[0])} cy={num(tip[1] - 1.5)} rx={num(Math.max(0.8, 2 * Math.abs(t.c) + 0.8))} ry={1.4} fill={light(skin, 0.3)} opacity={0.6} />
+          <path d={smoothPath([pts3[0], pts3[1], pts3[2], pts3[3], pts3[4], [lerp(pts3[0][0], pts3[4][0], 0.45), lerp(pts3[0][1], pts3[4][1], 0.62), 0] as V3].map(scr), true, 0.7)} fill={planeShade} />
+          {nl[2] > 0 && <ellipse cx={num(nl[0])} cy={num(nl[1] + 1.2)} rx={num(Math.max(0.5, 1.7 * Math.abs(t.c)))} ry={1} fill={mix(skin, INK, 0.4)} opacity={0.6} />}
+          {nr[2] > 0 && <ellipse cx={num(nr[0])} cy={num(nr[1] + 1.2)} rx={num(Math.max(0.5, 1.7 * Math.abs(t.c)))} ry={1} fill={mix(skin, INK, 0.4)} opacity={0.6} />}
+          <ellipse cx={num(tip[0] - 0.8)} cy={num(tip[1] - 1.8)} rx={num(Math.max(0.7, 1.6 * Math.abs(t.c) + 0.7))} ry={1.2} fill={light(skin, 0.24)} opacity={0.7} />
         </g>
       ))
     }
@@ -237,10 +255,11 @@ export function headParts(look: CharacterLook, t: Turn, uid: string, opts: { mar
   // The mouth.
   {
     const mouth = pick(MOUTHS, look.mouth)
-    const cy = 0 // the mouth is drawn about its own centre, which onFace puts at (0, 30)
+    const MOUTH_Y = 29
+    const cy = 0 // the mouth is drawn about its own centre, which onFace puts at (0, MOUTH_Y)
     const lipstick = look.marks.find(m => m.kind === 'makeup' && m.design === 'lipstick')
     const lipColor = lipstick ? markColor(lipstick) : look.lipColor
-    onFace(0, cy, () => {
+    onFace(0, MOUTH_Y, () => {
       const w = mouth.w * look.mouthSize
       const up = mouth.upper * look.mouthSize, low = mouth.lower * look.mouthSize
       const openH = expr.open * 9 * look.mouthSize
@@ -318,7 +337,7 @@ export function headParts(look: CharacterLook, t: Turn, uid: string, opts: { mar
     const streaks = look.streakColor ? Math.round(look.streakAmount * 7) : 0
 
     // A piece of hair: filled, with the edge of a curly texture, the strands of a streak and a light edge.
-    const piece = (pts2: V2[], side: 1 | -1, fill: string, k: number, o: { depth?: number; spiky?: boolean; lightEdge?: boolean; zmax?: number } = {}) => {
+    const piece = (pts2: V2[], side: 1 | -1, fill: string, k: number, o: { depth?: number; spiky?: boolean; lightEdge?: boolean; zmax?: number; flow?: number } = {}) => {
       const pts3 = patch(pts2, (x, y) => dome(x, y, side, spread, top, o.zmax))
       const pts = pts3.map(scr)
       const d = o.spiky ? polyPath(pts) : smoothPath(pts, true, k)
@@ -343,14 +362,27 @@ export function headParts(look: CharacterLook, t: Turn, uid: string, opts: { mar
         const sw = 1.6 + rnd() * 2.4
         strands.push(<path key={`s${i}`} d={`M${num(sx)} ${num(y0 - 2)}Q${num(sx + (rnd() - 0.5) * 14)} ${num(lerp(y0, y1, 0.5))} ${num(sx + (rnd() - 0.5) * 10)} ${num(y1 + 2)}`} fill="none" stroke={look.streakColor ?? hc} strokeWidth={num(sw)} strokeLinecap="round" opacity={0.95} />)
       }
+      // The flow of the hair: long soft strands that follow the fall of the lock (or fan out from the crown), a little lighter and darker than the colour.
+      const flow: ReactNode[] = []
+      if (o.flow && tex !== 'curly' && tex !== 'coily') {
+        const n = Math.max(3, Math.round((x1 - x0) / 11))
+        for (let i = 0; i < n; i += 1) {
+          const f = (i + 0.5) / n
+          const sx = lerp(x0, x1, f)
+          const bend = (f - 0.5) * 16 * o.flow + (tex === 'wavy' ? Math.sin(i * 1.7) * 6 : 0)
+          flow.push(<path key={`f${i}`} d={`M${num(sx)} ${num(y0 - 2)}C${num(sx + bend)} ${num(lerp(y0, y1, 0.35))} ${num(sx - bend * 0.6)} ${num(lerp(y0, y1, 0.7))} ${num(sx + bend * 0.5)} ${num(y1 + 2)}`} fill="none" stroke={i % 2 === 0 ? high : dark} strokeWidth={num(1.2 + (i % 3) * 0.5)} strokeLinecap="round" opacity={i % 2 === 0 ? 0.22 : 0.2} />)
+        }
+      }
       add(depth, (
         <g key={key()}>
           <path d={d} fill={fill} />
           {circles}
-          {(streaks > 0 || o.lightEdge) && (
+          {(streaks > 0 || o.lightEdge || o.flow) && (
             <>
               <clipPath id={id}><path d={d} /></clipPath>
               <g clipPath={`url(#${id})`}>
+                {o.flow ? <path d={d} fill="none" stroke={dark} strokeWidth={num(Math.max(6, (x1 - x0) * 0.16))} opacity={0.3} transform={`translate(${num(5)} ${num(4)})`} /> : null}
+                {flow}
                 {strands}
                 {o.lightEdge && <path d={d} fill="none" stroke={high} strokeWidth={4} opacity={0.35} transform={`translate(${num(-1.5)} ${num(-1.5)})`} />}
               </g>
@@ -386,7 +418,7 @@ export function headParts(look: CharacterLook, t: Turn, uid: string, opts: { mar
       if (shaved === 'mohawk') {
         piece(mohawkRidge(), -1, dark, 0.5, { spiky: true })
       } else {
-        piece(wavyBottom(back, tex, widen), -1, dark, tex === 'straight' ? 0.9 : 0.8)
+        piece(wavyBottom(back, tex, widen), -1, dark, tex === 'straight' ? 0.9 : 0.8, { flow: bd !== null && bd > 20 ? 1.4 : 0 })
       }
     }
     // A tail, a bun or pigtails.
@@ -397,7 +429,7 @@ export function headParts(look: CharacterLook, t: Turn, uid: string, opts: { mar
       piece(mohawkRidge(), 1, hc, 0.5, { spiky: true, lightEdge: true, depth: 0.55 })
     } else {
       const front = [...topArc(style.fringe === 'spiky'), ...hairline(style.fringe, style.hairline, spread, top)]
-      piece(front, 1, hc, style.fringe === 'spiky' || style.fringe === 'messy' ? 0.5 : 0.9, { spiky: style.fringe === 'spiky', lightEdge: true, depth: 0.55 })
+      piece(front, 1, hc, style.fringe === 'spiky' || style.fringe === 'messy' ? 0.5 : 0.9, { spiky: style.fringe === 'spiky', lightEdge: true, depth: 0.55, flow: style.fringe === 'spiky' ? 0 : 1 })
     }
 
     // The locks at the sides, down to the ears or past them.
@@ -415,7 +447,7 @@ export function headParts(look: CharacterLook, t: Turn, uid: string, opts: { mar
         const lock: V2[] = longHair
           ? [[s * (R(-6) + spread), -10], [s * edge(14), 14], [s * edge(34), 40], [outerB, lowY + wob], [lerp(outerB, innerB, 0.5), lowY - wob + 3], [innerB, lowY + wob * 0.5], [s * (R(30) - 4), 40], [s * (R(-6) - 6), -2]]
           : [[s * (R(-6) + spread), -6], [s * edge(8), 4], [outerB, lowY], [innerB, lowY - 1], [s * (R(-6) - 3), -2]]
-        piece(lock, 1, hc, 0.9, { depth: 0.52 + (s * -t.s) * 0.01, zmax: longHair ? 9 : 6 })
+        piece(lock, 1, hc, 0.9, { depth: 0.52 + (s * -t.s) * 0.01, zmax: longHair ? 9 : 6, flow: longHair ? 1.2 : 0 })
       }
     }
     accessoriesOnHead()

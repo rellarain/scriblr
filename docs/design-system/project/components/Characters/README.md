@@ -2,7 +2,7 @@
 
 The **Characters** console is where the book's cast is built. It is a tab of the Writer's **Project** level (after Maps, before History), with the people icon. A character is only its **look**: a handful of choices (ids of the part library), numbers (sliders), colours, marks and an outfit. No image is stored; the art is drawn from the look by code, in any view.
 
-Code: `writer/characters/` (`CharactersConsole.tsx`, `CharacterList.tsx`, `Drawers.tsx`, `CharFields.tsx`, `ForReadersSection.tsx`, `CastSection.tsx`, `SceneCast.tsx`, `castStore.ts`, `age.ts`, `charFile.ts`, `sheet.tsx`, `ProfileSection.tsx`, `RelationshipsSection.tsx`, `StorySection.tsx`, `story.ts`, `useCharacters.ts`, `characters.scss`) and the art engine in `writer/characters/art/` (`CharacterArt.tsx`, `head.tsx`, `body.tsx`, `marks.tsx`, `space.ts`, `library.ts`, `wardrobe.ts`, `defaults.ts`, `colour.ts`). Storage: the project's `characters` section (`project.json`), one entry per character; the API is `/api/projects/{id}/characters`.
+Code: `writer/characters/` (`CharactersConsole.tsx`, `CharacterList.tsx`, `Drawers.tsx`, `CharFields.tsx`, `ForReadersSection.tsx`, `CastSection.tsx`, `SceneCast.tsx`, `castStore.ts`, `age.ts`, `charFile.ts`, `sheet.tsx`, `ProfileSection.tsx`, `RelationshipsSection.tsx`, `StorySection.tsx`, `story.ts`, `useCharacters.ts`, `characters.scss`) and the art engine in `writer/characters/art/` (`CharacterArt.tsx`, `head.tsx`, `body.tsx`, `marks.tsx`, `shapes.tsx`, `space.ts`, `library.ts`, `wardrobe.ts`, `defaults.ts`, `colour.ts`). Storage: the project's `characters` section (`project.json`), one entry per character; the API is `/api/projects/{id}/characters`.
 
 ## Anatomy
 
@@ -17,7 +17,14 @@ Code: `writer/characters/` (`CharactersConsole.tsx`, `CharacterList.tsx`, `Drawe
 
 ## The art
 
-The figure is a skeleton of joints in 3D (a head is 100 units high): the pose gives the direction of every limb segment, a view turns it about the vertical axis, and the pieces are painted far to near, so one look draws in every view. The head is a little ellipsoid: a feature on the face has a depth, is squeezed as it turns away and is left out when it faces away. Limbs are tapered shapes, the torso a smooth outline whose width follows the turn; clothes are drawn over them. Everything is flat colour with two tones (a shade and a lit part on the left), no outlines. Seen from the side, a piece of hair that lies on the head is the hull of its sampled patch, because its outline alone folds flat. Skin, hair, eye and clothes colours come from the look; the figure never uses the page's colours.
+The figure is a skeleton of joints in 3D, in natural adult proportions (about seven and a half heads tall; a head is 100 units high): the pose gives the direction of every limb segment (with a sway of the hips and a tilt of the shoulders, so a standing figure rests on one leg), a view turns it about the vertical axis, and the pieces are painted far to near, so one look draws in every view. The head is a little ellipsoid: a feature on the face has a depth, is squeezed as it turns away and is left out when it faces away. The look is realistic but still minimal: flat colour and one plane of shadow, no outlines, light from the upper left.
+
+- **Body** (`art/shapes.tsx`): limbs are contoured shapes, not tubes (the profile swells at the shoulder, the calf and the hip), with the plane of shadow kept inside by a clip path; hands have fingers and a thumb; feet are the hull of the shoe; the torso is a smooth outline with shoulders sloping into a visible neck.
+- **Clothes**: cloth hangs from the body: a sleeve and a trouser leg follow the limb with a little slack, a skirt, dress or gown hangs from the hip to a hem that stays above the ground, and folds (a few lines at the waist, the elbow and the hem) show the drape.
+- **Face**: the skull is a light shape with planes: a plane of shade from the temple past the cheekbone to the jaw, a light forehead and cheekbone, a shadow under the lip and one plane of shade on the nose. Eyes have a lid and a crease; the mouth sits two thirds of the way down the face. Features are not outlined.
+- **Hair**: hair is shapes with flow: long soft strands that follow the fall of the lock, a plane of shade on the side away from the light and a light edge; the back of the hair is a mass behind the head, long locks fall in front of the shoulders.
+
+Skin, hair, eye and clothes colours come from the look; the figure never uses the page's colours. Seen from the side, a piece of hair that lies on the head is the hull of its sampled patch, because its outline alone folds flat.
 
 ## Profile, relationships and story
 

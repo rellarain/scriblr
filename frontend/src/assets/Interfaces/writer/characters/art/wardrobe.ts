@@ -16,11 +16,13 @@ export const BUILDS: readonly BuildKind[] = [
 
 // ---- poses ---- a segment points by [ab, fw] degrees: ab away from the middle of the body (sideways; 90 is level, 180 straight up), fw towards the viewer (90 is straight at it)
 export type Seg = [number, number]
-export interface PoseKind extends Option { lean: number; armL: [Seg, Seg]; armR: [Seg, Seg]; legL: [Seg, Seg]; legR: [Seg, Seg] }
+// `sway` shifts the upper body sideways over the feet, `hipTilt` and `shoulderTilt` tip the line of the hips and of the shoulders (degrees, against each other: the weight
+// is on the higher hip), so a stance is not a stiff column.
+export interface PoseKind extends Option { lean: number; sway?: number; hipTilt?: number; shoulderTilt?: number; armL: [Seg, Seg]; armR: [Seg, Seg]; legL: [Seg, Seg]; legR: [Seg, Seg] }
 export const POSES: readonly PoseKind[] = [
-  { id: 'standing', name: 'Standing', lean: 0, armL: [[8, 0], [6, 4]], armR: [[8, 0], [6, 4]], legL: [[3, 0], [2, 0]], legR: [[3, 0], [2, 0]] },
-  { id: 'relaxed', name: 'Hands on hips', lean: 0, armL: [[34, -8], [-42, 6]], armR: [[34, -8], [-42, 6]], legL: [[2, 0], [2, 0]], legR: [[11, 0], [9, 0]] },
-  { id: 'walking', name: 'Walking', lean: 3, armL: [[5, -26], [5, -8]], armR: [[5, 22], [5, 50]], legL: [[2, 26], [2, 6]], legR: [[2, -22], [2, -44]] },
+  { id: 'standing', name: 'Standing', lean: 0, sway: 5, hipTilt: -6, shoulderTilt: 4, armL: [[7, 6], [10, 26]], armR: [[10, -2], [16, 14]], legL: [[2, 0], [1, 0]], legR: [[10, 8], [7, -4]] },
+  { id: 'relaxed', name: 'Hands on hips', lean: 0, sway: 4, hipTilt: -5, shoulderTilt: 4, armL: [[34, -8], [-42, 6]], armR: [[34, -8], [-42, 6]], legL: [[2, 0], [2, 0]], legR: [[11, 6], [9, -4]] },
+  { id: 'walking', name: 'Walking', lean: 3, hipTilt: -3, shoulderTilt: 3, armL: [[5, -26], [5, -8]], armR: [[5, 22], [5, 50]], legL: [[2, 26], [2, 6]], legR: [[2, -22], [2, -44]] },
   { id: 'sitting', name: 'Sitting', lean: 0, armL: [[14, 18], [8, 72]], armR: [[14, 18], [8, 72]], legL: [[7, 86], [5, 2]], legR: [[7, 86], [5, 2]] },
   { id: 'running', name: 'Running', lean: 14, armL: [[10, 50], [8, 118]], armR: [[10, -45], [8, -10]], legL: [[2, 56], [2, 8]], legR: [[2, -30], [2, -96]] },
   { id: 'fighting', name: 'Fighting stance', lean: 6, armL: [[28, 35], [10, 118]], armR: [[22, 15], [-10, 102]], legL: [[22, 18], [14, -10]], legR: [[24, -14], [16, 10]] },
