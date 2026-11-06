@@ -203,6 +203,17 @@ export function setScale(draft: MapDraft, cellSize: number, unit: string): Chang
   return size === draft.cellSize && name === draft.unit ? null : change(draft, { cellSize: size, unit: name })
 }
 
+// Move the map inside another (null = a top-level map). The caller keeps it out of itself and what it holds (descendantIds).
+export function setParent(draft: MapDraft, parentId: string | null): Change {
+  return parentId === draft.parentId ? null : change(draft, { parentId })
+}
+
+// How far a traveller goes in a day, in the map's unit (null = not set).
+export function setPace(draft: MapDraft, pace: number | null): Change {
+  const next = pace !== null && Number.isFinite(pace) && pace > 0 ? Math.min(pace, 1_000_000) : null
+  return next === draft.pace ? null : change(draft, { pace: next })
+}
+
 // The map's look (how its terrain colours and text are drawn), and what is drawn over it.
 export function setTheme(draft: MapDraft, theme: MapDraft['theme']): Change {
   return theme === draft.theme ? null : change(draft, { theme })
@@ -341,3 +352,26 @@ export function mapRows(maps: MapSummary[]): MapRow[] {
 export const summaryOf = (doc: MapDoc | MapDraft): MapSummary => ({
   id: doc.id, title: doc.title, kind: doc.kind, parentId: doc.parentId, order: doc.order, width: doc.width, height: doc.height, updatedAt: doc.updatedAt,
 })
+
+// The maps a map is inside, outermost first, and the map itself last (a loop in the data is cut).
+export function mapPath(maps: MapSummary[], id: string): MapSummary[] {
+  const byId = new Map(maps.map(m => [m.id, m]))
+  const out: MapSummary[] = []
+  const seen = new Set<string>()
+  for (let cur = byId.get(id); cur && !seen.has(cur.id); cur = cur.parentId ? byId.get(cur.parentId) : undefined) {
+    seen.add(cur.id)
+    out.unshift(cur)
+  }
+  return out
+}
+
+// The ids of every map inside a map, at any depth.
+export function descendantIds(maps: MapSummary[], id: string): Set<string> {
+  const out = new Set<string>()
+  const queue = [id]
+  while (queue.length > 0) {
+    const at = queue.pop()!
+    for (const m of maps) if (m.parentId === at && !out.has(m.id) && m.id !== id) { out.add(m.id); queue.push(m.id) }
+  }
+  return out
+}

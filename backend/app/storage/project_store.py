@@ -1468,6 +1468,10 @@ def delete_map(root: Path, project_id: str, map_id: str) -> None:
         for child in pf.maps.values():
             if child.parentId == map_id:
                 child.parentId = gone.parentId
+            # A place that opened the map no longer does.
+            for symbol in child.symbols:
+                if map_id in symbol.mapIds:
+                    symbol.mapIds = [m for m in symbol.mapIds if m != map_id]
         pf.index.updatedAt = utcnow()
 
     _mutate(root, project_id, _do)

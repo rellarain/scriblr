@@ -14,7 +14,7 @@ const shape = (type: 'line' | 'region', points: MapShapePoint[], over: Partial<M
 const line = (...p: Array<[number, number]>) => shape('line', p.map(([x, y]) => pt(x, y)))
 
 const doc = (): MapDoc => ({
-  schemaVersion: 2, id: 'map_1', title: 'World', kind: 'world', parentId: null, order: 0, width: 20, height: 10, cellSize: 10, unit: 'miles',
+  schemaVersion: 2, id: 'map_1', title: 'World', kind: 'world', parentId: null, order: 0, width: 20, height: 10, cellSize: 10, unit: 'miles', pace: null,
   terrains: [{ id: 'sea', name: 'Sea', color: '#3b6ea5', builtIn: true }],
   layers: [
     { id: 'terrain', name: 'Terrain', kind: 'terrain', visible: true, locked: false },
@@ -309,7 +309,7 @@ describe('shapes on the map', () => {
     expect(hitItem(toggleLayer(d, 'shapes', 'locked')!.draft, 5, 5.2)).toBeNull()
     expect(hitItem(toggleLayer(d, 'shapes', 'visible')!.draft, 5, 5.2)).toBeNull()
     // A symbol on the layer above wins where they overlap.
-    d = { ...d, symbols: [{ id: 'sym_1', layerId: 'symbols', kind: 'tree', x: 5, y: 5, size: 2, color: null }] }
+    d = { ...d, symbols: [{ id: 'sym_1', layerId: 'symbols', kind: 'tree', x: 5, y: 5, size: 2, color: null, name: '', mapIds: [] }] }
     expect(hitItem(d, 5, 5.2)).toEqual({ kind: 'symbol', id: 'sym_1' })
   })
 

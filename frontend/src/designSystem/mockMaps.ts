@@ -1,4 +1,4 @@
-import type { MapCreate, MapDoc, MapKind, MapShape, MapSummary } from '../api/types'
+import type { MapCreate, MapDoc, MapKind, MapPlace, MapShape, MapSummary } from '../api/types'
 import { MAP_MAX_SIDE } from '../api/types'
 import type { MockAnswer } from './mockPresets'
 
@@ -31,7 +31,7 @@ export function newMap(id: string, body: MapCreate, order: number): MapDoc {
   const width = side(body.width, 32), height = side(body.height, 24)
   return {
     schemaVersion: 2, id, title: body.title?.trim() || 'Untitled map', kind, parentId: body.parentId ?? null, order, width, height,
-    cellSize: body.cellSize ?? 1, unit: body.unit?.trim() || 'cells',
+    cellSize: body.cellSize ?? 1, unit: body.unit?.trim() || 'cells', pace: null,
     terrains: SETS[kind].map(([tid, name, color]) => ({ id: tid, name, color, builtIn: true })),
     layers: LAYERS.map(([lid, name]) => ({ id: lid, name, kind: lid as MapDoc['layers'][number]['kind'], visible: true, locked: false })),
     cells: [0, width * height], symbols: [], labels: [], shapes: [], theme: body.theme ?? 'modern', scaleBar: true, compass: true, legend: false, updatedAt: AT,
@@ -58,6 +58,20 @@ export function createMockMaps(initial: MapDoc[] = []) {
   const maps = new Map<string, MapDoc>(initial.map(m => [m.id, m]))
   let next = initial.length + 1
 
+  // The places of every map, as the server lists them (the maps a map is inside, outermost first, then the place).
+  function places(): MapPlace[] {
+    const titles = (id: string): string[] => {
+      const out: string[] = []
+      for (let cur: string | null = id, n = 0; cur && maps.has(cur) && n < 50; cur = maps.get(cur)!.parentId, n += 1) out.unshift(maps.get(cur)!.title)
+      return out
+    }
+    return [...maps.values()]
+      .flatMap(m => m.symbols.filter(sy => sy.name).map(sy => ({
+        key: `${m.id}/${sy.id}`, mapId: m.id, placeId: sy.id, name: sy.name, path: [...titles(m.id), sy.name].join(' > '), kind: sy.kind, mapTitle: m.title, mapIds: [...sy.mapIds],
+      })))
+      .sort((a, b) => a.path.toLowerCase().localeCompare(b.path.toLowerCase()) || a.key.localeCompare(b.key))
+  }
+
   function route(method: string, rest: string[], body: unknown): MockAnswer {
     if (rest.length === 0) {
       if (method === 'GET') return ok([...maps.values()].sort((a, b) => a.order - b.order || a.title.localeCompare(b.title)).map(summaryOf))
@@ -72,6 +86,7 @@ export function createMockMaps(initial: MapDoc[] = []) {
       }
       return fail(405, 'Method not allowed')
     }
+    if (rest[0] === 'places' && rest[1] === 'all' && method === 'GET') return ok(places())
     const id = rest[0]
     const found = maps.get(id)
     if (method === 'GET') return found ? ok(found) : fail(404, 'Map not found')
@@ -80,14 +95,18 @@ export function createMockMaps(initial: MapDoc[] = []) {
       const b = body as MapDoc
       if (b.id !== id) return fail(422, 'The id does not match.')
       const terrains = b.terrains.length > 0 ? b.terrains : found.terrains
-      const saved: MapDoc = { ...b, terrains, title: b.title.trim() || 'Untitled map', cells: repairRuns(b.cells, b.width * b.height, terrains.length), updatedAt: AT }
+      const symbols = (b.symbols ?? []).map(sy => ({ ...sy, name: sy.name ?? '', mapIds: (sy.mapIds ?? []).filter(x => maps.has(x) && x !== id) }))
+      const saved: MapDoc = { ...b, symbols, terrains, title: b.title.trim() || 'Untitled map', cells: repairRuns(b.cells, b.width * b.height, terrains.length), updatedAt: AT }
       maps.set(id, saved)
       return ok(saved)
     }
     if (method === 'DELETE') {
       if (!found) return fail(404, 'Map not found')
       maps.delete(id)
-      for (const m of maps.values()) if (m.parentId === id) m.parentId = found.parentId
+      for (const m of maps.values()) {
+        if (m.parentId === id) m.parentId = found.parentId
+        for (const sym of m.symbols) sym.mapIds = (sym.mapIds ?? []).filter(x => x !== id)
+      }
       return { status: 204, body: undefined }
     }
     return fail(405, 'Method not allowed')
@@ -117,9 +136,10 @@ export function seedMaps(): MapDoc[] {
   world.cells = cells
   world.theme = 'parchment'
   world.legend = true
-  const stamp = (id: string, kind: string, x: number, y: number, size = 2) => ({ id, layerId: 'symbols', kind, x, y, size, color: null })
+  world.pace = 25
+  const stamp = (id: string, kind: string, x: number, y: number, size = 2, name = '', mapIds: string[] = []) => ({ id, layerId: 'symbols', kind, x, y, size, color: null, name, mapIds })
   world.symbols = [
-    stamp('sym_a', 'city', 11.5, 8.5, 2.5), stamp('sym_b', 'castle', 7.5, 6.5), stamp('sym_c', 'mountain', 22.5, 4.5, 3), stamp('sym_d', 'mountain', 20.5, 6.5, 2),
+    stamp('sym_a', 'city', 11.5, 8.5, 2.5, 'Port Veyra', ['map_town']), stamp('sym_b', 'castle', 7.5, 6.5), stamp('sym_c', 'mountain', 22.5, 4.5, 3), stamp('sym_d', 'mountain', 20.5, 6.5, 2),
     stamp('sym_e', 'tree', 9.5, 11.5, 1.5), stamp('sym_f', 'pine', 13.5, 11.5, 1.5), stamp('sym_g', 'harbour', 4.5, 9.5), stamp('sym_h', 'ship', 3.5, 13.5, 1.5),
   ]
   world.labels = [

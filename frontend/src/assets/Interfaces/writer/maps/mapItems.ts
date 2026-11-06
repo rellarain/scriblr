@@ -68,7 +68,7 @@ export function addSymbol(draft: MapDraft, kind: string, x: number, y: number, s
   if (!layerId || draft.symbols.length >= MAX_SYMBOLS) return null
   const [px, py] = held(draft, x, y)
   const id = freshId('sym', new Set(draft.symbols.map(s => s.id)), makeId)
-  const symbol: MapSymbol = { id, layerId, kind, x: px, y: py, size: clamp(size, SYMBOL_SIZE_RANGE.min, SYMBOL_SIZE_RANGE.max), color: null }
+  const symbol: MapSymbol = { id, layerId, kind, x: px, y: py, size: clamp(size, SYMBOL_SIZE_RANGE.min, SYMBOL_SIZE_RANGE.max), color: null, name: '', mapIds: [] }
   return { change: change(draft, { symbols: [...draft.symbols, symbol] }), id }
 }
 
@@ -124,7 +124,10 @@ export function movedItem(draft: MapDraft, ref: ItemRef, x: number, y: number): 
   return { ...draft, labels: draft.labels.map(l => (l.id === ref.id ? { ...l, x: px, y: py } : l)) }
 }
 
-export function editSymbol(draft: MapDraft, id: string, fields: Partial<Pick<MapSymbol, 'kind' | 'size' | 'color'>>): Change {
+export const MAX_PLACE_MAPS = 20
+export const PLACE_NAME_MAX = 80
+
+export function editSymbol(draft: MapDraft, id: string, fields: Partial<Pick<MapSymbol, 'kind' | 'size' | 'color' | 'name' | 'mapIds'>>): Change {
   const old = draft.symbols.find(s => s.id === id)
   if (!old) return null
   const next: MapSymbol = {
@@ -132,9 +135,34 @@ export function editSymbol(draft: MapDraft, id: string, fields: Partial<Pick<Map
     ...(fields.kind !== undefined ? { kind: fields.kind } : {}),
     ...(fields.size !== undefined && Number.isFinite(fields.size) ? { size: clamp(fields.size, SYMBOL_SIZE_RANGE.min, SYMBOL_SIZE_RANGE.max) } : {}),
     ...(fields.color !== undefined ? { color: fields.color } : {}),
+    ...(fields.name !== undefined ? { name: fields.name.trim().slice(0, PLACE_NAME_MAX) } : {}),
+    ...(fields.mapIds !== undefined ? { mapIds: [...new Set(fields.mapIds)].slice(0, MAX_PLACE_MAPS) } : {}),
   }
-  if (next.kind === old.kind && next.size === old.size && next.color === old.color) return null
+  const sameMaps = next.mapIds.length === old.mapIds.length && next.mapIds.every((m, i) => m === old.mapIds[i])
+  if (next.kind === old.kind && next.size === old.size && next.color === old.color && next.name === old.name && sameMaps) return null
   return change(draft, { symbols: draft.symbols.map(s => (s.id === id ? next : s)) })
+}
+
+// ---- places ----
+
+// A symbol with a name is a place: a scene can happen there, and the maps in `mapIds` open from it.
+export const isPlace = (s: Pick<MapSymbol, 'name'>) => s.name !== ''
+export const placeKey = (mapId: string, placeId: string) => `${mapId}/${placeId}`
+
+// New places for these names (symbols that are named), on the topmost shown, unlocked symbols layer, laid out in rows from the top left, three cells apart;
+// they are meant to be dragged to where they belong. None when there is no layer to put them on or the map is full.
+export function addPlaces(draft: MapDraft, names: string[], makeId: MakeId = randomId): { change: NonNullable<Change>; ids: string[] } | null {
+  const layerId = activeLayerId(draft, 'symbols')
+  if (!layerId || names.length === 0 || draft.symbols.length + names.length > MAX_SYMBOLS) return null
+  const taken = new Set(draft.symbols.map(s => s.id))
+  const perRow = Math.max(1, Math.floor((draft.width - 1) / 3))
+  const symbols: MapSymbol[] = names.map((name, i) => {
+    const id = freshId('sym', taken, makeId)
+    taken.add(id)
+    const [x, y] = held(draft, 1.5 + (i % perRow) * 3, 1.5 + Math.floor(i / perRow) * 3)
+    return { id, layerId, kind: 'interest', x, y, size: 2, color: null, name: name.trim().slice(0, PLACE_NAME_MAX), mapIds: [] }
+  })
+  return { change: change(draft, { symbols: [...draft.symbols, ...symbols] }), ids: symbols.map(s => s.id) }
 }
 
 export function editLabel(draft: MapDraft, id: string, fields: Partial<Pick<MapLabel, 'text' | 'size'>>): Change {

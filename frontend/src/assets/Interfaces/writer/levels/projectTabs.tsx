@@ -39,6 +39,11 @@ function OutlineSummary({ w }: { w: WriterWorkspace }) {
   )
 }
 
+// The scenes of the project, with their locations, for the Maps console (the places, and the old-locations tool).
+function scenesOf(nodes: WriterWorkspace['outlineNodes']) {
+  return nodes.filter(n => n.kind === 'scene').map(n => ({ id: n.id, title: n.title, location: n.location ?? '' }))
+}
+
 // Opens the node a task is about: an outline chapter (or a scene or act in one) in the Draft level, a book in its outline, a plot node focused in the plot.
 function openNode(w: WriterWorkspace, tree: 'outline' | 'plot', id: string) {
   if (tree === 'plot') { w.focusPlotNode(id); return }
@@ -73,7 +78,7 @@ export function projectTabs(w: WriterWorkspace): LevelTab[] {
       render: () => {
         const id = w.activeProjectId
         if (!id) return <p className="wrMuted">Open a project to map its setting.</p>
-        return <MapsConsole key={id} projectId={id} />
+        return <MapsConsole key={id} projectId={id} scenes={scenesOf(w.outlineNodes)} onSetLocation={(sceneId, location) => w.updateOutlineNode(sceneId, { location })} />
       },
     },
     { id: 'history', label: 'History', Icon: ClockIcon, render: () => placeholder('projectHistory') },

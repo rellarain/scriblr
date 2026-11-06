@@ -24,7 +24,7 @@ class FakePath { constructor(public d: string) {} }
 afterEach(() => { vi.unstubAllGlobals() })
 
 const doc = (): MapDoc => ({
-  schemaVersion: 2, id: 'map_1', title: 'World', kind: 'world', parentId: null, order: 0, width: 20, height: 10, cellSize: 10, unit: 'miles',
+  schemaVersion: 2, id: 'map_1', title: 'World', kind: 'world', parentId: null, order: 0, width: 20, height: 10, cellSize: 10, unit: 'miles', pace: null,
   terrains: [{ id: 'sea', name: 'Sea', color: '#3b6ea5', builtIn: true }, { id: 'land', name: 'Land', color: '#a8c66c', builtIn: true }],
   layers: [
     { id: 'terrain', name: 'Terrain', kind: 'terrain', visible: true, locked: false },
@@ -34,7 +34,7 @@ const doc = (): MapDoc => ({
   cells: [0, 100, 1, 100], symbols: [], labels: [], shapes: [], theme: 'modern', scaleBar: false, compass: false, legend: false, updatedAt: 'x',
 })
 const base = (draft: MapDraft, over: Partial<Parameters<typeof drawMap>[1]> = {}): Parameters<typeof drawMap>[1] => ({
-  width: 800, height: 520, dpr: 1, view: { zoom: 30, x: 40, y: 40 }, draft, bitmap: null, showGrid: false, ink: '#000', brush: [], selected: null, selectedNode: null, pending: null, legend: null, ...over,
+  width: 800, height: 520, dpr: 1, view: { zoom: 30, x: 40, y: 40 }, draft, bitmap: null, showGrid: false, ink: '#000', brush: [], selected: null, selectedNode: null, pending: null, measure: null, legend: null, ...over,
 })
 const withItems = (): MapDraft => {
   let d = draftOf(doc())

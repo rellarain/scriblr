@@ -1,12 +1,13 @@
 import type { OutlineNode, TimeSystem } from '../../../../api/types'
 import type { WriterWorkspace } from '../useWriterWorkspace'
 import { inheritedSceneValues, sceneChanges } from '../outlineTree'
+import { PlacePicker } from '../maps/PlacePicker'
 import { SceneTime } from '../SceneTime'
 import { formatTime } from '../timeSystem'
 
 const LABEL = { location: 'Location', time: 'Time', action: 'Action' } as const
 
-// A scene's Location, Time and Action, all editable. A field left empty takes the
+// A scene's Location (a dropdown of the places of the project's maps), Time and Action, all editable. A field left empty takes the
 // value of the nearest earlier scene in its chapter as its placeholder (never
 // saved), or its own name when nothing precedes. A field with a value that differs
 // from what it inherits is filled with the book's accent colour.
@@ -23,7 +24,14 @@ export function SceneFields({ w, scene, scenes, system }: {
   const changedTitle = (key: keyof typeof LABEL) => (changes[key] ? `${LABEL[key]} changed from the previous scene` : LABEL[key])
   const inheritedTime = inherited.timeValue ? formatTime(system, inherited.timeValue) : ''
 
-  const field = (key: 'location' | 'action') => (
+  const place = (
+    <PlacePicker
+      projectId={w.activeProjectId} value={scene.location ?? ''} inherited={inherited.location} label={LABEL.location} title={changedTitle('location')}
+      className={changes.location ? 'wrSceneField wrSceneField--location wrSceneField--changed' : 'wrSceneField wrSceneField--location'}
+      onChange={value => w.updateOutlineNode(scene.id, { location: value })}
+    />
+  )
+  const field = (key: 'action') => (
     <input
       className={changes[key] ? `wrSceneField wrSceneField--${key} wrSceneField--changed` : `wrSceneField wrSceneField--${key}`}
       placeholder={inherited[key] ?? LABEL[key]} value={scene[key] ?? ''} data-kf=""
@@ -33,7 +41,7 @@ export function SceneFields({ w, scene, scenes, system }: {
   )
   return (
     <div className="wrSceneFields">
-      {field('location')}
+      {place}
       <SceneTime
         system={system} value={scene.timeValue} changed={changes.time} placeholder={inheritedTime || LABEL.time}
         onChange={next => w.updateOutlineNode(scene.id, { timeValue: next })}

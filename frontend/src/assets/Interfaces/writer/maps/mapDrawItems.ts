@@ -37,6 +37,24 @@ export function drawSymbol(ctx: CanvasRenderingContext2D, s: MapSymbol, view: Ma
   ctx.fillStyle = colour
   ctx.fill(path, 'evenodd')
   ctx.restore()
+  if (s.name) drawPlaceName(ctx, s.name, left + px / 2, top + px, px, theme)
+}
+
+// A place's name under its symbol (left out when the symbol is too small for a name to be legible beside it).
+function drawPlaceName(ctx: CanvasRenderingContext2D, name: string, cx: number, y: number, px: number, theme: MapThemeDef) {
+  const size = Math.min(14, Math.max(9, px * 0.42))
+  if (px < 14) return
+  ctx.save()
+  ctx.font = `600 ${size}px ${theme.font}`
+  ctx.textAlign = 'center'
+  ctx.textBaseline = 'top'
+  ctx.lineJoin = 'round'
+  ctx.lineWidth = 3
+  ctx.strokeStyle = theme.halo
+  ctx.strokeText(name, cx, y + 1)
+  ctx.fillStyle = theme.ink
+  ctx.fillText(name, cx, y + 1)
+  ctx.restore()
 }
 
 // The smallest a label is drawn at, in pixels of height; below it the text is not legible and is left out.
@@ -174,6 +192,50 @@ export function drawOverlays(ctx: CanvasRenderingContext2D, o: OverlayOptions) {
       ctx.fillText(e.name, px + 28, ry)
     })
     if (more > 0) { ctx.fillStyle = theme.ink; ctx.fillText(`+ ${more} more`, px + 28, py + 6 + rows.length * 18 + 9) }
+  }
+  ctx.restore()
+}
+
+export interface MeasureState { points: Array<[number, number]>; cursor: [number, number] | null; text: string }
+
+// The Measure tool's path: a dashed line through its points with a dot at each, and what it says (the length, and the journey) on a plate at the end.
+export function drawMeasure(ctx: CanvasRenderingContext2D, m: MeasureState, view: MapView, theme: MapThemeDef, canvasWidth = Infinity) {
+  const pts = m.cursor ? [...m.points, m.cursor] : m.points
+  const at = ([x, y]: [number, number]): [number, number] => [view.x + x * view.zoom, view.y + y * view.zoom]
+  ctx.save()
+  ctx.lineJoin = 'round'
+  ctx.lineCap = 'round'
+  ctx.strokeStyle = theme.halo
+  ctx.lineWidth = 4
+  ctx.beginPath()
+  pts.forEach((p, i) => { const [x, y] = at(p); if (i === 0) ctx.moveTo(x, y); else ctx.lineTo(x, y) })
+  ctx.stroke()
+  ctx.strokeStyle = theme.ink
+  ctx.lineWidth = 2
+  ctx.setLineDash([7, 4])
+  ctx.stroke()
+  ctx.setLineDash([])
+  for (const p of m.points) {
+    const [x, y] = at(p)
+    ctx.beginPath()
+    ctx.arc(x, y, 3.5, 0, Math.PI * 2)
+    ctx.fillStyle = theme.ink
+    ctx.fill()
+    ctx.strokeStyle = theme.halo
+    ctx.lineWidth = 1.5
+    ctx.stroke()
+  }
+  if (pts.length > 1) {
+    const [x, y] = at(pts[pts.length - 1])
+    ctx.font = `600 ${FONT_PX}px ${theme.font}`
+    ctx.textAlign = 'left'
+    ctx.textBaseline = 'middle'
+    const w = ctx.measureText(m.text).width + 12
+    // The plate is at the right of the end of the path, or at its left when it would run off the canvas.
+    const px = x + 10 + w > canvasWidth - 4 ? Math.max(4, x - 10 - w) : x + 10
+    plate(ctx, px, y - 22, w, 20, theme)
+    ctx.fillStyle = theme.ink
+    ctx.fillText(m.text, px + 6, y - 12)
   }
   ctx.restore()
 }

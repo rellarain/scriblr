@@ -18,7 +18,7 @@ const LAYERS = [
 
 function doc(width = 4, height = 3, cells?: number[]): MapDoc {
   return {
-    schemaVersion: 2, id: 'map_1', title: 'World', kind: 'world', parentId: null, order: 0, width, height, cellSize: 10, unit: 'miles',
+    schemaVersion: 2, id: 'map_1', title: 'World', kind: 'world', parentId: null, order: 0, width, height, cellSize: 10, unit: 'miles', pace: null,
     terrains: TERRAINS, layers: LAYERS, cells: cells ?? [0, width * height], symbols: [], labels: [], shapes: [], theme: 'modern', scaleBar: true, compass: true, legend: false,
     updatedAt: '2026-01-01T00:00:00Z',
   }

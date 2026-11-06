@@ -418,7 +418,10 @@ export interface MapLayer { id: string; name: string; kind: MapLayerKind; visibl
 // `cells` is the terrain of every cell, row by row, as run pairs [index into `terrains`, how many cells, ...].
 export type MapThemeName = 'parchment' | 'modern' | 'night' | 'blueprint'
 // A stamp (`kind` is a symbol of the library, mapSymbols.ts): its centre in cells, how many cells wide, its own colour (null = the theme's).
-export interface MapSymbol { id: string; layerId: string; kind: string; x: number; y: number; size: number; color: string | null }
+// A symbol with a name is a place (a scene can happen there); `mapIds` are the maps that open from it.
+export interface MapSymbol { id: string; layerId: string; kind: string; x: number; y: number; size: number; color: string | null; name: string; mapIds: string[] }
+// A place as the project lists it: `key` is what a scene stores (`mapId/placeId`), `path` the maps it is inside and its name.
+export interface MapPlace { key: string; mapId: string; placeId: string; name: string; path: string; kind: string; mapTitle: string; mapIds: string[] }
 // A line of text centred on a point; `size` is its height in cells.
 export interface MapLabel { id: string; layerId: string; text: string; x: number; y: number; size: number }
 // A point of a line or of a region's outline, in cells. A smooth point is a curve through it; (hx, hy) is its handle, where the curve leaves it relative to
@@ -446,6 +449,8 @@ export interface MapDoc {
   // What one cell is, in `unit` (miles, paces, feet ...).
   cellSize: number
   unit: string
+  // How far a traveller goes in a day, in `unit` (null = not set).
+  pace: number | null
   terrains: MapTerrain[]
   layers: MapLayer[]
   cells: number[]

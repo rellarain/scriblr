@@ -2,12 +2,12 @@ import { useEffect, useState } from 'react'
 import { SaveCluster } from '../../../../components/SaveCluster'
 import { setAutosaveMode, useSettings } from '../../../../settings/settingsStore'
 import { autosaveModeOf } from '../../../../theme/types'
-import { BrushIcon, BucketIcon, CursorIcon, GridLinesIcon, HandIcon, PathIcon, PipetteIcon, PolygonIcon, RedoIcon, StampIcon, TextSizeIcon } from '../../../icons'
+import { BrushIcon, BucketIcon, ChevronLeftIcon, CursorIcon, GridLinesIcon, HandIcon, PathIcon, PipetteIcon, PolygonIcon, RedoIcon, RulerIcon, StampIcon, TextSizeIcon } from '../../../icons'
 import MapCanvas, { type MapTool } from './MapCanvas'
 import { MapList } from './MapList'
 import { MapSide } from './MapSide'
 import { addLabel, addShape, addSymbol, findItem, removeItem, replaceShape, type ItemRef } from './mapItems'
-import { cellIndex, BRUSH_SIZES } from './mapModel'
+import { cellIndex, BRUSH_SIZES, mapPath } from './mapModel'
 import { DEFAULT_LINE_PEN, DEFAULT_REGION_PEN, type Pen } from './mapShapes'
 import { DEFAULT_SYMBOL_SIZE, symbolName } from './mapSymbols'
 import { formatDistance } from './mapView'
@@ -23,6 +23,7 @@ const TOOLS: Array<{ tool: MapTool; label: string; Icon: typeof BrushIcon }> = [
   { tool: 'label', label: 'Place a label', Icon: TextSizeIcon },
   { tool: 'line', label: 'Draw a line', Icon: PathIcon },
   { tool: 'region', label: 'Draw a region', Icon: PolygonIcon },
+  { tool: 'measure', label: 'Measure a distance', Icon: RulerIcon },
   { tool: 'hand', label: 'Move the view', Icon: HandIcon },
 ]
 const NEW_LABEL_SIZE = 1.5
@@ -31,7 +32,15 @@ const NEW_LABEL_SIZE = 1.5
 // stamp symbols, place labels and draw lines and regions on (pan and zoom, a brush, a fill, a dropper, a pointer that picks and moves things, undo), and
 // beside it the terrains, the symbols, the pens, the layers and the map's own fields (its look, the scale bar, compass and legend). Edits save the way the Writer's do: the Save button,
 // and autosave when the user has turned it on.
-export default function MapsConsole({ projectId }: { projectId: string }) {
+// A scene of the project, for the places: its location is the key of a place (or old text, from before there were places).
+export interface ScenePlace { id: string; title: string; location: string }
+
+export default function MapsConsole({ projectId, scenes = [], onSetLocation }: {
+  projectId: string
+  scenes?: ScenePlace[]
+  // Give a scene another location (a place key, or '' for none): what the old-locations tool changes.
+  onSetLocation?: (sceneId: string, location: string) => void
+}) {
   const m = useMaps(projectId)
   const { ui } = useSettings()
   const [tool, setTool] = useState<MapTool>('brush')
@@ -47,6 +56,8 @@ export default function MapsConsole({ projectId }: { projectId: string }) {
   // The label that was just placed: its text takes the cursor.
   const [fresh, setFresh] = useState<string | null>(null)
   const [hover, setHover] = useState<[number, number] | null>(null)
+  // What the Measure tool says of its path.
+  const [measured, setMeasured] = useState<string | null>(null)
   const [blocked, setBlocked] = useState(false)
   const { draft } = m
 
@@ -56,7 +67,7 @@ export default function MapsConsole({ projectId }: { projectId: string }) {
     // Only when the list has loaded (opening is not repeated after a map is closed by deleting it).
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [m.status])
-  useEffect(() => { setBlocked(false); setPicked(null); setFresh(null) }, [m.openId])
+  useEffect(() => { setBlocked(false); setPicked(null); setFresh(null); setMeasured(null) }, [m.openId])
   // The chosen terrain stays one the map has, and the chosen item one that is still on it (an undo can take it away).
   const chosen = draft ? Math.min(terrain, draft.terrains.length - 1) : 0
   const selected = draft && picked && findItem(draft, picked) ? picked : null
@@ -111,6 +122,7 @@ export default function MapsConsole({ projectId }: { projectId: string }) {
     setPicked(null)
   }
 
+  const path = draft ? mapPath(m.maps, draft.id) : []
   const hint = tool === 'line' || tool === 'region' ? ' · click to add points, double-click or Enter to finish, Esc to cancel' : ''
   const statusText = hover
     ? `Cell ${hover[0] + 1}, ${hover[1] + 1}${under ? ` · ${under.name}` : ''}`
@@ -152,14 +164,25 @@ export default function MapsConsole({ projectId }: { projectId: string }) {
         {draft ? (
           <>
             <div className="mapStage">
+              {path.length > 1 && (
+                <nav className="mapPath" aria-label="Where this map is">
+                  <button type="button" className="mapIconBtn" aria-label={`Up to ${path[path.length - 2].title}`} title={`Up to ${path[path.length - 2].title}`} onClick={() => { void m.open(path[path.length - 2].id) }}><ChevronLeftIcon size={16} /></button>
+                  <ol className="mapCrumbs">
+                    {path.map((p, i) => (
+                      <li key={p.id}>{i < path.length - 1 ? <button type="button" className="mapCrumb" onClick={() => { void m.open(p.id) }}>{p.title}</button> : <span className="mapCrumb mapCrumb--here" aria-current="page">{p.title}</span>}</li>
+                    ))}
+                  </ol>
+                </nav>
+              )}
               <MapCanvas
                 draft={draft} rev={m.rev} tool={tool} terrain={chosen} brushSize={brush} showGrid={grid} pen={pen} selected={selected} onSelect={setPicked}
                 onBeginStroke={(t, size) => { setBlocked(false); return m.beginStroke(t, size) }} onEndStroke={m.endStroke}
                 onFill={(x, y, t) => { if (!m.fill(x, y, t)) setBlocked(true) }} onPick={i => { setTerrain(i); setTool('brush') }}
                 onPlace={place} onFinishShape={finishShape} onPreview={m.preview} onCommitMove={m.commitMove} onChangeShape={shape => { m.apply(replaceShape(draft, shape)) }} onDelete={removeChosen}
+                onOpenPlace={id => { void m.open(id) }} onMeasure={setMeasured}
                 onHover={setHover} onBlocked={() => setBlocked(true)}
               />
-              <p className="mapStatus" aria-live="off">{statusText} · {formatDistance(draft.width * draft.cellSize, draft.unit)} wide{hint}</p>
+              <p className="mapStatus" aria-live="off">{tool === 'measure' && measured !== null ? `${measured} · click to add a point, Backspace takes one back, Esc clears` : `${statusText} · ${formatDistance(draft.width * draft.cellSize, draft.unit)} wide${tool === 'measure' ? ' · click to start measuring' : hint}`}</p>
             </div>
             <MapSide
               m={m} draft={draft} terrain={chosen} onTerrain={i => { setTerrain(i); if (tool !== 'brush' && tool !== 'fill') setTool('brush') }}
@@ -168,6 +191,7 @@ export default function MapsConsole({ projectId }: { projectId: string }) {
               onPen={patch => (penType === 'region' ? setRegionPen : setLinePen)(old => ({ ...old, ...patch }))}
               onPreset={(type, next) => { (type === 'region' ? setRegionPen : setLinePen)(next); setTool(type) }}
               selected={selected} fresh={selected !== null && fresh === selected.id} onDeleted={() => setPicked(null)}
+              scenes={scenes} onSetLocation={onSetLocation}
             />
           </>
         ) : (

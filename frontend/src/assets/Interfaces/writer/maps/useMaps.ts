@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { createMap, deleteMap, getMap, listMaps, putMap } from '../../../../api/mapsApi'
 import type { MapCreate, MapDoc, MapSummary } from '../../../../api/types'
 import { combineCountdown, combineSaveStatus, useAutosave } from '../../../../lib/useAutosave'
+import { buildMapFile, importMaps, type Choice, type ImportResult, type MapFile } from './mapFile'
 import * as model from './mapModel'
 import { MapHistory, Stroke, docOf, draftOf, floodFill, metaEdit, summaryOf, type Change, type MapDraft, type MapEdit } from './mapModel'
 
@@ -90,13 +91,15 @@ export function useMaps(projectId: string | null) {
     }
   }, [projectId, show])
 
-  const create = useCallback(async (body: MapCreate): Promise<string | null> => {
+  // A new map. It is opened, unless `open` is false (a map made for a place of the map that is open, which stays open).
+  const create = useCallback(async (body: MapCreate, open = true): Promise<string | null> => {
     if (!projectId) return null
     setNotice(undefined)
     try {
       await autosaveRef.current.flush()
       const doc = await createMap(projectId, body)
       setMaps(list => [...list, summaryOf(doc)])
+      if (!open) return doc.id
       const mine = ++token.current
       const session: Session = { draft: draftOf(doc), history: new MapHistory() }
       sessions.current.set(doc.id, session)
@@ -107,6 +110,37 @@ export function useMaps(projectId: string | null) {
       return null
     }
   }, [projectId, show])
+
+  // The file of a map and the maps inside it (what is saved: what is waiting is saved first). Null when it cannot be made.
+  const exportFile = useCallback(async (rootId: string): Promise<MapFile | null> => {
+    if (!projectId) return null
+    setNotice(undefined)
+    try {
+      await autosaveRef.current.flush()
+      const inside = model.descendantIds(await listMaps(projectId), rootId)
+      const docs = await Promise.all([rootId, ...inside].map(id => getMap(projectId, id)))
+      return buildMapFile(rootId, docs)
+    } catch (err) {
+      setNotice(message(err, 'The map could not be exported.'))
+      return null
+    }
+  }, [projectId])
+
+  // Bring the maps of a file in (see mapFile.ts); the list is read again, and the first map made is opened.
+  const importFile = useCallback(async (file: MapFile, choices: Map<string, Choice>, parentId: string | null): Promise<ImportResult | null> => {
+    if (!projectId) return null
+    setNotice(undefined)
+    await autosaveRef.current.flush()
+    const result = await importMaps(file, choices, await listMaps(projectId), parentId, {
+      create: body => createMap(projectId, body),
+      put: doc => putMap(projectId, doc),
+    })
+    // What was written over is read again when it is next opened.
+    for (const id of result.replaced) sessions.current.delete(id)
+    setMaps(await listMaps(projectId))
+    if (result.error) setNotice(result.error)
+    return result
+  }, [projectId])
 
   // Delete a map. The maps inside it move up to its parent (the list is read again for that).
   const remove = useCallback(async (id: string) => {
@@ -200,12 +234,12 @@ export function useMaps(projectId: string | null) {
 
   return useMemo(() => ({
     status, loadError, reload: load, maps, openId, draft, rev, notice,
-    open, create, remove, apply, beginStroke, endStroke, fill, preview, commitMove, undo, redo,
+    open, create, remove, exportFile, importFile, apply, beginStroke, endStroke, fill, preview, commitMove, undo, redo,
     canUndo, canRedo,
     saveStatus: combineSaveStatus(autosave),
     saveCountdown: combineCountdown(autosave),
     saveNow: autosave.flush,
-  }), [status, loadError, load, maps, openId, draft, rev, notice, open, create, remove, apply, beginStroke, endStroke, fill, preview, commitMove, undo, redo, canUndo, canRedo, autosave])
+  }), [status, loadError, load, maps, openId, draft, rev, notice, open, create, remove, exportFile, importFile, apply, beginStroke, endStroke, fill, preview, commitMove, undo, redo, canUndo, canRedo, autosave])
 }
 
 export type Maps = ReturnType<typeof useMaps>

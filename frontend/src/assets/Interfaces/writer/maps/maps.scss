@@ -108,3 +108,23 @@
 .mapChecks { display: flex; flex-wrap: wrap; gap: var(--space-3) var(--space-5); }
 .mapCheck { display: inline-flex; align-items: center; gap: var(--space-2); font-size: var(--text-field); cursor: pointer; input { margin: 0; } }
 .mapSubTitle { margin: var(--space-2) 0 0; font-size: var(--text-small); font-weight: 700; color: var(--ink); }
+
+// ---- places, the way up, the old locations, the files ----
+.mapPath { display: flex; align-items: center; gap: var(--space-2); min-width: 0; }
+.mapCrumbs { list-style: none; margin: 0; padding: 0; display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-1); min-width: 0; li + li::before { content: '›'; margin-right: var(--space-1); color: var(--ink-muted); } }
+.mapCrumb {
+  padding: var(--space-1) var(--space-2); border: 0; border-radius: var(--radius-button); background: none; color: var(--ink); font: inherit; font-size: var(--text-small); cursor: pointer;
+  &:hover { background: var(--ov-sink-1); }
+  &:focus-visible { outline: 2px solid var(--accent-hover); outline-offset: 1px; }
+  &--here { font-weight: 700; cursor: default; &:hover { background: none; } }
+}
+.mapLinks { display: flex; flex-direction: column; gap: var(--space-2); }
+.mapLinked, .mapScenes, .mapOld { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: var(--space-1); }
+.mapScenes li { font-size: var(--text-field); }
+.mapLinkOpen {
+  flex: 1 1 0; min-width: 0; display: flex; align-items: center; gap: var(--space-2); padding: var(--space-1) var(--space-2); border: 0; border-radius: var(--radius-button); background: var(--ov-sink-1); color: var(--ink); font: inherit; font-size: var(--text-field); text-align: left; cursor: pointer;
+  &:hover { background: var(--ov-sink-2); }
+  &:focus-visible { outline: 2px solid var(--accent-hover); outline-offset: 1px; }
+  span { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+}
+.mapFileInput { position: absolute; width: 1px; height: 1px; opacity: 0; pointer-events: none; }

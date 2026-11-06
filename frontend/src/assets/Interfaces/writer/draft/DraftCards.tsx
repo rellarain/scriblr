@@ -106,7 +106,7 @@ export function DraftCards({ w, chapter, draft }: { w: WriterWorkspace; chapter:
         <div key={node.id} {...common} className="wrSceneCard wrOutlineCard wrOutlineCard--readonly">
           <div className="wrSceneHead">
             <span className="wrNodeHandle">{toggle(node, `Scene ${n}`)}<span className="wrNodeLabel wrNodeLabel--num">{n}</span></span>
-            <SceneChips scene={node} scenes={scenes} system={system} />
+            <SceneChips scene={node} scenes={scenes} system={system} projectId={w.activeProjectId} />
             {!open && <span className="wrWordCount wrFoldedCount">{formatWords(words(node.id))}</span>}
           </div>
           {open && <div className="wrChildren wrDraftChildren">{kids.map(renderNode)}</div>}

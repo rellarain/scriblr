@@ -970,3 +970,20 @@ export function PolygonIcon(props: IconProps) {
     <circle cx="6" cy="17" r="1.4" fill="currentColor" />
   </IconBase>
 }
+
+// A ruler: measure a distance on the map.
+export function RulerIcon(props: IconProps) {
+  return <IconBase {...props}>
+    <rect x="2.500" y="8" width="19" height="8" rx="1" transform="rotate(-30 12 12)" />
+    <path d="M8.500 10.500l1.500 2.600M12 8.500l1.500 2.600M15.500 6.500l1.500 2.600" />
+  </IconBase>
+}
+
+// A picture: save the map as an image.
+export function ImageIcon(props: IconProps) {
+  return <IconBase {...props}>
+    <rect x="3" y="4" width="18" height="16" rx="1.500" />
+    <circle cx="9" cy="10" r="1.800" />
+    <path d="M3.500 18l5.500-5.500 4 4 3-3 4.500 4.500" />
+  </IconBase>
+}

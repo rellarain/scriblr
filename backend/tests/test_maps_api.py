@@ -361,3 +361,95 @@ def test_a_map_saved_before_shapes_loads_without_them(client: TestClient, storag
 
     project_store._cache.clear()
     assert client.get(f"/api/projects/{pid}/maps/{doc['id']}").json()["shapes"] == []
+
+
+# ---- places (named symbols), nesting and the pace ----
+
+def _place(i: str, name: str, **over) -> dict:
+    return {"id": i, "layerId": "symbols", "kind": "town", "x": 2.5, "y": 2.5, "size": 2.0, "color": None, "name": name, "mapIds": [], **over}
+
+
+def test_a_symbol_with_a_name_is_a_place_and_the_names_and_links_round_trip(client: TestClient) -> None:
+    pid = _project(client)
+    world = _new(client, pid, title="World", width=10, height=8)
+    town = _new(client, pid, title="Port Veyra", parentId=world["id"])
+    world["symbols"] = [_place("s1", "  Port Veyra  ", mapIds=[town["id"]]), _item(id="s2")]
+    world["pace"] = 24
+    saved = client.put(f"/api/projects/{pid}/maps/{world['id']}", json=world).json()
+    assert [(s["name"], s["mapIds"]) for s in saved["symbols"]] == [("Port Veyra", [town["id"]]), ("", [])]
+    assert saved["pace"] == 24.0
+
+
+def test_odd_names_links_and_paces_are_repaired(client: TestClient) -> None:
+    pid = _project(client)
+    world = _new(client, pid, width=10, height=8)
+    other = _new(client, pid, title="Other")
+    world["symbols"] = [_place("s1", "x" * 200, mapIds=[other["id"], other["id"], "map_nope", world["id"], 5, ""] + [other["id"]] * 3), _place("s2", 7, mapIds="x")]
+    world["pace"] = -3
+    saved = client.put(f"/api/projects/{pid}/maps/{world['id']}", json=world).json()
+    first, second = saved["symbols"]
+    assert len(first["name"]) == 80
+    assert first["mapIds"] == [other["id"]]          # a map that is not there, this map itself and repeats are dropped
+    assert (second["name"], second["mapIds"]) == ("", [])
+    assert saved["pace"] is None
+    world["pace"] = "fast"
+    assert client.put(f"/api/projects/{pid}/maps/{world['id']}", json=world).json()["pace"] is None
+
+
+def test_deleting_a_map_takes_it_off_the_places_that_opened_it(client: TestClient) -> None:
+    pid = _project(client)
+    world = _new(client, pid, title="World", width=10, height=8)
+    town = _new(client, pid, title="Port Veyra", parentId=world["id"])
+    floor = _new(client, pid, title="Cellar", parentId=world["id"])
+    world["symbols"] = [_place("s1", "Port Veyra", mapIds=[town["id"], floor["id"]])]
+    client.put(f"/api/projects/{pid}/maps/{world['id']}", json=world)
+    assert client.delete(f"/api/projects/{pid}/maps/{town['id']}").status_code == 204
+    again = client.get(f"/api/projects/{pid}/maps/{world['id']}").json()
+    assert again["symbols"][0]["mapIds"] == [floor["id"]]
+
+
+def test_the_places_of_every_map_are_listed_with_the_maps_they_are_inside(client: TestClient) -> None:
+    pid = _project(client)
+    world = _new(client, pid, title="The Known World", width=10, height=8)
+    town = _new(client, pid, title="Port Veyra", parentId=world["id"])
+    world["symbols"] = [_place("w1", "Port Veyra", mapIds=[town["id"]]), _item(id="plain")]
+    town["symbols"] = [_place("t1", "The Harbour Inn", kind="door"), _place("t2", "Ale House")]
+    client.put(f"/api/projects/{pid}/maps/{world['id']}", json=world)
+    client.put(f"/api/projects/{pid}/maps/{town['id']}", json=town)
+    rows = client.get(f"/api/projects/{pid}/maps/places/all").json()
+    assert [r["path"] for r in rows] == ["The Known World > Port Veyra", "The Known World > Port Veyra > Ale House", "The Known World > Port Veyra > The Harbour Inn"]
+    inn = next(r for r in rows if r["name"] == "The Harbour Inn")
+    assert inn == {
+        "key": f"{town['id']}/t1", "mapId": town["id"], "placeId": "t1", "name": "The Harbour Inn", "path": "The Known World > Port Veyra > The Harbour Inn",
+        "kind": "door", "mapTitle": "Port Veyra", "mapIds": [],
+    }
+    assert next(r for r in rows if r["placeId"] == "w1")["mapIds"] == [town["id"]]
+
+
+def test_there_are_no_places_without_names_or_maps(client: TestClient) -> None:
+    pid = _project(client)
+    assert client.get(f"/api/projects/{pid}/maps/places/all").json() == []
+    doc = _new(client, pid)
+    doc["symbols"] = [_item()]
+    client.put(f"/api/projects/{pid}/maps/{doc['id']}", json=doc)
+    assert client.get(f"/api/projects/{pid}/maps/places/all").json() == []
+    assert client.get("/api/projects/prj_nope/maps/places/all").status_code == 404
+
+
+def test_a_map_saved_before_places_loads_with_none(client: TestClient, storage_root: Path) -> None:
+    pid = _project(client)
+    doc = _new(client, pid, width=4, height=4)
+    doc["symbols"] = [_item()]
+    client.put(f"/api/projects/{pid}/maps/{doc['id']}", json=doc)
+    path = storage_root / pid / "project.json"
+    raw = json.loads(path.read_text(encoding="utf-8"))
+    for s in raw["maps"][doc["id"]]["symbols"]:
+        s.pop("name", None)
+        s.pop("mapIds", None)
+    raw["maps"][doc["id"]].pop("pace", None)
+    path.write_text(json.dumps(raw), encoding="utf-8")
+    from app.storage import project_store
+
+    project_store._cache.clear()
+    again = client.get(f"/api/projects/{pid}/maps/{doc['id']}").json()
+    assert (again["symbols"][0]["name"], again["symbols"][0]["mapIds"], again["pace"]) == ("", [], None)

@@ -1,4 +1,4 @@
-import { drawLabel, drawOverlays, drawSelection, drawSymbol } from './mapDrawItems'
+import { drawMeasure, drawLabel, drawOverlays, drawSelection, drawSymbol, type MeasureState } from './mapDrawItems'
 import { drawPending, drawShape, drawShapeEditor, type PendingShape } from './mapDrawShapes'
 import type { MapShape } from '../../../../api/types'
 import { findItem, type ItemRef, type LegendEntry } from './mapItems'
@@ -44,6 +44,8 @@ export interface RenderOptions {
   selectedNode: number | null
   // The line or region that is being drawn.
   pending: PendingShape | null
+  // The path the Measure tool has so far, and what it says of it.
+  measure: MeasureState | null
   // What the legend lists (null = the legend is off).
   legend: LegendEntry[] | null
 }
@@ -122,6 +124,7 @@ export function drawMap(ctx: CanvasRenderingContext2D, o: RenderOptions) {
     }
   }
   if (o.pending) drawPending(ctx, o.pending, view, theme)
+  if (o.measure) drawMeasure(ctx, o.measure, view, theme, o.width)
 
   if (o.brush.length > 0) {
     ctx.save()

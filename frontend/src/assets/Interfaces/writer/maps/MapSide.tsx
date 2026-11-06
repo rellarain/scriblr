@@ -1,14 +1,17 @@
 import { useMemo, useState } from 'react'
-import { MAP_MAX_SIDE, type MapLayerKind, type MapLineStyle, type MapPattern, type MapShape, type MapShapeType } from '../../../../api/types'
-import { ChevronDownIcon, ChevronUpIcon, CheckIcon, CloseIcon, EyeClosedIcon, EyeIcon, LockIcon, PlusIcon, RestoreIcon, TrashIcon, UnlockIcon } from '../../../icons'
+import { MAP_MAX_SIDE, type MapSummary, type MapLayerKind, type MapLineStyle, type MapPattern, type MapShape, type MapShapeType } from '../../../../api/types'
+import { ChevronDownIcon, ChevronUpIcon, CheckIcon, CloseIcon, EyeClosedIcon, EyeIcon, FolderPlusIcon, ImageIcon, LockIcon, MapIcon, PlusIcon, RestoreIcon, TrashIcon, UnlockIcon } from '../../../icons'
 import { ColourInput, CommitNumber, CommitText, Field } from './MapFields'
-import { LABEL_SIZE_RANGE, SYMBOL_SIZE_RANGE, editLabel, editShape, editSymbol, findItem, removeItem, replaceShape, type ItemRef } from './mapItems'
+import { EXPORT_SCALES, exportMapImage, exportSize, type ExportScale } from './mapExport'
+import { LABEL_SIZE_RANGE, MAX_PLACE_MAPS, PLACE_NAME_MAX, SYMBOL_SIZE_RANGE, addPlaces, editLabel, editShape, editSymbol, findItem, placeKey, removeItem, replaceShape, type ItemRef } from './mapItems'
+import { looksLikePlaceKey } from './placesStore'
+import type { ScenePlace } from './MapsConsole'
 import { LINE_PRESETS, LINE_STYLES, PATTERNS, REGION_PRESETS, SHAPE_WIDTH_RANGE, setAllSmooth, type Pen } from './mapShapes'
 import { SYMBOL_SETS, symbolName } from './mapSymbols'
 import { MAP_THEMES } from './mapThemes'
 import {
   LAYER_NAMES, MAP_TITLE_MAX, addLayer, addTerrain, editTerrain, moveLayer, removeLayer, removeTerrain, renameLayer, resize, setScale, setTitle, terrainCounts,
-  setOverlay, setTheme, toggleLayer, type MapDraft,
+  descendantIds, setOverlay, setPace, setParent, setTheme, toggleLayer, type MapDraft,
 } from './mapModel'
 import type { Maps } from './useMaps'
 
@@ -38,18 +41,23 @@ export interface MapSideProps {
   selected: ItemRef | null
   fresh: boolean
   onDeleted: () => void
+  // The scenes of the project, and how to give one another location (for the places and the old-locations tool).
+  scenes: ScenePlace[]
+  onSetLocation?: (sceneId: string, location: string) => void
 }
 
 // The right-hand side of the Maps console: what is chosen on the map, the terrains to paint with, the symbols to stamp, the layers, and the map's own fields.
-export function MapSide({ m, draft, terrain, onTerrain, symbolKind, onSymbolKind, symbolSize, onSymbolSize, pen, penType, onPen, onPreset, selected, fresh, onDeleted }: MapSideProps) {
+export function MapSide({ m, draft, terrain, onTerrain, symbolKind, onSymbolKind, symbolSize, onSymbolSize, pen, penType, onPen, onPreset, selected, fresh, onDeleted, scenes, onSetLocation }: MapSideProps) {
   return (
     <aside className="mapSide" aria-label="Map details">
-      {selected && <InspectorPanel m={m} draft={draft} selected={selected} fresh={fresh} onDeleted={onDeleted} />}
+      {selected && <InspectorPanel m={m} draft={draft} selected={selected} fresh={fresh} onDeleted={onDeleted} scenes={scenes} />}
+      <OldLocations m={m} draft={draft} scenes={scenes} onSetLocation={onSetLocation} />
       <TerrainPanel m={m} draft={draft} terrain={terrain} onTerrain={onTerrain} />
       <SymbolPanel kind={symbolKind} onKind={onSymbolKind} size={symbolSize} onSize={onSymbolSize} />
       <PenPanel pen={pen} penType={penType} onPen={onPen} onPreset={onPreset} />
       <LayerPanel m={m} draft={draft} />
       <MapFieldsPanel m={m} draft={draft} />
+      <ExportPanel draft={draft} />
     </aside>
   )
 }
@@ -118,6 +126,156 @@ function PenPanel({ pen, penType, onPen, onPreset }: { pen: Pen; penType: MapSha
   )
 }
 
+// A symbol that has a name is a place: a scene can happen there, and the maps that open from it are listed (the town's map, the floors of a building).
+function PlaceFields({ m, draft, symbolId, scenes }: { m: Maps; draft: MapDraft; symbolId: string; scenes: ScenePlace[] }) {
+  const s = draft.symbols.find(y => y.id === symbolId)!
+  const linked = s.mapIds.map(id => m.maps.find(x => x.id === id)).filter((x): x is MapSummary => !!x)
+  const free = m.maps.filter(x => x.id !== draft.id && !s.mapIds.includes(x.id))
+  const [pick, setPick] = useState('')
+  const key = placeKey(draft.id, s.id)
+  const here = scenes.filter(sc => sc.location === key)
+
+  async function makeMap() {
+    const interior = SYMBOL_SETS.find(set => set.id === 'interior')?.symbols.some(y => y.id === s.kind)
+    const id = await m.create({ title: s.name, kind: interior ? 'interior' : 'town', width: 32, height: 24, theme: draft.theme, cellSize: interior ? 5 : 10, unit: interior ? 'feet' : 'paces', parentId: draft.id }, false)
+    if (id) m.apply(editSymbol(draft, s.id, { mapIds: [...s.mapIds, id] }))
+  }
+
+  return (
+    <>
+      <Field label="Place name"><CommitText label="Name of the place" value={s.name} max={PLACE_NAME_MAX} onCommit={name => m.apply(editSymbol(draft, s.id, { name }))} /></Field>
+      {s.name === '' && <p className="mapHint">Give it a name to make it a place: a scene can happen there, and maps can open from it.</p>}
+      {s.name !== '' && (
+        <div className="mapLinks" role="group" aria-label="Maps from this place">
+          <h4 className="mapSubTitle">Maps from here</h4>
+          {linked.length === 0 && <p className="mapHint">No map opens from here yet. Double-click the place with the Select tool to open its first map.</p>}
+          <ul className="mapLinked">
+            {linked.map(x => (
+              <li key={x.id} className="mapRow">
+                <button type="button" className="mapLinkOpen" title={`Open ${x.title}`} aria-label={`Open ${x.title}`} onClick={() => { void m.open(x.id) }}><MapIcon size={14} /><span>{x.title}</span></button>
+                <button type="button" className="mapIconBtn" aria-label={`Stop opening ${x.title} from here`} title="Stop opening this map from here" onClick={() => m.apply(editSymbol(draft, s.id, { mapIds: s.mapIds.filter(id => id !== x.id) }))}><CloseIcon size={14} /></button>
+              </li>
+            ))}
+          </ul>
+          <div className="mapRow">
+            <button type="button" className="mapIconBtn" aria-label="Make a map for this place" title="Make a map for this place (inside this map)" disabled={s.mapIds.length >= MAX_PLACE_MAPS} onClick={() => { void makeMap() }}><FolderPlusIcon size={16} /></button>
+            {free.length > 0 && (
+              <>
+                <select className="mapSelect" aria-label="Another map to open from here" value={pick} onChange={e => setPick(e.target.value)}>
+                  <option value="">Link a map that exists…</option>
+                  {free.map(x => <option key={x.id} value={x.id}>{x.title}</option>)}
+                </select>
+                <button type="button" className="mapIconBtn" aria-label="Link the map" title="Link the map" disabled={pick === ''} onClick={() => { m.apply(editSymbol(draft, s.id, { mapIds: [...s.mapIds, pick] })); setPick('') }}><PlusIcon size={16} /></button>
+              </>
+            )}
+          </div>
+          <h4 className="mapSubTitle">Scenes here</h4>
+          {here.length === 0 ? <p className="mapHint">No scene is set here. Choose it as a scene's Location in the Outline.</p> : <ul className="mapScenes">{here.map(sc => <li key={sc.id}>{sc.title || 'Untitled scene'}</li>)}</ul>}
+        </div>
+      )}
+    </>
+  )
+}
+
+// The tool for scenes whose Location is old text (typed before places existed): turn the texts that are checked into places on this map, and drop the rest.
+function OldLocations({ m, draft, scenes, onSetLocation }: { m: Maps; draft: MapDraft; scenes: ScenePlace[]; onSetLocation?: (id: string, location: string) => void }) {
+  const counts = new Map<string, number>()
+  for (const sc of scenes) {
+    const text = sc.location.trim()
+    if (text !== '' && !looksLikePlaceKey(text)) counts.set(text, (counts.get(text) ?? 0) + 1)
+  }
+  const texts = [...counts.keys()].sort((a, b) => a.localeCompare(b))
+  const [off, setOff] = useState<Set<string>>(new Set())
+  const [confirming, setConfirming] = useState(false)
+  const [busy, setBusy] = useState(false)
+  if (texts.length === 0 || !onSetLocation) return null
+  const chosen = texts.filter(t => !off.has(t))
+
+  async function convert() {
+    const r = addPlaces(draft, chosen)
+    if (!r) return
+    setBusy(true)
+    m.apply(r.change)
+    // The places are saved before any scene points at them.
+    await m.saveNow()
+    chosen.forEach((text, i) => {
+      for (const sc of scenes) if (sc.location.trim() === text) onSetLocation!(sc.id, placeKey(draft.id, r.ids[i]))
+    })
+    setBusy(false)
+  }
+  function dropRest() {
+    setConfirming(false)
+    for (const sc of scenes) {
+      const text = sc.location.trim()
+      if (text !== '' && !looksLikePlaceKey(text)) onSetLocation!(sc.id, '')
+    }
+  }
+
+  return (
+    <section className="mapPanel" aria-label="Old locations">
+      <header className="mapPanelHead"><h3 className="mapPanelTitle">Old locations</h3></header>
+      <p className="mapHint">These scenes have a Location typed before places existed. Make places of the texts you want to keep, here on {draft.title}; the rest can be dropped.</p>
+      <ul className="mapOld">
+        {texts.map(t => (
+          <li key={t}>
+            <label className="mapCheck">
+              <input type="checkbox" checked={!off.has(t)} onChange={e => setOff(prev => { const next = new Set(prev); if (e.target.checked) next.delete(t); else next.add(t); return next })} />
+              <span>{t}</span><span className="mapHint">{counts.get(t)} {counts.get(t) === 1 ? 'scene' : 'scenes'}</span>
+            </label>
+          </li>
+        ))}
+      </ul>
+      <div className="mapRow">
+        <button type="button" className="mapChip" disabled={chosen.length === 0 || busy} onClick={() => { void convert() }}>Make places of the checked texts</button>
+        {confirming ? (
+          <span className="mapConfirm" role="group" aria-label="Drop the old locations?">
+            <button type="button" className="mapIconBtn" aria-label="Confirm drop" title="Drop every old location that is still text" onClick={dropRest}><CheckIcon size={16} /></button>
+            <button type="button" className="mapIconBtn" aria-label="Cancel drop" title="Cancel" onClick={() => setConfirming(false)}><CloseIcon size={16} /></button>
+          </span>
+        ) : (
+          <button type="button" className="mapChip" onClick={() => setConfirming(true)}>Drop the old texts</button>
+        )}
+      </div>
+    </section>
+  )
+}
+
+// Save the map as an image: a size, and which layers are in it.
+function ExportPanel({ draft }: { draft: MapDraft }) {
+  const [scale, setScale] = useState<ExportScale>(1)
+  const [off, setOff] = useState<Set<string>>(new Set())
+  const [note, setNote] = useState('')
+  const chosen = new Set(draft.layers.map(l => l.id).filter(id => !off.has(id)))
+  const size = exportSize(draft.width, draft.height, scale)
+
+  async function save() {
+    setNote('')
+    const r = await exportMapImage(draft, scale, chosen)
+    if (r === 'unavailable') setNote('The image could not be made.')
+  }
+
+  return (
+    <section className="mapPanel" aria-label="Export">
+      <header className="mapPanelHead">
+        <h3 className="mapPanelTitle">Image</h3>
+        <button type="button" className="mapIconBtn" aria-label="Save the map as an image" title={`Save as a PNG, ${size.width} × ${size.height} pixels`} onClick={() => { void save() }}><ImageIcon size={16} /></button>
+      </header>
+      <div className="mapSizes" role="group" aria-label="Size of the image">
+        {EXPORT_SCALES.map(n => <button key={n} type="button" className="mapChip" aria-pressed={scale === n} title={`${exportSize(draft.width, draft.height, n).width} × ${exportSize(draft.width, draft.height, n).height} pixels`} onClick={() => setScale(n)}>{n}×</button>)}
+      </div>
+      <div className="mapChecks" role="group" aria-label="Layers in the image">
+        {draft.layers.map(l => (
+          <label key={l.id} className="mapCheck">
+            <input type="checkbox" checked={!off.has(l.id)} onChange={e => setOff(prev => { const next = new Set(prev); if (e.target.checked) next.delete(l.id); else next.add(l.id); return next })} />{l.name}
+          </label>
+        ))}
+      </div>
+      <p className="mapHint">{size.width} × {size.height} pixels. The scale bar, compass and legend that are on are in it; a layer that is hidden is left out.</p>
+      {note && <p className="mapHint" role="alert">{note}</p>}
+    </section>
+  )
+}
+
 // The symbols: four sets, and the one the Symbol tool stamps.
 function SymbolPanel({ kind, onKind, size, onSize }: { kind: string; onKind: (id: string) => void; size: number; onSize: (size: number) => void }) {
   const [setId, setSetId] = useState(() => SYMBOL_SETS.find(s => s.symbols.some(y => y.id === kind))?.id ?? SYMBOL_SETS[0].id)
@@ -147,7 +305,7 @@ function SymbolPanel({ kind, onKind, size, onSize }: { kind: string; onKind: (id
 }
 
 // What is chosen on the map: a symbol (its width and colour), a label (its text and height) or a line or region (how it is drawn), and a delete.
-function InspectorPanel({ m, draft, selected, fresh, onDeleted }: { m: Maps; draft: MapDraft; selected: ItemRef; fresh: boolean; onDeleted: () => void }) {
+function InspectorPanel({ m, draft, selected, fresh, onDeleted, scenes }: { m: Maps; draft: MapDraft; selected: ItemRef; fresh: boolean; onDeleted: () => void; scenes: ScenePlace[] }) {
   const item = findItem(draft, selected)
   if (!item) return null
   const remove = () => { m.apply(removeItem(draft, selected)); onDeleted() }
@@ -189,6 +347,7 @@ function InspectorPanel({ m, draft, selected, fresh, onDeleted }: { m: Maps; dra
             </span>
           </Field>
         </div>
+        <PlaceFields m={m} draft={draft} symbolId={s.id} scenes={scenes} />
         <p className="mapHint">Drag it with the Select tool, or move it with the arrow keys (Shift for a quarter cell).</p>
       </section>
     )
@@ -329,6 +488,18 @@ function MapFieldsPanel({ m, draft }: { m: Maps; draft: MapDraft }) {
           <Field label="One cell is" short><CommitNumber label="Size of one cell" value={draft.cellSize} min={0.001} max={1_000_000} step="any" onCommit={s => m.apply(setScale(draft, s, draft.unit))} /></Field>
           <Field label="Unit" short><CommitText label="Unit of a cell" value={draft.unit} max={20} className="mapInput mapInput--unit" onCommit={u => m.apply(setScale(draft, draft.cellSize, u))} /></Field>
         </div>
+        <Field label="Inside">
+          <select className="mapSelect" aria-label="Inside which map" value={draft.parentId ?? ''} onChange={e => m.apply(setParent(draft, e.target.value || null))}>
+            <option value="">No map (a top-level map)</option>
+            {m.maps.filter(x => x.id !== draft.id && !descendantIds(m.maps, draft.id).has(x.id)).map(x => <option key={x.id} value={x.id}>{x.title}</option>)}
+          </select>
+        </Field>
+        <Field label="A day's travel" short>
+          <span className="mapRow">
+            <CommitNumber label="How far a traveller goes in a day" value={draft.pace ?? 0} min={0} max={1_000_000} step="any" onCommit={n => m.apply(setPace(draft, n > 0 ? n : null))} />
+            <span className="mapHint">{draft.unit} (0: not set)</span>
+          </span>
+        </Field>
         <Field label="Look">
           <select className="mapSelect" aria-label="Look of the map" value={draft.theme} onChange={e => m.apply(setTheme(draft, e.target.value as MapDraft['theme']))}>
             {MAP_THEMES.map(t => <option key={t.id} value={t.id}>{t.name}</option>)}

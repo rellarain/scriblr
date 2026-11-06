@@ -82,6 +82,46 @@ def create_map(project_id: str, body: MapCreate, root: Path = Depends(get_storag
     return doc
 
 
+class Place(BaseModel):
+    """A named symbol of a map: where a scene can happen. `key` is what a scene stores (`mapId/symbolId`); `path` is the maps it is inside and its name."""
+
+    key: str
+    mapId: str
+    placeId: str
+    name: str
+    path: str
+    kind: str
+    mapTitle: str
+    mapIds: list[str]
+
+
+def _titles_above(maps: dict[str, MapDoc], map_id: str) -> list[str]:
+    """The titles of the maps a map is inside, outermost first, then its own."""
+    out: list[str] = []
+    seen: set[str] = set()
+    current: Optional[str] = map_id
+    while current is not None and current in maps and current not in seen:
+        seen.add(current)
+        out.append(maps[current].title)
+        current = maps[current].parentId
+    return list(reversed(out))
+
+
+@router.get("/places/all", response_model=list[Place])
+def list_places(project_id: str, root: Path = Depends(get_storage_root)) -> list[Place]:
+    """Every place (named symbol) of every map, with the path of maps it is inside: the choices for a scene's location."""
+    maps = {m.id: m for m in store.list_maps(root, project_id)}
+    out: list[Place] = []
+    for m in maps.values():
+        above = _titles_above(maps, m.id)
+        for s in m.symbols:
+            if s.name:
+                out.append(Place(
+                    key=f"{m.id}/{s.id}", mapId=m.id, placeId=s.id, name=s.name, path=" > ".join([*above, s.name]), kind=s.kind, mapTitle=m.title, mapIds=list(s.mapIds),
+                ))
+    return sorted(out, key=lambda p: (p.path.lower(), p.key))
+
+
 @router.get("/{map_id}", response_model=MapDoc)
 def get_map(project_id: str, map_id: str, root: Path = Depends(get_storage_root)) -> MapDoc:
     return store.load_map(root, project_id, map_id)
@@ -98,6 +138,9 @@ def put_map(project_id: str, map_id: str, body: MapDoc, root: Path = Depends(get
             raise store.MapNotFoundError(project_id, map_id)
         if body.parentId is not None and (body.parentId not in parents or _is_inside(parents, body.parentId, map_id)):
             raise HTTPException(status_code=422, detail="a map cannot be put inside itself or inside a map it holds")
+        # A place opens maps that are there, and not this one.
+        for symbol in body.symbols:
+            symbol.mapIds = [m for m in symbol.mapIds if m in parents and m != map_id]
         body.updatedAt = utcnow()
         store.save_map(root, project_id, body)
     return body

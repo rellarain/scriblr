@@ -56,3 +56,30 @@ export function formatDistance(value: number, unit: string): string {
   const rounded = value >= 100 ? Math.round(value) : Math.round(value * 10) / 10
   return `${rounded} ${unit}`
 }
+
+// ---- measuring ----
+
+// The length of the path through some points, in cells.
+export function pathLength(points: Array<[number, number]>): number {
+  let total = 0
+  for (let i = 1; i < points.length; i += 1) total += Math.hypot(points[i][0] - points[i - 1][0], points[i][1] - points[i - 1][1])
+  return total
+}
+
+// How long a journey of some length takes at a day's travel, as words (hours under a day).
+export function travelTime(distance: number, pace: number): string {
+  const days = distance / pace
+  if (days < 1) {
+    const hours = Math.max(1, Math.round(days * 24))
+    return `${hours} ${hours === 1 ? 'hour' : 'hours'}`
+  }
+  const rounded = days >= 10 ? Math.round(days) : Math.round(days * 10) / 10
+  return `${rounded} ${rounded === 1 ? 'day' : 'days'}`
+}
+
+// What the Measure tool says of a path: its length in the map's unit and, when the map has a day's travel, how long it takes.
+export function measureText(cells: number, cellSize: number, unit: string, pace: number | null): string {
+  const distance = cells * cellSize
+  const length = formatDistance(distance, unit)
+  return pace !== null && pace > 0 && distance > 0 ? `${length} · ${travelTime(distance, pace)}` : length
+}

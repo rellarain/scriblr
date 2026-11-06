@@ -6,7 +6,7 @@ import {
   getOutlineSnapshot, getPlotSnapshot, getProjectSettingsLog, getRevisionSnapshot, getUserSettingsLog, listOutlineHistory, listPlotHistory,
   listRevisionSummaries,
 } from './historyFetch'
-import { createMap, deleteMap, getMap, listMaps, putMap } from './mapsApi'
+import { createMap, deleteMap, getMap, listMaps, listPlaces, putMap } from './mapsApi'
 import { getOutline, putOutline } from './outlineApi'
 import { getPlot, putPlot } from './plotApi'
 import { createProject, deleteProject, getProject, getProjectsOverview, updateProject } from './projectsApi'
@@ -27,7 +27,7 @@ function answerWith(body: unknown = {}, init: { ok?: boolean; status?: number } 
 }
 
 const TREE = { schemaVersion: 2, nodes: [] }
-const MAP = { schemaVersion: 2, id: ID, title: 'W', kind: 'world' as const, parentId: null, order: 0, width: 2, height: 2, cellSize: 1, unit: 'cells', terrains: [], layers: [], cells: [0, 4], symbols: [], labels: [], shapes: [], theme: 'modern' as const, scaleBar: true, compass: true, legend: false, updatedAt: '2026-01-01T00:00:00Z' }
+const MAP = { schemaVersion: 2, id: ID, title: 'W', kind: 'world' as const, parentId: null, order: 0, width: 2, height: 2, cellSize: 1, unit: 'cells', pace: null, terrains: [], layers: [], cells: [0, 4], symbols: [], labels: [], shapes: [], theme: 'modern' as const, scaleBar: true, compass: true, legend: false, updatedAt: '2026-01-01T00:00:00Z' }
 const CASES: Array<[string, () => Promise<unknown>, string, string, unknown?]> = [
   ['getTraining', () => getTraining(), 'GET', '/api/training'],
   ['saveTrainingContent', () => saveTrainingContent({ curricula: [], courses: [] }), 'PUT', '/api/training/content', { curricula: [], courses: [] }],
@@ -49,6 +49,7 @@ const CASES: Array<[string, () => Promise<unknown>, string, string, unknown?]> =
   ['createMap', () => createMap(ID, { title: 'W' }), 'POST', `/api/projects/${ESC}/maps`, { title: 'W' }],
   ['getMap', () => getMap(ID, ID), 'GET', `/api/projects/${ESC}/maps/${ESC}`],
   ['putMap', () => putMap(ID, MAP), 'PUT', `/api/projects/${ESC}/maps/${ESC}`, MAP],
+  ['listPlaces', () => listPlaces(ID), 'GET', `/api/projects/${ESC}/maps/places/all`],
   ['deleteMap', () => deleteMap(ID, ID), 'DELETE', `/api/projects/${ESC}/maps/${ESC}`],
   ['getBookProgress', () => getBookProgress(ID), 'GET', `/api/projects/${ESC}/book-progress`],
   ['listOutlineHistory', () => listOutlineHistory(ID), 'GET', `/api/projects/${ESC}/outline/history`],

@@ -4,6 +4,7 @@ import { __resetSettingsForTests } from '../settings/settingsStore'
 import { __resetDragEndedForTests } from '../components/tiles/tileDragBus'
 import { __resetPlanStoreForTests } from '../assets/Interfaces/writer/schedule/planStore'
 import { __resetTrainingForTests } from '../assets/Interfaces/training/trainingStore'
+import { __resetPlacesForTests } from '../assets/Interfaces/writer/maps/placesStore'
 
 // What one test leaves behind must not reach the next: stubbed globals (fetch, ResizeObserver, ...), the browser storage the stores read,
 // and the settings store itself. (React Testing Library unmounts what a test rendered on its own.)
@@ -15,4 +16,5 @@ afterEach(() => {
   __resetDragEndedForTests()
   __resetPlanStoreForTests()
   __resetTrainingForTests()
+  __resetPlacesForTests()
 })

@@ -7,6 +7,9 @@ import { PlusIcon } from '../../icons'
 // description. Choosing one adds it to the project at once (a plain copy: see plotPreset.ts) and opens it. The list is read each time it opens,
 // so a preset published in Admin shows up without reloading the Writer.
 
+// The Characters and Settings presets are left out of the list: the Maps and Characters consoles are where a setting and a cast are made now.
+export const HIDDEN_PRESET_IDS = new Set(['preset-characters', 'preset-settings'])
+
 type Load = { status: 'loading' } | { status: 'error' } | { status: 'ready'; presets: PublishedPresetOut[] }
 
 export function PresetPicker({ onChoose }: {
@@ -23,7 +26,7 @@ export function PresetPicker({ onChoose }: {
     const mine = (request.current += 1)
     setLoad({ status: 'loading' })
     getPublishedPresets().then(
-      list => { if (request.current === mine) setLoad({ status: 'ready', presets: list.presets }) },
+      list => { if (request.current === mine) setLoad({ status: 'ready', presets: list.presets.filter(p => !HIDDEN_PRESET_IDS.has(p.id)) }) },
       () => { if (request.current === mine) setLoad({ status: 'error' }) },
     )
   }

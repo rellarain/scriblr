@@ -9,7 +9,7 @@ import {
 import { MapHistory, draftOf, metaEdit, removeLayer, toggleLayer, type MapDraft } from './mapModel'
 
 const doc = (): MapDoc => ({
-  schemaVersion: 2, id: 'map_1', title: 'World', kind: 'world', parentId: null, order: 0, width: 20, height: 10, cellSize: 10, unit: 'miles',
+  schemaVersion: 2, id: 'map_1', title: 'World', kind: 'world', parentId: null, order: 0, width: 20, height: 10, cellSize: 10, unit: 'miles', pace: null,
   terrains: [{ id: 'sea', name: 'Sea', color: '#3b6ea5', builtIn: true }, { id: 'land', name: 'Land', color: '#a8c66c', builtIn: true }, { id: 'wood', name: 'Wood', color: '#4f8a4a', builtIn: true }],
   layers: [
     { id: 'terrain', name: 'Terrain', kind: 'terrain', visible: true, locked: false },
@@ -106,7 +106,7 @@ describe('placing symbols and labels', () => {
   it('puts a symbol on the topmost shown, unlocked symbols layer, and holds it to the map', () => {
     const d = draft()
     const r = addSymbol(d, 'castle', 3.5, 2.5, 2, ids('a'))!
-    expect(r.change.draft.symbols).toEqual([{ id: 'sym_a', layerId: 'symbols', kind: 'castle', x: 3.5, y: 2.5, size: 2, color: null }])
+    expect(r.change.draft.symbols).toEqual([{ id: 'sym_a', layerId: 'symbols', kind: 'castle', x: 3.5, y: 2.5, size: 2, color: null, name: '', mapIds: [] }])
     const far = addSymbol(d, 'tree', 99, -4, 99, ids('b'))!.change.draft.symbols[0]
     expect([far.x, far.y, far.size]).toEqual([20, 0, 16])
   })
@@ -116,7 +116,7 @@ describe('placing symbols and labels', () => {
     expect(addSymbol(toggleLayer(d, 'symbols', 'locked')!.draft, 'castle', 1, 1, 2)).toBeNull()
     expect(addSymbol(toggleLayer(d, 'symbols', 'visible')!.draft, 'castle', 1, 1, 2)).toBeNull()
     expect(addLabel(toggleLayer(d, 'labels', 'locked')!.draft, 'x', 1, 1, 1)).toBeNull()
-    const full: MapDraft = { ...d, symbols: Array.from({ length: MAX_SYMBOLS }, (_, i) => ({ id: `s${i}`, layerId: 'symbols', kind: 'tree', x: 1, y: 1, size: 1, color: null })) }
+    const full: MapDraft = { ...d, symbols: Array.from({ length: MAX_SYMBOLS }, (_, i) => ({ id: `s${i}`, layerId: 'symbols', kind: 'tree', x: 1, y: 1, size: 1, color: null, name: '', mapIds: [] })) }
     expect(addSymbol(full, 'tree', 1, 1, 1)).toBeNull()
     const lots: MapDraft = { ...d, labels: Array.from({ length: MAX_LABELS }, (_, i) => ({ id: `l${i}`, layerId: 'labels', text: 'x', x: 1, y: 1, size: 1 })) }
     expect(addLabel(lots, 'x', 1, 1, 1)).toBeNull()

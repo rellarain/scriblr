@@ -131,3 +131,12 @@ describe('the + Preset picker', () => {
     expect(screen.queryByRole('menu')).toBeNull()
   })
 })
+
+describe('the presets that the consoles replace', () => {
+  it('leaves the Characters and Settings built-in presets out of the list', async () => {
+    const { user } = setup([published('preset-characters', 'Characters'), published('preset-settings', 'Settings'), published('preset-themes', 'Themes'), published('mine', 'Characters')])
+    await user.click(opener())
+    await screen.findAllByRole('menuitem')
+    expect(rows().map(r => r.textContent)).toEqual(['Themes', 'Characters'])
+  })
+})

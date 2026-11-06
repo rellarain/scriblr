@@ -1,7 +1,9 @@
-import { useMemo, useState } from 'react'
+import { useMemo, useRef, useState } from 'react'
 import { MAP_MAX_SIDE, type MapKind, type MapSummary, type MapThemeName } from '../../../../api/types'
-import { CheckIcon, ChevronRightIcon, CloseIcon, MapIcon, PlusIcon, TrashIcon } from '../../../icons'
+import { CheckIcon, ChevronRightIcon, CloseIcon, ExportIcon, MapIcon, PlusIcon, TrashIcon, ImportIcon } from '../../../icons'
 import { CommitNumber, CommitText, Field } from './MapFields'
+import { importRows, mapFileName, parseMapFile, type Choice, type MapFile } from './mapFile'
+import { saveBlob } from './mapExport'
 import { MAP_TITLE_MAX, mapRows } from './mapModel'
 import { MAP_THEMES } from './mapThemes'
 import type { Maps } from './useMaps'
@@ -22,13 +24,34 @@ export function MapList({ m }: { m: Maps }) {
   const [making, setMaking] = useState(false)
   const [confirming, setConfirming] = useState<string | null>(null)
   const open = m.openId
+  const [incoming, setIncoming] = useState<MapFile | null>(null)
+  const [problem, setProblem] = useState('')
+  const fileInput = useRef<HTMLInputElement>(null)
+
+  async function exportOne(id: string, title: string) {
+    const file = await m.exportFile(id)
+    if (file) saveBlob(new Blob([JSON.stringify(file, null, 2)], { type: 'application/json' }), mapFileName(title))
+  }
+  async function readFile(f: File | undefined) {
+    if (!f) return
+    setProblem('')
+    const parsed = parseMapFile(await readText(f))
+    if (parsed.ok) setIncoming(parsed.file)
+    else setProblem(parsed.error)
+  }
 
   return (
     <nav className="mapList" aria-label="Maps">
       <header className="mapPanelHead">
         <h3 className="mapPanelTitle">Maps</h3>
-        <button type="button" className="mapIconBtn" aria-label="New map" title="New map" aria-expanded={making} onClick={() => setMaking(v => !v)}><PlusIcon size={16} /></button>
+        <span className="mapRow">
+          <button type="button" className="mapIconBtn" aria-label="Import maps from a file" title="Import maps from a file" onClick={() => fileInput.current?.click()}><ImportIcon size={16} /></button>
+          <button type="button" className="mapIconBtn" aria-label="New map" title="New map" aria-expanded={making} onClick={() => setMaking(v => !v)}><PlusIcon size={16} /></button>
+        </span>
+        <input ref={fileInput} type="file" accept=".json,application/json" className="mapFileInput" aria-label="Map file" tabIndex={-1} onChange={e => { void readFile(e.target.files?.[0]); e.target.value = '' }} />
       </header>
+      {problem && <p className="mapHint" role="alert">{problem}</p>}
+      {incoming && <ImportForm m={m} file={incoming} onDone={() => setIncoming(null)} />}
       {making && <NewMapForm m={m} maps={m.maps} onDone={() => setMaking(false)} />}
       {rows.length === 0 && !making && <p className="mapHint">No maps yet. Make the first one with the plus.</p>}
       <ul className="mapRows">
@@ -39,6 +62,7 @@ export function MapList({ m }: { m: Maps }) {
               <span className="mapRowTitle">{map.title}</span>
               <span className="mapRowMeta">{map.width}×{map.height}</span>
             </button>
+            <button type="button" className="mapIconBtn mapRowDelete" aria-label={`Export ${map.title} to a file`} title={hasChildren ? `Export ${map.title} and the maps inside it to a file` : `Export ${map.title} to a file`} onClick={() => { void exportOne(map.id, map.title) }}><ExportIcon size={16} /></button>
             {confirming === map.id ? (
               <span className="mapConfirm" role="group" aria-label={`Delete ${map.title}?`}>
                 <button type="button" className="mapIconBtn" aria-label="Confirm delete" title="Confirm delete" onClick={() => { setConfirming(null); void m.remove(map.id) }}><CheckIcon size={16} /></button>
@@ -118,6 +142,62 @@ function NewMapForm({ m, maps, onDone }: { m: Maps; maps: MapSummary[]; onDone: 
       <div className="mapRow">
         <button type="submit" className="mapIconBtn" aria-label="Make the map" title="Make the map" disabled={busy}><CheckIcon size={16} /></button>
         <button type="button" className="mapIconBtn" aria-label="Cancel" title="Cancel" onClick={onDone}><CloseIcon size={16} /></button>
+      </div>
+    </form>
+  )
+}
+
+// The text of a file the user chose.
+const readText = (f: File) => new Promise<string>((resolve, reject) => {
+  const r = new FileReader()
+  r.onload = () => resolve(String(r.result ?? ''))
+  r.onerror = () => reject(r.error)
+  r.readAsText(f)
+})
+
+// What an import does: each map of the file, with a choice (bring it new, replace the map that has its id, or leave it out) for those that clash.
+function ImportForm({ m, file, onDone }: { m: Maps; file: MapFile; onDone: () => void }) {
+  const rows = useMemo(() => importRows(file, m.maps), [file, m.maps])
+  const [choices, setChoices] = useState<Map<string, Choice>>(new Map())
+  const [parent, setParent] = useState('')
+  const [busy, setBusy] = useState(false)
+
+  async function bring() {
+    setBusy(true)
+    const r = await m.importFile(file, choices, parent || null)
+    setBusy(false)
+    if (r && !r.error) onDone()
+  }
+
+  return (
+    <form className="mapNew" aria-label="Import maps" onSubmit={e => { e.preventDefault(); void bring() }}>
+      <h4 className="mapSubTitle">Maps in the file</h4>
+      <ul className="mapOld">
+        {rows.map(({ map, depth, clash }) => (
+          <li key={map.id} className="mapRow" style={{ paddingLeft: `calc(${depth} * var(--space-6))` }}>
+            <span className="mapRowTitle">{map.title}</span>
+            {clash ? (
+              <select className="mapSelect" aria-label={`What to do with ${map.title}, which the project has already`} value={choices.get(map.id) ?? 'both'} onChange={e => setChoices(prev => new Map(prev).set(map.id, e.target.value as Choice))}>
+                <option value="both">Keep both</option>
+                <option value="replace">Replace the one here</option>
+                <option value="skip">Leave it out</option>
+              </select>
+            ) : <span className="mapHint">new</span>}
+          </li>
+        ))}
+      </ul>
+      {m.maps.length > 0 && (
+        <Field label="Inside">
+          <select className="mapSelect" aria-label="Put the imported map inside" value={parent} onChange={e => setParent(e.target.value)}>
+            <option value="">No map (a top-level map)</option>
+            {mapRows(m.maps).map(({ map, depth }) => <option key={map.id} value={map.id}>{'– '.repeat(depth)}{map.title}</option>)}
+          </select>
+        </Field>
+      )}
+      <p className="mapHint">Links to maps that are not in the file are dropped.</p>
+      <div className="mapRow">
+        <button type="submit" className="mapIconBtn" aria-label="Import the maps" title="Import the maps" disabled={busy}><CheckIcon size={16} /></button>
+        <button type="button" className="mapIconBtn" aria-label="Cancel the import" title="Cancel" onClick={onDone}><CloseIcon size={16} /></button>
       </div>
     </form>
   )

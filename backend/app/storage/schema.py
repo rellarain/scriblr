@@ -1680,6 +1680,7 @@ def repair_map_runs(runs: Any, total: int, terrains: int) -> list[int]:
 
 
 MAP_MAX_SYMBOLS = 5000
+MAP_MAX_PLACE_MAPS = 20
 MAP_MAX_LABELS = 1000
 MapThemeName = Literal["parchment", "modern", "night", "blueprint"]
 
@@ -1703,6 +1704,9 @@ class MapSymbol(BaseModel):
     size: float = 2.0
     # Its own colour (#rrggbb); none = the map theme's symbol colour.
     color: Optional[str] = None
+    # A symbol with a name is a place: a scene's location can be it, and `mapIds` are the maps that open from it (a town's map, the floors of a building).
+    name: str = Field(default="", max_length=80)
+    mapIds: list[str] = Field(default_factory=list)
 
     @field_validator("x", "y", mode="before")
     @classmethod
@@ -1718,6 +1722,20 @@ class MapSymbol(BaseModel):
     @classmethod
     def _color_or_none(cls, value: Any) -> Any:
         return value if isinstance(value, str) and _MAP_HEX_COLOR.match(value) else None
+
+    @field_validator("name", mode="before")
+    @classmethod
+    def _cut_name(cls, value: Any) -> Any:
+        return value.strip()[:80] if isinstance(value, str) else ""
+
+    @field_validator("mapIds", mode="before")
+    @classmethod
+    def _map_ids(cls, value: Any) -> Any:
+        out: list[str] = []
+        for item in value if isinstance(value, list) else []:
+            if isinstance(item, str) and 0 < len(item) <= 80 and item not in out:
+                out.append(item)
+        return out[:MAP_MAX_PLACE_MAPS]
 
 
 class MapLabel(BaseModel):
@@ -1857,6 +1875,8 @@ class MapDoc(BaseModel):
     # What one cell is, in `unit` (miles, paces, feet ...).
     cellSize: float = Field(default=1.0, gt=0, le=1_000_000)
     unit: str = Field(default="cells", max_length=20)
+    # How far a traveller goes in a day, in `unit` (none = not set): the Measure tool turns a distance into days with it.
+    pace: Optional[float] = None
     terrains: list[MapTerrain] = Field(default_factory=list)
     layers: list[MapLayer] = Field(default_factory=list)
     # The terrain of every cell, row by row, as run pairs [index into `terrains`, how many cells, ...].
@@ -1872,6 +1892,13 @@ class MapDoc(BaseModel):
     compass: bool = True
     legend: bool = False
     updatedAt: datetime = Field(default_factory=utcnow)
+
+    @field_validator("pace", mode="before")
+    @classmethod
+    def _pace_or_none(cls, value: Any) -> Any:
+        if isinstance(value, bool) or not isinstance(value, (int, float)) or value != value or not 0 < value <= 1_000_000:
+            return None
+        return float(value)
 
     @field_validator("symbols", mode="before")
     @classmethod

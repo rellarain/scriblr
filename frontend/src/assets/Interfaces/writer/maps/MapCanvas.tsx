@@ -5,9 +5,9 @@ import { findItem, hitItem, legendEntries, movedItem, snapPoint, withShape, type
 import { brushCells, cellIndex, terrainCounts, type MapDraft, type Stroke } from './mapModel'
 import { drawMap, renderTerrain } from './mapRender'
 import { MIN_POINTS, insertPoint, movePoint, nearestOnShape, outVector, removePoint, setHandle, snapVertex, toggleSmooth, translateShape, type Pen } from './mapShapes'
-import { cellAt, fitView, nearestCell, panBy, zoomAt, type MapView } from './mapView'
+import { cellAt, fitView, measureText, nearestCell, panBy, pathLength, zoomAt, type MapView } from './mapView'
 
-export type MapTool = 'select' | 'brush' | 'fill' | 'pick' | 'symbol' | 'label' | 'line' | 'region' | 'hand'
+export type MapTool = 'select' | 'brush' | 'fill' | 'pick' | 'symbol' | 'label' | 'line' | 'region' | 'measure' | 'hand'
 
 export interface MapCanvasProps {
   draft: MapDraft
@@ -38,6 +38,10 @@ export interface MapCanvasProps {
   onChangeShape: (shape: MapShape) => void
   // Delete or Backspace on the chosen item.
   onDelete: () => void
+  // A double-click on a place that opens maps: the first of them is opened.
+  onOpenPlace: (mapId: string) => void
+  // What the Measure tool says of the path so far (null when it has none).
+  onMeasure: (text: string | null) => void
   // The cell under the pointer (null off the map), for the status line.
   onHover: (cell: [number, number] | null) => void
   // A try to paint or place where nothing can be put (the layer is hidden or locked).
@@ -61,7 +65,7 @@ const clampTo = (draft: Pick<MapDraft, 'width' | 'height'>, x: number, y: number
 
 // The map as a canvas: paint, stamp, place text and draw lines and regions with the pointer, pick and move things with the Select tool (a chosen shape shows its
 // points and handles to drag; double-click a point to curve or straighten it, a line to put a point in), wheel to zoom at the pointer, drag with the Hand tool (or
-// the middle or right button) to pan. Arrow keys move the chosen item (or point) by a cell, Delete removes it, Escape lets go of it.
+// the middle or right button) to pan. The Measure tool adds up the pieces of a path (and says how long it takes at the map's day's travel). Arrow keys move the chosen item (or point) by a cell, Delete removes it, Escape lets go of it.
 export default function MapCanvas(p: MapCanvasProps) {
   const { draft, rev } = p
   const box = useRef<HTMLDivElement | null>(null)
@@ -77,6 +81,9 @@ export default function MapCanvas(p: MapCanvasProps) {
   const [node, setNode] = useState<number | null>(null)
   const [pending, setPending] = useState<Array<[number, number]>>([])
   const [cursor, setCursor] = useState<[number, number] | null>(null)
+  // The Measure tool's path, and where the pointer is on it.
+  const [measure, setMeasure] = useState<Array<[number, number]>>([])
+  const [measureCursor, setMeasureCursor] = useState<[number, number] | null>(null)
   const drag = useRef<Drag>(null)
   const latest = useRef(p)
   latest.current = p
@@ -84,6 +91,8 @@ export default function MapCanvas(p: MapCanvasProps) {
   nodeRef.current = node
   const pendingRef = useRef({ points: pending, cursor })
   pendingRef.current = { points: pending, cursor }
+  const measureRef = useRef({ points: measure, cursor: measureCursor })
+  measureRef.current = { points: measure, cursor: measureCursor }
 
   // The canvas takes the size of its box.
   useEffect(() => {
@@ -118,7 +127,12 @@ export default function MapCanvas(p: MapCanvasProps) {
   // Another thing chosen, another tool, or another map: the chosen point and the line that was being drawn are let go.
   const selectedId = p.selected?.kind === 'shape' ? p.selected.id : null
   useEffect(() => { setNode(null) }, [selectedId, draft.id])
-  useEffect(() => { setPending([]); setCursor(null) }, [p.tool, draft.id])
+  useEffect(() => { setPending([]); setCursor(null); setMeasure([]); setMeasureCursor(null) }, [p.tool, draft.id])
+
+  // What the Measure tool says: the length of the path and the pointer's piece on to it, and how long that takes.
+  const measured = measure.length > 0 ? measureText(pathLength(measureCursor ? [...measure, measureCursor] : measure), draft.cellSize, draft.unit, draft.pace) : null
+  const onMeasure = p.onMeasure
+  useEffect(() => { onMeasure(p.tool === 'measure' ? measured : null) }, [measured, p.tool, onMeasure])
 
   // The terrain bitmap (and the count of each terrain, for the legend) is made again when the cells, the palette or the look change (and while a
   // stroke paints), not when the view moves.
@@ -148,6 +162,7 @@ export default function MapCanvas(p: MapCanvasProps) {
       drawMap(ctx, {
         width: size.width, height: size.height, dpr: window.devicePixelRatio || 1, view: viewRef.current, draft: d.draft, bitmap: bitmap.current,
         showGrid: d.showGrid, ink, selected: d.selected, selectedNode: nodeRef.current,
+        measure: d.tool === 'measure' && measureRef.current.points.length > 0 ? { points: measureRef.current.points, cursor: measureRef.current.cursor, text: measureText(pathLength(measureRef.current.cursor ? [...measureRef.current.points, measureRef.current.cursor] : measureRef.current.points), d.draft.cellSize, d.draft.unit, d.draft.pace) } : null,
         pending: draws && pendingRef.current.points.length > 0 ? { type: d.tool as 'line' | 'region', points: pendingRef.current.points, cursor: pendingRef.current.cursor, pen: d.pen } : null,
         legend: d.draft.legend ? legendEntries(d.draft, counts.current) : null,
         brush: d.tool === 'brush' && hoverRef.current ? brushCells(d.draft, hoverRef.current[0], hoverRef.current[1], d.brushSize).map(i => [i % d.draft.width, Math.floor(i / d.draft.width)] as [number, number]) : [],
@@ -156,7 +171,7 @@ export default function MapCanvas(p: MapCanvasProps) {
   }, [size])
   // (The legend counts terrain, so it is counted when the legend is turned on; the symbols it lists are read at every draw.)
   useEffect(() => { if (draft.legend) stale.current = true }, [draft.legend])
-  useEffect(() => { draw() }, [draw, view, rev, draft, p.showGrid, p.tool, p.brushSize, p.selected, p.pen, hover, node, pending, cursor])
+  useEffect(() => { draw() }, [draw, view, rev, draft, p.showGrid, p.tool, p.brushSize, p.selected, p.pen, hover, node, pending, cursor, measure, measureCursor])
   useEffect(() => () => { if (frame.current) { cancelAnimationFrame(frame.current); frame.current = 0 } }, [])
 
   // The wheel zooms at the pointer (a listener of its own: React's wheel handler cannot stop the page scrolling).
@@ -261,6 +276,13 @@ export default function MapCanvas(p: MapCanvasProps) {
       }
       return
     }
+    if (p.tool === 'measure') {
+      if (!cell) return
+      const at = snapPoint(fx, fy, e.altKey)
+      const last = measure[measure.length - 1]
+      if (!last || Math.hypot(last[0] - at[0], last[1] - at[1]) > 1e-6) setMeasure(list => [...list, at])
+      return
+    }
     if (p.tool === 'line' || p.tool === 'region') {
       if (!cell) return
       const at = shapePoint(fx, fy, e.altKey)
@@ -338,6 +360,10 @@ export default function MapCanvas(p: MapCanvasProps) {
     const cell = cellAt(view, px, py, draft.width, draft.height)
     setHover(prev => (prev && cell && prev[0] === cell[0] && prev[1] === cell[1] ? prev : cell))
     p.onHover(cell)
+    if (p.tool === 'measure' && measure.length > 0) {
+      const [fx, fy] = placeOf(px, py)
+      setMeasureCursor(snapPoint(fx, fy, e.altKey))
+    }
     if ((p.tool === 'line' || p.tool === 'region') && pending.length > 0) {
       const [fx, fy] = placeOf(px, py)
       setCursor(shapePoint(fx, fy, e.altKey))
@@ -363,9 +389,16 @@ export default function MapCanvas(p: MapCanvasProps) {
   function onDoubleClick(e: React.MouseEvent<HTMLCanvasElement>) {
     if (p.tool === 'line' || p.tool === 'region') { finishDrawing(); return }
     if (p.tool !== 'select') return
+    const { px, py } = point(e)
+    // A place that opens a map: the double-click opens it.
+    const [dx, dy] = placeOf(px, py)
+    const here = hitItem(draft, dx, dy)
+    if (here?.kind === 'symbol') {
+      const sym = draft.symbols.find(y => y.id === here.id)
+      if (sym && sym.mapIds.length > 0) { p.onOpenPlace(sym.mapIds[0]); return }
+    }
     const shape = chosenShape()
     if (!shape) return
-    const { px, py } = point(e)
     const grab = grabbed(shape, px, py)
     if (grab?.kind === 'node') { p.onChangeShape(toggleSmooth(shape, grab.i)); setNode(grab.i); return }
     const [fx, fy] = placeOf(px, py)
@@ -377,6 +410,11 @@ export default function MapCanvas(p: MapCanvasProps) {
   }
 
   function onKeyDown(e: React.KeyboardEvent<HTMLCanvasElement>) {
+    if (p.tool === 'measure') {
+      if (e.key === 'Escape') { setMeasure([]); setMeasureCursor(null) }
+      else if (e.key === 'Backspace' || e.key === 'Delete') { e.preventDefault(); setMeasure(list => list.slice(0, -1)) }
+      return
+    }
     if (p.tool === 'line' || p.tool === 'region') {
       if (e.key === 'Enter') { e.preventDefault(); finishDrawing() }
       else if (e.key === 'Escape') { setPending([]); setCursor(null) }
