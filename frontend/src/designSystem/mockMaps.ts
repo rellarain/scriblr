@@ -1,4 +1,4 @@
-import type { MapCreate, MapDoc, MapKind, MapSummary } from '../api/types'
+import type { MapCreate, MapDoc, MapKind, MapShape, MapSummary } from '../api/types'
 import { MAP_MAX_SIDE } from '../api/types'
 import type { MockAnswer } from './mockPresets'
 
@@ -34,7 +34,7 @@ export function newMap(id: string, body: MapCreate, order: number): MapDoc {
     cellSize: body.cellSize ?? 1, unit: body.unit?.trim() || 'cells',
     terrains: SETS[kind].map(([tid, name, color]) => ({ id: tid, name, color, builtIn: true })),
     layers: LAYERS.map(([lid, name]) => ({ id: lid, name, kind: lid as MapDoc['layers'][number]['kind'], visible: true, locked: false })),
-    cells: [0, width * height], symbols: [], labels: [], theme: body.theme ?? 'modern', scaleBar: true, compass: true, legend: false, updatedAt: AT,
+    cells: [0, width * height], symbols: [], labels: [], shapes: [], theme: body.theme ?? 'modern', scaleBar: true, compass: true, legend: false, updatedAt: AT,
   }
 }
 
@@ -126,6 +126,15 @@ export function seedMaps(): MapDoc[] {
     { id: 'lbl_a', layerId: 'labels', text: 'Port Veyra', x: 11.5, y: 6.7, size: 1.2 },
     { id: 'lbl_b', layerId: 'labels', text: 'The Spine', x: 21.5, y: 8.8, size: 1.1 },
     { id: 'lbl_c', layerId: 'labels', text: 'Sea of Glass', x: 4.5, y: 3.2, size: 1.3 },
+  ]
+  const pt = (x: number, y: number, smooth = true) => ({ x, y, smooth, hx: null, hy: null })
+  const shape = (id: string, type: 'line' | 'region', points: ReturnType<typeof pt>[], over: Partial<MapShape> = {}): MapShape =>
+    ({ id, layerId: 'shapes', type, points, style: 'solid', color: null, width: 0.25, fill: null, opacity: 0.35, pattern: 'solid', ...over })
+  world.shapes = [
+    shape('shp_a', 'region', [pt(14, 11.5, false), pt(17.5, 10.5, false), pt(19, 13.5, false), pt(15.5, 15, false)], { fill: '#4f8a4a', opacity: 0.4, pattern: 'dots', color: '#2f5f2c', width: 0.15 }),
+    shape('shp_b', 'line', [pt(22, 5), pt(19.5, 7.5), pt(17, 8), pt(14, 7.5), pt(11.5, 9.5), pt(9, 9)], { color: '#3b6ea5', width: 0.35 }),
+    shape('shp_c', 'line', [pt(11.5, 8.5), pt(13, 10), pt(15, 10.5), pt(17.5, 9)], { style: 'road', color: '#6b4a2b', width: 0.3 }),
+    shape('shp_d', 'line', [pt(3, 2, false), pt(8, 4.5, false), pt(6.5, 8, false)], { style: 'dashed', width: 0.16 }),
   ]
   const town = newMap('map_town', { title: 'Port Veyra', kind: 'town', width: 24, height: 16, cellSize: 10, unit: 'paces', parentId: 'map_world' }, 0)
   return [world, town]

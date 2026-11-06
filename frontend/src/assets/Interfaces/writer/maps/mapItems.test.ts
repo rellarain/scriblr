@@ -16,7 +16,7 @@ const doc = (): MapDoc => ({
     { id: 'symbols', name: 'Symbols', kind: 'symbols', visible: true, locked: false },
     { id: 'labels', name: 'Labels', kind: 'labels', visible: true, locked: false },
   ],
-  cells: [0, 200], symbols: [], labels: [], theme: 'modern', scaleBar: true, compass: true, legend: false, updatedAt: '2026-01-01T00:00:00Z',
+  cells: [0, 200], symbols: [], labels: [], shapes: [], theme: 'modern', scaleBar: true, compass: true, legend: false, updatedAt: '2026-01-01T00:00:00Z',
 })
 const draft = (): MapDraft => draftOf(doc())
 const ids = (...seed: string[]) => { let n = 0; return () => seed[n++] ?? `x${n}` }

@@ -1,11 +1,13 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
+import type { MapShape } from '../../../../api/types'
 import { FitIcon, ZoomInIcon, ZoomOutIcon } from '../../../icons'
-import { findItem, hitItem, legendEntries, movedItem, snapPoint, type ItemRef } from './mapItems'
+import { findItem, hitItem, legendEntries, movedItem, snapPoint, withShape, type ItemRef } from './mapItems'
 import { brushCells, cellIndex, terrainCounts, type MapDraft, type Stroke } from './mapModel'
 import { drawMap, renderTerrain } from './mapRender'
+import { MIN_POINTS, insertPoint, movePoint, nearestOnShape, outVector, removePoint, setHandle, snapVertex, toggleSmooth, translateShape, type Pen } from './mapShapes'
 import { cellAt, fitView, nearestCell, panBy, zoomAt, type MapView } from './mapView'
 
-export type MapTool = 'select' | 'brush' | 'fill' | 'pick' | 'symbol' | 'label' | 'hand'
+export type MapTool = 'select' | 'brush' | 'fill' | 'pick' | 'symbol' | 'label' | 'line' | 'region' | 'hand'
 
 export interface MapCanvasProps {
   draft: MapDraft
@@ -15,7 +17,9 @@ export interface MapCanvasProps {
   terrain: number
   brushSize: number
   showGrid: boolean
-  // The chosen symbol or label (the pointer's Select tool picks one, and moves it).
+  // What new lines and regions are drawn with.
+  pen: Pen
+  // The chosen symbol, label or shape (the Select tool picks one, and moves it).
   selected: ItemRef | null
   onSelect: (ref: ItemRef | null) => void
   // Paint: begin a stroke (null when the terrain layer is hidden or locked), end it, fill an area, pick up a terrain.
@@ -25,9 +29,13 @@ export interface MapCanvasProps {
   onPick: (terrain: number) => void
   // Stamp a symbol or put a label at a point (in cells); false when there is no layer to put it on (hidden or locked).
   onPlace: (kind: 'symbol' | 'label', x: number, y: number) => boolean
+  // A line or region was drawn (its points, in cells); false when there is no layer to put it on.
+  onFinishShape: (type: 'line' | 'region', points: Array<[number, number]>) => boolean
   // A drag of an item is shown as it goes (a draft with the item moved) and is handed over, before and after, when it ends: one undo step.
   onPreview: (next: MapDraft) => void
   onCommitMove: (before: MapDraft, after: MapDraft) => void
+  // A shape was changed in one step (a point put in, taken away or made smooth).
+  onChangeShape: (shape: MapShape) => void
   // Delete or Backspace on the chosen item.
   onDelete: () => void
   // The cell under the pointer (null off the map), for the status line.
@@ -37,9 +45,23 @@ export interface MapCanvasProps {
 }
 
 const FALLBACK_SIZE = { width: 800, height: 520 }
+// How close, in pixels, the pointer has to be to a point or a handle of the chosen shape to take it.
+const GRAB_PX = 9
 
-// The map as a canvas: paint or stamp with the pointer, pick and move things with the Select tool, wheel to zoom at the pointer, drag with the Hand tool
-// (or the middle or right button) to pan. Arrow keys move the chosen item by a cell, Delete removes it, Escape lets go of it.
+type Drag =
+  | { kind: 'stroke'; stroke: Stroke; last: [number, number] }
+  | { kind: 'pan'; x: number; y: number }
+  | { kind: 'move'; ref: ItemRef; before: MapDraft; current: MapDraft; dx: number; dy: number }
+  | { kind: 'shape'; id: string; before: MapDraft; current: MapDraft; fx: number; fy: number }
+  | { kind: 'node'; id: string; i: number; before: MapDraft; current: MapDraft }
+  | { kind: 'handle'; id: string; i: number; sign: 1 | -1; before: MapDraft; current: MapDraft }
+  | null
+
+const clampTo = (draft: Pick<MapDraft, 'width' | 'height'>, x: number, y: number): [number, number] => [Math.min(draft.width, Math.max(0, x)), Math.min(draft.height, Math.max(0, y))]
+
+// The map as a canvas: paint, stamp, place text and draw lines and regions with the pointer, pick and move things with the Select tool (a chosen shape shows its
+// points and handles to drag; double-click a point to curve or straighten it, a line to put a point in), wheel to zoom at the pointer, drag with the Hand tool (or
+// the middle or right button) to pan. Arrow keys move the chosen item (or point) by a cell, Delete removes it, Escape lets go of it.
 export default function MapCanvas(p: MapCanvasProps) {
   const { draft, rev } = p
   const box = useRef<HTMLDivElement | null>(null)
@@ -51,14 +73,17 @@ export default function MapCanvas(p: MapCanvasProps) {
   const viewRef = useRef(view)
   viewRef.current = view
   const [hover, setHover] = useState<[number, number] | null>(null)
-  const drag = useRef<
-    | { kind: 'stroke'; stroke: Stroke; last: [number, number] }
-    | { kind: 'pan'; x: number; y: number }
-    | { kind: 'move'; ref: ItemRef; before: MapDraft; current: MapDraft; dx: number; dy: number }
-    | null
-  >(null)
+  // The chosen point of the chosen shape, and the line or region that is being drawn (its clicked points and where the pointer is).
+  const [node, setNode] = useState<number | null>(null)
+  const [pending, setPending] = useState<Array<[number, number]>>([])
+  const [cursor, setCursor] = useState<[number, number] | null>(null)
+  const drag = useRef<Drag>(null)
   const latest = useRef(p)
   latest.current = p
+  const nodeRef = useRef(node)
+  nodeRef.current = node
+  const pendingRef = useRef({ points: pending, cursor })
+  pendingRef.current = { points: pending, cursor }
 
   // The canvas takes the size of its box.
   useEffect(() => {
@@ -90,6 +115,11 @@ export default function MapCanvas(p: MapCanvasProps) {
     else if (!byHand.current) fit()
   }, [draft.id, draft.width, draft.height, size, fit])
 
+  // Another thing chosen, another tool, or another map: the chosen point and the line that was being drawn are let go.
+  const selectedId = p.selected?.kind === 'shape' ? p.selected.id : null
+  useEffect(() => { setNode(null) }, [selectedId, draft.id])
+  useEffect(() => { setPending([]); setCursor(null) }, [p.tool, draft.id])
+
   // The terrain bitmap (and the count of each terrain, for the legend) is made again when the cells, the palette or the look change (and while a
   // stroke paints), not when the view moves.
   const stale = useRef(true)
@@ -114,9 +144,11 @@ export default function MapCanvas(p: MapCanvasProps) {
         stale.current = false
       }
       const ink = box.current ? getComputedStyle(box.current).color : '#000000'
+      const draws = d.tool === 'line' || d.tool === 'region'
       drawMap(ctx, {
         width: size.width, height: size.height, dpr: window.devicePixelRatio || 1, view: viewRef.current, draft: d.draft, bitmap: bitmap.current,
-        showGrid: d.showGrid, ink, selected: d.selected,
+        showGrid: d.showGrid, ink, selected: d.selected, selectedNode: nodeRef.current,
+        pending: draws && pendingRef.current.points.length > 0 ? { type: d.tool as 'line' | 'region', points: pendingRef.current.points, cursor: pendingRef.current.cursor, pen: d.pen } : null,
         legend: d.draft.legend ? legendEntries(d.draft, counts.current) : null,
         brush: d.tool === 'brush' && hoverRef.current ? brushCells(d.draft, hoverRef.current[0], hoverRef.current[1], d.brushSize).map(i => [i % d.draft.width, Math.floor(i / d.draft.width)] as [number, number]) : [],
       })
@@ -124,7 +156,7 @@ export default function MapCanvas(p: MapCanvasProps) {
   }, [size])
   // (The legend counts terrain, so it is counted when the legend is turned on; the symbols it lists are read at every draw.)
   useEffect(() => { if (draft.legend) stale.current = true }, [draft.legend])
-  useEffect(() => { draw() }, [draw, view, rev, draft, p.showGrid, p.tool, p.brushSize, p.selected, hover])
+  useEffect(() => { draw() }, [draw, view, rev, draft, p.showGrid, p.tool, p.brushSize, p.selected, p.pen, hover, node, pending, cursor])
   useEffect(() => () => { if (frame.current) { cancelAnimationFrame(frame.current); frame.current = 0 } }, [])
 
   // The wheel zooms at the pointer (a listener of its own: React's wheel handler cannot stop the page scrolling).
@@ -141,12 +173,49 @@ export default function MapCanvas(p: MapCanvasProps) {
     return () => el.removeEventListener('wheel', onWheel)
   }, [])
 
-  const point = (e: React.PointerEvent) => {
+  const point = (e: { clientX: number; clientY: number; currentTarget: EventTarget }) => {
     const r = (e.currentTarget as HTMLElement).getBoundingClientRect()
     return { px: e.clientX - r.left, py: e.clientY - r.top }
   }
   // A point of the canvas as a place on the map, in cells (not rounded).
   const placeOf = (px: number, py: number): [number, number] => [(px - view.x) / view.zoom, (py - view.y) / view.zoom]
+  const screenOf = (x: number, y: number): [number, number] => [view.x + x * view.zoom, view.y + y * view.zoom]
+  // A point of a shape as drawn: snapped to the grid (corners and cell centres) unless Alt is held, and held to the map.
+  const shapePoint = (fx: number, fy: number, free: boolean): [number, number] => {
+    const [x, y] = free ? [fx, fy] : snapVertex(fx, fy)
+    return clampTo(draft, x, y)
+  }
+
+  const chosenShape = (): MapShape | null => {
+    const ref = latest.current.selected
+    return ref?.kind === 'shape' ? latest.current.draft.shapes.find(s => s.id === ref.id) ?? null : null
+  }
+
+  // The point or handle of the chosen shape under a canvas point, if any.
+  function grabbed(shape: MapShape, px: number, py: number): { kind: 'node'; i: number } | { kind: 'handle'; i: number; sign: 1 | -1 } | null {
+    const closed = shape.type === 'region'
+    for (let i = 0; i < shape.points.length; i += 1) {
+      const [sx, sy] = screenOf(shape.points[i].x, shape.points[i].y)
+      if (Math.abs(px - sx) <= GRAB_PX && Math.abs(py - sy) <= GRAB_PX) return { kind: 'node', i }
+    }
+    for (let i = 0; i < shape.points.length; i += 1) {
+      const pt = shape.points[i]
+      if (!pt.smooth) continue
+      const [vx, vy] = outVector(shape.points, i, closed)
+      for (const sign of [1, -1] as const) {
+        const [hx, hy] = screenOf(pt.x + sign * vx, pt.y + sign * vy)
+        if (Math.hypot(px - hx, py - hy) <= GRAB_PX) return { kind: 'handle', i, sign }
+      }
+    }
+    return null
+  }
+
+  function finishDrawing() {
+    const type = p.tool === 'region' ? 'region' : 'line'
+    const points = pending
+    setPending([]); setCursor(null)
+    if (points.length >= MIN_POINTS[type] && !p.onFinishShape(type, points)) p.onBlocked()
+  }
 
   function onPointerDown(e: React.PointerEvent<HTMLCanvasElement>) {
     if (!size) return
@@ -163,13 +232,41 @@ export default function MapCanvas(p: MapCanvasProps) {
     const cell = cellAt(view, px, py, draft.width, draft.height)
     const [fx, fy] = placeOf(px, py)
     if (p.tool === 'select') {
+      const shape = chosenShape()
+      const grab = shape ? grabbed(shape, px, py) : null
+      if (shape && grab?.kind === 'node') {
+        setNode(grab.i)
+        drag.current = { kind: 'node', id: shape.id, i: grab.i, before: draft, current: draft }
+        e.currentTarget.setPointerCapture?.(e.pointerId)
+        return
+      }
+      if (shape && grab?.kind === 'handle') {
+        setNode(grab.i)
+        drag.current = { kind: 'handle', id: shape.id, i: grab.i, sign: grab.sign, before: draft, current: draft }
+        e.currentTarget.setPointerCapture?.(e.pointerId)
+        return
+      }
       const hit = hitItem(draft, fx, fy)
       p.onSelect(hit)
+      if (hit?.kind === 'shape') {
+        setNode(null)
+        drag.current = { kind: 'shape', id: hit.id, before: draft, current: draft, fx, fy }
+        e.currentTarget.setPointerCapture?.(e.pointerId)
+        return
+      }
       const item = hit ? findItem(draft, hit) : undefined
-      if (hit && item) {
+      if (hit && item && 'x' in item) {
         drag.current = { kind: 'move', ref: hit, before: draft, current: draft, dx: fx - item.x, dy: fy - item.y }
         e.currentTarget.setPointerCapture?.(e.pointerId)
       }
+      return
+    }
+    if (p.tool === 'line' || p.tool === 'region') {
+      if (!cell) return
+      const at = shapePoint(fx, fy, e.altKey)
+      const last = pending[pending.length - 1]
+      // (A double-click is two presses in one place: the second is not another point.)
+      if (!last || Math.hypot(last[0] - at[0], last[1] - at[1]) > 1e-6) setPending(list => [...list, at])
       return
     }
     if (!cell) return
@@ -218,9 +315,33 @@ export default function MapCanvas(p: MapCanvasProps) {
       p.onPreview(d.current)
       return
     }
+    if (d && (d.kind === 'shape' || d.kind === 'node' || d.kind === 'handle')) {
+      const shape = d.before.shapes.find(s => s.id === d.id)
+      if (!shape) return
+      const [fx, fy] = placeOf(px, py)
+      let next: MapShape
+      if (d.kind === 'node') {
+        const [sx, sy] = shapePoint(fx, fy, e.altKey)
+        next = movePoint(shape, d.i, sx, sy)
+      } else if (d.kind === 'handle') {
+        const pt = shape.points[d.i]
+        // Dragging the far end of a handle is dragging the near end from the other side.
+        next = setHandle(shape, d.i, d.sign === 1 ? fx : 2 * pt.x - fx, d.sign === 1 ? fy : 2 * pt.y - fy)
+      } else {
+        const snap = (n: number) => (e.altKey ? n : Math.round(n * 2) / 2)
+        next = translateShape(shape, snap(fx - d.fx), snap(fy - d.fy), draft.width, draft.height)
+      }
+      d.current = withShape(d.before, next)
+      p.onPreview(d.current)
+      return
+    }
     const cell = cellAt(view, px, py, draft.width, draft.height)
     setHover(prev => (prev && cell && prev[0] === cell[0] && prev[1] === cell[1] ? prev : cell))
     p.onHover(cell)
+    if ((p.tool === 'line' || p.tool === 'region') && pending.length > 0) {
+      const [fx, fy] = placeOf(px, py)
+      setCursor(shapePoint(fx, fy, e.altKey))
+    }
   }
 
   function finish(e: React.PointerEvent<HTMLCanvasElement>) {
@@ -228,7 +349,7 @@ export default function MapCanvas(p: MapCanvasProps) {
     drag.current = null
     e.currentTarget.releasePointerCapture?.(e.pointerId)
     if (d?.kind === 'stroke') p.onEndStroke(d.stroke)
-    else if (d?.kind === 'move' && d.current !== d.before) p.onCommitMove(d.before, d.current)
+    else if (d && d.kind !== 'pan' && d.current !== d.before) p.onCommitMove(d.before, d.current)
   }
 
   function leave() {
@@ -237,16 +358,63 @@ export default function MapCanvas(p: MapCanvasProps) {
     p.onHover(null)
   }
 
+  // Double-click: finishes a line or region being drawn; with the Select tool, on a point of the chosen shape it curves or straightens it, and on its
+  // line it puts a point in.
+  function onDoubleClick(e: React.MouseEvent<HTMLCanvasElement>) {
+    if (p.tool === 'line' || p.tool === 'region') { finishDrawing(); return }
+    if (p.tool !== 'select') return
+    const shape = chosenShape()
+    if (!shape) return
+    const { px, py } = point(e)
+    const grab = grabbed(shape, px, py)
+    if (grab?.kind === 'node') { p.onChangeShape(toggleSmooth(shape, grab.i)); setNode(grab.i); return }
+    const [fx, fy] = placeOf(px, py)
+    const near = nearestOnShape(shape, fx, fy)
+    if (near && near.dist * view.zoom <= GRAB_PX + (shape.width * view.zoom) / 2) {
+      const more = insertPoint(shape, near.seg, near.t)
+      if (more) { p.onChangeShape(more); setNode(near.seg + 1) }
+    }
+  }
+
   function onKeyDown(e: React.KeyboardEvent<HTMLCanvasElement>) {
+    if (p.tool === 'line' || p.tool === 'region') {
+      if (e.key === 'Enter') { e.preventDefault(); finishDrawing() }
+      else if (e.key === 'Escape') { setPending([]); setCursor(null) }
+      else if (e.key === 'Backspace' || e.key === 'Delete') { e.preventDefault(); setPending(list => list.slice(0, -1)) }
+      return
+    }
     const ref = p.selected
     if (!ref) return
-    if (e.key === 'Delete' || e.key === 'Backspace') { e.preventDefault(); p.onDelete(); return }
-    if (e.key === 'Escape') { p.onSelect(null); return }
+    const shape = chosenShape()
+    if (e.key === 'Delete' || e.key === 'Backspace') {
+      e.preventDefault()
+      // With a point chosen, it is the point that goes (the shape keeps its fewest); otherwise the whole thing.
+      if (shape && node !== null) {
+        const less = removePoint(shape, node)
+        if (less) { p.onChangeShape(less); setNode(null) }
+        return
+      }
+      p.onDelete()
+      return
+    }
+    if (e.key === 'Escape') { if (node !== null) setNode(null); else p.onSelect(null); return }
     const step = e.shiftKey ? 0.25 : 1
     const by: Record<string, [number, number]> = { ArrowLeft: [-step, 0], ArrowRight: [step, 0], ArrowUp: [0, -step], ArrowDown: [0, step] }
     const move = by[e.key]
+    if (!move) return
+    if (shape) {
+      e.preventDefault()
+      if (node !== null) {
+        const pt = shape.points[node]
+        const [nx, ny] = clampTo(draft, pt.x + move[0], pt.y + move[1])
+        p.onCommitMove(draft, withShape(draft, movePoint(shape, node, nx, ny)))
+      } else {
+        p.onCommitMove(draft, withShape(draft, translateShape(shape, move[0], move[1], draft.width, draft.height)))
+      }
+      return
+    }
     const item = findItem(draft, ref)
-    if (move && item) {
+    if (item && 'x' in item) {
       e.preventDefault()
       p.onCommitMove(draft, movedItem(draft, ref, item.x + move[0], item.y + move[1]))
     }
@@ -257,7 +425,7 @@ export default function MapCanvas(p: MapCanvasProps) {
     if (size) setView(v => zoomAt(v, factor, size.width / 2, size.height / 2))
   }
 
-  const cursor = p.tool === 'hand' ? (drag.current?.kind === 'pan' ? 'grabbing' : 'grab')
+  const cursorStyle = p.tool === 'hand' ? (drag.current?.kind === 'pan' ? 'grabbing' : 'grab')
     : p.tool === 'select' ? 'default' : p.tool === 'pick' || p.tool === 'fill' ? 'copy' : 'crosshair'
 
   return (
@@ -267,9 +435,9 @@ export default function MapCanvas(p: MapCanvasProps) {
         aria-label={`${draft.title}, a map ${draft.width} by ${draft.height} cells`}
         width={size ? Math.round(size.width * (window.devicePixelRatio || 1)) : undefined}
         height={size ? Math.round(size.height * (window.devicePixelRatio || 1)) : undefined}
-        style={{ width: size?.width, height: size?.height, cursor }}
+        style={{ width: size?.width, height: size?.height, cursor: cursorStyle }}
         onPointerDown={onPointerDown} onPointerMove={onPointerMove} onPointerUp={finish} onPointerCancel={finish} onPointerLeave={leave}
-        onKeyDown={onKeyDown} onContextMenu={e => e.preventDefault()}
+        onDoubleClick={onDoubleClick} onKeyDown={onKeyDown} onContextMenu={e => e.preventDefault()}
       />
       <div className="mapZoom" role="group" aria-label="View">
         <button type="button" className="mapIconBtn" aria-label="Zoom in" title="Zoom in" onClick={() => zoomBy(1.5)}><ZoomInIcon size={18} /></button>

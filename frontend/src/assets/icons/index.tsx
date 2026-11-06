@@ -949,3 +949,24 @@ export function StampIcon(props: IconProps) {
     <path d="M5 15h14v2H5ZM6 20h12" />
   </IconBase>
 }
+
+// A curved line with a point at each end: draw a line.
+export function PathIcon(props: IconProps) {
+  return <IconBase {...props}>
+    <path d="M4 18C4 8 12 18 12 11S20 6 20 6" />
+    <circle cx="4" cy="18" r="1.6" fill="currentColor" />
+    <circle cx="20" cy="6" r="1.6" fill="currentColor" />
+  </IconBase>
+}
+
+// A polygon with a point at each corner: draw a region.
+export function PolygonIcon(props: IconProps) {
+  return <IconBase {...props}>
+    <path d="M5 8l9-3 5 7-4 7-9-2Z" />
+    <circle cx="5" cy="8" r="1.4" fill="currentColor" />
+    <circle cx="14" cy="5" r="1.4" fill="currentColor" />
+    <circle cx="19" cy="12" r="1.4" fill="currentColor" />
+    <circle cx="15" cy="19" r="1.4" fill="currentColor" />
+    <circle cx="6" cy="17" r="1.4" fill="currentColor" />
+  </IconBase>
+}

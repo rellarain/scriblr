@@ -304,7 +304,7 @@ export function addLayer(draft: MapDraft, kind: Exclude<MapLayerKind, 'terrain'>
 export function removeLayer(draft: MapDraft, id: string): Change {
   const layer = draft.layers.find(l => l.id === id)
   if (!layer || layer.kind === 'terrain') return null
-  return change(draft, { layers: draft.layers.filter(l => l.id !== id), symbols: draft.symbols.filter(i => i.layerId !== id), labels: draft.labels.filter(i => i.layerId !== id) })
+  return change(draft, { layers: draft.layers.filter(l => l.id !== id), symbols: draft.symbols.filter(i => i.layerId !== id), labels: draft.labels.filter(i => i.layerId !== id), shapes: draft.shapes.filter(i => i.layerId !== id) })
 }
 
 // Whether the terrain can be painted now: its layer is shown and not locked.

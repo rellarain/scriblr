@@ -280,3 +280,84 @@ def test_a_map_saved_before_these_fields_loads_with_the_defaults(client: TestCli
     project_store._cache.clear()
     again = client.get(f"/api/projects/{pid}/maps/{doc['id']}").json()
     assert (again["theme"], again["scaleBar"], again["compass"], again["legend"], again["symbols"], again["labels"]) == ("modern", True, True, False, [], [])
+
+
+# ---- lines and regions ----
+
+def _shape(**over) -> dict:
+    return {
+        "id": "sh1", "layerId": "shapes", "type": "line", "points": [{"x": 1, "y": 1}, {"x": 4, "y": 2, "smooth": True, "hx": 1, "hy": 0.5}, {"x": 7, "y": 5}],
+        "style": "road", "color": "#664422", "width": 0.5, "fill": None, "opacity": 0.35, "pattern": "solid", **over,
+    }
+
+
+def test_a_new_map_has_no_shapes(client: TestClient) -> None:
+    pid = _project(client)
+    assert _new(client, pid)["shapes"] == []
+
+
+def test_lines_and_regions_round_trip_with_their_styles_and_handles(client: TestClient) -> None:
+    pid = _project(client)
+    doc = _new(client, pid, width=10, height=8)
+    doc["shapes"] = [
+        _shape(),
+        _shape(id="sh2", type="region", points=[{"x": 1, "y": 1}, {"x": 5, "y": 1}, {"x": 3, "y": 4}], fill="#88aa44", opacity=0.6, pattern="hatch", style="dashed", color=None),
+    ]
+    assert client.put(f"/api/projects/{pid}/maps/{doc['id']}", json=doc).status_code == 200
+    again = client.get(f"/api/projects/{pid}/maps/{doc['id']}").json()
+    first, second = again["shapes"]
+    assert (first["type"], first["style"], first["color"], first["width"]) == ("line", "road", "#664422", 0.5)
+    assert first["points"][1] == {"x": 4.0, "y": 2.0, "smooth": True, "hx": 1.0, "hy": 0.5}
+    assert first["points"][0] == {"x": 1.0, "y": 1.0, "smooth": False, "hx": None, "hy": None}
+    assert (second["type"], second["fill"], second["opacity"], second["pattern"], second["style"], second["color"]) == ("region", "#88aa44", 0.6, "hatch", "dashed", None)
+
+
+def test_odd_shapes_are_repaired_or_dropped_not_refused(client: TestClient) -> None:
+    pid = _project(client)
+    doc = _new(client, pid, width=10, height=8)
+    doc["shapes"] = [
+        _shape(id="ok", style="zigzag", pattern="plaid", color="red", fill="nope", width=99, opacity=7),   # bad words and numbers are put right
+        _shape(id="ok"),                                                                                   # a repeat id
+        _shape(id="few", points=[{"x": 1, "y": 1}]),                                                       # a line needs two points
+        _shape(id="tri", type="region", points=[{"x": 1, "y": 1}, {"x": 2, "y": 2}]),                      # a region needs three
+        _shape(id="gone", layerId="nope"),                                                                 # a layer that is not there
+        _shape(id="wrong", layerId="symbols"),                                                             # a layer of another kind
+        _shape(id="kindless", type=None), _shape(id="weird", type="blob"), "not a shape",
+        _shape(id="far", points=[{"x": -9, "y": 99}, {"x": "x", "y": 2, "smooth": "yes", "hx": 3}]),
+    ]
+    resp = client.put(f"/api/projects/{pid}/maps/{doc['id']}", json=doc)
+    assert resp.status_code == 200, resp.text
+    by_id = {s["id"]: s for s in resp.json()["shapes"]}
+    assert set(by_id) == {"ok", "far"}
+    ok = by_id["ok"]
+    assert (ok["style"], ok["pattern"], ok["color"], ok["fill"], ok["width"], ok["opacity"]) == ("solid", "solid", None, None, 4.0, 1.0)
+    far = by_id["far"]["points"]
+    assert [(p["x"], p["y"]) for p in far] == [(0.0, 8.0), (0.0, 2.0)]   # held to the map; a point that is not a number is the corner
+    assert far[1]["smooth"] is False and far[1]["hx"] is None            # a handle needs both of its numbers
+
+
+def test_a_shape_goes_with_its_layer_and_the_map_holds_at_most_so_many(client: TestClient) -> None:
+    from app.storage.schema import MAP_MAX_SHAPE_POINTS, MAP_MAX_SHAPES
+
+    pid = _project(client)
+    doc = _new(client, pid, width=4, height=4)
+    doc["shapes"] = [_shape(id=f"s{i}", points=[{"x": 1, "y": 1}, {"x": 2, "y": 2}]) for i in range(MAP_MAX_SHAPES + 5)]
+    saved = client.put(f"/api/projects/{pid}/maps/{doc['id']}", json=doc).json()
+    assert len(saved["shapes"]) == MAP_MAX_SHAPES
+    doc["shapes"] = [_shape(points=[{"x": 1, "y": 1}] * (MAP_MAX_SHAPE_POINTS + 50))]
+    assert len(client.put(f"/api/projects/{pid}/maps/{doc['id']}", json=doc).json()["shapes"][0]["points"]) == MAP_MAX_SHAPE_POINTS
+    doc["layers"] = [layer for layer in doc["layers"] if layer["id"] != "shapes"]
+    assert client.put(f"/api/projects/{pid}/maps/{doc['id']}", json=doc).json()["shapes"] == []
+
+
+def test_a_map_saved_before_shapes_loads_without_them(client: TestClient, storage_root: Path) -> None:
+    pid = _project(client)
+    doc = _new(client, pid)
+    path = storage_root / pid / "project.json"
+    raw = json.loads(path.read_text(encoding="utf-8"))
+    raw["maps"][doc["id"]].pop("shapes", None)
+    path.write_text(json.dumps(raw), encoding="utf-8")
+    from app.storage import project_store
+
+    project_store._cache.clear()
+    assert client.get(f"/api/projects/{pid}/maps/{doc['id']}").json()["shapes"] == []

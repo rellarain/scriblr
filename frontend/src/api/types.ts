@@ -421,6 +421,19 @@ export type MapThemeName = 'parchment' | 'modern' | 'night' | 'blueprint'
 export interface MapSymbol { id: string; layerId: string; kind: string; x: number; y: number; size: number; color: string | null }
 // A line of text centred on a point; `size` is its height in cells.
 export interface MapLabel { id: string; layerId: string; text: string; x: number; y: number; size: number }
+// A point of a line or of a region's outline, in cells. A smooth point is a curve through it; (hx, hy) is its handle, where the curve leaves it relative to
+// the point (it arrives on the other side), or null for the handle the neighbouring points make.
+export interface MapShapePoint { x: number; y: number; smooth: boolean; hx: number | null; hy: number | null }
+export type MapShapeType = 'line' | 'region'
+export type MapLineStyle = 'solid' | 'dashed' | 'dotted' | 'road' | 'wall' | 'fence'
+export type MapPattern = 'solid' | 'hatch' | 'cross' | 'dots'
+// A line (a river, a road, a border, a wall, a fence) or a region (a closed outline, filled). `color` is the line's (null = the look's ink), `width` is in
+// cells; a region's `fill` is null for the line colour, with how solid it is and a pattern over it.
+export interface MapShape {
+  id: string; layerId: string; type: MapShapeType; points: MapShapePoint[]
+  style: MapLineStyle; color: string | null; width: number
+  fill: string | null; opacity: number; pattern: MapPattern
+}
 export interface MapDoc {
   schemaVersion: number
   id: string
@@ -438,6 +451,7 @@ export interface MapDoc {
   cells: number[]
   symbols: MapSymbol[]
   labels: MapLabel[]
+  shapes: MapShape[]
   theme: MapThemeName
   scaleBar: boolean
   compass: boolean

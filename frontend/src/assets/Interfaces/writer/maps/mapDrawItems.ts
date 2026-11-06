@@ -1,4 +1,4 @@
-import type { MapLabel, MapSymbol } from '../../../../api/types'
+import type { MapLabel, MapShape, MapSymbol } from '../../../../api/types'
 import { itemBounds, niceScale, type ItemRef, type LegendEntry } from './mapItems'
 import { SYMBOL_BOX, symbolPath } from './mapSymbols'
 import type { MapThemeDef } from './mapThemes'
@@ -60,7 +60,7 @@ export function drawLabel(ctx: CanvasRenderingContext2D, l: MapLabel, view: MapV
 }
 
 // The chosen item's outline: a dashed box in the ink over a halo of its own, so it shows on any terrain.
-export function drawSelection(ctx: CanvasRenderingContext2D, item: MapSymbol | MapLabel, ref: ItemRef, view: MapView, theme: MapThemeDef) {
+export function drawSelection(ctx: CanvasRenderingContext2D, item: MapSymbol | MapLabel | MapShape, ref: ItemRef, view: MapView, theme: MapThemeDef) {
   const b = itemBounds(item, ref.kind)
   const x = view.x + b.x0 * view.zoom, y = view.y + b.y0 * view.zoom, w = (b.x1 - b.x0) * view.zoom, h = (b.y1 - b.y0) * view.zoom
   ctx.save()

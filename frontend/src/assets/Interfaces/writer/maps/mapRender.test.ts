@@ -1,7 +1,8 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
-import type { MapDoc } from '../../../../api/types'
+import type { MapDoc, MapShape } from '../../../../api/types'
 import { addLabel, addSymbol } from './mapItems'
 import { drawMap, terrainPixels } from './mapRender'
+import { LINE_PRESETS } from './mapShapes'
 import { draftOf, setOverlay, toggleLayer, type MapDraft } from './mapModel'
 
 // A recording stand-in for a canvas context: every call is kept with its arguments, every property can be set, and text is 6 pixels a letter.
@@ -30,10 +31,10 @@ const doc = (): MapDoc => ({
     { id: 'symbols', name: 'Symbols', kind: 'symbols', visible: true, locked: false },
     { id: 'labels', name: 'Labels', kind: 'labels', visible: true, locked: false },
   ],
-  cells: [0, 100, 1, 100], symbols: [], labels: [], theme: 'modern', scaleBar: false, compass: false, legend: false, updatedAt: 'x',
+  cells: [0, 100, 1, 100], symbols: [], labels: [], shapes: [], theme: 'modern', scaleBar: false, compass: false, legend: false, updatedAt: 'x',
 })
 const base = (draft: MapDraft, over: Partial<Parameters<typeof drawMap>[1]> = {}): Parameters<typeof drawMap>[1] => ({
-  width: 800, height: 520, dpr: 1, view: { zoom: 30, x: 40, y: 40 }, draft, bitmap: null, showGrid: false, ink: '#000', brush: [], selected: null, legend: null, ...over,
+  width: 800, height: 520, dpr: 1, view: { zoom: 30, x: 40, y: 40 }, draft, bitmap: null, showGrid: false, ink: '#000', brush: [], selected: null, selectedNode: null, pending: null, legend: null, ...over,
 })
 const withItems = (): MapDraft => {
   let d = draftOf(doc())
@@ -145,5 +146,92 @@ describe('drawing a map', () => {
     drawMap(r.ctx, base(withItems()))
     const names = r.calls.map(([n]) => n)
     expect(names.indexOf('fill')).toBeLessThan(names.indexOf('strokeText'))
+  })
+})
+
+describe('drawing lines and regions', () => {
+  const pt = (x: number, y: number, smooth = false) => ({ x, y, smooth, hx: null, hy: null })
+  const shape = (over: Partial<MapShape>): MapShape => ({ id: 's1', layerId: 'shapes', type: 'line', points: [pt(2, 2), pt(8, 2), pt(8, 6)], style: 'solid', color: null, width: 0.25, fill: null, opacity: 0.35, pattern: 'solid', ...over })
+  const mapWith = (...shapes: MapShape[]): MapDraft => {
+    const d = draftOf(doc())
+    d.layers = [d.layers[0], { id: 'shapes', name: 'Shapes', kind: 'shapes', visible: true, locked: false }, ...d.layers.slice(1)]
+    d.shapes = shapes
+    return d
+  }
+  const strokes = (r: ReturnType<typeof recorder>) => r.count('stroke')
+
+  it('traces straight pieces with lineTo and curves with bezierCurveTo', () => {
+    const straight = recorder()
+    drawMap(straight.ctx, base(mapWith(shape({}))))
+    expect(straight.count('lineTo')).toBe(2)
+    expect(straight.count('bezierCurveTo')).toBe(0)
+    const curved = recorder()
+    drawMap(curved.ctx, base(mapWith(shape({ points: [pt(2, 2, true), pt(8, 2, true), pt(8, 6, true)] }))))
+    expect(curved.count('bezierCurveTo')).toBe(2)
+  })
+
+  it('closes a region and fills it, then outlines it', () => {
+    const r = recorder()
+    drawMap(r.ctx, base(mapWith(shape({ type: 'region', fill: '#88aa44' }))))
+    expect(r.count('closePath')).toBeGreaterThanOrEqual(2)
+    expect(r.count('fill')).toBe(1)
+    expect(strokes(r)).toBe(1)
+  })
+
+  it('draws a pattern over a region inside its outline, with lines for hatching and dots for dots', () => {
+    const hatch = recorder()
+    drawMap(hatch.ctx, base(mapWith(shape({ type: 'region', pattern: 'hatch' }))))
+    expect(hatch.count('clip')).toBe(2) // the map's, and the region's
+    expect(hatch.count('arc')).toBe(0)
+    const cross = recorder(), plain = recorder()
+    drawMap(cross.ctx, base(mapWith(shape({ type: 'region', pattern: 'cross' }))))
+    drawMap(plain.ctx, base(mapWith(shape({ type: 'region', pattern: 'hatch' }))))
+    expect(cross.count('moveTo')).toBeGreaterThan(plain.count('moveTo'))
+    const dots = recorder()
+    drawMap(dots.ctx, base(mapWith(shape({ type: 'region', pattern: 'dots' }))))
+    expect(dots.count('arc')).toBeGreaterThan(5)
+    const solid = recorder()
+    drawMap(solid.ctx, base(mapWith(shape({ type: 'region', pattern: 'solid' }))))
+    expect(solid.count('clip')).toBe(1) // only the clip of the map itself
+  })
+
+  it('strokes each style of line its own way', () => {
+    const count = (style: MapShape['style']) => { const r = recorder(); drawMap(r.ctx, base(mapWith(shape({ style })))); return strokes(r) }
+    expect(count('solid')).toBe(1)
+    expect(count('dashed')).toBe(1)
+    expect(count('dotted')).toBe(1)
+    expect(count('road')).toBe(2) // two edges, and the road between them
+    expect(count('wall')).toBe(2) // the wall, and its crenels
+    expect(count('fence')).toBe(2) // the rail, and the posts
+    const dashes = recorder()
+    drawMap(dashes.ctx, base(mapWith(shape({ style: 'dashed' }))))
+    expect(dashes.calls.some(([n, a]) => n === 'setLineDash' && (a[0] as number[]).length === 2)).toBe(true)
+  })
+
+  it('draws what is on a hidden shapes layer not at all, and the shapes in the order of the layers', () => {
+    const r = recorder()
+    const d = mapWith(shape({}))
+    d.layers = d.layers.map(l => (l.id === 'shapes' ? { ...l, visible: false } : l))
+    drawMap(r.ctx, base(d))
+    expect(r.count('lineTo')).toBe(0)
+  })
+
+  it('draws the points and handles of the chosen shape, and the line that is being drawn', () => {
+    const r = recorder()
+    const d = mapWith(shape({ points: [pt(2, 2, true), pt(8, 2), pt(8, 6)] }))
+    drawMap(r.ctx, base(d, { selected: { kind: 'shape', id: 's1' }, selectedNode: 1 }))
+    // a square for each of the three points (fill and stroke), and the smooth one's two handle dots
+    expect(r.count('fillRect')).toBe(3)
+    expect(r.count('arc')).toBe(2)
+    const pend = recorder()
+    drawMap(pend.ctx, base(mapWith(), { pending: { type: 'line', points: [[2, 2], [4, 3]], cursor: [6, 3], pen: LINE_PRESETS[0].pen } }))
+    expect(pend.count('arc')).toBe(2) // a dot for each clicked point
+    expect(pend.count('lineTo') + pend.count('bezierCurveTo')).toBeGreaterThan(0)
+  })
+
+  it('does not draw a shape with too few points', () => {
+    const r = recorder()
+    drawMap(r.ctx, base(mapWith(shape({ points: [pt(2, 2)] }))))
+    expect(r.count('lineTo')).toBe(0)
   })
 })

@@ -1746,6 +1746,93 @@ class MapLabel(BaseModel):
         return _finite(value, 1.0, 0.25, 16.0)
 
 
+MAP_MAX_SHAPES = 2000
+MAP_MAX_SHAPE_POINTS = 500
+MapShapeType = Literal["line", "region"]
+MapLineStyle = Literal["solid", "dashed", "dotted", "road", "wall", "fence"]
+MapPattern = Literal["solid", "hatch", "cross", "dots"]
+_SHAPE_MIN_POINTS = {"line": 2, "region": 3}
+
+
+class MapShapePoint(BaseModel):
+    """A point of a line or the outline of a region, in cells. A smooth point is a curve through it: `hx`, `hy` is the handle (where the curve leaves it,
+    relative to the point; the curve arrives on the opposite side), or none for the handle the neighbouring points make."""
+
+    x: float = 0.0
+    y: float = 0.0
+    smooth: bool = False
+    hx: Optional[float] = None
+    hy: Optional[float] = None
+
+    @field_validator("x", "y", mode="before")
+    @classmethod
+    def _coordinate(cls, value: Any) -> Any:
+        return _finite(value, 0.0, -1.0, 100000.0)
+
+    @field_validator("smooth", mode="before")
+    @classmethod
+    def _smooth_flag(cls, value: Any) -> Any:
+        return value if isinstance(value, bool) else False
+
+    @field_validator("hx", "hy", mode="before")
+    @classmethod
+    def _handle(cls, value: Any) -> Any:
+        return None if value is None else _finite(value, 0.0, -1000.0, 1000.0)
+
+    @model_validator(mode="after")
+    def _both_or_neither(self) -> "MapShapePoint":
+        if self.hx is None or self.hy is None:
+            self.hx = self.hy = None
+        return self
+
+
+class MapShape(BaseModel):
+    """A line (a river, a road, a border, a wall, a fence) or a region (a closed outline, filled) drawn over the terrain."""
+
+    id: str = Field(min_length=1, max_length=40)
+    layerId: str = Field(min_length=1, max_length=40)
+    type: MapShapeType
+    points: list[MapShapePoint] = Field(default_factory=list)
+    # How the line, or the outline of a region, is drawn: its style, its colour (#rrggbb; none = the map look's ink) and how wide, in cells.
+    style: MapLineStyle = "solid"
+    color: Optional[str] = None
+    width: float = 0.25
+    # A region's fill: its colour (none = the line colour), how solid it is (0-1) and a pattern over it.
+    fill: Optional[str] = None
+    opacity: float = 0.35
+    pattern: MapPattern = "solid"
+
+    @field_validator("points", mode="before")
+    @classmethod
+    def _points_read(cls, value: Any) -> Any:
+        return _valid_items(value, MapShapePoint)[:MAP_MAX_SHAPE_POINTS]
+
+    @field_validator("style", mode="before")
+    @classmethod
+    def _style_or_solid(cls, value: Any) -> Any:
+        return value if value in ("solid", "dashed", "dotted", "road", "wall", "fence") else "solid"
+
+    @field_validator("pattern", mode="before")
+    @classmethod
+    def _pattern_or_solid(cls, value: Any) -> Any:
+        return value if value in ("solid", "hatch", "cross", "dots") else "solid"
+
+    @field_validator("color", "fill", mode="before")
+    @classmethod
+    def _color_or_none(cls, value: Any) -> Any:
+        return value if isinstance(value, str) and _MAP_HEX_COLOR.match(value) else None
+
+    @field_validator("width", mode="before")
+    @classmethod
+    def _width(cls, value: Any) -> Any:
+        return _finite(value, 0.25, 0.05, 4.0)
+
+    @field_validator("opacity", mode="before")
+    @classmethod
+    def _opacity(cls, value: Any) -> Any:
+        return _finite(value, 0.35, 0.0, 1.0)
+
+
 def _valid_items(value: Any, model: Any) -> list[Any]:
     """The items of a list that read as `model`; one that does not is dropped, so it cannot refuse the whole map."""
     out: list[Any] = []
@@ -1777,6 +1864,8 @@ class MapDoc(BaseModel):
     # The stamps and the text on the map, each on a layer of the matching kind (symbols, labels).
     symbols: list[MapSymbol] = Field(default_factory=list)
     labels: list[MapLabel] = Field(default_factory=list)
+    # The lines and regions drawn over the terrain, each on a layer of the kind `shapes`.
+    shapes: list[MapShape] = Field(default_factory=list)
     # The look of the map (how the terrain colours and the text are drawn) and what is drawn over it.
     theme: MapThemeName = "modern"
     scaleBar: bool = True
@@ -1793,6 +1882,11 @@ class MapDoc(BaseModel):
     @classmethod
     def _labels_read(cls, value: Any) -> Any:
         return _valid_items(value, MapLabel)
+
+    @field_validator("shapes", mode="before")
+    @classmethod
+    def _shapes_read(cls, value: Any) -> Any:
+        return _valid_items(value, MapShape)
 
     @field_validator("theme", mode="before")
     @classmethod
@@ -1847,7 +1941,25 @@ class MapDoc(BaseModel):
         self.cells = repair_map_runs(self.cells, self.width * self.height, len(terrains))
         self.symbols = self._kept(self.symbols, "symbols", MAP_MAX_SYMBOLS)
         self.labels = self._kept(self.labels, "labels", MAP_MAX_LABELS)
+        self.shapes = self._kept_shapes()
         return self
+
+    def _kept_shapes(self) -> list[MapShape]:
+        """The shapes that sit on a shapes layer and have enough points (2 for a line, 3 for a region), each id once, at most MAP_MAX_SHAPES, held to the map."""
+        layer_ids = {layer.id for layer in self.layers if layer.kind == "shapes"}
+        seen: set[str] = set()
+        out: list[MapShape] = []
+        for shape in self.shapes:
+            if shape.layerId not in layer_ids or shape.id in seen or len(shape.points) < _SHAPE_MIN_POINTS[shape.type]:
+                continue
+            seen.add(shape.id)
+            for p in shape.points:
+                p.x = min(float(self.width), max(0.0, p.x))
+                p.y = min(float(self.height), max(0.0, p.y))
+            out.append(shape)
+            if len(out) >= MAP_MAX_SHAPES:
+                break
+        return out
 
     def _kept(self, items: list[Any], kind: str, limit: int) -> list[Any]:
         """The items that sit on a layer of their kind, each id once, at most `limit`, held to the map."""

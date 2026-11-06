@@ -1,8 +1,9 @@
-import type { MapLabel, MapSymbol } from '../../../../api/types'
+import type { MapLabel, MapShape, MapShapeType, MapSymbol } from '../../../../api/types'
+import { MAX_POINTS, MIN_POINTS, SHAPE_WIDTH_RANGE, hitShape, makeShape, shapeBounds, type Pen } from './mapShapes'
 import { SYMBOL_SETS, symbolName } from './mapSymbols'
 import { change, type Change, type MakeId, type MapDraft } from './mapModel'
 
-// The things on a map besides its terrain: symbols (stamps) and labels (text), each on a layer of its kind. All pure: placing, moving, editing and
+// The things on a map besides its terrain: symbols (stamps), labels (text) and shapes (lines and regions, mapShapes.ts), each on a layer of its kind. All pure: placing, moving, editing and
 // removing return a new draft (and the undo entry), and the hit test, the legend and the scale bar are computed from a draft. Positions are in cells
 // (a symbol's or label's centre), so they stay where they are when the view zooms.
 
@@ -11,8 +12,9 @@ export const MAX_LABELS = 1000
 export const SYMBOL_SIZE_RANGE = { min: 0.25, max: 16 } as const
 export const LABEL_SIZE_RANGE = { min: 0.25, max: 16 } as const
 export const LABEL_TEXT_MAX = 120
+export const MAX_SHAPES = 2000
 
-export type ItemKind = 'symbol' | 'label'
+export type ItemKind = 'symbol' | 'label' | 'shape'
 export interface ItemRef { kind: ItemKind; id: string }
 export interface Rect { x0: number; y0: number; x1: number; y1: number }
 
@@ -30,21 +32,24 @@ export function labelExtent(text: string, size: number): { w: number; h: number 
   return { w: Math.max(1, text.length) * size * 0.55, h: size * 1.15 }
 }
 
-export function itemBounds(item: MapSymbol | MapLabel, kind: ItemKind): Rect {
+export function itemBounds(item: MapSymbol | MapLabel | MapShape, kind: ItemKind): Rect {
+  if (kind === 'shape') return shapeBounds(item as MapShape)
+  const at = item as MapSymbol | MapLabel
   if (kind === 'symbol') {
-    const half = (item as MapSymbol).size / 2
-    return { x0: item.x - half, y0: item.y - half, x1: item.x + half, y1: item.y + half }
+    const half = (at as MapSymbol).size / 2
+    return { x0: at.x - half, y0: at.y - half, x1: at.x + half, y1: at.y + half }
   }
-  const { w, h } = labelExtent((item as MapLabel).text, (item as MapLabel).size)
-  return { x0: item.x - w / 2, y0: item.y - h / 2, x1: item.x + w / 2, y1: item.y + h / 2 }
+  const { w, h } = labelExtent((at as MapLabel).text, (at as MapLabel).size)
+  return { x0: at.x - w / 2, y0: at.y - h / 2, x1: at.x + w / 2, y1: at.y + h / 2 }
 }
 
-export function findItem(draft: MapDraft, ref: ItemRef): MapSymbol | MapLabel | undefined {
+export function findItem(draft: MapDraft, ref: ItemRef): MapSymbol | MapLabel | MapShape | undefined {
+  if (ref.kind === 'shape') return draft.shapes.find(s => s.id === ref.id)
   return ref.kind === 'symbol' ? draft.symbols.find(s => s.id === ref.id) : draft.labels.find(l => l.id === ref.id)
 }
 
 // The layer new things of a kind go on: the topmost of that kind that is shown and not locked (none when there is not one).
-export function activeLayerId(draft: Pick<MapDraft, 'layers'>, kind: 'symbols' | 'labels'): string | null {
+export function activeLayerId(draft: Pick<MapDraft, 'layers'>, kind: 'symbols' | 'labels' | 'shapes'): string | null {
   for (let i = draft.layers.length - 1; i >= 0; i -= 1) {
     const layer = draft.layers[i]
     if (layer.kind === kind && layer.visible && !layer.locked) return layer.id
@@ -74,6 +79,42 @@ export function addLabel(draft: MapDraft, text: string, x: number, y: number, si
   const id = freshId('lbl', new Set(draft.labels.map(l => l.id)), makeId)
   const label: MapLabel = { id, layerId, text: text.trim().slice(0, LABEL_TEXT_MAX) || 'Label', x: px, y: py, size: clamp(size, LABEL_SIZE_RANGE.min, LABEL_SIZE_RANGE.max) }
   return { change: change(draft, { labels: [...draft.labels, label] }), id }
+}
+
+// A line or a region from the points that were clicked (in cells), drawn with the pen, on the topmost shown, unlocked shapes layer. None when there are too
+// few points or no layer to put it on.
+export function addShape(draft: MapDraft, type: MapShapeType, points: Array<[number, number]>, pen: Pen, makeId: MakeId = randomId): { change: NonNullable<Change>; id: string } | null {
+  const layerId = activeLayerId(draft, 'shapes')
+  if (!layerId || draft.shapes.length >= MAX_SHAPES || points.length < MIN_POINTS[type] || points.length > MAX_POINTS) return null
+  const held_ = points.map(([x, y]) => held(draft, x, y))
+  const id = freshId('shp', new Set(draft.shapes.map(s => s.id)), makeId)
+  return { change: change(draft, { shapes: [...draft.shapes, makeShape(id, layerId, type, held_, pen)] }), id }
+}
+
+// A shape replaced by an edited copy of itself, as a change of the map (one undo step).
+export function replaceShape(draft: MapDraft, shape: MapShape): Change {
+  const old = draft.shapes.find(s => s.id === shape.id)
+  if (!old || old === shape) return null
+  return change(draft, { shapes: draft.shapes.map(s => (s.id === shape.id ? shape : s)) })
+}
+
+// The draft with a shape replaced (no undo entry): for a drag that is shown as it goes.
+export function withShape(draft: MapDraft, shape: MapShape): MapDraft {
+  return { ...draft, shapes: draft.shapes.map(s => (s.id === shape.id ? shape : s)) }
+}
+
+export function editShape(draft: MapDraft, id: string, fields: Partial<Pick<MapShape, 'style' | 'color' | 'width' | 'fill' | 'opacity' | 'pattern'>>): Change {
+  const old = draft.shapes.find(s => s.id === id)
+  if (!old) return null
+  const next: MapShape = { ...old }
+  if (fields.style !== undefined) next.style = fields.style
+  if (fields.pattern !== undefined) next.pattern = fields.pattern
+  if (fields.color !== undefined) next.color = fields.color
+  if (fields.fill !== undefined) next.fill = fields.fill
+  if (fields.width !== undefined && Number.isFinite(fields.width)) next.width = clamp(fields.width, SHAPE_WIDTH_RANGE.min, SHAPE_WIDTH_RANGE.max)
+  if (fields.opacity !== undefined && Number.isFinite(fields.opacity)) next.opacity = clamp(fields.opacity, 0, 1)
+  const same = (Object.keys(next) as Array<keyof MapShape>).every(k => k === 'points' || next[k] === old[k])
+  return same ? null : change(draft, { shapes: draft.shapes.map(s => (s.id === id ? next : s)) })
 }
 
 // The draft with one item somewhere else (held to the map): for a drag, which is shown as it goes and is one undo step when it ends.
@@ -107,6 +148,7 @@ export function editLabel(draft: MapDraft, id: string, fields: Partial<Pick<MapL
 
 export function removeItem(draft: MapDraft, ref: ItemRef): Change {
   if (!findItem(draft, ref)) return null
+  if (ref.kind === 'shape') return change(draft, { shapes: draft.shapes.filter(s => s.id !== ref.id) })
   return ref.kind === 'symbol'
     ? change(draft, { symbols: draft.symbols.filter(s => s.id !== ref.id) })
     : change(draft, { labels: draft.labels.filter(l => l.id !== ref.id) })
@@ -124,6 +166,11 @@ export function hitItem(draft: MapDraft, x: number, y: number, slack = 0.3): Ite
         if (s.layerId !== layer.id) continue
         const half = Math.max(s.size / 2, 0.4) + slack
         if (Math.abs(x - s.x) <= half && Math.abs(y - s.y) <= half) return { kind: 'symbol', id: s.id }
+      }
+    } else if (layer.kind === 'shapes') {
+      for (let n = draft.shapes.length - 1; n >= 0; n -= 1) {
+        const sh = draft.shapes[n]
+        if (sh.layerId === layer.id && hitShape(sh, x, y, slack)) return { kind: 'shape', id: sh.id }
       }
     } else if (layer.kind === 'labels') {
       for (let n = draft.labels.length - 1; n >= 0; n -= 1) {

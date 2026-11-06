@@ -1,8 +1,9 @@
 import { useMemo, useState } from 'react'
-import { MAP_MAX_SIDE, type MapLayerKind } from '../../../../api/types'
+import { MAP_MAX_SIDE, type MapLayerKind, type MapLineStyle, type MapPattern, type MapShape, type MapShapeType } from '../../../../api/types'
 import { ChevronDownIcon, ChevronUpIcon, CheckIcon, CloseIcon, EyeClosedIcon, EyeIcon, LockIcon, PlusIcon, RestoreIcon, TrashIcon, UnlockIcon } from '../../../icons'
 import { ColourInput, CommitNumber, CommitText, Field } from './MapFields'
-import { LABEL_SIZE_RANGE, SYMBOL_SIZE_RANGE, editLabel, editSymbol, findItem, removeItem, type ItemRef } from './mapItems'
+import { LABEL_SIZE_RANGE, SYMBOL_SIZE_RANGE, editLabel, editShape, editSymbol, findItem, removeItem, replaceShape, type ItemRef } from './mapItems'
+import { LINE_PRESETS, LINE_STYLES, PATTERNS, REGION_PRESETS, SHAPE_WIDTH_RANGE, setAllSmooth, type Pen } from './mapShapes'
 import { SYMBOL_SETS, symbolName } from './mapSymbols'
 import { MAP_THEMES } from './mapThemes'
 import {
@@ -10,6 +11,9 @@ import {
   setOverlay, setTheme, toggleLayer, type MapDraft,
 } from './mapModel'
 import type { Maps } from './useMaps'
+
+// What a pen and a drawn shape have in common: how they are drawn.
+type ShapeLook = Pick<MapShape, 'style' | 'color' | 'width' | 'fill' | 'opacity' | 'pattern'>
 
 const NEW_TERRAIN_COLOURS = ['#c06c84', '#6c9bd2', '#d9a441', '#7a5c8e', '#4fa89a', '#b5654a', '#9aa86a', '#5a6f8e']
 const LAYER_KINDS: Array<Exclude<MapLayerKind, 'terrain'>> = ['shapes', 'symbols', 'labels', 'notes']
@@ -25,6 +29,11 @@ export interface MapSideProps {
   onSymbolKind: (id: string) => void
   symbolSize: number
   onSymbolSize: (size: number) => void
+  // What new lines and regions are drawn with (the pen of the line tool or the region tool, whichever is in use), a change to it, and a preset (it picks the tool).
+  pen: Pen
+  penType: MapShapeType
+  onPen: (patch: Partial<Pen>) => void
+  onPreset: (type: MapShapeType, pen: Pen) => void
   // The chosen symbol or label (null = none); `fresh` is true for one that was just made (its text takes the cursor).
   selected: ItemRef | null
   fresh: boolean
@@ -32,15 +41,80 @@ export interface MapSideProps {
 }
 
 // The right-hand side of the Maps console: what is chosen on the map, the terrains to paint with, the symbols to stamp, the layers, and the map's own fields.
-export function MapSide({ m, draft, terrain, onTerrain, symbolKind, onSymbolKind, symbolSize, onSymbolSize, selected, fresh, onDeleted }: MapSideProps) {
+export function MapSide({ m, draft, terrain, onTerrain, symbolKind, onSymbolKind, symbolSize, onSymbolSize, pen, penType, onPen, onPreset, selected, fresh, onDeleted }: MapSideProps) {
   return (
     <aside className="mapSide" aria-label="Map details">
       {selected && <InspectorPanel m={m} draft={draft} selected={selected} fresh={fresh} onDeleted={onDeleted} />}
       <TerrainPanel m={m} draft={draft} terrain={terrain} onTerrain={onTerrain} />
       <SymbolPanel kind={symbolKind} onKind={onSymbolKind} size={symbolSize} onSize={onSymbolSize} />
+      <PenPanel pen={pen} penType={penType} onPen={onPen} onPreset={onPreset} />
       <LayerPanel m={m} draft={draft} />
       <MapFieldsPanel m={m} draft={draft} />
     </aside>
+  )
+}
+
+// The fields of how a line or region is drawn, for the pen (what new ones are drawn with) and for the chosen one: a line's style, colour and width, and
+// for a region its fill, how solid it is and its pattern.
+function ShapeFields({ type, value, onChange }: { type: MapShapeType; value: ShapeLook; onChange: (patch: Partial<ShapeLook>) => void }) {
+  return (
+    <div className="mapFields">
+      <Field label={type === 'region' ? 'Outline' : 'Style'}>
+        <select className="mapSelect" aria-label={type === 'region' ? 'Outline style' : 'Line style'} value={value.style} onChange={e => onChange({ style: e.target.value as MapLineStyle })}>
+          {LINE_STYLES.map(s => <option key={s.id} value={s.id}>{s.name}</option>)}
+        </select>
+      </Field>
+      <div className="mapRow">
+        <Field label="Width" short>
+          <CommitNumber label={type === 'region' ? 'Width of the outline in cells' : 'Width of the line in cells'} value={value.width} min={SHAPE_WIDTH_RANGE.min} max={SHAPE_WIDTH_RANGE.max} step={0.05} onCommit={width => onChange({ width })} />
+        </Field>
+        <Field label="Colour" short>
+          <span className="mapRow">
+            <ColourInput label={type === 'region' ? 'Colour of the outline' : 'Colour of the line'} value={value.color ?? '#22262c'} onCommit={color => onChange({ color })} />
+            <button type="button" className="mapIconBtn" aria-label="Use the ink of the look" title="Use the ink of the look" disabled={value.color === null} onClick={() => onChange({ color: null })}><RestoreIcon size={16} /></button>
+          </span>
+        </Field>
+      </div>
+      {type === 'region' && (
+        <>
+          <div className="mapRow">
+            <Field label="Fill" short>
+              <span className="mapRow">
+                <ColourInput label="Fill colour" value={value.fill ?? value.color ?? '#7a8aa0'} onCommit={fill => onChange({ fill })} />
+                <button type="button" className="mapIconBtn" aria-label="Fill with the outline colour" title="Fill with the outline colour" disabled={value.fill === null} onClick={() => onChange({ fill: null })}><RestoreIcon size={16} /></button>
+              </span>
+            </Field>
+            <Field label="Solid" short>
+              <CommitNumber label="How solid the fill is, in percent" value={Math.round(value.opacity * 100)} min={0} max={100} step={5} onCommit={n => onChange({ opacity: n / 100 })} />
+            </Field>
+          </div>
+          <Field label="Pattern">
+            <select className="mapSelect" aria-label="Pattern of the fill" value={value.pattern} onChange={e => onChange({ pattern: e.target.value as MapPattern })}>
+              {PATTERNS.map(s => <option key={s.id} value={s.id}>{s.name}</option>)}
+            </select>
+          </Field>
+        </>
+      )}
+    </div>
+  )
+}
+
+// The pen: what a new line or region is drawn with. A preset sets it and picks the tool; the fields below change it.
+function PenPanel({ pen, penType, onPen, onPreset }: { pen: Pen; penType: MapShapeType; onPen: (patch: Partial<Pen>) => void; onPreset: (type: MapShapeType, pen: Pen) => void }) {
+  return (
+    <section className="mapPanel" aria-label="Lines and regions">
+      <header className="mapPanelHead"><h3 className="mapPanelTitle">Lines and regions</h3></header>
+      <div className="mapSizes" role="group" aria-label="Kinds of line">
+        {LINE_PRESETS.map(pr => <button key={pr.id} type="button" className="mapChip" title={`Draw a ${pr.name.toLowerCase()}`} onClick={() => onPreset('line', pr.pen)}>{pr.name}</button>)}
+      </div>
+      <div className="mapSizes" role="group" aria-label="Kinds of region">
+        {REGION_PRESETS.map(pr => <button key={pr.id} type="button" className="mapChip" title={`Draw a ${pr.name.toLowerCase()} region`} onClick={() => onPreset('region', pr.pen)}>{pr.name}</button>)}
+      </div>
+      <h4 className="mapSubTitle">New {penType === 'region' ? 'regions' : 'lines'}</h4>
+      <ShapeFields type={penType} value={pen} onChange={onPen} />
+      <label className="mapCheck"><input type="checkbox" checked={pen.smooth} onChange={e => onPen({ smooth: e.target.checked })} />Curve the points</label>
+      <p className="mapHint">Click to add points; double-click or Enter finishes, Escape cancels. Points snap to grid corners and cell centres; Alt: no snapping.</p>
+    </section>
   )
 }
 
@@ -72,11 +146,29 @@ function SymbolPanel({ kind, onKind, size, onSize }: { kind: string; onKind: (id
   )
 }
 
-// What is chosen on the map: a symbol (its width and colour) or a label (its text and height), and a delete.
+// What is chosen on the map: a symbol (its width and colour), a label (its text and height) or a line or region (how it is drawn), and a delete.
 function InspectorPanel({ m, draft, selected, fresh, onDeleted }: { m: Maps; draft: MapDraft; selected: ItemRef; fresh: boolean; onDeleted: () => void }) {
   const item = findItem(draft, selected)
   if (!item) return null
   const remove = () => { m.apply(removeItem(draft, selected)); onDeleted() }
+  if (selected.kind === 'shape') {
+    const sh = draft.shapes.find(y => y.id === selected.id)!
+    const kind = sh.type === 'region' ? 'region' : 'line'
+    return (
+      <section className="mapPanel" aria-label={`Chosen ${kind}`}>
+        <header className="mapPanelHead">
+          <h3 className="mapPanelTitle">{sh.type === 'region' ? 'Region' : 'Line'}</h3>
+          <button type="button" className="mapIconBtn" aria-label={`Delete the ${kind}`} title="Delete (Delete key)" onClick={remove}><TrashIcon size={16} /></button>
+        </header>
+        <ShapeFields type={sh.type} value={sh} onChange={patch => m.apply(editShape(draft, sh.id, patch))} />
+        <div className="mapSizes" role="group" aria-label="Curves">
+          <button type="button" className="mapChip" onClick={() => m.apply(replaceShape(draft, setAllSmooth(sh, true)))}>Curve all points</button>
+          <button type="button" className="mapChip" onClick={() => m.apply(replaceShape(draft, setAllSmooth(sh, false)))}>Straighten all points</button>
+        </div>
+        <p className="mapHint">Drag the shape, a point (square) or a handle (circle). Double-click a point to curve or straighten it, the line to put a point in. With a point chosen, Delete takes it away.</p>
+      </section>
+    )
+  }
   if (selected.kind === 'symbol') {
     const s = draft.symbols.find(y => y.id === selected.id)!
     return (
@@ -217,7 +309,7 @@ function LayerPanel({ m, draft }: { m: Maps; draft: MapDraft }) {
           </li>
         ))}
       </ul>
-      <p className="mapHint">Things are placed on the top layer of their kind that is shown and not locked. Regions and lines arrive in a later update.</p>
+      <p className="mapHint">Things are placed on the top layer of their kind that is shown and not locked. A line or region goes on the top shown, unlocked layer of regions and lines.</p>
     </section>
   )
 }

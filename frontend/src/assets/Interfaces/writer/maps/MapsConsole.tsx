@@ -2,12 +2,13 @@ import { useEffect, useState } from 'react'
 import { SaveCluster } from '../../../../components/SaveCluster'
 import { setAutosaveMode, useSettings } from '../../../../settings/settingsStore'
 import { autosaveModeOf } from '../../../../theme/types'
-import { BrushIcon, BucketIcon, CursorIcon, GridLinesIcon, HandIcon, PipetteIcon, RedoIcon, StampIcon, TextSizeIcon } from '../../../icons'
+import { BrushIcon, BucketIcon, CursorIcon, GridLinesIcon, HandIcon, PathIcon, PipetteIcon, PolygonIcon, RedoIcon, StampIcon, TextSizeIcon } from '../../../icons'
 import MapCanvas, { type MapTool } from './MapCanvas'
 import { MapList } from './MapList'
 import { MapSide } from './MapSide'
-import { addLabel, addSymbol, findItem, removeItem, type ItemRef } from './mapItems'
+import { addLabel, addShape, addSymbol, findItem, removeItem, replaceShape, type ItemRef } from './mapItems'
 import { cellIndex, BRUSH_SIZES } from './mapModel'
+import { DEFAULT_LINE_PEN, DEFAULT_REGION_PEN, type Pen } from './mapShapes'
 import { DEFAULT_SYMBOL_SIZE, symbolName } from './mapSymbols'
 import { formatDistance } from './mapView'
 import { useMaps } from './useMaps'
@@ -20,13 +21,15 @@ const TOOLS: Array<{ tool: MapTool; label: string; Icon: typeof BrushIcon }> = [
   { tool: 'pick', label: 'Pick up a terrain', Icon: PipetteIcon },
   { tool: 'symbol', label: 'Stamp a symbol', Icon: StampIcon },
   { tool: 'label', label: 'Place a label', Icon: TextSizeIcon },
+  { tool: 'line', label: 'Draw a line', Icon: PathIcon },
+  { tool: 'region', label: 'Draw a region', Icon: PolygonIcon },
   { tool: 'hand', label: 'Move the view', Icon: HandIcon },
 ]
 const NEW_LABEL_SIZE = 1.5
 
 // Project > Maps: the maps of the setting. A list of maps (nested ones under the map they are in), the open map as a canvas to paint terrain on and to
-// stamp symbols and place labels on (pan and zoom, a brush, a fill, a dropper, a pointer that picks and moves things, undo), and beside it the terrains,
-// the symbols, the layers and the map's own fields (its look, the scale bar, compass and legend). Edits save the way the Writer's do: the Save button,
+// stamp symbols, place labels and draw lines and regions on (pan and zoom, a brush, a fill, a dropper, a pointer that picks and moves things, undo), and
+// beside it the terrains, the symbols, the pens, the layers and the map's own fields (its look, the scale bar, compass and legend). Edits save the way the Writer's do: the Save button,
 // and autosave when the user has turned it on.
 export default function MapsConsole({ projectId }: { projectId: string }) {
   const m = useMaps(projectId)
@@ -37,6 +40,9 @@ export default function MapsConsole({ projectId }: { projectId: string }) {
   const [grid, setGrid] = useState(true)
   const [symbolKind, setSymbolKind] = useState('village')
   const [symbolSize, setSymbolSize] = useState(DEFAULT_SYMBOL_SIZE)
+  // What new lines and regions are drawn with, one pen for each.
+  const [linePen, setLinePen] = useState<Pen>(DEFAULT_LINE_PEN)
+  const [regionPen, setRegionPen] = useState<Pen>(DEFAULT_REGION_PEN)
   const [picked, setPicked] = useState<ItemRef | null>(null)
   // The label that was just placed: its text takes the cursor.
   const [fresh, setFresh] = useState<string | null>(null)
@@ -65,6 +71,8 @@ export default function MapsConsole({ projectId }: { projectId: string }) {
   }
   if (m.status === 'loading') return <p className="mapNote" role="status">Loading the maps…</p>
 
+  const penType = tool === 'region' ? 'region' : 'line'
+  const pen = penType === 'region' ? regionPen : linePen
   const under = hover && draft ? draft.terrains[draft.cells[cellIndex(draft.width, hover[0], hover[1])]] : null
 
   // Stamp a symbol, or put a label (which then takes the cursor in the side panel, ready to be given its text).
@@ -86,16 +94,28 @@ export default function MapsConsole({ projectId }: { projectId: string }) {
     return true
   }
 
+  // A line or region that was drawn: it goes on the top shown, unlocked layer of shapes and is chosen, so its points can be fixed straight away.
+  function finishShape(type: 'line' | 'region', points: Array<[number, number]>): boolean {
+    if (!draft) return false
+    setBlocked(false)
+    const r = addShape(draft, type, points, type === 'region' ? regionPen : linePen)
+    if (!r || !m.apply(r.change)) return false
+    setPicked({ kind: 'shape', id: r.id })
+    setFresh(null)
+    return true
+  }
+
   function removeChosen() {
     if (!draft || !selected) return
     m.apply(removeItem(draft, selected))
     setPicked(null)
   }
 
+  const hint = tool === 'line' || tool === 'region' ? ' · click to add points, double-click or Enter to finish, Esc to cancel' : ''
   const statusText = hover
     ? `Cell ${hover[0] + 1}, ${hover[1] + 1}${under ? ` · ${under.name}` : ''}`
     : selected && draft
-      ? (selected.kind === 'symbol' ? `${symbolName(draft.symbols.find(s => s.id === selected.id)?.kind ?? '')} chosen` : 'Label chosen')
+      ? (selected.kind === 'symbol' ? `${symbolName(draft.symbols.find(s => s.id === selected.id)?.kind ?? '')} chosen` : selected.kind === 'shape' ? `${draft.shapes.find(s => s.id === selected.id)?.type === 'region' ? 'Region' : 'Line'} chosen` : 'Label chosen')
       : `${draft?.width ?? 0} × ${draft?.height ?? 0} cells`
 
   return (
@@ -133,17 +153,20 @@ export default function MapsConsole({ projectId }: { projectId: string }) {
           <>
             <div className="mapStage">
               <MapCanvas
-                draft={draft} rev={m.rev} tool={tool} terrain={chosen} brushSize={brush} showGrid={grid} selected={selected} onSelect={setPicked}
+                draft={draft} rev={m.rev} tool={tool} terrain={chosen} brushSize={brush} showGrid={grid} pen={pen} selected={selected} onSelect={setPicked}
                 onBeginStroke={(t, size) => { setBlocked(false); return m.beginStroke(t, size) }} onEndStroke={m.endStroke}
                 onFill={(x, y, t) => { if (!m.fill(x, y, t)) setBlocked(true) }} onPick={i => { setTerrain(i); setTool('brush') }}
-                onPlace={place} onPreview={m.preview} onCommitMove={m.commitMove} onDelete={removeChosen}
+                onPlace={place} onFinishShape={finishShape} onPreview={m.preview} onCommitMove={m.commitMove} onChangeShape={shape => { m.apply(replaceShape(draft, shape)) }} onDelete={removeChosen}
                 onHover={setHover} onBlocked={() => setBlocked(true)}
               />
-              <p className="mapStatus" aria-live="off">{statusText} · {formatDistance(draft.width * draft.cellSize, draft.unit)} wide</p>
+              <p className="mapStatus" aria-live="off">{statusText} · {formatDistance(draft.width * draft.cellSize, draft.unit)} wide{hint}</p>
             </div>
             <MapSide
               m={m} draft={draft} terrain={chosen} onTerrain={i => { setTerrain(i); if (tool !== 'brush' && tool !== 'fill') setTool('brush') }}
               symbolKind={symbolKind} onSymbolKind={id => { setSymbolKind(id); setTool('symbol') }} symbolSize={symbolSize} onSymbolSize={setSymbolSize}
+              pen={pen} penType={penType}
+              onPen={patch => (penType === 'region' ? setRegionPen : setLinePen)(old => ({ ...old, ...patch }))}
+              onPreset={(type, next) => { (type === 'region' ? setRegionPen : setLinePen)(next); setTool(type) }}
               selected={selected} fresh={selected !== null && fresh === selected.id} onDeleted={() => setPicked(null)}
             />
           </>

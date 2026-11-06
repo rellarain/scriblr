@@ -1,4 +1,6 @@
 import { drawLabel, drawOverlays, drawSelection, drawSymbol } from './mapDrawItems'
+import { drawPending, drawShape, drawShapeEditor, type PendingShape } from './mapDrawShapes'
+import type { MapShape } from '../../../../api/types'
 import { findItem, type ItemRef, type LegendEntry } from './mapItems'
 import type { MapDraft } from './mapModel'
 import { hexToRgb, themeDef, themeRgb } from './mapThemes'
@@ -37,8 +39,11 @@ export interface RenderOptions {
   ink: string
   // The cells under the brush, to outline.
   brush: Array<[number, number]>
-  // The chosen symbol or label.
+  // The chosen symbol, label or shape, and the chosen point of a shape.
   selected: ItemRef | null
+  selectedNode: number | null
+  // The line or region that is being drawn.
+  pending: PendingShape | null
   // What the legend lists (null = the legend is off).
   legend: LegendEntry[] | null
 }
@@ -69,6 +74,8 @@ export function drawMap(ctx: CanvasRenderingContext2D, o: RenderOptions) {
       }
     } else if (layer.kind === 'symbols' && layer.visible) {
       for (const s of draft.symbols) if (s.layerId === layer.id) drawSymbol(ctx, s, view, theme)
+    } else if (layer.kind === 'shapes' && layer.visible) {
+      for (const sh of draft.shapes) if (sh.layerId === layer.id) drawShape(ctx, sh, view, theme)
     } else if (layer.kind === 'labels' && layer.visible) {
       for (const l of draft.labels) if (l.layerId === layer.id) drawLabel(ctx, l, view, theme)
     }
@@ -109,8 +116,12 @@ export function drawMap(ctx: CanvasRenderingContext2D, o: RenderOptions) {
 
   if (o.selected) {
     const item = findItem(draft, o.selected)
-    if (item) drawSelection(ctx, item, o.selected, view, theme)
+    if (item) {
+      drawSelection(ctx, item, o.selected, view, theme)
+      if (o.selected.kind === 'shape') drawShapeEditor(ctx, item as MapShape, view, theme, o.selectedNode)
+    }
   }
+  if (o.pending) drawPending(ctx, o.pending, view, theme)
 
   if (o.brush.length > 0) {
     ctx.save()

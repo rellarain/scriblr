@@ -27,7 +27,7 @@ function answerWith(body: unknown = {}, init: { ok?: boolean; status?: number } 
 }
 
 const TREE = { schemaVersion: 2, nodes: [] }
-const MAP = { schemaVersion: 2, id: ID, title: 'W', kind: 'world' as const, parentId: null, order: 0, width: 2, height: 2, cellSize: 1, unit: 'cells', terrains: [], layers: [], cells: [0, 4], symbols: [], labels: [], theme: 'modern' as const, scaleBar: true, compass: true, legend: false, updatedAt: '2026-01-01T00:00:00Z' }
+const MAP = { schemaVersion: 2, id: ID, title: 'W', kind: 'world' as const, parentId: null, order: 0, width: 2, height: 2, cellSize: 1, unit: 'cells', terrains: [], layers: [], cells: [0, 4], symbols: [], labels: [], shapes: [], theme: 'modern' as const, scaleBar: true, compass: true, legend: false, updatedAt: '2026-01-01T00:00:00Z' }
 const CASES: Array<[string, () => Promise<unknown>, string, string, unknown?]> = [
   ['getTraining', () => getTraining(), 'GET', '/api/training'],
   ['saveTrainingContent', () => saveTrainingContent({ curricula: [], courses: [] }), 'PUT', '/api/training/content', { curricula: [], courses: [] }],
