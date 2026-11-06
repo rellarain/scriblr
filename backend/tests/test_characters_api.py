@@ -120,3 +120,48 @@ def test_a_project_saved_before_characters_loads_with_none(client: TestClient, s
     raw.pop("characters", None)
     path.write_text(json.dumps(raw), encoding="utf-8")
     assert client.get(f"/api/projects/{pid}/characters").json() == []
+
+
+# ---- the profile, relationships and story ----
+
+def test_a_new_character_has_an_empty_profile_and_story(client: TestClient) -> None:
+    pid = _project(client)
+    c = _new(client, pid, name="Ada")
+    assert c["profile"]["role"] == "" and c["profile"]["fields"] == []
+    assert c["possessions"] == c["relationships"] == c["states"] == c["arc"] == c["events"] == []
+
+
+def test_the_profile_and_story_are_held_to_their_limits_and_repaired() -> None:
+    doc = CharacterDoc.model_validate({
+        "id": "c1",
+        "profile": {"role": "  Captain  ", "personality": "x" * 9000, "fields": [{"id": "f", "label": "Eyes", "value": "green"}, {"id": "f"}, "bad"]},
+        "possessions": [{"id": "p", "name": "Sword"}, {"id": "p"}, 3],
+        "relationships": [{"id": "r", "targetId": "c2", "kind": "nonsense", "family": "cousin", "changes": [{"id": "x", "at": "ch1"}, {"id": "x"}]}],
+        "states": [{"id": "s", "at": "ch1", "inventory": ["rope", "rope", "", 4], "snapshot": {"hair": "braid"}}, {"id": "s2", "snapshot": "no"}],
+        "arc": [{"id": "a", "name": "Denial", "at": ""}], "events": [{"id": "e", "when": "Year 3", "title": "Born"}],
+    })
+    assert doc.profile.role == "Captain" and len(doc.profile.personality) == 8000 and [f.id for f in doc.profile.fields] == ["f"]
+    assert [p.id for p in doc.possessions] == ["p"]
+    rel = doc.relationships[0]
+    assert rel.kind == "other" and rel.family is None and [c.id for c in rel.changes] == ["x"]
+    assert doc.states[0].inventory == ["rope"] and doc.states[0].snapshot is not None and doc.states[0].snapshot.hair == "braid" and doc.states[1].snapshot is None
+    assert doc.arc[0].at is None and doc.events[0].when == "Year 3"
+
+
+def test_put_drops_relationships_to_nobody_or_to_oneself(client: TestClient) -> None:
+    pid = _project(client)
+    a, b = _new(client, pid, name="A"), _new(client, pid, name="B")
+    a["relationships"] = [
+        {"id": "r1", "targetId": b["id"], "kind": "friend", "label": "old friend"}, {"id": "r2", "targetId": "chr_ghost"}, {"id": "r3", "targetId": a["id"]},
+    ]
+    saved = client.put(f"/api/projects/{pid}/characters/{a['id']}", json=a).json()
+    assert [r["id"] for r in saved["relationships"]] == ["r1"]
+
+
+def test_deleting_a_character_removes_the_relationships_that_point_at_it(client: TestClient) -> None:
+    pid = _project(client)
+    a, b = _new(client, pid, name="A"), _new(client, pid, name="B")
+    a["relationships"] = [{"id": "r1", "targetId": b["id"], "kind": "rival"}]
+    client.put(f"/api/projects/{pid}/characters/{a['id']}", json=a)
+    assert client.delete(f"/api/projects/{pid}/characters/{b['id']}").status_code == 204
+    assert client.get(f"/api/projects/{pid}/characters/{a['id']}").json()["relationships"] == []

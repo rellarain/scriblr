@@ -53,6 +53,9 @@ def put_character(project_id: str, character_id: str, body: CharacterDoc, root: 
         raise HTTPException(status_code=422, detail="the character's id does not match the address")
     with store.transaction(root, project_id):
         store.load_character(root, project_id, character_id)
+        # A relationship is with another character that is there, not with oneself.
+        known = {c.id for c in store.list_characters(root, project_id)}
+        body.relationships = [r for r in body.relationships if r.targetId in known and r.targetId != character_id]
         body.updatedAt = utcnow()
         store.save_character(root, project_id, body)
     return body

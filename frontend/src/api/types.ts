@@ -496,6 +496,35 @@ export interface CharacterLook {
   expression: string; pose: string; heldLeft: string | null; heldRight: string | null
   outfit: CharacterOutfit; marks: CharacterMark[]
 }
-export interface CharacterDoc { schemaVersion: number; id: string; name: string; order: number; look: CharacterLook; updatedAt: string }
+export const CHARACTER_MAX_FIELDS = 30
+export const CHARACTER_MAX_RELATIONSHIPS = 80
+export const CHARACTER_MAX_STATES = 300
+export const CHARACTER_MAX_STAGES = 20
+export const CHARACTER_MAX_EVENTS = 100
+export const CHARACTER_MAX_POSSESSIONS = 80
+export const CHARACTER_MAX_CHANGES = 20
+export interface CharacterField { id: string; label: string; value: string }
+// Who the character is: identity, personality and psychology, background, and fields of the author's own.
+export interface CharacterProfile {
+  role: string; age: string; occupation: string; aliases: string; summary: string; personality: string
+  goal: string; motivation: string; fear: string; flaw: string; strength: string; background: string; fields: CharacterField[]
+}
+export interface CharacterPossession { id: string; name: string; description: string }
+export type RelationshipKind = 'family' | 'friend' | 'ally' | 'rival' | 'enemy' | 'romance' | 'mentor' | 'other'
+// For a family link: who the other character is to this one.
+export type FamilyRole = 'parent' | 'child' | 'spouse' | 'sibling'
+// How a relationship changes at a point of the story (`at` is an outline chapter or scene).
+export interface RelationshipChange { id: string; at: string; label: string; note: string }
+export interface CharacterRelationship { id: string; targetId: string; kind: RelationshipKind; family: FamilyRole | null; label: string; description: string; changes: RelationshipChange[] }
+// What is true of the character from a point of the story until the next state.
+export interface CharacterState {
+  id: string; at: string; storyTime: string; mood: string; goal: string; where: string; note: string; inventory: string[]; snapshot: CharacterLook | null
+}
+export interface ArcStage { id: string; name: string; note: string; at: string | null }
+export interface LifeEvent { id: string; when: string; title: string; note: string }
+export interface CharacterDoc {
+  schemaVersion: number; id: string; name: string; order: number; look: CharacterLook; updatedAt: string
+  profile: CharacterProfile; possessions: CharacterPossession[]; relationships: CharacterRelationship[]; states: CharacterState[]; arc: ArcStage[]; events: LifeEvent[]
+}
 export interface CharacterSummary { id: string; name: string; order: number; updatedAt: string }
 export interface CharacterCreate { name?: string; look?: CharacterLook }

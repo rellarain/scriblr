@@ -1,5 +1,6 @@
 import type { CharacterCreate, CharacterDoc, CharacterSummary } from '../api/types'
 import { defaultLook, normalizeLook } from '../assets/Interfaces/writer/characters/art/defaults'
+import { emptyStory } from '../assets/Interfaces/writer/characters/story'
 import type { MockAnswer } from './mockPresets'
 
 // A pretend Characters API (`/api/projects/{id}/characters`), shared by the design system previews (mockBackend.ts) and the tests (test/charactersBackend.ts): the cast
@@ -14,12 +15,14 @@ export function summaryOf(c: CharacterDoc): CharacterSummary {
 }
 
 export function newCharacter(id: string, body: CharacterCreate, order: number): CharacterDoc {
-  return { schemaVersion: 2, id, name: body.name?.trim() || 'Unnamed character', order, look: body.look ? normalizeLook(body.look) : defaultLook(), updatedAt: AT }
+  return { schemaVersion: 2, id, name: body.name?.trim() || 'Unnamed character', order, look: body.look ? normalizeLook(body.look) : defaultLook(), ...emptyStory(), updatedAt: AT }
 }
 
 export function createMockCharacters(initial: CharacterDoc[] = []) {
   const cast = new Map<string, CharacterDoc>(initial.map(c => [c.id, c]))
   let next = initial.length + 1
+  // Every save stamps a new time, as the server does (the console reads the cast again when a time changes).
+  let saves = 1
 
   function route(method: string, rest: string[], body: unknown): MockAnswer {
     if (rest.length === 0) {
@@ -38,13 +41,16 @@ export function createMockCharacters(initial: CharacterDoc[] = []) {
       if (!found) return fail(404, 'Character not found')
       const b = body as CharacterDoc
       if (b.id !== id) return fail(422, 'The id does not match.')
-      const saved: CharacterDoc = { ...b, name: b.name.trim() || 'Unnamed character', look: normalizeLook(b.look), updatedAt: AT }
+      // A relationship is with another character that is there, not with oneself.
+      const relationships = (b.relationships ?? []).filter(r => cast.has(r.targetId) && r.targetId !== id)
+      const saved: CharacterDoc = { ...emptyStory(), ...b, relationships, name: b.name.trim() || 'Unnamed character', look: normalizeLook(b.look), updatedAt: `2026-11-02T12:${String(Math.floor(saves / 60) % 60).padStart(2, '0')}:${String(saves++ % 60).padStart(2, '0')}.000Z` }
       cast.set(id, saved)
       return ok(saved)
     }
     if (method === 'DELETE') {
       if (!found) return fail(404, 'Character not found')
       cast.delete(id)
+      for (const c of cast.values()) c.relationships = c.relationships.filter(r => r.targetId !== id)
       return { status: 204, body: undefined }
     }
     return fail(405, 'Method not allowed')
@@ -63,5 +69,10 @@ export function seedCharacters(): CharacterDoc[] {
   }
   const bram = newCharacter('chr_bram', { name: 'Bram Quill' }, 1)
   bram.look = { ...bram.look, skin: '#8d5a3b', hair: 'buzz', hairColor: '#1f1a17', facialHair: 'full', build: 'broad', headShape: 'square', nose: 'broad', brows: 'thick', pose: 'relaxed' }
+  ada.profile = { ...ada.profile, role: 'Navigator', age: '29', occupation: 'Ship’s cartographer', summary: 'Charts coasts nobody else will sail.', goal: 'Finish the chart of the Glass Sea.', fear: 'Open water at night.', fields: [{ id: 'f1', label: 'Motto', value: 'Measure twice.' }] }
+  ada.relationships = [{ id: 'r1', targetId: 'chr_bram', kind: 'ally', family: null, label: 'First mate', description: 'Trusts him with the helm and nothing else.', changes: [] }]
+  ada.possessions = [{ id: 'p1', name: 'Brass sextant', description: 'Her mother’s.' }]
+  ada.arc = [{ id: 'a1', name: 'Denial', note: 'Insists the coast is safe.', at: null }]
+  ada.events = [{ id: 'e1', when: 'Year 1', title: 'Born in Port Veyra', note: '' }]
   return [ada, bram]
 }

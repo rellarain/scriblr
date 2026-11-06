@@ -2237,12 +2237,282 @@ class CharacterLook(BaseModel):
         return out
 
 
+# ---- the profile, the relationships and the story of a character ----
+
+CHARACTER_MAX_FIELDS = 30
+CHARACTER_MAX_RELATIONSHIPS = 80
+CHARACTER_MAX_CHANGES = 20
+CHARACTER_MAX_STATES = 300
+CHARACTER_MAX_STAGES = 20
+CHARACTER_MAX_EVENTS = 100
+CHARACTER_MAX_POSSESSIONS = 80
+RelationshipKind = Literal["family", "friend", "ally", "rival", "enemy", "romance", "mentor", "other"]
+FamilyRole = Literal["parent", "child", "spouse", "sibling"]
+
+
+def _cut(value: Any, limit: int) -> str:
+    """A text trimmed and held to a length (anything that is not a text is empty)."""
+    return value.strip()[:limit] if isinstance(value, str) else ""
+
+
+def _unique_items(value: Any, model: Any, limit: int) -> list[Any]:
+    """The items of a list that read as `model`, each id once, at most `limit`."""
+    seen: set[str] = set()
+    out: list[Any] = []
+    for item in _valid_items(value, model):
+        if item.id in seen:
+            continue
+        seen.add(item.id)
+        out.append(item)
+        if len(out) >= limit:
+            break
+    return out
+
+
+class CharacterField(BaseModel):
+    """A field of the author's own in a profile: a label and its text."""
+
+    id: str = Field(min_length=1, max_length=40)
+    label: str = Field(default="", max_length=60)
+    value: str = Field(default="", max_length=2000)
+
+    @field_validator("label", mode="before")
+    @classmethod
+    def _label(cls, value: Any) -> Any:
+        return _cut(value, 60)
+
+    @field_validator("value", mode="before")
+    @classmethod
+    def _value(cls, value: Any) -> Any:
+        return _cut(value, 2000)
+
+
+class CharacterProfile(BaseModel):
+    """Who the character is: identity, personality and psychology, background, and fields of the author's own."""
+
+    role: str = ""
+    age: str = ""
+    occupation: str = ""
+    aliases: str = ""
+    summary: str = ""
+    personality: str = ""
+    goal: str = ""
+    motivation: str = ""
+    fear: str = ""
+    flaw: str = ""
+    strength: str = ""
+    background: str = ""
+    fields: list[CharacterField] = Field(default_factory=list)
+
+    @field_validator("role", "age", "occupation", "aliases", mode="before")
+    @classmethod
+    def _short(cls, value: Any) -> Any:
+        return _cut(value, 120)
+
+    @field_validator("summary", "goal", "motivation", "fear", "flaw", "strength", mode="before")
+    @classmethod
+    def _medium(cls, value: Any) -> Any:
+        return _cut(value, 1000)
+
+    @field_validator("personality", "background", mode="before")
+    @classmethod
+    def _long(cls, value: Any) -> Any:
+        return _cut(value, 8000)
+
+    @field_validator("fields", mode="before")
+    @classmethod
+    def _fields(cls, value: Any) -> Any:
+        return _unique_items(value, CharacterField, CHARACTER_MAX_FIELDS)
+
+
+class CharacterPossession(BaseModel):
+    id: str = Field(min_length=1, max_length=40)
+    name: str = Field(default="", max_length=80)
+    description: str = Field(default="", max_length=1000)
+
+    @field_validator("name", mode="before")
+    @classmethod
+    def _name(cls, value: Any) -> Any:
+        return _cut(value, 80)
+
+    @field_validator("description", mode="before")
+    @classmethod
+    def _description(cls, value: Any) -> Any:
+        return _cut(value, 1000)
+
+
+class RelationshipChange(BaseModel):
+    """How a relationship changes at a point of the story (`at` is an outline chapter or scene)."""
+
+    id: str = Field(min_length=1, max_length=40)
+    at: str = Field(default="", max_length=80)
+    label: str = Field(default="", max_length=60)
+    note: str = Field(default="", max_length=500)
+
+    @field_validator("at", mode="before")
+    @classmethod
+    def _at(cls, value: Any) -> Any:
+        return _cut(value, 80)
+
+    @field_validator("label", mode="before")
+    @classmethod
+    def _label(cls, value: Any) -> Any:
+        return _cut(value, 60)
+
+    @field_validator("note", mode="before")
+    @classmethod
+    def _note(cls, value: Any) -> Any:
+        return _cut(value, 500)
+
+
+class CharacterRelationship(BaseModel):
+    """A typed link to another character, with a description. For a family link, `family` says who the other is to this character (their parent, child, spouse, sibling)."""
+
+    id: str = Field(min_length=1, max_length=40)
+    targetId: str = Field(min_length=1, max_length=80)
+    kind: RelationshipKind = "other"
+    family: Optional[FamilyRole] = None
+    label: str = Field(default="", max_length=60)
+    description: str = Field(default="", max_length=1000)
+    changes: list[RelationshipChange] = Field(default_factory=list)
+
+    @field_validator("kind", mode="before")
+    @classmethod
+    def _kind(cls, value: Any) -> Any:
+        return value if value in ("family", "friend", "ally", "rival", "enemy", "romance", "mentor", "other") else "other"
+
+    @field_validator("family", mode="before")
+    @classmethod
+    def _family(cls, value: Any) -> Any:
+        return value if value in ("parent", "child", "spouse", "sibling") else None
+
+    @field_validator("label", mode="before")
+    @classmethod
+    def _label(cls, value: Any) -> Any:
+        return _cut(value, 60)
+
+    @field_validator("description", mode="before")
+    @classmethod
+    def _description(cls, value: Any) -> Any:
+        return _cut(value, 1000)
+
+    @field_validator("changes", mode="before")
+    @classmethod
+    def _changes(cls, value: Any) -> Any:
+        return _unique_items(value, RelationshipChange, CHARACTER_MAX_CHANGES)
+
+
+class CharacterState(BaseModel):
+    """What is true of the character from a point of the story (`at`, an outline chapter or scene) until the next state: how they are, what they want, where they are,
+    what they carry, and optionally how they look then (a copy of the look)."""
+
+    id: str = Field(min_length=1, max_length=40)
+    at: str = Field(default="", max_length=80)
+    storyTime: str = Field(default="", max_length=80)
+    mood: str = Field(default="", max_length=120)
+    goal: str = Field(default="", max_length=500)
+    where: str = Field(default="", max_length=120)
+    note: str = Field(default="", max_length=2000)
+    inventory: list[str] = Field(default_factory=list)
+    snapshot: Optional[CharacterLook] = None
+
+    @field_validator("at", "storyTime", mode="before")
+    @classmethod
+    def _short(cls, value: Any) -> Any:
+        return _cut(value, 80)
+
+    @field_validator("mood", "where", mode="before")
+    @classmethod
+    def _medium(cls, value: Any) -> Any:
+        return _cut(value, 120)
+
+    @field_validator("goal", mode="before")
+    @classmethod
+    def _goal(cls, value: Any) -> Any:
+        return _cut(value, 500)
+
+    @field_validator("note", mode="before")
+    @classmethod
+    def _note(cls, value: Any) -> Any:
+        return _cut(value, 2000)
+
+    @field_validator("inventory", mode="before")
+    @classmethod
+    def _inventory(cls, value: Any) -> Any:
+        out: list[str] = []
+        for item in value if isinstance(value, list) else []:
+            text = _cut(item, 80)
+            if text and text not in out:
+                out.append(text)
+            if len(out) >= 12:
+                break
+        return out
+
+    @field_validator("snapshot", mode="before")
+    @classmethod
+    def _snapshot(cls, value: Any) -> Any:
+        return value if isinstance(value, (dict, CharacterLook)) else None
+
+
+class ArcStage(BaseModel):
+    id: str = Field(min_length=1, max_length=40)
+    name: str = Field(default="", max_length=80)
+    note: str = Field(default="", max_length=1000)
+    at: Optional[str] = None
+
+    @field_validator("name", mode="before")
+    @classmethod
+    def _name(cls, value: Any) -> Any:
+        return _cut(value, 80)
+
+    @field_validator("note", mode="before")
+    @classmethod
+    def _note(cls, value: Any) -> Any:
+        return _cut(value, 1000)
+
+    @field_validator("at", mode="before")
+    @classmethod
+    def _at(cls, value: Any) -> Any:
+        text = _cut(value, 80)
+        return text or None
+
+
+class LifeEvent(BaseModel):
+    """An event of the character's life, in story time (`when` is text on the project's time system)."""
+
+    id: str = Field(min_length=1, max_length=40)
+    when: str = Field(default="", max_length=80)
+    title: str = Field(default="", max_length=120)
+    note: str = Field(default="", max_length=1000)
+
+    @field_validator("when", mode="before")
+    @classmethod
+    def _when(cls, value: Any) -> Any:
+        return _cut(value, 80)
+
+    @field_validator("title", mode="before")
+    @classmethod
+    def _title(cls, value: Any) -> Any:
+        return _cut(value, 120)
+
+    @field_validator("note", mode="before")
+    @classmethod
+    def _note(cls, value: Any) -> Any:
+        return _cut(value, 1000)
+
+
 class CharacterDoc(BaseModel):
     schemaVersion: int = SCHEMA_VERSION
     id: str = Field(min_length=1, max_length=80)
     name: str = Field(default="Unnamed character", max_length=120)
     order: int = 0
     look: CharacterLook = Field(default_factory=CharacterLook)
+    profile: CharacterProfile = Field(default_factory=CharacterProfile)
+    possessions: list[CharacterPossession] = Field(default_factory=list)
+    relationships: list[CharacterRelationship] = Field(default_factory=list)
+    states: list[CharacterState] = Field(default_factory=list)
+    arc: list[ArcStage] = Field(default_factory=list)
+    events: list[LifeEvent] = Field(default_factory=list)
     updatedAt: datetime = Field(default_factory=utcnow)
 
     @field_validator("name", mode="before")
@@ -2250,6 +2520,36 @@ class CharacterDoc(BaseModel):
     def _name_or_default(cls, value: Any) -> Any:
         text = value.strip()[:120] if isinstance(value, str) else ""
         return text or "Unnamed character"
+
+    @field_validator("profile", mode="before")
+    @classmethod
+    def _profile(cls, value: Any) -> Any:
+        return value if isinstance(value, (dict, CharacterProfile)) else {}
+
+    @field_validator("possessions", mode="before")
+    @classmethod
+    def _possessions(cls, value: Any) -> Any:
+        return _unique_items(value, CharacterPossession, CHARACTER_MAX_POSSESSIONS)
+
+    @field_validator("relationships", mode="before")
+    @classmethod
+    def _relationships(cls, value: Any) -> Any:
+        return _unique_items(value, CharacterRelationship, CHARACTER_MAX_RELATIONSHIPS)
+
+    @field_validator("states", mode="before")
+    @classmethod
+    def _states(cls, value: Any) -> Any:
+        return _unique_items(value, CharacterState, CHARACTER_MAX_STATES)
+
+    @field_validator("arc", mode="before")
+    @classmethod
+    def _arc(cls, value: Any) -> Any:
+        return _unique_items(value, ArcStage, CHARACTER_MAX_STAGES)
+
+    @field_validator("events", mode="before")
+    @classmethod
+    def _events(cls, value: Any) -> Any:
+        return _unique_items(value, LifeEvent, CHARACTER_MAX_EVENTS)
 
     @field_validator("look", mode="before")
     @classmethod

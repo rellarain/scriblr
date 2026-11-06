@@ -1538,6 +1538,9 @@ def delete_character(root: Path, project_id: str, character_id: str) -> None:
     def _do(pf: ProjectFile) -> None:
         if pf.characters.pop(character_id, None) is None:
             raise CharacterNotFoundError(project_id, character_id)
+        # No relationship points at a character that is gone.
+        for other in pf.characters.values():
+            other.relationships = [r for r in other.relationships if r.targetId != character_id]
         pf.index.updatedAt = utcnow()
 
     _mutate(root, project_id, _do)

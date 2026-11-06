@@ -87,7 +87,7 @@ export function projectTabs(w: WriterWorkspace): LevelTab[] {
       render: () => {
         const id = w.activeProjectId
         if (!id) return <p className="wrMuted">Open a project to build its cast.</p>
-        return <CharactersConsole key={id} projectId={id} />
+        return <CharactersConsole key={id} projectId={id} outline={w.outlineNodes} />
       },
     },
     { id: 'history', label: 'History', Icon: ClockIcon, render: () => placeholder('projectHistory') },

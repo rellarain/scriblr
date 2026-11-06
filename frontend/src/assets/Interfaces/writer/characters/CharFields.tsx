@@ -84,3 +84,17 @@ export function Options<T extends Option>({ label, items, value, onPick, thumb, 
     </div>
   )
 }
+
+// Text typed straight into the character (a line or a paragraph): every keystroke is handed over, and edits in one run are one undo step (the caller gives the group).
+export function TextField({ label, value, onChange, multiline = false, rows = 3, max }: {
+  label: string; value: string; onChange: (value: string) => void; multiline?: boolean; rows?: number; max?: number
+}) {
+  return (
+    <div className="charField">
+      <span className="charLabel" aria-hidden="true">{label}</span>
+      {multiline
+        ? <textarea className="charInput charArea" aria-label={label} title={label} rows={rows} maxLength={max} value={value} onChange={e => onChange(e.target.value)} />
+        : <input type="text" className="charInput" aria-label={label} title={label} maxLength={max} value={value} onChange={e => onChange(e.target.value)} />}
+    </div>
+  )
+}

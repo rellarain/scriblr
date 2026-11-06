@@ -1,17 +1,29 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
+import type { OutlineNode } from '../../../../api/types'
 import { SaveCluster } from '../../../../components/SaveCluster'
 import { setAutosaveMode, useSettings } from '../../../../settings/settingsStore'
 import { autosaveModeOf } from '../../../../theme/types'
-import { BagIcon, BodyIcon, BrushIcon, ChevronLeftIcon, ChevronRightIcon, EyeIcon, FaceIcon, HandIcon, MixedFaceIcon, NeutralFaceIcon, PencilIcon, RedoIcon, TurnIcon } from '../../../icons'
+import { BagIcon, BodyIcon, BrushIcon, ChevronLeftIcon, ChevronRightIcon, ClockIcon, EyeIcon, FaceIcon, HandIcon, LinkIcon, ListIcon, MixedFaceIcon, NeutralFaceIcon, PencilIcon, RedoIcon, TurnIcon } from '../../../icons'
 import { CharacterArt } from './art/CharacterArt'
 import { EXPRESSIONS } from './art/library'
 import { VIEWS, type View } from './art/space'
 import { CharacterList } from './CharacterList'
 import { BodyDrawer, ClothesDrawer, EyesDrawer, HairDrawer, HeadDrawer, MarksDrawer, NoseMouthDrawer, PoseDrawer, type DrawerCtx } from './Drawers'
 import { CommitText, Field } from './CharFields'
+import { ProfileSection } from './ProfileSection'
+import { RelationshipsSection } from './RelationshipsSection'
+import { StorySection } from './StorySection'
+import { storyPoints } from './story'
 import { useCharacters } from './useCharacters'
 import './characters.scss'
 
+type Section = 'look' | 'profile' | 'relationships' | 'story'
+const SECTIONS: Array<{ section: Section; label: string; Icon: typeof FaceIcon }> = [
+  { section: 'look', label: 'Look', Icon: BrushIcon },
+  { section: 'profile', label: 'Profile', Icon: ListIcon },
+  { section: 'relationships', label: 'Relationships', Icon: LinkIcon },
+  { section: 'story', label: 'Story', Icon: ClockIcon },
+]
 type Mode = 'closeup' | 'full' | 'turnaround' | 'expressions'
 const MODES: Array<{ mode: Mode; label: string; Icon: typeof FaceIcon }> = [
   { mode: 'closeup', label: 'Close-up', Icon: FaceIcon },
@@ -33,9 +45,11 @@ const DRAWERS: Array<{ id: string; name: string; Icon: typeof FaceIcon }> = [
 // Project > Characters: the cast. A list of characters, the open one drawn as a close-up, a full figure, a turnaround of four views or a strip of expressions, and beside it
 // the drawers where its parts are chosen (build, head, eyes, nose and mouth, hair, marks, clothes, pose). A character is only its look, a handful of choices and
 // numbers; the art is drawn from them in any view. Edits save the way the Writer's do: the Save button, and autosave when the user has turned it on.
-export default function CharactersConsole({ projectId }: { projectId: string }) {
+export default function CharactersConsole({ projectId, outline = [] }: { projectId: string; outline?: OutlineNode[] }) {
   const c = useCharacters(projectId)
   const { ui } = useSettings()
+  const [section, setSection] = useState<Section>('look')
+  const points = useMemo(() => storyPoints(outline), [outline])
   const [mode, setMode] = useState<Mode>('closeup')
   const [view, setView] = useState<View>('front')
   const [facing, setFacing] = useState<'left' | 'right'>('right')
@@ -71,6 +85,13 @@ export default function CharactersConsole({ projectId }: { projectId: string }) 
       <div className="charBar">
         <h2 className="charBarTitle">Characters</h2>
         {doc && (
+          <div className="charTools" role="toolbar" aria-label="What to work on">
+            {SECTIONS.map(({ section: x, label, Icon }) => (
+              <button key={x} type="button" className="charIconBtn" aria-pressed={section === x} aria-label={label} title={label} onClick={() => setSection(x)}><Icon size={18} /></button>
+            ))}
+          </div>
+        )}
+        {doc && section === 'look' && (
           <div className="charTools" role="toolbar" aria-label="Ways to see the character">
             {MODES.map(({ mode: m, label, Icon }) => (
               <button key={m} type="button" className="charIconBtn" aria-pressed={mode === m} aria-label={label} title={label} onClick={() => setMode(m)}><Icon size={18} /></button>
@@ -87,7 +108,10 @@ export default function CharactersConsole({ projectId }: { projectId: string }) 
       {c.notice && <p className="charNote charNote--error" role="alert">{c.notice}</p>}
       <div className="charSplit">
         <CharacterList c={c} />
-        {doc && ctx ? (
+        {doc && section === 'profile' && <ProfileSection doc={doc} edit={c.edit} />}
+        {doc && section === 'relationships' && <RelationshipsSection projectId={projectId} c={c} doc={doc} points={points} />}
+        {doc && section === 'story' && <StorySection doc={doc} edit={c.edit} points={points} />}
+        {doc && ctx && section === 'look' ? (
           <>
             <div className="charStage">
               {(mode === 'closeup' || mode === 'full') && (
@@ -161,7 +185,7 @@ export default function CharactersConsole({ projectId }: { projectId: string }) 
               ))}
             </div>
           </>
-        ) : (
+        ) : doc ? null : (
           <p className="charNote charEmpty">{c.cast.length === 0 ? 'Make a character to start: a face, a build and a wardrobe.' : 'Pick a character in the list to open it.'}</p>
         )}
       </div>

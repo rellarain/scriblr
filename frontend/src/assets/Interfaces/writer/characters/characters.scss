@@ -134,3 +134,22 @@
   .charBox { min-height: 420px; }
   .charTurn { grid-template-columns: repeat(2, minmax(0, 1fr)); }
 }
+
+// ---- the profile, the relationships and the story ----
+.charSheet { flex: 1 1 auto; min-width: 0; display: grid; grid-template-columns: repeat(auto-fill, minmax(320px, 1fr)); gap: var(--space-4); align-content: start; overflow-y: auto; }
+.charWide { grid-column: 1 / -1; }
+.charArea { resize: vertical; min-height: 56px; line-height: 1.4; }
+.charSelect--auto { width: auto; max-width: 100%; }
+.charList2 { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: var(--space-3); }
+.charItem { display: flex; align-items: flex-start; gap: var(--space-3); padding: var(--space-3); background: var(--ov-sink-1); min-width: 0; &--col { flex-direction: column; align-items: stretch; } }
+.charChanges { display: flex; flex-direction: column; gap: var(--space-2); padding: var(--space-3); background: var(--ov-sink-2); }
+.charIncoming { display: flex; gap: var(--space-3); align-items: baseline; font-size: var(--text-field); }
+.charLink { padding: 0; border: 0; background: none; color: var(--ink); font: inherit; font-weight: 700; text-decoration: underline; cursor: pointer; &:focus-visible { outline: 2px solid var(--accent-hover); outline-offset: 2px; } }
+.charWebSvg { display: block; width: 100%; max-width: 360px; height: auto; margin: 0 auto; }
+.charWebNode { cursor: pointer; &:focus-visible { outline: 2px solid var(--accent-hover); } }
+.charKey { list-style: none; margin: 0; padding: 0; display: flex; flex-wrap: wrap; gap: var(--space-4); font-size: var(--text-small); li { display: flex; align-items: center; gap: var(--space-2); } }
+.charTree { display: flex; flex-direction: column; gap: var(--space-3); }
+.charTreeRow { display: flex; flex-direction: column; gap: var(--space-1); }
+.charTreePeople { list-style: none; margin: 0; padding: 0; display: flex; flex-wrap: wrap; gap: var(--space-4); }
+.charTreeUnit { display: flex; align-items: center; gap: var(--space-2); }
+.charGaps { margin: 0; padding-left: var(--space-5); display: flex; flex-direction: column; gap: var(--space-3); font-size: var(--text-field); ul { margin: var(--space-1) 0 0; padding-left: var(--space-5); } }
