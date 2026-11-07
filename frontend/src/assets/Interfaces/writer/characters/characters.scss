@@ -74,30 +74,34 @@
 // ---- the panels ----
 .charPanel--start { align-self: start; }
 .charPanel { display: flex; flex-direction: column; gap: var(--space-3); padding: var(--space-3); background: var(--surface-raised); box-shadow: inset 0 0 0 1px var(--hairline); }
-// ---- a narrow console: the parts stack ----
-@container (max-width: 859px) {
-  .charSplit { flex-direction: column; }
-  .charList { flex: 0 0 auto; max-height: 300px; }
-  .charPortrait { flex-direction: column; align-items: stretch; }
-  .charPortraitStage { flex: 0 0 auto; max-width: 360px; }
-}
-
-// ---- the portrait: the card, the tabs and the dropdowns whose choices are pictures ----
+// ---- the portrait: the card, the sections that open and close, and the dropdowns whose choices are pictures ----
 // (The tile and what is drawn on it are the character's own colours, inside the picture.)
-.charPortrait { flex: 1 1 auto; min-width: 0; display: flex; align-items: flex-start; gap: var(--space-5); }
+.charPortrait { flex: 1 1 auto; min-width: 0; min-height: 0; display: flex; align-items: stretch; gap: var(--space-5); }
 .charPortrait > .charPanel:last-child { flex: 1 1 0; min-width: 0; }
-.charPortraitStage { flex: 0 0 320px; min-width: 0; }
+.charPortraitStage { flex: 0 0 320px; min-width: 0; align-self: flex-start; }
 .charPortraitCard { display: flex; flex-direction: column; align-items: center; gap: var(--space-1); min-width: 0; &--big { align-items: stretch; gap: var(--space-2); .charCardName { font-size: var(--text-title); text-align: center; } } }
 .charPortraitArt { display: block; width: 100%; height: auto; aspect-ratio: 1; }
-.charTabs { display: flex; flex-wrap: wrap; gap: var(--space-1); }
-.charTab {
-  display: inline-flex; align-items: center; gap: var(--space-2); min-height: 36px; padding: 0 var(--space-3); border: 0; border-radius: var(--radius-button); background: none; color: var(--ink);
-  font: inherit; font-size: var(--text-ui); font-weight: 600; opacity: 0.85; cursor: pointer;
-  &:hover { opacity: 1; background: var(--ov-sink-1); }
-  &[aria-selected='true'] { opacity: 1; background: var(--ov-sink-2); box-shadow: inset 0 -2px 0 var(--accent); }
-  &:focus-visible { outline: 2px solid var(--accent-hover); outline-offset: 1px; }
+// The sections: a heading button for each (the portrait is made of a head, hair, a face and a body; the card is its tile and the name) with its subsections inside.
+// The settings are as long as the page of sections is, and scroll beside the card, which stays where it is.
+.charAcc { gap: 0; padding: var(--space-1); align-self: stretch; min-height: 0; overflow-y: auto; }
+.charAccItem { display: flex; flex-direction: column; & + & { margin-top: var(--space-1); } }
+.charAccHead, .charSubHead { margin: 0; font: inherit; }
+.charAccBtn, .charSubBtn {
+  display: flex; align-items: center; gap: var(--space-2); width: 100%; box-sizing: border-box; border: 0; border-radius: var(--radius-none); background: none; color: var(--ink);
+  font: inherit; text-align: left; cursor: pointer;
+  &:hover { background: var(--ov-sink-1); }
+  &:focus-visible { outline: 2px solid var(--accent-hover); outline-offset: -2px; }
+  .charAccName { flex: 1 1 auto; min-width: 0; }
+  .charAccChev { display: inline-flex; flex: 0 0 auto; transition: transform 120ms; }
+  &[aria-expanded='false'] .charAccChev { transform: rotate(-90deg); }
 }
+.charAccBtn { min-height: 40px; padding: 0 var(--space-3); font-size: var(--text-ui); font-weight: 600; background: var(--ov-sink-1); &[aria-expanded='true'] { background: var(--ov-sink-2); box-shadow: inset 3px 0 0 var(--accent); } }
+.charAccBody { display: flex; flex-direction: column; gap: var(--space-1); padding: var(--space-2) 0 var(--space-1) var(--space-3); }
+.charSub { display: flex; flex-direction: column; gap: var(--space-2); }
+.charSubBtn { min-height: 30px; padding: 0 var(--space-2); font-size: var(--text-small); font-weight: 600; text-transform: uppercase; letter-spacing: 0.5px; color: var(--ink-muted); }
+.charSub .charPortraitFields { padding: var(--space-1) var(--space-2) var(--space-3); }
 .charPortraitFields { display: grid; grid-template-columns: repeat(auto-fill, minmax(240px, 1fr)); gap: var(--space-4) var(--space-5); align-content: start; }
+.charHint--wide { grid-column: 1 / -1; margin: 0; }
 .charStateHead { width: 32px; height: 32px; flex: 0 0 auto; }
 
 .charPick { display: flex; flex-direction: column; gap: var(--space-1); min-width: 0; }
@@ -124,6 +128,16 @@
   .charPickName { flex: 0 0 auto; max-width: 100%; white-space: normal; }
   &--active { background: var(--ov-sink-2); }
   &[aria-selected='true'] { box-shadow: inset 0 0 0 2px var(--accent); }
+}
+
+// ---- a narrow console: the parts stack ----
+@container (max-width: 859px) {
+  .charSplit { flex-direction: column; overflow-y: auto; }
+  .charList { flex: 0 0 auto; max-height: 300px; }
+  .charPortrait { flex: 0 0 auto; flex-direction: column; align-items: stretch; }
+  .charPortraitStage { flex: 0 0 auto; max-width: 360px; }
+  .charPortrait > .charPanel:last-child { flex: 0 0 auto; }
+  .charAcc { overflow-y: visible; align-self: stretch; }
 }
 
 // ---- the profile, the relationships and the story ----

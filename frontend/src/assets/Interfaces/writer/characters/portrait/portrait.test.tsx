@@ -4,8 +4,8 @@ import type { CharacterPortrait } from '../../../../../api/types'
 import { cropBox, type PortraitCrop } from './crops'
 import { defaultPortrait, normalizePortrait, PORTRAIT_RANGES, type SliderKey } from './defaults'
 import {
-  AGES, BROWS, BUILDS, CHESTS, EARS, EDGES, EXPRESSIONS, EYES, FACIAL, FRONTS, GREYING, HAIRLINES, HAIRLINE_HEIGHTS, HEADS, LENGTHS, MOUTHS, NOSES, STYLES, TEXTURES, TOPS,
-  fitHair, frontsFor, stylesFor,
+  AGES, BROWS, BUILDS, CHESTS, EARS, EDGES, ENDS, EXPRESSIONS, EYES, FACIAL, FRONTS, GREYING, HAIRLINES, HAIRLINE_HEIGHTS, HEADS, LENGTHS, MOUTHS, NOSES, PLACEMENTS, STYLES, TEXTURES, TOPS,
+  endsFor, fitHair, frontsFor, placementsFor, stylesFor,
 } from './library'
 import { Portrait } from './Portrait'
 import { PART_KEYS, optionsFor, type PartKey } from './registry'
@@ -27,7 +27,7 @@ function expectWhole(p: CharacterPortrait, what: string) {
 
 const LISTS: Record<Exclude<PartKey, 'hairStyle' | 'hairFront'>, readonly { id: string }[]> = {
   age: AGES, build: BUILDS, chest: CHESTS, headShape: HEADS, ears: EARS, expression: EXPRESSIONS, eyes: EYES, brows: BROWS, nose: NOSES, mouth: MOUTHS,
-  hairLength: LENGTHS, hairTexture: TEXTURES, hairline: HAIRLINES, hairlineHeight: HAIRLINE_HEIGHTS, hairEdges: EDGES, greying: GREYING, facialHair: FACIAL, top: TOPS,
+  hairLength: LENGTHS, hairTexture: TEXTURES, hairline: HAIRLINES, hairlineHeight: HAIRLINE_HEIGHTS, hairEdges: EDGES, hairEnds: ENDS, hairPlacement: PLACEMENTS, greying: GREYING, facialHair: FACIAL, top: TOPS,
 }
 
 describe('the portrait is drawn from its choices', () => {
@@ -60,6 +60,26 @@ describe('the portrait is drawn from its choices', () => {
     for (const front of FRONTS) for (const hairline of HAIRLINES) for (const edges of EDGES) {
       expectWhole(portrait({ hairLength: 'shoulder', hairFront: front.id, hairline: hairline.id, hairEdges: edges.id }), `${front.id} ${hairline.id} ${edges.id}`)
     }
+  })
+
+  it('draws every placement and every end, on loose hair of every length that hangs, in three textures and in every style that allows them', () => {
+    const hanging = LENGTHS.filter(l => l.i >= 3)
+    for (const style of ['plain', 'halfup', 'shavedside', 'triangle']) {
+      for (const length of hanging) for (const texture of ['1A', '2B', '3B']) {
+        const base = { hairStyle: style, hairLength: length.id, hairTexture: texture, hairFront: 'none' }
+        for (const placement of placementsFor(base).map(o => o.id)) for (const ends of endsFor(base).map(o => o.id)) {
+          expectWhole(portrait({ ...base, hairPlacement: placement, hairEnds: ends }), `${style} ${length.id} ${texture} ${placement} ${ends}`)
+        }
+      }
+    }
+  })
+
+  it('draws every placement and end even where the style or length does not allow it, as the hair that fits', () => {
+    for (const placement of PLACEMENTS) for (const ends of ENDS) for (const style of ['twobraids', 'boxbraids', 'topbun', 'mohawk', 'cornrows']) {
+      expectWhole(portrait({ hairLength: 'hip', hairStyle: style, hairPlacement: placement.id, hairEnds: ends.id, hairFront: 'none' }), `${style} ${placement.id} ${ends.id}`)
+    }
+    const short = { hairLength: 'short', hairStyle: 'plain', hairFront: 'none', hairTexture: '1A' }
+    expect(shapesOf(portrait({ ...short, hairPlacement: 'allleft', hairEnds: 'in' }))).toEqual(shapesOf(portrait(short)))
   })
 
   it('draws every hair length and texture together', () => {
@@ -186,7 +206,8 @@ describe('the Portrait component', () => {
 
 describe('the registry', () => {
   it('offers every part a list of choices that has the current one in it', () => {
-    const p = portrait()
+    // (Long loose hair, so that its placement and its ends are a choice too.)
+    const p = portrait({ hairLength: 'chest' })
     for (const key of PART_KEYS) {
       const options = optionsFor(key, p)
       expect(options.length, key).toBeGreaterThan(2)
@@ -211,6 +232,18 @@ describe('the registry', () => {
     expect(stylesFor({ hairLength: 'knee', hairStyle: 'plain', hairFront: 'none' }).map(s => s.id)).not.toContain('mohawk')
     expect(frontsFor({ hairLength: 'buzzed', hairStyle: 'plain', hairFront: 'none' }).map(f => f.id)).toEqual(['none'])
     expect(fitHair({ hairLength: 'bald', hairStyle: 'twobraids', hairFront: 'curtain' })).toEqual({ hairLength: 'bald', hairStyle: 'plain', hairFront: 'none' })
+    // The placement and the ends are a choice only for loose hair that hangs: otherwise they go back to the usual.
+    const short = { hairLength: 'short', hairStyle: 'plain', hairFront: 'none', hairEnds: 'in', hairPlacement: 'allleft' }
+    expect(fitHair(short)).toEqual({ ...short, hairEnds: 'straight', hairPlacement: 'front' })
+    const braids = { hairLength: 'hip', hairStyle: 'twobraids', hairFront: 'none', hairEnds: 'out', hairPlacement: 'left' }
+    expect(fitHair(braids)).toEqual({ ...braids, hairEnds: 'straight', hairPlacement: 'front' })
+    const coily = { hairLength: 'hip', hairStyle: 'plain', hairFront: 'none', hairTexture: '4C', hairEnds: 'out', hairPlacement: 'behind' }
+    expect(fitHair(coily)).toEqual({ ...coily, hairEnds: 'straight', hairPlacement: 'front' })
+    const triangle = { hairLength: 'chest', hairStyle: 'triangle', hairFront: 'none', hairEnds: 'in', hairPlacement: 'allright' }
+    expect(fitHair(triangle)).toEqual({ ...triangle, hairEnds: 'straight', hairPlacement: 'front' })
+    expect(fitHair({ ...triangle, hairPlacement: 'behind' }).hairPlacement).toBe('behind')
+    const loose = { hairLength: 'hip', hairStyle: 'plain', hairFront: 'none', hairEnds: 'out', hairPlacement: 'right' }
+    expect(fitHair(loose)).toEqual(loose)
     const whole = { hairLength: 'chest', hairStyle: 'twobraids', hairFront: 'side' }
     expect(fitHair(whole)).toEqual(whole)
   })

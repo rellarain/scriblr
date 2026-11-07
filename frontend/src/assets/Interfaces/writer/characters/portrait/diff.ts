@@ -11,7 +11,7 @@ const COLOURS: Array<[ColourKey, ColourKind, string]> = [
   ['skin', 'skin', ''], ['eyeColor', 'eye', ''], ['hairColor', 'hair', ''], ['highlightColor', 'hair', 'none'], ['browColor', 'hair', 'like the hair'], ['lipColor', 'cloth', 'natural'],
   ['facialHairColor', 'hair', 'like the hair'], ['topColor', 'cloth', ''],
 ]
-const SLIDERS: SliderKey[] = ['headWidth', 'eyeSize', 'eyeSpacing', 'noseSize', 'noseWidth', 'mouthSize']
+const SLIDERS: SliderKey[] = ['headWidth', 'eyeSize', 'eyeSpacing', 'noseSize', 'noseWidth', 'mouthSize', 'shoulderWidth', 'neckWidth']
 
 export function portraitDiff(a: CharacterPortrait, b: CharacterPortrait): string[] {
   const lines: string[] = []

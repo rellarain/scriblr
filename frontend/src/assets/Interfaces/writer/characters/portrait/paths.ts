@@ -62,15 +62,43 @@ export function band(curve: Pt[], w0: number, w1: number, wm?: number, side = 0)
 // A curve sampled from a function of t in 0..1.
 export function sample(f: (t: number) => Pt, n: number): Pt[] { let out = []; for (let i = 0; i <= n; i++) out.push(f(i / n)); return out; }
 
-// A closed outline with a bumpy (curly) edge: each segment bulges outward from the centre.
-export function bumpy(pts: Pt[], amp: number, cx: number, cy: number): string {
+// A repeatable number from 0 to 1 for each whole number: the same every time, with no pattern the eye can find (curls that are not all alike, drawn the same every time).
+export function rnd(i: number): number {
+  const x = Math.sin(i * 12.9898 + 78.233) * 43758.5453;
+  return x - Math.floor(x);
+}
+
+// A closed outline with a bumpy (curly) edge: each segment bulges outward from the centre, by `amp` (or by the amount a function gives for the segment), leaning a little to one
+// side or the other (`lean`, from 0, none, to 1) so that no two curls are the same.
+export function bumpy(pts: Pt[], amp: number | ((i: number) => number), cx: number, cy: number, lean = 0): string {
   let n = pts.length, d = 'M' + pt(pts[0]);
   for (let i = 0; i < n; i++) {
     let a = pts[i], b = pts[(i + 1) % n], mx = (a[0] + b[0]) / 2, my = (a[1] + b[1]) / 2, ox = mx - cx, oy = my - cy, ol = Math.hypot(ox, oy) || 1;
-    let seg = Math.hypot(b[0] - a[0], b[1] - a[1]); let k = Math.min(amp, seg * 0.7);
-    d += 'Q' + pt([mx + ox / ol * k * 1.6, my + oy / ol * k * 1.6]) + ' ' + pt(b);
+    let seg = Math.hypot(b[0] - a[0], b[1] - a[1]); let k = Math.min(typeof amp === 'function' ? amp(i) : amp, seg * 0.7);
+    let slide = lean ? (rnd(i + 31) - 0.5) * 2 * lean * seg * 0.45 : 0, tx = (b[0] - a[0]) / (seg || 1), ty = (b[1] - a[1]) / (seg || 1);
+    d += 'Q' + pt([mx + ox / ol * k * 1.6 + tx * slide, my + oy / ol * k * 1.6 + ty * slide]) + ' ' + pt(b);
   }
   return d + 'Z';
+}
+
+// Points along a closed outline at spaces that vary (by up to `spread` of the step, either way), so that curls and coils are not all the same size.
+export function uneven(pts: Pt[], step: number, spread = 0.4): Pt[] {
+  const n = pts.length, out: Pt[] = [pts[0]];
+  let k = 0, target = step * (1 + spread * (2 * rnd(0) - 1)), acc = 0;
+  for (let i = 0; i < n; i++) {
+    const a = pts[i], b = pts[(i + 1) % n], seg = Math.hypot(b[0] - a[0], b[1] - a[1]);
+    if (seg === 0) continue;
+    let pos = 0;
+    while (acc + (seg - pos) >= target) {
+      pos += target - acc;
+      out.push([lerp(a[0], b[0], pos / seg), lerp(a[1], b[1], pos / seg)]);
+      acc = 0; k++; target = step * (1 + spread * (2 * rnd(k) - 1));
+    }
+    acc += seg - pos;
+  }
+  const f = out[0], l = out[out.length - 1];
+  if (out.length > 3 && Math.hypot(f[0] - l[0], f[1] - l[1]) < step * 0.4) out.pop();
+  return out;
 }
 
 // Points every `step` units along a closed outline (so a curl or a wave has the same size wherever the outline is long or short).

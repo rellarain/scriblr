@@ -13,7 +13,7 @@ import { hasPending, usePendingOpen } from '../links/worldNav'
 import { ForReadersSection } from './ForReadersSection'
 import { useCast } from './castStore'
 import { exportSheet } from './sheet'
-import { PortraitSection, type PortraitTab } from './PortraitSection'
+import { PortraitSection } from './PortraitSection'
 import { ProfileSection } from './ProfileSection'
 import { RelationshipsSection } from './RelationshipsSection'
 import { StorySection } from './StorySection'
@@ -41,8 +41,6 @@ export default function CharactersConsole({ projectId, outline = [], plotNodes =
   const c = useCharacters(projectId)
   const { ui } = useSettings()
   const [section, setSection] = useState<Section>(initialSection)
-  // The tab of the portrait stays where it was when another character is opened.
-  const [portraitTab, setPortraitTab] = useState<PortraitTab>('face')
   const points = useMemo(() => storyPoints(outline), [outline])
   const { doc } = c
   const store = useCast(projectId)
@@ -102,7 +100,7 @@ export default function CharactersConsole({ projectId, outline = [], plotNodes =
       <div className="charSplit">
         <CharacterList c={c} />
         {doc && section === 'appearance' && <AppearanceSection doc={doc} edit={c.edit} rename={c.rename} />}
-        {doc && section === 'portrait' && <PortraitSection doc={doc} edit={c.edit} rename={c.rename} tab={portraitTab} onTab={setPortraitTab} />}
+        {doc && section === 'portrait' && <PortraitSection doc={doc} edit={c.edit} rename={c.rename} />}
         {doc && section === 'profile' && <ProfileSection doc={doc} edit={c.edit} />}
         {doc && section === 'relationships' && <RelationshipsSection projectId={projectId} c={c} doc={doc} points={points} />}
         {doc && section === 'cast' && <CastSection c={c} cast={all} doc={doc} onOpen={id => { void c.open(id) }} />}

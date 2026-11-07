@@ -7,10 +7,10 @@ export function CommitText({ label, value, onCommit, max }: { label: string; val
   return <MapCommitText label={label} value={value} onCommit={onCommit} max={max} className="charInput" />
 }
 
-export function Field({ label, children, short = false }: { label: string; children: React.ReactNode; short?: boolean }) {
+export function Field({ label, children, short = false, bare = false }: { label: string; children: React.ReactNode; short?: boolean; bare?: boolean }) {
   return (
     <div className={short ? 'charField charField--short' : 'charField'}>
-      <span className="charLabel" aria-hidden="true">{label}</span>
+      {!bare && <span className="charLabel" aria-hidden="true">{label}</span>}
       {children}
     </div>
   )

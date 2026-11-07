@@ -516,7 +516,9 @@ export interface CharacterPortrait {
   brows: string; browColor: string | null
   nose: string; noseSize: number; noseWidth: number
   mouth: string; mouthSize: number; lipColor: string | null
-  hairLength: string; hairTexture: string; hairStyle: string; hairFront: string; hairline: string; hairlineHeight: string; hairEdges: string
+  // How wide the shoulders and the neck are (1 is the build's own).
+  shoulderWidth: number; neckWidth: number
+  hairLength: string; hairTexture: string; hairStyle: string; hairFront: string; hairline: string; hairlineHeight: string; hairEdges: string; hairEnds: string; hairPlacement: string
   hairColor: string; highlightColor: string | null; greying: string
   facialHair: string; facialHairColor: string | null
   top: string; topColor: string; tileColor: string

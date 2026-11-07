@@ -108,6 +108,17 @@ const STYLE_WORDS: Record<string, string> = {
   topknot: 'in a top knot', halfup: 'worn half up', highpony: 'in a high ponytail', lowpony: 'in a low ponytail', pigtails: 'in pigtails', undercut: 'in an undercut',
   shavedside: 'with one side shaved', mohawk: 'in a mohawk', fade: 'in a fade', quiff: 'in a quiff', slicked: 'slicked back',
 }
+// Where hair that hangs lies is said as you look at the portrait (the left of the picture), since that is what the author sees.
+const PLACEMENT_WORDS: Record<string, string> = {
+  allleft: 'all brought forward on the left of the portrait', allright: 'all brought forward on the right of the portrait',
+  left: 'forward on the left of the portrait and behind on the right', right: 'forward on the right of the portrait and behind on the left', behind: 'all behind the shoulders',
+}
+const ENDS_WORDS: Record<string, string> = { in: 'with the ends curving in', out: 'with the ends curving out' }
+const TOP_WORDS: Record<string, string> = {
+  crew: 'crew-neck top', vneck: 'V-neck top', deepv: 'top with a deep V neckline', scoop: 'scoop-neck top', widescoop: 'top with a wide scoop neckline', boat: 'boat-neck top',
+  square: 'square-neck top', sweetheart: 'top with a sweetheart neckline', henley: 'henley', polo: 'polo shirt', mock: 'mock-neck top', turtle: 'turtleneck', cowl: 'cowl-neck top',
+  offshoulder: 'off-the-shoulder top', strapless: 'strapless top',
+}
 const FRONT_WORDS: Record<string, string> = { none: '', centre: 'with a centre part', side: 'with a side part', back: 'swept back', bangs: 'with straight bangs', curtain: 'with curtain bangs', sidebangs: 'with side-swept bangs' }
 const HAIRLINE_WORDS: Record<string, string> = {
   widow: 'a widow\u2019s peak', mshape: 'an M-shaped hairline', uneven: 'an uneven hairline', mature: 'a mature hairline', receding: 'a receding hairline', deep: 'a deeply receding hairline',
@@ -118,7 +129,15 @@ const EXPRESSION_WORDS: Record<string, string> = {
   surprised: 'surprised', sleepy: 'sleepy', thoughtful: 'thoughtful',
 }
 
-const buildWords = (p: CharacterPortrait): string => BUILD_WORDS[p.build] ?? `${lower(optionName('build', p.build))} build`
+function buildWords(p: CharacterPortrait): string {
+  const base = BUILD_WORDS[p.build] ?? `${lower(optionName('build', p.build))} build`
+  // The shoulders and the neck, when they are not the build's own.
+  const extras = [
+    p.shoulderWidth > 1.1 ? 'wide shoulders' : p.shoulderWidth < 0.9 ? 'narrow shoulders' : '',
+    p.neckWidth > 1.15 ? 'a thick neck' : p.neckWidth < 0.88 ? 'a slender neck' : '',
+  ].filter(Boolean)
+  return extras.length > 0 ? `${base}, with ${listed(extras)}` : base
+}
 
 const skinWords = (p: CharacterPortrait): string => `${cap(colourName(p.skin, 'skin'))} skin${p.age === 'older' || p.age === 'elderly' ? ', lined with age' : ''}`
 
@@ -132,6 +151,7 @@ function hairWords(p: CharacterPortrait): string {
   const texture = p.hairLength === 'buzzed' ? '' : `${TEXTURE_WORDS[p.hairTexture] ?? lower(optionName('hairTexture', p.hairTexture))} `
   const extras = [
     STYLE_WORDS[p.hairStyle] ?? '', FRONT_WORDS[p.hairFront] ?? '', HAIRLINE_WORDS[p.hairline] ?? '',
+    PLACEMENT_WORDS[p.hairPlacement] ?? '', ENDS_WORDS[p.hairEnds] ?? '',
     p.highlightColor ? `${colourName(p.highlightColor, 'hair')} highlights` : '',
   ].filter(Boolean)
   // The length, the texture and the colour are one phrase; the style, the front and the hairline follow it ("Chest-length wavy black hair, in two braids, with a side part").
@@ -155,7 +175,7 @@ function faceWords(p: CharacterPortrait): string {
 
 function styleWords(p: CharacterPortrait): string {
   const colour = colourName(p.topColor, 'cloth')
-  return `Wears ${article(colour)} ${colour} ${lower(optionName('top', p.top))}${p.top === 'turtle' ? '' : ' top'}`
+  return `Wears ${article(colour)} ${colour} ${TOP_WORDS[p.top] ?? `${lower(optionName('top', p.top))} top`}`
 }
 
 const bearingWords = (p: CharacterPortrait): string => `Usually looks ${EXPRESSION_WORDS[p.expression] ?? lower(optionName('expression', p.expression))}`

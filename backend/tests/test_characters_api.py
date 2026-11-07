@@ -62,6 +62,30 @@ def test_an_id_this_build_does_not_know_is_kept_so_a_newer_portrait_survives() -
     assert CharacterPortrait.model_validate({"hairStyle": "from-the-future", "age": "ancient"}).hairStyle == "from-the-future"
 
 
+def test_the_width_of_the_shoulders_and_of_the_neck_are_sliders_held_to_their_range_and_old_portraits_get_the_usual() -> None:
+    assert CharacterPortrait().shoulderWidth == 1.0 and CharacterPortrait().neckWidth == 1.0
+    old = CharacterPortrait.model_validate({"build": "broad"})
+    assert old.shoulderWidth == 1.0 and old.neckWidth == 1.0 and old.build == "broad"
+    wide = CharacterPortrait.model_validate({"shoulderWidth": 9, "neckWidth": -4})
+    assert wide.shoulderWidth == PORTRAIT_RANGES["shoulderWidth"][1] and wide.neckWidth == PORTRAIT_RANGES["neckWidth"][0]
+    assert CharacterPortrait.model_validate({"shoulderWidth": "wide", "neckWidth": None}).neckWidth == 1.0
+    assert CharacterPortrait.model_validate({"shoulderWidth": 1.1}).shoulderWidth == 1.1
+
+
+def test_the_ends_and_the_placement_of_the_hair_are_ids_with_defaults_and_old_portraits_get_them() -> None:
+    plain = CharacterPortrait()
+    assert plain.hairEnds == "straight" and plain.hairPlacement == "front"
+    # a portrait saved before these existed has neither: it opens with the defaults, and keeps what else it had
+    old = CharacterPortrait.model_validate({"hairLength": "hip", "hairStyle": "halfup"})
+    assert old.hairEnds == "straight" and old.hairPlacement == "front" and old.hairLength == "hip"
+    made = CharacterPortrait.model_validate({"hairEnds": " out ", "hairPlacement": "allleft"})
+    assert made.hairEnds == "out" and made.hairPlacement == "allleft"
+    # a bad value is the default, an id this build does not know is kept
+    assert CharacterPortrait.model_validate({"hairEnds": 4, "hairPlacement": "  "}).hairPlacement == "front"
+    assert CharacterPortrait.model_validate({"hairEnds": 4}).hairEnds == "straight"
+    assert CharacterPortrait.model_validate({"hairPlacement": "over-the-moon"}).hairPlacement == "over-the-moon"
+
+
 def test_a_character_without_a_portrait_or_with_a_broken_one_has_the_default() -> None:
     assert CharacterDoc.model_validate({"id": "c1"}).portrait == CharacterPortrait()
     assert CharacterDoc.model_validate({"id": "c1", "portrait": "nonsense"}).portrait == CharacterPortrait()
@@ -77,7 +101,7 @@ def test_a_state_keeps_a_portrait_it_captured_and_ignores_a_broken_one_and_the_o
 
 def test_the_ranges_are_the_front_ends(client: TestClient) -> None:
     # the front end's portrait/defaults.ts holds the same list (a portrait/defaults test reads this file too)
-    assert set(PORTRAIT_RANGES) == {"headWidth", "eyeSize", "eyeSpacing", "eyeTilt", "noseSize", "noseWidth", "mouthSize"}
+    assert set(PORTRAIT_RANGES) == {"headWidth", "eyeSize", "eyeSpacing", "eyeTilt", "noseSize", "noseWidth", "mouthSize", "shoulderWidth", "neckWidth"}
 
 
 # ---- the endpoints ----
@@ -107,10 +131,13 @@ def test_a_portrait_and_a_captured_one_are_saved_with_the_character_and_the_old_
     c = _new(client, pid, name="Ada", look={"hair": "braid"})
     c["portrait"]["hairTexture"] = "3B"
     c["portrait"]["highlightColor"] = "#c9a063"
+    c["portrait"]["hairEnds"] = "in"
+    c["portrait"]["hairPlacement"] = "right"
     c["states"] = [{"id": "s1", "at": "", "portrait": {**c["portrait"], "age": "older"}}]
     assert client.put(f"/api/projects/{pid}/characters/{c['id']}", json=c).status_code == 200
     got = client.get(f"/api/projects/{pid}/characters/{c['id']}").json()
     assert got["portrait"]["hairTexture"] == "3B" and got["portrait"]["highlightColor"] == "#c9a063"
+    assert got["portrait"]["hairEnds"] == "in" and got["portrait"]["hairPlacement"] == "right"
     assert got["states"][0]["portrait"]["age"] == "older" and got["states"][0]["snapshot"] is None
     assert got["look"]["hair"] == "braid"
 

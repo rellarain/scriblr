@@ -5,7 +5,7 @@
 import { clamp, lerp, PI, type Pt } from './paths'
 import { AGES, BUILDS, EYES, HEADS, pick, type Age, type Build, type Head } from './library'
 
-export interface RigInput { age: string; build: string; headShape: string; headWidth: number; eyes: string; eyeSize: number; eyeSpacing: number }
+export interface RigInput { age: string; build: string; headShape: string; headWidth: number; eyes: string; eyeSize: number; eyeSpacing: number; shoulderWidth?: number; neckWidth?: number }
 
 export interface Rig {
   age: Age; build: Build; hs: Head
@@ -33,9 +33,9 @@ export function rigOf(p: RigInput): Rig {
     chinW: W * lerp(hs.chin, 0.38, baby), lines: age.lines,
     hairK: 1 - baby * 0.5,
   } as Rig;
-  g.neck = W * build.neck * age.neckW * (child ? 1.05 : 1);
+  g.neck = W * build.neck * age.neckW * (child ? 1.05 : 1) * clamp(p.neckWidth ?? 1, 0.7, 1.4);
   g.neckBase = chin + age.neckLen * build.neckLen;
-  g.S = build.shoulder * age.shoulder;
+  g.S = build.shoulder * age.shoulder * clamp(p.shoulderWidth ?? 1, 0.7, 1.4);
   g.shoulderY = g.neckBase + 12 * Math.max(0.6, age.shoulder) + (build.trap - 0.35) * 8;
   g.sk = { rx: g.fore, ry: eyeY + H * 0.02 - top, cy: eyeY + H * 0.02 };
   // The eyes: half width and the distance of each centre from the middle.

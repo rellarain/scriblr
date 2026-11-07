@@ -2,17 +2,25 @@
 // back (what lies behind the head and the shoulders) and the front (the cap over the skull, the curtains beside the face, braids, buns and tails). A texture gives the edge of
 // every shape its waves, curls or coils; a length that is stretched is shortened by the texture (a curl draws shorter than the hair measures).
 
-import { Shapes, band, bumpy, clamp, ell, evenly, lerp, mirror, pt, PI, sample, smoothDense, spline, sym, type Pt } from '../paths'
+import { Shapes, band, bumpy, clamp, ell, evenly, lerp, mirror, pt, PI, rnd, sample, smoothDense, spline, sym, uneven, type Pt } from '../paths'
 import { mix, shade } from '../colour'
-import { FRONTS, HAIRLINE_HEIGHTS, LENGTHS, STYLES, TEXTURES, pick, fitHair, type Front, type Length, type Style, type Texture } from '../library'
+import { EARS, FRONTS, HAIRLINE_HEIGHTS, LENGTHS, STYLES, TEXTURES, pick, fitHair, type Front, type Length, type Style, type Texture } from '../library'
 import { capOuter, faceX, hug, skull, type Rig } from '../rig'
 import { type Drawn } from '../types'
 
-// What one portrait's hair is, worked out from its settings: the entries they name, the length in units, where the hair ends, how full it is, whether it hangs.
-export interface HairModel { p: Drawn; len: Length; tex: Texture; sty: Style; front: Front; L: number; end: number; V: number; coily: boolean; hang: boolean; sideY: number }
-// The cap over the skull: how far its top (vol) and its sides (side) stand off the skull, where its sides end (low), its front edge, and a lift of the crown.
-export interface CapOpts { vol: number; side: number; low: number; front: Pt[]; lift?: number; liftX?: number }
-export interface CurtainOpts { only?: number; flare?: boolean }
+// What one portrait's hair is, worked out from its settings: the entries they name, the length in units, where the hair ends, how full it is, whether it hangs, where it lies
+// (`place`: front, allleft, allright, left, right or behind, as you look at the portrait), how its ends turn (`ends`), how far the ears reach past the skull, and where the hair
+// at each side of the face ends (`sideYR` on the right of the picture, `sideYL` on the left: the eye line when that side falls in front, the brow when it is tucked behind the ear).
+export interface HairModel {
+  p: Drawn; len: Length; tex: Texture; sty: Style; front: Front; L: number; end: number; V: number; coily: boolean; hang: boolean; sideY: number
+  place: string; ends: string; ear: number; sideYR: number; sideYL: number
+}
+// The cap over the skull: how far its top (vol) and its sides (side) stand off the skull, where its sides end (low), its front edge, and a lift of the crown. The left side of the
+// picture may have its own side and low (sideL, lowL), for hair that lies differently there.
+export interface CapOpts { vol: number; side: number; low: number; front: Pt[]; lift?: number; liftX?: number; sideL?: number; lowL?: number }
+// One fall of hair beside the face: on one side only (1 is the right of the picture, -1 the left), flared out, or `wide` (all the hair in front over one shoulder: fuller, and
+// crossing the neck toward the chest).
+export interface CurtainOpts { only?: number; flare?: boolean; wide?: boolean }
 
 export function lock(g: Rig, x0: number, y0: number, x1: number, y1: number, w0: number, w1: number, wave: number): string {
   let c = sample(function (t) { return [lerp(x0, x1, t) + (wave ? Math.sin(t * PI * 2.5) * wave : 0), lerp(y0, y1, t)]; }, 10);
@@ -39,13 +47,54 @@ export function hairModel(g: Rig, p: Drawn): HairModel {
   let end = g.top + L * shrink;
   let coily = tex.kind === 'coily';
   let hang = !coily && end > g.browY + 6;
-  return { p: p, len: len, tex: tex, sty: sty, front: front, L: L, end: end, V: V, coily: coily, hang: hang, sideY: hang ? g.eyeY : g.browY + 1 };
+  // Where hair that hangs lies, and which sides of the face have it tucked behind the ear (the ear shows there, and the hair ends at the brow).
+  let place = hang ? (p.hairPlacement || 'front') : 'front', ends = hang ? (p.hairEnds || 'straight') : 'straight';
+  let sideY = hang ? g.eyeY : g.browY + 1;
+  let tuckR = place === 'allleft' || place === 'left' || place === 'behind', tuckL = place === 'allright' || place === 'right' || place === 'behind';
+  let ear = Math.max(0, g.cheek * 0.94 + g.H * 0.1 * pick(EARS, p.ears).w * (g.child ? 0.95 : 1) - g.sk.rx + 1.5);
+  return { p: p, len: len, tex: tex, sty: sty, front: front, L: L, end: end, V: V, coily: coily, hang: hang, sideY: sideY, place: place, ends: ends, ear: ear, sideYR: tuckR ? g.browY + 5 : sideY, sideYL: tuckL ? g.browY + 5 : sideY };
+}
+
+// The model with the hair at both sides of the face ending at one height (hair that does not hang: a cut, a fade, braids on the scalp).
+export function snug(m: HairModel, y: number): HairModel {
+  return { ...m, sideY: y, sideYR: y, sideYL: y };
+}
+
+// Whether the hair at one side of the face (1 the right of the picture, -1 the left) is tucked behind the ear.
+export function tucked(m: HairModel, k: number): boolean {
+  return m.hang && (k > 0 ? m.place === 'allleft' || m.place === 'left' || m.place === 'behind' : m.place === 'allright' || m.place === 'right' || m.place === 'behind');
+}
+
+// How far the hair at one side stands off the skull: as thick as the fall is, or, where it is tucked behind the ear, only enough to lie over the top of it.
+export function sideThickness(m: HairModel, k: number): number {
+  return tucked(m, k) ? Math.max(m.V * 0.8, hangW(m) * 0.55) : hangW(m);
+}
+
+// The falls of hair in front of the shoulders that a placement draws: both sides (front), the one side over its shoulder with the other behind, all of it over one shoulder, or none.
+export function curtainPlan(m: HairModel): CurtainOpts[] {
+  switch (m.place) {
+    case 'allleft': return [{ only: -1, wide: true }];
+    case 'allright': return [{ only: 1, wide: true }];
+    case 'left': return [{ only: -1 }];
+    case 'right': return [{ only: 1 }];
+    case 'behind': return [];
+    default: return [{}];
+  }
+}
+
+// How far the ends of a fall of hair are turned at a point along it (t is 0 at the top and 1 at the tip): in toward the neck (negative) or out (positive), over the last
+// third; none for ends cut straight.
+export function endBend(m: HairModel, t: number): number {
+  if (m.ends !== 'in' && m.ends !== 'out') return 0;
+  let u = clamp((t - 0.68) / 0.32, 0, 1), amp = clamp(2 + hangW(m) * 0.55, 5, 10);
+  if (u === 0) return 0;
+  return (m.ends === 'in' ? -1 : 1) * amp * u * u * (3 - 2 * u);
 }
 
 // How thick hair that hangs is: how far its outer edge stands off the skull beside the face. The cap over the skull, the curtains beside the face and the mass behind the head all
 // use it, so the crown is as full as the length is wide (a thin cap over a thick fall of hair looks like a buzz cut). It grows with the length and with the fullness of the texture.
 export function hangW(m: HairModel): number {
-  return Math.max(6.5, m.V * 0.9) + clamp((m.len.i - 4) * 1.5, 0, 10);
+  return Math.max(Math.max(6.5, m.V * 0.9) + clamp((m.len.i - 4) * 1.5, 0, 10), m.ear);
 }
 // How far the crown stands off the skull: a little less than the sides, and fuller the longer the hair.
 export function crownVol(m: HairModel): number {
@@ -67,16 +116,18 @@ export function texPath(pts: Pt[], tex: Texture | null, cx: number, cy: number):
     });
     return spline(waved, true);
   }
-  dense = evenly(dense, sp);
+  // Curls and coils are not all alike: the spaces between them, their height and the way each leans all vary, and so the two sides are not the same.
+  dense = uneven(dense, sp, 0.42);
   if (tex.zig) {
     let d = 'M' + pt(dense[0]);
     for (let i = 0; i < dense.length; i++) {
       let a = dense[i], b = dense[(i + 1) % dense.length], mx = (a[0] + b[0]) / 2, my = (a[1] + b[1]) / 2, ox = mx - cx, oy = my - cy, ol = Math.hypot(ox, oy) || 1;
-      d += 'L' + pt([mx + ox / ol * amp * 1.5, my + oy / ol * amp * 1.5]) + 'L' + pt(b);
+      let h = amp * 1.5 * (0.5 + 0.95 * rnd(i + 3)), seg = Math.hypot(b[0] - a[0], b[1] - a[1]) || 1, slide = (rnd(i + 19) - 0.5) * seg * 0.7;
+      d += 'L' + pt([mx + ox / ol * h + (b[0] - a[0]) / seg * slide, my + oy / ol * h + (b[1] - a[1]) / seg * slide]) + 'L' + pt(b);
     }
     return d + 'Z';
   }
-  return bumpy(dense, amp, cx, cy);
+  return bumpy(dense, function (i) { return amp * (0.5 + 0.95 * rnd(i + 11)) * (0.9 + 0.2 * Math.sin(i * 0.41)); }, cx, cy, 1);
 }
 
 // A strand or tail along a curve, w0 wide at its start and w1 at its end, with the texture's edge.
@@ -92,8 +143,8 @@ export function tube(curve: Pt[], w0: number, w1: number, tex: Texture | null): 
 }
 
 // The hairline: its right half from the side (at the top of the ear, or the eye line when the hair hangs) to the middle of the forehead.
-export function hairlineRight(g: Rig, m: HairModel): Pt[] {
-  let fx = g.fore, H = g.H, hy = g.hairY + pick(HAIRLINE_HEIGHTS, m.p.hairlineHeight).dy * H, s = m.sideY, r: Pt[];
+export function hairlineRight(g: Rig, m: HairModel, side: number = m.sideY): Pt[] {
+  let fx = g.fore, H = g.H, hy = g.hairY + pick(HAIRLINE_HEIGHTS, m.p.hairlineHeight).dy * H, s = side, r: Pt[];
   switch (m.p.hairline) {
     case 'straight': r = [[fx + 0.5, s], [fx * 0.985, s - 5], [fx * 0.95, hy + 0.05 * H], [fx * 0.86, hy + 0.004 * H], [fx * 0.4, hy], [0, hy]]; break;
     case 'widow': r = [[fx + 0.5, s], [fx * 0.985, s - 5], [fx * 0.9, hy + 0.05 * H], [fx * 0.62, hy - 0.006 * H], [fx * 0.25, hy + 0.014 * H], [0, hy + 0.055 * H, 1]]; break;
@@ -108,7 +159,7 @@ export function hairlineRight(g: Rig, m: HairModel): Pt[] {
 
 // The whole hairline, right side to left side (an uneven one sits higher on the left).
 export function hairlineFull(g: Rig, m: HairModel): Pt[] {
-  let right = hairlineRight(g, m), left = right.slice(0, -1).reverse().map(mirror);
+  let right = hairlineRight(g, m, m.sideYR), left = hairlineRight(g, m, m.sideYL).slice(0, -1).reverse().map(mirror);
   if (m.p.hairline === 'uneven') left = left.map(function (q) { let u = clamp(1 - Math.abs(q[0] - 100) / g.fore, 0, 1); return [q[0], q[1] - g.H * 0.04 * Math.sin(u * PI * 0.9 + 0.3), q[2]]; });
   return right.concat(left);
 }
@@ -129,10 +180,10 @@ export function notch(pts: Pt[], x: number): Pt[] {
 
 // The front edge of the cap: the hairline (with the notch of a part), or a fringe.
 export function frontEdge(g: Rig, m: HairModel): Pt[] {
-  let f = m.front.id, fx = g.fore, s = m.sideY, by = g.browY, full = hairlineFull(g, m), hy = yAt(full, 100);
-  if (f === 'bangs') { let fy = m.len.i <= 2 ? lerp(hy, by, 0.65) : by - 3.5; return [[100 + fx + 2, s], [100 + fx, fy + 2], [100 + fx * 0.6, fy + 0.5], [100, fy], [100 - fx * 0.6, fy + 0.5], [100 - fx, fy + 2], [100 - fx - 2, s]]; }
-  if (f === 'curtain') return [[100 + fx + 2, s], [100 + fx, by + 2], [100 + fx * 0.55, by - 3], [104, hy + 3], [100, hy + 1.5, 1], [96, hy + 3], [100 - fx * 0.55, by - 3], [100 - fx, by + 2], [100 - fx - 2, s]];
-  if (f === 'sidebangs') return [[100 + fx + 1, s], [100 + fx * 0.95, hy + 0.06 * g.H], [100 + fx * 0.5, hy + 2], [100, hy + 5], [100 - fx * 0.5, by - 6], [100 - fx * 0.92, by - 1], [100 - fx - 1, s]];
+  let f = m.front.id, fx = g.fore, sR = m.sideYR, sL = m.sideYL, by = g.browY, full = hairlineFull(g, m), hy = yAt(full, 100);
+  if (f === 'bangs') { let fy = m.len.i <= 2 ? lerp(hy, by, 0.65) : by - 3.5; return [[100 + fx + 2, sR], [100 + fx, fy + 2], [100 + fx * 0.6, fy + 0.5], [100, fy], [100 - fx * 0.6, fy + 0.5], [100 - fx, fy + 2], [100 - fx - 2, sL]]; }
+  if (f === 'curtain') return [[100 + fx + 2, sR], [100 + fx, by + 2], [100 + fx * 0.55, by - 3], [104, hy + 3], [100, hy + 1.5, 1], [96, hy + 3], [100 - fx * 0.55, by - 3], [100 - fx, by + 2], [100 - fx - 2, sL]];
+  if (f === 'sidebangs') return [[100 + fx + 1, sR], [100 + fx * 0.95, hy + 0.06 * g.H], [100 + fx * 0.5, hy + 2], [100, hy + 5], [100 - fx * 0.5, by - 6], [100 - fx * 0.92, by - 1], [100 - fx - 1, sL]];
   if (f === 'centre') return notch(full, 100);
   if (f === 'side') return notch(full, 100 - fx * 0.42);
   return full;
@@ -140,7 +191,7 @@ export function frontEdge(g: Rig, m: HairModel): Pt[] {
 
 // The cap of hair over the skull, its front edge given whole from the right side to the left.
 export function capT(g: Rig, o: CapOpts, tex?: Texture | null): string {
-  let outerR = capOuter(g, o, o.low), outerL = outerR.map(mirror);
+  let outerR = capOuter(g, o, o.low), outerL = capOuter(g, o.sideL === undefined ? o : { ...o, side: o.sideL }, o.lowL ?? o.low).map(mirror);
   const lift = o.lift ?? 0
   if (lift) outerR.concat(outerL).forEach(function (q) { let u = 1 - Math.min(1, Math.abs(q[0] - (100 + (o.liftX || 0))) / (g.sk.rx * 0.7)); if (u > 0) q[1] -= lift * u * u; });
   let path = outerR.slice().reverse().concat(hug(g, o.front)).concat(outerL.slice(0, -1));
@@ -148,12 +199,13 @@ export function capT(g: Rig, o: CapOpts, tex?: Texture | null): string {
 }
 
 // The hair behind the head and shoulders, down to `len`.
-export function backMassT(g: Rig, m: HairModel, len: number, flare: boolean, plain = false): string {
-  let V = m.V, side = V * 0.85, right = [];
+export function backMassT(g: Rig, m: HairModel, len: number, flare: boolean, plain = false, full = false): string {
+  // When all the hair is behind, the mass is as thick as the fall would be, so it shows beside the head and the neck.
+  let V = full ? crownVol(m) : m.V, side = full ? hangW(m) * 0.8 : V * 0.85, right = [];
   for (let a = 90; a >= 0; a -= 15) right.push(skull(g, a, side + (V - side) * (a / 90), V));
   let wid = g.sk.rx + Math.max(side + 4, hangW(m) * 0.9) + (m.end > g.shoulderY ? 6 : 2) + clamp((m.len.i - 4) * 1.3, 0, 8) + (flare ? (len - g.eyeY) * 0.3 : 0);
-  for (let i = 1; i <= 6; i++) { let t = i / 6; right.push([100 + lerp(g.sk.rx + side, wid, flare ? t : Math.sin(t * PI / 2)), lerp(g.sk.cy, len, t)]); }
-  right.push([100 + wid - 3, len + 1.5]); right.push([100, len + 2.5]);
+  for (let i = 1; i <= 6; i++) { let t = i / 6; right.push([100 + lerp(g.sk.rx + side, wid, flare ? t : Math.sin(t * PI / 2)) + endBend(m, t), lerp(g.sk.cy, len, t)]); }
+  right.push([100 + wid - 3 + endBend(m, 1), len + 1.5]); right.push([100, len + 2.5]);
   return texPath(sym(right), plain ? null : m.tex, 100, (g.sk.cy + len) / 2);
 }
 
@@ -176,33 +228,42 @@ export function ring(out: Shapes, cx: number, cy: number, r: number, dark: strin
 // Curtains beside the face: the inner edge just over the edge of the face down to the jaw, then beside the neck and over the shoulders.
 export function curtains(out: Shapes, g: Rig, p: Drawn, m: HairModel, c: string, dark: string, hi: string | null, opts: CurtainOpts): void {
   let E = Math.min(m.end, 214), nb = g.neckBase, sy = g.shoulderY, short = m.end <= g.chin + 4, jawX = faceX(g, g.jawY) - 2.2, by = g.browY;
-  let outerW = g.sk.rx + hangW(m);
+  let outerW = g.sk.rx + hangW(m) + (opts.wide ? 4 : 0);
+  // The fall starts at the temple, on the edge of the cap: its inner edge begins on the face edge and settles into the usual 2 units inside it, so no tab shows at the hairline.
+  let topY = by - 4, hairlineY = hairlineRight(g, m, m.sideY)[2][1];
   [1, -1].forEach(function (k) {
     if (opts.only && opts.only !== k) return;
     let inner = sample(function (t) {
-      let y = lerp(by - 4, E, t), x;
-      if (y <= g.jawY) x = faceX(g, y) - 2.2;
+      let y = lerp(topY, E, t), x;
+      if (y <= g.jawY) x = faceX(g, y) - lerp(0.4, 2.2, clamp((y - topY) / 12, 0, 1));
       else if (short) x = lerp(jawX, g.chinW + 4, clamp((y - g.jawY) / Math.max(1, E - g.jawY), 0, 1));
       else x = lerp(jawX, g.neck + 4, clamp((y - g.jawY) / Math.max(1, nb - g.jawY), 0, 1)) + (y > nb ? (y - nb) * 0.18 : 0);
-      return [100 + k * x, y];
+      // All the hair over one shoulder crosses the neck toward the chest as it falls.
+      if (opts.wide && y > g.jawY) x = lerp(x, 4, clamp((y - g.jawY) / Math.max(1, E - g.jawY), 0, 1) * 0.85);
+      return [100 + k * (x + endBend(m, t)), y];
     }, 14);
     let outer = sample(function (t) {
       let y = lerp(g.eyeY - 8, E, t), flare = opts.flare ? t * (E - g.eyeY) * 0.3 : (m.end > sy ? Math.sin(Math.min(1, t * 1.5) * PI / 2) * 8 : Math.sin(t * PI / 2) * 3);
-      return [100 + k * (outerW + flare), y];
+      return [100 + k * (outerW + flare + endBend(m, t)), y];
     }, 14);
     let pts = inner.concat([[lerp(inner[14][0], outer[14][0], 0.5), E + 1.5]]).concat(outer.slice().reverse());
     out.add(texPath(pts, m.tex, 100, (g.eyeY + E) / 2), c);
     if (m.tex.kind === 'curly') {
       for (let ri = 2; ri <= 13; ri++) [0.28, 0.72].forEach(function (u, ui) {
-        ring(out, lerp(inner[ri][0], outer[ri][0], u), inner[ri][1] + (ui ? 3 : 0), (m.tex.sp ?? 8) * 0.36, dark, (ri + ui * 3) % 4 * 0.5);
+        ring(out, lerp(inner[ri][0], outer[ri][0], u + (rnd(ri * 2 + ui + 5) - 0.5) * 0.3), inner[ri][1] + (ui ? 3 : 0) + (rnd(ri * 3 + ui + 9) - 0.5) * 4, (m.tex.sp ?? 8) * (0.26 + 0.2 * rnd(ri * 5 + ui + 1)), dark, (rnd(ri * 7 + ui * 3 + 2) * 2) % 2);
       });
     } else if (m.tex.kind === 'wavy') {
-      let wl = (m.tex.sp ?? 8) * 2.4, wa = (m.tex.amp ?? 0) * 0.7;
+      let wl = (m.tex.sp ?? 8) * 2.4, wa = (m.tex.amp ?? 0) * 0.7, y0 = Math.min(by + 4, hairlineY + 6);
       [0.28, 0.62].forEach(function (u) {
-        out.add(band(sample(function (t) { let y = lerp(by + 4, E - 4, t); return [lerp(inner[3][0], outer[3][0], u) + k * (t * 2) + Math.sin((y - by) / wl * PI * 2 + u * 3) * wa, y]; }, Math.max(8, Math.round((E - by) / 5))), 0.3, 0.4, 1.3), dark, 0.42);
+        out.add(band(sample(function (t) { let y = lerp(y0, E - 4, t); return [lerp(inner[3][0], outer[3][0], u) + k * (t * 2) + Math.sin((y - by) / wl * PI * 2 + u * 3) * wa, y]; }, Math.max(8, Math.round((E - y0) / 5))), 0.3, 0.4, 1.3), dark, 0.42);
       });
-    } else if (m.tex.kind === 'straight') out.add(band(sample(function (t) { return [lerp(inner[3][0], inner[13][0], t) + k * 2.6, lerp(inner[3][1], E - 4, t)]; }, 8), 0.3, 0.5, 1.6), dark, 0.5);
-    if (hi && k > 0) out.add(band(sample(function (t) { return [lerp(inner[2][0], inner[13][0], t) + k * 4.6, lerp(inner[2][1], E - 6, t)]; }, 8), 0.8, 0.6, 2.8), hi, 0.95);
+    } else if (m.tex.kind === 'straight') {
+      // One line of shade, from the hairline at the temple down the fall, a little outside its inner edge, to near its end.
+      let y0 = Math.min(inner[3][1], hairlineY + 3), line = [[100 + k * (faceX(g, y0) + 2.6), y0]].concat(inner.slice(3).map(function (q) { return [q[0] + k * 2.6, q[1]]; }));
+      line[line.length - 1] = [line[line.length - 1][0], E - 4];
+      out.add(band(line, 0.3, 0.5, 1.6), dark, 0.5);
+    }
+    if (hi && (k > 0 || opts.only)) out.add(band(sample(function (t) { return [lerp(inner[2][0], inner[13][0], t) + k * 4.6, lerp(inner[2][1], E - 6, t)]; }, 8), 0.8, 0.6, 2.8), hi, 0.95);
   });
 }
 
@@ -265,9 +326,9 @@ export function drawHair(out: Shapes, g: Rig, p0: Drawn, layer: 'back' | 'front'
   if (layer === 'back') {
     if (m.len.i <= 1) return;
     if (['plain', 'halfup', 'shavedside', 'slicked', 'triangle', 'undercut', 'quiff'].indexOf(id) >= 0) {
-      if (id === 'triangle') out.add(backMassT(g, m, Math.max(E, g.chin + 8), true), backC);
+      if (id === 'triangle') out.add(backMassT(g, m, Math.max(E, g.chin + 8), true, false, m.hang && m.place === 'behind'), backC);
       else if (m.coily && (id === 'plain' || id === 'halfup')) coilMass(out, g, m, c, dark);
-      else if (m.end > g.chin - 6 && id !== 'undercut' && id !== 'quiff') out.add(backMassT(g, m, E, false), backC);
+      else if (m.end > g.chin - 6 && id !== 'undercut' && id !== 'quiff' && !(m.hang && (m.place === 'allleft' || m.place === 'allright'))) out.add(backMassT(g, m, E, false, false, m.hang && m.place === 'behind'), backC);
       if (id === 'halfup') bunAt(out, 100, g.top - 1, 5 + Math.min(3, L * 0.01), c, dark, m.tex);
       return;
     }
@@ -300,7 +361,7 @@ export function drawHair(out: Shapes, g: Rig, p0: Drawn, layer: 'back' | 'front'
   // ---- front layer ----
   let front = frontEdge(g, m);
   if (m.len.i <= 1 || id === 'fade' || id === 'undercut' || id === 'mohawk' || id === 'shavedside') {
-    out.add(capT(g, { vol: m.coily ? 1.7 : 1.3, side: 0.6, low: by + 1, front: hairlineFull(g, Object.assign({}, m, { sideY: by + 1 })) }), skinMix);
+    out.add(capT(g, { vol: m.coily ? 1.7 : 1.3, side: 0.6, low: by + 1, front: hairlineFull(g, snug(m, by + 1)) }), skinMix);
     if (m.len.i <= 1 && id !== 'fade') { edgeHairs(out, g, p, m, c); return; }
   }
   let tex = m.tex, V = m.V;
@@ -321,10 +382,10 @@ export function drawHair(out: Shapes, g: Rig, p0: Drawn, layer: 'back' | 'front'
       out.add(capT(g, { vol: V, side: V * 0.5, low: by + 1, lift: 8 + Math.min(6, L * 0.03), liftX: fx * 0.1, front: front }, tex), c);
       capStrands(out, g, m, dark); break;
     case 'slicked':
-      out.add(capT(g, { vol: Math.max(3, V * 0.7), side: Math.max(1.4, V * 0.4), low: by + 1, front: hairlineFull(g, Object.assign({}, m, { sideY: by + 1 })) }), c);
+      out.add(capT(g, { vol: Math.max(3, V * 0.7), side: Math.max(1.4, V * 0.4), low: by + 1, front: hairlineFull(g, snug(m, by + 1)) }), c);
       capStrands(out, g, m, dark); break;
     case 'cornrows': {
-      out.add(capT(g, { vol: 2.4, side: 1.4, low: by + 1, front: hairlineFull(g, Object.assign({}, m, { sideY: by + 1 })) }), c);
+      out.add(capT(g, { vol: 2.4, side: 1.4, low: by + 1, front: hairlineFull(g, snug(m, by + 1)) }), c);
       let hy = yAt(hairlineFull(g, m), 100);
       for (let j = -3.5; j <= 3.5; j += 1) {
         let jx = j;
@@ -378,22 +439,22 @@ export function drawHair(out: Shapes, g: Rig, p0: Drawn, layer: 'back' | 'front'
       break;
     }
     case 'shavedside': {
-      let hyS = yAt(hairlineFull(g, m), 100), outerR = capOuter(g, m.hang ? { vol: crownVol(m), side: hangW(m) } : { vol: V, side: V * 0.8 }, m.sideY);
+      let hyS = yAt(hairlineFull(g, m), 100), outerR = capOuter(g, m.hang ? { vol: crownVol(m), side: sideThickness(m, 1) } : { vol: V, side: V * 0.8 }, m.sideYR);
       let frontS = front.filter(function (q) { return q[0] >= 100 - fx * 0.3; });
       let pathS = outerR.slice().reverse().concat(hug(g, frontS)).concat([[100 - fx * 0.32, hyS - 2], [100 - fx * 0.36, g.top + g.H * 0.12], [100 - fx * 0.2, g.top - V * 0.6]]);
       out.add(tex.kind === 'straight' ? spline(pathS, true) : texPath(pathS, tex, 100, g.sk.cy), c);
       capStrands(out, g, m, dark);
-      if (m.hang) curtains(out, g, p, m, c, dark, hi, { only: 1 });
+      if (m.hang && m.place !== 'behind') curtains(out, g, p, m, c, dark, hi, { only: 1 });
       break;
     }
     default: { // plain, half up, triangle
       if (m.coily) out.add(capT(g, { vol: 2.2, side: 1.5, low: m.sideY, front: front }, tex), c);
-      else if (m.hang) out.add(capT(g, { vol: id === 'triangle' ? crownVol(m) * 0.8 : crownVol(m), side: hangW(m), low: m.sideY, front: front }, tex), c);
+      else if (m.hang) out.add(capT(g, { vol: id === 'triangle' ? crownVol(m) * 0.8 : crownVol(m), side: sideThickness(m, 1), sideL: sideThickness(m, -1), low: m.sideYR, lowL: m.sideYL, front: front }, tex), c);
       else out.add(capT(g, { vol: id === 'triangle' ? V * 0.6 : V, side: V * 0.8, low: m.sideY, front: front }, tex), c);
       thinning(out, g, p, m);
       partLine(out, g, p, m, c);
       capStrands(out, g, m, dark);
-      if (m.hang) curtains(out, g, p, m, c, dark, hi, { flare: id === 'triangle' });
+      if (m.hang) curtainPlan(m).forEach(function (o) { curtains(out, g, p, m, c, dark, hi, { ...o, flare: id === 'triangle' }); });
       if (m.front.id === 'bangs') out.add(band(sample(function (t) { let fy = yAt(front, lerp(100 - fx * 0.8, 100 + fx * 0.8, t)); return [lerp(100 - fx * 0.8, 100 + fx * 0.8, t), fy - 2.2]; }, 10), 0.3, 0.3, 1.1), dark, 0.45);
       if (hi && !m.hang) out.add(band(sample(function (t) { return skull(g, lerp(118, 70, t), m.coily ? 6 : V * 0.6); }, 8), 0.6, 0.6, 3), hi, 0.9);
     }

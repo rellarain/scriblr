@@ -1,8 +1,9 @@
 import { describe, expect, it } from 'vitest'
-import { defaultPortrait } from './defaults'
+import { defaultPortrait, normalizePortrait } from './defaults'
 import { AGES, BUILDS, HEADS } from './library'
 import { agePortrait } from './age'
 import { APEX, faceX, headOutline, rigOf, skull } from './rig'
+import { portraitShapes } from './scene'
 
 const rig = (over: Record<string, unknown> = {}) => rigOf({ ...defaultPortrait(), ...over } as never)
 
@@ -127,5 +128,32 @@ describe('ageing a portrait', () => {
     const copy = structuredClone(p)
     agePortrait(p, 'child')
     expect(p).toEqual(copy)
+  })
+})
+
+describe('the shoulders and the neck', () => {
+  it('widen with their sliders, and are the build own at 1', () => {
+    expect(rig({ shoulderWidth: 1.25 }).S).toBeGreaterThan(rig().S)
+    expect(rig({ shoulderWidth: 0.8 }).S).toBeLessThan(rig().S)
+    expect(rig({ neckWidth: 1.3 }).neck).toBeGreaterThan(rig().neck)
+    expect(rig({ neckWidth: 0.8 }).neck).toBeLessThan(rig().neck)
+    expect(rig({ shoulderWidth: 1, neckWidth: 1 }).S).toBe(rig().S)
+    expect(rig({ shoulderWidth: 1, neckWidth: 1 }).neck).toBe(rig().neck)
+  })
+
+  it('leave the head alone, and are held to a sane range', () => {
+    expect(rig({ shoulderWidth: 1.25, neckWidth: 1.3 }).H).toBe(rig().H)
+    expect(rig({ shoulderWidth: 50 }).S).toBeLessThanOrEqual(rig().S * 1.41)
+    expect(rig({ neckWidth: -3 }).neck).toBeGreaterThan(0)
+  })
+
+  it('draw wider shoulders as a wider shape', () => {
+    const widest = (over: Record<string, unknown>) => {
+      const p = normalizePortrait({ ...defaultPortrait(), ...over })
+      const skin = portraitShapes(p).filter(s => s.fill === p.skin)
+      const xs = skin.flatMap(s => (s.d.match(/-?\d+(\.\d+)?/g) ?? []).map(Number).filter((_, i) => i % 2 === 0))
+      return Math.max(...xs) - Math.min(...xs)
+    }
+    expect(widest({ shoulderWidth: 1.25, top: 'strapless' })).toBeGreaterThan(widest({ shoulderWidth: 0.8, top: 'strapless' }))
   })
 })

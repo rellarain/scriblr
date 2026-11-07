@@ -133,7 +133,7 @@ describe('the story', () => {
     await user.click(screen.getAllByRole('button', { name: 'Capture the portrait now' })[0])
     expect(await screen.findByText(/No change/)).toBeInTheDocument()
     await goto(user, 'Portrait')
-    await user.click(screen.getByRole('tab', { name: 'Hair' }))
+    await user.click(screen.getByRole('button', { name: 'Hair' }))
     await user.click(screen.getByRole('button', { name: /^Style: / }))
     await user.click(within(screen.getByRole('listbox', { name: 'Style' })).getByRole('option', { name: 'Two-strand twists' }))
     await goto(user, 'Story')

@@ -2388,6 +2388,8 @@ PORTRAIT_RANGES: dict[str, tuple[float, float]] = {
     "noseSize": (0.75, 1.3),
     "noseWidth": (0.75, 1.35),
     "mouthSize": (0.8, 1.25),
+    "shoulderWidth": (0.8, 1.25),
+    "neckWidth": (0.8, 1.3),
 }
 
 
@@ -2413,6 +2415,8 @@ class CharacterPortrait(BaseModel):
     noseWidth: float = 1.0
     mouth: str = "medium"
     mouthSize: float = 1.0
+    shoulderWidth: float = 1.0
+    neckWidth: float = 1.0
     lipColor: Optional[str] = None
     hairLength: str = "short"
     hairTexture: str = "1B"
@@ -2421,6 +2425,8 @@ class CharacterPortrait(BaseModel):
     hairline: str = "rounded"
     hairlineHeight: str = "average"
     hairEdges: str = "none"
+    hairEnds: str = "straight"
+    hairPlacement: str = "front"
     hairColor: str = "#3a2a20"
     highlightColor: Optional[str] = None
     greying: str = "auto"
@@ -2432,7 +2438,7 @@ class CharacterPortrait(BaseModel):
 
     @field_validator(
         "age", "build", "chest", "headShape", "ears", "expression", "eyes", "brows", "nose", "mouth", "hairLength", "hairTexture", "hairStyle", "hairFront",
-        "hairline", "hairlineHeight", "hairEdges", "greying", "facialHair", "top", mode="before",
+        "hairline", "hairlineHeight", "hairEdges", "hairEnds", "hairPlacement", "greying", "facialHair", "top", mode="before",
     )
     @classmethod
     def _ids(cls, value: Any, info: Any) -> Any:

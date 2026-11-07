@@ -5,8 +5,8 @@ import type { Option } from './portrait/library'
 // A dropdown whose choices are pictures: the button shows the chosen one (its picture and its name) and opens a grid of every choice drawn as it would be, each beside its name.
 // It is a listbox: the arrow keys move over the choices (a row at a time too, when they lie in a grid), Home and End go to the first and the last, Enter or Space chooses, Escape
 // closes without choosing, Tab leaves, and typing the first letters of a name goes to it. A click outside closes it. The pictures are only drawn while it is open.
-export function PreviewSelect({ label, options, value, onChange, thumb, disabled = false }: {
-  label: string; options: readonly Option[]; value: string; onChange: (id: string) => void; thumb: (option: Option) => ReactNode; disabled?: boolean
+export function PreviewSelect({ label, options, value, onChange, thumb, disabled = false, bare = false }: {
+  label: string; options: readonly Option[]; value: string; onChange: (id: string) => void; thumb: (option: Option) => ReactNode; disabled?: boolean; bare?: boolean
 }) {
   const uid = useId().replace(/[^A-Za-z0-9]/g, '')
   const [open, setOpen] = useState(false)
@@ -73,7 +73,7 @@ export function PreviewSelect({ label, options, value, onChange, thumb, disabled
 
   return (
     <div className="charPick" ref={root}>
-      <span className="charLabel" aria-hidden="true">{label}</span>
+      {!bare && <span className="charLabel" aria-hidden="true">{label}</span>}
       <div className="charPickBox">
         <button
           type="button" ref={button} className="charPickBtn" disabled={disabled}

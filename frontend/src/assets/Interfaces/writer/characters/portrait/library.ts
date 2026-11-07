@@ -26,7 +26,9 @@ export interface Nose extends Option { tip: number; wing: number; bridge: number
 export interface Mouth extends Option { w: number; up: number; lo: number; bow: number; rest: number; uneven?: number }
 // An expression: how open the lids are, the lower lid raised, the inner and outer ends of the brows (down is more), the smile, the mouth open, the teeth shown, and more.
 export interface Expression extends Option { lid: number; bot: number; bin: number; bout: number; smile: number; open: number; teeth: number; wide?: number; asym?: number; browRaise?: number; narrow?: number; round?: number; look?: number }
-export interface Top extends Option { open: number; depth: number; band?: number; v?: boolean; turtle?: boolean }
+// A top: how far its neckline opens from the neck (open) and how deep it goes (depth), a band along the neckline, a V, a roll at the neck (turtle, or a mock one), or a shape of its own
+// (square, heart, cowl, henley, polo, off the shoulder, strapless).
+export interface Top extends Option { open: number; depth: number; band?: number; v?: boolean; turtle?: boolean; mock?: boolean; shape?: 'square' | 'heart' | 'cowl' | 'henley' | 'polo' | 'off' | 'strapless' }
 // Hair: a length (L is how far it falls from the crown when stretched, in head heights; i is its place in the list), a texture, a style, a front, a hairline.
 export interface Length extends Option { L: number; i: number }
 export interface Texture extends Option { kind: 'straight' | 'wavy' | 'curly' | 'coily'; vol: number; shrink: number; amp?: number; sp?: number; zig?: boolean }
@@ -171,9 +173,19 @@ export const EXPRESSIONS: Expression[] = [
 export const TOPS: Top[] = [
   { id: 'crew', name: 'Crew neck', open: 3, depth: 6, band: 1 },
   { id: 'vneck', name: 'V-neck', open: 5, depth: 25, v: true, band: 1 },
+  { id: 'deepv', name: 'Deep V', open: 5, depth: 42, v: true, band: 1 },
   { id: 'scoop', name: 'Scoop neck', open: 9, depth: 19, band: 1 },
+  { id: 'widescoop', name: 'Wide scoop', open: 16, depth: 24, band: 1 },
   { id: 'boat', name: 'Boat neck', open: 22, depth: 5, band: 0 },
+  { id: 'square', name: 'Square neck', open: 15, depth: 17, band: 1, shape: 'square' },
+  { id: 'sweetheart', name: 'Sweetheart', open: 20, depth: 38, band: 1, shape: 'heart' },
+  { id: 'henley', name: 'Henley', open: 3, depth: 6, band: 1, shape: 'henley' },
+  { id: 'polo', name: 'Polo collar', open: 6, depth: 15, v: true, shape: 'polo' },
+  { id: 'mock', name: 'Mock neck', open: 1, depth: 0, turtle: true, mock: true },
   { id: 'turtle', name: 'Turtleneck', open: 1, depth: 0, turtle: true },
+  { id: 'cowl', name: 'Cowl neck', open: 12, depth: 22, shape: 'cowl' },
+  { id: 'offshoulder', name: 'Off the shoulder', open: 0, depth: 17, shape: 'off' },
+  { id: 'strapless', name: 'Strapless', open: 0, depth: 36, shape: 'strapless' },
 ];
 export const FACIAL: Option[] = [
   { id: 'none', name: 'None' }, { id: 'stubble', name: 'Stubble' }, { id: 'moustache', name: 'Moustache' }, { id: 'handlebar', name: 'Handlebar' },
@@ -252,8 +264,15 @@ export const HAIRLINES: Option[] = [
 ];
 export const HAIRLINE_HEIGHTS: HairlineHeight[] = [{ id: 'average', name: 'Average', dy: 0 }, { id: 'low', name: 'Low', dy: 0.04 }, { id: 'high', name: 'High', dy: -0.05 }];
 export const EDGES: Option[] = [{ id: 'none', name: 'None' }, { id: 'baby', name: 'Baby hairs' }, { id: 'laid', name: 'Laid edges' }];
-// The hair settings a length, a style and a front depend on.
-export interface HairFields { hairLength: string; hairStyle: string; hairFront: string }
+// The ends of hair that hangs: cut straight, or turned in toward the neck, or flicked out.
+export const ENDS: Option[] = [{ id: 'straight', name: 'Straight' }, { id: 'in', name: 'Curve in' }, { id: 'out', name: 'Curve out' }];
+// Where hair that hangs lies, as you look at the portrait: both sides in front, all of it in front over one shoulder, one side in front and the other behind, or all behind.
+export const PLACEMENTS: Option[] = [
+  { id: 'front', name: 'All front, even' }, { id: 'allleft', name: 'All front, left' }, { id: 'allright', name: 'All front, right' },
+  { id: 'left', name: 'Left front' }, { id: 'right', name: 'Right front' }, { id: 'behind', name: 'All behind' },
+];
+// The hair settings a length, a style and a front depend on (the texture, the ends and the placement are there when they are known).
+export interface HairFields { hairLength: string; hairStyle: string; hairFront: string; hairTexture?: string; hairEnds?: string; hairPlacement?: string }
 
 // What fits: the styles a length allows, the fronts a length and style allow, and a hair choice made whole again (a style or a front that no longer fits becomes the first that does).
 export function stylesFor(p: HairFields): Style[] {
@@ -266,10 +285,30 @@ export function frontsFor(p: HairFields): Front[] {
   if (i <= 1) return FRONTS.filter(f => f.id === 'none')
   return FRONTS.filter(f => (!st.fronts || st.fronts.includes(f.id)) && i >= (f.min || 0))
 }
+// Whether the hair hangs loose from the chin down (a coily texture stands out instead): the only hair whose ends and placement are a choice.
+function hangs(p: HairFields): boolean {
+  return pick(LENGTHS, p.hairLength, 'short').i >= 3 && pick(TEXTURES, p.hairTexture ?? '1B', '1B').kind !== 'coily'
+}
+// The placements the length and the style allow: hair that hangs loose has all six, a triangle and a shaved side only in front or behind, anything else is as its style has it.
+export function placementsFor(p: HairFields): Option[] {
+  if (!hangs(p)) return PLACEMENTS.filter(o => o.id === 'front')
+  const style = p.hairStyle
+  if (style === 'plain' || style === 'halfup') return PLACEMENTS
+  if (style === 'triangle' || style === 'shavedside') return PLACEMENTS.filter(o => o.id === 'front' || o.id === 'behind')
+  return PLACEMENTS.filter(o => o.id === 'front')
+}
+// The ends the length and the style allow: loose hair has all three, any other hair is cut straight.
+export function endsFor(p: HairFields): Option[] {
+  if (!hangs(p)) return ENDS.filter(o => o.id === 'straight')
+  const style = p.hairStyle
+  return style === 'plain' || style === 'halfup' || style === 'shavedside' ? ENDS : ENDS.filter(o => o.id === 'straight')
+}
 export function fitHair<T extends HairFields>(p: T): T {
   const q = { ...p }
   if (!stylesFor(q).some(s => s.id === q.hairStyle)) q.hairStyle = 'plain'
   const fr = frontsFor(q)
   if (!fr.some(f => f.id === q.hairFront)) q.hairFront = fr[0].id
+  if (q.hairPlacement !== undefined && !placementsFor(q).some(o => o.id === q.hairPlacement)) q.hairPlacement = 'front'
+  if (q.hairEnds !== undefined && !endsFor(q).some(o => o.id === q.hairEnds)) q.hairEnds = 'straight'
   return q
 }

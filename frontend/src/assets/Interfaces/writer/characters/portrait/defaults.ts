@@ -14,6 +14,8 @@ export const PORTRAIT_RANGES = {
   noseSize: [0.75, 1.3],
   noseWidth: [0.75, 1.35],
   mouthSize: [0.8, 1.25],
+  shoulderWidth: [0.8, 1.25],
+  neckWidth: [0.8, 1.3],
 } as const satisfies Record<string, readonly [number, number]>
 export type SliderKey = keyof typeof PORTRAIT_RANGES
 
@@ -26,7 +28,8 @@ export function defaultPortrait(): CharacterPortrait {
     brows: 'soft', browColor: null,
     nose: 'straight', noseSize: 1, noseWidth: 1,
     mouth: 'medium', mouthSize: 1, lipColor: null,
-    hairLength: 'short', hairTexture: '1B', hairStyle: 'plain', hairFront: 'none', hairline: 'rounded', hairlineHeight: 'average', hairEdges: 'none',
+    shoulderWidth: 1, neckWidth: 1,
+    hairLength: 'short', hairTexture: '1B', hairStyle: 'plain', hairFront: 'none', hairline: 'rounded', hairlineHeight: 'average', hairEdges: 'none', hairEnds: 'straight', hairPlacement: 'front',
     hairColor: '#3a2a20', highlightColor: null, greying: 'auto',
     facialHair: 'none', facialHairColor: null,
     top: 'crew', topColor: '#2f4a5a', tileColor: '#e6d6c3',
@@ -35,7 +38,7 @@ export function defaultPortrait(): CharacterPortrait {
 
 const ID_KEYS = [
   'age', 'build', 'chest', 'headShape', 'ears', 'expression', 'eyes', 'brows', 'nose', 'mouth', 'hairLength', 'hairTexture', 'hairStyle', 'hairFront', 'hairline',
-  'hairlineHeight', 'hairEdges', 'greying', 'facialHair', 'top',
+  'hairlineHeight', 'hairEdges', 'hairEnds', 'hairPlacement', 'greying', 'facialHair', 'top',
 ] as const
 const COLOUR_KEYS = ['skin', 'eyeColor', 'hairColor', 'topColor', 'tileColor'] as const
 const OPTIONAL_COLOUR_KEYS = ['browColor', 'lipColor', 'highlightColor', 'facialHairColor'] as const
