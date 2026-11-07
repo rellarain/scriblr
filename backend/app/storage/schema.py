@@ -1870,7 +1870,8 @@ READER_MAX_REVEALS = 2000
 READER_MAX_FIELDS = 60
 # The parts of a character's profile that can be shown to readers (a field of the author's own is "field:<its id>"). The look is always shown with a published character.
 CHARACTER_SHARE_FIELDS = (
-    "role", "age", "occupation", "aliases", "summary", "personality", "goal", "motivation", "fear", "flaw", "strength", "background", "possessions", "relationships",
+    "role", "age", "occupation", "aliases", "summary", "appearance", "height", "build", "skin", "hair", "eyes", "face", "voice", "bearing", "style", "marks",
+    "personality", "goal", "motivation", "fear", "flaw", "strength", "background", "possessions", "relationships",
 )
 
 
@@ -2441,19 +2442,31 @@ class CharacterProfile(BaseModel):
     flaw: str = ""
     strength: str = ""
     background: str = ""
+    # How the character looks, in words (the text side of the look: the art is drawn from the look's numbers, this is what the author writes down or has written from them).
+    appearance: str = ""
+    height: str = ""
+    build: str = ""
+    skin: str = ""
+    hair: str = ""
+    eyes: str = ""
+    face: str = ""
+    voice: str = ""
+    bearing: str = ""
+    style: str = ""
+    marks: str = ""
     fields: list[CharacterField] = Field(default_factory=list)
 
-    @field_validator("role", "age", "occupation", "aliases", mode="before")
+    @field_validator("role", "age", "occupation", "aliases", "height", "build", mode="before")
     @classmethod
     def _short(cls, value: Any) -> Any:
         return _cut(value, 120)
 
-    @field_validator("summary", "goal", "motivation", "fear", "flaw", "strength", mode="before")
+    @field_validator("summary", "goal", "motivation", "fear", "flaw", "strength", "skin", "hair", "eyes", "face", "voice", "bearing", "style", "marks", mode="before")
     @classmethod
     def _medium(cls, value: Any) -> Any:
         return _cut(value, 1000)
 
-    @field_validator("personality", "background", mode="before")
+    @field_validator("personality", "background", "appearance", mode="before")
     @classmethod
     def _long(cls, value: Any) -> Any:
         return _cut(value, 8000)

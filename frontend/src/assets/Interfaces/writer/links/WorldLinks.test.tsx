@@ -67,7 +67,7 @@ describe('the links of a character', () => {
     const onOpenPlot = vi.fn()
     const user = userEvent.setup()
     render(<CharactersConsole projectId="p1" plotNodes={PLOT} onOpenPlot={onOpenPlot} />)
-    await screen.findByRole('img', { name: /close-up/ })
+    await screen.findByRole('textbox', { name: 'In a paragraph' })
     await user.click(within(screen.getByRole('toolbar', { name: 'What to work on' })).getByRole('button', { name: 'Story' }))
     return { api, user, onOpenPlot, group: within(await screen.findByRole('group', { name: 'Linked to' })) }
   }
@@ -106,7 +106,7 @@ describe('the links of a character', () => {
     vi.stubGlobal('fetch', vi.fn(async (url: string, init?: RequestInit) => (init?.method === 'POST' && String(url).includes('world-links') ? { ok: false, status: 422, statusText: 'x', json: async () => ({ detail: 'no' }), text: async () => '{}' } : inner(url, init))))
     const user = userEvent.setup()
     render(<CharactersConsole projectId="p1" plotNodes={PLOT} />)
-    await screen.findByRole('img', { name: /close-up/ })
+    await screen.findByRole('textbox', { name: 'In a paragraph' })
     await user.click(within(screen.getByRole('toolbar', { name: 'What to work on' })).getByRole('button', { name: 'Story' }))
     await user.selectOptions(await screen.findByRole('combobox', { name: 'Link to' }), 'plot:line1')
     expect(await screen.findByText('That link could not be saved.')).toBeInTheDocument()
@@ -117,7 +117,7 @@ describe('the links of a character', () => {
     withLinks(backend.fetch)
     requestOpen('char', 'chr_b')
     render(<CharactersConsole projectId="p1" />)
-    expect(await screen.findByRole('img', { name: /Bram, close-up/ })).toBeInTheDocument()
+    await waitFor(() => expect(screen.getByRole('textbox', { name: 'Name of the character' })).toHaveValue('Bram'))
   })
 })
 

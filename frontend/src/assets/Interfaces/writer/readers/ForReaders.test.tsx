@@ -103,7 +103,7 @@ describe('the character for readers', () => {
     const calls = withExtras(backend.fetch, preview)
     const user = userEvent.setup()
     render(<CharactersConsole projectId="p1" />)
-    await screen.findByRole('img', { name: /close-up/ })
+    await screen.findByRole('textbox', { name: 'In a paragraph' })
     await user.click(within(screen.getByRole('toolbar', { name: 'What to work on' })).getByRole('button', { name: 'For readers' }))
     return { backend, user, calls, section: within(await screen.findByRole('region', { name: 'For readers' })) }
   }
@@ -158,7 +158,7 @@ describe('the character for readers', () => {
     vi.stubGlobal('fetch', vi.fn(async (url: string, init?: RequestInit) => (String(url).includes('/reader-extras') ? { ok: false, status: 500, statusText: 'x', json: async () => ({ detail: 'no' }), text: async () => '{}' } : backend.fetch(url, init))))
     const user = userEvent.setup()
     render(<CharactersConsole projectId="p1" />)
-    await screen.findByRole('img', { name: /close-up/ })
+    await screen.findByRole('textbox', { name: 'In a paragraph' })
     await user.click(within(screen.getByRole('toolbar', { name: 'What to work on' })).getByRole('button', { name: 'For readers' }))
     expect(await screen.findByText('The chapters of the book could not be loaded.')).toBeInTheDocument()
   })

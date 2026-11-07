@@ -11,6 +11,7 @@ import { VIEWS, type View } from './art/space'
 import { CharacterList } from './CharacterList'
 import { BodyDrawer, ClothesDrawer, EyesDrawer, HairDrawer, HeadDrawer, MarksDrawer, NoseMouthDrawer, PoseDrawer, type DrawerCtx } from './Drawers'
 import { CommitText, Field } from './CharFields'
+import { AppearanceSection } from './AppearanceSection'
 import { CastSection } from './CastSection'
 import { WorldLinks } from '../links/WorldLinks'
 import { CarriedItems } from '../items/CarriedItems'
@@ -25,8 +26,9 @@ import { storyPoints } from './story'
 import { useCharacters } from './useCharacters'
 import './characters.scss'
 
-type Section = 'look' | 'profile' | 'relationships' | 'story' | 'cast' | 'readers'
+type Section = 'appearance' | 'look' | 'profile' | 'relationships' | 'story' | 'cast' | 'readers'
 const SECTIONS: Array<{ section: Section; label: string; Icon: typeof FaceIcon }> = [
+  { section: 'appearance', label: 'Appearance', Icon: PencilIcon },
   { section: 'look', label: 'Look', Icon: BrushIcon },
   { section: 'profile', label: 'Profile', Icon: ListIcon },
   { section: 'relationships', label: 'Relationships', Icon: LinkIcon },
@@ -58,7 +60,7 @@ const DRAWERS: Array<{ id: string; name: string; Icon: typeof FaceIcon }> = [
 export default function CharactersConsole({ projectId, outline = [], plotNodes = [], onOpenPlot, onOpenScene }: { projectId: string; outline?: OutlineNode[]; plotNodes?: PlotNode[]; onOpenPlot?: (nodeId: string) => void; onOpenScene?: (nodeId: string) => void }) {
   const c = useCharacters(projectId)
   const { ui } = useSettings()
-  const [section, setSection] = useState<Section>('look')
+  const [section, setSection] = useState<Section>('appearance')
   const points = useMemo(() => storyPoints(outline), [outline])
   const [mode, setMode] = useState<Mode>('closeup')
   const [view, setView] = useState<View>('front')
@@ -135,6 +137,7 @@ export default function CharactersConsole({ projectId, outline = [], plotNodes =
       {c.notice && <p className="charNote charNote--error" role="alert">{c.notice}</p>}
       <div className="charSplit">
         <CharacterList c={c} />
+        {doc && section === 'appearance' && <AppearanceSection doc={doc} edit={c.edit} rename={c.rename} />}
         {doc && section === 'profile' && <ProfileSection doc={doc} edit={c.edit} />}
         {doc && section === 'relationships' && <RelationshipsSection projectId={projectId} c={c} doc={doc} points={points} />}
         {doc && section === 'cast' && <CastSection c={c} cast={all} doc={doc} onOpen={id => { void c.open(id) }} />}

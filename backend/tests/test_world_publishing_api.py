@@ -137,6 +137,18 @@ def test_a_character_shows_only_its_public_fields_and_each_from_its_chapter(clie
     assert "Drowning" not in str(_extras(client, w))
 
 
+def test_the_words_about_how_a_character_looks_can_be_public_one_by_one(client: TestClient) -> None:
+    w = _world(client)
+    profile = {"appearance": "A weathered woman with a sailor's squint.", "hair": "Grey, cropped.", "voice": "Low and dry.", "marks": "A scar through the left brow."}
+    _share_character(client, w["pid"], "Ada", {"published": True, "fields": ["appearance", "hair", "marks"], "reveals": {"marks": 2}}, profile=profile)
+    _publish(client, w)
+    _read_to(client, w, 1)
+    fields = _extras(client, w)["characters"][0]["fields"]
+    assert [(f["key"], f["label"]) for f in fields] == [("appearance", "Appearance"), ("hair", "Hair")]  # the voice is private, the scar comes at chapter 2
+    _read_to(client, w, 2)
+    assert [f["key"] for f in _extras(client, w)["characters"][0]["fields"]] == ["appearance", "hair", "marks"]
+
+
 def test_relationships_show_only_between_published_characters(client: TestClient) -> None:
     w = _world(client)
     bram = _share_character(client, w["pid"], "Bram", {"published": True})

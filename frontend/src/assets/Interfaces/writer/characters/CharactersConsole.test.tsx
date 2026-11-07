@@ -13,7 +13,10 @@ async function open(cast: CharacterDoc[] = [ada(), bram()]) {
   const backend = charactersBackend(cast)
   render(<CharactersConsole projectId="p1" />)
   await screen.findByRole('heading', { name: 'Characters', level: 2 })
-  return { backend, user: userEvent.setup() }
+  const user = userEvent.setup()
+  // A console opens on the words (Appearance); these tests are of the drawing.
+  if (cast.length > 0) await user.click(await screen.findByRole('button', { name: 'Look' }))
+  return { backend, user }
 }
 type Backend = ReturnType<typeof charactersBackend>
 const save = () => screen.getByRole('button', { name: 'Save' })
@@ -38,6 +41,8 @@ describe('the Characters console', () => {
     const { backend, user } = await open([])
     expect(await screen.findByText(/Make a character to start/)).toBeInTheDocument()
     await user.click(screen.getByRole('button', { name: 'New character' }))
+    expect(await screen.findByRole('textbox', { name: 'Name of the character' })).toHaveValue('Unnamed character')
+    await user.click(screen.getByRole('button', { name: 'Look' }))
     expect(await screen.findByRole('img', { name: /Unnamed character, close-up/ })).toBeInTheDocument()
     expect(backend.of('POST')).toHaveLength(1)
   })

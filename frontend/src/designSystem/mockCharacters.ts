@@ -70,7 +70,7 @@ export function seedCharacters(): CharacterDoc[] {
   }
   const bram = newCharacter('chr_bram', { name: 'Bram Quill' }, 1)
   bram.look = { ...bram.look, skin: '#8d5a3b', hair: 'buzz', hairColor: '#1f1a17', facialHair: 'full', build: 'broad', headShape: 'square', nose: 'broad', brows: 'thick', pose: 'relaxed' }
-  ada.profile = { ...ada.profile, role: 'Navigator', age: '29', occupation: 'Ship’s cartographer', summary: 'Charts coasts nobody else will sail.', goal: 'Finish the chart of the Glass Sea.', fear: 'Open water at night.', fields: [{ id: 'f1', label: 'Motto', value: 'Measure twice.' }] }
+  ada.profile = { ...ada.profile, appearance: 'A weathered woman of twenty-nine with a sailor’s squint, ink on her fingers and a red cape that has seen salt.', height: 'Tall for the crew', hair: 'Wavy, auburn, tied back with string', eyes: 'Green, set a little wide', marks: 'Freckles across the nose', role: 'Navigator', age: '29', occupation: 'Ship’s cartographer', summary: 'Charts coasts nobody else will sail.', goal: 'Finish the chart of the Glass Sea.', fear: 'Open water at night.', fields: [{ id: 'f1', label: 'Motto', value: 'Measure twice.' }] }
   ada.relationships = [{ id: 'r1', targetId: 'chr_bram', kind: 'ally', family: null, label: 'First mate', description: 'Trusts him with the helm and nothing else.', changes: [] }]
   ada.possessions = [{ id: 'p1', name: 'Brass sextant', description: 'Her mother’s.' }]
   ada.arc = [{ id: 'a1', name: 'Denial', note: 'Insists the coast is safe.', at: null }]

@@ -148,6 +148,13 @@ def test_the_profile_and_story_are_held_to_their_limits_and_repaired() -> None:
     assert doc.arc[0].at is None and doc.events[0].when == "Year 3"
 
 
+def test_the_words_about_the_look_are_held_to_their_limits() -> None:
+    profile = CharacterDoc.model_validate({"id": "c1", "profile": {"appearance": "x" * 9000, "height": "  Tall " + "y" * 200, "hair": 5, "marks": "m" * 1500, "voice": "  Low  "}}).profile
+    assert len(profile.appearance) == 8000 and len(profile.height) == 120 and profile.height.startswith("Tall")
+    assert profile.hair == "" and len(profile.marks) == 1000 and profile.voice == "Low"
+    assert CharacterDoc.model_validate({"id": "c2"}).profile.appearance == ""
+
+
 def test_put_drops_relationships_to_nobody_or_to_oneself(client: TestClient) -> None:
     pid = _project(client)
     a, b = _new(client, pid, name="A"), _new(client, pid, name="B")

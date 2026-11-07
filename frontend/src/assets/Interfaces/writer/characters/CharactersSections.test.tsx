@@ -15,12 +15,15 @@ const ada = (): CharacterDoc => newCharacter('chr_a', { name: 'Ada' }, 0)
 const bram = (): CharacterDoc => newCharacter('chr_b', { name: 'Bram' }, 1)
 const cleo = (): CharacterDoc => newCharacter('chr_c', { name: 'Cleo' }, 2)
 
+const toLook = async (user: ReturnType<typeof userEvent.setup>) => { await user.click(await screen.findByRole('button', { name: 'Look' })) }
 async function open(cast: CharacterDoc[] = [ada(), bram(), cleo()]) {
   const backend = charactersBackend(cast)
   render(<CharactersConsole projectId="p1" outline={OUTLINE} />)
   await screen.findByRole('heading', { name: 'Characters', level: 2 })
+  const user = userEvent.setup()
+  await toLook(user)
   await screen.findByRole('img', { name: /close-up/ })
-  return { backend, user: userEvent.setup() }
+  return { backend, user }
 }
 type Backend = ReturnType<typeof charactersBackend>
 const save = () => screen.getByRole('button', { name: 'Save' })

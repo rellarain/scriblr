@@ -416,7 +416,9 @@ export interface ReaderShare { published: boolean; revealAt: number | null; reve
 export const NO_SHARE: ReaderShare = { published: false, revealAt: null, reveals: {}, fields: [] }
 export const shareOf = (doc: { reader?: ReaderShare }): ReaderShare => doc.reader ?? NO_SHARE
 export const CHARACTER_SHARE_FIELDS = [
-  ['role', 'Role'], ['age', 'Age'], ['occupation', 'Occupation'], ['aliases', 'Other names'], ['summary', 'In a sentence'], ['personality', 'Personality'], ['goal', 'What they want'],
+  ['role', 'Role'], ['age', 'Age'], ['occupation', 'Occupation'], ['aliases', 'Other names'], ['summary', 'In a sentence'],
+  ['appearance', 'Appearance'], ['height', 'Height'], ['build', 'Build'], ['skin', 'Skin'], ['hair', 'Hair'], ['eyes', 'Eyes'], ['face', 'Face'], ['voice', 'Voice'], ['bearing', 'Bearing'],
+  ['style', 'How they dress'], ['marks', 'Distinguishing marks'], ['personality', 'Personality'], ['goal', 'What they want'],
   ['motivation', 'Why they want it'], ['fear', 'What they fear'], ['flaw', 'Their flaw'], ['strength', 'Their strength'], ['background', 'History'], ['possessions', 'Possessions'], ['relationships', 'Relationships'],
 ] as const
 // A link between a plot node ("plot:<id>"), a character ("char:<id>") and a place ("place:<mapId>/<symbolId>"): one record for both ends.
@@ -539,7 +541,10 @@ export interface CharacterField { id: string; label: string; value: string }
 // Who the character is: identity, personality and psychology, background, and fields of the author's own.
 export interface CharacterProfile {
   role: string; age: string; occupation: string; aliases: string; summary: string; personality: string
-  goal: string; motivation: string; fear: string; flaw: string; strength: string; background: string; fields: CharacterField[]
+  goal: string; motivation: string; fear: string; flaw: string; strength: string; background: string
+  // How the character looks, in words: a paragraph, and the things a stranger would notice.
+  appearance: string; height: string; build: string; skin: string; hair: string; eyes: string; face: string; voice: string; bearing: string; style: string; marks: string
+  fields: CharacterField[]
 }
 export interface CharacterPossession { id: string; name: string; description: string }
 export type RelationshipKind = 'family' | 'friend' | 'ally' | 'rival' | 'enemy' | 'romance' | 'mentor' | 'other'

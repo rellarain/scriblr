@@ -28,6 +28,8 @@ MAX_WARNINGS = 60
 _LABELS = {
     "role": "Role", "age": "Age", "occupation": "Occupation", "aliases": "Also known as", "summary": "Summary", "personality": "Personality", "goal": "Goal",
     "motivation": "Motivation", "fear": "Fear", "flaw": "Flaw", "strength": "Strength", "background": "Background", "possessions": "Possessions",
+    "appearance": "Appearance", "height": "Height", "build": "Build", "skin": "Skin", "hair": "Hair", "eyes": "Eyes", "face": "Face", "voice": "Voice",
+    "bearing": "Bearing", "style": "How they dress", "marks": "Distinguishing marks",
 }
 
 

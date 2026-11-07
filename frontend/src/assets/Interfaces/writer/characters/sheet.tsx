@@ -3,6 +3,7 @@ import type { CharacterDoc } from '../../../../api/types'
 import { saveBlob } from '../maps/mapExport'
 import { CharacterArt } from './art/CharacterArt'
 import type { View } from './art/space'
+import { appearanceText } from './describe'
 
 // A character sheet as one picture: the figure, a close-up, three more views, and the profile in words. It is an SVG document built from the same drawing as the console's
 // (so the colours are the character's own, on white paper) and saved as a PNG.
@@ -54,7 +55,7 @@ export function sheetSvg(doc: CharacterDoc): string {
     for (const l of lines.slice(0, 7)) { parts.push(`<text x="${x}" y="${y + used}" font-family="sans-serif" font-size="17" fill="${ink}">${esc(l)}</text>`); used += 23 }
     return used + 18
   }
-  const left: Array<[string, string]> = [['In a sentence', p.summary], ['Personality', p.personality], ['Background', p.background]]
+  const left: Array<[string, string]> = [['In a sentence', p.summary], ['Appearance', appearanceText(p)], ['Personality', p.personality], ['Background', p.background]]
   const right: Array<[string, string]> = [['Wants', p.goal], ['Because', p.motivation], ['Fears', p.fear], ['Flaw', p.flaw], ['Strength', p.strength], ...p.fields.map((f): [string, string] => [f.label || 'Note', f.value]), ...(doc.possessions.length > 0 ? [['Carries', doc.possessions.map(x => x.name).filter(Boolean).join(', ')] as [string, string]] : [])]
   let lx = y, rx = y
   for (const [t, v] of left) { y = lx; lx += block(t, v, 40, 440) }

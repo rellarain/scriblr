@@ -7,7 +7,8 @@ import { BROWS, EARS, EYES, EXPRESSIONS, FACIAL_HAIR, HAIR, HEAD_SHAPES, MOUTHS,
 // from another, and the family tree. The story points are the chapters and scenes of the outline, in book order.
 
 export const emptyProfile = (): CharacterProfile => ({
-  role: '', age: '', occupation: '', aliases: '', summary: '', personality: '', goal: '', motivation: '', fear: '', flaw: '', strength: '', background: '', fields: [],
+  role: '', age: '', occupation: '', aliases: '', summary: '', personality: '', goal: '', motivation: '', fear: '', flaw: '', strength: '', background: '',
+  appearance: '', height: '', build: '', skin: '', hair: '', eyes: '', face: '', voice: '', bearing: '', style: '', marks: '', fields: [],
 })
 export type StoryFields = Pick<CharacterDoc, 'profile' | 'possessions' | 'relationships' | 'states' | 'arc' | 'events' | 'appearances'>
 export const emptyStory = (): StoryFields => ({ profile: emptyProfile(), possessions: [], relationships: [], states: [], arc: [], events: [], appearances: [] })

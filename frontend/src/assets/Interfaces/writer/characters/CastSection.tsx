@@ -3,6 +3,7 @@ import type { CharacterDoc } from '../../../../api/types'
 import { CharacterArt } from './art/CharacterArt'
 import { AGE_RANGE, ageLook } from './age'
 import { Slider } from './CharFields'
+import { appearanceText } from './describe'
 import { lookDiff } from './story'
 import type { Characters } from './useCharacters'
 
@@ -18,6 +19,9 @@ export function CastSection({ c, cast, doc, onOpen }: { c: Characters; cast: Cha
   )
 }
 
+// A text cut at a space to at most `max` characters, with an ellipsis when something was left out.
+const shortText = (text: string, max: number) => (text.length <= max ? text : `${text.slice(0, max).replace(/\s+\S*$/, '')}…`)
+
 function Overview({ cast, openId, onOpen }: { cast: CharacterDoc[]; openId: string; onOpen: (id: string) => void }) {
   return (
     <section className="charPanel charWide" aria-label="Cast overview">
@@ -29,6 +33,7 @@ function Overview({ cast, openId, onOpen }: { cast: CharacterDoc[]; openId: stri
               <CharacterArt look={d.look} mode="closeup" label="" className="charArt" frame="fixed" />
               <span className="charCardName">{d.name}</span>
               <span className="charCaption">{[d.profile.role, d.profile.age && `age ${d.profile.age}`].filter(Boolean).join(' · ') || ' '}</span>
+              {appearanceText(d.profile) && <span className="charCardText">{shortText(appearanceText(d.profile), 110)}</span>}
             </button>
           </li>
         ))}
@@ -43,7 +48,7 @@ function Compare({ cast, openId }: { cast: CharacterDoc[]; openId: string }) {
   const left = cast.find(x => x.id === a) ?? cast[0]
   const right = cast.find(x => x.id === b && x.id !== left?.id) ?? cast.find(x => x.id !== left?.id)
   const diffs = useMemo(() => (left && right ? lookDiff(left.look, right.look) : []), [left, right])
-  const who = left && right ? (['role', 'age', 'occupation'] as const).filter(k => left.profile[k] !== right.profile[k]).map(k => `${k[0].toUpperCase()}${k.slice(1)}: ${left.profile[k] || 'none'} > ${right.profile[k] || 'none'}`) : []
+  const who = left && right ? (['role', 'age', 'occupation', 'height', 'build', 'skin', 'hair', 'eyes'] as const).filter(k => left.profile[k] !== right.profile[k]).map(k => `${k[0].toUpperCase()}${k.slice(1)}: ${left.profile[k] || 'none'} > ${right.profile[k] || 'none'}`) : []
   return (
     <section className="charPanel charWide" aria-label="Compare two characters">
       <h3 className="charPanelTitle">Compare</h3>
@@ -59,6 +64,7 @@ function Compare({ cast, openId }: { cast: CharacterDoc[]; openId: string }) {
               <figure key={d.id} className="charCompareItem">
                 <CharacterArt look={d.look} mode="full" label={`${d.name}, full body`} className="charArt" frame="fixed" />
                 <figcaption className="charCaption">{d.name}</figcaption>
+                {appearanceText(d.profile) && <p className="charHint">{shortText(appearanceText(d.profile), 220)}</p>}
               </figure>
             ))}
           </div>

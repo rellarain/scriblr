@@ -24,11 +24,14 @@ const puts = (b: Backend) => b.fetch.mock.calls.filter(c => (c[1] as RequestInit
 const lastPut = (b: Backend) => JSON.parse((puts(b).at(-1)![1] as RequestInit).body as string) as CharacterDoc
 const bodies = (b: Backend, method: string) => b.fetch.mock.calls.filter(c => (c[1] as RequestInit | undefined)?.method === method).map(c => JSON.parse((c[1] as RequestInit).body as string))
 
+const toLook = async (user: ReturnType<typeof userEvent.setup>) => { await user.click(await screen.findByRole('button', { name: 'Look' })) }
 async function openConsole(cast = trio()) {
   const backend = charactersBackend(cast)
   render(<CharactersConsole projectId="p1" outline={OUTLINE} />)
+  const user = userEvent.setup()
+  await toLook(user)
   await screen.findByRole('img', { name: /close-up/ })
-  return { backend, user: userEvent.setup() }
+  return { backend, user }
 }
 const goto = (user: ReturnType<typeof userEvent.setup>, name: string) => user.click(within(screen.getByRole('toolbar', { name: 'What to work on' })).getByRole('button', { name }))
 
