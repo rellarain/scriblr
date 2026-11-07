@@ -42,6 +42,16 @@ export function hairModel(g: Rig, p: Drawn): HairModel {
   return { p: p, len: len, tex: tex, sty: sty, front: front, L: L, end: end, V: V, coily: coily, hang: hang, sideY: hang ? g.eyeY : g.browY + 1 };
 }
 
+// How thick hair that hangs is: how far its outer edge stands off the skull beside the face. The cap over the skull, the curtains beside the face and the mass behind the head all
+// use it, so the crown is as full as the length is wide (a thin cap over a thick fall of hair looks like a buzz cut). It grows with the length and with the fullness of the texture.
+export function hangW(m: HairModel): number {
+  return Math.max(6.5, m.V * 0.9) + clamp((m.len.i - 4) * 1.5, 0, 10);
+}
+// How far the crown stands off the skull: a little less than the sides, and fuller the longer the hair.
+export function crownVol(m: HairModel): number {
+  return hangW(m) * (0.62 + 0.04 * clamp(m.len.i - 3, 0, 6)) + 0.8;
+}
+
 export function texPath(pts: Pt[], tex: Texture | null, cx: number, cy: number): string {
   const amp = tex?.amp ?? 0
   if (!tex || tex.kind === 'straight' || !amp) return spline(pts, true);
@@ -141,7 +151,7 @@ export function capT(g: Rig, o: CapOpts, tex?: Texture | null): string {
 export function backMassT(g: Rig, m: HairModel, len: number, flare: boolean, plain = false): string {
   let V = m.V, side = V * 0.85, right = [];
   for (let a = 90; a >= 0; a -= 15) right.push(skull(g, a, side + (V - side) * (a / 90), V));
-  let wid = g.sk.rx + side + 4 + (m.end > g.shoulderY ? 6 : 2) + clamp((m.len.i - 4) * 1.3, 0, 8) + (flare ? (len - g.eyeY) * 0.3 : 0);
+  let wid = g.sk.rx + Math.max(side + 4, hangW(m) * 0.9) + (m.end > g.shoulderY ? 6 : 2) + clamp((m.len.i - 4) * 1.3, 0, 8) + (flare ? (len - g.eyeY) * 0.3 : 0);
   for (let i = 1; i <= 6; i++) { let t = i / 6; right.push([100 + lerp(g.sk.rx + side, wid, flare ? t : Math.sin(t * PI / 2)), lerp(g.sk.cy, len, t)]); }
   right.push([100 + wid - 3, len + 1.5]); right.push([100, len + 2.5]);
   return texPath(sym(right), plain ? null : m.tex, 100, (g.sk.cy + len) / 2);
@@ -166,7 +176,7 @@ export function ring(out: Shapes, cx: number, cy: number, r: number, dark: strin
 // Curtains beside the face: the inner edge just over the edge of the face down to the jaw, then beside the neck and over the shoulders.
 export function curtains(out: Shapes, g: Rig, p: Drawn, m: HairModel, c: string, dark: string, hi: string | null, opts: CurtainOpts): void {
   let E = Math.min(m.end, 214), nb = g.neckBase, sy = g.shoulderY, short = m.end <= g.chin + 4, jawX = faceX(g, g.jawY) - 2.2, by = g.browY;
-  let outerW = g.sk.rx + Math.max(4, m.V * 0.9) + clamp((m.len.i - 4) * 1.3, 0, 8);
+  let outerW = g.sk.rx + hangW(m);
   [1, -1].forEach(function (k) {
     if (opts.only && opts.only !== k) return;
     let inner = sample(function (t) {
@@ -368,7 +378,7 @@ export function drawHair(out: Shapes, g: Rig, p0: Drawn, layer: 'back' | 'front'
       break;
     }
     case 'shavedside': {
-      let hyS = yAt(hairlineFull(g, m), 100), outerR = capOuter(g, { vol: V, side: V * 0.8 }, m.sideY);
+      let hyS = yAt(hairlineFull(g, m), 100), outerR = capOuter(g, m.hang ? { vol: crownVol(m), side: hangW(m) } : { vol: V, side: V * 0.8 }, m.sideY);
       let frontS = front.filter(function (q) { return q[0] >= 100 - fx * 0.3; });
       let pathS = outerR.slice().reverse().concat(hug(g, frontS)).concat([[100 - fx * 0.32, hyS - 2], [100 - fx * 0.36, g.top + g.H * 0.12], [100 - fx * 0.2, g.top - V * 0.6]]);
       out.add(tex.kind === 'straight' ? spline(pathS, true) : texPath(pathS, tex, 100, g.sk.cy), c);
@@ -378,6 +388,7 @@ export function drawHair(out: Shapes, g: Rig, p0: Drawn, layer: 'back' | 'front'
     }
     default: { // plain, half up, triangle
       if (m.coily) out.add(capT(g, { vol: 2.2, side: 1.5, low: m.sideY, front: front }, tex), c);
+      else if (m.hang) out.add(capT(g, { vol: id === 'triangle' ? crownVol(m) * 0.8 : crownVol(m), side: hangW(m), low: m.sideY, front: front }, tex), c);
       else out.add(capT(g, { vol: id === 'triangle' ? V * 0.6 : V, side: V * 0.8, low: m.sideY, front: front }, tex), c);
       thinning(out, g, p, m);
       partLine(out, g, p, m, c);
