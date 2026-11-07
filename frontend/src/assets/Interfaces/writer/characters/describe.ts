@@ -1,9 +1,10 @@
-import type { CharacterLook, CharacterProfile } from '../../../../api/types'
-import { BROWS, EYES, FACIAL_HAIR, HAIR, HEAD_SHAPES, MOUTHS, NOSES, EXPRESSIONS, pick } from './art/library'
-import { ACCESSORIES, AREAS, BOTTOMS, BUILDS, MARK_KINDS, OUTER, POSES, SHOES, TOPS } from './art/wardrobe'
+import type { CharacterPortrait, CharacterProfile } from '../../../../api/types'
+import { optionName } from './portrait/registry'
+import { drawnOf } from './portrait/scene'
 
-// The look in words. A character's appearance is written down as text (the fields below, kept in the profile); this turns the numbers and choices of the look (what the art is
-// drawn from) into a first draft of that text, so the author starts from something and changes it. Pure; the console only decides which fields it fills.
+// The portrait in words. A character's appearance is written down as text (the fields below, kept in the profile); this turns the choices of the portrait (what the card is drawn
+// from) into a first draft of that text, so the author starts from something and changes it. The height, the voice and the distinguishing marks are the author's own: the
+// portrait has nothing to say about them. Pure; the console only decides which fields it fills.
 
 export const APPEARANCE_KEYS = ['height', 'build', 'skin', 'hair', 'eyes', 'face', 'voice', 'bearing', 'style', 'marks'] as const
 export type AppearanceKey = (typeof APPEARANCE_KEYS)[number]
@@ -52,7 +53,8 @@ export function colourName(hex: string, kind: ColourKind): string {
     if (l < 0.85) return 'fair'
     return 'pale'
   }
-  if (s < 0.12) {
+  // A very light colour with only a trace of tint (hair greyed to white) is white, not blond.
+  if (s < 0.12 || (l > 0.88 && s < 0.4)) {
     if (l < 0.15) return 'black'
     if (l < 0.4) return 'dark grey'
     if (l < 0.7) return 'grey'
@@ -87,91 +89,93 @@ const article = (word: string) => (/^[aeiou]/i.test(word) ? 'an' : 'a')
 const listed = (items: string[]) => (items.length <= 1 ? items.join('') : `${items.slice(0, -1).join(', ')} and ${items[items.length - 1]}`)
 
 // ---- the parts in words ----
-export function heightWords(height: number): string {
-  if (height < 0.88) return 'short'
-  if (height < 0.97) return 'a little under average height'
-  if (height <= 1.04) return 'of average height'
-  if (height <= 1.12) return 'tall'
-  return 'very tall'
+const AGE_WORDS: Record<string, string> = {
+  infant: 'an infant', toddler: 'a toddler', child: 'a child', teen: 'a teenager', young: 'a young adult', adult: 'an adult', middle: 'a middle-aged person', older: 'an older person',
+  elderly: 'an elderly person',
+}
+const BUILD_WORDS: Record<string, string> = { slight: 'slight build', average: 'average build', broad: 'broad build, broad through the shoulders', heavy: 'heavy build with a thick neck' }
+const LENGTH_WORDS: Record<string, string> = {
+  buzzed: 'buzzed', short: 'short', chin: 'chin-length', shoulder: 'shoulder-length', chest: 'chest-length', stomach: 'stomach-length', hip: 'hip-length', knee: 'knee-length',
+  body: 'body-length', rapunzel: 'Rapunzel-length',
+}
+const TEXTURE_WORDS: Record<string, string> = {
+  '1A': 'fine straight', '1B': 'straight', '1C': 'coarse straight', '2A': 'fine wavy', '2B': 'wavy', '2C': 'coarse wavy', '3A': 'fine curly', '3B': 'curly', '3C': 'tightly curled',
+  '4A': 'fine coily', '4B': 'coily', '4C': 'tightly coiled',
+}
+const STYLE_WORDS: Record<string, string> = {
+  plain: '', onebraid: 'in one braid', twobraids: 'in two braids', boxbraids: 'in full braids', trianglebraids: 'in triangle-part braids', locs: 'in locs', twists: 'in two-strand twists',
+  cornrows: 'in cornrows', bantu: 'in Bantu knots', triangle: 'cut in a triangle shape', puff: 'in a puff', topbun: 'in a top bun', lowbun: 'in a low bun', spacebuns: 'in space buns',
+  topknot: 'in a top knot', halfup: 'worn half up', highpony: 'in a high ponytail', lowpony: 'in a low ponytail', pigtails: 'in pigtails', undercut: 'in an undercut',
+  shavedside: 'with one side shaved', mohawk: 'in a mohawk', fade: 'in a fade', quiff: 'in a quiff', slicked: 'slicked back',
+}
+const FRONT_WORDS: Record<string, string> = { none: '', centre: 'with a centre part', side: 'with a side part', back: 'swept back', bangs: 'with straight bangs', curtain: 'with curtain bangs', sidebangs: 'with side-swept bangs' }
+const HAIRLINE_WORDS: Record<string, string> = {
+  widow: 'a widow\u2019s peak', mshape: 'an M-shaped hairline', uneven: 'an uneven hairline', mature: 'a mature hairline', receding: 'a receding hairline', deep: 'a deeply receding hairline',
+  thinning: 'thinning on top',
+}
+const EXPRESSION_WORDS: Record<string, string> = {
+  neutral: 'calm', soft: 'gently amused', smile: 'cheerful', grin: 'delighted', laugh: 'ready to laugh', smirk: 'smug', stern: 'stern', angry: 'angry', sad: 'sad', worried: 'worried',
+  surprised: 'surprised', sleepy: 'sleepy', thoughtful: 'thoughtful',
 }
 
-function buildWords(look: CharacterLook): string {
-  const base = `${lower(pick(BUILDS, look.build).name)} build`
-  const frame = look.width < 0.9 ? 'narrow' : look.width > 1.12 ? 'wide' : ''
-  const shoulders = look.shoulders < 0.9 ? 'narrow shoulders' : look.shoulders > 1.1 ? 'broad shoulders' : ''
-  return [frame ? `${frame}-framed` : '', base, shoulders ? `with ${shoulders}` : ''].filter(Boolean).join(' ').replace('build with', 'build, with')
+const buildWords = (p: CharacterPortrait): string => BUILD_WORDS[p.build] ?? `${lower(optionName('build', p.build))} build`
+
+const skinWords = (p: CharacterPortrait): string => `${cap(colourName(p.skin, 'skin'))} skin${p.age === 'older' || p.age === 'elderly' ? ', lined with age' : ''}`
+
+function hairWords(p: CharacterPortrait): string {
+  const drawn = drawnOf(p)
+  const young = ['infant', 'toddler', 'child'].includes(p.age)
+  const beard = p.facialHair === 'none' || young ? '' : `${article(optionName('facialHair', p.facialHair))} ${lower(optionName('facialHair', p.facialHair))}`
+  if (p.hairLength === 'bald') return ['Bald', beard].filter(Boolean).join('; ')
+  const colour = colourName(drawn.hairColor, 'hair')
+  const length = LENGTH_WORDS[p.hairLength] ?? lower(optionName('hairLength', p.hairLength))
+  const texture = p.hairLength === 'buzzed' ? '' : `${TEXTURE_WORDS[p.hairTexture] ?? lower(optionName('hairTexture', p.hairTexture))} `
+  const extras = [
+    STYLE_WORDS[p.hairStyle] ?? '', FRONT_WORDS[p.hairFront] ?? '', HAIRLINE_WORDS[p.hairline] ?? '',
+    p.highlightColor ? `${colourName(p.highlightColor, 'hair')} highlights` : '',
+  ].filter(Boolean)
+  // The length, the texture and the colour are one phrase; the style, the front and the hairline follow it ("Chest-length wavy black hair, in two braids, with a side part").
+  const hair = `${cap(length)} ${texture}${colour} hair${extras.length > 0 ? `, ${extras.join(', ')}` : ''}`
+  return [hair, beard].filter(Boolean).join('; ')
 }
 
-function hairWords(look: CharacterLook): string {
-  const style = pick(HAIR, look.hair)
-  const beard = pick(FACIAL_HAIR, look.facialHair)
-  const beardText = beard.id === 'none' ? '' : `${lower(beard.name)} in ${colourName(look.facialHairColor, 'hair')}`
-  if (style.id === 'bald') return ['Bald', beardText].filter(Boolean).join('; ')
-  const length = look.hairLength < 0.25 ? 'very short' : look.hairLength < 0.5 ? 'short' : look.hairLength < 0.75 ? 'shoulder-length' : 'long'
-  const streak = look.streakColor && look.streakAmount > 0 ? `, with ${colourName(look.streakColor, 'hair')} streaks` : ''
-  // A style named only for its length (short, long) adds nothing to the length already said.
-  const styled = ['short', 'long'].includes(lower(style.name)) ? '' : `, in a ${lower(style.name)} style`
-  const hair = `${cap(length)} ${colourName(look.hairColor, 'hair')} hair${streak}${styled}`
-  return [hair, beardText].filter(Boolean).join('; ')
+function eyesWords(p: CharacterPortrait): string {
+  const size = p.eyeSize > 1.12 ? 'large ' : p.eyeSize < 0.88 ? 'small ' : ''
+  const set = p.eyeSpacing > 1.08 ? ', set wide apart' : p.eyeSpacing < 0.92 ? ', set close together' : ''
+  return `${cap(colourName(p.eyeColor, 'eye'))}, ${size}${lower(optionName('eyes', p.eyes))} eyes${set}`
 }
 
-function eyesWords(look: CharacterLook): string {
-  const size = look.eyeSize > 1.15 ? 'large ' : look.eyeSize < 0.85 ? 'small ' : ''
-  const set = look.eyeSpacing > 1.12 ? ', set wide apart' : look.eyeSpacing < 0.9 ? ', set close together' : ''
-  return `${cap(colourName(look.eyeColor, 'eye'))}, ${size}${lower(pick(EYES, look.eyes).name)} eyes${set}`
+function faceWords(p: CharacterPortrait): string {
+  const head = optionName('headShape', p.headShape)
+  const brows = p.brows === 'none' ? 'no brows' : `${lower(optionName('brows', p.brows))} brows`
+  const nose = lower(optionName('nose', p.nose)), mouth = lower(optionName('mouth', p.mouth))
+  const ears = p.ears === 'protruding' ? '; ears that stick out' : ''
+  return `${cap(head === 'Pointed chin' ? 'pointed-chin' : lower(head))} face with ${brows}, ${article(nose)} ${nose} nose and ${article(mouth)} ${mouth} mouth${ears}`
 }
 
-function faceWords(look: CharacterLook): string {
-  const brows = `${lower(pick(BROWS, look.brows).name)}${look.browThickness > 1.2 ? ', heavy' : look.browThickness < 0.8 ? ', thin' : ''} brows`
-  return `${cap(lower(pick(HEAD_SHAPES, look.headShape).name))} face with ${brows}, ${article(pick(NOSES, look.nose).name)} ${lower(pick(NOSES, look.nose).name)} nose and ${article(pick(MOUTHS, look.mouth).name)} ${lower(pick(MOUTHS, look.mouth).name)} mouth`
+function styleWords(p: CharacterPortrait): string {
+  const colour = colourName(p.topColor, 'cloth')
+  return `Wears ${article(colour)} ${colour} ${lower(optionName('top', p.top))}${p.top === 'turtle' ? '' : ' top'}`
 }
 
-function styleWords(look: CharacterLook): string {
-  const o = look.outfit
-  const piece = (list: ReadonlyArray<{ id: string; name: string }>, id: string | null, slot: string) => {
-    if (!id) return ''
-    const name = lower(pick(list, id).name)
-    const colour = o.colors[slot] ? `${colourName(o.colors[slot], 'cloth')} ` : ''
-    // Trousers, boots and the like are plural: no article.
-    return /s$/.test(name) && !/ss$/.test(name) ? `${colour}${name}` : `${article(colour || name)} ${colour}${name}`
-  }
-  const worn = [piece(TOPS, o.top, 'top'), piece(BOTTOMS, o.bottom, 'bottom'), piece(OUTER, o.outer, 'outer'), piece(SHOES, o.shoes, 'shoes')].filter(Boolean)
-  const extras = o.accessories.map(id => lower(pick(ACCESSORIES, id).name))
-  if (worn.length === 0 && extras.length === 0) return ''
-  return `${worn.length > 0 ? `Wears ${listed(worn)}` : 'Dresses simply'}${extras.length > 0 ? `, with ${listed(extras)}` : ''}`
-}
+const bearingWords = (p: CharacterPortrait): string => `Usually looks ${EXPRESSION_WORDS[p.expression] ?? lower(optionName('expression', p.expression))}`
 
-function marksWords(look: CharacterLook): string {
-  const parts = look.marks.map(m => {
-    const kind = lower(MARK_KINDS.find(k => k.id === m.kind)?.name ?? m.kind)
-    const area = AREAS.find(a => a.id === m.area)
-    return `${kind}${area ? ` (${lower(area.name)})` : ''}`
-  })
-  return parts.length === 0 ? '' : cap(listed(parts))
-}
-
-function bearingWords(look: CharacterLook): string {
-  const expression = lower(pick(EXPRESSIONS, look.expression).name)
-  const pose = lower(pick(POSES, look.pose).name)
-  return `Usually looks ${expression}; most at ease ${pose === 'standing' ? 'standing' : `in a ${pose} stance`}`
-}
-
-// Every field of the look in words (an empty text where the look has nothing to say). `appearance` is the paragraph that joins the parts.
-export function describeLook(look: CharacterLook): Record<AppearanceField, string> {
+// Every field of the portrait in words (an empty text where the portrait has nothing to say). `appearance` is the paragraph that joins the parts.
+export function describePortrait(p: CharacterPortrait): Record<AppearanceField, string> {
   const parts: Record<AppearanceKey, string> = {
-    height: cap(heightWords(look.height)),
-    build: cap(buildWords(look)),
-    skin: `${cap(colourName(look.skin, 'skin'))} skin${look.marks.some(m => m.kind === 'freckles') ? ', freckled' : ''}`,
-    hair: hairWords(look),
-    eyes: eyesWords(look),
-    face: faceWords(look),
+    height: '',
+    build: cap(buildWords(p)),
+    skin: skinWords(p),
+    hair: hairWords(p),
+    eyes: eyesWords(p),
+    face: faceWords(p),
     voice: '',
-    bearing: bearingWords(look),
-    style: styleWords(look),
-    marks: marksWords(look),
+    bearing: bearingWords(p),
+    style: styleWords(p),
+    marks: '',
   }
   const hair = lower(parts.hair.split(';')[0])
-  const sentence = `${cap(`${heightWords(look.height)}, with a ${lower(parts.build)}`)}. ${cap(lower(parts.skin))}, ${hair}, and ${lower(parts.eyes)}.${parts.marks ? ` ${parts.marks}.` : ''}`
+  const sentence = `${cap(AGE_WORDS[p.age] ?? 'a person')}, with a ${lower(parts.build)}. ${parts.skin}, ${hair}, and ${lower(parts.eyes)}.`
   return { appearance: sentence, ...parts }
 }
 
@@ -184,9 +188,9 @@ export function appearanceText(profile: CharacterProfile): string {
 // The fields that are empty in a profile (so a first draft can fill just those).
 export const emptyAppearanceFields = (profile: CharacterProfile): AppearanceField[] => APPEARANCE_FIELDS.map(f => f.key).filter(k => profile[k].trim() === '')
 
-// A profile with the fields in `keys` written from the look (the other fields as they are; a field the look has no words for is left alone).
-export function writeFromLook(profile: CharacterProfile, look: CharacterLook, keys: AppearanceField[]): CharacterProfile {
-  const words = describeLook(look)
+// A profile with the fields in `keys` written from the portrait (the other fields as they are; a field the portrait has no words for is left alone).
+export function writeFromPortrait(profile: CharacterProfile, portrait: CharacterPortrait, keys: AppearanceField[]): CharacterProfile {
+  const words = describePortrait(portrait)
   const next = { ...profile }
   for (const k of keys) if (words[k]) next[k] = words[k]
   return next

@@ -2376,6 +2376,98 @@ class CharacterLook(BaseModel):
         return out
 
 
+# The portrait: how the character looks, drawn as a head-and-shoulders card from these choices (front view, flat colour). Every id names an entry of the front end's
+# portrait library (an unknown one is kept, and the library falls back to a default when it draws), a colour is #rrggbb (a nullable one follows the hair or the skin when
+# it is none), a slider is a number within its range. The ranges are the front end's (`portrait/defaults.ts`); a test keeps the two lists the same.
+PORTRAIT_VERSION = 1
+PORTRAIT_RANGES: dict[str, tuple[float, float]] = {
+    "headWidth": (0.88, 1.12),
+    "eyeSize": (0.75, 1.3),
+    "eyeSpacing": (0.85, 1.18),
+    "eyeTilt": (-10.0, 10.0),
+    "noseSize": (0.75, 1.3),
+    "noseWidth": (0.75, 1.35),
+    "mouthSize": (0.8, 1.25),
+}
+
+
+class CharacterPortrait(BaseModel):
+    version: int = PORTRAIT_VERSION
+    age: str = "adult"
+    build: str = "average"
+    chest: str = "average"
+    headShape: str = "oval"
+    headWidth: float = 1.0
+    ears: str = "average"
+    skin: str = "#d9a07a"
+    expression: str = "neutral"
+    eyes: str = "almond"
+    eyeColor: str = "#5a3a24"
+    eyeSize: float = 1.0
+    eyeSpacing: float = 1.0
+    eyeTilt: float = 0.0
+    brows: str = "soft"
+    browColor: Optional[str] = None
+    nose: str = "straight"
+    noseSize: float = 1.0
+    noseWidth: float = 1.0
+    mouth: str = "medium"
+    mouthSize: float = 1.0
+    lipColor: Optional[str] = None
+    hairLength: str = "short"
+    hairTexture: str = "1B"
+    hairStyle: str = "plain"
+    hairFront: str = "none"
+    hairline: str = "rounded"
+    hairlineHeight: str = "average"
+    hairEdges: str = "none"
+    hairColor: str = "#3a2a20"
+    highlightColor: Optional[str] = None
+    greying: str = "auto"
+    facialHair: str = "none"
+    facialHairColor: Optional[str] = None
+    top: str = "crew"
+    topColor: str = "#2f4a5a"
+    tileColor: str = "#e6d6c3"
+
+    @field_validator(
+        "age", "build", "chest", "headShape", "ears", "expression", "eyes", "brows", "nose", "mouth", "hairLength", "hairTexture", "hairStyle", "hairFront",
+        "hairline", "hairlineHeight", "hairEdges", "greying", "facialHair", "top", mode="before",
+    )
+    @classmethod
+    def _ids(cls, value: Any, info: Any) -> Any:
+        return _part_id(value, CharacterPortrait.model_fields[info.field_name].default)
+
+    @field_validator("skin", "eyeColor", "hairColor", "topColor", "tileColor", mode="before")
+    @classmethod
+    def _colors(cls, value: Any, info: Any) -> Any:
+        return _hex_or(value, CharacterPortrait.model_fields[info.field_name].default)
+
+    @field_validator("browColor", "lipColor", "highlightColor", "facialHairColor", mode="before")
+    @classmethod
+    def _optional_colors(cls, value: Any) -> Any:
+        return _hex_or(value, None)
+
+    @field_validator(*PORTRAIT_RANGES, mode="before")
+    @classmethod
+    def _sliders(cls, value: Any, info: Any) -> Any:
+        low, high = PORTRAIT_RANGES[info.field_name]
+        return _finite(value, 0.0 if info.field_name == "eyeTilt" else 1.0, low, high)
+
+    @field_validator("version", mode="before")
+    @classmethod
+    def _version(cls, value: Any) -> Any:
+        return value if isinstance(value, int) and not isinstance(value, bool) and 1 <= value <= 999 else PORTRAIT_VERSION
+
+
+def _portrait_or_default(value: Any) -> Any:
+    return value if isinstance(value, (dict, CharacterPortrait)) else {}
+
+
+def _portrait_or_none(value: Any) -> Any:
+    return value if isinstance(value, (dict, CharacterPortrait)) else None
+
+
 # ---- the profile, the relationships and the story of a character ----
 
 CHARACTER_MAX_FIELDS = 30
@@ -2567,6 +2659,13 @@ class CharacterState(BaseModel):
     note: str = Field(default="", max_length=2000)
     inventory: list[str] = Field(default_factory=list)
     snapshot: Optional[CharacterLook] = None
+    # How the character looks in this state (a copy of the portrait); none = not captured.
+    portrait: Optional[CharacterPortrait] = None
+
+    @field_validator("portrait", mode="before")
+    @classmethod
+    def _state_portrait(cls, value: Any) -> Any:
+        return _portrait_or_none(value)
 
     @field_validator("at", "storyTime", mode="before")
     @classmethod
@@ -2658,7 +2757,9 @@ class CharacterDoc(BaseModel):
     id: str = Field(min_length=1, max_length=80)
     name: str = Field(default="Unnamed character", max_length=120)
     order: int = 0
+    # The old figure's look, no longer drawn: it is kept as it was so that nothing the author made is lost.
     look: CharacterLook = Field(default_factory=CharacterLook)
+    portrait: CharacterPortrait = Field(default_factory=CharacterPortrait)
     profile: CharacterProfile = Field(default_factory=CharacterProfile)
     possessions: list[CharacterPossession] = Field(default_factory=list)
     relationships: list[CharacterRelationship] = Field(default_factory=list)
@@ -2729,6 +2830,11 @@ class CharacterDoc(BaseModel):
     def _look(cls, value: Any) -> Any:
         return value if isinstance(value, (dict, CharacterLook)) else {}
 
+    @field_validator("portrait", mode="before")
+    @classmethod
+    def _portrait(cls, value: Any) -> Any:
+        return _portrait_or_default(value)
+
 
 class EditionMap(BaseModel):
     """A published map as it was when the edition was made; `doc.reader` says what is shown from which chapter."""
@@ -2751,15 +2857,22 @@ class EditionRelationship(BaseModel):
 
 
 class EditionCharacter(BaseModel):
-    """A published character as it was when the edition was made: the look, the public fields only (not the rest of the profile) and the links."""
+    """A published character as it was when the edition was made: the portrait, the public fields only (not the rest of the profile) and the links."""
 
     characterId: str
     name: str
     revealAt: Optional[int] = None
     look: CharacterLook
+    # How the card is drawn; an edition made before portraits has none (the reader's view then draws the default portrait).
+    portrait: Optional[CharacterPortrait] = None
     fields: list[EditionCharacterField] = Field(default_factory=list)
     relationships: list[EditionRelationship] = Field(default_factory=list)
     relationshipsRevealAt: Optional[int] = None
+
+    @field_validator("portrait", mode="before")
+    @classmethod
+    def _edition_portrait(cls, value: Any) -> Any:
+        return _portrait_or_none(value)
 
 
 BookEdition.model_rebuild()

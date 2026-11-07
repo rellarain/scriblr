@@ -1,9 +1,8 @@
-import type { CharacterDoc, CharacterLook, CharacterProfile, CharacterRelationship, CharacterState, OutlineNode, RelationshipKind } from '../../../../api/types'
+import type { CharacterDoc, CharacterProfile, CharacterRelationship, CharacterState, OutlineNode, RelationshipKind } from '../../../../api/types'
 import { buildChildIndex } from '../outlineTree'
-import { BUILDS, ACCESSORIES, BOTTOMS, OUTER, POSES, SHOES, TOPS } from './art/wardrobe'
-import { BROWS, EARS, EYES, EXPRESSIONS, FACIAL_HAIR, HAIR, HEAD_SHAPES, MOUTHS, NOSES, type Option } from './art/library'
+import { portraitDiff } from './portrait/diff'
 
-// Pure helpers for the profile, the relationships and the story of a character: where in the book a state or a change sits, what is true at a point, how a look differs
+// Pure helpers for the profile, the relationships and the story of a character: where in the book a state or a change sits, what is true at a point, how a portrait differs
 // from another, and the family tree. The story points are the chapters and scenes of the outline, in book order.
 
 export const emptyProfile = (): CharacterProfile => ({
@@ -72,42 +71,15 @@ export function relationshipAt(rel: CharacterRelationship, points: StoryPoint[],
   return { label, note }
 }
 
-// ---- how a look differs ----
-const NAMED: Array<[keyof CharacterLook, string, readonly Option[]]> = [
-  ['build', 'Build', BUILDS], ['headShape', 'Head shape', HEAD_SHAPES], ['ears', 'Ears', EARS], ['eyes', 'Eyes', EYES], ['brows', 'Brows', BROWS], ['nose', 'Nose', NOSES], ['mouth', 'Mouth', MOUTHS],
-  ['facialHair', 'Facial hair', FACIAL_HAIR], ['hair', 'Hair', HAIR], ['expression', 'Expression', EXPRESSIONS], ['pose', 'Pose', POSES],
-]
-const COLOURS: Array<[keyof CharacterLook, string]> = [['skin', 'Skin'], ['eyeColor', 'Eye colour'], ['browColor', 'Brow colour'], ['lipColor', 'Lip colour'], ['hairColor', 'Hair colour'], ['facialHairColor', 'Facial hair colour']]
-const SLIDERS: Array<[keyof CharacterLook, string]> = [['height', 'Height'], ['width', 'Width'], ['hairLength', 'Hair length']]
-const nameOf = (list: readonly Option[], id: string | null) => (id === null ? 'none' : list.find(o => o.id === id)?.name ?? id)
+// ---- how a portrait differs ----
+// (`portraitDiff`, in portrait/diff.ts, lists the differences between two portraits as lines: "Hair style: Plain > Full braids".)
 
-// The differences between two looks, as lines ("Hair: Short > Braid"): the parts that are another choice, the colours, the sliders that moved by a tenth, the outfit and the marks.
-export function lookDiff(a: CharacterLook, b: CharacterLook): string[] {
-  const lines: string[] = []
-  for (const [k, label, list] of NAMED) if (a[k] !== b[k]) lines.push(`${label}: ${nameOf(list, a[k] as string)} > ${nameOf(list, b[k] as string)}`)
-  for (const [k, label] of COLOURS) if (a[k] !== b[k]) lines.push(`${label}: ${a[k]} > ${b[k]}`)
-  for (const [k, label] of SLIDERS) if (Math.abs((a[k] as number) - (b[k] as number)) >= 0.1) lines.push(`${label}: ${Math.round((a[k] as number) * 100)}% > ${Math.round((b[k] as number) * 100)}%`)
-  const slots: Array<['top' | 'bottom' | 'shoes' | 'outer', string, readonly Option[]]> = [['top', 'Top', TOPS], ['bottom', 'Bottom', BOTTOMS], ['shoes', 'Footwear', SHOES], ['outer', 'Outerwear', OUTER]]
-  for (const [k, label, list] of slots) if (a.outfit[k] !== b.outfit[k]) lines.push(`${label}: ${nameOf(list, a.outfit[k])} > ${nameOf(list, b.outfit[k])}`)
-  const added = b.outfit.accessories.filter(x => !a.outfit.accessories.includes(x))
-  const removed = a.outfit.accessories.filter(x => !b.outfit.accessories.includes(x))
-  if (added.length) lines.push(`Puts on: ${added.map(x => nameOf(ACCESSORIES, x)).join(', ')}`)
-  if (removed.length) lines.push(`Takes off: ${removed.map(x => nameOf(ACCESSORIES, x)).join(', ')}`)
-  const marks = (l: CharacterLook) => new Set(l.marks.map(m => `${m.kind}:${m.design}:${m.area}`))
-  const ma = marks(a), mb = marks(b)
-  const gained = [...mb].filter(x => !ma.has(x)).length
-  const lost = [...ma].filter(x => !mb.has(x)).length
-  if (gained) lines.push(`${gained} new ${gained === 1 ? 'mark' : 'marks'}`)
-  if (lost) lines.push(`${lost} ${lost === 1 ? 'mark' : 'marks'} gone`)
-  return lines
-}
-
-// What changed in how the character looks from one state with a captured look to the next (states with no captured look are skipped).
+// What changed in how the character looks from one state with a captured portrait to the next (states with none are skipped).
 export interface AppearanceGap { from: CharacterState; to: CharacterState; changes: string[] }
 export function appearanceGaps(states: CharacterState[], points: StoryPoint[]): AppearanceGap[] {
-  const shown = statesInOrder(states, points).filter(s => s.snapshot)
+  const shown = statesInOrder(states, points).filter(s => s.portrait)
   const out: AppearanceGap[] = []
-  for (let i = 1; i < shown.length; i += 1) out.push({ from: shown[i - 1], to: shown[i], changes: lookDiff(shown[i - 1].snapshot!, shown[i].snapshot!) })
+  for (let i = 1; i < shown.length; i += 1) out.push({ from: shown[i - 1], to: shown[i], changes: portraitDiff(shown[i - 1].portrait!, shown[i].portrait!) })
   return out
 }
 

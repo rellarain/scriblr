@@ -7,7 +7,7 @@ import {
   listRevisionSummaries,
 } from './historyFetch'
 import { emptyStory } from '../assets/Interfaces/writer/characters/story'
-import { defaultLook } from '../assets/Interfaces/writer/characters/art/defaults'
+import { defaultPortrait } from '../assets/Interfaces/writer/characters/portrait/defaults'
 import { getExtrasPreview, getReaderExtras } from './bookPublishing'
 import { getBookExtras } from './reader'
 import { createCharacter, deleteCharacter, getCharacter, listAllCharacters, listCharacters, putCharacter } from './charactersApi'
@@ -35,7 +35,7 @@ function answerWith(body: unknown = {}, init: { ok?: boolean; status?: number } 
 const TREE = { schemaVersion: 2, nodes: [] }
 const MAP = { schemaVersion: 2, id: ID, title: 'W', kind: 'world' as const, parentId: null, order: 0, width: 2, height: 2, cellSize: 1, unit: 'cells', pace: null, terrains: [], layers: [], cells: [0, 4], symbols: [], labels: [], shapes: [], theme: 'modern' as const, scaleBar: true, compass: true, legend: false, updatedAt: '2026-01-01T00:00:00Z' }
 const ITEM = { schemaVersion: 2, id: ID, name: 'Key', order: 0, kind: 'tool', description: '', notes: '', color: '', holdings: [], updatedAt: '2026-01-01T00:00:00Z' }
-const CHARACTER = { schemaVersion: 2, id: ID, name: 'Ada', order: 0, look: defaultLook(), ...emptyStory(), updatedAt: '2026-01-01T00:00:00Z' }
+const CHARACTER = { schemaVersion: 2, id: ID, name: 'Ada', order: 0, portrait: defaultPortrait(), ...emptyStory(), updatedAt: '2026-01-01T00:00:00Z' }
 const CASES: Array<[string, () => Promise<unknown>, string, string, unknown?]> = [
   ['getTraining', () => getTraining(), 'GET', '/api/training'],
   ['saveTrainingContent', () => saveTrainingContent({ curricula: [], courses: [] }), 'PUT', '/api/training/content', { curricula: [], courses: [] }],

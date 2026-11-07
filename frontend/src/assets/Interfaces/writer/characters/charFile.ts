@@ -1,5 +1,5 @@
 import type { CharacterCreate, CharacterDoc, CharacterSummary } from '../../../../api/types'
-import { normalizeLook } from './art/defaults'
+import { normalizePortrait } from './portrait/defaults'
 import { emptyStory } from './story'
 
 // Characters as a file, to move to another project or keep: JSON with the characters as the project holds them, except that the relationships to characters that are not in
@@ -20,7 +20,7 @@ export function buildCharacterFile(all: CharacterDoc[], ids: string[] | null = n
 export type ParsedCharacterFile = { ok: true; file: CharacterFile } | { ok: false; error: string }
 const isRecord = (v: unknown): v is Record<string, unknown> => typeof v === 'object' && v !== null && !Array.isArray(v)
 
-// A file's text: it must be a Scriblr character file of a version this app knows, with at least one character that has an id and a name (a look is repaired).
+// A file's text: it must be a Scriblr character file of a version this app knows, with at least one character that has an id and a name (a portrait is repaired; a file from before portraits gets the default one, and keeps the old look as it was).
 export function parseCharacterFile(text: string): ParsedCharacterFile {
   let raw: unknown
   try { raw = JSON.parse(text) } catch { return { ok: false, error: 'This is not a character file: it is not readable JSON.' } }
@@ -32,7 +32,7 @@ export function parseCharacterFile(text: string): ParsedCharacterFile {
   for (const item of raw.characters) {
     if (!isRecord(item) || typeof item.id !== 'string' || item.id === '' || typeof item.name !== 'string' || seen.has(item.id)) continue
     seen.add(item.id)
-    characters.push({ ...emptyStory(), ...(item as unknown as CharacterDoc), look: normalizeLook(item.look), appearances: [] })
+    characters.push({ ...emptyStory(), ...(item as unknown as CharacterDoc), portrait: normalizePortrait(item.portrait), appearances: [] })
   }
   if (characters.length === 0) return { ok: false, error: 'None of the characters in this file can be read.' }
   return { ok: true, file: { format: CHARACTER_FILE_FORMAT, version: raw.version, exportedAt: typeof raw.exportedAt === 'string' ? raw.exportedAt : '', characters } }
@@ -59,7 +59,7 @@ export async function importCharacters(file: CharacterFile, choices: Map<string,
   try {
     for (const r of taking) {
       if (choiceOf(r) === 'replace') { newId.set(r.doc.id, r.doc.id); continue }
-      const made = await api.create({ name: r.doc.name, look: r.doc.look })
+      const made = await api.create({ name: r.doc.name, portrait: r.doc.portrait, look: r.doc.look })
       newId.set(r.doc.id, made.id)
     }
     for (const r of taking) {

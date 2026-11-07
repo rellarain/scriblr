@@ -3,6 +3,7 @@ import type { ArcStage, CharacterDoc, CharacterState, LifeEvent } from '../../..
 import { CHARACTER_MAX_EVENTS, CHARACTER_MAX_STAGES, CHARACTER_MAX_STATES } from '../../../../api/types'
 import { PlusIcon, TrashIcon } from '../../../icons'
 import { TextField } from './CharFields'
+import { Portrait } from './portrait/Portrait'
 import { appearanceGaps, nextId, stateAt, statesInOrder, type StoryPoint } from './story'
 
 // Names separated by commas, kept as typed (the comma and the space after it are not lost while typing).
@@ -34,7 +35,7 @@ export function StorySection({ doc, edit, points, links }: { doc: CharacterDoc; 
   )
   function addState() {
     const free = points.find(p => !doc.states.some(s => s.at === p.id)) ?? points[0]
-    edit(d => ({ ...d, states: [...d.states, { id: nextId(d.states, 's'), at: free?.id ?? '', storyTime: '', mood: '', goal: '', where: '', note: '', inventory: [], snapshot: null }] }), 'states')
+    edit(d => ({ ...d, states: [...d.states, { id: nextId(d.states, 's'), at: free?.id ?? '', storyTime: '', mood: '', goal: '', where: '', note: '', inventory: [], portrait: null }] }), 'states')
   }
 
   return (
@@ -44,7 +45,7 @@ export function StorySection({ doc, edit, points, links }: { doc: CharacterDoc; 
           <h3 className="charPanelTitle">Where they are in the story</h3>
           <button type="button" className="charIconBtn" aria-label="Add a state" title="Add a state (from a chapter or scene on)" disabled={doc.states.length >= CHARACTER_MAX_STATES} onClick={addState}><PlusIcon size={16} /></button>
         </header>
-        <p className="charHint">A state is what is true of the character from a chapter or scene until the next state: how they feel, what they want, where they are, what they carry and, if you capture it, how they look.</p>
+        <p className="charHint">A state is what is true of the character from a chapter or scene until the next state: how they feel, what they want, where they are, what they carry and, if you capture it, how they look (a copy of the portrait).</p>
         {points.length === 0 && <p className="charHint">The outline has no chapters or scenes yet.</p>}
         {points.length > 0 && (
           <div className="charRow">
@@ -69,9 +70,11 @@ export function StorySection({ doc, edit, points, links }: { doc: CharacterDoc; 
               <ListField label={`Carrying in state ${s.id} (separate with commas)`} items={s.inventory} onChange={v => setState(s.id, { inventory: v })} />
               <TextField label={`Notes of state ${s.id}`} multiline rows={2} value={s.note} max={2000} onChange={v => setState(s.id, { note: v })} />
               <div className="charRow">
-                <button type="button" className="charChip" onClick={() => setState(s.id, { snapshot: structuredClone(doc.look) })}>{s.snapshot ? 'Capture the look again' : 'Capture the look now'}</button>
-                {s.snapshot && <button type="button" className="charChip" onClick={() => setState(s.id, { snapshot: null })}>Forget the look</button>}
-                {s.snapshot && <span className="charHint">A look is kept for this state.</span>}
+                {s.portrait && <span className="charStateHead"><Portrait portrait={s.portrait} crop="head" label={`Portrait kept for state ${i + 1}`} className="charPortraitArt" /></span>}
+                <button type="button" className="charChip" onClick={() => setState(s.id, { portrait: structuredClone(doc.portrait) })}>{s.portrait ? 'Capture the portrait again' : 'Capture the portrait now'}</button>
+                {s.portrait && <button type="button" className="charChip" onClick={() => setState(s.id, { portrait: null })}>Forget the portrait</button>}
+                {s.portrait && <span className="charHint">A portrait is kept for this state.</span>}
+                {!s.portrait && s.snapshot && <span className="charHint">An older look is kept with this state; capture the portrait to compare.</span>}
               </div>
             </li>
           ))}
@@ -79,7 +82,7 @@ export function StorySection({ doc, edit, points, links }: { doc: CharacterDoc; 
       </section>
       <section className="charPanel" aria-label="Changes of appearance">
         <h3 className="charPanelTitle">How they look, point to point</h3>
-        {gaps.length === 0 ? <p className="charHint">Capture the look in two states to see what changed between them.</p> : (
+        {gaps.length === 0 ? <p className="charHint">Capture the portrait in two states to see what changed between them.</p> : (
           <ol className="charGaps">
             {gaps.map(g => (
               <li key={`${g.from.id}-${g.to.id}`}>

@@ -1,5 +1,5 @@
 // Project > Characters (CharactersConsole.tsx and its parts). On the tab's light surface, in the ink colour. Colours are the theme tokens; the colours of a character
-// itself (skin, hair, clothes) are the author's data and are set inline or inside the drawing. Type is the text tokens and space the space scale. Flat and square.
+// itself (skin, hair, clothes, the tile) are the author's data and are set inline or inside the portrait. Type is the text tokens and space the space scale. Flat and square.
 
 .charPage {
   container-type: inline-size;
@@ -53,20 +53,6 @@
 }
 .charPicker { flex: 0 0 auto; width: 28px; height: 28px; padding: 0; border: 0; background: none; cursor: pointer; }
 
-// A grid of choices, with a small picture of the part when there is one.
-.charOptions { display: flex; flex-wrap: wrap; gap: var(--space-2); &--thumbs { display: grid; grid-template-columns: repeat(auto-fill, minmax(72px, 1fr)); } }
-.charOpt {
-  display: flex; flex-direction: column; align-items: center; justify-content: center; gap: var(--space-1); padding: var(--space-1) var(--space-3); border: 0; border-radius: var(--radius-button);
-  background: var(--ov-sink-1); color: var(--ink); font: inherit; font-size: var(--text-small); cursor: pointer; min-width: 0;
-  &:hover { background: var(--ov-sink-2); }
-  &[aria-pressed='true'] { background: var(--ov-sink-2); box-shadow: inset 0 -2px 0 var(--accent); font-weight: 700; }
-  &:focus-visible { outline: 2px solid var(--accent-hover); outline-offset: 1px; }
-  .charOptions--thumbs & { padding: var(--space-1); }
-}
-.charOptName { max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.charThumbBox { display: block; width: 100%; aspect-ratio: 1; background: var(--surface-raised); }
-.charThumb { display: block; width: 100%; height: 100%; &--tall { aspect-ratio: 1; } }
-
 // ---- the list ----
 .charList { flex: 0 0 200px; min-width: 0; display: flex; flex-direction: column; gap: var(--space-3); background: var(--surface-raised); box-shadow: inset 0 0 0 1px var(--hairline); padding: var(--space-3); overflow-y: auto; }
 .charPanelHead { display: flex; align-items: center; justify-content: space-between; gap: var(--space-3); }
@@ -81,59 +67,63 @@
 .charRowTool { opacity: 0; .charRowItem:hover &, &:focus-visible { opacity: 0.8; } }
 .charConfirm { display: inline-flex; align-items: center; gap: var(--space-1); padding: 0 var(--space-2); background: var(--ov-sink-2); box-shadow: inset 3px 0 0 var(--alert); }
 
-// ---- the stage ----
-.charStage { flex: 1 1 auto; min-width: 0; display: flex; flex-direction: column; gap: var(--space-2); }
-.charViews { display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-2); }
-.charBox { position: relative; flex: 1 1 auto; min-height: 360px; overflow: hidden; background: var(--ov-sink-2); display: flex; align-items: stretch; justify-content: center; }
 .charArt { display: block; width: 100%; height: 100%; min-height: 0; }
-.charTurn { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: var(--space-3); width: 100%; padding: var(--space-3); box-sizing: border-box; }
-.charTurnItem { margin: 0; display: flex; flex-direction: column; min-width: 0; min-height: 0; .charArt { flex: 1 1 auto; } }
 .charCaption { text-align: center; font-size: var(--text-small); color: var(--ink-muted); }
-.charExpressions { display: grid; grid-template-columns: repeat(auto-fill, minmax(120px, 1fr)); gap: var(--space-3); width: 100%; padding: var(--space-3); box-sizing: border-box; align-content: start; }
-.charExpr {
-  display: flex; flex-direction: column; gap: var(--space-1); padding: var(--space-2); border: 0; background: var(--surface-raised); color: var(--ink); font: inherit; cursor: pointer;
-  .charArt { aspect-ratio: 1; height: auto; }
-  &:hover { background: var(--ov-sink-1); }
-  &[aria-pressed='true'] { box-shadow: inset 0 -3px 0 var(--accent); }
-  &:focus-visible { outline: 2px solid var(--accent-hover); outline-offset: 1px; }
-}
 
 // ---- the side: the drawers ----
-.charSide { flex: 0 0 300px; min-width: 0; display: flex; flex-direction: column; gap: var(--space-3); overflow-y: auto; }
+// ---- the panels ----
 .charPanel--start { align-self: start; }
 .charPanel { display: flex; flex-direction: column; gap: var(--space-3); padding: var(--space-3); background: var(--surface-raised); box-shadow: inset 0 0 0 1px var(--hairline); }
-.charDrawer { padding: 0; gap: 0; }
-.charDrawerHead { margin: 0; font-size: inherit; }
-.charDrawerBtn {
-  width: 100%; display: flex; align-items: center; gap: var(--space-3); padding: var(--space-3); border: 0; background: none; color: var(--ink); font: inherit; font-size: var(--text-small); font-weight: 700;
-  text-transform: uppercase; letter-spacing: 0.05em; text-align: left; cursor: pointer;
-  &:hover { background: var(--ov-sink-1); }
-  &[aria-expanded='true'] { box-shadow: inset 3px 0 0 var(--accent); }
-  &:focus-visible { outline: 2px solid var(--accent-hover); outline-offset: -2px; }
-}
-.charDrawerBody { display: flex; flex-direction: column; gap: var(--space-4); padding: var(--space-3); }
-.charSlot { display: flex; flex-direction: column; gap: var(--space-2); }
-
-// ---- marks ----
-.charMarks { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: var(--space-1); }
-.charMarkRow { display: flex; align-items: center; gap: var(--space-1); }
-.charMarkOpen {
-  flex: 1 1 0; min-width: 0; padding: var(--space-1) var(--space-3); border: 0; background: var(--ov-sink-1); color: var(--ink); font: inherit; font-size: var(--text-field); text-align: left; cursor: pointer;
-  &[aria-pressed='true'] { background: var(--ov-sink-2); box-shadow: inset 3px 0 0 var(--accent); }
-  &:focus-visible { outline: 2px solid var(--accent-hover); outline-offset: 1px; }
-}
-.charMarkEdit { display: flex; flex-direction: column; gap: var(--space-3); padding: var(--space-3); background: var(--ov-sink-1); }
-.charPad { display: flex; flex-direction: column; gap: var(--space-2); }
-.charPadBox { display: block; width: 140px; height: 140px; background: var(--surface-raised); box-shadow: inset 0 0 0 1px var(--hairline); touch-action: none; cursor: crosshair; color: var(--ink); &:focus-visible { outline: 2px solid var(--accent-hover); } }
-.charPadTools { display: flex; align-items: center; gap: var(--space-2); }
-
 // ---- a narrow console: the parts stack ----
 @container (max-width: 859px) {
   .charSplit { flex-direction: column; }
-  .charList, .charSide { flex: 0 0 auto; max-height: 300px; }
-  .charStage { flex: 0 0 auto; }
-  .charBox { min-height: 420px; }
-  .charTurn { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .charList { flex: 0 0 auto; max-height: 300px; }
+  .charPortrait { flex-direction: column; align-items: stretch; }
+  .charPortraitStage { flex: 0 0 auto; max-width: 360px; }
+}
+
+// ---- the portrait: the card, the tabs and the dropdowns whose choices are pictures ----
+// (The tile and what is drawn on it are the character's own colours, inside the picture.)
+.charPortrait { flex: 1 1 auto; min-width: 0; display: flex; align-items: flex-start; gap: var(--space-5); }
+.charPortrait > .charPanel:last-child { flex: 1 1 0; min-width: 0; }
+.charPortraitStage { flex: 0 0 320px; min-width: 0; }
+.charPortraitCard { display: flex; flex-direction: column; align-items: center; gap: var(--space-1); min-width: 0; &--big { align-items: stretch; gap: var(--space-2); .charCardName { font-size: var(--text-title); text-align: center; } } }
+.charPortraitArt { display: block; width: 100%; height: auto; aspect-ratio: 1; }
+.charTabs { display: flex; flex-wrap: wrap; gap: var(--space-1); }
+.charTab {
+  display: inline-flex; align-items: center; gap: var(--space-2); min-height: 36px; padding: 0 var(--space-3); border: 0; border-radius: var(--radius-button); background: none; color: var(--ink);
+  font: inherit; font-size: var(--text-ui); font-weight: 600; opacity: 0.85; cursor: pointer;
+  &:hover { opacity: 1; background: var(--ov-sink-1); }
+  &[aria-selected='true'] { opacity: 1; background: var(--ov-sink-2); box-shadow: inset 0 -2px 0 var(--accent); }
+  &:focus-visible { outline: 2px solid var(--accent-hover); outline-offset: 1px; }
+}
+.charPortraitFields { display: grid; grid-template-columns: repeat(auto-fill, minmax(240px, 1fr)); gap: var(--space-4) var(--space-5); align-content: start; }
+.charStateHead { width: 32px; height: 32px; flex: 0 0 auto; }
+
+.charPick { display: flex; flex-direction: column; gap: var(--space-1); min-width: 0; }
+.charPickBox { position: relative; }
+.charPickBtn {
+  display: flex; align-items: center; gap: var(--space-3); width: 100%; min-height: 52px; padding: var(--space-1) var(--space-3) var(--space-1) var(--space-1); box-sizing: border-box; border: 0;
+  border-radius: var(--radius-none); background: var(--ov-sink-1); color: var(--ink); font: inherit; font-size: var(--text-field); text-align: left; cursor: pointer;
+  &:hover:not(:disabled) { background: var(--ov-sink-2); }
+  &[aria-expanded='true'] { box-shadow: inset 0 0 0 1px var(--accent); }
+  &:focus-visible { outline: 2px solid var(--accent-hover); outline-offset: 1px; }
+  &:disabled { opacity: 0.5; cursor: not-allowed; }
+}
+.charPickThumb { flex: 0 0 auto; width: 44px; height: 44px; display: block; overflow: hidden; &--big { width: 64px; height: 64px; } }
+.charPickArt { display: block; width: 100%; height: 100%; }
+.charPickName { flex: 1 1 auto; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+// The list of choices: a grid that scrolls (the bar is hidden everywhere) when there are more than fit.
+.charPickList {
+  position: absolute; z-index: 20; left: 0; right: 0; top: 100%; margin: var(--space-1) 0 0; padding: var(--space-2); list-style: none; max-height: 360px; overflow-y: auto; box-sizing: border-box;
+  display: grid; grid-template-columns: repeat(auto-fill, minmax(92px, 1fr)); gap: var(--space-1); background: var(--surface-raised); outline: none;
+  box-shadow: 0 8px 24px rgb(0 0 0 / calc(0.3 * var(--shade-k, 1))), inset 0 0 0 1px var(--hairline);
+}
+.charPickOpt {
+  display: flex; flex-direction: column; align-items: center; gap: var(--space-1); padding: var(--space-2) var(--space-1); min-width: 0; color: var(--ink); font-size: var(--text-small); text-align: center; cursor: pointer;
+  .charPickName { flex: 0 0 auto; max-width: 100%; white-space: normal; }
+  &--active { background: var(--ov-sink-2); }
+  &[aria-selected='true'] { box-shadow: inset 0 0 0 2px var(--accent); }
 }
 
 // ---- the profile, the relationships and the story ----
@@ -159,7 +149,6 @@
 .charOverview { list-style: none; margin: 0; padding: 0; display: grid; grid-template-columns: repeat(auto-fill, minmax(120px, 1fr)); gap: var(--space-3); }
 .charCard {
   width: 100%; display: flex; flex-direction: column; align-items: center; gap: var(--space-1); padding: var(--space-2); border: 0; background: var(--ov-sink-1); color: var(--ink); font: inherit; cursor: pointer;
-  .charArt { aspect-ratio: 1; height: auto; background: var(--surface-raised); }
   &:hover { background: var(--ov-sink-2); }
   &[aria-pressed='true'] { box-shadow: inset 0 -3px 0 var(--accent); }
   &:focus-visible { outline: 2px solid var(--accent-hover); outline-offset: 1px; }
@@ -167,12 +156,12 @@
 .charCardName { font-size: var(--text-field); font-weight: 700; max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .charCardText { font-size: var(--text-small); color: var(--ink-muted); max-width: 100%; text-align: center; line-height: 1.35; }
 .charCompare { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: var(--space-3); }
-.charCompareItem { margin: 0; display: flex; flex-direction: column; background: var(--surface-raised); min-width: 0; .charArt { height: 320px; } }
+.charCompareItem { margin: 0; display: flex; flex-direction: column; align-items: center; gap: var(--space-2); padding: var(--space-3); background: var(--surface-raised); min-width: 0; .charPortraitCard { width: 100%; max-width: 260px; } }
 .charDiffs { font-size: var(--text-field); ul { margin: 0; padding-left: var(--space-5); } }
 .charFileInput { position: absolute; width: 1px; height: 1px; opacity: 0; pointer-events: none; }
 .charImport { display: flex; flex-direction: column; gap: var(--space-3); padding: var(--space-3); background: var(--ov-sink-1); }
 
-// Who is in a scene: small heads on its card and its chips.
+// Who is in a scene: small faces on its card and its chips.
 .charTags { display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-2); min-width: 0; }
 .charTag { display: inline-flex; align-items: center; gap: var(--space-1); padding: 0; border: 0; background: none; color: inherit; font: inherit; font-size: var(--text-small); cursor: default; }
 .charTagHead { width: 26px; height: 26px; background: var(--surface-raised); box-shadow: inset 0 0 0 1px var(--hairline); .charArt { width: 100%; height: 100%; } }

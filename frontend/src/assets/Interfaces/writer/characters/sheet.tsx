@@ -1,15 +1,12 @@
-import { renderToStaticMarkup } from 'react-dom/server'
 import type { CharacterDoc } from '../../../../api/types'
 import { saveBlob } from '../maps/mapExport'
-import { CharacterArt } from './art/CharacterArt'
-import type { View } from './art/space'
 import { appearanceText } from './describe'
 
-// A character sheet as one picture: the figure, a close-up, three more views, and the profile in words. It is an SVG document built from the same drawing as the console's
-// (so the colours are the character's own, on white paper) and saved as a PNG.
+// A character sheet as one picture: the name and the profile in words, on white paper, saved as a PNG. (It has no drawing: the portrait is made to be seen in the console, on
+// the cards and in the book.)
 
 export const SHEET_W = 1000
-export const SHEET_H = 1320
+export const SHEET_H = 1100
 
 const esc = (t: string) => t.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;')
 
@@ -26,12 +23,6 @@ export function wrapText(text: string, max: number): string[] {
   return lines
 }
 
-// The drawing of the character placed in a box of the sheet (a nested svg).
-function art(doc: CharacterDoc, mode: 'full' | 'closeup', view: View, x: number, y: number, w: number, h: number, id: string): string {
-  const markup = renderToStaticMarkup(<CharacterArt look={doc.look} mode={mode} view={view} label={`${doc.name}, ${view}`} idPrefix={id} />)
-  return markup.replace('<svg ', `<svg x="${x}" y="${y}" width="${w}" height="${h}" `)
-}
-
 export function sheetSvg(doc: CharacterDoc): string {
   const p = doc.profile
   const ink = '#1c1226', muted = '#5a4f66'
@@ -40,12 +31,7 @@ export function sheetSvg(doc: CharacterDoc): string {
   parts.push(`<text x="40" y="70" font-family="Georgia, serif" font-size="44" font-weight="700" fill="${ink}">${esc(doc.name)}</text>`)
   const sub = [p.role, p.age && `age ${p.age}`, p.occupation].filter(Boolean).join(' · ')
   if (sub) parts.push(`<text x="40" y="104" font-family="sans-serif" font-size="20" fill="${muted}">${esc(sub)}</text>`)
-  parts.push(art(doc, 'full', 'front', 40, 130, 380, 700, 'sf'))
-  parts.push(art(doc, 'closeup', 'front', 440, 130, 270, 312, 'sc'))
-  parts.push(art({ ...doc, look: { ...doc.look } }, 'full', 'threeQuarter', 440, 470, 170, 360, 'sq'))
-  parts.push(art(doc, 'full', 'side', 620, 470, 170, 360, 'ss'))
-  parts.push(art(doc, 'full', 'back', 800, 470, 170, 360, 'sb'))
-  let y = 880
+  let y = 160
   const block = (title: string, text: string, x: number, width: number): number => {
     if (!text.trim()) return 0
     const lines = wrapText(text, Math.floor(width / 9.5))

@@ -1,46 +1,12 @@
 import { describe, expect, it } from 'vitest'
 import type { CharacterDoc } from '../../../../api/types'
 import { newCharacter } from '../../../../designSystem/mockCharacters'
-import { defaultLook } from './art/defaults'
-import { AGE_RANGE, ageLook } from './age'
+import { defaultPortrait } from './portrait/defaults'
 import { buildCharacterFile, importCharacters, importRows, parseCharacterFile } from './charFile'
 import { SHEET_H, SHEET_W, sheetFileName, sheetSvg, wrapText } from './sheet'
 
 const person = (id: string, name: string, over: Partial<CharacterDoc> = {}): CharacterDoc => ({ ...newCharacter(id, { name }, 0), ...over })
 const rel = (id: string, targetId: string) => ({ id, targetId, kind: 'friend' as const, family: null, label: '', description: '', changes: [] })
-
-describe('ageing a look', () => {
-  const look = { ...defaultLook(), hairColor: '#202020', facialHair: 'full', eyes: 'round', mouth: 'full' }
-  it('is no change at zero years', () => expect(ageLook(look, 0)).toBe(look))
-  it('greys the hair, brows and beard, and the more the older', () => {
-    const a = ageLook(look, 20), b = ageLook(look, 50)
-    const grey = (hex: string) => parseInt(hex.slice(1, 3), 16)
-    expect(grey(a.hairColor)).toBeGreaterThan(grey(look.hairColor))
-    expect(grey(b.hairColor)).toBeGreaterThan(grey(a.hairColor))
-    expect(grey(b.facialHairColor)).toBeGreaterThan(grey(look.facialHairColor))
-    expect(b.height).toBeLessThan(look.height)
-    expect(b.width).toBeGreaterThan(look.width)
-  })
-  it('hoods the eyes and thins the lips at an advanced age', () => {
-    expect(ageLook(look, 20).eyes).toBe('round')
-    expect(ageLook(look, 40)).toMatchObject({ eyes: 'hooded', mouth: 'thin' })
-  })
-  it('makes a younger figure smaller, with larger eyes and no beard', () => {
-    const y = ageLook(look, -30)
-    expect(y.height).toBeLessThan(look.height)
-    expect(y.eyeSize).toBeGreaterThan(look.eyeSize)
-    expect(y).toMatchObject({ eyes: 'large', facialHair: 'none' })
-  })
-  it('keeps every slider in its range, at either end', () => {
-    for (const years of [AGE_RANGE.min, AGE_RANGE.max]) {
-      const a = ageLook({ ...look, height: 0.7, width: 1.4, shoulders: 0.8, eyeSize: 0.6 }, years)
-      expect(a.height).toBeGreaterThanOrEqual(0.7)
-      expect(a.width).toBeLessThanOrEqual(1.4)
-      expect(a.shoulders).toBeGreaterThanOrEqual(0.8)
-      expect(a.eyeSize).toBeGreaterThanOrEqual(0.6)
-    }
-  })
-})
 
 describe('character files', () => {
   const cast = [person('a', 'Ada', { relationships: [rel('r1', 'b'), rel('r2', 'c')], appearances: ['ch1'] }), person('b', 'Bram'), person('c', 'Cleo')]
@@ -54,13 +20,27 @@ describe('character files', () => {
     expect(buildCharacterFile(cast).characters).toHaveLength(3)
   })
 
-  it('are read back, with the look repaired', () => {
-    const text = JSON.stringify({ ...buildCharacterFile(cast), characters: [{ ...cast[0], look: { skin: 'red', hair: 'braid' } }, { id: '', name: 'x' }, 'bad'] })
+  it('are read back, with the portrait repaired', () => {
+    const text = JSON.stringify({ ...buildCharacterFile(cast), characters: [{ ...cast[0], portrait: { skin: 'red', hairStyle: 'twists', eyeSize: 9 } }, { id: '', name: 'x' }, 'bad'] })
     const parsed = parseCharacterFile(text)
     expect(parsed.ok).toBe(true)
     if (parsed.ok) {
       expect(parsed.file.characters).toHaveLength(1)
-      expect(parsed.file.characters[0].look).toMatchObject({ skin: '#e0b08a', hair: 'braid' })
+      expect(parsed.file.characters[0].portrait).toMatchObject({ skin: defaultPortrait().skin, hairStyle: 'twists', eyeSize: 1.3 })
+    }
+  })
+
+  it('carry the portrait, and a file from before portraits gets the default one and keeps its old look', () => {
+    const made = person('a', 'Ada')
+    made.portrait = { ...made.portrait, hairLength: 'knee', hairTexture: '4A', tileColor: '#cfe0dc' }
+    const file = buildCharacterFile([made])
+    expect(file.characters[0].portrait).toMatchObject({ hairLength: 'knee', hairTexture: '4A', tileColor: '#cfe0dc' })
+    const old = JSON.stringify({ format: 'scriblr-characters', version: 1, exportedAt: '', characters: [{ id: 'z', name: 'Zed', look: { hair: 'braid' } }] })
+    const parsed = parseCharacterFile(old)
+    expect(parsed.ok).toBe(true)
+    if (parsed.ok) {
+      expect(parsed.file.characters[0].portrait).toEqual(defaultPortrait())
+      expect(parsed.file.characters[0].look).toEqual({ hair: 'braid' })
     }
   })
 
@@ -103,17 +83,22 @@ describe('character files', () => {
 
 describe('the character sheet', () => {
   const doc = person('a', 'Ada & <Co>', { profile: { ...person('a', 'x').profile, role: 'Navigator', age: '29', personality: 'Dry '.repeat(60), goal: 'Chart the Glass Sea' } })
-  it('is an SVG document with the name, the profile and every drawing, with ids that do not meet', () => {
+  it('is an SVG document with the name and the profile in words, and no drawing', () => {
     const svg = sheetSvg(doc)
     expect(svg.startsWith('<svg')).toBe(true)
     expect(svg).toContain(`width="${SHEET_W}" height="${SHEET_H}"`)
     expect(svg).toContain('Ada &amp; &lt;Co&gt;')
     expect(svg).toContain('Navigator · age 29')
     expect(svg).toContain('Chart the Glass Sea')
-    expect((svg.match(/<svg /g) ?? []).length).toBe(6)
-    const ids = [...svg.matchAll(/ id="([^"]+)"/g)].map(m => m[1])
-    expect(new Set(ids).size).toBe(ids.length)
-    expect(svg).not.toMatch(/NaN|undefined/)
+    expect((svg.match(/<svg /g) ?? []).length).toBe(1)
+    expect(svg).not.toMatch(/<path|<clipPath|NaN|undefined/)
+  })
+  it('carries the words of the appearance', () => {
+    const paragraph = sheetSvg(person('a', 'Ada', { profile: { ...doc.profile, appearance: 'A weathered woman with the sea in her squint.', hair: 'Grey, cropped' } }))
+    expect(paragraph).toContain('A weathered woman with the sea in her')
+    // With no paragraph, the pieces are joined.
+    const pieces = sheetSvg(person('a', 'Ada', { profile: { ...doc.profile, appearance: '', hair: 'Grey, cropped', eyes: 'Slate' } }))
+    expect(pieces).toContain('Grey, cropped. Slate.')
   })
   it('wraps text at spaces and names its file safely', () => {
     expect(wrapText('one two three four', 9)).toEqual(['one two', 'three', 'four'])

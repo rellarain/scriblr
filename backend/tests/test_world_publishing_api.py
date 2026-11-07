@@ -129,12 +129,33 @@ def test_a_character_shows_only_its_public_fields_and_each_from_its_chapter(clie
 
     _read_to(client, w, 1)
     card = _extras(client, w)["characters"][0]
-    assert card["name"] == "Ada" and card["look"]["skin"]
+    assert card["name"] == "Ada" and card["portrait"]["skin"] and "look" not in card
     assert [(f["key"], f["value"]) for f in card["fields"]] == [("role", "Navigator"), ("field:f1", "Onward")]  # the fear is private; empty possessions are left out
 
     _read_to(client, w, 2)
     assert [f["key"] for f in _extras(client, w)["characters"][0]["fields"]] == ["role", "background", "field:f1"]
     assert "Drowning" not in str(_extras(client, w))
+
+
+def test_the_portrait_is_frozen_with_the_edition_and_an_older_edition_shows_the_default(client: TestClient) -> None:
+    w = _world(client)
+    ada = _share_character(client, w["pid"], "Ada", {"published": True}, portrait={"hairStyle": "boxbraids", "hairLength": "hip", "tileColor": "#cfe0dc"})
+    _publish(client, w)
+    # changed after publishing: the next edition shows it, this one does not
+    ada_doc = client.get(f"/api/projects/{w['pid']}/characters/{ada.id}").json()
+    ada_doc["portrait"]["hairStyle"] = "plain"
+    client.put(f"/api/projects/{w['pid']}/characters/{ada.id}", json=ada_doc)
+    _read_to(client, w, 1)
+    card = _extras(client, w)["characters"][0]
+    assert card["portrait"]["hairStyle"] == "boxbraids" and card["portrait"]["tileColor"] == "#cfe0dc" and "look" not in card
+
+    from app.storage.schema import CharacterLook, CharacterPortrait, EditionCharacter
+    from app.storage.world_publishing import extras_view
+
+    old = EditionCharacter.model_validate({"characterId": "c", "name": "Old", "look": CharacterLook().model_dump(mode="json")})  # an edition made before portraits
+    assert old.portrait is None
+    card = extras_view("b", [], [old], 0).characters[0]
+    assert card.portrait == CharacterPortrait()
 
 
 def test_the_words_about_how_a_character_looks_can_be_public_one_by_one(client: TestClient) -> None:

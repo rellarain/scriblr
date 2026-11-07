@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { createCharacter, deleteCharacter, getCharacter, listAllCharacters, listCharacters, putCharacter } from '../../../../api/charactersApi'
-import type { CharacterDoc, CharacterLook, CharacterSummary } from '../../../../api/types'
+import type { CharacterDoc, CharacterPortrait, CharacterSummary, LegacyLook } from '../../../../api/types'
 import { notifyCastChanged } from './castStore'
 import { buildCharacterFile, importCharacters, type CharacterChoice, type CharacterFile, type CharacterImportResult } from './charFile'
 import { combineCountdown, combineSaveStatus, useAutosave } from '../../../../lib/useAutosave'
@@ -94,13 +94,13 @@ export function useCharacters(projectId: string | null) {
     }
   }, [projectId, show])
 
-  // A new character (from a look, to copy one). It is opened.
-  const create = useCallback(async (name?: string, look?: CharacterLook): Promise<string | null> => {
+  // A new character (from a portrait, to copy one or to keep an aged one). It is opened.
+  const create = useCallback(async (name?: string, start?: { portrait?: CharacterPortrait; look?: LegacyLook }): Promise<string | null> => {
     if (!projectId) return null
     setNotice(undefined)
     try {
       await autosaveRef.current.flush()
-      const d = await createCharacter(projectId, { name, look })
+      const d = await createCharacter(projectId, { name, portrait: start?.portrait, look: start?.look })
       setCast(list => [...list, summaryOf(d)])
       const mine = ++token.current
       const session = startSession(d)
@@ -112,13 +112,13 @@ export function useCharacters(projectId: string | null) {
     }
   }, [projectId, show])
 
-  // A copy of a character (its look, and a name that says so). It is opened.
+  // A copy of a character (its portrait, and a name that says so). It is opened.
   const duplicate = useCallback(async (id: string): Promise<string | null> => {
     if (!projectId) return null
     try {
       await autosaveRef.current.flush()
       const source = sessions.current.get(id)?.doc ?? (await getCharacter(projectId, id))
-      return await create(`${source.name} (copy)`.slice(0, 120), source.look)
+      return await create(`${source.name} (copy)`.slice(0, 120), { portrait: source.portrait, look: source.look })
     } catch (err) {
       setNotice(message(err, 'The character could not be copied.'))
       return null
@@ -197,9 +197,9 @@ export function useCharacters(projectId: string | null) {
     touched(next)
   }, [touched])
 
-  // A change of the look: `patch` is merged into it.
-  const setLook = useCallback((patch: Partial<CharacterLook> | ((look: CharacterLook) => CharacterLook), group: string | null = null) => {
-    edit(d => ({ ...d, look: typeof patch === 'function' ? patch(d.look) : { ...d.look, ...patch } }), group)
+  // A change of the portrait: `patch` is merged into it.
+  const setPortrait = useCallback((patch: Partial<CharacterPortrait> | ((portrait: CharacterPortrait) => CharacterPortrait), group: string | null = null) => {
+    edit(d => ({ ...d, portrait: typeof patch === 'function' ? patch(d.portrait) : { ...d.portrait, ...patch } }), group)
   }, [edit])
   const rename = useCallback((name: string) => edit(d => (name.trim() === '' || name === d.name ? d : { ...d, name: name.trim().slice(0, 120) }), 'name'), [edit])
 
@@ -225,11 +225,11 @@ export function useCharacters(projectId: string | null) {
 
   return useMemo(() => ({
     status, loadError, reload: load, cast, openId, doc, rev, notice,
-    open, create, duplicate, remove, exportFile, importFile, edit, setLook, rename, undo, redo, canUndo, canRedo,
+    open, create, duplicate, remove, exportFile, importFile, edit, setPortrait, rename, undo, redo, canUndo, canRedo,
     saveStatus: combineSaveStatus(autosave),
     saveCountdown: combineCountdown(autosave),
     saveNow: autosave.flush,
-  }), [status, loadError, load, cast, openId, doc, rev, notice, open, create, duplicate, remove, exportFile, importFile, edit, setLook, rename, undo, redo, canUndo, canRedo, autosave])
+  }), [status, loadError, load, cast, openId, doc, rev, notice, open, create, duplicate, remove, exportFile, importFile, edit, setPortrait, rename, undo, redo, canUndo, canRedo, autosave])
 }
 
 export type Characters = ReturnType<typeof useCharacters>

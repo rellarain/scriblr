@@ -14,7 +14,7 @@ const book = { id: 'local-p-b1', title: 'My Book' } as CatalogBook
 const ctx = (updatedAt: string | null = null) => ({ data: { reader: { progress: { [book.id]: { updatedAt } } } } }) as unknown as ReaderCtx
 const map = (id: string, title: string, over: Partial<MapDoc> = {}): MapDoc => ({ ...newMap(id, { title, width: 6, height: 6 }, 0), ...over })
 const extras = (over: Partial<BookExtras> = {}): BookExtras => ({ bookId: book.id, reach: 1, maps: [], characters: [], lockedMaps: 0, lockedCharacters: 0, ...over })
-const card = (id: string, name: string, over = {}) => ({ id, name, look: newCharacter(id, { name }, 0).look, fields: [], relationships: [], ...over })
+const card = (id: string, name: string, over = {}) => ({ id, name, portrait: newCharacter(id, { name }, 0).portrait, fields: [], relationships: [], ...over })
 
 // The book's extras are served as given, or the request fails.
 function serve(body: BookExtras | 'fail') {

@@ -4,7 +4,7 @@ import { BookPick, RevealSelect, ReachSelect, usePreview, useExtrasInfo, Warning
 import { CharacterCard } from '../readers/WorldViews'
 
 // The character for readers: whether it is published (shown in the Reader's book page once the book is published), from which chapter, which fields are public and from
-// which chapter each is shown, and a preview as a reader who has reached a chapter. The look is always shown with a published character; the rest of the profile never is.
+// which chapter each is shown, and a preview as a reader who has reached a chapter. The portrait is always shown with a published character; the rest of the profile never is.
 export function ForReadersSection({ projectId, doc, edit, savedAt }: {
   projectId: string
   doc: CharacterDoc
@@ -64,7 +64,7 @@ export function ForReadersSection({ projectId, doc, edit, savedAt }: {
       {share.published && (
         <section className="charPanel" aria-label="What readers are told">
           <h3 className="charPanelTitle">What readers are told</h3>
-          <p className="rvHint">The look is always shown. Tick what else is public, and from which chapter.</p>
+          <p className="rvHint">The portrait is always shown. Tick what else is public, and from which chapter.</p>
           <ul className="rvList">
             {parts.map(p => {
               const on = share.fields.includes(p.key)

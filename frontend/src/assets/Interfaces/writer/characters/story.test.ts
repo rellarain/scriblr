@@ -1,8 +1,9 @@
 import { describe, expect, it } from 'vitest'
 import type { CharacterDoc, CharacterRelationship, CharacterState, OutlineNode } from '../../../../api/types'
 import { newCharacter } from '../../../../designSystem/mockCharacters'
-import { defaultLook } from './art/defaults'
-import { appearanceGaps, familyTree, lookDiff, nextId, relationshipAt, stateAt, statesInOrder, storyPoints, webLinks } from './story'
+import { defaultPortrait } from './portrait/defaults'
+import { portraitDiff } from './portrait/diff'
+import { appearanceGaps, familyTree, nextId, relationshipAt, stateAt, statesInOrder, storyPoints, webLinks } from './story'
 
 const node = (id: string, kind: OutlineNode['kind'], parentId: string | null, order: number, title = id): OutlineNode => ({
   id, kind, parentId, order, title, synopsis: '', draftRef: null, flag: null, color: null, chapterCountTarget: null, plotlineIds: [], wordCountGoal: null,
@@ -13,7 +14,7 @@ const NODES = [
 ]
 const POINTS = storyPoints(NODES)
 
-const state = (id: string, at: string, over: Partial<CharacterState> = {}): CharacterState => ({ id, at, storyTime: '', mood: '', goal: '', where: '', note: '', inventory: [], snapshot: null, ...over })
+const state = (id: string, at: string, over: Partial<CharacterState> = {}): CharacterState => ({ id, at, storyTime: '', mood: '', goal: '', where: '', note: '', inventory: [], portrait: null, ...over })
 const rel = (id: string, targetId: string, over: Partial<CharacterRelationship> = {}): CharacterRelationship => ({ id, targetId, kind: 'friend', family: null, label: '', description: '', changes: [], ...over })
 const person = (id: string, name: string, relationships: CharacterRelationship[] = []): CharacterDoc => ({ ...newCharacter(id, { name }, 0), relationships })
 
@@ -54,25 +55,38 @@ describe('a relationship over the story', () => {
   })
 })
 
-describe('how a look differs', () => {
-  it('lists the parts, colours, sliders, outfit and marks that changed', () => {
-    const a = defaultLook()
-    const b = { ...a, hair: 'braid', hairColor: '#ff0000', height: 1.2, expression: 'sad', outfit: { ...a.outfit, top: 'hoodie', accessories: ['hat'] }, marks: [{ id: 'm', kind: 'scar' as const, design: 'slash', area: 'cheeks', x: 0.5, y: 0.5, size: 1, color: null, strokes: [] }] }
-    const lines = lookDiff(a, b)
-    expect(lines).toContain('Hair: Short > Braid')
-    expect(lines).toContain('Hair colour: #3b2a20 > #ff0000')
-    expect(lines).toContain('Height: 100% > 120%')
-    expect(lines).toContain('Top: T-shirt > Hoodie')
-    expect(lines).toContain('Puts on: Brimmed hat')
-    expect(lines).toContain('1 new mark')
-    expect(lookDiff(a, a)).toEqual([])
+describe('how a portrait differs', () => {
+  it('lists the parts, colours and sliders that changed', () => {
+    const a = defaultPortrait()
+    const b = { ...a, hairStyle: 'twobraids', hairLength: 'chest', hairColor: '#ff0000', eyeSize: 1.2, expression: 'sad', top: 'vneck', browColor: '#111111', tileColor: '#000000' }
+    const lines = portraitDiff(a, b)
+    expect(lines).toContain('Hair length: Short > Chest')
+    expect(lines).toContain('Hair style: Plain > 2 braids')
+    expect(lines).toContain('Hair colour: dark brown > red')
+    expect(lines).toContain('Eye size: 100% > 120%')
+    expect(lines).toContain('Expression: Neutral > Sad')
+    expect(lines).toContain('Top: Crew neck > V-neck')
+    expect(lines.find(l => l.startsWith('Brow colour'))).toMatch(/like the hair > black/)
+    // The tile is the card's colour, not a difference of the person.
+    expect(lines.some(l => /tile/i.test(l))).toBe(false)
+    expect(portraitDiff(a, a)).toEqual([])
   })
-  it('is found between states that have a captured look, in book order', () => {
-    const a = defaultLook()
-    const gaps = appearanceGaps([state('b', 's3', { snapshot: { ...a, hair: 'bun' } }), state('n', 's2'), state('a', 'c1', { snapshot: a })], POINTS)
+  it('says a slider only when it moved by a tenth, and the tilt of the eyes by three degrees', () => {
+    const a = defaultPortrait()
+    expect(portraitDiff(a, { ...a, noseSize: 1.05, eyeTilt: 2 })).toEqual([])
+    expect(portraitDiff(a, { ...a, eyeTilt: 4 })).toEqual(['Eye tilt: 0° > 4°'])
+  })
+  it('is found between states that have a captured portrait, in book order', () => {
+    const a = defaultPortrait()
+    const gaps = appearanceGaps([state('b', 's3', { portrait: { ...a, hairStyle: 'topbun', hairLength: 'chin' } }), state('n', 's2'), state('a', 'c1', { portrait: a })], POINTS)
     expect(gaps).toHaveLength(1)
     expect(gaps[0].from.id).toBe('a')
-    expect(gaps[0].changes).toEqual(['Hair: Short > Top bun'])
+    expect(gaps[0].changes).toEqual(['Hair length: Short > Chin', 'Hair style: Plain > Top bun'])
+  })
+  it('ignores a state that only has the old look captured', () => {
+    const a = defaultPortrait()
+    const gaps = appearanceGaps([state('a', 'c1', { portrait: a }), state('b', 's3', { snapshot: { hair: 'bun' } })], POINTS)
+    expect(gaps).toEqual([])
   })
 })
 

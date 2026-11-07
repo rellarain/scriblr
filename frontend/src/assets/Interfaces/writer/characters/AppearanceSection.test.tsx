@@ -26,8 +26,8 @@ describe('the Appearance section', () => {
     expect(screen.getByRole('textbox', { name: 'Name of the character' })).toHaveValue('Ada')
     for (const name of ['In a paragraph', 'Height', 'Build', 'Skin', 'Hair', 'Eyes', 'Face', 'Voice', 'Bearing and mannerisms', 'How they dress', 'Distinguishing marks']) expect(field(name)).toBeInTheDocument()
     expect(screen.getByRole('button', { name: 'Appearance' })).toHaveAttribute('aria-pressed', 'true')
-    // The drawing is one click away, not the first thing.
-    expect(screen.queryByRole('img', { name: /close-up/ })).not.toBeInTheDocument()
+    // The portrait is one click away, not the first thing.
+    expect(screen.queryByRole('img', { name: /portrait/ })).not.toBeInTheDocument()
   })
 
   it('keeps what is typed until Save, then saves it with the character', async () => {
@@ -40,17 +40,20 @@ describe('the Appearance section', () => {
     expect(lastPut(backend).profile).toMatchObject({ hair: 'Black, cropped', voice: 'Low and dry' })
   })
 
-  it('writes the empty fields from the look and leaves what is already written', async () => {
+  it('writes the empty fields from the portrait and leaves what is already written', async () => {
     const doc = ada()
     doc.profile = { ...doc.profile, eyes: 'Grey as slate' }
     const { user } = await open(doc)
-    await user.click(screen.getByRole('button', { name: 'Write the empty fields from the look' }))
+    await user.click(screen.getByRole('button', { name: 'Write the empty fields from the portrait' }))
     expect(field('Eyes')).toHaveValue('Grey as slate')
     expect((field('Hair') as HTMLTextAreaElement).value).toMatch(/hair/i)
     expect((field('In a paragraph') as HTMLTextAreaElement).value).not.toBe('')
     expect(field('Voice')).toHaveValue('')
-    // Everything the look can say is there now: nothing is left to write.
-    expect(screen.getByRole('button', { name: 'Write the empty fields from the look' })).toBeDisabled()
+    // What a portrait cannot say (a height, a voice, marks) stays the author's.
+    expect(field('Height')).toHaveValue('')
+    expect(field('Distinguishing marks')).toHaveValue('')
+    // Everything the portrait can say is there now: nothing is left to write.
+    expect(screen.getByRole('button', { name: 'Write the empty fields from the portrait' })).toBeDisabled()
     await user.click(screen.getByRole('button', { name: 'Undo' }))
     expect(field('Hair')).toHaveValue('')
   })
@@ -59,11 +62,11 @@ describe('the Appearance section', () => {
     const doc = ada()
     doc.profile = { ...doc.profile, eyes: 'Grey as slate' }
     const { user } = await open(doc)
-    await user.click(screen.getByRole('button', { name: 'Write every field again from the look' }))
+    await user.click(screen.getByRole('button', { name: 'Write every field again from the portrait' }))
     await user.click(screen.getByRole('button', { name: 'Cancel' }))
     expect(field('Eyes')).toHaveValue('Grey as slate')
-    await user.click(screen.getByRole('button', { name: 'Write every field again from the look' }))
-    await user.click(screen.getByRole('button', { name: 'Confirm: write every field from the look' }))
+    await user.click(screen.getByRole('button', { name: 'Write every field again from the portrait' }))
+    await user.click(screen.getByRole('button', { name: 'Confirm: write every field from the portrait' }))
     expect(field('Eyes')).not.toHaveValue('Grey as slate')
     expect((field('Eyes') as HTMLInputElement).value).toMatch(/eyes/i)
   })
@@ -83,11 +86,24 @@ describe('the Appearance section', () => {
     expect(backend.of('PUT')).toHaveLength(0)
   })
 
-  it('goes to the drawing from the Look button and back', async () => {
+  it('goes to the portrait from the Portrait button and back', async () => {
     const { user } = await open()
-    await user.click(screen.getByRole('button', { name: 'Look' }))
-    expect(await screen.findByRole('img', { name: /close-up/ })).toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: 'Look' })).not.toBeInTheDocument()
+    await user.click(screen.getByRole('button', { name: 'Portrait' }))
+    expect(await screen.findByRole('img', { name: 'Ada, portrait' })).toBeInTheDocument()
     await user.click(screen.getByRole('button', { name: 'Appearance' }))
     expect(field('Hair')).toBeInTheDocument()
+  })
+
+  it('writes the words from the portrait that was made, not from a default', async () => {
+    const doc = ada()
+    doc.portrait = { ...doc.portrait, age: 'elderly', hairColor: '#e2e0dc', hairLength: 'chest', hairTexture: '4C', build: 'heavy' }
+    const { user } = await open(doc)
+    await user.click(screen.getByRole('button', { name: 'Write the empty fields from the portrait' }))
+    const hair = (field('Hair') as HTMLTextAreaElement).value
+    expect(hair).toMatch(/chest/i)
+    expect(hair).toMatch(/tightly coiled/)
+    expect(hair).toMatch(/white|silver/)
+    expect((field('In a paragraph') as HTMLTextAreaElement).value).toMatch(/elderly|old/i)
   })
 })

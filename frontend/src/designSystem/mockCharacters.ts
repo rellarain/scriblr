@@ -1,10 +1,10 @@
 import type { CharacterCreate, CharacterDoc, CharacterSummary } from '../api/types'
-import { defaultLook, normalizeLook } from '../assets/Interfaces/writer/characters/art/defaults'
+import { defaultPortrait, normalizePortrait } from '../assets/Interfaces/writer/characters/portrait/defaults'
 import { emptyStory } from '../assets/Interfaces/writer/characters/story'
 import type { MockAnswer } from './mockPresets'
 
 // A pretend Characters API (`/api/projects/{id}/characters`), shared by the design system previews (mockBackend.ts) and the tests (test/charactersBackend.ts): the cast
-// lives in memory and answers the way the server does (a new character has the default look, a look that is sent is repaired, a character that is not there is a 404).
+// lives in memory and answers the way the server does (a new character has the default portrait, a portrait that is sent is repaired, a character that is not there is a 404).
 
 const ok = (body: unknown, status = 200): MockAnswer => ({ status, body })
 const fail = (status: number, detail: string): MockAnswer => ({ status, body: { detail } })
@@ -15,7 +15,7 @@ export function summaryOf(c: CharacterDoc): CharacterSummary {
 }
 
 export function newCharacter(id: string, body: CharacterCreate, order: number): CharacterDoc {
-  return { schemaVersion: 2, id, name: body.name?.trim() || 'Unnamed character', order, look: body.look ? normalizeLook(body.look) : defaultLook(), ...emptyStory(), updatedAt: AT }
+  return { schemaVersion: 2, id, name: body.name?.trim() || 'Unnamed character', order, portrait: body.portrait ? normalizePortrait(body.portrait) : defaultPortrait(), look: body.look ?? {}, ...emptyStory(), updatedAt: AT }
 }
 
 export function createMockCharacters(initial: CharacterDoc[] = []) {
@@ -44,7 +44,7 @@ export function createMockCharacters(initial: CharacterDoc[] = []) {
       if (b.id !== id) return fail(422, 'The id does not match.')
       // A relationship is with another character that is there, not with oneself.
       const relationships = (b.relationships ?? []).filter(r => cast.has(r.targetId) && r.targetId !== id)
-      const saved: CharacterDoc = { ...emptyStory(), ...b, relationships, name: b.name.trim() || 'Unnamed character', look: normalizeLook(b.look), updatedAt: `2026-11-02T12:${String(Math.floor(saves / 60) % 60).padStart(2, '0')}:${String(saves++ % 60).padStart(2, '0')}.000Z` }
+      const saved: CharacterDoc = { ...emptyStory(), ...b, relationships, name: b.name.trim() || 'Unnamed character', portrait: normalizePortrait(b.portrait), states: (b.states ?? []).map(st => ({ ...st, portrait: st.portrait ? normalizePortrait(st.portrait) : null })), updatedAt: `2026-11-02T12:${String(Math.floor(saves / 60) % 60).padStart(2, '0')}:${String(saves++ % 60).padStart(2, '0')}.000Z` }
       cast.set(id, saved)
       return ok(saved)
     }
@@ -60,16 +60,18 @@ export function createMockCharacters(initial: CharacterDoc[] = []) {
   return { route, get cast() { return cast } }
 }
 
-// The cast a preview opens with: two characters with looks of their own.
+// The cast a preview opens with: two characters with portraits of their own.
 export function seedCharacters(): CharacterDoc[] {
   const ada = newCharacter('chr_ada', { name: 'Ada Marsh' }, 0)
-  ada.look = {
-    ...ada.look, skin: '#c98f6b', hair: 'wavy', hairColor: '#7a3f22', hairLength: 0.7, eyes: 'almond', eyeColor: '#3e6b5a', brows: 'arched', mouth: 'heart', build: 'curvy', expression: 'smirk',
-    outfit: { top: 'shirt', bottom: 'skirt', shoes: 'boots', outer: 'cape', accessories: ['belt', 'glasses'], colors: { top: '#d9d2c0', bottom: '#2f4a5a', shoes: '#4a3a30', outer: '#802020', accessory: '#c9a227' } },
-    marks: [{ id: 'm1', kind: 'freckles', design: 'nose', area: 'cheeks', x: 0.5, y: 0.35, size: 1, color: null, strokes: [] }],
+  ada.portrait = {
+    ...ada.portrait, age: 'young', skin: '#e8b48f', hairLength: 'chest', hairTexture: '2B', hairFront: 'centre', hairColor: '#7a3f22', eyes: 'almond', eyeColor: '#3e6b5a', mouth: 'heart', chest: 'full',
+    expression: 'smirk', top: 'vneck', topColor: '#802020', tileColor: '#cfe0dc',
   }
   const bram = newCharacter('chr_bram', { name: 'Bram Quill' }, 1)
-  bram.look = { ...bram.look, skin: '#8d5a3b', hair: 'buzz', hairColor: '#1f1a17', facialHair: 'full', build: 'broad', headShape: 'square', nose: 'broad', brows: 'thick', pose: 'relaxed' }
+  bram.portrait = {
+    ...bram.portrait, age: 'middle', build: 'broad', headShape: 'square', skin: '#8d5a3b', hairLength: 'buzzed', hairColor: '#1f1a17', facialHair: 'full', nose: 'broad', brows: 'thick', expression: 'stern',
+    chest: 'flat', topColor: '#3e5a3a', tileColor: '#e9d39a', greying: 'none',
+  }
   ada.profile = { ...ada.profile, appearance: 'A weathered woman of twenty-nine with a sailor’s squint, ink on her fingers and a red cape that has seen salt.', height: 'Tall for the crew', hair: 'Wavy, auburn, tied back with string', eyes: 'Green, set a little wide', marks: 'Freckles across the nose', role: 'Navigator', age: '29', occupation: 'Ship’s cartographer', summary: 'Charts coasts nobody else will sail.', goal: 'Finish the chart of the Glass Sea.', fear: 'Open water at night.', fields: [{ id: 'f1', label: 'Motto', value: 'Measure twice.' }] }
   ada.relationships = [{ id: 'r1', targetId: 'chr_bram', kind: 'ally', family: null, label: 'First mate', description: 'Trusts him with the helm and nothing else.', changes: [] }]
   ada.possessions = [{ id: 'p1', name: 'Brass sextant', description: 'Her mother’s.' }]

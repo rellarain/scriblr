@@ -3,7 +3,7 @@ from pathlib import Path
 
 from fastapi.testclient import TestClient
 
-from app.storage.schema import CHARACTER_MAX_MARKS, CharacterDoc, CharacterLook
+from app.storage.schema import CHARACTER_MAX_MARKS, PORTRAIT_RANGES, CharacterDoc, CharacterLook, CharacterPortrait, CharacterState
 
 
 def _project(client: TestClient) -> str:
@@ -46,6 +46,40 @@ def test_an_outfit_keeps_only_real_colours_and_a_blank_name_is_put_back() -> Non
     assert doc.name == "Unnamed character" and doc.look.outfit.colors == {"top": "#112233"} and doc.look.outfit.top is None
 
 
+# ---- the portrait is repaired, never refused ----
+
+def test_a_bad_value_in_a_portrait_is_repaired_to_its_default_or_held_to_its_range() -> None:
+    p = CharacterPortrait.model_validate({
+        "age": "  ", "skin": "red", "eyeTilt": -90, "headWidth": "wide", "eyeSize": 9, "browColor": "#aabbcc", "lipColor": "nope", "highlightColor": 5,
+        "hairTexture": " 4C ", "hairStyle": 7, "version": True, "tileColor": "#12", "facialHairColor": "#112233",
+    })
+    assert p.age == "adult" and p.skin == "#d9a07a" and p.eyeTilt == PORTRAIT_RANGES["eyeTilt"][0] and p.headWidth == 1.0 and p.eyeSize == PORTRAIT_RANGES["eyeSize"][1]
+    assert p.browColor == "#aabbcc" and p.lipColor is None and p.highlightColor is None and p.facialHairColor == "#112233"
+    assert p.hairTexture == "4C" and p.hairStyle == "plain" and p.version == 1 and p.tileColor == "#e6d6c3"
+
+
+def test_an_id_this_build_does_not_know_is_kept_so_a_newer_portrait_survives() -> None:
+    assert CharacterPortrait.model_validate({"hairStyle": "from-the-future", "age": "ancient"}).hairStyle == "from-the-future"
+
+
+def test_a_character_without_a_portrait_or_with_a_broken_one_has_the_default() -> None:
+    assert CharacterDoc.model_validate({"id": "c1"}).portrait == CharacterPortrait()
+    assert CharacterDoc.model_validate({"id": "c1", "portrait": "nonsense"}).portrait == CharacterPortrait()
+    assert CharacterDoc.model_validate({"id": "c1", "portrait": {"hairLength": "chest"}}).portrait.hairLength == "chest"
+
+
+def test_a_state_keeps_a_portrait_it_captured_and_ignores_a_broken_one_and_the_old_snapshot_stays() -> None:
+    kept = CharacterState.model_validate({"id": "s1", "portrait": {"age": "elderly"}, "snapshot": {"hair": "bun"}})
+    assert kept.portrait is not None and kept.portrait.age == "elderly" and kept.snapshot is not None and kept.snapshot.hair == "bun"
+    assert CharacterState.model_validate({"id": "s1", "portrait": 4}).portrait is None
+    assert CharacterState.model_validate({"id": "s1"}).portrait is None
+
+
+def test_the_ranges_are_the_front_ends(client: TestClient) -> None:
+    # the front end's portrait/defaults.ts holds the same list (a portrait/defaults test reads this file too)
+    assert set(PORTRAIT_RANGES) == {"headWidth", "eyeSize", "eyeSpacing", "eyeTilt", "noseSize", "noseWidth", "mouthSize"}
+
+
 # ---- the endpoints ----
 
 def test_a_new_character_has_the_default_look_and_goes_last(client: TestClient) -> None:
@@ -56,6 +90,38 @@ def test_a_new_character_has_the_default_look_and_goes_last(client: TestClient) 
     assert a["order"] == 0 and b["order"] == 1 and a["look"]["hair"] == "short" and a["look"]["outfit"]["top"] == "tee"
     rows = client.get(f"/api/projects/{pid}/characters").json()
     assert [r["name"] for r in rows] == ["Ada", "Bram"] and "look" not in rows[0]
+
+
+def test_a_new_character_has_the_default_portrait_and_can_start_from_one(client: TestClient) -> None:
+    pid = _project(client)
+    plain = _new(client, pid, name="Plain")
+    assert plain["portrait"] == CharacterPortrait().model_dump(mode="json")
+    made = _new(client, pid, name="Copy", portrait={"hairStyle": "boxbraids", "hairLength": "hip", "skin": "#8d5524"})
+    assert made["portrait"]["hairStyle"] == "boxbraids" and made["portrait"]["skin"] == "#8d5524" and made["portrait"]["eyes"] == "almond"
+    # a portrait that is not one is the default, not a refusal
+    assert _new(client, pid, portrait="x")["portrait"]["age"] == "adult"
+
+
+def test_a_portrait_and_a_captured_one_are_saved_with_the_character_and_the_old_look_is_kept(client: TestClient) -> None:
+    pid = _project(client)
+    c = _new(client, pid, name="Ada", look={"hair": "braid"})
+    c["portrait"]["hairTexture"] = "3B"
+    c["portrait"]["highlightColor"] = "#c9a063"
+    c["states"] = [{"id": "s1", "at": "", "portrait": {**c["portrait"], "age": "older"}}]
+    assert client.put(f"/api/projects/{pid}/characters/{c['id']}", json=c).status_code == 200
+    got = client.get(f"/api/projects/{pid}/characters/{c['id']}").json()
+    assert got["portrait"]["hairTexture"] == "3B" and got["portrait"]["highlightColor"] == "#c9a063"
+    assert got["states"][0]["portrait"]["age"] == "older" and got["states"][0]["snapshot"] is None
+    assert got["look"]["hair"] == "braid"
+
+
+def test_a_character_saved_before_portraits_opens_with_the_default_portrait_and_keeps_its_look(client: TestClient) -> None:
+    pid = _project(client)
+    c = _new(client, pid, name="Old", look={"hair": "bun", "skin": "#8d5524"})
+    old = {k: v for k, v in c.items() if k != "portrait"}  # the document as an older build wrote it
+    assert client.put(f"/api/projects/{pid}/characters/{c['id']}", json=old).status_code == 200
+    got = client.get(f"/api/projects/{pid}/characters/{c['id']}").json()
+    assert got["portrait"] == CharacterPortrait().model_dump(mode="json") and got["look"]["hair"] == "bun" and got["look"]["skin"] == "#8d5524"
 
 
 def test_a_character_can_start_from_a_look(client: TestClient) -> None:

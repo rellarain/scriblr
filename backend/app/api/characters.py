@@ -1,12 +1,13 @@
 from datetime import datetime
 from pathlib import Path
+from typing import Any
 
 from fastapi import APIRouter, Depends, HTTPException
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, field_validator
 
 from ..deps import get_storage_root
 from ..storage import project_store as store
-from ..storage.schema import CHARACTER_MAX_PER_PROJECT, CharacterDoc, CharacterLook, utcnow
+from ..storage.schema import CHARACTER_MAX_PER_PROJECT, CharacterDoc, CharacterLook, CharacterPortrait, utcnow
 
 router = APIRouter(prefix="/api/projects/{project_id}/characters", tags=["characters"])
 
@@ -20,8 +21,15 @@ class CharacterSummary(BaseModel):
 
 class CharacterCreate(BaseModel):
     name: str = Field(default="Unnamed character", max_length=120)
-    # A look to start from (a copy of another character, or a file's); none = the default look.
+    # A portrait to start from (a copy of another character, or a file's); none = the default portrait.
+    portrait: CharacterPortrait = Field(default_factory=CharacterPortrait)
+    # The old figure's look, kept for a copy or a file that carries one; nothing draws it any more.
     look: CharacterLook = Field(default_factory=CharacterLook)
+
+    @field_validator("portrait", mode="before")
+    @classmethod
+    def _portrait(cls, value: Any) -> Any:
+        return value if isinstance(value, (dict, CharacterPortrait)) else {}
 
 
 @router.get("", response_model=list[CharacterSummary])
@@ -42,7 +50,7 @@ def create_character(project_id: str, body: CharacterCreate, root: Path = Depend
         existing = store.list_characters(root, project_id)
         if len(existing) >= CHARACTER_MAX_PER_PROJECT:
             raise HTTPException(status_code=422, detail=f"a project holds at most {CHARACTER_MAX_PER_PROJECT} characters")
-        doc = CharacterDoc(id=store.new_id("chr"), name=body.name, order=max((c.order for c in existing), default=-1) + 1, look=body.look)
+        doc = CharacterDoc(id=store.new_id("chr"), name=body.name, order=max((c.order for c in existing), default=-1) + 1, look=body.look, portrait=body.portrait)
         store.save_character(root, project_id, doc)
     return doc
 
@@ -54,7 +62,7 @@ def get_character(project_id: str, character_id: str, root: Path = Depends(get_s
 
 @router.put("/{character_id}", response_model=CharacterDoc)
 def put_character(project_id: str, character_id: str, body: CharacterDoc, root: Path = Depends(get_storage_root)) -> CharacterDoc:
-    """Replace a character (its name and look). The id in the body must be the one in the path."""
+    """Replace a character (its name and portrait, and the rest). The id in the body must be the one in the path."""
     if body.id != character_id:
         raise HTTPException(status_code=422, detail="the character's id does not match the address")
     with store.transaction(root, project_id):

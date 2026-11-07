@@ -46,7 +46,7 @@ export const CARD_META: CardMeta[] = [
   },
   {
     id: 'characters', dir: 'Characters', title: 'Characters: the cast builder', group: 'Outline', height: 760,
-    summary: 'Project > Characters, where the cast is built: the list of characters, the figure drawn as a close-up, a full body, a turnaround or a strip of expressions, and the drawers beside it where its parts are chosen.',
+    summary: 'Project > Characters, where the cast is built: the list of characters and, in the Portrait section, a flat portrait card drawn from a set of choices made with picture dropdowns in tabs (face, features, hair, body, card).',
   },
   {
     id: 'items', dir: 'Items', title: 'Items: the library of things that change hands', group: 'Outline', height: 700,

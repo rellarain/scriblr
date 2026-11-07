@@ -1,8 +1,8 @@
 import { useState } from 'react'
-import { CharacterArt } from './art/CharacterArt'
 import { setAppearance, taggedOn, useCast } from './castStore'
+import { Portrait } from './portrait/Portrait'
 
-// Who is in a scene (or a chapter): the heads of the characters tagged on it, with their names. In the Outline it can be edited (take one out, tag another); in the Draft it
+// Who is in a scene (or a chapter): the faces of the characters tagged on it, with their names. In the Outline it can be edited (take one out, tag another); in the Draft it
 // only shows. A tag is kept on the character, so it is saved at once with the character.
 export function SceneCast({ projectId, nodeId, editable = false }: { projectId: string | null; nodeId: string; editable?: boolean }) {
   const { cast } = useCast(projectId)
@@ -16,7 +16,7 @@ export function SceneCast({ projectId, nodeId, editable = false }: { projectId: 
     <div className="charTags" role="group" aria-label="Characters in this scene">
       {tagged.map(c => (
         <span key={c.id} className="charTag" title={[c.name, c.profile.role].filter(Boolean).join(', ')}>
-          <span className="charTagHead" aria-hidden="true"><CharacterArt look={c.look} mode="head" label="" className="charArt" marks={false} /></span>
+          <span className="charTagHead" aria-hidden="true"><Portrait portrait={c.portrait} crop="head" label="" className="charArt" /></span>
           <span>{c.name}</span>
           {editable && <button type="button" className="charTagRemove" aria-label={`Take ${c.name} out of this scene`} title={`Take ${c.name} out of this scene`} onClick={() => change(c.id, false)}>×</button>}
         </span>

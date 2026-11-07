@@ -284,7 +284,7 @@ function MapsCard() {
 function CharactersCard() {
   return (
     <div style={{ width: '100%', height: '100%', boxSizing: 'border-box', padding: 'var(--space-4)', background: 'var(--surface-side)', color: 'var(--ink)', overflow: 'hidden' }}>
-      <CharactersConsole projectId={FIXTURE_PROJECT_ID} />
+      <CharactersConsole projectId={FIXTURE_PROJECT_ID} initialSection="portrait" />
     </div>
   )
 }

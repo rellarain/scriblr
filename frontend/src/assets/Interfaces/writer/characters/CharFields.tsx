@@ -1,8 +1,7 @@
 import { useEffect, useRef, useState } from 'react'
 import { CommitText as MapCommitText } from '../maps/MapFields'
-import { pick, type Option } from './art/library'
 
-// Small inputs for the character panels: a name, a slider with its value, a colour with a row of swatches, a heading over a field and a grid of choices.
+// Small inputs for the character panels: a name, a slider with its value, a colour with a row of swatches, a heading over a field and a text.
 
 export function CommitText({ label, value, onCommit, max }: { label: string; value: string; onCommit: (value: string) => void; max?: number }) {
   return <MapCommitText label={label} value={value} onCommit={onCommit} max={max} className="charInput" />
@@ -30,17 +29,21 @@ export function Slider({ label, value, min, max, step = 0.01, onChange, format }
   )
 }
 
-// A colour: the swatch opens the browser's picker (handed over a moment after the last change, or when the field is left); `swatches` are quick choices.
-export function Colour({ label, value, onChange, swatches = [], none }: { label: string; value: string | null; onChange: (value: string | null) => void; swatches?: readonly string[]; none?: string }) {
-  const [colour, setColour] = useState(value ?? '#888888')
+// A colour: the swatch opens the browser's picker (handed over a moment after the last change, or when the field is left); `swatches` are quick choices. A colour that follows
+// another one (`none` names that choice, and `value` is null) shows `shown`, the colour it is drawn in, in the picker.
+export function Colour({ label, value, onChange, swatches = [], none, shown }: { label: string; value: string | null; onChange: (value: string | null) => void; swatches?: readonly string[]; none?: string; shown?: string }) {
+  const [colour, setColour] = useState(value ?? shown ?? '#888888')
   const timer = useRef<ReturnType<typeof setTimeout> | null>(null)
+  // Whether the picker was moved since the colour was last handed over (leaving the field without changing it hands nothing over).
+  const moved = useRef(false)
   const latest = useRef({ colour, value, onChange })
   latest.current = { colour, value, onChange }
-  useEffect(() => { setColour(value ?? '#888888') }, [value])
+  useEffect(() => { setColour(value ?? shown ?? '#888888') }, [value, shown])
   const send = () => {
     if (timer.current) { clearTimeout(timer.current); timer.current = null }
     const { colour: c, value: v, onChange: change } = latest.current
-    if (c !== v) change(c)
+    if (moved.current && c !== v) change(c)
+    moved.current = false
   }
   useEffect(() => () => { if (timer.current) clearTimeout(timer.current) }, [])
   return (
@@ -54,6 +57,7 @@ export function Colour({ label, value, onChange, swatches = [], none }: { label:
       <input
         type="color" className="charPicker" aria-label={`${label}, choose any`} title={`${label}, choose any`} value={colour}
         onChange={e => {
+          moved.current = true
           setColour(e.target.value)
           latest.current.colour = e.target.value
           if (timer.current) clearTimeout(timer.current)
@@ -61,26 +65,6 @@ export function Colour({ label, value, onChange, swatches = [], none }: { label:
         }}
         onBlur={send}
       />
-    </div>
-  )
-}
-
-// A grid of choices: each a button (with a picture when `thumb` draws one) and its name, the chosen one `aria-pressed`.
-export function Options<T extends Option>({ label, items, value, onPick, thumb, none }: {
-  label: string; items: readonly T[]; value: string | null; onPick: (id: string | null) => void; thumb?: (item: T) => React.ReactNode; none?: string
-}) {
-  const chosen = value === null ? null : pick(items, value).id
-  return (
-    <div className={thumb ? 'charOptions charOptions--thumbs' : 'charOptions'} role="group" aria-label={label}>
-      {none !== undefined && (
-        <button type="button" className="charOpt" aria-pressed={value === null} onClick={() => onPick(null)}><span className="charOptName">{none}</span></button>
-      )}
-      {items.map(o => (
-        <button key={o.id} type="button" className="charOpt" aria-pressed={chosen === o.id} aria-label={o.name} title={o.name} onClick={() => onPick(o.id)}>
-          {thumb && <span className="charThumbBox" aria-hidden="true">{thumb(o)}</span>}
-          <span className="charOptName">{o.name}</span>
-        </button>
-      ))}
     </div>
   )
 }

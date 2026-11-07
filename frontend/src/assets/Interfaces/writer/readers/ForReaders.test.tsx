@@ -73,20 +73,20 @@ describe('the reveal choice', () => {
 })
 
 describe('the views a reader gets', () => {
-  const card = { id: 'chr_a', name: 'Ada', look: ada().look, fields: [{ key: 'role', label: 'Role', value: 'Navigator' }], relationships: [{ targetId: 'chr_b', targetName: 'Bram', label: 'Old friend', description: 'Sailed together.' }] }
+  const card = { id: 'chr_a', name: 'Ada', portrait: ada().portrait, fields: [{ key: 'role', label: 'Role', value: 'Navigator' }], relationships: [{ targetId: 'chr_b', targetName: 'Bram', label: 'Old friend', description: 'Sailed together.' }] }
 
   it('shows a character as a card with its public fields and links', async () => {
     const onOpen = vi.fn()
     render(<CharacterCard card={card} onOpen={onOpen} />)
     const article = within(screen.getByRole('article', { name: 'Ada' }))
-    expect(article.getByRole('img', { name: 'Ada, close-up' })).toBeInTheDocument()
+    expect(article.getByRole('img', { name: 'Ada, portrait' })).toBeInTheDocument()
     expect(article.getByText('Navigator')).toBeInTheDocument()
     expect(article.getByText(/Old friend: Sailed together\./)).toBeInTheDocument()
     await userEvent.setup().click(article.getByRole('button', { name: 'Go to Bram' }))
     expect(onOpen).toHaveBeenCalledWith('chr_b')
   })
 
-  it('says so when a character has nothing public beyond the look', () => {
+  it('says so when a character has nothing public beyond the portrait', () => {
     render(<CharacterCard card={{ ...card, fields: [], relationships: [] }} />)
     expect(screen.getByText('Nothing more is told yet.')).toBeInTheDocument()
   })
@@ -143,7 +143,7 @@ describe('the character for readers', () => {
   })
 
   it('warns about a scene that comes before the reveal, and previews what a reader has reached', async () => {
-    const card = { id: 'chr_a', name: 'Ada', look: ada().look, fields: [{ key: 'role', label: 'Role', value: 'Navigator' }], relationships: [] }
+    const card = { id: 'chr_a', name: 'Ada', portrait: ada().portrait, fields: [{ key: 'role', label: 'Role', value: 'Navigator' }], relationships: [] }
     const { user, calls } = await openSection(ada({ reader: { published: true, revealAt: 2, reveals: {}, fields: ['role'] } }), chapter => extras({ reach: chapter, characters: chapter >= 2 ? [card] : [] }))
     const warnings = within(await screen.findByRole('list', { name: 'Spoiler warnings' }))
     expect(warnings.getByRole('note')).toHaveTextContent('Ada is shown from chapter 2, but the scene "Arrival" in chapter 1 uses them.')

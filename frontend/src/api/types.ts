@@ -428,7 +428,7 @@ export interface ExtrasWarning { kind: 'map' | 'place' | 'character'; targetId: 
 export interface BookExtrasInfo { bookId: string; title: string; chapters: ExtrasChapter[]; warnings: ExtrasWarning[] }
 export interface ReaderCharacterField { key: string; label: string; value: string }
 export interface ReaderCharacterLink { targetId: string; targetName: string; label: string; description: string }
-export interface ReaderCharacter { id: string; name: string; look: CharacterLook; fields: ReaderCharacterField[]; relationships: ReaderCharacterLink[] }
+export interface ReaderCharacter { id: string; name: string; portrait: CharacterPortrait; fields: ReaderCharacterField[]; relationships: ReaderCharacterLink[] }
 export interface BookExtras { bookId: string; reach: number; maps: MapDoc[]; characters: ReaderCharacter[]; lockedMaps: number; lockedCharacters: number }
 
 // ---- Maps (the setting) ----
@@ -502,33 +502,24 @@ export interface MapCreate { title?: string; kind?: MapKind; width?: number; hei
 export const MAP_MAX_SIDE = 512
 
 // ---- characters (the cast) ----
-// A character is its look: the parameters the figure is drawn from (ids of the part library, colours, sliders, marks, an outfit and a pose). No images are stored.
-export const CHARACTER_MAX_MARKS = 40
-export const CHARACTER_MAX_STROKES = 12
-export const CHARACTER_MAX_ACCESSORIES = 8
-export type CharacterMarkKind = 'freckles' | 'mole' | 'scar' | 'birthmark' | 'tattoo' | 'blush' | 'makeup' | 'paint'
-// A mark on an area of the body: (x, y) place it on the area (0 to 1 across and down); `strokes` are the lines of a tattoo the author drew (points 0 to 1 on the area).
-export interface CharacterMark {
-  id: string; kind: CharacterMarkKind; design: string; area: string
-  x: number; y: number; size: number; color: string | null; strokes: Array<Array<[number, number]>>
-}
-export interface CharacterOutfit {
-  top: string | null; bottom: string | null; shoes: string | null; outer: string | null
-  accessories: string[]
-  // A colour for each slot (top, bottom, shoes, outer, accessory).
-  colors: Record<string, string>
-}
-export interface CharacterLook {
-  skin: string; build: string; height: number; width: number; shoulders: number
-  headShape: string; headWidth: number; ears: string; earSize: number
+// A character looks the way its portrait says: the choices a head-and-shoulders card is drawn from (ids of the portrait library, colours and a few sliders). No images are stored.
+// The look of the old figure is kept in the file as it was, but nothing draws it any more: it is passed back to the server untouched.
+export type LegacyLook = Record<string, unknown>
+// The portrait: how a character looks, drawn as a head-and-shoulders card from these choices (front view, flat colour; no images are stored). An id names an entry of the
+// portrait library (an id this build does not know is kept, and the library draws a default for it); a colour is #rrggbb, and a null one follows the hair (the brows, the
+// facial hair) or the skin (the lips); a slider is a number within its range (`PORTRAIT_RANGES`, the same as the server's).
+export interface CharacterPortrait {
+  version: number
+  age: string; build: string; chest: string
+  headShape: string; headWidth: number; ears: string; skin: string; expression: string
   eyes: string; eyeColor: string; eyeSize: number; eyeSpacing: number; eyeTilt: number
-  brows: string; browColor: string; browThickness: number; browTilt: number
+  brows: string; browColor: string | null
   nose: string; noseSize: number; noseWidth: number
-  mouth: string; mouthSize: number; lipColor: string
-  facialHair: string; facialHairColor: string
-  hair: string; hairColor: string; hairLength: number; streakColor: string | null; streakAmount: number
-  expression: string; pose: string; heldLeft: string | null; heldRight: string | null
-  outfit: CharacterOutfit; marks: CharacterMark[]
+  mouth: string; mouthSize: number; lipColor: string | null
+  hairLength: string; hairTexture: string; hairStyle: string; hairFront: string; hairline: string; hairlineHeight: string; hairEdges: string
+  hairColor: string; highlightColor: string | null; greying: string
+  facialHair: string; facialHairColor: string | null
+  top: string; topColor: string; tileColor: string
 }
 export const CHARACTER_MAX_FIELDS = 30
 export const CHARACTER_MAX_RELATIONSHIPS = 80
@@ -555,12 +546,15 @@ export interface RelationshipChange { id: string; at: string; label: string; not
 export interface CharacterRelationship { id: string; targetId: string; kind: RelationshipKind; family: FamilyRole | null; label: string; description: string; changes: RelationshipChange[] }
 // What is true of the character from a point of the story until the next state.
 export interface CharacterState {
-  id: string; at: string; storyTime: string; mood: string; goal: string; where: string; note: string; inventory: string[]; snapshot: CharacterLook | null
+  id: string; at: string; storyTime: string; mood: string; goal: string; where: string; note: string; inventory: string[]
+  // The old look captured with the state (no longer shown), and how the character looks in this state: a copy of the portrait (none = not captured).
+  snapshot?: LegacyLook | null
+  portrait?: CharacterPortrait | null
 }
 export interface ArcStage { id: string; name: string; note: string; at: string | null }
 export interface LifeEvent { id: string; when: string; title: string; note: string }
 export interface CharacterDoc {
-  schemaVersion: number; id: string; name: string; order: number; look: CharacterLook; updatedAt: string
+  schemaVersion: number; id: string; name: string; order: number; portrait: CharacterPortrait; look?: LegacyLook; updatedAt: string
   profile: CharacterProfile; possessions: CharacterPossession[]; relationships: CharacterRelationship[]; states: CharacterState[]; arc: ArcStage[]; events: LifeEvent[]
   // The chapters and scenes of the outline the character is tagged on.
   appearances: string[]
@@ -583,4 +577,4 @@ export interface ItemDoc {
 }
 export interface ItemSummary { id: string; name: string; kind: string; order: number; updatedAt: string }
 export interface ItemCreate { name?: string; kind?: string }
-export interface CharacterCreate { name?: string; look?: CharacterLook }
+export interface CharacterCreate { name?: string; portrait?: CharacterPortrait; look?: LegacyLook }

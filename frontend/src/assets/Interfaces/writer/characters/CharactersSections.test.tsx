@@ -15,14 +15,13 @@ const ada = (): CharacterDoc => newCharacter('chr_a', { name: 'Ada' }, 0)
 const bram = (): CharacterDoc => newCharacter('chr_b', { name: 'Bram' }, 1)
 const cleo = (): CharacterDoc => newCharacter('chr_c', { name: 'Cleo' }, 2)
 
-const toLook = async (user: ReturnType<typeof userEvent.setup>) => { await user.click(await screen.findByRole('button', { name: 'Look' })) }
 async function open(cast: CharacterDoc[] = [ada(), bram(), cleo()]) {
   const backend = charactersBackend(cast)
   render(<CharactersConsole projectId="p1" outline={OUTLINE} />)
   await screen.findByRole('heading', { name: 'Characters', level: 2 })
   const user = userEvent.setup()
-  await toLook(user)
-  await screen.findByRole('img', { name: /close-up/ })
+  // The console opens on the words (Appearance) with the first character open.
+  await screen.findByRole('textbox', { name: 'Name of the character' })
   return { backend, user }
 }
 type Backend = ReturnType<typeof charactersBackend>
@@ -124,21 +123,36 @@ describe('the story', () => {
     expect(lastPut(backend).states[0]).toMatchObject({ at: 'c1', mood: 'Calm', inventory: ['rope', 'lamp'] })
   })
 
-  it('shows what changed in how they look between two states that captured the look', async () => {
+  it('shows what changed in how they look between two states that captured the portrait', async () => {
     const { user } = await open()
     await goto(user, 'Story')
     await user.click(screen.getByRole('button', { name: 'Add a state' }))
-    await user.click(screen.getByRole('button', { name: 'Capture the look now' }))
+    await user.click(screen.getByRole('button', { name: 'Capture the portrait now' }))
+    expect(screen.getByRole('img', { name: 'Portrait kept for state 1' })).toBeInTheDocument()
     await user.click(screen.getByRole('button', { name: 'Add a state' }))
-    await user.click(screen.getAllByRole('button', { name: 'Capture the look now' })[0])
+    await user.click(screen.getAllByRole('button', { name: 'Capture the portrait now' })[0])
     expect(await screen.findByText(/No change/)).toBeInTheDocument()
-    await goto(user, 'Look')
-    await user.click(screen.getByRole('button', { name: 'Hair and beard' }))
-    await user.click(screen.getByRole('button', { name: 'Braid' }))
+    await goto(user, 'Portrait')
+    await user.click(screen.getByRole('tab', { name: 'Hair' }))
+    await user.click(screen.getByRole('button', { name: /^Style: / }))
+    await user.click(within(screen.getByRole('listbox', { name: 'Style' })).getByRole('option', { name: 'Two-strand twists' }))
     await goto(user, 'Story')
-    await user.click(screen.getAllByRole('button', { name: /Capture the look/ })[1])
+    await user.click(screen.getAllByRole('button', { name: /Capture the portrait/ })[1])
     const gaps = within(screen.getByRole('region', { name: 'Changes of appearance' }))
-    expect(await gaps.findByText('Hair: Short > Braid')).toBeInTheDocument()
+    expect(await gaps.findByText('Hair style: Plain > Two-strand twists')).toBeInTheDocument()
+  })
+
+  it('forgets a captured portrait, and leaves the old look of a state alone', async () => {
+    const { backend, user } = await open()
+    await goto(user, 'Story')
+    await user.click(screen.getByRole('button', { name: 'Add a state' }))
+    await user.click(screen.getByRole('button', { name: 'Capture the portrait now' }))
+    await user.click(screen.getByRole('button', { name: 'Forget the portrait' }))
+    expect(screen.queryByRole('img', { name: 'Portrait kept for state 1' })).not.toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Capture the portrait now' })).toBeInTheDocument()
+    await user.click(save())
+    await waitFor(() => expect(puts(backend)).toHaveLength(1))
+    expect(lastPut(backend).states[0].portrait).toBeNull()
   })
 
   it('has an arc in stages and a life timeline', async () => {

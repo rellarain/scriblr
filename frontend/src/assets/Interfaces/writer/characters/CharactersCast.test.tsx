@@ -1,4 +1,4 @@
-import { fireEvent, render, screen, waitFor, within } from '@testing-library/react'
+import { render, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import type { CharacterDoc, OutlineNode } from '../../../../api/types'
@@ -24,13 +24,12 @@ const puts = (b: Backend) => b.fetch.mock.calls.filter(c => (c[1] as RequestInit
 const lastPut = (b: Backend) => JSON.parse((puts(b).at(-1)![1] as RequestInit).body as string) as CharacterDoc
 const bodies = (b: Backend, method: string) => b.fetch.mock.calls.filter(c => (c[1] as RequestInit | undefined)?.method === method).map(c => JSON.parse((c[1] as RequestInit).body as string))
 
-const toLook = async (user: ReturnType<typeof userEvent.setup>) => { await user.click(await screen.findByRole('button', { name: 'Look' })) }
 async function openConsole(cast = trio()) {
   const backend = charactersBackend(cast)
   render(<CharactersConsole projectId="p1" outline={OUTLINE} />)
   const user = userEvent.setup()
-  await toLook(user)
-  await screen.findByRole('img', { name: /close-up/ })
+  // The console opens on the words (Appearance) with the first character open.
+  await screen.findByRole('textbox', { name: 'Name of the character' })
   return { backend, user }
 }
 const goto = (user: ReturnType<typeof userEvent.setup>, name: string) => user.click(within(screen.getByRole('toolbar', { name: 'What to work on' })).getByRole('button', { name }))
@@ -42,21 +41,22 @@ describe('the cast section', () => {
     const overview = within(await screen.findByRole('region', { name: 'Cast overview' }))
     expect(overview.getAllByRole('button').map(b => b.getAttribute('aria-label'))).toEqual(['Open Ada', 'Open Bram', 'Open Cleo'])
     await user.click(overview.getByRole('button', { name: 'Open Bram' }))
-    expect(await screen.findByRole('heading', { name: 'Age Bram up or down' })).toBeInTheDocument()
+    expect(await screen.findByRole('heading', { name: 'Show Bram at another age' })).toBeInTheDocument()
   })
 
   it('compares two characters and says what differs', async () => {
     const bram = person('chr_b', 'Bram', 1)
-    bram.look = { ...bram.look, hair: 'braid', height: 1.2 }
+    bram.portrait = { ...bram.portrait, hairStyle: 'twists', eyeSize: 1.2, skin: '#46261a' }
     bram.profile = { ...bram.profile, role: 'Mate' }
     const { user } = await openConsole([person('chr_a', 'Ada', 0), bram, person('chr_c', 'Cleo', 2)])
     await goto(user, 'The cast')
     const compare = within(await screen.findByRole('region', { name: 'Compare two characters' }))
     await user.selectOptions(compare.getByRole('combobox', { name: 'Second character' }), 'chr_b')
-    expect(compare.getByText('Hair: Short > Braid')).toBeInTheDocument()
-    expect(compare.getByText('Height: 100% > 120%')).toBeInTheDocument()
+    expect(compare.getByText('Hair style: Plain > Two-strand twists')).toBeInTheDocument()
+    expect(compare.getByText('Eye size: 100% > 120%')).toBeInTheDocument()
+    expect(compare.getByText(/^Skin: .* > /)).toBeInTheDocument()
     expect(compare.getByText('Role: none > Mate')).toBeInTheDocument()
-    expect(compare.getByRole('img', { name: 'Bram, full body' })).toBeInTheDocument()
+    expect(compare.getByRole('img', { name: 'Bram, portrait' })).toBeInTheDocument()
     await user.selectOptions(compare.getByRole('combobox', { name: 'Second character' }), 'chr_c')
     expect(compare.getByText('They look and read the same.')).toBeInTheDocument()
   })
@@ -66,23 +66,39 @@ describe('the cast section', () => {
     await goto(user, 'The cast')
     const age = within(await screen.findByRole('region', { name: 'Age' }))
     expect(age.getByRole('button', { name: /Change Ada to this/ })).toBeDisabled()
-    const slider = age.getByRole('slider', { name: 'Years' })
-    fireEvent.change(slider, { target: { value: '30' } })
-    expect(age.getByRole('img', { name: /Ada, \d+ years older, full body/ })).toBeInTheDocument()
+    await user.click(age.getByRole('button', { name: 'Show Ada as: Adult (30s)' }))
+    await user.click(within(screen.getByRole('listbox', { name: 'Show Ada as' })).getByRole('option', { name: 'Elderly' }))
+    expect(age.getByRole('img', { name: 'Ada, elderly' })).toBeInTheDocument()
+    expect(age.getByRole('img', { name: 'Ada, as they are' })).toBeInTheDocument()
     await user.click(age.getByRole('button', { name: 'Make a copy at this age' }))
-    await waitFor(() => expect(bodies(backend, 'POST').at(-1)?.name).toMatch(/^Ada, \d+ years older$/))
-    expect(bodies(backend, 'POST').at(-1).look.hairColor).not.toBe(trio()[0].look.hairColor)
+    await waitFor(() => expect(bodies(backend, 'POST').at(-1)?.name).toBe('Ada, elderly'))
+    expect(bodies(backend, 'POST').at(-1).portrait).toMatchObject({ age: 'elderly', skin: trio()[0].portrait.skin })
   })
 
-  it('changes the open character to the aged look, as one edit to save', async () => {
+  it('changes the open character to the aged portrait, as one edit to save', async () => {
     const { backend, user } = await openConsole()
     await goto(user, 'The cast')
     const age = within(await screen.findByRole('region', { name: 'Age' }))
-    fireEvent.change(age.getByRole('slider', { name: 'Years' }), { target: { value: '40' } })
+    await user.click(age.getByRole('button', { name: 'Show Ada as: Adult (30s)' }))
+    await user.click(within(screen.getByRole('listbox', { name: 'Show Ada as' })).getByRole('option', { name: 'Child' }))
     await user.click(age.getByRole('button', { name: /Change Ada to this/ }))
+    expect(age.getByRole('button', { name: /Change Ada to this/ })).toBeDisabled()
     await user.click(screen.getByRole('button', { name: 'Save' }))
     await waitFor(() => expect(puts(backend)).toHaveLength(1))
-    expect(lastPut(backend).look.hairColor).not.toBe(trio()[0].look.hairColor)
+    expect(lastPut(backend).portrait.age).toBe('child')
+  })
+
+  it('takes the beard off a character shown as a child', async () => {
+    const bearded = person('chr_a', 'Ada', 0)
+    bearded.portrait = { ...bearded.portrait, facialHair: 'full' }
+    const { backend, user } = await openConsole([bearded])
+    await goto(user, 'The cast')
+    const age = within(await screen.findByRole('region', { name: 'Age' }))
+    await user.click(age.getByRole('button', { name: 'Show Ada as: Adult (30s)' }))
+    await user.click(within(screen.getByRole('listbox', { name: 'Show Ada as' })).getByRole('option', { name: 'Child' }))
+    await user.click(age.getByRole('button', { name: 'Make a copy at this age' }))
+    await waitFor(() => expect(bodies(backend, 'POST')).toHaveLength(1))
+    expect(bodies(backend, 'POST')[0].portrait).toMatchObject({ age: 'child', facialHair: 'none' })
   })
 })
 

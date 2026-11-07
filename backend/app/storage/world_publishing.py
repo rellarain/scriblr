@@ -12,7 +12,7 @@ from .book_publishing import chapters_in_order, latest_publication
 from .schema import (
     CHARACTER_SHARE_FIELDS,
     CharacterDoc,
-    CharacterLook,
+    CharacterPortrait,
     EditionCharacter,
     EditionCharacterField,
     EditionMap,
@@ -51,7 +51,7 @@ class ReaderCharacterLink(BaseModel):
 class ReaderCharacter(BaseModel):
     id: str
     name: str
-    look: CharacterLook
+    portrait: CharacterPortrait
     fields: list[ReaderCharacterField] = Field(default_factory=list)
     relationships: list[ReaderCharacterLink] = Field(default_factory=list)
 
@@ -133,6 +133,7 @@ def freeze_character(doc: CharacterDoc) -> EditionCharacter:
         name=doc.name,
         revealAt=share.revealAt,
         look=doc.look,
+        portrait=doc.portrait.model_copy(deep=True),
         fields=_character_fields(doc),
         relationships=links,
         relationshipsRevealAt=share.reveals.get("relationships"),
@@ -179,7 +180,7 @@ def extras_view(book_id: str, maps: list[EditionMap], characters: list[EditionCh
         ReaderCharacter(
             id=c.characterId,
             name=c.name,
-            look=c.look,
+            portrait=c.portrait or CharacterPortrait(),
             fields=[ReaderCharacterField(key=f.key, label=f.label, value=f.value) for f in c.fields if shown(f.revealAt, reach)],
             relationships=(
                 [ReaderCharacterLink(targetId=r.targetId, targetName=names[r.targetId], label=r.label, description=r.description) for r in c.relationships if r.targetId in names and r.targetId != c.characterId]
