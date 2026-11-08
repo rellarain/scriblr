@@ -67,6 +67,19 @@
 .charRowTool { opacity: 0; .charRowItem:hover &, &:focus-visible { opacity: 0.8; } }
 .charConfirm { display: inline-flex; align-items: center; gap: var(--space-1); padding: 0 var(--space-2); background: var(--ov-sink-2); box-shadow: inset 3px 0 0 var(--alert); }
 
+// The cast list's column: 200px, or the width its handle was dragged to (--char-list-w: held between 160px and 40% of the console, never more than 420px, as in listWidth.ts).
+// The list inside scrolls, so the handle is a sibling of it, in the gap between the list and the page: a 10px strip with a thin accent line on hover, on focus and while dragging.
+.charListCol {
+  position: relative; flex: 0 0 var(--char-list-w, 200px); min-width: 0; display: flex;
+  > .charList { flex: 1 1 auto; }
+}
+.charResizer {
+  position: absolute; top: 0; bottom: 0; right: calc(var(--space-5) / -2 - 5px); width: 10px; z-index: 5; cursor: col-resize; touch-action: none;
+  &::after { content: ''; position: absolute; top: var(--space-2); bottom: var(--space-2); left: 4px; width: 2px; background: var(--accent); opacity: 0; transition: opacity 0.15s; }
+  &:hover::after, &--active::after { opacity: 1; }
+  &:focus-visible { outline: 2px solid var(--accent-hover); outline-offset: -2px; &::after { opacity: 1; } }
+}
+
 // The cast list's cards: the portrait on the character's own colour (--cardBg), the name flush right in an ink that can be read on it (--cardInk); both are set on the card by
 // the character's data, so nothing here is a literal colour. The portrait is flush with the bottom of the card, so the shoulders run off its edge, as on the big card. Hovering or
 // opening a card is a ring in the ink: an overlay or the accent bar could be the colour of the card itself, or take the contrast from the name.
@@ -161,6 +174,9 @@
 @container (max-width: 859px) {
   .charSplit { flex-direction: column; overflow-y: auto; }
   .charList { flex: 0 0 auto; max-height: 340px; }
+  // The list is above the page here, as wide as the console: no column to resize.
+  .charListCol { flex: 0 0 auto; }
+  .charResizer { display: none; }
   // The cast as cards: the name above a larger portrait, as many to a row as fit; the tools lie over the bottom of the portrait (the shoulders).
   .charRows { display: grid; grid-template-columns: repeat(auto-fill, minmax(104px, 1fr)); gap: var(--space-2); }
   .charRowItem--card { flex-direction: column; min-height: 0; & + & { margin-top: 0; } .charRowMain { flex: 1 1 auto; padding: var(--space-1) var(--space-1) 0; } }

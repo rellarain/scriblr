@@ -1,12 +1,14 @@
-import { fireEvent, render, screen, waitFor, within } from '@testing-library/react'
+import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it, vi } from 'vitest'
 import type { CharacterDoc } from '../../../../api/types'
 import { newCharacter } from '../../../../designSystem/mockCharacters'
 import { charactersBackend } from '../../../../test/charactersBackend'
 import CharactersConsole from './CharactersConsole'
 import { readableInk } from './portrait/colour'
+import { LIST_WIDTH_KEY } from './listWidth'
 import { PANELS_KEY } from './portraitPanels'
+import { __resetSettingsForTests } from '../../../../settings/settingsStore'
 
 const ada = (): CharacterDoc => newCharacter('chr_a', { name: 'Ada' }, 0)
 const bram = (): CharacterDoc => newCharacter('chr_b', { name: 'Bram' }, 1)
@@ -168,6 +170,114 @@ describe('the cast list', () => {
     expect(rules).toMatch(/var\(--cardInk\)/)
     const items = readFileSync(path.resolve(__dirname, '../items/ItemsConsole.tsx'), 'utf-8')
     expect(items).not.toContain('charRowItem--card')
+  })
+})
+
+describe('the width of the cast list', () => {
+  const handle = () => screen.getByRole('separator', { name: 'Cast width' })
+  const column = () => document.querySelector('.charListCol') as HTMLElement
+  const widthVar = () => column().style.getPropertyValue('--char-list-w')
+  // jsdom lays nothing out: the console is 1000px wide, and the column is as wide as its variable says (200px when it has none), held as the CSS would hold it.
+  function layout() {
+    const rect = (width: number) => ({ width, height: 600, x: 0, y: 0, top: 0, left: 0, right: width, bottom: 600, toJSON: () => ({}) }) as DOMRect
+    return vi.spyOn(Element.prototype, 'getBoundingClientRect').mockImplementation(function (this: Element) {
+      if (this.classList.contains('charSplit')) return rect(1000)
+      if (!this.classList.contains('charListCol')) return rect(0)
+      const set = /max\((\d+)px/.exec((this as HTMLElement).style.getPropertyValue('--char-list-w'))
+      return rect(set ? Math.min(Math.max(Number(set[1]), 160), 420, 400) : 200)
+    })
+  }
+
+  it('has a handle between the list and the page, that a screen reader and the keyboard can reach', async () => {
+    await open()
+    await screen.findByRole('img', { name: /Ada/ })
+    expect(handle()).toHaveAttribute('aria-orientation', 'vertical')
+    expect(handle()).toHaveAttribute('aria-valuenow', '200')
+    expect(handle()).toHaveAttribute('tabindex', '0')
+    expect(handle().title).toMatch(/arrow keys.*double-click to reset/)
+    // the handle is beside the list, not inside the part of it that scrolls
+    expect(handle().parentElement).toBe(column())
+    expect(screen.getByRole('navigation', { name: 'Cast' }).parentElement).toBe(column())
+    expect(widthVar()).toBe('')
+  })
+
+  it('is dragged within 160px and 40% of the console (never over 420px), and the width is kept', async () => {
+    const spy = layout()
+    await open()
+    await screen.findByRole('img', { name: /Ada/ })
+    fireEvent.mouseDown(handle(), { clientX: 210 })
+    act(() => { fireEvent.mouseMove(window, { clientX: 310 }) })
+    expect(widthVar()).toBe('min(max(300px, 160px), 420px, 40%)') // 200 + 100, live
+    act(() => { fireEvent.mouseMove(window, { clientX: 900 }) })
+    expect(widthVar()).toBe('min(max(400px, 160px), 420px, 40%)') // held at 40% of 1000
+    act(() => { fireEvent.mouseMove(window, { clientX: 0 }) })
+    expect(widthVar()).toBe('min(max(160px, 160px), 420px, 40%)') // held at the minimum
+    act(() => { fireEvent.mouseMove(window, { clientX: 260 }) })
+    act(() => { fireEvent.mouseUp(window) })
+    expect(JSON.parse(window.localStorage.getItem(LIST_WIDTH_KEY) ?? 'null')).toBe(250)
+    await waitFor(() => expect(widthVar()).toBe('min(max(250px, 160px), 420px, 40%)'))
+    expect(handle()).toHaveAttribute('aria-valuenow', '250')
+    spy.mockRestore()
+  })
+
+  it('is moved by the arrow keys, 16px at a time or 80px with Shift, within the same limits', async () => {
+    const spy = layout()
+    const { user } = await open()
+    await screen.findByRole('img', { name: /Ada/ })
+    handle().focus()
+    await user.keyboard('{ArrowRight}')
+    expect(widthVar()).toBe('min(max(216px, 160px), 420px, 40%)')
+    await waitFor(() => expect(JSON.parse(window.localStorage.getItem(LIST_WIDTH_KEY) ?? 'null')).toBe(216))
+    await user.keyboard('{Shift>}{ArrowRight}{/Shift}')
+    expect(widthVar()).toBe('min(max(296px, 160px), 420px, 40%)')
+    await user.keyboard('{ArrowLeft}')
+    expect(widthVar()).toBe('min(max(280px, 160px), 420px, 40%)')
+    for (let i = 0; i < 4; i++) await user.keyboard('{Shift>}{ArrowRight}{/Shift}')
+    expect(widthVar()).toBe('min(max(400px, 160px), 420px, 40%)') // 40% of 1000
+    for (let i = 0; i < 6; i++) await user.keyboard('{Shift>}{ArrowLeft}{/Shift}')
+    expect(widthVar()).toBe('min(max(160px, 160px), 420px, 40%)')
+    // the other keys do nothing
+    await user.keyboard('{ArrowUp}{Enter}x')
+    expect(widthVar()).toBe('min(max(160px, 160px), 420px, 40%)')
+    spy.mockRestore()
+  })
+
+  it('goes back to the default on a double click and on Home, and a stored width is there when the console opens again', async () => {
+    window.localStorage.setItem(LIST_WIDTH_KEY, '320')
+    __resetSettingsForTests()
+    const { user } = await open()
+    await screen.findByRole('img', { name: /Ada/ })
+    expect(widthVar()).toBe('min(max(320px, 160px), 420px, 40%)')
+    expect(handle()).toHaveAttribute('aria-valuenow', '320')
+    await user.dblClick(handle())
+    expect(widthVar()).toBe('')
+    await waitFor(() => expect(JSON.parse(window.localStorage.getItem(LIST_WIDTH_KEY) ?? 'null')).toBeNull())
+    expect(handle()).toHaveAttribute('aria-valuenow', '200')
+    window.localStorage.setItem(LIST_WIDTH_KEY, '300')
+    __resetSettingsForTests()
+    document.body.innerHTML = ''
+    render(<CharactersConsole projectId="p1" initialSection="portrait" />)
+    await screen.findByRole('img', { name: /Ada/ })
+    expect(widthVar()).toBe('min(max(300px, 160px), 420px, 40%)')
+    handle().focus()
+    await userEvent.setup().keyboard('{Home}')
+    expect(widthVar()).toBe('')
+  })
+
+  it('is a column of its own in the stylesheet: the width in a variable with 200px as the default, no handle where the list lies above the page, the Items list untouched', async () => {
+    const { readFileSync } = await import('node:fs')
+    const path = await import('node:path')
+    const css = readFileSync(path.resolve(__dirname, 'characters.scss'), 'utf-8')
+    const col = /\.charListCol \{([\s\S]*?)\n\}/.exec(css)?.[1] ?? ''
+    expect(col).toMatch(/flex: 0 0 var\(--char-list-w, 200px\)/)
+    expect(css).toMatch(/\.charResizer \{[^}]*cursor: col-resize/)
+    const narrow = css.slice(css.indexOf('@container (max-width: 859px)'))
+    expect(narrow).toMatch(/\.charResizer \{ display: none; \}/)
+    expect(narrow).toMatch(/\.charListCol \{ flex: 0 0 auto; \}/)
+    // the Items list keeps its own 200px column
+    expect(css).toMatch(/^\.charList \{ flex: 0 0 200px;/m)
+    const items = readFileSync(path.resolve(__dirname, '../items/ItemsConsole.tsx'), 'utf-8')
+    expect(items).not.toContain('charListCol')
   })
 })
 

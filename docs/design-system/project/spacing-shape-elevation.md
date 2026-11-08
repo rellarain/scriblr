@@ -49,6 +49,7 @@ The Writer answers to the width of the **element** it is in, not the window, bec
 |---|---|---|
 | under 1,000px | the window | the side column (the levels beside the focused one) hides itself (`AUTO_HIDE_BELOW`); it can be shown again by hand |
 | 200px to 60% | the side column | the range its drag handle holds it in (`SIDE_MIN_W`, `SIDE_MAX_FRACTION`); the same limits are in the CSS, so a window that shrinks keeps a stored width |
+| 160px to 40% | the cast list | the range its drag handle holds it in (`LIST_MIN_W`, `LIST_MAX_FRACTION`, never over 420px; 200px by default); the same limits are in the CSS. Only a console of 860px and up has the list beside the page, so only then is there a handle |
 | under 720px | the Plot tool | one column: the contents become a bar on top (`PLOT_COMPACT_BELOW`) |
 | 720px to 1,040px | the Plot tool | the contents beside the editor, a plotline's chapters panel under its fields; from 1,040px (`PLOT_WIDE_FROM`) the chapters sit beside the fields |
 | 860px and up | the compare view | the plotlines sit side by side in columns (`COMPARE_COLUMNS_FROM`) |

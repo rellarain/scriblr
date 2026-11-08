@@ -1,8 +1,11 @@
 import { useMemo, useRef, useState, type CSSProperties } from 'react'
 import type { CharacterPortrait } from '../../../../api/types'
 import { CheckIcon, CloseIcon, CopyIcon, ExportIcon, ImportIcon, PlusIcon, TrashIcon } from '../../../icons'
+import SideResizer from '../levels/SideResizer'
 import { saveBlob } from '../maps/mapExport'
+import { useStoredState } from '../storage'
 import { characterFileName, importRows, parseCharacterFile, type CharacterChoice, type CharacterFile } from './charFile'
+import { clampListWidth, LIST_DEFAULT_W, LIST_WIDTH_KEY, listVars } from './listWidth'
 import { PortraitCard } from './PortraitCard'
 import { readableInk } from './portrait/colour'
 import { defaultPortrait } from './portrait/defaults'
@@ -24,6 +27,16 @@ export function CharacterList({ c }: { c: Characters }) {
   const [incoming, setIncoming] = useState<CharacterFile | null>(null)
   const [problem, setProblem] = useState('')
   const fileInput = useRef<HTMLInputElement>(null)
+  // The width of the column: kept on this computer, null until it is dragged. While the handle is dragged the width goes straight to the column's CSS variable (no render per
+  // mouse move); the stored width is set on release.
+  const [width, setWidth] = useStoredState<number | null>(LIST_WIDTH_KEY, null)
+  const column = useRef<HTMLDivElement>(null)
+  const dragWidth = (w: number | null) => {
+    const style = column.current?.style
+    if (!style) return
+    if (w === null) style.removeProperty('--char-list-w')
+    else for (const [name, value] of Object.entries(listVars(w))) style.setProperty(name, value)
+  }
 
   async function exportThem(ids: string[] | null, name: string) {
     const file = await c.exportFile(ids)
@@ -38,45 +51,51 @@ export function CharacterList({ c }: { c: Characters }) {
     else setProblem(parsed.error)
   }
   return (
-    <nav className="charList" aria-label="Cast">
-      <header className="charPanelHead">
-        <h3 className="charPanelTitle">Cast</h3>
-        <span className="charRow">
-          <button type="button" className="charIconBtn" aria-label="Save the whole cast to a file" title="Save the whole cast to a file" disabled={c.cast.length === 0} onClick={() => { void exportThem(null, 'cast') }}><ExportIcon size={16} /></button>
-          <button type="button" className="charIconBtn" aria-label="Import characters from a file" title="Import characters from a file" onClick={() => fileInput.current?.click()}><ImportIcon size={16} /></button>
-          <button type="button" className="charIconBtn" aria-label="New character" title="New character" onClick={() => { void c.create() }}><PlusIcon size={16} /></button>
-        </span>
-        <input ref={fileInput} type="file" accept=".json,application/json" className="charFileInput" aria-label="Character file" tabIndex={-1} onChange={e => { void readFile(e.target.files?.[0]); e.target.value = '' }} />
-      </header>
-      {problem && <p className="charHint" role="alert">{problem}</p>}
-      {incoming && <ImportForm c={c} file={incoming} onDone={() => setIncoming(null)} />}
-      {c.cast.length === 0 && <p className="charHint">No characters yet. Make the first one with the plus.</p>}
-      <ul className="charRows">
-        {c.cast.map(ch => {
-          // The open character's portrait is the live one (a change that is not saved yet shows); the others are as saved.
-          const portrait = c.doc?.id === ch.id ? c.doc.portrait : ch.portrait
-          return (
-            <li key={ch.id} className={`charRowItem charRowItem--card${ch.id === c.openId ? ' charRowItem--on' : ''}`} style={cardColours(portrait)}>
-              <button type="button" className="charRowMain" aria-label={`Open ${ch.name}`} aria-current={ch.id === c.openId ? 'true' : undefined} title={`Open ${ch.name}`} onClick={() => { void c.open(ch.id) }}>
-                <PortraitCard portrait={portrait} name={ch.name} className="charRowCard" />
-              </button>
-              <span className="charRowTools">
-                <button type="button" className="charIconBtn charRowTool" aria-label={`Save ${ch.name} to a file`} title={`Save ${ch.name} to a file`} onClick={() => { void exportThem([ch.id], ch.name) }}><ExportIcon size={16} /></button>
-                <button type="button" className="charIconBtn charRowTool" aria-label={`Copy ${ch.name}`} title={`Make a copy of ${ch.name}`} onClick={() => { void c.duplicate(ch.id) }}><CopyIcon size={16} /></button>
-                {confirming === ch.id ? (
-                  <span className="charConfirm" role="group" aria-label={`Delete ${ch.name}?`}>
-                    <button type="button" className="charIconBtn" aria-label="Confirm delete" title="Confirm delete" onClick={() => { setConfirming(null); void c.remove(ch.id) }}><CheckIcon size={16} /></button>
-                    <button type="button" className="charIconBtn" aria-label="Cancel delete" title="Cancel" onClick={() => setConfirming(null)}><CloseIcon size={16} /></button>
-                  </span>
-                ) : (
-                  <button type="button" className="charIconBtn charRowTool" aria-label={`Delete ${ch.name}`} title={`Delete ${ch.name}`} onClick={() => setConfirming(ch.id)}><TrashIcon size={16} /></button>
-                )}
-              </span>
-            </li>
-          )
-        })}
-      </ul>
-    </nav>
+    <div className="charListCol" ref={column} style={listVars(width)}>
+      <nav className="charList" aria-label="Cast">
+        <header className="charPanelHead">
+          <h3 className="charPanelTitle">Cast</h3>
+          <span className="charRow">
+            <button type="button" className="charIconBtn" aria-label="Save the whole cast to a file" title="Save the whole cast to a file" disabled={c.cast.length === 0} onClick={() => { void exportThem(null, 'cast') }}><ExportIcon size={16} /></button>
+            <button type="button" className="charIconBtn" aria-label="Import characters from a file" title="Import characters from a file" onClick={() => fileInput.current?.click()}><ImportIcon size={16} /></button>
+            <button type="button" className="charIconBtn" aria-label="New character" title="New character" onClick={() => { void c.create() }}><PlusIcon size={16} /></button>
+          </span>
+          <input ref={fileInput} type="file" accept=".json,application/json" className="charFileInput" aria-label="Character file" tabIndex={-1} onChange={e => { void readFile(e.target.files?.[0]); e.target.value = '' }} />
+        </header>
+        {problem && <p className="charHint" role="alert">{problem}</p>}
+        {incoming && <ImportForm c={c} file={incoming} onDone={() => setIncoming(null)} />}
+        {c.cast.length === 0 && <p className="charHint">No characters yet. Make the first one with the plus.</p>}
+        <ul className="charRows">
+          {c.cast.map(ch => {
+            // The open character's portrait is the live one (a change that is not saved yet shows); the others are as saved.
+            const portrait = c.doc?.id === ch.id ? c.doc.portrait : ch.portrait
+            return (
+              <li key={ch.id} className={`charRowItem charRowItem--card${ch.id === c.openId ? ' charRowItem--on' : ''}`} style={cardColours(portrait)}>
+                <button type="button" className="charRowMain" aria-label={`Open ${ch.name}`} aria-current={ch.id === c.openId ? 'true' : undefined} title={`Open ${ch.name}`} onClick={() => { void c.open(ch.id) }}>
+                  <PortraitCard portrait={portrait} name={ch.name} className="charRowCard" />
+                </button>
+                <span className="charRowTools">
+                  <button type="button" className="charIconBtn charRowTool" aria-label={`Save ${ch.name} to a file`} title={`Save ${ch.name} to a file`} onClick={() => { void exportThem([ch.id], ch.name) }}><ExportIcon size={16} /></button>
+                  <button type="button" className="charIconBtn charRowTool" aria-label={`Copy ${ch.name}`} title={`Make a copy of ${ch.name}`} onClick={() => { void c.duplicate(ch.id) }}><CopyIcon size={16} /></button>
+                  {confirming === ch.id ? (
+                    <span className="charConfirm" role="group" aria-label={`Delete ${ch.name}?`}>
+                      <button type="button" className="charIconBtn" aria-label="Confirm delete" title="Confirm delete" onClick={() => { setConfirming(null); void c.remove(ch.id) }}><CheckIcon size={16} /></button>
+                      <button type="button" className="charIconBtn" aria-label="Cancel delete" title="Cancel" onClick={() => setConfirming(null)}><CloseIcon size={16} /></button>
+                    </span>
+                  ) : (
+                    <button type="button" className="charIconBtn charRowTool" aria-label={`Delete ${ch.name}`} title={`Delete ${ch.name}`} onClick={() => setConfirming(ch.id)}><TrashIcon size={16} /></button>
+                  )}
+                </span>
+              </li>
+            )
+          })}
+        </ul>
+      </nav>
+      <SideResizer
+        className="charResizer" label="Cast width" what="the cast list" clamp={clampListWidth} value={width ?? LIST_DEFAULT_W} keyStep={16}
+        onDrag={dragWidth} onCommit={setWidth} onReset={() => { setWidth(null); dragWidth(null) }}
+      />
+    </div>
   )
 }
 
