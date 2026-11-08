@@ -1,0 +1,95 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Hair sections traced</title>
+<script src="./support.js"></script>
+<script src="./designer-engine.js"></script>
+<script src="./exact-chars.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<style>
+body { margin: 0; }
+.ht { width: 1500px; box-sizing: border-box; padding: 24px; background: #e6d1db; color: #090708; font-family: system-ui, -apple-system, 'Segoe UI', sans-serif; font-size: 12px; line-height: 17px; display: flex; flex-direction: column; gap: 16px; }
+.ht *, .ht *::before, .ht *::after { box-sizing: border-box; }
+.ht h1 { margin: 0; font-size: 18px; line-height: 24px; font-weight: 700; letter-spacing: 1.5px; text-transform: uppercase; }
+.ht p { margin: 0; max-width: 1200px; }
+.leg { display: flex; flex-wrap: wrap; gap: 8px; }
+.leg span { display: inline-flex; align-items: center; gap: 6px; background: #ddc0cf; padding: 3px 10px 3px 4px; }
+.leg i { display: block; width: 16px; height: 16px; }
+.grid { display: grid; grid-template-columns: repeat(2, 726px); gap: 12px; }
+.card { background: #ddc0cf; padding: 10px; display: flex; flex-direction: column; gap: 8px; }
+.who { display: flex; gap: 8px; align-items: baseline; flex-wrap: wrap; }
+.who b { font-size: 15px; line-height: 20px; }
+.row { display: flex; gap: 8px; align-items: flex-start; }
+.pic { display: flex; flex-direction: column; gap: 3px; font-size: 11px; line-height: 14px; width: 128px; flex: none; }
+.pic img { display: block; }
+.cells { display: grid; grid-template-columns: 62px repeat(3, 44px); gap: 2px; align-content: start; font-size: 11px; line-height: 15px; }
+.cells .ph { font-weight: 700; align-self: center; }
+.cells .c { height: 22px; display: flex; align-items: center; justify-content: center; background: #ebdbe3; font-variant-numeric: tabular-nums; }
+.note { font-size: 11px; line-height: 15px; }
+</style>
+</helmet>
+<div class="ht">
+  <h1>Hair sections, traced from the old hair</h1>
+  <p>{{intro}}</p>
+  <div class="leg"><sc-for list="{{legend}}" as="l" hint-placeholder-count="6"><span><i style="background: {{l.css}}"></i>{{l.name}}</span></sc-for></div>
+  <div class="grid">
+    <sc-for list="{{cards}}" as="c" hint-placeholder-count="14">
+      <div class="card">
+        <div class="who"><b>{{c.name}}</b><span>{{c.line}}</span></div>
+        <div class="row">
+          <div class="pic"><img src="{{c.old}}" width="128" height="128" alt="{{c.altA}}"><span>The old hair, as drawn</span></div>
+          <div class="pic"><img src="{{c.trace}}" width="128" height="128" alt="{{c.altB}}"><span>Pieces coloured by plane</span></div>
+          <div class="pic"><img src="{{c.demo}}" width="128" height="128" alt="{{c.altC}}"><span>{{c.demoNote}}</span></div>
+          <div>
+            <div class="cells">
+              <span></span><span class="ph">Left</span><span class="ph">Centre</span><span class="ph">Right</span>
+              <sc-for list="{{c.rows}}" as="r" hint-placeholder-count="6">
+                <span class="ph">{{r.name}}</span>
+                <sc-for list="{{r.cells}}" as="k" hint-placeholder-count="3"><span class="c" style="background: {{k.css}}" title="{{k.title}}">{{k.text}}</span></sc-for>
+              </sc-for>
+            </div>
+          </div>
+        </div>
+        <p class="note">{{c.note}}</p>
+      </div>
+    </sc-for>
+  </div>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":1500,"height":2020}}'>
+const PLANES = [['front', 'Front'], ['top', 'Top'], ['left', 'Left side'], ['right', 'Right side'], ['back', 'Back'], ['nape', 'Nape']];
+const ID = [1, 0, 0, 1, 0, 0];
+class Component extends DCLogic {
+  renderVals() {
+    const mq = Mannequin, chars = (typeof window !== 'undefined' && window.ExactChars) || (typeof globalThis !== 'undefined' && globalThis.ExactChars) || [];
+    const colOf = (id) => mq.HAIR_PLANE_COLOURS[id];
+    let pieces = 0, multi = 0, whole = 0, n = chars.length;
+    const cards = chars.map((ex) => {
+      const tr = mq.traceHair(ex), hb = tr.headBox, counts = tr.counts, wide = tr.wide, traced = tr.pieces, hair = traced.map((t) => t.s);
+      traced.forEach((t) => { pieces += 1; if (t.cells.length > 1) multi += 1; if (t.whole.length) whole += 1; });
+      // the demo: the same exact pieces after two edits (the top section takes a violet colour, the back section is stretched 25 % longer)
+      const edit = () => traced.map((t) => {
+        const d = mq.dOf(mq.build(mq.exactPts(t.s.n), true, ID), true), top = t.plane === 'top', back = t.cells.some((k) => k.indexOf('back.') === 0);
+        const fill = top && !t.shade ? mq.mixHex(t.s.f, '#7a3cc2', 0.6) : t.s.f;
+        const path = '<path d="' + d + '" fill="' + fill + '"' + (t.s.o < 0.999 ? ' fill-opacity="' + t.s.o + '"' : '') + '/>';
+        return back ? '<g transform="translate(0 ' + hb.y + ') scale(1 1.25) translate(0 ' + (-hb.y) + ')">' + path + '</g>' : path;
+      }).join('');
+      const dsvg = '<svg xmlns="http://www.w3.org/2000/svg" width="150" height="150" viewBox="0 0 200 200"><clipPath id="cd"><rect width="200" height="200" rx="16"/></clipPath><g clip-path="url(#cd)"><rect width="200" height="200" fill="#d9ced2"/>' + edit() + '</g></svg>';
+      const rows = mq.traceRows(tr);
+      const bald = !hair.length;
+      const note = bald ? 'No hair shapes: every section is off.' : hair.length + ' pieces (' + traced.filter((t) => t.shade).length + ' of them shading), the layers in paint order. A piece that spans several cells is rooted at all of them; a piece that stays inside one cell can take that section’s own length, colour or texture.';
+      return { name: ex.name, line: bald ? 'bald' : hair.length + ' hair shapes', old: mq.uri(mq.traceSvg(ex, tr, 'old', 150)), trace: mq.uri(mq.traceSvg(ex, tr, 'plane', 150)), demo: mq.uri(dsvg), rows: rows, note: note,
+        demoNote: bald ? 'Nothing to edit' : 'Top recoloured, back 25 % longer',
+        altA: ex.name + ': the old hair shapes alone', altB: ex.name + ': the same pieces coloured by the plane they are rooted in', altC: ex.name + ': the same pieces with the top section recoloured and the back section lengthened' };
+    });
+    const intro = 'The old drawing builds hair from a few layers (the mass behind the head, the cap, the locks beside the face, shading over them). Here each exact old shape of your ' + n + ' characters is assigned to the cells of the head (plane by side) where it is rooted, by where it lies on the head. ' + pieces + ' pieces in all. The rule: left, centre and right are each optional in a plane, and when only the centre is used it becomes a single unit that spans all three; ' + whole + ' pieces (the mass behind the head, the cap) are such whole-plane units, shown as “↔” in the centre cell and covering the left and right cells; ' + (multi - whole) + ' more reach two planes (the cap over the forehead spans front and top). Sections hold these exact pieces, layered in the old paint order, so the old hair is reproduced exactly until a section is edited; the third picture shows two edits on the same pieces (the top section recoloured, the back section made longer). Left and right are the character’s own (the picture’s right is the character’s left). The nape holds the pieces that hang below the jaw. The Designer shows the same trace for any character (Rig tab of the hair group) and can put that hair on the mannequin.';
+    return { intro: intro, legend: PLANES.map((p) => ({ name: p[1], css: colOf(p[0]) })), cards: cards };
+  }
+}
+</script>
+</body>
+</html>

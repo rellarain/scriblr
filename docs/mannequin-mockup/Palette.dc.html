@@ -1,0 +1,227 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Character palette</title>
+<script src="./support.js"></script>
+<script src="./exact-default.js"></script>
+<script src="./designer-engine.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<style>
+body { margin: 0; }
+.z-day { --base:#e6d1db; --side:#dfc3d1; --deep:#d4afc2; --raised:#ddc0cf; --raised-on:#ebdbe3; --ink:#090708; --hair:#0907081f; --lift1:#09070814; --lift2:#09070824; --acc:#aa6313; --acc-h:#73430d; --on-acc:#ffffff; --paper:#fbf8f4; --paper-ink:#1d161a; --paper-line:#ded7cf; }
+.z-dawn { --base:#d7c9d0; --side:#cebdc6; --deep:#c1abb6; --raised:#ccbac3; --raised-on:#ddd2d7; --ink:#090708; --hair:#0907081f; --lift1:#09070814; --lift2:#09070824; --acc:#986c3a; --acc-h:#6b4c29; --on-acc:#ffffff; --paper:#fbf8f4; --paper-ink:#1d161a; --paper-line:#ded7cf; }
+.z-dusk { --base:#63364d; --side:#562e42; --deep:#422433; --raised:#532d40; --raised-on:#6d3b54; --ink:#ffffff; --hair:#ffffff1f; --lift1:#ffffff14; --lift2:#ffffff24; --acc:#eca351; --acc-h:#f2c088; --on-acc:#090708; --paper:#432f19; --paper-ink:#ffffff; --paper-line:#5d5041; }
+.z-night { --base:#4c3842; --side:#413038; --deep:#2f2329; --raised:#3e2e36; --raised-on:#553f4a; --ink:#ffffff; --hair:#ffffff1f; --lift1:#ffffff14; --lift2:#ffffff24; --acc:#caa172; --acc-h:#dbbf9f; --on-acc:#090708; --paper:#2c2011; --paper-ink:#ffffff; --paper-line:#4b4134; }
+.app { font-family: system-ui, -apple-system, 'Segoe UI', sans-serif; font-size: 12px; line-height: 17px; color: var(--ink); background: var(--base); min-height: 900px; display: flex; flex-direction: column; box-sizing: border-box; }
+.app *, .app *::before, .app *::after { box-sizing: border-box; }
+.app button { font: inherit; color: inherit; background: none; border: 0; padding: 0; cursor: pointer; border-radius: 0; text-align: left; }
+.app button:focus-visible, .app select:focus-visible, .app input:focus-visible { outline: 2px solid var(--acc-h); outline-offset: 1px; }
+.app h1, .app h2, .app h3, .app p { margin: 0; }
+.hd { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; padding: 8px 14px; min-height: 44px; background: var(--side); }
+.name { font-family: Georgia, 'Times New Roman', serif; font-size: 22px; line-height: 28px; font-weight: 700; }
+.lbl { font-size: 11px; line-height: 15px; font-weight: 700; letter-spacing: 1px; text-transform: uppercase; }
+.crumb { display: flex; gap: 2px; flex-wrap: wrap; }
+.seg { height: 26px; padding: 0 10px; font-size: 11px; font-weight: 700; display: inline-flex; align-items: center; gap: 6px; background: var(--lift1); }
+.seg:hover { background: var(--lift2); }
+.seg.on { background: var(--acc); color: var(--on-acc); }
+.grow { flex: 1 1 auto; }
+.main { display: flex; flex-wrap: wrap; gap: 12px; padding: 12px; align-items: flex-start; }
+.left { flex: 1 1 480px; min-width: 0; display: flex; flex-direction: column; gap: 8px; }
+.right { flex: 0 0 320px; display: flex; flex-direction: column; gap: 8px; background: var(--side); padding: 8px; }
+.tile { background: var(--side); padding: 10px 12px; display: flex; flex-direction: column; gap: 10px; }
+.fields { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 8px; }
+.fld { display: flex; flex-direction: column; gap: 3px; }
+.fld input[type="text"], .fld select { height: 28px; padding: 0 8px; border: 0; background: var(--paper); color: var(--paper-ink); font: inherit; border-radius: 4px; width: 100%; }
+.swlist { display: flex; flex-wrap: wrap; gap: 6px; align-items: flex-start; }
+.swb { display: flex; flex-direction: column; gap: 4px; width: 76px; }
+.swb .chipc { width: 76px; height: 52px; border: 2px solid transparent; box-shadow: inset 0 0 0 1px #00000040; }
+.swb.on .chipc { border-color: var(--acc-h); outline: 2px solid var(--side); outline-offset: -5px; }
+.swb:hover .chipc { border-color: var(--ink); }
+.swb .nm { font-size: 11px; font-weight: 700; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.swb .us { font-size: 11px; line-height: 14px; }
+.addb { width: 76px; height: 52px; display: flex; align-items: center; justify-content: center; background: var(--lift1); }
+.addb:hover { box-shadow: inset 0 0 0 1px var(--ink); }
+.addb:disabled { opacity: 0.4; cursor: default; box-shadow: none; }
+.ic { width: 18px; height: 18px; fill: none; stroke: currentColor; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; }
+.slr { display: flex; align-items: center; gap: 10px; min-height: 30px; }
+.slr > span:first-child { flex: 0 0 84px; }
+.sv { min-width: 56px; text-align: right; font-variant-numeric: tabular-nums; }
+input.track { flex: 1 1 140px; min-width: 100px; height: 16px; -webkit-appearance: none; appearance: none; margin: 0; border: 1px solid var(--hair); }
+input.track::-webkit-slider-thumb { -webkit-appearance: none; width: 8px; height: 24px; background: var(--ink); border: 2px solid var(--base); cursor: grab; }
+input.track::-moz-range-thumb { width: 6px; height: 22px; background: var(--ink); border: 2px solid var(--base); border-radius: 0; cursor: grab; }
+.row { display: flex; align-items: center; gap: 10px; min-height: 36px; padding: 4px 8px; background: var(--raised); flex-wrap: wrap; }
+.row .chipc { width: 28px; height: 28px; flex: 0 0 auto; box-shadow: inset 0 0 0 1px #00000040; }
+.row .nm { flex: 0 0 84px; font-weight: 700; }
+.row select { flex: 1 1 160px; min-width: 120px; height: 28px; padding: 0 6px; border: 0; background: var(--paper); color: var(--paper-ink); font: inherit; border-radius: 4px; }
+.row .st { flex: 0 0 auto; font-size: 11px; }
+.pre { display: flex; align-items: center; gap: 4px; flex-wrap: wrap; padding: 4px 8px; background: var(--raised); }
+.pre .nm { flex: 0 0 84px; font-weight: 700; }
+.pb { display: flex; align-items: center; gap: 0; background: var(--lift1); }
+.pb:hover { box-shadow: inset 0 0 0 1px var(--ink); }
+.pb .chipc { width: 22px; height: 22px; box-shadow: inset 0 0 0 1px #00000040; }
+.pb .pl { padding: 0 6px; font-size: 11px; }
+.pb:disabled { opacity: 0.45; cursor: default; box-shadow: none; }
+.btn { height: 26px; padding: 0 10px; font-size: 11px; font-weight: 700; display: inline-flex; align-items: center; gap: 6px; background: var(--lift2); }
+.btn:hover { box-shadow: inset 0 0 0 1px var(--ink); }
+.btn:disabled { opacity: 0.4; cursor: default; box-shadow: none; }
+.mini { font-size: 11px; line-height: 15px; }
+.hint { font-style: italic; }
+.ctools { display: flex; flex-wrap: wrap; align-items: center; gap: 2px; }
+.card { position: relative; overflow: hidden; border-radius: 14px; align-self: center; }
+.card img { display: block; width: 100%; height: 100%; }
+</style>
+</helmet>
+<div class="app {{zoneClass}}">
+  <div class="hd">
+    <h1 class="name">Ada Marsh</h1>
+    <div class="crumb" role="tablist" aria-label="Character sections">
+      <button type="button" class="seg on" role="tab" aria-selected="true">General</button>
+      <button type="button" class="seg" role="tab" aria-selected="false">Profile</button>
+      <button type="button" class="seg" role="tab" aria-selected="false">Mannequin</button>
+      <button type="button" class="seg" role="tab" aria-selected="false">Story</button>
+    </div>
+    <span class="grow"></span>
+    <div class="crumb" role="group" aria-label="Time of day">
+      <sc-for list="{{zones}}" as="z" hint-placeholder-count="4"><button type="button" class="seg {{z.cls}}" onClick="{{z.pick}}" aria-pressed="{{z.on}}">{{z.name}}</button></sc-for>
+    </div>
+  </div>
+
+  <div class="main">
+    <div class="left">
+      <div class="tile">
+        <h2 class="lbl">General</h2>
+        <div class="fields">
+          <label class="fld"><span>Name</span><input type="text" value="Ada Marsh" aria-label="Name"></label>
+          <label class="fld"><span>Role</span><input type="text" value="Cartographer" aria-label="Role"></label>
+          <label class="fld"><span>Mannequin model</span><select aria-label="Mannequin model"><option>Adult (basic), v3</option></select></label>
+        </div>
+      </div>
+
+      <div class="tile">
+        <h2 class="lbl">Palette</h2>
+        <p class="mini">The colours of this character. A swatch is a hue and a saturation; the brightness and opacity are set on each object of the mannequin. Change a swatch here and everything that uses it changes with it.</p>
+        <div class="swlist" role="listbox" aria-label="Palette swatches">
+          <sc-for list="{{swatches}}" as="s" hint-placeholder-count="5">
+            <button type="button" class="swb {{s.cls}}" role="option" aria-selected="{{s.on}}" onClick="{{s.pick}}" aria-label="{{s.label}}">
+              <span class="chipc" style="display:block; background: {{s.css}}"></span>
+              <span class="nm">{{s.name}}</span>
+              <span class="us">{{s.used}}</span>
+            </button>
+          </sc-for>
+          <button type="button" class="addb" onClick="{{addSwatch}}" disabled="{{addOff}}" aria-label="Add a swatch" title="Add a swatch ({{count}} of 10)">
+            <svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg>
+          </button>
+        </div>
+        <label class="fld"><span>Name of the selected swatch</span><input type="text" value="{{selName}}" onInput="{{onName}}" onChange="{{onName}}" aria-label="Name of the selected swatch"></label>
+        <label class="slr"><span>Hue</span><input class="track" style="background: {{hueTrack}}" type="range" min="0" max="359" step="1" value="{{selH}}" onInput="{{onHue}}" onChange="{{onHue}}"><span class="sv">{{selHText}}</span></label>
+        <label class="slr"><span>Saturation</span><input class="track" style="background: {{satTrack}}" type="range" min="0" max="100" step="1" value="{{selS}}" onInput="{{onSat}}" onChange="{{onSat}}"><span class="sv">{{selSText}}</span></label>
+        <div class="ctools">
+          <button type="button" class="btn" onClick="{{removeSwatch}}" disabled="{{removeOff}}" title="Slots that use it go back to their default">Remove this swatch</button>
+          <span class="mini">{{removeNote}}</span>
+        </div>
+      </div>
+
+      <div class="tile">
+        <h2 class="lbl">Where each colour is used</h2>
+        <p class="mini">Every part of the mannequin takes its colour from a default the admin set for it (eye colours, skin colours…), or from this palette instead, so a custom colour stays tied to the palette above.</p>
+        <sc-for list="{{slots}}" as="r" hint-placeholder-count="7">
+          <div class="row">
+            <span class="chipc" style="background: {{r.css}}"></span>
+            <span class="nm">{{r.name}}</span>
+            <select value="{{r.value}}" onChange="{{r.set}}" aria-label="Colour source for {{r.name}}">
+              <sc-for list="{{r.opts}}" as="o" hint-placeholder-count="8"><option value="{{o.id}}">{{o.name}}</option></sc-for>
+            </select>
+            <span class="st">{{r.state}}</span>
+          </div>
+        </sc-for>
+      </div>
+
+      <div class="tile">
+        <h2 class="lbl">Add a default to the palette</h2>
+        <p class="mini">Defaults stay the admin’s. Adding one copies its hue and saturation as a new swatch of yours.</p>
+        <sc-for list="{{defaults}}" as="d" hint-placeholder-count="4">
+          <div class="pre"><span class="nm">{{d.name}}</span>
+            <sc-for list="{{d.items}}" as="p" hint-placeholder-count="6">
+              <button type="button" class="pb" onClick="{{p.add}}" disabled="{{p.off}}" aria-label="{{p.label}}" title="{{p.label}}"><span class="chipc" style="display:block; background: {{p.css}}"></span><span class="pl">{{p.name}}</span></button>
+            </sc-for>
+          </div>
+        </sc-for>
+      </div>
+    </div>
+
+    <aside class="right" aria-label="Live preview">
+      <h2 class="lbl">Live preview</h2>
+      <div class="ctools" role="toolbar" aria-label="Preview">
+        <sc-for list="{{frames}}" as="f" hint-placeholder-count="2"><button type="button" class="seg {{f.cls}}" onClick="{{f.pick}}" aria-pressed="{{f.on}}">{{f.name}}</button></sc-for>
+        <sc-for list="{{views}}" as="f" hint-placeholder-count="2"><button type="button" class="seg {{f.cls}}" onClick="{{f.pick}}" aria-pressed="{{f.on}}">{{f.name}}</button></sc-for>
+      </div>
+      <div class="card" style="width: {{cardW}}px; height: {{cardH}}px; background: {{tile}}"><img src="{{figureUri}}" alt="{{figureAlt}}"></div>
+      <p class="mini">{{usageNote}}</p>
+    </aside>
+  </div>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"zone":{"editor":"enum","options":["day","dawn","dusk","night"],"default":"day"},"$preview":{"width":960,"height":900}}'>
+const SLOTS = ['skin', 'hair', 'eye', 'lip', 'cloth', 'trouser', 'shoe'];
+class Component extends DCLogic {
+  constructor(...a) {
+    super(...a);
+    this.state = { rev: 0, zone: (this.props && this.props.zone) || 'day', sel: 'k3', frame: 'bust', view: 'front' };
+    this.M = Mannequin.model();
+    const c = Mannequin.defaultCfg(this.M);
+    c.col.skin = { src: 'preset', id: 'olive' }; c.col.hair = { src: 'preset', id: 'auburn' }; c.col.eye = { src: 'preset', id: 'green' };
+    c.forms['hairFront.style'] = 'sweep'; c.tile = '#d9e2ee';
+    this.cfg = c; this.rev = 0;
+  }
+  bump() { this.rev += 1; this.setState({ rev: this.rev }); }
+  usedBy(id) { const M = this.M; return SLOTS.filter((s) => (this.cfg.col[s] || M.slots[s].def).src === 'palette' && (this.cfg.col[s] || M.slots[s].def).id === id).map((s) => M.slots[s].name); }
+  hueTrack(s) { const st = []; for (let h = 0; h <= 360; h += 30) st.push('hsl(' + h + ',' + s + '%,50%) ' + (h / 3.6) + '%'); return 'linear-gradient(to right,' + st.join(',') + ')'; }
+
+  renderVals() {
+    const M = this.M, S = this.state, mq = Mannequin, cfg = this.cfg, v = {}, pal = cfg.palette;
+    v.zoneClass = 'z-' + S.zone;
+    v.zones = ['day', 'dawn', 'dusk', 'night'].map((z) => ({ name: z.charAt(0).toUpperCase() + z.slice(1), on: S.zone === z, cls: S.zone === z ? 'on' : '', pick: () => this.setState({ zone: z }) }));
+    const sel = pal.filter((p) => p.id === S.sel)[0] || pal[0];
+    v.swatches = pal.map((p) => { const u = this.usedBy(p.id); return { name: p.name, css: mq.swatchCss(p.h, p.s, 52), on: p.id === sel.id, cls: p.id === sel.id ? 'on' : '', used: u.length ? 'Used by ' + u.join(', ').toLowerCase() : 'Not used yet', label: p.name + ', hue ' + p.h + ', saturation ' + p.s + '%, ' + (u.length ? 'used by ' + u.join(', ') : 'not used'), pick: () => this.setState({ sel: p.id }) }; });
+    v.count = pal.length; v.addOff = pal.length >= 10;
+    v.addSwatch = () => { if (pal.length >= 10) return; let n = pal.length + 1; while (pal.some((p) => p.id === 'k' + n)) n++; pal.push({ id: 'k' + n, name: 'Swatch ' + n, h: (sel.h + 150) % 360, s: 50 }); this.setState({ sel: 'k' + n }); this.bump(); };
+    v.selName = sel.name; v.onName = (e) => { sel.name = e.target.value; this.bump(); };
+    v.selH = sel.h; v.selS = sel.s; v.selHText = sel.h + '°'; v.selSText = sel.s + '%';
+    v.hueTrack = this.hueTrack(sel.s); v.satTrack = 'linear-gradient(to right, hsl(' + sel.h + ',0%,50%), hsl(' + sel.h + ',100%,50%))';
+    v.onHue = (e) => { sel.h = +e.target.value; this.bump(); }; v.onSat = (e) => { sel.s = +e.target.value; this.bump(); };
+    const usedHere = this.usedBy(sel.id);
+    v.removeOff = pal.length <= 1;
+    v.removeNote = usedHere.length ? 'Used by ' + usedHere.join(', ').toLowerCase() + ': they return to their defaults.' : 'Not used by any part.';
+    v.removeSwatch = () => {
+      if (pal.length <= 1) return;
+      SLOTS.forEach((s) => { const c = cfg.col[s] || M.slots[s].def; if (c.src === 'palette' && c.id === sel.id) cfg.col[s] = { src: 'preset', id: M.slots[s].presets[0].id }; });
+      cfg.palette = pal.filter((p) => p.id !== sel.id); this.setState({ sel: cfg.palette[0].id }); this.bump();
+    };
+    v.slots = SLOTS.map((s) => {
+      const slot = M.slots[s], cur = cfg.col[s] || slot.def, c = mq.colour(M, cfg, s, 0);
+      const opts = slot.presets.map((p) => ({ id: 'p:' + p.id, name: 'Default: ' + p.name })).concat(pal.map((p) => ({ id: 'k:' + p.id, name: 'Palette: ' + p.name })));
+      return { name: slot.name, css: mq.css(c), value: (cur.src === 'palette' ? 'k:' : 'p:') + cur.id, opts: opts,
+        state: cur.src === 'palette' ? 'Linked to the palette · brightness ' + Math.round(c.l) + '%' : 'Admin default · brightness ' + Math.round(c.l) + '%',
+        set: (e) => { const val = e.target.value, id = val.slice(2); if (val.indexOf('k:') === 0) cfg.col[s] = { src: 'palette', id: id, l: slot.l.def }; else { const p = slot.presets.filter((x) => x.id === id)[0]; cfg.col[s] = { src: 'preset', id: id, l: p ? p.l : undefined }; } this.setState({ sel: val.indexOf('k:') === 0 ? id : S.sel }); this.bump(); } };
+    });
+    v.defaults = SLOTS.filter((s) => M.slots[s].presets.length > 1).map((s) => ({ name: M.slots[s].name, items: M.slots[s].presets.map((p) => ({ name: p.name, css: mq.swatchCss(p.h, p.s, p.l), label: 'Add ' + p.name + ' (' + M.slots[s].name.toLowerCase() + ') to the palette', off: pal.length >= 10,
+      add: () => { if (pal.length >= 10) return; let n = pal.length + 1; while (pal.some((q) => q.id === 'k' + n)) n++; pal.push({ id: 'k' + n, name: p.name, h: p.h, s: p.s }); this.setState({ sel: 'k' + n }); this.bump(); } })) }));
+    const fr = M.frames.filter((f) => f.id === S.frame)[0], a = fr.w / fr.h, cw = Math.round(Math.min(300, 440 * a)), ch = Math.round(cw / a);
+    v.frames = ['bust', 'full'].map((id) => { const f = M.frames.filter((x) => x.id === id)[0]; return { name: f.name, on: S.frame === id, cls: S.frame === id ? 'on' : '', pick: () => this.setState({ frame: id }) }; });
+    v.views = ['front', 'back'].map((x) => ({ name: x.charAt(0).toUpperCase() + x.slice(1), on: S.view === x, cls: S.view === x ? 'on' : '', pick: () => this.setState({ view: x }) }));
+    v.cardW = cw; v.cardH = ch; v.tile = cfg.tile;
+    const res = mq.solve(M, cfg, S.view);
+    v.figureUri = mq.uri(mq.svg(M, res, { frame: fr, w: cw * 2, h: ch * 2, hide: fr.hide }));
+    v.figureAlt = 'Ada Marsh, ' + S.view + ' view';
+    v.usageNote = usedHere.length ? '“' + sel.name + '” colours: ' + usedHere.join(', ').toLowerCase() + '. Drag its hue and they all follow.' : '“' + sel.name + '” is not used yet. Pick it for a part under “Where each colour is used”.';
+    v.zoneNote = '';
+    return v;
+  }
+}
+</script>
+</body>
+</html>

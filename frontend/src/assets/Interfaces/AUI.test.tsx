@@ -13,6 +13,7 @@ vi.mock('./admin/resources/ResourcesConsole', () => ({ default: () => <div>resou
 // The plot presets page (covered by its own tests) is mocked for the same reason.
 vi.mock('./admin/instructor/InstructorConsole', () => ({ default: () => <div>instructor console</div> }))
 vi.mock('./admin/plot/PlotPresetsConsole', () => ({ default: () => <div>plot presets console</div> }))
+vi.mock('./admin/characters/CharacterModelsConsole', () => ({ default: () => <div>character models console</div> }))
 
 beforeEach(() => {
   window.localStorage.clear()
@@ -45,6 +46,13 @@ describe('AUI (the Admin panel as tiles)', () => {
     const plot = within(tile('configuration')).getByRole('region', { name: 'Plot' })
     expect(await within(plot).findByText('plot presets console')).toBeTruthy()
     expect(plot.querySelector('h2')).toBeNull()
+  })
+
+  it('shows Configuration > Characters as the character models page', async () => {
+    render(<AUI />)
+    const characters = within(tile('configuration')).getByRole('region', { name: 'Characters' })
+    expect(await within(characters).findByText('character models console')).toBeTruthy()
+    expect(characters.querySelector('h2')).toBeNull()
   })
 
   it('shows Resources as the article/quiz builder', async () => {

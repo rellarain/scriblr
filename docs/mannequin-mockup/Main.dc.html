@@ -1,0 +1,1638 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Character designer</title>
+<script src="./support.js"></script>
+<script src="./exact-default.js"></script>
+<script src="./designer-engine.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<style>
+body { margin: 0; }
+.z-day { --base:#e6d1db; --side:#dfc3d1; --deep:#d4afc2; --deeper:#c28ea8; --raised:#ddc0cf; --raised-on:#ebdbe3; --ink:#090708; --hair:#0907081f; --lift1:#09070814; --lift2:#09070824; --acc:#4f15c1; --acc-h:#380f8a; --on-acc:#ffffff; --amber:#aa6313; --alert:#007ab8; }
+.z-dawn { --base:#d7c9d0; --side:#cebdc6; --deep:#c1abb6; --deeper:#ac8e9d; --raised:#ccbac3; --raised-on:#ddd2d7; --ink:#090708; --hair:#0907081f; --lift1:#09070814; --lift2:#09070824; --acc:#5b3b9b; --acc-h:#412a6f; --on-acc:#ffffff; --amber:#986c3a; --alert:#1e7cab; }
+.z-dusk { --base:#63364d; --side:#562e42; --deep:#422433; --deeper:#21121a; --raised:#532d40; --raised-on:#6d3b54; --ink:#ffffff; --hair:#ffffff1f; --lift1:#ffffff14; --lift2:#ffffff24; --acc:#8c5ced; --acc-h:#b393f3; --on-acc:#090708; --amber:#eca351; --alert:#52c5ff; }
+.z-night { --base:#4c3842; --side:#413038; --deep:#2f2329; --deeper:#120d0f; --raised:#3e2e36; --raised-on:#553f4a; --ink:#ffffff; --hair:#ffffff1f; --lift1:#ffffff14; --lift2:#ffffff24; --acc:#9072ca; --acc-h:#b39fdb; --on-acc:#090708; --amber:#caa172; --alert:#6cbde5; }
+.app { font-family: system-ui, -apple-system, 'Segoe UI', sans-serif; font-size: 12px; line-height: 17px; color: var(--ink); background: var(--base); min-height: 1040px; display: flex; flex-direction: column; box-sizing: border-box; }
+.app *, .app *::before, .app *::after { box-sizing: border-box; }
+.app button { font: inherit; color: inherit; background: none; border: 0; padding: 0; cursor: pointer; border-radius: 0; text-align: left; }
+.app button:focus-visible, .app input:focus-visible { outline: 2px solid var(--acc-h); outline-offset: 1px; }
+.app h1, .app h2, .app p { margin: 0; }
+.hd { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; padding: 8px 14px; min-height: 44px; background: var(--side); }
+.title { font-size: 18px; line-height: 24px; font-weight: 700; letter-spacing: 1.5px; text-transform: uppercase; }
+.crumb { display: flex; gap: 2px; }
+.crumb button, .seg { height: 26px; padding: 0 10px; font-size: 11px; font-weight: 700; display: inline-flex; align-items: center; background: var(--lift1); }
+.crumb button:hover, .seg:hover { background: var(--lift2); }
+.crumb button.on, .seg.on { background: var(--acc); color: var(--on-acc); }
+.grow { flex: 1 1 auto; }
+.lbl { font-size: 11px; line-height: 15px; font-weight: 700; letter-spacing: 1px; text-transform: uppercase; }
+.ibtn { width: 30px; height: 30px; display: inline-flex; align-items: center; justify-content: center; flex: 0 0 auto; }
+.ibtn:hover { background: var(--lift1); }
+.ibtn[aria-pressed="true"] { background: var(--acc); color: var(--on-acc); }
+.ibtn:disabled { opacity: 0.35; cursor: default; }
+.ibtn:disabled:hover { background: none; }
+.ic { width: 18px; height: 18px; fill: none; stroke: currentColor; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; }
+.btn { height: 26px; padding: 0 10px; font-size: 11px; font-weight: 700; display: inline-flex; align-items: center; gap: 6px; background: var(--lift2); }
+.btn:hover { background: var(--lift2); box-shadow: inset 0 0 0 1px var(--ink); }
+.btn.pri { background: var(--acc); color: var(--on-acc); }
+.btn:disabled { opacity: 0.4; cursor: default; box-shadow: none; }
+.chip { height: 24px; padding: 0 8px; font-size: 11px; display: inline-flex; align-items: center; gap: 6px; background: var(--lift1); }
+.chip.on { background: var(--acc); color: var(--on-acc); }
+.chip:hover { box-shadow: inset 0 0 0 1px var(--ink); }
+.tagline { display: inline-flex; align-items: center; height: 20px; padding: 0 6px; font-size: 11px; font-weight: 700; background: var(--lift2); }
+.bar { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; padding: 6px 14px; background: var(--side); border-top: 1px solid var(--hair); }
+.main { display: flex; flex-wrap: wrap; gap: 8px; padding: 8px; align-items: flex-start; flex: 1 1 auto; }
+.tree { flex: 0 0 250px; background: var(--side); min-height: 560px; display: flex; flex-direction: column; }
+.center { flex: 999 1 640px; min-width: 0; display: flex; flex-direction: column; gap: 8px; }
+.insp { flex: 1 1 330px; max-width: 360px; background: var(--side); min-height: 560px; }
+.ph { display: flex; align-items: center; gap: 8px; padding: 8px 12px; min-height: 40px; }
+.search { width: 100%; height: 28px; padding: 0 8px; border: 0; background: var(--raised-on); color: var(--ink); font: inherit; }
+.search::placeholder { color: var(--ink); opacity: 1; font-style: italic; }
+.rows { padding: 4px 0 12px; display: flex; flex-direction: column; }
+.row { display: flex; align-items: center; min-height: 28px; }
+.row:hover { background: var(--lift1); }
+.row.on { background: var(--acc); color: var(--on-acc); }
+.row.dim .rn { font-style: italic; }
+.caret { width: 22px; height: 28px; flex: 0 0 22px; display: inline-flex; align-items: center; justify-content: center; }
+.caret::before { content: ''; border-left: 5px solid currentColor; border-top: 4px solid transparent; border-bottom: 4px solid transparent; }
+.caret.open::before { border-left: 4px solid transparent; border-right: 4px solid transparent; border-top: 5px solid currentColor; border-bottom: 0; }
+.caret:disabled { visibility: hidden; }
+.rowmain { flex: 1 1 auto; min-width: 0; height: 28px; display: flex; align-items: center; gap: 6px; }
+.rn { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.rn.g { font-weight: 700; }
+.thumb { width: 20px; height: 20px; flex: 0 0 20px; background: var(--deep); }
+.tg { font-size: 11px; font-weight: 700; padding: 0 5px; background: var(--lift2); white-space: nowrap; }
+.row.on .tg { background: #ffffff2e; }
+.eye { width: 26px; height: 28px; flex: 0 0 26px; display: inline-flex; align-items: center; justify-content: center; }
+.eye .ic { width: 15px; height: 15px; }
+.eye.off { opacity: 0.4; }
+.eye:disabled { visibility: hidden; }
+.tools { display: flex; align-items: center; gap: 2px; flex-wrap: wrap; padding: 4px 6px; background: var(--side); }
+.sep { width: 1px; align-self: stretch; margin: 4px 6px; background: var(--hair); }
+.stage { position: relative; width: min(100%, 940px); aspect-ratio: 8 / 7; background: var(--deep); touch-action: none; user-select: none; overflow: hidden; align-self: center; cursor: crosshair; }
+.under { position: absolute; inset: 0; width: 100%; height: 100%; pointer-events: none; }
+.pt { position: absolute; width: 13px; height: 13px; transform: translate(-50%, -50%); background: #ffffff; border: 2px solid var(--acc); padding: 0; cursor: grab; touch-action: none; }
+.pt.pm-c { border-radius: 50%; }
+.pt.pm-cs { border-radius: 50% 0 0 50%; }
+.pt.pm-sc { border-radius: 0 50% 50% 0; }
+.pt.on { background: var(--acc); width: 15px; height: 15px; z-index: 3; }
+.pt.twin { border-style: dashed; }
+.pt.linked::after { content: ''; position: absolute; inset: -5px; border: 1px solid var(--acc); }
+.pt:focus-visible { outline: 2px solid var(--amber); outline-offset: 2px; }
+.hk { position: absolute; width: 10px; height: 10px; transform: translate(-50%, -50%) rotate(45deg); background: var(--acc); border: 1px solid #ffffff; padding: 0; cursor: grab; z-index: 4; touch-action: none; }
+.note { padding: 6px 12px; background: var(--raised); }
+.status { display: flex; gap: 14px; flex-wrap: wrap; align-items: center; padding: 6px 12px; background: var(--raised); }
+.tabs { display: flex; flex-wrap: wrap; gap: 2px; padding: 8px 8px 0; }
+.tab { height: 28px; padding: 0 10px; font-size: 11px; font-weight: 700; display: inline-flex; align-items: center; background: var(--lift1); }
+.tab:hover { background: var(--lift2); }
+.tab.on { background: var(--acc); color: var(--on-acc); }
+.ibody { padding: 10px 12px 16px; display: flex; flex-direction: column; gap: 14px; }
+.sec { display: flex; flex-direction: column; gap: 8px; }
+.sec + .sec { padding-top: 12px; border-top: 1px solid var(--hair); }
+.chips { display: flex; flex-wrap: wrap; gap: 4px; }
+.modes { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 4px; }
+.mode { display: flex; align-items: center; gap: 8px; height: 32px; padding: 0 8px; background: var(--lift1); font-size: 11px; font-weight: 700; }
+.mode:hover { box-shadow: inset 0 0 0 1px var(--ink); }
+.mode.on { background: var(--acc); color: var(--on-acc); }
+.tpls { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 4px; }
+.tpl { aspect-ratio: 1; background: var(--deep); display: flex; align-items: center; justify-content: center; padding: 0; }
+.tpl:hover { box-shadow: inset 0 0 0 1px var(--ink); }
+.tpl img { width: 100%; height: 100%; }
+.stp { display: flex; align-items: center; gap: 6px; min-height: 28px; }
+.sl { flex: 1 1 auto; }
+.sv { min-width: 56px; text-align: center; font-variant-numeric: tabular-nums; }
+.sb { width: 26px; height: 26px; display: inline-flex; align-items: center; justify-content: center; background: var(--lift2); font-weight: 700; }
+.sb:hover { box-shadow: inset 0 0 0 1px var(--ink); }
+.slr { display: flex; align-items: center; gap: 8px; min-height: 28px; }
+.slr input[type="range"] { flex: 1 1 90px; min-width: 60px; accent-color: var(--acc); }
+.slr .sl { flex: 0 0 96px; }
+.hint { font-style: italic; }
+.warn { font-weight: 700; }
+.fcards { display: grid; grid-template-columns: repeat(auto-fill, minmax(72px, 1fr)); gap: 4px; }
+.fcard { display: flex; flex-direction: column; gap: 2px; padding: 4px; background: var(--lift1); font-size: 11px; }
+.fcard img { width: 100%; aspect-ratio: 1; background: var(--deep); }
+.fcard.on { background: var(--acc); color: var(--on-acc); }
+.fcard:hover { box-shadow: inset 0 0 0 1px var(--ink); }
+.rng { display: flex; flex-direction: column; gap: 4px; padding: 8px; background: var(--raised); }
+.rng .nm { font-weight: 700; }
+.three { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 6px; }
+.three .stp { flex-direction: column; align-items: stretch; gap: 2px; }
+.three .stp .sl, .three .stp .sv { text-align: center; }
+.three .btnrow { display: flex; gap: 2px; }
+.three .btnrow .sb { flex: 1 1 0; }
+.swatches { display: flex; flex-wrap: wrap; gap: 4px; }
+.sw { width: 28px; height: 28px; padding: 0; border: 2px solid transparent; box-shadow: inset 0 0 0 1px #00000040; }
+.sw.on { border-color: var(--acc); outline: 2px solid var(--base); outline-offset: -4px; }
+.sw:hover { border-color: var(--ink); }
+.prev { background: var(--side); margin: 0 8px 8px; }
+.prevhead { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; padding: 8px 12px; }
+.strip { display: flex; gap: 8px; padding: 0 12px 12px; overflow-x: auto; align-items: flex-end; scrollbar-width: none; }
+.strip::-webkit-scrollbar { display: none; }
+.pcard { flex: 0 0 auto; display: flex; flex-direction: column; gap: 4px; padding: 6px; font-size: 11px; }
+.pcard:hover { box-shadow: inset 0 0 0 1px var(--ink); }
+.pcard img { display: block; }
+.pcard span { max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.mini { font-size: 11px; line-height: 15px; }
+.chk { display: flex; gap: 8px; align-items: flex-start; padding: 6px 8px; background: var(--raised); }
+.chk.bad { box-shadow: inset 0 0 0 2px var(--ink); }
+.chkl { flex: 0 0 62px; font-size: 11px; text-transform: uppercase; letter-spacing: 1px; }
+.vg { display: grid; grid-template-columns: minmax(0, 1.3fr) minmax(0, 1fr) minmax(0, 1.2fr); gap: 2px; }
+.vrow { display: contents; }
+.vh { font-size: 11px; font-weight: 700; letter-spacing: 1px; text-transform: uppercase; padding: 4px 6px; }
+.vc { padding: 4px 6px; background: var(--raised); font-size: 11px; line-height: 15px; }
+.vc.warn { font-weight: 700; box-shadow: inset 0 0 0 1px var(--ink); }
+.pt.locked { border-radius: 2px; transform: translate(-50%, -50%) rotate(45deg); border-color: var(--amber); }
+.pt.locked.on { background: var(--amber); }
+.hmap { display: flex; flex-direction: column; gap: 3px; }
+.hrow { display: grid; grid-template-columns: 78px repeat(3, minmax(0, 1fr)); gap: 3px; }
+.hpl { font-size: 11px; font-weight: 700; align-self: center; }
+.hcell { height: 28px; background: var(--lift1); font-size: 11px; text-align: center; padding: 0 4px; display: inline-flex; align-items: center; justify-content: center; overflow: hidden; }
+.hcell:hover { box-shadow: inset 0 0 0 1px var(--ink); }
+.hcell.on { background: var(--acc); color: var(--on-acc); }
+.hcell:disabled { opacity: 0.35; cursor: default; box-shadow: none; }
+.tcell { height: 24px; font-size: 11px; text-align: center; display: inline-flex; align-items: center; justify-content: center; overflow: hidden; font-variant-numeric: tabular-nums; }
+.timgs { display: flex; gap: 8px; margin: 4px 0; }
+.timgs img { display: block; }
+.tn { display: flex; align-items: center; gap: 6px; background: var(--raised); padding: 3px 8px 3px 3px; font-size: 11px; line-height: 15px; font-variant-numeric: tabular-nums; }
+.tn i { display: block; width: 22px; height: 22px; box-shadow: inset 0 0 0 1px #00000040; }
+.tn.faint { box-shadow: inset 0 0 0 1px var(--ink); font-weight: 700; }
+</style>
+</helmet>
+<div class="app {{zoneClass}}">
+
+  <div class="hd">
+    <h1 class="title">Characters</h1>
+    <div class="crumb" role="tablist" aria-label="Configuration">
+      <button type="button" role="tab" aria-selected="false">Overview</button>
+      <button type="button" role="tab" aria-selected="false">Plot</button>
+      <button type="button" role="tab" aria-selected="true" class="on">Design assets</button>
+    </div>
+    <span class="grow"></span>
+    <span class="mini"><b>{{statusText}}</b> · characters keep their own copy of every asset they use</span>
+    <button type="button" class="ibtn" onClick="{{undo}}" disabled="{{undoOff}}" aria-label="Undo" title="Undo"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M9 14L4 9l5-5M4 9h9a6 6 0 0 1 0 12h-3"/></svg></button>
+    <button type="button" class="ibtn" onClick="{{redo}}" disabled="{{redoOff}}" aria-label="Redo" title="Redo"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M15 14l5-5-5-5M20 9h-9a6 6 0 0 0 0 12h3"/></svg></button>
+    <button type="button" class="ibtn" aria-label="Version history" title="Version history: v1 to v{{ver}}"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 7v5l3 2M3 12a9 9 0 1 0 3-6.7M3 4v4h4"/></svg></button>
+    <div class="crumb" role="group" aria-label="Time of day">
+      <sc-for list="{{zones}}" as="z" hint-placeholder-count="4">
+        <button type="button" class="seg {{z.cls}}" onClick="{{z.pick}}" aria-pressed="{{z.on}}">{{z.name}}</button>
+      </sc-for>
+    </div>
+    <button type="button" class="btn pri" onClick="{{publish}}" title="Publish a new version of this model">
+      <svg class="ic" viewBox="0 0 24 24" aria-hidden="true" style="width:16px;height:16px"><path d="M12 16V4M7 9l5-5 5 5M4 20h16"/></svg>Publish
+    </button>
+  </div>
+
+  <div class="bar">
+    <span class="lbl">Model</span>
+    <button type="button" class="chip on">Adult (basic)</button>
+    <button type="button" class="chip">New model</button>
+    <span class="sep"></span>
+    <span class="mini">Body type: adult · Species: human · Art style: flat colour, no outlines</span>
+    <span class="grow"></span>
+    <span class="mini">Edits are saved as a draft as you go</span>
+  </div>
+
+  <div class="main">
+
+    <!-- ===== the asset tree ===== -->
+    <nav class="tree" aria-label="Assets">
+      <div class="ph"><h2 class="lbl">Assets</h2><span class="grow"></span><span class="mini">{{treeCount}}</span></div>
+      <div style="padding: 0 12px 6px">
+        <input class="search" type="search" placeholder="Search groups, objects, shapes" aria-label="Search assets" value="{{q}}" onInput="{{onQ}}" onChange="{{onQ}}">
+      </div>
+      <div class="rows">
+        <sc-for list="{{rows}}" as="r" hint-placeholder-count="12">
+          <div class="row {{r.cls}}" style="padding-left: {{r.pad}}px">
+            <button type="button" class="caret {{r.caretCls}}" onClick="{{r.toggle}}" disabled="{{r.noKids}}" aria-label="{{r.toggleLabel}}" aria-expanded="{{r.isOpen}}"></button>
+            <button type="button" class="rowmain" onClick="{{r.pick}}" aria-current="{{r.current}}">
+              <sc-if value="{{r.isShape}}" hint-placeholder-val="{{false}}"><img class="thumb" src="{{r.thumb}}" alt=""></sc-if>
+              <span class="rn {{r.nameCls}}">{{r.name}}</span>
+              <sc-if value="{{r.hasTag}}" hint-placeholder-val="{{false}}"><span class="tg">{{r.tag}}</span></sc-if>
+            </button>
+            <button type="button" class="eye {{r.eyeCls}}" onClick="{{r.eye}}" disabled="{{r.noEye}}" aria-label="{{r.eyeLabel}}" title="{{r.eyeLabel}}" aria-pressed="{{r.shown}}">
+              <sc-if value="{{r.hasEye}}" hint-placeholder-val="{{false}}"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M2 12s4-7 10-7 10 7 10 7-4 7-10 7S2 12 2 12zM12 9a3 3 0 1 0 0 6 3 3 0 0 0 0-6z"/></svg></sc-if>
+            </button>
+          </div>
+        </sc-for>
+      </div>
+    </nav>
+
+    <!-- ===== the canvas ===== -->
+    <section class="center" aria-label="Canvas">
+      <div class="tools" role="toolbar" aria-label="Canvas tools">
+        <button type="button" class="ibtn" onClick="{{toolSelect}}" aria-pressed="{{toolSelectOn}}" aria-label="Point editor" title="Point editor: click a shape, drag its points and handles (right-click a shape to change mode)"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M5 3l13 8-6 2-3 6z"/></svg></button>
+        <button type="button" class="ibtn" onClick="{{toolAdd}}" aria-pressed="{{toolAddOn}}" aria-label="Add point" title="Add point: click an edge of the selected shape"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg></button>
+        <button type="button" class="ibtn" onClick="{{toolDel}}" aria-pressed="{{toolDelOn}}" aria-label="Delete point" title="Delete point: click a point"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 7h16M9 7V4h6v3M6 7l1 13h10l1-13"/></svg></button>
+        <button type="button" class="ibtn" onClick="{{toolMove}}" aria-pressed="{{toolMoveOn}}" aria-label="Move shape" title="Move shape: drag the whole shape (right-click a shape to change mode)"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3v18M3 12h18M8 7l4-4 4 4M8 17l4 4 4-4M7 8l-4 4 4 4M17 8l4 4-4 4"/></svg></button>
+        <span class="sep"></span>
+        <sc-for list="{{modes}}" as="m" hint-placeholder-count="4">
+          <button type="button" class="ibtn" onClick="{{m.pick}}" aria-pressed="{{m.on}}" aria-label="{{m.name}}" title="{{m.name}}: sets the selected point">
+            <sc-if value="{{m.isC}}" hint-placeholder-val="{{false}}"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M3 19C7 3 17 3 21 19"/><circle cx="12" cy="7.5" r="1.8"/></svg></sc-if>
+            <sc-if value="{{m.isS}}" hint-placeholder-val="{{false}}"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M3 19L12 5l9 14"/><rect x="10.4" y="3.4" width="3.2" height="3.2"/></svg></sc-if>
+            <sc-if value="{{m.isCS}}" hint-placeholder-val="{{false}}"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M3 19C5 9 9 5 12 5l9 14"/></svg></sc-if>
+            <sc-if value="{{m.isSC}}" hint-placeholder-val="{{false}}"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M3 19L12 5c3 0 7 4 9 14"/></svg></sc-if>
+          </button>
+        </sc-for>
+        <span class="sep"></span>
+        <button type="button" class="ibtn" onClick="{{toggleMirror}}" aria-pressed="{{mirrorOn}}" aria-label="Mirror while editing" title="Mirror while editing: a point and its twin move together"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3v18M8 7L3 12l5 5M16 7l5 5-5 5"/></svg></button>
+        <button type="button" class="ibtn" onClick="{{toggleSnap}}" aria-pressed="{{snapOn}}" aria-label="Snapping and guides" title="Snap to half units, the mirror line and 15 degree handles"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M6 3v8a6 6 0 0 0 12 0V3h-4v8a2 2 0 0 1-4 0V3z"/></svg></button>
+        <button type="button" class="ibtn" onClick="{{toggleLock}}" aria-pressed="{{lockOn}}" aria-label="Lock to edges" title="Lock to edges: drop a clothing, hair or shading point on the edge of a body part and it locks there"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M7 11V8a5 5 0 0 1 10 0v3M5 11h14v10H5z"/></svg></button>
+        <button type="button" class="ibtn" onClick="{{toggleGrid}}" aria-pressed="{{gridOn}}" aria-label="Grid" title="Grid"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M3 3h18v18H3zM3 9h18M3 15h18M9 3v18M15 3v18"/></svg></button>
+        <button type="button" class="ibtn" onClick="{{toggleGhost}}" aria-pressed="{{ghostOn}}" aria-label="Ghost of the other view" title="Ghost: the other view of this object, dashed"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3l9 5-9 5-9-5zM3 13l9 5 9-5"/></svg></button>
+        <button type="button" class="ibtn" onClick="{{toggleFrames}}" aria-pressed="{{framesOn}}" aria-label="Show the frames" title="Show the named frames (Full body, Bust, Face, Hands)"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 8V4h4M16 4h4v4M20 16v4h-4M8 20H4v-4"/></svg></button>
+        <span class="sep"></span>
+        <sc-for list="{{shadeBtns}}" as="b" hint-placeholder-count="3"><button type="button" class="seg {{b.cls}}" onClick="{{b.pick}}" aria-pressed="{{b.on}}" title="{{b.title}}">{{b.name}}</button></sc-for>
+        <span class="sep"></span>
+        <button type="button" class="seg {{frontCls}}" onClick="{{viewFront}}" aria-pressed="{{frontOn}}" title="Front view">Front</button>
+        <button type="button" class="seg {{backCls}}" onClick="{{viewBack}}" aria-pressed="{{backOn}}" title="Back view: derived from the front, with overrides">Back</button>
+        <span class="grow"></span>
+        <button type="button" class="ibtn" onClick="{{zoomOut}}" aria-label="Zoom out" title="Zoom out"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M11 4a7 7 0 1 0 0 14 7 7 0 0 0 0-14zM21 21l-5-5M8 11h6"/></svg></button>
+        <button type="button" class="ibtn" onClick="{{zoomIn}}" aria-label="Zoom in" title="Zoom in"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M11 4a7 7 0 1 0 0 14 7 7 0 0 0 0-14zM21 21l-5-5M8 11h6M11 8v6"/></svg></button>
+        <button type="button" class="ibtn" onClick="{{toggleFit}}" aria-pressed="{{fitFig}}" aria-label="Fit the whole figure" title="Fit the whole figure"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M3 12h4M17 12h4M12 3v4M12 17v4M9 12a3 3 0 1 0 6 0 3 3 0 0 0-6 0"/></svg></button>
+        <span class="sep"></span>
+        <button type="button" class="ibtn" onClick="{{toggleDrawer}}" aria-pressed="{{drawerOn}}" aria-label="Inspector" title="Show or hide the inspector"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M3 4h18v16H3zM15 4v16"/></svg></button>
+      </div>
+
+      <div class="stage" onContextMenu="{{stageMenu}}" onPointerDown="{{stageDown}}" onPointerMove="{{stageMove}}" onPointerUp="{{stageUp}}" onPointerCancel="{{stageUp}}">
+        <img class="under" src="{{canvasUri}}" alt="{{canvasAlt}}" draggable="false">
+        <sc-for list="{{pts}}" as="p" hint-placeholder-count="12">
+          <button type="button" class="pt {{p.cls}}" style="left: {{p.left}}%; top: {{p.top}}%" onPointerDown="{{p.down}}" onKeyDown="{{p.key}}" aria-label="{{p.label}}" title="{{p.label}}"></button>
+        </sc-for>
+        <sc-for list="{{knobs}}" as="k" hint-placeholder-count="2">
+          <button type="button" class="hk" style="left: {{k.left}}%; top: {{k.top}}%" onPointerDown="{{k.down}}" aria-label="{{k.label}}" title="{{k.label}}"></button>
+        </sc-for>
+      </div>
+      <div class="status" role="status">
+        <span><b>{{statName}}</b></span>
+        <span>{{statPoint}}</span>
+        <span>{{statMode}}</span>
+        <span class="grow"></span>
+        <span class="{{budgetCls}}">{{budgetText}}</span>
+        <span class="{{copyCls}}">{{copyText}}</span>
+      </div>
+      <sc-if value="{{hasNote}}" hint-placeholder-val="{{false}}">
+        <div class="note"><b>{{noteText}}</b>
+          <sc-if value="{{noteReset}}" hint-placeholder-val="{{false}}"> <button type="button" class="btn" onClick="{{resetTest}}">Reset the test values</button></sc-if>
+        </div>
+      </sc-if>
+    </section>
+
+    <!-- ===== the inspector ===== -->
+    <sc-if value="{{drawerOn}}" hint-placeholder-val="{{true}}">
+    <aside class="insp" aria-label="Inspector">
+      <div class="tabs" role="tablist" aria-label="Inspector">
+        <sc-for list="{{tabs}}" as="t" hint-placeholder-count="6">
+          <button type="button" role="tab" class="tab {{t.cls}}" aria-selected="{{t.on}}" onClick="{{t.pick}}">{{t.name}}</button>
+        </sc-for>
+      </div>
+      <div class="ibody">
+        <div class="sec" style="padding-top:0;border:0">
+          <h2 class="lbl">{{insKind}}</h2>
+          <div style="font-size:15px;line-height:20px;font-weight:700">{{insTitle}}</div>
+          <div class="mini">{{insPath}}</div>
+          <div class="chips">
+            <sc-for list="{{insTags}}" as="g" hint-placeholder-count="2"><span class="tagline">{{g.text}}</span></sc-for>
+          </div>
+        </div>
+
+        <sc-if value="{{tabNone}}" hint-placeholder-val="{{false}}">
+          <div class="sec">
+            <p>This is the end result: nothing is selected, so there are no guides, points or dimming. Right-click a shape for the point editor, again for Move shape, again to unselect it. Click a part to select it.</p>
+            <sc-for list="{{overviewRows}}" as="o" hint-placeholder-count="5"><div class="stp"><span class="sl">{{o.name}}</span><span class="{{o.cls}}">{{o.value}}</span></div></sc-for>
+          </div>
+        </sc-if>
+
+        <!-- ---------- Shape ---------- -->
+        <sc-if value="{{tabShape}}" hint-placeholder-val="{{true}}">
+          <sc-if value="{{noShape}}" hint-placeholder-val="{{false}}">
+            <div class="sec">
+              <p class="hint">{{noShapeText}}</p>
+              <div class="chips">
+                <sc-for list="{{childChips}}" as="c" hint-placeholder-count="3"><button type="button" class="chip" onClick="{{c.pick}}">{{c.name}}</button></sc-for>
+              </div>
+            </div>
+          </sc-if>
+          <sc-if value="{{hasShape}}" hint-placeholder-val="{{true}}">
+            <div class="sec">
+              <h2 class="lbl">{{ptTitle}}</h2>
+              <div class="modes">
+                <sc-for list="{{modeBtns}}" as="m" hint-placeholder-count="4">
+                  <button type="button" class="mode {{m.cls}}" onClick="{{m.pick}}" aria-pressed="{{m.on}}">
+                    <sc-if value="{{m.isC}}" hint-placeholder-val="{{false}}"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M3 19C7 3 17 3 21 19"/><circle cx="12" cy="7.5" r="1.8"/></svg></sc-if>
+                    <sc-if value="{{m.isS}}" hint-placeholder-val="{{false}}"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M3 19L12 5l9 14"/><rect x="10.4" y="3.4" width="3.2" height="3.2"/></svg></sc-if>
+                    <sc-if value="{{m.isCS}}" hint-placeholder-val="{{false}}"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M3 19C5 9 9 5 12 5l9 14"/></svg></sc-if>
+                    <sc-if value="{{m.isSC}}" hint-placeholder-val="{{false}}"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M3 19L12 5c3 0 7 4 9 14"/></svg></sc-if>
+                    <span>{{m.name}}</span>
+                  </button>
+                </sc-for>
+              </div>
+              <div class="chips">
+                <button type="button" class="btn" onClick="{{ptAdd}}">Add after</button>
+                <button type="button" class="btn" onClick="{{ptDel}}" disabled="{{ptDelOff}}">Delete</button>
+                <button type="button" class="btn" onClick="{{ptReset}}">Reset handles</button>
+              </div>
+              <div class="mini">{{ptPos}}</div>
+            </div>
+
+            <div class="sec">
+              <h2 class="lbl">Link this point</h2>
+              <div class="mini">{{linkText}}</div>
+              <div class="chips">
+                <button type="button" class="btn" onClick="{{linkWeld}}" title="Weld: the same place as the nearest point of another shape">
+                  <svg class="ic" viewBox="0 0 24 24" aria-hidden="true" style="width:15px;height:15px"><path d="M10 14a4 4 0 0 0 5.7 0l3-3a4 4 0 0 0-5.7-5.7l-1 1M14 10a4 4 0 0 0-5.7 0l-3 3a4 4 0 0 0 5.7 5.7l1-1"/></svg>Weld to nearest</button>
+                <button type="button" class="btn" onClick="{{linkFollow}}" title="Follow: keeps its offset from the nearest point of another shape">Follow nearest</button>
+                <button type="button" class="btn" onClick="{{linkClear}}" disabled="{{linkOff}}">Unlink</button>
+              </div>
+            </div>
+
+            <div class="sec">
+              <h2 class="lbl">Lock to a body part</h2>
+              <p>{{lockText}}</p>
+              <div class="chips">
+                <button type="button" class="btn" onClick="{{lockNearest}}" disabled="{{lockNearOff}}" title="Lock this point to the nearest edge of a body part within 6 units">Lock to the nearest edge</button>
+                <button type="button" class="btn" onClick="{{lockClear}}" disabled="{{lockClearOff}}">Unlock</button>
+              </div>
+              <sc-for list="{{lockRows}}" as="x" hint-placeholder-count="2">
+                <div class="stp"><span class="sl">{{x.label}}</span><button type="button" class="sb" onClick="{{x.dec}}" aria-label="Decrease {{x.label}}">−</button><span class="sv">{{x.text}}</span><button type="button" class="sb" onClick="{{x.inc}}" aria-label="Increase {{x.label}}">+</button></div>
+              </sc-for>
+            </div>
+
+            <div class="sec">
+              <h2 class="lbl">Shading</h2>
+              <p>{{shadeText}}</p>
+              <sc-if value="{{isShade}}" hint-placeholder-val="{{false}}">
+                <div class="chips"><sc-for list="{{shadeKinds}}" as="k" hint-placeholder-count="3"><button type="button" class="chip {{k.cls}}" onClick="{{k.pick}}" aria-pressed="{{k.on}}">{{k.name}}</button></sc-for></div>
+                <sc-for list="{{shadeRows}}" as="x" hint-placeholder-count="2">
+                  <div class="stp"><span class="sl">{{x.label}}</span><button type="button" class="sb" onClick="{{x.dec}}" aria-label="Decrease {{x.label}}">−</button><span class="sv">{{x.text}}</span><button type="button" class="sb" onClick="{{x.inc}}" aria-label="Increase {{x.label}}">+</button></div>
+                </sc-for>
+                <div class="chips"><button type="button" class="btn" onClick="{{shadeDel}}" disabled="{{shadeDelOff}}">Delete this shading shape</button></div>
+              </sc-if>
+              <div class="chips"><sc-for list="{{shadeAdd}}" as="a" hint-placeholder-count="3"><button type="button" class="btn" onClick="{{a.pick}}" disabled="{{a.off}}">{{a.name}}</button></sc-for></div>
+            </div>
+
+            <div class="sec">
+              <h2 class="lbl">Start from a template</h2>
+              <div class="tpls">
+                <sc-for list="{{templates}}" as="t" hint-placeholder-count="15">
+                  <button type="button" class="tpl" onClick="{{t.pick}}" aria-label="{{t.name}}" title="{{t.name}}"><img src="{{t.uri}}" alt=""></button>
+                </sc-for>
+              </div>
+              <p class="mini">A template replaces the points and keeps this shape's size and place. Add, move or delete points afterwards: a path is a shape with customisable edges.</p>
+            </div>
+
+            <div class="sec">
+              <h2 class="lbl">Cutouts</h2>
+              <p>{{cutText}}</p>
+              <div class="chips"><span class="mini" style="align-self:center">Cut away</span>
+                <sc-for list="{{cutChips}}" as="c" hint-placeholder-count="3"><button type="button" class="chip {{c.cls}}" onClick="{{c.pick}}" aria-pressed="{{c.on}}">{{c.name}}</button></sc-for>
+              </div>
+              <div class="chips"><button type="button" class="chip {{helperCls}}" onClick="{{toggleHelper}}" aria-pressed="{{helperOn}}">Helper shape: not drawn, used to cut or clip</button></div>
+            </div>
+
+            <div class="sec">
+              <h2 class="lbl">Symmetry</h2>
+              <p>{{symText}}</p>
+              <sc-if value="{{symBtnOn}}" hint-placeholder-val="{{false}}"><div class="chips"><button type="button" class="btn" onClick="{{symBtn}}">{{symBtnText}}</button></div></sc-if>
+            </div>
+
+            <div class="sec">
+              <h2 class="lbl">Front and back</h2>
+              <p>{{viewText}}</p>
+              <sc-if value="{{backBtnOn}}" hint-placeholder-val="{{false}}"><div class="chips"><button type="button" class="btn" onClick="{{backBtn}}">{{backBtnText}}</button></div></sc-if>
+            </div>
+
+            <div class="sec">
+              <h2 class="lbl">Layer</h2>
+              <div class="stp"><span class="sl">{{zText}}</span>
+                <button type="button" class="sb" onClick="{{zDown}}" aria-label="Move behind"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true" style="width:14px;height:14px"><path d="M12 5v14M6 13l6 6 6-6"/></svg></button>
+                <button type="button" class="sb" onClick="{{zUp}}" aria-label="Move in front"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true" style="width:14px;height:14px"><path d="M12 19V5M6 11l6-6 6 6"/></svg></button>
+              </div>
+            </div>
+          </sc-if>
+        </sc-if>
+
+        <!-- ---------- Rig ---------- -->
+        <sc-if value="{{tabRig}}" hint-placeholder-val="{{false}}">
+          <div class="sec">
+            <h2 class="lbl">Pivot and parent</h2>
+            <p>{{pivotText}}</p>
+            <p class="mini">{{parentText}}</p>
+          </div>
+          <div class="sec">
+            <h2 class="lbl">Attached to a shape</h2>
+            <sc-if value="{{noAttach}}" hint-placeholder-val="{{false}}"><p class="hint">{{noAttachText}}</p></sc-if>
+            <sc-if value="{{hasAttach}}" hint-placeholder-val="{{true}}">
+              <p>{{attachText}}</p>
+              <div class="chips">
+                <sc-for list="{{kinds}}" as="k" hint-placeholder-count="4"><button type="button" class="chip {{k.cls}}" onClick="{{k.pick}}" aria-pressed="{{k.on}}">{{k.name}}</button></sc-for>
+              </div>
+              <sc-for list="{{attachRows}}" as="a" hint-placeholder-count="2">
+                <div>
+                  <sc-if value="{{a.isStep}}" hint-placeholder-val="{{true}}">
+                    <div class="stp"><span class="sl">{{a.label}}</span><button type="button" class="sb" onClick="{{a.dec}}" aria-label="Previous {{a.label}}">−</button><span class="sv">{{a.text}}</span><button type="button" class="sb" onClick="{{a.inc}}" aria-label="Next {{a.label}}">+</button></div>
+                  </sc-if>
+                  <sc-if value="{{a.isSlide}}" hint-placeholder-val="{{false}}">
+                    <label class="slr"><span class="sl">{{a.label}}</span><input type="range" min="{{a.min}}" max="{{a.max}}" step="{{a.step}}" value="{{a.val}}" onInput="{{a.set}}" onChange="{{a.set}}"><span class="sv">{{a.text}}</span></label>
+                  </sc-if>
+                </div>
+              </sc-for>
+              <p class="mini">Four ways to fix a group to a shape: on one point, at a spot along an edge, anywhere along a range a slider moves, or at a relative position inside the shape. Change the kind and watch the group follow.</p>
+            </sc-if>
+          </div>
+          <div class="sec">
+            <h2 class="lbl">Motion</h2>
+            <sc-for list="{{motions}}" as="m" hint-placeholder-count="2"><p>{{m.text}}</p></sc-for>
+            <sc-if value="{{noMotions}}" hint-placeholder-val="{{false}}"><p class="hint">Nothing here moves on its own. Ranges can still move its points or scale it (Ranges tab).</p></sc-if>
+          </div>
+          <sc-if value="{{hasHairMap}}" hint-placeholder-val="{{false}}">
+            <div class="sec">
+              <h2 class="lbl">Where the hair is rooted</h2>
+              <p>{{hairText}}</p>
+              <div class="hmap">
+                <sc-for list="{{hairRows}}" as="hr" hint-placeholder-count="6">
+                  <div class="hrow"><span class="hpl">{{hr.name}}</span>
+                    <sc-for list="{{hr.cells}}" as="hc" hint-placeholder-count="3"><button type="button" class="hcell {{hc.cls}}" onClick="{{hc.pick}}" disabled="{{hc.off}}" aria-pressed="{{hc.on}}" title="{{hc.title}}">{{hc.text}}</button></sc-for>
+                  </div>
+                </sc-for>
+              </div>
+            </div>
+            <div class="sec">
+              <h2 class="lbl">The old hair, traced into these cells</h2>
+              <p>{{traceText}}</p>
+              <label class="fld"><span class="sl">Character</span>
+                <select value="{{traceValue}}" onChange="{{traceSet}}">
+                  <sc-for list="{{traceOpts}}" as="o" hint-placeholder-count="6"><option value="{{o.id}}">{{o.name}}</option></sc-for>
+                </select>
+              </label>
+              <div class="timgs">
+                <img src="{{traceOld}}" width="112" height="112" alt="{{traceAltOld}}">
+                <img src="{{tracePlane}}" width="112" height="112" alt="{{traceAltPlane}}">
+              </div>
+              <div class="hmap">
+                <sc-for list="{{traceRows}}" as="tr" hint-placeholder-count="6">
+                  <div class="hrow"><span class="hpl">{{tr.name}}</span>
+                    <sc-for list="{{tr.cells}}" as="tc" hint-placeholder-count="3"><span class="tcell" style="background: {{tc.css}}" title="{{tc.title}}">{{tc.text}}</span></sc-for>
+                  </div>
+                </sc-for>
+              </div>
+              <button type="button" class="btn" onClick="{{traceLoad}}" disabled="{{traceLoadOff}}">Put this hair on the mannequin</button>
+            </div>
+          </sc-if>
+          <sc-if value="{{hasFall}}" hint-placeholder-val="{{false}}">
+            <div class="sec">
+              <h2 class="lbl">Fall (hanging chain)</h2>
+              <p>The lower points of the back hair hang from the root: stiff at the root, free at the end, keeping their length. The writer picks the side; the admin sets the strength limit.</p>
+              <div class="chips">
+                <sc-for list="{{fallSides}}" as="f" hint-placeholder-count="4"><button type="button" class="chip {{f.cls}}" onClick="{{f.pick}}" aria-pressed="{{f.on}}">{{f.name}}</button></sc-for>
+              </div>
+              <label class="slr"><span class="sl">Strength</span><input type="range" min="0" max="100" step="1" value="{{fallVal}}" onInput="{{fallSet}}" onChange="{{fallSet}}"><span class="sv">{{fallText}}</span></label>
+            </div>
+          </sc-if>
+          <div class="sec">
+            <h2 class="lbl">Links between points</h2>
+            <sc-for list="{{links}}" as="l" hint-placeholder-count="2">
+              <div class="stp"><span class="sl">{{l.text}}</span><button type="button" class="btn" onClick="{{l.unlink}}">Unlink</button></div>
+            </sc-for>
+            <sc-if value="{{noLinks}}" hint-placeholder-val="{{false}}"><p class="hint">No point of this group is linked. Select a point on the Shape tab to weld it.</p></sc-if>
+          </div>
+        </sc-if>
+
+        <!-- ---------- Forms ---------- -->
+        <sc-if value="{{tabForms}}" hint-placeholder-val="{{false}}">
+          <sc-if value="{{isClass}}" hint-placeholder-val="{{false}}">
+            <div class="sec">
+              <h2 class="lbl">Class</h2>
+              <p>{{classText}}</p>
+              <div class="chips">
+                <button type="button" class="chip {{syncCls}}" onClick="{{stayInSync}}" aria-pressed="{{syncOn}}">Stay in sync</button>
+                <button type="button" class="chip {{detachCls}}" onClick="{{detach}}" aria-pressed="{{detachOn}}">Detach (copy once)</button>
+              </div>
+            </div>
+          </sc-if>
+          <sc-for list="{{axes}}" as="x" hint-placeholder-count="2">
+            <div class="sec">
+              <h2 class="lbl">{{x.name}}</h2>
+              <div class="fcards">
+                <sc-for list="{{x.opts}}" as="o" hint-placeholder-count="4">
+                  <button type="button" class="fcard {{o.cls}}" onClick="{{o.pick}}" aria-pressed="{{o.on}}"><img src="{{o.uri}}" alt=""><span>{{o.name}}</span></button>
+                </sc-for>
+              </div>
+              <div class="chips"><button type="button" class="btn" onClick="{{x.add}}">Add a form from the current one</button></div>
+            </div>
+          </sc-for>
+          <sc-if value="{{noAxes}}" hint-placeholder-val="{{false}}">
+            <div class="sec"><p class="hint">{{noAxesText}}</p></div>
+          </sc-if>
+          <sc-if value="{{hasPresets}}" hint-placeholder-val="{{false}}">
+            <sc-for list="{{presetGroups}}" as="pg" hint-placeholder-count="2">
+              <div class="sec">
+                <h2 class="lbl">{{pg.name}} presets</h2>
+                <p class="mini">{{pg.note}}</p>
+                <div class="chips"><sc-for list="{{pg.chips}}" as="c" hint-placeholder-count="4"><button type="button" class="chip {{c.cls}}" onClick="{{c.pick}}" aria-pressed="{{c.on}}">{{c.name}}</button></sc-for></div>
+              </div>
+            </sc-for>
+          </sc-if>
+          <sc-if value="{{hasStyles}}" hint-placeholder-val="{{false}}">
+            <div class="sec">
+              <h2 class="lbl">Styles of {{styleName}}</h2>
+              <p class="mini">A style is a named look of every setting of this class: its forms, its sliders, which of its parts are on and the colours of its parts. The writer picks one in one click, and can save styles of their own.</p>
+              <div class="chips">
+                <sc-for list="{{styleChips}}" as="c" hint-placeholder-count="4"><button type="button" class="chip {{c.cls}}" onClick="{{c.pick}}" aria-pressed="{{c.on}}">{{c.name}}</button></sc-for>
+                <button type="button" class="btn" onClick="{{saveStyle}}">Save the current look as a style</button>
+              </div>
+            </div>
+          </sc-if>
+          <sc-if value="{{hasPoses}}" hint-placeholder-val="{{false}}">
+            <div class="sec">
+              <h2 class="lbl">Poses</h2>
+              <p class="mini">A pose is a preset of the joint sliders. The writer picks one per group.</p>
+              <div class="chips">
+                <sc-for list="{{poses}}" as="p" hint-placeholder-count="4"><button type="button" class="chip {{p.cls}}" onClick="{{p.pick}}">{{p.name}}</button></sc-for>
+                <button type="button" class="btn" onClick="{{savePose}}">Save the current sliders as a pose</button>
+              </div>
+            </div>
+          </sc-if>
+          <div class="sec">
+            <h2 class="lbl">Back view</h2>
+            <p>{{backText}}</p>
+          </div>
+        </sc-if>
+
+        <!-- ---------- Ranges ---------- -->
+        <sc-if value="{{tabRanges}}" hint-placeholder-val="{{false}}">
+          <sc-for list="{{ranges}}" as="r" hint-placeholder-count="3">
+            <div class="rng">
+              <div class="stp"><span class="nm sl">{{r.name}}</span><span class="tagline">{{r.scope}}</span></div>
+              <p class="mini">{{r.drives}}</p>
+              <label class="slr"><span class="sl">Try it</span><input type="range" min="{{r.min}}" max="{{r.max}}" step="{{r.step}}" value="{{r.val}}" onInput="{{r.set}}" onChange="{{r.set}}"><span class="sv">{{r.valText}}</span></label>
+              <div class="three">
+                <div class="stp"><span class="sl">Min</span><span class="sv">{{r.minText}}</span><span class="btnrow"><button type="button" class="sb" onClick="{{r.minDec}}" aria-label="Lower the minimum of {{r.name}}">−</button><button type="button" class="sb" onClick="{{r.minInc}}" aria-label="Raise the minimum of {{r.name}}">+</button></span></div>
+                <div class="stp"><span class="sl">Default</span><span class="sv">{{r.defText}}</span><span class="btnrow"><button type="button" class="sb" onClick="{{r.defDec}}" aria-label="Lower the default of {{r.name}}">−</button><button type="button" class="sb" onClick="{{r.defInc}}" aria-label="Raise the default of {{r.name}}">+</button></span></div>
+                <div class="stp"><span class="sl">Max</span><span class="sv">{{r.maxText}}</span><span class="btnrow"><button type="button" class="sb" onClick="{{r.maxDec}}" aria-label="Lower the maximum of {{r.name}}">−</button><button type="button" class="sb" onClick="{{r.maxInc}}" aria-label="Raise the maximum of {{r.name}}">+</button></span></div>
+              </div>
+              <div class="chips"><button type="button" class="chip {{r.scrubCls}}" onClick="{{r.scrub}}" aria-pressed="{{r.scrubOn}}" title="Sweep this slider from its minimum to its maximum and back, to see what it does">{{r.scrubText}}</button><button type="button" class="chip {{r.showCls}}" onClick="{{r.toggleShow}}" aria-pressed="{{r.show}}">{{r.showText}}</button></div>
+            </div>
+          </sc-for>
+          <sc-if value="{{noRanges}}" hint-placeholder-val="{{false}}"><p class="hint">{{noRangesText}}</p></sc-if>
+          <div class="chips"><button type="button" class="btn" onClick="{{resetTest}}">Reset every test value</button></div>
+        </sc-if>
+
+        <!-- ---------- Check ---------- -->
+        <sc-if value="{{tabCheck}}" hint-placeholder-val="{{false}}">
+          <div class="sec">
+            <h2 class="lbl">Rig check</h2>
+            <p>{{checkSummary}}</p>
+            <sc-for list="{{checks}}" as="k" hint-placeholder-count="4">
+              <div class="chk {{k.cls}}"><b class="chkl">{{k.level}}</b><span>{{k.text}}</span></div>
+            </sc-for>
+          </div>
+          <div class="sec">
+            <h2 class="lbl">Limits</h2>
+            <sc-for list="{{limitRows}}" as="l" hint-placeholder-count="3">
+              <div class="stp"><span class="sl">{{l.name}}</span><span class="{{l.cls}}">{{l.value}}</span></div>
+            </sc-for>
+          </div>
+          <div class="sec">
+            <h2 class="lbl">Forms by views</h2>
+            <p class="mini">What each form shows from the front and from the back. The back is derived from the front unless a shape has a back of its own.</p>
+            <div class="vg">
+              <span class="vh">Object · form</span><span class="vh">Front</span><span class="vh">Back</span>
+              <sc-for list="{{gridRows}}" as="g" hint-placeholder-count="6">
+                <div class="vrow"><span class="vc">{{g.name}}</span><span class="vc {{g.fcls}}">{{g.front}}</span><span class="vc {{g.bcls}}">{{g.back}}</span></div>
+              </sc-for>
+            </div>
+          </div>
+        </sc-if>
+
+        <!-- ---------- Colour ---------- -->
+        <sc-if value="{{tabColour}}" hint-placeholder-val="{{false}}">
+          <sc-if value="{{noShapeColour}}" hint-placeholder-val="{{false}}"><div class="sec"><p class="hint">Pick a shape to set its colour slot and paint.</p></div></sc-if>
+          <sc-if value="{{hasShapeColour}}" hint-placeholder-val="{{true}}">
+            <div class="sec">
+              <h2 class="lbl">Colour slot</h2>
+              <div class="chips">
+                <sc-for list="{{slotChips}}" as="s" hint-placeholder-count="6"><button type="button" class="chip {{s.cls}}" onClick="{{s.pick}}" aria-pressed="{{s.on}}">{{s.name}}</button></sc-for>
+              </div>
+              <div class="chips">
+                <span class="mini" style="align-self:center">Tone</span>
+                <sc-for list="{{tones}}" as="t" hint-placeholder-count="3"><button type="button" class="chip {{t.cls}}" onClick="{{t.pick}}" aria-pressed="{{t.on}}">{{t.name}}</button></sc-for>
+              </div>
+            </div>
+            <div class="sec">
+              <h2 class="lbl">{{slotName}} presets (the admin's, used as they are)</h2>
+              <div class="swatches">
+                <sc-for list="{{presets}}" as="p" hint-placeholder-count="6"><button type="button" class="sw {{p.cls}}" style="background: {{p.css}}" onClick="{{p.pick}}" aria-label="{{p.title}}" title="{{p.title}}" aria-pressed="{{p.on}}"></button></sc-for>
+              </div>
+              <p class="mini">A preset sets its own default brightness. Pick one and the test character wears it.</p>
+            </div>
+            <div class="sec">
+              <h2 class="lbl">Or a swatch from the character's palette</h2>
+              <div class="swatches">
+                <sc-for list="{{pal}}" as="p" hint-placeholder-count="5"><button type="button" class="sw {{p.cls}}" style="background: {{p.css}}" onClick="{{p.pick}}" aria-label="{{p.title}}" title="{{p.title}}" aria-pressed="{{p.on}}"></button></sc-for>
+              </div>
+              <p class="mini">The palette lives in the character's general settings (artboard 3). Its hue and saturation are locked here; the object sets brightness and opacity. Edit the test palette and every use follows:</p>
+              <label class="slr"><span class="sl">Hue</span><input type="range" min="0" max="359" step="1" value="{{palH}}" onInput="{{palHSet}}" onChange="{{palHSet}}"><span class="sv">{{palHText}}</span></label>
+              <label class="slr"><span class="sl">Saturation</span><input type="range" min="0" max="100" step="1" value="{{palS}}" onInput="{{palSSet}}" onChange="{{palSSet}}"><span class="sv">{{palSText}}</span></label>
+            </div>
+            <div class="sec">
+              <h2 class="lbl">Brightness and opacity</h2>
+              <label class="slr"><span class="sl">Brightness</span><input type="range" min="{{lMin}}" max="{{lMax}}" step="1" value="{{lVal}}" onInput="{{lSet}}" onChange="{{lSet}}"><span class="sv">{{lText}}</span></label>
+              <label class="slr"><span class="sl">Opacity</span><input type="range" min="{{aMin}}" max="{{aMax}}" step="1" value="{{aVal}}" onInput="{{aSet}}" onChange="{{aSet}}"><span class="sv">{{aText}}</span></label>
+              <p class="mini">The writer may move these only inside the range the admin sets for this slot:</p>
+              <sc-for list="{{rangeRows}}" as="x" hint-placeholder-count="4">
+                <div class="stp"><span class="sl">{{x.label}}</span><button type="button" class="sb" onClick="{{x.dec}}" aria-label="Decrease {{x.label}}">−</button><span class="sv">{{x.text}}</span><button type="button" class="sb" onClick="{{x.inc}}" aria-label="Increase {{x.label}}">+</button></div>
+              </sc-for>
+            </div>
+            <div class="sec">
+              <h2 class="lbl">Shading tones of this colour</h2>
+              <div class="chips"><sc-for list="{{toneRows}}" as="t" hint-placeholder-count="4"><span class="tn {{t.cls}}"><i style="background: {{t.css}}"></i>{{t.text}}</span></sc-for></div>
+              <p class="mini">{{toneNote}}</p>
+              <div class="chips"><span class="mini" style="align-self:center">Shading on the figure</span><sc-for list="{{shadeLevels}}" as="b" hint-placeholder-count="3"><button type="button" class="chip {{b.cls}}" onClick="{{b.pick}}" aria-pressed="{{b.on}}">{{b.name}}</button></sc-for></div>
+            </div>
+            <div class="sec">
+              <h2 class="lbl">Paint</h2>
+              <div class="chips">
+                <button type="button" class="chip {{gradCls}}" onClick="{{gradPick}}" aria-pressed="{{gradOn}}">Gradient</button>
+                <sc-for list="{{blends}}" as="b" hint-placeholder-count="4"><button type="button" class="chip {{b.cls}}" onClick="{{b.pick}}" aria-pressed="{{b.on}}">{{b.name}}</button></sc-for>
+              </div>
+              <sc-for list="{{paintRows}}" as="x" hint-placeholder-count="2">
+                <div class="stp"><span class="sl">{{x.label}}</span><button type="button" class="sb" onClick="{{x.dec}}" aria-label="Decrease {{x.label}}">−</button><span class="sv">{{x.text}}</span><button type="button" class="sb" onClick="{{x.inc}}" aria-label="Increase {{x.label}}">+</button></div>
+              </sc-for>
+              <div class="chips"><span class="mini" style="align-self:center">Clip to</span>
+                <sc-for list="{{clips}}" as="c" hint-placeholder-count="3"><button type="button" class="chip {{c.cls}}" onClick="{{c.pick}}" aria-pressed="{{c.on}}">{{c.name}}</button></sc-for>
+              </div>
+            </div>
+          </sc-if>
+        </sc-if>
+      </div>
+    </aside>
+    </sc-if>
+  </div>
+
+  <!-- ===== the preview strip ===== -->
+  <section class="prev" aria-label="Previews">
+    <div class="prevhead">
+      <h2 class="lbl">Previews</h2>
+      <span class="mini">random bodies, forms, palettes and sizes inside the ranges</span>
+      <span class="grow"></span>
+      <button type="button" class="btn pri" onClick="{{reroll}}" title="Roll new previews">
+        <svg class="ic" viewBox="0 0 24 24" aria-hidden="true" style="width:16px;height:16px"><path d="M5 3h14a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2zM8 8h.01M16 8h.01M12 12h.01M8 16h.01M16 16h.01"/></svg>Re-roll</button>
+      <div class="crumb" role="group" aria-label="Preview mode">
+        <sc-for list="{{pmodes}}" as="m" hint-placeholder-count="3"><button type="button" class="seg {{m.cls}}" onClick="{{m.pick}}" aria-pressed="{{m.on}}" title="{{m.title}}">{{m.name}}</button></sc-for>
+      </div>
+      <div class="crumb" role="group" aria-label="Preview frame">
+        <sc-for list="{{pframes}}" as="m" hint-placeholder-count="3"><button type="button" class="seg {{m.cls}}" onClick="{{m.pick}}" aria-pressed="{{m.on}}">{{m.name}}</button></sc-for>
+      </div>
+      <div class="crumb" role="group" aria-label="Preview size">
+        <sc-for list="{{psizes}}" as="m" hint-placeholder-count="3"><button type="button" class="seg {{m.cls}}" onClick="{{m.pick}}" aria-pressed="{{m.on}}">{{m.name}}</button></sc-for>
+      </div>
+      <button type="button" class="seg {{darkCls}}" onClick="{{toggleDark}}" aria-pressed="{{darkOn}}">Dark backdrop</button>
+    </div>
+    <div class="strip">
+      <sc-for list="{{previews}}" as="p" hint-placeholder-count="8">
+        <button type="button" class="pcard" style="background: {{p.bg}}; color: {{p.ink}}" onClick="{{p.pick}}" title="Use this one as the test character">
+          <img src="{{p.uri}}" alt="{{p.alt}}" style="width: {{p.w}}px; height: {{p.h}}px">
+          <span style="width: {{p.w}}px">{{p.label}}</span>
+        </button>
+      </sc-for>
+    </div>
+  </section>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"zone":{"editor":"enum","options":["day","dawn","dusk","night"],"default":"day"},"$preview":{"width":1440,"height":1040}}'>
+const ID6 = [1, 0, 0, 1, 0, 0];
+const ZC = {
+  day:   { bg: '#d4afc2', grid: 'rgba(9,7,8,0.07)', gridS: 'rgba(9,7,8,0.15)', ink: '#090708', acc: '#4f15c1', tile: '#e4cdd9' },
+  dawn:  { bg: '#c1abb6', grid: 'rgba(9,7,8,0.07)', gridS: 'rgba(9,7,8,0.15)', ink: '#090708', acc: '#5b3b9b', tile: '#d5c6cd' },
+  dusk:  { bg: '#422433', grid: 'rgba(255,255,255,0.08)', gridS: 'rgba(255,255,255,0.18)', ink: '#ffffff', acc: '#b393f3', tile: '#6d3b54' },
+  night: { bg: '#2f2329', grid: 'rgba(255,255,255,0.08)', gridS: 'rgba(255,255,255,0.18)', ink: '#ffffff', acc: '#b39fdb', tile: '#553f4a' }
+};
+const f1 = (v) => Math.round(v * 10) / 10;
+const r2 = (v) => Math.round(v * 100) / 100;
+const KINDS = [['point', 'Point'], ['edge', 'Edge spot'], ['range', 'Range'], ['inside', 'Inside']];
+
+class Component extends DCLogic {
+  constructor(...a) {
+    super(...a);
+    const z = (this.props && this.props.zone) || 'day';
+    this.state = { rev: 0, zone: z, selKind: 'shape', selId: 'skull', tab: 'shape', view: 'front', zoom: 1, fit: 'sel', tool: 'select', mirror: true, snap: true, grid: true, ghost: false, frames: false,
+      selPt: 0, pan: { x: 0, y: 0 }, tip: '', drawer: true, emode: 'points', lock: true, prevKind: 'shape', prevId: 'skull', scrub: null, open: { 'g:body:head': true, 'g:hair:hair': true, 'o:eyes': true }, q: '', seed: 11, pmode: 'rand', psize: 'M', pdark: false, pframe: 'full', palSel: 'k1', dirty: false, ver: 3, note: '', detached: {} };
+    this.M = Mannequin.model();
+    this.cfg = Mannequin.defaultCfg(this.M);
+    this.hist = []; this.future = []; this.drag = null; this.rev = 0;
+    this.v = { x: 0, y: 0, w: 100, h: 87.5 }; this.inv = ID6.slice();
+  }
+
+  /* ----- plumbing ----- */
+  bump(dirty) { this.rev += 1; const p = { rev: this.rev }; if (dirty !== false) p.dirty = true; this.setState(p); }
+  push() { this.hist.push(Mannequin.snapshot(this.M)); if (this.hist.length > 40) this.hist.shift(); this.future = []; }
+  undo() { if (!this.hist.length) return; this.future.push(Mannequin.snapshot(this.M)); Mannequin.restore(this.M, this.hist.pop()); this.bump(); }
+  redo() { if (!this.future.length) return; this.hist.push(Mannequin.snapshot(this.M)); Mannequin.restore(this.M, this.future.pop()); this.bump(); }
+
+  sel() {
+    const S = this.state, M = this.M, none = S.selKind === 'none', kind = none ? S.prevKind : S.selKind, id = none ? S.prevId : S.selId;
+    let g = null, o = null, s = null, shapes = [];
+    if (kind === 'group') { g = id; o = (M.groupById[g].objects || [])[0] || null; shapes = Mannequin.groupShapes(M, g).filter((x) => !M.shapes[x].mirrorOf); }
+    else if (kind === 'object') { o = id; const gr = M.groups.filter((x) => x.objects.indexOf(o) >= 0)[0]; g = gr ? gr.id : null; shapes = M.objects[o].shapes.filter((x) => !M.shapes[x].mirrorOf); }
+    else { s = id; o = M.objOfShape[s] || null; g = M.groupOfShape[s] || null; shapes = [s]; }
+    return { kind: kind, g, o, s, shapes, none };
+  }
+  list() { const s = this.sel().s; return s ? Mannequin.ptsOf(this.M, s, this.cfg, this.state.view) : null; }
+  mirrorActive() { const s = this.sel().s; return !!(s && this.state.mirror && this.M.shapes[s].mirror); }
+  selPt() { const l = this.list(); return l ? Math.min(this.state.selPt, l.length - 1) : 0; }
+  opsActive(sid) {
+    const M = this.M, sh = M.shapes[sid];
+    for (const r of M.ranges) {
+      const d = (this.cfg.val[r.id] != null ? this.cfg.val[r.id] : r.def) - r.def;
+      if (!d) continue;
+      for (const op of r.ops) if (op.shapes.indexOf(sid) >= 0 || (sh.mirrorOf && op.shapes.indexOf(sh.mirrorOf) >= 0)) return r;
+    }
+    return null;
+  }
+  local(e) {
+    const rc = e.currentTarget.closest('.stage').getBoundingClientRect(), v = this.v;
+    return [v.x + (e.clientX - rc.left) / rc.width * v.w, v.y + (e.clientY - rc.top) / rc.height * v.h];
+  }
+  toAuthored(e) { const p = this.local(e), q = Mannequin.math.ap(this.inv, p[0], p[1]); return q; }
+
+  /* ----- selection and tree ----- */
+  pickSel(kind, id) {
+    return () => {
+      const open = Object.assign({}, this.state.open), M = this.M;
+      if (kind === 'shape') { const o = M.objOfShape[id], lay = o && M.objects[o].layer, gr = o && M.groups.filter((x) => x.objects.indexOf(o) >= 0)[0]; if (o) open['o:' + o] = true; if (gr) open['g:' + lay + ':' + gr.id] = true; if (lay) open['l:' + lay] = true; }
+      if (kind === 'object') { const gr = M.groups.filter((x) => x.objects.indexOf(id) >= 0)[0], lay = M.objects[id].layer; if (gr) open['g:' + lay + ':' + gr.id] = true; open['l:' + lay] = true; }
+      this.setState({ selKind: kind, selId: id, selPt: 0, open: open, note: '', tip: '', pan: { x: 0, y: 0 } });
+    };
+  }
+  tree() {
+    const M = this.M, S = this.state, q = S.q.trim().toLowerCase(), rows = [];
+    const has = (t) => !q || t.toLowerCase().indexOf(q) >= 0;
+    const ids = (ob) => ob.shapes.filter((id) => !M.shapes[id].mirrorOf);
+    const shd = (ob) => (ob.shade || []).filter((id) => !M.shapes[id].mirrorOf);
+    const toggle = (key, now) => () => this.setState({ open: Object.assign({}, S.open, { [key]: !now }) });
+    [['body', 'Body'], ['clothing', 'Clothing'], ['hair', 'Hair']].forEach((L) => {
+      const lid = L[0], lname = L[1];
+      const objsIn = (g) => g.objects.map((id) => M.objects[id]).filter((ob) => ob.layer === lid);
+      const matches = (g, ob) => has(g.name) || has(ob.name) || ids(ob).some((id) => has(M.shapes[id].name));
+      const groups = M.groups.filter((g) => !g.hidden && objsIn(g).some((ob) => matches(g, ob)));
+      if (!groups.length) return;
+      const lKey = 'l:' + lid, lOpen = q ? true : S.open[lKey] !== false, lShown = !this.cfg.hidden['layer:' + lid];
+      const count = groups.reduce((n, g) => n + objsIn(g).length, 0);
+      rows.push({ cls: '', pad: 4, noKids: false, caretCls: lOpen ? 'open' : '', toggle: toggle(lKey, lOpen), toggleLabel: (lOpen ? 'Collapse the ' : 'Expand the ') + lname.toLowerCase() + ' layer', isOpen: lOpen,
+        pick: toggle(lKey, lOpen), current: false, isShape: false, thumb: '', nameCls: 'g', name: lname, hasTag: true, tag: count + (count === 1 ? ' object' : ' objects'),
+        hasEye: true, noEye: false, eyeCls: lShown ? '' : 'off', eye: () => { this.cfg.hidden['layer:' + lid] = lShown; this.bump(false); }, eyeLabel: (lShown ? 'Hide the ' : 'Show the ') + lname.toLowerCase() + ' layer', shown: lShown });
+      if (!lOpen) return;
+      groups.forEach((g) => {
+        const objs = objsIn(g).filter((ob) => matches(g, ob));
+        const gKey = 'g:' + lid + ':' + g.id, gOpen = q ? true : !!S.open[gKey];
+        const pair = M.groups.some((x) => x.mirrorOf === g.id), shown = !this.cfg.hidden[g.id];
+        rows.push({ cls: (S.selKind === 'group' && S.selId === g.id) ? 'on' : '', pad: 20, noKids: !objs.length, caretCls: gOpen ? 'open' : '', toggle: toggle(gKey, gOpen), toggleLabel: (gOpen ? 'Collapse ' : 'Expand ') + g.name, isOpen: gOpen,
+          pick: this.pickSel('group', g.id), current: S.selKind === 'group' && S.selId === g.id, isShape: false, thumb: '', nameCls: 'g', name: g.name, hasTag: pair, tag: 'L·R',
+          hasEye: true, noEye: false, eyeCls: shown ? '' : 'off', eye: () => { this.cfg.hidden[g.id] = shown; this.bump(false); }, eyeLabel: (shown ? 'Hide ' : 'Show ') + g.name, shown: shown });
+        if (!gOpen) return;
+        objs.forEach((ob) => {
+          const oKey = 'o:' + ob.id, oOpen = q ? true : !!S.open[oKey], oShown = !this.cfg.hidden[ob.id];
+          rows.push({ cls: (S.selKind === 'object' && S.selId === ob.id) ? 'on' : '', pad: 36, noKids: ids(ob).length + shd(ob).length < 2, caretCls: oOpen ? 'open' : '', toggle: toggle(oKey, oOpen), toggleLabel: (oOpen ? 'Collapse ' : 'Expand ') + ob.name, isOpen: oOpen,
+            pick: this.pickSel('object', ob.id), current: S.selKind === 'object' && S.selId === ob.id, isShape: false, thumb: '', nameCls: '', name: ob.name, hasTag: !!ob.cls || !!ob.joint || ob.axes.length > 0 || shd(ob).length > 0, tag: [ob.joint ? 'joint' : '', ob.cls ? 'class' : ob.axes.length ? 'forms' : '', shd(ob).length ? shd(ob).length + '/' + Mannequin.limits.shade + ' shading' : ''].filter(Boolean).join(' · '),
+            hasEye: true, noEye: false, eyeCls: oShown ? '' : 'off', eye: () => { this.cfg.hidden[ob.id] = oShown; this.bump(false); }, eyeLabel: (oShown ? 'Hide ' : 'Show ') + ob.name, shown: oShown });
+          if (!oOpen) return;
+          ids(ob).forEach((id) => {
+            const sh = M.shapes[id];
+            if (q && !has(sh.name) && !has(ob.name) && !has(g.name)) return;
+            const hasR = Object.keys(M.shapes).some((k) => M.shapes[k].mirrorOf === id);
+            rows.push({ cls: (S.selKind === 'shape' && S.selId === id) ? 'on' : '', pad: 56, noKids: true, caretCls: '', toggle: () => {}, toggleLabel: '', isOpen: false,
+              pick: this.pickSel('shape', id), current: S.selKind === 'shape' && S.selId === id, isShape: true, thumb: this.thumbOf(id), nameCls: '', name: sh.name, hasTag: hasR || !!sh.mirror || sh.view !== 'both' || !!sh.loose, tag: sh.loose ? 'draped' : hasR ? 'L·R' : sh.mirror ? 'sym' : sh.view,
+              hasEye: false, noEye: true, eyeCls: '', eye: () => {}, eyeLabel: 'No visibility toggle for a shape', shown: true });
+          });
+          shd(ob).forEach((id) => {
+            const sh = M.shapes[id];
+            if (q && !has(sh.name) && !has(ob.name) && !has(g.name)) return;
+            rows.push({ cls: (S.selKind === 'shape' && S.selId === id) ? 'on' : '', pad: 56, noKids: true, caretCls: '', toggle: () => {}, toggleLabel: '', isOpen: false,
+              pick: this.pickSel('shape', id), current: S.selKind === 'shape' && S.selId === id, isShape: true, thumb: this.thumbOf(id), nameCls: '', name: sh.name, hasTag: true, tag: sh.shade.kind,
+              hasEye: false, noEye: true, eyeCls: '', eye: () => {}, eyeLabel: 'No visibility toggle for a shape', shown: true });
+          });
+        });
+      });
+    });
+    return rows;
+  }
+  thumbOf(id) {
+    const M = this.M, list = Mannequin.ptsOf(M, id, this.cfg, 'front'), sh = M.shapes[id];
+    const base = Mannequin.colour(M, this.cfg, sh.cell ? sh.slot + ':' + sh.cell : sh.slot, sh.tone);
+    const col = sh.hex ? sh.hex : Mannequin.css(sh.shade ? Mannequin.tone(base, sh.shade.kind, sh.shade.t == null ? 0.12 : sh.shade.t) : base);
+    return Mannequin.pathUri(list, true, col);
+  }
+
+  /* ----- the canvas ----- */
+  canvas(res) {
+    const M = this.M, S = this.state, mq = Mannequin, sel = this.sel(), z = ZC[S.zone];
+    const sid = sel.s, shp = sid ? M.shapes[sid] : null, view = S.view;
+    // what is in focus
+    const none = !!sel.none, focus = {}; if (!none) sel.shapes.forEach((id) => { focus[id] = 1; Object.keys(M.shapes).forEach((k) => { if (M.shapes[k].mirrorOf === id) focus[k] = 1; }); });
+    // the view
+    const box = (S.fit === 'fig' || none) ? { x: 0, y: 0, w: 200, h: 400 } : (mq.bbox(res, sel.shapes) || { x: 50, y: 0, w: 100, h: 120 });
+    const cx = box.x + box.w / 2 + S.pan.x, cy = box.y + box.h / 2 + S.pan.y;
+    let w = Math.max(box.w * 1.7, 24), h = Math.max(box.h * 1.7, 21);
+    if (w / h < 8 / 7) w = h * 8 / 7; else h = w * 7 /8;
+    w /= S.zoom; h /= S.zoom;
+    const v = { x: cx - w / 2, y: cy - h / 2, w: w, h: h }; this.v = v;
+    const u = v.w / 640, ns = 'vector-effect="non-scaling-stroke"';
+    let pre = '<rect x="' + (v.x - 1) + '" y="' + (v.y - 1) + '" width="' + (v.w + 2) + '" height="' + (v.h + 2) + '" fill="' + z.bg + '"/>';
+    if (S.grid) {
+      const step = v.w > 120 ? 10 : v.w > 40 ? 5 : 1;
+      for (let k = Math.ceil(v.x / step); k * step < v.x + v.w; k++) pre += '<line x1="' + k * step + '" y1="' + v.y + '" x2="' + k * step + '" y2="' + (v.y + v.h) + '" stroke="' + (k % 5 === 0 ? z.gridS : z.grid) + '" stroke-width="1" ' + ns + '/>';
+      for (let k = Math.ceil(v.y / step); k * step < v.y + v.h; k++) pre += '<line x1="' + v.x + '" y1="' + k * step + '" x2="' + (v.x + v.w) + '" y2="' + k * step + '" stroke="' + (k % 5 === 0 ? z.gridS : z.grid) + '" stroke-width="1" ' + ns + '/>';
+    }
+    const mirrorNow = this.mirrorActive();
+    pre += '<line x1="100" y1="' + v.y + '" x2="100" y2="' + (v.y + v.h) + '" stroke="' + z.acc + '" stroke-width="1.2" stroke-dasharray="6 5" opacity="' + (mirrorNow ? 0.95 : 0.4) + '" ' + ns + '/>';
+    if (S.frames) M.frames.filter((fr) => !fr.internal).forEach((fr) => {
+      pre += '<rect x="' + fr.x + '" y="' + fr.y + '" width="' + fr.w + '" height="' + fr.h + '" fill="none" stroke="' + z.ink + '" stroke-width="1.2" stroke-dasharray="3 4" opacity="0.7" ' + ns + '/>';
+      pre += '<text x="' + (fr.x + 2 * u) + '" y="' + (fr.y + 13 * u) + '" font-family="system-ui,sans-serif" font-size="' + 11 * u + '" font-weight="700" fill="' + z.ink + '">' + fr.name + '</text>';
+    });
+    // overlays
+    let post = '';
+    const disp = (p) => p; // fin points are already in display coordinates
+    const rs = (sid && !none) ? res.shapes[sid] : null;
+    if (sel.o && !none) M.objects[sel.o].shapes.forEach((id) => { const r = res.shapes[id]; if (r && r.helper && r.visible && r.d && id !== sid) post += '<path d="' + r.d + '" fill="none" stroke="' + z.ink + '" stroke-width="1.2" stroke-dasharray="3 3" opacity="0.85" ' + ns + '/>'; });
+    if (!none && sel.kind !== 'shape') sel.shapes.forEach((id) => { const r = res.shapes[id]; if (r && r.visible) post += '<path d="' + r.d + '" fill="none" stroke="' + z.acc + '" stroke-width="1.2" ' + ns + '/>'; });
+    if (rs && rs.visible) {
+      post += '<path d="' + rs.d + '" fill="none" stroke="' + z.acc + '" stroke-width="1.8" ' + ns + '/>';
+      Object.keys(M.shapes).forEach((k) => { if (M.shapes[k].mirrorOf === sid && res.shapes[k]) post += '<path d="' + res.shapes[k].d + '" fill="none" stroke="' + z.acc + '" stroke-width="1.2" stroke-dasharray="4 4" ' + ns + '/>'; });
+      const i = this.selPt(), p = rs.fin[i];
+      if (p) {
+        if (mq.hasOut(p.m)) post += '<line x1="' + p.x + '" y1="' + p.y + '" x2="' + p.hox + '" y2="' + p.hoy + '" stroke="' + z.acc + '" stroke-width="1.2" ' + ns + '/>';
+        if (mq.hasIn(p.m)) post += '<line x1="' + p.x + '" y1="' + p.y + '" x2="' + p.hix + '" y2="' + p.hiy + '" stroke="' + z.acc + '" stroke-width="1.2" ' + ns + '/>';
+      }
+      // the body point a draped point follows
+      const lst0 = this.list(), bp0 = lst0 && lst0[this.selPt()] && lst0[this.selPt()].bind;
+      if (bp0 && rs.fin[this.selPt()] && (bp0.e != null ? res.local[bp0.s] : (res.shapes[bp0.s] && res.shapes[bp0.s].fin[bp0.i]))) {
+        const a0 = rs.fin[this.selPt()];
+        let b0;
+        if (bp0.e != null) { const q0 = mq.edgeAt(res.local[bp0.s], bp0.e, bp0.t, 0), gm0 = mq.math.mul(res.G, res.mats[M.groupOfShape[bp0.s]] || ID6), q1 = mq.math.ap(gm0, q0[0], q0[1]); b0 = { x: q1[0], y: q1[1] }; } else b0 = res.shapes[bp0.s].fin[bp0.i];
+        post += '<line x1="' + a0.x + '" y1="' + a0.y + '" x2="' + b0.x + '" y2="' + b0.y + '" stroke="' + z.ink + '" stroke-width="1.4" stroke-dasharray="2 3" ' + ns + '/><circle cx="' + b0.x + '" cy="' + b0.y + '" r="' + 5 * u + '" fill="none" stroke="' + z.ink + '" stroke-width="1.4" ' + ns + '/>';
+      }
+      // links
+      M.links.forEach((l) => {
+        const mine = (l.a.shape === sid) ? l.a : (l.b.shape === sid) ? l.b : null; if (!mine) return;
+        const other = mine === l.a ? l.b : l.a, ro = res.shapes[other.shape], pm = rs.fin[mine.i], po = ro && ro.fin[other.i];
+        if (pm && po) post += '<line x1="' + pm.x + '" y1="' + pm.y + '" x2="' + po.x + '" y2="' + po.y + '" stroke="' + z.acc + '" stroke-width="1.2" stroke-dasharray="2 3" ' + ns + '/><circle cx="' + po.x + '" cy="' + po.y + '" r="' + 5 * u + '" fill="none" stroke="' + z.acc + '" stroke-width="1.2" ' + ns + '/>';
+      });
+    }
+    if (rs && rs.visible && S.emode === 'move') post += '<rect x="' + rs.box.x + '" y="' + rs.box.y + '" width="' + rs.box.w + '" height="' + rs.box.h + '" fill="none" stroke="' + z.acc + '" stroke-width="1.6" stroke-dasharray="6 4" ' + ns + '/>';
+    if (this.near && !none) { const gm = mq.math.mul(res.G, res.mats[M.groupOfShape[this.near.s]] || ID6), nq = mq.math.ap(gm, this.near.x, this.near.y); post += '<circle cx="' + nq[0] + '" cy="' + nq[1] + '" r="' + 7 * u + '" fill="none" stroke="' + z.ink + '" stroke-width="2" ' + ns + '/><text x="' + (nq[0] + 10 * u) + '" y="' + (nq[1] - 8 * u) + '" font-family="system-ui,sans-serif" font-size="' + 11 * u + '" font-weight="700" fill="' + z.ink + '">lock to ' + M.shapes[this.near.s].name + '</text>'; }
+    // the pivot and anchor of the group
+    if (!none && sel.g && res.pivots[sel.g]) {
+      const pv = mq.math.ap(res.G, res.pivots[sel.g][0], res.pivots[sel.g][1]), r = 6 * u, grp = M.groupById[sel.g];
+      post += '<circle cx="' + pv[0] + '" cy="' + pv[1] + '" r="' + r + '" fill="none" stroke="' + z.ink + '" stroke-width="1.6" ' + ns + '/><path d="M' + (pv[0] - 10 * u) + ' ' + pv[1] + 'H' + (pv[0] + 10 * u) + 'M' + pv[0] + ' ' + (pv[1] - 10 * u) + 'V' + (pv[1] + 10 * u) + '" stroke="' + z.ink + '" stroke-width="1.6" ' + ns + '/>';
+      if (grp.attach) post += '<path d="M' + pv[0] + ' ' + (pv[1] - 9 * u) + 'L' + (pv[0] + 9 * u) + ' ' + pv[1] + 'L' + pv[0] + ' ' + (pv[1] + 9 * u) + 'L' + (pv[0] - 9 * u) + ' ' + pv[1] + 'Z" fill="none" stroke="' + z.acc + '" stroke-width="1.6" ' + ns + '/>';
+      post += '<text x="' + (pv[0] + 12 * u) + '" y="' + (pv[1] - 8 * u) + '" font-family="system-ui,sans-serif" font-size="' + 11 * u + '" font-weight="700" fill="' + z.ink + '">pivot: ' + grp.name + (grp.attach ? ' (attached)' : '') + '</text>';
+    }
+    // ghost of the other view
+    if (S.ghost && !none) {
+      const other = Mannequin.solve(M, this.cfg, view === 'front' ? 'back' : 'front');
+      sel.shapes.forEach((id) => { const r = other.shapes[id]; if (r && r.visible) post += '<path d="' + r.d + '" fill="none" stroke="' + z.ink + '" stroke-width="1.2" stroke-dasharray="5 4" opacity="0.7" ' + ns + '/>'; });
+    }
+    const hide = Object.keys(this.cfg.hidden).filter((k) => this.cfg.hidden[k]);
+    M.groups.forEach((g) => { if (g.mirrorOf && this.cfg.hidden[g.mirrorOf]) hide.push(g.id); });
+    const svg = Mannequin.svg(M, res, { frame: v, w: 640, h: 560, pre: pre, post: post, dim: none ? null : focus, hide: hide });
+    return { uri: Mannequin.uri(svg), sel: sel };
+  }
+
+  pointOverlay(res) {
+    const M = this.M, S = this.state, sel = this.sel(), sid = sel.s;
+    const out = { pts: [], knobs: [], note: '', reset: false };
+    if (!sid || sel.none) { out.note = ''; return out; }
+    const rs = res.shapes[sid];
+    if (!this.list().length) { out.note = '“' + M.shapes[sid].name + '” has no points in the form that is selected now. Choose the form that uses it on the Forms tab.'; return out; }
+    if (!rs || !rs.visible) { out.note = 'This shape is not drawn in the ' + S.view + ' view (it is a ' + M.shapes[sid].view + '-only shape). Switch the view to edit it.'; return out; }
+    const act = this.opsActive(sid);
+    if (act) { out.note = '“' + act.name + '” is away from its default, so the points are hidden. The points are edited in the default pose.'; out.reset = true; return out; }
+    const list = this.list(), v = this.v, mq = Mannequin, i0 = this.selPt();
+    const mir = this.mirrorActive(), tw = mir ? mq.twinIndex(list, i0, 100) : i0;
+    const grp = M.groupById[sel.g]; const full = mq.math.mul(res.G, res.mats[grp ? M.groupOfShape[sid] : sel.g] || ID6);
+    this.inv = mq.inv(full);
+    if (S.emode === 'move') { out.note = 'Move shape: drag the shape on the canvas (a symmetric shape moves up and down only). Points locked to an edge stay on their edge. Right-click the shape for the next mode.'; return out; }
+    rs.fin.forEach((p, i) => {
+      const lk = mq.linkOf(M, sid, i);
+      out.pts.push({ cls: 'pm-' + p.m + (i === i0 ? ' on' : '') + (mir && i === tw && tw !== i0 ? ' twin' : '') + (list[i].bind && list[i].bind.e != null ? ' locked' : (lk || list[i].bind ? ' linked' : '')), left: f1((p.x - v.x) / v.w * 100), top: f1((p.y - v.y) / v.h * 100),
+        label: 'Point ' + (i + 1) + ' of ' + rs.fin.length + ', ' + mq.modeName[p.m].toLowerCase() + (lk ? ', linked' : '') + (list[i].bind && list[i].bind.e != null ? ', locked to an edge' : ''), down: this.ptDown(i), key: this.ptKey(i) });
+    });
+    const p = rs.fin[i0];
+    if (p && S.tool !== 'delete') {
+      if (mq.hasOut(p.m)) out.knobs.push({ left: f1((p.hox - v.x) / v.w * 100), top: f1((p.hoy - v.y) / v.h * 100), label: 'Out handle of point ' + (i0 + 1), down: this.knobDown(i0, 'ho') });
+      if (mq.hasIn(p.m)) out.knobs.push({ left: f1((p.hix - v.x) / v.w * 100), top: f1((p.hiy - v.y) / v.h * 100), label: 'In handle of point ' + (i0 + 1), down: this.knobDown(i0, 'hi') });
+    }
+    return out;
+  }
+
+  /* ----- pointer work on the canvas ----- */
+  ptDown(i) {
+    return (e) => {
+      e.stopPropagation();
+      const S = this.state, sid = this.sel().s, list = this.list(); if (!sid || !list) return;
+      if (S.tool === 'delete') { this.push(); Mannequin.delPoint(list, i, { mirror: this.mirrorActive(), min: 3 }); this.setState({ selPt: 0 }); this.bump(); return; }
+      this.push();
+      this.drag = { kind: 'pt', i: i, twin: this.mirrorActive() ? Mannequin.twinIndex(list, i, 100) : null };
+      try { e.currentTarget.setPointerCapture(e.pointerId); } catch (err) { /* not everywhere */ }
+      this.setState({ selPt: i });
+    };
+  }
+  knobDown(i, which) {
+    return (e) => {
+      e.stopPropagation(); if (!this.list()) return;
+      this.push();
+      this.drag = { kind: 'h', i: i, which: which, twin: this.mirrorActive() ? Mannequin.twinIndex(this.list(), i, 100) : null };
+      try { e.currentTarget.setPointerCapture(e.pointerId); } catch (err) { /* not everywhere */ }
+    };
+  }
+  ptKey(i) {
+    return (e) => {
+      const d = { ArrowLeft: [-1, 0], ArrowRight: [1, 0], ArrowUp: [0, -1], ArrowDown: [0, 1] }[e.key]; if (!d) return;
+      e.preventDefault();
+      const list = this.list(), sid = this.sel().s; if (!list) return;
+      const st = e.shiftKey ? 2 : 0.5, p = list[i], back = this.state.view === 'back' ? -1 : 1;
+      this.push();
+      const tw = this.mirrorActive() ? Mannequin.twinIndex(list, i, 100) : null;
+      if (p.bind && p.bind.e != null) { p.bind.t = Math.max(0, Math.min(1, Math.round((p.bind.t + d[0] * st * 0.04 * back) * 100) / 100)); p.bind.o = Math.round((p.bind.o - d[1] * st) * 10) / 10; if (tw != null && tw !== i && list[tw].bind) list[tw].bind = Mannequin.mirrorEdge(p.bind, this.M.shapes[p.bind.s].pts.length); }
+      else if (p.bind) Mannequin.moveBound(p, d[0] * st * back, d[1] * st);
+      else { Mannequin.movePoint(list, i, p.x + d[0] * st * back, p.y + d[1] * st, { mirror: this.mirrorActive(), twin: tw, snap: false }); Mannequin.propagate(this.M, sid, i, this.cfg, this.state.view); }
+      this.setState({ selPt: i }); this.bump();
+    };
+  }
+  stageDown(e) {
+    const S = this.state, M = this.M, sel = this.sel(), p = this.local(e);
+    if (e.button === 2) { this.rightDown(e, p); return; }
+    if (S.tool === 'add' && sel.s && this.list()) {
+      const list = this.list(), q = Mannequin.math.ap(this.inv, p[0], p[1]);
+      if (list.length >= Mannequin.limits.pointsMax) { this.setState({ tip: 'This shape is at the limit of ' + Mannequin.limits.pointsMax + ' points.' }); return; }
+      let best = 0, bd = 1e9; const n = list.length;
+      for (let i = 0; i < n; i++) { const a = list[i], b = list[(i + 1) % n], mx = (a.x + b.x) / 2, my = (a.y + b.y) / 2, d = Math.hypot(mx - q[0], my - q[1]); if (d < bd) { bd = d; best = i; } }
+      this.push();
+      const ni = Mannequin.addPoint(list, best, { mirror: this.mirrorActive() });
+      const tw = this.mirrorActive() ? Mannequin.twinIndex(list, ni, 100) : null;
+      Mannequin.movePoint(list, ni, q[0], q[1], { mirror: this.mirrorActive(), twin: tw, snap: S.snap });
+      this.setState({ selPt: ni }); this.bump();
+      return;
+    }
+    // select: the shape under the pointer (in Move shape mode, a drag on the selected shape moves it)
+    const res = Mannequin.solve(M, this.cfg, S.view), id = Mannequin.hit(res, p[0], p[1]);
+    if (S.emode === 'move' && !sel.none && sel.s && id && (id === sel.s || M.shapes[id].mirrorOf === sel.s)) {
+      this.push(); this.drag = { kind: 'shape', last: Mannequin.math.ap(this.inv, p[0], p[1]) };
+      try { e.currentTarget.setPointerCapture(e.pointerId); } catch (err) { /* not everywhere */ }
+      return;
+    }
+    if (id) { const src = M.shapes[id].mirrorOf || id; this.pickSel('shape', src)(); }
+  }
+  // right button: a click on the grid unselects everything (the end result); a click on a part selects it in the point editor, again: move the shape, again: unselect;
+  // a drag on the grid moves the view; a drag on a part tilts it about its pivot, inside the range the admin set
+  rightDown(e, p) {
+    const S = this.state, M = this.M, mq = Mannequin, res = mq.solve(M, this.cfg, S.view), id = mq.hit(res, p[0], p[1]);
+    try { e.currentTarget.setPointerCapture(e.pointerId); } catch (err) { /* not everywhere */ }
+    const src = id ? (M.shapes[id].mirrorOf || id) : null;
+    let tilt = null;
+    if (id) {
+      const hg = res.shapes[id].group, grp = M.groupById[hg], base = grp.mirrorOf ? M.groupById[grp.mirrorOf] : grp, rot = base.rot;
+      if (rot) { const pv = mq.math.ap(res.G, res.pivots[hg][0], res.pivots[hg][1]), r = M.rangeById[rot.slider]; tilt = { slider: rot.slider, gain: rot.k * (grp.mirrorOf ? -1 : 1) * (S.view === 'back' ? -1 : 1), pivot: pv, a0: Math.atan2(p[1] - pv[1], p[0] - pv[0]), v0: this.cfg.val[rot.slider] != null ? this.cfg.val[rot.slider] : r.def, r: r }; }
+    }
+    this.drag = { kind: 'rclick', x: e.clientX, y: e.clientY, px: S.pan.x, py: S.pan.y, moved: false, id: src, tilt: tilt };
+  }
+  stageMove(e) {
+    const d = this.drag; if (!d) return;
+    if (d.kind === 'rclick') {
+      if (!d.moved && Math.hypot(e.clientX - d.x, e.clientY - d.y) < 5) return;
+      d.moved = true;
+      if (!d.id) d.kind = 'pan';
+      else if (d.tilt) { this.pickSel('shape', d.id)(); this.push(); Object.assign(d, d.tilt, { kind: 'tilt' }); this.setState({ tip: 'Tilting with “' + d.r.name + '” (' + d.r.min + d.r.unit + ' to ' + d.r.max + d.r.unit + ').' }); }
+      else { this.pickSel('shape', d.id)(); this.setState({ tip: 'This part has no tilt range of its own: it moves with its parent.' }); this.drag = null; return; }
+    }
+    if (d.kind === 'pan') {
+      const rc = e.currentTarget.closest('.stage').getBoundingClientRect();
+      this.setState({ pan: { x: d.px - (e.clientX - d.x) / rc.width * this.v.w, y: d.py - (e.clientY - d.y) / rc.height * this.v.h } });
+      return;
+    }
+    if (d.kind === 'tilt') {
+      const p = this.local(e), a = Math.atan2(p[1] - d.pivot[1], p[0] - d.pivot[0]);
+      let da = (a - d.a0) * 180 / Math.PI; da = ((da + 540) % 360) - 180;
+      this.cfg.val[d.slider] = Math.round(Math.max(d.r.min, Math.min(d.r.max, d.v0 + da / d.gain)) * 10) / 10;
+      this.bump(false);
+      return;
+    }
+    const sid = this.sel().s, list = this.list(); if (!sid || !list) return;
+    const q = this.toAuthored(e), o = { mirror: this.mirrorActive(), twin: d.twin, snap: this.state.snap };
+    if (d.kind === 'shape') {
+      let dx = q[0] - d.last[0], dy = q[1] - d.last[1];
+      if (this.mirrorActive()) dx = 0;
+      Mannequin.moveShape(list, dx, dy); d.last = [d.last[0] + dx, d.last[1] + dy]; this.bump();
+      return;
+    }
+    if (d.kind === 'pt' && list[d.i].bind && list[d.i].bind.e != null) {
+      // a point locked to an edge slides along it (and, drawn away, stands off it)
+      const bd = list[d.i].bind, tl = this.lastRes && this.lastRes.local[bd.s];
+      if (tl) {
+        const hit = Mannequin.nearestEdge(tl, q[0], q[1]);
+        if (hit) { bd.e = hit.e; bd.t = r2(hit.t); bd.o = Math.max(-12, Math.min(6, r2(hit.o))); if (Math.abs(bd.o) < 0.35) bd.o = 0; if (d.twin != null && d.twin !== d.i && list[d.twin].bind) list[d.twin].bind = Mannequin.mirrorEdge(bd, this.M.shapes[bd.s].pts.length); }
+      }
+    } else if (d.kind === 'pt' && list[d.i].bind) {
+      const fin = this.lastRes && this.lastRes.shapes[sid] && this.lastRes.shapes[sid].fin[d.i];
+      if (fin) { const cur = Mannequin.math.ap(this.inv, fin.x, fin.y), dx = q[0] - cur[0], dy = q[1] - cur[1]; Mannequin.moveBound(list[d.i], dx, dy); if (d.twin != null && d.twin !== d.i && list[d.twin].bind) Mannequin.moveBound(list[d.twin], -dx, dy); }
+    } else if (d.kind === 'pt') {
+      Mannequin.movePoint(list, d.i, q[0], q[1], o); Mannequin.propagate(this.M, sid, d.i, this.cfg, this.state.view); if (d.twin != null && d.twin !== d.i) Mannequin.propagate(this.M, sid, d.twin, this.cfg, this.state.view);
+      // near the edge of a body part: show where it would lock
+      this.near = (this.state.lock && this.lastRes && this.canLock(this.M.shapes[sid])) ? this.edgeNear(sid, list[d.i].x, list[d.i].y, 2.6, this.lastRes) : null;
+    }
+    else Mannequin.moveHandle(list, d.i, d.which, q[0], q[1], o);
+    this.bump();
+  }
+  stageUp() {
+    const d = this.drag; this.drag = null;
+    if (d && d.kind === 'rclick' && !d.moved) { this.rightClick(d.id); return; }
+    if (d && d.kind === 'pt') this.dropPoint(d);
+    if (this.near) { this.near = null; this.bump(false); }
+  }
+
+  /* ----- selection: a part, an object, a group, or nothing (the end result) ----- */
+  selTitle(sel) { const M = this.M; return sel.s ? M.shapes[sel.s].name : (sel.kind === 'object' && sel.o) ? M.objects[sel.o].name : sel.g ? M.groupById[sel.g].name : 'Nothing'; }
+  deselect(msg) {
+    const S = this.state;
+    this.setState({ selKind: 'none', prevKind: S.selKind === 'none' ? S.prevKind : S.selKind, prevId: S.selKind === 'none' ? S.prevId : S.selId, tip: msg || 'Nothing is selected: this is the end result. Click a part to select it again.', note: '' });
+  }
+  // right-click on a part: select it in the point editor; again: move the shape; again: unselect
+  rightClick(id) {
+    const S = this.state, sel = this.sel();
+    if (!id) { this.deselect(); return; }
+    const on = !sel.none && sel.kind === 'shape' && sel.s === id;
+    if (!on) { this.pickSel('shape', id)(); this.setState({ emode: 'points', tip: 'Point editor: drag points and handles. Right-click the shape again for Move shape.' }); return; }
+    if (S.emode === 'points') { this.setState({ emode: 'move', tip: 'Move shape: drag the shape. Right-click it again to unselect it.' }); return; }
+    this.setState({ emode: 'points' });
+    this.deselect('Unselected. Right-click a shape for the point editor, again for Move shape, again to unselect.');
+  }
+
+  /* ----- locking a point to the edge of a body part ----- */
+  canLock(sh) { const o = this.M.objOfShape[sh.id], lay = o && this.M.objects[o].layer; return !!(sh.shade || lay === 'clothing' || lay === 'hair'); }
+  edgeNear(sid, x, y, thr, res) {
+    const M = this.M, mq = Mannequin, sh = M.shapes[sid], g = M.groupOfShape[sid];
+    let best = null;
+    Object.keys(M.shapes).forEach((id) => {
+      const t = M.shapes[id];
+      if (id === sid || t.mirrorOf || t.helper || t.shade || M.groupOfShape[id] !== g) return;
+      const o = M.objOfShape[id]; if (!o || M.objects[o].layer !== 'body') return;
+      if (sh.mirror && !t.half) return;
+      const l = res.local[id]; if (!l || l.length < 3) return;
+      const hit = mq.nearestEdge(l, x, y);
+      if (hit && hit.dist < thr && (!best || hit.dist < best.dist)) { best = hit; best.s = id; }
+    });
+    return best;
+  }
+  lockTo(sid, list, i, twin, best) {
+    const M = this.M, mq = Mannequin, p = list[i];
+    mq.lockPoint(p, best.s, best, 0);
+    if (twin != null && twin !== i && list[twin]) list[twin].bind = mq.mirrorEdge(p.bind, M.shapes[best.s].pts.length);
+    this.setState({ tip: 'Locked to the edge of “' + M.shapes[best.s].name + '”. It follows that body part now: drag it to slide along the edge, or unlock it on the Shape tab.' });
+  }
+  dropPoint(d) {
+    const S = this.state, M = this.M, sel = this.sel(), sid = sel.s, list = this.list(), res = this.lastRes;
+    if (!S.lock || !sid || !list || !res || sel.none) return;
+    const p = list[d.i], sh = M.shapes[sid]; if (!p || p.bind || !this.canLock(sh)) return;
+    const best = this.edgeNear(sid, p.x, p.y, 2.6, res); if (!best) return;
+    this.lockTo(sid, list, d.i, d.twin, best); this.bump();
+  }
+  lockSection(sel, sh, res) {
+    const M = this.M, mq = Mannequin, out = { lockRows: [], lockText: '', lockNearOff: true, lockClearOff: true, lockNearest: () => {}, lockClear: () => {} };
+    if (!sh || !this.list() || !this.list().length) return out;
+    const list = this.list(), i = this.selPt(), p = list[i], mir = this.mirrorActive(), tw = mir ? mq.twinIndex(list, i, 100) : null;
+    const locked = !!(p.bind && p.bind.e != null), can = this.canLock(sh);
+    if (locked) {
+      const tn = M.shapes[p.bind.s] ? M.shapes[p.bind.s].name : 'a shape that no longer exists';
+      out.lockText = 'Locked to the edge of “' + tn + '”, ' + Math.round(p.bind.t * 100) + '% along edge ' + (p.bind.e + 1) + ', ' + (p.bind.o === 0 ? 'right on it' : Math.abs(p.bind.o) + (p.bind.o > 0 ? ' units outside it' : ' units inside it')) + '. It follows that part when it moves, bends or is resized' + (sh.loose ? '; “' + M.rangeById[sh.loose].name + '” scales the outside offset' : '') + '.';
+      const row = (label, text, dt, dO) => ({ label: label, text: text, dec: () => { this.push(); p.bind.t = Math.max(0, Math.min(1, Math.round((p.bind.t - dt) * 100) / 100)); p.bind.o = Math.round((p.bind.o - dO) * 10) / 10; if (tw != null && tw !== i && list[tw].bind) list[tw].bind = mq.mirrorEdge(p.bind, M.shapes[p.bind.s].pts.length); this.bump(); }, inc: () => { this.push(); p.bind.t = Math.max(0, Math.min(1, Math.round((p.bind.t + dt) * 100) / 100)); p.bind.o = Math.round((p.bind.o + dO) * 10) / 10; if (tw != null && tw !== i && list[tw].bind) list[tw].bind = mq.mirrorEdge(p.bind, M.shapes[p.bind.s].pts.length); this.bump(); } });
+      out.lockRows = [row('Along the edge', Math.round(p.bind.t * 100) + '%', 0.02, 0), row('Distance outward', f1(p.bind.o) + ' units', 0, 0.5)];
+    } else if (p.bind) {
+      out.lockText = 'This point follows point ' + (p.bind.i + 1) + ' of “' + (M.shapes[p.bind.s] ? M.shapes[p.bind.s].name : '?') + '” at a fixed offset. Drag it onto an edge to lock it to the edge instead.';
+    } else if (can) {
+      out.lockText = 'Free. Drag this point onto the edge of a body part (or press the button) and it locks there: from then on it follows that edge.';
+    } else {
+      out.lockText = 'Body shapes are not locked to other shapes: they are the base. Link points with Weld or Follow above. Clothing, hair and shading shapes can lock to a body part’s edge.';
+    }
+    out.lockNearOff = !can || locked;
+    out.lockClearOff = !locked;
+    out.lockNearest = () => {
+      const q = this.edgeNear(sh.id, p.x, p.y, 6, this.lastRes);
+      if (!q) { this.setState({ note: 'No body part edge lies within 6 units of this point. Drag it nearer first.' }); return; }
+      this.push(); this.lockTo(sh.id, list, i, tw, q); this.setState({ note: '' }); this.bump();
+    };
+    out.lockClear = () => { this.push(); mq.unlockPoint(p); if (tw != null && tw !== i && list[tw]) mq.unlockPoint(list[tw]); this.bump(); };
+    return out;
+  }
+
+  /* ----- shading layers ----- */
+  shadeSection(sel, sh, ob) {
+    const M = this.M, mq = Mannequin, L = mq.limits, out = { isShade: false, shadeText: '', shadeKinds: [], shadeRows: [], shadeAdd: [], shadeDelOff: true, shadeDel: () => {} };
+    if (!ob) { out.shadeText = 'Select a shape to see the shading of its object.'; return out; }
+    const own = (ob.shade || []).filter((id) => !M.shapes[id].mirrorOf), n = own.length;
+    out.shadeText = '“' + ob.name + '” has ' + n + ' of ' + L.shade + ' shading shapes. They lie over the object (its base colour is filled once) in one tone step of it: a shadow is the old drawing’s shade(colour, amount), at the shape’s own opacity. Shapes made from the old drawing are drawn as they were; new ones are clipped to the object’s outline and can lock to the edge of the skin. ' + (sh && sh.shade ? 'This one is a ' + sh.shade.kind + ' of amount ' + (sh.shade.t == null ? 0.12 : sh.shade.t) + '.' : 'Select one in the tree to change its kind and amount.');
+    out.isShade = !!(sh && sh.shade);
+    const twin = sh ? Object.keys(M.shapes).filter((k) => M.shapes[k].mirrorOf === sh.id)[0] : null;
+    if (out.isShade) {
+      out.shadeKinds = [['shadow', 'Shadow'], ['mid', 'Midtone'], ['highlight', 'Highlight']].map((k) => ({ name: k[1], on: sh.shade.kind === k[0], cls: sh.shade.kind === k[0] ? 'on' : '', pick: () => { this.push(); sh.shade.kind = k[0]; if (twin) M.shapes[twin].shade.kind = k[0]; this.bump(); } }));
+      const am = sh.shade.t == null ? 0.12 : sh.shade.t, opv = sh.op == null ? 1 : sh.op;
+      const setT = (v) => { this.push(); sh.shade.t = v; if (twin) M.shapes[twin].shade.t = v; this.bump(); }, setO = (v) => { this.push(); sh.op = v; if (twin) M.shapes[twin].op = v; this.bump(); };
+      out.shadeRows = [
+        { label: 'Amount', text: String(am), dec: () => setT(Math.max(0.02, Math.round((am - 0.01) * 100) / 100)), inc: () => setT(Math.min(0.8, Math.round((am + 0.01) * 100) / 100)) },
+        { label: 'Opacity', text: Math.round(opv * 100) + '%', dec: () => setO(Math.max(0.1, Math.round((opv - 0.05) * 100) / 100)), inc: () => setO(Math.min(1, Math.round((opv + 0.05) * 100) / 100)) }
+      ];
+      out.shadeDelOff = false;
+      out.shadeDel = () => {
+        this.push();
+        [sh.id].concat(twin ? [twin] : []).forEach((id) => { Object.keys(M.objects).forEach((k) => { const o2 = M.objects[k]; if (o2.shade) o2.shade = o2.shade.filter((x) => x !== id); o2.shapes = o2.shapes.filter((x) => x !== id); }); M.ranges.forEach((r) => r.ops.forEach((op) => { op.shapes = op.shapes.filter((x) => x !== id); })); delete M.shapes[id]; });
+        mq.index(M); this.pickSel('object', ob.id)(); this.bump();
+      };
+    }
+    out.shadeAdd = [['shadow', 'Add a shadow'], ['mid', 'Add a midtone'], ['highlight', 'Add a highlight']].map((k) => ({ name: k[1], off: n >= L.shade, pick: () => this.addShade(ob, k[0]) }));
+    return out;
+  }
+  addShade(ob, kind) {
+    const M = this.M, mq = Mannequin, L = mq.limits;
+    const n = (ob.shade || []).filter((id) => !M.shapes[id].mirrorOf).length;
+    if (n >= L.shade) { this.setState({ tip: 'This object has the most shading shapes it may have (' + L.shade + ').' }); return; }
+    // the first shape of the object that has an outline now (a form such as Sleeveless can empty one)
+    const base = ob.shapes.filter((id) => !M.shapes[id].mirrorOf && !M.shapes[id].helper && mq.ptsOf(M, id, this.cfg, 'front').length >= 3)[0];
+    if (!base) { this.setState({ tip: 'This object has no outline to shade with its current form. Pick another form first.' }); return; }
+    const bl = mq.ptsOf(M, base, this.cfg, 'front'), bb = mq.boxOf(mq.flat(mq.build(bl, true, ID6), true));
+    const id = 'shd_' + this.rev + '_' + n, box = { x: bb.x + bb.w * 0.25, y: bb.y + bb.h * 0.25, w: bb.w * 0.4, h: bb.h * 0.3 };
+    this.push();
+    M.shapes[id] = { id: id, name: (kind === 'shadow' ? 'Shadow ' : kind === 'highlight' ? 'Highlight ' : 'Midtone ') + (n + 1), pts: mq.templatePts('blob', box), closed: true, z: M.shapes[base].z + 0.05, slot: M.shapes[base].slot, cell: M.shapes[base].cell, tone: 0, op: 1, view: 'both', mirrorOf: null, half: 0, side: null, back: null, shade: { kind: kind, t: kind === 'highlight' ? 0.1 : 0.12 } };
+    ob.shade = (ob.shade || []).concat([id]); mq.index(M);
+    this.pickSel('shape', id)(); this.setState({ tab: 'shape' }); this.bump();
+  }
+  toneSection(sh) {
+    const M = this.M, mq = Mannequin, out = { toneRows: [], toneNote: '', shadeLevels: [] };
+    const lv = (name, v) => { const cur = this.cfg.shadeAmt == null ? 1 : this.cfg.shadeAmt, on = Math.abs(cur - v) < 0.01; return { name: name, on: on, cls: on ? 'on' : '', pick: () => { this.cfg.shadeAmt = v; this.bump(false); } }; };
+    out.shadeLevels = [lv('Flat', 0), lv('Soft', 0.55), lv('Full', 1)];
+    if (!sh) return out;
+    const base = mq.colour(M, this.cfg, sh.cell ? sh.slot + ':' + sh.cell : sh.slot, 0);
+    let faintShadow = false;
+    out.toneRows = ['base', 'shadow', 'mid', 'highlight'].map((k) => {
+      const amt = { shadow: 0.12, mid: 0.12, highlight: 0.12 }[k], t = k === 'base' ? base : mq.tone(base, k, amt), cr = k === 'base' ? null : mq.contrast(base, t);
+      if (k === 'shadow' && cr < 1.1) faintShadow = true;
+      return { css: mq.css(t), text: k === 'base' ? 'base L ' + Math.round(base.l) : k + ' 0.12 · ' + cr.toFixed(2) + ':1', cls: cr != null && cr < 1.12 ? 'faint' : '' };
+    });
+    out.toneNote = faintShadow ? 'This colour is very dark: the old rule (shade amount 0.12) changes it so little that its shadow is faint (outlined). Raise the amount of its shadows, or add highlights.' : base.l > 90 ? 'This colour is almost white: a highlight cannot go lighter, so the shadows carry the form.' : 'These are the tone steps at amount 0.12 (the old drawing uses 0.07 to 0.5). A step under 1.12:1 from the base is outlined because it is hard to see.';
+    return out;
+  }
+
+  /* ----- hair: the head is divided by plane and side; each piece is rooted in one cell ----- */
+  hairMap(sel, gr, ob) {
+    const M = this.M, mq = Mannequin, out = { hasHairMap: false, hairText: '', hairRows: [], traceText: '', traceValue: 'default', traceOpts: [], traceOld: '', tracePlane: '', traceAltOld: '', traceAltPlane: '', traceRows: [], traceSet: () => {}, traceLoad: () => {}, traceLoadOff: true };
+    const cell = ob && ob.cell ? ob : null;
+    if (!(gr && gr.sections) && !cell) return out;
+    out.hasHairMap = true;
+    // the old hair of a character, traced into the cells (exact pieces; left, centre and right are optional, a piece spanning all three is one centre unit)
+    const chars = (typeof window !== 'undefined' && window.ExactChars) || (typeof globalThis !== 'undefined' && globalThis.ExactChars) || [], dflt = (typeof window !== 'undefined' && window.ExactDefault) || (typeof globalThis !== 'undefined' && globalThis.ExactDefault) || null;
+    const tid = this.state.traceId != null ? this.state.traceId : 'default', exDef = dflt ? { name: 'The default adult', tile: '#e6d6c3', bases: null, shapes: dflt.shapes } : null, ex = tid === 'default' ? exDef : chars[+tid];
+    out.traceValue = String(tid);
+    out.traceOpts = (exDef ? [{ id: 'default', name: 'The default adult' }] : []).concat(chars.map((c, i) => ({ id: String(i), name: c.name + ' · ' + (c.shapes.filter((s) => s.p === 'hairBack' || s.p === 'hairFront').length || 'no') + ' hair shapes' })));
+    out.traceSet = (e) => this.setState({ traceId: e.target.value });
+    if (ex) {
+      const tr = mq.traceHair(ex), n = tr.pieces.length, whole = tr.pieces.filter((t) => t.whole.length).length;
+      out.traceText = n ? n + ' exact pieces of the old drawing' + (whole ? ', ' + whole + ' of them spanning a whole plane (one centre unit; the left and right cells are covered)' : '') + '. Each piece is rooted in the cells shown; left, centre and right are each optional, and a centre alone spans all three. “Put this hair on the mannequin” replaces the old-drawing hair with these pieces (their own colour included) and shows no section.' : 'This character has no hair shapes (bald): every section is off.';
+      out.traceOld = mq.uri(mq.traceSvg(ex, tr, 'old', 112)); out.tracePlane = mq.uri(mq.traceSvg(ex, tr, 'plane', 112));
+      out.traceAltOld = ex.name + ': the old hair as drawn'; out.traceAltPlane = ex.name + ': the pieces coloured by the plane they are rooted in';
+      out.traceRows = mq.traceRows(tr);
+      out.traceLoadOff = !n;
+      out.traceLoad = () => { this.push(); mq.loadOldHair(M, this.cfg, tid === 'default' ? null : ex); this.pickSel('object', 'hairOld')(); this.bump(); };
+    }
+    const cur = cell ? cell.cell : null, sh = cell ? M.shapes[cell.shapes[0]] : null;
+    const roots = sh ? sh.pts.filter((p) => p.bind && p.bind.e != null).length : 0;
+    out.hairText = cell ? 'The section “' + cell.name.replace('Hair: ', '') + '” is rooted on the skull with ' + roots + ' points locked to its edge, and hangs free from there. Its length, cut, texture and colour are its own.' : 'The head is divided into six planes (front, top, the two sides, back, nape) and three sides (left, centre, right). Each hair piece is rooted in one cell and layered with the others, so every section can differ in length, colour, shape and texture. The side planes are one strip each. Pick a cell.';
+    out.hairRows = M.hair.planes.map((pl) => ({ name: pl[1], cells: M.hair.sides.map((sd) => {
+      const c = M.hair.cells.filter((x) => x.plane === pl[0] && x.side === sd[0])[0], off = !c;
+      return { text: c ? sd[1] : '–', title: c ? 'Hair rooted at ' + pl[1].toLowerCase() + ', ' + sd[1].toLowerCase() : pl[1] + ', ' + sd[1].toLowerCase() + ': no section here', off: off, on: !!c && cur === c.id, cls: c && cur === c.id ? 'on' : '', pick: () => { if (c) this.pickSel('object', c.obj)(); } };
+    }) }));
+    return out;
+  }
+
+  /* ----- styles of a class (a named look of every setting of an object, or of the hair) ----- */
+  stylesSection(sel, ob, gr) {
+    const M = this.M, mq = Mannequin, out = { hasStyles: false, styleName: '', styleChips: [], saveStyle: () => {} };
+    const hairGroup = sel.kind === 'group' && gr && gr.sections;
+    const kind = hairGroup ? 'group' : (ob && ob.cls ? 'object' : null);
+    if (!kind) return out;
+    const id = hairGroup ? gr.id : ob.id, oids = mq.styleOids(M, kind, id), host = hairGroup ? gr : ob;
+    out.hasStyles = true; out.styleName = hairGroup ? 'the hair' : ob.name;
+    const cur = mq.styleSnap(M, this.cfg, oids);
+    const same = (a, b) => JSON.stringify([a.val, a.forms, a.off.slice().sort()]) === JSON.stringify([b.val, b.forms, b.off.slice().sort()]);
+    out.styleChips = mq.stylesOf(M, kind, id).map((st) => { const on = same(cur, st.snap); return { name: st.name, on: on, cls: on ? 'on' : '', pick: () => { mq.applyStyle(M, this.cfg, oids, st.snap); this.bump(false); } }; });
+    out.saveStyle = () => { this.push(); host.styles = (host.styles || []).concat([{ id: 's' + this.rev, name: 'Style ' + ((host.styles || []).length + 1), snap: mq.styleSnap(M, this.cfg, oids) }]); this.bump(); };
+    return out;
+  }
+  scrubRange(r) {
+    if (this.timer) { clearInterval(this.timer); this.timer = null; const was = this.state.scrub; this.setState({ scrub: null }); if (was === r.id) return; }
+    const start = this.cfg.val[r.id] != null ? this.cfg.val[r.id] : r.def, span = r.max - r.min; let t = 0;
+    this.setState({ scrub: r.id });
+    this.timer = setInterval(() => {
+      t += 0.04;
+      if (t >= 2) { this.cfg.val[r.id] = start; clearInterval(this.timer); this.timer = null; this.setState({ scrub: null }); this.bump(false); return; }
+      this.cfg.val[r.id] = Math.round((r.min + span * (t < 1 ? t : 2 - t)) * 10) / 10; this.bump(false);
+    }, 50);
+    if (this.timer && this.timer.unref) this.timer.unref();
+  }
+  overview(res) {
+    const M = this.M, mq = Mannequin, L = mq.limits;
+    const shapes = Object.keys(M.shapes).filter((k) => !M.shapes[k].mirrorOf), shades = shapes.filter((k) => M.shapes[k].shade).length;
+    let pts = 0, locks = 0; shapes.forEach((k) => { pts += M.shapes[k].pts.length; M.shapes[k].pts.forEach((p) => { if (p.bind && p.bind.e != null) locks += 1; }); });
+    return { overviewRows: [
+      { name: 'Groups · objects', value: M.groups.filter((g) => !g.mirrorOf).length + ' · ' + Object.keys(M.objects).length, cls: '' },
+      { name: 'Shapes', value: shapes.length - shades + ' base, ' + shades + ' shading', cls: '' },
+      { name: 'Points', value: String(pts), cls: '' },
+      { name: 'Points locked to an edge', value: String(locks), cls: '' },
+      { name: 'A character’s copy', value: this.copyKB() + ' KB of ' + L.copyMaxKB + ' KB', cls: this.copyKB() >= L.copyWarnKB ? 'warn' : '' }
+    ] };
+  }
+
+  /* ----- the inspector ----- */
+  inspector(res) {
+    const M = this.M, S = this.state, mq = Mannequin, sel = this.sel(), out = {};
+    const sh = sel.s ? M.shapes[sel.s] : null, ob = sel.o ? M.objects[sel.o] : null, gr = sel.g ? M.groupById[sel.g] : null;
+    out.insKind = sel.none ? 'Nothing selected' : sh ? 'Shape' : sel.kind === 'object' ? 'Object' : 'Group';
+    out.insKindLower = (sh ? 'shape' : sel.kind === 'object' ? 'object' : 'group');
+    out.insTitle = sel.none ? 'The end result' : this.selTitle(sel);
+    out.insPath = sel.none ? 'Right-click the grid to see this at any time' : [gr && gr.name, (sel.kind !== 'group') && ob && ob.name, sh && sh.name].filter(Boolean).filter((x, i, a) => a.indexOf(x) === i).join(' › ');
+    const tags = [];
+    if (sh) { const hasR = Object.keys(M.shapes).some((k) => M.shapes[k].mirrorOf === sh.id); tags.push(hasR ? 'Pair left · right' : sh.mirror ? 'Symmetric' : 'Single'); tags.push(sh.view === 'both' ? 'Front and back' : sh.view + ' only'); tags.push(sh.closed ? 'Closed' : 'Open'); }
+    if (sh && sh.helper) tags.push('Helper: not drawn');
+    if (sh && sh.shade) tags.push('Shading: ' + sh.shade.kind);
+    if (sh && sh.loose) tags.push('Draped on the body');
+    if (ob && ob.cls) tags.push('Class');
+    if (!sel.none && sel.kind === 'group' && gr.parent) tags.push('Child of ' + M.groupById[gr.parent].name);
+    out.insTags = tags.map((t) => ({ text: t }));
+    ['Shape', 'Rig', 'Forms', 'Ranges', 'Colour', 'Check'].forEach((n) => { out['tab' + n] = S.tab === n.toLowerCase() && !sel.none; });
+    out.tabNone = !!sel.none;
+    out.tabs = ['Shape', 'Rig', 'Forms', 'Ranges', 'Colour', 'Check'].map((n) => ({ name: n, cls: S.tab === n.toLowerCase() ? 'on' : '', on: S.tab === n.toLowerCase(), pick: () => this.setState({ tab: n.toLowerCase() }) }));
+    const npts = sh ? this.list().length : 0;
+    out.hasShape = !!sh && npts > 0; out.noShape = !out.hasShape;
+    out.noShapeText = sh ? '“' + sh.name + '” has no points in the form that is selected now. Choose the form that draws it on the Forms tab.' : 'Pick a shape to edit its points. This ' + out.insKindLower + ' holds:';
+    out.childChips = sel.shapes.map((id) => ({ name: M.shapes[id].name, pick: this.pickSel('shape', id) }));
+    out.hasShapeColour = !!sh; out.noShapeColour = !sh;
+    Object.assign(out, this.shapeTab(sel, sh), this.rigTab(sel, gr, res), this.formsTab(sel, ob, gr, res), this.rangesTab(sel, gr, ob), this.colourTab(sh), this.checkTab(res), this.lockSection(sel, sh, res), this.shadeSection(sel, sh, ob), this.hairMap(sel, gr, ob), this.stylesSection(sel, ob, gr), this.toneSection(sh), this.overview(res));
+    return out;
+  }
+
+  shapeTab(sel, sh) {
+    const out = {}, M = this.M, mq = Mannequin, S = this.state;
+    const empty = { ptTitle: '', modeBtns: [], ptPos: '', linkText: '', templates: [], symText: '', viewText: '', zText: '', cutText: '', cutChips: [], helperOn: false, helperCls: '', toggleHelper: () => {} };
+    if (!sh || !this.list().length) return Object.assign(empty, { ptAdd: () => {}, ptDel: () => {}, ptReset: () => {}, ptDelOff: true, linkWeld: () => {}, linkFollow: () => {}, linkClear: () => {}, linkOff: true, symBtnOn: false, symBtn: () => {}, symBtnText: '', backBtnOn: false, backBtn: () => {}, backBtnText: '', zUp: () => {}, zDown: () => {} });
+    const list = this.list(), i = this.selPt(), p = list[i], mir = this.mirrorActive();
+    const tw = mir ? mq.twinIndex(list, i, 100) : i, opt = () => ({ mirror: mir, twin: mir ? mq.twinIndex(list, this.selPt(), 100) : null });
+    out.ptTitle = 'Point ' + (i + 1) + ' of ' + list.length;
+    out.ptPos = 'x ' + f1(p.x) + ' · y ' + f1(p.y) + (mir && tw !== i ? ' · twin is point ' + (tw + 1) : '') + (p.hi || p.ho ? ' · handles set by hand' : ' · automatic handles');
+    out.modeBtns = this.modeList();
+    out.ptAdd = () => { if (list.length >= mq.limits.pointsMax) { this.setState({ tip: 'This shape is at the limit of ' + mq.limits.pointsMax + ' points.' }); return; } this.push(); const ni = mq.addPoint(list, i, { mirror: mir }); this.setState({ selPt: ni, tip: '' }); this.bump(); };
+    out.ptDel = () => { this.push(); mq.delPoint(list, i, { mirror: mir, min: 3 }); this.setState({ selPt: Math.max(0, Math.min(i, list.length - 1)) }); this.bump(); };
+    out.ptDelOff = list.length <= 3;
+    out.ptReset = () => { this.push(); mq.resetHandles(list, i, opt()); this.bump(); };
+    const lk = mq.linkOf(M, sh.id, i);
+    out.linkText = this.state.note || (p.bind && p.bind.e == null ? 'Follows point ' + (p.bind.i + 1) + ' of “' + M.shapes[p.bind.s].name + '” at an offset of ' + p.bind.d[0] + ', ' + p.bind.d[1] + (sh.loose ? ', plus a distance outward that “' + M.rangeById[sh.loose].name + '” scales.' : '.') + ' Dragging it changes the offset.' : null) || (lk ? (lk.link.kind === 'weld' ? 'Welded to ' : 'Follows ') + M.shapes[lk.other.shape].name + ', point ' + (lk.other.i + 1) + (lk.link.kind === 'follow' ? ' at an offset of ' + lk.link.dx + ', ' + lk.link.dy : '') + '. Moving one moves the other.' : 'Not linked. Links tie a point to a point of another shape (the collar to the shirt, the neck to the shoulders).');
+    out.linkOff = !lk;
+    const mk = (kind) => () => { const n = mq.nearestPoint(M, sh.id, i, this.cfg, S.view); if (!n) { this.setState({ note: 'No point of another shape lies within 7 units of this one. Drag it close to the point you want first.' }); return; } this.push(); mq.addLink(M, { shape: sh.id, i: i }, { shape: n.shape, i: n.i }, kind, this.cfg, S.view); this.setState({ note: '' }); this.bump(); };
+    out.linkWeld = mk('weld'); out.linkFollow = mk('follow');
+    out.linkClear = () => { this.push(); mq.removeLink(M, sh.id, i); this.setState({ note: '' }); this.bump(); };
+    out.templates = mq.templateIds.map((id) => ({ name: mq.templates[id].name, uri: mq.templateUri(id, ZC[S.zone].ink), pick: () => {
+      const a = mq.build(list, true, ID6), bb = mq.boxOf(mq.flat(a, true)); this.push();
+      list.splice.apply(list, [0, list.length].concat(mq.templatePts(id, bb))); this.setState({ selPt: 0 }); this.bump();
+    } }));
+    const hasR = Object.keys(M.shapes).filter((k) => M.shapes[k].mirrorOf === sh.id)[0];
+    if (hasR) { out.symText = 'A left and right pair. Edits to this shape are mirrored to “' + M.shapes[hasR].name + '” automatically, about the centre line.'; out.symBtnOn = true; out.symBtnText = 'Break symmetry (edit the right side on its own)'; out.symBtn = () => { this.push(); mq.breakPair(M, hasR, this.cfg); mq.index(M); this.bump(); }; }
+    else if (sh.mirror) { out.symText = 'Symmetric about the centre line (x = 100). With mirror editing on, a point and its twin move together; turn it off to make this shape asymmetric.'; out.symBtnOn = true; out.symBtnText = S.mirror ? 'Mirror editing is on: turn off' : 'Mirror editing is off: turn on'; out.symBtn = () => this.setState({ mirror: !S.mirror }); }
+    else { out.symText = 'A single shape. Symmetry is optional: the admin allows or forbids breaking it per object.'; out.symBtnOn = false; out.symBtn = () => {}; out.symBtnText = ''; }
+    const own = !!sh.back;
+    out.viewText = S.view === 'front' ? 'Front view. The back view is derived from this shape unless it has one of its own' + (own ? ' (it has: the high neckline).' : '.') : (own ? 'Back view: this shape has its own back (it overrides the front).' : 'Back view: derived from the front shape, mirrored left to right. Anchors and links are shared by both views.');
+    out.backBtnOn = sh.view === 'both';
+    out.backBtnText = own ? 'Reset the back to auto-derived' : 'Override for the back view';
+    out.backBtn = () => { this.push(); if (own) sh.back = null; else sh.back = JSON.parse(JSON.stringify(sh.pts)); this.bump(); };
+    out.zText = 'Layer ' + sh.z + ' (higher is in front)';
+    out.zUp = () => { this.push(); sh.z += 1; this.bump(); };
+    out.zDown = () => { this.push(); sh.z -= 1; this.bump(); };
+    // cutouts: other shapes cut away from this one (a boolean subtract), and a helper flag for shapes that are not drawn
+    const sibs = Object.keys(M.shapes).filter((id) => id !== sh.id && !M.shapes[id].mirrorOf && (M.objOfShape[id] === M.objOfShape[sh.id] || M.shapes[id].helper));
+    const twinOf = (id) => Object.keys(M.shapes).filter((k) => M.shapes[k].mirrorOf === id)[0];
+    const myTwin = twinOf(sh.id), cuts = sh.cut || [];
+    out.cutText = cuts.length ? 'Cut away from this shape: ' + cuts.map((c) => (M.shapes[c] ? M.shapes[c].name : c)).join(', ') + '. Whatever lies behind shows through the hole.' : 'Nothing is cut out of this shape. Cut a hole with another shape and what lies behind shows through: an open mouth, an eye between its lids, a neckline.';
+    out.helperOn = !!sh.helper; out.helperCls = sh.helper ? 'on' : '';
+    out.toggleHelper = () => { this.push(); sh.helper = !sh.helper; if (myTwin) M.shapes[myTwin].helper = sh.helper; this.bump(); };
+    out.cutChips = sibs.map((id) => { const on = cuts.indexOf(id) >= 0; return { name: M.shapes[id].name + (M.shapes[id].helper ? ' (helper)' : ''), on: on, cls: on ? 'on' : '', pick: () => {
+      this.push();
+      const set = (shp, cid) => { const arr = (shp.cut || []).slice(), k = arr.indexOf(cid); if (k >= 0) arr.splice(k, 1); else arr.push(cid); shp.cut = arr; };
+      set(sh, id); if (myTwin) set(M.shapes[myTwin], twinOf(id) || id);
+      this.bump();
+    } }; });
+    return out;
+  }
+  modeList() {
+    const sh = this.sel().s, mq = Mannequin; if (!sh || !this.list().length) return [];
+    const list = this.list(), i = this.selPt(), cur = list[i].m, mir = this.mirrorActive();
+    return [['c', 'Curve', 'isC'], ['s', 'Sharp', 'isS'], ['cs', 'Curve, then sharp', 'isCS'], ['sc', 'Sharp, then curve', 'isSC']].map((m) => {
+      const o = { name: m[1], on: cur === m[0], cls: cur === m[0] ? 'on' : '', isC: false, isS: false, isCS: false, isSC: false };
+      o[m[2]] = true;
+      o.pick = () => { this.push(); mq.setMode(list, i, m[0], { mirror: mir, twin: mir ? mq.twinIndex(list, i, 100) : null }); this.bump(); };
+      return o;
+    });
+  }
+
+  rigTab(sel, gr, res) {
+    const out = {}, M = this.M, mq = Mannequin, S = this.state;
+    const src = gr && gr.mirrorOf ? M.groupById[gr.mirrorOf] : gr;
+    out.pivotText = src ? 'Pivot at x ' + f1(src.pivot[0]) + ', y ' + f1(src.pivot[1]) + '. Everything in the group turns about it.' : 'Select a group, object or shape.';
+    out.parentText = src ? (src.parent ? 'Child of “' + M.groupById[src.parent].name + '”: it moves with its parent.' : 'The root of the skeleton: nothing above it.') : '';
+    out.hasAttach = !!(src && src.attach); out.noAttach = !out.hasAttach;
+    out.noAttachText = 'This group is not fixed to a shape: it follows its parent’s pivot. (Head and upper arm are attached; select Head to see the four kinds.)';
+    out.attachText = ''; out.kinds = []; out.attachRows = [];
+    if (src && src.attach) {
+      const at = src.attach, ps = M.shapes[at.shape], n = (ps.pts.length) || 1;
+      out.attachText = 'Fixed to the “' + ps.name + '” shape of its parent. Where: ' + ({ point: 'point ' + (at.i + 1), edge: 'edge ' + (at.i + 1) + ' to ' + ((at.i + 1) % n + 1) + ', ' + Math.round(at.t * 100) + '% along', range: 'along edge ' + (at.i + 1) + ', set by the “Neck position” slider', inside: Math.round(at.rx * 100) + '% across, ' + Math.round(at.ry * 100) + '% down inside the shape' })[at.kind] + '.';
+      out.kinds = KINDS.map((k) => ({ name: k[1], on: at.kind === k[0], cls: at.kind === k[0] ? 'on' : '', pick: () => {
+        this.push();
+        const prevI = at.i, prevKind = at.kind, shp = res.shapes[at.shape], bb = shp ? mq.boxOf(shp.pre.map((p) => [p.x, p.y])) : { x: 0, y: 0, w: 1, h: 1 }, pv = res.pivots[sel.g] || [0, 0];
+        at.kind = k[0];
+        if (k[0] === 'edge' || k[0] === 'range') { at.i = prevKind === 'point' ? (prevI + n - 1) % n : prevI; at.t = 1; this.cfg.val.neckSlide = 100; }
+        if (k[0] === 'point') at.i = (prevKind === 'edge' || prevKind === 'range') ? (prevI + 1) % n : prevI;
+        if (k[0] === 'inside') { at.rx = Math.min(1, Math.max(0, (pv[0] - bb.x) / (bb.w || 1))); at.ry = Math.min(1, Math.max(0, (pv[1] - bb.y) / (bb.h || 1))); }
+        this.bump();
+      } }));
+      const none = () => {};
+      const step = (label, text, d) => ({ isStep: true, isSlide: false, label: label, text: text, min: 0, max: 1, step: 1, val: 0, set: none, dec: () => { this.push(); at.i = (at.i + n - d) % n; this.bump(); }, inc: () => { this.push(); at.i = (at.i + d) % n; this.bump(); } });
+      const slide = (label, min, max, st, val, text, set) => ({ isStep: false, isSlide: true, label: label, min: min, max: max, step: st, val: val, text: text, set: set, dec: none, inc: none });
+      if (at.kind === 'point') out.attachRows = [step('Point', String(at.i + 1) + ' of ' + n, 1)];
+      if (at.kind === 'edge') out.attachRows = [step('Edge', String(at.i + 1) + ' of ' + n, 1), slide('Spot', 0, 1, 0.01, at.t, Math.round(at.t * 100) + '%', (e) => { at.t = +e.target.value; this.bump(); })];
+      if (at.kind === 'range') out.attachRows = [step('Edge', String(at.i + 1) + ' of ' + n, 1), slide('Neck position', 0, 100, 1, this.cfg.val.neckSlide, Math.round(this.cfg.val.neckSlide) + '%', (e) => { this.cfg.val.neckSlide = +e.target.value; this.bump(false); })];
+      if (at.kind === 'inside') out.attachRows = [slide('Across', 0, 1, 0.01, at.rx, Math.round(at.rx * 100) + '%', (e) => { at.rx = +e.target.value; this.bump(); }), slide('Down', 0, 1, 0.01, at.ry, Math.round(at.ry * 100) + '%', (e) => { at.ry = +e.target.value; this.bump(); })];
+    }
+    const mo = [];
+    if (src && src.rot) { const r = M.rangeById[src.rot.slider]; mo.push({ text: 'Turns about its pivot with “' + r.name + '” (' + r.min + r.unit + ' to ' + r.max + r.unit + '), ' + Math.round(Math.abs(src.rot.k) * 100) + '% of the slider.' + (gr.mirrorOf ? ' Mirrored.' : '') }); }
+    if (src && src.scl) { const r = M.rangeById[src.scl.slider]; mo.push({ text: 'Scales about its pivot with “' + r.name + '” (' + r.min + r.unit + ' to ' + r.max + r.unit + ').' }); }
+    if (src && src.id === 'head') mo.push({ text: 'The neck keeps its length: the neck leans 40% from the torso pivot, the head turns the other 60% about the top of the neck.' });
+    if (src && src.id === 'torso') mo.push({ text: 'The root. Proportions here: Height and Shoulder width (Ranges tab).' });
+    out.motions = mo; out.noMotions = !mo.length;
+    out.hasFall = sel.g === 'hair';
+    out.fallSides = [['down', 'Straight down'], ['left', 'To the picture’s left'], ['right', 'To the picture’s right'], ['behind', 'Behind']].map((f) => ({ name: f[1], on: this.cfg.fallSide === f[0], cls: this.cfg.fallSide === f[0] ? 'on' : '', pick: () => { this.cfg.fallSide = f[0]; if (!this.cfg.val.fall) this.cfg.val.fall = 70; this.bump(false); } }));
+    out.fallVal = this.cfg.val.fall || 0; out.fallText = Math.round(out.fallVal) + '%';
+    out.fallSet = (e) => { this.cfg.val.fall = +e.target.value; this.bump(false); };
+    const ls = M.links.filter((l) => sel.shapes.indexOf(l.a.shape) >= 0 || sel.shapes.indexOf(l.b.shape) >= 0 || (sel.kind === 'group' && Mannequin.groupShapes(M, sel.g).some((id) => id === l.a.shape || id === l.b.shape)));
+    out.links = ls.map((l) => ({ text: M.shapes[l.a.shape].name + ' ' + (l.a.i + 1) + (l.kind === 'weld' ? ' welded to ' : ' follows ') + M.shapes[l.b.shape].name + ' ' + (l.b.i + 1), unlink: () => { this.push(); M.links = M.links.filter((x) => x !== l); this.bump(); } }));
+    out.noLinks = !ls.length;
+    return out;
+  }
+
+  formThumbs(ob, ax, res) {
+    const M = this.M, mq = Mannequin, ids = ob.shapes.reduce((a, id) => { a[id] = 1; return a; }, {});
+    const key = ob.id + '.' + ax.id, box = mq.bbox(res, ob.shapes) || { x: 60, y: 10, w: 80, h: 80 };
+    const side = Math.max(box.w, box.h) * 1.4, fr = { x: box.x + box.w / 2 - side / 2, y: box.y + box.h / 2 - side / 2, w: side, h: side };
+    return ax.options.map((o) => {
+      const c = JSON.parse(JSON.stringify(this.cfg)); c.forms[key] = o.id; Object.keys(c.val).forEach((k) => { c.val[k] = M.rangeById[k].def; });
+      const r = mq.solve(M, c, this.state.view);
+      return mq.uri(mq.svg(M, r, { frame: fr, w: 72, h: 72, tile: ZC[this.state.zone].tile, only: ids }));
+    });
+  }
+  formsTab(sel, ob, gr, res) {
+    const M = this.M, S = this.state, mq = Mannequin, out = {};
+    out.isClass = !!(ob && ob.cls);
+    const det = ob && S.detached[ob.id];
+    out.classText = ob ? 'A class: every member of “' + ob.name + '” is built from one template object, so it shares the template’s shapes, links and ranges. ' + (det ? 'This one is a detached copy: edits here no longer follow the template.' : 'Members stay in sync; they may add extras of their own.') : '';
+    out.syncOn = !det; out.syncCls = det ? '' : 'on'; out.detachOn = !!det; out.detachCls = det ? 'on' : '';
+    out.stayInSync = () => { if (!ob) return; const d = Object.assign({}, S.detached); delete d[ob.id]; this.setState({ detached: d }); };
+    out.detach = () => { if (ob) this.setState({ detached: Object.assign({}, S.detached, { [ob.id]: true }) }); };
+    out.axes = ob ? ob.axes.map((ax) => {
+      const key = ob.id + '.' + ax.id, cur = this.cfg.forms[key] || ax.def, th = this.formThumbs(ob, ax, res);
+      return { name: ax.name + ' (one of several independent axes)', opts: ax.options.map((o, k) => ({ name: o.name + (o.id === ax.def ? ' · default' : ''), uri: th[k], on: cur === o.id, cls: cur === o.id ? 'on' : '', pick: () => { this.cfg.forms[key] = o.id; this.setState({ selPt: 0 }); this.bump(false); } })),
+        add: () => {
+          this.push();
+          const n = ax.options.length + 1, id = 'f' + n + '_' + this.rev, ovr = {};
+          ob.shapes.filter((s) => !M.shapes[s].mirrorOf).forEach((s) => { ovr[s] = JSON.parse(JSON.stringify(mq.ptsOf(M, s, this.cfg, 'front'))); });
+          ax.options.push({ id: id, name: 'Form ' + n, ovr: ovr }); this.cfg.forms[key] = id; this.bump();
+        } };
+    }) : [];
+    out.noAxes = !out.axes.length;
+    out.noAxesText = ob ? '“' + ob.name + '” has one form only. Add a form to give it alternates (aging, expressions, styles).' : 'Select an object to see its forms. Try Eyes, Mouth, Nose, Brows or Front hair.';
+    const poseOwn = M.ranges.filter((r) => r.pose && (r.scope === sel.g || r.scope === sel.o));
+    out.hasPoses = poseOwn.length > 0;
+    out.hasPresets = sel.g === 'torso' || sel.g === 'head';
+    const pgf = (kind, name, note) => ({ name: name, note: note, chips: M.presets.filter((p) => p.kind === kind).map((p) => { const on = Object.keys(p.values).every((k) => Math.abs((this.cfg.val[k] != null ? this.cfg.val[k] : 0) - p.values[k]) < 0.01); return { name: p.name, on: on, cls: on ? 'on' : '', pick: () => { Object.keys(p.values).forEach((k) => { this.cfg.val[k] = p.values[k]; }); this.bump(false); } }; }) });
+    out.presetGroups = sel.g === 'head' ? [pgf('expression', 'Expression', 'A preset sets how open the eyes are, the height and angle of the brows, the smile and the tilt of the head together. It works with every eye, brow and mouth shape, because it moves the points of whichever shape is chosen.')] : [pgf('build', 'Build', 'A preset moves the shoulder, waist and hip sliders together. Everything draped on the body follows.'), pgf('age', 'Age', 'A preset sets height, head size and leg length. Age can also switch forms.')];
+    out.poses = M.poses.map((p) => ({ name: p.name, cls: Object.keys(p.values).every((k) => Math.abs((this.cfg.val[k] != null ? this.cfg.val[k] : 0) - p.values[k]) < 0.01) ? 'on' : '', pick: () => { Object.keys(p.values).forEach((k) => { this.cfg.val[k] = p.values[k]; }); this.bump(false); } }));
+    out.savePose = () => { this.push(); const v = {}; M.ranges.filter((r) => r.pose).forEach((r) => { v[r.id] = this.cfg.val[r.id]; }); M.poses.push({ id: 'p' + this.rev, name: 'Pose ' + (M.poses.length + 1), values: v }); this.bump(); };
+    const own = ob ? ob.shapes.filter((s) => M.shapes[s].back).length : 0;
+    out.backText = ob ? (own ? own + ' of the ' + ob.shapes.length + ' shapes of “' + ob.name + '” have a back of their own. The rest are derived from the front.' : 'The back of “' + ob.name + '” is derived from its front, mirrored. Override a shape on the Shape tab when the back needs its own.') : 'Back is a form of every object: derived from the front, then overridden where it differs.';
+    return out;
+  }
+
+  copyKB() {
+    if (this.kbRev === this.rev && this.kbVal != null) return this.kbVal;
+    const M = this.M;
+    this.kbVal = Math.round(JSON.stringify({ shapes: M.shapes, objects: M.objects, groups: M.groups, ranges: M.ranges, slots: M.slots, poses: M.poses, presets: M.presets }).length / 102.4) / 10; this.kbRev = this.rev;
+    return this.kbVal;
+  }
+  checkTab(res) {
+    const M = this.M, L = Mannequin.limits, out = [], S = this.state;
+    const add = (level, text) => out.push({ level: level, cls: level === 'Stop' ? 'bad' : level === 'Warning' ? 'warn' : '', text: text });
+    let maxPts = 0, maxName = '';
+    Object.keys(M.shapes).forEach((id) => {
+      const sh = M.shapes[id]; if (sh.mirrorOf) return;
+      [['', sh.pts]].concat(sh.back ? [[' (back)', sh.back]] : []).forEach((x) => {
+        const n = x[1].length; if (n > maxPts) { maxPts = n; maxName = sh.name + x[0]; }
+        if (n >= L.pointsMax) add('Stop', sh.name + x[0] + ' has ' + n + ' points: the limit is ' + L.pointsMax + '.');
+        else if (n > L.pointsWarn) add('Warning', sh.name + x[0] + ' has ' + n + ' points: the warning starts above ' + L.pointsWarn + '.');
+      });
+      sh.pts.forEach((p) => { if (p.bind && (!M.shapes[p.bind.s] || (p.bind.e != null ? p.bind.e >= M.shapes[p.bind.s].pts.length : !M.shapes[p.bind.s].pts[p.bind.i]))) add('Stop', sh.name + ' follows a body point or an edge that no longer exists.'); });
+    });
+    let maxDepth = 0, deepest = '';
+    M.groups.forEach((g) => { let d = 1, x = g; while (x.parent && d < 30) { d++; x = M.groupById[x.parent]; } if (d > maxDepth) { maxDepth = d; deepest = g.name; } if (d > L.chain) add('Stop', g.name + ' is ' + d + ' groups below the root: the limit is ' + L.chain + '.'); });
+    Object.keys(M.shapes).forEach((id) => {
+      const sh = M.shapes[id]; if (!sh.helper || sh.mirrorOf) return;
+      if (!Object.keys(M.shapes).some((k) => (M.shapes[k].cut || []).indexOf(id) >= 0 || M.shapes[k].clip === id)) add('Warning', 'The helper shape “' + sh.name + '” does not cut or clip anything.');
+    });
+    Object.keys(res.shapes).forEach((id) => { const s = res.shapes[id]; if (!s.helper && s.visible && s.box.w > 0 && (s.box.x < -2 || s.box.y < -2 || s.box.x + s.box.w > 202 || s.box.y + s.box.h > 402)) add('Warning', M.shapes[id].name + ' reaches outside the figure’s frame in this pose.'); });
+    let maxObj = 0, maxObjName = '', maxShp = 0, maxShpName = '', maxShd = 0, maxShdName = '';
+    M.groups.forEach((g) => { const n = g.objects.length; if (n > maxObj) { maxObj = n; maxObjName = g.name; } if (n >= L.objectsMax) add('Stop', g.name + ' has ' + n + ' objects: the limit is ' + L.objectsMax + '.'); else if (n > L.objectsWarn) add('Warning', g.name + ' has ' + n + ' objects: the warning starts above ' + L.objectsWarn + '.'); });
+    Object.keys(M.objects).forEach((oid) => {
+      const ob = M.objects[oid], ns = ob.shapes.filter((id) => !M.shapes[id].mirrorOf).length + (ob.shade || []).filter((id) => !M.shapes[id].mirrorOf).length, nd = (ob.shade || []).filter((id) => !M.shapes[id].mirrorOf).length;
+      if (ns > maxShp) { maxShp = ns; maxShpName = ob.name; } if (nd > maxShd) { maxShd = nd; maxShdName = ob.name; }
+      if (ns >= L.shapesMax) add('Stop', ob.name + ' has ' + ns + ' shapes: the limit is ' + L.shapesMax + '.'); else if (ns > L.shapesWarn) add('Warning', ob.name + ' has ' + ns + ' shapes: the warning starts above ' + L.shapesWarn + '.');
+      if (nd > L.shade) add('Stop', ob.name + ' has ' + nd + ' shading shapes: the limit is ' + L.shade + '.');
+    });
+    let locks = 0; Object.keys(M.shapes).forEach((k) => { if (!M.shapes[k].mirrorOf) M.shapes[k].pts.forEach((p) => { if (p.bind && p.bind.e != null) locks += 1; }); });
+    if (locks) add('Info', locks + ' points are locked to the edge of a body part: they follow it when it bends, moves or is resized.');
+    const grid = [];
+    Object.keys(M.objects).forEach((oid) => {
+      const ob = M.objects[oid];
+      ob.axes.forEach((ax) => ax.options.forEach((o) => {
+        const ownBack = o.ovr ? Object.keys(o.ovr).filter((sid) => M.shapes[sid] && M.shapes[sid].back) : [];
+        const front = o.ovr ? 'own shapes' : 'base shapes';
+        const back = ownBack.length ? 'not used: the back has its own' : (o.ovr ? 'derived from the front' : 'base shapes');
+        grid.push({ name: ob.name + ' · ' + o.name, front: front, back: back, fcls: '', bcls: ownBack.length ? 'warn' : '' });
+        ownBack.forEach((sid) => add('Info', ob.name + ': the form “' + o.name + '” changes “' + M.shapes[sid].name + '”, which has its own back shape, so the form shows from the front only.'));
+      }));
+    });
+    M.groups.forEach((g) => { if (!g.mirrorOf && g.parent && !g.attach) add('Info', g.name + ' is not fixed to a shape: it follows its parent’s pivot.'); });
+    const kb = this.copyKB();
+    if (kb >= L.copyMaxKB) add('Stop', 'A character’s copy of this model is ' + kb + ' KB: the limit is ' + L.copyMaxKB + ' KB.');
+    else if (kb >= L.copyWarnKB) add('Warning', 'A character’s copy of this model is ' + kb + ' KB: the warning starts at ' + L.copyWarnKB + ' KB.');
+    const stops = out.filter((k) => k.level === 'Stop').length, warns = out.filter((k) => k.level === 'Warning').length;
+    return {
+      checks: out, checkSummary: out.length ? stops + ' to fix, ' + warns + ' warnings, ' + (out.length - stops - warns) + ' notes.' : 'Nothing to fix.',
+      limitRows: [
+        { name: 'Most points in a shape', value: maxPts + ' (' + maxName + ') of ' + L.pointsMax, cls: maxPts > L.pointsWarn ? 'warn' : '' },
+        { name: 'Deepest chain of pivots', value: maxDepth + ' (' + deepest + ') of ' + L.chain, cls: maxDepth > L.chain ? 'warn' : '' },
+        { name: 'Most objects in a group', value: maxObj + ' (' + maxObjName + ') of ' + L.objectsMax, cls: maxObj > L.objectsWarn ? 'warn' : '' },
+        { name: 'Most shapes in an object', value: maxShp + ' (' + maxShpName + ') of ' + L.shapesMax, cls: maxShp > L.shapesWarn ? 'warn' : '' },
+        { name: 'Most shading shapes in an object', value: maxShd + ' (' + maxShdName + ') of ' + L.shade, cls: maxShd >= L.shade ? 'warn' : '' },
+        { name: 'A character’s copy', value: kb + ' KB of ' + L.copyMaxKB + ' KB', cls: kb >= L.copyWarnKB ? 'warn' : '' }
+      ],
+      gridRows: grid.length ? grid : [{ name: 'No forms yet', front: '', back: '', fcls: '', bcls: '' }]
+    };
+  }
+
+  scopeIds(sel) {
+    const M = this.M, s = {};
+    if (sel.g) { s[sel.g] = 1; const gr = M.groupById[sel.g]; if (gr && gr.parent === null) s.model = 1; }
+    if (sel.o) s[sel.o] = 1;
+    if (sel.kind === 'group') (M.groupById[sel.g].objects || []).forEach((o) => { s[o] = 1; });
+    return s;
+  }
+  drives(r) {
+    const M = this.M, parts = [];
+    if (r.id.indexOf('loose') === 0) return 'Moves the points of the clothing that follow the body outward: 0% fits like skin, 100% as drawn, 200% baggy.';
+    M.groups.forEach((g) => { if (g.rot && g.rot.slider === r.id) parts.push('turns the ' + g.name.toLowerCase() + ' about its pivot'); if (g.scl && g.scl.slider === r.id) parts.push('scales the ' + g.name.toLowerCase()); if (g.attach && g.attach.slider === r.id && g.attach.kind === 'range') parts.push('slides the ' + g.name.toLowerCase()); });
+    r.ops.forEach((op) => {
+      const names = op.shapes.filter((id) => M.shapes[id]).map((id) => M.shapes[id].name.toLowerCase()).filter((x, i, a) => a.indexOf(x) === i).join(', ');
+      if (op.op === 'scale') parts.push('scales ' + names); if (op.op === 'move') parts.push('moves ' + names); if (op.op === 'rotate') parts.push('rotates ' + names);
+      if (op.op === 'point') parts.push('moves point ' + (op.idx + 1) + ' of ' + names + (op.sym ? ' and its twin' : '')); if (op.op === 'fall') parts.push('makes the back hair hang'); if (op.op === 'stretch') parts.push('makes this section longer or shorter from where it is rooted'); if (op.op === 'wave') parts.push('bends the free edge into waves, curls or coils');
+    });
+    if (r.id === 'height') parts.push('scales the whole figure from the floor');
+    const mirrored = r.ops.some((op) => op.op !== 'point' && op.op !== 'fall') ? ' Left and right follow together.' : '';
+    return parts.length ? (parts[0].charAt(0).toUpperCase() + parts[0].slice(1) + (parts.length > 1 ? ', and ' + parts.slice(1).join(', and ') : '') + '.' + mirrored) : 'No effect yet.';
+  }
+  rangesTab(sel, gr, ob) {
+    const M = this.M, out = {}, ids = this.scopeIds(sel);
+    const rs = M.ranges.filter((r) => !r.hidden && ids[r.scope]);
+    out.ranges = rs.map((r) => {
+      const st = (r.max - r.min) > 60 ? 5 : 1, val = this.cfg.val[r.id] != null ? this.cfg.val[r.id] : r.def;
+      const clampAll = () => { this.cfg.val[r.id] = Math.min(r.max, Math.max(r.min, this.cfg.val[r.id])); this.bump(); };
+      return { name: r.name, scope: r.scope, drives: this.drives(r), min: r.min, max: r.max, step: st >= 5 ? 1 : 0.5, val: val, valText: r.labels ? r.labels[Math.min(r.labels.length - 1, Math.round(val / (r.step || 33)))] : f1(val) + r.unit, scrubText: this.state.scrub === r.id ? 'Stop' : 'Scrub', scrubOn: this.state.scrub === r.id, scrubCls: this.state.scrub === r.id ? 'on' : '', scrub: () => this.scrubRange(r),
+        set: (e) => { this.cfg.val[r.id] = +e.target.value; this.bump(false); },
+        minText: r.min + r.unit, defText: r.def + r.unit, maxText: r.max + r.unit,
+        minDec: () => { this.push(); r.min -= st; this.bump(); }, minInc: () => { this.push(); r.min = Math.min(r.def, r.min + st); clampAll(); },
+        defDec: () => { this.push(); r.def = Math.max(r.min, r.def - st); this.bump(); }, defInc: () => { this.push(); r.def = Math.min(r.max, r.def + st); this.bump(); },
+        maxDec: () => { this.push(); r.max = Math.max(r.def, r.max - st); clampAll(); }, maxInc: () => { this.push(); r.max += st; this.bump(); },
+        show: !!r.show, showCls: r.show ? 'on' : '', showText: r.show ? 'Shown to the writer' : 'Hidden from the writer', toggleShow: () => { this.push(); r.show = !r.show; this.bump(); } };
+    });
+    out.noRanges = !out.ranges.length;
+    out.noRangesText = 'No sliders are attached to this selection. Select a group or an object (Head, Eyes, Skull, Shirt, Upper arm) to see its ranges.';
+    out.resetTest = () => { M.ranges.forEach((r) => { this.cfg.val[r.id] = r.def; }); this.bump(false); };
+    return out;
+  }
+
+  colourTab(sh) {
+    const M = this.M, S = this.state, mq = Mannequin, out = {};
+    const blank = { slotChips: [], tones: [], slotName: '', presets: [], pal: [], palH: 0, palS: 0, palHText: '', palSText: '', palHSet: () => {}, palSSet: () => {}, lMin: 0, lMax: 100, lVal: 50, lText: '', lSet: () => {}, aMin: 0, aMax: 100, aVal: 100, aText: '', aSet: () => {}, rangeRows: [], gradOn: false, gradCls: '', gradPick: () => {}, blends: [], paintRows: [], clips: [] };
+    if (!sh) return blank;
+    const slot = M.slots[sh.slot], cfg = this.cfg, cur = cfg.col[sh.slot] || slot.def;
+    out.slotChips = Object.keys(M.slots).map((k) => ({ name: M.slots[k].name, on: sh.slot === k, cls: sh.slot === k ? 'on' : '', pick: () => { this.push(); sh.slot = k; this.bump(); } }));
+    out.tones = [[-1, 'Shade'], [0, 'Base'], [1, 'Light']].map((t) => ({ name: t[1], on: sh.tone === t[0], cls: sh.tone === t[0] ? 'on' : '', pick: () => { this.push(); sh.tone = t[0]; this.bump(); } }));
+    out.slotName = slot.name;
+    out.presets = slot.presets.map((p) => ({ css: mq.swatchCss(p.h, p.s, p.l), title: p.name + ', brightness ' + p.l + '%', on: cur.src === 'preset' && cur.id === p.id, cls: cur.src === 'preset' && cur.id === p.id ? 'on' : '', pick: () => { cfg.col[sh.slot] = { src: 'preset', id: p.id }; this.bump(false); } }));
+    out.pal = cfg.palette.map((p) => ({ css: mq.swatchCss(p.h, p.s, 50), title: p.name + ', hue ' + p.h + ', saturation ' + p.s + '%', on: cur.src === 'palette' && cur.id === p.id, cls: cur.src === 'palette' && cur.id === p.id ? 'on' : '', pick: () => { cfg.col[sh.slot] = { src: 'palette', id: p.id, l: mq.colour(M, cfg, sh.slot, 0).l }; this.setState({ palSel: p.id }); this.bump(false); } }));
+    const ps = cfg.palette.filter((p) => p.id === (cur.src === 'palette' ? cur.id : S.palSel))[0] || cfg.palette[0];
+    out.palH = ps.h; out.palS = ps.s; out.palHText = ps.name + ' · ' + ps.h + '°'; out.palSText = ps.s + '%';
+    out.palHSet = (e) => { ps.h = +e.target.value; this.bump(false); };
+    out.palSSet = (e) => { ps.s = +e.target.value; this.bump(false); };
+    const c = mq.colour(M, cfg, sh.slot, 0);
+    out.lMin = slot.l.min; out.lMax = slot.l.max; out.lVal = Math.round(c.l); out.lText = Math.round(c.l) + '%';
+    out.lSet = (e) => { cfg.col[sh.slot] = Object.assign({}, cfg.col[sh.slot] || slot.def, { l: +e.target.value }); this.bump(false); };
+    out.aMin = slot.a.min; out.aMax = slot.a.max; out.aVal = Math.round(c.a * 100); out.aText = Math.round(c.a * 100) + '%';
+    out.aSet = (e) => { cfg.col[sh.slot] = Object.assign({}, cfg.col[sh.slot] || slot.def, { a: +e.target.value }); this.bump(false); };
+    const row = (label, obj, key, st, lo, hi, unit) => ({ label: label, text: obj[key] + unit, dec: () => { this.push(); obj[key] = Math.max(lo, obj[key] - st); this.bump(); }, inc: () => { this.push(); obj[key] = Math.min(hi, obj[key] + st); this.bump(); } });
+    out.rangeRows = [row('Brightness min', slot.l, 'min', 2, 0, slot.l.def, '%'), row('Brightness max', slot.l, 'max', 2, slot.l.def, 100, '%'), row('Opacity min', slot.a, 'min', 5, 0, slot.a.def, '%'), row('Opacity max', slot.a, 'max', 5, slot.a.def, 100, '%')];
+    out.gradOn = !!sh.grad; out.gradCls = sh.grad ? 'on' : ''; out.gradPick = () => { this.push(); sh.grad = !sh.grad; this.bump(); };
+    out.blends = [['', 'Normal'], ['multiply', 'Multiply'], ['screen', 'Screen'], ['overlay', 'Overlay']].map((b) => ({ name: b[1], on: (sh.blend || '') === b[0], cls: (sh.blend || '') === b[0] ? 'on' : '', pick: () => { this.push(); sh.blend = b[0] || null; this.bump(); } }));
+    out.paintRows = [
+      { label: 'Outline', text: sh.outline ? sh.outline + ' unit' : 'none', dec: () => { this.push(); sh.outline = Math.max(0, f1((sh.outline || 0) - 0.3)); this.bump(); }, inc: () => { this.push(); sh.outline = Math.min(1.5, f1((sh.outline || 0) + 0.3)); this.bump(); } },
+      { label: 'Shape opacity', text: Math.round(sh.op * 100) + '%', dec: () => { this.push(); sh.op = Math.max(0.05, f1(sh.op - 0.05)); this.bump(); }, inc: () => { this.push(); sh.op = Math.min(1, f1(sh.op + 0.05)); this.bump(); } }
+    ];
+    const sibs = (M.objects[M.objOfShape[sh.id]] || { shapes: [] }).shapes.filter((id) => id !== sh.id && !M.shapes[id].mirrorOf);
+    out.clips = [{ name: 'Nothing', on: !sh.clip, cls: !sh.clip ? 'on' : '', pick: () => { this.push(); sh.clip = null; this.bump(); } }].concat(sibs.map((id) => ({ name: M.shapes[id].name, on: sh.clip === id, cls: sh.clip === id ? 'on' : '', pick: () => { this.push(); sh.clip = id; this.bump(); } })));
+    return out;
+  }
+
+  /* ----- previews ----- */
+  previews() {
+    const M = this.M, S = this.state, mq = Mannequin, out = [], z = ZC[S.zone];
+    const fr = M.frames.filter((f) => f.id === S.pframe)[0] || M.frames[0], width = { S: 74, M: 108, L: 156 }[S.psize];
+    const n = S.pmode === 'rand' ? (S.psize === 'L' ? 6 : S.psize === 'M' ? 9 : 12) : (S.psize === 'L' ? 4 : 6);
+    for (let i = 0; i < n; i++) {
+      const rng = mq.rng(S.seed * 131 + i * 17 + (S.pmode === 'min' ? 5 : S.pmode === 'max' ? 9 : 0));
+      const mode = S.pmode === 'rand' ? 'rand' : (i % 2 === 0 ? S.pmode : (S.pmode === 'min' ? 'max' : 'min'));
+      const cfg = mq.randomCfg(M, rng, mode);
+      const res = mq.solve(M, cfg, S.view);
+      const h = Math.round(width * fr.h / fr.w);
+      const svg = mq.svg(M, res, { frame: fr, w: width, h: h, hide: fr.hide.concat(Object.keys(cfg.hidden).filter((k) => cfg.hidden[k])) });
+      out.push({ uri: mq.uri(svg), w: width, h: h, bg: S.pdark ? '#1d161a' : '#f6f3ee', ink: S.pdark ? '#ffffff' : '#090708', alt: 'Random preview ' + (i + 1), label: mode === 'rand' ? 'Random ' + (i + 1) : (mode === 'min' ? 'All at min' : 'All at max'), pick: () => { this.cfg = cfg; this.setState({ note: '' }); this.bump(false); } });
+    }
+    return out;
+  }
+
+  renderVals() {
+    const M = this.M, S = this.state, mq = Mannequin, v = {};
+    const res = mq.solve(M, this.cfg, S.view);
+    this.lastRes = res;
+    const cv = this.canvas(res), ov = this.pointOverlay(res), sel = cv.sel;
+    v.zoneClass = 'z-' + S.zone;
+    v.zones = ['day', 'dawn', 'dusk', 'night'].map((z) => ({ name: z.charAt(0).toUpperCase() + z.slice(1), on: S.zone === z, cls: S.zone === z ? 'on' : '', pick: () => this.setState({ zone: z }) }));
+    v.statusText = S.dirty ? 'Draft: autosaved' : 'v' + S.ver + ' published';
+    v.ver = S.ver; v.publish = () => this.setState({ ver: S.ver + 1, dirty: false });
+    v.undo = () => this.undo(); v.redo = () => this.redo(); v.undoOff = !this.hist.length; v.redoOff = !this.future.length;
+    v.q = S.q; v.onQ = (e) => this.setState({ q: e.target.value });
+    v.rows = this.tree(); v.treeCount = Object.keys(M.shapes).filter((k) => !M.shapes[k].mirrorOf).length + ' shapes';
+    v.toolSelect = () => this.setState({ tool: 'select', emode: 'points' }); v.toolAdd = () => this.setState({ tool: 'add', emode: 'points' }); v.toolDel = () => this.setState({ tool: 'delete', emode: 'points' }); v.toolMove = () => this.setState({ tool: 'select', emode: 'move' });
+    v.toolSelectOn = S.tool === 'select' && S.emode === 'points'; v.toolAddOn = S.tool === 'add'; v.toolDelOn = S.tool === 'delete'; v.toolMoveOn = S.tool === 'select' && S.emode === 'move';
+    v.toggleLock = () => this.setState({ lock: !S.lock }); v.lockOn = S.lock;
+    v.shadeBtns = [['Flat', 0, 'No shading layers: the base colours alone'], ['Soft', 0.55, 'Shading layers at a little over half their amount'], ['Full', 1, 'Shading layers as drawn']].map((b) => { const cur = this.cfg.shadeAmt == null ? 1 : this.cfg.shadeAmt, on = Math.abs(cur - b[1]) < 0.01; return { name: b[0], title: b[2], on: on, cls: on ? 'on' : '', pick: () => { this.cfg.shadeAmt = b[1]; this.bump(false); } }; });
+    v.modes = this.modeList().map((m) => m); if (!v.modes.length) v.modes = [];
+    v.toggleMirror = () => this.setState({ mirror: !S.mirror }); v.toggleSnap = () => this.setState({ snap: !S.snap }); v.toggleGrid = () => this.setState({ grid: !S.grid });
+    v.toggleGhost = () => this.setState({ ghost: !S.ghost }); v.toggleFrames = () => this.setState({ frames: !S.frames });
+    v.mirrorOn = S.mirror; v.snapOn = S.snap; v.gridOn = S.grid; v.ghostOn = S.ghost; v.framesOn = S.frames;
+    v.frontOn = S.view === 'front'; v.backOn = S.view === 'back'; v.frontCls = S.view === 'front' ? 'on' : ''; v.backCls = S.view === 'back' ? 'on' : '';
+    v.viewFront = () => this.setState({ view: 'front' }); v.viewBack = () => this.setState({ view: 'back' });
+    v.zoomIn = () => this.setState({ zoom: Math.min(6, S.zoom * 1.4) }); v.zoomOut = () => this.setState({ zoom: Math.max(0.4, S.zoom / 1.4) });
+    v.toggleFit = () => this.setState({ fit: S.fit === 'fig' ? 'sel' : 'fig', zoom: 1 }); v.fitFig = S.fit === 'fig';
+    v.drawerOn = S.drawer; v.toggleDrawer = () => this.setState({ drawer: !S.drawer });
+    v.stageMenu = (e) => e.preventDefault();
+    v.stageDown = (e) => this.stageDown(e); v.stageMove = (e) => this.stageMove(e); v.stageUp = () => this.stageUp();
+    v.canvasUri = cv.uri; v.pts = ov.pts; v.knobs = ov.knobs;
+    const sh = sel.s ? M.shapes[sel.s] : null;
+    v.canvasAlt = 'Canvas showing ' + (sel.none ? 'the whole figure, nothing selected' : this.selTitle(sel)) + ' in the ' + S.view + ' view' + (ov.pts.length ? ', ' + ov.pts.length + ' points' : '');
+    const list = sel.none ? null : this.list();
+    v.statName = (sel.none ? 'Nothing selected: the end result' : this.selTitle(sel)) + ' · ' + S.view + ' view';
+    v.statPoint = list && list.length ? 'Point ' + (this.selPt() + 1) + ' of ' + list.length : 'Select a shape to edit its points';
+    v.statMode = list && list.length ? mq.modeName[list[this.selPt()].m] + (this.mirrorActive() ? ' · mirror editing' : '') + (S.snap ? ' · snapping' : '') + (S.emode === 'move' ? ' · move shape' : ' · point editor') : '';
+    const LM = mq.limits, kb = this.copyKB();
+    v.budgetText = list && list.length ? list.length + ' points · warn above ' + LM.pointsWarn + ', stop at ' + LM.pointsMax : '';
+    v.budgetCls = list && list.length > LM.pointsWarn ? 'warn' : '';
+    v.copyText = 'A character’s copy: ' + kb + ' KB · warn at ' + LM.copyWarnKB + ', stop at ' + LM.copyMaxKB; v.copyCls = kb >= LM.copyWarnKB ? 'warn' : '';
+    const noteMsg = ov.note || S.tip || (sel.none ? 'Nothing is selected: this is the end result.' : sel.kind !== 'shape' ? 'Select a shape in the tree, or click one on the canvas, to edit its points. The pivot (cross) and anchor (diamond) of the group are drawn here. Right-click the grid to unselect everything, right-drag it to move the view. Right-click a shape: point editor, then move shape, then unselect; right-drag a part to tilt it.' : '');
+    v.hasNote = !!noteMsg; v.noteText = noteMsg; v.noteReset = ov.reset; v.resetTest = () => { M.ranges.forEach((r) => { this.cfg.val[r.id] = r.def; }); this.bump(false); };
+    Object.assign(v, this.inspector(res));
+    v.reroll = () => this.setState({ seed: S.seed + 1 });
+    const pm = (name, id, title) => ({ name: name, on: S.pmode === id, cls: S.pmode === id ? 'on' : '', title: title, pick: () => this.setState({ pmode: id }) });
+    v.pmodes = [pm('Random', 'rand', 'Random values inside the ranges'), pm('Min / max', 'min', 'Stress: every slider at the end of its range, alternating'), pm('Max / min', 'max', 'Stress, the other way round')];
+    v.pframes = M.frames.slice(0, 3).map((f) => ({ name: f.name, on: S.pframe === f.id, cls: S.pframe === f.id ? 'on' : '', pick: () => this.setState({ pframe: f.id }) }));
+    v.psizes = ['S', 'M', 'L'].map((s) => ({ name: s, on: S.psize === s, cls: S.psize === s ? 'on' : '', pick: () => this.setState({ psize: s }) }));
+    v.toggleDark = () => this.setState({ pdark: !S.pdark }); v.darkOn = S.pdark; v.darkCls = S.pdark ? 'on' : '';
+    v.previews = this.previews();
+    return v;
+  }
+}
+</script>
+</body>
+</html>

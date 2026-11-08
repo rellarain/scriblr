@@ -8,6 +8,7 @@ import type { Holding, ReaderState } from '../api/reader'
 import { createMockSocial } from './mockSocial'
 import { READER_BOOKS, READERS, bookDetailFixture, readerFixture, recommendationsFixture } from './readerFixtures'
 import { createMockPresets, previewPresets } from './mockPresets'
+import { createMockModels, previewModels } from './mockCharacterModels'
 import { createMockCharacters, seedCharacters } from './mockCharacters'
 import { createMockItems, seedItems } from './mockItems'
 import { createMockMaps, seedMaps } from './mockMaps'
@@ -190,6 +191,8 @@ export function createMockBackend() {
   const socialRoute = createMockSocial(() => reader, next => { reader = next })
   // The plot presets the admin page edits and the Plot sidebar's "+ Preset" offers.
   const presets = createMockPresets(previewPresets())
+  // The character models the admin Characters page edits.
+  const models = createMockModels(previewModels())
   // Training: the five placeholder curricula, with a course enrolled in so the Desk has something on it.
   const training = createMockTraining(undefined, { ...emptyProgress(), enrolled: { 'writer-c1': '2026-11-02T12:00:00.000Z' } })
   // The Maps console's maps, which its edits change in memory only.
@@ -225,6 +228,7 @@ export function createMockBackend() {
     if (parts[0] === 'activity' && parts[1] === 'ribbon') return json(ribbonFixture(localDay()))
     if (parts[0] === 'training') { const answer = training.route(method, parts.slice(1), body); return json(answer.body, answer.status) }
     if (parts[0] === 'presets') { const answer = presets.route(method, parts.slice(1), body); return json(answer.body, answer.status) }
+    if (parts[0] === 'character-models') { const answer = models.route(method, parts.slice(1), body); return json(answer.body, answer.status) }
     if (parts[0] === 'reader') return socialRoute(method, parts.slice(1), body) ?? readerRoute(method, parts.slice(1), body)
     if (parts[0] === 'library') {
       if (parts[1] === 'recommendations') return json(recommendationsFixture())

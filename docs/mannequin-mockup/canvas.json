@@ -1,0 +1,94 @@
+{
+  "v": 3,
+  "createdOnFiles": {
+    "v": 1,
+    "at": "2026-11-08T12:00:00Z"
+  },
+  "title": "Character Designer Mockup",
+  "launch": {
+    "view": "canvas"
+  },
+  "pages": [],
+  "boards": {
+    "Main.dc.html": {
+      "x": 0,
+      "y": 0,
+      "w": 1440,
+      "h": 1040,
+      "title": "1 · Designer (Configuration › Characters)",
+      "expand": "fill",
+      "is_interactive": true
+    },
+    "Editor.dc.html": {
+      "x": 0,
+      "y": 1160,
+      "w": 760,
+      "h": 1320,
+      "title": "2 · Writer's editor inside the character card",
+      "expand": "fill",
+      "is_interactive": true
+    },
+    "Palette.dc.html": {
+      "x": 840,
+      "y": 1160,
+      "w": 960,
+      "h": 900,
+      "title": "3 · Character palette (general settings)",
+      "expand": "fill",
+      "is_interactive": true
+    },
+    "Compare.dc.html": {
+      "x": 840,
+      "y": 2200,
+      "w": 1360,
+      "h": 560,
+      "title": "4 · The head is the old drawing's (exact shapes)",
+      "expand": "fill",
+      "is_interactive": false
+    },
+    "Review.dc.html": {
+      "x": 0,
+      "y": 2600,
+      "w": 1380,
+      "h": 2400,
+      "title": "5 · Shading and style review: your own characters, old shapes converted",
+      "expand": "fill",
+      "is_interactive": false
+    },
+    "HairTrace.dc.html": {
+      "x": 0,
+      "y": 5120,
+      "w": 1500,
+      "h": 2020,
+      "title": "6 · Hair sections traced from the old hair (exact pieces, by plane and side)",
+      "expand": "fill",
+      "is_interactive": false
+    }
+  },
+  "order": [
+    "Main.dc.html",
+    "Editor.dc.html",
+    "Palette.dc.html",
+    "Compare.dc.html",
+    "Review.dc.html",
+    "HairTrace.dc.html"
+  ],
+  "notes": {
+    "title": {
+      "x": 0,
+      "y": -260,
+      "text": "Character design console: mannequin designer, writer's editor, character palette, exact old shapes",
+      "kind": "title1",
+      "maxW": 2240
+    }
+  },
+  "designSystems": [
+    {
+      "title": "Scriblr Design System",
+      "namespace": "scriblr",
+      "artifact": "https://claude.ai/artifact/9JXWFN3hoR4QpE1JRdSqaf",
+      "version": "1794108242-a9b6",
+      "copiedAt": "2026-11-08T12:00:00Z"
+    }
+  ]
+}

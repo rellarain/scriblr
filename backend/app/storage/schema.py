@@ -1161,6 +1161,225 @@ class PublishedPresetList(BaseModel):
 
 
 # ---------------------------------------------------------------------------
+# Character models: the admin-designed assets of the art mannequin (see docs/mannequin-mockup). Global, not project-scoped, in
+# %APPDATA%\Scriblr\character-models.json, a sibling of presets.json, with the same draft / published / history shape as the plot presets.
+# A model holds shapes (a filled outline of points in the four modes), objects (a layer and a list of shapes) and groups (a list of
+# objects), all containers in phase 1: pivots, links, ranges, forms, colour slots and the rest are added by later phases as new fields with
+# defaults, so an older file still loads. Coordinates live in the model's space: 0..200 across, 0..400 down (a figure about 390 tall).
+# ---------------------------------------------------------------------------
+
+CHARACTER_MODELS_SCHEMA_VERSION = 1
+MODEL_NAME_MAX = 60
+MODEL_DESCRIPTION_MAX = 400
+MODEL_MAX_MODELS = 100
+MODEL_HISTORY_MAX = 10
+# The limits the user chose: warn above the first number, stop at the second.
+MODEL_POINTS_WARN = 24
+MODEL_POINTS_MAX = 60
+MODEL_OBJECTS_PER_GROUP_WARN = 24
+MODEL_OBJECTS_PER_GROUP_MAX = 48
+MODEL_SHAPES_PER_OBJECT_WARN = 36
+MODEL_SHAPES_PER_OBJECT_MAX = 72
+MODEL_COPY_WARN_BYTES = 150 * 1024   # the size of a character's copy of a model
+MODEL_COPY_MAX_BYTES = 250 * 1024
+# Generous caps on the totals, so the file stays small and one save is bounded.
+MODEL_MAX_SHAPES = 600
+MODEL_MAX_OBJECTS = 200
+MODEL_MAX_GROUPS = 60
+MODEL_X_RANGE = (-50.0, 250.0)
+MODEL_Y_RANGE = (-50.0, 450.0)
+_MODEL_ID = r"^[A-Za-z0-9_.-]{1,80}$"
+ModelPointMode = Literal["c", "s", "cs", "sc"]
+ModelLayer = Literal["body", "clothing", "hair"]
+ModelView = Literal["both", "front", "back"]
+
+
+class ModelPoint(BaseModel):
+    """One point of a shape: c = curve, s = sharp, cs = curve then sharp, sc = sharp then curve. `hi` and `ho` are the in and out handles as offsets
+    (None = automatic); `w` is how free the point is for hanging chains (later phases)."""
+
+    x: float = 0.0
+    y: float = 0.0
+    m: ModelPointMode = "c"
+    hi: Optional[list[float]] = None
+    ho: Optional[list[float]] = None
+    w: Optional[float] = None
+
+    @field_validator("x", mode="before")
+    @classmethod
+    def _x(cls, value: Any) -> float:
+        return _finite(value, 0.0, *MODEL_X_RANGE)
+
+    @field_validator("y", mode="before")
+    @classmethod
+    def _y(cls, value: Any) -> float:
+        return _finite(value, 0.0, *MODEL_Y_RANGE)
+
+    @field_validator("m", mode="before")
+    @classmethod
+    def _mode(cls, value: Any) -> Any:
+        return value if value in ("c", "s", "cs", "sc") else "c"
+
+    @field_validator("hi", "ho", mode="before")
+    @classmethod
+    def _handle(cls, value: Any) -> Optional[list[float]]:
+        if not isinstance(value, (list, tuple)) or len(value) != 2:
+            return None
+        return [_finite(value[0], 0.0, -200.0, 200.0), _finite(value[1], 0.0, -200.0, 200.0)]
+
+    @field_validator("w", mode="before")
+    @classmethod
+    def _weight(cls, value: Any) -> Optional[float]:
+        return None if value is None else _finite(value, 0.0, 0.0, 1.0)
+
+
+class ModelShape(BaseModel):
+    """A filled outline. `half` > 0 marks a symmetric outline: its first `half` points run down the right half and the rest mirror them."""
+
+    id: str = Field(pattern=_MODEL_ID)
+    name: str = Field(default="", max_length=MODEL_NAME_MAX)
+    closed: bool = True
+    z: float = 40.0
+    op: float = 1.0
+    view: ModelView = "both"
+    pts: list[ModelPoint] = Field(default_factory=list, max_length=MODEL_POINTS_MAX)
+    half: int = 0
+    template: Optional[str] = Field(default=None, pattern=_MODEL_ID)
+
+    @field_validator("name", mode="before")
+    @classmethod
+    def _trim(cls, value: Any) -> Any:
+        return value.strip() if isinstance(value, str) else value
+
+    @field_validator("z", mode="before")
+    @classmethod
+    def _z(cls, value: Any) -> float:
+        return _finite(value, 40.0, 0.0, 100.0)
+
+    @field_validator("op", mode="before")
+    @classmethod
+    def _op(cls, value: Any) -> float:
+        return _finite(value, 1.0, 0.0, 1.0)
+
+    @field_validator("half", mode="before")
+    @classmethod
+    def _half(cls, value: Any) -> int:
+        return int(_finite(value, 0.0, 0.0, float(MODEL_POINTS_MAX)))
+
+    @field_validator("view", mode="before")
+    @classmethod
+    def _view(cls, value: Any) -> Any:
+        return value if value in ("both", "front", "back") else "both"
+
+
+class ModelObject(BaseModel):
+    id: str = Field(pattern=_MODEL_ID)
+    name: str = Field(default="", max_length=MODEL_NAME_MAX)
+    layer: ModelLayer = "body"
+    shapes: list[str] = Field(default_factory=list, max_length=MODEL_SHAPES_PER_OBJECT_MAX)
+
+    @field_validator("name", mode="before")
+    @classmethod
+    def _trim(cls, value: Any) -> Any:
+        return value.strip() if isinstance(value, str) else value
+
+    @field_validator("layer", mode="before")
+    @classmethod
+    def _layer(cls, value: Any) -> Any:
+        return value if value in ("body", "clothing", "hair") else "body"
+
+
+class ModelGroup(BaseModel):
+    id: str = Field(pattern=_MODEL_ID)
+    name: str = Field(default="", max_length=MODEL_NAME_MAX)
+    parent: Optional[str] = None
+    objects: list[str] = Field(default_factory=list, max_length=MODEL_OBJECTS_PER_GROUP_MAX)
+
+    @field_validator("name", mode="before")
+    @classmethod
+    def _trim(cls, value: Any) -> Any:
+        return value.strip() if isinstance(value, str) else value
+
+
+class ModelContent(BaseModel):
+    """A model and everything in it. A draft may be unfinished (no name, dangling ids); publish_faults says what stops it being published."""
+
+    name: str = Field(default="", max_length=MODEL_NAME_MAX)
+    description: str = Field(default="", max_length=MODEL_DESCRIPTION_MAX)
+    shapes: list[ModelShape] = Field(default_factory=list, max_length=MODEL_MAX_SHAPES)
+    objects: list[ModelObject] = Field(default_factory=list, max_length=MODEL_MAX_OBJECTS)
+    groups: list[ModelGroup] = Field(default_factory=list, max_length=MODEL_MAX_GROUPS)
+
+    @field_validator("name", "description", mode="before")
+    @classmethod
+    def _trim(cls, value: Any) -> Any:
+        return value.strip() if isinstance(value, str) else value
+
+    @model_validator(mode="after")
+    def _unique_ids(self) -> "ModelContent":
+        for label, items in (("shape", self.shapes), ("object", self.objects), ("group", self.groups)):
+            ids = [i.id for i in items]
+            if len(set(ids)) != len(ids):
+                raise ValueError(f"two {label}s share an id")
+        return self
+
+
+class PublishedModel(BaseModel):
+    """One numbered, frozen copy of a model's content."""
+
+    version: int
+    publishedAt: datetime = Field(default_factory=utcnow)
+    content: ModelContent
+
+
+class ModelEntry(BaseModel):
+    id: str = Field(pattern=_MODEL_ID)
+    draft: ModelContent
+    # The copy the Writer's editor will offer; None until published, and again after Unpublish.
+    published: Optional[PublishedModel] = None
+    # Earlier published versions, newest first (the current one is `published`, not here).
+    history: list[PublishedModel] = Field(default_factory=list, max_length=MODEL_HISTORY_MAX)
+    # The version the next publish gets; it only ever goes up, so an unpublished model keeps counting.
+    nextVersion: int = 1
+
+
+class ModelCatalog(BaseModel):
+    schemaVersion: int = CHARACTER_MODELS_SCHEMA_VERSION
+    models: list[ModelEntry] = Field(default_factory=list, max_length=MODEL_MAX_MODELS)
+
+
+class ModelDraftIn(BaseModel):
+    id: str = Field(pattern=_MODEL_ID)
+    draft: ModelContent
+
+
+class ModelDraftList(BaseModel):
+    """What the admin page saves: just the drafts, in order. Published copies and history are never touched by a save, and a model left out is deleted."""
+
+    models: list[ModelDraftIn] = Field(default_factory=list, max_length=MODEL_MAX_MODELS)
+
+    @model_validator(mode="after")
+    def _unique(self) -> "ModelDraftList":
+        ids = [m.id for m in self.models]
+        if len(set(ids)) != len(ids):
+            raise ValueError("two models share an id")
+        return self
+
+
+class PublishedModelOut(BaseModel):
+    """What the Writer's editor will read: a published model, with its id."""
+
+    id: str
+    version: int
+    publishedAt: datetime
+    content: ModelContent
+
+
+class PublishedModelList(BaseModel):
+    models: list[PublishedModelOut] = Field(default_factory=list)
+
+
+# ---------------------------------------------------------------------------
 # AUI Configuration: a global (not project-scoped), admin-editable outline of
 # Console -> Component -> Feature ideas for each of AUI's Configuration
 # sub-tabs (Project Plan, Visitor, User, Reader, Training, Writer, Helper,

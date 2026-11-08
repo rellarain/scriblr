@@ -1,0 +1,58 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Exact head</title>
+<script src="./support.js"></script>
+<script src="./exact-default.js"></script>
+<script src="./designer-engine.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<style>
+body { margin: 0; }
+.cmp { width: 1360px; height: 560px; box-sizing: border-box; padding: 24px; background: #e6d1db; color: #090708; font-family: system-ui, -apple-system, 'Segoe UI', sans-serif; font-size: 12px; line-height: 17px; display: flex; flex-direction: column; gap: 14px; }
+.cmp *, .cmp *::before, .cmp *::after { box-sizing: border-box; }
+.cmp h1 { margin: 0; font-size: 18px; line-height: 24px; font-weight: 700; letter-spacing: 1.5px; text-transform: uppercase; }
+.cmp p { margin: 0; max-width: 1180px; }
+.trio { display: flex; gap: 24px; }
+.cell { display: flex; flex-direction: column; gap: 6px; }
+.card { position: relative; width: 400px; height: 400px; background: #000; isolation: isolate; border-radius: 16px; overflow: hidden; }
+.card img { position: absolute; inset: 0; width: 400px; height: 400px; display: block; }
+.card img.diff { mix-blend-mode: difference; }
+.lbl { font-size: 11px; font-weight: 700; letter-spacing: 1px; text-transform: uppercase; }
+</style>
+</helmet>
+<div class="cmp">
+  <h1>The head is the old drawing's: exact shapes, not an approximation</h1>
+  <p>Left: the default adult as the old portrait engine draws it. Middle: the same character drawn by the mannequin, whose head, ears, brows, eyes, nose, mouth and hair are the old engine's own paths converted to points with their handles, in the same paint order and with the old shade rule for every shadow. Right: the two on top of each other as a difference (black where they are the same). The face and hair come out black; what remains is the neck, the shoulders and the top, because the mannequin has a body of its own below the head.</p>
+  <div class="trio">
+    <div class="cell">
+      <div class="card"><img src="portrait-default.svg" alt="The default adult as the old portrait engine draws it"></div>
+      <span class="lbl">The old portrait</span>
+    </div>
+    <div class="cell">
+      <div class="card"><img src="{{newUri}}" alt="The same character drawn by the mannequin from the converted shapes"></div>
+      <span class="lbl">The mannequin, from the converted shapes</span>
+    </div>
+    <div class="cell">
+      <div class="card"><img src="portrait-default.svg" alt=""><img class="diff" src="{{newUri}}" alt="The difference between the two: black where they are the same"></div>
+      <span class="lbl">Difference</span>
+    </div>
+  </div>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":1360,"height":560}}'>
+class Component extends DCLogic {
+  renderVals() {
+    const mq = Mannequin, M = mq.model(), cfg = mq.defaultCfg(M);
+    const fr = M.frames.filter((f) => f.id === 'cmp')[0], res = mq.solve(M, cfg, 'front');
+    const hide = fr.hide.concat(Object.keys(cfg.hidden).filter((k) => cfg.hidden[k]));
+    const svg = mq.svg(M, res, { frame: fr, w: 400, h: 400, tile: cfg.tile, tileR: 16, hide: hide });
+    return { newUri: mq.uri(svg) };
+  }
+}
+</script>
+</body>
+</html>

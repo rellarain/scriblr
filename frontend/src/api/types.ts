@@ -588,3 +588,21 @@ export interface ItemDoc {
 export interface ItemSummary { id: string; name: string; kind: string; order: number; updatedAt: string }
 export interface ItemCreate { name?: string; kind?: string }
 export interface CharacterCreate { name?: string; portrait?: CharacterPortrait; look?: LegacyLook }
+
+// ---- character models (the admin-designed assets of the art mannequin; backend schema.py "Character models") ----
+export type ModelPointMode = 'c' | 's' | 'cs' | 'sc'
+export type ModelLayer = 'body' | 'clothing' | 'hair'
+export type ModelView = 'both' | 'front' | 'back'
+// A point of a shape: c = curve, s = sharp, cs = curve then sharp, sc = sharp then curve. hi and ho are the in and out handles as offsets (absent: automatic).
+export interface ModelPoint { x: number; y: number; m: ModelPointMode; hi?: [number, number] | null; ho?: [number, number] | null; w?: number | null }
+// A filled outline in the model's space (0..200 across, 0..400 down). `half` > 0 marks a symmetric outline: its first `half` points run down one half and the rest mirror them.
+export interface ModelShape { id: string; name: string; closed: boolean; z: number; op: number; view: ModelView; pts: ModelPoint[]; half: number; template?: string | null }
+export interface ModelObject { id: string; name: string; layer: ModelLayer; shapes: string[] }
+export interface ModelGroup { id: string; name: string; parent: string | null; objects: string[] }
+export interface ModelContent { name: string; description: string; shapes: ModelShape[]; objects: ModelObject[]; groups: ModelGroup[] }
+export interface PublishedModel { version: number; publishedAt: string; content: ModelContent }
+export interface ModelEntry { id: string; draft: ModelContent; published: PublishedModel | null; history: PublishedModel[]; nextVersion: number }
+export interface ModelCatalog { schemaVersion: number; models: ModelEntry[] }
+export interface ModelDraftList { models: Array<{ id: string; draft: ModelContent }> }
+export interface PublishedModelOut { id: string; version: number; publishedAt: string; content: ModelContent }
+export interface PublishedModelList { models: PublishedModelOut[] }

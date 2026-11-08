@@ -1,0 +1,97 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Shading and style review</title>
+<script src="./support.js"></script>
+<script src="./designer-engine.js"></script>
+<script src="./exact-chars.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<style>
+body { margin: 0; }
+.rv { width: 1380px; box-sizing: border-box; padding: 24px; background: #e6d1db; color: #090708; font-family: system-ui, -apple-system, 'Segoe UI', sans-serif; font-size: 12px; line-height: 17px; display: flex; flex-direction: column; gap: 16px; }
+.rv *, .rv *::before, .rv *::after { box-sizing: border-box; }
+.rv h1 { margin: 0; font-size: 18px; line-height: 24px; font-weight: 700; letter-spacing: 1.5px; text-transform: uppercase; }
+.rv h2 { margin: 0; font-size: 11px; line-height: 15px; font-weight: 700; letter-spacing: 1px; text-transform: uppercase; }
+.rv p { margin: 0; max-width: 1180px; }
+.how { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 8px; }
+.how div { background: #ddc0cf; padding: 10px 12px; display: flex; flex-direction: column; gap: 4px; }
+.grid { display: grid; grid-template-columns: repeat(2, 666px); gap: 12px; }
+.card { background: #ddc0cf; padding: 10px; display: flex; flex-direction: column; gap: 8px; }
+.pics { display: flex; gap: 8px; align-items: flex-start; }
+.pic { display: flex; flex-direction: column; gap: 3px; font-size: 11px; line-height: 14px; width: 150px; }
+.pic img { display: block; }
+.who { display: flex; gap: 8px; align-items: baseline; flex-wrap: wrap; }
+.who b { font-size: 15px; line-height: 20px; }
+.strip { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; }
+.tn { display: flex; align-items: center; gap: 6px; background: #ebdbe3; padding: 3px 8px 3px 3px; font-size: 11px; line-height: 15px; font-variant-numeric: tabular-nums; }
+.tn i { display: block; width: 22px; height: 22px; box-shadow: inset 0 0 0 1px #00000040; }
+.tn.faint { box-shadow: inset 0 0 0 1px #090708; font-weight: 700; }
+.lab { font-size: 11px; font-weight: 700; letter-spacing: 1px; text-transform: uppercase; width: 44px; }
+</style>
+</helmet>
+<div class="rv">
+  <h1>Shading and style review: the old drawing's own shapes, from your characters</h1>
+  <p>{{intro}}</p>
+  <div class="how">
+    <div><h2>1 · The shapes are the old drawing's</h2><span>Every shape the old portrait engine draws for a character is converted path by path into mannequin points (with their handles), in the same paint order. Nothing is redrawn or approximated.</span></div>
+    <div><h2>2 · Shading is shapes on top</h2><span>The old drawing lays shadow shapes over a flat base: a plane down one side of the face, the inside of an ear, the nose, the lid, the fold of a top. The mannequin keeps them as shading layers.</span></div>
+    <div><h2>3 · One tone rule</h2><span>A shadow is the old shade(colour, amount): darker, a little richer, the hue nudged toward red, at the shape's own opacity. There are no highlights in the old drawing. The light comes from the upper left.</span></div>
+    <div><h2>4 · What the review shows</h2><span>For each character: the old picture, the same shapes drawn from the converted points, the base shapes alone, and a map of where the shading shapes lie. Under them, the tone steps the old drawing uses on this skin and hair.</span></div>
+  </div>
+  <div class="grid">
+    <sc-for list="{{cards}}" as="c" hint-placeholder-count="14">
+      <div class="card">
+        <div class="who"><b>{{c.name}}</b><span>{{c.line}}</span></div>
+        <div class="pics">
+          <div class="pic"><img src="{{c.portrait}}" width="150" height="150" alt="{{c.altA}}"><span>The old portrait</span></div>
+          <div class="pic"><img src="{{c.exact}}" width="150" height="150" alt="{{c.altB}}"><span>Converted shapes</span></div>
+          <div class="pic"><img src="{{c.flat}}" width="150" height="150" alt="{{c.altC}}"><span>Base shapes alone</span></div>
+          <div class="pic"><img src="{{c.map}}" width="150" height="150" alt="{{c.altD}}"><span>{{c.mapNote}}</span></div>
+        </div>
+        <div class="strip"><span class="lab">Skin</span>
+          <sc-for list="{{c.skin}}" as="t" hint-placeholder-count="4"><span class="tn {{t.cls}}"><i style="background: {{t.css}}"></i>{{t.text}}</span></sc-for>
+        </div>
+        <div class="strip"><span class="lab">Hair</span>
+          <sc-for list="{{c.hair}}" as="t" hint-placeholder-count="3"><span class="tn {{t.cls}}"><i style="background: {{t.css}}"></i>{{t.text}}</span></sc-for>
+        </div>
+      </div>
+    </sc-for>
+  </div>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":1380,"height":2400}}'>
+class Component extends DCLogic {
+  renderVals() {
+    const mq = Mannequin, chars = (typeof window !== 'undefined' && window.ExactChars) || (typeof globalThis !== 'undefined' && globalThis.ExactChars) || [];
+    const fmt = (hex) => 'L ' + Math.round(mq.hexToHsl(hex).l);
+    let faint = 0, shadeTotal = 0, minT = 1, maxT = 0, lightKinds = 0, darkSkin = 0, n = chars.length;
+    const strip = (base, steps) => [{ css: base, text: 'base ' + fmt(base), cls: '' }].concat(steps.map((t) => {
+      const hx = mq.shadeHex(base, t), cr = mq.contrast(mq.hexToHsl(base), mq.hexToHsl(hx));
+      return { css: hx, text: 'shade ' + t + ' · ' + cr.toFixed(2) + ':1', cls: cr < 1.12 ? 'faint' : '' };
+    }));
+    const cards = chars.map((ex, i) => {
+      const sh = ex.shapes.filter(mq.isShadeShape), parts = {};
+      sh.forEach((s) => { parts[s.p] = (parts[s.p] || 0) + 1; shadeTotal += 1; if (s.c[1] === 'light') lightKinds += 1; minT = Math.min(minT, s.c[2]); maxT = Math.max(maxT, s.c[2]); });
+      const hasHair = ex.shapes.some((s) => s.p === 'hairFront' || s.p === 'hairBack');
+      const skin = ex.bases.skin, hair = hasHair ? ex.bases.hair : null;
+      const sk = strip(skin, [0.07, 0.12, 0.2, 0.34]), hr = hair ? strip(hair, [0.22]) : [{ css: '#cccccc', text: 'bald: no hair shapes', cls: '' }];
+      if (sk[2].cls === 'faint') faint += 1; if (mq.hexToHsl(skin).l < 20) darkSkin += 1;
+      const plist = Object.keys(parts).map((k) => k + ' ' + parts[k]).join(' · ');
+      const ts = sh.map((s) => s.c[2]), mn = ts.length ? Math.min.apply(null, ts) : 0, mx = ts.length ? Math.max.apply(null, ts) : 0;
+      return { name: ex.name, line: ex.shapes.length + ' shapes, ' + sh.length + ' of them shading (' + plist + '); amounts ' + mn + ' to ' + mx,
+        portrait: 'review/ch' + i + '.svg', exact: mq.uri(mq.exactSvg(ex, { mode: 'exact', w: 150 })), flat: mq.uri(mq.exactSvg(ex, { mode: 'flat', w: 150 })), map: mq.uri(mq.exactSvg(ex, { mode: 'map', w: 150 })),
+        mapNote: 'Where the shading lies (' + sh.length + ')', skin: sk, hair: hr,
+        altA: ex.name + ', the old portrait card', altB: ex.name + ', the same shapes drawn from the converted points', altC: ex.name + ' with the shading shapes left out', altD: ex.name + ': the shading shapes alone, dark' };
+    });
+    const intro = 'The ' + n + ' characters of your projects, with every shape the old drawing makes for them: ' + shadeTotal + ' shading shapes in all (about ' + Math.round(shadeTotal / Math.max(n, 1)) + ' per character), each one tone step of its base colour, between ' + minT + ' and ' + maxT + ', and ' + lightKinds + ' highlights. ' +
+      darkSkin + ' of the ' + n + ' skins are very dark (under L 20), and on those the same rule changes the colour so little that the shading is faint (outlined in the strips below): the old drawing does not adapt the step to the colour. So the proposal is to keep its shapes and its rule exactly, and to let the designer set a stronger step for a colour that needs it.';
+    return { intro: intro, cards: cards };
+  }
+}
+</script>
+</body>
+</html>

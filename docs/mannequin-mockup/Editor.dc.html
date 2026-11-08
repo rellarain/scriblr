@@ -1,0 +1,516 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Character card editor</title>
+<script src="./support.js"></script>
+<script src="./exact-default.js"></script>
+<script src="./designer-engine.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<style>
+body { margin: 0; }
+.z-day { --base:#e6d1db; --side:#dfc3d1; --deep:#d4afc2; --raised:#ddc0cf; --raised-on:#ebdbe3; --ink:#090708; --hair:#0907081f; --lift1:#09070814; --lift2:#09070824; --acc:#aa6313; --acc-h:#73430d; --on-acc:#ffffff; --paper:#fbf8f4; --paper-ink:#1d161a; --paper-line:#ded7cf; }
+.z-dawn { --base:#d7c9d0; --side:#cebdc6; --deep:#c1abb6; --raised:#ccbac3; --raised-on:#ddd2d7; --ink:#090708; --hair:#0907081f; --lift1:#09070814; --lift2:#09070824; --acc:#986c3a; --acc-h:#6b4c29; --on-acc:#ffffff; --paper:#fbf8f4; --paper-ink:#1d161a; --paper-line:#ded7cf; }
+.z-dusk { --base:#63364d; --side:#562e42; --deep:#422433; --raised:#532d40; --raised-on:#6d3b54; --ink:#ffffff; --hair:#ffffff1f; --lift1:#ffffff14; --lift2:#ffffff24; --acc:#eca351; --acc-h:#f2c088; --on-acc:#090708; --paper:#432f19; --paper-ink:#ffffff; --paper-line:#5d5041; }
+.z-night { --base:#4c3842; --side:#413038; --deep:#2f2329; --raised:#3e2e36; --raised-on:#553f4a; --ink:#ffffff; --hair:#ffffff1f; --lift1:#ffffff14; --lift2:#ffffff24; --acc:#caa172; --acc-h:#dbbf9f; --on-acc:#090708; --paper:#2c2011; --paper-ink:#ffffff; --paper-line:#4b4134; }
+.app { font-family: system-ui, -apple-system, 'Segoe UI', sans-serif; font-size: 12px; line-height: 17px; color: var(--ink); background: var(--base); min-height: 1320px; display: flex; flex-direction: column; box-sizing: border-box; }
+.app *, .app *::before, .app *::after { box-sizing: border-box; }
+.app button { font: inherit; color: inherit; background: none; border: 0; padding: 0; cursor: pointer; border-radius: 0; text-align: left; }
+.app button:focus-visible, .app select:focus-visible, .app input:focus-visible { outline: 2px solid var(--acc-h); outline-offset: 1px; }
+.app h1, .app h2, .app h3, .app p { margin: 0; }
+.hd { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; padding: 8px 14px; min-height: 44px; background: var(--side); }
+.name { font-family: Georgia, 'Times New Roman', serif; font-size: 22px; line-height: 28px; font-weight: 700; }
+.lbl { font-size: 11px; line-height: 15px; font-weight: 700; letter-spacing: 1px; text-transform: uppercase; }
+.crumb { display: flex; gap: 2px; flex-wrap: wrap; }
+.seg { height: 26px; padding: 0 10px; font-size: 11px; font-weight: 700; display: inline-flex; align-items: center; gap: 6px; background: var(--lift1); }
+.seg:hover { background: var(--lift2); }
+.seg.on { background: var(--acc); color: var(--on-acc); }
+.grow { flex: 1 1 auto; }
+.ibtn { width: 30px; height: 30px; display: inline-flex; align-items: center; justify-content: center; flex: 0 0 auto; }
+.ibtn:hover { background: var(--lift1); }
+.ibtn[aria-pressed="true"] { background: var(--acc); color: var(--on-acc); }
+.ibtn:disabled { opacity: 0.35; cursor: default; }
+.ic { width: 18px; height: 18px; fill: none; stroke: currentColor; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; }
+.main { width: 100%; max-width: 700px; margin: 0 auto; padding: 12px; display: flex; flex-direction: column; gap: 8px; }
+.ctools { display: flex; flex-wrap: wrap; align-items: center; gap: 2px; background: var(--side); padding: 4px 6px; }
+.sep { width: 1px; align-self: stretch; margin: 4px 6px; background: var(--hair); }
+.stagewrap { background: var(--side); padding: 8px; display: flex; flex-direction: column; gap: 6px; align-items: center; }
+.card { position: relative; overflow: hidden; border-radius: 14px; }
+.fig { position: absolute; inset: 0; width: 100%; height: 100%; pointer-events: none; z-index: 2; }
+.sheet { position: absolute; opacity: 0; transition: opacity 0.12s; border: 2px solid var(--ink); background: #ffffff3d; }
+.sheet:hover, .sheet:focus-visible { opacity: 1; }
+.sheet.front { z-index: 1; }
+.sheet.back { z-index: 4; background: #ffffff33; }
+.sheet .tag { position: absolute; left: 0; top: 0; padding: 0 6px; font-size: 11px; font-weight: 700; background: var(--acc); color: var(--on-acc); }
+.hot { position: absolute; z-index: 6; border: 1px solid #ffffff99; outline: 1px solid #00000040; outline-offset: -1px; }
+.hot:hover, .hot:focus-visible { border: 2px solid var(--acc-h); background: #ffffff33; outline: 0; }
+.hot.on { border: 2px solid var(--acc-h); background: #ffffff26; }
+.hot.locked::after { content: ''; position: absolute; right: 2px; top: 2px; width: 8px; height: 8px; background: var(--ink); }
+.hover { position: absolute; z-index: 8; max-width: 200px; padding: 6px 8px; background: var(--paper); color: var(--paper-ink); font-size: 11px; line-height: 15px; pointer-events: none; box-shadow: 0 2px 8px rgba(0,0,0,0.35); }
+.hover b { display: block; font-size: 12px; }
+.panel { background: var(--side); padding: 10px 12px 14px; display: flex; flex-direction: column; gap: 10px; }
+.crumbs { display: flex; align-items: center; gap: 4px; flex-wrap: wrap; min-height: 30px; }
+.crumbs .cr { height: 26px; padding: 0 8px; font-size: 11px; font-weight: 700; display: inline-flex; align-items: center; background: var(--lift1); }
+.crumbs .cr:hover { background: var(--lift2); }
+.crumbs .cr.cur { background: var(--acc); color: var(--on-acc); }
+.crumbs .div { font-weight: 700; }
+.sec { display: flex; flex-direction: column; gap: 8px; }
+.sec + .sec { padding-top: 10px; border-top: 1px solid var(--hair); }
+.chips { display: flex; flex-wrap: wrap; gap: 4px; align-items: center; }
+.chip { height: 26px; padding: 0 10px; font-size: 11px; display: inline-flex; align-items: center; gap: 6px; background: var(--lift1); }
+.chip:hover { box-shadow: inset 0 0 0 1px var(--ink); }
+.chip.on { background: var(--acc); color: var(--on-acc); font-weight: 700; }
+.fld { display: flex; align-items: center; gap: 8px; min-height: 28px; }
+.fld > span { flex: 0 0 110px; }
+.fld select { flex: 1 1 auto; min-width: 0; height: 28px; padding: 0 6px; border: 0; background: var(--paper); color: var(--paper-ink); font: inherit; border-radius: 4px; }
+.slr { display: flex; align-items: center; gap: 8px; min-height: 28px; }
+.slr > span:first-child { flex: 0 0 110px; }
+.slr input[type="range"] { flex: 1 1 90px; min-width: 60px; accent-color: var(--acc); }
+.sv { min-width: 44px; text-align: right; font-variant-numeric: tabular-nums; }
+.swatches { display: flex; flex-wrap: wrap; gap: 4px; align-items: center; }
+.sw { width: 26px; height: 26px; padding: 0; border: 2px solid transparent; box-shadow: inset 0 0 0 1px #00000040; }
+.sw.on { border-color: var(--acc-h); outline: 2px solid var(--side); outline-offset: -4px; }
+.sw:hover { border-color: var(--ink); }
+.cap { font-size: 11px; font-weight: 700; flex: 0 0 auto; min-width: 70px; }
+.mini { font-size: 11px; line-height: 15px; }
+.hint { font-style: italic; }
+.slot { display: flex; flex-direction: column; gap: 6px; padding: 8px; background: var(--raised); }
+.btn { height: 26px; padding: 0 10px; font-size: 11px; font-weight: 700; display: inline-flex; align-items: center; gap: 6px; background: var(--lift2); }
+.btn:hover { box-shadow: inset 0 0 0 1px var(--ink); }
+.crow { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; padding: 6px 8px; background: var(--raised); }
+.crow .nm { font-weight: 700; flex: 0 0 90px; }
+.crow select { flex: 1 1 150px; min-width: 120px; height: 28px; padding: 0 6px; border: 0; background: var(--paper); color: var(--paper-ink); font: inherit; border-radius: 4px; }
+.hmap { display: flex; flex-direction: column; gap: 3px; }
+.hrow { display: grid; grid-template-columns: 78px repeat(3, minmax(0, 1fr)); gap: 3px; }
+.hpl { font-size: 11px; font-weight: 700; align-self: center; }
+.hcell { height: 28px; background: var(--lift1); font-size: 11px; text-align: center; padding: 0 4px; display: inline-flex; align-items: center; justify-content: center; overflow: hidden; }
+.hcell:hover { box-shadow: inset 0 0 0 1px var(--ink); }
+.hcell.on { background: var(--acc); color: var(--on-acc); font-weight: 700; }
+.hcell.off { opacity: 0.55; font-style: italic; }
+.hcell:disabled { opacity: 0.3; cursor: default; box-shadow: none; }
+</style>
+</helmet>
+<div class="app {{zoneClass}}">
+  <div class="hd">
+    <h1 class="name">{{charName}}</h1>
+    <div class="crumb" role="tablist" aria-label="Character sections">
+      <button type="button" class="seg" role="tab" aria-selected="false">Profile</button>
+      <button type="button" class="seg" role="tab" aria-selected="false">Appearance</button>
+      <button type="button" class="seg on" role="tab" aria-selected="true">Mannequin</button>
+      <button type="button" class="seg" role="tab" aria-selected="false">Story</button>
+    </div>
+    <span class="grow"></span>
+    <span class="mini">Uses a copy of <b>Adult (basic)</b> v4, stored on this character</span>
+    <div class="crumb" role="group" aria-label="Time of day">
+      <sc-for list="{{zones}}" as="z" hint-placeholder-count="4"><button type="button" class="seg {{z.cls}}" onClick="{{z.pick}}" aria-pressed="{{z.on}}">{{z.name}}</button></sc-for>
+    </div>
+  </div>
+
+  <div class="main">
+    <div class="ctools" role="toolbar" aria-label="View and frame">
+      <sc-for list="{{views}}" as="v" hint-placeholder-count="2"><button type="button" class="seg {{v.cls}}" onClick="{{v.pick}}" aria-pressed="{{v.on}}">{{v.name}}</button></sc-for>
+      <span class="sep"></span>
+      <sc-for list="{{frames}}" as="f" hint-placeholder-count="4"><button type="button" class="seg {{f.cls}}" onClick="{{f.pick}}" aria-pressed="{{f.on}}">{{f.name}}</button></sc-for>
+      <span class="grow"></span>
+      <button type="button" class="ibtn" onClick="{{undo}}" disabled="{{undoOff}}" aria-label="Undo" title="Undo the last change"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M9 14L4 9l5-5M4 9h9a6 6 0 0 1 0 12h-3"/></svg></button>
+      <button type="button" class="seg on" onClick="{{reroll}}" title="Randomise everything that is not locked">
+        <svg class="ic" viewBox="0 0 24 24" aria-hidden="true" style="width:16px;height:16px"><path d="M5 3h14a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2zM8 8h.01M16 8h.01M12 12h.01M8 16h.01M16 16h.01"/></svg>Randomise</button>
+    </div>
+
+    <div class="stagewrap">
+      <div class="card" style="width: {{cardW}}px; height: {{cardH}}px; background: {{tile}}">
+        <sc-for list="{{sheets}}" as="b" hint-placeholder-count="3">
+          <button type="button" class="sheet {{b.cls}}" style="left: {{b.left}}%; right: {{b.right}}%; top: {{b.top}}%; bottom: {{b.bottom}}%" onClick="{{b.pick}}" aria-label="{{b.label}}"><span class="tag">{{b.name}}</span></button>
+        </sc-for>
+        <img class="fig" src="{{figureUri}}" alt="{{figureAlt}}" draggable="false">
+        <sc-for list="{{hotspots}}" as="h" hint-placeholder-count="5">
+          <button type="button" class="hot {{h.cls}}" style="left: {{h.left}}%; top: {{h.top}}%; width: {{h.width}}%; height: {{h.height}}%" onClick="{{h.pick}}" onMouseEnter="{{h.over}}" onMouseLeave="{{h.out}}" onFocus="{{h.over}}" onBlur="{{h.out}}" aria-label="{{h.label}}"></button>
+        </sc-for>
+        <sc-if value="{{hoverOn}}" hint-placeholder-val="{{false}}">
+          <div class="hover" style="left: {{hoverLeft}}%; top: {{hoverTop}}%; transform: translate(-50%, -100%)"><b>{{hoverName}}</b>{{hoverText}}</div>
+        </sc-if>
+      </div>
+      <p class="mini" style="max-width: {{cardW}}px; text-align: center">{{cardHint}}</p>
+    </div>
+
+    <!-- ===== the steps under the card ===== -->
+    <section class="panel" aria-label="Edit the figure">
+      <nav class="crumbs" aria-label="Where you are">
+        <sc-if value="{{hasBack}}" hint-placeholder-val="{{false}}">
+          <button type="button" class="ibtn" onClick="{{back}}" aria-label="Back" title="Back"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M15 5l-7 7 7 7"/></svg></button>
+        </sc-if>
+        <sc-for list="{{crumbs}}" as="c" hint-placeholder-count="3">
+          <button type="button" class="cr {{c.cls}}" onClick="{{c.pick}}" aria-current="{{c.cur}}">{{c.name}}</button>
+        </sc-for>
+      </nav>
+
+      <!-- step 0: nothing chosen -->
+      <sc-if value="{{step0}}" hint-placeholder-val="{{true}}">
+        <div class="sec">
+          <p>Click a part of the figure: hover it and a box shows which group it belongs to. Then click an object inside the group to change it.</p>
+          <label class="fld"><span>Build</span>
+            <select value="{{buildValue}}" onChange="{{onBuild}}">
+              <sc-for list="{{buildOpts}}" as="o" hint-placeholder-count="5"><option value="{{o.id}}">{{o.name}}</option></sc-for>
+            </select>
+          </label>
+          <label class="fld"><span>Age</span>
+            <select value="{{ageValue}}" onChange="{{onAge}}">
+              <sc-for list="{{ageOpts}}" as="o" hint-placeholder-count="5"><option value="{{o.id}}">{{o.name}}</option></sc-for>
+            </select>
+          </label>
+          <label class="fld"><span>Shading</span>
+            <select value="{{shadeValue}}" onChange="{{onShade}}">
+              <sc-for list="{{shadeOpts}}" as="o" hint-placeholder-count="3"><option value="{{o.id}}">{{o.name}}</option></sc-for>
+            </select>
+          </label>
+          <p class="mini">Build and age move the proportion sliders together. The clothes follow the body. Shading is the shadow shapes laid over each colour: flat leaves them out.</p>
+        </div>
+      </sc-if>
+
+      <!-- step 1: a group -->
+      <sc-if value="{{step1}}" hint-placeholder-val="{{false}}">
+        <div class="sec">
+          <h2 class="lbl">{{regionName}}</h2>
+          <sc-if value="{{hasExpr}}" hint-placeholder-val="{{false}}">
+            <label class="fld"><span>Expression</span>
+              <select value="{{exprValue}}" onChange="{{onExpr}}">
+                <sc-for list="{{exprOpts}}" as="o" hint-placeholder-count="5"><option value="{{o.id}}">{{o.name}}</option></sc-for>
+              </select>
+            </label>
+            <p class="mini">An expression sets the eyes, the brows, the smile and the tilt of the head together; it works with every eye, brow and mouth shape.</p>
+          </sc-if>
+          <sc-for list="{{regionControls}}" as="c" hint-placeholder-count="2">
+            <label class="slr"><span>{{c.name}}</span><input type="range" min="{{c.min}}" max="{{c.max}}" step="{{c.step}}" value="{{c.val}}" onInput="{{c.set}}" onChange="{{c.set}}"><span class="sv">{{c.text}}</span></label>
+          </sc-for>
+          <sc-if value="{{poseOn}}" hint-placeholder-val="{{false}}">
+            <label class="fld"><span>Pose</span>
+              <select value="{{poseValue}}" onChange="{{onPose}}">
+                <sc-for list="{{poseOpts}}" as="o" hint-placeholder-count="4"><option value="{{o.id}}">{{o.name}}</option></sc-for>
+              </select>
+            </label>
+          </sc-if>
+          <sc-if value="{{hasHair}}" hint-placeholder-val="{{false}}">
+            <div class="sec" style="border:0;padding-top:0">
+              <h2 class="lbl">Hair</h2>
+              <label class="fld"><span>Style</span>
+                <select value="{{hairStyleValue}}" onChange="{{onHairStyle}}">
+                  <sc-for list="{{hairStyleOpts}}" as="o" hint-placeholder-count="6"><option value="{{o.id}}">{{o.name}}</option></sc-for>
+                </select>
+              </label>
+              <div class="chips">
+                <button type="button" class="btn" onClick="{{saveHairStyle}}">Save this hair as my style</button>
+                <button type="button" class="btn" onClick="{{delHairStyle}}" disabled="{{delHairOff}}">Delete my style</button>
+              </div>
+              <p class="mini">The head is divided by plane and side. Pick a section to give it its own length, cut, texture and colour; a dashed section is off.</p>
+              <div class="hmap">
+                <sc-for list="{{hairRows}}" as="hr" hint-placeholder-count="6">
+                  <div class="hrow"><span class="hpl">{{hr.name}}</span>
+                    <sc-for list="{{hr.cells}}" as="hc" hint-placeholder-count="3"><button type="button" class="hcell {{hc.cls}}" onClick="{{hc.pick}}" disabled="{{hc.off}}" aria-pressed="{{hc.on}}" title="{{hc.title}}">{{hc.text}}</button></sc-for>
+                  </div>
+                </sc-for>
+              </div>
+            </div>
+          </sc-if>
+          <div class="chips"><span class="cap">Show on the card</span>
+            <sc-for list="{{layerChips}}" as="l" hint-placeholder-count="3"><button type="button" class="chip {{l.cls}}" onClick="{{l.pick}}" aria-pressed="{{l.on}}">{{l.name}}</button></sc-for>
+            <button type="button" class="chip" onClick="{{lockRegion}}">{{lockRegionText}}</button>
+          </div>
+        </div>
+        <sc-if value="{{hasClothes}}" hint-placeholder-val="{{false}}">
+          <div class="sec">
+            <h2 class="lbl">Clothing</h2>
+            <p class="mini">Where nothing is worn the bare body shows through. The layer buttons put a garment above or below another.</p>
+            <sc-for list="{{clothes}}" as="g" hint-placeholder-count="3">
+              <div class="crow">
+                <span class="nm">{{g.name}}</span>
+                <select value="{{g.value}}" onChange="{{g.set}}" aria-label="{{g.name}}: worn or not">
+                  <sc-for list="{{g.opts}}" as="o" hint-placeholder-count="2"><option value="{{o.id}}">{{o.name}}</option></sc-for>
+                </select>
+                <button type="button" class="ibtn" onClick="{{g.up}}" aria-label="Move {{g.name}} above" title="Layer above"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true" style="width:14px;height:14px"><path d="M12 19V5M6 11l6-6 6 6"/></svg></button>
+                <button type="button" class="ibtn" onClick="{{g.down}}" aria-label="Move {{g.name}} below" title="Layer below"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true" style="width:14px;height:14px"><path d="M12 5v14M6 13l6 6 6-6"/></svg></button>
+                <button type="button" class="btn" onClick="{{g.edit}}">Fit and colour</button>
+              </div>
+            </sc-for>
+          </div>
+        </sc-if>
+      </sc-if>
+
+      <!-- step 2: an object -->
+      <sc-if value="{{step2}}" hint-placeholder-val="{{false}}">
+        <div class="sec">
+          <div class="chips">
+            <h2 class="lbl" style="margin-right:8px">{{objName}}</h2>
+            <button type="button" class="chip {{lockCls}}" onClick="{{toggleLock}}" aria-pressed="{{locked}}" title="{{lockLabel}}">
+              <svg class="ic" viewBox="0 0 24 24" aria-hidden="true" style="width:14px;height:14px"><path d="M6 11h12v9H6zM8 11V8a4 4 0 0 1 8 0v3"/></svg>{{lockText}}</button>
+          </div>
+          <sc-if value="{{hasShow}}" hint-placeholder-val="{{false}}">
+            <div class="chips"><button type="button" class="chip {{showCls}}" onClick="{{toggleShow}}" aria-pressed="{{shown}}">{{showText}}</button></div>
+          </sc-if>
+          <sc-if value="{{hasStyles}}" hint-placeholder-val="{{false}}">
+            <label class="fld"><span>Style</span>
+              <select value="{{styleValue}}" onChange="{{onStyle}}">
+                <sc-for list="{{styleOpts}}" as="o" hint-placeholder-count="5"><option value="{{o.id}}">{{o.name}}</option></sc-for>
+              </select>
+            </label>
+            <div class="chips">
+              <button type="button" class="btn" onClick="{{saveStyle}}">Save this look as my style</button>
+              <button type="button" class="btn" onClick="{{delStyle}}" disabled="{{delStyleOff}}">Delete my style</button>
+            </div>
+          </sc-if>
+          <sc-for list="{{axes}}" as="a" hint-placeholder-count="2">
+            <label class="fld"><span>{{a.name}}</span>
+              <select value="{{a.value}}" onChange="{{a.set}}">
+                <sc-for list="{{a.opts}}" as="o" hint-placeholder-count="4"><option value="{{o.id}}">{{o.name}}</option></sc-for>
+              </select>
+            </label>
+          </sc-for>
+          <sc-if value="{{hasFall}}" hint-placeholder-val="{{false}}">
+            <label class="fld"><span>Hair falls</span>
+              <select value="{{fallValue}}" onChange="{{onFall}}">
+                <sc-for list="{{fallOpts}}" as="o" hint-placeholder-count="4"><option value="{{o.id}}">{{o.name}}</option></sc-for>
+              </select>
+            </label>
+          </sc-if>
+          <sc-for list="{{objRanges}}" as="r" hint-placeholder-count="3">
+            <label class="slr"><span>{{r.name}}</span><input type="range" min="{{r.min}}" max="{{r.max}}" step="{{r.step}}" value="{{r.val}}" onInput="{{r.set}}" onChange="{{r.set}}"><span class="sv">{{r.text}}</span></label>
+          </sc-for>
+        </div>
+        <sc-for list="{{slots}}" as="s" hint-placeholder-count="1">
+          <div class="slot">
+            <h3 class="lbl">{{s.name}}</h3>
+            <div class="swatches"><span class="cap">Defaults</span>
+              <sc-for list="{{s.presets}}" as="p" hint-placeholder-count="6"><button type="button" class="sw {{p.cls}}" style="background: {{p.css}}" onClick="{{p.pick}}" aria-label="{{p.title}}" title="{{p.title}}" aria-pressed="{{p.on}}"></button></sc-for>
+            </div>
+            <div class="swatches"><span class="cap">My palette</span>
+              <sc-for list="{{s.pal}}" as="p" hint-placeholder-count="5"><button type="button" class="sw {{p.cls}}" style="background: {{p.css}}" onClick="{{p.pick}}" aria-label="{{p.title}}" title="{{p.title}}" aria-pressed="{{p.on}}"></button></sc-for>
+            </div>
+            <label class="slr"><span>Brightness</span><input type="range" min="{{s.lMin}}" max="{{s.lMax}}" step="1" value="{{s.lVal}}" onInput="{{s.lSet}}" onChange="{{s.lSet}}"><span class="sv">{{s.lText}}</span></label>
+            <sc-if value="{{s.hasA}}" hint-placeholder-val="{{false}}">
+              <label class="slr"><span>Opacity</span><input type="range" min="{{s.aMin}}" max="{{s.aMax}}" step="1" value="{{s.aVal}}" onInput="{{s.aSet}}" onChange="{{s.aSet}}"><span class="sv">{{s.aText}}</span></label>
+            </sc-if>
+          </div>
+        </sc-for>
+      </sc-if>
+    </section>
+  </div>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"zone":{"editor":"enum","options":["day","dawn","dusk","night"],"default":"day"},"$preview":{"width":760,"height":1320}}'>
+// Head is the outermost sheet, then torso and arms, then legs: each one inside the one before, like pieces of paper laid on a card.
+const REGIONS = [
+  { id: 'head', name: 'Head and hair', groups: ['head', 'hair'], inset: 0 },
+  { id: 'torso', name: 'Torso and arms', groups: ['torso', 'shoulderL', 'shoulderR', 'armL', 'armR', 'foreL', 'foreR', 'handL', 'handR'], inset: 10 },
+  { id: 'legs', name: 'Legs and feet', groups: ['legL', 'legR', 'footL', 'footR'], inset: 20 }
+];
+const LAYERS = [['body', 'Body'], ['clothing', 'Clothing'], ['hair', 'Hair']];
+const f1 = (v) => Math.round(v * 10) / 10;
+const FEATURES = { eyes: 'Eye shape, size, spacing, tilt, style, colour', mouth: 'Mouth shape, size, style, lip colour', nose: 'Shape, size', brows: 'Shape, height, colour', skull: 'Head shape, skin', ears: 'Shape, size', hairOld: 'Colour (the old drawing’s short hair)', neck: 'Skin', chest: 'Chest form, shoulders, waist, skin', abdomen: 'Waist, hips, skin', pelvis: 'Hips, skin', shoulder: 'Shoulder lift, skin', uarm: 'Skin', elbow: 'Skin', forearm: 'Skin', hand: 'Thumb, skin', leg: 'Leg length, skin', ankle: 'Skin', foot: 'Skin', ball: 'Skin', toes: 'Toe bend, skin', shirt: 'Neckline, fit, colour', collar: 'Colour', sleeve: 'Length, fit, colour', trouser: 'Fit, colour', shoe: 'Colour' };
+const featuresOf = (M, oid) => (M.objects[oid] && M.objects[oid].cell) ? 'Length, cut, texture, colour' : (FEATURES[oid] || '');
+
+class Component extends DCLogic {
+  constructor(...a) {
+    super(...a);
+    this.state = { rev: 0, zone: (this.props && this.props.zone) || 'day', view: 'front', frame: 'full', region: null, obj: null, locks: {}, seed: 5, hover: null, layers: { body: true, clothing: true, hair: true } };
+    this.M = Mannequin.model();
+    const c = Mannequin.defaultCfg(this.M);
+    c.tile = '#e6d6c3';
+    this.cfg = c; this.hist = []; this.rev = 0; this.lastSlide = 0;
+  }
+  bump() { this.rev += 1; this.setState({ rev: this.rev }); }
+  push() { this.hist.push(JSON.stringify(this.cfg)); if (this.hist.length > 30) this.hist.shift(); }
+  slidePush(id) { const now = Date.now(); if (this.lastSlideId !== id || now - this.lastSlide > 700) this.push(); this.lastSlideId = id; this.lastSlide = now; }
+  regionOf() { return REGIONS.filter((r) => r.id === this.state.region)[0] || null; }
+  frameOf() { return this.M.frames.filter((f) => f.id === this.state.frame)[0]; }
+  // the objects of a group (not its right-hand twins), body first, then clothing, then hair
+  objectsOf(reg) {
+    const M = this.M, out = [];
+    LAYERS.forEach((L) => M.groups.forEach((g) => { if (reg.groups.indexOf(g.id) >= 0 && !g.mirrorOf) g.objects.forEach((o) => { if (M.objects[o].layer === L[0] && !M.objects[o].joint) out.push(o); }); }));
+    return out;
+  }
+  lockSet() {
+    const M = this.M, L = { palette: true, tile: true }, S = this.state;
+    Object.keys(M.objects).forEach((oid) => {
+      if (!S.locks[oid]) return;
+      L[oid] = true;
+      M.ranges.forEach((r) => { if (r.scope === oid) L[r.id] = true; });
+      M.objects[oid].shapes.forEach((sid) => { if (!M.shapes[sid].hex) L[M.shapes[sid].slot] = true; });
+      if (M.objects[oid].cell || oid === 'hairOld') { L.fall = true; L.hair = true; }
+    });
+    return L;
+  }
+  randomise() {
+    this.push();
+    const rng = Mannequin.rng(this.state.seed * 977 + this.rev * 31);
+    this.cfg = Mannequin.randomCfg(this.M, rng, 'rand', this.cfg, this.lockSet());
+    this.setState({ seed: this.state.seed + 1 }); this.bump();
+  }
+  goStart() { this.setState({ region: null, obj: null, hover: null }); }
+  goRegion(id) { return () => this.setState({ region: id, obj: null, hover: null }); }
+
+  sheets(res, fr) {
+    const S = this.state, out = [];
+    REGIONS.forEach((r) => {
+      const ids = Object.keys(res.shapes).filter((id) => res.shapes[id].visible && r.groups.indexOf(res.shapes[id].group) >= 0 && fr.hide.indexOf(res.shapes[id].group) < 0);
+      const bb = Mannequin.bbox(res, ids); if (!bb) return;
+      const top = Math.min(Math.max((bb.y - 5 - fr.y) / fr.h * 100, 0), 92);
+      out.push({ name: r.name, cls: S.view === 'front' ? 'front' : 'back', label: r.name + ' group' + (S.region === r.id ? ', selected' : ''),
+        left: f1(r.inset / 3.4), right: f1(r.inset / 3.4), top: f1(top), bottom: f1(r.inset / 6), pick: this.goRegion(r.id) });
+    });
+    return out;
+  }
+  hotspots(res, fr) {
+    const M = this.M, S = this.state, out = [], reg = this.regionOf();
+    if (!reg) return out;
+    this.objectsOf(reg).forEach((oid) => {
+      const ob = M.objects[oid];
+      if (!S.layers[ob.layer] || this.cfg.hidden[oid] || this.cfg.hidden['layer:' + ob.layer]) return;
+      const ids = Object.keys(res.shapes).filter((id) => res.shapes[id].visible && res.shapes[id].obj === oid && fr.hide.indexOf(res.shapes[id].group) < 0);
+      const bb = Mannequin.bbox(res, ids); if (!bb) return;
+      const pad = 2.5, x = bb.x - pad, y = bb.y - pad, w = bb.w + 2 * pad, h = bb.h + 2 * pad;
+      out.push({ cls: (S.obj === oid ? 'on ' : '') + (S.locks[oid] ? 'locked' : ''), label: ob.name + (S.locks[oid] ? ', locked' : '') + ': ' + featuresOf(M, oid),
+        left: f1((x - fr.x) / fr.w * 100), top: f1((y - fr.y) / fr.h * 100), width: f1(w / fr.w * 100), height: f1(h / fr.h * 100),
+        pick: () => this.setState({ obj: oid }), over: () => this.setState({ hover: { oid: oid, x: (x + w / 2 - fr.x) / fr.w, y: (y - fr.y) / fr.h } }), out: () => this.setState({ hover: null }) });
+    });
+    return out;
+  }
+  slotRows(oid) {
+    const M = this.M, cfg = this.cfg, mq = Mannequin, seen = {}, out = [], ob = M.objects[oid];
+    ob.shapes.concat(ob.shade || []).forEach((sid) => { const sh = M.shapes[sid]; if (sh.hex) return; seen[sh.cell ? sh.slot + ':' + sh.cell : sh.slot] = sh.slot; });
+    Object.keys(seen).forEach((sk) => {
+      const slot = M.slots[seen[sk]], cur = cfg.col[sk] || cfg.col[seen[sk]] || slot.def, c = mq.colour(M, cfg, sk, 0);
+      out.push({ name: slot.name + (sk.indexOf(':') > 0 ? ' of this section' : ''),
+        presets: slot.presets.map((p) => ({ css: mq.swatchCss(p.h, p.s, p.l), title: p.name + ', brightness ' + Math.round(p.l) + '%', on: cur.src === 'preset' && cur.id === p.id, cls: cur.src === 'preset' && cur.id === p.id ? 'on' : '', pick: () => { this.push(); cfg.col[sk] = { src: 'preset', id: p.id }; this.bump(); } })),
+        pal: cfg.palette.map((p) => ({ css: mq.swatchCss(p.h, p.s, 50), title: p.name + ', hue ' + p.h + ', saturation ' + p.s + '%', on: cur.src === 'palette' && cur.id === p.id, cls: cur.src === 'palette' && cur.id === p.id ? 'on' : '', pick: () => { this.push(); cfg.col[sk] = { src: 'palette', id: p.id, l: mq.colour(M, cfg, sk, 0).l }; this.bump(); } })),
+        lMin: slot.l.min, lMax: slot.l.max, lVal: Math.round(c.l), lText: Math.round(c.l) + '%', lSet: (e) => { this.slidePush('l' + sk); cfg.col[sk] = Object.assign({}, cfg.col[sk] || cfg.col[seen[sk]] || slot.def, { l: +e.target.value }); this.bump(); },
+        hasA: slot.a.max - slot.a.min > 0, aMin: slot.a.min, aMax: slot.a.max, aVal: Math.round(c.a * 100), aText: Math.round(c.a * 100) + '%', aSet: (e) => { this.slidePush('a' + sk); cfg.col[sk] = Object.assign({}, cfg.col[sk] || cfg.col[seen[sk]] || slot.def, { a: +e.target.value }); this.bump(); } });
+    });
+    return out;
+  }
+  // styles of a class: the admin's, then the writer's own (saved in this character)
+  styleList(kind, id) {
+    const M = this.M, mq = Mannequin, key = kind + ':' + id;
+    return mq.stylesOf(M, kind, id).map((st) => ({ id: 'a:' + st.id, name: st.name, snap: st.snap })).concat((this.cfg.mine[key] || []).map((st) => ({ id: 'm:' + st.id, name: st.name + ' (mine)', snap: st.snap })));
+  }
+  styleBlock(kind, id) {
+    const M = this.M, mq = Mannequin, cfg = this.cfg, oids = mq.styleOids(M, kind, id), key = kind + ':' + id, list = this.styleList(kind, id), cur = mq.styleSnap(M, cfg, oids);
+    const same = (a, b) => JSON.stringify([a.val, a.forms, a.off.slice().sort()]) === JSON.stringify([b.val, b.forms, b.off.slice().sort()]);
+    const on = list.filter((st) => same(cur, st.snap))[0];
+    return {
+      opts: list.map((st) => ({ id: st.id, name: st.name })).concat(on ? [] : [{ id: 'custom', name: 'Custom' }]), value: on ? on.id : 'custom',
+      set: (e) => { const st = list.filter((x) => x.id === e.target.value)[0]; if (!st) return; this.push(); mq.applyStyle(M, cfg, oids, st.snap); if (kind === 'group' && M.groupById[id].sections) cfg.hairStyle = st.id; this.bump(); },
+      save: () => { this.push(); const n = (cfg.mine[key] || []).length + 1; cfg.mine[key] = (cfg.mine[key] || []).concat([{ id: 'u' + this.rev, name: 'My style ' + n, snap: mq.styleSnap(M, cfg, oids) }]); this.bump(); },
+      del: () => { if (!on || on.id.charAt(0) !== 'm') return; this.push(); cfg.mine[key] = (cfg.mine[key] || []).filter((x) => 'm:' + x.id !== on.id); this.bump(); },
+      delOff: !(on && on.id.charAt(0) === 'm')
+    };
+  }
+  rangeRows(pred) {
+    const M = this.M, cfg = this.cfg;
+    return M.ranges.filter((r) => r.show && !r.hidden && !r.pose && pred(r)).map((r) => {
+      const v = cfg.val[r.id] != null ? cfg.val[r.id] : r.def;
+      return { name: r.name, min: r.min, max: r.max, step: r.step ? r.step : (r.max - r.min) > 60 ? 1 : 0.5, val: v, text: r.labels ? r.labels[Math.min(r.labels.length - 1, Math.round(v / (r.step || 33)))] : f1(v) + r.unit, set: (e) => { this.slidePush(r.id); cfg.val[r.id] = +e.target.value; this.bump(); } };
+    });
+  }
+  presetMatch(kind) { const cfg = this.cfg; return this.M.presets.filter((p) => p.kind === kind && Object.keys(p.values).every((k) => Math.abs((cfg.val[k] != null ? cfg.val[k] : 0) - p.values[k]) < 0.01))[0]; }
+
+  renderVals() {
+    const M = this.M, S = this.state, mq = Mannequin, v = {}, cfg = this.cfg;
+    const reg = this.regionOf(), fr = this.frameOf();
+    const ob = S.obj ? M.objects[S.obj] : null;
+    v.zoneClass = 'z-' + S.zone; v.charName = 'Ada Marsh';
+    v.zones = ['day', 'dawn', 'dusk', 'night'].map((z) => ({ name: z.charAt(0).toUpperCase() + z.slice(1), on: S.zone === z, cls: S.zone === z ? 'on' : '', pick: () => this.setState({ zone: z }) }));
+    v.views = ['front', 'back'].map((x) => ({ name: x.charAt(0).toUpperCase() + x.slice(1), on: S.view === x, cls: S.view === x ? 'on' : '', pick: () => this.setState({ view: x }) }));
+    v.frames = M.frames.filter((f) => !f.internal).map((f) => ({ name: f.name, on: S.frame === f.id, cls: S.frame === f.id ? 'on' : '', pick: () => this.setState({ frame: f.id, hover: null }) }));
+    v.undo = () => { if (!this.hist.length) return; this.cfg = JSON.parse(this.hist.pop()); this.bump(); }; v.undoOff = !this.hist.length;
+    v.reroll = () => this.randomise();
+
+    // the card
+    const a = fr.w / fr.h, cw = Math.round(Math.min(380, 600 * a)), ch = Math.round(cw / a);
+    v.cardW = cw; v.cardH = ch; v.tile = cfg.tile;
+    const res = mq.solve(M, cfg, S.view);
+    const hide = fr.hide.slice(); Object.keys(cfg.hidden).forEach((k) => { if (cfg.hidden[k]) hide.push(k); });
+    v.figureUri = mq.uri(mq.svg(M, res, { frame: fr, w: cw * 2, h: ch * 2, hide: hide }));
+    v.figureAlt = 'Ada Marsh, ' + S.view + ' view, ' + fr.name.toLowerCase();
+    v.sheets = this.sheets(res, fr);
+    v.hotspots = this.hotspots(res, fr);
+    const hv = S.hover && M.objects[S.hover.oid];
+    v.hoverOn = !!hv; v.hoverName = hv ? hv.name + (S.locks[S.hover.oid] ? ' (locked)' : '') : ''; v.hoverText = hv ? 'Change: ' + featuresOf(M, S.hover.oid) + '.' : '';
+    v.hoverLeft = hv ? Math.min(Math.max(f1(S.hover.x * 100), 28), 72) : 50; v.hoverTop = hv ? Math.max(f1(S.hover.y * 100 - 2), 14) : 0;
+    v.cardHint = (S.view === 'front' ? 'Front view: a group’s box is behind the figure and shows only while the pointer is over it.' : 'Back view: a group’s box is in front of the figure and shows only while the pointer is over it.') + (reg ? ' The objects of the chosen group are outlined.' : '');
+
+    // where we are
+    const crumbs = [{ name: 'Figure', cur: !reg, cls: !reg ? 'cur' : '', pick: () => this.goStart() }];
+    if (reg) crumbs.push({ name: reg.name, cur: !ob, cls: !ob ? 'cur' : '', pick: this.goRegion(reg.id) });
+    if (ob) crumbs.push({ name: ob.name, cur: true, cls: 'cur', pick: () => {} });
+    v.crumbs = crumbs;
+    v.hasBack = !!reg;
+    v.back = () => { if (ob) this.setState({ obj: null, hover: null }); else this.goStart(); };
+    v.step0 = !reg; v.step1 = !!reg && !ob; v.step2 = !!ob;
+
+    // step 0: build and age
+    const bp = this.presetMatch('build'), ap = this.presetMatch('age');
+    const popts = (kind, cur) => M.presets.filter((p) => p.kind === kind).map((p) => ({ id: p.id, name: p.name })).concat(cur ? [] : [{ id: 'custom', name: 'Custom' }]);
+    v.buildValue = bp ? bp.id : 'custom'; v.buildOpts = popts('build', bp);
+    v.ageValue = ap ? ap.id : 'custom'; v.ageOpts = popts('age', ap);
+    const setPreset = (e) => { const p = M.presets.filter((x) => x.id === e.target.value)[0]; if (!p) return; this.push(); Object.keys(p.values).forEach((k) => { cfg.val[k] = p.values[k]; }); this.bump(); };
+    v.onBuild = setPreset; v.onAge = setPreset;
+    const ep = this.presetMatch('expression');
+    v.hasExpr = !!reg && reg.id === 'head'; v.exprValue = ep ? ep.id : 'custom'; v.exprOpts = popts('expression', ep); v.onExpr = setPreset;
+    const sa = cfg.shadeAmt == null ? 1 : cfg.shadeAmt;
+    v.shadeOpts = [{ id: 'full', name: 'Full' }, { id: 'soft', name: 'Soft' }, { id: 'flat', name: 'Flat (no shading)' }];
+    v.shadeValue = sa >= 0.99 ? 'full' : sa <= 0.01 ? 'flat' : 'soft';
+    v.onShade = (e) => { this.push(); cfg.shadeAmt = { full: 1, soft: 0.55, flat: 0 }[e.target.value]; this.bump(); };
+
+    // step 1: a group
+    const objs = reg ? this.objectsOf(reg) : [];
+    v.regionName = reg ? reg.name : '';
+    v.regionControls = reg ? this.rangeRows((r) => reg.groups.indexOf(r.scope) >= 0 || (reg.id === 'torso' && r.scope === 'model')) : [];
+    const poseRanges = reg ? M.ranges.filter((r) => r.pose && (reg.groups.indexOf(r.scope) >= 0 || (reg.id === 'torso' && (r.scope === 'hand' || r.scope === 'foreL')))) : [];
+    v.poseOn = poseRanges.length > 0;
+    const cur = M.poses.filter((p) => Object.keys(p.values).every((k) => Math.abs((cfg.val[k] != null ? cfg.val[k] : 0) - p.values[k]) < 0.01))[0];
+    v.poseOpts = M.poses.map((p) => ({ id: p.id, name: p.name })).concat(cur ? [] : [{ id: 'custom', name: 'Custom' }]);
+    v.poseValue = cur ? cur.id : 'custom';
+    v.onPose = (e) => { const p = M.poses.filter((x) => x.id === e.target.value)[0]; if (!p) return; this.push(); Object.keys(p.values).forEach((k) => { cfg.val[k] = p.values[k]; }); this.bump(); };
+    v.layerChips = LAYERS.map((L) => ({ name: L[1], on: !!S.layers[L[0]], cls: S.layers[L[0]] ? 'on' : '', pick: () => this.setState({ layers: Object.assign({}, S.layers, { [L[0]]: !S.layers[L[0]] }) }) }));
+    v.hasHair = !!reg && reg.id === 'head';
+    const hb = v.hasHair ? this.styleBlock('group', 'hair') : { opts: [], value: '', set: () => {}, save: () => {}, del: () => {}, delOff: true };
+    v.hairStyleOpts = hb.opts; v.hairStyleValue = hb.value; v.onHairStyle = hb.set; v.saveHairStyle = hb.save; v.delHairStyle = hb.del; v.delHairOff = hb.delOff;
+    v.hairRows = M.hair.planes.map((pl) => ({ name: pl[1], cells: M.hair.sides.map((sd) => {
+      const c = M.hair.cells.filter((x) => x.plane === pl[0] && x.side === sd[0])[0], hid = c ? !!cfg.hidden[c.obj] : false;
+      return { text: c ? sd[1] : '–', title: c ? pl[1] + ', ' + sd[1].toLowerCase() + (hid ? ' (off)' : '') : pl[1] + ', ' + sd[1].toLowerCase() + ': no section here', off: !c, on: !!c && S.obj === c.obj, cls: (c && S.obj === c.obj ? 'on ' : '') + (hid ? 'off' : ''), pick: () => { if (c) this.setState({ obj: c.obj }); } };
+    }) }));
+    const allLocked = objs.length > 0 && objs.every((o) => S.locks[o]);
+    v.lockRegionText = allLocked ? 'Unlock all' : 'Lock all objects here';
+    v.lockRegion = () => { const l = Object.assign({}, S.locks); objs.forEach((o) => { l[o] = !allLocked; }); this.setState({ locks: l }); };
+    const clothing = objs.filter((o) => M.objects[o].layer === 'clothing');
+    v.hasClothes = clothing.length > 0;
+    v.clothes = clothing.map((oid) => { const g = M.objects[oid], worn = !cfg.hidden[oid]; return { name: g.name, value: worn ? 'on' : 'off', opts: [{ id: 'on', name: 'Worn' }, { id: 'off', name: 'Not worn: the body shows' }],
+      set: (e) => { this.push(); cfg.hidden[oid] = e.target.value === 'off'; this.bump(); },
+      up: () => { this.push(); cfg.zoff[oid] = (cfg.zoff[oid] || 0) + 3; this.bump(); }, down: () => { this.push(); cfg.zoff[oid] = (cfg.zoff[oid] || 0) - 3; this.bump(); },
+      edit: () => this.setState({ obj: oid }) }; });
+
+    // step 2: an object
+    const locked = !!(ob && S.locks[ob.id]);
+    v.objName = ob ? ob.name : ''; v.locked = locked; v.lockCls = locked ? 'on' : ''; v.lockText = locked ? 'Locked' : 'Lock'; v.lockLabel = ob ? (locked ? 'Unlock ' : 'Lock ') + ob.name + ': a locked object stays as it is when you randomise' : '';
+    v.toggleLock = () => { if (ob) this.setState({ locks: Object.assign({}, S.locks, { [ob.id]: !locked }) }); };
+    v.axes = ob ? ob.axes.map((ax) => { const key = ob.id + '.' + ax.id; return { name: ax.name, value: cfg.forms[key] || ax.def, opts: ax.options.map((o) => ({ id: o.id, name: o.name })), set: (e) => { this.push(); cfg.forms[key] = e.target.value; this.bump(); } }; }) : [];
+    const sec = !!ob && !!ob.cell, shownNow = !!ob && !cfg.hidden[ob.id];
+    v.hasShow = sec || (!!ob && ob.id === 'hairOld');
+    v.shown = shownNow; v.showCls = shownNow ? 'on' : ''; v.showText = shownNow ? 'This section is on' : 'This section is off';
+    v.toggleShow = () => { if (!ob) return; this.push(); cfg.hidden[ob.id] = shownNow; this.bump(); };
+    const sb = ob && ob.cls ? this.styleBlock('object', ob.id) : { opts: [], value: '', set: () => {}, save: () => {}, del: () => {}, delOff: true };
+    v.hasStyles = !!ob && !!ob.cls;
+    v.styleOpts = sb.opts; v.styleValue = sb.value; v.onStyle = sb.set; v.saveStyle = sb.save; v.delStyle = sb.del; v.delStyleOff = sb.delOff;
+    v.hasFall = sec && ['back', 'left', 'right'].indexOf(ob.plane) >= 0;
+    v.fallValue = cfg.fallSide; v.fallOpts = [['down', 'Straight down'], ['left', 'To the picture’s left'], ['right', 'To the picture’s right'], ['behind', 'Behind the shoulders']].map((x) => ({ id: x[0], name: x[1] }));
+    v.onFall = (e) => { this.push(); cfg.fallSide = e.target.value; this.bump(); };
+    v.objRanges = ob ? this.rangeRows((r) => r.scope === ob.id) : [];
+    v.slots = ob ? this.slotRows(ob.id) : [];
+    return v;
+  }
+}
+</script>
+</body>
+</html>

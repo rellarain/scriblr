@@ -2,7 +2,7 @@ import RoleAssignment from './admin/RoleAssignment'
 import { Suspense, lazy, useState, type ComponentType } from 'react'
 import {
   BarChartIcon, VotingIcon, LibraryIcon, PeopleIcon, BuildingIcon, BriefcaseIcon,
-  EnvelopeIcon, CalendarIcon, HelpIcon, TeamIcon, SortingIcon, ConfigurationIcon, InfoIcon, PlotIcon, GraduationCapIcon,
+  EnvelopeIcon, CalendarIcon, HelpIcon, TeamIcon, SortingIcon, ConfigurationIcon, InfoIcon, PlotIcon, BodyIcon, GraduationCapIcon,
   type IconProps,
 } from '../icons'
 import TileArea, { type AreaTile } from '../../components/tiles/TileArea'
@@ -14,6 +14,8 @@ const ResourcesConsole = lazy(() => import('./admin/resources/ResourcesConsole')
 const InstructorConsole = lazy(() => import('./admin/instructor/InstructorConsole'))
 // The plot presets page, loaded when Configuration > Plot is opened.
 const PlotPresetsConsole = lazy(() => import('./admin/plot/PlotPresetsConsole'))
+// The character models page (the designer), loaded when Configuration > Characters is opened.
+const CharacterModelsConsole = lazy(() => import('./admin/characters/CharacterModelsConsole'))
 
 // Eight consoles per scrilbrPlan.md's "Admin Page (AUI)" section (this array
 // covers 7 of them; Resources -- not in that doc -- is built separately
@@ -33,7 +35,7 @@ type AuiSubSectionKey =
   | 'allotment' | 'assignment' | 'teamSchedule' | 'managerHelp'
   | 'departmentDetails' | 'departmentRoster' | 'departmentAnalytics' | 'department' | 'directorHelp'
   | 'monitorTraining' | 'departmentSchedules' | 'hireTermAdmin' | 'officeHelp'
-  | 'configOverview' | 'configPlot' | 'configHelp'
+  | 'configOverview' | 'configPlot' | 'configCharacters' | 'configHelp'
 
 interface AuiSubSection {
   key: AuiSubSectionKey
@@ -131,6 +133,8 @@ const SECTIONS: AuiSectionDef[] = [
         body: 'Site-wide configuration settings will live here.' },
       { key: 'configPlot', label: 'Plot', Icon: PlotIcon,
         body: 'Set up the plot presets the Writer offers: ready-made categories with their description, keywords, fields, subcategories and clusters.' },
+      { key: 'configCharacters', label: 'Characters', Icon: BodyIcon,
+        body: 'Design the models characters are drawn from: groups, objects and shapes, with a canvas to draw them on and previews of how they hold up.' },
       { key: 'configHelp', label: 'Help', Icon: HelpIcon,
         body: 'Resources and assistance using the Configuration console here.' },
     ],
@@ -152,6 +156,7 @@ function AUI() {
       id: page.key, label: page.label, Icon: page.Icon,
       children: page.key === 'assignment' ? <RoleAssignment />
         : page.key === 'configPlot' ? <Suspense fallback={null}><PlotPresetsConsole /></Suspense>
+        : page.key === 'configCharacters' ? <Suspense fallback={null}><CharacterModelsConsole /></Suspense>
         : <p>{page.body}</p>,
     })),
   }))

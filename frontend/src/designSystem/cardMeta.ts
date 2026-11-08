@@ -45,6 +45,10 @@ export const CARD_META: CardMeta[] = [
     summary: 'Project > Maps, where the setting is mapped: the list of maps (nested ones under their map), the canvas to paint terrain on, and the terrains, layers and fields beside it, with the Save cluster.',
   },
   {
+    id: 'character-models', dir: 'CharacterModels', title: 'Character models: the designer', group: 'Outline', height: 900,
+    summary: 'Admin > Configuration > Characters, where the shapes characters are drawn from are designed: the list of models, a tree of groups, objects and shapes, a canvas with draggable points and curve handles, an inspector, previews at random sizes and the checks, with draft and publish like the Plot presets.',
+  },
+  {
     id: 'characters', dir: 'Characters', title: 'Characters: the cast builder', group: 'Outline', height: 760,
     summary: 'Project > Characters, where the cast is built: the list of characters and, in the Portrait section, a flat portrait card drawn from a set of choices made with picture dropdowns, on one page of collapsible sections (head, hair, face, body, fantasy, card) that scrolls beside the card, with Randomise and a lock for each section.',
   },

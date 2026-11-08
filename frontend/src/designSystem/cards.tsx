@@ -20,6 +20,7 @@ import WriterLevels from '../assets/Interfaces/writer/levels/WriterLevels'
 import { PlotpointTile } from '../assets/Interfaces/writer/PlotpointTile'
 import { PlotNav } from '../assets/Interfaces/writer/PlotNav'
 import PlotPresetsConsole from '../assets/Interfaces/admin/plot/PlotPresetsConsole'
+import CharacterModelsConsole from '../assets/Interfaces/admin/characters/CharacterModelsConsole'
 import InstructorConsole from '../assets/Interfaces/admin/instructor/InstructorConsole'
 import CharactersConsole from '../assets/Interfaces/writer/characters/CharactersConsole'
 import ItemsConsole from '../assets/Interfaces/writer/items/ItemsConsole'
@@ -289,6 +290,17 @@ function CharactersCard() {
   )
 }
 
+// The character models page as it sits in the admin panel (Configuration > Characters, in the admin accent).
+function CharacterModelsCard() {
+  return (
+    <div className="aUI" style={{ position: 'relative', width: '100%', height: '100%', flex: '0 0 auto', ['--aui-w' as string]: '100%' }}>
+      <div className="aUIPanel" style={{ height: '100%', overflow: 'auto', boxSizing: 'border-box', padding: 14 }}>
+        <CharacterModelsConsole />
+      </div>
+    </div>
+  )
+}
+
 // The Items console as it sits in the Project level's Items tab (on the tab's surface), against the pretend Items API.
 function ItemsCard() {
   return (
@@ -397,6 +409,7 @@ export const CARDS: CardDef[] = [
   card('plotpoint-tiles', { defaults: { zones: ['day'] }, render: () => <PlotpointsCard /> }),
   card('plot-presets', { frame: 'plain', views: [{ id: 'admin', label: 'Admin page' }, { id: 'sidebar', label: 'Plot sidebar', frame: 'writer' }], defaults: { view: 'admin', zones: ['day', 'night'], width: 1200 }, render: ({ view }) => <PlotPresetsCard key={view} view={view} /> }),
   card('instructor', { frame: 'plain', defaults: { zones: ['day', 'night'], width: 1200 }, render: () => <InstructorCard /> }),
+  card('character-models', { frame: 'plain', defaults: { zones: ['day', 'night'], width: 1200 }, render: () => <CharacterModelsCard /> }),
   card('characters', { frame: 'plain', defaults: { zones: ['day', 'night'], width: 1200 }, render: () => <CharactersCard /> }),
   card('items', { frame: 'plain', defaults: { zones: ['day', 'night'], width: 1200 }, render: () => <ItemsCard /> }),
   card('maps', { frame: 'plain', defaults: { zones: ['day', 'night'], width: 1200 }, render: () => <MapsCard /> }),

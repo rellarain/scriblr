@@ -1,0 +1,200 @@
+// AUI > Configuration > Characters: the character models page (CharacterModelsConsole.tsx, ModelList.tsx, ModelPane.tsx, AssetTree.tsx, DesignerCanvas.tsx,
+// Inspector.tsx, PreviewStrip.tsx, CheckPanel.tsx). Colours are the theme tokens; inside AUI's own scope --accent is already re-pointed at the admin
+// accent (App.scss), so this needs no colours of its own. Shapes are drawn in a neutral token until the model has colour slots. Type is the text tokens
+// (nothing under 11px) and space the space scale.
+
+.cmPage {
+  container-type: inline-size;
+  display: flex; flex-direction: column; gap: var(--space-5); width: 100%; min-width: 0; color: var(--ink); font-size: var(--text-ui);
+}
+.cmBar { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: var(--space-3) var(--space-6); }
+.cmBarTitle { margin: 0; font-size: var(--text-title); font-weight: 600; text-transform: uppercase; letter-spacing: 1px; }
+.cmNote { display: flex; flex-direction: column; align-items: flex-start; gap: var(--space-4); margin: 0; font-size: var(--text-field); color: var(--ink); }
+.cmSplit { display: flex; align-items: flex-start; gap: var(--space-6); min-width: 0; }
+.cmFoot { display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-3) var(--space-5); }
+.cmErr { margin: 0; font-size: var(--text-small); font-weight: 700; color: var(--ink); }
+.cmEmpty {
+  display: flex; flex-direction: column; align-items: flex-start; gap: var(--space-4); padding: var(--space-6); background: var(--ov-sink-1); box-shadow: inset 0 0 0 1px var(--hairline);
+  h3 { margin: 0; font-size: var(--text-title); }
+  p { margin: 0; max-width: 46ch; font-size: var(--text-field); color: var(--ink-muted); }
+}
+.cmLink { border: 0; padding: 0; background: none; color: inherit; font: inherit; text-decoration: underline; cursor: pointer; &:focus-visible { outline: 2px solid var(--accent-hover); outline-offset: 1px; } }
+
+// ---- buttons ----
+.cmBtn {
+  display: inline-flex; align-items: center; justify-content: center; gap: var(--space-2); padding: var(--space-2) 9px; min-height: 28px; box-sizing: border-box;
+  border: 0; border-radius: var(--radius-button); background: var(--ov-sink-2); color: var(--ink); font: inherit; font-size: var(--text-ui); font-weight: 700; white-space: nowrap; cursor: pointer;
+  &:hover:not(:disabled) { background: var(--ov-sink-3); }
+  &:disabled { opacity: 0.6; cursor: not-allowed; }
+  &:focus-visible { outline: 2px solid var(--accent-hover); outline-offset: 1px; }
+  &--primary { background: var(--accent); color: var(--on-accent); &:hover:not(:disabled) { background: var(--accent-hover); } }
+  &--danger { box-shadow: inset 0 0 0 2px var(--alert); }
+  &--small { padding: var(--space-1) var(--space-base); min-height: 24px; font-size: var(--text-small); }
+}
+.cmIconBtn {
+  display: inline-flex; align-items: center; justify-content: center; width: 28px; height: 28px; padding: 0; border: 0; border-radius: var(--radius-button);
+  background: none; color: var(--ink); opacity: 0.7; cursor: pointer; flex: 0 0 auto;
+  &:hover:not(:disabled) { opacity: 1; background: var(--ov-sink-1); }
+  &:disabled { opacity: 0.3; cursor: default; }
+  &:focus-visible { outline: 2px solid var(--accent-hover); outline-offset: 1px; }
+  &--on { opacity: 1; background: var(--ov-sink-2); box-shadow: inset 0 -2px 0 var(--accent); }
+  &--small { width: 22px; height: 22px; }
+}
+
+// ---- the list of models ----
+.cmList {
+  flex: 0 0 232px; min-width: 0; display: flex; flex-direction: column;
+  background: var(--surface-raised); box-shadow: inset 0 0 0 1px var(--hairline);
+}
+.cmListHead { display: flex; align-items: center; justify-content: space-between; gap: var(--space-3); padding: var(--space-4) var(--space-4) var(--space-3); }
+.cmListTitle { font-size: var(--text-small); font-weight: 700; text-transform: uppercase; letter-spacing: 0.05em; color: var(--ink-muted); }
+.cmRows { position: relative; list-style: none; margin: 0; padding: 0 var(--space-2) var(--space-3); display: flex; flex-direction: column; overflow-y: auto; max-height: 520px; }
+.cmRowItem { display: flex; align-items: center; gap: var(--space-1); &--dragging { opacity: 0.5; } }
+.cmGrip { display: inline-flex; flex: 0 0 auto; padding: var(--space-1); cursor: grab; opacity: 0.6; &:hover, &:focus-visible { opacity: 1; } &:focus-visible { outline: 2px solid var(--accent-hover); outline-offset: 1px; } }
+.cmRow {
+  flex: 1 1 auto; min-width: 0; display: flex; align-items: center; padding: var(--space-3) var(--space-2); border: 0; border-radius: var(--radius-none);
+  background: none; color: inherit; font: inherit; text-align: left; cursor: pointer;
+  &:hover { background: var(--ov-sink-1); }
+  &:focus-visible { outline: 2px solid var(--accent-hover); outline-offset: -2px; }
+  &--on { background: var(--ov-sink-2); box-shadow: inset 3px 0 0 var(--accent); }
+}
+.cmRowText { display: flex; flex-direction: column; min-width: 0; flex: 1 1 auto; gap: var(--space-1); }
+.cmRowName { font-size: var(--text-field); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+// The list folds into this one button when the page is narrow.
+.cmPick {
+  display: none; align-items: center; justify-content: space-between; gap: var(--space-4); width: 100%; box-sizing: border-box; padding: var(--space-4) var(--space-5);
+  border: 0; border-radius: var(--radius-none); background: var(--surface-raised); box-shadow: inset 0 0 0 1px var(--hairline); color: inherit; font: inherit; text-align: left; cursor: pointer;
+}
+.cmBadge { display: inline-flex; align-items: center; gap: var(--space-2); font-size: var(--text-small); color: var(--ink-muted); white-space: nowrap; &--pending { color: var(--ink); font-weight: 700; } }
+.cmDot { width: 8px; height: 8px; border-radius: 50%; flex: 0 0 auto; background: var(--accent); &--never { background: transparent; box-shadow: inset 0 0 0 1.5px var(--ink-muted); } &--off { background: var(--ink-faint); } }
+
+// ---- the open model ----
+.cmPane { flex: 1 1 auto; min-width: 0; position: relative; }
+.cmFieldset { border: 0; margin: 0; padding: 0; min-width: 0; display: flex; flex-direction: column; gap: var(--space-5); &:disabled { opacity: 0.7; } }
+.cmTools {
+  display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-2) var(--space-4); padding: var(--space-3) var(--space-4); background: var(--ov-sink-1);
+}
+.cmName {
+  flex: 1 1 180px; min-width: 0; box-sizing: border-box; margin: 0; padding: 0 0 var(--space-1); border: 0; border-bottom: 1px solid transparent; border-radius: var(--radius-none);
+  outline: none; background: transparent; color: inherit; font-family: Georgia, 'Times New Roman', serif; font-size: var(--text-heading); line-height: 1.25;
+  &:hover { border-bottom-color: var(--ink-faint); }
+  &:focus-visible { border-bottom-color: var(--ink); box-shadow: 0 1px 0 var(--ink); }
+  &::placeholder { color: var(--ink-muted); }
+}
+.cmToolGroup { display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-2) var(--space-3); margin-left: auto; }
+.cmConfirm { display: inline-flex; flex-wrap: wrap; align-items: center; gap: var(--space-3); font-size: var(--text-small); }
+.cmMenuAnchor { position: relative; display: inline-flex; }
+.cmMenu {
+  position: absolute; z-index: 4; top: calc(100% + 4px); right: 0; width: 300px; max-width: 80vw; display: flex; flex-direction: column; padding: var(--space-3);
+  background: var(--surface-base); color: var(--ink); box-shadow: inset 0 0 0 1px var(--hairline), 0 8px 24px rgb(0 0 0 / 0.35);
+  &--templates { left: 0; right: auto; width: 288px; display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: var(--space-1); }
+}
+.cmMenuItem {
+  display: flex; align-items: center; justify-content: space-between; gap: var(--space-4); padding: var(--space-3) var(--space-4); font-size: var(--text-field);
+  small { display: block; font-size: var(--text-small); color: var(--ink-muted); }
+  & + & { border-top: 1px solid var(--hairline); }
+}
+.cmTpl {
+  display: flex; flex-direction: column; align-items: center; gap: var(--space-1); padding: var(--space-2); border: 0; border-radius: var(--radius-button); background: none; color: inherit;
+  font: inherit; font-size: var(--text-small); cursor: pointer;
+  &:hover { background: var(--ov-sink-2); }
+  &:focus-visible { outline: 2px solid var(--accent-hover); outline-offset: -2px; }
+}
+.cmTplThumb { width: 44px; height: 44px; path { fill: var(--ink); } }
+
+// The work area: tree, stage, inspector.
+.cmWork { display: grid; grid-template-columns: 216px minmax(0, 1fr) 256px; gap: var(--space-5); align-items: start; min-width: 0; &--noDrawer { grid-template-columns: 216px minmax(0, 1fr); } }
+
+// ---- the tree ----
+.cmTree { min-width: 0; display: flex; flex-direction: column; gap: var(--space-3); background: var(--surface-raised); box-shadow: inset 0 0 0 1px var(--hairline); padding: var(--space-3); max-height: 640px; overflow-y: auto; }
+.cmTreeHead { display: flex; align-items: center; gap: var(--space-2); }
+.cmSearch {
+  flex: 1 1 auto; min-width: 0; display: flex; align-items: center; gap: var(--space-2); padding: 0 var(--space-3); background: var(--ov-sink-1); color: var(--ink-muted);
+  input { flex: 1 1 auto; min-width: 0; padding: var(--space-2) 0; border: 0; outline: none; background: transparent; color: var(--ink); font: inherit; font-size: var(--text-small); &::placeholder { color: var(--ink-faint); } }
+  &:focus-within { box-shadow: inset 0 0 0 1px var(--accent); }
+}
+.cmTreeList { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; &--in { padding-left: var(--space-4); } }
+.cmTreeRow {
+  display: flex; align-items: center; gap: var(--space-1); min-width: 0; min-height: 26px;
+  &--layer { font-size: var(--text-small); font-weight: 700; text-transform: uppercase; letter-spacing: 0.05em; color: var(--ink-muted); }
+  &--on { background: var(--ov-sink-2); box-shadow: inset 3px 0 0 var(--accent); }
+}
+.cmTreeTwisty { display: inline-flex; align-items: center; justify-content: center; flex: 0 0 18px; width: 18px; height: 22px; padding: 0; border: 0; background: none; color: inherit; cursor: pointer; opacity: 0.7; &:hover { opacity: 1; } &:focus-visible { outline: 2px solid var(--accent-hover); outline-offset: 1px; } }
+span.cmTreeTwisty { cursor: default; }
+.cmTreeName { flex: 1 1 auto; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: var(--text-small); &--muted { color: var(--ink-muted); font-style: italic; } }
+.cmTreeName--btn { padding: var(--space-1) var(--space-2); border: 0; background: none; color: var(--ink); font: inherit; font-size: var(--text-small); text-align: left; text-transform: none; letter-spacing: 0; font-weight: 400; cursor: pointer; &:hover { background: var(--ov-sink-1); } &:focus-visible { outline: 2px solid var(--accent-hover); outline-offset: -2px; } &[aria-current='true'] { font-weight: 700; } }
+.cmCount { flex: 0 0 auto; font-size: var(--text-small); color: var(--ink-muted); &--warn { color: var(--ink); font-weight: 700; box-shadow: inset 0 -2px 0 var(--accent); } &--stop { color: var(--ink); font-weight: 700; box-shadow: inset 0 -2px 0 var(--alert); } }
+
+// ---- the stage: toolbar and canvas ----
+.cmStage { min-width: 0; display: flex; flex-direction: column; gap: var(--space-3); }
+.cmToolbar { display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-1); padding: var(--space-1) var(--space-2); background: var(--ov-sink-1); }
+.cmSep { width: 1px; align-self: stretch; margin: var(--space-1) var(--space-2); background: var(--hairline); }
+.cmSpacer { flex: 1 1 auto; }
+.cmHint { margin: 0; font-size: var(--text-small); color: var(--ink-muted); }
+.cmStageNote { margin: 0; font-size: var(--text-small); color: var(--ink-muted); }
+.cmCanvas {
+  display: block; width: 100%; height: auto; aspect-ratio: 8 / 7; touch-action: none; user-select: none; cursor: crosshair; box-shadow: inset 0 0 0 1px var(--hairline);
+  &:focus-visible { outline: 2px solid var(--accent-hover); outline-offset: 1px; }
+}
+.cmCanvasBg { fill: var(--surface-deep); }
+.cmGridLine { stroke: var(--hairline); stroke-width: 0.35; vector-effect: non-scaling-stroke; &--major { stroke: var(--ink-faint); stroke-opacity: 0.6; } }
+.cmMirrorLine { stroke: var(--ink-faint); stroke-width: 1; stroke-dasharray: 4 4; vector-effect: non-scaling-stroke; opacity: 0.5; &--on { stroke: var(--accent); opacity: 1; } }
+.cmShape { fill: var(--ink-muted); stroke: var(--ink); stroke-width: 1; stroke-opacity: 0.55; vector-effect: non-scaling-stroke; cursor: pointer; &--on { stroke-opacity: 0.9; } &--dim { opacity: 0.35; } &--sel { fill: var(--accent); stroke: var(--ink); stroke-opacity: 1; stroke-width: 1.5; } }
+.cmHandles { pointer-events: none; .cmHandle { pointer-events: auto; } }
+.cmHandleLine { stroke: var(--ink); stroke-width: 1; vector-effect: non-scaling-stroke; opacity: 0.7; }
+.cmHandle { fill: var(--surface-raised); stroke: var(--ink); stroke-width: 1.5; vector-effect: non-scaling-stroke; cursor: grab; }
+.cmPoint { fill: var(--surface-raised); stroke: var(--ink); stroke-width: 1.5; vector-effect: non-scaling-stroke; cursor: grab; &--sharp { fill: var(--ink); } &--sel { fill: var(--accent); stroke-width: 2; } }
+
+// ---- the inspector ----
+.cmInspector { min-width: 0; display: flex; flex-direction: column; gap: var(--space-4); padding: var(--space-4); background: var(--surface-raised); box-shadow: inset 0 0 0 1px var(--hairline); }
+.cmInsTitle { margin: 0; font-size: var(--text-small); font-weight: 700; text-transform: uppercase; letter-spacing: 0.05em; color: var(--ink-muted); }
+.cmInsSub { margin: 0; display: flex; align-items: baseline; justify-content: space-between; gap: var(--space-3); font-size: var(--text-small); font-weight: 700; text-transform: uppercase; letter-spacing: 0.05em; color: var(--ink-muted); }
+.cmInsText { margin: 0; font-size: var(--text-small); color: var(--ink-muted); &--warn, &--stop { color: var(--ink); font-weight: 700; } }
+.cmCrumbs { margin: 0; font-size: var(--text-small); color: var(--ink-muted); overflow-wrap: anywhere; }
+.cmField {
+  display: flex; flex-direction: column; gap: var(--space-1); min-width: 0; font-size: var(--text-small); color: var(--ink-muted);
+  > span:first-child { font-weight: 700; text-transform: uppercase; letter-spacing: 0.05em; }
+  input:not([type='range']), select { box-sizing: border-box; width: 100%; padding: var(--space-2) var(--space-3); border: 0; border-radius: var(--radius-none); background: var(--ov-sink-1); color: var(--ink); font: inherit; font-size: var(--text-field); outline: none; &:focus-visible { box-shadow: inset 0 0 0 1px var(--accent); } }
+}
+.cmRange { display: flex; align-items: center; gap: var(--space-3); input { flex: 1 1 auto; min-width: 0; accent-color: var(--accent); } output { flex: 0 0 3.5em; text-align: right; color: var(--ink); } }
+.cmInline { display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-2) var(--space-3); }
+.cmPoints { display: flex; flex-direction: column; gap: var(--space-3); }
+.cmChips { display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-1); }
+.cmChip {
+  min-width: 26px; padding: var(--space-1) var(--space-2); border: 0; border-radius: var(--radius-button); background: var(--ov-sink-1); color: var(--ink); font: inherit; font-size: var(--text-small); cursor: pointer;
+  &:hover { background: var(--ov-sink-2); }
+  &:focus-visible { outline: 2px solid var(--accent-hover); outline-offset: 1px; }
+  &--wide { padding: var(--space-1) var(--space-3); }
+  &--on { background: var(--accent); color: var(--on-accent); font-weight: 700; &:hover { background: var(--accent-hover); } }
+}
+
+// ---- the preview strip ----
+.cmStrip { display: flex; flex-direction: column; gap: var(--space-3); padding: var(--space-4); background: var(--ov-sink-1); }
+.cmStripBar { display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-2) var(--space-5); }
+.cmTiles { display: flex; flex-wrap: wrap; gap: var(--space-3); }
+.cmTile { flex: 0 0 auto; box-shadow: inset 0 0 0 1px var(--hairline); }
+.cmTileShape { fill: var(--ink); }
+.cmTile--0 { background: var(--surface-raised); }
+.cmTile--1 { background: var(--surface-deep); }
+.cmTile--2 { background: var(--ink); .cmTileShape { fill: var(--surface-raised); } }
+.cmTile--3 { background: var(--accent); .cmTileShape { fill: var(--on-accent); } }
+
+// ---- the checks ----
+.cmCheck { display: flex; flex-direction: column; gap: var(--space-3); padding: var(--space-4); background: var(--ov-sink-1); }
+.cmFaults { margin: 0; padding: 0 0 0 var(--space-6); display: flex; flex-direction: column; gap: var(--space-2); font-size: var(--text-small); }
+.cmFaults--stop, .cmFaults--warn { color: var(--ink); }
+.cmFaults--stop { font-weight: 700; }
+
+// ---- a narrow page: the work area stacks, and the list folds into one picker above it ----
+@container (max-width: 1179px) {
+  .cmWork { grid-template-columns: 216px minmax(0, 1fr); }
+  .cmInspector { grid-column: 1 / -1; }
+}
+@container (max-width: 859px) {
+  .cmSplit { flex-direction: column; align-items: stretch; }
+  .cmPick { display: flex; }
+  .cmList { display: none; flex: 0 0 auto; &--open { display: flex; } }
+  .cmWork, .cmWork--noDrawer { grid-template-columns: minmax(0, 1fr); }
+  .cmTree { max-height: 280px; }
+  .cmMenu { right: auto; left: 0; }
+}

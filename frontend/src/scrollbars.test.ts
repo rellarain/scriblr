@@ -11,7 +11,7 @@ describe('scrollbars', () => {
   })
 
   it('are not turned back on anywhere in the stylesheets', () => {
-    for (const file of ['App.scss', 'assets/Interfaces/writer/writer.scss', 'assets/Interfaces/admin/resources/resources.scss', 'assets/Interfaces/admin/instructor/instructor.scss', 'assets/Interfaces/writer/maps/maps.scss', 'assets/Interfaces/writer/characters/characters.scss', 'assets/Interfaces/writer/items/items.scss', 'assets/Interfaces/writer/readers/readers.scss', 'assets/Interfaces/writer/links/links.scss', 'components/tiles/tiles.scss', 'theme/themeSettings.scss']) {
+    for (const file of ['App.scss', 'assets/Interfaces/writer/writer.scss', 'assets/Interfaces/admin/resources/resources.scss', 'assets/Interfaces/admin/instructor/instructor.scss', 'assets/Interfaces/writer/maps/maps.scss', 'assets/Interfaces/writer/characters/characters.scss', 'assets/Interfaces/admin/characters/characterModels.scss', 'assets/Interfaces/writer/items/items.scss', 'assets/Interfaces/writer/readers/readers.scss', 'assets/Interfaces/writer/links/links.scss', 'components/tiles/tiles.scss', 'theme/themeSettings.scss']) {
       const text = readStyles(file)
       expect(text, file).not.toMatch(/scrollbar-width:[ ]*(auto|thin)/)
       expect(text, file).not.toMatch(/overflow(-[xy])?:[ ]*scroll/)

@@ -17,6 +17,7 @@ import { getOutline, putOutline } from './outlineApi'
 import { getPlot, putPlot } from './plotApi'
 import { createProject, deleteProject, getProject, getProjectsOverview, updateProject } from './projectsApi'
 import { discardPresetChanges, getPresets, getPublishedPresets, publishPreset, putPresets, restorePresetVersion, unpublishPreset } from './presetsApi'
+import { discardModelChanges, getModels, getPublishedModels, publishModel, putModels, restoreModelVersion, unpublishModel } from './characterModelsApi'
 import { listPublications, publishChapter } from './publicationFetch'
 import { clearCompleted, enrol, getTraining, leave, recordAttempt, saveTrainingContent, setCompleted } from './trainingApi'
 
@@ -93,6 +94,13 @@ const CASES: Array<[string, () => Promise<unknown>, string, string, unknown?]> =
   ['unpublishPreset', () => unpublishPreset(ID), 'POST', `/api/presets/${ESC}/unpublish`],
   ['discardPresetChanges', () => discardPresetChanges(ID), 'POST', `/api/presets/${ESC}/discard`],
   ['restorePresetVersion', () => restorePresetVersion(ID, 3), 'POST', `/api/presets/${ESC}/restore/3`],
+  ['getModels', () => getModels(), 'GET', '/api/character-models'],
+  ['putModels', () => putModels({ models: [] }), 'PUT', '/api/character-models', { models: [] }],
+  ['getPublishedModels', () => getPublishedModels(), 'GET', '/api/character-models/published'],
+  ['publishModel', () => publishModel(ID), 'POST', `/api/character-models/${ESC}/publish`],
+  ['unpublishModel', () => unpublishModel(ID), 'POST', `/api/character-models/${ESC}/unpublish`],
+  ['discardModelChanges', () => discardModelChanges(ID), 'POST', `/api/character-models/${ESC}/discard`],
+  ['restoreModelVersion', () => restoreModelVersion(ID, 3), 'POST', `/api/character-models/${ESC}/restore/3`],
   ['putMomentDraft', () => putMomentDraft(ID, ID, ID, 'Text'), 'PUT', `/api/projects/${ESC}/draft/chapter/${ESC}/moment/${ESC}`, { outlineNodeId: ID, body: 'Text' }],
 ]
 
