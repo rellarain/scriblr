@@ -670,6 +670,16 @@ export function ShelfIcon(props: IconProps) {
 export function SparkleIcon(props: IconProps) {
   return <IconBase {...props}><path d="M12 3l2.2 5.8L20 11l-5.8 2.2L12 19l-2.2-5.8L4 11l5.8-2.2zM19 17v4M17 19h4" /></IconBase>
 }
+export function DiceIcon(props: IconProps) {
+  return <IconBase {...props}>
+    <rect x="4" y="4" width="16" height="16" rx="3" />
+    <circle cx="9" cy="9" r="1.1" fill="currentColor" />
+    <circle cx="15" cy="9" r="1.1" fill="currentColor" />
+    <circle cx="12" cy="12" r="1.1" fill="currentColor" />
+    <circle cx="9" cy="15" r="1.1" fill="currentColor" />
+    <circle cx="15" cy="15" r="1.1" fill="currentColor" />
+  </IconBase>
+}
 export function HistoryIcon(props: IconProps) {
   return <IconBase {...props}><path d="M12 7v5l3 2M3 12a9 9 0 109-9M3 4v5h5" /></IconBase>
 }

@@ -10,15 +10,28 @@ import { COLOUR_LABELS, PART_KEYS, PART_NAMES, SLIDER_LABELS, optionName, type C
 const COLOURS: Array<[ColourKey, ColourKind, string]> = [
   ['skin', 'skin', ''], ['eyeColor', 'eye', ''], ['hairColor', 'hair', ''], ['highlightColor', 'hair', 'none'], ['browColor', 'hair', 'like the hair'], ['lipColor', 'cloth', 'natural'],
   ['facialHairColor', 'hair', 'like the hair'], ['topColor', 'cloth', ''],
+  ['necklaceColor', 'cloth', ''], ['hornColor', 'cloth', ''], ['eyeColor2', 'eye', ''], ['crownColor', 'cloth', ''], ['hoodColor', 'cloth', ''], ['itemColor', 'cloth', ''],
 ]
+// A colour of something the portrait may not have (a horn, a crown...) is only a difference when one of the two has the thing.
+const HAS: Partial<Record<ColourKey, (p: CharacterPortrait) => boolean>> = {
+  necklaceColor: p => p.necklace !== 'none', hornColor: p => p.horns !== 'none', eyeColor2: p => p.eyeStyle === 'twocolour', crownColor: p => p.crown !== 'none',
+  hoodColor: p => p.hood !== 'none', itemColor: p => p.heldItem !== 'none',
+}
 const SLIDERS: SliderKey[] = ['headWidth', 'eyeSize', 'eyeSpacing', 'noseSize', 'noseWidth', 'mouthSize', 'shoulderWidth', 'neckWidth']
 
 export function portraitDiff(a: CharacterPortrait, b: CharacterPortrait): string[] {
   const lines: string[] = []
-  for (const key of PART_KEYS) if (a[key] !== b[key]) lines.push(`${PART_NAMES[key]}: ${optionName(key, a[key])} > ${optionName(key, b[key])}`)
+  for (const key of PART_KEYS) {
+    if (a[key] === b[key]) continue
+    // The hand that holds an item is only a difference when there is an item to hold.
+    if (key === 'heldSide' && a.heldItem === 'none' && b.heldItem === 'none') continue
+    lines.push(`${PART_NAMES[key]}: ${optionName(key, a[key])} > ${optionName(key, b[key])}`)
+  }
   for (const [key, kind, none] of COLOURS) {
     const x = a[key], y = b[key]
     if (x === y) continue
+    const has = HAS[key]
+    if (has && !has(a) && !has(b)) continue
     const nameX = x ? colourName(x, kind) : none, nameY = y ? colourName(y, kind) : none
     lines.push(`${COLOUR_LABELS[key]}: ${nameX === nameY ? `${x ?? none} > ${y ?? none}` : `${nameX} > ${nameY}`}`)
   }

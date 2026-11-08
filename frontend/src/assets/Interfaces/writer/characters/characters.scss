@@ -102,6 +102,11 @@
 .charSub .charPortraitFields { padding: var(--space-1) var(--space-2) var(--space-3); }
 .charPortraitFields { display: grid; grid-template-columns: repeat(auto-fill, minmax(240px, 1fr)); gap: var(--space-4) var(--space-5); align-content: start; }
 .charHint--wide { grid-column: 1 / -1; margin: 0; }
+// Randomise: the dice, and a lock for each section (a locked section keeps its choices). The lock shows as a small padlock on the section's icon.
+.charRandom { display: flex; flex-wrap: wrap; align-items: center; justify-content: center; gap: var(--space-1); padding-top: var(--space-2); }
+.charDice { width: 36px; height: 36px; }
+.charLock { position: relative; }
+.charLockMark { position: absolute; right: 1px; bottom: 1px; display: inline-flex; color: var(--ink); }
 .charStateHead { width: 32px; height: 32px; flex: 0 0 auto; }
 
 .charPick { display: flex; flex-direction: column; gap: var(--space-1); min-width: 0; }

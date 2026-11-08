@@ -33,14 +33,20 @@ export function defaultPortrait(): CharacterPortrait {
     hairColor: '#3a2a20', highlightColor: null, greying: 'auto',
     facialHair: 'none', facialHairColor: null,
     top: 'crew', topColor: '#2f4a5a', tileColor: '#e6d6c3',
+    necklace: 'none', necklaceColor: '#cfa83f',
+    fantasyEars: 'none', horns: 'none', hornColor: '#d8cdb4',
+    eyeStyle: 'normal', eyeColor2: '#6a8fb3', eyeCount: 'two',
+    crown: 'none', crownColor: '#d9b04a', hood: 'none', hoodColor: '#4a3f5e',
+    heldItem: 'none', heldSide: 'right', itemColor: '#8a5a2b',
   }
 }
 
 const ID_KEYS = [
   'age', 'build', 'chest', 'headShape', 'ears', 'expression', 'eyes', 'brows', 'nose', 'mouth', 'hairLength', 'hairTexture', 'hairStyle', 'hairFront', 'hairline',
   'hairlineHeight', 'hairEdges', 'hairEnds', 'hairPlacement', 'greying', 'facialHair', 'top',
+  'necklace', 'fantasyEars', 'horns', 'eyeStyle', 'eyeCount', 'crown', 'hood', 'heldItem', 'heldSide',
 ] as const
-const COLOUR_KEYS = ['skin', 'eyeColor', 'hairColor', 'topColor', 'tileColor'] as const
+const COLOUR_KEYS = ['skin', 'eyeColor', 'hairColor', 'topColor', 'tileColor', 'necklaceColor', 'hornColor', 'eyeColor2', 'crownColor', 'hoodColor', 'itemColor'] as const
 const OPTIONAL_COLOUR_KEYS = ['browColor', 'lipColor', 'highlightColor', 'facialHairColor'] as const
 
 const HEX = /^#[0-9a-fA-F]{6}$/

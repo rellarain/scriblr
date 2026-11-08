@@ -522,6 +522,14 @@ export interface CharacterPortrait {
   hairColor: string; highlightColor: string | null; greying: string
   facialHair: string; facialHairColor: string | null
   top: string; topColor: string; tileColor: string
+  // Jewellery worn at the neck.
+  necklace: string; necklaceColor: string
+  // The fantasy elements: ears, horns, the style of the eyes (and the colour of the second) and how many there are, a crown, a hood, and a thing held in a hand raised at the
+  // shoulder (on the picture's left or right).
+  fantasyEars: string; horns: string; hornColor: string
+  eyeStyle: string; eyeColor2: string; eyeCount: string
+  crown: string; crownColor: string; hood: string; hoodColor: string
+  heldItem: string; heldSide: string; itemColor: string
 }
 export const CHARACTER_MAX_FIELDS = 30
 export const CHARACTER_MAX_RELATIONSHIPS = 80

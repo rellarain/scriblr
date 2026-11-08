@@ -3,7 +3,7 @@ import { rigOf } from './rig'
 
 // What a portrait is drawn at: the whole card, or a square of it round one part (the previews in a dropdown show the part that choice changes, and a scene's small head shows the
 // face with a little hair).
-export type PortraitCrop = 'card' | 'head' | 'face' | 'ears' | 'eyes' | 'brows' | 'nose' | 'mouth' | 'lower'
+export type PortraitCrop = 'card' | 'head' | 'top' | 'face' | 'ears' | 'eyes' | 'brows' | 'nose' | 'mouth' | 'lower' | 'neck'
 export type Box = [number, number, number, number]
 
 const square = (cx: number, cy: number, side: number): Box => [cx - side / 2, cy - side / 2, side, side]
@@ -15,6 +15,10 @@ export function cropBox(p: CharacterPortrait, crop: PortraitCrop): Box {
   const W = g.W
   switch (crop) {
     case 'head': return square(100, g.top + g.H * 0.52, W * 2.5)
+    // The top of the head and the air above it, where horns and crowns are.
+    case 'top': return square(100, g.top + g.H * 0.18, W * 2.5)
+    // The neck and the chest below it, where a necklace hangs.
+    case 'neck': return square(100, g.neckBase + 6, g.S * 1.5)
     case 'face': return square(100, g.top + g.H * 0.56, W * 2.3)
     case 'ears': return square(100 + g.cheek + 3, (g.browY + g.noseY) / 2, W * 0.95)
     case 'eyes': return square(100, g.eyeY, W * 1.7)

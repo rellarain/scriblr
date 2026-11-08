@@ -3,6 +3,7 @@
 import { Shapes, band, clamp, ell, lerp, poly, PI, sample, spline, type Pt } from '../paths'
 import { mix, shade } from '../colour'
 import { BROWS, EYES, MOUTHS, NOSES, pick, type Expression, type Eye, type Mouth } from '../library'
+import { EYE_STYLES } from '../fantasyLibrary'
 import { type Rig } from '../rig'
 import { type Drawn } from '../types'
 
@@ -22,47 +23,74 @@ export function eyeCurves(g: Rig, p: Drawn, ex: Pick<Expression, 'lid' | 'bot'>,
   return { es: es, hw: hw, cx: cx, xi: xi, xo: xo, yi: yi, yo: yo, up: up, lo: lo, X: X, hTop: hTop, side: side };
 }
 
-export function drawEyes(out: Shapes, g: Rig, p: Drawn, ex: Expression): void {
+// Which eyes to draw (the picture's right is 1, the left -1) and whether they are the small extra eyes of a fantasy portrait, which have no crease, no bags and no lines.
+export interface EyeOpts { sides?: number[]; mini?: boolean }
+
+export function drawEyes(out: Shapes, g: Rig, p: Drawn, ex: Expression, opts: EyeOpts = {}): void {
   let lash = mix('#1d1513', p.browColor, 0.25);
-  [1, -1].forEach(function (side) {
+  const mini = !!opts.mini, style = EYE_STYLES.some(s => s.id === p.eyeStyle) ? p.eyeStyle : 'normal';
+  (opts.sides ?? [1, -1]).forEach(function (side) {
     let c = eyeCurves(g, p, ex, side), es = c.es, hw = c.hw, skin = p.skin;
+    // The colour of this eye: with two colours the picture's left eye has the second.
+    const iris = style === 'twocolour' && side < 0 ? p.eyeColor2 : p.eyeColor;
     let white = mix('#f7f2ec', skin, 0.1);
-    if (es.deep) out.add(spline(sample(function (t) { return [c.X(t), c.up(t) - 1.5 - Math.sin(t * PI) * hw * 0.55]; }, 10).concat(sample(function (t) { return [c.X(1 - t), c.up(1 - t)]; }, 10)), true), shade(skin, 0.1));
+    if (style === 'blank') white = mix('#f1f2f6', '#cfd3dd', 0.35);
+    if (es.deep && !mini) out.add(spline(sample(function (t) { return [c.X(t), c.up(t) - 1.5 - Math.sin(t * PI) * hw * 0.55]; }, 10).concat(sample(function (t) { return [c.X(1 - t), c.up(1 - t)]; }, 10)), true), shade(skin, 0.1));
     // The crease above the lid.
-    if (es.crease > 0 && ex.lid > 0.5 && g.baby < 0.7) {
+    if (es.crease > 0 && ex.lid > 0.5 && g.baby < 0.7 && !mini) {
       let gap = hw * (es.hood ? 0.18 : 0.34) * (0.6 + 0.4 * ex.lid);
       let crease = sample(function (t) { let u = lerp(0.12, 0.98, t); return [c.X(u), c.up(u) - gap - Math.sin(u * PI) * hw * 0.08]; }, 12);
       out.add(band(crease, 0.25, 0.4, 0.9 * es.crease, side > 0 ? 0.6 : -0.6), shade(skin, 0.2), 0.85);
     }
-    if (es.hood || es.lid) // the fold of the lid over the eye
+    if ((es.hood || es.lid) && !mini) // the fold of the lid over the eye
       out.add(spline(sample(function (t) { return [c.X(t), c.up(t) - 0.3]; }, 12).concat(sample(function (t) { let u = 1 - t; return [c.X(u), c.up(u) - hw * 0.2 * Math.sin(u * PI)]; }, 12)), true), shade(skin, 0.05));
     let outline = sample(function (t) { return [c.X(t), c.up(t)]; }, 14).concat(sample(function (t) { return [c.X(1 - t), c.lo(1 - t)]; }, 14).slice(1, -1));
-    out.add(spline(outline, true, 0.6), white);
+    // A glowing eye has a halo round it, under the lids.
+    const mid = lerp(c.yi, c.yo, 0.5);
+    if (style === 'glowing') {
+      out.add(ell(c.cx, mid, hw * 1.7, hw * 1.05), iris, 0.14);
+      out.add(ell(c.cx, mid, hw * 1.3, hw * 0.78), iris, 0.2);
+    }
+    out.add(spline(outline, true, 0.6), style === 'solid' ? iris : white);
     // The iris and pupil, kept inside the opening.
     let look = (ex.look || 0) * hw * 0.35;
     let ri = hw * 0.5 * es.iris * (1 + 0.14 * g.baby), icx = c.cx + look, icy = lerp(c.yi, c.yo, 0.5) - c.hTop * 0.12;
-    function clip(rad: number): Pt[] {
+    function clipEll(rx: number, ry: number): Pt[] {
       return sample(function (t) {
-        let a = t * PI * 2, x = icx + Math.cos(a) * rad, y = icy + Math.sin(a) * rad;
+        let a = t * PI * 2, x = icx + Math.cos(a) * rx, y = icy + Math.sin(a) * ry;
         let u = clamp((x - c.xi) / (c.xo - c.xi), 0.02, 0.98); x = c.X(u);
         return [x, clamp(y, c.up(u) + 0.15, c.lo(u) - 0.15)];
       }, 36).slice(0, -1);
     }
-    out.add(poly(clip(ri)), p.eyeColor);
-    out.add(poly(clip(ri * 0.62)), shade(p.eyeColor, 0.28), 0.6);
-    out.add(poly(clip(ri * 0.42)), '#16100e');
+    function clip(rad: number): Pt[] { return clipEll(rad, rad); }
+    if (style === 'glowing') {
+      out.add(poly(clip(ri)), mix(iris, '#ffffff', 0.25));
+      out.add(poly(clip(ri * 0.66)), mix(iris, '#ffffff', 0.62));
+      out.add(poly(clip(ri * 0.34)), '#ffffff', 0.92);
+    } else if (style === 'solid') {
+      out.add(poly(clip(ri * 1.5)), shade(iris, 0.26), 0.45);
+      out.add(poly(clip(ri * 0.8)), shade(iris, 0.12), 0.5);
+    } else if (style === 'slit' || style === 'goat') {
+      out.add(poly(clip(ri * 1.1)), iris);
+      out.add(poly(clip(ri * 0.74)), shade(iris, 0.28), 0.55);
+      out.add(poly(style === 'slit' ? clipEll(ri * 0.17, ri * 1.2) : clipEll(ri * 0.86, ri * 0.2)), '#16100e');
+    } else if (style !== 'blank') {
+      out.add(poly(clip(ri)), iris);
+      out.add(poly(clip(ri * 0.62)), shade(iris, 0.28), 0.6);
+      out.add(poly(clip(ri * 0.42)), '#16100e');
+    }
     let hx = icx - ri * 0.38, hy = icy - ri * 0.36, hu = clamp((hx - c.xi) / (c.xo - c.xi), 0, 1);
-    if (hy > c.up(hu) + 0.4) out.add(ell(hx, hy, ri * 0.2, ri * 0.2), '#ffffff', 0.9);
+    if (style !== 'blank' && hy > c.up(hu) + 0.4) out.add(ell(hx, hy, ri * 0.2, ri * 0.2), '#ffffff', 0.9);
     // The lash line along the upper lid, heavier toward the outer corner.
     let lashLine = sample(function (t) { return [c.X(t), c.up(t)]; }, 14);
     if (es.flick) lashLine.push([c.xo + side * hw * 0.28, c.yo - hw * 0.22]);
     out.add(band(lashLine, 0.35, es.flick ? 0.2 : 0.7, 1.35 * (1 - 0.4 * g.baby), side > 0 ? 0.55 : -0.55), lash);
     // A soft line under the eye: deeper with age.
-    if (g.lines > 0.5 || ex.bot > 0.3) {
+    if (!mini && (g.lines > 0.5 || ex.bot > 0.3)) {
       let bag = sample(function (t) { let u = lerp(0.18, 0.9, t); return [c.X(u), c.lo(u) + 1.4 + g.lines * 0.5]; }, 10);
       out.add(band(bag, 0.15, 0.25, 0.55 + g.lines * 0.12), shade(skin, 0.16), clamp(0.3 + g.lines * 0.3 + ex.bot * 0.4, 0, 0.9));
     }
-    if (g.lines > 1) { // crow's feet
+    if (g.lines > 1 && !mini) { // crow's feet
       for (let k = 0; k < 3; k++) {
         let fy = c.yo + (k - 1) * 1.9, fx = c.xo + side * 1.4;
         out.add(band([[fx, fy], [fx + side * 3, fy + (k - 1) * 0.8]], 0.4, 0.15), shade(skin, 0.16), 0.75);
@@ -71,9 +99,9 @@ export function drawEyes(out: Shapes, g: Rig, p: Drawn, ex: Expression): void {
   });
 }
 
-export function drawBrows(out: Shapes, g: Rig, p: Drawn, ex: Expression): void {
+export function drawBrows(out: Shapes, g: Rig, p: Drawn, ex: Expression, sides: number[] = [1, -1]): void {
   let b = pick(BROWS, p.brows); if (b.none) return;
-  [1, -1].forEach(function (side) {
+  sides.forEach(function (side) {
     let c = eyeCurves(g, p, { lid: 1, bot: 0 }, side), hw = c.hw;
     let xi = c.xi - side * hw * 0.12, xo = c.xo + side * hw * 0.45 * b.len;
     let raise = (ex.browRaise && side < 0 ? ex.browRaise : 0);

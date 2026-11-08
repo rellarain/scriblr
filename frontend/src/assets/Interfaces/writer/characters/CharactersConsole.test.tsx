@@ -84,7 +84,7 @@ describe('the portrait page of sections', () => {
     const { user } = await open()
     await screen.findByRole('img', { name: /Ada/ })
     expect(isOpen('Head')).toBe(true)
-    for (const name of ['Hair', 'Face', 'Body', 'Card']) expect(isOpen(name)).toBe(false)
+    for (const name of ['Hair', 'Face', 'Body', 'Fantasy', 'Card']) expect(isOpen(name)).toBe(false)
     expect(dropdown('Age')).toBeInTheDocument()
     expect(dropdown('Head shape')).toBeInTheDocument()
     expect(dropdown('Ears')).toBeInTheDocument()
@@ -161,7 +161,7 @@ describe('the portrait page of sections', () => {
     await screen.findByRole('img', { name: /Ada/ })
     await section(first.user, 'Face')
     await first.user.click(screen.getByRole('button', { name: 'Nose' }))
-    expect(JSON.parse(localStorage.getItem(PANELS_KEY) ?? '{}')).toEqual({ open: 'face', closed: ['face.nose'] })
+    expect(JSON.parse(localStorage.getItem(PANELS_KEY) ?? '{}')).toEqual({ open: 'face', closed: ['face.nose'], locked: ['fantasy'] })
     // Another console, as when the app is opened again.
     document.body.innerHTML = ''
     render(<CharactersConsole projectId="p1" initialSection="portrait" />)
@@ -310,6 +310,153 @@ describe('the parts of the portrait', () => {
     await user.click(save())
     await waitFor(() => expect(puts(backend)).toHaveLength(1))
     expect(lastPut(backend).portrait.top).toBe('cowl')
+  })
+})
+
+describe('the fantasy elements', () => {
+  const colourGroup = (label: string) => screen.queryByRole('group', { name: label })
+
+  it('are a section of their own, with a subsection for each, and the necklace is in the Body', async () => {
+    const { user } = await open()
+    await screen.findByRole('img', { name: /Ada/ })
+    await section(user, 'Fantasy')
+    for (const name of ['Ears', 'Horns and antlers', 'Unusual skin', 'Eyes', 'Crown or circlet', 'Hood', 'Held item']) expect(screen.getByRole('button', { name }), name).toBeInTheDocument()
+    for (const label of ['Fantasy ears', 'Horns', 'Eye style', 'Number of eyes', 'Crown', 'Hood', 'Item']) expect(dropdown(label), label).toBeInTheDocument()
+    await section(user, 'Body')
+    expect(screen.getByRole('button', { name: 'Necklace' })).toBeInTheDocument()
+    expect(dropdown('Necklace')).toBeInTheDocument()
+  })
+
+  it('ask for the colour of a horn, a crown, a hood, an item and a necklace only when there is one', async () => {
+    const { user } = await open()
+    await screen.findByRole('img', { name: /Ada/ })
+    await section(user, 'Fantasy')
+    for (const label of ['Horn colour', 'Crown colour', 'Hood colour', 'Item colour', 'Second eye colour']) expect(colourGroup(label), label).not.toBeInTheDocument()
+    expect(dropdown('Hand')).not.toBeInTheDocument()
+    await pick(user, 'Horns', 'Ram horns')
+    expect(colourGroup('Horn colour')).toBeInTheDocument()
+    await pick(user, 'Crown', 'Tiara')
+    expect(colourGroup('Crown colour')).toBeInTheDocument()
+    await pick(user, 'Hood', 'Deep hood')
+    expect(colourGroup('Hood colour')).toBeInTheDocument()
+    await pick(user, 'Item', 'Staff')
+    expect(colourGroup('Item colour')).toBeInTheDocument()
+    expect(dropdown('Hand')).toBeInTheDocument()
+    await pick(user, 'Eye style', 'Two colours')
+    expect(colourGroup('Second eye colour')).toBeInTheDocument()
+    await pick(user, 'Eye style', 'Usual')
+    expect(colourGroup('Second eye colour')).not.toBeInTheDocument()
+    await section(user, 'Body')
+    expect(colourGroup('Necklace colour')).not.toBeInTheDocument()
+    await pick(user, 'Necklace', 'Pearls')
+    expect(colourGroup('Necklace colour')).toBeInTheDocument()
+  })
+
+  it('save every choice with the character: the picks, the hand and the colours', async () => {
+    const { backend, user } = await open()
+    await screen.findByRole('img', { name: /Ada/ })
+    await section(user, 'Fantasy')
+    await pick(user, 'Fantasy ears', 'Elf')
+    await pick(user, 'Horns', 'Stag antlers')
+    await user.click(within(colourGroup('Horn colour')!).getByRole('button', { name: 'Horn colour #5a4636' }))
+    await pick(user, 'Number of eyes', 'A third eye')
+    await pick(user, 'Eye style', 'Glowing')
+    await user.click(within(screen.getByRole('group', { name: 'Eye colour' })).getByRole('button', { name: 'Eye colour #3fe0e0' }))
+    await pick(user, 'Hood', 'Cowl')
+    await pick(user, 'Item', 'Lantern')
+    await pick(user, 'Hand', 'Left of the picture')
+    await section(user, 'Body')
+    await pick(user, 'Necklace', 'Locket')
+    await user.click(save())
+    await waitFor(() => expect(puts(backend)).toHaveLength(1))
+    expect(lastPut(backend).portrait).toMatchObject({
+      fantasyEars: 'elf', horns: 'stag', hornColor: '#5a4636', eyeCount: 'third', eyeStyle: 'glowing', eyeColor: '#3fe0e0', hood: 'cowl', heldItem: 'lantern', heldSide: 'left', necklace: 'locket',
+    })
+  })
+
+  it('offer the unusual skin colours in the Fantasy and the usual ones in the Head', async () => {
+    const { backend, user } = await open()
+    await screen.findByRole('img', { name: /Ada/ })
+    expect(screen.queryByRole('button', { name: 'Skin #6f94bf' })).not.toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Skin #855034' })).toBeInTheDocument()
+    await section(user, 'Fantasy')
+    expect(screen.queryByRole('button', { name: 'Skin #855034' })).not.toBeInTheDocument()
+    await user.click(screen.getByRole('button', { name: 'Skin #6f94bf' }))
+    await user.click(save())
+    await waitFor(() => expect(puts(backend)).toHaveLength(1))
+    expect(lastPut(backend).portrait.skin).toBe('#6f94bf')
+  })
+})
+
+describe('Randomise', () => {
+  const dice = () => screen.getByRole('button', { name: 'Randomise the portrait' })
+  const lock = (name: string) => screen.getByRole('button', { name: `Lock ${name}` })
+
+  it('has a lock for every section, with the fantasy locked to begin with', async () => {
+    await open()
+    await screen.findByRole('img', { name: /Ada/ })
+    expect(screen.getByRole('group', { name: 'Randomise' })).toBeInTheDocument()
+    for (const name of ['Head', 'Hair', 'Face', 'Body', 'Fantasy', 'Card']) expect(lock(name), name).toBeInTheDocument()
+    expect(lock('Fantasy')).toHaveAttribute('aria-pressed', 'true')
+    for (const name of ['Head', 'Hair', 'Face', 'Body', 'Card']) expect(lock(name), name).toHaveAttribute('aria-pressed', 'false')
+  })
+
+  it('makes new choices, saves them with the character, and is one step of the undo', async () => {
+    const { backend, user } = await open()
+    await screen.findByRole('img', { name: /Ada/ })
+    const before = (await import('../../../../designSystem/mockCharacters')).newCharacter('chr_a', { name: 'Ada' }, 0).portrait
+    await user.click(dice())
+    expect(save()).toBeEnabled()
+    await user.click(save())
+    await waitFor(() => expect(puts(backend)).toHaveLength(1))
+    const after = lastPut(backend).portrait
+    expect(after).not.toEqual(before)
+    // the fantasy was locked: none of it came
+    expect(after).toMatchObject({ horns: 'none', crown: 'none', hood: 'none', heldItem: 'none', fantasyEars: 'none', eyeStyle: 'normal', eyeCount: 'two' })
+    // one undo puts it all back
+    await user.click(screen.getByRole('button', { name: 'Undo' }))
+    await user.click(save())
+    await waitFor(() => expect(puts(backend)).toHaveLength(2))
+    expect(lastPut(backend).portrait).toEqual(before)
+  })
+
+  it('leaves a locked section as it is, and gives something of the fantasy once it is unlocked', async () => {
+    const { backend, user } = await open()
+    await screen.findByRole('img', { name: /Ada/ })
+    const before = (await import('../../../../designSystem/mockCharacters')).newCharacter('chr_a', { name: 'Ada' }, 0).portrait
+    for (const name of ['Head', 'Hair', 'Face', 'Body', 'Card']) await user.click(lock(name))
+    await user.click(lock('Fantasy'))
+    expect(lock('Fantasy')).toHaveAttribute('aria-pressed', 'false')
+    expect(lock('Hair')).toHaveAttribute('aria-pressed', 'true')
+    await user.click(dice())
+    await user.click(save())
+    await waitFor(() => expect(puts(backend)).toHaveLength(1))
+    const after = lastPut(backend).portrait
+    const fantasy = ['fantasyEars', 'horns', 'eyeStyle', 'eyeCount', 'crown', 'hood', 'heldItem'] as const
+    expect(fantasy.some(k => after[k] !== before[k]) || after.skin !== before.skin).toBe(true)
+    // everything else is as it was
+    for (const key of ['age', 'headShape', 'ears', 'hairLength', 'hairStyle', 'hairColor', 'expression', 'eyes', 'nose', 'mouth', 'build', 'top', 'topColor', 'tileColor'] as const) expect(after[key], key).toBe(before[key])
+  })
+
+  it('remembers the locks, like the open section', async () => {
+    const first = await open()
+    await screen.findByRole('img', { name: /Ada/ })
+    await first.user.click(lock('Hair'))
+    await first.user.click(lock('Fantasy'))
+    expect(JSON.parse(localStorage.getItem(PANELS_KEY) ?? '{}').locked).toEqual(['hair'])
+    document.body.innerHTML = ''
+    render(<CharactersConsole projectId="p1" initialSection="portrait" />)
+    await screen.findByRole('img', { name: /Ada/ })
+    expect(lock('Hair')).toHaveAttribute('aria-pressed', 'true')
+    expect(lock('Fantasy')).toHaveAttribute('aria-pressed', 'false')
+  })
+
+  it('starts the fantasy locked when what was remembered was written before the locks', async () => {
+    localStorage.setItem(PANELS_KEY, '{"open":"face","closed":[]}')
+    await open()
+    await screen.findByRole('img', { name: /Ada/ })
+    expect(lock('Fantasy')).toHaveAttribute('aria-pressed', 'true')
+    expect(lock('Face')).toHaveAttribute('aria-pressed', 'false')
   })
 })
 

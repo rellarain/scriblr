@@ -1,17 +1,20 @@
 import type { CharacterPortrait } from '../../../../../api/types'
 import { drawBody } from './draw/body'
 import { drawBeard, drawMoustache } from './draw/facial'
-import { drawBrows, drawEyes, drawMouth, drawNose } from './draw/features'
+import { drawBrows, drawMouth, drawNose } from './draw/features'
+import { drawFantasyEars, drawCrown, drawEyeSet, drawHeldItem, drawHood, drawHoodDown, drawHorns, drawNecklace } from './draw/fantasy'
 import { drawEars, drawHead } from './draw/head'
 import { drawHair } from './draw/hair'
 import { mix, lightOf, shade } from './colour'
+import { FANTASY_EARS, HOODED } from './fantasyLibrary'
 import { EXPRESSIONS, GREYING, AUTO_GREY, pick } from './library'
 import { Shapes, band, lerp, PI, sample, type Shape } from './paths'
 import { rigOf } from './rig'
 import type { Drawn } from './types'
 
-// The portrait as a list of filled shapes in paint order: the tile, the hair behind, the body, the ears, the head, the lines of age, the brows, the eyes, the nose, the facial hair,
-// the mouth, the moustache, and the hair in front. The tile is 200 x 200 with rounded corners; what lies beyond it (hair, shoulders) is cut off by the card.
+// The portrait as a list of filled shapes in paint order: the tile, the hair behind, the hood when it is down, the body, the necklace, the ears, the head, the lines of age, the
+// brows, the eyes, the nose, the facial hair, the mouth, the moustache, the hair in front, then the hood when it is up (and the hair that falls out of it), the horns, the crown and
+// the hand with what it holds. The tile is 200 x 200 with rounded corners; what lies beyond it (hair, shoulders) is cut off by the card.
 
 // How grey the hair, the brows and the beard are drawn: with `greying` set to auto, as much as the age gives; otherwise the amount the setting names.
 export function greyAmount(p: Pick<CharacterPortrait, 'greying' | 'age'>): number {
@@ -43,8 +46,11 @@ export function portraitShapes(portrait: CharacterPortrait): Shape[] {
   const out = new Shapes()
   out.add(TILE, p.tileColor)
   drawHair(out, g, p, 'back')
+  drawHoodDown(out, g, p)
   drawBody(out, g, p)
-  drawEars(out, g, p)
+  drawNecklace(out, g, p)
+  if (pick(FANTASY_EARS, p.fantasyEars).id === 'none') drawEars(out, g, p)
+  else drawFantasyEars(out, g, p)
   drawHead(out, g, p)
   // The lines across the forehead of an older face.
   if (g.lines > 1) {
@@ -53,12 +59,26 @@ export function portraitShapes(portrait: CharacterPortrait): Shape[] {
       out.add(band(sample(t => [lerp(100 - g.fore * 0.45, 100 + g.fore * 0.45, t), y - Math.sin(t * PI) * 1.2], 8), 0.2, 0.2, 0.7), shade(p.skin, 0.12), 0.65)
     })
   }
-  drawBrows(out, g, p, ex)
-  drawEyes(out, g, p, ex)
-  drawNose(out, g, p)
+  // One great eye has one brow over it (and the nose below it, so the shade of the bridge does not fall across the eye); the others have a brow over each eye.
+  if (p.eyeCount === 'one') {
+    drawBrows(out, { ...g, eyeCX: -g.eyeHW * 0.3, eyeHW: g.eyeHW * 1.55 }, p, ex, [1])
+    drawNose(out, g, p)
+    drawEyeSet(out, g, p, ex)
+  } else {
+    drawBrows(out, g, p, ex)
+    drawEyeSet(out, g, p, ex)
+    drawNose(out, g, p)
+  }
   drawBeard(out, g, p, ex)
   drawMouth(out, g, p, ex)
   drawMoustache(out, g, p, ex)
   drawHair(out, g, p, 'front')
+  if (HOODED.includes(p.hood)) {
+    drawHood(out, g, p)
+    drawHair(out, g, p, 'fall')
+  }
+  drawHorns(out, g, p)
+  drawCrown(out, g, p)
+  drawHeldItem(out, g, p)
   return out.list
 }

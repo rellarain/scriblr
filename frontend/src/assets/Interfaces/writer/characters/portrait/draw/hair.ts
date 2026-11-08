@@ -4,6 +4,7 @@
 
 import { Shapes, band, bumpy, clamp, ell, evenly, lerp, mirror, pt, PI, rnd, sample, smoothDense, spline, sym, uneven, type Pt } from '../paths'
 import { mix, shade } from '../colour'
+import { HOODED } from '../fantasyLibrary'
 import { EARS, FRONTS, HAIRLINE_HEIGHTS, LENGTHS, STYLES, TEXTURES, pick, fitHair, type Front, type Length, type Style, type Texture } from '../library'
 import { capOuter, faceX, hug, skull, type Rig } from '../rig'
 import { type Drawn } from '../types'
@@ -315,7 +316,9 @@ export function bunAt(out: Shapes, cx: number, cy: number, r: number, c: string,
   out.add(band(sample(function (t) { let a = lerp(0.2, 1.7, t) * PI; return [cx + Math.cos(a) * r * (0.7 - t * 0.35), cy + Math.sin(a) * r * 0.6 * (0.7 - t * 0.35)]; }, 10), 0.4, 0.3, 0.9), dark, 0.5);
 }
 
-export function drawHair(out: Shapes, g: Rig, p0: Drawn, layer: 'back' | 'front'): void {
+// The hair in three passes: behind the body (`back`), in front of the head (`front`), and, for a character in a hood, the part that hangs out from under it (`fall`: what is
+// left of `front` when the cap on the head, the parting and the fringe are taken away, since the hood covers those).
+export function drawHair(out: Shapes, g: Rig, p0: Drawn, layer: 'back' | 'front' | 'fall'): void {
   let p = fitHair(p0), m = hairModel(g, p), c = p.hairColor, dark = shade(c, 0.22), hi = p.highlightColor;
   if (m.len.id === 'bald') return;
   let backC = shade(c, m.tex.kind === 'straight' ? 0.16 : m.tex.kind === 'wavy' ? 0.13 : 0.06);
@@ -346,6 +349,8 @@ export function drawHair(out: Shapes, g: Rig, p0: Drawn, layer: 'back' | 'front'
       return;
     }
     if (id === 'cornrows' && m.end > sy) [1, -1].forEach(function (k) { chain(out, 100 + k * (g.neck + 3), g.chin, 100 + k * (g.neck + 7), E, 4.6, Math.max(4, Math.round((E - g.chin) / 7)), c, dark); });
+    // The hood covers the top of the head: no bun or knot shows above it.
+    if (HOODED.includes(p.hood) && ['puff', 'topbun', 'topknot', 'spacebuns'].includes(id)) return;
     if (id === 'puff') { let rp = 9 + Math.min(16, L * 0.045); bunAt(out, 100, g.top - rp * 0.45, rp, c, dark, m.coily || m.tex.kind === 'curly' ? m.tex : null); }
     if (id === 'topbun') bunAt(out, 100, g.top - (7 + Math.min(9, L * 0.028)) * 0.55, 7 + Math.min(9, L * 0.028), c, dark, m.tex);
     if (id === 'topknot') bunAt(out, 100, g.top - (4.5 + Math.min(4, L * 0.014)) * 0.5, 4.5 + Math.min(4, L * 0.014), c, dark, m.tex);
@@ -359,54 +364,56 @@ export function drawHair(out: Shapes, g: Rig, p0: Drawn, layer: 'back' | 'front'
   }
 
   // ---- front layer ----
+  // What the hood covers is drawn into `cap`: the real output for `front`, nowhere for `fall`.
+  const cap = layer === 'fall' ? new Shapes() : out;
   let front = frontEdge(g, m);
   if (m.len.i <= 1 || id === 'fade' || id === 'undercut' || id === 'mohawk' || id === 'shavedside') {
-    out.add(capT(g, { vol: m.coily ? 1.7 : 1.3, side: 0.6, low: by + 1, front: hairlineFull(g, snug(m, by + 1)) }), skinMix);
-    if (m.len.i <= 1 && id !== 'fade') { edgeHairs(out, g, p, m, c); return; }
+    cap.add(capT(g, { vol: m.coily ? 1.7 : 1.3, side: 0.6, low: by + 1, front: hairlineFull(g, snug(m, by + 1)) }), skinMix);
+    if (m.len.i <= 1 && id !== 'fade') { edgeHairs(cap, g, p, m, c); return; }
   }
   let tex = m.tex, V = m.V;
   switch (id) {
     case 'fade':
-      out.add(capT(g, { vol: Math.max(3, V * 0.7), side: -fx * 0.12, low: g.hairY + 4, front: [[100 + fx * 0.92, g.hairY + 4]].concat(front.filter(function (q) { return Math.abs(q[0] - 100) < fx * 0.85 && q[1] < by - 2; })).concat([[100 - fx * 0.92, g.hairY + 4]]) }, tex), c);
-      capStrands(out, g, m, dark); break;
+      cap.add(capT(g, { vol: Math.max(3, V * 0.7), side: -fx * 0.12, low: g.hairY + 4, front: [[100 + fx * 0.92, g.hairY + 4]].concat(front.filter(function (q) { return Math.abs(q[0] - 100) < fx * 0.85 && q[1] < by - 2; })).concat([[100 - fx * 0.92, g.hairY + 4]]) }, tex), c);
+      capStrands(cap, g, m, dark); break;
     case 'undercut':
-      out.add(capT(g, { vol: 6 + Math.min(8, L * 0.04), side: 1, low: g.hairY + 5, lift: 4, liftX: fx * 0.2, front: [[100 + fx * 0.97, g.hairY + 5], [100 + fx * 0.9, g.hairY + 6.5], [100 + fx * 0.3, g.hairY + 2], [100 - fx * 0.3, g.hairY + 5], [100 - fx * 0.78, g.hairY + 10 + Math.min(8, L * 0.05)], [100 - fx * 0.97, g.hairY + 5]] }, tex), c);
+      cap.add(capT(g, { vol: 6 + Math.min(8, L * 0.04), side: 1, low: g.hairY + 5, lift: 4, liftX: fx * 0.2, front: [[100 + fx * 0.97, g.hairY + 5], [100 + fx * 0.9, g.hairY + 6.5], [100 + fx * 0.3, g.hairY + 2], [100 - fx * 0.3, g.hairY + 5], [100 - fx * 0.78, g.hairY + 10 + Math.min(8, L * 0.05)], [100 - fx * 0.97, g.hairY + 5]] }, tex), c);
       break;
     case 'mohawk': {
       let h = 8 + Math.min(20, L * 0.1), w = fx * 0.24;
       let crest = [[100 - fx * 0.2, g.hairY + 1], [100 - w, g.top + 3], [100 - w * 0.5, g.top - h * 0.7], [100, g.top - h], [100 + w * 0.5, g.top - h * 0.7], [100 + w, g.top + 3], [100 + fx * 0.2, g.hairY + 1], [100, g.hairY - 1]];
-      out.add(tex.kind === 'straight' ? spline(crest, true) : texPath(crest, tex, 100, g.top - h * 0.3), c);
+      cap.add(tex.kind === 'straight' ? spline(crest, true) : texPath(crest, tex, 100, g.top - h * 0.3), c);
       break;
     }
     case 'quiff':
-      out.add(capT(g, { vol: V, side: V * 0.5, low: by + 1, lift: 8 + Math.min(6, L * 0.03), liftX: fx * 0.1, front: front }, tex), c);
-      capStrands(out, g, m, dark); break;
+      cap.add(capT(g, { vol: V, side: V * 0.5, low: by + 1, lift: 8 + Math.min(6, L * 0.03), liftX: fx * 0.1, front: front }, tex), c);
+      capStrands(cap, g, m, dark); break;
     case 'slicked':
-      out.add(capT(g, { vol: Math.max(3, V * 0.7), side: Math.max(1.4, V * 0.4), low: by + 1, front: hairlineFull(g, snug(m, by + 1)) }), c);
-      capStrands(out, g, m, dark); break;
+      cap.add(capT(g, { vol: Math.max(3, V * 0.7), side: Math.max(1.4, V * 0.4), low: by + 1, front: hairlineFull(g, snug(m, by + 1)) }), c);
+      capStrands(cap, g, m, dark); break;
     case 'cornrows': {
-      out.add(capT(g, { vol: 2.4, side: 1.4, low: by + 1, front: hairlineFull(g, snug(m, by + 1)) }), c);
+      cap.add(capT(g, { vol: 2.4, side: 1.4, low: by + 1, front: hairlineFull(g, snug(m, by + 1)) }), c);
       let hy = yAt(hairlineFull(g, m), 100);
       for (let j = -3.5; j <= 3.5; j += 1) {
         let jx = j;
-        out.add(band(sample(function (t) { return [lerp(100 + jx * fx * 0.25, 100 + jx * fx * 0.1, t), lerp(yAt(hairlineFull(g, m), 100 + jx * fx * 0.25) + 1, g.top + 1, t)]; }, 8), 1.1, 0.7, 1.2), mix(p.skin, c, 0.28), 0.9);
+        cap.add(band(sample(function (t) { return [lerp(100 + jx * fx * 0.25, 100 + jx * fx * 0.1, t), lerp(yAt(hairlineFull(g, m), 100 + jx * fx * 0.25) + 1, g.top + 1, t)]; }, 8), 1.1, 0.7, 1.2), mix(p.skin, c, 0.28), 0.9);
       }
       break;
     }
     case 'bantu': {
-      out.add(capT(g, { vol: 2.2, side: 1.4, low: by + 1, front: front }), c);
-      partLine(out, g, p, m, c);
-      [26, 58, 90, 122, 154].forEach(function (a) { let q = skull(g, a, 3); bunAt(out, q[0], q[1], 4.4 + tex.vol * 0.7, c, dark, null); });
+      cap.add(capT(g, { vol: 2.2, side: 1.4, low: by + 1, front: front }), c);
+      partLine(cap, g, p, m, c);
+      [26, 58, 90, 122, 154].forEach(function (a) { let q = skull(g, a, 3); bunAt(cap, q[0], q[1], 4.4 + tex.vol * 0.7, c, dark, null); });
       break;
     }
     case 'onebraid': case 'twobraids': case 'boxbraids': case 'trianglebraids': case 'locs': case 'twists': {
-      out.add(capT(g, { vol: 3.2 + tex.vol, side: 2.4, low: by + 1, front: front.map(function (q) { return [q[0], Math.min(q[1], q === front[0] || q === front[front.length - 1] ? by + 1 : q[1])]; }) }), c);
-      partLine(out, g, p, m, c);
+      cap.add(capT(g, { vol: 3.2 + tex.vol, side: 2.4, low: by + 1, front: front.map(function (q) { return [q[0], Math.min(q[1], q === front[0] || q === front[front.length - 1] ? by + 1 : q[1])]; }) }), c);
+      partLine(cap, g, p, m, c);
       if (id === 'boxbraids' || id === 'trianglebraids' || id === 'twists') {
         // the parts of the braids on the scalp
-        for (let r2 = 1; r2 <= 2; r2++) out.add(band(sample(function (t) { return skull(g, lerp(160, 20, t), -4 - r2 * 5); }, 12), 0.5, 0.5, 0.6), dark, 0.6);
-        if (id === 'trianglebraids') for (let z = 0; z < 7; z++) { let a1 = lerp(150, 30, z / 6); out.add(band([skull(g, a1, -14), skull(g, a1 + 9, -4), skull(g, a1 - 9, -4)], 0.5, 0.5), dark, 0.6); }
-        else for (let v = -3; v <= 3; v++) out.add(band(sample(function (t) { return [100 + v * fx * 0.22 * (1 - t * 0.3), lerp(g.hairY + 1, g.top + 3, t)]; }, 5), 0.4, 0.4, 0.5), dark, 0.5);
+        for (let r2 = 1; r2 <= 2; r2++) cap.add(band(sample(function (t) { return skull(g, lerp(160, 20, t), -4 - r2 * 5); }, 12), 0.5, 0.5, 0.6), dark, 0.6);
+        if (id === 'trianglebraids') for (let z = 0; z < 7; z++) { let a1 = lerp(150, 30, z / 6); cap.add(band([skull(g, a1, -14), skull(g, a1 + 9, -4), skull(g, a1 - 9, -4)], 0.5, 0.5), dark, 0.6); }
+        else for (let v = -3; v <= 3; v++) cap.add(band(sample(function (t) { return [100 + v * fx * 0.22 * (1 - t * 0.3), lerp(g.hairY + 1, g.top + 3, t)]; }, 5), 0.4, 0.4, 0.5), dark, 0.5);
       }
       let sides = id === 'onebraid' ? [1] : [1, -1];
       sides.forEach(function (k) {
@@ -427,8 +434,8 @@ export function drawHair(out: Shapes, g: Rig, p0: Drawn, layer: 'back' | 'front'
     }
     case 'topbun': case 'lowbun': case 'spacebuns': case 'topknot': case 'puff': case 'highpony': case 'lowpony': case 'pigtails': {
       let tight = Math.min(V, 3.4 + tex.vol);
-      out.add(capT(g, { vol: tight, side: tight * 0.6, low: by + 1, front: m.front.id === 'curtain' ? front : front.map(function (q, i) { return i === 0 || i === front.length - 1 ? [q[0], by + 1] : q; }) }, tex.kind === 'straight' ? null : tex), c);
-      partLine(out, g, p, m, c); capStrands(out, g, m, dark);
+      cap.add(capT(g, { vol: tight, side: tight * 0.6, low: by + 1, front: m.front.id === 'curtain' ? front : front.map(function (q, i) { return i === 0 || i === front.length - 1 ? [q[0], by + 1] : q; }) }, tex.kind === 'straight' ? null : tex), c);
+      partLine(cap, g, p, m, c); capStrands(cap, g, m, dark);
       if (m.front.id === 'curtain') curtains(out, g, p, Object.assign({}, m, { end: Math.min(m.end, g.chin) }), c, dark, null, {});
       if (id === 'lowpony') out.add(tube(sample(function (t) { return [lerp(100 + g.neck + 1, 100 + g.neck + 10, t) + Math.sin(t * PI) * 3, lerp(g.chin - 2, tailEnd(g.chin), t)]; }, 12), 7 + V * 0.3, 4, tex), c);
       if (id === 'pigtails') [1, -1].forEach(function (k) {
@@ -442,22 +449,22 @@ export function drawHair(out: Shapes, g: Rig, p0: Drawn, layer: 'back' | 'front'
       let hyS = yAt(hairlineFull(g, m), 100), outerR = capOuter(g, m.hang ? { vol: crownVol(m), side: sideThickness(m, 1) } : { vol: V, side: V * 0.8 }, m.sideYR);
       let frontS = front.filter(function (q) { return q[0] >= 100 - fx * 0.3; });
       let pathS = outerR.slice().reverse().concat(hug(g, frontS)).concat([[100 - fx * 0.32, hyS - 2], [100 - fx * 0.36, g.top + g.H * 0.12], [100 - fx * 0.2, g.top - V * 0.6]]);
-      out.add(tex.kind === 'straight' ? spline(pathS, true) : texPath(pathS, tex, 100, g.sk.cy), c);
-      capStrands(out, g, m, dark);
+      cap.add(tex.kind === 'straight' ? spline(pathS, true) : texPath(pathS, tex, 100, g.sk.cy), c);
+      capStrands(cap, g, m, dark);
       if (m.hang && m.place !== 'behind') curtains(out, g, p, m, c, dark, hi, { only: 1 });
       break;
     }
     default: { // plain, half up, triangle
-      if (m.coily) out.add(capT(g, { vol: 2.2, side: 1.5, low: m.sideY, front: front }, tex), c);
-      else if (m.hang) out.add(capT(g, { vol: id === 'triangle' ? crownVol(m) * 0.8 : crownVol(m), side: sideThickness(m, 1), sideL: sideThickness(m, -1), low: m.sideYR, lowL: m.sideYL, front: front }, tex), c);
-      else out.add(capT(g, { vol: id === 'triangle' ? V * 0.6 : V, side: V * 0.8, low: m.sideY, front: front }, tex), c);
-      thinning(out, g, p, m);
-      partLine(out, g, p, m, c);
-      capStrands(out, g, m, dark);
+      if (m.coily) cap.add(capT(g, { vol: 2.2, side: 1.5, low: m.sideY, front: front }, tex), c);
+      else if (m.hang) cap.add(capT(g, { vol: id === 'triangle' ? crownVol(m) * 0.8 : crownVol(m), side: sideThickness(m, 1), sideL: sideThickness(m, -1), low: m.sideYR, lowL: m.sideYL, front: front }, tex), c);
+      else cap.add(capT(g, { vol: id === 'triangle' ? V * 0.6 : V, side: V * 0.8, low: m.sideY, front: front }, tex), c);
+      thinning(cap, g, p, m);
+      partLine(cap, g, p, m, c);
+      capStrands(cap, g, m, dark);
       if (m.hang) curtainPlan(m).forEach(function (o) { curtains(out, g, p, m, c, dark, hi, { ...o, flare: id === 'triangle' }); });
-      if (m.front.id === 'bangs') out.add(band(sample(function (t) { let fy = yAt(front, lerp(100 - fx * 0.8, 100 + fx * 0.8, t)); return [lerp(100 - fx * 0.8, 100 + fx * 0.8, t), fy - 2.2]; }, 10), 0.3, 0.3, 1.1), dark, 0.45);
-      if (hi && !m.hang) out.add(band(sample(function (t) { return skull(g, lerp(118, 70, t), m.coily ? 6 : V * 0.6); }, 8), 0.6, 0.6, 3), hi, 0.9);
+      if (m.front.id === 'bangs') cap.add(band(sample(function (t) { let fy = yAt(front, lerp(100 - fx * 0.8, 100 + fx * 0.8, t)); return [lerp(100 - fx * 0.8, 100 + fx * 0.8, t), fy - 2.2]; }, 10), 0.3, 0.3, 1.1), dark, 0.45);
+      if (hi && !m.hang) cap.add(band(sample(function (t) { return skull(g, lerp(118, 70, t), m.coily ? 6 : V * 0.6); }, 8), 0.6, 0.6, 3), hi, 0.9);
     }
   }
-  edgeHairs(out, g, p, m, c);
+  edgeHairs(cap, g, p, m, c);
 }

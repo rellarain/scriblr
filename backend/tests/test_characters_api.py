@@ -86,6 +86,43 @@ def test_the_ends_and_the_placement_of_the_hair_are_ids_with_defaults_and_old_po
     assert CharacterPortrait.model_validate({"hairPlacement": "over-the-moon"}).hairPlacement == "over-the-moon"
 
 
+FANTASY_IDS = {
+    "necklace": "none", "fantasyEars": "none", "horns": "none", "eyeStyle": "normal", "eyeCount": "two", "crown": "none", "hood": "none", "heldItem": "none", "heldSide": "right",
+}
+FANTASY_COLOURS = {
+    "necklaceColor": "#cfa83f", "hornColor": "#d8cdb4", "eyeColor2": "#6a8fb3", "crownColor": "#d9b04a", "hoodColor": "#4a3f5e", "itemColor": "#8a5a2b",
+}
+
+
+def test_the_fantasy_elements_are_ids_and_colours_with_defaults_and_old_portraits_get_them() -> None:
+    plain = CharacterPortrait()
+    for key, value in FANTASY_IDS.items():
+        assert getattr(plain, key) == value, key
+    for key, value in FANTASY_COLOURS.items():
+        assert getattr(plain, key) == value, key
+    # a portrait saved before these existed has none of them: it opens with the usual, and keeps what else it had
+    old = CharacterPortrait.model_validate({"hairLength": "hip", "eyeColor": "#112233"})
+    for key, value in {**FANTASY_IDS, **FANTASY_COLOURS}.items():
+        assert getattr(old, key) == value, key
+    assert old.hairLength == "hip" and old.eyeColor == "#112233"
+    made = CharacterPortrait.model_validate({
+        "fantasyEars": " elf ", "horns": "ram", "hornColor": "#101010", "eyeStyle": "glowing", "eyeColor2": "#aa22cc", "eyeCount": "third", "crown": "tiara", "crownColor": "#c0c0c0",
+        "hood": "deep", "hoodColor": "#222233", "heldItem": "wand", "heldSide": "left", "itemColor": "#ffffff", "necklace": "pendant", "necklaceColor": "#b87333",
+    })
+    assert made.fantasyEars == "elf" and made.horns == "ram" and made.hornColor == "#101010" and made.eyeStyle == "glowing" and made.eyeColor2 == "#aa22cc"
+    assert made.eyeCount == "third" and made.crown == "tiara" and made.crownColor == "#c0c0c0" and made.hood == "deep" and made.hoodColor == "#222233"
+    assert made.heldItem == "wand" and made.heldSide == "left" and made.itemColor == "#ffffff" and made.necklace == "pendant" and made.necklaceColor == "#b87333"
+
+
+def test_a_bad_fantasy_value_is_the_default_and_an_id_this_build_does_not_know_is_kept() -> None:
+    bad = CharacterPortrait.model_validate({
+        "horns": 4, "eyeStyle": None, "heldSide": "  ", "hood": ["deep"], "hornColor": "red", "eyeColor2": 12, "crownColor": "#12345", "itemColor": None, "necklaceColor": "#GGGGGG",
+    })
+    assert bad.horns == "none" and bad.eyeStyle == "normal" and bad.heldSide == "right" and bad.hood == "none"
+    assert bad.hornColor == "#d8cdb4" and bad.eyeColor2 == "#6a8fb3" and bad.crownColor == "#d9b04a" and bad.itemColor == "#8a5a2b" and bad.necklaceColor == "#cfa83f"
+    assert CharacterPortrait.model_validate({"horns": "from-the-future", "heldItem": "sword-of-doom"}).heldItem == "sword-of-doom"
+
+
 def test_a_character_without_a_portrait_or_with_a_broken_one_has_the_default() -> None:
     assert CharacterDoc.model_validate({"id": "c1"}).portrait == CharacterPortrait()
     assert CharacterDoc.model_validate({"id": "c1", "portrait": "nonsense"}).portrait == CharacterPortrait()
@@ -133,11 +170,18 @@ def test_a_portrait_and_a_captured_one_are_saved_with_the_character_and_the_old_
     c["portrait"]["highlightColor"] = "#c9a063"
     c["portrait"]["hairEnds"] = "in"
     c["portrait"]["hairPlacement"] = "right"
+    c["portrait"]["horns"] = "ram"
+    c["portrait"]["eyeStyle"] = "twocolour"
+    c["portrait"]["eyeColor2"] = "#aa22cc"
+    c["portrait"]["heldItem"] = "staff"
+    c["portrait"]["heldSide"] = "left"
     c["states"] = [{"id": "s1", "at": "", "portrait": {**c["portrait"], "age": "older"}}]
     assert client.put(f"/api/projects/{pid}/characters/{c['id']}", json=c).status_code == 200
     got = client.get(f"/api/projects/{pid}/characters/{c['id']}").json()
     assert got["portrait"]["hairTexture"] == "3B" and got["portrait"]["highlightColor"] == "#c9a063"
     assert got["portrait"]["hairEnds"] == "in" and got["portrait"]["hairPlacement"] == "right"
+    assert got["portrait"]["horns"] == "ram" and got["portrait"]["eyeStyle"] == "twocolour" and got["portrait"]["eyeColor2"] == "#aa22cc"
+    assert got["portrait"]["heldItem"] == "staff" and got["portrait"]["heldSide"] == "left"
     assert got["states"][0]["portrait"]["age"] == "older" and got["states"][0]["snapshot"] is None
     assert got["look"]["hair"] == "braid"
 

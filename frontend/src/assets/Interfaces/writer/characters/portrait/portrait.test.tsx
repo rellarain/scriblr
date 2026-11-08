@@ -7,6 +7,7 @@ import {
   AGES, BROWS, BUILDS, CHESTS, EARS, EDGES, ENDS, EXPRESSIONS, EYES, FACIAL, FRONTS, GREYING, HAIRLINES, HAIRLINE_HEIGHTS, HEADS, LENGTHS, MOUTHS, NOSES, PLACEMENTS, STYLES, TEXTURES, TOPS,
   endsFor, fitHair, frontsFor, placementsFor, stylesFor,
 } from './library'
+import { CROWNS, EYE_COUNTS, EYE_STYLES, FANTASY_EARS, HELD_SIDES, HOODS, HORNS, ITEMS, NECKLACES } from './fantasyLibrary'
 import { Portrait } from './Portrait'
 import { PART_KEYS, optionsFor, type PartKey } from './registry'
 import { portraitShapes } from './scene'
@@ -28,6 +29,7 @@ function expectWhole(p: CharacterPortrait, what: string) {
 const LISTS: Record<Exclude<PartKey, 'hairStyle' | 'hairFront'>, readonly { id: string }[]> = {
   age: AGES, build: BUILDS, chest: CHESTS, headShape: HEADS, ears: EARS, expression: EXPRESSIONS, eyes: EYES, brows: BROWS, nose: NOSES, mouth: MOUTHS,
   hairLength: LENGTHS, hairTexture: TEXTURES, hairline: HAIRLINES, hairlineHeight: HAIRLINE_HEIGHTS, hairEdges: EDGES, hairEnds: ENDS, hairPlacement: PLACEMENTS, greying: GREYING, facialHair: FACIAL, top: TOPS,
+  necklace: NECKLACES, fantasyEars: FANTASY_EARS, horns: HORNS, eyeStyle: EYE_STYLES, eyeCount: EYE_COUNTS, crown: CROWNS, hood: HOODS, heldItem: ITEMS, heldSide: HELD_SIDES,
 }
 
 describe('the portrait is drawn from its choices', () => {
@@ -130,7 +132,7 @@ describe('the portrait is drawn from its choices', () => {
 })
 
 describe('the crops', () => {
-  const CROPS: PortraitCrop[] = ['card', 'head', 'face', 'ears', 'eyes', 'brows', 'nose', 'mouth', 'lower']
+  const CROPS: PortraitCrop[] = ['card', 'head', 'top', 'face', 'ears', 'eyes', 'brows', 'nose', 'mouth', 'lower', 'neck']
 
   it('are squares of the tile, for every age', () => {
     for (const age of AGES) {
@@ -210,7 +212,7 @@ describe('the registry', () => {
     const p = portrait({ hairLength: 'chest' })
     for (const key of PART_KEYS) {
       const options = optionsFor(key, p)
-      expect(options.length, key).toBeGreaterThan(2)
+      expect(options.length, key).toBeGreaterThanOrEqual(2)
       expect(options.some(o => o.id === p[key]), key).toBe(true)
       expect(new Set(options.map(o => o.id)).size, key).toBe(options.length)
     }

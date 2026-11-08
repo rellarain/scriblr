@@ -72,6 +72,20 @@ describe('normalizePortrait', () => {
   })
 
   it('drops a field it does not know', () => {
-    expect(normalizePortrait({ ...defaultPortrait(), horns: 'big' })).not.toHaveProperty('horns')
+    expect(normalizePortrait({ ...defaultPortrait(), tail: 'long' })).not.toHaveProperty('tail')
+  })
+
+  it('gives a portrait made before the fantasy elements none of them, and repairs the ones it has', () => {
+    const old = normalizePortrait({ hairLength: 'hip' })
+    expect(old).toMatchObject({
+      fantasyEars: 'none', horns: 'none', hornColor: '#d8cdb4', eyeStyle: 'normal', eyeColor2: '#6a8fb3', eyeCount: 'two', crown: 'none', crownColor: '#d9b04a',
+      hood: 'none', hoodColor: '#4a3f5e', heldItem: 'none', heldSide: 'right', itemColor: '#8a5a2b', necklace: 'none', necklaceColor: '#cfa83f',
+    })
+    const made = normalizePortrait({ horns: ' ram ', hornColor: 'red', heldSide: 7, eyeColor2: '#AA22CC', hood: 'from-the-future' })
+    expect(made.horns).toBe('ram')
+    expect(made.hornColor).toBe('#d8cdb4')
+    expect(made.heldSide).toBe('right')
+    expect(made.eyeColor2).toBe('#AA22CC')
+    expect(made.hood).toBe('from-the-future')
   })
 })

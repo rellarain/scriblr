@@ -2435,16 +2435,37 @@ class CharacterPortrait(BaseModel):
     top: str = "crew"
     topColor: str = "#2f4a5a"
     tileColor: str = "#e6d6c3"
+    # Jewellery worn at the neck.
+    necklace: str = "none"
+    necklaceColor: str = "#cfa83f"
+    # The fantasy elements: ears, horns, the style of the eyes (and the colour of the second one) and how many there are, a crown, a hood, and a thing held in a hand raised at
+    # the shoulder (on the picture's left or right).
+    fantasyEars: str = "none"
+    horns: str = "none"
+    hornColor: str = "#d8cdb4"
+    eyeStyle: str = "normal"
+    eyeColor2: str = "#6a8fb3"
+    eyeCount: str = "two"
+    crown: str = "none"
+    crownColor: str = "#d9b04a"
+    hood: str = "none"
+    hoodColor: str = "#4a3f5e"
+    heldItem: str = "none"
+    heldSide: str = "right"
+    itemColor: str = "#8a5a2b"
 
     @field_validator(
         "age", "build", "chest", "headShape", "ears", "expression", "eyes", "brows", "nose", "mouth", "hairLength", "hairTexture", "hairStyle", "hairFront",
-        "hairline", "hairlineHeight", "hairEdges", "hairEnds", "hairPlacement", "greying", "facialHair", "top", mode="before",
+        "hairline", "hairlineHeight", "hairEdges", "hairEnds", "hairPlacement", "greying", "facialHair", "top",
+        "necklace", "fantasyEars", "horns", "eyeStyle", "eyeCount", "crown", "hood", "heldItem", "heldSide", mode="before",
     )
     @classmethod
     def _ids(cls, value: Any, info: Any) -> Any:
         return _part_id(value, CharacterPortrait.model_fields[info.field_name].default)
 
-    @field_validator("skin", "eyeColor", "hairColor", "topColor", "tileColor", mode="before")
+    @field_validator(
+        "skin", "eyeColor", "hairColor", "topColor", "tileColor", "necklaceColor", "hornColor", "eyeColor2", "crownColor", "hoodColor", "itemColor", mode="before",
+    )
     @classmethod
     def _colors(cls, value: Any, info: Any) -> Any:
         return _hex_or(value, CharacterPortrait.model_fields[info.field_name].default)

@@ -45,6 +45,19 @@ export type ColourKind = 'skin' | 'hair' | 'eye' | 'cloth'
 export function colourName(hex: string, kind: ColourKind): string {
   const [h, s, l] = hsl(hex)
   if (kind === 'skin') {
+    // Skin that no human has: grey or white, or a hue of its own (a hue between orange and yellow, a green, a blue...).
+    if (s < 0.1) return l < 0.3 ? 'charcoal grey' : l < 0.72 ? 'grey' : 'white'
+    const natural = (h >= 8 && h < 40) || (h >= 40 && h < 62 && !(s > 0.45 && l > 0.4)) || ((h < 8 || h >= 345) && !(s > 0.4 && l > 0.25))
+    if (!natural) {
+      const tone = l > 0.72 ? 'pale ' : l < 0.3 ? 'dark ' : ''
+      if (h >= 40 && h < 62) return 'golden'
+      if (h < 8 || h >= 345) return l > 0.72 ? 'pink' : `${tone}red`
+      if (h < 170) return `${tone}green`
+      if (h < 200) return `${tone}teal`
+      if (h < 260) return `${tone}blue`
+      if (h < 300) return l > 0.72 ? 'lilac' : `${tone}purple`
+      return l > 0.65 ? 'pink' : 'magenta'
+    }
     if (l < 0.22) return 'deep brown'
     if (l < 0.34) return 'dark brown'
     if (l < 0.46) return 'brown'
@@ -62,6 +75,8 @@ export function colourName(hex: string, kind: ColourKind): string {
     return 'white'
   }
   if (l < 0.1) return 'black'
+  if (kind === 'eye' && h >= 40 && h < 62 && s > 0.55 && l > 0.4) return 'gold'
+  if (kind === 'eye' && (h < 20 || h >= 340) && s > 0.5 && l >= 0.2) return l < 0.42 ? 'deep red' : 'red'
   if (h < 20 || h >= 340) {
     if (kind === 'cloth') return l > 0.7 ? 'pink' : l < 0.25 ? 'maroon' : 'red'
     return l < 0.2 ? 'dark brown' : s > 0.5 && l < 0.42 ? 'auburn' : s > 0.5 ? 'red' : 'brown'
@@ -119,6 +134,31 @@ const TOP_WORDS: Record<string, string> = {
   square: 'square-neck top', sweetheart: 'top with a sweetheart neckline', henley: 'henley', polo: 'polo shirt', mock: 'mock-neck top', turtle: 'turtleneck', cowl: 'cowl-neck top',
   offshoulder: 'off-the-shoulder top', strapless: 'strapless top',
 }
+const FANTASY_EAR_WORDS: Record<string, string> = {
+  pointed: 'pointed ears', elf: 'elf ears', longelf: 'long elf ears swept up', goblin: 'large goblin ears', bat: 'tall bat-like ears', fin: 'finned ears',
+}
+const HORN_WORDS: Record<string, string> = {
+  nubs: 'small horns', devil: 'curved horns', ram: 'ram horns curled by the ears', bull: 'bull horns', long: 'long swept-back horns', unicorn: 'a single spiralled horn on the forehead',
+  antlers: 'small antlers', stag: 'stag antlers', brow: 'a row of spikes over the brow',
+}
+const HOOD_WORDS: Record<string, string> = {
+  hood: 'a hood drawn up', deep: 'a deep hood pulled low', pointed: 'a pointed hood', cowl: 'a loose cowl', down: 'a hood hanging down behind the neck',
+}
+const CROWN_WORDS: Record<string, string> = {
+  circlet: 'a circlet', gem: 'a gem circlet', diadem: 'a diadem', tiara: 'a tiara', laurel: 'a laurel wreath', flowers: 'a crown of flowers', spikes: 'a spiked crown', royal: 'a royal crown',
+}
+const NECKLACE_WORDS: Record<string, string> = {
+  chain: 'a fine chain', choker: 'a choker', beads: 'a string of beads', pearls: 'a pearl necklace', pendant: 'a round pendant on a chain', amulet: 'a gem amulet', locket: 'a locket',
+  medallion: 'a medallion', torc: 'a torc',
+}
+const ITEM_WORDS: Record<string, string> = {
+  staff: 'a staff', crook: 'a crooked staff', crystal: 'a crystal-topped staff', wand: 'a wand', book: 'a closed book', openbook: 'an open book', scroll: 'a scroll', lantern: 'a lantern',
+  torch: 'a lit torch', candle: 'a lit candle', goblet: 'a goblet', flower: 'a flower', quill: 'a quill',
+}
+const EYE_COUNT_WORDS: Record<string, string> = {
+  third: 'a third eye in the middle of the forehead', four: 'a second pair of eyes above the first', six: 'six eyes in all: a pair above, the usual pair and a pair on the cheeks',
+  cheeks: 'an extra pair of eyes on the cheeks', temples: 'an extra pair of eyes at the temples',
+}
 const FRONT_WORDS: Record<string, string> = { none: '', centre: 'with a centre part', side: 'with a side part', back: 'swept back', bangs: 'with straight bangs', curtain: 'with curtain bangs', sidebangs: 'with side-swept bangs' }
 const HAIRLINE_WORDS: Record<string, string> = {
   widow: 'a widow\u2019s peak', mshape: 'an M-shaped hairline', uneven: 'an uneven hairline', mature: 'a mature hairline', receding: 'a receding hairline', deep: 'a deeply receding hairline',
@@ -162,20 +202,51 @@ function hairWords(p: CharacterPortrait): string {
 function eyesWords(p: CharacterPortrait): string {
   const size = p.eyeSize > 1.12 ? 'large ' : p.eyeSize < 0.88 ? 'small ' : ''
   const set = p.eyeSpacing > 1.08 ? ', set wide apart' : p.eyeSpacing < 0.92 ? ', set close together' : ''
-  return `${cap(colourName(p.eyeColor, 'eye'))}, ${size}${lower(optionName('eyes', p.eyes))} eyes${set}`
+  const colour = colourName(p.eyeColor, 'eye'), shape = `${size}${lower(optionName('eyes', p.eyes))}`
+  if (p.eyeCount === 'one') return `${cap(p.eyeStyle === 'blank' ? 'blank white' : colour)}, a single great eye in the middle of the face${p.eyeStyle === 'glowing' ? ', glowing' : ''}`
+  // The style of the eyes, then the extra ones.
+  const main = (() => {
+    switch (p.eyeStyle) {
+      case 'glowing': return `Glowing ${colour}, ${shape} eyes`
+      case 'solid': return `Solid ${colour}, ${shape} eyes with no whites`
+      case 'twocolour': return `${cap(colour)} and ${colourName(p.eyeColor2, 'eye')}, ${shape} eyes, one of each colour`
+      case 'slit': return `${cap(colour)}, ${shape} eyes with slit pupils`
+      case 'goat': return `${cap(colour)}, ${shape} eyes with horizontal pupils like a goat's`
+      case 'blank': return `Blank white, ${shape} eyes`
+      default: return `${cap(colour)}, ${shape} eyes`
+    }
+  })()
+  const more = EYE_COUNT_WORDS[p.eyeCount]
+  return `${main}${set}${more ? `, and ${more}` : ''}`
 }
 
 function faceWords(p: CharacterPortrait): string {
   const head = optionName('headShape', p.headShape)
   const brows = p.brows === 'none' ? 'no brows' : `${lower(optionName('brows', p.brows))} brows`
   const nose = lower(optionName('nose', p.nose)), mouth = lower(optionName('mouth', p.mouth))
-  const ears = p.ears === 'protruding' ? '; ears that stick out' : ''
+  const fantasy = [FANTASY_EAR_WORDS[p.fantasyEars], HORN_WORDS[p.horns]].filter(Boolean)
+  const ears = fantasy.length > 0 ? `; ${fantasy.join(', ')}` : p.ears === 'protruding' ? '; ears that stick out' : ''
   return `${cap(head === 'Pointed chin' ? 'pointed-chin' : lower(head))} face with ${brows}, ${article(nose)} ${nose} nose and ${article(mouth)} ${mouth} mouth${ears}`
+}
+
+// A metal in words: gold, silver, iron, copper (or the colour of cloth when it is none of these).
+export function metalName(hex: string): string {
+  const [h, s, l] = hsl(hex)
+  if (s < 0.15) return l > 0.6 ? 'silver' : 'iron'
+  if (h >= 36 && h < 62 && s > 0.35) return 'gold'
+  if (h >= 14 && h < 36 && s > 0.35 && l < 0.58) return 'copper'
+  return colourName(hex, 'cloth')
 }
 
 function styleWords(p: CharacterPortrait): string {
   const colour = colourName(p.topColor, 'cloth')
-  return `Wears ${article(colour)} ${colour} ${TOP_WORDS[p.top] ?? `${lower(optionName('top', p.top))} top`}`
+  const worn = [`${article(colour)} ${colour} ${TOP_WORDS[p.top] ?? `${lower(optionName('top', p.top))} top`}`]
+  if (HOOD_WORDS[p.hood]) worn.push(`${colourName(p.hoodColor, 'cloth')} ${HOOD_WORDS[p.hood].replace(/^an? /, '')}`)
+  if (CROWN_WORDS[p.crown]) worn.push(`${metalName(p.crownColor)} ${CROWN_WORDS[p.crown].replace(/^an? /, '')}`)
+  if (NECKLACE_WORDS[p.necklace]) worn.push(`${metalName(p.necklaceColor)} ${NECKLACE_WORDS[p.necklace].replace(/^an? /, '')}`)
+  const sentence = `Wears ${listed(worn)}`
+  const held = ITEM_WORDS[p.heldItem]
+  return held ? `${sentence}; holds ${held} in the hand on the ${p.heldSide === 'left' ? 'left' : 'right'} of the portrait` : sentence
 }
 
 const bearingWords = (p: CharacterPortrait): string => `Usually looks ${EXPRESSION_WORDS[p.expression] ?? lower(optionName('expression', p.expression))}`
