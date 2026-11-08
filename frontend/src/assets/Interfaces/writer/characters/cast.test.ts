@@ -54,7 +54,7 @@ describe('character files', () => {
 
   it('import as new characters, with the links between them on the new ids, or replace one that clashes', async () => {
     const file = buildCharacterFile(cast, ['a', 'b'])
-    const existing = [{ id: 'b', name: 'Bram', order: 0, updatedAt: '' }]
+    const existing = [{ id: 'b', name: 'Bram', order: 0, updatedAt: '', portrait: defaultPortrait() }]
     expect(importRows(file, existing).map(r => !!r.clash)).toEqual([false, true])
     const created: string[] = []
     const put: CharacterDoc[] = []

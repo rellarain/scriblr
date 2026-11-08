@@ -571,7 +571,7 @@ export interface CharacterDoc {
   // What readers may see of the character (absent = nothing).
   reader?: ReaderShare
 }
-export interface CharacterSummary { id: string; name: string; order: number; updatedAt: string }
+export interface CharacterSummary { id: string; name: string; order: number; updatedAt: string; portrait: CharacterPortrait }
 
 // ---- items (the library of things that change hands) ----
 export const ITEM_KINDS = ['weapon', 'tool', 'clothing', 'jewel', 'document', 'vehicle', 'treasure', 'other'] as const

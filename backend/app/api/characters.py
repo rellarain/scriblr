@@ -17,6 +17,8 @@ class CharacterSummary(BaseModel):
     name: str
     order: int
     updatedAt: datetime
+    # The portrait, for the card each character has in the cast list.
+    portrait: CharacterPortrait
 
 
 class CharacterCreate(BaseModel):
@@ -34,8 +36,8 @@ class CharacterCreate(BaseModel):
 
 @router.get("", response_model=list[CharacterSummary])
 def list_characters(project_id: str, root: Path = Depends(get_storage_root)) -> list[dict]:
-    """The project's characters (id, name, order): the cast list."""
-    return [{"id": c.id, "name": c.name, "order": c.order, "updatedAt": c.updatedAt} for c in store.list_characters(root, project_id)]
+    """The project's characters (id, name, order, portrait): the cast list."""
+    return [{"id": c.id, "name": c.name, "order": c.order, "updatedAt": c.updatedAt, "portrait": c.portrait} for c in store.list_characters(root, project_id)]
 
 
 @router.get("/all", response_model=list[CharacterDoc])

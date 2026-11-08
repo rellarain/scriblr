@@ -153,6 +153,21 @@ def test_a_new_character_has_the_default_look_and_goes_last(client: TestClient) 
     assert [r["name"] for r in rows] == ["Ada", "Bram"] and "look" not in rows[0]
 
 
+def test_the_cast_list_carries_each_portrait_for_the_card_it_is_shown_on(client: TestClient) -> None:
+    pid = _project(client)
+    a = _new(client, pid, name="Ada", portrait={"tileColor": "#223344", "hairStyle": "twobraids", "hairLength": "hip"})
+    b = _new(client, pid, name="Bram")
+    rows = {r["name"]: r for r in client.get(f"/api/projects/{pid}/characters").json()}
+    assert rows["Ada"]["portrait"] == a["portrait"] and rows["Ada"]["portrait"]["tileColor"] == "#223344"
+    # a character that was made with no portrait shows the default one
+    assert rows["Bram"]["portrait"] == b["portrait"] == CharacterPortrait().model_dump(mode="json")
+    # a change saved with the character is what the list shows next
+    a["portrait"]["tileColor"] = "#abcdef"
+    assert client.put(f"/api/projects/{pid}/characters/{a['id']}", json=a).status_code == 200
+    again = {r["name"]: r for r in client.get(f"/api/projects/{pid}/characters").json()}
+    assert again["Ada"]["portrait"]["tileColor"] == "#abcdef"
+
+
 def test_a_new_character_has_the_default_portrait_and_can_start_from_one(client: TestClient) -> None:
     pid = _project(client)
     plain = _new(client, pid, name="Plain")

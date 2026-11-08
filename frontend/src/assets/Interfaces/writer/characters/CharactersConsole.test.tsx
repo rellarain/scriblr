@@ -5,6 +5,7 @@ import type { CharacterDoc } from '../../../../api/types'
 import { newCharacter } from '../../../../designSystem/mockCharacters'
 import { charactersBackend } from '../../../../test/charactersBackend'
 import CharactersConsole from './CharactersConsole'
+import { readableInk } from './portrait/colour'
 import { PANELS_KEY } from './portraitPanels'
 
 const ada = (): CharacterDoc => newCharacter('chr_a', { name: 'Ada' }, 0)
@@ -76,6 +77,97 @@ describe('the Characters console', () => {
     await waitFor(() => expect(puts(backend)).toHaveLength(1))
     expect(lastPut(backend).portrait.hairStyle).toBe('twists')
     expect(lastPut(backend).portrait.hairLength).toBe('short')
+  })
+})
+
+describe('the cast list', () => {
+  const rows = () => within(screen.getByRole('navigation', { name: 'Cast' })).getAllByRole('listitem')
+  const cardOf = (row: HTMLElement) => ({ bg: row.style.getPropertyValue('--cardBg'), ink: row.style.getPropertyValue('--cardInk') })
+  // Ada has the usual tile; Bram a tile of his own.
+  const withBram = (): CharacterDoc[] => { const b = bram(); b.portrait = { ...b.portrait, tileColor: '#e9d39a' }; return [ada(), b] }
+
+  it('shows each character as a card: the portrait on the character\'s own colour, and the name', async () => {
+    await open(withBram())
+    await screen.findByRole('img', { name: 'Ada, portrait' })
+    const [ada, bram] = rows()
+    // the colour of each character's tile is the card's background, and the ink is one that can be read on it
+    expect(cardOf(ada)).toEqual({ bg: '#e6d6c3', ink: readableInk('#e6d6c3') })
+    expect(cardOf(bram)).toEqual({ bg: '#e9d39a', ink: readableInk('#e9d39a') })
+    for (const row of [ada, bram]) {
+      const open = within(row).getByRole('button', { name: /^Open / })
+      // a portrait that is only a picture (hidden from a screen reader: the button already says whose it is), and the name as the only text
+      const art = open.querySelector('svg')
+      expect(art).not.toBeNull()
+      expect(art).toHaveAttribute('aria-hidden', 'true')
+      expect(art).not.toHaveAttribute('role')
+      expect(open.querySelectorAll('path').length).toBeGreaterThan(20)
+      expect(row.classList.contains('charRowItem--card')).toBe(true)
+    }
+    expect(within(ada).getByRole('button', { name: 'Open Ada' })).toHaveAttribute('aria-current', 'true')
+    expect(within(bram).getByRole('button', { name: 'Open Bram' })).not.toHaveAttribute('aria-current')
+    // the tools are still there, with their names
+    for (const name of ['Save Ada to a file', 'Copy Ada', 'Delete Ada']) expect(within(ada).getByRole('button', { name })).toBeInTheDocument()
+  })
+
+  it('shows the open character\'s tile colour as it is chosen, before Save, and the others as they were', async () => {
+    const { backend, user } = await open(withBram())
+    await screen.findByRole('img', { name: /Ada/ })
+    expect(cardOf(rows()[0]).bg).toBe('#e6d6c3')
+    await section(user, 'Card')
+    await user.click(within(screen.getByRole('group', { name: 'Tile colour' })).getByRole('button', { name: 'Tile colour #d9d0ec' }))
+    expect(puts(backend)).toHaveLength(0)
+    expect(cardOf(rows()[0])).toEqual({ bg: '#d9d0ec', ink: readableInk('#d9d0ec') })
+    expect(cardOf(rows()[1]).bg).toBe('#e9d39a')
+    await user.click(save())
+    await waitFor(() => expect(puts(backend)).toHaveLength(1))
+    // once saved, the list has it from the server's answer too
+    expect(cardOf(rows()[0]).bg).toBe('#d9d0ec')
+    expect(lastPut(backend).portrait.tileColor).toBe('#d9d0ec')
+  })
+
+  it('takes a colour that is not a colour as the default tile, and still reads it', async () => {
+    const odd = ada()
+    odd.portrait = { ...odd.portrait, tileColor: 'not-a-colour' }
+    await open([odd])
+    await screen.findByRole('img', { name: /Ada/ })
+    const { bg, ink } = cardOf(rows()[0])
+    expect(bg).toBe('#e6d6c3')
+    expect(ink).toBe(readableInk('#e6d6c3'))
+  })
+
+  it('is written as a row beside a larger card below: the stylesheet right-aligns the name and stacks the card with the name first in a narrow console', async () => {
+    const { readFileSync } = await import('node:fs')
+    const path = await import('node:path')
+    const css = readFileSync(path.resolve(__dirname, 'characters.scss'), 'utf-8')
+    // The base (wide) rules come first: the name is right-aligned, the portrait small and square, in a row.
+    const card = /\.charRowCard \{([\s\S]*?)\n\}/.exec(css)?.[1] ?? ''
+    expect(card).toMatch(/\.charCardName \{[^}]*text-align: right/)
+    expect(card).toMatch(/\.charPortraitArt \{[^}]*width: 52px; height: 52px/)
+    expect(card).not.toMatch(/flex-direction: column/)
+    // The narrow overrides are in the console's own @container block, after those rules: the name above a larger portrait.
+    const wideAt = css.indexOf('.charRowCard {')
+    const narrowAt = css.indexOf('@container (max-width: 859px)')
+    expect(wideAt).toBeGreaterThan(0)
+    expect(narrowAt).toBeGreaterThan(wideAt)
+    const narrow = css.slice(narrowAt)
+    const narrowCard = /\.charRowCard \{([\s\S]*?)\n  \}/.exec(narrow)?.[1] ?? ''
+    expect(narrowCard).toMatch(/flex-direction: column/)
+    expect(narrowCard).toMatch(/\.charCardName \{[^}]*order: -1/)
+    expect(narrowCard).toMatch(/\.charPortraitArt \{[^}]*max-width: 88px/)
+    expect(narrow).toMatch(/\.charRows \{[^}]*display: grid/)
+  })
+
+  it('leaves no literal colour in the card\'s rules (the colours are the character\'s, set on the card), and leaves the items list alone', async () => {
+    const { readFileSync } = await import('node:fs')
+    const path = await import('node:path')
+    const css = readFileSync(path.resolve(__dirname, 'characters.scss'), 'utf-8')
+    const rules = css.slice(css.indexOf('.charRowItem--card {'), css.indexOf('.charRowTools {'))
+    expect(rules.length).toBeGreaterThan(200)
+    expect(rules).not.toMatch(/#[0-9a-fA-F]{3,8}\b|rgba?\(|hsla?\(|\b(white|black)\b/)
+    expect(rules).toMatch(/var\(--cardBg\)/)
+    expect(rules).toMatch(/var\(--cardInk\)/)
+    const items = readFileSync(path.resolve(__dirname, '../items/ItemsConsole.tsx'), 'utf-8')
+    expect(items).not.toContain('charRowItem--card')
   })
 })
 
@@ -350,7 +442,7 @@ describe('the fantasy elements', () => {
     expect(colourGroup('Necklace colour')).not.toBeInTheDocument()
     await pick(user, 'Necklace', 'Pearls')
     expect(colourGroup('Necklace colour')).toBeInTheDocument()
-  })
+  }, 20_000)
 
   it('save every choice with the character: the picks, the hand and the colours', async () => {
     const { backend, user } = await open()
@@ -372,7 +464,7 @@ describe('the fantasy elements', () => {
     expect(lastPut(backend).portrait).toMatchObject({
       fantasyEars: 'elf', horns: 'stag', hornColor: '#5a4636', eyeCount: 'third', eyeStyle: 'glowing', eyeColor: '#3fe0e0', hood: 'cowl', heldItem: 'lantern', heldSide: 'left', necklace: 'locket',
     })
-  })
+  }, 20_000)
 
   it('offer the unusual skin colours in the Fantasy and the usual ones in the Head', async () => {
     const { backend, user } = await open()

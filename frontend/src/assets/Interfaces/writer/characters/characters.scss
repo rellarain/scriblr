@@ -67,6 +67,28 @@
 .charRowTool { opacity: 0; .charRowItem:hover &, &:focus-visible { opacity: 0.8; } }
 .charConfirm { display: inline-flex; align-items: center; gap: var(--space-1); padding: 0 var(--space-2); background: var(--ov-sink-2); box-shadow: inset 3px 0 0 var(--alert); }
 
+// The cast list's cards: the portrait on the character's own colour (--cardBg), the name flush right in an ink that can be read on it (--cardInk); both are set on the card by
+// the character's data, so nothing here is a literal colour. The portrait is flush with the bottom of the card, so the shoulders run off its edge, as on the big card. Hovering or
+// opening a card is a ring in the ink: an overlay or the accent bar could be the colour of the card itself, or take the contrast from the name.
+.charRowItem--card {
+  position: relative; align-items: stretch; min-height: 56px; background: var(--cardBg); color: var(--cardInk);
+  & + & { margin-top: var(--space-1); }
+  &:hover, &:focus-within { background: var(--cardBg); box-shadow: inset 0 0 0 1px var(--cardInk); }
+  &.charRowItem--on { background: var(--cardBg); box-shadow: inset 0 0 0 2px var(--cardInk); }
+  .charRowMain { align-items: stretch; padding: var(--space-1) var(--space-2) 0 var(--space-1); }
+  .charIconBtn { color: inherit; &:hover:not(:disabled) { background: none; box-shadow: inset 0 0 0 1px var(--cardInk); opacity: 1; } }
+  &:focus-within .charRowTool { opacity: 0.8; }
+  .charConfirm { background: var(--cardBg); box-shadow: inset 0 0 0 2px var(--cardInk); }
+}
+.charRowCard {
+  display: flex; flex: 1 1 auto; align-items: stretch; gap: var(--space-3); min-width: 0;
+  .charPortraitArt { flex: 0 0 52px; width: 52px; height: 52px; align-self: flex-end; }
+  .charCardName { flex: 1 1 auto; align-self: flex-start; min-width: 0; max-width: none; padding-top: var(--space-1); text-align: right; font-weight: 400; }
+}
+.charRowItem--on .charCardName { font-weight: 700; }
+// The tools sit under the name at the card's right edge, on the card's colour, so they never take room from the name.
+.charRowTools { position: absolute; right: var(--space-1); bottom: var(--space-1); display: inline-flex; align-items: center; background: var(--cardBg); }
+
 .charArt { display: block; width: 100%; height: 100%; min-height: 0; }
 .charCaption { text-align: center; font-size: var(--text-small); color: var(--ink-muted); }
 
@@ -138,7 +160,15 @@
 // ---- a narrow console: the parts stack ----
 @container (max-width: 859px) {
   .charSplit { flex-direction: column; overflow-y: auto; }
-  .charList { flex: 0 0 auto; max-height: 300px; }
+  .charList { flex: 0 0 auto; max-height: 340px; }
+  // The cast as cards: the name above a larger portrait, as many to a row as fit; the tools lie over the bottom of the portrait (the shoulders).
+  .charRows { display: grid; grid-template-columns: repeat(auto-fill, minmax(104px, 1fr)); gap: var(--space-2); }
+  .charRowItem--card { flex-direction: column; min-height: 0; & + & { margin-top: 0; } .charRowMain { flex: 1 1 auto; padding: var(--space-1) var(--space-1) 0; } }
+  .charRowCard {
+    flex-direction: column; gap: var(--space-1);
+    .charCardName { order: -1; align-self: stretch; padding: var(--space-1) var(--space-1) 0; }
+    .charPortraitArt { flex: 0 0 auto; width: 100%; max-width: 88px; height: auto; aspect-ratio: 1; }
+  }
   .charPortrait { flex: 0 0 auto; flex-direction: column; align-items: stretch; }
   .charPortraitStage { flex: 0 0 auto; max-width: 360px; }
   .charPortrait > .charPanel:last-child { flex: 0 0 auto; }

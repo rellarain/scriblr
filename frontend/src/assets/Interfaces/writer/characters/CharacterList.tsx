@@ -1,10 +1,24 @@
-import { useMemo, useRef, useState } from 'react'
-import { CheckIcon, CloseIcon, CopyIcon, ExportIcon, ImportIcon, PeopleIcon, PlusIcon, TrashIcon } from '../../../icons'
+import { useMemo, useRef, useState, type CSSProperties } from 'react'
+import type { CharacterPortrait } from '../../../../api/types'
+import { CheckIcon, CloseIcon, CopyIcon, ExportIcon, ImportIcon, PlusIcon, TrashIcon } from '../../../icons'
 import { saveBlob } from '../maps/mapExport'
 import { characterFileName, importRows, parseCharacterFile, type CharacterChoice, type CharacterFile } from './charFile'
+import { PortraitCard } from './PortraitCard'
+import { readableInk } from './portrait/colour'
+import { defaultPortrait } from './portrait/defaults'
 import type { Characters } from './useCharacters'
 
-// The cast: each character by name, with a copy and a delete that asks first; the plus makes a new one.
+const DEFAULT_TILE = defaultPortrait().tileColor
+const HEX = /^#[0-9a-fA-F]{6}$/
+
+// The colours a character's card is drawn in: the colour of the portrait's tile as the background, and an ink that can be read on it (the tile can be any colour at all). They
+// are the character's own, so they are set on the card itself and the stylesheet only refers to them.
+function cardColours(portrait: CharacterPortrait | undefined): CSSProperties {
+  const tile = portrait && HEX.test(portrait.tileColor) ? portrait.tileColor : DEFAULT_TILE
+  return { '--cardBg': tile, '--cardInk': readableInk(tile) } as CSSProperties
+}
+
+// The cast: each character as a card (the portrait on the character's own colour, and the name), with a save to file, a copy and a delete that asks first; the plus makes a new one.
 export function CharacterList({ c }: { c: Characters }) {
   const [confirming, setConfirming] = useState<string | null>(null)
   const [incoming, setIncoming] = useState<CharacterFile | null>(null)
@@ -38,24 +52,29 @@ export function CharacterList({ c }: { c: Characters }) {
       {incoming && <ImportForm c={c} file={incoming} onDone={() => setIncoming(null)} />}
       {c.cast.length === 0 && <p className="charHint">No characters yet. Make the first one with the plus.</p>}
       <ul className="charRows">
-        {c.cast.map(ch => (
-          <li key={ch.id} className={`charRowItem${ch.id === c.openId ? ' charRowItem--on' : ''}`}>
-            <button type="button" className="charRowMain" aria-label={`Open ${ch.name}`} aria-current={ch.id === c.openId ? 'true' : undefined} title={`Open ${ch.name}`} onClick={() => { void c.open(ch.id) }}>
-              <PeopleIcon size={14} />
-              <span className="charRowName">{ch.name}</span>
-            </button>
-            <button type="button" className="charIconBtn charRowTool" aria-label={`Save ${ch.name} to a file`} title={`Save ${ch.name} to a file`} onClick={() => { void exportThem([ch.id], ch.name) }}><ExportIcon size={16} /></button>
-            <button type="button" className="charIconBtn charRowTool" aria-label={`Copy ${ch.name}`} title={`Make a copy of ${ch.name}`} onClick={() => { void c.duplicate(ch.id) }}><CopyIcon size={16} /></button>
-            {confirming === ch.id ? (
-              <span className="charConfirm" role="group" aria-label={`Delete ${ch.name}?`}>
-                <button type="button" className="charIconBtn" aria-label="Confirm delete" title="Confirm delete" onClick={() => { setConfirming(null); void c.remove(ch.id) }}><CheckIcon size={16} /></button>
-                <button type="button" className="charIconBtn" aria-label="Cancel delete" title="Cancel" onClick={() => setConfirming(null)}><CloseIcon size={16} /></button>
+        {c.cast.map(ch => {
+          // The open character's portrait is the live one (a change that is not saved yet shows); the others are as saved.
+          const portrait = c.doc?.id === ch.id ? c.doc.portrait : ch.portrait
+          return (
+            <li key={ch.id} className={`charRowItem charRowItem--card${ch.id === c.openId ? ' charRowItem--on' : ''}`} style={cardColours(portrait)}>
+              <button type="button" className="charRowMain" aria-label={`Open ${ch.name}`} aria-current={ch.id === c.openId ? 'true' : undefined} title={`Open ${ch.name}`} onClick={() => { void c.open(ch.id) }}>
+                <PortraitCard portrait={portrait} name={ch.name} className="charRowCard" />
+              </button>
+              <span className="charRowTools">
+                <button type="button" className="charIconBtn charRowTool" aria-label={`Save ${ch.name} to a file`} title={`Save ${ch.name} to a file`} onClick={() => { void exportThem([ch.id], ch.name) }}><ExportIcon size={16} /></button>
+                <button type="button" className="charIconBtn charRowTool" aria-label={`Copy ${ch.name}`} title={`Make a copy of ${ch.name}`} onClick={() => { void c.duplicate(ch.id) }}><CopyIcon size={16} /></button>
+                {confirming === ch.id ? (
+                  <span className="charConfirm" role="group" aria-label={`Delete ${ch.name}?`}>
+                    <button type="button" className="charIconBtn" aria-label="Confirm delete" title="Confirm delete" onClick={() => { setConfirming(null); void c.remove(ch.id) }}><CheckIcon size={16} /></button>
+                    <button type="button" className="charIconBtn" aria-label="Cancel delete" title="Cancel" onClick={() => setConfirming(null)}><CloseIcon size={16} /></button>
+                  </span>
+                ) : (
+                  <button type="button" className="charIconBtn charRowTool" aria-label={`Delete ${ch.name}`} title={`Delete ${ch.name}`} onClick={() => setConfirming(ch.id)}><TrashIcon size={16} /></button>
+                )}
               </span>
-            ) : (
-              <button type="button" className="charIconBtn charRowTool" aria-label={`Delete ${ch.name}`} title={`Delete ${ch.name}`} onClick={() => setConfirming(ch.id)}><TrashIcon size={16} /></button>
-            )}
-          </li>
-        ))}
+            </li>
+          )
+        })}
       </ul>
     </nav>
   )

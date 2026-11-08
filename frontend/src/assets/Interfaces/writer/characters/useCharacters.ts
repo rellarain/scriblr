@@ -13,7 +13,7 @@ const COALESCE_MS = 900
 interface Session { doc: CharacterDoc; past: CharacterDoc[]; future: CharacterDoc[]; group: string | null; at: number }
 
 const message = (err: unknown, fallback: string) => (err instanceof Error ? err.message : fallback)
-const summaryOf = (c: CharacterDoc): CharacterSummary => ({ id: c.id, name: c.name, order: c.order, updatedAt: c.updatedAt })
+const summaryOf = (c: CharacterDoc): CharacterSummary => ({ id: c.id, name: c.name, order: c.order, updatedAt: c.updatedAt, portrait: c.portrait })
 
 export function useCharacters(projectId: string | null) {
   const [status, setStatus] = useState<'loading' | 'ready' | 'error'>('loading')

@@ -27,3 +27,26 @@ export function fromHsl(hu: number, s: number, l: number): string {
 export function shade(h: string, t: number): string { let c = toHsl(h); let hu = c[0] > 0.5 ? c[0] + (1 - c[0]) * 0.04 * t : c[0] - c[0] * 0.04 * t; return fromHsl(hu, clamp(c[1] * (1 + 0.35 * t) + 0.03 * t, 0, 1), clamp(c[2] * (1 - t), 0, 1)); }
 
 export function lightOf(h: string): number { return toHsl(h)[2]; }
+
+// The relative luminance of a colour (WCAG), 0 for black and 1 for white.
+export function luminance(h: string): number {
+  const [r, g, b] = hexRgb(h).map(function (v) { const c = v / 255; return c <= 0.03928 ? c / 12.92 : Math.pow((c + 0.055) / 1.055, 2.4); });
+  return 0.2126 * r + 0.7152 * g + 0.0722 * b;
+}
+
+// The contrast of two colours (WCAG), from 1 (the same) to 21 (black on white).
+export function contrast(a: string, b: string): number {
+  const x = luminance(a), y = luminance(b);
+  return (Math.max(x, y) + 0.05) / (Math.min(x, y) + 0.05);
+}
+
+// A colour to write on `bg` that can be read there: a very dark or a very light tone of the background's own hue (whichever contrasts more), and, for the mid-tones where such a
+// tone is not enough (only black or white reach 4.5 to 1 there), black or white. The text of a card that takes the character's tile colour, which can be any colour at all.
+export function readableInk(bg: string): string {
+  const [hu, s] = toHsl(bg);
+  const dark = fromHsl(hu, Math.min(s, 0.45), 0.08), light = fromHsl(hu, Math.min(s, 0.45) * 0.5, 0.96);
+  const best = contrast(dark, bg) >= contrast(light, bg) ? dark : light;
+  if (contrast(best, bg) >= 4.5) return best;
+  const black = fromHsl(0, 0, 0), white = fromHsl(0, 0, 1);
+  return contrast(black, bg) >= contrast(white, bg) ? black : white;
+}

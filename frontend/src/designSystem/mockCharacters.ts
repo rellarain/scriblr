@@ -11,7 +11,7 @@ const fail = (status: number, detail: string): MockAnswer => ({ status, body: { 
 const AT = '2026-11-02T12:00:00.000Z'
 
 export function summaryOf(c: CharacterDoc): CharacterSummary {
-  return { id: c.id, name: c.name, order: c.order, updatedAt: c.updatedAt }
+  return { id: c.id, name: c.name, order: c.order, updatedAt: c.updatedAt, portrait: c.portrait }
 }
 
 export function newCharacter(id: string, body: CharacterCreate, order: number): CharacterDoc {
