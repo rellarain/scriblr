@@ -25,6 +25,13 @@ export function rotate(deg: number, px: number, py: number): Mat {
   return [c, s, -s, c, px - c * px + s * py, py - s * px - c * py]
 }
 export const scale = (sx: number, sy: number, px: number, py: number): Mat => [sx, 0, 0, sy, px - sx * px, py - sy * py]
+// A stretch by `f` along the unit direction (ux, uy) about the point (px, py): lengths along the direction change, lengths across it do not.
+export function scaleAlong(f: number, ux: number, uy: number, px: number, py: number): Mat {
+  const k = f - 1, a = 1 + k * ux * ux, b = k * ux * uy, d = 1 + k * uy * uy
+  return [a, b, b, d, px - (a * px + b * py), py - (b * px + d * py)]
+}
+// The turn in a matrix (degrees): the angle of the rotation nearest to its linear part, so a scale or a shear on top of a turn is not counted.
+export const turnOf = (m: Mat): number => (Math.atan2(m[1] - m[2], m[0] + m[3]) * 180) / Math.PI
 // The matrix that undoes `m` (a flat or singular matrix has no undo: the determinant is held away from zero, so the result is finite).
 export function inverse(m: Mat): Mat {
   const det = m[0] * m[3] - m[1] * m[2] || 1

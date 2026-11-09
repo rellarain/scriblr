@@ -444,6 +444,49 @@ def _paint_faults(content: ModelContent) -> list[str]:
     return faults
 
 
+def _proportion_faults(content: ModelContent) -> list[str]:
+    """What is wrong with the skeleton, the fit of objects and the frames (phase 5a; the frontend's proportionFaults says the same words)."""
+    faults: list[str] = []
+    group_ids = {g.id for g in content.groups}
+    twin_groups = {g.id for g in content.groups if g.mirrorOf}
+    shapes = {s.id: s for s in content.shapes}
+    bones = {b.id: b for b in content.bones}
+    thing_ids = {o.id for o in content.objects} | group_ids
+    for b in content.bones:
+        name = _label(b.name, b.id)
+        if b.start not in group_ids:
+            faults.append(f"Bone {name} starts at a group that does not exist.")
+        elif b.start in twin_groups:
+            faults.append(f"Bone {name} starts at a twin group; use the original.")
+        if b.end.kind == "group":
+            if b.end.id not in group_ids:
+                faults.append(f"Bone {name} ends at a group that does not exist.")
+        elif b.end.id not in shapes:
+            faults.append(f"Bone {name} ends at a shape that does not exist.")
+        elif b.end.i >= _outline_size(shapes, shapes[b.end.id]):
+            faults.append(f"Bone {name} ends at a point that does not exist.")
+    for r in content.ranges:
+        for d in r.drives:
+            if d.kind == "length" and d.id not in bones:
+                faults.append(f"Slider {_label(r.name, r.id)} changes the length of a bone that does not exist.")
+    if content.headBone is not None and content.headBone not in bones:
+        faults.append("The head bone does not exist.")
+    for o in content.objects:
+        if o.fit != "stretch":
+            continue
+        name = _label(o.name, o.id)
+        if o.fitTo is None:
+            faults.append(f"Object {name} stretches to a shape but has none chosen.")
+        elif o.fitTo not in shapes:
+            faults.append(f"Object {name} stretches to a shape that does not exist.")
+        elif o.fitTo in o.shapes:
+            faults.append(f"Object {name} stretches to a shape of its own.")
+    for f in content.frames:
+        if any(h not in thing_ids for h in f.hide):
+            faults.append(f"Frame {_label(f.name, f.id)} hides something that does not exist.")
+    return faults
+
+
 def publish_faults(content: ModelContent) -> list[str]:
     """What stops this draft from being published, in plain words."""
     faults: list[str] = []
@@ -487,6 +530,7 @@ def publish_faults(content: ModelContent) -> list[str]:
     faults.extend(_preset_faults(content))
     faults.extend(_colour_faults(content))
     faults.extend(_paint_faults(content))
+    faults.extend(_proportion_faults(content))
     size = copy_bytes(content)
     if size > MODEL_COPY_MAX_BYTES:
         faults.append(f"A character's copy of this model would be {size // 1024} KB; the limit is {MODEL_COPY_MAX_BYTES // 1024} KB.")

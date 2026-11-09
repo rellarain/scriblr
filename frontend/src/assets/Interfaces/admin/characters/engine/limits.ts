@@ -46,6 +46,12 @@ export const LIMITS = {
   shadesMax: 10,
   cutsMax: 8,
   looksMax: 72,
+  // proportions and frames: bones per model, frames per model, what a frame may hide (the stops are the server's max_lengths)
+  bonesWarn: 12,
+  bonesMax: 24,
+  framesWarn: 8,
+  framesMax: 16,
+  frameHideMax: 100,
   // how many of each a model may hold (the server's caps)
   shapesMax: 600,
   objectsMax: 200,
@@ -122,6 +128,10 @@ export function limitNotes(content: ModelContent): LimitNote[] {
     const shading = shadingCount(content, o.id)
     add(level(shading, LIMITS.shadesWarn, LIMITS.shadesMax), `${o.name || o.id} has ${shading} shading shapes: the warning starts above ${LIMITS.shadesWarn}.`, `${o.name || o.id} has ${shading} shading shapes: the limit is ${LIMITS.shadesMax}.`)
   }
+  const bones = (content.bones ?? []).length
+  add(level(bones, LIMITS.bonesWarn, LIMITS.bonesMax), `The model has ${bones} bones: the warning starts above ${LIMITS.bonesWarn}.`, `The model has ${bones} bones: the limit is ${LIMITS.bonesMax}.`)
+  const frames = (content.frames ?? []).length
+  add(level(frames, LIMITS.framesWarn, LIMITS.framesMax), `The model has ${frames} frames: the warning starts above ${LIMITS.framesWarn}.`, `The model has ${frames} frames: the limit is ${LIMITS.framesMax}.`)
   const links = linkCount(content)
   if (links > LIMITS.linksWarn) notes.push({ level: links > LIMITS.linksMax ? 'stop' : 'warn', text: links > LIMITS.linksMax ? `The model has ${links} point links: the limit is ${LIMITS.linksMax}, so it cannot be published.` : `The model has ${links} point links: the warning starts above ${LIMITS.linksWarn}.` })
   for (const g of content.groups) {

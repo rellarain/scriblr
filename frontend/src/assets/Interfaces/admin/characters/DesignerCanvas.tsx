@@ -1,7 +1,8 @@
-import { useMemo, useRef, useState, type KeyboardEvent, type MouseEvent as ReactMouseEvent, type PointerEvent as ReactPointerEvent, type ReactElement } from 'react'
+import { useMemo, useRef, useState, type CSSProperties, type KeyboardEvent, type MouseEvent as ReactMouseEvent, type PointerEvent as ReactPointerEvent, type ReactElement } from 'react'
 import type { ModelContent, ModelShape } from '../../../../api/types'
 import { NO_COLOURING, type Colouring } from './engine/colour'
 import { addPoint, deletePoint, moveHandle, movePoint, moveShape, nudgePoint } from './engine/edit'
+import { FRAME_HANDLES, movedBox, resizedBox, type FrameHandle } from './engine/frames'
 import { apply, build, inverse, nearestEdge, type Box } from './engine/geometry'
 import { paintDefs, paintShapes } from './engine/paint'
 import type { Solved } from './engine/rig'
@@ -43,6 +44,22 @@ export interface PoseCanvas {
   onCancel: () => void
 }
 
+// Frames (phase 5a): every frame of the model as a rectangle in the view (the one being edited has handles, and is moved and resized by dragging; the arrow keys
+// nudge it, Shift with them resizes it, Alt makes the step five). The boxes are in canvas space, as seen from the view being edited.
+export interface FrameMark { id: string; name: string; box: Box; on: boolean }
+export interface FrameCanvas {
+  frames: FrameMark[]
+  // A drag is about to change a frame: remember it for undo once.
+  onGesture: () => void
+  onBox: (id: string, box: Box) => void
+  onSelect: (id: string) => void
+  onNudge: (id: string, dx: number, dy: number, resize: boolean) => void
+}
+// Looking through a frame: the picture is cropped to the box, on the card colour.
+export interface ThroughFrame { box: Box; tile: string; name: string }
+// Picking the pivot of a group by clicking its marker (the end of a bone).
+export interface PickGroup { id: string; name: string; x: number; y: number }
+
 export interface CanvasProps {
   content: ModelContent
   solved: Solved
@@ -70,9 +87,12 @@ export interface CanvasProps {
   // The points of the selected shape that are linked to another shape: they are not dragged (the arrow keys adjust the link instead).
   linked?: number[]
   onNudgeLink?: (dx: number, dy: number) => void
-  // Clicking one of these shapes picks an anchor (or what to link a point to) instead of selecting it.
-  pick?: { shapes: string[] } | null
+  // Clicking one of these shapes picks an anchor (or what to link a point to) instead of selecting it; the groups are markers to click for a bone's end.
+  pick?: { shapes: string[]; groups?: PickGroup[] } | null
   onPick?: (shapeId: string, x: number, y: number) => void
+  onPickGroup?: (groupId: string) => void
+  frames?: FrameCanvas | null
+  through?: ThroughFrame | null
   onPivot?: (x: number, y: number) => void
   onPivotNudge?: (dx: number, dy: number) => void
   onSelect: (sel: Selection) => void
@@ -94,6 +114,7 @@ type Drag =
   | { kind: 'move'; shapeId: string; last: [number, number] }
   | { kind: 'pivot' }
   | { kind: 'pose' }
+  | { kind: 'frame'; id: string; handle: FrameHandle | 'move'; start: [number, number]; box: Box }
   | { kind: 'pan'; startX: number; startY: number; panX: number; panY: number; target: { kind: 'grid' } | { kind: 'shape'; id: string }; moved: boolean }
 
 export function DesignerCanvas(p: CanvasProps) {
@@ -110,8 +131,9 @@ export function DesignerCanvas(p: CanvasProps) {
   const focus = shapesOf(content, sel)
   const focusIds = new Set(focus.map(s => s.id))
   const none = sel.kind === 'none'
-  const box = fitAll || none || p.pose ? FIGURE : boxOfSolved(solved, focus) ?? FIGURE
-  let w = Math.max(box.w * 1.7, 24), h = Math.max(box.h * 1.7, 21)
+  const through = p.through ?? null
+  const box = through ? through.box : fitAll || none || p.pose ? FIGURE : boxOfSolved(solved, focus) ?? FIGURE
+  let w = Math.max(box.w * (through ? 1.12 : 1.7), 24), h = Math.max(box.h * (through ? 1.12 : 1.7), 21)
   if (w / h < ASPECT) w = h * ASPECT
   else h = w / ASPECT
   w /= zoom; h /= zoom
@@ -121,7 +143,7 @@ export function DesignerCanvas(p: CanvasProps) {
   const shape = activeShape(content, sel)
   const solvedShape = shape ? solved.shapes[shape.id] : undefined
   const matrix = solvedShape?.matrix
-  const overlay = !!shape && !p.pose && !!solvedShape?.visible && shape.pts.length >= 3
+  const overlay = !!shape && !p.pose && !through && !!solvedShape?.visible && shape.pts.length >= 3
   const shapesById = new Map(content.shapes.map(s => [s.id, s]))
   const picking = new Set(p.pick?.shapes ?? [])
   const linkedSet = new Set(p.linked ?? [])
@@ -197,10 +219,32 @@ export function DesignerCanvas(p: CanvasProps) {
     if (e.button !== 0 || !p.pose) return
     if (p.pose.onDown(grab, toWorld(e), false)) { dragRef.current = { kind: 'pose' }; capture(e) }
   }
+  function onFrameDown(e: ReactPointerEvent, f: FrameMark, handle: FrameHandle | 'move') {
+    e.stopPropagation()
+    if (e.button !== 0 || !p.frames) return
+    if (!f.on) { p.frames.onSelect(f.id); return }
+    p.frames.onGesture()
+    dragRef.current = { kind: 'frame', id: f.id, handle, start: toWorld(e), box: f.box }
+    capture(e)
+  }
+  function onFrameKey(e: KeyboardEvent, f: FrameMark) {
+    const step = e.altKey ? 5 : 1
+    const d: Record<string, [number, number]> = { ArrowLeft: [-step, 0], ArrowRight: [step, 0], ArrowUp: [0, -step], ArrowDown: [0, step] }
+    if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); e.stopPropagation(); p.frames?.onSelect(f.id); return }
+    if (!d[e.key] || !f.on) return
+    e.preventDefault()
+    e.stopPropagation()
+    p.frames?.onNudge(f.id, d[e.key][0], d[e.key][1], e.shiftKey)
+  }
   function onMove(e: ReactPointerEvent<SVGSVGElement>) {
     const d = dragRef.current
     if (!d) return
     if (d.kind === 'pose') { p.pose?.onMove(toWorld(e)); return }
+    if (d.kind === 'frame') {
+      const [wx, wy] = toWorld(e), dx = wx - d.start[0], dy = wy - d.start[1]
+      p.frames?.onBox(d.id, d.handle === 'move' ? movedBox(d.box, dx, dy) : resizedBox(d.box, d.handle, dx, dy))
+      return
+    }
     if (d.kind === 'pan') {
       const r = rect(), dx = e.clientX - d.startX, dy = e.clientY - d.startY
       if (Math.abs(dx) + Math.abs(dy) > 3) d.moved = true
@@ -291,6 +335,13 @@ export function DesignerCanvas(p: CanvasProps) {
         return r?.ghost && r.visible ? <path key={`ghost-${id}`} d={r.ghost} data-ghost={id} className="cmGhost" aria-hidden="true" /> : null
       })}
       <PaintDefs defs={defs} />
+      {through && (
+        <>
+          <defs><clipPath id={`${prefix}-through`}><rect x={through.box.x} y={through.box.y} width={through.box.w} height={through.box.h} /></clipPath></defs>
+          <rect x={through.box.x} y={through.box.y} width={through.box.w} height={through.box.h} className="cmFrameTile" style={{ '--tile': through.tile } as CSSProperties} data-tile="" aria-hidden="true" />
+        </>
+      )}
+      <g clipPath={through ? `url(#${prefix}-through)` : undefined}>
       {paintItems.map(item => {
         const id = item.id, s = shapesById.get(id)
         if (!s) return null
@@ -304,6 +355,33 @@ export function DesignerCanvas(p: CanvasProps) {
             />
             {selected && <path d={item.d} className="cmRing cmRing--under" aria-hidden="true" />}
             {selected && <path d={item.d} className="cmRing cmRing--over" data-ring={id} aria-hidden="true" />}
+          </g>
+        )
+      })}
+      </g>
+      {p.pick?.groups?.map(g => (
+        <g key={g.id} className="cmPickGroup" role="button" tabIndex={0} aria-label={`Pick the pivot of ${g.name}`} onPointerDown={e => { e.stopPropagation(); if (e.button === 0) p.onPickGroup?.(g.id) }} onKeyDown={e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); p.onPickGroup?.(g.id) } }}>
+          <circle cx={g.x} cy={g.y} r={9 * u} className="cmPickGroupHit" />
+          <circle cx={g.x} cy={g.y} r={4.5 * u} className="cmPickGroupDot" />
+        </g>
+      ))}
+      {p.frames && !through && p.frames.frames.map(f => {
+        const label = `Frame ${f.name || 'Frame'}`
+        const hs = 4 * u
+        const at = (h: FrameHandle): [number, number] => [f.box.x + (h.includes('w') ? 0 : h.includes('e') ? f.box.w : f.box.w / 2), f.box.y + (h.includes('n') ? 0 : h.includes('s') ? f.box.h : f.box.h / 2)]
+        return (
+          <g key={f.id} className={`cmFrame${f.on ? ' cmFrame--on' : ''}`}>
+            <rect x={f.box.x} y={f.box.y} width={f.box.w} height={f.box.h} className="cmFrameRect" aria-hidden="true" />
+            <text x={f.box.x + 2 * u} y={f.box.y - 3 * u} className="cmFrameName" aria-hidden="true" style={{ fontSize: 10 * u }}>{f.name || 'Frame'}</text>
+            <rect
+              x={f.box.x} y={f.box.y} width={f.box.w} height={f.box.h} className="cmFrameHit" style={{ strokeWidth: 12 * u }} role="button" tabIndex={0} aria-pressed={f.on}
+              aria-label={f.on ? `${label}. Drag it to move it, or press the arrow keys; with Shift they resize it, with Alt they step by five` : `${label}. Press Enter to edit it`}
+              onPointerDown={e => onFrameDown(e, f, 'move')} onKeyDown={e => onFrameKey(e, f)}
+            />
+            {f.on && FRAME_HANDLES.map(h => {
+              const [cx, cy] = at(h)
+              return <rect key={h} x={cx - hs} y={cy - hs} width={hs * 2} height={hs * 2} className="cmFrameHandle" role="button" tabIndex={-1} aria-label={`Resize ${f.name || 'the frame'} from its ${h}`} onPointerDown={e => onFrameDown(e, f, h)} />
+            })}
           </g>
         )
       })}
@@ -332,8 +410,8 @@ export function DesignerCanvas(p: CanvasProps) {
       {p.pose && p.pose.scales.map(m => (
         <rect key={m.id} x={m.x - 4.5 * u} y={m.y - 4.5 * u} width={9 * u} height={9 * u} role="button" tabIndex={-1} aria-label={`Scale ${m.name}`} className="cmScaleHandle" onPointerDown={e => onPoseHandleDown(e, { kind: 'scale', groupId: m.id })} />
       ))}
-      {anchor && !p.pose && <rect x={anchor[0] - 3.5 * u} y={anchor[1] - 3.5 * u} width={7 * u} height={7 * u} transform={`rotate(45 ${anchor[0]} ${anchor[1]})`} className="cmAnchor" aria-hidden="true" />}
-      {pivot && !p.pose && (
+      {anchor && !p.pose && !through && <rect x={anchor[0] - 3.5 * u} y={anchor[1] - 3.5 * u} width={7 * u} height={7 * u} transform={`rotate(45 ${anchor[0]} ${anchor[1]})`} className="cmAnchor" aria-hidden="true" />}
+      {pivot && !p.pose && !through && (
         <g
           className={`cmPivot${pivot.draggable ? '' : ' cmPivot--off'}`} role="button" tabIndex={0} aria-label={`Pivot of ${pivot.name}${pivot.draggable ? '. Drag it, or press the arrow keys' : ''}`}
           onPointerDown={onPivotDown} onKeyDown={onPivotKey}

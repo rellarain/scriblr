@@ -2,8 +2,10 @@ import { describe, expect, it } from 'vitest'
 import { publishFaults } from '../assets/Interfaces/admin/characters/modelContent'
 import { grayHex, paintOf, paletteOf, rollChoices, slotById } from '../assets/Interfaces/admin/characters/engine/colour'
 import { classKey } from '../assets/Interfaces/admin/characters/engine/forms'
+import { boneLength, headHeights, measures } from '../assets/Interfaces/admin/characters/engine/bones'
+import { framesOf, hiddenThrough } from '../assets/Interfaces/admin/characters/engine/frames'
 import { applyPreset, restState } from '../assets/Interfaces/admin/characters/engine/presets'
-import { paintCheck, rigCheck } from '../assets/Interfaces/admin/characters/engine/rigCheck'
+import { paintCheck, proportionCheck, rigCheck } from '../assets/Interfaces/admin/characters/engine/rigCheck'
 import { drawable, paintDefs, paintShapes } from '../assets/Interfaces/admin/characters/engine/paint'
 import { solve } from '../assets/Interfaces/admin/characters/engine/rig'
 import { previewModels } from './mockCharacterModels'
@@ -84,7 +86,10 @@ describe('the rigged preview model', () => {
   })
 
   it('has presets: poses, an expression, a build, two outfits and a style of the head', () => {
-    expect(adult.presets!.map(p => `${p.kind}: ${p.name}`)).toEqual(['Pose: At rest', 'Pose: Wave', 'Expression: Curious', 'Build: Broad', 'Outfit: Shirt on', 'Outfit: No shirt', 'Style: Sleepy'])
+    expect(adult.presets!.map(p => `${p.kind}: ${p.name}`)).toEqual([
+      'Pose: At rest', 'Pose: Wave', 'Expression: Curious', 'Build: Broad', 'Outfit: Shirt on', 'Outfit: No shirt', 'Style: Sleepy',
+      'Age: Infant', 'Age: Child', 'Age: Teen', 'Age: Adult', 'Age: Elder', 'Build: Slim', 'Build: Average', 'Build: Heavy',
+    ])
     let state = restState(adult)
     const apply = (name: string) => { state = applyPreset(adult, state, adult.presets!.find(p => p.name === name)!) }
     apply('Wave'); apply('Curious')
@@ -167,6 +172,80 @@ describe('the rigged preview model', () => {
     for (const i of items.filter(x => irises.some(s => s.id === x.id))) expect(i.gradient?.dir).toBe('radial')
     expect(paintDefs(drawable(items), 'x').length).toBeGreaterThan(0)
     expect(JSON.stringify(items)).not.toMatch(/NaN|undefined/)
+  })
+
+  it('has a skeleton: bones along the head, the upper arm and the forearm, with the head as the unit', () => {
+    expect(adult.bones!.map(b => b.name)).toEqual(['Head', 'Upper arm', 'Forearm'])
+    expect(adult.headBone).toBe(adult.bones![0].id)
+    const rest = solve(adult, {})
+    expect(measures(adult, rest).every(m => m.length != null && m.length > 5 && m.percent === 100)).toBe(true)
+    const heads = headHeights(adult, rest)!
+    expect(heads).toBeGreaterThan(2); expect(heads).toBeLessThan(6)
+    expect(proportionCheck(adult).map(l => l.text)).toEqual([expect.stringMatching(/keeps its size/), expect.stringMatching(/keeps its size/), expect.stringMatching(/keeps its size/)])
+  })
+
+  it('lengthens an arm with its Length slider, and the other arm with it', () => {
+    const [, upper] = adult.bones!
+    const rest = solve(adult, {}), long = solve(adult, { r_arm_len: 120 })
+    expect(boneLength(long, upper)! / boneLength(rest, upper)!).toBeCloseTo(1.2, 5)
+    const twin = adult.shapes.find(s => s.mirrorOf === 's_arm')!
+    expect(long.shapes[twin.id].box.h).toBeGreaterThan(rest.shapes[twin.id].box.h)
+    expect(long.shapes.s_arm.box.h).toBeCloseTo(long.shapes[twin.id].box.h, 5)
+    // the forearm hangs from the arm, so it is carried down; it is lengthened by its own slider
+    expect(long.shapes.s_fore.box.y).toBeGreaterThan(rest.shapes.s_fore.box.y)
+    expect(long.shapes.s_fore.box.h).toBeGreaterThan(rest.shapes.s_fore.box.h)
+  })
+
+  it('offers writers a span of the sliders that change the proportions, and always the resting value', () => {
+    const limited = adult.ranges.filter(r => r.limit)
+    expect(limited.map(r => r.id).sort()).toEqual(['r_arm_len', 'r_fore_len', 'r_head', 'r_height', 'r_shoulders'])
+    for (const r of limited) { expect(r.limit![0]).toBeGreaterThanOrEqual(r.min); expect(r.limit![1]).toBeLessThanOrEqual(r.max); expect(r.limit![0]).toBeLessThanOrEqual(r.rest); expect(r.limit![1]).toBeGreaterThanOrEqual(r.rest) }
+  })
+
+  it('has Age and Build presets that change the proportions, each inside the span a writer may choose', () => {
+    let state = restState(adult)
+    const apply = (name: string) => { state = applyPreset(adult, state, adult.presets!.find(p => p.name === name)!) }
+    const tall = (v: Record<string, number>) => solve(adult, v).shapes.s_head.box.h
+    apply('Infant')
+    expect(state.values).toMatchObject({ r_height: 80, r_head: 115 })
+    const infant = solve(adult, state.values)
+    apply('Adult')
+    expect(state.values).toMatchObject({ r_height: 100, r_head: 100 })   // an age replaces the last age
+    const grown = solve(adult, state.values)
+    expect(infant.shapes.s_head.box.h / (infant.shapes.s_fore.box.y + infant.shapes.s_fore.box.h - infant.shapes.s_head.box.y)).toBeGreaterThan(grown.shapes.s_head.box.h / (grown.shapes.s_fore.box.y + grown.shapes.s_fore.box.h - grown.shapes.s_head.box.y))
+    expect(tall({ r_head: 115 })).toBeGreaterThan(tall({}))
+    for (const p of adult.presets!.filter(x => x.kind === 'Age')) for (const [id, v] of Object.entries(p.values)) {
+      const r = adult.ranges.find(x => x.id === id)!
+      if (r.limit) { expect(v).toBeGreaterThanOrEqual(r.limit[0]); expect(v).toBeLessThanOrEqual(r.limit[1]) }
+    }
+    apply('Slim'); apply('Heavy')
+    expect(state.values).toMatchObject({ r_shoulders: 118, r_fit: 130 })
+  })
+
+  it('keeps the eyes the size they are drawn when the head grows', () => {
+    const eyes = adult.objects.filter(o => o.classOf)
+    expect(eyes.map(o => o.fit)).toEqual(['keep', 'keep', 'keep'])
+    const members = new Set(eyes.flatMap(o => o.shapes))
+    const forms = { [classKey(adult.classes![0].id)]: eyes[0].id }
+    const rest = solve(adult, {}, 'front', { forms }), big = solve(adult, { r_head: 115 }, 'front', { forms })
+    const shown = [...members].filter(id => rest.shapes[id]?.visible)
+    expect(shown.length).toBeGreaterThan(0)
+    for (const id of shown) { expect(big.shapes[id].box.w).toBeCloseTo(rest.shapes[id].box.w, 5); expect(big.shapes[id].box.h).toBeCloseTo(rest.shapes[id].box.h, 5) }
+    expect(big.shapes.s_head.box.w).toBeGreaterThan(rest.shapes.s_head.box.w)
+  })
+
+  it('has frames: head to hands, a bust and a face that leaves out the arms and the shirt', () => {
+    expect(framesOf(adult).map(f => f.name)).toEqual(['Head to hands', 'Bust', 'Face'])
+    const face = framesOf(adult)[2]
+    expect(face.hide).toEqual(expect.arrayContaining(['g_arm', 'g_shirt']))
+    const through = solve(adult, {}, 'front', { hidden: hiddenThrough(face, []) })
+    expect(through.shapes.s_shirt.visible).toBe(false); expect(through.shapes.s_arm.visible).toBe(false); expect(through.shapes.s_head.visible).toBe(true)
+    const [whole, bust] = framesOf(adult)
+    expect(whole).toMatchObject({ x: 30, y: 10, w: 140, h: 190 })
+    expect(bust.w).toBeLessThan(whole.w)
+    // the first frame holds every drawn shape of the figure
+    const rest = solve(adult, {})
+    for (const id of rest.order) { const b = rest.shapes[id].box; expect(b.x).toBeGreaterThanOrEqual(whole.x - 0.5); expect(b.x + b.w).toBeLessThanOrEqual(whole.x + whole.w + 0.5); expect(b.y + b.h).toBeLessThanOrEqual(whole.y + whole.h + 0.5) }
   })
 
   it('keeps the older published versions simple and valid', () => {

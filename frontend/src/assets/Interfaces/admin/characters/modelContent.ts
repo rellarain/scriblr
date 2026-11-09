@@ -1,4 +1,4 @@
-import type { ModelContent, ModelEntry, ModelForm, ModelGradient, ModelGroup, ModelLayer, ModelLook, ModelObject, ModelShape, ModelSlot, ModelTint } from '../../../../api/types'
+import type { ModelBone, ModelContent, ModelEntry, ModelFit, ModelForm, ModelFrame, ModelGradient, ModelGroup, ModelLayer, ModelLook, ModelObject, ModelRange, ModelShape, ModelSlot, ModelTint } from '../../../../api/types'
 import { LIMITS, copyBytes, linkCount, shadingCount } from './engine/limits'
 import { chainOf } from './engine/rig'
 import { standardGenres, standardSlots, starterPalette } from './engine/standardColours'
@@ -18,6 +18,10 @@ export const RANGE_NAME_MAX = 40
 export const KIND_MAX = 24
 export const SWATCH_NAME_MAX = 30
 export const AXIS_RANGE = { min: 40, max: 160 } as const
+// frames (phase 5a): the smallest and biggest a frame is, and the card colour a figure stands on unless the model says another
+export const FRAME_MIN = 8
+export const FRAME_BIGGEST = 500
+export const TILE_DEFAULT = '#e6d6c3'
 
 export const blankContent = (name = ''): ModelContent => ({ name, description: '', shapes: [], objects: [], groups: [], axis: 100, ranges: [] })
 // What a new model starts as: blank, with the standard genres, starter palette and colour slots (all of it plain data an admin may change or delete).
@@ -35,15 +39,19 @@ export function normalizeContent(c: ModelContent): ModelContent {
     name: clean(c.name, NAME_MAX),
     description: clean(c.description, DESCRIPTION_MAX),
     shapes: c.shapes.map(s => ({ ...s, name: clean(s.name, NAME_MAX), mirrorOf: s.mirrorOf ?? null, back: s.back ?? null, zBack: s.zBack ?? null, loose: s.loose ?? null, copyOf: s.copyOf ?? null, hide: s.hide === true, slot: s.slot ?? null, gray: s.gray ?? null, ...paintFields(s) })),
-    objects: c.objects.map(o => ({ ...o, name: clean(o.name, NAME_MAX), mirrorOf: o.mirrorOf ?? null, classOf: o.classOf ?? null, axes: (o.axes ?? []).map(a => ({ ...a, name: clean(a.name, NAME_MAX), options: a.options.map(f => ({ ...f, name: clean(f.name, NAME_MAX), looks: repairLooks(f.looks) })) })) })),
+    objects: c.objects.map(o => ({ ...o, name: clean(o.name, NAME_MAX), mirrorOf: o.mirrorOf ?? null, classOf: o.classOf ?? null, ...fitFields(o), axes: (o.axes ?? []).map(a => ({ ...a, name: clean(a.name, NAME_MAX), options: a.options.map(f => ({ ...f, name: clean(f.name, NAME_MAX), looks: repairLooks(f.looks) })) })) })),
     groups: c.groups.map(g => ({ ...g, name: clean(g.name, NAME_MAX), pivot: g.pivot ?? null, attach: g.attach ?? null, mirrorOf: g.mirrorOf ?? null })),
     axis: c.axis ?? 100,
-    ranges: (c.ranges ?? []).map(r => ({ ...r, name: clean(r.name, RANGE_NAME_MAX) })),
+    ranges: (c.ranges ?? []).map(repairRange),
     presets: (c.presets ?? []).map(p => ({ ...p, name: clean(p.name, NAME_MAX), kind: clean(p.kind, KIND_MAX) || 'Pose', scope: p.scope ?? null, forms: p.forms ?? {} })),
     classes: (c.classes ?? []).map(k => ({ ...k, name: clean(k.name, NAME_MAX), exclusive: k.exclusive === true })),
     genres: (c.genres ?? []).map(g => ({ ...g, name: clean(g.name, SWATCH_NAME_MAX) })),
     palette: (c.palette ?? []).map(p => ({ ...p, name: clean(p.name, SWATCH_NAME_MAX), h: percent(p.h, 0, 359), s: percent(p.s, 50, 100) })),
     slots: (c.slots ?? []).map(repairSlot),
+    bones: (c.bones ?? []).map(repairBone),
+    headBone: c.headBone ?? null,
+    frames: (c.frames ?? []).map(repairFrame),
+    tile: typeof c.tile === 'string' && HEX.test(c.tile) ? c.tile.toLowerCase() : TILE_DEFAULT,
   }
 }
 
@@ -73,6 +81,34 @@ export function repairLooks(looks: ModelLook[] | undefined): ModelLook[] {
     out.push({ shape: l.shape, slot, gray, tone })
   }
   return out
+}
+
+// A slider as the server keeps it (phase 5a: the writer's limit is held inside the slider, ordered, holds the resting value; the whole slider is no limit).
+function repairRange(r: ModelRange): ModelRange {
+  const { drives, ...rest } = r
+  let limit: [number, number] | null = null
+  if (Array.isArray(r.limit) && r.limit.length === 2) {
+    const held = (v: number) => Math.min(r.max, Math.max(r.min, Number.isFinite(v) ? v : r.rest))
+    const [a, b] = [held(r.limit[0]), held(r.limit[1])]
+    const lo = Math.min(a, b, r.rest), hi = Math.max(a, b, r.rest)
+    limit = lo <= r.min && hi >= r.max ? null : [lo, hi]
+  }
+  return { ...rest, name: clean(r.name, RANGE_NAME_MAX), limit, drives }
+}
+// How an object fits the body: only a stretching object has a shape to follow.
+function fitFields(o: ModelObject): { fit: ModelFit; fitTo: string | null } {
+  const fit: ModelFit = o.fit === 'keep' || o.fit === 'stretch' ? o.fit : 'scale'
+  return { fit, fitTo: fit === 'stretch' ? o.fitTo ?? null : null }
+}
+const unit = (v: number, lo: number, hi: number, fallback: number): number => (typeof v === 'number' && Number.isFinite(v) ? Math.min(hi, Math.max(lo, v)) : fallback)
+function repairBone(b: ModelBone): ModelBone {
+  return { id: b.id, name: clean(b.name, RANGE_NAME_MAX), start: b.start, end: { kind: b.end.kind === 'point' ? 'point' : 'group', id: b.end.id, i: Math.round(unit(b.end.i, 0, LIMITS.pointsMax - 1, 0)) } }
+}
+function repairFrame(f: ModelFrame): ModelFrame {
+  return {
+    id: f.id, name: clean(f.name, RANGE_NAME_MAX), x: unit(f.x, -50, 250, 0), y: unit(f.y, -50, 450, 0), w: unit(f.w, FRAME_MIN, FRAME_BIGGEST, 100), h: unit(f.h, FRAME_MIN, FRAME_BIGGEST, 100),
+    hide: [...new Set(f.hide ?? [])].slice(0, LIMITS.frameHideMax),
+  }
 }
 
 const percent = (v: number, fallback: number, max: number): number => (typeof v === 'number' && Number.isFinite(v) ? Math.round(Math.min(max, Math.max(0, v))) : fallback)
@@ -205,6 +241,7 @@ function removeAll(c: ModelContent, gone: { shapes: Set<string>; objects: Set<st
     }),
     objects: c.objects.filter(o => !gone.objects.has(o.id)).map(o => ({
       ...o, shapes: o.shapes.filter(sid => !gone.shapes.has(sid)), classOf: o.classOf && deadClasses.has(o.classOf) ? null : o.classOf,
+      ...(o.fitTo && gone.shapes.has(o.fitTo) ? { fit: 'scale' as const, fitTo: null } : {}),
       axes: (o.axes ?? []).map(a => ({ ...a, options: a.options.map(f => forgetShapes(f, gone.shapes)) })),
     })),
     groups: c.groups.filter(g => !gone.groups.has(g.id)).map(g => ({ ...g, parent: up(g.parent), objects: g.objects.filter(oid => !gone.objects.has(oid)) })),
@@ -215,6 +252,7 @@ function removeAll(c: ModelContent, gone: { shapes: Set<string>; objects: Set<st
       return trimmed.hidden.some(h => gone.objects.has(h) || gone.groups.has(h)) ? { ...trimmed, hidden: trimmed.hidden.filter(h => !gone.objects.has(h) && !gone.groups.has(h)) } : trimmed
     }),
     classes: (c.classes ?? []).filter(k => !deadClasses.has(k.id)),
+    ...(c.frames ? { frames: c.frames.map(f => (f.hide.some(h => gone.objects.has(h) || gone.groups.has(h)) ? { ...f, hide: f.hide.filter(h => !gone.objects.has(h) && !gone.groups.has(h)) } : f)) } : {}),
   }
 }
 
@@ -270,9 +308,9 @@ export function moveObjectWithin(c: ModelContent, groupId: string, objectId: str
   return { ...c, groups: c.groups.map(g => (g.id === groupId ? { ...g, objects: moveBefore(g.objects.map(id => ({ id })), objectId, beforeId).map(x => x.id) } : g)) }
 }
 
-// The next free id of a kind ('s', 'o', 'g') in the content.
-export function freshId(c: ModelContent, prefix: 's' | 'o' | 'g' | 'r', make: MakeId = randomId): string {
-  const taken = new Set([...c.shapes.map(s => s.id), ...c.objects.map(o => o.id), ...c.groups.map(g => g.id), ...c.ranges.map(r => r.id)])
+// The next free id of a kind ('s', 'o', 'g', 'r', 'b' for a bone, 'f' for a frame) in the content.
+export function freshId(c: ModelContent, prefix: 's' | 'o' | 'g' | 'r' | 'b' | 'f', make: MakeId = randomId): string {
+  const taken = new Set([...c.shapes.map(s => s.id), ...c.objects.map(o => o.id), ...c.groups.map(g => g.id), ...c.ranges.map(r => r.id), ...(c.bones ?? []).map(b => b.id), ...(c.frames ?? []).map(f => f.id)])
   for (let i = 0; i < 20; i++) { const id = make(prefix); if (!taken.has(id)) return id }
   return `${prefix}_${taken.size}_${Date.now().toString(36)}`
 }
@@ -519,6 +557,33 @@ function paintFaults(c: ModelContent): string[] {
   return faults
 }
 
+// What is wrong with the skeleton, the fit of objects and the frames (the server's _proportion_faults says the same words).
+function proportionFaults(c: ModelContent): string[] {
+  const faults: string[] = []
+  const groupIds = new Set(c.groups.map(g => g.id)), twinGroups = new Set(c.groups.filter(g => g.mirrorOf).map(g => g.id))
+  const shapes = new Map(c.shapes.map(s => [s.id, s])), bones = new Map((c.bones ?? []).map(b => [b.id, b]))
+  const thingIds = new Set([...c.objects.map(o => o.id), ...groupIds])
+  for (const b of c.bones ?? []) {
+    const name = label(b.name, b.id)
+    if (!groupIds.has(b.start)) faults.push(`Bone ${name} starts at a group that does not exist.`)
+    else if (twinGroups.has(b.start)) faults.push(`Bone ${name} starts at a twin group; use the original.`)
+    if (b.end.kind === 'group') { if (!groupIds.has(b.end.id)) faults.push(`Bone ${name} ends at a group that does not exist.`) }
+    else if (!shapes.has(b.end.id)) faults.push(`Bone ${name} ends at a shape that does not exist.`)
+    else if (b.end.i >= outlineSize(c, shapes.get(b.end.id)!)) faults.push(`Bone ${name} ends at a point that does not exist.`)
+  }
+  for (const r of c.ranges) for (const d of r.drives) if (d.kind === 'length' && !(d.id && bones.has(d.id))) faults.push(`Slider ${label(r.name, r.id)} changes the length of a bone that does not exist.`)
+  if (c.headBone && !bones.has(c.headBone)) faults.push('The head bone does not exist.')
+  for (const o of c.objects) {
+    if (o.fit !== 'stretch') continue
+    const name = label(o.name, o.id)
+    if (!o.fitTo) faults.push(`Object ${name} stretches to a shape but has none chosen.`)
+    else if (!shapes.has(o.fitTo)) faults.push(`Object ${name} stretches to a shape that does not exist.`)
+    else if (o.shapes.includes(o.fitTo)) faults.push(`Object ${name} stretches to a shape of its own.`)
+  }
+  for (const f of c.frames ?? []) if (f.hide.some(h => !thingIds.has(h))) faults.push(`Frame ${label(f.name, f.id)} hides something that does not exist.`)
+  return faults
+}
+
 export function publishFaults(c: ModelContent): string[] {
   const faults: string[] = []
   if (!c.name.trim()) faults.push('The model needs a name.')
@@ -551,6 +616,7 @@ export function publishFaults(c: ModelContent): string[] {
   faults.push(...presetFaults(c))
   faults.push(...colourFaults(c))
   faults.push(...paintFaults(c))
+  faults.push(...proportionFaults(c))
   const bytes = copyBytes(c)
   if (bytes > LIMITS.copyMaxBytes) faults.push(`A character's copy of this model would be ${Math.floor(bytes / 1024)} KB; the limit is ${LIMITS.copyMaxBytes / 1024} KB.`)
   return faults

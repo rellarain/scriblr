@@ -342,3 +342,23 @@ span.cmTreeTwisty { cursor: default; }
 .cmSlotBody { display: flex; flex-direction: column; gap: var(--space-2); min-width: 0; }
 .cmColourEditor { display: flex; flex-direction: column; gap: var(--space-2); padding: var(--space-2) var(--space-3); background: var(--ov-sink-2); min-width: 0; }
 .cmHueLabel { font-size: var(--text-small); font-weight: 700; text-transform: uppercase; letter-spacing: 0.05em; color: var(--ink-muted); }
+
+// ---- proportions and frames (phase 5a) ----
+.cmMeasure { font-variant-numeric: tabular-nums; }
+.cmLimit { display: grid; grid-template-columns: minmax(0, 1fr) auto; align-items: center; column-gap: var(--space-2); row-gap: var(--space-1); .cmStep { grid-column: 1; } > .cmIconBtn { grid-column: 2; grid-row: 1 / span 2; } }
+.cmLimitRow { display: flex; flex-direction: column; gap: var(--space-1); padding: var(--space-3); background: var(--ov-sink-1); p { margin: 0; } }
+// a frame on the canvas: a dashed outline, solid with handles when it is the one being edited; the hit area is the border only, so the figure inside stays clickable
+.cmFrameRect { fill: none; stroke: var(--ink-muted); stroke-width: 1.5; stroke-dasharray: 5 4; vector-effect: non-scaling-stroke; pointer-events: none; }
+.cmFrame--on .cmFrameRect { stroke: var(--accent); stroke-dasharray: none; stroke-width: 2; }
+.cmFrameName { fill: var(--ink); pointer-events: none; user-select: none; }
+.cmFrameHit { fill: none; stroke: transparent; pointer-events: stroke; cursor: pointer; outline: none; &:focus-visible { stroke: var(--accent); stroke-opacity: 0.25; } }
+.cmFrame--on .cmFrameHit { cursor: move; }
+.cmFrameHandle { fill: var(--surface-raised); stroke: var(--accent); stroke-width: 2; vector-effect: non-scaling-stroke; cursor: nwse-resize; }
+// the card behind the figure when it is seen through a frame: its colour is data (set inline in --tile), like the colours of the shapes
+.cmFrameTile { fill: var(--tile, var(--surface-raised)); pointer-events: none; }
+.cmTilePreview { display: block; height: 28px; background: var(--tile); box-shadow: inset 0 0 0 1px var(--hairline); }
+// picking the end of a bone: a marker on the pivot of every group
+.cmPickGroup { cursor: copy; outline: none; }
+.cmPickGroupHit { fill: transparent; }
+.cmPickGroupDot { fill: var(--surface-raised); stroke: var(--accent); stroke-width: 2; vector-effect: non-scaling-stroke; }
+.cmPickGroup:hover .cmPickGroupDot, .cmPickGroup:focus-visible .cmPickGroupDot { fill: var(--accent); }

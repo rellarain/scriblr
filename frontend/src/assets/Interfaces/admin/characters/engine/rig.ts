@@ -1,5 +1,5 @@
-import type { ModelAttach, ModelContent, ModelDrive, ModelGroup, ModelPoint, ModelRange, ModelShape } from '../../../../../api/types'
-import { IDENTITY, apply, boxOf, build, clamp, edgeAt, flatten, inverse, mul, pathText, reflectList, rotate, scale, translate, twinIndex, windSign, type Box, type BuiltPoint, type Mat } from './geometry'
+import type { ModelAttach, ModelBone, ModelBoneEnd, ModelContent, ModelDrive, ModelGroup, ModelObject, ModelPoint, ModelRange, ModelShape } from '../../../../../api/types'
+import { IDENTITY, apply, boxOf, build, clamp, edgeAt, flatten, inverse, mul, pathText, reflectList, rotate, scale, scaleAlong, translate, turnOf, twinIndex, windSign, type Box, type BuiltPoint, type Mat } from './geometry'
 import { classKey, classesOf, membersOf, overrideFor, type Choices } from './forms'
 import { drawOrder } from './order'
 
@@ -172,6 +172,26 @@ export function restPivot(c: ModelContent, g: ModelGroup): [number, number] {
   return any ? [(x0 + x1) / 2, (y0 + y1) / 2] : [c.axis ?? 100, 200]
 }
 
+// Where a group turns with every slider at rest, in the model's own space: its pivot, or for a twin the reflection of its original's.
+export function pivotAtRest(c: ModelContent, g: ModelGroup): [number, number] {
+  const original = g.mirrorOf && g.mirrorOf !== g.id ? c.groups.find(x => x.id === g.mirrorOf) : undefined
+  if (original && !original.mirrorOf) { const p = pivotAtRest(c, original); return [2 * (c.axis ?? 100) - p[0], p[1]] }
+  return g.pivot ?? restPivot(c, g)
+}
+
+// Where a bone's end is with every slider at rest (null when the group, shape or point it names is not there).
+export function boneEndAtRest(c: ModelContent, e: ModelBoneEnd): [number, number] | null {
+  if (e.kind === 'group') { const g = c.groups.find(x => x.id === e.id); return g ? pivotAtRest(c, g) : null }
+  const p = c.shapes.find(x => x.id === e.id)?.pts[e.i]
+  return p ? [p.x, p.y] : null
+}
+
+// A bone at rest: from the pivot of its group to its end, in the model's own space (null when either cannot be found).
+export function boneAtRest(c: ModelContent, b: ModelBone): { a: [number, number]; b: [number, number] } | null {
+  const g = c.groups.find(x => x.id === b.start), end = boneEndAtRest(c, b.end)
+  return g && end ? { a: pivotAtRest(c, g), b: end } : null
+}
+
 // Where an anchor is, from the solved points of the shape it is on: a point, a spot along an edge, anywhere along an edge that a slider moves, or a
 // relative place inside the shape's box. `shapes` holds what is solved so far.
 export function anchorFrom(c: ModelContent, shapes: Record<string, { pre: BuiltPoint[]; rig?: ModelPoint[]; frame?: Mat }>, att: ModelAttach, values: Values): [number, number] | null {
@@ -206,7 +226,17 @@ export function looseFactor(c: ModelContent, shape: Pick<ModelShape, 'loose'>, v
 
 // What the admin has set besides the sliders (test state, never saved): the form each axis shows and the member each family shows (see forms.ts), the objects
 // and groups switched off, and the objects to show whatever their class says (the pattern or the member being edited: a family then shows only those).
-export interface SolveOptions { forms?: Choices; hidden?: Iterable<string>; show?: Iterable<string> }
+// `plain` draws every object scaled with its group, whatever its fit mode says (what fit modes are measured against).
+export interface SolveOptions { forms?: Choices; hidden?: Iterable<string>; show?: Iterable<string>; plain?: boolean }
+
+// The model with every slider at rest and every object scaled with its group, kept for the content it was solved from (a stretching object reads its target's
+// box from it).
+const plainRests = new WeakMap<ModelContent, Solved>()
+function plainRest(c: ModelContent): Solved {
+  let s = plainRests.get(c)
+  if (!s) { s = solve(c, defaultValues(c), 'front', { plain: true }); plainRests.set(c, s) }
+  return s
+}
 
 export function solve(c: ModelContent, values: Values = {}, view: View = 'front', opts: SolveOptions = {}): Solved {
   const axis = c.axis ?? 100
@@ -230,6 +260,7 @@ export function solve(c: ModelContent, values: Values = {}, view: View = 'front'
 
   const shapeMap = new Map(c.shapes.map(s => [s.id, s]))
   const groupMap = new Map(c.groups.map(g => [g.id, g]))
+  const boneMap = new Map((c.bones ?? []).map(b => [b.id, b]))
   const groupOfShape = new Map<string, string>()
   const objectShapes = new Map(c.objects.map(o => [o.id, o.shapes]))
   for (const g of c.groups) for (const oid of g.objects) for (const sid of objectShapes.get(oid) ?? []) if (!groupOfShape.has(sid)) groupOfShape.set(sid, g.id)
@@ -365,6 +396,57 @@ export function solve(c: ModelContent, values: Values = {}, view: View = 'front'
   }
   const groupMatOf = (shapeId: string): Mat => { const gid = groupOfShape.get(shapeId); return gid ? groupMat(gid) : IDENTITY }
 
+  // The box (in the model's space, before the whole-model transform) a shape is drawn in; its object's fit mode is not counted.
+  const boxIn = (s: SolvedShape | undefined): Box | null => {
+    if (!s || s.local.length < 3) return null
+    const closed = shapeMap.get(s.id)?.closed ?? true
+    const poly = flatten(build(s.local, closed, s.frame), closed)
+    return poly.length ? boxOf(poly) : null
+  }
+
+  // The middle of an object at rest, in its group's space (null when none of its shapes has an outline to take it from).
+  function objectCentre(o: ModelObject): [number, number] | null {
+    let x0 = Infinity, y0 = Infinity, x1 = -Infinity, y1 = -Infinity
+    for (const sid of o.shapes) {
+      let s = shapeMap.get(sid)
+      if (s && s.pts.length < 3 && s.copyOf) s = shapeMap.get(s.copyOf)   // a shape that follows its pattern lies where the pattern's shape does
+      if (!s || s.pts.length < 3) continue
+      const b = boxOf(flatten(build(s.pts, s.closed), s.closed))
+      x0 = Math.min(x0, b.x); y0 = Math.min(y0, b.y); x1 = Math.max(x1, b.x + b.w); y1 = Math.max(y1, b.y + b.h)
+    }
+    return x1 >= x0 ? [(x0 + x1) / 2, (y0 + y1) / 2] : null
+  }
+
+  // How an object that does not scale with its group is drawn (phase 5a): the matrix that stands in for its group's, or null for an object that does. 'keep'
+  // is carried by its group (the middle of the object goes where the group puts it, and it turns as the group does) but is drawn at its own size: the scale and
+  // the shear of the group and of the groups above it are taken out. 'stretch' follows the box of another shape: the object is scaled and moved as that box
+  // has grown and moved since rest (no turn). Only the drawing changes: anchors and links read the outline as the group holds it. A twin is the mirror image
+  // of its original's.
+  function fitMatrix(sh: ModelShape): Mat | null {
+    if (opts.plain) return null
+    const original = sh.mirrorOf && sh.mirrorOf !== sh.id ? shapeMap.get(sh.mirrorOf) : undefined
+    if (original && !original.mirrorOf) { const m = fitMatrix(original); return m ? mul(RF, mul(m, RF)) : null }
+    const oid = objectOfShape.get(sh.id), o = oid ? objectMap.get(oid) : undefined
+    const gid = groupOfShape.get(sh.id)
+    if (!o || !gid || !o.fit || o.fit === 'scale') return null
+    let m: Mat | null = null
+    if (o.fit === 'keep') {
+      const Mg = groupMat(gid), pw = out.pivots[gid]
+      // the middle of the object (else the pivot of the group) goes where the group's matrix puts it, and only the turn is kept
+      const [cx, cy] = objectCentre(o) ?? (pw ? apply(inverse(Mg), pw[0], pw[1]) : [0, 0])
+      const [wx, wy] = apply(Mg, cx, cy), th = (turnOf(Mg) * Math.PI) / 180, cs = Math.cos(th), sn = Math.sin(th)
+      m = [cs, sn, -sn, cs, wx - (cs * cx - sn * cy), wy - (sn * cx + cs * cy)]
+    } else {
+      const target = o.fitTo ? shapeMap.get(o.fitTo) : undefined
+      if (!target || objectOfShape.get(target.id) === o.id) return null
+      const now = boxIn(shapeOut(target.id)), then = boxIn(plainRest(c).shapes[target.id])
+      if (!now || !then) return null
+      const kx = then.w > 1e-6 ? clamp(now.w / then.w, 0.05, 20) : 1, ky = then.h > 1e-6 ? clamp(now.h / then.h, 0.05, 20) : 1
+      m = [kx, 0, 0, ky, now.x - kx * then.x, now.y - ky * then.y]
+    }
+    return finiteMat(m) ? m : null
+  }
+
   function place(sh: ModelShape, groupId: string | null, Mg: Mat) {
     const original = sh.mirrorOf && sh.mirrorOf !== sh.id ? shapeMap.get(sh.mirrorOf) : undefined
     const twin = original && !original.mirrorOf ? original : undefined
@@ -396,7 +478,7 @@ export function solve(c: ModelContent, values: Values = {}, view: View = 'front'
       }
     }
     const ok = rig.length >= 3 && drawn.length >= 3
-    const matrix = mul(G, Mg)
+    const matrix = mul(G, (ok ? fitMatrix(sh) : null) ?? Mg)
     const off = switchedOff(sh.id)
     const fin = ok ? build(drawn, closed, matrix) : []
     const poly = ok ? flatten(fin, closed) : []
@@ -451,15 +533,25 @@ export function solve(c: ModelContent, values: Values = {}, view: View = 'front'
       }
       const pw2 = apply(bm, pv[0], pv[1])
       let angle = 0, sx = 1, sy = 1
+      // a bone starting at this group is stretched along its own rest direction (as the parent holds it now), about the pivot; all the groups that hang from
+      // this one follow, since they stand in this group's matrix
+      let lengthen = bm
       for (const r of ranges) for (const d of r.drives) {
         if (d.kind === 'turn' && d.group === id) angle += amount(r, d, val(r))
         else if (d.kind === 'scale' && d.target === 'group' && d.id === id) {
           const f = factorOf(r, d, val(r))
           if (d.axis !== 'y') sx *= f
           if (d.axis !== 'x') sy *= f
+        } else if (d.kind === 'length' && d.id) {
+          const bone = boneMap.get(d.id)
+          const rest = bone && bone.start === id ? boneAtRest(c, bone) : null
+          if (!rest) continue
+          const vx = rest.b[0] - rest.a[0], vy = rest.b[1] - rest.a[1]
+          const ux = bm[0] * vx + bm[2] * vy, uy = bm[1] * vx + bm[3] * vy, len = Math.hypot(ux, uy)
+          if (len > 1e-6) lengthen = mul(scaleAlong(factorOf(r, d, val(r)), ux / len, uy / len, pw2[0], pw2[1]), lengthen)
         }
       }
-      Mg = mul(rotate(angle, pw2[0], pw2[1]), mul(scale(sx, sy, pw2[0], pw2[1]), bm))
+      Mg = mul(rotate(angle, pw2[0], pw2[1]), mul(scale(sx, sy, pw2[0], pw2[1]), lengthen))
       out.pivots[id] = [pw2[0], pw2[1]]
       out.anchors[id] = g.attach ? an : null
     }

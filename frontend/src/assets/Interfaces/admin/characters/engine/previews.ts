@@ -43,14 +43,14 @@ export const PREVIEW_RANGES = { scale: [0.35, 1.4], tilt: [-28, 28], skew: [-14,
 export const PREVIEW_BACKGROUNDS = 4
 
 // The values of the sliders for one preview: the stress previews put every slider at the end of its range; a random one draws each from the span the slider
-// is meant to stay in (`rand`, else its whole range), mostly near the middle of it.
+// is meant to stay in (`rand`, else the span a writer may choose within, else its whole range), mostly near the middle of it.
 function sliderValues(ranges: ModelRange[], mode: PreviewMode, rng: Rng): Record<string, number> {
   const out: Record<string, number> = {}
   for (const r of ranges) {
     if (mode === 'min') out[r.id] = r.min
     else if (mode === 'max') out[r.id] = r.max
     else {
-      const [lo, hi] = r.rand ?? [r.min, r.max]
+      const [lo, hi] = r.rand ?? r.limit ?? [r.min, r.max]
       out[r.id] = Math.round((lo + (hi - lo) * ((rng() + rng() + rng()) / 3)) * 100) / 100
     }
   }

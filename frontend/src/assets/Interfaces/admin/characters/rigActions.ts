@@ -2,7 +2,7 @@ import type { ModelAttach, ModelScaleAxis } from '../../../../api/types'
 import type { Selection } from './designerState'
 
 // What the Rig and Ranges tabs ask the page to do. The page (ModelPane) applies them to the content, keeps the undo stack and says why when one is refused.
-export type NewSliderKind = 'turn' | 'scale' | 'points' | 'bend'
+export type NewSliderKind = 'turn' | 'scale' | 'points' | 'bend' | 'length'
 export interface Recording { rangeId: string; shapeId: string; end: 'max' | 'min' }
 
 export interface RigActions {
@@ -21,6 +21,11 @@ export interface RigActions {
   addDrive: (rangeId: string, kind: NewSliderKind) => void
   removeDrive: (rangeId: string, index: number) => void
   stepDrive: (rangeId: string, index: number, field: 'atMin' | 'atMax', dir: -1 | 1, big: boolean) => void
+  // A Length drive lengthens another bone.
+  setDriveBone: (rangeId: string, index: number, boneId: string) => void
+  // The smallest or largest value a writer may choose (phase 5a); clearLimit lets them choose anywhere on the slider.
+  stepLimit: (rangeId: string, end: 'lo' | 'hi', dir: -1 | 1, big: boolean) => void
+  clearLimit: (rangeId: string) => void
   setDriveAxis: (rangeId: string, index: number, axis: ModelScaleAxis) => void
   stepBend: (rangeId: string, index: number, edge: 'y0' | 'y1', dir: -1 | 1, big: boolean) => void
   // Record the points of a shape at the slider's maximum or minimum: the canvas edits a copy until finishRecording (or cancelRecording).
@@ -54,4 +59,44 @@ export interface PairActions {
   // A shape's outline for the back view goes back to the front one; a shape moves one place in front of or behind its neighbour in the view being edited.
   useFront: (shapeId: string) => void
   moveInOrder: (shapeId: string, dir: -1 | 1) => void
+}
+
+// Phase 5a: proportions (the skeleton of bones), how an object fits the body, and frames.
+export type BoneEndKind = 'group' | 'point'
+export interface BonePick { boneId: string; end: 'end' }
+
+export interface ProportionActions {
+  // Add a bone from the selected group (else the first group) to a group that hangs from it (else any other group).
+  addBone: () => void
+  renameBone: (id: string, name: string) => void
+  // Where a bone starts (a group) and ends (the pivot of a group, or point `i` of a shape).
+  setStart: (id: string, groupId: string) => void
+  setEnd: (id: string, kind: BoneEndKind, targetId: string, i: number) => void
+  stepEndPoint: (id: string, dir: -1 | 1) => void
+  // Choose the end of a bone by clicking the canvas (a pivot marker or a shape); stop picking.
+  pickEnd: (id: string | null) => void
+  removeBone: (id: string) => void
+  setHeadBone: (id: string | null) => void
+  // A new slider that lengthens a bone (and lists in the Ranges tab).
+  lengthSlider: (boneId: string) => void
+  openSlider: (rangeId: string) => void
+}
+
+export interface FitActions {
+  setFit: (objectId: string, mode: 'scale' | 'keep' | 'stretch', fitTo?: string | null) => void
+  pick: (on: boolean) => void
+}
+
+export interface FrameActions {
+  add: () => void
+  rename: (id: string, name: string) => void
+  remove: (id: string) => void
+  select: (id: string | null) => void
+  // Look at the canvas through a frame (null: the whole figure).
+  through: (id: string | null) => void
+  toggleHide: (id: string, thingId: string) => void
+  // The card colour behind the figure: a test colour, kept as the model's starter tile on request.
+  setTile: (hex: string) => void
+  useTile: () => void
+  resetTile: () => void
 }

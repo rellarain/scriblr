@@ -7,27 +7,32 @@ import { AssetTree, type TreeActions, type TreeMode } from './AssetTree'
 import type { ClassActions } from './ClassPanel'
 import { ColourTab, type ColourActions } from './ColourTab'
 import { CheckPanel } from './CheckPanel'
-import { DesignerCanvas, type PivotMarker, type PoseCanvas, type PoseGrab } from './DesignerCanvas'
+import { DesignerCanvas, type FrameCanvas, type PivotMarker, type PoseCanvas, type PoseGrab, type ThroughFrame } from './DesignerCanvas'
 import { FormsTab, type FormActions } from './FormsTab'
+import { FramesTab, type FramesState } from './FramesTab'
 import { Inspector, type InspectorTab } from './Inspector'
 import { StatusBadge, modelLabel } from './ModelList'
 import type { PaintActions } from './PaintSection'
 import { PoseBar } from './PoseBar'
+import { ProportionsTab } from './ProportionsTab'
 import { PresetsTab, type PresetActions } from './PresetsTab'
 import { PreviewStrip } from './PreviewStrip'
 import { RangesTab } from './RangesTab'
 import { RigTab } from './RigTab'
 import { TemplateMenu } from './TemplateMenu'
-import { NONE, contextObject, repair, rightClickGrid, rightClickShape, showFor, type EditMode, type Selection } from './designerState'
+import { NONE, contextObject, repair, rightClickGrid, rightClickShape, shapesOf, showFor, type EditMode, type Selection } from './designerState'
 import {
   NEUTRAL_GRAY, addColour, addGenre, addSlot, addStandardSlots, addSwatch, paletteOf, removeColour, removeGenre, removeSlot, removeSwatch, renameColour, renameGenre, renameSlot, setColourHex,
   setStarterPalette, setSwatch, stepSlot, toggleColourGenre,
 } from './engine/colour'
+import { addBone, boneById, removeBone, renameBone, setBoneEnd, setBoneStart, setHeadBone } from './engine/bones'
+import { setFit as setObjectFit, stretchTargets } from './engine/fitEdit'
+import { addFrame, framesOf, frameById, hiddenThrough, movedBox, removeFrame, renameFrame, resizedBox, setFrameBox, setTile, tileOf, toggleFrameHide, viewBoxOf } from './engine/frames'
 import { addMember, deleteClass, detachBeforeRemoval, detachMember, followTemplate, makeClass, moveObjectToGroup, reconcileClasses, renameClass, setExclusive, setShapeHide } from './engine/classEdit'
 import { newShape } from './engine/edit'
 import { addAxis, addForm, hideInForm, moveAxis, moveForm, overrideState, removeAxis, removeForm, renameAxis, renameForm, setInitialForm, setLook, setOverride, useBaseOutline } from './engine/formEdit'
 import { classKey, presetsOf, targetForShape } from './engine/forms'
-import { apply, inverse } from './engine/geometry'
+import { apply, inverse, type Box } from './engine/geometry'
 import { LIMITS } from './engine/limits'
 import { emptyHistory, redo as redoHistory, remember, undo as undoHistory, type History } from './engine/history'
 import { beginScale, beginTurn, grabPoint, moveScale, moveTurn, poseTarget, reach, reachJoints, scaleDriver, slideValue, toModel, turnDrivers, type ReachGrab, type ScaleDrag, type TurnDrag } from './engine/pose'
@@ -36,12 +41,12 @@ import { chainOf, isPointDriven, restPivot, solve, type Solved, type Values } fr
 import * as paintOps from './engine/paintEdit'
 import { addShading } from './engine/shadeEdit'
 import {
-  addBend, addRange, addScale, addTurn, attachFromClick, attachGroup, clearPointMoves, detachGroup, groupOfShape, newRange, recordPoints, removeDrive, removeRange, renameRange, reparent,
-  setAxis, setDriveAxis, setPivot, setShow, stepBendEdge, stepBound, stepDrive, type Edit,
+  addBend, addLength, addRange, addScale, addTurn, attachFromClick, attachGroup, clearLimit, clearPointMoves, detachGroup, groupOfShape, newRange, recordPoints, removeDrive, removeRange, renameRange, reparent,
+  setAxis, setDriveAxis, setDriveBone, setPivot, setShow, stepBendEdge, stepBound, stepDrive, stepLimit, type Edit,
 } from './engine/rigEdit'
 import { templateBox, templateById } from './engine/templates'
 import { breakPair, clearLinksTo, linkToEdge, linkToPoint, makeTwin, moveInOrder, setBack, setLoose, stepLink, unlinkPoint } from './engine/pairEdit'
-import type { LinkHow, NewSliderKind, PairActions, Recording, RigActions, ViewName } from './rigActions'
+import type { FitActions, FrameActions, LinkHow, NewSliderKind, PairActions, ProportionActions, Recording, RigActions, ViewName } from './rigActions'
 import { groupOfSelection, offRest, scrubValue, valueText } from './rigView'
 import {
   NAME_MAX, addGroup, addObject, addShape, duplicateShape, freshId, groupOfObject, moveBefore, moveObjectWithin, moveShapeWithin, newGroup, objectById, objectOfShape, publishFaults, removeGroup, removeObject,
@@ -127,6 +132,13 @@ export function ModelPane({ entry, models, makeId, onRemove, onDuplicate, onExpo
   const [poseStatus, setPoseStatus] = useState(POSE_HINT)
   const [poseActive, setPoseActive] = useState<string | null>(null)
   const [ghost, setGhost] = useState(false)
+  // proportions and frames (phase 5a): the bone whose end is being picked on the canvas, picking the shape an object stretches to, the frame being edited on the
+  // canvas, the frame the canvas looks through, and the test card colour (never saved unless it is kept as the starter colour)
+  const [bonePick, setBonePick] = useState<string | null>(null)
+  const [fitPick, setFitPick] = useState(false)
+  const [frameSel, setFrameSel] = useState<string | null>(null)
+  const [throughId, setThroughId] = useState<string | null>(null)
+  const [tileTest, setTileTest] = useState<string | null>(null)
   const poseRef = useRef<PoseDrag | null>(null)
   const historyRef = useRef(history)
   historyRef.current = history
@@ -141,7 +153,9 @@ export function ModelPane({ entry, models, makeId, onRemove, onDuplicate, onExpo
   const shown = useMemo(() => (recording ? updateShape(content, recording.shapeId, () => recording.draft) : content), [content, recording])
   // the selected object is drawn whatever its class says (a pattern, or a member of a family that is not the one chosen), so it can be looked at and edited
   const show = useMemo(() => showFor(content, sel), [content, sel])
-  const solved = useMemo(() => solve(shown, recording ? {} : values, view, recording ? {} : { forms: test.forms, hidden: test.hidden, show }), [shown, values, recording, view, test.forms, test.hidden, show])
+  // looking through a frame leaves out what the frame leaves out
+  const through = frameById(content, throughId)
+  const solved = useMemo(() => solve(shown, recording ? {} : values, view, recording ? {} : { forms: test.forms, hidden: hiddenThrough(through, test.hidden), show }), [shown, values, recording, view, test.forms, test.hidden, show, through])
   const group = groupOfSelection(content, sel)
   const valuesRef = useRef(values)
   valuesRef.current = values
@@ -268,7 +282,7 @@ export function ModelPane({ entry, models, makeId, onRemove, onDuplicate, onExpo
 
   function choose(next: Selection) {
     if (recording) return
-    setSel(next); setSelPoint(0); setMode('points'); setPickOn(false); setLinkMode(null); setPaintPick(null)
+    setSel(next); setSelPoint(0); setMode('points'); setPickOn(false); setLinkMode(null); setPaintPick(null); setBonePick(null); setFitPick(false)
   }
 
   // ---- the sliders' test values ----
@@ -310,9 +324,22 @@ export function ModelPane({ entry, models, makeId, onRemove, onDuplicate, onExpo
     setRecording({ rangeId, shapeId, end, draft: { ...s, pts: s.pts.map(p => ({ ...p })) } })
     setNote('')
   }
+  // The bone a new Length drive lengthens: one that starts at the selected group, else the first.
+  function lengthBone() {
+    const bones = content.bones ?? []
+    return bones.find(b => b.start === group?.id) ?? bones[0]
+  }
   function newSlider(kind: NewSliderKind) {
     const id = freshId(content, 'r', makeId)
     const gName = group?.name.trim() || 'the group'
+    if (kind === 'length') {
+      const b = lengthBone()
+      if (!b) { setNote('Add a bone first (Proportions tab): a Length slider lengthens a bone.'); return }
+      const start = addRange(content, newRange(id, sliderName(content, `${b.name.trim() || 'Bone'} length`), 'length', b.start))
+      if (start.ok && applyEdit(addLength(start.content, id, b.id))) { setTab('ranges'); setRangeFilter('selection') }
+      else if (!start.ok) setNote(start.reason)
+      return
+    }
     if (kind === 'turn') {
       if (!group) { setNote('Select a group first.'); return }
       const start = addRange(content, newRange(id, sliderName(content, `${gName} turn`), 'turn', group.id))
@@ -336,6 +363,7 @@ export function ModelPane({ entry, models, makeId, onRemove, onDuplicate, onExpo
     else { commit(start.content, true); startRecording(id, selShape.id, 'max') }
   }
   function addDrive(rangeId: string, kind: NewSliderKind) {
+    if (kind === 'length') { const b = lengthBone(); if (!b) setNote('Add a bone first (Proportions tab): a Length slider lengthens a bone.'); else applyEdit(addLength(content, rangeId, b.id)); return }
     if (kind === 'turn') { if (!group) setNote('Select a group first.'); else applyEdit(addTurn(content, rangeId, group.id)); return }
     if (kind === 'scale') { const t = scaleTarget(); applyEdit(addScale(content, rangeId, t.target, t.id)); return }
     if (!selShape) { setNote('Select a shape first.'); return }
@@ -373,6 +401,9 @@ export function ModelPane({ entry, models, makeId, onRemove, onDuplicate, onExpo
     addDrive,
     removeDrive: (rangeId, index) => commit(removeDrive(content, rangeId, index), true),
     stepDrive: (rangeId, index, field, dir, big) => commit(stepDrive(content, rangeId, index, field, dir, big), true),
+    setDriveBone: (rangeId, index, boneId) => { applyEdit(setDriveBone(content, rangeId, index, boneId)) },
+    stepLimit: (rangeId, end, dir, big) => commit(stepLimit(content, rangeId, end, dir, big), true),
+    clearLimit: rangeId => commit(clearLimit(content, rangeId), true),
     setDriveAxis: (rangeId, index, axis) => commit(setDriveAxis(content, rangeId, index, axis), true),
     stepBend: (rangeId, index, edge, dir, big) => commit(stepBendEdge(content, rangeId, index, edge, dir, big), true),
     record: startRecording,
@@ -383,6 +414,84 @@ export function ModelPane({ entry, models, makeId, onRemove, onDuplicate, onExpo
     resetValues,
     openSlider: () => { setTab('ranges'); setRangeFilter('selection') },
   }
+
+  // ---- proportions: bones, fit and frames ----
+
+  const proportions: ProportionActions = {
+    addBone: () => {
+      const start = group && !group.mirrorOf ? group : content.groups.find(g => !g.mirrorOf)
+      if (!start) { setNote('Make a group first: a bone starts at the pivot of one.'); return }
+      const end = content.groups.find(g => g.parent === start.id) ?? content.groups.find(g => g.id !== start.id)
+      if (!end) { setNote('Make a second group first: a bone runs from the pivot of one group to another.'); return }
+      if (applyEdit(addBone(content, start.id, { kind: 'group', id: end.id, i: 0 }, `${start.name.trim() || 'Group'} bone`, makeId))) setTab('proportions')
+    },
+    renameBone: (id, name) => models.edit(entry.id, c => renameBone(c, id, name), false),
+    setStart: (id, groupId) => { applyEdit(setBoneStart(content, id, groupId)) },
+    setEnd: (id, kind, targetId, i) => { applyEdit(setBoneEnd(content, id, { kind, id: targetId, i })) },
+    stepEndPoint: (id, dir) => {
+      const b = boneById(content, id), n = b ? shapeById(content, b.end.id)?.pts.length ?? 0 : 0
+      if (b && b.end.kind === 'point' && n > 0) applyEdit(setBoneEnd(content, id, { ...b.end, i: ((b.end.i + dir) % n + n) % n }))
+    },
+    pickEnd: id => { setBonePick(id); if (id) { setLinkMode(null); setPickOn(false); setPaintPick(null); setFitPick(false) } },
+    removeBone: id => {
+      const r = removeBone(content, id)
+      commit(r.content, true)
+      if (r.sliders.length) setNote(`The Length drive of ${r.sliders.join(', ')} went with the bone.`)
+    },
+    setHeadBone: id => { applyEdit(setHeadBone(content, id)) },
+    lengthSlider: boneId => {
+      const b = boneById(content, boneId)
+      if (!b) return
+      const id = freshId(content, 'r', makeId)
+      const start = addRange(content, newRange(id, sliderName(content, `${b.name.trim() || 'Bone'} length`), 'length', b.start))
+      if (!start.ok) { setNote(start.reason); return }
+      applyEdit(addLength(start.content, id, boneId))
+    },
+    openSlider: () => { setTab('ranges'); setRangeFilter('all') },
+  }
+  const fit: FitActions = {
+    setFit: (objectId, mode, fitTo) => { setFitPick(false); applyEdit(setObjectFit(content, objectId, mode, fitTo)) },
+    pick: on => { setFitPick(on); if (on) { setBonePick(null); setLinkMode(null); setPickOn(false); setPaintPick(null) } },
+  }
+  // the box a new frame starts as, in the view being edited: around the selection (else the whole figure), with a margin
+  function frameStart(): Box {
+    const ids = sel.kind === 'none' ? solved.order : shapesOf(content, sel).map(s => s.id)
+    const boxes = ids.map(id => solved.shapes[id]).filter(r => r?.visible).map(r => r.box)
+    if (boxes.length === 0) return { x: 0, y: 0, w: 200, h: 400 }
+    const x0 = Math.min(...boxes.map(b => b.x)), y0 = Math.min(...boxes.map(b => b.y)), x1 = Math.max(...boxes.map(b => b.x + b.w)), y1 = Math.max(...boxes.map(b => b.y + b.h))
+    const mx = (x1 - x0) * 0.08, my = (y1 - y0) * 0.08
+    return { x: x0 - mx, y: y0 - my, w: x1 - x0 + 2 * mx, h: y1 - y0 + 2 * my }
+  }
+  const tile = tileTest ?? tileOf(content)
+  const frameActions: FrameActions = {
+    add: () => {
+      const e = addFrame(content, viewBoxOf(frameStart(), view, content.axis), `Frame ${framesOf(content).length + 1}`, makeId)
+      if (applyEdit(e) && e.ok && e.frameId) setFrameSel(e.frameId)
+    },
+    rename: (id, name) => models.edit(entry.id, c => renameFrame(c, id, name), false),
+    remove: id => { commit(removeFrame(content, id), true); setFrameSel(s => (s === id ? null : s)); setThroughId(t => (t === id ? null : t)) },
+    select: setFrameSel,
+    through: id => { setThroughId(id); if (id) { setPoseMode(false); poseRef.current = null } },
+    toggleHide: (id, thingId) => { applyEdit(toggleFrameHide(content, id, thingId)) },
+    setTile: setTileTest,
+    useTile: () => { if (tileTest) { commit(setTile(content, tileTest), true); setTileTest(null) } },
+    resetTile: () => setTileTest(null),
+  }
+  const framesState: FramesState = { selected: frameById(content, frameSel)?.id ?? null, through: through?.id ?? null, tile, tileChanged: tileTest !== null && tileTest !== tileOf(content) }
+  // the rectangles of the frames on the canvas while the Frames tab is open, as seen from the view being edited (a drag gives a box in that view)
+  const frameCanvas: FrameCanvas | null = tab === 'frames' && !through && !recording ? {
+    frames: framesOf(content).map(f => ({ id: f.id, name: f.name, box: viewBoxOf(f, view, content.axis), on: f.id === framesState.selected })),
+    onGesture: () => setHistory(h => remember(h, content)),
+    onBox: (id, box) => models.edit(entry.id, c => setFrameBox(c, id, viewBoxOf(box, view, c.axis)), false),
+    onSelect: setFrameSel,
+    onNudge: (id, dx, dy, resize) => {
+      const f = frameById(content, id)
+      if (!f) return
+      const at = viewBoxOf(f, view, content.axis)
+      commit(setFrameBox(content, id, viewBoxOf(resize ? resizedBox(at, 'se', dx, dy) : movedBox(at, dx, dy), view, content.axis)))
+    },
+  } : null
+  const throughFrame: ThroughFrame | null = through ? { box: viewBoxOf(through, view, content.axis), tile, name: through.name } : null
 
   // ---- pairs, links and the back view ----
 
@@ -484,7 +593,7 @@ export function ModelPane({ entry, models, makeId, onRemove, onDuplicate, onExpo
   }
   // what the pose mode shows on the canvas: a ring at the pivot of every group a drag can turn, a square on every group that has a Scale slider, a circle on
   // every anchor that a slider slides
-  const poseCanvas: PoseCanvas | null = poseMode && !recording ? (() => {
+  const poseCanvas: PoseCanvas | null = poseMode && !recording && !through ? (() => {
     const at = (x: number, y: number) => apply(solved.global, x, y)
     const named = (id: string) => content.groups.find(g => g.id === id)?.name.trim() || 'the group'
     const joints = content.groups.filter(g => !g.mirrorOf && turnDrivers(content, g.id).length > 0 && solved.pivots[g.id]).map(g => { const [x, y] = at(...solved.pivots[g.id]); return { id: g.id, name: named(g.id), x, y, active: poseActive === g.id } })
@@ -703,7 +812,15 @@ export function ModelPane({ entry, models, makeId, onRemove, onDuplicate, onExpo
   const linkPick = linkMode && selShape && !selShape.mirrorOf ? { shapes: content.shapes.filter(s => s.id !== selShape.id && outlineSize(content, s) >= 3 && !!solved.shapes[s.id]?.d).map(s => s.id) } : null
   // choosing what the selected shape is clipped to, or cut by: any other shape that is drawn (a helper too)
   const paintPickShapes = paintPick && selShape ? { shapes: content.shapes.filter(s => s.id !== selShape.id && !!solved.shapes[s.id]?.d).map(s => s.id) } : null
-  const pick = linkPick ?? paintPickShapes ?? (pickOn && group?.attach ? { shapes: ancestorShapes.map(s => s.id) } : null)
+  // choosing the end of a bone: a pivot marker of any group, or a shape (its nearest point to the click)
+  const bonePickData = bonePick ? {
+    shapes: content.shapes.filter(s => s.pts.length >= 3 && !!solved.shapes[s.id]?.d).map(s => s.id),
+    groups: content.groups.filter(g => solved.pivots[g.id]).map(g => { const [x, y] = apply(solved.global, ...solved.pivots[g.id]); return { id: g.id, name: g.name.trim() || 'Untitled group', x, y } }),
+  } : null
+  // choosing the shape the selected object stretches to
+  const selObject = sel.kind === 'object' ? objectById(content, sel.id) : sel.kind === 'shape' ? objectOfShape(content, sel.id) : undefined
+  const fitPickData = fitPick && selObject ? { shapes: stretchTargets(content, selObject.id).filter(id => !!solved.shapes[id]?.d) } : null
+  const pick = bonePickData ?? fitPickData ?? linkPick ?? paintPickShapes ?? (pickOn && group?.attach ? { shapes: ancestorShapes.map(s => s.id) } : null)
 
   // Dragging the pivot of a group: an unanchored one moves to the pointer (read back into the group's own space); an anchored one is fixed again at the
   // nearest place of the same kind on its shape.
@@ -746,6 +863,15 @@ export function ModelPane({ entry, models, makeId, onRemove, onDuplicate, onExpo
     commit(stepLink(content, selShape.id, selPoint, b.kind === 'edge' ? (sideways ? 't' : 'o') : sideways ? 'dx' : 'dy', dir, big))
   }
   function onPick(shapeId: string, wx: number, wy: number) {
+    if (bonePick) {
+      const at = attachFromClick(solved, 'point', shapeId, wx, wy)
+      if (at && applyEdit(setBoneEnd(content, bonePick, { kind: 'point', id: shapeId, i: at.i }))) setBonePick(null)
+      return
+    }
+    if (fitPick && selObject) {
+      if (applyEdit(setObjectFit(content, selObject.id, 'stretch', shapeId))) setFitPick(false)
+      return
+    }
     if (paintPick && selShape) {
       const e = paintPick === 'clip' ? paintOps.setClip(content, selShape.id, shapeId) : paintOps.toggleCut(content, selShape.id, shapeId)
       if (applyEdit(e)) setPaintPick(null)
@@ -762,7 +888,11 @@ export function ModelPane({ entry, models, makeId, onRemove, onDuplicate, onExpo
     if (att && applyEdit(attachGroup(content, group.id, att))) setPickOn(false)
   }
 
-  const stageNote = recording ? 'Recording: drag the points, then press Set in the Ranges tab.'
+  const stageNote = throughFrame ? `Looking through ${through?.name.trim() || 'the frame'}: the figure is cropped to it, without what it leaves out. Choose Whole figure in the Frames tab to go back.`
+    : bonePick ? 'Click the pivot marker of a group, or a shape, for the end of the bone. Escape stops.'
+    : fitPick && selObject ? `Click the shape ${selObject.name.trim() || 'this object'} is to stretch to. Escape stops.`
+    : tab === 'frames' && frameCanvas ? 'Frames: drag the outlined rectangle to move the frame, its handles to resize it. Press Enter on a rectangle to edit it.'
+    : recording ? 'Recording: drag the points, then press Set in the Ranges tab.'
     : poseMode ? 'Pose mode: the figure is grabbed, not edited. The sliders in the Ranges tab do the same from the keyboard.'
     : linkMode ? `Click the shape to link point ${selPoint + 1} to. Escape stops.`
     : paintPick && selShape ? `Click the shape ${selShape.name.trim() || 'this shape'} is to be ${paintPick === 'clip' ? 'clipped to' : 'cut by (click it again to stop)'}. Escape stops.`
@@ -845,7 +975,8 @@ export function ModelPane({ entry, models, makeId, onRemove, onDuplicate, onExpo
             {empty && <p className="cmHint">No shape yet. Use New shape to start from a template, or the + beside a layer in the tree.</p>}
             <DesignerCanvas
               content={canvasContent} solved={solved} sel={sel} mode={mode} selPoint={selPoint} mirror={mirror} snap={snap} grid={grid} zoom={zoom} fitAll={fitAll} axis={content.axis}
-              editable={editable || (!!recording && !!selShape)} pivot={pivot} anchor={anchorSpot} pick={pick} onPick={onPick} pose={poseCanvas} ghost={ghost} colouring={colouring}
+              editable={editable || (!!recording && !!selShape)} pivot={pivot} anchor={anchorSpot} pick={pick} onPick={onPick} onPickGroup={id => { if (bonePick && applyEdit(setBoneEnd(content, bonePick, { kind: 'group', id, i: 0 }))) setBonePick(null) }} pose={poseCanvas} ghost={ghost} colouring={colouring}
+              frames={frameCanvas} through={throughFrame}
               linked={selShape ? selShape.pts.flatMap((pt, i) => (pt.bind ? [i] : [])) : []} onNudgeLink={nudgeLink} onPivot={movePivot} onPivotNudge={nudgePivot}
               onSelect={choose} onSelectPoint={setSelPoint}
               onGesture={() => { if (!recording) setHistory(h => remember(h, content)) }}
@@ -855,7 +986,7 @@ export function ModelPane({ entry, models, makeId, onRemove, onDuplicate, onExpo
                 const next = t.kind === 'grid' ? rightClickGrid() : rightClickShape(sel, mode, t.id)
                 setSel(next.sel); setMode(next.mode); if (t.kind === 'shape' && next.sel.kind === 'shape' && next.sel.id !== (sel.kind === 'shape' ? sel.id : '')) setSelPoint(0)
               }}
-              onEscape={() => { if (linkMode) setLinkMode(null); else if (paintPick) setPaintPick(null); else if (pickOn) setPickOn(false); else if (!recording) setSel(NONE) }}
+              onEscape={() => { if (bonePick) setBonePick(null); else if (fitPick) setFitPick(false); else if (linkMode) setLinkMode(null); else if (paintPick) setPaintPick(null); else if (pickOn) setPickOn(false); else if (!recording) setSel(NONE) }}
             />
             <p className="cmStageNote" aria-live="polite">{stageNote}</p>
           </div>
@@ -867,15 +998,17 @@ export function ModelPane({ entry, models, makeId, onRemove, onDuplicate, onExpo
               onEditShape={editShape}
               tab={tab} onTab={setTab}
               onAxis={(dir, big) => commit(setAxis(content, content.axis + dir * (big ? 5 : 1)), true)}
-              rigTab={<RigTab content={content} group={group} picking={pickOn} actions={rigActions} pairs={pairs} />}
+              rigTab={<RigTab content={content} group={group} object={selObject} picking={pickOn} fitPicking={fitPick} actions={rigActions} pairs={pairs} fit={fit} />}
               rangesTab={<RangesTab content={content} sel={sel} group={group} values={values} recording={recording} scrubbing={scrubbing} filter={rangeFilter} onFilter={setRangeFilter} actions={rigActions} />}
               formsTab={<FormsTab content={content} sel={sel} state={test.state} actions={forms} presets={presets} colouring={colouring} />}
               presetsTab={<PresetsTab content={content} state={test.state} actions={presets} />}
+              proportionsTab={<ProportionsTab content={content} solved={solved} picking={bonePick} actions={proportions} limits={rigActions} />}
+              framesTab={<FramesTab content={content} state={framesState} actions={frameActions} />}
               colourTab={<ColourTab content={content} sel={sel} state={{ colours: test.colours, palette: testPalette, genre: test.genre, locks: test.locks }} actions={colourActions} paint={paintActions} picking={paintPick} />}
             />
           )}
         </div>
-        <PreviewStrip content={content} sel={sel} view={view} />
+        <PreviewStrip content={content} sel={sel} view={view} tile={tile} />
         <CheckPanel content={content} />
       </fieldset>
     </div>

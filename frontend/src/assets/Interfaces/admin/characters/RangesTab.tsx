@@ -4,14 +4,16 @@ import { EyeIcon, EyeOffIcon, PauseIcon, PlayIcon, PlusIcon, RestoreIcon, TrashI
 import { LIMITS } from './engine/limits'
 import { valueOf, type Values } from './engine/rig'
 import { stepOf } from './engine/rigEdit'
+import { LimitSteppers } from './LimitSteppers'
 import { Stepper } from './Stepper'
 import type { Selection } from './designerState'
 import type { NewSliderKind, Recording, RigActions } from './rigActions'
 import { driveText, offRest, rangesForSelection, valueText } from './rigView'
 
 // The Ranges tab: the model's sliders. Each has a Try it slider (the test value is only for looking: it is never saved), its minimum, rest and maximum,
-// and what it drives (turn a group about its pivot, scale, move recorded points, bend a shape), each with steppers for how much.
-const KIND_LABEL: Record<NewSliderKind, string> = { turn: 'Turn the group', scale: 'Scale', points: 'Move points (record)', bend: 'Bend the shape' }
+// and what it drives (turn a group about its pivot, scale, move recorded points, bend a shape, lengthen a bone), each with steppers for how much. A slider that
+// is offered to writers also has the span a writer may choose within.
+const KIND_LABEL: Record<NewSliderKind, string> = { turn: 'Turn the group', scale: 'Scale', points: 'Move points (record)', bend: 'Bend the shape', length: 'Length of a bone' }
 const AXES: Array<{ id: ModelScaleAxis; name: string }> = [{ id: 'xy', name: 'Both ways' }, { id: 'x', name: 'Across' }, { id: 'y', name: 'Up and down' }]
 
 export interface RangesTabProps {
@@ -33,8 +35,11 @@ export function RangesTab({ content, sel, group, values, recording, scrubbing, f
   const list = filter === 'all' || sel.kind === 'none' ? content.ranges : rangesForSelection(content, sel)
   const away = offRest(content, values)
   const can = (kind: NewSliderKind): string | null =>
-    kind === 'turn' ? (group ? null : 'Select a group first') : kind === 'scale' ? null : shapeSel ? null : 'Select a shape first'
-  const kinds: NewSliderKind[] = ['turn', 'scale', 'points', 'bend']
+    kind === 'turn' ? (group ? null : 'Select a group first')
+      : kind === 'scale' ? null
+      : kind === 'length' ? ((content.bones ?? []).length > 0 ? null : 'Add a bone in the Proportions tab first')
+      : shapeSel ? null : 'Select a shape first'
+  const kinds: NewSliderKind[] = ['turn', 'scale', 'points', 'bend', 'length']
   const recShape = recording ? content.shapes.find(s => s.id === recording.shapeId) : undefined
   const recRange = recording ? content.ranges.find(r => r.id === recording.rangeId) : undefined
 
@@ -107,6 +112,7 @@ export function RangesTab({ content, sel, group, values, recording, scrubbing, f
           <Stepper label={`Rest of ${title}`} value={valueText(r, r.rest)} onStep={(dir, big) => actions.stepBound(r.id, 'rest', dir, big)} />
           <Stepper label={`Maximum of ${title}`} value={valueText(r, r.max)} onStep={(dir, big) => actions.stepBound(r.id, 'max', dir, big)} />
         </div>
+        {r.show && <LimitSteppers range={r} onStep={(end, dir, big) => actions.stepLimit(r.id, end, dir, big)} onClear={() => actions.clearLimit(r.id)} />}
         <ul className="cmDrives">
           {r.drives.map((d, i) => <li key={i}>{driveRow(r, d, i, locked)}</li>)}
         </ul>
@@ -122,7 +128,7 @@ export function RangesTab({ content, sel, group, values, recording, scrubbing, f
   }
 
   function driveRow(r: ModelRange, d: ModelDrive, i: number, locked: boolean) {
-    const unit = d.kind === 'scale' ? '%' : '°'
+    const unit = d.kind === 'scale' || d.kind === 'length' ? '%' : '°'
     return (
       <div className="cmDrive">
         <p className="cmInsText">{driveText(content, d)}</p>
@@ -131,6 +137,15 @@ export function RangesTab({ content, sel, group, values, recording, scrubbing, f
             <Stepper label={`At the minimum (drive ${i + 1} of ${r.name.trim() || 'the slider'})`} value={`${d.atMin}${unit}`} onStep={(dir, big) => actions.stepDrive(r.id, i, 'atMin', dir, big)} />
             <Stepper label={`At the maximum (drive ${i + 1} of ${r.name.trim() || 'the slider'})`} value={`${d.atMax}${unit}`} onStep={(dir, big) => actions.stepDrive(r.id, i, 'atMax', dir, big)} />
           </div>
+        )}
+        {d.kind === 'length' && (
+          <label className="cmField">
+            <span>Bone</span>
+            <select value={d.id ?? ''} aria-label={`Bone that drive ${i + 1} of ${r.name.trim() || 'the slider'} lengthens`} disabled={locked} onChange={e => actions.setDriveBone(r.id, i, e.target.value)}>
+              {!(content.bones ?? []).some(b => b.id === d.id) && <option value="">(gone)</option>}
+              {(content.bones ?? []).map(b => <option key={b.id} value={b.id}>{b.name.trim() || b.id}</option>)}
+            </select>
+          </label>
         )}
         {d.kind === 'scale' && (
           <div className="cmChips" role="group" aria-label="Which way it scales">

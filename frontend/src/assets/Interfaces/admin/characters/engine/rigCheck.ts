@@ -1,7 +1,8 @@
 import type { ModelContent } from '../../../../../api/types'
 import { IDENTITY, apply } from './geometry'
 import { isUsed } from './paintEdit'
-import { defaultValues, solve, solveAtRest } from './rig'
+import { boneAtRest, defaultValues, solve, solveAtRest } from './rig'
+import { fitOf } from './fitEdit'
 
 // The Rig check: what is probably a mistake in the rig, in plain words, for the Check panel. These are not publish faults (publishFaults has those):
 // a slider that drives nothing, a group the anchor moves away from where it was drawn, a slider that sends a shape out of the picture.
@@ -54,6 +55,29 @@ export function paintCheck(c: ModelContent): CheckLine[] {
   for (const o of c.objects) {
     const mine = o.shapes.map(id => shapes.get(id)).filter((s): s is NonNullable<typeof s> => !!s)
     if (mine.some(s => s.shade) && !mine.some(s => !s.shade && !s.helper)) say(`${o.name || o.id} has shading but no base shape for it to lie on: the shading is not drawn.`)
+  }
+  return lines
+}
+
+// What is worth knowing about proportions (phase 5a), as plain information: a bone with no length at rest cannot be stretched by a Length slider, an object that
+// does not scale with its group is drawn differently from the outline anchors and links read, and a slider whose writer's limit leaves only the resting value
+// gives the writer no choice.
+export function proportionCheck(c: ModelContent): CheckLine[] {
+  const lines: CheckLine[] = []
+  const say = (text: string) => { if (lines.length < MOST_LINES) lines.push({ level: 'info', text }) }
+  const shapes = new Map(c.shapes.map(s => [s.id, s]))
+  for (const b of c.bones ?? []) {
+    const e = boneAtRest(c, b)
+    if (e && Math.hypot(e.b[0] - e.a[0], e.b[1] - e.a[1]) < 0.5) say(`Bone ${b.name || b.id} has no length at rest: a Length slider cannot stretch it.`)
+  }
+  for (const o of c.objects) {
+    const mode = fitOf(o)
+    if (o.mirrorOf || mode === 'scale') continue
+    const target = mode === 'stretch' && o.fitTo ? shapes.get(o.fitTo) : undefined
+    say(`${o.name || o.id} ${mode === 'keep' ? 'keeps its size' : `stretches to ${target ? target.name || target.id : 'a shape'}`}: its anchors and links read the outline as its group holds it, not as it is drawn.`)
+  }
+  for (const r of c.ranges) {
+    if (r.limit && r.limit[0] >= r.rest && r.limit[1] <= r.rest) say(`Slider ${r.name || r.id} lets a writer choose only its resting value.`)
   }
   return lines
 }

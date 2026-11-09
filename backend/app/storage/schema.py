@@ -1224,6 +1224,14 @@ MODEL_SHADES_WARN = 8    # paint effects (phase 4b): shading shapes per object, 
 MODEL_SHADES_MAX = 10
 MODEL_CUTS_MAX = 8
 MODEL_LOOKS_MAX = 72   # as many as an object has shapes
+MODEL_BONES_WARN = 12   # proportions and frames (phase 5a): bones per model, frames per model, the groups and objects a frame may hide
+MODEL_BONES_MAX = 24
+MODEL_FRAMES_WARN = 8
+MODEL_FRAMES_MAX = 16
+MODEL_FRAME_HIDE_MAX = 100
+MODEL_FRAME_MIN = 8.0    # the smallest a frame is, in the model's units
+MODEL_FRAME_BIGGEST = 500.0
+MODEL_TILE_DEFAULT = "#e6d6c3"   # the card colour a figure stands on, unless the model says another
 MODEL_TINT_RANGE = (0.02, 0.8)
 MODEL_TONE_RANGE = (-2, 2)
 _MODEL_ID = r"^[A-Za-z0-9_.-]{1,80}$"
@@ -1232,7 +1240,9 @@ ModelLayer = Literal["body", "clothing", "hair"]
 ModelView = Literal["both", "front", "back"]
 ModelAnchorKind = Literal["point", "edge", "range", "inside"]
 ModelRangeUnit = Literal["", "°", "%"]
-ModelDriveKind = Literal["turn", "scale", "points", "bend"]
+ModelDriveKind = Literal["turn", "scale", "points", "bend", "length"]
+ModelFit = Literal["scale", "keep", "stretch"]
+ModelBoneEndKind = Literal["group", "point"]
 ModelScaleTarget = Literal["group", "shape", "model"]
 ModelScaleAxis = Literal["xy", "x", "y"]
 ModelBindKind = Literal["point", "edge"]
@@ -1581,8 +1591,9 @@ class ModelMove(BaseModel):
 
 class ModelDrive(BaseModel):
     """What a slider does: `turn` a group about its pivot, `scale` a group, a shape or the whole model, `points` move chosen points of a shape, or
-    `bend` a shape smoothly along a length. `atMin` and `atMax` are the amount at the slider's minimum and maximum (degrees for turn and bend, percent
-    for scale); the amount is 0 (or 100 %) at the slider's rest value. A mirrored twin does the opposite turn or sideways move unless `mirror` is false."""
+    `bend` a shape smoothly along a length, or change the `length` of a bone (the group it starts at is stretched along it, and what hangs from it follows).
+    `atMin` and `atMax` are the amount at the slider's minimum and maximum (degrees for turn and bend, percent for scale and length); the amount is 0
+    (or 100 %) at the slider's rest value. A mirrored twin does the opposite turn or sideways move unless `mirror` is false."""
 
     kind: ModelDriveKind
     group: Optional[str] = None
@@ -1639,7 +1650,9 @@ class ModelDrive(BaseModel):
             raise ValueError("a scale drive needs a target")
         if self.kind in ("points", "bend") and not self.shape:
             raise ValueError("this drive needs a shape")
-        if self.kind == "scale":
+        if self.kind == "length" and not self.id:
+            raise ValueError("a length drive needs a bone")
+        if self.kind in ("scale", "length"):
             # a percentage: 100 is the size at rest
             for name in ("atMin", "atMax"):
                 setattr(self, name, 100.0 if name not in self.model_fields_set else _finite(getattr(self, name), 100.0, 5.0, 1000.0))
@@ -1667,6 +1680,8 @@ class ModelRange(BaseModel):
     unit: ModelRangeUnit = ""
     show: bool = True
     rand: Optional[list[float]] = None
+    # The span a writer may choose within (phase 5a): inside min..max, ordered, always holding the resting value; None = the whole slider.
+    limit: Optional[list[float]] = None
     drives: list[ModelDrive] = Field(default_factory=list, max_length=MODEL_DRIVES_MAX)
 
     @field_validator("name", mode="before")
@@ -1678,6 +1693,11 @@ class ModelRange(BaseModel):
     @classmethod
     def _scope(cls, value: Any) -> Optional[str]:
         return _optional_id(value)
+
+    @field_validator("limit", mode="before")
+    @classmethod
+    def _limit(cls, value: Any) -> Any:
+        return value if isinstance(value, (list, tuple)) and len(value) == 2 else None
 
     @field_validator("min", "rest", "max", mode="before")
     @classmethod
@@ -1705,6 +1725,13 @@ class ModelRange(BaseModel):
             else:
                 a, b = (_finite(v, self.rest, self.min, self.max) for v in self.rand)
                 self.rand = [min(a, b), max(a, b)]
+        if self.limit is not None:
+            if not isinstance(self.limit, list) or len(self.limit) != 2:
+                self.limit = None
+            else:
+                a, b = (_finite(v, self.rest, self.min, self.max) for v in self.limit)
+                lo, hi = min(a, b, self.rest), max(a, b, self.rest)
+                self.limit = None if lo <= self.min and hi >= self.max else [lo, hi]
         return self
 
 
@@ -1831,6 +1858,10 @@ class ModelObject(BaseModel):
     axes: list[ModelAxis] = Field(default_factory=list, max_length=MODEL_AXES_MAX)
     # The class this object is a member of (phase 3b): its shapes follow the shapes of the class's template, and it chooses among the template's forms.
     classOf: Optional[str] = None
+    # How the object fits the body when proportions change (phase 5a): it moves and scales with its group (`scale`), moves and turns with it but keeps its
+    # own size (`keep`), or is stretched to follow the box of the shape `fitTo` (`stretch`). Only the drawing changes: anchors and links read the outline as it is.
+    fit: ModelFit = "scale"
+    fitTo: Optional[str] = None
 
     @field_validator("axes", mode="before")
     @classmethod
@@ -1848,10 +1879,21 @@ class ModelObject(BaseModel):
     def _trim(cls, value: Any) -> Any:
         return value.strip() if isinstance(value, str) else value
 
-    @field_validator("mirrorOf", "classOf", mode="before")
+    @field_validator("mirrorOf", "classOf", "fitTo", mode="before")
     @classmethod
     def _twin(cls, value: Any) -> Optional[str]:
         return _optional_id(value)
+
+    @field_validator("fit", mode="before")
+    @classmethod
+    def _fit(cls, value: Any) -> Any:
+        return value if value in ("scale", "keep", "stretch") else "scale"
+
+    @model_validator(mode="after")
+    def _fit_target(self) -> "ModelObject":
+        if self.fit != "stretch":
+            self.fitTo = None
+        return self
 
     @field_validator("layer", mode="before")
     @classmethod
@@ -2098,6 +2140,88 @@ class ModelSlot(BaseModel):
         return self
 
 
+class ModelBoneEnd(BaseModel):
+    """The far end of a bone: the pivot of a group (`kind` group, `id` the group), or point `i` of a shape's own outline (`kind` point, `id` the shape)."""
+
+    kind: ModelBoneEndKind = "group"
+    id: str = Field(pattern=_MODEL_ID)
+    i: int = 0
+
+    @field_validator("kind", mode="before")
+    @classmethod
+    def _kind(cls, value: Any) -> Any:
+        return value if value in ("group", "point") else "group"
+
+    @field_validator("i", mode="before")
+    @classmethod
+    def _index(cls, value: Any) -> int:
+        return int(_finite(value, 0.0, 0.0, float(MODEL_POINTS_MAX - 1)))
+
+
+class ModelBone(BaseModel):
+    """A measured length of the skeleton (phase 5a): from the pivot of the group `start` to `end`. Its length is read off the drawn model (in units, and in
+    head heights when the model has a head bone), and a `length` drive of a slider changes it."""
+
+    id: str = Field(pattern=_MODEL_ID)
+    name: str = Field(default="", max_length=MODEL_RANGE_NAME_MAX)
+    start: str = Field(pattern=_MODEL_ID)
+    end: ModelBoneEnd
+
+    @field_validator("name", mode="before")
+    @classmethod
+    def _trim(cls, value: Any) -> Any:
+        return value.strip()[:MODEL_RANGE_NAME_MAX] if isinstance(value, str) else value
+
+    @field_validator("end", mode="before")
+    @classmethod
+    def _end(cls, value: Any) -> Any:
+        return value if isinstance(value, ModelBoneEnd) else ModelBoneEnd.model_validate(value)
+
+
+class ModelFrame(BaseModel):
+    """A named crop of the figure (phase 5a): a box in the model's space and the groups and objects that are left out when the figure is seen through it."""
+
+    id: str = Field(pattern=_MODEL_ID)
+    name: str = Field(default="", max_length=MODEL_RANGE_NAME_MAX)
+    x: float = 0.0
+    y: float = 0.0
+    w: float = 200.0
+    h: float = 400.0
+    hide: list[str] = Field(default_factory=list, max_length=MODEL_FRAME_HIDE_MAX)
+
+    @field_validator("name", mode="before")
+    @classmethod
+    def _trim(cls, value: Any) -> Any:
+        return value.strip()[:MODEL_RANGE_NAME_MAX] if isinstance(value, str) else value
+
+    @field_validator("x", mode="before")
+    @classmethod
+    def _x(cls, value: Any) -> float:
+        return _finite(value, 0.0, *MODEL_X_RANGE)
+
+    @field_validator("y", mode="before")
+    @classmethod
+    def _y(cls, value: Any) -> float:
+        return _finite(value, 0.0, *MODEL_Y_RANGE)
+
+    @field_validator("w", "h", mode="before")
+    @classmethod
+    def _size(cls, value: Any) -> float:
+        return _finite(value, 100.0, MODEL_FRAME_MIN, MODEL_FRAME_BIGGEST)
+
+    @field_validator("hide", mode="before")
+    @classmethod
+    def _hide(cls, value: Any) -> list[str]:
+        if not isinstance(value, list):
+            return []
+        out: list[str] = []
+        for v in value:
+            ident = _optional_id(v)
+            if ident is not None and ident not in out:
+                out.append(ident)
+        return out[:MODEL_FRAME_HIDE_MAX]
+
+
 class ModelContent(BaseModel):
     """A model and everything in it. A draft may be unfinished (no name, dangling ids); publish_faults says what stops it being published."""
 
@@ -2117,6 +2241,31 @@ class ModelContent(BaseModel):
     genres: list[ModelGenre] = Field(default_factory=list, max_length=MODEL_GENRES_MAX)
     palette: list[ModelSwatch] = Field(default_factory=list, max_length=MODEL_PALETTE_MAX)
     slots: list[ModelSlot] = Field(default_factory=list, max_length=MODEL_SLOTS_MAX)
+    # Proportions and frames (phase 5a): the skeleton's bones, the bone that is one head high, the named crops, and the card colour a figure stands on.
+    bones: list[ModelBone] = Field(default_factory=list, max_length=MODEL_BONES_MAX)
+    headBone: Optional[str] = None
+    frames: list[ModelFrame] = Field(default_factory=list, max_length=MODEL_FRAMES_MAX)
+    tile: str = MODEL_TILE_DEFAULT
+
+    @field_validator("bones", mode="before")
+    @classmethod
+    def _bones(cls, value: Any) -> list[Any]:
+        return _keep_valid(ModelBone, value)
+
+    @field_validator("frames", mode="before")
+    @classmethod
+    def _frames(cls, value: Any) -> list[Any]:
+        return _keep_valid(ModelFrame, value)
+
+    @field_validator("headBone", mode="before")
+    @classmethod
+    def _head_bone(cls, value: Any) -> Optional[str]:
+        return _optional_id(value)
+
+    @field_validator("tile", mode="before")
+    @classmethod
+    def _tile(cls, value: Any) -> str:
+        return value.lower() if isinstance(value, str) and re.fullmatch(r"#[0-9a-fA-F]{6}", value) else MODEL_TILE_DEFAULT
 
     @field_validator("genres", mode="before")
     @classmethod
@@ -2160,7 +2309,7 @@ class ModelContent(BaseModel):
 
     @model_validator(mode="after")
     def _unique_ids(self) -> "ModelContent":
-        for label, items in (("shape", self.shapes), ("object", self.objects), ("group", self.groups), ("slider", self.ranges), ("preset", self.presets), ("class", self.classes), ("genre", self.genres), ("swatch", self.palette), ("slot", self.slots)):
+        for label, items in (("shape", self.shapes), ("object", self.objects), ("group", self.groups), ("slider", self.ranges), ("preset", self.presets), ("class", self.classes), ("genre", self.genres), ("swatch", self.palette), ("slot", self.slots), ("bone", self.bones), ("frame", self.frames)):
             ids = [i.id for i in items]
             if len(set(ids)) != len(ids):
                 raise ValueError(f"two {label}s share an id")

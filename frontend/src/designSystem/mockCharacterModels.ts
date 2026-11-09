@@ -1,7 +1,10 @@
 import type { ModelContent, ModelEntry, PublishedModel } from '../api/types'
 import { addGroup, addObject, addShape, blankContent, newGroup, normalizeContent, objectById, publishFaults, renameObject, updateShape } from '../assets/Interfaces/admin/characters/modelContent'
 import { newShape } from '../assets/Interfaces/admin/characters/engine/edit'
-import { addRange, addScale, addTurn, attachGroup, newRange, recordPoints, reparent, type Edit } from '../assets/Interfaces/admin/characters/engine/rigEdit'
+import { addLength, addRange, addScale, addTurn, attachGroup, newRange, recordPoints, reparent, type Edit } from '../assets/Interfaces/admin/characters/engine/rigEdit'
+import { addBone, setHeadBone } from '../assets/Interfaces/admin/characters/engine/bones'
+import { setFit } from '../assets/Interfaces/admin/characters/engine/fitEdit'
+import { addFrame, toggleFrameHide } from '../assets/Interfaces/admin/characters/engine/frames'
 import { addAxis, addForm, renameForm, setOverride } from '../assets/Interfaces/admin/characters/engine/formEdit'
 import { addMember, makeClass } from '../assets/Interfaces/admin/characters/engine/classEdit'
 import { classKey, formKey } from '../assets/Interfaces/admin/characters/engine/forms'
@@ -206,6 +209,43 @@ function riggedFigure(): ModelContent {
   // a style of the head: the hooded eye with closed lids and the head turned a little (it belongs to the Head group, and is listed with the presets)
   const closed = objectById(c, 'o_eye')!.axes![0].options.find(f => f.name === 'Closed')!.id
   c = must(saveStyle(c, { values: { r_tilt: -8 }, forms: { [classKey(family.classId!)]: memberIds.Hooded, [formKey(memberIds.Hooded, lids)]: closed }, hidden: [] }, 'g_head', 'Sleepy', 'Style', mk))
+
+  // proportions: bones along the head (to the top of the skull, the unit for head heights), the upper arm and the forearm; a Length slider for each arm bone (the
+  // other arm follows); the span a writer may choose for the sliders that change the body's proportions; Age and Build presets over them; the eyes keep their
+  // size when the head grows
+  let nb = 0
+  const mkBone = (prefix: string) => `${prefix}_bone${++nb}`
+  const extreme = (shapeId: string, bottom: boolean) => c.shapes.find(x => x.id === shapeId)!.pts.reduce((best, pt, i, all) => ((bottom ? pt.y > all[best].y : pt.y < all[best].y) ? i : best), 0)
+  c = must(addBone(c, 'g_head', { kind: 'point', id: 's_head', i: extreme('s_head', false) }, 'Head', mkBone))
+  c = must(addBone(c, 'g_arm', { kind: 'group', id: 'g_fore', i: 0 }, 'Upper arm', mkBone))
+  c = must(addBone(c, 'g_fore', { kind: 'point', id: 's_fore', i: extreme('s_fore', true) }, 'Forearm', mkBone))
+  const [headBone, upperBone, foreBone] = c.bones!.map(x => x.id)
+  c = must(setHeadBone(c, headBone))
+  for (const [id, name, group, bone] of [['r_arm_len', 'Upper arm length', 'g_arm', upperBone], ['r_fore_len', 'Forearm length', 'g_fore', foreBone]] as const) {
+    c = must(addRange(c, { ...newRange(id, name, 'length', group), min: 85, rest: 100, max: 120 }))
+    c = must(addLength(c, id, bone))
+    c = { ...c, ranges: c.ranges.map(r => (r.id === id ? { ...r, drives: r.drives.map(d => ({ ...d, atMin: 85, atMax: 120 })) } : r)) }
+  }
+  const limits: Record<string, [number, number]> = { r_height: [80, 105], r_head: [90, 115], r_shoulders: [90, 118], r_arm_len: [90, 115], r_fore_len: [90, 115] }
+  c = { ...c, ranges: c.ranges.map(r => (limits[r.id] ? { ...r, limit: limits[r.id] } : r)) }
+  preset('Infant', 'Age', { r_height: 80, r_head: 115, r_arm_len: 90, r_fore_len: 90, r_shoulders: 90 })
+  preset('Child', 'Age', { r_height: 88, r_head: 110, r_arm_len: 94, r_fore_len: 94, r_shoulders: 94 })
+  preset('Teen', 'Age', { r_height: 97, r_head: 104, r_arm_len: 98, r_fore_len: 98, r_shoulders: 98 })
+  preset('Adult', 'Age', {})
+  preset('Elder', 'Age', { r_height: 94, r_head: 102 })
+  preset('Slim', 'Build', { r_shoulders: 92 })
+  preset('Average', 'Build', {})
+  preset('Heavy', 'Build', { r_shoulders: 118, r_fit: 130 })
+  for (const name of Object.keys(memberIds)) c = must(setFit(c, memberIds[name], 'keep'))
+
+  // frames: the figure from head to hands, a bust and the face (which leaves out the arms and the shirt)
+  let nf = 0
+  const mkFrame = (prefix: string) => `${prefix}_frame${++nf}`
+  c = must(addFrame(c, { x: 30, y: 10, w: 140, h: 190 }, 'Head to hands', mkFrame))
+  c = must(addFrame(c, { x: 50, y: 14, w: 100, h: 96 }, 'Bust', mkFrame))
+  const face = addFrame(c, { x: 72, y: 16, w: 56, h: 60 }, 'Face', mkFrame)
+  c = must(face)
+  for (const thing of ['g_arm', c.groups.find(g => g.mirrorOf === 'g_arm')!.id, 'g_shirt']) c = must(toggleFrameHide(c, face.frameId!, thing))
   return c
 }
 
@@ -216,7 +256,7 @@ export function previewModels(): ModelEntry[] {
   const plain = (shapeIds: string[]): ModelContent => {
     const shapes = adult.shapes.filter(s => shapeIds.includes(s.id)).map(s => ({ ...s, cut: [], clip: null }))
     const objects = adult.objects.map(o => ({ ...o, shapes: o.shapes.filter(s => shapeIds.includes(s)), axes: [] })).filter(o => o.shapes.length)
-    return { ...adult, shapes, objects, presets: [], classes: [], groups: [newGroup('g_head', 'Head', null, objects.map(o => o.id))], ranges: [] }
+    return { ...adult, shapes, objects, presets: [], classes: [], groups: [newGroup('g_head', 'Head', null, objects.map(o => o.id))], ranges: [], bones: [], headBone: null, frames: [] }
   }
   const live = liveEntry('adult', adult, { nextVersion: 3 })
   live.published = published(2, plain(['s_head', 's_neck', 's_chest']))

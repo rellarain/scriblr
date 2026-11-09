@@ -1,4 +1,4 @@
-import type { ModelAttach, ModelBind, ModelContent, ModelDrive, ModelObject, ModelPoint, ModelShape } from '../../../../../api/types'
+import type { ModelAttach, ModelBind, ModelBoneEnd, ModelContent, ModelDrive, ModelObject, ModelPoint, ModelShape } from '../../../../../api/types'
 import { bakedPaint } from './colour'
 import { NAME_MAX, addShape, freshId, groupById, groupOfObject, objectById, objectOfShape, outlineSize, randomId, shapeById, twinsOf, type MakeId } from '../modelContent'
 import { IDENTITY, apply, boxOf, clamp, inverse, nearestEdge, r2, reflectList, transformList, twinIndex, type Mat } from './geometry'
@@ -177,7 +177,15 @@ function breakObject(c: ModelContent, id: string): Edit {
     next = e.content
     if (e.note) notes.push(e.note)
   }
-  next = { ...next, objects: next.objects.map(x => (x.id === id ? { ...x, mirrorOf: null } : x)) }
+  // it keeps the way its original fits the body; one that stretches to a shape stretches to that shape's twin when it has one
+  const fit = o.mirrorOf ? objectById(c, o.mirrorOf) : undefined
+  let fitFields: Pick<ModelObject, 'fit' | 'fitTo'> | null = null
+  if (fit && (fit.fit === 'keep' || fit.fit === 'stretch')) {
+    const target = fit.fit === 'stretch' && fit.fitTo ? shapeById(c, fit.fitTo) : undefined
+    const partner = target ? (target.mirrorOf ? shapeById(c, target.mirrorOf) : c.shapes.find(s => s.mirrorOf === target.id)) : undefined
+    fitFields = { fit: fit.fit, fitTo: fit.fit === 'stretch' ? partner?.id ?? target?.id ?? null : null }
+  }
+  next = { ...next, objects: next.objects.map(x => (x.id === id ? { ...x, mirrorOf: null, ...fitFields } : x)) }
   return done(next, notes[0])
 }
 
@@ -205,6 +213,39 @@ export function mirrorAttach(c: ModelContent, att: ModelAttach): ModelAttach | n
   }
   const a = twinIndex(pts, (att.i + 1) % n, axis, 6), b = twinIndex(pts, att.i, axis, 6)
   return (a + 1) % n === b ? { ...att, i: a, t: r2(1 - att.t) } : null
+}
+
+// The bone end that mirrors another: the twin of the group (or the same group when it has none, like the head), or the point of the twin shape counted from the
+// other end (null when the shape has no twin to mirror it).
+function mirrorEnd(c: ModelContent, e: ModelBoneEnd): ModelBoneEnd | null {
+  if (e.kind === 'group') {
+    const g = groupById(c, e.id)
+    const partner = g?.mirrorOf ? groupById(c, g.mirrorOf) : c.groups.find(x => x.mirrorOf === e.id)
+    return { kind: 'group', id: partner?.id ?? e.id, i: 0 }
+  }
+  const s = shapeById(c, e.id)
+  const partner = s?.mirrorOf ? shapeById(c, s.mirrorOf) : c.shapes.find(x => x.mirrorOf === e.id)
+  return s && partner ? { kind: 'point', id: partner.id, i: outlineSize(c, s) - 1 - e.i } : null
+}
+
+// A bone that starts at the original group gets a twin that starts at the group being freed, and the sliders that lengthen the bone lengthen the twin too.
+// `before` is the content while the pair still stood (it tells which shape mirrors which); the new bones go into `into`.
+function twinBones(before: ModelContent, into: ModelContent, originalId: string, groupId: string): ModelContent {
+  let next = into
+  for (const b of (before.bones ?? []).filter(x => x.start === originalId)) {
+    const end = mirrorEnd(before, b.end)
+    if (!end || (next.bones ?? []).length >= LIMITS.bonesMax) continue
+    const nid = freshId(next, 'b')
+    next = {
+      ...next,
+      bones: [...(next.bones ?? []), { id: nid, name: twinName(b.name), start: groupId, end }],
+      ranges: next.ranges.map(r => {
+        const extra = r.drives.filter(d => d.kind === 'length' && d.id === b.id).map(d => ({ ...d, id: nid }))
+        return extra.length && r.drives.length + extra.length <= LIMITS.drivesMax ? { ...r, drives: [...r.drives, ...extra] } : r
+      }),
+    }
+  }
+  return next
 }
 
 function breakGroup(c: ModelContent, id: string): Edit {
@@ -245,6 +286,7 @@ function breakGroup(c: ModelContent, id: string): Edit {
         return extra.length && r.drives.length + extra.length <= LIMITS.drivesMax ? { ...r, drives: [...r.drives, ...extra] } : r
       }),
     }
+    next = twinBones(c, next, orig.id, gid)
   }
   for (const gid of ids) {
     const original = groupById(c, groupById(c, gid)!.mirrorOf!)

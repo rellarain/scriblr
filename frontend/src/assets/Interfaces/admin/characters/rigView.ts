@@ -27,12 +27,14 @@ function related(c: ModelContent, sel: Selection): Set<string> {
 export function rangesForSelection(c: ModelContent, sel: Selection): ModelRange[] {
   if (sel.kind === 'none') return []
   const ids = related(c, sel)
-  return c.ranges.filter(r => (r.scope !== null && ids.has(r.scope)) || r.drives.some(d => [d.group, d.id, d.shape].some(x => x !== null && ids.has(x))))
+  const lengthens = (d: ModelDrive) => d.kind === 'length' && (c.bones ?? []).some(b => b.id === d.id && ids.has(b.start))
+  return c.ranges.filter(r => (r.scope !== null && ids.has(r.scope)) || r.drives.some(d => [d.group, d.id, d.shape].some(x => x !== null && ids.has(x)) || lengthens(d)))
 }
 
-// The sliders that turn, scale or anchor a group.
+// The sliders that turn, scale, lengthen or anchor a group.
 export function rangesMovingGroup(c: ModelContent, groupId: string): ModelRange[] {
-  return c.ranges.filter(r => r.drives.some(d => (d.kind === 'turn' && d.group === groupId) || (d.kind === 'scale' && d.target === 'group' && d.id === groupId)) || c.groups.some(g => g.id === groupId && g.attach?.kind === 'range' && g.attach.slider === r.id))
+  const lengthens = (d: ModelDrive) => d.kind === 'length' && (c.bones ?? []).some(b => b.id === d.id && b.start === groupId)
+  return c.ranges.filter(r => r.drives.some(d => (d.kind === 'turn' && d.group === groupId) || (d.kind === 'scale' && d.target === 'group' && d.id === groupId) || lengthens(d)) || c.groups.some(g => g.id === groupId && g.attach?.kind === 'range' && g.attach.slider === r.id))
 }
 
 const named = (name: string | undefined, id: string | null) => name?.trim() || id || 'something'
@@ -46,6 +48,7 @@ export function driveText(c: ModelContent, d: ModelDrive): string {
     const axis = d.axis === 'x' ? ' across' : d.axis === 'y' ? ' up and down' : ''
     return `Scales ${target}${axis} to ${d.atMin}% at the minimum and ${d.atMax}% at the maximum`
   }
+  if (d.kind === 'length') return `Lengthens ${named((c.bones ?? []).find(b => b.id === d.id)?.name, d.id)} to ${d.atMin}% of its length at the minimum and ${d.atMax}% at the maximum`
   const shape = named(c.shapes.find(s => s.id === d.shape)?.name, d.shape)
   if (d.kind === 'points') return `Moves ${d.moves.length} point${d.moves.length === 1 ? '' : 's'} of ${shape}`
   return `Bends ${shape} by ${sign(d.atMin)}° at the minimum and ${sign(d.atMax)}° at the maximum`

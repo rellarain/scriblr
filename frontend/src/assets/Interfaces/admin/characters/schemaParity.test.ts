@@ -3,7 +3,7 @@ import { readFileSync } from 'node:fs'
 import path from 'node:path'
 import { describe, expect, it } from 'vitest'
 import { LIMITS } from './engine/limits'
-import { AXIS_RANGE, DESCRIPTION_MAX, KIND_MAX, NAME_MAX, RANGE_NAME_MAX, SWATCH_NAME_MAX } from './modelContent'
+import { AXIS_RANGE, DESCRIPTION_MAX, FRAME_BIGGEST, FRAME_MIN, KIND_MAX, NAME_MAX, RANGE_NAME_MAX, SWATCH_NAME_MAX, TILE_DEFAULT } from './modelContent'
 
 // The backend validates a model with extra='ignore', so a field the frontend sends that the schema does not know is dropped without a word. These
 // tests read schema.py and api/types.ts side by side so the two cannot drift apart unnoticed, and check the limits are the same numbers.
@@ -36,6 +36,7 @@ describe('the model types match the backend schema', () => {
     ['ModelOverride', 'ModelOverride'], ['ModelForm', 'ModelForm'], ['ModelAxis', 'ModelAxis'], ['ModelPreset', 'ModelPreset'], ['ModelClass', 'ModelClass'],
     ['ModelGenre', 'ModelGenre'], ['ModelSwatch', 'ModelSwatch'], ['ModelColour', 'ModelColour'], ['ModelSlot', 'ModelSlot'],
     ['ModelTint', 'ModelTint'], ['ModelGradient', 'ModelGradient'], ['ModelLook', 'ModelLook'],
+    ['ModelBone', 'ModelBone'], ['ModelBoneEnd', 'ModelBoneEnd'], ['ModelFrame', 'ModelFrame'],
   ]
   for (const [python, ts] of pairs) {
     it(`${ts} has the fields of ${python}`, () => {
@@ -52,7 +53,7 @@ describe('the model types match the backend schema', () => {
     expect(union('ModelLayer')).toEqual(literal('ModelLayer'))
     expect(union('ModelView')).toEqual(literal('ModelView'))
     expect(union('ModelPointMode').length).toBe(4)
-    for (const alias of ['ModelAnchorKind', 'ModelRangeUnit', 'ModelDriveKind', 'ModelScaleTarget', 'ModelScaleAxis', 'ModelBindKind', 'ModelTintKind', 'ModelGradDir', 'ModelBlend']) {
+    for (const alias of ['ModelAnchorKind', 'ModelRangeUnit', 'ModelDriveKind', 'ModelScaleTarget', 'ModelScaleAxis', 'ModelBindKind', 'ModelTintKind', 'ModelGradDir', 'ModelBlend', 'ModelFit', 'ModelBoneEndKind']) {
       expect(union(alias), alias).toEqual(literal(alias))
       expect(union(alias).length, alias).toBeGreaterThan(1)
     }
@@ -119,6 +120,16 @@ describe('the limits are the backend\'s numbers', () => {
     expect(LIMITS.shadesMax).toBe(number('MODEL_SHADES_MAX'))
     expect(LIMITS.cutsMax).toBe(number('MODEL_CUTS_MAX'))
     expect(LIMITS.looksMax).toBe(number('MODEL_LOOKS_MAX'))
+  })
+  it('for proportions and frames: bones, frames, what a frame hides, the smallest and biggest frame and the starter card colour', () => {
+    expect(LIMITS.bonesWarn).toBe(number('MODEL_BONES_WARN'))
+    expect(LIMITS.bonesMax).toBe(number('MODEL_BONES_MAX'))
+    expect(LIMITS.framesWarn).toBe(number('MODEL_FRAMES_WARN'))
+    expect(LIMITS.framesMax).toBe(number('MODEL_FRAMES_MAX'))
+    expect(LIMITS.frameHideMax).toBe(number('MODEL_FRAME_HIDE_MAX'))
+    expect(FRAME_MIN).toBe(number('MODEL_FRAME_MIN'))
+    expect(FRAME_BIGGEST).toBe(number('MODEL_FRAME_BIGGEST'))
+    expect(TILE_DEFAULT).toBe(/MODEL_TILE_DEFAULT\s*=\s*"(#[0-9a-f]{6})"/.exec(schema)?.[1])
   })
   it('for the mirror line', () => {
     const m = /MODEL_AXIS_RANGE\s*=\s*\(([-\d.]+),\s*([-\d.]+)\)/.exec(schema)

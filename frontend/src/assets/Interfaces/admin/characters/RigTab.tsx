@@ -1,10 +1,11 @@
-import type { ModelAnchorKind, ModelAttach, ModelContent, ModelGroup } from '../../../../api/types'
+import type { ModelAnchorKind, ModelAttach, ModelContent, ModelGroup, ModelObject } from '../../../../api/types'
 import { LIMITS } from './engine/limits'
 import { chainDepth, chainOf, descendantsOf } from './engine/rig'
 import { groupOfShape } from './engine/rigEdit'
+import { FitSection } from './FitSection'
 import { PairPanel } from './PairPanels'
 import { Stepper } from './Stepper'
-import type { PairActions, RigActions } from './rigActions'
+import type { FitActions, PairActions, RigActions } from './rigActions'
 import { outlineSize } from './modelContent'
 import { rangesMovingGroup } from './rigView'
 
@@ -20,7 +21,17 @@ const KINDS: Array<{ id: ModelAnchorKind | 'none'; name: string; hint: string }>
 const name = (g: { name: string; id: string }) => g.name.trim() || 'Untitled group'
 const f1 = (n: number) => Math.round(n * 10) / 10
 
-export function RigTab({ content, group, picking, actions, pairs }: { content: ModelContent; group: ModelGroup | undefined; picking: boolean; actions: RigActions; pairs: PairActions }) {
+export function RigTab({ content, group, object, picking, fitPicking, actions, pairs, fit }: {
+  content: ModelContent
+  group: ModelGroup | undefined
+  // The selected object (or the object of the selected shape), whose fit to the body is chosen here.
+  object: ModelObject | undefined
+  picking: boolean
+  fitPicking: boolean
+  actions: RigActions
+  pairs: PairActions
+  fit: FitActions
+}) {
   if (!group) {
     return (
       <div className="cmTabBody">
@@ -85,6 +96,7 @@ export function RigTab({ content, group, picking, actions, pairs }: { content: M
         )}
       </section>
       <PairPanel content={content} kind="group" id={group.id} actions={pairs} />
+      <FitSection content={content} object={object} picking={fitPicking} actions={fit} />
       {group.mirrorOf ? null : <>
 
       <section className="cmSec" aria-label="Attached to a shape">

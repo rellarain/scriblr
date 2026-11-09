@@ -1,9 +1,9 @@
 import type {
-  ModelAxis, ModelBind, ModelBlend, ModelClass, ModelColour, ModelContent, ModelDrive, ModelForm, ModelGenre, ModelGradDir, ModelGradient, ModelGroup, ModelLook, ModelMove, ModelObject, ModelOverride, ModelPoint,
+  ModelAxis, ModelBind, ModelBlend, ModelBone, ModelClass, ModelColour, ModelContent, ModelDrive, ModelForm, ModelFrame, ModelGenre, ModelGradDir, ModelGradient, ModelGroup, ModelLook, ModelMove, ModelObject, ModelOverride, ModelPoint,
   ModelPreset, ModelRange, ModelShape, ModelSlot, ModelSwatch, ModelTint, ModelTintKind,
 } from '../../../../api/types'
 import { LIMITS } from './engine/limits'
-import { KIND_MAX, SWATCH_NAME_MAX, TINT_RANGE, TONE_RANGE, blankContent, normalizeContent, repairLooks } from './modelContent'
+import { FRAME_BIGGEST, FRAME_MIN, KIND_MAX, SWATCH_NAME_MAX, TILE_DEFAULT, TINT_RANGE, TONE_RANGE, blankContent, normalizeContent, repairLooks } from './modelContent'
 
 // The file Export writes and Import reads: JSON with a marker and a version, and the models' content as it is (a shape, object, group or slider keeps its
 // id: the ids only mean something inside one model). Everything read is held to what the server accepts, so one bad model can never make the whole save
@@ -96,14 +96,15 @@ function move(v: unknown): ModelMove {
 
 // A drive the server would accept, or null (the server drops the same ones).
 function drive(v: unknown): ModelDrive | null {
-  if (!isRecord(v) || !['turn', 'scale', 'points', 'bend'].includes(v.kind as string)) return null
+  if (!isRecord(v) || !['turn', 'scale', 'points', 'bend', 'length'].includes(v.kind as string)) return null
   const kind = v.kind as ModelDrive['kind']
   const group = idOf(v.group), id = idOf(v.id), shapeId = idOf(v.shape)
   const target = v.target === 'group' || v.target === 'shape' || v.target === 'model' ? v.target : null
   if (kind === 'turn' && !group) return null
   if (kind === 'scale' && (!target || (target !== 'model' && !id))) return null
   if ((kind === 'points' || kind === 'bend') && !shapeId) return null
-  const scale = kind === 'scale'
+  if (kind === 'length' && !id) return null
+  const scale = kind === 'scale' || kind === 'length'
   const at = (x: unknown) => (scale ? num(x, 100, 5, 1000) : num(x, 0, -360, 360))
   const y0 = num(v.y0, 0, -50, 450), y1 = num(v.y1, 0, -50, 450)
   return {
@@ -121,6 +122,7 @@ function range(v: Record<string, unknown>, id: string): ModelRange {
   const rand = pair(v.rand) ? ((): [number, number] => { const [a, b] = v.rand as [number, number]; const lo = Math.min(a, b), hi = Math.max(a, b); return [Math.max(min, Math.min(max, lo)), Math.max(min, Math.min(max, hi))] })() : null
   return {
     id, name: text(v.name), scope: idOrNull(v.scope), min, rest, max, unit: v.unit === '°' || v.unit === '%' ? v.unit : '', show: v.show !== false, rand,
+    limit: Array.isArray(v.limit) && v.limit.length === 2 && v.limit.every(x => typeof x === 'number') ? [v.limit[0] as number, v.limit[1] as number] : null,
     drives: list(v.drives).map(drive).filter((d): d is ModelDrive => d !== null),
   }
 }
@@ -172,6 +174,7 @@ function object(v: Record<string, unknown>, id: string): ModelObject {
   return {
     id, name: text(v.name), layer: v.layer === 'clothing' || v.layer === 'hair' ? v.layer : 'body', shapes: list(v.shapes).filter((x): x is string => typeof x === 'string'),
     mirrorOf: idOrNull(v.mirrorOf), classOf: idOrNull(v.classOf), axes: withIds(list(v.axes), axis),
+    fit: v.fit === 'keep' || v.fit === 'stretch' ? v.fit : 'scale', fitTo: v.fit === 'stretch' ? idOrNull(v.fitTo) : null,
   }
 }
 
@@ -202,6 +205,19 @@ function slot(v: Record<string, unknown>, id: string): ModelSlot {
   }
 }
 
+// A bone the server would accept (it needs a group to start at and an end), or null.
+function bone(v: Record<string, unknown>, id: string): ModelBone | null {
+  const start = idOf(v.start), end = isRecord(v.end) ? v.end : null, endId = end ? idOf(end.id) : null
+  if (!start || !end || !endId) return null
+  return { id, name: text(v.name).trim().slice(0, 40), start, end: { kind: end.kind === 'point' ? 'point' : 'group', id: endId, i: Math.round(num(end.i, 0, 0, LIMITS.pointsMax - 1)) } }
+}
+function frame(v: Record<string, unknown>, id: string): ModelFrame {
+  return {
+    id, name: text(v.name).trim().slice(0, 40), x: num(v.x, 0, -50, 250), y: num(v.y, 0, -50, 450), w: num(v.w, 100, FRAME_MIN, FRAME_BIGGEST), h: num(v.h, 100, FRAME_MIN, FRAME_BIGGEST),
+    hide: [...new Set(list(v.hide).map(idOf).filter((x): x is string => x !== null))].slice(0, LIMITS.frameHideMax),
+  }
+}
+
 const genre = (v: Record<string, unknown>, id: string): ModelGenre => ({ id, name: text(v.name).trim().slice(0, SWATCH_NAME_MAX) })
 const swatch = (v: Record<string, unknown>, id: string): ModelSwatch => ({ id, name: text(v.name).trim().slice(0, SWATCH_NAME_MAX), h: Math.round(num(v.h, 0, 0, 359)), s: Math.round(num(v.s, 50, 0, 100)) })
 
@@ -224,7 +240,7 @@ function problem(v: unknown): string | null {
     ?? groups.map(g => tooMany(list((g as Record<string, unknown>).objects).length, LIMITS.objectsPerGroupMax, 'objects in a group')).find(Boolean)
     ?? ranges.map(r => tooMany(list((r as Record<string, unknown>).drives).length, LIMITS.drivesMax, 'drives in a slider')).find(Boolean)
     ?? tooMany(list(v.presets).length, LIMITS.presetsMax, 'presets') ?? tooMany(list(v.classes).length, LIMITS.classesMax, 'classes')
-    ?? tooMany(list(v.slots).length, LIMITS.slotsMax, 'colour slots') ?? tooMany(list(v.genres).length, LIMITS.genresMax, 'genres') ?? tooMany(list(v.palette).length, LIMITS.paletteMax, 'swatches in the palette')
+    ?? tooMany(list(v.slots).length, LIMITS.slotsMax, 'colour slots') ?? tooMany(list(v.genres).length, LIMITS.genresMax, 'genres') ?? tooMany(list(v.palette).length, LIMITS.paletteMax, 'swatches in the palette') ?? tooMany(list(v.bones).length, LIMITS.bonesMax, 'bones') ?? tooMany(list(v.frames).length, LIMITS.framesMax, 'frames')
     ?? list(v.slots).map(sl => tooMany(list(rec(sl).colours).length, LIMITS.coloursMax, 'default colours in a slot')).find(Boolean)
     ?? objects.map(o => tooMany(list(rec(o).axes).length, LIMITS.axesMax, 'axes of forms in an object')).find(Boolean)
     ?? objects.map(o => list(rec(o).axes).map(a => tooMany(list(rec(a).options).length, LIMITS.formsMax, 'forms in an axis')).find(Boolean)).find(Boolean)
@@ -269,6 +285,10 @@ export function parseModelFile(source: string): ModelImport {
       genres: withIds(list(m.genres), genre),
       palette: withIds(list(m.palette), swatch),
       slots: withIds(list(m.slots), slot),
+      bones: withIds(list(m.bones), bone),
+      headBone: idOrNull(m.headBone),
+      frames: withIds(list(m.frames), frame),
+      tile: typeof m.tile === 'string' && /^#[0-9a-fA-F]{6}$/.test(m.tile) ? m.tile.toLowerCase() : TILE_DEFAULT,
     }))
   })
   return { models, skipped }

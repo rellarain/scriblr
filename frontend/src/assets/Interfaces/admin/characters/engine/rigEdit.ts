@@ -115,10 +115,10 @@ export function setAxis(c: ModelContent, x: number): ModelContent {
 
 // ---- sliders ----
 
-export type DriveKindPreset = 'turn' | 'scale' | 'points' | 'bend'
+export type DriveKindPreset = 'turn' | 'scale' | 'points' | 'bend' | 'length'
 // A new slider with a sensible span for the first thing it will drive.
 export function newRange(id: string, name: string, kind: DriveKindPreset, scope: string | null = null): ModelRange {
-  const span = kind === 'scale' ? { min: 50, rest: 100, max: 150, unit: '%' as const } : kind === 'points' ? { min: 0, rest: 0, max: 100, unit: '' as const } : { min: -30, rest: 0, max: 30, unit: '°' as const }
+  const span = kind === 'scale' || kind === 'length' ? { min: 50, rest: 100, max: 150, unit: '%' as const } : kind === 'points' ? { min: 0, rest: 0, max: 100, unit: '' as const } : { min: -30, rest: 0, max: 30, unit: '°' as const }
   return { id, name, scope, ...span, show: true, rand: null, drives: [] }
 }
 
@@ -148,7 +148,15 @@ export function stepOf(r: ModelRange, big = false): number {
   return big ? base * 5 : base
 }
 
-// Move a slider's minimum, rest or maximum one step. They stay in order (min below max, rest between), and the sliders never vanish into each other.
+// A writer's limit held to its slider: inside min..max, in order, and always holding the resting value; one that covers the whole slider is no limit at all.
+export function fitLimit(r: Pick<ModelRange, 'min' | 'rest' | 'max' | 'limit'>): [number, number] | null {
+  if (!r.limit) return null
+  const lo = Math.min(clamp(Math.min(r.limit[0], r.limit[1]), r.min, r.max), r.rest), hi = Math.max(clamp(Math.max(r.limit[0], r.limit[1]), r.min, r.max), r.rest)
+  return lo <= r.min && hi >= r.max ? null : [lo, hi]
+}
+
+// Move a slider's minimum, rest or maximum one step. They stay in order (min below max, rest between), and the sliders never vanish into each other. A
+// writer's limit follows: it stays inside the slider and keeps holding the resting value.
 export function stepBound(c: ModelContent, id: string, field: 'min' | 'rest' | 'max', dir: -1 | 1, big = false): ModelContent {
   return mapRange(c, id, r => {
     const step = stepOf(r, big), gap = stepOf(r)
@@ -157,15 +165,30 @@ export function stepBound(c: ModelContent, id: string, field: 'min' | 'rest' | '
     if (field === 'max') next.max = Math.max(r2(r.max + dir * step), r.rest, r.min + gap)
     if (field === 'rest') next.rest = r2(clamp(r.rest + dir * step, r.min, r.max))
     next.min = clamp(next.min, -1000, 1000); next.max = clamp(next.max, -1000, 1000)
+    if (r.limit) next.limit = fitLimit(next)
     return next
   })
 }
 
+// Move the smallest or the largest value a writer may choose one step. The first press starts from the whole slider. They stay inside the slider and the
+// resting value always stays allowed; a limit that reaches both ends of the slider is dropped.
+export function stepLimit(c: ModelContent, id: string, end: 'lo' | 'hi', dir: -1 | 1, big = false): ModelContent {
+  return mapRange(c, id, r => {
+    const [lo, hi] = r.limit ?? [r.min, r.max], step = stepOf(r, big)
+    const next: [number, number] = end === 'lo' ? [clamp(r2(lo + dir * step), r.min, r.rest), hi] : [lo, clamp(r2(hi + dir * step), r.rest, r.max)]
+    return { ...r, limit: fitLimit({ ...r, limit: next }) }
+  })
+}
+
+// Let the writer choose anywhere on the slider again.
+export const clearLimit = (c: ModelContent, id: string): ModelContent => mapRange(c, id, r => ({ ...r, limit: null }))
+
 // ---- drives ----
 
 const withDrive = (r: ModelRange, d: ModelDrive): ModelRange => ({ ...r, drives: [...r.drives, d] })
+const percentOf = (kind: ModelDrive['kind']): boolean => kind === 'scale' || kind === 'length'
 const blankDrive = (kind: ModelDrive['kind']): ModelDrive => ({
-  kind, group: null, target: null, id: null, axis: 'xy', shape: null, moves: [], sym: false, pivot: null, y0: 0, y1: 0, atMin: kind === 'scale' ? 100 : 0, atMax: kind === 'scale' ? 100 : 0, mirror: true,
+  kind, group: null, target: null, id: null, axis: 'xy', shape: null, moves: [], sym: false, pivot: null, y0: 0, y1: 0, atMin: percentOf(kind) ? 100 : 0, atMax: percentOf(kind) ? 100 : 0, mirror: true,
 })
 
 function addDrive(c: ModelContent, rangeId: string, d: ModelDrive): Edit {
@@ -193,6 +216,17 @@ export function addScale(c: ModelContent, rangeId: string, target: 'group' | 'sh
   return edit
 }
 
+// The slider lengthens or shortens a bone (and so the group it starts at, and everything that hangs from it): 80 percent of the bone's rest length at the
+// slider's minimum and 120 at its maximum to begin with. A twin of the bone's group follows it.
+export function addLength(c: ModelContent, rangeId: string, boneId: string): Edit {
+  const b = (c.bones ?? []).find(x => x.id === boneId)
+  if (!b) return fail('There is no such bone.')
+  const g = c.groups.find(x => x.id === b.start)
+  if (!g) return fail('The bone starts at a group that is not there.')
+  if (g.mirrorOf) return fail('The bone starts at a twin group; lengthen the original instead.')
+  return addDrive(ensurePivot(c, b.start), rangeId, { ...blankDrive('length'), id: boneId, atMin: 80, atMax: 120 })
+}
+
 const shapeBox = (s: ModelShape) => (s.pts.length >= 3 ? boxOf(flatten(build(s.pts, s.closed), s.closed)) : null)
 
 // The slider bends a shape smoothly along a length: from its middle down to near its end, 30 degrees each way to begin with.
@@ -214,8 +248,15 @@ const mapDrive = (c: ModelContent, rangeId: string, index: number, change: (d: M
 export function stepDrive(c: ModelContent, rangeId: string, index: number, field: 'atMin' | 'atMax', dir: -1 | 1, big = false): ModelContent {
   return mapDrive(c, rangeId, index, d => {
     const next = d[field] + dir * (big ? 5 : 1)
-    return { ...d, [field]: d.kind === 'scale' ? clamp(next, 5, 1000) : clamp(next, -360, 360) }
+    return { ...d, [field]: percentOf(d.kind) ? clamp(next, 5, 1000) : clamp(next, -360, 360) }
   })
+}
+// A Length drive lengthens another bone.
+export function setDriveBone(c: ModelContent, rangeId: string, index: number, boneId: string): Edit {
+  const b = (c.bones ?? []).find(x => x.id === boneId)
+  if (!b) return fail('There is no such bone.')
+  if (c.groups.find(g => g.id === b.start)?.mirrorOf) return fail('The bone starts at a twin group; lengthen the original instead.')
+  return done(mapDrive(c, rangeId, index, d => (d.kind === 'length' ? { ...d, id: boneId } : d)))
 }
 export const setDriveAxis = (c: ModelContent, rangeId: string, index: number, axis: ModelScaleAxis): ModelContent => mapDrive(c, rangeId, index, d => ({ ...d, axis }))
 export const setDriveMirror = (c: ModelContent, rangeId: string, index: number, mirror: boolean): ModelContent => mapDrive(c, rangeId, index, d => ({ ...d, mirror }))

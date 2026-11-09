@@ -619,14 +619,16 @@ export interface ModelAxis { id: string; name: string; options: ModelForm[]; ini
 // slot: the colour slot a shape is painted from (a twin follows its original's, a shape that follows the template its template shape's, when none); gray: a fixed gray 0..100 used when there is no slot (an eye white, teeth); neither: the neutral gray every uncoloured model is drawn in.
 // tone: steps lighter (+) or darker (-) than the colour; derive: this shape is a tone of its colour; shade: this is a shading shape, a tone of its slot's colour kept inside the base shapes of its object; grad, blend: gradient and blend mode; clip: the shape it is kept inside; cut: shapes that cut a hole in it; helper: never drawn, only used to clip or cut. A twin and a shape that follows a template take all of these from the shape they copy.
 // copyOf (on a shape of a class member): the shape of the class's template it follows, with no points of its own until it has an outline of its own; hide leaves the inherited shape out of the member. classOf (on an object): the class it is a member of.
-export interface ModelObject { id: string; name: string; layer: ModelLayer; shapes: string[]; mirrorOf?: string | null; axes?: ModelAxis[]; classOf?: string | null }
+// fit (phase 5a): how the object fits the body when proportions change: it moves and scales with its group ('scale'), moves and turns with it but keeps its own size ('keep'), or is stretched to follow the box of the shape fitTo ('stretch'). Only the drawing changes.
+export type ModelFit = 'scale' | 'keep' | 'stretch'
+export interface ModelObject { id: string; name: string; layer: ModelLayer; shapes: string[]; mirrorOf?: string | null; axes?: ModelAxis[]; classOf?: string | null; fit?: ModelFit; fitTo?: string | null }
 // Where a group is fixed to a shape of its parent (or an ancestor): on one point (i), at a spot t (0..1) along edge i, anywhere along edge i that the slider moves, or at a relative place (rx, ry) inside the shape's box.
 export type ModelAnchorKind = 'point' | 'edge' | 'range' | 'inside'
 export interface ModelAttach { shape: string; kind: ModelAnchorKind; i: number; t: number; slider: string | null; rx: number; ry: number }
 // A group of objects that move together. parent is the group it hangs from (the rig), pivot the point it turns about (in the model's space at rest), attach where on a shape of its parent it is fixed.
 export interface ModelGroup { id: string; name: string; parent: string | null; objects: string[]; pivot: [number, number] | null; attach: ModelAttach | null; mirrorOf?: string | null }
 export type ModelRangeUnit = '' | '°' | '%'
-export type ModelDriveKind = 'turn' | 'scale' | 'points' | 'bend'
+export type ModelDriveKind = 'turn' | 'scale' | 'points' | 'bend' | 'length'
 export type ModelScaleTarget = 'group' | 'shape' | 'model'
 export type ModelScaleAxis = 'xy' | 'x' | 'y'
 // One point of a points drive: how far it moves with the slider at its maximum (dx, dy) and at its minimum (dxMin, dyMin).
@@ -649,7 +651,7 @@ export interface ModelDrive {
   mirror: boolean
 }
 // A slider of the model: from min to max, resting at rest (what is drawn), with what it drives. rand is the span random previews stay in; show says whether the writer's editor offers it.
-export interface ModelRange { id: string; name: string; scope: string | null; min: number; rest: number; max: number; unit: ModelRangeUnit; show: boolean; rand: [number, number] | null; drives: ModelDrive[] }
+export interface ModelRange { id: string; name: string; scope: string | null; min: number; rest: number; max: number; unit: ModelRangeUnit; show: boolean; rand: [number, number] | null; limit?: [number, number] | null; drives: ModelDrive[] }
 // A named set of slider values and of hidden objects (a pose, an expression, an age, a build, an outfit). kind is the slot it fills: applying one puts back whatever any other preset of its kind controls. values lists only the sliders it moves; hidden the objects and groups it hides.
 // A style is a preset with a scope (an object or a group): it also keeps the forms chosen for what is in the scope ("objectId.axisId" to a form id, "class:classId" to the member shown) and only controls what the scope holds.
 export interface ModelPreset { id: string; name: string; kind: string; values: Record<string, number>; hidden: string[]; scope?: string | null; forms?: Record<string, string> }
@@ -663,7 +665,12 @@ export interface ModelSwatch { id: string; name: string; h: number; s: number }
 export interface ModelColour { id: string; name: string; hex: string; genres: string[] }
 // A colour slot (Skin, Hair, Eye...): the default colours offered, and how bright (l) and how opaque (a), 0..100, a colour in it may be: smallest, resting and largest.
 export interface ModelSlot { id: string; name: string; lMin: number; lRest: number; lMax: number; aMin: number; aRest: number; aMax: number; colours: ModelColour[] }
-export interface ModelContent { name: string; description: string; shapes: ModelShape[]; objects: ModelObject[]; groups: ModelGroup[]; axis: number; ranges: ModelRange[]; presets?: ModelPreset[]; classes?: ModelClass[]; genres?: ModelGenre[]; palette?: ModelSwatch[]; slots?: ModelSlot[] }
+// Proportions and frames (phase 5a). A bone is a measured length of the skeleton: from the pivot of the group `start` to `end`, the pivot of a group or point i of a shape; a 'length' drive changes it. A frame is a named crop of the figure (a box in the model's space) with the groups and objects that are left out when seen through it.
+export type ModelBoneEndKind = 'group' | 'point'
+export interface ModelBoneEnd { kind: ModelBoneEndKind; id: string; i: number }
+export interface ModelBone { id: string; name: string; start: string; end: ModelBoneEnd }
+export interface ModelFrame { id: string; name: string; x: number; y: number; w: number; h: number; hide: string[] }
+export interface ModelContent { name: string; description: string; shapes: ModelShape[]; objects: ModelObject[]; groups: ModelGroup[]; axis: number; ranges: ModelRange[]; presets?: ModelPreset[]; classes?: ModelClass[]; genres?: ModelGenre[]; palette?: ModelSwatch[]; slots?: ModelSlot[]; bones?: ModelBone[]; headBone?: string | null; frames?: ModelFrame[]; tile?: string }
 export interface PublishedModel { version: number; publishedAt: string; content: ModelContent }
 export interface ModelEntry { id: string; draft: ModelContent; published: PublishedModel | null; history: PublishedModel[]; nextVersion: number }
 export interface ModelCatalog { schemaVersion: number; models: ModelEntry[] }
