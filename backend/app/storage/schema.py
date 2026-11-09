@@ -1185,14 +1185,18 @@ MODEL_COPY_MAX_BYTES = 250 * 1024
 # Generous caps on the totals, so the file stays small and one save is bounded.
 MODEL_MAX_SHAPES = 600
 MODEL_MAX_OBJECTS = 200
-MODEL_MAX_GROUPS = 60
+MODEL_MAX_GROUPS = 120   # phase 5c: a hand with its fingers is about fifteen groups
 MODEL_X_RANGE = (-50.0, 250.0)
 MODEL_Y_RANGE = (-50.0, 450.0)
 # The rig (phase 2): the user's numbers. The pivot chain of 6 is a stop (publish is refused above it); the counts of sliders and of what one
 # slider drives are stops too (max_length), with a warning above the first number.
-MODEL_CHAIN_MAX = 6
-MODEL_RANGES_WARN = 40
-MODEL_RANGES_MAX = 80
+MODEL_CHAIN_WARN = 6    # phase 5c: torso, arm, forearm, hand and three finger joints is 7 deep: warn above 6, stop above 9
+MODEL_CHAIN_MAX = 9
+MODEL_RANGES_WARN = 60
+MODEL_RANGES_MAX = 120
+MODEL_ROLE_MAX = 40
+MODEL_GRIPS_WARN = 8   # grip points per model
+MODEL_GRIPS_MAX = 16
 MODEL_DRIVES_WARN = 12
 MODEL_DRIVES_MAX = 24
 MODEL_RANGE_NAME_MAX = 40
@@ -1624,7 +1628,8 @@ class ModelDrive(BaseModel):
     `bend` a shape smoothly along a length, or change the `length` of a bone (the group it starts at is stretched along it, and what hangs from it follows),
     or let a shape `fall` (phase 5b: the runs of its points that have a weight hang from the point before them, each keeping its length).
     `atMin` and `atMax` are the amount at the slider's minimum and maximum (degrees for turn and bend, percent for scale, length and fall); the amount is 0
-    (or 100 %) at the slider's rest value. A mirrored twin does the opposite turn or sideways move unless `mirror` is false."""
+    (or 100 %) at the slider's rest value. A mirrored twin does the opposite turn or sideways move unless `mirror` is false (phase 5c: then it does not follow
+    this drive, and the twin group may have drives of its own, so the two sides are posed apart)."""
 
     kind: ModelDriveKind
     group: Optional[str] = None
@@ -1717,7 +1722,15 @@ class ModelRange(BaseModel):
     rand: Optional[list[float]] = None
     # The span a writer may choose within (phase 5a): inside min..max, ordered, always holding the resting value; None = the whole slider.
     limit: Optional[list[float]] = None
+    # What the slider is for, as a short tag (phase 5c: `curl-index`, `spread`, ... for a hand; the other side's slider has `~` added), so the starter hand poses find it.
+    role: Optional[str] = Field(default=None, max_length=MODEL_ROLE_MAX)
     drives: list[ModelDrive] = Field(default_factory=list, max_length=MODEL_DRIVES_MAX)
+
+    @field_validator("role", mode="before")
+    @classmethod
+    def _role(cls, value: Any) -> Optional[str]:
+        text = value.strip()[:MODEL_ROLE_MAX] if isinstance(value, str) else ""
+        return text or None
 
     @field_validator("name", mode="before")
     @classmethod
@@ -2011,6 +2024,13 @@ class ModelPreset(BaseModel):
     forms: dict[str, str] = Field(default_factory=dict, max_length=MODEL_PRESET_FORMS_MAX)
     # Phase 5b: the side hanging things fall to, when the preset keeps one (None: it leaves the side as it is).
     fall: Optional[ModelFallSide] = None
+    # Phase 5c: the grip point a hand pose holds with (None: none).
+    grip: Optional[str] = None
+
+    @field_validator("grip", mode="before")
+    @classmethod
+    def _grip(cls, value: Any) -> Optional[str]:
+        return _optional_id(value)
 
     @field_validator("scope", mode="before")
     @classmethod
@@ -2220,6 +2240,43 @@ class ModelBone(BaseModel):
         return value if isinstance(value, ModelBoneEnd) else ModelBoneEnd.model_validate(value)
 
 
+class ModelGrip(BaseModel):
+    """A grip point (phase 5c): the spot of a hand where a held item is taken, in the model's space at rest, carried by the group `group` (it moves with the hand), and the
+    direction the held item points, in degrees (0 = straight down, positive toward the picture's right)."""
+
+    id: str = Field(pattern=_MODEL_ID)
+    name: str = Field(default="", max_length=MODEL_RANGE_NAME_MAX)
+    group: Optional[str] = None
+    x: float = 100.0
+    y: float = 200.0
+    angle: float = 0.0
+
+    @field_validator("name", mode="before")
+    @classmethod
+    def _trim(cls, value: Any) -> Any:
+        return value.strip()[:MODEL_RANGE_NAME_MAX] if isinstance(value, str) else value
+
+    @field_validator("group", mode="before")
+    @classmethod
+    def _group(cls, value: Any) -> Optional[str]:
+        return _optional_id(value)
+
+    @field_validator("x", mode="before")
+    @classmethod
+    def _x(cls, value: Any) -> float:
+        return _finite(value, 100.0, *MODEL_X_RANGE)
+
+    @field_validator("y", mode="before")
+    @classmethod
+    def _y(cls, value: Any) -> float:
+        return _finite(value, 200.0, *MODEL_Y_RANGE)
+
+    @field_validator("angle", mode="before")
+    @classmethod
+    def _angle(cls, value: Any) -> float:
+        return _finite(value, 0.0, -180.0, 180.0)
+
+
 class ModelFrame(BaseModel):
     """A named crop of the figure (phase 5a): a box in the model's space and the groups and objects that are left out when the figure is seen through it."""
 
@@ -2288,6 +2345,13 @@ class ModelContent(BaseModel):
     headBone: Optional[str] = None
     frames: list[ModelFrame] = Field(default_factory=list, max_length=MODEL_FRAMES_MAX)
     tile: str = MODEL_TILE_DEFAULT
+    # Hands (phase 5c): the grip points where a held item is taken.
+    grips: list[ModelGrip] = Field(default_factory=list, max_length=MODEL_GRIPS_MAX)
+
+    @field_validator("grips", mode="before")
+    @classmethod
+    def _grips(cls, value: Any) -> list[Any]:
+        return _keep_valid(ModelGrip, value)
 
     @field_validator("bones", mode="before")
     @classmethod

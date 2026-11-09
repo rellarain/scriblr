@@ -1,7 +1,8 @@
 import { useState } from 'react'
 import type { ModelContent } from '../../../../api/types'
-import { CheckIcon, PlayIcon, SaveIcon, TrashIcon } from '../../../icons'
+import { BookmarkIcon, CheckIcon, PlayIcon, SaveIcon, TrashIcon } from '../../../icons'
 import { presetsOf } from './engine/forms'
+import { gripsOf, slidersByRole } from './engine/hands'
 import { LIMITS } from './engine/limits'
 import { isOn, kindsOf, type TestState } from './engine/presets'
 import { KIND_MAX, NAME_MAX, groupById, objectById } from './modelContent'
@@ -17,6 +18,9 @@ export interface PresetActions {
   remove: (id: string) => void
   // Keep the current look of an object or a group as a style (a preset that belongs to it).
   saveStyle: (scopeId: string, name: string) => void
+  // Phase 5c: the starter hand poses, and the grip point a pose holds with (null: none).
+  addHandPoses: () => void
+  setGrip: (id: string, gripId: string | null) => void
 }
 
 const label = (name: string, fallback: string) => name.trim() || fallback
@@ -30,6 +34,8 @@ export function PresetsTab({ content, state, actions }: { content: ModelContent;
   const kinds = kindsOf(content)
   const shown = filter === 'all' ? presets : presets.filter(p => p.kind.trim().toLowerCase() === filter.trim().toLowerCase())
   const full = presets.length >= LIMITS.presetsMax
+  const handsHere = [false, true].some(other => Object.keys(slidersByRole(content, other)).some(r => r.startsWith('curl-')))
+  const grips = gripsOf(content)
 
   return (
     <div className="cmTabBody">
@@ -55,6 +61,16 @@ export function PresetsTab({ content, state, actions }: { content: ModelContent;
         </div>
       </section>
 
+      {handsHere && (
+        <section className="cmSec" aria-label="Hand poses">
+          <h3 className="cmInsSub">Hand poses</h3>
+          <p className="cmInsText">Open, Fist, Point, Pinch and Grip, made from the Curl, Spread and thumb sliders of the hands. The other hand&apos;s poses are a kind of their own, so each hand takes one.</p>
+          <div className="cmInline">
+            <button type="button" className="cmBtn cmBtn--small" disabled={full} title={full ? `A model may have at most ${LIMITS.presetsMax} presets` : 'Add the standard hand poses that are not there yet'} onClick={actions.addHandPoses}><BookmarkIcon size={12} /> Add the standard hand poses</button>
+          </div>
+        </section>
+      )}
+
       {kinds.length > 0 && (
         <div className="cmChips" role="group" aria-label="Which presets to list">
           <button type="button" className={`cmChip cmChip--wide${filter === 'all' ? ' cmChip--on' : ''}`} aria-pressed={filter === 'all'} onClick={() => setFilter('all')}>All ({presets.length})</button>
@@ -73,6 +89,15 @@ export function PresetsTab({ content, state, actions }: { content: ModelContent;
                 {on && <span className="cmOn" role="img" aria-label={`${title} is on`} title="The sliders and hidden things are as this preset sets them"><CheckIcon size={12} /> On</span>}
               </div>
               <p className="cmInsText">{p.scope ? `${p.kind} of ${label(objectById(content, p.scope)?.name ?? groupById(content, p.scope)?.name ?? '', 'something gone')}` : p.kind} · {Object.keys(p.values).length} slider{Object.keys(p.values).length === 1 ? '' : 's'}, {p.hidden.length} hidden{p.scope ? `, ${Object.keys(p.forms ?? {}).length} form choice${Object.keys(p.forms ?? {}).length === 1 ? '' : 's'}` : ''}</p>
+              {grips.length > 0 && !p.scope && (
+                <label className="cmField">
+                  <span>Holds with</span>
+                  <select value={p.grip ?? ''} aria-label={`Grip point that ${title} holds with`} onChange={e => actions.setGrip(p.id, e.target.value || null)}>
+                    <option value="">No grip point</option>
+                    {grips.map(g => <option key={g.id} value={g.id}>{g.name.trim() || 'Grip'}</option>)}
+                  </select>
+                </label>
+              )}
               <div className="cmInline">
                 <button type="button" className="cmBtn cmBtn--small" aria-label={`Apply ${title}`} title="Set the sliders and the hidden things to this preset" onClick={() => actions.apply(p.id)}><PlayIcon size={12} /> Apply</button>
                 <button type="button" className="cmIconBtn cmIconBtn--small" aria-label={`Update ${title} from the current`} title="Replace what this preset keeps with the current sliders and hidden things" onClick={() => actions.update(p.id)}><SaveIcon size={12} /></button>

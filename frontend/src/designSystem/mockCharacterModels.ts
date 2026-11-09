@@ -1,6 +1,8 @@
 import type { ModelContent, ModelEntry, PublishedModel } from '../api/types'
 import { addGroup, addObject, addShape, blankContent, newGroup, normalizeContent, objectById, publishFaults, renameObject, updateShape } from '../assets/Interfaces/admin/characters/modelContent'
 import { newShape } from '../assets/Interfaces/admin/characters/engine/edit'
+import { addGrip, addHand, addHandPoses, apartHand, mirrorGrip, renameGrip, setPresetGrip } from '../assets/Interfaces/admin/characters/engine/hands'
+import { apartSlider } from '../assets/Interfaces/admin/characters/engine/sidesEdit'
 import { addLength, addRange, addScale, addTurn, attachGroup, newRange, recordPoints, reparent, type Edit } from '../assets/Interfaces/admin/characters/engine/rigEdit'
 import { addBone, setHeadBone } from '../assets/Interfaces/admin/characters/engine/bones'
 import { setFit } from '../assets/Interfaces/admin/characters/engine/fitEdit'
@@ -115,7 +117,7 @@ function riggedFigure(): ModelContent {
     c = { ...c, ranges: c.ranges.map(r => (r.id === id ? { ...r, drives: r.drives.map(d => ({ ...d, atMin, atMax })) } : r)) }
   }
   turn('r_tilt', 'Head tilt', 'g_head', -20, 20, -12, 12)
-  turn('r_raise', 'Arm raise', 'g_arm', -10, 95, 6, -95)
+  turn('r_raise', 'Arm raise', 'g_arm', -10, 70, 6, -70)       // (not higher: with a hand on it, the arm held out sideways would leave the picture)
   turn('r_elbow', 'Elbow bend', 'g_fore', 0, 130, 0, -130)
   c = must(addRange(c, { ...newRange('r_head', 'Head size', 'scale', 'g_head'), min: 85, max: 125 }))
   c = must(addScale(c, 'r_head', 'group', 'g_head'))
@@ -150,9 +152,20 @@ function riggedFigure(): ModelContent {
   // a sleeve on the upper arm, short unless a form of the arm says otherwise
   c = addShape(c, 'o_arm', { ...newShape('s_sleeve', 'Sleeve', 'rounded', box(122, 88, 18, 28)), slot: 'k_cloth' })
   // (the body is painted from Skin, the shirt and sleeve from Clothing, the iris from Eye, the white of the eye a fixed white)
-  // the other arm: a twin of the arm and the forearm under it, which follows the arm's raise and elbow
+  // a hand on the forearm: a palm, four fingers of three joints and a thumb on the side of the palm, with their sliders (a Curl for each finger and the thumb,
+  // the Spread of the fingers, the thumb's Swing and Across)
+  let nh = 0
+  const hand = addHand(c, 'g_fore', {}, prefix => `${prefix}_hand${++nh}`)
+  c = must(hand)
+  const palm = hand.hand!.palm
+  // the other arm: a twin of the arm and the forearm under it (and the hand), mirrored from the original; the two arms and the two hands are posed apart, each
+  // with a slider of its own, while the drawing stays mirrored
   let n = 0
   c = must(makeTwin(c, 'group', 'g_arm', prefix => `${prefix}_twin${++n}`))
+  let ns = 0
+  const mkSide = (prefix: string) => `${prefix}_side${++ns}`
+  for (const id of ['r_raise', 'r_elbow']) c = must(apartSlider(c, id, mkSide))
+  c = must(apartHand(c, palm, mkSide))
   // the hair side of the head is wider from behind: an outline of its own for the back view
   const head = c.shapes.find(x => x.id === 's_head')!, cx = 100, cy = 46
   c = must(setBack(c, 's_head', head.pts.map(p => ({ ...p, x: cx + (p.x - cx) * 1.12, y: cy + (p.y - cy) * 1.08, hi: p.hi ? [p.hi[0] * 1.12, p.hi[1] * 1.08] as [number, number] : p.hi, ho: p.ho ? [p.ho[0] * 1.12, p.ho[1] * 1.08] as [number, number] : p.ho }))))
@@ -224,7 +237,7 @@ function riggedFigure(): ModelContent {
   // presets: a pose replaces the last pose, an expression leaves the arms alone, an outfit switches the shirt off or on
   const preset = (name: string, kind: string, values: Record<string, number>, hidden: string[] = [], fall?: 'down' | 'left' | 'right' | 'behind') => { c = must(savePreset(c, { values, forms: {}, hidden, fall }, name, kind, mk)) }
   preset('At rest', 'Pose', {})
-  preset('Wave', 'Pose', { r_raise: 80, r_elbow: 50 })
+  preset('Wave', 'Pose', { r_raise: 65, r_elbow: 50 })
   preset('Curious', 'Expression', { r_tilt: 12 })
   preset('Broad', 'Build', { r_shoulders: 118 })
   preset('Shirt on', 'Outfit', {})
@@ -261,12 +274,21 @@ function riggedFigure(): ModelContent {
   preset('Slim', 'Build', { r_shoulders: 92 })
   preset('Average', 'Build', {})
   preset('Heavy', 'Build', { r_shoulders: 118, r_fit: 130 })
+  // the starter hand poses (a kind for each hand, so each takes its own), and a grip point in the middle of each hand that the Grip pose holds with
+  c = must(addHandPoses(c, palm, mk))
+  let ng = 0
+  const mkGrip = (prefix: string) => `${prefix}_grip${++ng}`
+  const grip = addGrip(c, palm, mkGrip)
+  c = renameGrip(must(grip), grip.gripId!, 'Staff grip')
+  const otherGrip = mirrorGrip(c, grip.gripId!, mkGrip)
+  c = must(otherGrip)
+  for (const [kind, id] of [['Hand', grip.gripId!], ['Hand (other side)', otherGrip.gripId!]] as const) c = must(setPresetGrip(c, c.presets!.find(p => p.kind === kind && p.name === 'Grip')!.id, id))
   for (const name of Object.keys(memberIds)) c = must(setFit(c, memberIds[name], 'keep'))
 
   // frames: the figure from head to hands, a bust and the face (which leaves out the arms and the shirt)
   let nf = 0
   const mkFrame = (prefix: string) => `${prefix}_frame${++nf}`
-  c = must(addFrame(c, { x: 30, y: 10, w: 140, h: 190 }, 'Head to hands', mkFrame))
+  c = must(addFrame(c, { x: 30, y: 10, w: 140, h: 215 }, 'Head to hands', mkFrame))
   c = must(addFrame(c, { x: 50, y: 14, w: 100, h: 96 }, 'Bust', mkFrame))
   const face = addFrame(c, { x: 72, y: 16, w: 56, h: 60 }, 'Face', mkFrame)
   c = must(face)
@@ -281,7 +303,7 @@ export function previewModels(): ModelEntry[] {
   const plain = (shapeIds: string[]): ModelContent => {
     const shapes = adult.shapes.filter(s => shapeIds.includes(s.id)).map(s => ({ ...s, cut: [], clip: null }))
     const objects = adult.objects.map(o => ({ ...o, shapes: o.shapes.filter(s => shapeIds.includes(s)), axes: [] })).filter(o => o.shapes.length)
-    return { ...adult, shapes, objects, presets: [], classes: [], groups: [newGroup('g_head', 'Head', null, objects.map(o => o.id))], ranges: [], bones: [], headBone: null, frames: [] }
+    return { ...adult, shapes, objects, presets: [], classes: [], groups: [newGroup('g_head', 'Head', null, objects.map(o => o.id))], ranges: [], bones: [], headBone: null, frames: [], grips: [] }
   }
   const live = liveEntry('adult', adult, { nextVersion: 3 })
   live.published = published(2, plain(['s_head', 's_neck', 's_chest']))

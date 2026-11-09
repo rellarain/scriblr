@@ -164,7 +164,6 @@ def _rig_faults(content: ModelContent, parents: dict[str, Optional[str]], circul
     shapes = {s.id: s for s in content.shapes}
     group_ids = {g.id for g in content.groups}
     range_ids = {r.id for r in content.ranges}
-    twin_groups = {g.id: g.mirrorOf for g in content.groups if g.mirrorOf}
     if not circular:
         for g in content.groups:
             depth = len(_ancestors(parents, g.id)) + 1
@@ -195,11 +194,9 @@ def _rig_faults(content: ModelContent, parents: dict[str, Optional[str]], circul
         for d in r.drives:
             if d.kind == "turn" and d.group not in group_ids:
                 faults.append(f"Slider {name} turns a group that does not exist.")
-            elif d.kind == "turn" and twin_groups.get(d.group or ""):
-                faults.append(f"Slider {name} turns a group that is a twin; turn the original instead.")
             elif d.kind == "scale" and d.target != "model" and not ((d.target == "group" and d.id in group_ids) or (d.target == "shape" and d.id in shapes)):
                 faults.append(f"Slider {name} scales something that does not exist.")
-            elif d.kind == "scale" and ((d.target == "group" and twin_groups.get(d.id or "")) or (d.target == "shape" and shapes[d.id or ""].mirrorOf)):
+            elif d.kind == "scale" and d.target == "shape" and shapes[d.id or ""].mirrorOf:
                 faults.append(f"Slider {name} scales a twin; scale the original instead.")
             elif d.kind in ("points", "bend", "fall") and d.shape not in shapes:
                 faults.append(f"Slider {name} moves a shape that does not exist.")
@@ -447,6 +444,20 @@ def _paint_faults(content: ModelContent) -> list[str]:
     return faults
 
 
+def _hand_faults(content: ModelContent) -> list[str]:
+    """Grip points (phase 5c; the frontend's handFaults says the same words): a grip on a group that is not there, a preset that holds with a grip that is not there."""
+    faults: list[str] = []
+    group_ids = {g.id for g in content.groups}
+    grip_ids = {g.id for g in content.grips}
+    for g in content.grips:
+        if g.group is None or g.group not in group_ids:
+            faults.append(f"Grip {_label(g.name, g.id)} is on a group that does not exist.")
+    for p in content.presets:
+        if p.grip is not None and p.grip not in grip_ids:
+            faults.append(f"Preset {_label(p.name, p.id)} holds with a grip that does not exist.")
+    return faults
+
+
 def _proportion_faults(content: ModelContent) -> list[str]:
     """What is wrong with the skeleton, the fit of objects and the frames (phase 5a; the frontend's proportionFaults says the same words)."""
     faults: list[str] = []
@@ -534,6 +545,7 @@ def publish_faults(content: ModelContent) -> list[str]:
     faults.extend(_colour_faults(content))
     faults.extend(_paint_faults(content))
     faults.extend(_proportion_faults(content))
+    faults.extend(_hand_faults(content))
     size = copy_bytes(content)
     if size > MODEL_COPY_MAX_BYTES:
         faults.append(f"A character's copy of this model would be {size // 1024} KB; the limit is {MODEL_COPY_MAX_BYTES // 1024} KB.")

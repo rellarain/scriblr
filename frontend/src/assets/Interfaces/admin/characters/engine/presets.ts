@@ -13,8 +13,8 @@ import { defaultValues, descendantsOf, valueOf, type Values } from './rig'
 // A style is a preset with a scope, an object or a group: it also keeps the forms chosen for what the scope holds (and which member of a family is shown), and
 // only controls what the scope holds. Its slot is its kind within its scope, so a style of the head does not undo a style of the hands.
 
-// `fall` is the side hanging things fall to (down when absent).
-export interface TestState { values: Values; forms: Choices; hidden: string[]; fall?: ModelFallSide }
+// `fall` is the side hanging things fall to (down when absent); `grip` is the grip point a hand pose holds with now (none when absent), marked on the canvas.
+export interface TestState { values: Values; forms: Choices; hidden: string[]; fall?: ModelFallSide; grip?: string | null }
 
 export const restState = (c: ModelContent): TestState => ({ values: defaultValues(c), forms: {}, hidden: [], fall: 'down' })
 const sideOf = (s: Pick<TestState, 'fall'>): ModelFallSide => s.fall ?? 'down'
@@ -52,14 +52,15 @@ export function scopeOf(c: ModelContent, scopeId: string): Scope | null {
 }
 
 // Everything the presets of a kind (and scope) control: slider ids, thing ids and form-choice keys.
-export function footprint(c: ModelContent, kind: string, scope: string | null = null): { values: Set<string>; hidden: Set<string>; forms: Set<string>; fall: boolean } {
-  const out = { values: new Set<string>(), hidden: new Set<string>(), forms: new Set<string>(), fall: false }
+export function footprint(c: ModelContent, kind: string, scope: string | null = null): { values: Set<string>; hidden: Set<string>; forms: Set<string>; fall: boolean; grip: boolean } {
+  const out = { values: new Set<string>(), hidden: new Set<string>(), forms: new Set<string>(), fall: false, grip: false }
   for (const p of presetsOf(c)) {
     if (kindKey(p.kind) !== kindKey(kind) || !sameScope(p.scope, scope)) continue
     for (const k of Object.keys(p.values)) out.values.add(k)
     for (const h of p.hidden) out.hidden.add(h)
     for (const k of Object.keys(p.forms ?? {})) out.forms.add(k)
     if (p.fall) out.fall = true
+    if (p.grip) out.grip = true
   }
   return out
 }
@@ -81,7 +82,11 @@ export function applyPreset(c: ModelContent, s: TestState, p: ModelPreset): Test
   let fall = sideOf(s)
   if (free.fall) fall = 'down'
   if (p.fall) fall = p.fall
-  return { values, forms, hidden: [...hidden], fall }
+  // the grip a hand pose holds with: a pose of a kind that names grips lets go of the last one, then takes its own
+  let grip = s.grip ?? null
+  if (free.grip) grip = null
+  if (p.grip) grip = p.grip
+  return { values, forms, hidden: [...hidden], fall, ...(grip ? { grip } : {}) }
 }
 
 // Whether applying the preset would change nothing: it is on.
@@ -91,19 +96,21 @@ export function isOn(c: ModelContent, s: TestState, p: ModelPreset): boolean {
   const keys = new Set([...Object.keys(p.forms ?? {}), ...footprint(c, p.kind, p.scope).forms])
   if ([...keys].some(k => choiceOf(c, k, next.forms) !== choiceOf(c, k, s.forms))) return false
   if (sideOf(next) !== sideOf(s)) return false
+  if ((next.grip ?? null) !== (s.grip ?? null)) return false
   const a = new Set(s.hidden), b = new Set(next.hidden)
   return a.size === b.size && [...a].every(h => b.has(h))
 }
 
 // The sliders away from rest and the things switched off, as an unscoped preset holds them.
-function captured(c: ModelContent, s: TestState): Pick<ModelPreset, 'values' | 'hidden' | 'fall'> {
+function captured(c: ModelContent, s: TestState): Pick<ModelPreset, 'values' | 'hidden' | 'fall' | 'grip'> {
   const values: Record<string, number> = {}
   for (const r of c.ranges) {
     const v = valueOf(r, s.values)
     if (Math.abs(v - r.rest) > SAME) values[r.id] = Math.round(v * 100) / 100
   }
   const known = things(c)
-  return { values, hidden: [...new Set(s.hidden.filter(h => known.has(h)))], ...(sideOf(s) === 'down' ? {} : { fall: sideOf(s) }) }
+  const grip = s.grip && (c.grips ?? []).some(g => g.id === s.grip) ? s.grip : null
+  return { values, hidden: [...new Set(s.hidden.filter(h => known.has(h)))], ...(sideOf(s) === 'down' ? {} : { fall: sideOf(s) }), ...(grip ? { grip } : {}) }
 }
 
 // The same for a style: only the sliders listed under the scope, the things inside it that are switched off, the forms (away from their default) of the objects

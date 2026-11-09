@@ -274,7 +274,7 @@ function RigTree({ content, sel, actions, q, hidden, locks }: { content: ModelCo
                 ) : <span className="cmTreeTwisty" aria-hidden="true" />}
                 <button type="button" className="cmTreeName cmTreeName--btn" aria-current={same(sel, { kind: 'group', id: g.id })} onClick={() => actions.onSelect({ kind: 'group', id: g.id })}>{name}</button>
                 <Twin of={g.mirrorOf} name={name} />
-                <span className={`cmCount${level >= LIMITS.chainMax ? ' cmCount--warn' : ''}`} title={`Level ${level} of ${LIMITS.chainMax} in the pivot chain`}>{level}</span>
+                <span className={`cmCount${level > LIMITS.chainWarn ? ' cmCount--warn' : ''}`} title={`Level ${level} of ${LIMITS.chainMax} in the pivot chain`}>{level}</span>
                 <Eye id={g.id} name={name} hidden={hidden} onToggle={actions.onToggleHidden} /><Lock id={g.id} name={name} locks={locks} onToggle={actions.onToggleLock} />
               </div>
               {open && branch(g.id, depth + 1)}

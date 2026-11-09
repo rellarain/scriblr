@@ -117,7 +117,7 @@ describe('making a twin of an object or a group', () => {
   it('is refused past the number of groups a model may hold', () => {
     const c = body()
     const extra = Array.from({ length: LIMITS.groupsMax - c.groups.length }, (_, i) => newGroup(`x${i}`, `x${i}`))
-    expect(refused(makeTwin({ ...c, groups: [...c.groups, ...extra] }, 'group', 'gArm'))).toMatch(/at most 60 groups/)
+    expect(refused(makeTwin({ ...c, groups: [...c.groups, ...extra] }, 'group', 'gArm'))).toMatch(new RegExp(`at most ${LIMITS.groupsMax} groups`))
   })
 })
 
@@ -397,11 +397,11 @@ describe('the checks and notes about pairs and links', () => {
     expect(publishFaults(named(twice))).toContain('Shape a3 is a twin of a twin.')
     expect(publishFaults(named({ ...body(), shapes: [...body().shapes, sharp('me', [], { mirrorOf: 'me' })] }))).toContain('Shape me is a twin of itself.')
   })
-  it('say a slider may not drive a twin', () => {
+  it('allow a slider to turn a twin group (the two sides are posed apart)', () => {
     let c = must(makeTwin(body(), 'group', 'gArm', n => `${n}_${Math.random().toString(36).slice(2, 6)}`))
     const twinGroup = c.groups.find(g => g.mirrorOf === 'gArm')!.id
     c = { ...c, ranges: c.ranges.map(r => (r.id === 'raise' ? { ...r, drives: [...r.drives, { ...r.drives[0], group: twinGroup }] } : r)) }
-    expect(publishFaults(named(c))).toContain('Slider raise turns a group that is a twin; turn the original instead.')
+    expect(publishFaults(named(c)).join(' ')).not.toMatch(/turns a group that is a twin/)
   })
   it('say a link points at something that is not there, or goes round in a circle', () => {
     const base = must(linkToPoint(dressed(), 'shirt', 0, 'body', 60, 60, 'weld'))

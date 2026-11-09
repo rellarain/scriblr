@@ -7,7 +7,7 @@ import { AssetTree, type TreeActions, type TreeMode } from './AssetTree'
 import type { ClassActions } from './ClassPanel'
 import { ColourTab, type ColourActions } from './ColourTab'
 import { CheckPanel } from './CheckPanel'
-import { DesignerCanvas, type FrameCanvas, type PivotMarker, type PoseCanvas, type PoseGrab, type ThroughFrame } from './DesignerCanvas'
+import { DesignerCanvas, type FrameCanvas, type GripMark, type PivotMarker, type PoseCanvas, type PoseGrab, type ThroughFrame } from './DesignerCanvas'
 import { FormsTab, type FormActions } from './FormsTab'
 import { FramesTab, type FramesState } from './FramesTab'
 import { Inspector, type InspectorTab } from './Inspector'
@@ -37,6 +37,7 @@ import { SIDE_NAMES, addFall, addFallToObject, withWeight } from './engine/fallE
 import { addAxis, addForm, hideInForm, moveAxis, moveForm, overrideState, removeAxis, removeForm, renameAxis, renameForm, setInitialForm, setLook, setOverride, useBaseOutline } from './engine/formEdit'
 import { classKey, presetsOf, targetForShape } from './engine/forms'
 import { apply, inverse, type Box } from './engine/geometry'
+import { addFinger, addGrip, addHand, addHandPoses, addThumb, apartHand, gripAt, gripGrab, gripsOf, mirrorGrip, moveGrip, removeGrip, renameGrip, setPresetGrip, stepGripAngle } from './engine/hands'
 import { LIMITS } from './engine/limits'
 import { emptyHistory, redo as redoHistory, remember, undo as undoHistory, type History } from './engine/history'
 import { beginScale, beginTurn, grabPoint, moveScale, moveTurn, poseTarget, reach, reachJoints, scaleDriver, slideValue, toModel, turnDrivers, type ReachGrab, type ScaleDrag, type TurnDrag } from './engine/pose'
@@ -44,13 +45,14 @@ import { deletePreset, renamePreset, savePreset, saveStyle, updatePreset } from 
 import { chainOf, isPointDriven, restPivot, solve, type Solved, type Values } from './engine/rig'
 import * as paintOps from './engine/paintEdit'
 import { addShading } from './engine/shadeEdit'
+import { apartSlider, joinSides } from './engine/sidesEdit'
 import {
   addBend, addLength, addRange, addScale, addTurn, attachFromClick, attachGroup, clearLimit, clearPointMoves, detachGroup, groupOfShape, newRange, recordPoints, removeDrive, removeRange, renameRange, reparent,
   setAxis, setDriveAxis, setDriveBone, setPivot, setShow, stepBendEdge, stepBound, stepDrive, stepLimit, type Edit,
 } from './engine/rigEdit'
 import { templateBox, templateById } from './engine/templates'
 import { breakPair, clearLinksTo, linkToEdge, linkToPoint, makeTwin, moveInOrder, setBack, setLoose, stepLink, unlinkPoint } from './engine/pairEdit'
-import type { FitActions, FrameActions, LinkHow, NewSliderKind, PairActions, ProportionActions, Recording, RigActions, ViewName } from './rigActions'
+import type { FitActions, FrameActions, HandActions, LinkHow, NewSliderKind, PairActions, ProportionActions, Recording, RigActions, ViewName } from './rigActions'
 import { groupOfSelection, offRest, scrubValue, valueText } from './rigView'
 import {
   FALL_SIDES, NAME_MAX, addGroup, addObject, addShape, duplicateShape, freshId, groupOfObject, moveBefore, moveObjectWithin, moveShapeWithin, newGroup, objectById, objectOfShape, publishFaults, removeGroup, removeObject,
@@ -92,7 +94,7 @@ type PoseDrag = { solved: Solved; start: Values; group: string } & (
   | { kind: 'slide' }
   | { kind: 'reach'; grab: ReachGrab; current: Values }
 )
-const POSE_HINT = 'Pose mode: drag a part to turn it, a square to scale its group, a circle to slide its anchor. Hold Alt, or press Reach, and drag a hand or foot to bend the limb.'
+const POSE_HINT = 'Pose mode: drag a part to turn it, a square to scale its group, a circle to slide its anchor. Hold Alt, or press Reach, and drag a hand or foot to bend the limb; drag a grip point to reach with it.'
 
 // The open model: its name and publishing buttons, then the tree, the canvas and the inspector, the preview strip and the checks. The undo stack
 // lives here (it starts empty when another model is opened: the page keys this component on the model's id), and so do the test values of the sliders
@@ -433,6 +435,31 @@ export function ModelPane({ entry, models, makeId, onRemove, onDuplicate, onExpo
     openSlider: () => { setTab('ranges'); setRangeFilter('selection') },
     selectShape: id => choose({ kind: 'shape', id }),
     fallObject: (rangeId, objectId) => { applyEdit(addFallToObject(content, rangeId, objectId)) },
+    apartSlider: rangeId => { applyEdit(apartSlider(content, rangeId, makeId)) },
+    joinSides: rangeId => {
+      const e = joinSides(content, rangeId)
+      if (applyEdit(e)) setValues(vs => { const kept = new Set(e.ok ? e.content.ranges.map(r => r.id) : []); return Object.fromEntries(Object.entries(vs).filter(([k]) => kept.has(k))) })
+    },
+  }
+
+  // ---- hands (phase 5c) ----
+
+  const hands: HandActions = {
+    addFinger: (groupId, joints) => { applyEdit(addFinger(content, groupId, { joints, role: null }, makeId)) },
+    addThumb: groupId => { applyEdit(addThumb(content, groupId, {}, makeId)) },
+    addHand: groupId => { applyEdit(addHand(content, groupId, {}, makeId)) },
+    apartHand: groupId => { applyEdit(apartHand(content, groupId, makeId)) },
+    addPoses: groupId => { if (applyEdit(addHandPoses(content, groupId, makeId))) setTab('presets') },
+    addGrip: groupId => { const e = addGrip(content, groupId, makeId); if (applyEdit(e) && e.ok && e.gripId) test.setGrip(e.gripId) },
+    renameGrip: (id, name) => models.edit(entry.id, c => renameGrip(c, id, name), false),
+    stepGrip: (id, field, dir, big) => {
+      const g = gripsOf(content).find(x => x.id === id)
+      if (!g) return
+      commit(field === 'angle' ? stepGripAngle(content, id, dir, big) : moveGrip(content, id, g.x + (field === 'x' ? dir * (big ? 5 : 1) : 0), g.y + (field === 'y' ? dir * (big ? 5 : 1) : 0)), true)
+    },
+    mirrorGrip: id => { applyEdit(mirrorGrip(content, id, makeId)) },
+    removeGrip: id => { commit(removeGrip(content, id), true); if (test.grip === id) test.setGrip(null) },
+    holdGrip: test.setGrip,
   }
 
   // ---- proportions: bones, fit and frames ----
@@ -551,13 +578,22 @@ export function ModelPane({ entry, models, makeId, onRemove, onDuplicate, onExpo
   function poseBegin(grab: PoseGrab, world: [number, number], alt: boolean): boolean {
     if (recording) return false
     const sv = solved, p = toModel(sv, world[0], world[1]), start = valuesRef.current
-    const gid = grab.kind === 'part' ? groupOfShape(content, grab.shapeId) : grab.groupId
+    const gid = grab.kind === 'part' ? groupOfShape(content, grab.shapeId) : grab.kind === 'grip' ? undefined : grab.groupId
     const name = content.groups.find(g => g.id === gid)?.name.trim() || 'the group'
     if (grab.kind === 'scale') {
       const scale = gid ? beginScale(content, sv, start, gid, p) : null
       if (!scale || !gid) return false
       poseRef.current = { kind: 'scale', solved: sv, start, group: gid, scale }
       setPoseActive(gid); setPoseStatus(`Scaling ${name}.`)
+      return true
+    }
+    if (grab.kind === 'grip') {
+      const grip = gripsOf(content).find(g => g.id === grab.gripId), held = grip && gripGrab(grip)
+      if (!grip || !held) return false
+      if (reachJoints(content, held.groupId).length === 0) { setPoseStatus('Nothing bends to reach with this grip: give the arm Turn sliders.'); return false }
+      poseRef.current = { kind: 'reach', solved: sv, start, group: held.groupId, grab: held, current: start }
+      test.setGrip(grip.id)
+      setPoseActive(held.groupId); setPoseStatus(`Reaching with ${grip.name.trim() || 'the grip point'}.`)
       return true
     }
     if (grab.kind === 'slide') {
@@ -617,13 +653,23 @@ export function ModelPane({ entry, models, makeId, onRemove, onDuplicate, onExpo
     const n = presetsOf(content).filter(x => x.kind.trim().toLowerCase() === 'pose').length + 1
     if (applyEdit(savePreset(content, { ...test.state, hidden: [] }, `Pose ${n}`, 'Pose', makeId))) setPoseStatus(`Saved as the preset Pose ${n}. Rename it in the Presets tab.`)
   }
-  // what the pose mode shows on the canvas: a ring at the pivot of every group a drag can turn, a square on every group that has a Scale slider, a circle on
+  // what the pose mode shows on the canvas (a twin group shows its ring and square only when it has a slider of its own): a ring at the pivot of every group a drag can turn, a square on every group that has a Scale slider, a circle on
   // every anchor that a slider slides
+  // the grip points on the canvas: where each is now (carried by its hand) and the way it points; shown in Pose mode, in the Rig and Presets tabs, and while one is held
+  const gripMarks: GripMark[] | undefined = (() => {
+    const list = gripsOf(content)
+    if (list.length === 0 || !(poseMode || tab === 'rig' || tab === 'presets' || test.grip)) return undefined
+    return list.map(g => {
+      const at = gripAt(solved, g), a = (at.angle * Math.PI) / 180
+      const [x, y] = apply(solved.global, at.x, at.y), [tx, ty] = apply(solved.global, at.x + Math.sin(a) * 10, at.y + Math.cos(a) * 10)
+      return { id: g.id, name: g.name, x, y, tx, ty, active: test.grip === g.id }
+    })
+  })()
   const poseCanvas: PoseCanvas | null = poseMode && !recording && !through ? (() => {
     const at = (x: number, y: number) => apply(solved.global, x, y)
     const named = (id: string) => content.groups.find(g => g.id === id)?.name.trim() || 'the group'
-    const joints = content.groups.filter(g => !g.mirrorOf && turnDrivers(content, g.id).length > 0 && solved.pivots[g.id]).map(g => { const [x, y] = at(...solved.pivots[g.id]); return { id: g.id, name: named(g.id), x, y, active: poseActive === g.id } })
-    const scales = content.groups.filter(g => !g.mirrorOf && scaleDriver(content, g.id)).flatMap(g => {
+    const joints = content.groups.filter(g => turnDrivers(content, g.id).length > 0 && solved.pivots[g.id]).map(g => { const [x, y] = at(...solved.pivots[g.id]); return { id: g.id, name: named(g.id), x, y, active: poseActive === g.id } })
+    const scales = content.groups.filter(g => scaleDriver(content, g.id)).flatMap(g => {
       const boxes = g.objects.flatMap(oid => objectById(content, oid)?.shapes ?? []).map(id => solved.shapes[id]).filter(r => r?.visible).map(r => r.box)
       if (!boxes.length) return []
       return [{ id: g.id, name: named(g.id), x: Math.max(...boxes.map(b => b.x + b.w)), y: Math.max(...boxes.map(b => b.y + b.h)) }]
@@ -711,6 +757,8 @@ export function ModelPane({ entry, models, makeId, onRemove, onDuplicate, onExpo
     update: id => commit(updatePreset(content, id, test.state), true),
     rename: (id, name) => models.edit(entry.id, c => renamePreset(c, id, name), false),
     remove: id => commit(deletePreset(content, id), true),
+    addHandPoses: () => { applyEdit(addHandPoses(content, undefined, makeId)) },
+    setGrip: (id, gripId) => { applyEdit(setPresetGrip(content, id, gripId)) },
   }
 
   const colourActions: ColourActions = {
@@ -1038,7 +1086,7 @@ export function ModelPane({ entry, models, makeId, onRemove, onDuplicate, onExpo
             {empty && <p className="cmHint">No shape yet. Use New shape to start from a template, or the + beside a layer in the tree.</p>}
             <DesignerCanvas
               content={canvasContent} solved={solved} sel={sel} mode={mode} selPoint={selPoint} mirror={mirror} snap={snap} grid={grid} zoom={zoom} fitAll={fitAll} axis={content.axis}
-              editable={editable || (!!recording && !!selShape)} pivot={pivot} anchor={anchorSpot} pick={pick} onPick={onPick} onPickGroup={id => { if (bonePick && applyEdit(setBoneEnd(content, bonePick, { kind: 'group', id, i: 0 }))) setBonePick(null) }} pose={poseCanvas} ghost={ghost} colouring={colouring}
+              editable={editable || (!!recording && !!selShape)} pivot={pivot} anchor={anchorSpot} pick={pick} onPick={onPick} onPickGroup={id => { if (bonePick && applyEdit(setBoneEnd(content, bonePick, { kind: 'group', id, i: 0 }))) setBonePick(null) }} pose={poseCanvas} grips={gripMarks} ghost={ghost} colouring={colouring}
               frames={frameCanvas} through={throughFrame} weights={weights}
               linked={selShape ? selShape.pts.flatMap((pt, i) => (pt.bind ? [i] : [])) : []} onNudgeLink={nudgeLink} onPivot={movePivot} onPivotNudge={nudgePivot}
               onSelect={choose} onSelectPoint={setSelPoint}
@@ -1061,7 +1109,7 @@ export function ModelPane({ entry, models, makeId, onRemove, onDuplicate, onExpo
               onEditShape={editShape} onWeight={(i, dir) => setWeightAt(i, stepWeight(weightAt(i), dir))} bridge={bridgeSpots ? bridgeSpots.length : null}
               tab={tab} onTab={setTab}
               onAxis={(dir, big) => commit(setAxis(content, content.axis + dir * (big ? 5 : 1)), true)}
-              rigTab={<RigTab content={content} group={group} object={selObject} picking={pickOn} fitPicking={fitPick} actions={rigActions} pairs={pairs} fit={fit} />}
+              rigTab={<RigTab content={content} group={group} object={selObject} picking={pickOn} fitPicking={fitPick} actions={rigActions} pairs={pairs} fit={fit} hands={hands} held={test.grip} />}
               rangesTab={<RangesTab content={content} sel={sel} group={group} values={values} recording={recording} scrubbing={scrubbing} filter={rangeFilter} onFilter={setRangeFilter} actions={rigActions} />}
               formsTab={<FormsTab content={content} sel={sel} state={test.state} actions={forms} presets={presets} colouring={colouring} />}
               presetsTab={<PresetsTab content={content} state={test.state} actions={presets} />}

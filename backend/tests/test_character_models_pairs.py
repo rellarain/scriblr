@@ -160,7 +160,7 @@ def test_a_twin_of_nothing_or_of_a_twin_or_of_itself_is_refused(client: TestClie
     assert "Group Arm (twin) is a twin of itself." in refused(client, c)
 
 
-def test_a_slider_may_not_drive_a_twin(client: TestClient) -> None:
+def test_a_slider_may_turn_or_scale_a_twin_group_but_not_move_a_twin_shape(client: TestClient) -> None:
     c = twins(ranges=[
         {"id": "r1", "name": "Raise", "min": 0, "rest": 0, "max": 10, "drives": [
             {"kind": "turn", "group": "g_arm2", "atMax": 5},
@@ -169,9 +169,13 @@ def test_a_slider_may_not_drive_a_twin(client: TestClient) -> None:
         ]},
     ])
     detail = refused(client, c)
-    assert "Slider Raise turns a group that is a twin; turn the original instead." in detail
+    # a twin group may have drives of its own (the two sides are posed apart); a twin shape has no points to move
+    assert "turns a group that is a twin" not in detail
     assert "Slider Raise scales a twin; scale the original instead." in detail
     assert "Slider Raise moves a shape that is a twin; move the original instead." in detail
+    twin_group = twins(ranges=[{"id": "r1", "name": "Raise", "min": 0, "rest": 0, "max": 10, "drives": [{"kind": "turn", "group": "g_arm2", "atMax": 5}, {"kind": "scale", "target": "group", "id": "g_arm2"}]}])
+    save(client, {"id": "m2", "draft": twin_group})
+    assert client.post("/api/character-models/m2/publish").status_code == 200
 
 
 def test_a_group_may_be_attached_to_a_point_of_a_twin_shape(client: TestClient) -> None:

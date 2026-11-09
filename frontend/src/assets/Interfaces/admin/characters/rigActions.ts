@@ -40,6 +40,26 @@ export interface RigActions {
   // Select a shape (from the list of shapes a slider fades), and let every weighted shape of an object fall with a slider (phase 5b).
   selectShape: (id: string) => void
   fallObject: (rangeId: string, objectId: string) => void
+  // Two sides apart (phase 5c): give the twin groups of a slider's turns and scales a slider of their own, or take it away again.
+  apartSlider: (rangeId: string) => void
+  joinSides: (rangeId: string) => void
+}
+
+// Phase 5c: hands. Fingers, a thumb or a whole hand hung from the bottom of a group, the other hand posed on its own, the starter hand poses, and the grip points
+// where a held item is taken (with the one a pose holds shown on the canvas).
+export interface HandActions {
+  addFinger: (groupId: string, joints: 2 | 3) => void
+  addThumb: (groupId: string) => void
+  addHand: (groupId: string) => void
+  apartHand: (groupId: string) => void
+  addPoses: (groupId: string) => void
+  addGrip: (groupId: string) => void
+  renameGrip: (id: string, name: string) => void
+  stepGrip: (id: string, field: 'x' | 'y' | 'angle', dir: -1 | 1, big: boolean) => void
+  mirrorGrip: (id: string) => void
+  removeGrip: (id: string) => void
+  // The grip point shown as held now (null: none); a pose that names one does this when it is applied.
+  holdGrip: (id: string | null) => void
 }
 
 // Phase 2b: pairs, point links and the back view.

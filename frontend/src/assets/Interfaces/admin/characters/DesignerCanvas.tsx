@@ -32,7 +32,10 @@ export interface PivotMarker {
 
 // Pose mode: the figure is grabbed instead of edited. The page decides what a grab does (turn a group, scale one, slide an anchor, reach with a limb) and
 // answers whether a drag began; the canvas only passes the pointer on, and draws the markers it is given (in canvas space).
-export type PoseGrab = { kind: 'part'; shapeId: string } | { kind: 'scale'; groupId: string } | { kind: 'slide'; groupId: string }
+export type PoseGrab = { kind: 'part'; shapeId: string } | { kind: 'scale'; groupId: string } | { kind: 'slide'; groupId: string } | { kind: 'grip'; gripId: string }
+// A grip point of a hand (phase 5c), where a held item is taken: its place and the end of the short line showing the way the item points (canvas space). In Pose mode
+// it is grabbed: dragging it reaches with the arm.
+export interface GripMark { id: string; name: string; x: number; y: number; tx: number; ty: number; active: boolean }
 export interface PoseMark { id: string; name: string; x: number; y: number }
 export interface PoseCanvas {
   joints: Array<PoseMark & { active: boolean }>
@@ -82,6 +85,8 @@ export interface CanvasProps {
   anchor?: [number, number] | null
   // Pose mode (see above): null or missing is the ordinary editor.
   pose?: PoseCanvas | null
+  // The grip points to show (missing: none are drawn).
+  grips?: GripMark[]
   // The colours of the test character: what each shape is filled with (missing: every shape in the neutral gray).
   colouring?: Colouring
   // Draw, dashed behind each shape of a class member that has an outline of its own, the outline of the pattern it would otherwise follow.
@@ -222,6 +227,10 @@ export function DesignerCanvas(p: CanvasProps) {
     e.stopPropagation()
     if (e.button !== 0 || !p.pose) return
     if (p.pose.onDown(grab, toWorld(e), false)) { dragRef.current = { kind: 'pose' }; capture(e) }
+  }
+  function onGripDown(e: ReactPointerEvent, grab: PoseGrab) {
+    if (!p.pose) return
+    onPoseHandleDown(e, grab)
   }
   function onFrameDown(e: ReactPointerEvent, f: FrameMark, handle: FrameHandle | 'move') {
     e.stopPropagation()
@@ -427,6 +436,16 @@ export function DesignerCanvas(p: CanvasProps) {
       ))}
       {p.pose && p.pose.scales.map(m => (
         <rect key={m.id} x={m.x - 4.5 * u} y={m.y - 4.5 * u} width={9 * u} height={9 * u} role="button" tabIndex={-1} aria-label={`Scale ${m.name}`} className="cmScaleHandle" onPointerDown={e => onPoseHandleDown(e, { kind: 'scale', groupId: m.id })} />
+      ))}
+      {p.grips && !through && p.grips.map(g => (
+        <g
+          key={g.id} className={`cmGrip${g.active ? ' cmGrip--on' : ''}${p.pose ? ' cmGrip--live' : ''}`} data-grip={g.id}
+          {...(p.pose ? { role: 'button', tabIndex: -1, 'aria-label': `Reach with ${g.name.trim() || 'the grip point'}`, onPointerDown: (e: ReactPointerEvent) => onGripDown(e, { kind: 'grip', gripId: g.id }) } : { 'aria-hidden': true })}
+        >
+          <circle cx={g.x} cy={g.y} r={8 * u} className="cmGripHit" />
+          <line x1={g.x} y1={g.y} x2={g.tx} y2={g.ty} className="cmGripLine" />
+          <circle cx={g.x} cy={g.y} r={3.5 * u} className="cmGripDot" />
+        </g>
       ))}
       {anchor && !p.pose && !through && <rect x={anchor[0] - 3.5 * u} y={anchor[1] - 3.5 * u} width={7 * u} height={7 * u} transform={`rotate(45 ${anchor[0]} ${anchor[1]})`} className="cmAnchor" aria-hidden="true" />}
       {pivot && !p.pose && !through && (

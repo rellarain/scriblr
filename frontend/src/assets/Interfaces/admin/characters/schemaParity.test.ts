@@ -3,7 +3,7 @@ import { readFileSync } from 'node:fs'
 import path from 'node:path'
 import { describe, expect, it } from 'vitest'
 import { LIMITS } from './engine/limits'
-import { AXIS_RANGE, DESCRIPTION_MAX, FRAME_BIGGEST, FRAME_MIN, KIND_MAX, NAME_MAX, RANGE_NAME_MAX, SWATCH_NAME_MAX, TILE_DEFAULT } from './modelContent'
+import { AXIS_RANGE, DESCRIPTION_MAX, ROLE_MAX, FRAME_BIGGEST, FRAME_MIN, KIND_MAX, NAME_MAX, RANGE_NAME_MAX, SWATCH_NAME_MAX, TILE_DEFAULT } from './modelContent'
 
 // The backend validates a model with extra='ignore', so a field the frontend sends that the schema does not know is dropped without a word. These
 // tests read schema.py and api/types.ts side by side so the two cannot drift apart unnoticed, and check the limits are the same numbers.
@@ -36,7 +36,7 @@ describe('the model types match the backend schema', () => {
     ['ModelOverride', 'ModelOverride'], ['ModelForm', 'ModelForm'], ['ModelAxis', 'ModelAxis'], ['ModelPreset', 'ModelPreset'], ['ModelClass', 'ModelClass'],
     ['ModelGenre', 'ModelGenre'], ['ModelSwatch', 'ModelSwatch'], ['ModelColour', 'ModelColour'], ['ModelSlot', 'ModelSlot'],
     ['ModelTint', 'ModelTint'], ['ModelGradient', 'ModelGradient'], ['ModelLook', 'ModelLook'], ['ModelFade', 'ModelFade'],
-    ['ModelBone', 'ModelBone'], ['ModelBoneEnd', 'ModelBoneEnd'], ['ModelFrame', 'ModelFrame'],
+    ['ModelBone', 'ModelBone'], ['ModelBoneEnd', 'ModelBoneEnd'], ['ModelFrame', 'ModelFrame'], ['ModelGrip', 'ModelGrip'],
   ]
   for (const [python, ts] of pairs) {
     it(`${ts} has the fields of ${python}`, () => {
@@ -78,6 +78,10 @@ describe('the limits are the backend\'s numbers', () => {
   })
   it('for the rig: the pivot chain, sliders, what a slider drives and the length of the name of a slider', () => {
     expect(LIMITS.chainMax).toBe(number('MODEL_CHAIN_MAX'))
+    expect(LIMITS.chainWarn).toBe(number('MODEL_CHAIN_WARN'))
+    expect(LIMITS.gripsWarn).toBe(number('MODEL_GRIPS_WARN'))
+    expect(LIMITS.gripsMax).toBe(number('MODEL_GRIPS_MAX'))
+    expect(ROLE_MAX).toBe(number('MODEL_ROLE_MAX'))
     expect(LIMITS.rangesWarn).toBe(number('MODEL_RANGES_WARN'))
     expect(LIMITS.rangesMax).toBe(number('MODEL_RANGES_MAX'))
     expect(LIMITS.drivesWarn).toBe(number('MODEL_DRIVES_WARN'))

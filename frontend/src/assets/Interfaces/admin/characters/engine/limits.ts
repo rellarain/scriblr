@@ -11,10 +11,11 @@ export const LIMITS = {
   shapesPerObjectMax: 72,
   copyWarnBytes: 150 * 1024,
   copyMaxBytes: 250 * 1024,
-  // the rig: a pivot chain of at most 6 groups (refused above it); sliders per model and what one slider drives
-  chainMax: 6,
-  rangesWarn: 40,
-  rangesMax: 80,
+  // the rig: a pivot chain of at most 9 groups (refused above it, a warning above 6: torso, arm, forearm, hand and three finger joints is 7); sliders per model and what one slider drives
+  chainWarn: 6,
+  chainMax: 9,
+  rangesWarn: 60,
+  rangesMax: 120,
   drivesWarn: 12,
   drivesMax: 24,
   // point links (a point welded to, following or locked to the edge of another shape), counted over the whole model; more than the most is refused at Publish
@@ -52,10 +53,13 @@ export const LIMITS = {
   framesWarn: 8,
   framesMax: 16,
   frameHideMax: 100,
+  // hands: grip points per model (the stops are the server's max_lengths)
+  gripsWarn: 8,
+  gripsMax: 16,
   // how many of each a model may hold (the server's caps)
   shapesMax: 600,
   objectsMax: 200,
-  groupsMax: 60,
+  groupsMax: 120,
 } as const
 
 export type LimitLevel = 'ok' | 'warn' | 'stop'
@@ -130,14 +134,23 @@ export function limitNotes(content: ModelContent): LimitNote[] {
   }
   const bones = (content.bones ?? []).length
   add(level(bones, LIMITS.bonesWarn, LIMITS.bonesMax), `The model has ${bones} bones: the warning starts above ${LIMITS.bonesWarn}.`, `The model has ${bones} bones: the limit is ${LIMITS.bonesMax}.`)
+  const grips = (content.grips ?? []).length
+  add(level(grips, LIMITS.gripsWarn, LIMITS.gripsMax), `The model has ${grips} grip points: the warning starts above ${LIMITS.gripsWarn}.`, `The model has ${grips} grip points: the limit is ${LIMITS.gripsMax}.`)
   const frames = (content.frames ?? []).length
   add(level(frames, LIMITS.framesWarn, LIMITS.framesMax), `The model has ${frames} frames: the warning starts above ${LIMITS.framesWarn}.`, `The model has ${frames} frames: the limit is ${LIMITS.framesMax}.`)
   const links = linkCount(content)
   if (links > LIMITS.linksWarn) notes.push({ level: links > LIMITS.linksMax ? 'stop' : 'warn', text: links > LIMITS.linksMax ? `The model has ${links} point links: the limit is ${LIMITS.linksMax}, so it cannot be published.` : `The model has ${links} point links: the warning starts above ${LIMITS.linksWarn}.` })
+  // a chain too long is named group by group; more than a few that are deep (the fingers of a hand) are said once, with the deepest
+  const deep: Array<{ name: string; depth: number }> = []
   for (const g of content.groups) {
     const depth = chainDepth(content, g.id), name = g.name || g.id
     if (depth > LIMITS.chainMax) notes.push({ level: 'stop', text: `${name} is ${depth} levels deep: a pivot chain may have at most ${LIMITS.chainMax}, so it cannot be published.` })
-    else if (depth === LIMITS.chainMax) notes.push({ level: 'warn', text: `${name} is ${depth} levels deep, the most a pivot chain may have.` })
+    else if (depth > LIMITS.chainWarn) deep.push({ name, depth })
+  }
+  if (deep.length <= 3) for (const d of deep) notes.push({ level: 'warn', text: `${d.name} is ${d.depth} levels deep: the warning starts above ${LIMITS.chainWarn} (the most is ${LIMITS.chainMax}).` })
+  else {
+    const deepest = deep.reduce((a, b) => (b.depth > a.depth ? b : a))
+    notes.push({ level: 'warn', text: `${deep.length} groups are more than ${LIMITS.chainWarn} levels deep (the deepest is ${deepest.name}, ${deepest.depth} levels): the warning starts above ${LIMITS.chainWarn} (the most is ${LIMITS.chainMax}).` })
   }
   const bytes = copyBytes(content)
   const kb = Math.round(bytes / 102.4) / 10

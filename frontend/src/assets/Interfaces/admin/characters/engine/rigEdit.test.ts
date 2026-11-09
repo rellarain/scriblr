@@ -48,22 +48,21 @@ describe('hanging groups from each other', () => {
     expect(reparent(c, 'headG', 'ghost').ok).toBe(false)
     expect(reparent(c, 'ghost', 'torso').ok).toBe(false)
   })
-  it('allows a chain of six and refuses a seventh level', () => {
-    let c: ModelContent = { ...figure(), groups: Array.from({ length: 7 }, (_, i) => g(`g${i}`, null, [])) }
-    for (let i = 1; i < 6; i++) c = ok(reparent(c, `g${i}`, `g${i - 1}`))
-    const refused = reparent(c, 'g6', 'g5')
+  it('allows a chain as deep as the limit and refuses one more level', () => {
+    const most = LIMITS.chainMax
+    let c: ModelContent = { ...figure(), groups: Array.from({ length: most + 1 }, (_, i) => g(`g${i}`, null, [])) }
+    for (let i = 1; i < most; i++) c = ok(reparent(c, `g${i}`, `g${i - 1}`))
+    const refused = reparent(c, `g${most}`, `g${most - 1}`)
     expect(refused.ok).toBe(false)
-    expect(!refused.ok && refused.reason).toBe(`That would make a pivot chain 7 groups long; the most is ${LIMITS.chainMax}.`)
+    expect(!refused.ok && refused.reason).toBe(`That would make a pivot chain ${most + 1} groups long; the most is ${most}.`)
   })
   it('counts what hangs below the group it moves', () => {
-    let c: ModelContent = { ...figure(), groups: Array.from({ length: 8 }, (_, i) => g(`g${i}`, null, [])) }
-    for (let i = 1; i < 4; i++) c = ok(reparent(c, `g${i}`, `g${i - 1}`))   // g0 > g1 > g2 > g3
-    for (let i = 5; i < 8; i++) c = ok(reparent(c, `g${i}`, `g${i - 1}`))   // g4 > g5 > g6 > g7
-    expect(reparent(c, 'g4', 'g3').ok).toBe(false)                          // 4 + 4 = 8
-    c = ok(reparent(c, 'g7', null))                                         // g4 > g5 > g6
-    expect(reparent(c, 'g4', 'g3').ok).toBe(false)                          // 4 + 3 = 7
-    c = ok(reparent(c, 'g6', null))                                         // g4 > g5
-    expect(reparent(c, 'g4', 'g3').ok).toBe(true)                           // 4 + 2 = 6
+    let c: ModelContent = { ...figure(), groups: Array.from({ length: 10 }, (_, i) => g(`g${i}`, null, [])) }
+    for (let i = 1; i < 5; i++) c = ok(reparent(c, `g${i}`, `g${i - 1}`))   // g0 > g1 > g2 > g3 > g4
+    for (let i = 6; i < 10; i++) c = ok(reparent(c, `g${i}`, `g${i - 1}`))  // g5 > g6 > g7 > g8 > g9
+    expect(reparent(c, 'g5', 'g4').ok).toBe(false)                          // 5 + 5 = 10
+    c = ok(reparent(c, 'g9', null))                                         // g5 > g6 > g7 > g8
+    expect(reparent(c, 'g5', 'g4').ok).toBe(true)                           // 5 + 4 = 9
   })
   it('drops the anchor when its shape is no longer in the parent or above, and says so', () => {
     let c = ok(reparent(figure(), 'headG', 'torso'))
@@ -259,16 +258,28 @@ describe('the mirror line and the limit notes', () => {
   it('holds the mirror line between 40 and 160', () => {
     expect(setAxis(figure(), 12).axis).toBe(40); expect(setAxis(figure(), 400).axis).toBe(160); expect(setAxis(figure(), 97.456).axis).toBe(97.46); expect(setAxis(figure(), NaN).axis).toBe(100)
   })
-  it('warn above 40 sliders and stop at 80, 12 and 24 drives, and say when a chain is as long as it may be', () => {
+  it('warn above 60 sliders and stop at 120, 12 and 24 drives, and say when a chain is deeper than 6 and than the limit', () => {
     let c = figure()
-    for (let i = 0; i < 41; i++) c = ok(addRange(c, newRange(`s${i}`, `S${i}`, 'turn')))
-    expect(limitNotes(c).some(n => n.level === 'warn' && /41 sliders/.test(n.text))).toBe(true)
+    for (let i = 0; i < 61; i++) c = ok(addRange(c, newRange(`s${i}`, `S${i}`, 'turn')))
+    expect(limitNotes(c).some(n => n.level === 'warn' && /61 sliders/.test(n.text))).toBe(true)
     let d = withRange(figure())
     for (let i = 0; i < 13; i++) d = ok(addTurn(d, 'r1', 'headG'))
     expect(limitNotes(d).some(n => n.level === 'warn' && /13 things/.test(n.text))).toBe(true)
     let chain: ModelContent = { ...figure(), groups: Array.from({ length: 6 }, (_, i) => g(`g${i}`, i ? `g${i - 1}` : null, [])) }
-    expect(limitNotes(chain).some(n => n.level === 'warn' && /6 levels deep/.test(n.text))).toBe(true)
+    expect(limitNotes(chain).some(n => /levels deep/.test(n.text))).toBe(false)
     chain = { ...chain, groups: [...chain.groups, g('g6', 'g5', [])] }
-    expect(limitNotes(chain).some(n => n.level === 'stop' && /7 levels deep/.test(n.text))).toBe(true)
+    expect(limitNotes(chain).some(n => n.level === 'warn' && /7 levels deep/.test(n.text))).toBe(true)
+    chain = { ...chain, groups: [...chain.groups, g('g7', 'g6', []), g('g8', 'g7', []), g('g9', 'g8', [])] }
+    expect(limitNotes(chain).some(n => n.level === 'stop' && /10 levels deep/.test(n.text))).toBe(true)
+  })
+  it('say it once when many groups (the fingers of a hand) are deeper than 6', () => {
+    const base: ModelContent = { ...figure(), groups: Array.from({ length: 6 }, (_, i) => g(`g${i}`, i ? `g${i - 1}` : null, [])) }
+    const fingers = ['a', 'b', 'c', 'd'].map(id => g(id, 'g5', []))
+    const notes = limitNotes({ ...base, groups: [...base.groups, ...fingers] }).filter(n => /levels deep|levels\)/.test(n.text))
+    expect(notes).toHaveLength(1)
+    expect(notes[0]).toMatchObject({ level: 'warn' })
+    expect(notes[0].text).toMatch(/^4 groups are more than 6 levels deep \(the deepest is a, 7 levels\)/)
+    // three or fewer are named one by one
+    expect(limitNotes({ ...base, groups: [...base.groups, ...fingers.slice(0, 3)] }).filter(n => /7 levels deep/.test(n.text))).toHaveLength(3)
   })
 })

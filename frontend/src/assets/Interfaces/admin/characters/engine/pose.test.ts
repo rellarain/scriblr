@@ -325,9 +325,9 @@ describe('reaching with a limb', () => {
     expect(reach(twin, {}, 'front', grabPoint(sol, tg.id, [0, 0]), [10, 10]).values).toEqual({})
   })
 
-  it('uses at most four joints', () => {
+  it('uses at most six joints', () => {
     let c: ModelContent = { ...blankContent('Chain'), shapes: [], objects: [], groups: [] }
-    const ids = ['g0', 'g1', 'g2', 'g3', 'g4', 'g5']
+    const ids = ['g0', 'g1', 'g2', 'g3', 'g4', 'g5', 'g6', 'g7']
     c = { ...c, shapes: ids.map((id, i) => sharp(`s${i}`, [[100 + i * 30, 50], [120 + i * 30, 50], [120 + i * 30, 60], [100 + i * 30, 60]])) }
     c = { ...c, objects: ids.map((id, i) => ({ id: `o${i}`, name: id, layer: 'body' as const, shapes: [`s${i}`] })) }
     c = { ...c, groups: ids.map((id, i) => newGroup(id, id, i ? ids[i - 1] : null, [`o${i}`])) }
@@ -337,11 +337,12 @@ describe('reaching with a limb', () => {
       c = must(addTurn(c, `r_${id}`, id))
       c = { ...c, ranges: c.ranges.map(r => (r.id === `r_${id}` ? { ...r, drives: r.drives.map(d => ({ ...d, atMin: -90, atMax: 90 })) } : r)) }
     }
-    const sol = solve(c, {}), grab = grabPoint(sol, 'g5', [sol.shapes.s5.box.x + 10, 55])
+    const sol = solve(c, {}), grab = grabPoint(sol, 'g7', [sol.shapes.s7.box.x + 10, 55])
     const got = reach(c, {}, 'front', grab, [100, 300])
     const changed = Object.entries(got.values).filter(([, v]) => v !== 0).map(([k]) => k).sort()
     expect(changed.length).toBeGreaterThan(0)
-    expect(changed.every(k => ['r_g5', 'r_g4', 'r_g3', 'r_g2'].includes(k))).toBe(true)
+    expect(changed.every(k => ['r_g7', 'r_g6', 'r_g5', 'r_g4', 'r_g3', 'r_g2'].includes(k))).toBe(true)
+    expect(reachJoints(c, 'g7').map(j => j.group.id)).toEqual(['g7', 'g6', 'g5', 'g4', 'g3', 'g2'])
   })
 
   it('gives finite values for any target', () => {

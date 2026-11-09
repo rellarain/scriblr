@@ -1,9 +1,9 @@
 import type {
-  ModelAxis, ModelBind, ModelBlend, ModelBone, ModelClass, ModelColour, ModelContent, ModelDrive, ModelFade, ModelFallSide, ModelForm, ModelFrame, ModelGenre, ModelGradDir, ModelGradient, ModelGroup, ModelLook, ModelMove, ModelObject, ModelOverride, ModelPoint,
+  ModelAxis, ModelBind, ModelBlend, ModelBone, ModelClass, ModelColour, ModelContent, ModelDrive, ModelFade, ModelFallSide, ModelForm, ModelFrame, ModelGenre, ModelGrip, ModelGradDir, ModelGradient, ModelGroup, ModelLook, ModelMove, ModelObject, ModelOverride, ModelPoint,
   ModelPreset, ModelRange, ModelShape, ModelSlot, ModelSwatch, ModelTint, ModelTintKind,
 } from '../../../../api/types'
 import { LIMITS } from './engine/limits'
-import { FALL_SIDES, FRAME_BIGGEST, FRAME_MIN, KIND_MAX, SWATCH_NAME_MAX, TILE_DEFAULT, TINT_RANGE, TONE_RANGE, blankContent, normalizeContent, repairLooks } from './modelContent'
+import { FALL_SIDES, ROLE_MAX, FRAME_BIGGEST, FRAME_MIN, KIND_MAX, SWATCH_NAME_MAX, TILE_DEFAULT, TINT_RANGE, TONE_RANGE, blankContent, normalizeContent, repairLooks } from './modelContent'
 
 // The file Export writes and Import reads: JSON with a marker and a version, and the models' content as it is (a shape, object, group or slider keeps its
 // id: the ids only mean something inside one model). Everything read is held to what the server accepts, so one bad model can never make the whole save
@@ -20,7 +20,7 @@ export interface ModelImport {
   skipped: string[]
 }
 
-const MOST = { shapes: 600, objects: 200, groups: 60 } as const
+const MOST = { shapes: 600, objects: 200, groups: LIMITS.groupsMax } as const
 const ID = /^[A-Za-z0-9_.-]{1,80}$/
 const MODES = ['c', 's', 'cs', 'sc']
 
@@ -128,6 +128,7 @@ function range(v: Record<string, unknown>, id: string): ModelRange {
   const rand = pair(v.rand) ? ((): [number, number] => { const [a, b] = v.rand as [number, number]; const lo = Math.min(a, b), hi = Math.max(a, b); return [Math.max(min, Math.min(max, lo)), Math.max(min, Math.min(max, hi))] })() : null
   return {
     id, name: text(v.name), scope: idOrNull(v.scope), min, rest, max, unit: v.unit === '°' || v.unit === '%' ? v.unit : '', show: v.show !== false, rand,
+    role: typeof v.role === 'string' && v.role.trim() ? v.role.trim().slice(0, ROLE_MAX) : null,
     limit: Array.isArray(v.limit) && v.limit.length === 2 && v.limit.every(x => typeof x === 'number') ? [v.limit[0] as number, v.limit[1] as number] : null,
     drives: list(v.drives).map(drive).filter((d): d is ModelDrive => d !== null),
   }
@@ -190,7 +191,7 @@ function preset(v: Record<string, unknown>, id: string): ModelPreset {
   const forms: Record<string, string> = {}
   if (isRecord(v.forms)) for (const [k, x] of Object.entries(v.forms)) if (k.length >= 3 && k.length <= 170 && idOf(x) && Object.keys(forms).length < LIMITS.presetFormsMax) forms[k] = x as string
   const hidden = [...new Set(list(v.hidden).map(idOf).filter((x): x is string => x !== null))].slice(0, 100)
-  return { id, name: text(v.name), kind: text(v.kind).trim().slice(0, KIND_MAX) || 'Pose', values, hidden, scope: idOrNull(v.scope), forms, fall: FALL_SIDES.includes(v.fall as ModelFallSide) ? (v.fall as ModelFallSide) : null }
+  return { id, name: text(v.name), kind: text(v.kind).trim().slice(0, KIND_MAX) || 'Pose', values, hidden, scope: idOrNull(v.scope), forms, fall: FALL_SIDES.includes(v.fall as ModelFallSide) ? (v.fall as ModelFallSide) : null, grip: idOrNull(v.grip) }
 }
 
 function modelClass(v: Record<string, unknown>, id: string): ModelClass | null {
@@ -216,6 +217,10 @@ function bone(v: Record<string, unknown>, id: string): ModelBone | null {
   const start = idOf(v.start), end = isRecord(v.end) ? v.end : null, endId = end ? idOf(end.id) : null
   if (!start || !end || !endId) return null
   return { id, name: text(v.name).trim().slice(0, 40), start, end: { kind: end.kind === 'point' ? 'point' : 'group', id: endId, i: Math.round(num(end.i, 0, 0, LIMITS.pointsMax - 1)) } }
+}
+// A grip point the server would accept (phase 5c).
+function grip(v: Record<string, unknown>, id: string): ModelGrip {
+  return { id, name: text(v.name).trim().slice(0, 40), group: idOrNull(v.group), x: num(v.x, 100, -50, 250), y: num(v.y, 200, -50, 450), angle: num(v.angle, 0, -180, 180) }
 }
 function frame(v: Record<string, unknown>, id: string): ModelFrame {
   return {
@@ -294,6 +299,7 @@ export function parseModelFile(source: string): ModelImport {
       bones: withIds(list(m.bones), bone),
       headBone: idOrNull(m.headBone),
       frames: withIds(list(m.frames), frame),
+      grips: withIds(list(m.grips), grip),
       tile: typeof m.tile === 'string' && /^#[0-9a-fA-F]{6}$/.test(m.tile) ? m.tile.toLowerCase() : TILE_DEFAULT,
     }))
   })

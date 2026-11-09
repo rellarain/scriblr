@@ -6,7 +6,7 @@ import { framesOf, hiddenThrough, viewBoxOf } from './engine/frames'
 import { drawable, paintDefs, paintShapes } from './engine/paint'
 import { previewSpecs, previewTransform, type PreviewMode } from './engine/previews'
 import type { Box } from './engine/geometry'
-import { defaultValues, solve } from './engine/rig'
+import { defaultValues, descendantsOf, solve } from './engine/rig'
 import { TILE_DEFAULT, outlineSize } from './modelContent'
 import { PaintDefs, PaintedPath, useSvgPrefix } from './PaintedPath'
 
@@ -24,7 +24,13 @@ export function PreviewStrip({ content, sel, view = 'front', tile = TILE_DEFAULT
   const [mode, setMode] = useState<PreviewMode>('rand')
   const [size, setSize] = useState<(typeof SIZES)[number]['id']>('M')
   // what is drawn: the selection (or the whole model), each tile with its own slider values
-  const ids = useMemo(() => new Set((sel.kind === 'none' || frame ? content.shapes : shapesOf(content, sel)).filter(s => outlineSize(content, s) >= 3).map(s => s.id)), [content, sel, frame])
+  // (a selected group is drawn with everything hung from it: a hand with its fingers)
+  const ids = useMemo(() => {
+    const scoped = sel.kind === 'none' || frame ? content.shapes
+      : sel.kind === 'group' ? [sel.id, ...descendantsOf(content, sel.id)].flatMap(id => shapesOf(content, { kind: 'group', id }))
+      : shapesOf(content, sel)
+    return new Set(scoped.filter(s => outlineSize(content, s) >= 3).map(s => s.id))
+  }, [content, sel, frame])
   const specs = useMemo(() => previewSpecs(seed, mode, 6, content.ranges, content), [seed, mode, content])
   // a selected pattern, or a member of a family that a preview would not choose, is drawn all the same
   const show = useMemo(() => showFor(content, sel), [content, sel])

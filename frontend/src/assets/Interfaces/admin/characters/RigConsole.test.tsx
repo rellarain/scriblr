@@ -94,7 +94,7 @@ describe('the Rig tab', () => {
     await user.click(groupRow('Face'))
     await user.click(tab('Rig'))
     expect(screen.getByLabelText('Chain of groups')).toHaveTextContent('Body › Face')
-    expect(screen.getByText(/Level 2 of 6 in the pivot chain/)).toBeInTheDocument()
+    expect(screen.getByText(/Level 2 of 9 in the pivot chain/)).toBeInTheDocument()
     expect(screen.getByRole('combobox', { name: 'Parent group' })).toHaveValue('gB')
     expect(screen.getByRole('button', { name: 'Edge spot' })).toHaveAttribute('aria-pressed', 'true')
     expect(screen.getByRole('combobox', { name: 'Shape it is fixed to' })).toHaveValue('neck')
@@ -106,7 +106,7 @@ describe('the Rig tab', () => {
     await user.click(groupRow('Arm'))
     await user.click(tab('Rig'))
     await user.selectOptions(screen.getByRole('combobox', { name: 'Parent group' }), 'gF')
-    expect(screen.getByText(/Level 3 of 6 in the pivot chain/)).toBeInTheDocument()
+    expect(screen.getByText(/Level 3 of 9 in the pivot chain/)).toBeInTheDocument()
     await save(user)
     await waitFor(() => expect(savedGroup(backend, 'gA').parent).toBe('gF'))
     expect(savedGroup(backend, 'gA').attach).toMatchObject({ shape: 'chest' })      // the chest is in Body, which is still above it
@@ -121,16 +121,16 @@ describe('the Rig tab', () => {
     expect(options).toEqual(['Nothing (the root)'])                      // every other group hangs below it
   })
 
-  it('refuses a seventh level of the chain and says so', async () => {
+  it('refuses a tenth level of the chain and says so', async () => {
     let c = figure()
-    for (let i = 0; i < 4; i++) { c = addGroup(c, newGroup(`x${i}`, `Level ${i + 3}`)); c = must(reparent(c, `x${i}`, i ? `x${i - 1}` : 'gF')) }   // Body > Face > Level 3..6
+    for (let i = 0; i < 7; i++) { c = addGroup(c, newGroup(`x${i}`, `Level ${i + 3}`)); c = must(reparent(c, `x${i}`, i ? `x${i - 1}` : 'gF')) }   // Body > Face > Level 3..9
     c = addGroup(c, newGroup('top', 'One too many'))
     const { user } = await open([draftEntry('a', c)])
     await user.click(screen.getByRole('button', { name: 'Rig' }))          // a group with no object is only in the Rig view of the tree
     await user.click(groupRow('One too many'))
     await user.click(tab('Rig'))
-    await user.selectOptions(screen.getByRole('combobox', { name: 'Parent group' }), 'x3')
-    expect(screen.getByText(/That would make a pivot chain 7 groups long; the most is 6/)).toBeInTheDocument()
+    await user.selectOptions(screen.getByRole('combobox', { name: 'Parent group' }), 'x6')
+    expect(screen.getByText(/That would make a pivot chain 10 groups long; the most is 9/)).toBeInTheDocument()
     expect(screen.getByRole('combobox', { name: 'Parent group' })).toHaveValue('')
   })
 
@@ -481,8 +481,8 @@ describe('the tree', () => {
     expect(rig.getByRole('button', { name: 'Body' })).toBeInTheDocument()
     expect(rig.getByRole('button', { name: 'Face' })).toBeInTheDocument()
     expect(rig.getByRole('button', { name: 'Arm' })).toBeInTheDocument()
-    expect(rig.getByTitle('Level 1 of 6 in the pivot chain')).toHaveTextContent('1')
-    expect(rig.getAllByTitle('Level 2 of 6 in the pivot chain')).toHaveLength(2)
+    expect(rig.getByTitle('Level 1 of 9 in the pivot chain')).toHaveTextContent('1')
+    expect(rig.getAllByTitle('Level 2 of 9 in the pivot chain')).toHaveLength(2)
     await user.click(rig.getByRole('button', { name: 'Fold Body' }))
     expect(rig.queryByRole('button', { name: 'Face' })).toBeNull()
     await user.click(rig.getByRole('button', { name: 'Open Body' }))
@@ -497,10 +497,10 @@ describe('the tree', () => {
     const armGrip = () => screen.getByRole('button', { name: 'Move Arm to another parent (Alt+Right or Left)' })
     armGrip().focus()
     await user.keyboard('{Alt>}{ArrowRight}{/Alt}')                        // Arm now hangs from Face, the group above it
-    expect(tree().getAllByTitle('Level 3 of 6 in the pivot chain')).toHaveLength(1)
+    expect(tree().getAllByTitle('Level 3 of 9 in the pivot chain')).toHaveLength(1)
     armGrip().focus()
     await user.keyboard('{Alt>}{ArrowLeft}{/Alt}')
-    expect(tree().queryByTitle('Level 3 of 6 in the pivot chain')).toBeNull()
+    expect(tree().queryByTitle('Level 3 of 9 in the pivot chain')).toBeNull()
     await save(user)
     await waitFor(() => expect(savedGroup(backend, 'gA').parent).toBe('gB'))
   })
@@ -519,13 +519,13 @@ describe('the tree', () => {
     held.moveTo(50, 50)
     expect(row('Face').className).toContain('cmTreeRow--drop')
     held.drop()
-    expect(tree().getAllByTitle('Level 3 of 6 in the pivot chain')).toHaveLength(1)
+    expect(tree().getAllByTitle('Level 3 of 9 in the pivot chain')).toHaveLength(1)
     // and back to the root
     rects(row('Arm'), 0, 120, 200, 20)
     const again = holdTile(screen.getByRole('button', { name: 'Move Arm to another parent (Alt+Right or Left)' }), { x: 10, y: 130 })
     again.moveTo(300, 300)
     again.drop()
-    expect(tree().queryByTitle('Level 3 of 6 in the pivot chain')).toBeNull()
+    expect(tree().queryByTitle('Level 3 of 9 in the pivot chain')).toBeNull()
     await save(user)
     await waitFor(() => expect(savedGroup(backend, 'gA').parent).toBeNull())
   })
@@ -538,7 +538,7 @@ describe('the tree', () => {
     const held = holdTile(screen.getByRole('button', { name: 'Move Arm to another parent (Alt+Right or Left)' }), { x: 10, y: 90 })
     held.moveTo(50, 50)
     held.cancel()
-    expect(tree().queryByTitle('Level 3 of 6 in the pivot chain')).toBeNull()
+    expect(tree().queryByTitle('Level 3 of 9 in the pivot chain')).toBeNull()
   })
 
   it('draws a shape reordered in the tree in front or behind the other: the order is what is drawn', async () => {
@@ -594,11 +594,11 @@ describe('the previews and the checks', () => {
     expect(checks.getByText('Slider Idle slider drives nothing yet.')).toBeInTheDocument()
   })
 
-  it('name a pivot chain that is as deep as it may be', async () => {
+  it('warn about a pivot chain that is deeper than 6 levels', async () => {
     let c = figure()
-    for (let i = 0; i < 4; i++) { c = addGroup(c, newGroup(`x${i}`, `Deep ${i}`)); c = must(reparent(c, `x${i}`, i ? `x${i - 1}` : 'gF')) }
+    for (let i = 0; i < 5; i++) { c = addGroup(c, newGroup(`x${i}`, `Deep ${i}`)); c = must(reparent(c, `x${i}`, i ? `x${i - 1}` : 'gF')) }
     await open([draftEntry('a', c)])
-    expect(within(screen.getByRole('region', { name: 'Checks' })).getByText(/Deep 3 is 6 levels deep, the most a pivot chain may have/)).toBeInTheDocument()
+    expect(within(screen.getByRole('region', { name: 'Checks' })).getByText(/Deep 4 is 7 levels deep: the warning starts above 6/)).toBeInTheDocument()
   })
 })
 

@@ -548,6 +548,45 @@ export function solve(c: ModelContent, values: Values = {}, view: View = 'front'
     return out.shapes[id]
   }
 
+  // What a group does on top of where its parent and its anchor put it: its matrix and its pivot (in the parent's frame, before the group's own movement), with
+  // `forTwin` leaving out the drives that a twin does not follow (a drive with `mirror: false`: the two sides are posed apart).
+  function movement(g: ModelGroup, forTwin: boolean): { Mg: Mat; pw2: [number, number]; an: [number, number] | null } {
+    const id = g.id
+    const pm = (g.parent ? groupMat(g.parent) : undefined) ?? IDENTITY
+    const pv = g.pivot ?? restPivot(c, g)
+    let bm = pm
+    let an: [number, number] | null = null
+    if (g.attach) {
+      const target = shapeOut(g.attach.shape)
+      an = anchorFrom(c, target ? { [g.attach.shape]: target } : {}, g.attach, values)
+      if (an) { const pw = apply(pm, pv[0], pv[1]); bm = mul(translate(an[0] - pw[0], an[1] - pw[1]), pm) }
+    }
+    const pw2 = apply(bm, pv[0], pv[1])
+    let angle = 0, sx = 1, sy = 1
+    // a bone starting at this group is stretched along its own rest direction (as the parent holds it now), about the pivot; all the groups that hang from
+    // this one follow, since they stand in this group's matrix
+    let lengthen = bm
+    for (const r of ranges) for (const d of r.drives) {
+      if (forTwin && d.mirror === false) continue
+      if (d.kind === 'turn' && d.group === id) angle += amount(r, d, val(r))
+      else if (d.kind === 'scale' && d.target === 'group' && d.id === id) {
+        const f = factorOf(r, d, val(r))
+        if (d.axis !== 'y') sx *= f
+        if (d.axis !== 'x') sy *= f
+      } else if (d.kind === 'length' && d.id) {
+        const bone = boneMap.get(d.id)
+        const rest = bone && bone.start === id ? boneAtRest(c, bone) : null
+        if (!rest) continue
+        const vx = rest.b[0] - rest.a[0], vy = rest.b[1] - rest.a[1]
+        const ux = bm[0] * vx + bm[2] * vy, uy = bm[1] * vx + bm[3] * vy, len = Math.hypot(ux, uy)
+        if (len > 1e-6) lengthen = mul(scaleAlong(factorOf(r, d, val(r)), ux / len, uy / len, pw2[0], pw2[1]), lengthen)
+      }
+    }
+    return { Mg: mul(rotate(angle, pw2[0], pw2[1]), mul(scale(sx, sy, pw2[0], pw2[1]), lengthen)), pw2, an }
+  }
+  // Whether a group has drives that its twin does not follow.
+  const apartFrom = (id: string): boolean => ranges.some(r => r.drives.some(d => d.mirror === false && ((d.kind === 'turn' && d.group === id) || (d.kind === 'scale' && d.target === 'group' && d.id === id) || d.kind === 'length')))
+
   function groupMat(id: string): Mat {
     const done = out.mats[id]
     if (done) return done
@@ -559,47 +598,32 @@ export function solve(c: ModelContent, values: Values = {}, view: View = 'front'
     if (original && !original.mirrorOf) {
       // A twin group does what its original does, mirrored, from where its own parent stands: the original's movement relative to its parent (turned,
       // scaled, moved by its anchor), reflected about the axis, applied in the twin's parent's frame. With the same parent for both (the torso), a lean of
-      // the torso carries both arms alike; with twin parents (left arm and forearm) it is the plain reflection of the original.
+      // the torso carries both arms alike; with twin parents (left arm and forearm) it is the plain reflection of the original. The drives of the original that
+      // do not mirror are left out, and the twin may have drives of its own (phase 5c): what the same slider would do to the original, as a mirror image
+      // (a turn the other way round about the twin's own pivot), so the two sides are posed apart while the drawing stays mirrored.
       const Mpo = original.parent ? groupMat(original.parent) : IDENTITY
       const Mpt = g.parent ? groupMat(g.parent) : IDENTITY
-      Mg = mul(Mpt, mul(RF, mul(inverse(Mpo), mul(groupMat(original.id), RF))))
+      const Mo = apartFrom(original.id) ? movement(original, true).Mg : groupMat(original.id)
+      Mg = mul(Mpt, mul(RF, mul(inverse(Mpo), mul(Mo, RF))))
       const po = out.pivots[original.id]
       const pw = po ? apply(Mpt, ...apply(RF, ...apply(inverse(Mpo), po[0], po[1]))) : [axis, 200]
       out.pivots[id] = [pw[0], pw[1]]
       out.anchors[id] = null
-    } else {
-      const pm = (g.parent ? groupMat(g.parent) : undefined) ?? IDENTITY
-      const pv = g.pivot ?? restPivot(c, g)
-      let bm = pm
-      let an: [number, number] | null = null
-      if (g.attach) {
-        const target = shapeOut(g.attach.shape)
-        an = anchorFrom(c, target ? { [g.attach.shape]: target } : {}, g.attach, values)
-        if (an) { const pw = apply(pm, pv[0], pv[1]); bm = mul(translate(an[0] - pw[0], an[1] - pw[1]), pm) }
-      }
-      const pw2 = apply(bm, pv[0], pv[1])
       let angle = 0, sx = 1, sy = 1
-      // a bone starting at this group is stretched along its own rest direction (as the parent holds it now), about the pivot; all the groups that hang from
-      // this one follow, since they stand in this group's matrix
-      let lengthen = bm
       for (const r of ranges) for (const d of r.drives) {
         if (d.kind === 'turn' && d.group === id) angle += amount(r, d, val(r))
         else if (d.kind === 'scale' && d.target === 'group' && d.id === id) {
           const f = factorOf(r, d, val(r))
           if (d.axis !== 'y') sx *= f
           if (d.axis !== 'x') sy *= f
-        } else if (d.kind === 'length' && d.id) {
-          const bone = boneMap.get(d.id)
-          const rest = bone && bone.start === id ? boneAtRest(c, bone) : null
-          if (!rest) continue
-          const vx = rest.b[0] - rest.a[0], vy = rest.b[1] - rest.a[1]
-          const ux = bm[0] * vx + bm[2] * vy, uy = bm[1] * vx + bm[3] * vy, len = Math.hypot(ux, uy)
-          if (len > 1e-6) lengthen = mul(scaleAlong(factorOf(r, d, val(r)), ux / len, uy / len, pw2[0], pw2[1]), lengthen)
         }
       }
-      Mg = mul(rotate(angle, pw2[0], pw2[1]), mul(scale(sx, sy, pw2[0], pw2[1]), lengthen))
-      out.pivots[id] = [pw2[0], pw2[1]]
-      out.anchors[id] = g.attach ? an : null
+      if (angle !== 0 || sx !== 1 || sy !== 1) Mg = mul(rotate(-angle, pw[0], pw[1]), mul(scale(sx, sy, pw[0], pw[1]), Mg))
+    } else {
+      const m = movement(g, false)
+      Mg = m.Mg
+      out.pivots[id] = [m.pw2[0], m.pw2[1]]
+      out.anchors[id] = g.attach ? m.an : null
     }
     if (!finiteMat(Mg)) Mg = IDENTITY
     out.mats[id] = Mg

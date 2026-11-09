@@ -631,6 +631,8 @@ export interface ModelAttach { shape: string; kind: ModelAnchorKind; i: number; 
 // A group of objects that move together. parent is the group it hangs from (the rig), pivot the point it turns about (in the model's space at rest), attach where on a shape of its parent it is fixed.
 export interface ModelGroup { id: string; name: string; parent: string | null; objects: string[]; pivot: [number, number] | null; attach: ModelAttach | null; mirrorOf?: string | null }
 export type ModelRangeUnit = '' | '°' | '%'
+// A grip point (phase 5c): the spot of a hand where a held item is taken, in the model's space at rest, carried by the group `group`; angle is the way the held item points, in degrees (0 = straight down, positive toward the picture's right).
+export interface ModelGrip { id: string; name: string; group: string | null; x: number; y: number; angle: number }
 export type ModelDriveKind = 'turn' | 'scale' | 'points' | 'bend' | 'length' | 'fall'
 // The side hanging things fall to (phase 5b): straight down, toward the picture's left or right, or behind the figure.
 export type ModelFallSide = 'down' | 'left' | 'right' | 'behind'
@@ -656,10 +658,10 @@ export interface ModelDrive {
   mirror: boolean
 }
 // A slider of the model: from min to max, resting at rest (what is drawn), with what it drives. rand is the span random previews stay in; show says whether the writer's editor offers it.
-export interface ModelRange { id: string; name: string; scope: string | null; min: number; rest: number; max: number; unit: ModelRangeUnit; show: boolean; rand: [number, number] | null; limit?: [number, number] | null; drives: ModelDrive[] }
+export interface ModelRange { id: string; name: string; scope: string | null; min: number; rest: number; max: number; unit: ModelRangeUnit; show: boolean; rand: [number, number] | null; limit?: [number, number] | null; role?: string | null; drives: ModelDrive[] }
 // A named set of slider values and of hidden objects (a pose, an expression, an age, a build, an outfit). kind is the slot it fills: applying one puts back whatever any other preset of its kind controls. values lists only the sliders it moves; hidden the objects and groups it hides.
 // A style is a preset with a scope (an object or a group): it also keeps the forms chosen for what is in the scope ("objectId.axisId" to a form id, "class:classId" to the member shown) and only controls what the scope holds.
-export interface ModelPreset { id: string; name: string; kind: string; values: Record<string, number>; hidden: string[]; scope?: string | null; forms?: Record<string, string>; fall?: ModelFallSide | null }
+export interface ModelPreset { id: string; name: string; kind: string; values: Record<string, number>; hidden: string[]; scope?: string | null; forms?: Record<string, string>; fall?: ModelFallSide | null; grip?: string | null }
 // A template object and the members built from it. The template is a pattern, not drawn once it has members; a family (exclusive) shows one member at a time, otherwise every member is drawn.
 export interface ModelClass { id: string; name: string; template: string; exclusive: boolean }
 // Colour. A genre tag (Fiction, Fantasy, Non-fiction...): a default colour says which genres it fits, so a character made for a project of that genre draws its random colours from those only.
@@ -675,7 +677,7 @@ export type ModelBoneEndKind = 'group' | 'point'
 export interface ModelBoneEnd { kind: ModelBoneEndKind; id: string; i: number }
 export interface ModelBone { id: string; name: string; start: string; end: ModelBoneEnd }
 export interface ModelFrame { id: string; name: string; x: number; y: number; w: number; h: number; hide: string[] }
-export interface ModelContent { name: string; description: string; shapes: ModelShape[]; objects: ModelObject[]; groups: ModelGroup[]; axis: number; ranges: ModelRange[]; presets?: ModelPreset[]; classes?: ModelClass[]; genres?: ModelGenre[]; palette?: ModelSwatch[]; slots?: ModelSlot[]; bones?: ModelBone[]; headBone?: string | null; frames?: ModelFrame[]; tile?: string }
+export interface ModelContent { name: string; description: string; shapes: ModelShape[]; objects: ModelObject[]; groups: ModelGroup[]; axis: number; ranges: ModelRange[]; presets?: ModelPreset[]; classes?: ModelClass[]; genres?: ModelGenre[]; palette?: ModelSwatch[]; slots?: ModelSlot[]; bones?: ModelBone[]; headBone?: string | null; frames?: ModelFrame[]; tile?: string; grips?: ModelGrip[] }
 export interface PublishedModel { version: number; publishedAt: string; content: ModelContent }
 export interface ModelEntry { id: string; draft: ModelContent; published: PublishedModel | null; history: PublishedModel[]; nextVersion: number }
 export interface ModelCatalog { schemaVersion: number; models: ModelEntry[] }

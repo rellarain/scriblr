@@ -159,11 +159,11 @@ def chain(depth: int) -> dict:
     return {**complete("Adult"), "groups": groups}
 
 
-def test_a_pivot_chain_of_six_is_fine_and_seven_is_refused(client: TestClient) -> None:
+def test_a_pivot_chain_up_to_the_limit_is_fine_and_one_more_is_refused(client: TestClient) -> None:
     save(client, {"id": "m1", "draft": chain(MODEL_CHAIN_MAX)})
     assert client.post("/api/character-models/m1/publish").status_code == 200
     detail = refused(client, chain(MODEL_CHAIN_MAX + 1))
-    assert f"7 levels deep" in detail and f"at most {MODEL_CHAIN_MAX}" in detail
+    assert f"{MODEL_CHAIN_MAX + 1} levels deep" in detail and f"at most {MODEL_CHAIN_MAX}" in detail
 
 
 def test_an_anchor_must_point_at_a_shape_of_an_ancestor(client: TestClient) -> None:

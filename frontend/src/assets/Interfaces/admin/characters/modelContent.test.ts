@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import type { ModelContent, ModelEntry } from '../../../../api/types'
+import { LIMITS } from './engine/limits'
 import { newShape } from './engine/edit'
 import { templateBox } from './engine/templates'
 import {
@@ -135,10 +136,10 @@ describe('what publishing checks about the rig (the server says the same words)'
     c.groups[0] = g('g1', 'g2', ['o1'], { pivot: [100, 40], attach: { shape: 's2', kind: 'point', i: 0, t: 0, slider: null, rx: 0.5, ry: 0.5 } })
     expect(publishFaults(c)).toEqual([])
   })
-  it('refuses a pivot chain of seven and allows six', () => {
+  it('refuses a pivot chain deeper than the limit and allows one as deep as it', () => {
     const chain = (n: number): ModelContent => ({ ...sample(), groups: Array.from({ length: n }, (_, i) => g(`c${i}`, i ? `c${i - 1}` : null, i ? [] : ['o1', 'o2', 'o3'])) })
-    expect(publishFaults(chain(6))).toEqual([])
-    expect(publishFaults(chain(7)).join(' ')).toMatch(/7 levels deep; a pivot chain may have at most 6/)
+    expect(publishFaults(chain(LIMITS.chainMax))).toEqual([])
+    expect(publishFaults(chain(LIMITS.chainMax + 1)).join(' ')).toMatch(new RegExp(`${LIMITS.chainMax + 1} levels deep; a pivot chain may have at most ${LIMITS.chainMax}`))
   })
   it('says what is wrong with an anchor', () => {
     const attach = (a: Partial<NonNullable<ModelContent['groups'][number]['attach']>>, parent: string | null = 'g2'): ModelContent => {

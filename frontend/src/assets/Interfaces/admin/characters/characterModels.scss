@@ -315,6 +315,10 @@ span.cmTreeTwisty { cursor: default; }
 }
 .cmPresets { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: var(--space-3); }
 .cmPreset { display: flex; flex-direction: column; gap: var(--space-2); padding: var(--space-3); background: var(--ov-sink-1); min-width: 0; p { margin: 0; } &--on { box-shadow: inset 3px 0 0 var(--accent); } }
+// ---- hands (phase 5c): the grip points listed in the Rig tab, and the line under a slider that says it is posed apart ----
+.cmGripRow { list-style: none; display: flex; flex-direction: column; gap: var(--space-2); padding: var(--space-3); background: var(--ov-sink-1); min-width: 0; }
+.cmGripRow p, .cmSides p { margin: 0; }
+.cmSides { align-items: center; justify-content: space-between; }
 .cmOn { display: inline-flex; align-items: center; gap: var(--space-1); flex: 0 0 auto; font-size: var(--text-small); font-weight: 700; color: var(--ink); }
 
 // ---- pose mode (phase 3) ----
@@ -325,6 +329,14 @@ span.cmTreeTwisty { cursor: default; }
 .cmJointRing { fill: none; stroke: var(--accent); stroke-width: 2; vector-effect: non-scaling-stroke; }
 .cmJointDot { fill: var(--accent); }
 .cmJoint--on .cmJointRing { fill: var(--accent); fill-opacity: 0.25; stroke-width: 3.5; }
+// a grip point of a hand: a dot where the item is taken and a short line the way it points; live (grabbed) only in Pose mode
+.cmGrip { pointer-events: none; }
+.cmGrip--live { pointer-events: all; cursor: grab; }
+.cmGripHit { fill: transparent; }
+.cmGripLine { stroke: var(--ink); stroke-width: 2; stroke-linecap: round; vector-effect: non-scaling-stroke; }
+.cmGripDot { fill: var(--surface-raised); stroke: var(--ink); stroke-width: 2; vector-effect: non-scaling-stroke; }
+.cmGrip--on .cmGripDot { fill: var(--accent); stroke: var(--accent); }
+.cmGrip--on .cmGripLine { stroke: var(--accent); stroke-width: 3; }
 .cmScaleHandle { fill: var(--surface-raised); stroke: var(--ink); stroke-width: 1.5; vector-effect: non-scaling-stroke; cursor: nwse-resize; }
 .cmSlideHandle { fill: var(--surface-raised); stroke: var(--accent); stroke-width: 2; vector-effect: non-scaling-stroke; cursor: ew-resize; }
 

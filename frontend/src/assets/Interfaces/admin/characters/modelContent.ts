@@ -1,4 +1,4 @@
-import type { ModelBone, ModelContent, ModelEntry, ModelFade, ModelFallSide, ModelFit, ModelForm, ModelFrame, ModelGradient, ModelGroup, ModelLayer, ModelLook, ModelObject, ModelRange, ModelShape, ModelSlot, ModelTint } from '../../../../api/types'
+import type { ModelGrip, ModelBone, ModelContent, ModelEntry, ModelFade, ModelFallSide, ModelFit, ModelForm, ModelFrame, ModelGradient, ModelGroup, ModelLayer, ModelLook, ModelObject, ModelRange, ModelShape, ModelSlot, ModelTint } from '../../../../api/types'
 import { LIMITS, copyBytes, linkCount, shadingCount } from './engine/limits'
 import { chainOf } from './engine/rig'
 import { standardGenres, standardSlots, starterPalette } from './engine/standardColours'
@@ -43,7 +43,7 @@ export function normalizeContent(c: ModelContent): ModelContent {
     groups: c.groups.map(g => ({ ...g, name: clean(g.name, NAME_MAX), pivot: g.pivot ?? null, attach: g.attach ?? null, mirrorOf: g.mirrorOf ?? null })),
     axis: c.axis ?? 100,
     ranges: (c.ranges ?? []).map(repairRange),
-    presets: (c.presets ?? []).map(p => ({ ...p, name: clean(p.name, NAME_MAX), kind: clean(p.kind, KIND_MAX) || 'Pose', scope: p.scope ?? null, forms: p.forms ?? {}, fall: p.fall && FALL_SIDES.includes(p.fall) ? p.fall : null })),
+    presets: (c.presets ?? []).map(p => ({ ...p, name: clean(p.name, NAME_MAX), kind: clean(p.kind, KIND_MAX) || 'Pose', scope: p.scope ?? null, forms: p.forms ?? {}, fall: p.fall && FALL_SIDES.includes(p.fall) ? p.fall : null, grip: p.grip ?? null })),
     classes: (c.classes ?? []).map(k => ({ ...k, name: clean(k.name, NAME_MAX), exclusive: k.exclusive === true })),
     genres: (c.genres ?? []).map(g => ({ ...g, name: clean(g.name, SWATCH_NAME_MAX) })),
     palette: (c.palette ?? []).map(p => ({ ...p, name: clean(p.name, SWATCH_NAME_MAX), h: percent(p.h, 0, 359), s: percent(p.s, 50, 100) })),
@@ -52,6 +52,7 @@ export function normalizeContent(c: ModelContent): ModelContent {
     headBone: c.headBone ?? null,
     frames: (c.frames ?? []).map(repairFrame),
     tile: typeof c.tile === 'string' && HEX.test(c.tile) ? c.tile.toLowerCase() : TILE_DEFAULT,
+    grips: (c.grips ?? []).map(repairGrip),
   }
 }
 
@@ -71,6 +72,11 @@ function paintFields(s: ModelShape) {
   }
 }
 // The sides things may fall to, and a shape's fade as the server keeps it (phase 5b): the places are held to the span a slider may have.
+// A grip point as the server keeps it (phase 5c): the name cut, the place inside the model's space, the angle held to a half turn each way.
+export const ROLE_MAX = 40
+function repairGrip(g: ModelGrip): ModelGrip {
+  return { id: g.id, name: clean(g.name, RANGE_NAME_MAX), group: g.group ?? null, x: unit(g.x, -50, 250, 100), y: unit(g.y, -50, 450, 200), angle: unit(g.angle, -180, 180, 0) }
+}
 export const FALL_SIDES: ModelFallSide[] = ['down', 'left', 'right', 'behind']
 const fadeAt = (v: number, fallback: number): number => (typeof v === 'number' && Number.isFinite(v) ? Math.min(1000, Math.max(-1000, v)) : fallback)
 const fadeOf = (f: ModelFade | null | undefined): ModelFade | null => (f && typeof f.slider === 'string' && f.slider ? { slider: f.slider, hidden: fadeAt(f.hidden, 0), shown: fadeAt(f.shown, 100) } : null)
@@ -89,7 +95,7 @@ export function repairLooks(looks: ModelLook[] | undefined): ModelLook[] {
 
 // A slider as the server keeps it (phase 5a: the writer's limit is held inside the slider, ordered, holds the resting value; the whole slider is no limit).
 function repairRange(r: ModelRange): ModelRange {
-  const { drives, ...rest } = r
+  const { drives, role: _role, ...rest } = r
   let limit: [number, number] | null = null
   if (Array.isArray(r.limit) && r.limit.length === 2) {
     const held = (v: number) => Math.min(r.max, Math.max(r.min, Number.isFinite(v) ? v : r.rest))
@@ -97,7 +103,8 @@ function repairRange(r: ModelRange): ModelRange {
     const lo = Math.min(a, b, r.rest), hi = Math.max(a, b, r.rest)
     limit = lo <= r.min && hi >= r.max ? null : [lo, hi]
   }
-  return { ...rest, name: clean(r.name, RANGE_NAME_MAX), limit, drives }
+  const role = typeof r.role === 'string' ? r.role.trim().slice(0, ROLE_MAX) : ''
+  return { ...rest, name: clean(r.name, RANGE_NAME_MAX), limit, role: role || null, drives }
 }
 // How an object fits the body: only a stretching object has a shape to follow.
 function fitFields(o: ModelObject): { fit: ModelFit; fitTo: string | null } {
@@ -256,6 +263,7 @@ function removeAll(c: ModelContent, gone: { shapes: Set<string>; objects: Set<st
       return trimmed.hidden.some(h => gone.objects.has(h) || gone.groups.has(h)) ? { ...trimmed, hidden: trimmed.hidden.filter(h => !gone.objects.has(h) && !gone.groups.has(h)) } : trimmed
     }),
     classes: (c.classes ?? []).filter(k => !deadClasses.has(k.id)),
+    ...(c.grips ? { grips: c.grips.filter(g => !(g.group && gone.groups.has(g.group))) } : {}),
     ...(c.frames ? { frames: c.frames.map(f => (f.hide.some(h => gone.objects.has(h) || gone.groups.has(h)) ? { ...f, hide: f.hide.filter(h => !gone.objects.has(h) && !gone.groups.has(h)) } : f)) } : {}),
   }
 }
@@ -313,8 +321,8 @@ export function moveObjectWithin(c: ModelContent, groupId: string, objectId: str
 }
 
 // The next free id of a kind ('s', 'o', 'g', 'r', 'b' for a bone, 'f' for a frame) in the content.
-export function freshId(c: ModelContent, prefix: 's' | 'o' | 'g' | 'r' | 'b' | 'f', make: MakeId = randomId): string {
-  const taken = new Set([...c.shapes.map(s => s.id), ...c.objects.map(o => o.id), ...c.groups.map(g => g.id), ...c.ranges.map(r => r.id), ...(c.bones ?? []).map(b => b.id), ...(c.frames ?? []).map(f => f.id)])
+export function freshId(c: ModelContent, prefix: 's' | 'o' | 'g' | 'r' | 'b' | 'f' | 'k', make: MakeId = randomId): string {
+  const taken = new Set([...c.shapes.map(s => s.id), ...c.objects.map(o => o.id), ...c.groups.map(g => g.id), ...c.ranges.map(r => r.id), ...(c.bones ?? []).map(b => b.id), ...(c.frames ?? []).map(f => f.id), ...(c.grips ?? []).map(k => k.id)])
   for (let i = 0; i < 20; i++) { const id = make(prefix); if (!taken.has(id)) return id }
   return `${prefix}_${taken.size}_${Date.now().toString(36)}`
 }
@@ -342,7 +350,6 @@ function rigFaults(c: ModelContent, circular: boolean, owner: Map<string, string
   const faults: string[] = []
   const shapes = new Map(c.shapes.map(s => [s.id, s]))
   const groupIds = new Set(c.groups.map(g => g.id)), rangeIds = new Set(c.ranges.map(r => r.id))
-  const twinGroups = new Map(c.groups.filter(g => g.mirrorOf).map(g => [g.id, g.mirrorOf]))
   if (!circular) {
     for (const g of c.groups) {
       const depth = chainOf(c, g.id).length
@@ -367,9 +374,8 @@ function rigFaults(c: ModelContent, circular: boolean, owner: Map<string, string
     const name = label(r.name, r.id)
     for (const d of r.drives) {
       if (d.kind === 'turn' && !(d.group && groupIds.has(d.group))) faults.push(`Slider ${name} turns a group that does not exist.`)
-      else if (d.kind === 'turn' && d.group && twinGroups.get(d.group)) faults.push(`Slider ${name} turns a group that is a twin; turn the original instead.`)
       else if (d.kind === 'scale' && d.target !== 'model' && !((d.target === 'group' && d.id && groupIds.has(d.id)) || (d.target === 'shape' && d.id && shapes.has(d.id)))) faults.push(`Slider ${name} scales something that does not exist.`)
-      else if (d.kind === 'scale' && ((d.target === 'group' && d.id && twinGroups.get(d.id)) || (d.target === 'shape' && d.id && shapes.get(d.id)?.mirrorOf))) faults.push(`Slider ${name} scales a twin; scale the original instead.`)
+      else if (d.kind === 'scale' && d.target === 'shape' && d.id && shapes.get(d.id)?.mirrorOf) faults.push(`Slider ${name} scales a twin; scale the original instead.`)
       else if ((d.kind === 'points' || d.kind === 'bend' || d.kind === 'fall') && !(d.shape && shapes.has(d.shape))) faults.push(`Slider ${name} moves a shape that does not exist.`)
       else if ((d.kind === 'points' || d.kind === 'bend' || d.kind === 'fall') && d.shape && shapes.get(d.shape)?.mirrorOf) faults.push(`Slider ${name} moves a shape that is a twin; move the original instead.`)
       else if (d.kind === 'points' && d.shape && d.moves.some(m => m.i >= (shapes.get(d.shape!)?.pts.length ?? 0))) faults.push(`Slider ${name} moves a point of ${label(shapes.get(d.shape)?.name ?? '', d.shape)} that is no longer there. Record it again.`)
@@ -563,6 +569,15 @@ function paintFaults(c: ModelContent): string[] {
 }
 
 // What is wrong with the skeleton, the fit of objects and the frames (the server's _proportion_faults says the same words).
+// What is wrong with the grip points (the server's _hand_faults says the same words).
+function handFaults(c: ModelContent): string[] {
+  const faults: string[] = []
+  const groupIds = new Set(c.groups.map(g => g.id)), gripIds = new Set((c.grips ?? []).map(g => g.id))
+  for (const g of c.grips ?? []) if (!g.group || !groupIds.has(g.group)) faults.push(`Grip ${label(g.name, g.id)} is on a group that does not exist.`)
+  for (const p of c.presets ?? []) if (p.grip && !gripIds.has(p.grip)) faults.push(`Preset ${label(p.name, p.id)} holds with a grip that does not exist.`)
+  return faults
+}
+
 function proportionFaults(c: ModelContent): string[] {
   const faults: string[] = []
   const groupIds = new Set(c.groups.map(g => g.id)), twinGroups = new Set(c.groups.filter(g => g.mirrorOf).map(g => g.id))
@@ -622,6 +637,7 @@ export function publishFaults(c: ModelContent): string[] {
   faults.push(...colourFaults(c))
   faults.push(...paintFaults(c))
   faults.push(...proportionFaults(c))
+  faults.push(...handFaults(c))
   const bytes = copyBytes(c)
   if (bytes > LIMITS.copyMaxBytes) faults.push(`A character's copy of this model would be ${Math.floor(bytes / 1024)} KB; the limit is ${LIMITS.copyMaxBytes / 1024} KB.`)
   return faults

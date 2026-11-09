@@ -1,11 +1,12 @@
 import { useState } from 'react'
 import type { ModelContent, ModelDrive, ModelGroup, ModelRange, ModelScaleAxis } from '../../../../api/types'
-import { EyeIcon, EyeOffIcon, PauseIcon, PlayIcon, PlusIcon, RestoreIcon, TrashIcon } from '../../../icons'
+import { EyeIcon, EyeOffIcon, LinkIcon, PauseIcon, PlayIcon, PlusIcon, RestoreIcon, TrashIcon } from '../../../icons'
 import { fadedBy } from './engine/fadeEdit'
 import { hangs } from './engine/fall'
 import { LIMITS } from './engine/limits'
 import { valueOf, type Values } from './engine/rig'
 import { stepOf } from './engine/rigEdit'
+import { isApart, originalSideOf, otherSideOf, whyNotApart } from './engine/sidesEdit'
 import { LimitSteppers } from './LimitSteppers'
 import { Stepper } from './Stepper'
 import type { Selection } from './designerState'
@@ -123,6 +124,7 @@ export function RangesTab({ content, sel, group, values, recording, scrubbing, f
           {r.drives.map((d, i) => <li key={i}>{driveRow(r, d, i, locked)}</li>)}
         </ul>
         {r.drives.length === 0 && fadedBy(content, r.id).length === 0 && <p className="cmInsText">It drives nothing yet.</p>}
+        {sidesRow(r, locked)}
         {fadedBy(content, r.id).length > 0 && (
           <p className="cmInsText">Shows with it: {fadedBy(content, r.id).map((s, k) => <span key={s.id}>{k > 0 && ', '}<button type="button" className="cmLink" onClick={() => actions.selectShape(s.id)}>{s.name.trim() || s.id}</button></span>)}. Set in the Colour tab.</p>
         )}
@@ -136,6 +138,27 @@ export function RangesTab({ content, sel, group, values, recording, scrubbing, f
           )}
         </div>
       </section>
+    )
+  }
+
+  // Posing the two sides apart (phase 5c): a slider that turns or scales groups that have twins can give the twins a slider of their own.
+  function sidesRow(r: ModelRange, locked: boolean) {
+    const other = isApart(r) ? otherSideOf(content, r) : undefined, original = other ? undefined : originalSideOf(content, r)
+    const title = r.name.trim() || 'the slider'
+    if (other || original) {
+      const mate = other ?? original!
+      return (
+        <div className="cmInline cmSides">
+          <p className="cmInsText">Posed apart from <b>{mate.name.trim() || 'its other side'}</b>: each side has its own slider.</p>
+          <button type="button" className="cmBtn cmBtn--small" disabled={locked} aria-label={`Pose both sides of ${title} together`} title="Take the other side's slider away: one slider poses both sides again" onClick={() => actions.joinSides(r.id)}><LinkIcon size={12} /> Pose both sides together</button>
+        </div>
+      )
+    }
+    if (whyNotApart(content, r)) return null
+    return (
+      <div className="cmInline cmSides">
+        <button type="button" className="cmBtn cmBtn--small" disabled={locked} aria-label={`Pose the other side of ${title} apart`} title="Give the twin groups it turns or scales a slider of their own, so the two sides can be posed on their own" onClick={() => actions.apartSlider(r.id)}><LinkIcon size={12} /> Pose the other side apart</button>
+      </div>
     )
   }
 

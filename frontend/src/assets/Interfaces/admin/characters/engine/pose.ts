@@ -48,7 +48,7 @@ export function turnDrivers(c: ModelContent, groupId: string): Driver[] {
 }
 
 // The group that turns when a part of `groupId` is dragged: the group itself or the nearest one above it that has a Turn slider. A twin follows its original, so
-// it cannot be posed, and nor can anything under it.
+// it can be posed only when it has a Turn slider of its own (the two sides are posed apart, phase 5c); a twin without one stops the search.
 export function poseTarget(c: ModelContent, groupId: string | null | undefined): PoseTarget {
   const byId = new Map(c.groups.map(g => [g.id, g]))
   const seen = new Set<string>()
@@ -56,8 +56,8 @@ export function poseTarget(c: ModelContent, groupId: string | null | undefined):
   if (!g) return { ok: false, reason: 'This shape is in no group, so nothing turns it.' }
   while (g && !seen.has(g.id)) {
     seen.add(g.id)
-    if (g.mirrorOf) return { ok: false, reason: 'This is a twin: it follows its original. Pose the original, or break the pair.' }
     const first = turnDrivers(c, g.id)[0]
+    if (g.mirrorOf && !first) return { ok: false, reason: 'This is a twin: it follows its original. Pose the original, pose the other side apart (Ranges tab), or break the pair.' }
     if (first) return { ok: true, group: g, range: first.range, drive: first.drive }
     g = g.parent ? byId.get(g.parent) : undefined
   }
@@ -81,6 +81,8 @@ export interface TurnDrag {
   swept: number
   start: Values
   ownStart: number
+  // A twin group turns the other way round for the same amount (it is the mirror image), so the sweep counts against the amount.
+  sign: 1 | -1
 }
 
 export function beginTurn(c: ModelContent, solved: Solved, values: Values, target: Extract<PoseTarget, { ok: true }>, pointer: Point): TurnDrag | null {
@@ -88,7 +90,7 @@ export function beginTurn(c: ModelContent, solved: Solved, values: Values, targe
   if (!pivot) return null
   return {
     groupId: target.group.id, rangeId: target.range.id, driveIndex: target.range.drives.indexOf(target.drive), pivot, last: angleOf(pointer[0] - pivot[0], pointer[1] - pivot[1]), swept: 0,
-    start: values, ownStart: amount(target.range, target.drive, valueOf(target.range, values)),
+    start: values, ownStart: amount(target.range, target.drive, valueOf(target.range, values)), sign: target.group.mirrorOf ? -1 : 1,
   }
 }
 
@@ -100,7 +102,7 @@ export function moveTurn(c: ModelContent, drag: TurnDrag, pointer: Point): { dra
   const now = angleOf(dx, dy)
   const swept = drag.swept + wrap(now - drag.last)
   const next = { ...drag, last: now, swept }
-  return { drag: next, values: { ...drag.start, [range.id]: valueForAmount(range, drive, drag.ownStart + swept, 0, valueOf(range, drag.start)) } }
+  return { drag: next, values: { ...drag.start, [range.id]: valueForAmount(range, drive, drag.ownStart + drag.sign * swept, 0, valueOf(range, drag.start)) } }
 }
 
 // ---- scaling a group ----
@@ -120,7 +122,7 @@ function reachFrom(drag: Pick<ScaleDrag, 'pivot' | 'toParent' | 'axis'>, p: Poin
 
 export function beginScale(c: ModelContent, solved: Solved, values: Values, groupId: string, pointer: Point): ScaleDrag | null {
   const group = c.groups.find(g => g.id === groupId), driver = scaleDriver(c, groupId), pivot = solved.pivots[groupId]
-  if (!group || group.mirrorOf || !driver || !pivot) return null
+  if (!group || !driver || !pivot) return null     // a twin with a Scale slider of its own is scaled like any group
   const parent = (group.parent ? solved.mats[group.parent] : undefined) ?? IDENTITY, inv = inverse(parent)
   const drag: ScaleDrag = {
     groupId, rangeId: driver.range.id, driveIndex: driver.range.drives.indexOf(driver.drive), pivot, toParent: [inv[0], inv[1], inv[2], inv[3], 0, 0], axis: driver.drive.axis,
@@ -153,7 +155,7 @@ export function slideValue(c: ModelContent, solved: Solved, groupId: string, poi
 
 // ---- reaching: drag a hand or a foot and the limb bends ----
 
-export const REACH_JOINTS = 4
+export const REACH_JOINTS = 6        // torso, shoulder, elbow, wrist and two more: a hand reaching with its fingers (phase 5c raised it from 4)
 const REACH_PASSES = 24
 const REACH_TOLERANCE = 0.5
 
@@ -164,19 +166,21 @@ export function grabPoint(solved: Solved, groupId: string, pointer: Point): Reac
   return { groupId, local: apply(inverse(solved.mats[groupId] ?? IDENTITY), pointer[0], pointer[1]) }
 }
 
-// The groups that can bend to bring the grabbed point to the target: from the grabbed group up through its parents, each with a Turn slider, at most four.
-// The chain of a twin is empty (the original is the one to pose).
+// The groups that can bend to bring the grabbed point to the target: from the grabbed group up through its parents, each with a Turn slider, at most six.
+// A twin joint counts only with a Turn slider of its own (the two sides posed apart); one that follows its original is passed over, and when none of the
+// twin joints is free the chain is empty (the original is the one to pose).
 export function reachJoints(c: ModelContent, groupId: string, most = REACH_JOINTS): Array<Driver & { group: ModelGroup }> {
   const byId = new Map(c.groups.map(g => [g.id, g]))
   const out: Array<Driver & { group: ModelGroup }> = []
   const seen = new Set<string>()
+  let twinned = false
   for (let g = byId.get(groupId); g && !seen.has(g.id) && out.length < most; g = g.parent ? byId.get(g.parent) : undefined) {
     seen.add(g.id)
-    if (g.mirrorOf) return []
+    if (g.mirrorOf) twinned = true
     const first = turnDrivers(c, g.id)[0]
     if (first) out.push({ ...first, group: g })
   }
-  return out
+  return twinned && !out.some(j => j.group.mirrorOf) ? [] : out
 }
 
 export interface Reached { values: Values; error: number; passes: number }
@@ -199,9 +203,10 @@ export function reach(c: ModelContent, values: Values, view: View, grab: ReachGr
       const ax = end[0] - pivot[0], ay = end[1] - pivot[1], bx = target[0] - pivot[0], by = target[1] - pivot[1]
       if (Math.hypot(ax, ay) < 1e-6 || Math.hypot(bx, by) < 1e-6) continue
       const want = wrap(angleOf(bx, by) - angleOf(ax, ay))
+      const sign = j.group.mirrorOf ? -1 : 1                          // a twin group turns the other way round for the same amount
       const before = amount(j.range, j.drive, valueOf(j.range, cur))
-      const value = valueForAmount(j.range, j.drive, before + want, 0, valueOf(j.range, cur))
-      const turned = amount(j.range, j.drive, value) - before         // what the slider actually allows
+      const value = valueForAmount(j.range, j.drive, before + sign * want, 0, valueOf(j.range, cur))
+      const turned = sign * (amount(j.range, j.drive, value) - before)   // what the slider actually allows
       moved = Math.max(moved, Math.abs(value - valueOf(j.range, cur)))
       cur[j.range.id] = value
       // the grabbed point goes round the pivot with the joint: carry it along, so the next joint sees where it has got to
