@@ -26,6 +26,8 @@ from .schema import (
     DraftChapterMoment,
     DraftMoment,
     FacetActivity,
+    FIGURE_MAX_MODELS,
+    FigureModel,
     CharacterDoc,
     ItemDoc,
     WorldLink,
@@ -623,6 +625,7 @@ def _load_project_file_locked(root: Path, project_id: str) -> tuple[ProjectFile,
         planner=_parse_section_default(raw, "planner", Planner, project_dir, path, errors, planner_default),
         maps=_parse_dict_section(raw, "maps", MapDoc, project_dir, path, errors),
         characters=_parse_dict_section(raw, "characters", CharacterDoc, project_dir, path, errors),
+        figureModels=_parse_dict_section(raw, "figureModels", FigureModel, project_dir, path, errors),
         worldLinks=_parse_list_section(raw, "worldLinks", WorldLink, project_dir, path, errors),
         items=_parse_dict_section(raw, "items", ItemDoc, project_dir, path, errors),
         scrap=_parse_section_default(raw, "scrap", ScrapRegistry, project_dir, path, errors, scrap_default),
@@ -1561,6 +1564,67 @@ def delete_character(root: Path, project_id: str, character_id: str) -> None:
 
 def character_count(root: Path, project_id: str) -> int:
     return _read(root, project_id, lambda pf, _errors: len(pf.characters), copy_result=False)
+
+
+# ---------------------------------------------------------------------------
+# Figure models (the frozen copies of models that characters' figures point at)
+# ---------------------------------------------------------------------------
+
+
+class FigureModelLimitError(Exception):
+    """The project already holds as many copies of models as it may."""
+
+
+def list_figure_models(root: Path, project_id: str) -> list[FigureModel]:
+    """Every readable copy of a model the project holds (each is a copy), oldest first."""
+    return _read(root, project_id, lambda pf, _errors: sorted(pf.figureModels.values(), key=lambda m: (m.publishedAt or utcnow(), m.id)))
+
+
+def add_figure_model(root: Path, project_id: str, model: FigureModel) -> FigureModel:
+    """Keep a copy of a model in the project; one with the same key (the same content) is the entry that is there already, which is returned."""
+    result: list[FigureModel] = []
+
+    def _do(pf: ProjectFile) -> None:
+        held = pf.figureModels.get(model.id)
+        if held is None:
+            if len(pf.figureModels) >= FIGURE_MAX_MODELS:
+                raise FigureModelLimitError(f"a project holds at most {FIGURE_MAX_MODELS} copies of models")
+            pf.figureModels[model.id] = model
+            pf.index.updatedAt = utcnow()
+            held = model
+        result.append(held)
+
+    _mutate(root, project_id, _do)
+    return result[0].model_copy(deep=True)
+
+
+def referenced_figure_models(pf: ProjectFile) -> set[str]:
+    """The keys of the copies the project's characters (and their story states) point at."""
+    keys: set[str] = set()
+    for c in pf.characters.values():
+        if c.figure is not None:
+            keys.add(c.figure.model)
+        for s in c.states:
+            if s.figure is not None:
+                keys.add(s.figure.model)
+    return keys
+
+
+def prune_figure_models(root: Path, project_id: str) -> int:
+    """Drop the copies no character points at any more (done when a project is opened, never in the middle of a save, so a copy that was just made
+    for a character that is about to be saved is never lost). Editions keep their own frozen copies. Returns how many went."""
+    if not _read(root, project_id, lambda pf, _errors: bool(set(pf.figureModels) - referenced_figure_models(pf)), copy_result=False):
+        return 0
+    gone: list[str] = []
+
+    def _do(pf: ProjectFile) -> None:
+        unused = set(pf.figureModels) - referenced_figure_models(pf)
+        for key in unused:
+            del pf.figureModels[key]
+        gone.extend(unused)
+
+    _mutate(root, project_id, _do)
+    return len(gone)
 
 
 # ---------------------------------------------------------------------------

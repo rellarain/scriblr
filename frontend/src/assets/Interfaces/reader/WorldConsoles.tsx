@@ -108,7 +108,7 @@ export function CastConsole({ ctx, book }: { ctx: ReaderCtx; book: CatalogBook }
   const [focused, setFocused] = useState<string | null>(null)
   if (loaded.state === 'loading') return <p className="rdMuted" role="status">Loading the cast…</p>
   if (loaded.state === 'failed') return <p className="rdMuted" role="alert">The cast could not be loaded.</p>
-  const { characters, lockedCharacters } = loaded.extras
+  const { characters, lockedCharacters, figureModels } = loaded.extras
   const shown = new Set(characters.map(c => c.id))
   // A link between characters jumps to the other card, which is marked for a moment.
   const goTo = (id: string) => {
@@ -118,7 +118,7 @@ export function CastConsole({ ctx, book }: { ctx: ReaderCtx; book: CatalogBook }
   return (
     <>
       {characters.length === 0 && <p className="rdMuted">{lockedCharacters > 0 ? 'Nobody to meet yet. Keep reading.' : 'The author has not published any characters for this book.'}</p>}
-      <div className="rdCast">{characters.map(c => <CharacterCard key={c.id} card={c} onOpen={goTo} shown={shown} focused={focused === c.id} />)}</div>
+      <div className="rdCast">{characters.map(c => <CharacterCard key={c.id} card={c} onOpen={goTo} shown={shown} focused={focused === c.id} copies={figureModels} />)}</div>
       {more(lockedCharacters, 'character')}
     </>
   )

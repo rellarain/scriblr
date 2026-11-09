@@ -428,8 +428,9 @@ export interface ExtrasWarning { kind: 'map' | 'place' | 'character'; targetId: 
 export interface BookExtrasInfo { bookId: string; title: string; chapters: ExtrasChapter[]; warnings: ExtrasWarning[] }
 export interface ReaderCharacterField { key: string; label: string; value: string }
 export interface ReaderCharacterLink { targetId: string; targetName: string; label: string; description: string }
-export interface ReaderCharacter { id: string; name: string; portrait: CharacterPortrait; fields: ReaderCharacterField[]; relationships: ReaderCharacterLink[] }
-export interface BookExtras { bookId: string; reach: number; maps: MapDoc[]; characters: ReaderCharacter[]; lockedMaps: number; lockedCharacters: number }
+export interface ReaderCharacter { id: string; name: string; portrait: CharacterPortrait; figure?: CharacterFigure | null; fields: ReaderCharacterField[]; relationships: ReaderCharacterLink[] }
+// `figureModels` are the copies of models the shown characters' figures are drawn from (key -> copy).
+export interface BookExtras { bookId: string; reach: number; maps: MapDoc[]; characters: ReaderCharacter[]; figureModels?: Record<string, FigureModel>; lockedMaps: number; lockedCharacters: number }
 
 // ---- Maps (the setting) ----
 export type MapKind = 'world' | 'town' | 'interior'
@@ -531,6 +532,31 @@ export interface CharacterPortrait {
   crown: string; crownColor: string; hood: string; hoodColor: string
   heldItem: string; heldSide: string; itemColor: string
 }
+// The figure of a character (the art mannequin, phase 6): what the writer chose on a frozen copy of a published model. The copy itself is `FigureModel`, kept once in the
+// project under a key (a hash of its content) that `model` names, so the same model version used by several characters is one entry and never changes when the admin
+// publishes again. Everything else is the writer's own choices: the sliders away from rest (a pose and an expression are values), the form on each axis and the member of
+// each family (`objectId.axisId` / `class:classId` -> form or member id), the objects not worn, the colour of each slot, the character's own palette (null: the model's
+// starter palette), the card colour, the side hanging things fall to, the objects and groups Randomise leaves alone, layer offsets, the writer's own styles (`mine`, the
+// same shape as the model's presets) and the genre Randomise stays within. A value, form or colour the copy does not have is ignored when it is drawn.
+export interface FigureColour { src: 'colour' | 'swatch'; id: string; l?: number | null; a?: number | null }
+export interface CharacterFigure {
+  model: string
+  values: Record<string, number>
+  forms: Record<string, string>
+  hidden: string[]
+  colours: Record<string, FigureColour>
+  palette: ModelSwatch[] | null
+  tile: string
+  fall: ModelFallSide
+  locks: string[]
+  zoff: Record<string, number>
+  mine: ModelPreset[]
+  genre: string | null
+}
+export interface FigureModel { id: string; modelId: string; version: number; name: string; publishedAt: string | null; content: ModelContent }
+export interface FigureModelCreate { modelId: string; version?: number; name?: string; content?: ModelContent }
+export const FIGURE_MAX_MINE = 40
+export const FIGURE_MAX_LOCKS = 300
 export const CHARACTER_MAX_FIELDS = 30
 export const CHARACTER_MAX_RELATIONSHIPS = 80
 export const CHARACTER_MAX_STATES = 300
@@ -560,18 +586,23 @@ export interface CharacterState {
   // The old look captured with the state (no longer shown), and how the character looks in this state: a copy of the portrait (none = not captured).
   snapshot?: LegacyLook | null
   portrait?: CharacterPortrait | null
+  // The same for a figure: the choices (the model copy is the character's own, in the project's figure models).
+  figure?: CharacterFigure | null
 }
 export interface ArcStage { id: string; name: string; note: string; at: string | null }
 export interface LifeEvent { id: string; when: string; title: string; note: string }
 export interface CharacterDoc {
-  schemaVersion: number; id: string; name: string; order: number; portrait: CharacterPortrait; look?: LegacyLook; updatedAt: string
+  schemaVersion: number; id: string; name: string; order: number; portrait: CharacterPortrait
+  // The art mannequin: a character with a figure is drawn from it, one without from the portrait.
+  figure?: CharacterFigure | null
+  look?: LegacyLook; updatedAt: string
   profile: CharacterProfile; possessions: CharacterPossession[]; relationships: CharacterRelationship[]; states: CharacterState[]; arc: ArcStage[]; events: LifeEvent[]
   // The chapters and scenes of the outline the character is tagged on.
   appearances: string[]
   // What readers may see of the character (absent = nothing).
   reader?: ReaderShare
 }
-export interface CharacterSummary { id: string; name: string; order: number; updatedAt: string; portrait: CharacterPortrait }
+export interface CharacterSummary { id: string; name: string; order: number; updatedAt: string; portrait: CharacterPortrait; figure?: CharacterFigure | null }
 
 // ---- items (the library of things that change hands) ----
 export const ITEM_KINDS = ['weapon', 'tool', 'clothing', 'jewel', 'document', 'vehicle', 'treasure', 'other'] as const
@@ -587,7 +618,7 @@ export interface ItemDoc {
 }
 export interface ItemSummary { id: string; name: string; kind: string; order: number; updatedAt: string }
 export interface ItemCreate { name?: string; kind?: string }
-export interface CharacterCreate { name?: string; portrait?: CharacterPortrait; look?: LegacyLook }
+export interface CharacterCreate { name?: string; portrait?: CharacterPortrait; figure?: CharacterFigure | null; look?: LegacyLook }
 
 // ---- character models (the admin-designed assets of the art mannequin; backend schema.py "Character models") ----
 export type ModelPointMode = 'c' | 's' | 'cs' | 'sc'

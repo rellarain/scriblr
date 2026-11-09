@@ -1,8 +1,9 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { createCharacter, deleteCharacter, getCharacter, listAllCharacters, listCharacters, putCharacter } from '../../../../api/charactersApi'
-import type { CharacterDoc, CharacterPortrait, CharacterSummary, LegacyLook } from '../../../../api/types'
+import type { CharacterDoc, CharacterFigure, CharacterPortrait, CharacterSummary, LegacyLook } from '../../../../api/types'
 import { notifyCastChanged } from './castStore'
-import { buildCharacterFile, importCharacters, type CharacterChoice, type CharacterFile, type CharacterImportResult } from './charFile'
+import { buildCharacterFile, figureKeys, importCharacters, type CharacterChoice, type CharacterFile, type CharacterImportResult } from './charFile'
+import { ensureFigureModel, figureCopiesFor } from './figure/figureModelStore'
 import { combineCountdown, combineSaveStatus, useAutosave } from '../../../../lib/useAutosave'
 
 // The Characters console's state: the cast (a list of names), the open character as a document, and an undo log for each character that has been opened (kept while
@@ -13,7 +14,7 @@ const COALESCE_MS = 900
 interface Session { doc: CharacterDoc; past: CharacterDoc[]; future: CharacterDoc[]; group: string | null; at: number }
 
 const message = (err: unknown, fallback: string) => (err instanceof Error ? err.message : fallback)
-const summaryOf = (c: CharacterDoc): CharacterSummary => ({ id: c.id, name: c.name, order: c.order, updatedAt: c.updatedAt, portrait: c.portrait })
+const summaryOf = (c: CharacterDoc): CharacterSummary => ({ id: c.id, name: c.name, order: c.order, updatedAt: c.updatedAt, portrait: c.portrait, figure: c.figure ?? null })
 
 export function useCharacters(projectId: string | null) {
   const [status, setStatus] = useState<'loading' | 'ready' | 'error'>('loading')
@@ -95,12 +96,12 @@ export function useCharacters(projectId: string | null) {
   }, [projectId, show])
 
   // A new character (from a portrait, to copy one or to keep an aged one). It is opened.
-  const create = useCallback(async (name?: string, start?: { portrait?: CharacterPortrait; look?: LegacyLook }): Promise<string | null> => {
+  const create = useCallback(async (name?: string, start?: { portrait?: CharacterPortrait; figure?: CharacterFigure | null; look?: LegacyLook }): Promise<string | null> => {
     if (!projectId) return null
     setNotice(undefined)
     try {
       await autosaveRef.current.flush()
-      const d = await createCharacter(projectId, { name, portrait: start?.portrait, look: start?.look })
+      const d = await createCharacter(projectId, { name, portrait: start?.portrait, figure: start?.figure ?? undefined, look: start?.look })
       setCast(list => [...list, summaryOf(d)])
       const mine = ++token.current
       const session = startSession(d)
@@ -112,13 +113,13 @@ export function useCharacters(projectId: string | null) {
     }
   }, [projectId, show])
 
-  // A copy of a character (its portrait, and a name that says so). It is opened.
+  // A copy of a character (its portrait and its figure, and a name that says so). It is opened. The figure's model copy is shared, so nothing else is copied.
   const duplicate = useCallback(async (id: string): Promise<string | null> => {
     if (!projectId) return null
     try {
       await autosaveRef.current.flush()
       const source = sessions.current.get(id)?.doc ?? (await getCharacter(projectId, id))
-      return await create(`${source.name} (copy)`.slice(0, 120), { portrait: source.portrait, look: source.look })
+      return await create(`${source.name} (copy)`.slice(0, 120), { portrait: source.portrait, figure: source.figure, look: source.look })
     } catch (err) {
       setNotice(message(err, 'The character could not be copied.'))
       return null
@@ -131,7 +132,8 @@ export function useCharacters(projectId: string | null) {
     setNotice(undefined)
     try {
       await autosaveRef.current.flush()
-      return buildCharacterFile(await listAllCharacters(projectId), ids)
+      const all = await listAllCharacters(projectId)
+      return buildCharacterFile(all, ids, new Date(), await figureCopiesFor(projectId, figureKeys(all)))
     } catch (err) {
       setNotice(message(err, 'The characters could not be exported.'))
       return null
@@ -146,6 +148,7 @@ export function useCharacters(projectId: string | null) {
     const result = await importCharacters(file, choices, await listCharacters(projectId), {
       create: body => createCharacter(projectId, body),
       put: d => putCharacter(projectId, d),
+      keepCopy: m => ensureFigureModel(projectId, { modelId: m.modelId || 'imported', version: m.version, name: m.name, content: m.content }),
     })
     // What was written over is read again when it is next opened.
     for (const id of result.replaced) sessions.current.delete(id)
@@ -153,6 +156,7 @@ export function useCharacters(projectId: string | null) {
     if (result.replaced.includes(openId ?? '')) { token.current += 1; show(null, null) }
     notifyCastChanged()
     if (result.error) setNotice(result.error)
+    else if (result.note) setNotice(result.note)
     return result
   }, [projectId, openId, show])
 
@@ -201,6 +205,13 @@ export function useCharacters(projectId: string | null) {
   const setPortrait = useCallback((patch: Partial<CharacterPortrait> | ((portrait: CharacterPortrait) => CharacterPortrait), group: string | null = null) => {
     edit(d => ({ ...d, portrait: typeof patch === 'function' ? patch(d.portrait) : { ...d.portrait, ...patch } }), group)
   }, [edit])
+  // A change of the figure (the art mannequin): a new one, none (back to the portrait), or a function of the figure the character has (nothing happens without one).
+  const setFigure = useCallback((next: CharacterFigure | null | ((figure: CharacterFigure) => CharacterFigure), group: string | null = null) => {
+    edit(d => {
+      if (typeof next === 'function') return d.figure ? { ...d, figure: next(d.figure) } : d
+      return { ...d, figure: next }
+    }, group)
+  }, [edit])
   const rename = useCallback((name: string) => edit(d => (name.trim() === '' || name === d.name ? d : { ...d, name: name.trim().slice(0, 120) }), 'name'), [edit])
 
   const undo = useCallback(() => {
@@ -225,11 +236,11 @@ export function useCharacters(projectId: string | null) {
 
   return useMemo(() => ({
     status, loadError, reload: load, cast, openId, doc, rev, notice,
-    open, create, duplicate, remove, exportFile, importFile, edit, setPortrait, rename, undo, redo, canUndo, canRedo,
+    open, create, duplicate, remove, exportFile, importFile, edit, setPortrait, setFigure, rename, undo, redo, canUndo, canRedo,
     saveStatus: combineSaveStatus(autosave),
     saveCountdown: combineCountdown(autosave),
     saveNow: autosave.flush,
-  }), [status, loadError, load, cast, openId, doc, rev, notice, open, create, duplicate, remove, exportFile, importFile, edit, setPortrait, rename, undo, redo, canUndo, canRedo, autosave])
+  }), [status, loadError, load, cast, openId, doc, rev, notice, open, create, duplicate, remove, exportFile, importFile, edit, setPortrait, setFigure, rename, undo, redo, canUndo, canRedo, autosave])
 }
 
 export type Characters = ReturnType<typeof useCharacters>

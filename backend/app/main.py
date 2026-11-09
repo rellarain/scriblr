@@ -18,6 +18,7 @@ from .api import (
     library,
     character_models,
     characters,
+    figure_models,
     items,
     world_links,
     maps,
@@ -142,6 +143,7 @@ def create_app(static_dir: Optional[Path] = None) -> FastAPI:
     app.include_router(plot.router)
     app.include_router(maps.router)
     app.include_router(characters.router)
+    app.include_router(figure_models.router)
     app.include_router(items.router)
     app.include_router(world_links.router)
     app.include_router(draft.router)

@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
-import type { MapDoc, ReaderCharacter } from '../../../../api/types'
-import { Portrait } from '../characters/portrait/Portrait'
+import type { FigureModel, MapDoc, ReaderCharacter } from '../../../../api/types'
+import { CharacterArt } from '../characters/figure/CharacterArt'
 import { BASE_CELL_PX, renderMapImage } from '../maps/mapExport'
 import { draftOf } from '../maps/mapModel'
 import './readers.scss'
@@ -32,10 +32,11 @@ export function MapView({ doc }: { doc: MapDoc }) {
 
 // A character card: the portrait, the name, the fields the author made public and the links to other published characters. With `onOpen`, a link to a character
 // that is `shown` (a card is on the page for them) jumps to that card; one to a character not shown (not revealed yet) is only named. `focused` marks the card jumped to.
-export function CharacterCard({ card, onOpen, shown, focused = false }: { card: ReaderCharacter; onOpen?: (id: string) => void; shown?: ReadonlySet<string>; focused?: boolean }) {
+// A character with a figure is drawn from it, through the copy of its model that the book's extras carry (`copies`).
+export function CharacterCard({ card, onOpen, shown, focused = false, copies }: { card: ReaderCharacter; onOpen?: (id: string) => void; shown?: ReadonlySet<string>; focused?: boolean; copies?: Record<string, FigureModel> | null }) {
   return (
     <article className={focused ? 'wvCard wvCard--focus' : 'wvCard'} id={`wvCard-${card.id}`} aria-label={card.name}>
-      <div className="wvCardArt"><Portrait portrait={card.portrait} label={`${card.name}, portrait`} className="wvArt" /></div>
+      <div className="wvCardArt"><CharacterArt portrait={card.portrait} figure={card.figure} copies={copies} crop="bust" label={`${card.name}, ${card.figure ? 'figure' : 'portrait'}`} className="wvArt" /></div>
       <div className="wvCardBody">
         <h4 className="wvCardName">{card.name}</h4>
         {card.fields.length === 0 && <p className="rvHint">Nothing more is told yet.</p>}

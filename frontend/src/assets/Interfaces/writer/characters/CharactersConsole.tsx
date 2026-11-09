@@ -12,6 +12,7 @@ import { CarriedItems } from '../items/CarriedItems'
 import { hasPending, usePendingOpen } from '../links/worldNav'
 import { ForReadersSection } from './ForReadersSection'
 import { useCast } from './castStore'
+import { useFigureModels } from './figure/figureModelStore'
 import { exportSheet } from './sheet'
 import { PortraitSection } from './PortraitSection'
 import { ProfileSection } from './ProfileSection'
@@ -39,6 +40,8 @@ export default function CharactersConsole({ projectId, outline = [], plotNodes =
   projectId: string; outline?: OutlineNode[]; plotNodes?: PlotNode[]; onOpenPlot?: (nodeId: string) => void; onOpenScene?: (nodeId: string) => void; initialSection?: CharacterSection
 }) {
   const c = useCharacters(projectId)
+  // The copies of models the cast's figures are drawn from.
+  useFigureModels(projectId)
   const { ui } = useSettings()
   const [section, setSection] = useState<Section>(initialSection)
   const points = useMemo(() => storyPoints(outline), [outline])
@@ -100,7 +103,7 @@ export default function CharactersConsole({ projectId, outline = [], plotNodes =
       <div className="charSplit">
         <CharacterList c={c} />
         {doc && section === 'appearance' && <AppearanceSection doc={doc} edit={c.edit} rename={c.rename} />}
-        {doc && section === 'portrait' && <PortraitSection doc={doc} edit={c.edit} rename={c.rename} />}
+        {doc && section === 'portrait' && <PortraitSection projectId={projectId} doc={doc} edit={c.edit} rename={c.rename} setFigure={c.setFigure} />}
         {doc && section === 'profile' && <ProfileSection doc={doc} edit={c.edit} />}
         {doc && section === 'relationships' && <RelationshipsSection projectId={projectId} c={c} doc={doc} points={points} />}
         {doc && section === 'cast' && <CastSection c={c} cast={all} doc={doc} onOpen={id => { void c.open(id) }} />}

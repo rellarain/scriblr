@@ -2,6 +2,7 @@ import { useId } from 'react'
 import type { CharacterDoc, CharacterPortrait } from '../../../../api/types'
 import { BodyIcon, BrushIcon, CardIcon, ChevronDownIcon, DiceIcon, EyeIcon, FaceIcon, LockIcon, SparkleIcon } from '../../../icons'
 import { Colour, CommitText, Field, Slider } from './CharFields'
+import { MannequinPanel } from './MannequinPanel'
 import { PortraitCard, roleAge } from './PortraitCard'
 import { PreviewSelect } from './PreviewSelect'
 import { usePortraitPanels } from './portraitPanels'
@@ -11,6 +12,7 @@ import { Portrait } from './portrait/Portrait'
 import { randomPortrait } from './portrait/random'
 import { COLOUR_LABELS, PART_CROPS, PART_LABELS, SLIDER_LABELS, SWATCHES, optionsFor, previewBase, type ColourKey, type PartKey } from './portrait/registry'
 import { drawnOf } from './portrait/scene'
+import type { Characters } from './useCharacters'
 
 // A field may have a condition (`when`): the colour of a horn is only asked when there are horns.
 type FieldSpec =
@@ -98,10 +100,12 @@ export const PORTRAIT_SECTIONS: PortraitSectionSpec[] = [
 // The portrait of the open character: the card as it is drawn (it stays in view while the page scrolls) and beside it the choices it is made of, on one page of sections that
 // open and close. A choice from a list is a dropdown whose entries are drawn as they would look on this character; a colour is a row of swatches and a picker; a few sliders
 // fine-tune the face. Every change is one step of the character's undo (a slider or a colour moved several times in a row is one step).
-export function PortraitSection({ doc, edit, rename }: {
+export function PortraitSection({ projectId, doc, edit, rename, setFigure }: {
+  projectId: string
   doc: CharacterDoc
   edit: (change: (d: CharacterDoc) => CharacterDoc, group?: string) => void
   rename: (name: string) => void
+  setFigure: Characters['setFigure']
 }) {
   const uid = useId().replace(/[^A-Za-z0-9]/g, '')
   const panels = usePortraitPanels()
@@ -155,9 +159,10 @@ export function PortraitSection({ doc, edit, rename }: {
   return (
     <div className="charPortrait">
       <section className="charPanel charPanel--start charPortraitStage" aria-label="The portrait card">
-        <PortraitCard portrait={p} name={doc.name} caption={roleAge(doc.profile)} label={`${doc.name}, portrait`} className="charPortraitCard charPortraitCard--big" />
-        <p className="charHint">The name and the role and age under the card come from Profile. The tile colour is part of the portrait.</p>
-        <div className="charRandom" role="group" aria-label="Randomise">
+        <PortraitCard portrait={p} figure={doc.figure} crop="card" name={doc.name} caption={roleAge(doc.profile)} label={`${doc.name}, ${doc.figure ? 'figure' : 'portrait'}`} className="charPortraitCard charPortraitCard--big" />
+        <p className="charHint">The name and the role and age under the card come from Profile. {doc.figure ? 'The card colour is part of the mannequin.' : 'The tile colour is part of the portrait.'}</p>
+        <MannequinPanel projectId={projectId} doc={doc} setFigure={setFigure} />
+        {!doc.figure && <div className="charRandom" role="group" aria-label="Randomise">
           <button type="button" className="charIconBtn charDice" aria-label="Randomise the portrait" title="Randomise the portrait: new choices for every section that is not locked" onClick={randomise}>
             <DiceIcon size={20} />
           </button>
@@ -173,7 +178,7 @@ export function PortraitSection({ doc, edit, rename }: {
               </button>
             )
           })}
-        </div>
+        </div>}
       </section>
       <section className="charPanel charPanel--start charAcc" aria-label="Parts of the portrait">
         {PORTRAIT_SECTIONS.map(({ id, label, Icon, subs }) => {

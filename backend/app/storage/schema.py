@@ -674,6 +674,8 @@ class BookEdition(BaseModel):
     # The published maps and characters as they were when the book was published (frozen, like the chapters).
     maps: list["EditionMap"] = Field(default_factory=list)
     characters: list["EditionCharacter"] = Field(default_factory=list)
+    # The copies of models the characters' figures were made from, frozen with the edition (key -> copy).
+    figureModels: dict[str, "FigureModel"] = Field(default_factory=dict)
 
 
 class BookListing(BaseModel):
@@ -3812,6 +3814,198 @@ def _portrait_or_none(value: Any) -> Any:
     return value if isinstance(value, (dict, CharacterPortrait)) else None
 
 
+# ---- the figure of a character (the art mannequin, phase 6) ----
+#
+# A character may hold a figure: a frozen copy of a published model plus the writer's own choices. The copies are kept once in the project (`ProjectFile.figureModels`,
+# keyed by a hash of the content, so the same model version copied twice, by an import or by an edition, is one entry) and every figure points at one of them; the
+# choices are small. Nothing here refuses what a writer made: a value, form or colour the copy no longer has is cut when the figure is read, and a list that is too
+# long is cut to its limit (the figure is the writer's own data, the way the portrait is).
+
+FIGURE_MODEL_KEY = r"^[0-9a-f]{12}$"
+FIGURE_MAX_MODELS = 40       # frozen copies of models in one project
+FIGURE_MAX_MINE = 40         # the writer's own styles and presets on one figure
+FIGURE_MAX_LOCKS = 300       # objects and groups kept as they are when the look is randomised
+FIGURE_MAX_ENTRIES = 600     # sliders, forms, colours and layer offsets on one figure
+
+
+class FigureModel(BaseModel):
+    """A frozen copy of a published model, kept once in the project and shared by every figure that points at it. `id` is a hash of the content; `modelId` and `version`
+    say which published model it was copied from (so a writer can tell it from a newer one); the copy never changes when the admin publishes again."""
+
+    id: str = Field(pattern=FIGURE_MODEL_KEY)
+    modelId: str = Field(default="", max_length=80)
+    version: int = Field(default=0, ge=0)
+    name: str = Field(default="", max_length=MODEL_NAME_MAX)
+    publishedAt: Optional[datetime] = None
+    content: ModelContent
+
+    @field_validator("name", mode="before")
+    @classmethod
+    def _model_name(cls, value: Any) -> str:
+        return _cut(value, MODEL_NAME_MAX)
+
+
+class FigureColour(BaseModel):
+    """The colour chosen for a slot of the model: one of its default colours (`colour`) or a swatch of the character's palette (`swatch`), with the brightness and the
+    opacity the writer set inside the slot's range (none: the slot's resting values)."""
+
+    src: Literal["colour", "swatch"] = "colour"
+    id: str = Field(pattern=_MODEL_ID)
+    l: Optional[float] = None
+    a: Optional[float] = None
+
+    @field_validator("l", "a", mode="before")
+    @classmethod
+    def _percent_or_none(cls, value: Any) -> Optional[float]:
+        if isinstance(value, bool) or not isinstance(value, (int, float)):
+            return None
+        return _finite(value, 0.0, 0.0, 100.0)
+
+
+def _figure_ids(value: Any, limit: int) -> list[str]:
+    out: list[str] = []
+    for v in value if isinstance(value, list) else []:
+        ident = _optional_id(v)
+        if ident is not None and ident not in out:
+            out.append(ident)
+        if len(out) >= limit:
+            break
+    return out
+
+
+class CharacterFigure(BaseModel):
+    """What a writer chose for a character's figure (the model copy itself is `figureModels[model]`): the sliders away from rest (a pose and an expression are values), the
+    form on each axis and the member of each family (`objectId.axisId` -> form id, `class:classId` -> member id), the objects not worn, the colour of each slot, the character's
+    own palette (none: the model's starter palette), the card colour, the side hanging things fall to, the objects and groups kept as they are when the look is randomised,
+    layer offsets (`zoff`), the writer's own styles (`mine`, presets of the same shape the model has) and the genre the look is randomised within."""
+
+    model: str = Field(default="", pattern=r"^([0-9a-f]{12})?$")
+    values: dict[str, float] = Field(default_factory=dict)
+    forms: dict[str, str] = Field(default_factory=dict)
+    hidden: list[str] = Field(default_factory=list)
+    colours: dict[str, FigureColour] = Field(default_factory=dict)
+    palette: Optional[list[ModelSwatch]] = None
+    tile: str = MODEL_TILE_DEFAULT
+    fall: ModelFallSide = "down"
+    locks: list[str] = Field(default_factory=list)
+    zoff: dict[str, int] = Field(default_factory=dict)
+    mine: list[ModelPreset] = Field(default_factory=list)
+    genre: Optional[str] = None
+
+    @field_validator("model", mode="before")
+    @classmethod
+    def _figure_model(cls, value: Any) -> str:
+        return value if isinstance(value, str) and re.fullmatch(FIGURE_MODEL_KEY, value) else ""
+
+    @field_validator("values", mode="before")
+    @classmethod
+    def _figure_values(cls, value: Any) -> dict[str, float]:
+        if not isinstance(value, dict):
+            return {}
+        out = {k: _finite(v, 0.0, -1000.0, 1000.0) for k, v in value.items() if _optional_id(k) is not None and isinstance(v, (int, float)) and not isinstance(v, bool)}
+        return dict(list(out.items())[:FIGURE_MAX_ENTRIES])
+
+    @field_validator("forms", mode="before")
+    @classmethod
+    def _figure_forms(cls, value: Any) -> dict[str, str]:
+        if not isinstance(value, dict):
+            return {}
+        out = {k: v for k, v in value.items() if isinstance(k, str) and 3 <= len(k) <= 170 and _optional_id(v) is not None}
+        return dict(list(out.items())[:FIGURE_MAX_ENTRIES])
+
+    @field_validator("hidden", mode="before")
+    @classmethod
+    def _figure_hidden(cls, value: Any) -> list[str]:
+        return _figure_ids(value, FIGURE_MAX_ENTRIES)
+
+    @field_validator("locks", mode="before")
+    @classmethod
+    def _figure_locks(cls, value: Any) -> list[str]:
+        return _figure_ids(value, FIGURE_MAX_LOCKS)
+
+    @field_validator("colours", mode="before")
+    @classmethod
+    def _figure_colours(cls, value: Any) -> dict[str, Any]:
+        if not isinstance(value, dict):
+            return {}
+        out: dict[str, Any] = {}
+        for slot, choice in value.items():
+            if _optional_id(slot) is None or len(out) >= FIGURE_MAX_ENTRIES:
+                continue
+            try:
+                out[slot] = FigureColour.model_validate(choice)
+            except ValueError:
+                continue
+        return out
+
+    @field_validator("palette", mode="before")
+    @classmethod
+    def _figure_palette(cls, value: Any) -> Optional[list[Any]]:
+        if not isinstance(value, list):
+            return None
+        out: list[Any] = []
+        for item in value:
+            try:
+                out.append(ModelSwatch.model_validate(item))
+            except ValueError:
+                continue
+            if len(out) >= MODEL_PALETTE_MAX:
+                break
+        return out or None
+
+    @field_validator("tile", mode="before")
+    @classmethod
+    def _figure_tile(cls, value: Any) -> str:
+        return value.lower() if isinstance(value, str) and re.fullmatch(r"#[0-9a-fA-F]{6}", value) else MODEL_TILE_DEFAULT
+
+    @field_validator("fall", mode="before")
+    @classmethod
+    def _figure_fall(cls, value: Any) -> str:
+        return value if value in ("down", "left", "right", "behind") else "down"
+
+    @field_validator("zoff", mode="before")
+    @classmethod
+    def _figure_zoff(cls, value: Any) -> dict[str, int]:
+        if not isinstance(value, dict):
+            return {}
+        out = {k: int(round(_finite(v, 0.0, -50.0, 50.0))) for k, v in value.items() if _optional_id(k) is not None and isinstance(v, (int, float)) and not isinstance(v, bool)}
+        return dict(list((k, v) for k, v in out.items() if v != 0)[:FIGURE_MAX_ENTRIES])
+
+    @field_validator("mine", mode="before")
+    @classmethod
+    def _figure_mine(cls, value: Any) -> list[Any]:
+        if not isinstance(value, list):
+            return []
+        out: list[Any] = []
+        seen: set[str] = set()
+        for item in value:
+            try:
+                preset = ModelPreset.model_validate(item)
+            except ValueError:
+                continue
+            if preset.id in seen:
+                continue
+            seen.add(preset.id)
+            out.append(preset)
+            if len(out) >= FIGURE_MAX_MINE:
+                break
+        return out
+
+    @field_validator("genre", mode="before")
+    @classmethod
+    def _figure_genre(cls, value: Any) -> Optional[str]:
+        return _optional_id(value)
+
+
+def _figure_or_none(value: Any) -> Any:
+    """A figure as it was stored (a dict or the model), else none; a figure that does not point at a model copy is none."""
+    if isinstance(value, CharacterFigure):
+        return value if value.model else None
+    if isinstance(value, dict) and isinstance(value.get("model"), str) and re.fullmatch(FIGURE_MODEL_KEY, value["model"]):
+        return value
+    return None
+
+
 # ---- the profile, the relationships and the story of a character ----
 
 CHARACTER_MAX_FIELDS = 30
@@ -4005,11 +4199,18 @@ class CharacterState(BaseModel):
     snapshot: Optional[CharacterLook] = None
     # How the character looks in this state (a copy of the portrait); none = not captured.
     portrait: Optional[CharacterPortrait] = None
+    # The same for a figure: the choices (the model copy is the character's, in `figureModels`).
+    figure: Optional[CharacterFigure] = None
 
     @field_validator("portrait", mode="before")
     @classmethod
     def _state_portrait(cls, value: Any) -> Any:
         return _portrait_or_none(value)
+
+    @field_validator("figure", mode="before")
+    @classmethod
+    def _state_figure(cls, value: Any) -> Any:
+        return _figure_or_none(value)
 
     @field_validator("at", "storyTime", mode="before")
     @classmethod
@@ -4104,6 +4305,8 @@ class CharacterDoc(BaseModel):
     # The old figure's look, no longer drawn: it is kept as it was so that nothing the author made is lost.
     look: CharacterLook = Field(default_factory=CharacterLook)
     portrait: CharacterPortrait = Field(default_factory=CharacterPortrait)
+    # The art mannequin (phase 6): a copy of a model with the writer's choices. A character with a figure is drawn from it; one without is drawn from the portrait.
+    figure: Optional[CharacterFigure] = None
     profile: CharacterProfile = Field(default_factory=CharacterProfile)
     possessions: list[CharacterPossession] = Field(default_factory=list)
     relationships: list[CharacterRelationship] = Field(default_factory=list)
@@ -4179,6 +4382,11 @@ class CharacterDoc(BaseModel):
     def _portrait(cls, value: Any) -> Any:
         return _portrait_or_default(value)
 
+    @field_validator("figure", mode="before")
+    @classmethod
+    def _figure(cls, value: Any) -> Any:
+        return _figure_or_none(value)
+
 
 class EditionMap(BaseModel):
     """A published map as it was when the edition was made; `doc.reader` says what is shown from which chapter."""
@@ -4209,6 +4417,8 @@ class EditionCharacter(BaseModel):
     look: CharacterLook
     # How the card is drawn; an edition made before portraits has none (the reader's view then draws the default portrait).
     portrait: Optional[CharacterPortrait] = None
+    # The figure as it was (its model copy is in the edition's `figureModels`); a card with one is drawn from it.
+    figure: Optional[CharacterFigure] = None
     fields: list[EditionCharacterField] = Field(default_factory=list)
     relationships: list[EditionRelationship] = Field(default_factory=list)
     relationshipsRevealAt: Optional[int] = None
@@ -4217,6 +4427,11 @@ class EditionCharacter(BaseModel):
     @classmethod
     def _edition_portrait(cls, value: Any) -> Any:
         return _portrait_or_none(value)
+
+    @field_validator("figure", mode="before")
+    @classmethod
+    def _edition_figure(cls, value: Any) -> Any:
+        return _figure_or_none(value)
 
 
 BookEdition.model_rebuild()
@@ -4342,6 +4557,8 @@ class ProjectFile(BaseModel):
     maps: dict[str, MapDoc] = Field(default_factory=dict)
     # Character id -> the character (the cast). Read the way the maps are: one that cannot be read is dropped and kept in quarantine.
     characters: dict[str, CharacterDoc] = Field(default_factory=dict)
+    # Key -> a frozen copy of a published model, shared by the figures of the characters that use it (see FigureModel). One that cannot be read is dropped and kept in quarantine.
+    figureModels: dict[str, FigureModel] = Field(default_factory=dict)
     # Links between plot nodes, characters and places (see WorldLink); one that points at something that is gone is not shown and goes at the next change.
     worldLinks: list[WorldLink] = Field(default_factory=list)
     # Item id -> the item (the library of things that pass from hand to hand). Read the way the characters are.

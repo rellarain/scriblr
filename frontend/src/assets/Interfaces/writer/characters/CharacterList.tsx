@@ -1,5 +1,5 @@
 import { useMemo, useRef, useState, type CSSProperties } from 'react'
-import type { CharacterPortrait } from '../../../../api/types'
+import type { CharacterFigure, CharacterPortrait } from '../../../../api/types'
 import { CheckIcon, CloseIcon, CopyIcon, ExportIcon, ImportIcon, PlusIcon, TrashIcon } from '../../../icons'
 import SideResizer from '../levels/SideResizer'
 import { saveBlob } from '../maps/mapExport'
@@ -16,8 +16,10 @@ const HEX = /^#[0-9a-fA-F]{6}$/
 
 // The colours a character's card is drawn in: the colour of the portrait's tile as the background, and an ink that can be read on it (the tile can be any colour at all). They
 // are the character's own, so they are set on the card itself and the stylesheet only refers to them.
-function cardColours(portrait: CharacterPortrait | undefined): CSSProperties {
-  const tile = portrait && HEX.test(portrait.tileColor) ? portrait.tileColor : DEFAULT_TILE
+function cardColours(portrait: CharacterPortrait | undefined, figure: CharacterFigure | null | undefined): CSSProperties {
+  // A character with a figure has the card colour of the figure (the portrait's is no longer shown).
+  const wanted = figure ? figure.tile : portrait?.tileColor
+  const tile = wanted && HEX.test(wanted) ? wanted : DEFAULT_TILE
   return { '--cardBg': tile, '--cardInk': readableInk(tile) } as CSSProperties
 }
 
@@ -68,11 +70,12 @@ export function CharacterList({ c }: { c: Characters }) {
         <ul className="charRows">
           {c.cast.map(ch => {
             // The open character's portrait is the live one (a change that is not saved yet shows); the others are as saved.
-            const portrait = c.doc?.id === ch.id ? c.doc.portrait : ch.portrait
+            const live = c.doc?.id === ch.id ? c.doc : ch
+            const { portrait, figure } = live
             return (
-              <li key={ch.id} className={`charRowItem charRowItem--card${ch.id === c.openId ? ' charRowItem--on' : ''}`} style={cardColours(portrait)}>
+              <li key={ch.id} className={`charRowItem charRowItem--card${ch.id === c.openId ? ' charRowItem--on' : ''}`} style={cardColours(portrait, figure)}>
                 <button type="button" className="charRowMain" aria-label={`Open ${ch.name}`} aria-current={ch.id === c.openId ? 'true' : undefined} title={`Open ${ch.name}`} onClick={() => { void c.open(ch.id) }}>
-                  <PortraitCard portrait={portrait} name={ch.name} className="charRowCard" />
+                  <PortraitCard portrait={portrait} figure={figure} name={ch.name} className="charRowCard" />
                 </button>
                 <span className="charRowTools">
                   <button type="button" className="charIconBtn charRowTool" aria-label={`Save ${ch.name} to a file`} title={`Save ${ch.name} to a file`} onClick={() => { void exportThem([ch.id], ch.name) }}><ExportIcon size={16} /></button>

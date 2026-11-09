@@ -1,5 +1,6 @@
-import type { CharacterDoc, CharacterProfile, CharacterRelationship, CharacterState, OutlineNode, RelationshipKind } from '../../../../api/types'
+import type { CharacterDoc, CharacterPortrait, CharacterProfile, CharacterRelationship, CharacterState, ModelContent, OutlineNode, RelationshipKind } from '../../../../api/types'
 import { buildChildIndex } from '../outlineTree'
+import { describeFigure, figureDiff } from './figure/figureState'
 import { portraitDiff } from './portrait/diff'
 
 // Pure helpers for the profile, the relationships and the story of a character: where in the book a state or a change sits, what is true at a point, how a portrait differs
@@ -74,12 +75,23 @@ export function relationshipAt(rel: CharacterRelationship, points: StoryPoint[],
 // ---- how a portrait differs ----
 // (`portraitDiff`, in portrait/diff.ts, lists the differences between two portraits as lines: "Hair style: Plain > Full braids".)
 
-// What changed in how the character looks from one state with a captured portrait to the next (states with none are skipped).
+// What changed in how the character looks from one state with a captured look to the next (states with none are skipped). A look is a figure or a portrait; a figure is
+// read through the copy of its model (`copyOf`), so one whose copy is not here yet is left out until it is.
 export interface AppearanceGap { from: CharacterState; to: CharacterState; changes: string[] }
-export function appearanceGaps(states: CharacterState[], points: StoryPoint[]): AppearanceGap[] {
-  const shown = statesInOrder(states, points).filter(s => s.portrait)
+type Look = { kind: 'portrait'; portrait: CharacterPortrait } | { kind: 'figure'; lines: Array<[string, string]> }
+function lookOf(s: CharacterState, copyOf?: (key: string) => ModelContent | undefined): Look | null {
+  if (s.figure) {
+    const copy = copyOf?.(s.figure.model)
+    return copy ? { kind: 'figure', lines: describeFigure(copy, s.figure) } : null
+  }
+  return s.portrait ? { kind: 'portrait', portrait: s.portrait } : null
+}
+const lookDiff = (a: Look, b: Look): string[] => (a.kind === 'portrait' && b.kind === 'portrait' ? portraitDiff(a.portrait, b.portrait)
+  : a.kind === 'figure' && b.kind === 'figure' ? figureDiff(a.lines, b.lines) : ['Drawn another way: a mannequin and a portrait.'])
+export function appearanceGaps(states: CharacterState[], points: StoryPoint[], copyOf?: (key: string) => ModelContent | undefined): AppearanceGap[] {
+  const shown = statesInOrder(states, points).map(s => ({ s, look: lookOf(s, copyOf) })).filter((x): x is { s: CharacterState; look: Look } => x.look !== null)
   const out: AppearanceGap[] = []
-  for (let i = 1; i < shown.length; i += 1) out.push({ from: shown[i - 1], to: shown[i], changes: portraitDiff(shown[i - 1].portrait!, shown[i].portrait!) })
+  for (let i = 1; i < shown.length; i += 1) out.push({ from: shown[i - 1].s, to: shown[i].s, changes: lookDiff(shown[i - 1].look, shown[i].look) })
   return out
 }
 

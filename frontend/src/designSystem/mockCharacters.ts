@@ -1,4 +1,5 @@
 import type { CharacterCreate, CharacterDoc, CharacterSummary } from '../api/types'
+import { normalizeFigure } from '../assets/Interfaces/writer/characters/figure/figureState'
 import { defaultPortrait, normalizePortrait } from '../assets/Interfaces/writer/characters/portrait/defaults'
 import { emptyStory } from '../assets/Interfaces/writer/characters/story'
 import type { MockAnswer } from './mockPresets'
@@ -11,11 +12,11 @@ const fail = (status: number, detail: string): MockAnswer => ({ status, body: { 
 const AT = '2026-11-02T12:00:00.000Z'
 
 export function summaryOf(c: CharacterDoc): CharacterSummary {
-  return { id: c.id, name: c.name, order: c.order, updatedAt: c.updatedAt, portrait: c.portrait }
+  return { id: c.id, name: c.name, order: c.order, updatedAt: c.updatedAt, portrait: c.portrait, figure: c.figure ?? null }
 }
 
 export function newCharacter(id: string, body: CharacterCreate, order: number): CharacterDoc {
-  return { schemaVersion: 2, id, name: body.name?.trim() || 'Unnamed character', order, portrait: body.portrait ? normalizePortrait(body.portrait) : defaultPortrait(), look: body.look ?? {}, ...emptyStory(), updatedAt: AT }
+  return { schemaVersion: 2, id, name: body.name?.trim() || 'Unnamed character', order, portrait: body.portrait ? normalizePortrait(body.portrait) : defaultPortrait(), figure: normalizeFigure(body.figure), look: body.look ?? {}, ...emptyStory(), updatedAt: AT }
 }
 
 export function createMockCharacters(initial: CharacterDoc[] = []) {
@@ -44,7 +45,7 @@ export function createMockCharacters(initial: CharacterDoc[] = []) {
       if (b.id !== id) return fail(422, 'The id does not match.')
       // A relationship is with another character that is there, not with oneself.
       const relationships = (b.relationships ?? []).filter(r => cast.has(r.targetId) && r.targetId !== id)
-      const saved: CharacterDoc = { ...emptyStory(), ...b, relationships, name: b.name.trim() || 'Unnamed character', portrait: normalizePortrait(b.portrait), states: (b.states ?? []).map(st => ({ ...st, portrait: st.portrait ? normalizePortrait(st.portrait) : null })), updatedAt: `2026-11-02T12:${String(Math.floor(saves / 60) % 60).padStart(2, '0')}:${String(saves++ % 60).padStart(2, '0')}.000Z` }
+      const saved: CharacterDoc = { ...emptyStory(), ...b, relationships, name: b.name.trim() || 'Unnamed character', portrait: normalizePortrait(b.portrait), figure: normalizeFigure(b.figure), states: (b.states ?? []).map(st => ({ ...st, portrait: st.portrait ? normalizePortrait(st.portrait) : null, figure: normalizeFigure(st.figure) })), updatedAt: `2026-11-02T12:${String(Math.floor(saves / 60) % 60).padStart(2, '0')}:${String(saves++ % 60).padStart(2, '0')}.000Z` }
       cast.set(id, saved)
       return ok(saved)
     }

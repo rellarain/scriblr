@@ -3,7 +3,9 @@ import type { ArcStage, CharacterDoc, CharacterState, LifeEvent } from '../../..
 import { CHARACTER_MAX_EVENTS, CHARACTER_MAX_STAGES, CHARACTER_MAX_STATES } from '../../../../api/types'
 import { PlusIcon, TrashIcon } from '../../../icons'
 import { TextField } from './CharFields'
-import { Portrait } from './portrait/Portrait'
+import { CharacterArt } from './figure/CharacterArt'
+import { useFigureCopies } from './figure/figureModelStore'
+import { copyFigure } from './figure/figureState'
 import { appearanceGaps, nextId, stateAt, statesInOrder, type StoryPoint } from './story'
 
 // Names separated by commas, kept as typed (the comma and the space after it are not lost while typing).
@@ -20,7 +22,8 @@ function ListField({ label, items, onChange }: { label: string; items: string[];
 export function StorySection({ doc, edit, points, links }: { doc: CharacterDoc; edit: (change: (d: CharacterDoc) => CharacterDoc, group?: string) => void; points: StoryPoint[]; links?: ReactNode }) {
   const [at, setAt] = useState('')
   const ordered = statesInOrder(doc.states, points)
-  const gaps = appearanceGaps(doc.states, points)
+  const copyOf = useFigureCopies()
+  const gaps = appearanceGaps(doc.states, points, key => copyOf(key)?.content)
   const here = at ? stateAt(doc.states, points, at) : null
   const pointName = (id: string) => points.find(p => p.id === id)?.label ?? 'A part of the book that is gone'
 
@@ -55,7 +58,9 @@ export function StorySection({ doc, edit, points, links }: { doc: CharacterDoc; 
           </div>
         )}
         <ul className="charList2">
-          {ordered.map((s, i) => (
+          {ordered.map((s, i) => {
+            const kept = !!(s.figure || s.portrait), what = s.figure ? 'Figure' : 'Portrait'
+            return (
             <li key={s.id} className="charItem charItem--col" aria-label={`State ${i + 1}`}>
               <div className="charRow">
                 {pointSelect(`Where state ${s.id} starts`, s.at, v => setState(s.id, { at: v }))}
@@ -70,14 +75,15 @@ export function StorySection({ doc, edit, points, links }: { doc: CharacterDoc; 
               <ListField label={`Carrying in state ${s.id} (separate with commas)`} items={s.inventory} onChange={v => setState(s.id, { inventory: v })} />
               <TextField label={`Notes of state ${s.id}`} multiline rows={2} value={s.note} max={2000} onChange={v => setState(s.id, { note: v })} />
               <div className="charRow">
-                {s.portrait && <span className="charStateHead"><Portrait portrait={s.portrait} crop="head" label={`Portrait kept for state ${i + 1}`} className="charPortraitArt" /></span>}
-                <button type="button" className="charChip" onClick={() => setState(s.id, { portrait: structuredClone(doc.portrait) })}>{s.portrait ? 'Capture the portrait again' : 'Capture the portrait now'}</button>
-                {s.portrait && <button type="button" className="charChip" onClick={() => setState(s.id, { portrait: null })}>Forget the portrait</button>}
-                {s.portrait && <span className="charHint">A portrait is kept for this state.</span>}
-                {!s.portrait && s.snapshot && <span className="charHint">An older look is kept with this state; capture the portrait to compare.</span>}
+                {kept && <span className="charStateHead"><CharacterArt portrait={s.portrait} figure={s.figure} crop="head" label={`${what} kept for state ${i + 1}`} className="charPortraitArt" /></span>}
+                <button type="button" className="charChip" onClick={() => setState(s.id, doc.figure ? { figure: copyFigure(doc.figure), portrait: null } : { portrait: structuredClone(doc.portrait), figure: null })}>{kept ? `Capture the ${doc.figure ? 'figure' : 'portrait'} again` : `Capture the ${doc.figure ? 'figure' : 'portrait'} now`}</button>
+                {kept && <button type="button" className="charChip" onClick={() => setState(s.id, { portrait: null, figure: null })}>Forget the {what.toLowerCase()}</button>}
+                {kept && <span className="charHint">A {what.toLowerCase()} is kept for this state.</span>}
+                {!kept && s.snapshot && <span className="charHint">An older look is kept with this state; capture the {doc.figure ? 'figure' : 'portrait'} to compare.</span>}
               </div>
             </li>
-          ))}
+            )
+          })}
         </ul>
       </section>
       <section className="charPanel" aria-label="Changes of appearance">

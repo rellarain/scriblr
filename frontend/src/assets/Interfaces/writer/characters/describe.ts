@@ -279,10 +279,12 @@ export function appearanceText(profile: CharacterProfile): string {
 // The fields that are empty in a profile (so a first draft can fill just those).
 export const emptyAppearanceFields = (profile: CharacterProfile): AppearanceField[] => APPEARANCE_FIELDS.map(f => f.key).filter(k => profile[k].trim() === '')
 
-// A profile with the fields in `keys` written from the portrait (the other fields as they are; a field the portrait has no words for is left alone).
-export function writeFromPortrait(profile: CharacterProfile, portrait: CharacterPortrait, keys: AppearanceField[]): CharacterProfile {
-  const words = describePortrait(portrait)
+// A profile with the fields in `keys` written from some words (the other fields as they are; a field the words are empty for is left alone).
+export function writeFromWords(profile: CharacterProfile, words: Record<AppearanceField, string>, keys: AppearanceField[]): CharacterProfile {
   const next = { ...profile }
   for (const k of keys) if (words[k]) next[k] = words[k]
   return next
 }
+
+// The same from the portrait.
+export const writeFromPortrait = (profile: CharacterProfile, portrait: CharacterPortrait, keys: AppearanceField[]): CharacterProfile => writeFromWords(profile, describePortrait(portrait), keys)

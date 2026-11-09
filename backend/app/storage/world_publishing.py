@@ -12,6 +12,7 @@ from .book_publishing import chapters_in_order, latest_publication
 from .schema import (
     CHARACTER_SHARE_FIELDS,
     CharacterDoc,
+    CharacterFigure,
     CharacterPortrait,
     EditionCharacter,
     EditionCharacterField,
@@ -19,6 +20,7 @@ from .schema import (
     EditionRelationship,
     MapDoc,
     OutlineNode,
+    FigureModel,
     ProjectFile,
     ReaderShare,
 )
@@ -52,6 +54,8 @@ class ReaderCharacter(BaseModel):
     id: str
     name: str
     portrait: CharacterPortrait
+    # A character made with the art mannequin is drawn from its figure (the model copy is in `BookExtras.figureModels`); the portrait is its fallback.
+    figure: Optional[CharacterFigure] = None
     fields: list[ReaderCharacterField] = Field(default_factory=list)
     relationships: list[ReaderCharacterLink] = Field(default_factory=list)
 
@@ -63,6 +67,8 @@ class BookExtras(BaseModel):
     reach: int = 0
     maps: list[MapDoc] = Field(default_factory=list)
     characters: list[ReaderCharacter] = Field(default_factory=list)
+    # The copies of models the shown characters' figures are drawn from (key -> copy).
+    figureModels: dict[str, FigureModel] = Field(default_factory=dict)
     lockedMaps: int = 0
     lockedCharacters: int = 0
 
@@ -134,6 +140,7 @@ def freeze_character(doc: CharacterDoc) -> EditionCharacter:
         revealAt=share.revealAt,
         look=doc.look,
         portrait=doc.portrait.model_copy(deep=True),
+        figure=doc.figure.model_copy(deep=True) if doc.figure is not None else None,
         fields=_character_fields(doc),
         relationships=links,
         relationshipsRevealAt=share.reveals.get("relationships"),
@@ -170,7 +177,13 @@ def _visible_map(frozen: EditionMap, reach: int, public_ids: set[str]) -> MapDoc
     )
 
 
-def extras_view(book_id: str, maps: list[EditionMap], characters: list[EditionCharacter], reach: int) -> BookExtras:
+def freeze_figure_models(pf: ProjectFile, characters: list[EditionCharacter]) -> dict[str, FigureModel]:
+    """The copies of models the frozen characters' figures point at, taken from the project (what a new edition holds beside them)."""
+    keys = {c.figure.model for c in characters if c.figure is not None}
+    return {key: pf.figureModels[key].model_copy(deep=True) for key in sorted(keys) if key in pf.figureModels}
+
+
+def extras_view(book_id: str, maps: list[EditionMap], characters: list[EditionCharacter], reach: int, figure_models: Optional[dict[str, FigureModel]] = None) -> BookExtras:
     """What a reader who has reached chapter `reach` sees: what is revealed by then, with what is not left out."""
     open_maps = [m for m in maps if shown(m.doc.reader.revealAt, reach)]
     open_chars = [c for c in characters if shown(c.revealAt, reach)]
@@ -181,6 +194,7 @@ def extras_view(book_id: str, maps: list[EditionMap], characters: list[EditionCh
             id=c.characterId,
             name=c.name,
             portrait=c.portrait or CharacterPortrait(),
+            figure=c.figure,
             fields=[ReaderCharacterField(key=f.key, label=f.label, value=f.value) for f in c.fields if shown(f.revealAt, reach)],
             relationships=(
                 [ReaderCharacterLink(targetId=r.targetId, targetName=names[r.targetId], label=r.label, description=r.description) for r in c.relationships if r.targetId in names and r.targetId != c.characterId]
@@ -190,11 +204,14 @@ def extras_view(book_id: str, maps: list[EditionMap], characters: list[EditionCh
         )
         for c in open_chars
     ]
+    held = figure_models or {}
+    shown_keys = {c.figure.model for c in cards if c.figure is not None}
     return BookExtras(
         bookId=book_id,
         reach=reach,
         maps=[_visible_map(m, reach, public_maps) for m in open_maps],
         characters=cards,
+        figureModels={key: held[key] for key in sorted(shown_keys) if key in held},
         lockedMaps=len(maps) - len(open_maps),
         lockedCharacters=len(characters) - len(open_chars),
     )
@@ -203,7 +220,7 @@ def extras_view(book_id: str, maps: list[EditionMap], characters: list[EditionCh
 def preview(pf: ProjectFile, book_id: str, chapter: int) -> BookExtras:
     """The author's preview: the maps and characters as they are now, shown as a reader who has reached `chapter` would see them."""
     maps, characters = freeze_world(pf)
-    return extras_view(book_id, maps, characters, max(0, chapter))
+    return extras_view(book_id, maps, characters, max(0, chapter), freeze_figure_models(pf, characters))
 
 
 # ------------------------------------------------------------------------------------------------------------------------------ the author's chapters and warnings

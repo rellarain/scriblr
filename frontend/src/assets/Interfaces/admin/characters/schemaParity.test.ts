@@ -2,6 +2,7 @@
 import { readFileSync } from 'node:fs'
 import path from 'node:path'
 import { describe, expect, it } from 'vitest'
+import { FIGURE_MAX_LOCKS, FIGURE_MAX_MINE } from '../../../../api/types'
 import { LIMITS } from './engine/limits'
 import { AXIS_RANGE, DESCRIPTION_MAX, ROLE_MAX, FRAME_BIGGEST, FRAME_MIN, KIND_MAX, NAME_MAX, RANGE_NAME_MAX, SWATCH_NAME_MAX, TILE_DEFAULT } from './modelContent'
 
@@ -37,6 +38,8 @@ describe('the model types match the backend schema', () => {
     ['ModelGenre', 'ModelGenre'], ['ModelSwatch', 'ModelSwatch'], ['ModelColour', 'ModelColour'], ['ModelSlot', 'ModelSlot'],
     ['ModelTint', 'ModelTint'], ['ModelGradient', 'ModelGradient'], ['ModelLook', 'ModelLook'], ['ModelFade', 'ModelFade'],
     ['ModelBone', 'ModelBone'], ['ModelBoneEnd', 'ModelBoneEnd'], ['ModelFrame', 'ModelFrame'], ['ModelGrip', 'ModelGrip'],
+    // the figure of a character (phase 6)
+    ['CharacterFigure', 'CharacterFigure'], ['FigureColour', 'FigureColour'], ['FigureModel', 'FigureModel'],
   ]
   for (const [python, ts] of pairs) {
     it(`${ts} has the fields of ${python}`, () => {
@@ -66,6 +69,10 @@ describe('the limits are the backend\'s numbers', () => {
     expect(m, name).not.toBeNull()
     return m![1].split('*').map(x => Number(x.trim())).reduce((a, b) => a * b, 1)
   }
+  it('for the figure of a character: the writer\'s own styles and the objects and groups it locks', () => {
+    expect(FIGURE_MAX_MINE).toBe(number('FIGURE_MAX_MINE'))
+    expect(FIGURE_MAX_LOCKS).toBe(number('FIGURE_MAX_LOCKS'))
+  })
   it('for points, objects, shapes and the size of a copy', () => {
     expect(LIMITS.pointsWarn).toBe(number('MODEL_POINTS_WARN'))
     expect(LIMITS.pointsMax).toBe(number('MODEL_POINTS_MAX'))

@@ -11,6 +11,7 @@ import { defaultPortrait } from '../assets/Interfaces/writer/characters/portrait
 import { getExtrasPreview, getReaderExtras } from './bookPublishing'
 import { getBookExtras } from './reader'
 import { createCharacter, deleteCharacter, getCharacter, listAllCharacters, listCharacters, putCharacter } from './charactersApi'
+import { addFigureModel, listFigureModels } from './figureModelsApi'
 import { createItem, deleteItem, getItem, listAllItems, listItems, putItem } from './itemsApi'
 import { createMap, deleteMap, getMap, listMaps, listPlaces, putMap, createMapVersion } from './mapsApi'
 import { getOutline, putOutline } from './outlineApi'
@@ -62,6 +63,8 @@ const CASES: Array<[string, () => Promise<unknown>, string, string, unknown?]> =
   ['deleteMap', () => deleteMap(ID, ID), 'DELETE', `/api/projects/${ESC}/maps/${ESC}`],
   ['listCharacters', () => listCharacters(ID), 'GET', `/api/projects/${ESC}/characters`],
   ['listAllCharacters', () => listAllCharacters(ID), 'GET', `/api/projects/${ESC}/characters/all`],
+  ['listFigureModels', () => listFigureModels(ID), 'GET', `/api/projects/${ESC}/figure-models`],
+  ['addFigureModel', () => addFigureModel(ID, { modelId: 'adult' }), 'POST', `/api/projects/${ESC}/figure-models`, { modelId: 'adult' }],
   ['createCharacter', () => createCharacter(ID, { name: 'Ada' }), 'POST', `/api/projects/${ESC}/characters`, { name: 'Ada' }],
   ['getCharacter', () => getCharacter(ID, ID), 'GET', `/api/projects/${ESC}/characters/${ESC}`],
   ['putCharacter', () => putCharacter(ID, CHARACTER), 'PUT', `/api/projects/${ESC}/characters/${ESC}`, CHARACTER],

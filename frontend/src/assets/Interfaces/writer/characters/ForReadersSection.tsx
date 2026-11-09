@@ -89,7 +89,7 @@ export function ForReadersSection({ projectId, doc, edit, savedAt }: {
         <h3 className="charPanelTitle">Preview as a reader</h3>
         <div className="rvPreview">
           <ReachSelect chapters={chapters} value={reach} onChange={setReach} />
-          {card ? <CharacterCard card={card} /> : <p className="rvHint" role="status">{share.published ? 'Not shown yet at this point of the book, or not saved yet: the preview is of what is saved.' : 'Not shown to readers.'}</p>}
+          {card ? <CharacterCard card={card} copies={preview?.figureModels} /> : <p className="rvHint" role="status">{share.published ? 'Not shown yet at this point of the book, or not saved yet: the preview is of what is saved.' : 'Not shown to readers.'}</p>}
         </div>
       </section>
     </div>

@@ -2,7 +2,7 @@ import { DEFAULT_UI_SETTINGS, defaultThemeSettings } from '../theme/defaults'
 import { addHue, assignHue } from '../theme/themeHues'
 import { ZONE_KEYS, type ThemeSettings } from '../theme/types'
 import { enableZone } from '../theme/zones'
-import type { OutlineNode, OutlineTree, PlotNode, PlotTree, ProjectIndex, ProjectSummaryResponse, Publication } from '../api/types'
+import type { OutlineNode, OutlineTree, PlotNode, PlotTree, ProjectIndex, ProjectSummaryResponse, Publication, PublishedModelOut } from '../api/types'
 import type { DraftChapter, ProjectAnalytics } from '../types'
 import type { Holding, ReaderState } from '../api/reader'
 import { createMockSocial } from './mockSocial'
@@ -10,6 +10,8 @@ import { READER_BOOKS, READERS, bookDetailFixture, readerFixture, recommendation
 import { createMockPresets, previewPresets } from './mockPresets'
 import { createMockModels, previewModels } from './mockCharacterModels'
 import { createMockCharacters, seedCharacters } from './mockCharacters'
+import { blankFigure } from '../assets/Interfaces/writer/characters/figure/figureState'
+import { copyOf, createMockFigureModels } from './mockFigureModels'
 import { createMockItems, seedItems } from './mockItems'
 import { createMockMaps, seedMaps } from './mockMaps'
 import { createMockTraining, emptyProgress } from './mockTraining'
@@ -199,6 +201,12 @@ export function createMockBackend() {
   const maps = createMockMaps(seedMaps())
   // The Characters console's cast, which its edits change in memory only.
   const cast = createMockCharacters(seedCharacters())
+  // The copies of published models the cast's figures are drawn from (a model is copied from the catalog above when a character is given a figure).
+  const sample = copyOf(previewModels()[0].draft)
+  const figures = createMockFigureModels(() => (models.route('GET', ['published'], undefined).body as { models: PublishedModelOut[] }).models, [sample])
+  // Ada is drawn as a mannequin of the sample model, Bram as a portrait, so the cast shows both side by side.
+  const ada = cast.cast.get('chr_ada')
+  if (ada) ada.figure = { ...blankFigure(sample.id, sample.content), tile: '#cfe0dc', colours: { k_skin: { src: 'colour', id: 'c_skin_3' }, k_hair: { src: 'colour', id: 'c_hair_9' }, k_eye: { src: 'colour', id: 'c_eye_6' }, k_cloth: { src: 'colour', id: 'c_cloth_2' } } }
   // The Items console's library, which its edits change in memory only.
   const library = createMockItems(seedItems())
   // The Schedule console's planner, which its edits change in memory only.
@@ -270,6 +278,7 @@ export function createMockBackend() {
     }
     if (rest[0] === 'maps') { const answer = maps.route(method, rest.slice(1), body); return answer.body === undefined ? new Response(null, { status: answer.status }) : json(answer.body, answer.status) }
     if (rest[0] === 'items') { const answer = library.route(method, rest.slice(1), body); return answer.body === undefined ? new Response(null, { status: answer.status }) : json(answer.body, answer.status) }
+    if (rest[0] === 'figure-models') { const answer = figures.route(method, rest.slice(1), body); return answer.body === undefined ? new Response(null, { status: answer.status }) : json(answer.body, answer.status) }
     if (rest[0] === 'characters') { const answer = cast.route(method, rest.slice(1), body); return answer.body === undefined ? new Response(null, { status: answer.status }) : json(answer.body, answer.status) }
     if (rest[0] === 'analytics') return json(analytics(project))
     if (rest[0] === 'activity' && rest[1] === 'facets') return json(facetsFixture(localDay(), FIXTURE_IDS.book))

@@ -84,7 +84,7 @@ def test_nothing_is_shown_until_it_is_published(client: TestClient) -> None:
     _share_map(client, w["pid"], {"published": False})
     _share_character(client, w["pid"], "Ada", {"published": False, "fields": ["role"]})
     _publish(client, w)
-    assert _extras(client, w) == {"bookId": w["book"], "reach": 0, "maps": [], "characters": [], "lockedMaps": 0, "lockedCharacters": 0}
+    assert _extras(client, w) == {"bookId": w["book"], "reach": 0, "maps": [], "characters": [], "figureModels": {}, "lockedMaps": 0, "lockedCharacters": 0}
 
 
 def test_a_published_map_is_shown_from_its_chapter_and_a_symbol_from_its_own(client: TestClient) -> None:

@@ -36,6 +36,7 @@ def get_project(project_id: str, root: Path = Depends(get_storage_root)) -> Proj
     index = store.load_index(root, project_id)
     warnings: list[str] = []
     warnings.extend(store.consolidate_project_history(root, project_id))
+    store.prune_figure_models(root, project_id)
     facet_activity.compact_project(root, project_id)
     outline = None
     try:
