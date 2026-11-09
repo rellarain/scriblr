@@ -152,12 +152,26 @@ export function DesignerCanvas(p: CanvasProps) {
   const none = sel.kind === 'none'
   const through = p.through ?? null
   const throughOn = !!through
-  // The box the view is fitted to is found when the selection changes (or Fit is pressed) and then held: the view follows the selection, never what a drag does to it. Fit
-  // takes the box round everything that is drawn; a selection (or nothing, or Pose mode) gets room around it for its handles.
-  const fitKey = `${fitAll ? 'all' : `${sel.kind}:${sel.id}`}|${p.pose ? 1 : 0}|${p.viewKey ?? ''}|${p.viewNonce ?? 0}`
+  // The box the view is fitted to is found when Fit is pressed, the view (front or back) or Pose mode changes, or a selection is made that cannot be seen in the view, and then
+  // held: the view never follows what a drag does to the selection. A selection that is in view leaves the view where it is (however it was made: a click, a right-click
+  // that moves on through the modes, the tree), and so does selecting nothing. Fit takes the box round everything that is drawn; a selection (or Pose mode) gets room round
+  // it for its handles.
+  const forceKey = `${fitAll ? 'all' : 'sel'}|${p.pose ? 1 : 0}|${p.viewKey ?? ''}|${p.viewNonce ?? 0}`
+  const selKey = fitAll ? '' : `${sel.kind}:${sel.id}`
   const live: Box | null = fitAll ? boxOfSolved(solved, content.shapes) : none || p.pose ? FIGURE : boxOfSolved(solved, focus)
-  const fitted = useRef<{ key: string; box: Box; found: boolean } | null>(null)
-  if (!through && (!fitted.current || fitted.current.key !== fitKey || (!fitted.current.found && live))) fitted.current = { key: fitKey, box: live ?? FIGURE, found: live !== null }
+  const vbRef = useRef<Box | null>(null)   // the view as it was last drawn
+  const fitted = useRef<{ force: string; sel: string; box: Box; found: boolean; stamp: number } | null>(null)
+  if (!through) {
+    const cur = fitted.current
+    const fresh = () => { fitted.current = { force: forceKey, sel: selKey, box: live ?? FIGURE, found: live !== null, stamp: (cur?.stamp ?? 0) + 1 } }
+    if (!cur || cur.force !== forceKey || (!cur.found && live)) fresh()
+    else if (cur.sel !== selKey) {
+      const seen = vbRef.current
+      if (!none && live && seen && !within(live, seen)) fresh()
+      else fitted.current = { ...cur, sel: selKey }
+    }
+  }
+  const fitStamp = fitted.current?.stamp ?? 0
   const box: Box = through ? through.box : fitted.current?.box ?? FIGURE
   const tight = fitAll && !through
   let w = Math.max(box.w * (through ? 1.12 : tight ? 1.04 : 1.7) + (tight ? 6 : 0), 24), h = Math.max(box.h * (through ? 1.12 : tight ? 1.04 : 1.7) + (tight ? 6 : 0), 21)
@@ -165,6 +179,7 @@ export function DesignerCanvas(p: CanvasProps) {
   else h = w / ASPECT
   w /= zoom; h /= zoom
   const vb = { x: box.x + box.w / 2 + pan.x - w / 2, y: box.y + box.h / 2 + pan.y - h / 2, w, h }
+  vbRef.current = vb
   const u = vb.w / 640   // one screen pixel in model units, roughly
 
   const shape = activeShape(content, sel)
@@ -191,15 +206,13 @@ export function DesignerCanvas(p: CanvasProps) {
   const options = { mirror, snap, axis }
 
   // A new fit starts from the middle of the view (a pan belongs to the fit it was made in).
-  useLayoutEffect(() => { setPan(q => (q.x === 0 && q.y === 0 ? q : { x: 0, y: 0 })) }, [fitKey, throughOn])
+  useLayoutEffect(() => { setPan(q => (q.x === 0 && q.y === 0 ? q : { x: 0, y: 0 })) }, [fitStamp, throughOn])
 
   // Holding a drag at an edge or a corner pans the view (see EDGE). The thing being dragged follows the view: after the view moves, the held pointer is handed to onMove again.
   const lastPointer = useRef<{ clientX: number; clientY: number } | null>(null)
   const edgeSince = useRef<number | null>(null)
   const follow = useRef(false)
   const frame = useRef(0)
-  const vbRef = useRef(vb)
-  vbRef.current = vb
   const moved = useRef(p.onViewMoved)
   moved.current = p.onViewMoved
   const moveRef = useRef(onMove)
@@ -226,7 +239,7 @@ export function DesignerCanvas(p: CanvasProps) {
         else {
           if (edgeSince.current === null) edgeSince.current = now
           if (now - edgeSince.current >= EDGE_HOLD) {
-            const v = vbRef.current
+            const v = vbRef.current ?? vb
             follow.current = true
             setPan(q => ({ x: q.x + ax * EDGE_SPEED * dt * (v.w / r.w), y: q.y + ay * EDGE_SPEED * dt * (v.h / r.h) }))
             moved.current?.()
@@ -545,6 +558,9 @@ export function DesignerCanvas(p: CanvasProps) {
     </svg>
   )
 }
+
+// Whether a box lies wholly inside another.
+const within = (inner: Box, outer: Box): boolean => inner.x >= outer.x && inner.y >= outer.y && inner.x + inner.w <= outer.x + outer.w && inner.y + inner.h <= outer.y + outer.h
 
 // The box around the solved shapes of a selection (null when none of them is drawn).
 function boxOfSolved(solved: Solved, shapes: ModelShape[]): Box | null {

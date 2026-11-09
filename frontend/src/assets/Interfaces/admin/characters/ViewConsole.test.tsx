@@ -1,4 +1,4 @@
-import { act, fireEvent, render, screen } from '@testing-library/react'
+import { act, fireEvent, render, screen, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import type { ModelContent } from '../../../../api/types'
@@ -77,14 +77,60 @@ describe('the view while something is dragged', () => {
     await user.click(screen.getByRole('button', { name: 'Move shape' }))
   })
 
-  it('fits the new selection when the selection changes', async () => {
+  it('leaves the view where it is when what is selected is in view, however it is selected', async () => {
     await open()
+    const start = viewBox()
+    // a click on a shape, and a click on another one
     pointer(pathOf('torso'), 'pointerdown', pixelOf(100, 90))
     pointer(canvas(), 'pointerup')
-    const torso = viewBox()
+    expect(viewBox()).toEqual(start)
     pointer(pathOf('arm'), 'pointerdown', pixelOf(141, 90))
     pointer(canvas(), 'pointerup')
-    expect(viewBox()).not.toEqual(torso)
+    expect(viewBox()).toEqual(start)
+    // a right-click selects a shape, moves it on to Move shape, and then unselects it: none of it moves the view
+    for (const id of ['torso', 'torso', 'torso']) {
+      pointer(pathOf(id), 'pointerdown', { ...pixelOf(100, 90), button: 2 })
+      pointer(canvas(), 'pointerup', { button: 2 })
+      expect(viewBox()).toEqual(start)
+    }
+    expect(screen.getByRole('button', { name: 'Point editor' })).toHaveAttribute('aria-pressed', 'true')
+    // a right-click on the grid unselects, and nothing selected leaves the view too
+    pointer(pathOf('arm'), 'pointerdown', { ...pixelOf(141, 90), button: 2 })
+    pointer(canvas(), 'pointerup', { button: 2 })
+    pointer(canvas(), 'pointerdown', { x: 10, y: 10, button: 2 })
+    pointer(canvas(), 'pointerup', { button: 2 })
+    expect(viewBox()).toEqual(start)
+  })
+
+  it('fits a selection that cannot be seen in the view, and then holds that view', async () => {
+    const user = await open()
+    const tree = () => within(screen.getByRole('navigation', { name: 'Model tree' }))
+    // the view is panned right away from the figure (a right-drag), so nothing is in it
+    const panAway = () => {
+      pointer(canvas(), 'pointerdown', { x: 600, y: 300, button: 2 })
+      pointer(canvas(), 'pointermove', { x: 50, y: 300, button: 2 })
+      pointer(canvas(), 'pointerup', { button: 2 })
+    }
+    panAway()
+    const away = viewBox()
+    expect(away[0]).toBeGreaterThan(148)
+    await user.click(tree().getByRole('button', { name: 'Torso shape' }))
+    const torso = viewBox()
+    expect(torso).not.toEqual(away)
+    expect(torso[0]).toBeLessThanOrEqual(70)
+    expect(torso[0] + torso[2]).toBeGreaterThanOrEqual(130)
+    // and again for the arm, from a view that has gone away from it
+    panAway()
+    expect(viewBox()[0]).toBeGreaterThan(148)
+    await user.click(tree().getByRole('button', { name: 'Arm shape' }))
+    const arm = viewBox()
+    expect(arm[0]).toBeLessThanOrEqual(134)
+    expect(arm[0] + arm[2]).toBeGreaterThanOrEqual(148)
+    // the torso sticks out of that view, so selecting it fits it again
+    await user.click(tree().getByRole('button', { name: 'Torso shape' }))
+    expect(viewBox()).not.toEqual(arm)
+    expect(viewBox()[0]).toBeLessThanOrEqual(70)
+    expect(viewBox()[0] + viewBox()[2]).toBeGreaterThanOrEqual(130)
   })
 
   it('pans only while the drag is held at an edge, after a short hold, and the shape follows the view', async () => {
@@ -208,10 +254,14 @@ describe('Fit to screen', () => {
     pointer(canvas(), 'pointermove', { x: 380, y: 340, button: 2 })
     pointer(canvas(), 'pointerup', { button: 2 })
     expect(viewBox()).not.toEqual(torso)
-    pointer(pathOf('arm'), 'pointerdown', pixelOf(141, 90 + 0))
+    // a selection that is in the panned view leaves it as it is, a pan belongs to the view it was made in
+    const panned = viewBox()
+    const arm = pathOf('arm').getBoundingClientRect()
+    expect(arm).toBeTruthy()
+    pointer(pathOf('torso'), 'pointerdown', pixelOf(100, 90))
     pointer(canvas(), 'pointerup')
-    const arm = viewBox()
-    expect(arm[0] + arm[2] / 2).toBeCloseTo(141, 0)
-    await user.click(screen.getByRole('button', { name: 'Zoom out' }))
+    expect(viewBox()).toEqual(panned)
+    await user.click(screen.getByRole('button', { name: 'Fit to screen' }))
+    expect(viewBox()[0] + viewBox()[2] / 2).toBeCloseTo(109, 0)   // the middle of everything that is drawn (70..148)
   })
 })
