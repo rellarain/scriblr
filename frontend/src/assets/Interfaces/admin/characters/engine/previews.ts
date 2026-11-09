@@ -1,4 +1,5 @@
-import type { ModelContent, ModelRange } from '../../../../../api/types'
+import type { ModelContent, ModelRange, ModelSwatch } from '../../../../../api/types'
+import { paletteOf, randomPalette, rollChoices, slotsOf, type SlotChoices } from './colour'
 import { axesFor, classKey, classesOf, formKey, membersOf, presetsOf } from './forms'
 import type { Box } from './geometry'
 import { applyPreset, type TestState } from './presets'
@@ -33,6 +34,9 @@ export interface PreviewSpec {
   // The form each axis shows ("objectId.axisId" to form id) and the things switched off (empty when the model has none).
   forms: Record<string, string>
   hidden: string[]
+  // The colouring of this preview: its own palette and the colour chosen for each slot (empty when the model has no slots: the figure is gray).
+  palette: ModelSwatch[]
+  choices: SlotChoices
 }
 
 export const PREVIEW_RANGES = { scale: [0.35, 1.4], tilt: [-28, 28], skew: [-14, 14] } as const
@@ -77,18 +81,27 @@ function looks(c: ModelContent | undefined, mode: PreviewMode, rng: Rng, values:
   return state
 }
 
+// The colouring of one preview, from a stream of its own so the sizes, tilts and sliders of a seed stay as they were: a random one has a palette of its own and a
+// random default colour or swatch for every slot; the stress previews use the model's palette (else a random one) with brightness and opacity at the smallest or
+// the largest of each range.
+function colouring(c: ModelContent | undefined, mode: PreviewMode, rng: Rng): Pick<PreviewSpec, 'palette' | 'choices'> {
+  if (!c || slotsOf(c).length === 0) return { palette: [], choices: {} }
+  const palette = mode === 'rand' || paletteOf(c).length === 0 ? randomPalette(rng) : paletteOf(c)
+  return { palette, choices: rollChoices(c, rng, palette, {}, { extreme: mode === 'min' ? 'min' : mode === 'max' ? 'max' : null }) }
+}
+
 export function previewSpecs(seed: number, mode: PreviewMode, count = 6, ranges: ModelRange[] = [], content?: ModelContent): PreviewSpec[] {
-  const rng = seededRng(seed), out: PreviewSpec[] = []
+  const rng = seededRng(seed), crng = seededRng((seed ^ 0x9e3779b9) >>> 0), out: PreviewSpec[] = []
   const [s0, s1] = PREVIEW_RANGES.scale, [t0, t1] = PREVIEW_RANGES.tilt, [k0, k1] = PREVIEW_RANGES.skew
   for (let i = 0; i < count; i++) {
     const bg = i % PREVIEW_BACKGROUNDS
-    if (mode === 'min') out.push({ scale: s0, tilt: i % 2 ? t1 : t0, skew: i % 2 ? k1 : k0, flip: i % 3 === 0, bg, ...looks(content, mode, rng, sliderValues(ranges, mode, rng)) })
-    else if (mode === 'max') out.push({ scale: s1, tilt: i % 2 ? t0 : t1, skew: i % 2 ? k0 : k1, flip: i % 3 === 1, bg, ...looks(content, mode, rng, sliderValues(ranges, mode, rng)) })
+    if (mode === 'min') out.push({ scale: s0, tilt: i % 2 ? t1 : t0, skew: i % 2 ? k1 : k0, flip: i % 3 === 0, bg, ...looks(content, mode, rng, sliderValues(ranges, mode, rng)), ...colouring(content, mode, crng) })
+    else if (mode === 'max') out.push({ scale: s1, tilt: i % 2 ? t0 : t1, skew: i % 2 ? k0 : k1, flip: i % 3 === 1, bg, ...looks(content, mode, rng, sliderValues(ranges, mode, rng)), ...colouring(content, mode, crng) })
     else {
       // three draws averaged: most previews are ordinary, a few are extreme
       const pick = (lo: number, hi: number) => lo + (hi - lo) * ((rng() + rng() + rng()) / 3)
       const scale = Math.round(pick(0.5, 1.15) * 100) / 100, tilt = Math.round(pick(t0, t1) * 10) / 10, skew = Math.round(pick(k0, k1) * 10) / 10, flip = rng() < 0.25
-      out.push({ scale, tilt, skew, flip, bg, ...looks(content, mode, rng, sliderValues(ranges, mode, rng)) })
+      out.push({ scale, tilt, skew, flip, bg, ...looks(content, mode, rng, sliderValues(ranges, mode, rng)), ...colouring(content, mode, crng) })
     }
   }
   return out

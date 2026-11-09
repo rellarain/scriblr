@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from 'react'
 import { discardModelChanges, getModels, publishModel, putModels, restoreModelVersion, unpublishModel } from '../../../../api/characterModelsApi'
 import type { ModelCatalog, ModelContent, ModelDraftList, ModelEntry } from '../../../../api/types'
 import { combineCountdown, combineSaveStatus, useAutosave } from '../../../../lib/useAutosave'
-import { blankContent, copyName, moveBefore, normalizeContent, randomId, type MakeId } from './modelContent'
+import { copyName, moveBefore, normalizeContent, randomId, starterContent, type MakeId } from './modelContent'
 
 type LoadStatus = 'loading' | 'ready' | 'error'
 
@@ -82,7 +82,7 @@ export function useCharacterModels(makeId: MakeId = randomId) {
     commit(ref.current.map(e => (e.id === id ? { ...e, draft } : e)), false)
   }
 
-  function addModel(content: ModelContent = blankContent(), afterId?: string): string {
+  function addModel(content: ModelContent = starterContent(), afterId?: string): string {
     const id = makeId('model')
     const entry: ModelEntry = { id, draft: content, published: null, history: [], nextVersion: 1 }
     const list = ref.current

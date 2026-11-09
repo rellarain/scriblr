@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { publishFaults } from '../assets/Interfaces/admin/characters/modelContent'
+import { grayHex, paintOf, paletteOf, rollChoices, slotById } from '../assets/Interfaces/admin/characters/engine/colour'
 import { classKey } from '../assets/Interfaces/admin/characters/engine/forms'
 import { applyPreset, restState } from '../assets/Interfaces/admin/characters/engine/presets'
 import { rigCheck } from '../assets/Interfaces/admin/characters/engine/rigCheck'
@@ -123,6 +124,25 @@ describe('the rigged preview model', () => {
     expect(seen.shapes[shapesOf('Hooded').find(id => id !== iris)!].visible).toBe(true)
     expect(seen.shapes[iris].visible).toBe(false)
     expect(seen.shapes[shapesOf('Almond')[0]].visible).toBe(false)
+  })
+
+  it('is painted from the standard slots: gray until colours are chosen, the eye white a fixed white, copies and twins following', () => {
+    const shape = (id: string) => adult.shapes.find(s => s.id === id)!
+    const none = { palette: paletteOf(adult), choices: {} }
+    expect(paintOf(adult, none, shape('s_head')).fill).toBe(grayHex(slotById(adult, 'k_skin')!.lRest))
+    expect(paintOf(adult, none, shape('s_shirt')).fill).toBe(grayHex(slotById(adult, 'k_cloth')!.lRest))
+    expect(paintOf(adult, none, shape('s_eye')).fill).toBe('#ffffff')
+    const colouring = { palette: paletteOf(adult), choices: { k_eye: { src: 'colour' as const, id: 'c_eye_6' }, k_skin: { src: 'swatch' as const, id: 'k1' } } }
+    const iris = paintOf(adult, colouring, shape('s_iris'))
+    expect(iris.fill).toBe(slotById(adult, 'k_eye')!.colours[5].hex)
+    // a member's iris follows the pattern's, and so does the twin of the arm
+    const followers = adult.shapes.filter(s => s.copyOf === 's_iris')
+    expect(followers).toHaveLength(3)
+    for (const f of followers) expect(paintOf(adult, colouring, f)).toEqual(iris)
+    const twinArm = adult.shapes.find(s => s.mirrorOf === 's_arm')!
+    expect(paintOf(adult, colouring, twinArm)).toEqual(paintOf(adult, colouring, shape('s_arm')))
+    const rolled = rollChoices(adult, () => 0.4, paletteOf(adult), {}, { genre: 'g_fantasy' })
+    expect(Object.keys(rolled).sort()).toEqual(adult.slots!.map(s => s.id).sort())
   })
 
   it('keeps the older published versions simple and valid', () => {

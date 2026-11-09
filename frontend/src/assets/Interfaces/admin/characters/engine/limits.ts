@@ -33,6 +33,14 @@ export const LIMITS = {
   membersWarn: 12,
   membersMax: 24,
   presetFormsMax: 100,
+  // colour: genre tags per model, colour slots per model, default colours per slot, swatches of the starter palette (the stops are the server's max_lengths)
+  genresWarn: 8,
+  genresMax: 12,
+  slotsWarn: 16,
+  slotsMax: 32,
+  coloursWarn: 40,
+  coloursMax: 64,
+  paletteMax: 10,
   // how many of each a model may hold (the server's caps)
   shapesMax: 600,
   objectsMax: 200,
@@ -92,6 +100,11 @@ export function limitNotes(content: ModelContent): LimitNote[] {
     const members = content.objects.filter(o => o.classOf === k.id).length
     add(level(members, LIMITS.membersWarn, LIMITS.membersMax), `Class ${k.name || k.id} has ${members} members: the warning starts above ${LIMITS.membersWarn}.`, `Class ${k.name || k.id} has ${members} members: the limit is ${LIMITS.membersMax}.`)
   }
+  const slots = content.slots ?? []
+  add(level(slots.length, LIMITS.slotsWarn, LIMITS.slotsMax), `The model has ${slots.length} colour slots: the warning starts above ${LIMITS.slotsWarn}.`, `The model has ${slots.length} colour slots: the limit is ${LIMITS.slotsMax}.`)
+  for (const sl of slots) add(level(sl.colours.length, LIMITS.coloursWarn, LIMITS.coloursMax), `${sl.name || sl.id} has ${sl.colours.length} default colours: the warning starts above ${LIMITS.coloursWarn}.`, `${sl.name || sl.id} has ${sl.colours.length} default colours: the limit is ${LIMITS.coloursMax}.`)
+  const genres = (content.genres ?? []).length
+  add(level(genres, LIMITS.genresWarn, LIMITS.genresMax), `The model has ${genres} genres: the warning starts above ${LIMITS.genresWarn}.`, `The model has ${genres} genres: the limit is ${LIMITS.genresMax}.`)
   const links = linkCount(content)
   if (links > LIMITS.linksWarn) notes.push({ level: links > LIMITS.linksMax ? 'stop' : 'warn', text: links > LIMITS.linksMax ? `The model has ${links} point links: the limit is ${LIMITS.linksMax}, so it cannot be published.` : `The model has ${links} point links: the warning starts above ${LIMITS.linksWarn}.` })
   for (const g of content.groups) {

@@ -1212,6 +1212,14 @@ MODEL_CLASSES_MAX = 24
 MODEL_MEMBERS_WARN = 12
 MODEL_MEMBERS_MAX = 24   # more than this is a publish fault
 MODEL_PRESET_FORMS_MAX = 100   # form choices one style may keep
+MODEL_GENRES_WARN = 8    # colour (phase 4): genre tags per model, colour slots per model, default colours per slot, swatches of the starter palette
+MODEL_GENRES_MAX = 12
+MODEL_SLOTS_WARN = 16
+MODEL_SLOTS_MAX = 32
+MODEL_COLOURS_WARN = 40
+MODEL_COLOURS_MAX = 64
+MODEL_PALETTE_MAX = 10
+MODEL_SWATCH_NAME_MAX = 30
 _MODEL_ID = r"^[A-Za-z0-9_.-]{1,80}$"
 ModelPointMode = Literal["c", "s", "cs", "sc"]
 ModelLayer = Literal["body", "clothing", "hair"]
@@ -1360,6 +1368,10 @@ class ModelShape(BaseModel):
     # the member's own group; with points it has an outline of its own. `hide` leaves an inherited shape out of this member.
     copyOf: Optional[str] = None
     hide: bool = False
+    # The colour (phase 4): the slot the shape is painted from (a twin follows its original's, a shape that follows the template its template shape's, when
+    # this is None), else a fixed gray 0..100 (an eye white, teeth), else the neutral gray every uncoloured model is drawn in.
+    slot: Optional[str] = None
+    gray: Optional[int] = None
 
     @field_validator("name", mode="before")
     @classmethod
@@ -1371,10 +1383,17 @@ class ModelShape(BaseModel):
     def _hide(cls, value: Any) -> bool:
         return value is True
 
-    @field_validator("mirrorOf", "loose", "copyOf", mode="before")
+    @field_validator("mirrorOf", "loose", "copyOf", "slot", mode="before")
     @classmethod
     def _links(cls, value: Any) -> Optional[str]:
         return _optional_id(value)
+
+    @field_validator("gray", mode="before")
+    @classmethod
+    def _gray(cls, value: Any) -> Optional[int]:
+        if value is None or isinstance(value, bool) or not isinstance(value, (int, float)):
+            return None
+        return int(round(_finite(value, 50.0, 0.0, 100.0)))
 
     @field_validator("back", mode="before")
     @classmethod
@@ -1811,6 +1830,128 @@ class ModelPreset(BaseModel):
         return out
 
 
+def _model_hex(value: Any) -> str:
+    """A colour as #rrggbb in lower case; anything else is a mid gray."""
+    return value.lower() if isinstance(value, str) and re.fullmatch(r"#[0-9a-fA-F]{6}", value) else "#808080"
+
+
+def _percent(value: Any, default: int) -> int:
+    return int(round(_finite(value, float(default), 0.0, 100.0)))
+
+
+class ModelGenre(BaseModel):
+    """A genre tag of the model (Fiction, Fantasy, Non-fiction...): a default colour says which genres it fits, so a character made for a project of that genre
+    only draws its random colours from those."""
+
+    id: str = Field(pattern=_MODEL_ID)
+    name: str = Field(default="", max_length=MODEL_SWATCH_NAME_MAX)
+
+    @field_validator("name", mode="before")
+    @classmethod
+    def _trim(cls, value: Any) -> Any:
+        return value.strip()[:MODEL_SWATCH_NAME_MAX] if isinstance(value, str) else value
+
+
+class ModelSwatch(BaseModel):
+    """A swatch of the starter palette a new character gets: a hue and a saturation (brightness and opacity belong to the object using it)."""
+
+    id: str = Field(pattern=_MODEL_ID)
+    name: str = Field(default="", max_length=MODEL_SWATCH_NAME_MAX)
+    h: int = 0
+    s: int = 50
+
+    @field_validator("name", mode="before")
+    @classmethod
+    def _trim(cls, value: Any) -> Any:
+        return value.strip()[:MODEL_SWATCH_NAME_MAX] if isinstance(value, str) else value
+
+    @field_validator("h", mode="before")
+    @classmethod
+    def _hue(cls, value: Any) -> int:
+        return int(round(_finite(value, 0.0, 0.0, 359.0)))
+
+    @field_validator("s", mode="before")
+    @classmethod
+    def _sat(cls, value: Any) -> int:
+        return _percent(value, 50)
+
+
+class ModelColour(BaseModel):
+    """A default colour of a slot (an eye colour, a skin tone): `hex` is the colour exactly, `genres` the genre tags it fits (none: every genre)."""
+
+    id: str = Field(pattern=_MODEL_ID)
+    name: str = Field(default="", max_length=MODEL_NAME_MAX)
+    hex: str = "#808080"
+    genres: list[str] = Field(default_factory=list, max_length=MODEL_GENRES_MAX)
+
+    @field_validator("name", mode="before")
+    @classmethod
+    def _trim(cls, value: Any) -> Any:
+        return value.strip()[:MODEL_NAME_MAX] if isinstance(value, str) else value
+
+    @field_validator("hex", mode="before")
+    @classmethod
+    def _hex(cls, value: Any) -> str:
+        return _model_hex(value)
+
+    @field_validator("genres", mode="before")
+    @classmethod
+    def _genres(cls, value: Any) -> list[str]:
+        if not isinstance(value, list):
+            return []
+        out: list[str] = []
+        for v in value:
+            ident = _optional_id(v)
+            if ident is not None and ident not in out:
+                out.append(ident)
+        return out[:MODEL_GENRES_MAX]
+
+
+class ModelSlot(BaseModel):
+    """A colour slot (Skin, Hair, Eye...): the default colours the admin offers, and how bright (`l`, 0..100) and how opaque (`a`, 0..100) a colour in it may
+    be, each as a smallest, a resting and a largest value. A shape picks a slot; the character picks the colour."""
+
+    id: str = Field(pattern=_MODEL_ID)
+    name: str = Field(default="", max_length=MODEL_NAME_MAX)
+    lMin: int = 0
+    lRest: int = 50
+    lMax: int = 100
+    aMin: int = 100
+    aRest: int = 100
+    aMax: int = 100
+    colours: list[ModelColour] = Field(default_factory=list, max_length=MODEL_COLOURS_MAX)
+
+    @field_validator("name", mode="before")
+    @classmethod
+    def _trim(cls, value: Any) -> Any:
+        return value.strip()[:MODEL_NAME_MAX] if isinstance(value, str) else value
+
+    @field_validator("lMin", "lRest", "lMax", mode="before")
+    @classmethod
+    def _l(cls, value: Any) -> int:
+        return _percent(value, 50)
+
+    @field_validator("aMin", "aRest", "aMax", mode="before")
+    @classmethod
+    def _a(cls, value: Any) -> int:
+        return _percent(value, 100)
+
+    @field_validator("colours", mode="before")
+    @classmethod
+    def _colours(cls, value: Any) -> list[Any]:
+        return _keep_valid(ModelColour, value)
+
+    @model_validator(mode="after")
+    def _repair(self) -> "ModelSlot":
+        self.lMax = max(self.lMax, self.lMin)
+        self.lRest = min(self.lMax, max(self.lMin, self.lRest))
+        self.aMax = max(self.aMax, self.aMin)
+        self.aRest = min(self.aMax, max(self.aMin, self.aRest))
+        seen: set[str] = set()
+        self.colours = [c for c in self.colours if not (c.id in seen or seen.add(c.id))]
+        return self
+
+
 class ModelContent(BaseModel):
     """A model and everything in it. A draft may be unfinished (no name, dangling ids); publish_faults says what stops it being published."""
 
@@ -1826,6 +1967,25 @@ class ModelContent(BaseModel):
     presets: list[ModelPreset] = Field(default_factory=list, max_length=MODEL_PRESETS_MAX)
     # Template objects and their members (phase 3b).
     classes: list[ModelClass] = Field(default_factory=list, max_length=MODEL_CLASSES_MAX)
+    # Colour (phase 4): the genre tags, the starter palette a new character gets, and the colour slots shapes are painted from.
+    genres: list[ModelGenre] = Field(default_factory=list, max_length=MODEL_GENRES_MAX)
+    palette: list[ModelSwatch] = Field(default_factory=list, max_length=MODEL_PALETTE_MAX)
+    slots: list[ModelSlot] = Field(default_factory=list, max_length=MODEL_SLOTS_MAX)
+
+    @field_validator("genres", mode="before")
+    @classmethod
+    def _genres(cls, value: Any) -> list[Any]:
+        return _keep_valid(ModelGenre, value)
+
+    @field_validator("palette", mode="before")
+    @classmethod
+    def _palette(cls, value: Any) -> list[Any]:
+        return _keep_valid(ModelSwatch, value)
+
+    @field_validator("slots", mode="before")
+    @classmethod
+    def _slots(cls, value: Any) -> list[Any]:
+        return _keep_valid(ModelSlot, value)
 
     @field_validator("classes", mode="before")
     @classmethod
@@ -1854,7 +2014,7 @@ class ModelContent(BaseModel):
 
     @model_validator(mode="after")
     def _unique_ids(self) -> "ModelContent":
-        for label, items in (("shape", self.shapes), ("object", self.objects), ("group", self.groups), ("slider", self.ranges), ("preset", self.presets), ("class", self.classes)):
+        for label, items in (("shape", self.shapes), ("object", self.objects), ("group", self.groups), ("slider", self.ranges), ("preset", self.presets), ("class", self.classes), ("genre", self.genres), ("swatch", self.palette), ("slot", self.slots)):
             ids = [i.id for i in items]
             if len(set(ids)) != len(ids):
                 raise ValueError(f"two {label}s share an id")

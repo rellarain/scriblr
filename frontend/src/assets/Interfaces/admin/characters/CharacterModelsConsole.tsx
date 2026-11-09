@@ -7,7 +7,7 @@ import { downloadTextFile, readFileText } from '../plot/presetFile'
 import { ModelList } from './ModelList'
 import { ModelPane } from './ModelPane'
 import { ModelFileError, exportFileName, parseModelFile, serializeModels } from './modelFile'
-import { blankContent, randomId } from './modelContent'
+import { randomId, starterContent } from './modelContent'
 import { useCharacterModels } from './useCharacterModels'
 import './characterModels.scss'
 
@@ -34,7 +34,7 @@ function CharacterModelsConsole() {
   }
 
   function create() {
-    select(models.addModel(blankContent()))
+    select(models.addModel(starterContent()))
   }
 
   function duplicate(id: string) {

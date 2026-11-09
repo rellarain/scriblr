@@ -1,7 +1,8 @@
-import { useDeferredValue, useMemo, useState } from 'react'
+import { useDeferredValue, useMemo, useState, type CSSProperties } from 'react'
 import type { ModelAxis, ModelContent, ModelForm, ModelObject } from '../../../../api/types'
 import { CheckIcon, ChevronDownIcon, ChevronUpIcon, PlayIcon, PlusIcon, SaveIcon, StarIcon, TrashIcon } from '../../../icons'
 import type { Selection } from './designerState'
+import { NO_COLOURING, paintOf, type Colouring } from './engine/colour'
 import { overrideState } from './engine/formEdit'
 import { axesFor, chosenForm, formKey, targetForShape, templateOfMember } from './engine/forms'
 import { LIMITS } from './engine/limits'
@@ -29,13 +30,13 @@ export interface FormActions {
   useBase: (objectId: string, axisId: string, formId: string, shapeId: string) => void
 }
 
-export interface FormsTabProps { content: ModelContent; sel: Selection; state: TestState; actions: FormActions; presets: PresetActions }
+export interface FormsTabProps { content: ModelContent; sel: Selection; state: TestState; actions: FormActions; presets: PresetActions; colouring?: Colouring }
 
 const label = (name: string, fallback: string) => name.trim() || fallback
 
 // A small picture of each form of an axis: the object's shapes with that form chosen (and the other axes as they are now), all at one scale. Drawn from the
 // content that lags behind while a point is being dragged, so dragging stays smooth.
-function useThumbs(content: ModelContent, object: ModelObject, axis: ModelAxis, state: TestState) {
+function useThumbs(content: ModelContent, object: ModelObject, axis: ModelAxis, state: TestState, colouring: Colouring) {
   const lagging = useDeferredValue(content)
   return useMemo(() => {
     const own = new Set(object.shapes)
@@ -45,11 +46,11 @@ function useThumbs(content: ModelContent, object: ModelObject, axis: ModelAxis, 
     solves.forEach((s, i) => { for (const id of drawn[i]) { const b = s.shapes[id].box; x0 = Math.min(x0, b.x); y0 = Math.min(y0, b.y); x1 = Math.max(x1, b.x + b.w); y1 = Math.max(y1, b.y + b.h) } })
     const any = x1 >= x0
     const pad = 4, w = Math.max(any ? x1 - x0 : 0, 10), h = Math.max(any ? y1 - y0 : 0, 10)
-    return { viewBox: `${any ? x0 - pad : 0} ${any ? y0 - pad : 0} ${w + 2 * pad} ${h + 2 * pad}`, paths: solves.map((s, i) => drawn[i].map(id => ({ id, d: s.shapes[id].d }))) }
-  }, [lagging, object, axis, state.forms])
+    return { viewBox: `${any ? x0 - pad : 0} ${any ? y0 - pad : 0} ${w + 2 * pad} ${h + 2 * pad}`, paths: solves.map((s, i) => drawn[i].map(id => ({ id, d: s.shapes[id].d, paint: paintOf(lagging, colouring, lagging.shapes.find(x => x.id === id)!) }))) }
+  }, [lagging, object, axis, state.forms, colouring])
 }
 
-export function FormsTab({ content, sel, state, actions, presets }: FormsTabProps) {
+export function FormsTab({ content, sel, state, actions, presets, colouring = NO_COLOURING }: FormsTabProps) {
   const object = sel.kind === 'object' ? objectById(content, sel.id) : sel.kind === 'shape' ? objectOfShape(content, sel.id) : undefined
   const group = sel.kind === 'group' ? groupById(content, sel.id) : undefined
 
@@ -92,7 +93,7 @@ export function FormsTab({ content, sel, state, actions, presets }: FormsTabProp
           )}
           {owner && <p className="cmInsText">{name} is a member of a class: it chooses among the forms of {label(owner.name, 'the pattern')}. Edit the forms on the pattern.</p>}
           {axes.length === 0 && !owner && <p className="cmInsText">No axes yet. An axis is a way this object can vary, such as the shape of an eye or an expression. Each axis has forms to choose from; a form can give a shape an outline of its own or hide it.</p>}
-          {axes.map((axis, i) => <AxisSection key={axis.id} content={content} object={object} owner={owner ?? object} readOnly={!!owner} axis={axis} first={i === 0} last={i === axes.length - 1} state={state} actions={actions} />)}
+          {axes.map((axis, i) => <AxisSection key={axis.id} content={content} object={object} owner={owner ?? object} readOnly={!!owner} axis={axis} first={i === 0} last={i === axes.length - 1} state={state} actions={actions} colouring={colouring} />)}
           {!owner && <div className="cmInline">
             <button type="button" className="cmBtn cmBtn--small" disabled={axes.length >= LIMITS.axesMax} title={axes.length >= LIMITS.axesMax ? `An object may have at most ${LIMITS.axesMax} axes` : 'A new way this object can vary'} onClick={() => actions.addAxis(object.id)}><PlusIcon size={12} /> Add an axis</button>
             <span className={`cmCount${axes.length > LIMITS.axesWarn ? ' cmCount--warn' : ''}`} title="Axes of the object">{axes.length} of {LIMITS.axesMax}</span>
@@ -105,9 +106,9 @@ export function FormsTab({ content, sel, state, actions, presets }: FormsTabProp
   )
 }
 
-function AxisSection({ content, object, owner, readOnly, axis, first, last, state, actions }: { content: ModelContent; object: ModelObject; owner: ModelObject; readOnly: boolean; axis: ModelAxis; first: boolean; last: boolean; state: TestState; actions: FormActions }) {
+function AxisSection({ content, object, owner, readOnly, axis, first, last, state, actions, colouring }: { content: ModelContent; object: ModelObject; owner: ModelObject; readOnly: boolean; axis: ModelAxis; first: boolean; last: boolean; state: TestState; actions: FormActions; colouring: Colouring }) {
   const [confirm, setConfirm] = useState<string | null>(null)   // 'axis' or a form id
-  const thumbs = useThumbs(content, object, axis, state)
+  const thumbs = useThumbs(content, object, axis, state, colouring)
   const chosen = chosenForm(owner, axis, state.forms, object.id)
   const title = label(axis.name, 'Untitled axis')
   const o = object.id, a = axis.id
@@ -132,7 +133,7 @@ function AxisSection({ content, object, owner, readOnly, axis, first, last, stat
           return (
             <button key={f.id} type="button" className={`cmFormCard${on ? ' cmFormCard--on' : ''}`} aria-pressed={on} onClick={() => actions.choose(o, a, f.id)}>
               <svg className="cmFormThumb" viewBox={thumbs.viewBox} aria-hidden="true" focusable="false">
-                {thumbs.paths[i]?.map(p => <path key={p.id} d={p.d} className="cmFormShape" />)}
+                {thumbs.paths[i]?.map(p => <path key={p.id} d={p.d} className="cmFormShape" style={{ '--shape-fill': p.paint.fill } as CSSProperties} fillOpacity={p.paint.opacity} />)}
               </svg>
               <span className="cmFormName">{label(f.name, 'Untitled form')}{f.id === axis.initial ? <small> · default</small> : null}</span>
             </button>

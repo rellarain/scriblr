@@ -4,7 +4,8 @@ import { newShape } from './engine/edit'
 import { templateBox } from './engine/templates'
 import { addTurn, addRange, attachGroup, newRange, reparent } from './engine/rigEdit'
 import { ModelFileError, FILE_MARKER, exportFileName, parseModelFile, serializeModels } from './modelFile'
-import { addGroup, addObject, addShape, blankContent, newGroup, normalizeContent } from './modelContent'
+import { addGroup, addObject, addShape, blankContent, newGroup, normalizeContent, starterContent } from './modelContent'
+import { previewModels } from '../../../../designSystem/mockCharacterModels'
 
 function rigged(): ModelContent {
   let c = blankContent('Adult')
@@ -31,6 +32,34 @@ describe('writing and reading a model file', () => {
     expect(back.models[0].ranges[0].drives[0]).toMatchObject({ kind: 'turn', group: 'head' })
     expect(back.models[0].groups.find(g => g.id === 'head')?.attach?.kind).toBe('edge')
     expect(back.models[0].axis).toBe(96)
+  })
+  // import used to rebuild shapes, objects and groups by hand and drop everything added after the rig (twins, links, back outlines, forms, presets, classes)
+  const plain = (c: ModelContent) => JSON.parse(JSON.stringify(c, (_k, v) => (v === null ? undefined : v)))
+  it('keeps everything the sample figure has: twins, links, back outlines, forms, presets, classes and colour', () => {
+    const sample = previewModels()[0].draft
+    expect(sample.shapes.some(s => s.mirrorOf)).toBe(true)
+    expect(sample.shapes.some(s => s.pts.some(p => p.bind))).toBe(true)
+    expect(sample.shapes.some(s => s.back)).toBe(true)
+    expect(sample.shapes.some(s => s.copyOf)).toBe(true)
+    expect((sample.classes ?? []).length).toBeGreaterThan(0)
+    expect((sample.presets ?? []).length).toBeGreaterThan(0)
+    expect(sample.objects.some(o => (o.axes ?? []).length > 0)).toBe(true)
+    const back = parseModelFile(serializeModels([sample]))
+    expect(back.skipped).toEqual([])
+    expect(plain(back.models[0])).toEqual(plain(normalizeContent(sample)))
+  })
+  it('keeps the colour of a new model, the slot and fixed gray of a shape, and holds the lists to the limits of the server', () => {
+    let c = starterContent('Painted')
+    c = addGroup(c, newGroup('g', 'G')); c = addObject(c, 'g', { id: 'o', name: 'O', layer: 'body', shapes: [] })
+    c = addShape(c, 'o', { ...newShape('a', 'A', 'oval', templateBox('oval', 100, 50, 30)), slot: 'k_skin' })
+    c = addShape(c, 'o', { ...newShape('b', 'B', 'oval', templateBox('oval', 100, 50, 30)), gray: 100 })
+    const back = parseModelFile(serializeModels([c]))
+    expect(back.skipped).toEqual([])
+    expect(plain(back.models[0])).toEqual(plain(normalizeContent(c)))
+    expect(back.models[0].slots?.length).toBeGreaterThan(5)
+    expect(back.models[0].shapes.map(s => [s.slot, s.gray])).toEqual([['k_skin', null], [null, 100]])
+    const tooMany = JSON.stringify({ [FILE_MARKER]: 1, models: [{ ...normalizeContent(c), palette: Array.from({ length: 11 }, (_, i) => ({ id: `p${i}`, name: '', h: i, s: 10 })) }] })
+    expect(parseModelFile(tooMany).skipped).toEqual(['The model at position 1 has more than 10 swatches in the palette.'])
   })
   it('marks the file with its kind and version, and names it after a single model', () => {
     const parsed = JSON.parse(serializeModels([rigged()], new Date('2026-11-08T10:00:00Z')))

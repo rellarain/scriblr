@@ -1,5 +1,6 @@
-import { useRef, useState, type KeyboardEvent, type MouseEvent as ReactMouseEvent, type PointerEvent as ReactPointerEvent, type ReactElement } from 'react'
+import { useRef, useState, type CSSProperties, type KeyboardEvent, type MouseEvent as ReactMouseEvent, type PointerEvent as ReactPointerEvent, type ReactElement } from 'react'
 import type { ModelContent, ModelShape } from '../../../../api/types'
+import { NO_COLOURING, paintOf, type Colouring } from './engine/colour'
 import { addPoint, deletePoint, moveHandle, movePoint, moveShape, nudgePoint } from './engine/edit'
 import { apply, build, inverse, nearestEdge, type Box } from './engine/geometry'
 import type { Solved } from './engine/rig'
@@ -60,6 +61,8 @@ export interface CanvasProps {
   anchor?: [number, number] | null
   // Pose mode (see above): null or missing is the ordinary editor.
   pose?: PoseCanvas | null
+  // The colours of the test character: what each shape is filled with (missing: every shape in the neutral gray).
+  colouring?: Colouring
   // Draw, dashed behind each shape of a class member that has an outline of its own, the outline of the pattern it would otherwise follow.
   ghost?: boolean
   // The points of the selected shape that are linked to another shape: they are not dragged (the arrow keys adjust the link instead).
@@ -284,14 +287,18 @@ export function DesignerCanvas(p: CanvasProps) {
       {solved.order.map(id => {
         const s = shapesById.get(id), r = solved.shapes[id]
         if (!s || !r?.d) return null
-        const pickable = picking.has(id)
+        const pickable = picking.has(id), selected = sel.kind === 'shape' && sel.id === id, paint = paintOf(content, p.colouring ?? NO_COLOURING, s)
         return (
-          <path
-            key={id} d={r.d} data-shape={id}
-            className={`cmShape${focusIds.has(id) ? ' cmShape--on' : ''}${!none && focusIds.size > 0 && !focusIds.has(id) ? ' cmShape--dim' : ''}${sel.kind === 'shape' && sel.id === id ? ' cmShape--sel' : ''}${pickable ? ' cmShape--pick' : ''}${p.pick && !pickable ? ' cmShape--off' : ''}${s.mirrorOf ? ' cmShape--twin' : ''}`}
-            fillOpacity={s.op}
-            onPointerDown={e => onShapeDown(e, id)} onDoubleClick={e => onDouble(e, s)}
-          />
+          <g key={id}>
+            <path
+              d={r.d} data-shape={id} style={{ '--shape-fill': paint.fill } as CSSProperties}
+              className={`cmShape${focusIds.has(id) ? ' cmShape--on' : ''}${!none && focusIds.size > 0 && !focusIds.has(id) ? ' cmShape--dim' : ''}${selected ? ' cmShape--sel' : ''}${pickable ? ' cmShape--pick' : ''}${p.pick && !pickable ? ' cmShape--off' : ''}${s.mirrorOf ? ' cmShape--twin' : ''}`}
+              fillOpacity={paint.opacity}
+              onPointerDown={e => onShapeDown(e, id)} onDoubleClick={e => onDouble(e, s)}
+            />
+            {selected && <path d={r.d} className="cmRing cmRing--under" aria-hidden="true" />}
+            {selected && <path d={r.d} className="cmRing cmRing--over" data-ring={id} aria-hidden="true" />}
+          </g>
         )
       })}
       {overlay && mode === 'points' && cur && (

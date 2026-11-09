@@ -3,7 +3,7 @@ import { readFileSync } from 'node:fs'
 import path from 'node:path'
 import { describe, expect, it } from 'vitest'
 import { LIMITS } from './engine/limits'
-import { AXIS_RANGE, DESCRIPTION_MAX, KIND_MAX, NAME_MAX, RANGE_NAME_MAX } from './modelContent'
+import { AXIS_RANGE, DESCRIPTION_MAX, KIND_MAX, NAME_MAX, RANGE_NAME_MAX, SWATCH_NAME_MAX } from './modelContent'
 
 // The backend validates a model with extra='ignore', so a field the frontend sends that the schema does not know is dropped without a word. These
 // tests read schema.py and api/types.ts side by side so the two cannot drift apart unnoticed, and check the limits are the same numbers.
@@ -34,6 +34,7 @@ describe('the model types match the backend schema', () => {
     ['ModelContent', 'ModelContent'], ['PublishedModel', 'PublishedModel'], ['ModelEntry', 'ModelEntry'], ['ModelCatalog', 'ModelCatalog'],
     ['ModelAttach', 'ModelAttach'], ['ModelMove', 'ModelMove'], ['ModelDrive', 'ModelDrive'], ['ModelRange', 'ModelRange'], ['ModelBind', 'ModelBind'],
     ['ModelOverride', 'ModelOverride'], ['ModelForm', 'ModelForm'], ['ModelAxis', 'ModelAxis'], ['ModelPreset', 'ModelPreset'], ['ModelClass', 'ModelClass'],
+    ['ModelGenre', 'ModelGenre'], ['ModelSwatch', 'ModelSwatch'], ['ModelColour', 'ModelColour'], ['ModelSlot', 'ModelSlot'],
   ]
   for (const [python, ts] of pairs) {
     it(`${ts} has the fields of ${python}`, () => {
@@ -101,6 +102,16 @@ describe('the limits are the backend\'s numbers', () => {
     expect(LIMITS.membersWarn).toBe(number('MODEL_MEMBERS_WARN'))
     expect(LIMITS.membersMax).toBe(number('MODEL_MEMBERS_MAX'))
     expect(LIMITS.presetFormsMax).toBe(number('MODEL_PRESET_FORMS_MAX'))
+  })
+  it('for colour: genres, slots, default colours and the starter palette', () => {
+    expect(LIMITS.genresWarn).toBe(number('MODEL_GENRES_WARN'))
+    expect(LIMITS.genresMax).toBe(number('MODEL_GENRES_MAX'))
+    expect(LIMITS.slotsWarn).toBe(number('MODEL_SLOTS_WARN'))
+    expect(LIMITS.slotsMax).toBe(number('MODEL_SLOTS_MAX'))
+    expect(LIMITS.coloursWarn).toBe(number('MODEL_COLOURS_WARN'))
+    expect(LIMITS.coloursMax).toBe(number('MODEL_COLOURS_MAX'))
+    expect(LIMITS.paletteMax).toBe(number('MODEL_PALETTE_MAX'))
+    expect(SWATCH_NAME_MAX).toBe(number('MODEL_SWATCH_NAME_MAX'))
   })
   it('for the mirror line', () => {
     const m = /MODEL_AXIS_RANGE\s*=\s*\(([-\d.]+),\s*([-\d.]+)\)/.exec(schema)

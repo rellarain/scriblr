@@ -1,6 +1,7 @@
-import type { ModelContent, ModelEntry, ModelGroup, ModelLayer, ModelObject, ModelShape } from '../../../../api/types'
+import type { ModelContent, ModelEntry, ModelGroup, ModelLayer, ModelObject, ModelShape, ModelSlot } from '../../../../api/types'
 import { LIMITS, copyBytes, linkCount } from './engine/limits'
 import { chainOf } from './engine/rig'
+import { standardGenres, standardSlots, starterPalette } from './engine/standardColours'
 
 // The pure side of the Characters page: editing a model's tree (groups, objects, shapes), the checks Publish makes, and ids and names. Nothing here
 // touches the network or React. Every function returns new content and leaves the one it was given alone.
@@ -15,9 +16,12 @@ export const randomId: MakeId = prefix => `${prefix}_${Math.random().toString(36
 
 export const RANGE_NAME_MAX = 40
 export const KIND_MAX = 24
+export const SWATCH_NAME_MAX = 30
 export const AXIS_RANGE = { min: 40, max: 160 } as const
 
 export const blankContent = (name = ''): ModelContent => ({ name, description: '', shapes: [], objects: [], groups: [], axis: 100, ranges: [] })
+// What a new model starts as: blank, with the standard genres, starter palette and colour slots (all of it plain data an admin may change or delete).
+export const starterContent = (name = ''): ModelContent => ({ ...blankContent(name), genres: standardGenres(), palette: starterPalette(), slots: standardSlots() })
 
 // A group as the page makes one: no parent, no pivot and no anchor until the rig says otherwise.
 export const newGroup = (id: string, name: string, parent: string | null = null, objects: string[] = []): ModelGroup => ({ id, name, parent, objects, pivot: null, attach: null })
@@ -30,13 +34,29 @@ export function normalizeContent(c: ModelContent): ModelContent {
     ...c,
     name: clean(c.name, NAME_MAX),
     description: clean(c.description, DESCRIPTION_MAX),
-    shapes: c.shapes.map(s => ({ ...s, name: clean(s.name, NAME_MAX), mirrorOf: s.mirrorOf ?? null, back: s.back ?? null, zBack: s.zBack ?? null, loose: s.loose ?? null, copyOf: s.copyOf ?? null, hide: s.hide === true })),
+    shapes: c.shapes.map(s => ({ ...s, name: clean(s.name, NAME_MAX), mirrorOf: s.mirrorOf ?? null, back: s.back ?? null, zBack: s.zBack ?? null, loose: s.loose ?? null, copyOf: s.copyOf ?? null, hide: s.hide === true, slot: s.slot ?? null, gray: s.gray ?? null })),
     objects: c.objects.map(o => ({ ...o, name: clean(o.name, NAME_MAX), mirrorOf: o.mirrorOf ?? null, classOf: o.classOf ?? null, axes: (o.axes ?? []).map(a => ({ ...a, name: clean(a.name, NAME_MAX), options: a.options.map(f => ({ ...f, name: clean(f.name, NAME_MAX) })) })) })),
     groups: c.groups.map(g => ({ ...g, name: clean(g.name, NAME_MAX), pivot: g.pivot ?? null, attach: g.attach ?? null, mirrorOf: g.mirrorOf ?? null })),
     axis: c.axis ?? 100,
     ranges: (c.ranges ?? []).map(r => ({ ...r, name: clean(r.name, RANGE_NAME_MAX) })),
     presets: (c.presets ?? []).map(p => ({ ...p, name: clean(p.name, NAME_MAX), kind: clean(p.kind, KIND_MAX) || 'Pose', scope: p.scope ?? null, forms: p.forms ?? {} })),
     classes: (c.classes ?? []).map(k => ({ ...k, name: clean(k.name, NAME_MAX), exclusive: k.exclusive === true })),
+    genres: (c.genres ?? []).map(g => ({ ...g, name: clean(g.name, SWATCH_NAME_MAX) })),
+    palette: (c.palette ?? []).map(p => ({ ...p, name: clean(p.name, SWATCH_NAME_MAX), h: percent(p.h, 0, 359), s: percent(p.s, 50, 100) })),
+    slots: (c.slots ?? []).map(repairSlot),
+  }
+}
+
+const percent = (v: number, fallback: number, max: number): number => (typeof v === 'number' && Number.isFinite(v) ? Math.round(Math.min(max, Math.max(0, v))) : fallback)
+const HEX = /^#[0-9a-fA-F]{6}$/
+
+// A slot as the server keeps it: names cut, ranges whole numbers with the smallest first and the resting value between, repeated default colours dropped.
+function repairSlot(sl: ModelSlot): ModelSlot {
+  const lMin = percent(sl.lMin, 50, 100), lMax = Math.max(percent(sl.lMax, 50, 100), lMin), aMin = percent(sl.aMin, 100, 100), aMax = Math.max(percent(sl.aMax, 100, 100), aMin)
+  const seen = new Set<string>()
+  return {
+    ...sl, name: clean(sl.name, NAME_MAX), lMin, lMax, lRest: Math.min(lMax, Math.max(lMin, percent(sl.lRest, 50, 100))), aMin, aMax, aRest: Math.min(aMax, Math.max(aMin, percent(sl.aRest, 100, 100))),
+    colours: sl.colours.filter(k => !(seen.has(k.id) || !seen.add(k.id))).map(k => ({ ...k, name: clean(k.name, NAME_MAX), hex: HEX.test(k.hex) ? k.hex.toLowerCase() : '#808080', genres: [...new Set(k.genres)].slice(0, LIMITS.genresMax) })),
   }
 }
 
@@ -413,6 +433,15 @@ function presetFaults(c: ModelContent): string[] {
   return faults
 }
 
+// What is wrong with the colour of a model (the server's _colour_faults says the same words).
+function colourFaults(c: ModelContent): string[] {
+  const faults: string[] = []
+  const slotIds = new Set((c.slots ?? []).map(sl => sl.id)), genreIds = new Set((c.genres ?? []).map(g => g.id))
+  for (const s of c.shapes) if (s.slot && !slotIds.has(s.slot)) faults.push(`Shape ${label(s.name, s.id)} uses a colour slot that does not exist.`)
+  for (const sl of c.slots ?? []) for (const k of sl.colours) if (k.genres.some(g => !genreIds.has(g))) faults.push(`Colour ${label(k.name, k.id)} of slot ${label(sl.name, sl.id)} fits a genre that does not exist.`)
+  return faults
+}
+
 export function publishFaults(c: ModelContent): string[] {
   const faults: string[] = []
   if (!c.name.trim()) faults.push('The model needs a name.')
@@ -443,6 +472,7 @@ export function publishFaults(c: ModelContent): string[] {
   faults.push(...formFaults(c))
   faults.push(...classFaults(c))
   faults.push(...presetFaults(c))
+  faults.push(...colourFaults(c))
   const bytes = copyBytes(c)
   if (bytes > LIMITS.copyMaxBytes) faults.push(`A character's copy of this model would be ${Math.floor(bytes / 1024)} KB; the limit is ${LIMITS.copyMaxBytes / 1024} KB.`)
   return faults

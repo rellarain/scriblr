@@ -1,7 +1,7 @@
 import { useMemo, useState, type KeyboardEvent } from 'react'
 import type { ModelContent, ModelGroup, ModelLayer, ModelObject } from '../../../../api/types'
 import { gripProps, zoneRef } from '../../../../lib/pointerDrag'
-import { ChevronDownIcon, ChevronRightIcon, ChevronUpIcon, CopyIcon, EyeIcon, EyeOffIcon, FolderPlusIcon, GripIcon, LayersIcon, LinkIcon, PlusIcon, SearchIcon, StampIcon, SwapIcon, TrashIcon, TreeIcon } from '../../../icons'
+import { ChevronDownIcon, ChevronRightIcon, ChevronUpIcon, CopyIcon, EyeIcon, EyeOffIcon, FolderPlusIcon, GripIcon, LayersIcon, LinkIcon, LockIcon, PlusIcon, SearchIcon, StampIcon, SwapIcon, TrashIcon, TreeIcon, UnlockIcon } from '../../../icons'
 import { ReorderList } from './ReorderList'
 import { TemplateMenu } from './TemplateMenu'
 import { same, type Selection } from './designerState'
@@ -28,6 +28,8 @@ export interface TreeActions {
   onReparent: (groupId: string, parentId: string | null) => void
   // Switch an object or a group off or on for looking (the eye); the page keeps the list, and a preset can keep it.
   onToggleHidden: (id: string) => void
+  // lock or unlock a group or an object against rolling the look (no lock button when missing)
+  onToggleLock?: (id: string) => void
 }
 export type TreeMode = 'layers' | 'rig'
 
@@ -57,7 +59,18 @@ function Eye({ id, name, hidden, onToggle }: { id: string; name: string; hidden:
   )
 }
 
-export function AssetTree({ content, sel, actions, mode, onMode, hidden = NO_HIDDEN }: { content: ModelContent; sel: Selection; actions: TreeActions; mode: TreeMode; onMode: (m: TreeMode) => void; hidden?: ReadonlySet<string> }) {
+// The lock beside the eye: a locked group or object (and everything in it) is left as it is when the look is rolled.
+function Lock({ id, name, locks, onToggle }: { id: string; name: string; locks: ReadonlySet<string>; onToggle?: (id: string) => void }) {
+  if (!onToggle) return null
+  const on = locks.has(id)
+  return (
+    <button type="button" className="cmIconBtn cmIconBtn--small" aria-label={`Lock ${name}`} aria-pressed={on} title={on ? `${name} is locked: rolling the look leaves it as it is` : `Lock ${name}, so rolling the look leaves it as it is`} onClick={() => onToggle(id)}>
+      {on ? <LockIcon size={12} /> : <UnlockIcon size={12} />}
+    </button>
+  )
+}
+
+export function AssetTree({ content, sel, actions, mode, onMode, hidden = NO_HIDDEN, locks = NO_HIDDEN }: { content: ModelContent; sel: Selection; actions: TreeActions; mode: TreeMode; onMode: (m: TreeMode) => void; hidden?: ReadonlySet<string>; locks?: ReadonlySet<string> }) {
   const [query, setQuery] = useState('')
   const q = query.trim().toLowerCase()
   return (
@@ -73,14 +86,14 @@ export function AssetTree({ content, sel, actions, mode, onMode, hidden = NO_HID
         <button type="button" className={`cmIconBtn${mode === 'layers' ? ' cmIconBtn--on' : ''}`} aria-label="Layers" title="Layers: Body, Clothing and Hair" aria-pressed={mode === 'layers'} onClick={() => onMode('layers')}><LayersIcon size={14} /></button>
         <button type="button" className={`cmIconBtn${mode === 'rig' ? ' cmIconBtn--on' : ''}`} aria-label="Rig" title="Rig: groups under the group they hang from" aria-pressed={mode === 'rig'} onClick={() => onMode('rig')}><TreeIcon size={14} /></button>
       </div>
-      {mode === 'layers' ? <LayersTree content={content} sel={sel} actions={actions} q={q} hidden={hidden} /> : <RigTree content={content} sel={sel} actions={actions} q={q} hidden={hidden} />}
+      {mode === 'layers' ? <LayersTree content={content} sel={sel} actions={actions} q={q} hidden={hidden} locks={locks} /> : <RigTree content={content} sel={sel} actions={actions} q={q} hidden={hidden} locks={locks} />}
     </nav>
   )
 }
 
 // ---- layers ----
 
-function LayersTree({ content, sel, actions, q, hidden }: { content: ModelContent; sel: Selection; actions: TreeActions; q: string; hidden: ReadonlySet<string> }) {
+function LayersTree({ content, sel, actions, q, hidden, locks }: { content: ModelContent; sel: Selection; actions: TreeActions; q: string; hidden: ReadonlySet<string>; locks: ReadonlySet<string> }) {
   const [closed, setClosed] = useState<Record<string, boolean>>({})
   const tree = useMemo(() => treeOf(content), [content])
   const match = (name: string) => !q || name.toLowerCase().includes(q)
@@ -128,7 +141,7 @@ function LayersTree({ content, sel, actions, q, hidden }: { content: ModelConten
                         {g && <Twin of={g.mirrorOf} name={label(g.name, 'Untitled group')} />}
                         {g && <>
                           <span className={`cmCount${g.objects.length > LIMITS.objectsPerGroupWarn ? ' cmCount--warn' : ''}`} title="Objects in the group">{g.objects.length}</span>
-                          <Eye id={g.id} name={label(g.name, 'Untitled group')} hidden={hidden} onToggle={actions.onToggleHidden} />
+                          <Eye id={g.id} name={label(g.name, 'Untitled group')} hidden={hidden} onToggle={actions.onToggleHidden} /><Lock id={g.id} name={label(g.name, 'Untitled group')} locks={locks} onToggle={actions.onToggleLock} />
                           <button type="button" className="cmIconBtn cmIconBtn--small" aria-label={`Delete group ${label(g.name, 'Untitled group')}`} title="Delete the group with its objects and shapes" onClick={() => actions.onDelete({ kind: 'group', id: g.id })}><TrashIcon size={12} /></button>
                         </>}
                       </div>
@@ -150,7 +163,7 @@ function LayersTree({ content, sel, actions, q, hidden }: { content: ModelConten
                                 <Twin of={o.object.mirrorOf} name={label(o.object.name, 'Untitled object')} />
                                 <ClassTag content={content} object={o.object} />
                                 <span className={`cmCount${o.object.shapes.length > LIMITS.shapesPerObjectWarn ? ' cmCount--warn' : ''}`} title="Shapes in the object">{o.object.shapes.length}</span>
-                                <Eye id={o.object.id} name={label(o.object.name, 'Untitled object')} hidden={hidden} onToggle={actions.onToggleHidden} />
+                                <Eye id={o.object.id} name={label(o.object.name, 'Untitled object')} hidden={hidden} onToggle={actions.onToggleHidden} /><Lock id={o.object.id} name={label(o.object.name, 'Untitled object')} locks={locks} onToggle={actions.onToggleLock} />
                                 <TemplateMenu label={`Add a shape to ${label(o.object.name, 'the object')}`} onPick={t => actions.onAddShape(o.object.id, t)} />
                                 <button type="button" className="cmIconBtn cmIconBtn--small" aria-label={`Delete object ${label(o.object.name, 'Untitled object')}`} title="Delete the object with its shapes" onClick={() => actions.onDelete({ kind: 'object', id: o.object.id })}><TrashIcon size={12} /></button>
                               </div>
@@ -194,7 +207,7 @@ function LayersTree({ content, sel, actions, q, hidden }: { content: ModelConten
 
 // ---- rig ----
 
-function RigTree({ content, sel, actions, q, hidden }: { content: ModelContent; sel: Selection; actions: TreeActions; q: string; hidden: ReadonlySet<string> }) {
+function RigTree({ content, sel, actions, q, hidden, locks }: { content: ModelContent; sel: Selection; actions: TreeActions; q: string; hidden: ReadonlySet<string>; locks: ReadonlySet<string> }) {
   const [dragId, setDragId] = useState<string | null>(null)
   const [over, setOver] = useState<string | null>(null)
   const [closed, setClosed] = useState<Record<string, boolean>>({})
@@ -251,7 +264,7 @@ function RigTree({ content, sel, actions, q, hidden }: { content: ModelContent; 
                 <button type="button" className="cmTreeName cmTreeName--btn" aria-current={same(sel, { kind: 'group', id: g.id })} onClick={() => actions.onSelect({ kind: 'group', id: g.id })}>{name}</button>
                 <Twin of={g.mirrorOf} name={name} />
                 <span className={`cmCount${level >= LIMITS.chainMax ? ' cmCount--warn' : ''}`} title={`Level ${level} of ${LIMITS.chainMax} in the pivot chain`}>{level}</span>
-                <Eye id={g.id} name={name} hidden={hidden} onToggle={actions.onToggleHidden} />
+                <Eye id={g.id} name={name} hidden={hidden} onToggle={actions.onToggleHidden} /><Lock id={g.id} name={name} locks={locks} onToggle={actions.onToggleLock} />
               </div>
               {open && branch(g.id, depth + 1)}
             </li>

@@ -1,6 +1,6 @@
 import type { ReactNode } from 'react'
 import type { ModelContent, ModelLayer, ModelPointMode, ModelShape, ModelView } from '../../../../api/types'
-import { BookmarkIcon, PathIcon, PlusIcon, SlidersIcon, StackIcon, TrashIcon, TreeIcon, UndoIcon } from '../../../icons'
+import { BookmarkIcon, BucketIcon, PathIcon, PlusIcon, SlidersIcon, StackIcon, TrashIcon, TreeIcon, UndoIcon } from '../../../icons'
 import { ClassPanel, FollowPanel, type ClassActions } from './ClassPanel'
 import { LinksPanel, PairPanel, ViewPanel } from './PairPanels'
 import { Stepper } from './Stepper'
@@ -16,25 +16,26 @@ import { templateBox } from './engine/templates'
 import { LAYERS, NAME_MAX, groupById, groupOfObject, objectById, objectOfShape } from './modelContent'
 
 // The inspector: tabs for what the selection is and its shape's settings (Shape), how its group hangs and is fixed in the rig (Rig), the model's sliders
-// (Ranges), the forms of an object (Forms) and the presets of the model (Presets). The mockup's other tab (Colour) comes with its phase. It is a drawer the
-// canvas can fold away.
-export type InspectorTab = 'shape' | 'rig' | 'ranges' | 'forms' | 'presets'
+// (Ranges), the forms of an object (Forms), the presets of the model (Presets) and its colours (Colour). It is a drawer the canvas can fold away.
+export type InspectorTab = 'shape' | 'rig' | 'ranges' | 'forms' | 'presets' | 'colour'
 const TABS: Array<{ id: InspectorTab; name: string; Icon: typeof PathIcon }> = [
   { id: 'shape', name: 'Shape', Icon: PathIcon },
   { id: 'rig', name: 'Rig', Icon: TreeIcon },
   { id: 'ranges', name: 'Ranges', Icon: SlidersIcon },
   { id: 'forms', name: 'Forms', Icon: StackIcon },
   { id: 'presets', name: 'Presets', Icon: BookmarkIcon },
+  { id: 'colour', name: 'Colour', Icon: BucketIcon },
 ]
 
 export interface InspectorProps {
   tab: InspectorTab
   onTab: (tab: InspectorTab) => void
-  // What the Rig, Ranges, Forms and Presets tabs show (the page builds them: they need its actions).
+  // What the Rig, Ranges, Forms, Presets and Colour tabs show (the page builds them: they need its actions).
   rigTab: ReactNode
   rangesTab: ReactNode
   formsTab: ReactNode
   presetsTab: ReactNode
+  colourTab: ReactNode
   // The line the model mirrors about, changed one step at a time.
   onAxis: (dir: -1 | 1, big: boolean) => void
   content: ModelContent
@@ -75,7 +76,7 @@ export function Inspector(p: InspectorProps) {
         ))}
       </div>
       <div id="cm-tabpanel" role="tabpanel" aria-labelledby={`cm-tab-${p.tab}`} className="cmTabPanel">
-        {p.tab === 'shape' ? <ShapeTab {...p} /> : p.tab === 'rig' ? p.rigTab : p.tab === 'ranges' ? p.rangesTab : p.tab === 'forms' ? p.formsTab : p.presetsTab}
+        {p.tab === 'shape' ? <ShapeTab {...p} /> : p.tab === 'rig' ? p.rigTab : p.tab === 'ranges' ? p.rangesTab : p.tab === 'forms' ? p.formsTab : p.tab === 'presets' ? p.presetsTab : p.colourTab}
       </div>
     </section>
   )

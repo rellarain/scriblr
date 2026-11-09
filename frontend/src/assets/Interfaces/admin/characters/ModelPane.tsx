@@ -1,10 +1,11 @@
 import { useEffect, useMemo, useRef, useState, type KeyboardEvent } from 'react'
 import type { ModelContent, ModelEntry, ModelLayer, ModelShape } from '../../../../api/types'
 import {
-  BackIcon, CheckIcon, CopyIcon, CursorIcon, ExportIcon, EyeOffIcon, FitIcon, StampIcon, FrontIcon, GridLinesIcon, HandIcon, HistoryIcon, PathIcon, RedoIcon, RestoreIcon, RulerIcon, SlidersIcon, SwapIcon, TrashIcon, UndoIcon, ZoomInIcon, ZoomOutIcon,
+  BackIcon, CheckIcon, CopyIcon, CursorIcon, DiceIcon, ExportIcon, EyeOffIcon, FitIcon, StampIcon, FrontIcon, GridLinesIcon, HandIcon, HistoryIcon, PathIcon, RedoIcon, RestoreIcon, RulerIcon, SlidersIcon, SwapIcon, TrashIcon, UndoIcon, ZoomInIcon, ZoomOutIcon,
 } from '../../../icons'
 import { AssetTree, type TreeActions, type TreeMode } from './AssetTree'
 import type { ClassActions } from './ClassPanel'
+import { ColourTab, type ColourActions } from './ColourTab'
 import { CheckPanel } from './CheckPanel'
 import { DesignerCanvas, type PivotMarker, type PoseCanvas, type PoseGrab } from './DesignerCanvas'
 import { FormsTab, type FormActions } from './FormsTab'
@@ -17,6 +18,10 @@ import { RangesTab } from './RangesTab'
 import { RigTab } from './RigTab'
 import { TemplateMenu } from './TemplateMenu'
 import { NONE, contextObject, repair, rightClickGrid, rightClickShape, showFor, type EditMode, type Selection } from './designerState'
+import {
+  NEUTRAL_GRAY, addColour, addGenre, addSlot, addStandardSlots, addSwatch, paletteOf, removeColour, removeGenre, removeSlot, removeSwatch, renameColour, renameGenre, renameSlot, setColourHex,
+  setStarterPalette, setSwatch, stepSlot, toggleColourGenre,
+} from './engine/colour'
 import { addMember, deleteClass, detachBeforeRemoval, detachMember, followTemplate, makeClass, moveObjectToGroup, reconcileClasses, renameClass, setExclusive, setShapeHide } from './engine/classEdit'
 import { newShape } from './engine/edit'
 import { addAxis, addForm, hideInForm, moveAxis, moveForm, overrideState, removeAxis, removeForm, renameAxis, renameForm, setInitialForm, setOverride, useBaseOutline } from './engine/formEdit'
@@ -138,6 +143,11 @@ export function ModelPane({ entry, models, makeId, onRemove, onDuplicate, onExpo
   const away = offRest(content, values)
   const awayAll = test.away(content)
   const hiddenSet = useMemo(() => new Set(test.hidden), [test.hidden])
+  const lockSet = useMemo(() => new Set(test.locks), [test.locks])
+  // the colours of the test character: its own palette once edited, else the model's; no choice for a slot is gray
+  const colouringOf = test.colouring
+  const colouring = useMemo(() => colouringOf(content), [colouringOf, content])
+  const testPalette = colouring.palette
   const selShape = sel.kind === 'shape' ? shapeById(content, sel.id) : undefined
   const pointDriven = !!selShape && !recording && isPointDriven(content, values, selShape.id)
   // the form the selected shape's outline is drawn from (or would be edited into): the canvas edits that form's outline, not the base one
@@ -541,6 +551,33 @@ export function ModelPane({ entry, models, makeId, onRemove, onDuplicate, onExpo
     remove: id => commit(deletePreset(content, id), true),
   }
 
+  const colourActions: ColourActions = {
+    setSlot: (shapeIds, slotId) => commit({ ...content, shapes: content.shapes.map(s => (shapeIds.includes(s.id) ? { ...s, slot: slotId } : s)) }, true),
+    stepGray: (id, dir, big) => commit(updateShape(content, id, s => ({ ...s, gray: Math.min(100, Math.max(0, Math.round((s.gray ?? NEUTRAL_GRAY) + dir * (big ? 25 : 5)))) })), true),
+    neutral: id => commit(updateShape(content, id, s => ({ ...s, gray: null })), true),
+    choose: test.setColour,
+    roll: () => test.roll(content),
+    setGenre: test.setGenre,
+    addSwatch: () => { const r = addSwatch(testPalette, makeId); if (r.reason) setNote(r.reason); else test.setPalette(r.palette) },
+    setSwatch: (id, change) => test.setPalette(setSwatch(testPalette, id, change)),
+    removeSwatch: id => { const r = removeSwatch(testPalette, test.colours, id); test.setPalette(r.palette, r.choices) },
+    saveStarter: () => { commit(setStarterPalette(content, testPalette), true); test.setPalette(null) },
+    resetPalette: () => test.setPalette(null),
+    addSlot: () => { applyEdit(addSlot(content, 'Colour', makeId)) },
+    renameSlot: (id, name) => models.edit(entry.id, c => renameSlot(c, id, name), false),
+    stepSlot: (id, key, dir, big) => commit(stepSlot(content, id, key, dir, big), true),
+    removeSlot: id => { if (applyEdit(removeSlot(content, id))) test.setColour(id, null) },
+    addColour: slotId => { applyEdit(addColour(content, slotId, '#808080', makeId)) },
+    renameColour: (slotId, id, name) => models.edit(entry.id, c => renameColour(c, slotId, id, name), false),
+    setColourHex: (slotId, id, hex) => models.edit(entry.id, c => setColourHex(c, slotId, id, hex), false),
+    toggleColourGenre: (slotId, id, genreId) => commit(toggleColourGenre(content, slotId, id, genreId), true),
+    removeColour: (slotId, id) => commit(removeColour(content, slotId, id), true),
+    addGenre: () => { applyEdit(addGenre(content, 'Genre', makeId)) },
+    renameGenre: (id, name) => models.edit(entry.id, c => renameGenre(c, id, name), false),
+    removeGenre: id => { commit(removeGenre(content, id), true); if (test.genre === id) test.setGenre(null) },
+    addStandard: () => { applyEdit(addStandardSlots(content)) },
+  }
+
   // ---- the tree's actions ----
 
   // The group a new object goes into: the selection's group, else the first group, else a new one (returned with its content).
@@ -611,6 +648,7 @@ export function ModelPane({ entry, models, makeId, onRemove, onDuplicate, onExpo
     onReorderGroup: (groupId, before) => commit({ ...content, groups: moveBefore(content.groups, groupId, before) }, true),
     onReparent: (groupId, parentId) => { applyEdit(reparent(content, groupId, parentId)) },
     onToggleHidden: test.toggleHidden,
+    onToggleLock: test.toggleLock,
   }
 
   // The canvas's "new shape" button: into the selected object, else into a new object (and group) on the Body layer.
@@ -740,7 +778,7 @@ export function ModelPane({ entry, models, makeId, onRemove, onDuplicate, onExpo
         {note && <p className="cmErr" role="status">{note}</p>}
 
         <div className={`cmWork${drawer ? '' : ' cmWork--noDrawer'}`}>
-          <AssetTree content={content} sel={sel} actions={actions} mode={treeMode} onMode={setTreeMode} hidden={hiddenSet} />
+          <AssetTree content={content} sel={sel} actions={actions} mode={treeMode} onMode={setTreeMode} hidden={hiddenSet} locks={lockSet} />
           <div className="cmStage">
             <div className="cmToolbar" role="toolbar" aria-label="Designer tools">
               <button type="button" className="cmIconBtn" aria-label="Undo" title="Undo (Ctrl+Z)" disabled={!history.past.length || !!recording} onClick={undo}><UndoIcon size={14} /></button>
@@ -762,6 +800,7 @@ export function ModelPane({ entry, models, makeId, onRemove, onDuplicate, onExpo
               <button type="button" className="cmIconBtn" aria-label="Zoom out" title="Zoom out" onClick={() => setZoom(z => Math.max(0.25, z / 1.25))}><ZoomOutIcon size={14} /></button>
               <button type="button" className={`cmIconBtn${fitAll ? ' cmIconBtn--on' : ''}`} aria-label="Fit the whole figure" title="Fit the whole figure" aria-pressed={fitAll} onClick={() => { setFitAll(f => !f); setZoom(1) }}><FitIcon size={14} /></button>
               <span className="cmSep" aria-hidden="true" />
+              <button type="button" className="cmIconBtn" aria-label="Roll the look" title="Roll a new look for the test character: colours, a form on every axis and the member of each family; what is locked in the tree stays" disabled={!!recording} onClick={() => test.roll(content)}><DiceIcon size={14} /></button>
               <TemplateMenu label="New shape" title="New shape from a template" onPick={newShapeFromCanvas} />
               <span className="cmSpacer" />
               {awayAll > 0 && (
@@ -773,7 +812,7 @@ export function ModelPane({ entry, models, makeId, onRemove, onDuplicate, onExpo
             {empty && <p className="cmHint">No shape yet. Use New shape to start from a template, or the + beside a layer in the tree.</p>}
             <DesignerCanvas
               content={canvasContent} solved={solved} sel={sel} mode={mode} selPoint={selPoint} mirror={mirror} snap={snap} grid={grid} zoom={zoom} fitAll={fitAll} axis={content.axis}
-              editable={editable || (!!recording && !!selShape)} pivot={pivot} anchor={anchorSpot} pick={pick} onPick={onPick} pose={poseCanvas} ghost={ghost}
+              editable={editable || (!!recording && !!selShape)} pivot={pivot} anchor={anchorSpot} pick={pick} onPick={onPick} pose={poseCanvas} ghost={ghost} colouring={colouring}
               linked={selShape ? selShape.pts.flatMap((pt, i) => (pt.bind ? [i] : [])) : []} onNudgeLink={nudgeLink} onPivot={movePivot} onPivotNudge={nudgePivot}
               onSelect={choose} onSelectPoint={setSelPoint}
               onGesture={() => { if (!recording) setHistory(h => remember(h, content)) }}
@@ -797,8 +836,9 @@ export function ModelPane({ entry, models, makeId, onRemove, onDuplicate, onExpo
               onAxis={(dir, big) => commit(setAxis(content, content.axis + dir * (big ? 5 : 1)), true)}
               rigTab={<RigTab content={content} group={group} picking={pickOn} actions={rigActions} pairs={pairs} />}
               rangesTab={<RangesTab content={content} sel={sel} group={group} values={values} recording={recording} scrubbing={scrubbing} filter={rangeFilter} onFilter={setRangeFilter} actions={rigActions} />}
-              formsTab={<FormsTab content={content} sel={sel} state={test.state} actions={forms} presets={presets} />}
+              formsTab={<FormsTab content={content} sel={sel} state={test.state} actions={forms} presets={presets} colouring={colouring} />}
               presetsTab={<PresetsTab content={content} state={test.state} actions={presets} />}
+              colourTab={<ColourTab content={content} sel={sel} state={{ colours: test.colours, palette: testPalette, genre: test.genre, locks: test.locks }} actions={colourActions} />}
             />
           )}
         </div>

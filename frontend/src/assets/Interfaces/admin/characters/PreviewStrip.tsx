@@ -1,7 +1,8 @@
-import { useMemo, useState } from 'react'
+import { useMemo, useState, type CSSProperties } from 'react'
 import type { ModelContent } from '../../../../api/types'
 import { DiceIcon } from '../../../icons'
 import { shapesOf, showFor, type Selection } from './designerState'
+import { paintOf } from './engine/colour'
 import { previewSpecs, previewTransform, type PreviewMode } from './engine/previews'
 import type { Box } from './engine/geometry'
 import { defaultValues, solve } from './engine/rig'
@@ -34,7 +35,7 @@ export function PreviewStrip({ content, sel, view = 'front' }: { content: ModelC
     }
     return any ? { x: x0, y: y0, w: x1 - x0, h: y1 - y0 } : null
   }, [content, ids, view, show])
-  const opacity = useMemo(() => new Map(content.shapes.map(s => [s.id, s.op])), [content.shapes])
+  const byId = useMemo(() => new Map(content.shapes.map(s => [s.id, s])), [content.shapes])
   const px = SIZES.find(s => s.id === size)!.px
 
   return (
@@ -54,7 +55,10 @@ export function PreviewStrip({ content, sel, view = 'front' }: { content: ModelC
           {specs.map((spec, i) => (
             <svg key={i} className={`cmTile cmTile--${spec.bg}`} viewBox="0 0 100 100" width={px} height={px} role="img" aria-label={`Preview ${i + 1}`}>
               <g transform={previewTransform(box, spec)}>
-                {tiles[i].order.filter(id => ids.has(id)).map(id => <path key={id} d={tiles[i].shapes[id].d} className="cmTileShape" fillOpacity={opacity.get(id) ?? 1} />)}
+                {tiles[i].order.filter(id => ids.has(id)).map(id => {
+                  const shape = byId.get(id), paint = shape ? paintOf(content, { palette: spec.palette, choices: spec.choices }, shape) : null
+                  return <path key={id} d={tiles[i].shapes[id].d} className="cmTileShape" style={paint ? ({ '--shape-fill': paint.fill } as CSSProperties) : undefined} fillOpacity={paint?.opacity ?? 1} />
+                })}
               </g>
             </svg>
           ))}

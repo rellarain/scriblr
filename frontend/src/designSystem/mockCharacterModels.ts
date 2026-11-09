@@ -8,6 +8,7 @@ import { classKey, formKey } from '../assets/Interfaces/admin/characters/engine/
 import { linkToEdge, makeTwin, setBack, setLoose } from '../assets/Interfaces/admin/characters/engine/pairEdit'
 import { saveStyle, savePreset } from '../assets/Interfaces/admin/characters/engine/presets'
 import { templateBox } from '../assets/Interfaces/admin/characters/engine/templates'
+import { standardGenres, standardSlots, starterPalette } from '../assets/Interfaces/admin/characters/engine/standardColours'
 
 // A pretend character models API (`/api/character-models`), shared by the design system's previews (mockBackend.ts) and the tests
 // (test/characterModelsBackend.ts): the catalog lives in memory and answers the way the server does -- drafts saved in order with their
@@ -83,7 +84,7 @@ export function createMockModels(initial: ModelEntry[]) {
 function riggedFigure(): ModelContent {
   const must = (e: Edit): ModelContent => { if (!e.ok) throw new Error(e.reason); return e.content }
   const box = (x: number, y: number, w: number, h: number) => ({ x, y, w, h })
-  let c = modelContent('Adult (basic)', { description: 'Lorem ipsum dolor sit amet, consectetur.' })
+  let c = modelContent('Adult (basic)', { description: 'Lorem ipsum dolor sit amet, consectetur.', genres: standardGenres(), palette: starterPalette(), slots: standardSlots() })
   for (const [id, name] of [['g_torso', 'Torso'], ['g_head', 'Head'], ['g_arm', 'Upper arm'], ['g_fore', 'Forearm']]) c = addGroup(c, newGroup(id, name))
   const parts: Array<[string, string, string, string, ReturnType<typeof box>, string]> = [
     ['g_torso', 'o_neck', 'Neck', 's_neck', box(92, 64, 16, 26), 'rounded'],
@@ -94,7 +95,7 @@ function riggedFigure(): ModelContent {
   ]
   for (const [g, o, name, sid, b, tpl] of parts) {
     c = addObject(c, g, { id: o, name, layer: 'body', shapes: [] })
-    c = addShape(c, o, newShape(sid, name, tpl, b))
+    c = addShape(c, o, { ...newShape(sid, name, tpl, b), slot: 'k_skin' })
   }
   c = must(reparent(c, 'g_head', 'g_torso')); c = must(reparent(c, 'g_arm', 'g_torso')); c = must(reparent(c, 'g_fore', 'g_arm'))
   c = must(attachGroup(c, 'g_head', { shape: 's_neck', kind: 'edge', i: 0, t: 0.5, slider: null, rx: 0.5, ry: 0.5 }))
@@ -123,13 +124,14 @@ function riggedFigure(): ModelContent {
   // a shirt over the chest: every point locked to the chest's edge where it is drawn, so it follows the shoulders; a slider loosens or tightens it
   c = addGroup(c, newGroup('g_shirt', 'Clothes'))
   c = addObject(c, 'g_shirt', { id: 'o_shirt', name: 'Shirt', layer: 'clothing', shapes: [] })
-  const shirt = newShape('s_shirt', 'Shirt', 'rounded', box(64, 82, 72, 84))
+  const shirt = { ...newShape('s_shirt', 'Shirt', 'rounded', box(64, 82, 72, 84)), slot: 'k_cloth' }
   c = addShape(c, 'o_shirt', shirt)
   shirt.pts.forEach((p, i) => { c = must(linkToEdge(c, 's_shirt', i, 's_chest', p.x, p.y)) })
   c = must(addRange(c, { ...newRange('r_fit', 'Shirt fit', 'scale', 's_shirt'), min: 0, rest: 100, max: 200, unit: '%' }))
   c = must(setLoose(c, ['s_shirt'], 'r_fit'))
   // a sleeve on the upper arm, short unless a form of the arm says otherwise
-  c = addShape(c, 'o_arm', newShape('s_sleeve', 'Sleeve', 'rounded', box(122, 88, 18, 28)))
+  c = addShape(c, 'o_arm', { ...newShape('s_sleeve', 'Sleeve', 'rounded', box(122, 88, 18, 28)), slot: 'k_cloth' })
+  // (the body is painted from Skin, the shirt and sleeve from Clothing, the iris from Eye, the white of the eye a fixed white)
   // the other arm: a twin of the arm and the forearm under it, which follows the arm's raise and elbow
   let n = 0
   c = must(makeTwin(c, 'group', 'g_arm', prefix => `${prefix}_twin${++n}`))
@@ -159,8 +161,8 @@ function riggedFigure(): ModelContent {
   // eyes: one pattern (the white and the iris, with an axis of lids that each member chooses on its own) and three members of the family -- Almond follows the
   // pattern, Round and Hooded give a shape an outline of their own -- each with its twin on the other side of the face; the head shows one of them at a time
   c = addObject(c, 'g_head', { id: 'o_eye', name: 'Eye', layer: 'body', shapes: [] })
-  c = addShape(c, 'o_eye', newShape('s_eye', 'White', 'oval', box(85, 41, 11, 7)))
-  c = addShape(c, 'o_eye', newShape('s_iris', 'Iris', 'oval', box(88.5, 41.5, 5, 5)))
+  c = addShape(c, 'o_eye', { ...newShape('s_eye', 'White', 'oval', box(85, 41, 11, 7)), gray: 100 })
+  c = addShape(c, 'o_eye', { ...newShape('s_iris', 'Iris', 'oval', box(88.5, 41.5, 5, 5)), slot: 'k_eye' })
   const lids = axisWith('o_eye', 'Lids', 'Open')
   formWith('o_eye', lids, 'Closed', 's_iris', null)
   const family = makeClass(c, 'o_eye', 'Eye', true, mk)

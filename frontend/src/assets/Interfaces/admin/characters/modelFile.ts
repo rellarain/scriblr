@@ -1,6 +1,9 @@
-import type { ModelContent, ModelDrive, ModelGroup, ModelMove, ModelObject, ModelPoint, ModelRange, ModelShape } from '../../../../api/types'
+import type {
+  ModelAxis, ModelBind, ModelClass, ModelColour, ModelContent, ModelDrive, ModelForm, ModelGenre, ModelGroup, ModelMove, ModelObject, ModelOverride, ModelPoint, ModelPreset, ModelRange,
+  ModelShape, ModelSlot, ModelSwatch,
+} from '../../../../api/types'
 import { LIMITS } from './engine/limits'
-import { blankContent, normalizeContent } from './modelContent'
+import { KIND_MAX, SWATCH_NAME_MAX, blankContent, normalizeContent } from './modelContent'
 
 // The file Export writes and Import reads: JSON with a marker and a version, and the models' content as it is (a shape, object, group or slider keeps its
 // id: the ids only mean something inside one model). Everything read is held to what the server accepts, so one bad model can never make the whole save
@@ -39,10 +42,21 @@ const idOf = (v: unknown): string | null => (typeof v === 'string' && ID.test(v)
 const idOrNull = (v: unknown): string | null => idOf(v)
 const pair = (v: unknown): [number, number] | null => (Array.isArray(v) && v.length === 2 ? [num(v[0], 0, -200, 200), num(v[1], 0, -200, 200)] : null)
 
+// A point link the server would accept (it needs the shape it follows), or null.
+function bind(v: unknown): ModelBind | null {
+  if (!isRecord(v)) return null
+  const s = idOf(v.s)
+  if (!s) return null
+  const at = (x: unknown) => Math.round(num(x, 0, 0, LIMITS.pointsMax - 1))
+  return { kind: v.kind === 'edge' ? 'edge' : 'point', s, i: at(v.i), d: pair(v.d) ?? [0, 0], e: at(v.e), t: num(v.t, 0, 0, 1), o: num(v.o, 0, -100, 100) }
+}
+
 function point(v: unknown): ModelPoint {
   const p = isRecord(v) ? v : {}
   const out: ModelPoint = { x: num(p.x, 0, -50, 250), y: num(p.y, 0, -50, 450), m: (MODES.includes(p.m as string) ? p.m : 'c') as ModelPoint['m'], hi: pair(p.hi), ho: pair(p.ho) }
   if (typeof p.w === 'number') out.w = num(p.w, 0, 0, 1)
+  const b = bind(p.bind)
+  if (b) out.bind = b
   return out
 }
 
@@ -51,6 +65,8 @@ function shape(v: Record<string, unknown>, id: string): ModelShape {
   return {
     id, name: text(v.name), closed: v.closed !== false, z: num(v.z, 40, 0, 100), op: num(v.op, 1, 0, 1), view, pts: list(v.pts).map(point),
     half: Math.round(num(v.half, 0, 0, LIMITS.pointsMax)), template: idOrNull(v.template),
+    mirrorOf: idOrNull(v.mirrorOf), back: Array.isArray(v.back) ? v.back.map(point) : null, zBack: typeof v.zBack === 'number' ? num(v.zBack, 40, 0, 100) : null,
+    loose: idOrNull(v.loose), copyOf: idOrNull(v.copyOf), hide: v.hide === true, slot: idOrNull(v.slot), gray: typeof v.gray === 'number' ? Math.round(num(v.gray, 50, 0, 100)) : null,
   }
 }
 
@@ -95,15 +111,80 @@ function group(v: Record<string, unknown>, id: string): ModelGroup {
   const shapeId = a ? idOf(a.shape) : null
   const kind = a && ['point', 'edge', 'range', 'inside'].includes(a.kind as string) ? (a.kind as 'point' | 'edge' | 'range' | 'inside') : 'point'
   return {
-    id, name: text(v.name), parent: typeof v.parent === 'string' ? v.parent : null, objects: list(v.objects).filter((x): x is string => typeof x === 'string'),
+    id, name: text(v.name), parent: typeof v.parent === 'string' ? v.parent : null, objects: list(v.objects).filter((x): x is string => typeof x === 'string'), mirrorOf: idOrNull(v.mirrorOf),
     pivot: Array.isArray(v.pivot) && v.pivot.length === 2 ? [num(v.pivot[0], 100, -50, 250), num(v.pivot[1], 200, -50, 450)] : null,
     attach: a && shapeId ? { shape: shapeId, kind, i: Math.round(num(a.i, 0, 0, LIMITS.pointsMax - 1)), t: num(a.t, 0, 0, 1), slider: idOrNull(a.slider), rx: num(a.rx, 0.5, 0, 1), ry: num(a.ry, 0.5, 0, 1) } : null,
   }
 }
 
-function object(v: Record<string, unknown>, id: string): ModelObject {
-  return { id, name: text(v.name), layer: v.layer === 'clothing' || v.layer === 'hair' ? v.layer : 'body', shapes: list(v.shapes).filter((x): x is string => typeof x === 'string') }
+// The entries of a list that have an id the server accepts, the first of each id (the server drops the others or refuses the model).
+function withIds<T>(items: unknown[], read: (v: Record<string, unknown>, id: string) => T | null): T[] {
+  const seen = new Set<string>(), out: T[] = []
+  for (const item of items) {
+    if (!isRecord(item)) continue
+    const id = idOf(item.id)
+    if (!id || seen.has(id)) continue
+    const made = read(item, id)
+    if (made) { seen.add(id); out.push(made) }
+  }
+  return out
 }
+
+function override(v: Record<string, unknown>): ModelOverride | null {
+  const shapeId = idOf(v.shape)
+  return shapeId ? { shape: shapeId, pts: list(v.pts).map(point) } : null
+}
+
+function form(v: Record<string, unknown>, id: string): ModelForm {
+  const seen = new Set<string>()
+  const ovr = list(v.ovr).filter(isRecord).map(override).filter((o): o is ModelOverride => o !== null && !seen.has(o.shape) && !!seen.add(o.shape))
+  return { id, name: text(v.name), ovr }
+}
+
+// An axis needs a form; its default form is one of its forms.
+function axis(v: Record<string, unknown>, id: string): ModelAxis | null {
+  const options = withIds(list(v.options), form)
+  if (options.length === 0) return null
+  const initial = typeof v.initial === 'string' && options.some(o => o.id === v.initial) ? v.initial : options[0].id
+  return { id, name: text(v.name), options, initial }
+}
+
+function object(v: Record<string, unknown>, id: string): ModelObject {
+  return {
+    id, name: text(v.name), layer: v.layer === 'clothing' || v.layer === 'hair' ? v.layer : 'body', shapes: list(v.shapes).filter((x): x is string => typeof x === 'string'),
+    mirrorOf: idOrNull(v.mirrorOf), classOf: idOrNull(v.classOf), axes: withIds(list(v.axes), axis),
+  }
+}
+
+function preset(v: Record<string, unknown>, id: string): ModelPreset {
+  const values: Record<string, number> = {}
+  if (isRecord(v.values)) for (const [k, x] of Object.entries(v.values)) if (ID.test(k) && typeof x === 'number' && Number.isFinite(x)) values[k] = num(x, 0, -1000, 1000)
+  const forms: Record<string, string> = {}
+  if (isRecord(v.forms)) for (const [k, x] of Object.entries(v.forms)) if (k.length >= 3 && k.length <= 170 && idOf(x) && Object.keys(forms).length < LIMITS.presetFormsMax) forms[k] = x as string
+  const hidden = [...new Set(list(v.hidden).map(idOf).filter((x): x is string => x !== null))].slice(0, 100)
+  return { id, name: text(v.name), kind: text(v.kind).trim().slice(0, KIND_MAX) || 'Pose', values, hidden, scope: idOrNull(v.scope), forms }
+}
+
+function modelClass(v: Record<string, unknown>, id: string): ModelClass | null {
+  const template = idOf(v.template)
+  return template ? { id, name: text(v.name), template, exclusive: v.exclusive === true } : null
+}
+
+const colourOf = (v: Record<string, unknown>, id: string): ModelColour => ({
+  id, name: text(v.name), hex: typeof v.hex === 'string' && /^#[0-9a-fA-F]{6}$/.test(v.hex) ? v.hex.toLowerCase() : '#808080',
+  genres: [...new Set(list(v.genres).map(idOf).filter((x): x is string => x !== null))].slice(0, LIMITS.genresMax),
+})
+
+function slot(v: Record<string, unknown>, id: string): ModelSlot {
+  const pct = (x: unknown, fallback: number) => Math.round(num(x, fallback, 0, 100))
+  return {
+    id, name: text(v.name), lMin: pct(v.lMin, 50), lRest: pct(v.lRest, 50), lMax: pct(v.lMax, 50), aMin: pct(v.aMin, 100), aRest: pct(v.aRest, 100), aMax: pct(v.aMax, 100),
+    colours: withIds(list(v.colours), colourOf),
+  }
+}
+
+const genre = (v: Record<string, unknown>, id: string): ModelGenre => ({ id, name: text(v.name).trim().slice(0, SWATCH_NAME_MAX) })
+const swatch = (v: Record<string, unknown>, id: string): ModelSwatch => ({ id, name: text(v.name).trim().slice(0, SWATCH_NAME_MAX), h: Math.round(num(v.h, 0, 0, 359)), s: Math.round(num(v.s, 50, 0, 100)) })
 
 // What is wrong with one model in the file, or null.
 function problem(v: unknown): string | null {
@@ -111,6 +192,7 @@ function problem(v: unknown): string | null {
   if (!text(v.name).trim()) return 'has no name'
   const tooMany = (n: number, max: number, what: string) => (n > max ? `has more than ${max} ${what}` : null)
   const shapes = list(v.shapes), objects = list(v.objects), groups = list(v.groups), ranges = list(v.ranges)
+  const rec = (x: unknown): Record<string, unknown> => (isRecord(x) ? x : {})
   const dup = (items: unknown[], what: string): string | null => {
     const ids = items.filter(isRecord).map(i => i.id)
     if (items.some(i => !isRecord(i) || !idOf(i.id))) return `has ${what} with an id that is not allowed`
@@ -122,6 +204,13 @@ function problem(v: unknown): string | null {
     ?? objects.map(o => tooMany(list((o as Record<string, unknown>).shapes).length, LIMITS.shapesPerObjectMax, 'shapes in an object')).find(Boolean)
     ?? groups.map(g => tooMany(list((g as Record<string, unknown>).objects).length, LIMITS.objectsPerGroupMax, 'objects in a group')).find(Boolean)
     ?? ranges.map(r => tooMany(list((r as Record<string, unknown>).drives).length, LIMITS.drivesMax, 'drives in a slider')).find(Boolean)
+    ?? tooMany(list(v.presets).length, LIMITS.presetsMax, 'presets') ?? tooMany(list(v.classes).length, LIMITS.classesMax, 'classes')
+    ?? tooMany(list(v.slots).length, LIMITS.slotsMax, 'colour slots') ?? tooMany(list(v.genres).length, LIMITS.genresMax, 'genres') ?? tooMany(list(v.palette).length, LIMITS.paletteMax, 'swatches in the palette')
+    ?? list(v.slots).map(sl => tooMany(list(rec(sl).colours).length, LIMITS.coloursMax, 'default colours in a slot')).find(Boolean)
+    ?? objects.map(o => tooMany(list(rec(o).axes).length, LIMITS.axesMax, 'axes of forms in an object')).find(Boolean)
+    ?? objects.map(o => list(rec(o).axes).map(a => tooMany(list(rec(a).options).length, LIMITS.formsMax, 'forms in an axis')).find(Boolean)).find(Boolean)
+    ?? shapes.map(sh => (Array.isArray(rec(sh).back) ? tooMany(list(rec(sh).back).length, LIMITS.pointsMax, 'points in an outline for the back') : null)).find(Boolean)
+    ?? objects.map(o => list(rec(o).axes).map(a => list(rec(a).options).map(f => list(rec(f).ovr).map(ov => tooMany(list(rec(ov).pts).length, LIMITS.pointsMax, 'points in the outline of a form')).find(Boolean)).find(Boolean)).find(Boolean)).find(Boolean)
     ?? null
 }
 
@@ -154,6 +243,11 @@ export function parseModelFile(source: string): ModelImport {
       groups: list(m.groups).map(g => group(g as Record<string, unknown>, (g as Record<string, string>).id)),
       axis: num(m.axis, 100, 40, 160),
       ranges: list(m.ranges).map(r => range(r as Record<string, unknown>, (r as Record<string, string>).id)),
+      presets: withIds(list(m.presets), preset),
+      classes: withIds(list(m.classes), modelClass),
+      genres: withIds(list(m.genres), genre),
+      palette: withIds(list(m.palette), swatch),
+      slots: withIds(list(m.slots), slot),
     }))
   })
   return { models, skipped }

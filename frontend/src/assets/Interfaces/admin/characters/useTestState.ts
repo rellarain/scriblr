@@ -1,11 +1,16 @@
 import { useCallback, useMemo, useState } from 'react'
-import type { ModelContent, ModelPreset } from '../../../../api/types'
+import type { ModelContent, ModelPreset, ModelSwatch } from '../../../../api/types'
+import { chosenCount, paletteOf, type Colouring, type SlotChoice, type SlotChoices } from './engine/colour'
 import { formKey, type Choices } from './engine/forms'
 import { applyPreset, awayCount, type TestState } from './engine/presets'
+import { rollLook } from './engine/roll'
 import type { Values } from './engine/rig'
+import { seededRng, type Rng } from './engine/previews'
 
-// What the admin has set up to look at the model, besides drawing it: the Try it sliders, the form each axis shows and the things switched off with the eye.
-// It lives with the open model and is never saved (a preset is how a set of these is kept). `away` counts what is not at rest, for the toolbar.
+// What the admin has set up to look at the model, besides drawing it: the Try it sliders, the form each axis shows, the things switched off with the eye, and the
+// colours of the test character (a palette of its own, the colour chosen for each slot, the genre the colours are drawn from) with the locks that keep things as
+// they are when the look is rolled. It lives with the open model and is never saved (a preset is how a set of the first three is kept; the starter palette is how
+// the palette is). `away` counts what is not at rest, for the toolbar.
 export interface TestControls {
   state: TestState
   values: Values
@@ -16,6 +21,19 @@ export interface TestControls {
   // a choice by its key: "objectId.axisId" (a form) or "class:classId" (the member of a family that is shown)
   setChoice: (key: string, option: string) => void
   toggleHidden: (id: string) => void
+  // colour: the choice for each slot (none = gray), the test palette (null = the model's own), the genre colours are drawn from, the locks
+  colours: SlotChoices
+  palette: ModelSwatch[] | null
+  genre: string | null
+  locks: string[]
+  setColour: (slotId: string, choice: SlotChoice | null) => void
+  setPalette: (palette: ModelSwatch[] | null, choices?: SlotChoices) => void
+  setGenre: (genreId: string | null) => void
+  toggleLock: (id: string) => void
+  // the colours as the canvas draws them
+  colouring: (content: ModelContent) => Colouring
+  // a new look: colours, a form on every axis and the member of every family, except for what is locked
+  roll: (content: ModelContent, rng?: Rng) => void
   resetAll: () => void
   apply: (content: ModelContent, preset: ModelPreset) => void
   away: (content: ModelContent) => number
@@ -25,15 +43,31 @@ export function useTestState(): TestControls {
   const [values, setValues] = useState<Values>({})
   const [forms, setForms] = useState<Choices>({})
   const [hidden, setHidden] = useState<string[]>([])
+  const [colours, setColours] = useState<SlotChoices>({})
+  const [palette, setPaletteState] = useState<ModelSwatch[] | null>(null)
+  const [genre, setGenre] = useState<string | null>(null)
+  const [locks, setLocks] = useState<string[]>([])
   const state = useMemo<TestState>(() => ({ values, forms, hidden }), [values, forms, hidden])
   const setForm = useCallback((objectId: string, axisId: string, formId: string) => setForms(f => ({ ...f, [formKey(objectId, axisId)]: formId })), [])
   const setChoice = useCallback((key: string, option: string) => setForms(f => ({ ...f, [key]: option })), [])
   const toggleHidden = useCallback((id: string) => setHidden(h => (h.includes(id) ? h.filter(x => x !== id) : [...h, id])), [])
-  const resetAll = useCallback(() => { setValues({}); setForms({}); setHidden([]) }, [])
+  const setColour = useCallback((slotId: string, choice: SlotChoice | null) => setColours(cs => {
+    if (choice) return { ...cs, [slotId]: choice }
+    const { [slotId]: _gone, ...rest } = cs
+    return rest
+  }), [])
+  const setPalette = useCallback((next: ModelSwatch[] | null, choices?: SlotChoices) => { setPaletteState(next); if (choices) setColours(choices) }, [])
+  const toggleLock = useCallback((id: string) => setLocks(l => (l.includes(id) ? l.filter(x => x !== id) : [...l, id])), [])
+  const resetAll = useCallback(() => { setValues({}); setForms({}); setHidden([]); setColours({}); setPaletteState(null) }, [])
   const apply = useCallback((content: ModelContent, preset: ModelPreset) => {
     const next = applyPreset(content, state, preset)
     setValues(next.values); setForms(next.forms); setHidden(next.hidden)
   }, [state])
-  const away = useCallback((content: ModelContent) => awayCount(content, state), [state])
-  return { state, values, forms, hidden, setValues, setForm, setChoice, toggleHidden, resetAll, apply, away }
+  const away = useCallback((content: ModelContent) => awayCount(content, state) + chosenCount(content, colours) + (palette ? 1 : 0), [state, colours, palette])
+  const colouring = useCallback((content: ModelContent): Colouring => ({ palette: palette ?? paletteOf(content), choices: colours }), [palette, colours])
+  const roll = useCallback((content: ModelContent, rng: Rng = seededRng(Math.floor(Math.random() * 2 ** 31))) => {
+    const next = rollLook(content, rng, { genre, locks, forms, choices: colours, palette: palette ?? paletteOf(content) })
+    setForms(next.forms); setColours(next.choices)
+  }, [genre, locks, forms, colours, palette])
+  return { state, values, forms, hidden, setValues, setForm, setChoice, toggleHidden, colours, palette, genre, locks, setColour, setPalette, setGenre, toggleLock, colouring, roll, resetAll, apply, away }
 }

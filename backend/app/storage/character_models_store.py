@@ -388,6 +388,21 @@ def _preset_faults(content: ModelContent) -> list[str]:
     return faults
 
 
+def _colour_faults(content: ModelContent) -> list[str]:
+    """What is wrong with the colour of a model (the frontend's colourFaults says the same words)."""
+    faults: list[str] = []
+    slot_ids = {sl.id for sl in content.slots}
+    genre_ids = {g.id for g in content.genres}
+    for s in content.shapes:
+        if s.slot is not None and s.slot not in slot_ids:
+            faults.append(f"Shape {_label(s.name, s.id)} uses a colour slot that does not exist.")
+    for sl in content.slots:
+        for c in sl.colours:
+            if any(g not in genre_ids for g in c.genres):
+                faults.append(f"Colour {_label(c.name, c.id)} of slot {_label(sl.name, sl.id)} fits a genre that does not exist.")
+    return faults
+
+
 def publish_faults(content: ModelContent) -> list[str]:
     """What stops this draft from being published, in plain words."""
     faults: list[str] = []
@@ -429,6 +444,7 @@ def publish_faults(content: ModelContent) -> list[str]:
     faults.extend(_form_faults(content))
     faults.extend(_class_faults(content))
     faults.extend(_preset_faults(content))
+    faults.extend(_colour_faults(content))
     size = copy_bytes(content)
     if size > MODEL_COPY_MAX_BYTES:
         faults.append(f"A character's copy of this model would be {size // 1024} KB; the limit is {MODEL_COPY_MAX_BYTES // 1024} KB.")
