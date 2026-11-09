@@ -598,8 +598,37 @@ export interface ModelPoint { x: number; y: number; m: ModelPointMode; hi?: [num
 // A filled outline in the model's space (0..200 across, 0..400 down). `half` > 0 marks a symmetric outline: its first `half` points run down one half and the rest mirror them.
 export interface ModelShape { id: string; name: string; closed: boolean; z: number; op: number; view: ModelView; pts: ModelPoint[]; half: number; template?: string | null }
 export interface ModelObject { id: string; name: string; layer: ModelLayer; shapes: string[] }
-export interface ModelGroup { id: string; name: string; parent: string | null; objects: string[] }
-export interface ModelContent { name: string; description: string; shapes: ModelShape[]; objects: ModelObject[]; groups: ModelGroup[] }
+// Where a group is fixed to a shape of its parent (or an ancestor): on one point (i), at a spot t (0..1) along edge i, anywhere along edge i that the slider moves, or at a relative place (rx, ry) inside the shape's box.
+export type ModelAnchorKind = 'point' | 'edge' | 'range' | 'inside'
+export interface ModelAttach { shape: string; kind: ModelAnchorKind; i: number; t: number; slider: string | null; rx: number; ry: number }
+// A group of objects that move together. parent is the group it hangs from (the rig), pivot the point it turns about (in the model's space at rest), attach where on a shape of its parent it is fixed.
+export interface ModelGroup { id: string; name: string; parent: string | null; objects: string[]; pivot: [number, number] | null; attach: ModelAttach | null }
+export type ModelRangeUnit = '' | '°' | '%'
+export type ModelDriveKind = 'turn' | 'scale' | 'points' | 'bend'
+export type ModelScaleTarget = 'group' | 'shape' | 'model'
+export type ModelScaleAxis = 'xy' | 'x' | 'y'
+// One point of a points drive: how far it moves with the slider at its maximum (dx, dy) and at its minimum (dxMin, dyMin).
+export interface ModelMove { i: number; dx: number; dy: number; dxMin: number; dyMin: number }
+// What a slider does: turn a group about its pivot, scale a group, a shape or the whole model, move points, or bend a shape along a length. atMin and atMax are the amount at the slider's minimum and maximum (degrees for turn and bend, percent for scale); it is 0 (100 %) at the rest value.
+export interface ModelDrive {
+  kind: ModelDriveKind
+  group: string | null
+  target: ModelScaleTarget | null
+  id: string | null
+  axis: ModelScaleAxis
+  shape: string | null
+  moves: ModelMove[]
+  sym: boolean
+  pivot: [number, number] | null
+  y0: number
+  y1: number
+  atMin: number
+  atMax: number
+  mirror: boolean
+}
+// A slider of the model: from min to max, resting at rest (what is drawn), with what it drives. rand is the span random previews stay in; show says whether the writer's editor offers it.
+export interface ModelRange { id: string; name: string; scope: string | null; min: number; rest: number; max: number; unit: ModelRangeUnit; show: boolean; rand: [number, number] | null; drives: ModelDrive[] }
+export interface ModelContent { name: string; description: string; shapes: ModelShape[]; objects: ModelObject[]; groups: ModelGroup[]; axis: number; ranges: ModelRange[] }
 export interface PublishedModel { version: number; publishedAt: string; content: ModelContent }
 export interface ModelEntry { id: string; draft: ModelContent; published: PublishedModel | null; history: PublishedModel[]; nextVersion: number }
 export interface ModelCatalog { schemaVersion: number; models: ModelEntry[] }

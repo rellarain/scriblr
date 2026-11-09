@@ -1,13 +1,18 @@
-import { useState } from 'react'
+import { useRef, useState, type ChangeEvent } from 'react'
 import { SaveCluster } from '../../../../components/SaveCluster'
 import { setAutosaveMode, useSettings } from '../../../../settings/settingsStore'
 import { autosaveModeOf } from '../../../../theme/types'
 import type { ModelEntry } from '../../../../api/types'
+import { downloadTextFile, readFileText } from '../plot/presetFile'
 import { ModelList } from './ModelList'
 import { ModelPane } from './ModelPane'
+import { ModelFileError, exportFileName, parseModelFile, serializeModels } from './modelFile'
 import { blankContent, randomId } from './modelContent'
 import { useCharacterModels } from './useCharacterModels'
 import './characterModels.scss'
+
+// What an import did, shown until it is dismissed.
+interface ImportNotice { tone: 'ok' | 'error'; lines: string[] }
 
 // AUI > Configuration > Characters: the models the character designer is built from. A list of models and, beside it, the open one: a tree of its
 // groups, objects and shapes, a canvas to draw the shapes on, an inspector, and previews under it. Edits save to the draft the way the Writer's do (the
@@ -18,6 +23,8 @@ function CharacterModelsConsole() {
   const { entries } = models
   const [selectedId, setSelectedId] = useState<string | null>(null)
   const [listOpen, setListOpen] = useState(false)
+  const [notice, setNotice] = useState<ImportNotice | null>(null)
+  const fileInput = useRef<HTMLInputElement>(null)
 
   const current: ModelEntry | undefined = entries.find(e => e.id === selectedId) ?? entries[0]
 
@@ -42,6 +49,31 @@ function CharacterModelsConsole() {
     setSelectedId(next?.id ?? null)
   }
 
+  function exportEntries(list: ModelEntry[]) {
+    const contents = list.map(e => e.draft)
+    downloadTextFile(exportFileName(contents), serializeModels(contents))
+  }
+
+  async function onFile(e: ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0]
+    e.target.value = ''
+    if (!file) return
+    try {
+      const { models: found, skipped } = parseModelFile(await readFileText(file))
+      const added = await models.importModels(found)
+      if (added[0]) select(added[0].id)
+      const skippedLines = skipped.map(s => `Skipped: ${s}`)
+      setNotice(added.length === 0
+        ? { tone: 'error', lines: ['Nothing in the file could be imported.', ...skippedLines] }
+        : {
+          tone: 'ok',
+          lines: [`Imported ${added.length} model${added.length === 1 ? '' : 's'} as drafts. They stay unpublished until you publish them.`, added.map(a => a.name).join(' · '), ...skippedLines],
+        })
+    } catch (err) {
+      setNotice({ tone: 'error', lines: [err instanceof ModelFileError ? err.message : 'The file could not be read.'] })
+    }
+  }
+
   if (models.status === 'loading') return <p className="cmNote" role="status">Loading the models…</p>
   if (models.status === 'error') {
     return (
@@ -61,18 +93,30 @@ function CharacterModelsConsole() {
           autosave={{ mode: autosaveModeOf(ui), onChange: setAutosaveMode, nextSaveAt: models.saveCountdown.nextSaveAt, wait: models.saveCountdown.wait }}
         />
       </div>
+      {notice && (
+        <div className={`cmToast${notice.tone === 'error' ? ' cmToast--error' : ''}`} role={notice.tone === 'error' ? 'alert' : 'status'}>
+          <p><b>{notice.lines[0]}</b></p>
+          {notice.lines.slice(1).map(line => <small key={line}>{line}</small>)}
+          <button type="button" className="cmLink" onClick={() => setNotice(null)}>Dismiss</button>
+        </div>
+      )}
+      <input ref={fileInput} type="file" accept=".json,application/json" hidden aria-label="Import character models from a file" onChange={e => void onFile(e)} />
       {entries.length === 0 ? (
         <div className="cmEmpty">
           <h3>No models yet</h3>
           <p>A model is the set of shapes a character is drawn from: its body, its clothes and its hair, arranged in groups and objects. Create one, then draw its first shape from a template.</p>
           <div className="cmFoot">
             <button type="button" className="cmBtn cmBtn--primary" onClick={create}>New model</button>
+            <button type="button" className="cmBtn" onClick={() => fileInput.current?.click()}>Import</button>
           </div>
         </div>
       ) : (
         <div className="cmSplit">
-          <ModelList entries={entries} current={current} open={listOpen} onToggle={() => setListOpen(o => !o)} onSelect={select} onNew={create} onMove={models.moveModel} />
-          {current && <ModelPane key={current.id} entry={current} models={models} makeId={randomId} onRemove={remove} onDuplicate={duplicate} />}
+          <ModelList
+            entries={entries} current={current} open={listOpen} onToggle={() => setListOpen(o => !o)} onSelect={select} onNew={create}
+            onImport={() => fileInput.current?.click()} onExportAll={() => exportEntries(entries)} onMove={models.moveModel}
+          />
+          {current && <ModelPane key={current.id} entry={current} models={models} makeId={randomId} onRemove={remove} onDuplicate={duplicate} onExport={e => exportEntries([e])} />}
         </div>
       )}
     </div>

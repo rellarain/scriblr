@@ -67,7 +67,7 @@ describe('history', () => {
   })
 })
 
-const content = (over: Partial<ModelContent> = {}): ModelContent => ({ name: 'Adult', description: '', shapes: [], objects: [], groups: [], ...over })
+const content = (over: Partial<ModelContent> = {}): ModelContent => ({ name: 'Adult', description: '', shapes: [], objects: [], groups: [], axis: 100, ranges: [], ...over })
 
 describe('limits', () => {
   it('uses the numbers the user chose', () => {
@@ -87,7 +87,7 @@ describe('limits', () => {
     const notes = limitNotes(content({
       shapes: [many],
       objects: [{ id: 'o', name: 'Obj', layer: 'body', shapes: Array.from({ length: 40 }, (_, i) => `x${i}`) }],
-      groups: [{ id: 'g', name: 'Grp', parent: null, objects: Array.from({ length: 48 }, (_, i) => `o${i}`) }],
+      groups: [{ id: 'g', name: 'Grp', parent: null, objects: Array.from({ length: 48 }, (_, i) => `o${i}`), pivot: null, attach: null }],
     }))
     expect(notes.find(n => n.text.includes('Big'))?.level).toBe('stop')
     expect(notes.find(n => n.text.includes('Obj'))?.level).toBe('warn')

@@ -1,6 +1,6 @@
 import type { ModelEntry } from '../../../../api/types'
 import DragGap from '../../../../components/DragGap'
-import { CheckIcon, ChevronDownIcon, GripIcon, PlusIcon } from '../../../icons'
+import { CheckIcon, ChevronDownIcon, ExportIcon, GripIcon, ImportIcon, PlusIcon } from '../../../icons'
 import { useReorder } from '../plot/useReorder'
 import { publishState } from './modelContent'
 
@@ -24,13 +24,15 @@ function nudged<T extends { id: string }>(list: T[], id: string, dir: -1 | 1): T
 }
 
 // The models, in a column. On a narrow page the list folds into one picker above the designer.
-export function ModelList({ entries, current, open, onToggle, onSelect, onNew, onMove }: {
+export function ModelList({ entries, current, open, onToggle, onSelect, onNew, onImport, onExportAll, onMove }: {
   entries: ModelEntry[]
   current: ModelEntry | undefined
   open: boolean
   onToggle: () => void
   onSelect: (id: string) => void
   onNew: () => void
+  onImport: () => void
+  onExportAll: () => void
   onMove: (id: string, beforeId: string | null) => void
 }) {
   const drag = useReorder<string>(onMove, (id, dir) => {
@@ -51,6 +53,10 @@ export function ModelList({ entries, current, open, onToggle, onSelect, onNew, o
         <div className="cmListHead">
           <span className="cmListTitle">Models · {entries.length}</span>
           <button type="button" className="cmBtn cmBtn--small" onClick={onNew}><PlusIcon size={12} /> New</button>
+        </div>
+        <div className="cmListTools">
+          <button type="button" className="cmBtn cmBtn--small" onClick={onImport}><ImportIcon size={12} /> Import</button>
+          <button type="button" className="cmBtn cmBtn--small" disabled={entries.length === 0} onClick={onExportAll}><ExportIcon size={12} /> Export all</button>
         </div>
         <ul className="cmRows" ref={drag.listRef}>
           <DragGap rect={drag.gap} />

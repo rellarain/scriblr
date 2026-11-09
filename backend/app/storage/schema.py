@@ -4,7 +4,7 @@ from typing import Any, Literal, Optional
 import colorsys
 import re
 
-from pydantic import BaseModel, Field, PrivateAttr, field_validator, model_validator
+from pydantic import BaseModel, Field, PrivateAttr, ValidationError, field_validator, model_validator
 
 SCHEMA_VERSION = 2
 # The version of the project.json file as a whole (ProjectFile.schemaVersion), which a build refuses to write over when the file is newer than it
@@ -1188,10 +1188,46 @@ MODEL_MAX_OBJECTS = 200
 MODEL_MAX_GROUPS = 60
 MODEL_X_RANGE = (-50.0, 250.0)
 MODEL_Y_RANGE = (-50.0, 450.0)
+# The rig (phase 2): the user's numbers. The pivot chain of 6 is a stop (publish is refused above it); the counts of sliders and of what one
+# slider drives are stops too (max_length), with a warning above the first number.
+MODEL_CHAIN_MAX = 6
+MODEL_RANGES_WARN = 40
+MODEL_RANGES_MAX = 80
+MODEL_DRIVES_WARN = 12
+MODEL_DRIVES_MAX = 24
+MODEL_RANGE_NAME_MAX = 40
+MODEL_AXIS_RANGE = (40.0, 160.0)   # the line a model mirrors about (the middle of the 0..200 space by default)
 _MODEL_ID = r"^[A-Za-z0-9_.-]{1,80}$"
 ModelPointMode = Literal["c", "s", "cs", "sc"]
 ModelLayer = Literal["body", "clothing", "hair"]
 ModelView = Literal["both", "front", "back"]
+ModelAnchorKind = Literal["point", "edge", "range", "inside"]
+ModelRangeUnit = Literal["", "°", "%"]
+ModelDriveKind = Literal["turn", "scale", "points", "bend"]
+ModelScaleTarget = Literal["group", "shape", "model"]
+ModelScaleAxis = Literal["xy", "x", "y"]
+
+
+def _keep_valid(cls: Any, value: Any) -> list[Any]:
+    """The entries of a list that are valid, one by one: a bad entry is dropped, its siblings stay (as a corrupt entry of a draft list is)."""
+    if not isinstance(value, list):
+        return []
+    kept: list[Any] = []
+    for item in value:
+        try:
+            kept.append(cls.model_validate(item))
+        except ValidationError as err:
+            # a bad entry is dropped, but a limit that is passed (too many drives, too many points) is refused, not quietly lost
+            if any(e["type"] == "too_long" for e in err.errors()):
+                raise
+        except ValueError:
+            continue
+    return kept
+
+
+def _optional_id(value: Any) -> Optional[str]:
+    """An id that fits the id pattern, or None."""
+    return value if isinstance(value, str) and re.fullmatch(_MODEL_ID, value) else None
 
 
 class ModelPoint(BaseModel):
@@ -1272,6 +1308,188 @@ class ModelShape(BaseModel):
         return value if value in ("both", "front", "back") else "both"
 
 
+class ModelAttach(BaseModel):
+    """Where a group is fixed to a shape of its parent (or an ancestor): on one `point` (`i`), at a spot `t` (0..1) along edge `i`, anywhere along edge
+    `i` that the slider `slider` moves, or at a relative place `rx`, `ry` inside the shape's box."""
+
+    shape: str = Field(pattern=_MODEL_ID)
+    kind: ModelAnchorKind = "point"
+    i: int = 0
+    t: float = 0.0
+    slider: Optional[str] = None
+    rx: float = 0.5
+    ry: float = 0.5
+
+    @field_validator("kind", mode="before")
+    @classmethod
+    def _kind(cls, value: Any) -> Any:
+        return value if value in ("point", "edge", "range", "inside") else "point"
+
+    @field_validator("i", mode="before")
+    @classmethod
+    def _i(cls, value: Any) -> int:
+        return int(_finite(value, 0.0, 0.0, float(MODEL_POINTS_MAX - 1)))
+
+    @field_validator("t", "rx", "ry", mode="before")
+    @classmethod
+    def _unit(cls, value: Any) -> float:
+        return _finite(value, 0.0, 0.0, 1.0)
+
+    @field_validator("slider", mode="before")
+    @classmethod
+    def _slider(cls, value: Any) -> Optional[str]:
+        return _optional_id(value)
+
+
+class ModelMove(BaseModel):
+    """One point of a `points` drive: how far it moves when the slider is at its maximum (`dx`, `dy`) and at its minimum (`dxMin`, `dyMin`)."""
+
+    i: int = 0
+    dx: float = 0.0
+    dy: float = 0.0
+    dxMin: float = 0.0
+    dyMin: float = 0.0
+
+    @field_validator("i", mode="before")
+    @classmethod
+    def _i(cls, value: Any) -> int:
+        return int(_finite(value, 0.0, 0.0, float(MODEL_POINTS_MAX - 1)))
+
+    @field_validator("dx", "dy", "dxMin", "dyMin", mode="before")
+    @classmethod
+    def _d(cls, value: Any) -> float:
+        return _finite(value, 0.0, -200.0, 200.0)
+
+
+class ModelDrive(BaseModel):
+    """What a slider does: `turn` a group about its pivot, `scale` a group, a shape or the whole model, `points` move chosen points of a shape, or
+    `bend` a shape smoothly along a length. `atMin` and `atMax` are the amount at the slider's minimum and maximum (degrees for turn and bend, percent
+    for scale); the amount is 0 (or 100 %) at the slider's rest value. A mirrored twin does the opposite turn or sideways move unless `mirror` is false."""
+
+    kind: ModelDriveKind
+    group: Optional[str] = None
+    target: Optional[ModelScaleTarget] = None
+    id: Optional[str] = None
+    axis: ModelScaleAxis = "xy"
+    shape: Optional[str] = None
+    moves: list[ModelMove] = Field(default_factory=list, max_length=MODEL_POINTS_MAX)
+    sym: bool = False
+    pivot: Optional[list[float]] = None
+    y0: float = 0.0
+    y1: float = 0.0
+    atMin: float = 0.0
+    atMax: float = 0.0
+    mirror: bool = True
+
+    @field_validator("group", "id", "shape", mode="before")
+    @classmethod
+    def _ref(cls, value: Any) -> Optional[str]:
+        return _optional_id(value)
+
+    @field_validator("target", mode="before")
+    @classmethod
+    def _target(cls, value: Any) -> Any:
+        return value if value in ("group", "shape", "model") else None
+
+    @field_validator("axis", mode="before")
+    @classmethod
+    def _axis(cls, value: Any) -> Any:
+        return value if value in ("xy", "x", "y") else "xy"
+
+    @field_validator("moves", mode="before")
+    @classmethod
+    def _moves(cls, value: Any) -> list[Any]:
+        return _keep_valid(ModelMove, value)
+
+    @field_validator("pivot", mode="before")
+    @classmethod
+    def _pivot(cls, value: Any) -> Optional[list[float]]:
+        if not isinstance(value, (list, tuple)) or len(value) != 2:
+            return None
+        return [_finite(value[0], 100.0, *MODEL_X_RANGE), _finite(value[1], 200.0, *MODEL_Y_RANGE)]
+
+    @field_validator("y0", "y1", mode="before")
+    @classmethod
+    def _y(cls, value: Any) -> float:
+        return _finite(value, 0.0, *MODEL_Y_RANGE)
+
+    @model_validator(mode="after")
+    def _complete(self) -> "ModelDrive":
+        if self.kind == "turn" and not self.group:
+            raise ValueError("a turn drive needs a group")
+        if self.kind == "scale" and (self.target is None or (self.target != "model" and not self.id)):
+            raise ValueError("a scale drive needs a target")
+        if self.kind in ("points", "bend") and not self.shape:
+            raise ValueError("this drive needs a shape")
+        if self.kind == "scale":
+            # a percentage: 100 is the size at rest
+            for name in ("atMin", "atMax"):
+                setattr(self, name, 100.0 if name not in self.model_fields_set else _finite(getattr(self, name), 100.0, 5.0, 1000.0))
+        else:
+            self.atMin = _finite(self.atMin, 0.0, -360.0, 360.0)
+            self.atMax = _finite(self.atMax, 0.0, -360.0, 360.0)
+        if self.kind == "bend":
+            if self.pivot is None:
+                self.pivot = [100.0, 200.0]
+            if self.y1 < self.y0:
+                self.y0, self.y1 = self.y1, self.y0
+        return self
+
+
+class ModelRange(BaseModel):
+    """A slider of the model: from `min` to `max`, resting at `rest` (what is drawn), with what it `drives`. `rand` is the span the random previews
+    and the writer's Randomise stay in; `show` says whether the writer's editor offers it."""
+
+    id: str = Field(pattern=_MODEL_ID)
+    name: str = Field(default="", max_length=MODEL_RANGE_NAME_MAX)
+    scope: Optional[str] = None
+    min: float = 0.0
+    rest: float = 0.0
+    max: float = 100.0
+    unit: ModelRangeUnit = ""
+    show: bool = True
+    rand: Optional[list[float]] = None
+    drives: list[ModelDrive] = Field(default_factory=list, max_length=MODEL_DRIVES_MAX)
+
+    @field_validator("name", mode="before")
+    @classmethod
+    def _trim(cls, value: Any) -> Any:
+        return value.strip() if isinstance(value, str) else value
+
+    @field_validator("scope", mode="before")
+    @classmethod
+    def _scope(cls, value: Any) -> Optional[str]:
+        return _optional_id(value)
+
+    @field_validator("min", "rest", "max", mode="before")
+    @classmethod
+    def _value(cls, value: Any) -> float:
+        return _finite(value, 0.0, -1000.0, 1000.0)
+
+    @field_validator("unit", mode="before")
+    @classmethod
+    def _unit(cls, value: Any) -> Any:
+        return value if value in ("", "°", "%") else ""
+
+    @field_validator("drives", mode="before")
+    @classmethod
+    def _drives(cls, value: Any) -> list[Any]:
+        return _keep_valid(ModelDrive, value)
+
+    @model_validator(mode="after")
+    def _ordered(self) -> "ModelRange":
+        if self.max <= self.min:
+            self.max = self.min + 1.0
+        self.rest = min(self.max, max(self.min, self.rest))
+        if self.rand is not None:
+            if not isinstance(self.rand, list) or len(self.rand) != 2:
+                self.rand = None
+            else:
+                a, b = (_finite(v, self.rest, self.min, self.max) for v in self.rand)
+                self.rand = [min(a, b), max(a, b)]
+        return self
+
+
 class ModelObject(BaseModel):
     id: str = Field(pattern=_MODEL_ID)
     name: str = Field(default="", max_length=MODEL_NAME_MAX)
@@ -1290,15 +1508,37 @@ class ModelObject(BaseModel):
 
 
 class ModelGroup(BaseModel):
+    """A group of objects that move together. `parent` is the group it hangs from (the rig), `pivot` the point it turns about (in the model's space at
+    rest), `attach` where on a shape of its parent it is fixed."""
+
     id: str = Field(pattern=_MODEL_ID)
     name: str = Field(default="", max_length=MODEL_NAME_MAX)
     parent: Optional[str] = None
     objects: list[str] = Field(default_factory=list, max_length=MODEL_OBJECTS_PER_GROUP_MAX)
+    pivot: Optional[list[float]] = None
+    attach: Optional[ModelAttach] = None
 
     @field_validator("name", mode="before")
     @classmethod
     def _trim(cls, value: Any) -> Any:
         return value.strip() if isinstance(value, str) else value
+
+    @field_validator("pivot", mode="before")
+    @classmethod
+    def _pivot(cls, value: Any) -> Optional[list[float]]:
+        if not isinstance(value, (list, tuple)) or len(value) != 2:
+            return None
+        return [_finite(value[0], 100.0, *MODEL_X_RANGE), _finite(value[1], 200.0, *MODEL_Y_RANGE)]
+
+    @field_validator("attach", mode="before")
+    @classmethod
+    def _attach(cls, value: Any) -> Any:
+        if value is None or isinstance(value, ModelAttach):
+            return value
+        try:
+            return ModelAttach.model_validate(value)
+        except ValueError:
+            return None
 
 
 class ModelContent(BaseModel):
@@ -1309,15 +1549,28 @@ class ModelContent(BaseModel):
     shapes: list[ModelShape] = Field(default_factory=list, max_length=MODEL_MAX_SHAPES)
     objects: list[ModelObject] = Field(default_factory=list, max_length=MODEL_MAX_OBJECTS)
     groups: list[ModelGroup] = Field(default_factory=list, max_length=MODEL_MAX_GROUPS)
+    # The line the model mirrors about (left/right twins and mirror editing), and its sliders.
+    axis: float = 100.0
+    ranges: list[ModelRange] = Field(default_factory=list, max_length=MODEL_RANGES_MAX)
 
     @field_validator("name", "description", mode="before")
     @classmethod
     def _trim(cls, value: Any) -> Any:
         return value.strip() if isinstance(value, str) else value
 
+    @field_validator("axis", mode="before")
+    @classmethod
+    def _axis(cls, value: Any) -> float:
+        return _finite(value, 100.0, *MODEL_AXIS_RANGE)
+
+    @field_validator("ranges", mode="before")
+    @classmethod
+    def _ranges(cls, value: Any) -> list[Any]:
+        return _keep_valid(ModelRange, value)
+
     @model_validator(mode="after")
     def _unique_ids(self) -> "ModelContent":
-        for label, items in (("shape", self.shapes), ("object", self.objects), ("group", self.groups)):
+        for label, items in (("shape", self.shapes), ("object", self.objects), ("group", self.groups), ("slider", self.ranges)):
             ids = [i.id for i in items]
             if len(set(ids)) != len(ids):
                 raise ValueError(f"two {label}s share an id")

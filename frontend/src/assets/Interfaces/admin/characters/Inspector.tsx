@@ -1,5 +1,7 @@
+import type { ReactNode } from 'react'
 import type { ModelContent, ModelLayer, ModelPointMode, ModelShape, ModelView } from '../../../../api/types'
-import { PlusIcon, TrashIcon, UndoIcon } from '../../../icons'
+import { PathIcon, PlusIcon, SlidersIcon, TrashIcon, TreeIcon, UndoIcon } from '../../../icons'
+import { Stepper } from './Stepper'
 import { TemplateMenu } from './TemplateMenu'
 import { activeShape, type Selection } from './designerState'
 import { addPoint, applyTemplate, deletePoint, resetHandles, setMode } from './engine/edit'
@@ -9,9 +11,23 @@ import { shapeBox } from './engine/svgText'
 import { templateBox } from './engine/templates'
 import { LAYERS, NAME_MAX, groupById, groupOfObject, objectById, objectOfShape } from './modelContent'
 
-// The inspector: what the selection is, its name, and the settings of a shape (view, opacity, template, points and their modes). The other tabs of the
-// mockup (Rig, Forms, Ranges, Colour) come with their phases. It is a drawer the canvas can fold away.
+// The inspector: tabs for what the selection is and its shape's settings (Shape), how its group hangs and is fixed in the rig (Rig) and the model's sliders
+// (Ranges). The mockup's other tabs (Forms, Colour) come with their phases. It is a drawer the canvas can fold away.
+export type InspectorTab = 'shape' | 'rig' | 'ranges'
+const TABS: Array<{ id: InspectorTab; name: string; Icon: typeof PathIcon }> = [
+  { id: 'shape', name: 'Shape', Icon: PathIcon },
+  { id: 'rig', name: 'Rig', Icon: TreeIcon },
+  { id: 'ranges', name: 'Ranges', Icon: SlidersIcon },
+]
+
 export interface InspectorProps {
+  tab: InspectorTab
+  onTab: (tab: InspectorTab) => void
+  // What the Rig and Ranges tabs show (the page builds them: they need its actions).
+  rigTab: ReactNode
+  rangesTab: ReactNode
+  // The line the model mirrors about, changed one step at a time.
+  onAxis: (dir: -1 | 1, big: boolean) => void
   content: ModelContent
   sel: Selection
   selPoint: number
@@ -25,6 +41,31 @@ export interface InspectorProps {
 const VIEWS: Array<{ id: ModelView; name: string }> = [{ id: 'both', name: 'Front and back' }, { id: 'front', name: 'Front only' }, { id: 'back', name: 'Back only' }]
 
 export function Inspector(p: InspectorProps) {
+  return (
+    <section className="cmInspector" aria-label="Inspector">
+      <div className="cmTabs" role="tablist" aria-label="Inspector tabs">
+        {TABS.map(t => (
+          <button
+            key={t.id} type="button" role="tab" id={`cm-tab-${t.id}`} className={`cmTab${p.tab === t.id ? ' cmTab--on' : ''}`} aria-selected={p.tab === t.id} aria-controls="cm-tabpanel" tabIndex={p.tab === t.id ? 0 : -1}
+            title={t.name} onClick={() => p.onTab(t.id)}
+            onKeyDown={e => {
+              if (e.key !== 'ArrowRight' && e.key !== 'ArrowLeft') return
+              e.preventDefault()
+              const at = TABS.findIndex(x => x.id === t.id), next = TABS[(at + (e.key === 'ArrowRight' ? 1 : TABS.length - 1)) % TABS.length]
+              p.onTab(next.id)
+              document.getElementById(`cm-tab-${next.id}`)?.focus()
+            }}
+          ><t.Icon size={13} /> {t.name}</button>
+        ))}
+      </div>
+      <div id="cm-tabpanel" role="tabpanel" aria-labelledby={`cm-tab-${p.tab}`} className="cmTabPanel">
+        {p.tab === 'shape' ? <ShapeTab {...p} /> : p.tab === 'rig' ? p.rigTab : p.rangesTab}
+      </div>
+    </section>
+  )
+}
+
+function ShapeTab(p: InspectorProps) {
   const { content, sel, selPoint, mirror } = p
   const shape = activeShape(content, sel)
   const object = sel.kind === 'object' ? objectById(content, sel.id) : sel.kind === 'shape' ? objectOfShape(content, sel.id) : undefined
@@ -34,16 +75,19 @@ export function Inspector(p: InspectorProps) {
 
   if (sel.kind === 'none') {
     return (
-      <section className="cmInspector" aria-label="Inspector">
+      <div className="cmTabBody">
         <h2 className="cmInsTitle">Overview</h2>
-        <p className="cmInsText">{content.groups.length} groups, {content.objects.length} objects and {content.shapes.length} shapes. Nothing is selected: the canvas shows the end result.</p>
+        <p className="cmInsText">{content.groups.length} groups, {content.objects.length} objects, {content.shapes.length} shapes and {content.ranges.length} sliders. Nothing is selected: the canvas shows the end result.</p>
         <p className="cmInsText">Pick a row in the tree, or click a shape. Right-click the grid to unselect everything. Right-click a shape to move through point editor, move shape and unselected. Right-drag the grid to pan.</p>
-      </section>
+        <h3 className="cmInsSub">Mirror line</h3>
+        <Stepper label="Mirror line" value={`x ${content.axis}`} onStep={p.onAxis} lowerOff={content.axis <= 40} raiseOff={content.axis >= 160} />
+        <p className="cmInsText">Twins and mirror editing reflect about this line. It is drawn on the canvas.</p>
+      </div>
     )
   }
 
   return (
-    <section className="cmInspector" aria-label="Inspector">
+    <div className="cmTabBody">
       <h2 className="cmInsTitle">{sel.kind === 'shape' ? 'Shape' : sel.kind === 'object' ? 'Object' : 'Group'}</h2>
       {crumbs.length > 1 && <p className="cmCrumbs">{crumbs.join(' › ')}</p>}
       <label className="cmField">
@@ -89,7 +133,7 @@ export function Inspector(p: InspectorProps) {
           <PointsSection shape={shape} selPoint={selPoint} mirror={mirror} onSelectPoint={p.onSelectPoint} onEditShape={p.onEditShape} />
         </>
       )}
-    </section>
+    </div>
   )
 }
 

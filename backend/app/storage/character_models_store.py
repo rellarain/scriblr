@@ -14,6 +14,7 @@ from typing import Callable, Optional
 from . import project_store
 from .schema import (
     CHARACTER_MODELS_SCHEMA_VERSION,
+    MODEL_CHAIN_MAX,
     MODEL_COPY_MAX_BYTES,
     MODEL_HISTORY_MAX,
     ModelCatalog,
@@ -129,6 +130,62 @@ def _has_cycle(parents: dict[str, Optional[str]]) -> Optional[str]:
     return None
 
 
+def _ancestors(parents: dict[str, Optional[str]], group_id: str) -> list[str]:
+    """The groups above this one, nearest first (a cycle is cut short)."""
+    chain: list[str] = []
+    cur = parents.get(group_id)
+    while cur is not None and cur in parents and cur not in chain and cur != group_id:
+        chain.append(cur)
+        cur = parents.get(cur)
+    return chain
+
+
+def _rig_faults(content: ModelContent, parents: dict[str, Optional[str]], circular: bool, owner: dict[str, str], holder: dict[str, str]) -> list[str]:
+    """What the rig (phase 2) must not have when published: a pivot chain over the limit, an anchor or a slider that points at something that is
+    not there. The front end makes the same checks (modelContent.publishFaults) in the same words."""
+    faults: list[str] = []
+    shapes = {s.id: s for s in content.shapes}
+    group_ids = {g.id for g in content.groups}
+    range_ids = {r.id for r in content.ranges}
+    if not circular:
+        for g in content.groups:
+            depth = len(_ancestors(parents, g.id)) + 1
+            if depth > MODEL_CHAIN_MAX:
+                faults.append(f"Group {_label(g.name, g.id)} is {depth} levels deep; a pivot chain may have at most {MODEL_CHAIN_MAX}.")
+    for g in content.groups:
+        a = g.attach
+        if a is None:
+            continue
+        name = _label(g.name, g.id)
+        target = shapes.get(a.shape)
+        if g.parent is None:
+            faults.append(f"Group {name} is attached to a shape but has no parent group.")
+        elif target is None:
+            faults.append(f"Group {name} is attached to a shape that does not exist.")
+        else:
+            home = holder.get(owner.get(a.shape, ""), "")
+            if home not in _ancestors(parents, g.id):
+                faults.append(f"Group {name} is attached to a shape that is not in its parent group or one above it.")
+            if a.kind == "point" and a.i >= len(target.pts):
+                faults.append(f"Group {name} is attached to a point that does not exist.")
+            if a.kind in ("edge", "range") and a.i >= len(target.pts):
+                faults.append(f"Group {name} is attached to an edge that does not exist.")
+        if a.kind == "range" and (a.slider is None or a.slider not in range_ids):
+            faults.append(f"Group {name} is attached along a slider that does not exist.")
+    for r in content.ranges:
+        name = _label(r.name, r.id)
+        for d in r.drives:
+            if d.kind == "turn" and d.group not in group_ids:
+                faults.append(f"Slider {name} turns a group that does not exist.")
+            elif d.kind == "scale" and d.target != "model" and not ((d.target == "group" and d.id in group_ids) or (d.target == "shape" and d.id in shapes)):
+                faults.append(f"Slider {name} scales something that does not exist.")
+            elif d.kind in ("points", "bend") and d.shape not in shapes:
+                faults.append(f"Slider {name} moves a shape that does not exist.")
+            elif d.kind == "points" and any(m.i >= len(shapes[d.shape or ""].pts) for m in d.moves):
+                faults.append(f"Slider {name} moves a point of {_label(shapes[d.shape or ''].name, d.shape or '')} that is no longer there. Record it again.")
+    return faults
+
+
 def publish_faults(content: ModelContent) -> list[str]:
     """What stops this draft from being published, in plain words."""
     faults: list[str] = []
@@ -160,9 +217,11 @@ def publish_faults(content: ModelContent) -> list[str]:
                 holder[oid] = g.id
         if g.parent is not None and g.parent not in group_ids:
             faults.append(f"Group {_label(g.name, g.id)} has a parent that does not exist.")
-    loop = _has_cycle({g.id: g.parent for g in content.groups})
+    parents = {g.id: g.parent for g in content.groups}
+    loop = _has_cycle(parents)
     if loop is not None:
         faults.append("The groups are linked in a circle.")
+    faults.extend(_rig_faults(content, parents, loop is not None, owner, holder))
     size = copy_bytes(content)
     if size > MODEL_COPY_MAX_BYTES:
         faults.append(f"A character's copy of this model would be {size // 1024} KB; the limit is {MODEL_COPY_MAX_BYTES // 1024} KB.")

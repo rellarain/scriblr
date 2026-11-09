@@ -1,6 +1,7 @@
 import type { ModelContent, ModelEntry, PublishedModel } from '../api/types'
-import { blankContent, normalizeContent, publishFaults } from '../assets/Interfaces/admin/characters/modelContent'
+import { addGroup, addObject, addShape, blankContent, newGroup, normalizeContent, publishFaults } from '../assets/Interfaces/admin/characters/modelContent'
 import { newShape } from '../assets/Interfaces/admin/characters/engine/edit'
+import { addRange, addScale, addTurn, attachGroup, newRange, recordPoints, reparent, type Edit } from '../assets/Interfaces/admin/characters/engine/rigEdit'
 import { templateBox } from '../assets/Interfaces/admin/characters/engine/templates'
 
 // A pretend character models API (`/api/character-models`), shared by the design system's previews (mockBackend.ts) and the tests
@@ -68,27 +69,62 @@ export function createMockModels(initial: ModelEntry[]) {
   return { state, route }
 }
 
-// The catalog the design system's previews open with: a model with a head and a torso drawn from templates (published, with changes since), and
-// a blank one that was never published.
+// A small rigged figure for the previews: a torso (neck and chest) with a head hung from the neck's top edge, an arm hung from the chest and a forearm
+// from the arm; sliders for the head's tilt and size, the arm's raise, the elbow, the shoulders' width (recorded point moves) and the height. Built with
+// the same operations the Designer uses, so it is what a person would have made.
+function riggedFigure(): ModelContent {
+  const must = (e: Edit): ModelContent => { if (!e.ok) throw new Error(e.reason); return e.content }
+  const box = (x: number, y: number, w: number, h: number) => ({ x, y, w, h })
+  let c = modelContent('Adult (basic)', { description: 'Lorem ipsum dolor sit amet, consectetur.' })
+  for (const [id, name] of [['g_torso', 'Torso'], ['g_head', 'Head'], ['g_arm', 'Upper arm'], ['g_fore', 'Forearm']]) c = addGroup(c, newGroup(id, name))
+  const parts: Array<[string, string, string, string, ReturnType<typeof box>, string]> = [
+    ['g_torso', 'o_neck', 'Neck', 's_neck', box(92, 64, 16, 26), 'rounded'],
+    ['g_torso', 'o_chest', 'Chest', 's_chest', box(70, 86, 60, 74), 'rounded'],
+    ['g_head', 'o_head', 'Head', 's_head', box(80, 24, 40, 44), 'oval'],
+    ['g_arm', 'o_arm', 'Upper arm', 's_arm', box(124, 90, 14, 50), 'rounded'],
+    ['g_fore', 'o_fore', 'Forearm', 's_fore', box(125, 138, 12, 46), 'rounded'],
+  ]
+  for (const [g, o, name, sid, b, tpl] of parts) {
+    c = addObject(c, g, { id: o, name, layer: 'body', shapes: [] })
+    c = addShape(c, o, newShape(sid, name, tpl, b))
+  }
+  c = must(reparent(c, 'g_head', 'g_torso')); c = must(reparent(c, 'g_arm', 'g_torso')); c = must(reparent(c, 'g_fore', 'g_arm'))
+  c = must(attachGroup(c, 'g_head', { shape: 's_neck', kind: 'edge', i: 0, t: 0.5, slider: null, rx: 0.5, ry: 0.5 }))
+  c = must(attachGroup(c, 'g_arm', { shape: 's_chest', kind: 'inside', i: 0, t: 0, slider: null, rx: 1, ry: 0.1 }))
+  c = must(attachGroup(c, 'g_fore', { shape: 's_arm', kind: 'inside', i: 0, t: 0, slider: null, rx: 0.5, ry: 1 }))
+  const turn = (id: string, name: string, group: string, min: number, max: number, atMin: number, atMax: number) => {
+    c = must(addRange(c, { ...newRange(id, name, 'turn', group), min, max }))
+    c = must(addTurn(c, id, group))
+    c = { ...c, ranges: c.ranges.map(r => (r.id === id ? { ...r, drives: r.drives.map(d => ({ ...d, atMin, atMax })) } : r)) }
+  }
+  turn('r_tilt', 'Head tilt', 'g_head', -20, 20, -12, 12)
+  turn('r_raise', 'Arm raise', 'g_arm', -10, 95, 6, -95)
+  turn('r_elbow', 'Elbow bend', 'g_fore', 0, 130, 0, -130)
+  c = must(addRange(c, { ...newRange('r_head', 'Head size', 'scale', 'g_head'), min: 85, max: 125 }))
+  c = must(addScale(c, 'r_head', 'group', 'g_head'))
+  c = { ...c, ranges: c.ranges.map(r => (r.id === 'r_head' ? { ...r, drives: r.drives.map(d => ({ ...d, atMin: 85, atMax: 125 })) } : r)) }
+  c = must(addRange(c, { ...newRange('r_height', 'Height', 'scale', null), min: 70, max: 110 }))
+  c = must(addScale(c, 'r_height', 'model'))
+  c = { ...c, ranges: c.ranges.map(r => (r.id === 'r_height' ? { ...r, drives: r.drives.map(d => ({ ...d, atMin: 70, atMax: 110 })) } : r)) }
+  // shoulder width: the chest's top points move outward at the maximum and inward at the minimum
+  c = must(addRange(c, { ...newRange('r_shoulders', 'Shoulder width', 'points', 's_chest'), min: 85, rest: 100, max: 120, unit: '%' }))
+  const chest = c.shapes.find(x => x.id === 's_chest')!
+  const moved = (at: Record<number, number>, sign: 1 | -1) => ({ ...chest, pts: chest.pts.map((p, i) => (at[i] ? { ...p, x: p.x + sign * at[i] } : p)) })
+  c = must(recordPoints(c, 'r_shoulders', 's_chest', 'max', moved({ 0: -4, 1: 4, 2: 6, 3: 4, 6: -4, 7: -6 }, 1)))
+  c = must(recordPoints(c, 'r_shoulders', 's_chest', 'min', moved({ 0: -4, 1: 4, 2: 6, 3: 4, 6: -4, 7: -6 }, -1)))
+  return c
+}
+
+// The catalog the design system's previews open with: the rigged figure (published as a simpler version, with changes since), and a blank model that
+// was never published.
 export function previewModels(): ModelEntry[] {
-  const head = newShape('s_head', 'Head', 'oval', templateBox('oval', 100, 46, 40))
-  const neck = newShape('s_neck', 'Neck', 'rounded', templateBox('rounded', 100, 74, 22))
-  const chest = newShape('s_chest', 'Chest', 'trapezoid', templateBox('trapezoid', 100, 108, 64))
-  const adult = modelContent('Adult (basic)', {
-    description: 'Lorem ipsum dolor sit amet.',
-    shapes: [head, neck, chest],
-    objects: [
-      { id: 'o_head', name: 'Head', layer: 'body', shapes: ['s_head'] },
-      { id: 'o_neck', name: 'Neck', layer: 'body', shapes: ['s_neck'] },
-      { id: 'o_chest', name: 'Chest', layer: 'body', shapes: ['s_chest'] },
-    ],
-    groups: [
-      { id: 'g_head', name: 'Head', parent: null, objects: ['o_head'] },
-      { id: 'g_torso', name: 'Torso', parent: null, objects: ['o_neck', 'o_chest'] },
-    ],
-  })
-  const live = liveEntry('adult', { ...adult, description: 'Lorem ipsum dolor sit amet, consectetur.' }, { nextVersion: 3 })
-  live.published = published(2, { ...adult, shapes: adult.shapes.slice(0, 2), objects: adult.objects.slice(0, 2), groups: [{ id: 'g_head', name: 'Head', parent: null, objects: ['o_head', 'o_neck'] }] })
-  live.history = [published(1, { ...adult, shapes: adult.shapes.slice(0, 1), objects: adult.objects.slice(0, 1), groups: [{ id: 'g_head', name: 'Head', parent: null, objects: ['o_head'] }] }, '2026-01-05T09:00:00.000Z')]
+  const adult = riggedFigure()
+  const plain = (shapeIds: string[]): ModelContent => {
+    const shapes = adult.shapes.filter(s => shapeIds.includes(s.id))
+    return { ...adult, shapes, objects: adult.objects.filter(o => o.shapes.every(s => shapeIds.includes(s)) && o.shapes.length), groups: [newGroup('g_head', 'Head', null, adult.objects.filter(o => o.shapes.every(s => shapeIds.includes(s))).map(o => o.id))], ranges: [] }
+  }
+  const live = liveEntry('adult', adult, { nextVersion: 3 })
+  live.published = published(2, plain(['s_head', 's_neck', 's_chest']))
+  live.history = [published(1, plain(['s_head']), '2026-01-05T09:00:00.000Z')]
   return [live, draftEntry('stylised', modelContent('Stylised (draft)', { description: 'Ut enim ad minim veniam.' }))]
 }

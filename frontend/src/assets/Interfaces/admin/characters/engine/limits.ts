@@ -1,4 +1,5 @@
 import type { ModelContent, ModelShape } from '../../../../../api/types'
+import { chainDepth } from './rig'
 
 // The limits the user chose (the same numbers as backend schema.py "Character models"): a warning above the first, a stop at the second.
 export const LIMITS = {
@@ -10,6 +11,12 @@ export const LIMITS = {
   shapesPerObjectMax: 72,
   copyWarnBytes: 150 * 1024,
   copyMaxBytes: 250 * 1024,
+  // the rig: a pivot chain of at most 6 groups (refused above it); sliders per model and what one slider drives
+  chainMax: 6,
+  rangesWarn: 40,
+  rangesMax: 80,
+  drivesWarn: 12,
+  drivesMax: 24,
 } as const
 
 export type LimitLevel = 'ok' | 'warn' | 'stop'
@@ -43,6 +50,16 @@ export function limitNotes(content: ModelContent): LimitNote[] {
   for (const g of content.groups) {
     const name = g.name || g.id
     add(level(g.objects.length, LIMITS.objectsPerGroupWarn, LIMITS.objectsPerGroupMax), `${name} has ${g.objects.length} objects: the warning starts above ${LIMITS.objectsPerGroupWarn}.`, `${name} has ${g.objects.length} objects: the limit is ${LIMITS.objectsPerGroupMax}.`)
+  }
+  add(level(content.ranges.length, LIMITS.rangesWarn, LIMITS.rangesMax), `The model has ${content.ranges.length} sliders: the warning starts above ${LIMITS.rangesWarn}.`, `The model has ${content.ranges.length} sliders: the limit is ${LIMITS.rangesMax}.`)
+  for (const r of content.ranges) {
+    const name = r.name || r.id
+    add(level(r.drives.length, LIMITS.drivesWarn, LIMITS.drivesMax), `${name} drives ${r.drives.length} things: the warning starts above ${LIMITS.drivesWarn}.`, `${name} drives ${r.drives.length} things: the limit is ${LIMITS.drivesMax}.`)
+  }
+  for (const g of content.groups) {
+    const depth = chainDepth(content, g.id), name = g.name || g.id
+    if (depth > LIMITS.chainMax) notes.push({ level: 'stop', text: `${name} is ${depth} levels deep: a pivot chain may have at most ${LIMITS.chainMax}, so it cannot be published.` })
+    else if (depth === LIMITS.chainMax) notes.push({ level: 'warn', text: `${name} is ${depth} levels deep, the most a pivot chain may have.` })
   }
   const bytes = copyBytes(content)
   const kb = Math.round(bytes / 102.4) / 10

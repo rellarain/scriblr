@@ -14,7 +14,7 @@ const puts = (b: { calls: string[] }) => b.calls.filter(c => c === 'PUT /charact
 // a model that can be published: one shape in one object in one group
 function complete(name: string) {
   let c = content(name)
-  c = addGroup(c, { id: 'g', name: 'Head', parent: null, objects: [] })
+  c = addGroup(c, { id: 'g', name: 'Head', parent: null, objects: [], pivot: null, attach: null })
   c = addObject(c, 'g', { id: 'o', name: 'Head', layer: 'body', shapes: [] })
   return addShape(c, 'o', newShape('s', 'Head', 'oval', templateBox('oval', 100, 46, 40)))
 }

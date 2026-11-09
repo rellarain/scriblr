@@ -3,7 +3,7 @@ import { readFileSync } from 'node:fs'
 import path from 'node:path'
 import { describe, expect, it } from 'vitest'
 import { LIMITS } from './engine/limits'
-import { DESCRIPTION_MAX, NAME_MAX } from './modelContent'
+import { AXIS_RANGE, DESCRIPTION_MAX, NAME_MAX, RANGE_NAME_MAX } from './modelContent'
 
 // The backend validates a model with extra='ignore', so a field the frontend sends that the schema does not know is dropped without a word. These
 // tests read schema.py and api/types.ts side by side so the two cannot drift apart unnoticed, and check the limits are the same numbers.
@@ -32,6 +32,7 @@ describe('the model types match the backend schema', () => {
   const pairs: Array<[python: string, ts: string]> = [
     ['ModelPoint', 'ModelPoint'], ['ModelShape', 'ModelShape'], ['ModelObject', 'ModelObject'], ['ModelGroup', 'ModelGroup'],
     ['ModelContent', 'ModelContent'], ['PublishedModel', 'PublishedModel'], ['ModelEntry', 'ModelEntry'], ['ModelCatalog', 'ModelCatalog'],
+    ['ModelAttach', 'ModelAttach'], ['ModelMove', 'ModelMove'], ['ModelDrive', 'ModelDrive'], ['ModelRange', 'ModelRange'],
   ]
   for (const [python, ts] of pairs) {
     it(`${ts} has the fields of ${python}`, () => {
@@ -42,12 +43,16 @@ describe('the model types match the backend schema', () => {
   }
 
   it('lists the same point modes, layers and views', () => {
-    const literal = (alias: string) => [...(new RegExp(`${alias}\\s*=\\s*Literal\\[([^\\]]*)\\]`).exec(schema)?.[1] ?? '').matchAll(/"(\w+)"/g)].map(m => m[1]).sort()
-    const union = (alias: string) => [...(new RegExp(`export type ${alias} = ([^\\n]*)`).exec(types)?.[1] ?? '').matchAll(/'(\w+)'/g)].map(m => m[1]).sort()
+    const literal = (alias: string) => [...(new RegExp(`${alias}\\s*=\\s*Literal\\[([^\\]]*)\\]`).exec(schema)?.[1] ?? '').matchAll(/"([^"]*)"/g)].map(m => m[1]).sort()
+    const union = (alias: string) => [...(new RegExp(`export type ${alias} = ([^\\n]*)`).exec(types)?.[1] ?? '').matchAll(/'([^']*)'/g)].map(m => m[1]).sort()
     expect(union('ModelPointMode')).toEqual(literal('ModelPointMode'))
     expect(union('ModelLayer')).toEqual(literal('ModelLayer'))
     expect(union('ModelView')).toEqual(literal('ModelView'))
     expect(union('ModelPointMode').length).toBe(4)
+    for (const alias of ['ModelAnchorKind', 'ModelRangeUnit', 'ModelDriveKind', 'ModelScaleTarget', 'ModelScaleAxis']) {
+      expect(union(alias), alias).toEqual(literal(alias))
+      expect(union(alias).length, alias).toBeGreaterThan(1)
+    }
   })
 })
 
@@ -66,6 +71,18 @@ describe('the limits are the backend\'s numbers', () => {
     expect(LIMITS.shapesPerObjectMax).toBe(number('MODEL_SHAPES_PER_OBJECT_MAX'))
     expect(LIMITS.copyWarnBytes).toBe(number('MODEL_COPY_WARN_BYTES'))
     expect(LIMITS.copyMaxBytes).toBe(number('MODEL_COPY_MAX_BYTES'))
+  })
+  it('for the rig: the pivot chain, sliders, what a slider drives and the length of the name of a slider', () => {
+    expect(LIMITS.chainMax).toBe(number('MODEL_CHAIN_MAX'))
+    expect(LIMITS.rangesWarn).toBe(number('MODEL_RANGES_WARN'))
+    expect(LIMITS.rangesMax).toBe(number('MODEL_RANGES_MAX'))
+    expect(LIMITS.drivesWarn).toBe(number('MODEL_DRIVES_WARN'))
+    expect(LIMITS.drivesMax).toBe(number('MODEL_DRIVES_MAX'))
+    expect(RANGE_NAME_MAX).toBe(number('MODEL_RANGE_NAME_MAX'))
+  })
+  it('for the mirror line', () => {
+    const m = /MODEL_AXIS_RANGE\s*=\s*\(([-\d.]+),\s*([-\d.]+)\)/.exec(schema)
+    expect([Number(m?.[1]), Number(m?.[2])]).toEqual([AXIS_RANGE.min, AXIS_RANGE.max])
   })
   it('for the length of a name and a description', () => {
     expect(NAME_MAX).toBe(number('MODEL_NAME_MAX'))

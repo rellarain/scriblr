@@ -25,6 +25,11 @@ export function rotate(deg: number, px: number, py: number): Mat {
   return [c, s, -s, c, px - c * px + s * py, py - s * px - c * py]
 }
 export const scale = (sx: number, sy: number, px: number, py: number): Mat => [sx, 0, 0, sy, px - sx * px, py - sy * py]
+// The matrix that undoes `m` (a flat or singular matrix has no undo: the determinant is held away from zero, so the result is finite).
+export function inverse(m: Mat): Mat {
+  const det = m[0] * m[3] - m[1] * m[2] || 1
+  return [m[3] / det, -m[1] / det, -m[2] / det, m[0] / det, (m[2] * m[5] - m[3] * m[4]) / det, (m[1] * m[4] - m[0] * m[5]) / det]
+}
 
 // ---- points ----
 
@@ -180,6 +185,11 @@ export function windSign(a: BuiltPoint[]): 1 | -1 {
   const n = a.length
   for (let i = 0; i < n; i++) { const p = a[i], q = a[(i + 1) % n]; s += p.x * q.y - q.x * p.y }
   return s >= 0 ? 1 : -1
+}
+// The place at t along the edge from point e, o units outward (negative: inward), with the outward normal: [x, y, nx, ny].
+export function edgeAt(a: BuiltPoint[], sign: 1 | -1, e: number, t: number, o = 0): [number, number, number, number] {
+  const b = bezierAt(a, e, t), nx = b.ty * sign, ny = -b.tx * sign
+  return [b.x + nx * o, b.y + ny * o, nx, ny]
 }
 export interface NearestEdge { e: number; t: number; dist: number; x: number; y: number; nx: number; ny: number; o: number }
 // The nearest place on the edge of an outline: the edge (from point e), t along it, the distance, the place, and the outward normal.

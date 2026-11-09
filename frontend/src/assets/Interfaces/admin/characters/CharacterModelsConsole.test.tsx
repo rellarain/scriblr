@@ -11,7 +11,7 @@ import { addGroup, addObject, addShape } from './modelContent'
 // a model that can be published: one oval in one object in one group
 function complete(name: string, shape = newShape('s', 'Skull', 'oval', templateBox('oval', 100, 46, 40))): ModelContent {
   let c = content(name)
-  c = addGroup(c, { id: 'g', name: 'Head', parent: null, objects: [] })
+  c = addGroup(c, { id: 'g', name: 'Head', parent: null, objects: [], pivot: null, attach: null })
   c = addObject(c, 'g', { id: 'o', name: 'Face', layer: 'body', shapes: [] })
   return addShape(c, 'o', shape)
 }

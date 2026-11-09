@@ -106,6 +106,22 @@ export function useCharacterModels(makeId: MakeId = randomId) {
     return addModel({ ...structuredClone(source.draft), name: copyName(source.draft.name, ref.current) }, id)
   }
 
+  // Models read from a file: each added as an unpublished draft (a name that is taken becomes "Name (copy)"), saved at once.
+  async function importModels(contents: ModelContent[]): Promise<Array<{ id: string; name: string }>> {
+    if (contents.length === 0) return []
+    let list = ref.current
+    const added: Array<{ id: string; name: string }> = []
+    for (const content of contents) {
+      const id = makeId('model')
+      const name = copyName(content.name, list)
+      added.push({ id, name })
+      list = [...list, { id, draft: { ...content, name }, published: null, history: [], nextVersion: 1 }]
+    }
+    commit(list, true)
+    await draftSave.flush()
+    return added
+  }
+
   // ---- publishing ----
 
   async function act(run: () => Promise<ModelCatalog>): Promise<boolean> {
@@ -133,7 +149,7 @@ export function useCharacterModels(makeId: MakeId = randomId) {
 
   return {
     entries, status, loadError, reload: load, busy, actionError, clearActionError: () => setActionError(undefined),
-    edit, setDraft, addModel, removeModel, moveModel, duplicateModel,
+    edit, setDraft, addModel, removeModel, moveModel, duplicateModel, importModels,
     publish, unpublish, discard, restore,
     saveStatus: combineSaveStatus(draftSave), saveCountdown: combineCountdown(draftSave), saveNow: draftSave.flush,
   }

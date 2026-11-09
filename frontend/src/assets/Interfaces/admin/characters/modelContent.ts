@@ -1,5 +1,6 @@
 import type { ModelContent, ModelEntry, ModelGroup, ModelLayer, ModelObject, ModelShape } from '../../../../api/types'
 import { LIMITS, copyBytes } from './engine/limits'
+import { chainOf } from './engine/rig'
 
 // The pure side of the Characters page: editing a model's tree (groups, objects, shapes), the checks Publish makes, and ids and names. Nothing here
 // touches the network or React. Every function returns new content and leaves the one it was given alone.
@@ -12,7 +13,13 @@ export const LAYERS: Array<{ id: ModelLayer; name: string }> = [{ id: 'body', na
 export type MakeId = (prefix: string) => string
 export const randomId: MakeId = prefix => `${prefix}_${Math.random().toString(36).slice(2, 10)}`
 
-export const blankContent = (name = ''): ModelContent => ({ name, description: '', shapes: [], objects: [], groups: [] })
+export const RANGE_NAME_MAX = 40
+export const AXIS_RANGE = { min: 40, max: 160 } as const
+
+export const blankContent = (name = ''): ModelContent => ({ name, description: '', shapes: [], objects: [], groups: [], axis: 100, ranges: [] })
+
+// A group as the page makes one: no parent, no pivot and no anchor until the rig says otherwise.
+export const newGroup = (id: string, name: string, parent: string | null = null, objects: string[] = []): ModelGroup => ({ id, name, parent, objects, pivot: null, attach: null })
 
 const clean = (v: string, max: number): string => v.trim().slice(0, max)
 
@@ -24,7 +31,9 @@ export function normalizeContent(c: ModelContent): ModelContent {
     description: clean(c.description, DESCRIPTION_MAX),
     shapes: c.shapes.map(s => ({ ...s, name: clean(s.name, NAME_MAX) })),
     objects: c.objects.map(o => ({ ...o, name: clean(o.name, NAME_MAX) })),
-    groups: c.groups.map(g => ({ ...g, name: clean(g.name, NAME_MAX) })),
+    groups: c.groups.map(g => ({ ...g, name: clean(g.name, NAME_MAX), pivot: g.pivot ?? null, attach: g.attach ?? null })),
+    axis: c.axis ?? 100,
+    ranges: (c.ranges ?? []).map(r => ({ ...r, name: clean(r.name, RANGE_NAME_MAX) })),
   }
 }
 
@@ -145,9 +154,14 @@ export function moveShapeWithin(c: ModelContent, objectId: string, shapeId: stri
   return { ...c, objects: c.objects.map(o => (o.id === objectId ? { ...o, shapes: moveBefore(o.shapes.map(id => ({ id })), shapeId, beforeId).map(x => x.id) } : o)) }
 }
 
+// An object moves among the objects of its group (the later in the list, the nearer the front).
+export function moveObjectWithin(c: ModelContent, groupId: string, objectId: string, beforeId: string | null): ModelContent {
+  return { ...c, groups: c.groups.map(g => (g.id === groupId ? { ...g, objects: moveBefore(g.objects.map(id => ({ id })), objectId, beforeId).map(x => x.id) } : g)) }
+}
+
 // The next free id of a kind ('s', 'o', 'g') in the content.
-export function freshId(c: ModelContent, prefix: 's' | 'o' | 'g', make: MakeId = randomId): string {
-  const taken = new Set([...c.shapes.map(s => s.id), ...c.objects.map(o => o.id), ...c.groups.map(g => g.id)])
+export function freshId(c: ModelContent, prefix: 's' | 'o' | 'g' | 'r', make: MakeId = randomId): string {
+  const taken = new Set([...c.shapes.map(s => s.id), ...c.objects.map(o => o.id), ...c.groups.map(g => g.id), ...c.ranges.map(r => r.id)])
   for (let i = 0; i < 20; i++) { const id = make(prefix); if (!taken.has(id)) return id }
   return `${prefix}_${taken.size}_${Date.now().toString(36)}`
 }
@@ -167,6 +181,44 @@ function hasCycle(parents: Map<string, string | null>): boolean {
     }
   }
   return false
+}
+
+// What the rig must not have when published (the server makes the same checks in the same words): a pivot chain over the limit, an anchor or a slider
+// that points at something that is not there.
+function rigFaults(c: ModelContent, circular: boolean, owner: Map<string, string>, holder: Map<string, string>): string[] {
+  const faults: string[] = []
+  const shapes = new Map(c.shapes.map(s => [s.id, s]))
+  const groupIds = new Set(c.groups.map(g => g.id)), rangeIds = new Set(c.ranges.map(r => r.id))
+  if (!circular) {
+    for (const g of c.groups) {
+      const depth = chainOf(c, g.id).length
+      if (depth > LIMITS.chainMax) faults.push(`Group ${label(g.name, g.id)} is ${depth} levels deep; a pivot chain may have at most ${LIMITS.chainMax}.`)
+    }
+  }
+  for (const g of c.groups) {
+    const a = g.attach
+    if (!a) continue
+    const name = label(g.name, g.id), target = shapes.get(a.shape)
+    if (g.parent === null) faults.push(`Group ${name} is attached to a shape but has no parent group.`)
+    else if (!target) faults.push(`Group ${name} is attached to a shape that does not exist.`)
+    else {
+      const home = holder.get(owner.get(a.shape) ?? '') ?? ''
+      if (!chainOf(c, g.parent).includes(home)) faults.push(`Group ${name} is attached to a shape that is not in its parent group or one above it.`)
+      if (a.kind === 'point' && a.i >= target.pts.length) faults.push(`Group ${name} is attached to a point that does not exist.`)
+      if ((a.kind === 'edge' || a.kind === 'range') && a.i >= target.pts.length) faults.push(`Group ${name} is attached to an edge that does not exist.`)
+    }
+    if (a.kind === 'range' && !(a.slider && rangeIds.has(a.slider))) faults.push(`Group ${name} is attached along a slider that does not exist.`)
+  }
+  for (const r of c.ranges) {
+    const name = label(r.name, r.id)
+    for (const d of r.drives) {
+      if (d.kind === 'turn' && !(d.group && groupIds.has(d.group))) faults.push(`Slider ${name} turns a group that does not exist.`)
+      else if (d.kind === 'scale' && d.target !== 'model' && !((d.target === 'group' && d.id && groupIds.has(d.id)) || (d.target === 'shape' && d.id && shapes.has(d.id)))) faults.push(`Slider ${name} scales something that does not exist.`)
+      else if ((d.kind === 'points' || d.kind === 'bend') && !(d.shape && shapes.has(d.shape))) faults.push(`Slider ${name} moves a shape that does not exist.`)
+      else if (d.kind === 'points' && d.shape && d.moves.some(m => m.i >= (shapes.get(d.shape!)?.pts.length ?? 0))) faults.push(`Slider ${name} moves a point of ${label(shapes.get(d.shape)?.name ?? '', d.shape)} that is no longer there. Record it again.`)
+    }
+  }
+  return faults
 }
 
 export function publishFaults(c: ModelContent): string[] {
@@ -191,7 +243,9 @@ export function publishFaults(c: ModelContent): string[] {
     }
     if (g.parent !== null && !groupIds.has(g.parent)) faults.push(`Group ${label(g.name, g.id)} has a parent that does not exist.`)
   }
-  if (hasCycle(new Map(c.groups.map(g => [g.id, g.parent])))) faults.push('The groups are linked in a circle.')
+  const circular = hasCycle(new Map(c.groups.map(g => [g.id, g.parent])))
+  if (circular) faults.push('The groups are linked in a circle.')
+  faults.push(...rigFaults(c, circular, owner, holder))
   const bytes = copyBytes(c)
   if (bytes > LIMITS.copyMaxBytes) faults.push(`A character's copy of this model would be ${Math.floor(bytes / 1024)} KB; the limit is ${LIMITS.copyMaxBytes / 1024} KB.`)
   return faults

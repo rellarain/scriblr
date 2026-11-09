@@ -1,0 +1,156 @@
+import { useState } from 'react'
+import type { ModelContent, ModelDrive, ModelGroup, ModelRange, ModelScaleAxis } from '../../../../api/types'
+import { EyeIcon, EyeOffIcon, PauseIcon, PlayIcon, PlusIcon, RestoreIcon, TrashIcon } from '../../../icons'
+import { LIMITS } from './engine/limits'
+import { valueOf, type Values } from './engine/rig'
+import { stepOf } from './engine/rigEdit'
+import { Stepper } from './Stepper'
+import type { Selection } from './designerState'
+import type { NewSliderKind, Recording, RigActions } from './rigActions'
+import { driveText, offRest, rangesForSelection, valueText } from './rigView'
+
+// The Ranges tab: the model's sliders. Each has a Try it slider (the test value is only for looking: it is never saved), its minimum, rest and maximum,
+// and what it drives (turn a group about its pivot, scale, move recorded points, bend a shape), each with steppers for how much.
+const KIND_LABEL: Record<NewSliderKind, string> = { turn: 'Turn the group', scale: 'Scale', points: 'Move points (record)', bend: 'Bend the shape' }
+const AXES: Array<{ id: ModelScaleAxis; name: string }> = [{ id: 'xy', name: 'Both ways' }, { id: 'x', name: 'Across' }, { id: 'y', name: 'Up and down' }]
+
+export interface RangesTabProps {
+  content: ModelContent
+  sel: Selection
+  group: ModelGroup | undefined
+  values: Values
+  recording: Recording | null
+  scrubbing: string | null
+  filter: 'selection' | 'all'
+  onFilter: (f: 'selection' | 'all') => void
+  actions: RigActions
+}
+
+export function RangesTab({ content, sel, group, values, recording, scrubbing, filter, onFilter, actions }: RangesTabProps) {
+  const [menu, setMenu] = useState<string | null>(null)   // 'new' or a slider id: whose add menu is open
+  const [confirm, setConfirm] = useState<string | null>(null)
+  const shapeSel = sel.kind === 'shape'
+  const list = filter === 'all' || sel.kind === 'none' ? content.ranges : rangesForSelection(content, sel)
+  const away = offRest(content, values)
+  const can = (kind: NewSliderKind): string | null =>
+    kind === 'turn' ? (group ? null : 'Select a group first') : kind === 'scale' ? null : shapeSel ? null : 'Select a shape first'
+  const kinds: NewSliderKind[] = ['turn', 'scale', 'points', 'bend']
+  const recShape = recording ? content.shapes.find(s => s.id === recording.shapeId) : undefined
+  const recRange = recording ? content.ranges.find(r => r.id === recording.rangeId) : undefined
+
+  function menuFor(id: string, onPick: (k: NewSliderKind) => void) {
+    return (
+      <div className="cmMenu cmMenu--list" role="menu" aria-label={id === 'new' ? 'New slider' : 'Add what the slider drives'}>
+        {kinds.map(k => {
+          const why = can(k)
+          return <button key={k} type="button" role="menuitem" className="cmMenuBtn" disabled={!!why} title={why ?? undefined} onClick={() => { setMenu(null); onPick(k) }}>{KIND_LABEL[k]}{why ? <small>{why}</small> : null}</button>
+        })}
+      </div>
+    )
+  }
+
+  return (
+    <div className="cmTabBody">
+      <div className="cmInline cmRangesBar">
+        <span className="cmMenuAnchor">
+          <button type="button" className="cmBtn cmBtn--small" aria-haspopup="menu" aria-expanded={menu === 'new'} disabled={content.ranges.length >= LIMITS.rangesMax || !!recording} onClick={() => setMenu(m => (m === 'new' ? null : 'new'))}><PlusIcon size={12} /> New slider</button>
+          {menu === 'new' && menuFor('new', k => actions.newSlider(k))}
+        </span>
+        <button type="button" className="cmBtn cmBtn--small" disabled={away === 0 || !!recording} onClick={actions.resetValues} title="Put every slider back at rest"><RestoreIcon size={12} /> Reset test values{away ? ` (${away})` : ''}</button>
+      </div>
+      <div className="cmChips" role="group" aria-label="Which sliders to list">
+        <button type="button" className={`cmChip cmChip--wide${filter === 'selection' ? ' cmChip--on' : ''}`} aria-pressed={filter === 'selection'} onClick={() => onFilter('selection')}>This selection</button>
+        <button type="button" className={`cmChip cmChip--wide${filter === 'all' ? ' cmChip--on' : ''}`} aria-pressed={filter === 'all'} onClick={() => onFilter('all')}>All ({content.ranges.length})</button>
+      </div>
+
+      {recording && recShape && recRange && (
+        <div className="cmRecording" role="status">
+          <p><b>Recording {recording.end === 'max' ? 'the maximum' : 'the minimum'} of {recRange.name.trim() || 'the slider'}.</b> Drag the points of {recShape.name.trim() || 'the shape'} to where they should be, then press Set. Adding or deleting points is not recorded.</p>
+          <div className="cmInline">
+            <button type="button" className="cmBtn cmBtn--small cmBtn--primary" onClick={actions.finishRecording}>Set {recording.end === 'max' ? 'maximum' : 'minimum'}</button>
+            <button type="button" className="cmBtn cmBtn--small" onClick={actions.cancelRecording}>Cancel</button>
+          </div>
+        </div>
+      )}
+
+      {list.length === 0 && <p className="cmInsText">{content.ranges.length === 0 ? 'No slider yet. A slider turns a group, scales something, moves points or bends a shape; make one with New slider.' : filter === 'selection' && sel.kind === 'none' ? 'Select something to see its sliders.' : 'No slider has to do with the selection. Show All, or make one.'}</p>}
+
+      {list.map(r => sliderCard(r))}
+    </div>
+  )
+
+  function sliderCard(r: ModelRange) {
+    const v = valueOf(r, values), step = stepOf(r), title = r.name.trim() || 'Slider'
+    const locked = !!recording
+    return (
+      <section key={r.id} className="cmSlider" aria-label={`Slider ${title}`}>
+        <div className="cmSliderHead">
+          <input className="cmSliderName" aria-label={`Name of ${title}`} value={r.name} maxLength={40} placeholder="Name" onChange={e => actions.renameRange(r.id, e.target.value)} />
+          <button type="button" className="cmIconBtn cmIconBtn--small" aria-label={r.show ? `Hide ${title} from writers` : `Offer ${title} to writers`} title={r.show ? 'Writers can use this slider (click to hide it)' : 'Hidden from writers (click to offer it)'} aria-pressed={r.show} onClick={() => actions.setShow(r.id, !r.show)}>{r.show ? <EyeIcon size={12} /> : <EyeOffIcon size={12} />}</button>
+          {confirm === r.id ? (
+            <span className="cmConfirm" role="group" aria-label={`Delete ${title}?`}>
+              <button type="button" className="cmBtn cmBtn--danger cmBtn--small" onClick={() => { setConfirm(null); actions.removeRange(r.id) }}>Delete it</button>
+              <button type="button" className="cmBtn cmBtn--small" onClick={() => setConfirm(null)}>Keep it</button>
+            </span>
+          ) : <button type="button" className="cmIconBtn cmIconBtn--small" aria-label={`Delete slider ${title}`} title="Delete the slider" disabled={locked} onClick={() => setConfirm(r.id)}><TrashIcon size={12} /></button>}
+        </div>
+        <label className="cmField">
+          <span>Try it</span>
+          <span className="cmRange">
+            <input type="range" min={r.min} max={r.max} step={step} value={v} disabled={locked} aria-label={`Try ${title}`} onChange={e => actions.setValue(r.id, Number(e.target.value))} />
+            <output>{valueText(r, v)}</output>
+            <button type="button" className="cmIconBtn cmIconBtn--small" aria-label={scrubbing === r.id ? `Stop sweeping ${title}` : `Sweep ${title} from its minimum to its maximum`} title="Sweep from the minimum to the maximum and back, to see what it does" aria-pressed={scrubbing === r.id} disabled={locked} onClick={() => actions.scrub(r.id)}>{scrubbing === r.id ? <PauseIcon size={12} /> : <PlayIcon size={12} />}</button>
+          </span>
+        </label>
+        <div className="cmSteps">
+          <Stepper label={`Minimum of ${title}`} value={valueText(r, r.min)} onStep={(dir, big) => actions.stepBound(r.id, 'min', dir, big)} />
+          <Stepper label={`Rest of ${title}`} value={valueText(r, r.rest)} onStep={(dir, big) => actions.stepBound(r.id, 'rest', dir, big)} />
+          <Stepper label={`Maximum of ${title}`} value={valueText(r, r.max)} onStep={(dir, big) => actions.stepBound(r.id, 'max', dir, big)} />
+        </div>
+        <ul className="cmDrives">
+          {r.drives.map((d, i) => <li key={i}>{driveRow(r, d, i, locked)}</li>)}
+        </ul>
+        {r.drives.length === 0 && <p className="cmInsText">It drives nothing yet.</p>}
+        <div className="cmInline">
+          <span className="cmMenuAnchor">
+            <button type="button" className="cmBtn cmBtn--small" aria-haspopup="menu" aria-expanded={menu === r.id} disabled={locked || r.drives.length >= LIMITS.drivesMax} onClick={() => setMenu(m => (m === r.id ? null : r.id))}><PlusIcon size={12} /> Add what it drives</button>
+            {menu === r.id && menuFor(r.id, k => actions.addDrive(r.id, k))}
+          </span>
+        </div>
+      </section>
+    )
+  }
+
+  function driveRow(r: ModelRange, d: ModelDrive, i: number, locked: boolean) {
+    const unit = d.kind === 'scale' ? '%' : '°'
+    return (
+      <div className="cmDrive">
+        <p className="cmInsText">{driveText(content, d)}</p>
+        {d.kind !== 'points' && (
+          <div className="cmSteps">
+            <Stepper label={`At the minimum (drive ${i + 1} of ${r.name.trim() || 'the slider'})`} value={`${d.atMin}${unit}`} onStep={(dir, big) => actions.stepDrive(r.id, i, 'atMin', dir, big)} />
+            <Stepper label={`At the maximum (drive ${i + 1} of ${r.name.trim() || 'the slider'})`} value={`${d.atMax}${unit}`} onStep={(dir, big) => actions.stepDrive(r.id, i, 'atMax', dir, big)} />
+          </div>
+        )}
+        {d.kind === 'scale' && (
+          <div className="cmChips" role="group" aria-label="Which way it scales">
+            {AXES.map(a => <button key={a.id} type="button" className={`cmChip cmChip--wide${d.axis === a.id ? ' cmChip--on' : ''}`} aria-pressed={d.axis === a.id} onClick={() => actions.setDriveAxis(r.id, i, a.id)}>{a.name}</button>)}
+          </div>
+        )}
+        {d.kind === 'bend' && (
+          <div className="cmSteps">
+            <Stepper label="Bend starts at" value={`${Math.round(d.y0)}`} onStep={(dir, big) => actions.stepBend(r.id, i, 'y0', dir, big)} />
+            <Stepper label="Bend ends at" value={`${Math.round(d.y1)}`} onStep={(dir, big) => actions.stepBend(r.id, i, 'y1', dir, big)} />
+          </div>
+        )}
+        {d.kind === 'points' && d.shape && (
+          <div className="cmInline">
+            <button type="button" className="cmBtn cmBtn--small" disabled={locked} onClick={() => actions.record(r.id, d.shape!, 'max')}>Record the maximum again</button>
+            <button type="button" className="cmBtn cmBtn--small" disabled={locked} onClick={() => actions.record(r.id, d.shape!, 'min')}>Record the minimum</button>
+          </div>
+        )}
+        <button type="button" className="cmLink" disabled={locked} onClick={() => actions.removeDrive(r.id, i)}>Remove this</button>
+      </div>
+    )
+  }
+}

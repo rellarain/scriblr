@@ -12,8 +12,8 @@ const shape = (id: string, name = id) => newShape(id, name, 'square', templateBo
 // a model with two groups: Head (head object, body layer) and Torso (chest object, body layer; shirt object, clothing layer)
 function sample(): ModelContent {
   let c = blankContent('Adult')
-  c = addGroup(c, { id: 'g1', name: 'Head', parent: null, objects: [] })
-  c = addGroup(c, { id: 'g2', name: 'Torso', parent: null, objects: [] })
+  c = addGroup(c, { id: 'g1', name: 'Head', parent: null, objects: [], pivot: null, attach: null })
+  c = addGroup(c, { id: 'g2', name: 'Torso', parent: null, objects: [], pivot: null, attach: null })
   c = addObject(c, 'g1', { id: 'o1', name: 'Head', layer: 'body', shapes: [] })
   c = addObject(c, 'g2', { id: 'o2', name: 'Chest', layer: 'body', shapes: [] })
   c = addObject(c, 'g2', { id: 'o3', name: 'Shirt', layer: 'clothing', shapes: [] })
@@ -81,7 +81,7 @@ describe('the tree', () => {
   })
   it('a group under a removed group moves up to its parent', () => {
     let c = sample()
-    c = addGroup(c, { id: 'g3', name: 'Sub', parent: 'g2', objects: [] })
+    c = addGroup(c, { id: 'g3', name: 'Sub', parent: 'g2', objects: [], pivot: null, attach: null })
     c = removeGroup(c, 'g2')
     expect(c.groups.find(g => g.id === 'g3')?.parent).toBeNull()
   })
@@ -120,6 +120,49 @@ describe('what publishing checks', () => {
   it('refuses a copy over the size limit', () => {
     const big = { ...blankContent('Big'), shapes: Array.from({ length: 120 }, (_, i) => ({ ...shape(`s${i}`, 'x'.repeat(60)), pts: Array.from({ length: 60 }, (_, j) => ({ x: j + 0.123456, y: (j % 9) + 0.654321, m: 'c' as const, hi: [1.123456, 2.123456] as [number, number], ho: [3.123456, 4.123456] as [number, number] })) })) }
     expect(publishFaults(big).join()).toMatch(/KB/)
+  })
+})
+
+describe('what publishing checks about the rig (the server says the same words)', () => {
+  const g = (id: string, parent: string | null, objects: string[], over: Partial<ModelContent['groups'][number]> = {}) => ({ id, name: id, parent, objects, pivot: null, attach: null, ...over })
+  const drive = (over: Partial<ModelContent['ranges'][number]['drives'][number]>) => ({ kind: 'turn' as const, group: null, target: null, id: null, axis: 'xy' as const, shape: null, moves: [], sym: false, pivot: null, y0: 0, y1: 0, atMin: 0, atMax: 0, mirror: true, ...over })
+  const range = (drives: ModelContent['ranges'][number]['drives']) => ({ id: 'r1', name: 'Tilt', scope: null, min: -20, rest: 0, max: 20, unit: '°' as const, show: true, rand: null, drives })
+  // shapes s1 (head, in group g1) and s2 (chest, in group g2): g1 hangs from g2
+  const rigged = (over: Partial<ModelContent> = {}): ModelContent => ({ ...sample(), groups: [g('g1', 'g2', ['o1']), g('g2', null, ['o2', 'o3'])], ...over })
+
+  it('passes a rigged model', () => {
+    const c = rigged({ ranges: [range([drive({ kind: 'turn', group: 'g1', atMin: -10, atMax: 10 })])] })
+    c.groups[0] = g('g1', 'g2', ['o1'], { pivot: [100, 40], attach: { shape: 's2', kind: 'point', i: 0, t: 0, slider: null, rx: 0.5, ry: 0.5 } })
+    expect(publishFaults(c)).toEqual([])
+  })
+  it('refuses a pivot chain of seven and allows six', () => {
+    const chain = (n: number): ModelContent => ({ ...sample(), groups: Array.from({ length: n }, (_, i) => g(`c${i}`, i ? `c${i - 1}` : null, i ? [] : ['o1', 'o2', 'o3'])) })
+    expect(publishFaults(chain(6))).toEqual([])
+    expect(publishFaults(chain(7)).join(' ')).toMatch(/7 levels deep; a pivot chain may have at most 6/)
+  })
+  it('says what is wrong with an anchor', () => {
+    const attach = (a: Partial<NonNullable<ModelContent['groups'][number]['attach']>>, parent: string | null = 'g2'): ModelContent => {
+      const c = rigged()
+      c.groups[0] = g('g1', parent, ['o1'], { attach: { shape: 's2', kind: 'point', i: 0, t: 0, slider: null, rx: 0.5, ry: 0.5, ...a } })
+      return c
+    }
+    const said = (c: ModelContent) => publishFaults(c).join(' ')
+    expect(said(attach({ shape: 'gone' }))).toMatch(/attached to a shape that does not exist/)
+    expect(said(attach({ shape: 's1' }))).toMatch(/not in its parent group or one above it/)
+    expect(said(attach({}, null))).toMatch(/has no parent group/)
+    expect(said(attach({ i: 30 }))).toMatch(/attached to a point that does not exist/)
+    expect(said(attach({ kind: 'edge', i: 30 }))).toMatch(/attached to an edge that does not exist/)
+    expect(said(attach({ kind: 'range', slider: 'nope' }))).toMatch(/attached along a slider that does not exist/)
+    expect(said(attach({ kind: 'range', i: 1, slider: 'r1' }))).toMatch(/slider that does not exist/)   // r1 is not in this content
+  })
+  it('says what is wrong with a slider', () => {
+    const said = (d: ModelContent['ranges'][number]['drives'][number]) => publishFaults(rigged({ ranges: [range([d])] })).join(' ')
+    expect(said(drive({ kind: 'turn', group: 'gone' }))).toMatch(/Tilt turns a group that does not exist/)
+    expect(said(drive({ kind: 'scale', target: 'shape', id: 'gone', atMin: 100, atMax: 120 }))).toMatch(/scales something that does not exist/)
+    expect(said(drive({ kind: 'scale', target: 'group', id: 's1', atMin: 100, atMax: 120 }))).toMatch(/scales something that does not exist/)
+    expect(said(drive({ kind: 'bend', shape: 'gone' }))).toMatch(/moves a shape that does not exist/)
+    expect(said(drive({ kind: 'points', shape: 's1', moves: [{ i: 9, dx: 1, dy: 0, dxMin: 0, dyMin: 0 }] }))).toMatch(/moves a point of Skull that is no longer there/)
+    expect(said(drive({ kind: 'scale', target: 'model', atMin: 100, atMax: 110 }))).toBe('')
   })
 })
 
