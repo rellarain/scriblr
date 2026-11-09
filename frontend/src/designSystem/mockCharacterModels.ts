@@ -5,6 +5,9 @@ import { addLength, addRange, addScale, addTurn, attachGroup, newRange, recordPo
 import { addBone, setHeadBone } from '../assets/Interfaces/admin/characters/engine/bones'
 import { setFit } from '../assets/Interfaces/admin/characters/engine/fitEdit'
 import { addFrame, toggleFrameHide } from '../assets/Interfaces/admin/characters/engine/frames'
+import { bridgeBetween, spotFromClick } from '../assets/Interfaces/admin/characters/engine/bridgeEdit'
+import { setFade } from '../assets/Interfaces/admin/characters/engine/fadeEdit'
+import { addFall, withWeight } from '../assets/Interfaces/admin/characters/engine/fallEdit'
 import { addAxis, addForm, renameForm, setOverride } from '../assets/Interfaces/admin/characters/engine/formEdit'
 import { addMember, makeClass } from '../assets/Interfaces/admin/characters/engine/classEdit'
 import { classKey, formKey } from '../assets/Interfaces/admin/characters/engine/forms'
@@ -198,14 +201,36 @@ function riggedFigure(): ModelContent {
   ownOutline('Hooded', 's_eye', box(85, 43, 11, 4))
   ownOutline('Hooded', 's_iris', box(89, 43, 4, 4))
   for (const name of Object.keys(memberIds)) c = must(makeTwin(c, 'object', memberIds[name], mk))
+  // a bridge of skin across the elbow, locked to the edges of the upper arm and the forearm (it is built on the left arm and the right one gets its twin), and a
+  // crease in the bend that shows as the elbow does (the shading band along the top of the forearm, faint until the elbow is bent)
+  const bridge = bridgeBetween(c, [
+    spotFromClick(c, 's_arm', 124, 132)!, spotFromClick(c, 's_fore', 125, 146)!, spotFromClick(c, 's_fore', 137, 146)!, spotFromClick(c, 's_arm', 138, 132)!,
+  ], mkPaint)
+  c = must(bridge)
+  const crease = addShading(c, 's_fore', 'shadow', 'top', mkPaint)
+  c = must(crease)
+  c = must(setFade(c, crease.shapeId!, 'r_elbow'))
+  c = { ...c, shapes: c.shapes.map(x => (x.id === crease.shapeId ? { ...x, name: 'Crease of the elbow', opBy: { slider: 'r_elbow', hidden: 8, shown: 110 } } : x)) }
+  // a ponytail on the head: it sticks out sideways at rest, and the weighted points hang under their own weight as the Hair fall slider rises (to the side the
+  // test character is turned to: down, the picture's left or right, behind)
+  c = addObject(c, 'g_head', { id: 'o_hair', name: 'Ponytail', layer: 'hair', shapes: [] })
+  const lock = [[118, 36, 0], [134, 31, 0.5], [150, 35, 1], [150, 45, 1], [134, 43, 0.5], [118, 44, 0]] as const
+  c = addShape(c, 'o_hair', {
+    id: 's_lock', name: 'Ponytail', closed: true, z: 35, op: 1, view: 'both', half: 0, template: null, slot: 'k_hair',
+    pts: lock.map(([x, y, w]) => withWeight({ x, y, m: 'c' as const, hi: null, ho: null }, w)),
+  })
+  c = must(addRange(c, { ...newRange('r_fall', 'Hair fall', 'fall', 's_lock'), min: 0, rest: 0, max: 100, unit: '%' }))
+  c = must(addFall(c, 'r_fall', 's_lock'))
   // presets: a pose replaces the last pose, an expression leaves the arms alone, an outfit switches the shirt off or on
-  const preset = (name: string, kind: string, values: Record<string, number>, hidden: string[] = []) => { c = must(savePreset(c, { values, forms: {}, hidden }, name, kind, mk)) }
+  const preset = (name: string, kind: string, values: Record<string, number>, hidden: string[] = [], fall?: 'down' | 'left' | 'right' | 'behind') => { c = must(savePreset(c, { values, forms: {}, hidden, fall }, name, kind, mk)) }
   preset('At rest', 'Pose', {})
   preset('Wave', 'Pose', { r_raise: 80, r_elbow: 50 })
   preset('Curious', 'Expression', { r_tilt: 12 })
   preset('Broad', 'Build', { r_shoulders: 118 })
   preset('Shirt on', 'Outfit', {})
   preset('No shirt', 'Outfit', {}, ['o_shirt'])
+  preset('Calm', 'Weather', {})
+  preset('Windswept', 'Weather', { r_fall: 100 }, [], 'left')
   // a style of the head: the hooded eye with closed lids and the head turned a little (it belongs to the Head group, and is listed with the presets)
   const closed = objectById(c, 'o_eye')!.axes![0].options.find(f => f.name === 'Closed')!.id
   c = must(saveStyle(c, { values: { r_tilt: -8 }, forms: { [classKey(family.classId!)]: memberIds.Hooded, [formKey(memberIds.Hooded, lids)]: closed }, hidden: [] }, 'g_head', 'Sleepy', 'Style', mk))

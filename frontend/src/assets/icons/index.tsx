@@ -997,3 +997,22 @@ export function ImageIcon(props: IconProps) {
     <path d="M3.500 18l5.500-5.500 4 4 3-3 4.500 4.500" />
   </IconBase>
 }
+
+// A weight hanging from a line: mark the points of a shape that hang.
+export function WeightIcon(props: IconProps) {
+  return <IconBase {...props}>
+    <path d="M12 2.5v7" />
+    <path d="M9.5 9.5h5" />
+    <path d="M8.2 12.5h7.6L18 20.5H6z" />
+  </IconBase>
+}
+
+// An arch between two posts: skin that joins two parts.
+export function BridgeIcon(props: IconProps) {
+  return <IconBase {...props}>
+    <path d="M2.5 19h19" />
+    <path d="M4.5 19V9" />
+    <path d="M19.5 19V9" />
+    <path d="M4.5 9C8 15.5 16 15.5 19.5 9" />
+  </IconBase>
+}

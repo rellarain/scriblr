@@ -3,6 +3,7 @@ import { IDENTITY, apply } from './geometry'
 import { isUsed } from './paintEdit'
 import { boneAtRest, defaultValues, solve, solveAtRest } from './rig'
 import { fitOf } from './fitEdit'
+import { hangs, weightOf } from './fall'
 
 // The Rig check: what is probably a mistake in the rig, in plain words, for the Check panel. These are not publish faults (publishFaults has those):
 // a slider that drives nothing, a group the anchor moves away from where it was drawn, a slider that sends a shape out of the picture.
@@ -78,6 +79,31 @@ export function proportionCheck(c: ModelContent): CheckLine[] {
   }
   for (const r of c.ranges) {
     if (r.limit && r.limit[0] >= r.rest && r.limit[1] <= r.rest) say(`Slider ${r.name || r.id} lets a writer choose only its resting value.`)
+  }
+  return lines
+}
+
+// What is worth knowing about bridges, creases and fall (phase 5b), as plain information: a point set to leave along its edge with no partner does nothing, a
+// shape that is set to fall but has nothing that can hang (no weighted run), weights that nothing lets fall, and a crease whose two ends are the same value.
+export function hangCheck(c: ModelContent): CheckLine[] {
+  const lines: CheckLine[] = []
+  const say = (text: string) => { if (lines.length < MOST_LINES) lines.push({ level: 'info', text }) }
+  const falling = new Set(c.ranges.flatMap(r => r.drives.filter(d => d.kind === 'fall' && d.shape).map(d => d.shape as string)))
+  for (const s of c.shapes) {
+    const name = s.name || s.id
+    if (s.mirrorOf) continue
+    const n = s.pts.length
+    for (let i = 0; i < n; i++) {
+      const b = s.pts[i].bind
+      if (b?.kind !== 'edge' || !b.tan) continue
+      const next = s.pts[(i + 1) % n].bind, prev = s.pts[(i + n - 1) % n].bind
+      const pairs = (o: typeof next) => o?.kind === 'edge' && o.tan === true && o.s !== b.s
+      if (!(pairs(next) && (s.closed || i + 1 < n)) && !(pairs(prev) && (s.closed || i > 0))) say(`Point ${i + 1} of ${name} leaves along its edge, but the points beside it are not locked to another shape that way: it has no effect.`)
+    }
+    const weighted = s.pts.some(p => weightOf(p) > 0)
+    if (falling.has(s.id) && !hangs(s.pts, s.closed)) say(weighted ? `${name} is set to fall, but every point of it carries a weight, so nothing holds it up.` : `${name} is set to fall, but no point of it carries a weight: use the Weights tool to mark the points that hang.`)
+    else if (weighted && !falling.has(s.id)) say(`${name} has weighted points, but no slider lets it fall.`)
+    if (s.opBy && s.opBy.hidden === s.opBy.shown) say(`${name} shows with a slider whose two ends are the same value: it switches on at once.`)
   }
   return lines
 }

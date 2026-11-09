@@ -1,5 +1,5 @@
 import { useCallback, useMemo, useState } from 'react'
-import type { ModelContent, ModelPreset, ModelSwatch } from '../../../../api/types'
+import type { ModelContent, ModelFallSide, ModelPreset, ModelSwatch } from '../../../../api/types'
 import { chosenCount, paletteOf, type Colouring, type SlotChoice, type SlotChoices } from './engine/colour'
 import { formKey, type Choices } from './engine/forms'
 import { applyPreset, awayCount, type TestState } from './engine/presets'
@@ -16,6 +16,9 @@ export interface TestControls {
   values: Values
   forms: Choices
   hidden: string[]
+  // the side hanging things fall to (down, the picture's left or right, behind)
+  fall: ModelFallSide
+  setFall: (side: ModelFallSide) => void
   setValues: (change: Values | ((v: Values) => Values)) => void
   setForm: (objectId: string, axisId: string, formId: string) => void
   // a choice by its key: "objectId.axisId" (a form) or "class:classId" (the member of a family that is shown)
@@ -43,11 +46,12 @@ export function useTestState(): TestControls {
   const [values, setValues] = useState<Values>({})
   const [forms, setForms] = useState<Choices>({})
   const [hidden, setHidden] = useState<string[]>([])
+  const [fall, setFall] = useState<ModelFallSide>('down')
   const [colours, setColours] = useState<SlotChoices>({})
   const [palette, setPaletteState] = useState<ModelSwatch[] | null>(null)
   const [genre, setGenre] = useState<string | null>(null)
   const [locks, setLocks] = useState<string[]>([])
-  const state = useMemo<TestState>(() => ({ values, forms, hidden }), [values, forms, hidden])
+  const state = useMemo<TestState>(() => ({ values, forms, hidden, fall }), [values, forms, hidden, fall])
   const setForm = useCallback((objectId: string, axisId: string, formId: string) => setForms(f => ({ ...f, [formKey(objectId, axisId)]: formId })), [])
   const setChoice = useCallback((key: string, option: string) => setForms(f => ({ ...f, [key]: option })), [])
   const toggleHidden = useCallback((id: string) => setHidden(h => (h.includes(id) ? h.filter(x => x !== id) : [...h, id])), [])
@@ -58,16 +62,16 @@ export function useTestState(): TestControls {
   }), [])
   const setPalette = useCallback((next: ModelSwatch[] | null, choices?: SlotChoices) => { setPaletteState(next); if (choices) setColours(choices) }, [])
   const toggleLock = useCallback((id: string) => setLocks(l => (l.includes(id) ? l.filter(x => x !== id) : [...l, id])), [])
-  const resetAll = useCallback(() => { setValues({}); setForms({}); setHidden([]); setColours({}); setPaletteState(null) }, [])
+  const resetAll = useCallback(() => { setValues({}); setForms({}); setHidden([]); setFall('down'); setColours({}); setPaletteState(null) }, [])
   const apply = useCallback((content: ModelContent, preset: ModelPreset) => {
     const next = applyPreset(content, state, preset)
-    setValues(next.values); setForms(next.forms); setHidden(next.hidden)
+    setValues(next.values); setForms(next.forms); setHidden(next.hidden); setFall(next.fall ?? 'down')
   }, [state])
   const away = useCallback((content: ModelContent) => awayCount(content, state) + chosenCount(content, colours) + (palette ? 1 : 0), [state, colours, palette])
   const colouring = useCallback((content: ModelContent): Colouring => ({ palette: palette ?? paletteOf(content), choices: colours, forms }), [palette, colours, forms])
   const roll = useCallback((content: ModelContent, rng: Rng = seededRng(Math.floor(Math.random() * 2 ** 31))) => {
-    const next = rollLook(content, rng, { genre, locks, forms, choices: colours, palette: palette ?? paletteOf(content) })
-    setForms(next.forms); setColours(next.choices)
-  }, [genre, locks, forms, colours, palette])
-  return { state, values, forms, hidden, setValues, setForm, setChoice, toggleHidden, colours, palette, genre, locks, setColour, setPalette, setGenre, toggleLock, colouring, roll, resetAll, apply, away }
+    const next = rollLook(content, rng, { genre, locks, forms, choices: colours, palette: palette ?? paletteOf(content), fall })
+    setForms(next.forms); setColours(next.choices); setFall(next.fall)
+  }, [genre, locks, forms, colours, palette, fall])
+  return { state, values, forms, hidden, fall, setFall, setValues, setForm, setChoice, toggleHidden, colours, palette, genre, locks, setColour, setPalette, setGenre, toggleLock, colouring, roll, resetAll, apply, away }
 }

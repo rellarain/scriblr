@@ -126,7 +126,7 @@ export function detachMember(c: ModelContent, memberId: string): Edit {
     if (s.hide || !src) { dropped.add(s.id); return [] }
     follows.set(src.id, s.id)
     const own = s.pts.length >= 3
-    return [{ ...s, pts: own ? s.pts : copyPts(src.pts), back: own ? s.back ?? null : s.back ?? (src.back ? copyPts(src.back) : null), closed: own ? s.closed : src.closed, copyOf: null, hide: false, ...bakedPaint(c, s) }]
+    return [{ ...s, pts: own ? s.pts : copyPts(src.pts), back: own ? s.back ?? null : s.back ?? (src.back ? copyPts(src.back) : null), closed: own ? s.closed : src.closed, copyOf: null, hide: false, ...bakedPaint(c, s), opBy: s.opBy ?? src.opBy ?? null }]
   })
   const axes: ModelAxis[] = (t ? axesOf(t) : []).map(a => ({
     ...a, options: a.options.map(f => ({

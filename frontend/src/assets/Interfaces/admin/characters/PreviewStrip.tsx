@@ -28,7 +28,7 @@ export function PreviewStrip({ content, sel, view = 'front', tile = TILE_DEFAULT
   const specs = useMemo(() => previewSpecs(seed, mode, 6, content.ranges, content), [seed, mode, content])
   // a selected pattern, or a member of a family that a preview would not choose, is drawn all the same
   const show = useMemo(() => showFor(content, sel), [content, sel])
-  const tiles = useMemo(() => specs.map(spec => solve(content, spec.values, view, { forms: spec.forms, hidden: hiddenThrough(frame, spec.hidden), show })), [specs, content, view, show, frame])
+  const tiles = useMemo(() => specs.map(spec => solve(content, spec.values, view, { forms: spec.forms, hidden: hiddenThrough(frame, spec.hidden), show, fall: spec.fall })), [specs, content, view, show, frame])
   // every tile is fitted to the selection as it stands at rest, so what a slider does shows as a change in the tile
   const box = useMemo<Box | null>(() => {
     if (frame) return viewBoxOf(frame, view, content.axis)

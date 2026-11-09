@@ -2,7 +2,7 @@ import type { ModelAttach, ModelScaleAxis } from '../../../../api/types'
 import type { Selection } from './designerState'
 
 // What the Rig and Ranges tabs ask the page to do. The page (ModelPane) applies them to the content, keeps the undo stack and says why when one is refused.
-export type NewSliderKind = 'turn' | 'scale' | 'points' | 'bend' | 'length'
+export type NewSliderKind = 'turn' | 'scale' | 'points' | 'bend' | 'length' | 'fall'
 export interface Recording { rangeId: string; shapeId: string; end: 'max' | 'min' }
 
 export interface RigActions {
@@ -37,6 +37,9 @@ export interface RigActions {
   resetValues: () => void
   // Show this slider in the Ranges tab (from the Rig tab's Motion list).
   openSlider: (rangeId: string) => void
+  // Select a shape (from the list of shapes a slider fades), and let every weighted shape of an object fall with a slider (phase 5b).
+  selectShape: (id: string) => void
+  fallObject: (rangeId: string, objectId: string) => void
 }
 
 // Phase 2b: pairs, point links and the back view.
@@ -59,6 +62,10 @@ export interface PairActions {
   // A shape's outline for the back view goes back to the front one; a shape moves one place in front of or behind its neighbour in the view being edited.
   useFront: (shapeId: string) => void
   moveInOrder: (shapeId: string, dir: -1 | 1) => void
+  // Bridges (phase 5b): make a point locked to an edge leave along that edge, or stop; start picking the four spots of a bridge on the canvas, or stop.
+  setLeaves: (shapeId: string, index: number, on: boolean) => void
+  startBridge: () => void
+  stopBridge: () => void
 }
 
 // Phase 5a: proportions (the skeleton of bones), how an object fits the body, and frames.

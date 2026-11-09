@@ -362,3 +362,9 @@ span.cmTreeTwisty { cursor: default; }
 .cmPickGroupHit { fill: transparent; }
 .cmPickGroupDot { fill: var(--surface-raised); stroke: var(--accent); stroke-width: 2; vector-effect: non-scaling-stroke; }
 .cmPickGroup:hover .cmPickGroupDot, .cmPickGroup:focus-visible .cmPickGroupDot { fill: var(--accent); }
+
+// Fall (phase 5b): a ring round a point says how free it is to hang (bigger and stronger the heavier it is); with the Weights tool a click steps it.
+.cmWeightRing { fill: none; stroke: var(--accent); stroke-width: 2; vector-effect: non-scaling-stroke; pointer-events: none; }
+.cmPoint--weigh { cursor: pointer; }
+.cmPoint--weighted { stroke: var(--accent); }
+.cmFallSide { display: inline-flex; gap: var(--space-1); align-items: center; margin-left: var(--space-2); }

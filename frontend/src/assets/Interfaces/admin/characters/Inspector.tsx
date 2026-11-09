@@ -8,6 +8,7 @@ import type { LinkHow, PairActions, ViewName } from './rigActions'
 import { TemplateMenu } from './TemplateMenu'
 import { activeShape, type Selection } from './designerState'
 import { addPoint, applyTemplate, deletePoint, resetHandles, setMode } from './engine/edit'
+import { weightOf } from './engine/fall'
 import type { Choices } from './engine/forms'
 import { MODES, MODE_NAMES } from './engine/geometry'
 import { LIMITS, pointLevel } from './engine/limits'
@@ -51,6 +52,9 @@ export interface InspectorProps {
   onRename: (sel: Selection, name: string) => void
   onSetLayer: (objectId: string, layer: ModelLayer) => void
   onEditShape: (id: string, next: ModelShape, selectPoint?: number, remember?: boolean) => void
+  // The weight of the selected point (how free it is to hang) stepped up or down a quarter, and the spot of the bridge being picked on the canvas (null: none).
+  onWeight: (i: number, dir: -1 | 1) => void
+  bridge: number | null
   // Pairs, point links and the back view: the view being edited, the link being picked on the canvas, and what the panels ask for.
   view: ViewName
   linkMode: LinkHow | null
@@ -158,8 +162,8 @@ function ShapeTab(p: InspectorProps) {
           )}
           <FollowPanel content={content} shape={shape} actions={p.classes} />
           <PairPanel content={content} kind="shape" id={shape.id} actions={p.pairs} />
-          {!shape.mirrorOf && <PointsSection shape={shape} selPoint={selPoint} mirror={mirror} onSelectPoint={p.onSelectPoint} onEditShape={p.onEditShape} />}
-          <LinksPanel content={content} shape={shape} selPoint={selPoint} linkMode={p.linkMode} actions={p.pairs} />
+          {!shape.mirrorOf && <PointsSection shape={shape} selPoint={selPoint} mirror={mirror} onSelectPoint={p.onSelectPoint} onEditShape={p.onEditShape} onWeight={p.onWeight} />}
+          <LinksPanel content={content} shape={shape} selPoint={selPoint} linkMode={p.linkMode} bridge={p.bridge} actions={p.pairs} />
           <ViewPanel content={content} shape={shape} view={p.view} actions={p.pairs} />
         </>
       )}
@@ -167,7 +171,7 @@ function ShapeTab(p: InspectorProps) {
   )
 }
 
-function PointsSection({ shape, selPoint, mirror, onSelectPoint, onEditShape }: { shape: ModelShape; selPoint: number; mirror: boolean; onSelectPoint: (i: number) => void; onEditShape: InspectorProps['onEditShape'] }) {
+function PointsSection({ shape, selPoint, mirror, onSelectPoint, onEditShape, onWeight }: { shape: ModelShape; selPoint: number; mirror: boolean; onSelectPoint: (i: number) => void; onEditShape: InspectorProps['onEditShape']; onWeight: InspectorProps['onWeight'] }) {
   const lv = pointLevel(shape), cur = shape.pts[selPoint]
   const opts = { mirror }
   const note = lv === 'stop' ? `The most points a shape may have (${LIMITS.pointsMax}).` : lv === 'warn' ? `More than ${LIMITS.pointsWarn} points: fewer points keep a shape easy to edit and light to store.` : ''
@@ -187,6 +191,8 @@ function PointsSection({ shape, selPoint, mirror, onSelectPoint, onEditShape }: 
               <button key={m} type="button" className={`cmChip cmChip--wide${cur.m === m ? ' cmChip--on' : ''}`} aria-pressed={cur.m === m} onClick={() => onEditShape(shape.id, setMode(shape, selPoint, m, opts), selPoint)}>{MODE_NAMES[m]}</button>
             ))}
           </div>
+          <Stepper label={`Weight of point ${selPoint + 1}`} value={`${Math.round(weightOf(cur) * 100)}%`} lowerOff={weightOf(cur) <= 0} raiseOff={weightOf(cur) >= 1} onStep={dir => onWeight(selPoint, dir)} />
+          <p className="cmInsText">A weight says how free the point is to hang when something lets this shape fall (Ranges tab). None: it holds still.</p>
           <div className="cmInline">
             <button type="button" className="cmBtn cmBtn--small" disabled={lv === 'stop'} onClick={() => { const r = addPoint(shape, selPoint, { ...opts, max: LIMITS.pointsMax }); if (r.index >= 0) onEditShape(shape.id, r.shape, r.index) }}>
               <PlusIcon size={12} /> Add a point after it

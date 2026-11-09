@@ -595,7 +595,8 @@ export type ModelLayer = 'body' | 'clothing' | 'hair'
 export type ModelView = 'both' | 'front' | 'back'
 // A point link, kept on the point that follows: kind 'point' = on point i of shape s plus the offset d (a weld has none); kind 'edge' = t (0..1) along the edge from point e of shape s, o units outward (a clothes point locked to the edge of a body part). Solved when the model is drawn.
 export type ModelBindKind = 'point' | 'edge'
-export interface ModelBind { kind: ModelBindKind; s: string; i: number; d: [number, number]; e: number; t: number; o: number }
+// tan (phase 5b): an edge link may also leave along the direction of its edge; between two such points locked to different shapes the outline runs on smoothly from one edge to the other (a bridge).
+export interface ModelBind { kind: ModelBindKind; s: string; i: number; d: [number, number]; e: number; t: number; o: number; tan?: boolean }
 // A point of a shape: c = curve, s = sharp, cs = curve then sharp, sc = sharp then curve. hi and ho are the in and out handles as offsets (absent: automatic). bind links it to another shape.
 export interface ModelPoint { x: number; y: number; m: ModelPointMode; hi?: [number, number] | null; ho?: [number, number] | null; w?: number | null; bind?: ModelBind | null }
 // Paint effects. A tone of a colour: a shadow (darker, a little warmer and fuller), a mid tone (half a shadow) or a highlight (toward white), by an amount t (0.02..0.8).
@@ -605,9 +606,11 @@ export interface ModelTint { kind: ModelTintKind; t: number }
 export type ModelGradDir = 'down' | 'up' | 'left' | 'right' | 'radial'
 export interface ModelGradient { dir: ModelGradDir; to: string | null }
 export type ModelBlend = 'multiply' | 'screen' | 'overlay'
+// A shape that shows with a slider (phase 5b; a crease): fully hidden when the slider is at `hidden`, fully drawn at `shown`, in proportion between.
+export interface ModelFade { slider: string; hidden: number; shown: number }
 // A filled outline in the model's space (0..200 across, 0..400 down). `half` > 0 marks a symmetric outline: its first `half` points run down one half and the rest mirror them.
 // mirrorOf: the shape this one is the mirror image of about the model's axis (a derived twin has no points of its own until the pair is broken). back: an outline of its own for the back view (absent: the front outline seen from behind); zBack: its depth in the back view; loose: the slider that loosens the links of its points.
-export interface ModelShape { id: string; name: string; closed: boolean; z: number; op: number; view: ModelView; pts: ModelPoint[]; half: number; template?: string | null; mirrorOf?: string | null; back?: ModelPoint[] | null; zBack?: number | null; loose?: string | null; copyOf?: string | null; hide?: boolean; slot?: string | null; gray?: number | null; tone?: number; derive?: ModelTint | null; shade?: ModelTint | null; grad?: ModelGradient | null; blend?: ModelBlend | null; clip?: string | null; cut?: string[]; helper?: boolean }
+export interface ModelShape { id: string; name: string; closed: boolean; z: number; op: number; view: ModelView; pts: ModelPoint[]; half: number; template?: string | null; mirrorOf?: string | null; back?: ModelPoint[] | null; zBack?: number | null; loose?: string | null; copyOf?: string | null; hide?: boolean; slot?: string | null; gray?: number | null; tone?: number; derive?: ModelTint | null; shade?: ModelTint | null; grad?: ModelGradient | null; blend?: ModelBlend | null; clip?: string | null; cut?: string[]; helper?: boolean; opBy?: ModelFade | null }
 // What one form does to one shape of its object: the outline the shape has in that form (an empty list hides the shape in the form).
 export interface ModelOverride { shape: string; pts: ModelPoint[] }
 // One form of an axis (round eyes, almond eyes): the shapes it changes with their outlines. A form with no overrides is the base outline.
@@ -628,12 +631,14 @@ export interface ModelAttach { shape: string; kind: ModelAnchorKind; i: number; 
 // A group of objects that move together. parent is the group it hangs from (the rig), pivot the point it turns about (in the model's space at rest), attach where on a shape of its parent it is fixed.
 export interface ModelGroup { id: string; name: string; parent: string | null; objects: string[]; pivot: [number, number] | null; attach: ModelAttach | null; mirrorOf?: string | null }
 export type ModelRangeUnit = '' | '°' | '%'
-export type ModelDriveKind = 'turn' | 'scale' | 'points' | 'bend' | 'length'
+export type ModelDriveKind = 'turn' | 'scale' | 'points' | 'bend' | 'length' | 'fall'
+// The side hanging things fall to (phase 5b): straight down, toward the picture's left or right, or behind the figure.
+export type ModelFallSide = 'down' | 'left' | 'right' | 'behind'
 export type ModelScaleTarget = 'group' | 'shape' | 'model'
 export type ModelScaleAxis = 'xy' | 'x' | 'y'
 // One point of a points drive: how far it moves with the slider at its maximum (dx, dy) and at its minimum (dxMin, dyMin).
 export interface ModelMove { i: number; dx: number; dy: number; dxMin: number; dyMin: number }
-// What a slider does: turn a group about its pivot, scale a group, a shape or the whole model, move points, or bend a shape along a length. atMin and atMax are the amount at the slider's minimum and maximum (degrees for turn and bend, percent for scale); it is 0 (100 %) at the rest value.
+// What a slider does: turn a group about its pivot, scale a group, a shape or the whole model, move points, bend a shape along a length, change a bone's length, or let a shape fall (the runs of its points that have a weight hang from the point before them). atMin and atMax are the amount at the slider's minimum and maximum (degrees for turn and bend, percent for scale, length and fall); it is 0 (100 %) at the rest value.
 export interface ModelDrive {
   kind: ModelDriveKind
   group: string | null
@@ -654,7 +659,7 @@ export interface ModelDrive {
 export interface ModelRange { id: string; name: string; scope: string | null; min: number; rest: number; max: number; unit: ModelRangeUnit; show: boolean; rand: [number, number] | null; limit?: [number, number] | null; drives: ModelDrive[] }
 // A named set of slider values and of hidden objects (a pose, an expression, an age, a build, an outfit). kind is the slot it fills: applying one puts back whatever any other preset of its kind controls. values lists only the sliders it moves; hidden the objects and groups it hides.
 // A style is a preset with a scope (an object or a group): it also keeps the forms chosen for what is in the scope ("objectId.axisId" to a form id, "class:classId" to the member shown) and only controls what the scope holds.
-export interface ModelPreset { id: string; name: string; kind: string; values: Record<string, number>; hidden: string[]; scope?: string | null; forms?: Record<string, string> }
+export interface ModelPreset { id: string; name: string; kind: string; values: Record<string, number>; hidden: string[]; scope?: string | null; forms?: Record<string, string>; fall?: ModelFallSide | null }
 // A template object and the members built from it. The template is a pattern, not drawn once it has members; a family (exclusive) shows one member at a time, otherwise every member is drawn.
 export interface ModelClass { id: string; name: string; template: string; exclusive: boolean }
 // Colour. A genre tag (Fiction, Fantasy, Non-fiction...): a default colour says which genres it fits, so a character made for a project of that genre draws its random colours from those only.

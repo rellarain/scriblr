@@ -1,6 +1,7 @@
-import type { ModelAttach, ModelBone, ModelBoneEnd, ModelContent, ModelDrive, ModelGroup, ModelObject, ModelPoint, ModelRange, ModelShape } from '../../../../../api/types'
-import { IDENTITY, apply, boxOf, build, clamp, edgeAt, flatten, inverse, mul, pathText, reflectList, rotate, scale, scaleAlong, translate, turnOf, twinIndex, windSign, type Box, type BuiltPoint, type Mat } from './geometry'
+import type { ModelAttach, ModelBone, ModelBoneEnd, ModelContent, ModelDrive, ModelFallSide, ModelGroup, ModelObject, ModelPoint, ModelRange, ModelShape } from '../../../../../api/types'
+import { IDENTITY, apply, bezierAt, boxOf, build, clamp, edgeAt, flatten, inverse, mul, pathText, reflectList, rotate, scale, scaleAlong, translate, turnOf, twinIndex, windSign, type Box, type BuiltPoint, type Mat } from './geometry'
 import { classKey, classesOf, membersOf, overrideFor, type Choices } from './forms'
+import { applyFall, hangDirection, squeezeOf } from './fall'
 import { drawOrder } from './order'
 
 // The rig: groups hang from parent groups, are fixed to a shape of the parent by an anchor and turn about a pivot, and sliders (ranges) drive them.
@@ -46,7 +47,7 @@ export function amount(r: ModelRange, d: ModelDrive, v: number, base = 0): numbe
 
 // The sliders that change a shape's own points (a recorded move, a bend, a scale of the shape), as opposed to turning or scaling its group.
 export const drivesShapePoints = (d: ModelDrive, shapeId: string): boolean =>
-  (d.kind === 'points' && d.shape === shapeId) || (d.kind === 'bend' && d.shape === shapeId) || (d.kind === 'scale' && d.target === 'shape' && d.id === shapeId)
+  (d.kind === 'points' && d.shape === shapeId) || (d.kind === 'bend' && d.shape === shapeId) || (d.kind === 'fall' && d.shape === shapeId) || (d.kind === 'scale' && d.target === 'shape' && d.id === shapeId)
 
 export function pointDrivers(c: ModelContent, shapeId: string): ModelRange[] {
   return c.ranges.filter(r => r.drives.some(d => drivesShapePoints(d, shapeId)))
@@ -128,6 +129,8 @@ export interface SolvedShape {
   // Switched off with the eye (its object, its group or a group above it), or by its class (a pattern that has members, a member of a family that is not the
   // one shown): it is solved all the same, but not drawn.
   off: boolean
+  // How much of the shape shows, 0..1: a shape that fades in with a slider (a crease) is 0 until the slider reaches it. 1 for every other shape.
+  fade: number
   // For a shape of a class member that has an outline of its own: the outline it would have following the template, drawn the same way ('' otherwise).
   ghost: string
   z: number
@@ -148,6 +151,8 @@ const finiteMat = (m: Mat): boolean => m.every(Number.isFinite)
 const NO_BOX: Box = { x: 0, y: 0, w: 0, h: 0 }
 const copyPoint = (p: ModelPoint): ModelPoint => ({ ...p, hi: p.hi ? [p.hi[0], p.hi[1]] : p.hi, ho: p.ho ? [p.ho[0], p.ho[1]] : p.ho })
 const factorOf = (r: ModelRange, d: ModelDrive, v: number): number => Math.max(0.05, amount(r, d, v, 100) / 100)
+// How far along its edge the outline of a bridge keeps going before it turns toward the other part, as a share of the gap.
+const BRIDGE_REACH = 0.42
 
 function centreOfPoints(list: ModelPoint[], closed: boolean): [number, number] {
   if (list.length < 3) return [100, 200]
@@ -227,7 +232,8 @@ export function looseFactor(c: ModelContent, shape: Pick<ModelShape, 'loose'>, v
 // What the admin has set besides the sliders (test state, never saved): the form each axis shows and the member each family shows (see forms.ts), the objects
 // and groups switched off, and the objects to show whatever their class says (the pattern or the member being edited: a family then shows only those).
 // `plain` draws every object scaled with its group, whatever its fit mode says (what fit modes are measured against).
-export interface SolveOptions { forms?: Choices; hidden?: Iterable<string>; show?: Iterable<string>; plain?: boolean }
+// `fall` is the side things fall to (default: down).
+export interface SolveOptions { forms?: Choices; hidden?: Iterable<string>; show?: Iterable<string>; plain?: boolean; fall?: ModelFallSide }
 
 // The model with every slider at rest and every object scaled with its group, kept for the content it was solved from (a stretching object reads its target's
 // box from it).
@@ -245,6 +251,7 @@ export function solve(c: ModelContent, values: Values = {}, view: View = 'front'
   const choices: Choices = opts.forms ?? {}
   const hidden = new Set(opts.hidden ?? [])
   const show = new Set(opts.show ?? [])
+  const fallSide: ModelFallSide = opts.fall ?? 'down'
 
   // the whole model: sliders that scale it (Height) about its feet, and the back view, which turns the figure round
   let gx = 1, gy = 1
@@ -310,7 +317,7 @@ export function solve(c: ModelContent, values: Values = {}, view: View = 'front'
   const busyGroups = new Set<string>(), busyShapes = new Set<string>()
 
   // what the sliders do to a list of points (a recorded move, a bend, a scale of the shape); `own` is the shape's own outline, which the moves were recorded on
-  function drive(sh: ModelShape, list: ModelPoint[], own: ModelPoint[]) {
+  function drive(sh: ModelShape, list: ModelPoint[], own: ModelPoint[], Mg: Mat) {
     if (list.length < 3) return
     let rest: [number, number] | null = null
     for (const r of ranges) {
@@ -351,6 +358,15 @@ export function solve(c: ModelContent, values: Values = {}, view: View = 'front'
         }
       }
     }
+    // the runs of weighted points hang, from where the other sliders have left them: toward the way things fall, which is a direction in the picture, so it is
+    // read back into this shape's own space (a tilted head still lets its hair hang straight down)
+    let falling = 0
+    for (const r of ranges) for (const d of r.drives) if (d.kind === 'fall' && d.shape === sh.id) falling += amount(r, d, val(r)) / 100
+    if (falling > 0 && list.some(p => (p.w ?? 0) > 0)) {
+      const inv = inverse(Mg), w = hangDirection(fallSide, view === 'back')
+      const dx = inv[0] * w[0] + inv[2] * w[1], dy = inv[1] * w[0] + inv[3] * w[1]
+      applyFall(list, sh.closed, Math.min(1, falling), [dx, dy], squeezeOf(fallSide))
+    }
   }
 
   // Points linked to another shape take its place: on one of its points (plus an offset), or at a spot along one of its edges, some way outward. The
@@ -359,8 +375,9 @@ export function solve(c: ModelContent, values: Values = {}, view: View = 'front'
     if (!list.some(p => p.bind)) return
     const f = looseFactor(c, sh, values)
     let inv: Mat | null = null
-    for (const p of list) {
-      const b = p.bind
+    const leaves = new Map<number, [number, number]>()   // the points that leave along their edge, with the direction of that edge in this shape's space
+    for (let k = 0; k < list.length; k++) {
+      const p = list[k], b = p.bind
       if (!b || b.s === sh.id) continue
       const a = shapeOut(b.s)?.pre
       if (!a || a.length < 1) continue
@@ -371,7 +388,25 @@ export function solve(c: ModelContent, values: Values = {}, view: View = 'front'
       inv = inv ?? inverse(Mg)
       const [lx, ly] = apply(inv, wx, wy)
       const x = lx + (b.kind === 'point' ? b.d[0] * f : 0), y = ly + (b.kind === 'point' ? b.d[1] * f : 0)
-      if (Number.isFinite(x) && Number.isFinite(y)) { p.x = x; p.y = y }
+      if (Number.isFinite(x) && Number.isFinite(y)) {
+        p.x = x; p.y = y
+        if (b.kind === 'edge' && b.tan) {
+          const e = bezierAt(a, b.e % n, b.t), tx = inv[0] * e.tx + inv[2] * e.ty, ty = inv[1] * e.tx + inv[3] * e.ty, tl = Math.hypot(tx, ty)
+          if (tl > 1e-9) leaves.set(k, [tx / tl, ty / tl])
+        }
+      }
+    }
+    if (leaves.size < 2) return
+    // A side between two such points locked to different shapes (the two ends of a bridge) leaves one part along the direction of its edge and arrives at the
+    // other along the direction of its edge, so the outline runs on smoothly through a bend however far the parts have turned.
+    const n = list.length
+    for (let i = 0; i < (sh.closed ? n : n - 1); i++) {
+      const j = (i + 1) % n, ta = leaves.get(i), tb = leaves.get(j)
+      if (!ta || !tb || list[i].bind?.s === list[j].bind?.s) continue
+      const a = list[i], b = list[j], dx = b.x - a.x, dy = b.y - a.y, reach = Math.max(0.5, Math.hypot(dx, dy) * BRIDGE_REACH)
+      const sa = ta[0] * dx + ta[1] * dy >= 0 ? 1 : -1, sb = tb[0] * -dx + tb[1] * -dy >= 0 ? 1 : -1
+      a.ho = [ta[0] * sa * reach, ta[1] * sa * reach]
+      b.hi = [tb[0] * sb * reach, tb[1] * sb * reach]
     }
   }
 
@@ -380,17 +415,17 @@ export function solve(c: ModelContent, values: Values = {}, view: View = 'front'
   function plainOutline(sh: ModelShape, Mg: Mat, form: ModelPoint[] | undefined): { rig: ModelPoint[]; drawn: ModelPoint[] } {
     const rig = sh.pts.map(copyPoint)
     link(sh, rig, Mg)
-    drive(sh, rig, sh.pts)
+    drive(sh, rig, sh.pts, Mg)
     let drawn = rig
     if (form) {
       drawn = form.map(copyPoint)
       link(sh, drawn, Mg)
-      drive(sh, drawn, sh.pts)
+      drive(sh, drawn, sh.pts, Mg)
     }
     if (view === 'back' && sh.back && sh.back.length >= 3 && !(form && form.length === 0)) {
       drawn = sh.back.map(copyPoint)
       link(sh, drawn, Mg)
-      drive(sh, drawn, sh.back)
+      drive(sh, drawn, sh.back, Mg)
     }
     return { rig, drawn }
   }
@@ -447,6 +482,17 @@ export function solve(c: ModelContent, values: Values = {}, view: View = 'front'
     return finiteMat(m) ? m : null
   }
 
+  // How much of a shape shows (a crease fades in with a slider): its own fade, else that of the shape it mirrors or follows; 1 for a shape that does not fade.
+  function fadeOf(sh: ModelShape): number {
+    const mirrored = sh.mirrorOf && sh.mirrorOf !== sh.id ? shapeMap.get(sh.mirrorOf) : undefined
+    const followed = sh.copyOf ? shapeMap.get(sh.copyOf) : undefined
+    const f = sh.opBy ?? mirrored?.opBy ?? followed?.opBy
+    const r = f ? ranges.find(x => x.id === f.slider) : undefined
+    if (!f || !r) return 1
+    const span = f.shown - f.hidden
+    return Math.abs(span) < 1e-9 ? (val(r) >= f.shown ? 1 : 0) : clamp((val(r) - f.hidden) / span, 0, 1)
+  }
+
   function place(sh: ModelShape, groupId: string | null, Mg: Mat) {
     const original = sh.mirrorOf && sh.mirrorOf !== sh.id ? shapeMap.get(sh.mirrorOf) : undefined
     const twin = original && !original.mirrorOf ? original : undefined
@@ -486,7 +532,7 @@ export function solve(c: ModelContent, values: Values = {}, view: View = 'front'
       id: sh.id, group: groupId, local: drawn, rig, matrix, frame: Mg, ghost,
       pre: rig.length >= 3 ? build(rig, closed, Mg) : [],   // from the base outline even where a form hides the shape: anchors and links still read it
       d: ok ? pathText(fin, closed) : '', poly, box: poly.length ? boxOf(poly) : NO_BOX,
-      visible: ok && (sh.view === 'both' || sh.view === view) && !off && !sh.hide, off, z: view === 'back' && sh.zBack != null ? sh.zBack : sh.z,
+      visible: ok && (sh.view === 'both' || sh.view === view) && !off && !sh.hide, off, fade: fadeOf(sh), z: view === 'back' && sh.zBack != null ? sh.zBack : sh.z,
     }
   }
 

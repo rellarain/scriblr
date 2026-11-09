@@ -1240,7 +1240,8 @@ ModelLayer = Literal["body", "clothing", "hair"]
 ModelView = Literal["both", "front", "back"]
 ModelAnchorKind = Literal["point", "edge", "range", "inside"]
 ModelRangeUnit = Literal["", "°", "%"]
-ModelDriveKind = Literal["turn", "scale", "points", "bend", "length"]
+ModelDriveKind = Literal["turn", "scale", "points", "bend", "length", "fall"]
+ModelFallSide = Literal["down", "left", "right", "behind"]
 ModelFit = Literal["scale", "keep", "stretch"]
 ModelBoneEndKind = Literal["group", "point"]
 ModelScaleTarget = Literal["group", "shape", "model"]
@@ -1285,6 +1286,14 @@ class ModelBind(BaseModel):
     e: int = 0
     t: float = 0.0
     o: float = 0.0
+    # An edge link may also leave along the direction of its edge (phase 5b): between two such points locked to different shapes the outline runs on
+    # smoothly from one edge to the other, as skin does across a joint (a bridge).
+    tan: bool = False
+
+    @field_validator("tan", mode="before")
+    @classmethod
+    def _tan(cls, value: Any) -> bool:
+        return value is True
 
     @field_validator("kind", mode="before")
     @classmethod
@@ -1408,6 +1417,20 @@ def _optional_model(cls: Any, value: Any) -> Any:
         return None
 
 
+class ModelFade(BaseModel):
+    """A shape that shows with a slider (phase 5b; a crease that appears as a joint bends): fully hidden when the slider is at `hidden`, fully drawn at
+    `shown`, in between in proportion (`shown` below `hidden` fades it out as the slider rises)."""
+
+    slider: str = Field(pattern=_MODEL_ID)
+    hidden: float = 0.0
+    shown: float = 100.0
+
+    @field_validator("hidden", "shown", mode="before")
+    @classmethod
+    def _at(cls, value: Any) -> float:
+        return _finite(value, 0.0, -1000.0, 1000.0)
+
+
 class ModelShape(BaseModel):
     """A filled outline. `half` > 0 marks a symmetric outline: its first `half` points run down the right half and the rest mirror them."""
 
@@ -1448,11 +1471,18 @@ class ModelShape(BaseModel):
     clip: Optional[str] = None
     cut: list[str] = Field(default_factory=list, max_length=MODEL_CUTS_MAX)
     helper: bool = False
+    # Phase 5b: the shape is faded in and out by a slider (a twin and a shape that follows a template take it from the shape they copy, when this is None).
+    opBy: Optional[ModelFade] = None
 
     @field_validator("name", mode="before")
     @classmethod
     def _trim(cls, value: Any) -> Any:
         return value.strip() if isinstance(value, str) else value
+
+    @field_validator("opBy", mode="before")
+    @classmethod
+    def _fade(cls, value: Any) -> Any:
+        return _optional_model(ModelFade, value)
 
     @field_validator("hide", "helper", mode="before")
     @classmethod
@@ -1591,8 +1621,9 @@ class ModelMove(BaseModel):
 
 class ModelDrive(BaseModel):
     """What a slider does: `turn` a group about its pivot, `scale` a group, a shape or the whole model, `points` move chosen points of a shape, or
-    `bend` a shape smoothly along a length, or change the `length` of a bone (the group it starts at is stretched along it, and what hangs from it follows).
-    `atMin` and `atMax` are the amount at the slider's minimum and maximum (degrees for turn and bend, percent for scale and length); the amount is 0
+    `bend` a shape smoothly along a length, or change the `length` of a bone (the group it starts at is stretched along it, and what hangs from it follows),
+    or let a shape `fall` (phase 5b: the runs of its points that have a weight hang from the point before them, each keeping its length).
+    `atMin` and `atMax` are the amount at the slider's minimum and maximum (degrees for turn and bend, percent for scale, length and fall); the amount is 0
     (or 100 %) at the slider's rest value. A mirrored twin does the opposite turn or sideways move unless `mirror` is false."""
 
     kind: ModelDriveKind
@@ -1648,7 +1679,7 @@ class ModelDrive(BaseModel):
             raise ValueError("a turn drive needs a group")
         if self.kind == "scale" and (self.target is None or (self.target != "model" and not self.id)):
             raise ValueError("a scale drive needs a target")
-        if self.kind in ("points", "bend") and not self.shape:
+        if self.kind in ("points", "bend", "fall") and not self.shape:
             raise ValueError("this drive needs a shape")
         if self.kind == "length" and not self.id:
             raise ValueError("a length drive needs a bone")
@@ -1656,6 +1687,10 @@ class ModelDrive(BaseModel):
             # a percentage: 100 is the size at rest
             for name in ("atMin", "atMax"):
                 setattr(self, name, 100.0 if name not in self.model_fields_set else _finite(getattr(self, name), 100.0, 5.0, 1000.0))
+        elif self.kind == "fall":
+            # how much of the way to hanging, in percent: none at rest, all of it at the maximum unless the drive says otherwise
+            self.atMin = 0.0 if "atMin" not in self.model_fields_set else _finite(self.atMin, 0.0, 0.0, 100.0)
+            self.atMax = 100.0 if "atMax" not in self.model_fields_set else _finite(self.atMax, 100.0, 0.0, 100.0)
         else:
             self.atMin = _finite(self.atMin, 0.0, -360.0, 360.0)
             self.atMax = _finite(self.atMax, 0.0, -360.0, 360.0)
@@ -1974,11 +2009,18 @@ class ModelPreset(BaseModel):
     hidden: list[str] = Field(default_factory=list, max_length=MODEL_HIDDEN_MAX)
     scope: Optional[str] = None
     forms: dict[str, str] = Field(default_factory=dict, max_length=MODEL_PRESET_FORMS_MAX)
+    # Phase 5b: the side hanging things fall to, when the preset keeps one (None: it leaves the side as it is).
+    fall: Optional[ModelFallSide] = None
 
     @field_validator("scope", mode="before")
     @classmethod
     def _scope(cls, value: Any) -> Optional[str]:
         return _optional_id(value)
+
+    @field_validator("fall", mode="before")
+    @classmethod
+    def _fall_side(cls, value: Any) -> Any:
+        return value if value in ("down", "left", "right", "behind") else None
 
     @field_validator("forms", mode="before")
     @classmethod

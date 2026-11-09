@@ -201,9 +201,9 @@ def _rig_faults(content: ModelContent, parents: dict[str, Optional[str]], circul
                 faults.append(f"Slider {name} scales something that does not exist.")
             elif d.kind == "scale" and ((d.target == "group" and twin_groups.get(d.id or "")) or (d.target == "shape" and shapes[d.id or ""].mirrorOf)):
                 faults.append(f"Slider {name} scales a twin; scale the original instead.")
-            elif d.kind in ("points", "bend") and d.shape not in shapes:
+            elif d.kind in ("points", "bend", "fall") and d.shape not in shapes:
                 faults.append(f"Slider {name} moves a shape that does not exist.")
-            elif d.kind in ("points", "bend") and shapes[d.shape or ""].mirrorOf:
+            elif d.kind in ("points", "bend", "fall") and shapes[d.shape or ""].mirrorOf:
                 faults.append(f"Slider {name} moves a shape that is a twin; move the original instead.")
             elif d.kind == "points" and any(m.i >= len(shapes[d.shape or ""].pts) for m in d.moves):
                 faults.append(f"Slider {name} moves a point of {_label(shapes[d.shape or ''].name, d.shape or '')} that is no longer there. Record it again.")
@@ -410,8 +410,11 @@ def _paint_faults(content: ModelContent) -> list[str]:
     faults: list[str] = []
     shapes = {s.id: s for s in content.shapes}
     slot_ids = {sl.id for sl in content.slots}
+    range_ids = {r.id for r in content.ranges}
     for s in content.shapes:
         name = _label(s.name, s.id)
+        if s.opBy is not None and s.opBy.slider not in range_ids:
+            faults.append(f"Shape {name} fades with a slider that does not exist.")
         if s.clip is not None:
             if s.clip == s.id:
                 faults.append(f"Shape {name} is clipped to itself.")

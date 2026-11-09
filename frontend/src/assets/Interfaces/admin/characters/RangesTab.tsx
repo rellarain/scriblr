@@ -1,6 +1,8 @@
 import { useState } from 'react'
 import type { ModelContent, ModelDrive, ModelGroup, ModelRange, ModelScaleAxis } from '../../../../api/types'
 import { EyeIcon, EyeOffIcon, PauseIcon, PlayIcon, PlusIcon, RestoreIcon, TrashIcon } from '../../../icons'
+import { fadedBy } from './engine/fadeEdit'
+import { hangs } from './engine/fall'
 import { LIMITS } from './engine/limits'
 import { valueOf, type Values } from './engine/rig'
 import { stepOf } from './engine/rigEdit'
@@ -11,9 +13,9 @@ import type { NewSliderKind, Recording, RigActions } from './rigActions'
 import { driveText, offRest, rangesForSelection, valueText } from './rigView'
 
 // The Ranges tab: the model's sliders. Each has a Try it slider (the test value is only for looking: it is never saved), its minimum, rest and maximum,
-// and what it drives (turn a group about its pivot, scale, move recorded points, bend a shape, lengthen a bone), each with steppers for how much. A slider that
+// and what it drives (turn a group about its pivot, scale, move recorded points, bend a shape, lengthen a bone, let a shape fall), each with steppers for how much. A slider that
 // is offered to writers also has the span a writer may choose within.
-const KIND_LABEL: Record<NewSliderKind, string> = { turn: 'Turn the group', scale: 'Scale', points: 'Move points (record)', bend: 'Bend the shape', length: 'Length of a bone' }
+const KIND_LABEL: Record<NewSliderKind, string> = { turn: 'Turn the group', scale: 'Scale', points: 'Move points (record)', bend: 'Bend the shape', length: 'Length of a bone', fall: 'Let the shape fall' }
 const AXES: Array<{ id: ModelScaleAxis; name: string }> = [{ id: 'xy', name: 'Both ways' }, { id: 'x', name: 'Across' }, { id: 'y', name: 'Up and down' }]
 
 export interface RangesTabProps {
@@ -32,14 +34,18 @@ export function RangesTab({ content, sel, group, values, recording, scrubbing, f
   const [menu, setMenu] = useState<string | null>(null)   // 'new' or a slider id: whose add menu is open
   const [confirm, setConfirm] = useState<string | null>(null)
   const shapeSel = sel.kind === 'shape'
+  const selected = sel.kind === 'shape' ? content.shapes.find(s => s.id === sel.id) : undefined
+  // the object whose weighted shapes can all be let fall with a slider at once
+  const selObject = sel.kind === 'object' ? content.objects.find(o => o.id === sel.id) : sel.kind === 'shape' ? content.objects.find(o => o.shapes.includes(sel.id)) : undefined
   const list = filter === 'all' || sel.kind === 'none' ? content.ranges : rangesForSelection(content, sel)
   const away = offRest(content, values)
   const can = (kind: NewSliderKind): string | null =>
     kind === 'turn' ? (group ? null : 'Select a group first')
       : kind === 'scale' ? null
       : kind === 'length' ? ((content.bones ?? []).length > 0 ? null : 'Add a bone in the Proportions tab first')
+      : kind === 'fall' ? (!shapeSel ? 'Select a shape first' : selected && hangs(selected.pts, selected.closed) ? null : 'Mark points with the Weights tool first')
       : shapeSel ? null : 'Select a shape first'
-  const kinds: NewSliderKind[] = ['turn', 'scale', 'points', 'bend', 'length']
+  const kinds: NewSliderKind[] = ['turn', 'scale', 'points', 'bend', 'length', 'fall']
   const recShape = recording ? content.shapes.find(s => s.id === recording.shapeId) : undefined
   const recRange = recording ? content.ranges.find(r => r.id === recording.rangeId) : undefined
 
@@ -116,19 +122,25 @@ export function RangesTab({ content, sel, group, values, recording, scrubbing, f
         <ul className="cmDrives">
           {r.drives.map((d, i) => <li key={i}>{driveRow(r, d, i, locked)}</li>)}
         </ul>
-        {r.drives.length === 0 && <p className="cmInsText">It drives nothing yet.</p>}
+        {r.drives.length === 0 && fadedBy(content, r.id).length === 0 && <p className="cmInsText">It drives nothing yet.</p>}
+        {fadedBy(content, r.id).length > 0 && (
+          <p className="cmInsText">Shows with it: {fadedBy(content, r.id).map((s, k) => <span key={s.id}>{k > 0 && ', '}<button type="button" className="cmLink" onClick={() => actions.selectShape(s.id)}>{s.name.trim() || s.id}</button></span>)}. Set in the Colour tab.</p>
+        )}
         <div className="cmInline">
           <span className="cmMenuAnchor">
             <button type="button" className="cmBtn cmBtn--small" aria-haspopup="menu" aria-expanded={menu === r.id} disabled={locked || r.drives.length >= LIMITS.drivesMax} onClick={() => setMenu(m => (m === r.id ? null : r.id))}><PlusIcon size={12} /> Add what it drives</button>
             {menu === r.id && menuFor(r.id, k => actions.addDrive(r.id, k))}
           </span>
+          {selObject && selObject.shapes.some(sid => { const sh = content.shapes.find(x => x.id === sid); return !!sh && !sh.mirrorOf && hangs(sh.pts, sh.closed) && !r.drives.some(d => d.kind === 'fall' && d.shape === sid) }) && (
+            <button type="button" className="cmBtn cmBtn--small" disabled={locked || r.drives.length >= LIMITS.drivesMax} title="Let every shape of this object that has weighted points fall with the slider" onClick={() => actions.fallObject(r.id, selObject.id)}><PlusIcon size={12} /> Let {selObject.name.trim() || 'the object'} fall</button>
+          )}
         </div>
       </section>
     )
   }
 
   function driveRow(r: ModelRange, d: ModelDrive, i: number, locked: boolean) {
-    const unit = d.kind === 'scale' || d.kind === 'length' ? '%' : '°'
+    const unit = d.kind === 'scale' || d.kind === 'length' || d.kind === 'fall' ? '%' : '°'
     return (
       <div className="cmDrive">
         <p className="cmInsText">{driveText(content, d)}</p>

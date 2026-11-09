@@ -1,9 +1,9 @@
 import type {
-  ModelAxis, ModelBind, ModelBlend, ModelBone, ModelClass, ModelColour, ModelContent, ModelDrive, ModelForm, ModelFrame, ModelGenre, ModelGradDir, ModelGradient, ModelGroup, ModelLook, ModelMove, ModelObject, ModelOverride, ModelPoint,
+  ModelAxis, ModelBind, ModelBlend, ModelBone, ModelClass, ModelColour, ModelContent, ModelDrive, ModelFade, ModelFallSide, ModelForm, ModelFrame, ModelGenre, ModelGradDir, ModelGradient, ModelGroup, ModelLook, ModelMove, ModelObject, ModelOverride, ModelPoint,
   ModelPreset, ModelRange, ModelShape, ModelSlot, ModelSwatch, ModelTint, ModelTintKind,
 } from '../../../../api/types'
 import { LIMITS } from './engine/limits'
-import { FRAME_BIGGEST, FRAME_MIN, KIND_MAX, SWATCH_NAME_MAX, TILE_DEFAULT, TINT_RANGE, TONE_RANGE, blankContent, normalizeContent, repairLooks } from './modelContent'
+import { FALL_SIDES, FRAME_BIGGEST, FRAME_MIN, KIND_MAX, SWATCH_NAME_MAX, TILE_DEFAULT, TINT_RANGE, TONE_RANGE, blankContent, normalizeContent, repairLooks } from './modelContent'
 
 // The file Export writes and Import reads: JSON with a marker and a version, and the models' content as it is (a shape, object, group or slider keeps its
 // id: the ids only mean something inside one model). Everything read is held to what the server accepts, so one bad model can never make the whole save
@@ -48,7 +48,7 @@ function bind(v: unknown): ModelBind | null {
   const s = idOf(v.s)
   if (!s) return null
   const at = (x: unknown) => Math.round(num(x, 0, 0, LIMITS.pointsMax - 1))
-  return { kind: v.kind === 'edge' ? 'edge' : 'point', s, i: at(v.i), d: pair(v.d) ?? [0, 0], e: at(v.e), t: num(v.t, 0, 0, 1), o: num(v.o, 0, -100, 100) }
+  return { kind: v.kind === 'edge' ? 'edge' : 'point', s, i: at(v.i), d: pair(v.d) ?? [0, 0], e: at(v.e), t: num(v.t, 0, 0, 1), o: num(v.o, 0, -100, 100), ...(v.tan === true ? { tan: true } : {}) }
 }
 
 function point(v: unknown): ModelPoint {
@@ -70,6 +70,12 @@ function gradient(v: unknown): ModelGradient | null {
   if (!isRecord(v)) return null
   return { dir: (['down', 'up', 'left', 'right', 'radial'].includes(v.dir as string) ? v.dir : 'down') as ModelGradDir, to: idOrNull(v.to) }
 }
+// A shape that shows with a slider (phase 5b), or null.
+function fade(v: unknown): ModelFade | null {
+  if (!isRecord(v)) return null
+  const slider = idOf(v.slider)
+  return slider ? { slider, hidden: num(v.hidden, 0, -1000, 1000), shown: num(v.shown, 100, -1000, 1000) } : null
+}
 function look(v: Record<string, unknown>): ModelLook | null {
   const shapeId = idOf(v.shape)
   if (!shapeId) return null
@@ -85,7 +91,7 @@ function shape(v: Record<string, unknown>, id: string): ModelShape {
     loose: idOrNull(v.loose), copyOf: idOrNull(v.copyOf), hide: v.hide === true, slot: idOrNull(v.slot), gray: typeof v.gray === 'number' ? Math.round(num(v.gray, 50, 0, 100)) : null,
     tone: typeof v.tone === 'number' ? Math.round(num(v.tone, 0, TONE_RANGE.min, TONE_RANGE.max)) : 0, derive: tint(v.derive), shade: tint(v.shade), grad: gradient(v.grad),
     blend: (['multiply', 'screen', 'overlay'].includes(v.blend as string) ? v.blend : null) as ModelBlend | null, clip: idOrNull(v.clip),
-    cut: [...new Set(list(v.cut).map(idOf).filter((x): x is string => x !== null))].slice(0, LIMITS.cutsMax), helper: v.helper === true,
+    cut: [...new Set(list(v.cut).map(idOf).filter((x): x is string => x !== null))].slice(0, LIMITS.cutsMax), helper: v.helper === true, opBy: fade(v.opBy),
   }
 }
 
@@ -96,21 +102,21 @@ function move(v: unknown): ModelMove {
 
 // A drive the server would accept, or null (the server drops the same ones).
 function drive(v: unknown): ModelDrive | null {
-  if (!isRecord(v) || !['turn', 'scale', 'points', 'bend', 'length'].includes(v.kind as string)) return null
+  if (!isRecord(v) || !['turn', 'scale', 'points', 'bend', 'length', 'fall'].includes(v.kind as string)) return null
   const kind = v.kind as ModelDrive['kind']
   const group = idOf(v.group), id = idOf(v.id), shapeId = idOf(v.shape)
   const target = v.target === 'group' || v.target === 'shape' || v.target === 'model' ? v.target : null
   if (kind === 'turn' && !group) return null
   if (kind === 'scale' && (!target || (target !== 'model' && !id))) return null
-  if ((kind === 'points' || kind === 'bend') && !shapeId) return null
+  if ((kind === 'points' || kind === 'bend' || kind === 'fall') && !shapeId) return null
   if (kind === 'length' && !id) return null
   const scale = kind === 'scale' || kind === 'length'
-  const at = (x: unknown) => (scale ? num(x, 100, 5, 1000) : num(x, 0, -360, 360))
+  const at = (x: unknown, rest = 0) => (scale ? num(x, 100, 5, 1000) : kind === 'fall' ? num(x, rest, 0, 100) : num(x, 0, -360, 360))
   const y0 = num(v.y0, 0, -50, 450), y1 = num(v.y1, 0, -50, 450)
   return {
     kind, group, target, id, axis: v.axis === 'x' || v.axis === 'y' ? v.axis : 'xy', shape: shapeId,
     moves: list(v.moves).slice(0, LIMITS.pointsMax).map(move), sym: v.sym === true,
-    pivot: kind === 'bend' ? (pair(v.pivot) ?? [100, 200]) : pair(v.pivot), y0: Math.min(y0, y1), y1: Math.max(y0, y1), atMin: at(v.atMin), atMax: at(v.atMax), mirror: v.mirror !== false,
+    pivot: kind === 'bend' ? (pair(v.pivot) ?? [100, 200]) : pair(v.pivot), y0: Math.min(y0, y1), y1: Math.max(y0, y1), atMin: at(v.atMin, 0), atMax: at(v.atMax, 100), mirror: v.mirror !== false,
   }
 }
 
@@ -184,7 +190,7 @@ function preset(v: Record<string, unknown>, id: string): ModelPreset {
   const forms: Record<string, string> = {}
   if (isRecord(v.forms)) for (const [k, x] of Object.entries(v.forms)) if (k.length >= 3 && k.length <= 170 && idOf(x) && Object.keys(forms).length < LIMITS.presetFormsMax) forms[k] = x as string
   const hidden = [...new Set(list(v.hidden).map(idOf).filter((x): x is string => x !== null))].slice(0, 100)
-  return { id, name: text(v.name), kind: text(v.kind).trim().slice(0, KIND_MAX) || 'Pose', values, hidden, scope: idOrNull(v.scope), forms }
+  return { id, name: text(v.name), kind: text(v.kind).trim().slice(0, KIND_MAX) || 'Pose', values, hidden, scope: idOrNull(v.scope), forms, fall: FALL_SIDES.includes(v.fall as ModelFallSide) ? (v.fall as ModelFallSide) : null }
 }
 
 function modelClass(v: Record<string, unknown>, id: string): ModelClass | null {

@@ -139,6 +139,7 @@ function mirrorShapeDrives(c: ModelContent, originalId: string, twinId: string, 
         if (d.kind === 'points' && d.shape === originalId) extra.push({ ...d, shape: twinId, moves: d.moves.map(m => mirrorMove(m, size)) })
         else if (d.kind === 'bend' && d.shape === originalId) extra.push({ ...d, shape: twinId, pivot: d.pivot ? [r2(2 * axis - d.pivot[0]), d.pivot[1]] : null, atMin: -d.atMin, atMax: -d.atMax })
         else if (d.kind === 'scale' && d.target === 'shape' && d.id === originalId) extra.push({ ...d, id: twinId })
+        else if (d.kind === 'fall' && d.shape === originalId) extra.push({ ...d, shape: twinId })
       }
       return extra.length && r.drives.length + extra.length <= LIMITS.drivesMax ? { ...r, drives: [...r.drives, ...extra] } : r
     }),
@@ -160,7 +161,8 @@ function breakShape(c: ModelContent, id: string): Edit {
   const linked = orig.pts.some(p => p.bind)
   // it keeps the paint it was drawn with (slot, tone, shading, clip...), as its original gives it
   const paint = bakedPaint(c, s)
-  let next: ModelContent = { ...c, shapes: c.shapes.map(x => (x.id === id ? { ...x, mirrorOf: null, pts, back, half: 0, ...paint } : x)) }
+  // and the way it fades in with a slider (a crease)
+  let next: ModelContent = { ...c, shapes: c.shapes.map(x => (x.id === id ? { ...x, mirrorOf: null, pts, back, half: 0, ...paint, opBy: x.opBy ?? orig.opBy ?? null } : x)) }
   next = mirrorShapeDrives(next, orig.id, id, pts.length)
   return done(next, linked ? 'Its point links are not copied: link its points again.' : undefined)
 }

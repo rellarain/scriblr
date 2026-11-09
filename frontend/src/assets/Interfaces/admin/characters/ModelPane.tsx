@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useRef, useState, type KeyboardEvent } from 'react'
 import type { ModelContent, ModelEntry, ModelLayer, ModelShape } from '../../../../api/types'
 import {
-  BackIcon, CheckIcon, CopyIcon, CursorIcon, DiceIcon, ExportIcon, EyeOffIcon, FitIcon, StampIcon, FrontIcon, GridLinesIcon, HandIcon, HistoryIcon, PathIcon, RedoIcon, RestoreIcon, RulerIcon, SlidersIcon, SwapIcon, TrashIcon, UndoIcon, ZoomInIcon, ZoomOutIcon,
+  BackIcon, CheckIcon, CopyIcon, CursorIcon, DiceIcon, ExportIcon, EyeOffIcon, FitIcon, StampIcon, FrontIcon, GridLinesIcon, HandIcon, HistoryIcon, PathIcon, RedoIcon, RestoreIcon, RulerIcon, SlidersIcon, SwapIcon, TrashIcon, UndoIcon, WeightIcon, ZoomInIcon, ZoomOutIcon,
 } from '../../../icons'
 import { AssetTree, type TreeActions, type TreeMode } from './AssetTree'
 import type { ClassActions } from './ClassPanel'
@@ -30,6 +30,10 @@ import { setFit as setObjectFit, stretchTargets } from './engine/fitEdit'
 import { addFrame, framesOf, frameById, hiddenThrough, movedBox, removeFrame, renameFrame, resizedBox, setFrameBox, setTile, tileOf, toggleFrameHide, viewBoxOf } from './engine/frames'
 import { addMember, deleteClass, detachBeforeRemoval, detachMember, followTemplate, makeClass, moveObjectToGroup, reconcileClasses, renameClass, setExclusive, setShapeHide } from './engine/classEdit'
 import { newShape } from './engine/edit'
+import { bridgeBetween, setLeaves, spotFromClick, type EdgeSpot } from './engine/bridgeEdit'
+import { fadedBy as _fadedBy, setFade, stepFade } from './engine/fadeEdit'
+import { cycleWeight, hangs, stepWeight } from './engine/fall'
+import { SIDE_NAMES, addFall, addFallToObject, withWeight } from './engine/fallEdit'
 import { addAxis, addForm, hideInForm, moveAxis, moveForm, overrideState, removeAxis, removeForm, renameAxis, renameForm, setInitialForm, setLook, setOverride, useBaseOutline } from './engine/formEdit'
 import { classKey, presetsOf, targetForShape } from './engine/forms'
 import { apply, inverse, type Box } from './engine/geometry'
@@ -49,7 +53,7 @@ import { breakPair, clearLinksTo, linkToEdge, linkToPoint, makeTwin, moveInOrder
 import type { FitActions, FrameActions, LinkHow, NewSliderKind, PairActions, ProportionActions, Recording, RigActions, ViewName } from './rigActions'
 import { groupOfSelection, offRest, scrubValue, valueText } from './rigView'
 import {
-  NAME_MAX, addGroup, addObject, addShape, duplicateShape, freshId, groupOfObject, moveBefore, moveObjectWithin, moveShapeWithin, newGroup, objectById, objectOfShape, publishFaults, removeGroup, removeObject,
+  FALL_SIDES, NAME_MAX, addGroup, addObject, addShape, duplicateShape, freshId, groupOfObject, moveBefore, moveObjectWithin, moveShapeWithin, newGroup, objectById, objectOfShape, publishFaults, removeGroup, removeObject,
   outlineSize, removeShape, renameGroup, renameObject, renameShape, shapeById, twinsOf, updateShape, type MakeId,
 } from './modelContent'
 import type { CharacterModels } from './useCharacterModels'
@@ -136,6 +140,9 @@ export function ModelPane({ entry, models, makeId, onRemove, onDuplicate, onExpo
   // canvas, the frame the canvas looks through, and the test card colour (never saved unless it is kept as the starter colour)
   const [bonePick, setBonePick] = useState<string | null>(null)
   const [fitPick, setFitPick] = useState(false)
+  // bridges, creases and fall (phase 5b): the spots of a bridge picked so far on the canvas (null: not making one), and the Weights tool (a click on a point steps its weight)
+  const [bridgeSpots, setBridgeSpots] = useState<EdgeSpot[] | null>(null)
+  const [weighing, setWeighing] = useState(false)
   const [frameSel, setFrameSel] = useState<string | null>(null)
   const [throughId, setThroughId] = useState<string | null>(null)
   const [tileTest, setTileTest] = useState<string | null>(null)
@@ -155,7 +162,7 @@ export function ModelPane({ entry, models, makeId, onRemove, onDuplicate, onExpo
   const show = useMemo(() => showFor(content, sel), [content, sel])
   // looking through a frame leaves out what the frame leaves out
   const through = frameById(content, throughId)
-  const solved = useMemo(() => solve(shown, recording ? {} : values, view, recording ? {} : { forms: test.forms, hidden: hiddenThrough(through, test.hidden), show }), [shown, values, recording, view, test.forms, test.hidden, show, through])
+  const solved = useMemo(() => solve(shown, recording ? {} : values, view, recording ? {} : { forms: test.forms, hidden: hiddenThrough(through, test.hidden), show, fall: test.fall }), [shown, values, recording, view, test.forms, test.hidden, test.fall, show, through])
   const group = groupOfSelection(content, sel)
   const valuesRef = useRef(values)
   valuesRef.current = values
@@ -259,6 +266,15 @@ export function ModelPane({ entry, models, makeId, onRemove, onDuplicate, onExpo
     else if (cut.length) setNote(`The links of ${cut.join(', ')} to this shape were cut because its points changed. Link them again.`)
     if (point !== undefined) setSelPoint(point)
   }
+  // The weight of a point of the selected shape (how free it is to hang), set through the canvas's own edit so a form or the back view gets it where it belongs.
+  function setWeightAt(i: number, w: number) {
+    const cs = selShape ? shapeById(canvasContent, selShape.id) : undefined
+    if (!cs || !cs.pts[i]) return
+    if (!editable) { setNote(pointDriven ? 'A slider changes this shape\'s points and is away from rest: set the sliders back to rest to change its weights.' : 'This shape is shown, not edited.'); return }
+    editShape(cs.id, { ...cs, pts: cs.pts.map((p, k) => (k === i ? withWeight(p, w) : p)) }, i)
+  }
+  const weightAt = (i: number): number | undefined => (selShape ? shapeById(canvasContent, selShape.id)?.pts[i]?.w ?? undefined : undefined)
+  const weights = weighing && selShape && editable ? { onCycle: (i: number) => setWeightAt(i, cycleWeight(weightAt(i))), onStep: (i: number, dir: -1 | 1) => setWeightAt(i, stepWeight(weightAt(i), dir)) } : null
   function undo() {
     const r = undoHistory(history, content)
     if (!r) return
@@ -282,7 +298,7 @@ export function ModelPane({ entry, models, makeId, onRemove, onDuplicate, onExpo
 
   function choose(next: Selection) {
     if (recording) return
-    setSel(next); setSelPoint(0); setMode('points'); setPickOn(false); setLinkMode(null); setPaintPick(null); setBonePick(null); setFitPick(false)
+    setSel(next); setSelPoint(0); setMode('points'); setPickOn(false); setLinkMode(null); setPaintPick(null); setBonePick(null); setFitPick(false); setBridgeSpots(null)
   }
 
   // ---- the sliders' test values ----
@@ -357,9 +373,10 @@ export function ModelPane({ entry, models, makeId, onRemove, onDuplicate, onExpo
     if (!selShape) { setNote('Select a shape first.'); return }
     if (selShape.mirrorOf) { setNote('A twin follows its original: use the original, or break the pair.'); return }
     const name = selShape.name.trim() || 'the shape'
-    const start = addRange(content, newRange(id, sliderName(content, kind === 'points' ? `${name} shape` : `${name} bend`), kind, selShape.id))
+    const start = addRange(content, newRange(id, sliderName(content, kind === 'points' ? `${name} shape` : kind === 'fall' ? `${name} fall` : `${name} bend`), kind, selShape.id))
     if (!start.ok) { setNote(start.reason); return }
-    if (kind === 'bend') { if (applyEdit(addBend(start.content, id, selShape.id))) { setTab('ranges'); setRangeFilter('selection') } }
+    if (kind === 'fall') { if (applyEdit(addFall(start.content, id, selShape.id))) { setTab('ranges'); setRangeFilter('selection') } }
+    else if (kind === 'bend') { if (applyEdit(addBend(start.content, id, selShape.id))) { setTab('ranges'); setRangeFilter('selection') } }
     else { commit(start.content, true); startRecording(id, selShape.id, 'max') }
   }
   function addDrive(rangeId: string, kind: NewSliderKind) {
@@ -367,7 +384,8 @@ export function ModelPane({ entry, models, makeId, onRemove, onDuplicate, onExpo
     if (kind === 'turn') { if (!group) setNote('Select a group first.'); else applyEdit(addTurn(content, rangeId, group.id)); return }
     if (kind === 'scale') { const t = scaleTarget(); applyEdit(addScale(content, rangeId, t.target, t.id)); return }
     if (!selShape) { setNote('Select a shape first.'); return }
-    if (kind === 'bend') applyEdit(addBend(content, rangeId, selShape.id))
+    if (kind === 'fall') applyEdit(addFall(content, rangeId, selShape.id))
+    else if (kind === 'bend') applyEdit(addBend(content, rangeId, selShape.id))
     else startRecording(rangeId, selShape.id, 'max')
   }
   function finishRecording() {
@@ -413,6 +431,8 @@ export function ModelPane({ entry, models, makeId, onRemove, onDuplicate, onExpo
     setValue,
     resetValues,
     openSlider: () => { setTab('ranges'); setRangeFilter('selection') },
+    selectShape: id => choose({ kind: 'shape', id }),
+    fallObject: (rangeId, objectId) => { applyEdit(addFallToObject(content, rangeId, objectId)) },
   }
 
   // ---- proportions: bones, fit and frames ----
@@ -518,6 +538,12 @@ export function ModelPane({ entry, models, makeId, onRemove, onDuplicate, onExpo
     },
     useFront: shapeId => { applyEdit(setBack(content, shapeId, null)) },
     moveInOrder: (shapeId, dir) => { applyEdit(moveInOrder(content, shapeId, view, dir)) },
+    setLeaves: (shapeId, index, on) => { applyEdit(setLeaves(content, shapeId, index, on)) },
+    startBridge: () => {
+      if (view === 'back') { setNote('Build a bridge in the front view: its points are locked to edges, which work in both views.'); return }
+      setPickOn(false); setLinkMode(null); setPaintPick(null); setBonePick(null); setFitPick(false); setWeighing(false); setMode('points'); setBridgeSpots([])
+    },
+    stopBridge: () => setBridgeSpots(null),
   }
 
   // ---- posing by dragging ----
@@ -645,6 +671,8 @@ export function ModelPane({ entry, models, makeId, onRemove, onDuplicate, onExpo
   // ---- paint effects ----
 
   const paintActions: PaintActions = {
+    setFade: (id, sliderId) => { applyEdit(setFade(content, id, sliderId)) },
+    stepFade: (id, end, dir, big) => commit(stepFade(content, id, end, dir, big), true),
     setTone: (id, tone) => { applyEdit(paintOps.setTone(content, id, tone)) },
     setDerive: (id, kind) => { applyEdit(paintOps.setDerive(content, id, kind)) },
     stepTint: (id, field, dir, big) => { applyEdit(paintOps.stepTint(content, id, field, dir, big)) },
@@ -820,7 +848,9 @@ export function ModelPane({ entry, models, makeId, onRemove, onDuplicate, onExpo
   // choosing the shape the selected object stretches to
   const selObject = sel.kind === 'object' ? objectById(content, sel.id) : sel.kind === 'shape' ? objectOfShape(content, sel.id) : undefined
   const fitPickData = fitPick && selObject ? { shapes: stretchTargets(content, selObject.id).filter(id => !!solved.shapes[id]?.d) } : null
-  const pick = bonePickData ?? fitPickData ?? linkPick ?? paintPickShapes ?? (pickOn && group?.attach ? { shapes: ancestorShapes.map(s => s.id) } : null)
+  // making a bridge: any shape that is drawn and is not a twin (the spots are on the edges of the original parts)
+  const bridgePickData = bridgeSpots ? { shapes: content.shapes.filter(s => !s.mirrorOf && !s.shade && outlineSize(content, s) >= 3 && !!solved.shapes[s.id]?.d).map(s => s.id) } : null
+  const pick = bridgePickData ?? bonePickData ?? fitPickData ?? linkPick ?? paintPickShapes ?? (pickOn && group?.attach ? { shapes: ancestorShapes.map(s => s.id) } : null)
 
   // Dragging the pivot of a group: an unanchored one moves to the pointer (read back into the group's own space); an anchored one is fixed again at the
   // nearest place of the same kind on its shape.
@@ -863,6 +893,24 @@ export function ModelPane({ entry, models, makeId, onRemove, onDuplicate, onExpo
     commit(stepLink(content, selShape.id, selPoint, b.kind === 'edge' ? (sideways ? 't' : 'o') : sideways ? 'dx' : 'dy', dir, big))
   }
   function onPick(shapeId: string, wx: number, wy: number) {
+    if (bridgeSpots) {
+      const [x, y] = apply(inverse(solved.global), wx, wy)
+      const spot = spotFromClick(content, shapeId, x, y)
+      if (!spot) { setNote('That shape has no edge to join.'); return }
+      const [a, b] = [bridgeSpots[0]?.shape, bridgeSpots[1]?.shape]
+      if (bridgeSpots.length === 1 && spot.shape === a) { setNote('Click the other part for the second spot: a bridge joins two different parts.'); return }
+      if (bridgeSpots.length === 2 && spot.shape !== a && spot.shape !== b) { setNote('The other side runs between the same two parts: click an edge of one of them.'); return }
+      if (bridgeSpots.length === 3 && spot.shape === bridgeSpots[2].shape) { setNote('Click an edge of the other part for the last spot.'); return }
+      const spots = [...bridgeSpots, spot]
+      setNote('')
+      if (spots.length < 4) { setBridgeSpots(spots); return }
+      const e = bridgeBetween(content, spots, makeId)
+      if (applyEdit(e)) {
+        setBridgeSpots(null)
+        if (e.ok && e.shapeId) { setSel({ kind: 'shape', id: e.shapeId }); setSelPoint(0) }
+      }
+      return
+    }
     if (bonePick) {
       const at = attachFromClick(solved, 'point', shapeId, wx, wy)
       if (at && applyEdit(setBoneEnd(content, bonePick, { kind: 'point', id: shapeId, i: at.i }))) setBonePick(null)
@@ -888,7 +936,10 @@ export function ModelPane({ entry, models, makeId, onRemove, onDuplicate, onExpo
     if (att && applyEdit(attachGroup(content, group.id, att))) setPickOn(false)
   }
 
-  const stageNote = throughFrame ? `Looking through ${through?.name.trim() || 'the frame'}: the figure is cropped to it, without what it leaves out. Choose Whole figure in the Frames tab to go back.`
+  const stageNote = bridgeSpots ? `Bridge: ${['click the edge of the first part, where one side of the bridge leaves it', 'click the edge of the other part, where that side arrives', 'for the other side, click an edge of either part', 'click the edge of the other part again'][bridgeSpots.length]} (spot ${bridgeSpots.length + 1} of 4). Escape stops.`
+    : weights ? 'Weights: click a point (or press Enter) to step how free it is to hang; the arrow keys step it too. A ring round a point shows its weight.'
+    : weighing && selShape && !editable ? (pointDriven ? 'A slider changes this shape\'s points and is away from rest: set the sliders back to rest to change its weights.' : 'This shape is shown, not edited.')
+    : throughFrame ? `Looking through ${through?.name.trim() || 'the frame'}: the figure is cropped to it, without what it leaves out. Choose Whole figure in the Frames tab to go back.`
     : bonePick ? 'Click the pivot marker of a group, or a shape, for the end of the bone. Escape stops.'
     : fitPick && selObject ? `Click the shape ${selObject.name.trim() || 'this object'} is to stretch to. Escape stops.`
     : tab === 'frames' && frameCanvas ? 'Frames: drag the outlined rectangle to move the frame, its handles to resize it. Press Enter on a rectangle to edit it.'
@@ -949,6 +1000,7 @@ export function ModelPane({ entry, models, makeId, onRemove, onDuplicate, onExpo
               <span className="cmSep" aria-hidden="true" />
               <button type="button" className={`cmIconBtn${mode === 'points' ? ' cmIconBtn--on' : ''}`} aria-label="Point editor" title="Point editor: drag points and curve handles" aria-pressed={mode === 'points'} onClick={() => setMode('points')}><PathIcon size={14} /></button>
               <button type="button" className={`cmIconBtn${mode === 'move' ? ' cmIconBtn--on' : ''}`} aria-label="Move shape" title="Move shape: drag the whole shape" aria-pressed={mode === 'move'} onClick={() => setMode('move')}><CursorIcon size={14} /></button>
+              <button type="button" className={`cmIconBtn${weighing ? ' cmIconBtn--on' : ''}`} aria-label="Weights" title="Weights: click a point to say how free it is to hang (for hair, scarves, capes and tails)" aria-pressed={weighing} disabled={!!recording || poseMode} onClick={() => { setWeighing(w => !w); setMode('points'); setBridgeSpots(null) }}><WeightIcon size={14} /></button>
               <button type="button" className={`cmIconBtn${poseMode ? ' cmIconBtn--on' : ''}`} aria-label="Pose mode" title="Pose mode: drag the figure to turn, scale and reach (the sliders follow)" aria-pressed={poseMode} disabled={!!recording} onClick={() => { if (poseMode) poseCancel(); setPoseMode(m => !m); setPoseStatus(POSE_HINT) }}><HandIcon size={14} /></button>
               <span className="cmSep" aria-hidden="true" />
               <button type="button" className={`cmIconBtn${mirror ? ' cmIconBtn--on' : ''}`} aria-label="Mirror editing" title="Mirror editing: a point and its twin move together" aria-pressed={mirror} onClick={() => setMirror(m => !m)}><SwapIcon size={14} /></button>
@@ -965,6 +1017,17 @@ export function ModelPane({ entry, models, makeId, onRemove, onDuplicate, onExpo
               <span className="cmSep" aria-hidden="true" />
               <button type="button" className="cmIconBtn" aria-label="Roll the look" title="Roll a new look for the test character: colours, a form on every axis and the member of each family; what is locked in the tree stays" disabled={!!recording} onClick={() => test.roll(content)}><DiceIcon size={14} /></button>
               <TemplateMenu label="New shape" title="New shape from a template" onPick={newShapeFromCanvas} />
+              {(weighing || content.ranges.some(r => r.drives.some(d => d.kind === 'fall'))) && (
+                <span className="cmFallSide" role="group" aria-label="The side things fall to">
+                  {FALL_SIDES.map(side => (
+                    <button
+                      key={side} type="button" className={`cmChip${test.fall === side ? ' cmChip--on' : ''}`} aria-pressed={test.fall === side}
+                      aria-label={`Things fall ${side === 'down' ? 'straight down' : side === 'behind' ? 'behind the figure' : `to the picture's ${side}`}`}
+                      title={side === 'down' ? 'Straight down' : side === 'behind' ? 'Behind the figure: narrower, seen from the front' : `Toward the picture's ${side}`} onClick={() => test.setFall(side)}
+                    >{SIDE_NAMES[side]}</button>
+                  ))}
+                </span>
+              )}
               <span className="cmSpacer" />
               {awayAll > 0 && (
                 <button type="button" className="cmBtn cmBtn--small" aria-label="Reset test values" title="Put every slider back at rest, every axis on its default form and show everything" disabled={!!recording} onClick={resetEverything}><RestoreIcon size={12} /> {awayAll} off rest</button>
@@ -976,7 +1039,7 @@ export function ModelPane({ entry, models, makeId, onRemove, onDuplicate, onExpo
             <DesignerCanvas
               content={canvasContent} solved={solved} sel={sel} mode={mode} selPoint={selPoint} mirror={mirror} snap={snap} grid={grid} zoom={zoom} fitAll={fitAll} axis={content.axis}
               editable={editable || (!!recording && !!selShape)} pivot={pivot} anchor={anchorSpot} pick={pick} onPick={onPick} onPickGroup={id => { if (bonePick && applyEdit(setBoneEnd(content, bonePick, { kind: 'group', id, i: 0 }))) setBonePick(null) }} pose={poseCanvas} ghost={ghost} colouring={colouring}
-              frames={frameCanvas} through={throughFrame}
+              frames={frameCanvas} through={throughFrame} weights={weights}
               linked={selShape ? selShape.pts.flatMap((pt, i) => (pt.bind ? [i] : [])) : []} onNudgeLink={nudgeLink} onPivot={movePivot} onPivotNudge={nudgePivot}
               onSelect={choose} onSelectPoint={setSelPoint}
               onGesture={() => { if (!recording) setHistory(h => remember(h, content)) }}
@@ -986,7 +1049,7 @@ export function ModelPane({ entry, models, makeId, onRemove, onDuplicate, onExpo
                 const next = t.kind === 'grid' ? rightClickGrid() : rightClickShape(sel, mode, t.id)
                 setSel(next.sel); setMode(next.mode); if (t.kind === 'shape' && next.sel.kind === 'shape' && next.sel.id !== (sel.kind === 'shape' ? sel.id : '')) setSelPoint(0)
               }}
-              onEscape={() => { if (bonePick) setBonePick(null); else if (fitPick) setFitPick(false); else if (linkMode) setLinkMode(null); else if (paintPick) setPaintPick(null); else if (pickOn) setPickOn(false); else if (!recording) setSel(NONE) }}
+              onEscape={() => { if (bridgeSpots) setBridgeSpots(null); else if (weighing) setWeighing(false); else if (bonePick) setBonePick(null); else if (fitPick) setFitPick(false); else if (linkMode) setLinkMode(null); else if (paintPick) setPaintPick(null); else if (pickOn) setPickOn(false); else if (!recording) setSel(NONE) }}
             />
             <p className="cmStageNote" aria-live="polite">{stageNote}</p>
           </div>
@@ -995,7 +1058,7 @@ export function ModelPane({ entry, models, makeId, onRemove, onDuplicate, onExpo
               content={canvasContent} sel={sel} view={view} linkMode={linkMode} pairs={pairs} classes={classes} choices={test.forms} selPoint={selPoint} mirror={mirror} onSelectPoint={setSelPoint}
               onRename={(s, name) => models.edit(entry.id, c => (s.kind === 'shape' ? renameShape(c, s.id, name) : s.kind === 'object' ? renameObject(c, s.id, name) : renameGroup(c, s.id, name)), false)}
               onSetLayer={(id, layer) => commit({ ...content, objects: content.objects.map(o => (o.id === id ? { ...o, layer } : o)) })}
-              onEditShape={editShape}
+              onEditShape={editShape} onWeight={(i, dir) => setWeightAt(i, stepWeight(weightAt(i), dir))} bridge={bridgeSpots ? bridgeSpots.length : null}
               tab={tab} onTab={setTab}
               onAxis={(dir, big) => commit(setAxis(content, content.axis + dir * (big ? 5 : 1)), true)}
               rigTab={<RigTab content={content} group={group} object={selObject} picking={pickOn} fitPicking={fitPick} actions={rigActions} pairs={pairs} fit={fit} />}

@@ -56,6 +56,8 @@ export interface FrameCanvas {
   onNudge: (id: string, dx: number, dy: number, resize: boolean) => void
 }
 // Looking through a frame: the picture is cropped to the box, on the card colour.
+// The Weights tool: a click on a point of the selected shape steps its weight (how free it is to hang), and the arrow keys step it too.
+export interface WeightTool { onCycle: (i: number) => void; onStep: (i: number, dir: -1 | 1) => void }
 export interface ThroughFrame { box: Box; tile: string; name: string }
 // Picking the pivot of a group by clicking its marker (the end of a bone).
 export interface PickGroup { id: string; name: string; x: number; y: number }
@@ -93,6 +95,7 @@ export interface CanvasProps {
   onPickGroup?: (groupId: string) => void
   frames?: FrameCanvas | null
   through?: ThroughFrame | null
+  weights?: WeightTool | null
   onPivot?: (x: number, y: number) => void
   onPivotNudge?: (dx: number, dy: number) => void
   onSelect: (sel: Selection) => void
@@ -195,6 +198,7 @@ export function DesignerCanvas(p: CanvasProps) {
     e.stopPropagation()
     if (!shape || e.button !== 0) return
     p.onSelectPoint(i)
+    if (p.weights && editable) { p.weights.onCycle(i); return }
     if (!editable || linkedSet.has(i)) return
     p.onGesture()
     dragRef.current = { kind: 'point', shapeId: shape.id, index: i }
@@ -286,6 +290,12 @@ export function DesignerCanvas(p: CanvasProps) {
       return
     }
     if (!shape || !editable) return
+    if (p.weights) {
+      const up = e.key === 'ArrowUp' || e.key === 'ArrowRight', down = e.key === 'ArrowDown' || e.key === 'ArrowLeft'
+      if (up || down) { e.preventDefault(); p.weights.onStep(selPoint, up ? 1 : -1) }
+      else if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); p.weights.onCycle(selPoint) }
+      return
+    }
     const step = e.shiftKey ? 5 : 0.5
     const d: Record<string, [number, number]> = { ArrowLeft: [-step, 0], ArrowRight: [step, 0], ArrowUp: [0, -step], ArrowDown: [0, step] }
     if (d[e.key] && mode === 'points' && linkedSet.has(selPoint)) {
@@ -319,7 +329,7 @@ export function DesignerCanvas(p: CanvasProps) {
 
   const built = overlay && matrix ? build(shape!.pts, shape!.closed, matrix) : []
   const cur = built[selPoint]
-  const nudgeHint = !editable ? 'This shape is shown, not edited' : mode === 'move' ? 'Arrow keys move the shape' : 'Arrow keys move the point; Delete removes it'
+  const nudgeHint = !editable ? 'This shape is shown, not edited' : p.weights ? 'Click a point or press Enter to change its weight; the arrow keys step it' : mode === 'move' ? 'Arrow keys move the shape' : 'Arrow keys move the point; Delete removes it'
 
   return (
     <svg
@@ -391,13 +401,21 @@ export function DesignerCanvas(p: CanvasProps) {
           {(cur.m === 'c' || cur.m === 'sc') && <HandleDot x={cur.x} y={cur.y} hx={cur.hox} hy={cur.hoy} u={u} label="Outgoing curve handle" onDown={e => onHandleDown(e, 'ho')} />}
         </g>
       )}
-      {overlay && mode === 'points' && built.map((b, i) => (
-        <circle
-          key={i} cx={b.x} cy={b.y} r={(i === selPoint ? 5.5 : 4) * u} role="button" tabIndex={-1} aria-label={linkedSet.has(i) ? `Point ${i + 1}, linked` : `Point ${i + 1}`} aria-pressed={i === selPoint}
-          className={`cmPoint${i === selPoint ? ' cmPoint--sel' : ''}${shape!.pts[i].m === 's' ? ' cmPoint--sharp' : ''}${editable ? '' : ' cmPoint--off'}${linkedSet.has(i) ? ' cmPoint--linked' : ''}`}
-          onPointerDown={e => onPointDown(e, i)}
-        />
-      ))}
+      {overlay && mode === 'points' && built.map((b, i) => {
+        const w = Math.min(1, Math.max(0, shape!.pts[i].w ?? 0))
+        return w > 0 ? <circle key={`w${i}`} cx={b.x} cy={b.y} r={(6 + w * 6) * u} data-weight={w} className="cmWeightRing" style={{ opacity: 0.35 + 0.65 * w }} aria-hidden="true" /> : null
+      })}
+      {overlay && mode === 'points' && built.map((b, i) => {
+        const w = Math.min(1, Math.max(0, shape!.pts[i].w ?? 0))
+        return (
+          <circle
+            key={i} cx={b.x} cy={b.y} r={(i === selPoint ? 5.5 : 4) * u} role="button" tabIndex={-1} aria-pressed={i === selPoint}
+            aria-label={`Point ${i + 1}${linkedSet.has(i) ? ', linked' : ''}${w > 0 ? `, weight ${Math.round(w * 100)}%` : p.weights ? ', no weight' : ''}`}
+            className={`cmPoint${i === selPoint ? ' cmPoint--sel' : ''}${shape!.pts[i].m === 's' ? ' cmPoint--sharp' : ''}${editable ? '' : ' cmPoint--off'}${linkedSet.has(i) ? ' cmPoint--linked' : ''}${w > 0 ? ' cmPoint--weighted' : ''}${p.weights ? ' cmPoint--weigh' : ''}`}
+            onPointerDown={e => onPointDown(e, i)}
+          />
+        )
+      })}
       {p.pose && p.pose.joints.map(j => (
         <g key={j.id} className={`cmJoint${j.active ? ' cmJoint--on' : ''}`} aria-hidden="true">
           <circle cx={j.x} cy={j.y} r={5 * u} className="cmJointRing" />

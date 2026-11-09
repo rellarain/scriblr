@@ -115,10 +115,10 @@ export function setAxis(c: ModelContent, x: number): ModelContent {
 
 // ---- sliders ----
 
-export type DriveKindPreset = 'turn' | 'scale' | 'points' | 'bend' | 'length'
+export type DriveKindPreset = 'turn' | 'scale' | 'points' | 'bend' | 'length' | 'fall'
 // A new slider with a sensible span for the first thing it will drive.
 export function newRange(id: string, name: string, kind: DriveKindPreset, scope: string | null = null): ModelRange {
-  const span = kind === 'scale' || kind === 'length' ? { min: 50, rest: 100, max: 150, unit: '%' as const } : kind === 'points' ? { min: 0, rest: 0, max: 100, unit: '' as const } : { min: -30, rest: 0, max: 30, unit: '°' as const }
+  const span = kind === 'scale' || kind === 'length' ? { min: 50, rest: 100, max: 150, unit: '%' as const } : kind === 'points' ? { min: 0, rest: 0, max: 100, unit: '' as const } : kind === 'fall' ? { min: 0, rest: 0, max: 100, unit: '%' as const } : { min: -30, rest: 0, max: 30, unit: '°' as const }
   return { id, name, scope, ...span, show: true, rand: null, drives: [] }
 }
 
@@ -134,7 +134,7 @@ export function removeRange(c: ModelContent, id: string): Edit {
   return done({
     ...c,
     ranges: c.ranges.filter(r => r.id !== id),
-    shapes: c.shapes.map(s => (s.loose === id ? { ...s, loose: null } : s)),
+    shapes: c.shapes.map(s => (s.loose === id || s.opBy?.slider === id ? { ...s, loose: s.loose === id ? null : s.loose, opBy: s.opBy?.slider === id ? null : s.opBy } : s)),
     presets: (c.presets ?? []).map(p => (id in p.values ? { ...p, values: Object.fromEntries(Object.entries(p.values).filter(([k]) => k !== id)) } : p)),
   })
 }
@@ -187,8 +187,10 @@ export const clearLimit = (c: ModelContent, id: string): ModelContent => mapRang
 
 const withDrive = (r: ModelRange, d: ModelDrive): ModelRange => ({ ...r, drives: [...r.drives, d] })
 const percentOf = (kind: ModelDrive['kind']): boolean => kind === 'scale' || kind === 'length'
+// A fall drive is a percent of the way to hanging: 0 to 100 (none at rest)
+const fallOf = (kind: ModelDrive['kind']): boolean => kind === 'fall'
 const blankDrive = (kind: ModelDrive['kind']): ModelDrive => ({
-  kind, group: null, target: null, id: null, axis: 'xy', shape: null, moves: [], sym: false, pivot: null, y0: 0, y1: 0, atMin: percentOf(kind) ? 100 : 0, atMax: percentOf(kind) ? 100 : 0, mirror: true,
+  kind, group: null, target: null, id: null, axis: 'xy', shape: null, moves: [], sym: false, pivot: null, y0: 0, y1: 0, atMin: percentOf(kind) ? 100 : 0, atMax: percentOf(kind) ? 100 : fallOf(kind) ? 100 : 0, mirror: true,
 })
 
 function addDrive(c: ModelContent, rangeId: string, d: ModelDrive): Edit {
@@ -248,7 +250,7 @@ const mapDrive = (c: ModelContent, rangeId: string, index: number, change: (d: M
 export function stepDrive(c: ModelContent, rangeId: string, index: number, field: 'atMin' | 'atMax', dir: -1 | 1, big = false): ModelContent {
   return mapDrive(c, rangeId, index, d => {
     const next = d[field] + dir * (big ? 5 : 1)
-    return { ...d, [field]: percentOf(d.kind) ? clamp(next, 5, 1000) : clamp(next, -360, 360) }
+    return { ...d, [field]: percentOf(d.kind) ? clamp(next, 5, 1000) : fallOf(d.kind) ? clamp(next, 0, 100) : clamp(next, -360, 360) }
   })
 }
 // A Length drive lengthens another bone.

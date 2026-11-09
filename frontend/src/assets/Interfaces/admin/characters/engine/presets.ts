@@ -1,4 +1,4 @@
-import type { ModelContent, ModelObject, ModelPreset } from '../../../../../api/types'
+import type { ModelContent, ModelFallSide, ModelObject, ModelPreset } from '../../../../../api/types'
 import { KIND_MAX, NAME_MAX, randomId, type MakeId } from '../modelContent'
 import { freshFormId } from './formEdit'
 import { axesFor, chosenForm, choiceOf, classKey, classesOf, formKey, formsAway, membersOf, presetsOf, shownMember, templateOfMember, type Choices } from './forms'
@@ -13,9 +13,11 @@ import { defaultValues, descendantsOf, valueOf, type Values } from './rig'
 // A style is a preset with a scope, an object or a group: it also keeps the forms chosen for what the scope holds (and which member of a family is shown), and
 // only controls what the scope holds. Its slot is its kind within its scope, so a style of the head does not undo a style of the hands.
 
-export interface TestState { values: Values; forms: Choices; hidden: string[] }
+// `fall` is the side hanging things fall to (down when absent).
+export interface TestState { values: Values; forms: Choices; hidden: string[]; fall?: ModelFallSide }
 
-export const restState = (c: ModelContent): TestState => ({ values: defaultValues(c), forms: {}, hidden: [] })
+export const restState = (c: ModelContent): TestState => ({ values: defaultValues(c), forms: {}, hidden: [], fall: 'down' })
+const sideOf = (s: Pick<TestState, 'fall'>): ModelFallSide => s.fall ?? 'down'
 
 const SAME = 0.01
 const clean = (s: string, max: number) => s.trim().slice(0, max)
@@ -26,7 +28,7 @@ const sameScope = (a: string | null | undefined, b: string | null | undefined) =
 // What is away from rest in the test state, for the toolbar's count: sliders off their rest value, forms that are not the default, things switched off.
 export function awayCount(c: ModelContent, s: TestState): number {
   const known = things(c)
-  return c.ranges.filter(r => valueOf(r, s.values) !== r.rest).length + formsAway(c, s.forms) + new Set(s.hidden.filter(h => known.has(h))).size
+  return c.ranges.filter(r => valueOf(r, s.values) !== r.rest).length + formsAway(c, s.forms) + new Set(s.hidden.filter(h => known.has(h))).size + (sideOf(s) !== 'down' ? 1 : 0)
 }
 
 // The kinds in use, in the order they first appear (one spelling each).
@@ -50,13 +52,14 @@ export function scopeOf(c: ModelContent, scopeId: string): Scope | null {
 }
 
 // Everything the presets of a kind (and scope) control: slider ids, thing ids and form-choice keys.
-export function footprint(c: ModelContent, kind: string, scope: string | null = null): { values: Set<string>; hidden: Set<string>; forms: Set<string> } {
-  const out = { values: new Set<string>(), hidden: new Set<string>(), forms: new Set<string>() }
+export function footprint(c: ModelContent, kind: string, scope: string | null = null): { values: Set<string>; hidden: Set<string>; forms: Set<string>; fall: boolean } {
+  const out = { values: new Set<string>(), hidden: new Set<string>(), forms: new Set<string>(), fall: false }
   for (const p of presetsOf(c)) {
     if (kindKey(p.kind) !== kindKey(kind) || !sameScope(p.scope, scope)) continue
     for (const k of Object.keys(p.values)) out.values.add(k)
     for (const h of p.hidden) out.hidden.add(h)
     for (const k of Object.keys(p.forms ?? {})) out.forms.add(k)
+    if (p.fall) out.fall = true
   }
   return out
 }
@@ -74,7 +77,11 @@ export function applyPreset(c: ModelContent, s: TestState, p: ModelPreset): Test
   const forms: Choices = { ...s.forms }
   for (const key of free.forms) delete forms[key]
   for (const [key, option] of Object.entries(p.forms ?? {})) forms[key] = option
-  return { values, forms, hidden: [...hidden] }
+  // the side things fall to: a preset that keeps one puts it back to down first, as it does the sliders it controls
+  let fall = sideOf(s)
+  if (free.fall) fall = 'down'
+  if (p.fall) fall = p.fall
+  return { values, forms, hidden: [...hidden], fall }
 }
 
 // Whether applying the preset would change nothing: it is on.
@@ -83,24 +90,25 @@ export function isOn(c: ModelContent, s: TestState, p: ModelPreset): boolean {
   if (c.ranges.some(r => Math.abs(valueOf(r, next.values) - valueOf(r, s.values)) > SAME)) return false
   const keys = new Set([...Object.keys(p.forms ?? {}), ...footprint(c, p.kind, p.scope).forms])
   if ([...keys].some(k => choiceOf(c, k, next.forms) !== choiceOf(c, k, s.forms))) return false
+  if (sideOf(next) !== sideOf(s)) return false
   const a = new Set(s.hidden), b = new Set(next.hidden)
   return a.size === b.size && [...a].every(h => b.has(h))
 }
 
 // The sliders away from rest and the things switched off, as an unscoped preset holds them.
-function captured(c: ModelContent, s: TestState): Pick<ModelPreset, 'values' | 'hidden'> {
+function captured(c: ModelContent, s: TestState): Pick<ModelPreset, 'values' | 'hidden' | 'fall'> {
   const values: Record<string, number> = {}
   for (const r of c.ranges) {
     const v = valueOf(r, s.values)
     if (Math.abs(v - r.rest) > SAME) values[r.id] = Math.round(v * 100) / 100
   }
   const known = things(c)
-  return { values, hidden: [...new Set(s.hidden.filter(h => known.has(h)))] }
+  return { values, hidden: [...new Set(s.hidden.filter(h => known.has(h)))], ...(sideOf(s) === 'down' ? {} : { fall: sideOf(s) }) }
 }
 
 // The same for a style: only the sliders listed under the scope, the things inside it that are switched off, the forms (away from their default) of the objects
 // in it, and the member of each family that has the scope's objects (template or members) in it.
-function capturedStyle(c: ModelContent, s: TestState, scope: Scope): Pick<ModelPreset, 'values' | 'hidden' | 'forms'> {
+function capturedStyle(c: ModelContent, s: TestState, scope: Scope): Pick<ModelPreset, 'values' | 'hidden' | 'forms' | 'fall'> {
   const values: Record<string, number> = {}
   for (const r of c.ranges) {
     const v = valueOf(r, s.values)
@@ -120,7 +128,9 @@ function capturedStyle(c: ModelContent, s: TestState, scope: Scope): Pick<ModelP
     const shown = shownMember(c, k, s.forms)
     if (k.exclusive && inside && first && shown && shown.id !== first.id) forms[classKey(k.id)] = shown.id
   }
-  return { values, hidden: [...new Set(s.hidden.filter(h => scope.things.has(h)))], forms }
+  // a style keeps the side when something in its scope hangs
+  const hangs = scope.objects.some(o => o.shapes.some(sid => c.ranges.some(r => r.drives.some(d => d.kind === 'fall' && d.shape === sid))))
+  return { values, hidden: [...new Set(s.hidden.filter(h => scope.things.has(h)))], forms, ...(hangs && sideOf(s) !== 'down' ? { fall: sideOf(s) } : {}) }
 }
 
 export function savePreset(c: ModelContent, s: TestState, name: string, kind: string, make: MakeId = randomId): Edit & { presetId?: string } {
@@ -147,7 +157,7 @@ const mapPreset = (c: ModelContent, id: string, change: (p: ModelPreset) => Mode
 
 // Replace what a preset keeps with what the test state shows now (its name, kind and scope stay).
 export const updatePreset = (c: ModelContent, id: string, s: TestState): ModelContent =>
-  mapPreset(c, id, p => { const scope = p.scope ? scopeOf(c, p.scope) : null; return { ...p, ...(scope ? capturedStyle(c, s, scope) : captured(c, s)) } })
+  mapPreset(c, id, p => { const scope = p.scope ? scopeOf(c, p.scope) : null; return { ...p, fall: null, ...(scope ? capturedStyle(c, s, scope) : captured(c, s)) } })
 export const renamePreset = (c: ModelContent, id: string, name: string): ModelContent => mapPreset(c, id, p => ({ ...p, name }))
 export const setPresetKind = (c: ModelContent, id: string, kind: string): ModelContent => mapPreset(c, id, p => ({ ...p, kind: clean(kind, KIND_MAX) || p.kind }))
 export const deletePreset = (c: ModelContent, id: string): ModelContent => ({ ...c, presets: presetsOf(c).filter(p => p.id !== id) })

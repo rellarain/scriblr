@@ -52,7 +52,7 @@ export function paintShapes(c: ModelContent, solved: Solved, colouring: Colourin
     }
     const cutDs = layer.cuts.map(outline).filter(Boolean)
     items.push({
-      id, d: r.d, fill: layer.fill, opacity: layer.opacity, gradient: layer.gradient, blend: layer.blend, clipD: clipD || null, compDs, cutDs, helper: layer.helper, shading: layer.shading,
+      id, d: r.d, fill: layer.fill, opacity: layer.opacity * (r.fade ?? 1), gradient: layer.gradient, blend: layer.blend, clipD: clipD || null, compDs, cutDs, helper: layer.helper, shading: layer.shading,
       blank: (!!layer.clip && !clipD) || (layer.shading && compDs.length === 0),
     })
   }

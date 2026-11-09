@@ -1,5 +1,5 @@
 import type { ModelBind, ModelContent, ModelShape } from '../../../../api/types'
-import { BackIcon, ChevronDownIcon, ChevronUpIcon, FrontIcon, LinkIcon, PlusIcon, SwapIcon, UnlockIcon } from '../../../icons'
+import { BackIcon, BridgeIcon, ChevronDownIcon, ChevronUpIcon, FrontIcon, LinkIcon, PlusIcon, SwapIcon, UnlockIcon } from '../../../icons'
 import { Stepper } from './Stepper'
 import type { Selection } from './designerState'
 import { LIMITS, linkCount } from './engine/limits'
@@ -53,6 +53,13 @@ export function PairPanel({ content, kind, id, actions }: { content: ModelConten
   )
 }
 
+const BRIDGE_STEPS = [
+  'click the edge of the first part, where one side of the bridge leaves it',
+  'click the edge of the other part, where that side arrives',
+  'for the other side, click an edge of either part',
+  'click the edge of the other part again',
+]
+
 const HOWS: Array<{ id: LinkHow; name: string; hint: string }> = [
   { id: 'weld', name: 'Weld', hint: 'Put the point exactly on a point of another shape.' },
   { id: 'follow', name: 'Follow', hint: 'Keep the point where it is and move it with a point of another shape.' },
@@ -61,12 +68,12 @@ const HOWS: Array<{ id: LinkHow; name: string; hint: string }> = [
 
 function describe(c: ModelContent, b: ModelBind): string {
   const target = shapeById(c, b.s)?.name.trim() || 'a shape'
-  if (b.kind === 'edge') return `locked to the edge from point ${b.e + 1} of ${target}, ${b.o} out`
+  if (b.kind === 'edge') return `locked to the edge from point ${b.e + 1} of ${target}, ${b.o} out${b.tan ? ', leaves along the edge' : ''}`
   return b.d[0] === 0 && b.d[1] === 0 ? `welded to point ${b.i + 1} of ${target}` : `follows point ${b.i + 1} of ${target} (${b.d[0]}, ${b.d[1]} away)`
 }
 
 // Point links of the selected shape: link the selected point by clicking a shape on the canvas, and adjust or cut each link.
-export function LinksPanel({ content, shape, selPoint, linkMode, actions }: { content: ModelContent; shape: ModelShape; selPoint: number; linkMode: LinkHow | null; actions: PairActions }) {
+export function LinksPanel({ content, shape, selPoint, linkMode, bridge, actions }: { content: ModelContent; shape: ModelShape; selPoint: number; linkMode: LinkHow | null; bridge?: number | null; actions: PairActions }) {
   if (shape.mirrorOf) return null
   const links = linksOf(content, shape.id)
   const here = shape.pts[selPoint]?.bind
@@ -80,6 +87,10 @@ export function LinksPanel({ content, shape, selPoint, linkMode, actions }: { co
           <button key={h.id} type="button" className={`cmChip cmChip--wide${linkMode === h.id ? ' cmChip--on' : ''}`} aria-pressed={linkMode === h.id} title={h.hint} onClick={() => (linkMode === h.id ? actions.stopLink() : actions.startLink(h.id))}><LinkIcon size={11} /> {h.name}</button>
         ))}
       </div>
+      <div className="cmInline">
+        <button type="button" className={`cmBtn cmBtn--small${bridge != null ? ' cmBtn--primary' : ''}`} aria-pressed={bridge != null} title="Join two parts with skin: click four spots on the edges of the two parts" onClick={() => (bridge != null ? actions.stopBridge() : actions.startBridge())}><BridgeIcon size={12} /> {bridge != null ? 'Stop the bridge' : 'Add a bridge'}</button>
+      </div>
+      {bridge != null && <p className="cmInsText" role="status">Bridge: {BRIDGE_STEPS[Math.min(bridge, 3)]} (spot {Math.min(bridge, 3) + 1} of 4). Escape stops.</p>}
       {linkMode && <p className="cmInsText" role="status">Click the shape to link point {selPoint + 1} to{linkMode === 'edge' ? ' (the point goes to the edge nearest your click).' : ' (the point nearest your click).'} Escape stops.</p>}
       {here && <div className="cmInline"><button type="button" className="cmBtn cmBtn--small" aria-label={`Unlink point ${selPoint + 1}`} onClick={() => actions.unlink(shape.id, selPoint)}><UnlockIcon size={12} /> Unlink point {selPoint + 1}</button></div>}
       {links.length === 0 ? <p className="cmInsText">None of this shape&apos;s points is linked.</p> : (
@@ -92,6 +103,7 @@ export function LinksPanel({ content, shape, selPoint, linkMode, actions }: { co
                   <>
                     <Stepper label={`Distance from the edge (point ${index + 1})`} value={`${bind.o}`} onStep={(dir, big) => actions.stepLink(shape.id, index, 'o', dir, big)} />
                     <Stepper label={`Spot along the edge (point ${index + 1})`} value={`${Math.round(bind.t * 100)}%`} onStep={(dir, big) => actions.stepLink(shape.id, index, 't', dir, big)} />
+                    <button type="button" className={`cmChip cmChip--wide${bind.tan ? ' cmChip--on' : ''}`} aria-pressed={!!bind.tan} aria-label={`Point ${index + 1} leaves along its edge`} title="Let the outline leave this point along the direction of the edge it is locked to, so it runs on smoothly (the two ends of a bridge)" onClick={() => actions.setLeaves(shape.id, index, !bind.tan)}>Leaves along the edge</button>
                   </>
                 ) : (
                   <>

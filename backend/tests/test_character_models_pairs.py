@@ -86,8 +86,8 @@ def test_twins_round_trip(client: TestClient) -> None:
 def test_links_round_trip_and_are_repaired(client: TestClient) -> None:
     out = saved(client, linked())
     a, b = out["shapes"][1]["pts"][0]["bind"], out["shapes"][1]["pts"][1]["bind"]
-    assert a == {"kind": "point", "s": "s_body", "i": 0, "d": [-2.0, 0.0], "e": 0, "t": 0.0, "o": 0.0}
-    assert b == {"kind": "edge", "s": "s_body", "i": 0, "d": [0.0, 0.0], "e": 1, "t": 0.5, "o": 3.0}
+    assert a == {"kind": "point", "s": "s_body", "i": 0, "d": [-2.0, 0.0], "e": 0, "t": 0.0, "o": 0.0, "tan": False}
+    assert b == {"kind": "edge", "s": "s_body", "i": 0, "d": [0.0, 0.0], "e": 1, "t": 0.5, "o": 3.0, "tan": False}
     messy = linked()
     messy["shapes"][1]["pts"][0]["bind"] = {"kind": "wiggle", "s": "s_body", "i": -4, "d": [1, 2, 3], "t": 9, "o": 1e9}
     messy["shapes"][1]["pts"][1]["bind"] = {"kind": "edge"}          # no target: the link is dropped, the point stays

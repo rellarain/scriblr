@@ -1,4 +1,4 @@
-import type { ModelBone, ModelContent, ModelEntry, ModelFit, ModelForm, ModelFrame, ModelGradient, ModelGroup, ModelLayer, ModelLook, ModelObject, ModelRange, ModelShape, ModelSlot, ModelTint } from '../../../../api/types'
+import type { ModelBone, ModelContent, ModelEntry, ModelFade, ModelFallSide, ModelFit, ModelForm, ModelFrame, ModelGradient, ModelGroup, ModelLayer, ModelLook, ModelObject, ModelRange, ModelShape, ModelSlot, ModelTint } from '../../../../api/types'
 import { LIMITS, copyBytes, linkCount, shadingCount } from './engine/limits'
 import { chainOf } from './engine/rig'
 import { standardGenres, standardSlots, starterPalette } from './engine/standardColours'
@@ -43,7 +43,7 @@ export function normalizeContent(c: ModelContent): ModelContent {
     groups: c.groups.map(g => ({ ...g, name: clean(g.name, NAME_MAX), pivot: g.pivot ?? null, attach: g.attach ?? null, mirrorOf: g.mirrorOf ?? null })),
     axis: c.axis ?? 100,
     ranges: (c.ranges ?? []).map(repairRange),
-    presets: (c.presets ?? []).map(p => ({ ...p, name: clean(p.name, NAME_MAX), kind: clean(p.kind, KIND_MAX) || 'Pose', scope: p.scope ?? null, forms: p.forms ?? {} })),
+    presets: (c.presets ?? []).map(p => ({ ...p, name: clean(p.name, NAME_MAX), kind: clean(p.kind, KIND_MAX) || 'Pose', scope: p.scope ?? null, forms: p.forms ?? {}, fall: p.fall && FALL_SIDES.includes(p.fall) ? p.fall : null })),
     classes: (c.classes ?? []).map(k => ({ ...k, name: clean(k.name, NAME_MAX), exclusive: k.exclusive === true })),
     genres: (c.genres ?? []).map(g => ({ ...g, name: clean(g.name, SWATCH_NAME_MAX) })),
     palette: (c.palette ?? []).map(p => ({ ...p, name: clean(p.name, SWATCH_NAME_MAX), h: percent(p.h, 0, 359), s: percent(p.s, 50, 100) })),
@@ -67,9 +67,13 @@ function paintFields(s: ModelShape) {
   return {
     tone: typeof s.tone === 'number' && Number.isFinite(s.tone) ? Math.round(Math.min(TONE_RANGE.max, Math.max(TONE_RANGE.min, s.tone))) : 0,
     derive: tintOf(s.derive), shade: tintOf(s.shade), grad: gradOf(s.grad), blend: s.blend && BLENDS.includes(s.blend) ? s.blend : null, clip: s.clip ?? null,
-    cut: [...new Set(s.cut ?? [])].slice(0, LIMITS.cutsMax), helper: s.helper === true,
+    cut: [...new Set(s.cut ?? [])].slice(0, LIMITS.cutsMax), helper: s.helper === true, opBy: fadeOf(s.opBy),
   }
 }
+// The sides things may fall to, and a shape's fade as the server keeps it (phase 5b): the places are held to the span a slider may have.
+export const FALL_SIDES: ModelFallSide[] = ['down', 'left', 'right', 'behind']
+const fadeAt = (v: number, fallback: number): number => (typeof v === 'number' && Number.isFinite(v) ? Math.min(1000, Math.max(-1000, v)) : fallback)
+const fadeOf = (f: ModelFade | null | undefined): ModelFade | null => (f && typeof f.slider === 'string' && f.slider ? { slider: f.slider, hidden: fadeAt(f.hidden, 0), shown: fadeAt(f.shown, 100) } : null)
 // A form's looks as the server keeps them: a slot wins over a gray, one look per shape, a look that changes nothing is dropped.
 export function repairLooks(looks: ModelLook[] | undefined): ModelLook[] {
   const seen = new Set<string>(), out: ModelLook[] = []
@@ -366,8 +370,8 @@ function rigFaults(c: ModelContent, circular: boolean, owner: Map<string, string
       else if (d.kind === 'turn' && d.group && twinGroups.get(d.group)) faults.push(`Slider ${name} turns a group that is a twin; turn the original instead.`)
       else if (d.kind === 'scale' && d.target !== 'model' && !((d.target === 'group' && d.id && groupIds.has(d.id)) || (d.target === 'shape' && d.id && shapes.has(d.id)))) faults.push(`Slider ${name} scales something that does not exist.`)
       else if (d.kind === 'scale' && ((d.target === 'group' && d.id && twinGroups.get(d.id)) || (d.target === 'shape' && d.id && shapes.get(d.id)?.mirrorOf))) faults.push(`Slider ${name} scales a twin; scale the original instead.`)
-      else if ((d.kind === 'points' || d.kind === 'bend') && !(d.shape && shapes.has(d.shape))) faults.push(`Slider ${name} moves a shape that does not exist.`)
-      else if ((d.kind === 'points' || d.kind === 'bend') && d.shape && shapes.get(d.shape)?.mirrorOf) faults.push(`Slider ${name} moves a shape that is a twin; move the original instead.`)
+      else if ((d.kind === 'points' || d.kind === 'bend' || d.kind === 'fall') && !(d.shape && shapes.has(d.shape))) faults.push(`Slider ${name} moves a shape that does not exist.`)
+      else if ((d.kind === 'points' || d.kind === 'bend' || d.kind === 'fall') && d.shape && shapes.get(d.shape)?.mirrorOf) faults.push(`Slider ${name} moves a shape that is a twin; move the original instead.`)
       else if (d.kind === 'points' && d.shape && d.moves.some(m => m.i >= (shapes.get(d.shape!)?.pts.length ?? 0))) faults.push(`Slider ${name} moves a point of ${label(shapes.get(d.shape)?.name ?? '', d.shape)} that is no longer there. Record it again.`)
     }
   }
@@ -526,9 +530,10 @@ function colourFaults(c: ModelContent): string[] {
 // slot that is not there, a form that changes the paint of a shape it should not, and too many shading shapes in an object.
 function paintFaults(c: ModelContent): string[] {
   const faults: string[] = []
-  const shapes = new Map(c.shapes.map(s => [s.id, s])), slotIds = new Set((c.slots ?? []).map(sl => sl.id))
+  const shapes = new Map(c.shapes.map(s => [s.id, s])), slotIds = new Set((c.slots ?? []).map(sl => sl.id)), rangeIds = new Set(c.ranges.map(r => r.id))
   for (const s of c.shapes) {
     const name = label(s.name, s.id)
+    if (s.opBy && !rangeIds.has(s.opBy.slider)) faults.push(`Shape ${name} fades with a slider that does not exist.`)
     if (s.clip) {
       if (s.clip === s.id) faults.push(`Shape ${name} is clipped to itself.`)
       else if (!shapes.has(s.clip)) faults.push(`Shape ${name} is clipped to a shape that does not exist.`)

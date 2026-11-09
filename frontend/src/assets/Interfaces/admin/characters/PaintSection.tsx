@@ -6,6 +6,7 @@ import { paintLocked } from './engine/paintEdit'
 import { LIMITS, shadingCount } from './engine/limits'
 import { KINDS, SIDES, type Side } from './engine/shadeEdit'
 import { slotsOf } from './engine/colour'
+import { valueText } from './rigView'
 import { objectOfShape, shapeById } from './modelContent'
 
 // The Paint section of the Colour tab (phase 4b): what is done to the colour of the selected shape. A tone, a derived tone, a gradient, a blend mode, a clip, the
@@ -21,6 +22,9 @@ export interface PaintActions {
   setClip: (id: string, target: string | null) => void
   toggleCut: (id: string, target: string) => void
   setHelper: (id: string, on: boolean) => void
+  // Show the shape with a slider (null: always shown), and move the two places that hide and show it one step (phase 5b)
+  setFade: (id: string, sliderId: string | null) => void
+  stepFade: (id: string, end: 'hidden' | 'shown', dir: 1 | -1, big: boolean) => void
   addShading: (id: string, kind: ModelTintKind, side: Side) => void
   // start (or stop, with null) picking a shape on the canvas to clip to or to cut with
   pick: (what: 'clip' | 'cut' | null) => void
@@ -127,6 +131,29 @@ export function PaintSection({ content, shape, picking, actions }: { content: Mo
       <div className="cmInline">
         <button type="button" className={`cmBtn cmBtn--small${shape.helper ? ' cmBtn--primary' : ''}`} aria-pressed={!!shape.helper} title="A helper shape is never drawn in the previews: it only clips or cuts other shapes" onClick={() => actions.setHelper(id, !shape.helper)}><EyeOffIcon size={12} /> Helper shape</button>
       </div>
+
+      <h4 className="cmInsSub">Shows with a slider</h4>
+      <label className="cmField">
+        <span>Slider</span>
+        <select value={shape.opBy?.slider ?? ''} aria-label={`Slider that ${name} shows with`} onChange={e => actions.setFade(id, e.target.value || null)}>
+          <option value="">Always shown</option>
+          {content.ranges.map(r => <option key={r.id} value={r.id}>{label(r.name, 'Untitled slider')}</option>)}
+          {shape.opBy && !content.ranges.some(r => r.id === shape.opBy!.slider) && <option value={shape.opBy.slider}>(gone)</option>}
+        </select>
+      </label>
+      {shape.opBy && (() => {
+        const r = content.ranges.find(x => x.id === shape.opBy!.slider)
+        const at = (v: number) => (r ? valueText(r, v) : `${v}`)
+        return (
+          <>
+            <div className="cmSteps">
+              <Stepper label={`${name} is hidden at`} value={at(shape.opBy.hidden)} onStep={(dir, big) => actions.stepFade(id, 'hidden', dir, big)} />
+              <Stepper label={`${name} is shown at`} value={at(shape.opBy.shown)} onStep={(dir, big) => actions.stepFade(id, 'shown', dir, big)} />
+            </div>
+            <p className="cmInsText">It fades in as the slider moves from the first value to the second (a crease that comes with a bend). Any shape can do this.</p>
+          </>
+        )
+      })()}
 
       {!shape.shade && (
         <>

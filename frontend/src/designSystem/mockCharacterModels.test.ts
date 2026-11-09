@@ -5,7 +5,7 @@ import { classKey } from '../assets/Interfaces/admin/characters/engine/forms'
 import { boneLength, headHeights, measures } from '../assets/Interfaces/admin/characters/engine/bones'
 import { framesOf, hiddenThrough } from '../assets/Interfaces/admin/characters/engine/frames'
 import { applyPreset, restState } from '../assets/Interfaces/admin/characters/engine/presets'
-import { paintCheck, proportionCheck, rigCheck } from '../assets/Interfaces/admin/characters/engine/rigCheck'
+import { hangCheck, paintCheck, proportionCheck, rigCheck } from '../assets/Interfaces/admin/characters/engine/rigCheck'
 import { drawable, paintDefs, paintShapes } from '../assets/Interfaces/admin/characters/engine/paint'
 import { solve } from '../assets/Interfaces/admin/characters/engine/rig'
 import { previewModels } from './mockCharacterModels'
@@ -17,11 +17,12 @@ describe('the rigged preview model', () => {
   it('is complete: nothing stops it being published, and the rig check has nothing to say', () => {
     expect(publishFaults(adult)).toEqual([])
     expect(rigCheck(adult)).toEqual([])
+    expect(hangCheck(adult)).toEqual([])
   })
 
   it('stands as drawn at rest, with every shape in the picture', () => {
     const s = solve(adult, {})
-    expect(s.order).toHaveLength(17)   // five shapes, the sleeve, the shirt, the twins of the arm, its sleeve and the forearm, and the eye shown (two shapes) with its twin, the neckline, and two bands of shading
+    expect(s.order).toHaveLength(22)   // five shapes, the sleeve, the shirt, the twins of the arm, its sleeve and the forearm, and the eye shown (two shapes) with its twin, the neckline, two bands of shading, the bridge of the elbow and its twin, the crease of the elbow and its twin, and the ponytail
     for (const g of adult.groups) s.mats[g.id].forEach((v, i) => expect(v).toBeCloseTo([1, 0, 0, 1, 0, 0][i], 1))
   })
 
@@ -87,7 +88,7 @@ describe('the rigged preview model', () => {
 
   it('has presets: poses, an expression, a build, two outfits and a style of the head', () => {
     expect(adult.presets!.map(p => `${p.kind}: ${p.name}`)).toEqual([
-      'Pose: At rest', 'Pose: Wave', 'Expression: Curious', 'Build: Broad', 'Outfit: Shirt on', 'Outfit: No shirt', 'Style: Sleepy',
+      'Pose: At rest', 'Pose: Wave', 'Expression: Curious', 'Build: Broad', 'Outfit: Shirt on', 'Outfit: No shirt', 'Weather: Calm', 'Weather: Windswept', 'Style: Sleepy',
       'Age: Infant', 'Age: Child', 'Age: Teen', 'Age: Adult', 'Age: Elder', 'Build: Slim', 'Build: Average', 'Build: Heavy',
     ])
     let state = restState(adult)
@@ -160,12 +161,12 @@ describe('the rigged preview model', () => {
     expect(drawable(items).map(i => i.id)).not.toContain('s_neckline')
     expect(items.find(i => i.id === 's_shirt')!.cutDs).toEqual([solved.shapes.s_neckline.d])
     expect(paintCheck(adult)).toEqual([])
-    // two shading shapes, each kept inside the base shapes of its object, the shirt's blended with what is under it
+    // four shading shapes (the shirt's, the head's, and the crease of the elbow with its twin), each kept inside the base shapes of its object, the shirt's blended with what is under it
     const shading = items.filter(i => i.shading)
-    expect(shading).toHaveLength(2)
+    expect(shading).toHaveLength(4)
     for (const band of shading) { expect(band.blank).toBe(false); expect(band.compDs.length).toBeGreaterThan(0) }
     expect(shading.filter(b => b.blend === 'multiply')).toHaveLength(1)
-    expect(shading.filter(b => b.blend === null)).toHaveLength(1)
+    expect(shading.filter(b => b.blend === null)).toHaveLength(3)
     // every member of the eye family follows the pattern's iris, and so has its radial gradient
     const irises = adult.shapes.filter(s => s.id === 's_iris' || s.copyOf === 's_iris')
     expect(irises).toHaveLength(4)
@@ -246,6 +247,59 @@ describe('the rigged preview model', () => {
     // the first frame holds every drawn shape of the figure
     const rest = solve(adult, {})
     for (const id of rest.order) { const b = rest.shapes[id].box; expect(b.x).toBeGreaterThanOrEqual(whole.x - 0.5); expect(b.x + b.w).toBeLessThanOrEqual(whole.x + whole.w + 0.5); expect(b.y + b.h).toBeLessThanOrEqual(whole.y + whole.h + 0.5) }
+  })
+
+  it('has a bridge of skin across the elbow, its twin on the other arm, and it runs on from the arm to the forearm along their edges', () => {
+    const bridge = adult.shapes.find(x => x.pts.some(p => p.bind?.tan))!
+    expect(bridge.name).toBe('Bridge')
+    expect(bridge.pts.map(p => p.bind?.s)).toEqual(['s_arm', 's_fore', 's_fore', 's_arm'])
+    expect(adult.shapes.filter(x => x.mirrorOf === bridge.id)).toHaveLength(1)
+    const bent = solve(adult, { r_raise: 95, r_elbow: 130 })
+    const b = bent.shapes[bridge.id]
+    expect(b.local[0].ho).toBeDefined(); expect(b.local[1].hi).toBeDefined()
+    expect(b.d).not.toMatch(/NaN|undefined/)
+    // the bridge follows the bent forearm: its lower points are where the forearm is
+    const fore = bent.shapes.s_fore.box, lowest = Math.max(...b.poly.map(p => p[1]))
+    expect(lowest).toBeGreaterThan(fore.y - 2)
+  })
+
+  it('has a crease in the elbow that shows as the elbow bends, on both arms', () => {
+    const crease = adult.shapes.find(x => x.opBy?.slider === 'r_elbow')!
+    expect(crease.shade).toBeTruthy()
+    const twin = adult.shapes.find(x => x.mirrorOf === crease.id)!
+    const fade = (v: number, id: string) => solve(adult, { r_elbow: v }).shapes[id].fade
+    expect(fade(0, crease.id)).toBe(0); expect(fade(130, crease.id)).toBe(1)
+    expect(fade(60, crease.id)).toBeGreaterThan(0); expect(fade(60, crease.id)).toBeLessThan(1)
+    expect(fade(60, twin.id)).toBeCloseTo(fade(60, crease.id))
+    const items = paintShapes(adult, solve(adult, { r_elbow: 130 }), { palette: paletteOf(adult), choices: {} })
+    expect(items.find(i => i.id === crease.id)!.opacity).toBeCloseTo(1)
+    expect(paintShapes(adult, solve(adult, {}), { palette: paletteOf(adult), choices: {} }).find(i => i.id === crease.id)!.opacity).toBe(0)
+  })
+
+  it('has a ponytail that hangs with the Hair fall slider, to the side the figure is turned to', () => {
+    const rest = solve(adult, {}), down = solve(adult, { r_fall: 100 }), left = solve(adult, { r_fall: 100 }, 'front', { fall: 'left' }), behind = solve(adult, { r_fall: 100 }, 'front', { fall: 'behind' })
+    expect(rest.shapes.s_lock.box.w).toBeGreaterThan(rest.shapes.s_lock.box.h)   // it sticks out sideways at rest
+    expect(down.shapes.s_lock.box.h).toBeGreaterThan(down.shapes.s_lock.box.w)   // and hangs down
+    expect(left.shapes.s_lock.box.x).toBeLessThan(down.shapes.s_lock.box.x)
+    expect(behind.shapes.s_lock.box.w).toBeLessThan(down.shapes.s_lock.box.w)    // narrower when it falls behind
+    // each side of it keeps the length it was drawn with
+    const was = adult.shapes.find(x => x.id === 's_lock')!.pts
+    const now = down.shapes.s_lock.local
+    for (const [a, b] of [[0, 1], [1, 2], [5, 4], [4, 3]]) expect(Math.hypot(now[a].x - now[b].x, now[a].y - now[b].y)).toBeCloseTo(Math.hypot(was[a].x - was[b].x, was[a].y - was[b].y), 4)
+    // a preset keeps the side: Windswept swings it to the left, Calm puts it back
+    let state = restState(adult)
+    state = applyPreset(adult, state, adult.presets!.find(p => p.name === 'Windswept')!)
+    expect(state.fall).toBe('left'); expect(state.values.r_fall).toBe(100)
+    state = applyPreset(adult, state, adult.presets!.find(p => p.name === 'Calm')!)
+    expect(state.fall).toBe('down'); expect(state.values.r_fall).toBe(0)
+  })
+
+  it('is finite and valid at every end of every slider, on every side, in both views', () => {
+    for (const view of ['front', 'back'] as const) for (const fall of ['down', 'left', 'right', 'behind'] as const) for (const end of ['min', 'max'] as const) {
+      const values = Object.fromEntries(adult.ranges.map(r => [r.id, r[end]]))
+      const s = solve(adult, values, view, { fall })
+      for (const id of s.order) { expect(s.shapes[id].d).not.toMatch(/NaN|undefined/); expect(Number.isFinite(s.shapes[id].fade)).toBe(true) }
+    }
   })
 
   it('keeps the older published versions simple and valid', () => {

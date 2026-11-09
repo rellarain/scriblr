@@ -1,4 +1,5 @@
-import type { ModelContent, ModelRange, ModelSwatch } from '../../../../../api/types'
+import type { ModelContent, ModelFallSide, ModelRange, ModelSwatch } from '../../../../../api/types'
+import { FALL_SIDES } from '../modelContent'
 import { paletteOf, randomPalette, rollChoices, slotsOf, type SlotChoices } from './colour'
 import { axesFor, classKey, classesOf, formKey, membersOf, presetsOf } from './forms'
 import type { Box } from './geometry'
@@ -34,6 +35,8 @@ export interface PreviewSpec {
   // The form each axis shows ("objectId.axisId" to form id) and the things switched off (empty when the model has none).
   forms: Record<string, string>
   hidden: string[]
+  // The side hanging things fall to in this preview (down when absent).
+  fall?: ModelFallSide
   // The colouring of this preview: its own palette and the colour chosen for each slot (empty when the model has no slots: the figure is gray).
   palette: ModelSwatch[]
   choices: SlotChoices
@@ -59,7 +62,7 @@ function sliderValues(ranges: ModelRange[], mode: PreviewMode, rng: Rng): Record
 
 // The forms and switched-off things for one preview: the stress previews take the first or the last form of every axis; a random one draws a form for each
 // axis and, 60% of the time per kind, one random preset of the kind (which sets sliders and switches things off over the drawn values).
-function looks(c: ModelContent | undefined, mode: PreviewMode, rng: Rng, values: Record<string, number>): Pick<PreviewSpec, 'values' | 'forms' | 'hidden'> {
+function looks(c: ModelContent | undefined, mode: PreviewMode, rng: Rng, values: Record<string, number>): Pick<PreviewSpec, 'values' | 'forms' | 'hidden' | 'fall'> {
   if (!c) return { values, forms: {}, hidden: [] }
   const forms: Record<string, string> = {}
   const pickOf = (n: number) => (mode === 'min' ? 0 : mode === 'max' ? n - 1 : Math.min(n - 1, Math.floor(rng() * n)))
@@ -71,13 +74,15 @@ function looks(c: ModelContent | undefined, mode: PreviewMode, rng: Rng, values:
     const members = membersOf(c, k.id)
     if (k.exclusive && members.length > 0) forms[classKey(k.id)] = members[pickOf(members.length)].id
   }
-  let state: TestState = { values, forms, hidden: [] }
+  let state: TestState = { values, forms, hidden: [], fall: 'down' }
   if (mode === 'rand') {
     // one random preset of each slot (a kind within its scope), 60% of the time
     const slots = new Map<string, ReturnType<typeof presetsOf>>()
     for (const p of presetsOf(c)) { const key = `${p.kind.trim().toLowerCase()}|${p.scope ?? ''}`; slots.set(key, [...(slots.get(key) ?? []), p]) }
     for (const list of slots.values()) if (rng() < 0.6) state = applyPreset(c, state, list[Math.min(list.length - 1, Math.floor(rng() * list.length))])
   }
+  // a model with something that hangs draws a side too (a stress preview takes the first side or the last; nothing is drawn for a model with nothing that hangs)
+  if (c.ranges.some(r => r.drives.some(d => d.kind === 'fall'))) state = { ...state, fall: mode === 'min' ? 'down' : mode === 'max' ? 'behind' : FALL_SIDES[Math.min(FALL_SIDES.length - 1, Math.floor(rng() * FALL_SIDES.length))] }
   return state
 }
 

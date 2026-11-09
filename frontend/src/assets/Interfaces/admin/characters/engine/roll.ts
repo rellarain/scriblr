@@ -1,7 +1,8 @@
-import type { ModelContent, ModelSwatch } from '../../../../../api/types'
+import type { ModelContent, ModelFallSide, ModelSwatch } from '../../../../../api/types'
 import { paintSource, rollChoices, type Rng, type SlotChoices } from './colour'
 import { axesFor, classKey, classesOf, formKey, membersOf, type Choices } from './forms'
 import { descendantsOf } from './rig'
+import { FALL_SIDES } from '../modelContent'
 
 // Rolling the look of the test character: a new colour for every colour slot (a default colour that fits the genre, or a swatch of the palette), a form on every axis
 // and the member of every family that is shown. Things that are LOCKED (an object or a group, and everything in it) are left as they are: their forms and members, and
@@ -32,8 +33,8 @@ export function lockedSlots(c: ModelContent, objects: ReadonlySet<string>): Set<
   return out
 }
 
-export interface RollInput { genre: string | null; locks: readonly string[]; forms: Choices; choices: SlotChoices; palette: ModelSwatch[] }
-export interface RollResult { forms: Choices; choices: SlotChoices }
+export interface RollInput { genre: string | null; locks: readonly string[]; forms: Choices; choices: SlotChoices; palette: ModelSwatch[]; fall?: ModelFallSide }
+export interface RollResult { forms: Choices; choices: SlotChoices; fall: ModelFallSide }
 
 const pick = <T,>(list: T[], rng: Rng): T => list[Math.min(list.length - 1, Math.floor(rng() * list.length))]
 
@@ -52,5 +53,9 @@ export function rollLook(c: ModelContent, rng: Rng, input: RollInput): RollResul
     forms[classKey(k.id)] = pick(members, rng).id
   }
   const choices = rollChoices(c, rng, input.palette, input.choices, { genre: input.genre, keep: lockedSlots(c, locked.objects) })
-  return { forms, choices }
+  // the side things fall to is rolled too, when something in the model hangs and nothing that hangs is locked (drawn last, so a model with nothing that hangs rolls as it did)
+  let fall: ModelFallSide = input.fall ?? 'down'
+  const falling = new Set(c.ranges.flatMap(r => r.drives.filter(d => d.kind === 'fall' && d.shape).map(d => d.shape as string)))
+  if (falling.size > 0 && !c.objects.some(o => locked.objects.has(o.id) && o.shapes.some(sid => falling.has(sid)))) fall = pick(FALL_SIDES, rng)
+  return { forms, choices, fall }
 }
