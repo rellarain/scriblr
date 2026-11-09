@@ -1,7 +1,9 @@
 import type { ReactNode } from 'react'
 import type { ModelContent, ModelLayer, ModelPointMode, ModelShape, ModelView } from '../../../../api/types'
 import { PathIcon, PlusIcon, SlidersIcon, TrashIcon, TreeIcon, UndoIcon } from '../../../icons'
+import { LinksPanel, PairPanel, ViewPanel } from './PairPanels'
 import { Stepper } from './Stepper'
+import type { LinkHow, PairActions, ViewName } from './rigActions'
 import { TemplateMenu } from './TemplateMenu'
 import { activeShape, type Selection } from './designerState'
 import { addPoint, applyTemplate, deletePoint, resetHandles, setMode } from './engine/edit'
@@ -36,6 +38,10 @@ export interface InspectorProps {
   onRename: (sel: Selection, name: string) => void
   onSetLayer: (objectId: string, layer: ModelLayer) => void
   onEditShape: (id: string, next: ModelShape, selectPoint?: number, remember?: boolean) => void
+  // Pairs, point links and the back view: the view being edited, the link being picked on the canvas, and what the panels ask for.
+  view: ViewName
+  linkMode: LinkHow | null
+  pairs: PairActions
 }
 
 const VIEWS: Array<{ id: ModelView; name: string }> = [{ id: 'both', name: 'Front and back' }, { id: 'front', name: 'Front only' }, { id: 'back', name: 'Back only' }]
@@ -104,6 +110,7 @@ function ShapeTab(p: InspectorProps) {
             </select>
           </label>
           <p className="cmInsText">{object.shapes.length} of {LIMITS.shapesPerObjectMax} shapes. The shapes of an object are drawn in the order of the tree, later ones in front.</p>
+          <PairPanel content={content} kind="object" id={object.id} actions={p.pairs} />
         </>
       )}
       {sel.kind === 'group' && group && <p className="cmInsText">{group.objects.length} of {LIMITS.objectsPerGroupMax} objects.</p>}
@@ -120,17 +127,22 @@ function ShapeTab(p: InspectorProps) {
             <span>Opacity</span>
             <span className="cmRange"><input type="range" min={0} max={100} step={5} value={Math.round(shape.op * 100)} aria-label="Opacity of the shape" onChange={e => p.onEditShape(shape.id, { ...shape, op: Number(e.target.value) / 100 })} /><output>{Math.round(shape.op * 100)}%</output></span>
           </label>
-          <div className="cmField">
-            <span>Template</span>
-            <span className="cmInline">
-              <TemplateMenu
-                label="Put a template on the shape" title="Put a template on the shape (replaces its points)"
-                onPick={t => p.onEditShape(shape.id, applyTemplate(shape, t, shapeBox(shape) ?? templateBox(t, 100, 100)), 0)}
-              />
-              <small className="cmInsText">{shape.template ? `Started from ${shape.template}` : 'Freeform'}</small>
-            </span>
-          </div>
-          <PointsSection shape={shape} selPoint={selPoint} mirror={mirror} onSelectPoint={p.onSelectPoint} onEditShape={p.onEditShape} />
+          {!shape.mirrorOf && (
+            <div className="cmField">
+              <span>Template</span>
+              <span className="cmInline">
+                <TemplateMenu
+                  label="Put a template on the shape" title="Put a template on the shape (replaces its points)"
+                  onPick={t => p.onEditShape(shape.id, applyTemplate(shape, t, shapeBox(shape) ?? templateBox(t, 100, 100)), 0)}
+                />
+                <small className="cmInsText">{shape.template ? `Started from ${shape.template}` : 'Freeform'}</small>
+              </span>
+            </div>
+          )}
+          <PairPanel content={content} kind="shape" id={shape.id} actions={p.pairs} />
+          {!shape.mirrorOf && <PointsSection shape={shape} selPoint={selPoint} mirror={mirror} onSelectPoint={p.onSelectPoint} onEditShape={p.onEditShape} />}
+          <LinksPanel content={content} shape={shape} selPoint={selPoint} linkMode={p.linkMode} actions={p.pairs} />
+          <ViewPanel content={content} shape={shape} view={p.view} actions={p.pairs} />
         </>
       )}
     </div>

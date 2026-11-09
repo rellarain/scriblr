@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useRef, useState, type KeyboardEvent } from 'react'
 import type { ModelContent, ModelEntry, ModelLayer, ModelShape } from '../../../../api/types'
 import {
-  CheckIcon, CopyIcon, CursorIcon, ExportIcon, EyeOffIcon, FitIcon, GridLinesIcon, HistoryIcon, PathIcon, RedoIcon, RestoreIcon, RulerIcon, SlidersIcon, SwapIcon, TrashIcon, UndoIcon, ZoomInIcon, ZoomOutIcon,
+  BackIcon, CheckIcon, CopyIcon, CursorIcon, ExportIcon, EyeOffIcon, FitIcon, FrontIcon, GridLinesIcon, HistoryIcon, PathIcon, RedoIcon, RestoreIcon, RulerIcon, SlidersIcon, SwapIcon, TrashIcon, UndoIcon, ZoomInIcon, ZoomOutIcon,
 } from '../../../icons'
 import { AssetTree, type TreeActions, type TreeMode } from './AssetTree'
 import { CheckPanel } from './CheckPanel'
@@ -23,11 +23,12 @@ import {
   setAxis, setDriveAxis, setPivot, setShow, stepBendEdge, stepBound, stepDrive, type Edit,
 } from './engine/rigEdit'
 import { templateBox, templateById } from './engine/templates'
-import type { NewSliderKind, Recording, RigActions } from './rigActions'
+import { breakPair, clearLinksTo, linkToEdge, linkToPoint, makeTwin, moveInOrder, setBack, setLoose, stepLink, unlinkPoint } from './engine/pairEdit'
+import type { LinkHow, NewSliderKind, PairActions, Recording, RigActions, ViewName } from './rigActions'
 import { groupOfSelection, offRest, scrubValue } from './rigView'
 import {
   NAME_MAX, addGroup, addObject, addShape, duplicateShape, freshId, groupOfObject, moveBefore, moveObjectWithin, moveShapeWithin, newGroup, objectById, objectOfShape, publishFaults, removeGroup, removeObject,
-  removeShape, renameGroup, renameObject, renameShape, shapeById, updateShape, type MakeId,
+  outlineSize, removeShape, renameGroup, renameObject, renameShape, shapeById, twinsOf, updateShape, type MakeId,
 } from './modelContent'
 import type { CharacterModels } from './useCharacterModels'
 
@@ -86,6 +87,8 @@ export function ModelPane({ entry, models, makeId, onRemove, onDuplicate, onExpo
   const [values, setValues] = useState<Values>({})
   const [recording, setRecording] = useState<RecordingState | null>(null)
   const [pickOn, setPickOn] = useState(false)
+  const [view, setView] = useState<ViewName>('front')
+  const [linkMode, setLinkMode] = useState<LinkHow | null>(null)
   const [rangeFilter, setRangeFilter] = useState<'selection' | 'all'>('selection')
   const [scrubbing, setScrubbing] = useState<string | null>(null)
   const historyRef = useRef(history)
@@ -99,12 +102,18 @@ export function ModelPane({ entry, models, makeId, onRemove, onDuplicate, onExpo
 
   // while a shape is recorded the canvas shows the copy being dragged, with every slider at rest
   const shown = useMemo(() => (recording ? updateShape(content, recording.shapeId, () => recording.draft) : content), [content, recording])
-  const solved = useMemo(() => solve(shown, recording ? {} : values), [shown, values, recording])
+  const solved = useMemo(() => solve(shown, recording ? {} : values, view), [shown, values, recording, view])
   const group = groupOfSelection(content, sel)
   const away = offRest(content, values)
   const selShape = sel.kind === 'shape' ? shapeById(content, sel.id) : undefined
   const pointDriven = !!selShape && !recording && isPointDriven(content, values, selShape.id)
-  const editable = !!selShape && !pointDriven
+  const editable = !!selShape && !pointDriven && !selShape.mirrorOf
+  // What the canvas draws and edits for the selected shape: the points as the rig puts them (links resolved), in the view being edited. A twin is shown the same
+  // way, but not edited.
+  const canvasContent = useMemo(() => {
+    const r = selShape ? solved.shapes[selShape.id] : undefined
+    return selShape && r && r.local.length >= 3 ? updateShape(shown, selShape.id, sh => ({ ...sh, pts: r.local })) : shown
+  }, [shown, solved, selShape])
 
   // ---- applying changes ----
 
@@ -121,10 +130,11 @@ export function ModelPane({ entry, models, makeId, onRemove, onDuplicate, onExpo
     if (e.note) setNote(e.note)
     return true
   }
-  // A change in the middle of a drag: no undo step of its own (onGesture made it).
+  // A change in the middle of a drag: no undo step of its own (onGesture made it). The canvas hands back the shape as it is drawn: in the front view its
+  // points go back into `pts`, in the back view into the outline of its own for the back.
   function live(id: string, next: ModelShape) {
     if (recording) { setRecording(r => (r ? { ...r, draft: next } : r)); return }
-    models.edit(entry.id, c => updateShape(c, id, () => next), false)
+    models.edit(entry.id, c => updateShape(c, id, sh => (view === 'back' ? { ...next, pts: sh.pts, back: next.pts } : next)), false)
   }
   function editShape(id: string, next: ModelShape, point?: number) {
     if (recording) {
@@ -133,12 +143,29 @@ export function ModelPane({ entry, models, makeId, onRemove, onDuplicate, onExpo
       if (point !== undefined) setSelPoint(point)
       return
     }
-    // points recorded by number cannot survive a change in how many there are
     const old = shapeById(content, id)
-    let base = content, cleared: string[] = []
-    if (old && old.pts.length !== next.pts.length) { const r = clearPointMoves(content, id); base = r.content; cleared = r.cleared }
+    if (!old) return
+    // a change of the shape's settings (view, opacity, template name) leaves its points as they are stored
+    if (JSON.stringify(next.pts) === JSON.stringify(solved.shapes[id]?.local ?? old.pts)) {
+      commit(updateShape(content, id, () => ({ ...next, pts: old.pts })))
+      if (point !== undefined) setSelPoint(point)
+      return
+    }
+    if (view === 'back') {
+      commit(updateShape(content, id, () => ({ ...next, pts: old.pts, back: next.pts })))
+      if (point !== undefined) setSelPoint(point)
+      return
+    }
+    // points recorded or linked by number cannot survive a change in how many there are
+    let base = content, cleared: string[] = [], cut: string[] = []
+    if (old.pts.length !== next.pts.length) {
+      const r = clearPointMoves(content, id)
+      const l = clearLinksTo(r.content, id)
+      base = l.content; cleared = r.cleared; cut = l.cut
+    }
     commit(updateShape(base, id, () => next))
     if (cleared.length) setNote(`The recorded point moves of ${cleared.join(', ')} were cleared because the shape's points changed. Record them again.`)
+    else if (cut.length) setNote(`The links of ${cut.join(', ')} to this shape were cut because its points changed. Link them again.`)
     if (point !== undefined) setSelPoint(point)
   }
   function undo() {
@@ -164,7 +191,7 @@ export function ModelPane({ entry, models, makeId, onRemove, onDuplicate, onExpo
 
   function choose(next: Selection) {
     if (recording) return
-    setSel(next); setSelPoint(0); setMode('points'); setPickOn(false)
+    setSel(next); setSelPoint(0); setMode('points'); setPickOn(false); setLinkMode(null)
   }
 
   // ---- the sliders' test values ----
@@ -198,6 +225,8 @@ export function ModelPane({ entry, models, makeId, onRemove, onDuplicate, onExpo
   function startRecording(rangeId: string, shapeId: string, end: 'max' | 'min') {
     const s = shapeById(content, shapeId)
     if (!s) return
+    if (s.mirrorOf) { setNote('A twin follows its original: record the original instead, or break the pair.'); return }
+    setView('front'); setLinkMode(null)
     setValues({}); setScrubbing(null); setPickOn(false); setDrawer(true); setTab('ranges')
     setSel({ kind: 'shape', id: shapeId }); setSelPoint(0); setMode('points')
     setRecording({ rangeId, shapeId, end, draft: { ...s, pts: s.pts.map(p => ({ ...p })) } })
@@ -221,6 +250,7 @@ export function ModelPane({ entry, models, makeId, onRemove, onDuplicate, onExpo
       return
     }
     if (!selShape) { setNote('Select a shape first.'); return }
+    if (selShape.mirrorOf) { setNote('A twin follows its original: use the original, or break the pair.'); return }
     const name = selShape.name.trim() || 'the shape'
     const start = addRange(content, newRange(id, sliderName(content, kind === 'points' ? `${name} shape` : `${name} bend`), kind, selShape.id))
     if (!start.ok) { setNote(start.reason); return }
@@ -276,6 +306,33 @@ export function ModelPane({ entry, models, makeId, onRemove, onDuplicate, onExpo
     openSlider: () => { setTab('ranges'); setRangeFilter('selection') },
   }
 
+  // ---- pairs, links and the back view ----
+
+  const pairs: PairActions = {
+    select: choose,
+    makeTwin: (kind, id) => { applyEdit(makeTwin(content, kind, id, makeId)) },
+    breakPair: (kind, id) => { applyEdit(breakPair(content, kind, id)) },
+    startLink: how => {
+      if (!selShape || selShape.mirrorOf) return
+      if (view === 'back') { setNote('Link points in the front view: a link works in both views.'); return }
+      setPickOn(false); setMode('points'); setLinkMode(how)
+    },
+    stopLink: () => setLinkMode(null),
+    unlink: (shapeId, index) => commit(unlinkPoint(content, shapeId, index), true),
+    stepLink: (shapeId, index, field, dir, big) => commit(stepLink(content, shapeId, index, field, dir, big), true),
+    setLoose: (shapeId, rangeId) => { applyEdit(setLoose(content, [shapeId], rangeId)) },
+    makeLoose: shapeId => {
+      const sh = shapeById(content, shapeId)
+      if (!sh) return
+      const id = freshId(content, 'r', makeId)
+      const made = addRange(content, { ...newRange(id, sliderName(content, `${sh.name.trim() || 'Shape'} fit`), 'scale', shapeId), min: 0, rest: 100, max: 200, unit: '%' })
+      if (!made.ok) { setNote(made.reason); return }
+      applyEdit(setLoose(made.content, [shapeId], id))
+    },
+    useFront: shapeId => { applyEdit(setBack(content, shapeId, null)) },
+    moveInOrder: (shapeId, dir) => { applyEdit(moveInOrder(content, shapeId, view, dir)) },
+  }
+
   // ---- the tree's actions ----
 
   // The group a new object goes into: the selection's group, else the first group, else a new one (returned with its content).
@@ -318,6 +375,7 @@ export function ModelPane({ entry, models, makeId, onRemove, onDuplicate, onExpo
     },
     onAddShape: (objectId, t) => addShapeTo(objectId, t, content),
     onDuplicateShape: id => {
+      if (shapeById(content, id)?.mirrorOf) { setNote('A twin has no outline of its own to copy: break the pair first, or copy the original.'); return }
       const owner = objectOfShape(content, id)
       if (owner && owner.shapes.length >= LIMITS.shapesPerObjectMax) { setNote(`An object may have at most ${LIMITS.shapesPerObjectMax} shapes.`); return }
       const copyId = freshId(content, 's', makeId)
@@ -325,8 +383,10 @@ export function ModelPane({ entry, models, makeId, onRemove, onDuplicate, onExpo
       choose({ kind: 'shape', id: copyId })
     },
     onDelete: s => {
+      const twins = twinsOf(content, s.kind === 'none' ? 'shape' : s.kind, s.kind === 'none' ? '' : s.id).length
       commit(s.kind === 'shape' ? removeShape(content, s.id) : s.kind === 'object' ? removeObject(content, s.id) : removeGroup(content, s.id), true)
       setSel(NONE)
+      if (twins) setNote('Its twin went with it.')
     },
     onMoveShape: (objectId, shapeId, dir) => {
       const list = objectById(content, objectId)?.shapes ?? []
@@ -356,14 +416,16 @@ export function ModelPane({ entry, models, makeId, onRemove, onDuplicate, onExpo
     const p = solved.pivots[group.id]
     if (!p) return null
     const [x, y] = apply(solved.global, p[0], p[1])
-    return { groupId: group.id, name: group.name.trim() || 'the group', x, y, draggable: atRest }
+    return { groupId: group.id, name: group.name.trim() || 'the group', x, y, draggable: atRest && !group.mirrorOf }
   })()
   const anchorSpot = (() => {
     const a = group ? solved.anchors[group.id] : null
     return a ? apply(solved.global, a[0], a[1]) : null
   })()
-  const ancestorShapes = group?.parent ? content.shapes.filter(s => { const home = groupOfShape(content, s.id); return !!home && chainOf(content, group.parent!).includes(home) && s.pts.length >= 3 }) : []
-  const pick = pickOn && group?.attach ? { shapes: ancestorShapes.map(s => s.id) } : null
+  const ancestorShapes = group?.parent ? content.shapes.filter(s => { const home = groupOfShape(content, s.id); return !!home && chainOf(content, group.parent!).includes(home) && outlineSize(content, s) >= 3 }) : []
+  // linking a point: any other shape with an outline can be clicked; picking an anchor: the shapes of the parent and above
+  const linkPick = linkMode && selShape && !selShape.mirrorOf ? { shapes: content.shapes.filter(s => s.id !== selShape.id && outlineSize(content, s) >= 3 && !!solved.shapes[s.id]?.d).map(s => s.id) } : null
+  const pick = linkPick ?? (pickOn && group?.attach ? { shapes: ancestorShapes.map(s => s.id) } : null)
 
   // Dragging the pivot of a group: an unanchored one moves to the pointer (read back into the group's own space); an anchored one is fixed again at the
   // nearest place of the same kind on its shape.
@@ -398,13 +460,29 @@ export function ModelPane({ entry, models, makeId, onRemove, onDuplicate, onExpo
     const p = group.pivot ?? restPivot(content, group)
     commit(setPivot(content, group.id, p[0] + dx, p[1] + dy))
   }
+  // The arrow keys on a linked point adjust the link: along the edge (or across, for a follow) with left and right, outward (or down) with up and down.
+  function nudgeLink(dx: number, dy: number) {
+    const b = selShape?.pts[selPoint]?.bind
+    if (!selShape || !b) return
+    const sideways = Math.abs(dx) >= Math.abs(dy), dir = (sideways ? dx : dy) < 0 ? -1 : 1, big = Math.abs(dx) + Math.abs(dy) > 1
+    commit(stepLink(content, selShape.id, selPoint, b.kind === 'edge' ? (sideways ? 't' : 'o') : sideways ? 'dx' : 'dy', dir, big))
+  }
   function onPick(shapeId: string, wx: number, wy: number) {
+    if (linkMode && selShape) {
+      const [x, y] = apply(inverse(solved.global), wx, wy)
+      const e = linkMode === 'edge' ? linkToEdge(content, selShape.id, selPoint, shapeId, x, y) : linkToPoint(content, selShape.id, selPoint, shapeId, x, y, linkMode)
+      if (applyEdit(e)) setLinkMode(null)
+      return
+    }
     if (!group?.attach) return
     const att = attachFromClick(solved, group.attach.kind, shapeId, wx, wy, group.attach.slider)
     if (att && applyEdit(attachGroup(content, group.id, att))) setPickOn(false)
   }
 
   const stageNote = recording ? 'Recording: drag the points, then press Set in the Ranges tab.'
+    : linkMode ? `Click the shape to link point ${selPoint + 1} to. Escape stops.`
+    : selShape?.mirrorOf ? `This is the twin of ${shapeById(content, selShape.mirrorOf)?.name.trim() || 'another shape'}: it mirrors it. Edit the original, or break the pair.`
+    : selShape && view === 'back' ? 'Back view: a shape shows its front outline from behind until you edit its points here; then it has an outline of its own for the back.'
     : selShape && pointDriven ? 'A slider changes this shape\'s points and is away from rest: set the sliders back to rest to edit it.'
     : selShape ? (mode === 'points' ? 'Point editor: drag a point or a handle; double-click an edge to add a point.' : 'Move shape: drag the shape.')
     : sel.kind === 'none' ? 'Nothing is selected: this is the end result.' : 'Pick a shape in the tree to edit its points.'
@@ -455,6 +533,9 @@ export function ModelPane({ entry, models, makeId, onRemove, onDuplicate, onExpo
               <button type="button" className={`cmIconBtn${snap ? ' cmIconBtn--on' : ''}`} aria-label="Snap" title="Snap to half units and the mirror line" aria-pressed={snap} onClick={() => setSnap(s => !s)}><RulerIcon size={14} /></button>
               <button type="button" className={`cmIconBtn${grid ? ' cmIconBtn--on' : ''}`} aria-label="Grid" title="Grid" aria-pressed={grid} onClick={() => setGrid(g => !g)}><GridLinesIcon size={14} /></button>
               <span className="cmSep" aria-hidden="true" />
+              <button type="button" className={`cmIconBtn${view === 'front' ? ' cmIconBtn--on' : ''}`} aria-label="Front view" title="Front view" aria-pressed={view === 'front'} disabled={!!recording} onClick={() => { setView('front') }}><FrontIcon size={14} /></button>
+              <button type="button" className={`cmIconBtn${view === 'back' ? ' cmIconBtn--on' : ''}`} aria-label="Back view" title="Back view: the figure turned round" aria-pressed={view === 'back'} disabled={!!recording} onClick={() => { setView('back'); setLinkMode(null) }}><BackIcon size={14} /></button>
+              <span className="cmSep" aria-hidden="true" />
               <button type="button" className="cmIconBtn" aria-label="Zoom in" title="Zoom in" onClick={() => setZoom(z => Math.min(8, z * 1.25))}><ZoomInIcon size={14} /></button>
               <button type="button" className="cmIconBtn" aria-label="Zoom out" title="Zoom out" onClick={() => setZoom(z => Math.max(0.25, z / 1.25))}><ZoomOutIcon size={14} /></button>
               <button type="button" className={`cmIconBtn${fitAll ? ' cmIconBtn--on' : ''}`} aria-label="Fit the whole figure" title="Fit the whole figure" aria-pressed={fitAll} onClick={() => { setFitAll(f => !f); setZoom(1) }}><FitIcon size={14} /></button>
@@ -468,8 +549,9 @@ export function ModelPane({ entry, models, makeId, onRemove, onDuplicate, onExpo
             </div>
             {empty && <p className="cmHint">No shape yet. Use New shape to start from a template, or the + beside a layer in the tree.</p>}
             <DesignerCanvas
-              content={shown} solved={solved} sel={sel} mode={mode} selPoint={selPoint} mirror={mirror} snap={snap} grid={grid} zoom={zoom} fitAll={fitAll} axis={content.axis}
-              editable={editable || (!!recording && !!selShape)} pivot={pivot} anchor={anchorSpot} pick={pick} onPick={onPick} onPivot={movePivot} onPivotNudge={nudgePivot}
+              content={canvasContent} solved={solved} sel={sel} mode={mode} selPoint={selPoint} mirror={mirror} snap={snap} grid={grid} zoom={zoom} fitAll={fitAll} axis={content.axis}
+              editable={editable || (!!recording && !!selShape)} pivot={pivot} anchor={anchorSpot} pick={pick} onPick={onPick}
+              linked={selShape ? selShape.pts.flatMap((pt, i) => (pt.bind ? [i] : [])) : []} onNudgeLink={nudgeLink} onPivot={movePivot} onPivotNudge={nudgePivot}
               onSelect={choose} onSelectPoint={setSelPoint}
               onGesture={() => { if (!recording) setHistory(h => remember(h, content)) }}
               onShape={live} onEditShape={editShape}
@@ -478,24 +560,24 @@ export function ModelPane({ entry, models, makeId, onRemove, onDuplicate, onExpo
                 const next = t.kind === 'grid' ? rightClickGrid() : rightClickShape(sel, mode, t.id)
                 setSel(next.sel); setMode(next.mode); if (t.kind === 'shape' && next.sel.kind === 'shape' && next.sel.id !== (sel.kind === 'shape' ? sel.id : '')) setSelPoint(0)
               }}
-              onEscape={() => { if (pickOn) setPickOn(false); else if (!recording) setSel(NONE) }}
+              onEscape={() => { if (linkMode) setLinkMode(null); else if (pickOn) setPickOn(false); else if (!recording) setSel(NONE) }}
             />
             <p className="cmStageNote" aria-live="polite">{stageNote}</p>
           </div>
           {drawer && (
             <Inspector
-              content={content} sel={sel} selPoint={selPoint} mirror={mirror} onSelectPoint={setSelPoint}
+              content={canvasContent} sel={sel} view={view} linkMode={linkMode} pairs={pairs} selPoint={selPoint} mirror={mirror} onSelectPoint={setSelPoint}
               onRename={(s, name) => models.edit(entry.id, c => (s.kind === 'shape' ? renameShape(c, s.id, name) : s.kind === 'object' ? renameObject(c, s.id, name) : renameGroup(c, s.id, name)), false)}
               onSetLayer={(id, layer) => commit({ ...content, objects: content.objects.map(o => (o.id === id ? { ...o, layer } : o)) })}
               onEditShape={editShape}
               tab={tab} onTab={setTab}
               onAxis={(dir, big) => commit(setAxis(content, content.axis + dir * (big ? 5 : 1)), true)}
-              rigTab={<RigTab content={content} group={group} picking={pickOn} actions={rigActions} />}
+              rigTab={<RigTab content={content} group={group} picking={pickOn} actions={rigActions} pairs={pairs} />}
               rangesTab={<RangesTab content={content} sel={sel} group={group} values={values} recording={recording} scrubbing={scrubbing} filter={rangeFilter} onFilter={setRangeFilter} actions={rigActions} />}
             />
           )}
         </div>
-        <PreviewStrip content={content} sel={sel} />
+        <PreviewStrip content={content} sel={sel} view={view} />
         <CheckPanel content={content} />
       </fieldset>
     </div>

@@ -17,6 +17,13 @@ export const LIMITS = {
   rangesMax: 80,
   drivesWarn: 12,
   drivesMax: 24,
+  // point links (a point welded to, following or locked to the edge of another shape), counted over the whole model; more than the most is refused at Publish
+  linksWarn: 100,
+  linksMax: 200,
+  // how many of each a model may hold (the server's caps)
+  shapesMax: 600,
+  objectsMax: 200,
+  groupsMax: 60,
 } as const
 
 export type LimitLevel = 'ok' | 'warn' | 'stop'
@@ -32,6 +39,9 @@ export const canAddPoint = (shape: Pick<ModelShape, 'pts'>): boolean => shape.pt
 export function copyBytes(content: ModelContent): number {
   return new TextEncoder().encode(JSON.stringify(content)).length
 }
+
+// How many point links the model has (every point of every shape that is linked to another shape).
+export const linkCount = (content: ModelContent): number => content.shapes.reduce((n, s) => n + s.pts.filter(p => p.bind).length, 0)
 
 export interface LimitNote { level: 'warn' | 'stop'; text: string }
 
@@ -56,6 +66,8 @@ export function limitNotes(content: ModelContent): LimitNote[] {
     const name = r.name || r.id
     add(level(r.drives.length, LIMITS.drivesWarn, LIMITS.drivesMax), `${name} drives ${r.drives.length} things: the warning starts above ${LIMITS.drivesWarn}.`, `${name} drives ${r.drives.length} things: the limit is ${LIMITS.drivesMax}.`)
   }
+  const links = linkCount(content)
+  if (links > LIMITS.linksWarn) notes.push({ level: links > LIMITS.linksMax ? 'stop' : 'warn', text: links > LIMITS.linksMax ? `The model has ${links} point links: the limit is ${LIMITS.linksMax}, so it cannot be published.` : `The model has ${links} point links: the warning starts above ${LIMITS.linksWarn}.` })
   for (const g of content.groups) {
     const depth = chainDepth(content, g.id), name = g.name || g.id
     if (depth > LIMITS.chainMax) notes.push({ level: 'stop', text: `${name} is ${depth} levels deep: a pivot chain may have at most ${LIMITS.chainMax}, so it cannot be published.` })

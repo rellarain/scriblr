@@ -2,8 +2,10 @@ import type { ModelAnchorKind, ModelAttach, ModelContent, ModelGroup } from '../
 import { LIMITS } from './engine/limits'
 import { chainDepth, chainOf, descendantsOf } from './engine/rig'
 import { groupOfShape } from './engine/rigEdit'
+import { PairPanel } from './PairPanels'
 import { Stepper } from './Stepper'
-import type { RigActions } from './rigActions'
+import type { PairActions, RigActions } from './rigActions'
+import { outlineSize } from './modelContent'
 import { rangesMovingGroup } from './rigView'
 
 // The Rig tab: where the selected group hangs (its chain of parents and pivots), what it is fixed to on its parent (the four kinds of anchor), and which
@@ -18,7 +20,7 @@ const KINDS: Array<{ id: ModelAnchorKind | 'none'; name: string; hint: string }>
 const name = (g: { name: string; id: string }) => g.name.trim() || 'Untitled group'
 const f1 = (n: number) => Math.round(n * 10) / 10
 
-export function RigTab({ content, group, picking, actions }: { content: ModelContent; group: ModelGroup | undefined; picking: boolean; actions: RigActions }) {
+export function RigTab({ content, group, picking, actions, pairs }: { content: ModelContent; group: ModelGroup | undefined; picking: boolean; actions: RigActions; pairs: PairActions }) {
   if (!group) {
     return (
       <div className="cmTabBody">
@@ -32,7 +34,7 @@ export function RigTab({ content, group, picking, actions }: { content: ModelCon
   const att = group.attach
   // the shapes it can be fixed to: those of its parent and the groups above
   const ancestors = group.parent ? chainOf(content, group.parent) : []
-  const targets = content.shapes.filter(s => { const home = groupOfShape(content, s.id); return !!home && ancestors.includes(home) && s.pts.length >= 3 })
+  const targets = content.shapes.filter(s => { const home = groupOfShape(content, s.id); return !!home && ancestors.includes(home) && outlineSize(content, s) >= 3 })
   const target = att ? content.shapes.find(s => s.id === att.shape) : undefined
   const moving = rangesMovingGroup(content, group.id)
 
@@ -71,12 +73,19 @@ export function RigTab({ content, group, picking, actions }: { content: ModelCon
             {parents.map(g => <option key={g.id} value={g.id}>{name(g)}</option>)}
           </select>
         </label>
-        <p className="cmInsText">{group.pivot ? `Pivot at x ${f1(group.pivot[0])}, y ${f1(group.pivot[1])}.` : 'No pivot yet: it will be the middle of the group.'} Everything in the group turns about it.</p>
-        <div className="cmInline">
-          <button type="button" className="cmBtn cmBtn--small" onClick={() => actions.centerPivot(group.id)}>Put it in the middle of the group</button>
-        </div>
-        <p className="cmInsText">The cross on the canvas is the pivot: drag it, or focus it and press the arrow keys.</p>
+        {group.mirrorOf && <p className="cmInsText">A twin has no pivot or anchor of its own: it does what its original does, mirrored, from where its own parent stands.</p>}
+        {!group.mirrorOf && <p className="cmInsText">{group.pivot ? `Pivot at x ${f1(group.pivot[0])}, y ${f1(group.pivot[1])}.` : 'No pivot yet: it will be the middle of the group.'} Everything in the group turns about it.</p>}
+        {!group.mirrorOf && (
+          <>
+            <div className="cmInline">
+              <button type="button" className="cmBtn cmBtn--small" onClick={() => actions.centerPivot(group.id)}>Put it in the middle of the group</button>
+            </div>
+            <p className="cmInsText">The cross on the canvas is the pivot: drag it, or focus it and press the arrow keys.</p>
+          </>
+        )}
       </section>
+      <PairPanel content={content} kind="group" id={group.id} actions={pairs} />
+      {group.mirrorOf ? null : <>
 
       <section className="cmSec" aria-label="Attached to a shape">
         <h3 className="cmInsSub">Attached to a shape</h3>
@@ -145,6 +154,7 @@ export function RigTab({ content, group, picking, actions }: { content: ModelCon
           </ul>
         )}
       </section>
+      </>}
     </div>
   )
 }

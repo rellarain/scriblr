@@ -44,7 +44,10 @@ export interface CanvasProps {
   editable?: boolean
   pivot?: PivotMarker | null
   anchor?: [number, number] | null
-  // Clicking one of these shapes picks an anchor instead of selecting it.
+  // The points of the selected shape that are linked to another shape: they are not dragged (the arrow keys adjust the link instead).
+  linked?: number[]
+  onNudgeLink?: (dx: number, dy: number) => void
+  // Clicking one of these shapes picks an anchor (or what to link a point to) instead of selecting it.
   pick?: { shapes: string[] } | null
   onPick?: (shapeId: string, x: number, y: number) => void
   onPivot?: (x: number, y: number) => void
@@ -93,6 +96,7 @@ export function DesignerCanvas(p: CanvasProps) {
   const overlay = !!shape && !!solvedShape?.visible && shape.pts.length >= 3
   const shapesById = new Map(content.shapes.map(s => [s.id, s]))
   const picking = new Set(p.pick?.shapes ?? [])
+  const linkedSet = new Set(p.linked ?? [])
 
   function rect() {
     const r = svgRef.current?.getBoundingClientRect()
@@ -140,7 +144,7 @@ export function DesignerCanvas(p: CanvasProps) {
     e.stopPropagation()
     if (!shape || e.button !== 0) return
     p.onSelectPoint(i)
-    if (!editable) return
+    if (!editable || linkedSet.has(i)) return
     p.onGesture()
     dragRef.current = { kind: 'point', shapeId: shape.id, index: i }
     capture(e)
@@ -200,7 +204,10 @@ export function DesignerCanvas(p: CanvasProps) {
     if (!shape || !editable) return
     const step = e.shiftKey ? 5 : 0.5
     const d: Record<string, [number, number]> = { ArrowLeft: [-step, 0], ArrowRight: [step, 0], ArrowUp: [0, -step], ArrowDown: [0, step] }
-    if (d[e.key]) {
+    if (d[e.key] && mode === 'points' && linkedSet.has(selPoint)) {
+      e.preventDefault()
+      p.onNudgeLink?.(d[e.key][0], d[e.key][1])
+    } else if (d[e.key]) {
       e.preventDefault()
       p.onEditShape(shape.id, mode === 'move' ? moveShape(shape, d[e.key][0], d[e.key][1]) : nudgePoint(shape, selPoint, d[e.key][0], d[e.key][1], { mirror, axis }), undefined)
     } else if ((e.key === 'Delete' || e.key === 'Backspace') && mode === 'points') {
@@ -246,7 +253,7 @@ export function DesignerCanvas(p: CanvasProps) {
         return (
           <path
             key={id} d={r.d} data-shape={id}
-            className={`cmShape${focusIds.has(id) ? ' cmShape--on' : ''}${!none && focusIds.size > 0 && !focusIds.has(id) ? ' cmShape--dim' : ''}${sel.kind === 'shape' && sel.id === id ? ' cmShape--sel' : ''}${pickable ? ' cmShape--pick' : ''}${p.pick && !pickable ? ' cmShape--off' : ''}`}
+            className={`cmShape${focusIds.has(id) ? ' cmShape--on' : ''}${!none && focusIds.size > 0 && !focusIds.has(id) ? ' cmShape--dim' : ''}${sel.kind === 'shape' && sel.id === id ? ' cmShape--sel' : ''}${pickable ? ' cmShape--pick' : ''}${p.pick && !pickable ? ' cmShape--off' : ''}${s.mirrorOf ? ' cmShape--twin' : ''}`}
             fillOpacity={s.op}
             onPointerDown={e => onShapeDown(e, id)} onDoubleClick={e => onDouble(e, s)}
           />
@@ -260,8 +267,8 @@ export function DesignerCanvas(p: CanvasProps) {
       )}
       {overlay && mode === 'points' && built.map((b, i) => (
         <circle
-          key={i} cx={b.x} cy={b.y} r={(i === selPoint ? 5.5 : 4) * u} role="button" tabIndex={-1} aria-label={`Point ${i + 1}`} aria-pressed={i === selPoint}
-          className={`cmPoint${i === selPoint ? ' cmPoint--sel' : ''}${shape!.pts[i].m === 's' ? ' cmPoint--sharp' : ''}${editable ? '' : ' cmPoint--off'}`}
+          key={i} cx={b.x} cy={b.y} r={(i === selPoint ? 5.5 : 4) * u} role="button" tabIndex={-1} aria-label={linkedSet.has(i) ? `Point ${i + 1}, linked` : `Point ${i + 1}`} aria-pressed={i === selPoint}
+          className={`cmPoint${i === selPoint ? ' cmPoint--sel' : ''}${shape!.pts[i].m === 's' ? ' cmPoint--sharp' : ''}${editable ? '' : ' cmPoint--off'}${linkedSet.has(i) ? ' cmPoint--linked' : ''}`}
           onPointerDown={e => onPointDown(e, i)}
         />
       ))}

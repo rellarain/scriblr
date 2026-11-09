@@ -32,7 +32,7 @@ describe('the model types match the backend schema', () => {
   const pairs: Array<[python: string, ts: string]> = [
     ['ModelPoint', 'ModelPoint'], ['ModelShape', 'ModelShape'], ['ModelObject', 'ModelObject'], ['ModelGroup', 'ModelGroup'],
     ['ModelContent', 'ModelContent'], ['PublishedModel', 'PublishedModel'], ['ModelEntry', 'ModelEntry'], ['ModelCatalog', 'ModelCatalog'],
-    ['ModelAttach', 'ModelAttach'], ['ModelMove', 'ModelMove'], ['ModelDrive', 'ModelDrive'], ['ModelRange', 'ModelRange'],
+    ['ModelAttach', 'ModelAttach'], ['ModelMove', 'ModelMove'], ['ModelDrive', 'ModelDrive'], ['ModelRange', 'ModelRange'], ['ModelBind', 'ModelBind'],
   ]
   for (const [python, ts] of pairs) {
     it(`${ts} has the fields of ${python}`, () => {
@@ -49,7 +49,7 @@ describe('the model types match the backend schema', () => {
     expect(union('ModelLayer')).toEqual(literal('ModelLayer'))
     expect(union('ModelView')).toEqual(literal('ModelView'))
     expect(union('ModelPointMode').length).toBe(4)
-    for (const alias of ['ModelAnchorKind', 'ModelRangeUnit', 'ModelDriveKind', 'ModelScaleTarget', 'ModelScaleAxis']) {
+    for (const alias of ['ModelAnchorKind', 'ModelRangeUnit', 'ModelDriveKind', 'ModelScaleTarget', 'ModelScaleAxis', 'ModelBindKind']) {
       expect(union(alias), alias).toEqual(literal(alias))
       expect(union(alias).length, alias).toBeGreaterThan(1)
     }
@@ -79,6 +79,13 @@ describe('the limits are the backend\'s numbers', () => {
     expect(LIMITS.drivesWarn).toBe(number('MODEL_DRIVES_WARN'))
     expect(LIMITS.drivesMax).toBe(number('MODEL_DRIVES_MAX'))
     expect(RANGE_NAME_MAX).toBe(number('MODEL_RANGE_NAME_MAX'))
+  })
+  it('for point links and how many shapes, objects and groups a model holds', () => {
+    expect(LIMITS.linksWarn).toBe(number('MODEL_LINKS_WARN'))
+    expect(LIMITS.linksMax).toBe(number('MODEL_LINKS_MAX'))
+    expect(LIMITS.shapesMax).toBe(number('MODEL_MAX_SHAPES'))
+    expect(LIMITS.objectsMax).toBe(number('MODEL_MAX_OBJECTS'))
+    expect(LIMITS.groupsMax).toBe(number('MODEL_MAX_GROUPS'))
   })
   it('for the mirror line', () => {
     const m = /MODEL_AXIS_RANGE\s*=\s*\(([-\d.]+),\s*([-\d.]+)\)/.exec(schema)

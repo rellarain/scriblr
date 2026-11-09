@@ -1197,6 +1197,8 @@ MODEL_DRIVES_WARN = 12
 MODEL_DRIVES_MAX = 24
 MODEL_RANGE_NAME_MAX = 40
 MODEL_AXIS_RANGE = (40.0, 160.0)   # the line a model mirrors about (the middle of the 0..200 space by default)
+MODEL_LINKS_WARN = 100   # point links (a point welded to, following, or locked to the edge of another shape): counted over the whole model
+MODEL_LINKS_MAX = 200    # more than this is a publish fault
 _MODEL_ID = r"^[A-Za-z0-9_.-]{1,80}$"
 ModelPointMode = Literal["c", "s", "cs", "sc"]
 ModelLayer = Literal["body", "clothing", "hair"]
@@ -1206,6 +1208,7 @@ ModelRangeUnit = Literal["", "°", "%"]
 ModelDriveKind = Literal["turn", "scale", "points", "bend"]
 ModelScaleTarget = Literal["group", "shape", "model"]
 ModelScaleAxis = Literal["xy", "x", "y"]
+ModelBindKind = Literal["point", "edge"]
 
 
 def _keep_valid(cls: Any, value: Any) -> list[Any]:
@@ -1230,9 +1233,50 @@ def _optional_id(value: Any) -> Optional[str]:
     return value if isinstance(value, str) and re.fullmatch(_MODEL_ID, value) else None
 
 
+class ModelBind(BaseModel):
+    """A point link, kept on the point that follows. `kind` "point": the point sits on point `i` of shape `s` plus the offset `d` (a weld has none); kind
+    "edge": it sits at `t` (0..1) along the edge from point `e` of shape `s`, `o` units outward (a clothes point locked to the edge of a body part). A
+    link is solved when the model is drawn, so the point never has to be kept in step by hand."""
+
+    kind: ModelBindKind = "point"
+    s: str = Field(pattern=_MODEL_ID)
+    i: int = 0
+    d: list[float] = Field(default_factory=lambda: [0.0, 0.0])
+    e: int = 0
+    t: float = 0.0
+    o: float = 0.0
+
+    @field_validator("kind", mode="before")
+    @classmethod
+    def _kind(cls, value: Any) -> Any:
+        return value if value in ("point", "edge") else "point"
+
+    @field_validator("i", "e", mode="before")
+    @classmethod
+    def _index(cls, value: Any) -> int:
+        return int(_finite(value, 0.0, 0.0, float(MODEL_POINTS_MAX - 1)))
+
+    @field_validator("d", mode="before")
+    @classmethod
+    def _offset(cls, value: Any) -> list[float]:
+        if not isinstance(value, (list, tuple)) or len(value) != 2:
+            return [0.0, 0.0]
+        return [_finite(value[0], 0.0, -200.0, 200.0), _finite(value[1], 0.0, -200.0, 200.0)]
+
+    @field_validator("t", mode="before")
+    @classmethod
+    def _spot(cls, value: Any) -> float:
+        return _finite(value, 0.0, 0.0, 1.0)
+
+    @field_validator("o", mode="before")
+    @classmethod
+    def _outward(cls, value: Any) -> float:
+        return _finite(value, 0.0, -100.0, 100.0)
+
+
 class ModelPoint(BaseModel):
     """One point of a shape: c = curve, s = sharp, cs = curve then sharp, sc = sharp then curve. `hi` and `ho` are the in and out handles as offsets
-    (None = automatic); `w` is how free the point is for hanging chains (later phases)."""
+    (None = automatic); `w` is how free the point is for hanging chains (later phases); `bind` links it to another shape."""
 
     x: float = 0.0
     y: float = 0.0
@@ -1240,6 +1284,17 @@ class ModelPoint(BaseModel):
     hi: Optional[list[float]] = None
     ho: Optional[list[float]] = None
     w: Optional[float] = None
+    bind: Optional[ModelBind] = None
+
+    @field_validator("bind", mode="before")
+    @classmethod
+    def _bind(cls, value: Any) -> Any:
+        if value is None or isinstance(value, ModelBind):
+            return value
+        try:
+            return ModelBind.model_validate(value)
+        except ValueError:
+            return None
 
     @field_validator("x", mode="before")
     @classmethod
@@ -1281,11 +1336,33 @@ class ModelShape(BaseModel):
     pts: list[ModelPoint] = Field(default_factory=list, max_length=MODEL_POINTS_MAX)
     half: int = 0
     template: Optional[str] = Field(default=None, pattern=_MODEL_ID)
+    # The shape this one is the mirror image of (about the model's axis): a derived twin has no points of its own until the pair is broken.
+    mirrorOf: Optional[str] = None
+    # An outline of its own for the back view (None: the front outline seen from behind), its own depth in the back view, and the slider that loosens
+    # the links of its points (None: they keep their distance).
+    back: Optional[list[ModelPoint]] = Field(default=None, max_length=MODEL_POINTS_MAX)
+    zBack: Optional[float] = None
+    loose: Optional[str] = None
 
     @field_validator("name", mode="before")
     @classmethod
     def _trim(cls, value: Any) -> Any:
         return value.strip() if isinstance(value, str) else value
+
+    @field_validator("mirrorOf", "loose", mode="before")
+    @classmethod
+    def _links(cls, value: Any) -> Optional[str]:
+        return _optional_id(value)
+
+    @field_validator("back", mode="before")
+    @classmethod
+    def _back(cls, value: Any) -> Any:
+        return None if not isinstance(value, list) else _keep_valid(ModelPoint, value)
+
+    @field_validator("zBack", mode="before")
+    @classmethod
+    def _z_back(cls, value: Any) -> Optional[float]:
+        return None if value is None else _finite(value, 40.0, 0.0, 100.0)
 
     @field_validator("z", mode="before")
     @classmethod
@@ -1495,11 +1572,17 @@ class ModelObject(BaseModel):
     name: str = Field(default="", max_length=MODEL_NAME_MAX)
     layer: ModelLayer = "body"
     shapes: list[str] = Field(default_factory=list, max_length=MODEL_SHAPES_PER_OBJECT_MAX)
+    mirrorOf: Optional[str] = None
 
     @field_validator("name", mode="before")
     @classmethod
     def _trim(cls, value: Any) -> Any:
         return value.strip() if isinstance(value, str) else value
+
+    @field_validator("mirrorOf", mode="before")
+    @classmethod
+    def _twin(cls, value: Any) -> Optional[str]:
+        return _optional_id(value)
 
     @field_validator("layer", mode="before")
     @classmethod
@@ -1517,11 +1600,17 @@ class ModelGroup(BaseModel):
     objects: list[str] = Field(default_factory=list, max_length=MODEL_OBJECTS_PER_GROUP_MAX)
     pivot: Optional[list[float]] = None
     attach: Optional[ModelAttach] = None
+    mirrorOf: Optional[str] = None
 
     @field_validator("name", mode="before")
     @classmethod
     def _trim(cls, value: Any) -> Any:
         return value.strip() if isinstance(value, str) else value
+
+    @field_validator("mirrorOf", mode="before")
+    @classmethod
+    def _twin(cls, value: Any) -> Optional[str]:
+        return _optional_id(value)
 
     @field_validator("pivot", mode="before")
     @classmethod

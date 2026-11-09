@@ -17,10 +17,12 @@ from .schema import (
     MODEL_CHAIN_MAX,
     MODEL_COPY_MAX_BYTES,
     MODEL_HISTORY_MAX,
+    MODEL_LINKS_MAX,
     ModelCatalog,
     ModelContent,
     ModelDraftList,
     ModelEntry,
+    ModelShape,
     PublishedModel,
     PublishedModelList,
     PublishedModelOut,
@@ -140,6 +142,12 @@ def _ancestors(parents: dict[str, Optional[str]], group_id: str) -> list[str]:
     return chain
 
 
+def _outline_size(shapes: dict[str, ModelShape], shape: ModelShape) -> int:
+    """How many points a shape's outline has: a twin has as many as the shape it mirrors."""
+    src = shapes.get(shape.mirrorOf) if shape.mirrorOf else None
+    return len(src.pts) if src is not None and src.mirrorOf is None else len(shape.pts)
+
+
 def _rig_faults(content: ModelContent, parents: dict[str, Optional[str]], circular: bool, owner: dict[str, str], holder: dict[str, str]) -> list[str]:
     """What the rig (phase 2) must not have when published: a pivot chain over the limit, an anchor or a slider that points at something that is
     not there. The front end makes the same checks (modelContent.publishFaults) in the same words."""
@@ -147,6 +155,7 @@ def _rig_faults(content: ModelContent, parents: dict[str, Optional[str]], circul
     shapes = {s.id: s for s in content.shapes}
     group_ids = {g.id for g in content.groups}
     range_ids = {r.id for r in content.ranges}
+    twin_groups = {g.id: g.mirrorOf for g in content.groups if g.mirrorOf}
     if not circular:
         for g in content.groups:
             depth = len(_ancestors(parents, g.id)) + 1
@@ -166,9 +175,9 @@ def _rig_faults(content: ModelContent, parents: dict[str, Optional[str]], circul
             home = holder.get(owner.get(a.shape, ""), "")
             if home not in _ancestors(parents, g.id):
                 faults.append(f"Group {name} is attached to a shape that is not in its parent group or one above it.")
-            if a.kind == "point" and a.i >= len(target.pts):
+            if a.kind == "point" and a.i >= _outline_size(shapes, target):
                 faults.append(f"Group {name} is attached to a point that does not exist.")
-            if a.kind in ("edge", "range") and a.i >= len(target.pts):
+            if a.kind in ("edge", "range") and a.i >= _outline_size(shapes, target):
                 faults.append(f"Group {name} is attached to an edge that does not exist.")
         if a.kind == "range" and (a.slider is None or a.slider not in range_ids):
             faults.append(f"Group {name} is attached along a slider that does not exist.")
@@ -177,12 +186,86 @@ def _rig_faults(content: ModelContent, parents: dict[str, Optional[str]], circul
         for d in r.drives:
             if d.kind == "turn" and d.group not in group_ids:
                 faults.append(f"Slider {name} turns a group that does not exist.")
+            elif d.kind == "turn" and twin_groups.get(d.group or ""):
+                faults.append(f"Slider {name} turns a group that is a twin; turn the original instead.")
             elif d.kind == "scale" and d.target != "model" and not ((d.target == "group" and d.id in group_ids) or (d.target == "shape" and d.id in shapes)):
                 faults.append(f"Slider {name} scales something that does not exist.")
+            elif d.kind == "scale" and ((d.target == "group" and twin_groups.get(d.id or "")) or (d.target == "shape" and shapes[d.id or ""].mirrorOf)):
+                faults.append(f"Slider {name} scales a twin; scale the original instead.")
             elif d.kind in ("points", "bend") and d.shape not in shapes:
                 faults.append(f"Slider {name} moves a shape that does not exist.")
+            elif d.kind in ("points", "bend") and shapes[d.shape or ""].mirrorOf:
+                faults.append(f"Slider {name} moves a shape that is a twin; move the original instead.")
             elif d.kind == "points" and any(m.i >= len(shapes[d.shape or ""].pts) for m in d.moves):
                 faults.append(f"Slider {name} moves a point of {_label(shapes[d.shape or ''].name, d.shape or '')} that is no longer there. Record it again.")
+    return faults
+
+
+def _pair_faults(content: ModelContent) -> list[str]:
+    """Twins (shapes, objects and groups that mirror another): the original must be there and must not be a twin itself."""
+    faults: list[str] = []
+    for kind, items in (("Shape", content.shapes), ("Object", content.objects), ("Group", content.groups)):
+        by_id = {i.id: i for i in items}
+        article = "an" if kind == "Object" else "a"
+        for i in items:
+            src = i.mirrorOf
+            if not src:
+                continue
+            name = _label(i.name, i.id)
+            if src == i.id:
+                faults.append(f"{kind} {name} is a twin of itself.")
+            elif src not in by_id:
+                faults.append(f"{kind} {name} is a twin of {article} {kind.lower()} that does not exist.")
+            elif by_id[src].mirrorOf:
+                faults.append(f"{kind} {name} is a twin of a twin.")
+    return faults
+
+
+def _link_faults(content: ModelContent) -> list[str]:
+    """Point links, looseness and back outlines: what they point at must be there, links must not go round in a circle, and there are at most
+    MODEL_LINKS_MAX of them."""
+    faults: list[str] = []
+    shapes = {s.id: s for s in content.shapes}
+    range_ids = {r.id for r in content.ranges}
+    depends: dict[str, set[str]] = {}
+    links = 0
+    for s in content.shapes:
+        name = _label(s.name, s.id)
+        for p in s.pts:
+            b = p.bind
+            if b is None:
+                continue
+            links += 1
+            target = shapes.get(b.s)
+            if b.s == s.id:
+                faults.append(f"Shape {name} has a point linked to its own shape.")
+            elif target is None:
+                faults.append(f"Shape {name} has a point linked to a shape that does not exist.")
+            else:
+                depends.setdefault(s.id, set()).add(b.s)
+                size = _outline_size(shapes, target)
+                if b.kind == "point" and b.i >= size:
+                    faults.append(f"Shape {name} has a point linked to a point that does not exist.")
+                elif b.kind == "edge" and b.e >= size:
+                    faults.append(f"Shape {name} has a point linked to an edge that does not exist.")
+        if s.loose is not None and s.loose not in range_ids:
+            faults.append(f"Shape {name} takes its looseness from a slider that does not exist.")
+        if s.back is not None and len(s.back) < 3:
+            faults.append(f"Shape {name} has a back outline of fewer than 3 points.")
+    for s in content.shapes:
+        seen: set[str] = set()
+        stack = list(depends.get(s.id, ()))
+        while stack:
+            cur = stack.pop()
+            if cur == s.id:
+                faults.append(f"The point links of shape {_label(s.name, s.id)} go round in a circle.")
+                break
+            if cur in seen:
+                continue
+            seen.add(cur)
+            stack.extend(depends.get(cur, ()))
+    if links > MODEL_LINKS_MAX:
+        faults.append(f"A model may have at most {MODEL_LINKS_MAX} point links.")
     return faults
 
 
@@ -195,7 +278,7 @@ def publish_faults(content: ModelContent) -> list[str]:
     object_ids = {o.id for o in content.objects}
     group_ids = {g.id for g in content.groups}
     for s in content.shapes:
-        if len(s.pts) < 3:
+        if len(s.pts) < 3 and not s.mirrorOf:
             faults.append(f"Shape {_label(s.name, s.id)} needs at least 3 points.")
     owner: dict[str, str] = {}
     for o in content.objects:
@@ -222,6 +305,8 @@ def publish_faults(content: ModelContent) -> list[str]:
     if loop is not None:
         faults.append("The groups are linked in a circle.")
     faults.extend(_rig_faults(content, parents, loop is not None, owner, holder))
+    faults.extend(_pair_faults(content))
+    faults.extend(_link_faults(content))
     size = copy_bytes(content)
     if size > MODEL_COPY_MAX_BYTES:
         faults.append(f"A character's copy of this model would be {size // 1024} KB; the limit is {MODEL_COPY_MAX_BYTES // 1024} KB.")

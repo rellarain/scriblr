@@ -7,8 +7,8 @@ import { anchorFrom, chainDepth, chainOf, defaultValues, descendantsOf, restPivo
 // making sliders and what they drive. Each returns new content (or why it cannot), and leaves the content it was given alone.
 
 export type Edit = { ok: true; content: ModelContent; note?: string } | { ok: false; reason: string }
-const fail = (reason: string): Edit => ({ ok: false, reason })
-const done = (content: ModelContent, note?: string): Edit => ({ ok: true, content, note })
+export const fail = (reason: string): Edit => ({ ok: false, reason })
+export const done = (content: ModelContent, note?: string): Edit => ({ ok: true, content, note })
 const label = (name: string, id: string) => name || id
 
 const mapGroup = (c: ModelContent, id: string, change: (g: ModelGroup) => ModelGroup): ModelContent => ({ ...c, groups: c.groups.map(g => (g.id === id ? change(g) : g)) })
@@ -63,6 +63,7 @@ export function groupOfShape(c: ModelContent, shapeId: string): string | undefin
 export function attachGroup(c: ModelContent, groupId: string, att: ModelAttach): Edit {
   const g = c.groups.find(x => x.id === groupId)
   if (!g) return fail('There is no such group.')
+  if (g.mirrorOf) return fail('A twin follows its original, so it has no anchor of its own. Break the pair to anchor it.')
   if (g.parent === null) return fail('Hang the group from a parent first: it is fixed to one of the parent\'s shapes.')
   const shape = c.shapes.find(s => s.id === att.shape)
   if (!shape) return fail('That shape does not exist.')
@@ -100,8 +101,10 @@ export function attachFromClick(solved: Solved, kind: ModelAnchorKind, shapeId: 
     }
     return { ...base, i: best.i, t: r2(best.t) }
   }
-  const bb = boxOf(a.map((p): [number, number] => [p.x, p.y]))
-  return { ...base, rx: r2(clamp(bb.w > 0 ? (x - bb.x) / bb.w : 0.5, 0, 1)), ry: r2(clamp(bb.h > 0 ? (y - bb.y) / bb.h : 0.5, 0, 1)) }
+  // inside: the click's relative place in the shape's own box (the same measure the anchor is read with)
+  const own = solved.shapes[shapeId], [lx, ly] = own.rig.length >= 3 ? apply(inverse(own.frame), x, y) : [x, y]
+  const bb = boxOf((own.rig.length >= 3 ? own.rig : a).map((p): [number, number] => [p.x, p.y]))
+  return { ...base, rx: r2(clamp(bb.w > 0 ? (lx - bb.x) / bb.w : 0.5, 0, 1)), ry: r2(clamp(bb.h > 0 ? (ly - bb.y) / bb.h : 0.5, 0, 1)) }
 }
 
 export const detachGroup = (c: ModelContent, groupId: string): ModelContent => mapGroup(c, groupId, g => ({ ...g, attach: null }))
@@ -128,7 +131,7 @@ export function addRange(c: ModelContent, r: ModelRange): Edit {
 export function removeRange(c: ModelContent, id: string): Edit {
   const user = c.groups.find(g => g.attach?.kind === 'range' && g.attach.slider === id)
   if (user) return fail(`Group ${label(user.name, user.id)} is anchored along this slider. Change its anchor first.`)
-  return done({ ...c, ranges: c.ranges.filter(r => r.id !== id) })
+  return done({ ...c, ranges: c.ranges.filter(r => r.id !== id), shapes: c.shapes.map(s => (s.loose === id ? { ...s, loose: null } : s)) })
 }
 
 export const renameRange = (c: ModelContent, id: string, name: string): ModelContent => mapRange(c, id, r => ({ ...r, name }))
@@ -169,7 +172,9 @@ function addDrive(c: ModelContent, rangeId: string, d: ModelDrive): Edit {
 
 // The slider turns a group about its pivot: -20 degrees at its minimum and 20 at its maximum to begin with (the stepper changes that).
 export function addTurn(c: ModelContent, rangeId: string, groupId: string): Edit {
-  if (!c.groups.some(g => g.id === groupId)) return fail('There is no such group.')
+  const g = c.groups.find(x => x.id === groupId)
+  if (!g) return fail('There is no such group.')
+  if (g.mirrorOf) return fail('A twin follows its original: turn the original instead, or break the pair.')
   const edit = addDrive(ensurePivot(c, groupId), rangeId, { ...blankDrive('turn'), group: groupId, atMin: -20, atMax: 20 })
   return edit
 }
@@ -178,6 +183,7 @@ export function addTurn(c: ModelContent, rangeId: string, groupId: string): Edit
 export function addScale(c: ModelContent, rangeId: string, target: 'group' | 'shape' | 'model', id: string | null = null): Edit {
   if (target === 'group' && !c.groups.some(g => g.id === id)) return fail('There is no such group.')
   if (target === 'shape' && !c.shapes.some(s => s.id === id)) return fail('There is no such shape.')
+  if ((target === 'group' && c.groups.find(g => g.id === id)?.mirrorOf) || (target === 'shape' && c.shapes.find(s => s.id === id)?.mirrorOf)) return fail('A twin follows its original: scale the original instead, or break the pair.')
   const edit = addDrive(target === 'group' && id ? ensurePivot(c, id) : c, rangeId, { ...blankDrive('scale'), target, id: target === 'model' ? null : id, atMin: 80, atMax: 120 })
   return edit
 }
@@ -188,6 +194,7 @@ const shapeBox = (s: ModelShape) => (s.pts.length >= 3 ? boxOf(flatten(build(s.p
 export function addBend(c: ModelContent, rangeId: string, shapeId: string): Edit {
   const s = c.shapes.find(x => x.id === shapeId), b = s && shapeBox(s)
   if (!s || !b) return fail('Pick a shape with an outline.')
+  if (s.mirrorOf) return fail('A twin follows its original: bend the original instead, or break the pair.')
   return addDrive(c, rangeId, { ...blankDrive('bend'), shape: shapeId, pivot: [r2(b.x + b.w / 2), r2(b.y + b.h * 0.5)], y0: r2(b.y + b.h * 0.45), y1: r2(b.y + b.h * 0.85), atMin: -30, atMax: 30 })
 }
 
@@ -224,6 +231,7 @@ const MOVED = 0.05
 export function recordPoints(c: ModelContent, rangeId: string, shapeId: string, end: 'max' | 'min', edited: ModelShape): Edit {
   const shape = c.shapes.find(s => s.id === shapeId), range = c.ranges.find(r => r.id === rangeId)
   if (!shape || !range) return fail('There is no such slider or shape.')
+  if (shape.mirrorOf) return fail('A twin follows its original: record the original instead, or break the pair.')
   if (edited.pts.length !== shape.pts.length) return fail('The number of points changed. Record again without adding or deleting points.')
   const deltas = new Map<number, [number, number]>()
   edited.pts.forEach((p, i) => {

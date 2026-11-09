@@ -251,6 +251,11 @@ span.cmTreeTwisty { cursor: default; }
 .cmPivot--off .cmPivotRing { stroke: var(--ink-muted); }
 .cmAnchor { fill: var(--accent); stroke: var(--ink); stroke-width: 1; vector-effect: non-scaling-stroke; pointer-events: none; }
 .cmCanvas--pick { cursor: copy; }
+.cmShape--twin { stroke-dasharray: 5 3; }
+.cmPoint--linked { fill: var(--ink); stroke: var(--accent); stroke-width: 2.5; cursor: pointer; }
+.cmTwin { display: inline-flex; align-items: center; flex: 0 0 auto; color: var(--ink-muted); }
+.cmLinks .cmPlain { padding-left: 0; list-style: none; gap: var(--space-3); }
+.cmLink-item { display: flex; flex-direction: column; gap: var(--space-1); padding-left: var(--space-3); box-shadow: inset 2px 0 0 var(--hairline); p { margin: 0; } }
 .cmShape--pick { stroke: var(--accent); stroke-opacity: 1; stroke-width: 2; cursor: copy; }
 .cmShape--off { opacity: 0.25; pointer-events: none; }
 .cmPoint--off { cursor: default; opacity: 0.6; }

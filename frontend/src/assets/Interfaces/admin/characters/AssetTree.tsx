@@ -1,7 +1,7 @@
 import { useMemo, useState, type KeyboardEvent } from 'react'
 import type { ModelContent, ModelGroup, ModelLayer } from '../../../../api/types'
 import { gripProps, zoneRef } from '../../../../lib/pointerDrag'
-import { ChevronDownIcon, ChevronRightIcon, ChevronUpIcon, CopyIcon, FolderPlusIcon, GripIcon, LayersIcon, PlusIcon, SearchIcon, TrashIcon, TreeIcon } from '../../../icons'
+import { ChevronDownIcon, ChevronRightIcon, ChevronUpIcon, CopyIcon, FolderPlusIcon, GripIcon, LayersIcon, PlusIcon, SearchIcon, SwapIcon, TrashIcon, TreeIcon } from '../../../icons'
 import { ReorderList } from './ReorderList'
 import { TemplateMenu } from './TemplateMenu'
 import { same, type Selection } from './designerState'
@@ -29,6 +29,10 @@ export interface TreeActions {
 export type TreeMode = 'layers' | 'rig'
 
 const label = (name: string, fallback: string) => name.trim() || fallback
+// The mark on a twin in the tree: it mirrors another thing and follows it.
+function Twin({ of, name }: { of?: string | null; name: string }) {
+  return of ? <span className="cmTwin" role="img" title={`${name} is a twin: it mirrors another and follows it`} aria-label={`${name} is a twin`}><SwapIcon size={11} /></span> : null
+}
 const DRAG = 'cm-group'
 
 export function AssetTree({ content, sel, actions, mode, onMode }: { content: ModelContent; sel: Selection; actions: TreeActions; mode: TreeMode; onMode: (m: TreeMode) => void }) {
@@ -99,6 +103,7 @@ function LayersTree({ content, sel, actions, q }: { content: ModelContent; sel: 
                             {label(g.name, 'Untitled group')}
                           </button>
                         ) : <span className="cmTreeName cmTreeName--muted">Not in a group</span>}
+                        {g && <Twin of={g.mirrorOf} name={label(g.name, 'Untitled group')} />}
                         {g && <>
                           <span className={`cmCount${g.objects.length > LIMITS.objectsPerGroupWarn ? ' cmCount--warn' : ''}`} title="Objects in the group">{g.objects.length}</span>
                           <button type="button" className="cmIconBtn cmIconBtn--small" aria-label={`Delete group ${label(g.name, 'Untitled group')}`} title="Delete the group with its objects and shapes" onClick={() => actions.onDelete({ kind: 'group', id: g.id })}><TrashIcon size={12} /></button>
@@ -119,6 +124,7 @@ function LayersTree({ content, sel, actions, q }: { content: ModelContent; sel: 
                                 <button type="button" className="cmTreeName cmTreeName--btn" aria-current={same(sel, { kind: 'object', id: o.object.id })} onClick={() => actions.onSelect({ kind: 'object', id: o.object.id })}>
                                   {label(o.object.name, 'Untitled object')}
                                 </button>
+                                <Twin of={o.object.mirrorOf} name={label(o.object.name, 'Untitled object')} />
                                 <span className={`cmCount${o.object.shapes.length > LIMITS.shapesPerObjectWarn ? ' cmCount--warn' : ''}`} title="Shapes in the object">{o.object.shapes.length}</span>
                                 <TemplateMenu label={`Add a shape to ${label(o.object.name, 'the object')}`} onPick={t => actions.onAddShape(o.object.id, t)} />
                                 <button type="button" className="cmIconBtn cmIconBtn--small" aria-label={`Delete object ${label(o.object.name, 'Untitled object')}`} title="Delete the object with its shapes" onClick={() => actions.onDelete({ kind: 'object', id: o.object.id })}><TrashIcon size={12} /></button>
@@ -135,6 +141,7 @@ function LayersTree({ content, sel, actions, q }: { content: ModelContent; sel: 
                                     <button type="button" className="cmTreeName cmTreeName--btn" aria-current={same(sel, { kind: 'shape', id: s.id })} onClick={() => actions.onSelect({ kind: 'shape', id: s.id })}>
                                       {label(s.name, 'Untitled shape')}
                                     </button>
+                                    <Twin of={s.mirrorOf} name={label(s.name, 'Untitled shape')} />
                                     <button type="button" className="cmIconBtn cmIconBtn--small" aria-label={`Move ${label(s.name, 'the shape')} down in the draw order`} title="Draw it earlier (further back)" disabled={shown[0]?.id === s.id} onClick={() => actions.onMoveShape(o.object.id, s.id, -1)}><ChevronDownIcon size={12} /></button>
                                     <button type="button" className="cmIconBtn cmIconBtn--small" aria-label={`Move ${label(s.name, 'the shape')} up in the draw order`} title="Draw it later (in front)" disabled={shown[shown.length - 1]?.id === s.id} onClick={() => actions.onMoveShape(o.object.id, s.id, 1)}><ChevronUpIcon size={12} /></button>
                                     <button type="button" className="cmIconBtn cmIconBtn--small" aria-label={`Copy ${label(s.name, 'the shape')}`} title="Copy the shape" onClick={() => actions.onDuplicateShape(s.id)}><CopyIcon size={12} /></button>
@@ -206,6 +213,7 @@ function RigTree({ content, sel, actions, q }: { content: ModelContent; sel: Sel
                   </button>
                 ) : <span className="cmTreeTwisty" aria-hidden="true" />}
                 <button type="button" className="cmTreeName cmTreeName--btn" aria-current={same(sel, { kind: 'group', id: g.id })} onClick={() => actions.onSelect({ kind: 'group', id: g.id })}>{name}</button>
+                <Twin of={g.mirrorOf} name={name} />
                 <span className={`cmCount${level >= LIMITS.chainMax ? ' cmCount--warn' : ''}`} title={`Level ${level} of ${LIMITS.chainMax} in the pivot chain`}>{level}</span>
               </div>
               {open && branch(g.id, depth + 1)}

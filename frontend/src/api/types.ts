@@ -593,16 +593,20 @@ export interface CharacterCreate { name?: string; portrait?: CharacterPortrait; 
 export type ModelPointMode = 'c' | 's' | 'cs' | 'sc'
 export type ModelLayer = 'body' | 'clothing' | 'hair'
 export type ModelView = 'both' | 'front' | 'back'
-// A point of a shape: c = curve, s = sharp, cs = curve then sharp, sc = sharp then curve. hi and ho are the in and out handles as offsets (absent: automatic).
-export interface ModelPoint { x: number; y: number; m: ModelPointMode; hi?: [number, number] | null; ho?: [number, number] | null; w?: number | null }
+// A point link, kept on the point that follows: kind 'point' = on point i of shape s plus the offset d (a weld has none); kind 'edge' = t (0..1) along the edge from point e of shape s, o units outward (a clothes point locked to the edge of a body part). Solved when the model is drawn.
+export type ModelBindKind = 'point' | 'edge'
+export interface ModelBind { kind: ModelBindKind; s: string; i: number; d: [number, number]; e: number; t: number; o: number }
+// A point of a shape: c = curve, s = sharp, cs = curve then sharp, sc = sharp then curve. hi and ho are the in and out handles as offsets (absent: automatic). bind links it to another shape.
+export interface ModelPoint { x: number; y: number; m: ModelPointMode; hi?: [number, number] | null; ho?: [number, number] | null; w?: number | null; bind?: ModelBind | null }
 // A filled outline in the model's space (0..200 across, 0..400 down). `half` > 0 marks a symmetric outline: its first `half` points run down one half and the rest mirror them.
-export interface ModelShape { id: string; name: string; closed: boolean; z: number; op: number; view: ModelView; pts: ModelPoint[]; half: number; template?: string | null }
-export interface ModelObject { id: string; name: string; layer: ModelLayer; shapes: string[] }
+// mirrorOf: the shape this one is the mirror image of about the model's axis (a derived twin has no points of its own until the pair is broken). back: an outline of its own for the back view (absent: the front outline seen from behind); zBack: its depth in the back view; loose: the slider that loosens the links of its points.
+export interface ModelShape { id: string; name: string; closed: boolean; z: number; op: number; view: ModelView; pts: ModelPoint[]; half: number; template?: string | null; mirrorOf?: string | null; back?: ModelPoint[] | null; zBack?: number | null; loose?: string | null }
+export interface ModelObject { id: string; name: string; layer: ModelLayer; shapes: string[]; mirrorOf?: string | null }
 // Where a group is fixed to a shape of its parent (or an ancestor): on one point (i), at a spot t (0..1) along edge i, anywhere along edge i that the slider moves, or at a relative place (rx, ry) inside the shape's box.
 export type ModelAnchorKind = 'point' | 'edge' | 'range' | 'inside'
 export interface ModelAttach { shape: string; kind: ModelAnchorKind; i: number; t: number; slider: string | null; rx: number; ry: number }
 // A group of objects that move together. parent is the group it hangs from (the rig), pivot the point it turns about (in the model's space at rest), attach where on a shape of its parent it is fixed.
-export interface ModelGroup { id: string; name: string; parent: string | null; objects: string[]; pivot: [number, number] | null; attach: ModelAttach | null }
+export interface ModelGroup { id: string; name: string; parent: string | null; objects: string[]; pivot: [number, number] | null; attach: ModelAttach | null; mirrorOf?: string | null }
 export type ModelRangeUnit = '' | '°' | '%'
 export type ModelDriveKind = 'turn' | 'scale' | 'points' | 'bend'
 export type ModelScaleTarget = 'group' | 'shape' | 'model'

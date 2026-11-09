@@ -1,4 +1,5 @@
 import type { ModelAttach, ModelScaleAxis } from '../../../../api/types'
+import type { Selection } from './designerState'
 
 // What the Rig and Ranges tabs ask the page to do. The page (ModelPane) applies them to the content, keeps the undo stack and says why when one is refused.
 export type NewSliderKind = 'turn' | 'scale' | 'points' | 'bend'
@@ -31,4 +32,26 @@ export interface RigActions {
   resetValues: () => void
   // Show this slider in the Ranges tab (from the Rig tab's Motion list).
   openSlider: (rangeId: string) => void
+}
+
+// Phase 2b: pairs, point links and the back view.
+export type PairKind = 'shape' | 'object' | 'group'
+export type LinkHow = 'weld' | 'follow' | 'edge'
+export type ViewName = 'front' | 'back'
+
+export interface PairActions {
+  select: (sel: Selection) => void
+  makeTwin: (kind: PairKind, id: string) => void
+  breakPair: (kind: PairKind, id: string) => void
+  // Link the selected point: start picking what to link it to on the canvas (a click on a shape does it), or stop.
+  startLink: (how: LinkHow) => void
+  stopLink: () => void
+  unlink: (shapeId: string, index: number) => void
+  stepLink: (shapeId: string, index: number, field: 'o' | 't' | 'dx' | 'dy', dir: -1 | 1, big: boolean) => void
+  // The slider a shape takes its looseness from (null: none), or a new one made for it.
+  setLoose: (shapeId: string, rangeId: string | null) => void
+  makeLoose: (shapeId: string) => void
+  // A shape's outline for the back view goes back to the front one; a shape moves one place in front of or behind its neighbour in the view being edited.
+  useFront: (shapeId: string) => void
+  moveInOrder: (shapeId: string, dir: -1 | 1) => void
 }

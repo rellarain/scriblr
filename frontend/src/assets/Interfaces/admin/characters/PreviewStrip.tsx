@@ -5,23 +5,24 @@ import { shapesOf, type Selection } from './designerState'
 import { previewSpecs, previewTransform, type PreviewMode } from './engine/previews'
 import type { Box } from './engine/geometry'
 import { solve, solveAtRest } from './engine/rig'
+import { outlineSize } from './modelContent'
 
 // The always-on strip under the canvas: the selection (or, with nothing selected, the whole model) at random sizes, tilts and backgrounds, so the
 // admin sees how it holds up. Re-roll draws a new set; Smallest and Largest are the stress previews (every value at the end of its range).
 const SIZES = [{ id: 'S', px: 64 }, { id: 'M', px: 96 }, { id: 'L', px: 144 }] as const
 const MODES: Array<{ id: PreviewMode; name: string }> = [{ id: 'rand', name: 'Random' }, { id: 'min', name: 'Smallest' }, { id: 'max', name: 'Largest' }]
 
-export function PreviewStrip({ content, sel }: { content: ModelContent; sel: Selection }) {
+export function PreviewStrip({ content, sel, view = 'front' }: { content: ModelContent; sel: Selection; view?: 'front' | 'back' }) {
   const [seed, setSeed] = useState(1)
   const [mode, setMode] = useState<PreviewMode>('rand')
   const [size, setSize] = useState<(typeof SIZES)[number]['id']>('M')
   // what is drawn: the selection (or the whole model), each tile with its own slider values
-  const ids = useMemo(() => new Set((sel.kind === 'none' ? content.shapes : shapesOf(content, sel)).filter(s => s.pts.length >= 3).map(s => s.id)), [content, sel])
+  const ids = useMemo(() => new Set((sel.kind === 'none' ? content.shapes : shapesOf(content, sel)).filter(s => outlineSize(content, s) >= 3).map(s => s.id)), [content, sel])
   const specs = useMemo(() => previewSpecs(seed, mode, 6, content.ranges), [seed, mode, content.ranges])
-  const tiles = useMemo(() => specs.map(spec => solve(content, spec.values)), [specs, content])
+  const tiles = useMemo(() => specs.map(spec => solve(content, spec.values, view)), [specs, content, view])
   // every tile is fitted to the selection as it stands at rest, so what a slider does shows as a change in the tile
   const box = useMemo<Box | null>(() => {
-    const rest = solveAtRest(content)
+    const rest = solveAtRest(content, view)
     let x0 = 1e9, y0 = 1e9, x1 = -1e9, y1 = -1e9, any = false
     for (const id of ids) {
       const r = rest.shapes[id]
@@ -30,7 +31,7 @@ export function PreviewStrip({ content, sel }: { content: ModelContent; sel: Sel
       x0 = Math.min(x0, r.box.x); y0 = Math.min(y0, r.box.y); x1 = Math.max(x1, r.box.x + r.box.w); y1 = Math.max(y1, r.box.y + r.box.h)
     }
     return any ? { x: x0, y: y0, w: x1 - x0, h: y1 - y0 } : null
-  }, [content, ids])
+  }, [content, ids, view])
   const opacity = useMemo(() => new Map(content.shapes.map(s => [s.id, s.op])), [content.shapes])
   const px = SIZES.find(s => s.id === size)!.px
 

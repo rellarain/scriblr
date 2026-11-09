@@ -2,6 +2,7 @@ import type { ModelContent, ModelEntry, PublishedModel } from '../api/types'
 import { addGroup, addObject, addShape, blankContent, newGroup, normalizeContent, publishFaults } from '../assets/Interfaces/admin/characters/modelContent'
 import { newShape } from '../assets/Interfaces/admin/characters/engine/edit'
 import { addRange, addScale, addTurn, attachGroup, newRange, recordPoints, reparent, type Edit } from '../assets/Interfaces/admin/characters/engine/rigEdit'
+import { linkToEdge, makeTwin, setBack, setLoose } from '../assets/Interfaces/admin/characters/engine/pairEdit'
 import { templateBox } from '../assets/Interfaces/admin/characters/engine/templates'
 
 // A pretend character models API (`/api/character-models`), shared by the design system's previews (mockBackend.ts) and the tests
@@ -70,8 +71,9 @@ export function createMockModels(initial: ModelEntry[]) {
 }
 
 // A small rigged figure for the previews: a torso (neck and chest) with a head hung from the neck's top edge, an arm hung from the chest and a forearm
-// from the arm; sliders for the head's tilt and size, the arm's raise, the elbow, the shoulders' width (recorded point moves) and the height. Built with
-// the same operations the Designer uses, so it is what a person would have made.
+// from the arm (and the arm's twin on the other side); sliders for the head's tilt and size, the arm's raise, the elbow, the shoulders' width (recorded
+// point moves) and the height; a shirt whose points are locked to the chest's edge, with a slider for how loose it is; and a back outline for the head.
+// Built with the same operations the Designer uses, so it is what a person would have made.
 function riggedFigure(): ModelContent {
   const must = (e: Edit): ModelContent => { if (!e.ok) throw new Error(e.reason); return e.content }
   const box = (x: number, y: number, w: number, h: number) => ({ x, y, w, h })
@@ -112,6 +114,20 @@ function riggedFigure(): ModelContent {
   const moved = (at: Record<number, number>, sign: 1 | -1) => ({ ...chest, pts: chest.pts.map((p, i) => (at[i] ? { ...p, x: p.x + sign * at[i] } : p)) })
   c = must(recordPoints(c, 'r_shoulders', 's_chest', 'max', moved({ 0: -4, 1: 4, 2: 6, 3: 4, 6: -4, 7: -6 }, 1)))
   c = must(recordPoints(c, 'r_shoulders', 's_chest', 'min', moved({ 0: -4, 1: 4, 2: 6, 3: 4, 6: -4, 7: -6 }, -1)))
+  // a shirt over the chest: every point locked to the chest's edge where it is drawn, so it follows the shoulders; a slider loosens or tightens it
+  c = addGroup(c, newGroup('g_shirt', 'Clothes'))
+  c = addObject(c, 'g_shirt', { id: 'o_shirt', name: 'Shirt', layer: 'clothing', shapes: [] })
+  const shirt = newShape('s_shirt', 'Shirt', 'rounded', box(64, 82, 72, 84))
+  c = addShape(c, 'o_shirt', shirt)
+  shirt.pts.forEach((p, i) => { c = must(linkToEdge(c, 's_shirt', i, 's_chest', p.x, p.y)) })
+  c = must(addRange(c, { ...newRange('r_fit', 'Shirt fit', 'scale', 's_shirt'), min: 0, rest: 100, max: 200, unit: '%' }))
+  c = must(setLoose(c, ['s_shirt'], 'r_fit'))
+  // the other arm: a twin of the arm and the forearm under it, which follows the arm's raise and elbow
+  let n = 0
+  c = must(makeTwin(c, 'group', 'g_arm', prefix => `${prefix}_twin${++n}`))
+  // the hair side of the head is wider from behind: an outline of its own for the back view
+  const head = c.shapes.find(x => x.id === 's_head')!, cx = 100, cy = 46
+  c = must(setBack(c, 's_head', head.pts.map(p => ({ ...p, x: cx + (p.x - cx) * 1.12, y: cy + (p.y - cy) * 1.08, hi: p.hi ? [p.hi[0] * 1.12, p.hi[1] * 1.08] as [number, number] : p.hi, ho: p.ho ? [p.ho[0] * 1.12, p.ho[1] * 1.08] as [number, number] : p.ho }))))
   return c
 }
 

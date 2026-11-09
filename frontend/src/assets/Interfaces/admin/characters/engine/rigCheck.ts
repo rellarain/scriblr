@@ -15,7 +15,9 @@ export function rigCheck(c: ModelContent): CheckLine[] {
   const say = (level: CheckLine['level'], text: string) => { if (lines.length < MOST_LINES) lines.push({ level, text }) }
   const name = (n: string, id: string) => n || id
 
-  for (const r of c.ranges) if (r.drives.length === 0) say('warn', `Slider ${name(r.name, r.id)} drives nothing yet.`)
+  // a slider that slides an anchor or loosens the links of a shape is in use even though it drives nothing itself
+  const used = new Set([...c.groups.map(g => g.attach?.slider), ...c.shapes.map(s => s.loose)].filter((x): x is string => !!x))
+  for (const r of c.ranges) if (r.drives.length === 0 && !used.has(r.id)) say('warn', `Slider ${name(r.name, r.id)} drives nothing yet.`)
 
   // a group whose anchor does not sit on its pivot is moved by the anchor even at rest: it jumps when it is attached
   const rest = solveAtRest(c)
