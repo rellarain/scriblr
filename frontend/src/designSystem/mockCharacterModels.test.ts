@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { publishFaults } from '../assets/Interfaces/admin/characters/modelContent'
+import { classKey } from '../assets/Interfaces/admin/characters/engine/forms'
 import { applyPreset, restState } from '../assets/Interfaces/admin/characters/engine/presets'
 import { rigCheck } from '../assets/Interfaces/admin/characters/engine/rigCheck'
 import { solve } from '../assets/Interfaces/admin/characters/engine/rig'
@@ -16,7 +17,7 @@ describe('the rigged preview model', () => {
 
   it('stands as drawn at rest, with every shape in the picture', () => {
     const s = solve(adult, {})
-    expect(s.order).toHaveLength(10)   // five shapes, the sleeve, the shirt and the twins of the arm, its sleeve and the forearm
+    expect(s.order).toHaveLength(14)   // five shapes, the sleeve, the shirt, the twins of the arm, its sleeve and the forearm, and the eye shown (two shapes) with its twin
     for (const g of adult.groups) s.mats[g.id].forEach((v, i) => expect(v).toBeCloseTo([1, 0, 0, 1, 0, 0][i], 1))
   })
 
@@ -80,8 +81,8 @@ describe('the rigged preview model', () => {
     expect(none[twin.id].visible).toBe(false)
   })
 
-  it('has presets: poses, an expression, a build and two outfits', () => {
-    expect(adult.presets!.map(p => `${p.kind}: ${p.name}`)).toEqual(['Pose: At rest', 'Pose: Wave', 'Expression: Curious', 'Build: Broad', 'Outfit: Shirt on', 'Outfit: No shirt'])
+  it('has presets: poses, an expression, a build, two outfits and a style of the head', () => {
+    expect(adult.presets!.map(p => `${p.kind}: ${p.name}`)).toEqual(['Pose: At rest', 'Pose: Wave', 'Expression: Curious', 'Build: Broad', 'Outfit: Shirt on', 'Outfit: No shirt', 'Style: Sleepy'])
     let state = restState(adult)
     const apply = (name: string) => { state = applyPreset(adult, state, adult.presets!.find(p => p.name === name)!) }
     apply('Wave'); apply('Curious')
@@ -92,6 +93,36 @@ describe('the rigged preview model', () => {
     expect(solve(adult, state.values, 'front', state).shapes.s_shirt.visible).toBe(false)
     apply('Shirt on')
     expect(solve(adult, state.values, 'front', state).shapes.s_shirt.visible).toBe(true)
+  })
+
+  it('has a family of eyes: one member shown at a time, each with a twin, and a style of the head that picks the hooded eye', () => {
+    const [family] = adult.classes!, members = adult.objects.filter(o => o.classOf === family.id)
+    expect(family).toMatchObject({ name: 'Eye', template: 'o_eye', exclusive: true })
+    expect(members.map(m => m.name)).toEqual(['Almond', 'Round', 'Hooded'])
+    const shapesOf = (name: string) => members.find(m => m.name === name)!.shapes
+    const drawn = (forms: Record<string, string> = {}) => Object.entries(solve(adult, {}, 'front', { forms }).shapes).filter(([, r]) => r.visible).map(([id]) => id)
+    // the pattern is not drawn; the first member is, with the twin of its shapes
+    expect(drawn()).toEqual(expect.arrayContaining(shapesOf('Almond')))
+    expect(drawn()).not.toContain('s_eye')
+    expect(shapesOf('Round').some(id => drawn().includes(id))).toBe(false)
+    const round = drawn({ [classKey(family.id)]: members.find(m => m.name === 'Round')!.id })
+    expect(shapesOf('Round').every(id => round.includes(id))).toBe(true)
+    expect(shapesOf('Almond').some(id => round.includes(id))).toBe(false)
+    // Round has an outline of its own for the white; Almond follows the pattern
+    const white = (name: string) => adult.shapes.find(s => shapesOf(name).includes(s.id) && s.copyOf === 's_eye')!
+    expect(white('Almond').pts).toEqual([])
+    expect(white('Round').pts.length).toBeGreaterThanOrEqual(3)
+    expect(adult.shapes.filter(s => s.mirrorOf && shapesOf('Almond').includes(s.mirrorOf))).toHaveLength(2)
+    // the style: the hooded eye, its lids closed (the iris is gone), the head turned
+    const style = adult.presets!.find(p => p.name === 'Sleepy')!
+    expect(style.scope).toBe('g_head')
+    const state = applyPreset(adult, restState(adult), style)
+    expect(state.values).toMatchObject({ r_tilt: -8 })
+    const seen = solve(adult, state.values, 'front', state)
+    const iris = shapesOf('Hooded').find(id => adult.shapes.find(s => s.id === id)!.copyOf === 's_iris')!
+    expect(seen.shapes[shapesOf('Hooded').find(id => id !== iris)!].visible).toBe(true)
+    expect(seen.shapes[iris].visible).toBe(false)
+    expect(seen.shapes[shapesOf('Almond')[0]].visible).toBe(false)
   })
 
   it('keeps the older published versions simple and valid', () => {

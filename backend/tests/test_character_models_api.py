@@ -17,7 +17,8 @@ SQUARE = [{"x": 90, "y": 40, "m": "s"}, {"x": 110, "y": 40, "m": "s"}, {"x": 110
 
 
 def shape(sid: str, name: str = "", pts=None, **over) -> dict:
-    return {"id": sid, "name": name, "pts": SQUARE if pts is None else pts, **over}
+    # a copy of the points: a test that edits a shape's points (links, handles) must not edit them for every other test
+    return {"id": sid, "name": name, "pts": [dict(p) for p in SQUARE] if pts is None else pts, **over}
 
 
 def content(name: str, **over) -> dict:

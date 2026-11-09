@@ -1,10 +1,11 @@
 import { useMemo, useState, type KeyboardEvent } from 'react'
-import type { ModelContent, ModelGroup, ModelLayer } from '../../../../api/types'
+import type { ModelContent, ModelGroup, ModelLayer, ModelObject } from '../../../../api/types'
 import { gripProps, zoneRef } from '../../../../lib/pointerDrag'
-import { ChevronDownIcon, ChevronRightIcon, ChevronUpIcon, CopyIcon, EyeIcon, EyeOffIcon, FolderPlusIcon, GripIcon, LayersIcon, PlusIcon, SearchIcon, SwapIcon, TrashIcon, TreeIcon } from '../../../icons'
+import { ChevronDownIcon, ChevronRightIcon, ChevronUpIcon, CopyIcon, EyeIcon, EyeOffIcon, FolderPlusIcon, GripIcon, LayersIcon, LinkIcon, PlusIcon, SearchIcon, StampIcon, SwapIcon, TrashIcon, TreeIcon } from '../../../icons'
 import { ReorderList } from './ReorderList'
 import { TemplateMenu } from './TemplateMenu'
 import { same, type Selection } from './designerState'
+import { classOfObject } from './engine/classEdit'
 import { chainDepth } from './engine/rig'
 import { LIMITS } from './engine/limits'
 import { treeOf } from './modelContent'
@@ -34,6 +35,14 @@ const label = (name: string, fallback: string) => name.trim() || fallback
 // The mark on a twin in the tree: it mirrors another thing and follows it.
 function Twin({ of, name }: { of?: string | null; name: string }) {
   return of ? <span className="cmTwin" role="img" title={`${name} is a twin: it mirrors another and follows it`} aria-label={`${name} is a twin`}><SwapIcon size={11} /></span> : null
+}
+// The mark on an object of a class: the pattern (it is not drawn once it has members) or a member (its shapes follow the pattern's).
+function ClassTag({ content, object }: { content: ModelContent; object: ModelObject }) {
+  const k = classOfObject(content, object)
+  if (!k) return null
+  const pattern = k.template === object.id, name = k.name.trim() || 'Untitled class'
+  const text = pattern ? `${object.name.trim() || 'This object'} is the pattern of class ${name}` : `${object.name.trim() || 'This object'} is a member of class ${name}`
+  return <span className="cmTwin" role="img" title={text} aria-label={text}>{pattern ? <StampIcon size={11} /> : <LinkIcon size={11} />}</span>
 }
 const DRAG = 'cm-group'
 const NO_HIDDEN: ReadonlySet<string> = new Set()
@@ -139,6 +148,7 @@ function LayersTree({ content, sel, actions, q, hidden }: { content: ModelConten
                                   {label(o.object.name, 'Untitled object')}
                                 </button>
                                 <Twin of={o.object.mirrorOf} name={label(o.object.name, 'Untitled object')} />
+                                <ClassTag content={content} object={o.object} />
                                 <span className={`cmCount${o.object.shapes.length > LIMITS.shapesPerObjectWarn ? ' cmCount--warn' : ''}`} title="Shapes in the object">{o.object.shapes.length}</span>
                                 <Eye id={o.object.id} name={label(o.object.name, 'Untitled object')} hidden={hidden} onToggle={actions.onToggleHidden} />
                                 <TemplateMenu label={`Add a shape to ${label(o.object.name, 'the object')}`} onPick={t => actions.onAddShape(o.object.id, t)} />
@@ -147,7 +157,7 @@ function LayersTree({ content, sel, actions, q, hidden }: { content: ModelConten
                               <ReorderList
                                 className="cmTreeList cmTreeList--in"
                                 items={shown}
-                                itemClass={s => `cmTreeRow cmTreeRow--shape${same(sel, { kind: 'shape', id: s.id }) ? ' cmTreeRow--on' : ''}${hidden.has(o.object.id) || (g && hidden.has(g.id)) ? ' cmTreeRow--off' : ''}`}
+                                itemClass={s => `cmTreeRow cmTreeRow--shape${same(sel, { kind: 'shape', id: s.id }) ? ' cmTreeRow--on' : ''}${hidden.has(o.object.id) || (g && hidden.has(g.id)) || s.hide ? ' cmTreeRow--off' : ''}`}
                                 label={s => label(s.name, 'the shape')}
                                 onMove={(id, before) => actions.onReorderShape(o.object.id, id, before)}
                                 render={(s, sgrip) => (
@@ -157,10 +167,11 @@ function LayersTree({ content, sel, actions, q, hidden }: { content: ModelConten
                                       {label(s.name, 'Untitled shape')}
                                     </button>
                                     <Twin of={s.mirrorOf} name={label(s.name, 'Untitled shape')} />
+                                    {s.copyOf && <span className="cmTwin" role="img" title={`${label(s.name, 'This shape')} follows the pattern${s.pts.length >= 3 ? ' (it has an outline of its own)' : ''}`} aria-label={`${label(s.name, 'This shape')} follows the pattern`}><LinkIcon size={11} /></span>}
                                     <button type="button" className="cmIconBtn cmIconBtn--small" aria-label={`Move ${label(s.name, 'the shape')} down in the draw order`} title="Draw it earlier (further back)" disabled={shown[0]?.id === s.id} onClick={() => actions.onMoveShape(o.object.id, s.id, -1)}><ChevronDownIcon size={12} /></button>
                                     <button type="button" className="cmIconBtn cmIconBtn--small" aria-label={`Move ${label(s.name, 'the shape')} up in the draw order`} title="Draw it later (in front)" disabled={shown[shown.length - 1]?.id === s.id} onClick={() => actions.onMoveShape(o.object.id, s.id, 1)}><ChevronUpIcon size={12} /></button>
-                                    <button type="button" className="cmIconBtn cmIconBtn--small" aria-label={`Copy ${label(s.name, 'the shape')}`} title="Copy the shape" onClick={() => actions.onDuplicateShape(s.id)}><CopyIcon size={12} /></button>
-                                    <button type="button" className="cmIconBtn cmIconBtn--small" aria-label={`Delete ${label(s.name, 'the shape')}`} title="Delete the shape" onClick={() => actions.onDelete({ kind: 'shape', id: s.id })}><TrashIcon size={12} /></button>
+                                    {!s.copyOf && <button type="button" className="cmIconBtn cmIconBtn--small" aria-label={`Copy ${label(s.name, 'the shape')}`} title="Copy the shape" onClick={() => actions.onDuplicateShape(s.id)}><CopyIcon size={12} /></button>}
+                                    {!s.copyOf && <button type="button" className="cmIconBtn cmIconBtn--small" aria-label={`Delete ${label(s.name, 'the shape')}`} title="Delete the shape" onClick={() => actions.onDelete({ kind: 'shape', id: s.id })}><TrashIcon size={12} /></button>}
                                   </>
                                 )}
                               />

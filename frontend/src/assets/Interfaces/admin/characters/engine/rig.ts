@@ -1,6 +1,6 @@
 import type { ModelAttach, ModelContent, ModelDrive, ModelGroup, ModelPoint, ModelRange, ModelShape } from '../../../../../api/types'
 import { IDENTITY, apply, boxOf, build, clamp, edgeAt, flatten, inverse, mul, pathText, reflectList, rotate, scale, translate, twinIndex, windSign, type Box, type BuiltPoint, type Mat } from './geometry'
-import { overrideFor, type Choices } from './forms'
+import { classKey, classesOf, membersOf, overrideFor, type Choices } from './forms'
 import { drawOrder } from './order'
 
 // The rig: groups hang from parent groups, are fixed to a shape of the parent by an anchor and turn about a pivot, and sliders (ranges) drive them.
@@ -125,8 +125,11 @@ export interface SolvedShape {
   poly: Array<[number, number]>
   box: Box
   visible: boolean
-  // Switched off with the eye (its object, its group or a group above it): it is solved all the same, but not drawn.
+  // Switched off with the eye (its object, its group or a group above it), or by its class (a pattern that has members, a member of a family that is not the
+  // one shown): it is solved all the same, but not drawn.
   off: boolean
+  // For a shape of a class member that has an outline of its own: the outline it would have following the template, drawn the same way ('' otherwise).
+  ghost: string
   z: number
 }
 export interface Solved {
@@ -201,8 +204,9 @@ export function looseFactor(c: ModelContent, shape: Pick<ModelShape, 'loose'>, v
   return r && r.rest > 0 ? clamp(valueOf(r, values) / r.rest, 0, 4) : 1
 }
 
-// What the admin has set besides the sliders (test state, never saved): the form each axis shows (see forms.ts), and the objects and groups switched off.
-export interface SolveOptions { forms?: Choices; hidden?: Iterable<string> }
+// What the admin has set besides the sliders (test state, never saved): the form each axis shows and the member each family shows (see forms.ts), the objects
+// and groups switched off, and the objects to show whatever their class says (the pattern or the member being edited: a family then shows only those).
+export interface SolveOptions { forms?: Choices; hidden?: Iterable<string>; show?: Iterable<string> }
 
 export function solve(c: ModelContent, values: Values = {}, view: View = 'front', opts: SolveOptions = {}): Solved {
   const axis = c.axis ?? 100
@@ -210,6 +214,7 @@ export function solve(c: ModelContent, values: Values = {}, view: View = 'front'
   const val = (r: ModelRange) => valueOf(r, values)
   const choices: Choices = opts.forms ?? {}
   const hidden = new Set(opts.hidden ?? [])
+  const show = new Set(opts.show ?? [])
 
   // the whole model: sliders that scale it (Height) about its feet, and the back view, which turns the figure round
   let gx = 1, gy = 1
@@ -237,11 +242,29 @@ export function solve(c: ModelContent, values: Values = {}, view: View = 'front'
     const oid = objectOfShape.get(sid), o = oid ? objectMap.get(oid) : undefined
     return o ? overrideFor(o, sid, choices) : undefined
   }
+  // The same for a shape of a class member that follows `tid`, a shape of the template: the template's forms, with the member's own choice on each axis.
+  const memberForm = (tid: string, memberId: string | undefined): ModelPoint[] | undefined => {
+    const oid = objectOfShape.get(tid), t = oid ? objectMap.get(oid) : undefined
+    return t && memberId ? overrideFor(t, tid, choices, memberId) : undefined
+  }
+  // What a class switches off: the template once it has members (it is a pattern; unless it is the thing being shown), and in a family every member but the one
+  // shown. A twin goes with the object it mirrors.
+  const classOff = new Set<string>()
+  for (const k of classesOf(c)) {
+    const tpl = objectMap.get(k.template), members = membersOf(c, k.id)
+    if (!tpl || members.length === 0) continue
+    if (!show.has(tpl.id)) classOff.add(tpl.id)
+    if (!k.exclusive) continue
+    const shown = members.filter(m => show.has(m.id))
+    const pick = new Set(shown.length ? shown.map(m => m.id) : show.has(tpl.id) ? [] : [(members.find(m => m.id === choices[classKey(k.id)]) ?? members[0]).id])
+    for (const m of members) if (!pick.has(m.id)) classOff.add(m.id)
+  }
+  for (const o of c.objects) if (o.mirrorOf && classOff.has(o.mirrorOf)) classOff.add(o.id)
   // Whether the shape's object, its group or a group above it is switched off (it is still solved: anchors and links read it).
   const switchedOff = (sid: string): boolean => {
-    if (hidden.size === 0) return false
+    if (hidden.size === 0 && classOff.size === 0) return false
     const oid = objectOfShape.get(sid)
-    if (oid && hidden.has(oid)) return true
+    if (oid && (hidden.has(oid) || classOff.has(oid))) return true
     const seen = new Set<string>()
     for (let gid = groupOfShape.get(sid); gid && !seen.has(gid); gid = groupMap.get(gid)?.parent ?? undefined) {
       if (hidden.has(gid)) return true
@@ -321,10 +344,37 @@ export function solve(c: ModelContent, values: Values = {}, view: View = 'front'
     }
   }
 
+  // The outline of a shape that has points of its own: the base outline linked and driven (what the rig reads), and what is drawn: a chosen form's outline in its
+  // place, or in the back view the outline of its own for the back. An empty form outline hides the shape in every view.
+  function plainOutline(sh: ModelShape, Mg: Mat, form: ModelPoint[] | undefined): { rig: ModelPoint[]; drawn: ModelPoint[] } {
+    const rig = sh.pts.map(copyPoint)
+    link(sh, rig, Mg)
+    drive(sh, rig, sh.pts)
+    let drawn = rig
+    if (form) {
+      drawn = form.map(copyPoint)
+      link(sh, drawn, Mg)
+      drive(sh, drawn, sh.pts)
+    }
+    if (view === 'back' && sh.back && sh.back.length >= 3 && !(form && form.length === 0)) {
+      drawn = sh.back.map(copyPoint)
+      link(sh, drawn, Mg)
+      drive(sh, drawn, sh.back)
+    }
+    return { rig, drawn }
+  }
+  const groupMatOf = (shapeId: string): Mat => { const gid = groupOfShape.get(shapeId); return gid ? groupMat(gid) : IDENTITY }
+
   function place(sh: ModelShape, groupId: string | null, Mg: Mat) {
     const original = sh.mirrorOf && sh.mirrorOf !== sh.id ? shapeMap.get(sh.mirrorOf) : undefined
     const twin = original && !original.mirrorOf ? original : undefined
-    let rig: ModelPoint[], drawn: ModelPoint[], closed = sh.closed
+    let rig: ModelPoint[], drawn: ModelPoint[], closed = sh.closed, ghost = ''
+    // a shape of a class member follows a shape of the template; with no points of its own it is drawn as the template's shape is, in the member's own group,
+    // under the member's own choice of form
+    const followed = !twin && sh.copyOf ? shapeMap.get(sh.copyOf) : undefined
+    const tpl = followed && !followed.mirrorOf && !followed.copyOf ? followed : undefined
+    const memberObject = tpl ? objectMap.get(objectOfShape.get(sh.id) ?? '') : undefined
+    const memberId = memberObject?.classOf ? memberObject.id : undefined
     if (twin) {
       // a twin is the mirror image of its original as the original is drawn: its points are the reflection of the original's (in the group's own space,
       // so a group turned with the original is turned the other way round on the twin's side)
@@ -332,23 +382,17 @@ export function solve(c: ModelContent, values: Values = {}, view: View = 'front'
       rig = o ? reflectList(o.rig, axis) : []
       drawn = o ? reflectList(o.local, axis) : []
       closed = twin.closed
+    } else if (tpl && sh.pts.length < 3) {
+      const o = plainOutline(tpl, groupMatOf(tpl.id), memberForm(tpl.id, memberId))
+      rig = o.rig; drawn = o.drawn; closed = tpl.closed
     } else {
       // The rig always reads the base outline. A form gives only the drawn outline (it still gets the shape's links and, when it has as many points as the
       // base, its recorded moves); an empty one hides the shape in every view.
-      rig = sh.pts.map(copyPoint)
-      link(sh, rig, Mg)
-      drive(sh, rig, sh.pts)
-      drawn = rig
-      const form = formOutline(sh.id)
-      if (form) {
-        drawn = form.map(copyPoint)
-        link(sh, drawn, Mg)
-        drive(sh, drawn, sh.pts)
-      }
-      if (view === 'back' && sh.back && sh.back.length >= 3 && !(form && form.length === 0)) {
-        drawn = sh.back.map(copyPoint)
-        link(sh, drawn, Mg)
-        drive(sh, drawn, sh.back)
+      const o = plainOutline(sh, Mg, tpl ? memberForm(tpl.id, memberId) : formOutline(sh.id))
+      rig = o.rig; drawn = o.drawn
+      if (tpl) {
+        const g = plainOutline(tpl, groupMatOf(tpl.id), memberForm(tpl.id, memberId)).drawn
+        ghost = g.length >= 3 ? pathText(build(g, tpl.closed, mul(G, Mg)), tpl.closed) : ''
       }
     }
     const ok = rig.length >= 3 && drawn.length >= 3
@@ -357,10 +401,10 @@ export function solve(c: ModelContent, values: Values = {}, view: View = 'front'
     const fin = ok ? build(drawn, closed, matrix) : []
     const poly = ok ? flatten(fin, closed) : []
     out.shapes[sh.id] = {
-      id: sh.id, group: groupId, local: drawn, rig, matrix, frame: Mg,
+      id: sh.id, group: groupId, local: drawn, rig, matrix, frame: Mg, ghost,
       pre: rig.length >= 3 ? build(rig, closed, Mg) : [],   // from the base outline even where a form hides the shape: anchors and links still read it
       d: ok ? pathText(fin, closed) : '', poly, box: poly.length ? boxOf(poly) : NO_BOX,
-      visible: ok && (sh.view === 'both' || sh.view === view) && !off, off, z: view === 'back' && sh.zBack != null ? sh.zBack : sh.z,
+      visible: ok && (sh.view === 'both' || sh.view === view) && !off && !sh.hide, off, z: view === 'back' && sh.zBack != null ? sh.zBack : sh.z,
     }
   }
 

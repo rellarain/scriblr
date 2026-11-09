@@ -33,7 +33,7 @@ describe('the model types match the backend schema', () => {
     ['ModelPoint', 'ModelPoint'], ['ModelShape', 'ModelShape'], ['ModelObject', 'ModelObject'], ['ModelGroup', 'ModelGroup'],
     ['ModelContent', 'ModelContent'], ['PublishedModel', 'PublishedModel'], ['ModelEntry', 'ModelEntry'], ['ModelCatalog', 'ModelCatalog'],
     ['ModelAttach', 'ModelAttach'], ['ModelMove', 'ModelMove'], ['ModelDrive', 'ModelDrive'], ['ModelRange', 'ModelRange'], ['ModelBind', 'ModelBind'],
-    ['ModelOverride', 'ModelOverride'], ['ModelForm', 'ModelForm'], ['ModelAxis', 'ModelAxis'], ['ModelPreset', 'ModelPreset'],
+    ['ModelOverride', 'ModelOverride'], ['ModelForm', 'ModelForm'], ['ModelAxis', 'ModelAxis'], ['ModelPreset', 'ModelPreset'], ['ModelClass', 'ModelClass'],
   ]
   for (const [python, ts] of pairs) {
     it(`${ts} has the fields of ${python}`, () => {
@@ -96,6 +96,11 @@ describe('the limits are the backend\'s numbers', () => {
     expect(LIMITS.presetsWarn).toBe(number('MODEL_PRESETS_WARN'))
     expect(LIMITS.presetsMax).toBe(number('MODEL_PRESETS_MAX'))
     expect(KIND_MAX).toBe(number('MODEL_KIND_MAX'))
+    expect(LIMITS.classesWarn).toBe(number('MODEL_CLASSES_WARN'))
+    expect(LIMITS.classesMax).toBe(number('MODEL_CLASSES_MAX'))
+    expect(LIMITS.membersWarn).toBe(number('MODEL_MEMBERS_WARN'))
+    expect(LIMITS.membersMax).toBe(number('MODEL_MEMBERS_MAX'))
+    expect(LIMITS.presetFormsMax).toBe(number('MODEL_PRESET_FORMS_MAX'))
   })
   it('for the mirror line', () => {
     const m = /MODEL_AXIS_RANGE\s*=\s*\(([-\d.]+),\s*([-\d.]+)\)/.exec(schema)

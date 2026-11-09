@@ -1,9 +1,10 @@
 import { useEffect, useMemo, useRef, useState, type KeyboardEvent } from 'react'
 import type { ModelContent, ModelEntry, ModelLayer, ModelShape } from '../../../../api/types'
 import {
-  BackIcon, CheckIcon, CopyIcon, CursorIcon, ExportIcon, EyeOffIcon, FitIcon, FrontIcon, GridLinesIcon, HandIcon, HistoryIcon, PathIcon, RedoIcon, RestoreIcon, RulerIcon, SlidersIcon, SwapIcon, TrashIcon, UndoIcon, ZoomInIcon, ZoomOutIcon,
+  BackIcon, CheckIcon, CopyIcon, CursorIcon, ExportIcon, EyeOffIcon, FitIcon, StampIcon, FrontIcon, GridLinesIcon, HandIcon, HistoryIcon, PathIcon, RedoIcon, RestoreIcon, RulerIcon, SlidersIcon, SwapIcon, TrashIcon, UndoIcon, ZoomInIcon, ZoomOutIcon,
 } from '../../../icons'
 import { AssetTree, type TreeActions, type TreeMode } from './AssetTree'
+import type { ClassActions } from './ClassPanel'
 import { CheckPanel } from './CheckPanel'
 import { DesignerCanvas, type PivotMarker, type PoseCanvas, type PoseGrab } from './DesignerCanvas'
 import { FormsTab, type FormActions } from './FormsTab'
@@ -15,15 +16,16 @@ import { PreviewStrip } from './PreviewStrip'
 import { RangesTab } from './RangesTab'
 import { RigTab } from './RigTab'
 import { TemplateMenu } from './TemplateMenu'
-import { NONE, contextObject, repair, rightClickGrid, rightClickShape, type EditMode, type Selection } from './designerState'
+import { NONE, contextObject, repair, rightClickGrid, rightClickShape, showFor, type EditMode, type Selection } from './designerState'
+import { addMember, deleteClass, detachBeforeRemoval, detachMember, followTemplate, makeClass, moveObjectToGroup, reconcileClasses, renameClass, setExclusive, setShapeHide } from './engine/classEdit'
 import { newShape } from './engine/edit'
 import { addAxis, addForm, hideInForm, moveAxis, moveForm, overrideState, removeAxis, removeForm, renameAxis, renameForm, setInitialForm, setOverride, useBaseOutline } from './engine/formEdit'
-import { presetsOf, targetForShape } from './engine/forms'
+import { classKey, presetsOf, targetForShape } from './engine/forms'
 import { apply, inverse } from './engine/geometry'
 import { LIMITS } from './engine/limits'
 import { emptyHistory, redo as redoHistory, remember, undo as undoHistory, type History } from './engine/history'
 import { beginScale, beginTurn, grabPoint, moveScale, moveTurn, poseTarget, reach, reachJoints, scaleDriver, slideValue, toModel, turnDrivers, type ReachGrab, type ScaleDrag, type TurnDrag } from './engine/pose'
-import { deletePreset, renamePreset, savePreset, updatePreset } from './engine/presets'
+import { deletePreset, renamePreset, savePreset, saveStyle, updatePreset } from './engine/presets'
 import { chainOf, isPointDriven, restPivot, solve, type Solved, type Values } from './engine/rig'
 import {
   addBend, addRange, addScale, addTurn, attachFromClick, attachGroup, clearPointMoves, detachGroup, groupOfShape, newRange, recordPoints, removeDrive, removeRange, renameRange, reparent,
@@ -114,6 +116,7 @@ export function ModelPane({ entry, models, makeId, onRemove, onDuplicate, onExpo
   const [reachOn, setReachOn] = useState(false)
   const [poseStatus, setPoseStatus] = useState(POSE_HINT)
   const [poseActive, setPoseActive] = useState<string | null>(null)
+  const [ghost, setGhost] = useState(false)
   const poseRef = useRef<PoseDrag | null>(null)
   const historyRef = useRef(history)
   historyRef.current = history
@@ -126,7 +129,9 @@ export function ModelPane({ entry, models, makeId, onRemove, onDuplicate, onExpo
 
   // while a shape is recorded the canvas shows the copy being dragged, with every slider at rest
   const shown = useMemo(() => (recording ? updateShape(content, recording.shapeId, () => recording.draft) : content), [content, recording])
-  const solved = useMemo(() => solve(shown, recording ? {} : values, view, recording ? {} : { forms: test.forms, hidden: test.hidden }), [shown, values, recording, view, test.forms, test.hidden])
+  // the selected object is drawn whatever its class says (a pattern, or a member of a family that is not the one chosen), so it can be looked at and edited
+  const show = useMemo(() => showFor(content, sel), [content, sel])
+  const solved = useMemo(() => solve(shown, recording ? {} : values, view, recording ? {} : { forms: test.forms, hidden: test.hidden, show }), [shown, values, recording, view, test.forms, test.hidden, show])
   const group = groupOfSelection(content, sel)
   const valuesRef = useRef(values)
   valuesRef.current = values
@@ -139,7 +144,7 @@ export function ModelPane({ entry, models, makeId, onRemove, onDuplicate, onExpo
   const formTarget = selShape && !selShape.mirrorOf && !recording ? formTargetIn(content, selShape.id) : null
   const hiddenByForm = !!formTarget && overrideState(formTarget.form, formTarget.shapeId) === 'hidden'
   const switchedOff = !!selShape && !!solved.shapes[selShape.id]?.off
-  const editable = !!selShape && !pointDriven && !selShape.mirrorOf && !hiddenByForm && !switchedOff
+  const editable = !!selShape && !pointDriven && !selShape.mirrorOf && !hiddenByForm && !switchedOff && !selShape.hide
   // What the canvas draws and edits for the selected shape: the points as the rig puts them (links resolved), in the view being edited. A twin is shown the same
   // way, but not edited.
   const canvasContent = useMemo(() => {
@@ -160,7 +165,9 @@ export function ModelPane({ entry, models, makeId, onRemove, onDuplicate, onExpo
   // A change that is one undo step of its own.
   function commit(next: ModelContent, immediate = false) {
     setHistory(h => remember(h, content))
-    models.edit(entry.id, () => next, immediate)
+    // every member has a shape for each shape of its pattern: an edit that added or took away a pattern's shape reaches them here
+    const synced = reconcileClasses(next, makeId)
+    models.edit(entry.id, () => synced, immediate)
     setNote('')
   }
   // Apply what a rig operation returns: the new content, or why it cannot.
@@ -213,7 +220,7 @@ export function ModelPane({ entry, models, makeId, onRemove, onDuplicate, onExpo
     }
     // points recorded or linked by number cannot survive a change in how many there are
     let base = content, cleared: string[] = [], cut: string[] = []
-    if (old.pts.length !== next.pts.length) {
+    if (outlineSize(content, old) !== next.pts.length) {
       const r = clearPointMoves(content, id)
       const l = clearLinksTo(r.content, id)
       base = l.content; cleared = r.cleared; cut = l.cut
@@ -509,9 +516,26 @@ export function ModelPane({ entry, models, makeId, onRemove, onDuplicate, onExpo
     hideShape: (objectId, axisId, formId, shapeId) => { applyEdit(hideInForm(content, objectId, axisId, formId, shapeId)) },
     useBase: (objectId, axisId, formId, shapeId) => { applyEdit(useBaseOutline(content, objectId, axisId, formId, shapeId)) },
   }
+  const classes: ClassActions = {
+    select: choose,
+    makeClass: (objectId, name, exclusive) => { applyEdit(makeClass(content, objectId, name, exclusive, makeId)) },
+    renameClass: (classId, name) => models.edit(entry.id, c => renameClass(c, classId, name), false),
+    setExclusive: (classId, exclusive) => commit(setExclusive(content, classId, exclusive), true),
+    addMember: classId => {
+      const e = addMember(content, classId, makeId)
+      if (applyEdit(e) && e.ok && e.memberId) choose({ kind: 'object', id: e.memberId })
+    },
+    detach: memberId => { applyEdit(detachMember(content, memberId)) },
+    deleteClass: classId => { applyEdit(deleteClass(content, classId)) },
+    showMember: (classId, memberId) => test.setChoice(classKey(classId), memberId),
+    moveToGroup: (objectId, groupId) => { applyEdit(moveObjectToGroup(content, objectId, groupId)) },
+    followTemplate: shapeId => commit(followTemplate(content, shapeId), true),
+    hideShape: (shapeId, hide) => commit(setShapeHide(content, shapeId, hide), true),
+  }
   const presets: PresetActions = {
     apply: id => { const p = presetsOf(content).find(x => x.id === id); if (p) { setScrubbing(null); test.apply(content, p) } },
     save: (name, kind) => { applyEdit(savePreset(content, test.state, name, kind, makeId)) },
+    saveStyle: (scopeId, name) => { applyEdit(saveStyle(content, test.state, scopeId, name, 'Style', makeId)) },
     update: id => commit(updatePreset(content, id, test.state), true),
     rename: (id, name) => models.edit(entry.id, c => renamePreset(c, id, name), false),
     remove: id => commit(deletePreset(content, id), true),
@@ -567,10 +591,14 @@ export function ModelPane({ entry, models, makeId, onRemove, onDuplicate, onExpo
       choose({ kind: 'shape', id: copyId })
     },
     onDelete: s => {
+      if (s.kind === 'shape' && shapeById(content, s.id)?.copyOf) { setNote('A shape that follows the pattern cannot be deleted: hide it in this member instead (the Shape tab).'); return }
       const twins = twinsOf(content, s.kind === 'none' ? 'shape' : s.kind, s.kind === 'none' ? '' : s.id).length
-      commit(s.kind === 'shape' ? removeShape(content, s.id) : s.kind === 'object' ? removeObject(content, s.id) : removeGroup(content, s.id), true)
+      // the members of a class whose pattern goes keep their look: they are detached first
+      const base = s.kind === 'none' ? content : detachBeforeRemoval(content, s.kind === 'shape' ? { shapes: [s.id] } : s.kind === 'object' ? { objects: [s.id] } : { groups: [s.id] })
+      commit(s.kind === 'shape' ? removeShape(base, s.id) : s.kind === 'object' ? removeObject(base, s.id) : removeGroup(base, s.id), true)
       setSel(NONE)
-      if (twins) setNote('Its twin went with it.')
+      if (base !== content) setNote('The members of its class were detached first: they keep their look.')
+      else if (twins) setNote('Its twin went with it.')
     },
     onMoveShape: (objectId, shapeId, dir) => {
       const list = objectById(content, objectId)?.shapes ?? []
@@ -671,6 +699,9 @@ export function ModelPane({ entry, models, makeId, onRemove, onDuplicate, onExpo
     : formTarget && selShape ? `Editing the form ${formTarget.form.name.trim() || 'chosen'} of ${formTarget.axis.name.trim() || 'the axis'}: the points you move change only this form.`
     : selShape && switchedOff ? `${selShape.name.trim() || 'This shape'} is switched off with the eye: show it to edit it.`
     : selShape?.mirrorOf ? `This is the twin of ${shapeById(content, selShape.mirrorOf)?.name.trim() || 'another shape'}: it mirrors it. Edit the original, or break the pair.`
+    : selShape?.copyOf && selShape.hide ? `${selShape.name.trim() || 'This shape'} is left out of this member: show it again in the Shape tab to edit it.`
+    : selShape?.copyOf && selShape.pts.length < 3 ? `${selShape.name.trim() || 'This shape'} follows the pattern: move a point to give it an outline of its own, or edit the pattern.`
+    : selShape?.copyOf ? `${selShape.name.trim() || 'This shape'} has an outline of its own: follow the pattern again from the Shape tab to drop it.`
     : selShape && view === 'back' ? 'Back view: a shape shows its front outline from behind until you edit its points here; then it has an outline of its own for the back.'
     : selShape && pointDriven ? 'A slider changes this shape\'s points and is away from rest: set the sliders back to rest to edit it.'
     : selShape ? (mode === 'points' ? 'Point editor: drag a point or a handle; double-click an edge to add a point.' : 'Move shape: drag the shape.')
@@ -722,6 +753,7 @@ export function ModelPane({ entry, models, makeId, onRemove, onDuplicate, onExpo
               <button type="button" className={`cmIconBtn${mirror ? ' cmIconBtn--on' : ''}`} aria-label="Mirror editing" title="Mirror editing: a point and its twin move together" aria-pressed={mirror} onClick={() => setMirror(m => !m)}><SwapIcon size={14} /></button>
               <button type="button" className={`cmIconBtn${snap ? ' cmIconBtn--on' : ''}`} aria-label="Snap" title="Snap to half units and the mirror line" aria-pressed={snap} onClick={() => setSnap(s => !s)}><RulerIcon size={14} /></button>
               <button type="button" className={`cmIconBtn${grid ? ' cmIconBtn--on' : ''}`} aria-label="Grid" title="Grid" aria-pressed={grid} onClick={() => setGrid(g => !g)}><GridLinesIcon size={14} /></button>
+              <button type="button" className={`cmIconBtn${ghost ? ' cmIconBtn--on' : ''}`} aria-label="Ghost of the pattern" title="Ghost of the pattern: a dashed line where the pattern's outline is, behind a member's own outline" aria-pressed={ghost} onClick={() => setGhost(g => !g)}><StampIcon size={14} /></button>
               <span className="cmSep" aria-hidden="true" />
               <button type="button" className={`cmIconBtn${view === 'front' ? ' cmIconBtn--on' : ''}`} aria-label="Front view" title="Front view" aria-pressed={view === 'front'} disabled={!!recording} onClick={() => { setView('front') }}><FrontIcon size={14} /></button>
               <button type="button" className={`cmIconBtn${view === 'back' ? ' cmIconBtn--on' : ''}`} aria-label="Back view" title="Back view: the figure turned round" aria-pressed={view === 'back'} disabled={!!recording} onClick={() => { setView('back'); setLinkMode(null) }}><BackIcon size={14} /></button>
@@ -741,7 +773,7 @@ export function ModelPane({ entry, models, makeId, onRemove, onDuplicate, onExpo
             {empty && <p className="cmHint">No shape yet. Use New shape to start from a template, or the + beside a layer in the tree.</p>}
             <DesignerCanvas
               content={canvasContent} solved={solved} sel={sel} mode={mode} selPoint={selPoint} mirror={mirror} snap={snap} grid={grid} zoom={zoom} fitAll={fitAll} axis={content.axis}
-              editable={editable || (!!recording && !!selShape)} pivot={pivot} anchor={anchorSpot} pick={pick} onPick={onPick} pose={poseCanvas}
+              editable={editable || (!!recording && !!selShape)} pivot={pivot} anchor={anchorSpot} pick={pick} onPick={onPick} pose={poseCanvas} ghost={ghost}
               linked={selShape ? selShape.pts.flatMap((pt, i) => (pt.bind ? [i] : [])) : []} onNudgeLink={nudgeLink} onPivot={movePivot} onPivotNudge={nudgePivot}
               onSelect={choose} onSelectPoint={setSelPoint}
               onGesture={() => { if (!recording) setHistory(h => remember(h, content)) }}
@@ -757,7 +789,7 @@ export function ModelPane({ entry, models, makeId, onRemove, onDuplicate, onExpo
           </div>
           {drawer && (
             <Inspector
-              content={canvasContent} sel={sel} view={view} linkMode={linkMode} pairs={pairs} selPoint={selPoint} mirror={mirror} onSelectPoint={setSelPoint}
+              content={canvasContent} sel={sel} view={view} linkMode={linkMode} pairs={pairs} classes={classes} choices={test.forms} selPoint={selPoint} mirror={mirror} onSelectPoint={setSelPoint}
               onRename={(s, name) => models.edit(entry.id, c => (s.kind === 'shape' ? renameShape(c, s.id, name) : s.kind === 'object' ? renameObject(c, s.id, name) : renameGroup(c, s.id, name)), false)}
               onSetLayer={(id, layer) => commit({ ...content, objects: content.objects.map(o => (o.id === id ? { ...o, layer } : o)) })}
               onEditShape={editShape}
@@ -765,7 +797,7 @@ export function ModelPane({ entry, models, makeId, onRemove, onDuplicate, onExpo
               onAxis={(dir, big) => commit(setAxis(content, content.axis + dir * (big ? 5 : 1)), true)}
               rigTab={<RigTab content={content} group={group} picking={pickOn} actions={rigActions} pairs={pairs} />}
               rangesTab={<RangesTab content={content} sel={sel} group={group} values={values} recording={recording} scrubbing={scrubbing} filter={rangeFilter} onFilter={setRangeFilter} actions={rigActions} />}
-              formsTab={<FormsTab content={content} sel={sel} state={test.state} actions={forms} />}
+              formsTab={<FormsTab content={content} sel={sel} state={test.state} actions={forms} presets={presets} />}
               presetsTab={<PresetsTab content={content} state={test.state} actions={presets} />}
             />
           )}

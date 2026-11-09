@@ -41,6 +41,13 @@ export function contextObject(c: ModelContent, sel: Selection): string | undefin
   return undefined
 }
 
+// The objects drawn whatever their class says: the one selected (or the one the selected shape is in), so that a pattern, or a member of a family that is not
+// the one chosen, can be looked at and edited.
+export function showFor(c: ModelContent, sel: Selection): string[] {
+  const o = contextObject(c, sel)
+  return o ? [o] : []
+}
+
 // Right-clicking a shape moves through: select it and edit its points, then move the whole shape, then unselect it. Right-clicking the grid
 // unselects everything, to see the end result.
 export function rightClickShape(sel: Selection, mode: EditMode, shapeId: string): { sel: Selection; mode: EditMode } {

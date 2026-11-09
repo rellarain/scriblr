@@ -18,6 +18,7 @@ from .schema import (
     MODEL_COPY_MAX_BYTES,
     MODEL_HISTORY_MAX,
     MODEL_LINKS_MAX,
+    MODEL_MEMBERS_MAX,
     ModelCatalog,
     ModelContent,
     ModelDraftList,
@@ -143,9 +144,16 @@ def _ancestors(parents: dict[str, Optional[str]], group_id: str) -> list[str]:
 
 
 def _outline_size(shapes: dict[str, ModelShape], shape: ModelShape) -> int:
-    """How many points a shape's outline has: a twin has as many as the shape it mirrors."""
+    """How many points a shape's outline has: a twin has as many as the shape it mirrors, a shape that follows its class's template (and has no points of
+    its own) as many as the template's shape."""
     src = shapes.get(shape.mirrorOf) if shape.mirrorOf else None
-    return len(src.pts) if src is not None and src.mirrorOf is None else len(shape.pts)
+    if src is not None and src.mirrorOf is None:
+        return len(src.pts)
+    if shape.copyOf and not shape.pts:
+        tpl = shapes.get(shape.copyOf)
+        if tpl is not None and tpl.copyOf is None:
+            return len(tpl.pts)
+    return len(shape.pts)
 
 
 def _rig_faults(content: ModelContent, parents: dict[str, Optional[str]], circular: bool, owner: dict[str, str], holder: dict[str, str]) -> list[str]:
@@ -293,8 +301,77 @@ def _form_faults(content: ModelContent) -> list[str]:
     return faults
 
 
+def _class_faults(content: ModelContent) -> list[str]:
+    """Classes (phase 3b): the template must be an ordinary object, a member must belong to a class that is there, a shape that follows another must be in a
+    member and follow a shape of its class's template, and a class has at most MODEL_MEMBERS_MAX members. The front end makes the same checks in the same
+    words (modelContent.classFaults)."""
+    faults: list[str] = []
+    objects = {o.id: o for o in content.objects}
+    shapes = {s.id: s for s in content.shapes}
+    classes = {c.id: c for c in content.classes}
+    templates: dict[str, list[str]] = {}
+    for c in content.classes:
+        name = _label(c.name, c.id)
+        tpl = objects.get(c.template)
+        templates.setdefault(c.template, []).append(c.id)
+        if tpl is None:
+            faults.append(f"Class {name} has a template that does not exist.")
+            continue
+        if tpl.classOf:
+            faults.append(f"Class {name} has a template that is a member of a class.")
+        if tpl.mirrorOf:
+            faults.append(f"Class {name} has a template that is a twin; use the original.")
+        members = [o for o in content.objects if o.classOf == c.id]
+        if len(members) > MODEL_MEMBERS_MAX:
+            faults.append(f"Class {name} has more than {MODEL_MEMBERS_MAX} members.")
+    for oid, owners in templates.items():
+        if len(owners) > 1 and oid in objects:
+            faults.append(f"Object {_label(objects[oid].name, oid)} is the template of more than one class.")
+    for o in content.objects:
+        if o.classOf and o.classOf not in classes:
+            faults.append(f"Object {_label(o.name, o.id)} is a member of a class that does not exist.")
+        elif o.classOf and classes[o.classOf].template == o.id:
+            faults.append(f"Object {_label(o.name, o.id)} is a member of the class it is the template of.")
+    member_of = {sid: o for o in content.objects if o.classOf for sid in o.shapes}
+    for s in content.shapes:
+        if not s.copyOf:
+            continue
+        name = _label(s.name, s.id)
+        member = member_of.get(s.id)
+        target = shapes.get(s.copyOf)
+        cls = classes.get(member.classOf or "") if member is not None else None
+        if member is None:
+            faults.append(f"Shape {name} copies a shape but is not in a member of a class.")
+        elif target is None:
+            faults.append(f"Shape {name} copies a shape that does not exist.")
+        elif cls is None or target.id not in (objects[cls.template].shapes if cls.template in objects else []):
+            faults.append(f"Shape {name} copies a shape that is not in the template of its class.")
+        elif target.mirrorOf:
+            faults.append(f"Shape {name} copies a twin; copy the original.")
+    return faults
+
+
+def _style_choice_exists(content: ModelContent, key: str, value: str) -> bool:
+    """Whether a style's form choice names an axis and form (or, for 'class:id', a member) that are there."""
+    if key.startswith("class:"):
+        return any(c.id == key[6:] for c in content.classes) and any(o.id == value and o.classOf == key[6:] for o in content.objects)
+    classes = {c.id: c for c in content.classes}
+    objects = {o.id: o for o in content.objects}
+    for o in content.objects:
+        if not key.startswith(o.id + "."):
+            continue
+        owner = o
+        if o.classOf and o.classOf in classes:
+            owner = objects.get(classes[o.classOf].template, o)
+        axis_id = key[len(o.id) + 1:]
+        if any(a.id == axis_id and any(f.id == value for f in a.options) for a in owner.axes):
+            return True
+    return False
+
+
 def _preset_faults(content: ModelContent) -> list[str]:
-    """Presets: the sliders they set and the objects and groups they hide must be there."""
+    """Presets and styles: the sliders they set and the objects and groups they hide must be there, a style's scope must exist and the forms it chooses
+    must be there."""
     faults: list[str] = []
     range_ids = {r.id for r in content.ranges}
     thing_ids = {o.id for o in content.objects} | {g.id for g in content.groups}
@@ -304,6 +381,10 @@ def _preset_faults(content: ModelContent) -> list[str]:
             faults.append(f"Preset {name} sets a slider that does not exist.")
         if any(h not in thing_ids for h in p.hidden):
             faults.append(f"Preset {name} hides something that does not exist.")
+        if p.scope is not None and p.scope not in thing_ids:
+            faults.append(f"Preset {name} belongs to something that does not exist.")
+        if any(not _style_choice_exists(content, k, v) for k, v in p.forms.items()):
+            faults.append(f"Preset {name} chooses a form that does not exist.")
     return faults
 
 
@@ -316,7 +397,7 @@ def publish_faults(content: ModelContent) -> list[str]:
     object_ids = {o.id for o in content.objects}
     group_ids = {g.id for g in content.groups}
     for s in content.shapes:
-        if len(s.pts) < 3 and not s.mirrorOf:
+        if len(s.pts) < 3 and not s.mirrorOf and not (s.copyOf and not s.pts):
             faults.append(f"Shape {_label(s.name, s.id)} needs at least 3 points.")
     owner: dict[str, str] = {}
     for o in content.objects:
@@ -346,6 +427,7 @@ def publish_faults(content: ModelContent) -> list[str]:
     faults.extend(_pair_faults(content))
     faults.extend(_link_faults(content))
     faults.extend(_form_faults(content))
+    faults.extend(_class_faults(content))
     faults.extend(_preset_faults(content))
     size = copy_bytes(content)
     if size > MODEL_COPY_MAX_BYTES:

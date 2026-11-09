@@ -27,6 +27,12 @@ export const LIMITS = {
   formsMax: 48,
   presetsWarn: 40,
   presetsMax: 80,
+  // classes: per model, members per class, form choices one style keeps
+  classesWarn: 12,
+  classesMax: 24,
+  membersWarn: 12,
+  membersMax: 24,
+  presetFormsMax: 100,
   // how many of each a model may hold (the server's caps)
   shapesMax: 600,
   objectsMax: 200,
@@ -80,6 +86,12 @@ export function limitNotes(content: ModelContent): LimitNote[] {
   }
   const presets = (content.presets ?? []).length
   add(level(presets, LIMITS.presetsWarn, LIMITS.presetsMax), `The model has ${presets} presets: the warning starts above ${LIMITS.presetsWarn}.`, `The model has ${presets} presets: the limit is ${LIMITS.presetsMax}.`)
+  const classes = (content.classes ?? []).length
+  add(level(classes, LIMITS.classesWarn, LIMITS.classesMax), `The model has ${classes} classes: the warning starts above ${LIMITS.classesWarn}.`, `The model has ${classes} classes: the limit is ${LIMITS.classesMax}.`)
+  for (const k of content.classes ?? []) {
+    const members = content.objects.filter(o => o.classOf === k.id).length
+    add(level(members, LIMITS.membersWarn, LIMITS.membersMax), `Class ${k.name || k.id} has ${members} members: the warning starts above ${LIMITS.membersWarn}.`, `Class ${k.name || k.id} has ${members} members: the limit is ${LIMITS.membersMax}.`)
+  }
   const links = linkCount(content)
   if (links > LIMITS.linksWarn) notes.push({ level: links > LIMITS.linksMax ? 'stop' : 'warn', text: links > LIMITS.linksMax ? `The model has ${links} point links: the limit is ${LIMITS.linksMax}, so it cannot be published.` : `The model has ${links} point links: the warning starts above ${LIMITS.linksWarn}.` })
   for (const g of content.groups) {

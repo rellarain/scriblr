@@ -259,6 +259,11 @@ span.cmTreeTwisty { cursor: default; }
 .cmAnchor { fill: var(--accent); stroke: var(--ink); stroke-width: 1; vector-effect: non-scaling-stroke; pointer-events: none; }
 .cmCanvas--pick { cursor: copy; }
 .cmShape--twin { stroke-dasharray: 5 3; }
+// the outline of the pattern behind a member's own outline: a dashed line, never filled and never picked
+.cmGhost { fill: none; stroke: var(--ink-muted); stroke-width: 1; stroke-opacity: 0.75; stroke-dasharray: 4 3; vector-effect: non-scaling-stroke; pointer-events: none; }
+// classes: the pattern's and the members' panel in the Shape tab
+.cmClass { display: flex; flex-direction: column; gap: var(--space-2); }
+.cmMembers { display: flex; flex-direction: column; gap: var(--space-1); margin: 0; padding-left: 0; list-style: none; small { color: var(--ink-muted); } }
 .cmPoint--linked { fill: var(--ink); stroke: var(--accent); stroke-width: 2.5; cursor: pointer; }
 .cmTwin { display: inline-flex; align-items: center; flex: 0 0 auto; color: var(--ink-muted); }
 .cmLinks .cmPlain { padding-left: 0; list-style: none; gap: var(--space-3); }

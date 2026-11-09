@@ -4,7 +4,7 @@ import { CheckIcon, PlayIcon, SaveIcon, TrashIcon } from '../../../icons'
 import { presetsOf } from './engine/forms'
 import { LIMITS } from './engine/limits'
 import { isOn, kindsOf, type TestState } from './engine/presets'
-import { KIND_MAX, NAME_MAX } from './modelContent'
+import { KIND_MAX, NAME_MAX, groupById, objectById } from './modelContent'
 
 // The Presets tab: a preset is a named set of slider values and of objects and groups switched off (a pose, an expression, an age, a build, an outfit).
 // Its kind is the slot it fills: applying a preset puts back whatever any other preset of the same kind controls, then sets its own, so a pose replaces the
@@ -15,7 +15,11 @@ export interface PresetActions {
   update: (id: string) => void
   rename: (id: string, name: string) => void
   remove: (id: string) => void
+  // Keep the current look of an object or a group as a style (a preset that belongs to it).
+  saveStyle: (scopeId: string, name: string) => void
 }
+
+const label = (name: string, fallback: string) => name.trim() || fallback
 
 export function PresetsTab({ content, state, actions }: { content: ModelContent; state: TestState; actions: PresetActions }) {
   const [filter, setFilter] = useState<string>('all')
@@ -68,7 +72,7 @@ export function PresetsTab({ content, state, actions }: { content: ModelContent;
                 <input className="cmSliderName" aria-label={`Name of preset ${title}`} value={p.name} maxLength={NAME_MAX} placeholder="Name" onChange={e => actions.rename(p.id, e.target.value)} />
                 {on && <span className="cmOn" role="img" aria-label={`${title} is on`} title="The sliders and hidden things are as this preset sets them"><CheckIcon size={12} /> On</span>}
               </div>
-              <p className="cmInsText">{p.kind} · {Object.keys(p.values).length} slider{Object.keys(p.values).length === 1 ? '' : 's'}, {p.hidden.length} hidden</p>
+              <p className="cmInsText">{p.scope ? `${p.kind} of ${label(objectById(content, p.scope)?.name ?? groupById(content, p.scope)?.name ?? '', 'something gone')}` : p.kind} · {Object.keys(p.values).length} slider{Object.keys(p.values).length === 1 ? '' : 's'}, {p.hidden.length} hidden{p.scope ? `, ${Object.keys(p.forms ?? {}).length} form choice${Object.keys(p.forms ?? {}).length === 1 ? '' : 's'}` : ''}</p>
               <div className="cmInline">
                 <button type="button" className="cmBtn cmBtn--small" aria-label={`Apply ${title}`} title="Set the sliders and the hidden things to this preset" onClick={() => actions.apply(p.id)}><PlayIcon size={12} /> Apply</button>
                 <button type="button" className="cmIconBtn cmIconBtn--small" aria-label={`Update ${title} from the current`} title="Replace what this preset keeps with the current sliders and hidden things" onClick={() => actions.update(p.id)}><SaveIcon size={12} /></button>

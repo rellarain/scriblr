@@ -30,12 +30,13 @@ export function normalizeContent(c: ModelContent): ModelContent {
     ...c,
     name: clean(c.name, NAME_MAX),
     description: clean(c.description, DESCRIPTION_MAX),
-    shapes: c.shapes.map(s => ({ ...s, name: clean(s.name, NAME_MAX), mirrorOf: s.mirrorOf ?? null, back: s.back ?? null, zBack: s.zBack ?? null, loose: s.loose ?? null })),
-    objects: c.objects.map(o => ({ ...o, name: clean(o.name, NAME_MAX), mirrorOf: o.mirrorOf ?? null, axes: (o.axes ?? []).map(a => ({ ...a, name: clean(a.name, NAME_MAX), options: a.options.map(f => ({ ...f, name: clean(f.name, NAME_MAX) })) })) })),
+    shapes: c.shapes.map(s => ({ ...s, name: clean(s.name, NAME_MAX), mirrorOf: s.mirrorOf ?? null, back: s.back ?? null, zBack: s.zBack ?? null, loose: s.loose ?? null, copyOf: s.copyOf ?? null, hide: s.hide === true })),
+    objects: c.objects.map(o => ({ ...o, name: clean(o.name, NAME_MAX), mirrorOf: o.mirrorOf ?? null, classOf: o.classOf ?? null, axes: (o.axes ?? []).map(a => ({ ...a, name: clean(a.name, NAME_MAX), options: a.options.map(f => ({ ...f, name: clean(f.name, NAME_MAX) })) })) })),
     groups: c.groups.map(g => ({ ...g, name: clean(g.name, NAME_MAX), pivot: g.pivot ?? null, attach: g.attach ?? null, mirrorOf: g.mirrorOf ?? null })),
     axis: c.axis ?? 100,
     ranges: (c.ranges ?? []).map(r => ({ ...r, name: clean(r.name, RANGE_NAME_MAX) })),
-    presets: (c.presets ?? []).map(p => ({ ...p, name: clean(p.name, NAME_MAX), kind: clean(p.kind, KIND_MAX) || 'Pose' })),
+    presets: (c.presets ?? []).map(p => ({ ...p, name: clean(p.name, NAME_MAX), kind: clean(p.kind, KIND_MAX) || 'Pose', scope: p.scope ?? null, forms: p.forms ?? {} })),
+    classes: (c.classes ?? []).map(k => ({ ...k, name: clean(k.name, NAME_MAX), exclusive: k.exclusive === true })),
   }
 }
 
@@ -117,13 +118,14 @@ export function addShape(c: ModelContent, objectId: string, shape: ModelShape, a
 
 // What goes when these shapes, objects and groups go: their twins too (a twin is nothing without its original), and a group's objects and an object's
 // shapes with it. Repeats until nothing more is added.
-function goneWith(c: ModelContent, seed: { shapes?: string[]; objects?: string[]; groups?: string[] }) {
+export function goneWith(c: ModelContent, seed: { shapes?: string[]; objects?: string[]; groups?: string[] }) {
   const shapes = new Set(seed.shapes ?? []), objects = new Set(seed.objects ?? []), groups = new Set(seed.groups ?? [])
   for (let grew = true; grew;) {
     const before = shapes.size + objects.size + groups.size
     for (const g of c.groups) if (g.mirrorOf && groups.has(g.mirrorOf)) groups.add(g.id)
     for (const o of c.objects) if (o.mirrorOf && objects.has(o.mirrorOf)) objects.add(o.id)
     for (const s of c.shapes) if (s.mirrorOf && shapes.has(s.mirrorOf)) shapes.add(s.id)
+    for (const s of c.shapes) if (s.copyOf && shapes.has(s.copyOf)) shapes.add(s.id)
     for (const g of c.groups) if (groups.has(g.id)) for (const oid of g.objects) objects.add(oid)
     for (const o of c.objects) if (objects.has(o.id)) for (const sid of o.shapes) shapes.add(sid)
     grew = shapes.size + objects.size + groups.size > before
@@ -133,16 +135,24 @@ function goneWith(c: ModelContent, seed: { shapes?: string[]; objects?: string[]
 
 function removeAll(c: ModelContent, gone: { shapes: Set<string>; objects: Set<string>; groups: Set<string> }): ModelContent {
   const parentOf = new Map(c.groups.map(g => [g.id, g.parent]))
+  // a class goes with its template; its members stop being members (the page freezes them first, so they keep their look: see classEdit.detachBeforeRemoval)
+  const deadClasses = new Set((c.classes ?? []).filter(k => gone.objects.has(k.template)).map(k => k.id))
   const up = (id: string | null): string | null => { let cur = id; while (cur !== null && gone.groups.has(cur)) cur = parentOf.get(cur) ?? null; return cur }
   return {
     ...c,
     shapes: c.shapes.filter(s => !gone.shapes.has(s.id)).map(s => (s.pts.some(p => p.bind && gone.shapes.has(p.bind.s)) ? { ...s, pts: s.pts.map(p => (p.bind && gone.shapes.has(p.bind.s) ? { ...p, bind: null } : p)) } : s)),
     objects: c.objects.filter(o => !gone.objects.has(o.id)).map(o => ({
-      ...o, shapes: o.shapes.filter(sid => !gone.shapes.has(sid)),
+      ...o, shapes: o.shapes.filter(sid => !gone.shapes.has(sid)), classOf: o.classOf && deadClasses.has(o.classOf) ? null : o.classOf,
       axes: (o.axes ?? []).map(a => ({ ...a, options: a.options.map(f => (f.ovr.some(v => gone.shapes.has(v.shape)) ? { ...f, ovr: f.ovr.filter(v => !gone.shapes.has(v.shape)) } : f)) })),
     })),
     groups: c.groups.filter(g => !gone.groups.has(g.id)).map(g => ({ ...g, parent: up(g.parent), objects: g.objects.filter(oid => !gone.objects.has(oid)) })),
-    presets: (c.presets ?? []).map(p => (p.hidden.some(h => gone.objects.has(h) || gone.groups.has(h)) ? { ...p, hidden: p.hidden.filter(h => !gone.objects.has(h) && !gone.groups.has(h)) } : p)),
+    presets: (c.presets ?? []).filter(p => !(p.scope && (gone.objects.has(p.scope) || gone.groups.has(p.scope)))).map(p => {
+      const forms = p.forms ?? {}
+      const keep = Object.keys(forms).filter(k => !k.startsWith('class:') ? ![...gone.objects].some(o => k.startsWith(`${o}.`)) : !deadClasses.has(k.slice(6)) && !gone.objects.has(forms[k]))
+      const trimmed = keep.length === Object.keys(forms).length ? p : { ...p, forms: Object.fromEntries(keep.map(k => [k, forms[k]])) }
+      return trimmed.hidden.some(h => gone.objects.has(h) || gone.groups.has(h)) ? { ...trimmed, hidden: trimmed.hidden.filter(h => !gone.objects.has(h) && !gone.groups.has(h)) } : trimmed
+    }),
+    classes: (c.classes ?? []).filter(k => !deadClasses.has(k.id)),
   }
 }
 
@@ -169,7 +179,10 @@ export const twinsOf = (c: ModelContent, kind: 'shape' | 'object' | 'group', id:
 // How many points a shape's outline has: a twin has as many as the shape it mirrors.
 export function outlineSize(c: ModelContent, s: ModelShape): number {
   const src = s.mirrorOf ? shapeById(c, s.mirrorOf) : undefined
-  return src && !src.mirrorOf ? src.pts.length : s.pts.length
+  if (src && !src.mirrorOf) return src.pts.length
+  // a shape of a class member with no points of its own follows the template's shape
+  const tpl = s.copyOf && s.pts.length === 0 ? shapeById(c, s.copyOf) : undefined
+  return tpl && !tpl.copyOf ? tpl.pts.length : s.pts.length
 }
 
 export const renameShape = (c: ModelContent, id: string, name: string): ModelContent => updateShape(c, id, s => ({ ...s, name }))
@@ -340,7 +353,53 @@ function formFaults(c: ModelContent): string[] {
   return faults
 }
 
-// Presets: the sliders they set and the objects and groups they hide must be there.
+// Classes: the template must be an ordinary object, a member must belong to a class that is there, a shape that follows another must be in a member and
+// follow a shape of its class's template, and a class has at most LIMITS.membersMax members.
+function classFaults(c: ModelContent): string[] {
+  const faults: string[] = []
+  const objects = new Map(c.objects.map(o => [o.id, o])), shapes = new Map(c.shapes.map(s => [s.id, s])), classes = new Map((c.classes ?? []).map(k => [k.id, k]))
+  const templates = new Map<string, number>()
+  for (const k of c.classes ?? []) {
+    const name = label(k.name, k.id), tpl = objects.get(k.template)
+    templates.set(k.template, (templates.get(k.template) ?? 0) + 1)
+    if (!tpl) { faults.push(`Class ${name} has a template that does not exist.`); continue }
+    if (tpl.classOf) faults.push(`Class ${name} has a template that is a member of a class.`)
+    if (tpl.mirrorOf) faults.push(`Class ${name} has a template that is a twin; use the original.`)
+    if (c.objects.filter(o => o.classOf === k.id).length > LIMITS.membersMax) faults.push(`Class ${name} has more than ${LIMITS.membersMax} members.`)
+  }
+  for (const [oid, n] of templates) { const o = objects.get(oid); if (n > 1 && o) faults.push(`Object ${label(o.name, oid)} is the template of more than one class.`) }
+  for (const o of c.objects) {
+    if (o.classOf && !classes.has(o.classOf)) faults.push(`Object ${label(o.name, o.id)} is a member of a class that does not exist.`)
+    else if (o.classOf && classes.get(o.classOf)!.template === o.id) faults.push(`Object ${label(o.name, o.id)} is a member of the class it is the template of.`)
+  }
+  const memberOf = new Map<string, ModelObject>()
+  for (const o of c.objects) if (o.classOf) for (const sid of o.shapes) memberOf.set(sid, o)
+  for (const s of c.shapes) {
+    if (!s.copyOf) continue
+    const name = label(s.name, s.id), member = memberOf.get(s.id), target = shapes.get(s.copyOf)
+    const cls = member ? classes.get(member.classOf ?? '') : undefined
+    if (!member) faults.push(`Shape ${name} copies a shape but is not in a member of a class.`)
+    else if (!target) faults.push(`Shape ${name} copies a shape that does not exist.`)
+    else if (!cls || !(objects.get(cls.template)?.shapes ?? []).includes(target.id)) faults.push(`Shape ${name} copies a shape that is not in the template of its class.`)
+    else if (target.mirrorOf) faults.push(`Shape ${name} copies a twin; copy the original.`)
+  }
+  return faults
+}
+
+// Whether a style's form choice names an axis and form (or, for "class:id", a member) that are there. A member chooses among its template's axes.
+function styleChoiceExists(c: ModelContent, key: string, value: string): boolean {
+  if (key.startsWith('class:')) return (c.classes ?? []).some(k => k.id === key.slice(6)) && c.objects.some(o => o.id === value && o.classOf === key.slice(6))
+  const classes = new Map((c.classes ?? []).map(k => [k.id, k])), objects = new Map(c.objects.map(o => [o.id, o]))
+  for (const o of c.objects) {
+    if (!key.startsWith(`${o.id}.`)) continue
+    const owner = (o.classOf && objects.get(classes.get(o.classOf)?.template ?? '')) || o
+    const axisId = key.slice(o.id.length + 1)
+    if ((owner.axes ?? []).some(a => a.id === axisId && a.options.some(f => f.id === value))) return true
+  }
+  return false
+}
+
+// Presets and styles: the sliders they set and the objects and groups they hide must be there, a style's scope must exist and the forms it chooses must be there.
 function presetFaults(c: ModelContent): string[] {
   const faults: string[] = []
   const rangeIds = new Set(c.ranges.map(r => r.id)), thingIds = new Set([...c.objects.map(o => o.id), ...c.groups.map(g => g.id)])
@@ -348,6 +407,8 @@ function presetFaults(c: ModelContent): string[] {
     const name = label(p.name, p.id)
     if (Object.keys(p.values).some(k => !rangeIds.has(k))) faults.push(`Preset ${name} sets a slider that does not exist.`)
     if (p.hidden.some(h => !thingIds.has(h))) faults.push(`Preset ${name} hides something that does not exist.`)
+    if (p.scope && !thingIds.has(p.scope)) faults.push(`Preset ${name} belongs to something that does not exist.`)
+    if (Object.entries(p.forms ?? {}).some(([k, v]) => !styleChoiceExists(c, k, v))) faults.push(`Preset ${name} chooses a form that does not exist.`)
   }
   return faults
 }
@@ -356,7 +417,7 @@ export function publishFaults(c: ModelContent): string[] {
   const faults: string[] = []
   if (!c.name.trim()) faults.push('The model needs a name.')
   const shapeIds = new Set(c.shapes.map(s => s.id)), objectIds = new Set(c.objects.map(o => o.id)), groupIds = new Set(c.groups.map(g => g.id))
-  for (const s of c.shapes) if (s.pts.length < 3 && !s.mirrorOf) faults.push(`Shape ${label(s.name, s.id)} needs at least 3 points.`)
+  for (const s of c.shapes) if (s.pts.length < 3 && !s.mirrorOf && !(s.copyOf && s.pts.length === 0)) faults.push(`Shape ${label(s.name, s.id)} needs at least 3 points.`)
   const owner = new Map<string, string>()
   for (const o of c.objects) {
     for (const sid of o.shapes) {
@@ -380,6 +441,7 @@ export function publishFaults(c: ModelContent): string[] {
   faults.push(...pairFaults(c))
   faults.push(...linkFaults(c))
   faults.push(...formFaults(c))
+  faults.push(...classFaults(c))
   faults.push(...presetFaults(c))
   const bytes = copyBytes(c)
   if (bytes > LIMITS.copyMaxBytes) faults.push(`A character's copy of this model would be ${Math.floor(bytes / 1024)} KB; the limit is ${LIMITS.copyMaxBytes / 1024} KB.`)

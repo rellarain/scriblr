@@ -60,6 +60,8 @@ export interface CanvasProps {
   anchor?: [number, number] | null
   // Pose mode (see above): null or missing is the ordinary editor.
   pose?: PoseCanvas | null
+  // Draw, dashed behind each shape of a class member that has an outline of its own, the outline of the pattern it would otherwise follow.
+  ghost?: boolean
   // The points of the selected shape that are linked to another shape: they are not dragged (the arrow keys adjust the link instead).
   linked?: number[]
   onNudgeLink?: (dx: number, dy: number) => void
@@ -275,6 +277,10 @@ export function DesignerCanvas(p: CanvasProps) {
       <rect x={vb.x - 1} y={vb.y - 1} width={vb.w + 2} height={vb.h + 2} className="cmCanvasBg" />
       {gridLines}
       <line x1={axis} y1={vb.y} x2={axis} y2={vb.y + vb.h} className={`cmMirrorLine${mirror ? ' cmMirrorLine--on' : ''}`} />
+      {p.ghost && solved.order.map(id => {
+        const r = solved.shapes[id]
+        return r?.ghost && r.visible ? <path key={`ghost-${id}`} d={r.ghost} data-ghost={id} className="cmGhost" aria-hidden="true" /> : null
+      })}
       {solved.order.map(id => {
         const s = shapesById.get(id), r = solved.shapes[id]
         if (!s || !r?.d) return null

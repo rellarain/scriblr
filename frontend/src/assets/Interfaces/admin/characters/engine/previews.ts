@@ -1,7 +1,7 @@
 import type { ModelContent, ModelRange } from '../../../../../api/types'
-import { formKey, presetsOf } from './forms'
+import { axesFor, classKey, classesOf, formKey, membersOf, presetsOf } from './forms'
 import type { Box } from './geometry'
-import { applyPreset, kindsOf, type TestState } from './presets'
+import { applyPreset, type TestState } from './presets'
 
 // The preview strip: the thing being designed shown several times at random sizes, tilts and backgrounds, so the admin sees how it holds up
 // before publishing. 'rand' stays inside a sensible range; 'min' and 'max' are the stress previews (every value at the end of its range).
@@ -58,19 +58,21 @@ function sliderValues(ranges: ModelRange[], mode: PreviewMode, rng: Rng): Record
 function looks(c: ModelContent | undefined, mode: PreviewMode, rng: Rng, values: Record<string, number>): Pick<PreviewSpec, 'values' | 'forms' | 'hidden'> {
   if (!c) return { values, forms: {}, hidden: [] }
   const forms: Record<string, string> = {}
+  const pickOf = (n: number) => (mode === 'min' ? 0 : mode === 'max' ? n - 1 : Math.min(n - 1, Math.floor(rng() * n)))
   for (const o of c.objects) {
-    for (const a of o.axes ?? []) {
-      if (a.options.length === 0) continue
-      const at = mode === 'min' ? 0 : mode === 'max' ? a.options.length - 1 : Math.min(a.options.length - 1, Math.floor(rng() * a.options.length))
-      forms[formKey(o.id, a.id)] = a.options[at].id
-    }
+    for (const a of axesFor(c, o)) if (a.options.length > 0) forms[formKey(o.id, a.id)] = a.options[pickOf(a.options.length)].id
+  }
+  // the member of a family that is shown
+  for (const k of classesOf(c)) {
+    const members = membersOf(c, k.id)
+    if (k.exclusive && members.length > 0) forms[classKey(k.id)] = members[pickOf(members.length)].id
   }
   let state: TestState = { values, forms, hidden: [] }
   if (mode === 'rand') {
-    for (const kind of kindsOf(c)) {
-      const list = presetsOf(c).filter(p => p.kind.trim().toLowerCase() === kind.trim().toLowerCase())
-      if (rng() < 0.6 && list.length) state = applyPreset(c, state, list[Math.min(list.length - 1, Math.floor(rng() * list.length))])
-    }
+    // one random preset of each slot (a kind within its scope), 60% of the time
+    const slots = new Map<string, ReturnType<typeof presetsOf>>()
+    for (const p of presetsOf(c)) { const key = `${p.kind.trim().toLowerCase()}|${p.scope ?? ''}`; slots.set(key, [...(slots.get(key) ?? []), p]) }
+    for (const list of slots.values()) if (rng() < 0.6) state = applyPreset(c, state, list[Math.min(list.length - 1, Math.floor(rng() * list.length))])
   }
   return state
 }

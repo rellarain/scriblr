@@ -1,10 +1,12 @@
 import type { ModelContent, ModelEntry, PublishedModel } from '../api/types'
-import { addGroup, addObject, addShape, blankContent, newGroup, normalizeContent, publishFaults } from '../assets/Interfaces/admin/characters/modelContent'
+import { addGroup, addObject, addShape, blankContent, newGroup, normalizeContent, objectById, publishFaults, renameObject, updateShape } from '../assets/Interfaces/admin/characters/modelContent'
 import { newShape } from '../assets/Interfaces/admin/characters/engine/edit'
 import { addRange, addScale, addTurn, attachGroup, newRange, recordPoints, reparent, type Edit } from '../assets/Interfaces/admin/characters/engine/rigEdit'
 import { addAxis, addForm, renameForm, setOverride } from '../assets/Interfaces/admin/characters/engine/formEdit'
+import { addMember, makeClass } from '../assets/Interfaces/admin/characters/engine/classEdit'
+import { classKey, formKey } from '../assets/Interfaces/admin/characters/engine/forms'
 import { linkToEdge, makeTwin, setBack, setLoose } from '../assets/Interfaces/admin/characters/engine/pairEdit'
-import { savePreset } from '../assets/Interfaces/admin/characters/engine/presets'
+import { saveStyle, savePreset } from '../assets/Interfaces/admin/characters/engine/presets'
 import { templateBox } from '../assets/Interfaces/admin/characters/engine/templates'
 
 // A pretend character models API (`/api/character-models`), shared by the design system's previews (mockBackend.ts) and the tests
@@ -75,8 +77,9 @@ export function createMockModels(initial: ModelEntry[]) {
 // A small rigged figure for the previews: a torso (neck and chest) with a head hung from the neck's top edge, an arm hung from the chest and a forearm
 // from the arm (and the arm's twin on the other side); sliders for the head's tilt and size, the arm's raise, the elbow, the shoulders' width (recorded
 // point moves) and the height; a shirt whose points are locked to the chest's edge, with a slider for how loose it is; a back outline for the head; forms
-// (the head is Oval, Square or Long; the sleeve is Short, Long or none) and presets (poses, an expression, a build, outfits). Built with the same operations
-// the Designer uses, so it is what a person would have made.
+// (the head is Oval, Square or Long; the sleeve is Short, Long or none), a family of eyes (Almond, Round, Hooded: members of one pattern, each with its twin on
+// the other side of the face and its own choice of lids) and presets (poses, an expression, a build, outfits, and a style of the head). Built with the same
+// operations the Designer uses, so it is what a person would have made.
 function riggedFigure(): ModelContent {
   const must = (e: Edit): ModelContent => { if (!e.ok) throw new Error(e.reason); return e.content }
   const box = (x: number, y: number, w: number, h: number) => ({ x, y, w, h })
@@ -153,6 +156,30 @@ function riggedFigure(): ModelContent {
   const sleeve = axisWith('o_arm', 'Sleeve', 'Short')
   formWith('o_arm', sleeve, 'Long', 's_sleeve', newShape('x', 'Sleeve', 'rounded', box(122, 88, 18, 52)).pts)
   formWith('o_arm', sleeve, 'None', 's_sleeve', null)
+  // eyes: one pattern (the white and the iris, with an axis of lids that each member chooses on its own) and three members of the family -- Almond follows the
+  // pattern, Round and Hooded give a shape an outline of their own -- each with its twin on the other side of the face; the head shows one of them at a time
+  c = addObject(c, 'g_head', { id: 'o_eye', name: 'Eye', layer: 'body', shapes: [] })
+  c = addShape(c, 'o_eye', newShape('s_eye', 'White', 'oval', box(85, 41, 11, 7)))
+  c = addShape(c, 'o_eye', newShape('s_iris', 'Iris', 'oval', box(88.5, 41.5, 5, 5)))
+  const lids = axisWith('o_eye', 'Lids', 'Open')
+  formWith('o_eye', lids, 'Closed', 's_iris', null)
+  const family = makeClass(c, 'o_eye', 'Eye', true, mk)
+  c = must(family)
+  const memberIds: Record<string, string> = {}
+  for (const name of ['Almond', 'Round', 'Hooded']) {
+    const made = addMember(c, family.classId!, mk)
+    c = must(made)
+    c = renameObject(c, made.memberId!, name)
+    memberIds[name] = made.memberId!
+  }
+  const ownOutline = (member: string, followed: string, b: ReturnType<typeof box>) => {
+    const mine = objectById(c, memberIds[member])!.shapes.find(id => c.shapes.find(x => x.id === id)?.copyOf === followed)!
+    c = updateShape(c, mine, sh => ({ ...sh, pts: newShape('x', sh.name, 'oval', b).pts }))
+  }
+  ownOutline('Round', 's_eye', box(85, 40, 11, 9))
+  ownOutline('Hooded', 's_eye', box(85, 43, 11, 4))
+  ownOutline('Hooded', 's_iris', box(89, 43, 4, 4))
+  for (const name of Object.keys(memberIds)) c = must(makeTwin(c, 'object', memberIds[name], mk))
   // presets: a pose replaces the last pose, an expression leaves the arms alone, an outfit switches the shirt off or on
   const preset = (name: string, kind: string, values: Record<string, number>, hidden: string[] = []) => { c = must(savePreset(c, { values, forms: {}, hidden }, name, kind, mk)) }
   preset('At rest', 'Pose', {})
@@ -161,6 +188,9 @@ function riggedFigure(): ModelContent {
   preset('Broad', 'Build', { r_shoulders: 118 })
   preset('Shirt on', 'Outfit', {})
   preset('No shirt', 'Outfit', {}, ['o_shirt'])
+  // a style of the head: the hooded eye with closed lids and the head turned a little (it belongs to the Head group, and is listed with the presets)
+  const closed = objectById(c, 'o_eye')!.axes![0].options.find(f => f.name === 'Closed')!.id
+  c = must(saveStyle(c, { values: { r_tilt: -8 }, forms: { [classKey(family.classId!)]: memberIds.Hooded, [formKey(memberIds.Hooded, lids)]: closed }, hidden: [] }, 'g_head', 'Sleepy', 'Style', mk))
   return c
 }
 
@@ -170,7 +200,7 @@ export function previewModels(): ModelEntry[] {
   const adult = riggedFigure()
   const plain = (shapeIds: string[]): ModelContent => {
     const shapes = adult.shapes.filter(s => shapeIds.includes(s.id))
-    return { ...adult, shapes, objects: adult.objects.filter(o => o.shapes.every(s => shapeIds.includes(s)) && o.shapes.length).map(o => ({ ...o, axes: [] })), presets: [], groups: [newGroup('g_head', 'Head', null, adult.objects.filter(o => o.shapes.every(s => shapeIds.includes(s))).map(o => o.id))], ranges: [] }
+    return { ...adult, shapes, objects: adult.objects.filter(o => o.shapes.every(s => shapeIds.includes(s)) && o.shapes.length).map(o => ({ ...o, axes: [] })), presets: [], classes: [], groups: [newGroup('g_head', 'Head', null, adult.objects.filter(o => o.shapes.every(s => shapeIds.includes(s))).map(o => o.id))], ranges: [] }
   }
   const live = liveEntry('adult', adult, { nextVersion: 3 })
   live.published = published(2, plain(['s_head', 's_neck', 's_chest']))

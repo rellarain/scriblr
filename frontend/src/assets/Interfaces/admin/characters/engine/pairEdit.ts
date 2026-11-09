@@ -29,7 +29,7 @@ function untwinnable(c: ModelContent, kind: PairKind, id: string): string | null
     if (!s) return 'There is no such shape.'
     if (s.mirrorOf) return `${label(s.name, s.id)} is a twin already.`
     if (twinsOf(c, 'shape', id).length) return `${label(s.name, s.id)} already has a twin.`
-    if (s.pts.length < 3) return `${label(s.name, s.id)} has no outline yet: draw it first.`
+    if (outlineSize(c, s) < 3) return `${label(s.name, s.id)} has no outline yet: draw it first.`
     return null
   }
   if (kind === 'object') {
@@ -67,7 +67,7 @@ function twinObject(c: ModelContent, o: ModelObject, groupId: string, make: Make
   }
   for (const sid of o.shapes) {
     const s = shapeById(next, sid)
-    if (s && s.pts.length >= 3) next = addShape(next, id, twinShape(s, freshId(next, 's', make)))
+    if (s && outlineSize(next, s) >= 3) next = addShape(next, id, twinShape(s, freshId(next, 's', make)))
   }
   return next
 }

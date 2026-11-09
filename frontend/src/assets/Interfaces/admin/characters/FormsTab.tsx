@@ -1,12 +1,13 @@
 import { useDeferredValue, useMemo, useState } from 'react'
 import type { ModelAxis, ModelContent, ModelForm, ModelObject } from '../../../../api/types'
-import { ChevronDownIcon, ChevronUpIcon, PlusIcon, StarIcon, TrashIcon } from '../../../icons'
+import { CheckIcon, ChevronDownIcon, ChevronUpIcon, PlayIcon, PlusIcon, SaveIcon, StarIcon, TrashIcon } from '../../../icons'
 import type { Selection } from './designerState'
 import { overrideState } from './engine/formEdit'
-import { axesOf, chosenForm, formKey, targetForShape } from './engine/forms'
+import { axesFor, chosenForm, formKey, targetForShape, templateOfMember } from './engine/forms'
 import { LIMITS } from './engine/limits'
-import type { TestState } from './engine/presets'
+import { isOn, stylesOf, type TestState } from './engine/presets'
 import { solve } from './engine/rig'
+import type { PresetActions } from './PresetsTab'
 import { NAME_MAX, groupById, objectById, objectOfShape, shapeById } from './modelContent'
 
 // The Forms tab: an object has axes (the shape of an eye, an expression, a style), each with forms to choose from. A form gives some of the object's shapes
@@ -28,7 +29,7 @@ export interface FormActions {
   useBase: (objectId: string, axisId: string, formId: string, shapeId: string) => void
 }
 
-export interface FormsTabProps { content: ModelContent; sel: Selection; state: TestState; actions: FormActions }
+export interface FormsTabProps { content: ModelContent; sel: Selection; state: TestState; actions: FormActions; presets: PresetActions }
 
 const label = (name: string, fallback: string) => name.trim() || fallback
 
@@ -38,7 +39,7 @@ function useThumbs(content: ModelContent, object: ModelObject, axis: ModelAxis, 
   const lagging = useDeferredValue(content)
   return useMemo(() => {
     const own = new Set(object.shapes)
-    const solves = axis.options.map(f => solve(lagging, {}, 'front', { forms: { ...state.forms, [formKey(object.id, axis.id)]: f.id } }))
+    const solves = axis.options.map(f => solve(lagging, {}, 'front', { forms: { ...state.forms, [formKey(object.id, axis.id)]: f.id }, show: [object.id] }))
     let x0 = 1e9, y0 = 1e9, x1 = -1e9, y1 = -1e9
     const drawn = solves.map(s => s.order.filter(id => own.has(id)))
     solves.forEach((s, i) => { for (const id of drawn[i]) { const b = s.shapes[id].box; x0 = Math.min(x0, b.x); y0 = Math.min(y0, b.y); x1 = Math.max(x1, b.x + b.w); y1 = Math.max(y1, b.y + b.h) } })
@@ -48,7 +49,7 @@ function useThumbs(content: ModelContent, object: ModelObject, axis: ModelAxis, 
   }, [lagging, object, axis, state.forms])
 }
 
-export function FormsTab({ content, sel, state, actions }: FormsTabProps) {
+export function FormsTab({ content, sel, state, actions, presets }: FormsTabProps) {
   const object = sel.kind === 'object' ? objectById(content, sel.id) : sel.kind === 'shape' ? objectOfShape(content, sel.id) : undefined
   const group = sel.kind === 'group' ? groupById(content, sel.id) : undefined
 
@@ -60,14 +61,16 @@ export function FormsTab({ content, sel, state, actions }: FormsTabProps) {
         <p className="cmInsText">Forms belong to an object: the shape of an eye, an expression, a style. Select an object, or a shape in one, to see its forms.</p>
         {choices.length > 0 && (
           <div className="cmChips" role="group" aria-label="Objects of the group">
-            {choices.map(o => <button key={o.id} type="button" className="cmChip cmChip--wide" onClick={() => actions.selectObject(o.id)}>{label(o.name, 'Untitled object')}{axesOf(o).length ? ` (${axesOf(o).length})` : ''}</button>)}
+            {choices.map(o => <button key={o.id} type="button" className="cmChip cmChip--wide" onClick={() => actions.selectObject(o.id)}>{label(o.name, 'Untitled object')}{axesFor(content, o).length ? ` (${axesFor(content, o).length})` : ''}</button>)}
           </div>
         )}
+        {group && <StylesSection content={content} scopeId={group.id} scopeName={label(group.name, 'the group')} state={state} actions={presets} />}
       </div>
     )
   }
 
-  const axes = axesOf(object)
+  const owner = templateOfMember(content, object)   // a member of a class chooses among its template's axes
+  const axes = axesFor(content, object)
   const name = label(object.name, 'Untitled object')
   const target = sel.kind === 'shape' ? targetForShape(object, sel.id, state.forms) : null
   const original = object.mirrorOf ? objectById(content, object.mirrorOf) : undefined
@@ -87,28 +90,30 @@ export function FormsTab({ content, sel, state, actions }: FormsTabProps) {
               <b>Editing form {label(target.form.name, 'Untitled form')} of {label(target.axis.name, 'Untitled axis')}.</b> The points you move change only this form. Choose the default form to edit the base outline.
             </p>
           )}
-          {axes.length === 0 && <p className="cmInsText">No axes yet. An axis is a way this object can vary, such as the shape of an eye or an expression. Each axis has forms to choose from; a form can give a shape an outline of its own or hide it.</p>}
-          {axes.map((axis, i) => <AxisSection key={axis.id} content={content} object={object} axis={axis} first={i === 0} last={i === axes.length - 1} state={state} actions={actions} />)}
-          <div className="cmInline">
+          {owner && <p className="cmInsText">{name} is a member of a class: it chooses among the forms of {label(owner.name, 'the pattern')}. Edit the forms on the pattern.</p>}
+          {axes.length === 0 && !owner && <p className="cmInsText">No axes yet. An axis is a way this object can vary, such as the shape of an eye or an expression. Each axis has forms to choose from; a form can give a shape an outline of its own or hide it.</p>}
+          {axes.map((axis, i) => <AxisSection key={axis.id} content={content} object={object} owner={owner ?? object} readOnly={!!owner} axis={axis} first={i === 0} last={i === axes.length - 1} state={state} actions={actions} />)}
+          {!owner && <div className="cmInline">
             <button type="button" className="cmBtn cmBtn--small" disabled={axes.length >= LIMITS.axesMax} title={axes.length >= LIMITS.axesMax ? `An object may have at most ${LIMITS.axesMax} axes` : 'A new way this object can vary'} onClick={() => actions.addAxis(object.id)}><PlusIcon size={12} /> Add an axis</button>
             <span className={`cmCount${axes.length > LIMITS.axesWarn ? ' cmCount--warn' : ''}`} title="Axes of the object">{axes.length} of {LIMITS.axesMax}</span>
-          </div>
-          {axes.length > 1 && <p className="cmInsText">When two axes give the same shape an outline, the first axis in this list wins.</p>}
+          </div>}
+          {axes.length > 1 && !owner && <p className="cmInsText">When two axes give the same shape an outline, the first axis in this list wins.</p>}
         </>
       )}
+      <StylesSection content={content} scopeId={object.id} scopeName={name} state={state} actions={presets} />
     </div>
   )
 }
 
-function AxisSection({ content, object, axis, first, last, state, actions }: { content: ModelContent; object: ModelObject; axis: ModelAxis; first: boolean; last: boolean; state: TestState; actions: FormActions }) {
+function AxisSection({ content, object, owner, readOnly, axis, first, last, state, actions }: { content: ModelContent; object: ModelObject; owner: ModelObject; readOnly: boolean; axis: ModelAxis; first: boolean; last: boolean; state: TestState; actions: FormActions }) {
   const [confirm, setConfirm] = useState<string | null>(null)   // 'axis' or a form id
   const thumbs = useThumbs(content, object, axis, state)
-  const chosen = chosenForm(object, axis, state.forms)
+  const chosen = chosenForm(owner, axis, state.forms, object.id)
   const title = label(axis.name, 'Untitled axis')
   const o = object.id, a = axis.id
   return (
     <section className="cmAxis" aria-label={`Axis ${title}`}>
-      <div className="cmSliderHead">
+      {readOnly ? <h3 className="cmInsSub">{title}</h3> : <div className="cmSliderHead">
         <input className="cmSliderName" aria-label={`Name of axis ${title}`} value={axis.name} maxLength={NAME_MAX} placeholder="Name" onChange={e => actions.renameAxis(o, a, e.target.value)} />
         <span className={`cmCount${axis.options.length > LIMITS.formsWarn ? ' cmCount--warn' : ''}`} title="Forms of the axis">{axis.options.length} of {LIMITS.formsMax}</span>
         <button type="button" className="cmIconBtn cmIconBtn--small" aria-label={`Move axis ${title} earlier`} title="Earlier: its forms win over the axes after it" disabled={first} onClick={() => actions.moveAxis(o, a, -1)}><ChevronUpIcon size={12} /></button>
@@ -119,7 +124,7 @@ function AxisSection({ content, object, axis, first, last, state, actions }: { c
             <button type="button" className="cmBtn cmBtn--small" onClick={() => setConfirm(null)}>Keep it</button>
           </span>
         ) : <button type="button" className="cmIconBtn cmIconBtn--small" aria-label={`Delete axis ${title}`} title="Delete the axis with all its forms" onClick={() => setConfirm('axis')}><TrashIcon size={12} /></button>}
-      </div>
+      </div>}
 
       <div className="cmForms" role="group" aria-label={`Forms of ${title}`}>
         {axis.options.map((f, i) => {
@@ -134,11 +139,11 @@ function AxisSection({ content, object, axis, first, last, state, actions }: { c
           )
         })}
       </div>
-      <div className="cmInline">
+      {!readOnly && <div className="cmInline">
         <button type="button" className="cmBtn cmBtn--small" disabled={axis.options.length >= LIMITS.formsMax} title={axis.options.length >= LIMITS.formsMax ? `An axis may have at most ${LIMITS.formsMax} forms` : 'A new form that starts as a copy of the outlines drawn now'} onClick={() => actions.addForm(o, a)}><PlusIcon size={12} /> Add a form from the current one</button>
-      </div>
+      </div>}
 
-      {chosen && (
+      {chosen && !readOnly && (
         <FormDetail
           content={content} object={object} axis={axis} form={chosen} confirm={confirm === chosen.id} onConfirm={v => setConfirm(v ? chosen.id : null)} actions={actions}
           index={axis.options.findIndex(f => f.id === chosen.id)}
@@ -192,5 +197,51 @@ function FormDetail({ content, object, axis, form, index, confirm, onConfirm, ac
       </ul>
       <p className="cmInsText">Choose this form, then pick a shape and move its points: the shape gets an outline of its own in this form. The base outline is what anchors, links and sliders always read.</p>
     </div>
+  )
+}
+
+// Styles: named looks of an object or a group, kept as presets that belong to it. A style keeps the forms chosen for what is inside, the member of a family
+// that is shown, the sliders listed under it and what is switched off inside it; applying one replaces the last style of its kind that belongs to the same thing.
+function StylesSection({ content, scopeId, scopeName, state, actions }: { content: ModelContent; scopeId: string; scopeName: string; state: TestState; actions: PresetActions }) {
+  const [name, setName] = useState('')
+  const [confirm, setConfirm] = useState<string | null>(null)
+  const styles = stylesOf(content, scopeId)
+  return (
+    <section className="cmSec" aria-label={`Styles of ${scopeName}`}>
+      <h3 className="cmInsSub">Styles</h3>
+      <p className="cmInsText">A style is a named look of {scopeName}: the forms chosen inside it, the family member shown, the sliders listed under it and what is switched off inside it.</p>
+      <label className="cmField">
+        <span>Style name</span>
+        <input value={name} maxLength={NAME_MAX} aria-label={`Style name for ${scopeName}`} placeholder="Tired, Angry, Formal…" onChange={e => setName(e.target.value)} />
+      </label>
+      <div className="cmInline">
+        <button type="button" className="cmBtn cmBtn--small" title={`Keep the current look of ${scopeName} as a style`} onClick={() => { actions.saveStyle(scopeId, name); setName('') }}><PlusIcon size={12} /> Save the current look as a style</button>
+      </div>
+      {styles.length > 0 && (
+        <ul className="cmPresets">
+          {styles.map(p => {
+            const title = label(p.name, 'Untitled style'), on = isOn(content, state, p)
+            return (
+              <li key={p.id} className={`cmPreset${on ? ' cmPreset--on' : ''}`} aria-label={`Style ${title}`}>
+                <div className="cmSliderHead">
+                  <input className="cmSliderName" aria-label={`Name of style ${title}`} value={p.name} maxLength={NAME_MAX} placeholder="Name" onChange={e => actions.rename(p.id, e.target.value)} />
+                  {on && <span className="cmOn" role="img" aria-label={`${title} is on`} title="The look is as this style sets it"><CheckIcon size={12} /> On</span>}
+                </div>
+                <div className="cmInline">
+                  <button type="button" className="cmBtn cmBtn--small" aria-label={`Apply style ${title}`} onClick={() => actions.apply(p.id)}><PlayIcon size={12} /> Apply</button>
+                  <button type="button" className="cmIconBtn cmIconBtn--small" aria-label={`Update style ${title} from the current look`} title="Replace what this style keeps with the current look" onClick={() => actions.update(p.id)}><SaveIcon size={12} /></button>
+                  {confirm === p.id ? (
+                    <span className="cmConfirm" role="group" aria-label={`Delete style ${title}?`}>
+                      <button type="button" className="cmBtn cmBtn--danger cmBtn--small" onClick={() => { setConfirm(null); actions.remove(p.id) }}>Delete the style</button>
+                      <button type="button" className="cmBtn cmBtn--small" onClick={() => setConfirm(null)}>Keep it</button>
+                    </span>
+                  ) : <button type="button" className="cmIconBtn cmIconBtn--small" aria-label={`Delete style ${title}`} title="Delete the style" onClick={() => setConfirm(p.id)}><TrashIcon size={12} /></button>}
+                </div>
+              </li>
+            )
+          })}
+        </ul>
+      )}
+    </section>
   )
 }

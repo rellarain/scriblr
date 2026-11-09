@@ -1207,6 +1207,11 @@ MODEL_PRESETS_WARN = 40
 MODEL_PRESETS_MAX = 80
 MODEL_KIND_MAX = 24
 MODEL_HIDDEN_MAX = 100   # objects and groups one preset may hide
+MODEL_CLASSES_WARN = 12  # classes (phase 3b): classes per model, members per class
+MODEL_CLASSES_MAX = 24
+MODEL_MEMBERS_WARN = 12
+MODEL_MEMBERS_MAX = 24   # more than this is a publish fault
+MODEL_PRESET_FORMS_MAX = 100   # form choices one style may keep
 _MODEL_ID = r"^[A-Za-z0-9_.-]{1,80}$"
 ModelPointMode = Literal["c", "s", "cs", "sc"]
 ModelLayer = Literal["body", "clothing", "hair"]
@@ -1351,13 +1356,22 @@ class ModelShape(BaseModel):
     back: Optional[list[ModelPoint]] = Field(default=None, max_length=MODEL_POINTS_MAX)
     zBack: Optional[float] = None
     loose: Optional[str] = None
+    # A shape of a class member that follows a shape of the class's template (phase 3b): with no points of its own it is drawn as the template's shape is, in
+    # the member's own group; with points it has an outline of its own. `hide` leaves an inherited shape out of this member.
+    copyOf: Optional[str] = None
+    hide: bool = False
 
     @field_validator("name", mode="before")
     @classmethod
     def _trim(cls, value: Any) -> Any:
         return value.strip() if isinstance(value, str) else value
 
-    @field_validator("mirrorOf", "loose", mode="before")
+    @field_validator("hide", mode="before")
+    @classmethod
+    def _hide(cls, value: Any) -> bool:
+        return value is True
+
+    @field_validator("mirrorOf", "loose", "copyOf", mode="before")
     @classmethod
     def _links(cls, value: Any) -> Optional[str]:
         return _optional_id(value)
@@ -1650,6 +1664,8 @@ class ModelObject(BaseModel):
     mirrorOf: Optional[str] = None
     # The ways the object can vary (phase 3): each axis has forms, and the object shows one form of every axis.
     axes: list[ModelAxis] = Field(default_factory=list, max_length=MODEL_AXES_MAX)
+    # The class this object is a member of (phase 3b): its shapes follow the shapes of the class's template, and it chooses among the template's forms.
+    classOf: Optional[str] = None
 
     @field_validator("axes", mode="before")
     @classmethod
@@ -1667,7 +1683,7 @@ class ModelObject(BaseModel):
     def _trim(cls, value: Any) -> Any:
         return value.strip() if isinstance(value, str) else value
 
-    @field_validator("mirrorOf", mode="before")
+    @field_validator("mirrorOf", "classOf", mode="before")
     @classmethod
     def _twin(cls, value: Any) -> Optional[str]:
         return _optional_id(value)
@@ -1718,15 +1734,51 @@ class ModelGroup(BaseModel):
             return None
 
 
+class ModelClass(BaseModel):
+    """A template object and the members built from it (phase 3b). The template is a pattern, not drawn once it has members; each member follows its shapes
+    until it is given an outline of its own. A family (`exclusive`) shows one member at a time; otherwise every member is drawn (copies in several places)."""
+
+    id: str = Field(pattern=_MODEL_ID)
+    name: str = Field(default="", max_length=MODEL_NAME_MAX)
+    template: str = Field(pattern=_MODEL_ID)
+    exclusive: bool = False
+
+    @field_validator("name", mode="before")
+    @classmethod
+    def _trim(cls, value: Any) -> Any:
+        return value.strip() if isinstance(value, str) else value
+
+    @field_validator("exclusive", mode="before")
+    @classmethod
+    def _exclusive(cls, value: Any) -> bool:
+        return value is True
+
+
 class ModelPreset(BaseModel):
     """A named set of slider values and of hidden objects (a pose, an expression, an age, a build, an outfit): `kind` says which slot it fills, so applying
-    one puts back whatever any other preset of its kind controls. `values` lists only the sliders it moves; `hidden` the objects and groups it hides."""
+    one puts back whatever any other preset of its kind controls. `values` lists only the sliders it moves; `hidden` the objects and groups it hides.
+    A style (phase 3b) is a preset with a `scope` (an object or a group): it also keeps the forms chosen for what is in the scope (`forms`: "objectId.axisId"
+    to a form id, "class:classId" to the member shown), and only controls what the scope holds."""
 
     id: str = Field(pattern=_MODEL_ID)
     name: str = Field(default="", max_length=MODEL_NAME_MAX)
     kind: str = Field(default="Pose", max_length=MODEL_KIND_MAX)
     values: dict[str, float] = Field(default_factory=dict)
     hidden: list[str] = Field(default_factory=list, max_length=MODEL_HIDDEN_MAX)
+    scope: Optional[str] = None
+    forms: dict[str, str] = Field(default_factory=dict, max_length=MODEL_PRESET_FORMS_MAX)
+
+    @field_validator("scope", mode="before")
+    @classmethod
+    def _scope(cls, value: Any) -> Optional[str]:
+        return _optional_id(value)
+
+    @field_validator("forms", mode="before")
+    @classmethod
+    def _forms(cls, value: Any) -> dict[str, str]:
+        if not isinstance(value, dict):
+            return {}
+        return {k: v for k, v in value.items() if isinstance(k, str) and 3 <= len(k) <= 170 and _optional_id(v) is not None}
 
     @field_validator("name", mode="before")
     @classmethod
@@ -1772,6 +1824,13 @@ class ModelContent(BaseModel):
     ranges: list[ModelRange] = Field(default_factory=list, max_length=MODEL_RANGES_MAX)
     # Named sets of slider values and hidden objects (phase 3).
     presets: list[ModelPreset] = Field(default_factory=list, max_length=MODEL_PRESETS_MAX)
+    # Template objects and their members (phase 3b).
+    classes: list[ModelClass] = Field(default_factory=list, max_length=MODEL_CLASSES_MAX)
+
+    @field_validator("classes", mode="before")
+    @classmethod
+    def _classes(cls, value: Any) -> list[Any]:
+        return _keep_valid(ModelClass, value)
 
     @field_validator("presets", mode="before")
     @classmethod
@@ -1795,7 +1854,7 @@ class ModelContent(BaseModel):
 
     @model_validator(mode="after")
     def _unique_ids(self) -> "ModelContent":
-        for label, items in (("shape", self.shapes), ("object", self.objects), ("group", self.groups), ("slider", self.ranges), ("preset", self.presets)):
+        for label, items in (("shape", self.shapes), ("object", self.objects), ("group", self.groups), ("slider", self.ranges), ("preset", self.presets), ("class", self.classes)):
             ids = [i.id for i in items]
             if len(set(ids)) != len(ids):
                 raise ValueError(f"two {label}s share an id")

@@ -1,12 +1,14 @@
 import type { ReactNode } from 'react'
 import type { ModelContent, ModelLayer, ModelPointMode, ModelShape, ModelView } from '../../../../api/types'
 import { BookmarkIcon, PathIcon, PlusIcon, SlidersIcon, StackIcon, TrashIcon, TreeIcon, UndoIcon } from '../../../icons'
+import { ClassPanel, FollowPanel, type ClassActions } from './ClassPanel'
 import { LinksPanel, PairPanel, ViewPanel } from './PairPanels'
 import { Stepper } from './Stepper'
 import type { LinkHow, PairActions, ViewName } from './rigActions'
 import { TemplateMenu } from './TemplateMenu'
 import { activeShape, type Selection } from './designerState'
 import { addPoint, applyTemplate, deletePoint, resetHandles, setMode } from './engine/edit'
+import type { Choices } from './engine/forms'
 import { MODES, MODE_NAMES } from './engine/geometry'
 import { LIMITS, pointLevel } from './engine/limits'
 import { shapeBox } from './engine/svgText'
@@ -47,6 +49,9 @@ export interface InspectorProps {
   view: ViewName
   linkMode: LinkHow | null
   pairs: PairActions
+  // Classes (what the Class panel asks for) and the forms chosen now (which member of a family is shown).
+  classes: ClassActions
+  choices: Choices
 }
 
 const VIEWS: Array<{ id: ModelView; name: string }> = [{ id: 'both', name: 'Front and back' }, { id: 'front', name: 'Front only' }, { id: 'back', name: 'Back only' }]
@@ -116,6 +121,7 @@ function ShapeTab(p: InspectorProps) {
           </label>
           <p className="cmInsText">{object.shapes.length} of {LIMITS.shapesPerObjectMax} shapes. The shapes of an object are drawn in the order of the tree, later ones in front.</p>
           <PairPanel content={content} kind="object" id={object.id} actions={p.pairs} />
+          <ClassPanel content={content} object={object} choices={p.choices} actions={p.classes} />
         </>
       )}
       {sel.kind === 'group' && group && <p className="cmInsText">{group.objects.length} of {LIMITS.objectsPerGroupMax} objects.</p>}
@@ -144,6 +150,7 @@ function ShapeTab(p: InspectorProps) {
               </span>
             </div>
           )}
+          <FollowPanel content={content} shape={shape} actions={p.classes} />
           <PairPanel content={content} kind="shape" id={shape.id} actions={p.pairs} />
           {!shape.mirrorOf && <PointsSection shape={shape} selPoint={selPoint} mirror={mirror} onSelectPoint={p.onSelectPoint} onEditShape={p.onEditShape} />}
           <LinksPanel content={content} shape={shape} selPoint={selPoint} linkMode={p.linkMode} actions={p.pairs} />

@@ -1,10 +1,10 @@
 import { useMemo, useState } from 'react'
 import type { ModelContent } from '../../../../api/types'
 import { DiceIcon } from '../../../icons'
-import { shapesOf, type Selection } from './designerState'
+import { shapesOf, showFor, type Selection } from './designerState'
 import { previewSpecs, previewTransform, type PreviewMode } from './engine/previews'
 import type { Box } from './engine/geometry'
-import { solve, solveAtRest } from './engine/rig'
+import { defaultValues, solve } from './engine/rig'
 import { outlineSize } from './modelContent'
 
 // The always-on strip under the canvas: the selection (or, with nothing selected, the whole model) at random sizes, tilts and backgrounds, so the
@@ -19,10 +19,12 @@ export function PreviewStrip({ content, sel, view = 'front' }: { content: ModelC
   // what is drawn: the selection (or the whole model), each tile with its own slider values
   const ids = useMemo(() => new Set((sel.kind === 'none' ? content.shapes : shapesOf(content, sel)).filter(s => outlineSize(content, s) >= 3).map(s => s.id)), [content, sel])
   const specs = useMemo(() => previewSpecs(seed, mode, 6, content.ranges, content), [seed, mode, content])
-  const tiles = useMemo(() => specs.map(spec => solve(content, spec.values, view, { forms: spec.forms, hidden: spec.hidden })), [specs, content, view])
+  // a selected pattern, or a member of a family that a preview would not choose, is drawn all the same
+  const show = useMemo(() => showFor(content, sel), [content, sel])
+  const tiles = useMemo(() => specs.map(spec => solve(content, spec.values, view, { forms: spec.forms, hidden: spec.hidden, show })), [specs, content, view, show])
   // every tile is fitted to the selection as it stands at rest, so what a slider does shows as a change in the tile
   const box = useMemo<Box | null>(() => {
-    const rest = solveAtRest(content, view)
+    const rest = solve(content, defaultValues(content), view, { show })
     let x0 = 1e9, y0 = 1e9, x1 = -1e9, y1 = -1e9, any = false
     for (const id of ids) {
       const r = rest.shapes[id]
@@ -31,7 +33,7 @@ export function PreviewStrip({ content, sel, view = 'front' }: { content: ModelC
       x0 = Math.min(x0, r.box.x); y0 = Math.min(y0, r.box.y); x1 = Math.max(x1, r.box.x + r.box.w); y1 = Math.max(y1, r.box.y + r.box.h)
     }
     return any ? { x: x0, y: y0, w: x1 - x0, h: y1 - y0 } : null
-  }, [content, ids, view])
+  }, [content, ids, view, show])
   const opacity = useMemo(() => new Map(content.shapes.map(s => [s.id, s.op])), [content.shapes])
   const px = SIZES.find(s => s.id === size)!.px
 
