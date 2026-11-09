@@ -35,6 +35,7 @@ describe('the model types match the backend schema', () => {
     ['ModelAttach', 'ModelAttach'], ['ModelMove', 'ModelMove'], ['ModelDrive', 'ModelDrive'], ['ModelRange', 'ModelRange'], ['ModelBind', 'ModelBind'],
     ['ModelOverride', 'ModelOverride'], ['ModelForm', 'ModelForm'], ['ModelAxis', 'ModelAxis'], ['ModelPreset', 'ModelPreset'], ['ModelClass', 'ModelClass'],
     ['ModelGenre', 'ModelGenre'], ['ModelSwatch', 'ModelSwatch'], ['ModelColour', 'ModelColour'], ['ModelSlot', 'ModelSlot'],
+    ['ModelTint', 'ModelTint'], ['ModelGradient', 'ModelGradient'], ['ModelLook', 'ModelLook'],
   ]
   for (const [python, ts] of pairs) {
     it(`${ts} has the fields of ${python}`, () => {
@@ -51,7 +52,7 @@ describe('the model types match the backend schema', () => {
     expect(union('ModelLayer')).toEqual(literal('ModelLayer'))
     expect(union('ModelView')).toEqual(literal('ModelView'))
     expect(union('ModelPointMode').length).toBe(4)
-    for (const alias of ['ModelAnchorKind', 'ModelRangeUnit', 'ModelDriveKind', 'ModelScaleTarget', 'ModelScaleAxis', 'ModelBindKind']) {
+    for (const alias of ['ModelAnchorKind', 'ModelRangeUnit', 'ModelDriveKind', 'ModelScaleTarget', 'ModelScaleAxis', 'ModelBindKind', 'ModelTintKind', 'ModelGradDir', 'ModelBlend']) {
       expect(union(alias), alias).toEqual(literal(alias))
       expect(union(alias).length, alias).toBeGreaterThan(1)
     }
@@ -112,6 +113,12 @@ describe('the limits are the backend\'s numbers', () => {
     expect(LIMITS.coloursMax).toBe(number('MODEL_COLOURS_MAX'))
     expect(LIMITS.paletteMax).toBe(number('MODEL_PALETTE_MAX'))
     expect(SWATCH_NAME_MAX).toBe(number('MODEL_SWATCH_NAME_MAX'))
+  })
+  it('for paint effects: shading shapes, cut-outs and the paint changes of a form', () => {
+    expect(LIMITS.shadesWarn).toBe(number('MODEL_SHADES_WARN'))
+    expect(LIMITS.shadesMax).toBe(number('MODEL_SHADES_MAX'))
+    expect(LIMITS.cutsMax).toBe(number('MODEL_CUTS_MAX'))
+    expect(LIMITS.looksMax).toBe(number('MODEL_LOOKS_MAX'))
   })
   it('for the mirror line', () => {
     const m = /MODEL_AXIS_RANGE\s*=\s*\(([-\d.]+),\s*([-\d.]+)\)/.exec(schema)

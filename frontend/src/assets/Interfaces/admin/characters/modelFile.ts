@@ -1,9 +1,9 @@
 import type {
-  ModelAxis, ModelBind, ModelClass, ModelColour, ModelContent, ModelDrive, ModelForm, ModelGenre, ModelGroup, ModelMove, ModelObject, ModelOverride, ModelPoint, ModelPreset, ModelRange,
-  ModelShape, ModelSlot, ModelSwatch,
+  ModelAxis, ModelBind, ModelBlend, ModelClass, ModelColour, ModelContent, ModelDrive, ModelForm, ModelGenre, ModelGradDir, ModelGradient, ModelGroup, ModelLook, ModelMove, ModelObject, ModelOverride, ModelPoint,
+  ModelPreset, ModelRange, ModelShape, ModelSlot, ModelSwatch, ModelTint, ModelTintKind,
 } from '../../../../api/types'
 import { LIMITS } from './engine/limits'
-import { KIND_MAX, SWATCH_NAME_MAX, blankContent, normalizeContent } from './modelContent'
+import { KIND_MAX, SWATCH_NAME_MAX, TINT_RANGE, TONE_RANGE, blankContent, normalizeContent, repairLooks } from './modelContent'
 
 // The file Export writes and Import reads: JSON with a marker and a version, and the models' content as it is (a shape, object, group or slider keeps its
 // id: the ids only mean something inside one model). Everything read is held to what the server accepts, so one bad model can never make the whole save
@@ -60,6 +60,22 @@ function point(v: unknown): ModelPoint {
   return out
 }
 
+// The paint effects of a shape (phase 4b), held to what the server accepts.
+function tint(v: unknown): ModelTint | null {
+  if (!isRecord(v)) return null
+  const kind = (['shadow', 'mid', 'highlight'].includes(v.kind as string) ? v.kind : 'shadow') as ModelTintKind
+  return { kind, t: Math.round(num(v.t, 0.12, TINT_RANGE.min, TINT_RANGE.max) * 100) / 100 }
+}
+function gradient(v: unknown): ModelGradient | null {
+  if (!isRecord(v)) return null
+  return { dir: (['down', 'up', 'left', 'right', 'radial'].includes(v.dir as string) ? v.dir : 'down') as ModelGradDir, to: idOrNull(v.to) }
+}
+function look(v: Record<string, unknown>): ModelLook | null {
+  const shapeId = idOf(v.shape)
+  if (!shapeId) return null
+  return { shape: shapeId, slot: idOrNull(v.slot), gray: typeof v.gray === 'number' ? Math.round(num(v.gray, 50, 0, 100)) : null, tone: typeof v.tone === 'number' ? Math.round(num(v.tone, 0, TONE_RANGE.min, TONE_RANGE.max)) : null }
+}
+
 function shape(v: Record<string, unknown>, id: string): ModelShape {
   const view = v.view === 'front' || v.view === 'back' ? v.view : 'both'
   return {
@@ -67,6 +83,9 @@ function shape(v: Record<string, unknown>, id: string): ModelShape {
     half: Math.round(num(v.half, 0, 0, LIMITS.pointsMax)), template: idOrNull(v.template),
     mirrorOf: idOrNull(v.mirrorOf), back: Array.isArray(v.back) ? v.back.map(point) : null, zBack: typeof v.zBack === 'number' ? num(v.zBack, 40, 0, 100) : null,
     loose: idOrNull(v.loose), copyOf: idOrNull(v.copyOf), hide: v.hide === true, slot: idOrNull(v.slot), gray: typeof v.gray === 'number' ? Math.round(num(v.gray, 50, 0, 100)) : null,
+    tone: typeof v.tone === 'number' ? Math.round(num(v.tone, 0, TONE_RANGE.min, TONE_RANGE.max)) : 0, derive: tint(v.derive), shade: tint(v.shade), grad: gradient(v.grad),
+    blend: (['multiply', 'screen', 'overlay'].includes(v.blend as string) ? v.blend : null) as ModelBlend | null, clip: idOrNull(v.clip),
+    cut: [...new Set(list(v.cut).map(idOf).filter((x): x is string => x !== null))].slice(0, LIMITS.cutsMax), helper: v.helper === true,
   }
 }
 
@@ -138,7 +157,7 @@ function override(v: Record<string, unknown>): ModelOverride | null {
 function form(v: Record<string, unknown>, id: string): ModelForm {
   const seen = new Set<string>()
   const ovr = list(v.ovr).filter(isRecord).map(override).filter((o): o is ModelOverride => o !== null && !seen.has(o.shape) && !!seen.add(o.shape))
-  return { id, name: text(v.name), ovr }
+  return { id, name: text(v.name), ovr, looks: repairLooks(list(v.looks).filter(isRecord).map(look).filter((l): l is ModelLook => l !== null)) }
 }
 
 // An axis needs a form; its default form is one of its forms.
@@ -211,6 +230,8 @@ function problem(v: unknown): string | null {
     ?? objects.map(o => list(rec(o).axes).map(a => tooMany(list(rec(a).options).length, LIMITS.formsMax, 'forms in an axis')).find(Boolean)).find(Boolean)
     ?? shapes.map(sh => (Array.isArray(rec(sh).back) ? tooMany(list(rec(sh).back).length, LIMITS.pointsMax, 'points in an outline for the back') : null)).find(Boolean)
     ?? objects.map(o => list(rec(o).axes).map(a => list(rec(a).options).map(f => list(rec(f).ovr).map(ov => tooMany(list(rec(ov).pts).length, LIMITS.pointsMax, 'points in the outline of a form')).find(Boolean)).find(Boolean)).find(Boolean)).find(Boolean)
+    ?? objects.map(o => list(rec(o).axes).map(a => list(rec(a).options).map(f => tooMany(list(rec(f).looks).length, LIMITS.looksMax, 'paint changes in a form')).find(Boolean)).find(Boolean)).find(Boolean)
+    ?? shapes.map(sh => tooMany(list(rec(sh).cut).length, LIMITS.cutsMax, 'cut-outs in a shape')).find(Boolean)
     ?? null
 }
 

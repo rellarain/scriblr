@@ -19,6 +19,7 @@ from .schema import (
     MODEL_HISTORY_MAX,
     MODEL_LINKS_MAX,
     MODEL_MEMBERS_MAX,
+    MODEL_SHADES_MAX,
     ModelCatalog,
     ModelContent,
     ModelDraftList,
@@ -403,6 +404,46 @@ def _colour_faults(content: ModelContent) -> list[str]:
     return faults
 
 
+def _paint_faults(content: ModelContent) -> list[str]:
+    """What is wrong with the paint effects of a model (phase 4b; the frontend's paintFaults says the same words): a clip or a cut-out that points at
+    nothing, a gradient to a slot that is not there, a form that changes the paint of a shape it should not, and too many shading shapes in an object."""
+    faults: list[str] = []
+    shapes = {s.id: s for s in content.shapes}
+    slot_ids = {sl.id for sl in content.slots}
+    for s in content.shapes:
+        name = _label(s.name, s.id)
+        if s.clip is not None:
+            if s.clip == s.id:
+                faults.append(f"Shape {name} is clipped to itself.")
+            elif s.clip not in shapes:
+                faults.append(f"Shape {name} is clipped to a shape that does not exist.")
+        for target in s.cut:
+            if target == s.id:
+                faults.append(f"Shape {name} is cut by itself.")
+            elif target not in shapes:
+                faults.append(f"Shape {name} is cut by a shape that does not exist.")
+        if s.grad is not None and s.grad.to is not None and s.grad.to not in slot_ids:
+            faults.append(f"Shape {name} has a gradient to a colour slot that does not exist.")
+    for o in content.objects:
+        obj = _label(o.name, o.id)
+        own = set(o.shapes)
+        shading = sum(1 for sid in o.shapes if sid in shapes and shapes[sid].shade is not None and not shapes[sid].mirrorOf)
+        if shading > MODEL_SHADES_MAX:
+            faults.append(f"Object {obj} has more than {MODEL_SHADES_MAX} shading shapes.")
+        for axis in o.axes:
+            for form in axis.options:
+                fname = _label(form.name, form.id)
+                for look in form.looks:
+                    shape = shapes.get(look.shape)
+                    if look.shape not in own or shape is None:
+                        faults.append(f"Form {fname} of {obj} changes the paint of a shape that is not in the object.")
+                    elif shape.mirrorOf:
+                        faults.append(f"Form {fname} of {obj} changes the paint of a twin; change the original instead.")
+                    elif look.slot is not None and look.slot not in slot_ids:
+                        faults.append(f"Form {fname} of {obj} paints shape {_label(shape.name, shape.id)} from a colour slot that does not exist.")
+    return faults
+
+
 def publish_faults(content: ModelContent) -> list[str]:
     """What stops this draft from being published, in plain words."""
     faults: list[str] = []
@@ -445,6 +486,7 @@ def publish_faults(content: ModelContent) -> list[str]:
     faults.extend(_class_faults(content))
     faults.extend(_preset_faults(content))
     faults.extend(_colour_faults(content))
+    faults.extend(_paint_faults(content))
     size = copy_bytes(content)
     if size > MODEL_COPY_MAX_BYTES:
         faults.append(f"A character's copy of this model would be {size // 1024} KB; the limit is {MODEL_COPY_MAX_BYTES // 1024} KB.")

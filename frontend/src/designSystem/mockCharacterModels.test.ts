@@ -3,7 +3,8 @@ import { publishFaults } from '../assets/Interfaces/admin/characters/modelConten
 import { grayHex, paintOf, paletteOf, rollChoices, slotById } from '../assets/Interfaces/admin/characters/engine/colour'
 import { classKey } from '../assets/Interfaces/admin/characters/engine/forms'
 import { applyPreset, restState } from '../assets/Interfaces/admin/characters/engine/presets'
-import { rigCheck } from '../assets/Interfaces/admin/characters/engine/rigCheck'
+import { paintCheck, rigCheck } from '../assets/Interfaces/admin/characters/engine/rigCheck'
+import { drawable, paintDefs, paintShapes } from '../assets/Interfaces/admin/characters/engine/paint'
 import { solve } from '../assets/Interfaces/admin/characters/engine/rig'
 import { previewModels } from './mockCharacterModels'
 
@@ -18,7 +19,7 @@ describe('the rigged preview model', () => {
 
   it('stands as drawn at rest, with every shape in the picture', () => {
     const s = solve(adult, {})
-    expect(s.order).toHaveLength(14)   // five shapes, the sleeve, the shirt, the twins of the arm, its sleeve and the forearm, and the eye shown (two shapes) with its twin
+    expect(s.order).toHaveLength(17)   // five shapes, the sleeve, the shirt, the twins of the arm, its sleeve and the forearm, and the eye shown (two shapes) with its twin, the neckline, and two bands of shading
     for (const g of adult.groups) s.mats[g.id].forEach((v, i) => expect(v).toBeCloseTo([1, 0, 0, 1, 0, 0][i], 1))
   })
 
@@ -143,6 +144,29 @@ describe('the rigged preview model', () => {
     expect(paintOf(adult, colouring, twinArm)).toEqual(paintOf(adult, colouring, shape('s_arm')))
     const rolled = rollChoices(adult, () => 0.4, paletteOf(adult), {}, { genre: 'g_fantasy' })
     expect(Object.keys(rolled).sort()).toEqual(adult.slots!.map(s => s.id).sort())
+  })
+
+  it('has paint effects: a neckline cut out of the shirt, shading that lies on its shapes, a gradient in the iris of every eye', () => {
+    const solved = solve(adult, {}), colouring = { palette: paletteOf(adult), choices: {} }
+    const items = paintShapes(adult, solved, colouring)
+    // the neckline is a helper that something cuts: drawn on the canvas, never in the previews, and nothing in the checks about it
+    const neckline = items.find(i => i.id === 's_neckline')!
+    expect(neckline.helper).toBe(true)
+    expect(drawable(items).map(i => i.id)).not.toContain('s_neckline')
+    expect(items.find(i => i.id === 's_shirt')!.cutDs).toEqual([solved.shapes.s_neckline.d])
+    expect(paintCheck(adult)).toEqual([])
+    // two shading shapes, each kept inside the base shapes of its object, the shirt's blended with what is under it
+    const shading = items.filter(i => i.shading)
+    expect(shading).toHaveLength(2)
+    for (const band of shading) { expect(band.blank).toBe(false); expect(band.compDs.length).toBeGreaterThan(0) }
+    expect(shading.filter(b => b.blend === 'multiply')).toHaveLength(1)
+    expect(shading.filter(b => b.blend === null)).toHaveLength(1)
+    // every member of the eye family follows the pattern's iris, and so has its radial gradient
+    const irises = adult.shapes.filter(s => s.id === 's_iris' || s.copyOf === 's_iris')
+    expect(irises).toHaveLength(4)
+    for (const i of items.filter(x => irises.some(s => s.id === x.id))) expect(i.gradient?.dir).toBe('radial')
+    expect(paintDefs(drawable(items), 'x').length).toBeGreaterThan(0)
+    expect(JSON.stringify(items)).not.toMatch(/NaN|undefined/)
   })
 
   it('keeps the older published versions simple and valid', () => {

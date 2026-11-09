@@ -1,7 +1,8 @@
-import type { ModelColour, ModelContent, ModelGenre, ModelShape, ModelSlot, ModelSwatch } from '../../../../../api/types'
-import { fromHsl, toHsl } from '../../../writer/characters/portrait/colour'
+import type { ModelBlend, ModelColour, ModelContent, ModelGenre, ModelGradDir, ModelObject, ModelShape, ModelSlot, ModelSwatch, ModelTintKind } from '../../../../../api/types'
+import { fromHsl, mix, shade, toHsl } from '../../../writer/characters/portrait/colour'
 import { NAME_MAX, SWATCH_NAME_MAX, shapeById, type MakeId, randomId } from '../modelContent'
 import { freshFormId } from './formEdit'
+import { axesOf, chosenForm, type Choices } from './forms'
 import { LIMITS } from './limits'
 import { done, fail, type Edit } from './rigEdit'
 import { standardGenres, standardSlots, starterPalette } from './standardColours'
@@ -15,10 +16,22 @@ import { standardGenres, standardSlots, starterPalette } from './standardColours
 // 0..100, it is set to inside the slot's range.
 export interface SlotChoice { src: 'colour' | 'swatch'; id: string; l?: number; a?: number }
 export type SlotChoices = Record<string, SlotChoice>
-// The palette in use and what is chosen from it: what colours a shape is drawn with.
-export interface Colouring { palette: ModelSwatch[]; choices: SlotChoices }
+// The palette in use and what is chosen from it: what colours a shape is drawn with. `forms` are the forms chosen on the test character: a form may change the
+// paint of a shape (its slot, its tone), so they belong to the colouring.
+export interface Colouring { palette: ModelSwatch[]; choices: SlotChoices; forms?: Choices }
 export interface ResolvedColour { h: number; s: number; l: number; a: number; css: string }
 export interface Paint { fill: string; opacity: number }
+// Everything a shape is painted with (phase 4b): the fill (the colour with its tone and any derived tone), a gradient to another colour, how it blends with what is
+// under it, the shapes it is kept inside (`clip`) and that cut a hole in it (`cuts`), whether it is a shading shape (kept inside the base shapes of its object) and
+// whether it is a helper (never drawn). `clip` and `cuts` name shapes of this shape's own side: a twin's refer to the twins of what its original's refer to.
+export interface PaintLayer extends Paint {
+  gradient: { dir: ModelGradDir; end: string } | null
+  blend: ModelBlend | null
+  clip: string | null
+  cuts: string[]
+  shading: boolean
+  helper: boolean
+}
 
 export const NEUTRAL_GRAY = 50
 export const NO_COLOURING: Colouring = { palette: [], choices: {} }
@@ -66,7 +79,93 @@ export function resolveColour(slot: ModelSlot, choice: SlotChoice | undefined, p
   return { h: sw.h, s: sw.s, l, a, css: hslHex(sw.h, sw.s, l) }
 }
 
-// Where a shape gets its paint: its own slot, else its own fixed gray, else (a twin, a shape that follows the template's) the shape it copies.
+// ---- tones: a shadow, a mid tone, a highlight, and a step lighter or darker (the old portrait engine's arithmetic) ----
+
+// A tone of a colour: a shadow is the portrait's shade, a mid tone half of it, a highlight a mix with white.
+export const toneHex = (hex: string, kind: ModelTintKind, t: number): string => (kind === 'shadow' ? shade(hex, t) : kind === 'mid' ? shade(hex, t * 0.5) : mix(hex, '#ffffff', t))
+// A step lighter (+) or darker (-) than a colour: lightness + 9 or - 12 per step, held to 2..98.
+export function toneShift(hex: string, steps: number): string {
+  if (!steps) return hex
+  const [h, s, l] = hexHsl(hex)
+  return hslHex(h, s, clamp(l + (steps > 0 ? 9 : -12) * Math.abs(steps), 2, 98))
+}
+
+// ---- where a shape gets its paint ----
+
+// What the paint walk needs to know about a model, found once per content (content is never changed in place).
+interface PaintIndex { shapes: Map<string, ModelShape>; owner: Map<string, ModelObject>; twin: Map<string, string>; copies: Map<string, string> }
+const indexes = new WeakMap<ModelContent, PaintIndex>()
+function paintIndex(c: ModelContent): PaintIndex {
+  const found = indexes.get(c)
+  if (found) return found
+  const shapes = new Map(c.shapes.map(s => [s.id, s])), owner = new Map<string, ModelObject>()
+  for (const o of c.objects) for (const id of o.shapes) if (!owner.has(id)) owner.set(id, o)
+  // an original's twin, and the shape a member has for each shape of its template
+  const twin = new Map<string, string>(), copies = new Map<string, string>()
+  for (const s of c.shapes) {
+    if (s.mirrorOf && !twin.has(s.mirrorOf)) twin.set(s.mirrorOf, s.id)
+    const member = s.copyOf ? owner.get(s.id) : undefined
+    if (s.copyOf && member) copies.set(`${s.copyOf}|${member.id}`, s.id)
+  }
+  const made = { shapes, owner, twin, copies }
+  indexes.set(c, made)
+  return made
+}
+
+// One step from a shape to the shape whose paint it takes: a twin follows its original, a shape of a class member the template's shape (under the member's choice).
+interface Hop { kind: 'twin' | 'copy'; member?: string }
+export interface PaintOrigin { shape: ModelShape; hops: Hop[] }
+
+// The shape whose paint fields a shape uses: itself when it has a slot or a fixed gray of its own (or nothing to follow), else the shape it copies, and so on.
+export function paintOrigin(c: ModelContent, shape: ModelShape): PaintOrigin {
+  const ix = paintIndex(c), hops: Hop[] = []
+  let cur = shape
+  while (hops.length < 4 && !cur.slot && (cur.gray === null || cur.gray === undefined)) {
+    const from = cur.mirrorOf ?? cur.copyOf, next = from ? ix.shapes.get(from) : undefined
+    if (!next) break
+    const home = ix.owner.get(cur.id)
+    hops.push(cur.mirrorOf ? { kind: 'twin' } : { kind: 'copy', member: home?.classOf ? home.id : undefined })
+    cur = next
+  }
+  return { shape: cur, hops }
+}
+
+// A shape named from the origin's side, as it is on the painted shape's side: through a twin, the twin of what it names (or the original, if it names a twin; a
+// shape on the middle line, with no twin, stays); through a member, the member's own shape for it.
+function mapRef(ix: PaintIndex, hops: Hop[], id: string): string {
+  let t = id
+  for (let i = hops.length - 1; i >= 0; i--) {
+    const h = hops[i]
+    if (h.kind === 'twin') t = ix.twin.get(t) ?? ix.shapes.get(t)?.mirrorOf ?? t
+    else if (h.member) t = ix.copies.get(`${t}|${h.member}`) ?? t
+  }
+  return t
+}
+
+// The look the chosen forms give a shape's paint: the first axis (in order) of the origin's object whose chosen form has one for it wins. A shape of a class member
+// takes the template's forms under the member's own choice.
+function lookFor(ix: PaintIndex, origin: PaintOrigin, forms: Choices) {
+  const home = ix.owner.get(origin.shape.id)
+  if (!home) return undefined
+  const via = [...origin.hops].reverse().find(h => h.kind === 'copy')
+  for (const axis of axesOf(home)) {
+    const look = chosenForm(home, axis, forms, via?.member ?? home.id)?.looks?.find(l => l.shape === origin.shape.id)
+    if (look) return look
+  }
+  return undefined
+}
+
+// The paint fields a shape would carry if it stood on its own: used when a twin or a member stops following (the pair is broken, the member detached).
+export function bakedPaint(c: ModelContent, shape: ModelShape): Pick<ModelShape, 'slot' | 'gray' | 'tone' | 'derive' | 'shade' | 'grad' | 'blend' | 'clip' | 'cut' | 'helper'> {
+  const ix = paintIndex(c), origin = paintOrigin(c, shape), o = origin.shape
+  const slot = o.slot ?? null
+  return {
+    slot, gray: slot ? null : o.gray ?? null, tone: o.tone ?? 0, derive: o.derive ?? null, shade: o.shade ?? null, grad: o.grad ?? null, blend: o.blend ?? null,
+    clip: o.clip ? mapRef(ix, origin.hops, o.clip) : null, cut: (o.cut ?? []).map(t => mapRef(ix, origin.hops, t)), helper: o.helper === true,
+  }
+}
+
+// Where a shape gets its colour: its own slot, else its own fixed gray, else (a twin, a shape that follows the template's) the shape it copies.
 export function paintSource(c: ModelContent, shape: ModelShape, depth = 0): { slot: ModelSlot | null; gray: number | null } {
   if (shape.slot) return { slot: slotById(c, shape.slot) ?? null, gray: null }
   if (shape.gray !== null && shape.gray !== undefined) return { slot: null, gray: shape.gray }
@@ -75,14 +174,41 @@ export function paintSource(c: ModelContent, shape: ModelShape, depth = 0): { sl
   return next ? paintSource(c, next, depth + 1) : { slot: null, gray: null }
 }
 
-// The fill and opacity a shape is drawn with: its shape's own opacity times the opacity the colour has.
-export function paintOf(c: ModelContent, colouring: Colouring, shape: ModelShape): Paint {
-  const { slot, gray } = paintSource(c, shape)
+// Everything a shape is painted with. The paint fields (tone, derived tone, shading, gradient, blend, clip, cut-outs, helper) come from the shape the paint walk ends
+// at, whose slot or fixed gray is the one used; the forms the colouring chooses may change that shape's slot, gray and tone.
+export function paintLayer(c: ModelContent, colouring: Colouring, shape: ModelShape): PaintLayer {
+  const ix = paintIndex(c), origin = paintOrigin(c, shape), o = origin.shape
+  const forms = colouring.forms ?? {}
+  const look = Object.keys(forms).length > 0 ? lookFor(ix, origin, forms) : undefined
+  let slot: ModelSlot | null, gray: number | null
+  if (look?.slot) { slot = slotById(c, look.slot) ?? null; gray = null }
+  else if (look && look.gray !== null && look.gray !== undefined) { slot = null; gray = look.gray }
+  else if (o.slot) { slot = slotById(c, o.slot) ?? null; gray = null }
+  else { slot = null; gray = o.gray ?? null }
+  const tone = look?.tone ?? o.tone ?? 0
+  let css: string, alpha = 1
   if (slot) {
     const r = resolveColour(slot, colouring.choices[slot.id], colouring.palette)
-    return { fill: r.css, opacity: round2(shape.op * r.a) }
+    css = r.css; alpha = r.a
+  } else css = grayHex(gray ?? NEUTRAL_GRAY)
+  // a shading shape is a tone of its slot's colour; any other shape is the colour a step lighter or darker, and perhaps a tone of that
+  const shading = !!o.shade
+  let fill = o.shade ? toneHex(css, o.shade.kind, o.shade.t) : toneShift(css, tone)
+  if (!o.shade && o.derive) fill = toneHex(fill, o.derive.kind, o.derive.t)
+  let gradient: PaintLayer['gradient'] = null
+  if (o.grad && !shading) {
+    const to = o.grad.to ? slotById(c, o.grad.to) : undefined
+    gradient = { dir: o.grad.dir, end: to ? resolveColour(to, colouring.choices[to.id], colouring.palette).css : toneShift(fill, -1) }
   }
-  return { fill: grayHex(gray ?? NEUTRAL_GRAY), opacity: shape.op }
+  const clip = o.clip ? mapRef(ix, origin.hops, o.clip) : null
+  const cuts = [...new Set((o.cut ?? []).map(t => mapRef(ix, origin.hops, t)))].filter(t => t !== shape.id)
+  return { fill, opacity: slot ? round2(shape.op * alpha) : shape.op, gradient, blend: o.blend ?? null, clip: clip === shape.id ? null : clip, cuts, shading, helper: o.helper === true }
+}
+
+// The fill and opacity a shape is drawn with: its shape's own opacity times the opacity the colour has.
+export function paintOf(c: ModelContent, colouring: Colouring, shape: ModelShape): Paint {
+  const { fill, opacity } = paintLayer(c, colouring, shape)
+  return { fill, opacity }
 }
 
 // The slot a shape is painted from, as the Colour tab shows it (own or inherited), and whether it is the shape's own.
@@ -120,7 +246,12 @@ export function stepSlot(c: ModelContent, id: string, key: SlotKey, dir: 1 | -1,
 // A slot goes: the shapes painted from it are left with no slot (gray).
 export function removeSlot(c: ModelContent, id: string): Edit {
   if (!slotById(c, id)) return fail('There is no such colour slot.')
-  return done({ ...c, slots: slotsOf(c).filter(s => s.id !== id), shapes: c.shapes.map(s => (s.slot === id ? { ...s, slot: null } : s)) })
+  return done({
+    ...c, slots: slotsOf(c).filter(s => s.id !== id),
+    shapes: c.shapes.map(s => (s.slot === id || s.grad?.to === id ? { ...s, slot: s.slot === id ? null : s.slot, grad: s.grad?.to === id ? { ...s.grad, to: null } : s.grad } : s)),
+    objects: c.objects.map(o => (o.axes ?? []).some(a => a.options.some(f => (f.looks ?? []).some(l => l.slot === id)))
+      ? { ...o, axes: (o.axes ?? []).map(a => ({ ...a, options: a.options.map(f => ({ ...f, looks: (f.looks ?? []).flatMap(l => (l.slot !== id ? [l] : l.tone != null ? [{ ...l, slot: null }] : [])) })) })) } : o),
+  })
 }
 
 export function addColour(c: ModelContent, slotId: string, hex = '#808080', make: MakeId = randomId): Edit & { colourId?: string } {

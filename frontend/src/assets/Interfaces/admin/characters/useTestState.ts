@@ -64,7 +64,7 @@ export function useTestState(): TestControls {
     setValues(next.values); setForms(next.forms); setHidden(next.hidden)
   }, [state])
   const away = useCallback((content: ModelContent) => awayCount(content, state) + chosenCount(content, colours) + (palette ? 1 : 0), [state, colours, palette])
-  const colouring = useCallback((content: ModelContent): Colouring => ({ palette: palette ?? paletteOf(content), choices: colours }), [palette, colours])
+  const colouring = useCallback((content: ModelContent): Colouring => ({ palette: palette ?? paletteOf(content), choices: colours, forms }), [palette, colours, forms])
   const roll = useCallback((content: ModelContent, rng: Rng = seededRng(Math.floor(Math.random() * 2 ** 31))) => {
     const next = rollLook(content, rng, { genre, locks, forms, choices: colours, palette: palette ?? paletteOf(content) })
     setForms(next.forms); setColours(next.choices)

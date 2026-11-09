@@ -1,9 +1,11 @@
-import { useRef, useState, type CSSProperties, type KeyboardEvent, type MouseEvent as ReactMouseEvent, type PointerEvent as ReactPointerEvent, type ReactElement } from 'react'
+import { useMemo, useRef, useState, type KeyboardEvent, type MouseEvent as ReactMouseEvent, type PointerEvent as ReactPointerEvent, type ReactElement } from 'react'
 import type { ModelContent, ModelShape } from '../../../../api/types'
-import { NO_COLOURING, paintOf, type Colouring } from './engine/colour'
+import { NO_COLOURING, type Colouring } from './engine/colour'
 import { addPoint, deletePoint, moveHandle, movePoint, moveShape, nudgePoint } from './engine/edit'
 import { apply, build, inverse, nearestEdge, type Box } from './engine/geometry'
+import { paintDefs, paintShapes } from './engine/paint'
 import type { Solved } from './engine/rig'
+import { PaintDefs, PaintedPath, useSvgPrefix } from './PaintedPath'
 import { activeShape, shapesOf, type EditMode, type Selection } from './designerState'
 
 // The designer's canvas: the solved model's shapes in an SVG (every group where its pivots, anchors and the test sliders put it), with the selected shape's
@@ -96,6 +98,10 @@ type Drag =
 
 export function DesignerCanvas(p: CanvasProps) {
   const { content, solved, sel, mode, selPoint, mirror, snap, grid, zoom, fitAll, axis, pivot, anchor } = p
+  // what every shape is painted with (colour, gradient, clip, cut-outs, blend), found once per drawing and shared by the shapes and their definitions
+  const prefix = useSvgPrefix()
+  const paintItems = useMemo(() => paintShapes(content, solved, p.colouring ?? NO_COLOURING), [content, solved, p.colouring])
+  const defs = useMemo(() => paintDefs(paintItems, prefix), [paintItems, prefix])
   const editable = p.editable !== false
   const svgRef = useRef<SVGSVGElement>(null)
   const dragRef = useRef<Drag | null>(null)
@@ -284,20 +290,20 @@ export function DesignerCanvas(p: CanvasProps) {
         const r = solved.shapes[id]
         return r?.ghost && r.visible ? <path key={`ghost-${id}`} d={r.ghost} data-ghost={id} className="cmGhost" aria-hidden="true" /> : null
       })}
-      {solved.order.map(id => {
-        const s = shapesById.get(id), r = solved.shapes[id]
-        if (!s || !r?.d) return null
-        const pickable = picking.has(id), selected = sel.kind === 'shape' && sel.id === id, paint = paintOf(content, p.colouring ?? NO_COLOURING, s)
+      <PaintDefs defs={defs} />
+      {paintItems.map(item => {
+        const id = item.id, s = shapesById.get(id)
+        if (!s) return null
+        const pickable = picking.has(id), selected = sel.kind === 'shape' && sel.id === id
         return (
           <g key={id}>
-            <path
-              d={r.d} data-shape={id} style={{ '--shape-fill': paint.fill } as CSSProperties}
-              className={`cmShape${focusIds.has(id) ? ' cmShape--on' : ''}${!none && focusIds.size > 0 && !focusIds.has(id) ? ' cmShape--dim' : ''}${selected ? ' cmShape--sel' : ''}${pickable ? ' cmShape--pick' : ''}${p.pick && !pickable ? ' cmShape--off' : ''}${s.mirrorOf ? ' cmShape--twin' : ''}`}
-              fillOpacity={paint.opacity}
+            <PaintedPath
+              item={item} prefix={prefix} data-shape={id}
+              className={`cmShape${focusIds.has(id) ? ' cmShape--on' : ''}${!none && focusIds.size > 0 && !focusIds.has(id) ? ' cmShape--dim' : ''}${selected ? ' cmShape--sel' : ''}${pickable ? ' cmShape--pick' : ''}${p.pick && !pickable ? ' cmShape--off' : ''}${s.mirrorOf ? ' cmShape--twin' : ''}${item.helper ? ' cmShape--helper' : ''}`}
               onPointerDown={e => onShapeDown(e, id)} onDoubleClick={e => onDouble(e, s)}
             />
-            {selected && <path d={r.d} className="cmRing cmRing--under" aria-hidden="true" />}
-            {selected && <path d={r.d} className="cmRing cmRing--over" data-ring={id} aria-hidden="true" />}
+            {selected && <path d={item.d} className="cmRing cmRing--under" aria-hidden="true" />}
+            {selected && <path d={item.d} className="cmRing cmRing--over" data-ring={id} aria-hidden="true" />}
           </g>
         )
       })}

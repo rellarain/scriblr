@@ -11,6 +11,7 @@ import { DesignerCanvas, type PivotMarker, type PoseCanvas, type PoseGrab } from
 import { FormsTab, type FormActions } from './FormsTab'
 import { Inspector, type InspectorTab } from './Inspector'
 import { StatusBadge, modelLabel } from './ModelList'
+import type { PaintActions } from './PaintSection'
 import { PoseBar } from './PoseBar'
 import { PresetsTab, type PresetActions } from './PresetsTab'
 import { PreviewStrip } from './PreviewStrip'
@@ -24,7 +25,7 @@ import {
 } from './engine/colour'
 import { addMember, deleteClass, detachBeforeRemoval, detachMember, followTemplate, makeClass, moveObjectToGroup, reconcileClasses, renameClass, setExclusive, setShapeHide } from './engine/classEdit'
 import { newShape } from './engine/edit'
-import { addAxis, addForm, hideInForm, moveAxis, moveForm, overrideState, removeAxis, removeForm, renameAxis, renameForm, setInitialForm, setOverride, useBaseOutline } from './engine/formEdit'
+import { addAxis, addForm, hideInForm, moveAxis, moveForm, overrideState, removeAxis, removeForm, renameAxis, renameForm, setInitialForm, setLook, setOverride, useBaseOutline } from './engine/formEdit'
 import { classKey, presetsOf, targetForShape } from './engine/forms'
 import { apply, inverse } from './engine/geometry'
 import { LIMITS } from './engine/limits'
@@ -32,6 +33,8 @@ import { emptyHistory, redo as redoHistory, remember, undo as undoHistory, type 
 import { beginScale, beginTurn, grabPoint, moveScale, moveTurn, poseTarget, reach, reachJoints, scaleDriver, slideValue, toModel, turnDrivers, type ReachGrab, type ScaleDrag, type TurnDrag } from './engine/pose'
 import { deletePreset, renamePreset, savePreset, saveStyle, updatePreset } from './engine/presets'
 import { chainOf, isPointDriven, restPivot, solve, type Solved, type Values } from './engine/rig'
+import * as paintOps from './engine/paintEdit'
+import { addShading } from './engine/shadeEdit'
 import {
   addBend, addRange, addScale, addTurn, attachFromClick, attachGroup, clearPointMoves, detachGroup, groupOfShape, newRange, recordPoints, removeDrive, removeRange, renameRange, reparent,
   setAxis, setDriveAxis, setPivot, setShow, stepBendEdge, stepBound, stepDrive, type Edit,
@@ -113,6 +116,8 @@ export function ModelPane({ entry, models, makeId, onRemove, onDuplicate, onExpo
   const { values, setValues } = test
   const [recording, setRecording] = useState<RecordingState | null>(null)
   const [pickOn, setPickOn] = useState(false)
+  // picking a shape on the canvas to clip the selected shape to, or to let cut a hole in it
+  const [paintPick, setPaintPick] = useState<'clip' | 'cut' | null>(null)
   const [view, setView] = useState<ViewName>('front')
   const [linkMode, setLinkMode] = useState<LinkHow | null>(null)
   const [rangeFilter, setRangeFilter] = useState<'selection' | 'all'>('selection')
@@ -263,7 +268,7 @@ export function ModelPane({ entry, models, makeId, onRemove, onDuplicate, onExpo
 
   function choose(next: Selection) {
     if (recording) return
-    setSel(next); setSelPoint(0); setMode('points'); setPickOn(false); setLinkMode(null)
+    setSel(next); setSelPoint(0); setMode('points'); setPickOn(false); setLinkMode(null); setPaintPick(null)
   }
 
   // ---- the sliders' test values ----
@@ -525,6 +530,26 @@ export function ModelPane({ entry, models, makeId, onRemove, onDuplicate, onExpo
     removeForm: (objectId, axisId, formId) => { applyEdit(removeForm(content, objectId, axisId, formId)) },
     hideShape: (objectId, axisId, formId, shapeId) => { applyEdit(hideInForm(content, objectId, axisId, formId, shapeId)) },
     useBase: (objectId, axisId, formId, shapeId) => { applyEdit(useBaseOutline(content, objectId, axisId, formId, shapeId)) },
+    setLook: (objectId, axisId, formId, shapeId, look) => { applyEdit(setLook(content, objectId, axisId, formId, shapeId, look)) },
+  }
+
+  // ---- paint effects ----
+
+  const paintActions: PaintActions = {
+    setTone: (id, tone) => { applyEdit(paintOps.setTone(content, id, tone)) },
+    setDerive: (id, kind) => { applyEdit(paintOps.setDerive(content, id, kind)) },
+    stepTint: (id, field, dir, big) => { applyEdit(paintOps.stepTint(content, id, field, dir, big)) },
+    setShadeKind: (id, kind) => { applyEdit(paintOps.setShadeKind(content, id, kind)) },
+    setGradient: (id, grad) => { applyEdit(paintOps.setGradient(content, id, grad)) },
+    setBlend: (id, blend) => { applyEdit(paintOps.setBlend(content, id, blend)) },
+    setClip: (id, target) => { applyEdit(paintOps.setClip(content, id, target)) },
+    toggleCut: (id, target) => { applyEdit(paintOps.toggleCut(content, id, target)) },
+    setHelper: (id, on) => { applyEdit(paintOps.setHelper(content, id, on)) },
+    addShading: (id, kind, side) => {
+      const e = addShading(content, id, kind, side, makeId)
+      if (applyEdit(e) && e.ok && e.shapeId) { setSel({ kind: 'shape', id: e.shapeId }); setSelPoint(0) }
+    },
+    pick: what => { setPaintPick(what); if (what) { setLinkMode(null); setPickOn(false) } },
   }
   const classes: ClassActions = {
     select: choose,
@@ -676,7 +701,9 @@ export function ModelPane({ entry, models, makeId, onRemove, onDuplicate, onExpo
   const ancestorShapes = group?.parent ? content.shapes.filter(s => { const home = groupOfShape(content, s.id); return !!home && chainOf(content, group.parent!).includes(home) && outlineSize(content, s) >= 3 }) : []
   // linking a point: any other shape with an outline can be clicked; picking an anchor: the shapes of the parent and above
   const linkPick = linkMode && selShape && !selShape.mirrorOf ? { shapes: content.shapes.filter(s => s.id !== selShape.id && outlineSize(content, s) >= 3 && !!solved.shapes[s.id]?.d).map(s => s.id) } : null
-  const pick = linkPick ?? (pickOn && group?.attach ? { shapes: ancestorShapes.map(s => s.id) } : null)
+  // choosing what the selected shape is clipped to, or cut by: any other shape that is drawn (a helper too)
+  const paintPickShapes = paintPick && selShape ? { shapes: content.shapes.filter(s => s.id !== selShape.id && !!solved.shapes[s.id]?.d).map(s => s.id) } : null
+  const pick = linkPick ?? paintPickShapes ?? (pickOn && group?.attach ? { shapes: ancestorShapes.map(s => s.id) } : null)
 
   // Dragging the pivot of a group: an unanchored one moves to the pointer (read back into the group's own space); an anchored one is fixed again at the
   // nearest place of the same kind on its shape.
@@ -719,6 +746,11 @@ export function ModelPane({ entry, models, makeId, onRemove, onDuplicate, onExpo
     commit(stepLink(content, selShape.id, selPoint, b.kind === 'edge' ? (sideways ? 't' : 'o') : sideways ? 'dx' : 'dy', dir, big))
   }
   function onPick(shapeId: string, wx: number, wy: number) {
+    if (paintPick && selShape) {
+      const e = paintPick === 'clip' ? paintOps.setClip(content, selShape.id, shapeId) : paintOps.toggleCut(content, selShape.id, shapeId)
+      if (applyEdit(e)) setPaintPick(null)
+      return
+    }
     if (linkMode && selShape) {
       const [x, y] = apply(inverse(solved.global), wx, wy)
       const e = linkMode === 'edge' ? linkToEdge(content, selShape.id, selPoint, shapeId, x, y) : linkToPoint(content, selShape.id, selPoint, shapeId, x, y, linkMode)
@@ -733,6 +765,7 @@ export function ModelPane({ entry, models, makeId, onRemove, onDuplicate, onExpo
   const stageNote = recording ? 'Recording: drag the points, then press Set in the Ranges tab.'
     : poseMode ? 'Pose mode: the figure is grabbed, not edited. The sliders in the Ranges tab do the same from the keyboard.'
     : linkMode ? `Click the shape to link point ${selPoint + 1} to. Escape stops.`
+    : paintPick && selShape ? `Click the shape ${selShape.name.trim() || 'this shape'} is to be ${paintPick === 'clip' ? 'clipped to' : 'cut by (click it again to stop)'}. Escape stops.`
     : formTarget && selShape && hiddenByForm ? `${selShape.name.trim() || 'This shape'} is hidden in the form ${formTarget.form.name.trim() || 'chosen'}: use the base outline for it in the Forms tab, or choose another form.`
     : formTarget && selShape ? `Editing the form ${formTarget.form.name.trim() || 'chosen'} of ${formTarget.axis.name.trim() || 'the axis'}: the points you move change only this form.`
     : selShape && switchedOff ? `${selShape.name.trim() || 'This shape'} is switched off with the eye: show it to edit it.`
@@ -822,7 +855,7 @@ export function ModelPane({ entry, models, makeId, onRemove, onDuplicate, onExpo
                 const next = t.kind === 'grid' ? rightClickGrid() : rightClickShape(sel, mode, t.id)
                 setSel(next.sel); setMode(next.mode); if (t.kind === 'shape' && next.sel.kind === 'shape' && next.sel.id !== (sel.kind === 'shape' ? sel.id : '')) setSelPoint(0)
               }}
-              onEscape={() => { if (linkMode) setLinkMode(null); else if (pickOn) setPickOn(false); else if (!recording) setSel(NONE) }}
+              onEscape={() => { if (linkMode) setLinkMode(null); else if (paintPick) setPaintPick(null); else if (pickOn) setPickOn(false); else if (!recording) setSel(NONE) }}
             />
             <p className="cmStageNote" aria-live="polite">{stageNote}</p>
           </div>
@@ -838,7 +871,7 @@ export function ModelPane({ entry, models, makeId, onRemove, onDuplicate, onExpo
               rangesTab={<RangesTab content={content} sel={sel} group={group} values={values} recording={recording} scrubbing={scrubbing} filter={rangeFilter} onFilter={setRangeFilter} actions={rigActions} />}
               formsTab={<FormsTab content={content} sel={sel} state={test.state} actions={forms} presets={presets} colouring={colouring} />}
               presetsTab={<PresetsTab content={content} state={test.state} actions={presets} />}
-              colourTab={<ColourTab content={content} sel={sel} state={{ colours: test.colours, palette: testPalette, genre: test.genre, locks: test.locks }} actions={colourActions} />}
+              colourTab={<ColourTab content={content} sel={sel} state={{ colours: test.colours, palette: testPalette, genre: test.genre, locks: test.locks }} actions={colourActions} paint={paintActions} picking={paintPick} />}
             />
           )}
         </div>

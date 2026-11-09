@@ -598,16 +598,26 @@ export type ModelBindKind = 'point' | 'edge'
 export interface ModelBind { kind: ModelBindKind; s: string; i: number; d: [number, number]; e: number; t: number; o: number }
 // A point of a shape: c = curve, s = sharp, cs = curve then sharp, sc = sharp then curve. hi and ho are the in and out handles as offsets (absent: automatic). bind links it to another shape.
 export interface ModelPoint { x: number; y: number; m: ModelPointMode; hi?: [number, number] | null; ho?: [number, number] | null; w?: number | null; bind?: ModelBind | null }
+// Paint effects. A tone of a colour: a shadow (darker, a little warmer and fuller), a mid tone (half a shadow) or a highlight (toward white), by an amount t (0.02..0.8).
+export type ModelTintKind = 'shadow' | 'mid' | 'highlight'
+export interface ModelTint { kind: ModelTintKind; t: number }
+// A gradient fill from the shape's colour to the colour of slot `to` (null: a darker tone of its own colour), in a direction.
+export type ModelGradDir = 'down' | 'up' | 'left' | 'right' | 'radial'
+export interface ModelGradient { dir: ModelGradDir; to: string | null }
+export type ModelBlend = 'multiply' | 'screen' | 'overlay'
 // A filled outline in the model's space (0..200 across, 0..400 down). `half` > 0 marks a symmetric outline: its first `half` points run down one half and the rest mirror them.
 // mirrorOf: the shape this one is the mirror image of about the model's axis (a derived twin has no points of its own until the pair is broken). back: an outline of its own for the back view (absent: the front outline seen from behind); zBack: its depth in the back view; loose: the slider that loosens the links of its points.
-export interface ModelShape { id: string; name: string; closed: boolean; z: number; op: number; view: ModelView; pts: ModelPoint[]; half: number; template?: string | null; mirrorOf?: string | null; back?: ModelPoint[] | null; zBack?: number | null; loose?: string | null; copyOf?: string | null; hide?: boolean; slot?: string | null; gray?: number | null }
+export interface ModelShape { id: string; name: string; closed: boolean; z: number; op: number; view: ModelView; pts: ModelPoint[]; half: number; template?: string | null; mirrorOf?: string | null; back?: ModelPoint[] | null; zBack?: number | null; loose?: string | null; copyOf?: string | null; hide?: boolean; slot?: string | null; gray?: number | null; tone?: number; derive?: ModelTint | null; shade?: ModelTint | null; grad?: ModelGradient | null; blend?: ModelBlend | null; clip?: string | null; cut?: string[]; helper?: boolean }
 // What one form does to one shape of its object: the outline the shape has in that form (an empty list hides the shape in the form).
 export interface ModelOverride { shape: string; pts: ModelPoint[] }
 // One form of an axis (round eyes, almond eyes): the shapes it changes with their outlines. A form with no overrides is the base outline.
-export interface ModelForm { id: string; name: string; ovr: ModelOverride[] }
+// What one form does to the paint of one shape: the colour slot it is painted from, or a fixed gray (no slot), and a tone (-2..2). null leaves the shape's own value.
+export interface ModelLook { shape: string; slot: string | null; gray: number | null; tone: number | null }
+export interface ModelForm { id: string; name: string; ovr: ModelOverride[]; looks?: ModelLook[] }
 // A way an object can vary (eye shape, expression, style): its forms, and the one it shows unless another is chosen (initial). An object shows one form of every axis.
 export interface ModelAxis { id: string; name: string; options: ModelForm[]; initial: string }
 // slot: the colour slot a shape is painted from (a twin follows its original's, a shape that follows the template its template shape's, when none); gray: a fixed gray 0..100 used when there is no slot (an eye white, teeth); neither: the neutral gray every uncoloured model is drawn in.
+// tone: steps lighter (+) or darker (-) than the colour; derive: this shape is a tone of its colour; shade: this is a shading shape, a tone of its slot's colour kept inside the base shapes of its object; grad, blend: gradient and blend mode; clip: the shape it is kept inside; cut: shapes that cut a hole in it; helper: never drawn, only used to clip or cut. A twin and a shape that follows a template take all of these from the shape they copy.
 // copyOf (on a shape of a class member): the shape of the class's template it follows, with no points of its own until it has an outline of its own; hide leaves the inherited shape out of the member. classOf (on an object): the class it is a member of.
 export interface ModelObject { id: string; name: string; layer: ModelLayer; shapes: string[]; mirrorOf?: string | null; axes?: ModelAxis[]; classOf?: string | null }
 // Where a group is fixed to a shape of its parent (or an ancestor): on one point (i), at a spot t (0..1) along edge i, anywhere along edge i that the slider moves, or at a relative place (rx, ry) inside the shape's box.

@@ -1,5 +1,5 @@
-import type { ModelContent, ModelEntry, ModelGroup, ModelLayer, ModelObject, ModelShape, ModelSlot } from '../../../../api/types'
-import { LIMITS, copyBytes, linkCount } from './engine/limits'
+import type { ModelContent, ModelEntry, ModelForm, ModelGradient, ModelGroup, ModelLayer, ModelLook, ModelObject, ModelShape, ModelSlot, ModelTint } from '../../../../api/types'
+import { LIMITS, copyBytes, linkCount, shadingCount } from './engine/limits'
 import { chainOf } from './engine/rig'
 import { standardGenres, standardSlots, starterPalette } from './engine/standardColours'
 
@@ -34,8 +34,8 @@ export function normalizeContent(c: ModelContent): ModelContent {
     ...c,
     name: clean(c.name, NAME_MAX),
     description: clean(c.description, DESCRIPTION_MAX),
-    shapes: c.shapes.map(s => ({ ...s, name: clean(s.name, NAME_MAX), mirrorOf: s.mirrorOf ?? null, back: s.back ?? null, zBack: s.zBack ?? null, loose: s.loose ?? null, copyOf: s.copyOf ?? null, hide: s.hide === true, slot: s.slot ?? null, gray: s.gray ?? null })),
-    objects: c.objects.map(o => ({ ...o, name: clean(o.name, NAME_MAX), mirrorOf: o.mirrorOf ?? null, classOf: o.classOf ?? null, axes: (o.axes ?? []).map(a => ({ ...a, name: clean(a.name, NAME_MAX), options: a.options.map(f => ({ ...f, name: clean(f.name, NAME_MAX) })) })) })),
+    shapes: c.shapes.map(s => ({ ...s, name: clean(s.name, NAME_MAX), mirrorOf: s.mirrorOf ?? null, back: s.back ?? null, zBack: s.zBack ?? null, loose: s.loose ?? null, copyOf: s.copyOf ?? null, hide: s.hide === true, slot: s.slot ?? null, gray: s.gray ?? null, ...paintFields(s) })),
+    objects: c.objects.map(o => ({ ...o, name: clean(o.name, NAME_MAX), mirrorOf: o.mirrorOf ?? null, classOf: o.classOf ?? null, axes: (o.axes ?? []).map(a => ({ ...a, name: clean(a.name, NAME_MAX), options: a.options.map(f => ({ ...f, name: clean(f.name, NAME_MAX), looks: repairLooks(f.looks) })) })) })),
     groups: c.groups.map(g => ({ ...g, name: clean(g.name, NAME_MAX), pivot: g.pivot ?? null, attach: g.attach ?? null, mirrorOf: g.mirrorOf ?? null })),
     axis: c.axis ?? 100,
     ranges: (c.ranges ?? []).map(r => ({ ...r, name: clean(r.name, RANGE_NAME_MAX) })),
@@ -45,6 +45,34 @@ export function normalizeContent(c: ModelContent): ModelContent {
     palette: (c.palette ?? []).map(p => ({ ...p, name: clean(p.name, SWATCH_NAME_MAX), h: percent(p.h, 0, 359), s: percent(p.s, 50, 100) })),
     slots: (c.slots ?? []).map(repairSlot),
   }
+}
+
+// The paint effects of a shape as the server keeps them (phase 4b): a tone held to -2..2, amounts to 0.02..0.8 in hundredths, only the real kinds, no repeated or
+// excess cut-outs.
+export const TINT_RANGE = { min: 0.02, max: 0.8 } as const
+export const TONE_RANGE = { min: -2, max: 2 } as const
+const KINDS = ['shadow', 'mid', 'highlight'], DIRS = ['down', 'up', 'left', 'right', 'radial'], BLENDS = ['multiply', 'screen', 'overlay']
+export const tintAmount = (t: number): number => Math.round(Math.min(TINT_RANGE.max, Math.max(TINT_RANGE.min, Number.isFinite(t) ? t : 0.12)) * 100) / 100
+const tintOf = (t: ModelTint | null | undefined): ModelTint | null => (t ? { kind: KINDS.includes(t.kind) ? t.kind : 'shadow', t: tintAmount(t.t) } : null)
+const gradOf = (g: ModelGradient | null | undefined): ModelGradient | null => (g ? { dir: DIRS.includes(g.dir) ? g.dir : 'down', to: g.to ?? null } : null)
+function paintFields(s: ModelShape) {
+  return {
+    tone: typeof s.tone === 'number' && Number.isFinite(s.tone) ? Math.round(Math.min(TONE_RANGE.max, Math.max(TONE_RANGE.min, s.tone))) : 0,
+    derive: tintOf(s.derive), shade: tintOf(s.shade), grad: gradOf(s.grad), blend: s.blend && BLENDS.includes(s.blend) ? s.blend : null, clip: s.clip ?? null,
+    cut: [...new Set(s.cut ?? [])].slice(0, LIMITS.cutsMax), helper: s.helper === true,
+  }
+}
+// A form's looks as the server keeps them: a slot wins over a gray, one look per shape, a look that changes nothing is dropped.
+export function repairLooks(looks: ModelLook[] | undefined): ModelLook[] {
+  const seen = new Set<string>(), out: ModelLook[] = []
+  for (const l of looks ?? []) {
+    const slot = l.slot ?? null, gray = slot === null && l.gray != null ? Math.round(Math.min(100, Math.max(0, l.gray))) : null
+    const tone = l.tone == null ? null : Math.round(Math.min(TONE_RANGE.max, Math.max(TONE_RANGE.min, l.tone)))
+    if ((slot === null && gray === null && tone === null) || seen.has(l.shape)) continue
+    seen.add(l.shape)
+    out.push({ shape: l.shape, slot, gray, tone })
+  }
+  return out
 }
 
 const percent = (v: number, fallback: number, max: number): number => (typeof v === 'number' && Number.isFinite(v) ? Math.round(Math.min(max, Math.max(0, v))) : fallback)
@@ -153,6 +181,13 @@ export function goneWith(c: ModelContent, seed: { shapes?: string[]; objects?: s
   return { shapes, objects, groups }
 }
 
+// A form without the outlines and paint changes of shapes that are gone.
+function forgetShapes(f: ModelForm, gone: Set<string>): ModelForm {
+  const ovr = f.ovr.some(v => gone.has(v.shape)) ? f.ovr.filter(v => !gone.has(v.shape)) : f.ovr
+  const looks = (f.looks ?? []).some(l => gone.has(l.shape)) ? (f.looks ?? []).filter(l => !gone.has(l.shape)) : f.looks
+  return ovr === f.ovr && looks === f.looks ? f : { ...f, ovr, ...(looks ? { looks } : {}) }
+}
+
 function removeAll(c: ModelContent, gone: { shapes: Set<string>; objects: Set<string>; groups: Set<string> }): ModelContent {
   const parentOf = new Map(c.groups.map(g => [g.id, g.parent]))
   // a class goes with its template; its members stop being members (the page freezes them first, so they keep their look: see classEdit.detachBeforeRemoval)
@@ -160,10 +195,17 @@ function removeAll(c: ModelContent, gone: { shapes: Set<string>; objects: Set<st
   const up = (id: string | null): string | null => { let cur = id; while (cur !== null && gone.groups.has(cur)) cur = parentOf.get(cur) ?? null; return cur }
   return {
     ...c,
-    shapes: c.shapes.filter(s => !gone.shapes.has(s.id)).map(s => (s.pts.some(p => p.bind && gone.shapes.has(p.bind.s)) ? { ...s, pts: s.pts.map(p => (p.bind && gone.shapes.has(p.bind.s) ? { ...p, bind: null } : p)) } : s)),
+    shapes: c.shapes.filter(s => !gone.shapes.has(s.id)).map(s => {
+      let out = s
+      if (s.pts.some(p => p.bind && gone.shapes.has(p.bind.s))) out = { ...out, pts: s.pts.map(p => (p.bind && gone.shapes.has(p.bind.s) ? { ...p, bind: null } : p)) }
+      // a clip or a cut-out that pointed at a shape that is gone no longer does
+      if (s.clip && gone.shapes.has(s.clip)) out = { ...out, clip: null }
+      if ((s.cut ?? []).some(t => gone.shapes.has(t))) out = { ...out, cut: (s.cut ?? []).filter(t => !gone.shapes.has(t)) }
+      return out
+    }),
     objects: c.objects.filter(o => !gone.objects.has(o.id)).map(o => ({
       ...o, shapes: o.shapes.filter(sid => !gone.shapes.has(sid)), classOf: o.classOf && deadClasses.has(o.classOf) ? null : o.classOf,
-      axes: (o.axes ?? []).map(a => ({ ...a, options: a.options.map(f => (f.ovr.some(v => gone.shapes.has(v.shape)) ? { ...f, ovr: f.ovr.filter(v => !gone.shapes.has(v.shape)) } : f)) })),
+      axes: (o.axes ?? []).map(a => ({ ...a, options: a.options.map(f => forgetShapes(f, gone.shapes)) })),
     })),
     groups: c.groups.filter(g => !gone.groups.has(g.id)).map(g => ({ ...g, parent: up(g.parent), objects: g.objects.filter(oid => !gone.objects.has(oid)) })),
     presets: (c.presets ?? []).filter(p => !(p.scope && (gone.objects.has(p.scope) || gone.groups.has(p.scope)))).map(p => {
@@ -442,6 +484,41 @@ function colourFaults(c: ModelContent): string[] {
   return faults
 }
 
+// What is wrong with the paint effects of a model (the server's _paint_faults says the same words): a clip or a cut-out that points at nothing, a gradient to a
+// slot that is not there, a form that changes the paint of a shape it should not, and too many shading shapes in an object.
+function paintFaults(c: ModelContent): string[] {
+  const faults: string[] = []
+  const shapes = new Map(c.shapes.map(s => [s.id, s])), slotIds = new Set((c.slots ?? []).map(sl => sl.id))
+  for (const s of c.shapes) {
+    const name = label(s.name, s.id)
+    if (s.clip) {
+      if (s.clip === s.id) faults.push(`Shape ${name} is clipped to itself.`)
+      else if (!shapes.has(s.clip)) faults.push(`Shape ${name} is clipped to a shape that does not exist.`)
+    }
+    for (const t of s.cut ?? []) {
+      if (t === s.id) faults.push(`Shape ${name} is cut by itself.`)
+      else if (!shapes.has(t)) faults.push(`Shape ${name} is cut by a shape that does not exist.`)
+    }
+    if (s.grad?.to && !slotIds.has(s.grad.to)) faults.push(`Shape ${name} has a gradient to a colour slot that does not exist.`)
+  }
+  for (const o of c.objects) {
+    const obj = label(o.name, o.id), own = new Set(o.shapes)
+    if (shadingCount(c, o.id) > LIMITS.shadesMax) faults.push(`Object ${obj} has more than ${LIMITS.shadesMax} shading shapes.`)
+    for (const axis of o.axes ?? []) {
+      for (const form of axis.options) {
+        const fname = label(form.name, form.id)
+        for (const look of form.looks ?? []) {
+          const shape = shapes.get(look.shape)
+          if (!own.has(look.shape) || !shape) faults.push(`Form ${fname} of ${obj} changes the paint of a shape that is not in the object.`)
+          else if (shape.mirrorOf) faults.push(`Form ${fname} of ${obj} changes the paint of a twin; change the original instead.`)
+          else if (look.slot && !slotIds.has(look.slot)) faults.push(`Form ${fname} of ${obj} paints shape ${label(shape.name, shape.id)} from a colour slot that does not exist.`)
+        }
+      }
+    }
+  }
+  return faults
+}
+
 export function publishFaults(c: ModelContent): string[] {
   const faults: string[] = []
   if (!c.name.trim()) faults.push('The model needs a name.')
@@ -473,6 +550,7 @@ export function publishFaults(c: ModelContent): string[] {
   faults.push(...classFaults(c))
   faults.push(...presetFaults(c))
   faults.push(...colourFaults(c))
+  faults.push(...paintFaults(c))
   const bytes = copyBytes(c)
   if (bytes > LIMITS.copyMaxBytes) faults.push(`A character's copy of this model would be ${Math.floor(bytes / 1024)} KB; the limit is ${LIMITS.copyMaxBytes / 1024} KB.`)
   return faults

@@ -1,5 +1,5 @@
-import type { ModelAxis, ModelContent, ModelForm, ModelObject, ModelPoint } from '../../../../../api/types'
-import { NAME_MAX, objectById, randomId, shapeById, type MakeId } from '../modelContent'
+import type { ModelAxis, ModelContent, ModelForm, ModelLook, ModelObject, ModelPoint } from '../../../../../api/types'
+import { NAME_MAX, TONE_RANGE, objectById, randomId, shapeById, type MakeId } from '../modelContent'
 import { axesOf } from './forms'
 import { LIMITS } from './limits'
 import { done, fail, type Edit } from './rigEdit'
@@ -110,6 +110,30 @@ export function setOverride(c: ModelContent, objectId: string, axisId: string, f
 
 export const hideInForm = (c: ModelContent, objectId: string, axisId: string, formId: string, shapeId: string): Edit => setOverride(c, objectId, axisId, formId, shapeId, [])
 export const useBaseOutline = (c: ModelContent, objectId: string, axisId: string, formId: string, shapeId: string): Edit => setOverride(c, objectId, axisId, formId, shapeId, null)
+
+// ---- the paint a form gives a shape ----
+
+// What a form does to the paint of a shape of the object: the colour slot it is painted from, or a fixed gray (no slot), and a tone. A null leaves the shape's own
+// value; all three null takes the look away. Only the shape's slot, gray and tone can change in a form.
+export type LookChange = Pick<ModelLook, 'slot' | 'gray' | 'tone'>
+export function setLook(c: ModelContent, objectId: string, axisId: string, formId: string, shapeId: string, look: LookChange | null): Edit {
+  const o = objectById(c, objectId), axis = o && axesOf(o).find(a => a.id === axisId), form = axis?.options.find(f => f.id === formId)
+  if (!o || !axis || !form) return fail('There is no such form.')
+  const shape = shapeById(c, shapeId)
+  if (!shape || !o.shapes.includes(shapeId)) return fail('That shape is not in the object.')
+  if (shape.mirrorOf) return fail('A twin is painted like its original: change the original.')
+  if (look?.slot && !(c.slots ?? []).some(sl => sl.id === look.slot)) return fail('There is no such colour slot.')
+  const slot = look?.slot ?? null
+  const gray = slot === null && look?.gray != null ? Math.round(Math.min(100, Math.max(0, look.gray))) : null
+  const tone = look?.tone == null ? null : Math.round(Math.min(TONE_RANGE.max, Math.max(TONE_RANGE.min, look.tone)))
+  const others = (form.looks ?? []).filter(l => l.shape !== shapeId)
+  const empty = slot === null && gray === null && tone === null
+  if (!empty && !(form.looks ?? []).some(l => l.shape === shapeId) && others.length >= LIMITS.looksMax) return fail(`A form may change the paint of at most ${LIMITS.looksMax} shapes.`)
+  return done(mapForm(c, objectId, axisId, formId, f => ({ ...f, looks: empty ? others : [...(f.looks ?? []).filter(l => l.shape !== shapeId), { shape: shapeId, slot, gray, tone }] })))
+}
+
+// The look a form gives a shape, or undefined.
+export const lookState = (f: ModelForm, shapeId: string): ModelLook | undefined => (f.looks ?? []).find(l => l.shape === shapeId)
 
 // What a form does to one shape, for the Forms tab's list of shapes.
 export function overrideState(f: ModelForm, shapeId: string): 'base' | 'own' | 'hidden' {

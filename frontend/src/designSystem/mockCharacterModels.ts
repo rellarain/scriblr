@@ -6,6 +6,8 @@ import { addAxis, addForm, renameForm, setOverride } from '../assets/Interfaces/
 import { addMember, makeClass } from '../assets/Interfaces/admin/characters/engine/classEdit'
 import { classKey, formKey } from '../assets/Interfaces/admin/characters/engine/forms'
 import { linkToEdge, makeTwin, setBack, setLoose } from '../assets/Interfaces/admin/characters/engine/pairEdit'
+import { setBlend, setGradient, toggleCut } from '../assets/Interfaces/admin/characters/engine/paintEdit'
+import { addShading } from '../assets/Interfaces/admin/characters/engine/shadeEdit'
 import { saveStyle, savePreset } from '../assets/Interfaces/admin/characters/engine/presets'
 import { templateBox } from '../assets/Interfaces/admin/characters/engine/templates'
 import { standardGenres, standardSlots, starterPalette } from '../assets/Interfaces/admin/characters/engine/standardColours'
@@ -129,6 +131,16 @@ function riggedFigure(): ModelContent {
   shirt.pts.forEach((p, i) => { c = must(linkToEdge(c, 's_shirt', i, 's_chest', p.x, p.y)) })
   c = must(addRange(c, { ...newRange('r_fit', 'Shirt fit', 'scale', 's_shirt'), min: 0, rest: 100, max: 200, unit: '%' }))
   c = must(setLoose(c, ['s_shirt'], 'r_fit'))
+  // paint effects: a neckline (a helper shape, never drawn) cuts a hole in the shirt, a shadow band along its right edge is multiplied with what is under it, and a
+  // highlight lies along the left of the head
+  c = addShape(c, 'o_shirt', { ...newShape('s_neckline', 'Neckline', 'oval', box(88, 78, 24, 14)), slot: 'k_cloth', helper: true })
+  c = must(toggleCut(c, 's_shirt', 's_neckline'))
+  let paintIds = 0
+  const mkPaint = (prefix: string) => `${prefix}_paint${++paintIds}`
+  const shirtShade = addShading(c, 's_shirt', 'shadow', 'right', mkPaint)
+  c = must(shirtShade)
+  c = must(setBlend(c, shirtShade.shapeId!, 'multiply'))
+  c = must(addShading(c, 's_head', 'highlight', 'left', mkPaint))
   // a sleeve on the upper arm, short unless a form of the arm says otherwise
   c = addShape(c, 'o_arm', { ...newShape('s_sleeve', 'Sleeve', 'rounded', box(122, 88, 18, 28)), slot: 'k_cloth' })
   // (the body is painted from Skin, the shirt and sleeve from Clothing, the iris from Eye, the white of the eye a fixed white)
@@ -163,6 +175,7 @@ function riggedFigure(): ModelContent {
   c = addObject(c, 'g_head', { id: 'o_eye', name: 'Eye', layer: 'body', shapes: [] })
   c = addShape(c, 'o_eye', { ...newShape('s_eye', 'White', 'oval', box(85, 41, 11, 7)), gray: 100 })
   c = addShape(c, 'o_eye', { ...newShape('s_iris', 'Iris', 'oval', box(88.5, 41.5, 5, 5)), slot: 'k_eye' })
+  c = must(setGradient(c, 's_iris', { dir: 'radial', to: null }))   // every member of the family follows it
   const lids = axisWith('o_eye', 'Lids', 'Open')
   formWith('o_eye', lids, 'Closed', 's_iris', null)
   const family = makeClass(c, 'o_eye', 'Eye', true, mk)
@@ -201,8 +214,9 @@ function riggedFigure(): ModelContent {
 export function previewModels(): ModelEntry[] {
   const adult = riggedFigure()
   const plain = (shapeIds: string[]): ModelContent => {
-    const shapes = adult.shapes.filter(s => shapeIds.includes(s.id))
-    return { ...adult, shapes, objects: adult.objects.filter(o => o.shapes.every(s => shapeIds.includes(s)) && o.shapes.length).map(o => ({ ...o, axes: [] })), presets: [], classes: [], groups: [newGroup('g_head', 'Head', null, adult.objects.filter(o => o.shapes.every(s => shapeIds.includes(s))).map(o => o.id))], ranges: [] }
+    const shapes = adult.shapes.filter(s => shapeIds.includes(s.id)).map(s => ({ ...s, cut: [], clip: null }))
+    const objects = adult.objects.map(o => ({ ...o, shapes: o.shapes.filter(s => shapeIds.includes(s)), axes: [] })).filter(o => o.shapes.length)
+    return { ...adult, shapes, objects, presets: [], classes: [], groups: [newGroup('g_head', 'Head', null, objects.map(o => o.id))], ranges: [] }
   }
   const live = liveEntry('adult', adult, { nextVersion: 3 })
   live.published = published(2, plain(['s_head', 's_neck', 's_chest']))

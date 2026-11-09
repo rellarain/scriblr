@@ -9,6 +9,7 @@ import {
 } from './engine/colour'
 import { standardSlots } from './engine/standardColours'
 import { LIMITS } from './engine/limits'
+import { PaintSection, type PaintActions } from './PaintSection'
 import { NAME_MAX, SWATCH_NAME_MAX, objectById, objectOfShape, shapeById } from './modelContent'
 
 // The Colour tab: what the selected shape or object is painted from (a colour slot, or a fixed gray), the colours of the test character (a default colour or a swatch
@@ -279,7 +280,7 @@ function Genres({ content, actions }: { content: ModelContent; actions: ColourAc
   )
 }
 
-export function ColourTab({ content, sel, state, actions }: { content: ModelContent; sel: Selection; state: ColourState; actions: ColourActions }) {
+export function ColourTab({ content, sel, state, actions, paint, picking = null }: { content: ModelContent; sel: Selection; state: ColourState; actions: ColourActions; paint?: PaintActions; picking?: 'clip' | 'cut' | null }) {
   const [slotPick, setSlotPick] = useState<string | null>(null)
   const shape = sel.kind === 'shape' ? shapeById(content, sel.id) : undefined
   const object = sel.kind === 'object' ? objectById(content, sel.id) : sel.kind === 'shape' ? objectOfShape(content, sel.id) : undefined
@@ -291,6 +292,7 @@ export function ColourTab({ content, sel, state, actions }: { content: ModelCont
       <h2 className="cmInsTitle">Colour</h2>
       <p className="cmInsText">The model is drawn in gray until colours are chosen. Shapes pick a slot; the test character picks a colour for each slot.</p>
       {(shape || object) && <ThisShape content={content} shape={shape} shapeIds={shapeIds} name={label(object?.name ?? '', 'the object')} actions={actions} />}
+      {shape && paint && <PaintSection content={content} shape={shape} picking={picking} actions={paint} />}
       <TestColours content={content} state={state} slotId={slotPick ?? current?.id ?? null} onSlot={setSlotPick} actions={actions} />
       <TestPalette content={content} state={state} actions={actions} />
       <Slots content={content} actions={actions} />

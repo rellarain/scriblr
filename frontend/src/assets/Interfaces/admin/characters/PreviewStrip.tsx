@@ -1,12 +1,13 @@
-import { useMemo, useState, type CSSProperties } from 'react'
+import { useMemo, useState } from 'react'
 import type { ModelContent } from '../../../../api/types'
 import { DiceIcon } from '../../../icons'
 import { shapesOf, showFor, type Selection } from './designerState'
-import { paintOf } from './engine/colour'
+import { drawable, paintDefs, paintShapes } from './engine/paint'
 import { previewSpecs, previewTransform, type PreviewMode } from './engine/previews'
 import type { Box } from './engine/geometry'
 import { defaultValues, solve } from './engine/rig'
 import { outlineSize } from './modelContent'
+import { PaintDefs, PaintedPath, useSvgPrefix } from './PaintedPath'
 
 // The always-on strip under the canvas: the selection (or, with nothing selected, the whole model) at random sizes, tilts and backgrounds, so the
 // admin sees how it holds up. Re-roll draws a new set; Smallest and Largest are the stress previews (every value at the end of its range).
@@ -35,7 +36,9 @@ export function PreviewStrip({ content, sel, view = 'front' }: { content: ModelC
     }
     return any ? { x: x0, y: y0, w: x1 - x0, h: y1 - y0 } : null
   }, [content, ids, view, show])
-  const byId = useMemo(() => new Map(content.shapes.map(s => [s.id, s])), [content.shapes])
+  // what each tile draws: the paint of every shape of the selection under the tile's own colours (and forms), minus helpers and shapes with nothing to lie in
+  const prefix = useSvgPrefix()
+  const painted = useMemo(() => specs.map((spec, i) => drawable(paintShapes(content, tiles[i], { palette: spec.palette, choices: spec.choices, forms: spec.forms }, tiles[i].order.filter(id => ids.has(id))))), [specs, tiles, content, ids])
   const px = SIZES.find(s => s.id === size)!.px
 
   return (
@@ -54,11 +57,9 @@ export function PreviewStrip({ content, sel, view = 'front' }: { content: ModelC
         <div className="cmTiles">
           {specs.map((spec, i) => (
             <svg key={i} className={`cmTile cmTile--${spec.bg}`} viewBox="0 0 100 100" width={px} height={px} role="img" aria-label={`Preview ${i + 1}`}>
+              <PaintDefs defs={paintDefs(painted[i], `${prefix}-${i}`)} />
               <g transform={previewTransform(box, spec)}>
-                {tiles[i].order.filter(id => ids.has(id)).map(id => {
-                  const shape = byId.get(id), paint = shape ? paintOf(content, { palette: spec.palette, choices: spec.choices }, shape) : null
-                  return <path key={id} d={tiles[i].shapes[id].d} className="cmTileShape" style={paint ? ({ '--shape-fill': paint.fill } as CSSProperties) : undefined} fillOpacity={paint?.opacity ?? 1} />
-                })}
+                {painted[i].map(item => <PaintedPath key={item.id} item={item} prefix={`${prefix}-${i}`} className="cmTileShape" />)}
               </g>
             </svg>
           ))}

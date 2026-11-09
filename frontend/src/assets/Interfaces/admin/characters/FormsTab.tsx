@@ -1,15 +1,18 @@
-import { useDeferredValue, useMemo, useState, type CSSProperties } from 'react'
-import type { ModelAxis, ModelContent, ModelForm, ModelObject } from '../../../../api/types'
+import { useDeferredValue, useMemo, useState } from 'react'
+import type { ModelAxis, ModelContent, ModelForm, ModelObject, ModelShape } from '../../../../api/types'
 import { CheckIcon, ChevronDownIcon, ChevronUpIcon, PlayIcon, PlusIcon, SaveIcon, StarIcon, TrashIcon } from '../../../icons'
 import type { Selection } from './designerState'
-import { NO_COLOURING, paintOf, type Colouring } from './engine/colour'
-import { overrideState } from './engine/formEdit'
+import { NO_COLOURING, type Colouring } from './engine/colour'
+import { lookState, overrideState, type LookChange } from './engine/formEdit'
 import { axesFor, chosenForm, formKey, targetForShape, templateOfMember } from './engine/forms'
 import { LIMITS } from './engine/limits'
+import { slotsOf } from './engine/colour'
 import { isOn, stylesOf, type TestState } from './engine/presets'
+import { drawable, paintDefs, paintShapes, type PaintItem } from './engine/paint'
 import { solve } from './engine/rig'
 import type { PresetActions } from './PresetsTab'
 import { NAME_MAX, groupById, objectById, objectOfShape, shapeById } from './modelContent'
+import { PaintDefs, PaintedPath, useSvgPrefix } from './PaintedPath'
 
 // The Forms tab: an object has axes (the shape of an eye, an expression, a style), each with forms to choose from. A form gives some of the object's shapes
 // an outline of their own (or hides them); every other shape keeps its base outline. The chosen form is only for looking, like the Try it sliders: it is not
@@ -28,6 +31,8 @@ export interface FormActions {
   removeForm: (objectId: string, axisId: string, formId: string) => void
   hideShape: (objectId: string, axisId: string, formId: string, shapeId: string) => void
   useBase: (objectId: string, axisId: string, formId: string, shapeId: string) => void
+  // the paint a form gives a shape: its colour slot (or a fixed gray), and a tone; null puts the shape's own paint back
+  setLook: (objectId: string, axisId: string, formId: string, shapeId: string, look: LookChange | null) => void
 }
 
 export interface FormsTabProps { content: ModelContent; sel: Selection; state: TestState; actions: FormActions; presets: PresetActions; colouring?: Colouring }
@@ -46,7 +51,9 @@ function useThumbs(content: ModelContent, object: ModelObject, axis: ModelAxis, 
     solves.forEach((s, i) => { for (const id of drawn[i]) { const b = s.shapes[id].box; x0 = Math.min(x0, b.x); y0 = Math.min(y0, b.y); x1 = Math.max(x1, b.x + b.w); y1 = Math.max(y1, b.y + b.h) } })
     const any = x1 >= x0
     const pad = 4, w = Math.max(any ? x1 - x0 : 0, 10), h = Math.max(any ? y1 - y0 : 0, 10)
-    return { viewBox: `${any ? x0 - pad : 0} ${any ? y0 - pad : 0} ${w + 2 * pad} ${h + 2 * pad}`, paths: solves.map((s, i) => drawn[i].map(id => ({ id, d: s.shapes[id].d, paint: paintOf(lagging, colouring, lagging.shapes.find(x => x.id === id)!) }))) }
+    // each picture is painted under the choices it shows (the form of this axis, the other axes as they are now)
+    const paths: PaintItem[][] = solves.map((s, i) => drawable(paintShapes(lagging, s, { ...colouring, forms: { ...state.forms, [formKey(object.id, axis.id)]: axis.options[i].id } }, drawn[i])))
+    return { viewBox: `${any ? x0 - pad : 0} ${any ? y0 - pad : 0} ${w + 2 * pad} ${h + 2 * pad}`, paths }
   }, [lagging, object, axis, state.forms, colouring])
 }
 
@@ -109,6 +116,7 @@ export function FormsTab({ content, sel, state, actions, presets, colouring = NO
 function AxisSection({ content, object, owner, readOnly, axis, first, last, state, actions, colouring }: { content: ModelContent; object: ModelObject; owner: ModelObject; readOnly: boolean; axis: ModelAxis; first: boolean; last: boolean; state: TestState; actions: FormActions; colouring: Colouring }) {
   const [confirm, setConfirm] = useState<string | null>(null)   // 'axis' or a form id
   const thumbs = useThumbs(content, object, axis, state, colouring)
+  const prefix = useSvgPrefix()
   const chosen = chosenForm(owner, axis, state.forms, object.id)
   const title = label(axis.name, 'Untitled axis')
   const o = object.id, a = axis.id
@@ -133,7 +141,8 @@ function AxisSection({ content, object, owner, readOnly, axis, first, last, stat
           return (
             <button key={f.id} type="button" className={`cmFormCard${on ? ' cmFormCard--on' : ''}`} aria-pressed={on} onClick={() => actions.choose(o, a, f.id)}>
               <svg className="cmFormThumb" viewBox={thumbs.viewBox} aria-hidden="true" focusable="false">
-                {thumbs.paths[i]?.map(p => <path key={p.id} d={p.d} className="cmFormShape" style={{ '--shape-fill': p.paint.fill } as CSSProperties} fillOpacity={p.paint.opacity} />)}
+                <PaintDefs defs={paintDefs(thumbs.paths[i] ?? [], `${prefix}-${i}`)} />
+                {thumbs.paths[i]?.map(p => <PaintedPath key={p.id} item={p} prefix={`${prefix}-${i}`} className="cmFormShape" />)}
               </svg>
               <span className="cmFormName">{label(f.name, 'Untitled form')}{f.id === axis.initial ? <small> · default</small> : null}</span>
             </button>
@@ -192,12 +201,43 @@ function FormDetail({ content, object, axis, form, index, confirm, onConfirm, ac
                 {state !== 'hidden' && <button type="button" className="cmBtn cmBtn--small" onClick={() => actions.hideShape(o, a, f, id)}>Hide {sName} in this form</button>}
                 {state !== 'base' && <button type="button" className="cmBtn cmBtn--small" onClick={() => actions.useBase(o, a, f, id)}>Use the base outline for {sName}</button>}
               </span>
+              <LookRow content={content} form={form} shape={s} name={sName} onChange={look => actions.setLook(o, a, f, id, look)} />
             </li>
           )
         })}
       </ul>
       <p className="cmInsText">Choose this form, then pick a shape and move its points: the shape gets an outline of its own in this form. The base outline is what anchors, links and sliders always read.</p>
     </div>
+  )
+}
+
+// What a form does to the paint of a shape: the colour slot it is painted from (or no slot, a gray) and a tone, in this form only.
+function LookRow({ content, form, shape, name, onChange }: { content: ModelContent; form: ModelForm; shape: ModelShape; name: string; onChange: (look: LookChange | null) => void }) {
+  const look = lookState(form, shape.id)
+  const slotValue = look?.slot ? look.slot : look?.gray != null ? '@gray' : ''
+  const toneValue = look?.tone == null ? '' : String(look.tone)
+  const change = (patch: Partial<LookChange>) => onChange({ slot: look?.slot ?? null, gray: look?.gray ?? null, tone: look?.tone ?? null, ...patch })
+  return (
+    <span className="cmInline cmLookRow">
+      <label className="cmField cmField--inline">
+        <span>Colour slot</span>
+        <select value={slotValue} aria-label={`Colour slot of ${name} in this form`} onChange={e => change(e.target.value === '' ? { slot: null, gray: null } : e.target.value === '@gray' ? { slot: null, gray: 50 } : { slot: e.target.value, gray: null })}>
+          <option value="">Same as the shape</option>
+          <option value="@gray">No slot (gray)</option>
+          {slotsOf(content).map(sl => <option key={sl.id} value={sl.id}>{label(sl.name, 'Untitled slot')}</option>)}
+        </select>
+      </label>
+      <label className="cmField cmField--inline">
+        <span>Tone</span>
+        <select value={toneValue} aria-label={`Tone of ${name} in this form`} onChange={e => change({ tone: e.target.value === '' ? null : Number(e.target.value) })}>
+          <option value="">Same as the shape</option>
+          <option value="-1">Darker</option>
+          <option value="0">Base</option>
+          <option value="1">Lighter</option>
+        </select>
+      </label>
+      {look && <button type="button" className="cmBtn cmBtn--small" onClick={() => onChange(null)}>Use the paint of {name}</button>}
+    </span>
   )
 }
 

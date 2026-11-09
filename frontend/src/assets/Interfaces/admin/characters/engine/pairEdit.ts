@@ -1,4 +1,5 @@
 import type { ModelAttach, ModelBind, ModelContent, ModelDrive, ModelObject, ModelPoint, ModelShape } from '../../../../../api/types'
+import { bakedPaint } from './colour'
 import { NAME_MAX, addShape, freshId, groupById, groupOfObject, objectById, objectOfShape, outlineSize, randomId, shapeById, twinsOf, type MakeId } from '../modelContent'
 import { IDENTITY, apply, boxOf, clamp, inverse, nearestEdge, r2, reflectList, transformList, twinIndex, type Mat } from './geometry'
 import { LIMITS, linkCount } from './limits'
@@ -18,7 +19,7 @@ const owns = (c: ModelContent, kind: PairKind, id: string): boolean => (kind ===
 
 // ---- making a twin ----
 
-function twinShape(src: ModelShape, id: string): ModelShape {
+export function twinShape(src: ModelShape, id: string): ModelShape {
   return { id, name: twinName(src.name), closed: src.closed, z: src.z, op: src.op, view: src.view, pts: [], half: 0, template: src.template ?? null, mirrorOf: src.id, back: null, zBack: src.zBack ?? null, loose: null }
 }
 
@@ -157,7 +158,9 @@ function breakShape(c: ModelContent, id: string): Edit {
     if (ob && ob.local.length >= 3) back = reflectList(ob.local, axis)
   }
   const linked = orig.pts.some(p => p.bind)
-  let next: ModelContent = { ...c, shapes: c.shapes.map(x => (x.id === id ? { ...x, mirrorOf: null, pts, back, half: 0 } : x)) }
+  // it keeps the paint it was drawn with (slot, tone, shading, clip...), as its original gives it
+  const paint = bakedPaint(c, s)
+  let next: ModelContent = { ...c, shapes: c.shapes.map(x => (x.id === id ? { ...x, mirrorOf: null, pts, back, half: 0, ...paint } : x)) }
   next = mirrorShapeDrives(next, orig.id, id, pts.length)
   return done(next, linked ? 'Its point links are not copied: link its points again.' : undefined)
 }

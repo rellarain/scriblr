@@ -1220,6 +1220,12 @@ MODEL_COLOURS_WARN = 40
 MODEL_COLOURS_MAX = 64
 MODEL_PALETTE_MAX = 10
 MODEL_SWATCH_NAME_MAX = 30
+MODEL_SHADES_WARN = 8    # paint effects (phase 4b): shading shapes per object, cut-outs per shape, paint changes (looks) per form
+MODEL_SHADES_MAX = 10
+MODEL_CUTS_MAX = 8
+MODEL_LOOKS_MAX = 72   # as many as an object has shapes
+MODEL_TINT_RANGE = (0.02, 0.8)
+MODEL_TONE_RANGE = (-2, 2)
 _MODEL_ID = r"^[A-Za-z0-9_.-]{1,80}$"
 ModelPointMode = Literal["c", "s", "cs", "sc"]
 ModelLayer = Literal["body", "clothing", "hair"]
@@ -1230,6 +1236,9 @@ ModelDriveKind = Literal["turn", "scale", "points", "bend"]
 ModelScaleTarget = Literal["group", "shape", "model"]
 ModelScaleAxis = Literal["xy", "x", "y"]
 ModelBindKind = Literal["point", "edge"]
+ModelTintKind = Literal["shadow", "mid", "highlight"]
+ModelGradDir = Literal["down", "up", "left", "right", "radial"]
+ModelBlend = Literal["multiply", "screen", "overlay"]
 
 
 def _keep_valid(cls: Any, value: Any) -> list[Any]:
@@ -1345,6 +1354,50 @@ class ModelPoint(BaseModel):
         return None if value is None else _finite(value, 0.0, 0.0, 1.0)
 
 
+class ModelTint(BaseModel):
+    """A tone of a colour: a `shadow` (darker, a little warmer and fuller), a `mid` tone (half a shadow) or a `highlight` (toward white), by an amount `t`."""
+
+    kind: ModelTintKind = "shadow"
+    t: float = 0.12
+
+    @field_validator("kind", mode="before")
+    @classmethod
+    def _kind(cls, value: Any) -> Any:
+        return value if value in ("shadow", "mid", "highlight") else "shadow"
+
+    @field_validator("t", mode="before")
+    @classmethod
+    def _amount(cls, value: Any) -> float:
+        return round(_finite(value, 0.12, *MODEL_TINT_RANGE), 2)
+
+
+class ModelGradient(BaseModel):
+    """A gradient fill: from the shape's colour to the colour of slot `to` (None: a darker tone of its own colour), in a direction."""
+
+    dir: ModelGradDir = "down"
+    to: Optional[str] = None
+
+    @field_validator("dir", mode="before")
+    @classmethod
+    def _dir(cls, value: Any) -> Any:
+        return value if value in ("down", "up", "left", "right", "radial") else "down"
+
+    @field_validator("to", mode="before")
+    @classmethod
+    def _to(cls, value: Any) -> Optional[str]:
+        return _optional_id(value)
+
+
+def _optional_model(cls: Any, value: Any) -> Any:
+    """A nested record that is valid, or None."""
+    if value is None or isinstance(value, cls):
+        return value
+    try:
+        return cls.model_validate(value)
+    except ValueError:
+        return None
+
+
 class ModelShape(BaseModel):
     """A filled outline. `half` > 0 marks a symmetric outline: its first `half` points run down the right half and the rest mirror them."""
 
@@ -1372,21 +1425,68 @@ class ModelShape(BaseModel):
     # this is None), else a fixed gray 0..100 (an eye white, teeth), else the neutral gray every uncoloured model is drawn in.
     slot: Optional[str] = None
     gray: Optional[int] = None
+    # Paint effects (phase 4b). A shape with a slot or a fixed gray of its own is painted from its own fields; a twin and a shape that follows a template take
+    # all of them from the shape they copy. `tone` is a step lighter (+) or darker (-) than the colour; `derive` makes it a tone of the colour (a brow is a shadow of the
+    # hair); `shade` makes this a shading shape: a tone of its slot's colour kept inside the base shapes of its object; `grad` a gradient to another slot's
+    # colour; `blend` how it mixes with what is under it; `clip` the shape it is kept inside; `cut` shapes that cut a hole in it; `helper` a shape that is
+    # never drawn and only serves to clip or cut.
+    tone: int = 0
+    derive: Optional[ModelTint] = None
+    shade: Optional[ModelTint] = None
+    grad: Optional[ModelGradient] = None
+    blend: Optional[ModelBlend] = None
+    clip: Optional[str] = None
+    cut: list[str] = Field(default_factory=list, max_length=MODEL_CUTS_MAX)
+    helper: bool = False
 
     @field_validator("name", mode="before")
     @classmethod
     def _trim(cls, value: Any) -> Any:
         return value.strip() if isinstance(value, str) else value
 
-    @field_validator("hide", mode="before")
+    @field_validator("hide", "helper", mode="before")
     @classmethod
     def _hide(cls, value: Any) -> bool:
         return value is True
 
-    @field_validator("mirrorOf", "loose", "copyOf", "slot", mode="before")
+    @field_validator("mirrorOf", "loose", "copyOf", "slot", "clip", mode="before")
     @classmethod
     def _links(cls, value: Any) -> Optional[str]:
         return _optional_id(value)
+
+    @field_validator("tone", mode="before")
+    @classmethod
+    def _tone(cls, value: Any) -> int:
+        if isinstance(value, bool) or not isinstance(value, (int, float)):
+            return 0
+        return int(round(_finite(value, 0.0, float(MODEL_TONE_RANGE[0]), float(MODEL_TONE_RANGE[1]))))
+
+    @field_validator("derive", "shade", mode="before")
+    @classmethod
+    def _tint(cls, value: Any) -> Any:
+        return _optional_model(ModelTint, value)
+
+    @field_validator("grad", mode="before")
+    @classmethod
+    def _grad(cls, value: Any) -> Any:
+        return _optional_model(ModelGradient, value)
+
+    @field_validator("blend", mode="before")
+    @classmethod
+    def _blend(cls, value: Any) -> Any:
+        return value if value in ("multiply", "screen", "overlay") else None
+
+    @field_validator("cut", mode="before")
+    @classmethod
+    def _cut(cls, value: Any) -> list[str]:
+        if not isinstance(value, list):
+            return []
+        out: list[str] = []
+        for v in value:
+            ident = _optional_id(v)
+            if ident is not None and ident not in out:
+                out.append(ident)
+        return out[:MODEL_CUTS_MAX]
 
     @field_validator("gray", mode="before")
     @classmethod
@@ -1620,12 +1720,51 @@ class ModelOverride(BaseModel):
         return _keep_valid(ModelPoint, value)
 
 
+class ModelLook(BaseModel):
+    """What one form does to the paint of one shape of its object (phase 4b): the colour slot it is painted from, or a fixed gray (no slot), and a tone. None
+    leaves the shape's own value. A look with nothing set is dropped."""
+
+    shape: str = Field(pattern=_MODEL_ID)
+    slot: Optional[str] = None
+    gray: Optional[int] = None
+    tone: Optional[int] = None
+
+    @field_validator("slot", mode="before")
+    @classmethod
+    def _slot(cls, value: Any) -> Optional[str]:
+        return _optional_id(value)
+
+    @field_validator("gray", mode="before")
+    @classmethod
+    def _gray(cls, value: Any) -> Optional[int]:
+        if value is None or isinstance(value, bool) or not isinstance(value, (int, float)):
+            return None
+        return int(round(_finite(value, 50.0, 0.0, 100.0)))
+
+    @field_validator("tone", mode="before")
+    @classmethod
+    def _tone(cls, value: Any) -> Optional[int]:
+        if value is None or isinstance(value, bool) or not isinstance(value, (int, float)):
+            return None
+        return int(round(_finite(value, 0.0, float(MODEL_TONE_RANGE[0]), float(MODEL_TONE_RANGE[1]))))
+
+    @model_validator(mode="after")
+    def _something(self) -> "ModelLook":
+        if self.slot is None and self.gray is None and self.tone is None:
+            raise ValueError("a look changes nothing")
+        if self.slot is not None:
+            self.gray = None   # a slot wins over a fixed gray
+        return self
+
+
 class ModelForm(BaseModel):
-    """One form of an axis (round eyes, almond eyes): the shapes of the object it changes, with their outlines. A form with no overrides is the base outline."""
+    """One form of an axis (round eyes, almond eyes): the shapes of the object it changes, with their outlines. A form with no overrides is the base outline.
+    `looks` change the paint of some of the shapes in that form (a different colour slot, a tone)."""
 
     id: str = Field(pattern=_MODEL_ID)
     name: str = Field(default="", max_length=MODEL_NAME_MAX)
     ovr: list[ModelOverride] = Field(default_factory=list, max_length=MODEL_SHAPES_PER_OBJECT_MAX)
+    looks: list[ModelLook] = Field(default_factory=list, max_length=MODEL_LOOKS_MAX)
 
     @field_validator("name", mode="before")
     @classmethod
@@ -1637,10 +1776,17 @@ class ModelForm(BaseModel):
     def _ovr(cls, value: Any) -> list[Any]:
         return _keep_valid(ModelOverride, value)
 
+    @field_validator("looks", mode="before")
+    @classmethod
+    def _looks(cls, value: Any) -> list[Any]:
+        return _keep_valid(ModelLook, value)
+
     @model_validator(mode="after")
     def _one_per_shape(self) -> "ModelForm":
         seen: set[str] = set()
         self.ovr = [o for o in self.ovr if not (o.shape in seen or seen.add(o.shape))]
+        seen_look: set[str] = set()
+        self.looks = [lk for lk in self.looks if not (lk.shape in seen_look or seen_look.add(lk.shape))]
         return self
 
 

@@ -41,6 +41,11 @@ export const LIMITS = {
   coloursWarn: 40,
   coloursMax: 64,
   paletteMax: 10,
+  // paint effects: shading shapes per object (twins are not counted), cut-outs per shape, paint changes one form may make (the stops are the server's max_lengths and publish faults)
+  shadesWarn: 8,
+  shadesMax: 10,
+  cutsMax: 8,
+  looksMax: 72,
   // how many of each a model may hold (the server's caps)
   shapesMax: 600,
   objectsMax: 200,
@@ -63,6 +68,14 @@ export function copyBytes(content: ModelContent): number {
 
 // How many point links the model has (every point of every shape that is linked to another shape).
 export const linkCount = (content: ModelContent): number => content.shapes.reduce((n, s) => n + s.pts.filter(p => p.bind).length, 0)
+
+// How many shading shapes an object has (a twin follows its original and is not counted).
+export function shadingCount(content: ModelContent, objectId: string): number {
+  const o = content.objects.find(x => x.id === objectId)
+  if (!o) return 0
+  const shapes = new Map(content.shapes.map(s => [s.id, s]))
+  return o.shapes.filter(id => { const s = shapes.get(id); return !!s && !!s.shade && !s.mirrorOf }).length
+}
 
 export interface LimitNote { level: 'warn' | 'stop'; text: string }
 
@@ -105,6 +118,10 @@ export function limitNotes(content: ModelContent): LimitNote[] {
   for (const sl of slots) add(level(sl.colours.length, LIMITS.coloursWarn, LIMITS.coloursMax), `${sl.name || sl.id} has ${sl.colours.length} default colours: the warning starts above ${LIMITS.coloursWarn}.`, `${sl.name || sl.id} has ${sl.colours.length} default colours: the limit is ${LIMITS.coloursMax}.`)
   const genres = (content.genres ?? []).length
   add(level(genres, LIMITS.genresWarn, LIMITS.genresMax), `The model has ${genres} genres: the warning starts above ${LIMITS.genresWarn}.`, `The model has ${genres} genres: the limit is ${LIMITS.genresMax}.`)
+  for (const o of content.objects) {
+    const shading = shadingCount(content, o.id)
+    add(level(shading, LIMITS.shadesWarn, LIMITS.shadesMax), `${o.name || o.id} has ${shading} shading shapes: the warning starts above ${LIMITS.shadesWarn}.`, `${o.name || o.id} has ${shading} shading shapes: the limit is ${LIMITS.shadesMax}.`)
+  }
   const links = linkCount(content)
   if (links > LIMITS.linksWarn) notes.push({ level: links > LIMITS.linksMax ? 'stop' : 'warn', text: links > LIMITS.linksMax ? `The model has ${links} point links: the limit is ${LIMITS.linksMax}, so it cannot be published.` : `The model has ${links} point links: the warning starts above ${LIMITS.linksWarn}.` })
   for (const g of content.groups) {

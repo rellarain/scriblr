@@ -1,7 +1,7 @@
 import type { ModelContent } from '../../../../api/types'
 import { LIMITS, copyBytes, limitNotes } from './engine/limits'
 import { formsByViews } from './engine/forms'
-import { formCheck, rigCheck } from './engine/rigCheck'
+import { formCheck, paintCheck, rigCheck } from './engine/rigCheck'
 import { publishFaults } from './modelContent'
 
 // The model's checks in plain words: what stops Publish, which limits it is at or past, the size of a character's copy of it, and what looks wrong in the rig.
@@ -10,7 +10,7 @@ export function CheckPanel({ content }: { content: ModelContent }) {
   // a limit that is also a publish fault is said once, in the faults
   const notes = limitNotes(content).filter(n => !faults.some(f => ['KB', 'levels deep'].some(key => f.includes(key) && n.text.includes(key))))
   const rig = rigCheck(content)
-  const formNotes = formCheck(content)
+  const formNotes = [...formCheck(content), ...paintCheck(content)]
   const grid = formsByViews(content)
   const kb = Math.round(copyBytes(content) / 102.4) / 10
   return (
@@ -34,7 +34,7 @@ export function CheckPanel({ content }: { content: ModelContent }) {
         </>
       )}
       {formNotes.length > 0 && (
-        <ul className="cmFaults" aria-label="About forms">{formNotes.map(l => <li key={l.text} className="cmFaults--info"><b>Note:</b> {l.text}</li>)}</ul>
+        <ul className="cmFaults" aria-label="About forms and paint">{formNotes.map(l => <li key={l.text} className="cmFaults--info"><b>Note:</b> {l.text}</li>)}</ul>
       )}
       {grid.length > 0 && (
         <div className="cmGridWrap">

@@ -151,6 +151,8 @@ span.cmTreeTwisty { cursor: default; }
 .cmInspector { min-width: 0; display: flex; flex-direction: column; gap: var(--space-4); padding: var(--space-4); background: var(--surface-raised); box-shadow: inset 0 0 0 1px var(--hairline); }
 .cmInsTitle { margin: 0; font-size: var(--text-small); font-weight: 700; text-transform: uppercase; letter-spacing: 0.05em; color: var(--ink-muted); }
 .cmInsSub { margin: 0; display: flex; align-items: baseline; justify-content: space-between; gap: var(--space-3); font-size: var(--text-small); font-weight: 700; text-transform: uppercase; letter-spacing: 0.05em; color: var(--ink-muted); }
+.cmChipRow { display: flex; flex-direction: column; gap: var(--space-1); }
+.cmChipsLabel { font-size: var(--text-small); color: var(--ink-muted); }
 .cmInsText { margin: 0; font-size: var(--text-small); color: var(--ink-muted); &--warn, &--stop { color: var(--ink); font-weight: 700; } }
 .cmCrumbs { margin: 0; font-size: var(--text-small); color: var(--ink-muted); overflow-wrap: anywhere; }
 .cmField {
@@ -261,6 +263,8 @@ span.cmTreeTwisty { cursor: default; }
 .cmAnchor { fill: var(--accent); stroke: var(--ink); stroke-width: 1; vector-effect: non-scaling-stroke; pointer-events: none; }
 .cmCanvas--pick { cursor: copy; }
 .cmShape--twin { stroke-dasharray: 5 3; }
+// a helper shape is never drawn in the previews: on the canvas it is an outline, so it can still be picked and edited
+.cmShape--helper { fill-opacity: 0; stroke-dasharray: 2 3; stroke-opacity: 0.85; }
 // the outline of the pattern behind a member's own outline: a dashed line, never filled and never picked
 .cmGhost { fill: none; stroke: var(--ink-muted); stroke-width: 1; stroke-opacity: 0.75; stroke-dasharray: 4 3; vector-effect: non-scaling-stroke; pointer-events: none; }
 // classes: the pattern's and the members' panel in the Shape tab

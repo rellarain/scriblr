@@ -1,5 +1,6 @@
 import type { ModelContent } from '../../../../../api/types'
 import { IDENTITY, apply } from './geometry'
+import { isUsed } from './paintEdit'
 import { defaultValues, solve, solveAtRest } from './rig'
 
 // The Rig check: what is probably a mistake in the rig, in plain words, for the Check panel. These are not publish faults (publishFaults has those):
@@ -37,6 +38,22 @@ export function rigCheck(c: ModelContent): CheckLine[] {
       const bad = Object.values(out.shapes).find(s => s.visible && (s.box.x < FRAME.x0 || s.box.y < FRAME.y0 || s.box.x + s.box.w > FRAME.x1 || s.box.y + s.box.h > FRAME.y1))
       if (bad) { say('warn', `Slider ${name(r.name, r.id)} at its ${end === 'min' ? 'minimum' : 'maximum'} sends ${name(c.shapes.find(s => s.id === bad.id)?.name ?? '', bad.id)} outside the picture.`); break }
     }
+  }
+  return lines
+}
+
+// What is worth knowing about paint effects (phase 4b), as plain information: a helper shape that nothing clips to or is cut by is never drawn and does nothing, and a
+// shading shape in an object with no base shape to lie on is not drawn either.
+export function paintCheck(c: ModelContent): CheckLine[] {
+  const lines: CheckLine[] = []
+  const say = (text: string) => { if (lines.length < MOST_LINES) lines.push({ level: 'info', text }) }
+  const shapes = new Map(c.shapes.map(s => [s.id, s]))
+  for (const s of c.shapes) {
+    if (s.helper === true && !s.mirrorOf && !isUsed(c, s.id) && !c.shapes.some(t => t.mirrorOf === s.id)) say(`${s.name || s.id} is a helper shape, but nothing is clipped to it or cut by it: it is never drawn.`)
+  }
+  for (const o of c.objects) {
+    const mine = o.shapes.map(id => shapes.get(id)).filter((s): s is NonNullable<typeof s> => !!s)
+    if (mine.some(s => s.shade) && !mine.some(s => !s.shade && !s.helper)) say(`${o.name || o.id} has shading but no base shape for it to lie on: the shading is not drawn.`)
   }
   return lines
 }

@@ -1,5 +1,5 @@
 import { useMemo, useState, type KeyboardEvent } from 'react'
-import type { ModelContent, ModelGroup, ModelLayer, ModelObject } from '../../../../api/types'
+import type { ModelContent, ModelGroup, ModelLayer, ModelObject, ModelShape } from '../../../../api/types'
 import { gripProps, zoneRef } from '../../../../lib/pointerDrag'
 import { ChevronDownIcon, ChevronRightIcon, ChevronUpIcon, CopyIcon, EyeIcon, EyeOffIcon, FolderPlusIcon, GripIcon, LayersIcon, LinkIcon, LockIcon, PlusIcon, SearchIcon, StampIcon, SwapIcon, TrashIcon, TreeIcon, UnlockIcon } from '../../../icons'
 import { ReorderList } from './ReorderList'
@@ -34,6 +34,16 @@ export interface TreeActions {
 export type TreeMode = 'layers' | 'rig'
 
 const label = (name: string, fallback: string) => name.trim() || fallback
+// The marks on a shape in the tree (phase 4b): a shading shape lies on the shapes of its object; a helper shape is never drawn, it only clips or cuts.
+function PaintMarks({ shape, name }: { shape: ModelShape; name: string }) {
+  return (
+    <>
+      {shape.shade && <span className="cmTwin" role="img" title={`${name} is a shading shape: a ${shape.shade.kind === 'mid' ? 'mid tone' : shape.shade.kind} kept inside the other shapes of its object`} aria-label={`${name} is a shading shape`}><LayersIcon size={11} /></span>}
+      {shape.helper && <span className="cmTwin" role="img" title={`${name} is a helper shape: it is not drawn in the previews`} aria-label={`${name} is a helper shape`}><EyeOffIcon size={11} /></span>}
+    </>
+  )
+}
+
 // The mark on a twin in the tree: it mirrors another thing and follows it.
 function Twin({ of, name }: { of?: string | null; name: string }) {
   return of ? <span className="cmTwin" role="img" title={`${name} is a twin: it mirrors another and follows it`} aria-label={`${name} is a twin`}><SwapIcon size={11} /></span> : null
@@ -180,6 +190,7 @@ function LayersTree({ content, sel, actions, q, hidden, locks }: { content: Mode
                                       {label(s.name, 'Untitled shape')}
                                     </button>
                                     <Twin of={s.mirrorOf} name={label(s.name, 'Untitled shape')} />
+                                    <PaintMarks shape={s} name={label(s.name, 'Untitled shape')} />
                                     {s.copyOf && <span className="cmTwin" role="img" title={`${label(s.name, 'This shape')} follows the pattern${s.pts.length >= 3 ? ' (it has an outline of its own)' : ''}`} aria-label={`${label(s.name, 'This shape')} follows the pattern`}><LinkIcon size={11} /></span>}
                                     <button type="button" className="cmIconBtn cmIconBtn--small" aria-label={`Move ${label(s.name, 'the shape')} down in the draw order`} title="Draw it earlier (further back)" disabled={shown[0]?.id === s.id} onClick={() => actions.onMoveShape(o.object.id, s.id, -1)}><ChevronDownIcon size={12} /></button>
                                     <button type="button" className="cmIconBtn cmIconBtn--small" aria-label={`Move ${label(s.name, 'the shape')} up in the draw order`} title="Draw it later (in front)" disabled={shown[shown.length - 1]?.id === s.id} onClick={() => actions.onMoveShape(o.object.id, s.id, 1)}><ChevronUpIcon size={12} /></button>
