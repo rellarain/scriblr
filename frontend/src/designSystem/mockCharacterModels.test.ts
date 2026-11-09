@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { publishFaults } from '../assets/Interfaces/admin/characters/modelContent'
+import { applyPreset, restState } from '../assets/Interfaces/admin/characters/engine/presets'
 import { rigCheck } from '../assets/Interfaces/admin/characters/engine/rigCheck'
 import { solve } from '../assets/Interfaces/admin/characters/engine/rig'
 import { previewModels } from './mockCharacterModels'
@@ -15,7 +16,7 @@ describe('the rigged preview model', () => {
 
   it('stands as drawn at rest, with every shape in the picture', () => {
     const s = solve(adult, {})
-    expect(s.order).toHaveLength(8)   // five shapes, the shirt and the twins of the arm and the forearm
+    expect(s.order).toHaveLength(10)   // five shapes, the sleeve, the shirt and the twins of the arm, its sleeve and the forearm
     for (const g of adult.groups) s.mats[g.id].forEach((v, i) => expect(v).toBeCloseTo([1, 0, 0, 1, 0, 0][i], 1))
   })
 
@@ -61,6 +62,36 @@ describe('the rigged preview model', () => {
     const front = solve(adult, {}, 'front').shapes.s_head, back = solve(adult, {}, 'back').shapes.s_head
     expect(back.box.w).toBeGreaterThan(front.box.w * 1.05)
     expect(solve(adult, {}, 'back').shapes.s_neck.box.w).toBeCloseTo(solve(adult, {}, 'front').shapes.s_neck.box.w, 3)
+  })
+
+  it('has forms: a head that is Oval, Square or Long, and a sleeve that is Short, Long or gone, which the other arm follows', () => {
+    const head = adult.objects.find(o => o.id === 'o_head')!.axes![0], arm = adult.objects.find(o => o.id === 'o_arm')!.axes![0]
+    expect(head.options.map(f => f.name)).toEqual(['Oval', 'Square', 'Long'])
+    expect(arm.options.map(f => f.name)).toEqual(['Short', 'Long', 'None'])
+    const form = (axis: typeof head, name: string) => ({ [`${axis === head ? 'o_head' : 'o_arm'}.${axis.id}`]: axis.options.find(f => f.name === name)!.id })
+    const oval = solve(adult, {}).shapes.s_head, square = solve(adult, {}, 'front', { forms: form(head, 'Square') }).shapes.s_head, long = solve(adult, {}, 'front', { forms: form(head, 'Long') }).shapes.s_head
+    expect(long.box.h).toBeGreaterThan(oval.box.h)
+    expect(square.d).not.toBe(oval.d)
+    const twin = adult.shapes.find(s => s.mirrorOf === 's_sleeve')!
+    const short = solve(adult, {}).shapes, longer = solve(adult, {}, 'front', { forms: form(arm, 'Long') }).shapes, none = solve(adult, {}, 'front', { forms: form(arm, 'None') }).shapes
+    expect(longer.s_sleeve.box.h).toBeGreaterThan(short.s_sleeve.box.h)
+    expect(longer[twin.id].box.h).toBeCloseTo(longer.s_sleeve.box.h, 3)         // the other arm's sleeve follows
+    expect(none.s_sleeve.visible).toBe(false)
+    expect(none[twin.id].visible).toBe(false)
+  })
+
+  it('has presets: poses, an expression, a build and two outfits', () => {
+    expect(adult.presets!.map(p => `${p.kind}: ${p.name}`)).toEqual(['Pose: At rest', 'Pose: Wave', 'Expression: Curious', 'Build: Broad', 'Outfit: Shirt on', 'Outfit: No shirt'])
+    let state = restState(adult)
+    const apply = (name: string) => { state = applyPreset(adult, state, adult.presets!.find(p => p.name === name)!) }
+    apply('Wave'); apply('Curious')
+    expect(state.values).toMatchObject({ r_raise: 80, r_elbow: 50, r_tilt: 12 })
+    apply('At rest')
+    expect(state.values).toMatchObject({ r_raise: 0, r_elbow: 0, r_tilt: 12 })      // a pose is replaced, an expression stays
+    apply('No shirt')
+    expect(solve(adult, state.values, 'front', state).shapes.s_shirt.visible).toBe(false)
+    apply('Shirt on')
+    expect(solve(adult, state.values, 'front', state).shapes.s_shirt.visible).toBe(true)
   })
 
   it('keeps the older published versions simple and valid', () => {

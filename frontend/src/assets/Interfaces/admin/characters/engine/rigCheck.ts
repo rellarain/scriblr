@@ -4,7 +4,7 @@ import { defaultValues, solve, solveAtRest } from './rig'
 
 // The Rig check: what is probably a mistake in the rig, in plain words, for the Check panel. These are not publish faults (publishFaults has those):
 // a slider that drives nothing, a group the anchor moves away from where it was drawn, a slider that sends a shape out of the picture.
-export interface CheckLine { level: 'warn'; text: string }
+export interface CheckLine { level: 'warn' | 'info'; text: string }
 
 const FRAME = { x0: -50, y0: -50, x1: 250, y1: 450 }
 const MOVED = 0.5
@@ -36,6 +36,28 @@ export function rigCheck(c: ModelContent): CheckLine[] {
       const out = solve(c, { ...base, [r.id]: r[end] })
       const bad = Object.values(out.shapes).find(s => s.visible && (s.box.x < FRAME.x0 || s.box.y < FRAME.y0 || s.box.x + s.box.w > FRAME.x1 || s.box.y + s.box.h > FRAME.y1))
       if (bad) { say('warn', `Slider ${name(r.name, r.id)} at its ${end === 'min' ? 'minimum' : 'maximum'} sends ${name(c.shapes.find(s => s.id === bad.id)?.name ?? '', bad.id)} outside the picture.`); break }
+    }
+  }
+  return lines
+}
+
+// What is worth knowing about forms, as plain information (not mistakes): a form that changes a shape which has an outline of its own for the back view shows
+// from the front only, and a form whose outline has another number of points than the base is followed by anchors, links and recorded moves by the base.
+export function formCheck(c: ModelContent): CheckLine[] {
+  const lines: CheckLine[] = []
+  const say = (text: string) => { if (lines.length < MOST_LINES) lines.push({ level: 'info', text }) }
+  const shapes = new Map(c.shapes.map(s => [s.id, s]))
+  for (const o of c.objects) {
+    for (const a of o.axes ?? []) {
+      for (const f of a.options) {
+        for (const v of f.ovr) {
+          const s = shapes.get(v.shape)
+          if (!s) continue
+          const label = `${f.name || f.id} (${a.name || a.id} of ${o.name || o.id}) changes ${s.name || s.id}`
+          if ((s.back?.length ?? 0) >= 3) say(`${label}, which has an outline of its own for the back: the form shows from the front only.`)
+          if (v.pts.length >= 3 && v.pts.length !== s.pts.length) say(`${label} with ${v.pts.length} points where the base has ${s.pts.length}: anchors, links and sliders follow the base outline.`)
+        }
+      }
     }
   }
   return lines

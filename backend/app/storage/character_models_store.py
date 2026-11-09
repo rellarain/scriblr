@@ -269,6 +269,44 @@ def _link_faults(content: ModelContent) -> list[str]:
     return faults
 
 
+def _form_faults(content: ModelContent) -> list[str]:
+    """Forms (phase 3): a form may only change shapes of its own object, never a twin's, and an outline is empty (the shape is hidden in that form) or has at
+    least three points. The front end makes the same checks in the same words (modelContent.formFaults)."""
+    faults: list[str] = []
+    shapes = {s.id: s for s in content.shapes}
+    for o in content.objects:
+        obj = _label(o.name, o.id)
+        own = set(o.shapes)
+        for axis in o.axes:
+            if axis.initial not in {f.id for f in axis.options}:
+                faults.append(f"Axis {_label(axis.name, axis.id)} of object {obj} has a default form that does not exist.")
+            for form in axis.options:
+                name = _label(form.name, form.id)
+                for ov in form.ovr:
+                    shape = shapes.get(ov.shape)
+                    if ov.shape not in own or shape is None:
+                        faults.append(f"Form {name} of {obj} changes a shape that is not in the object.")
+                    elif shape.mirrorOf:
+                        faults.append(f"Form {name} of {obj} changes a twin; change the original instead.")
+                    elif 0 < len(ov.pts) < 3:
+                        faults.append(f"Form {name} of {obj} has an outline of fewer than 3 points for shape {_label(shape.name, shape.id)}.")
+    return faults
+
+
+def _preset_faults(content: ModelContent) -> list[str]:
+    """Presets: the sliders they set and the objects and groups they hide must be there."""
+    faults: list[str] = []
+    range_ids = {r.id for r in content.ranges}
+    thing_ids = {o.id for o in content.objects} | {g.id for g in content.groups}
+    for p in content.presets:
+        name = _label(p.name, p.id)
+        if any(k not in range_ids for k in p.values):
+            faults.append(f"Preset {name} sets a slider that does not exist.")
+        if any(h not in thing_ids for h in p.hidden):
+            faults.append(f"Preset {name} hides something that does not exist.")
+    return faults
+
+
 def publish_faults(content: ModelContent) -> list[str]:
     """What stops this draft from being published, in plain words."""
     faults: list[str] = []
@@ -307,6 +345,8 @@ def publish_faults(content: ModelContent) -> list[str]:
     faults.extend(_rig_faults(content, parents, loop is not None, owner, holder))
     faults.extend(_pair_faults(content))
     faults.extend(_link_faults(content))
+    faults.extend(_form_faults(content))
+    faults.extend(_preset_faults(content))
     size = copy_bytes(content)
     if size > MODEL_COPY_MAX_BYTES:
         faults.append(f"A character's copy of this model would be {size // 1024} KB; the limit is {MODEL_COPY_MAX_BYTES // 1024} KB.")

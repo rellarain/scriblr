@@ -131,7 +131,12 @@ export function addRange(c: ModelContent, r: ModelRange): Edit {
 export function removeRange(c: ModelContent, id: string): Edit {
   const user = c.groups.find(g => g.attach?.kind === 'range' && g.attach.slider === id)
   if (user) return fail(`Group ${label(user.name, user.id)} is anchored along this slider. Change its anchor first.`)
-  return done({ ...c, ranges: c.ranges.filter(r => r.id !== id), shapes: c.shapes.map(s => (s.loose === id ? { ...s, loose: null } : s)) })
+  return done({
+    ...c,
+    ranges: c.ranges.filter(r => r.id !== id),
+    shapes: c.shapes.map(s => (s.loose === id ? { ...s, loose: null } : s)),
+    presets: (c.presets ?? []).map(p => (id in p.values ? { ...p, values: Object.fromEntries(Object.entries(p.values).filter(([k]) => k !== id)) } : p)),
+  })
 }
 
 export const renameRange = (c: ModelContent, id: string, name: string): ModelContent => mapRange(c, id, r => ({ ...r, name }))

@@ -1,5 +1,6 @@
 import type { ModelAttach, ModelContent, ModelDrive, ModelGroup, ModelPoint, ModelRange, ModelShape } from '../../../../../api/types'
 import { IDENTITY, apply, boxOf, build, clamp, edgeAt, flatten, inverse, mul, pathText, reflectList, rotate, scale, translate, twinIndex, windSign, type Box, type BuiltPoint, type Mat } from './geometry'
+import { overrideFor, type Choices } from './forms'
 import { drawOrder } from './order'
 
 // The rig: groups hang from parent groups, are fixed to a shape of the parent by an anchor and turn about a pivot, and sliders (ranges) drive them.
@@ -124,6 +125,8 @@ export interface SolvedShape {
   poly: Array<[number, number]>
   box: Box
   visible: boolean
+  // Switched off with the eye (its object, its group or a group above it): it is solved all the same, but not drawn.
+  off: boolean
   z: number
 }
 export interface Solved {
@@ -198,10 +201,15 @@ export function looseFactor(c: ModelContent, shape: Pick<ModelShape, 'loose'>, v
   return r && r.rest > 0 ? clamp(valueOf(r, values) / r.rest, 0, 4) : 1
 }
 
-export function solve(c: ModelContent, values: Values = {}, view: View = 'front'): Solved {
+// What the admin has set besides the sliders (test state, never saved): the form each axis shows (see forms.ts), and the objects and groups switched off.
+export interface SolveOptions { forms?: Choices; hidden?: Iterable<string> }
+
+export function solve(c: ModelContent, values: Values = {}, view: View = 'front', opts: SolveOptions = {}): Solved {
   const axis = c.axis ?? 100
   const ranges = c.ranges ?? []
   const val = (r: ModelRange) => valueOf(r, values)
+  const choices: Choices = opts.forms ?? {}
+  const hidden = new Set(opts.hidden ?? [])
 
   // the whole model: sliders that scale it (Height) about its feet, and the back view, which turns the figure round
   let gx = 1, gy = 1
@@ -220,6 +228,27 @@ export function solve(c: ModelContent, values: Values = {}, view: View = 'front'
   const groupOfShape = new Map<string, string>()
   const objectShapes = new Map(c.objects.map(o => [o.id, o.shapes]))
   for (const g of c.groups) for (const oid of g.objects) for (const sid of objectShapes.get(oid) ?? []) if (!groupOfShape.has(sid)) groupOfShape.set(sid, g.id)
+  const objectMap = new Map(c.objects.map(o => [o.id, o]))
+  const objectOfShape = new Map<string, string>()
+  for (const o of c.objects) for (const sid of o.shapes) if (!objectOfShape.has(sid)) objectOfShape.set(sid, o.id)
+
+  // The outline the chosen forms give a shape (undefined: it keeps its base outline; an empty list: the form hides it).
+  const formOutline = (sid: string): ModelPoint[] | undefined => {
+    const oid = objectOfShape.get(sid), o = oid ? objectMap.get(oid) : undefined
+    return o ? overrideFor(o, sid, choices) : undefined
+  }
+  // Whether the shape's object, its group or a group above it is switched off (it is still solved: anchors and links read it).
+  const switchedOff = (sid: string): boolean => {
+    if (hidden.size === 0) return false
+    const oid = objectOfShape.get(sid)
+    if (oid && hidden.has(oid)) return true
+    const seen = new Set<string>()
+    for (let gid = groupOfShape.get(sid); gid && !seen.has(gid); gid = groupMap.get(gid)?.parent ?? undefined) {
+      if (hidden.has(gid)) return true
+      seen.add(gid)
+    }
+    return false
+  }
 
   const out: Solved = { shapes: {}, order: [], mats: {}, pivots: {}, anchors: {}, global: G }
   // Groups and shapes are solved when something asks for them (an anchor asks for a shape, a shape for its group, a link for another shape); a thing that
@@ -304,11 +333,19 @@ export function solve(c: ModelContent, values: Values = {}, view: View = 'front'
       drawn = o ? reflectList(o.local, axis) : []
       closed = twin.closed
     } else {
+      // The rig always reads the base outline. A form gives only the drawn outline (it still gets the shape's links and, when it has as many points as the
+      // base, its recorded moves); an empty one hides the shape in every view.
       rig = sh.pts.map(copyPoint)
       link(sh, rig, Mg)
       drive(sh, rig, sh.pts)
       drawn = rig
-      if (view === 'back' && sh.back && sh.back.length >= 3) {
+      const form = formOutline(sh.id)
+      if (form) {
+        drawn = form.map(copyPoint)
+        link(sh, drawn, Mg)
+        drive(sh, drawn, sh.pts)
+      }
+      if (view === 'back' && sh.back && sh.back.length >= 3 && !(form && form.length === 0)) {
         drawn = sh.back.map(copyPoint)
         link(sh, drawn, Mg)
         drive(sh, drawn, sh.back)
@@ -316,13 +353,14 @@ export function solve(c: ModelContent, values: Values = {}, view: View = 'front'
     }
     const ok = rig.length >= 3 && drawn.length >= 3
     const matrix = mul(G, Mg)
+    const off = switchedOff(sh.id)
     const fin = ok ? build(drawn, closed, matrix) : []
     const poly = ok ? flatten(fin, closed) : []
     out.shapes[sh.id] = {
       id: sh.id, group: groupId, local: drawn, rig, matrix, frame: Mg,
-      pre: ok ? build(rig, closed, Mg) : [],
+      pre: rig.length >= 3 ? build(rig, closed, Mg) : [],   // from the base outline even where a form hides the shape: anchors and links still read it
       d: ok ? pathText(fin, closed) : '', poly, box: poly.length ? boxOf(poly) : NO_BOX,
-      visible: ok && (sh.view === 'both' || sh.view === view), z: view === 'back' && sh.zBack != null ? sh.zBack : sh.z,
+      visible: ok && (sh.view === 'both' || sh.view === view) && !off, off, z: view === 'back' && sh.zBack != null ? sh.zBack : sh.z,
     }
   }
 

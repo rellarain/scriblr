@@ -2,7 +2,9 @@ import type { ModelContent, ModelEntry, PublishedModel } from '../api/types'
 import { addGroup, addObject, addShape, blankContent, newGroup, normalizeContent, publishFaults } from '../assets/Interfaces/admin/characters/modelContent'
 import { newShape } from '../assets/Interfaces/admin/characters/engine/edit'
 import { addRange, addScale, addTurn, attachGroup, newRange, recordPoints, reparent, type Edit } from '../assets/Interfaces/admin/characters/engine/rigEdit'
+import { addAxis, addForm, renameForm, setOverride } from '../assets/Interfaces/admin/characters/engine/formEdit'
 import { linkToEdge, makeTwin, setBack, setLoose } from '../assets/Interfaces/admin/characters/engine/pairEdit'
+import { savePreset } from '../assets/Interfaces/admin/characters/engine/presets'
 import { templateBox } from '../assets/Interfaces/admin/characters/engine/templates'
 
 // A pretend character models API (`/api/character-models`), shared by the design system's previews (mockBackend.ts) and the tests
@@ -72,8 +74,9 @@ export function createMockModels(initial: ModelEntry[]) {
 
 // A small rigged figure for the previews: a torso (neck and chest) with a head hung from the neck's top edge, an arm hung from the chest and a forearm
 // from the arm (and the arm's twin on the other side); sliders for the head's tilt and size, the arm's raise, the elbow, the shoulders' width (recorded
-// point moves) and the height; a shirt whose points are locked to the chest's edge, with a slider for how loose it is; and a back outline for the head.
-// Built with the same operations the Designer uses, so it is what a person would have made.
+// point moves) and the height; a shirt whose points are locked to the chest's edge, with a slider for how loose it is; a back outline for the head; forms
+// (the head is Oval, Square or Long; the sleeve is Short, Long or none) and presets (poses, an expression, a build, outfits). Built with the same operations
+// the Designer uses, so it is what a person would have made.
 function riggedFigure(): ModelContent {
   const must = (e: Edit): ModelContent => { if (!e.ok) throw new Error(e.reason); return e.content }
   const box = (x: number, y: number, w: number, h: number) => ({ x, y, w, h })
@@ -122,12 +125,42 @@ function riggedFigure(): ModelContent {
   shirt.pts.forEach((p, i) => { c = must(linkToEdge(c, 's_shirt', i, 's_chest', p.x, p.y)) })
   c = must(addRange(c, { ...newRange('r_fit', 'Shirt fit', 'scale', 's_shirt'), min: 0, rest: 100, max: 200, unit: '%' }))
   c = must(setLoose(c, ['s_shirt'], 'r_fit'))
+  // a sleeve on the upper arm, short unless a form of the arm says otherwise
+  c = addShape(c, 'o_arm', newShape('s_sleeve', 'Sleeve', 'rounded', box(122, 88, 18, 28)))
   // the other arm: a twin of the arm and the forearm under it, which follows the arm's raise and elbow
   let n = 0
   c = must(makeTwin(c, 'group', 'g_arm', prefix => `${prefix}_twin${++n}`))
   // the hair side of the head is wider from behind: an outline of its own for the back view
   const head = c.shapes.find(x => x.id === 's_head')!, cx = 100, cy = 46
   c = must(setBack(c, 's_head', head.pts.map(p => ({ ...p, x: cx + (p.x - cx) * 1.12, y: cy + (p.y - cy) * 1.08, hi: p.hi ? [p.hi[0] * 1.12, p.hi[1] * 1.08] as [number, number] : p.hi, ho: p.ho ? [p.ho[0] * 1.12, p.ho[1] * 1.08] as [number, number] : p.ho }))))
+  // forms: the head is Oval (its base outline), Square or Long; the arm's sleeve is Short (its base outline), Long (an outline of its own) or gone
+  let f = 0
+  const mk = (prefix: string) => `${prefix}_form${++f}`
+  const axisWith = (objectId: string, axisName: string, firstName: string) => {
+    const made = addAxis(c, objectId, axisName, mk)
+    c = must(made)
+    c = renameForm(c, objectId, made.axisId!, made.formId!, firstName)
+    return made.axisId!
+  }
+  const formWith = (objectId: string, axisId: string, name: string, shapeId: string, pts: ModelContent['shapes'][number]['pts'] | null) => {
+    const made = addForm(c, objectId, axisId, {}, name, mk)
+    c = must(made)
+    c = must(setOverride(c, objectId, axisId, made.formId!, shapeId, pts ?? []))
+  }
+  const headShape = axisWith('o_head', 'Head shape', 'Oval')
+  formWith('o_head', headShape, 'Square', 's_head', newShape('x', 'Head', 'rounded', box(80, 26, 40, 40)).pts)
+  formWith('o_head', headShape, 'Long', 's_head', newShape('x', 'Head', 'oval', box(83, 18, 34, 54)).pts)
+  const sleeve = axisWith('o_arm', 'Sleeve', 'Short')
+  formWith('o_arm', sleeve, 'Long', 's_sleeve', newShape('x', 'Sleeve', 'rounded', box(122, 88, 18, 52)).pts)
+  formWith('o_arm', sleeve, 'None', 's_sleeve', null)
+  // presets: a pose replaces the last pose, an expression leaves the arms alone, an outfit switches the shirt off or on
+  const preset = (name: string, kind: string, values: Record<string, number>, hidden: string[] = []) => { c = must(savePreset(c, { values, forms: {}, hidden }, name, kind, mk)) }
+  preset('At rest', 'Pose', {})
+  preset('Wave', 'Pose', { r_raise: 80, r_elbow: 50 })
+  preset('Curious', 'Expression', { r_tilt: 12 })
+  preset('Broad', 'Build', { r_shoulders: 118 })
+  preset('Shirt on', 'Outfit', {})
+  preset('No shirt', 'Outfit', {}, ['o_shirt'])
   return c
 }
 
@@ -137,7 +170,7 @@ export function previewModels(): ModelEntry[] {
   const adult = riggedFigure()
   const plain = (shapeIds: string[]): ModelContent => {
     const shapes = adult.shapes.filter(s => shapeIds.includes(s.id))
-    return { ...adult, shapes, objects: adult.objects.filter(o => o.shapes.every(s => shapeIds.includes(s)) && o.shapes.length), groups: [newGroup('g_head', 'Head', null, adult.objects.filter(o => o.shapes.every(s => shapeIds.includes(s))).map(o => o.id))], ranges: [] }
+    return { ...adult, shapes, objects: adult.objects.filter(o => o.shapes.every(s => shapeIds.includes(s)) && o.shapes.length).map(o => ({ ...o, axes: [] })), presets: [], groups: [newGroup('g_head', 'Head', null, adult.objects.filter(o => o.shapes.every(s => shapeIds.includes(s))).map(o => o.id))], ranges: [] }
   }
   const live = liveEntry('adult', adult, { nextVersion: 3 })
   live.published = published(2, plain(['s_head', 's_neck', 's_chest']))

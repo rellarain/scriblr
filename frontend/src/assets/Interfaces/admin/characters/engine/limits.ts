@@ -20,6 +20,13 @@ export const LIMITS = {
   // point links (a point welded to, following or locked to the edge of another shape), counted over the whole model; more than the most is refused at Publish
   linksWarn: 100,
   linksMax: 200,
+  // forms: axes per object, forms per axis, presets per model (the stops are the server's max_lengths)
+  axesWarn: 4,
+  axesMax: 8,
+  formsWarn: 24,
+  formsMax: 48,
+  presetsWarn: 40,
+  presetsMax: 80,
   // how many of each a model may hold (the server's caps)
   shapesMax: 600,
   objectsMax: 200,
@@ -66,6 +73,13 @@ export function limitNotes(content: ModelContent): LimitNote[] {
     const name = r.name || r.id
     add(level(r.drives.length, LIMITS.drivesWarn, LIMITS.drivesMax), `${name} drives ${r.drives.length} things: the warning starts above ${LIMITS.drivesWarn}.`, `${name} drives ${r.drives.length} things: the limit is ${LIMITS.drivesMax}.`)
   }
+  for (const o of content.objects) {
+    const name = o.name || o.id, axes = o.axes ?? []
+    add(level(axes.length, LIMITS.axesWarn, LIMITS.axesMax), `${name} has ${axes.length} axes of forms: the warning starts above ${LIMITS.axesWarn}.`, `${name} has ${axes.length} axes of forms: the limit is ${LIMITS.axesMax}.`)
+    for (const a of axes) add(level(a.options.length, LIMITS.formsWarn, LIMITS.formsMax), `${a.name || a.id} of ${name} has ${a.options.length} forms: the warning starts above ${LIMITS.formsWarn}.`, `${a.name || a.id} of ${name} has ${a.options.length} forms: the limit is ${LIMITS.formsMax}.`)
+  }
+  const presets = (content.presets ?? []).length
+  add(level(presets, LIMITS.presetsWarn, LIMITS.presetsMax), `The model has ${presets} presets: the warning starts above ${LIMITS.presetsWarn}.`, `The model has ${presets} presets: the limit is ${LIMITS.presetsMax}.`)
   const links = linkCount(content)
   if (links > LIMITS.linksWarn) notes.push({ level: links > LIMITS.linksMax ? 'stop' : 'warn', text: links > LIMITS.linksMax ? `The model has ${links} point links: the limit is ${LIMITS.linksMax}, so it cannot be published.` : `The model has ${links} point links: the warning starts above ${LIMITS.linksWarn}.` })
   for (const g of content.groups) {

@@ -3,7 +3,7 @@ import { readFileSync } from 'node:fs'
 import path from 'node:path'
 import { describe, expect, it } from 'vitest'
 import { LIMITS } from './engine/limits'
-import { AXIS_RANGE, DESCRIPTION_MAX, NAME_MAX, RANGE_NAME_MAX } from './modelContent'
+import { AXIS_RANGE, DESCRIPTION_MAX, KIND_MAX, NAME_MAX, RANGE_NAME_MAX } from './modelContent'
 
 // The backend validates a model with extra='ignore', so a field the frontend sends that the schema does not know is dropped without a word. These
 // tests read schema.py and api/types.ts side by side so the two cannot drift apart unnoticed, and check the limits are the same numbers.
@@ -33,6 +33,7 @@ describe('the model types match the backend schema', () => {
     ['ModelPoint', 'ModelPoint'], ['ModelShape', 'ModelShape'], ['ModelObject', 'ModelObject'], ['ModelGroup', 'ModelGroup'],
     ['ModelContent', 'ModelContent'], ['PublishedModel', 'PublishedModel'], ['ModelEntry', 'ModelEntry'], ['ModelCatalog', 'ModelCatalog'],
     ['ModelAttach', 'ModelAttach'], ['ModelMove', 'ModelMove'], ['ModelDrive', 'ModelDrive'], ['ModelRange', 'ModelRange'], ['ModelBind', 'ModelBind'],
+    ['ModelOverride', 'ModelOverride'], ['ModelForm', 'ModelForm'], ['ModelAxis', 'ModelAxis'], ['ModelPreset', 'ModelPreset'],
   ]
   for (const [python, ts] of pairs) {
     it(`${ts} has the fields of ${python}`, () => {
@@ -86,6 +87,15 @@ describe('the limits are the backend\'s numbers', () => {
     expect(LIMITS.shapesMax).toBe(number('MODEL_MAX_SHAPES'))
     expect(LIMITS.objectsMax).toBe(number('MODEL_MAX_OBJECTS'))
     expect(LIMITS.groupsMax).toBe(number('MODEL_MAX_GROUPS'))
+  })
+  it('for forms and presets', () => {
+    expect(LIMITS.axesWarn).toBe(number('MODEL_AXES_WARN'))
+    expect(LIMITS.axesMax).toBe(number('MODEL_AXES_MAX'))
+    expect(LIMITS.formsWarn).toBe(number('MODEL_FORMS_WARN'))
+    expect(LIMITS.formsMax).toBe(number('MODEL_FORMS_MAX'))
+    expect(LIMITS.presetsWarn).toBe(number('MODEL_PRESETS_WARN'))
+    expect(LIMITS.presetsMax).toBe(number('MODEL_PRESETS_MAX'))
+    expect(KIND_MAX).toBe(number('MODEL_KIND_MAX'))
   })
   it('for the mirror line', () => {
     const m = /MODEL_AXIS_RANGE\s*=\s*\(([-\d.]+),\s*([-\d.]+)\)/.exec(schema)

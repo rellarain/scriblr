@@ -68,18 +68,18 @@ const dotAt = (n: number) => ({ x: Number(screen.getByRole('button', { name: `Po
 afterEach(() => { vi.useRealTimers(); vi.mocked(presetFile.downloadTextFile).mockClear() })
 
 describe('the inspector\'s tabs', () => {
-  it('has Shape, Rig and Ranges, moved between with the arrow keys', async () => {
+  it('has Shape, Rig, Ranges, Forms and Presets, moved between with the arrow keys', async () => {
     const { user } = await open()
-    expect(screen.getAllByRole('tab').map(t => t.textContent?.trim())).toEqual(['Shape', 'Rig', 'Ranges'])
+    expect(screen.getAllByRole('tab').map(t => t.textContent?.trim())).toEqual(['Shape', 'Rig', 'Ranges', 'Forms', 'Presets'])
     expect(tab('Shape')).toHaveAttribute('aria-selected', 'true')
     tab('Shape').focus()
     await user.keyboard('{ArrowRight}')
     expect(tab('Rig')).toHaveAttribute('aria-selected', 'true')
     expect(tab('Rig')).toHaveFocus()
-    await user.keyboard('{ArrowRight}{ArrowRight}')
+    await user.keyboard('{ArrowRight}{ArrowRight}{ArrowRight}{ArrowRight}')
     expect(tab('Shape')).toHaveAttribute('aria-selected', 'true')
     await user.keyboard('{ArrowLeft}')
-    expect(tab('Ranges')).toHaveAttribute('aria-selected', 'true')
+    expect(tab('Presets')).toHaveAttribute('aria-selected', 'true')
   })
   it('asks for a group when none is selected', async () => {
     const { user } = await open()

@@ -1199,6 +1199,14 @@ MODEL_RANGE_NAME_MAX = 40
 MODEL_AXIS_RANGE = (40.0, 160.0)   # the line a model mirrors about (the middle of the 0..200 space by default)
 MODEL_LINKS_WARN = 100   # point links (a point welded to, following, or locked to the edge of another shape): counted over the whole model
 MODEL_LINKS_MAX = 200    # more than this is a publish fault
+MODEL_AXES_WARN = 4      # forms: axes per object, forms per axis, presets per model
+MODEL_AXES_MAX = 8
+MODEL_FORMS_WARN = 24
+MODEL_FORMS_MAX = 48
+MODEL_PRESETS_WARN = 40
+MODEL_PRESETS_MAX = 80
+MODEL_KIND_MAX = 24
+MODEL_HIDDEN_MAX = 100   # objects and groups one preset may hide
 _MODEL_ID = r"^[A-Za-z0-9_.-]{1,80}$"
 ModelPointMode = Literal["c", "s", "cs", "sc"]
 ModelLayer = Literal["body", "clothing", "hair"]
@@ -1567,12 +1575,92 @@ class ModelRange(BaseModel):
         return self
 
 
+class ModelOverride(BaseModel):
+    """What one form does to one shape of its object: the outline the shape has in that form. An empty list hides the shape in the form."""
+
+    shape: str = Field(pattern=_MODEL_ID)
+    pts: list[ModelPoint] = Field(default_factory=list, max_length=MODEL_POINTS_MAX)
+
+    @field_validator("pts", mode="before")
+    @classmethod
+    def _pts(cls, value: Any) -> list[Any]:
+        return _keep_valid(ModelPoint, value)
+
+
+class ModelForm(BaseModel):
+    """One form of an axis (round eyes, almond eyes): the shapes of the object it changes, with their outlines. A form with no overrides is the base outline."""
+
+    id: str = Field(pattern=_MODEL_ID)
+    name: str = Field(default="", max_length=MODEL_NAME_MAX)
+    ovr: list[ModelOverride] = Field(default_factory=list, max_length=MODEL_SHAPES_PER_OBJECT_MAX)
+
+    @field_validator("name", mode="before")
+    @classmethod
+    def _trim(cls, value: Any) -> Any:
+        return value.strip() if isinstance(value, str) else value
+
+    @field_validator("ovr", mode="before")
+    @classmethod
+    def _ovr(cls, value: Any) -> list[Any]:
+        return _keep_valid(ModelOverride, value)
+
+    @model_validator(mode="after")
+    def _one_per_shape(self) -> "ModelForm":
+        seen: set[str] = set()
+        self.ovr = [o for o in self.ovr if not (o.shape in seen or seen.add(o.shape))]
+        return self
+
+
+class ModelAxis(BaseModel):
+    """A way an object can vary (eye shape, expression, style): its forms, and which one it shows unless told otherwise. Axes are independent: an object
+    shows one form of each. An axis with no form is dropped."""
+
+    id: str = Field(pattern=_MODEL_ID)
+    name: str = Field(default="", max_length=MODEL_NAME_MAX)
+    options: list[ModelForm] = Field(default_factory=list, max_length=MODEL_FORMS_MAX)
+    # the form shown unless another is chosen
+    initial: str = ""
+
+    @field_validator("name", mode="before")
+    @classmethod
+    def _trim(cls, value: Any) -> Any:
+        return value.strip() if isinstance(value, str) else value
+
+    @field_validator("options", mode="before")
+    @classmethod
+    def _options(cls, value: Any) -> list[Any]:
+        return _keep_valid(ModelForm, value)
+
+    @model_validator(mode="after")
+    def _repair(self) -> "ModelAxis":
+        seen: set[str] = set()
+        self.options = [o for o in self.options if not (o.id in seen or seen.add(o.id))]
+        if not self.options:
+            raise ValueError("an axis needs a form")
+        if self.initial not in {o.id for o in self.options}:
+            self.initial = self.options[0].id
+        return self
+
+
 class ModelObject(BaseModel):
     id: str = Field(pattern=_MODEL_ID)
     name: str = Field(default="", max_length=MODEL_NAME_MAX)
     layer: ModelLayer = "body"
     shapes: list[str] = Field(default_factory=list, max_length=MODEL_SHAPES_PER_OBJECT_MAX)
     mirrorOf: Optional[str] = None
+    # The ways the object can vary (phase 3): each axis has forms, and the object shows one form of every axis.
+    axes: list[ModelAxis] = Field(default_factory=list, max_length=MODEL_AXES_MAX)
+
+    @field_validator("axes", mode="before")
+    @classmethod
+    def _axes(cls, value: Any) -> list[Any]:
+        return _keep_valid(ModelAxis, value)
+
+    @model_validator(mode="after")
+    def _unique_axes(self) -> "ModelObject":
+        seen: set[str] = set()
+        self.axes = [a for a in self.axes if not (a.id in seen or seen.add(a.id))]
+        return self
 
     @field_validator("name", mode="before")
     @classmethod
@@ -1630,6 +1718,47 @@ class ModelGroup(BaseModel):
             return None
 
 
+class ModelPreset(BaseModel):
+    """A named set of slider values and of hidden objects (a pose, an expression, an age, a build, an outfit): `kind` says which slot it fills, so applying
+    one puts back whatever any other preset of its kind controls. `values` lists only the sliders it moves; `hidden` the objects and groups it hides."""
+
+    id: str = Field(pattern=_MODEL_ID)
+    name: str = Field(default="", max_length=MODEL_NAME_MAX)
+    kind: str = Field(default="Pose", max_length=MODEL_KIND_MAX)
+    values: dict[str, float] = Field(default_factory=dict)
+    hidden: list[str] = Field(default_factory=list, max_length=MODEL_HIDDEN_MAX)
+
+    @field_validator("name", mode="before")
+    @classmethod
+    def _trim(cls, value: Any) -> Any:
+        return value.strip() if isinstance(value, str) else value
+
+    @field_validator("kind", mode="before")
+    @classmethod
+    def _kind(cls, value: Any) -> str:
+        text = value.strip() if isinstance(value, str) else ""
+        return text[:MODEL_KIND_MAX] or "Pose"
+
+    @field_validator("values", mode="before")
+    @classmethod
+    def _values(cls, value: Any) -> dict[str, float]:
+        if not isinstance(value, dict):
+            return {}
+        return {k: _finite(v, 0.0, -1000.0, 1000.0) for k, v in value.items() if _optional_id(k) is not None and isinstance(v, (int, float)) and not isinstance(v, bool)}
+
+    @field_validator("hidden", mode="before")
+    @classmethod
+    def _hidden(cls, value: Any) -> list[str]:
+        if not isinstance(value, list):
+            return []
+        out: list[str] = []
+        for v in value:
+            ident = _optional_id(v)
+            if ident is not None and ident not in out:
+                out.append(ident)
+        return out
+
+
 class ModelContent(BaseModel):
     """A model and everything in it. A draft may be unfinished (no name, dangling ids); publish_faults says what stops it being published."""
 
@@ -1641,6 +1770,13 @@ class ModelContent(BaseModel):
     # The line the model mirrors about (left/right twins and mirror editing), and its sliders.
     axis: float = 100.0
     ranges: list[ModelRange] = Field(default_factory=list, max_length=MODEL_RANGES_MAX)
+    # Named sets of slider values and hidden objects (phase 3).
+    presets: list[ModelPreset] = Field(default_factory=list, max_length=MODEL_PRESETS_MAX)
+
+    @field_validator("presets", mode="before")
+    @classmethod
+    def _presets(cls, value: Any) -> list[Any]:
+        return _keep_valid(ModelPreset, value)
 
     @field_validator("name", "description", mode="before")
     @classmethod
@@ -1659,7 +1795,7 @@ class ModelContent(BaseModel):
 
     @model_validator(mode="after")
     def _unique_ids(self) -> "ModelContent":
-        for label, items in (("shape", self.shapes), ("object", self.objects), ("group", self.groups), ("slider", self.ranges)):
+        for label, items in (("shape", self.shapes), ("object", self.objects), ("group", self.groups), ("slider", self.ranges), ("preset", self.presets)):
             ids = [i.id for i in items]
             if len(set(ids)) != len(ids):
                 raise ValueError(f"two {label}s share an id")

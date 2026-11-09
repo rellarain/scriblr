@@ -182,8 +182,15 @@ span.cmTreeTwisty { cursor: default; }
 // ---- the checks ----
 .cmCheck { display: flex; flex-direction: column; gap: var(--space-3); padding: var(--space-4); background: var(--ov-sink-1); }
 .cmFaults { margin: 0; padding: 0 0 0 var(--space-6); display: flex; flex-direction: column; gap: var(--space-2); font-size: var(--text-small); }
-.cmFaults--stop, .cmFaults--warn { color: var(--ink); }
+.cmFaults--stop, .cmFaults--warn, .cmFaults--info { color: var(--ink); }
 .cmFaults--stop { font-weight: 700; }
+.cmGridWrap { overflow-x: auto; }
+.cmGrid {
+  width: 100%; border-collapse: collapse; font-size: var(--text-small);
+  caption { text-align: left; padding-bottom: var(--space-2); }
+  th, td { text-align: left; vertical-align: top; padding: var(--space-1) var(--space-3) var(--space-1) 0; box-shadow: inset 0 -1px 0 var(--hairline); }
+  th { color: var(--ink-muted); font-weight: 700; }
+}
 
 .cmListTools { display: flex; flex-wrap: wrap; gap: var(--space-2); padding: 0 var(--space-4) var(--space-3); }
 .cmToast {
@@ -202,7 +209,7 @@ span.cmTreeTwisty { cursor: default; }
 .cmTreeRow { &--drop { box-shadow: inset 0 0 0 2px var(--accent); } &--lifted { opacity: 0.4; } }
 
 // ---- the inspector's tabs ----
-.cmTabs { display: flex; gap: var(--space-1); box-shadow: inset 0 -1px 0 var(--hairline); }
+.cmTabs { display: flex; flex-wrap: wrap; gap: var(--space-1); box-shadow: inset 0 -1px 0 var(--hairline); }
 .cmTab {
   display: inline-flex; align-items: center; gap: var(--space-2); padding: var(--space-2) var(--space-3); border: 0; border-radius: var(--radius-none); background: none; color: var(--ink-muted);
   font: inherit; font-size: var(--text-small); font-weight: 700; cursor: pointer;
@@ -273,3 +280,39 @@ span.cmTreeTwisty { cursor: default; }
   .cmTree { max-height: 280px; }
   .cmMenu { right: auto; left: 0; }
 }
+
+// ---- forms, presets and the eye (phase 3) ----
+.cmTreeRow--off .cmTreeName--btn { color: var(--ink-muted); font-style: italic; }
+.cmAxis { display: flex; flex-direction: column; gap: var(--space-3); padding: var(--space-3); background: var(--ov-sink-1); min-width: 0; }
+.cmForms { display: grid; grid-template-columns: repeat(auto-fill, minmax(76px, 1fr)); gap: var(--space-2); }
+.cmFormCard {
+  display: flex; flex-direction: column; align-items: stretch; gap: var(--space-1); min-width: 0; padding: var(--space-2); border: 0; border-radius: var(--radius-none);
+  background: var(--surface-raised); box-shadow: inset 0 0 0 1px var(--hairline); color: var(--ink); font: inherit; font-size: var(--text-small); text-align: center; cursor: pointer;
+  &:hover { background: var(--ov-sink-1); }
+  &:focus-visible { outline: 2px solid var(--accent-hover); outline-offset: 1px; }
+  &--on { box-shadow: inset 0 0 0 2px var(--accent); font-weight: 700; }
+}
+.cmFormThumb { width: 100%; height: 56px; }
+.cmFormShape { fill: var(--ink-muted); stroke: var(--ink); stroke-opacity: 0.55; stroke-width: 1; vector-effect: non-scaling-stroke; }
+.cmFormName { overflow-wrap: anywhere; small { font-weight: 400; color: var(--ink-muted); } }
+.cmFormDetail { display: flex; flex-direction: column; gap: var(--space-3); padding-left: var(--space-3); box-shadow: inset 2px 0 0 var(--hairline); min-width: 0; }
+.cmFormShapes {
+  list-style: none; padding-left: 0; gap: var(--space-3);
+  li { display: flex; flex-direction: column; gap: var(--space-1); }
+  .cmFormShapeName { font-weight: 700; }
+  small { color: var(--ink-muted); }
+}
+.cmPresets { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: var(--space-3); }
+.cmPreset { display: flex; flex-direction: column; gap: var(--space-2); padding: var(--space-3); background: var(--ov-sink-1); min-width: 0; p { margin: 0; } &--on { box-shadow: inset 3px 0 0 var(--accent); } }
+.cmOn { display: inline-flex; align-items: center; gap: var(--space-1); flex: 0 0 auto; font-size: var(--text-small); font-weight: 700; color: var(--ink); }
+
+// ---- pose mode (phase 3) ----
+.cmPoseBar { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: var(--space-2) var(--space-4); padding: var(--space-2) var(--space-3); background: var(--ov-sink-2); box-shadow: inset 4px 0 0 var(--accent); }
+.cmPoseText { margin: 0; flex: 1 1 240px; min-width: 0; font-size: var(--text-small); color: var(--ink); }
+.cmCanvas--pose { cursor: default; .cmShape { cursor: grab; } }
+.cmJoint { pointer-events: none; }
+.cmJointRing { fill: none; stroke: var(--accent); stroke-width: 2; vector-effect: non-scaling-stroke; }
+.cmJointDot { fill: var(--accent); }
+.cmJoint--on .cmJointRing { fill: var(--accent); fill-opacity: 0.25; stroke-width: 3.5; }
+.cmScaleHandle { fill: var(--surface-raised); stroke: var(--ink); stroke-width: 1.5; vector-effect: non-scaling-stroke; cursor: nwse-resize; }
+.cmSlideHandle { fill: var(--surface-raised); stroke: var(--accent); stroke-width: 2; vector-effect: non-scaling-stroke; cursor: ew-resize; }

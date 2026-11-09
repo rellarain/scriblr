@@ -18,8 +18,8 @@ export function PreviewStrip({ content, sel, view = 'front' }: { content: ModelC
   const [size, setSize] = useState<(typeof SIZES)[number]['id']>('M')
   // what is drawn: the selection (or the whole model), each tile with its own slider values
   const ids = useMemo(() => new Set((sel.kind === 'none' ? content.shapes : shapesOf(content, sel)).filter(s => outlineSize(content, s) >= 3).map(s => s.id)), [content, sel])
-  const specs = useMemo(() => previewSpecs(seed, mode, 6, content.ranges), [seed, mode, content.ranges])
-  const tiles = useMemo(() => specs.map(spec => solve(content, spec.values, view)), [specs, content, view])
+  const specs = useMemo(() => previewSpecs(seed, mode, 6, content.ranges, content), [seed, mode, content])
+  const tiles = useMemo(() => specs.map(spec => solve(content, spec.values, view, { forms: spec.forms, hidden: spec.hidden })), [specs, content, view])
   // every tile is fitted to the selection as it stands at rest, so what a slider does shows as a change in the tile
   const box = useMemo<Box | null>(() => {
     const rest = solveAtRest(content, view)

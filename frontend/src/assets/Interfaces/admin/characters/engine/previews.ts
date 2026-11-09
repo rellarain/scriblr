@@ -1,5 +1,7 @@
-import type { ModelRange } from '../../../../../api/types'
+import type { ModelContent, ModelRange } from '../../../../../api/types'
+import { formKey, presetsOf } from './forms'
 import type { Box } from './geometry'
+import { applyPreset, kindsOf, type TestState } from './presets'
 
 // The preview strip: the thing being designed shown several times at random sizes, tilts and backgrounds, so the admin sees how it holds up
 // before publishing. 'rand' stays inside a sensible range; 'min' and 'max' are the stress previews (every value at the end of its range).
@@ -28,6 +30,9 @@ export interface PreviewSpec {
   bg: number
   // Where each slider of the model stands in this preview (empty when the model has none).
   values: Record<string, number>
+  // The form each axis shows ("objectId.axisId" to form id) and the things switched off (empty when the model has none).
+  forms: Record<string, string>
+  hidden: string[]
 }
 
 export const PREVIEW_RANGES = { scale: [0.35, 1.4], tilt: [-28, 28], skew: [-14, 14] } as const
@@ -48,17 +53,40 @@ function sliderValues(ranges: ModelRange[], mode: PreviewMode, rng: Rng): Record
   return out
 }
 
-export function previewSpecs(seed: number, mode: PreviewMode, count = 6, ranges: ModelRange[] = []): PreviewSpec[] {
+// The forms and switched-off things for one preview: the stress previews take the first or the last form of every axis; a random one draws a form for each
+// axis and, 60% of the time per kind, one random preset of the kind (which sets sliders and switches things off over the drawn values).
+function looks(c: ModelContent | undefined, mode: PreviewMode, rng: Rng, values: Record<string, number>): Pick<PreviewSpec, 'values' | 'forms' | 'hidden'> {
+  if (!c) return { values, forms: {}, hidden: [] }
+  const forms: Record<string, string> = {}
+  for (const o of c.objects) {
+    for (const a of o.axes ?? []) {
+      if (a.options.length === 0) continue
+      const at = mode === 'min' ? 0 : mode === 'max' ? a.options.length - 1 : Math.min(a.options.length - 1, Math.floor(rng() * a.options.length))
+      forms[formKey(o.id, a.id)] = a.options[at].id
+    }
+  }
+  let state: TestState = { values, forms, hidden: [] }
+  if (mode === 'rand') {
+    for (const kind of kindsOf(c)) {
+      const list = presetsOf(c).filter(p => p.kind.trim().toLowerCase() === kind.trim().toLowerCase())
+      if (rng() < 0.6 && list.length) state = applyPreset(c, state, list[Math.min(list.length - 1, Math.floor(rng() * list.length))])
+    }
+  }
+  return state
+}
+
+export function previewSpecs(seed: number, mode: PreviewMode, count = 6, ranges: ModelRange[] = [], content?: ModelContent): PreviewSpec[] {
   const rng = seededRng(seed), out: PreviewSpec[] = []
   const [s0, s1] = PREVIEW_RANGES.scale, [t0, t1] = PREVIEW_RANGES.tilt, [k0, k1] = PREVIEW_RANGES.skew
   for (let i = 0; i < count; i++) {
     const bg = i % PREVIEW_BACKGROUNDS
-    if (mode === 'min') out.push({ scale: s0, tilt: i % 2 ? t1 : t0, skew: i % 2 ? k1 : k0, flip: i % 3 === 0, bg, values: sliderValues(ranges, mode, rng) })
-    else if (mode === 'max') out.push({ scale: s1, tilt: i % 2 ? t0 : t1, skew: i % 2 ? k0 : k1, flip: i % 3 === 1, bg, values: sliderValues(ranges, mode, rng) })
+    if (mode === 'min') out.push({ scale: s0, tilt: i % 2 ? t1 : t0, skew: i % 2 ? k1 : k0, flip: i % 3 === 0, bg, ...looks(content, mode, rng, sliderValues(ranges, mode, rng)) })
+    else if (mode === 'max') out.push({ scale: s1, tilt: i % 2 ? t0 : t1, skew: i % 2 ? k0 : k1, flip: i % 3 === 1, bg, ...looks(content, mode, rng, sliderValues(ranges, mode, rng)) })
     else {
       // three draws averaged: most previews are ordinary, a few are extreme
       const pick = (lo: number, hi: number) => lo + (hi - lo) * ((rng() + rng() + rng()) / 3)
-      out.push({ scale: Math.round(pick(0.5, 1.15) * 100) / 100, tilt: Math.round(pick(t0, t1) * 10) / 10, skew: Math.round(pick(k0, k1) * 10) / 10, flip: rng() < 0.25, bg, values: sliderValues(ranges, mode, rng) })
+      const scale = Math.round(pick(0.5, 1.15) * 100) / 100, tilt = Math.round(pick(t0, t1) * 10) / 10, skew = Math.round(pick(k0, k1) * 10) / 10, flip = rng() < 0.25
+      out.push({ scale, tilt, skew, flip, bg, ...looks(content, mode, rng, sliderValues(ranges, mode, rng)) })
     }
   }
   return out

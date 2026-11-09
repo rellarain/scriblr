@@ -26,6 +26,20 @@ export interface PivotMarker {
   draggable: boolean
 }
 
+// Pose mode: the figure is grabbed instead of edited. The page decides what a grab does (turn a group, scale one, slide an anchor, reach with a limb) and
+// answers whether a drag began; the canvas only passes the pointer on, and draws the markers it is given (in canvas space).
+export type PoseGrab = { kind: 'part'; shapeId: string } | { kind: 'scale'; groupId: string } | { kind: 'slide'; groupId: string }
+export interface PoseMark { id: string; name: string; x: number; y: number }
+export interface PoseCanvas {
+  joints: Array<PoseMark & { active: boolean }>
+  scales: PoseMark[]
+  slides: PoseMark[]
+  onDown: (grab: PoseGrab, world: [number, number], alt: boolean) => boolean
+  onMove: (world: [number, number]) => void
+  onUp: () => void
+  onCancel: () => void
+}
+
 export interface CanvasProps {
   content: ModelContent
   solved: Solved
@@ -44,6 +58,8 @@ export interface CanvasProps {
   editable?: boolean
   pivot?: PivotMarker | null
   anchor?: [number, number] | null
+  // Pose mode (see above): null or missing is the ordinary editor.
+  pose?: PoseCanvas | null
   // The points of the selected shape that are linked to another shape: they are not dragged (the arrow keys adjust the link instead).
   linked?: number[]
   onNudgeLink?: (dx: number, dy: number) => void
@@ -70,6 +86,7 @@ type Drag =
   | { kind: 'handle'; shapeId: string; index: number; which: 'hi' | 'ho' }
   | { kind: 'move'; shapeId: string; last: [number, number] }
   | { kind: 'pivot' }
+  | { kind: 'pose' }
   | { kind: 'pan'; startX: number; startY: number; panX: number; panY: number; target: { kind: 'grid' } | { kind: 'shape'; id: string }; moved: boolean }
 
 export function DesignerCanvas(p: CanvasProps) {
@@ -82,7 +99,7 @@ export function DesignerCanvas(p: CanvasProps) {
   const focus = shapesOf(content, sel)
   const focusIds = new Set(focus.map(s => s.id))
   const none = sel.kind === 'none'
-  const box = fitAll || none ? FIGURE : boxOfSolved(solved, focus) ?? FIGURE
+  const box = fitAll || none || p.pose ? FIGURE : boxOfSolved(solved, focus) ?? FIGURE
   let w = Math.max(box.w * 1.7, 24), h = Math.max(box.h * 1.7, 21)
   if (w / h < ASPECT) w = h * ASPECT
   else h = w / ASPECT
@@ -93,7 +110,7 @@ export function DesignerCanvas(p: CanvasProps) {
   const shape = activeShape(content, sel)
   const solvedShape = shape ? solved.shapes[shape.id] : undefined
   const matrix = solvedShape?.matrix
-  const overlay = !!shape && !!solvedShape?.visible && shape.pts.length >= 3
+  const overlay = !!shape && !p.pose && !!solvedShape?.visible && shape.pts.length >= 3
   const shapesById = new Map(content.shapes.map(s => [s.id, s]))
   const picking = new Set(p.pick?.shapes ?? [])
   const linkedSet = new Set(p.linked ?? [])
@@ -128,6 +145,7 @@ export function DesignerCanvas(p: CanvasProps) {
       return
     }
     if (e.button !== 0) return
+    if (p.pose) { if (p.pose.onDown({ kind: 'part', shapeId: id }, toWorld(e), e.altKey)) { dragRef.current = { kind: 'pose' }; capture(e) } return }
     if (p.pick) {
       if (picking.has(id)) { const [x, y] = toWorld(e); p.onPick?.(id, x, y) }
       return
@@ -163,9 +181,15 @@ export function DesignerCanvas(p: CanvasProps) {
     dragRef.current = { kind: 'pivot' }
     capture(e)
   }
+  function onPoseHandleDown(e: ReactPointerEvent, grab: PoseGrab) {
+    e.stopPropagation()
+    if (e.button !== 0 || !p.pose) return
+    if (p.pose.onDown(grab, toWorld(e), false)) { dragRef.current = { kind: 'pose' }; capture(e) }
+  }
   function onMove(e: ReactPointerEvent<SVGSVGElement>) {
     const d = dragRef.current
     if (!d) return
+    if (d.kind === 'pose') { p.pose?.onMove(toWorld(e)); return }
     if (d.kind === 'pan') {
       const r = rect(), dx = e.clientX - d.startX, dy = e.clientY - d.startY
       if (Math.abs(dx) + Math.abs(dy) > 3) d.moved = true
@@ -186,6 +210,7 @@ export function DesignerCanvas(p: CanvasProps) {
   function onUp() {
     const d = dragRef.current
     dragRef.current = null
+    if (d && d.kind === 'pose') p.pose?.onUp()
     if (d && d.kind === 'pan' && !d.moved) p.onRightClick(d.target)
   }
   function onDouble(e: ReactMouseEvent, s: ModelShape) {
@@ -200,7 +225,11 @@ export function DesignerCanvas(p: CanvasProps) {
     p.onEditShape(s.id, placed, added.index)
   }
   function onKey(e: KeyboardEvent<SVGSVGElement>) {
-    if (e.key === 'Escape') { p.onEscape(); return }
+    if (e.key === 'Escape') {
+      if (dragRef.current?.kind === 'pose') { dragRef.current = null; p.pose?.onCancel() }
+      else p.onEscape()
+      return
+    }
     if (!shape || !editable) return
     const step = e.shiftKey ? 5 : 0.5
     const d: Record<string, [number, number]> = { ArrowLeft: [-step, 0], ArrowRight: [step, 0], ArrowUp: [0, -step], ArrowDown: [0, step] }
@@ -239,7 +268,7 @@ export function DesignerCanvas(p: CanvasProps) {
 
   return (
     <svg
-      ref={svgRef} className={`cmCanvas${p.pick ? ' cmCanvas--pick' : ''}`} viewBox={`${vb.x} ${vb.y} ${vb.w} ${vb.h}`} role="application" tabIndex={0}
+      ref={svgRef} className={`cmCanvas${p.pick ? ' cmCanvas--pick' : ''}${p.pose ? ' cmCanvas--pose' : ''}`} viewBox={`${vb.x} ${vb.y} ${vb.w} ${vb.h}`} role="application" tabIndex={0}
       aria-label={`Designer canvas. ${nudgeHint}. Right-click the grid to see the end result.`}
       onPointerDown={onDown} onPointerMove={onMove} onPointerUp={onUp} onPointerCancel={onUp} onContextMenu={e => e.preventDefault()} onKeyDown={onKey}
     >
@@ -272,8 +301,20 @@ export function DesignerCanvas(p: CanvasProps) {
           onPointerDown={e => onPointDown(e, i)}
         />
       ))}
-      {anchor && <rect x={anchor[0] - 3.5 * u} y={anchor[1] - 3.5 * u} width={7 * u} height={7 * u} transform={`rotate(45 ${anchor[0]} ${anchor[1]})`} className="cmAnchor" aria-hidden="true" />}
-      {pivot && (
+      {p.pose && p.pose.joints.map(j => (
+        <g key={j.id} className={`cmJoint${j.active ? ' cmJoint--on' : ''}`} aria-hidden="true">
+          <circle cx={j.x} cy={j.y} r={5 * u} className="cmJointRing" />
+          <circle cx={j.x} cy={j.y} r={1.5 * u} className="cmJointDot" />
+        </g>
+      ))}
+      {p.pose && p.pose.slides.map(m => (
+        <circle key={m.id} cx={m.x} cy={m.y} r={6 * u} role="button" tabIndex={-1} aria-label={`Slide ${m.name}`} className="cmSlideHandle" onPointerDown={e => onPoseHandleDown(e, { kind: 'slide', groupId: m.id })} />
+      ))}
+      {p.pose && p.pose.scales.map(m => (
+        <rect key={m.id} x={m.x - 4.5 * u} y={m.y - 4.5 * u} width={9 * u} height={9 * u} role="button" tabIndex={-1} aria-label={`Scale ${m.name}`} className="cmScaleHandle" onPointerDown={e => onPoseHandleDown(e, { kind: 'scale', groupId: m.id })} />
+      ))}
+      {anchor && !p.pose && <rect x={anchor[0] - 3.5 * u} y={anchor[1] - 3.5 * u} width={7 * u} height={7 * u} transform={`rotate(45 ${anchor[0]} ${anchor[1]})`} className="cmAnchor" aria-hidden="true" />}
+      {pivot && !p.pose && (
         <g
           className={`cmPivot${pivot.draggable ? '' : ' cmPivot--off'}`} role="button" tabIndex={0} aria-label={`Pivot of ${pivot.name}${pivot.draggable ? '. Drag it, or press the arrow keys' : ''}`}
           onPointerDown={onPivotDown} onKeyDown={onPivotKey}

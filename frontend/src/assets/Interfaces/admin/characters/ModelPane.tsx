@@ -1,23 +1,30 @@
 import { useEffect, useMemo, useRef, useState, type KeyboardEvent } from 'react'
 import type { ModelContent, ModelEntry, ModelLayer, ModelShape } from '../../../../api/types'
 import {
-  BackIcon, CheckIcon, CopyIcon, CursorIcon, ExportIcon, EyeOffIcon, FitIcon, FrontIcon, GridLinesIcon, HistoryIcon, PathIcon, RedoIcon, RestoreIcon, RulerIcon, SlidersIcon, SwapIcon, TrashIcon, UndoIcon, ZoomInIcon, ZoomOutIcon,
+  BackIcon, CheckIcon, CopyIcon, CursorIcon, ExportIcon, EyeOffIcon, FitIcon, FrontIcon, GridLinesIcon, HandIcon, HistoryIcon, PathIcon, RedoIcon, RestoreIcon, RulerIcon, SlidersIcon, SwapIcon, TrashIcon, UndoIcon, ZoomInIcon, ZoomOutIcon,
 } from '../../../icons'
 import { AssetTree, type TreeActions, type TreeMode } from './AssetTree'
 import { CheckPanel } from './CheckPanel'
-import { DesignerCanvas, type PivotMarker } from './DesignerCanvas'
+import { DesignerCanvas, type PivotMarker, type PoseCanvas, type PoseGrab } from './DesignerCanvas'
+import { FormsTab, type FormActions } from './FormsTab'
 import { Inspector, type InspectorTab } from './Inspector'
 import { StatusBadge, modelLabel } from './ModelList'
+import { PoseBar } from './PoseBar'
+import { PresetsTab, type PresetActions } from './PresetsTab'
 import { PreviewStrip } from './PreviewStrip'
 import { RangesTab } from './RangesTab'
 import { RigTab } from './RigTab'
 import { TemplateMenu } from './TemplateMenu'
 import { NONE, contextObject, repair, rightClickGrid, rightClickShape, type EditMode, type Selection } from './designerState'
 import { newShape } from './engine/edit'
+import { addAxis, addForm, hideInForm, moveAxis, moveForm, overrideState, removeAxis, removeForm, renameAxis, renameForm, setInitialForm, setOverride, useBaseOutline } from './engine/formEdit'
+import { presetsOf, targetForShape } from './engine/forms'
 import { apply, inverse } from './engine/geometry'
 import { LIMITS } from './engine/limits'
 import { emptyHistory, redo as redoHistory, remember, undo as undoHistory, type History } from './engine/history'
-import { chainOf, isPointDriven, restPivot, solve, type Values } from './engine/rig'
+import { beginScale, beginTurn, grabPoint, moveScale, moveTurn, poseTarget, reach, reachJoints, scaleDriver, slideValue, toModel, turnDrivers, type ReachGrab, type ScaleDrag, type TurnDrag } from './engine/pose'
+import { deletePreset, renamePreset, savePreset, updatePreset } from './engine/presets'
+import { chainOf, isPointDriven, restPivot, solve, type Solved, type Values } from './engine/rig'
 import {
   addBend, addRange, addScale, addTurn, attachFromClick, attachGroup, clearPointMoves, detachGroup, groupOfShape, newRange, recordPoints, removeDrive, removeRange, renameRange, reparent,
   setAxis, setDriveAxis, setPivot, setShow, stepBendEdge, stepBound, stepDrive, type Edit,
@@ -25,12 +32,13 @@ import {
 import { templateBox, templateById } from './engine/templates'
 import { breakPair, clearLinksTo, linkToEdge, linkToPoint, makeTwin, moveInOrder, setBack, setLoose, stepLink, unlinkPoint } from './engine/pairEdit'
 import type { LinkHow, NewSliderKind, PairActions, Recording, RigActions, ViewName } from './rigActions'
-import { groupOfSelection, offRest, scrubValue } from './rigView'
+import { groupOfSelection, offRest, scrubValue, valueText } from './rigView'
 import {
   NAME_MAX, addGroup, addObject, addShape, duplicateShape, freshId, groupOfObject, moveBefore, moveObjectWithin, moveShapeWithin, newGroup, objectById, objectOfShape, publishFaults, removeGroup, removeObject,
   outlineSize, removeShape, renameGroup, renameObject, renameShape, shapeById, twinsOf, updateShape, type MakeId,
 } from './modelContent'
 import type { CharacterModels } from './useCharacterModels'
+import { useTestState } from './useTestState'
 
 const when = (iso: string) => new Date(iso).toLocaleDateString('en-US', { day: 'numeric', month: 'short' })
 const SCRUB_MS = 3000
@@ -56,6 +64,16 @@ function VersionsMenu({ entry, onBring }: { entry: ModelEntry; onBring: (version
 }
 
 interface RecordingState extends Recording { draft: ModelShape }
+
+// A drag in Pose mode: what was grabbed, the solved figure it began on (its pivots and whole-model transform stay put while it lasts) and the slider values
+// to go back to if Escape is pressed.
+type PoseDrag = { solved: Solved; start: Values; group: string } & (
+  | { kind: 'turn'; turn: TurnDrag }
+  | { kind: 'scale'; scale: ScaleDrag }
+  | { kind: 'slide' }
+  | { kind: 'reach'; grab: ReachGrab; current: Values }
+)
+const POSE_HINT = 'Pose mode: drag a part to turn it, a square to scale its group, a circle to slide its anchor. Hold Alt, or press Reach, and drag a hand or foot to bend the limb.'
 
 // The open model: its name and publishing buttons, then the tree, the canvas and the inspector, the preview strip and the checks. The undo stack
 // lives here (it starts empty when another model is opened: the page keys this component on the model's id), and so do the test values of the sliders
@@ -84,13 +102,19 @@ export function ModelPane({ entry, models, makeId, onRemove, onDuplicate, onExpo
   const [note, setNote] = useState('')
   const [tab, setTab] = useState<InspectorTab>('shape')
   const [treeMode, setTreeMode] = useState<TreeMode>('layers')
-  const [values, setValues] = useState<Values>({})
+  const test = useTestState()
+  const { values, setValues } = test
   const [recording, setRecording] = useState<RecordingState | null>(null)
   const [pickOn, setPickOn] = useState(false)
   const [view, setView] = useState<ViewName>('front')
   const [linkMode, setLinkMode] = useState<LinkHow | null>(null)
   const [rangeFilter, setRangeFilter] = useState<'selection' | 'all'>('selection')
   const [scrubbing, setScrubbing] = useState<string | null>(null)
+  const [poseMode, setPoseMode] = useState(false)
+  const [reachOn, setReachOn] = useState(false)
+  const [poseStatus, setPoseStatus] = useState(POSE_HINT)
+  const [poseActive, setPoseActive] = useState<string | null>(null)
+  const poseRef = useRef<PoseDrag | null>(null)
   const historyRef = useRef(history)
   historyRef.current = history
   const faults = publishFaults(content)
@@ -102,18 +126,34 @@ export function ModelPane({ entry, models, makeId, onRemove, onDuplicate, onExpo
 
   // while a shape is recorded the canvas shows the copy being dragged, with every slider at rest
   const shown = useMemo(() => (recording ? updateShape(content, recording.shapeId, () => recording.draft) : content), [content, recording])
-  const solved = useMemo(() => solve(shown, recording ? {} : values, view), [shown, values, recording, view])
+  const solved = useMemo(() => solve(shown, recording ? {} : values, view, recording ? {} : { forms: test.forms, hidden: test.hidden }), [shown, values, recording, view, test.forms, test.hidden])
   const group = groupOfSelection(content, sel)
+  const valuesRef = useRef(values)
+  valuesRef.current = values
   const away = offRest(content, values)
+  const awayAll = test.away(content)
+  const hiddenSet = useMemo(() => new Set(test.hidden), [test.hidden])
   const selShape = sel.kind === 'shape' ? shapeById(content, sel.id) : undefined
   const pointDriven = !!selShape && !recording && isPointDriven(content, values, selShape.id)
-  const editable = !!selShape && !pointDriven && !selShape.mirrorOf
+  // the form the selected shape's outline is drawn from (or would be edited into): the canvas edits that form's outline, not the base one
+  const formTarget = selShape && !selShape.mirrorOf && !recording ? formTargetIn(content, selShape.id) : null
+  const hiddenByForm = !!formTarget && overrideState(formTarget.form, formTarget.shapeId) === 'hidden'
+  const switchedOff = !!selShape && !!solved.shapes[selShape.id]?.off
+  const editable = !!selShape && !pointDriven && !selShape.mirrorOf && !hiddenByForm && !switchedOff
   // What the canvas draws and edits for the selected shape: the points as the rig puts them (links resolved), in the view being edited. A twin is shown the same
   // way, but not edited.
   const canvasContent = useMemo(() => {
     const r = selShape ? solved.shapes[selShape.id] : undefined
     return selShape && r && r.local.length >= 3 ? updateShape(shown, selShape.id, sh => ({ ...sh, pts: r.local })) : shown
   }, [shown, solved, selShape])
+
+  // The form an edit of this shape's points goes to, if a chosen form gives the shape its outline (see forms.targetForShape).
+  function formTargetIn(c: ModelContent, shapeId: string) {
+    const sh = shapeById(c, shapeId), o = objectOfShape(c, shapeId)
+    if (!sh || !o || sh.mirrorOf) return null
+    const t = targetForShape(o, shapeId, test.forms)
+    return t ? { object: o, axis: t.axis, form: t.form, shapeId } : null
+  }
 
   // ---- applying changes ----
 
@@ -134,7 +174,13 @@ export function ModelPane({ entry, models, makeId, onRemove, onDuplicate, onExpo
   // points go back into `pts`, in the back view into the outline of its own for the back.
   function live(id: string, next: ModelShape) {
     if (recording) { setRecording(r => (r ? { ...r, draft: next } : r)); return }
-    models.edit(entry.id, c => updateShape(c, id, sh => (view === 'back' ? { ...next, pts: sh.pts, back: next.pts } : next)), false)
+    models.edit(entry.id, c => {
+      if (view === 'back') return updateShape(c, id, sh => ({ ...next, pts: sh.pts, back: next.pts }))
+      const t = formTargetIn(c, id)
+      if (!t) return updateShape(c, id, () => next)
+      const e = setOverride(c, t.object.id, t.axis.id, t.form.id, id, next.pts)
+      return e.ok ? e.content : c
+    }, false)
   }
   function editShape(id: string, next: ModelShape, point?: number) {
     if (recording) {
@@ -153,6 +199,15 @@ export function ModelPane({ entry, models, makeId, onRemove, onDuplicate, onExpo
     }
     if (view === 'back') {
       commit(updateShape(content, id, () => ({ ...next, pts: old.pts, back: next.pts })))
+      if (point !== undefined) setSelPoint(point)
+      return
+    }
+    // a chosen form gives the shape its outline: the points go there, and the base outline (which anchors and links read) is left alone
+    const t = formTargetIn(content, id)
+    if (t) {
+      const e = setOverride(content, t.object.id, t.axis.id, t.form.id, id, next.pts)
+      if (!e.ok) { setNote(e.reason); return }
+      commit(updateShape(e.content, id, sh => ({ ...next, pts: sh.pts })))
       if (point !== undefined) setSelPoint(point)
       return
     }
@@ -198,6 +253,7 @@ export function ModelPane({ entry, models, makeId, onRemove, onDuplicate, onExpo
 
   const setValue = (id: string, v: number) => { setScrubbing(null); setValues(vs => ({ ...vs, [id]: v })) }
   const resetValues = () => { setScrubbing(null); setValues({}) }
+  const resetEverything = () => { setScrubbing(null); test.resetAll() }
   // the scrub sweeps a slider from its minimum to its maximum and back (it runs even with reduced motion: it is asked for, and shows what the slider does)
   useEffect(() => {
     if (!scrubbing) return
@@ -206,7 +262,7 @@ export function ModelPane({ entry, models, makeId, onRemove, onDuplicate, onExpo
     let t = 0
     const timer = setInterval(() => { t = (t + SCRUB_TICK / SCRUB_MS) % 1; setValues(vs => ({ ...vs, [r.id]: scrubValue(r, t) })) }, SCRUB_TICK)
     return () => clearInterval(timer)
-  }, [scrubbing, content.ranges])
+  }, [scrubbing, content.ranges, setValues])
 
   // ---- the rig ----
 
@@ -226,7 +282,7 @@ export function ModelPane({ entry, models, makeId, onRemove, onDuplicate, onExpo
     const s = shapeById(content, shapeId)
     if (!s) return
     if (s.mirrorOf) { setNote('A twin follows its original: record the original instead, or break the pair.'); return }
-    setView('front'); setLinkMode(null)
+    setView('front'); setLinkMode(null); setPoseMode(false); poseRef.current = null
     setValues({}); setScrubbing(null); setPickOn(false); setDrawer(true); setTab('ranges')
     setSel({ kind: 'shape', id: shapeId }); setSelPoint(0); setMode('points')
     setRecording({ rangeId, shapeId, end, draft: { ...s, pts: s.pts.map(p => ({ ...p })) } })
@@ -333,6 +389,134 @@ export function ModelPane({ entry, models, makeId, onRemove, onDuplicate, onExpo
     moveInOrder: (shapeId, dir) => { applyEdit(moveInOrder(content, shapeId, view, dir)) },
   }
 
+  // ---- posing by dragging ----
+
+  function poseBegin(grab: PoseGrab, world: [number, number], alt: boolean): boolean {
+    if (recording) return false
+    const sv = solved, p = toModel(sv, world[0], world[1]), start = valuesRef.current
+    const gid = grab.kind === 'part' ? groupOfShape(content, grab.shapeId) : grab.groupId
+    const name = content.groups.find(g => g.id === gid)?.name.trim() || 'the group'
+    if (grab.kind === 'scale') {
+      const scale = gid ? beginScale(content, sv, start, gid, p) : null
+      if (!scale || !gid) return false
+      poseRef.current = { kind: 'scale', solved: sv, start, group: gid, scale }
+      setPoseActive(gid); setPoseStatus(`Scaling ${name}.`)
+      return true
+    }
+    if (grab.kind === 'slide') {
+      if (!gid) return false
+      poseRef.current = { kind: 'slide', solved: sv, start, group: gid }
+      setPoseActive(gid); setPoseStatus(`Sliding ${name}.`)
+      return true
+    }
+    if (alt || reachOn) {
+      if (!gid || reachJoints(content, gid).length === 0) { const t = poseTarget(content, gid); setPoseStatus(t.ok ? 'Nothing here bends.' : t.reason); return false }
+      poseRef.current = { kind: 'reach', solved: sv, start, group: gid, grab: grabPoint(sv, gid, p), current: start }
+      setPoseActive(gid); setPoseStatus(`Reaching with ${name}.`)
+      return true
+    }
+    const target = poseTarget(content, gid)
+    if (!target.ok) { setPoseStatus(target.reason); return false }
+    const turn = beginTurn(content, sv, start, target, p)
+    if (!turn) return false
+    poseRef.current = { kind: 'turn', solved: sv, start, group: target.group.id, turn }
+    setPoseActive(target.group.id); setPoseStatus(`Turning ${target.group.name.trim() || 'the group'}.`)
+    return true
+  }
+  function poseMove(world: [number, number]) {
+    const d = poseRef.current
+    if (!d) return
+    const p = toModel(d.solved, world[0], world[1])
+    if (d.kind === 'turn') {
+      const r = moveTurn(content, d.turn, p)
+      d.turn = r.drag
+      setValues(r.values)
+      const range = content.ranges.find(x => x.id === d.turn.rangeId)
+      if (range) setPoseStatus(`Turning ${content.groups.find(g => g.id === d.group)?.name.trim() || 'the group'}: ${range.name.trim() || 'slider'} ${valueText(range, r.values[range.id] ?? range.rest)}.`)
+    } else if (d.kind === 'scale') {
+      const next = moveScale(content, d.scale, p)
+      setValues(next)
+      const range = content.ranges.find(x => x.id === d.scale.rangeId)
+      if (range) setPoseStatus(`Scaling ${content.groups.find(g => g.id === d.group)?.name.trim() || 'the group'}: ${range.name.trim() || 'slider'} ${valueText(range, next[range.id] ?? range.rest)}.`)
+    } else if (d.kind === 'slide') {
+      const s = slideValue(content, d.solved, d.group, p)
+      if (s) setValues({ ...d.start, [s.rangeId]: s.value })
+    } else {
+      const r = reach(content, d.current, view, d.grab, p)
+      d.current = r.values
+      setValues(r.values)
+    }
+  }
+  function poseEnd() {
+    if (poseRef.current) setPoseStatus('Drag again to keep posing, or save the pose as a preset.')
+    poseRef.current = null; setPoseActive(null)
+  }
+  function poseCancel() {
+    const d = poseRef.current
+    if (d) setValues(d.start)
+    poseRef.current = null; setPoseActive(null); setPoseStatus('Put back as it was.')
+  }
+  function savePose() {
+    const n = presetsOf(content).filter(x => x.kind.trim().toLowerCase() === 'pose').length + 1
+    if (applyEdit(savePreset(content, { ...test.state, hidden: [] }, `Pose ${n}`, 'Pose', makeId))) setPoseStatus(`Saved as the preset Pose ${n}. Rename it in the Presets tab.`)
+  }
+  // what the pose mode shows on the canvas: a ring at the pivot of every group a drag can turn, a square on every group that has a Scale slider, a circle on
+  // every anchor that a slider slides
+  const poseCanvas: PoseCanvas | null = poseMode && !recording ? (() => {
+    const at = (x: number, y: number) => apply(solved.global, x, y)
+    const named = (id: string) => content.groups.find(g => g.id === id)?.name.trim() || 'the group'
+    const joints = content.groups.filter(g => !g.mirrorOf && turnDrivers(content, g.id).length > 0 && solved.pivots[g.id]).map(g => { const [x, y] = at(...solved.pivots[g.id]); return { id: g.id, name: named(g.id), x, y, active: poseActive === g.id } })
+    const scales = content.groups.filter(g => !g.mirrorOf && scaleDriver(content, g.id)).flatMap(g => {
+      const boxes = g.objects.flatMap(oid => objectById(content, oid)?.shapes ?? []).map(id => solved.shapes[id]).filter(r => r?.visible).map(r => r.box)
+      if (!boxes.length) return []
+      return [{ id: g.id, name: named(g.id), x: Math.max(...boxes.map(b => b.x + b.w)), y: Math.max(...boxes.map(b => b.y + b.h)) }]
+    })
+    const slides = content.groups.filter(g => !g.mirrorOf && g.attach?.kind === 'range' && solved.anchors[g.id]).map(g => { const [x, y] = at(...solved.anchors[g.id]!); return { id: g.id, name: named(g.id), x, y } })
+    return { joints, scales, slides, onDown: poseBegin, onMove: poseMove, onUp: poseEnd, onCancel: poseCancel }
+  })() : null
+
+  // ---- forms and presets ----
+
+  // The outlines now drawn for the object's shapes that differ from the base, to start a new form from (the others keep the base outline).
+  function drawnOutlines(objectId: string): Record<string, ModelContent['shapes'][number]['pts']> {
+    const rest = solve(content, {}, 'front', { forms: test.forms })
+    const out: Record<string, ModelContent['shapes'][number]['pts']> = {}
+    for (const id of objectById(content, objectId)?.shapes ?? []) {
+      const sh = shapeById(content, id), drawn = rest.shapes[id]?.local
+      if (sh && drawn && drawn.length >= 3 && JSON.stringify(drawn) !== JSON.stringify(sh.pts)) out[id] = drawn
+    }
+    return out
+  }
+  const forms: FormActions = {
+    selectObject: id => choose({ kind: 'object', id }),
+    addAxis: objectId => {
+      const e = addAxis(content, objectId, `Axis ${(objectById(content, objectId)?.axes?.length ?? 0) + 1}`, makeId)
+      if (applyEdit(e) && e.ok && e.axisId && e.formId) test.setForm(objectId, e.axisId, e.formId)
+    },
+    removeAxis: (objectId, axisId) => commit(removeAxis(content, objectId, axisId), true),
+    renameAxis: (objectId, axisId, name) => models.edit(entry.id, c => renameAxis(c, objectId, axisId, name), false),
+    moveAxis: (objectId, axisId, dir) => commit(moveAxis(content, objectId, axisId, dir), true),
+    choose: (objectId, axisId, formId) => test.setForm(objectId, axisId, formId),
+    addForm: (objectId, axisId) => {
+      const count = objectById(content, objectId)?.axes?.find(a => a.id === axisId)?.options.length ?? 0
+      const e = addForm(content, objectId, axisId, drawnOutlines(objectId), `Form ${count + 1}`, makeId)
+      if (applyEdit(e) && e.ok && e.formId) test.setForm(objectId, axisId, e.formId)
+    },
+    renameForm: (objectId, axisId, formId, name) => models.edit(entry.id, c => renameForm(c, objectId, axisId, formId, name), false),
+    makeDefault: (objectId, axisId, formId) => commit(setInitialForm(content, objectId, axisId, formId), true),
+    moveForm: (objectId, axisId, formId, dir) => commit(moveForm(content, objectId, axisId, formId, dir), true),
+    removeForm: (objectId, axisId, formId) => { applyEdit(removeForm(content, objectId, axisId, formId)) },
+    hideShape: (objectId, axisId, formId, shapeId) => { applyEdit(hideInForm(content, objectId, axisId, formId, shapeId)) },
+    useBase: (objectId, axisId, formId, shapeId) => { applyEdit(useBaseOutline(content, objectId, axisId, formId, shapeId)) },
+  }
+  const presets: PresetActions = {
+    apply: id => { const p = presetsOf(content).find(x => x.id === id); if (p) { setScrubbing(null); test.apply(content, p) } },
+    save: (name, kind) => { applyEdit(savePreset(content, test.state, name, kind, makeId)) },
+    update: id => commit(updatePreset(content, id, test.state), true),
+    rename: (id, name) => models.edit(entry.id, c => renamePreset(c, id, name), false),
+    remove: id => commit(deletePreset(content, id), true),
+  }
+
   // ---- the tree's actions ----
 
   // The group a new object goes into: the selection's group, else the first group, else a new one (returned with its content).
@@ -398,6 +582,7 @@ export function ModelPane({ entry, models, makeId, onRemove, onDuplicate, onExpo
     onReorderObject: (groupId, objectId, before) => commit(moveObjectWithin(content, groupId, objectId, before), true),
     onReorderGroup: (groupId, before) => commit({ ...content, groups: moveBefore(content.groups, groupId, before) }, true),
     onReparent: (groupId, parentId) => { applyEdit(reparent(content, groupId, parentId)) },
+    onToggleHidden: test.toggleHidden,
   }
 
   // The canvas's "new shape" button: into the selected object, else into a new object (and group) on the Body layer.
@@ -480,7 +665,11 @@ export function ModelPane({ entry, models, makeId, onRemove, onDuplicate, onExpo
   }
 
   const stageNote = recording ? 'Recording: drag the points, then press Set in the Ranges tab.'
+    : poseMode ? 'Pose mode: the figure is grabbed, not edited. The sliders in the Ranges tab do the same from the keyboard.'
     : linkMode ? `Click the shape to link point ${selPoint + 1} to. Escape stops.`
+    : formTarget && selShape && hiddenByForm ? `${selShape.name.trim() || 'This shape'} is hidden in the form ${formTarget.form.name.trim() || 'chosen'}: use the base outline for it in the Forms tab, or choose another form.`
+    : formTarget && selShape ? `Editing the form ${formTarget.form.name.trim() || 'chosen'} of ${formTarget.axis.name.trim() || 'the axis'}: the points you move change only this form.`
+    : selShape && switchedOff ? `${selShape.name.trim() || 'This shape'} is switched off with the eye: show it to edit it.`
     : selShape?.mirrorOf ? `This is the twin of ${shapeById(content, selShape.mirrorOf)?.name.trim() || 'another shape'}: it mirrors it. Edit the original, or break the pair.`
     : selShape && view === 'back' ? 'Back view: a shape shows its front outline from behind until you edit its points here; then it has an outline of its own for the back.'
     : selShape && pointDriven ? 'A slider changes this shape\'s points and is away from rest: set the sliders back to rest to edit it.'
@@ -520,7 +709,7 @@ export function ModelPane({ entry, models, makeId, onRemove, onDuplicate, onExpo
         {note && <p className="cmErr" role="status">{note}</p>}
 
         <div className={`cmWork${drawer ? '' : ' cmWork--noDrawer'}`}>
-          <AssetTree content={content} sel={sel} actions={actions} mode={treeMode} onMode={setTreeMode} />
+          <AssetTree content={content} sel={sel} actions={actions} mode={treeMode} onMode={setTreeMode} hidden={hiddenSet} />
           <div className="cmStage">
             <div className="cmToolbar" role="toolbar" aria-label="Designer tools">
               <button type="button" className="cmIconBtn" aria-label="Undo" title="Undo (Ctrl+Z)" disabled={!history.past.length || !!recording} onClick={undo}><UndoIcon size={14} /></button>
@@ -528,6 +717,7 @@ export function ModelPane({ entry, models, makeId, onRemove, onDuplicate, onExpo
               <span className="cmSep" aria-hidden="true" />
               <button type="button" className={`cmIconBtn${mode === 'points' ? ' cmIconBtn--on' : ''}`} aria-label="Point editor" title="Point editor: drag points and curve handles" aria-pressed={mode === 'points'} onClick={() => setMode('points')}><PathIcon size={14} /></button>
               <button type="button" className={`cmIconBtn${mode === 'move' ? ' cmIconBtn--on' : ''}`} aria-label="Move shape" title="Move shape: drag the whole shape" aria-pressed={mode === 'move'} onClick={() => setMode('move')}><CursorIcon size={14} /></button>
+              <button type="button" className={`cmIconBtn${poseMode ? ' cmIconBtn--on' : ''}`} aria-label="Pose mode" title="Pose mode: drag the figure to turn, scale and reach (the sliders follow)" aria-pressed={poseMode} disabled={!!recording} onClick={() => { if (poseMode) poseCancel(); setPoseMode(m => !m); setPoseStatus(POSE_HINT) }}><HandIcon size={14} /></button>
               <span className="cmSep" aria-hidden="true" />
               <button type="button" className={`cmIconBtn${mirror ? ' cmIconBtn--on' : ''}`} aria-label="Mirror editing" title="Mirror editing: a point and its twin move together" aria-pressed={mirror} onClick={() => setMirror(m => !m)}><SwapIcon size={14} /></button>
               <button type="button" className={`cmIconBtn${snap ? ' cmIconBtn--on' : ''}`} aria-label="Snap" title="Snap to half units and the mirror line" aria-pressed={snap} onClick={() => setSnap(s => !s)}><RulerIcon size={14} /></button>
@@ -542,15 +732,16 @@ export function ModelPane({ entry, models, makeId, onRemove, onDuplicate, onExpo
               <span className="cmSep" aria-hidden="true" />
               <TemplateMenu label="New shape" title="New shape from a template" onPick={newShapeFromCanvas} />
               <span className="cmSpacer" />
-              {away > 0 && (
-                <button type="button" className="cmBtn cmBtn--small" aria-label="Reset test values" title="Put every slider back at rest" disabled={!!recording} onClick={resetValues}><RestoreIcon size={12} /> {away} off rest</button>
+              {awayAll > 0 && (
+                <button type="button" className="cmBtn cmBtn--small" aria-label="Reset test values" title="Put every slider back at rest, every axis on its default form and show everything" disabled={!!recording} onClick={resetEverything}><RestoreIcon size={12} /> {awayAll} off rest</button>
               )}
               <button type="button" className={`cmIconBtn${drawer ? ' cmIconBtn--on' : ''}`} aria-label="Inspector" title="Show or hide the inspector" aria-pressed={drawer} onClick={() => setDrawer(d => !d)}><SlidersIcon size={14} /></button>
             </div>
+            {poseMode && !recording && <PoseBar status={poseStatus} reach={reachOn} onReach={() => setReachOn(r => !r)} onReset={() => { setScrubbing(null); setValues({}) }} onSave={savePose} canReset={away > 0} />}
             {empty && <p className="cmHint">No shape yet. Use New shape to start from a template, or the + beside a layer in the tree.</p>}
             <DesignerCanvas
               content={canvasContent} solved={solved} sel={sel} mode={mode} selPoint={selPoint} mirror={mirror} snap={snap} grid={grid} zoom={zoom} fitAll={fitAll} axis={content.axis}
-              editable={editable || (!!recording && !!selShape)} pivot={pivot} anchor={anchorSpot} pick={pick} onPick={onPick}
+              editable={editable || (!!recording && !!selShape)} pivot={pivot} anchor={anchorSpot} pick={pick} onPick={onPick} pose={poseCanvas}
               linked={selShape ? selShape.pts.flatMap((pt, i) => (pt.bind ? [i] : [])) : []} onNudgeLink={nudgeLink} onPivot={movePivot} onPivotNudge={nudgePivot}
               onSelect={choose} onSelectPoint={setSelPoint}
               onGesture={() => { if (!recording) setHistory(h => remember(h, content)) }}
@@ -574,6 +765,8 @@ export function ModelPane({ entry, models, makeId, onRemove, onDuplicate, onExpo
               onAxis={(dir, big) => commit(setAxis(content, content.axis + dir * (big ? 5 : 1)), true)}
               rigTab={<RigTab content={content} group={group} picking={pickOn} actions={rigActions} pairs={pairs} />}
               rangesTab={<RangesTab content={content} sel={sel} group={group} values={values} recording={recording} scrubbing={scrubbing} filter={rangeFilter} onFilter={setRangeFilter} actions={rigActions} />}
+              formsTab={<FormsTab content={content} sel={sel} state={test.state} actions={forms} />}
+              presetsTab={<PresetsTab content={content} state={test.state} actions={presets} />}
             />
           )}
         </div>

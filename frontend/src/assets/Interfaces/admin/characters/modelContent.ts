@@ -14,6 +14,7 @@ export type MakeId = (prefix: string) => string
 export const randomId: MakeId = prefix => `${prefix}_${Math.random().toString(36).slice(2, 10)}`
 
 export const RANGE_NAME_MAX = 40
+export const KIND_MAX = 24
 export const AXIS_RANGE = { min: 40, max: 160 } as const
 
 export const blankContent = (name = ''): ModelContent => ({ name, description: '', shapes: [], objects: [], groups: [], axis: 100, ranges: [] })
@@ -30,10 +31,11 @@ export function normalizeContent(c: ModelContent): ModelContent {
     name: clean(c.name, NAME_MAX),
     description: clean(c.description, DESCRIPTION_MAX),
     shapes: c.shapes.map(s => ({ ...s, name: clean(s.name, NAME_MAX), mirrorOf: s.mirrorOf ?? null, back: s.back ?? null, zBack: s.zBack ?? null, loose: s.loose ?? null })),
-    objects: c.objects.map(o => ({ ...o, name: clean(o.name, NAME_MAX), mirrorOf: o.mirrorOf ?? null })),
+    objects: c.objects.map(o => ({ ...o, name: clean(o.name, NAME_MAX), mirrorOf: o.mirrorOf ?? null, axes: (o.axes ?? []).map(a => ({ ...a, name: clean(a.name, NAME_MAX), options: a.options.map(f => ({ ...f, name: clean(f.name, NAME_MAX) })) })) })),
     groups: c.groups.map(g => ({ ...g, name: clean(g.name, NAME_MAX), pivot: g.pivot ?? null, attach: g.attach ?? null, mirrorOf: g.mirrorOf ?? null })),
     axis: c.axis ?? 100,
     ranges: (c.ranges ?? []).map(r => ({ ...r, name: clean(r.name, RANGE_NAME_MAX) })),
+    presets: (c.presets ?? []).map(p => ({ ...p, name: clean(p.name, NAME_MAX), kind: clean(p.kind, KIND_MAX) || 'Pose' })),
   }
 }
 
@@ -135,8 +137,12 @@ function removeAll(c: ModelContent, gone: { shapes: Set<string>; objects: Set<st
   return {
     ...c,
     shapes: c.shapes.filter(s => !gone.shapes.has(s.id)).map(s => (s.pts.some(p => p.bind && gone.shapes.has(p.bind.s)) ? { ...s, pts: s.pts.map(p => (p.bind && gone.shapes.has(p.bind.s) ? { ...p, bind: null } : p)) } : s)),
-    objects: c.objects.filter(o => !gone.objects.has(o.id)).map(o => ({ ...o, shapes: o.shapes.filter(sid => !gone.shapes.has(sid)) })),
+    objects: c.objects.filter(o => !gone.objects.has(o.id)).map(o => ({
+      ...o, shapes: o.shapes.filter(sid => !gone.shapes.has(sid)),
+      axes: (o.axes ?? []).map(a => ({ ...a, options: a.options.map(f => (f.ovr.some(v => gone.shapes.has(v.shape)) ? { ...f, ovr: f.ovr.filter(v => !gone.shapes.has(v.shape)) } : f)) })),
+    })),
     groups: c.groups.filter(g => !gone.groups.has(g.id)).map(g => ({ ...g, parent: up(g.parent), objects: g.objects.filter(oid => !gone.objects.has(oid)) })),
+    presets: (c.presets ?? []).map(p => (p.hidden.some(h => gone.objects.has(h) || gone.groups.has(h)) ? { ...p, hidden: p.hidden.filter(h => !gone.objects.has(h) && !gone.groups.has(h)) } : p)),
   }
 }
 
@@ -312,6 +318,40 @@ function linkFaults(c: ModelContent): string[] {
   return faults
 }
 
+// Forms: a form may only change shapes of its own object, never a twin's, and an outline is empty (the shape is hidden in that form) or has at least three points.
+function formFaults(c: ModelContent): string[] {
+  const faults: string[] = []
+  const shapes = new Map(c.shapes.map(s => [s.id, s]))
+  for (const o of c.objects) {
+    const obj = label(o.name, o.id), own = new Set(o.shapes)
+    for (const axis of o.axes ?? []) {
+      if (!axis.options.some(f => f.id === axis.initial)) faults.push(`Axis ${label(axis.name, axis.id)} of object ${obj} has a default form that does not exist.`)
+      for (const form of axis.options) {
+        const name = label(form.name, form.id)
+        for (const ov of form.ovr) {
+          const shape = shapes.get(ov.shape)
+          if (!own.has(ov.shape) || !shape) faults.push(`Form ${name} of ${obj} changes a shape that is not in the object.`)
+          else if (shape.mirrorOf) faults.push(`Form ${name} of ${obj} changes a twin; change the original instead.`)
+          else if (ov.pts.length > 0 && ov.pts.length < 3) faults.push(`Form ${name} of ${obj} has an outline of fewer than 3 points for shape ${label(shape.name, shape.id)}.`)
+        }
+      }
+    }
+  }
+  return faults
+}
+
+// Presets: the sliders they set and the objects and groups they hide must be there.
+function presetFaults(c: ModelContent): string[] {
+  const faults: string[] = []
+  const rangeIds = new Set(c.ranges.map(r => r.id)), thingIds = new Set([...c.objects.map(o => o.id), ...c.groups.map(g => g.id)])
+  for (const p of c.presets ?? []) {
+    const name = label(p.name, p.id)
+    if (Object.keys(p.values).some(k => !rangeIds.has(k))) faults.push(`Preset ${name} sets a slider that does not exist.`)
+    if (p.hidden.some(h => !thingIds.has(h))) faults.push(`Preset ${name} hides something that does not exist.`)
+  }
+  return faults
+}
+
 export function publishFaults(c: ModelContent): string[] {
   const faults: string[] = []
   if (!c.name.trim()) faults.push('The model needs a name.')
@@ -339,6 +379,8 @@ export function publishFaults(c: ModelContent): string[] {
   faults.push(...rigFaults(c, circular, owner, holder))
   faults.push(...pairFaults(c))
   faults.push(...linkFaults(c))
+  faults.push(...formFaults(c))
+  faults.push(...presetFaults(c))
   const bytes = copyBytes(c)
   if (bytes > LIMITS.copyMaxBytes) faults.push(`A character's copy of this model would be ${Math.floor(bytes / 1024)} KB; the limit is ${LIMITS.copyMaxBytes / 1024} KB.`)
   return faults

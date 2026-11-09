@@ -601,7 +601,13 @@ export interface ModelPoint { x: number; y: number; m: ModelPointMode; hi?: [num
 // A filled outline in the model's space (0..200 across, 0..400 down). `half` > 0 marks a symmetric outline: its first `half` points run down one half and the rest mirror them.
 // mirrorOf: the shape this one is the mirror image of about the model's axis (a derived twin has no points of its own until the pair is broken). back: an outline of its own for the back view (absent: the front outline seen from behind); zBack: its depth in the back view; loose: the slider that loosens the links of its points.
 export interface ModelShape { id: string; name: string; closed: boolean; z: number; op: number; view: ModelView; pts: ModelPoint[]; half: number; template?: string | null; mirrorOf?: string | null; back?: ModelPoint[] | null; zBack?: number | null; loose?: string | null }
-export interface ModelObject { id: string; name: string; layer: ModelLayer; shapes: string[]; mirrorOf?: string | null }
+// What one form does to one shape of its object: the outline the shape has in that form (an empty list hides the shape in the form).
+export interface ModelOverride { shape: string; pts: ModelPoint[] }
+// One form of an axis (round eyes, almond eyes): the shapes it changes with their outlines. A form with no overrides is the base outline.
+export interface ModelForm { id: string; name: string; ovr: ModelOverride[] }
+// A way an object can vary (eye shape, expression, style): its forms, and the one it shows unless another is chosen (initial). An object shows one form of every axis.
+export interface ModelAxis { id: string; name: string; options: ModelForm[]; initial: string }
+export interface ModelObject { id: string; name: string; layer: ModelLayer; shapes: string[]; mirrorOf?: string | null; axes?: ModelAxis[] }
 // Where a group is fixed to a shape of its parent (or an ancestor): on one point (i), at a spot t (0..1) along edge i, anywhere along edge i that the slider moves, or at a relative place (rx, ry) inside the shape's box.
 export type ModelAnchorKind = 'point' | 'edge' | 'range' | 'inside'
 export interface ModelAttach { shape: string; kind: ModelAnchorKind; i: number; t: number; slider: string | null; rx: number; ry: number }
@@ -632,7 +638,9 @@ export interface ModelDrive {
 }
 // A slider of the model: from min to max, resting at rest (what is drawn), with what it drives. rand is the span random previews stay in; show says whether the writer's editor offers it.
 export interface ModelRange { id: string; name: string; scope: string | null; min: number; rest: number; max: number; unit: ModelRangeUnit; show: boolean; rand: [number, number] | null; drives: ModelDrive[] }
-export interface ModelContent { name: string; description: string; shapes: ModelShape[]; objects: ModelObject[]; groups: ModelGroup[]; axis: number; ranges: ModelRange[] }
+// A named set of slider values and of hidden objects (a pose, an expression, an age, a build, an outfit). kind is the slot it fills: applying one puts back whatever any other preset of its kind controls. values lists only the sliders it moves; hidden the objects and groups it hides.
+export interface ModelPreset { id: string; name: string; kind: string; values: Record<string, number>; hidden: string[] }
+export interface ModelContent { name: string; description: string; shapes: ModelShape[]; objects: ModelObject[]; groups: ModelGroup[]; axis: number; ranges: ModelRange[]; presets?: ModelPreset[] }
 export interface PublishedModel { version: number; publishedAt: string; content: ModelContent }
 export interface ModelEntry { id: string; draft: ModelContent; published: PublishedModel | null; history: PublishedModel[]; nextVersion: number }
 export interface ModelCatalog { schemaVersion: number; models: ModelEntry[] }

@@ -1,7 +1,7 @@
 import { useMemo, useState, type KeyboardEvent } from 'react'
 import type { ModelContent, ModelGroup, ModelLayer } from '../../../../api/types'
 import { gripProps, zoneRef } from '../../../../lib/pointerDrag'
-import { ChevronDownIcon, ChevronRightIcon, ChevronUpIcon, CopyIcon, FolderPlusIcon, GripIcon, LayersIcon, PlusIcon, SearchIcon, SwapIcon, TrashIcon, TreeIcon } from '../../../icons'
+import { ChevronDownIcon, ChevronRightIcon, ChevronUpIcon, CopyIcon, EyeIcon, EyeOffIcon, FolderPlusIcon, GripIcon, LayersIcon, PlusIcon, SearchIcon, SwapIcon, TrashIcon, TreeIcon } from '../../../icons'
 import { ReorderList } from './ReorderList'
 import { TemplateMenu } from './TemplateMenu'
 import { same, type Selection } from './designerState'
@@ -25,6 +25,8 @@ export interface TreeActions {
   onReorderObject: (groupId: string, objectId: string, beforeId: string | null) => void
   onReorderGroup: (groupId: string, beforeId: string | null) => void
   onReparent: (groupId: string, parentId: string | null) => void
+  // Switch an object or a group off or on for looking (the eye); the page keeps the list, and a preset can keep it.
+  onToggleHidden: (id: string) => void
 }
 export type TreeMode = 'layers' | 'rig'
 
@@ -34,8 +36,19 @@ function Twin({ of, name }: { of?: string | null; name: string }) {
   return of ? <span className="cmTwin" role="img" title={`${name} is a twin: it mirrors another and follows it`} aria-label={`${name} is a twin`}><SwapIcon size={11} /></span> : null
 }
 const DRAG = 'cm-group'
+const NO_HIDDEN: ReadonlySet<string> = new Set()
 
-export function AssetTree({ content, sel, actions, mode, onMode }: { content: ModelContent; sel: Selection; actions: TreeActions; mode: TreeMode; onMode: (m: TreeMode) => void }) {
+// The eye on an object or group row: pressed while the thing is shown. A hidden thing stays in the model and keeps doing its part in the rig.
+function Eye({ id, name, hidden, onToggle }: { id: string; name: string; hidden: ReadonlySet<string>; onToggle: (id: string) => void }) {
+  const off = hidden.has(id)
+  return (
+    <button type="button" className="cmIconBtn cmIconBtn--small" aria-label={`Show ${name}`} aria-pressed={!off} title={off ? `${name} is hidden: show it` : `${name} is shown: hide it, to look at the rest`} onClick={() => onToggle(id)}>
+      {off ? <EyeOffIcon size={12} /> : <EyeIcon size={12} />}
+    </button>
+  )
+}
+
+export function AssetTree({ content, sel, actions, mode, onMode, hidden = NO_HIDDEN }: { content: ModelContent; sel: Selection; actions: TreeActions; mode: TreeMode; onMode: (m: TreeMode) => void; hidden?: ReadonlySet<string> }) {
   const [query, setQuery] = useState('')
   const q = query.trim().toLowerCase()
   return (
@@ -51,14 +64,14 @@ export function AssetTree({ content, sel, actions, mode, onMode }: { content: Mo
         <button type="button" className={`cmIconBtn${mode === 'layers' ? ' cmIconBtn--on' : ''}`} aria-label="Layers" title="Layers: Body, Clothing and Hair" aria-pressed={mode === 'layers'} onClick={() => onMode('layers')}><LayersIcon size={14} /></button>
         <button type="button" className={`cmIconBtn${mode === 'rig' ? ' cmIconBtn--on' : ''}`} aria-label="Rig" title="Rig: groups under the group they hang from" aria-pressed={mode === 'rig'} onClick={() => onMode('rig')}><TreeIcon size={14} /></button>
       </div>
-      {mode === 'layers' ? <LayersTree content={content} sel={sel} actions={actions} q={q} /> : <RigTree content={content} sel={sel} actions={actions} q={q} />}
+      {mode === 'layers' ? <LayersTree content={content} sel={sel} actions={actions} q={q} hidden={hidden} /> : <RigTree content={content} sel={sel} actions={actions} q={q} hidden={hidden} />}
     </nav>
   )
 }
 
 // ---- layers ----
 
-function LayersTree({ content, sel, actions, q }: { content: ModelContent; sel: Selection; actions: TreeActions; q: string }) {
+function LayersTree({ content, sel, actions, q, hidden }: { content: ModelContent; sel: Selection; actions: TreeActions; q: string; hidden: ReadonlySet<string> }) {
   const [closed, setClosed] = useState<Record<string, boolean>>({})
   const tree = useMemo(() => treeOf(content), [content])
   const match = (name: string) => !q || name.toLowerCase().includes(q)
@@ -95,7 +108,7 @@ function LayersTree({ content, sel, actions, q }: { content: ModelContent; sel: 
                   const objects = e.objects.filter(o => !q || groupMatches || match(o.object.name) || o.shapes.some(s => match(s.name)))
                   return (
                     <>
-                      <div className={`cmTreeRow${g && same(sel, { kind: 'group', id: g.id }) ? ' cmTreeRow--on' : ''}`}>
+                      <div className={`cmTreeRow${g && same(sel, { kind: 'group', id: g.id }) ? ' cmTreeRow--on' : ''}${g && hidden.has(g.id) ? ' cmTreeRow--off' : ''}`}>
                         {g ? grip : <span className="cmGrip cmGrip--off" aria-hidden="true" />}
                         {twisty(gkey, label(g?.name ?? '', 'No group'))}
                         {g ? (
@@ -106,6 +119,7 @@ function LayersTree({ content, sel, actions, q }: { content: ModelContent; sel: 
                         {g && <Twin of={g.mirrorOf} name={label(g.name, 'Untitled group')} />}
                         {g && <>
                           <span className={`cmCount${g.objects.length > LIMITS.objectsPerGroupWarn ? ' cmCount--warn' : ''}`} title="Objects in the group">{g.objects.length}</span>
+                          <Eye id={g.id} name={label(g.name, 'Untitled group')} hidden={hidden} onToggle={actions.onToggleHidden} />
                           <button type="button" className="cmIconBtn cmIconBtn--small" aria-label={`Delete group ${label(g.name, 'Untitled group')}`} title="Delete the group with its objects and shapes" onClick={() => actions.onDelete({ kind: 'group', id: g.id })}><TrashIcon size={12} /></button>
                         </>}
                       </div>
@@ -119,20 +133,21 @@ function LayersTree({ content, sel, actions, q }: { content: ModelContent; sel: 
                             const shown = o.shapes.filter(s => !q || groupMatches || match(o.object.name) || match(s.name))
                             return (
                             <>
-                              <div className={`cmTreeRow${same(sel, { kind: 'object', id: o.object.id }) ? ' cmTreeRow--on' : ''}`}>
+                              <div className={`cmTreeRow${same(sel, { kind: 'object', id: o.object.id }) ? ' cmTreeRow--on' : ''}${hidden.has(o.object.id) || (g && hidden.has(g.id)) ? ' cmTreeRow--off' : ''}`}>
                                 {g ? ogrip : <span className="cmGrip cmGrip--off" aria-hidden="true" />}
                                 <button type="button" className="cmTreeName cmTreeName--btn" aria-current={same(sel, { kind: 'object', id: o.object.id })} onClick={() => actions.onSelect({ kind: 'object', id: o.object.id })}>
                                   {label(o.object.name, 'Untitled object')}
                                 </button>
                                 <Twin of={o.object.mirrorOf} name={label(o.object.name, 'Untitled object')} />
                                 <span className={`cmCount${o.object.shapes.length > LIMITS.shapesPerObjectWarn ? ' cmCount--warn' : ''}`} title="Shapes in the object">{o.object.shapes.length}</span>
+                                <Eye id={o.object.id} name={label(o.object.name, 'Untitled object')} hidden={hidden} onToggle={actions.onToggleHidden} />
                                 <TemplateMenu label={`Add a shape to ${label(o.object.name, 'the object')}`} onPick={t => actions.onAddShape(o.object.id, t)} />
                                 <button type="button" className="cmIconBtn cmIconBtn--small" aria-label={`Delete object ${label(o.object.name, 'Untitled object')}`} title="Delete the object with its shapes" onClick={() => actions.onDelete({ kind: 'object', id: o.object.id })}><TrashIcon size={12} /></button>
                               </div>
                               <ReorderList
                                 className="cmTreeList cmTreeList--in"
                                 items={shown}
-                                itemClass={s => `cmTreeRow cmTreeRow--shape${same(sel, { kind: 'shape', id: s.id }) ? ' cmTreeRow--on' : ''}`}
+                                itemClass={s => `cmTreeRow cmTreeRow--shape${same(sel, { kind: 'shape', id: s.id }) ? ' cmTreeRow--on' : ''}${hidden.has(o.object.id) || (g && hidden.has(g.id)) ? ' cmTreeRow--off' : ''}`}
                                 label={s => label(s.name, 'the shape')}
                                 onMove={(id, before) => actions.onReorderShape(o.object.id, id, before)}
                                 render={(s, sgrip) => (
@@ -168,7 +183,7 @@ function LayersTree({ content, sel, actions, q }: { content: ModelContent; sel: 
 
 // ---- rig ----
 
-function RigTree({ content, sel, actions, q }: { content: ModelContent; sel: Selection; actions: TreeActions; q: string }) {
+function RigTree({ content, sel, actions, q, hidden }: { content: ModelContent; sel: Selection; actions: TreeActions; q: string; hidden: ReadonlySet<string> }) {
   const [dragId, setDragId] = useState<string | null>(null)
   const [over, setOver] = useState<string | null>(null)
   const [closed, setClosed] = useState<Record<string, boolean>>({})
@@ -190,6 +205,16 @@ function RigTree({ content, sel, actions, q }: { content: ModelContent; sel: Sel
     }
   }
 
+  // a group is dimmed when it, or a group above it, is switched off
+  const dimmed = (g: ModelGroup): boolean => {
+    const seen = new Set<string>()
+    for (let cur: ModelGroup | undefined = g; cur && !seen.has(cur.id); cur = cur.parent ? content.groups.find(x => x.id === cur!.parent) : undefined) {
+      if (hidden.has(cur.id)) return true
+      seen.add(cur.id)
+    }
+    return false
+  }
+
   function branch(parent: string | null, depth: number) {
     const list = kids(parent).filter(hasMatch)
     if (!list.length) return null
@@ -201,7 +226,7 @@ function RigTree({ content, sel, actions, q }: { content: ModelContent; sel: Sel
           const level = chainDepth(content, g.id)
           return (
             <li key={g.id}>
-              <div ref={row} className={`cmTreeRow${same(sel, { kind: 'group', id: g.id }) ? ' cmTreeRow--on' : ''}${over === g.id && dragId !== g.id ? ' cmTreeRow--drop' : ''}${dragId === g.id ? ' cmTreeRow--lifted' : ''}`} data-rig-row="">
+              <div ref={row} className={`cmTreeRow${same(sel, { kind: 'group', id: g.id }) ? ' cmTreeRow--on' : ''}${over === g.id && dragId !== g.id ? ' cmTreeRow--drop' : ''}${dragId === g.id ? ' cmTreeRow--lifted' : ''}${dimmed(g) ? ' cmTreeRow--off' : ''}`} data-rig-row="">
                 <span
                   className="cmGrip" role="button" tabIndex={0} aria-label={`Move ${name} to another parent (Alt+Right or Left)`}
                   {...gripProps(DRAG, g.id, grip => grip.closest<HTMLElement>('[data-rig-row]'), { start: setDragId, end: () => { setDragId(null); setOver(null) } })}
@@ -215,6 +240,7 @@ function RigTree({ content, sel, actions, q }: { content: ModelContent; sel: Sel
                 <button type="button" className="cmTreeName cmTreeName--btn" aria-current={same(sel, { kind: 'group', id: g.id })} onClick={() => actions.onSelect({ kind: 'group', id: g.id })}>{name}</button>
                 <Twin of={g.mirrorOf} name={name} />
                 <span className={`cmCount${level >= LIMITS.chainMax ? ' cmCount--warn' : ''}`} title={`Level ${level} of ${LIMITS.chainMax} in the pivot chain`}>{level}</span>
+                <Eye id={g.id} name={name} hidden={hidden} onToggle={actions.onToggleHidden} />
               </div>
               {open && branch(g.id, depth + 1)}
             </li>
