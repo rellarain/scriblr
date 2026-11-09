@@ -116,6 +116,9 @@ export function ModelPane({ entry, models, makeId, onRemove, onDuplicate, onExpo
   const [grid, setGrid] = useState(true)
   const [zoom, setZoom] = useState(1)
   const [fitAll, setFitAll] = useState(false)
+  // Fit asks the canvas for a new fit (and a view in the middle of it); `viewMoved` is whether the view has been panned or zoomed since.
+  const [viewNonce, setViewNonce] = useState(0)
+  const [viewMoved, setViewMoved] = useState(false)
   const [drawer, setDrawer] = useState(true)
   const [history, setHistory] = useState<History<ModelContent>>(emptyHistory)
   const [versions, setVersions] = useState(false)
@@ -1061,7 +1064,14 @@ export function ModelPane({ entry, models, makeId, onRemove, onDuplicate, onExpo
               <span className="cmSep" aria-hidden="true" />
               <button type="button" className="cmIconBtn" aria-label="Zoom in" title="Zoom in" onClick={() => setZoom(z => Math.min(8, z * 1.25))}><ZoomInIcon size={14} /></button>
               <button type="button" className="cmIconBtn" aria-label="Zoom out" title="Zoom out" onClick={() => setZoom(z => Math.max(0.25, z / 1.25))}><ZoomOutIcon size={14} /></button>
-              <button type="button" className={`cmIconBtn${fitAll ? ' cmIconBtn--on' : ''}`} aria-label="Fit the whole figure" title="Fit the whole figure" aria-pressed={fitAll} onClick={() => { setFitAll(f => !f); setZoom(1) }}><FitIcon size={14} /></button>
+              <button
+                type="button" className={`cmIconBtn${fitAll ? ' cmIconBtn--on' : ''}`} aria-label="Fit to screen" title="Fit everything that is drawn to the screen, with little blank space (press again to fit the selection instead)" aria-pressed={fitAll}
+                onClick={() => {
+                  // Pressed with everything fitted and the view left alone: back to fitting the selection. Otherwise fit everything, and start from the middle of it.
+                  const same = fitAll && !viewMoved && Math.abs(zoom - 1) < 1e-6
+                  setFitAll(!same); setZoom(1); setViewMoved(false); setViewNonce(n => n + 1)
+                }}
+              ><FitIcon size={14} /></button>
               <span className="cmSep" aria-hidden="true" />
               <button type="button" className="cmIconBtn" aria-label="Roll the look" title="Roll a new look for the test character: colours, a form on every axis and the member of each family; what is locked in the tree stays" disabled={!!recording} onClick={() => test.roll(content)}><DiceIcon size={14} /></button>
               <TemplateMenu label="New shape" title="New shape from a template" onPick={newShapeFromCanvas} />
@@ -1085,7 +1095,7 @@ export function ModelPane({ entry, models, makeId, onRemove, onDuplicate, onExpo
             {poseMode && !recording && <PoseBar status={poseStatus} reach={reachOn} onReach={() => setReachOn(r => !r)} onReset={() => { setScrubbing(null); setValues({}) }} onSave={savePose} canReset={away > 0} />}
             {empty && <p className="cmHint">No shape yet. Use New shape to start from a template, or the + beside a layer in the tree.</p>}
             <DesignerCanvas
-              content={canvasContent} solved={solved} sel={sel} mode={mode} selPoint={selPoint} mirror={mirror} snap={snap} grid={grid} zoom={zoom} fitAll={fitAll} axis={content.axis}
+              content={canvasContent} solved={solved} sel={sel} mode={mode} selPoint={selPoint} mirror={mirror} snap={snap} grid={grid} zoom={zoom} fitAll={fitAll} viewKey={view} viewNonce={viewNonce} onViewMoved={() => setViewMoved(true)} axis={content.axis}
               editable={editable || (!!recording && !!selShape)} pivot={pivot} anchor={anchorSpot} pick={pick} onPick={onPick} onPickGroup={id => { if (bonePick && applyEdit(setBoneEnd(content, bonePick, { kind: 'group', id, i: 0 }))) setBonePick(null) }} pose={poseCanvas} grips={gripMarks} ghost={ghost} colouring={colouring}
               frames={frameCanvas} through={throughFrame} weights={weights}
               linked={selShape ? selShape.pts.flatMap((pt, i) => (pt.bind ? [i] : [])) : []} onNudgeLink={nudgeLink} onPivot={movePivot} onPivotNudge={nudgePivot}

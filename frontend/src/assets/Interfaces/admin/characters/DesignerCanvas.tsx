@@ -1,4 +1,4 @@
-import { useMemo, useRef, useState, type CSSProperties, type KeyboardEvent, type MouseEvent as ReactMouseEvent, type PointerEvent as ReactPointerEvent, type ReactElement } from 'react'
+import { useEffect, useLayoutEffect, useMemo, useRef, useState, type CSSProperties, type KeyboardEvent, type MouseEvent as ReactMouseEvent, type PointerEvent as ReactPointerEvent, type ReactElement } from 'react'
 import type { ModelContent, ModelShape } from '../../../../api/types'
 import { NO_COLOURING, type Colouring } from './engine/colour'
 import { addPoint, deletePoint, moveHandle, movePoint, moveShape, nudgePoint } from './engine/edit'
@@ -19,6 +19,11 @@ import { activeShape, shapesOf, type EditMode, type Selection } from './designer
 export const FIGURE: Box = { x: 0, y: 0, w: 200, h: 400 }
 const ASPECT = 8 / 7
 const FALLBACK = { w: 704, h: 616 }   // the canvas's pixel size when the browser cannot say (tests)
+// Holding a drag at an edge or a corner of the canvas pans the view that way: the pointer must be within EDGE pixels of the edge (or past it) for EDGE_HOLD milliseconds, then
+// the view moves at up to EDGE_SPEED pixels a second, faster the nearer the edge. Anywhere else a drag leaves the view still.
+const EDGE = 28
+const EDGE_HOLD = 280
+const EDGE_SPEED = 420
 
 export interface PivotMarker {
   groupId: string
@@ -77,8 +82,14 @@ export interface CanvasProps {
   zoom: number
   // The line the model mirrors about.
   axis: number
-  // Fit the whole figure (true) or the selection (false).
+  // Fit everything that is drawn, with little blank space (true), or the selection (false).
   fitAll: boolean
+  // The view is fitted when the selection (or the view being looked at, front or back) changes, or when this changes (the page bumps it when Fit is pressed): never because a
+  // drag changed the shape, so the grid stays still while something is dragged.
+  viewKey?: string
+  viewNonce?: number
+  // The view was moved by the canvas itself (panned with the right button, or by holding a drag at an edge).
+  onViewMoved?: () => void
   // False while the selected shape's points are changed by a slider, or the shape is a derived twin: it is shown, not edited.
   editable?: boolean
   pivot?: PivotMarker | null
@@ -140,8 +151,16 @@ export function DesignerCanvas(p: CanvasProps) {
   const focusIds = new Set(focus.map(s => s.id))
   const none = sel.kind === 'none'
   const through = p.through ?? null
-  const box = through ? through.box : fitAll || none || p.pose ? FIGURE : boxOfSolved(solved, focus) ?? FIGURE
-  let w = Math.max(box.w * (through ? 1.12 : 1.7), 24), h = Math.max(box.h * (through ? 1.12 : 1.7), 21)
+  const throughOn = !!through
+  // The box the view is fitted to is found when the selection changes (or Fit is pressed) and then held: the view follows the selection, never what a drag does to it. Fit
+  // takes the box round everything that is drawn; a selection (or nothing, or Pose mode) gets room around it for its handles.
+  const fitKey = `${fitAll ? 'all' : `${sel.kind}:${sel.id}`}|${p.pose ? 1 : 0}|${p.viewKey ?? ''}|${p.viewNonce ?? 0}`
+  const live: Box | null = fitAll ? boxOfSolved(solved, content.shapes) : none || p.pose ? FIGURE : boxOfSolved(solved, focus)
+  const fitted = useRef<{ key: string; box: Box; found: boolean } | null>(null)
+  if (!through && (!fitted.current || fitted.current.key !== fitKey || (!fitted.current.found && live))) fitted.current = { key: fitKey, box: live ?? FIGURE, found: live !== null }
+  const box: Box = through ? through.box : fitted.current?.box ?? FIGURE
+  const tight = fitAll && !through
+  let w = Math.max(box.w * (through ? 1.12 : tight ? 1.04 : 1.7) + (tight ? 6 : 0), 24), h = Math.max(box.h * (through ? 1.12 : tight ? 1.04 : 1.7) + (tight ? 6 : 0), 21)
   if (w / h < ASPECT) w = h * ASPECT
   else h = w / ASPECT
   w /= zoom; h /= zoom
@@ -169,8 +188,70 @@ export function DesignerCanvas(p: CanvasProps) {
     const [x, y] = toWorld(e)
     return matrix ? apply(inverse(matrix), x, y) : [x, y]
   }
-  const capture = (e: ReactPointerEvent) => { try { svgRef.current?.setPointerCapture(e.pointerId) } catch { /* not every environment has it */ } }
   const options = { mirror, snap, axis }
+
+  // A new fit starts from the middle of the view (a pan belongs to the fit it was made in).
+  useLayoutEffect(() => { setPan(q => (q.x === 0 && q.y === 0 ? q : { x: 0, y: 0 })) }, [fitKey, throughOn])
+
+  // Holding a drag at an edge or a corner pans the view (see EDGE). The thing being dragged follows the view: after the view moves, the held pointer is handed to onMove again.
+  const lastPointer = useRef<{ clientX: number; clientY: number } | null>(null)
+  const edgeSince = useRef<number | null>(null)
+  const follow = useRef(false)
+  const frame = useRef(0)
+  const vbRef = useRef(vb)
+  vbRef.current = vb
+  const moved = useRef(p.onViewMoved)
+  moved.current = p.onViewMoved
+  const moveRef = useRef(onMove)
+  moveRef.current = onMove
+  function stopWatch() {
+    if (frame.current) cancelAnimationFrame(frame.current)
+    frame.current = 0
+    lastPointer.current = null
+    edgeSince.current = null
+  }
+  function watchEdges() {
+    if (frame.current) cancelAnimationFrame(frame.current)
+    let before = performance.now()
+    // How far into the edge zone a position is: 0 outside it, up to 1 (at the edge or past it), negative on the near side.
+    const depth = (pos: number, size: number): number => (pos < EDGE ? -Math.min(1, (EDGE - pos) / EDGE) : pos > size - EDGE ? Math.min(1, (pos - (size - EDGE)) / EDGE) : 0)
+    const tick = (now: number) => {
+      const d = dragRef.current, at = lastPointer.current
+      if (!d || d.kind === 'pan') { frame.current = 0; return }
+      const dt = Math.min(0.05, (now - before) / 1000)
+      before = now
+      if (at) {
+        const r = rect(), ax = depth(at.clientX - r.left, r.w), ay = depth(at.clientY - r.top, r.h)
+        if (ax === 0 && ay === 0) edgeSince.current = null
+        else {
+          if (edgeSince.current === null) edgeSince.current = now
+          if (now - edgeSince.current >= EDGE_HOLD) {
+            const v = vbRef.current
+            follow.current = true
+            setPan(q => ({ x: q.x + ax * EDGE_SPEED * dt * (v.w / r.w), y: q.y + ay * EDGE_SPEED * dt * (v.h / r.h) }))
+            moved.current?.()
+          }
+        }
+      }
+      frame.current = requestAnimationFrame(tick)
+    }
+    frame.current = requestAnimationFrame(tick)
+  }
+  useEffect(() => {
+    if (!follow.current) return
+    follow.current = false
+    const d = dragRef.current, at = lastPointer.current
+    if (d && d.kind !== 'pan' && at) moveRef.current(at)
+  }, [pan])
+  useEffect(() => () => { if (frame.current) cancelAnimationFrame(frame.current) }, [])
+
+  // Every drag starts by capturing the pointer (after `dragRef` is set); a drag that is not a pan then watches the edges.
+  const capture = (e: ReactPointerEvent) => {
+    try { svgRef.current?.setPointerCapture(e.pointerId) } catch { /* not every environment has it */ }
+    lastPointer.current = { clientX: e.clientX, clientY: e.clientY }
+    edgeSince.current = null
+    if (dragRef.current && dragRef.current.kind !== 'pan') watchEdges()
+  }
 
   function onDown(e: ReactPointerEvent<SVGSVGElement>) {
     if (e.button === 2) {
@@ -249,9 +330,10 @@ export function DesignerCanvas(p: CanvasProps) {
     e.stopPropagation()
     p.frames?.onNudge(f.id, d[e.key][0], d[e.key][1], e.shiftKey)
   }
-  function onMove(e: ReactPointerEvent<SVGSVGElement>) {
+  function onMove(e: { clientX: number; clientY: number }) {
     const d = dragRef.current
     if (!d) return
+    lastPointer.current = { clientX: e.clientX, clientY: e.clientY }
     if (d.kind === 'pose') { p.pose?.onMove(toWorld(e)); return }
     if (d.kind === 'frame') {
       const [wx, wy] = toWorld(e), dx = wx - d.start[0], dy = wy - d.start[1]
@@ -261,7 +343,7 @@ export function DesignerCanvas(p: CanvasProps) {
     if (d.kind === 'pan') {
       const r = rect(), dx = e.clientX - d.startX, dy = e.clientY - d.startY
       if (Math.abs(dx) + Math.abs(dy) > 3) d.moved = true
-      if (d.moved) setPan({ x: d.panX - (dx / r.w) * vb.w, y: d.panY - (dy / r.h) * vb.h })
+      if (d.moved) { setPan({ x: d.panX - (dx / r.w) * vb.w, y: d.panY - (dy / r.h) * vb.h }); p.onViewMoved?.() }
       return
     }
     if (d.kind === 'pivot') { const [wx, wy] = toWorld(e); p.onPivot?.(wx, wy); return }
@@ -278,6 +360,7 @@ export function DesignerCanvas(p: CanvasProps) {
   function onUp() {
     const d = dragRef.current
     dragRef.current = null
+    stopWatch()
     if (d && d.kind === 'pose') p.pose?.onUp()
     if (d && d.kind === 'pan' && !d.moved) p.onRightClick(d.target)
   }
