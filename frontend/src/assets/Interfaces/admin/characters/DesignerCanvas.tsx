@@ -3,7 +3,8 @@ import type { ModelContent, ModelShape } from '../../../../api/types'
 import { NO_COLOURING, type Colouring } from './engine/colour'
 import { addPoint, deletePoint, moveHandle, movePoint, moveShape, nudgePoint } from './engine/edit'
 import { FRAME_HANDLES, movedBox, resizedBox, type FrameHandle } from './engine/frames'
-import { apply, build, inverse, nearestEdge, type Box } from './engine/geometry'
+import { apply, boxOf, build, flatten, inverse, nearestEdge, type Box } from './engine/geometry'
+import { gridStep, isMajor, snapTo } from './engine/gridSnap'
 import { paintDefs, paintShapes } from './engine/paint'
 import type { Solved } from './engine/rig'
 import { PaintDefs, PaintedPath, useSvgPrefix } from './PaintedPath'
@@ -79,6 +80,8 @@ export interface CanvasProps {
   mirror: boolean
   snap: boolean
   grid: boolean
+  // Shapes (moved whole), pivots and frames land on the lines of the grid while they are dragged.
+  gridSnap?: boolean
   zoom: number
   // The line the model mirrors about.
   axis: number
@@ -130,7 +133,7 @@ export interface CanvasProps {
 type Drag =
   | { kind: 'point'; shapeId: string; index: number }
   | { kind: 'handle'; shapeId: string; index: number; which: 'hi' | 'ho' }
-  | { kind: 'move'; shapeId: string; last: [number, number] }
+  | { kind: 'move'; shapeId: string; last: [number, number]; start: [number, number]; from: ModelShape; box: Box | null }
   | { kind: 'pivot' }
   | { kind: 'pose' }
   | { kind: 'frame'; id: string; handle: FrameHandle | 'move'; start: [number, number]; box: Box }
@@ -181,6 +184,8 @@ export function DesignerCanvas(p: CanvasProps) {
   const vb = { x: box.x + box.w / 2 + pan.x - w / 2, y: box.y + box.h / 2 + pan.y - h / 2, w, h }
   vbRef.current = vb
   const u = vb.w / 640   // one screen pixel in model units, roughly
+  const unit = gridStep(vb.w)   // the distance between two lines of the grid
+  const onGrid = p.gridSnap === true
 
   const shape = activeShape(content, sel)
   const solvedShape = shape ? solved.shapes[shape.id] : undefined
@@ -289,7 +294,9 @@ export function DesignerCanvas(p: CanvasProps) {
     if (!already) p.onSelect({ kind: 'shape', id })
     if (mode === 'move' && already && editable) {
       p.onGesture()
-      dragRef.current = { kind: 'move', shapeId: id, last: toLocal(e) }
+      const from = shapesById.get(id)
+      const at = toLocal(e)
+      dragRef.current = { kind: 'move', shapeId: id, last: at, start: at, from: from ?? shape!, box: from && from.pts.length >= 3 ? boxOf(flatten(build(from.pts, from.closed), from.closed)) : null }
       capture(e)
     }
   }
@@ -349,7 +356,19 @@ export function DesignerCanvas(p: CanvasProps) {
     lastPointer.current = { clientX: e.clientX, clientY: e.clientY }
     if (d.kind === 'pose') { p.pose?.onMove(toWorld(e)); return }
     if (d.kind === 'frame') {
-      const [wx, wy] = toWorld(e), dx = wx - d.start[0], dy = wy - d.start[1]
+      const [wx, wy] = toWorld(e)
+      let dx = wx - d.start[0], dy = wy - d.start[1]
+      if (onGrid) {
+        // the side or corner being dragged lands on a line (a frame that is moved lands with its top left corner on one)
+        const b = d.box
+        if (d.handle === 'move') { dx = snapTo(b.x + dx, unit) - b.x; dy = snapTo(b.y + dy, unit) - b.y }
+        else {
+          if (d.handle.includes('w')) dx = snapTo(b.x + dx, unit) - b.x
+          else if (d.handle.includes('e')) dx = snapTo(b.x + b.w + dx, unit) - (b.x + b.w)
+          if (d.handle.includes('n')) dy = snapTo(b.y + dy, unit) - b.y
+          else if (d.handle.includes('s')) dy = snapTo(b.y + b.h + dy, unit) - (b.y + b.h)
+        }
+      }
       p.frames?.onBox(d.id, d.handle === 'move' ? movedBox(d.box, dx, dy) : resizedBox(d.box, d.handle, dx, dy))
       return
     }
@@ -359,13 +378,17 @@ export function DesignerCanvas(p: CanvasProps) {
       if (d.moved) { setPan({ x: d.panX - (dx / r.w) * vb.w, y: d.panY - (dy / r.h) * vb.h }); p.onViewMoved?.() }
       return
     }
-    if (d.kind === 'pivot') { const [wx, wy] = toWorld(e); p.onPivot?.(wx, wy); return }
+    if (d.kind === 'pivot') { const [wx, wy] = toWorld(e); p.onPivot?.(onGrid ? snapTo(wx, unit) : wx, onGrid ? snapTo(wy, unit) : wy); return }
     const s = shapesById.get(d.shapeId)
     if (!s) return
     const [x, y] = toLocal(e)
     if (d.kind === 'point') p.onShape(s.id, movePoint(s, d.index, x, y, options))
     else if (d.kind === 'handle') p.onShape(s.id, moveHandle(s, d.index, d.which, x, y, options))
-    else {
+    else if (onGrid && d.box) {
+      // the shape's top left corner lands on a line, whatever the pointer has done on the way
+      const dx = snapTo(d.box.x + (x - d.start[0]), unit) - d.box.x, dy = snapTo(d.box.y + (y - d.start[1]), unit) - d.box.y
+      p.onShape(s.id, moveShape(d.from, dx, dy))
+    } else {
       p.onShape(s.id, moveShape(s, x - d.last[0], y - d.last[1]))
       d.last = [x, y]
     }
@@ -424,12 +447,11 @@ export function DesignerCanvas(p: CanvasProps) {
     p.onPivotNudge?.(d[e.key][0], d[e.key][1])
   }
 
-  // The grid is a line every 10 units when zoomed out, 5 closer, 1 closer still.
-  const step = vb.w > 120 ? 10 : vb.w > 40 ? 5 : 1
+  // The grid is a faint line every 2 units (1, then 0.5 as the view closes in; wider apart when it is zoomed far out) and a stronger one every 10 (see engine/gridSnap.ts).
   const gridLines: ReactElement[] = []
   if (grid) {
-    for (let k = Math.ceil(vb.x / step); k * step < vb.x + vb.w; k++) gridLines.push(<line key={`v${k}`} x1={k * step} y1={vb.y} x2={k * step} y2={vb.y + vb.h} className={k % 5 === 0 ? 'cmGridLine cmGridLine--major' : 'cmGridLine'} />)
-    for (let k = Math.ceil(vb.y / step); k * step < vb.y + vb.h; k++) gridLines.push(<line key={`h${k}`} x1={vb.x} y1={k * step} x2={vb.x + vb.w} y2={k * step} className={k % 5 === 0 ? 'cmGridLine cmGridLine--major' : 'cmGridLine'} />)
+    for (let k = Math.ceil(vb.x / unit); k * unit < vb.x + vb.w; k++) gridLines.push(<line key={`v${k}`} x1={k * unit} y1={vb.y} x2={k * unit} y2={vb.y + vb.h} className={isMajor(k * unit, unit) ? 'cmGridLine cmGridLine--major' : 'cmGridLine'} />)
+    for (let k = Math.ceil(vb.y / unit); k * unit < vb.y + vb.h; k++) gridLines.push(<line key={`h${k}`} x1={vb.x} y1={k * unit} x2={vb.x + vb.w} y2={k * unit} className={isMajor(k * unit, unit) ? 'cmGridLine cmGridLine--major' : 'cmGridLine'} />)
   }
 
   const built = overlay && matrix ? build(shape!.pts, shape!.closed, matrix) : []

@@ -38,7 +38,9 @@ export function valueForAmount(r: ModelRange, d: ModelDrive, target: number, bas
 // ---- which slider a drag on a part moves ----
 
 export interface Driver { range: ModelRange; drive: ModelDrive }
-export type PoseTarget = { ok: true; group: ModelGroup; range: ModelRange; drive: ModelDrive } | { ok: false; reason: string }
+// `side` on a refusal is the twin group that has no slider of its own yet but whose original has one that moves only its own side: the caller can make that
+// slider (`poseSides`) and ask again.
+export type PoseTarget = { ok: true; group: ModelGroup; range: ModelRange; drive: ModelDrive } | { ok: false; reason: string; side?: string }
 
 // The turn drives of a group, in the order of the model's sliders.
 export function turnDrivers(c: ModelContent, groupId: string): Driver[] {
@@ -47,8 +49,17 @@ export function turnDrivers(c: ModelContent, groupId: string): Driver[] {
   return out
 }
 
-// The group that turns when a part of `groupId` is dragged: the group itself or the nearest one above it that has a Turn slider. A twin follows its original, so
-// it can be posed only when it has a Turn slider of its own (the two sides are posed apart, phase 5c); a twin without one stops the search.
+// What turns a twin group that has no Turn slider of its own: the slider of its original, when the twin follows it (the two sides are posed together). The twin
+// turns the other way round for the same amount, as a mirror image does.
+function followedTurn(c: ModelContent, g: ModelGroup): Driver | undefined {
+  return g.mirrorOf ? turnDrivers(c, g.mirrorOf).find(d => d.drive.mirror !== false) : undefined
+}
+
+// Whether a drag on the group's pivot can turn it: it has a Turn slider, or it is a twin whose original has one (the twin's own slider is made when it is grabbed).
+export const canTurn = (c: ModelContent, g: ModelGroup): boolean => turnDrivers(c, g.id).length > 0 || (!!g.mirrorOf && turnDrivers(c, g.mirrorOf).length > 0)
+
+// The group that turns when a part of `groupId` is dragged: the group itself or the nearest one above it that can be turned. A twin is turned by its own Turn
+// slider (the two sides posed apart), by its original's when the pair is posed together, and otherwise it wants a slider of its own (`side`).
 export function poseTarget(c: ModelContent, groupId: string | null | undefined): PoseTarget {
   const byId = new Map(c.groups.map(g => [g.id, g]))
   const seen = new Set<string>()
@@ -56,9 +67,9 @@ export function poseTarget(c: ModelContent, groupId: string | null | undefined):
   if (!g) return { ok: false, reason: 'This shape is in no group, so nothing turns it.' }
   while (g && !seen.has(g.id)) {
     seen.add(g.id)
-    const first = turnDrivers(c, g.id)[0]
-    if (g.mirrorOf && !first) return { ok: false, reason: 'This is a twin: it follows its original. Pose the original, pose the other side apart (Ranges tab), or break the pair.' }
-    if (first) return { ok: true, group: g, range: first.range, drive: first.drive }
+    const own = turnDrivers(c, g.id)[0] ?? followedTurn(c, g)
+    if (own) return { ok: true, group: g, range: own.range, drive: own.drive }
+    if (g.mirrorOf && turnDrivers(c, g.mirrorOf).length > 0) return { ok: false, side: g.id, reason: 'This side has no slider of its own yet: use "Pose the other side apart" in the Ranges tab.' }
     g = g.parent ? byId.get(g.parent) : undefined
   }
   return { ok: false, reason: 'Nothing turns this part: give its group, or a group above it, a Turn slider in the Ranges tab.' }
@@ -109,10 +120,17 @@ export function moveTurn(c: ModelContent, drag: TurnDrag, pointer: Point): { dra
 
 export interface ScaleDrag { groupId: string; rangeId: string; driveIndex: number; pivot: Point; toParent: Mat; axis: ModelDrive['axis']; startDist: number; startPercent: number; start: Values }
 
+// The Scale slider of a group: its own, or (for a twin) its original's when the twin follows it. A twin scales by the same amount, not the opposite.
 export const scaleDriver = (c: ModelContent, groupId: string): Driver | null => {
   for (const range of c.ranges) for (const drive of range.drives) if (drive.kind === 'scale' && drive.target === 'group' && drive.id === groupId) return { range, drive }
+  const original = c.groups.find(g => g.id === groupId)?.mirrorOf
+  if (original) for (const range of c.ranges) for (const drive of range.drives) if (drive.kind === 'scale' && drive.target === 'group' && drive.id === original && drive.mirror !== false) return { range, drive }
   return null
 }
+
+// Whether a drag on the group's square can scale it: it has a Scale slider or (a twin) its original has one.
+export const canScale = (c: ModelContent, g: ModelGroup): boolean =>
+  scaleDriver(c, g.id) !== null || (!!g.mirrorOf && c.ranges.some(r => r.drives.some(d => d.kind === 'scale' && d.target === 'group' && d.id === g.mirrorOf)))
 
 // The distance of a point from the pivot, in the parent's directions (a scale acts along its parent's axes): across, up and down, or both.
 function reachFrom(drag: Pick<ScaleDrag, 'pivot' | 'toParent' | 'axis'>, p: Point): number {
@@ -167,8 +185,8 @@ export function grabPoint(solved: Solved, groupId: string, pointer: Point): Reac
 }
 
 // The groups that can bend to bring the grabbed point to the target: from the grabbed group up through its parents, each with a Turn slider, at most six.
-// A twin joint counts only with a Turn slider of its own (the two sides posed apart); one that follows its original is passed over, and when none of the
-// twin joints is free the chain is empty (the original is the one to pose).
+// A twin joint counts with a Turn slider of its own (the two sides posed apart) or with its original's when the pair is posed together; one whose original moves
+// only its own side has to be given a slider first (`poseSides`), and when none of the twin joints is free the chain is empty (the original is the one to pose).
 export function reachJoints(c: ModelContent, groupId: string, most = REACH_JOINTS): Array<Driver & { group: ModelGroup }> {
   const byId = new Map(c.groups.map(g => [g.id, g]))
   const out: Array<Driver & { group: ModelGroup }> = []
@@ -177,7 +195,7 @@ export function reachJoints(c: ModelContent, groupId: string, most = REACH_JOINT
   for (let g = byId.get(groupId); g && !seen.has(g.id) && out.length < most; g = g.parent ? byId.get(g.parent) : undefined) {
     seen.add(g.id)
     if (g.mirrorOf) twinned = true
-    const first = turnDrivers(c, g.id)[0]
+    const first = turnDrivers(c, g.id)[0] ?? followedTurn(c, g)
     if (first) out.push({ ...first, group: g })
   }
   return twinned && !out.some(j => j.group.mirrorOf) ? [] : out

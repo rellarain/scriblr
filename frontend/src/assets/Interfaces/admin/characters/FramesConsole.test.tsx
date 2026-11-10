@@ -5,6 +5,7 @@ import type { ModelContent, ModelEntry, ModelFrame } from '../../../../api/types
 import { content as blank, draftEntry, modelsBackend } from '../../../../test/characterModelsBackend'
 import CharacterModelsConsole from './CharacterModelsConsole'
 import { newShape } from './engine/edit'
+import { gridStep } from './engine/gridSnap'
 import { addGroup, addObject, addShape, newGroup } from './modelContent'
 
 const box = (x: number, y: number, w: number, h: number) => ({ x, y, w, h })
@@ -86,6 +87,33 @@ describe('the Frames tab', () => {
     await user.click(screen.getByRole('button', { name: 'Undo' }))
     await save(user)
     expect(frames(backend)[0]).toMatchObject({ x: 60, y: 30 })
+  })
+
+  it('lands a frame that is moved, and the side that is resized, on the grid lines when Snap to grid is on', async () => {
+    const { backend, user } = await open()
+    await selectBust(user)
+    fireEvent.click(screen.getByRole('button', { name: 'Snap to grid' }))
+    const step = gridStep(viewBox()[2])
+    const onLine = (v: number) => Math.abs(v / step - Math.round(v / step)) < 1e-6
+    const from = pixelOf(100, 30)
+    pointer(hit(), 'pointerdown', from)
+    pointer(canvas(), 'pointermove', { x: from.x + 37.3, y: from.y + 21.7 })
+    pointer(canvas(), 'pointerup')
+    await save(user)
+    let f = frames(backend)[0]
+    expect(onLine(f.x) && onLine(f.y)).toBe(true)
+    expect(f.x).not.toBe(60)
+    expect([f.w, f.h]).toEqual([90, 120])
+    // the right side of the frame, dragged by its handle
+    const east = screen.getByRole('button', { name: 'Resize Bust from its e' })
+    const at = pixelOf(f.x + f.w, f.y + f.h / 2)
+    pointer(east, 'pointerdown', at)
+    pointer(canvas(), 'pointermove', { x: at.x + 29.1, y: at.y })
+    pointer(canvas(), 'pointerup')
+    await save(user)
+    f = frames(backend)[0]
+    expect(onLine(f.x + f.w)).toBe(true)
+    expect(f.w).not.toBe(90)
   })
 
   it('does not move a frame that is not selected: a click on its outline selects it', async () => {

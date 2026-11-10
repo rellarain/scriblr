@@ -945,6 +945,14 @@ export function GridLinesIcon(props: IconProps) {
   </IconBase>
 }
 
+// The grid with a dot on one of its crossings: something that snaps to the grid.
+export function GridSnapIcon(props: IconProps) {
+  return <IconBase {...props}>
+    <path d="M4 9h16M4 15h16M9 4v16M15 4v16" />
+    <circle cx="15" cy="15" r="2.6" />
+  </IconBase>
+}
+
 // An arrow pointer: pick things and move them.
 export function CursorIcon(props: IconProps) {
   return <IconBase {...props}>

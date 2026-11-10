@@ -137,7 +137,8 @@ span.cmTreeTwisty { cursor: default; }
   &:focus-visible { outline: 2px solid var(--accent-hover); outline-offset: 1px; }
 }
 .cmCanvasBg { fill: var(--surface-deep); }
-.cmGridLine { stroke: var(--hairline); stroke-width: 0.35; vector-effect: non-scaling-stroke; &--major { stroke: var(--ink-faint); stroke-opacity: 0.6; } }
+// The grid is fine (a line every 2 units), so its lines are faint and every tenth is a little stronger.
+.cmGridLine { stroke: var(--hairline); stroke-width: 0.35; stroke-opacity: 0.4; vector-effect: non-scaling-stroke; &--major { stroke: var(--ink-faint); stroke-opacity: 0.6; } }
 .cmMirrorLine { stroke: var(--ink-faint); stroke-width: 1; stroke-dasharray: 4 4; vector-effect: non-scaling-stroke; opacity: 0.5; &--on { stroke: var(--accent); opacity: 1; } }
 // a shape is filled with the colour of the test character (its own data, set inline as --shape-fill); the selection is a ring round it, not a recolouring
 .cmShape { fill: var(--shape-fill, var(--ink-muted)); stroke: var(--ink); stroke-width: 1; stroke-opacity: 0.55; vector-effect: non-scaling-stroke; cursor: pointer; &--on { stroke-opacity: 0.9; } &--dim { opacity: 0.35; } &--sel { stroke-opacity: 0; } }

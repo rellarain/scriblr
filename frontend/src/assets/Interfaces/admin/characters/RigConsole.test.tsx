@@ -6,6 +6,7 @@ import { holdTile } from '../../../../test/tileDrag'
 import { content, draftEntry, modelsBackend } from '../../../../test/characterModelsBackend'
 import CharacterModelsConsole from './CharacterModelsConsole'
 import { newShape } from './engine/edit'
+import { gridStep } from './engine/gridSnap'
 import { addRange, addTurn, attachGroup, newRange, reparent, type Edit } from './engine/rigEdit'
 import { addGroup, addObject, addShape, newGroup } from './modelContent'
 import * as presetFile from '../plot/presetFile'
@@ -199,6 +200,30 @@ describe('the pivot on the canvas', () => {
     await save(user)
     await waitFor(() => expect(savedGroup(backend, 'gB').pivot![0]).toBeCloseTo(x0 + 10, 0))
     expect(savedGroup(backend, 'gB').pivot![1]).toBeCloseTo(y0 - 12, 0)
+  })
+
+  it('lands a pivot that is dragged on the grid lines when Snap to grid is on', async () => {
+    const { user, backend } = await open()
+    await user.click(groupRow('Body'))
+    const pivot = () => screen.getByRole('button', { name: /^Pivot of Body/ })
+    pivot().focus()
+    fireEvent.keyDown(pivot(), { key: 'ArrowRight' })
+    await save(user)
+    await waitFor(() => expect(savedGroup(backend, 'gB').pivot).not.toBeNull())
+    const circle = pivot().querySelector('.cmPivotRing') as SVGCircleElement
+    const x0 = Number(circle.getAttribute('cx')), y0 = Number(circle.getAttribute('cy'))
+    fireEvent.click(screen.getByRole('button', { name: 'Snap to grid' }))
+    const [, , vw] = canvas().getAttribute('viewBox')!.split(' ').map(Number)
+    const step = gridStep(vw)
+    const start = pixelOf(x0, y0), to = pixelOf(x0 + 10.37, y0 - 12.71)
+    pointer(pivot(), 'pointerdown', start)
+    pointer(canvas(), 'pointermove', to)
+    pointer(canvas(), 'pointerup', to)
+    await save(user)
+    await waitFor(() => expect(savedGroup(backend, 'gB').pivot![0]).not.toBeCloseTo(x0, 0))
+    const [px, py] = savedGroup(backend, 'gB').pivot!
+    expect(Math.abs(px / step - Math.round(px / step))).toBeLessThan(1e-6)
+    expect(Math.abs(py / step - Math.round(py / step))).toBeLessThan(1e-6)
   })
 
   it('steps the anchor of an anchored group with the arrow keys: along the edge, to the next point, across the shape', async () => {

@@ -189,8 +189,11 @@ const withDrive = (r: ModelRange, d: ModelDrive): ModelRange => ({ ...r, drives:
 const percentOf = (kind: ModelDrive['kind']): boolean => kind === 'scale' || kind === 'length'
 // A fall drive is a percent of the way to hanging: 0 to 100 (none at rest)
 const fallOf = (kind: ModelDrive['kind']): boolean => kind === 'fall'
+// A Turn drive is a pose, and a pose belongs to one side: its twin group is not turned with it (`mirror: false`; the other side gets a slider of its own in the
+// Ranges tab or the moment its part is grabbed in Pose mode). Everything else (scale, length, points, bend, fall) is a measure of the body or of the drawing, and a
+// twin follows it as before.
 const blankDrive = (kind: ModelDrive['kind']): ModelDrive => ({
-  kind, group: null, target: null, id: null, axis: 'xy', shape: null, moves: [], sym: false, pivot: null, y0: 0, y1: 0, atMin: percentOf(kind) ? 100 : 0, atMax: percentOf(kind) ? 100 : fallOf(kind) ? 100 : 0, mirror: true,
+  kind, group: null, target: null, id: null, axis: 'xy', shape: null, moves: [], sym: false, pivot: null, y0: 0, y1: 0, atMin: percentOf(kind) ? 100 : 0, atMax: percentOf(kind) ? 100 : fallOf(kind) ? 100 : 0, mirror: kind !== 'turn',
 })
 
 function addDrive(c: ModelContent, rangeId: string, d: ModelDrive): Edit {

@@ -43,6 +43,8 @@ export interface RigActions {
   // Two sides apart (phase 5c): give the twin groups of a slider's turns and scales a slider of their own, or take it away again.
   apartSlider: (rangeId: string) => void
   joinSides: (rangeId: string) => void
+  // Every slider that turns a group with a twin moves only its own side from now on (a model made before a pose belonged to one side).
+  oneSideEach: () => void
 }
 
 // Phase 5c: hands. Fingers, a thumb or a whole hand hung from the bottom of a group, the other hand posed on its own, the starter hand poses, and the grip points

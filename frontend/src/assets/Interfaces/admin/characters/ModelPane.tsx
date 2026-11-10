@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useRef, useState, type KeyboardEvent } from 'react'
 import type { ModelContent, ModelEntry, ModelLayer, ModelShape } from '../../../../api/types'
 import {
-  BackIcon, CheckIcon, CopyIcon, CursorIcon, DiceIcon, ExportIcon, EyeOffIcon, FitIcon, StampIcon, FrontIcon, GridLinesIcon, HandIcon, HistoryIcon, PathIcon, RedoIcon, RestoreIcon, RulerIcon, SlidersIcon, SwapIcon, TrashIcon, UndoIcon, WeightIcon, ZoomInIcon, ZoomOutIcon,
+  BackIcon, CheckIcon, CopyIcon, CursorIcon, DiceIcon, ExportIcon, EyeOffIcon, FitIcon, StampIcon, FrontIcon, GridLinesIcon, GridSnapIcon, HandIcon, HistoryIcon, PathIcon, RedoIcon, RestoreIcon, RulerIcon, SlidersIcon, SwapIcon, TrashIcon, UndoIcon, WeightIcon, ZoomInIcon, ZoomOutIcon,
 } from '../../../icons'
 import { AssetTree, type TreeActions, type TreeMode } from './AssetTree'
 import type { ClassActions } from './ClassPanel'
@@ -40,12 +40,12 @@ import { apply, inverse, type Box } from './engine/geometry'
 import { addFinger, addGrip, addHand, addHandPoses, addThumb, apartHand, gripAt, gripGrab, gripsOf, mirrorGrip, moveGrip, removeGrip, renameGrip, setPresetGrip, stepGripAngle } from './engine/hands'
 import { LIMITS } from './engine/limits'
 import { emptyHistory, redo as redoHistory, remember, undo as undoHistory, type History } from './engine/history'
-import { beginScale, beginTurn, grabPoint, moveScale, moveTurn, poseTarget, reach, reachJoints, scaleDriver, slideValue, toModel, turnDrivers, type ReachGrab, type ScaleDrag, type TurnDrag } from './engine/pose'
+import { beginScale, beginTurn, canScale, canTurn, grabPoint, moveScale, moveTurn, poseTarget, reach, reachJoints, scaleDriver, slideValue, toModel, type ReachGrab, type ScaleDrag, type TurnDrag } from './engine/pose'
 import { deletePreset, renamePreset, savePreset, saveStyle, updatePreset } from './engine/presets'
 import { chainOf, isPointDriven, restPivot, solve, type Solved, type Values } from './engine/rig'
 import * as paintOps from './engine/paintEdit'
 import { addShading } from './engine/shadeEdit'
-import { apartSlider, joinSides } from './engine/sidesEdit'
+import { apartSlider, joinSides, oneSideEach, poseSides } from './engine/sidesEdit'
 import {
   addBend, addLength, addRange, addScale, addTurn, attachFromClick, attachGroup, clearLimit, clearPointMoves, detachGroup, groupOfShape, newRange, recordPoints, removeDrive, removeRange, renameRange, reparent,
   setAxis, setDriveAxis, setDriveBone, setPivot, setShow, stepBendEdge, stepBound, stepDrive, stepLimit, type Edit,
@@ -113,6 +113,8 @@ export function ModelPane({ entry, models, makeId, onRemove, onDuplicate, onExpo
   const [selPoint, setSelPoint] = useState(0)
   const [mirror, setMirror] = useState(true)
   const [snap, setSnap] = useState(true)
+  // Shapes (moved whole), pivots and frames land on the lines of the grid while they are dragged.
+  const [gridSnap, setGridSnap] = useState(false)
   const [grid, setGrid] = useState(true)
   const [zoom, setZoom] = useState(1)
   const [fitAll, setFitAll] = useState(false)
@@ -443,6 +445,7 @@ export function ModelPane({ entry, models, makeId, onRemove, onDuplicate, onExpo
       const e = joinSides(content, rangeId)
       if (applyEdit(e)) setValues(vs => { const kept = new Set(e.ok ? e.content.ranges.map(r => r.id) : []); return Object.fromEntries(Object.entries(vs).filter(([k]) => kept.has(k))) })
     },
+    oneSideEach: () => { applyEdit(oneSideEach(content)) },
   }
 
   // ---- hands (phase 5c) ----
@@ -583,11 +586,16 @@ export function ModelPane({ entry, models, makeId, onRemove, onDuplicate, onExpo
     const sv = solved, p = toModel(sv, world[0], world[1]), start = valuesRef.current
     const gid = grab.kind === 'part' ? groupOfShape(content, grab.shapeId) : grab.kind === 'grip' ? undefined : grab.groupId
     const name = content.groups.find(g => g.id === gid)?.name.trim() || 'the group'
+    // A twin whose original moves only its own side is given the slider it lacks the moment it is grabbed, so either side can be posed: the new sliders are one
+    // undo step of their own, and the status says so.
+    const sided = (made: string[]) => (made.length > 0 ? ` A slider for this side was added (${made.length}).` : '')
     if (grab.kind === 'scale') {
-      const scale = gid ? beginScale(content, sv, start, gid, p) : null
+      const sides = gid && !scaleDriver(content, gid) ? poseSides(content, [gid], 'scale', makeId) : { content, made: [] as string[] }
+      const scale = gid ? beginScale(sides.content, sv, start, gid, p) : null
       if (!scale || !gid) return false
+      if (sides.made.length > 0) commit(sides.content, true)
       poseRef.current = { kind: 'scale', solved: sv, start, group: gid, scale }
-      setPoseActive(gid); setPoseStatus(`Scaling ${name}.`)
+      setPoseActive(gid); setPoseStatus(`Scaling ${name}.${sided(sides.made)}`)
       return true
     }
     if (grab.kind === 'grip') {
@@ -606,17 +614,25 @@ export function ModelPane({ entry, models, makeId, onRemove, onDuplicate, onExpo
       return true
     }
     if (alt || reachOn) {
-      if (!gid || reachJoints(content, gid).length === 0) { const t = poseTarget(content, gid); setPoseStatus(t.ok ? 'Nothing here bends.' : t.reason); return false }
+      // every joint of the limb on this side gets the slider it lacks, so the whole limb bends
+      const sides = gid ? poseSides(content, chainOf(content, gid), 'turn', makeId) : { content, made: [] as string[] }
+      if (!gid || reachJoints(sides.content, gid).length === 0) { const t = poseTarget(content, gid); setPoseStatus(t.ok ? 'Nothing here bends.' : t.reason); return false }
+      if (sides.made.length > 0) commit(sides.content, true)
       poseRef.current = { kind: 'reach', solved: sv, start, group: gid, grab: grabPoint(sv, gid, p), current: start }
-      setPoseActive(gid); setPoseStatus(`Reaching with ${name}.`)
+      setPoseActive(gid); setPoseStatus(`Reaching with ${name}.${sided(sides.made)}`)
       return true
     }
-    const target = poseTarget(content, gid)
+    let target = poseTarget(content, gid), made: string[] = [], c2 = content
+    if (!target.ok && target.side) {
+      const sides = poseSides(content, [target.side], 'turn', makeId)
+      if (sides.made.length > 0) { c2 = sides.content; made = sides.made; target = poseTarget(c2, gid) }
+    }
     if (!target.ok) { setPoseStatus(target.reason); return false }
-    const turn = beginTurn(content, sv, start, target, p)
+    const turn = beginTurn(c2, sv, start, target, p)
     if (!turn) return false
+    if (made.length > 0) commit(c2, true)
     poseRef.current = { kind: 'turn', solved: sv, start, group: target.group.id, turn }
-    setPoseActive(target.group.id); setPoseStatus(`Turning ${target.group.name.trim() || 'the group'}.`)
+    setPoseActive(target.group.id); setPoseStatus(`Turning ${target.group.name.trim() || 'the group'}.${sided(made)}`)
     return true
   }
   function poseMove(world: [number, number]) {
@@ -656,7 +672,7 @@ export function ModelPane({ entry, models, makeId, onRemove, onDuplicate, onExpo
     const n = presetsOf(content).filter(x => x.kind.trim().toLowerCase() === 'pose').length + 1
     if (applyEdit(savePreset(content, { ...test.state, hidden: [] }, `Pose ${n}`, 'Pose', makeId))) setPoseStatus(`Saved as the preset Pose ${n}. Rename it in the Presets tab.`)
   }
-  // what the pose mode shows on the canvas (a twin group shows its ring and square only when it has a slider of its own): a ring at the pivot of every group a drag can turn, a square on every group that has a Scale slider, a circle on
+  // what the pose mode shows on the canvas: a ring at the pivot of every group a drag can turn (a twin too: the slider of its side is made when it is grabbed), a square on every group that has a Scale slider, a circle on
   // every anchor that a slider slides
   // the grip points on the canvas: where each is now (carried by its hand) and the way it points; shown in Pose mode, in the Rig and Presets tabs, and while one is held
   const gripMarks: GripMark[] | undefined = (() => {
@@ -671,8 +687,8 @@ export function ModelPane({ entry, models, makeId, onRemove, onDuplicate, onExpo
   const poseCanvas: PoseCanvas | null = poseMode && !recording && !through ? (() => {
     const at = (x: number, y: number) => apply(solved.global, x, y)
     const named = (id: string) => content.groups.find(g => g.id === id)?.name.trim() || 'the group'
-    const joints = content.groups.filter(g => turnDrivers(content, g.id).length > 0 && solved.pivots[g.id]).map(g => { const [x, y] = at(...solved.pivots[g.id]); return { id: g.id, name: named(g.id), x, y, active: poseActive === g.id } })
-    const scales = content.groups.filter(g => scaleDriver(content, g.id)).flatMap(g => {
+    const joints = content.groups.filter(g => canTurn(content, g) && solved.pivots[g.id]).map(g => { const [x, y] = at(...solved.pivots[g.id]); return { id: g.id, name: named(g.id), x, y, active: poseActive === g.id } })
+    const scales = content.groups.filter(g => canScale(content, g)).flatMap(g => {
       const boxes = g.objects.flatMap(oid => objectById(content, oid)?.shapes ?? []).map(id => solved.shapes[id]).filter(r => r?.visible).map(r => r.box)
       if (!boxes.length) return []
       return [{ id: g.id, name: named(g.id), x: Math.max(...boxes.map(b => b.x + b.w)), y: Math.max(...boxes.map(b => b.y + b.h)) }]
@@ -1056,7 +1072,8 @@ export function ModelPane({ entry, models, makeId, onRemove, onDuplicate, onExpo
               <span className="cmSep" aria-hidden="true" />
               <button type="button" className={`cmIconBtn${mirror ? ' cmIconBtn--on' : ''}`} aria-label="Mirror editing" title="Mirror editing: a point and its twin move together" aria-pressed={mirror} onClick={() => setMirror(m => !m)}><SwapIcon size={14} /></button>
               <button type="button" className={`cmIconBtn${snap ? ' cmIconBtn--on' : ''}`} aria-label="Snap" title="Snap to half units and the mirror line" aria-pressed={snap} onClick={() => setSnap(s => !s)}><RulerIcon size={14} /></button>
-              <button type="button" className={`cmIconBtn${grid ? ' cmIconBtn--on' : ''}`} aria-label="Grid" title="Grid" aria-pressed={grid} onClick={() => setGrid(g => !g)}><GridLinesIcon size={14} /></button>
+              <button type="button" className={`cmIconBtn${grid ? ' cmIconBtn--on' : ''}`} aria-label="Grid" title="Grid: a faint line every 2 units, a stronger one every 10" aria-pressed={grid} onClick={() => setGrid(g => !g)}><GridLinesIcon size={14} /></button>
+              <button type="button" className={`cmIconBtn${gridSnap ? ' cmIconBtn--on' : ''}`} aria-label="Snap to grid" title="Snap to grid: a shape moved whole, a pivot and a frame land on the grid lines" aria-pressed={gridSnap} onClick={() => setGridSnap(s => !s)}><GridSnapIcon size={14} /></button>
               <button type="button" className={`cmIconBtn${ghost ? ' cmIconBtn--on' : ''}`} aria-label="Ghost of the pattern" title="Ghost of the pattern: a dashed line where the pattern's outline is, behind a member's own outline" aria-pressed={ghost} onClick={() => setGhost(g => !g)}><StampIcon size={14} /></button>
               <span className="cmSep" aria-hidden="true" />
               <button type="button" className={`cmIconBtn${view === 'front' ? ' cmIconBtn--on' : ''}`} aria-label="Front view" title="Front view" aria-pressed={view === 'front'} disabled={!!recording} onClick={() => { setView('front') }}><FrontIcon size={14} /></button>
@@ -1095,7 +1112,7 @@ export function ModelPane({ entry, models, makeId, onRemove, onDuplicate, onExpo
             {poseMode && !recording && <PoseBar status={poseStatus} reach={reachOn} onReach={() => setReachOn(r => !r)} onReset={() => { setScrubbing(null); setValues({}) }} onSave={savePose} canReset={away > 0} />}
             {empty && <p className="cmHint">No shape yet. Use New shape to start from a template, or the + beside a layer in the tree.</p>}
             <DesignerCanvas
-              content={canvasContent} solved={solved} sel={sel} mode={mode} selPoint={selPoint} mirror={mirror} snap={snap} grid={grid} zoom={zoom} fitAll={fitAll} viewKey={view} viewNonce={viewNonce} onViewMoved={() => setViewMoved(true)} axis={content.axis}
+              content={canvasContent} solved={solved} sel={sel} mode={mode} selPoint={selPoint} mirror={mirror} snap={snap} grid={grid} gridSnap={gridSnap} zoom={zoom} fitAll={fitAll} viewKey={view} viewNonce={viewNonce} onViewMoved={() => setViewMoved(true)} axis={content.axis}
               editable={editable || (!!recording && !!selShape)} pivot={pivot} anchor={anchorSpot} pick={pick} onPick={onPick} onPickGroup={id => { if (bonePick && applyEdit(setBoneEnd(content, bonePick, { kind: 'group', id, i: 0 }))) setBonePick(null) }} pose={poseCanvas} grips={gripMarks} ghost={ghost} colouring={colouring}
               frames={frameCanvas} through={throughFrame} weights={weights}
               linked={selShape ? selShape.pts.flatMap((pt, i) => (pt.bind ? [i] : [])) : []} onNudgeLink={nudgeLink} onPivot={movePivot} onPivotNudge={nudgePivot}

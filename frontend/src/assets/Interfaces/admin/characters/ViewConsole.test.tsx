@@ -5,6 +5,8 @@ import type { ModelContent } from '../../../../api/types'
 import { content as blank, draftEntry, modelsBackend } from '../../../../test/characterModelsBackend'
 import CharacterModelsConsole from './CharacterModelsConsole'
 import { newShape } from './engine/edit'
+import { boxOf, build, flatten } from './engine/geometry'
+import { gridStep } from './engine/gridSnap'
 import { addGroup, addObject, addShape, newGroup } from './modelContent'
 
 // The designer's view: it is fitted when the selection changes (or Fit is pressed) and then held, so the grid stays still while something is dragged; holding a drag at an
@@ -23,12 +25,15 @@ function figure(): ModelContent {
 }
 const EVERYTHING = box(70, 40, 78, 100)
 
-async function open() {
-  modelsBackend([draftEntry('a', figure())])
+async function openWith() {
+  const backend = modelsBackend([draftEntry('a', figure())])
   const user = userEvent.setup()
   render(<CharacterModelsConsole />)
   await screen.findByRole('heading', { name: 'Character models' })
-  return user
+  return { user, backend }
+}
+async function open() {
+  return (await openWith()).user
 }
 
 const canvas = () => screen.getByRole('application')
@@ -263,5 +268,84 @@ describe('Fit to screen', () => {
     expect(viewBox()).toEqual(panned)
     await user.click(screen.getByRole('button', { name: 'Fit to screen' }))
     expect(viewBox()[0] + viewBox()[2] / 2).toBeCloseTo(109, 0)   // the middle of everything that is drawn (70..148)
+  })
+})
+
+describe('Snap to grid', () => {
+  const toggle = () => screen.getByRole('button', { name: 'Snap to grid' })
+  const savedBox = (b: { entries: Array<{ draft: ModelContent }> }, id: string) => {
+    const shape = b.entries[0].draft.shapes.find(x => x.id === id)!
+    return boxOf(flatten(build(shape.pts, shape.closed), shape.closed))
+  }
+  const onLine = (v: number, step: number) => Math.abs(v / step - Math.round(v / step)) < 1e-6
+
+  it('is a toggle next to Grid, and is off until it is switched on', async () => {
+    await open()
+    expect(toggle()).toHaveAttribute('aria-pressed', 'false')
+    fireEvent.click(toggle())
+    expect(toggle()).toHaveAttribute('aria-pressed', 'true')
+    expect(screen.getByRole('button', { name: 'Grid' })).toHaveAttribute('aria-pressed', 'true')
+  })
+
+  it('draws a faint line every 2 units and a stronger one every 10 at the normal zoom', async () => {
+    const user = await open()
+    await user.click(screen.getByRole('button', { name: 'Fit to screen' }))
+    const step = gridStep(viewBox()[2])
+    expect(step).toBe(2)
+    const lines = [...canvas().querySelectorAll('line.cmGridLine')]
+    const verticals = lines.filter(l => l.getAttribute('x1') === l.getAttribute('x2'))
+    const xs = verticals.map(l => Number(l.getAttribute('x1'))).sort((a, b) => a - b)
+    expect(xs.every((x, i) => i === 0 || Math.abs(x - xs[i - 1] - 2) < 1e-9)).toBe(true)
+    for (const l of verticals) expect(l.classList.contains('cmGridLine--major')).toBe(Math.abs(Number(l.getAttribute('x1')) / 10 - Math.round(Number(l.getAttribute('x1')) / 10)) < 1e-9)
+    expect(verticals.some(l => l.classList.contains('cmGridLine--major'))).toBe(true)
+  })
+
+  it('puts a shape that is moved whole with its top left corner on a line, whatever the pointer did', async () => {
+    const { user, backend } = await openWith()
+    await pickTorso(user)
+    fireEvent.click(toggle())
+    const step = gridStep(viewBox()[2])
+    const from = pixelOf(100, 90)
+    pointer(pathOf('torso'), 'pointerdown', from)
+    for (const dx of [7, 23, 41]) pointer(canvas(), 'pointermove', { x: from.x + dx + 0.37, y: from.y + dx * 0.61 + 0.11 })
+    pointer(canvas(), 'pointerup')
+    await user.click(screen.getByRole('button', { name: 'Save' }))
+    const b = savedBox(backend, 'torso')
+    expect(b.x).not.toBeCloseTo(70, 0)
+    expect(onLine(Math.round(b.x * 100) / 100, step)).toBe(true)
+    expect(onLine(Math.round(b.y * 100) / 100, step)).toBe(true)
+    // the size is what it was
+    expect(b.w).toBeCloseTo(60, 0)
+    expect(b.h).toBeCloseTo(100, 0)
+  })
+
+  it('leaves a shape alone to land anywhere while it is off', async () => {
+    const { user, backend } = await openWith()
+    await pickTorso(user)
+    const step = gridStep(viewBox()[2])
+    const from = pixelOf(100, 90)
+    pointer(pathOf('torso'), 'pointerdown', from)
+    pointer(canvas(), 'pointermove', { x: from.x + 23.4, y: from.y + 11.9 })
+    pointer(canvas(), 'pointerup')
+    await user.click(screen.getByRole('button', { name: 'Save' }))
+    const b = savedBox(backend, 'torso')
+    expect(onLine(Math.round(b.x * 100) / 100, step) && onLine(Math.round(b.y * 100) / 100, step)).toBe(false)
+  })
+
+  it('does not pull a dragged point to the grid (that is the Snap button: half units and the mirror line)', async () => {
+    const { user, backend } = await openWith()
+    pointer(pathOf('torso'), 'pointerdown', pixelOf(100, 90))
+    pointer(canvas(), 'pointerup')
+    fireEvent.click(toggle())
+    fireEvent.click(screen.getByRole('button', { name: 'Snap' }))   // off: so the point is free
+    const dot = canvas().querySelector('.cmPoint')!
+    const from = pixelOf(70, 40)
+    pointer(dot, 'pointerdown', from)
+    pointer(canvas(), 'pointermove', { x: from.x - 11.3, y: from.y - 7.7 })
+    pointer(canvas(), 'pointerup')
+    await user.click(screen.getByRole('button', { name: 'Save' }))
+    const b = savedBox(backend, 'torso')
+    const step = gridStep(viewBox()[2])
+    expect(onLine(Math.round(b.x * 100) / 100, step) && onLine(Math.round(b.y * 100) / 100, step)).toBe(false)
   })
 })

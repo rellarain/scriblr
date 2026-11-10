@@ -105,11 +105,19 @@ describe('which group a drag turns', () => {
     expect(poseTarget(body(), 'gone')).toMatchObject({ ok: false })
   })
 
-  it('does not pose a twin, or anything under one', () => {
+  it('asks a twin of a slider that moves only its own side for a slider of its own, and does not reach through it', () => {
     const c = must(makeTwin(body(), 'group', 'gArm', n => `${n}_tw`))
     const twin = c.groups.find(g => g.mirrorOf === 'gArm')!
-    expect(poseTarget(c, twin.id)).toMatchObject({ ok: false, reason: expect.stringMatching(/twin/) })
+    expect(poseTarget(c, twin.id)).toMatchObject({ ok: false, side: twin.id, reason: expect.stringMatching(/slider of its own/) })
     expect(reachJoints(c, twin.id)).toEqual([])
+  })
+
+  it('turns a twin that follows its original with the slider of the original, the other way round', () => {
+    const one = must(makeTwin(body(), 'group', 'gArm', n => `${n}_tw`))
+    const c = { ...one, ranges: one.ranges.map(r => ({ ...r, drives: r.drives.map(d => ({ ...d, mirror: true })) })) }
+    const twin = c.groups.find(g => g.mirrorOf === 'gArm')!
+    expect(poseTarget(c, twin.id)).toMatchObject({ ok: true, group: { id: twin.id }, range: { id: 'raise' } })
+    expect(reachJoints(c, twin.id).map(j => j.group.id)).toEqual([twin.id, 'torso'])      // the torso\'s own Lean slider is a joint of the limb too
   })
 
   it('adds up several sliders that turn one group', () => {

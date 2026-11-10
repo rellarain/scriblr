@@ -475,9 +475,11 @@ described, now stale, in `docs/data-model.md`).
   preset `grip` (the grip point a hand pose holds with). A **twin group may have turn and scale
   drives of its own** (the mirror image of what the same drive would do to the original), and a
   drive with `mirror: false` is not followed by the twin: that is how the two arms and the two
-  hands are posed apart while the drawing stays mirrored (*Pose the other side apart* makes the
-  slider of the other side and sets the original's drives to `mirror: false`; a crease that
-  fades with the slider fades on the twin with the other side's). The limits are raised for
+  hands are posed apart while the drawing stays mirrored. A new Turn drive is `mirror: false`
+  (a pose belongs to one side; Scale and Length drives still mirror, they are body measures);
+  *Pose the other side apart* makes the slider of the other side, Pose mode makes it the moment
+  that side is grabbed, and *One side each* switches the Turn drives of an older draft (a crease
+  that fades with the slider fades on the twin with the other side's). The limits are raised for
   hands: a pivot chain warns above 6 and stops above 9, a model holds up to 120 groups and 120
   sliders (warn 60), 16 grip points (warn 8), and Reach bends through up to six joints.
   Invalid entries of a list are dropped one by one; a passed limit is refused.

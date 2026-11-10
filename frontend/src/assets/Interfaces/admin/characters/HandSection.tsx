@@ -18,7 +18,7 @@ export function HandSection({ content, group, held, actions }: { content: ModelC
   const twin = !!group.mirrorOf
   const inHand = new Set([group.id, ...descendantsOf(content, group.id)])
   const sliders = handSliders(content, group.id)
-  const canApart = !twin && !!twinGroupOf(content, group.id) && sliders.some(r => !isApart(r))
+  const canApart = !twin && !!twinGroupOf(content, group.id) && sliders.some(r => !isApart(content, r))
   const canPose = !twin && Object.keys(slidersByRole(content, false, group.id)).some(r => r.startsWith('curl-'))
   const grips = gripsOf(content).filter(g => g.group && inHand.has(g.group))
   const gripFull = gripsOf(content).length >= LIMITS.gripsMax

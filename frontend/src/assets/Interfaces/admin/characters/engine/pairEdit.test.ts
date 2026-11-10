@@ -35,7 +35,8 @@ function body(): ModelContent {
   for (const [id, group, lo, hi, atMin, atMax] of [['lean', 'torso', -10, 10, -8, 8], ['raise', 'gArm', 0, 90, 0, -80], ['elbow', 'gFore', 0, 130, 0, -100]] as const) {
     c = must(addRange(c, { ...newRange(id, id, 'turn', group), min: lo, max: hi, rest: 0 }))
     c = must(addTurn(c, id, group))
-    c = { ...c, ranges: c.ranges.map(r => (r.id === id ? { ...r, drives: r.drives.map(d => ({ ...d, atMin, atMax })) } : r)) }
+    // these tests are about a twin that follows its original, so the drives mirror (a new Turn drive moves only its own side)
+    c = { ...c, ranges: c.ranges.map(r => (r.id === id ? { ...r, drives: r.drives.map(d => ({ ...d, atMin, atMax, mirror: true })) } : r)) }
   }
   return c
 }

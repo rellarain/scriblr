@@ -6,7 +6,7 @@ import { hangs } from './engine/fall'
 import { LIMITS } from './engine/limits'
 import { valueOf, type Values } from './engine/rig'
 import { stepOf } from './engine/rigEdit'
-import { isApart, originalSideOf, otherSideOf, whyNotApart } from './engine/sidesEdit'
+import { oneSided, originalSideOf, otherSideOf, turnsTogether, whyNotApart } from './engine/sidesEdit'
 import { LimitSteppers } from './LimitSteppers'
 import { Stepper } from './Stepper'
 import type { Selection } from './designerState'
@@ -40,6 +40,7 @@ export function RangesTab({ content, sel, group, values, recording, scrubbing, f
   const selObject = sel.kind === 'object' ? content.objects.find(o => o.id === sel.id) : sel.kind === 'shape' ? content.objects.find(o => o.shapes.includes(sel.id)) : undefined
   const list = filter === 'all' || sel.kind === 'none' ? content.ranges : rangesForSelection(content, sel)
   const away = offRest(content, values)
+  const together = turnsTogether(content)
   const can = (kind: NewSliderKind): string | null =>
     kind === 'turn' ? (group ? null : 'Select a group first')
       : kind === 'scale' ? null
@@ -69,6 +70,9 @@ export function RangesTab({ content, sel, group, values, recording, scrubbing, f
           {menu === 'new' && menuFor('new', k => actions.newSlider(k))}
         </span>
         <button type="button" className="cmBtn cmBtn--small" disabled={away === 0 || !!recording} onClick={actions.resetValues} title="Put every slider back at rest"><RestoreIcon size={12} /> Reset test values{away ? ` (${away})` : ''}</button>
+        {together > 0 && (
+          <button type="button" className="cmBtn cmBtn--small" disabled={!!recording} aria-label={`Make the ${together} turning slider${together === 1 ? '' : 's'} that move both sides move only their own side`} title="A pose belongs to one side. Make every slider that turns a group with a twin move only its own side (the other side keeps still until it has a slider of its own: Pose mode makes it when you grab that side)" onClick={actions.oneSideEach}><LinkIcon size={12} /> One side each ({together})</button>
+        )}
       </div>
       <div className="cmChips" role="group" aria-label="Which sliders to list">
         <button type="button" className={`cmChip cmChip--wide${filter === 'selection' ? ' cmChip--on' : ''}`} aria-pressed={filter === 'selection'} onClick={() => onFilter('selection')}>This selection</button>
@@ -141,9 +145,10 @@ export function RangesTab({ content, sel, group, values, recording, scrubbing, f
     )
   }
 
-  // Posing the two sides apart (phase 5c): a slider that turns or scales groups that have twins can give the twins a slider of their own.
+  // Posing the two sides apart (phases 5c and 6): a slider that turns groups that have twins moves only its own side; the twins get a slider of their own when
+  // their part is grabbed in Pose mode, or here. A slider that scales groups that have twins moves both sides until it is posed apart.
   function sidesRow(r: ModelRange, locked: boolean) {
-    const other = isApart(r) ? otherSideOf(content, r) : undefined, original = other ? undefined : originalSideOf(content, r)
+    const other = otherSideOf(content, r), original = other ? undefined : originalSideOf(content, r)
     const title = r.name.trim() || 'the slider'
     if (other || original) {
       const mate = other ?? original!
@@ -151,6 +156,15 @@ export function RangesTab({ content, sel, group, values, recording, scrubbing, f
         <div className="cmInline cmSides">
           <p className="cmInsText">Posed apart from <b>{mate.name.trim() || 'its other side'}</b>: each side has its own slider.</p>
           <button type="button" className="cmBtn cmBtn--small" disabled={locked} aria-label={`Pose both sides of ${title} together`} title="Take the other side's slider away: one slider poses both sides again" onClick={() => actions.joinSides(r.id)}><LinkIcon size={12} /> Pose both sides together</button>
+        </div>
+      )
+    }
+    if (oneSided(content, r)) {
+      return (
+        <div className="cmInline cmSides">
+          <p className="cmInsText">Moves only its own side: the twin keeps still.</p>
+          <button type="button" className="cmBtn cmBtn--small" disabled={locked || !!whyNotApart(content, r)} aria-label={`Pose the other side of ${title} apart`} title="Make the slider that poses the twin groups it turns, so the other side can be posed on its own (Pose mode does this when you grab that side)" onClick={() => actions.apartSlider(r.id)}><LinkIcon size={12} /> Pose the other side apart</button>
+          <button type="button" className="cmBtn cmBtn--small" disabled={locked} aria-label={`Pose both sides of ${title} together`} title="The twin groups turn the other way round with it, as a mirror image does" onClick={() => actions.joinSides(r.id)}><LinkIcon size={12} /> Pose both sides together</button>
         </div>
       )
     }

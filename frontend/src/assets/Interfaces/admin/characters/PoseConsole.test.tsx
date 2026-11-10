@@ -5,6 +5,7 @@ import type { ModelContent, ModelEntry } from '../../../../api/types'
 import { content, draftEntry, modelsBackend } from '../../../../test/characterModelsBackend'
 import CharacterModelsConsole from './CharacterModelsConsole'
 import { newShape } from './engine/edit'
+import { makeTwin } from './engine/pairEdit'
 import { addRange, addScale, addTurn, attachGroup, newRange, reparent, type Edit } from './engine/rigEdit'
 import { addGroup, addObject, addShape, newGroup } from './modelContent'
 
@@ -184,5 +185,105 @@ describe('Pose mode', () => {
     await save(user)
     await waitFor(() => expect(backend.entries[0].draft.presets).toHaveLength(1))
     expect(backend.entries[0].draft.presets![0]).toMatchObject({ name: 'Pose 1', kind: 'Pose', values: { nod: 25 }, hidden: [] })
+  })
+})
+
+// ---- the two sides of a pair ----
+
+const sharpShape = (id: string, pts: Array<[number, number]>): ModelContent['shapes'][number] => ({ id, name: `${id} shape`, closed: true, z: 40, op: 1, view: 'both', half: 0, template: null, pts: pts.map(([x, y]) => ({ x, y, m: 's' as const })) })
+// A torso and an arm (with its twin on the other side) and a slider that raises the arm; `together` has the slider turn both arms (a model made before a pose belonged to one side).
+function armed(together: boolean): ModelContent {
+  let c: ModelContent = {
+    ...content('Armed'),
+    shapes: [sharpShape('chest', [[70, 86], [130, 86], [130, 160], [70, 160]]), sharpShape('arm', [[124, 90], [138, 90], [138, 140], [124, 140]])],
+    objects: [{ id: 'oChest', name: 'Chest part', layer: 'body', shapes: ['chest'] }, { id: 'oArm', name: 'Arm part', layer: 'body', shapes: ['arm'] }],
+    groups: [newGroup('torso', 'Torso', null, ['oChest']), newGroup('gArm', 'Arm', 'torso', ['oArm'])],
+  }
+  c = must(attachGroup(c, 'gArm', { shape: 'chest', kind: 'inside', i: 0, t: 0, slider: null, rx: 1, ry: 0.1 }))
+  c = must(addRange(c, { ...newRange('raise', 'Arm raise', 'turn', 'gArm'), min: 0, max: 90, rest: 0 }))
+  c = must(addTurn(c, 'raise', 'gArm'))
+  c = { ...c, ranges: c.ranges.map(r => ({ ...r, drives: r.drives.map(d => ({ ...d, atMin: 0, atMax: -80, mirror: together })) })) }
+  let n = 0
+  return must(makeTwin(c, 'group', 'gArm', p => `${p}_t${++n}`))
+}
+const twinPath = () => canvas().querySelector('path[data-shape^="s_t"]') as SVGPathElement
+const armPath = () => canvas().querySelector('path[data-shape="arm"]') as SVGPathElement
+// a point on the arm (the original is on the right of the figure) and on its twin on the left
+const onArm = () => pixelOf(131, 120)
+const onTwin = () => pixelOf(69, 120)
+
+describe('Pose mode with a pair', () => {
+  it('turns only the arm that is grabbed: a Turn slider moves its own side', async () => {
+    const { user } = await open(armed(false))
+    await user.click(screen.getByRole('button', { name: 'Pose mode' }))
+    const twinBefore = twinPath().getAttribute('d'), armBefore = armPath().getAttribute('d')
+    pointer(armPath(), 'pointerdown', onArm())
+    pointer(canvas(), 'pointermove', pixelOf(150, 100))
+    expect(armPath().getAttribute('d')).not.toBe(armBefore)
+    expect(twinPath().getAttribute('d')).toBe(twinBefore)
+    expect(status()).toHaveTextContent(/Turning Arm/)
+  })
+
+  it('gives the other arm a slider of its own the moment it is grabbed, and turns it', async () => {
+    const { user, backend } = await open(armed(false))
+    await user.click(screen.getByRole('button', { name: 'Pose mode' }))
+    const twinBefore = twinPath().getAttribute('d'), armBefore = armPath().getAttribute('d')
+    pointer(twinPath(), 'pointerdown', onTwin())
+    expect(status()).toHaveTextContent(/A slider for this side was added/)
+    pointer(canvas(), 'pointermove', pixelOf(50, 100))
+    pointer(canvas(), 'pointerup')
+    expect(twinPath().getAttribute('d')).not.toBe(twinBefore)
+    expect(armPath().getAttribute('d')).toBe(armBefore)
+    expect(reset()).toHaveTextContent('1 off rest')
+    await save(user)
+    await waitFor(() => expect(backend.entries[0].draft.ranges).toHaveLength(2))
+    expect(backend.entries[0].draft.ranges.map(r => r.name)).toEqual(['Arm raise', 'Arm raise (other side)'])
+  })
+
+  it('makes that slider only once, and an undo puts it away', async () => {
+    const { user } = await open(armed(false))
+    await user.click(screen.getByRole('button', { name: 'Pose mode' }))
+    for (let i = 0; i < 2; i++) {
+      pointer(twinPath(), 'pointerdown', onTwin())
+      pointer(canvas(), 'pointermove', pixelOf(50, 100))
+      pointer(canvas(), 'pointerup')
+    }
+    await user.click(screen.getByRole('tab', { name: 'Ranges' }))
+    await user.click(screen.getByRole('button', { name: /^All \(/ }))
+    expect(screen.getAllByRole('region', { name: /^Slider / })).toHaveLength(2)
+    await user.click(screen.getByRole('button', { name: 'Undo' }))
+    expect(screen.getAllByRole('region', { name: /^Slider / })).toHaveLength(1)
+  })
+
+  it('turns both arms with the one slider when the pair is posed together, whichever is grabbed', async () => {
+    const { user } = await open(armed(true))
+    await user.click(screen.getByRole('button', { name: 'Pose mode' }))
+    const twinBefore = twinPath().getAttribute('d'), armBefore = armPath().getAttribute('d')
+    pointer(twinPath(), 'pointerdown', onTwin())
+    pointer(canvas(), 'pointermove', pixelOf(50, 100))
+    pointer(canvas(), 'pointerup')
+    expect(twinPath().getAttribute('d')).not.toBe(twinBefore)
+    expect(armPath().getAttribute('d')).not.toBe(armBefore)
+    expect(status()).not.toHaveTextContent(/slider for this side/)
+  })
+
+  it('offers One side each for a model whose Turn sliders still move both sides, and does it', async () => {
+    const { user, backend } = await open(armed(true))
+    await user.click(screen.getByRole('tab', { name: 'Ranges' }))
+    await user.click(screen.getByRole('button', { name: /^All \(/ }))
+    await user.click(screen.getByRole('button', { name: /Make the 1 turning slider that move both sides move only their own side/ }))
+    expect(screen.queryByRole('button', { name: /move only their own side/ })).toBeNull()
+    expect(screen.getByText(/Moves only its own side: the twin keeps still/)).toBeInTheDocument()
+    await save(user)
+    await waitFor(() => expect(backend.entries[0].draft.ranges[0].drives[0].mirror).toBe(false))
+  })
+
+  it('does not offer One side each when every slider already moves its own side', async () => {
+    const { user } = await open(armed(false))
+    await user.click(screen.getByRole('tab', { name: 'Ranges' }))
+    await user.click(screen.getByRole('button', { name: /^All \(/ }))
+    expect(screen.queryByRole('button', { name: /move only their own side/ })).toBeNull()
+    expect(screen.getByRole('button', { name: 'Pose the other side of Arm raise apart' })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Pose both sides of Arm raise together' })).toBeInTheDocument()
   })
 })

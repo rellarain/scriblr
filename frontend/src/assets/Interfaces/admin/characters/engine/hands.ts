@@ -275,7 +275,7 @@ export function apartHand(c: ModelContent, palmGroupId: string, make: MakeId = r
   let next = c
   let n = 0
   for (const r of handSliders(c, palmGroupId)) {
-    if (isApart(next.ranges.find(x => x.id === r.id) ?? r)) continue
+    if (isApart(next, next.ranges.find(x => x.id === r.id) ?? r)) continue
     const e = apartSlider(next, r.id, make)
     if (!e.ok) return e
     next = e.content; n++
