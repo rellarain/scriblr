@@ -3,7 +3,7 @@ import userEvent from '@testing-library/user-event'
 import { describe, expect, it } from 'vitest'
 import type { ModelContent, ModelEntry, ModelShape } from '../../../../api/types'
 import { content, draftEntry, modelsBackend } from '../../../../test/characterModelsBackend'
-import CharacterModelsConsole from './CharacterModelsConsole'
+import DesignerConsole from './DesignerConsole'
 import { addGroup, addObject, addShape, newGroup } from './modelContent'
 
 // Phase 2b in the console: twins (Make a twin, Break the pair), point links (Weld, Follow, Lock to an edge, the arrow keys on a linked point), the back view
@@ -29,8 +29,8 @@ function outfit(): ModelContent {
 async function open(entries: ModelEntry[] = [draftEntry('a', outfit())]) {
   const backend = modelsBackend(entries)
   const user = userEvent.setup()
-  render(<CharacterModelsConsole />)
-  await screen.findByRole('heading', { name: 'Character models' })
+  render(<DesignerConsole />)
+  await screen.findByRole('region', { name: 'Designer' })
   return { backend, user }
 }
 

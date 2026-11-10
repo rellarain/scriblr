@@ -13,7 +13,7 @@ vi.mock('./admin/resources/ResourcesConsole', () => ({ default: () => <div>resou
 // The plot presets page (covered by its own tests) is mocked for the same reason.
 vi.mock('./admin/instructor/InstructorConsole', () => ({ default: () => <div>instructor console</div> }))
 vi.mock('./admin/plot/PlotPresetsConsole', () => ({ default: () => <div>plot presets console</div> }))
-vi.mock('./admin/characters/CharacterModelsConsole', () => ({ default: () => <div>character models console</div> }))
+vi.mock('./admin/characters/DesignerConsole', () => ({ default: () => <div>character models console</div> }))
 
 beforeEach(() => {
   window.localStorage.clear()
@@ -23,10 +23,10 @@ beforeEach(() => {
 afterEach(() => { vi.unstubAllGlobals() })
 
 const tile = (id: string) => document.querySelector(`[data-tile-id="${id}"]`) as HTMLElement
-const SECTIONS = ['dashboard', 'processor', 'organizer', 'manager', 'director', 'office', 'configuration', 'resources', 'instructor']
+const SECTIONS = ['dashboard', 'processor', 'organizer', 'manager', 'director', 'office', 'configuration', 'designer', 'resources', 'instructor']
 
 describe('AUI (the Admin panel as tiles)', () => {
-  it('shows the nine sections as consoles with their pages as tiles, and every section Help text in the Help console', () => {
+  it('shows the ten sections as consoles with their pages as tiles, and every section Help text in the Help console', () => {
     render(<AUI />)
     expect(SECTIONS.map(id => tile(id)?.getAttribute('data-tile-id'))).toEqual(SECTIONS)
     expect(within(tile('manager')).getByText('Assignment')).toBeTruthy()
@@ -48,11 +48,14 @@ describe('AUI (the Admin panel as tiles)', () => {
     expect(plot.querySelector('h2')).toBeNull()
   })
 
-  it('shows Configuration > Characters as the character models page', async () => {
+  it('shows the Designer as a console of its own beside Configuration, with a slot in its title bar for the console tools', async () => {
     render(<AUI />)
-    const characters = within(tile('configuration')).getByRole('region', { name: 'Characters' })
-    expect(await within(characters).findByText('character models console')).toBeTruthy()
-    expect(characters.querySelector('h2')).toBeNull()
+    expect(within(tile('designer')).getByRole('heading', { name: /Designer/ })).toBeTruthy()
+    expect(await within(tile('designer')).findByText('character models console')).toBeTruthy()
+    expect(tile('designer').querySelector('.gtTitle .gtRailSlot--tools')).not.toBeNull()
+    // it left Configuration: the characters page is not one of that console's tiles any more
+    expect(within(tile('configuration')).queryByRole('region', { name: 'Characters' })).toBeNull()
+    expect(screen.getByRole('toolbar', { name: 'Admin panel consoles tabs' }).querySelector('[aria-label="Designer"]')).not.toBeNull()
   })
 
   it('shows Resources as the article/quiz builder', async () => {

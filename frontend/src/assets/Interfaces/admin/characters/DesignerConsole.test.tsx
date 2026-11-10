@@ -3,10 +3,11 @@ import userEvent from '@testing-library/user-event'
 import { describe, expect, it } from 'vitest'
 import type { ModelContent, ModelEntry } from '../../../../api/types'
 import { content, draftEntry, liveEntry, modelsBackend } from '../../../../test/characterModelsBackend'
-import CharacterModelsConsole from './CharacterModelsConsole'
+import DesignerConsole from './DesignerConsole'
 import { newShape } from './engine/edit'
 import { templateBox } from './engine/templates'
 import { addGroup, addObject, addShape } from './modelContent'
+import { openDrawer } from '../../../../test/designerUi'
 
 // a model that can be published: one oval in one object in one group
 function complete(name: string, shape = newShape('s', 'Skull', 'oval', templateBox('oval', 100, 46, 40))): ModelContent {
@@ -29,8 +30,8 @@ function polygon(count: number) {
 async function open(entries: ModelEntry[] = [liveEntry('a', complete('Adult')), draftEntry('b', content('Stylised'))]) {
   const backend = modelsBackend(entries)
   const user = userEvent.setup()
-  const view = render(<CharacterModelsConsole />)
-  await screen.findByRole('heading', { name: 'Character models' })
+  const view = render(<DesignerConsole />)
+  await screen.findByRole('region', { name: 'Designer' })
   return { backend, user, view }
 }
 
@@ -85,7 +86,7 @@ describe('the list', () => {
   it('shows what is loading and what failed', async () => {
     const backend = modelsBackend([])
     backend.failNext('/character-models', 500, 'The models file is damaged.')
-    render(<CharacterModelsConsole />)
+    render(<DesignerConsole />)
     expect(screen.getByRole('status')).toHaveTextContent('Loading the models')
     expect(await screen.findByRole('alert')).toHaveTextContent('The models file is damaged.')
     await userEvent.click(screen.getByRole('button', { name: 'Try again' }))
@@ -227,6 +228,7 @@ describe('the limits', () => {
     await user.click(tree().getByRole('button', { name: 'Round' }))
     expect(screen.getByText(/The most points a shape may have \(60\)/)).toBeInTheDocument()
     expect(screen.getByRole('button', { name: /Add a point after it/ })).toBeDisabled()
+    await openDrawer(user)
     expect(within(screen.getByRole('region', { name: 'Checks' })).getAllByText(/the limit is 60/).length).toBeGreaterThan(0)
   })
 })
@@ -243,7 +245,8 @@ describe('saving and publishing', () => {
   })
 
   it('does not offer Publish for a model that has no name', async () => {
-    await open([draftEntry('a', content(''))])
+    const { user } = await open([draftEntry('a', content(''))])
+    await openDrawer(user)
     expect(screen.getByRole('button', { name: /Publish/ })).toBeDisabled()
     expect(within(screen.getByRole('region', { name: 'Checks' })).getByText(/Publish is refused/)).toBeInTheDocument()
   })
@@ -299,6 +302,7 @@ describe('saving and publishing', () => {
 describe('the preview strip and the tree', () => {
   it('draws six previews of the model and a new set on request', async () => {
     const { user } = await open([draftEntry('a', complete('Adult'))])
+    await openDrawer(user)
     const strip = screen.getByRole('region', { name: 'Previews' })
     expect(within(strip).getAllByRole('img')).toHaveLength(6)
     const before = within(strip).getAllByRole('img').map(s => s.innerHTML).join()
@@ -308,7 +312,8 @@ describe('the preview strip and the tree', () => {
   })
 
   it('says there is nothing to preview for an empty model', async () => {
-    await open([draftEntry('a', content('Empty'))])
+    const { user } = await open([draftEntry('a', content('Empty'))])
+    await openDrawer(user)
     expect(within(screen.getByRole('region', { name: 'Previews' })).getByText(/Nothing to preview/)).toBeInTheDocument()
   })
 

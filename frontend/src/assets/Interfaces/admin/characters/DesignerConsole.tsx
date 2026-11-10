@@ -1,7 +1,4 @@
 import { useRef, useState, type ChangeEvent } from 'react'
-import { SaveCluster } from '../../../../components/SaveCluster'
-import { setAutosaveMode, useSettings } from '../../../../settings/settingsStore'
-import { autosaveModeOf } from '../../../../theme/types'
 import type { ModelEntry } from '../../../../api/types'
 import { downloadTextFile, readFileText } from '../plot/presetFile'
 import { ModelList } from './ModelList'
@@ -14,12 +11,11 @@ import './characterModels.scss'
 // What an import did, shown until it is dismissed.
 interface ImportNotice { tone: 'ok' | 'error'; lines: string[] }
 
-// AUI > Configuration > Characters: the models the character designer is built from. A list of models and, beside it, the open one: a tree of its
-// groups, objects and shapes, a canvas to draw the shapes on, an inspector, and previews under it. Edits save to the draft the way the Writer's do (the
-// Save button, and autosave when the user has turned it on); each model is published on its own.
-function CharacterModelsConsole() {
+// The Designer (an Admin console of its own, beside Configuration): the models character art is drawn from. The canvas fills the console, with the tree of the open model on
+// its left, the editor on its right, the view controls under it and the console tools (undo, redo, save, publish) in the console's header (`toolbarHost`; without one they
+// sit at the top). Edits save to the draft the way the Writer's do (the Save button, and autosave when the user has turned it on); each model is published on its own.
+function DesignerConsole({ toolbarHost = null }: { toolbarHost?: HTMLElement | null }) {
   const models = useCharacterModels()
-  const { ui } = useSettings()
   const { entries } = models
   const [selectedId, setSelectedId] = useState<string | null>(null)
   const [listOpen, setListOpen] = useState(false)
@@ -85,14 +81,7 @@ function CharacterModelsConsole() {
   }
 
   return (
-    <div className="cmPage">
-      <div className="cmBar">
-        <h2 className="cmBarTitle">Character models</h2>
-        <SaveCluster
-          status={models.saveStatus} onSave={() => { void models.saveNow() }} scope=".cmPage"
-          autosave={{ mode: autosaveModeOf(ui), onChange: setAutosaveMode, nextSaveAt: models.saveCountdown.nextSaveAt, wait: models.saveCountdown.wait }}
-        />
-      </div>
+    <div className="cmPage dzConsole" role="region" aria-label="Designer">
       {notice && (
         <div className={`cmToast${notice.tone === 'error' ? ' cmToast--error' : ''}`} role={notice.tone === 'error' ? 'alert' : 'status'}>
           <p><b>{notice.lines[0]}</b></p>
@@ -111,16 +100,20 @@ function CharacterModelsConsole() {
           </div>
         </div>
       ) : (
-        <div className="cmSplit">
-          <ModelList
-            entries={entries} current={current} open={listOpen} onToggle={() => setListOpen(o => !o)} onSelect={select} onNew={create}
-            onImport={() => fileInput.current?.click()} onExportAll={() => exportEntries(entries)} onMove={models.moveModel}
+        current && (
+          <ModelPane
+            key={current.id} entry={current} models={models} makeId={randomId} onRemove={remove} onDuplicate={duplicate} onExport={e => exportEntries([e])} barHost={toolbarHost}
+            treeHead={(
+              <ModelList
+                entries={entries} current={current} open={listOpen} onToggle={() => setListOpen(o => !o)} onSelect={select} onNew={create}
+                onImport={() => fileInput.current?.click()} onExportAll={() => exportEntries(entries)} onMove={models.moveModel}
+              />
+            )}
           />
-          {current && <ModelPane key={current.id} entry={current} models={models} makeId={randomId} onRemove={remove} onDuplicate={duplicate} onExport={e => exportEntries([e])} />}
-        </div>
+        )
       )}
     </div>
   )
 }
 
-export default CharacterModelsConsole
+export default DesignerConsole

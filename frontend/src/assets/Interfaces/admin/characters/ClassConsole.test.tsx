@@ -3,7 +3,7 @@ import userEvent from '@testing-library/user-event'
 import { describe, expect, it } from 'vitest'
 import type { ModelContent, ModelEntry, ModelPoint } from '../../../../api/types'
 import { content, draftEntry, modelsBackend } from '../../../../test/characterModelsBackend'
-import CharacterModelsConsole from './CharacterModelsConsole'
+import DesignerConsole from './DesignerConsole'
 import { newShape } from './engine/edit'
 import { addGroup, addObject, addShape, newGroup } from './modelContent'
 
@@ -38,8 +38,8 @@ function eyed(): ModelContent {
 async function open(entries: ModelEntry[] = [draftEntry('a', eyed())]) {
   const backend = modelsBackend(entries)
   const user = userEvent.setup()
-  render(<CharacterModelsConsole />)
-  await screen.findByRole('heading', { name: 'Character models' })
+  render(<DesignerConsole />)
+  await screen.findByRole('region', { name: 'Designer' })
   return { backend, user }
 }
 
@@ -199,14 +199,18 @@ describe('a member\'s shapes', () => {
     expect(draft(backend).shapes.find(s => s.copyOf === 'iris')!.pts).toEqual([])
   })
 
-  it('draws the ghost of the pattern only while the toggle is on', async () => {
+  it('draws the ghost of the pattern only while its layer is shown in the view toolbar', async () => {
     const { user } = await onMember()
     const row = tree().getAllByRole('button', { name: 'Iris' })
     await user.click(row[row.length - 1])
     fireEvent.keyDown(canvas(), { key: 'ArrowDown' })
+    const layer = () => screen.getByRole('button', { name: 'Pattern ghost and frames' })
+    expect(layer()).toHaveAttribute('aria-pressed', 'true')
+    expect(canvas().querySelector('[data-ghost]')).not.toBeNull()
+    await user.click(layer())
+    expect(layer()).toHaveAttribute('aria-pressed', 'false')
     expect(canvas().querySelector('[data-ghost]')).toBeNull()
-    await user.click(screen.getByRole('button', { name: 'Ghost of the pattern' }))
-    expect(screen.getByRole('button', { name: 'Ghost of the pattern' })).toHaveAttribute('aria-pressed', 'true')
+    await user.click(layer())
     expect(canvas().querySelector('[data-ghost]')).not.toBeNull()
   })
 

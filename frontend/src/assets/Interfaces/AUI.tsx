@@ -2,7 +2,7 @@ import RoleAssignment from './admin/RoleAssignment'
 import { Suspense, lazy, useState, type ComponentType } from 'react'
 import {
   BarChartIcon, VotingIcon, LibraryIcon, PeopleIcon, BuildingIcon, BriefcaseIcon,
-  EnvelopeIcon, CalendarIcon, HelpIcon, TeamIcon, SortingIcon, ConfigurationIcon, InfoIcon, PlotIcon, BodyIcon, GraduationCapIcon,
+  EnvelopeIcon, CalendarIcon, HelpIcon, TeamIcon, SortingIcon, ConfigurationIcon, InfoIcon, PlotIcon, MannequinIcon, GraduationCapIcon,
   type IconProps,
 } from '../icons'
 import TileArea, { type AreaTile } from '../../components/tiles/TileArea'
@@ -14,8 +14,8 @@ const ResourcesConsole = lazy(() => import('./admin/resources/ResourcesConsole')
 const InstructorConsole = lazy(() => import('./admin/instructor/InstructorConsole'))
 // The plot presets page, loaded when Configuration > Plot is opened.
 const PlotPresetsConsole = lazy(() => import('./admin/plot/PlotPresetsConsole'))
-// The character models page (the designer), loaded when Configuration > Characters is opened.
-const CharacterModelsConsole = lazy(() => import('./admin/characters/CharacterModelsConsole'))
+// The Designer (the character models and the canvas they are drawn on), loaded when its console is opened.
+const DesignerConsole = lazy(() => import('./admin/characters/DesignerConsole'))
 
 // Eight consoles per scrilbrPlan.md's "Admin Page (AUI)" section (this array
 // covers 7 of them; Resources -- not in that doc -- is built separately
@@ -26,7 +26,7 @@ const CharacterModelsConsole = lazy(() => import('./admin/characters/CharacterMo
 // sections (which didn't match the doc; the parts of that pipeline the
 // doc actually keeps, Tone/Sorting/Explicate, moved to HUI's Inbox
 // Console instead, since the doc assigns them there).
-type AuiSectionKey = 'dashboard' | 'processor' | 'organizer' | 'manager' | 'director' | 'office' | 'configuration' | 'resources'
+type AuiSectionKey = 'dashboard' | 'processor' | 'organizer' | 'manager' | 'director' | 'office' | 'configuration' | 'designer' | 'resources'
 
 type AuiSubSectionKey =
   | 'notifications' | 'dashboardSchedule' | 'dashboardHelp'
@@ -35,7 +35,8 @@ type AuiSubSectionKey =
   | 'allotment' | 'assignment' | 'teamSchedule' | 'managerHelp'
   | 'departmentDetails' | 'departmentRoster' | 'departmentAnalytics' | 'department' | 'directorHelp'
   | 'monitorTraining' | 'departmentSchedules' | 'hireTermAdmin' | 'officeHelp'
-  | 'configOverview' | 'configPlot' | 'configCharacters' | 'configHelp'
+  | 'configOverview' | 'configPlot' | 'configHelp'
+  | 'designerWork' | 'designerHelp'
 
 interface AuiSubSection {
   key: AuiSubSectionKey
@@ -133,10 +134,18 @@ const SECTIONS: AuiSectionDef[] = [
         body: 'Site-wide configuration settings will live here.' },
       { key: 'configPlot', label: 'Plot', Icon: PlotIcon,
         body: 'Set up the plot presets the Writer offers: ready-made categories with their description, keywords, fields, subcategories and clusters.' },
-      { key: 'configCharacters', label: 'Characters', Icon: BodyIcon,
-        body: 'Design the models characters are drawn from: groups, objects and shapes, with a canvas to draw them on and previews of how they hold up.' },
       { key: 'configHelp', label: 'Help', Icon: HelpIcon,
         body: 'Resources and assistance using the Configuration console here.' },
+    ],
+  },
+  {
+    // A console of its own, beside Configuration: one page, the canvas with its four toolbars (admin/characters/DesignerConsole.tsx).
+    key: 'designer', label: 'Designer', Icon: MannequinIcon,
+    subSections: [
+      { key: 'designerWork', label: 'Designer', Icon: MannequinIcon,
+        body: 'Design the models characters are drawn from: groups, objects and shapes, with a canvas to draw them on and previews of how they hold up.' },
+      { key: 'designerHelp', label: 'Help', Icon: HelpIcon,
+        body: 'Resources and assistance using the Designer console here.' },
     ],
   },
 ]
@@ -145,18 +154,27 @@ const SECTIONS: AuiSectionDef[] = [
 // (admin/resources/ResourcesConsole.tsx) -- real backend persistence, its own Interface > Console >
 // Component > Feature tree, not a per-page settings editor.
 
+// The Designer's tile: the console is the whole body (the canvas with the tree, the editor and the view controls over it), and its title bar holds the console tools
+// (undo, redo, save, publish), which the console puts there.
+function designerTile(slots: ReturnType<typeof useRailSlots>): AreaTile {
+  return {
+    id: 'designer', title: 'Designer', Icon: MannequinIcon, bodyClassName: 'gtBody--designer',
+    titleExtras: <span ref={slots.ref('designer')} className="gtRailSlot gtRailSlot--tools" />,
+    children: <Suspense fallback={null}><DesignerConsole toolbarHost={slots.host('designer')} /></Suspense>,
+  }
+}
+
 function AUI() {
   const slots = useRailSlots()
   const [rail, setRail] = useState<HTMLElement | null>(null)
   // Each section is a console holding its pages as tiles (their rail is in its title bar). Help is a console of its own, last in the panel's rail,
   // with each section's help under its name (the sections' own Help sub-pages).
-  const tiles: AreaTile[] = SECTIONS.map(section => consoleTile(slots, {
+  const tiles: AreaTile[] = SECTIONS.map(section => section.key === 'designer' ? designerTile(slots) : consoleTile(slots, {
     panel: 'aui', id: section.key, title: section.label, Icon: section.Icon,
     pages: section.subSections.filter(s => s.label !== 'Help').map(page => ({
       id: page.key, label: page.label, Icon: page.Icon,
       children: page.key === 'assignment' ? <RoleAssignment />
         : page.key === 'configPlot' ? <Suspense fallback={null}><PlotPresetsConsole /></Suspense>
-        : page.key === 'configCharacters' ? <Suspense fallback={null}><CharacterModelsConsole /></Suspense>
         : <p>{page.body}</p>,
     })),
   }))

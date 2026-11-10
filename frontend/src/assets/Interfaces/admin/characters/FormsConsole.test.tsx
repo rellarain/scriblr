@@ -3,10 +3,11 @@ import userEvent from '@testing-library/user-event'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import type { ModelContent, ModelEntry, ModelPoint } from '../../../../api/types'
 import { content, draftEntry, modelsBackend } from '../../../../test/characterModelsBackend'
-import CharacterModelsConsole from './CharacterModelsConsole'
+import DesignerConsole from './DesignerConsole'
 import { newShape } from './engine/edit'
 import { addRange, addTurn, newRange, type Edit } from './engine/rigEdit'
 import { addGroup, addObject, addShape, newGroup } from './modelContent'
+import { openDrawer } from '../../../../test/designerUi'
 
 const must = (e: Edit): ModelContent => { if (!e.ok) throw new Error(e.reason); return e.content }
 const box = (x: number, y: number, w: number, h: number) => ({ x, y, w, h })
@@ -52,8 +53,8 @@ function faced(over: (c: ModelContent) => ModelContent = c => c): ModelContent {
 async function open(entries: ModelEntry[] = [draftEntry('a', faced())]) {
   const backend = modelsBackend(entries)
   const user = userEvent.setup()
-  const view = render(<CharacterModelsConsole />)
-  await screen.findByRole('heading', { name: 'Character models' })
+  const view = render(<DesignerConsole />)
+  await screen.findByRole('region', { name: 'Designer' })
   return { backend, user, view }
 }
 
@@ -407,10 +408,11 @@ describe('the Presets tab', () => {
 
 describe('the checks about forms', () => {
   it('lists each form by view, and notes a form with another number of points', async () => {
-    await open([draftEntry('a', faced(c => ({
+    const { user } = await open([draftEntry('a', faced(c => ({
       ...c,
       objects: c.objects.map(o => (o.id === 'oE' ? { ...o, axes: o.axes!.map(a => ({ ...a, options: a.options.map(f => (f.id === 'wide' ? { ...f, ovr: [{ shape: 'iris', pts: c.shapes.find(s => s.id === 'iris')!.pts.slice(0, 3) }] } : f)) })) } : o)),
     })))])
+    await openDrawer(user)
     const grid = within(screen.getByRole('table', { name: 'Forms by views' }))
     const rows = grid.getAllByRole('row').slice(1).map(r => r.textContent)
     expect(rows).toEqual(['EyeEye shapeStandard (default)base outlinebase outline', 'EyeEye shapeWide1 own outlinederived from the front', 'EyeEye shapeShut1 shape hiddenderived from the front'])
@@ -418,7 +420,8 @@ describe('the checks about forms', () => {
   })
 
   it('shows no grid for a model without forms', async () => {
-    await open([draftEntry('a', content('Plain'))])
+    const { user } = await open([draftEntry('a', content('Plain'))])
+    await openDrawer(user)
     expect(screen.queryByRole('table', { name: 'Forms by views' })).toBeNull()
   })
 })

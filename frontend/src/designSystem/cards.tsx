@@ -20,7 +20,7 @@ import WriterLevels from '../assets/Interfaces/writer/levels/WriterLevels'
 import { PlotpointTile } from '../assets/Interfaces/writer/PlotpointTile'
 import { PlotNav } from '../assets/Interfaces/writer/PlotNav'
 import PlotPresetsConsole from '../assets/Interfaces/admin/plot/PlotPresetsConsole'
-import CharacterModelsConsole from '../assets/Interfaces/admin/characters/CharacterModelsConsole'
+import DesignerConsole from '../assets/Interfaces/admin/characters/DesignerConsole'
 import InstructorConsole from '../assets/Interfaces/admin/instructor/InstructorConsole'
 import CharactersConsole from '../assets/Interfaces/writer/characters/CharactersConsole'
 import ItemsConsole from '../assets/Interfaces/writer/items/ItemsConsole'
@@ -295,7 +295,7 @@ function CharacterModelsCard() {
   return (
     <div className="aUI" style={{ position: 'relative', width: '100%', height: '100%', flex: '0 0 auto', ['--aui-w' as string]: '100%' }}>
       <div className="aUIPanel" style={{ height: '100%', overflow: 'auto', boxSizing: 'border-box', padding: 14 }}>
-        <CharacterModelsConsole />
+        <DesignerConsole />
       </div>
     </div>
   )

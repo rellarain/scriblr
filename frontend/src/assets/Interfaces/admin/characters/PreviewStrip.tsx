@@ -54,7 +54,7 @@ export function PreviewStrip({ content, sel, view = 'front', tile = TILE_DEFAULT
   const px = SIZES.find(s => s.id === size)!.px
 
   return (
-    <div className="cmStrip">
+    <section className="cmStrip" aria-label="Previews">
       <div className="cmStripBar">
         <button type="button" className="cmIconBtn" aria-label="Draw a new set of previews" title="Draw a new set of previews" onClick={() => { setSeed(s => s + 1); setMode('rand') }}><DiceIcon size={14} /></button>
         <div className="cmChips" role="group" aria-label="Kind of preview">
@@ -90,6 +90,6 @@ export function PreviewStrip({ content, sel, view = 'front', tile = TILE_DEFAULT
           ))}
         </div>
       ) : <p className="cmInsText">Nothing to preview yet: draw a shape.</p>}
-    </div>
+    </section>
   )
 }

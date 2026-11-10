@@ -1,17 +1,20 @@
-import { useEffect, useMemo, useRef, useState, type KeyboardEvent } from 'react'
+import { useEffect, useMemo, useRef, useState, type KeyboardEvent, type ReactNode } from 'react'
+import { createPortal } from 'react-dom'
 import type { ModelContent, ModelEntry, ModelLayer, ModelShape } from '../../../../api/types'
 import {
-  BackIcon, EyeIcon, GridViewIcon, TreeIcon, CheckIcon, CopyIcon, CursorIcon, DiceIcon, ExportIcon, EyeOffIcon, FitIcon, StampIcon, FrontIcon, GridLinesIcon, GridSnapIcon, HandIcon, HistoryIcon, PathIcon, RedoIcon, RestoreIcon, RulerIcon, SlidersIcon, SwapIcon, TrashIcon, UndoIcon, WeightIcon, ZoomInIcon, ZoomOutIcon,
+  CopyIcon, CursorIcon, DiceIcon, ExportIcon, EyeOffIcon, GridSnapIcon, HandIcon, HistoryIcon, PathIcon, RestoreIcon, RulerIcon, SwapIcon, TrashIcon, UndoIcon, WeightIcon,
 } from '../../../icons'
-import TileArea from '../../../../components/tiles/TileArea'
-import { resetTileLayout } from '../../../../components/tiles/tileReset'
-import type { SplitNode } from '../../../../components/tiles/splitTree'
+import { setAutosaveMode, useSettings } from '../../../../settings/settingsStore'
+import { autosaveModeOf } from '../../../../theme/types'
 import { useStoredState } from '../../writer/storage'
 import { AssetTree, type TreeActions, type TreeMode } from './AssetTree'
 import type { ClassActions } from './ClassPanel'
 import { ColourTab, type ColourActions } from './ColourTab'
 import { CheckPanel } from './CheckPanel'
-import { DesignerCanvas, type FrameCanvas, type GripMark, type PivotMarker, type PoseCanvas, type PoseGrab, type ThroughFrame } from './DesignerCanvas'
+import { DesignerCanvas, type FrameCanvas, type GripMark, type LockTool, type PivotMarker, type PoseCanvas, type PoseGrab, type ThroughFrame } from './DesignerCanvas'
+import { ConsoleBar, PANEL_REST, ToolbarPanel, ViewBar, type PanelState } from './DesignerShell'
+import { DEFAULT_LAYERS, drawOrder, normalizeLayers, type LayerState } from './layerStack'
+import { advanceLock, lockStage } from './engine/crossings'
 import { FormsTab, type FormActions } from './FormsTab'
 import { FramesTab, type FramesState } from './FramesTab'
 import { Inspector, type InspectorTab } from './Inspector'
@@ -100,26 +103,29 @@ type PoseDrag = { solved: Solved; start: Values; group: string } & (
 )
 const POSE_HINT = 'Pose mode: drag a part to turn it, a square to scale its group, a circle to slide its anchor. Hold Alt, or press Reach, and drag a hand or foot to bend the limb; drag a grip point to reach with it.'
 
-// The open model: its name and publishing buttons, then the tree, the canvas and the inspector, the preview strip and the checks. The undo stack
-// lives here (it starts empty when another model is opened: the page keys this component on the model's id), and so do the test values of the sliders
-// (what the Try it sliders are set to: for looking, never saved).
-// The designer is a grid of tiles (components/tiles): the tree, the canvas with its toolbar, the inspector, the previews and the checks. Each can be dragged by its title
-// bar to sit beside or above another or to swap with it, resized by the dividers, minimized to the tab bar above the tiles or (the canvas) maximized; where they sit is
-// remembered on this computer, and Reset layout puts them back as they began: the tree, the canvas and the inspector side by side over the previews and the checks.
-const DESIGNER_GRID = 'characters.designer'
-const DESIGNER_TREE: SplitNode = {
-  dir: 'col', ratio: 0.7,
-  a: { dir: 'row', ratio: 0.2, a: { id: 'tree' }, b: { dir: 'row', ratio: 0.72, a: { id: 'canvas' }, b: { id: 'inspector' } } },
-  b: { dir: 'row', ratio: 0.5, a: { id: 'previews' }, b: { id: 'checks' } },
-}
+// The open model. The canvas fills the whole console, and four toolbars lie over its edges: the tree (left), the editor (right), the view controls (the footer) and the
+// console tools (undo, redo, save, publish: in the console's header, or at the top where the console has no header of its own). The undo stack lives here (it starts empty
+// when another model is opened: the page keys this component on the model's id), and so do the test values of the sliders (what the Try it sliders are set to: for looking,
+// never saved). The two side toolbars can be dragged wider or narrower and folded away, and the layers of the canvas (gridlines, guides, outlines, points...) are toggled and
+// ordered in the view toolbar; where these are is remembered on this computer.
+const PANELS_START: { left: PanelState; right: PanelState } = { left: { open: true, w: 300 }, right: { open: true, w: 360 } }
+const PANEL_LIMITS = { left: { min: 220, max: 480 }, right: { min: 280, max: 600 } }
+const VIEW_BAR = 44
+// below this many pixels across, the console has room for one side toolbar at a time
+const NARROW = 640
+const DRAWER = 240
 
-export function ModelPane({ entry, models, makeId, onRemove, onDuplicate, onExport }: {
+export function ModelPane({ entry, models, makeId, onRemove, onDuplicate, onExport, barHost = null, treeHead = null }: {
   entry: ModelEntry
   models: CharacterModels
   makeId: MakeId
   onRemove: (id: string) => void
   onDuplicate: (id: string) => void
   onExport: (entry: ModelEntry) => void
+  // The element the console toolbar goes into (the console's header); missing: it is drawn at the top of the pane.
+  barHost?: HTMLElement | null
+  // What the tree panel shows above the tree (the list of models).
+  treeHead?: ReactNode
 }) {
   const content = entry.draft
   const [sel, setSel] = useState<Selection>(NONE)
@@ -129,16 +135,53 @@ export function ModelPane({ entry, models, makeId, onRemove, onDuplicate, onExpo
   const [snap, setSnap] = useState(true)
   // Shapes (moved whole), pivots and frames land on the lines of the grid while they are dragged.
   const [gridSnap, setGridSnap] = useState(false)
-  const [grid, setGrid] = useState(true)
   const [zoom, setZoom] = useState(1)
   const [fitAll, setFitAll] = useState(false)
   // Fit asks the canvas for a new fit (and a view in the middle of it); `viewMoved` is whether the view has been panned or zoomed since.
   const [viewNonce, setViewNonce] = useState(0)
   const [viewMoved, setViewMoved] = useState(false)
-  // The tiles of the designer: where each sits is kept by the tile grid (on this computer, with the other settings); which are shut (minimized to the tab bar) is kept here,
-  // so that starting a recording can open the inspector.
-  const [closed, setClosed] = useStoredState<string[]>('scriblr.designer.closed', [])
-  const setTileClosed = (id: string, shut: boolean) => setClosed(prev => (shut ? (prev.includes(id) ? prev : [...prev, id]) : prev.filter(x => x !== id)))
+  // The layers of the canvas (which are shown and in what order) and the two side panels (open, and how wide) are kept on this computer, with the other settings; the
+  // previews and checks drawer is open or not.
+  const [layersRaw, setLayersRaw] = useStoredState<LayerState>('scriblr.designer.layers', DEFAULT_LAYERS)
+  const layerState = useMemo(() => normalizeLayers(layersRaw), [layersRaw])
+  const [panelsRaw, setPanelsRaw] = useStoredState<{ left: PanelState; right: PanelState }>('scriblr.designer.panels', PANELS_START)
+  const panels = {
+    left: { ...PANELS_START.left, ...panelsRaw.left, w: Math.min(PANEL_LIMITS.left.max, Math.max(PANEL_LIMITS.left.min, Number(panelsRaw.left?.w) || PANELS_START.left.w)) },
+    right: { ...PANELS_START.right, ...panelsRaw.right, w: Math.min(PANEL_LIMITS.right.max, Math.max(PANEL_LIMITS.right.min, Number(panelsRaw.right?.w) || PANELS_START.right.w)) },
+  }
+  // the width of a panel while it is being dragged, before it settles
+  const [dragW, setDragW] = useState<{ side: 'left' | 'right'; w: number } | null>(null)
+  // The panels never take more than 46% of the console each, so a narrow console still has some canvas between them.
+  const stageRef = useRef<HTMLDivElement>(null)
+  const [stageW, setStageW] = useState(0)
+  const narrowRef = useRef(false)
+  useEffect(() => {
+    const el = stageRef.current
+    if (!el) return
+    const measure = () => setStageW(el.getBoundingClientRect().width)
+    measure()
+    if (typeof ResizeObserver === 'undefined') return
+    const observer = new ResizeObserver(measure)
+    observer.observe(el)
+    return () => observer.disconnect()
+  }, [])
+  // In a console too narrow for both, the tree has the room and the editor is a rail until the tree is folded (opening the editor then folds the tree).
+  const narrow = stageW > 0 && stageW < NARROW
+  narrowRef.current = narrow
+  const panelNow = (side: 'left' | 'right'): PanelState => {
+    const w = dragW && dragW.side === side ? dragW.w : panels[side].w
+    const open = panels[side].open && !(narrow && side === 'right' && panels.left.open)
+    return { open, w: stageW > 0 ? Math.min(w, Math.floor(stageW * (narrow ? 0.7 : 0.46))) : w }
+  }
+  const setPanel = (side: 'left' | 'right', change: Partial<PanelState>) => setPanelsRaw(prev => {
+    const other = side === 'left' ? 'right' : 'left'
+    const next = { ...PANELS_START, ...prev, [side]: { ...PANELS_START[side], ...prev[side], ...change } }
+    // where only one fits, opening a toolbar folds the other
+    if (change.open && narrowRef.current) next[other] = { ...PANELS_START[other], ...prev[other], open: false }
+    return next
+  })
+  const [drawer, setDrawer] = useState(false)
+  const { ui } = useSettings()
   const [history, setHistory] = useState<History<ModelContent>>(emptyHistory)
   const [versions, setVersions] = useState(false)
   const [confirmDelete, setConfirmDelete] = useState(false)
@@ -159,7 +202,6 @@ export function ModelPane({ entry, models, makeId, onRemove, onDuplicate, onExpo
   const [reachOn, setReachOn] = useState(false)
   const [poseStatus, setPoseStatus] = useState(POSE_HINT)
   const [poseActive, setPoseActive] = useState<string | null>(null)
-  const [ghost, setGhost] = useState(false)
   // proportions and frames (phase 5a): the bone whose end is being picked on the canvas, picking the shape an object stretches to, the frame being edited on the
   // canvas, the frame the canvas looks through, and the test card colour (never saved unless it is kept as the starter colour)
   const [bonePick, setBonePick] = useState<string | null>(null)
@@ -359,7 +401,7 @@ export function ModelPane({ entry, models, makeId, onRemove, onDuplicate, onExpo
     if (!s) return
     if (s.mirrorOf) { setNote('A twin follows its original: record the original instead, or break the pair.'); return }
     setView('front'); setLinkMode(null); setPoseMode(false); poseRef.current = null
-    setValues({}); setScrubbing(null); setPickOn(false); setTileClosed('inspector', false); setTab('ranges')
+    setValues({}); setScrubbing(null); setPickOn(false); setPanel('right', { open: true }); setTab('ranges')
     setSel({ kind: 'shape', id: shapeId }); setSelPoint(0); setMode('points')
     setRecording({ rangeId, shapeId, end, draft: { ...s, pts: s.pts.map(p => ({ ...p })) } })
     setNote('')
@@ -1043,74 +1085,98 @@ export function ModelPane({ entry, models, makeId, onRemove, onDuplicate, onExpo
     : selShape ? (mode === 'points' ? 'Point editor: drag a point or a handle; double-click an edge to add a point.' : 'Move shape: drag the shape.')
     : sel.kind === 'none' ? 'Nothing is selected: this is the end result.' : 'Pick a shape in the tree to edit its points.'
 
-  return (
-    <div className="cmPane" onKeyDown={onKeyDown}>
-      <fieldset className="cmFieldset" disabled={busy}>
-        <div className="cmTools">
-          <input
-            className="cmName" data-kf="" maxLength={NAME_MAX} aria-label="Model name" placeholder="Model name" value={content.name}
-            onChange={e => models.edit(entry.id, c => ({ ...c, name: e.target.value }), false)}
-          />
-          <StatusBadge entry={entry} />
-          <span className="cmToolGroup">
-            <button type="button" className="cmBtn cmBtn--primary" disabled={faults.length > 0} title={faults.length ? 'Fix what the checks say first' : 'Publish this draft as the next version'} onClick={() => void models.publish(entry.id)}><CheckIcon size={12} /> Publish</button>
-            <button type="button" className="cmBtn" disabled={!published} onClick={() => void models.unpublish(entry.id)}><EyeOffIcon size={12} /> Unpublish</button>
-            <button type="button" className="cmBtn" onClick={() => void models.discard(entry.id)} title={published ? 'Put the draft back to the published version' : 'Clear the draft'}><UndoIcon size={12} /> Discard changes</button>
-            <span className="cmMenuAnchor">
-              <button type="button" className="cmIconBtn" aria-label="Versions" title="Versions" aria-expanded={versions} onClick={() => setVersions(v => !v)}><HistoryIcon size={14} /></button>
-              {versions && <VersionsMenu entry={entry} onBring={v => { void models.restore(entry.id, v); setVersions(false) }} />}
-            </span>
-            <button type="button" className="cmIconBtn" aria-label="Duplicate the model" title="Duplicate the model" onClick={() => onDuplicate(entry.id)}><CopyIcon size={14} /></button>
-            <button type="button" className="cmIconBtn" aria-label="Export the model to a file" title="Export the draft to a file" onClick={() => onExport(entry)}><ExportIcon size={14} /></button>
-            <button type="button" className="cmIconBtn" aria-label="Reset layout" title="Put the tiles back where they began" onClick={() => { resetTileLayout(DESIGNER_GRID); setClosed([]) }}><GridViewIcon size={14} /></button>
-            {confirmDelete ? (
-              <span className="cmConfirm" role="group" aria-label="Delete the model?">
-                <button type="button" className="cmBtn cmBtn--danger cmBtn--small" onClick={() => { setConfirmDelete(false); onRemove(entry.id) }}>Delete the model</button>
-                <button type="button" className="cmBtn cmBtn--small" onClick={() => setConfirmDelete(false)}>Keep it</button>
-              </span>
-            ) : (
-              <button type="button" className="cmIconBtn" aria-label="Delete the model" title="Delete the model" onClick={() => setConfirmDelete(true)}><TrashIcon size={14} /></button>
-            )}
-          </span>
-        </div>
-        {models.actionError && <p className="cmErr" role="alert">{models.actionError} <button type="button" className="cmLink" onClick={models.clearActionError}>Dismiss</button></p>}
-        {note && <p className="cmErr" role="status">{note}</p>}
+  // ---- the toolbars ----
 
-        <div className="cmTiles">
-          <TileArea
-            gridId={DESIGNER_GRID} label="Designer tiles" bar defaultTree={DESIGNER_TREE} minimized={closed} onMinimizedChange={setTileClosed}
-            tiles={[
-          { id: 'tree', title: 'Tree', Icon: TreeIcon, bodyClassName: 'cmTileBody', children: <AssetTree content={content} sel={sel} actions={actions} mode={treeMode} onMode={setTreeMode} hidden={hiddenSet} locks={lockSet} /> },
-          { id: 'canvas', title: 'Canvas', Icon: PathIcon, maximizable: true, bodyClassName: 'cmTileBody cmTileBody--stage', children: (
-          <div className="cmStage">
-            <div className="cmToolbar" role="toolbar" aria-label="Designer tools">
-              <button type="button" className="cmIconBtn" aria-label="Undo" title="Undo (Ctrl+Z)" disabled={!history.past.length || !!recording} onClick={undo}><UndoIcon size={14} /></button>
-              <button type="button" className="cmIconBtn" aria-label="Redo" title="Redo (Ctrl+Y)" disabled={!history.future.length || !!recording} onClick={redo}><RedoIcon size={14} /></button>
-              <span className="cmSep" aria-hidden="true" />
-              <button type="button" className={`cmIconBtn${mode === 'points' ? ' cmIconBtn--on' : ''}`} aria-label="Point editor" title="Point editor: drag points and curve handles" aria-pressed={mode === 'points'} onClick={() => setMode('points')}><PathIcon size={14} /></button>
+  const consoleBar = (
+    <ConsoleBar
+      canUndo={history.past.length > 0 && !recording} canRedo={history.future.length > 0 && !recording} onUndo={undo} onRedo={redo}
+      saveStatus={models.saveStatus} onSave={() => { void models.saveNow() }}
+      autosave={{ mode: autosaveModeOf(ui), onChange: setAutosaveMode, nextSaveAt: models.saveCountdown.nextSaveAt, wait: models.saveCountdown.wait }}
+      onPublish={() => void models.publish(entry.id)} publishBlocked={faults.length > 0 ? 'Fix what the checks say first' : null} busy={busy}
+    />
+  )
+  // A lock at a crossing of two outlines is made in the model's own space, so it waits for the sliders at rest, the front view and the base outline.
+  const lock: LockTool = {
+    enabled: !!selShape && editable && atRest && awayAll === 0 && view === 'front' && !formTarget && !through,
+    stageOf: cr => (selShape ? lockStage(content, solved, selShape.id, cr).stage : 0),
+    onAdvance: cr => { if (selShape) applyEdit(advanceLock(content, solved, selShape.id, cr)) },
+  }
+  const left = panelNow('left'), right = panelNow('right')
+  const insets = { left: left.open ? left.w : PANEL_REST, right: right.open ? right.w : PANEL_REST, bottom: VIEW_BAR + (drawer ? DRAWER : 0) }
+  const onPanelWidth = (side: 'left' | 'right') => (w: number, settled: boolean) => {
+    if (settled) { setPanel(side, { w }); setDragW(null) } else setDragW({ side, w })
+  }
+
+  return (
+    <div className="cmPane dzPane" onKeyDown={onKeyDown}>
+      {barHost ? createPortal(consoleBar, barHost) : <div className="dzBarRow">{consoleBar}</div>}
+      <fieldset className="cmFieldset dzFieldset" disabled={busy}>
+        <div className="dzStage" ref={stageRef}>
+          <DesignerCanvas
+            content={canvasContent} solved={solved} sel={sel} mode={mode} selPoint={selPoint} mirror={mirror} snap={snap} layers={drawOrder(layerState)} gridSnap={gridSnap} zoom={zoom} fitAll={fitAll} viewKey={view} viewNonce={viewNonce} insets={insets}
+            onViewMoved={() => setViewMoved(true)} axis={content.axis}
+            editable={editable || (!!recording && !!selShape)} pivot={pivot} anchor={anchorSpot} pick={pick} onPick={onPick} onPickGroup={id => { if (bonePick && applyEdit(setBoneEnd(content, bonePick, { kind: 'group', id, i: 0 }))) setBonePick(null) }} pose={poseCanvas} grips={gripMarks} colouring={colouring}
+            frames={frameCanvas} through={throughFrame} weights={weights} lock={lock} onNote={setNote}
+            linked={selShape ? selShape.pts.flatMap((pt, i) => (pt.bind ? [i] : [])) : []} onNudgeLink={nudgeLink} onPivot={movePivot} onPivotNudge={nudgePivot}
+            onSelect={choose} onSelectPoint={setSelPoint}
+            onGesture={() => { if (!recording) setHistory(h => remember(h, content)) }}
+            onShape={live} onEditShape={editShape}
+            onRightClick={t => {
+              if (recording) return
+              const next = t.kind === 'grid' ? rightClickGrid() : rightClickShape(sel, mode, t.id)
+              setSel(next.sel); setMode(next.mode); if (t.kind === 'shape' && next.sel.kind === 'shape' && next.sel.id !== (sel.kind === 'shape' ? sel.id : '')) setSelPoint(0)
+            }}
+            onEscape={() => { if (bridgeSpots) setBridgeSpots(null); else if (weighing) setWeighing(false); else if (bonePick) setBonePick(null); else if (fitPick) setFitPick(false); else if (linkMode) setLinkMode(null); else if (paintPick) setPaintPick(null); else if (pickOn) setPickOn(false); else if (!recording) setSel(NONE) }}
+          />
+
+          <div className="dzNotes">
+            {models.actionError && <p className="cmErr" role="alert">{models.actionError} <button type="button" className="cmLink" onClick={models.clearActionError}>Dismiss</button></p>}
+            {note && <p className="cmErr" role="status">{note}</p>}
+            {empty && <p className="cmHint">No shape yet. Use New shape to start from a template, or the + beside a layer in the tree.</p>}
+            <p className="cmStageNote" aria-live="polite">{stageNote}</p>
+          </div>
+
+          <ToolbarPanel side="left" title="Tree" label="Tree tools" state={left} min={PANEL_LIMITS.left.min} max={PANEL_LIMITS.left.max} onOpen={open => setPanel('left', { open })} onWidth={onPanelWidth('left')}>
+            {treeHead}
+            <AssetTree content={content} sel={sel} actions={actions} mode={treeMode} onMode={setTreeMode} hidden={hiddenSet} locks={lockSet} />
+          </ToolbarPanel>
+
+          <ToolbarPanel side="right" title="Editor" label="Editor tools" state={right} min={PANEL_LIMITS.right.min} max={PANEL_LIMITS.right.max} onOpen={open => setPanel('right', { open })} onWidth={onPanelWidth('right')}>
+            <div className="dzModel">
+              <input
+                className="cmName" data-kf="" maxLength={NAME_MAX} aria-label="Model name" placeholder="Model name" value={content.name}
+                onChange={e => models.edit(entry.id, c => ({ ...c, name: e.target.value }), false)}
+              />
+              <StatusBadge entry={entry} />
+              <span className="cmToolGroup dzModelActions">
+                <button type="button" className="cmBtn cmBtn--small" disabled={!published} onClick={() => void models.unpublish(entry.id)}><EyeOffIcon size={12} /> Unpublish</button>
+                <button type="button" className="cmBtn cmBtn--small" onClick={() => void models.discard(entry.id)} title={published ? 'Put the draft back to the published version' : 'Clear the draft'}><UndoIcon size={12} /> Discard changes</button>
+                <span className="cmMenuAnchor">
+                  <button type="button" className="cmIconBtn" aria-label="Versions" title="Versions" aria-expanded={versions} onClick={() => setVersions(v => !v)}><HistoryIcon size={14} /></button>
+                  {versions && <VersionsMenu entry={entry} onBring={v => { void models.restore(entry.id, v); setVersions(false) }} />}
+                </span>
+                <button type="button" className="cmIconBtn" aria-label="Duplicate the model" title="Duplicate the model" onClick={() => onDuplicate(entry.id)}><CopyIcon size={14} /></button>
+                <button type="button" className="cmIconBtn" aria-label="Export the model to a file" title="Export the draft to a file" onClick={() => onExport(entry)}><ExportIcon size={14} /></button>
+                {confirmDelete ? (
+                  <span className="cmConfirm" role="group" aria-label="Delete the model?">
+                    <button type="button" className="cmBtn cmBtn--danger cmBtn--small" onClick={() => { setConfirmDelete(false); onRemove(entry.id) }}>Delete the model</button>
+                    <button type="button" className="cmBtn cmBtn--small" onClick={() => setConfirmDelete(false)}>Keep it</button>
+                  </span>
+                ) : (
+                  <button type="button" className="cmIconBtn" aria-label="Delete the model" title="Delete the model" onClick={() => setConfirmDelete(true)}><TrashIcon size={14} /></button>
+                )}
+              </span>
+            </div>
+
+            <div className="cmToolbar dzTools" role="toolbar" aria-label="Designer tools">
+              <button type="button" className={`cmIconBtn${mode === 'points' ? ' cmIconBtn--on' : ''}`} aria-label="Point editor" title="Point editor: drag points and curve handles; click a point to step its handles" aria-pressed={mode === 'points'} onClick={() => setMode('points')}><PathIcon size={14} /></button>
               <button type="button" className={`cmIconBtn${mode === 'move' ? ' cmIconBtn--on' : ''}`} aria-label="Move shape" title="Move shape: drag the whole shape" aria-pressed={mode === 'move'} onClick={() => setMode('move')}><CursorIcon size={14} /></button>
               <button type="button" className={`cmIconBtn${weighing ? ' cmIconBtn--on' : ''}`} aria-label="Weights" title="Weights: click a point to say how free it is to hang (for hair, scarves, capes and tails)" aria-pressed={weighing} disabled={!!recording || poseMode} onClick={() => { setWeighing(w => !w); setMode('points'); setBridgeSpots(null) }}><WeightIcon size={14} /></button>
               <button type="button" className={`cmIconBtn${poseMode ? ' cmIconBtn--on' : ''}`} aria-label="Pose mode" title="Pose mode: drag the figure to turn, scale and reach (the sliders follow)" aria-pressed={poseMode} disabled={!!recording} onClick={() => { if (poseMode) poseCancel(); setPoseMode(m => !m); setPoseStatus(POSE_HINT) }}><HandIcon size={14} /></button>
               <span className="cmSep" aria-hidden="true" />
               <button type="button" className={`cmIconBtn${mirror ? ' cmIconBtn--on' : ''}`} aria-label="Mirror editing" title="Mirror editing: a point and its twin move together" aria-pressed={mirror} onClick={() => setMirror(m => !m)}><SwapIcon size={14} /></button>
-              <button type="button" className={`cmIconBtn${snap ? ' cmIconBtn--on' : ''}`} aria-label="Snap" title="Snap to half units and the mirror line" aria-pressed={snap} onClick={() => setSnap(s => !s)}><RulerIcon size={14} /></button>
-              <button type="button" className={`cmIconBtn${grid ? ' cmIconBtn--on' : ''}`} aria-label="Grid" title="Grid: a faint line every 2 units, a stronger one every 10" aria-pressed={grid} onClick={() => setGrid(g => !g)}><GridLinesIcon size={14} /></button>
+              <button type="button" className={`cmIconBtn${snap ? ' cmIconBtn--on' : ''}`} aria-label="Snap" title="Snap to half units, the mirror line and the alignment guides" aria-pressed={snap} onClick={() => setSnap(s => !s)}><RulerIcon size={14} /></button>
               <button type="button" className={`cmIconBtn${gridSnap ? ' cmIconBtn--on' : ''}`} aria-label="Snap to grid" title="Snap to grid: a shape moved whole, a pivot and a frame land on the grid lines" aria-pressed={gridSnap} onClick={() => setGridSnap(s => !s)}><GridSnapIcon size={14} /></button>
-              <button type="button" className={`cmIconBtn${ghost ? ' cmIconBtn--on' : ''}`} aria-label="Ghost of the pattern" title="Ghost of the pattern: a dashed line where the pattern's outline is, behind a member's own outline" aria-pressed={ghost} onClick={() => setGhost(g => !g)}><StampIcon size={14} /></button>
-              <span className="cmSep" aria-hidden="true" />
-              <button type="button" className={`cmIconBtn${view === 'front' ? ' cmIconBtn--on' : ''}`} aria-label="Front view" title="Front view" aria-pressed={view === 'front'} disabled={!!recording} onClick={() => { setView('front') }}><FrontIcon size={14} /></button>
-              <button type="button" className={`cmIconBtn${view === 'back' ? ' cmIconBtn--on' : ''}`} aria-label="Back view" title="Back view: the figure turned round" aria-pressed={view === 'back'} disabled={!!recording} onClick={() => { setView('back'); setLinkMode(null) }}><BackIcon size={14} /></button>
-              <span className="cmSep" aria-hidden="true" />
-              <button type="button" className="cmIconBtn" aria-label="Zoom in" title="Zoom in" onClick={() => setZoom(z => Math.min(8, z * 1.25))}><ZoomInIcon size={14} /></button>
-              <button type="button" className="cmIconBtn" aria-label="Zoom out" title="Zoom out" onClick={() => setZoom(z => Math.max(0.25, z / 1.25))}><ZoomOutIcon size={14} /></button>
-              <button
-                type="button" className={`cmIconBtn${fitAll ? ' cmIconBtn--on' : ''}`} aria-label="Fit to screen" title="Fit everything that is drawn to the screen, with little blank space (press again to fit the selection instead)" aria-pressed={fitAll}
-                onClick={() => {
-                  // Pressed with everything fitted and the view left alone: back to fitting the selection. Otherwise fit everything, and start from the middle of it.
-                  const same = fitAll && !viewMoved && Math.abs(zoom - 1) < 1e-6
-                  setFitAll(!same); setZoom(1); setViewMoved(false); setViewNonce(n => n + 1)
-                }}
-              ><FitIcon size={14} /></button>
               <span className="cmSep" aria-hidden="true" />
               <button type="button" className="cmIconBtn" aria-label="Roll the look" title="Roll a new look for the test character: colours, a form on every axis and the member of each family; what is locked in the tree stays" disabled={!!recording} onClick={() => test.roll(content)}><DiceIcon size={14} /></button>
               <TemplateMenu label="New shape" title="New shape from a template" onPick={newShapeFromCanvas} />
@@ -1125,32 +1191,12 @@ export function ModelPane({ entry, models, makeId, onRemove, onDuplicate, onExpo
                   ))}
                 </span>
               )}
-              <span className="cmSpacer" />
               {awayAll > 0 && (
                 <button type="button" className="cmBtn cmBtn--small" aria-label="Reset test values" title="Put every slider back at rest, every axis on its default form and show everything" disabled={!!recording} onClick={resetEverything}><RestoreIcon size={12} /> {awayAll} off rest</button>
               )}
             </div>
             {poseMode && !recording && <PoseBar status={poseStatus} reach={reachOn} onReach={() => setReachOn(r => !r)} onReset={() => { setScrubbing(null); setValues({}) }} onSave={savePose} canReset={away > 0} />}
-            {empty && <p className="cmHint">No shape yet. Use New shape to start from a template, or the + beside a layer in the tree.</p>}
-            <DesignerCanvas
-              content={canvasContent} solved={solved} sel={sel} mode={mode} selPoint={selPoint} mirror={mirror} snap={snap} grid={grid} gridSnap={gridSnap} zoom={zoom} fitAll={fitAll} viewKey={view} viewNonce={viewNonce} onViewMoved={() => setViewMoved(true)} axis={content.axis}
-              editable={editable || (!!recording && !!selShape)} pivot={pivot} anchor={anchorSpot} pick={pick} onPick={onPick} onPickGroup={id => { if (bonePick && applyEdit(setBoneEnd(content, bonePick, { kind: 'group', id, i: 0 }))) setBonePick(null) }} pose={poseCanvas} grips={gripMarks} ghost={ghost} colouring={colouring}
-              frames={frameCanvas} through={throughFrame} weights={weights}
-              linked={selShape ? selShape.pts.flatMap((pt, i) => (pt.bind ? [i] : [])) : []} onNudgeLink={nudgeLink} onPivot={movePivot} onPivotNudge={nudgePivot}
-              onSelect={choose} onSelectPoint={setSelPoint}
-              onGesture={() => { if (!recording) setHistory(h => remember(h, content)) }}
-              onShape={live} onEditShape={editShape}
-              onRightClick={t => {
-                if (recording) return
-                const next = t.kind === 'grid' ? rightClickGrid() : rightClickShape(sel, mode, t.id)
-                setSel(next.sel); setMode(next.mode); if (t.kind === 'shape' && next.sel.kind === 'shape' && next.sel.id !== (sel.kind === 'shape' ? sel.id : '')) setSelPoint(0)
-              }}
-              onEscape={() => { if (bridgeSpots) setBridgeSpots(null); else if (weighing) setWeighing(false); else if (bonePick) setBonePick(null); else if (fitPick) setFitPick(false); else if (linkMode) setLinkMode(null); else if (paintPick) setPaintPick(null); else if (pickOn) setPickOn(false); else if (!recording) setSel(NONE) }}
-            />
-            <p className="cmStageNote" aria-live="polite">{stageNote}</p>
-          </div>
-          ) },
-          { id: 'inspector', title: 'Inspector', Icon: SlidersIcon, bodyClassName: 'cmTileBody', children: (
+
             <Inspector
               content={canvasContent} sel={sel} view={view} linkMode={linkMode} pairs={pairs} classes={classes} choices={test.forms} selPoint={selPoint} mirror={mirror} onSelectPoint={setSelPoint}
               onRename={(s, name) => models.edit(entry.id, c => (s.kind === 'shape' ? renameShape(c, s.id, name) : s.kind === 'object' ? renameObject(c, s.id, name) : renameGroup(c, s.id, name)), false)}
@@ -1166,14 +1212,28 @@ export function ModelPane({ entry, models, makeId, onRemove, onDuplicate, onExpo
               framesTab={<FramesTab content={content} state={framesState} actions={frameActions} />}
               colourTab={<ColourTab content={content} sel={sel} state={{ colours: test.colours, palette: testPalette, genre: test.genre, locks: test.locks }} actions={colourActions} paint={paintActions} picking={paintPick} />}
             />
-          ) },
-          { id: 'previews', title: 'Previews', Icon: EyeIcon, bodyClassName: 'cmTileBody', children: <PreviewStrip content={content} sel={sel} view={view} tile={tile} /> },
-          { id: 'checks', title: 'Checks', Icon: CheckIcon, bodyClassName: 'cmTileBody', children: <CheckPanel content={content} /> },
-            ]}
-          />
+          </ToolbarPanel>
+
+          <div className="dzFoot" style={{ left: 0, right: 0 }}>
+            {drawer && (
+              <div id="dz-drawer" className="dzDrawer" role="region" aria-label="Previews and checks" style={{ height: DRAWER }}>
+                <PreviewStrip content={content} sel={sel} view={view} tile={tile} />
+                <CheckPanel content={content} />
+              </div>
+            )}
+            <ViewBar
+              layers={layerState} onLayers={setLayersRaw} view={view} onView={v => { setView(v); if (v === 'back') setLinkMode(null) }} viewOff={!!recording}
+              fitAll={fitAll}
+              onFit={() => {
+                // Pressed with everything fitted and the view left alone: back to fitting the selection. Otherwise fit everything, and start from the middle of it.
+                const same = fitAll && !viewMoved && Math.abs(zoom - 1) < 1e-6
+                setFitAll(!same); setZoom(1); setViewMoved(false); setViewNonce(n => n + 1)
+              }}
+              zoom={zoom} onZoom={setZoom} drawerOpen={drawer} onDrawer={() => setDrawer(d => !d)} checks={faults.length}
+            />
+          </div>
         </div>
       </fieldset>
     </div>
   )
 }
-

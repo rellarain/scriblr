@@ -3,10 +3,11 @@ import userEvent from '@testing-library/user-event'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import type { ModelContent } from '../../../../api/types'
 import { content as blank, draftEntry, modelsBackend } from '../../../../test/characterModelsBackend'
-import CharacterModelsConsole from './CharacterModelsConsole'
+import DesignerConsole from './DesignerConsole'
 import { newShape } from './engine/edit'
 import { boxOf, build, flatten } from './engine/geometry'
 import { gridStep } from './engine/gridSnap'
+import { zoomToSlider } from './zoomMap'
 import { addGroup, addObject, addShape, newGroup } from './modelContent'
 
 // The designer's view: it is fitted when the selection changes (or Fit is pressed) and then held, so the grid stays still while something is dragged; holding a drag at an
@@ -28,8 +29,8 @@ const EVERYTHING = box(70, 40, 78, 100)
 async function openWith() {
   const backend = modelsBackend([draftEntry('a', figure())])
   const user = userEvent.setup()
-  render(<CharacterModelsConsole />)
-  await screen.findByRole('heading', { name: 'Character models' })
+  render(<DesignerConsole />)
+  await screen.findByRole('region', { name: 'Designer' })
   return { user, backend }
 }
 async function open() {
@@ -241,7 +242,7 @@ describe('Fit to screen', () => {
     await user.click(fit())
     expect(fit()).toHaveAttribute('aria-pressed', 'true')
     expect(viewBox()).toEqual(fitted)
-    await user.click(screen.getByRole('button', { name: 'Zoom in' }))
+    fireEvent.change(screen.getByRole('slider', { name: 'Zoom' }), { target: { value: String(zoomToSlider(2)) } })
     expect(viewBox()[2]).toBeLessThan(fitted[2])
     await user.click(fit())
     expect(fit()).toHaveAttribute('aria-pressed', 'true')
@@ -279,12 +280,12 @@ describe('Snap to grid', () => {
   }
   const onLine = (v: number, step: number) => Math.abs(v / step - Math.round(v / step)) < 1e-6
 
-  it('is a toggle next to Grid, and is off until it is switched on', async () => {
+  it('is a toggle in the editor tools, and is off until it is switched on', async () => {
     await open()
     expect(toggle()).toHaveAttribute('aria-pressed', 'false')
     fireEvent.click(toggle())
     expect(toggle()).toHaveAttribute('aria-pressed', 'true')
-    expect(screen.getByRole('button', { name: 'Grid' })).toHaveAttribute('aria-pressed', 'true')
+    expect(screen.getByRole('button', { name: 'Gridlines' })).toHaveAttribute('aria-pressed', 'true')
   })
 
   it('draws a faint line every 2 units and a stronger one every 10 at the normal zoom', async () => {
@@ -378,11 +379,11 @@ describe('the canvas in its tile', () => {
     vi.stubGlobal('ResizeObserver', class { constructor(cb: () => void) { callbacks.push(cb) } observe() {} unobserve() {} disconnect() {} })
     const user = await open()
     await pickTorso(user)
-    const rect = { x: 0, y: 0, left: 0, top: 0, right: 600, bottom: 300, width: 600, height: 300, toJSON: () => ({}) }
+    const rect = { x: 0, y: 0, left: 0, top: 0, right: 1400, bottom: 700, width: 1400, height: 700, toJSON: () => ({}) }
     vi.spyOn(canvas(), 'getBoundingClientRect').mockReturnValue(rect as DOMRect)
     act(() => { callbacks.forEach(cb => cb()) })
     const [x, y, w, h] = viewBox()
-    const at = (wx: number, wy: number) => ({ x: ((wx - x) / w) * 600, y: ((wy - y) / h) * 300 })
+    const at = (wx: number, wy: number) => ({ x: ((wx - x) / w) * 1400, y: ((wy - y) / h) * 700 })
     const from = at(100, 90)
     const d0 = pathOf('torso').getAttribute('d')
     pointer(pathOf('torso'), 'pointerdown', from)

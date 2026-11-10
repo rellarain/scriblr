@@ -3,10 +3,11 @@ import userEvent from '@testing-library/user-event'
 import { describe, expect, it, vi } from 'vitest'
 import type { ModelContent, ModelEntry, ModelShape } from '../../../../api/types'
 import { draftEntry, modelsBackend } from '../../../../test/characterModelsBackend'
-import CharacterModelsConsole from './CharacterModelsConsole'
+import DesignerConsole from './DesignerConsole'
 import { blankContent, newGroup } from './modelContent'
 import { makeTwin } from './engine/pairEdit'
 import { addRange, addTurn, attachGroup, newRange, reparent, type Edit } from './engine/rigEdit'
+import { openDrawer } from '../../../../test/designerUi'
 
 const must = (e: Edit): ModelContent => { if (!e.ok) throw new Error(e.reason); return e.content }
 const sharp = (id: string, name: string, pts: Array<[number, number]>): ModelShape => ({ id, name, closed: true, z: 40, op: 1, view: 'both', half: 0, template: null, pts: pts.map(([x, y]) => ({ x, y, m: 's' as const })) })
@@ -37,8 +38,8 @@ function armed(twin: boolean): ModelContent {
 async function open(c: ModelContent) {
   const backend = modelsBackend([draftEntry('a', c)])
   const user = userEvent.setup()
-  render(<CharacterModelsConsole />)
-  await screen.findByRole('heading', { name: 'Character models' })
+  render(<DesignerConsole />)
+  await screen.findByRole('region', { name: 'Designer' })
   return { backend, user }
 }
 
@@ -127,6 +128,7 @@ describe('the previews of a hand', () => {
     await toHands(user)
     await user.click(button(/Add a whole hand/))
     await user.click(tree().getAllByRole('button', { name: 'Hand' })[0])      // the group of the hand
+    await openDrawer(user)
     expect(screen.getByRole('img', { name: 'Preview 1' }).querySelectorAll('path[data-shape], path').length).toBeGreaterThanOrEqual(15)
   })
 })

@@ -3,7 +3,7 @@ import userEvent from '@testing-library/user-event'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import type { ModelContent, ModelEntry } from '../../../../api/types'
 import { content, draftEntry, modelsBackend } from '../../../../test/characterModelsBackend'
-import CharacterModelsConsole from './CharacterModelsConsole'
+import DesignerConsole from './DesignerConsole'
 import { newShape } from './engine/edit'
 import { makeTwin } from './engine/pairEdit'
 import { addRange, addScale, addTurn, attachGroup, newRange, reparent, type Edit } from './engine/rigEdit'
@@ -41,8 +41,8 @@ function figure(sized = false): ModelContent {
 async function open(c = figure()) {
   const backend = modelsBackend([draftEntry('a', c)] as ModelEntry[])
   const user = userEvent.setup()
-  render(<CharacterModelsConsole />)
-  await screen.findByRole('heading', { name: 'Character models' })
+  render(<DesignerConsole />)
+  await screen.findByRole('region', { name: 'Designer' })
   return { backend, user }
 }
 

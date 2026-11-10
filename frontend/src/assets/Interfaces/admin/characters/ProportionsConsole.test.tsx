@@ -3,11 +3,12 @@ import userEvent from '@testing-library/user-event'
 import { describe, expect, it } from 'vitest'
 import type { ModelContent, ModelEntry } from '../../../../api/types'
 import { content as blank, draftEntry, modelsBackend } from '../../../../test/characterModelsBackend'
-import CharacterModelsConsole from './CharacterModelsConsole'
+import DesignerConsole from './DesignerConsole'
 import { newShape } from './engine/edit'
 import { makeTwin } from './engine/pairEdit'
 import { setPivot } from './engine/rigEdit'
 import { addGroup, addObject, addShape, newGroup } from './modelContent'
+import { openDrawer } from '../../../../test/designerUi'
 
 const box = (x: number, y: number, w: number, h: number) => ({ x, y, w, h })
 
@@ -27,8 +28,8 @@ function armed(): ModelContent {
 async function open(entries: ModelEntry[] = [draftEntry('a', armed())]) {
   const backend = modelsBackend(entries)
   const user = userEvent.setup()
-  render(<CharacterModelsConsole />)
-  await screen.findByRole('heading', { name: 'Character models' })
+  render(<DesignerConsole />)
+  await screen.findByRole('region', { name: 'Designer' })
   return { backend, user }
 }
 
@@ -284,7 +285,7 @@ describe('how an object fits the body', () => {
 
   it('tells the Check panel about an object that does not scale with its group', async () => {
     const { user } = await open([draftEntry('a', { ...armed(), objects: armed().objects.map(o => (o.id === 'oF' ? { ...o, fit: 'keep' as const } : o)) })])
+    await openDrawer(user)
     expect(screen.getByText(/Fore part keeps its size/)).toBeInTheDocument()
-    expect(user).toBeTruthy()
   })
 })

@@ -953,6 +953,15 @@ export function GridSnapIcon(props: IconProps) {
   </IconBase>
 }
 
+// A dress form: the neck cap, the shoulders, bust and waist, and the stand with its foot (the Designer).
+export function MannequinIcon(props: IconProps) {
+  return <IconBase {...props}>
+    <path d="M10 5.200c0-1 .900-1.700 2-1.700s2 .700 2 1.700" />
+    <path d="M10 5.200L6.800 6.600c-.800 2.600-.300 4.900 1.400 6.400L7 18h10l-1.200-5c1.700-1.500 2.200-3.800 1.400-6.400L14 5.200" />
+    <path d="M12 18v3.500M9 21.500h6" />
+  </IconBase>
+}
+
 // An arrow pointer: pick things and move them.
 export function CursorIcon(props: IconProps) {
   return <IconBase {...props}>

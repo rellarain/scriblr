@@ -3,11 +3,12 @@ import userEvent from '@testing-library/user-event'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import type { ModelContent, ModelEntry } from '../../../../api/types'
 import { content as blank, draftEntry, modelsBackend } from '../../../../test/characterModelsBackend'
-import CharacterModelsConsole from './CharacterModelsConsole'
+import DesignerConsole from './DesignerConsole'
 import { grayHex, hexHsl, hslHex, slotById } from './engine/colour'
 import { newShape } from './engine/edit'
 import { standardGenres, standardSlots, starterPalette } from './engine/standardColours'
 import { addGroup, addObject, addShape, newGroup } from './modelContent'
+import { openDrawer } from '../../../../test/designerUi'
 
 const box = (x: number, y: number, w: number, h: number) => ({ x, y, w, h })
 
@@ -35,8 +36,8 @@ function coloured(over: Partial<ModelContent> = {}): ModelContent {
 async function open(entries: ModelEntry[] = [draftEntry('a', coloured())]) {
   const backend = modelsBackend(entries)
   const user = userEvent.setup()
-  render(<CharacterModelsConsole />)
-  await screen.findByRole('heading', { name: 'Character models' })
+  render(<DesignerConsole />)
+  await screen.findByRole('region', { name: 'Designer' })
   return { backend, user }
 }
 
@@ -127,7 +128,8 @@ describe('the Colour tab: what a shape is painted from', () => {
   it('is refused at Publish when a shape names a slot that is gone', async () => {
     const bad = coloured()
     bad.shapes = bad.shapes.map(s => (s.id === 'skull' ? { ...s, slot: 'k_gone' } : s))
-    await open([draftEntry('a', bad)])
+    const { user } = await open([draftEntry('a', bad)])
+    await openDrawer(user)
     expect(screen.getByRole('button', { name: /Publish/ })).toBeDisabled()
     expect(screen.getByText(/uses a colour slot that does not exist/)).toBeInTheDocument()
   })
@@ -298,7 +300,8 @@ describe('the selection ring and the other places that draw colour', () => {
   })
 
   it('draws the previews in colour: each tile has colours of its own', async () => {
-    await open()
+    const { user } = await open()
+    await openDrawer(user)
     const tiles = [...document.querySelectorAll('svg.cmTile')]
     expect(tiles.length).toBeGreaterThan(1)
     const fills = tiles.map(t => [...t.querySelectorAll('path')].map(p => /--shape-fill:\s*([^;]+)/.exec(p.getAttribute('style') ?? '')?.[1]).join())

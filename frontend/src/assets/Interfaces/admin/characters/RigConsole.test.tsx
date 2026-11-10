@@ -4,12 +4,13 @@ import { afterEach, describe, expect, it, vi } from 'vitest'
 import type { ModelContent, ModelEntry } from '../../../../api/types'
 import { holdTile } from '../../../../test/tileDrag'
 import { content, draftEntry, modelsBackend } from '../../../../test/characterModelsBackend'
-import CharacterModelsConsole from './CharacterModelsConsole'
+import DesignerConsole from './DesignerConsole'
 import { newShape } from './engine/edit'
 import { gridStep } from './engine/gridSnap'
 import { addRange, addTurn, attachGroup, newRange, reparent, type Edit } from './engine/rigEdit'
 import { addGroup, addObject, addShape, newGroup } from './modelContent'
 import * as presetFile from '../plot/presetFile'
+import { openDrawer } from '../../../../test/designerUi'
 
 vi.mock('../plot/presetFile', async importOriginal => ({ ...(await importOriginal<typeof import('../plot/presetFile')>()), downloadTextFile: vi.fn() }))
 
@@ -42,8 +43,8 @@ function figure(over: (c: ModelContent) => ModelContent = c => c): ModelContent 
 async function open(entries: ModelEntry[] = [draftEntry('a', figure())]) {
   const backend = modelsBackend(entries)
   const user = userEvent.setup()
-  const view = render(<CharacterModelsConsole />)
-  await screen.findByRole('heading', { name: 'Character models' })
+  const view = render(<DesignerConsole />)
+  await screen.findByRole('region', { name: 'Designer' })
   return { backend, user, view }
 }
 
@@ -181,6 +182,7 @@ describe('the Rig tab', () => {
 describe('the pivot on the canvas', () => {
   it('is drawn for the selected group, nudged with the arrow keys, and dragged when no slider is away from rest', async () => {
     const { user, backend } = await open()
+    await user.click(screen.getByRole('button', { name: 'Alignment guides' }))   // (the guides would pull the pivot to a line it comes near)
     await user.click(groupRow('Body'))
     const pivot = () => screen.getByRole('button', { name: /^Pivot of Body/ })
     expect(pivot()).toHaveAccessibleName(/Drag it, or press the arrow keys/)
@@ -603,6 +605,7 @@ describe('the mirror line', () => {
 describe('the previews and the checks', () => {
   it('draw the sliders at the ends of their ranges in the stress previews', async () => {
     const { user } = await open()
+    await openDrawer(user)
     const strip = screen.getByRole('region', { name: 'Previews' })
     const tile = () => within(strip).getByRole('img', { name: 'Preview 1' }).innerHTML
     await user.click(within(strip).getByRole('button', { name: 'Smallest' }))
@@ -613,7 +616,8 @@ describe('the previews and the checks', () => {
 
   it('say what looks wrong in the rig', async () => {
     const c = figure(m => ({ ...m, ranges: [...m.ranges, newRange('idle', 'Idle slider', 'turn')] }))
-    await open([draftEntry('a', c)])
+    const { user } = await open([draftEntry('a', c)])
+    await openDrawer(user)
     const checks = within(screen.getByRole('region', { name: 'Checks' }))
     expect(checks.getByText('Rig check:')).toBeInTheDocument()
     expect(checks.getByText('Slider Idle slider drives nothing yet.')).toBeInTheDocument()
@@ -622,7 +626,8 @@ describe('the previews and the checks', () => {
   it('warn about a pivot chain that is deeper than 6 levels', async () => {
     let c = figure()
     for (let i = 0; i < 5; i++) { c = addGroup(c, newGroup(`x${i}`, `Deep ${i}`)); c = must(reparent(c, `x${i}`, i ? `x${i - 1}` : 'gF')) }
-    await open([draftEntry('a', c)])
+    const { user } = await open([draftEntry('a', c)])
+    await openDrawer(user)
     expect(within(screen.getByRole('region', { name: 'Checks' })).getByText(/Deep 4 is 7 levels deep: the warning starts above 6/)).toBeInTheDocument()
   })
 })

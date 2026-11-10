@@ -3,10 +3,11 @@ import userEvent from '@testing-library/user-event'
 import { describe, expect, it } from 'vitest'
 import type { ModelContent, ModelEntry, ModelFrame } from '../../../../api/types'
 import { content as blank, draftEntry, modelsBackend } from '../../../../test/characterModelsBackend'
-import CharacterModelsConsole from './CharacterModelsConsole'
+import DesignerConsole from './DesignerConsole'
 import { newShape } from './engine/edit'
 import { gridStep } from './engine/gridSnap'
 import { addGroup, addObject, addShape, newGroup } from './modelContent'
+import { openDrawer } from '../../../../test/designerUi'
 
 const box = (x: number, y: number, w: number, h: number) => ({ x, y, w, h })
 
@@ -23,8 +24,8 @@ const bust: ModelFrame = { id: 'fB', name: 'Bust', x: 60, y: 30, w: 90, h: 120, 
 async function open(c: ModelContent = figure([bust])) {
   const backend = modelsBackend([draftEntry('a', c)])
   const user = userEvent.setup()
-  render(<CharacterModelsConsole />)
-  await screen.findByRole('heading', { name: 'Character models' })
+  render(<DesignerConsole />)
+  await screen.findByRole('region', { name: 'Designer' })
   await user.click(screen.getByRole('tab', { name: 'Frames' }))
   return { backend, user }
 }
@@ -236,6 +237,7 @@ describe('looking through a frame', () => {
 
   it('shows the previews through a frame too', async () => {
     const { user } = await open()
+    await openDrawer(user)
     const chips = within(screen.getByRole('group', { name: 'Frame to look through' }))
     expect(chips.getByRole('button', { name: 'Whole' })).toHaveAttribute('aria-pressed', 'true')
     const strip = screen.getByRole('region', { name: 'Previews' })

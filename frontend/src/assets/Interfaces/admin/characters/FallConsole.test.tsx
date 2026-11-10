@@ -3,7 +3,7 @@ import userEvent from '@testing-library/user-event'
 import { describe, expect, it } from 'vitest'
 import type { ModelContent, ModelEntry, ModelPoint, ModelShape } from '../../../../api/types'
 import { content as blank, draftEntry, modelsBackend } from '../../../../test/characterModelsBackend'
-import CharacterModelsConsole from './CharacterModelsConsole'
+import DesignerConsole from './DesignerConsole'
 import { addGroup, addObject, addShape, newGroup } from './modelContent'
 
 const pt = (x: number, y: number, over: Partial<ModelPoint> = {}): ModelPoint => ({ x, y, m: 's', ...over })
@@ -24,8 +24,8 @@ function figure(weighted = true): ModelContent {
 async function open(c: ModelContent = figure()) {
   const backend = modelsBackend([draftEntry('a', c)])
   const user = userEvent.setup()
-  render(<CharacterModelsConsole />)
-  await screen.findByRole('heading', { name: 'Character models' })
+  render(<DesignerConsole />)
+  await screen.findByRole('region', { name: 'Designer' })
   return { backend, user }
 }
 

@@ -82,6 +82,14 @@ export function setMode(shape: ModelShape, i: number, mode: ModelPointMode, o: E
   return s
 }
 
+// A click on a point steps its handles through: none (sharp), both (curve), the incoming one only (curve, then sharp: the left handle) and the outgoing one only
+// (sharp, then curve: the right handle), and round to none again.
+export const NEXT_MODE: Record<ModelPointMode, ModelPointMode> = { s: 'c', c: 'cs', cs: 'sc', sc: 's' }
+export function cycleMode(shape: ModelShape, i: number, o: EditOptions = {}): ModelShape {
+  const p = shape.pts[i]
+  return p ? setMode(shape, i, NEXT_MODE[p.m] ?? 's', o) : copyShape(shape)
+}
+
 // Back to the automatic handles.
 export function resetHandles(shape: ModelShape, i: number, o: EditOptions = {}): ModelShape {
   const s = copyShape(shape)
