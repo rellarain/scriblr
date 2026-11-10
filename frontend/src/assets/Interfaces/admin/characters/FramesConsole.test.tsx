@@ -7,7 +7,7 @@ import DesignerConsole from './DesignerConsole'
 import { newShape } from './engine/edit'
 import { gridStep } from './engine/gridSnap'
 import { addGroup, addObject, addShape, newGroup } from './modelContent'
-import { openDrawer } from '../../../../test/designerUi'
+import { openDrawer, pick } from '../../../../test/designerUi'
 
 const box = (x: number, y: number, w: number, h: number) => ({ x, y, w, h })
 
@@ -65,7 +65,7 @@ describe('the Frames tab', () => {
   it('adds a frame round the selection', async () => {
     const { backend, user } = await open(figure())
     await user.click(tab('Shape'))
-    await user.click(within(screen.getByRole('navigation', { name: 'Model tree' })).getByRole('button', { name: 'Arm shape' }))
+    await pick(user, 'Arm shape', 'shape')
     await user.click(tab('Frames'))
     await user.click(screen.getByRole('button', { name: 'Add a frame' }))
     await save(user)

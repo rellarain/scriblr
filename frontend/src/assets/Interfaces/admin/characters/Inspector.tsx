@@ -31,6 +31,12 @@ const TABS: Array<{ id: InspectorTab; name: string; Icon: typeof PathIcon }> = [
   { id: 'frames', name: 'Frames', Icon: CardIcon },
 ]
 
+// The tabs that mean something for what is open: the rig is for a group and what is in it, forms belong to an object (and so to its shapes), and the rest are the model's own and
+// stay (the colour of a shape, the span a slider gives a writer, a frame round the selection). A tab that is not here is not offered, and one that was open falls back to Shape.
+export function tabsFor(kind: Selection['kind']): InspectorTab[] {
+  return TABS.map(t => t.id).filter(id => (id === 'rig' ? kind !== 'none' : id === 'forms' ? kind === 'object' || kind === 'shape' : true))
+}
+
 export interface InspectorProps {
   tab: InspectorTab
   onTab: (tab: InspectorTab) => void
@@ -67,25 +73,28 @@ export interface InspectorProps {
 const VIEWS: Array<{ id: ModelView; name: string }> = [{ id: 'both', name: 'Front and back' }, { id: 'front', name: 'Front only' }, { id: 'back', name: 'Back only' }]
 
 export function Inspector(p: InspectorProps) {
+  const offered = tabsFor(p.sel.kind)
+  const tabs = TABS.filter(t => offered.includes(t.id))
+  const tab = offered.includes(p.tab) ? p.tab : 'shape'
   return (
     <div className="cmInspector">
       <div className="cmTabs" role="tablist" aria-label="Inspector tabs">
-        {TABS.map(t => (
+        {tabs.map(t => (
           <button
-            key={t.id} type="button" role="tab" id={`cm-tab-${t.id}`} className={`cmTab${p.tab === t.id ? ' cmTab--on' : ''}`} aria-selected={p.tab === t.id} aria-controls="cm-tabpanel" tabIndex={p.tab === t.id ? 0 : -1}
+            key={t.id} type="button" role="tab" id={`cm-tab-${t.id}`} className={`cmTab${tab === t.id ? ' cmTab--on' : ''}`} aria-selected={tab === t.id} aria-controls="cm-tabpanel" tabIndex={tab === t.id ? 0 : -1}
             title={t.name} onClick={() => p.onTab(t.id)}
             onKeyDown={e => {
               if (e.key !== 'ArrowRight' && e.key !== 'ArrowLeft') return
               e.preventDefault()
-              const at = TABS.findIndex(x => x.id === t.id), next = TABS[(at + (e.key === 'ArrowRight' ? 1 : TABS.length - 1)) % TABS.length]
+              const at = tabs.findIndex(x => x.id === t.id), next = tabs[(at + (e.key === 'ArrowRight' ? 1 : tabs.length - 1)) % tabs.length]
               p.onTab(next.id)
               document.getElementById(`cm-tab-${next.id}`)?.focus()
             }}
           ><t.Icon size={13} /> {t.name}</button>
         ))}
       </div>
-      <div id="cm-tabpanel" role="tabpanel" aria-labelledby={`cm-tab-${p.tab}`} className="cmTabPanel">
-        {p.tab === 'shape' ? <ShapeTab {...p} /> : p.tab === 'rig' ? p.rigTab : p.tab === 'ranges' ? p.rangesTab : p.tab === 'forms' ? p.formsTab : p.tab === 'presets' ? p.presetsTab : p.tab === 'colour' ? p.colourTab : p.tab === 'proportions' ? p.proportionsTab : p.framesTab}
+      <div id="cm-tabpanel" role="tabpanel" aria-labelledby={`cm-tab-${tab}`} className="cmTabPanel">
+        {tab === 'shape' ? <ShapeTab {...p} /> : tab === 'rig' ? p.rigTab : tab === 'ranges' ? p.rangesTab : tab === 'forms' ? p.formsTab : tab === 'presets' ? p.presetsTab : tab === 'colour' ? p.colourTab : tab === 'proportions' ? p.proportionsTab : p.framesTab}
       </div>
     </div>
   )
@@ -104,7 +113,7 @@ function ShapeTab(p: InspectorProps) {
       <div className="cmTabBody">
         <h2 className="cmInsTitle">Overview</h2>
         <p className="cmInsText">{content.groups.length} groups, {content.objects.length} objects, {content.shapes.length} shapes and {content.ranges.length} sliders. Nothing is selected: the canvas shows the end result.</p>
-        <p className="cmInsText">Pick a row in the tree, or click a shape. Right-click the grid to unselect everything. Right-click a shape to move through point editor, move shape and unselected. Right-drag the grid to pan.</p>
+        <p className="cmInsText">Open a card in the tree, or click a shape. Right-click the grid to unselect everything. Right-click a shape to move through point editor, move shape and unselected. Right-drag the grid to pan.</p>
         <h3 className="cmInsSub">Mirror line</h3>
         <Stepper label="Mirror line" value={`x ${content.axis}`} onStep={p.onAxis} lowerOff={content.axis <= 40} raiseOff={content.axis >= 160} />
         <p className="cmInsText">Twins and mirror editing reflect about this line. It is drawn on the canvas.</p>

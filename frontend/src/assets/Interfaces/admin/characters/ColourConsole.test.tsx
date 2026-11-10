@@ -8,7 +8,7 @@ import { grayHex, hexHsl, hslHex, slotById } from './engine/colour'
 import { newShape } from './engine/edit'
 import { standardGenres, standardSlots, starterPalette } from './engine/standardColours'
 import { addGroup, addObject, addShape, newGroup } from './modelContent'
-import { openDrawer } from '../../../../test/designerUi'
+import { openDrawer, pick } from '../../../../test/designerUi'
 
 const box = (x: number, y: number, w: number, h: number) => ({ x, y, w, h })
 
@@ -41,7 +41,6 @@ async function open(entries: ModelEntry[] = [draftEntry('a', coloured())]) {
   return { backend, user }
 }
 
-const tree = () => within(screen.getByRole('navigation', { name: 'Model tree' }))
 const canvas = () => screen.getByRole('application')
 const pathOf = (id: string) => canvas().querySelector(`path[data-shape="${id}"]`) as SVGPathElement | null
 const fillOf = (id: string) => /--shape-fill:\s*([^;]+)/.exec(pathOf(id)?.getAttribute('style') ?? '')?.[1].trim() ?? null
@@ -57,7 +56,7 @@ const model = coloured()
 const skin = slotById(model, 'k_skin')!
 
 async function onSkull(user: ReturnType<typeof userEvent.setup>) {
-  await user.click(tree().getByRole('button', { name: 'Skull shape' }))
+  await pick(user, 'Skull shape')
   await user.click(tab('Colour'))
 }
 
@@ -101,7 +100,7 @@ describe('the Colour tab: what a shape is painted from', () => {
 
   it('paints every shape of an object from a slot at once', async () => {
     const { user, backend } = await open()
-    await user.click(tree().getByRole('button', { name: 'Skull' }))
+    await pick(user, 'Skull')
     await user.click(tab('Colour'))
     await user.click(region('Colour of the selection').getByRole('button', { name: 'Hair' }))
     await save(user)
@@ -258,12 +257,13 @@ describe('rolling the look', () => {
 
   it('leaves a locked object as it is, and rolls the rest', async () => {
     const { user } = await open()
-    await user.click(tree().getByRole('button', { name: 'Skull shape' }))
+    await pick(user, 'Skull shape')
     await user.click(tab('Colour'))
     await user.click(region('Test colours').getByRole('button', { name: `Colour ${skin.colours[0].hex}` }))
-    expect(tree().getByRole('button', { name: 'Lock Skull' })).toHaveAttribute('aria-pressed', 'false')
-    await user.click(tree().getByRole('button', { name: 'Lock Skull' }))
-    expect(tree().getByRole('button', { name: 'Lock Skull' })).toHaveAttribute('aria-pressed', 'true')
+    await pick(user, 'Skull', 'object')
+    expect(screen.getByRole('button', { name: 'Lock Skull' })).toHaveAttribute('aria-pressed', 'false')
+    await user.click(screen.getByRole('button', { name: 'Lock Skull' }))
+    expect(screen.getByRole('button', { name: 'Lock Skull' })).toHaveAttribute('aria-pressed', 'true')
     expect(reset()).toHaveTextContent('1 off rest')          // a lock is not something off rest
     const shirts = new Set<string | null>()
     for (let i = 0; i < 10; i++) { fireEvent.click(screen.getByRole('button', { name: 'Roll the look' })); expect(fillOf('skull')).toBe(skin.colours[0].hex); shirts.add(fillOf('shirt')) }
@@ -272,7 +272,8 @@ describe('rolling the look', () => {
 
   it('locks a whole group, and a lock on a group holds its objects\' slots', async () => {
     const { user } = await open()
-    await user.click(tree().getByRole('button', { name: 'Lock Head' }))
+    await pick(user, 'Head', 'group')
+    await user.click(screen.getByRole('button', { name: 'Lock Head' }))
     await user.click(screen.getByRole('button', { name: 'Roll the look' }))
     expect(fillOf('skull')).toBe(grayHex(skin.lRest))        // the head's slots stay as they were (gray)
     expect(fillOf('shirt')).not.toBe(grayHex(slotById(model, 'k_cloth')!.lRest))
@@ -293,7 +294,7 @@ describe('the selection ring and the other places that draw colour', () => {
     await user.click(screen.getByRole('button', { name: 'Roll the look' }))
     const before = fillOf('skull')
     expect(canvas().querySelector('[data-ring]')).toBeNull()
-    await user.click(tree().getByRole('button', { name: 'Skull shape' }))
+    await pick(user, 'Skull shape')
     expect(canvas().querySelector('[data-ring="skull"]')).not.toBeNull()
     expect(canvas().querySelectorAll('.cmRing')).toHaveLength(2)
     expect(fillOf('skull')).toBe(before)
@@ -311,7 +312,7 @@ describe('the selection ring and the other places that draw colour', () => {
 
   it('draws the pictures of the forms in the test colours', async () => {
     const { user } = await open()
-    await user.click(tree().getByRole('button', { name: 'Eye' }))
+    await pick(user, 'Eye')
     await user.click(tab('Colour'))
     const eye = slotById(model, 'k_eye')!
     await user.click(region('Test colours').getByRole('button', { name: 'Eye' }))
@@ -405,7 +406,7 @@ describe('the slots of the model', () => {
 
   it('adds the standard slots to a model that has none, keeping the model\'s own', async () => {
     const { user, backend } = await open([draftEntry('a', coloured({ genres: [], palette: [], slots: [{ ...standardSlots()[0], name: 'My skin', colours: [] }] }))])
-    await user.click(tree().getByRole('button', { name: 'Skull shape' }))
+    await pick(user, 'Skull shape')
     await user.click(tab('Colour'))
     const slots = region('Slots of the model')
     await user.click(slots.getByRole('button', { name: /Add the standard slots/ }))

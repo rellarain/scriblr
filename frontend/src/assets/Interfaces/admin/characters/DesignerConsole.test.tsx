@@ -7,7 +7,7 @@ import DesignerConsole from './DesignerConsole'
 import { newShape } from './engine/edit'
 import { templateBox } from './engine/templates'
 import { addGroup, addObject, addShape } from './modelContent'
-import { openDrawer } from '../../../../test/designerUi'
+import { openDrawer, pick } from '../../../../test/designerUi'
 
 // a model that can be published: one oval in one object in one group
 function complete(name: string, shape = newShape('s', 'Skull', 'oval', templateBox('oval', 100, 46, 40))): ModelContent {
@@ -35,9 +35,11 @@ async function open(entries: ModelEntry[] = [liveEntry('a', complete('Adult')), 
   return { backend, user, view }
 }
 
-const list = () => screen.getByRole('complementary', { name: 'Models' })
-const rowOf = (name: string) => within(list()).getByRole('button', { name: new RegExp(`^${name}`) })
 const tree = () => within(screen.getByRole('navigation', { name: 'Model tree' }))
+// the card of a model: the open one at the top of the tree, or any of them in the list of all the models
+const rowOf = (name: string) => tree().getByRole('group', { name: `Model ${name}` })
+const showAll = (user: ReturnType<typeof userEvent.setup>) => user.click(screen.getByRole('button', { name: 'Show all the models' }))
+const list = () => tree().getByRole('region', { name: 'Models' })
 const canvas = () => screen.getByRole('application')
 const shapePaths = () => Array.from(canvas().querySelectorAll('path[data-shape]'))
 const pointDot = (n: number) => screen.getByRole('button', { name: `Point ${n}` })
@@ -57,18 +59,21 @@ const dotAt = (n: number) => ({ x: Number(pointDot(n).getAttribute('cx')), y: Nu
 
 describe('the list', () => {
   it('lists the models, each with where it stands, and opens the first', async () => {
-    await open()
-    expect(within(list()).getByText('Models · 2')).toBeInTheDocument()
+    const { user } = await open()
+    expect(rowOf('Adult')).toHaveTextContent('Published v1')                       // the open model is a card of its own at the top of the tree
+    await showAll(user)
+    expect(list().querySelector('.cmCount')).toHaveTextContent('2')
     expect(rowOf('Adult')).toHaveTextContent('Published v1')
     expect(rowOf('Stylised')).toHaveTextContent('Not published')
-    expect(rowOf('Adult')).toHaveAttribute('aria-current', 'true')
+    expect(within(rowOf('Adult')).getByRole('button', { name: 'Adult' })).toHaveAttribute('aria-current', 'true')
     expect(screen.getByRole('textbox', { name: 'Model name' })).toHaveValue('Adult')
     expect(shapePaths()).toHaveLength(1)
   })
 
   it('opens another model when its row is chosen', async () => {
     const { user } = await open()
-    await user.click(rowOf('Stylised'))
+    await showAll(user)
+    await user.click(within(rowOf('Stylised')).getByRole('button', { name: 'Stylised' }))
     expect(screen.getByRole('textbox', { name: 'Model name' })).toHaveValue('Stylised')
     expect(shapePaths()).toHaveLength(0)
     expect(screen.getByText(/No shape yet/)).toBeInTheDocument()
@@ -97,7 +102,7 @@ describe('the list', () => {
 describe('drawing', () => {
   async function startWithOval() {
     const ctx = await open([draftEntry('a', complete('Adult'))])
-    await ctx.user.click(tree().getByRole('button', { name: 'Skull' }))
+    await pick(ctx.user, 'Skull')
     return ctx
   }
 
@@ -160,7 +165,8 @@ describe('drawing', () => {
 
   it('removes a shape and brings it back with undo', async () => {
     const { user } = await open([draftEntry('a', complete('Adult'))])
-    await user.click(tree().getByRole('button', { name: 'Delete Skull' }))
+    await pick(user, 'Skull', 'shape')
+    await user.click(screen.getByRole('button', { name: 'Delete Skull' }))
     expect(shapePaths()).toHaveLength(0)
     await user.click(screen.getByRole('button', { name: 'Undo' }))
     expect(shapePaths()).toHaveLength(1)
@@ -185,13 +191,13 @@ describe('drawing', () => {
     expect(note()).toHaveTextContent('Point editor')
     rightClick(canvas())
     expect(note()).toHaveTextContent('Nothing is selected')
-    await user.click(tree().getByRole('button', { name: 'Head' }))
+    await pick(user, 'Head')
     expect(note()).toHaveTextContent('Pick a shape')
   })
 
   it('moves the whole shape in move mode', async () => {
     const { user } = await open([draftEntry('a', complete('Adult'))])
-    await user.click(tree().getByRole('button', { name: 'Skull' }))
+    await pick(user, 'Skull')
     await user.click(screen.getByRole('button', { name: 'Move shape' }))
     const shape = shapePaths()[0], before = shape.getAttribute('d')
     const start = pixelOf(100, 46)
@@ -217,7 +223,7 @@ describe('drawing', () => {
 describe('the limits', () => {
   it('warns above 24 points and stops adding at 60', async () => {
     const { user } = await open([draftEntry('a', complete('Adult', polygon(25)))])
-    await user.click(tree().getByRole('button', { name: 'Round' }))
+    await pick(user, 'Round')
     expect(screen.getByText('25 of 60')).toBeInTheDocument()
     expect(screen.getAllByText(/More than 24 points/).length).toBeGreaterThan(0)
     expect(screen.getByRole('button', { name: /Add a point after it/ })).toBeEnabled()
@@ -225,7 +231,7 @@ describe('the limits', () => {
 
   it('refuses a 61st point and blocks Publish for a shape at the limit', async () => {
     const { user } = await open([draftEntry('a', complete('Adult', polygon(60)))])
-    await user.click(tree().getByRole('button', { name: 'Round' }))
+    await pick(user, 'Round')
     expect(screen.getByText(/The most points a shape may have \(60\)/)).toBeInTheDocument()
     expect(screen.getByRole('button', { name: /Add a point after it/ })).toBeDisabled()
     await openDrawer(user)
@@ -322,10 +328,12 @@ describe('the preview strip and the tree', () => {
     c = addShape(c, 'o', newShape('t', 'Chin', 'oval', templateBox('oval', 100, 70, 20)))
     const { user, backend } = await open([draftEntry('a', c)])
     await user.type(screen.getByRole('textbox', { name: 'Search the model' }), 'chin')
-    expect(tree().queryByRole('button', { name: 'Skull' })).toBeNull()   // the shape named Skull is filtered out; Chin stays
-    expect(tree().getByRole('button', { name: 'Chin' })).toBeInTheDocument()
+    expect(tree().queryByRole('button', { name: /^Skull/ })).toBeNull()   // the shape named Skull is filtered out; Chin stays
+    expect(tree().getByRole('button', { name: /^Chin/ })).toBeInTheDocument()
     await user.clear(screen.getByRole('textbox', { name: 'Search the model' }))
-    await user.click(tree().getByRole('button', { name: /Move Skull up in the draw order/ }))
+    await pick(user, 'Face', 'object')
+    screen.getByRole('button', { name: 'Move Skull (Alt+Up or Down)' }).focus()      // the shapes are listed topmost first: Chin over Skull, so Skull moves up
+    await user.keyboard('{Alt>}{ArrowUp}{/Alt}')
     await save(user)
     await waitFor(() => expect(backend.entries[0].draft.objects[0].shapes).toEqual(['t', 's']))
   })

@@ -9,6 +9,7 @@ import { boxOf, build, flatten } from './engine/geometry'
 import { gridStep } from './engine/gridSnap'
 import { zoomToSlider } from './zoomMap'
 import { addGroup, addObject, addShape, newGroup } from './modelContent'
+import { pick } from '../../../../test/designerUi'
 
 // The designer's view: it is fitted when the selection changes (or Fit is pressed) and then held, so the grid stays still while something is dragged; holding a drag at an
 // edge or a corner pans it; and Fit to screen takes the box round everything that is drawn, with little blank space.
@@ -110,7 +111,6 @@ describe('the view while something is dragged', () => {
 
   it('fits a selection that cannot be seen in the view, and then holds that view', async () => {
     const user = await open()
-    const tree = () => within(screen.getByRole('navigation', { name: 'Model tree' }))
     // the view is panned right away from the figure (a right-drag), so nothing is in it
     const panAway = () => {
       pointer(canvas(), 'pointerdown', { x: 600, y: 300, button: 2 })
@@ -120,7 +120,7 @@ describe('the view while something is dragged', () => {
     panAway()
     const away = viewBox()
     expect(away[0]).toBeGreaterThan(148)
-    await user.click(tree().getByRole('button', { name: 'Torso shape' }))
+    await pick(user, 'Torso shape')
     const torso = viewBox()
     expect(torso).not.toEqual(away)
     expect(torso[0]).toBeLessThanOrEqual(70)
@@ -128,12 +128,12 @@ describe('the view while something is dragged', () => {
     // and again for the arm, from a view that has gone away from it
     panAway()
     expect(viewBox()[0]).toBeGreaterThan(148)
-    await user.click(tree().getByRole('button', { name: 'Arm shape' }))
+    await pick(user, 'Arm shape')
     const arm = viewBox()
     expect(arm[0]).toBeLessThanOrEqual(134)
     expect(arm[0] + arm[2]).toBeGreaterThanOrEqual(148)
     // the torso sticks out of that view, so selecting it fits it again
-    await user.click(tree().getByRole('button', { name: 'Torso shape' }))
+    await pick(user, 'Torso shape')
     expect(viewBox()).not.toEqual(arm)
     expect(viewBox()[0]).toBeLessThanOrEqual(70)
     expect(viewBox()[0] + viewBox()[2]).toBeGreaterThanOrEqual(130)

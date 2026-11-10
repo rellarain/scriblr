@@ -11,7 +11,7 @@ import { isOn, stylesOf, type TestState } from './engine/presets'
 import { drawable, paintDefs, paintShapes, type PaintItem } from './engine/paint'
 import { solve } from './engine/rig'
 import type { PresetActions } from './PresetsTab'
-import { NAME_MAX, groupById, objectById, objectOfShape, shapeById } from './modelContent'
+import { NAME_MAX, objectById, objectOfShape, shapeById } from './modelContent'
 import { PaintDefs, PaintedPath, useSvgPrefix } from './PaintedPath'
 
 // The Forms tab: an object has axes (the shape of an eye, an expression, a style), each with forms to choose from. A form gives some of the object's shapes
@@ -59,20 +59,13 @@ function useThumbs(content: ModelContent, object: ModelObject, axis: ModelAxis, 
 
 export function FormsTab({ content, sel, state, actions, presets, colouring = NO_COLOURING }: FormsTabProps) {
   const object = sel.kind === 'object' ? objectById(content, sel.id) : sel.kind === 'shape' ? objectOfShape(content, sel.id) : undefined
-  const group = sel.kind === 'group' ? groupById(content, sel.id) : undefined
 
+  // The tab is offered for an object and the shapes in it (the Designer's tabs: see `tabsFor`); a group or the model has none.
   if (!object) {
-    const choices = group ? group.objects.map(id => objectById(content, id)).filter((o): o is ModelObject => !!o) : []
     return (
       <div className="cmTabBody">
         <h2 className="cmInsTitle">Forms</h2>
-        <p className="cmInsText">Forms belong to an object: the shape of an eye, an expression, a style. Select an object, or a shape in one, to see its forms.</p>
-        {choices.length > 0 && (
-          <div className="cmChips" role="group" aria-label="Objects of the group">
-            {choices.map(o => <button key={o.id} type="button" className="cmChip cmChip--wide" onClick={() => actions.selectObject(o.id)}>{label(o.name, 'Untitled object')}{axesFor(content, o).length ? ` (${axesFor(content, o).length})` : ''}</button>)}
-          </div>
-        )}
-        {group && <StylesSection content={content} scopeId={group.id} scopeName={label(group.name, 'the group')} state={state} actions={presets} />}
+        <p className="cmInsText">Forms belong to an object: the shape of an eye, an expression, a style. Open an object, or a shape in one, to see its forms.</p>
       </div>
     )
   }

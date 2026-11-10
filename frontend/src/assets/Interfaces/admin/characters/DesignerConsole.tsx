@@ -1,7 +1,6 @@
 import { useRef, useState, type ChangeEvent } from 'react'
 import type { ModelEntry } from '../../../../api/types'
 import { downloadTextFile, readFileText } from '../plot/presetFile'
-import { ModelList } from './ModelList'
 import { ModelPane } from './ModelPane'
 import { ModelFileError, exportFileName, parseModelFile, serializeModels } from './modelFile'
 import { randomId, starterContent } from './modelContent'
@@ -103,12 +102,10 @@ function DesignerConsole({ toolbarHost = null }: { toolbarHost?: HTMLElement | n
         current && (
           <ModelPane
             key={current.id} entry={current} models={models} makeId={randomId} onRemove={remove} onDuplicate={duplicate} onExport={e => exportEntries([e])} barHost={toolbarHost}
-            treeHead={(
-              <ModelList
-                entries={entries} current={current} open={listOpen} onToggle={() => setListOpen(o => !o)} onSelect={select} onNew={create}
-                onImport={() => fileInput.current?.click()} onExportAll={() => exportEntries(entries)} onMove={models.moveModel}
-              />
-            )}
+            nav={{
+              entries, currentId: current.id, open: listOpen, onOpen: setListOpen, onSelect: select, onNew: create, onImport: () => fileInput.current?.click(),
+              onExportAll: () => exportEntries(entries), onDuplicate: duplicate, onMove: models.moveModel,
+            }}
           />
         )
       )}

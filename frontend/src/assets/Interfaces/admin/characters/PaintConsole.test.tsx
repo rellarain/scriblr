@@ -9,7 +9,7 @@ import { newShape } from './engine/edit'
 import { makeTwin } from './engine/pairEdit'
 import { standardGenres, standardSlots, starterPalette } from './engine/standardColours'
 import { addGroup, addObject, addShape, newGroup } from './modelContent'
-import { openDrawer } from '../../../../test/designerUi'
+import { openDrawer, pick } from '../../../../test/designerUi'
 
 const box = (x: number, y: number, w: number, h: number) => ({ x, y, w, h })
 
@@ -55,7 +55,7 @@ function pointer(el: Element, type: 'pointerdown' | 'pointermove' | 'pointerup',
 }
 
 async function on(user: ReturnType<typeof userEvent.setup>, shape = 'Skull shape') {
-  await user.click(tree().getByRole('button', { name: shape }))
+  await pick(user, shape)
   await user.click(tab('Colour'))
 }
 
@@ -215,7 +215,7 @@ describe('shading shapes', () => {
     await on(user)
     expect(paint().getByText(/0 of 10/)).toBeInTheDocument()
     await addBand(user, 'Shadow', 'Left')
-    await user.click(tree().getByRole('button', { name: 'Skull shape' }))
+    await pick(user, 'Skull shape')
     expect(paint().getByText(/1 of 10/)).toBeInTheDocument()
   })
 })
@@ -234,7 +234,7 @@ describe('shapes that follow another for their paint', () => {
 describe('forms that change paint', () => {
   it('gives a shape another colour slot and tone in a chosen form, only while that form is chosen', async () => {
     const { user, backend } = await open()
-    await user.click(tree().getByRole('button', { name: 'Eye' }))
+    await pick(user, 'Eye')
     await user.click(tab('Forms'))
     const dark = screen.getByRole('button', { name: /^Dark/ })
     await user.click(dark)

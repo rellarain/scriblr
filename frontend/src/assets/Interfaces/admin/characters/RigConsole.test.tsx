@@ -2,7 +2,6 @@ import { act, fireEvent, render, screen, waitFor, within } from '@testing-librar
 import userEvent from '@testing-library/user-event'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import type { ModelContent, ModelEntry } from '../../../../api/types'
-import { holdTile } from '../../../../test/tileDrag'
 import { content, draftEntry, modelsBackend } from '../../../../test/characterModelsBackend'
 import DesignerConsole from './DesignerConsole'
 import { newShape } from './engine/edit'
@@ -10,7 +9,7 @@ import { gridStep } from './engine/gridSnap'
 import { addRange, addTurn, attachGroup, newRange, reparent, type Edit } from './engine/rigEdit'
 import { addGroup, addObject, addShape, newGroup } from './modelContent'
 import * as presetFile from '../plot/presetFile'
-import { openDrawer } from '../../../../test/designerUi'
+import { openDrawer, pick } from '../../../../test/designerUi'
 
 vi.mock('../plot/presetFile', async importOriginal => ({ ...(await importOriginal<typeof import('../plot/presetFile')>()), downloadTextFile: vi.fn() }))
 
@@ -48,13 +47,11 @@ async function open(entries: ModelEntry[] = [draftEntry('a', figure())]) {
   return { backend, user, view }
 }
 
-const tree = () => within(screen.getByRole('navigation', { name: 'Model tree' }))
 const canvas = () => screen.getByRole('application')
 const pathOf = (id: string) => canvas().querySelector(`path[data-shape="${id}"]`) as SVGPathElement
 const dOf = (id: string) => pathOf(id).getAttribute('d')
 const save = (user: ReturnType<typeof userEvent.setup>) => user.click(screen.getByRole('button', { name: 'Save' }))
 const tab = (name: string) => screen.getByRole('tab', { name })
-const groupRow = (name: string) => tree().getByRole('button', { name })
 const savedRange = (b: { entries: ModelEntry[] }, id = 'nod') => b.entries[0].draft.ranges.find(r => r.id === id)!
 const savedGroup = (b: { entries: ModelEntry[] }, id: string) => b.entries[0].draft.groups.find(g => g.id === id)!
 
@@ -70,30 +67,40 @@ const dotAt = (n: number) => ({ x: Number(screen.getByRole('button', { name: `Po
 afterEach(() => { vi.useRealTimers(); vi.mocked(presetFile.downloadTextFile).mockClear() })
 
 describe('the inspector\'s tabs', () => {
-  it('has Shape, Rig, Ranges, Forms, Presets, Colour, Proportions and Frames, moved between with the arrow keys', async () => {
+  const tabNames = () => screen.getAllByRole('tab').map(t => t.textContent?.trim())
+  it('has the tabs of what is open, moved between with the arrow keys', async () => {
     const { user } = await open()
-    expect(screen.getAllByRole('tab').map(t => t.textContent?.trim())).toEqual(['Shape', 'Rig', 'Ranges', 'Forms', 'Presets', 'Colour', 'Proportions', 'Frames'])
+    expect(tabNames()).toEqual(['Shape', 'Ranges', 'Presets', 'Colour', 'Proportions', 'Frames'])          // the model alone has no rig and no forms
     expect(tab('Shape')).toHaveAttribute('aria-selected', 'true')
     tab('Shape').focus()
     await user.keyboard('{ArrowRight}')
-    expect(tab('Rig')).toHaveAttribute('aria-selected', 'true')
-    expect(tab('Rig')).toHaveFocus()
-    await user.keyboard('{ArrowRight}{ArrowRight}{ArrowRight}{ArrowRight}{ArrowRight}{ArrowRight}{ArrowRight}')
+    expect(tab('Ranges')).toHaveAttribute('aria-selected', 'true')
+    expect(tab('Ranges')).toHaveFocus()
+    await user.keyboard('{ArrowRight}{ArrowRight}{ArrowRight}{ArrowRight}{ArrowRight}')
     expect(tab('Shape')).toHaveAttribute('aria-selected', 'true')
     await user.keyboard('{ArrowLeft}')
     expect(tab('Frames')).toHaveAttribute('aria-selected', 'true')
+    await pick(user, 'Face', 'group')
+    expect(tabNames()).toEqual(['Shape', 'Rig', 'Ranges', 'Presets', 'Colour', 'Proportions', 'Frames'])    // a group has a rig, its objects have the forms
+    await pick(user, 'Skull', 'shape')
+    expect(tabNames()).toEqual(['Shape', 'Rig', 'Ranges', 'Forms', 'Presets', 'Colour', 'Proportions', 'Frames'])
   })
-  it('asks for a group when none is selected', async () => {
+  it('has no Rig tab without a group, and goes back to Shape when what was open is gone', async () => {
     const { user } = await open()
+    expect(screen.queryByRole('tab', { name: 'Rig' })).toBeNull()
+    await pick(user, 'Face', 'group')
     await user.click(tab('Rig'))
-    expect(screen.getByText(/Select a group, or an object or shape in one/)).toBeInTheDocument()
+    expect(tab('Rig')).toHaveAttribute('aria-selected', 'true')
+    await user.click(screen.getByRole('button', { name: 'Adult' }))                                        // the model's card: nothing selected
+    expect(screen.queryByRole('tab', { name: 'Rig' })).toBeNull()
+    expect(tab('Shape')).toHaveAttribute('aria-selected', 'true')
   })
 })
 
 describe('the Rig tab', () => {
   it('shows the group\'s chain, its level and its anchor', async () => {
     const { user } = await open()
-    await user.click(groupRow('Face'))
+    await pick(user, 'Face', 'group')
     await user.click(tab('Rig'))
     expect(screen.getByLabelText('Chain of groups')).toHaveTextContent('Body › Face')
     expect(screen.getByText(/Level 2 of 9 in the pivot chain/)).toBeInTheDocument()
@@ -105,7 +112,7 @@ describe('the Rig tab', () => {
 
   it('hangs a group from another and keeps a group from hanging from its own child', async () => {
     const { user, backend } = await open()
-    await user.click(groupRow('Arm'))
+    await pick(user, 'Arm', 'group')
     await user.click(tab('Rig'))
     await user.selectOptions(screen.getByRole('combobox', { name: 'Parent group' }), 'gF')
     expect(screen.getByText(/Level 3 of 9 in the pivot chain/)).toBeInTheDocument()
@@ -118,7 +125,7 @@ describe('the Rig tab', () => {
     expect(savedGroup(backend, 'gA').attach).toBeNull()               // with no parent there is nothing to be fixed to
     expect(screen.getByText(/Its anchor was removed: the shape it was fixed to is not in the new parent or above it/)).toBeInTheDocument()
     await user.selectOptions(screen.getByRole('combobox', { name: 'Parent group' }), 'gF')
-    await user.click(groupRow('Body'))
+    await pick(user, 'Body', 'group')
     const options = within(screen.getByRole('combobox', { name: 'Parent group' })).getAllByRole('option').map(o => o.textContent)
     expect(options).toEqual(['Nothing (the root)'])                      // every other group hangs below it
   })
@@ -128,8 +135,7 @@ describe('the Rig tab', () => {
     for (let i = 0; i < 7; i++) { c = addGroup(c, newGroup(`x${i}`, `Level ${i + 3}`)); c = must(reparent(c, `x${i}`, i ? `x${i - 1}` : 'gF')) }   // Body > Face > Level 3..9
     c = addGroup(c, newGroup('top', 'One too many'))
     const { user } = await open([draftEntry('a', c)])
-    await user.click(screen.getByRole('button', { name: 'Rig' }))          // a group with no object is only in the Rig view of the tree
-    await user.click(groupRow('One too many'))
+    await pick(user, 'One too many', 'group')
     await user.click(tab('Rig'))
     await user.selectOptions(screen.getByRole('combobox', { name: 'Parent group' }), 'x6')
     expect(screen.getByText(/That would make a pivot chain 10 groups long; the most is 9/)).toBeInTheDocument()
@@ -138,7 +144,7 @@ describe('the Rig tab', () => {
 
   it('changes the kind of anchor and steps along the shape', async () => {
     const { user, backend } = await open()
-    await user.click(groupRow('Face'))
+    await pick(user, 'Face', 'group')
     await user.click(tab('Rig'))
     await user.click(screen.getByRole('button', { name: 'Point' }))
     expect(within(screen.getByRole('group', { name: 'Point' })).getByText('1 of 8')).toBeInTheDocument()
@@ -153,7 +159,7 @@ describe('the Rig tab', () => {
 
   it('offers a sliding anchor only when there is a slider, and then picks it', async () => {
     const { user, backend } = await open()
-    await user.click(groupRow('Face'))
+    await pick(user, 'Face', 'group')
     await user.click(tab('Rig'))
     await user.click(screen.getByRole('button', { name: 'Slides' }))
     expect(screen.getByRole('combobox', { name: 'Slider that moves the anchor' })).toHaveValue('nod')
@@ -163,7 +169,7 @@ describe('the Rig tab', () => {
 
   it('picks an anchor by clicking a shape of the parent on the canvas', async () => {
     const { user, backend } = await open()
-    await user.click(groupRow('Face'))
+    await pick(user, 'Face', 'group')
     await user.click(tab('Rig'))
     await user.click(screen.getByRole('button', { name: 'Point' }))
     await user.click(screen.getByRole('button', { name: 'Pick on the canvas' }))
@@ -183,7 +189,7 @@ describe('the pivot on the canvas', () => {
   it('is drawn for the selected group, nudged with the arrow keys, and dragged when no slider is away from rest', async () => {
     const { user, backend } = await open()
     await user.click(screen.getByRole('button', { name: 'Alignment guides' }))   // (the guides would pull the pivot to a line it comes near)
-    await user.click(groupRow('Body'))
+    await pick(user, 'Body', 'group')
     const pivot = () => screen.getByRole('button', { name: /^Pivot of Body/ })
     expect(pivot()).toHaveAccessibleName(/Drag it, or press the arrow keys/)
     const before = savedGroup(backend, 'gB').pivot
@@ -206,7 +212,7 @@ describe('the pivot on the canvas', () => {
 
   it('lands a pivot that is dragged on the grid lines when Snap to grid is on', async () => {
     const { user, backend } = await open()
-    await user.click(groupRow('Body'))
+    await pick(user, 'Body', 'group')
     const pivot = () => screen.getByRole('button', { name: /^Pivot of Body/ })
     pivot().focus()
     fireEvent.keyDown(pivot(), { key: 'ArrowRight' })
@@ -230,7 +236,7 @@ describe('the pivot on the canvas', () => {
 
   it('steps the anchor of an anchored group with the arrow keys: along the edge, to the next point, across the shape', async () => {
     const { user, backend } = await open()
-    await user.click(groupRow('Face'))
+    await pick(user, 'Face', 'group')
     const pivot = () => screen.getByRole('button', { name: /^Pivot of Face/ })
     pivot().focus()
     fireEvent.keyDown(pivot(), { key: 'ArrowRight' })
@@ -249,7 +255,7 @@ describe('the pivot on the canvas', () => {
     fireEvent.keyDown(pivot(), { key: 'ArrowUp' })
     await save(user)
     await waitFor(() => expect(savedGroup(backend, 'gF').attach!.i).toBe(7))                     // wraps round to the last of the eight points
-    await user.click(groupRow('Arm'))                                                           // an "inside" anchor, at 100% across and 10% down
+    await pick(user, 'Arm', 'group')                                                           // an "inside" anchor, at 100% across and 10% down
     const arm = () => screen.getByRole('button', { name: /^Pivot of Arm/ })
     fireEvent.keyDown(arm(), { key: 'ArrowLeft', shiftKey: true })
     fireEvent.keyDown(arm(), { key: 'ArrowDown' })
@@ -259,7 +265,7 @@ describe('the pivot on the canvas', () => {
 
   it('cannot be moved while a slider is away from rest', async () => {
     const { user } = await open()
-    await user.click(groupRow('Body'))
+    await pick(user, 'Body', 'group')
     await user.click(tab('Ranges'))
     await user.click(screen.getByRole('button', { name: 'All (1)' }))
     fireEvent.change(screen.getByLabelText('Try Nod'), { target: { value: '10' } })
@@ -268,9 +274,9 @@ describe('the pivot on the canvas', () => {
 
   it('shows where an anchored group is fixed', async () => {
     const { user } = await open()
-    await user.click(groupRow('Face'))
+    await pick(user, 'Face', 'group')
     expect(canvas().querySelector('.cmAnchor')).not.toBeNull()
-    await user.click(groupRow('Body'))
+    await pick(user, 'Body', 'group')
     expect(canvas().querySelector('.cmAnchor')).toBeNull()
   })
 })
@@ -280,20 +286,20 @@ describe('the Ranges tab', () => {
     const { user } = await open()
     await user.click(tab('Ranges'))
     expect(screen.getByRole('region', { name: 'Slider Nod' })).toBeInTheDocument()           // nothing selected: every slider
-    await user.click(groupRow('Arm'))
+    await pick(user, 'Arm', 'group')
     expect(screen.queryByRole('region', { name: 'Slider Nod' })).toBeNull()
     expect(screen.getByText(/No slider has to do with the selection/)).toBeInTheDocument()
     await user.click(screen.getByRole('button', { name: 'All (1)' }))
     expect(screen.getByRole('region', { name: 'Slider Nod' })).toBeInTheDocument()
     await user.click(screen.getByRole('button', { name: 'This selection' }))
     expect(screen.queryByRole('region', { name: 'Slider Nod' })).toBeNull()
-    await user.click(groupRow('Face'))
+    await pick(user, 'Face', 'group')
     expect(screen.getByRole('region', { name: 'Slider Nod' })).toBeInTheDocument()
   })
 
   it('moves the drawing with the Try it slider, says how many sliders are off rest, and resets them', async () => {
     const { user } = await open()
-    await user.click(groupRow('Face'))
+    await pick(user, 'Face', 'group')
     await user.click(tab('Ranges'))
     const rest = dOf('skull'), neck = dOf('neck')
     expect(screen.queryByText(/off rest/)).toBeNull()
@@ -310,7 +316,7 @@ describe('the Ranges tab', () => {
 
   it('steps the minimum, rest and maximum, and what the drive does at each end', async () => {
     const { user, backend } = await open()
-    await user.click(groupRow('Face'))
+    await pick(user, 'Face', 'group')
     await user.click(tab('Ranges'))
     const card = within(screen.getByRole('region', { name: 'Slider Nod' }))
     await user.click(card.getByRole('button', { name: 'Raise Maximum of Nod' }))
@@ -326,7 +332,7 @@ describe('the Ranges tab', () => {
 
   it('renames a slider, hides it from writers and deletes it after asking', async () => {
     const { user, backend } = await open()
-    await user.click(groupRow('Face'))
+    await pick(user, 'Face', 'group')
     await user.click(tab('Ranges'))
     const name = screen.getByRole('textbox', { name: 'Name of Nod' })
     await user.clear(name)
@@ -347,7 +353,7 @@ describe('the Ranges tab', () => {
     await user.click(screen.getByRole('button', { name: 'New slider' }))
     expect(screen.getByRole('menuitem', { name: /Turn the group/ })).toBeDisabled()
     await user.click(screen.getByRole('button', { name: 'New slider' }))           // closes the menu again
-    await user.click(groupRow('Arm'))
+    await pick(user, 'Arm', 'group')
     await user.click(screen.getByRole('button', { name: 'New slider' }))
     await user.click(screen.getByRole('menuitem', { name: 'Turn the group' }))
     const card = within(screen.getByRole('region', { name: 'Slider Arm turn' }))
@@ -366,7 +372,7 @@ describe('the Ranges tab', () => {
     await user.click(screen.getByRole('button', { name: 'New slider' }))
     await user.click(screen.getByRole('menuitem', { name: 'Scale' }))
     expect(screen.getByRole('region', { name: 'Slider Size' })).toHaveTextContent('Scales the whole model to 80% at the minimum and 120% at the maximum')
-    await user.click(tree().getByRole('button', { name: 'Skull' }))
+    await pick(user, 'Skull')
     await user.click(screen.getByRole('button', { name: 'New slider' }))
     await user.click(screen.getByRole('menuitem', { name: 'Scale' }))
     expect(screen.getByRole('region', { name: 'Slider Skull size' })).toHaveTextContent('Scales Skull to 80% at the minimum')
@@ -376,13 +382,13 @@ describe('the Ranges tab', () => {
 
   it('adds a bend to a slider from the selected shape, and adds nothing when no shape is selected', async () => {
     const { user } = await open()
-    await user.click(groupRow('Arm'))
+    await pick(user, 'Arm', 'group')
     await user.click(tab('Ranges'))
     await user.click(screen.getByRole('button', { name: 'All (1)' }))
     const card = within(screen.getByRole('region', { name: 'Slider Nod' }))
     await user.click(card.getByRole('button', { name: 'Add what it drives' }))
     expect(screen.getByRole('menuitem', { name: /Bend the shape/ })).toBeDisabled()
-    await user.click(tree().getByRole('button', { name: 'Bicep' }))                // the menu stays open while another thing is selected
+    await pick(user, 'Bicep')                // the menu stays open while another thing is selected
     await user.click(screen.getByRole('menuitem', { name: 'Bend the shape' }))
     expect(card.getByText(/Bends Bicep by -30° at the minimum and \+30° at the maximum/)).toBeInTheDocument()
     await user.click(card.getByRole('button', { name: 'Raise Bend ends at' }))
@@ -392,7 +398,7 @@ describe('the Ranges tab', () => {
 
   it('sweeps a slider from its minimum to its maximum and back, and stops', async () => {
     const { user } = await open()
-    await user.click(groupRow('Face'))
+    await pick(user, 'Face', 'group')
     await user.click(tab('Ranges'))
     vi.useFakeTimers()
     const rest = dOf('skull')
@@ -413,7 +419,7 @@ describe('the Ranges tab', () => {
 describe('recording points', () => {
   async function startRecording() {
     const ctx = await open()
-    await ctx.user.click(tree().getByRole('button', { name: 'Chest' }))
+    await pick(ctx.user, 'Chest')
     await ctx.user.click(screen.getByRole('tab', { name: 'Ranges' }))
     await ctx.user.click(screen.getByRole('button', { name: 'New slider' }))
     await ctx.user.click(screen.getByRole('menuitem', { name: /Move points/ }))
@@ -483,7 +489,7 @@ describe('recording points', () => {
 describe('editing with the groups turned', () => {
   it('draws the points on the shape where the group has put it, and drags them in the shape\'s own space', async () => {
     const { user, backend } = await open()
-    await user.click(tree().getByRole('button', { name: 'Skull' }))
+    await pick(user, 'Skull')
     await user.click(tab('Ranges'))
     await user.click(screen.getByRole('button', { name: 'All (1)' }))
     fireEvent.change(screen.getByLabelText('Try Nod'), { target: { value: '20' } })       // the head is turned 12 degrees
@@ -501,71 +507,19 @@ describe('editing with the groups turned', () => {
 })
 
 describe('the tree', () => {
-  it('switches to the Rig view: groups under their parent with their level, folded and opened', async () => {
-    const { user } = await open()
-    await user.click(screen.getByRole('button', { name: 'Rig' }))
-    const rig = within(tree().getByText('Body').closest('.cmRigTree') as HTMLElement)
-    expect(rig.getByRole('button', { name: 'Body' })).toBeInTheDocument()
-    expect(rig.getByRole('button', { name: 'Face' })).toBeInTheDocument()
-    expect(rig.getByRole('button', { name: 'Arm' })).toBeInTheDocument()
-    expect(rig.getByTitle('Level 1 of 9 in the pivot chain')).toHaveTextContent('1')
-    expect(rig.getAllByTitle('Level 2 of 9 in the pivot chain')).toHaveLength(2)
-    await user.click(rig.getByRole('button', { name: 'Fold Body' }))
-    expect(rig.queryByRole('button', { name: 'Face' })).toBeNull()
-    await user.click(rig.getByRole('button', { name: 'Open Body' }))
-    expect(rig.getByRole('button', { name: 'Face' })).toBeInTheDocument()
-    await user.click(screen.getByRole('button', { name: 'Layers' }))
-    expect(tree().getByRole('button', { name: 'Skull' })).toBeInTheDocument()
-  })
-
-  it('indents and outdents a group with Alt + Right and Left on its grip', async () => {
+  it('hangs a group on another from the Rig tab, and back on nothing', async () => {
     const { user, backend } = await open()
-    await user.click(screen.getByRole('button', { name: 'Rig' }))
-    const armGrip = () => screen.getByRole('button', { name: 'Move Arm to another parent (Alt+Right or Left)' })
-    armGrip().focus()
-    await user.keyboard('{Alt>}{ArrowRight}{/Alt}')                        // Arm now hangs from Face, the group above it
-    expect(tree().getAllByTitle('Level 3 of 9 in the pivot chain')).toHaveLength(1)
-    armGrip().focus()
-    await user.keyboard('{Alt>}{ArrowLeft}{/Alt}')
-    expect(tree().queryByTitle('Level 3 of 9 in the pivot chain')).toBeNull()
+    await pick(user, 'Arm', 'group')
+    await user.click(tab('Rig'))
+    const parent = () => screen.getByRole('combobox', { name: 'Parent group' })
+    expect(parent()).toHaveValue('gB')
+    await user.selectOptions(parent(), 'gF')                                // Arm now hangs from Face
+    expect(parent()).toHaveValue('gF')
     await save(user)
-    await waitFor(() => expect(savedGroup(backend, 'gA').parent).toBe('gB'))
-  })
-
-  it('hangs a group on another by dragging its grip onto it, and unhangs it dropped on the empty space', async () => {
-    const { user, backend } = await open()
-    await user.click(screen.getByRole('button', { name: 'Rig' }))
-    const rects = (el: Element, left: number, top: number, w: number, h: number) => {
-      (el as HTMLElement).getBoundingClientRect = () => ({ left, top, width: w, height: h, right: left + w, bottom: top + h, x: left, y: top, toJSON: () => ({}) })
-    }
-    const row = (name: string) => tree().getByRole('button', { name, hidden: false }).closest('[data-rig-row]') as HTMLElement
-    rects(tree().getByText('Body').closest('.cmRigTree')!, 0, 0, 400, 400)
-    rects(row('Body'), 0, 0, 200, 20); rects(row('Face'), 0, 40, 200, 20); rects(row('Arm'), 0, 80, 200, 20)
-    const grip = screen.getByRole('button', { name: 'Move Arm to another parent (Alt+Right or Left)' })
-    const held = holdTile(grip, { x: 10, y: 90 })
-    held.moveTo(50, 50)
-    expect(row('Face').className).toContain('cmTreeRow--drop')
-    held.drop()
-    expect(tree().getAllByTitle('Level 3 of 9 in the pivot chain')).toHaveLength(1)
-    // and back to the root
-    rects(row('Arm'), 0, 120, 200, 20)
-    const again = holdTile(screen.getByRole('button', { name: 'Move Arm to another parent (Alt+Right or Left)' }), { x: 10, y: 130 })
-    again.moveTo(300, 300)
-    again.drop()
-    expect(tree().queryByTitle('Level 3 of 9 in the pivot chain')).toBeNull()
+    await waitFor(() => expect(savedGroup(backend, 'gA').parent).toBe('gF'))
+    await user.selectOptions(parent(), '')
     await save(user)
     await waitFor(() => expect(savedGroup(backend, 'gA').parent).toBeNull())
-  })
-
-  it('keeps Escape for a drag: the group stays where it was', async () => {
-    await open()
-    await userEvent.click(screen.getByRole('button', { name: 'Rig' }))
-    const row = (name: string) => tree().getByRole('button', { name }).closest('[data-rig-row]') as HTMLElement
-    ;[['Body', 0], ['Face', 40], ['Arm', 80]].forEach(([name, top]) => { (row(name as string) as HTMLElement).getBoundingClientRect = () => ({ left: 0, top: top as number, width: 200, height: 20, right: 200, bottom: (top as number) + 20, x: 0, y: top as number, toJSON: () => ({}) }) })
-    const held = holdTile(screen.getByRole('button', { name: 'Move Arm to another parent (Alt+Right or Left)' }), { x: 10, y: 90 })
-    held.moveTo(50, 50)
-    held.cancel()
-    expect(tree().queryByTitle('Level 3 of 9 in the pivot chain')).toBeNull()
   })
 
   it('draws a shape reordered in the tree in front or behind the other: the order is what is drawn', async () => {
@@ -573,15 +527,18 @@ describe('the tree', () => {
     const { user } = await open([draftEntry('a', c)])
     const order = () => Array.from(canvas().querySelectorAll('path[data-shape]')).map(p => p.getAttribute('data-shape')).filter(id => id === 'neck' || id === 'chest')
     expect(order()).toEqual(['neck', 'chest'])
-    await user.click(tree().getByRole('button', { name: 'Move Neck up in the draw order' }))
+    await pick(user, 'Neck part', 'object')
+    screen.getByRole('button', { name: 'Move Neck (Alt+Up or Down)' }).focus()      // the shapes are listed topmost first: Chest over Neck, so Neck moves up
+    await user.keyboard('{Alt>}{ArrowUp}{/Alt}')
     expect(order()).toEqual(['chest', 'neck'])
   })
 
   it('reorders by the grip with Alt + Up and Down', async () => {
     const c = figure(m => ({ ...m, objects: m.objects.map(o => (o.id === 'oN' ? { ...o, shapes: ['neck', 'chest'] } : o.id === 'oC' ? { ...o, shapes: [] } : o)) }))
     const { user, backend } = await open([draftEntry('a', c)])
+    await pick(user, 'Neck part', 'object')
     screen.getByRole('button', { name: 'Move Neck (Alt+Up or Down)' }).focus()
-    await user.keyboard('{Alt>}{ArrowDown}{/Alt}')
+    await user.keyboard('{Alt>}{ArrowUp}{/Alt}')
     await save(user)
     await waitFor(() => expect(backend.entries[0].draft.objects.find(o => o.id === 'oN')!.shapes).toEqual(['chest', 'neck']))
   })
@@ -639,7 +596,8 @@ describe('model files', () => {
     const [name, body] = vi.mocked(presetFile.downloadTextFile).mock.calls[0]
     expect(name).toBe('scriblr-character-model-adult.json')
     expect(JSON.parse(body).models[0].ranges[0].id).toBe('nod')
-    await user.click(screen.getByRole('button', { name: /Export all/ }))
+    await user.click(screen.getByRole('button', { name: 'Show all the models' }))
+    await user.click(screen.getByRole('button', { name: 'Export all the models to a file' }))
     const [all, allBody] = vi.mocked(presetFile.downloadTextFile).mock.calls[1]
     expect(all).toBe('scriblr-character-models.json')
     expect(JSON.parse(allBody).models).toHaveLength(2)

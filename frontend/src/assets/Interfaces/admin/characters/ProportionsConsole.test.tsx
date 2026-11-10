@@ -8,7 +8,7 @@ import { newShape } from './engine/edit'
 import { makeTwin } from './engine/pairEdit'
 import { setPivot } from './engine/rigEdit'
 import { addGroup, addObject, addShape, newGroup } from './modelContent'
-import { openDrawer } from '../../../../test/designerUi'
+import { openDrawer, pick } from '../../../../test/designerUi'
 
 const box = (x: number, y: number, w: number, h: number) => ({ x, y, w, h })
 
@@ -33,7 +33,6 @@ async function open(entries: ModelEntry[] = [draftEntry('a', armed())]) {
   return { backend, user }
 }
 
-const tree = () => within(screen.getByRole('navigation', { name: 'Model tree' }))
 const canvas = () => screen.getByRole('application')
 const tab = (name: string) => screen.getByRole('tab', { name })
 const save = (user: ReturnType<typeof userEvent.setup>) => user.click(screen.getByRole('button', { name: 'Save' }))
@@ -90,7 +89,7 @@ describe('the Proportions tab', () => {
 
   it('adds a bone from the selected group to the group that hangs from it', async () => {
     const { backend, user } = await open()
-    await user.click(tree().getByRole('button', { name: 'Torso' }))
+    await pick(user, 'Torso')
     await proportions(user)
     await user.click(screen.getByRole('button', { name: 'Add a bone' }))
     expect(screen.getByRole('region', { name: 'Bone Torso bone' })).toBeInTheDocument()
@@ -218,7 +217,7 @@ describe('the Proportions tab', () => {
 
 describe('how an object fits the body', () => {
   async function fitTab(user: ReturnType<typeof userEvent.setup>, object = 'Fore part') {
-    await user.click(tree().getByRole('button', { name: object }))
+    await pick(user, object)
     await user.click(tab('Rig'))
     return within(screen.getByRole('region', { name: 'How it fits the body' }))
   }
@@ -236,13 +235,13 @@ describe('how an object fits the body', () => {
   it('draws a kept object at its own size when its group is scaled', async () => {
     const { user } = await open([draftEntry('a', armed())])
     // a slider that scales the forearm group
-    await user.click(tree().getByRole('button', { name: 'Forearm' }))
+    await pick(user, 'Forearm')
     await user.click(tab('Ranges'))
     await user.click(screen.getByRole('button', { name: 'New slider' }))
     await user.click(screen.getByRole('menuitem', { name: 'Scale' }))
     fireEvent.change(screen.getByRole('slider', { name: /Try Forearm size/ }), { target: { value: '150' } })
     const scaled = canvas().querySelector('path[data-shape="fore"]')!.getAttribute('d')
-    await user.click(tree().getByRole('button', { name: 'Fore part' }))
+    await pick(user, 'Fore part')
     await user.click(tab('Rig'))
     await user.click(within(screen.getByRole('region', { name: 'How it fits the body' })).getByRole('button', { name: 'Keeps its size' }))
     const kept = canvas().querySelector('path[data-shape="fore"]')!.getAttribute('d')
@@ -278,7 +277,7 @@ describe('how an object fits the body', () => {
     if (!twin.ok) throw new Error(twin.reason)
     const t = twin.content.objects.find(o => o.mirrorOf === 'oF')!
     const { user } = await open([draftEntry('a', twin.content)])
-    await user.click(tree().getByRole('button', { name: t.name }))
+    await pick(user, t.name)
     await user.click(tab('Rig'))
     expect(screen.getByText(/is a twin: it fits the body as its original does/)).toBeInTheDocument()
   })

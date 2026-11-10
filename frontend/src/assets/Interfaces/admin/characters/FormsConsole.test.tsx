@@ -7,7 +7,7 @@ import DesignerConsole from './DesignerConsole'
 import { newShape } from './engine/edit'
 import { addRange, addTurn, newRange, type Edit } from './engine/rigEdit'
 import { addGroup, addObject, addShape, newGroup } from './modelContent'
-import { openDrawer } from '../../../../test/designerUi'
+import { openDrawer, pick } from '../../../../test/designerUi'
 
 const must = (e: Edit): ModelContent => { if (!e.ok) throw new Error(e.reason); return e.content }
 const box = (x: number, y: number, w: number, h: number) => ({ x, y, w, h })
@@ -66,7 +66,11 @@ const save = (user: ReturnType<typeof userEvent.setup>) => user.click(screen.get
 const tab = (name: string) => screen.getByRole('tab', { name })
 const axis = () => within(screen.getByRole('region', { name: 'Axis Eye shape' }))
 const card = (name: RegExp | string) => axis().getByRole('button', { name })
-const eye = (name: string) => tree().getByRole('button', { name: `Show ${name}` })
+// The eye of a card (hide and reveal): a group's is listed while nothing is open, an object's while its group is open, so the parent is opened first when the eye is not there.
+async function eyeOf(user: ReturnType<typeof userEvent.setup>, name: string, parent?: string) {
+  if (parent && !tree().queryByRole('button', { name: `Show ${name}` })) await pick(user, parent, 'group')
+  return tree().getByRole('button', { name: `Show ${name}` })
+}
 const reset = () => screen.queryByRole('button', { name: 'Reset test values' })
 const draft = (b: { entries: ModelEntry[] }) => b.entries[0].draft
 const axisOf = (b: { entries: ModelEntry[] }) => draft(b).objects.find(o => o.id === 'oE')!.axes![0]
@@ -94,32 +98,32 @@ describe('the eye in the tree', () => {
   it('switches an object off and on, only for looking', async () => {
     const { user } = await open()
     expect(pathOf('shirt')).not.toBeNull()
-    expect(eye('Shirt')).toHaveAttribute('aria-pressed', 'true')
+    expect(await eyeOf(user, 'Shirt', 'Body')).toHaveAttribute('aria-pressed', 'true')
     expect(reset()).toBeNull()
-    await user.click(eye('Shirt'))
-    expect(eye('Shirt')).toHaveAttribute('aria-pressed', 'false')
+    await user.click(await eyeOf(user, 'Shirt', 'Body'))
+    expect(await eyeOf(user, 'Shirt', 'Body')).toHaveAttribute('aria-pressed', 'false')
     expect(pathOf('shirt')).toBeNull()
     expect(pathOf('skull')).not.toBeNull()
     expect(reset()).toHaveTextContent('1 off rest')
-    await user.click(eye('Shirt'))
+    await user.click(await eyeOf(user, 'Shirt', 'Body'))
     expect(pathOf('shirt')).not.toBeNull()
     expect(reset()).toBeNull()
   })
 
   it('switches a group off with everything in it', async () => {
     const { user } = await open()
-    await user.click(eye('Head'))
+    await user.click(await eyeOf(user, 'Head'))
     expect(['iris', 'pupil', 'skull'].map(pathOf)).toEqual([null, null, null])
     expect(pathOf('shirt')).not.toBeNull()
     await user.click(reset()!)
     expect(['iris', 'pupil', 'skull'].every(id => pathOf(id))).toBe(true)
-    expect(eye('Head')).toHaveAttribute('aria-pressed', 'true')
+    expect(await eyeOf(user, 'Head')).toHaveAttribute('aria-pressed', 'true')
   })
 
   it('does not save what is switched off, and a hidden shape cannot be edited', async () => {
     const { user, backend } = await open()
-    await user.click(eye('Shirt'))
-    await user.click(tree().getByRole('button', { name: 'Shirt part' }))
+    await user.click(await eyeOf(user, 'Shirt', 'Body'))
+    await pick(user, 'Shirt part')
     expect(screen.getByText(/switched off with the eye/)).toBeInTheDocument()
     expect(screen.getByRole('button', { name: 'Save' })).toBeDisabled()       // switching things off is not a change to the model
     expect(backend.calls.some(c => c.startsWith('PUT'))).toBe(false)
@@ -129,17 +133,18 @@ describe('the eye in the tree', () => {
 describe('the Forms tab', () => {
   async function onEye() {
     const r = await open()
-    await r.user.click(tree().getByRole('button', { name: 'Eye' }))
+    await pick(r.user, 'Eye')
     await r.user.click(tab('Forms'))
     return r
   }
 
-  it('asks for an object, or for one of the objects of a group', async () => {
+  it('is the tab of an object, and of the shapes in it: not of the model or a group', async () => {
     const { user } = await open()
+    expect(screen.queryByRole('tab', { name: 'Forms' })).toBeNull()
+    await pick(user, 'Head', 'group')
+    expect(screen.queryByRole('tab', { name: 'Forms' })).toBeNull()
+    await pick(user, 'Eye', 'object')
     await user.click(tab('Forms'))
-    expect(screen.getByText(/Forms belong to an object/)).toBeInTheDocument()
-    await user.click(tree().getByRole('button', { name: 'Head' }))
-    await user.click(screen.getByRole('button', { name: /^Eye \(1\)$/ }))
     expect(screen.getByRole('heading', { name: 'Forms of Eye' })).toBeInTheDocument()
   })
 
@@ -198,7 +203,7 @@ describe('the Forms tab', () => {
     const base = JSON.stringify(draft(backend).shapes.find(s => s.id === 'iris')!.pts)
     const wideX = axisOf(backend).options[1].ovr[0].pts[1].x
     await user.click(card(/^Wide/))
-    await user.click(tree().getByRole('button', { name: 'Iris' }))
+    await pick(user, 'Iris')
     expect(screen.getAllByText(/Editing (the )?form Wide of Eye shape/).length).toBeGreaterThan(0)
     await user.click(tab('Forms'))
     expect(screen.getByText(/Editing form Wide of Eye shape/)).toBeInTheDocument()
@@ -213,7 +218,7 @@ describe('the Forms tab', () => {
     const { user, backend } = await onEye()
     const base = JSON.stringify(draft(backend).shapes.find(s => s.id === 'pupil')!.pts)
     await user.click(card(/^Wide/))
-    await user.click(tree().getByRole('button', { name: 'Pupil' }))
+    await pick(user, 'Pupil')
     await dragPoint(user, 2, 4)
     await save(user)
     await waitFor(() => expect(axisOf(backend).options[1].ovr.map(v => v.shape).sort()).toEqual(['iris', 'pupil']))
@@ -222,7 +227,7 @@ describe('the Forms tab', () => {
 
   it('edits the base outline when the default form is shown', async () => {
     const { user, backend } = await onEye()
-    await user.click(tree().getByRole('button', { name: 'Iris' }))
+    await pick(user, 'Iris')
     const before = JSON.stringify(draft(backend).shapes.find(s => s.id === 'iris')!.pts)
     await dragPoint(user, 2, 6)
     await save(user)
@@ -233,7 +238,7 @@ describe('the Forms tab', () => {
   it('says a shape is hidden in the form and does not edit it', async () => {
     const { user } = await onEye()
     await user.click(card(/^Shut/))
-    await user.click(tree().getByRole('button', { name: 'Pupil' }))
+    await pick(user, 'Pupil')
     expect(screen.getByText(/Pupil is hidden in the form Shut/)).toBeInTheDocument()
     expect(screen.queryByRole('button', { name: 'Point 1' })).toBeNull()
   })
@@ -308,8 +313,8 @@ describe('the Forms tab', () => {
   })
 
   it('tells a twin where its forms are', async () => {
-    const { user } = await open([draftEntry('a', faced(c => ({ ...c, objects: [...c.objects, { id: 'oE2', name: 'Eye twin', layer: 'body', shapes: [], mirrorOf: 'oE' }] })))])
-    await user.click(tree().getByRole('button', { name: 'Eye twin' }))
+    const { user } = await open([draftEntry('a', faced(c => ({ ...c, objects: [...c.objects, { id: 'oE2', name: 'Eye twin', layer: 'body', shapes: [], mirrorOf: 'oE' }], groups: c.groups.map(g => (g.id === 'gH' ? { ...g, objects: [...g.objects, 'oE2'] } : g)) })))])
+    await pick(user, 'Eye twin')
     await user.click(tab('Forms'))
     expect(screen.getByText(/is the twin of Eye/)).toBeInTheDocument()
     await user.click(screen.getByRole('button', { name: 'Go to Eye' }))
@@ -341,15 +346,15 @@ describe('the Presets tab', () => {
     expect(screen.queryByRole('img', { name: 'Bare is on' })).toBeNull()
     expect(screen.getByRole('img', { name: 'Dressed is on' })).toBeInTheDocument()       // nothing is hidden: the outfit with nothing hidden is on
     await user.click(screen.getByRole('button', { name: 'Apply Bare' }))
-    expect(eye('Shirt')).toHaveAttribute('aria-pressed', 'false')
+    expect(await eyeOf(user, 'Shirt', 'Body')).toHaveAttribute('aria-pressed', 'false')
     expect(pathOf('shirt')).toBeNull()
     expect(screen.getByRole('img', { name: 'Bare is on' })).toBeInTheDocument()
     expect(screen.queryByRole('img', { name: 'Dressed is on' })).toBeNull()
     await user.click(screen.getByRole('button', { name: 'Apply Turned' }))
-    expect(eye('Shirt')).toHaveAttribute('aria-pressed', 'false')                          // a pose leaves the outfit alone
+    expect(await eyeOf(user, 'Shirt', 'Body')).toHaveAttribute('aria-pressed', 'false')                          // a pose leaves the outfit alone
     expect(reset()).toHaveTextContent('2 off rest')
     await user.click(screen.getByRole('button', { name: 'Apply Dressed' }))
-    expect(eye('Shirt')).toHaveAttribute('aria-pressed', 'true')
+    expect(await eyeOf(user, 'Shirt', 'Body')).toHaveAttribute('aria-pressed', 'true')
     expect(pathOf('shirt')).not.toBeNull()
     expect(reset()).toHaveTextContent('1 off rest')
     expect(screen.getByRole('img', { name: 'Turned is on' })).toBeInTheDocument()
@@ -357,7 +362,7 @@ describe('the Presets tab', () => {
 
   it('saves the current sliders and hidden things as a preset, with a name and a kind', async () => {
     const { user, backend } = await onPresets()
-    await user.click(eye('Skull'))
+    await user.click(await eyeOf(user, 'Skull', 'Head'))
     await user.type(screen.getByRole('textbox', { name: 'Preset name' }), 'No skull')
     const kind = screen.getByRole('combobox', { name: 'Preset kind' })
     await user.clear(kind)
@@ -372,7 +377,7 @@ describe('the Presets tab', () => {
 
   it('updates a preset from the current look, renames it and deletes it after asking', async () => {
     const { user, backend } = await onPresets()
-    await user.click(eye('Shirt'))
+    await user.click(await eyeOf(user, 'Shirt', 'Body'))
     await user.click(screen.getByRole('button', { name: 'Update Dressed from the current' }))
     const name = screen.getByRole('textbox', { name: 'Name of preset Dressed' })
     await user.clear(name)
@@ -391,7 +396,7 @@ describe('the Presets tab', () => {
 
   it('does not keep the chosen forms', async () => {
     const { user, backend } = await open()
-    await user.click(tree().getByRole('button', { name: 'Eye' }))
+    await pick(user, 'Eye')
     await user.click(tab('Forms'))
     await user.click(card(/^Wide/))
     await user.click(tab('Presets'))

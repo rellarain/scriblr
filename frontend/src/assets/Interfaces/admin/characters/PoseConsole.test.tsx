@@ -3,6 +3,7 @@ import userEvent from '@testing-library/user-event'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import type { ModelContent, ModelEntry } from '../../../../api/types'
 import { content, draftEntry, modelsBackend } from '../../../../test/characterModelsBackend'
+import { pick } from '../../../../test/designerUi'
 import DesignerConsole from './DesignerConsole'
 import { newShape } from './engine/edit'
 import { makeTwin } from './engine/pairEdit'
@@ -69,7 +70,7 @@ afterEach(() => { vi.useRealTimers() })
 describe('Pose mode', () => {
   it('is a toggle that grabs the figure instead of editing its points', async () => {
     const { user } = await open()
-    await user.click(screen.getByRole('button', { name: 'Skull' }))
+    await pick(user, 'Skull', 'shape')
     expect(screen.getByRole('button', { name: 'Point 1' })).toBeInTheDocument()
     const toggle = screen.getByRole('button', { name: 'Pose mode' })
     expect(toggle).toHaveAttribute('aria-pressed', 'false')
@@ -172,6 +173,7 @@ describe('Pose mode', () => {
 
   it('keeps a pose as a preset of kind Pose, without the hidden things', async () => {
     const { user, backend } = await open()
+    await pick(user, 'Body', 'group')
     await user.click(screen.getByRole('button', { name: 'Show Chest part' }))  // switch the chest off: a pose does not keep that
     await user.click(screen.getByRole('button', { name: 'Pose mode' }))
     grabSkull()

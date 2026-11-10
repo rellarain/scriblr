@@ -1,13 +1,14 @@
-import { useEffect, useMemo, useRef, useState, type KeyboardEvent, type ReactNode } from 'react'
+import { useEffect, useMemo, useRef, useState, type KeyboardEvent } from 'react'
 import { createPortal } from 'react-dom'
 import type { ModelContent, ModelEntry, ModelLayer, ModelShape } from '../../../../api/types'
 import {
-  CopyIcon, CursorIcon, DiceIcon, ExportIcon, EyeOffIcon, GridSnapIcon, HandIcon, HistoryIcon, PathIcon, RestoreIcon, RulerIcon, SwapIcon, TrashIcon, UndoIcon, WeightIcon,
+  CopyIcon, CursorIcon, ExportIcon, EyeOffIcon, GridSnapIcon, HandIcon, HistoryIcon, PathIcon, RulerIcon, SwapIcon, TrashIcon, UndoIcon, WeightIcon,
 } from '../../../icons'
 import { setAutosaveMode, useSettings } from '../../../../settings/settingsStore'
 import { autosaveModeOf } from '../../../../theme/types'
 import { useStoredState } from '../../writer/storage'
-import { AssetTree, type TreeActions, type TreeMode } from './AssetTree'
+import { NodeBar } from './NodeBar'
+import { TreeBar, type ModelsNav, type TreeActions } from './TreeBar'
 import type { ClassActions } from './ClassPanel'
 import { ColourTab, type ColourActions } from './ColourTab'
 import { CheckPanel } from './CheckPanel'
@@ -18,7 +19,7 @@ import { advanceLock, lockStage } from './engine/crossings'
 import { FormsTab, type FormActions } from './FormsTab'
 import { FramesTab, type FramesState } from './FramesTab'
 import { Inspector, type InspectorTab } from './Inspector'
-import { StatusBadge, modelLabel } from './ModelList'
+import { StatusBadge, modelLabel } from './StatusBadge'
 import type { PaintActions } from './PaintSection'
 import { PoseBar } from './PoseBar'
 import { ProportionsTab } from './ProportionsTab'
@@ -29,7 +30,7 @@ import { RigTab } from './RigTab'
 import { TemplateMenu } from './TemplateMenu'
 import { NONE, contextObject, repair, rightClickGrid, rightClickShape, shapesOf, showFor, type EditMode, type Selection } from './designerState'
 import {
-  NEUTRAL_GRAY, addColour, addGenre, addSlot, addStandardSlots, addSwatch, paletteOf, removeColour, removeGenre, removeSlot, removeSwatch, renameColour, renameGenre, renameSlot, setColourHex,
+  NEUTRAL_GRAY, addColour, addGenre, addSlot, addStandardSlots, addSwatch, removeColour, removeGenre, removeSlot, removeSwatch, renameColour, renameGenre, renameSlot, setColourHex,
   setStarterPalette, setSwatch, stepSlot, toggleColourGenre,
 } from './engine/colour'
 import { addBone, boneById, removeBone, renameBone, setBoneEnd, setBoneStart, setHeadBone } from './engine/bones'
@@ -39,7 +40,7 @@ import { addMember, deleteClass, detachBeforeRemoval, detachMember, followTempla
 import { newShape } from './engine/edit'
 import { bridgeBetween, setLeaves, spotFromClick, type EdgeSpot } from './engine/bridgeEdit'
 import { fadedBy as _fadedBy, setFade, stepFade } from './engine/fadeEdit'
-import { cycleWeight, hangs, stepWeight } from './engine/fall'
+import { cycleWeight, stepWeight } from './engine/fall'
 import { SIDE_NAMES, addFall, addFallToObject, withWeight } from './engine/fallEdit'
 import { addAxis, addForm, hideInForm, moveAxis, moveForm, overrideState, removeAxis, removeForm, renameAxis, renameForm, setInitialForm, setLook, setOverride, useBaseOutline } from './engine/formEdit'
 import { classKey, presetsOf, targetForShape } from './engine/forms'
@@ -48,7 +49,7 @@ import { addFinger, addGrip, addHand, addHandPoses, addThumb, apartHand, gripAt,
 import { LIMITS } from './engine/limits'
 import { emptyHistory, redo as redoHistory, remember, undo as undoHistory, type History } from './engine/history'
 import { beginScale, beginTurn, canScale, canTurn, grabPoint, moveScale, moveTurn, poseTarget, reach, reachJoints, scaleDriver, slideValue, toModel, type ReachGrab, type ScaleDrag, type TurnDrag } from './engine/pose'
-import { deletePreset, renamePreset, savePreset, saveStyle, updatePreset } from './engine/presets'
+import { deletePreset, duplicatePreset, renamePreset, savePreset, saveStyle, updatePreset } from './engine/presets'
 import { chainOf, isPointDriven, restPivot, solve, type Solved, type Values } from './engine/rig'
 import * as paintOps from './engine/paintEdit'
 import { addShading } from './engine/shadeEdit'
@@ -63,7 +64,7 @@ import type { FitActions, FrameActions, HandActions, LinkHow, NewSliderKind, Pai
 import { groupOfSelection, offRest, scrubValue, valueText } from './rigView'
 import {
   FALL_SIDES, NAME_MAX, addGroup, addObject, addShape, duplicateShape, freshId, groupOfObject, moveBefore, moveObjectWithin, moveShapeWithin, newGroup, objectById, objectOfShape, publishFaults, removeGroup, removeObject,
-  outlineSize, removeShape, renameGroup, renameObject, renameShape, shapeById, twinsOf, updateShape, type MakeId,
+  outlineSize, removeShape, renameGroup, renameObject, renameShape, shapeById, twinsOf, updateShape, groupById, type MakeId,
 } from './modelContent'
 import type { CharacterModels } from './useCharacterModels'
 import { useTestState } from './useTestState'
@@ -115,7 +116,7 @@ const VIEW_BAR = 44
 const NARROW = 640
 const DRAWER = 240
 
-export function ModelPane({ entry, models, makeId, onRemove, onDuplicate, onExport, barHost = null, treeHead = null }: {
+export function ModelPane({ entry, models, makeId, onRemove, onDuplicate, onExport, barHost = null, nav }: {
   entry: ModelEntry
   models: CharacterModels
   makeId: MakeId
@@ -124,8 +125,8 @@ export function ModelPane({ entry, models, makeId, onRemove, onDuplicate, onExpo
   onExport: (entry: ModelEntry) => void
   // The element the console toolbar goes into (the console's header); missing: it is drawn at the top of the pane.
   barHost?: HTMLElement | null
-  // What the tree panel shows above the tree (the list of models).
-  treeHead?: ReactNode
+  // The models as cards, for the top of the tree.
+  nav: ModelsNav
 }) {
   const content = entry.draft
   const [sel, setSel] = useState<Selection>(NONE)
@@ -187,7 +188,6 @@ export function ModelPane({ entry, models, makeId, onRemove, onDuplicate, onExpo
   const [confirmDelete, setConfirmDelete] = useState(false)
   const [note, setNote] = useState('')
   const [tab, setTab] = useState<InspectorTab>('shape')
-  const [treeMode, setTreeMode] = useState<TreeMode>('layers')
   const test = useTestState()
   const { values, setValues } = test
   const [recording, setRecording] = useState<RecordingState | null>(null)
@@ -891,6 +891,34 @@ export function ModelPane({ entry, models, makeId, onRemove, onDuplicate, onExpo
     commit(addShape(c, objectId, shape), true)
     choose({ kind: 'shape', id })
   }
+  // Delete what is selected, with what goes with it (a group's objects, an object's shapes, a twin).
+  function deleteSelection(s: Selection) {
+    if (s.kind === 'shape' && shapeById(content, s.id)?.copyOf) { setNote('A shape that follows the pattern cannot be deleted: hide it in this member instead (the Shape tab).'); return }
+    const twins = twinsOf(content, s.kind === 'none' ? 'shape' : s.kind, s.kind === 'none' ? '' : s.id).length
+    // the members of a class whose pattern goes keep their look: they are detached first
+    const base = s.kind === 'none' ? content : detachBeforeRemoval(content, s.kind === 'shape' ? { shapes: [s.id] } : s.kind === 'object' ? { objects: [s.id] } : { groups: [s.id] })
+    commit(s.kind === 'shape' ? removeShape(base, s.id) : s.kind === 'object' ? removeObject(base, s.id) : removeGroup(base, s.id), true)
+    setSel(NONE)
+    if (base !== content) setNote('The members of its class were detached first: they keep their look.')
+    else if (twins) setNote('Its twin went with it.')
+  }
+  function copyShape(id: string) {
+    if (shapeById(content, id)?.mirrorOf) { setNote('A twin has no outline of its own to copy: break the pair first, or copy the original.'); return }
+    const owner = objectOfShape(content, id)
+    if (owner && owner.shapes.length >= LIMITS.shapesPerObjectMax) { setNote(`An object may have at most ${LIMITS.shapesPerObjectMax} shapes.`); return }
+    const copyId = freshId(content, 's', makeId)
+    commit(duplicateShape(content, id, copyId), true)
+    choose({ kind: 'shape', id: copyId })
+  }
+  // A new look kept as a variant (of the model), a pose (of a group) or a style (of an object).
+  function newPreset(scope: string | null) {
+    const group = scope ? groupById(content, scope) : undefined
+    const count = presetsOf(content).filter(p => (p.scope ?? null) === scope).length + 1
+    const e = !scope
+      ? savePreset(content, test.state, `Variant ${count}`, 'Variant', makeId)
+      : saveStyle(content, test.state, scope, `${group ? 'Pose' : 'Style'} ${count}`, group ? 'Pose' : 'Style', makeId)
+    applyEdit(e)
+  }
   const actions: TreeActions = {
     onSelect: choose,
     onAddGroup: () => {
@@ -899,44 +927,31 @@ export function ModelPane({ entry, models, makeId, onRemove, onDuplicate, onExpo
       commit(addGroup(content, newGroup(id, `Group ${content.groups.length + 1}`)), true)
       choose({ kind: 'group', id })
     },
-    onAddObject: layer => {
-      const groupObjects = (() => { const { content: b, groupId } = groupForNew(content); return b.groups.find(g => g.id === groupId)?.objects.length ?? 0 })()
-      if (groupObjects >= LIMITS.objectsPerGroupMax) { setNote(`A group may have at most ${LIMITS.objectsPerGroupMax} objects.`); return }
-      const r = addObjectOn(layer)
-      commit(r.content, true)
-      choose({ kind: 'object', id: r.objectId })
+    onAddObject: groupId => {
+      const g = groupById(content, groupId)
+      if (!g) return
+      if (g.objects.length >= LIMITS.objectsPerGroupMax) { setNote(`A group may have at most ${LIMITS.objectsPerGroupMax} objects.`); return }
+      const id = freshId(content, 'o', makeId)
+      commit(addObject(content, groupId, { id, name: `Object ${content.objects.length + 1}`, layer: 'body', shapes: [] }), true)
+      choose({ kind: 'object', id })
     },
     onAddShape: (objectId, t) => addShapeTo(objectId, t, content),
-    onDuplicateShape: id => {
-      if (shapeById(content, id)?.mirrorOf) { setNote('A twin has no outline of its own to copy: break the pair first, or copy the original.'); return }
-      const owner = objectOfShape(content, id)
-      if (owner && owner.shapes.length >= LIMITS.shapesPerObjectMax) { setNote(`An object may have at most ${LIMITS.shapesPerObjectMax} shapes.`); return }
-      const copyId = freshId(content, 's', makeId)
-      commit(duplicateShape(content, id, copyId), true)
-      choose({ kind: 'shape', id: copyId })
-    },
-    onDelete: s => {
-      if (s.kind === 'shape' && shapeById(content, s.id)?.copyOf) { setNote('A shape that follows the pattern cannot be deleted: hide it in this member instead (the Shape tab).'); return }
-      const twins = twinsOf(content, s.kind === 'none' ? 'shape' : s.kind, s.kind === 'none' ? '' : s.id).length
-      // the members of a class whose pattern goes keep their look: they are detached first
-      const base = s.kind === 'none' ? content : detachBeforeRemoval(content, s.kind === 'shape' ? { shapes: [s.id] } : s.kind === 'object' ? { objects: [s.id] } : { groups: [s.id] })
-      commit(s.kind === 'shape' ? removeShape(base, s.id) : s.kind === 'object' ? removeObject(base, s.id) : removeGroup(base, s.id), true)
-      setSel(NONE)
-      if (base !== content) setNote('The members of its class were detached first: they keep their look.')
-      else if (twins) setNote('Its twin went with it.')
-    },
-    onMoveShape: (objectId, shapeId, dir) => {
-      const list = objectById(content, objectId)?.shapes ?? []
-      const at = list.indexOf(shapeId)
-      if (at < 0) return
-      commit(moveShapeWithin(content, objectId, shapeId, dir < 0 ? list[at - 1] ?? null : list[at + 2] ?? null), true)
-    },
+    onTwin: (kind, id) => { applyEdit(makeTwin(content, kind, id, makeId)) },
     onReorderShape: (objectId, shapeId, before) => commit(moveShapeWithin(content, objectId, shapeId, before), true),
     onReorderObject: (groupId, objectId, before) => commit(moveObjectWithin(content, groupId, objectId, before), true),
     onReorderGroup: (groupId, before) => commit({ ...content, groups: moveBefore(content.groups, groupId, before) }, true),
-    onReparent: (groupId, parentId) => { applyEdit(reparent(content, groupId, parentId)) },
     onToggleHidden: test.toggleHidden,
-    onToggleLock: test.toggleLock,
+    onToggleModelHidden: () => test.setHidden(content.groups.map(g => g.id), !(content.groups.length > 0 && content.groups.every(g => hiddenSet.has(g.id)))),
+    onApply: id => { const p = presetsOf(content).find(x => x.id === id); if (p) { setScrubbing(null); test.apply(content, p) } },
+    onClear: id => { const p = presetsOf(content).find(x => x.id === id); if (p) { setScrubbing(null); test.clear(content, p) } },
+    onNewPreset: newPreset,
+    onDuplicatePreset: id => { applyEdit(duplicatePreset(content, id, makeId)) },
+    onChooseForm: (objectId, axisId, formId) => test.setForm(objectId, axisId, formId),
+    onAddForm: (objectId, axisId, fromCurrent) => {
+      const count = objectById(content, objectId)?.axes?.find(a => a.id === axisId)?.options.length ?? 0
+      const e = addForm(content, objectId, axisId, fromCurrent ? drawnOutlines(objectId) : {}, `Form ${count + 1}`, makeId)
+      if (applyEdit(e) && e.ok && e.formId) test.setForm(objectId, axisId, e.formId)
+    },
   }
 
   // The canvas's "new shape" button: into the selected object, else into a new object (and group) on the Body layer.
@@ -1137,8 +1152,7 @@ export function ModelPane({ entry, models, makeId, onRemove, onDuplicate, onExpo
           </div>
 
           <ToolbarPanel side="left" title="Tree" label="Tree tools" state={left} min={PANEL_LIMITS.left.min} max={PANEL_LIMITS.left.max} onOpen={open => setPanel('left', { open })} onWidth={onPanelWidth('left')}>
-            {treeHead}
-            <AssetTree content={content} sel={sel} actions={actions} mode={treeMode} onMode={setTreeMode} hidden={hiddenSet} locks={lockSet} />
+            <TreeBar content={content} sel={sel} state={test.state} hidden={hiddenSet} models={nav} actions={actions} />
           </ToolbarPanel>
 
           <ToolbarPanel side="right" title="Editor" label="Editor tools" state={right} min={PANEL_LIMITS.right.min} max={PANEL_LIMITS.right.max} onOpen={open => setPanel('right', { open })} onWidth={onPanelWidth('right')}>
@@ -1178,7 +1192,6 @@ export function ModelPane({ entry, models, makeId, onRemove, onDuplicate, onExpo
               <button type="button" className={`cmIconBtn${snap ? ' cmIconBtn--on' : ''}`} aria-label="Snap" title="Snap to half units, the mirror line and the alignment guides" aria-pressed={snap} onClick={() => setSnap(s => !s)}><RulerIcon size={14} /></button>
               <button type="button" className={`cmIconBtn${gridSnap ? ' cmIconBtn--on' : ''}`} aria-label="Snap to grid" title="Snap to grid: a shape moved whole, a pivot and a frame land on the grid lines" aria-pressed={gridSnap} onClick={() => setGridSnap(s => !s)}><GridSnapIcon size={14} /></button>
               <span className="cmSep" aria-hidden="true" />
-              <button type="button" className="cmIconBtn" aria-label="Roll the look" title="Roll a new look for the test character: colours, a form on every axis and the member of each family; what is locked in the tree stays" disabled={!!recording} onClick={() => test.roll(content)}><DiceIcon size={14} /></button>
               <TemplateMenu label="New shape" title="New shape from a template" onPick={newShapeFromCanvas} />
               {(weighing || content.ranges.some(r => r.drives.some(d => d.kind === 'fall'))) && (
                 <span className="cmFallSide" role="group" aria-label="The side things fall to">
@@ -1191,12 +1204,13 @@ export function ModelPane({ entry, models, makeId, onRemove, onDuplicate, onExpo
                   ))}
                 </span>
               )}
-              {awayAll > 0 && (
-                <button type="button" className="cmBtn cmBtn--small" aria-label="Reset test values" title="Put every slider back at rest, every axis on its default form and show everything" disabled={!!recording} onClick={resetEverything}><RestoreIcon size={12} /> {awayAll} off rest</button>
-              )}
             </div>
             {poseMode && !recording && <PoseBar status={poseStatus} reach={reachOn} onReach={() => setReachOn(r => !r)} onReset={() => { setScrubbing(null); setValues({}) }} onSave={savePose} canReset={away > 0} />}
 
+            <NodeBar
+              content={content} sel={sel} locked={sel.kind === 'group' || sel.kind === 'object' ? lockSet.has(sel.id) : false} away={awayAll} busy={!!recording}
+              onToggleLock={test.toggleLock} onDelete={deleteSelection} onCopyShape={copyShape} onRoll={() => test.roll(content)} onReset={resetEverything}
+            />
             <Inspector
               content={canvasContent} sel={sel} view={view} linkMode={linkMode} pairs={pairs} classes={classes} choices={test.forms} selPoint={selPoint} mirror={mirror} onSelectPoint={setSelPoint}
               onRename={(s, name) => models.edit(entry.id, c => (s.kind === 'shape' ? renameShape(c, s.id, name) : s.kind === 'object' ? renameObject(c, s.id, name) : renameGroup(c, s.id, name)), false)}

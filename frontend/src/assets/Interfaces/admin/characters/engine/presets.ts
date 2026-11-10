@@ -157,6 +157,22 @@ export function saveStyle(c: ModelContent, s: TestState, scopeId: string, name: 
   return { ...done({ ...c, presets: [...presetsOf(c), style] }), presetId: id }
 }
 
+// A preset turned off: everything the presets of its kind (and scope) control goes back to rest, shown and its default form, and nothing is set in its place.
+export const clearedBy = (c: ModelContent, s: TestState, p: ModelPreset): TestState => applyPreset(c, s, { ...p, values: {}, hidden: [], forms: {}, fall: null, grip: null })
+
+// The same preset again, named like it with (copy), in the same kind and scope.
+export function duplicatePreset(c: ModelContent, id: string, make: MakeId = randomId): Edit & { presetId?: string } {
+  const p = presetsOf(c).find(x => x.id === id)
+  if (!p) return fail('There is no such preset.')
+  if (presetsOf(c).length >= LIMITS.presetsMax) return fail(`A model may have at most ${LIMITS.presetsMax} presets.`)
+  const copyId = freshFormId(presetsOf(c).map(x => x.id), 'p', make)
+  const at = presetsOf(c).findIndex(x => x.id === id)
+  const copy: ModelPreset = { ...p, id: copyId, name: clean(`${p.name.trim() || 'Preset'} (copy)`, NAME_MAX), values: { ...p.values }, hidden: [...p.hidden], ...(p.forms ? { forms: { ...p.forms } } : {}) }
+  const presets = [...presetsOf(c)]
+  presets.splice(at + 1, 0, copy)
+  return { ...done({ ...c, presets }), presetId: copyId }
+}
+
 // The styles that belong to an object or a group.
 export const stylesOf = (c: ModelContent, scopeId: string): ModelPreset[] => presetsOf(c).filter(p => p.scope === scopeId)
 

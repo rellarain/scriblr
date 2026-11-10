@@ -5,7 +5,7 @@ import { addAxis, addForm, hideInForm, moveForm, moveAxis, overrideState, remove
 import { chosenForm, editTarget, formKey, formsAway, formsByViews, overrideFor } from './forms'
 import { LIMITS, limitNotes } from './limits'
 import { makeTwin } from './pairEdit'
-import { applyPreset, awayCount, deletePreset, footprint, isOn, kindsOf, renamePreset, restState, savePreset, setPresetKind, updatePreset, type TestState } from './presets'
+import { applyPreset, awayCount, clearedBy, deletePreset, duplicatePreset, footprint, isOn, kindsOf, renamePreset, restState, savePreset, setPresetKind, updatePreset, type TestState } from './presets'
 import { previewSpecs, seededRng } from './previews'
 import { solve } from './rig'
 import { formCheck } from './rigCheck'
@@ -490,6 +490,46 @@ describe('presets', () => {
     expect(byId(setPresetKind(c, 'left', '   '), 'left').kind).toBe('Pose')
     expect(deletePreset(c, 'left').presets!.map(p => p.id)).not.toContain('left')
     expect(deletePreset(c, 'left').presets!.length).toBe(c.presets!.length - 1)
+  })
+
+  it('turns a preset off: what its kind controls goes back to rest, and nothing is set in its place', () => {
+    const c = library()
+    const on = applyPreset(c, restState(c), byId(c, 'left'))
+    expect(on.values.lean).toBe(-8)
+    const off = clearedBy(c, on, byId(c, 'left'))
+    expect(off.values.lean).toBe(0)
+    expect(isOn(c, off, byId(c, 'left'))).toBe(false)
+    expect(isOn(c, off, byId(c, 'rest'))).toBe(true)                                         // the rest pose is what is left
+    const bare = applyPreset(c, restState(c), byId(c, 'bare'))
+    expect(bare.hidden).toEqual(['oShirt'])
+    expect(clearedBy(c, bare, byId(c, 'bare')).hidden).toEqual([])
+  })
+
+  it('leaves the presets of another kind alone when one is turned off', () => {
+    const c = library()
+    let s = applyPreset(c, restState(c), byId(c, 'left'))
+    s = applyPreset(c, s, byId(c, 'curious'))
+    s = clearedBy(c, s, byId(c, 'curious'))
+    expect(s.values).toMatchObject({ lean: -8, tilt: 0 })
+  })
+
+  it('copies a preset next to the original, in its kind and scope, with a name of its own', () => {
+    const c = faced({ presets: [preset('a', 'Pose', { lean: 8 }), { ...preset('b', 'Style', { tilt: 3 }, ['oShirt']), scope: 'oEye', forms: { 'oEye.aShape': 'wide' } }, preset('z', 'Pose', {})] })
+    const copy = duplicatePreset(c, 'b', make)
+    expect(copy.ok).toBe(true)
+    const out = must(copy)
+    expect(out.presets!.map(p => p.id)).toEqual(['a', 'b', (copy as { presetId: string }).presetId, 'z'])
+    const dup = out.presets![2]
+    expect(dup).toMatchObject({ name: 'b (copy)', kind: 'Style', scope: 'oEye', values: { tilt: 3 }, hidden: ['oShirt'], forms: { 'oEye.aShape': 'wide' } })
+    expect(dup.values).not.toBe(out.presets![1].values)
+    expect(dup.hidden).not.toBe(out.presets![1].hidden)
+  })
+
+  it('refuses to copy a preset that is not there or past the limit', () => {
+    const c = library()
+    expect(refused(duplicatePreset(c, 'nothing', make))).toMatch(/no such preset/)
+    const many = faced({ presets: Array.from({ length: LIMITS.presetsMax }, (_, i) => preset(`p${i}`, 'Pose', {})) })
+    expect(refused(duplicatePreset(many, 'p0', make))).toMatch(new RegExp(`at most ${LIMITS.presetsMax} presets`))
   })
 })
 

@@ -5,6 +5,7 @@ import type { ModelContent, ModelEntry, ModelShape } from '../../../../api/types
 import { content, draftEntry, modelsBackend } from '../../../../test/characterModelsBackend'
 import DesignerConsole from './DesignerConsole'
 import { addGroup, addObject, addShape, newGroup } from './modelContent'
+import { pick } from '../../../../test/designerUi'
 
 // Phase 2b in the console: twins (Make a twin, Break the pair), point links (Weld, Follow, Lock to an edge, the arrow keys on a linked point), the back view
 // (an outline of its own, the depth of the view) and the slider that loosens links.
@@ -38,9 +39,7 @@ const tree = () => within(screen.getByRole('navigation', { name: 'Model tree' })
 const canvas = () => screen.getByRole('application')
 const pathOf = (id: string) => canvas().querySelector(`path[data-shape="${id}"]`) as SVGPathElement
 const save = (user: ReturnType<typeof userEvent.setup>) => user.click(screen.getByRole('button', { name: 'Save' }))
-const shapeRow = (name: string) => tree().getByRole('button', { name })
 const saved = (b: { entries: ModelEntry[] }, id: string) => b.entries[0].draft.shapes.find(s => s.id === id)!
-const savedGroup = (b: { entries: ModelEntry[] }, id: string) => b.entries[0].draft.groups.find(g => g.id === id)!
 function pointer(el: Element, type: 'pointerdown' | 'pointermove' | 'pointerup', init: { x?: number; y?: number } = {}) {
   fireEvent(el, new MouseEvent(type, { bubbles: true, cancelable: true, button: 0, clientX: init.x ?? 0, clientY: init.y ?? 0 }))
 }
@@ -52,11 +51,10 @@ function pixelOf(worldX: number, worldY: number) {
 describe('pairs', () => {
   it('makes a twin of a shape, marks it in the tree and draws it dashed, shown but not edited', async () => {
     const { user, backend } = await open()
-    await user.click(shapeRow('Arm'))
+    await pick(user, 'Arm', 'shape')
     await user.click(screen.getByRole('button', { name: 'Make a twin of Arm' }))
-    expect(shapeRow('Arm (twin)')).toBeInTheDocument()
+    await pick(user, 'Arm (twin)', 'shape')
     expect(tree().getByRole('img', { name: 'Arm (twin) is a twin' })).toBeInTheDocument()
-    await user.click(shapeRow('Arm (twin)'))
     expect(screen.getByText(/This is the twin of Arm: it mirrors it/)).toBeInTheDocument()
     const twinId = canvas().querySelector('path.cmShape--twin')!.getAttribute('data-shape')!
     expect(pathOf(twinId)).toBeTruthy()
@@ -69,7 +67,7 @@ describe('pairs', () => {
 
   it('mirrors the original: the twin is drawn on the other side of the mirror line', async () => {
     const { user } = await open()
-    await user.click(shapeRow('Arm'))
+    await pick(user, 'Arm', 'shape')
     await user.click(screen.getByRole('button', { name: 'Make a twin of Arm' }))
     const twinId = canvas().querySelector('path.cmShape--twin')!.getAttribute('data-shape')!
     const xs = (id: string) => (pathOf(id).getAttribute('d')!.match(/-?\d+(?:\.\d+)?/g) ?? []).map(Number).filter((_, i) => i % 2 === 0)
@@ -79,9 +77,9 @@ describe('pairs', () => {
 
   it('breaks the pair: the twin becomes a shape of its own with the points it was drawn with', async () => {
     const { user, backend } = await open()
-    await user.click(shapeRow('Arm'))
+    await pick(user, 'Arm', 'shape')
     await user.click(screen.getByRole('button', { name: 'Make a twin of Arm' }))
-    await user.click(shapeRow('Arm (twin)'))
+    await pick(user, 'Arm (twin)', 'shape')
     await user.click(screen.getByRole('button', { name: 'Break the pair of Arm (twin)' }))
     expect(canvas().querySelector('path.cmShape--twin')).toBeNull()
     expect(tree().queryByRole('img', { name: /is a twin/ })).toBeNull()
@@ -95,11 +93,10 @@ describe('pairs', () => {
 
   it('makes a twin of a group from the Rig tab, which then has no pivot or anchor of its own', async () => {
     const { user, backend } = await open()
-    await user.click(screen.getByRole('button', { name: 'Rig' }))
-    await user.click(tree().getByRole('button', { name: 'Limb' }))
+    await pick(user, 'Limb')
     await user.click(screen.getByRole('tab', { name: 'Rig' }))
     await user.click(screen.getByRole('button', { name: 'Make a twin of Limb' }))
-    await user.click(tree().getByRole('button', { name: 'Limb (twin)' }))
+    await pick(user, 'Limb (twin)')
     expect(screen.getByText(/A twin has no pivot or anchor of its own/)).toBeInTheDocument()
     expect(screen.queryByRole('button', { name: 'Put it in the middle of the group' })).toBeNull()
     expect(screen.queryByRole('group', { name: 'Kind of anchor' })).toBeNull()
@@ -115,7 +112,7 @@ describe('pairs', () => {
 
   it('takes the twin when the original is deleted, and says so', async () => {
     const { user, backend } = await open()
-    await user.click(shapeRow('Arm'))
+    await pick(user, 'Arm', 'shape')
     await user.click(screen.getByRole('button', { name: 'Make a twin of Arm' }))
     await user.click(screen.getByRole('button', { name: 'Delete Arm' }))
     expect(screen.getByText('Its twin went with it.')).toBeInTheDocument()
@@ -126,11 +123,12 @@ describe('pairs', () => {
 
   it('says why a pair cannot be made, in a note', async () => {
     const { user } = await open()
-    await user.click(shapeRow('Arm'))
+    await pick(user, 'Arm', 'shape')
     await user.click(screen.getByRole('button', { name: 'Make a twin of Arm' }))
-    await user.click(shapeRow('Arm'))
+    await pick(user, 'Arm', 'shape')
     expect(screen.queryByRole('button', { name: 'Make a twin of Arm' })).toBeNull()      // it has one: the panel says so
     expect(screen.getByText(/Has a twin:/)).toBeInTheDocument()
+    await pick(user, 'Arm (twin)', 'shape')
     await user.click(screen.getByRole('button', { name: 'Copy Arm (twin)' }))
     expect(screen.getByText(/A twin has no outline of its own to copy/)).toBeInTheDocument()
   })
@@ -139,7 +137,7 @@ describe('pairs', () => {
 describe('point links', () => {
   async function shirtSelected() {
     const ctx = await open()
-    await ctx.user.click(shapeRow('Shirt'))
+    await pick(ctx.user, 'Shirt', 'shape')
     return ctx
   }
 
@@ -222,7 +220,7 @@ describe('point links', () => {
     const { user, backend } = await shirtSelected()
     await user.click(screen.getByRole('button', { name: /^Weld/ }))
     pointer(pathOf('body'), 'pointerdown', pixelOf(61, 61))
-    await user.click(shapeRow('Body'))
+    await pick(user, 'Body', 'shape')
     await user.click(screen.getByRole('button', { name: 'Mirror editing' }))        // off: one point is added, not a pair
     await user.click(screen.getByRole('button', { name: 'Add a point after it' }))
     expect(screen.getByText(/The links of Shirt to this shape were cut because its points changed/)).toBeInTheDocument()
@@ -235,7 +233,7 @@ describe('point links', () => {
     const { user } = await shirtSelected()
     await user.click(screen.getByRole('button', { name: /^Weld/ }))
     pointer(pathOf('body'), 'pointerdown', pixelOf(61, 61))
-    await user.click(shapeRow('Body'))
+    await pick(user, 'Body', 'shape')
     await user.click(screen.getByRole('button', { name: /^Weld/ }))
     pointer(pathOf('shirt'), 'pointerdown', pixelOf(51, 51))
     expect(screen.getByText('That would make the links go round in a circle.')).toBeInTheDocument()
@@ -257,7 +255,7 @@ describe('the back view', () => {
 
   it('gives a shape an outline of its own for the back when its points are edited there, and takes it away again', async () => {
     const { user, backend } = await open()
-    await user.click(shapeRow('Body'))
+    await pick(user, 'Body', 'shape')
     await user.click(screen.getByRole('button', { name: 'Back view' }))
     expect(screen.getByText(/It shows its front outline from behind/)).toBeInTheDocument()
     await user.click(screen.getByRole('button', { name: 'Snap' }))
@@ -281,7 +279,7 @@ describe('the back view', () => {
 
   it('moves a shape in front of the next one in the view being edited only', async () => {
     const { user, backend } = await open()
-    await user.click(shapeRow('Body'))
+    await pick(user, 'Body', 'shape')
     await user.click(screen.getByRole('button', { name: 'Back view' }))
     await user.click(screen.getByRole('button', { name: 'Move Body in front in the back view' }))
     await save(user)
@@ -294,7 +292,7 @@ describe('the back view', () => {
 
   it('records points in the front view: the back view is left for the drawing', async () => {
     const { user } = await open()
-    await user.click(shapeRow('Body'))
+    await pick(user, 'Body', 'shape')
     await user.click(screen.getByRole('button', { name: 'Back view' }))
     await user.click(screen.getByRole('tab', { name: 'Ranges' }))
     await user.click(screen.getByRole('button', { name: 'New slider' }))
@@ -306,7 +304,7 @@ describe('the back view', () => {
 describe('the looseness slider', () => {
   it('is made for a shape with links, assigned to it, and listed among the choices', async () => {
     const { user, backend } = await open()
-    await user.click(shapeRow('Shirt'))
+    await pick(user, 'Shirt', 'shape')
     expect(screen.getByRole('button', { name: /Make a slider/ })).toBeDisabled()          // nothing is linked yet
     await user.click(screen.getByRole('button', { name: /^Lock to an edge/ }))
     pointer(pathOf('body'), 'pointerdown', pixelOf(100, 52))
@@ -325,7 +323,7 @@ describe('the looseness slider', () => {
 
   it('loosens the drawing: the shirt sits further from the body as the slider goes up', async () => {
     const { user } = await open()
-    await user.click(shapeRow('Shirt'))
+    await pick(user, 'Shirt', 'shape')
     await user.click(screen.getByRole('button', { name: /^Lock to an edge/ }))
     pointer(pathOf('body'), 'pointerdown', pixelOf(100, 52))
     await user.click(screen.getByRole('button', { name: /Make a slider/ }))

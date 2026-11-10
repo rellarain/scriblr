@@ -6,6 +6,7 @@ import { content, draftEntry, modelsBackend } from '../../../../test/characterMo
 import DesignerConsole from './DesignerConsole'
 import { newShape } from './engine/edit'
 import { addGroup, addObject, addShape, newGroup } from './modelContent'
+import { pick } from '../../../../test/designerUi'
 
 const box = (x: number, y: number, w: number, h: number) => ({ x, y, w, h })
 const widen = (pts: ModelPoint[]): ModelPoint[] => pts.map(p => ({ ...p, x: 100 + (p.x - 100) * 1.4 }))
@@ -54,11 +55,16 @@ const draft = (b: { entries: ModelEntry[] }) => b.entries[0].draft
 const memberShapes = () => drawn().filter(id => !OWN.includes(id))
 
 async function makeEyeClass(user: ReturnType<typeof userEvent.setup>, exclusive = true) {
-  await user.click(tree().getByRole('button', { name: 'Eye' }))
+  await pick(user, 'Eye')
   if (!exclusive) await user.click(klass().getByRole('button', { name: 'Copies' }))
   await user.click(klass().getByRole('button', { name: 'Make a class' }))
 }
 const addMember = (user: ReturnType<typeof userEvent.setup>) => user.click(klass().getByRole('button', { name: 'Add a member' }))
+// the first shape of the member (Eye 1): open the member, then its shape
+async function memberIris(user: ReturnType<typeof userEvent.setup>) {
+  await pick(user, 'Eye 1', 'object')
+  await user.click(tree().getByRole('button', { name: 'Iris' }))
+}
 
 describe('making a class', () => {
   it('turns an object into the pattern of a class, drawn like any object until it has a member', async () => {
@@ -97,7 +103,7 @@ describe('members', () => {
     const { user } = await open()
     await makeEyeClass(user)
     await addMember(user)
-    await user.click(tree().getByRole('button', { name: 'Skull' }))
+    await pick(user, 'Skull')
     expect(drawn()).not.toContain('iris')
     expect(drawn()).not.toContain('pupil')
     expect(memberShapes()).toHaveLength(2)
@@ -108,7 +114,7 @@ describe('members', () => {
     const { user } = await open()
     await makeEyeClass(user)
     await addMember(user)
-    await user.click(tree().getByRole('button', { name: 'Eye' }))
+    await pick(user, 'Eye')
     expect(drawn()).toEqual(expect.arrayContaining(['iris', 'pupil']))
     expect(memberShapes()).toHaveLength(0)    // a family draws one member at a time: the pattern, when it is the one looked at
   })
@@ -117,14 +123,14 @@ describe('members', () => {
     const family = await open()
     await makeEyeClass(family.user)
     await addMember(family.user)
-    await family.user.click(tree().getByRole('button', { name: 'Eye' }))
+    await pick(family.user, 'Eye')
     await addMember(family.user)
-    await family.user.click(tree().getByRole('button', { name: 'Skull' }))
+    await pick(family.user, 'Skull')
     expect(memberShapes()).toHaveLength(2)
     const first = memberShapes()
-    await family.user.click(tree().getByRole('button', { name: 'Eye 2' }))
+    await pick(family.user, 'Eye 2')
     await family.user.click(klass().getByRole('button', { name: 'Show this member' }))
-    await family.user.click(tree().getByRole('button', { name: 'Skull' }))
+    await pick(family.user, 'Skull')
     expect(memberShapes()).toHaveLength(2)
     expect(memberShapes()).not.toEqual(first)
   })
@@ -133,9 +139,9 @@ describe('members', () => {
     const { user } = await open()
     await makeEyeClass(user, false)
     await addMember(user)
-    await user.click(tree().getByRole('button', { name: 'Eye' }))
+    await pick(user, 'Eye')
     await addMember(user)
-    await user.click(tree().getByRole('button', { name: 'Skull' }))
+    await pick(user, 'Skull')
     expect(memberShapes()).toHaveLength(4)
   })
 
@@ -154,7 +160,7 @@ describe('members', () => {
     const { user, backend } = await open()
     await makeEyeClass(user)
     await addMember(user)
-    await user.click(tree().getByRole('button', { name: 'Eye' }))
+    await pick(user, 'Eye', 'object')
     await user.click(tree().getByRole('button', { name: 'Add a shape to Eye' }))
     await user.click(screen.getByRole('menuitem', { name: /Circle/i }))
     await save(user)
@@ -174,11 +180,13 @@ describe('a member\'s shapes', () => {
 
   it('cannot be deleted or copied, but can be left out', async () => {
     const { user, backend } = await onMember()
-    const row = tree().getAllByRole('button', { name: 'Iris' })
-    expect(row.length).toBeGreaterThan(0)
-    expect(tree().queryAllByRole('button', { name: 'Delete Iris' })).toHaveLength(1)   // the pattern's own, not the member's
-    // select the member's first shape by its row (the second 'Iris' in the tree) and leave it out
-    await user.click(row[row.length - 1])
+    await pick(user, 'Eye', 'object')                                                  // the pattern's own shape can be deleted and copied
+    await user.click(tree().getByRole('button', { name: 'Iris' }))
+    expect(screen.getByRole('button', { name: 'Delete Iris' })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Copy Iris' })).toBeInTheDocument()
+    await memberIris(user)                                                             // the member's follows it: neither, only leave it out
+    expect(screen.queryByRole('button', { name: 'Delete Iris' })).toBeNull()
+    expect(screen.queryByRole('button', { name: 'Copy Iris' })).toBeNull()
     await user.click(screen.getByRole('button', { name: 'Hide in this member' }))
     expect(screen.getByRole('button', { name: 'Hide in this member' })).toHaveAttribute('aria-pressed', 'true')
     await save(user)
@@ -187,8 +195,7 @@ describe('a member\'s shapes', () => {
 
   it('gets an outline of its own when a point is moved, and follows the pattern again on request', async () => {
     const { user, backend } = await onMember()
-    const row = tree().getAllByRole('button', { name: 'Iris' })
-    await user.click(row[row.length - 1])
+    await memberIris(user)
     expect(screen.getByText(/follows the pattern: move a point/)).toBeInTheDocument()
     fireEvent.keyDown(canvas(), { key: 'ArrowDown' })    // the arrow keys nudge the selected point (point 1 is on the mirror line: down, not sideways)
     await save(user)
@@ -201,8 +208,7 @@ describe('a member\'s shapes', () => {
 
   it('draws the ghost of the pattern only while its layer is shown in the view toolbar', async () => {
     const { user } = await onMember()
-    const row = tree().getAllByRole('button', { name: 'Iris' })
-    await user.click(row[row.length - 1])
+    await memberIris(user)
     fireEvent.keyDown(canvas(), { key: 'ArrowDown' })
     const layer = () => screen.getByRole('button', { name: 'Pattern ghost and frames' })
     expect(layer()).toHaveAttribute('aria-pressed', 'true')
@@ -216,17 +222,17 @@ describe('a member\'s shapes', () => {
 
   it('chooses its own form on each of the pattern\'s axes, which it cannot edit', async () => {
     const { user } = await onMember()
-    await user.click(tree().getByRole('button', { name: 'Eye 1' }))
+    await pick(user, 'Eye 1')
     await user.click(tab('Forms'))
     const axis = () => within(screen.getByRole('region', { name: 'Axis Eye shape' }))
     expect(screen.queryByRole('textbox', { name: 'Name of axis Eye shape' })).toBeNull()
     expect(axis().queryByRole('button', { name: /Add a form from the current one/ })).toBeNull()
-    await user.click(tree().getByRole('button', { name: 'Skull' }))
+    await pick(user, 'Skull')
     const before = dOf(memberShapes()[0])
-    await user.click(tree().getByRole('button', { name: 'Eye 1' }))
+    await pick(user, 'Eye 1')
     await user.click(axis().getByRole('button', { name: /^Wide/ }))
     expect(axis().getByRole('button', { name: /^Wide/ })).toHaveAttribute('aria-pressed', 'true')
-    await user.click(tree().getByRole('button', { name: 'Skull' }))
+    await pick(user, 'Skull')
     expect(dOf(memberShapes()[0])).not.toBe(before)
   })
 })
@@ -250,7 +256,7 @@ describe('leaving a class', () => {
     const { user, backend } = await open()
     await makeEyeClass(user)
     await addMember(user)
-    await user.click(tree().getByRole('button', { name: 'Eye' }))
+    await pick(user, 'Eye')
     await user.click(klass().getByRole('button', { name: 'Delete the class' }))
     await user.click(klass().getByRole('button', { name: 'Delete the class' }))
     await save(user)
@@ -264,6 +270,7 @@ describe('leaving a class', () => {
     const { user, backend } = await open()
     await makeEyeClass(user)
     await addMember(user)
+    await pick(user, 'Eye', 'object')
     await user.click(screen.getByRole('button', { name: 'Delete object Eye' }))
     expect(screen.getByText(/detached first: they keep their look/)).toBeInTheDocument()
     await save(user)
@@ -277,7 +284,7 @@ describe('leaving a class', () => {
 describe('styles', () => {
   async function onEye() {
     const r = await open()
-    await r.user.click(tree().getByRole('button', { name: 'Eye' }))
+    await pick(r.user, 'Eye')
     await r.user.click(tab('Forms'))
     return r
   }
@@ -319,9 +326,9 @@ describe('styles', () => {
     const { user, backend } = await open()
     await makeEyeClass(user)
     await addMember(user)
-    await user.click(tree().getByRole('button', { name: 'Eye' }))
+    await pick(user, 'Eye')
     await addMember(user)
-    await user.click(tree().getByRole('button', { name: 'Eye' }))
+    await pick(user, 'Eye')
     await user.click(within(klass().getByRole('group', { name: 'Member shown' })).getByRole('button', { name: 'Eye 2' }))
     await user.click(tab('Forms'))
     await user.type(screen.getByRole('textbox', { name: 'Style name for Eye' }), 'Second')

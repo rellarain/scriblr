@@ -7,7 +7,7 @@ import DesignerConsole from './DesignerConsole'
 import { blankContent, newGroup } from './modelContent'
 import { makeTwin } from './engine/pairEdit'
 import { addRange, addTurn, attachGroup, newRange, reparent, type Edit } from './engine/rigEdit'
-import { openDrawer } from '../../../../test/designerUi'
+import { openDrawer, pick } from '../../../../test/designerUi'
 
 const must = (e: Edit): ModelContent => { if (!e.ok) throw new Error(e.reason); return e.content }
 const sharp = (id: string, name: string, pts: Array<[number, number]>): ModelShape => ({ id, name, closed: true, z: 40, op: 1, view: 'both', half: 0, template: null, pts: pts.map(([x, y]) => ({ x, y, m: 's' as const })) })
@@ -44,14 +44,13 @@ async function open(c: ModelContent) {
 }
 
 type User = ReturnType<typeof userEvent.setup>
-const tree = () => within(screen.getByRole('navigation', { name: 'Model tree' }))
 const tab = (name: string) => screen.getByRole('tab', { name })
 const save = (user: User) => user.click(screen.getByRole('button', { name: 'Save' }))
 const draft = (b: { entries: ModelEntry[] }) => b.entries[0].draft
 const button = (name: string | RegExp) => screen.getByRole('button', { name })
 
 async function toHands(user: User) {
-  await user.click(tree().getByRole('button', { name: 'Forearm shape' }))
+  await pick(user, 'Forearm shape')
   await user.click(tab('Rig'))
 }
 
@@ -127,7 +126,7 @@ describe('the previews of a hand', () => {
     const { user } = await open(armed(false))
     await toHands(user)
     await user.click(button(/Add a whole hand/))
-    await user.click(tree().getAllByRole('button', { name: 'Hand' })[0])      // the group of the hand
+    await pick(user, 'Hand', 'group')      // the group of the hand
     await openDrawer(user)
     expect(screen.getByRole('img', { name: 'Preview 1' }).querySelectorAll('path[data-shape], path').length).toBeGreaterThanOrEqual(15)
   })
@@ -136,7 +135,7 @@ describe('the previews of a hand', () => {
 describe('apart sliders', () => {
   it('poses the other side of a slider apart and together again', async () => {
     const { backend, user } = await open(armed(true))
-    await user.click(tree().getByRole('button', { name: 'Arm shape' }))
+    await pick(user, 'Arm shape')
     await user.click(tab('Ranges'))
     await user.click(screen.getByRole('button', { name: /^All \(/ }))
     await user.click(button('Pose the other side of Arm raise apart'))
@@ -152,7 +151,7 @@ describe('apart sliders', () => {
 
   it('offers nothing for a slider with no twin groups to pose', async () => {
     const { user } = await open(armed(false))
-    await user.click(tree().getByRole('button', { name: 'Arm shape' }))
+    await pick(user, 'Arm shape')
     await user.click(tab('Ranges'))
     await user.click(screen.getByRole('button', { name: /^All \(/ }))
     expect(screen.queryByRole('button', { name: 'Pose the other side of Arm raise apart' })).toBeNull()
@@ -160,7 +159,7 @@ describe('apart sliders', () => {
 
   it('moves the arm of the other side with its own slider only', async () => {
     const { user } = await open(armed(true))
-    await user.click(tree().getByRole('button', { name: 'Arm shape' }))
+    await pick(user, 'Arm shape')
     await user.click(tab('Ranges'))
     await user.click(screen.getByRole('button', { name: /^All \(/ }))
     await user.click(button('Pose the other side of Arm raise apart'))
@@ -178,7 +177,7 @@ describe('grip points', () => {
     const ctx = await open(armed(true))
     await toHands(ctx.user)
     await ctx.user.click(button(/Add a whole hand/))
-    await ctx.user.click(tree().getAllByRole('button', { name: 'Hand' })[0])      // the group of the hand
+    await pick(ctx.user, 'Hand', 'group')      // the group of the hand
     return ctx
   }
 
@@ -246,7 +245,7 @@ describe('grip points', () => {
 
   it('draws no grip when there is none', async () => {
     const { user } = await open(armed(false))
-    await user.click(tree().getByRole('button', { name: 'Forearm shape' }))
+    await pick(user, 'Forearm shape')
     await user.click(tab('Rig'))
     expect(document.querySelector('[data-grip]')).toBeNull()
   })

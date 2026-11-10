@@ -5,6 +5,7 @@ import type { ModelContent, ModelEntry, ModelPoint, ModelShape } from '../../../
 import { content as blank, draftEntry, modelsBackend } from '../../../../test/characterModelsBackend'
 import DesignerConsole from './DesignerConsole'
 import { addGroup, addObject, addShape, newGroup } from './modelContent'
+import { pick } from '../../../../test/designerUi'
 
 const pt = (x: number, y: number, over: Partial<ModelPoint> = {}): ModelPoint => ({ x, y, m: 's', ...over })
 const poly = (id: string, name: string, pts: ModelPoint[]): ModelShape => ({ id, name, closed: true, z: 40, op: 1, view: 'both', half: 0, template: null, pts })
@@ -30,13 +31,12 @@ async function open(c: ModelContent = figure()) {
 }
 
 type User = ReturnType<typeof userEvent.setup>
-const tree = () => within(screen.getByRole('navigation', { name: 'Model tree' }))
 const tab = (name: string) => screen.getByRole('tab', { name })
 const save = (user: User) => user.click(screen.getByRole('button', { name: 'Save' }))
 const shape = (b: { entries: ModelEntry[] }, id: string) => b.entries[0].draft.shapes.find(s => s.id === id)!
 const canvas = () => screen.getByRole('application')
 const pathOf = (id: string) => document.querySelector(`path[data-shape="${id}"]`) as SVGPathElement
-const select = (user: User, name: string) => user.click(tree().getByRole('button', { name }))
+const select = (user: User, name: string) => pick(user, name)
 function pointer(el: Element, type: 'pointerdown' | 'pointerup') { fireEvent(el, new MouseEvent(type, { bubbles: true, cancelable: true, button: 0 })) }
 const point = (n: number) => screen.getByRole('button', { name: new RegExp(`^Point ${n}\\b`) })
 
@@ -182,7 +182,7 @@ describe('a Fall slider', () => {
     await user.click(screen.getByRole('button', { name: "Things fall to the picture's right" }))
     await user.click(tab('Presets'))
     await user.type(screen.getByRole('textbox', { name: 'Preset name' }), 'Windy')
-    await user.click(screen.getByRole('button', { name: /Save the current/ }))
+    await user.click(screen.getByRole('button', { name: 'Save the current as a preset' }))
     await save(user)
     expect(backend.entries[0].draft.presets?.[0]).toMatchObject({ name: 'Windy', fall: 'right' })
     await user.click(screen.getByRole('button', { name: "Things fall straight down" }))
@@ -201,7 +201,7 @@ describe('a Fall slider', () => {
 
   it('lets every weighted shape of the selected object fall with one button', async () => {
     const o = await open()
-    await o.user.click(tree().getByRole('button', { name: 'Scarf part' }))
+    await pick(o.user, 'Scarf part')
     await o.user.click(tab('Ranges'))
     await o.user.click(screen.getByRole('button', { name: /^All \(/ }))
     await o.user.click(screen.getByRole('button', { name: /Let Scarf part fall/ }))

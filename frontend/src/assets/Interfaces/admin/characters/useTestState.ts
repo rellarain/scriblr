@@ -2,7 +2,7 @@ import { useCallback, useMemo, useState } from 'react'
 import type { ModelContent, ModelFallSide, ModelPreset, ModelSwatch } from '../../../../api/types'
 import { chosenCount, paletteOf, type Colouring, type SlotChoice, type SlotChoices } from './engine/colour'
 import { formKey, type Choices } from './engine/forms'
-import { applyPreset, awayCount, type TestState } from './engine/presets'
+import { applyPreset, awayCount, clearedBy, type TestState } from './engine/presets'
 import { rollLook } from './engine/roll'
 import type { Values } from './engine/rig'
 import { seededRng, type Rng } from './engine/previews'
@@ -42,6 +42,10 @@ export interface TestControls {
   roll: (content: ModelContent, rng?: Rng) => void
   resetAll: () => void
   apply: (content: ModelContent, preset: ModelPreset) => void
+  // turn a preset off: what its kind controls goes back to rest
+  clear: (content: ModelContent, preset: ModelPreset) => void
+  // switch several things off or on together (the groups of a model)
+  setHidden: (ids: string[], hide: boolean) => void
   away: (content: ModelContent) => number
 }
 
@@ -71,11 +75,16 @@ export function useTestState(): TestControls {
     const next = applyPreset(content, state, preset)
     setValues(next.values); setForms(next.forms); setHidden(next.hidden); setFall(next.fall ?? 'down'); setGrip(next.grip ?? null)
   }, [state])
+  const clear = useCallback((content: ModelContent, preset: ModelPreset) => {
+    const next = clearedBy(content, state, preset)
+    setValues(next.values); setForms(next.forms); setHidden(next.hidden); setFall(next.fall ?? 'down'); setGrip(next.grip ?? null)
+  }, [state])
+  const setHiddenIds = useCallback((ids: string[], hide: boolean) => setHidden(h => (hide ? [...new Set([...h, ...ids])] : h.filter(x => !ids.includes(x)))), [])
   const away = useCallback((content: ModelContent) => awayCount(content, state) + chosenCount(content, colours) + (palette ? 1 : 0), [state, colours, palette])
   const colouring = useCallback((content: ModelContent): Colouring => ({ palette: palette ?? paletteOf(content), choices: colours, forms }), [palette, colours, forms])
   const roll = useCallback((content: ModelContent, rng: Rng = seededRng(Math.floor(Math.random() * 2 ** 31))) => {
     const next = rollLook(content, rng, { genre, locks, forms, choices: colours, palette: palette ?? paletteOf(content), fall })
     setForms(next.forms); setColours(next.choices); setFall(next.fall)
   }, [genre, locks, forms, colours, palette, fall])
-  return { state, values, forms, hidden, fall, setFall, grip, setGrip, setValues, setForm, setChoice, toggleHidden, colours, palette, genre, locks, setColour, setPalette, setGenre, toggleLock, colouring, roll, resetAll, apply, away }
+  return { state, values, forms, hidden, fall, setFall, grip, setGrip, setValues, setForm, setChoice, toggleHidden, colours, palette, genre, locks, setColour, setPalette, setGenre, toggleLock, colouring, roll, resetAll, apply, clear, setHidden: setHiddenIds, away }
 }
