@@ -51,6 +51,7 @@ import { emptyHistory, redo as redoHistory, remember, undo as undoHistory, type 
 import { beginScale, beginTurn, canScale, canTurn, grabPoint, moveScale, moveTurn, poseTarget, reach, reachJoints, scaleDriver, slideValue, toModel, type ReachGrab, type ScaleDrag, type TurnDrag } from './engine/pose'
 import { setObjectLock, setStyleLock, type LockPart } from './engine/locks'
 import { shapesInOrder } from './engine/order'
+import { addOption, addState, applyOption, removeOption, removeState, renameOption, renameState, updateOption } from './engine/states'
 import { deletePreset, duplicatePreset, renamePreset, savePreset, saveStyle, updatePreset } from './engine/presets'
 import { chainOf, isPointDriven, restPivot, solve, type Solved, type Values } from './engine/rig'
 import * as paintOps from './engine/paintEdit'
@@ -965,6 +966,14 @@ export function ModelPane({ entry, models, makeId, onRemove, onDuplicate, onExpo
     onApply: id => { const p = presetsOf(content).find(x => x.id === id); if (p) { setScrubbing(null); test.apply(content, p) } },
     onClear: id => { const p = presetsOf(content).find(x => x.id === id); if (p) { setScrubbing(null); test.clear(content, p) } },
     onNewPreset: newPreset,
+    onAddState: groupId => { applyEdit(addState(content, test.state, groupId, makeId)) },
+    onRenameState: (groupId, stateId, name) => models.edit(entry.id, c => renameState(c, groupId, stateId, name), false),
+    onRemoveState: (groupId, stateId) => commit(removeState(content, groupId, stateId), true),
+    onAddOption: (groupId, stateId) => { applyEdit(addOption(content, test.state, groupId, stateId, makeId)) },
+    onRenameOption: (groupId, stateId, optionId, name) => models.edit(entry.id, c => renameOption(c, groupId, stateId, optionId, name), false),
+    onUpdateOption: (groupId, stateId, optionId) => commit(updateOption(content, test.state, groupId, stateId, optionId), true),
+    onRemoveOption: (groupId, stateId, optionId) => { applyEdit(removeOption(content, groupId, stateId, optionId)) },
+    onChooseOption: (groupId, stateId, optionId) => { setScrubbing(null); test.set(applyOption(content, test.state, groupId, stateId, optionId)) },
     onDuplicatePreset: id => { applyEdit(duplicatePreset(content, id, makeId)) },
     onChooseForm: (objectId, axisId, formId) => test.setForm(objectId, axisId, formId),
     onAddForm: (objectId, axisId, fromCurrent) => {

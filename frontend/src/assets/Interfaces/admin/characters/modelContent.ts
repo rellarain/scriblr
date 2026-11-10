@@ -1,4 +1,4 @@
-import type { ModelGrip, ModelBone, ModelContent, ModelEntry, ModelFade, ModelFallSide, ModelFit, ModelForm, ModelFrame, ModelGradient, ModelGroup, ModelHsl, ModelLayer, ModelLook, ModelObject, ModelPreset, ModelRange, ModelShape, ModelSlot, ModelTint } from '../../../../api/types'
+import type { ModelGrip, ModelBone, ModelContent, ModelEntry, ModelFade, ModelFallSide, ModelFit, ModelForm, ModelFrame, ModelGradient, ModelGroup, ModelHsl, ModelLayer, ModelLook, ModelObject, ModelPreset, ModelRange, ModelShape, ModelSlot, ModelState, ModelTint } from '../../../../api/types'
 import { LIMITS, copyBytes, linkCount, shadingCount } from './engine/limits'
 import { chainOf } from './engine/rig'
 import { standardGenres, standardSlots, starterPalette } from './engine/standardColours'
@@ -40,7 +40,7 @@ export function normalizeContent(c: ModelContent): ModelContent {
     description: clean(c.description, DESCRIPTION_MAX),
     shapes: c.shapes.map(s => ({ ...s, name: clean(s.name, NAME_MAX), mirrorOf: s.mirrorOf ?? null, back: s.back ?? null, zBack: s.zBack ?? null, loose: s.loose ?? null, copyOf: s.copyOf ?? null, hide: s.hide === true, slot: s.slot ?? null, gray: s.gray ?? null, ...paintFields(s) })),
     objects: c.objects.map(o => ({ ...o, name: clean(o.name, NAME_MAX), mirrorOf: o.mirrorOf ?? null, classOf: o.classOf ?? null, ...fitFields(o), hsl: repairHsl(o.hsl), axes: (o.axes ?? []).map(a => ({ ...a, name: clean(a.name, NAME_MAX), options: a.options.map(f => ({ ...f, name: clean(f.name, NAME_MAX), looks: repairLooks(f.looks) })) })) })),
-    groups: c.groups.map(g => ({ ...g, name: clean(g.name, NAME_MAX), pivot: g.pivot ?? null, attach: g.attach ?? null, mirrorOf: g.mirrorOf ?? null })),
+    groups: c.groups.map(g => ({ ...g, name: clean(g.name, NAME_MAX), pivot: g.pivot ?? null, attach: g.attach ?? null, mirrorOf: g.mirrorOf ?? null, states: repairStates(g.states) })),
     axis: c.axis ?? 100,
     ranges: (c.ranges ?? []).map(repairRange),
     presets: (c.presets ?? []).map(p => ({ ...p, name: clean(p.name, NAME_MAX), kind: clean(p.kind, KIND_MAX) || 'Pose', scope: p.scope ?? null, forms: p.forms ?? {}, fall: p.fall && FALL_SIDES.includes(p.fall) ? p.fall : null, grip: p.grip ?? null, ...variantFields(p) })),
@@ -101,6 +101,23 @@ export function repairHsl(locks: Record<string, ModelHsl> | undefined): Record<s
   for (const [slot, l] of Object.entries(locks ?? {})) {
     const lock = { h: part(l?.h, 359), s: part(l?.s, 100), l: part(l?.l, 100) }
     if (lock.h !== null || lock.s !== null || lock.l !== null) out[slot] = lock
+  }
+  return out
+}
+// The states of a group as the server keeps them (phase D3b): names cut, one option per id, an option's values held to a slider's span, its hidden things listed once, and a
+// state with no option dropped.
+export function repairStates(states: ModelState[] | undefined): ModelState[] {
+  const seen = new Set<string>(), out: ModelState[] = []
+  for (const st of states ?? []) {
+    if (seen.has(st.id)) continue
+    const ids = new Set<string>(), options = (st.options ?? []).filter(o => !ids.has(o.id) && !!ids.add(o.id)).map(o => ({
+      id: o.id, name: clean(o.name, RANGE_NAME_MAX),
+      values: Object.fromEntries(Object.entries(o.values ?? {}).filter(([, v]) => typeof v === 'number' && Number.isFinite(v)).map(([k, v]) => [k, Math.min(1000, Math.max(-1000, v))])),
+      hidden: [...new Set(o.hidden ?? [])], forms: o.forms ?? {},
+    }))
+    if (options.length === 0) continue
+    seen.add(st.id)
+    out.push({ id: st.id, name: clean(st.name, RANGE_NAME_MAX), options })
   }
   return out
 }
@@ -270,6 +287,17 @@ function forgetPresets(c: ModelContent, gone: { shapes: Set<string>; objects: Se
   })
 }
 
+// A group state without the objects, groups and forms of things that are gone (an option stays, whatever is left in it).
+function forgetInState(st: ModelState, gone: { shapes: Set<string>; objects: Set<string>; groups: Set<string> }, deadClasses: Set<string>): ModelState {
+  return {
+    ...st, options: st.options.map(o => ({
+      ...o,
+      hidden: o.hidden.filter(h => !gone.objects.has(h) && !gone.groups.has(h)),
+      forms: Object.fromEntries(Object.entries(o.forms).filter(([k, v]) => (!k.startsWith('class:') ? ![...gone.objects].some(id => k.startsWith(`${id}.`)) : !deadClasses.has(k.slice(6)) && !gone.objects.has(v)))),
+    })),
+  }
+}
+
 function removeAll(c: ModelContent, gone: { shapes: Set<string>; objects: Set<string>; groups: Set<string> }): ModelContent {
   const parentOf = new Map(c.groups.map(g => [g.id, g.parent]))
   // a class goes with its template; its members stop being members (the page freezes them first, so they keep their look: see classEdit.detachBeforeRemoval)
@@ -290,7 +318,7 @@ function removeAll(c: ModelContent, gone: { shapes: Set<string>; objects: Set<st
       ...(o.fitTo && gone.shapes.has(o.fitTo) ? { fit: 'scale' as const, fitTo: null } : {}),
       axes: (o.axes ?? []).map(a => ({ ...a, options: a.options.map(f => forgetShapes(f, gone.shapes)) })),
     })),
-    groups: c.groups.filter(g => !gone.groups.has(g.id)).map(g => ({ ...g, parent: up(g.parent), objects: g.objects.filter(oid => !gone.objects.has(oid)) })),
+    groups: c.groups.filter(g => !gone.groups.has(g.id)).map(g => ({ ...g, parent: up(g.parent), objects: g.objects.filter(oid => !gone.objects.has(oid)), ...(g.states?.length ? { states: g.states.map(st => forgetInState(st, gone, deadClasses)) } : {}) })),
     presets: forgetPresets(c, gone, deadClasses),
     classes: (c.classes ?? []).filter(k => !deadClasses.has(k.id)),
     ...(c.grips ? { grips: c.grips.filter(g => !(g.group && gone.groups.has(g.group))) } : {}),
@@ -561,6 +589,25 @@ function presetFaults(c: ModelContent): string[] {
   return faults
 }
 
+// Group states (the server's _state_faults says the same words): an option that sets a slider, switches off a thing or chooses a form that is not there, and a twin group that has
+// states of its own.
+function stateFaults(c: ModelContent): string[] {
+  const faults: string[] = []
+  const rangeIds = new Set(c.ranges.map(r => r.id)), thingIds = new Set([...c.objects.map(o => o.id), ...c.groups.map(g => g.id)])
+  for (const g of c.groups) {
+    if (g.mirrorOf && (g.states ?? []).length > 0) faults.push(`Group ${label(g.name, g.id)} is a twin and has states of its own; give them to the original.`)
+    for (const st of g.states ?? []) {
+      for (const o of st.options) {
+        const name = `${label(o.name, o.id)} of state ${label(st.name, st.id)}`
+        if (Object.keys(o.values).some(k => !rangeIds.has(k))) faults.push(`Option ${name} sets a slider that does not exist.`)
+        if (o.hidden.some(h => !thingIds.has(h))) faults.push(`Option ${name} switches off something that does not exist.`)
+        if (Object.entries(o.forms).some(([k, v]) => !styleChoiceExists(c, k, v))) faults.push(`Option ${name} chooses a form that does not exist.`)
+      }
+    }
+  }
+  return faults
+}
+
 // What is wrong with the colour of a model (the server's _colour_faults says the same words).
 function colourFaults(c: ModelContent): string[] {
   const faults: string[] = []
@@ -673,6 +720,7 @@ export function publishFaults(c: ModelContent): string[] {
   faults.push(...formFaults(c))
   faults.push(...classFaults(c))
   faults.push(...presetFaults(c))
+  faults.push(...stateFaults(c))
   faults.push(...colourFaults(c))
   faults.push(...paintFaults(c))
   faults.push(...proportionFaults(c))

@@ -225,7 +225,7 @@ function captured(c: ModelContent, s: TestState, keep: PresetKeep = {}): Pick<Mo
 
 // The same for a style: only the sliders listed under the scope, the things inside it that are switched off (and, for a style of an object, its shapes), the forms (away
 // from their default) of the objects in it, the member of each family that has the scope's objects (template or members) in it, and the order an object's shapes are drawn in.
-function capturedStyle(c: ModelContent, s: TestState, scope: Scope): Pick<ModelPreset, 'values' | 'hidden' | 'forms' | 'fall' | 'order'> {
+export function capturedStyle(c: ModelContent, s: TestState, scope: Scope): Pick<ModelPreset, 'values' | 'hidden' | 'forms' | 'fall' | 'order'> {
   const values: Record<string, number> = {}
   for (const r of c.ranges) {
     const v = valueOf(r, s.values)

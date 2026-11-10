@@ -1,6 +1,6 @@
 import type {
   ModelAxis, ModelBind, ModelBlend, ModelBone, ModelClass, ModelColour, ModelContent, ModelDrive, ModelFade, ModelFallSide, ModelForm, ModelFrame, ModelGenre, ModelGrip, ModelGradDir, ModelGradient, ModelGroup, ModelHsl, ModelLook, ModelMove, ModelObject, ModelOverride, ModelPoint,
-  ModelPreset, ModelRange, ModelShape, ModelSlot, ModelSwatch, ModelTint, ModelTintKind,
+  ModelPreset, ModelRange, ModelShape, ModelSlot, ModelState, ModelStateOption, ModelSwatch, ModelTint, ModelTintKind,
 } from '../../../../api/types'
 import { LIMITS } from './engine/limits'
 import { FALL_SIDES, ROLE_MAX, FRAME_BIGGEST, FRAME_MIN, KIND_MAX, SWATCH_NAME_MAX, TILE_DEFAULT, TINT_RANGE, TONE_RANGE, blankContent, normalizeContent, repairHsl, repairLooks } from './modelContent'
@@ -134,6 +134,19 @@ function range(v: Record<string, unknown>, id: string): ModelRange {
   }
 }
 
+// An option of a group state and a state the server would accept (phase D3b): a state needs an option, ids are kept once, and the sets are held to what the server keeps.
+function stateOption(v: Record<string, unknown>, id: string): ModelStateOption {
+  const values: Record<string, number> = {}
+  if (isRecord(v.values)) for (const [k, x] of Object.entries(v.values)) if (ID.test(k) && typeof x === 'number' && Number.isFinite(x) && Object.keys(values).length < LIMITS.rangesMax) values[k] = num(x, 0, -1000, 1000)
+  const forms: Record<string, string> = {}
+  if (isRecord(v.forms)) for (const [k, x] of Object.entries(v.forms)) if (k.length >= 3 && k.length <= 170 && idOf(x) && Object.keys(forms).length < LIMITS.presetFormsMax) forms[k] = x as string
+  return { id, name: text(v.name).trim().slice(0, 40), values, hidden: [...new Set(list(v.hidden).map(idOf).filter((x): x is string => x !== null))].slice(0, 100), forms }
+}
+function groupState(v: Record<string, unknown>, id: string): ModelState | null {
+  const options = withIds(list(v.options), stateOption).slice(0, LIMITS.stateOptionsMax)
+  return options.length > 0 ? { id, name: text(v.name).trim().slice(0, 40), options } : null
+}
+
 function group(v: Record<string, unknown>, id: string): ModelGroup {
   const a = isRecord(v.attach) ? v.attach : null
   const shapeId = a ? idOf(a.shape) : null
@@ -142,6 +155,7 @@ function group(v: Record<string, unknown>, id: string): ModelGroup {
     id, name: text(v.name), parent: typeof v.parent === 'string' ? v.parent : null, objects: list(v.objects).filter((x): x is string => typeof x === 'string'), mirrorOf: idOrNull(v.mirrorOf),
     pivot: Array.isArray(v.pivot) && v.pivot.length === 2 ? [num(v.pivot[0], 100, -50, 250), num(v.pivot[1], 200, -50, 450)] : null,
     attach: a && shapeId ? { shape: shapeId, kind, i: Math.round(num(a.i, 0, 0, LIMITS.pointsMax - 1)), t: num(a.t, 0, 0, 1), slider: idOrNull(a.slider), rx: num(a.rx, 0.5, 0, 1), ry: num(a.ry, 0.5, 0, 1) } : null,
+    states: withIds(list(v.states), groupState).slice(0, LIMITS.statesMax),
   }
 }
 

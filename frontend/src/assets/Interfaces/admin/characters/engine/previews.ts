@@ -4,6 +4,7 @@ import { paletteOf, randomPalette, rollChoices, slotsOf, type SlotChoices } from
 import { axesFor, classKey, classesOf, formKey, membersOf, presetsOf } from './forms'
 import type { Box } from './geometry'
 import { applyPreset, type TestState } from './presets'
+import { applyOption, statesOf } from './states'
 
 // The preview strip: the thing being designed shown several times at random sizes, tilts and backgrounds, so the admin sees how it holds up
 // before publishing. 'rand' stays inside a sensible range; 'min' and 'max' are the stress previews (every value at the end of its range).
@@ -85,6 +86,8 @@ function looks(c: ModelContent | undefined, mode: PreviewMode, rng: Rng, values:
     const slots = new Map<string, ReturnType<typeof presetsOf>>()
     for (const p of presetsOf(c)) { const key = `${p.kind.trim().toLowerCase()}|${p.scope ?? ''}`; slots.set(key, [...(slots.get(key) ?? []), p]) }
     for (const list of slots.values()) if (rng() < 0.6) state = applyPreset(c, state, list[Math.min(list.length - 1, Math.floor(rng() * list.length))])
+    // and one random option of each state of each group, 60% of the time (a model with no states draws nothing here)
+    for (const g of c.groups) for (const st of statesOf(g)) if (rng() < 0.6) state = applyOption(c, state, g.id, st.id, st.options[Math.min(st.options.length - 1, Math.floor(rng() * st.options.length))].id)
   }
   // a model with something that hangs draws a side too (a stress preview takes the first side or the last; nothing is drawn for a model with nothing that hangs)
   if (c.ranges.some(r => r.drives.some(d => d.kind === 'fall'))) state = { ...state, fall: mode === 'min' ? 'down' : mode === 'max' ? 'behind' : FALL_SIDES[Math.min(FALL_SIDES.length - 1, Math.floor(rng() * FALL_SIDES.length))] }

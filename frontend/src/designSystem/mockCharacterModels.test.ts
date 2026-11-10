@@ -6,6 +6,7 @@ import { boneLength, headHeights, measures } from '../assets/Interfaces/admin/ch
 import { framesOf, hiddenThrough } from '../assets/Interfaces/admin/characters/engine/frames'
 import { activeLocks } from '../assets/Interfaces/admin/characters/engine/locks'
 import { applyPreset, restState } from '../assets/Interfaces/admin/characters/engine/presets'
+import { applyOption, optionIsOn } from '../assets/Interfaces/admin/characters/engine/states'
 import { hangCheck, paintCheck, proportionCheck, rigCheck } from '../assets/Interfaces/admin/characters/engine/rigCheck'
 import { drawable, paintDefs, paintShapes } from '../assets/Interfaces/admin/characters/engine/paint'
 import { solve } from '../assets/Interfaces/admin/characters/engine/rig'
@@ -166,6 +167,18 @@ describe('the rigged preview model', () => {
     const shirt = adult.shapes.find(x => x.id === 's_shirt')!
     const colouring = { palette: paletteOf(adult), choices: { k_cloth: { src: 'colour', id: 'c_cloth_2' } } as const, locks: activeLocks(adult, on) }
     expect(paintOf(adult, colouring, shirt).fill).toMatch(/^#[0-9a-f]{6}$/)
+  })
+
+  it('has a state of the arm: Down is the arm as drawn, Raised lifts it and bends the elbow', () => {
+    const arm = adult.groups.find(g => g.id === 'g_arm')!
+    expect(arm.states).toHaveLength(1)
+    const [st] = arm.states!
+    expect([st.name, ...st.options.map(o => o.name)]).toEqual(['Arm', 'Down', 'Raised'])
+    expect(optionIsOn(adult, restState(adult), 'g_arm', st.id, st.options[0].id)).toBe(true)
+    const raised = applyOption(adult, restState(adult), 'g_arm', st.id, st.options[1].id)
+    expect(raised.values).toMatchObject({ r_raise: 60, r_elbow: 40 })
+    expect(optionIsOn(adult, raised, 'g_arm', st.id, st.options[1].id)).toBe(true)
+    expect(applyOption(adult, raised, 'g_arm', st.id, st.options[0].id).values).toMatchObject({ r_raise: 0, r_elbow: 0 })
   })
 
   it('has a family of eyes: one member shown at a time, each with a twin, and a style of the head that picks the hooded eye', () => {

@@ -17,7 +17,7 @@ const mapForm = (c: ModelContent, objectId: string, axisId: string, formId: stri
   mapAxis(c, objectId, axisId, a => ({ ...a, options: a.options.map(f => (f.id === formId ? change(f) : f)) }))
 
 // A fresh id for an axis or a form: unique among the object's axes (or the axis's forms), so a "objectId.axisId" key and a form id never clash.
-export function freshFormId(taken: string[], prefix: 'a' | 'f' | 'p' | 'k' | 'c' | 'g', make: MakeId = randomId): string {
+export function freshFormId(taken: string[], prefix: string, make: MakeId = randomId): string {
   for (let i = 0; i < 20; i++) { const id = make(prefix); if (!taken.includes(id)) return id }
   return `${prefix}_${taken.length}_${Date.now().toString(36)}`
 }

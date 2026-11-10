@@ -1,11 +1,12 @@
 import { useState, type MouseEvent as ReactMouseEvent, type ReactNode } from 'react'
 import type { ModelContent, ModelEntry, ModelGroup, ModelObject, ModelPreset, ModelShape } from '../../../../api/types'
-import { ChevronDownIcon, CopyIcon, EyeIcon, EyeOffIcon, FolderPlusIcon, ImportIcon, ExportIcon, LayersIcon, LinkIcon, PlusIcon, SearchIcon, StampIcon, SwapIcon } from '../../../icons'
+import { CheckIcon, ChevronDownIcon, CopyIcon, EyeIcon, EyeOffIcon, FolderPlusIcon, ImportIcon, ExportIcon, LayersIcon, LinkIcon, PlayIcon, PlusIcon, SaveIcon, SearchIcon, StampIcon, SwapIcon, TrashIcon } from '../../../icons'
 import { ReorderList } from './ReorderList'
 import { StatusBadge, modelLabel } from './StatusBadge'
 import { TemplateMenu } from './TemplateMenu'
 import { classOfObject } from './engine/classEdit'
 import { isOn, type TestState } from './engine/presets'
+import { optionIsOn, statesOf } from './engine/states'
 import { LIMITS } from './engine/limits'
 import type { Selection } from './designerState'
 import {
@@ -50,6 +51,15 @@ export interface TreeActions {
   onClear: (presetId: string) => void
   onNewPreset: (scope: string | null) => void
   onDuplicatePreset: (presetId: string) => void
+  // group states (phase D3b), on the card of the group: add a state or an option from the look now, rename, delete, give an option the look now, choose an option
+  onAddState: (groupId: string) => void
+  onRenameState: (groupId: string, stateId: string, name: string) => void
+  onRemoveState: (groupId: string, stateId: string) => void
+  onAddOption: (groupId: string, stateId: string) => void
+  onRenameOption: (groupId: string, stateId: string, optionId: string, name: string) => void
+  onUpdateOption: (groupId: string, stateId: string, optionId: string) => void
+  onRemoveOption: (groupId: string, stateId: string, optionId: string) => void
+  onChooseOption: (groupId: string, stateId: string, optionId: string) => void
   onChooseForm: (objectId: string, axisId: string, formId: string) => void
   onAddForm: (objectId: string, axisId: string, fromCurrent: boolean) => void
 }
@@ -191,6 +201,47 @@ export function TreeBar({ content, sel, state, hidden, models, actions }: {
     )
   }
 
+  // ---- the states of a group: switches whose options each set several things of the group at once ----
+  function groupStates(g: ModelGroup): ReactNode {
+    if (g.mirrorOf) return null
+    const list = statesOf(g), gname = label(g.name, 'the group')
+    return (
+      <section className="dzStates" aria-label="States">
+        <div className="dzLevelHead">
+          <span className="dzLevelName">States <span className="cmCount">{list.length}</span></span>
+          <button type="button" className="cmIconBtn cmIconBtn--small" aria-label={`Add a state to ${gname}`} title={`Add a state to ${gname}, with an option that keeps how the group looks now`} disabled={list.length >= LIMITS.statesMax} onClick={() => actions.onAddState(g.id)}><PlusIcon size={12} /></button>
+        </div>
+        {list.length === 0 && <p className="cmInsText">None yet: set the group up as one of its settings, then add a state.</p>}
+        {list.map(st => {
+          const sname = label(st.name, 'Untitled state')
+          return (
+            <div key={st.id} className="dzState" role="group" aria-label={`State ${sname}`}>
+              <div className="dzStateHead">
+                <input className="dzStateName" aria-label={`Name of state ${sname}`} value={st.name} maxLength={40} placeholder="Name" onChange={e => actions.onRenameState(g.id, st.id, e.target.value)} />
+                <button type="button" className="cmIconBtn cmIconBtn--small" aria-label={`Add an option to ${sname}`} title="Add an option that keeps how the group looks now" disabled={st.options.length >= LIMITS.stateOptionsMax} onClick={() => actions.onAddOption(g.id, st.id)}><PlusIcon size={12} /></button>
+                <button type="button" className="cmIconBtn cmIconBtn--small" aria-label={`Delete state ${sname}`} title="Delete the state" onClick={() => actions.onRemoveState(g.id, st.id)}><TrashIcon size={12} /></button>
+              </div>
+              {st.options.map(o => {
+                const on = optionIsOn(content, state, g.id, st.id, o.id), oname = label(o.name, 'Untitled option')
+                return (
+                  <div key={o.id} className={`dzOption${on ? ' dzOption--on' : ''}`} role="group" aria-label={`Option ${oname} of ${sname}`}>
+                    <button
+                      type="button" className={`cmIconBtn cmIconBtn--small${on ? ' cmIconBtn--on' : ''}`} aria-pressed={on} aria-label={`Set ${sname} to ${oname}`}
+                      title={on ? `${sname} is at ${oname}` : `Set the group to ${oname}: its sliders, things and forms take this option's`} onClick={() => actions.onChooseOption(g.id, st.id, o.id)}
+                    >{on ? <CheckIcon size={12} /> : <PlayIcon size={12} />}</button>
+                    <input className="dzStateName" aria-label={`Name of option ${oname} of ${sname}`} value={o.name} maxLength={40} placeholder="Name" onChange={e => actions.onRenameOption(g.id, st.id, o.id, e.target.value)} />
+                    <button type="button" className="cmIconBtn cmIconBtn--small" aria-label={`Update ${oname} of ${sname} from the current look`} title="Keep how the group looks now in this option" onClick={() => actions.onUpdateOption(g.id, st.id, o.id)}><SaveIcon size={12} /></button>
+                    <button type="button" className="cmIconBtn cmIconBtn--small" aria-label={`Delete option ${oname} of ${sname}`} title={st.options.length <= 1 ? 'A state needs an option: delete the state instead' : 'Delete the option'} disabled={st.options.length <= 1} onClick={() => actions.onRemoveOption(g.id, st.id, o.id)}><TrashIcon size={12} /></button>
+                  </div>
+                )
+              })}
+            </div>
+          )
+        })}
+      </section>
+    )
+  }
+
   // ---- expressions: the forms of an object's axes ----
   function expressions(o: ModelObject): ReactNode {
     const list = expressionsOf(content, o, state.forms)
@@ -264,6 +315,7 @@ export function TreeBar({ content, sel, state, hidden, models, actions }: {
       const kids = (g: ModelGroup) => (
         <>
           {states('pose', posesOf(content, g.id), g.id, 'Poses')}
+          {groupStates(g)}
           {renderLevel(1)}
         </>
       )

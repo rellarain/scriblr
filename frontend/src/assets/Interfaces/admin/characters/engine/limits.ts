@@ -34,6 +34,11 @@ export const LIMITS = {
   membersWarn: 12,
   membersMax: 24,
   presetFormsMax: 100,
+  // group states (phase D3b): state axes per group, options per state axis (the stops are the server's max_lengths)
+  statesWarn: 4,
+  statesMax: 8,
+  stateOptionsWarn: 8,
+  stateOptionsMax: 24,
   // colour: genre tags per model, colour slots per model, default colours per slot, swatches of the starter palette (the stops are the server's max_lengths)
   genresWarn: 8,
   genresMax: 12,
@@ -114,6 +119,11 @@ export function limitNotes(content: ModelContent): LimitNote[] {
     const name = o.name || o.id, axes = o.axes ?? []
     add(level(axes.length, LIMITS.axesWarn, LIMITS.axesMax), `${name} has ${axes.length} axes of forms: the warning starts above ${LIMITS.axesWarn}.`, `${name} has ${axes.length} axes of forms: the limit is ${LIMITS.axesMax}.`)
     for (const a of axes) add(level(a.options.length, LIMITS.formsWarn, LIMITS.formsMax), `${a.name || a.id} of ${name} has ${a.options.length} forms: the warning starts above ${LIMITS.formsWarn}.`, `${a.name || a.id} of ${name} has ${a.options.length} forms: the limit is ${LIMITS.formsMax}.`)
+  }
+  for (const g of content.groups) {
+    const name = g.name || g.id, states = g.states ?? []
+    add(level(states.length, LIMITS.statesWarn, LIMITS.statesMax), `${name} has ${states.length} states: the warning starts above ${LIMITS.statesWarn}.`, `${name} has ${states.length} states: the limit is ${LIMITS.statesMax}.`)
+    for (const st of states) add(level(st.options.length, LIMITS.stateOptionsWarn, LIMITS.stateOptionsMax), `${st.name || st.id} of ${name} has ${st.options.length} options: the warning starts above ${LIMITS.stateOptionsWarn}.`, `${st.name || st.id} of ${name} has ${st.options.length} options: the limit is ${LIMITS.stateOptionsMax}.`)
   }
   const presets = (content.presets ?? []).length
   add(level(presets, LIMITS.presetsWarn, LIMITS.presetsMax), `The model has ${presets} presets: the warning starts above ${LIMITS.presetsWarn}.`, `The model has ${presets} presets: the limit is ${LIMITS.presetsMax}.`)

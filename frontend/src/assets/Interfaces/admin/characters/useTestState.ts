@@ -45,6 +45,8 @@ export interface TestControls {
   apply: (content: ModelContent, preset: ModelPreset) => void
   // turn a preset off: what its kind controls goes back to rest
   clear: (content: ModelContent, preset: ModelPreset) => void
+  // the whole look replaced (what choosing an option of a group state comes to)
+  set: (next: TestState) => void
   // switch several things off or on together (the groups of a model)
   setHidden: (ids: string[], hide: boolean) => void
   // the order a style draws an object's shapes in (back to front), per object; an object with none is drawn in the tree's order
@@ -99,5 +101,5 @@ export function useTestState(): TestControls {
     const next = rollLook(content, rng, { genre, locks, forms, choices: colours, palette: palette ?? paletteOf(content), fall })
     setForms(next.forms); setColours(next.choices); setFall(next.fall)
   }, [genre, locks, forms, colours, palette, fall])
-  return { state, values, forms, hidden, fall, setFall, grip, setGrip, setValues, setForm, setChoice, toggleHidden, colours, palette, genre, locks, setColour, setPalette, setGenre, toggleLock, colouring, roll, resetAll, apply, clear, setHidden: setHiddenIds, order, setOrder, away }
+  return { state, values, forms, hidden, fall, setFall, grip, setGrip, setValues, setForm, setChoice, toggleHidden, colours, palette, genre, locks, setColour, setPalette, setGenre, toggleLock, colouring, roll, resetAll, apply, clear, setHidden: setHiddenIds, order, setOrder, set: take, away }
 }

@@ -418,6 +418,9 @@ described, now stale, in `docs/data-model.md`).
   it turns on) and `picks` (slot id to the default colour it picks; its `forms` are the
   expressions it sets), and on a style `order` (the shape ids of its object in the order it
   draws them, back to front; its `hidden` may name shapes of the object).
+  Phase D3b adds, with defaults: on a group `states` (`ModelState`: a name and its `options`,
+  `ModelStateOption`: a name, slider `values`, `hidden` ids of objects and groups switched off
+  and `forms` chosen, as a preset's; a state needs an option, a twin group has none).
   Phase 4a (colour) adds, with defaults: on the model `genres` (`ModelGenre`: genre tags a
   default colour may fit), `palette` (`ModelSwatch`: the starter palette, a hue 0..359 and a
   saturation 0..100 per swatch, at most 10) and `slots` (`ModelSlot`: a colour slot with a

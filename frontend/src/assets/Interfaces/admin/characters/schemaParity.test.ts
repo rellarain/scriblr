@@ -39,6 +39,7 @@ describe('the model types match the backend schema', () => {
     ['ModelTint', 'ModelTint'], ['ModelGradient', 'ModelGradient'], ['ModelLook', 'ModelLook'], ['ModelFade', 'ModelFade'],
     ['ModelBone', 'ModelBone'], ['ModelBoneEnd', 'ModelBoneEnd'], ['ModelFrame', 'ModelFrame'], ['ModelGrip', 'ModelGrip'],
     ['ModelHsl', 'ModelHsl'],
+    ['ModelState', 'ModelState'], ['ModelStateOption', 'ModelStateOption'],
     // the figure of a character (phase 6)
     ['CharacterFigure', 'CharacterFigure'], ['FigureColour', 'FigureColour'], ['FigureModel', 'FigureModel'],
   ]
@@ -116,6 +117,10 @@ describe('the limits are the backend\'s numbers', () => {
     expect(LIMITS.membersWarn).toBe(number('MODEL_MEMBERS_WARN'))
     expect(LIMITS.membersMax).toBe(number('MODEL_MEMBERS_MAX'))
     expect(LIMITS.presetFormsMax).toBe(number('MODEL_PRESET_FORMS_MAX'))
+    expect(LIMITS.statesWarn).toBe(number('MODEL_STATES_WARN'))
+    expect(LIMITS.statesMax).toBe(number('MODEL_STATES_MAX'))
+    expect(LIMITS.stateOptionsWarn).toBe(number('MODEL_STATE_OPTIONS_WARN'))
+    expect(LIMITS.stateOptionsMax).toBe(number('MODEL_STATE_OPTIONS_MAX'))
   })
   it('for colour: genres, slots, default colours and the starter palette', () => {
     expect(LIMITS.genresWarn).toBe(number('MODEL_GENRES_WARN'))

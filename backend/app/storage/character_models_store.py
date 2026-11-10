@@ -401,6 +401,27 @@ def _preset_faults(content: ModelContent) -> list[str]:
     return faults
 
 
+def _state_faults(content: ModelContent) -> list[str]:
+    """Group states (phase D3b; the frontend's stateFaults says the same words): an option that sets a slider, switches off a thing or chooses a form that is not there, and a
+    twin group that has states of its own."""
+    faults: list[str] = []
+    range_ids = {r.id for r in content.ranges}
+    thing_ids = {o.id for o in content.objects} | {g.id for g in content.groups}
+    for g in content.groups:
+        if g.mirrorOf and g.states:
+            faults.append(f"Group {_label(g.name, g.id)} is a twin and has states of its own; give them to the original.")
+        for st in g.states:
+            for opt in st.options:
+                name = f"{_label(opt.name, opt.id)} of state {_label(st.name, st.id)}"
+                if any(k not in range_ids for k in opt.values):
+                    faults.append(f"Option {name} sets a slider that does not exist.")
+                if any(h not in thing_ids for h in opt.hidden):
+                    faults.append(f"Option {name} switches off something that does not exist.")
+                if any(not _style_choice_exists(content, k, v) for k, v in opt.forms.items()):
+                    faults.append(f"Option {name} chooses a form that does not exist.")
+    return faults
+
+
 def _colour_faults(content: ModelContent) -> list[str]:
     """What is wrong with the colour of a model (the frontend's colourFaults says the same words)."""
     faults: list[str] = []
@@ -560,6 +581,7 @@ def publish_faults(content: ModelContent) -> list[str]:
     faults.extend(_form_faults(content))
     faults.extend(_class_faults(content))
     faults.extend(_preset_faults(content))
+    faults.extend(_state_faults(content))
     faults.extend(_colour_faults(content))
     faults.extend(_paint_faults(content))
     faults.extend(_proportion_faults(content))

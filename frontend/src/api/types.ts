@@ -662,7 +662,11 @@ export interface ModelObject { id: string; name: string; layer: ModelLayer; shap
 export type ModelAnchorKind = 'point' | 'edge' | 'range' | 'inside'
 export interface ModelAttach { shape: string; kind: ModelAnchorKind; i: number; t: number; slider: string | null; rx: number; ry: number }
 // A group of objects that move together. parent is the group it hangs from (the rig), pivot the point it turns about (in the model's space at rest), attach where on a shape of its parent it is fixed.
-export interface ModelGroup { id: string; name: string; parent: string | null; objects: string[]; pivot: [number, number] | null; attach: ModelAttach | null; mirrorOf?: string | null }
+// One setting of a group state (phase D3b): the slider values it puts, the objects and groups it switches off, and the form chosen on axes of the group's objects ("objectId.axisId" to a form id, "class:classId" to the member shown). Choosing one puts back whatever any other option of the state controls, then sets its own.
+export interface ModelStateOption { id: string; name: string; values: Record<string, number>; hidden: string[]; forms: Record<string, string> }
+// A named switch on a group (Front or Back, Open or Closed): the group shows one option at a time, and several states of a group combine.
+export interface ModelState { id: string; name: string; options: ModelStateOption[] }
+export interface ModelGroup { id: string; name: string; parent: string | null; objects: string[]; pivot: [number, number] | null; attach: ModelAttach | null; mirrorOf?: string | null; states?: ModelState[] }
 export type ModelRangeUnit = '' | '°' | '%'
 // A grip point (phase 5c): the spot of a hand where a held item is taken, in the model's space at rest, carried by the group `group`; angle is the way the held item points, in degrees (0 = straight down, positive toward the picture's right).
 export interface ModelGrip { id: string; name: string; group: string | null; x: number; y: number; angle: number }

@@ -17,7 +17,8 @@ import { linkToEdge, makeTwin, setBack, setLoose } from '../assets/Interfaces/ad
 import { setBlend, setGradient, toggleCut } from '../assets/Interfaces/admin/characters/engine/paintEdit'
 import { addShading } from '../assets/Interfaces/admin/characters/engine/shadeEdit'
 import { setObjectLock, setStyleLock } from '../assets/Interfaces/admin/characters/engine/locks'
-import { saveStyle, savePreset } from '../assets/Interfaces/admin/characters/engine/presets'
+import { restState, saveStyle, savePreset } from '../assets/Interfaces/admin/characters/engine/presets'
+import { addOption, addState, renameOption, renameState } from '../assets/Interfaces/admin/characters/engine/states'
 import { templateBox } from '../assets/Interfaces/admin/characters/engine/templates'
 import { standardGenres, standardSlots, starterPalette } from '../assets/Interfaces/admin/characters/engine/standardColours'
 
@@ -254,6 +255,15 @@ function riggedFigure(): ModelContent {
   if (!darkShirt.ok || !darkShirt.presetId) throw new Error('The sample shirt style could not be made')
   c = must(setStyleLock(darkShirt.content, darkShirt.presetId, 'k_cloth', 'l', 18))
   c = must(setObjectLock(c, 'o_shirt', 'k_cloth', 's', 35))
+  // a state of the arm group (a switch whose options each set sliders, things and forms of the group at once): Down is the arm as drawn, Raised lifts it and bends the elbow
+  let nArm = 0
+  const mkArm = (prefix: string) => `${prefix}_arm${++nArm}`
+  const armState = addState(c, restState(c), 'g_arm', mkArm)
+  if (!armState.ok || !armState.stateId || !armState.optionId) throw new Error('The sample arm state could not be made')
+  c = renameOption(renameState(armState.content, 'g_arm', armState.stateId, 'Arm'), 'g_arm', armState.stateId, armState.optionId, 'Down')
+  const raised = addOption(c, { ...restState(c), values: { ...restState(c).values, r_raise: 60, r_elbow: 40 } }, 'g_arm', armState.stateId, mkArm)
+  if (!raised.ok || !raised.optionId) throw new Error('The sample arm state could not be made')
+  c = renameOption(raised.content, 'g_arm', armState.stateId, raised.optionId, 'Raised')
 
   // proportions: bones along the head (to the top of the skull, the unit for head heights), the upper arm and the forearm; a Length slider for each arm bone (the
   // other arm follows); the span a writer may choose for the sliders that change the body's proportions; Age and Build presets over them; the eyes keep their

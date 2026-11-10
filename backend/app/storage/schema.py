@@ -1218,6 +1218,10 @@ MODEL_CLASSES_MAX = 24
 MODEL_MEMBERS_WARN = 12
 MODEL_MEMBERS_MAX = 24   # more than this is a publish fault
 MODEL_PRESET_FORMS_MAX = 100   # form choices one style may keep
+MODEL_STATES_WARN = 4    # group states (phase D3b): state axes per group, options per axis
+MODEL_STATES_MAX = 8
+MODEL_STATE_OPTIONS_WARN = 8
+MODEL_STATE_OPTIONS_MAX = 24
 MODEL_GENRES_WARN = 8    # colour (phase 4): genre tags per model, colour slots per model, default colours per slot, swatches of the starter palette
 MODEL_GENRES_MAX = 12
 MODEL_SLOTS_WARN = 16
@@ -2000,6 +2004,76 @@ class ModelObject(BaseModel):
         return value if value in ("body", "clothing", "hair") else "body"
 
 
+class ModelStateOption(BaseModel):
+    """One setting of a group state (phase D3b): the slider `values` it puts, the objects and groups it switches off (`hidden`) and the form chosen on axes of the group's
+    objects (`forms`, "objectId.axisId" to a form id, "class:classId" to the member shown). Choosing an option puts back whatever any other option of the state controls, then
+    sets its own, as a preset does."""
+
+    id: str = Field(pattern=_MODEL_ID)
+    name: str = Field(default="", max_length=MODEL_RANGE_NAME_MAX)
+    values: dict[str, float] = Field(default_factory=dict, max_length=MODEL_RANGES_MAX)
+    hidden: list[str] = Field(default_factory=list, max_length=MODEL_HIDDEN_MAX)
+    forms: dict[str, str] = Field(default_factory=dict, max_length=MODEL_PRESET_FORMS_MAX)
+
+    @field_validator("name", mode="before")
+    @classmethod
+    def _trim(cls, value: Any) -> Any:
+        return value.strip()[:MODEL_RANGE_NAME_MAX] if isinstance(value, str) else value
+
+    @field_validator("values", mode="before")
+    @classmethod
+    def _values(cls, value: Any) -> dict[str, float]:
+        if not isinstance(value, dict):
+            return {}
+        return {k: _finite(v, 0.0, -1000.0, 1000.0) for k, v in value.items() if _optional_id(k) is not None and isinstance(v, (int, float)) and not isinstance(v, bool)}
+
+    @field_validator("hidden", mode="before")
+    @classmethod
+    def _hidden(cls, value: Any) -> list[str]:
+        if not isinstance(value, list):
+            return []
+        out: list[str] = []
+        for v in value:
+            ident = _optional_id(v)
+            if ident is not None and ident not in out:
+                out.append(ident)
+        return out
+
+    @field_validator("forms", mode="before")
+    @classmethod
+    def _forms(cls, value: Any) -> dict[str, str]:
+        if not isinstance(value, dict):
+            return {}
+        return {k: v for k, v in value.items() if isinstance(k, str) and 3 <= len(k) <= 170 and _optional_id(v) is not None}
+
+
+class ModelState(BaseModel):
+    """A named switch on a group (phase D3b): Front or Back, Open or Closed. Each option sets several things of the group at once; the group shows one option at a time,
+    and several states of one group combine. A state with no option is dropped."""
+
+    id: str = Field(pattern=_MODEL_ID)
+    name: str = Field(default="", max_length=MODEL_RANGE_NAME_MAX)
+    options: list[ModelStateOption] = Field(default_factory=list, max_length=MODEL_STATE_OPTIONS_MAX)
+
+    @field_validator("name", mode="before")
+    @classmethod
+    def _trim(cls, value: Any) -> Any:
+        return value.strip()[:MODEL_RANGE_NAME_MAX] if isinstance(value, str) else value
+
+    @field_validator("options", mode="before")
+    @classmethod
+    def _options(cls, value: Any) -> list[Any]:
+        return _keep_valid(ModelStateOption, value)
+
+    @model_validator(mode="after")
+    def _repair(self) -> "ModelState":
+        seen: set[str] = set()
+        self.options = [o for o in self.options if not (o.id in seen or seen.add(o.id))]
+        if not self.options:
+            raise ValueError("a state needs an option")
+        return self
+
+
 class ModelGroup(BaseModel):
     """A group of objects that move together. `parent` is the group it hangs from (the rig), `pivot` the point it turns about (in the model's space at
     rest), `attach` where on a shape of its parent it is fixed."""
@@ -2011,6 +2085,19 @@ class ModelGroup(BaseModel):
     pivot: Optional[list[float]] = None
     attach: Optional[ModelAttach] = None
     mirrorOf: Optional[str] = None
+    # The switches of the group (phase D3b): each option sets slider values, switches objects and groups off and chooses forms.
+    states: list[ModelState] = Field(default_factory=list, max_length=MODEL_STATES_MAX)
+
+    @field_validator("states", mode="before")
+    @classmethod
+    def _states(cls, value: Any) -> list[Any]:
+        return _keep_valid(ModelState, value)
+
+    @model_validator(mode="after")
+    def _unique_states(self) -> "ModelGroup":
+        seen: set[str] = set()
+        self.states = [s for s in self.states if not (s.id in seen or seen.add(s.id))]
+        return self
 
     @field_validator("name", mode="before")
     @classmethod
