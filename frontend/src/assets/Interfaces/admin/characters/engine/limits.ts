@@ -44,6 +44,11 @@ export const LIMITS = {
   fieldsetsMax: 24,
   fieldsWarn: 6,
   fieldsMax: 12,
+  // corner roundness (phase D4): the most a radius may be; patterns per model and marks per pattern (the stops are the server's max_lengths)
+  roundMax: 20,
+  patternsWarn: 12,
+  patternsMax: 24,
+  patternMarksMax: 72,
   // colour: genre tags per model, colour slots per model, default colours per slot, swatches of the starter palette (the stops are the server's max_lengths)
   genresWarn: 8,
   genresMax: 12,
@@ -133,6 +138,8 @@ export function limitNotes(content: ModelContent): LimitNote[] {
   const fieldsets = content.fieldsets ?? []
   add(level(fieldsets.length, LIMITS.fieldsetsWarn, LIMITS.fieldsetsMax), `The model has ${fieldsets.length} fieldsets: the warning starts above ${LIMITS.fieldsetsWarn}.`, `The model has ${fieldsets.length} fieldsets: the limit is ${LIMITS.fieldsetsMax}.`)
   for (const f of fieldsets) add(level(f.ranges.length, LIMITS.fieldsWarn, LIMITS.fieldsMax), `${f.name || f.id} has ${f.ranges.length} fields: the warning starts above ${LIMITS.fieldsWarn}.`, `${f.name || f.id} has ${f.ranges.length} fields: the limit is ${LIMITS.fieldsMax}.`)
+  const patterns = content.patterns ?? []
+  add(level(patterns.length, LIMITS.patternsWarn, LIMITS.patternsMax), `The model has ${patterns.length} patterns: the warning starts above ${LIMITS.patternsWarn}.`, `The model has ${patterns.length} patterns: the limit is ${LIMITS.patternsMax}.`)
   const presets = (content.presets ?? []).length
   add(level(presets, LIMITS.presetsWarn, LIMITS.presetsMax), `The model has ${presets} presets: the warning starts above ${LIMITS.presetsWarn}.`, `The model has ${presets} presets: the limit is ${LIMITS.presetsMax}.`)
   const classes = (content.classes ?? []).length

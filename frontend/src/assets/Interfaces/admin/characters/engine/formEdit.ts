@@ -113,9 +113,9 @@ export const useBaseOutline = (c: ModelContent, objectId: string, axisId: string
 
 // ---- the paint a form gives a shape ----
 
-// What a form does to the paint of a shape of the object: the colour slot it is painted from, or a fixed gray (no slot), and a tone. A null leaves the shape's own
-// value; all three null takes the look away. Only the shape's slot, gray and tone can change in a form.
-export type LookChange = Pick<ModelLook, 'slot' | 'gray' | 'tone'>
+// What a form does to the paint of a shape of the object: the colour slot it is painted from, or a fixed gray (no slot), a tone, and the radius its sharp corners are rounded to
+// (phase D4). A null leaves the shape's own value; all of them null takes the look away. A change that does not say `round` keeps the radius the look had.
+export type LookChange = Pick<ModelLook, 'slot' | 'gray' | 'tone'> & { round?: number | null }
 export function setLook(c: ModelContent, objectId: string, axisId: string, formId: string, shapeId: string, look: LookChange | null): Edit {
   const o = objectById(c, objectId), axis = o && axesOf(o).find(a => a.id === axisId), form = axis?.options.find(f => f.id === formId)
   if (!o || !axis || !form) return fail('There is no such form.')
@@ -127,9 +127,11 @@ export function setLook(c: ModelContent, objectId: string, axisId: string, formI
   const gray = slot === null && look?.gray != null ? Math.round(Math.min(100, Math.max(0, look.gray))) : null
   const tone = look?.tone == null ? null : Math.round(Math.min(TONE_RANGE.max, Math.max(TONE_RANGE.min, look.tone)))
   const others = (form.looks ?? []).filter(l => l.shape !== shapeId)
-  const empty = slot === null && gray === null && tone === null
+  const prior = (form.looks ?? []).find(l => l.shape === shapeId)
+  const round = look === null ? null : look.round === undefined ? prior?.round ?? null : look.round === null ? null : Math.round(Math.min(LIMITS.roundMax, Math.max(0, look.round)))
+  const empty = slot === null && gray === null && tone === null && round === null
   if (!empty && !(form.looks ?? []).some(l => l.shape === shapeId) && others.length >= LIMITS.looksMax) return fail(`A form may change the paint of at most ${LIMITS.looksMax} shapes.`)
-  return done(mapForm(c, objectId, axisId, formId, f => ({ ...f, looks: empty ? others : [...(f.looks ?? []).filter(l => l.shape !== shapeId), { shape: shapeId, slot, gray, tone }] })))
+  return done(mapForm(c, objectId, axisId, formId, f => ({ ...f, looks: empty ? others : [...(f.looks ?? []).filter(l => l.shape !== shapeId), { shape: shapeId, slot, gray, tone, round }] })))
 }
 
 // The look a form gives a shape, or undefined.

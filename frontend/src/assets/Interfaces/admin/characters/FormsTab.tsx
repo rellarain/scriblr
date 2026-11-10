@@ -204,11 +204,15 @@ function FormDetail({ content, object, axis, form, index, confirm, onConfirm, ac
   )
 }
 
-// What a form does to the paint of a shape: the colour slot it is painted from (or no slot, a gray) and a tone, in this form only.
+// The radii a form can round a shape's corners to (phase D4); the shape's own radius is stepped in the Colour tab.
+const ROUND_CHOICES = [{ value: 0, name: 'Sharp' }, { value: 4, name: 'Slightly rounded' }, { value: 8, name: 'Rounded' }, { value: 14, name: 'Very rounded' }, { value: 20, name: 'Fully rounded' }]
+
+// What a form does to the paint of a shape: the colour slot it is painted from (or no slot, a gray), a tone and how round its corners are, in this form only.
 function LookRow({ content, form, shape, name, onChange }: { content: ModelContent; form: ModelForm; shape: ModelShape; name: string; onChange: (look: LookChange | null) => void }) {
   const look = lookState(form, shape.id)
   const slotValue = look?.slot ? look.slot : look?.gray != null ? '@gray' : ''
   const toneValue = look?.tone == null ? '' : String(look.tone)
+  const roundValue = look?.round == null ? '' : String(look.round)
   const change = (patch: Partial<LookChange>) => onChange({ slot: look?.slot ?? null, gray: look?.gray ?? null, tone: look?.tone ?? null, ...patch })
   return (
     <span className="cmInline cmLookRow">
@@ -227,6 +231,14 @@ function LookRow({ content, form, shape, name, onChange }: { content: ModelConte
           <option value="-1">Darker</option>
           <option value="0">Base</option>
           <option value="1">Lighter</option>
+        </select>
+      </label>
+      <label className="cmField cmField--inline">
+        <span>Corners</span>
+        <select value={roundValue} aria-label={`Corners of ${name} in this form`} onChange={e => change({ round: e.target.value === '' ? null : Number(e.target.value) })}>
+          <option value="">Same as the shape</option>
+          {ROUND_CHOICES.map(r => <option key={r.value} value={r.value}>{r.name}</option>)}
+          {roundValue !== '' && !ROUND_CHOICES.some(r => String(r.value) === roundValue) && <option value={roundValue}>Radius {roundValue}</option>}
         </select>
       </label>
       {look && <button type="button" className="cmBtn cmBtn--small" onClick={() => onChange(null)}>Use the paint of {name}</button>}

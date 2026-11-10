@@ -1226,6 +1226,10 @@ MODEL_FIELDSETS_WARN = 12   # authored fields (phase D3c): fieldsets per model, 
 MODEL_FIELDSETS_MAX = 24
 MODEL_FIELDS_WARN = 6
 MODEL_FIELDS_MAX = 12
+MODEL_ROUND_MAX = 20     # corner roundness (phase D4): the radius, in the model's units, that a sharp corner of a shape is drawn rounded to
+MODEL_PATTERNS_WARN = 12   # patterns (phase D4): per model, marks per pattern
+MODEL_PATTERNS_MAX = 24
+MODEL_PATTERN_MARKS_MAX = 72   # as many as an object has shapes
 MODEL_GENRES_WARN = 8   # colour (phase 4): genre tags per model, colour slots per model, default colours per slot, swatches of the starter palette
 MODEL_GENRES_MAX = 12
 MODEL_SLOTS_WARN = 16
@@ -1268,6 +1272,7 @@ MODEL_PROPS: dict[str, tuple[tuple[str, ...], float, float, float]] = {
     "height": (_SHAPE_OR_OBJECT, 100.0, 5.0, 1000.0),
     "rotation": (_SHAPE_OR_OBJECT, 0.0, -360.0, 360.0),
     "opacity": (_SHAPE_OR_OBJECT, 100.0, 0.0, 100.0),
+    "roundness": (_SHAPE_OR_OBJECT, 0.0, -20.0, 20.0),
     "offset": (("edge",), 0.0, -200.0, 200.0),
     "fillHue": (_SHAPE_OR_OBJECT, 0.0, -180.0, 180.0),
     "fillSat": (_SHAPE_OR_OBJECT, 0.0, -100.0, 100.0),
@@ -1511,6 +1516,8 @@ class ModelShape(BaseModel):
     helper: bool = False
     # Phase 5b: the shape is faded in and out by a slider (a twin and a shape that follows a template take it from the shape they copy, when this is None).
     opBy: Optional[ModelFade] = None
+    # Phase D4: the radius a sharp corner of the drawn outline is rounded to (0 = left sharp). A twin and a shape that follows a template take it from the shape they copy.
+    round: int = 0
 
     @field_validator("name", mode="before")
     @classmethod
@@ -1572,6 +1579,13 @@ class ModelShape(BaseModel):
         if value is None or isinstance(value, bool) or not isinstance(value, (int, float)):
             return None
         return int(round(_finite(value, 50.0, 0.0, 100.0)))
+
+    @field_validator("round", mode="before")
+    @classmethod
+    def _round(cls, value: Any) -> int:
+        if isinstance(value, bool) or not isinstance(value, (int, float)):
+            return 0
+        return int(round(_finite(value, 0.0, 0.0, float(MODEL_ROUND_MAX))))
 
     @field_validator("back", mode="before")
     @classmethod
@@ -1901,6 +1915,33 @@ class ModelFieldset(BaseModel):
         return self
 
 
+class ModelPattern(BaseModel):
+    """A pattern (phase D4): marks (ordinary shapes, drawn by hand) kept inside a base shape, switched on and off together. The marks are painted as if clipped to the base, so
+    nothing of them shows outside it, and a pattern is switched off by hiding its id like an object. A twin of a mark follows it; a pattern is on the original."""
+
+    id: str = Field(pattern=_MODEL_ID)
+    name: str = Field(default="", max_length=MODEL_RANGE_NAME_MAX)
+    base: str = Field(pattern=_MODEL_ID)
+    marks: list[str] = Field(default_factory=list, max_length=MODEL_PATTERN_MARKS_MAX)
+
+    @field_validator("name", mode="before")
+    @classmethod
+    def _trim(cls, value: Any) -> Any:
+        return value.strip()[:MODEL_RANGE_NAME_MAX] if isinstance(value, str) else value
+
+    @field_validator("marks", mode="before")
+    @classmethod
+    def _marks(cls, value: Any) -> list[str]:
+        if not isinstance(value, list):
+            return []
+        out: list[str] = []
+        for v in value:
+            ident = _optional_id(v)
+            if ident is not None and ident not in out:
+                out.append(ident)
+        return out
+
+
 class ModelOverride(BaseModel):
     """What one form does to one shape of its object: the outline the shape has in that form. An empty list hides the shape in the form."""
 
@@ -1914,13 +1955,21 @@ class ModelOverride(BaseModel):
 
 
 class ModelLook(BaseModel):
-    """What one form does to the paint of one shape of its object (phase 4b): the colour slot it is painted from, or a fixed gray (no slot), and a tone. None
-    leaves the shape's own value. A look with nothing set is dropped."""
+    """What one form does to the paint of one shape of its object (phase 4b): the colour slot it is painted from, or a fixed gray (no slot), a tone, and (phase D4)
+    the radius its sharp corners are rounded to. None leaves the shape's own value. A look with nothing set is dropped."""
 
     shape: str = Field(pattern=_MODEL_ID)
     slot: Optional[str] = None
     gray: Optional[int] = None
     tone: Optional[int] = None
+    round: Optional[int] = None
+
+    @field_validator("round", mode="before")
+    @classmethod
+    def _round(cls, value: Any) -> Optional[int]:
+        if value is None or isinstance(value, bool) or not isinstance(value, (int, float)):
+            return None
+        return int(round(_finite(value, 0.0, 0.0, float(MODEL_ROUND_MAX))))
 
     @field_validator("slot", mode="before")
     @classmethod
@@ -1943,7 +1992,7 @@ class ModelLook(BaseModel):
 
     @model_validator(mode="after")
     def _something(self) -> "ModelLook":
-        if self.slot is None and self.gray is None and self.tone is None:
+        if self.slot is None and self.gray is None and self.tone is None and self.round is None:
             raise ValueError("a look changes nothing")
         if self.slot is not None:
             self.gray = None   # a slot wins over a fixed gray
@@ -2632,6 +2681,13 @@ class ModelContent(BaseModel):
     grips: list[ModelGrip] = Field(default_factory=list, max_length=MODEL_GRIPS_MAX)
     # Authored fields (phase D3c): the fieldsets, each a feature and the sliders that change its properties.
     fieldsets: list[ModelFieldset] = Field(default_factory=list, max_length=MODEL_FIELDSETS_MAX)
+    # Patterns (phase D4): marks kept inside a base shape.
+    patterns: list[ModelPattern] = Field(default_factory=list, max_length=MODEL_PATTERNS_MAX)
+
+    @field_validator("patterns", mode="before")
+    @classmethod
+    def _patterns(cls, value: Any) -> list[Any]:
+        return _keep_valid(ModelPattern, value)
 
     @field_validator("fieldsets", mode="before")
     @classmethod
@@ -2705,7 +2761,7 @@ class ModelContent(BaseModel):
 
     @model_validator(mode="after")
     def _unique_ids(self) -> "ModelContent":
-        for label, items in (("shape", self.shapes), ("object", self.objects), ("group", self.groups), ("slider", self.ranges), ("preset", self.presets), ("class", self.classes), ("genre", self.genres), ("swatch", self.palette), ("slot", self.slots), ("bone", self.bones), ("frame", self.frames), ("fieldset", self.fieldsets)):
+        for label, items in (("shape", self.shapes), ("object", self.objects), ("group", self.groups), ("slider", self.ranges), ("preset", self.presets), ("class", self.classes), ("genre", self.genres), ("swatch", self.palette), ("slot", self.slots), ("bone", self.bones), ("frame", self.frames), ("fieldset", self.fieldsets), ("pattern", self.patterns)):
             ids = [i.id for i in items]
             if len(set(ids)) != len(ids):
                 raise ValueError(f"two {label}s share an id")

@@ -25,7 +25,7 @@ describe('the rigged preview model', () => {
 
   it('stands as drawn at rest, with every shape in the picture', () => {
     const s = solve(adult, {})
-    expect(s.order).toHaveLength(52)   // five shapes, the sleeve, the shirt, the twins of the arm, its sleeve and the forearm, and the eye shown (two shapes) with its twin, the neckline, two bands of shading, the bridge of the elbow and its twin, the crease of the elbow and its twin, the ponytail, and the two hands (fifteen shapes each)
+    expect(s.order).toHaveLength(55)   // five shapes, the sleeve, the shirt, the pocket and the two stripes of its fill pattern, the twins of the arm, its sleeve and the forearm, and the eye shown (two shapes) with its twin, the neckline, two bands of shading, the bridge of the elbow and its twin, the crease of the elbow and its twin, the ponytail, and the two hands (fifteen shapes each)
     for (const g of adult.groups) s.mats[g.id].forEach((v, i) => expect(v).toBeCloseTo([1, 0, 0, 1, 0, 0][i], 1))
   })
 
@@ -388,10 +388,26 @@ describe('the rigged preview model', () => {
     expect(live.history.map(h => publishFaults(h.content))).toEqual([[]])
   })
 
+  it('has a pocket with rounded corners that a slider rounds further, and a fill pattern of stripes kept inside the shirt that can be switched off', () => {
+    const rest = solve(adult, {})
+    expect(adult.shapes.find(s => s.id === 's_pocket')!.round).toBe(4)
+    expect(rest.shapes.s_pocket.d).toMatch(/C/)
+    expect(rest.shapes.s_pocket.local).toHaveLength(4)               // the points are as drawn
+    const roundness = adult.ranges.find(r => r.name === 'Pocket roundness')!
+    expect(solve(adult, { [roundness.id]: roundness.max }).shapes.s_pocket.d).not.toBe(rest.shapes.s_pocket.d)
+    expect(adult.patterns).toHaveLength(1)
+    expect(adult.patterns![0]).toMatchObject({ name: 'Stripes', base: 's_shirt', marks: ['s_stripe1', 's_stripe2'] })
+    const colouring = { palette: paletteOf(adult), choices: {}, values: {} }
+    expect(paintLayer(adult, colouring, adult.shapes.find(s => s.id === 's_stripe1')!).clip).toBe('s_shirt')
+    expect(paintLayer(adult, colouring, adult.shapes.find(s => s.id === 's_shirt')!).clip).toBeNull()
+    const off = solve(adult, {}, 'front', { hidden: [adult.patterns![0].id] })
+    expect(off.shapes.s_stripe1.visible).toBe(false); expect(off.shapes.s_stripe2.visible).toBe(false); expect(off.shapes.s_shirt.visible).toBe(true)
+  })
+
   it('has authored fields: sliders that each change one property of a shape, an edge or an object, and the iris glow', () => {
     expect(fieldCheck(adult)).toEqual([])
     const sets = fieldsetsOf(adult)
-    expect(sets.map(f => [f.name, f.ownerKind, f.feature])).toEqual([['Head shape', 'object', 'shape'], ['Shirt colour', 'object', 'object'], ['Darker shirt', 'preset', 'object'], ['Iris glow', 'object', 'shape'], ['Chest side', 'object', 'edge']])
+    expect(sets.map(f => [f.name, f.ownerKind, f.feature])).toEqual([['Head shape', 'object', 'shape'], ['Shirt colour', 'object', 'object'], ['Darker shirt', 'preset', 'object'], ['Iris glow', 'object', 'shape'], ['Chest side', 'object', 'edge'], ['Pocket corners', 'object', 'shape']])
     const slider = (name: string) => adult.ranges.find(r => r.name === name)!
     const rest = solve(adult, {})
     const wide = solve(adult, { [slider('Head width').id]: slider('Head width').max })

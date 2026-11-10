@@ -28,6 +28,23 @@ function change(c: ModelContent, id: string, patch: (s: ModelShape) => Partial<M
   return done(updateShape(c, id, x => ({ ...x, ...made })))
 }
 
+// Why a shape's corners cannot be rounded here (null when they can): a twin is rounded like its original, and a shape that follows a template like the template's shape.
+export function roundLocked(c: ModelContent, s: ModelShape): string | null {
+  if (s.mirrorOf) return `${label(s)} is rounded like the shape it mirrors: change the original instead.`
+  if (s.copyOf && s.pts.length < 3) return `${label(s)} is rounded like the template shape it follows: change that instead, or give it an outline of its own first.`
+  return null
+}
+
+// The radius a shape's sharp corners are rounded to (phase D4): 0..LIMITS.roundMax, 0 leaves them sharp.
+export function setRound(c: ModelContent, id: string, radius: number): Edit {
+  const s = shapeById(c, id)
+  if (!s) return fail('There is no such shape.')
+  const locked = roundLocked(c, s)
+  if (locked) return fail(locked)
+  return done(updateShape(c, id, x => ({ ...x, round: Math.round(Math.min(LIMITS.roundMax, Math.max(0, radius))) })))
+}
+export const stepRound = (c: ModelContent, id: string, dir: -1 | 1, big = false): Edit => setRound(c, id, (shapeById(c, id)?.round ?? 0) + dir * (big ? 5 : 1))
+
 // A step lighter (+) or darker (-) than the colour: -2 to 2, none is the colour itself.
 export const setTone = (c: ModelContent, id: string, tone: number): Edit =>
   change(c, id, () => ({ tone: Math.round(Math.min(TONE_RANGE.max, Math.max(TONE_RANGE.min, tone))) }))

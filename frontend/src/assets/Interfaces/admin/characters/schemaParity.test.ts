@@ -40,7 +40,7 @@ describe('the model types match the backend schema', () => {
     ['ModelTint', 'ModelTint'], ['ModelGradient', 'ModelGradient'], ['ModelLook', 'ModelLook'], ['ModelFade', 'ModelFade'],
     ['ModelBone', 'ModelBone'], ['ModelBoneEnd', 'ModelBoneEnd'], ['ModelFrame', 'ModelFrame'], ['ModelGrip', 'ModelGrip'],
     ['ModelHsl', 'ModelHsl'],
-    ['ModelState', 'ModelState'], ['ModelStateOption', 'ModelStateOption'], ['ModelFieldset', 'ModelFieldset'],
+    ['ModelState', 'ModelState'], ['ModelStateOption', 'ModelStateOption'], ['ModelFieldset', 'ModelFieldset'], ['ModelPattern', 'ModelPattern'],
     // the figure of a character (phase 6)
     ['CharacterFigure', 'CharacterFigure'], ['FigureColour', 'FigureColour'], ['FigureModel', 'FigureModel'],
   ]
@@ -126,6 +126,10 @@ describe('the limits are the backend\'s numbers', () => {
     expect(LIMITS.fieldsetsMax).toBe(number('MODEL_FIELDSETS_MAX'))
     expect(LIMITS.fieldsWarn).toBe(number('MODEL_FIELDS_WARN'))
     expect(LIMITS.fieldsMax).toBe(number('MODEL_FIELDS_MAX'))
+    expect(LIMITS.roundMax).toBe(number('MODEL_ROUND_MAX'))
+    expect(LIMITS.patternsWarn).toBe(number('MODEL_PATTERNS_WARN'))
+    expect(LIMITS.patternsMax).toBe(number('MODEL_PATTERNS_MAX'))
+    expect(LIMITS.patternMarksMax).toBe(number('MODEL_PATTERN_MARKS_MAX'))
   })
   it('for colour: genres, slots, default colours and the starter palette', () => {
     expect(LIMITS.genresWarn).toBe(number('MODEL_GENRES_WARN'))

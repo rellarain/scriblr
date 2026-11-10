@@ -192,7 +192,7 @@ describe('what a form does to the paint of a shape', () => {
   it('takes the look away when it changes nothing, lets a slot win over a gray, and refuses what cannot be', () => {
     const { c, axisId, dark } = formed()
     const a = must(setLook(c, 'oE', axisId, dark, 'iris', { slot: 'k_hair', gray: 50, tone: null }))
-    expect(a.objects.find(o => o.id === 'oE')!.axes![0].options.find(f => f.id === dark)!.looks).toEqual([{ shape: 'iris', slot: 'k_hair', gray: null, tone: null }])
+    expect(a.objects.find(o => o.id === 'oE')!.axes![0].options.find(f => f.id === dark)!.looks).toEqual([{ shape: 'iris', slot: 'k_hair', gray: null, tone: null, round: null }])
     const gone = must(setLook(a, 'oE', axisId, dark, 'iris', null))
     expect(gone.objects.find(o => o.id === 'oE')!.axes![0].options.find(f => f.id === dark)!.looks).toEqual([])
     expect(refused(setLook(c, 'oE', axisId, dark, 'skull', { slot: null, gray: null, tone: 1 }))).toMatch(/not in the object/)
@@ -447,7 +447,7 @@ describe('the model with paint effects', () => {
     expect(shape(noHole, 'cheek').cut).toEqual([])
     const noHair = must(removeSlot(c, 'k_hair'))
     expect(shape(noHair, 'cheek').grad).toEqual({ dir: 'down', to: null })
-    expect(noHair.objects.find(o => o.id === 'oS')!.axes![0].options.find(o => o.id === f.formId)!.looks).toEqual([{ shape: 'hole', slot: null, gray: null, tone: 1 }])
+    expect(noHair.objects.find(o => o.id === 'oS')!.axes![0].options.find(o => o.id === f.formId)!.looks).toEqual([{ shape: 'hole', slot: null, gray: null, tone: 1, round: null }])
   })
 })
 

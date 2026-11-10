@@ -422,9 +422,16 @@ described, now stale, in `docs/data-model.md`).
   `ModelStateOption`: a name, slider `values`, `hidden` ids of objects and groups switched off
   and `forms` chosen, as a preset's; a state needs an option, a twin group has none).
   Phase D3c adds, with defaults: `ModelDrive.kind 'prop'` (with `feature` `shape|point|edge|object`, `prop` one of 16
-  properties, `i`, and `shape` or `id` for what it changes; its `atMin`/`atMax` are held to the property's span), and
+  properties (17 since phase D4), `i`, and `shape` or `id` for what it changes; its `atMin`/`atMax` are held to the property's span), and
   `ModelContent.fieldsets` (`ModelFieldset`: `ownerKind` `object|group|preset`, `owner`, `feature`, `target`, `i`, and
   the `ranges` that are its fields).
+  Phase D4 adds, with defaults: on a shape `round` (corner roundness, a whole number 0..20: the radius its sharp
+  corners are rounded to in the drawing only; the points stay as drawn), on a form's `ModelLook` an optional `round`
+  (a look needs at least one of slot, gray, tone and round), a 17th drive property `roundness` (a shape or an object),
+  and `ModelContent.patterns` (`ModelPattern`: `id`, `name`, `base` shape id and `marks` shape ids, at most 72; a
+  pattern keeps its marks inside its base and switches them off together, by its id in a preset's or an option's
+  `hidden`; at most 24 patterns, a twin is neither a base nor a mark and no shape is both). Nothing about an outline
+  is stored: the canvas outline is the selection ring.
   Phase 4a (colour) adds, with defaults: on the model `genres` (`ModelGenre`: genre tags a
   default colour may fit), `palette` (`ModelSwatch`: the starter palette, a hue 0..359 and a
   saturation 0..100 per swatch, at most 10) and `slots` (`ModelSlot`: a colour slot with a

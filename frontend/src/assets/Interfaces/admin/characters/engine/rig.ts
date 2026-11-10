@@ -1,9 +1,9 @@
 import type { ModelAttach, ModelBone, ModelBoneEnd, ModelContent, ModelDrive, ModelFallSide, ModelGroup, ModelObject, ModelPoint, ModelRange, ModelShape } from '../../../../../api/types'
-import { IDENTITY, apply, bezierAt, boxOf, build, clamp, edgeAt, flatten, inverse, mul, pathText, reflectList, rotate, scale, scaleAlong, translate, turnOf, twinIndex, windSign, type Box, type BuiltPoint, type Mat } from './geometry'
-import { classKey, classesOf, membersOf, overrideFor, type Choices } from './forms'
+import { IDENTITY, apply, bezierAt, boxOf, build, clamp, edgeAt, flatten, inverse, mul, pathText, reflectList, rotate, roundCorners, scale, scaleAlong, translate, turnOf, twinIndex, windSign, type Box, type BuiltPoint, type Mat } from './geometry'
+import { classKey, classesOf, lookOf, membersOf, overrideFor, type Choices } from './forms'
 import { applyFall, hangDirection, squeezeOf } from './fall'
 import { drawOrder } from './order'
-import { PROPS, isPaintProp, type PropKey } from './props'
+import { PROPS, ROUND_MAX, isDrawingProp, isPaintProp, type PropKey } from './props'
 
 // The rig: groups hang from parent groups, are fixed to a shape of the parent by an anchor and turn about a pivot, and sliders (ranges) drive them.
 // `solve` turns a model and the slider values into the place and outline of every shape. Ported from the mockup's `M.solve` (docs/mannequin-mockup/
@@ -48,7 +48,7 @@ export function amount(r: ModelRange, d: ModelDrive, v: number, base = 0): numbe
 
 // The sliders that change a shape's own points (a recorded move, a bend, a scale of the shape), as opposed to turning or scaling its group.
 // What an authored field's slider (a `prop` drive, phase D3c) does to the points of a shape: a position, a size, a rotation, a point, an edge. Opacity and paint do not.
-const movesPoints = (d: ModelDrive): boolean => d.kind === 'prop' && !!d.prop && !isPaintProp(d.prop) && d.prop !== 'opacity'
+const movesPoints = (d: ModelDrive): boolean => d.kind === 'prop' && !!d.prop && !isPaintProp(d.prop) && !isDrawingProp(d.prop)
 export const drivesShapePoints = (d: ModelDrive, shapeId: string, objectId?: string): boolean =>
   (d.kind === 'points' && d.shape === shapeId) || (d.kind === 'bend' && d.shape === shapeId) || (d.kind === 'fall' && d.shape === shapeId) || (d.kind === 'scale' && d.target === 'shape' && d.id === shapeId)
   || (movesPoints(d) && (d.feature === 'object' ? !!objectId && d.id === objectId : d.shape === shapeId))
@@ -246,6 +246,16 @@ export interface SolveOptions { forms?: Choices; hidden?: Iterable<string>; show
 
 // The model with every slider at rest and every object scaled with its group, kept for the content it was solved from (a stretching object reads its target's
 // box from it).
+const roundUses = new WeakMap<ModelContent, boolean>()
+function roundUse(c: ModelContent): boolean {
+  let found = roundUses.get(c)
+  if (found === undefined) {
+    found = c.shapes.some(s => (s.round ?? 0) > 0) || c.ranges.some(r => r.drives.some(d => d.kind === 'prop' && d.prop === 'roundness'))
+      || c.objects.some(o => (o.axes ?? []).some(a => a.options.some(f => (f.looks ?? []).some(l => l.round != null))))
+    roundUses.set(c, found)
+  }
+  return found
+}
 const plainRests = new WeakMap<ModelContent, Solved>()
 function plainRest(c: ModelContent): Solved {
   let s = plainRests.get(c)
@@ -307,9 +317,13 @@ export function solve(c: ModelContent, values: Values = {}, view: View = 'front'
     for (const m of members) if (!pick.has(m.id)) classOff.add(m.id)
   }
   for (const o of c.objects) if (o.mirrorOf && classOff.has(o.mirrorOf)) classOff.add(o.id)
+  // The patterns a shape is a mark of (phase D4): hiding a pattern switches its marks off, and a twin goes with the mark it mirrors.
+  const patternsOfMark = new Map<string, string[]>()
+  for (const p of c.patterns ?? []) for (const m of p.marks) patternsOfMark.set(m, [...(patternsOfMark.get(m) ?? []), p.id])
   // Whether the shape's object, its group or a group above it is switched off (it is still solved: anchors and links read it).
   const switchedOff = (sid: string): boolean => {
     if (hidden.size === 0 && classOff.size === 0) return false
+    if (patternsOfMark.size > 0) for (const id of [sid, shapeMap.get(sid)?.mirrorOf ?? '']) if ((patternsOfMark.get(id) ?? []).some(pid => hidden.has(pid))) return true
     // a shape a style hides, or one that mirrors it
     if (hidden.has(sid) || hidden.has(shapeMap.get(sid)?.mirrorOf ?? '')) return true
     const oid = objectOfShape.get(sid)
@@ -361,7 +375,7 @@ export function solve(c: ModelContent, values: Values = {}, view: View = 'front'
       const v = val(r), { t, up } = pull(r, v)
       if (t === 0) continue
       for (const d of r.drives) {
-        if (d.kind === 'prop' && d.prop && !isPaintProp(d.prop) && d.prop !== 'opacity') {
+        if (d.kind === 'prop' && d.prop && !isPaintProp(d.prop) && !isDrawingProp(d.prop)) {
           const a = propAmount(r, d, v)
           if (d.feature === 'shape' && d.shape === sh.id) addWholly(whole, d.prop, a)
           else if (d.feature === 'object' && d.id && d.id === ownerId) addWholly(objectWhole, d.prop, a)
@@ -575,6 +589,28 @@ export function solve(c: ModelContent, values: Values = {}, view: View = 'front'
     return keep
   }
 
+  // Whether any corner of the model is rounded (a shape's own radius, a form's, or a field that adds to it): a model with none pays nothing.
+  const anyRound = roundUse(c)
+  // The radius the sharp corners of a shape are rounded to (phase D4): its own, or the radius a chosen form gives it, plus what authored fields add (0..ROUND_MAX). A twin
+  // goes with the shape it mirrors, and a shape that follows a template with the template's (under the member's own choice of forms).
+  function radiusOf(sh: ModelShape, twin: ModelShape | undefined, tpl: ModelShape | undefined, memberId: string | undefined): number {
+    if (!anyRound) return 0
+    const origin = twin ?? (tpl && sh.pts.length < 3 ? tpl : sh)
+    const home = objectOfShape.get(origin.id), homeObject = home ? objectMap.get(home) : undefined
+    const look = homeObject ? lookOf(homeObject, origin.id, choices, (origin === tpl ? memberId : undefined) ?? homeObject.id) : undefined
+    let radius = look && look.round != null ? look.round : origin.round ?? 0
+    const shapes = new Set([sh.id, origin.id]), objects = new Set<string>()
+    for (const id of shapes) { const oid = objectOfShape.get(id); if (oid) { objects.add(oid); const m = objectMap.get(oid)?.mirrorOf; if (m) objects.add(m) } }
+    for (const r of ranges) {
+      const v = val(r)
+      for (const d of r.drives) {
+        if (d.kind !== 'prop' || d.prop !== 'roundness') continue
+        if ((d.feature === 'shape' && d.shape && shapes.has(d.shape)) || (d.feature === 'object' && d.id && objects.has(d.id))) radius += propAmount(r, d, v)
+      }
+    }
+    return clamp(radius, 0, ROUND_MAX)
+  }
+
   function place(sh: ModelShape, groupId: string | null, Mg: Mat) {
     const original = sh.mirrorOf && sh.mirrorOf !== sh.id ? shapeMap.get(sh.mirrorOf) : undefined
     const twin = original && !original.mirrorOf ? original : undefined
@@ -608,7 +644,9 @@ export function solve(c: ModelContent, values: Values = {}, view: View = 'front'
     const ok = rig.length >= 3 && drawn.length >= 3
     const matrix = mul(G, (ok ? fitMatrix(sh) : null) ?? Mg)
     const off = switchedOff(sh.id)
-    const fin = ok ? build(drawn, closed, matrix) : []
+    // the corners are rounded in the drawing only: `local` and `rig` keep the points as they were drawn, so editing, anchors and links are not affected
+    const radius = ok ? radiusOf(sh, twin, tpl, memberId) : 0
+    const fin = ok ? build(radius > 0 ? roundCorners(drawn, closed, radius) : drawn, closed, matrix) : []
     const poly = ok ? flatten(fin, closed) : []
     out.shapes[sh.id] = {
       id: sh.id, group: groupId, local: drawn, rig, matrix, frame: Mg, ghost,

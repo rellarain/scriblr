@@ -1,10 +1,10 @@
 import type {
-  ModelAxis, ModelBind, ModelBlend, ModelBone, ModelClass, ModelColour, ModelContent, ModelDrive, ModelFade, ModelFallSide, ModelFeatureKind, ModelFieldset, ModelForm, ModelFrame, ModelGenre, ModelGrip, ModelGradDir, ModelGradient, ModelGroup, ModelHsl, ModelLook, ModelMove, ModelObject, ModelOverride, ModelPoint,
+  ModelAxis, ModelBind, ModelBlend, ModelBone, ModelClass, ModelColour, ModelContent, ModelDrive, ModelFade, ModelFallSide, ModelFeatureKind, ModelFieldset, ModelForm, ModelFrame, ModelGenre, ModelGrip, ModelGradDir, ModelGradient, ModelGroup, ModelHsl, ModelLook, ModelMove, ModelObject, ModelOverride, ModelPattern, ModelPoint,
   ModelPreset, ModelRange, ModelShape, ModelSlot, ModelState, ModelStateOption, ModelSwatch, ModelTint, ModelTintKind,
 } from '../../../../api/types'
 import { LIMITS } from './engine/limits'
 import { PROPS, hasProp, type PropKey } from './engine/props'
-import { FALL_SIDES, ROLE_MAX, FRAME_BIGGEST, FRAME_MIN, KIND_MAX, SWATCH_NAME_MAX, TILE_DEFAULT, TINT_RANGE, TONE_RANGE, blankContent, normalizeContent, repairHsl, repairLooks } from './modelContent'
+import { FALL_SIDES, ROLE_MAX, FRAME_BIGGEST, FRAME_MIN, KIND_MAX, SWATCH_NAME_MAX, TILE_DEFAULT, TINT_RANGE, TONE_RANGE, blankContent, normalizeContent, repairHsl, repairLooks, roundOf } from './modelContent'
 
 // The file Export writes and Import reads: JSON with a marker and a version, and the models' content as it is (a shape, object, group or slider keeps its
 // id: the ids only mean something inside one model). Everything read is held to what the server accepts, so one bad model can never make the whole save
@@ -80,7 +80,7 @@ function fade(v: unknown): ModelFade | null {
 function look(v: Record<string, unknown>): ModelLook | null {
   const shapeId = idOf(v.shape)
   if (!shapeId) return null
-  return { shape: shapeId, slot: idOrNull(v.slot), gray: typeof v.gray === 'number' ? Math.round(num(v.gray, 50, 0, 100)) : null, tone: typeof v.tone === 'number' ? Math.round(num(v.tone, 0, TONE_RANGE.min, TONE_RANGE.max)) : null }
+  return { shape: shapeId, slot: idOrNull(v.slot), gray: typeof v.gray === 'number' ? Math.round(num(v.gray, 50, 0, 100)) : null, tone: typeof v.tone === 'number' ? Math.round(num(v.tone, 0, TONE_RANGE.min, TONE_RANGE.max)) : null, round: typeof v.round === 'number' ? roundOf(v.round) : null }
 }
 
 function shape(v: Record<string, unknown>, id: string): ModelShape {
@@ -92,7 +92,7 @@ function shape(v: Record<string, unknown>, id: string): ModelShape {
     loose: idOrNull(v.loose), copyOf: idOrNull(v.copyOf), hide: v.hide === true, slot: idOrNull(v.slot), gray: typeof v.gray === 'number' ? Math.round(num(v.gray, 50, 0, 100)) : null,
     tone: typeof v.tone === 'number' ? Math.round(num(v.tone, 0, TONE_RANGE.min, TONE_RANGE.max)) : 0, derive: tint(v.derive), shade: tint(v.shade), grad: gradient(v.grad),
     blend: (['multiply', 'screen', 'overlay'].includes(v.blend as string) ? v.blend : null) as ModelBlend | null, clip: idOrNull(v.clip),
-    cut: [...new Set(list(v.cut).map(idOf).filter((x): x is string => x !== null))].slice(0, LIMITS.cutsMax), helper: v.helper === true, opBy: fade(v.opBy),
+    cut: [...new Set(list(v.cut).map(idOf).filter((x): x is string => x !== null))].slice(0, LIMITS.cutsMax), helper: v.helper === true, opBy: fade(v.opBy), round: roundOf(typeof v.round === 'number' ? v.round : 0),
   }
 }
 
@@ -169,6 +169,13 @@ function fieldset(v: Record<string, unknown>, id: string): ModelFieldset | null 
     i: feature === 'point' || feature === 'edge' ? Math.round(num(v.i, 0, 0, LIMITS.pointsMax - 1)) : 0,
     ranges: [...new Set(list(v.ranges).map(idOf).filter((x): x is string => x !== null))].slice(0, LIMITS.fieldsMax),
   }
+}
+
+// A pattern the server would accept (phase D4): it needs a base shape; each mark is kept once.
+function pattern(v: Record<string, unknown>, id: string): ModelPattern | null {
+  const base = idOf(v.base)
+  if (!base) return null
+  return { id, name: text(v.name).trim().slice(0, 40), base, marks: [...new Set(list(v.marks).map(idOf).filter((x): x is string => x !== null))].slice(0, LIMITS.patternMarksMax) }
 }
 
 function group(v: Record<string, unknown>, id: string): ModelGroup {
@@ -306,6 +313,7 @@ function problem(v: unknown): string | null {
     ?? tooMany(list(v.presets).length, LIMITS.presetsMax, 'presets') ?? tooMany(list(v.classes).length, LIMITS.classesMax, 'classes')
     ?? tooMany(list(v.slots).length, LIMITS.slotsMax, 'colour slots') ?? tooMany(list(v.genres).length, LIMITS.genresMax, 'genres') ?? tooMany(list(v.palette).length, LIMITS.paletteMax, 'swatches in the palette') ?? tooMany(list(v.bones).length, LIMITS.bonesMax, 'bones') ?? tooMany(list(v.frames).length, LIMITS.framesMax, 'frames') ?? tooMany(list(v.fieldsets).length, LIMITS.fieldsetsMax, 'fieldsets')
     ?? list(v.fieldsets).map(f => tooMany(list(rec(f).ranges).length, LIMITS.fieldsMax, 'fields in a fieldset')).find(Boolean)
+    ?? tooMany(list(v.patterns).length, LIMITS.patternsMax, 'patterns') ?? list(v.patterns).map(pt => tooMany(list(rec(pt).marks).length, LIMITS.patternMarksMax, 'marks in a pattern')).find(Boolean)
     ?? list(v.slots).map(sl => tooMany(list(rec(sl).colours).length, LIMITS.coloursMax, 'default colours in a slot')).find(Boolean)
     ?? objects.map(o => tooMany(list(rec(o).axes).length, LIMITS.axesMax, 'axes of forms in an object')).find(Boolean)
     ?? objects.map(o => list(rec(o).axes).map(a => tooMany(list(rec(a).options).length, LIMITS.formsMax, 'forms in an axis')).find(Boolean)).find(Boolean)
@@ -355,6 +363,7 @@ export function parseModelFile(source: string): ModelImport {
       frames: withIds(list(m.frames), frame),
       grips: withIds(list(m.grips), grip),
       fieldsets: withIds(list(m.fieldsets), fieldset),
+      patterns: withIds(list(m.patterns), pattern),
       tile: typeof m.tile === 'string' && /^#[0-9a-fA-F]{6}$/.test(m.tile) ? m.tile.toLowerCase() : TILE_DEFAULT,
     }))
   })

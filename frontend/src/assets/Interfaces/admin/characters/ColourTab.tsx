@@ -46,7 +46,7 @@ export interface ColourActions {
   addStandard: () => void
 }
 
-export interface ColourState { colours: SlotChoices; palette: ModelSwatch[]; genre: string | null; locks: string[] }
+export interface ColourState { colours: SlotChoices; palette: ModelSwatch[]; genre: string | null; locks: string[]; hidden?: string[] }
 
 const label = (name: string, fallback: string) => name.trim() || fallback
 const same = (a: ModelSwatch[], b: ModelSwatch[]) => JSON.stringify(a) === JSON.stringify(b)
@@ -316,7 +316,7 @@ export function ColourTab({ content, sel, state, actions, paint, picking = null 
       <h2 className="cmInsTitle">Colour</h2>
       <p className="cmInsText">The model is drawn in gray until colours are chosen. Shapes pick a slot; the test character picks a colour for each slot.</p>
       {(shape || object) && <ThisShape content={content} shape={shape} shapeIds={shapeIds} name={label(object?.name ?? '', 'the object')} actions={actions} />}
-      {shape && paint && <PaintSection content={content} shape={shape} picking={picking} actions={paint} />}
+      {shape && paint && <PaintSection content={content} shape={shape} picking={picking} actions={paint} hidden={state.hidden} />}
       {object && <ObjectLocks content={content} state={state} object={object} actions={actions} />}
       <TestColours content={content} state={state} slotId={slotPick ?? current?.id ?? null} held={object && (slotPick ?? current?.id) ? object.hsl?.[(slotPick ?? current?.id) as string] : undefined} heldBy={label(object?.name ?? '', 'the object')} onSlot={setSlotPick} actions={actions} />
       <TestPalette content={content} state={state} actions={actions} />

@@ -1,4 +1,4 @@
-import type { ModelGrip, ModelBone, ModelContent, ModelDrive, ModelEntry, ModelFade, ModelFeatureKind, ModelFieldset, ModelOwnerKind, ModelFallSide, ModelFit, ModelForm, ModelFrame, ModelGradient, ModelGroup, ModelHsl, ModelLayer, ModelLook, ModelObject, ModelPreset, ModelRange, ModelShape, ModelSlot, ModelState, ModelTint } from '../../../../api/types'
+import type { ModelGrip, ModelBone, ModelContent, ModelDrive, ModelEntry, ModelFade, ModelFeatureKind, ModelFieldset, ModelOwnerKind, ModelFallSide, ModelFit, ModelForm, ModelFrame, ModelGradient, ModelGroup, ModelHsl, ModelLayer, ModelLook, ModelObject, ModelPattern, ModelPreset, ModelRange, ModelShape, ModelSlot, ModelState, ModelTint } from '../../../../api/types'
 import { LIMITS, copyBytes, linkCount, shadingCount } from './engine/limits'
 import { PROPS, hasProp } from './engine/props'
 import { chainOf } from './engine/rig'
@@ -55,6 +55,7 @@ export function normalizeContent(c: ModelContent): ModelContent {
     tile: typeof c.tile === 'string' && HEX.test(c.tile) ? c.tile.toLowerCase() : TILE_DEFAULT,
     grips: (c.grips ?? []).map(repairGrip),
     fieldsets: repairFieldsets(c.fieldsets),
+    patterns: repairPatterns(c.patterns),
   }
 }
 
@@ -70,9 +71,11 @@ function paintFields(s: ModelShape) {
   return {
     tone: typeof s.tone === 'number' && Number.isFinite(s.tone) ? Math.round(Math.min(TONE_RANGE.max, Math.max(TONE_RANGE.min, s.tone))) : 0,
     derive: tintOf(s.derive), shade: tintOf(s.shade), grad: gradOf(s.grad), blend: s.blend && BLENDS.includes(s.blend) ? s.blend : null, clip: s.clip ?? null,
-    cut: [...new Set(s.cut ?? [])].slice(0, LIMITS.cutsMax), helper: s.helper === true, opBy: fadeOf(s.opBy),
+    cut: [...new Set(s.cut ?? [])].slice(0, LIMITS.cutsMax), helper: s.helper === true, opBy: fadeOf(s.opBy), round: roundOf(s.round),
   }
 }
+// A radius as the server keeps it: a whole number from 0 to the most, 0 when it is not a number.
+export const roundOf = (v: number | null | undefined): number => (typeof v === 'number' && Number.isFinite(v) ? Math.round(Math.min(LIMITS.roundMax, Math.max(0, v))) : 0)
 // The sides things may fall to, and a shape's fade as the server keeps it (phase 5b): the places are held to the span a slider may have.
 // A grip point as the server keeps it (phase 5c): the name cut, the place inside the model's space, the angle held to a half turn each way.
 export const ROLE_MAX = 40
@@ -88,9 +91,10 @@ export function repairLooks(looks: ModelLook[] | undefined): ModelLook[] {
   for (const l of looks ?? []) {
     const slot = l.slot ?? null, gray = slot === null && l.gray != null ? Math.round(Math.min(100, Math.max(0, l.gray))) : null
     const tone = l.tone == null ? null : Math.round(Math.min(TONE_RANGE.max, Math.max(TONE_RANGE.min, l.tone)))
-    if ((slot === null && gray === null && tone === null) || seen.has(l.shape)) continue
+    const round = l.round == null ? null : roundOf(l.round)
+    if ((slot === null && gray === null && tone === null && round === null) || seen.has(l.shape)) continue
     seen.add(l.shape)
-    out.push({ shape: l.shape, slot, gray, tone })
+    out.push({ shape: l.shape, slot, gray, tone, round })
   }
   return out
 }
@@ -152,6 +156,16 @@ function repairDrive(d: ModelDrive): ModelDrive[] {
   const held = (v: number) => (typeof v === 'number' && Number.isFinite(v) ? Math.min(spec.hi, Math.max(spec.lo, v)) : spec.rest)
   const withIndex = d.feature === 'point' || d.feature === 'edge'
   return [{ ...d, atMin: held(d.atMin), atMax: held(d.atMax), i: withIndex ? Math.round(unit(d.i ?? 0, 0, LIMITS.pointsMax - 1, 0)) : 0 }]
+}
+// The patterns as the server keeps them (phase D4): the name cut, one entry per id, each mark once, and a pattern with no base dropped.
+export function repairPatterns(patterns: ModelPattern[] | undefined): ModelPattern[] {
+  const seen = new Set<string>(), out: ModelPattern[] = []
+  for (const p of patterns ?? []) {
+    if (!p.base || seen.has(p.id)) continue
+    seen.add(p.id)
+    out.push({ id: p.id, name: clean(p.name, RANGE_NAME_MAX), base: p.base, marks: [...new Set(p.marks ?? [])].slice(0, LIMITS.patternMarksMax) })
+  }
+  return out
 }
 // The fieldsets as the server keeps them (phase D3c): the name cut, an owner and a feature that are real kinds, the number only on a point or an edge, one entry per slider,
 // and a fieldset with no owner or no feature target dropped.
@@ -348,6 +362,34 @@ export function withoutRanges(c: ModelContent, ids: ReadonlySet<string>): ModelC
   }
 }
 
+// Things taken out of what presets and group-state options switch off (a pattern that went).
+export function withoutHidden(c: ModelContent, ids: ReadonlySet<string>): ModelContent {
+  if (ids.size === 0) return c
+  const lists = (hidden: string[]) => hidden.some(h => ids.has(h))
+  const keep = (hidden: string[]) => hidden.filter(h => !ids.has(h))
+  return {
+    ...c,
+    presets: (c.presets ?? []).map(p => (lists(p.hidden) ? { ...p, hidden: keep(p.hidden) } : p)),
+    groups: c.groups.map(g => (g.states?.some(st => st.options.some(o => lists(o.hidden)))
+      ? { ...g, states: g.states.map(st => ({ ...st, options: st.options.map(o => (lists(o.hidden) ? { ...o, hidden: keep(o.hidden) } : o)) })) } : g)),
+  }
+}
+
+// Patterns once shapes are gone: a pattern goes with its base, loses the marks that went, and goes when it has none left; presets and group states no longer switch it off.
+export function forgetPatterns(c: ModelContent, goneShapes: ReadonlySet<string>): ModelContent {
+  const patterns = c.patterns ?? []
+  if (patterns.length === 0 || goneShapes.size === 0) return c
+  const kept: ModelPattern[] = [], dead = new Set<string>()
+  let changed = false
+  for (const p of patterns) {
+    const marks = p.marks.filter(m => !goneShapes.has(m))
+    if (goneShapes.has(p.base) || marks.length === 0) { dead.add(p.id); changed = true }
+    else if (marks.length !== p.marks.length) { kept.push({ ...p, marks }); changed = true }
+    else kept.push(p)
+  }
+  return changed ? withoutHidden({ ...c, patterns: kept }, dead) : c
+}
+
 // The fieldsets that match, gone with their sliders.
 export function dropFieldsets(c: ModelContent, gone: (f: ModelFieldset) => boolean): ModelContent {
   const dead = (c.fieldsets ?? []).filter(gone)
@@ -366,7 +408,7 @@ function removeAll(c: ModelContent, gone: { shapes: Set<string>; objects: Set<st
   // a fieldset goes (with its sliders) with its owner or with the shape or object it is bound to
   const lost = (f: ModelFieldset): boolean => (f.ownerKind === 'object' && gone.objects.has(f.owner)) || (f.ownerKind === 'group' && gone.groups.has(f.owner)) || (f.ownerKind === 'preset' && !keptPresets.has(f.owner))
     || (f.feature === 'object' ? gone.objects.has(f.target) : gone.shapes.has(f.target))
-  return dropFieldsets({
+  const out = dropFieldsets({
     ...c,
     shapes: c.shapes.filter(s => !gone.shapes.has(s.id)).map(s => {
       let out = s
@@ -387,6 +429,7 @@ function removeAll(c: ModelContent, gone: { shapes: Set<string>; objects: Set<st
     ...(c.grips ? { grips: c.grips.filter(g => !(g.group && gone.groups.has(g.group))) } : {}),
     ...(c.frames ? { frames: c.frames.map(f => (f.hide.some(h => gone.objects.has(h) || gone.groups.has(h)) ? { ...f, hide: f.hide.filter(h => !gone.objects.has(h) && !gone.groups.has(h)) } : f)) } : {}),
   }, lost)
+  return forgetPatterns(out, gone.shapes)
 }
 
 // A shape goes with its twin.
@@ -633,7 +676,7 @@ function styleChoiceExists(c: ModelContent, key: string, value: string): boolean
 // Presets and styles: the sliders they set and the objects and groups they hide must be there, a style's scope must exist and the forms it chooses must be there.
 function presetFaults(c: ModelContent): string[] {
   const faults: string[] = []
-  const rangeIds = new Set(c.ranges.map(r => r.id)), objects = new Map(c.objects.map(o => [o.id, o])), thingIds = new Set([...objects.keys(), ...c.groups.map(g => g.id)])
+  const rangeIds = new Set(c.ranges.map(r => r.id)), objects = new Map(c.objects.map(o => [o.id, o])), thingIds = new Set([...objects.keys(), ...c.groups.map(g => g.id), ...(c.patterns ?? []).map(p => p.id)])
   const slots = new Map((c.slots ?? []).map(sl => [sl.id, sl])), presets = new Map((c.presets ?? []).map(p => [p.id, p]))
   for (const p of c.presets ?? []) {
     const name = label(p.name, p.id)
@@ -656,7 +699,7 @@ function presetFaults(c: ModelContent): string[] {
 // states of its own.
 function stateFaults(c: ModelContent): string[] {
   const faults: string[] = []
-  const rangeIds = new Set(c.ranges.map(r => r.id)), thingIds = new Set([...c.objects.map(o => o.id), ...c.groups.map(g => g.id)])
+  const rangeIds = new Set(c.ranges.map(r => r.id)), thingIds = new Set([...c.objects.map(o => o.id), ...c.groups.map(g => g.id), ...(c.patterns ?? []).map(p => p.id)])
   for (const g of c.groups) {
     if (g.mirrorOf && (g.states ?? []).length > 0) faults.push(`Group ${label(g.name, g.id)} is a twin and has states of its own; give them to the original.`)
     for (const st of g.states ?? []) {
@@ -800,6 +843,25 @@ function proportionFaults(c: ModelContent): string[] {
   return faults
 }
 
+// Patterns (the server's _pattern_faults says the same words): a base or a mark that is not there or is a twin (a pattern is made on the originals, and the twins follow), and a mark that
+// is the base itself.
+function patternFaults(c: ModelContent): string[] {
+  const faults: string[] = []
+  const shapes = new Map(c.shapes.map(s => [s.id, s]))
+  for (const p of c.patterns ?? []) {
+    const name = label(p.name, p.id), base = shapes.get(p.base)
+    if (!base) faults.push(`Pattern ${name} is on a shape that does not exist.`)
+    else if (base.mirrorOf) faults.push(`Pattern ${name} is on a twin; put it on the original.`)
+    for (const m of p.marks) {
+      const mark = shapes.get(m)
+      if (!mark) faults.push(`Pattern ${name} has a mark that does not exist.`)
+      else if (m === p.base) faults.push(`Pattern ${name} has its own base as a mark.`)
+      else if (mark.mirrorOf) faults.push(`Pattern ${name} has a mark that is a twin; use the original.`)
+    }
+  }
+  return faults
+}
+
 export function publishFaults(c: ModelContent): string[] {
   const faults: string[] = []
   if (!c.name.trim()) faults.push('The model needs a name.')
@@ -832,6 +894,7 @@ export function publishFaults(c: ModelContent): string[] {
   faults.push(...presetFaults(c))
   faults.push(...stateFaults(c))
   faults.push(...fieldFaults(c))
+  faults.push(...patternFaults(c))
   faults.push(...colourFaults(c))
   faults.push(...paintFaults(c))
   faults.push(...proportionFaults(c))

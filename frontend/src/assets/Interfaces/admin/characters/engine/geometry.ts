@@ -97,6 +97,28 @@ export function autoHandles(list: ModelPoint[], closed: boolean): Handles[] {
   return out
 }
 
+// The outline with its sharp corners rounded (phase D4). A corner is a sharp point with a straight side on each side of it: it is replaced by two points, `r` along each side
+// (held to 45% of the shorter side, so neighbouring corners never meet), joined by a short curve. A curve point, a sharp point beside a curved side and the ends of an open
+// outline are left as drawn. The points of the outline stay where they were drawn; only what is drawn from them changes.
+const CORNER_K = 0.55
+export function roundCorners(list: ModelPoint[], closed: boolean, r: number): ModelPoint[] {
+  const n = list.length
+  if (!(r > 0) || n < 3) return list
+  const out: ModelPoint[] = []
+  let rounded = false
+  for (let i = 0; i < n; i++) {
+    const p = list[i], a = list[(i + n - 1) % n], b = list[(i + 1) % n]
+    if (p.m !== 's' || (!closed && (i === 0 || i === n - 1)) || hasOut(a.m) || hasIn(b.m)) { out.push(p); continue }
+    const la = Math.hypot(a.x - p.x, a.y - p.y), lb = Math.hypot(b.x - p.x, b.y - p.y), d = Math.min(r, la * 0.45, lb * 0.45)
+    if (!(d >= 0.2)) { out.push(p); continue }
+    const ax = p.x + ((a.x - p.x) / la) * d, ay = p.y + ((a.y - p.y) / la) * d, bx = p.x + ((b.x - p.x) / lb) * d, by = p.y + ((b.y - p.y) / lb) * d
+    const w = p.w != null ? { w: p.w } : {}
+    out.push({ x: ax, y: ay, m: 'sc', hi: null, ho: [(p.x - ax) * CORNER_K, (p.y - ay) * CORNER_K], ...w }, { x: bx, y: by, m: 'cs', hi: [(p.x - bx) * CORNER_K, (p.y - by) * CORNER_K], ho: null, ...w })
+    rounded = true
+  }
+  return rounded ? out : list
+}
+
 // The absolute control points of a point list under a matrix.
 export interface BuiltPoint { x: number; y: number; m: ModelPointMode; hix: number; hiy: number; hox: number; hoy: number }
 export function build(list: ModelPoint[], closed: boolean, mat: Mat = IDENTITY): BuiltPoint[] {

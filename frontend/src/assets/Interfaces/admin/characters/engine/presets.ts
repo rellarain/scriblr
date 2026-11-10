@@ -30,7 +30,7 @@ const SAME = 0.01
 const clean = (s: string, max: number) => s.trim().slice(0, max)
 const kindKey = (k: string) => k.trim().toLowerCase()
 // What may be switched off: objects and groups, and (for a style of their object) shapes.
-const things = (c: ModelContent): Set<string> => new Set([...c.objects.map(o => o.id), ...c.groups.map(g => g.id), ...c.shapes.map(x => x.id)])
+const things = (c: ModelContent): Set<string> => new Set([...c.objects.map(o => o.id), ...c.groups.map(g => g.id), ...c.shapes.map(x => x.id), ...(c.patterns ?? []).map(p => p.id)])
 const sameScope = (a: string | null | undefined, b: string | null | undefined) => (a ?? null) === (b ?? null)
 
 // What is away from rest in the test state, for the toolbar's count: sliders off their rest value, forms that are not the default, things switched off.
@@ -55,7 +55,9 @@ export function scopeOf(c: ModelContent, scopeId: string): Scope | null {
   if (!group && !object) return null
   const groups = group ? new Set([group.id, ...descendantsOf(c, group.id)]) : new Set<string>()
   const objects = group ? c.objects.filter(o => c.groups.some(g => groups.has(g.id) && g.objects.includes(o.id))) : object ? [object] : []
-  const things = new Set<string>([...groups, ...objects.map(o => o.id)])
+  // a pattern is switched off like an object, so the patterns on the shapes of the scope are in it
+  const own = new Set(objects.flatMap(o => o.shapes))
+  const things = new Set<string>([...groups, ...objects.map(o => o.id), ...(c.patterns ?? []).filter(p => own.has(p.base)).map(p => p.id)])
   const listed = new Set<string>([...things, ...objects.flatMap(o => o.shapes)])
   return { things, objects, listed, object: object ?? null, shapes: new Set(object ? object.shapes : []) }
 }

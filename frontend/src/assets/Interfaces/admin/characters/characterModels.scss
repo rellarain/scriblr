@@ -98,9 +98,11 @@
 // The grid is fine (a line every 2 units), so its lines are faint and every tenth is a little stronger.
 .cmGridLine { stroke: var(--hairline); stroke-width: 0.35; stroke-opacity: 0.4; vector-effect: non-scaling-stroke; &--major { stroke: var(--ink-faint); stroke-opacity: 0.6; } }
 .cmMirrorLine { stroke: var(--ink-faint); stroke-width: 1; stroke-dasharray: 4 4; vector-effect: non-scaling-stroke; opacity: 0.5; &--on { stroke: var(--accent); opacity: 1; } }
-// a shape is filled with the colour of the test character (its own data, set inline as --shape-fill); the selection is a ring round it, not a recolouring
-.cmShape { fill: var(--shape-fill, var(--ink-muted)); stroke: var(--ink); stroke-width: 1; stroke-opacity: 0.55; vector-effect: non-scaling-stroke; cursor: pointer; &--on { stroke-opacity: 0.9; } &--dim { opacity: 0.35; } &--sel { stroke-opacity: 0; } }
-.cmRing { fill: none; pointer-events: none; vector-effect: non-scaling-stroke; stroke-linejoin: round; &--under { stroke: var(--ink); stroke-width: 4; } &--over { stroke: var(--surface-raised); stroke-width: 2; } }
+// a shape is filled with the colour of the test character (its own data, set inline as --shape-fill) and has no outline of its own: an outline is canvas chrome (phase D4), drawn
+// only round the selected shape, as a ring in the accent colour with an edge in the ink that is readable on the accent (the pair the audit already holds at 4.5:1), so it reads on a
+// fill of any colour whatever accent the user picks. The selection never recolours the fill.
+.cmShape { fill: var(--shape-fill, var(--ink-muted)); stroke: none; vector-effect: non-scaling-stroke; cursor: pointer; &--dim { opacity: 0.35; } }
+.cmRing { fill: none; pointer-events: none; vector-effect: non-scaling-stroke; stroke-linejoin: round; &--under { stroke: var(--on-accent); stroke-width: 4; } &--over { stroke: var(--accent); stroke-width: 2; } }
 .cmHandles { pointer-events: none; .cmHandle { pointer-events: auto; } }
 .cmHandleLine { stroke: var(--ink); stroke-width: 1; vector-effect: non-scaling-stroke; opacity: 0.7; }
 .cmHandle { fill: var(--surface-raised); stroke: var(--ink); stroke-width: 1.5; vector-effect: non-scaling-stroke; cursor: grab; }
@@ -219,9 +221,8 @@
 .cmPivot--off .cmPivotRing { stroke: var(--ink-muted); }
 .cmAnchor { fill: var(--accent); stroke: var(--ink); stroke-width: 1; vector-effect: non-scaling-stroke; pointer-events: none; }
 .cmCanvas--pick { cursor: copy; }
-.cmShape--twin { stroke-dasharray: 5 3; }
 // a helper shape is never drawn in the previews: on the canvas it is an outline, so it can still be picked and edited
-.cmShape--helper { fill-opacity: 0; stroke-dasharray: 2 3; stroke-opacity: 0.85; }
+.cmShape--helper { fill-opacity: 0; stroke: var(--ink); stroke-width: 1; stroke-dasharray: 2 3; stroke-opacity: 0.85; }
 // the outline of the pattern behind a member's own outline: a dashed line, never filled and never picked
 .cmGhost { fill: none; stroke: var(--ink-muted); stroke-width: 1; stroke-opacity: 0.75; stroke-dasharray: 4 3; vector-effect: non-scaling-stroke; pointer-events: none; }
 // classes: the pattern's and the members' panel in the Shape tab
@@ -267,6 +268,8 @@
 .cmLockSlot { display: flex; flex-direction: column; gap: var(--space-1); min-width: 0; h4 { margin: 0; } }
 .cmLockRow { display: grid; grid-template-columns: auto 5.5em minmax(0, 1fr); align-items: center; gap: var(--space-2); min-width: 0; .cmRange, .colorRange { min-width: 0; } }
 .cmLockName { color: var(--ink-muted); font-size: var(--text-small); }
+// a fill pattern of the shape: its name, eye and delete, then its marks as chips (phase D4)
+.cmPattern { display: flex; flex-direction: column; gap: var(--space-2); padding: var(--space-3); background: var(--ov-sink-1); min-width: 0; }
 .cmShapeRows { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: var(--space-1); }
 .cmShapeRow { display: flex; align-items: center; gap: var(--space-2); min-width: 0; padding: var(--space-1) var(--space-2); background: var(--ov-sink-1); &--off { opacity: 0.6; } }
 .cmShapeName { flex: 1 1 auto; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
@@ -411,7 +414,6 @@
 }
 
 // ---- the canvas gestures ----
-.cmCanvas--bare .cmShape { stroke: none; }
 .cmGridLine, .cmMirrorLine, .cmGuide, .cmHover, .cmHover * { pointer-events: none; }
 .cmGuide { stroke: var(--accent); stroke-width: 1; stroke-dasharray: 3 3; vector-effect: non-scaling-stroke; }
 .cmHoverOutline { fill: none; stroke: var(--accent); stroke-width: 6; stroke-opacity: 0.4; stroke-linejoin: round; vector-effect: non-scaling-stroke; }

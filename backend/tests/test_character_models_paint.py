@@ -85,7 +85,7 @@ def test_paint_effects_round_trip(client: TestClient) -> None:
     shadow = by_id(out, "s_shadow")
     assert shadow["shade"] == {"kind": "shadow", "t": 0.2} and shadow["clip"] == "s_head"
     look = out["objects"][1]["axes"][0]["options"][1]["looks"]
-    assert look == [{"shape": "s_iris", "slot": "k_hair", "gray": None, "tone": -1}]
+    assert look == [{"shape": "s_iris", "slot": "k_hair", "gray": None, "tone": -1, "round": None}]
 
 
 def test_derived_tones_round_trip_and_are_held_to_their_range(client: TestClient) -> None:
@@ -128,9 +128,9 @@ def test_a_look_that_changes_nothing_is_dropped_and_a_slot_wins_over_a_gray(clie
     form = c["objects"][1]["axes"][0]["options"][1]
     form["looks"] = [{"shape": "s_iris"}, {"shape": "s_iris", "slot": "k_hair", "gray": 20}, {"shape": "s_iris", "tone": 1}]
     looks = saved(client, c)["objects"][1]["axes"][0]["options"][1]["looks"]
-    assert looks == [{"shape": "s_iris", "slot": "k_hair", "gray": None, "tone": None}]   # one per shape: the first valid one stays
+    assert looks == [{"shape": "s_iris", "slot": "k_hair", "gray": None, "tone": None, "round": None}]   # one per shape: the first valid one stays
     form["looks"] = [{"shape": "s_iris", "gray": 250, "tone": 7}]
-    assert saved(client, c)["objects"][1]["axes"][0]["options"][1]["looks"] == [{"shape": "s_iris", "slot": None, "gray": 100, "tone": 2}]
+    assert saved(client, c)["objects"][1]["axes"][0]["options"][1]["looks"] == [{"shape": "s_iris", "slot": None, "gray": 100, "tone": 2, "round": None}]
 
 
 def test_too_many_looks_are_refused(client: TestClient) -> None:

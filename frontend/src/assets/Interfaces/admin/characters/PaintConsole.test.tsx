@@ -249,7 +249,7 @@ describe('forms that change paint', () => {
     expect(fillOf('iris')).toBe(plainFill)
     await save(user)
     const form = backend.entries[0].draft.objects.find(o => o.id === 'oE')!.axes![0].options.find(f => f.id === 'dark')!
-    expect(form.looks).toEqual([{ shape: 'iris', slot: 'k_hair', gray: null, tone: -1 }])
+    expect(form.looks).toEqual([{ shape: 'iris', slot: 'k_hair', gray: null, tone: -1, round: null }])
     // the shape's own paint is put back
     await user.click(screen.getByRole('button', { name: /^Dark/ }))
     await user.click(screen.getByRole('button', { name: 'Use the paint of Iris' }))

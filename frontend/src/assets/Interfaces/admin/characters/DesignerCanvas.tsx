@@ -811,7 +811,7 @@ export function DesignerCanvas(p: CanvasProps) {
 
   return (
     <svg
-      ref={svgRef} className={`cmCanvas${p.pick ? ' cmCanvas--pick' : ''}${p.pose ? ' cmCanvas--pose' : ''}${shown.has('outlines') ? '' : ' cmCanvas--bare'}`} viewBox={`${vb.x} ${vb.y} ${vb.w} ${vb.h}`} role="application" tabIndex={0}
+      ref={svgRef} className={`cmCanvas${p.pick ? ' cmCanvas--pick' : ''}${p.pose ? ' cmCanvas--pose' : ''}`} viewBox={`${vb.x} ${vb.y} ${vb.w} ${vb.h}`} role="application" tabIndex={0}
       aria-label={`Designer canvas. ${nudgeHint}. Click the empty grid to unselect everything, or right-click it.`}
       onPointerDown={onDown} onPointerMove={onMove} onPointerUp={onUp} onPointerCancel={onUp} onPointerLeave={() => setHover(null)} onContextMenu={e => e.preventDefault()} onKeyDown={onKey}
     >

@@ -1,13 +1,14 @@
 import { useState, type ReactNode } from 'react'
 import type { ModelBlend, ModelContent, ModelGradDir, ModelShape, ModelTintKind } from '../../../../api/types'
-import { CursorIcon, EyeOffIcon, LayersIcon, PlusIcon } from '../../../icons'
+import { CursorIcon, EyeIcon, EyeOffIcon, LayersIcon, PlusIcon, TrashIcon } from '../../../icons'
 import { Stepper } from './Stepper'
-import { paintLocked } from './engine/paintEdit'
+import { paintLocked, roundLocked } from './engine/paintEdit'
+import { patternOfMark, patternsOf, patternsOn } from './engine/patterns'
 import { LIMITS, shadingCount } from './engine/limits'
 import { KINDS, SIDES, type Side } from './engine/shadeEdit'
 import { slotsOf } from './engine/colour'
 import { valueText } from './rigView'
-import { objectOfShape, shapeById } from './modelContent'
+import { RANGE_NAME_MAX, objectOfShape, shapeById } from './modelContent'
 
 // The Paint section of the Colour tab (phase 4b): what is done to the colour of the selected shape. A tone, a derived tone, a gradient, a blend mode, a clip, the
 // shapes that cut a hole in it, whether it is a helper; or, for a shading shape, its kind and amount. A shape that takes its paint from another (a twin, a shape that
@@ -28,6 +29,15 @@ export interface PaintActions {
   addShading: (id: string, kind: ModelTintKind, side: Side) => void
   // start (or stop, with null) picking a shape on the canvas to clip to or to cut with
   pick: (what: 'clip' | 'cut' | null) => void
+  // The radius the sharp corners of the shape are rounded to, one step (phase D4)
+  stepRound: (id: string, dir: 1 | -1, big: boolean) => void
+  // Fill patterns (phase D4): marks drawn as ordinary shapes, kept inside a base shape and switched on and off together
+  addPattern: (baseId: string, marks: string[], name: string) => void
+  renamePattern: (id: string, name: string) => void
+  toggleMark: (patternId: string, shapeId: string) => void
+  removePattern: (id: string) => void
+  // Switch a pattern on or off in the test (what the eye of a row does for an object)
+  toggleShown: (patternId: string) => void
 }
 
 const label = (name: string, fallback: string) => name.trim() || fallback
@@ -46,9 +56,11 @@ function ChipRow({ label: text, children }: { label: string; children: ReactNode
   )
 }
 
-export function PaintSection({ content, shape, picking, actions }: { content: ModelContent; shape: ModelShape; picking: 'clip' | 'cut' | null; actions: PaintActions }) {
+export function PaintSection({ content, shape, picking, actions, hidden = [] }: { content: ModelContent; shape: ModelShape; picking: 'clip' | 'cut' | null; actions: PaintActions; hidden?: string[] }) {
   const [kind, setKind] = useState<ModelTintKind>('shadow')
   const [side, setSide] = useState<Side>('left')
+  const [picked, setPicked] = useState<string[]>([])
+  const [patternName, setPatternName] = useState('')
   const home = objectOfShape(content, shape.id)
   const name = label(shape.name, 'This shape')
   const locked = paintLocked(content, shape)
@@ -72,6 +84,16 @@ export function PaintSection({ content, shape, picking, actions }: { content: Mo
 
   const shading = shadingCount(content, home?.id ?? '')
   const bandKindName = KIND_NAMES[kind].toLowerCase()
+  const round = shape.round ?? 0
+  const roundNote = roundLocked(content, shape)
+  // fill patterns: the shapes of the object that can be marks (no twin, no shading, not a mark of a pattern already), the patterns made on this shape, the one it is a mark of
+  const marked = new Set(patternsOf(content).flatMap(p => p.marks))
+  const markable = (home?.shapes ?? []).map(t => shapeById(content, t)).filter((s): s is ModelShape => !!s && s.id !== id && !s.mirrorOf && !s.helper && !s.shade && !marked.has(s.id) && patternsOn(content, s.id).length === 0)
+  const chosen = picked.filter(m => markable.some(s => s.id === m))
+  const here = patternsOn(content, id)
+  const markOf = patternOfMark(content, id)
+  const markBase = markOf ? shapeById(content, markOf.base) : undefined
+  const roomForPattern = patternsOf(content).length < LIMITS.patternsMax
   return (
     <section className="cmSec" aria-label="Paint of the selection">
       <h3 className="cmInsSub">{shape.shade ? 'Shading' : 'Paint'}</h3>
@@ -111,6 +133,14 @@ export function PaintSection({ content, shape, picking, actions }: { content: Mo
       <ChipRow label="Blend mode">
         {BLENDS.map(b => <button key={b.name} type="button" className={`cmChip cmChip--wide${(shape.blend ?? null) === b.id ? ' cmChip--on' : ''}`} aria-pressed={(shape.blend ?? null) === b.id} onClick={() => actions.setBlend(id, b.id)}>{b.name}</button>)}
       </ChipRow>
+
+      <h4 className="cmInsSub">Corners</h4>
+      {roundNote ? <p className="cmInsText">{roundNote}</p> : (
+        <>
+          <Stepper label="Corner roundness" value={round === 0 ? 'Sharp' : String(round)} lowerOff={round <= 0} raiseOff={round >= LIMITS.roundMax} onStep={(dir, big) => actions.stepRound(id, dir, big)} />
+          <p className="cmInsText">Rounds the sharp corners of {name}, up to {LIMITS.roundMax}. A curve point, a corner beside a curved side and the ends of an open outline stay as drawn, and the points stay where they were drawn. A form or a slider can change it.</p>
+        </>
+      )}
 
       <ChipRow label="Clip to">
         <button type="button" className={`cmChip cmChip--wide${!shape.clip ? ' cmChip--on' : ''}`} aria-pressed={!shape.clip} title="Draw it whole" onClick={() => actions.setClip(id, null)}>Not clipped</button>
@@ -169,6 +199,46 @@ export function PaintSection({ content, shape, picking, actions }: { content: Mo
             <button type="button" className="cmBtn cmBtn--small" disabled={shading >= LIMITS.shadesMax} title={shading >= LIMITS.shadesMax ? `An object may have at most ${LIMITS.shadesMax} shading shapes` : undefined} onClick={() => actions.addShading(id, kind, side)}><PlusIcon size={12} /> Add a {bandKindName} band along the {side} edge</button>
             <span className={`cmCount${shading > LIMITS.shadesWarn ? ' cmCount--warn' : ''}`} title="Shading shapes of the object"><LayersIcon size={11} /> {shading} of {LIMITS.shadesMax}</span>
           </div>
+
+          <h4 className="cmInsSub">Fill patterns</h4>
+          {markOf && <p className="cmInsText">{name} is a mark of the fill pattern {label(markOf.name, 'Untitled pattern')}: it is kept inside {label(markBase?.name ?? '', 'its base shape')} and drawn over it. Select that shape to change the pattern.</p>}
+          {here.map(p => {
+            const pname = label(p.name, 'Untitled pattern'), shown = !hidden.includes(p.id)
+            return (
+              <div key={p.id} className="cmPattern" role="group" aria-label={`Fill pattern ${pname}`}>
+                <div className="cmInline">
+                  <input className="cmSliderName" aria-label={`Name of the fill pattern ${pname}`} value={p.name} maxLength={RANGE_NAME_MAX} placeholder="Name" onChange={e => actions.renamePattern(p.id, e.target.value)} />
+                  <button type="button" className="cmIconBtn cmIconBtn--small" aria-pressed={shown} aria-label={`${shown ? 'Switch off' : 'Switch on'} ${pname}`} title={shown ? 'Switch the marks off in the test' : 'Switch the marks on in the test'} onClick={() => actions.toggleShown(p.id)}>{shown ? <EyeIcon size={14} /> : <EyeOffIcon size={14} />}</button>
+                  <button type="button" className="cmIconBtn cmIconBtn--small" aria-label={`Delete the fill pattern ${pname}`} title="Delete the pattern: its marks stay, as ordinary shapes" onClick={() => actions.removePattern(p.id)}><TrashIcon size={14} /></button>
+                </div>
+                <ChipRow label={`Marks of ${pname}`}>
+                  {p.marks.map(m => {
+                    const s = shapeById(content, m), only = p.marks.length === 1
+                    return <button key={m} type="button" className="cmChip cmChip--wide cmChip--on" aria-pressed="true" disabled={only} title={only ? 'A pattern needs a mark: delete the pattern instead' : `Take ${label(s?.name ?? '', 'this shape')} out of the pattern`} onClick={() => actions.toggleMark(p.id, m)}>{label(s?.name ?? '', 'Gone')}</button>
+                  })}
+                  {markable.map(s => <button key={s.id} type="button" className="cmChip cmChip--wide" aria-pressed="false" title={`Make ${label(s.name, 'this shape')} a mark of the pattern`} onClick={() => actions.toggleMark(p.id, s.id)}>{label(s.name, 'Untitled shape')}</button>)}
+                </ChipRow>
+              </div>
+            )
+          })}
+          {!markOf && markable.length > 0 && roomForPattern ? (
+            <>
+              <p className="cmInsText">Draw the marks (stripes, dots, scales) as ordinary shapes in this object, then choose them here: they are kept inside {name}, drawn over it, and switched on and off together.</p>
+              <ChipRow label="Marks of the new fill pattern">
+                {markable.map(s => <button key={s.id} type="button" className={`cmChip cmChip--wide${chosen.includes(s.id) ? ' cmChip--on' : ''}`} aria-pressed={chosen.includes(s.id)} onClick={() => setPicked(chosen.includes(s.id) ? chosen.filter(m => m !== s.id) : [...chosen, s.id])}>{label(s.name, 'Untitled shape')}</button>)}
+              </ChipRow>
+              <label className="cmField">
+                <span>Pattern name</span>
+                <input aria-label="Name of the new fill pattern" value={patternName} maxLength={RANGE_NAME_MAX} placeholder="Stripes, Dots, Scales…" onChange={e => setPatternName(e.target.value)} />
+              </label>
+              <div className="cmInline">
+                <button type="button" className="cmBtn cmBtn--small" disabled={chosen.length === 0} onClick={() => { actions.addPattern(id, chosen, patternName); setPicked([]); setPatternName('') }}><PlusIcon size={12} /> Make a fill pattern on {name}</button>
+                <span className={`cmCount${patternsOf(content).length > LIMITS.patternsWarn ? ' cmCount--warn' : ''}`} title="Fill patterns of the model"><LayersIcon size={11} /> {patternsOf(content).length} of {LIMITS.patternsMax}</span>
+              </div>
+            </>
+          ) : here.length === 0 && !markOf && (
+            <p className="cmInsText">{roomForPattern ? `Draw the marks (stripes, dots, scales) as ordinary shapes in the same object as ${name}, then come back here to keep them inside it.` : `A model may have at most ${LIMITS.patternsMax} fill patterns.`}</p>
+          )}
         </>
       )}
     </section>

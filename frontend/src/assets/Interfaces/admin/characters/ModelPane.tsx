@@ -57,6 +57,7 @@ import { addField, addFieldset, removeField, removeFieldset, renameFieldset, set
 import { deletePreset, duplicatePreset, renamePreset, savePreset, saveStyle, updatePreset } from './engine/presets'
 import { chainOf, isPointDriven, restPivot, solve, type Solved, type Values } from './engine/rig'
 import * as paintOps from './engine/paintEdit'
+import * as patternOps from './engine/patterns'
 import { addShading } from './engine/shadeEdit'
 import { apartSlider, joinSides, oneSideEach, poseSides } from './engine/sidesEdit'
 import {
@@ -839,6 +840,12 @@ export function ModelPane({ entry, models, makeId, onRemove, onDuplicate, onExpo
       if (applyEdit(e) && e.ok && e.shapeId) { setSel({ kind: 'shape', id: e.shapeId }); setSelPoint(0) }
     },
     pick: what => { setPaintPick(what); if (what) { setLinkMode(null); setPickOn(false) } },
+    stepRound: (id, dir, big) => { applyEdit(paintOps.stepRound(content, id, dir, big)) },
+    addPattern: (baseId, marks, name) => { applyEdit(patternOps.addPattern(content, baseId, marks, name, makeId)) },
+    renamePattern: (id, name) => models.edit(entry.id, c => patternOps.renamePattern(c, id, name), false),
+    toggleMark: (patternId, shapeId) => { applyEdit(patternOps.toggleMark(content, patternId, shapeId)) },
+    removePattern: id => commit(patternOps.removePattern(content, id), true),
+    toggleShown: id => test.toggleHidden(id),
   }
   const classes: ClassActions = {
     select: choose,
@@ -1279,7 +1286,7 @@ export function ModelPane({ entry, models, makeId, onRemove, onDuplicate, onExpo
               presetsTab={<PresetsTab content={content} state={test.state} actions={presets} object={contextObjectOf(content, sel)} />}
               proportionsTab={<ProportionsTab content={content} solved={solved} picking={bonePick} actions={proportions} limits={rigActions} />}
               framesTab={<FramesTab content={content} state={framesState} actions={frameActions} />}
-              colourTab={<ColourTab content={content} sel={sel} state={{ colours: test.colours, palette: testPalette, genre: test.genre, locks: test.locks }} actions={colourActions} paint={paintActions} picking={paintPick} />}
+              colourTab={<ColourTab content={content} sel={sel} state={{ colours: test.colours, palette: testPalette, genre: test.genre, locks: test.locks, hidden: test.hidden }} actions={colourActions} paint={paintActions} picking={paintPick} />}
             />
           </ToolbarPanel>
 

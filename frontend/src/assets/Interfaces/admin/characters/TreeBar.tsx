@@ -1,10 +1,11 @@
 import { useState, type MouseEvent as ReactMouseEvent, type ReactNode } from 'react'
 import type { ModelContent, ModelEntry, ModelGroup, ModelObject, ModelPreset, ModelShape } from '../../../../api/types'
-import { CheckIcon, ChevronDownIcon, CopyIcon, EyeIcon, EyeOffIcon, FolderPlusIcon, ImportIcon, ExportIcon, LayersIcon, LinkIcon, PlayIcon, PlusIcon, SaveIcon, SearchIcon, StampIcon, SwapIcon, TrashIcon } from '../../../icons'
+import { CheckIcon, ChevronDownIcon, CopyIcon, EyeIcon, EyeOffIcon, FolderPlusIcon, GridViewIcon, ImportIcon, ExportIcon, LayersIcon, LinkIcon, PlayIcon, PlusIcon, SaveIcon, SearchIcon, StampIcon, SwapIcon, TrashIcon } from '../../../icons'
 import { ReorderList } from './ReorderList'
 import { StatusBadge, modelLabel } from './StatusBadge'
 import { TemplateMenu } from './TemplateMenu'
 import { classOfObject } from './engine/classEdit'
+import { patternOfMark } from './engine/patterns'
 import { isOn, type TestState } from './engine/presets'
 import { optionIsOn, statesOf } from './engine/states'
 import { LIMITS } from './engine/limits'
@@ -72,11 +73,13 @@ function Mark({ label: aria, title, children }: { label: string; title?: string;
   return <span className="cmTwin" role="img" title={title ?? aria} aria-label={aria}>{children}</span>
 }
 const TWIN = (name: string) => ({ label: `${name} is a twin`, title: `${name} is a twin: it mirrors another and follows it` })
-function ShapeMarks({ shape, name }: { shape: ModelShape; name: string }) {
+function ShapeMarks({ content, shape, name }: { content: ModelContent; shape: ModelShape; name: string }) {
+  const pattern = patternOfMark(content, shape.id)
   return (
     <>
       {shape.mirrorOf && <Mark {...TWIN(name)}><SwapIcon size={11} /></Mark>}
       {shape.shade && <Mark label={`${name} is a shading shape`} title={`${name} is a shading shape: a ${shape.shade.kind === 'mid' ? 'mid tone' : shape.shade.kind} kept inside the other shapes of its object`}><LayersIcon size={11} /></Mark>}
+      {pattern && <Mark label={`${name} is a mark of the fill pattern ${label(pattern.name, 'Untitled pattern')}`} title={`${name} is a mark of the fill pattern ${label(pattern.name, 'Untitled pattern')}: it is kept inside its base shape`}><GridViewIcon size={11} /></Mark>}
       {shape.helper && <Mark label={`${name} is a helper shape`} title={`${name} is a helper shape: it is not drawn in the previews`}><EyeOffIcon size={11} /></Mark>}
       {shape.copyOf && <Mark label={`${name} follows the pattern`} title={`${name} follows the pattern${shape.pts.length >= 3 ? ' (it has an outline of its own)' : ''}`}><LinkIcon size={11} /></Mark>}
     </>
@@ -299,7 +302,7 @@ export function TreeBar({ content, sel, state, hidden, models, actions }: {
     return (
       <Card
         key={s.id} kind="shape" id={s.id} name={s.name} open={open} off={hidden.has(o.id) || hidden.has(g.id) || !!s.hide} grip={grip}
-        marks={<ShapeMarks shape={s} name={name} />}
+        marks={<ShapeMarks content={content} shape={s} name={name} />}
         onMain={() => actions.onSelect(stepTo(content, sel, 'shape', s.id))}
         tools={{ plus: () => actions.onAddShape(o.id, 'rounded'), copy: () => actions.onTwin('shape', s.id) }}
       />

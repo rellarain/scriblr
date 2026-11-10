@@ -1,4 +1,4 @@
-import type { ModelAxis, ModelClass, ModelContent, ModelForm, ModelObject, ModelPoint, ModelPreset } from '../../../../../api/types'
+import type { ModelAxis, ModelClass, ModelContent, ModelForm, ModelLook, ModelObject, ModelPoint, ModelPreset } from '../../../../../api/types'
 
 // Forms: an object has axes (eye shape, expression, style), each with forms, and shows one form of every axis. What the admin has chosen is test state (like the
 // Try it sliders): `Choices` maps "objectId.axisId" to a form id and is never saved. A form changes the outline of some of the object's shapes; a shape no form
@@ -33,6 +33,15 @@ export function shownMember(c: ModelContent, k: ModelClass, choices: Choices): M
 export function chosenForm(o: ModelObject, axis: ModelAxis, choices: Choices, ownerId = o.id): ModelForm | undefined {
   const id = choices[formKey(ownerId, axis.id)]
   return axis.options.find(f => f.id === id) ?? axis.options.find(f => f.id === axis.initial) ?? axis.options[0]
+}
+
+// The paint look the forms give a shape (phase 4b; its radius is phase D4): the first axis (in order) whose chosen form has a look for it wins, as for outlines.
+export function lookOf(o: ModelObject, shapeId: string, choices: Choices, ownerId = o.id): ModelLook | undefined {
+  for (const axis of axesOf(o)) {
+    const look = chosenForm(o, axis, choices, ownerId)?.looks?.find(l => l.shape === shapeId)
+    if (look) return look
+  }
+  return undefined
 }
 
 // The outline the forms give a shape: the first axis (in order) whose chosen form has an override for it wins (they are not merged). undefined: no form changes

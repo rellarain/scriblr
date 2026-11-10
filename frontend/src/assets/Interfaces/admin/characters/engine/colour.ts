@@ -112,7 +112,7 @@ export function toneShift(hex: string, steps: number): string {
 // ---- where a shape gets its paint ----
 
 // What the paint walk needs to know about a model, found once per content (content is never changed in place).
-interface PaintIndex { shapes: Map<string, ModelShape>; owner: Map<string, ModelObject>; twin: Map<string, string>; copies: Map<string, string> }
+interface PaintIndex { shapes: Map<string, ModelShape>; owner: Map<string, ModelObject>; twin: Map<string, string>; copies: Map<string, string>; marks: Map<string, string> }
 const indexes = new WeakMap<ModelContent, PaintIndex>()
 function paintIndex(c: ModelContent): PaintIndex {
   const found = indexes.get(c)
@@ -126,7 +126,10 @@ function paintIndex(c: ModelContent): PaintIndex {
     const member = s.copyOf ? owner.get(s.id) : undefined
     if (s.copyOf && member) copies.set(`${s.copyOf}|${member.id}`, s.id)
   }
-  const made = { shapes, owner, twin, copies }
+  // a mark of a pattern (phase D4) is kept inside the pattern's base: shape id to base id
+  const marks = new Map<string, string>()
+  for (const p of c.patterns ?? []) for (const m of p.marks) if (!marks.has(m)) marks.set(m, p.base)
+  const made = { shapes, owner, twin, copies, marks }
   indexes.set(c, made)
   return made
 }
@@ -175,13 +178,26 @@ function lookFor(ix: PaintIndex, origin: PaintOrigin, forms: Choices) {
 }
 
 // The paint fields a shape would carry if it stood on its own: used when a twin or a member stops following (the pair is broken, the member detached).
-export function bakedPaint(c: ModelContent, shape: ModelShape): Pick<ModelShape, 'slot' | 'gray' | 'tone' | 'derive' | 'shade' | 'grad' | 'blend' | 'clip' | 'cut' | 'helper'> {
+export function bakedPaint(c: ModelContent, shape: ModelShape): Pick<ModelShape, 'slot' | 'gray' | 'tone' | 'derive' | 'shade' | 'grad' | 'blend' | 'clip' | 'cut' | 'helper' | 'round'> {
   const ix = paintIndex(c), origin = paintOrigin(c, shape), o = origin.shape
   const slot = o.slot ?? null
   return {
     slot, gray: slot ? null : o.gray ?? null, tone: o.tone ?? 0, derive: o.derive ?? null, shade: o.shade ?? null, grad: o.grad ?? null, blend: o.blend ?? null,
-    clip: o.clip ? mapRef(ix, origin.hops, o.clip) : null, cut: (o.cut ?? []).map(t => mapRef(ix, origin.hops, t)), helper: o.helper === true,
+    // a mark of a pattern is kept inside the pattern's base, which a shape that stops following it keeps being (it is no longer a mark)
+    clip: o.clip ? mapRef(ix, origin.hops, o.clip) : ix.marks.has(o.id) ? mapRef(ix, origin.hops, ix.marks.get(o.id)!) : null, cut: (o.cut ?? []).map(t => mapRef(ix, origin.hops, t)), helper: o.helper === true,
+    round: roundedLike(ix, shape),
   }
+}
+
+// The radius a shape is rounded to, as it would be if it stood on its own: that of the shape it mirrors or follows (the corners are rounded the same whatever its paint).
+function roundedLike(ix: PaintIndex, shape: ModelShape): number {
+  let cur = shape
+  for (let i = 0; i < 4; i++) {
+    const next = cur.mirrorOf ? ix.shapes.get(cur.mirrorOf) : cur.copyOf && cur.pts.length < 3 ? ix.shapes.get(cur.copyOf) : undefined
+    if (!next) break
+    cur = next
+  }
+  return cur.round ?? 0
 }
 
 // Where a shape gets its colour: its own slot, else its own fixed gray, else (a twin, a shape that follows the template's) the shape it copies.
@@ -276,7 +292,8 @@ export function paintLayer(c: ModelContent, colouring: Colouring, shape: ModelSh
     if (shift.blend < 100) end = mix(fill, end, shift.blend / 100)
     gradient = { dir: o.grad.dir, end, ...(shift.reach !== 100 ? { reach: shift.reach } : {}), ...(shift.dir !== 0 && o.grad.dir !== 'radial' ? { angle: shift.dir } : {}) }
   }
-  const clip = o.clip ? mapRef(ix, origin.hops, o.clip) : null
+  // a mark of a pattern (phase D4) is kept inside the pattern's base unless it is clipped to something of its own
+  const clip = o.clip ? mapRef(ix, origin.hops, o.clip) : ix.marks.has(o.id) ? mapRef(ix, origin.hops, ix.marks.get(o.id)!) : null
   const cuts = [...new Set((o.cut ?? []).map(t => mapRef(ix, origin.hops, t)))].filter(t => t !== shape.id)
   return { fill, opacity: slot ? round2(shape.op * alpha) : shape.op, gradient, blend: o.blend ?? null, clip: clip === shape.id ? null : clip, cuts, shading, helper: o.helper === true }
 }

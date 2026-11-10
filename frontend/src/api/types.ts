@@ -641,12 +641,13 @@ export type ModelBlend = 'multiply' | 'screen' | 'overlay'
 export interface ModelFade { slider: string; hidden: number; shown: number }
 // A filled outline in the model's space (0..200 across, 0..400 down). `half` > 0 marks a symmetric outline: its first `half` points run down one half and the rest mirror them.
 // mirrorOf: the shape this one is the mirror image of about the model's axis (a derived twin has no points of its own until the pair is broken). back: an outline of its own for the back view (absent: the front outline seen from behind); zBack: its depth in the back view; loose: the slider that loosens the links of its points.
-export interface ModelShape { id: string; name: string; closed: boolean; z: number; op: number; view: ModelView; pts: ModelPoint[]; half: number; template?: string | null; mirrorOf?: string | null; back?: ModelPoint[] | null; zBack?: number | null; loose?: string | null; copyOf?: string | null; hide?: boolean; slot?: string | null; gray?: number | null; tone?: number; derive?: ModelTint | null; shade?: ModelTint | null; grad?: ModelGradient | null; blend?: ModelBlend | null; clip?: string | null; cut?: string[]; helper?: boolean; opBy?: ModelFade | null }
+export interface ModelShape { id: string; name: string; closed: boolean; z: number; op: number; view: ModelView; pts: ModelPoint[]; half: number; template?: string | null; mirrorOf?: string | null; back?: ModelPoint[] | null; zBack?: number | null; loose?: string | null; copyOf?: string | null; hide?: boolean; slot?: string | null; gray?: number | null; tone?: number; derive?: ModelTint | null; shade?: ModelTint | null; grad?: ModelGradient | null; blend?: ModelBlend | null; clip?: string | null; cut?: string[]; helper?: boolean; opBy?: ModelFade | null; round?: number }
 // What one form does to one shape of its object: the outline the shape has in that form (an empty list hides the shape in the form).
 export interface ModelOverride { shape: string; pts: ModelPoint[] }
 // One form of an axis (round eyes, almond eyes): the shapes it changes with their outlines. A form with no overrides is the base outline.
 // What one form does to the paint of one shape: the colour slot it is painted from, or a fixed gray (no slot), and a tone (-2..2). null leaves the shape's own value.
-export interface ModelLook { shape: string; slot: string | null; gray: number | null; tone: number | null }
+// round (phase D4) is the radius the shape's sharp corners are rounded to in this form; null leaves the shape's own.
+export interface ModelLook { shape: string; slot: string | null; gray: number | null; tone: number | null; round?: number | null }
 export interface ModelForm { id: string; name: string; ovr: ModelOverride[]; looks?: ModelLook[] }
 // A way an object can vary (eye shape, expression, style): its forms, and the one it shows unless another is chosen (initial). An object shows one form of every axis.
 export interface ModelAxis { id: string; name: string; options: ModelForm[]; initial: string }
@@ -703,6 +704,8 @@ export interface ModelDrive {
 }
 // A slider of the model: from min to max, resting at rest (what is drawn), with what it drives. rand is the span random previews stay in; show says whether the writer's editor offers it.
 export interface ModelRange { id: string; name: string; scope: string | null; min: number; rest: number; max: number; unit: ModelRangeUnit; show: boolean; rand: [number, number] | null; limit?: [number, number] | null; role?: string | null; drives: ModelDrive[] }
+// A pattern (phase D4): marks (ordinary shapes, drawn by hand) kept inside a base shape and switched on and off together by hiding the pattern's id like an object's.
+export interface ModelPattern { id: string; name: string; base: string; marks: string[] }
 // A set of authored fields (phase D3c): sliders that change properties of one feature. The feature is a whole shape, one point or one edge of a shape (target is the shape, i the point or edge), or a whole object (target is the object). It belongs to an object, a group or a preset (a variant or a style), where the writer is offered it; a preset's is offered while that preset is on. ranges are the sliders, each with a 'prop' drive of this feature.
 export interface ModelFieldset { id: string; name: string; ownerKind: ModelOwnerKind; owner: string; feature: ModelFeatureKind; target: string; i: number; ranges: string[] }
 // A named set of slider values and of hidden objects (a pose, an expression, an age, a build, an outfit). kind is the slot it fills: applying one puts back whatever any other preset of its kind controls. values lists only the sliders it moves; hidden the objects and groups it hides.
@@ -724,7 +727,7 @@ export type ModelBoneEndKind = 'group' | 'point'
 export interface ModelBoneEnd { kind: ModelBoneEndKind; id: string; i: number }
 export interface ModelBone { id: string; name: string; start: string; end: ModelBoneEnd }
 export interface ModelFrame { id: string; name: string; x: number; y: number; w: number; h: number; hide: string[] }
-export interface ModelContent { name: string; description: string; shapes: ModelShape[]; objects: ModelObject[]; groups: ModelGroup[]; axis: number; ranges: ModelRange[]; presets?: ModelPreset[]; classes?: ModelClass[]; genres?: ModelGenre[]; palette?: ModelSwatch[]; slots?: ModelSlot[]; bones?: ModelBone[]; headBone?: string | null; frames?: ModelFrame[]; tile?: string; grips?: ModelGrip[]; fieldsets?: ModelFieldset[] }
+export interface ModelContent { name: string; description: string; shapes: ModelShape[]; objects: ModelObject[]; groups: ModelGroup[]; axis: number; ranges: ModelRange[]; presets?: ModelPreset[]; classes?: ModelClass[]; genres?: ModelGenre[]; palette?: ModelSwatch[]; slots?: ModelSlot[]; bones?: ModelBone[]; headBone?: string | null; frames?: ModelFrame[]; tile?: string; grips?: ModelGrip[]; fieldsets?: ModelFieldset[]; patterns?: ModelPattern[] }
 export interface PublishedModel { version: number; publishedAt: string; content: ModelContent }
 export interface ModelEntry { id: string; draft: ModelContent; published: PublishedModel | null; history: PublishedModel[]; nextVersion: number }
 export interface ModelCatalog { schemaVersion: number; models: ModelEntry[] }

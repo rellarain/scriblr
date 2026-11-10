@@ -17,6 +17,7 @@ import { addMember, makeClass } from '../assets/Interfaces/admin/characters/engi
 import { classKey, formKey } from '../assets/Interfaces/admin/characters/engine/forms'
 import { linkToEdge, makeTwin, setBack, setLoose } from '../assets/Interfaces/admin/characters/engine/pairEdit'
 import { setBlend, setGradient, toggleCut } from '../assets/Interfaces/admin/characters/engine/paintEdit'
+import { addPattern } from '../assets/Interfaces/admin/characters/engine/patterns'
 import { addShading } from '../assets/Interfaces/admin/characters/engine/shadeEdit'
 import { setObjectLock, setStyleLock } from '../assets/Interfaces/admin/characters/engine/locks'
 import { restState, saveStyle, savePreset } from '../assets/Interfaces/admin/characters/engine/presets'
@@ -153,6 +154,12 @@ function riggedFigure(): ModelContent {
   c = must(shirtShade)
   c = must(setBlend(c, shirtShade.shapeId!, 'multiply'))
   c = must(addShading(c, 's_head', 'highlight', 'left', mkPaint))
+  // corners and a fill pattern (phase D4): a pocket whose square corners are rounded, and two stripes, drawn as ordinary shapes, kept inside the shirt as a pattern that can be
+  // switched off
+  c = addShape(c, 'o_shirt', { ...newShape('s_pocket', 'Pocket', 'square', box(76, 124, 18, 20)), slot: 'k_cloth', tone: 1, round: 4 })
+  c = addShape(c, 'o_shirt', { ...newShape('s_stripe1', 'Stripe 1', 'square', box(56, 100, 88, 7)), slot: 'k_cloth', tone: -1 })
+  c = addShape(c, 'o_shirt', { ...newShape('s_stripe2', 'Stripe 2', 'square', box(56, 114, 88, 7)), slot: 'k_cloth', tone: -1 })
+  c = must(addPattern(c, 's_shirt', ['s_stripe1', 's_stripe2'], 'Stripes', prefix => `${prefix}_stripes`))
   // a sleeve on the upper arm, short unless a form of the arm says otherwise
   c = addShape(c, 'o_arm', { ...newShape('s_sleeve', 'Sleeve', 'rounded', box(122, 88, 18, 28)), slot: 'k_cloth' })
   // (the body is painted from Skin, the shirt and sleeve from Clothing, the iris from Eye, the white of the eye a fixed white)
@@ -284,6 +291,7 @@ function riggedFigure(): ModelContent {
   fields({ kind: 'preset', id: darkShirt.presetId }, { feature: 'object', target: 'o_shirt', i: 0 }, 'Darker shirt', [['fillLight', 'Shirt lightness']])
   fields({ kind: 'object', id: 'o_eye' }, { feature: 'shape', target: 's_iris', i: 0 }, 'Iris glow', [['gradReach', 'Glow reach'], ['gradBlend', 'Glow strength']])
   fields({ kind: 'object', id: 'o_chest' }, { feature: 'edge', target: 's_chest', i: 1 }, 'Chest side', [['offset', 'Chest side']])
+  fields({ kind: 'object', id: 'o_shirt' }, { feature: 'shape', target: 's_pocket', i: 0 }, 'Pocket corners', [['roundness', 'Pocket roundness']])
 
   // proportions: bones along the head (to the top of the skull, the unit for head heights), the upper arm and the forearm; a Length slider for each arm bone (the
   // other arm follows); the span a writer may choose for the sliders that change the body's proportions; Age and Build presets over them; the eyes keep their
@@ -341,7 +349,7 @@ export function previewModels(): ModelEntry[] {
   const plain = (shapeIds: string[]): ModelContent => {
     const shapes = adult.shapes.filter(s => shapeIds.includes(s.id)).map(s => ({ ...s, cut: [], clip: null }))
     const objects = adult.objects.map(o => ({ ...o, shapes: o.shapes.filter(s => shapeIds.includes(s)), axes: [] })).filter(o => o.shapes.length)
-    return { ...adult, shapes, objects, presets: [], classes: [], groups: [newGroup('g_head', 'Head', null, objects.map(o => o.id))], ranges: [], bones: [], headBone: null, frames: [], grips: [], fieldsets: [] }
+    return { ...adult, shapes, objects, presets: [], classes: [], groups: [newGroup('g_head', 'Head', null, objects.map(o => o.id))], ranges: [], bones: [], headBone: null, frames: [], grips: [], fieldsets: [], patterns: [] }
   }
   const live = liveEntry('adult', adult, { nextVersion: 3 })
   live.published = published(2, plain(['s_head', 's_neck', 's_chest']))

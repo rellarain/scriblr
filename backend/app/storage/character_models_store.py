@@ -373,7 +373,7 @@ def _preset_faults(content: ModelContent) -> list[str]:
     faults: list[str] = []
     range_ids = {r.id for r in content.ranges}
     objects = {o.id: o for o in content.objects}
-    thing_ids = set(objects) | {g.id for g in content.groups}
+    thing_ids = set(objects) | {g.id for g in content.groups} | {p.id for p in content.patterns}   # a pattern is switched off like an object
     slots = {sl.id: sl for sl in content.slots}
     presets = {p.id: p for p in content.presets}
     for p in content.presets:
@@ -406,7 +406,7 @@ def _state_faults(content: ModelContent) -> list[str]:
     twin group that has states of its own."""
     faults: list[str] = []
     range_ids = {r.id for r in content.ranges}
-    thing_ids = {o.id for o in content.objects} | {g.id for g in content.groups}
+    thing_ids = {o.id for o in content.objects} | {g.id for g in content.groups} | {p.id for p in content.patterns}
     for g in content.groups:
         if g.mirrorOf and g.states:
             faults.append(f"Group {_label(g.name, g.id)} is a twin and has states of its own; give them to the original.")
@@ -476,6 +476,29 @@ def _field_faults(content: ModelContent) -> list[str]:
                 for d in r.drives
             ):
                 faults.append(f"Slider {_label(r.name, r.id)} of fieldset {name} does not change a property of its feature.")
+    return faults
+
+
+def _pattern_faults(content: ModelContent) -> list[str]:
+    """Patterns (phase D4; the frontend's patternFaults says the same words): a base or a mark that is not there or is a twin (a pattern is made on the originals, and the
+    twins follow), and a mark that is the base itself."""
+    faults: list[str] = []
+    shapes = {s.id: s for s in content.shapes}
+    for p in content.patterns:
+        name = _label(p.name, p.id)
+        base = shapes.get(p.base)
+        if base is None:
+            faults.append(f"Pattern {name} is on a shape that does not exist.")
+        elif base.mirrorOf:
+            faults.append(f"Pattern {name} is on a twin; put it on the original.")
+        for mark in p.marks:
+            m = shapes.get(mark)
+            if m is None:
+                faults.append(f"Pattern {name} has a mark that does not exist.")
+            elif mark == p.base:
+                faults.append(f"Pattern {name} has its own base as a mark.")
+            elif m.mirrorOf:
+                faults.append(f"Pattern {name} has a mark that is a twin; use the original.")
     return faults
 
 
@@ -640,6 +663,7 @@ def publish_faults(content: ModelContent) -> list[str]:
     faults.extend(_preset_faults(content))
     faults.extend(_state_faults(content))
     faults.extend(_field_faults(content))
+    faults.extend(_pattern_faults(content))
     faults.extend(_colour_faults(content))
     faults.extend(_paint_faults(content))
     faults.extend(_proportion_faults(content))
