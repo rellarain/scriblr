@@ -4,6 +4,8 @@ import { isUsed } from './paintEdit'
 import { boneAtRest, defaultValues, solve, solveAtRest } from './rig'
 import { fitOf } from './fitEdit'
 import { hangs, weightOf } from './fall'
+import { paintOrigin } from './colour'
+import { PROPS, type PropKey } from './props'
 
 // The Rig check: what is probably a mistake in the rig, in plain words, for the Check panel. These are not publish faults (publishFaults has those):
 // a slider that drives nothing, a group the anchor moves away from where it was drawn, a slider that sends a shape out of the picture.
@@ -104,6 +106,30 @@ export function hangCheck(c: ModelContent): CheckLine[] {
     if (falling.has(s.id) && !hangs(s.pts, s.closed)) say(weighted ? `${name} is set to fall, but every point of it carries a weight, so nothing holds it up.` : `${name} is set to fall, but no point of it carries a weight: use the Weights tool to mark the points that hang.`)
     else if (weighted && !falling.has(s.id)) say(`${name} has weighted points, but no slider lets it fall.`)
     if (s.opBy && s.opBy.hidden === s.opBy.shown) say(`${name} shows with a slider whose two ends are the same value: it switches on at once.`)
+  }
+  return lines
+}
+
+// What is worth knowing about authored fields (phase D3c), as plain information: a field that changes the gradient of a shape that has none (or the direction of a radial
+// one, which has none) draws nothing different, and a field whose two ends and rest are the same amount changes nothing.
+export function fieldCheck(c: ModelContent): CheckLine[] {
+  const lines: CheckLine[] = []
+  const say = (text: string) => { if (lines.length < MOST_LINES) lines.push({ level: 'info', text }) }
+  const shapes = new Map(c.shapes.map(s => [s.id, s])), objects = new Map(c.objects.map(o => [o.id, o]))
+  const gradientOf = (id: string) => { const s = shapes.get(id); return s && !s.shade ? paintOrigin(c, s).shape.grad ?? null : null }
+  for (const r of c.ranges) {
+    const name = r.name || r.id
+    for (const d of r.drives) {
+      if (d.kind !== 'prop' || !d.prop || !(d.prop in PROPS)) continue
+      const spec = PROPS[d.prop as PropKey]
+      if (Math.abs(d.atMin - spec.rest) < 1e-9 && Math.abs(d.atMax - spec.rest) < 1e-9) say(`Field ${name} changes nothing: ${spec.label.toLowerCase()} is the same at both ends of the slider.`)
+      if (!d.prop.startsWith('grad')) continue
+      const ids = d.feature === 'object' ? objects.get(d.id ?? '')?.shapes ?? [] : d.shape ? [d.shape] : []
+      const grads = ids.map(gradientOf).filter((g): g is NonNullable<typeof g> => !!g)
+      const where = d.feature === 'object' ? objects.get(d.id ?? '')?.name || d.id : shapes.get(d.shape ?? '')?.name || d.shape
+      if (grads.length === 0) say(`Field ${name} changes the gradient of ${where}, which has none: it has no effect.`)
+      else if (d.prop === 'gradDir' && grads.every(g => g.dir === 'radial')) say(`Field ${name} turns the direction of the gradient of ${where}, which is radial: it has no effect.`)
+    }
   }
   return lines
 }

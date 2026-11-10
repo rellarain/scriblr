@@ -1,8 +1,9 @@
 import type {
-  ModelAxis, ModelBind, ModelBlend, ModelBone, ModelClass, ModelColour, ModelContent, ModelDrive, ModelFade, ModelFallSide, ModelForm, ModelFrame, ModelGenre, ModelGrip, ModelGradDir, ModelGradient, ModelGroup, ModelHsl, ModelLook, ModelMove, ModelObject, ModelOverride, ModelPoint,
+  ModelAxis, ModelBind, ModelBlend, ModelBone, ModelClass, ModelColour, ModelContent, ModelDrive, ModelFade, ModelFallSide, ModelFeatureKind, ModelFieldset, ModelForm, ModelFrame, ModelGenre, ModelGrip, ModelGradDir, ModelGradient, ModelGroup, ModelHsl, ModelLook, ModelMove, ModelObject, ModelOverride, ModelPoint,
   ModelPreset, ModelRange, ModelShape, ModelSlot, ModelState, ModelStateOption, ModelSwatch, ModelTint, ModelTintKind,
 } from '../../../../api/types'
 import { LIMITS } from './engine/limits'
+import { PROPS, hasProp, type PropKey } from './engine/props'
 import { FALL_SIDES, ROLE_MAX, FRAME_BIGGEST, FRAME_MIN, KIND_MAX, SWATCH_NAME_MAX, TILE_DEFAULT, TINT_RANGE, TONE_RANGE, blankContent, normalizeContent, repairHsl, repairLooks } from './modelContent'
 
 // The file Export writes and Import reads: JSON with a marker and a version, and the models' content as it is (a shape, object, group or slider keeps its
@@ -102,9 +103,20 @@ function move(v: unknown): ModelMove {
 
 // A drive the server would accept, or null (the server drops the same ones).
 function drive(v: unknown): ModelDrive | null {
-  if (!isRecord(v) || !['turn', 'scale', 'points', 'bend', 'length', 'fall'].includes(v.kind as string)) return null
+  if (!isRecord(v) || !['turn', 'scale', 'points', 'bend', 'length', 'fall', 'prop'].includes(v.kind as string)) return null
   const kind = v.kind as ModelDrive['kind']
   const group = idOf(v.group), id = idOf(v.id), shapeId = idOf(v.shape)
+  if (kind === 'prop') {
+    // an authored field's slider (phase D3c): a property its feature has, on a shape or an object it names
+    const feature = ['shape', 'point', 'edge', 'object'].includes(v.feature as string) ? (v.feature as ModelFeatureKind) : null
+    const prop = typeof v.prop === 'string' && feature && hasProp(feature, v.prop) ? (v.prop as PropKey) : null
+    if (!feature || !prop || (feature === 'object' ? !id : !shapeId)) return null
+    const spec = PROPS[prop]
+    return {
+      kind, group: null, target: null, id: feature === 'object' ? id : null, axis: 'xy', shape: feature === 'object' ? null : shapeId, moves: [], sym: false, pivot: null, y0: 0, y1: 0,
+      atMin: num(v.atMin, spec.rest, spec.lo, spec.hi), atMax: num(v.atMax, spec.rest, spec.lo, spec.hi), mirror: v.mirror !== false, feature, prop, i: feature === 'point' || feature === 'edge' ? Math.round(num(v.i, 0, 0, LIMITS.pointsMax - 1)) : 0,
+    }
+  }
   const target = v.target === 'group' || v.target === 'shape' || v.target === 'model' ? v.target : null
   if (kind === 'turn' && !group) return null
   if (kind === 'scale' && (!target || (target !== 'model' && !id))) return null
@@ -145,6 +157,18 @@ function stateOption(v: Record<string, unknown>, id: string): ModelStateOption {
 function groupState(v: Record<string, unknown>, id: string): ModelState | null {
   const options = withIds(list(v.options), stateOption).slice(0, LIMITS.stateOptionsMax)
   return options.length > 0 ? { id, name: text(v.name).trim().slice(0, 40), options } : null
+}
+
+// A fieldset the server would accept (phase D3c): it needs an owner and a target, and the kinds are held to the real ones.
+function fieldset(v: Record<string, unknown>, id: string): ModelFieldset | null {
+  const owner = idOf(v.owner), target = idOf(v.target)
+  if (!owner || !target) return null
+  const feature = (['shape', 'point', 'edge', 'object'].includes(v.feature as string) ? v.feature : 'shape') as ModelFeatureKind
+  return {
+    id, name: text(v.name).trim().slice(0, 40), ownerKind: v.ownerKind === 'group' || v.ownerKind === 'preset' ? v.ownerKind : 'object', owner, feature, target,
+    i: feature === 'point' || feature === 'edge' ? Math.round(num(v.i, 0, 0, LIMITS.pointsMax - 1)) : 0,
+    ranges: [...new Set(list(v.ranges).map(idOf).filter((x): x is string => x !== null))].slice(0, LIMITS.fieldsMax),
+  }
 }
 
 function group(v: Record<string, unknown>, id: string): ModelGroup {
@@ -280,7 +304,8 @@ function problem(v: unknown): string | null {
     ?? groups.map(g => tooMany(list((g as Record<string, unknown>).objects).length, LIMITS.objectsPerGroupMax, 'objects in a group')).find(Boolean)
     ?? ranges.map(r => tooMany(list((r as Record<string, unknown>).drives).length, LIMITS.drivesMax, 'drives in a slider')).find(Boolean)
     ?? tooMany(list(v.presets).length, LIMITS.presetsMax, 'presets') ?? tooMany(list(v.classes).length, LIMITS.classesMax, 'classes')
-    ?? tooMany(list(v.slots).length, LIMITS.slotsMax, 'colour slots') ?? tooMany(list(v.genres).length, LIMITS.genresMax, 'genres') ?? tooMany(list(v.palette).length, LIMITS.paletteMax, 'swatches in the palette') ?? tooMany(list(v.bones).length, LIMITS.bonesMax, 'bones') ?? tooMany(list(v.frames).length, LIMITS.framesMax, 'frames')
+    ?? tooMany(list(v.slots).length, LIMITS.slotsMax, 'colour slots') ?? tooMany(list(v.genres).length, LIMITS.genresMax, 'genres') ?? tooMany(list(v.palette).length, LIMITS.paletteMax, 'swatches in the palette') ?? tooMany(list(v.bones).length, LIMITS.bonesMax, 'bones') ?? tooMany(list(v.frames).length, LIMITS.framesMax, 'frames') ?? tooMany(list(v.fieldsets).length, LIMITS.fieldsetsMax, 'fieldsets')
+    ?? list(v.fieldsets).map(f => tooMany(list(rec(f).ranges).length, LIMITS.fieldsMax, 'fields in a fieldset')).find(Boolean)
     ?? list(v.slots).map(sl => tooMany(list(rec(sl).colours).length, LIMITS.coloursMax, 'default colours in a slot')).find(Boolean)
     ?? objects.map(o => tooMany(list(rec(o).axes).length, LIMITS.axesMax, 'axes of forms in an object')).find(Boolean)
     ?? objects.map(o => list(rec(o).axes).map(a => tooMany(list(rec(a).options).length, LIMITS.formsMax, 'forms in an axis')).find(Boolean)).find(Boolean)
@@ -329,6 +354,7 @@ export function parseModelFile(source: string): ModelImport {
       headBone: idOrNull(m.headBone),
       frames: withIds(list(m.frames), frame),
       grips: withIds(list(m.grips), grip),
+      fieldsets: withIds(list(m.fieldsets), fieldset),
       tile: typeof m.tile === 'string' && /^#[0-9a-fA-F]{6}$/.test(m.tile) ? m.tile.toLowerCase() : TILE_DEFAULT,
     }))
   })

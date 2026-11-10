@@ -3,8 +3,10 @@ import { addGroup, addObject, addShape, blankContent, newGroup, normalizeContent
 import { newShape } from '../assets/Interfaces/admin/characters/engine/edit'
 import { addGrip, addHand, addHandPoses, apartHand, mirrorGrip, renameGrip, setPresetGrip } from '../assets/Interfaces/admin/characters/engine/hands'
 import { apartSlider } from '../assets/Interfaces/admin/characters/engine/sidesEdit'
-import { addLength, addRange, addScale, addTurn, attachGroup, newRange, recordPoints, reparent, type Edit } from '../assets/Interfaces/admin/characters/engine/rigEdit'
+import { addLength, addRange, addScale, addTurn, attachGroup, newRange, recordPoints, renameRange, reparent, type Edit } from '../assets/Interfaces/admin/characters/engine/rigEdit'
 import { addBone, setHeadBone } from '../assets/Interfaces/admin/characters/engine/bones'
+import { addField, addFieldset, type FeatureRef, type OwnerRef } from '../assets/Interfaces/admin/characters/engine/fields'
+import type { PropKey } from '../assets/Interfaces/admin/characters/engine/props'
 import { setFit } from '../assets/Interfaces/admin/characters/engine/fitEdit'
 import { addFrame, toggleFrameHide } from '../assets/Interfaces/admin/characters/engine/frames'
 import { bridgeBetween, spotFromClick } from '../assets/Interfaces/admin/characters/engine/bridgeEdit'
@@ -265,6 +267,24 @@ function riggedFigure(): ModelContent {
   if (!raised.ok || !raised.optionId) throw new Error('The sample arm state could not be made')
   c = renameOption(raised.content, 'g_arm', armState.stateId, raised.optionId, 'Raised')
 
+  // authored fields (phase D3c): sliders that each change one property of one feature. The head's width and height; the whole shirt's hue; the iris's glow (how far its radial
+  // gradient reaches and how much of the second colour it blends to); the side of the chest pushed out; and a field of the Dark style, offered while that style is on
+  let nField = 0
+  const mkField = (prefix: string) => `${prefix}_f${++nField}`
+  const fields = (owner: OwnerRef, ref: FeatureRef, name: string, props: Array<[PropKey, string]>) => {
+    const made = addFieldset(c, owner, ref, name, mkField)
+    c = must(made)
+    for (const [prop, label] of props) {
+      const added = addField(c, made.ok ? made.fieldsetId! : '', prop, mkField)
+      c = renameRange(must(added), added.ok ? added.rangeId! : '', label)
+    }
+  }
+  fields({ kind: 'object', id: 'o_head' }, { feature: 'shape', target: 's_head', i: 0 }, 'Head shape', [['width', 'Head width'], ['height', 'Head height']])
+  fields({ kind: 'object', id: 'o_shirt' }, { feature: 'object', target: 'o_shirt', i: 0 }, 'Shirt colour', [['fillHue', 'Shirt hue']])
+  fields({ kind: 'preset', id: darkShirt.presetId }, { feature: 'object', target: 'o_shirt', i: 0 }, 'Darker shirt', [['fillLight', 'Shirt lightness']])
+  fields({ kind: 'object', id: 'o_eye' }, { feature: 'shape', target: 's_iris', i: 0 }, 'Iris glow', [['gradReach', 'Glow reach'], ['gradBlend', 'Glow strength']])
+  fields({ kind: 'object', id: 'o_chest' }, { feature: 'edge', target: 's_chest', i: 1 }, 'Chest side', [['offset', 'Chest side']])
+
   // proportions: bones along the head (to the top of the skull, the unit for head heights), the upper arm and the forearm; a Length slider for each arm bone (the
   // other arm follows); the span a writer may choose for the sliders that change the body's proportions; Age and Build presets over them; the eyes keep their
   // size when the head grows
@@ -321,7 +341,7 @@ export function previewModels(): ModelEntry[] {
   const plain = (shapeIds: string[]): ModelContent => {
     const shapes = adult.shapes.filter(s => shapeIds.includes(s.id)).map(s => ({ ...s, cut: [], clip: null }))
     const objects = adult.objects.map(o => ({ ...o, shapes: o.shapes.filter(s => shapeIds.includes(s)), axes: [] })).filter(o => o.shapes.length)
-    return { ...adult, shapes, objects, presets: [], classes: [], groups: [newGroup('g_head', 'Head', null, objects.map(o => o.id))], ranges: [], bones: [], headBone: null, frames: [], grips: [] }
+    return { ...adult, shapes, objects, presets: [], classes: [], groups: [newGroup('g_head', 'Head', null, objects.map(o => o.id))], ranges: [], bones: [], headBone: null, frames: [], grips: [], fieldsets: [] }
   }
   const live = liveEntry('adult', adult, { nextVersion: 3 })
   live.published = published(2, plain(['s_head', 's_neck', 's_chest']))

@@ -198,6 +198,9 @@
 .cmDrives { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: var(--space-3); }
 .cmDrive { display: flex; flex-direction: column; gap: var(--space-2); padding: var(--space-2) 0 var(--space-2) var(--space-3); box-shadow: inset 2px 0 0 var(--hairline); }
 .cmMenu--list { left: 0; right: auto; width: 240px; }
+// the Fields tab (phase D3c): making a fieldset, and a fieldset's fields
+.cmFieldMake { display: flex; flex-direction: column; gap: var(--space-2); padding: var(--space-3); background: var(--ov-sink-1); min-width: 0; .cmInsSub { margin: 0; } }
+.cmFieldset .cmInline select { flex: 1 1 auto; min-width: 0; }
 .cmMenuBtn {
   display: flex; flex-direction: column; align-items: flex-start; gap: var(--space-1); padding: var(--space-3) var(--space-4); border: 0; border-radius: var(--radius-none); background: none; color: var(--ink);
   font: inherit; font-size: var(--text-field); text-align: left; cursor: pointer;

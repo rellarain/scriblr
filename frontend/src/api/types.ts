@@ -670,7 +670,10 @@ export interface ModelGroup { id: string; name: string; parent: string | null; o
 export type ModelRangeUnit = '' | '°' | '%'
 // A grip point (phase 5c): the spot of a hand where a held item is taken, in the model's space at rest, carried by the group `group`; angle is the way the held item points, in degrees (0 = straight down, positive toward the picture's right).
 export interface ModelGrip { id: string; name: string; group: string | null; x: number; y: number; angle: number }
-export type ModelDriveKind = 'turn' | 'scale' | 'points' | 'bend' | 'length' | 'fall'
+export type ModelDriveKind = 'turn' | 'scale' | 'points' | 'bend' | 'length' | 'fall' | 'prop'
+// Authored fields (phase D3c). A 'prop' drive changes one property of a feature: a whole shape, one point or one edge of a shape, or a whole object.
+export type ModelFeatureKind = 'shape' | 'point' | 'edge' | 'object'
+export type ModelOwnerKind = 'object' | 'group' | 'preset'
 // The side hanging things fall to (phase 5b): straight down, toward the picture's left or right, or behind the figure.
 export type ModelFallSide = 'down' | 'left' | 'right' | 'behind'
 export type ModelScaleTarget = 'group' | 'shape' | 'model'
@@ -693,9 +696,15 @@ export interface ModelDrive {
   atMin: number
   atMax: number
   mirror: boolean
+  // a 'prop' drive (phase D3c): the feature it changes (shape holds the shape of a shape, point or edge; id the object), the property, and the point or edge number
+  feature?: ModelFeatureKind | null
+  prop?: string | null
+  i?: number
 }
 // A slider of the model: from min to max, resting at rest (what is drawn), with what it drives. rand is the span random previews stay in; show says whether the writer's editor offers it.
 export interface ModelRange { id: string; name: string; scope: string | null; min: number; rest: number; max: number; unit: ModelRangeUnit; show: boolean; rand: [number, number] | null; limit?: [number, number] | null; role?: string | null; drives: ModelDrive[] }
+// A set of authored fields (phase D3c): sliders that change properties of one feature. The feature is a whole shape, one point or one edge of a shape (target is the shape, i the point or edge), or a whole object (target is the object). It belongs to an object, a group or a preset (a variant or a style), where the writer is offered it; a preset's is offered while that preset is on. ranges are the sliders, each with a 'prop' drive of this feature.
+export interface ModelFieldset { id: string; name: string; ownerKind: ModelOwnerKind; owner: string; feature: ModelFeatureKind; target: string; i: number; ranges: string[] }
 // A named set of slider values and of hidden objects (a pose, an expression, an age, a build, an outfit). kind is the slot it fills: applying one puts back whatever any other preset of its kind controls. values lists only the sliders it moves; hidden the objects and groups it hides.
 // A style is a preset with a scope (an object or a group): it also keeps the forms chosen for what is in the scope ("objectId.axisId" to a form id, "class:classId" to the member shown) and only controls what the scope holds.
 // A named set of choices. A variant (no scope) is a bundle over the same shapes: slider values, things hidden, the form (expression) of each object axis, the style it turns on for each object (object id to style id) and the default colour it picks for each slot (slot id to colour id). A style (an object or group as scope) keeps the same for what is in its scope, holds parts of the colour of its slots while it is on (hsl) and puts the shapes of its object in a drawing order of its own (order, back to front); its hidden may name shapes of the object.
@@ -715,7 +724,7 @@ export type ModelBoneEndKind = 'group' | 'point'
 export interface ModelBoneEnd { kind: ModelBoneEndKind; id: string; i: number }
 export interface ModelBone { id: string; name: string; start: string; end: ModelBoneEnd }
 export interface ModelFrame { id: string; name: string; x: number; y: number; w: number; h: number; hide: string[] }
-export interface ModelContent { name: string; description: string; shapes: ModelShape[]; objects: ModelObject[]; groups: ModelGroup[]; axis: number; ranges: ModelRange[]; presets?: ModelPreset[]; classes?: ModelClass[]; genres?: ModelGenre[]; palette?: ModelSwatch[]; slots?: ModelSlot[]; bones?: ModelBone[]; headBone?: string | null; frames?: ModelFrame[]; tile?: string; grips?: ModelGrip[] }
+export interface ModelContent { name: string; description: string; shapes: ModelShape[]; objects: ModelObject[]; groups: ModelGroup[]; axis: number; ranges: ModelRange[]; presets?: ModelPreset[]; classes?: ModelClass[]; genres?: ModelGenre[]; palette?: ModelSwatch[]; slots?: ModelSlot[]; bones?: ModelBone[]; headBone?: string | null; frames?: ModelFrame[]; tile?: string; grips?: ModelGrip[]; fieldsets?: ModelFieldset[] }
 export interface PublishedModel { version: number; publishedAt: string; content: ModelContent }
 export interface ModelEntry { id: string; draft: ModelContent; published: PublishedModel | null; history: PublishedModel[]; nextVersion: number }
 export interface ModelCatalog { schemaVersion: number; models: ModelEntry[] }

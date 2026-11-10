@@ -1,5 +1,6 @@
-import type { ModelGrip, ModelBone, ModelContent, ModelEntry, ModelFade, ModelFallSide, ModelFit, ModelForm, ModelFrame, ModelGradient, ModelGroup, ModelHsl, ModelLayer, ModelLook, ModelObject, ModelPreset, ModelRange, ModelShape, ModelSlot, ModelState, ModelTint } from '../../../../api/types'
+import type { ModelGrip, ModelBone, ModelContent, ModelDrive, ModelEntry, ModelFade, ModelFeatureKind, ModelFieldset, ModelOwnerKind, ModelFallSide, ModelFit, ModelForm, ModelFrame, ModelGradient, ModelGroup, ModelHsl, ModelLayer, ModelLook, ModelObject, ModelPreset, ModelRange, ModelShape, ModelSlot, ModelState, ModelTint } from '../../../../api/types'
 import { LIMITS, copyBytes, linkCount, shadingCount } from './engine/limits'
+import { PROPS, hasProp } from './engine/props'
 import { chainOf } from './engine/rig'
 import { standardGenres, standardSlots, starterPalette } from './engine/standardColours'
 
@@ -53,6 +54,7 @@ export function normalizeContent(c: ModelContent): ModelContent {
     frames: (c.frames ?? []).map(repairFrame),
     tile: typeof c.tile === 'string' && HEX.test(c.tile) ? c.tile.toLowerCase() : TILE_DEFAULT,
     grips: (c.grips ?? []).map(repairGrip),
+    fieldsets: repairFieldsets(c.fieldsets),
   }
 }
 
@@ -137,7 +139,35 @@ function repairRange(r: ModelRange): ModelRange {
     limit = lo <= r.min && hi >= r.max ? null : [lo, hi]
   }
   const role = typeof r.role === 'string' ? r.role.trim().slice(0, ROLE_MAX) : ''
-  return { ...rest, name: clean(r.name, RANGE_NAME_MAX), limit, role: role || null, drives }
+  return { ...rest, name: clean(r.name, RANGE_NAME_MAX), limit, role: role || null, drives: drives.flatMap(repairDrive) }
+}
+// A drive as the server keeps it: a prop drive (phase D3c) must change a property its feature has on a shape or object it names, its amounts are held to what the property
+// allows (the amount at rest when it has none) and only a point or an edge has a number; anything else of a drive is left alone.
+const FEATURES: ModelFeatureKind[] = ['shape', 'point', 'edge', 'object']
+function repairDrive(d: ModelDrive): ModelDrive[] {
+  // the other kinds carry the three fields of an authored field empty, as the server writes them (so a draft and its published copy compare equal)
+  if (d.kind !== 'prop') return [{ ...d, feature: d.feature ?? null, prop: d.prop ?? null, i: d.i ?? 0 }]
+  const spec = d.prop && hasProp(d.feature ?? 'shape', d.prop) ? PROPS[d.prop as keyof typeof PROPS] : undefined
+  if (!spec || !d.feature || !FEATURES.includes(d.feature) || (d.feature === 'object' ? !d.id : !d.shape)) return []
+  const held = (v: number) => (typeof v === 'number' && Number.isFinite(v) ? Math.min(spec.hi, Math.max(spec.lo, v)) : spec.rest)
+  const withIndex = d.feature === 'point' || d.feature === 'edge'
+  return [{ ...d, atMin: held(d.atMin), atMax: held(d.atMax), i: withIndex ? Math.round(unit(d.i ?? 0, 0, LIMITS.pointsMax - 1, 0)) : 0 }]
+}
+// The fieldsets as the server keeps them (phase D3c): the name cut, an owner and a feature that are real kinds, the number only on a point or an edge, one entry per slider,
+// and a fieldset with no owner or no feature target dropped.
+const OWNERS: ModelOwnerKind[] = ['object', 'group', 'preset']
+export function repairFieldsets(sets: ModelFieldset[] | undefined): ModelFieldset[] {
+  const seen = new Set<string>(), out: ModelFieldset[] = []
+  for (const f of sets ?? []) {
+    if (!f.owner || !f.target || seen.has(f.id)) continue
+    seen.add(f.id)
+    const feature = FEATURES.includes(f.feature) ? f.feature : 'shape'
+    out.push({
+      id: f.id, name: clean(f.name, RANGE_NAME_MAX), ownerKind: OWNERS.includes(f.ownerKind) ? f.ownerKind : 'object', owner: f.owner, feature, target: f.target,
+      i: feature === 'point' || feature === 'edge' ? Math.round(unit(f.i, 0, LIMITS.pointsMax - 1, 0)) : 0, ranges: [...new Set(f.ranges ?? [])],
+    })
+  }
+  return out
 }
 // How an object fits the body: only a stretching object has a shape to follow.
 function fitFields(o: ModelObject): { fit: ModelFit; fitTo: string | null } {
@@ -298,12 +328,45 @@ function forgetInState(st: ModelState, gone: { shapes: Set<string>; objects: Set
   }
 }
 
+// Sliders taken out of the model, with everything that named them: a shape that took its looseness or its fade from one, the values presets and group-state options set, and
+// the fieldsets that listed them.
+export function withoutRanges(c: ModelContent, ids: ReadonlySet<string>): ModelContent {
+  if (ids.size === 0) return c
+  const without = <T,>(values: Record<string, T>): Record<string, T> => Object.fromEntries(Object.entries(values).filter(([k]) => !ids.has(k)))
+  const sets = (values: Record<string, unknown>) => Object.keys(values).some(k => ids.has(k))
+  return {
+    ...c,
+    ranges: c.ranges.filter(r => !ids.has(r.id)),
+    shapes: c.shapes.map(s => {
+      const loose = s.loose != null && ids.has(s.loose), fade = !!s.opBy && ids.has(s.opBy.slider)
+      return loose || fade ? { ...s, loose: loose ? null : s.loose, opBy: fade ? null : s.opBy } : s
+    }),
+    presets: (c.presets ?? []).map(p => (sets(p.values) ? { ...p, values: without(p.values) } : p)),
+    groups: c.groups.map(g => (g.states?.some(st => st.options.some(o => sets(o.values)))
+      ? { ...g, states: g.states.map(st => ({ ...st, options: st.options.map(o => (sets(o.values) ? { ...o, values: without(o.values) } : o)) })) } : g)),
+    ...(c.fieldsets ? { fieldsets: c.fieldsets.map(f => (f.ranges.some(r => ids.has(r)) ? { ...f, ranges: f.ranges.filter(r => !ids.has(r)) } : f)) } : {}),
+  }
+}
+
+// The fieldsets that match, gone with their sliders.
+export function dropFieldsets(c: ModelContent, gone: (f: ModelFieldset) => boolean): ModelContent {
+  const dead = (c.fieldsets ?? []).filter(gone)
+  if (dead.length === 0) return c
+  const sliders = new Set(dead.flatMap(f => f.ranges))
+  return withoutRanges({ ...c, fieldsets: (c.fieldsets ?? []).filter(f => !dead.includes(f)) }, sliders)
+}
+
 function removeAll(c: ModelContent, gone: { shapes: Set<string>; objects: Set<string>; groups: Set<string> }): ModelContent {
   const parentOf = new Map(c.groups.map(g => [g.id, g.parent]))
   // a class goes with its template; its members stop being members (the page freezes them first, so they keep their look: see classEdit.detachBeforeRemoval)
   const deadClasses = new Set((c.classes ?? []).filter(k => gone.objects.has(k.template)).map(k => k.id))
   const up = (id: string | null): string | null => { let cur = id; while (cur !== null && gone.groups.has(cur)) cur = parentOf.get(cur) ?? null; return cur }
-  return {
+  const presets = forgetPresets(c, gone, deadClasses)
+  const keptPresets = new Set(presets.map(p => p.id))
+  // a fieldset goes (with its sliders) with its owner or with the shape or object it is bound to
+  const lost = (f: ModelFieldset): boolean => (f.ownerKind === 'object' && gone.objects.has(f.owner)) || (f.ownerKind === 'group' && gone.groups.has(f.owner)) || (f.ownerKind === 'preset' && !keptPresets.has(f.owner))
+    || (f.feature === 'object' ? gone.objects.has(f.target) : gone.shapes.has(f.target))
+  return dropFieldsets({
     ...c,
     shapes: c.shapes.filter(s => !gone.shapes.has(s.id)).map(s => {
       let out = s
@@ -319,11 +382,11 @@ function removeAll(c: ModelContent, gone: { shapes: Set<string>; objects: Set<st
       axes: (o.axes ?? []).map(a => ({ ...a, options: a.options.map(f => forgetShapes(f, gone.shapes)) })),
     })),
     groups: c.groups.filter(g => !gone.groups.has(g.id)).map(g => ({ ...g, parent: up(g.parent), objects: g.objects.filter(oid => !gone.objects.has(oid)), ...(g.states?.length ? { states: g.states.map(st => forgetInState(st, gone, deadClasses)) } : {}) })),
-    presets: forgetPresets(c, gone, deadClasses),
+    presets,
     classes: (c.classes ?? []).filter(k => !deadClasses.has(k.id)),
     ...(c.grips ? { grips: c.grips.filter(g => !(g.group && gone.groups.has(g.group))) } : {}),
     ...(c.frames ? { frames: c.frames.map(f => (f.hide.some(h => gone.objects.has(h) || gone.groups.has(h)) ? { ...f, hide: f.hide.filter(h => !gone.objects.has(h) && !gone.groups.has(h)) } : f)) } : {}),
-  }
+  }, lost)
 }
 
 // A shape goes with its twin.
@@ -608,6 +671,53 @@ function stateFaults(c: ModelContent): string[] {
   return faults
 }
 
+// Authored fields (the server's _field_faults says the same words): a slider that changes a property of a shape, point, edge or object that is not there (or of a twin), and a
+// fieldset whose owner, feature or sliders are not there or whose sliders do not change a property of its feature.
+function fieldFaults(c: ModelContent): string[] {
+  const faults: string[] = []
+  const shapes = new Map(c.shapes.map(s => [s.id, s])), objects = new Map(c.objects.map(o => [o.id, o])), ranges = new Map(c.ranges.map(r => [r.id, r]))
+  const groups = new Set(c.groups.map(g => g.id)), presets = new Set((c.presets ?? []).map(p => p.id))
+  for (const r of c.ranges) {
+    const name = label(r.name, r.id)
+    for (const d of r.drives) {
+      if (d.kind !== 'prop') continue
+      if (d.feature === 'object') {
+        const o = d.id ? objects.get(d.id) : undefined
+        if (!o) faults.push(`Slider ${name} changes a property of an object that does not exist.`)
+        else if (o.mirrorOf) faults.push(`Slider ${name} changes a property of a twin object; change the original instead.`)
+        continue
+      }
+      const shape = d.shape ? shapes.get(d.shape) : undefined
+      if (!shape) faults.push(`Slider ${name} changes a property of a shape that does not exist.`)
+      else if (shape.mirrorOf) faults.push(`Slider ${name} changes a property of a twin; change the original instead.`)
+      else if ((d.feature === 'point' || d.feature === 'edge') && (d.i ?? 0) >= shape.pts.length) faults.push(`Slider ${name} changes ${d.feature === 'point' ? 'a point' : 'an edge'} of ${label(shape.name, shape.id)} that is no longer there.`)
+    }
+  }
+  for (const fs of c.fieldsets ?? []) {
+    const name = label(fs.name, fs.id)
+    const ownerFound = fs.ownerKind === 'object' ? objects.has(fs.owner) : fs.ownerKind === 'group' ? groups.has(fs.owner) : presets.has(fs.owner)
+    if (!ownerFound) faults.push(`Fieldset ${name} belongs to something that does not exist.`)
+    if (fs.feature === 'object') {
+      const o = objects.get(fs.target)
+      if (!o) faults.push(`Fieldset ${name} is bound to an object that does not exist.`)
+      else if (o.mirrorOf) faults.push(`Fieldset ${name} is bound to a twin object; bind the original.`)
+    } else {
+      const shape = shapes.get(fs.target)
+      if (!shape) faults.push(`Fieldset ${name} is bound to a shape that does not exist.`)
+      else if (shape.mirrorOf) faults.push(`Fieldset ${name} is bound to a twin; bind the original.`)
+      else if ((fs.feature === 'point' || fs.feature === 'edge') && fs.i >= shape.pts.length) faults.push(`Fieldset ${name} is bound to ${fs.feature === 'point' ? 'a point' : 'an edge'} that does not exist.`)
+    }
+    for (const rid of fs.ranges) {
+      const r = ranges.get(rid)
+      if (!r) faults.push(`Fieldset ${name} lists a slider that does not exist.`)
+      else if (!r.drives.some(d => d.kind === 'prop' && d.feature === fs.feature && (fs.feature === 'object' ? d.id : d.shape) === fs.target && ((fs.feature !== 'point' && fs.feature !== 'edge') || (d.i ?? 0) === fs.i))) {
+        faults.push(`Slider ${label(r.name, r.id)} of fieldset ${name} does not change a property of its feature.`)
+      }
+    }
+  }
+  return faults
+}
+
 // What is wrong with the colour of a model (the server's _colour_faults says the same words).
 function colourFaults(c: ModelContent): string[] {
   const faults: string[] = []
@@ -721,6 +831,7 @@ export function publishFaults(c: ModelContent): string[] {
   faults.push(...classFaults(c))
   faults.push(...presetFaults(c))
   faults.push(...stateFaults(c))
+  faults.push(...fieldFaults(c))
   faults.push(...colourFaults(c))
   faults.push(...paintFaults(c))
   faults.push(...proportionFaults(c))

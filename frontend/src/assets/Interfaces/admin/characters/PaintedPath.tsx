@@ -1,5 +1,5 @@
 import { useId, type CSSProperties, type ReactElement, type SVGProps } from 'react'
-import { GRADIENT_AXES, MASK_BOX, paintAttrs, type PaintDef, type PaintItem } from './engine/paint'
+import { MASK_BOX, gradientAxis, gradientStops, paintAttrs, type PaintDef, type PaintItem } from './engine/paint'
 
 // The SVG side of painting (phase 4b): the definitions an effect needs and one path drawn with all of them. The canvas, the preview tiles and the pictures of
 // forms use these, so a gradient, a clip or a cut-out looks the same everywhere.
@@ -15,10 +15,10 @@ export function PaintDefs({ defs }: { defs: PaintDef[] }): ReactElement | null {
     <defs>
       {defs.map(d => {
         if (d.kind === 'gradient') {
-          const stops = [<stop key="a" offset="0" stopColor={d.from} />, <stop key="b" offset="1" stopColor={d.to} />]
+          const stops = gradientStops(d.from, d.to, d.reach).map((st, i) => <stop key={i} offset={st.offset} stopColor={st.colour} />)
           return d.dir === 'radial'
             ? <radialGradient key={d.id} id={d.id} cx="0.5" cy="0.5" r="0.5">{stops}</radialGradient>
-            : <linearGradient key={d.id} id={d.id} {...GRADIENT_AXES[d.dir]}>{stops}</linearGradient>
+            : <linearGradient key={d.id} id={d.id} {...gradientAxis(d.dir, d.angle)}>{stops}</linearGradient>
         }
         if (d.kind === 'clip') return <clipPath key={d.id} id={d.id}>{d.ds.map((x, i) => <path key={i} d={x} />)}</clipPath>
         return (

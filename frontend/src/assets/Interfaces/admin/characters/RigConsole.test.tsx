@@ -70,20 +70,20 @@ describe('the inspector\'s tabs', () => {
   const tabNames = () => screen.getAllByRole('tab').map(t => t.textContent?.trim())
   it('has the tabs of what is open, moved between with the arrow keys', async () => {
     const { user } = await open()
-    expect(tabNames()).toEqual(['Shape', 'Ranges', 'Presets', 'Colour', 'Proportions', 'Frames'])          // the model alone has no rig and no forms
+    expect(tabNames()).toEqual(['Shape', 'Ranges', 'Fields', 'Presets', 'Colour', 'Proportions', 'Frames'])          // the model alone has no rig and no forms
     expect(tab('Shape')).toHaveAttribute('aria-selected', 'true')
     tab('Shape').focus()
     await user.keyboard('{ArrowRight}')
     expect(tab('Ranges')).toHaveAttribute('aria-selected', 'true')
     expect(tab('Ranges')).toHaveFocus()
-    await user.keyboard('{ArrowRight}{ArrowRight}{ArrowRight}{ArrowRight}{ArrowRight}')
+    await user.keyboard('{ArrowRight}{ArrowRight}{ArrowRight}{ArrowRight}{ArrowRight}{ArrowRight}')
     expect(tab('Shape')).toHaveAttribute('aria-selected', 'true')
     await user.keyboard('{ArrowLeft}')
     expect(tab('Frames')).toHaveAttribute('aria-selected', 'true')
     await pick(user, 'Face', 'group')
-    expect(tabNames()).toEqual(['Shape', 'Rig', 'Ranges', 'Presets', 'Colour', 'Proportions', 'Frames'])    // a group has a rig, its objects have the forms
+    expect(tabNames()).toEqual(['Shape', 'Rig', 'Ranges', 'Fields', 'Presets', 'Colour', 'Proportions', 'Frames'])    // a group has a rig, its objects have the forms
     await pick(user, 'Skull', 'shape')
-    expect(tabNames()).toEqual(['Shape', 'Rig', 'Ranges', 'Forms', 'Presets', 'Colour', 'Proportions', 'Frames'])
+    expect(tabNames()).toEqual(['Shape', 'Rig', 'Ranges', 'Fields', 'Forms', 'Presets', 'Colour', 'Proportions', 'Frames'])
   })
   it('has no Rig tab without a group, and goes back to Shape when what was open is gone', async () => {
     const { user } = await open()

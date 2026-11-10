@@ -4,7 +4,9 @@ import { NAME_MAX, SWATCH_NAME_MAX, shapeById, type MakeId, randomId } from '../
 import { freshFormId } from './formEdit'
 import { axesOf, chosenForm, type Choices } from './forms'
 import { LIMITS } from './limits'
+import { isPaintProp, PROPS, type PropKey } from './props'
 import { done, fail, type Edit } from './rigEdit'
+import { amount, valueOf, type Values } from './rig'
 import { standardGenres, standardSlots, starterPalette } from './standardColours'
 
 // Colour. A shape is painted from a colour SLOT (Skin, Hair, Eye...), or has a fixed gray, or neither (the neutral gray every uncoloured model is drawn in). A slot
@@ -21,14 +23,15 @@ export type SlotChoices = Record<string, SlotChoice>
 // The parts of a slot's colour that objects hold (phase D3a): object id to slot id to the lock. A locked hue, saturation or lightness keeps its value whatever colour is
 // chosen for the slot; a free part comes from the colour chosen.
 export type HslLocks = Record<string, Record<string, ModelHsl>>
-export interface Colouring { palette: ModelSwatch[]; choices: SlotChoices; forms?: Choices; locks?: HslLocks }
+// `values` are the slider values: an authored field (phase D3c) may shift the colour of a shape or the second colour of its gradient, or change how far the gradient reaches.
+export interface Colouring { palette: ModelSwatch[]; choices: SlotChoices; forms?: Choices; locks?: HslLocks; values?: Values }
 export interface ResolvedColour { h: number; s: number; l: number; a: number; css: string }
 export interface Paint { fill: string; opacity: number }
 // Everything a shape is painted with (phase 4b): the fill (the colour with its tone and any derived tone), a gradient to another colour, how it blends with what is
 // under it, the shapes it is kept inside (`clip`) and that cut a hole in it (`cuts`), whether it is a shading shape (kept inside the base shapes of its object) and
 // whether it is a helper (never drawn). `clip` and `cuts` name shapes of this shape's own side: a twin's refer to the twins of what its original's refer to.
 export interface PaintLayer extends Paint {
-  gradient: { dir: ModelGradDir; end: string } | null
+  gradient: { dir: ModelGradDir; end: string; reach?: number; angle?: number } | null
   blend: ModelBlend | null
   clip: string | null
   cuts: string[]
@@ -190,6 +193,55 @@ export function paintSource(c: ModelContent, shape: ModelShape, depth = 0): { sl
   return next ? paintSource(c, next, depth + 1) : { slot: null, gray: null }
 }
 
+// ---- authored fields that change paint (phase D3c) ----
+
+// What the fields that fade, shift or reshape the paint of a shape come to: the shifts of hue (degrees), saturation and lightness (points) of its colour and of the second colour
+// of its gradient, how far the gradient reaches and how much it blends (percent; 100 at rest) and how far a linear gradient is turned (degrees). A field of a whole shape counts
+// for that shape (and for a twin or a member shape that follows it), a field of a whole object for every shape of that object.
+export interface PaintShift { hue: number; sat: number; light: number; gradHue: number; gradSat: number; gradLight: number; reach: number; blend: number; dir: number; any: boolean }
+const NO_SHIFT: PaintShift = { hue: 0, sat: 0, light: 0, gradHue: 0, gradSat: 0, gradLight: 0, reach: 100, blend: 100, dir: 0, any: false }
+
+const paintFields = new WeakMap<ModelContent, boolean>()
+const hasPaintFields = (c: ModelContent): boolean => {
+  let found = paintFields.get(c)
+  if (found === undefined) { found = c.ranges.some(r => r.drives.some(d => d.kind === 'prop' && isPaintProp(d.prop))); paintFields.set(c, found) }
+  return found
+}
+
+function paintShift(c: ModelContent, values: Values | undefined, ix: PaintIndex, shapeIds: string[]): PaintShift {
+  if (!values || !hasPaintFields(c)) return NO_SHIFT
+  const shapes = new Set(shapeIds), objects = new Set<string>()
+  for (const id of shapeIds) { const o = ix.owner.get(id); if (o) { objects.add(o.id); if (o.mirrorOf) objects.add(o.mirrorOf) } }
+  const out = { ...NO_SHIFT }
+  for (const r of c.ranges) {
+    for (const d of r.drives) {
+      if (d.kind !== 'prop' || !isPaintProp(d.prop)) continue
+      if (!((d.feature === 'shape' && d.shape && shapes.has(d.shape)) || (d.feature === 'object' && d.id && objects.has(d.id)))) continue
+      const spec = PROPS[d.prop as PropKey], a = amount(r, d, valueOf(r, values), spec.rest) - spec.rest
+      if (Math.abs(a) < 1e-9) continue
+      out.any = true
+      if (d.prop === 'fillHue') out.hue += a
+      else if (d.prop === 'fillSat') out.sat += a
+      else if (d.prop === 'fillLight') out.light += a
+      else if (d.prop === 'gradHue') out.gradHue += a
+      else if (d.prop === 'gradSat') out.gradSat += a
+      else if (d.prop === 'gradLight') out.gradLight += a
+      else if (d.prop === 'gradReach') out.reach += a
+      else if (d.prop === 'gradBlend') out.blend += a
+      else if (d.prop === 'gradDir') out.dir += a
+    }
+  }
+  out.reach = clamp(out.reach, 0, 200); out.blend = clamp(out.blend, 0, 100)
+  return out
+}
+
+// A colour with its hue turned and its saturation and lightness moved, the lightness held inside a slot's brightness range (a colour already outside it is not pushed further out).
+export function shiftColour(hex: string, hue: number, sat: number, light: number, slot?: Pick<ModelSlot, 'lMin' | 'lMax'> | null): string {
+  if (!hue && !sat && !light) return hex
+  const [h, s, l] = hexHsl(hex), lo = Math.min(slot?.lMin ?? 0, l), hi = Math.max(slot?.lMax ?? 100, l)
+  return hslHex(h + hue, clamp(s + sat, 0, 100), clamp(l + light, lo, hi))
+}
+
 // Everything a shape is painted with. The paint fields (tone, derived tone, shading, gradient, blend, clip, cut-outs, helper) come from the shape the paint walk ends
 // at, whose slot or fixed gray is the one used; the forms the colouring chooses may change that shape's slot, gray and tone.
 export function paintLayer(c: ModelContent, colouring: Colouring, shape: ModelShape): PaintLayer {
@@ -209,6 +261,9 @@ export function paintLayer(c: ModelContent, colouring: Colouring, shape: ModelSh
     const r = resolveLocked(slot, colouring.choices[slot.id], colouring.palette, held?.[slot.id])
     css = r.css; alpha = r.a
   } else css = grayHex(gray ?? NEUTRAL_GRAY)
+  // authored fields may shift the colour itself (after the parts an object holds), and shape what the gradient does
+  const shift = paintShift(c, colouring.values, ix, shape.id === o.id ? [o.id] : [shape.id, o.id])
+  if (shift.any) css = shiftColour(css, shift.hue, shift.sat, shift.light, slot)
   // a shading shape is a tone of its slot's colour; any other shape is the colour a step lighter or darker, and perhaps a tone of that
   const shading = !!o.shade
   let fill = o.shade ? toneHex(css, o.shade.kind, o.shade.t) : toneShift(css, tone)
@@ -216,7 +271,10 @@ export function paintLayer(c: ModelContent, colouring: Colouring, shape: ModelSh
   let gradient: PaintLayer['gradient'] = null
   if (o.grad && !shading) {
     const to = o.grad.to ? slotById(c, o.grad.to) : undefined
-    gradient = { dir: o.grad.dir, end: to ? resolveLocked(to, colouring.choices[to.id], colouring.palette, held?.[to.id]).css : toneShift(fill, -1) }
+    let end = to ? resolveLocked(to, colouring.choices[to.id], colouring.palette, held?.[to.id]).css : toneShift(fill, -1)
+    end = shiftColour(end, shift.gradHue, shift.gradSat, shift.gradLight, to)
+    if (shift.blend < 100) end = mix(fill, end, shift.blend / 100)
+    gradient = { dir: o.grad.dir, end, ...(shift.reach !== 100 ? { reach: shift.reach } : {}), ...(shift.dir !== 0 && o.grad.dir !== 'radial' ? { angle: shift.dir } : {}) }
   }
   const clip = o.clip ? mapRef(ix, origin.hops, o.clip) : null
   const cuts = [...new Set((o.cut ?? []).map(t => mapRef(ix, origin.hops, t)))].filter(t => t !== shape.id)

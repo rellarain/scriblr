@@ -421,6 +421,10 @@ described, now stale, in `docs/data-model.md`).
   Phase D3b adds, with defaults: on a group `states` (`ModelState`: a name and its `options`,
   `ModelStateOption`: a name, slider `values`, `hidden` ids of objects and groups switched off
   and `forms` chosen, as a preset's; a state needs an option, a twin group has none).
+  Phase D3c adds, with defaults: `ModelDrive.kind 'prop'` (with `feature` `shape|point|edge|object`, `prop` one of 16
+  properties, `i`, and `shape` or `id` for what it changes; its `atMin`/`atMax` are held to the property's span), and
+  `ModelContent.fieldsets` (`ModelFieldset`: `ownerKind` `object|group|preset`, `owner`, `feature`, `target`, `i`, and
+  the `ranges` that are its fields).
   Phase 4a (colour) adds, with defaults: on the model `genres` (`ModelGenre`: genre tags a
   default colour may fit), `palette` (`ModelSwatch`: the starter palette, a hue 0..359 and a
   saturation 0..100 per swatch, at most 10) and `slots` (`ModelSlot`: a colour slot with a

@@ -25,6 +25,7 @@ import { PoseBar } from './PoseBar'
 import { ProportionsTab } from './ProportionsTab'
 import { PresetsTab, type PresetActions } from './PresetsTab'
 import { PreviewStrip } from './PreviewStrip'
+import { FieldsTab, type FieldActions } from './FieldsTab'
 import { RangesTab } from './RangesTab'
 import { RigTab } from './RigTab'
 import { TemplateMenu } from './TemplateMenu'
@@ -52,6 +53,7 @@ import { beginScale, beginTurn, canScale, canTurn, grabPoint, moveScale, moveTur
 import { setObjectLock, setStyleLock, type LockPart } from './engine/locks'
 import { shapesInOrder } from './engine/order'
 import { addOption, addState, applyOption, removeOption, removeState, renameOption, renameState, updateOption } from './engine/states'
+import { addField, addFieldset, removeField, removeFieldset, renameFieldset, setFieldProp } from './engine/fields'
 import { deletePreset, duplicatePreset, renamePreset, savePreset, saveStyle, updatePreset } from './engine/presets'
 import { chainOf, isPointDriven, restPivot, solve, type Solved, type Values } from './engine/rig'
 import * as paintOps from './engine/paintEdit'
@@ -508,6 +510,29 @@ export function ModelPane({ entry, models, makeId, onRemove, onDuplicate, onExpo
       if (applyEdit(e)) setValues(vs => { const kept = new Set(e.ok ? e.content.ranges.map(r => r.id) : []); return Object.fromEntries(Object.entries(vs).filter(([k]) => kept.has(k))) })
     },
     oneSideEach: () => { applyEdit(oneSideEach(content)) },
+  }
+
+  // ---- authored fields (phase D3c) ----
+
+  const fieldActions: FieldActions = {
+    addFieldset: (owner, ref) => { applyEdit(addFieldset(content, owner, ref, '', makeId)) },
+    renameFieldset: (id, name) => models.edit(entry.id, c => renameFieldset(c, id, name), false),
+    removeFieldset: id => {
+      const gone = new Set((content.fieldsets ?? []).find(f => f.id === id)?.ranges ?? [])
+      commit(removeFieldset(content, id), true)
+      setValues(vs => Object.fromEntries(Object.entries(vs).filter(([k]) => !gone.has(k))))
+    },
+    addField: (fieldsetId, prop) => { applyEdit(addField(content, fieldsetId, prop, makeId)) },
+    removeField: id => {
+      commit(removeField(content, id), true)
+      setValues(vs => { const { [id]: _gone, ...rest } = vs; return rest })
+    },
+    setProp: (fieldsetId, rangeId, prop) => { if (applyEdit(setFieldProp(content, fieldsetId, rangeId, prop))) setValues(vs => { const { [rangeId]: _gone, ...rest } = vs; return rest }) },
+    select: f => {
+      if (f.feature === 'object') choose({ kind: 'object', id: f.target })
+      else { choose({ kind: 'shape', id: f.target }); if (f.feature === 'point' || f.feature === 'edge') setSelPoint(f.i) }
+    },
+    openRanges: () => { setTab('ranges'); setRangeFilter('selection') },
   }
 
   // ---- hands (phase 5c) ----
@@ -1249,6 +1274,7 @@ export function ModelPane({ entry, models, makeId, onRemove, onDuplicate, onExpo
               onAxis={(dir, big) => commit(setAxis(content, content.axis + dir * (big ? 5 : 1)), true)}
               rigTab={<RigTab content={content} group={group} object={selObject} picking={pickOn} fitPicking={fitPick} actions={rigActions} pairs={pairs} fit={fit} hands={hands} held={test.grip} />}
               rangesTab={<RangesTab content={content} sel={sel} group={group} values={values} recording={recording} scrubbing={scrubbing} filter={rangeFilter} onFilter={setRangeFilter} actions={rigActions} />}
+              fieldsTab={<FieldsTab content={content} sel={sel} selPoint={selPoint} state={test.state} values={values} actions={fieldActions} rig={rigActions} />}
               formsTab={<FormsTab content={content} sel={sel} state={test.state} actions={forms} presets={presets} colouring={colouring} />}
               presetsTab={<PresetsTab content={content} state={test.state} actions={presets} object={contextObjectOf(content, sel)} />}
               proportionsTab={<ProportionsTab content={content} solved={solved} picking={bonePick} actions={proportions} limits={rigActions} />}

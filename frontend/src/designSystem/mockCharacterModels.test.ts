@@ -1,14 +1,15 @@
 import { describe, expect, it } from 'vitest'
 import { publishFaults } from '../assets/Interfaces/admin/characters/modelContent'
-import { grayHex, paintOf, paletteOf, rollChoices, slotById } from '../assets/Interfaces/admin/characters/engine/colour'
+import { grayHex, paintLayer, paintOf, paletteOf, rollChoices, slotById } from '../assets/Interfaces/admin/characters/engine/colour'
 import { classKey } from '../assets/Interfaces/admin/characters/engine/forms'
 import { boneLength, headHeights, measures } from '../assets/Interfaces/admin/characters/engine/bones'
 import { framesOf, hiddenThrough } from '../assets/Interfaces/admin/characters/engine/frames'
 import { activeLocks } from '../assets/Interfaces/admin/characters/engine/locks'
 import { applyPreset, restState } from '../assets/Interfaces/admin/characters/engine/presets'
 import { applyOption, optionIsOn } from '../assets/Interfaces/admin/characters/engine/states'
-import { hangCheck, paintCheck, proportionCheck, rigCheck } from '../assets/Interfaces/admin/characters/engine/rigCheck'
+import { fieldCheck, hangCheck, paintCheck, proportionCheck, rigCheck } from '../assets/Interfaces/admin/characters/engine/rigCheck'
 import { drawable, paintDefs, paintShapes } from '../assets/Interfaces/admin/characters/engine/paint'
+import { fieldsetsOf, isOffered, fieldsOf } from '../assets/Interfaces/admin/characters/engine/fields'
 import { solve } from '../assets/Interfaces/admin/characters/engine/rig'
 import { previewModels } from './mockCharacterModels'
 
@@ -385,5 +386,32 @@ describe('the rigged preview model', () => {
     expect(live.published?.version).toBe(2)
     expect(publishFaults(live.published!.content)).toEqual([])
     expect(live.history.map(h => publishFaults(h.content))).toEqual([[]])
+  })
+
+  it('has authored fields: sliders that each change one property of a shape, an edge or an object, and the iris glow', () => {
+    expect(fieldCheck(adult)).toEqual([])
+    const sets = fieldsetsOf(adult)
+    expect(sets.map(f => [f.name, f.ownerKind, f.feature])).toEqual([['Head shape', 'object', 'shape'], ['Shirt colour', 'object', 'object'], ['Darker shirt', 'preset', 'object'], ['Iris glow', 'object', 'shape'], ['Chest side', 'object', 'edge']])
+    const slider = (name: string) => adult.ranges.find(r => r.name === name)!
+    const rest = solve(adult, {})
+    const wide = solve(adult, { [slider('Head width').id]: slider('Head width').max })
+    expect(wide.shapes.s_head.box.w).toBeGreaterThan(rest.shapes.s_head.box.w * 1.2)
+    expect(wide.shapes.s_neck.box).toEqual(rest.shapes.s_neck.box)
+    const pushed = solve(adult, { [slider('Chest side').id]: 10 })
+    expect(pushed.shapes.s_chest.box.w).toBeGreaterThan(rest.shapes.s_chest.box.w + 5)         // a rounded side bulges between its points, so the box grows by a little less than the push
+    expect(pushed.shapes.s_chest.box.w).toBeLessThanOrEqual(rest.shapes.s_chest.box.w + 10.001)
+    const chosen = { palette: paletteOf(adult), choices: { k_cloth: { src: 'colour' as const, id: slotById(adult, 'k_cloth')!.colours[1].id } } }
+    const shirt = (values: Record<string, number>) => paintOf(adult, { ...chosen, values }, adult.shapes.find(s => s.id === 's_shirt')!).fill
+    expect(shirt({ [slider('Shirt hue').id]: 60 })).not.toBe(shirt({}))
+    const iris = adult.shapes.find(s => s.id === 's_iris')!
+    const glow = (values: Record<string, number>) => paintLayer(adult, { palette: paletteOf(adult), choices: { k_eye: { src: 'colour' as const, id: slotById(adult, 'k_eye')!.colours[2].id } }, values }, iris).gradient
+    expect(glow({})).not.toHaveProperty('reach')
+    expect(glow({ [slider('Glow reach').id]: 60 })).toMatchObject({ reach: 60 })
+    // the Dark style's field is offered while the style is on
+    const dark = adult.presets!.find(p => p.name === 'Dark')!
+    const darker = sets.find(f => f.name === 'Darker shirt')!
+    expect(fieldsOf(adult, darker).map(r => r.name)).toEqual(['Shirt lightness'])
+    expect(isOffered(adult, restState(adult), darker)).toBe(false)
+    expect(isOffered(adult, applyPreset(adult, restState(adult), dark), darker)).toBe(true)
   })
 })

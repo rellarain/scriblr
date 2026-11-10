@@ -51,7 +51,7 @@ export function PreviewStrip({ content, sel, view = 'front', tile = TILE_DEFAULT
   }, [content, ids, view, show, frame])
   // what each tile draws: the paint of every shape of the selection under the tile's own colours (and forms), minus helpers and shapes with nothing to lie in
   const prefix = useSvgPrefix()
-  const painted = useMemo(() => specs.map((spec, i) => drawable(paintShapes(content, tiles[i], { palette: spec.palette, choices: spec.choices, forms: spec.forms, locks: activeLocks(content, specState(spec)) }, tiles[i].order.filter(id => ids.has(id))))), [specs, tiles, content, ids])
+  const painted = useMemo(() => specs.map((spec, i) => drawable(paintShapes(content, tiles[i], { palette: spec.palette, choices: spec.choices, forms: spec.forms, locks: activeLocks(content, specState(spec)), values: spec.values }, tiles[i].order.filter(id => ids.has(id))))), [specs, tiles, content, ids])
   const px = SIZES.find(s => s.id === size)!.px
 
   return (

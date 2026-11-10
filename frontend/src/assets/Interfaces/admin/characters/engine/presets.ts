@@ -1,5 +1,5 @@
 import type { ModelContent, ModelFallSide, ModelObject, ModelPreset } from '../../../../../api/types'
-import { KIND_MAX, NAME_MAX, randomId, type MakeId } from '../modelContent'
+import { KIND_MAX, NAME_MAX, dropFieldsets, randomId, type MakeId } from '../modelContent'
 import { colourById, slotById, type SlotChoices } from './colour'
 import { freshFormId } from './formEdit'
 import { axesFor, chosenForm, choiceOf, classKey, classesOf, formKey, formsAway, membersOf, presetsOf, shownMember, templateOfMember, type Choices } from './forms'
@@ -291,7 +291,8 @@ export const updatePreset = (c: ModelContent, id: string, s: TestState, keep: Pr
   })
 export const renamePreset = (c: ModelContent, id: string, name: string): ModelContent => mapPreset(c, id, p => ({ ...p, name }))
 export const setPresetKind = (c: ModelContent, id: string, kind: string): ModelContent => mapPreset(c, id, p => ({ ...p, kind: clean(kind, KIND_MAX) || p.kind }))
-export const deletePreset = (c: ModelContent, id: string): ModelContent => ({ ...c, presets: presetsOf(c).filter(p => p.id !== id) })
+// A preset goes with the fieldsets it owns (and their sliders).
+export const deletePreset = (c: ModelContent, id: string): ModelContent => dropFieldsets({ ...c, presets: presetsOf(c).filter(p => p.id !== id) }, f => f.ownerKind === 'preset' && f.owner === id)
 
 // A test state with the forms of the first axis of an object chosen, used by the Forms tab's thumbnails.
 export const withForm = (s: TestState, objectId: string, axisId: string, formId: string): TestState => ({ ...s, forms: { ...s.forms, [`${objectId}.${axisId}`]: formId } })

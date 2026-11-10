@@ -1222,7 +1222,11 @@ MODEL_STATES_WARN = 4    # group states (phase D3b): state axes per group, optio
 MODEL_STATES_MAX = 8
 MODEL_STATE_OPTIONS_WARN = 8
 MODEL_STATE_OPTIONS_MAX = 24
-MODEL_GENRES_WARN = 8    # colour (phase 4): genre tags per model, colour slots per model, default colours per slot, swatches of the starter palette
+MODEL_FIELDSETS_WARN = 12   # authored fields (phase D3c): fieldsets per model, sliders (fields) per fieldset
+MODEL_FIELDSETS_MAX = 24
+MODEL_FIELDS_WARN = 6
+MODEL_FIELDS_MAX = 12
+MODEL_GENRES_WARN = 8   # colour (phase 4): genre tags per model, colour slots per model, default colours per slot, swatches of the starter palette
 MODEL_GENRES_MAX = 12
 MODEL_SLOTS_WARN = 16
 MODEL_SLOTS_MAX = 32
@@ -1250,7 +1254,31 @@ ModelLayer = Literal["body", "clothing", "hair"]
 ModelView = Literal["both", "front", "back"]
 ModelAnchorKind = Literal["point", "edge", "range", "inside"]
 ModelRangeUnit = Literal["", "°", "%"]
-ModelDriveKind = Literal["turn", "scale", "points", "bend", "length", "fall"]
+ModelDriveKind = Literal["turn", "scale", "points", "bend", "length", "fall", "prop"]
+# Authored fields (phase D3c): a `prop` drive changes one property of a feature (a whole shape, one point or one edge of a shape, a whole object). For each property: the features
+# that have it, the amount at the slider's rest, and the least and the most it may be. Positions and offsets are in the model's units, sizes/opacity/reach/blend in percent
+# (100 at rest), rotation and direction in degrees, colour shifts in degrees of hue and points of saturation and lightness (0 at rest).
+ModelFeatureKind = Literal["shape", "point", "edge", "object"]
+ModelOwnerKind = Literal["object", "group", "preset"]
+_SHAPE_OR_OBJECT = ("shape", "object")
+MODEL_PROPS: dict[str, tuple[tuple[str, ...], float, float, float]] = {
+    "x": (("shape", "object", "point"), 0.0, -200.0, 200.0),
+    "y": (("shape", "object", "point"), 0.0, -200.0, 200.0),
+    "width": (_SHAPE_OR_OBJECT, 100.0, 5.0, 1000.0),
+    "height": (_SHAPE_OR_OBJECT, 100.0, 5.0, 1000.0),
+    "rotation": (_SHAPE_OR_OBJECT, 0.0, -360.0, 360.0),
+    "opacity": (_SHAPE_OR_OBJECT, 100.0, 0.0, 100.0),
+    "offset": (("edge",), 0.0, -200.0, 200.0),
+    "fillHue": (_SHAPE_OR_OBJECT, 0.0, -180.0, 180.0),
+    "fillSat": (_SHAPE_OR_OBJECT, 0.0, -100.0, 100.0),
+    "fillLight": (_SHAPE_OR_OBJECT, 0.0, -100.0, 100.0),
+    "gradReach": (_SHAPE_OR_OBJECT, 100.0, 0.0, 200.0),
+    "gradBlend": (_SHAPE_OR_OBJECT, 100.0, 0.0, 100.0),
+    "gradDir": (_SHAPE_OR_OBJECT, 0.0, -360.0, 360.0),
+    "gradHue": (_SHAPE_OR_OBJECT, 0.0, -180.0, 180.0),
+    "gradSat": (_SHAPE_OR_OBJECT, 0.0, -100.0, 100.0),
+    "gradLight": (_SHAPE_OR_OBJECT, 0.0, -100.0, 100.0),
+}
 ModelFallSide = Literal["down", "left", "right", "behind"]
 ModelFit = Literal["scale", "keep", "stretch"]
 ModelBoneEndKind = Literal["group", "point"]
@@ -1651,11 +1679,30 @@ class ModelDrive(BaseModel):
     atMin: float = 0.0
     atMax: float = 0.0
     mirror: bool = True
+    # A `prop` drive (phase D3c) changes `prop` of a feature: a whole `shape` (`shape`), one `point` or one `edge` of it (`shape`, `i`), or a whole `object` (`id`).
+    feature: Optional[ModelFeatureKind] = None
+    prop: Optional[str] = None
+    i: int = 0
 
     @field_validator("group", "id", "shape", mode="before")
     @classmethod
     def _ref(cls, value: Any) -> Optional[str]:
         return _optional_id(value)
+
+    @field_validator("feature", mode="before")
+    @classmethod
+    def _feature(cls, value: Any) -> Any:
+        return value if value in ("shape", "point", "edge", "object") else None
+
+    @field_validator("prop", mode="before")
+    @classmethod
+    def _prop(cls, value: Any) -> Optional[str]:
+        return value if isinstance(value, str) and value in MODEL_PROPS else None
+
+    @field_validator("i", mode="before")
+    @classmethod
+    def _index(cls, value: Any) -> int:
+        return int(_finite(value, 0.0, 0.0, float(MODEL_POINTS_MAX - 1)))
 
     @field_validator("target", mode="before")
     @classmethod
@@ -1694,6 +1741,18 @@ class ModelDrive(BaseModel):
             raise ValueError("this drive needs a shape")
         if self.kind == "length" and not self.id:
             raise ValueError("a length drive needs a bone")
+        if self.kind == "prop":
+            spec = MODEL_PROPS.get(self.prop or "")
+            if spec is None or self.feature not in spec[0]:
+                raise ValueError("a prop drive needs a property its feature has")
+            if (self.id if self.feature == "object" else self.shape) is None:
+                raise ValueError("a prop drive needs the shape or object it changes")
+            if self.feature not in ("point", "edge"):
+                self.i = 0
+            _, base, lo, hi = spec
+            for name in ("atMin", "atMax"):
+                setattr(self, name, base if name not in self.model_fields_set else _finite(getattr(self, name), base, lo, hi))
+            return self
         if self.kind in ("scale", "length"):
             # a percentage: 100 is the size at rest
             for name in ("atMin", "atMax"):
@@ -1786,6 +1845,59 @@ class ModelRange(BaseModel):
                 a, b = (_finite(v, self.rest, self.min, self.max) for v in self.limit)
                 lo, hi = min(a, b, self.rest), max(a, b, self.rest)
                 self.limit = None if lo <= self.min and hi >= self.max else [lo, hi]
+        return self
+
+
+class ModelFieldset(BaseModel):
+    """A set of authored fields (phase D3c): sliders that change properties of one feature. The feature is a whole `shape`, one `point` or one `edge` of a shape (`target` is
+    the shape, `i` the point or the edge), or a whole `object` (`target` is the object). The fieldset belongs to an object, a group or a preset (a variant or a style), which is
+    where the writer is offered it: a preset's is offered while that preset is on. `ranges` are the sliders, each with a `prop` drive of this feature."""
+
+    id: str = Field(pattern=_MODEL_ID)
+    name: str = Field(default="", max_length=MODEL_RANGE_NAME_MAX)
+    ownerKind: ModelOwnerKind = "object"
+    owner: str = Field(pattern=_MODEL_ID)
+    feature: ModelFeatureKind = "shape"
+    target: str = Field(pattern=_MODEL_ID)
+    i: int = 0
+    ranges: list[str] = Field(default_factory=list, max_length=MODEL_FIELDS_MAX)
+
+    @field_validator("name", mode="before")
+    @classmethod
+    def _trim(cls, value: Any) -> Any:
+        return value.strip()[:MODEL_RANGE_NAME_MAX] if isinstance(value, str) else value
+
+    @field_validator("ownerKind", mode="before")
+    @classmethod
+    def _owner_kind(cls, value: Any) -> Any:
+        return value if value in ("object", "group", "preset") else "object"
+
+    @field_validator("feature", mode="before")
+    @classmethod
+    def _feature(cls, value: Any) -> Any:
+        return value if value in ("shape", "point", "edge", "object") else "shape"
+
+    @field_validator("i", mode="before")
+    @classmethod
+    def _index(cls, value: Any) -> int:
+        return int(_finite(value, 0.0, 0.0, float(MODEL_POINTS_MAX - 1)))
+
+    @field_validator("ranges", mode="before")
+    @classmethod
+    def _ranges(cls, value: Any) -> list[str]:
+        if not isinstance(value, list):
+            return []
+        out: list[str] = []
+        for v in value:
+            ident = _optional_id(v)
+            if ident is not None and ident not in out:
+                out.append(ident)
+        return out
+
+    @model_validator(mode="after")
+    def _only_point_or_edge_has_an_index(self) -> "ModelFieldset":
+        if self.feature not in ("point", "edge"):
+            self.i = 0
         return self
 
 
@@ -2518,6 +2630,13 @@ class ModelContent(BaseModel):
     tile: str = MODEL_TILE_DEFAULT
     # Hands (phase 5c): the grip points where a held item is taken.
     grips: list[ModelGrip] = Field(default_factory=list, max_length=MODEL_GRIPS_MAX)
+    # Authored fields (phase D3c): the fieldsets, each a feature and the sliders that change its properties.
+    fieldsets: list[ModelFieldset] = Field(default_factory=list, max_length=MODEL_FIELDSETS_MAX)
+
+    @field_validator("fieldsets", mode="before")
+    @classmethod
+    def _fieldsets(cls, value: Any) -> list[Any]:
+        return _keep_valid(ModelFieldset, value)
 
     @field_validator("grips", mode="before")
     @classmethod
@@ -2586,7 +2705,7 @@ class ModelContent(BaseModel):
 
     @model_validator(mode="after")
     def _unique_ids(self) -> "ModelContent":
-        for label, items in (("shape", self.shapes), ("object", self.objects), ("group", self.groups), ("slider", self.ranges), ("preset", self.presets), ("class", self.classes), ("genre", self.genres), ("swatch", self.palette), ("slot", self.slots), ("bone", self.bones), ("frame", self.frames)):
+        for label, items in (("shape", self.shapes), ("object", self.objects), ("group", self.groups), ("slider", self.ranges), ("preset", self.presets), ("class", self.classes), ("genre", self.genres), ("swatch", self.palette), ("slot", self.slots), ("bone", self.bones), ("frame", self.frames), ("fieldset", self.fieldsets)):
             ids = [i.id for i in items]
             if len(set(ids)) != len(ids):
                 raise ValueError(f"two {label}s share an id")

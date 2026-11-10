@@ -4,6 +4,7 @@ import { EyeIcon, EyeOffIcon, LinkIcon, PauseIcon, PlayIcon, PlusIcon, RestoreIc
 import { fadedBy } from './engine/fadeEdit'
 import { hangs } from './engine/fall'
 import { LIMITS } from './engine/limits'
+import { PROPS, type PropKey } from './engine/props'
 import { valueOf, type Values } from './engine/rig'
 import { stepOf } from './engine/rigEdit'
 import { oneSided, originalSideOf, otherSideOf, turnsTogether, whyNotApart } from './engine/sidesEdit'
@@ -177,7 +178,7 @@ export function RangesTab({ content, sel, group, values, recording, scrubbing, f
   }
 
   function driveRow(r: ModelRange, d: ModelDrive, i: number, locked: boolean) {
-    const unit = d.kind === 'scale' || d.kind === 'length' || d.kind === 'fall' ? '%' : '°'
+    const unit = d.kind === 'prop' ? (d.prop && d.prop in PROPS ? PROPS[d.prop as PropKey].unit : '') : d.kind === 'scale' || d.kind === 'length' || d.kind === 'fall' ? '%' : '°'
     return (
       <div className="cmDrive">
         <p className="cmInsText">{driveText(content, d)}</p>

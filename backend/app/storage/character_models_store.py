@@ -422,6 +422,63 @@ def _state_faults(content: ModelContent) -> list[str]:
     return faults
 
 
+def _field_faults(content: ModelContent) -> list[str]:
+    """Authored fields (phase D3c; the frontend's fieldFaults says the same words): a slider that changes a property of a shape, point, edge or object that is not there (or of a
+    twin), and a fieldset whose owner, feature or sliders are not there or whose sliders do not change a property of its feature."""
+    faults: list[str] = []
+    shapes = {s.id: s for s in content.shapes}
+    objects = {o.id: o for o in content.objects}
+    groups = {g.id for g in content.groups}
+    presets = {p.id for p in content.presets}
+    ranges = {r.id: r for r in content.ranges}
+    for r in content.ranges:
+        name = _label(r.name, r.id)
+        for d in r.drives:
+            if d.kind != "prop":
+                continue
+            if d.feature == "object":
+                if d.id not in objects:
+                    faults.append(f"Slider {name} changes a property of an object that does not exist.")
+                elif objects[d.id or ""].mirrorOf:
+                    faults.append(f"Slider {name} changes a property of a twin object; change the original instead.")
+                continue
+            shape = shapes.get(d.shape or "")
+            if shape is None:
+                faults.append(f"Slider {name} changes a property of a shape that does not exist.")
+            elif shape.mirrorOf:
+                faults.append(f"Slider {name} changes a property of a twin; change the original instead.")
+            elif d.feature in ("point", "edge") and d.i >= len(shape.pts):
+                faults.append(f"Slider {name} changes {'a point' if d.feature == 'point' else 'an edge'} of {_label(shape.name, shape.id)} that is no longer there.")
+    for fs in content.fieldsets:
+        name = _label(fs.name, fs.id)
+        owners = {"object": objects, "group": groups, "preset": presets}[fs.ownerKind]
+        if fs.owner not in owners:
+            faults.append(f"Fieldset {name} belongs to something that does not exist.")
+        if fs.feature == "object":
+            if fs.target not in objects:
+                faults.append(f"Fieldset {name} is bound to an object that does not exist.")
+            elif objects[fs.target].mirrorOf:
+                faults.append(f"Fieldset {name} is bound to a twin object; bind the original.")
+        else:
+            shape = shapes.get(fs.target)
+            if shape is None:
+                faults.append(f"Fieldset {name} is bound to a shape that does not exist.")
+            elif shape.mirrorOf:
+                faults.append(f"Fieldset {name} is bound to a twin; bind the original.")
+            elif fs.feature in ("point", "edge") and fs.i >= len(shape.pts):
+                faults.append(f"Fieldset {name} is bound to {'a point' if fs.feature == 'point' else 'an edge'} that does not exist.")
+        for rid in fs.ranges:
+            r = ranges.get(rid)
+            if r is None:
+                faults.append(f"Fieldset {name} lists a slider that does not exist.")
+            elif not any(
+                d.kind == "prop" and d.feature == fs.feature and (d.id if fs.feature == "object" else d.shape) == fs.target and (fs.feature not in ("point", "edge") or d.i == fs.i)
+                for d in r.drives
+            ):
+                faults.append(f"Slider {_label(r.name, r.id)} of fieldset {name} does not change a property of its feature.")
+    return faults
+
+
 def _colour_faults(content: ModelContent) -> list[str]:
     """What is wrong with the colour of a model (the frontend's colourFaults says the same words)."""
     faults: list[str] = []
@@ -582,6 +639,7 @@ def publish_faults(content: ModelContent) -> list[str]:
     faults.extend(_class_faults(content))
     faults.extend(_preset_faults(content))
     faults.extend(_state_faults(content))
+    faults.extend(_field_faults(content))
     faults.extend(_colour_faults(content))
     faults.extend(_paint_faults(content))
     faults.extend(_proportion_faults(content))

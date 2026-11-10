@@ -4,6 +4,7 @@ import path from 'node:path'
 import { describe, expect, it } from 'vitest'
 import { FIGURE_MAX_LOCKS, FIGURE_MAX_MINE } from '../../../../api/types'
 import { LIMITS } from './engine/limits'
+import { PROPS, PROP_KEYS } from './engine/props'
 import { AXIS_RANGE, DESCRIPTION_MAX, ROLE_MAX, FRAME_BIGGEST, FRAME_MIN, KIND_MAX, NAME_MAX, RANGE_NAME_MAX, SWATCH_NAME_MAX, TILE_DEFAULT } from './modelContent'
 
 // The backend validates a model with extra='ignore', so a field the frontend sends that the schema does not know is dropped without a word. These
@@ -39,7 +40,7 @@ describe('the model types match the backend schema', () => {
     ['ModelTint', 'ModelTint'], ['ModelGradient', 'ModelGradient'], ['ModelLook', 'ModelLook'], ['ModelFade', 'ModelFade'],
     ['ModelBone', 'ModelBone'], ['ModelBoneEnd', 'ModelBoneEnd'], ['ModelFrame', 'ModelFrame'], ['ModelGrip', 'ModelGrip'],
     ['ModelHsl', 'ModelHsl'],
-    ['ModelState', 'ModelState'], ['ModelStateOption', 'ModelStateOption'],
+    ['ModelState', 'ModelState'], ['ModelStateOption', 'ModelStateOption'], ['ModelFieldset', 'ModelFieldset'],
     // the figure of a character (phase 6)
     ['CharacterFigure', 'CharacterFigure'], ['FigureColour', 'FigureColour'], ['FigureModel', 'FigureModel'],
   ]
@@ -58,7 +59,7 @@ describe('the model types match the backend schema', () => {
     expect(union('ModelLayer')).toEqual(literal('ModelLayer'))
     expect(union('ModelView')).toEqual(literal('ModelView'))
     expect(union('ModelPointMode').length).toBe(4)
-    for (const alias of ['ModelAnchorKind', 'ModelRangeUnit', 'ModelDriveKind', 'ModelScaleTarget', 'ModelScaleAxis', 'ModelBindKind', 'ModelTintKind', 'ModelGradDir', 'ModelBlend', 'ModelFit', 'ModelBoneEndKind', 'ModelFallSide']) {
+    for (const alias of ['ModelAnchorKind', 'ModelRangeUnit', 'ModelDriveKind', 'ModelScaleTarget', 'ModelScaleAxis', 'ModelBindKind', 'ModelTintKind', 'ModelGradDir', 'ModelBlend', 'ModelFit', 'ModelBoneEndKind', 'ModelFallSide', 'ModelFeatureKind', 'ModelOwnerKind']) {
       expect(union(alias), alias).toEqual(literal(alias))
       expect(union(alias).length, alias).toBeGreaterThan(1)
     }
@@ -121,6 +122,10 @@ describe('the limits are the backend\'s numbers', () => {
     expect(LIMITS.statesMax).toBe(number('MODEL_STATES_MAX'))
     expect(LIMITS.stateOptionsWarn).toBe(number('MODEL_STATE_OPTIONS_WARN'))
     expect(LIMITS.stateOptionsMax).toBe(number('MODEL_STATE_OPTIONS_MAX'))
+    expect(LIMITS.fieldsetsWarn).toBe(number('MODEL_FIELDSETS_WARN'))
+    expect(LIMITS.fieldsetsMax).toBe(number('MODEL_FIELDSETS_MAX'))
+    expect(LIMITS.fieldsWarn).toBe(number('MODEL_FIELDS_WARN'))
+    expect(LIMITS.fieldsMax).toBe(number('MODEL_FIELDS_MAX'))
   })
   it('for colour: genres, slots, default colours and the starter palette', () => {
     expect(LIMITS.genresWarn).toBe(number('MODEL_GENRES_WARN'))
@@ -155,5 +160,28 @@ describe('the limits are the backend\'s numbers', () => {
   it('for the length of a name and a description', () => {
     expect(NAME_MAX).toBe(number('MODEL_NAME_MAX'))
     expect(DESCRIPTION_MAX).toBe(number('MODEL_DESCRIPTION_MAX'))
+  })
+})
+
+describe('the properties an authored field can change are the backend\'s', () => {
+  // MODEL_PROPS in schema.py: the property, the features that have it (or the alias of both whole features), its amount at rest and the least and most it may be
+  const block = /MODEL_PROPS[^=]*=\s*\{([\s\S]*?)\n\}/.exec(schema)?.[1] ?? ''
+  const rows = [...block.matchAll(/^\s+"(\w+)":\s*\((_SHAPE_OR_OBJECT|\(([^)]*)\)),\s*(-?[\d.]+),\s*(-?[\d.]+),\s*(-?[\d.]+)\),/gm)]
+  it('lists the same properties with the same features and amounts', () => {
+    expect(rows.length).toBeGreaterThan(10)
+    expect(rows.map(r => r[1]).sort()).toEqual([...PROP_KEYS].sort())
+    for (const r of rows) {
+      const features = r[2] === '_SHAPE_OR_OBJECT' ? ['shape', 'object'] : [...r[3].matchAll(/"(\w+)"/g)].map(m => m[1])
+      const p = PROPS[r[1] as keyof typeof PROPS]
+      expect([...p.features].sort(), r[1]).toEqual(features.sort())
+      expect([p.rest, p.lo, p.hi], r[1]).toEqual([Number(r[4]), Number(r[5]), Number(r[6])])
+    }
+  })
+  it('gives a new field a slider and amounts inside what the property allows', () => {
+    for (const p of Object.values(PROPS)) {
+      expect(p.slider[0], p.key).toBeLessThanOrEqual(p.slider[1])
+      expect(p.slider[1], p.key).toBeLessThanOrEqual(p.slider[2])
+      for (const a of [...p.amounts, p.rest]) { expect(a, p.key).toBeGreaterThanOrEqual(p.lo); expect(a, p.key).toBeLessThanOrEqual(p.hi) }
+    }
   })
 })

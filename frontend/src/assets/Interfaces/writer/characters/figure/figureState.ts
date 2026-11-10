@@ -92,7 +92,7 @@ export function colouringOf(copy: ModelContent, figure: CharacterFigure): Colour
     if (typeof c.a === 'number') choice.a = c.a
     choices[slot] = choice
   }
-  return { palette: figure.palette ?? paletteOf(copy), choices, forms: figure.forms ?? {} }
+  return { palette: figure.palette ?? paletteOf(copy), choices, forms: figure.forms ?? {}, values: valuesOf(copy, figure) }
 }
 const coloursFrom = (choices: SlotChoices): Record<string, FigureColour> => {
   const out: Record<string, FigureColour> = {}

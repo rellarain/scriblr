@@ -1,6 +1,6 @@
 import type { ReactNode } from 'react'
 import type { ModelContent, ModelLayer, ModelPointMode, ModelShape, ModelView } from '../../../../api/types'
-import { BodyIcon, BookmarkIcon, BucketIcon, CardIcon, PathIcon, PlusIcon, SlidersIcon, StackIcon, TrashIcon, TreeIcon, UndoIcon } from '../../../icons'
+import { BodyIcon, BookmarkIcon, BucketIcon, CardIcon, ListIcon, PathIcon, PlusIcon, SlidersIcon, StackIcon, TrashIcon, TreeIcon, UndoIcon } from '../../../icons'
 import { ClassPanel, FollowPanel, type ClassActions } from './ClassPanel'
 import { LinksPanel, PairPanel, ViewPanel } from './PairPanels'
 import { Stepper } from './Stepper'
@@ -17,13 +17,14 @@ import { templateBox } from './engine/templates'
 import { LAYERS, NAME_MAX, groupById, groupOfObject, objectById, objectOfShape } from './modelContent'
 
 // The inspector: tabs for what the selection is and its shape's settings (Shape), how its group hangs and is fixed in the rig (Rig), the model's sliders
-// (Ranges), the forms of an object (Forms), the presets of the model (Presets), its colours (Colour), its skeleton and the span writers may choose
+// (Ranges), the authored fields of a feature (Fields), the forms of an object (Forms), the presets of the model (Presets), its colours (Colour), its skeleton and the span writers may choose
 // (Proportions) and its frames (Frames). It is a drawer the canvas can fold away.
-export type InspectorTab = 'shape' | 'rig' | 'ranges' | 'forms' | 'presets' | 'colour' | 'proportions' | 'frames'
+export type InspectorTab = 'shape' | 'rig' | 'ranges' | 'fields' | 'forms' | 'presets' | 'colour' | 'proportions' | 'frames'
 const TABS: Array<{ id: InspectorTab; name: string; Icon: typeof PathIcon }> = [
   { id: 'shape', name: 'Shape', Icon: PathIcon },
   { id: 'rig', name: 'Rig', Icon: TreeIcon },
   { id: 'ranges', name: 'Ranges', Icon: SlidersIcon },
+  { id: 'fields', name: 'Fields', Icon: ListIcon },
   { id: 'forms', name: 'Forms', Icon: StackIcon },
   { id: 'presets', name: 'Presets', Icon: BookmarkIcon },
   { id: 'colour', name: 'Colour', Icon: BucketIcon },
@@ -43,6 +44,7 @@ export interface InspectorProps {
   // What the Rig, Ranges, Forms, Presets, Colour, Proportions and Frames tabs show (the page builds them: they need its actions).
   rigTab: ReactNode
   rangesTab: ReactNode
+  fieldsTab: ReactNode
   formsTab: ReactNode
   presetsTab: ReactNode
   colourTab: ReactNode
@@ -94,7 +96,7 @@ export function Inspector(p: InspectorProps) {
         ))}
       </div>
       <div id="cm-tabpanel" role="tabpanel" aria-labelledby={`cm-tab-${tab}`} className="cmTabPanel">
-        {tab === 'shape' ? <ShapeTab {...p} /> : tab === 'rig' ? p.rigTab : tab === 'ranges' ? p.rangesTab : tab === 'forms' ? p.formsTab : tab === 'presets' ? p.presetsTab : tab === 'colour' ? p.colourTab : tab === 'proportions' ? p.proportionsTab : p.framesTab}
+        {tab === 'shape' ? <ShapeTab {...p} /> : tab === 'rig' ? p.rigTab : tab === 'ranges' ? p.rangesTab : tab === 'fields' ? p.fieldsTab : tab === 'forms' ? p.formsTab : tab === 'presets' ? p.presetsTab : tab === 'colour' ? p.colourTab : tab === 'proportions' ? p.proportionsTab : p.framesTab}
       </div>
     </div>
   )

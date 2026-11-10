@@ -1,6 +1,8 @@
 import type { ModelAnchorKind, ModelAttach, ModelContent, ModelDrive, ModelGroup, ModelMove, ModelRange, ModelScaleAxis, ModelShape } from '../../../../../api/types'
+import { withoutRanges } from '../modelContent'
 import { boxOf, build, clamp, flatten, inverse, apply, r2 } from './geometry'
 import { LIMITS } from './limits'
+import { PROPS, type PropKey } from './props'
 import { anchorFrom, chainDepth, chainOf, defaultValues, descendantsOf, restPivot, solveAtRest, subtreeHeight, type Solved } from './rig'
 
 // The pure operations the Rig and Ranges tabs make on a model's content: hanging groups from each other, fixing them to a shape, setting pivots, and
@@ -131,15 +133,7 @@ export function addRange(c: ModelContent, r: ModelRange): Edit {
 export function removeRange(c: ModelContent, id: string): Edit {
   const user = c.groups.find(g => g.attach?.kind === 'range' && g.attach.slider === id)
   if (user) return fail(`Group ${label(user.name, user.id)} is anchored along this slider. Change its anchor first.`)
-  return done({
-    ...c,
-    ranges: c.ranges.filter(r => r.id !== id),
-    shapes: c.shapes.map(s => (s.loose === id || s.opBy?.slider === id ? { ...s, loose: s.loose === id ? null : s.loose, opBy: s.opBy?.slider === id ? null : s.opBy } : s)),
-    presets: (c.presets ?? []).map(p => (id in p.values ? { ...p, values: Object.fromEntries(Object.entries(p.values).filter(([k]) => k !== id)) } : p)),
-    // and the options of group states
-    groups: c.groups.map(g => (g.states?.some(st => st.options.some(o => id in o.values))
-      ? { ...g, states: g.states.map(st => ({ ...st, options: st.options.map(o => (id in o.values ? { ...o, values: Object.fromEntries(Object.entries(o.values).filter(([k]) => k !== id)) } : o)) })) } : g)),
-  })
+  return done(withoutRanges(c, new Set([id])))
 }
 
 export const renameRange = (c: ModelContent, id: string, name: string): ModelContent => mapRange(c, id, r => ({ ...r, name }))
@@ -256,7 +250,8 @@ const mapDrive = (c: ModelContent, rangeId: string, index: number, change: (d: M
 export function stepDrive(c: ModelContent, rangeId: string, index: number, field: 'atMin' | 'atMax', dir: -1 | 1, big = false): ModelContent {
   return mapDrive(c, rangeId, index, d => {
     const next = d[field] + dir * (big ? 5 : 1)
-    return { ...d, [field]: percentOf(d.kind) ? clamp(next, 5, 1000) : fallOf(d.kind) ? clamp(next, 0, 100) : clamp(next, -360, 360) }
+    const prop = d.kind === 'prop' && d.prop && d.prop in PROPS ? PROPS[d.prop as PropKey] : undefined
+    return { ...d, [field]: prop ? clamp(next, prop.lo, prop.hi) : percentOf(d.kind) ? clamp(next, 5, 1000) : fallOf(d.kind) ? clamp(next, 0, 100) : clamp(next, -360, 360) }
   })
 }
 // A Length drive lengthens another bone.

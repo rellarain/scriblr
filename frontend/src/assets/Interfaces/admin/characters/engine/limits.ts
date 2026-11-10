@@ -39,6 +39,11 @@ export const LIMITS = {
   statesMax: 8,
   stateOptionsWarn: 8,
   stateOptionsMax: 24,
+  // authored fields (phase D3c): fieldsets per model, sliders (fields) per fieldset (the stops are the server's max_lengths)
+  fieldsetsWarn: 12,
+  fieldsetsMax: 24,
+  fieldsWarn: 6,
+  fieldsMax: 12,
   // colour: genre tags per model, colour slots per model, default colours per slot, swatches of the starter palette (the stops are the server's max_lengths)
   genresWarn: 8,
   genresMax: 12,
@@ -125,6 +130,9 @@ export function limitNotes(content: ModelContent): LimitNote[] {
     add(level(states.length, LIMITS.statesWarn, LIMITS.statesMax), `${name} has ${states.length} states: the warning starts above ${LIMITS.statesWarn}.`, `${name} has ${states.length} states: the limit is ${LIMITS.statesMax}.`)
     for (const st of states) add(level(st.options.length, LIMITS.stateOptionsWarn, LIMITS.stateOptionsMax), `${st.name || st.id} of ${name} has ${st.options.length} options: the warning starts above ${LIMITS.stateOptionsWarn}.`, `${st.name || st.id} of ${name} has ${st.options.length} options: the limit is ${LIMITS.stateOptionsMax}.`)
   }
+  const fieldsets = content.fieldsets ?? []
+  add(level(fieldsets.length, LIMITS.fieldsetsWarn, LIMITS.fieldsetsMax), `The model has ${fieldsets.length} fieldsets: the warning starts above ${LIMITS.fieldsetsWarn}.`, `The model has ${fieldsets.length} fieldsets: the limit is ${LIMITS.fieldsetsMax}.`)
+  for (const f of fieldsets) add(level(f.ranges.length, LIMITS.fieldsWarn, LIMITS.fieldsMax), `${f.name || f.id} has ${f.ranges.length} fields: the warning starts above ${LIMITS.fieldsWarn}.`, `${f.name || f.id} has ${f.ranges.length} fields: the limit is ${LIMITS.fieldsMax}.`)
   const presets = (content.presets ?? []).length
   add(level(presets, LIMITS.presetsWarn, LIMITS.presetsMax), `The model has ${presets} presets: the warning starts above ${LIMITS.presetsWarn}.`, `The model has ${presets} presets: the limit is ${LIMITS.presetsMax}.`)
   const classes = (content.classes ?? []).length

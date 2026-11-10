@@ -1,4 +1,5 @@
 import type { ModelBlend, ModelContent, ModelGradDir } from '../../../../../api/types'
+import { mix } from '../../../writer/characters/portrait/colour'
 import { paintLayer, type Colouring, type PaintLayer } from './colour'
 import type { Solved } from './rig'
 
@@ -11,7 +12,9 @@ export interface PaintItem {
   d: string
   fill: string
   opacity: number
-  gradient: { dir: ModelGradDir; end: string } | null
+  // `reach` (percent of the way across the shape the second colour is reached at; 100 unless an authored field says otherwise) and `angle` (degrees a linear gradient is turned) are
+  // there only when they are not at rest
+  gradient: { dir: ModelGradDir; end: string; reach?: number; angle?: number } | null
   blend: ModelBlend | null
   // the outline the shape is kept inside, the outlines of the base shapes a shading shape is kept inside, and the outlines that cut a hole in it
   clipD: string | null
@@ -66,7 +69,7 @@ export const drawable = (items: PaintItem[]): PaintItem[] => items.filter(i => !
 
 // Each definition has an id of the form prefix-kind-shape. Ids of inline SVG are global to the whole page, so the prefix is the drawing's own (see PaintedPath).
 export type PaintDef =
-  | { kind: 'gradient'; id: string; dir: ModelGradDir; from: string; to: string }
+  | { kind: 'gradient'; id: string; dir: ModelGradDir; from: string; to: string; reach?: number; angle?: number }
   | { kind: 'clip'; id: string; ds: string[] }
   | { kind: 'mask'; id: string; ds: string[] }
 
@@ -79,7 +82,7 @@ export function paintDefs(items: PaintItem[], prefix: string): PaintDef[] {
   const defs: PaintDef[] = []
   for (const i of items) {
     if (i.blank) continue
-    if (i.gradient) defs.push({ kind: 'gradient', id: gradId(prefix, i.id), dir: i.gradient.dir, from: i.fill, to: i.gradient.end })
+    if (i.gradient) defs.push({ kind: 'gradient', id: gradId(prefix, i.id), dir: i.gradient.dir, from: i.fill, to: i.gradient.end, ...(i.gradient.reach !== undefined ? { reach: i.gradient.reach } : {}), ...(i.gradient.angle !== undefined ? { angle: i.gradient.angle } : {}) })
     if (i.clipD) defs.push({ kind: 'clip', id: clipId(prefix, i.id), ds: [i.clipD] })
     if (i.compDs.length) defs.push({ kind: 'clip', id: compId(prefix, i.id), ds: i.compDs })
     if (i.cutDs.length) defs.push({ kind: 'mask', id: maskId(prefix, i.id), ds: i.cutDs })
@@ -115,6 +118,27 @@ export const GRADIENT_AXES: Record<Exclude<ModelGradDir, 'radial'>, { x1: number
   up: { x1: 0, y1: 1, x2: 0, y2: 0 },
   left: { x1: 1, y1: 0, x2: 0, y2: 0 },
   right: { x1: 0, y1: 0, x2: 1, y2: 0 },
+}
+
+// The two ends of a linear gradient turned by `angle` degrees about the middle of the shape's box (the direction is turned in the box's own units, so a long thin shape
+// turns its gradient as the box is turned).
+export function gradientAxis(dir: Exclude<ModelGradDir, 'radial'>, angle = 0): { x1: number; y1: number; x2: number; y2: number } {
+  if (!angle) return GRADIENT_AXES[dir]
+  // turned, the axis has to run through the middle of the box, which the plain ones (along an edge) do not
+  const base = GRADIENT_AXES[dir], a = dir === 'down' || dir === 'up' ? { ...base, x1: 0.5, x2: 0.5 } : { ...base, y1: 0.5, y2: 0.5 }
+  const t = (angle * Math.PI) / 180, c = Math.cos(t), s = Math.sin(t)
+  const turn = (x: number, y: number): [number, number] => [0.5 + (x - 0.5) * c - (y - 0.5) * s, 0.5 + (x - 0.5) * s + (y - 0.5) * c]
+  const [x1, y1] = turn(a.x1, a.y1), [x2, y2] = turn(a.x2, a.y2)
+  return { x1, y1, x2, y2 }
+}
+
+// The stops of a gradient from one colour to another, the second reached `reach` percent of the way across the shape (100: at its far side). Past 100 the gradient has only
+// got part of the way there at the far side, so the last stop is a mix; at 0 the shape is the second colour throughout.
+export function gradientStops(from: string, to: string, reach = 100): Array<{ offset: number; colour: string }> {
+  const r = Math.max(0, reach) / 100
+  if (r > 1) return [{ offset: 0, colour: from }, { offset: 1, colour: mix(from, to, 1 / r) }]
+  if (r >= 0.999) return [{ offset: 0, colour: from }, { offset: 1, colour: to }]
+  return [{ offset: 0, colour: from }, { offset: r, colour: to }, { offset: 1, colour: to }]
 }
 
 // The region a mask covers: wide enough for any outline a model can have, after its scale.

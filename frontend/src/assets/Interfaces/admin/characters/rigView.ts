@@ -1,6 +1,7 @@
 import type { ModelContent, ModelDrive, ModelGroup, ModelRange } from '../../../../api/types'
 import { groupById, groupOfObject, objectById, objectOfShape } from './modelContent'
 import type { Selection } from './designerState'
+import { PROPS, type PropKey } from './engine/props'
 import { valueOf, type Values } from './engine/rig'
 
 // What the Rig and Ranges tabs say about the selection, in plain words. Pure, so it is tested without the page.
@@ -14,7 +15,7 @@ export function groupOfSelection(c: ModelContent, sel: Selection): ModelGroup | 
 }
 
 // Every id the selection stands for: itself, what is under it, and what it is in.
-function related(c: ModelContent, sel: Selection): Set<string> {
+export function related(c: ModelContent, sel: Selection): Set<string> {
   const ids = new Set<string>()
   const addObject = (oid: string) => { ids.add(oid); for (const sid of objectById(c, oid)?.shapes ?? []) ids.add(sid) }
   if (sel.kind === 'group') { ids.add(sel.id); for (const oid of groupById(c, sel.id)?.objects ?? []) addObject(oid) }
@@ -47,6 +48,12 @@ export function driveText(c: ModelContent, d: ModelDrive): string {
     const target = d.target === 'model' ? 'the whole model' : d.target === 'group' ? named(groupById(c, d.id ?? '')?.name, d.id) : named(c.shapes.find(s => s.id === d.id)?.name, d.id)
     const axis = d.axis === 'x' ? ' across' : d.axis === 'y' ? ' up and down' : ''
     return `Scales ${target}${axis} to ${d.atMin}% at the minimum and ${d.atMax}% at the maximum`
+  }
+  if (d.kind === 'prop') {
+    const spec = d.prop && d.prop in PROPS ? PROPS[d.prop as PropKey] : undefined
+    const what = d.feature === 'object' ? `the object ${named(c.objects.find(o => o.id === d.id)?.name, d.id)}` : `${d.feature === 'point' ? `point ${(d.i ?? 0) + 1} of ` : d.feature === 'edge' ? `edge ${(d.i ?? 0) + 1} of ` : ''}${named(c.shapes.find(s => s.id === d.shape)?.name, d.shape)}`
+    const u = spec?.unit ?? ''
+    return `Sets ${(spec?.label ?? 'a property').toLowerCase()} of ${what} to ${d.atMin}${u} at the minimum and ${d.atMax}${u} at the maximum`
   }
   if (d.kind === 'length') return `Lengthens ${named((c.bones ?? []).find(b => b.id === d.id)?.name, d.id)} to ${d.atMin}% of its length at the minimum and ${d.atMax}% at the maximum`
   const shape = named(c.shapes.find(s => s.id === d.shape)?.name, d.shape)

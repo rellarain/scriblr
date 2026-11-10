@@ -3,6 +3,7 @@ import { IDENTITY, apply, bezierAt, boxOf, build, clamp, edgeAt, flatten, invers
 import { classKey, classesOf, membersOf, overrideFor, type Choices } from './forms'
 import { applyFall, hangDirection, squeezeOf } from './fall'
 import { drawOrder } from './order'
+import { PROPS, isPaintProp, type PropKey } from './props'
 
 // The rig: groups hang from parent groups, are fixed to a shape of the parent by an anchor and turn about a pivot, and sliders (ranges) drive them.
 // `solve` turns a model and the slider values into the place and outline of every shape. Ported from the mockup's `M.solve` (docs/mannequin-mockup/
@@ -46,12 +47,19 @@ export function amount(r: ModelRange, d: ModelDrive, v: number, base = 0): numbe
 }
 
 // The sliders that change a shape's own points (a recorded move, a bend, a scale of the shape), as opposed to turning or scaling its group.
-export const drivesShapePoints = (d: ModelDrive, shapeId: string): boolean =>
+// What an authored field's slider (a `prop` drive, phase D3c) does to the points of a shape: a position, a size, a rotation, a point, an edge. Opacity and paint do not.
+const movesPoints = (d: ModelDrive): boolean => d.kind === 'prop' && !!d.prop && !isPaintProp(d.prop) && d.prop !== 'opacity'
+export const drivesShapePoints = (d: ModelDrive, shapeId: string, objectId?: string): boolean =>
   (d.kind === 'points' && d.shape === shapeId) || (d.kind === 'bend' && d.shape === shapeId) || (d.kind === 'fall' && d.shape === shapeId) || (d.kind === 'scale' && d.target === 'shape' && d.id === shapeId)
+  || (movesPoints(d) && (d.feature === 'object' ? !!objectId && d.id === objectId : d.shape === shapeId))
 
 export function pointDrivers(c: ModelContent, shapeId: string): ModelRange[] {
-  return c.ranges.filter(r => r.drives.some(d => drivesShapePoints(d, shapeId)))
+  const objectId = c.objects.find(o => o.shapes.includes(shapeId))?.id
+  return c.ranges.filter(r => r.drives.some(d => drivesShapePoints(d, shapeId, objectId)))
 }
+
+// What a prop drive comes to at a slider value: the amount at rest is the property's own (0 for a move, 100 percent for a size).
+export const propAmount = (r: ModelRange, d: ModelDrive, v: number): number => amount(r, d, v, d.prop && d.prop in PROPS ? PROPS[d.prop as PropKey].rest : 0)
 
 // Whether a slider that changes this shape's points is away from rest, so the points on the canvas are not the ones that were drawn.
 export function isPointDriven(c: ModelContent, values: Values, shapeId: string): boolean {
@@ -319,14 +327,60 @@ export function solve(c: ModelContent, values: Values = {}, view: View = 'front'
   // is being solved is not asked for again, so a circle of anchors or links cannot loop: it is cut where it closes.
   const busyGroups = new Set<string>(), busyShapes = new Set<string>()
 
-  // what the sliders do to a list of points (a recorded move, a bend, a scale of the shape); `own` is the shape's own outline, which the moves were recorded on
+  // The place, size and turn authored fields give a whole shape or a whole object (phase D3c), added up over every field that changes it; the middle they are about is the
+  // shape's own, or the object's at rest. The matrix is a scale, then a turn, then a move, whatever order the sliders are in.
+  interface Wholly { dx: number; dy: number; sx: number; sy: number; turn: number; any: boolean }
+  const noChange = (): Wholly => ({ dx: 0, dy: 0, sx: 1, sy: 1, turn: 0, any: false })
+  function applyWholly(list: ModelPoint[], w: Wholly, about: [number, number]) {
+    if (!w.any) return
+    const m = mul(translate(w.dx, w.dy), mul(rotate(w.turn, about[0], about[1]), scale(w.sx, w.sy, about[0], about[1])))
+    if (!finiteMat(m)) return
+    for (const p of list) {
+      const a = apply(m, p.x, p.y)
+      p.x = a[0]; p.y = a[1]
+      if (p.hi) p.hi = [m[0] * p.hi[0] + m[2] * p.hi[1], m[1] * p.hi[0] + m[3] * p.hi[1]]
+      if (p.ho) p.ho = [m[0] * p.ho[0] + m[2] * p.ho[1], m[1] * p.ho[0] + m[3] * p.ho[1]]
+    }
+  }
+  const addWholly = (w: Wholly, prop: string | null | undefined, a: number) => {
+    if (prop === 'x') w.dx += a
+    else if (prop === 'y') w.dy += a
+    else if (prop === 'width') w.sx *= Math.max(0.05, a / 100)
+    else if (prop === 'height') w.sy *= Math.max(0.05, a / 100)
+    else if (prop === 'rotation') w.turn += a
+    else return
+    w.any = true
+  }
+
+  // what the sliders do to a list of points (a recorded move, a bend, a scale of the shape, an authored field); `own` is the shape's own outline, which the moves were recorded on
   function drive(sh: ModelShape, list: ModelPoint[], own: ModelPoint[], Mg: Mat) {
     if (list.length < 3) return
     let rest: [number, number] | null = null
+    const whole = noChange(), objectWhole = noChange(), ownerId = objectOfShape.get(sh.id)
     for (const r of ranges) {
       const v = val(r), { t, up } = pull(r, v)
       if (t === 0) continue
       for (const d of r.drives) {
+        if (d.kind === 'prop' && d.prop && !isPaintProp(d.prop) && d.prop !== 'opacity') {
+          const a = propAmount(r, d, v)
+          if (d.feature === 'shape' && d.shape === sh.id) addWholly(whole, d.prop, a)
+          else if (d.feature === 'object' && d.id && d.id === ownerId) addWholly(objectWhole, d.prop, a)
+          else if (d.feature === 'point' && d.shape === sh.id && list.length === own.length) {
+            const p = list[d.i ?? 0]
+            if (p && d.prop === 'x') p.x += a
+            else if (p && d.prop === 'y') p.y += a
+          } else if (d.feature === 'edge' && d.shape === sh.id && d.prop === 'offset' && list.length === own.length) {
+            // both points of the edge move along its normal, outward (away from the middle of the shape) for a positive amount
+            const i = (d.i ?? 0) % list.length, j = (i + 1) % list.length, p = list[i], q = list[j], ex = q.x - p.x, ey = q.y - p.y, len = Math.hypot(ex, ey)
+            if (len > 1e-9) {
+              const mid = centreOfPoints(own, sh.closed)
+              let nx = ey / len, ny = -ex / len
+              if (nx * ((p.x + q.x) / 2 - mid[0]) + ny * ((p.y + q.y) / 2 - mid[1]) < 0) { nx = -nx; ny = -ny }
+              p.x += nx * a; p.y += ny * a; q.x += nx * a; q.y += ny * a
+            }
+          }
+          continue
+        }
         if (d.kind === 'scale' && d.target === 'shape' && d.id === sh.id) {
           rest = rest ?? centreOfPoints(own, sh.closed)
           const f = factorOf(r, d, v), fx = d.axis === 'y' ? 1 : f, fy = d.axis === 'x' ? 1 : f
@@ -360,6 +414,11 @@ export function solve(c: ModelContent, values: Values = {}, view: View = 'front'
           }
         }
       }
+    }
+    if (whole.any || objectWhole.any) {
+      applyWholly(list, whole, centreOfPoints(own, sh.closed))
+      const o = ownerId ? objectMap.get(ownerId) : undefined
+      applyWholly(list, objectWhole, (o && objectCentre(o)) ?? centreOfPoints(own, sh.closed))
     }
     // the runs of weighted points hang, from where the other sliders have left them: toward the way things fall, which is a direction in the picture, so it is
     // read back into this shape's own space (a tilted head still lets its hair hang straight down)
@@ -491,9 +550,29 @@ export function solve(c: ModelContent, values: Values = {}, view: View = 'front'
     const followed = sh.copyOf ? shapeMap.get(sh.copyOf) : undefined
     const f = sh.opBy ?? mirrored?.opBy ?? followed?.opBy
     const r = f ? ranges.find(x => x.id === f.slider) : undefined
-    if (!f || !r) return 1
-    const span = f.shown - f.hidden
-    return Math.abs(span) < 1e-9 ? (val(r) >= f.shown ? 1 : 0) : clamp((val(r) - f.hidden) / span, 0, 1)
+    let fade = 1
+    if (f && r) {
+      const span = f.shown - f.hidden
+      fade = Math.abs(span) < 1e-9 ? (val(r) >= f.shown ? 1 : 0) : clamp((val(r) - f.hidden) / span, 0, 1)
+    }
+    return fade * opacityOf(sh, mirrored, followed)
+  }
+  // How much of its own opacity a shape keeps, from the authored fields that fade it or its object (a twin and a shape of a member go with the shape they follow).
+  const anyOpacityField = ranges.some(r => r.drives.some(d => d.kind === 'prop' && d.prop === 'opacity'))
+  function opacityOf(sh: ModelShape, ...others: Array<ModelShape | undefined>): number {
+    if (!anyOpacityField) return 1
+    const shapeIds = new Set([sh.id]), objectIds = new Set<string>()
+    for (const o of others) if (o) shapeIds.add(o.id)
+    for (const id of shapeIds) { const oid = objectOfShape.get(id); if (oid) { objectIds.add(oid); const m = objectMap.get(oid)?.mirrorOf; if (m) objectIds.add(m) } }
+    let keep = 1
+    for (const r of ranges) {
+      const v = val(r)
+      for (const d of r.drives) {
+        if (d.kind !== 'prop' || d.prop !== 'opacity') continue
+        if ((d.feature === 'shape' && d.shape && shapeIds.has(d.shape)) || (d.feature === 'object' && d.id && objectIds.has(d.id))) keep *= clamp(propAmount(r, d, v) / 100, 0, 1)
+      }
+    }
+    return keep
   }
 
   function place(sh: ModelShape, groupId: string | null, Mg: Mat) {
