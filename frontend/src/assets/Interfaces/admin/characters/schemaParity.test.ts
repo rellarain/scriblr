@@ -130,6 +130,7 @@ describe('the limits are the backend\'s numbers', () => {
     expect(LIMITS.patternsWarn).toBe(number('MODEL_PATTERNS_WARN'))
     expect(LIMITS.patternsMax).toBe(number('MODEL_PATTERNS_MAX'))
     expect(LIMITS.patternMarksMax).toBe(number('MODEL_PATTERN_MARKS_MAX'))
+    expect(LIMITS.underMax).toBe(number('MODEL_UNDER_MAX'))
   })
   it('for colour: genres, slots, default colours and the starter palette', () => {
     expect(LIMITS.genresWarn).toBe(number('MODEL_GENRES_WARN'))

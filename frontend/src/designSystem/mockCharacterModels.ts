@@ -18,6 +18,7 @@ import { classKey, formKey } from '../assets/Interfaces/admin/characters/engine/
 import { linkToEdge, makeTwin, setBack, setLoose } from '../assets/Interfaces/admin/characters/engine/pairEdit'
 import { setBlend, setGradient, toggleCut } from '../assets/Interfaces/admin/characters/engine/paintEdit'
 import { addPattern } from '../assets/Interfaces/admin/characters/engine/patterns'
+import { toggleUnder } from '../assets/Interfaces/admin/characters/engine/wear'
 import { addShading } from '../assets/Interfaces/admin/characters/engine/shadeEdit'
 import { setObjectLock, setStyleLock } from '../assets/Interfaces/admin/characters/engine/locks'
 import { restState, saveStyle, savePreset } from '../assets/Interfaces/admin/characters/engine/presets'
@@ -160,6 +161,12 @@ function riggedFigure(): ModelContent {
   c = addShape(c, 'o_shirt', { ...newShape('s_stripe1', 'Stripe 1', 'square', box(56, 100, 88, 7)), slot: 'k_cloth', tone: -1 })
   c = addShape(c, 'o_shirt', { ...newShape('s_stripe2', 'Stripe 2', 'square', box(56, 114, 88, 7)), slot: 'k_cloth', tone: -1 })
   c = must(addPattern(c, 's_shirt', ['s_stripe1', 's_stripe2'], 'Stripes', prefix => `${prefix}_stripes`))
+  // an undershirt (phase 6b), a little wider than the shirt and worn under it: it is trimmed to the shirt's outline while the shirt is on, and shows whole when an outfit takes the
+  // shirt off. It comes first in its group, so it is drawn under the shirt.
+  c = addObject(c, 'g_shirt', { id: 'o_under', name: 'Undershirt', layer: 'clothing', shapes: [] })
+  c = addShape(c, 'o_under', { ...newShape('s_under', 'Undershirt', 'rounded', box(60, 92, 80, 46)), slot: 'k_cloth', tone: 1 })
+  c = { ...c, groups: c.groups.map(g => (g.id === 'g_shirt' ? { ...g, objects: ['o_under', ...g.objects.filter(id => id !== 'o_under')] } : g)) }
+  c = must(toggleUnder(c, 'o_under', 'o_shirt'))
   // a sleeve on the upper arm, short unless a form of the arm says otherwise
   c = addShape(c, 'o_arm', { ...newShape('s_sleeve', 'Sleeve', 'rounded', box(122, 88, 18, 28)), slot: 'k_cloth' })
   // (the body is painted from Skin, the shirt and sleeve from Clothing, the iris from Eye, the white of the eye a fixed white)

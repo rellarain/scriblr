@@ -3,6 +3,7 @@ import { IDENTITY, apply } from './geometry'
 import { isUsed } from './paintEdit'
 import { boneAtRest, defaultValues, solve, solveAtRest } from './rig'
 import { fitOf } from './fitEdit'
+import { wearsRoundInACircle } from './wear'
 import { hangs, weightOf } from './fall'
 import { paintOrigin } from './colour'
 import { PROPS, type PropKey } from './props'
@@ -48,6 +49,16 @@ export function rigCheck(c: ModelContent): CheckLine[] {
 
 // What is worth knowing about paint effects (phase 4b), as plain information: a helper shape that nothing clips to or is cut by is never drawn and does nothing, and a
 // shading shape in an object with no base shape to lie on is not drawn either.
+// What objects are worn under (phase 6b): two garments that are each worn under the other (or a longer circle) trim each other to nothing much.
+export function wearCheck(c: ModelContent): CheckLine[] {
+  const lines: CheckLine[] = []
+  for (const o of c.objects) {
+    if (lines.length >= MOST_LINES) break
+    if (wearsRoundInACircle(c, o)) lines.push({ level: 'warn', text: `${o.name || o.id} is worn under something that is worn under it: they trim each other.` })
+  }
+  return lines
+}
+
 export function paintCheck(c: ModelContent): CheckLine[] {
   const lines: CheckLine[] = []
   const say = (text: string) => { if (lines.length < MOST_LINES) lines.push({ level: 'info', text }) }

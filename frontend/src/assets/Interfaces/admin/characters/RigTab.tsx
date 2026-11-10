@@ -3,10 +3,11 @@ import { LIMITS } from './engine/limits'
 import { chainDepth, chainOf, descendantsOf } from './engine/rig'
 import { groupOfShape } from './engine/rigEdit'
 import { FitSection } from './FitSection'
+import { WearSection } from './WearSection'
 import { HandSection } from './HandSection'
 import { PairPanel } from './PairPanels'
 import { Stepper } from './Stepper'
-import type { FitActions, HandActions, PairActions, RigActions } from './rigActions'
+import type { FitActions, HandActions, PairActions, RigActions, WearActions } from './rigActions'
 import { outlineSize } from './modelContent'
 import { rangesMovingGroup } from './rigView'
 
@@ -22,7 +23,7 @@ const KINDS: Array<{ id: ModelAnchorKind | 'none'; name: string; hint: string }>
 const name = (g: { name: string; id: string }) => g.name.trim() || 'Untitled group'
 const f1 = (n: number) => Math.round(n * 10) / 10
 
-export function RigTab({ content, group, object, picking, fitPicking, actions, pairs, fit, hands, held }: {
+export function RigTab({ content, group, object, picking, fitPicking, actions, pairs, fit, wear, hands, held }: {
   content: ModelContent
   group: ModelGroup | undefined
   // The selected object (or the object of the selected shape), whose fit to the body is chosen here.
@@ -32,6 +33,7 @@ export function RigTab({ content, group, object, picking, fitPicking, actions, p
   actions: RigActions
   pairs: PairActions
   fit: FitActions
+  wear: WearActions
   hands: HandActions
   // The grip point shown as held now.
   held: string | null
@@ -101,6 +103,7 @@ export function RigTab({ content, group, object, picking, fitPicking, actions, p
       </section>
       <PairPanel content={content} kind="group" id={group.id} actions={pairs} />
       <FitSection content={content} object={object} picking={fitPicking} actions={fit} />
+      <WearSection content={content} object={object} actions={wear} />
       <HandSection content={content} group={group} held={held} actions={hands} />
       {group.mirrorOf ? null : <>
 

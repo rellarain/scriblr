@@ -172,6 +172,15 @@ A **fill pattern** is built from shapes, then applied to a base shape: the **mar
 - A shape is **a base or a mark, not both**, so marks never clip to each other in a circle. A twin follows the mark it mirrors (clipped to the twin of the base, switched off with it); breaking the pair keeps the clip. Deleting the base deletes the pattern; deleting a mark takes it out; deleting the last mark deletes the pattern.
 - Hiding a pattern's id is how it is switched off, so `hidden` in a preset or a group option may name patterns as well as objects, groups and shapes.
 
+### Worn under (phase 6b)
+
+A garment can be **worn under** others, so a shirt never shows outside a jacket and underwear never shows outside the clothes. It is set **in the Rig tab, for the selected object** (the *Worn under* section, `WearSection.tsx`): the other clothing objects (the *Clothing* layer, not twins or class members) and the families whose template is clothing are chips (*Jacket*, *Coats (family)*; press to put it under, press again to take it out). Nothing else about the object changes.
+
+- **What is drawn.** While any of what it is worn under is **shown**, every shape of the garment (a shading shape too; a helper is never drawn) is **trimmed to the union of their outlines**: the shapes' own outlines, ignoring their cut-outs, so an open neckline still shows what is under it. With none of them shown (switched off, hidden by a preset, a group state or a frame, or by a form) nothing is trimmed and the garment is drawn whole. A family counts through whichever of its members is shown. All the shapes of an object share one SVG clip (`-w-<object>`), in a group around the path (and around a shading shape's own group).
+- **Twins and members.** A twin object is worn under what its original is, each on its own side (a left sleeve under the left sleeve of the jacket); breaking the pair keeps the list. A member of a class that names nothing follows the template's list, and keeps it when it is detached; naming a garment gives it a list of its own.
+- **Refusals and checks.** A garment cannot be worn under itself, under something that is worn under it already (each would trim the other), or under more than 24 things; a twin is changed on its original. A list that names something that is gone is refused at Publish (*Object Shirt is worn under something that does not exist*; deleting an object or a family takes it out of the lists), and two garments that are each worn under the other (by an imported file) get a line in the Checks.
+- It shows in the canvas, the previews, the pictures of forms and every figure a writer sees, because they all draw through the same items.
+
 ## Proportions
 
 Since phase 5a a model has a **skeleton of measured lengths** and says how far a writer may change each proportion. The **Proportions** tab (the body icon) holds both; the Rig tab says how an object fits the body, and the Ranges tab has the Length slider.
@@ -280,6 +289,7 @@ The hand among the Designer tools (**Pose mode**, `aria-pressed`) lets the figur
 | Fill patterns in a model | 12 | 24 |
 | Marks of a fill pattern | | 72 |
 | Radius of rounded corners | | 20 |
+| Garments or families one object is worn under | | 24 |
 
 The frontend numbers (`engine/limits.ts`) and the backend's (`schema.py`) are held equal by `schemaParity.test.ts`.
 
@@ -307,6 +317,8 @@ A published model is what the Characters console offers under *Make a mannequin*
 - Don't recolour the selected shape to show it is selected: the selection is a ring, in the accent colour (and a shape has no outline of its own to recolour).
 - Don't tile a fill pattern or set its size or angle: a pattern is shapes drawn by hand, kept inside a base; draw one more mark.
 - Don't make a mark the base of another pattern, or a base a mark: a shape is one or the other.
+- Don't trim a shirt to a jacket by clipping each of its shapes by hand: put the object under the jacket, and the trim follows whatever is shown.
+- Don't wear two garments under each other: each would trim the other.
 - Don't round a corner by drawing the curve points yourself when the shape only needs softening: set its corner roundness (the points stay where they were drawn).
 - Don't make a field for what a slider already drives (a turn, a scale, a bend, recorded points, a length): add the drive to that slider. A field is for one property of one feature, and its amounts are the property's.
 - Don't give a field to a twin: give it to the original, which the twin follows.

@@ -40,7 +40,7 @@ export function normalizeContent(c: ModelContent): ModelContent {
     name: clean(c.name, NAME_MAX),
     description: clean(c.description, DESCRIPTION_MAX),
     shapes: c.shapes.map(s => ({ ...s, name: clean(s.name, NAME_MAX), mirrorOf: s.mirrorOf ?? null, back: s.back ?? null, zBack: s.zBack ?? null, loose: s.loose ?? null, copyOf: s.copyOf ?? null, hide: s.hide === true, slot: s.slot ?? null, gray: s.gray ?? null, ...paintFields(s) })),
-    objects: c.objects.map(o => ({ ...o, name: clean(o.name, NAME_MAX), mirrorOf: o.mirrorOf ?? null, classOf: o.classOf ?? null, ...fitFields(o), hsl: repairHsl(o.hsl), axes: (o.axes ?? []).map(a => ({ ...a, name: clean(a.name, NAME_MAX), options: a.options.map(f => ({ ...f, name: clean(f.name, NAME_MAX), looks: repairLooks(f.looks) })) })) })),
+    objects: c.objects.map(o => ({ ...o, name: clean(o.name, NAME_MAX), mirrorOf: o.mirrorOf ?? null, classOf: o.classOf ?? null, ...fitFields(o), under: [...new Set(o.under ?? [])].slice(0, LIMITS.underMax), hsl: repairHsl(o.hsl), axes: (o.axes ?? []).map(a => ({ ...a, name: clean(a.name, NAME_MAX), options: a.options.map(f => ({ ...f, name: clean(f.name, NAME_MAX), looks: repairLooks(f.looks) })) })) })),
     groups: c.groups.map(g => ({ ...g, name: clean(g.name, NAME_MAX), pivot: g.pivot ?? null, attach: g.attach ?? null, mirrorOf: g.mirrorOf ?? null, states: repairStates(g.states) })),
     axis: c.axis ?? 100,
     ranges: (c.ranges ?? []).map(repairRange),
@@ -420,6 +420,8 @@ function removeAll(c: ModelContent, gone: { shapes: Set<string>; objects: Set<st
     }),
     objects: c.objects.filter(o => !gone.objects.has(o.id)).map(o => ({
       ...o, shapes: o.shapes.filter(sid => !gone.shapes.has(sid)), classOf: o.classOf && deadClasses.has(o.classOf) ? null : o.classOf,
+      // what it was worn under that is gone no longer is
+      ...((o.under ?? []).some(t => gone.objects.has(t) || deadClasses.has(t)) ? { under: (o.under ?? []).filter(t => !gone.objects.has(t) && !deadClasses.has(t)) } : {}),
       ...(o.fitTo && gone.shapes.has(o.fitTo) ? { fit: 'scale' as const, fitTo: null } : {}),
       axes: (o.axes ?? []).map(a => ({ ...a, options: a.options.map(f => forgetShapes(f, gone.shapes)) })),
     })),
@@ -845,6 +847,19 @@ function proportionFaults(c: ModelContent): string[] {
 
 // Patterns (the server's _pattern_faults says the same words): a base or a mark that is not there or is a twin (a pattern is made on the originals, and the twins follow), and a mark that
 // is the base itself.
+// What an object is worn under (phase 6b): something that is no object or class, or the object itself (the server's _wear_faults says the same words).
+function wearFaults(c: ModelContent): string[] {
+  const faults: string[] = []
+  const objects = new Set(c.objects.map(o => o.id)), classes = new Set((c.classes ?? []).map(k => k.id))
+  for (const o of c.objects) {
+    for (const t of o.under ?? []) {
+      if (t === o.id) faults.push(`Object ${label(o.name, o.id)} is worn under itself.`)
+      else if (!objects.has(t) && !classes.has(t)) faults.push(`Object ${label(o.name, o.id)} is worn under something that does not exist.`)
+    }
+  }
+  return faults
+}
+
 function patternFaults(c: ModelContent): string[] {
   const faults: string[] = []
   const shapes = new Map(c.shapes.map(s => [s.id, s]))
@@ -895,6 +910,7 @@ export function publishFaults(c: ModelContent): string[] {
   faults.push(...stateFaults(c))
   faults.push(...fieldFaults(c))
   faults.push(...patternFaults(c))
+  faults.push(...wearFaults(c))
   faults.push(...colourFaults(c))
   faults.push(...paintFaults(c))
   faults.push(...proportionFaults(c))

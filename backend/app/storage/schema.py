@@ -1230,6 +1230,7 @@ MODEL_ROUND_MAX = 20     # corner roundness (phase D4): the radius, in the model
 MODEL_PATTERNS_WARN = 12   # patterns (phase D4): per model, marks per pattern
 MODEL_PATTERNS_MAX = 24
 MODEL_PATTERN_MARKS_MAX = 72   # as many as an object has shapes
+MODEL_UNDER_MAX = 24           # the garments or families one object is worn under
 MODEL_GENRES_WARN = 8   # colour (phase 4): genre tags per model, colour slots per model, default colours per slot, swatches of the starter palette
 MODEL_GENRES_MAX = 12
 MODEL_SLOTS_WARN = 16
@@ -2121,6 +2122,21 @@ class ModelObject(BaseModel):
     # own size (`keep`), or is stretched to follow the box of the shape `fitTo` (`stretch`). Only the drawing changes: anchors and links read the outline as it is.
     fit: ModelFit = "scale"
     fitTo: Optional[str] = None
+    # What the object is worn under (phase 6b): ids of objects or classes (families) whose outlines trim it, so a shirt does not show outside a jacket and underwear does not show outside
+    # the clothes. Nothing is trimmed while none of them is shown. A twin follows its original, and a member of a class that has none of its own follows the class's template.
+    under: list[str] = Field(default_factory=list, max_length=MODEL_UNDER_MAX)
+
+    @field_validator("under", mode="before")
+    @classmethod
+    def _under(cls, value: Any) -> list[str]:
+        if not isinstance(value, list):
+            return []
+        out: list[str] = []
+        for v in value:
+            ident = _optional_id(v)
+            if ident is not None and ident not in out:
+                out.append(ident)
+        return out
 
     @field_validator("hsl", mode="before")
     @classmethod

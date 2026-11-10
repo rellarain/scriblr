@@ -502,6 +502,20 @@ def _pattern_faults(content: ModelContent) -> list[str]:
     return faults
 
 
+def _wear_faults(content: ModelContent) -> list[str]:
+    """What an object is worn under (phase 6b; the frontend's wearFaults says the same words): something that is not an object or a class, or the object itself."""
+    faults: list[str] = []
+    objects = {o.id for o in content.objects}
+    classes = {k.id for k in content.classes}
+    for o in content.objects:
+        for target in o.under:
+            if target == o.id:
+                faults.append(f"Object {_label(o.name, o.id)} is worn under itself.")
+            elif target not in objects and target not in classes:
+                faults.append(f"Object {_label(o.name, o.id)} is worn under something that does not exist.")
+    return faults
+
+
 def _colour_faults(content: ModelContent) -> list[str]:
     """What is wrong with the colour of a model (the frontend's colourFaults says the same words)."""
     faults: list[str] = []
@@ -664,6 +678,7 @@ def publish_faults(content: ModelContent) -> list[str]:
     faults.extend(_state_faults(content))
     faults.extend(_field_faults(content))
     faults.extend(_pattern_faults(content))
+    faults.extend(_wear_faults(content))
     faults.extend(_colour_faults(content))
     faults.extend(_paint_faults(content))
     faults.extend(_proportion_faults(content))

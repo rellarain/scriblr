@@ -238,7 +238,8 @@ function object(v: Record<string, unknown>, id: string): ModelObject {
   return {
     id, name: text(v.name), layer: v.layer === 'clothing' || v.layer === 'hair' ? v.layer : 'body', shapes: list(v.shapes).filter((x): x is string => typeof x === 'string'),
     mirrorOf: idOrNull(v.mirrorOf), classOf: idOrNull(v.classOf), axes: withIds(list(v.axes), axis),
-    fit: v.fit === 'keep' || v.fit === 'stretch' ? v.fit : 'scale', fitTo: v.fit === 'stretch' ? idOrNull(v.fitTo) : null, hsl: lockMap(v.hsl),
+    fit: v.fit === 'keep' || v.fit === 'stretch' ? v.fit : 'scale', fitTo: v.fit === 'stretch' ? idOrNull(v.fitTo) : null,
+    under: [...new Set(list(v.under).map(idOf).filter((x): x is string => x !== null))].slice(0, LIMITS.underMax), hsl: lockMap(v.hsl),
   }
 }
 

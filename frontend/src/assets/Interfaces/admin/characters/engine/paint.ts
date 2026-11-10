@@ -2,6 +2,7 @@ import type { ModelBlend, ModelContent, ModelGradDir } from '../../../../../api/
 import { mix } from '../../../writer/characters/portrait/colour'
 import { paintLayer, type Colouring, type PaintLayer } from './colour'
 import type { Solved } from './rig'
+import { coveringObjects } from './wear'
 
 // Painting a solved model (phase 4b): what each shape is drawn with, and the SVG definitions (gradients, clip paths, masks) that the effects need. Pure: the
 // canvas, the preview tiles and the pictures of forms all draw from the same items, so they cannot disagree. The solver gives each shape's outline as path text in
@@ -22,6 +23,9 @@ export interface PaintItem {
   cutDs: string[]
   helper: boolean
   shading: boolean
+  // what the object it belongs to is worn under (phase 6b): the outlines of the garments over it that are shown, which it is trimmed to; `key` is the object, so its shapes share one
+  // clip. Null when the object is worn under nothing or none of it is shown.
+  wear: { key: string; ds: string[] } | null
   // something it must be kept inside is not there (a clip to a shape a form hides, a shading shape with no base shape to lie on): nothing is drawn
   blank: boolean
 }
@@ -40,6 +44,27 @@ export function paintShapes(c: ModelContent, solved: Solved, colouring: Colourin
     return made
   }
   const outline = (id: string | null): string => (id ? solved.shapes[id]?.d ?? '' : '')
+  // the garments a shape's object is worn under (only worked out when some object is worn under anything)
+  const anyWear = c.objects.some(o => (o.under ?? []).length > 0)
+  const ownerOf = new Map<string, string>()
+  if (anyWear) for (const o of c.objects) for (const sid of o.shapes) if (!ownerOf.has(sid)) ownerOf.set(sid, o.id)
+  const objects = new Map(c.objects.map(o => [o.id, o]))
+  const wears = new Map<string, { key: string; ds: string[] } | null>()
+  const wearOf = (shapeId: string): { key: string; ds: string[] } | null => {
+    const oid = ownerOf.get(shapeId), o = oid ? objects.get(oid) : undefined
+    if (!o) return null
+    if (wears.has(o.id)) return wears.get(o.id)!
+    const ds: string[] = []
+    for (const t of coveringObjects(c, o)) {
+      for (const sid of t.shapes) {
+        const r = solved.shapes[sid], b = layerOf(sid)
+        if (r?.visible && r.d && b && !b.helper && !b.shading) ds.push(r.d)
+      }
+    }
+    const made = ds.length > 0 ? { key: o.id, ds } : null
+    wears.set(o.id, made)
+    return made
+  }
   const items: PaintItem[] = []
   for (const id of ids) {
     const r = solved.shapes[id], layer = layerOf(id)
@@ -55,7 +80,7 @@ export function paintShapes(c: ModelContent, solved: Solved, colouring: Colourin
     }
     const cutDs = layer.cuts.map(outline).filter(Boolean)
     items.push({
-      id, d: r.d, fill: layer.fill, opacity: layer.opacity * (r.fade ?? 1), gradient: layer.gradient, blend: layer.blend, clipD: clipD || null, compDs, cutDs, helper: layer.helper, shading: layer.shading,
+      id, d: r.d, fill: layer.fill, opacity: layer.opacity * (r.fade ?? 1), gradient: layer.gradient, blend: layer.blend, clipD: clipD || null, compDs, cutDs, helper: layer.helper, shading: layer.shading, wear: anyWear && !layer.helper ? wearOf(id) : null,
       blank: (!!layer.clip && !clipD) || (layer.shading && compDs.length === 0),
     })
   }
@@ -77,11 +102,14 @@ const gradId = (prefix: string, id: string) => `${prefix}-g-${id}`
 const clipId = (prefix: string, id: string) => `${prefix}-k-${id}`
 const compId = (prefix: string, id: string) => `${prefix}-c-${id}`
 const maskId = (prefix: string, id: string) => `${prefix}-m-${id}`
+const wearId = (prefix: string, key: string) => `${prefix}-w-${key}`
 
 export function paintDefs(items: PaintItem[], prefix: string): PaintDef[] {
   const defs: PaintDef[] = []
+  const worn = new Set<string>()
   for (const i of items) {
     if (i.blank) continue
+    if (i.wear && !worn.has(i.wear.key)) { worn.add(i.wear.key); defs.push({ kind: 'clip', id: wearId(prefix, i.wear.key), ds: i.wear.ds }) }
     if (i.gradient) defs.push({ kind: 'gradient', id: gradId(prefix, i.id), dir: i.gradient.dir, from: i.fill, to: i.gradient.end, ...(i.gradient.reach !== undefined ? { reach: i.gradient.reach } : {}), ...(i.gradient.angle !== undefined ? { angle: i.gradient.angle } : {}) })
     if (i.clipD) defs.push({ kind: 'clip', id: clipId(prefix, i.id), ds: [i.clipD] })
     if (i.compDs.length) defs.push({ kind: 'clip', id: compId(prefix, i.id), ds: i.compDs })
@@ -96,6 +124,8 @@ export interface PaintAttrs {
   clip?: string
   // the group around the path that keeps a shading shape inside the base shapes of its object
   comp?: string
+  // the group around all of that, for a garment worn under others: it is drawn only inside their outlines
+  wear?: string
   mask?: string
   blend?: string
 }
@@ -107,6 +137,7 @@ export function paintAttrs(item: PaintItem, prefix: string): PaintAttrs {
     fill: item.gradient ? url(gradId(prefix, item.id)) : item.fill,
     clip: item.clipD ? url(clipId(prefix, item.id)) : undefined,
     comp: item.compDs.length ? url(compId(prefix, item.id)) : undefined,
+    wear: item.wear ? url(wearId(prefix, item.wear.key)) : undefined,
     mask: item.cutDs.length ? url(maskId(prefix, item.id)) : undefined,
     blend: item.blend ?? undefined,
   }

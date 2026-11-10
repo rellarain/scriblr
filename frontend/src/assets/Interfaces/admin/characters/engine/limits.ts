@@ -49,6 +49,8 @@ export const LIMITS = {
   patternsWarn: 12,
   patternsMax: 24,
   patternMarksMax: 72,
+  // the garments or families one object is worn under
+  underMax: 24,
   // colour: genre tags per model, colour slots per model, default colours per slot, swatches of the starter palette (the stops are the server's max_lengths)
   genresWarn: 8,
   genresMax: 12,

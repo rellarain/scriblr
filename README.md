@@ -432,6 +432,9 @@ described, now stale, in `docs/data-model.md`).
   pattern keeps its marks inside its base and switches them off together, by its id in a preset's or an option's
   `hidden`; at most 24 patterns, a twin is neither a base nor a mark and no shape is both). Nothing about an outline
   is stored: the canvas outline is the selection ring.
+  Phase 6b adds, with a default: on an object `under` (the ids of the objects or classes it is worn under, at most 24, each
+  once: while any is shown the object is drawn only inside their outlines; a twin follows its original, a member with
+  none its class's template).
   Phase 4a (colour) adds, with defaults: on the model `genres` (`ModelGenre`: genre tags a
   default colour may fit), `palette` (`ModelSwatch`: the starter palette, a hue 0..359 and a
   saturation 0..100 per swatch, at most 10) and `slots` (`ModelSlot`: a colour slot with a

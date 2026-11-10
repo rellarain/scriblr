@@ -111,6 +111,11 @@ export interface ProportionActions {
   openSlider: (rangeId: string) => void
 }
 
+// What the selected object is worn under (phase 6b): a garment or family put under it, or taken out from under it.
+export interface WearActions {
+  toggleUnder: (objectId: string, targetId: string) => void
+}
+
 export interface FitActions {
   setFit: (objectId: string, mode: 'scale' | 'keep' | 'stretch', fitTo?: string | null) => void
   pick: (on: boolean) => void

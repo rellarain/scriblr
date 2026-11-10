@@ -35,7 +35,8 @@ export function PaintDefs({ defs }: { defs: PaintDef[] }): ReactElement | null {
 type PathProps = Omit<SVGProps<SVGPathElement>, 'd' | 'style' | 'fillOpacity' | 'clipPath' | 'mask' | 'ref'>
 
 // One shape, painted. Its fill is the colour (or the gradient) in the `--shape-fill` variable, like the portrait's own colours, so the stylesheet can still dim or
-// ring it; a shading shape sits in a group that keeps it inside the base shapes. A thing with nothing to be kept inside is invisible but still there to be picked.
+// ring it; a shading shape sits in a group that keeps it inside the base shapes, and a garment worn under others in one that keeps it inside theirs. A thing with nothing to be kept inside
+// is invisible but still there to be picked.
 export function PaintedPath({ item, prefix, ...rest }: { item: PaintItem; prefix: string } & PathProps): ReactElement {
   const a = paintAttrs(item, prefix)
   const path = (
@@ -44,5 +45,7 @@ export function PaintedPath({ item, prefix, ...rest }: { item: PaintItem; prefix
       clipPath={a.clip} mask={a.mask} {...rest}
     />
   )
-  return a.comp ? <g clipPath={a.comp}>{path}</g> : path
+  const inner = a.comp ? <g clipPath={a.comp}>{path}</g> : path
+  // a garment worn under others is drawn only inside their outlines
+  return a.wear ? <g clipPath={a.wear}>{inner}</g> : inner
 }

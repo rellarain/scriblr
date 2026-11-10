@@ -137,7 +137,7 @@ export function detachMember(c: ModelContent, memberId: string): Edit {
   return done({
     ...c,
     shapes,
-    objects: c.objects.map(o => (o.id === memberId ? { ...o, shapes: o.shapes.filter(id => !dropped.has(id)), axes, classOf: null } : o)),
+    objects: c.objects.map(o => (o.id === memberId ? { ...o, shapes: o.shapes.filter(id => !dropped.has(id)), axes, classOf: null, ...(!(o.under ?? []).length && (t?.under ?? []).length ? { under: [...t!.under!] } : {}) } : o)),
     presets: (c.presets ?? []).map(p => dropClassChoice(p, memberId)),
   })
 }
@@ -162,6 +162,7 @@ export function deleteClass(c: ModelContent, classId: string): Edit {
   return done({
     ...next,
     classes: classesOf(next).filter(k => k.id !== classId),
+    objects: next.objects.map(o => ((o.under ?? []).includes(classId) ? { ...o, under: (o.under ?? []).filter(t => t !== classId) } : o)),
     presets: (next.presets ?? []).map(p => (p.forms && key in p.forms ? { ...p, forms: Object.fromEntries(Object.entries(p.forms).filter(([k]) => k !== key)) } : p)),
   })
 }

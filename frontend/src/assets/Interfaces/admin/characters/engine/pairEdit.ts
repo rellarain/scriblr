@@ -6,6 +6,7 @@ import { LIMITS, linkCount } from './limits'
 import { descendantsOf, restPivot, solveAtRest, type Solved } from './rig'
 import { attachGroup, done, fail, type Edit } from './rigEdit'
 import { drawOrder } from './order'
+import { wornUnder } from './wear'
 
 // The pure operations behind pairs, point links and the back view: making a twin of a shape, an object or a group (a derived mirror image that follows
 // every edit of the original) and breaking the pair into two independent things; welding or following a point, or locking it to the edge of another shape
@@ -187,7 +188,8 @@ function breakObject(c: ModelContent, id: string): Edit {
     const partner = target ? (target.mirrorOf ? shapeById(c, target.mirrorOf) : c.shapes.find(s => s.mirrorOf === target.id)) : undefined
     fitFields = { fit: fit.fit, fitTo: fit.fit === 'stretch' ? partner?.id ?? target?.id ?? null : null }
   }
-  next = { ...next, objects: next.objects.map(x => (x.id === id ? { ...x, mirrorOf: null, ...fitFields } : x)) }
+  const under = wornUnder(c, o)
+  next = { ...next, objects: next.objects.map(x => (x.id === id ? { ...x, mirrorOf: null, ...fitFields, ...(under.length > 0 ? { under } : {}) } : x)) }
   return done(next, notes[0])
 }
 

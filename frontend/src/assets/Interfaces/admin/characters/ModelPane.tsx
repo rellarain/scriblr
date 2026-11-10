@@ -36,6 +36,7 @@ import {
 } from './engine/colour'
 import { addBone, boneById, removeBone, renameBone, setBoneEnd, setBoneStart, setHeadBone } from './engine/bones'
 import { setFit as setObjectFit, stretchTargets } from './engine/fitEdit'
+import { toggleUnder } from './engine/wear'
 import { addFrame, framesOf, frameById, hiddenThrough, movedBox, removeFrame, renameFrame, resizedBox, setFrameBox, setTile, tileOf, toggleFrameHide, viewBoxOf } from './engine/frames'
 import { addMember, deleteClass, detachBeforeRemoval, detachMember, followTemplate, makeClass, moveObjectToGroup, reconcileClasses, renameClass, setExclusive, setShapeHide } from './engine/classEdit'
 import { newShape } from './engine/edit'
@@ -66,7 +67,7 @@ import {
 } from './engine/rigEdit'
 import { templateBox, templateById } from './engine/templates'
 import { breakPair, clearLinksTo, linkToEdge, linkToPoint, makeTwin, moveInOrder, setBack, setLoose, stepLink, unlinkPoint } from './engine/pairEdit'
-import type { FitActions, FrameActions, HandActions, LinkHow, NewSliderKind, PairActions, ProportionActions, Recording, RigActions, ViewName } from './rigActions'
+import type { FitActions, FrameActions, HandActions, LinkHow, NewSliderKind, PairActions, ProportionActions, Recording, RigActions, ViewName, WearActions } from './rigActions'
 import { groupOfSelection, offRest, scrubValue, valueText } from './rigView'
 import {
   FALL_SIDES, NAME_MAX, addGroup, addObject, addShape, duplicateShape, freshId, groupOfObject, moveBefore, moveObjectWithin, moveShapeWithin, newGroup, objectById, objectOfShape, publishFaults, removeGroup, removeObject,
@@ -590,6 +591,7 @@ export function ModelPane({ entry, models, makeId, onRemove, onDuplicate, onExpo
     },
     openSlider: () => { setTab('ranges'); setRangeFilter('all') },
   }
+  const wear: WearActions = { toggleUnder: (objectId, targetId) => { applyEdit(toggleUnder(content, objectId, targetId)) } }
   const fit: FitActions = {
     setFit: (objectId, mode, fitTo) => { setFitPick(false); applyEdit(setObjectFit(content, objectId, mode, fitTo)) },
     pick: on => { setFitPick(on); if (on) { setBonePick(null); setLinkMode(null); setPickOn(false); setPaintPick(null) } },
@@ -1279,7 +1281,7 @@ export function ModelPane({ entry, models, makeId, onRemove, onDuplicate, onExpo
               onEditShape={editShape} onWeight={(i, dir) => setWeightAt(i, stepWeight(weightAt(i), dir))} bridge={bridgeSpots ? bridgeSpots.length : null}
               tab={tab} onTab={setTab}
               onAxis={(dir, big) => commit(setAxis(content, content.axis + dir * (big ? 5 : 1)), true)}
-              rigTab={<RigTab content={content} group={group} object={selObject} picking={pickOn} fitPicking={fitPick} actions={rigActions} pairs={pairs} fit={fit} hands={hands} held={test.grip} />}
+              rigTab={<RigTab content={content} group={group} object={selObject} picking={pickOn} fitPicking={fitPick} actions={rigActions} pairs={pairs} fit={fit} wear={wear} hands={hands} held={test.grip} />}
               rangesTab={<RangesTab content={content} sel={sel} group={group} values={values} recording={recording} scrubbing={scrubbing} filter={rangeFilter} onFilter={setRangeFilter} actions={rigActions} />}
               fieldsTab={<FieldsTab content={content} sel={sel} selPoint={selPoint} state={test.state} values={values} actions={fieldActions} rig={rigActions} />}
               formsTab={<FormsTab content={content} sel={sel} state={test.state} actions={forms} presets={presets} colouring={colouring} />}

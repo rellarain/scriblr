@@ -25,7 +25,7 @@ describe('the rigged preview model', () => {
 
   it('stands as drawn at rest, with every shape in the picture', () => {
     const s = solve(adult, {})
-    expect(s.order).toHaveLength(55)   // five shapes, the sleeve, the shirt, the pocket and the two stripes of its fill pattern, the twins of the arm, its sleeve and the forearm, and the eye shown (two shapes) with its twin, the neckline, two bands of shading, the bridge of the elbow and its twin, the crease of the elbow and its twin, the ponytail, and the two hands (fifteen shapes each)
+    expect(s.order).toHaveLength(56)   // five shapes, the sleeve, the shirt, the undershirt, the pocket and the two stripes of its fill pattern, the twins of the arm, its sleeve and the forearm, and the eye shown (two shapes) with its twin, the neckline, two bands of shading, the bridge of the elbow and its twin, the crease of the elbow and its twin, the ponytail, and the two hands (fifteen shapes each)
     for (const g of adult.groups) s.mats[g.id].forEach((v, i) => expect(v).toBeCloseTo([1, 0, 0, 1, 0, 0][i], 1))
   })
 
@@ -402,6 +402,18 @@ describe('the rigged preview model', () => {
     expect(paintLayer(adult, colouring, adult.shapes.find(s => s.id === 's_shirt')!).clip).toBeNull()
     const off = solve(adult, {}, 'front', { hidden: [adult.patterns![0].id] })
     expect(off.shapes.s_stripe1.visible).toBe(false); expect(off.shapes.s_stripe2.visible).toBe(false); expect(off.shapes.s_shirt.visible).toBe(true)
+  })
+
+  it('has an undershirt worn under the shirt: trimmed to its outline while the shirt is on, and whole when an outfit takes the shirt off', () => {
+    expect(adult.objects.find(o => o.id === 'o_under')!.under).toEqual(['o_shirt'])
+    const colouring = { palette: paletteOf(adult), choices: {}, values: {} }
+    const solved = solve(adult, {})
+    const trimmed = paintShapes(adult, solved, colouring).find(i => i.id === 's_under')!
+    expect(trimmed.wear!.key).toBe('o_under')
+    for (const id of ['s_shirt', 's_pocket', 's_stripe1', 's_stripe2']) expect(trimmed.wear!.ds).toContain(solved.shapes[id].d)          // the shirt and what is drawn on it
+    expect(trimmed.wear!.ds).not.toContain(solved.shapes.s_neckline.d)                                                                  // not the helper that cuts its neckline
+    const noShirt = solve(adult, {}, 'front', { hidden: ['o_shirt'] })
+    expect(paintShapes(adult, noShirt, colouring).find(i => i.id === 's_under')!.wear).toBeNull()
   })
 
   it('has authored fields: sliders that each change one property of a shape, an edge or an object, and the iris glow', () => {

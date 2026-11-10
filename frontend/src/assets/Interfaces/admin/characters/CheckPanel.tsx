@@ -1,7 +1,7 @@
 import type { ModelContent } from '../../../../api/types'
 import { LIMITS, copyBytes, limitNotes } from './engine/limits'
 import { formsByViews } from './engine/forms'
-import { fieldCheck, formCheck, hangCheck, paintCheck, proportionCheck, rigCheck } from './engine/rigCheck'
+import { fieldCheck, formCheck, hangCheck, paintCheck, proportionCheck, rigCheck, wearCheck } from './engine/rigCheck'
 import { publishFaults } from './modelContent'
 
 // The model's checks in plain words: what stops Publish, which limits it is at or past, the size of a character's copy of it, and what looks wrong in the rig.
@@ -10,7 +10,7 @@ export function CheckPanel({ content }: { content: ModelContent }) {
   // a limit that is also a publish fault is said once, in the faults
   const notes = limitNotes(content).filter(n => !faults.some(f => ['KB', 'levels deep'].some(key => f.includes(key) && n.text.includes(key))))
   const rig = rigCheck(content)
-  const formNotes = [...formCheck(content), ...paintCheck(content), ...proportionCheck(content), ...hangCheck(content), ...fieldCheck(content)]
+  const formNotes = [...formCheck(content), ...paintCheck(content), ...proportionCheck(content), ...hangCheck(content), ...fieldCheck(content), ...wearCheck(content)]
   const grid = formsByViews(content)
   const kb = Math.round(copyBytes(content) / 102.4) / 10
   return (
