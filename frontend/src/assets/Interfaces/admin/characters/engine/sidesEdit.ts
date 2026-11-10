@@ -128,19 +128,17 @@ export function joinSides(c: ModelContent, rangeId: string): Edit {
 
 // ---- one side each ----
 
-// How many Turn drives of the model still turn a group and its twin together (a model made before a pose belonged to one side).
-export const turnsTogether = (c: ModelContent): number => c.ranges.reduce((n, r) => n + r.drives.filter(d => d.kind === 'turn' && d.mirror !== false && poseable(c, d)).length, 0)
+// The sliders of the model that still turn a group and its twin together (a model made before a pose belonged to one side), apart from those posed apart already.
+const togetherRanges = (c: ModelContent): ModelRange[] => c.ranges.filter(r => !isApart(c, r) && r.drives.some(d => d.kind === 'turn' && d.mirror !== false && poseable(c, d)))
+export const turnsTogether = (c: ModelContent): number => togetherRanges(c).length
 
 // Make every slider that turns a group that has a twin move only its own side. The twin stays where it was; the other side's slider is made when it is wanted
 // (Pose mode makes it the moment that side is grabbed; "Pose the other side apart" makes it at once). Sliders that already have an other side are left as they are.
 export function oneSideEach(c: ModelContent): Edit {
-  let n = 0
-  const ranges = c.ranges.map(r => {
-    if (isApart(c, r) || !r.drives.some(d => d.kind === 'turn' && d.mirror !== false && poseable(c, d))) return r
-    n++
-    return { ...r, drives: r.drives.map(d => (d.kind === 'turn' && d.mirror !== false && poseable(c, d) ? { ...d, mirror: false } : d)) }
-  })
-  if (n === 0) return fail('Every slider that turns a group with a twin already moves only its own side.')
+  const those = new Set(togetherRanges(c).map(r => r.id))
+  if (those.size === 0) return fail('Every slider that turns a group with a twin already moves only its own side.')
+  const n = those.size
+  const ranges = c.ranges.map(r => (those.has(r.id) ? { ...r, drives: r.drives.map(d => (d.kind === 'turn' && d.mirror !== false && poseable(c, d) ? { ...d, mirror: false } : d)) } : r))
   return done({ ...c, ranges }, `${n} slider${n === 1 ? '' : 's'} now ${n === 1 ? 'moves' : 'move'} only ${n === 1 ? 'its' : 'their'} own side.`)
 }
 

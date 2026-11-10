@@ -1,8 +1,12 @@
 import { useEffect, useMemo, useRef, useState, type KeyboardEvent } from 'react'
 import type { ModelContent, ModelEntry, ModelLayer, ModelShape } from '../../../../api/types'
 import {
-  BackIcon, CheckIcon, CopyIcon, CursorIcon, DiceIcon, ExportIcon, EyeOffIcon, FitIcon, StampIcon, FrontIcon, GridLinesIcon, GridSnapIcon, HandIcon, HistoryIcon, PathIcon, RedoIcon, RestoreIcon, RulerIcon, SlidersIcon, SwapIcon, TrashIcon, UndoIcon, WeightIcon, ZoomInIcon, ZoomOutIcon,
+  BackIcon, EyeIcon, GridViewIcon, TreeIcon, CheckIcon, CopyIcon, CursorIcon, DiceIcon, ExportIcon, EyeOffIcon, FitIcon, StampIcon, FrontIcon, GridLinesIcon, GridSnapIcon, HandIcon, HistoryIcon, PathIcon, RedoIcon, RestoreIcon, RulerIcon, SlidersIcon, SwapIcon, TrashIcon, UndoIcon, WeightIcon, ZoomInIcon, ZoomOutIcon,
 } from '../../../icons'
+import TileArea from '../../../../components/tiles/TileArea'
+import { resetTileLayout } from '../../../../components/tiles/tileReset'
+import type { SplitNode } from '../../../../components/tiles/splitTree'
+import { useStoredState } from '../../writer/storage'
 import { AssetTree, type TreeActions, type TreeMode } from './AssetTree'
 import type { ClassActions } from './ClassPanel'
 import { ColourTab, type ColourActions } from './ColourTab'
@@ -99,6 +103,16 @@ const POSE_HINT = 'Pose mode: drag a part to turn it, a square to scale its grou
 // The open model: its name and publishing buttons, then the tree, the canvas and the inspector, the preview strip and the checks. The undo stack
 // lives here (it starts empty when another model is opened: the page keys this component on the model's id), and so do the test values of the sliders
 // (what the Try it sliders are set to: for looking, never saved).
+// The designer is a grid of tiles (components/tiles): the tree, the canvas with its toolbar, the inspector, the previews and the checks. Each can be dragged by its title
+// bar to sit beside or above another or to swap with it, resized by the dividers, minimized to the tab bar above the tiles or (the canvas) maximized; where they sit is
+// remembered on this computer, and Reset layout puts them back as they began: the tree, the canvas and the inspector side by side over the previews and the checks.
+const DESIGNER_GRID = 'characters.designer'
+const DESIGNER_TREE: SplitNode = {
+  dir: 'col', ratio: 0.7,
+  a: { dir: 'row', ratio: 0.2, a: { id: 'tree' }, b: { dir: 'row', ratio: 0.72, a: { id: 'canvas' }, b: { id: 'inspector' } } },
+  b: { dir: 'row', ratio: 0.5, a: { id: 'previews' }, b: { id: 'checks' } },
+}
+
 export function ModelPane({ entry, models, makeId, onRemove, onDuplicate, onExport }: {
   entry: ModelEntry
   models: CharacterModels
@@ -121,7 +135,10 @@ export function ModelPane({ entry, models, makeId, onRemove, onDuplicate, onExpo
   // Fit asks the canvas for a new fit (and a view in the middle of it); `viewMoved` is whether the view has been panned or zoomed since.
   const [viewNonce, setViewNonce] = useState(0)
   const [viewMoved, setViewMoved] = useState(false)
-  const [drawer, setDrawer] = useState(true)
+  // The tiles of the designer: where each sits is kept by the tile grid (on this computer, with the other settings); which are shut (minimized to the tab bar) is kept here,
+  // so that starting a recording can open the inspector.
+  const [closed, setClosed] = useStoredState<string[]>('scriblr.designer.closed', [])
+  const setTileClosed = (id: string, shut: boolean) => setClosed(prev => (shut ? (prev.includes(id) ? prev : [...prev, id]) : prev.filter(x => x !== id)))
   const [history, setHistory] = useState<History<ModelContent>>(emptyHistory)
   const [versions, setVersions] = useState(false)
   const [confirmDelete, setConfirmDelete] = useState(false)
@@ -342,7 +359,7 @@ export function ModelPane({ entry, models, makeId, onRemove, onDuplicate, onExpo
     if (!s) return
     if (s.mirrorOf) { setNote('A twin follows its original: record the original instead, or break the pair.'); return }
     setView('front'); setLinkMode(null); setPoseMode(false); poseRef.current = null
-    setValues({}); setScrubbing(null); setPickOn(false); setDrawer(true); setTab('ranges')
+    setValues({}); setScrubbing(null); setPickOn(false); setTileClosed('inspector', false); setTab('ranges')
     setSel({ kind: 'shape', id: shapeId }); setSelPoint(0); setMode('points')
     setRecording({ rangeId, shapeId, end, draft: { ...s, pts: s.pts.map(p => ({ ...p })) } })
     setNote('')
@@ -1045,6 +1062,7 @@ export function ModelPane({ entry, models, makeId, onRemove, onDuplicate, onExpo
             </span>
             <button type="button" className="cmIconBtn" aria-label="Duplicate the model" title="Duplicate the model" onClick={() => onDuplicate(entry.id)}><CopyIcon size={14} /></button>
             <button type="button" className="cmIconBtn" aria-label="Export the model to a file" title="Export the draft to a file" onClick={() => onExport(entry)}><ExportIcon size={14} /></button>
+            <button type="button" className="cmIconBtn" aria-label="Reset layout" title="Put the tiles back where they began" onClick={() => { resetTileLayout(DESIGNER_GRID); setClosed([]) }}><GridViewIcon size={14} /></button>
             {confirmDelete ? (
               <span className="cmConfirm" role="group" aria-label="Delete the model?">
                 <button type="button" className="cmBtn cmBtn--danger cmBtn--small" onClick={() => { setConfirmDelete(false); onRemove(entry.id) }}>Delete the model</button>
@@ -1058,8 +1076,12 @@ export function ModelPane({ entry, models, makeId, onRemove, onDuplicate, onExpo
         {models.actionError && <p className="cmErr" role="alert">{models.actionError} <button type="button" className="cmLink" onClick={models.clearActionError}>Dismiss</button></p>}
         {note && <p className="cmErr" role="status">{note}</p>}
 
-        <div className={`cmWork${drawer ? '' : ' cmWork--noDrawer'}`}>
-          <AssetTree content={content} sel={sel} actions={actions} mode={treeMode} onMode={setTreeMode} hidden={hiddenSet} locks={lockSet} />
+        <div className="cmTiles">
+          <TileArea
+            gridId={DESIGNER_GRID} label="Designer tiles" bar defaultTree={DESIGNER_TREE} minimized={closed} onMinimizedChange={setTileClosed}
+            tiles={[
+          { id: 'tree', title: 'Tree', Icon: TreeIcon, bodyClassName: 'cmTileBody', children: <AssetTree content={content} sel={sel} actions={actions} mode={treeMode} onMode={setTreeMode} hidden={hiddenSet} locks={lockSet} /> },
+          { id: 'canvas', title: 'Canvas', Icon: PathIcon, maximizable: true, bodyClassName: 'cmTileBody cmTileBody--stage', children: (
           <div className="cmStage">
             <div className="cmToolbar" role="toolbar" aria-label="Designer tools">
               <button type="button" className="cmIconBtn" aria-label="Undo" title="Undo (Ctrl+Z)" disabled={!history.past.length || !!recording} onClick={undo}><UndoIcon size={14} /></button>
@@ -1107,7 +1129,6 @@ export function ModelPane({ entry, models, makeId, onRemove, onDuplicate, onExpo
               {awayAll > 0 && (
                 <button type="button" className="cmBtn cmBtn--small" aria-label="Reset test values" title="Put every slider back at rest, every axis on its default form and show everything" disabled={!!recording} onClick={resetEverything}><RestoreIcon size={12} /> {awayAll} off rest</button>
               )}
-              <button type="button" className={`cmIconBtn${drawer ? ' cmIconBtn--on' : ''}`} aria-label="Inspector" title="Show or hide the inspector" aria-pressed={drawer} onClick={() => setDrawer(d => !d)}><SlidersIcon size={14} /></button>
             </div>
             {poseMode && !recording && <PoseBar status={poseStatus} reach={reachOn} onReach={() => setReachOn(r => !r)} onReset={() => { setScrubbing(null); setValues({}) }} onSave={savePose} canReset={away > 0} />}
             {empty && <p className="cmHint">No shape yet. Use New shape to start from a template, or the + beside a layer in the tree.</p>}
@@ -1128,7 +1149,8 @@ export function ModelPane({ entry, models, makeId, onRemove, onDuplicate, onExpo
             />
             <p className="cmStageNote" aria-live="polite">{stageNote}</p>
           </div>
-          {drawer && (
+          ) },
+          { id: 'inspector', title: 'Inspector', Icon: SlidersIcon, bodyClassName: 'cmTileBody', children: (
             <Inspector
               content={canvasContent} sel={sel} view={view} linkMode={linkMode} pairs={pairs} classes={classes} choices={test.forms} selPoint={selPoint} mirror={mirror} onSelectPoint={setSelPoint}
               onRename={(s, name) => models.edit(entry.id, c => (s.kind === 'shape' ? renameShape(c, s.id, name) : s.kind === 'object' ? renameObject(c, s.id, name) : renameGroup(c, s.id, name)), false)}
@@ -1144,10 +1166,12 @@ export function ModelPane({ entry, models, makeId, onRemove, onDuplicate, onExpo
               framesTab={<FramesTab content={content} state={framesState} actions={frameActions} />}
               colourTab={<ColourTab content={content} sel={sel} state={{ colours: test.colours, palette: testPalette, genre: test.genre, locks: test.locks }} actions={colourActions} paint={paintActions} picking={paintPick} />}
             />
-          )}
+          ) },
+          { id: 'previews', title: 'Previews', Icon: EyeIcon, bodyClassName: 'cmTileBody', children: <PreviewStrip content={content} sel={sel} view={view} tile={tile} /> },
+          { id: 'checks', title: 'Checks', Icon: CheckIcon, bodyClassName: 'cmTileBody', children: <CheckPanel content={content} /> },
+            ]}
+          />
         </div>
-        <PreviewStrip content={content} sel={sel} view={view} tile={tile} />
-        <CheckPanel content={content} />
       </fieldset>
     </div>
   )

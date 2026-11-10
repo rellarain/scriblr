@@ -71,7 +71,7 @@ export function RangesTab({ content, sel, group, values, recording, scrubbing, f
         </span>
         <button type="button" className="cmBtn cmBtn--small" disabled={away === 0 || !!recording} onClick={actions.resetValues} title="Put every slider back at rest"><RestoreIcon size={12} /> Reset test values{away ? ` (${away})` : ''}</button>
         {together > 0 && (
-          <button type="button" className="cmBtn cmBtn--small" disabled={!!recording} aria-label={`Make the ${together} turning slider${together === 1 ? '' : 's'} that move both sides move only their own side`} title="A pose belongs to one side. Make every slider that turns a group with a twin move only its own side (the other side keeps still until it has a slider of its own: Pose mode makes it when you grab that side)" onClick={actions.oneSideEach}><LinkIcon size={12} /> One side each ({together})</button>
+          <button type="button" className="cmBtn cmBtn--small" disabled={!!recording} aria-label={together === 1 ? 'Make the 1 turning slider that moves both sides move only its own side' : `Make the ${together} turning sliders that move both sides move only their own side`} title="A pose belongs to one side. Make every slider that turns a group with a twin move only its own side (the other side keeps still until it has a slider of its own: Pose mode makes it when you grab that side)" onClick={actions.oneSideEach}><LinkIcon size={12} /> One side each ({together})</button>
         )}
       </div>
       <div className="cmChips" role="group" aria-label="Which sliders to list">

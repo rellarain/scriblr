@@ -68,7 +68,7 @@ const VIEWS: Array<{ id: ModelView; name: string }> = [{ id: 'both', name: 'Fron
 
 export function Inspector(p: InspectorProps) {
   return (
-    <section className="cmInspector" aria-label="Inspector">
+    <div className="cmInspector">
       <div className="cmTabs" role="tablist" aria-label="Inspector tabs">
         {TABS.map(t => (
           <button
@@ -87,7 +87,7 @@ export function Inspector(p: InspectorProps) {
       <div id="cm-tabpanel" role="tabpanel" aria-labelledby={`cm-tab-${p.tab}`} className="cmTabPanel">
         {p.tab === 'shape' ? <ShapeTab {...p} /> : p.tab === 'rig' ? p.rigTab : p.tab === 'ranges' ? p.rangesTab : p.tab === 'forms' ? p.formsTab : p.tab === 'presets' ? p.presetsTab : p.tab === 'colour' ? p.colourTab : p.tab === 'proportions' ? p.proportionsTab : p.framesTab}
       </div>
-    </section>
+    </div>
   )
 }
 

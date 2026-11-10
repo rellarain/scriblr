@@ -349,3 +349,45 @@ describe('Snap to grid', () => {
     expect(onLine(Math.round(b.x * 100) / 100, step) && onLine(Math.round(b.y * 100) / 100, step)).toBe(false)
   })
 })
+
+describe('the canvas in its tile', () => {
+  // The canvas takes the shape of its tile: the view is as wide as the tile is, in proportion to how tall it is (the browser says; the test DOM cannot).
+  it('is as wide as its tile is in proportion to its height', async () => {
+    const callbacks: Array<() => void> = []
+    vi.stubGlobal('ResizeObserver', class { constructor(cb: () => void) { callbacks.push(cb) } observe() {} unobserve() {} disconnect() {} })
+    await open()
+    const before = viewBox()
+    expect(before[2] / before[3]).toBeCloseTo(8 / 7, 2)
+    const wide = { x: 0, y: 0, left: 0, top: 0, right: 900, bottom: 300, width: 900, height: 300, toJSON: () => ({}) }
+    vi.spyOn(canvas(), 'getBoundingClientRect').mockReturnValue(wide as DOMRect)
+    act(() => { callbacks.forEach(cb => cb()) })
+    const wideView = viewBox()
+    expect(wideView[2] / wideView[3]).toBeCloseTo(3, 1)
+    const tall = { ...wide, right: 300, bottom: 900, width: 300, height: 900 }
+    vi.spyOn(canvas(), 'getBoundingClientRect').mockReturnValue(tall as DOMRect)
+    act(() => { callbacks.forEach(cb => cb()) })
+    const tallView = viewBox()
+    expect(tallView[2] / tallView[3]).toBeCloseTo(1 / 3, 1)
+    // what is drawn is still all in view
+    expect(tallView[2]).toBeGreaterThan(EVERYTHING.w)
+    expect(tallView[3]).toBeGreaterThan(EVERYTHING.h)
+  })
+
+  it('keeps pointers true to the world when the tile is not 8 by 7', async () => {
+    const callbacks: Array<() => void> = []
+    vi.stubGlobal('ResizeObserver', class { constructor(cb: () => void) { callbacks.push(cb) } observe() {} unobserve() {} disconnect() {} })
+    const user = await open()
+    await pickTorso(user)
+    const rect = { x: 0, y: 0, left: 0, top: 0, right: 600, bottom: 300, width: 600, height: 300, toJSON: () => ({}) }
+    vi.spyOn(canvas(), 'getBoundingClientRect').mockReturnValue(rect as DOMRect)
+    act(() => { callbacks.forEach(cb => cb()) })
+    const [x, y, w, h] = viewBox()
+    const at = (wx: number, wy: number) => ({ x: ((wx - x) / w) * 600, y: ((wy - y) / h) * 300 })
+    const from = at(100, 90)
+    const d0 = pathOf('torso').getAttribute('d')
+    pointer(pathOf('torso'), 'pointerdown', from)
+    pointer(canvas(), 'pointermove', { x: from.x + 30, y: from.y })
+    pointer(canvas(), 'pointerup')
+    expect(pathOf('torso').getAttribute('d')).not.toBe(d0)
+  })
+})

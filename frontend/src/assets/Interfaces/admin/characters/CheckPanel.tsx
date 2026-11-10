@@ -14,8 +14,7 @@ export function CheckPanel({ content }: { content: ModelContent }) {
   const grid = formsByViews(content)
   const kb = Math.round(copyBytes(content) / 102.4) / 10
   return (
-    <section className="cmCheck" aria-label="Checks">
-      <h2 className="cmInsSub">Checks</h2>
+    <div className="cmCheck">
       <p className="cmInsText">A character's copy of this model: {kb} KB (warning above {LIMITS.copyWarnBytes / 1024}, stop at {LIMITS.copyMaxBytes / 1024}).</p>
       {faults.length === 0 && notes.length === 0 && rig.length === 0 && formNotes.length === 0 && <p className="cmInsText" role="status">Nothing to fix: the model can be published.</p>}
       {faults.length > 0 && (
@@ -47,6 +46,6 @@ export function CheckPanel({ content }: { content: ModelContent }) {
           </table>
         </div>
       )}
-    </section>
+    </div>
   )
 }

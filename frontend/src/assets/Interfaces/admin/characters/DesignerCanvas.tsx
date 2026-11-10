@@ -18,6 +18,7 @@ import { activeShape, shapesOf, type EditMode, type Selection } from './designer
 // Nothing here changes the content itself: it reports gestures, and the page applies them (and keeps the undo stack).
 
 export const FIGURE: Box = { x: 0, y: 0, w: 200, h: 400 }
+// The canvas takes the shape of its tile, so the view is as wide as it is tall in pixels (8 by 7 where the browser cannot say: tests, a canvas not yet drawn).
 const ASPECT = 8 / 7
 const FALLBACK = { w: 704, h: 616 }   // the canvas's pixel size when the browser cannot say (tests)
 // Holding a drag at an edge or a corner of the canvas pans the view that way: the pointer must be within EDGE pixels of the edge (or past it) for EDGE_HOLD milliseconds, then
@@ -147,6 +148,21 @@ export function DesignerCanvas(p: CanvasProps) {
   const defs = useMemo(() => paintDefs(paintItems, prefix), [paintItems, prefix])
   const editable = p.editable !== false
   const svgRef = useRef<SVGSVGElement>(null)
+  const [aspect, setAspect] = useState(ASPECT)
+  useLayoutEffect(() => {
+    const el = svgRef.current
+    if (!el) return
+    const measure = () => {
+      const r = el.getBoundingClientRect()
+      const a = r.width > 0 && r.height > 0 ? Math.min(6, Math.max(1 / 6, r.width / r.height)) : ASPECT
+      setAspect(prev => (Math.abs(prev - a) < 0.002 ? prev : a))
+    }
+    measure()
+    if (typeof ResizeObserver === 'undefined') return
+    const observer = new ResizeObserver(measure)
+    observer.observe(el)
+    return () => observer.disconnect()
+  }, [])
   const dragRef = useRef<Drag | null>(null)
   const [pan, setPan] = useState({ x: 0, y: 0 })
 
@@ -178,8 +194,8 @@ export function DesignerCanvas(p: CanvasProps) {
   const box: Box = through ? through.box : fitted.current?.box ?? FIGURE
   const tight = fitAll && !through
   let w = Math.max(box.w * (through ? 1.12 : tight ? 1.04 : 1.7) + (tight ? 6 : 0), 24), h = Math.max(box.h * (through ? 1.12 : tight ? 1.04 : 1.7) + (tight ? 6 : 0), 21)
-  if (w / h < ASPECT) w = h * ASPECT
-  else h = w / ASPECT
+  if (w / h < aspect) w = h * aspect
+  else h = w / aspect
   w /= zoom; h /= zoom
   const vb = { x: box.x + box.w / 2 + pan.x - w / 2, y: box.y + box.h / 2 + pan.y - h / 2, w, h }
   vbRef.current = vb
