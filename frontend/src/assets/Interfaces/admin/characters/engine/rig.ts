@@ -233,7 +233,8 @@ export function looseFactor(c: ModelContent, shape: Pick<ModelShape, 'loose'>, v
 // and groups switched off, and the objects to show whatever their class says (the pattern or the member being edited: a family then shows only those).
 // `plain` draws every object scaled with its group, whatever its fit mode says (what fit modes are measured against).
 // `fall` is the side things fall to (default: down).
-export interface SolveOptions { forms?: Choices; hidden?: Iterable<string>; show?: Iterable<string>; plain?: boolean; fall?: ModelFallSide }
+// `order` is the order a style draws an object's shapes in (back to front), per object; `hidden` may also name shapes (a style hides some of its object's).
+export interface SolveOptions { forms?: Choices; hidden?: Iterable<string>; show?: Iterable<string>; plain?: boolean; fall?: ModelFallSide; order?: Record<string, string[]> }
 
 // The model with every slider at rest and every object scaled with its group, kept for the content it was solved from (a stretching object reads its target's
 // box from it).
@@ -301,6 +302,8 @@ export function solve(c: ModelContent, values: Values = {}, view: View = 'front'
   // Whether the shape's object, its group or a group above it is switched off (it is still solved: anchors and links read it).
   const switchedOff = (sid: string): boolean => {
     if (hidden.size === 0 && classOff.size === 0) return false
+    // a shape a style hides, or one that mirrors it
+    if (hidden.has(sid) || hidden.has(shapeMap.get(sid)?.mirrorOf ?? '')) return true
     const oid = objectOfShape.get(sid)
     if (oid && (hidden.has(oid) || classOff.has(oid))) return true
     const seen = new Set<string>()
@@ -635,7 +638,7 @@ export function solve(c: ModelContent, values: Values = {}, view: View = 'front'
   for (const sh of c.shapes) shapeOut(sh.id)   // a shape in no group stands still
 
   const visible = Object.values(out.shapes).filter(s => s.visible)
-  out.order = drawOrder(c, visible.map(s => ({ id: s.id, z: s.z }))).map(s => s.id)
+  out.order = drawOrder(c, visible.map(s => ({ id: s.id, z: s.z })), undefined, opts.order).map(s => s.id)
   return out
 }
 

@@ -159,7 +159,7 @@ describe('age', () => {
     expect(ageOf(model, f)?.name).toBe('Adult')
     const elder = atAge(model, f, 'p_form44')
     expect(ageOf(model, elder)?.name).toBe('Elder')
-    expect(elder.colours).toEqual(f.colours)
+    expect(elder.colours).toEqual({ ...f.colours, k_hair: { src: 'colour', id: 'c_hair_11' } })       // the age picks gray hair; the skin colour is the writer's own
     expect(elder.tile).toBe('#112233')
     expect(drawFigure(model, elder).items.map(i => i.d).join()).not.toBe(drawFigure(model, f).items.map(i => i.d).join())
     expect(atAge(model, f, 'nope')).toBe(f)
@@ -228,7 +228,10 @@ describe('words', () => {
   })
   it('two figures differ by their lines, and the same figure by none', () => {
     const a = describeFigure(model, fresh()), b = describeFigure(model, atAge(model, fresh(), 'p_form44'))
-    expect(figureDiff(a, b)).toEqual(['Age: Adult > Elder'])
+    const diff = figureDiff(a, b)
+    expect(diff).toHaveLength(2)
+    expect(diff).toContain('Age: Adult > Elder')
+    expect(diff.find(l => l !== 'Age: Adult > Elder')).toMatch(/^Hair: /)          // Elder also picks a hair colour
     expect(figureDiff(a, a)).toEqual([])
     expect(figureDiff([['Hair', 'Rose']], [])).toEqual(['Hair: Rose > none'])
   })

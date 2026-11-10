@@ -6,7 +6,7 @@ import type { Box } from '../../../admin/characters/engine/geometry'
 import { drawable, paintShapes, type PaintItem } from '../../../admin/characters/engine/paint'
 import { applyPreset, isOn, type TestState } from '../../../admin/characters/engine/presets'
 import { defaultValues, solve, type Values, type View } from '../../../admin/characters/engine/rig'
-import { lockedThings, rollLook } from '../../../admin/characters/engine/roll'
+import { lockedSlots, lockedThings, rollLook } from '../../../admin/characters/engine/roll'
 import { TILE_DEFAULT } from '../../../admin/characters/modelContent'
 import { colourName, type ColourKind } from '../describe'
 
@@ -170,11 +170,12 @@ export function drawFigure(copy: ModelContent, figure: CharacterFigure, crop: Cr
 
 // ---- the test state the admin's engine works with ----
 
-export const testOf = (copy: ModelContent, figure: CharacterFigure): TestState => ({ values: valuesOf(copy, figure), forms: { ...figure.forms }, hidden: [...figure.hidden], fall: figure.fall })
+// (the default colours a variant picks are part of it: an age that picks a hair colour is on when the figure has that colour)
+export const testOf = (copy: ModelContent, figure: CharacterFigure): TestState => ({ values: valuesOf(copy, figure), forms: { ...figure.forms }, hidden: [...figure.hidden], fall: figure.fall, colours: colouringOf(copy, figure).choices })
 
 const known = (copy: ModelContent): Set<string> => new Set([...copy.objects.map(o => o.id), ...copy.groups.map(g => g.id)])
 
-// The figure with the sliders, forms, worn things and fall side of a test state (what a preset or a roll gives); the rest of the figure stays as it was.
+// The figure with the sliders, forms, worn things, fall side and colours of a test state (what a preset or a roll gives); the rest of the figure stays as it was.
 export function withTest(copy: ModelContent, figure: CharacterFigure, state: TestState): CharacterFigure {
   const values: Record<string, number> = {}
   for (const r of copy.ranges) {
@@ -182,7 +183,7 @@ export function withTest(copy: ModelContent, figure: CharacterFigure, state: Tes
     if (Math.abs(v - r.rest) >= 1e-6) values[r.id] = v
   }
   const things = known(copy)
-  return { ...figure, values, forms: { ...state.forms }, hidden: [...new Set(state.hidden.filter(h => things.has(h)))], fall: state.fall ?? 'down' }
+  return { ...figure, values, forms: { ...state.forms }, hidden: [...new Set(state.hidden.filter(h => things.has(h)))], fall: state.fall ?? 'down', colours: coloursFrom(state.colours ?? {}) }
 }
 
 // ---- age ----
@@ -214,7 +215,11 @@ function coveredByLock(copy: ModelContent, locked: ReturnType<typeof lockedThing
 const touchesLock = (copy: ModelContent, locked: ReturnType<typeof lockedThings>, p: ModelPreset): boolean => {
   if (coveredByLock(copy, locked, p.scope)) return true
   if (Object.keys(p.values).some(rid => coveredByLock(copy, locked, copy.ranges.find(r => r.id === rid)?.scope))) return true
-  return Object.keys(p.forms ?? {}).some(key => coveredByLock(copy, locked, key.startsWith('class:') ? null : key.split('.')[0]))
+  if (Object.keys(p.forms ?? {}).some(key => coveredByLock(copy, locked, key.startsWith('class:') ? null : key.split('.')[0]))) return true
+  // a variant that turns on the style of a locked object, or picks the colour of a slot a locked object is painted from
+  if (Object.keys(p.styles ?? {}).some(objectId => coveredByLock(copy, locked, objectId))) return true
+  const held = lockedSlots(copy, locked.objects)
+  return Object.keys(p.picks ?? {}).some(slotId => held.has(slotId))
 }
 
 // A new random look inside the genre the figure is set to: a form on every axis and the member of every family, a colour for every slot, a value for every slider the writer
@@ -230,7 +235,7 @@ export function rollFigure(copy: ModelContent, figure: CharacterFigure, rng: Rng
     const [lo, hi] = r.rand ?? spanOf(r)
     values[r.id] = r2(clampToSpan(r, lo + (hi - lo) * ((rng() + rng() + rng()) / 3)))
   }
-  let state: TestState = { values, forms: look.forms, hidden: [...figure.hidden], fall: look.fall }
+  let state: TestState = { values, forms: look.forms, hidden: [...figure.hidden], fall: look.fall, colours: look.choices }
   // A kind of preset that takes something off anywhere (Outfit) is the writer's to choose: applying one of its other presets would put back what they took off.
   const slotKey = (p: ModelPreset) => `${p.kind.trim().toLowerCase()}|${p.scope ?? ''}`
   const dressing = new Set(presetsOf(copy).filter(p => p.hidden.length > 0).map(slotKey))
@@ -241,7 +246,7 @@ export function rollFigure(copy: ModelContent, figure: CharacterFigure, rng: Rng
     if (dressing.has(key) || list.some(p => touchesLock(copy, locked, p))) continue
     if (rng() < 0.6) state = applyPreset(copy, state, list[Math.min(list.length - 1, Math.floor(rng() * list.length))])
   }
-  return { ...withTest(copy, figure, state), colours: coloursFrom(look.choices) }
+  return withTest(copy, figure, state)
 }
 
 // ---- words ----

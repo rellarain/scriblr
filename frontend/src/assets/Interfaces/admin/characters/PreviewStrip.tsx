@@ -4,7 +4,8 @@ import { DiceIcon } from '../../../icons'
 import { shapesOf, showFor, type Selection } from './designerState'
 import { framesOf, hiddenThrough, viewBoxOf } from './engine/frames'
 import { drawable, paintDefs, paintShapes } from './engine/paint'
-import { previewSpecs, previewTransform, type PreviewMode } from './engine/previews'
+import { activeLocks } from './engine/locks'
+import { previewSpecs, previewTransform, specState, type PreviewMode } from './engine/previews'
 import type { Box } from './engine/geometry'
 import { defaultValues, descendantsOf, solve } from './engine/rig'
 import { TILE_DEFAULT, outlineSize } from './modelContent'
@@ -34,7 +35,7 @@ export function PreviewStrip({ content, sel, view = 'front', tile = TILE_DEFAULT
   const specs = useMemo(() => previewSpecs(seed, mode, 6, content.ranges, content), [seed, mode, content])
   // a selected pattern, or a member of a family that a preview would not choose, is drawn all the same
   const show = useMemo(() => showFor(content, sel), [content, sel])
-  const tiles = useMemo(() => specs.map(spec => solve(content, spec.values, view, { forms: spec.forms, hidden: hiddenThrough(frame, spec.hidden), show, fall: spec.fall })), [specs, content, view, show, frame])
+  const tiles = useMemo(() => specs.map(spec => solve(content, spec.values, view, { forms: spec.forms, hidden: hiddenThrough(frame, spec.hidden), show, fall: spec.fall, order: spec.order })), [specs, content, view, show, frame])
   // every tile is fitted to the selection as it stands at rest, so what a slider does shows as a change in the tile
   const box = useMemo<Box | null>(() => {
     if (frame) return viewBoxOf(frame, view, content.axis)
@@ -50,7 +51,7 @@ export function PreviewStrip({ content, sel, view = 'front', tile = TILE_DEFAULT
   }, [content, ids, view, show, frame])
   // what each tile draws: the paint of every shape of the selection under the tile's own colours (and forms), minus helpers and shapes with nothing to lie in
   const prefix = useSvgPrefix()
-  const painted = useMemo(() => specs.map((spec, i) => drawable(paintShapes(content, tiles[i], { palette: spec.palette, choices: spec.choices, forms: spec.forms }, tiles[i].order.filter(id => ids.has(id))))), [specs, tiles, content, ids])
+  const painted = useMemo(() => specs.map((spec, i) => drawable(paintShapes(content, tiles[i], { palette: spec.palette, choices: spec.choices, forms: spec.forms, locks: activeLocks(content, specState(spec)) }, tiles[i].order.filter(id => ids.has(id))))), [specs, tiles, content, ids])
   const px = SIZES.find(s => s.id === size)!.px
 
   return (

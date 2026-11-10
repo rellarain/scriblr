@@ -1,4 +1,4 @@
-import type { ModelGrip, ModelBone, ModelContent, ModelEntry, ModelFade, ModelFallSide, ModelFit, ModelForm, ModelFrame, ModelGradient, ModelGroup, ModelLayer, ModelLook, ModelObject, ModelRange, ModelShape, ModelSlot, ModelTint } from '../../../../api/types'
+import type { ModelGrip, ModelBone, ModelContent, ModelEntry, ModelFade, ModelFallSide, ModelFit, ModelForm, ModelFrame, ModelGradient, ModelGroup, ModelHsl, ModelLayer, ModelLook, ModelObject, ModelPreset, ModelRange, ModelShape, ModelSlot, ModelTint } from '../../../../api/types'
 import { LIMITS, copyBytes, linkCount, shadingCount } from './engine/limits'
 import { chainOf } from './engine/rig'
 import { standardGenres, standardSlots, starterPalette } from './engine/standardColours'
@@ -39,11 +39,11 @@ export function normalizeContent(c: ModelContent): ModelContent {
     name: clean(c.name, NAME_MAX),
     description: clean(c.description, DESCRIPTION_MAX),
     shapes: c.shapes.map(s => ({ ...s, name: clean(s.name, NAME_MAX), mirrorOf: s.mirrorOf ?? null, back: s.back ?? null, zBack: s.zBack ?? null, loose: s.loose ?? null, copyOf: s.copyOf ?? null, hide: s.hide === true, slot: s.slot ?? null, gray: s.gray ?? null, ...paintFields(s) })),
-    objects: c.objects.map(o => ({ ...o, name: clean(o.name, NAME_MAX), mirrorOf: o.mirrorOf ?? null, classOf: o.classOf ?? null, ...fitFields(o), axes: (o.axes ?? []).map(a => ({ ...a, name: clean(a.name, NAME_MAX), options: a.options.map(f => ({ ...f, name: clean(f.name, NAME_MAX), looks: repairLooks(f.looks) })) })) })),
+    objects: c.objects.map(o => ({ ...o, name: clean(o.name, NAME_MAX), mirrorOf: o.mirrorOf ?? null, classOf: o.classOf ?? null, ...fitFields(o), hsl: repairHsl(o.hsl), axes: (o.axes ?? []).map(a => ({ ...a, name: clean(a.name, NAME_MAX), options: a.options.map(f => ({ ...f, name: clean(f.name, NAME_MAX), looks: repairLooks(f.looks) })) })) })),
     groups: c.groups.map(g => ({ ...g, name: clean(g.name, NAME_MAX), pivot: g.pivot ?? null, attach: g.attach ?? null, mirrorOf: g.mirrorOf ?? null })),
     axis: c.axis ?? 100,
     ranges: (c.ranges ?? []).map(repairRange),
-    presets: (c.presets ?? []).map(p => ({ ...p, name: clean(p.name, NAME_MAX), kind: clean(p.kind, KIND_MAX) || 'Pose', scope: p.scope ?? null, forms: p.forms ?? {}, fall: p.fall && FALL_SIDES.includes(p.fall) ? p.fall : null, grip: p.grip ?? null })),
+    presets: (c.presets ?? []).map(p => ({ ...p, name: clean(p.name, NAME_MAX), kind: clean(p.kind, KIND_MAX) || 'Pose', scope: p.scope ?? null, forms: p.forms ?? {}, fall: p.fall && FALL_SIDES.includes(p.fall) ? p.fall : null, grip: p.grip ?? null, ...variantFields(p) })),
     classes: (c.classes ?? []).map(k => ({ ...k, name: clean(k.name, NAME_MAX), exclusive: k.exclusive === true })),
     genres: (c.genres ?? []).map(g => ({ ...g, name: clean(g.name, SWATCH_NAME_MAX) })),
     palette: (c.palette ?? []).map(p => ({ ...p, name: clean(p.name, SWATCH_NAME_MAX), h: percent(p.h, 0, 359), s: percent(p.s, 50, 100) })),
@@ -91,6 +91,22 @@ export function repairLooks(looks: ModelLook[] | undefined): ModelLook[] {
     out.push({ shape: l.shape, slot, gray, tone })
   }
   return out
+}
+
+// The parts of a colour an object or a style holds, as the server keeps them (phase D3a): hue held to 0..359, saturation and lightness to 0..100, a part that is not
+// a number free (null), and an entry that locks nothing dropped.
+const part = (v: number | null | undefined, top: number): number | null => (typeof v === 'number' && Number.isFinite(v) ? Math.round(Math.min(top, Math.max(0, v))) : null)
+export function repairHsl(locks: Record<string, ModelHsl> | undefined): Record<string, ModelHsl> {
+  const out: Record<string, ModelHsl> = {}
+  for (const [slot, l] of Object.entries(locks ?? {})) {
+    const lock = { h: part(l?.h, 359), s: part(l?.s, 100), l: part(l?.l, 100) }
+    if (lock.h !== null || lock.s !== null || lock.l !== null) out[slot] = lock
+  }
+  return out
+}
+// What a variant bundles and a style adds, with the defaults the server fills in.
+function variantFields(p: ModelPreset): Pick<ModelPreset, 'styles' | 'picks' | 'hsl' | 'order'> {
+  return { styles: p.styles ?? {}, picks: p.picks ?? {}, hsl: repairHsl(p.hsl), order: [...new Set(p.order ?? [])] }
 }
 
 // A slider as the server keeps it (phase 5a: the writer's limit is held inside the slider, ordered, holds the resting value; the whole slider is no limit).
@@ -235,6 +251,25 @@ function forgetShapes(f: ModelForm, gone: Set<string>): ModelForm {
   return ovr === f.ovr && looks === f.looks ? f : { ...f, ovr, ...(looks ? { looks } : {}) }
 }
 
+// The presets that are left once things are gone: a style goes with its scope, a variant forgets the styles that went and the objects they were for, and no preset
+// keeps a form, a hidden thing or a shape of something gone.
+function forgetPresets(c: ModelContent, gone: { shapes: Set<string>; objects: Set<string>; groups: Set<string> }, deadClasses: Set<string>): ModelPreset[] {
+  const all = c.presets ?? []
+  const kept = all.filter(p => !(p.scope && (gone.objects.has(p.scope) || gone.groups.has(p.scope))))
+  const deadStyles = new Set(all.filter(p => !kept.includes(p)).map(p => p.id))
+  return kept.map(p => {
+    const forms = p.forms ?? {}
+    const keep = Object.keys(forms).filter(k => !k.startsWith('class:') ? ![...gone.objects].some(o => k.startsWith(`${o}.`)) : !deadClasses.has(k.slice(6)) && !gone.objects.has(forms[k]))
+    let out: ModelPreset = keep.length === Object.keys(forms).length ? p : { ...p, forms: Object.fromEntries(keep.map(k => [k, forms[k]])) }
+    const goneThing = (h: string) => gone.objects.has(h) || gone.groups.has(h) || gone.shapes.has(h)
+    if (out.hidden.some(goneThing)) out = { ...out, hidden: out.hidden.filter(h => !goneThing(h)) }
+    const styles = Object.entries(out.styles ?? {})
+    if (styles.some(([o, st]) => gone.objects.has(o) || deadStyles.has(st))) out = { ...out, styles: Object.fromEntries(styles.filter(([o, st]) => !gone.objects.has(o) && !deadStyles.has(st))) }
+    if ((out.order ?? []).some(id => gone.shapes.has(id))) out = { ...out, order: (out.order ?? []).filter(id => !gone.shapes.has(id)) }
+    return out
+  })
+}
+
 function removeAll(c: ModelContent, gone: { shapes: Set<string>; objects: Set<string>; groups: Set<string> }): ModelContent {
   const parentOf = new Map(c.groups.map(g => [g.id, g.parent]))
   // a class goes with its template; its members stop being members (the page freezes them first, so they keep their look: see classEdit.detachBeforeRemoval)
@@ -256,12 +291,7 @@ function removeAll(c: ModelContent, gone: { shapes: Set<string>; objects: Set<st
       axes: (o.axes ?? []).map(a => ({ ...a, options: a.options.map(f => forgetShapes(f, gone.shapes)) })),
     })),
     groups: c.groups.filter(g => !gone.groups.has(g.id)).map(g => ({ ...g, parent: up(g.parent), objects: g.objects.filter(oid => !gone.objects.has(oid)) })),
-    presets: (c.presets ?? []).filter(p => !(p.scope && (gone.objects.has(p.scope) || gone.groups.has(p.scope)))).map(p => {
-      const forms = p.forms ?? {}
-      const keep = Object.keys(forms).filter(k => !k.startsWith('class:') ? ![...gone.objects].some(o => k.startsWith(`${o}.`)) : !deadClasses.has(k.slice(6)) && !gone.objects.has(forms[k]))
-      const trimmed = keep.length === Object.keys(forms).length ? p : { ...p, forms: Object.fromEntries(keep.map(k => [k, forms[k]])) }
-      return trimmed.hidden.some(h => gone.objects.has(h) || gone.groups.has(h)) ? { ...trimmed, hidden: trimmed.hidden.filter(h => !gone.objects.has(h) && !gone.groups.has(h)) } : trimmed
-    }),
+    presets: forgetPresets(c, gone, deadClasses),
     classes: (c.classes ?? []).filter(k => !deadClasses.has(k.id)),
     ...(c.grips ? { grips: c.grips.filter(g => !(g.group && gone.groups.has(g.group))) } : {}),
     ...(c.frames ? { frames: c.frames.map(f => (f.hide.some(h => gone.objects.has(h) || gone.groups.has(h)) ? { ...f, hide: f.hide.filter(h => !gone.objects.has(h) && !gone.groups.has(h)) } : f)) } : {}),
@@ -512,13 +542,21 @@ function styleChoiceExists(c: ModelContent, key: string, value: string): boolean
 // Presets and styles: the sliders they set and the objects and groups they hide must be there, a style's scope must exist and the forms it chooses must be there.
 function presetFaults(c: ModelContent): string[] {
   const faults: string[] = []
-  const rangeIds = new Set(c.ranges.map(r => r.id)), thingIds = new Set([...c.objects.map(o => o.id), ...c.groups.map(g => g.id)])
+  const rangeIds = new Set(c.ranges.map(r => r.id)), objects = new Map(c.objects.map(o => [o.id, o])), thingIds = new Set([...objects.keys(), ...c.groups.map(g => g.id)])
+  const slots = new Map((c.slots ?? []).map(sl => [sl.id, sl])), presets = new Map((c.presets ?? []).map(p => [p.id, p]))
   for (const p of c.presets ?? []) {
     const name = label(p.name, p.id)
+    // a style of an object may also hide shapes of that object
+    const scopeObject = p.scope ? objects.get(p.scope) : undefined, hideable = new Set([...thingIds, ...(scopeObject?.shapes ?? [])])
     if (Object.keys(p.values).some(k => !rangeIds.has(k))) faults.push(`Preset ${name} sets a slider that does not exist.`)
-    if (p.hidden.some(h => !thingIds.has(h))) faults.push(`Preset ${name} hides something that does not exist.`)
+    if (p.hidden.some(h => !hideable.has(h))) faults.push(`Preset ${name} hides something that does not exist.`)
     if (p.scope && !thingIds.has(p.scope)) faults.push(`Preset ${name} belongs to something that does not exist.`)
     if (Object.entries(p.forms ?? {}).some(([k, v]) => !styleChoiceExists(c, k, v))) faults.push(`Preset ${name} chooses a form that does not exist.`)
+    // phase D3a: the style of each object a variant turns on, the default colour of each slot it picks, the parts of a colour a style holds, the order of shapes
+    if (Object.entries(p.styles ?? {}).some(([o, st]) => !objects.has(o) || presets.get(st)?.scope !== o)) faults.push(`Preset ${name} turns on a style that does not exist.`)
+    if (Object.entries(p.picks ?? {}).some(([sl, k]) => !slots.get(sl)?.colours.some(x => x.id === k))) faults.push(`Preset ${name} picks a colour that does not exist.`)
+    if (Object.keys(p.hsl ?? {}).some(sl => !slots.has(sl))) faults.push(`Preset ${name} locks a colour of a slot that does not exist.`)
+    if ((p.order ?? []).length > 0 && (!scopeObject || p.order!.some(id => !scopeObject.shapes.includes(id)))) faults.push(`Preset ${name} puts shapes in order that are not in its object.`)
   }
   return faults
 }
@@ -529,6 +567,7 @@ function colourFaults(c: ModelContent): string[] {
   const slotIds = new Set((c.slots ?? []).map(sl => sl.id)), genreIds = new Set((c.genres ?? []).map(g => g.id))
   for (const s of c.shapes) if (s.slot && !slotIds.has(s.slot)) faults.push(`Shape ${label(s.name, s.id)} uses a colour slot that does not exist.`)
   for (const sl of c.slots ?? []) for (const k of sl.colours) if (k.genres.some(g => !genreIds.has(g))) faults.push(`Colour ${label(k.name, k.id)} of slot ${label(sl.name, sl.id)} fits a genre that does not exist.`)
+  for (const o of c.objects) if (Object.keys(o.hsl ?? {}).some(sl => !slotIds.has(sl))) faults.push(`Object ${label(o.name, o.id)} locks a colour of a slot that does not exist.`)
   return faults
 }
 

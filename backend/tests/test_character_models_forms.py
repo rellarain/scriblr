@@ -67,7 +67,7 @@ def test_forms_and_presets_round_trip(client: TestClient) -> None:
     assert [f["id"] for f in axis["options"]] == ["f_std", "f_wide", "f_shut"]
     assert axis["options"][1]["ovr"][0]["shape"] == "s_eye" and len(axis["options"][1]["ovr"][0]["pts"]) == 4
     assert axis["options"][2]["ovr"] == [{"shape": "s_pupil", "pts": []}]
-    assert out["presets"] == [{"id": "p_wave", "name": "Wave", "kind": "Pose", "values": {"r_open": 5.0}, "hidden": ["o_eye"], "scope": None, "forms": {}, "fall": None, "grip": None}]
+    assert out["presets"] == [{"id": "p_wave", "name": "Wave", "kind": "Pose", "values": {"r_open": 5.0}, "hidden": ["o_eye"], "scope": None, "forms": {}, "fall": None, "grip": None, "styles": {}, "picks": {}, "hsl": {}, "order": []}]
     assert client.get("/api/character-models").json()["models"][0]["draft"] == out
 
 

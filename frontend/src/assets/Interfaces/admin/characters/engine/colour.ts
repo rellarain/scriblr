@@ -1,4 +1,4 @@
-import type { ModelBlend, ModelColour, ModelContent, ModelGenre, ModelGradDir, ModelObject, ModelShape, ModelSlot, ModelSwatch, ModelTintKind } from '../../../../../api/types'
+import type { ModelBlend, ModelColour, ModelContent, ModelGenre, ModelGradDir, ModelHsl, ModelObject, ModelShape, ModelSlot, ModelSwatch, ModelTintKind } from '../../../../../api/types'
 import { fromHsl, mix, shade, toHsl } from '../../../writer/characters/portrait/colour'
 import { NAME_MAX, SWATCH_NAME_MAX, shapeById, type MakeId, randomId } from '../modelContent'
 import { freshFormId } from './formEdit'
@@ -18,7 +18,10 @@ export interface SlotChoice { src: 'colour' | 'swatch'; id: string; l?: number; 
 export type SlotChoices = Record<string, SlotChoice>
 // The palette in use and what is chosen from it: what colours a shape is drawn with. `forms` are the forms chosen on the test character: a form may change the
 // paint of a shape (its slot, its tone), so they belong to the colouring.
-export interface Colouring { palette: ModelSwatch[]; choices: SlotChoices; forms?: Choices }
+// The parts of a slot's colour that objects hold (phase D3a): object id to slot id to the lock. A locked hue, saturation or lightness keeps its value whatever colour is
+// chosen for the slot; a free part comes from the colour chosen.
+export type HslLocks = Record<string, Record<string, ModelHsl>>
+export interface Colouring { palette: ModelSwatch[]; choices: SlotChoices; forms?: Choices; locks?: HslLocks }
 export interface ResolvedColour { h: number; s: number; l: number; a: number; css: string }
 export interface Paint { fill: string; opacity: number }
 // Everything a shape is painted with (phase 4b): the fill (the colour with its tone and any derived tone), a gradient to another colour, how it blends with what is
@@ -77,6 +80,19 @@ export function resolveColour(slot: ModelSlot, choice: SlotChoice | undefined, p
   if (!sw) return gray()
   const l = clamp(choice.l ?? slot.lRest, slot.lMin, slot.lMax)
   return { h: sw.h, s: sw.s, l, a, css: hslHex(sw.h, sw.s, l) }
+}
+
+// Whether a choice names a colour (or a swatch) that is there.
+const choiceValid = (slot: ModelSlot, choice: SlotChoice | undefined, palette: ModelSwatch[]): boolean =>
+  !!choice && (choice.src === 'colour' ? !!colourById(slot, choice.id) : palette.some(p => p.id === choice.id))
+
+// The same with the parts an object holds: each locked part replaces the part of the chosen colour (the lightness inside the slot's range). A slot with no colour chosen
+// stays gray, whatever is locked: the model as saved is a gray figure, and colour comes from a choice.
+export function resolveLocked(slot: ModelSlot, choice: SlotChoice | undefined, palette: ModelSwatch[], lock: ModelHsl | undefined): ResolvedColour {
+  const r = resolveColour(slot, choice, palette)
+  if (!lock || (lock.h === null && lock.s === null && lock.l === null) || !choiceValid(slot, choice, palette)) return r
+  const h = lock.h ?? r.h, sat = lock.s ?? r.s, l = clamp(lock.l ?? r.l, slot.lMin, slot.lMax)
+  return { h, s: sat, l, a: r.a, css: hslHex(h, sat, l) }
 }
 
 // ---- tones: a shadow, a mid tone, a highlight, and a step lighter or darker (the old portrait engine's arithmetic) ----
@@ -186,9 +202,11 @@ export function paintLayer(c: ModelContent, colouring: Colouring, shape: ModelSh
   else if (o.slot) { slot = slotById(c, o.slot) ?? null; gray = null }
   else { slot = null; gray = o.gray ?? null }
   const tone = look?.tone ?? o.tone ?? 0
+  // the parts of the colour the shape's own object holds
+  const held = colouring.locks?.[ix.owner.get(shape.id)?.id ?? '']
   let css: string, alpha = 1
   if (slot) {
-    const r = resolveColour(slot, colouring.choices[slot.id], colouring.palette)
+    const r = resolveLocked(slot, colouring.choices[slot.id], colouring.palette, held?.[slot.id])
     css = r.css; alpha = r.a
   } else css = grayHex(gray ?? NEUTRAL_GRAY)
   // a shading shape is a tone of its slot's colour; any other shape is the colour a step lighter or darker, and perhaps a tone of that
@@ -198,7 +216,7 @@ export function paintLayer(c: ModelContent, colouring: Colouring, shape: ModelSh
   let gradient: PaintLayer['gradient'] = null
   if (o.grad && !shading) {
     const to = o.grad.to ? slotById(c, o.grad.to) : undefined
-    gradient = { dir: o.grad.dir, end: to ? resolveColour(to, colouring.choices[to.id], colouring.palette).css : toneShift(fill, -1) }
+    gradient = { dir: o.grad.dir, end: to ? resolveLocked(to, colouring.choices[to.id], colouring.palette, held?.[to.id]).css : toneShift(fill, -1) }
   }
   const clip = o.clip ? mapRef(ix, origin.hops, o.clip) : null
   const cuts = [...new Set((o.cut ?? []).map(t => mapRef(ix, origin.hops, t)))].filter(t => t !== shape.id)
@@ -243,14 +261,25 @@ export function stepSlot(c: ModelContent, id: string, key: SlotKey, dir: 1 | -1,
   })
 }
 
-// A slot goes: the shapes painted from it are left with no slot (gray).
+// A record without one key (the same record when the key is not there).
+const without = <V,>(rec: Record<string, V> | undefined, key: string): Record<string, V> | undefined => {
+  if (!rec || !(key in rec)) return rec
+  const { [key]: _gone, ...rest } = rec
+  return rest
+}
+
+// A slot goes: the shapes painted from it are left with no slot (gray), and no object, style or variant keeps a lock or a pick for it.
 export function removeSlot(c: ModelContent, id: string): Edit {
   if (!slotById(c, id)) return fail('There is no such colour slot.')
   return done({
     ...c, slots: slotsOf(c).filter(s => s.id !== id),
+    ...(c.presets ? { presets: c.presets.map(p => (p.hsl?.[id] || p.picks?.[id] ? { ...p, hsl: without(p.hsl, id), picks: without(p.picks, id) } : p)) } : {}),
     shapes: c.shapes.map(s => (s.slot === id || s.grad?.to === id ? { ...s, slot: s.slot === id ? null : s.slot, grad: s.grad?.to === id ? { ...s.grad, to: null } : s.grad } : s)),
-    objects: c.objects.map(o => (o.axes ?? []).some(a => a.options.some(f => (f.looks ?? []).some(l => l.slot === id)))
-      ? { ...o, axes: (o.axes ?? []).map(a => ({ ...a, options: a.options.map(f => ({ ...f, looks: (f.looks ?? []).flatMap(l => (l.slot !== id ? [l] : l.tone != null ? [{ ...l, slot: null }] : [])) })) })) } : o),
+    objects: c.objects.map(o => {
+      const unlocked = o.hsl?.[id] ? { ...o, hsl: without(o.hsl, id) } : o
+      return (o.axes ?? []).some(a => a.options.some(f => (f.looks ?? []).some(l => l.slot === id)))
+        ? { ...unlocked, axes: (o.axes ?? []).map(a => ({ ...a, options: a.options.map(f => ({ ...f, looks: (f.looks ?? []).flatMap(l => (l.slot !== id ? [l] : l.tone != null ? [{ ...l, slot: null }] : [])) })) })) } : unlocked
+    }),
   })
 }
 
@@ -267,7 +296,11 @@ export const renameColour = (c: ModelContent, slotId: string, id: string, name: 
 export const setColourHex = (c: ModelContent, slotId: string, id: string, hex: string): ModelContent => (isHex(hex) ? mapColour(c, slotId, id, k => ({ ...k, hex: hex.toLowerCase() })) : c)
 // The genres a colour fits: switched on or off one at a time (all off: it fits every genre).
 export const toggleColourGenre = (c: ModelContent, slotId: string, id: string, genreId: string): ModelContent => mapColour(c, slotId, id, k => ({ ...k, genres: k.genres.includes(genreId) ? k.genres.filter(g => g !== genreId) : [...k.genres, genreId] }))
-export const removeColour = (c: ModelContent, slotId: string, id: string): ModelContent => mapSlot(c, slotId, s => ({ ...s, colours: s.colours.filter(k => k.id !== id) }))
+// A default colour goes: a variant that picked it picks nothing for the slot any more.
+export const removeColour = (c: ModelContent, slotId: string, id: string): ModelContent => {
+  const next = mapSlot(c, slotId, s => ({ ...s, colours: s.colours.filter(k => k.id !== id) }))
+  return next.presets?.some(p => p.picks?.[slotId] === id) ? { ...next, presets: next.presets.map(p => (p.picks?.[slotId] === id ? { ...p, picks: without(p.picks, slotId) } : p)) } : next
+}
 
 export function addGenre(c: ModelContent, name: string, make: MakeId = randomId): Edit & { genreId?: string } {
   if (genresOf(c).length >= LIMITS.genresMax) return fail(`A model may have at most ${LIMITS.genresMax} genres.`)

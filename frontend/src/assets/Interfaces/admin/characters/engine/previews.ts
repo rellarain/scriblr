@@ -35,8 +35,11 @@ export interface PreviewSpec {
   // The form each axis shows ("objectId.axisId" to form id) and the things switched off (empty when the model has none).
   forms: Record<string, string>
   hidden: string[]
-  // The side hanging things fall to in this preview (down when absent).
+  // The side hanging things fall to in this preview (down when absent), and the order a style draws an object's shapes in (phase D3a).
   fall?: ModelFallSide
+  order?: Record<string, string[]>
+  // the styles applied that set nothing of the look (they only hold parts of a colour)
+  on?: string[]
   // The colouring of this preview: its own palette and the colour chosen for each slot (empty when the model has no slots: the figure is gray).
   palette: ModelSwatch[]
   choices: SlotChoices
@@ -62,7 +65,9 @@ function sliderValues(ranges: ModelRange[], mode: PreviewMode, rng: Rng): Record
 
 // The forms and switched-off things for one preview: the stress previews take the first or the last form of every axis; a random one draws a form for each
 // axis and, 60% of the time per kind, one random preset of the kind (which sets sliders and switches things off over the drawn values).
-function looks(c: ModelContent | undefined, mode: PreviewMode, rng: Rng, values: Record<string, number>): Pick<PreviewSpec, 'values' | 'forms' | 'hidden' | 'fall'> {
+// What the looks of a preview come to: besides the spec's own fields, the default colours a variant picked (they replace the colours drawn for those slots).
+type Looks = Pick<PreviewSpec, 'values' | 'forms' | 'hidden' | 'fall' | 'order' | 'on'> & { colours?: SlotChoices }
+function looks(c: ModelContent | undefined, mode: PreviewMode, rng: Rng, values: Record<string, number>): Looks {
   if (!c) return { values, forms: {}, hidden: [] }
   const forms: Record<string, string> = {}
   const pickOf = (n: number) => (mode === 'min' ? 0 : mode === 'max' ? n - 1 : Math.min(n - 1, Math.floor(rng() * n)))
@@ -86,6 +91,15 @@ function looks(c: ModelContent | undefined, mode: PreviewMode, rng: Rng, values:
   return state
 }
 
+// A preview's spec from its size, its looks and its colouring.
+function compose(shape: Pick<PreviewSpec, 'scale' | 'tilt' | 'skew' | 'flip' | 'bg'>, l: Looks, col: Pick<PreviewSpec, 'palette' | 'choices'>): PreviewSpec {
+  const { colours, ...rest } = l
+  return { ...shape, ...rest, ...col, choices: { ...col.choices, ...(colours ?? {}) } }
+}
+
+// The test state a preview stands for (what styles are asked whether they are on).
+export const specState = (spec: PreviewSpec): TestState => ({ values: spec.values, forms: spec.forms, hidden: spec.hidden, fall: spec.fall ?? 'down', colours: spec.choices, order: spec.order, on: spec.on })
+
 // The colouring of one preview, from a stream of its own so the sizes, tilts and sliders of a seed stay as they were: a random one has a palette of its own and a
 // random default colour or swatch for every slot; the stress previews use the model's palette (else a random one) with brightness and opacity at the smallest or
 // the largest of each range.
@@ -100,13 +114,13 @@ export function previewSpecs(seed: number, mode: PreviewMode, count = 6, ranges:
   const [s0, s1] = PREVIEW_RANGES.scale, [t0, t1] = PREVIEW_RANGES.tilt, [k0, k1] = PREVIEW_RANGES.skew
   for (let i = 0; i < count; i++) {
     const bg = i % PREVIEW_BACKGROUNDS
-    if (mode === 'min') out.push({ scale: s0, tilt: i % 2 ? t1 : t0, skew: i % 2 ? k1 : k0, flip: i % 3 === 0, bg, ...looks(content, mode, rng, sliderValues(ranges, mode, rng)), ...colouring(content, mode, crng) })
-    else if (mode === 'max') out.push({ scale: s1, tilt: i % 2 ? t0 : t1, skew: i % 2 ? k0 : k1, flip: i % 3 === 1, bg, ...looks(content, mode, rng, sliderValues(ranges, mode, rng)), ...colouring(content, mode, crng) })
+    if (mode === 'min') out.push(compose({ scale: s0, tilt: i % 2 ? t1 : t0, skew: i % 2 ? k1 : k0, flip: i % 3 === 0, bg }, looks(content, mode, rng, sliderValues(ranges, mode, rng)), colouring(content, mode, crng)))
+    else if (mode === 'max') out.push(compose({ scale: s1, tilt: i % 2 ? t0 : t1, skew: i % 2 ? k0 : k1, flip: i % 3 === 1, bg }, looks(content, mode, rng, sliderValues(ranges, mode, rng)), colouring(content, mode, crng)))
     else {
       // three draws averaged: most previews are ordinary, a few are extreme
       const pick = (lo: number, hi: number) => lo + (hi - lo) * ((rng() + rng() + rng()) / 3)
       const scale = Math.round(pick(0.5, 1.15) * 100) / 100, tilt = Math.round(pick(t0, t1) * 10) / 10, skew = Math.round(pick(k0, k1) * 10) / 10, flip = rng() < 0.25
-      out.push({ scale, tilt, skew, flip, bg, ...looks(content, mode, rng, sliderValues(ranges, mode, rng)), ...colouring(content, mode, crng) })
+      out.push(compose({ scale, tilt, skew, flip, bg }, looks(content, mode, rng, sliderValues(ranges, mode, rng)), colouring(content, mode, crng)))
     }
   }
   return out

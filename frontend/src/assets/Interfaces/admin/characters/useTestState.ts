@@ -3,6 +3,7 @@ import type { ModelContent, ModelFallSide, ModelPreset, ModelSwatch } from '../.
 import { chosenCount, paletteOf, type Colouring, type SlotChoice, type SlotChoices } from './engine/colour'
 import { formKey, type Choices } from './engine/forms'
 import { applyPreset, awayCount, clearedBy, type TestState } from './engine/presets'
+import { activeLocks } from './engine/locks'
 import { rollLook } from './engine/roll'
 import type { Values } from './engine/rig'
 import { seededRng, type Rng } from './engine/previews'
@@ -46,6 +47,9 @@ export interface TestControls {
   clear: (content: ModelContent, preset: ModelPreset) => void
   // switch several things off or on together (the groups of a model)
   setHidden: (ids: string[], hide: boolean) => void
+  // the order a style draws an object's shapes in (back to front), per object; an object with none is drawn in the tree's order
+  order: Record<string, string[]>
+  setOrder: (objectId: string, ids: string[] | null) => void
   away: (content: ModelContent) => number
 }
 
@@ -59,7 +63,9 @@ export function useTestState(): TestControls {
   const [palette, setPaletteState] = useState<ModelSwatch[] | null>(null)
   const [genre, setGenre] = useState<string | null>(null)
   const [locks, setLocks] = useState<string[]>([])
-  const state = useMemo<TestState>(() => ({ values, forms, hidden, fall, grip }), [values, forms, hidden, fall, grip])
+  const [order, setOrders] = useState<Record<string, string[]>>({})
+  const [marked, setMarked] = useState<string[]>([])
+  const state = useMemo<TestState>(() => ({ values, forms, hidden, fall, grip, colours, order, on: marked }), [values, forms, hidden, fall, grip, colours, order, marked])
   const setForm = useCallback((objectId: string, axisId: string, formId: string) => setForms(f => ({ ...f, [formKey(objectId, axisId)]: formId })), [])
   const setChoice = useCallback((key: string, option: string) => setForms(f => ({ ...f, [key]: option })), [])
   const toggleHidden = useCallback((id: string) => setHidden(h => (h.includes(id) ? h.filter(x => x !== id) : [...h, id])), [])
@@ -70,21 +76,28 @@ export function useTestState(): TestControls {
   }), [])
   const setPalette = useCallback((next: ModelSwatch[] | null, choices?: SlotChoices) => { setPaletteState(next); if (choices) setColours(choices) }, [])
   const toggleLock = useCallback((id: string) => setLocks(l => (l.includes(id) ? l.filter(x => x !== id) : [...l, id])), [])
-  const resetAll = useCallback(() => { setValues({}); setForms({}); setHidden([]); setFall('down'); setGrip(null); setColours({}); setPaletteState(null) }, [])
+  const resetAll = useCallback(() => { setValues({}); setForms({}); setHidden([]); setFall('down'); setGrip(null); setColours({}); setPaletteState(null); setOrders({}); setMarked([]) }, [])
+  const setOrder = useCallback((objectId: string, ids: string[] | null) => setOrders(o => {
+    if (ids && ids.length > 0) return { ...o, [objectId]: ids }
+    const { [objectId]: _gone, ...rest } = o
+    return rest
+  }), [])
+  // what applying or clearing a preset leaves: the sliders, forms, hidden things, side and grip, the default colours variants pick and the order styles set
+  const take = useCallback((next: TestState) => {
+    setValues(next.values); setForms(next.forms); setHidden(next.hidden); setFall(next.fall ?? 'down'); setGrip(next.grip ?? null); setColours(next.colours ?? {}); setOrders(next.order ?? {}); setMarked(next.on ?? [])
+  }, [])
   const apply = useCallback((content: ModelContent, preset: ModelPreset) => {
-    const next = applyPreset(content, state, preset)
-    setValues(next.values); setForms(next.forms); setHidden(next.hidden); setFall(next.fall ?? 'down'); setGrip(next.grip ?? null)
-  }, [state])
+    take(applyPreset(content, state, preset))
+  }, [state, take])
   const clear = useCallback((content: ModelContent, preset: ModelPreset) => {
-    const next = clearedBy(content, state, preset)
-    setValues(next.values); setForms(next.forms); setHidden(next.hidden); setFall(next.fall ?? 'down'); setGrip(next.grip ?? null)
-  }, [state])
+    take(clearedBy(content, state, preset))
+  }, [state, take])
   const setHiddenIds = useCallback((ids: string[], hide: boolean) => setHidden(h => (hide ? [...new Set([...h, ...ids])] : h.filter(x => !ids.includes(x)))), [])
   const away = useCallback((content: ModelContent) => awayCount(content, state) + chosenCount(content, colours) + (palette ? 1 : 0), [state, colours, palette])
-  const colouring = useCallback((content: ModelContent): Colouring => ({ palette: palette ?? paletteOf(content), choices: colours, forms }), [palette, colours, forms])
+  const colouring = useCallback((content: ModelContent): Colouring => ({ palette: palette ?? paletteOf(content), choices: colours, forms, locks: activeLocks(content, state) }), [palette, colours, forms, state])
   const roll = useCallback((content: ModelContent, rng: Rng = seededRng(Math.floor(Math.random() * 2 ** 31))) => {
     const next = rollLook(content, rng, { genre, locks, forms, choices: colours, palette: palette ?? paletteOf(content), fall })
     setForms(next.forms); setColours(next.choices); setFall(next.fall)
   }, [genre, locks, forms, colours, palette, fall])
-  return { state, values, forms, hidden, fall, setFall, grip, setGrip, setValues, setForm, setChoice, toggleHidden, colours, palette, genre, locks, setColour, setPalette, setGenre, toggleLock, colouring, roll, resetAll, apply, clear, setHidden: setHiddenIds, away }
+  return { state, values, forms, hidden, fall, setFall, grip, setGrip, setValues, setForm, setChoice, toggleHidden, colours, palette, genre, locks, setColour, setPalette, setGenre, toggleLock, colouring, roll, resetAll, apply, clear, setHidden: setHiddenIds, order, setOrder, away }
 }

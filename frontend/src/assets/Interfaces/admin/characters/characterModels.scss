@@ -259,6 +259,14 @@
 }
 .cmPresets { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: var(--space-3); }
 .cmPreset { display: flex; flex-direction: column; gap: var(--space-2); padding: var(--space-3); background: var(--ov-sink-1); min-width: 0; p { margin: 0; } &--on { box-shadow: inset 3px 0 0 var(--accent); } }
+// ---- the parts of a colour an object or a style holds, and the order of an object's shapes (phase D3a) ----
+.cmLocks { display: flex; flex-direction: column; gap: var(--space-3); }
+.cmLockSlot { display: flex; flex-direction: column; gap: var(--space-1); min-width: 0; h4 { margin: 0; } }
+.cmLockRow { display: grid; grid-template-columns: auto 5.5em minmax(0, 1fr); align-items: center; gap: var(--space-2); min-width: 0; .cmRange, .colorRange { min-width: 0; } }
+.cmLockName { color: var(--ink-muted); font-size: var(--text-small); }
+.cmShapeRows { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: var(--space-1); }
+.cmShapeRow { display: flex; align-items: center; gap: var(--space-2); min-width: 0; padding: var(--space-1) var(--space-2); background: var(--ov-sink-1); &--off { opacity: 0.6; } }
+.cmShapeName { flex: 1 1 auto; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 // ---- hands (phase 5c): the grip points listed in the Rig tab, and the line under a slider that says it is posed apart ----
 .cmGripRow { list-style: none; display: flex; flex-direction: column; gap: var(--space-2); padding: var(--space-3); background: var(--ov-sink-1); min-width: 0; }
 .cmGripRow p, .cmSides p { margin: 0; }

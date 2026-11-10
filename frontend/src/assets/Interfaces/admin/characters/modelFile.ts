@@ -1,9 +1,9 @@
 import type {
-  ModelAxis, ModelBind, ModelBlend, ModelBone, ModelClass, ModelColour, ModelContent, ModelDrive, ModelFade, ModelFallSide, ModelForm, ModelFrame, ModelGenre, ModelGrip, ModelGradDir, ModelGradient, ModelGroup, ModelLook, ModelMove, ModelObject, ModelOverride, ModelPoint,
+  ModelAxis, ModelBind, ModelBlend, ModelBone, ModelClass, ModelColour, ModelContent, ModelDrive, ModelFade, ModelFallSide, ModelForm, ModelFrame, ModelGenre, ModelGrip, ModelGradDir, ModelGradient, ModelGroup, ModelHsl, ModelLook, ModelMove, ModelObject, ModelOverride, ModelPoint,
   ModelPreset, ModelRange, ModelShape, ModelSlot, ModelSwatch, ModelTint, ModelTintKind,
 } from '../../../../api/types'
 import { LIMITS } from './engine/limits'
-import { FALL_SIDES, ROLE_MAX, FRAME_BIGGEST, FRAME_MIN, KIND_MAX, SWATCH_NAME_MAX, TILE_DEFAULT, TINT_RANGE, TONE_RANGE, blankContent, normalizeContent, repairLooks } from './modelContent'
+import { FALL_SIDES, ROLE_MAX, FRAME_BIGGEST, FRAME_MIN, KIND_MAX, SWATCH_NAME_MAX, TILE_DEFAULT, TINT_RANGE, TONE_RANGE, blankContent, normalizeContent, repairHsl, repairLooks } from './modelContent'
 
 // The file Export writes and Import reads: JSON with a marker and a version, and the models' content as it is (a shape, object, group or slider keeps its
 // id: the ids only mean something inside one model). Everything read is held to what the server accepts, so one bad model can never make the whole save
@@ -177,11 +177,23 @@ function axis(v: Record<string, unknown>, id: string): ModelAxis | null {
   return { id, name: text(v.name), options, initial }
 }
 
+// The parts of a colour an object or a style holds, per slot (phase D3a), as the server keeps them; a map of ids to ids (a variant's styles and picks).
+function lockMap(v: unknown): Record<string, ModelHsl> {
+  const ok: Record<string, ModelHsl> = {}
+  if (isRecord(v)) for (const [k, x] of Object.entries(v)) if (ID.test(k) && isRecord(x)) ok[k] = x as unknown as ModelHsl
+  return Object.fromEntries(Object.entries(repairHsl(ok)).slice(0, LIMITS.slotsMax))
+}
+function idMap(v: unknown, most: number): Record<string, string> {
+  const out: Record<string, string> = {}
+  if (isRecord(v)) for (const [k, x] of Object.entries(v)) if (ID.test(k) && idOf(x) && Object.keys(out).length < most) out[k] = x as string
+  return out
+}
+
 function object(v: Record<string, unknown>, id: string): ModelObject {
   return {
     id, name: text(v.name), layer: v.layer === 'clothing' || v.layer === 'hair' ? v.layer : 'body', shapes: list(v.shapes).filter((x): x is string => typeof x === 'string'),
     mirrorOf: idOrNull(v.mirrorOf), classOf: idOrNull(v.classOf), axes: withIds(list(v.axes), axis),
-    fit: v.fit === 'keep' || v.fit === 'stretch' ? v.fit : 'scale', fitTo: v.fit === 'stretch' ? idOrNull(v.fitTo) : null,
+    fit: v.fit === 'keep' || v.fit === 'stretch' ? v.fit : 'scale', fitTo: v.fit === 'stretch' ? idOrNull(v.fitTo) : null, hsl: lockMap(v.hsl),
   }
 }
 
@@ -191,7 +203,10 @@ function preset(v: Record<string, unknown>, id: string): ModelPreset {
   const forms: Record<string, string> = {}
   if (isRecord(v.forms)) for (const [k, x] of Object.entries(v.forms)) if (k.length >= 3 && k.length <= 170 && idOf(x) && Object.keys(forms).length < LIMITS.presetFormsMax) forms[k] = x as string
   const hidden = [...new Set(list(v.hidden).map(idOf).filter((x): x is string => x !== null))].slice(0, 100)
-  return { id, name: text(v.name), kind: text(v.kind).trim().slice(0, KIND_MAX) || 'Pose', values, hidden, scope: idOrNull(v.scope), forms, fall: FALL_SIDES.includes(v.fall as ModelFallSide) ? (v.fall as ModelFallSide) : null, grip: idOrNull(v.grip) }
+  return { id, name: text(v.name), kind: text(v.kind).trim().slice(0, KIND_MAX) || 'Pose', values, hidden, scope: idOrNull(v.scope), forms, fall: FALL_SIDES.includes(v.fall as ModelFallSide) ? (v.fall as ModelFallSide) : null, grip: idOrNull(v.grip),
+    styles: idMap(v.styles, LIMITS.presetFormsMax), picks: idMap(v.picks, LIMITS.slotsMax), hsl: lockMap(v.hsl),
+    order: [...new Set(list(v.order).map(idOf).filter((x): x is string => x !== null))].slice(0, LIMITS.shapesPerObjectMax),
+  }
 }
 
 function modelClass(v: Record<string, unknown>, id: string): ModelClass | null {

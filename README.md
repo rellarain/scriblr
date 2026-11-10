@@ -412,6 +412,12 @@ described, now stale, in `docs/data-model.md`).
   pattern's edits reach it) and `hide` (an inherited shape left out of the member), and on a
   preset `scope` (the object or group it belongs to, which makes it a **style**) and `forms`
   (the form chosen for `objectId.axisId`, and for a family `class:classId` = the member shown).
+  Phase D3a adds, with defaults: on an object `hsl` and on a preset `hsl` (`ModelHsl`: the
+  hue, saturation and lightness of a colour slot's colour that it holds at one value, null =
+  free, per slot id), on a variant (a preset with no scope) `styles` (object id to the style
+  it turns on) and `picks` (slot id to the default colour it picks; its `forms` are the
+  expressions it sets), and on a style `order` (the shape ids of its object in the order it
+  draws them, back to front; its `hidden` may name shapes of the object).
   Phase 4a (colour) adds, with defaults: on the model `genres` (`ModelGenre`: genre tags a
   default colour may fit), `palette` (`ModelSwatch`: the starter palette, a hue 0..359 and a
   saturation 0..100 per swatch, at most 10) and `slots` (`ModelSlot`: a colour slot with a

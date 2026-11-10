@@ -4,6 +4,7 @@ import { grayHex, paintOf, paletteOf, rollChoices, slotById } from '../assets/In
 import { classKey } from '../assets/Interfaces/admin/characters/engine/forms'
 import { boneLength, headHeights, measures } from '../assets/Interfaces/admin/characters/engine/bones'
 import { framesOf, hiddenThrough } from '../assets/Interfaces/admin/characters/engine/frames'
+import { activeLocks } from '../assets/Interfaces/admin/characters/engine/locks'
 import { applyPreset, restState } from '../assets/Interfaces/admin/characters/engine/presets'
 import { hangCheck, paintCheck, proportionCheck, rigCheck } from '../assets/Interfaces/admin/characters/engine/rigCheck'
 import { drawable, paintDefs, paintShapes } from '../assets/Interfaces/admin/characters/engine/paint'
@@ -137,7 +138,7 @@ describe('the rigged preview model', () => {
 
   it('has presets: poses, an expression, a build, two outfits and a style of the head', () => {
     expect(adult.presets!.map(p => `${p.kind}: ${p.name}`)).toEqual([
-      'Pose: At rest', 'Pose: Wave', 'Expression: Curious', 'Build: Broad', 'Outfit: Shirt on', 'Outfit: No shirt', 'Weather: Calm', 'Weather: Windswept', 'Style: Sleepy',
+      'Pose: At rest', 'Pose: Wave', 'Expression: Curious', 'Build: Broad', 'Outfit: Shirt on', 'Outfit: No shirt', 'Weather: Calm', 'Weather: Windswept', 'Style: Sleepy', 'Style: Dark',
       'Age: Infant', 'Age: Child', 'Age: Teen', 'Age: Adult', 'Age: Elder', 'Build: Slim', 'Build: Average', 'Build: Heavy',
       'Hand: Open', 'Hand: Fist', 'Hand: Point', 'Hand: Pinch', 'Hand: Grip', 'Hand (other side): Open', 'Hand (other side): Fist', 'Hand (other side): Point', 'Hand (other side): Pinch', 'Hand (other side): Grip',
     ])
@@ -151,6 +152,20 @@ describe('the rigged preview model', () => {
     expect(solve(adult, state.values, 'front', state).shapes.s_shirt.visible).toBe(false)
     apply('Shirt on')
     expect(solve(adult, state.values, 'front', state).shapes.s_shirt.visible).toBe(true)
+  })
+
+  it('has a variant that is a bundle: Elder turns the Dark shirt style on and picks gray hair, and the shirt keeps its saturation', () => {
+    const elder = adult.presets!.find(p => p.name === 'Elder')!, dark = adult.presets!.find(p => p.name === 'Dark')!
+    expect(elder).toMatchObject({ kind: 'Age', styles: { o_shirt: dark.id }, picks: { k_hair: 'c_hair_11' } })
+    expect(dark.scope).toBe('o_shirt')
+    expect(adult.objects.find(o => o.id === 'o_shirt')!.hsl).toEqual({ k_cloth: { h: null, s: 35, l: null } })
+    const on = applyPreset(adult, restState(adult), elder)
+    expect(on.colours?.k_hair).toEqual({ src: 'colour', id: 'c_hair_11' })
+    expect(activeLocks(adult, restState(adult)).o_shirt.k_cloth).toEqual({ h: null, s: 35, l: null })                 // Dark is not on yet, or is it? it sets nothing, so it holds
+    expect(activeLocks(adult, on).o_shirt.k_cloth).toEqual({ h: null, s: 35, l: 18 })
+    const shirt = adult.shapes.find(x => x.id === 's_shirt')!
+    const colouring = { palette: paletteOf(adult), choices: { k_cloth: { src: 'colour', id: 'c_cloth_2' } } as const, locks: activeLocks(adult, on) }
+    expect(paintOf(adult, colouring, shirt).fill).toMatch(/^#[0-9a-f]{6}$/)
   })
 
   it('has a family of eyes: one member shown at a time, each with a twin, and a style of the head that picks the hooded eye', () => {

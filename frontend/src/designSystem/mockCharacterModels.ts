@@ -16,6 +16,7 @@ import { classKey, formKey } from '../assets/Interfaces/admin/characters/engine/
 import { linkToEdge, makeTwin, setBack, setLoose } from '../assets/Interfaces/admin/characters/engine/pairEdit'
 import { setBlend, setGradient, toggleCut } from '../assets/Interfaces/admin/characters/engine/paintEdit'
 import { addShading } from '../assets/Interfaces/admin/characters/engine/shadeEdit'
+import { setObjectLock, setStyleLock } from '../assets/Interfaces/admin/characters/engine/locks'
 import { saveStyle, savePreset } from '../assets/Interfaces/admin/characters/engine/presets'
 import { templateBox } from '../assets/Interfaces/admin/characters/engine/templates'
 import { standardGenres, standardSlots, starterPalette } from '../assets/Interfaces/admin/characters/engine/standardColours'
@@ -247,6 +248,12 @@ function riggedFigure(): ModelContent {
   // a style of the head: the hooded eye with closed lids and the head turned a little (it belongs to the Head group, and is listed with the presets)
   const closed = objectById(c, 'o_eye')!.axes![0].options.find(f => f.name === 'Closed')!.id
   c = must(saveStyle(c, { values: { r_tilt: -8 }, forms: { [classKey(family.classId!)]: memberIds.Hooded, [formKey(memberIds.Hooded, lids)]: closed }, hidden: [] }, 'g_head', 'Sleepy', 'Style', mk))
+  // a style of the shirt that holds the lightness of its colour low while it is on, and the saturation the shirt always keeps (so clothes stay in muted tones whatever swatch
+  // is chosen); the Elder variant below turns that style on and picks gray hair
+  const darkShirt = saveStyle(c, { values: {}, forms: {}, hidden: [] }, 'o_shirt', 'Dark', 'Style', prefix => `${prefix}_dark`)   // an id of its own, so the other ids are as they were
+  if (!darkShirt.ok || !darkShirt.presetId) throw new Error('The sample shirt style could not be made')
+  c = must(setStyleLock(darkShirt.content, darkShirt.presetId, 'k_cloth', 'l', 18))
+  c = must(setObjectLock(c, 'o_shirt', 'k_cloth', 's', 35))
 
   // proportions: bones along the head (to the top of the skull, the unit for head heights), the upper arm and the forearm; a Length slider for each arm bone (the
   // other arm follows); the span a writer may choose for the sliders that change the body's proportions; Age and Build presets over them; the eyes keep their
@@ -271,6 +278,7 @@ function riggedFigure(): ModelContent {
   preset('Teen', 'Age', { r_height: 97, r_head: 104, r_arm_len: 98, r_fore_len: 98, r_shoulders: 98 })
   preset('Adult', 'Age', {})
   preset('Elder', 'Age', { r_height: 94, r_head: 102 })
+  c = { ...c, presets: c.presets!.map(p => (p.name === 'Elder' && p.kind === 'Age' ? { ...p, styles: { o_shirt: darkShirt.presetId! }, picks: { k_hair: 'c_hair_11' } } : p)) }
   preset('Slim', 'Build', { r_shoulders: 92 })
   preset('Average', 'Build', {})
   preset('Heavy', 'Build', { r_shoulders: 118, r_fit: 130 })

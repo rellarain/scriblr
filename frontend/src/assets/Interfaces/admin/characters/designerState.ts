@@ -1,4 +1,4 @@
-import type { ModelContent, ModelShape } from '../../../../api/types'
+import type { ModelContent, ModelObject, ModelShape } from '../../../../api/types'
 import { objectById, groupById, objectOfShape, shapeById } from './modelContent'
 
 // What is selected in the designer, and how the right button moves through the modes. Pure, so it is tested without the page.
@@ -35,6 +35,11 @@ export function activeShape(c: ModelContent, sel: Selection): ModelShape | undef
 }
 
 // The object a selection is in (for adding a shape next to it): the object, the shape's object, or none.
+// The object that is open, or the one the open shape is in.
+export const contextObjectOf = (c: ModelContent, sel: Selection): ModelObject | null => {
+  const id = contextObject(c, sel)
+  return id ? c.objects.find(o => o.id === id) ?? null : null
+}
 export function contextObject(c: ModelContent, sel: Selection): string | undefined {
   if (sel.kind === 'object') return sel.id
   if (sel.kind === 'shape') return objectOfShape(c, sel.id)?.id

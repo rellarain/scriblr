@@ -1,8 +1,10 @@
 import { useState, type CSSProperties } from 'react'
-import type { ModelColour, ModelContent, ModelShape, ModelSlot, ModelSwatch } from '../../../../api/types'
+import type { ModelColour, ModelContent, ModelHsl, ModelObject, ModelShape, ModelSlot, ModelSwatch } from '../../../../api/types'
 import { ColorRange } from '../../../../components/ColorRange'
 import { ChevronDownIcon, ChevronRightIcon, DiceIcon, PlusIcon, RestoreIcon, SaveIcon, TrashIcon } from '../../../icons'
+import { HslLocks } from './HslLocks'
 import { Stepper } from './Stepper'
+import { slotsUsedBy, type LockPart } from './engine/locks'
 import type { Selection } from './designerState'
 import {
   NEUTRAL_GRAY, fitsGenre, genresOf, hexHsl, hslHex, paintSource, paletteOf, resolveColour, slotById, slotOfShape, slotsOf, swatchHex, type SlotChoice, type SlotChoices, type SlotKey,
@@ -16,6 +18,8 @@ import { NAME_MAX, SWATCH_NAME_MAX, objectById, objectOfShape, shapeById } from 
 // of the palette for each slot, inside the slot's brightness and opacity, and a Roll for the whole look), the test palette, and the model's own slots with their default
 // colours and ranges, and its genre tags. The test character is never saved; the slots, default colours and genres are the model's.
 export interface ColourActions {
+  // Phase D3a: a part of the colour of a slot that an object holds (null: free)
+  lockObject: (objectId: string, slotId: string, part: LockPart, value: number | null) => void
   setSlot: (shapeIds: string[], slotId: string | null) => void
   stepGray: (shapeId: string, dir: 1 | -1, big: boolean) => void
   neutral: (shapeId: string) => void
@@ -53,11 +57,11 @@ function Swatch({ hex, name, on, onClick, title }: { hex: string; name: string; 
   return <button type="button" className={`cmSwatch${on ? ' cmSwatch--on' : ''}`} style={css(hex)} aria-label={name} aria-pressed={on} title={title ?? name} onClick={onClick} />
 }
 
-function Range({ label: text, value, min, max, step = 1, onChange }: { label: string; value: number; min: number; max: number; step?: number; onChange: (v: number) => void }) {
+function Range({ label: text, value, min, max, step = 1, disabled = false, onChange }: { label: string; value: number; min: number; max: number; step?: number; disabled?: boolean; onChange: (v: number) => void }) {
   return (
     <label className="cmField">
       <span>{text} <output>{Math.round(value)}%</output></span>
-      <span className="cmRange"><input type="range" min={min} max={max} step={step} value={Math.min(max, Math.max(min, value))} aria-label={text} onChange={e => onChange(Number(e.target.value))} /></span>
+      <span className="cmRange"><input type="range" min={min} max={max} step={step} value={Math.min(max, Math.max(min, value))} aria-label={text} disabled={disabled} onChange={e => onChange(Number(e.target.value))} /></span>
     </label>
   )
 }
@@ -93,13 +97,32 @@ function ThisShape({ content, shape, shapeIds, name, actions }: { content: Model
   )
 }
 
+// ---- the parts of a slot's colour the open object holds ----
+
+function ObjectLocks({ content, state, object, actions }: { content: ModelContent; state: ColourState; object: ModelObject; actions: ColourActions }) {
+  const name = label(object.name, 'the object')
+  return (
+    <section className="cmSec" aria-label="Colour locks of the object">
+      <h3 className="cmInsSub">Locked parts of {name}</h3>
+      {object.mirrorOf ? <p className="cmInsText">{name} is a twin: it holds the parts its original holds.</p> : (
+        <>
+          <p className="cmInsText">Lock the hue, the saturation or the lightness of a slot&apos;s colour for the shapes of {name}: they keep it whatever colour or swatch is chosen, and whatever the look is rolled to. A slot with no colour chosen stays gray.</p>
+          <HslLocks content={content} state={state} slots={slotsUsedBy(content, object)} locks={object.hsl} owner={name} onChange={(slotId, part, value) => actions.lockObject(object.id, slotId, part, value)} />
+        </>
+      )}
+    </section>
+  )
+}
+
 // ---- the test character's colours ----
 
-function TestColours({ content, state, slotId, onSlot, actions }: { content: ModelContent; state: ColourState; slotId: string | null; onSlot: (id: string) => void; actions: ColourActions }) {
+function TestColours({ content, state, slotId, held, heldBy, onSlot, actions }: { content: ModelContent; state: ColourState; slotId: string | null; held?: ModelHsl; heldBy?: string; onSlot: (id: string) => void; actions: ColourActions }) {
   const slots = slotsOf(content), genres = genresOf(content)
   const slot = slotById(content, slotId) ?? slots[0]
   const choice = slot ? state.colours[slot.id] : undefined
   const r = slot ? resolveColour(slot, choice, state.palette) : null
+  // what the open object holds of this slot's colour: its shapes keep it, so the slider that would change it is put away
+  const heldParts = held ? [held.h !== null ? 'hue' : '', held.s !== null ? 'saturation' : '', held.l !== null ? 'lightness' : ''].filter(Boolean) : []
   const fits = slot ? slot.colours.filter(k => fitsGenre(k, state.genre)) : []
   const pick = (next: SlotChoice) => slot && actions.choose(slot.id, { ...next, ...(choice?.l !== undefined ? { l: choice.l } : {}), ...(choice?.a !== undefined ? { a: choice.a } : {}) })
   return (
@@ -133,7 +156,8 @@ function TestColours({ content, state, slotId, onSlot, actions }: { content: Mod
           </div>
           {choice && (
             <>
-              <Range label={`Brightness of ${label(slot.name, 'the slot')}`} value={r.l} min={slot.lMin} max={slot.lMax} onChange={l => actions.choose(slot.id, { ...choice, l })} />
+              <Range label={`Brightness of ${label(slot.name, 'the slot')}`} value={r.l} min={slot.lMin} max={slot.lMax} disabled={held?.l != null} onChange={l => actions.choose(slot.id, { ...choice, l })} />
+              {heldParts.length > 0 && <p className="cmInsText">{heldBy} holds the {heldParts.join(', ')} of {label(slot.name, 'this slot')}: its shapes keep {heldParts.length === 1 ? 'it' : 'them'} whatever is chosen here.</p>}
               {slot.aMax > slot.aMin && <Range label={`Opacity of ${label(slot.name, 'the slot')}`} value={r.a * 100} min={slot.aMin} max={slot.aMax} onChange={a => actions.choose(slot.id, { ...choice, a })} />}
             </>
           )}
@@ -293,7 +317,8 @@ export function ColourTab({ content, sel, state, actions, paint, picking = null 
       <p className="cmInsText">The model is drawn in gray until colours are chosen. Shapes pick a slot; the test character picks a colour for each slot.</p>
       {(shape || object) && <ThisShape content={content} shape={shape} shapeIds={shapeIds} name={label(object?.name ?? '', 'the object')} actions={actions} />}
       {shape && paint && <PaintSection content={content} shape={shape} picking={picking} actions={paint} />}
-      <TestColours content={content} state={state} slotId={slotPick ?? current?.id ?? null} onSlot={setSlotPick} actions={actions} />
+      {object && <ObjectLocks content={content} state={state} object={object} actions={actions} />}
+      <TestColours content={content} state={state} slotId={slotPick ?? current?.id ?? null} held={object && (slotPick ?? current?.id) ? object.hsl?.[(slotPick ?? current?.id) as string] : undefined} heldBy={label(object?.name ?? '', 'the object')} onSlot={setSlotPick} actions={actions} />
       <TestPalette content={content} state={state} actions={actions} />
       <Slots content={content} actions={actions} />
       <Genres content={content} actions={actions} />

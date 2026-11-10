@@ -1898,12 +1898,56 @@ class ModelAxis(BaseModel):
         return self
 
 
+class ModelHsl(BaseModel):
+    """Which parts of a colour an object (or a style) holds at one value (phase D3a): hue 0..359, saturation and lightness 0..100. A part left out (None) is free,
+    so it comes from whatever colour is chosen for the slot; a locked part keeps its value whatever is chosen, and whatever Randomise rolls."""
+
+    h: Optional[int] = None
+    s: Optional[int] = None
+    l: Optional[int] = None
+
+    @field_validator("h", mode="before")
+    @classmethod
+    def _hue(cls, value: Any) -> Optional[int]:
+        return _lock_part(value, 359.0)
+
+    @field_validator("s", "l", mode="before")
+    @classmethod
+    def _percent_part(cls, value: Any) -> Optional[int]:
+        return _lock_part(value, 100.0)
+
+
+def _lock_part(value: Any, top: float) -> Optional[int]:
+    if isinstance(value, bool) or not isinstance(value, (int, float)):
+        return None
+    return int(round(_finite(value, 0.0, 0.0, top)))
+
+
+def _keep_locks(value: Any) -> dict[str, Any]:
+    """A slot id -> lock map as the model keeps it: a bad entry is dropped on its own, and so is one that locks nothing."""
+    if not isinstance(value, dict):
+        return {}
+    out: dict[str, Any] = {}
+    for key, raw in value.items():
+        if _optional_id(key) is None:
+            continue
+        try:
+            lock = raw if isinstance(raw, ModelHsl) else ModelHsl.model_validate(raw)
+        except ValueError:
+            continue
+        if lock.h is not None or lock.s is not None or lock.l is not None:
+            out[key] = lock
+    return out
+
+
 class ModelObject(BaseModel):
     id: str = Field(pattern=_MODEL_ID)
     name: str = Field(default="", max_length=MODEL_NAME_MAX)
     layer: ModelLayer = "body"
     shapes: list[str] = Field(default_factory=list, max_length=MODEL_SHAPES_PER_OBJECT_MAX)
     mirrorOf: Optional[str] = None
+    # The parts of a colour this object holds, per colour slot (phase D3a): its shapes keep the locked hue, saturation or lightness of the slot's colour.
+    hsl: dict[str, ModelHsl] = Field(default_factory=dict, max_length=MODEL_SLOTS_MAX)
     # The ways the object can vary (phase 3): each axis has forms, and the object shows one form of every axis.
     axes: list[ModelAxis] = Field(default_factory=list, max_length=MODEL_AXES_MAX)
     # The class this object is a member of (phase 3b): its shapes follow the shapes of the class's template, and it chooses among the template's forms.
@@ -1912,6 +1956,11 @@ class ModelObject(BaseModel):
     # own size (`keep`), or is stretched to follow the box of the shape `fitTo` (`stretch`). Only the drawing changes: anchors and links read the outline as it is.
     fit: ModelFit = "scale"
     fitTo: Optional[str] = None
+
+    @field_validator("hsl", mode="before")
+    @classmethod
+    def _hsl(cls, value: Any) -> dict[str, Any]:
+        return _keep_locks(value)
 
     @field_validator("axes", mode="before")
     @classmethod
@@ -2028,6 +2077,39 @@ class ModelPreset(BaseModel):
     fall: Optional[ModelFallSide] = None
     # Phase 5c: the grip point a hand pose holds with (None: none).
     grip: Optional[str] = None
+    # Phase D3a, a variant (a preset with no scope) is a bundle of choices over the same shapes: besides `values`, `hidden` and `forms` (the expression of each
+    # object) it turns on a style of each object listed in `styles` (object id to style id) and picks a default colour for each slot listed in `picks` (slot id to
+    # colour id). A palette swatch is the character's own, so only default colours can be bundled.
+    styles: dict[str, str] = Field(default_factory=dict, max_length=MODEL_PRESET_FORMS_MAX)
+    picks: dict[str, str] = Field(default_factory=dict, max_length=MODEL_SLOTS_MAX)
+    # A style (a preset with an object as its scope) holds parts of the colours of its slots while it is on (`hsl`: an object's own locks win) and puts the shapes of
+    # its object in a drawing order of its own (`order`: shape ids, back to front); its `hidden` may name shapes of the object.
+    hsl: dict[str, ModelHsl] = Field(default_factory=dict, max_length=MODEL_SLOTS_MAX)
+    order: list[str] = Field(default_factory=list, max_length=MODEL_SHAPES_PER_OBJECT_MAX)
+
+    @field_validator("styles", "picks", mode="before")
+    @classmethod
+    def _id_map(cls, value: Any) -> dict[str, str]:
+        if not isinstance(value, dict):
+            return {}
+        return {k: v for k, v in value.items() if _optional_id(k) is not None and _optional_id(v) is not None}
+
+    @field_validator("hsl", mode="before")
+    @classmethod
+    def _hsl(cls, value: Any) -> dict[str, Any]:
+        return _keep_locks(value)
+
+    @field_validator("order", mode="before")
+    @classmethod
+    def _order(cls, value: Any) -> list[str]:
+        if not isinstance(value, list):
+            return []
+        out: list[str] = []
+        for v in value:
+            ident = _optional_id(v)
+            if ident is not None and ident not in out:
+                out.append(ident)
+        return out
 
     @field_validator("grip", mode="before")
     @classmethod

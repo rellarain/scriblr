@@ -28,7 +28,7 @@ import { PreviewStrip } from './PreviewStrip'
 import { RangesTab } from './RangesTab'
 import { RigTab } from './RigTab'
 import { TemplateMenu } from './TemplateMenu'
-import { NONE, contextObject, repair, rightClickGrid, rightClickShape, shapesOf, showFor, type EditMode, type Selection } from './designerState'
+import { NONE, contextObject, contextObjectOf, repair, rightClickGrid, rightClickShape, shapesOf, showFor, type EditMode, type Selection } from './designerState'
 import {
   NEUTRAL_GRAY, addColour, addGenre, addSlot, addStandardSlots, addSwatch, removeColour, removeGenre, removeSlot, removeSwatch, renameColour, renameGenre, renameSlot, setColourHex,
   setStarterPalette, setSwatch, stepSlot, toggleColourGenre,
@@ -49,6 +49,8 @@ import { addFinger, addGrip, addHand, addHandPoses, addThumb, apartHand, gripAt,
 import { LIMITS } from './engine/limits'
 import { emptyHistory, redo as redoHistory, remember, undo as undoHistory, type History } from './engine/history'
 import { beginScale, beginTurn, canScale, canTurn, grabPoint, moveScale, moveTurn, poseTarget, reach, reachJoints, scaleDriver, slideValue, toModel, type ReachGrab, type ScaleDrag, type TurnDrag } from './engine/pose'
+import { setObjectLock, setStyleLock, type LockPart } from './engine/locks'
+import { shapesInOrder } from './engine/order'
 import { deletePreset, duplicatePreset, renamePreset, savePreset, saveStyle, updatePreset } from './engine/presets'
 import { chainOf, isPointDriven, restPivot, solve, type Solved, type Values } from './engine/rig'
 import * as paintOps from './engine/paintEdit'
@@ -228,7 +230,7 @@ export function ModelPane({ entry, models, makeId, onRemove, onDuplicate, onExpo
   const show = useMemo(() => showFor(content, sel), [content, sel])
   // looking through a frame leaves out what the frame leaves out
   const through = frameById(content, throughId)
-  const solved = useMemo(() => solve(shown, recording ? {} : values, view, recording ? {} : { forms: test.forms, hidden: hiddenThrough(through, test.hidden), show, fall: test.fall }), [shown, values, recording, view, test.forms, test.hidden, test.fall, show, through])
+  const solved = useMemo(() => solve(shown, recording ? {} : values, view, recording ? {} : { forms: test.forms, hidden: hiddenThrough(through, test.hidden), show, fall: test.fall, order: test.order }), [shown, values, recording, view, test.forms, test.hidden, test.fall, test.order, show, through])
   const group = groupOfSelection(content, sel)
   const valuesRef = useRef(values)
   valuesRef.current = values
@@ -830,16 +832,34 @@ export function ModelPane({ entry, models, makeId, onRemove, onDuplicate, onExpo
   }
   const presets: PresetActions = {
     apply: id => { const p = presetsOf(content).find(x => x.id === id); if (p) { setScrubbing(null); test.apply(content, p) } },
-    save: (name, kind) => { applyEdit(savePreset(content, test.state, name, kind, makeId)) },
+    save: (name, kind, keep) => { applyEdit(savePreset(content, test.state, name, kind, makeId, keep)) },
     saveStyle: (scopeId, name) => { applyEdit(saveStyle(content, test.state, scopeId, name, 'Style', makeId)) },
-    update: id => commit(updatePreset(content, id, test.state), true),
+    update: (id, keep) => commit(updatePreset(content, id, test.state, keep), true),
     rename: (id, name) => models.edit(entry.id, c => renamePreset(c, id, name), false),
     remove: id => commit(deletePreset(content, id), true),
     addHandPoses: () => { applyEdit(addHandPoses(content, undefined, makeId)) },
     setGrip: (id, gripId) => { applyEdit(setPresetGrip(content, id, gripId)) },
+    lockStyle: (id, slotId, part, value) => lockEdit(c => setStyleLock(c, id, slotId, part, value), (presetsOf(content).find(p => p.id === id)?.hsl?.[slotId]?.[part] ?? null) === null !== (value === null)),
+    moveShape: (objectId, shapeId, dir) => {
+      const o = objectById(content, objectId)
+      if (!o) return
+      const seq = shapesInOrder(content, o, test.order), at = seq.indexOf(shapeId), to = at + dir
+      if (at < 0 || to < 0 || to >= seq.length) return
+      const next = [...seq]
+      ;[next[at], next[to]] = [next[to], next[at]]
+      test.setOrder(objectId, next)
+    },
+    toggleShape: shapeId => test.toggleHidden(shapeId),
+    resetOrder: objectId => test.setOrder(objectId, null),
+  }
+  // A change to the parts of a colour an object or a style holds: switching a lock on or off is a step of its own, moving a locked value is not (as for a colour's sliders).
+  function lockEdit(make: (c: ModelContent) => Edit, step: boolean) {
+    if (step) { applyEdit(make(content)); return }
+    models.edit(entry.id, c => { const e = make(c); return e.ok ? e.content : c }, false)
   }
 
   const colourActions: ColourActions = {
+    lockObject: (objectId, slotId, part: LockPart, value) => lockEdit(c => setObjectLock(c, objectId, slotId, part, value), (objectById(content, objectId)?.hsl?.[slotId]?.[part] ?? null) === null !== (value === null)),
     setSlot: (shapeIds, slotId) => commit({ ...content, shapes: content.shapes.map(s => (shapeIds.includes(s.id) ? { ...s, slot: slotId } : s)) }, true),
     stepGray: (id, dir, big) => commit(updateShape(content, id, s => ({ ...s, gray: Math.min(100, Math.max(0, Math.round((s.gray ?? NEUTRAL_GRAY) + dir * (big ? 25 : 5)))) })), true),
     neutral: id => commit(updateShape(content, id, s => ({ ...s, gray: null })), true),
@@ -915,7 +935,7 @@ export function ModelPane({ entry, models, makeId, onRemove, onDuplicate, onExpo
     const group = scope ? groupById(content, scope) : undefined
     const count = presetsOf(content).filter(p => (p.scope ?? null) === scope).length + 1
     const e = !scope
-      ? savePreset(content, test.state, `Variant ${count}`, 'Variant', makeId)
+      ? savePreset(content, test.state, `Variant ${count}`, 'Variant', makeId, { forms: true, styles: true, colours: true })
       : saveStyle(content, test.state, scope, `${group ? 'Pose' : 'Style'} ${count}`, group ? 'Pose' : 'Style', makeId)
     applyEdit(e)
   }
@@ -1221,7 +1241,7 @@ export function ModelPane({ entry, models, makeId, onRemove, onDuplicate, onExpo
               rigTab={<RigTab content={content} group={group} object={selObject} picking={pickOn} fitPicking={fitPick} actions={rigActions} pairs={pairs} fit={fit} hands={hands} held={test.grip} />}
               rangesTab={<RangesTab content={content} sel={sel} group={group} values={values} recording={recording} scrubbing={scrubbing} filter={rangeFilter} onFilter={setRangeFilter} actions={rigActions} />}
               formsTab={<FormsTab content={content} sel={sel} state={test.state} actions={forms} presets={presets} colouring={colouring} />}
-              presetsTab={<PresetsTab content={content} state={test.state} actions={presets} />}
+              presetsTab={<PresetsTab content={content} state={test.state} actions={presets} object={contextObjectOf(content, sel)} />}
               proportionsTab={<ProportionsTab content={content} solved={solved} picking={bonePick} actions={proportions} limits={rigActions} />}
               framesTab={<FramesTab content={content} state={framesState} actions={frameActions} />}
               colourTab={<ColourTab content={content} sel={sel} state={{ colours: test.colours, palette: testPalette, genre: test.genre, locks: test.locks }} actions={colourActions} paint={paintActions} picking={paintPick} />}

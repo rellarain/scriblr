@@ -372,17 +372,32 @@ def _preset_faults(content: ModelContent) -> list[str]:
     must be there."""
     faults: list[str] = []
     range_ids = {r.id for r in content.ranges}
-    thing_ids = {o.id for o in content.objects} | {g.id for g in content.groups}
+    objects = {o.id: o for o in content.objects}
+    thing_ids = set(objects) | {g.id for g in content.groups}
+    slots = {sl.id: sl for sl in content.slots}
+    presets = {p.id: p for p in content.presets}
     for p in content.presets:
         name = _label(p.name, p.id)
+        # a style of an object may also hide shapes of that object
+        scope_object = objects.get(p.scope) if p.scope is not None else None
+        hideable = thing_ids | set(scope_object.shapes if scope_object is not None else [])
         if any(k not in range_ids for k in p.values):
             faults.append(f"Preset {name} sets a slider that does not exist.")
-        if any(h not in thing_ids for h in p.hidden):
+        if any(h not in hideable for h in p.hidden):
             faults.append(f"Preset {name} hides something that does not exist.")
         if p.scope is not None and p.scope not in thing_ids:
             faults.append(f"Preset {name} belongs to something that does not exist.")
         if any(not _style_choice_exists(content, k, v) for k, v in p.forms.items()):
             faults.append(f"Preset {name} chooses a form that does not exist.")
+        # phase D3a: the style of each object a variant turns on, the default colour of each slot it picks, the parts of a colour a style holds, the order of shapes
+        if any(k not in objects or presets.get(v) is None or presets[v].scope != k for k, v in p.styles.items()):
+            faults.append(f"Preset {name} turns on a style that does not exist.")
+        if any(k not in slots or not any(c.id == v for c in slots[k].colours) for k, v in p.picks.items()):
+            faults.append(f"Preset {name} picks a colour that does not exist.")
+        if any(k not in slots for k in p.hsl):
+            faults.append(f"Preset {name} locks a colour of a slot that does not exist.")
+        if p.order and (scope_object is None or any(sid not in scope_object.shapes for sid in p.order)):
+            faults.append(f"Preset {name} puts shapes in order that are not in its object.")
     return faults
 
 
@@ -398,6 +413,9 @@ def _colour_faults(content: ModelContent) -> list[str]:
         for c in sl.colours:
             if any(g not in genre_ids for g in c.genres):
                 faults.append(f"Colour {_label(c.name, c.id)} of slot {_label(sl.name, sl.id)} fits a genre that does not exist.")
+    for o in content.objects:
+        if any(k not in slot_ids for k in o.hsl):
+            faults.append(f"Object {_label(o.name, o.id)} locks a colour of a slot that does not exist.")
     return faults
 
 
