@@ -185,6 +185,17 @@ describe('the Portrait section', () => {
     expect(screen.queryByRole('button', { name: 'Make a mannequin' })).toBeNull()
   })
 
+  it('adds the basic model when none is published, and then offers it', async () => {
+    const { backend, user } = await openConsole([person('chr_a', 'Ada', 0)], { published: [], basic: { id: 'basic', version: 1, publishedAt: '2026-01-10T09:00:00.000Z', content: { ...model, name: 'Adult (basic)' } } })
+    await goto(user, 'Portrait')
+    await user.click(await screen.findByRole('button', { name: 'Add the basic model' }))
+    const panel = within(await screen.findByRole('group', { name: 'Mannequin' }))
+    expect(await panel.findByRole('combobox', { name: 'Model for the mannequin' })).toHaveValue('basic')
+    expect(backend.calls).toContain('POST /character-models/basic')
+    expect(panel.getByRole('button', { name: 'Make a mannequin' })).toBeEnabled()
+    expect(screen.queryByRole('button', { name: 'Add the basic model' })).toBeNull()
+  })
+
   it('rolls a new look within the genre, and goes back to the portrait', async () => {
     const { backend, user } = await openConsole([person('chr_a', 'Ada', 0, { figure: figure({ genre: 'g_fiction' }) })])
     await goto(user, 'Portrait')

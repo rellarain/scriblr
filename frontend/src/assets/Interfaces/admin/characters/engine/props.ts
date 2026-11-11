@@ -6,7 +6,7 @@ import type { ModelFeatureKind } from '../../../../../api/types'
 // MODEL_PROPS (schemaParity.test.ts keeps them the same).
 
 export type PropKey =
-  | 'x' | 'y' | 'width' | 'height' | 'rotation' | 'opacity' | 'roundness' | 'offset'
+  | 'x' | 'y' | 'width' | 'height' | 'rotation' | 'curve' | 'opacity' | 'roundness' | 'offset'
   | 'fillHue' | 'fillSat' | 'fillLight'
   | 'gradReach' | 'gradBlend' | 'gradDir' | 'gradHue' | 'gradSat' | 'gradLight'
 
@@ -38,6 +38,7 @@ export const PROPS: Record<PropKey, PropSpec> = Object.fromEntries([
   spec({ key: 'width', label: 'Width', group: 'size', features: WHOLE, rest: 100, lo: 5, hi: 1000, unit: '%', slider: [50, 100, 150], amounts: [50, 150], hint: 'Its width as a percent of the width it is drawn with.' }),
   spec({ key: 'height', label: 'Height', group: 'size', features: WHOLE, rest: 100, lo: 5, hi: 1000, unit: '%', slider: [50, 100, 150], amounts: [50, 150], hint: 'Its height as a percent of the height it is drawn with.' }),
   spec({ key: 'rotation', label: 'Rotation', group: 'place', features: WHOLE, rest: 0, lo: -360, hi: 360, unit: '°', slider: [-30, 0, 30], amounts: [-30, 30], hint: 'Turns it about its middle.' }),
+  spec({ key: 'curve', label: 'Curve the ends', group: 'place', features: WHOLE, rest: 0, lo: -50, hi: 50, unit: '', slider: [-10, 0, 10], amounts: [-2, 2], hint: 'Lifts the two ends of it against its middle (a smile), or drops them (a frown), in the units of the model.' }),
   spec({ key: 'opacity', label: 'Opacity', group: 'look', features: WHOLE, rest: 100, lo: 0, hi: 100, unit: '%', slider: [0, 100, 100], amounts: [0, 100], hint: 'How much of its own opacity it keeps.' }),
   spec({ key: 'roundness', label: 'Corner roundness', group: 'look', features: WHOLE, rest: 0, lo: -20, hi: 20, unit: '', slider: [0, 0, 20], amounts: [0, 20], hint: 'Adds to the radius its sharp corners are rounded to (less than none is none).' }),
   spec({ key: 'offset', label: 'Push the edge', group: 'place', features: ['edge'], rest: 0, lo: -200, hi: 200, unit: '', slider: [-20, 0, 20], amounts: [-20, 20], hint: 'Pushes the edge outward (or inward) by moving both of its points.' }),

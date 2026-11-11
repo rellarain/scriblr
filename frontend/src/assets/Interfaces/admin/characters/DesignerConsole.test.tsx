@@ -79,6 +79,24 @@ describe('the list', () => {
     expect(screen.getByText(/No shape yet/)).toBeInTheDocument()
   })
 
+  it('adds the basic model that comes with the app, once: the server publishes it and it opens', async () => {
+    const { backend, user } = await open()
+    await user.click(screen.getByRole('button', { name: 'Show all the models' }))
+    await user.click(screen.getByRole('button', { name: 'Add the basic model' }))
+    await waitFor(() => expect(backend.calls).toContain('POST /character-models/basic'))
+    expect(await screen.findByRole('group', { name: 'Model Adult (basic)' })).toBeInTheDocument()
+    expect(backend.entries.find(e => e.id === 'basic')?.published).not.toBeNull()
+    // it is in the catalog now, so the button goes
+    expect(screen.queryByRole('button', { name: 'Add the basic model' })).toBeNull()
+  })
+
+  it('offers the basic model first when there is no model yet', async () => {
+    const { user, backend } = await open([])
+    await user.click(screen.getByRole('button', { name: 'Add the basic model' }))
+    await waitFor(() => expect(backend.entries.map(e => e.id)).toEqual(['basic']))
+    expect(await screen.findByRole('group', { name: 'Model Adult (basic)' })).toBeInTheDocument()
+  })
+
   it('says it is empty and makes the first model', async () => {
     const { user, backend } = await open([])
     expect(screen.getByRole('heading', { name: 'No models yet' })).toBeInTheDocument()

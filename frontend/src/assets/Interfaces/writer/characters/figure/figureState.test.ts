@@ -4,7 +4,7 @@ import { copyOf } from '../../../../../designSystem/mockFigureModels'
 import { previewModels } from '../../../../../designSystem/mockCharacterModels'
 import { seededRng } from '../../../admin/characters/engine/previews'
 import {
-  agePresets, ageOf, atAge, blankFigure, clampToSpan, colouringOf, copyFigure, cropBox, describeFigure, drawFigure, figureDiff, frameFor, normalizeFigure, restBox, rollFigure, setValue,
+  agePresets, ageOf, atAge, blankFigure, followHeight, clampToSpan, colouringOf, copyFigure, cropBox, describeFigure, drawFigure, figureDiff, frameFor, normalizeFigure, restBox, rollFigure, setValue,
   spanOf, squareBox, testOf, valuesOf, withTest, writerRanges,
 } from './figureState'
 import { describeFigureFields } from './figureWords'
@@ -255,5 +255,24 @@ describe('the test state', () => {
     expect(back.hidden).toEqual(['o_shirt'])
     expect(back.fall).toBe('left')
     expect(back.model).toBe(KEY)
+  })
+})
+
+describe("a frame follows the figure's height", () => {
+  const box = { x: 60, y: 10, w: 80, h: 100 }
+  it('is the same box for a figure at its full height, and with no matrix', () => {
+    expect(followHeight(box, [1, 0, 0, 1, 0, 0])).toEqual(box)
+    expect(cropBox(model, { frame: model.frames![0].id }, 'front')).toEqual(cropBox(model, { frame: model.frames![0].id }, 'front', [1, 0, 0, 1, 0, 0]))
+  })
+  it('shrinks about the feet and the middle line with a figure scaled to half its height', () => {
+    const half = followHeight(box, [0.5, 0, 0, 0.5, 50, 196])   // a scale of one half about (100, 392)
+    expect(half).toEqual({ x: 80, y: 201, w: 40, h: 50 })
+  })
+  it("reads only the size of the matrix: the back view's mirror is the frame's own business", () => {
+    expect(followHeight(box, [-0.5, 0, 0, 0.5, 150, 196])).toEqual(followHeight(box, [0.5, 0, 0, 0.5, 50, 196]))
+  })
+  it('leaves a box alone when the matrix is not a size', () => {
+    expect(followHeight(box, [NaN, 0, 0, 1, 0, 0])).toEqual(box)
+    expect(followHeight(box, [0, 0, 0, 0, 0, 0])).toEqual(box)
   })
 })

@@ -344,10 +344,17 @@ export function solve(c: ModelContent, values: Values = {}, view: View = 'front'
 
   // The place, size and turn authored fields give a whole shape or a whole object (phase D3c), added up over every field that changes it; the middle they are about is the
   // shape's own, or the object's at rest. The matrix is a scale, then a turn, then a move, whatever order the sliders are in.
-  interface Wholly { dx: number; dy: number; sx: number; sy: number; turn: number; any: boolean }
-  const noChange = (): Wholly => ({ dx: 0, dy: 0, sx: 1, sy: 1, turn: 0, any: false })
+  interface Wholly { dx: number; dy: number; sx: number; sy: number; turn: number; curve: number; any: boolean }
+  const noChange = (): Wholly => ({ dx: 0, dy: 0, sx: 1, sy: 1, turn: 0, curve: 0, any: false })
   function applyWholly(list: ModelPoint[], w: Wholly, about: [number, number]) {
     if (!w.any) return
+    // a curve lifts the two ends of the outline against its middle (the ends are where it is furthest across: a smile for a positive amount), before it is moved or sized
+    if (w.curve !== 0 && list.length > 0) {
+      let x0 = Infinity, x1 = -Infinity
+      for (const p of list) { x0 = Math.min(x0, p.x); x1 = Math.max(x1, p.x) }
+      const mid = (x0 + x1) / 2, half = Math.max(1e-6, (x1 - x0) / 2)
+      for (const p of list) { const u = (p.x - mid) / half; p.y -= w.curve * Math.min(1.6, u * u) }
+    }
     const m = mul(translate(w.dx, w.dy), mul(rotate(w.turn, about[0], about[1]), scale(w.sx, w.sy, about[0], about[1])))
     if (!finiteMat(m)) return
     for (const p of list) {
@@ -363,6 +370,7 @@ export function solve(c: ModelContent, values: Values = {}, view: View = 'front'
     else if (prop === 'width') w.sx *= Math.max(0.05, a / 100)
     else if (prop === 'height') w.sy *= Math.max(0.05, a / 100)
     else if (prop === 'rotation') w.turn += a
+    else if (prop === 'curve') w.curve += a
     else return
     w.any = true
   }

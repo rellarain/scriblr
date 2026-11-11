@@ -1,6 +1,6 @@
 import { useState, type MouseEvent as ReactMouseEvent, type ReactNode } from 'react'
 import type { ModelContent, ModelEntry, ModelGroup, ModelObject, ModelPreset, ModelShape } from '../../../../api/types'
-import { CheckIcon, ChevronDownIcon, CopyIcon, EyeIcon, EyeOffIcon, FolderPlusIcon, GridViewIcon, ImportIcon, ExportIcon, LayersIcon, LinkIcon, PlayIcon, PlusIcon, SaveIcon, SearchIcon, StampIcon, SwapIcon, TrashIcon } from '../../../icons'
+import { CheckIcon, ChevronDownIcon, CopyIcon, EyeIcon, EyeOffIcon, FolderPlusIcon, GridViewIcon, ImportIcon, ExportIcon, LayersIcon, LinkIcon, MannequinIcon, PlayIcon, PlusIcon, SaveIcon, SearchIcon, StampIcon, SwapIcon, TrashIcon } from '../../../icons'
 import { ReorderList } from './ReorderList'
 import { StatusBadge, modelLabel } from './StatusBadge'
 import { TemplateMenu } from './TemplateMenu'
@@ -30,6 +30,8 @@ export interface ModelsNav {
   onSelect: (id: string) => void
   onNew: () => void
   onImport: () => void
+  // adds the basic adult that comes with the app (offered while the catalog does not have it)
+  onAddBasic: () => void
   onExportAll: () => void
   onDuplicate: (id: string) => void
   onMove: (id: string, beforeId: string | null) => void
@@ -393,6 +395,7 @@ export function TreeBar({ content, sel, state, hidden, models, actions }: {
           <span className="dzLevelTools">
             <button type="button" className="cmIconBtn cmIconBtn--small" aria-label="New model" title="New model" onClick={models.onNew}><PlusIcon size={12} /></button>
             <button type="button" className="cmIconBtn cmIconBtn--small" aria-label="Import models from a file" title="Import models from a file" onClick={models.onImport}><ImportIcon size={12} /></button>
+            {!models.entries.some(e => e.id === 'basic') && <button type="button" className="cmIconBtn cmIconBtn--small" aria-label="Add the basic model" title="Add the basic model that comes with Scriblr: a bare adult with a face, ages, builds and expressions, published" onClick={models.onAddBasic}><MannequinIcon size={12} /></button>}
             <button type="button" className="cmIconBtn cmIconBtn--small" aria-label="Export all the models to a file" title="Export all the models to a file" disabled={models.entries.length === 0} onClick={models.onExportAll}><ExportIcon size={12} /></button>
           </span>
         </div>

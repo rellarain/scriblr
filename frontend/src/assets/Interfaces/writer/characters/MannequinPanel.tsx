@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { getPublishedModels } from '../../../../api/characterModelsApi'
+import { addBasicModel, getPublishedModels } from '../../../../api/characterModelsApi'
 import type { CharacterDoc, CharacterFigure, PublishedModelOut } from '../../../../api/types'
 import { CloseIcon, DiceIcon, UserIcon } from '../../../icons'
 import { genresOf } from '../../admin/characters/engine/colour'
@@ -24,13 +24,27 @@ function Make({ projectId, setFigure }: { projectId: string; setFigure: Characte
   const [genre, setGenre] = useState('')
   const [busy, setBusy] = useState(false)
   const [problem, setProblem] = useState('')
+  const [tick, setTick] = useState(0)
   useEffect(() => {
     let live = true
     getPublishedModels().then(r => { if (live) setModels(Array.isArray(r.models) ? r.models : []) }).catch(() => { if (live) { setModels([]); setProblem('The models could not be loaded.') } })
     return () => { live = false }
-  }, [])
+  }, [tick])
   const chosen = models?.find(m => m.id === modelId) ?? models?.[0]
   const genres = chosen ? genresOf(chosen.content) : []
+
+  // No model is published: the basic adult that comes with the app can be added (the server publishes it), then the list is read again.
+  async function addBasic() {
+    setBusy(true)
+    setProblem('')
+    try {
+      await addBasicModel()
+      setTick(t => t + 1)
+    } catch (err) {
+      setProblem(message(err, 'The basic model could not be added.'))
+    }
+    setBusy(false)
+  }
 
   async function make() {
     if (!chosen) return
@@ -49,7 +63,12 @@ function Make({ projectId, setFigure }: { projectId: string; setFigure: Characte
     <div className="charMannequin" role="group" aria-label="Mannequin">
       <h4 className="charLabel">Mannequin</h4>
       {models === null && <p className="charHint" role="status">Looking for models…</p>}
-      {models !== null && models.length === 0 && !problem && <p className="charHint">No model is published yet. Models are designed and published in Configuration, Characters.</p>}
+      {models !== null && models.length === 0 && !problem && (
+        <div className="charRow">
+          <p className="charHint">No model is published yet. Models are designed and published in Designer; the basic adult that comes with Scriblr can be added here.</p>
+          <button type="button" className="charIconBtn" aria-label="Add the basic model" title="Add the basic model that comes with Scriblr, published" disabled={busy} onClick={() => { void addBasic() }}><UserIcon size={16} /></button>
+        </div>
+      )}
       {chosen && (
         <div className="charRow">
           <select className="charSelect charSelect--auto" aria-label="Model for the mannequin" value={chosen.id} onChange={e => { setModelId(e.target.value); setGenre('') }}>

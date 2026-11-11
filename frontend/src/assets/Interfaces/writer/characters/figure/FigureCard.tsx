@@ -5,7 +5,7 @@ import { viewBoxOf } from '../../../admin/characters/engine/frames'
 import type { Box } from '../../../admin/characters/engine/geometry'
 import type { View } from '../../../admin/characters/engine/rig'
 import { hotspotsOf, regionsOf, type Layers, type Region } from './figureEditing'
-import { cropBox, solveFigure, type Crop } from './figureState'
+import { cropBox, followHeight, solveFigure, type Crop } from './figureState'
 import { Figure } from './Figure'
 
 // The card of the editor: the figure on its tile, looked at through the crop the writer chose, with the model's frames laid on it as stacked sheets (card-wide buttons, nested like
@@ -33,15 +33,15 @@ export function FigureCard({ copy, figure, view, crop, region, objectId, layers,
   onRegion: (id: string) => void
   onObject: (id: string) => void
 }) {
-  const box = useMemo(() => cropBox(copy, crop, view), [copy, crop, view])
   const solved = useMemo(() => solveFigure(copy, figure, crop, view), [copy, figure, crop, view])
+  const box = useMemo(() => cropBox(copy, crop, view, solved.global), [copy, crop, view, solved.global])
   const regions: Region[] = useMemo(() => regionsOf(copy), [copy])
   const [tip, setTip] = useState<string | null>(null)
 
   const sheets = useMemo(() => regions.flatMap(r => {
-    const at = onCard(r.frame ? viewBoxOf(r.frame, view, copy.axis ?? 100) : box, box)
+    const at = onCard(r.frame ? followHeight(viewBoxOf(r.frame, view, copy.axis ?? 100), solved.global, copy.axis ?? 100) : box, box)
     return at ? [{ region: r, at }] : []
-  }), [regions, view, copy.axis, box])
+  }), [regions, view, copy.axis, box, solved.global])
   const spots = useMemo(() => (region ? hotspotsOf(copy, figure, solved, region, layers).flatMap(h => { const at = onCard(h.box, box); return at ? [{ h, at }] : [] }) : []), [copy, figure, solved, region, layers, box])
   const shown = spots.find(s => s.h.object.id === tip)
 

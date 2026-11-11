@@ -32,6 +32,11 @@ function DesignerConsole({ toolbarHost = null }: { toolbarHost?: HTMLElement | n
     select(models.addModel(starterContent()))
   }
 
+  // The basic adult that comes with the app: added and published by the server, then opened.
+  async function addBasic() {
+    if (await models.addBasic()) select('basic')
+  }
+
   function duplicate(id: string) {
     const copy = models.duplicateModel(id)
     if (copy) select(copy)
@@ -92,9 +97,10 @@ function DesignerConsole({ toolbarHost = null }: { toolbarHost?: HTMLElement | n
       {entries.length === 0 ? (
         <div className="cmEmpty">
           <h3>No models yet</h3>
-          <p>A model is the set of shapes a character is drawn from: its body, its clothes and its hair, arranged in groups and objects. Create one, then draw its first shape from a template.</p>
+          <p>A model is the set of shapes a character is drawn from: its body, its clothes and its hair, arranged in groups and objects. Start from the basic model that comes with Scriblr (a bare adult with a face, ages, builds and expressions), or create one and draw its first shape from a template.</p>
           <div className="cmFoot">
-            <button type="button" className="cmBtn cmBtn--primary" onClick={create}>New model</button>
+            <button type="button" className="cmBtn cmBtn--primary" onClick={() => void addBasic()}>Add the basic model</button>
+            <button type="button" className="cmBtn" onClick={create}>New model</button>
             <button type="button" className="cmBtn" onClick={() => fileInput.current?.click()}>Import</button>
           </div>
         </div>
@@ -103,7 +109,7 @@ function DesignerConsole({ toolbarHost = null }: { toolbarHost?: HTMLElement | n
           <ModelPane
             key={current.id} entry={current} models={models} makeId={randomId} onRemove={remove} onDuplicate={duplicate} onExport={e => exportEntries([e])} barHost={toolbarHost}
             nav={{
-              entries, currentId: current.id, open: listOpen, onOpen: setListOpen, onSelect: select, onNew: create, onImport: () => fileInput.current?.click(),
+              entries, currentId: current.id, open: listOpen, onOpen: setListOpen, onSelect: select, onNew: create, onAddBasic: () => void addBasic(), onImport: () => fileInput.current?.click(),
               onExportAll: () => exportEntries(entries), onDuplicate: duplicate, onMove: models.moveModel,
             }}
           />

@@ -27,6 +27,15 @@ def get_published_models(root: Path = Depends(get_app_data_storage_root)) -> Pub
     return store.published_models(root)
 
 
+@router.post("/basic", response_model=ModelCatalog)
+def add_basic_model(root: Path = Depends(get_app_data_storage_root)) -> ModelCatalog:
+    """Add the basic adult that comes with the app (published when its name is free). 409 when it is already in the catalog."""
+    try:
+        return store.add_basic_model(root)
+    except store.BasicModelPresentError as exc:
+        raise HTTPException(status_code=409, detail=str(exc)) from exc
+
+
 @router.post("/{model_id}/publish", response_model=ModelCatalog)
 def publish_model(model_id: str, root: Path = Depends(get_app_data_storage_root)) -> ModelCatalog:
     try:

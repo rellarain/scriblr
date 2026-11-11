@@ -2,7 +2,7 @@ import type { CharacterFigure, FigureColour, ModelContent, ModelFrame, ModelPres
 import { colourById, paletteOf, rollChoices, slotById, slotsOf, type Colouring, type Rng, type SlotChoice, type SlotChoices } from '../../../admin/characters/engine/colour'
 import { axesFor, chosenForm, classesOf, membersOf, presetsOf, shownMember, type Choices } from '../../../admin/characters/engine/forms'
 import { framesOf, hiddenThrough, tileOf, viewBoxOf } from '../../../admin/characters/engine/frames'
-import type { Box } from '../../../admin/characters/engine/geometry'
+import type { Box, Mat } from '../../../admin/characters/engine/geometry'
 import { activeLocks } from '../../../admin/characters/engine/locks'
 import { drawable, paintShapes, type PaintItem } from '../../../admin/characters/engine/paint'
 import { applyPreset, isOn, type TestState } from '../../../admin/characters/engine/presets'
@@ -145,9 +145,17 @@ export function restBox(copy: ModelContent, view: View = 'front'): Box {
 }
 
 // The box a crop shows: the frame's (turned about the axis in the back view), else the figure's, or for a head without a frame the top of the figure as wide as it is.
-export function cropBox(copy: ModelContent, crop: Crop, view: View = 'front'): Box {
+// A box in the model's space moved with the figure's height: a model's Height slider scales the whole figure about its feet, so a frame on the bust or the face goes with the
+// bust or the face (a child's bust is lower and smaller). `global` is the figure's whole-model matrix, of which only the size is read (the back view's mirror is the frame's).
+export function followHeight(box: Box, global: Mat, axis = 100): Box {
+  const sx = Math.hypot(global[0], global[1]), sy = Math.hypot(global[2], global[3])
+  if (!Number.isFinite(sx) || !Number.isFinite(sy) || sx <= 0 || sy <= 0 || (Math.abs(sx - 1) < 1e-9 && Math.abs(sy - 1) < 1e-9)) return box
+  return { x: axis + (box.x - axis) * sx, y: 392 + (box.y - 392) * sy, w: box.w * sx, h: box.h * sy }
+}
+
+export function cropBox(copy: ModelContent, crop: Crop, view: View = 'front', global?: Mat): Box {
   const frame = frameFor(copy, crop)
-  if (frame) return viewBoxOf(frame, view, copy.axis ?? 100)
+  if (frame) return global ? followHeight(viewBoxOf(frame, view, copy.axis ?? 100), global, copy.axis ?? 100) : viewBoxOf(frame, view, copy.axis ?? 100)
   const whole = restBox(copy, view)
   return crop === 'head' || crop === 'bust' ? { x: whole.x, y: whole.y, w: whole.w, h: Math.min(whole.h, whole.w) } : whole
 }
@@ -180,8 +188,9 @@ export function drawFigure(copy: ModelContent, figure: CharacterFigure, crop: Cr
   const key = `${typeof crop === 'string' ? crop : crop.frame}|${view}|${square ? 1 : 0}`
   const hit = byKey.get(key)
   if (hit) return hit
-  const items = drawable(paintShapes(copy, solveFigure(copy, figure, crop, view), colouringOf(copy, figure)))
-  const box = cropBox(copy, crop, view)
+  const solved = solveFigure(copy, figure, crop, view)
+  const items = drawable(paintShapes(copy, solved, colouringOf(copy, figure)))
+  const box = cropBox(copy, crop, view, solved.global)
   const made: FigureDrawing = { box: square ? squareBox(box) : box, items, tile: HEX.test(figure.tile) ? figure.tile : tileOf(copy) }
   byKey.set(key, made)
   return made

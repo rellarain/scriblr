@@ -16,6 +16,11 @@ export function getPublishedModels(): Promise<PublishedModelList> {
   return api.get<PublishedModelList>('/character-models/published')
 }
 
+// Adds the basic adult that comes with the app, published (409 when it is already in the catalog).
+export function addBasicModel(): Promise<ModelCatalog> {
+  return api.post<ModelCatalog>('/character-models/basic')
+}
+
 const id = encodeURIComponent
 
 // Freezes the draft as the next published version.

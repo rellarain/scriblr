@@ -56,6 +56,11 @@ export function createMockModels(initial: ModelEntry[]) {
       state.entries = drafts.map(m => ({ ...(byId.get(m.id) ?? { id: m.id, published: null, history: [], nextVersion: 1 }), draft: normalizeContent(m.draft) }))
       return ok(catalog())
     }
+    if (parts[0] === 'basic' && parts.length === 1 && method === 'POST') {
+      if (state.entries.some(e => e.id === 'basic')) return fail(409, 'The basic model is already here.')
+      state.entries.push(liveEntry('basic', modelContent('Adult (basic)', structuredClone(riggedFigure()))))
+      return ok(catalog())
+    }
     if (parts[0] === 'published' && method === 'GET') {
       return ok({ models: state.entries.filter(e => e.published).map(e => ({ id: e.id, version: e.published!.version, publishedAt: e.published!.publishedAt, content: e.published!.content })) })
     }

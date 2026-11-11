@@ -15,8 +15,8 @@ export interface CharactersBackend {
   failNext(path: string, status: number, detail: unknown): void
 }
 
-// `copies` are the model copies the project holds, `published` the models the catalog offers to copy.
-export function charactersBackend(initial: CharacterDoc[] = [], more: { copies?: FigureModel[]; published?: PublishedModelOut[] } = {}): CharactersBackend {
+// `copies` are the model copies the project holds, `published` the models the catalog offers to copy, `basic` the model that asking for the basic one publishes.
+export function charactersBackend(initial: CharacterDoc[] = [], more: { copies?: FigureModel[]; published?: PublishedModelOut[]; basic?: PublishedModelOut } = {}): CharactersBackend {
   const mock = createMockCharacters(initial)
   const figures = createMockFigureModels(() => more.published ?? [], more.copies ?? [])
   const failures = new Map<string, { status: number; detail: unknown }>()
@@ -32,6 +32,11 @@ export function charactersBackend(initial: CharacterDoc[] = [], more: { copies?:
     const parts = path.split('/').filter(Boolean).map(decodeURIComponent)
     // /projects/{id}/characters[/{characterId}] and /projects/{id}/figure-models; anything else the page asks for (settings) is answered with an empty document.
     if (parts[0] === 'character-models' && parts[1] === 'published') return reply(200, { models: more.published ?? [] })
+    if (parts[0] === 'character-models' && parts[1] === 'basic' && method === 'POST') {
+      if (!more.basic || (more.published ?? []).some(m => m.id === more.basic!.id)) return reply(409, { detail: 'The basic model is already here.' })
+      more.published = [...(more.published ?? []), more.basic]
+      return reply(200, { schemaVersion: 1, models: [] })
+    }
     if (parts[0] !== 'projects' || (parts[2] !== 'characters' && parts[2] !== 'figure-models')) return reply(200, {})
     const body = typeof init?.body === 'string' ? JSON.parse(init.body) : undefined
     const answer = parts[2] === 'figure-models' ? figures.route(method, parts.slice(3), body) : mock.route(method, parts.slice(3), body)

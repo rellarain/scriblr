@@ -1272,6 +1272,7 @@ MODEL_PROPS: dict[str, tuple[tuple[str, ...], float, float, float]] = {
     "width": (_SHAPE_OR_OBJECT, 100.0, 5.0, 1000.0),
     "height": (_SHAPE_OR_OBJECT, 100.0, 5.0, 1000.0),
     "rotation": (_SHAPE_OR_OBJECT, 0.0, -360.0, 360.0),
+    "curve": (_SHAPE_OR_OBJECT, 0.0, -50.0, 50.0),
     "opacity": (_SHAPE_OR_OBJECT, 100.0, 0.0, 100.0),
     "roundness": (_SHAPE_OR_OBJECT, 0.0, -20.0, 20.0),
     "offset": (("edge",), 0.0, -200.0, 200.0),

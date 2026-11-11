@@ -39,6 +39,7 @@ from .api import (
     user_settings,
 )
 from .storage.ids import InvalidIdError
+from .storage import character_models_store
 from .storage.backup import ensure_pre_migration_backup
 from .storage.paths import get_app_data_root, get_projects_root
 from .storage.schema import PROJECT_FILE_VERSION
@@ -69,6 +70,10 @@ async def _lifespan(_app: FastAPI):
         sweep_temp_files(root)
         purge_trash(root)
     except OSError:
+        pass
+    try:
+        character_models_store.seed_on_first_start(get_app_data_root())  # a fresh install gets the basic adult, published
+    except (OSError, ValueError):
         pass
     yield
 

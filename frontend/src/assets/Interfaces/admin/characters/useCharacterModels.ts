@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
-import { discardModelChanges, getModels, publishModel, putModels, restoreModelVersion, unpublishModel } from '../../../../api/characterModelsApi'
+import { addBasicModel, discardModelChanges, getModels, publishModel, putModels, restoreModelVersion, unpublishModel } from '../../../../api/characterModelsApi'
 import type { ModelCatalog, ModelContent, ModelDraftList, ModelEntry } from '../../../../api/types'
 import { combineCountdown, combineSaveStatus, useAutosave } from '../../../../lib/useAutosave'
 import { copyName, moveBefore, normalizeContent, randomId, starterContent, type MakeId } from './modelContent'
@@ -142,6 +142,9 @@ export function useCharacterModels(makeId: MakeId = randomId) {
     }
   }
 
+  // The basic adult that comes with the app, added and published by the server (what is waiting is saved first).
+  const addBasic = () => act(() => addBasicModel())
+
   const publish = (id: string) => act(() => publishModel(id))
   const unpublish = (id: string) => act(() => unpublishModel(id))
   const discard = (id: string) => act(() => discardModelChanges(id))
@@ -149,7 +152,7 @@ export function useCharacterModels(makeId: MakeId = randomId) {
 
   return {
     entries, status, loadError, reload: load, busy, actionError, clearActionError: () => setActionError(undefined),
-    edit, setDraft, addModel, removeModel, moveModel, duplicateModel, importModels,
+    edit, setDraft, addModel, removeModel, moveModel, duplicateModel, importModels, addBasic,
     publish, unpublish, discard, restore,
     saveStatus: combineSaveStatus(draftSave), saveCountdown: combineCountdown(draftSave), saveNow: draftSave.flush,
   }

@@ -7,7 +7,7 @@
   2. Tests: backend (ruff, pytest) and frontend (tsc, eslint, vitest), unless -SkipTests.
   3. Build: frontend (vite), the backend (PyInstaller, one-dir), the installer (electron-builder), unless -SkipBuild.
   4. Smoke check, unless -SkipSmoke: the packaged backend is started on a free port against a scratch data
-     folder (never your projects), asked for /api/health, the shelves' overview and a deep route, shown a bad
+     folder (never your projects), asked for /api/health, the shelves' overview, the basic model and a deep route, shown a bad
      id, and then stopped; no process may be left behind.
   5. End-to-end check of the packaged app, unless -SkipE2E: Playwright launches Scriblr.exe (electron/e2e/smoke.mjs) against a scratch
      data folder and checks its window, its backend, a project on the shelves, the single-instance lock and a clean quit.
@@ -132,10 +132,14 @@ if (-not $SkipSmoke) {
     $page = Invoke-WebRequest "$base/write" -UseBasicParsing
     if ($page.StatusCode -ne 200 -or $page.Content -notmatch '<div id="root">') { throw 'A deep route did not serve the app' }
 
+    # a fresh data folder has the basic adult published: its data file is part of the bundle (backend/app/seed, see scriblr.spec)
+    $models = Invoke-RestMethod "$base/api/character-models/published"
+    if (@($models.models).Count -ne 1 -or $models.models[0].id -ne 'basic' -or @($models.models[0].content.shapes).Count -lt 60) { throw 'The packaged backend did not publish the basic model on a fresh install' }
+
     $badStatus = 0
     try { Invoke-WebRequest "$base/api/projects/..%5C..%5Cx" -UseBasicParsing | Out-Null } catch { $badStatus = [int]$_.Exception.Response.StatusCode }
     if ($badStatus -lt 400) { throw "A bad project id was not refused (status $badStatus)" }
-    Write-Host "Backend answered on port $port; the shelves, a deep route and a bad id behave."
+    Write-Host "Backend answered on port $port; the shelves, the basic model, a deep route and a bad id behave."
   } finally {
     if (-not $process.HasExited) { & taskkill /PID $process.Id /T /F | Out-Null }
     Remove-Item Env:SCRIBLR_DATA_DIR, Env:SCRIBLR_PORT -ErrorAction SilentlyContinue

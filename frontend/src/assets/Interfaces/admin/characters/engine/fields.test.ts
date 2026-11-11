@@ -174,6 +174,26 @@ describe('what the sliders do to the drawing', () => {
     near(flat.w, at0.h, 2); near(flat.h, at0.w, 2)     // a quarter turn swaps width and height
   })
 
+  it('lifts the two ends of a shape against its middle (a smile) and drops them for a negative amount, whatever its points', () => {
+    let c = nosed()
+    c = addShape(c, 'oN', { ...newShape('lip', 'Lip', 'oval', box(60, 80, 80, 20)), slot: 'k_skin' })
+    const { c: d, id } = withField(c, { feature: 'shape', target: 'lip', i: 0 }, 'curve')
+    expect(d.ranges[0]).toMatchObject({ min: -10, rest: 0, max: 10 })
+    const pts = (v: number) => solve(d, { [id]: v }).shapes.lip.local
+    const at0 = pts(0), up = pts(10), down = pts(-10)
+    const left = at0.reduce((m, p, i) => (p.x < at0[m].x ? i : m), 0), right = at0.reduce((m, p, i) => (p.x > at0[m].x ? i : m), 0)
+    const top = at0.reduce((m, p, i) => (p.y < at0[m].y ? i : m), 0)
+    near(up[left].y, at0[left].y - 2); near(up[right].y, at0[right].y - 2)        // a smile: the ends go up (y runs downward)
+    near(down[left].y, at0[left].y + 2); near(down[right].y, at0[right].y + 2)    // a frown
+    near(up[top].y, at0[top].y)                                                   // the middle stays where it was
+    near(up[top].x, at0[top].x)
+    // an object's curve reaches every shape in it about the object's own middle, and a form with another number of points is curved too
+    const o = withField(nosed(), { feature: 'object', target: 'oN', i: 0 }, 'curve')
+    const before = solve(o.c, {}).shapes.plate.local, after = solve(o.c, { [o.id]: 10 }).shapes.plate.local
+    expect(after.length).toBe(before.length)
+    expect(after.some((p, i) => Math.abs(p.y - before[i].y) > 0.5)).toBe(true)
+  })
+
   it('moves one point and pushes one edge outward', () => {
     const p = withField(nosed(), { feature: 'point', target: 'plate', i: 1 }, 'x')       // the top right corner
     const at0 = boxOf(p.c, {}, 'plate'), out = boxOf(p.c, { [p.id]: 10 }, 'plate')

@@ -6,6 +6,7 @@ ever touches a project or a character.
 """
 
 import json
+import sys
 import threading
 from datetime import datetime
 from pathlib import Path
@@ -50,6 +51,10 @@ class PublishRefusedError(ValueError):
     """The draft cannot be published as it is; the message says what to fix."""
 
 
+class BasicModelPresentError(ValueError):
+    """The catalog already has the basic model."""
+
+
 def _models_path(root: Path) -> Path:
     return root / "character-models.json"
 
@@ -59,7 +64,8 @@ def _published(version: int, content: ModelContent, at: Optional[datetime] = Non
 
 
 def default_catalog() -> ModelCatalog:
-    """A new install starts with no model: the seed model (a basic adult) is a later phase."""
+    """The catalog a missing file starts as: empty. The basic adult is added by `seed_on_first_start`, not here, so a catalog that is read is never changed behind the
+    admin's back."""
     return ModelCatalog()
 
 
@@ -755,3 +761,53 @@ def published_models(root: Path) -> PublishedModelList:
         PublishedModelOut(id=e.id, version=e.published.version, publishedAt=e.published.publishedAt, content=e.published.content)
         for e in catalog.models if e.published
     ])
+
+
+# ---- the model that comes with the app ----
+
+BASIC_MODEL_ID = "basic"
+_SEEDED_MARKER = "character-models.seeded"
+
+
+def _seed_path() -> Path:
+    """The basic adult as data (generated from the old portrait engine and the mockup by frontend/scripts/seed-model): next to the app's code, or in the bundle."""
+    if hasattr(sys, "_MEIPASS"):
+        return Path(sys._MEIPASS) / "app" / "seed" / "basic_model.json"  # type: ignore[attr-defined]
+    return Path(__file__).resolve().parent.parent / "seed" / "basic_model.json"
+
+
+def basic_model_content() -> ModelContent:
+    return ModelContent.model_validate(json.loads(_seed_path().read_text(encoding="utf-8")))
+
+
+def add_basic_model(root: Path) -> ModelCatalog:
+    """Add the basic adult to the catalog as a draft and publish it (when its name is free: another published model with the same name leaves it a draft, which
+    the admin can rename and publish). Raises BasicModelPresentError when it is there already."""
+    content = basic_model_content()
+
+    def change(catalog: ModelCatalog) -> None:
+        if any(e.id == BASIC_MODEL_ID for e in catalog.models):
+            raise BasicModelPresentError("The basic model is already here.")
+        entry = ModelEntry(id=BASIC_MODEL_ID, draft=content)
+        catalog.models.append(entry)
+        taken = any(o.published and o.published.content.name.casefold() == content.name.casefold() for o in catalog.models if o.id != BASIC_MODEL_ID)
+        if not taken and not publish_faults(content):
+            entry.published = _published(entry.nextVersion, content)
+            entry.nextVersion += 1
+
+    return _mutate(root, change)
+
+
+def seed_on_first_start(root: Path) -> bool:
+    """On the first start of a build that has the basic model: a catalog that has no model (a fresh install) gets it, published; a catalog that has models is left alone
+    (the admin offers it with a button). Either way it is done once: a marker is left, so a model the admin deletes does not come back. True when it was added."""
+    marker = root / _SEEDED_MARKER
+    with _lock:
+        if marker.exists():
+            return False
+        added = False
+        if not load_models(root).models:
+            add_basic_model(root)
+            added = True
+        marker.write_text("done", encoding="utf-8")
+        return added
