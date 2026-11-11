@@ -4,6 +4,7 @@ import { mkdirSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { dirname, join, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
+import type { CharacterFigure } from '../../src/api/types'
 import { copyBytes } from '../../src/assets/Interfaces/admin/characters/engine/limits'
 import { defaultValues, solve } from '../../src/assets/Interfaces/admin/characters/engine/rig'
 import { publishFaults } from '../../src/assets/Interfaces/admin/characters/modelContent'
@@ -21,12 +22,14 @@ console.log('faults', publishFaults(content))
 
 // the body against the mockup's own solve at rest: the box of every shape the two share
 const mock = loadMockupModel()
+// the clothes have the mockup's ids too, and are not the body
+const CLOTHES = new Set(['shirt', 'neckHole', 'collar', 'sleeveUpL', 'sleeveUpR', 'sleeveForeL', 'sleeveForeR', 'trouserHip', 'trouserL', 'trouserR', 'shoeL', 'shoeR'])
 const M = (globalThis as any).Mannequin
 const mres = M.solve(mock, M.defaultCfg(mock), 'front')
 const ares = solve(content, defaultValues(content), 'front')
 let worst = 0, worstId = ''
 for (const s of content.shapes) {
-  if (/^(ear|hd|brow|eye|nose|mouth|hr|hs|bd|mo)_/.test(s.id) || s.id === 'skull') continue
+  if (/^(ear|hd|brow|eye|nose|mouth|hr|hs|bd|mo)_/.test(s.id) || CLOTHES.has(s.id) || s.id === 'skull') continue
   const a = ares.shapes[s.id]?.box, m = mres.shapes[s.id]?.box
   if (!a || !m) continue
   const d = Math.max(Math.abs(a.x - m.x), Math.abs(a.y - m.y), Math.abs(a.w - m.w), Math.abs(a.h - m.h))
@@ -59,9 +62,23 @@ const fantasy = [['ears', 'fantasy'], ['eyes', 'style'], ['extraEyes', 'count'],
   const axis = content.objects.find(o => o.id === oid)!.axes!.find(a => a.id === aid)!
   return axis.options.filter(f => f.id !== axis.initial).map(f => ({ label: `${oid}: ${f.name}`, figure: { forms: { [`${oid}.${aid}`]: f.id } }, crop: 'bust' }))
 })
+const tops = content.presets!.filter(p => p.kind === 'Top').map(p => ({ label: `Top: ${p.name}`, figure: { values: p.values, forms: p.forms ?? {}, hidden: p.hidden }, crop: 'bust' }))
+const outfits: Array<{ label: string; figure: Partial<CharacterFigure>; crop: string }> = [
+  ...content.presets!.filter(p => p.kind === 'Outfit').map(p => ({ label: `Outfit: ${p.name}`, figure: { values: p.values, forms: p.forms ?? {}, hidden: p.hidden }, crop: 'figure' })),
+  { label: 'Skirt midi', figure: { forms: { 'skirt.length': 'midi' }, hidden: ['trousers'] }, crop: 'figure' },
+  { label: 'Skirt maxi', figure: { forms: { 'skirt.length': 'maxi' }, hidden: ['trousers'] }, crop: 'figure' },
+  { label: 'Coat buttoned', figure: { forms: { 'coat.style': 'shut', 'sleeves.length': 'long' } }, crop: 'figure' },
+  { label: 'Jacket buttoned arms up', figure: { forms: { 'jacket.style': 'shut', 'sleeves.length': 'long' }, values: { shoulder: 50 } }, crop: 'figure' },
+  { label: 'Outfit as it comes', figure: {}, crop: 'figure' },
+  { label: 'Long sleeves', figure: { forms: { 'sleeves.length': 'long' } }, crop: 'figure' },
+  { label: 'Sleeveless', figure: { forms: { 'sleeves.length': 'none' } }, crop: 'figure' },
+  { label: 'Top loose 200%', figure: { values: { looseTop: 200, looseBottom: 200 } }, crop: 'figure' },
+  { label: 'Top snug 0%', figure: { values: { looseTop: 0, looseBottom: 0 } }, crop: 'figure' },
+  { label: 'Arms raised, legs apart', figure: { values: { shoulder: 60, legSpread: 25 } }, crop: 'figure' },
+]
 const heads = ['oval', 'square', 'narrow', 'wide', 'pointed'].map(h => ({ label: `Short hair, ${h} head`, figure: { forms: { 'skull.headShape': h } }, crop: 'bust' }))
 const ends = ['eyeSize', 'eyeSpacing', 'eyeTilt', 'eyeOpen', 'browHeight', 'browAngle', 'noseSize', 'mouthSize', 'mouthCurve', 'earSize', 'headTilt'].flatMap(id => {
   const r = content.ranges.find(x => x.id === id)!
   return [{ label: `${r.name} min`, figure: { values: { [id]: r.min } }, crop: 'head' }, { label: `${r.name} max`, figure: { values: { [id]: r.max } }, crop: 'head' }]
 })
-writePreview(`${out}/index.html`, 'Seed model', content, [...hairs, ...beards, ...fantasy, ...heads, ...ends, ...expressions, ...ages, ...builds], sheet)
+writePreview(`${out}/index.html`, 'Seed model', content, [...outfits, ...tops, ...hairs, ...beards, ...fantasy, ...heads, ...ends, ...expressions, ...ages, ...builds], sheet)

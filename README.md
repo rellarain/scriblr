@@ -516,7 +516,7 @@ described, now stale, in `docs/data-model.md`).
   Limits (the same numbers on the frontend, `engine/limits.ts`, held equal by
   `schemaParity.test.ts`): points per shape warn 24 / stop 60, objects per group warn
   24 / stop 48, shapes per object warn 36 / stop 72 (the stops are `max_length`s), and
-  the size of a character's copy of a model warn 800 KB / stop 1536 KB (publish is refused
+  the size of a character's copy of a model warn 1200 KB / stop 2048 KB (publish is refused
   above the stop). Publish is also refused for a blank or duplicate name, a shape with
   fewer than three points, an object or group id that points at nothing, a cycle of
   groups, a shape in two objects, a pivot chain deeper than 9, an anchor whose shape is
@@ -544,7 +544,7 @@ described, now stale, in `docs/data-model.md`).
   `_pair_faults`, `_link_faults`, `_form_faults`, `_class_faults`, `_preset_faults`,
   `_colour_faults`, `_paint_faults` and `_proportion_faults` say the same words).
   The rig limits: sliders per model warn 60 / stop 120, drives per slider warn 12 / stop 24,
-  chain warn 6 / stop 9, groups per model 120, grip points warn 8 / stop 16, point links warn 100 / stop 200, axes per object warn 4 / stop 8, forms per
+  chain warn 6 / stop 9, groups per model 120, grip points warn 8 / stop 16, point links warn 600 / stop 1200, axes per object warn 4 / stop 8, forms per
   axis warn 24 / stop 48, presets per model warn 40 / stop 80, classes per model warn 12 /
   stop 24, members per class warn 12 / stop 24, form choices one style keeps stop 100, colour
   slots per model warn 16 / stop 32, default colours per slot warn 40 / stop 64, genres warn 8 /

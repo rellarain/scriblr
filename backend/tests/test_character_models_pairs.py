@@ -211,8 +211,9 @@ def test_links_may_not_go_round_in_a_circle(client: TestClient) -> None:
 def test_too_many_links_are_refused(client: TestClient) -> None:
     c = linked()
     many = [{"x": i % 100, "y": i // 100, "bind": {"kind": "point", "s": "s_body", "i": 0}} for i in range(MODEL_POINTS_MAX)]
-    c["shapes"] += [shape(f"s_{k}", f"Piece {k}", pts=many) for k in range(4)]
-    c["objects"][0]["shapes"] += [f"s_{k}" for k in range(4)]
+    pieces = MODEL_LINKS_MAX // MODEL_POINTS_MAX + 2
+    c["shapes"] += [shape(f"s_{k}", f"Piece {k}", pts=many) for k in range(pieces)]
+    c["objects"][0]["shapes"] += [f"s_{k}" for k in range(pieces)]
     detail = refused(client, c)
     assert f"A model may have at most {MODEL_LINKS_MAX} point links." in detail
 

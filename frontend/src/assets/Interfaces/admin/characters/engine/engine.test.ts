@@ -72,7 +72,7 @@ const content = (over: Partial<ModelContent> = {}): ModelContent => ({ name: 'Ad
 describe('limits', () => {
   it('uses the numbers the user chose', () => {
     expect([LIMITS.pointsWarn, LIMITS.pointsMax, LIMITS.objectsPerGroupWarn, LIMITS.objectsPerGroupMax, LIMITS.shapesPerObjectWarn, LIMITS.shapesPerObjectMax]).toEqual([24, 60, 24, 48, 36, 72])
-    expect([LIMITS.copyWarnBytes, LIMITS.copyMaxBytes]).toEqual([800 * 1024, 1536 * 1024])
+    expect([LIMITS.copyWarnBytes, LIMITS.copyMaxBytes]).toEqual([1200 * 1024, 2048 * 1024])
   })
   it('warns above the first number and stops at the second', () => {
     expect(level(24, 24, 60)).toBe('ok'); expect(level(25, 24, 60)).toBe('warn'); expect(level(59, 24, 60)).toBe('warn'); expect(level(60, 24, 60)).toBe('stop')

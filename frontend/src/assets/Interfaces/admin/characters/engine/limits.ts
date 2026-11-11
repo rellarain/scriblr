@@ -9,8 +9,8 @@ export const LIMITS = {
   objectsPerGroupMax: 48,
   shapesPerObjectWarn: 36,
   shapesPerObjectMax: 72,
-  copyWarnBytes: 800 * 1024,
-  copyMaxBytes: 1536 * 1024,
+  copyWarnBytes: 1200 * 1024,
+  copyMaxBytes: 2048 * 1024,
   // the rig: a pivot chain of at most 9 groups (refused above it, a warning above 6: torso, arm, forearm, hand and three finger joints is 7); sliders per model and what one slider drives
   chainWarn: 6,
   chainMax: 9,
@@ -19,8 +19,8 @@ export const LIMITS = {
   drivesWarn: 12,
   drivesMax: 24,
   // point links (a point welded to, following or locked to the edge of another shape), counted over the whole model; more than the most is refused at Publish
-  linksWarn: 100,
-  linksMax: 200,
+  linksWarn: 600,
+  linksMax: 1200,
   // forms: axes per object, forms per axis, presets per model (the stops are the server's max_lengths)
   axesWarn: 4,
   axesMax: 8,

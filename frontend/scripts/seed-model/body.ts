@@ -8,7 +8,8 @@ const r2 = (v: number): number => Math.round(v * 100) / 100
 
 function bindOf(b: any): ModelBind {
   if (b.e !== undefined) return { kind: 'edge', s: b.s, i: 0, d: [0, 0], e: b.e, t: r2(b.t), o: r2(b.o), ...(b.tan ? { tan: true } : {}) }
-  return { kind: 'point', s: b.s, i: b.i, d: [r2(b.d[0]), r2(b.d[1])], e: 0, t: 0, o: 0 }
+  // a garment's point follows a body point at an offset and, outward from the body, a thickness: the app's offset is the two together (and the looseness slider stretches both)
+  return { kind: 'point', s: b.s, i: b.i, d: [r2(b.d[0] + (b.n?.[0] ?? 0)), r2(b.d[1] + (b.n?.[1] ?? 0))], e: 0, t: 0, o: 0 }
 }
 function pointOf(p: any): ModelPoint {
   const q: ModelPoint = { x: r2(p.x), y: r2(p.y), m: p.m, hi: p.hi ? [r2(p.hi[0]), r2(p.hi[1])] : null, ho: p.ho ? [r2(p.ho[0]), r2(p.ho[1])] : null }

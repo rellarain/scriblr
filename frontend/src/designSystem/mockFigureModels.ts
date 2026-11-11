@@ -8,7 +8,7 @@ import type { MockAnswer } from './mockPresets'
 
 const ok = (body: unknown, status = 200): MockAnswer => ({ status, body })
 const fail = (status: number, detail: string): MockAnswer => ({ status, body: { detail } })
-export const MOCK_COPY_MAX_BYTES = 1536 * 1024
+export const MOCK_COPY_MAX_BYTES = 2048 * 1024
 export const MOCK_MAX_COPIES = 40
 
 // Twelve hex digits of a hash of the normalised content (the server's own hash differs; only equal content having an equal key matters here).

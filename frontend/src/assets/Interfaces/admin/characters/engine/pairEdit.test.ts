@@ -334,7 +334,7 @@ describe('welding and following a point', () => {
     const twinned = must(makeTwin(c, 'shape', 'shirt', n => `${n}_tw`))
     expect(refused(linkToPoint(twinned, 's_tw', 0, 'body', 0, 0, 'weld'))).toMatch(/twin has no points/)
     const full: ModelContent = { ...c, shapes: c.shapes.map(s => (s.id === 'shirt' ? { ...s, pts: Array.from({ length: LIMITS.linksMax }, () => ({ x: 1, y: 1, m: 's' as const, bind: { kind: 'point' as const, s: 'body', i: 0, d: [0, 0] as [number, number], e: 0, t: 0, o: 0 } })) } : s)) }
-    expect(refused(linkToPoint({ ...full, shapes: [...full.shapes.filter(s => s.id !== 'body'), sharp('body', [[1, 1], [2, 1], [2, 2]]), sharp('other', [[1, 1], [2, 1], [2, 2]])] }, 'other', 0, 'body', 0, 0, 'weld'))).toMatch(/at most 200 point links/)
+    expect(refused(linkToPoint({ ...full, shapes: [...full.shapes.filter(s => s.id !== 'body'), sharp('body', [[1, 1], [2, 1], [2, 2]]), sharp('other', [[1, 1], [2, 1], [2, 2]])] }, 'other', 0, 'body', 0, 0, 'weld'))).toMatch(/at most 1200 point links/)
   })
   it('is cut when the shape it points at goes', () => {
     const c = must(linkToPoint(dressed(), 'shirt', 0, 'body', 60, 60, 'weld'))
@@ -416,10 +416,10 @@ describe('the checks and notes about pairs and links', () => {
   })
   it('count links and warn above the warning level and stop above the limit', () => {
     const many = (n: number): ModelContent => ({ ...dressed(), shapes: dressed().shapes.map(s => (s.id === 'shirt' ? { ...s, pts: Array.from({ length: n }, () => ({ x: 1, y: 1, m: 's' as const, bind: { kind: 'point' as const, s: 'body', i: 0, d: [0, 0] as [number, number], e: 0, t: 0, o: 0 } })) } : s)) })
-    expect(limitNotes(many(100)).filter(n => /point links/.test(n.text))).toEqual([])
-    expect(limitNotes(many(120)).find(n => /point links/.test(n.text))).toMatchObject({ level: 'warn' })
-    expect(limitNotes(many(201)).find(n => /point links/.test(n.text))).toMatchObject({ level: 'stop' })
-    expect(publishFaults(named(many(201)))).toContain(`A model may have at most ${LIMITS.linksMax} point links.`)
+    expect(limitNotes(many(LIMITS.linksWarn)).filter(n => /point links/.test(n.text))).toEqual([])
+    expect(limitNotes(many(LIMITS.linksWarn + 20)).find(n => /point links/.test(n.text))).toMatchObject({ level: 'warn' })
+    expect(limitNotes(many(LIMITS.linksMax + 1)).find(n => /point links/.test(n.text))).toMatchObject({ level: 'stop' })
+    expect(publishFaults(named(many(LIMITS.linksMax + 1)))).toContain(`A model may have at most ${LIMITS.linksMax} point links.`)
   })
 })
 

@@ -5,7 +5,7 @@ import type { CharacterFigure, ModelContent } from '../../../../api/types'
 import { ageOf, agePresets, atAge, blankFigure, cropBox, drawFigure, rollFigure, valuesOf } from '../../writer/characters/figure/figureState'
 import { applyPreset, restState } from './engine/presets'
 import { seededRng } from './engine/previews'
-import { copyBytes, LIMITS } from './engine/limits'
+import { copyBytes, LIMITS, linkCount } from './engine/limits'
 import { optionalObjects } from '../../writer/characters/figure/figureEditing'
 import { defaultValues, solve } from './engine/rig'
 import { publishFaults } from './modelContent'
@@ -201,6 +201,101 @@ describe('the basic model', () => {
     expect(extras).toEqual(expect.arrayContaining(['beard', 'moustache', 'extraEyes', 'horns', 'crown', 'laurel', 'flowers', 'hood', 'necklace']))
     expect(extras).not.toContain('eyes'); expect(extras).not.toContain('skull')
     expect(extras.some(id => seed.objects.find(o => o.id === id)!.mirrorOf)).toBe(false)
+  })
+
+  it('is dressed to begin with: a shirt with short sleeves, trousers and shoes, and underwear under them', () => {
+    const clothing = seed.objects.filter(o => o.layer === 'clothing').map(o => o.id)
+    expect(clothing).toEqual(expect.arrayContaining(['shirt', 'sleeves', 'trousers', 'shoes', 'jacket', 'coat', 'skirt', 'dress', 'briefs', 'bandeau', 'hood', 'crown', 'necklace']))
+    const rest = solve(seed, defaultValues(seed), 'front')
+    const drawn = (id: string) => objectOf(id).shapes.filter(sid => rest.shapes[sid]?.visible)
+    for (const id of ['shirt', 'trousers', 'shoes', 'briefs', 'bandeau']) expect(drawn(id).length, id).toBeGreaterThan(0)
+    // short sleeves: the upper arms, not the forearms
+    expect(drawn('sleeves').sort()).toEqual(['sleeveUpL', 'sleeveUpR'])
+    // the garments that are put on are off to begin with
+    for (const id of ['jacket', 'coat', 'skirt', 'dress']) expect(drawn(id), id).toEqual([])
+  })
+
+  it('has the fifteen necklines of the old portrait as forms of the shirt, each one a hole cut out of it', () => {
+    const axis = objectOf('shirt').axes!.find(a => a.id === 'neckline')!
+    expect(axis.options.map(f => f.id)).toEqual(['crew', 'vneck', 'deepv', 'scoop', 'widescoop', 'boat', 'square', 'sweetheart', 'henley', 'polo', 'mock', 'turtle', 'cowl', 'offshoulder', 'strapless'])
+    expect(axis.initial).toBe('crew')
+    const holes = axis.options.map(f => solve(seed, defaultValues(seed), 'front', { forms: { 'shirt.neckline': f.id } }).shapes.neckHole.box)
+    // every hole is a different one, and a deeper neckline is a deeper hole
+    expect(new Set(holes.map(h => `${h.x.toFixed(1)},${h.y.toFixed(1)},${h.w.toFixed(1)},${h.h.toFixed(1)}`)).size).toBeGreaterThanOrEqual(12)
+    const depth = (id: string) => holes[axis.options.findIndex(f => f.id === id)].h
+    expect(depth('deepv')).toBeGreaterThan(depth('vneck')); expect(depth('vneck')).toBeGreaterThan(depth('crew'))
+    expect(holes[axis.options.findIndex(f => f.id === 'widescoop')].w).toBeGreaterThan(holes[axis.options.findIndex(f => f.id === 'crew')].w)
+    // and the fifteen come as ready tops, with the sleeves that go with them
+    const tops = seed.presets!.filter(p => p.kind === 'Top')
+    expect(tops).toHaveLength(15)
+    expect(tops.find(p => p.id === 'top_strapless')!.forms).toEqual({ 'shirt.neckline': 'strapless', 'sleeves.length': 'none' })
+    expect(tops.find(p => p.id === 'top_offshoulder')!.forms!['sleeves.length']).toBe('none')
+  })
+
+  it('has what a neckline brings: buttons, flaps, a drape and a roll round the neck, each only in its own', () => {
+    const shown = (neck: string) => objectOf('shirt').shapes.filter(sid => !seed.shapes.find(sh => sh.id === sid)!.helper).filter(sid => solve(seed, defaultValues(seed), 'front', { forms: { 'shirt.neckline': neck } }).shapes[sid]?.visible)
+    expect(shown('crew')).toEqual(['shirt', 'collar'])
+    expect(shown('henley')).toEqual(expect.arrayContaining(['placket', 'button1', 'button2', 'button3']))
+    expect(shown('polo')).toEqual(expect.arrayContaining(['flapL', 'flapR', 'poloPlacket']))
+    expect(shown('cowl')).toContain('cowl'); expect(shown('turtle')).toContain('turtleCollar'); expect(shown('mock')).toContain('mockCollar')
+    expect(shown('strapless')).not.toContain('collar')
+  })
+
+  it('has the sleeves of three lengths and the other garments in forms and lengths: a jacket, a coat, a skirt of four lengths and a dress of five necklines', () => {
+    const names = (id: string, axis: string) => objectOf(id).axes!.find(a => a.id === axis)!.options.map(f => f.id)
+    expect(names('sleeves', 'length')).toEqual(['none', 'short', 'long'])
+    expect(names('jacket', 'style')).toEqual(['none', 'open', 'shut']); expect(names('coat', 'style')).toEqual(['none', 'open', 'shut'])
+    expect(names('skirt', 'length')).toEqual(['none', 'mini', 'knee', 'midi', 'maxi'])
+    expect(names('dress', 'style')).toEqual(['none', 'crew', 'vneck', 'scoop', 'boat', 'square'])
+    // a longer skirt is longer, a coat is longer than a jacket, long sleeves reach the wrist
+    const bottom = (forms: Record<string, string>, ids: string[]) => Math.max(...ids.map(id => { const b = solve(seed, defaultValues(seed), 'front', { forms }).shapes[id].box; return b.y + b.h }))
+    expect(bottom({ 'skirt.length': 'maxi' }, ['skirtBody'])).toBeGreaterThan(bottom({ 'skirt.length': 'mini' }, ['skirtBody']) + 80)
+    expect(bottom({ 'coat.style': 'open' }, ['coatBody'])).toBeGreaterThan(bottom({ 'jacket.style': 'open' }, ['jacketBody']) + 40)
+    expect(bottom({ 'sleeves.length': 'long' }, ['sleeveForeL'])).toBeGreaterThan(190)
+    // the jacket and the coat have an opening that shows the shirt, and lapels round it
+    const lapel = (form: string) => solve(seed, defaultValues(seed), 'front', { forms: { 'jacket.style': form } }).shapes.jacketLapel.box
+    expect(lapel('open').h).toBeGreaterThan(lapel('shut').h)
+  })
+
+  it('has the garments follow the body: wider shoulders widen the shirt, spread legs spread the trousers, and the two sides are the same at rest', () => {
+    const at = (values: Record<string, number>) => solve(seed, { ...defaultValues(seed), ...values }, 'front').shapes
+    const rest = at({}), wide = at({ shoulders: 120 }), apart = at({ legSpread: 25 })
+    expect(wide.shirt.box.w).toBeGreaterThan(rest.shirt.box.w + 2)
+    expect(apart.trouserL.box.x).not.toBeCloseTo(rest.trouserL.box.x, 0)
+    expect(apart.trouserR.box.x).not.toBeCloseTo(rest.trouserR.box.x, 0)
+    for (const [l, r] of [['sleeveUpL', 'sleeveUpR'], ['trouserL', 'trouserR'], ['shoeL', 'shoeR']]) {
+      expect(rest[l].box.w, l).toBeCloseTo(rest[r].box.w, 0)
+      expect(rest[l].box.x + rest[l].box.w / 2 + rest[r].box.x + rest[r].box.w / 2, `${l} and ${r} are mirror images`).toBeCloseTo(200, 0)
+    }
+    // a looser top is further from the body, a snug one closer
+    expect(at({ looseTop: 200 }).shirt.box.w).toBeGreaterThan(rest.shirt.box.w); expect(at({ looseTop: 0 }).shirt.box.w).toBeLessThan(rest.shirt.box.w)
+  })
+
+  it('wears a shirt and its sleeves under a jacket or a coat, and underwear under what covers it', () => {
+    expect(objectOf('shirt').under).toEqual(['jacket', 'coat']); expect(objectOf('sleeves').under).toEqual(['jacket', 'coat'])
+    expect(objectOf('briefs').under).toEqual(expect.arrayContaining(['trousers', 'skirt', 'dress']))
+    expect(objectOf('bandeau').under).toEqual(expect.arrayContaining(['shirt', 'dress', 'jacket']))
+    const ids = new Set(seed.objects.map(o => o.id))
+    for (const o of seed.objects) for (const u of o.under ?? []) expect(ids.has(u), `${o.id} is worn under ${u}`).toBe(true)
+  })
+
+  it('has the outfits as presets that take things off or put them on, and Randomise never takes a garment off or puts one on', () => {
+    const outfits = seed.presets!.filter(p => p.kind === 'Outfit')
+    expect(outfits.map(p => p.name)).toEqual(['Everyday', 'Jacket', 'Coat', 'Skirt and top', 'Dress', 'Underwear only'])
+    const fig: CharacterFigure = blankFigure('basic', seed)
+    for (let s = 1; s <= 60; s++) {
+      const rolled = rollFigure(seed, fig, seededRng(s + 300))
+      expect(rolled.hidden).toEqual([])
+      for (const k of ['jacket.style', 'coat.style', 'skirt.length', 'dress.style']) expect(rolled.forms[k] ?? 'none', k).toBe('none')
+    }
+  })
+
+  it('has a slot for the colours of the garments of its own: trousers and skirts, jackets and coats, underwear', () => {
+    for (const id of ['k_trouser', 'k_outer', 'k_under']) {
+      expect(seed.slots!.find(sl => sl.id === id)!.colours.length, id).toBeGreaterThan(3)
+      expect(seed.shapes.some(sh => sh.slot === id), id).toBe(true)
+    }
+    expect(linkCount(seed)).toBeLessThan(LIMITS.linksWarn)
   })
 
   it('rolls a face that has no beard most of the time and always some hair', () => {

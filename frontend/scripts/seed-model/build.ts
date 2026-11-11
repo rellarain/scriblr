@@ -7,6 +7,7 @@ import type { MakeId } from '../../src/assets/Interfaces/admin/characters/modelC
 import { bodyParts, bodyRanges, twinBody } from './body'
 import { loadExact, loadMockupModel, type ExactData, type ExactShape } from './exact'
 import { buildPart, pairUp, type PartSpec } from './face'
+import { clothesParts, finishClothes } from './clothes'
 import { hairParts } from './hair'
 import { AGES, BUILDS, EXPRESSIONS } from './presets'
 
@@ -83,6 +84,13 @@ const fantasySlots = (): ModelSlot[] => [
   { id: 'k_bloom', name: 'Blossoms', lMin: 30, lRest: 72, lMax: 96, aMin: 100, aRest: 100, aMax: 100, colours: SLOT_COLOURS('bloom', ['#f3d27a', '#bdd94a', '#e49aae', '#f3efea', '#b5473a', '#8a6aa8']) },
 ]
 
+// The colour slots of the clothes besides the shirt's (Clothing) and the shoes': trousers and skirts, the outer layer and underwear, with default colours of their own.
+const clothingSlots = (): ModelSlot[] => [
+  { id: 'k_outer', name: 'Jacket and coat', lMin: 8, lRest: 28, lMax: 90, aMin: 100, aRest: 100, aMax: 100, colours: SLOT_COLOURS('outer', ['#2b2b33', '#5a4a38', '#3e5a3a', '#2f4a5a', '#802020', '#6b6b6b', '#d9d2c0', '#4a3f5e']) },
+  { id: 'k_under', name: 'Underwear', lMin: 20, lRest: 80, lMax: 98, aMin: 100, aRest: 100, aMax: 100, colours: SLOT_COLOURS('under', ['#f2eee4', '#d9d2c0', '#9a9a9a', '#2b2b33', '#e8c3c3', '#c9a0a0']) },
+  { id: 'k_trouser', name: 'Trousers and skirts', lMin: 8, lRest: 30, lMax: 90, aMin: 100, aRest: 100, aMax: 100, colours: SLOT_COLOURS('trouser', ['#3a4658', '#2b2b33', '#5a4a38', '#6b6b6b', '#8a7a5a', '#2f3a4a', '#d9d2c0', '#4a3f5e']) },
+]
+
 export interface Report { part: string; channels: number; pairs: string; points: number }
 
 // The groups and objects a frame hides (a group takes everything under it with it), with their twins.
@@ -127,16 +135,19 @@ export function buildSeed(): { content: ModelContent; report: Report[] } {
     report.push({ part: spec.objectName, channels: r.channels, pairs: r.pairs, points: r.points })
   })
   const body = bodyParts(mock)
+  const clothes = clothesParts(mock)
   const hair = hairParts(mock, faceShapes.find(s => s.id === 'skull')!.pts)
   const head: ModelGroup = { id: 'head', name: 'Head', parent: 'torso', objects: faceObjects.map(o => o.id), pivot: [100, 54], attach: { shape: 'neck', kind: 'point', i: 0, t: 1, slider: null, rx: 0.5, ry: 0 } }
   let content: ModelContent = {
-    name: 'Adult (basic)', description: 'A basic adult, bare: the body, the head and its features, with the ages, builds and expressions as presets.',
-    shapes: [...body.shapes, ...faceShapes, ...hair.shapes], objects: [...body.objects, ...faceObjects, ...hair.objects], groups: [...body.groups, head, hair.group], axis: 100, ranges: [...bodyRanges(mock), ...hair.ranges],
-    presets: [...AGES, ...BUILDS, ...EXPRESSIONS, ...hair.presets, ...facialHairPresets(data)], classes: [], genres: standardGenres(), palette: starterPalette(), slots: [...standardSlots(), ...fantasySlots()], bones: [], headBone: null,
+    name: 'Adult (basic)', description: 'A basic adult in everyday clothes: the body, the head and its features, hair, clothes and fantasy parts, with the ages, builds, expressions, hairstyles and outfits as presets.',
+    shapes: [...body.shapes, ...faceShapes, ...hair.shapes, ...clothes.shapes], objects: [...body.objects, ...faceObjects, ...hair.objects, ...clothes.objects],
+    groups: [...body.groups.map(g => (g.id === 'torso' ? { ...g, objects: [...g.objects, ...clothes.objects.map(o => o.id)] } : g)), head, hair.group], axis: 100, ranges: [...bodyRanges(mock), ...hair.ranges, ...clothes.ranges],
+    presets: [...AGES, ...BUILDS, ...EXPRESSIONS, ...hair.presets, ...facialHairPresets(data), ...clothes.presets], classes: [], genres: standardGenres(), palette: starterPalette(), slots: [...standardSlots(), ...fantasySlots(), ...clothingSlots()], bones: [], headBone: null,
     frames: [], tile: '#e6d6c3', grips: [], fieldsets: [], patterns: [],
   }
   results.forEach(r => { content = pairUp(content, r, make) })
   content = twinBody(content, body, make)
+  content = finishClothes(content)
   content = nameSides(content)
   content = { ...content, frames: framesOf(content) }
   return { content, report }
