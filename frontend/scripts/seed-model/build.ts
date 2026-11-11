@@ -9,6 +9,7 @@ import { loadExact, loadMockupModel, type ExactData, type ExactShape } from './e
 import { buildPart, pairUp, type PartSpec } from './face'
 import { clothesParts, finishClothes } from './clothes'
 import { hairParts } from './hair'
+import { itemParts, itemSpec, mirrorItem, poseArmsApart, prepareItems } from './items'
 import { AGES, BUILDS, EXPRESSIONS } from './presets'
 
 export const TOLERANCE = 0.08
@@ -61,6 +62,7 @@ function prepare(data: ExactData): void {
   data.options.crownMetal = data.options.crown.filter(o => !wreaths.has(o.id))
   data.options.laurel = data.options.crown.filter(o => o.id === 'none' || o.id === 'laurel')
   data.options.flowers = data.options.crown.filter(o => o.id === 'none' || o.id === 'flowers')
+  prepareItems(data)
   data.options.extraEyes = data.options.eyeCount.filter(o => o.id !== 'one').map(o => ({ ...o, shapes: o.shapes.filter(s => s.p === 'eyes' && !standard.has(key(s))) }))
 }
 
@@ -78,7 +80,7 @@ const SLOT_COLOURS = (prefix: string, hexes: readonly string[]): ModelSlot['colo
 const fantasySlots = (): ModelSlot[] => [
   { id: 'k_horn', name: 'Horns', lMin: 8, lRest: 70, lMax: 92, aMin: 100, aRest: 100, aMax: 100, colours: SLOT_COLOURS('horn', FANTASY_SWATCHES.horn) },
   { id: 'k_metal', name: 'Metal and jewellery', lMin: 12, lRest: 58, lMax: 92, aMin: 100, aRest: 100, aMax: 100, colours: SLOT_COLOURS('metal', FANTASY_SWATCHES.metal) },
-  { id: 'k_gem', name: 'Gems', lMin: 10, lRest: 45, lMax: 90, aMin: 100, aRest: 100, aMax: 100, colours: SLOT_COLOURS('gem', ['#2882c0', '#b5473a', '#3e8a5a', '#8a5ab0', '#d6b030', '#3fe0e0', '#c4c8cf']) },
+  { id: 'k_gem', name: 'Gems', lMin: 10, lRest: 45, lMax: 90, aMin: 100, aRest: 100, aMax: 100, colours: SLOT_COLOURS('gem', ['#2882c0', '#b5473a', '#3e8a5a', '#8a5ab0', '#d6b030', '#3fe0e0', '#c4c8cf', '#2e8094']) },
   { id: 'k_hood', name: 'Hood', lMin: 8, lRest: 28, lMax: 90, aMin: 100, aRest: 100, aMax: 100, colours: SLOT_COLOURS('hood', FANTASY_SWATCHES.hood) },
   { id: 'k_leaf', name: 'Leaves', lMin: 10, lRest: 34, lMax: 80, aMin: 100, aRest: 100, aMax: 100, colours: SLOT_COLOURS('leaf', ['#4f7a3a', '#5f8a3e', '#3e5a3a', '#7ea65e']) },
   { id: 'k_bloom', name: 'Blossoms', lMin: 30, lRest: 72, lMax: 96, aMin: 100, aRest: 100, aMax: 100, colours: SLOT_COLOURS('bloom', ['#f3d27a', '#bdd94a', '#e49aae', '#f3efea', '#b5473a', '#8a6aa8']) },
@@ -89,6 +91,15 @@ const clothingSlots = (): ModelSlot[] => [
   { id: 'k_outer', name: 'Jacket and coat', lMin: 8, lRest: 28, lMax: 90, aMin: 100, aRest: 100, aMax: 100, colours: SLOT_COLOURS('outer', ['#2b2b33', '#5a4a38', '#3e5a3a', '#2f4a5a', '#802020', '#6b6b6b', '#d9d2c0', '#4a3f5e']) },
   { id: 'k_under', name: 'Underwear', lMin: 20, lRest: 80, lMax: 98, aMin: 100, aRest: 100, aMax: 100, colours: SLOT_COLOURS('under', ['#f2eee4', '#d9d2c0', '#9a9a9a', '#2b2b33', '#e8c3c3', '#c9a0a0']) },
   { id: 'k_trouser', name: 'Trousers and skirts', lMin: 8, lRest: 30, lMax: 90, aMin: 100, aRest: 100, aMax: 100, colours: SLOT_COLOURS('trouser', ['#3a4658', '#2b2b33', '#5a4a38', '#6b6b6b', '#8a7a5a', '#2f3a4a', '#d9d2c0', '#4a3f5e']) },
+]
+
+// The colour slots of the held items: the item's own colour, and the materials of the old drawing (wood, parchment, a flame and a glow, a drink; a crystal is a gem).
+const itemSlots = (): ModelSlot[] => [
+  { id: 'k_item', name: 'Held item', lMin: 8, lRest: 40, lMax: 90, aMin: 100, aRest: 100, aMax: 100, colours: SLOT_COLOURS('item', FANTASY_SWATCHES.item) },
+  { id: 'k_wood', name: 'Wood', lMin: 8, lRest: 25, lMax: 70, aMin: 100, aRest: 100, aMax: 100, colours: SLOT_COLOURS('wood', ['#6b4a2a', '#8a5a2b', '#4a3220', '#a67836', '#5c4a32']) },
+  { id: 'k_paper', name: 'Paper and parchment', lMin: 55, lRest: 90, lMax: 99, aMin: 100, aRest: 100, aMax: 100, colours: SLOT_COLOURS('paper', ['#f2ead6', '#e8dcc0', '#faf4e2', '#d9c9a0', '#ece3cf']) },
+  { id: 'k_flame', name: 'Flame', lMin: 30, lRest: 64, lMax: 90, aMin: 100, aRest: 100, aMax: 100, colours: SLOT_COLOURS('flame', ['#ffb347', '#ff8a3d', '#ffd34d', '#7fd6ff', '#b9f58a']) },
+  { id: 'k_wine', name: 'Drink', lMin: 10, lRest: 26, lMax: 60, aMin: 100, aRest: 100, aMax: 100, colours: SLOT_COLOURS('wine', ['#7a1f2e', '#4a2a6a', '#2a6a3a', '#8a5a2b']) },
 ]
 
 export interface Report { part: string; channels: number; pairs: string; points: number }
@@ -139,16 +150,25 @@ export function buildSeed(): { content: ModelContent; report: Report[] } {
   const hair = hairParts(mock, faceShapes.find(s => s.id === 'skull')!.pts)
   const head: ModelGroup = { id: 'head', name: 'Head', parent: 'torso', objects: faceObjects.map(o => o.id), pivot: [100, 54], attach: { shape: 'neck', kind: 'point', i: 0, t: 1, slider: null, rx: 0.5, ry: 0 } }
   let content: ModelContent = {
-    name: 'Adult (basic)', description: 'A basic adult in everyday clothes: the body, the head and its features, hair, clothes and fantasy parts, with the ages, builds, expressions, hairstyles and outfits as presets.',
+    name: 'Adult (basic)', description: 'A basic adult in everyday clothes: the body, the head and its features, hair, clothes, fantasy parts and held items, with the ages, builds, expressions, hairstyles, outfits and poses as presets.',
     shapes: [...body.shapes, ...faceShapes, ...hair.shapes, ...clothes.shapes], objects: [...body.objects, ...faceObjects, ...hair.objects, ...clothes.objects],
     groups: [...body.groups.map(g => (g.id === 'torso' ? { ...g, objects: [...g.objects, ...clothes.objects.map(o => o.id)] } : g)), head, hair.group], axis: 100, ranges: [...bodyRanges(mock), ...hair.ranges, ...clothes.ranges],
-    presets: [...AGES, ...BUILDS, ...EXPRESSIONS, ...hair.presets, ...facialHairPresets(data), ...clothes.presets], classes: [], genres: standardGenres(), palette: starterPalette(), slots: [...standardSlots(), ...fantasySlots(), ...clothingSlots()], bones: [], headBone: null,
+    presets: [...AGES, ...BUILDS, ...EXPRESSIONS, ...hair.presets, ...facialHairPresets(data), ...clothes.presets], classes: [], genres: standardGenres(), palette: starterPalette(), slots: [...standardSlots(), ...fantasySlots(), ...clothingSlots(), ...itemSlots()], bones: [], headBone: null,
     frames: [], tile: '#e6d6c3', grips: [], fieldsets: [], patterns: [],
   }
   results.forEach(r => { content = pairUp(content, r, make) })
   content = twinBody(content, body, make)
   content = finishClothes(content)
   content = nameSides(content)
+  // each arm is posed on its own, and each hand has an item of its own, in a group hung from the hand
+  content = poseArmsApart(content)
+  const leftItem = buildPart(data, itemSpec('L'), TOLERANCE)
+  report.push({ part: leftItem.object.name, channels: leftItem.channels, pairs: leftItem.pairs, points: leftItem.points })
+  const items = itemParts(content, leftItem, mirrorItem(leftItem))
+  content = {
+    ...content, shapes: [...content.shapes, ...items.shapes], objects: [...content.objects, ...items.objects], groups: [...content.groups, ...items.groups],
+    ranges: [...content.ranges, ...items.ranges], presets: [...(content.presets ?? []), ...items.presets], grips: items.grips,
+  }
   content = { ...content, frames: framesOf(content) }
   return { content, report }
 }

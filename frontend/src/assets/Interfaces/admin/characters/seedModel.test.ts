@@ -298,6 +298,123 @@ describe('the basic model', () => {
     expect(linkCount(seed)).toBeLessThan(LIMITS.linksWarn)
   })
 
+  // ---- held items ----
+  const ITEMS = ['none', 'staff', 'crook', 'crystal', 'wand', 'book', 'openbook', 'scroll', 'openscroll', 'lantern', 'torch', 'candle', 'goblet', 'flower', 'quill']
+  const preset = (id: string) => seed.presets!.find(p => p.id === id)!
+  // the box of everything an item draws (the band of skin over it for the fingers aside), with the arms at the given values
+  const itemBox = (obj: string, item: string, values: Record<string, number> = {}) => {
+    const solved = solve(seed, { ...defaultValues(seed), ...values }, 'front', { forms: { [`${obj}.item`]: item } }).shapes
+    const shown = objectOf(obj).shapes.map(id => solved[id]).filter(sh => sh?.visible)
+    const x0 = Math.min(...shown.map(sh => sh.box.x)), y0 = Math.min(...shown.map(sh => sh.box.y))
+    const x1 = Math.max(...shown.map(sh => sh.box.x + sh.box.w)), y1 = Math.max(...shown.map(sh => sh.box.y + sh.box.h))
+    return { x0, y0, x1, y1, w: x1 - x0, h: y1 - y0 }
+  }
+
+  it('has an item of its own in each hand: fourteen of them as forms of one axis, hidden until one is chosen, in a group hung from the hand', () => {
+    for (const side of ['L', 'R']) {
+      const o = objectOf(`item${side}`), axis = o.axes!.find(a => a.id === 'item')!
+      expect(axis.options.map(f => f.id)).toEqual(ITEMS)
+      expect(axis.initial).toBe('none')
+      expect(axis.roll).toBe(0)
+      expect(o.mirrorOf ?? null).toBeNull()
+    }
+    const handR = seed.groups.find(g => g.mirrorOf === 'handL')!.id
+    expect(seed.groups.find(g => g.id === 'holdL')).toMatchObject({ parent: 'handL', objects: ['itemL'] })
+    expect(seed.groups.find(g => g.id === 'holdR')).toMatchObject({ parent: handR, objects: ['itemR'] })
+    const rest = solve(seed, defaultValues(seed), 'front')
+    for (const id of ['itemL', 'itemR']) expect(objectOf(id).shapes.filter(sid => rest.shapes[sid]?.visible), id).toEqual([])
+    // the writer reaches them from the first step, each as a dropdown of its own
+    expect(optionalObjects(seed).map(o => o.id)).toEqual(expect.arrayContaining(['itemL', 'itemR']))
+  })
+
+  it('puts an item in the palm of its hand, and the left and the right are mirror images', () => {
+    for (const id of ITEMS.filter(i => i !== 'none')) {
+      const l = itemBox('itemL', id), r = itemBox('itemR', id)
+      expect(l.x0, `${id} in the left hand`).toBeLessThan(149); expect(l.x1, id).toBeGreaterThan(149)
+      expect(l.y0, id).toBeLessThan(211); expect(l.y1, id).toBeGreaterThan(211)
+      expect(l.x0 + l.x1 + r.x0 + r.x1, `${id}: the two hands hold it the same, mirrored`).toBeCloseTo(400, 0)
+      expect(r.y0, id).toBeCloseTo(l.y0, 0)
+    }
+    // the fingers are skin over the item, in front of it
+    const solved = solve(seed, defaultValues(seed), 'front', { forms: { 'itemL.item': 'staff' } }).shapes
+    const skin = objectOf('itemL').shapes.filter(id => seed.shapes.find(sh => sh.id === id)!.slot === 'k_skin' && solved[id].visible)
+    expect(skin).toHaveLength(1)
+    expect(solved[skin[0]].z).toBeGreaterThan(Math.max(...objectOf('itemL').shapes.filter(id => id !== skin[0] && solved[id].visible).map(id => solved[id].z)))
+  })
+
+  it('poses each arm on its own: a slider for the left and one for the right, and the hand of the other side stays', () => {
+    for (const id of ['shoulder', 'elbow', 'wrist']) expect(seed.ranges.find(r => r.id === `${id}R`), id).toBeDefined()
+    expect(seed.ranges.find(r => r.id === 'shoulder')!.name).toBe('Arm raise (left)'); expect(seed.ranges.find(r => r.id === 'shoulderR')!.name).toBe('Arm raise (right)')
+    const handAt = (values: Record<string, number>, id: string) => solve(seed, { ...defaultValues(seed), ...values }, 'front').shapes[id].box
+    const twin = seed.shapes.find(s => s.mirrorOf === 'handL')!.id
+    const round = (b: { x: number; y: number; w: number; h: number }) => [b.x, b.y, b.w, b.h].map(v => Math.round(v * 100) / 100)
+    const rest = handAt({}, 'handL'), restR = handAt({}, twin)
+    const raisedL = handAt({ shoulder: 60 }, 'handL'), rightOfThat = handAt({ shoulder: 60 }, twin)
+    expect(rest.y - raisedL.y).toBeGreaterThan(40)
+    expect(round(rightOfThat)).toEqual(round(restR))
+    // and the other way round
+    expect(round(handAt({ shoulderR: 60 }, 'handL'))).toEqual(round(rest))
+    expect(restR.y - handAt({ shoulderR: 60 }, twin).y).toBeGreaterThan(40)
+  })
+
+  it('carries the item with the hand: held up beside the head it is upright and inside the bust, for either hand', () => {
+    const bust = seed.frames!.find(f => f.name === 'Bust')!
+    for (const [obj, pose, side] of [['itemL', 'pose_left_up', 1], ['itemR', 'pose_right_up', -1]] as const) {
+      const values = preset(pose).values
+      for (const id of ['staff', 'crook', 'crystal', 'lantern', 'torch', 'book', 'flower']) {
+        const b = itemBox(obj, id, values)
+        // the hand is up beside the head, on its own side of the figure
+        expect(b.y1, `${id} (${obj}) is raised`).toBeLessThan(150)
+        expect((b.x0 + b.x1) / 2 - 100, `${id} (${obj}) is on its own side`).toSatisfy((d: number) => d * side > 20)
+        // and in the bust frame
+        expect((b.x0 + b.x1) / 2, id).toBeGreaterThan(bust.x); expect((b.x0 + b.x1) / 2, id).toBeLessThan(bust.x + bust.w)
+        expect(b.y0, `${id} does not leave the top of the bust`).toBeGreaterThan(bust.y - 1)
+      }
+      // a staff stands upright, whatever the arm does to the hand
+      const staff = itemBox(obj, 'staff', values)
+      expect(staff.h).toBeGreaterThan(staff.w * 4)
+    }
+    // the hand that holds nothing up stays where it was
+    const held = itemBox('itemR', 'staff', preset('pose_left_up').values), still = itemBox('itemR', 'staff')
+    for (const k of ['x0', 'y0', 'x1', 'y1'] as const) expect(held[k], k).toBeCloseTo(still[k], 6)
+  })
+
+  it('has the poses that hold a hand up as presets of a kind of their own, and an item that opens and unrolls', () => {
+    const poses = seed.presets!.filter(p => p.kind === 'Pose')
+    expect(poses.map(p => p.name)).toEqual(['Arms down', 'Left hand up', 'Right hand up', 'Both hands up'])
+    const ids = new Set(seed.ranges.map(r => r.id))
+    for (const p of poses) for (const k of Object.keys(p.values)) expect(ids.has(k), `${p.name} sets ${k}`).toBe(true)
+    // the arms down put every arm slider back
+    const up = applyPreset(seed, restState(seed), preset('pose_both_up'))
+    expect(up.values.shoulder).toBe(95); expect(up.values.shoulderR).toBe(95)
+    expect(applyPreset(seed, up, preset('pose_down')).values.shoulder ?? 0).toBe(0)
+    // a closed book opens and a rolled scroll unrolls: the forms are wider and longer
+    expect(itemBox('itemL', 'openbook').w).toBeGreaterThan(itemBox('itemL', 'book').w * 1.5)
+    expect(itemBox('itemL', 'openscroll').h).toBeGreaterThan(itemBox('itemL', 'scroll').h * 0.9)
+    expect(itemBox('itemL', 'openscroll').w).toBeGreaterThan(itemBox('itemL', 'scroll').w)
+  })
+
+  it('has a slot for the colours of an item, of a flame and a glow, of wood, of parchment and of a drink, and two grip points', () => {
+    const used = new Set(objectOf('itemL').shapes.map(id => seed.shapes.find(sh => sh.id === id)!.slot))
+    for (const id of ['k_item', 'k_wood', 'k_paper', 'k_flame', 'k_wine', 'k_gem', 'k_skin', 'k_leaf', 'k_bloom']) expect(used.has(id), id).toBe(true)
+    expect(seed.grips!.map(g => g.group)).toEqual(['handL', seed.groups.find(g => g.mirrorOf === 'handL')!.id])
+    expect(seed.slots!.length).toBeLessThanOrEqual(LIMITS.slotsWarn)
+    expect(objectOf('itemL').shapes.length).toBeLessThanOrEqual(LIMITS.shapesPerObjectMax)
+  })
+
+  it('never puts an item in a hand or lifts a hand when Randomise rolls: the item angle stays at rest and a pose is the writers', () => {
+    const fig: CharacterFigure = blankFigure('basic', seed)
+    for (let n = 1; n <= 60; n++) {
+      const rolled = rollFigure(seed, fig, seededRng(n + 500))
+      const values = valuesOf(seed, rolled)
+      for (const o of ['itemL', 'itemR']) expect(rolled.forms[`${o}.item`] ?? 'none', o).toBe('none')
+      expect(values.holdL ?? 0).toBe(0); expect(values.holdR ?? 0).toBe(0)
+      // the arms hang, a little away from the body at most
+      for (const id of ['shoulder', 'shoulderR']) expect(values[id] ?? 0, id).toBeLessThanOrEqual(8)
+      for (const id of ['elbow', 'elbowR']) expect(values[id] ?? 0, id).toBeLessThanOrEqual(10)
+    }
+  })
+
   it('rolls a face that has no beard most of the time and always some hair', () => {
     const fig: CharacterFigure = blankFigure('basic', seed)
     const beards = Array.from({ length: 60 }, (_, s) => rollFigure(seed, fig, seededRng(s + 100)).forms['beard.style']).filter(f => f && f !== 'none' && f !== 'moustache' && f !== 'handlebar' && f !== 'horseshoe' && f !== 'soulpatch').length

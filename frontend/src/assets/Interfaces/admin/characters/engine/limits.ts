@@ -54,7 +54,7 @@ export const LIMITS = {
   // colour: genre tags per model, colour slots per model, default colours per slot, swatches of the starter palette (the stops are the server's max_lengths)
   genresWarn: 8,
   genresMax: 12,
-  slotsWarn: 16,
+  slotsWarn: 24,
   slotsMax: 32,
   coloursWarn: 40,
   coloursMax: 64,
@@ -74,7 +74,7 @@ export const LIMITS = {
   gripsWarn: 8,
   gripsMax: 16,
   // how many of each a model may hold (the server's caps)
-  shapesMax: 600,
+  shapesMax: 800,
   objectsMax: 200,
   groupsMax: 120,
 } as const

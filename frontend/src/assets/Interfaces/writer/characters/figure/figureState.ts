@@ -280,7 +280,9 @@ export function rollFigure(copy: ModelContent, figure: CharacterFigure, rng: Rng
     const at = key.lastIndexOf('.'), axis = copy.objects.find(o => o.id === key.slice(0, at))?.axes?.find(a => a.id === key.slice(at + 1))
     return axis !== undefined && ((axis.roll ?? 100) < 100 || (axis.genres?.length ?? 0) > 0)
   })
-  const dressing = new Set(presetsOf(copy).filter(p => p.hidden.length > 0 || sparing(p)).map(slotKey))
+  // a preset that sets a slider Randomise never moves (an item held up turns about the hand by the arm, which the slider of the item's angle follows) is the writer's too
+  const fixed = (p: ModelPreset): boolean => Object.keys(p.values).some(id => { const r = copy.ranges.find(x => x.id === id); return !!r?.rand && r.rand[0] === r.rand[1] })
+  const dressing = new Set(presetsOf(copy).filter(p => p.hidden.length > 0 || sparing(p) || fixed(p)).map(slotKey))
   const slots = new Map<string, ModelPreset[]>()
   for (const p of presetsOf(copy)) slots.set(slotKey(p), [...(slots.get(slotKey(p)) ?? []), p])
   // Applying one preset of a kind first puts back everything any preset of the kind controls, so a kind with a preset that touches something locked is left alone as a whole.

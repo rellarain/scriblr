@@ -76,9 +76,16 @@ const outfits: Array<{ label: string; figure: Partial<CharacterFigure>; crop: st
   { label: 'Top snug 0%', figure: { values: { looseTop: 0, looseBottom: 0 } }, crop: 'figure' },
   { label: 'Arms raised, legs apart', figure: { values: { shoulder: 60, legSpread: 25 } }, crop: 'figure' },
 ]
+// every held item, in the left hand held up (the bust) and at the side (the whole figure), and a few in the right
+const poseOf = (id: string): Record<string, number> => content.presets!.find(p => p.id === id)!.values
+const itemOptions = content.objects.find(o => o.id === 'itemL')!.axes!.find(a => a.id === 'item')!.options.filter(f => f.id !== 'none')
+const heldUp = itemOptions.map(f => ({ label: `${f.name}, left hand up`, figure: { values: poseOf('pose_left_up'), forms: { 'itemL.item': f.id } }, crop: 'bust' }))
+const heldDown = itemOptions.map(f => ({ label: `${f.name}, at the side`, figure: { forms: { 'itemL.item': f.id } }, crop: 'figure' }))
+const heldRight = ['staff', 'book', 'lantern', 'wand'].map(id => ({ label: `${id}, right hand up`, figure: { values: poseOf('pose_right_up'), forms: { 'itemR.item': id } }, crop: 'bust' }))
+const heldBoth = [{ label: 'Both hands up, a staff and a lantern', figure: { values: poseOf('pose_both_up'), forms: { 'itemL.item': 'staff', 'itemR.item': 'lantern' } }, crop: 'figure' }]
 const heads = ['oval', 'square', 'narrow', 'wide', 'pointed'].map(h => ({ label: `Short hair, ${h} head`, figure: { forms: { 'skull.headShape': h } }, crop: 'bust' }))
 const ends = ['eyeSize', 'eyeSpacing', 'eyeTilt', 'eyeOpen', 'browHeight', 'browAngle', 'noseSize', 'mouthSize', 'mouthCurve', 'earSize', 'headTilt'].flatMap(id => {
   const r = content.ranges.find(x => x.id === id)!
   return [{ label: `${r.name} min`, figure: { values: { [id]: r.min } }, crop: 'head' }, { label: `${r.name} max`, figure: { values: { [id]: r.max } }, crop: 'head' }]
 })
-writePreview(`${out}/index.html`, 'Seed model', content, [...outfits, ...tops, ...hairs, ...beards, ...fantasy, ...heads, ...ends, ...expressions, ...ages, ...builds], sheet)
+writePreview(`${out}/index.html`, 'Seed model', content, [...heldUp, ...heldRight, ...heldBoth, ...heldDown, ...outfits, ...tops, ...hairs, ...beards, ...fantasy, ...heads, ...ends, ...expressions, ...ages, ...builds], sheet)

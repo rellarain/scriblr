@@ -23,6 +23,18 @@ const LITERAL: Record<string, { slot: string; derive?: ModelTint }> = {
   '#6c5685': { slot: 'k_gem', derive: { kind: 'shadow', t: 0.3 } },
   '#4f7a3a': { slot: 'k_leaf', derive: { kind: 'shadow', t: 0.15 } }, '#5f8a3e': { slot: 'k_leaf' },
   '#f3d27a': { slot: 'k_bloom' }, '#bdd94a': { slot: 'k_bloom', derive: { kind: 'shadow', t: 0.12 } },
+  // the materials of the held items: a crystal (a gem), wood, parchment, a flame and the glow of a light, a drink (the tones are few, so the items share the shapes of the object they are forms of)
+  '#2e8094': { slot: 'k_gem' }, '#abccd4': { slot: 'k_gem', derive: { kind: 'highlight', t: 0.5 } }, '#82b3bf': { slot: 'k_gem', derive: { kind: 'highlight', t: 0.3 } },
+  '#21667a': { slot: 'k_gem', derive: { kind: 'shadow', t: 0.3 } },
+  '#6b4a2a': { slot: 'k_wood' }, '#4a3220': { slot: 'k_wood', derive: { kind: 'shadow', t: 0.3 } }, '#a67836': { slot: 'k_wood', derive: { kind: 'highlight', t: 0.3 } },
+  '#f2ead6': { slot: 'k_paper' }, '#e9dfc6': { slot: 'k_paper' }, '#e8dcc0': { slot: 'k_paper' }, '#dac493': { slot: 'k_paper', derive: { kind: 'shadow', t: 0.1 } },
+  '#dcc899': { slot: 'k_paper', derive: { kind: 'shadow', t: 0.1 } }, '#f1e8d0': { slot: 'k_paper' }, '#e6d4a5': { slot: 'k_paper', derive: { kind: 'shadow', t: 0.1 } },
+  '#faf4e2': { slot: 'k_paper', derive: { kind: 'highlight', t: 0.5 } }, '#cfb574': { slot: 'k_paper', derive: { kind: 'shadow', t: 0.2 } },
+  '#ffb347': { slot: 'k_flame' }, '#f08a24': { slot: 'k_flame', derive: { kind: 'shadow', t: 0.2 } }, '#ffd34d': { slot: 'k_flame', derive: { kind: 'highlight', t: 0.3 } },
+  '#fff6c8': { slot: 'k_flame', derive: { kind: 'highlight', t: 0.75 } },
+  '#ffd98a': { slot: 'k_flame', derive: { kind: 'highlight', t: 0.3 } }, '#fff3c8': { slot: 'k_flame', derive: { kind: 'highlight', t: 0.75 } }, '#fff3b0': { slot: 'k_flame', derive: { kind: 'highlight', t: 0.5 } },
+  '#fff6c4': { slot: 'k_flame', derive: { kind: 'highlight', t: 0.75 } },
+  '#7a1f2e': { slot: 'k_wine' }, '#651623': { slot: 'k_wine', derive: { kind: 'shadow', t: 0.2 } }, '#9c2a3d': { slot: 'k_wine', derive: { kind: 'highlight', t: 0.2 } },
 }
 const chroma = (hex: string): number => {
   const n = parseInt(hex.slice(1), 16), r = (n >> 16) & 255, g = (n >> 8) & 255, b = n & 255

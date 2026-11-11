@@ -1185,7 +1185,7 @@ MODEL_SHAPES_PER_OBJECT_MAX = 72
 MODEL_COPY_WARN_BYTES = 1200 * 1024   # the size of a character's copy of a model (raised from 150/250 KB to 300/600 KB for the basic model's face and hair, and to this for its fantasy parts, clothes and held items)
 MODEL_COPY_MAX_BYTES = 2048 * 1024
 # Generous caps on the totals, so the file stays small and one save is bounded.
-MODEL_MAX_SHAPES = 600
+MODEL_MAX_SHAPES = 800
 MODEL_MAX_OBJECTS = 200
 MODEL_MAX_GROUPS = 120   # phase 5c: a hand with its fingers is about fifteen groups
 MODEL_X_RANGE = (-50.0, 250.0)
@@ -1233,7 +1233,7 @@ MODEL_PATTERN_MARKS_MAX = 72   # as many as an object has shapes
 MODEL_UNDER_MAX = 24           # the garments or families one object is worn under
 MODEL_GENRES_WARN = 8   # colour (phase 4): genre tags per model, colour slots per model, default colours per slot, swatches of the starter palette
 MODEL_GENRES_MAX = 12
-MODEL_SLOTS_WARN = 16
+MODEL_SLOTS_WARN = 24
 MODEL_SLOTS_MAX = 32
 MODEL_COLOURS_WARN = 40
 MODEL_COLOURS_MAX = 64

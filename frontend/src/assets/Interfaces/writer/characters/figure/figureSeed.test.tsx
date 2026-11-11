@@ -110,6 +110,25 @@ describe('the writer meets the basic model', () => {
     expect(extras.queryByRole('combobox', { name: 'Fantasy ears' })).toBeNull()
   })
 
+  it('offers a held item for each hand as an extra, and a pose that holds a hand up with it', async () => {
+    const { user, seen } = setup()
+    const extras = within(screen.getByRole('group', { name: 'Extras' }))
+    const art = () => card().querySelector('.charFigLayer--figure')!.innerHTML
+    const before = art()
+    for (const name of ['Held item (left hand)', 'Held item (right hand)']) expect(within(extras.getByRole('combobox', { name })).getAllByRole('option')).toHaveLength(15)
+    await user.selectOptions(extras.getByRole('combobox', { name: 'Held item (left hand)' }), 'staff')
+    expect(seen.figure.forms['itemL.item']).toBe('staff')
+    expect(art()).not.toBe(before)
+    // the right hand has an item of its own
+    expect(seen.figure.forms['itemR.item']).toBeUndefined()
+    const down = art()
+    await user.selectOptions(screen.getByRole('combobox', { name: /^Pose/i }), 'Left hand up')
+    expect(seen.figure.values.shoulder).toBe(95)
+    expect(seen.figure.values.holdL).toBe(-135)
+    expect(seen.figure.values.shoulderR).toBeUndefined()
+    expect(art()).not.toBe(down)
+  })
+
   it('draws the beard of the facial hair that is chosen, and nothing of it before', async () => {
     const { user } = setup()
     const art = () => card().querySelector('.charFigLayer--figure')!.innerHTML

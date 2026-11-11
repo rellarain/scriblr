@@ -85,7 +85,7 @@ describe('making a twin of a shape', () => {
   it('is refused past the number of shapes a model may hold', () => {
     const c = body()
     const many = Array.from({ length: LIMITS.shapesMax - c.shapes.length }, (_, i) => sharp(`x${i}`, CHEST))
-    expect(refused(makeTwin({ ...c, shapes: [...c.shapes, ...many] }, 'shape', 'arm'))).toMatch(/at most 600 shapes/)
+    expect(refused(makeTwin({ ...c, shapes: [...c.shapes, ...many] }, 'shape', 'arm'))).toMatch(new RegExp(`at most ${LIMITS.shapesMax} shapes`))
   })
   it('passes the publish checks', () => {
     expect(publishFaults(must(makeTwin(body(), 'shape', 'arm')))).toEqual([])

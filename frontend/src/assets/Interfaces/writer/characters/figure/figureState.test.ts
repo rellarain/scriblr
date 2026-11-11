@@ -208,7 +208,7 @@ describe('Randomise', () => {
     }
   })
   it('leaves a kind of preset alone when it sets a form that Randomise only sometimes changes, as the axis has its own chance', () => {
-    const tilt = (c: ModelContent): ModelContent => ({ ...c, ranges: c.ranges!.map(r => (r.id === 'r_tilt' ? { ...r, rand: [0, 0] as [number, number] } : r)) })
+    const tilt = (c: ModelContent): ModelContent => ({ ...c, ranges: c.ranges!.map(r => (r.id === 'r_tilt' ? { ...r, rand: [0, 0.01] as [number, number] } : r)) })
     const withLook = (roll: number): ModelContent => tilt({
       ...model,
       objects: model.objects.map(o => (o.id === 'o_head' ? { ...o, axes: o.axes!.map(a => (a.id === 'a_form1' ? { ...a, roll } : a)) } : o)),
@@ -217,6 +217,16 @@ describe('Randomise', () => {
     const tilts = (c: ModelContent) => Array.from({ length: 60 }, (_, s) => rollFigure(c, fresh(), seededRng(s + 1)).values.r_tilt)
     expect(tilts(withLook(100))).toContain(17.3)                              // an axis that is always rolled: the kind is drawn now and then
     expect(new Set(tilts(withLook(10)))).not.toContain(17.3)                  // one that is sometimes rolled: the kind is the writer's
+  })
+  it('leaves a kind of preset alone when it sets a slider that Randomise never moves, since drawing it would move the slider all the same', () => {
+    const fixed = (rand: [number, number]): ModelContent => ({
+      ...model,
+      ranges: model.ranges!.map(r => (r.id === 'r_tilt' ? { ...r, rand } : r)),
+      presets: [...model.presets!, { id: 'p_hold', name: 'Hold', kind: 'Pose', values: { r_tilt: 17.3 }, hidden: [] }],
+    })
+    const tilts = (c: ModelContent) => Array.from({ length: 60 }, (_, s) => rollFigure(c, fresh(), seededRng(s + 1)).values.r_tilt)
+    expect(new Set(tilts(fixed([3, 3])))).toEqual(new Set([3]))                // the slider stays at its one value, and the preset is never drawn
+    expect(tilts(fixed([0, 0.01]))).toContain(17.3)                            // a slider that is rolled over a span is not fixed: the preset is drawn now and then
   })
   it('never takes clothes off: a preset that hides something is not drawn, and what was off stays off', () => {
     for (let s = 1; s <= 30; s += 1) expect(roll(fresh(), s).hidden).toEqual([])
