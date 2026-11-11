@@ -1,3 +1,5 @@
+import { readFileSync } from 'node:fs'
+import path from 'node:path'
 import { act, fireEvent, render, screen, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { describe, expect, it, vi } from 'vitest'
@@ -230,5 +232,29 @@ describe('the previews and checks drawer', () => {
     expect(drawer.getByRole('region', { name: 'Checks' })).toBeInTheDocument()
     await user.click(button())
     expect(screen.queryByRole('region', { name: 'Previews and checks' })).toBeNull()
+  })
+})
+
+describe('the Designer fills its console', () => {
+  // jsdom cannot lay anything out, so the rules are read from the stylesheet (the real layout is checked in the browser): the view toolbar lies along the bottom of the stage, so
+  // the stage must reach the bottom of the console. A fixed height on it leaves a gap under the toolbar whenever the console is taller.
+  const css = readFileSync(path.resolve(__dirname, 'characterModels.scss'), 'utf-8')
+  const block = (selector: string) => new RegExp(`^${selector.replace(/[.\-]/g, '\\$&')} \\{[^}]*\\}`, 'm').exec(css)?.[0] ?? ''
+
+  it('lets the stage grow into the console, with a height of its own only as a floor', () => {
+    const stage = block('.dzStage')
+    expect(stage).toMatch(/flex: 1 1 auto/)
+    expect(stage).toMatch(/min-height: clamp\(/)
+    expect(stage).not.toMatch(/(^|[\s;{])height:/)
+  })
+
+  it('makes the fieldset round the stage a column that fills the pane, so the stage can grow', () => {
+    const fieldset = block('.dzFieldset')
+    expect(fieldset).toMatch(/display: flex; flex-direction: column/)
+    expect(fieldset).toMatch(/flex: 1 1 auto/)
+  })
+
+  it('pins the view toolbar to the bottom of the stage', () => {
+    expect(block('.dzFoot')).toMatch(/position: absolute; bottom: 0/)
   })
 })
