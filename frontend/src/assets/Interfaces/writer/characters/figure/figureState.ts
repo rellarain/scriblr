@@ -3,9 +3,10 @@ import { colourById, paletteOf, rollChoices, slotById, slotsOf, type Colouring, 
 import { axesFor, chosenForm, classesOf, membersOf, presetsOf, shownMember, type Choices } from '../../../admin/characters/engine/forms'
 import { framesOf, hiddenThrough, tileOf, viewBoxOf } from '../../../admin/characters/engine/frames'
 import type { Box } from '../../../admin/characters/engine/geometry'
+import { activeLocks } from '../../../admin/characters/engine/locks'
 import { drawable, paintShapes, type PaintItem } from '../../../admin/characters/engine/paint'
 import { applyPreset, isOn, type TestState } from '../../../admin/characters/engine/presets'
-import { defaultValues, solve, type Values, type View } from '../../../admin/characters/engine/rig'
+import { defaultValues, solve, type Solved, type Values, type View } from '../../../admin/characters/engine/rig'
 import { lockedSlots, lockedThings, rollLook } from '../../../admin/characters/engine/roll'
 import { TILE_DEFAULT } from '../../../admin/characters/modelContent'
 import { colourName, type ColourKind } from '../describe'
@@ -25,7 +26,7 @@ const isRecord = (v: unknown): v is Record<string, unknown> => typeof v === 'obj
 
 // A figure on a model copy with nothing chosen: every slider at rest, the model's own forms and colours, the model's card colour.
 export function blankFigure(modelKey: string, copy: ModelContent): CharacterFigure {
-  return { model: modelKey, values: {}, forms: {}, hidden: [], colours: {}, palette: null, tile: tileOf(copy), fall: 'down', locks: [], zoff: {}, mine: [], genre: null }
+  return { model: modelKey, values: {}, forms: {}, hidden: [], colours: {}, palette: null, tile: tileOf(copy), fall: 'down', locks: [], zoff: {}, mine: [], genre: null, on: [], order: {} }
 }
 
 // A figure as a file or an older answer gives it, with what is missing filled in (null when it does not point at a model copy). The server is the authority on ranges.
@@ -40,6 +41,7 @@ export function normalizeFigure(raw: unknown): CharacterFigure | null {
     tile: typeof raw.tile === 'string' && HEX.test(raw.tile) ? raw.tile.toLowerCase() : TILE_DEFAULT,
     fall: raw.fall === 'left' || raw.fall === 'right' || raw.fall === 'behind' ? raw.fall : 'down',
     locks: list<string>(raw.locks), zoff: map<number>(raw.zoff), mine: list<ModelPreset>(raw.mine), genre: typeof raw.genre === 'string' && raw.genre ? raw.genre : null,
+    on: list<string>(raw.on), order: map<string[]>(raw.order),
   }
 }
 
@@ -83,7 +85,8 @@ export function setValue(copy: ModelContent, figure: CharacterFigure, rangeId: s
 
 // ---- colour ----
 
-export function colouringOf(copy: ModelContent, figure: CharacterFigure): Colouring {
+// The colours a figure has chosen for the slots the copy has.
+function choicesOf(copy: ModelContent, figure: CharacterFigure): SlotChoices {
   const choices: SlotChoices = {}
   for (const [slot, c] of Object.entries(figure.colours ?? {})) {
     if (!c || !slotById(copy, slot)) continue
@@ -92,7 +95,16 @@ export function colouringOf(copy: ModelContent, figure: CharacterFigure): Colour
     if (typeof c.a === 'number') choice.a = c.a
     choices[slot] = choice
   }
-  return { palette: figure.palette ?? paletteOf(copy), choices, forms: figure.forms ?? {}, values: valuesOf(copy, figure) }
+  return choices
+}
+
+// The colouring of a figure, with the parts of a colour the model locks (an object's own, and those of the styles that are on): a locked hue, saturation or lightness replaces
+// that part of whatever colour is chosen, so the figure keeps it whatever the palette or a roll gives.
+export function colouringOf(copy: ModelContent, figure: CharacterFigure): Colouring {
+  const choices = choicesOf(copy, figure)
+  const values = valuesOf(copy, figure)
+  const locks = activeLocks(copy, { values, forms: { ...figure.forms }, hidden: [...figure.hidden], fall: figure.fall, colours: choices, on: [...(figure.on ?? [])], order: { ...(figure.order ?? {}) } })
+  return { palette: figure.palette ?? paletteOf(copy), choices, forms: figure.forms ?? {}, values, ...(Object.keys(locks).length > 0 ? { locks } : {}) }
 }
 const coloursFrom = (choices: SlotChoices): Record<string, FigureColour> => {
   const out: Record<string, FigureColour> = {}
@@ -148,6 +160,12 @@ export function squareBox(b: Box): Box {
 
 export interface FigureDrawing { box: Box; items: PaintItem[]; tile: string }
 
+// The figure solved the way it is drawn through a crop (what the editor reads where each part lies from).
+export function solveFigure(copy: ModelContent, figure: CharacterFigure, crop: Crop = 'figure', view: View = 'front'): Solved {
+  const frame = frameFor(copy, crop)
+  return solve(copy, valuesOf(copy, figure), view, { forms: figure.forms, hidden: hiddenThrough(frame, figure.hidden), fall: figure.fall, ...(figure.order && Object.keys(figure.order).length > 0 ? { order: figure.order } : {}) })
+}
+
 // A figure drawn through a crop: the shapes to paint (back to front, no helpers) and the box to look at. Remembered for the figure object and the copy it was drawn from
 // (a figure is replaced when it changes, never changed in place), so a cast list draws each card once.
 const drawn = new WeakMap<ModelContent, WeakMap<CharacterFigure, Map<string, FigureDrawing>>>()
@@ -159,9 +177,7 @@ export function drawFigure(copy: ModelContent, figure: CharacterFigure, crop: Cr
   const key = `${typeof crop === 'string' ? crop : crop.frame}|${view}|${square ? 1 : 0}`
   const hit = byKey.get(key)
   if (hit) return hit
-  const frame = frameFor(copy, crop)
-  const solved = solve(copy, valuesOf(copy, figure), view, { forms: figure.forms, hidden: hiddenThrough(frame, figure.hidden), fall: figure.fall })
-  const items = drawable(paintShapes(copy, solved, colouringOf(copy, figure)))
+  const items = drawable(paintShapes(copy, solveFigure(copy, figure, crop, view), colouringOf(copy, figure)))
   const box = cropBox(copy, crop, view)
   const made: FigureDrawing = { box: square ? squareBox(box) : box, items, tile: HEX.test(figure.tile) ? figure.tile : tileOf(copy) }
   byKey.set(key, made)
@@ -171,9 +187,12 @@ export function drawFigure(copy: ModelContent, figure: CharacterFigure, crop: Cr
 // ---- the test state the admin's engine works with ----
 
 // (the default colours a variant picks are part of it: an age that picks a hair colour is on when the figure has that colour)
-export const testOf = (copy: ModelContent, figure: CharacterFigure): TestState => ({ values: valuesOf(copy, figure), forms: { ...figure.forms }, hidden: [...figure.hidden], fall: figure.fall, colours: colouringOf(copy, figure).choices })
+export const testOf = (copy: ModelContent, figure: CharacterFigure): TestState => ({
+  values: valuesOf(copy, figure), forms: { ...figure.forms }, hidden: [...figure.hidden], fall: figure.fall, colours: choicesOf(copy, figure), on: [...(figure.on ?? [])], order: { ...(figure.order ?? {}) },
+})
 
-const known = (copy: ModelContent): Set<string> => new Set([...copy.objects.map(o => o.id), ...copy.groups.map(g => g.id)])
+// What may be switched off: objects and groups, and (for a style of their object, or a fill pattern the writer turns off) shapes and patterns.
+const known = (copy: ModelContent): Set<string> => new Set([...copy.objects.map(o => o.id), ...copy.groups.map(g => g.id), ...copy.shapes.map(s => s.id), ...(copy.patterns ?? []).map(p => p.id)])
 
 // The figure with the sliders, forms, worn things, fall side and colours of a test state (what a preset or a roll gives); the rest of the figure stays as it was.
 export function withTest(copy: ModelContent, figure: CharacterFigure, state: TestState): CharacterFigure {
@@ -183,7 +202,13 @@ export function withTest(copy: ModelContent, figure: CharacterFigure, state: Tes
     if (Math.abs(v - r.rest) >= 1e-6) values[r.id] = v
   }
   const things = known(copy)
-  return { ...figure, values, forms: { ...state.forms }, hidden: [...new Set(state.hidden.filter(h => things.has(h)))], fall: state.fall ?? 'down', colours: coloursFrom(state.colours ?? {}) }
+  const presets = new Set(presetsOf(copy).map(p => p.id))
+  const order: Record<string, string[]> = {}
+  for (const [objectId, ids] of Object.entries(state.order ?? {})) if (ids.length > 0 && copy.objects.some(o => o.id === objectId)) order[objectId] = [...ids]
+  return {
+    ...figure, values, forms: { ...state.forms }, hidden: [...new Set(state.hidden.filter(h => things.has(h)))], fall: state.fall ?? 'down', colours: coloursFrom(state.colours ?? {}),
+    on: [...new Set((state.on ?? []).filter(id => presets.has(id)))], order,
+  }
 }
 
 // ---- age ----
@@ -235,7 +260,7 @@ export function rollFigure(copy: ModelContent, figure: CharacterFigure, rng: Rng
     const [lo, hi] = r.rand ?? spanOf(r)
     values[r.id] = r2(clampToSpan(r, lo + (hi - lo) * ((rng() + rng() + rng()) / 3)))
   }
-  let state: TestState = { values, forms: look.forms, hidden: [...figure.hidden], fall: look.fall, colours: look.choices }
+  let state: TestState = { values, forms: look.forms, hidden: [...figure.hidden], fall: look.fall, colours: look.choices, on: [...(figure.on ?? [])], order: { ...(figure.order ?? {}) } }
   // A kind of preset that takes something off anywhere (Outfit) is the writer's to choose: applying one of its other presets would put back what they took off.
   const slotKey = (p: ModelPreset) => `${p.kind.trim().toLowerCase()}|${p.scope ?? ''}`
   const dressing = new Set(presetsOf(copy).filter(p => p.hidden.length > 0).map(slotKey))

@@ -17,13 +17,13 @@ export function Field({ label, children, short = false, bare = false }: { label:
 }
 
 // A slider: the range input, and its value beside it.
-export function Slider({ label, value, min, max, step = 0.01, onChange, format }: {
-  label: string; value: number; min: number; max: number; step?: number; onChange: (value: number) => void; format?: (value: number) => string
+export function Slider({ label, value, min, max, step = 0.01, onChange, format, disabled = false, hint }: {
+  label: string; value: number; min: number; max: number; step?: number; onChange: (value: number) => void; format?: (value: number) => string; disabled?: boolean; hint?: string
 }) {
   return (
     <label className="charSlider">
       <span className="charLabel">{label}</span>
-      <input type="range" className="charRange" aria-label={label} title={label} min={min} max={max} step={step} value={value} onChange={e => onChange(Number(e.target.value))} />
+      <input type="range" className="charRange" aria-label={label} title={hint ?? label} min={min} max={max} step={step} value={value} disabled={disabled} onChange={e => onChange(Number(e.target.value))} />
       <span className="charValue" aria-hidden="true">{format ? format(value) : (Math.round(value * 100) / 100).toString()}</span>
     </label>
   )

@@ -2,6 +2,8 @@ import { useId } from 'react'
 import type { CharacterDoc, CharacterPortrait } from '../../../../api/types'
 import { BodyIcon, BrushIcon, CardIcon, ChevronDownIcon, DiceIcon, EyeIcon, FaceIcon, LockIcon, SparkleIcon } from '../../../icons'
 import { Colour, CommitText, Field, Slider } from './CharFields'
+import { FigureEditor } from './figure/FigureEditor'
+import { useFigureCopy } from './figure/figureModelStore'
 import { MannequinPanel } from './MannequinPanel'
 import { PortraitCard, roleAge } from './PortraitCard'
 import { PreviewSelect } from './PreviewSelect'
@@ -109,6 +111,7 @@ export function PortraitSection({ projectId, doc, edit, rename, setFigure }: {
 }) {
   const uid = useId().replace(/[^A-Za-z0-9]/g, '')
   const panels = usePortraitPanels()
+  const model = useFigureCopy(doc.figure?.model)
   const p = doc.portrait
   const drawn = drawnOf(p)
   // The colour a colour that follows another is drawn in (shown in its picker).
@@ -155,6 +158,10 @@ export function PortraitSection({ projectId, doc, edit, rename, setFigure }: {
     const [min, max] = PORTRAIT_RANGES[f.key]
     return <Slider key={f.key} label={SLIDER_LABELS[f.key]} value={p[f.key]} min={min} max={max} step={f.key === 'eyeTilt' ? 1 : 0.01} format={f.format} onChange={v => set({ [f.key]: v }, `portrait.${f.key}`)} />
   }
+
+  // A character with a mannequin whose model copy is here is edited on its figure's own card; one whose copy has not arrived (or is not in this project) keeps this page, which
+  // draws its portrait and says where the mannequin stands.
+  if (doc.figure && model) return <FigureEditor key={doc.id} figure={doc.figure} model={model} label={`${doc.name}, figure`} setFigure={setFigure} />
 
   return (
     <div className="charPortrait">

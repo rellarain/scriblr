@@ -18,7 +18,7 @@ const allFinite = (d: string) => !/NaN|undefined|Infinity/.test(d)
 
 describe('the figure and its repairs', () => {
   it('a blank figure has nothing chosen and the model card colour', () => {
-    expect(fresh()).toEqual({ model: KEY, values: {}, forms: {}, hidden: [], colours: {}, palette: null, tile: '#e6d6c3', fall: 'down', locks: [], zoff: {}, mine: [], genre: null })
+    expect(fresh()).toEqual({ model: KEY, values: {}, forms: {}, hidden: [], colours: {}, palette: null, tile: '#e6d6c3', fall: 'down', locks: [], zoff: {}, mine: [], genre: null, on: [], order: {} })
   })
   it('a figure read from a file is filled in, and one that points at no copy is none', () => {
     expect(normalizeFigure({ model: KEY, tile: '#ABCDEF', fall: 'left', genre: 'g_fantasy' })).toMatchObject({ model: KEY, tile: '#abcdef', fall: 'left', genre: 'g_fantasy', values: {}, locks: [], palette: null })

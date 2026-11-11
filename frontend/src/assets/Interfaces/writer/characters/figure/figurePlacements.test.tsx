@@ -190,8 +190,9 @@ describe('the Portrait section', () => {
     await goto(user, 'Portrait')
     const panel = within(await screen.findByRole('group', { name: 'Mannequin' }))
     expect(await panel.findByText(/Drawn from Adult \(basic\), version 1/)).toBeInTheDocument()
-    expect(panel.getByRole('combobox', { name: 'Genre to roll within' })).toHaveValue('g_fiction')
-    await user.click(panel.getByRole('button', { name: 'Roll a new look' }))
+    const roll = within(screen.getByRole('group', { name: 'Randomise' }))
+    expect(roll.getByRole('combobox', { name: 'Genre to roll within' })).toHaveValue('g_fiction')
+    await user.click(roll.getByRole('button', { name: 'Roll a new look' }))
     await user.click(screen.getByRole('button', { name: 'Save' }))
     await waitFor(() => expect(puts(backend).length).toBeGreaterThan(0))
     const rolled = lastPut(backend).figure!

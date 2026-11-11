@@ -2,7 +2,7 @@
 import { readFileSync } from 'node:fs'
 import path from 'node:path'
 import { describe, expect, it } from 'vitest'
-import { FIGURE_MAX_LOCKS, FIGURE_MAX_MINE } from '../../../../api/types'
+import { FIGURE_MAX_LOCKS, FIGURE_MAX_MINE, FIGURE_MAX_ON } from '../../../../api/types'
 import { LIMITS } from './engine/limits'
 import { PROPS, PROP_KEYS } from './engine/props'
 import { AXIS_RANGE, DESCRIPTION_MAX, ROLE_MAX, FRAME_BIGGEST, FRAME_MIN, KIND_MAX, NAME_MAX, RANGE_NAME_MAX, SWATCH_NAME_MAX, TILE_DEFAULT } from './modelContent'
@@ -75,6 +75,7 @@ describe('the limits are the backend\'s numbers', () => {
   it('for the figure of a character: the writer\'s own styles and the objects and groups it locks', () => {
     expect(FIGURE_MAX_MINE).toBe(number('FIGURE_MAX_MINE'))
     expect(FIGURE_MAX_LOCKS).toBe(number('FIGURE_MAX_LOCKS'))
+    expect(FIGURE_MAX_ON).toBe(number('FIGURE_MAX_ON'))
   })
   it('for points, objects, shapes and the size of a copy', () => {
     expect(LIMITS.pointsWarn).toBe(number('MODEL_POINTS_WARN'))

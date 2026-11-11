@@ -109,6 +109,62 @@
 .charMannequin { display: flex; flex-direction: column; gap: var(--space-2); }
 .charCaption { text-align: center; font-size: var(--text-small); color: var(--ink-muted); }
 
+// ---- the figure editor (phase 6b-2): the card, its sheets and parts, and the steps under it ----
+// The editor is a container of its own, so it lays itself out by its own width: the controls under the card, and beside it (the card staying in view) when there is room.
+.charFigWrap { flex: 1 1 0; min-width: 0; min-height: 0; container-type: inline-size; overflow-y: auto; scrollbar-width: none; &::-webkit-scrollbar { display: none; } }
+.charFigEdit { display: grid; grid-template-columns: minmax(0, 1fr); grid-template-areas: 'tools' 'stage' 'steps'; gap: var(--space-3) var(--space-5); align-items: start; min-width: 0; }
+.charFigTools { grid-area: tools; display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-2) var(--space-4); min-width: 0; }
+.charFigStage { grid-area: stage; display: flex; justify-content: center; min-width: 0; }
+.charFigSteps { grid-area: steps; min-width: 0; }
+@container (min-width: 660px) {
+  .charFigEdit { grid-template-columns: minmax(260px, 380px) minmax(0, 1fr); grid-template-areas: 'stage tools' 'stage steps'; grid-template-rows: auto 1fr; }
+  .charFigStage { position: sticky; top: 0; align-self: start; }
+}
+// The card is the shape of what it looks through (--ar is its width over its height) and no taller than the window can hold. Its tile is drawn under everything and its figure over the
+// sheets (the sheets lie behind the figure in the front view and in front of it in the back view), so a click on the figure reaches the sheet under it; the parts lie over all of it.
+.charFigCard { position: relative; width: min(100%, calc(min(560px, 72vh) * var(--ar, 0.6))); aspect-ratio: var(--ar, 0.6); min-width: 0; }
+.charFigLayer { position: absolute; inset: 0; width: 100%; height: 100%; display: block; pointer-events: none; }
+.charFigLayer--tile { z-index: 0; }
+.charFigLayer--figure { z-index: 2; }
+// A sheet: invisible until the pointer or the keyboard is on it, then a ring (an accent line on an edge of the colour that goes with it, so it shows on any tile) and its name.
+.charFigSheet {
+  position: absolute; z-index: 1; margin: 0; padding: 0; border: 0; border-radius: var(--radius-none); background: transparent; opacity: 0; cursor: pointer; transition: opacity 0.12s;
+  box-shadow: inset 0 0 0 2px var(--accent), inset 0 0 0 4px var(--on-accent);
+  &:hover, &:focus-visible { opacity: 1; outline: none; background: color-mix(in srgb, var(--on-accent) 14%, transparent); }
+}
+.charFigCard--back .charFigSheet { z-index: 4; }
+.charFigTag { position: absolute; left: 0; top: 0; padding: 0 var(--space-2); font-size: var(--text-small); font-weight: 700; background: var(--accent); color: var(--on-accent); }
+// A part that can be changed: faint until the pointer is on it, strong for the one that is open.
+.charFigHot {
+  position: absolute; z-index: 5; margin: 0; padding: 0; border: 0; border-radius: var(--radius-none); background: transparent; cursor: pointer; opacity: 0.4;
+  box-shadow: inset 0 0 0 1px var(--accent), inset 0 0 0 2px var(--on-accent);
+  &:hover, &:focus-visible, &--on { opacity: 1; outline: none; box-shadow: inset 0 0 0 2px var(--accent), inset 0 0 0 4px var(--on-accent); }
+}
+.charFigTip {
+  position: absolute; z-index: 6; transform: translate(-50%, -100%); display: flex; flex-direction: column; max-width: 80%; padding: var(--space-1) var(--space-2); pointer-events: none;
+  background: var(--surface-raised); color: var(--ink); box-shadow: inset 0 0 0 1px var(--hairline); font-size: var(--text-small);
+  span { color: var(--ink-muted); }
+}
+// The steps: where you are, and what that step offers.
+.charFigCrumbs { display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-1); }
+.charFigCrumb {
+  padding: var(--space-1) var(--space-2); border: 0; border-radius: var(--radius-button); background: none; color: var(--ink-muted); font: inherit; font-size: var(--text-small); cursor: pointer;
+  & + &::before { content: '\203A'; margin-right: var(--space-2); }
+  &:hover { background: var(--ov-sink-1); color: var(--ink); }
+  &[aria-current='step'] { color: var(--ink); font-weight: 700; }
+  &:focus-visible { outline: 2px solid var(--accent-hover); outline-offset: 1px; }
+}
+.charStep { display: flex; flex-direction: column; gap: var(--space-3); min-width: 0; }
+.charStepHead { display: flex; align-items: center; justify-content: space-between; gap: var(--space-2); min-width: 0; }
+.charStepTitle { margin: 0; font-size: var(--text-field); font-weight: 700; }
+.charStepGroup, .charStepSet, .charSlot { display: flex; flex-direction: column; gap: var(--space-3); min-width: 0; padding-top: var(--space-3); box-shadow: inset 0 1px 0 var(--hairline); }
+.charStepGrid { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: var(--space-3); min-width: 0; }
+.charStepGrid:empty { display: none; }
+.charSlot { gap: var(--space-2); }
+.charLocked { display: flex; align-items: center; gap: var(--space-1); }
+.charCheck { display: flex; align-items: center; gap: var(--space-3); min-width: 0; font-size: var(--text-ui); cursor: pointer; input { flex: 0 0 auto; appearance: auto; -webkit-appearance: checkbox; width: 16px; height: 16px; margin: 0; accent-color: var(--accent); cursor: pointer; } }
+.charSwatch:disabled { opacity: 0.4; cursor: not-allowed; }
+
 // ---- the side: the drawers ----
 // ---- the panels ----
 .charPanel--start { align-self: start; }
@@ -193,6 +249,8 @@
   .charPortraitStage { flex: 0 0 auto; max-width: 360px; }
   .charPortrait > .charPanel:last-child { flex: 0 0 auto; }
   .charAcc { overflow-y: visible; align-self: stretch; }
+  // the page scrolls here, not the editor
+  .charFigWrap { flex: 0 0 auto; overflow-y: visible; }
 }
 
 // ---- the profile, the relationships and the story ----

@@ -8,8 +8,9 @@ import { ensureFigureModel, useFigureCopy } from './figure/figureModelStore'
 import { blankFigure, rollFigure } from './figure/figureState'
 import type { Characters } from './useCharacters'
 
-// The art mannequin in the Portrait section (phase 6a): a character with no figure can be given one from a published model (the first look is rolled within a genre); one with a
-// figure can be rolled again within its genre, or go back to the portrait. The editor that changes the figure step by step arrives with the next slice.
+// The art mannequin in the Portrait section (phase 6a): a character with no figure can be given one from a published model (the first look is rolled within a genre). A figure whose
+// model copy is here is edited step by step on its own card (figure/FigureEditor.tsx); this panel stays for one whose copy has not arrived (it says so, can roll it again within its
+// genre, or put it away and go back to the portrait).
 const seed = () => Math.floor(Math.random() * 0x100000000)
 const message = (err: unknown, fallback: string) => (err instanceof Error ? err.message : fallback)
 

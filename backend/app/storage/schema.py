@@ -4186,6 +4186,7 @@ FIGURE_MAX_MODELS = 40       # frozen copies of models in one project
 FIGURE_MAX_MINE = 40         # the writer's own styles and presets on one figure
 FIGURE_MAX_LOCKS = 300       # objects and groups kept as they are when the look is randomised
 FIGURE_MAX_ENTRIES = 600     # sliders, forms, colours and layer offsets on one figure
+FIGURE_MAX_ON = 120          # the styles marked on (one that only holds parts of a colour sets nothing else to show it is on)
 
 
 class FigureModel(BaseModel):
@@ -4237,7 +4238,8 @@ class CharacterFigure(BaseModel):
     """What a writer chose for a character's figure (the model copy itself is `figureModels[model]`): the sliders away from rest (a pose and an expression are values), the
     form on each axis and the member of each family (`objectId.axisId` -> form id, `class:classId` -> member id), the objects not worn, the colour of each slot, the character's
     own palette (none: the model's starter palette), the card colour, the side hanging things fall to, the objects and groups kept as they are when the look is randomised,
-    layer offsets (`zoff`), the writer's own styles (`mine`, presets of the same shape the model has) and the genre the look is randomised within."""
+    layer offsets (`zoff`), the writer's own styles (`mine`, presets of the same shape the model has), the genre the look is randomised within, the styles that are on (`on`: a style
+    that only holds parts of a colour sets nothing else to tell it apart) and the order a style gave the shapes of an object (`order`, object id -> shape ids, back to front)."""
 
     model: str = Field(default="", pattern=r"^([0-9a-f]{12})?$")
     values: dict[str, float] = Field(default_factory=dict)
@@ -4251,6 +4253,27 @@ class CharacterFigure(BaseModel):
     zoff: dict[str, int] = Field(default_factory=dict)
     mine: list[ModelPreset] = Field(default_factory=list)
     genre: Optional[str] = None
+    on: list[str] = Field(default_factory=list)
+    order: dict[str, list[str]] = Field(default_factory=dict)
+
+    @field_validator("on", mode="before")
+    @classmethod
+    def _figure_on(cls, value: Any) -> list[str]:
+        return _figure_ids(value, FIGURE_MAX_ON)
+
+    @field_validator("order", mode="before")
+    @classmethod
+    def _figure_order(cls, value: Any) -> dict[str, list[str]]:
+        if not isinstance(value, dict):
+            return {}
+        out: dict[str, list[str]] = {}
+        for key, shapes in value.items():
+            ids = _figure_ids(shapes, MODEL_SHAPES_PER_OBJECT_MAX)
+            if _optional_id(key) is not None and ids:
+                out[key] = ids
+            if len(out) >= FIGURE_MAX_ENTRIES:
+                break
+        return out
 
     @field_validator("model", mode="before")
     @classmethod

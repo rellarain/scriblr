@@ -552,11 +552,16 @@ export interface CharacterFigure {
   zoff: Record<string, number>
   mine: ModelPreset[]
   genre: string | null
+  // The styles that are on (one that only holds parts of a colour sets nothing else, so nothing else tells it from a style that is off), and the order a style gave the shapes of an
+  // object (object id to shape ids, back to front). Both are empty when nothing is chosen.
+  on?: string[]
+  order?: Record<string, string[]>
 }
 export interface FigureModel { id: string; modelId: string; version: number; name: string; publishedAt: string | null; content: ModelContent }
 export interface FigureModelCreate { modelId: string; version?: number; name?: string; content?: ModelContent }
 export const FIGURE_MAX_MINE = 40
 export const FIGURE_MAX_LOCKS = 300
+export const FIGURE_MAX_ON = 120
 export const CHARACTER_MAX_FIELDS = 30
 export const CHARACTER_MAX_RELATIONSHIPS = 80
 export const CHARACTER_MAX_STATES = 300

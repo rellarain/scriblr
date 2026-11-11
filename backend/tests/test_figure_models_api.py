@@ -5,7 +5,7 @@ import pytest
 from fastapi.testclient import TestClient
 
 from app.storage import figure_models, project_store
-from app.storage.schema import FIGURE_MAX_MINE, CharacterDoc, CharacterFigure, CharacterState
+from app.storage.schema import FIGURE_MAX_MINE, FIGURE_MAX_ON, CharacterDoc, CharacterFigure, CharacterState
 from tests.test_character_models_api import complete, entry_of, save
 from tests.test_world_publishing_api import _extras, _publish, _read_to, _share_character, _world
 
@@ -184,6 +184,14 @@ def test_what_is_wrong_in_a_figure_is_repaired_not_refused() -> None:
 def test_a_figure_with_nothing_chosen_has_the_defaults() -> None:
     f = CharacterFigure.model_validate({"model": KEY})
     assert (f.values, f.forms, f.hidden, f.colours, f.palette, f.tile, f.fall, f.locks, f.zoff, f.mine, f.genre) == ({}, {}, [], {}, None, "#e6d6c3", "down", [], {}, [], None)
+    assert (f.on, f.order) == ([], {})
+
+
+def test_the_styles_that_are_on_and_the_order_a_style_gave_are_kept_and_repaired() -> None:
+    f = CharacterFigure.model_validate({"model": KEY, "on": ["p_dark", "p_dark", 5, " "], "order": {"o_shirt": ["s2", "s1", "s2", 4], "o_none": [], "o_bad": "x", " ": ["s1"]}})
+    assert f.on == ["p_dark"] and f.order == {"o_shirt": ["s2", "s1"]}
+    assert CharacterFigure.model_validate({"model": KEY, "on": "nope", "order": [1, 2]}).on == []
+    assert CharacterFigure.model_validate({"model": KEY, "order": [1, 2]}).order == {}
 
 
 def test_the_lists_of_a_figure_are_cut_to_their_limits() -> None:
@@ -192,6 +200,7 @@ def test_the_lists_of_a_figure_are_cut_to_their_limits() -> None:
         "palette": [{"id": f"p{i}", "h": i, "s": 50} for i in range(14)], "locks": [f"o{i}" for i in range(400)],
     })
     assert len(f.mine) == FIGURE_MAX_MINE and f.palette is not None and len(f.palette) == 10 and len(f.locks) == 300
+    assert len(CharacterFigure.model_validate({"model": KEY, "on": [f"p{i}" for i in range(FIGURE_MAX_ON + 30)]}).on) == FIGURE_MAX_ON
 
 
 # ---- an edition freezes the figure and its copy ----
