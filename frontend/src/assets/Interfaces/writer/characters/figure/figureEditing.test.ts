@@ -5,10 +5,12 @@ import { previewModels } from '../../../../../designSystem/mockCharacterModels'
 import { hexHsl } from '../../../admin/characters/engine/colour'
 import { seededRng } from '../../../admin/characters/engine/previews'
 import {
-  ALL_LAYERS, NONE, WHOLE, chooseKind, chooseOption, figurePartOf, garmentsIn, groupPartsOf, hotspotsOf, kindsFor, layersIn, objectPartOf, pickColour, regionOfObject, regionsOf, rollPart,
-  setBrightness, setFall, setForm, setMember, setOpacity, setPattern, setWorn, slotViewOf, wornIds,
+  ALL_LAYERS, NONE, WHOLE, addSwatchTo, chooseKind, chooseOption, deleteMine, deleteSwatch, editSwatch, figurePartOf, groupPartsOf, hotspotsOf, isLocked, isMine, kindsFor, layerListIn, layersIn, lockSheet,
+  moveLayer, objectPartOf, paletteFor, pickColour, presetContent, regionOfObject, regionsOf, renameMine, rollPart, saveMine, setBrightness, setFall, setForm, setLock, setMember, setOpacity, setPattern,
+  setTile, setWorn, sheetLocked, slotViewOf, unlockAll, wornIds,
 } from './figureEditing'
-import { atAge, blankFigure, colouringOf, drawFigure, normalizeFigure, solveFigure, spanOf, testOf, valuesOf, withTest } from './figureState'
+import { carryOver } from './figureCarry'
+import { atAge, blankFigure, colouringOf, drawFigure, normalizeFigure, setValue, solveFigure, spanOf, testOf, valuesOf, withTest } from './figureState'
 
 // What the editor offers, on the design system's sample model: a rigged figure with frames (Head to hands, Bust, Face), sliders (some with a writer's limit), forms, a family of eyes,
 // presets (Age, Build, Outfit, a Style for the head and for the shirt), a group state, authored fields, a fill pattern and a colour lock on the shirt.
@@ -150,11 +152,11 @@ describe('a part', () => {
   })
   it('a garment is worn or not, and a garment that is not worn is still listed to put it on again', () => {
     const f = fresh()
-    expect(garmentsIn(c, f, frame('Head to hands')).map(g => [g.name, g.worn])).toEqual([['Shirt', true], ['Undershirt', true]])
+    expect(layerListIn(c, f, frame('Head to hands'), 'clothing').map(g => [g.name, g.worn])).toEqual([['Shirt', true], ['Undershirt', true]])
     const off = setWorn(c, f, 'o_shirt', false)
     expect(off.hidden).toEqual(['o_shirt'])
     expect(objectPartOf(c, off, 'o_shirt')!.worn).toBe(false)
-    expect(garmentsIn(c, off, frame('Head to hands')).find(g => g.name === 'Shirt')!.worn).toBe(false)
+    expect(layerListIn(c, off, frame('Head to hands'), 'clothing').find(g => g.name === 'Shirt')!.worn).toBe(false)
     expect(hotspotsOf(c, off, solveFigure(c, off), frame('Head to hands')).some(h => h.object.id === 'o_shirt')).toBe(false)
     expect(setWorn(c, off, 'o_shirt', true).hidden).toEqual([])
     expect(wornIds(c, c.objects.find(o => o.id === 'o_shirt')!)).toEqual(['o_shirt'])
@@ -341,5 +343,254 @@ describe('Randomise this part only', () => {
     const rolled = rollPart(c, f, 'g_head', seededRng(3))
     expect(rolled.on).toEqual(['p_dark'])
     expect(rolled.order).toEqual({ o_shirt: ['s_pocket', 's_shirt'] })
+  })
+})
+
+// A vest over the shirt (the shirt's shape, drawn after every shape of the shirt): a garment the model puts in no order with the others, so a writer may move it.
+const vested: ModelContent = (() => {
+  const shirt = c.shapes.find(s => s.id === 's_shirt')!
+  const top = Math.max(...c.objects.find(o => o.id === 'o_shirt')!.shapes.map(id => c.shapes.find(s => s.id === id)!.z))
+  return {
+    ...c,
+    shapes: [...c.shapes, { ...shirt, id: 's_vest', name: 'Vest', z: top }],
+    objects: [...c.objects, { id: 'o_vest', name: 'Vest', layer: 'clothing', shapes: ['s_vest'] }],
+    groups: c.groups.map(g => (g.id === 'g_shirt' ? { ...g, objects: [...g.objects, 'o_vest'] } : g)),
+  }
+})()
+const vestFig = (over: Partial<CharacterFigure> = {}): CharacterFigure => ({ ...blankFigure(copyOf(vested).id, vested), ...over })
+const region = () => frame('Head to hands')
+
+describe('the clothing and the hair of a sheet', () => {
+  it('lists the parts of a layer with the one in front first, and says why a part cannot move', () => {
+    const rows = layerListIn(vested, vestFig(), region(), 'clothing')
+    expect(rows.map(r => r.name)).toEqual(['Vest', 'Shirt', 'Undershirt'])
+    expect(rows.map(r => [r.front, r.behind])).toEqual([
+      ['It is in front already.', null],
+      [null, 'Undershirt is worn under Shirt: the model keeps it there.'],
+      ['Undershirt is worn under Shirt: the model keeps it there.', 'It is at the back already.'],
+    ])
+  })
+  it('moves a part behind the next one by changing places, and the offsets say exactly the order that is drawn', () => {
+    const f = moveLayer(vested, vestFig(), 'clothing', 'o_vest', 'behind', region())
+    expect(f.zoff).toEqual({ o_vest: -1, o_shirt: 1 })
+    expect(layerListIn(vested, f, region(), 'clothing').map(r => r.name)).toEqual(['Shirt', 'Vest', 'Undershirt'])
+    const order = solveFigure(vested, f).order
+    expect(order.indexOf('s_vest')).toBeLessThan(order.indexOf('s_shirt'))
+    expect(solveFigure(vested, vestFig()).order.indexOf('s_vest')).toBeGreaterThan(solveFigure(vested, vestFig()).order.indexOf('s_shirt'))
+    // and back again: nothing is kept
+    expect(moveLayer(vested, f, 'clothing', 'o_vest', 'front', region()).zoff).toEqual({})
+  })
+  it('does not move a part the model keeps in order, nor one past the end', () => {
+    const f = vestFig()
+    expect(moveLayer(vested, f, 'clothing', 'o_shirt', 'behind', region())).toBe(f)
+    expect(moveLayer(vested, f, 'clothing', 'o_under', 'front', region())).toBe(f)
+    expect(moveLayer(vested, f, 'clothing', 'o_vest', 'front', region())).toBe(f)
+    expect(moveLayer(vested, f, 'clothing', 'o_nope', 'front', region())).toBe(f)
+  })
+  it('a garment that is not worn keeps its place in the list and in the order', () => {
+    const off = setWorn(vested, vestFig(), 'o_vest', false)
+    const rows = layerListIn(vested, off, region(), 'clothing')
+    expect(rows.map(r => [r.name, r.worn])).toEqual([['Vest', false], ['Shirt', true], ['Undershirt', true]])
+    expect(moveLayer(vested, off, 'clothing', 'o_vest', 'behind', region()).zoff).toEqual({ o_vest: -1, o_shirt: 1 })
+  })
+  it('lists the hair of a sheet without a worn switch', () => {
+    const rows = layerListIn(c, fresh(), frame('Bust'), 'hair')
+    expect(rows.map(r => [r.name, r.worn])).toEqual([['Ponytail', null]])
+    expect(rows[0].open.id).toBe('o_hair')
+    expect(layerListIn(c, fresh(), frame('Face'), 'hair')).toEqual([])
+  })
+  it('moves hair parts among the hair of the model the same way', () => {
+    const fringe = { ...c.shapes.find(s => s.id === 's_lock')!, id: 's_fringe', name: 'Fringe' }
+    const two: ModelContent = {
+      ...c, shapes: [...c.shapes, fringe], objects: [...c.objects, { id: 'o_fringe', name: 'Fringe', layer: 'hair', shapes: ['s_fringe'] }],
+      groups: c.groups.map(g => (g.id === 'g_head' ? { ...g, objects: [...g.objects, 'o_fringe'] } : g)),
+    }
+    const f = { ...blankFigure(copyOf(two).id, two) }
+    const bust = frame('Bust')
+    const rows = layerListIn(two, f, bust, 'hair')
+    expect(rows.map(r => r.name).sort()).toEqual(['Fringe', 'Ponytail'])
+    const front = rows[0]
+    const moved = moveLayer(two, f, 'hair', front.key, 'behind', bust)
+    expect(layerListIn(two, moved, bust, 'hair')[1].key).toBe(front.key)
+  })
+})
+
+describe('locks', () => {
+  it('are kept on the part, and a twin has its original\'s', () => {
+    const f = setLock(c, fresh(), 'o_head', true)
+    expect(f.locks).toEqual(['o_head'])
+    expect(isLocked(c, f, 'o_head')).toBe(true)
+    expect(setLock(c, f, 'o_head', false).locks).toEqual([])
+    const twin = setLock(c, fresh(), 'o_twin2', true)
+    expect(twin.locks).toEqual(['o_arm'])
+    expect(isLocked(c, twin, 'o_twin2')).toBe(true)
+    expect(setLock(c, fresh(), 'o_nope', true).locks).toEqual([])
+  })
+  it('a lock on a sheet covers every part on it, and is on only while every part is locked', () => {
+    const f = lockSheet(c, fresh(), frame('Face'), true)
+    expect(sheetLocked(c, f, frame('Face'))).toBe(true)
+    expect(f.locks).toEqual(expect.arrayContaining(['o_head', 'o_eye', 'o_form15']))
+    expect(f.locks).not.toContain('o_shirt')
+    expect(sheetLocked(c, setLock(c, f, 'o_head', false), frame('Face'))).toBe(false)
+    expect(lockSheet(c, f, frame('Face'), false).locks).toEqual([])
+    expect(unlockAll(f).locks).toEqual([])
+    expect(unlockAll(fresh())).toEqual(fresh())
+  })
+  it('show on the part\'s box, and Randomise leaves the part as it is', () => {
+    const f = setLock(c, fresh(), 'o_head', true)
+    const spots = hotspotsOf(c, f, solveFigure(c, f), frame('Face'))
+    expect(spots.find(h => h.object.id === 'o_head')!.locked).toBe(true)
+    expect(spots.find(h => h.object.id === 'o_form15')!.locked).toBe(false)
+    expect(objectPartOf(c, f, 'o_twin2')!.locked).toBe(false)
+    for (let i = 1; i <= 12; i += 1) expect(rollPart(c, f, 'g_head', seededRng(i)).forms['o_head.a_form1']).toBeUndefined()
+  })
+})
+
+describe('a style of the writer\'s own', () => {
+  const squareHead = () => { const head = objectPartOf(c, fresh(), 'o_head')!; return setForm(fresh(), 'o_head', head.axes[0].axis, 'f_form3') }
+
+  it('is kept from what is chosen for the part, and reads as the style that is on', () => {
+    const made = saveMine(c, squareHead(), 'o_head', 'Square jaw')
+    expect(typeof made).toBe('object')
+    const f = made as CharacterFigure
+    expect(f.mine).toHaveLength(1)
+    expect(f.mine[0]).toMatchObject({ name: 'Square jaw', kind: 'Style', scope: 'o_head', forms: { 'o_head.a_form1': 'f_form3' } })
+    const style = objectPartOf(c, f, 'o_head')!.kinds.find(k => k.label === 'Style')!
+    expect(style.presets.map(p => p.name)).toEqual(['Square jaw'])
+    expect(style.value).toBe(f.mine[0].id)
+    expect(isMine(f, f.mine[0].id)).toBe(true)
+  })
+  it('is chosen again like the model\'s own, and a field kept in it comes back', () => {
+    const head = objectPartOf(c, fresh(), 'o_head')!
+    const start = setValue(c, squareHead(), 'r_f2', 120)
+    const f = saveMine(c, start, 'o_head', 'Wide square') as CharacterFigure
+    expect(f.mine[0].values).toEqual({ r_f2: 120 })
+    const changed = setValue(c, setForm(f, 'o_head', head.axes[0].axis, 'f_form4'), 'r_f2', 60)
+    const kind = objectPartOf(c, changed, 'o_head')!.kinds.find(k => k.label === 'Style')!
+    expect(kind.value).toBe('')
+    const again = chooseKind(c, changed, kind, f.mine[0].id)
+    expect(again.forms['o_head.a_form1']).toBe('f_form3')
+    expect(valuesOf(c, again).r_f2).toBe(120)
+    expect(objectPartOf(c, again, 'o_head')!.kinds.find(k => k.label === 'Style')!.value).toBe(f.mine[0].id)
+  })
+  it('sits with the model\'s styles of the part in one dropdown, and is named My style 1 when no name is given', () => {
+    const f = saveMine(c, setValue(c, fresh(), 'r_fit', 150), 'o_shirt', '  ') as CharacterFigure
+    const kind = objectPartOf(c, f, 'o_shirt')!.kinds.find(k => k.label === 'Style')!
+    expect(kind.presets.map(p => p.name)).toEqual(['Dark', 'My style 1'])
+    expect(presetContent(c, f).presets).toHaveLength((c.presets ?? []).length + 1)
+    expect(presetContent(c, fresh())).toBe(c)
+  })
+  it('is kept on the original of a twin', () => {
+    const f = saveMine(c, setForm(fresh(), 'o_arm', objectPartOf(c, fresh(), 'o_arm')!.axes[0].axis, 'f_form7'), 'o_twin2', 'Long sleeves') as CharacterFigure
+    expect(f.mine[0].scope).toBe('o_arm')
+  })
+  it('is refused when nothing about the part is away from the model\'s look, and past the limit', () => {
+    expect(saveMine(c, fresh(), 'o_head', 'Nothing')).toBe('Change something about this part first: a style keeps its forms and sliders.')
+    const full: CharacterFigure = { ...squareHead(), mine: Array.from({ length: 40 }, (_, i) => ({ id: `m${i}`, name: `S${i}`, kind: 'Style', values: {}, hidden: [] })) }
+    expect(saveMine(c, full, 'o_head', 'One more')).toMatch(/at most 40 styles/)
+    expect(saveMine(c, squareHead(), 'o_nope', 'x')).toBe('That part is not in this model.')
+  })
+  it('is renamed and deleted, and a deleted one is no longer on', () => {
+    const f = saveMine(c, squareHead(), 'o_head', 'Square jaw') as CharacterFigure
+    const id = f.mine[0].id
+    expect(renameMine(f, id, '  Strong jaw ').mine[0].name).toBe('Strong jaw')
+    expect(renameMine(f, id, '   ')).toBe(f)
+    expect(renameMine(f, 'p_dark', 'x')).toBe(f)
+    const gone = deleteMine({ ...f, on: [id, 'p_dark'] }, id)
+    expect(gone.mine).toEqual([])
+    expect(gone.on).toEqual(['p_dark'])
+    expect(deleteMine(f, 'p_dark')).toBe(f)
+  })
+})
+
+describe('the character\'s own palette and card colour', () => {
+  it('starts as the model\'s and becomes the character\'s own with the first change', () => {
+    expect(fresh().palette).toBeNull()
+    expect(paletteFor(c, fresh()).map(p => p.id)).toEqual(['k1', 'k2', 'k3', 'k4', 'k5'])
+    const f = editSwatch(c, fresh(), 'k2', { h: 400, s: -5 })
+    expect(f.palette!.find(p => p.id === 'k2')).toMatchObject({ h: 359, s: 0 })
+    expect(f.palette).toHaveLength(5)
+    expect(c.palette!.find(p => p.id === 'k2')!.h).not.toBe(359)
+  })
+  it('a swatch is renamed, with a name that is not empty', () => {
+    expect(editSwatch(c, fresh(), 'k1', { name: '  Honey ' }).palette!.find(p => p.id === 'k1')!.name).toBe('Honey')
+    expect(editSwatch(c, fresh(), 'k1', { name: '   ' }).palette!.find(p => p.id === 'k1')!.name).toBe(c.palette!.find(p => p.id === 'k1')!.name)
+  })
+  it('gets swatches added up to ten, and says so at the limit', () => {
+    let f = fresh()
+    for (let i = 0; i < 5; i += 1) { const made = addSwatchTo(c, f); expect(typeof made).toBe('object'); f = made as CharacterFigure }
+    expect(f.palette).toHaveLength(10)
+    expect(addSwatchTo(c, f)).toMatch(/at most 10 swatches/)
+  })
+  it('loses a swatch, and the colours that used it go gray; the last one stays', () => {
+    const f = pickColour(c, { ...fresh(), palette: paletteFor(c, fresh()) }, 'k_hair', 'swatch', 'k3')
+    expect(f.colours.k_hair).toMatchObject({ src: 'swatch', id: 'k3' })
+    const gone = deleteSwatch(c, f, 'k3')
+    expect(gone.palette!.map(p => p.id)).toEqual(['k1', 'k2', 'k4', 'k5'])
+    expect(gone.colours.k_hair).toBeUndefined()
+    const one: CharacterFigure = { ...fresh(), palette: [{ id: 'k1', name: 'Only', h: 10, s: 10 }] }
+    expect(deleteSwatch(c, one, 'k1')).toBe(one)
+    expect(deleteSwatch(c, f, 'k_none')).toBe(f)
+  })
+  it('a swatch changed recolours every colour that uses it', () => {
+    const f = pickColour(c, fresh(), 'k_hair', 'swatch', 'k2')
+    const before = drawFigure(c, f).items.find(i => i.id === 's_lock')!.fill
+    const after = drawFigure(c, editSwatch(c, f, 'k2', { h: 200 })).items.find(i => i.id === 's_lock')!.fill
+    expect(after).not.toBe(before)
+  })
+  it('the card colour is a colour', () => {
+    expect(setTile(fresh(), '#A1B2C3').tile).toBe('#a1b2c3')
+    expect(setTile(fresh(), 'red')).toEqual(fresh())
+    expect(drawFigure(c, setTile(fresh(), '#112233')).tile).toBe('#112233')
+  })
+})
+
+describe('using another model', () => {
+  const to: ModelContent = {
+    ...c,
+    ranges: c.ranges.filter(r => r.id !== 'r_tilt'),
+    objects: c.objects.filter(o => o.id !== 'o_hair'),
+    genres: c.genres!.filter(g => g.id !== 'g_fantasy'),
+    presets: (c.presets ?? []).filter(p => p.id !== 'p_dark'),
+  }
+  const long = (): CharacterFigure => ({
+    ...fresh(), values: { r_tilt: 10, r_head: 95, r_height: 99 }, forms: { 'o_head.a_form1': 'f_form3', 'o_head.a_gone': 'x', 'o_gone.a_form1': 'f', 'class:k_form12': 'o_form18', 'class:k_none': 'o_form18' },
+    hidden: ['o_shirt', 'o_hair', 'pt_stripes'], colours: { k_hair: { src: 'swatch', id: 'k2', l: 40 }, k_skin: { src: 'colour', id: 'c_skin_3' }, k_gone: { src: 'colour', id: 'x' }, k_eye: { src: 'colour', id: 'c_gone' } },
+    palette: [{ id: 'k2', name: 'Mine', h: 10, s: 50 }], tile: '#445566', fall: 'left', locks: ['o_head', 'o_hair', 'g_head', 'g_gone'], zoff: { o_shirt: 1, o_hair: -1 },
+    mine: [{ id: 'm1', name: 'Mine', kind: 'Style', scope: 'o_head', values: { r_tilt: 4, r_head: 100 }, hidden: ['o_hair', 's_head'], forms: { 'o_head.a_form1': 'f_form3', 'o_head.a_gone': 'x' } }, { id: 'm2', name: 'Hair', kind: 'Style', scope: 'o_hair', values: {}, hidden: [] }],
+    genre: 'g_fantasy', on: ['p_dark', 'p_form43', 'm1'], order: { o_shirt: ['s_shirt', 's_gone'], o_hair: ['s_lock'] },
+  })
+  it('keeps what the new model has under the same name, and leaves the rest behind', () => {
+    const f = carryOver(to, long(), 'abcdef012345')
+    expect(f.model).toBe('abcdef012345')
+    expect(f.values).toEqual({ r_head: 95, r_height: 99 })
+    expect(f.forms).toEqual({ 'o_head.a_form1': 'f_form3', 'class:k_form12': 'o_form18' })
+    expect(f.hidden).toEqual(['o_shirt', 'pt_stripes'])
+    expect(f.colours).toEqual({ k_hair: { src: 'swatch', id: 'k2', l: 40 }, k_skin: { src: 'colour', id: 'c_skin_3' } })
+    expect(f.locks).toEqual(['o_head', 'g_head'])
+    expect(f.zoff).toEqual({ o_shirt: 1 })
+    expect(f.order).toEqual({ o_shirt: ['s_shirt'] })
+    expect(f.genre).toBeNull()
+    expect(f.on).toEqual(['p_form43', 'm1'])
+  })
+  it('keeps the character\'s own: its palette, card colour, fall side, and its own styles for the parts that are there', () => {
+    const f = carryOver(to, long(), 'abcdef012345')
+    expect(f.palette).toEqual([{ id: 'k2', name: 'Mine', h: 10, s: 50 }])
+    expect(f.tile).toBe('#445566')
+    expect(f.fall).toBe('left')
+    expect(f.mine.map(p => p.id)).toEqual(['m1'])
+    expect(f.mine[0]).toMatchObject({ values: { r_head: 100 }, hidden: ['s_head'], forms: { 'o_head.a_form1': 'f_form3' } })
+  })
+  it('holds a slider to the span the new model lets a writer choose within', () => {
+    const narrow: ModelContent = { ...to, ranges: to.ranges.map(r => (r.id === 'r_head' ? { ...r, limit: [98, 110] as [number, number] } : r)) }
+    expect(carryOver(narrow, long(), 'abcdef012345').values.r_head).toBe(98)
+  })
+  it('does not change the figure it is given, and draws something', () => {
+    const f = long()
+    const before = JSON.stringify(f)
+    const moved = carryOver(to, f, 'abcdef012345')
+    expect(JSON.stringify(f)).toBe(before)
+    expect(drawFigure(to, moved).items.length).toBeGreaterThan(10)
+    expect(carryOver(c, fresh(), 'abcdef012345')).toEqual({ ...fresh(), model: 'abcdef012345' })
   })
 })

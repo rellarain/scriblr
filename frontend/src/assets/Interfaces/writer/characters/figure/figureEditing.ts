@@ -1,15 +1,18 @@
-import type { CharacterFigure, FigureColour, ModelAxis, ModelClass, ModelContent, ModelFallSide, ModelFieldset, ModelFrame, ModelGroup, ModelHsl, ModelLayer, ModelObject, ModelPattern, ModelPreset, ModelRange, ModelSlot, ModelState } from '../../../../../api/types'
-import { colourById, paletteOf, resolveLocked, slotsOf, type ResolvedColour, type Rng, type SlotChoice, type SlotChoices } from '../../../admin/characters/engine/colour'
+import { FIGURE_MAX_LOCKS, FIGURE_MAX_MINE, type CharacterFigure, type FigureColour, type ModelAxis, type ModelClass, type ModelContent, type ModelFallSide, type ModelFieldset, type ModelFrame, type ModelGroup, type ModelHsl, type ModelLayer, type ModelObject, type ModelPattern, type ModelPreset, type ModelRange, type ModelSlot, type ModelState, type ModelSwatch } from '../../../../../api/types'
+import { addSwatch, colourById, paletteOf, removeSwatch, resolveLocked, setSwatch, slotsOf, type ResolvedColour, type Rng, type SlotChoice, type SlotChoices } from '../../../admin/characters/engine/colour'
 import { fieldsOf, fieldsetsOf, isOffered } from '../../../admin/characters/engine/fields'
 import { axesFor, chosenForm, classKey, classesOf, formKey, membersOf, presetsOf, shownMember } from '../../../admin/characters/engine/forms'
 import { framesOf } from '../../../admin/characters/engine/frames'
 import type { Box } from '../../../admin/characters/engine/geometry'
 import { activeLocks, slotsUsedBy } from '../../../admin/characters/engine/locks'
-import { applyPreset, isOn, scopeOf, type TestState } from '../../../admin/characters/engine/presets'
+import { applyPreset, isOn, saveStyle, scopeOf, type TestState } from '../../../admin/characters/engine/presets'
+import { orderedUnits, type LayerUnit } from '../../../admin/characters/engine/order'
 import { defaultValues, solve, type Solved } from '../../../admin/characters/engine/rig'
 import { lockedSlots as slotsPaintedBy, lockedThings, rollLook } from '../../../admin/characters/engine/roll'
 import { applyOption, chosenOption, statesOf } from '../../../admin/characters/engine/states'
-import { clampToSpan, spanOf, testOf, withTest, writerRanges } from './figureState'
+import { wearPair } from '../../../admin/characters/engine/wear'
+import { NAME_MAX, SWATCH_NAME_MAX, randomId } from '../../../admin/characters/modelContent'
+import { clampToSpan, coloursFrom, spanOf, testOf, withTest, writerRanges } from './figureState'
 
 // What the writer's editor offers for a figure (phase 6b-2), as pure functions of the model copy and the figure: the regions of the card (the model's frames), where each part of
 // the figure lies, what can be changed about the figure, a region's groups and an object, and each change as a new figure. The editor (FigureEditor.tsx) only draws and calls these.
@@ -78,6 +81,19 @@ export const regionOfGroup = (copy: ModelContent, groupId: string): string => pl
 
 export interface PresetKind { key: string; label: string; presets: ModelPreset[]; scoped: boolean; value: string }
 
+// The model's presets and the writer's own (the styles saved on the figure) as one list of presets, which is what a dropdown of styles lists and what choosing one applies. The
+// same content for the same figure styles, so what is worked out from it is remembered.
+const withMine = new WeakMap<ModelContent, WeakMap<ModelPreset[], ModelContent>>()
+export function presetContent(copy: ModelContent, figure: CharacterFigure): ModelContent {
+  const mine = figure.mine ?? []
+  if (mine.length === 0) return copy
+  let by = withMine.get(copy)
+  if (!by) { by = new WeakMap(); withMine.set(copy, by) }
+  let made = by.get(mine)
+  if (!made) { made = { ...copy, presets: [...presetsOf(copy), ...mine] }; by.set(mine, made) }
+  return made
+}
+
 // The presets of a scope (none: the model's own: ages, builds, outfits, poses...), a dropdown for each kind in the order the kinds first appear. `value` is the preset that is on
 // (NONE for a scoped kind that is all at rest; '' for a look that is none of them, which the dropdown calls Custom).
 export function kindsFor(copy: ModelContent, state: TestState, scope: string | null): PresetKind[] {
@@ -97,13 +113,13 @@ export function kindsFor(copy: ModelContent, state: TestState, scope: string | n
 
 // The figure with one preset of a kind chosen (NONE: the kind put back to rest). Only what the kind controls changes; the colours, the palette and the card stay.
 export function chooseKind(copy: ModelContent, figure: CharacterFigure, kind: PresetKind, id: string): CharacterFigure {
-  const state = testOf(copy, figure)
+  const state = testOf(copy, figure), all = presetContent(copy, figure)
   if (id === NONE) {
     const scope = kind.presets[0]?.scope ?? null
-    return withTest(copy, figure, applyPreset(copy, state, { id: NONE, name: 'None', kind: kind.label, scope, values: {}, hidden: [] }))
+    return withTest(all, figure, applyPreset(all, state, { id: NONE, name: 'None', kind: kind.label, scope, values: {}, hidden: [] }))
   }
   const p = kind.presets.find(x => x.id === id)
-  return p ? withTest(copy, figure, applyPreset(copy, state, p)) : figure
+  return p ? withTest(all, figure, applyPreset(all, state, p)) : figure
 }
 
 export interface StateChoice { state: ModelState; value: string }
@@ -193,6 +209,8 @@ export interface ObjectPart {
   worn: boolean | null
   // the side hanging things fall to can be chosen
   falls: boolean
+  // the part is locked: Randomise leaves it as it is
+  locked: boolean
 }
 
 const fallingShapes = (copy: ModelContent): Set<string> => new Set(copy.ranges.flatMap(r => r.drives.filter(d => d.kind === 'fall' && d.shape).map(d => d.shape as string)))
@@ -211,12 +229,13 @@ export function objectPartOf(copy: ModelContent, figure: CharacterFigure, object
   return {
     object, owner, family, axes,
     sliders: slidersUnder(copy, new Set([owner.id, ...owner.shapes])),
-    kinds: kindsFor(copy, state, owner.id),
+    kinds: kindsFor(presetContent(copy, figure), state, owner.id),
     fieldsets: fieldsetsAt(copy, state, 'object', owner.id),
     patterns: (copy.patterns ?? []).filter(p => owner.shapes.includes(p.base)).map(pattern => ({ pattern, on: !figure.hidden.includes(pattern.id) })),
     slots: slotsUsedBy(copy, owner).filter(s => s.colours.length > 0 || palette.length > 0),
     worn: owner.layer === 'clothing' ? !figure.hidden.includes(owner.id) : null,
     falls: owner.shapes.some(id => falling.has(id)),
+    locked: figure.locks.includes(owner.id),
   }
 }
 
@@ -235,26 +254,83 @@ export function changesOf(part: ObjectPart): string[] {
   return out
 }
 
-// The garments of a region, worn or not (a garment that is not worn has no hotspot, so this list is how it is put on again): one row for each garment and each family of
-// garments, in the model's order.
-export interface Garment { object: ModelObject; name: string; worn: boolean }
-export function garmentsIn(copy: ModelContent, figure: CharacterFigure, regionId: string): Garment[] {
+// ---- the clothing and the hair of a sheet: put on and taken off, and moved in front of or behind one another ----
+
+export type MovableLayer = 'clothing' | 'hair'
+export interface LayerRow {
+  // the key of the part (see order.ts `layerUnits`): what is moved
+  key: string
+  // the object to open for it: the object, or the member of a family that is shown
+  open: ModelObject
+  name: string
+  // worn or not (a garment that is not worn has no box on the card, so this list is how it is put on again); null for a layer that is not put on and taken off (hair)
+  worn: boolean | null
+  // why the part cannot be moved in front of (or behind) the next one in the list (null: it can)
+  front: string | null
+  behind: string | null
+}
+
+// The object that stands for a part: the object itself, or in a family the member that is shown (the first when none is).
+function unitObject(copy: ModelContent, figure: CharacterFigure, u: LayerUnit): ModelObject | undefined {
+  const klass = (copy.classes ?? []).find(k => k.template === u.key)
+  if (!klass) return u.objects.find(o => o.id === u.key)
+  return shownMember(copy, klass, figure.forms) ?? membersOf(copy, klass.id)[0]
+}
+
+// The parts of a layer that lie on a sheet, from the back to the front as they are drawn now (a twin goes with its original, a family counts once).
+function listedUnits(copy: ModelContent, figure: CharacterFigure, regionId: string, layer: MovableLayer): LayerUnit[] {
   const placed = placementOf(copy)
-  const out: Garment[] = [], families = new Set<string>()
-  for (const o of copy.objects) {
-    if (o.layer !== 'clothing' || o.mirrorOf || placed.objects[o.id] !== regionId) continue
-    const klass = o.classOf ? classesOf(copy).find(k => k.id === o.classOf) : undefined
-    if (klass) { if (families.has(klass.id)) continue; families.add(klass.id) }
-    out.push({ object: o, name: klass?.name.trim() || o.name, worn: !figure.hidden.includes(o.id) })
-  }
-  return out
+  return orderedUnits(copy, layer, figure.zoff ?? {}).filter(u => { const o = unitObject(copy, figure, u); return !!o && placed.objects[o.id] === regionId })
+}
+
+const keeps = (c: ModelContent, a: LayerUnit, b: LayerUnit): string | null => {
+  const pair = wearPair(c, a.objects, b.objects)
+  return pair ? `${pair.under.name.trim() || 'It'} is worn under ${pair.over.name.trim() || 'it'}: the model keeps it there.` : null
+}
+
+// The rows of a layer of a sheet, the one in front first (a list of layers reads from the top). A part cannot be moved past one the model says it is worn under or over.
+export function layerListIn(copy: ModelContent, figure: CharacterFigure, regionId: string, layer: MovableLayer): LayerRow[] {
+  const listed = listedUnits(copy, figure, regionId, layer)
+  const rows: LayerRow[] = listed.map((u, i) => {
+    const open = unitObject(copy, figure, u)!
+    const klass = (copy.classes ?? []).find(k => k.template === u.key)
+    const ahead = listed[i + 1], behind = listed[i - 1]
+    return {
+      key: u.key, open, name: klass?.name.trim() || open.name,
+      worn: layer === 'clothing' ? !figure.hidden.includes(open.id) : null,
+      front: ahead ? keeps(copy, u, ahead) : 'It is in front already.',
+      behind: behind ? keeps(copy, u, behind) : 'It is at the back already.',
+    }
+  })
+  return rows.reverse()
+}
+
+// The figure with a part moved in front of the next part of its sheet (or behind the previous one): the two change places among all the parts of the layer, and every part's offset is
+// worked out again from where the model puts it, so the offsets always describe exactly the order that is drawn.
+export function moveLayer(copy: ModelContent, figure: CharacterFigure, layer: MovableLayer, key: string, toward: 'front' | 'behind', regionId: string): CharacterFigure {
+  const row = layerListIn(copy, figure, regionId, layer).find(r => r.key === key)
+  if (!row || (toward === 'front' ? row.front : row.behind) !== null) return figure
+  const listed = listedUnits(copy, figure, regionId, layer)
+  const at = listed.findIndex(u => u.key === key)
+  const other = listed[at + (toward === 'front' ? 1 : -1)]
+  const all = orderedUnits(copy, layer, figure.zoff ?? {})
+  const i = all.findIndex(u => u.key === key), j = all.findIndex(u => u.key === other?.key)
+  if (i < 0 || j < 0) return figure
+  ;[all[i], all[j]] = [all[j], all[i]]
+  const zoff = { ...(figure.zoff ?? {}) }
+  all.forEach((u, place) => {
+    const off = Math.max(-50, Math.min(50, place - u.base))
+    if (off === 0) delete zoff[u.key]
+    else zoff[u.key] = off
+  })
+  return { ...figure, zoff }
 }
 
 // ---- the parts on the card: hotspots ----
 
 export type Layers = Record<ModelLayer, boolean>
 export const ALL_LAYERS: Layers = { body: true, clothing: true, hair: true }
-export interface Hotspot { object: ModelObject; box: Box; changes: string[] }
+export interface Hotspot { object: ModelObject; box: Box; changes: string[]; locked: boolean }
 
 // The objects of a region that can be pointed at on the card: shown now, with something to change, in a layer that is on. The box is where it is drawn (in the card's view).
 export function hotspotsOf(copy: ModelContent, figure: CharacterFigure, solved: Solved, regionId: string, layers: Layers = ALL_LAYERS): Hotspot[] {
@@ -269,10 +345,10 @@ export function hotspotsOf(copy: ModelContent, figure: CharacterFigure, solved: 
     if (!box) continue
     const part = objectPartOf(copy, figure, o.id)
     const changes = part ? changesOf(part) : []
-    if (changes.length > 0) out.push({ object: o, box, changes, top: Math.max(...shapes.map(id => drawn.get(id) ?? -1)) })
+    if (changes.length > 0) out.push({ object: o, box, changes, locked: !!part?.locked, top: Math.max(...shapes.map(id => drawn.get(id) ?? -1)) })
   }
   // In the order they are drawn, back to front: what is drawn in front is in front to be pointed at (a shirt over the undershirt it covers, an eye on a head).
-  return out.sort((a, b) => a.top - b.top).map(({ object, box, changes }) => ({ object, box, changes }))
+  return out.sort((a, b) => a.top - b.top).map(({ object, box, changes, locked }) => ({ object, box, changes, locked }))
 }
 // The layers that have an object that can be pointed at in a region (for the chips that switch them).
 export function layersIn(copy: ModelContent, figure: CharacterFigure, regionId: string): ModelLayer[] {
@@ -417,3 +493,82 @@ export function rollPart(copy: ModelContent, figure: CharacterFigure, scopeId: s
   }
   return withTest(copy, figure, state)
 }
+
+// ---- locks: what Randomise leaves as it is ----
+
+// A lock is kept on the object itself; a twin follows its original, so the lock of a twin is its original's.
+const lockId = (copy: ModelContent, objectId: string): string => objectById(copy, objectById(copy, objectId)?.mirrorOf)?.id ?? objectId
+export const isLocked = (copy: ModelContent, figure: CharacterFigure, objectId: string): boolean => figure.locks.includes(lockId(copy, objectId))
+
+export function setLock(copy: ModelContent, figure: CharacterFigure, objectId: string, on: boolean): CharacterFigure {
+  const id = lockId(copy, objectId)
+  if (!objectById(copy, id)) return figure
+  const rest = figure.locks.filter(x => x !== id)
+  return { ...figure, locks: on ? [...rest, id].slice(0, FIGURE_MAX_LOCKS) : rest }
+}
+
+// Every object that lies on a sheet (the parts a lock on the sheet covers: those with something to change and those with only a colour), as the objects locks are kept on.
+const lockedOnSheet = (copy: ModelContent, regionId: string): string[] => [...new Set(copy.objects.filter(o => placementOf(copy).objects[o.id] === regionId).map(o => lockId(copy, o.id)))]
+export const sheetLocked = (copy: ModelContent, figure: CharacterFigure, regionId: string): boolean => {
+  const ids = lockedOnSheet(copy, regionId)
+  return ids.length > 0 && ids.every(id => figure.locks.includes(id))
+}
+export function lockSheet(copy: ModelContent, figure: CharacterFigure, regionId: string, on: boolean): CharacterFigure {
+  const ids = lockedOnSheet(copy, regionId), set = new Set(ids)
+  const rest = figure.locks.filter(id => !set.has(id))
+  return { ...figure, locks: on ? [...rest, ...ids].slice(0, FIGURE_MAX_LOCKS) : rest }
+}
+export const unlockAll = (figure: CharacterFigure): CharacterFigure => (figure.locks.length === 0 ? figure : { ...figure, locks: [] })
+
+// ---- the writer's own styles ("mine"): the look of one part, kept on the figure ----
+
+export const isMine = (figure: CharacterFigure, presetId: string): boolean => (figure.mine ?? []).some(p => p.id === presetId)
+
+// Keep what is chosen for a part (its forms, its sliders and the fields among them, what it hides) as a style of the writer's own, in the kind its styles are in. It comes back as the
+// figure with the style added, which then reads as the style that is on; or why not (nothing about the part is away from the model's own look yet, or the figure has all it may keep).
+export function saveMine(copy: ModelContent, figure: CharacterFigure, objectId: string, name: string): CharacterFigure | string {
+  const mine = figure.mine ?? []
+  if (mine.length >= FIGURE_MAX_MINE) return `A character may keep at most ${FIGURE_MAX_MINE} styles of its own. Delete one first.`
+  const owner = objectById(copy, objectById(copy, objectId)?.mirrorOf) ?? objectById(copy, objectId)
+  if (!owner) return 'That part is not in this model.'
+  const kind = presetsOf(copy).find(p => p.scope === owner.id)?.kind ?? 'Style'
+  const made = saveStyle(presetContent(copy, figure), testOf(copy, figure), owner.id, name.trim() || `My style ${mine.length + 1}`, kind, randomId)
+  if (!made.ok) return made.reason
+  const preset = presetsOf(made.content).find(p => p.id === made.presetId)
+  if (!preset) return 'The style could not be kept.'
+  if (Object.keys(preset.values).length === 0 && preset.hidden.length === 0 && Object.keys(preset.forms ?? {}).length === 0 && !preset.fall && (preset.order ?? []).length === 0) {
+    return 'Change something about this part first: a style keeps its forms and sliders.'
+  }
+  return { ...figure, mine: [...mine, preset] }
+}
+export const renameMine = (figure: CharacterFigure, presetId: string, name: string): CharacterFigure => {
+  const clean = name.trim().slice(0, NAME_MAX)
+  return !clean || !isMine(figure, presetId) ? figure : { ...figure, mine: figure.mine.map(p => (p.id === presetId ? { ...p, name: clean } : p)) }
+}
+export const deleteMine = (figure: CharacterFigure, presetId: string): CharacterFigure =>
+  (isMine(figure, presetId) ? { ...figure, mine: figure.mine.filter(p => p.id !== presetId), on: (figure.on ?? []).filter(id => id !== presetId) } : figure)
+
+// ---- the character's own palette and the card colour ----
+
+export const paletteFor = (copy: ModelContent, figure: CharacterFigure): ModelSwatch[] => figure.palette ?? paletteOf(copy)
+
+// The first change to a palette makes it the character's own (a copy of the model's starter palette, changed).
+export function addSwatchTo(copy: ModelContent, figure: CharacterFigure): CharacterFigure | string {
+  const made = addSwatch(paletteFor(copy, figure), randomId)
+  return made.reason ?? { ...figure, palette: made.palette }
+}
+export function editSwatch(copy: ModelContent, figure: CharacterFigure, id: string, change: { h?: number; s?: number; name?: string }): CharacterFigure {
+  const name = change.name === undefined ? '' : change.name.trim().slice(0, SWATCH_NAME_MAX)
+  const colour: { h?: number; s?: number } = {}
+  if (change.h !== undefined) colour.h = change.h
+  if (change.s !== undefined) colour.s = change.s
+  return { ...figure, palette: setSwatch(paletteFor(copy, figure), id, name ? { ...colour, name } : colour) }
+}
+// A swatch goes (the last one stays): every colour of a slot that used it falls back to gray.
+export function deleteSwatch(copy: ModelContent, figure: CharacterFigure, id: string): CharacterFigure {
+  const palette = paletteFor(copy, figure)
+  if (palette.length <= 1 || !palette.some(p => p.id === id)) return figure
+  const gone = removeSwatch(palette, testOf(copy, figure).colours ?? {}, id)
+  return { ...figure, palette: gone.palette, colours: coloursFrom(gone.choices) }
+}
+export const setTile = (figure: CharacterFigure, hex: string): CharacterFigure => (/^#[0-9a-f]{6}$/i.test(hex) ? { ...figure, tile: hex.toLowerCase() } : figure)

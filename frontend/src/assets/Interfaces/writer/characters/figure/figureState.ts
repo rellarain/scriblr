@@ -106,7 +106,7 @@ export function colouringOf(copy: ModelContent, figure: CharacterFigure): Colour
   const locks = activeLocks(copy, { values, forms: { ...figure.forms }, hidden: [...figure.hidden], fall: figure.fall, colours: choices, on: [...(figure.on ?? [])], order: { ...(figure.order ?? {}) } })
   return { palette: figure.palette ?? paletteOf(copy), choices, forms: figure.forms ?? {}, values, ...(Object.keys(locks).length > 0 ? { locks } : {}) }
 }
-const coloursFrom = (choices: SlotChoices): Record<string, FigureColour> => {
+export const coloursFrom = (choices: SlotChoices): Record<string, FigureColour> => {
   const out: Record<string, FigureColour> = {}
   for (const [slot, c] of Object.entries(choices)) out[slot] = { src: c.src, id: c.id, ...(c.l !== undefined ? { l: c.l } : {}), ...(c.a !== undefined ? { a: c.a } : {}) }
   return out
@@ -163,7 +163,10 @@ export interface FigureDrawing { box: Box; items: PaintItem[]; tile: string }
 // The figure solved the way it is drawn through a crop (what the editor reads where each part lies from).
 export function solveFigure(copy: ModelContent, figure: CharacterFigure, crop: Crop = 'figure', view: View = 'front'): Solved {
   const frame = frameFor(copy, crop)
-  return solve(copy, valuesOf(copy, figure), view, { forms: figure.forms, hidden: hiddenThrough(frame, figure.hidden), fall: figure.fall, ...(figure.order && Object.keys(figure.order).length > 0 ? { order: figure.order } : {}) })
+  return solve(copy, valuesOf(copy, figure), view, {
+    forms: figure.forms, hidden: hiddenThrough(frame, figure.hidden), fall: figure.fall,
+    ...(figure.order && Object.keys(figure.order).length > 0 ? { order: figure.order } : {}), ...(figure.zoff && Object.keys(figure.zoff).length > 0 ? { zoff: figure.zoff } : {}),
+  })
 }
 
 // A figure drawn through a crop: the shapes to paint (back to front, no helpers) and the box to look at. Remembered for the figure object and the copy it was drawn from

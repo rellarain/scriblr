@@ -1,13 +1,13 @@
 import { useCallback, useMemo, useState } from 'react'
 import type { CharacterFigure, FigureModel } from '../../../../../api/types'
-import { BackIcon, ChevronLeftIcon, DiceIcon, FrontIcon } from '../../../../icons'
+import { BackIcon, ChevronLeftIcon, DiceIcon, FrontIcon, UnlockIcon } from '../../../../icons'
 import { genresOf } from '../../../admin/characters/engine/colour'
 import { framesOf } from '../../../admin/characters/engine/frames'
 import { seededRng } from '../../../admin/characters/engine/previews'
 import type { View } from '../../../admin/characters/engine/rig'
 import type { Characters } from '../useCharacters'
 import { FigureCard } from './FigureCard'
-import { ALL_LAYERS, objectPartOf, regionOfObject, regionsOf, type Layers } from './figureEditing'
+import { ALL_LAYERS, objectPartOf, regionOfObject, regionsOf, unlockAll, type Layers } from './figureEditing'
 import { rollFigure, type Crop } from './figureState'
 import { FigureStep, ObjectStep, RegionStep, type Apply, type Ctx } from './FigureSteps'
 
@@ -17,7 +17,7 @@ import { FigureStep, ObjectStep, RegionStep, type Apply, type Ctx } from './Figu
 // character's figure, and undone with the page's Undo. Randomise rolls the whole figure inside its genre; each step has a dice for just that part.
 const seed = (): number => Math.floor(Math.random() * 0x100000000)
 
-export function FigureEditor({ figure, model, label, setFigure }: { figure: CharacterFigure; model: FigureModel; label: string; setFigure: Characters['setFigure'] }) {
+export function FigureEditor({ projectId, figure, model, label, setFigure }: { projectId: string; figure: CharacterFigure; model: FigureModel; label: string; setFigure: Characters['setFigure'] }) {
   const copy = model.content
   const [view, setView] = useState<View>('front')
   const [frameId, setFrameId] = useState<string | null>(null)
@@ -66,6 +66,12 @@ export function FigureEditor({ figure, model, label, setFigure }: { figure: Char
           )}
           <button type="button" className="charIconBtn charDice" aria-label="Roll a new look" title="Roll a new look within the genre: everything that is not locked" onClick={() => apply(f => rollFigure(copy, f, seededRng(seed())))}><DiceIcon size={20} /></button>
         </div>
+        {figure.locks.length > 0 && (
+          <div className="charRow charFigLocks" role="group" aria-label="Locks">
+            <span className="charHint">{figure.locks.length} locked</span>
+            <button type="button" className="charIconBtn" aria-label="Unlock all" title="Unlock every part: Randomise may change them all again" onClick={() => apply(f => unlockAll(f))}><UnlockIcon size={16} /></button>
+          </div>
+        )}
       </div>
 
       <div className="charFigStage">
@@ -79,7 +85,7 @@ export function FigureEditor({ figure, model, label, setFigure }: { figure: Char
         </nav>
         {part ? <ObjectStep ctx={ctx} part={part} />
           : here ? <RegionStep ctx={ctx} regionId={here.id} regionName={here.name} layers={layers} onLayers={setLayers} />
-          : <FigureStep ctx={ctx} describe={`Drawn from ${model.name || copy.name || 'a model'}${model.version ? `, version ${model.version}` : ''}.`} onForget={() => setFigure(null)} />}
+          : <FigureStep ctx={ctx} projectId={projectId} model={model} describe={`Drawn from ${model.name || copy.name || 'a model'}${model.version ? `, version ${model.version}` : ''}.`} onForget={() => setFigure(null)} />}
       </section>
     </div></div>
   )

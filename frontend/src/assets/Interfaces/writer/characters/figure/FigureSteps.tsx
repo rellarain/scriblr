@@ -1,14 +1,15 @@
 import type { ReactNode } from 'react'
-import type { CharacterFigure, ModelContent, ModelFallSide, ModelLayer, ModelRange, ModelSlot } from '../../../../../api/types'
+import type { CharacterFigure, FigureModel, ModelContent, ModelFallSide, ModelLayer, ModelRange, ModelSlot } from '../../../../../api/types'
 import { paletteOf, swatchHex } from '../../../admin/characters/engine/colour'
 import { seededRng } from '../../../admin/characters/engine/previews'
 import { FALL_SIDES } from '../../../admin/characters/modelContent'
-import { DiceIcon, LockIcon } from '../../../../icons'
+import { ChevronDownIcon, ChevronUpIcon, DiceIcon, LockIcon } from '../../../../icons'
 import { Field, Slider } from '../CharFields'
 import {
-  FALL_LABELS, NONE, chooseKind, chooseOption, garmentsIn, groupPartsOf, layersIn, objectPartOf, figurePartOf, pickColour, rollPart, setBrightness, setForm, setMember, setOpacity, setPattern,
-  setFall, setWorn, slotViewOf, type FieldsetPart, type Layers, type ObjectPart, type PresetKind, type StateChoice,
+  FALL_LABELS, NONE, chooseKind, chooseOption, groupPartsOf, isMine, layerListIn, layersIn, lockSheet, moveLayer, objectPartOf, figurePartOf, pickColour, rollPart, setBrightness, setForm, setLock,
+  setMember, setOpacity, setPattern, setFall, setWorn, sheetLocked, slotViewOf, type FieldsetPart, type Layers, type MovableLayer, type ObjectPart, type PresetKind, type StateChoice,
 } from './figureEditing'
+import { CardColour, MineBlock, OtherModel, PaletteEditor } from './FigureSettings'
 import { setValue, spanOf, valuesOf } from './figureState'
 
 // The controls under the card, one step at a time: the figure as a whole (step 0), what a sheet of the card holds (step 1: its groups, and the clothes worn there) and one part of it
@@ -79,7 +80,7 @@ function Kinds({ kinds, ctx }: { kinds: PresetKind[]; ctx: Ctx }) {
       {kinds.map(k => (
         <Pick
           key={k.key} label={k.label} value={k.value} onChange={id => ctx.apply(f => chooseKind(ctx.copy, f, k, id))}
-          options={[...(k.scoped ? [{ id: NONE, name: 'None' }] : []), ...k.presets.map(p => ({ id: p.id, name: p.name }))]}
+          options={[...(k.scoped ? [{ id: NONE, name: 'None' }] : []), ...k.presets.map(p => ({ id: p.id, name: isMine(ctx.figure, p.id) ? `${p.name} (mine)` : p.name }))]}
         />
       ))}
     </>
@@ -113,7 +114,7 @@ const Title = ({ children, roll }: { children: ReactNode; roll?: ReactNode }) =>
 
 // ---- step 0: the figure ----
 
-export function FigureStep({ ctx, describe, onForget }: { ctx: Ctx; describe: string; onForget: () => void }) {
+export function FigureStep({ ctx, projectId, model, describe, onForget }: { ctx: Ctx; projectId: string; model: FigureModel; describe: string; onForget: () => void }) {
   const part = figurePartOf(ctx.copy, ctx.figure)
   return (
     <div className="charStep">
@@ -121,9 +122,12 @@ export function FigureStep({ ctx, describe, onForget }: { ctx: Ctx; describe: st
       {part.kinds.length > 0 && <div className="charStepGrid"><Kinds kinds={part.kinds} ctx={ctx} /></div>}
       <Ranges ranges={part.sliders} ctx={ctx} />
       <Fieldsets parts={part.fieldsets} ctx={ctx} />
+      <PaletteEditor ctx={ctx} />
+      <CardColour ctx={ctx} />
       <div className="charMannequin" role="group" aria-label="Mannequin">
         <h4 className="charLabel">Mannequin</h4>
         <p className="charHint">{describe}</p>
+        <OtherModel projectId={projectId} model={model} ctx={ctx} />
         <div className="charRow">
           <button type="button" className="charChip" aria-label="Go back to the portrait" title="Stop using the mannequin: the character is drawn from its portrait again" onClick={onForget}>Use the portrait instead</button>
         </div>
@@ -137,13 +141,43 @@ export function FigureStep({ ctx, describe, onForget }: { ctx: Ctx; describe: st
 
 const LAYER_NAMES: Record<ModelLayer, string> = { body: 'Body', clothing: 'Clothing', hair: 'Hair' }
 
+// The clothing or the hair of a sheet, the part in front first: put a garment on or take it off, move a part in front of or behind the next one (a part the model keeps in order
+// cannot be moved past that one, and the button says why), and open it for its fit and colour.
+function LayerList({ ctx, regionId, layer, title }: { ctx: Ctx; regionId: string; layer: MovableLayer; title: string }) {
+  const { copy, figure, apply } = ctx
+  const rows = layerListIn(copy, figure, regionId, layer)
+  if (rows.length === 0) return null
+  return (
+    <section className="charStepGroup" role="group" aria-label={title}>
+      <Title>{title}</Title>
+      {rows.map(r => (
+        <div key={r.key} className="charLayerRow">
+          {r.worn !== null ? <Toggle label={`${r.name} worn`} on={r.worn} onChange={on => apply(f => setWorn(copy, f, r.open.id, on))} /> : <span className="charLayerName">{r.name}</span>}
+          <div className="charLayerBtns">
+            <button
+              type="button" className="charIconBtn" aria-label={`Move ${r.name} in front`} title={r.front ?? `Move ${r.name} in front of the one above it`} disabled={r.front !== null}
+              onClick={() => apply(f => moveLayer(copy, f, layer, r.key, 'front', regionId))}
+            ><ChevronUpIcon size={14} /></button>
+            <button
+              type="button" className="charIconBtn" aria-label={`Move ${r.name} behind`} title={r.behind ?? `Move ${r.name} behind the one below it`} disabled={r.behind !== null}
+              onClick={() => apply(f => moveLayer(copy, f, layer, r.key, 'behind', regionId))}
+            ><ChevronDownIcon size={14} /></button>
+            <button type="button" className="charChip" aria-label={`${layer === 'clothing' ? 'Fit and colour' : 'Shape and colour'} of ${r.name}`} onClick={() => ctx.onObject(r.open.id)}>{layer === 'clothing' ? 'Fit and colour' : 'Shape and colour'}</button>
+          </div>
+        </div>
+      ))}
+    </section>
+  )
+}
+
 export function RegionStep({ ctx, regionId, regionName, layers, onLayers }: { ctx: Ctx; regionId: string; regionName: string; layers: Layers; onLayers: (l: Layers) => void }) {
   const groups = groupPartsOf(ctx.copy, ctx.figure, regionId)
-  const garments = garmentsIn(ctx.copy, ctx.figure, regionId)
+  const clothes = layerListIn(ctx.copy, ctx.figure, regionId, 'clothing'), hair = layerListIn(ctx.copy, ctx.figure, regionId, 'hair')
   const here = layersIn(ctx.copy, ctx.figure, regionId)
   return (
     <div className="charStep">
       <Title>{regionName}</Title>
+      <Toggle label="Lock all here" on={sheetLocked(ctx.copy, ctx.figure, regionId)} onChange={on => ctx.apply(f => lockSheet(ctx.copy, f, regionId, on))} />
       {groups.map(g => (
         <section key={g.group.id} className="charStepGroup" role="group" aria-label={g.group.name}>
           <Title roll={<Roll ctx={ctx} id={g.group.id} name={g.group.name} />}>{g.group.name}</Title>
@@ -152,19 +186,15 @@ export function RegionStep({ ctx, regionId, regionName, layers, onLayers }: { ct
           <Fieldsets parts={g.fieldsets} ctx={ctx} />
         </section>
       ))}
-      {garments.length > 0 && (
-        <section className="charStepGroup" role="group" aria-label="Clothing">
-          <Title>Clothing</Title>
-          {garments.map(g => <Toggle key={g.object.id} label={`${g.name} worn`} on={g.worn} onChange={on => ctx.apply(f => setWorn(ctx.copy, f, g.object.id, on))} />)}
-        </section>
-      )}
+      <LayerList ctx={ctx} regionId={regionId} layer="clothing" title="Clothing" />
+      <LayerList ctx={ctx} regionId={regionId} layer="hair" title="Hair" />
       {here.length > 1 && (
         <div className="charRow" role="group" aria-label="Pick from">
           <span className="charLabel">Pick from</span>
           {here.map(l => <button key={l} type="button" className="charChip" aria-pressed={layers[l]} title={`${layers[l] ? 'Hide' : 'Show'} the ${LAYER_NAMES[l].toLowerCase()} on the card to reach what is under it`} onClick={() => onLayers({ ...layers, [l]: !layers[l] })}>{LAYER_NAMES[l]}</button>)}
         </div>
       )}
-      {groups.length === 0 && garments.length === 0 && <p className="charHint">Click a part of the figure to change it.</p>}
+      {groups.length === 0 && clothes.length === 0 && hair.length === 0 && <p className="charHint">Click a part of the figure to change it.</p>}
     </div>
   )
 }
@@ -217,12 +247,24 @@ function SlotBlock({ ctx, objectId, slot }: { ctx: Ctx; objectId: string; slot: 
   )
 }
 
+// A part is locked: Randomise (the whole figure's and the part's own) leaves it as it is. The lock is kept on the part, and a twin has its original's.
+function LockButton({ ctx, part }: { ctx: Ctx; part: ObjectPart }) {
+  const name = part.object.name
+  return (
+    <button
+      type="button" className="charIconBtn charLock" aria-pressed={part.locked} aria-label={`Lock ${name}`}
+      title={part.locked ? `${name} is locked: Randomise leaves it as it is` : `Lock ${name}: Randomise leaves it as it is`} onClick={() => ctx.apply(f => setLock(ctx.copy, f, part.owner.id, !part.locked))}
+    ><LockIcon size={16} /></button>
+  )
+}
+
 export function ObjectStep({ ctx, part }: { ctx: Ctx; part: ObjectPart }) {
   const { copy, apply } = ctx
   const { object, owner } = part
+  const varies = part.axes.length + part.sliders.length + part.fieldsets.length + part.patterns.length > 0 || !!part.family || part.falls
   return (
     <div className="charStep" role="group" aria-label={object.name}>
-      <Title roll={<Roll ctx={ctx} id={owner.id} name={object.name} />}>{object.name}</Title>
+      <Title roll={<span className="charStepTools"><LockButton ctx={ctx} part={part} /><Roll ctx={ctx} id={owner.id} name={object.name} /></span>}>{object.name}</Title>
       {object !== owner && <p className="charHint">{object.name} mirrors {owner.name}: a change here changes both.</p>}
       {part.worn !== null && <Toggle label="Worn" on={part.worn} onChange={on => apply(f => setWorn(copy, f, owner.id, on))} />}
       <div className="charStepGrid">
@@ -238,6 +280,7 @@ export function ObjectStep({ ctx, part }: { ctx: Ctx; part: ObjectPart }) {
         ))}
         {part.falls && <Pick label="Where it falls" value={ctx.figure.fall} options={FALL_SIDES.map(s => ({ id: s, name: FALL_LABELS[s] }))} onChange={id => apply(f => setFall(f, id as ModelFallSide))} />}
       </div>
+      {varies && <MineBlock ctx={ctx} part={part} />}
       <Ranges ranges={part.sliders} ctx={ctx} />
       <Fieldsets parts={part.fieldsets} ctx={ctx} />
       {part.patterns.map(({ pattern, on }) => <Toggle key={pattern.id} label={pattern.name.trim() || 'Pattern'} on={on} onChange={next => apply(f => setPattern(f, pattern.id, next))} />)}

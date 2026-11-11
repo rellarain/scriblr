@@ -242,7 +242,8 @@ export function looseFactor(c: ModelContent, shape: Pick<ModelShape, 'loose'>, v
 // `plain` draws every object scaled with its group, whatever its fit mode says (what fit modes are measured against).
 // `fall` is the side things fall to (default: down).
 // `order` is the order a style draws an object's shapes in (back to front), per object; `hidden` may also name shapes (a style hides some of its object's).
-export interface SolveOptions { forms?: Choices; hidden?: Iterable<string>; show?: Iterable<string>; plain?: boolean; fall?: ModelFallSide; order?: Record<string, string[]> }
+// `zoff` (phase 6b-3) is how far a garment or a hair part has been moved among the parts of its layer (see order.ts `layerUnits`), per part: a writer puts a jacket over a shirt.
+export interface SolveOptions { forms?: Choices; hidden?: Iterable<string>; show?: Iterable<string>; plain?: boolean; fall?: ModelFallSide; order?: Record<string, string[]>; zoff?: Record<string, number> }
 
 // The model with every slider at rest and every object scaled with its group, kept for the content it was solved from (a stretching object reads its target's
 // box from it).
@@ -755,7 +756,7 @@ export function solve(c: ModelContent, values: Values = {}, view: View = 'front'
   for (const sh of c.shapes) shapeOut(sh.id)   // a shape in no group stands still
 
   const visible = Object.values(out.shapes).filter(s => s.visible)
-  out.order = drawOrder(c, visible.map(s => ({ id: s.id, z: s.z })), undefined, opts.order).map(s => s.id)
+  out.order = drawOrder(c, visible.map(s => ({ id: s.id, z: s.z })), undefined, opts.order, opts.zoff).map(s => s.id)
   return out
 }
 

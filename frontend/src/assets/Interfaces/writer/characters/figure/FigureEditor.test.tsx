@@ -1,17 +1,26 @@
-import { fireEvent, render, screen, within } from '@testing-library/react'
+import { fireEvent, render, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { useState } from 'react'
-import { describe, expect, it, vi } from 'vitest'
+import { beforeEach, describe, expect, it, vi } from 'vitest'
 import type { CharacterFigure, FigureModel, ModelContent } from '../../../../../api/types'
 import { copyOf } from '../../../../../designSystem/mockFigureModels'
 import { previewModels } from '../../../../../designSystem/mockCharacterModels'
 import type { Characters } from '../useCharacters'
 import { FigureEditor } from './FigureEditor'
-import { ageOf, blankFigure, spanOf } from './figureState'
+import { ageOf, blankFigure, cropBox, spanOf } from './figureState'
 
 // The writer's editor of a figure: the card with its sheets and parts, and the steps under it. The sample model of the design system has three frames (Head to hands, Bust, Face), a
 // family of eyes, an Age/Build/Outfit/Pose set of presets, a state on the upper arm, authored fields, a fill pattern and a colour lock on the shirt.
 vi.setConfig({ testTimeout: 30000 })
+
+// The published models the "use another model" control lists, and the copy it makes of the one chosen: both are the app's own calls, put in the tests' hands.
+const calls = vi.hoisted(() => ({ getPublishedModels: vi.fn(), ensureFigureModel: vi.fn() }))
+vi.mock('../../../../../api/characterModelsApi', async importOriginal => ({ ...(await importOriginal<typeof import('../../../../../api/characterModelsApi')>()), getPublishedModels: calls.getPublishedModels }))
+vi.mock('./figureModelStore', async importOriginal => ({ ...(await importOriginal<typeof import('./figureModelStore')>()), ensureFigureModel: calls.ensureFigureModel }))
+beforeEach(() => {
+  calls.getPublishedModels.mockReset().mockResolvedValue({ models: [] })
+  calls.ensureFigureModel.mockReset()
+})
 
 const model = previewModels()[0].draft
 const sample = copyOf(model)
@@ -28,7 +37,7 @@ function setup(start: CharacterFigure = fresh(), copy: FigureModel = sample) {
       if (next === null) { seen.forgotten += 1; return }
       set(prev => { const made = typeof next === 'function' ? next(prev) : next; seen.figure = made; return made })
     }
-    return <FigureEditor figure={figure} model={copy} label="Ada, figure" setFigure={setFigure} />
+    return <FigureEditor projectId="p1" figure={figure} model={copy} label="Ada, figure" setFigure={setFigure} />
   }
   const user = userEvent.setup()
   render(<Host />)
@@ -89,7 +98,8 @@ describe('step 0: the figure', () => {
     expect(screen.getByRole('combobox', { name: 'Age' })).toHaveValue('p_form43')
     expect(screen.getByRole('combobox', { name: 'Expression' })).toHaveValue('')
     expect(within(screen.getByRole('combobox', { name: 'Age' })).getAllByRole('option').map(o => o.textContent)).toEqual(['Infant', 'Child', 'Teen', 'Adult', 'Elder'])
-    expect(steps().getAllByRole('slider').map(s => s.getAttribute('aria-label'))).toEqual(['Height'])
+    const palette = screen.getByRole('group', { name: 'Palette' })
+    expect(steps().getAllByRole('slider').filter(s => !palette.contains(s)).map(s => s.getAttribute('aria-label'))).toEqual(['Height'])
   })
   it('holds a slider to the span the writer may move it in', () => {
     setup()
@@ -205,8 +215,12 @@ describe('step 1: a sheet', () => {
     expect(card().querySelector('[aria-label^="Upper arm:"]')).not.toBeNull()
   })
   it('says there is nothing here to change when that is so', async () => {
-    const { user } = setup()
-    await user.click(sheet('Bust'))
+    // a sheet in the corner of the card that no part lies in
+    const whole = cropBox(sample.content, 'figure')
+    const corner = { ...sample.content.frames![0], id: 'f_corner', name: 'Corner', x: whole.x, y: whole.y, w: whole.w * 0.1, h: whole.h * 0.06, hide: [] }
+    const content: ModelContent = { ...sample.content, frames: [...sample.content.frames!, corner] }
+    const { user } = setup(blankFigure(copyOf(content).id, content), copyOf(content))
+    await user.click(sheet('Corner'))
     expect(steps().getByText('Click a part of the figure to change it.')).toBeInTheDocument()
   })
   it('randomises just the group: its sliders and forms move, the rest of the figure does not', async () => {
@@ -358,5 +372,290 @@ describe('a model with no frames', () => {
     expect(card().querySelectorAll('.charFigHot').length).toBeGreaterThan(5)
     await user.click(hot(/^Head:/))
     expect(steps().getByRole('combobox', { name: 'Head shape' })).toBeInTheDocument()
+  })
+})
+
+// ---- 6b-3: locks, the order of the clothes and the hair, the character's own styles, palette and card colour, and another model ----
+
+// A vest over the shirt and a fringe beside the ponytail: parts the sample model puts in no order with the others, so a writer may move them.
+const vested: ModelContent = (() => {
+  const shirt = sample.content.shapes.find(s => s.id === 's_shirt')!
+  const top = Math.max(...sample.content.objects.find(o => o.id === 'o_shirt')!.shapes.map(id => sample.content.shapes.find(s => s.id === id)!.z))
+  return {
+    ...sample.content,
+    shapes: [...sample.content.shapes, { ...shirt, id: 's_vest', name: 'Vest', z: top }],
+    objects: [...sample.content.objects, { id: 'o_vest', name: 'Vest', layer: 'clothing', shapes: ['s_vest'] }],
+    groups: sample.content.groups.map(g => (g.id === 'g_shirt' ? { ...g, objects: [...g.objects, 'o_vest'] } : g)),
+  }
+})()
+const fringed: ModelContent = (() => {
+  const lock = sample.content.shapes.find(s => s.id === 's_lock')!
+  return {
+    ...sample.content,
+    shapes: [...sample.content.shapes, { ...lock, id: 's_fringe', name: 'Fringe' }],
+    objects: [...sample.content.objects, { id: 'o_fringe', name: 'Fringe', layer: 'hair', shapes: ['s_fringe'] }],
+    groups: sample.content.groups.map(g => (g.id === 'g_head' ? { ...g, objects: [...g.objects, 'o_fringe'] } : g)),
+  }
+})()
+const withModel = (content: ModelContent) => setup(blankFigure(copyOf(content).id, content), copyOf(content))
+// The rows of a list of layers on a sheet, the one in front first (a garment by its Worn switch, a hair part by its name).
+const rowsOf = (title: string) => [...screen.getByRole('group', { name: title }).querySelectorAll('.charLayerRow')].map(r => r.querySelector('label, .charLayerName')!.textContent)
+
+describe('locks', () => {
+  it('a part is locked from its step, shown on its box and counted in the toolbar, and every lock is let go at once', async () => {
+    const { user, seen } = setup()
+    await user.click(sheet('Face'))
+    await user.click(hot(/^Head:/))
+    const lock = screen.getByRole('button', { name: 'Lock Head' })
+    expect(lock).toHaveAttribute('aria-pressed', 'false')
+    expect(screen.queryByRole('group', { name: 'Locks' })).toBeNull()
+    await user.click(lock)
+    expect(lock).toHaveAttribute('aria-pressed', 'true')
+    expect(seen.figure.locks).toEqual(['o_head'])
+    const bar = within(screen.getByRole('group', { name: 'Locks' }))
+    expect(bar.getByText('1 locked')).toBeInTheDocument()
+    await user.click(screen.getByRole('button', { name: 'Back' }))
+    expect(hot(/^Head:.*, locked$/)).toBeInTheDocument()
+    await user.click(bar.getByRole('button', { name: 'Unlock all' }))
+    expect(seen.figure.locks).toEqual([])
+    expect(screen.queryByRole('group', { name: 'Locks' })).toBeNull()
+    expect(hot(/^Head:/).getAttribute('aria-label')).not.toMatch(/locked/)
+  })
+  it('Lock all here locks every part of a sheet, and is off as soon as one of them is let go', async () => {
+    const { user, seen } = setup()
+    await user.click(sheet('Face'))
+    const all = () => screen.getByRole('switch', { name: 'Lock all here' })
+    expect(all()).not.toBeChecked()
+    await user.click(all())
+    expect(all()).toBeChecked()
+    expect(seen.figure.locks).toEqual(expect.arrayContaining(['o_head', 'o_eye', 'o_form15']))
+    expect(seen.figure.locks).not.toContain('o_shirt')
+    expect(within(screen.getByRole('group', { name: 'Locks' })).getByText(`${seen.figure.locks.length} locked`)).toBeInTheDocument()
+    await user.click(hot(/^Head:/))
+    await user.click(screen.getByRole('button', { name: 'Lock Head' }))
+    await user.click(screen.getByRole('button', { name: 'Back' }))
+    expect(all()).not.toBeChecked()
+    await user.click(all())
+    expect(all()).toBeChecked()
+    await user.click(all())
+    expect(seen.figure.locks).toEqual([])
+  })
+  it('Randomise leaves a locked part as it is', async () => {
+    const start: CharacterFigure = { ...fresh(), locks: ['o_head'] }
+    const { user, seen } = setup(start)
+    for (let i = 0; i < 10; i += 1) await user.click(screen.getByRole('button', { name: 'Roll a new look' }))
+    expect(seen.figure).not.toEqual(start)
+    expect(seen.figure.forms['o_head.a_form1']).toBeUndefined()
+    expect(seen.figure.locks).toEqual(['o_head'])
+  })
+})
+
+describe('the order of the clothes and of the hair', () => {
+  it('lists the clothes with the one in front first, and says why the model\'s own order cannot be changed', async () => {
+    const { user } = setup()
+    await user.click(sheet('Head to hands'))
+    expect(rowsOf('Clothing')).toEqual(['Shirt worn', 'Undershirt worn'])
+    const clothing = within(screen.getByRole('group', { name: 'Clothing' }))
+    const kept = 'Undershirt is worn under Shirt: the model keeps it there.'
+    expect(clothing.getByRole('button', { name: 'Move Shirt in front' })).toBeDisabled()
+    expect(clothing.getByRole('button', { name: 'Move Shirt in front' })).toHaveAttribute('title', 'It is in front already.')
+    expect(clothing.getByRole('button', { name: 'Move Shirt behind' })).toBeDisabled()
+    expect(clothing.getByRole('button', { name: 'Move Shirt behind' })).toHaveAttribute('title', kept)
+    expect(clothing.getByRole('button', { name: 'Move Undershirt in front' })).toBeDisabled()
+    expect(clothing.getByRole('button', { name: 'Move Undershirt in front' })).toHaveAttribute('title', kept)
+    expect(clothing.getByRole('button', { name: 'Move Undershirt behind' })).toHaveAttribute('title', 'It is at the back already.')
+  })
+  it('moves a garment behind the next one, in the list and in what is saved, and back again', async () => {
+    const { user, seen } = withModel(vested)
+    await user.click(sheet('Head to hands'))
+    expect(rowsOf('Clothing')).toEqual(['Vest worn', 'Shirt worn', 'Undershirt worn'])
+    const clothing = () => within(screen.getByRole('group', { name: 'Clothing' }))
+    expect(clothing().getByRole('button', { name: 'Move Vest in front' })).toBeDisabled()
+    await user.click(clothing().getByRole('button', { name: 'Move Vest behind' }))
+    expect(seen.figure.zoff).toEqual({ o_vest: -1, o_shirt: 1 })
+    expect(rowsOf('Clothing')).toEqual(['Shirt worn', 'Vest worn', 'Undershirt worn'])
+    expect(clothing().getByRole('button', { name: 'Move Vest in front' })).toBeEnabled()
+    await user.click(clothing().getByRole('button', { name: 'Move Vest in front' }))
+    expect(seen.figure.zoff).toEqual({})
+    expect(rowsOf('Clothing')).toEqual(['Vest worn', 'Shirt worn', 'Undershirt worn'])
+  })
+  it('opens a garment for its fit and colour from the list', async () => {
+    const { user } = setup()
+    await user.click(sheet('Head to hands'))
+    await user.click(within(screen.getByRole('group', { name: 'Clothing' })).getByRole('button', { name: 'Fit and colour of Shirt' }))
+    expect(crumbs().getByRole('button', { name: 'Shirt' })).toHaveAttribute('aria-current', 'step')
+  })
+  it('lists the hair of a sheet without a worn switch, and opens a part from the list', async () => {
+    const { user } = setup()
+    await user.click(sheet('Bust'))
+    expect(rowsOf('Hair')).toEqual(['Ponytail'])
+    expect(within(screen.getByRole('group', { name: 'Hair' })).queryAllByRole('switch')).toHaveLength(0)
+    await user.click(screen.getByRole('button', { name: 'Shape and colour of Ponytail' }))
+    expect(crumbs().getByRole('button', { name: 'Ponytail' })).toHaveAttribute('aria-current', 'step')
+  })
+  it('moves hair parts among the hair of the sheet the same way', async () => {
+    const { user, seen } = withModel(fringed)
+    await user.click(sheet('Bust'))
+    const before = rowsOf('Hair')
+    expect([...before].sort()).toEqual(['Fringe', 'Ponytail'])
+    await user.click(within(screen.getByRole('group', { name: 'Hair' })).getByRole('button', { name: `Move ${before[0]} behind` }))
+    expect(rowsOf('Hair')).toEqual([before[1], before[0]])
+    expect(Object.keys(seen.figure.zoff)).toHaveLength(2)
+  })
+})
+
+describe('a style of the character\'s own', () => {
+  const part = () => within(steps().getByRole('group', { name: 'Head' }))
+  async function openHead(user: ReturnType<typeof userEvent.setup>) {
+    await user.click(sheet('Face'))
+    await user.click(hot(/^Head:/))
+  }
+  async function keepSquare(user: ReturnType<typeof userEvent.setup>, name: string) {
+    await user.selectOptions(part().getByRole('combobox', { name: 'Head shape' }), 'f_form3')
+    if (name) await user.type(part().getByRole('textbox', { name: 'Name for my style' }), name)
+    await user.click(part().getByRole('button', { name: 'Save as my style' }))
+  }
+  it('is kept from what is chosen for the part, and chosen from the same dropdown as the model\'s styles', async () => {
+    const { user, seen } = setup()
+    await openHead(user)
+    await keepSquare(user, 'Square jaw')
+    expect(seen.figure.mine).toHaveLength(1)
+    expect(seen.figure.mine[0]).toMatchObject({ name: 'Square jaw', scope: 'o_head', forms: { 'o_head.a_form1': 'f_form3' } })
+    const style = part().getByRole('combobox', { name: 'Style' })
+    expect(style).toHaveValue(seen.figure.mine[0].id)
+    expect(within(style).getByRole('option', { name: 'Square jaw (mine)' })).toBeInTheDocument()
+    expect(part().getByRole('textbox', { name: 'Name of my style' })).toHaveValue('Square jaw')
+    expect(part().getByRole('textbox', { name: 'Name for my style' })).toHaveValue('')
+    // choosing another head shape means the style is no longer the one that is on, and choosing the style brings the shape back
+    await user.selectOptions(part().getByRole('combobox', { name: 'Head shape' }), 'f_form4')
+    expect(part().getByRole('combobox', { name: 'Style' })).not.toHaveValue(seen.figure.mine[0].id)
+    await user.selectOptions(part().getByRole('combobox', { name: 'Style' }), seen.figure.mine[0].id)
+    expect(seen.figure.forms['o_head.a_form1']).toBe('f_form3')
+  })
+  it('is called My style 1 when it is not given a name', async () => {
+    const { user, seen } = setup()
+    await openHead(user)
+    await keepSquare(user, '')
+    expect(seen.figure.mine[0].name).toBe('My style 1')
+  })
+  it('is renamed and deleted from the part it is on', async () => {
+    const { user, seen } = setup()
+    await openHead(user)
+    await keepSquare(user, 'Square jaw')
+    const name = part().getByRole('textbox', { name: 'Name of my style' })
+    await user.clear(name)
+    await user.type(name, 'Strong jaw')
+    await user.tab()
+    expect(seen.figure.mine[0].name).toBe('Strong jaw')
+    expect(within(part().getByRole('combobox', { name: 'Style' })).getByRole('option', { name: 'Strong jaw (mine)' })).toBeInTheDocument()
+    await user.click(part().getByRole('button', { name: 'Delete my style' }))
+    expect(seen.figure.mine).toEqual([])
+    expect(part().queryByRole('button', { name: 'Delete my style' })).toBeNull()
+  })
+  it('says what to do first when nothing about the part is changed', async () => {
+    const { user, seen } = setup()
+    await openHead(user)
+    await user.click(part().getByRole('button', { name: 'Save as my style' }))
+    expect(screen.getByRole('alert')).toHaveTextContent('Change something about this part first')
+    expect(seen.figure.mine).toEqual([])
+  })
+})
+
+describe('the palette and the colour of the card', () => {
+  const palette = () => within(screen.getByRole('group', { name: 'Palette' }))
+  const swatches = () => palette().getAllByRole('group').map(g => g.getAttribute('aria-label'))
+  it('starts as the model\'s and is the character\'s own from the first change, which recolours what uses it', () => {
+    const { seen } = setup()
+    expect(seen.figure.palette).toBeNull()
+    expect(swatches()).toEqual(['Warm', 'Rose', 'Ink blue', 'Moss', 'Gold'])
+    fireEvent.change(palette().getByRole('slider', { name: 'Warm hue' }), { target: { value: '200' } })
+    expect(seen.figure.palette).toHaveLength(5)
+    expect(seen.figure.palette!.find(p => p.id === 'k1')!.h).toBe(200)
+    expect(seen.groups.at(-1)).toBe('figure.palette.k1.h')
+    fireEvent.change(palette().getByRole('slider', { name: 'Warm saturation' }), { target: { value: '80' } })
+    expect(seen.figure.palette!.find(p => p.id === 'k1')!.s).toBe(80)
+    expect(seen.groups.at(-1)).toBe('figure.palette.k1.s')
+  })
+  it('gets a swatch added up to ten, loses one that is deleted, and keeps the last', async () => {
+    const { user, seen } = setup()
+    for (let i = 0; i < 5; i += 1) await user.click(screen.getByRole('button', { name: 'Add a swatch' }))
+    expect(seen.figure.palette).toHaveLength(10)
+    expect(swatches()).toHaveLength(10)
+    expect(screen.getByRole('button', { name: 'Add a swatch' })).toBeDisabled()
+    await user.click(palette().getByRole('button', { name: 'Delete Warm' }))
+    expect(seen.figure.palette).toHaveLength(9)
+    expect(swatches()).not.toContain('Warm')
+    const one: CharacterFigure = { ...fresh(), palette: [{ id: 'k1', name: 'Only', h: 10, s: 10 }] }
+    const second = setup(one)
+    expect(second.seen.figure.palette).toHaveLength(1)
+    expect(within(screen.getAllByRole('group', { name: 'Palette' })[1]).getByRole('button', { name: 'Delete Only' })).toBeDisabled()
+  })
+  it('renames a swatch', async () => {
+    const { user, seen } = setup()
+    const name = palette().getByRole('textbox', { name: 'Name of Warm' })
+    await user.clear(name)
+    await user.type(name, 'Honey{Enter}')
+    expect(seen.figure.palette!.find(p => p.id === 'k1')!.name).toBe('Honey')
+    expect(swatches()[0]).toBe('Honey')
+  })
+  it('the card colour is chosen from the swatches, and is the one shown', async () => {
+    const { user, seen } = setup()
+    const colour = within(screen.getByRole('group', { name: 'Card colour' }))
+    await user.click(colour.getByRole('button', { name: 'Card colour #cfe0dc' }))
+    expect(seen.figure.tile).toBe('#cfe0dc')
+    expect(seen.groups.at(-1)).toBe('figure.tile')
+    expect(colour.getByRole('button', { name: 'Card colour #cfe0dc' })).toHaveAttribute('aria-pressed', 'true')
+  })
+})
+
+describe('using another model', () => {
+  const fantasy: ModelContent = { ...sample.content, name: 'Fantasy base', ranges: sample.content.ranges.filter(r => r.id !== 'r_tilt') }
+  const listed = (id: string, content: ModelContent, version = 1) => ({ id, version, publishedAt: '2026-01-10T09:00:00.000Z', content })
+  const use = () => screen.getByRole('button', { name: /Use this model/ })
+
+  it('lists every published model, marks the one in use and a newer version of it', async () => {
+    calls.getPublishedModels.mockResolvedValue({ models: [listed('adult', sample.content, 2), listed('fantasy', fantasy)] })
+    setup()
+    const select = await screen.findByRole('combobox', { name: 'Model to use' })
+    expect(within(select).getAllByRole('option').map(o => o.textContent)).toEqual(['Adult (basic) (newer version)', 'Fantasy base'])
+    expect(select).toHaveValue('adult')
+    expect(use()).toBeEnabled()
+  })
+  it('has nothing to use while the model is the one in use', async () => {
+    calls.getPublishedModels.mockResolvedValue({ models: [listed('adult', sample.content, 1), listed('fantasy', fantasy)] })
+    setup()
+    const select = await screen.findByRole('combobox', { name: 'Model to use' })
+    expect(within(select).getAllByRole('option').map(o => o.textContent)).toEqual(['Adult (basic) (in use)', 'Fantasy base'])
+    expect(use()).toBeDisabled()
+    await userEvent.selectOptions(select, 'fantasy')
+    expect(use()).toBeEnabled()
+  })
+  it('copies the model chosen, and carries over what the figure has chosen that the new model has too', async () => {
+    const made = copyOf(fantasy, 'fantasy', 1)
+    calls.getPublishedModels.mockResolvedValue({ models: [listed('adult', sample.content), listed('fantasy', fantasy)] })
+    calls.ensureFigureModel.mockResolvedValue(made)
+    const start: CharacterFigure = { ...fresh(), values: { r_tilt: 10, r_height: 90 }, locks: ['o_head'], tile: '#445566' }
+    const { user, seen } = setup(start)
+    await user.selectOptions(await screen.findByRole('combobox', { name: 'Model to use' }), 'fantasy')
+    await user.click(use())
+    await waitFor(() => expect(seen.figure.model).toBe(made.id))
+    expect(calls.ensureFigureModel).toHaveBeenCalledWith('p1', { modelId: 'fantasy' })
+    expect(seen.figure.values).toEqual({ r_height: 90 })
+    expect(seen.figure.locks).toEqual(['o_head'])
+    expect(seen.figure.tile).toBe('#445566')
+  })
+  it('says so when the model cannot be copied, and changes nothing', async () => {
+    calls.getPublishedModels.mockResolvedValue({ models: [listed('adult', sample.content), listed('fantasy', fantasy)] })
+    calls.ensureFigureModel.mockRejectedValue(new Error('A copy of a model may be at most 250 KB.'))
+    const { user, seen } = setup()
+    await user.selectOptions(await screen.findByRole('combobox', { name: 'Model to use' }), 'fantasy')
+    await user.click(use())
+    expect(await screen.findByRole('alert')).toHaveTextContent('250 KB')
+    expect(seen.figure).toEqual(fresh())
+  })
+  it('says so when the models cannot be loaded', async () => {
+    calls.getPublishedModels.mockRejectedValue(new Error('offline'))
+    setup()
+    expect(await screen.findByRole('alert')).toHaveTextContent('The models could not be loaded.')
   })
 })

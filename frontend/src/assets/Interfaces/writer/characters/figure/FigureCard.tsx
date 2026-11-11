@@ -1,5 +1,6 @@
 import { useMemo, useState, type CSSProperties } from 'react'
 import type { CharacterFigure, ModelContent } from '../../../../../api/types'
+import { LockIcon } from '../../../../icons'
 import { viewBoxOf } from '../../../admin/characters/engine/frames'
 import type { Box } from '../../../admin/characters/engine/geometry'
 import type { View } from '../../../admin/characters/engine/rig'
@@ -56,10 +57,10 @@ export function FigureCard({ copy, figure, view, crop, region, objectId, layers,
       <Figure copy={copy} figure={figure} crop={crop} view={view} square={false} layer="figure" label={label} className="charFigLayer charFigLayer--figure" />
       {spots.map(({ h, at }) => (
         <button
-          key={h.object.id} type="button" className={`charFigHot${objectId === h.object.id ? ' charFigHot--on' : ''}`} aria-pressed={objectId === h.object.id}
-          aria-label={`${h.object.name}: ${h.changes.join(', ')}`} style={{ left: `${at.left}%`, top: `${at.top}%`, width: `${at.width}%`, height: `${at.height}%` }}
+          key={h.object.id} type="button" className={`charFigHot${objectId === h.object.id ? ' charFigHot--on' : ''}${h.locked ? ' charFigHot--locked' : ''}`} aria-pressed={objectId === h.object.id}
+          aria-label={`${h.object.name}: ${h.changes.join(', ')}${h.locked ? ', locked' : ''}`} style={{ left: `${at.left}%`, top: `${at.top}%`, width: `${at.width}%`, height: `${at.height}%` }}
           onClick={() => onObject(h.object.id)} onMouseEnter={() => setTip(h.object.id)} onMouseLeave={() => setTip(null)} onFocus={() => setTip(h.object.id)} onBlur={() => setTip(null)}
-        />
+        >{h.locked && <span className="charFigLockMark" aria-hidden="true"><LockIcon size={10} /></span>}</button>
       ))}
       {shown && (
         <div className="charFigTip" role="tooltip" style={{ left: `${Math.min(80, Math.max(20, shown.at.left + shown.at.width / 2))}%`, top: `${shown.at.top}%` }}>

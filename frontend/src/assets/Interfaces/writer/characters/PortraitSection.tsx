@@ -161,7 +161,7 @@ export function PortraitSection({ projectId, doc, edit, rename, setFigure }: {
 
   // A character with a mannequin whose model copy is here is edited on its figure's own card; one whose copy has not arrived (or is not in this project) keeps this page, which
   // draws its portrait and says where the mannequin stands.
-  if (doc.figure && model) return <FigureEditor key={doc.id} figure={doc.figure} model={model} label={`${doc.name}, figure`} setFigure={setFigure} />
+  if (doc.figure && model) return <FigureEditor key={`${doc.id}:${doc.figure.model}`} projectId={projectId} figure={doc.figure} model={model} label={`${doc.name}, figure`} setFigure={setFigure} />
 
   return (
     <div className="charPortrait">

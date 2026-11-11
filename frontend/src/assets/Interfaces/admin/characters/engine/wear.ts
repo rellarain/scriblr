@@ -51,6 +51,16 @@ function reaches(c: ModelContent, from: ModelObject, goal: string, seen = new Se
   return false
 }
 
+// The pair, if any, that the model keeps in order between two sets of objects (a garment with its twins, a family): an object of one that is worn under an object of the other,
+// through any chain of garments.
+export function wearPair(c: ModelContent, a: ModelObject[], b: ModelObject[]): { under: ModelObject; over: ModelObject } | null {
+  for (const x of a) for (const y of b) {
+    if (reaches(c, x, y.id)) return { under: x, over: y }
+    if (reaches(c, y, x.id)) return { under: y, over: x }
+  }
+  return null
+}
+
 // An object that is worn under something that is worn under it (each would trim the other).
 export const wearsRoundInACircle = (c: ModelContent, o: ModelObject): boolean => reaches(c, o, o.id)
 
