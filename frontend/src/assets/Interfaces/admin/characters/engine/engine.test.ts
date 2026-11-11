@@ -72,7 +72,7 @@ const content = (over: Partial<ModelContent> = {}): ModelContent => ({ name: 'Ad
 describe('limits', () => {
   it('uses the numbers the user chose', () => {
     expect([LIMITS.pointsWarn, LIMITS.pointsMax, LIMITS.objectsPerGroupWarn, LIMITS.objectsPerGroupMax, LIMITS.shapesPerObjectWarn, LIMITS.shapesPerObjectMax]).toEqual([24, 60, 24, 48, 36, 72])
-    expect([LIMITS.copyWarnBytes, LIMITS.copyMaxBytes]).toEqual([150 * 1024, 250 * 1024])
+    expect([LIMITS.copyWarnBytes, LIMITS.copyMaxBytes]).toEqual([300 * 1024, 600 * 1024])
   })
   it('warns above the first number and stops at the second', () => {
     expect(level(24, 24, 60)).toBe('ok'); expect(level(25, 24, 60)).toBe('warn'); expect(level(59, 24, 60)).toBe('warn'); expect(level(60, 24, 60)).toBe('stop')
@@ -96,7 +96,7 @@ describe('limits', () => {
   })
   it('counts the size of a character\'s copy', () => {
     expect(copyBytes(content())).toBeGreaterThan(20)
-    const big = content({ shapes: Array.from({ length: 120 }, (_, i) => ({ ...newShape(`s${i}`, 'x'.repeat(60), 'star', { x: 0, y: 0, w: 10, h: 10 }), pts: Array.from({ length: 60 }, (_, j) => ({ x: j + 0.123456, y: j % 9 + 0.654321, m: 'c' as const, hi: [1.123456, 2.123456] as [number, number], ho: [3.123456, 4.123456] as [number, number] })) })) })
+    const big = content({ shapes: Array.from({ length: 300 }, (_, i) => ({ ...newShape(`s${i}`, 'x'.repeat(60), 'star', { x: 0, y: 0, w: 10, h: 10 }), pts: Array.from({ length: 60 }, (_, j) => ({ x: j + 0.123456, y: j % 9 + 0.654321, m: 'c' as const, hi: [1.123456, 2.123456] as [number, number], ho: [3.123456, 4.123456] as [number, number] })) })) })
     expect(copyBytes(big)).toBeGreaterThan(LIMITS.copyMaxBytes)
     expect(limitNotes(big).some(n => n.level === 'stop' && n.text.includes('KB'))).toBe(true)
   })

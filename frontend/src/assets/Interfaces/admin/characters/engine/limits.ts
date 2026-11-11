@@ -9,8 +9,8 @@ export const LIMITS = {
   objectsPerGroupMax: 48,
   shapesPerObjectWarn: 36,
   shapesPerObjectMax: 72,
-  copyWarnBytes: 150 * 1024,
-  copyMaxBytes: 250 * 1024,
+  copyWarnBytes: 300 * 1024,
+  copyMaxBytes: 600 * 1024,
   // the rig: a pivot chain of at most 9 groups (refused above it, a warning above 6: torso, arm, forearm, hand and three finger joints is 7); sliders per model and what one slider drives
   chainWarn: 6,
   chainMax: 9,

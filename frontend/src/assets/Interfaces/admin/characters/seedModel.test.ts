@@ -84,6 +84,76 @@ describe('the basic model', () => {
     for (const age of agePresets(seed)) expect(ageOf(seed, atAge(seed, fig, age.id))?.id, age.name).toBe(age.id)
   })
 
+  it('has the hair as fourteen sections by plane and side, each with its own length, texture and cut', () => {
+    const sections = seed.objects.filter(o => o.id.startsWith('hair.'))
+    expect(sections).toHaveLength(14)
+    for (const o of sections) {
+      expect(o.layer).toBe('hair')
+      const mine = seed.ranges.filter(r => r.scope === o.id)
+      expect(mine.map(r => r.name).sort(), o.id).toEqual(['Length', 'Texture'])
+      // Randomise leaves the length and texture of a section to a hairstyle, and its cut with them
+      for (const r of mine) expect(r.rand, `${o.id} ${r.name}`).toEqual(r.name === 'Length' ? [r.rest, r.rest] : [0, 0])
+      expect(o.axes![0].roll).toBe(0)
+      expect(o.axes![0].options.length).toBeGreaterThan(1)
+    }
+    expect(seed.groups.find(g => g.id === 'hair')!.objects).toHaveLength(14)
+  })
+
+  it('stretches a section from its roots with its Length slider, and waves it with its Texture slider', () => {
+    const at = (values: Record<string, number>) => solve(seed, { ...defaultValues(seed), ...values }, 'front').shapes
+    const short = at({ len_back_center: 12 }).hr_back_center, long = at({ len_back_center: 90 }).hr_back_center
+    expect(long.box.h).toBeGreaterThan(short.box.h * 2)
+    expect(long.box.y).toBeCloseTo(short.box.y, 0)   // the roots stay where they are
+    const straight = at({ tex_back_center: 0, len_back_center: 90 }).hr_back_center, curly = at({ tex_back_center: 66, len_back_center: 90 }).hr_back_center
+    expect(curly.d).not.toBe(straight.d)
+    expect(allFinite(curly.d)).toBe(true)
+  })
+
+  it('has fourteen ready hairstyles that set whole heads of hair: shorter and longer, textured, shaved and bald', () => {
+    const styles = seed.presets!.filter(p => p.kind === 'Hair style')
+    expect(styles.map(p => p.name)).toEqual(['Short', 'Buzzed', 'Pixie', 'Undercut', 'Mohawk', 'Shaved on one side', 'Bob', 'Shoulder-length', 'Long and straight', 'Long and wavy', 'Curls', 'Coils', 'Afro', 'Bald'])
+    // what a style names is there: a cut that exists on a section that exists
+    for (const p of styles) for (const [key, form] of Object.entries(p.forms ?? {})) {
+      const [objectId, axisId] = [key.slice(0, key.lastIndexOf('.')), key.slice(key.lastIndexOf('.') + 1)]
+      expect(objectOf(objectId).axes!.find(a => a.id === axisId)!.options.some(f => f.id === form), `${p.name}: ${key}`).toBe(true)
+    }
+    const drawn = (name: string) => {
+      const p = styles.find(x => x.name === name)!, state = applyPreset(seed, restState(seed), p)
+      return solve(seed, state.values, 'front', { forms: state.forms, hidden: state.hidden }).shapes
+    }
+    const hairBox = (shapes: ReturnType<typeof drawn>) => Math.max(...Object.entries(shapes).filter(([id, s]) => /^hr_/.test(id) && s.visible).map(([, s]) => s.box.y + s.box.h))
+    expect(hairBox(drawn('Buzzed'))).toBeLessThan(hairBox(drawn('Short')))
+    expect(hairBox(drawn('Long and straight'))).toBeGreaterThan(hairBox(drawn('Bob')) + 10)
+    expect(Object.entries(drawn('Bald')).filter(([id, s]) => /^h[rs]_/.test(id) && s.visible)).toEqual([])
+    expect(Object.entries(drawn('Short')).filter(([id, s]) => /^hr_/.test(id) && s.visible).length).toBeGreaterThan(8)
+  })
+
+  it('has a beard and a moustache with every facial hair of the old portrait, off until chosen and only now and then rolled', () => {
+    for (const id of ['beard', 'moustache']) {
+      const o = objectOf(id), axis = o.axes![0]
+      expect(axis.options.map(f => f.id)).toEqual(['none', 'stubble', 'moustache', 'handlebar', 'horseshoe', 'goatee', 'circle', 'vandyke', 'soulpatch', 'chinstrap', 'chops', 'short', 'full', 'long'])
+      expect(axis.initial).toBe('none')
+      expect(axis.roll).toBe(15)
+      expect(o.layer).toBe('hair')
+    }
+    // and the old fourteen come as ready presets that choose the beard and the moustache of the option together
+    const ready = seed.presets!.filter(p => p.kind === 'Facial hair')
+    expect(ready.map(p => p.name)).toEqual(['None', 'Stubble', 'Moustache', 'Handlebar', 'Horseshoe', 'Goatee', 'Circle beard', 'Van Dyke', 'Soul patch', 'Chin strap', 'Mutton chops', 'Short beard', 'Full beard', 'Long beard'])
+    expect(ready.find(p => p.name === 'Goatee')!.forms).toEqual({ 'beard.style': 'goatee', 'moustache.style': 'goatee' })
+    const mine = new Set([...objectOf('beard').shapes, ...objectOf('moustache').shapes])
+    const shown = (forms: Record<string, string>) => Object.entries(solve(seed, defaultValues(seed), 'front', { forms }).shapes).filter(([id, s]) => mine.has(id) && s.visible).map(([id]) => id)
+    expect(shown({})).toEqual([])
+    expect(shown({ 'beard.style': 'full' }).length).toBeGreaterThan(0)
+    expect(shown({ 'moustache.style': 'handlebar' }).every(id => objectOf('moustache').shapes.includes(id))).toBe(true)
+    expect(shown({ 'beard.style': 'chops' })).toHaveLength(2)   // the two mutton chops, one the twin of the other
+  })
+
+  it('rolls a face that has no beard most of the time and always some hair', () => {
+    const fig: CharacterFigure = blankFigure('basic', seed)
+    const beards = Array.from({ length: 60 }, (_, s) => rollFigure(seed, fig, seededRng(s + 100)).forms['beard.style']).filter(f => f && f !== 'none' && f !== 'moustache' && f !== 'handlebar' && f !== 'horseshoe' && f !== 'soulpatch').length
+    expect(beards).toBeLessThan(25)
+  })
+
   it('rolls a look that draws', () => {
     const fig = rollFigure(seed, blankFigure('basic', seed), seededRng(7))
     const drawn = drawFigure(seed, fig, 'bust')

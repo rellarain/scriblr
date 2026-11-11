@@ -48,7 +48,18 @@ function placementOf(copy: ModelContent): Placement {
   const frames = [...framesOf(copy)].sort((a, b) => a.w * a.h - b.w * b.h)
   const helpers = new Set(copy.shapes.filter(s => s.helper).map(s => s.id))
   const regionAt = (x: number, y: number): string => frames.find(f => x >= f.x && x <= f.x + f.w && y >= f.y && y <= f.y + f.h)?.id ?? WHOLE
-  const boxOfObject = (o: ModelObject): Box | null => unionBox(o.shapes.filter(id => !helpers.has(id)).map(id => solved.shapes[id]?.box))
+  const boxIn = (o: ModelObject, from: Solved): Box | null => unionBox(o.shapes.filter(id => !helpers.has(id)).map(id => from.shapes[id]?.box))
+  // A part a form hides at rest (a beard) has no box there: it lies where its first form that shows anything puts it.
+  const boxOfObject = (o: ModelObject): Box | null => {
+    const at = boxIn(o, solved)
+    if (at) return at
+    for (const axis of o.axes ?? []) for (const form of axis.options) {
+      if (form.id === axis.initial) continue
+      const box = boxIn(o, solve(copy, defaultValues(copy), 'front', { forms: { [`${o.id}.${axis.id}`]: form.id } }))
+      if (box) return box
+    }
+    return null
+  }
   const placed: Placement = { objects: {}, groups: {} }
   const boxes: Record<string, Box | null> = {}
   for (const o of copy.objects) {

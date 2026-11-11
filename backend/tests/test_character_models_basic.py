@@ -27,6 +27,25 @@ def test_the_basic_model_has_a_body_a_face_and_the_presets():
     assert forms["eyes"] == 14 and forms["nose"] == 14 and forms["mouth"] == 13 and forms["skull"] == 13 and forms["ears"] == 12 and forms["brows"] == 13
 
 
+def test_the_basic_model_has_hair_in_sections_and_facial_hair_with_a_chance_of_being_rolled():
+    content = store.basic_model_content()
+    sections = [o for o in content.objects if o.id.startswith("hair.")]
+    assert len(sections) == 14 and {o.layer for o in sections} == {"hair"}
+    for o in sections:
+        assert o.axes[0].id == "cut" and o.axes[0].roll == 0                      # a hairstyle chooses the cut: Randomise does not
+        names = sorted(r.name for r in content.ranges if r.scope == o.id)
+        assert names == ["Length", "Texture"]
+    props = {d.prop for r in content.ranges for d in r.drives if d.kind == "prop"}
+    assert {"length", "texture"} <= props
+    assert [p.name for p in content.presets if p.kind == "Hair style"][:3] == ["Short", "Buzzed", "Pixie"]
+    assert len([p for p in content.presets if p.kind == "Hair style"]) == 14
+    facial = {o.id: o for o in content.objects if o.id in ("beard", "moustache")}
+    assert set(facial) == {"beard", "moustache"}
+    for o in facial.values():
+        assert len(o.axes[0].options) == 14 and o.axes[0].initial == "none" and o.axes[0].roll == 15 and o.layer == "hair"
+    assert len([p for p in content.presets if p.kind == "Facial hair"]) == 14
+
+
 def test_a_fresh_install_gets_the_basic_model_published_once(app_data_root: Path):
     assert store.seed_on_first_start(app_data_root) is True
     catalog = store.load_models(app_data_root)

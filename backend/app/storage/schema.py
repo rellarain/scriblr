@@ -1182,8 +1182,8 @@ MODEL_OBJECTS_PER_GROUP_WARN = 24
 MODEL_OBJECTS_PER_GROUP_MAX = 48
 MODEL_SHAPES_PER_OBJECT_WARN = 36
 MODEL_SHAPES_PER_OBJECT_MAX = 72
-MODEL_COPY_WARN_BYTES = 150 * 1024   # the size of a character's copy of a model
-MODEL_COPY_MAX_BYTES = 250 * 1024
+MODEL_COPY_WARN_BYTES = 300 * 1024   # the size of a character's copy of a model (raised from 150/250 KB when the basic model, with its face, hair and clothes, came to need the room)
+MODEL_COPY_MAX_BYTES = 600 * 1024
 # Generous caps on the totals, so the file stays small and one save is bounded.
 MODEL_MAX_SHAPES = 600
 MODEL_MAX_OBJECTS = 200
@@ -1273,6 +1273,8 @@ MODEL_PROPS: dict[str, tuple[tuple[str, ...], float, float, float]] = {
     "height": (_SHAPE_OR_OBJECT, 100.0, 5.0, 1000.0),
     "rotation": (_SHAPE_OR_OBJECT, 0.0, -360.0, 360.0),
     "curve": (_SHAPE_OR_OBJECT, 0.0, -50.0, 50.0),
+    "length": (_SHAPE_OR_OBJECT, 100.0, 0.0, 1000.0),
+    "texture": (_SHAPE_OR_OBJECT, 0.0, 0.0, 100.0),
     "opacity": (_SHAPE_OR_OBJECT, 100.0, 0.0, 100.0),
     "roundness": (_SHAPE_OR_OBJECT, 0.0, -20.0, 20.0),
     "offset": (("edge",), 0.0, -200.0, 200.0),
@@ -2043,11 +2045,20 @@ class ModelAxis(BaseModel):
     options: list[ModelForm] = Field(default_factory=list, max_length=MODEL_FORMS_MAX)
     # the form shown unless another is chosen
     initial: str = ""
+    # the chance, in percent, that Randomise changes the axis (anything else keeps the form it shows): 100 rolls it every time, 0 never (a beard, a hair cut)
+    roll: int = 100
 
     @field_validator("name", mode="before")
     @classmethod
     def _trim(cls, value: Any) -> Any:
         return value.strip() if isinstance(value, str) else value
+
+    @field_validator("roll", mode="before")
+    @classmethod
+    def _roll(cls, value: Any) -> int:
+        if isinstance(value, bool) or not isinstance(value, (int, float)) or value != value or value in (float("inf"), float("-inf")):
+            return 100
+        return max(0, min(100, int(round(value))))
 
     @field_validator("options", mode="before")
     @classmethod

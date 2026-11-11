@@ -301,6 +301,24 @@ describe('the Forms tab', () => {
     expect(draft(backend).objects.find(o => o.id === 'oE')!.axes![1].options).toHaveLength(1)
   })
 
+  it('sets how often Randomise changes an axis, in steps, and saves it', async () => {
+    const { user, backend } = await onEye()
+    const roll = within(axis().getByRole('group', { name: /^Randomise changes/ }))
+    expect(roll.getByText('100%')).toBeInTheDocument()
+    expect(roll.getByRole('button', { name: /^Raise/ })).toBeDisabled()
+    await user.click(roll.getByRole('button', { name: /^Lower/ }))
+    expect(roll.getByText('95%')).toBeInTheDocument()
+    await user.keyboard('{Shift>}')
+    await user.click(roll.getByRole('button', { name: /^Lower/ }))
+    await user.keyboard('{/Shift}')
+    expect(roll.getByText('70%')).toBeInTheDocument()
+    await save(user)
+    await waitFor(() => expect(axisOf(backend).roll).toBe(70))
+    for (let i = 0; i < 20; i++) await user.click(roll.getByRole('button', { name: /^Lower/ }))
+    expect(roll.getByText('0%')).toBeInTheDocument()
+    expect(roll.getByRole('button', { name: /^Lower/ })).toBeDisabled()
+  })
+
   it('is undone with the rest', async () => {
     const { user, backend } = await onEye()
     await user.click(screen.getByRole('button', { name: 'Add an axis' }))

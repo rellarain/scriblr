@@ -251,7 +251,7 @@ describe('editing axes and forms', () => {
     const e = addAxis(faced(), 'oHead', 'Skull', make)
     expect(e.ok && e.axisId && e.formId).toBeTruthy()
     const c = must(e)
-    expect(c.objects.find(o => o.id === 'oHead')!.axes).toEqual([{ id: e.axisId, name: 'Skull', initial: e.formId, options: [{ id: e.formId, name: 'Standard', ovr: [] }] }])
+    expect(c.objects.find(o => o.id === 'oHead')!.axes).toEqual([{ id: e.axisId, name: 'Skull', initial: e.formId, roll: 100, options: [{ id: e.formId, name: 'Standard', ovr: [] }] }])
     expect(refused(addAxis(faced(), 'o_gone'))).toMatch(/no such object/)
     let full = faced()
     for (let i = 0; i < LIMITS.axesMax - 2; i++) full = must(addAxis(full, 'oEye', 'A', make))

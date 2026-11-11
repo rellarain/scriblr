@@ -26,7 +26,7 @@ const mres = M.solve(mock, M.defaultCfg(mock), 'front')
 const ares = solve(content, defaultValues(content), 'front')
 let worst = 0, worstId = ''
 for (const s of content.shapes) {
-  if (/^(ear|hd|brow|eye|nose|mouth)_/.test(s.id) || s.id === 'skull') continue
+  if (/^(ear|hd|brow|eye|nose|mouth|hr|hs|bd|mo)_/.test(s.id) || s.id === 'skull') continue
   const a = ares.shapes[s.id]?.box, m = mres.shapes[s.id]?.box
   if (!a || !m) continue
   const d = Math.max(Math.abs(a.x - m.x), Math.abs(a.y - m.y), Math.abs(a.w - m.w), Math.abs(a.h - m.h))
@@ -52,8 +52,11 @@ const sheet = optionSheet(content, [
 const expressions = content.presets!.filter(p => p.kind === 'Expression').map(p => ({ label: p.name, figure: { values: p.values }, crop: 'head' }))
 const ages = content.presets!.filter(p => p.kind === 'Age').flatMap(p => [{ label: p.name + ' (bust)', figure: { values: p.values }, crop: 'bust' }, { label: p.name, figure: { values: p.values }, crop: 'figure' }])
 const builds = content.presets!.filter(p => p.kind === 'Build').map(p => ({ label: p.name, figure: { values: p.values }, crop: 'figure' }))
+const hairs = content.presets!.filter(p => p.kind === 'Hair style').map(p => ({ label: p.name, figure: { values: p.values, forms: p.forms ?? {}, hidden: p.hidden }, crop: 'bust' }))
+const beards = content.presets!.filter(p => p.kind === 'Facial hair').map(p => ({ label: p.name, figure: { values: p.values, forms: p.forms ?? {}, hidden: p.hidden }, crop: 'head' }))
+const heads = ['oval', 'square', 'narrow', 'wide', 'pointed'].map(h => ({ label: `Short hair, ${h} head`, figure: { forms: { 'skull.headShape': h } }, crop: 'bust' }))
 const ends = ['eyeSize', 'eyeSpacing', 'eyeTilt', 'eyeOpen', 'browHeight', 'browAngle', 'noseSize', 'mouthSize', 'mouthCurve', 'earSize', 'headTilt'].flatMap(id => {
   const r = content.ranges.find(x => x.id === id)!
   return [{ label: `${r.name} min`, figure: { values: { [id]: r.min } }, crop: 'head' }, { label: `${r.name} max`, figure: { values: { [id]: r.max } }, crop: 'head' }]
 })
-writePreview(`${out}/index.html`, 'Seed model', content, [...ends, ...expressions, ...ages, ...builds], sheet)
+writePreview(`${out}/index.html`, 'Seed model', content, [...hairs, ...beards, ...heads, ...ends, ...expressions, ...ages, ...builds], sheet)

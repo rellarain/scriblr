@@ -5,7 +5,7 @@ import { defaultPortrait, normalizePortrait } from 'C:/Users/rella/scriblr/scrib
 import { drawnOf } from 'C:/Users/rella/scriblr/scriblr/frontend/src/assets/Interfaces/writer/characters/portrait/scene'
 import { rigOf } from 'C:/Users/rella/scriblr/scriblr/frontend/src/assets/Interfaces/writer/characters/portrait/rig'
 import { Shapes, band, lerp, PI, sample } from 'C:/Users/rella/scriblr/scriblr/frontend/src/assets/Interfaces/writer/characters/portrait/paths'
-import { EXPRESSIONS, HEADS, EARS, EYES, BROWS, NOSES, MOUTHS, pick } from 'C:/Users/rella/scriblr/scriblr/frontend/src/assets/Interfaces/writer/characters/portrait/library'
+import { EXPRESSIONS, HEADS, EARS, EYES, BROWS, NOSES, MOUTHS, FACIAL, pick } from 'C:/Users/rella/scriblr/scriblr/frontend/src/assets/Interfaces/writer/characters/portrait/library'
 import { FANTASY_EARS, HOODED } from 'C:/Users/rella/scriblr/scriblr/frontend/src/assets/Interfaces/writer/characters/portrait/fantasyLibrary'
 import { shade, mix } from 'C:/Users/rella/scriblr/scriblr/frontend/src/assets/Interfaces/writer/characters/portrait/colour'
 import { drawBody } from 'C:/Users/rella/scriblr/scriblr/frontend/src/assets/Interfaces/writer/characters/portrait/draw/body'
@@ -161,6 +161,8 @@ function optionsOf(field: string, list: { id: string; name: string }[], parts: s
 const options = {
   headShape: optionsOf('headShape', HEADS, ['head']), ears: optionsOf('ears', EARS, ['ears']), eyes: optionsOf('eyes', EYES, ['eyes']),
   brows: optionsOf('brows', BROWS, ['brows']), nose: optionsOf('nose', NOSES, ['nose']), mouth: optionsOf('mouth', MOUTHS, ['mouth']),
+  // facial hair is two parts of the old drawing (the beard goes under the mouth, the moustache over it), each with every one of the old facial hair options
+  beard: optionsOf('facialHair', FACIAL, ['beard']), moustache: optionsOf('facialHair', FACIAL, ['moustache']),
 }
 
 // ---- compact data files for the mockup ----

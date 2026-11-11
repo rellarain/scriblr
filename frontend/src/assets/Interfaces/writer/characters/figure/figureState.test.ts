@@ -207,6 +207,17 @@ describe('Randomise', () => {
       for (const c of Object.values(r.colours)) if (c.src === 'colour') expect(c.id).not.toMatch(/_f\d+$/)
     }
   })
+  it('leaves a kind of preset alone when it sets a form that Randomise only sometimes changes, as the axis has its own chance', () => {
+    const tilt = (c: ModelContent): ModelContent => ({ ...c, ranges: c.ranges!.map(r => (r.id === 'r_tilt' ? { ...r, rand: [0, 0] as [number, number] } : r)) })
+    const withLook = (roll: number): ModelContent => tilt({
+      ...model,
+      objects: model.objects.map(o => (o.id === 'o_head' ? { ...o, axes: o.axes!.map(a => (a.id === 'a_form1' ? { ...a, roll } : a)) } : o)),
+      presets: [...model.presets!, { id: 'p_look', name: 'Square look', kind: 'Look', values: { r_tilt: 17.3 }, hidden: [], forms: { 'o_head.a_form1': 'f_form3' } }],
+    })
+    const tilts = (c: ModelContent) => Array.from({ length: 60 }, (_, s) => rollFigure(c, fresh(), seededRng(s + 1)).values.r_tilt)
+    expect(tilts(withLook(100))).toContain(17.3)                              // an axis that is always rolled: the kind is drawn now and then
+    expect(new Set(tilts(withLook(10)))).not.toContain(17.3)                  // one that is sometimes rolled: the kind is the writer's
+  })
   it('never takes clothes off: a preset that hides something is not drawn, and what was off stays off', () => {
     for (let s = 1; s <= 30; s += 1) expect(roll(fresh(), s).hidden).toEqual([])
     expect(roll({ ...fresh(), hidden: ['o_shirt'] }, 3).hidden).toEqual(['o_shirt'])

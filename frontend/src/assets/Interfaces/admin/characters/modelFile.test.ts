@@ -48,6 +48,14 @@ describe('writing and reading a model file', () => {
     expect(back.skipped).toEqual([])
     expect(plain(back.models[0])).toEqual(plain(normalizeContent(sample)))
   })
+  it('keeps how often Randomise changes an axis, and a file saved before the setting rolls it every time', () => {
+    const sample = previewModels()[0].draft
+    const withRoll = (roll: number | undefined): ModelContent => ({ ...sample, objects: sample.objects.map(o => ({ ...o, axes: (o.axes ?? []).map(a => ({ ...a, roll })) })) })
+    const rolls = (c: ModelContent) => c.objects.flatMap(o => (o.axes ?? []).map(a => a.roll))
+    expect(new Set(rolls(parseModelFile(serializeModels([withRoll(15)])).models[0]))).toEqual(new Set([15]))
+    expect(new Set(rolls(parseModelFile(serializeModels([withRoll(undefined)])).models[0]))).toEqual(new Set([100]))
+    expect(new Set(rolls(parseModelFile(serializeModels([withRoll(400)])).models[0]))).toEqual(new Set([100]))
+  })
   it('keeps the colour of a new model, the slot and fixed gray of a shape, and holds the lists to the limits of the server', () => {
     let c = starterContent('Painted')
     c = addGroup(c, newGroup('g', 'G')); c = addObject(c, 'g', { id: 'o', name: 'O', layer: 'body', shapes: [] })

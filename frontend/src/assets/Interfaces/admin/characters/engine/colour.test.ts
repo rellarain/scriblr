@@ -345,6 +345,18 @@ describe('rolling the whole look, with locks', () => {
     const member = { ...input, locks: ['oE1'], forms: { 'class:kEye': 'oE2' } }
     for (let s = 0; s < 20; s++) expect(rollLook(c, seededRng(s), member).forms['class:kEye']).toBe('oE2')
   })
+  it('rolls an axis only as often as its chance says: never at 0, now and then at a few percent, every time without one', () => {
+    const withRoll = (roll: number | undefined): ModelContent => ({ ...c, objects: c.objects.map(o => (o.id === 'oE' ? { ...o, axes: o.axes!.map(a => ({ ...a, initial: 'open', roll })) } : o)) })
+    const shown = (content: ModelContent) => Array.from({ length: 200 }, (_, s) => rollLook(content, seededRng(s), input).forms['oE.aLid'] ?? 'open')   // a form that is not rolled is not set: the axis shows its own
+    expect(new Set(shown(withRoll(0)))).toEqual(new Set(['open']))
+    const some = shown(withRoll(15)).filter(f => f === 'shut').length
+    expect(some).toBeGreaterThan(0); expect(some).toBeLessThan(40)
+    expect(new Set(shown(withRoll(100)))).toEqual(new Set(['open', 'shut']))
+    expect(new Set(shown(withRoll(undefined)))).toEqual(new Set(['open', 'shut']))
+    // an axis that is not rolled keeps the form the figure already shows, not only the form it starts with
+    const kept = rollLook(withRoll(0), seededRng(1), { ...input, forms: { 'oE.aLid': 'shut' } })
+    expect(kept.forms['oE.aLid']).toBe('shut')
+  })
   it('ignores a lock on something that is gone, and a locked thing nothing paints from a slot', () => {
     expect(lockedThings(c, ['gone'])).toEqual({ groups: new Set(), objects: new Set() })
     expect(lockedSlots(c, new Set(['oNothing'])).size).toBe(0)

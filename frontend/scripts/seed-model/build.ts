@@ -1,11 +1,12 @@
 // Builds the seed model ("Adult (basic)") as model content: the face from the exact shapes of the old portrait engine, the body from the mockup, a rig, sliders, presets,
 // colour slots and frames. Run by run.ts, which writes backend/app/seed/basic-model.json.
-import type { ModelContent, ModelFrame, ModelGroup, ModelObject, ModelShape } from '../../src/api/types'
+import type { ModelContent, ModelFrame, ModelGroup, ModelObject, ModelPreset, ModelShape } from '../../src/api/types'
 import { standardGenres, standardSlots, starterPalette } from '../../src/assets/Interfaces/admin/characters/engine/standardColours'
 import type { MakeId } from '../../src/assets/Interfaces/admin/characters/modelContent'
 import { bodyParts, bodyRanges, twinBody } from './body'
-import { loadExact, loadMockupModel } from './exact'
+import { loadExact, loadMockupModel, type ExactData } from './exact'
 import { buildPart, pairUp, type PartSpec } from './face'
+import { hairParts } from './hair'
 import { AGES, BUILDS, EXPRESSIONS } from './presets'
 
 export const TOLERANCE = 0.08
@@ -22,7 +23,22 @@ const PARTS: PartSpec[] = [
   { part: 'eyes', options: 'eyes', objectId: 'eyes', objectName: 'Eyes', axisId: 'shape', axisName: 'Eye shape', defaultOption: 'almond', z: 38.5, prefix: 'eye' },
   { part: 'nose', options: 'nose', objectId: 'nose', objectName: 'Nose', axisId: 'shape', axisName: 'Nose shape', defaultOption: 'straight', z: 38.6, prefix: 'nose' },
   { part: 'mouth', options: 'mouth', objectId: 'mouth', objectName: 'Mouth', axisId: 'shape', axisName: 'Mouth shape', defaultOption: 'medium', z: 38.7, prefix: 'mouth', names: ['Shade under the lips', 'Shade of the lower lip', 'Lips', 'Mouth line'] },
+  // facial hair is two parts of the old drawing: the beard goes under the mouth and the moustache over it, each with every one of its options (hidden by default)
+  { part: 'beard', options: 'beard', objectId: 'beard', objectName: 'Beard', axisId: 'style', axisName: 'Beard style', defaultOption: 'none', z: 38.65, prefix: 'bd' },
+  { part: 'moustache', options: 'moustache', objectId: 'moustache', objectName: 'Moustache', axisId: 'style', axisName: 'Moustache style', defaultOption: 'none', z: 38.75, prefix: 'mo' },
 ]
+// Randomise gives a face a beard or a moustache only now and then (the beard and the moustache are chosen apart: a goatee has a moustache over it only if the writer says so).
+const FACIAL_PARTS = new Set(['beard', 'moustache'])
+const FACIAL_CHANCE = 15
+
+// Every one of the old facial hair options as a ready preset: the beard and the moustache it is made of are chosen together (a goatee has a moustache over it). A beard is not
+// on the card until it is chosen, so there is nothing there to point at: the writer reaches it from the first step.
+function facialHairPresets(data: ExactData): ModelPreset[] {
+  return data.options.beard.map(o => ({
+    id: `facial_${o.id}`, name: o.name, kind: 'Facial hair', values: {}, hidden: [],
+    forms: { 'beard.style': o.id, 'moustache.style': o.id },
+  }))
+}
 
 export interface Report { part: string; channels: number; pairs: string; points: number }
 
@@ -61,15 +77,16 @@ export function buildSeed(): { content: ModelContent; report: Report[] } {
   const faceShapes: ModelShape[] = [], faceObjects: ModelObject[] = []
   PARTS.forEach((spec, i) => {
     const r = results[i]
-    faceShapes.push(...r.shapes); faceObjects.push(r.object)
+    faceShapes.push(...r.shapes); faceObjects.push(FACIAL_PARTS.has(spec.part) ? { ...r.object, layer: 'hair', axes: r.object.axes!.map(a => ({ ...a, roll: FACIAL_CHANCE })) } : r.object)
     report.push({ part: spec.objectName, channels: r.channels, pairs: r.pairs, points: r.points })
   })
   const body = bodyParts(mock)
+  const hair = hairParts(mock, faceShapes.find(s => s.id === 'skull')!.pts)
   const head: ModelGroup = { id: 'head', name: 'Head', parent: 'torso', objects: faceObjects.map(o => o.id), pivot: [100, 54], attach: { shape: 'neck', kind: 'point', i: 0, t: 1, slider: null, rx: 0.5, ry: 0 } }
   let content: ModelContent = {
     name: 'Adult (basic)', description: 'A basic adult, bare: the body, the head and its features, with the ages, builds and expressions as presets.',
-    shapes: [...body.shapes, ...faceShapes], objects: [...body.objects, ...faceObjects], groups: [...body.groups, head], axis: 100, ranges: bodyRanges(mock),
-    presets: [...AGES, ...BUILDS, ...EXPRESSIONS], classes: [], genres: standardGenres(), palette: starterPalette(), slots: standardSlots(), bones: [], headBone: null,
+    shapes: [...body.shapes, ...faceShapes, ...hair.shapes], objects: [...body.objects, ...faceObjects, ...hair.objects], groups: [...body.groups, head, hair.group], axis: 100, ranges: [...bodyRanges(mock), ...hair.ranges],
+    presets: [...AGES, ...BUILDS, ...EXPRESSIONS, ...hair.presets, ...facialHairPresets(data)], classes: [], genres: standardGenres(), palette: starterPalette(), slots: standardSlots(), bones: [], headBone: null,
     frames: [], tile: '#e6d6c3', grips: [], fieldsets: [], patterns: [],
   }
   results.forEach(r => { content = pairUp(content, r, make) })

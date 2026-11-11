@@ -13,6 +13,7 @@ import { solve } from './engine/rig'
 import type { PresetActions } from './PresetsTab'
 import { NAME_MAX, objectById, objectOfShape, shapeById } from './modelContent'
 import { PaintDefs, PaintedPath, useSvgPrefix } from './PaintedPath'
+import { Stepper } from './Stepper'
 
 // The Forms tab: an object has axes (the shape of an eye, an expression, a style), each with forms to choose from. A form gives some of the object's shapes
 // an outline of their own (or hides them); every other shape keeps its base outline. The chosen form is only for looking, like the Try it sliders: it is not
@@ -22,6 +23,7 @@ export interface FormActions {
   addAxis: (objectId: string) => void
   removeAxis: (objectId: string, axisId: string) => void
   renameAxis: (objectId: string, axisId: string, name: string) => void
+  setAxisRoll: (objectId: string, axisId: string, roll: number) => void
   moveAxis: (objectId: string, axisId: string, dir: -1 | 1) => void
   choose: (objectId: string, axisId: string, formId: string) => void
   addForm: (objectId: string, axisId: string) => void
@@ -128,6 +130,8 @@ function AxisSection({ content, object, owner, readOnly, axis, first, last, stat
         ) : <button type="button" className="cmIconBtn cmIconBtn--small" aria-label={`Delete axis ${title}`} title="Delete the axis with all its forms" onClick={() => setConfirm('axis')}><TrashIcon size={12} /></button>}
       </div>}
 
+      {!readOnly && <Stepper label={`Randomise changes ${title}`} value={`${axis.roll ?? 100}%`} bigBy={25} lowerOff={(axis.roll ?? 100) <= 0} raiseOff={(axis.roll ?? 100) >= 100}
+        onStep={(dir, big) => actions.setAxisRoll(o, a, (axis.roll ?? 100) + dir * (big ? 25 : 5))} />}
       <div className="cmForms" role="group" aria-label={`Forms of ${title}`}>
         {axis.options.map((f, i) => {
           const on = chosen?.id === f.id

@@ -4,7 +4,7 @@ import type {
 } from '../../../../api/types'
 import { LIMITS } from './engine/limits'
 import { PROPS, hasProp, type PropKey } from './engine/props'
-import { FALL_SIDES, ROLE_MAX, FRAME_BIGGEST, FRAME_MIN, KIND_MAX, SWATCH_NAME_MAX, TILE_DEFAULT, TINT_RANGE, TONE_RANGE, blankContent, normalizeContent, repairHsl, repairLooks, roundOf } from './modelContent'
+import { FALL_SIDES, ROLE_MAX, FRAME_BIGGEST, FRAME_MIN, KIND_MAX, SWATCH_NAME_MAX, TILE_DEFAULT, TINT_RANGE, TONE_RANGE, blankContent, normalizeContent, repairHsl, repairLooks, repairRoll, roundOf } from './modelContent'
 
 // The file Export writes and Import reads: JSON with a marker and a version, and the models' content as it is (a shape, object, group or slider keeps its
 // id: the ids only mean something inside one model). Everything read is held to what the server accepts, so one bad model can never make the whole save
@@ -219,7 +219,7 @@ function axis(v: Record<string, unknown>, id: string): ModelAxis | null {
   const options = withIds(list(v.options), form)
   if (options.length === 0) return null
   const initial = typeof v.initial === 'string' && options.some(o => o.id === v.initial) ? v.initial : options[0].id
-  return { id, name: text(v.name), options, initial }
+  return { id, name: text(v.name), options, initial, roll: repairRoll(v.roll) }
 }
 
 // The parts of a colour an object or a style holds, per slot (phase D3a), as the server keeps them; a map of ids to ids (a variant's styles and picks).

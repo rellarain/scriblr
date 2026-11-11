@@ -261,7 +261,7 @@ const touchesLock = (copy: ModelContent, locked: ReturnType<typeof lockedThings>
 
 // A new random look inside the genre the figure is set to: a form on every axis and the member of every family, a colour for every slot, a value for every slider the writer
 // may move (from the slider's own random span, else the span it may be moved within), and, 60% of the time per kind, one preset that only moves sliders and forms (a preset
-// that takes clothes off is never drawn: what is worn is the writer's choice). Everything the figure locks stays as it is. The palette and the card colour never change.
+// that takes clothes off is never drawn: what is worn is the writer's choice; nor is one that sets a form Randomise only sometimes changes). Everything the figure locks stays as it is. The palette and the card colour never change.
 export function rollFigure(copy: ModelContent, figure: CharacterFigure, rng: Rng): CharacterFigure {
   const locked = lockedThings(copy, figure.locks)
   const start = colouringOf(copy, figure)
@@ -273,9 +273,14 @@ export function rollFigure(copy: ModelContent, figure: CharacterFigure, rng: Rng
     values[r.id] = r2(clampToSpan(r, lo + (hi - lo) * ((rng() + rng() + rng()) / 3)))
   }
   let state: TestState = { values, forms: look.forms, hidden: [...figure.hidden], fall: look.fall, colours: look.choices, on: [...(figure.on ?? [])], order: { ...(figure.order ?? {}) } }
-  // A kind of preset that takes something off anywhere (Outfit) is the writer's to choose: applying one of its other presets would put back what they took off.
+  // A kind of preset that takes something off anywhere (Outfit) is the writer's to choose: applying one of its other presets would put back what they took off. So is a kind
+  // that sets a form of an axis Randomise changes only now and then (a beard, a hair cut): the axis has its own chance, and the presets would roll it far more often.
   const slotKey = (p: ModelPreset) => `${p.kind.trim().toLowerCase()}|${p.scope ?? ''}`
-  const dressing = new Set(presetsOf(copy).filter(p => p.hidden.length > 0).map(slotKey))
+  const sparing = (p: ModelPreset): boolean => Object.keys(p.forms ?? {}).some(key => {
+    const at = key.lastIndexOf('.'), axis = copy.objects.find(o => o.id === key.slice(0, at))?.axes?.find(a => a.id === key.slice(at + 1))
+    return axis !== undefined && (axis.roll ?? 100) < 100
+  })
+  const dressing = new Set(presetsOf(copy).filter(p => p.hidden.length > 0 || sparing(p)).map(slotKey))
   const slots = new Map<string, ModelPreset[]>()
   for (const p of presetsOf(copy)) slots.set(slotKey(p), [...(slots.get(slotKey(p)) ?? []), p])
   // Applying one preset of a kind first puts back everything any preset of the kind controls, so a kind with a preset that touches something locked is left alone as a whole.

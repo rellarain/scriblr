@@ -30,7 +30,7 @@ export function addAxis(c: ModelContent, objectId: string, name = 'Axis', make: 
   if (!o) return fail('There is no such object.')
   if (axesOf(o).length >= LIMITS.axesMax) return fail(`An object may have at most ${LIMITS.axesMax} axes of forms.`)
   const axisId = freshFormId(axesOf(o).map(a => a.id), 'a', make), formId = freshFormId([], 'f', make)
-  const axis: ModelAxis = { id: axisId, name: clean(name) || 'Axis', initial: formId, options: [{ id: formId, name: 'Standard', ovr: [] }] }
+  const axis: ModelAxis = { id: axisId, name: clean(name) || 'Axis', initial: formId, roll: 100, options: [{ id: formId, name: 'Standard', ovr: [] }] }
   return { ...done(mapObject(c, objectId, x => ({ ...x, axes: [...axesOf(x), axis] }))), axisId, formId }
 }
 
@@ -38,6 +38,8 @@ export function removeAxis(c: ModelContent, objectId: string, axisId: string): M
   return mapObject(c, objectId, o => ({ ...o, axes: axesOf(o).filter(a => a.id !== axisId) }))
 }
 
+// How often Randomise changes the axis, in percent (0 never, 100 every time).
+export const setAxisRoll = (c: ModelContent, objectId: string, axisId: string, roll: number): ModelContent => mapAxis(c, objectId, axisId, a => ({ ...a, roll: Math.max(0, Math.min(100, Math.round(roll))) }))
 export const renameAxis = (c: ModelContent, objectId: string, axisId: string, name: string): ModelContent => mapAxis(c, objectId, axisId, a => ({ ...a, name }))
 
 export function moveAxis(c: ModelContent, objectId: string, axisId: string, dir: -1 | 1): ModelContent {

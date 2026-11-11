@@ -194,6 +194,33 @@ describe('what the sliders do to the drawing', () => {
     expect(after.some((p, i) => Math.abs(p.y - before[i].y) > 0.5)).toBe(true)
   })
 
+  it('stretches the weighted ends of a lock of hair away from its roots, and waves them, whatever the points it is drawn with', () => {
+    // a strip: three roots across the top (no weight) and three tips below (weight 1, 0.5, 1)
+    const lock: ModelShape = { ...newShape('lock', 'Lock', 'square', box(80, 10, 40, 40)), slot: 'k_hair', pts: [
+      { x: 80, y: 10, m: 's' }, { x: 100, y: 10, m: 's' }, { x: 120, y: 10, m: 's' },
+      { x: 120, y: 50, m: 's', w: 1 }, { x: 100, y: 40, m: 's', w: 0.5 }, { x: 80, y: 50, m: 's', w: 1 },
+    ] }
+    let c = nosed()
+    c = addShape(c, 'oH', lock)
+    const { c: d, id } = withField(c, { feature: 'shape', target: 'lock', i: 0 }, 'length')
+    expect(d.ranges[0]).toMatchObject({ min: 50, rest: 100, max: 200 })
+    const at = (v: number) => solve(d, { [id]: v }).shapes.lock.local
+    const rest = at(100), long = at(200), short = at(50)
+    near(long[3].y, 10 + 40 * 2); near(long[4].y, 10 + 30 + 30 * 0.5)      // the tip doubles its distance from the roots; the half weight moves half as far
+    near(short[3].y, 10 + 40 * 0.5)
+    for (const i of [0, 1, 2]) near(long[i].y, rest[i].y)                      // the roots stay
+    expect(solve(d, {}).shapes.lock.d).toBe(solve(c, {}).shapes.lock.d)        // at rest nothing changed
+    const w = withField(c, { feature: 'shape', target: 'lock', i: 0 }, 'texture')
+    expect(w.c.ranges[0]).toMatchObject({ min: 0, rest: 0, max: 99 })
+    const waved = solve(w.c, { [w.id]: 99 }).shapes.lock.local, plain = solve(w.c, {}).shapes.lock.local
+    for (const i of [0, 1, 2]) near(waved[i].x, plain[i].x)                    // the roots stay
+    expect([3, 4, 5].some(i => Math.abs(waved[i].x - plain[i].x) > 0.5)).toBe(true)
+    for (const p of waved) expect(Number.isFinite(p.x) && Number.isFinite(p.y)).toBe(true)
+    // an object's length reaches every shape in it with the roots of its own
+    const o = withField(c, { feature: 'object', target: 'oH', i: 0 }, 'length')
+    near(solve(o.c, { [o.id]: 200 }).shapes.lock.local[3].y, 10 + 40 * 2)
+  })
+
   it('moves one point and pushes one edge outward', () => {
     const p = withField(nosed(), { feature: 'point', target: 'plate', i: 1 }, 'x')       // the top right corner
     const at0 = boxOf(p.c, {}, 'plate'), out = boxOf(p.c, { [p.id]: 10 }, 'plate')

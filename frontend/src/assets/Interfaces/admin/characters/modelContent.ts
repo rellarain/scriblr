@@ -40,7 +40,7 @@ export function normalizeContent(c: ModelContent): ModelContent {
     name: clean(c.name, NAME_MAX),
     description: clean(c.description, DESCRIPTION_MAX),
     shapes: c.shapes.map(s => ({ ...s, name: clean(s.name, NAME_MAX), mirrorOf: s.mirrorOf ?? null, back: s.back ?? null, zBack: s.zBack ?? null, loose: s.loose ?? null, copyOf: s.copyOf ?? null, hide: s.hide === true, slot: s.slot ?? null, gray: s.gray ?? null, ...paintFields(s) })),
-    objects: c.objects.map(o => ({ ...o, name: clean(o.name, NAME_MAX), mirrorOf: o.mirrorOf ?? null, classOf: o.classOf ?? null, ...fitFields(o), under: [...new Set(o.under ?? [])].slice(0, LIMITS.underMax), hsl: repairHsl(o.hsl), axes: (o.axes ?? []).map(a => ({ ...a, name: clean(a.name, NAME_MAX), options: a.options.map(f => ({ ...f, name: clean(f.name, NAME_MAX), looks: repairLooks(f.looks) })) })) })),
+    objects: c.objects.map(o => ({ ...o, name: clean(o.name, NAME_MAX), mirrorOf: o.mirrorOf ?? null, classOf: o.classOf ?? null, ...fitFields(o), under: [...new Set(o.under ?? [])].slice(0, LIMITS.underMax), hsl: repairHsl(o.hsl), axes: (o.axes ?? []).map(a => ({ ...a, name: clean(a.name, NAME_MAX), roll: repairRoll(a.roll), options: a.options.map(f => ({ ...f, name: clean(f.name, NAME_MAX), looks: repairLooks(f.looks) })) })) })),
     groups: c.groups.map(g => ({ ...g, name: clean(g.name, NAME_MAX), pivot: g.pivot ?? null, attach: g.attach ?? null, mirrorOf: g.mirrorOf ?? null, states: repairStates(g.states) })),
     axis: c.axis ?? 100,
     ranges: (c.ranges ?? []).map(repairRange),
@@ -102,6 +102,11 @@ export function repairLooks(looks: ModelLook[] | undefined): ModelLook[] {
 // The parts of a colour an object or a style holds, as the server keeps them (phase D3a): hue held to 0..359, saturation and lightness to 0..100, a part that is not
 // a number free (null), and an entry that locks nothing dropped.
 const part = (v: number | null | undefined, top: number): number | null => (typeof v === 'number' && Number.isFinite(v) ? Math.round(Math.min(top, Math.max(0, v))) : null)
+// The chance (percent, 0..100) that Randomise changes an axis: anything that is not a number rolls every time, as the server repairs it.
+export function repairRoll(v: unknown): number {
+  return typeof v === 'number' && Number.isFinite(v) ? Math.max(0, Math.min(100, Math.round(v))) : 100
+}
+
 export function repairHsl(locks: Record<string, ModelHsl> | undefined): Record<string, ModelHsl> {
   const out: Record<string, ModelHsl> = {}
   for (const [slot, l] of Object.entries(locks ?? {})) {

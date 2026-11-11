@@ -43,7 +43,13 @@ export function rollLook(c: ModelContent, rng: Rng, input: RollInput): RollResul
   const forms: Choices = { ...input.forms }
   for (const o of c.objects) {
     if (locked.objects.has(o.id)) continue
-    for (const a of axesFor(c, o)) if (a.options.length > 0) forms[formKey(o.id, a.id)] = pick(a.options, rng).id
+    for (const a of axesFor(c, o)) {
+      if (a.options.length === 0) continue
+      // an axis that Randomise only sometimes changes (a beard, a hair cut) keeps the form it shows the rest of the time; the dice are thrown for it only when it has a chance
+      const chance = a.roll ?? 100
+      if (chance < 100 && (chance <= 0 || rng() * 100 >= chance)) continue
+      forms[formKey(o.id, a.id)] = pick(a.options, rng).id
+    }
   }
   for (const k of classesOf(c)) {
     const members = membersOf(c, k.id)

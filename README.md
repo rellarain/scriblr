@@ -401,7 +401,8 @@ described, now stale, in `docs/data-model.md`).
   of its own for the back view), `zBack` (its depth in the back view) and `loose` (the
   slider that stretches the distance of its links). Phase 3a adds, with defaults: on an
   object `axes` (`ModelAxis`: a name, the forms it can show and which one it shows by default,
-  `initial`; a `ModelForm` is a name and `ovr`, the outlines it gives some of the object's
+  `initial`, and `roll`, the chance in percent (0..100, 100 when absent) that Randomise changes
+  the axis at all, so a beard or a hair cut is rolled only now and then or never; a `ModelForm` is a name and `ovr`, the outlines it gives some of the object's
   shapes as `ModelOverride { shape, pts }`, an empty list hiding the shape in that form) and on
   the model `presets` (`ModelPreset`: a name, a free `kind` that is its slot, `values` of
   sliders and `hidden` ids of objects or groups switched off). Which form is chosen, the
@@ -514,7 +515,7 @@ described, now stale, in `docs/data-model.md`).
   Limits (the same numbers on the frontend, `engine/limits.ts`, held equal by
   `schemaParity.test.ts`): points per shape warn 24 / stop 60, objects per group warn
   24 / stop 48, shapes per object warn 36 / stop 72 (the stops are `max_length`s), and
-  the size of a character's copy of a model warn 150 KB / stop 250 KB (publish is refused
+  the size of a character's copy of a model warn 300 KB / stop 600 KB (publish is refused
   above the stop). Publish is also refused for a blank or duplicate name, a shape with
   fewer than three points, an object or group id that points at nothing, a cycle of
   groups, a shape in two objects, a pivot chain deeper than 9, an anchor whose shape is

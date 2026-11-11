@@ -82,6 +82,29 @@ describe('the writer meets the basic model', () => {
     expect(child[1]).toBeGreaterThan(adult[1])
   })
 
+  it('offers the ready hairstyles and the facial hair in the first step, and a hairstyle sets the sections of the hair together', async () => {
+    const { user, seen } = setup()
+    const styles = screen.getByRole('combobox', { name: /^Hair style/i })
+    expect(within(styles).getAllByRole('option').map(o => o.textContent)).toEqual(expect.arrayContaining(['Short', 'Buzzed', 'Pixie', 'Undercut', 'Mohawk', 'Bob', 'Long and wavy', 'Curls', 'Afro', 'Bald']))
+    await user.selectOptions(styles, 'hair_bob')
+    expect(seen.figure.values.len_front_center).toBe(100)
+    expect(seen.figure.values.len_back_center).toBe(58)
+    await user.selectOptions(styles, 'hair_bald')
+    expect(seen.figure.hidden).toEqual(expect.arrayContaining(['hair.front.center', 'hair.back.center']))
+    const facial = screen.getByRole('combobox', { name: /^Facial hair/i })
+    expect(within(facial).getAllByRole('option')).toHaveLength(14)
+    await user.selectOptions(facial, 'facial_goatee')
+    expect(seen.figure.forms).toMatchObject({ 'beard.style': 'goatee', 'moustache.style': 'goatee' })
+  })
+
+  it('draws the beard of the facial hair that is chosen, and nothing of it before', async () => {
+    const { user } = setup()
+    const art = () => card().querySelector('.charFigLayer--figure')!.innerHTML
+    const before = art()
+    await user.selectOptions(screen.getByRole('combobox', { name: /^Facial hair/i }), 'facial_full')
+    expect(art()).not.toBe(before)
+  })
+
   it('rolls a new look that still draws', async () => {
     const { user, seen } = setup()
     await user.click(screen.getByRole('button', { name: 'Roll a new look' }))

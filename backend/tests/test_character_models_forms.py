@@ -71,6 +71,14 @@ def test_forms_and_presets_round_trip(client: TestClient) -> None:
     assert client.get("/api/character-models").json()["models"][0]["draft"] == out
 
 
+def test_how_often_randomise_changes_an_axis_defaults_to_always_and_is_kept_between_zero_and_a_hundred(client: TestClient) -> None:
+    assert saved(client, faced())["objects"][0]["axes"][0]["roll"] == 100            # a model saved before the field rolls every time
+    for sent, kept in ((0, 0), (15, 15), (100, 100), (250, 100), (-3, 0), (14.6, 15), ("often", 100), (None, 100), (True, 100)):
+        c = faced()
+        c["objects"][0]["axes"][0]["roll"] = sent
+        assert saved(client, c)["objects"][0]["axes"][0]["roll"] == kept, sent
+
+
 def test_an_axis_is_repaired_not_refused(client: TestClient) -> None:
     c = faced()
     axis = c["objects"][0]["axes"][0]
