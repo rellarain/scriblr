@@ -386,6 +386,8 @@ export const renameGenre = (c: ModelContent, id: string, name: string): ModelCon
 // A genre goes: colours that fitted it no longer name it (one left with no genre fits every genre).
 export const removeGenre = (c: ModelContent, id: string): ModelContent => ({
   ...c, genres: genresOf(c).filter(g => g.id !== id), slots: slotsOf(c).map(s => ({ ...s, colours: s.colours.map(k => (k.genres.includes(id) ? { ...k, genres: k.genres.filter(g => g !== id) } : k)) })),
+  // an axis that was rolled only in that genre is rolled in any (a genre that is gone cannot be matched)
+  objects: c.objects.map(o => ((o.axes ?? []).some(a => a.genres?.includes(id)) ? { ...o, axes: o.axes!.map(a => (a.genres?.includes(id) ? { ...a, genres: a.genres.filter(g => g !== id) } : a)) } : o)),
 })
 
 // The standard genres, slots and starter palette, added where the model has none of them (an older model, or one whose slots were deleted): existing ones are kept.

@@ -40,6 +40,9 @@ export function removeAxis(c: ModelContent, objectId: string, axisId: string): M
 
 // How often Randomise changes the axis, in percent (0 never, 100 every time).
 export const setAxisRoll = (c: ModelContent, objectId: string, axisId: string, roll: number): ModelContent => mapAxis(c, objectId, axisId, a => ({ ...a, roll: Math.max(0, Math.min(100, Math.round(roll))) }))
+// Rolls the axis in a genre or stops rolling it there (no genre ticked: every genre).
+export const toggleAxisGenre = (c: ModelContent, objectId: string, axisId: string, genreId: string): ModelContent =>
+  mapAxis(c, objectId, axisId, a => ({ ...a, genres: (a.genres ?? []).includes(genreId) ? (a.genres ?? []).filter(g => g !== genreId) : [...(a.genres ?? []), genreId] }))
 export const renameAxis = (c: ModelContent, objectId: string, axisId: string, name: string): ModelContent => mapAxis(c, objectId, axisId, a => ({ ...a, name }))
 
 export function moveAxis(c: ModelContent, objectId: string, axisId: string, dir: -1 | 1): ModelContent {

@@ -1182,8 +1182,8 @@ MODEL_OBJECTS_PER_GROUP_WARN = 24
 MODEL_OBJECTS_PER_GROUP_MAX = 48
 MODEL_SHAPES_PER_OBJECT_WARN = 36
 MODEL_SHAPES_PER_OBJECT_MAX = 72
-MODEL_COPY_WARN_BYTES = 300 * 1024   # the size of a character's copy of a model (raised from 150/250 KB when the basic model, with its face, hair and clothes, came to need the room)
-MODEL_COPY_MAX_BYTES = 600 * 1024
+MODEL_COPY_WARN_BYTES = 800 * 1024   # the size of a character's copy of a model (raised from 150/250 KB to 300/600 KB for the basic model's face and hair, and to this for its fantasy parts and clothes)
+MODEL_COPY_MAX_BYTES = 1536 * 1024
 # Generous caps on the totals, so the file stays small and one save is bounded.
 MODEL_MAX_SHAPES = 600
 MODEL_MAX_OBJECTS = 200
@@ -2047,11 +2047,23 @@ class ModelAxis(BaseModel):
     initial: str = ""
     # the chance, in percent, that Randomise changes the axis (anything else keeps the form it shows): 100 rolls it every time, 0 never (a beard, a hair cut)
     roll: int = 100
+    # the genres of the model the axis is rolled in (none: any): an axis with genres is not rolled for a figure that has no genre or another one (a horn, only for Fantasy)
+    genres: list[str] = Field(default_factory=list, max_length=MODEL_GENRES_MAX)
 
     @field_validator("name", mode="before")
     @classmethod
     def _trim(cls, value: Any) -> Any:
         return value.strip() if isinstance(value, str) else value
+
+    @field_validator("genres", mode="before")
+    @classmethod
+    def _genres(cls, value: Any) -> list[str]:
+        out: list[str] = []
+        for v in value if isinstance(value, list) else []:
+            ident = _optional_id(v)
+            if ident is not None and ident not in out and len(out) < MODEL_GENRES_MAX:
+                out.append(ident)
+        return out
 
     @field_validator("roll", mode="before")
     @classmethod

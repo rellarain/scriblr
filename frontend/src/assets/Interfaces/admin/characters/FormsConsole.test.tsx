@@ -319,6 +319,26 @@ describe('the Forms tab', () => {
     expect(roll.getByRole('button', { name: /^Lower/ })).toBeDisabled()
   })
 
+  it('sets the genres an axis is rolled in: one chip for each genre of the model, none ticked meaning every genre', async () => {
+    const r = await open([draftEntry('a', faced(c => ({ ...c, genres: [{ id: 'g_fiction', name: 'Fiction' }, { id: 'g_fantasy', name: 'Fantasy' }] })))])
+    await pick(r.user, 'Eye')
+    await r.user.click(tab('Forms'))
+    const chips = within(axis().getByRole('group', { name: /^Genres .* is rolled in/ }))
+    expect(chips.getByRole('button', { name: 'Fantasy' })).toHaveAttribute('aria-pressed', 'false')
+    await r.user.click(chips.getByRole('button', { name: 'Fantasy' }))
+    expect(chips.getByRole('button', { name: 'Fantasy' })).toHaveAttribute('aria-pressed', 'true')
+    await save(r.user)
+    await waitFor(() => expect(axisOf(r.backend).genres).toEqual(['g_fantasy']))
+    await r.user.click(chips.getByRole('button', { name: 'Fantasy' }))
+    await save(r.user)
+    await waitFor(() => expect(axisOf(r.backend).genres).toEqual([]))
+  })
+
+  it('offers no genre chips to a model that has no genres', async () => {
+    await onEye()
+    expect(screen.queryByRole('group', { name: /is rolled in/ })).toBeNull()
+  })
+
   it('is undone with the rest', async () => {
     const { user, backend } = await onEye()
     await user.click(screen.getByRole('button', { name: 'Add an axis' }))

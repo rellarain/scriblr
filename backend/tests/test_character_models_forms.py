@@ -79,6 +79,20 @@ def test_how_often_randomise_changes_an_axis_defaults_to_always_and_is_kept_betw
         assert saved(client, c)["objects"][0]["axes"][0]["roll"] == kept, sent
 
 
+def test_the_genres_an_axis_is_rolled_in_are_kept_repaired_and_must_exist(client: TestClient) -> None:
+    c = faced()
+    c["genres"] = [{"id": "g_a", "name": "A"}, {"id": "g_b", "name": "B"}]
+    axis = c["objects"][0]["axes"][0]
+    axis["genres"] = ["g_a", "g_a", "g_b", 5, "bad id!"]
+    out = saved(client, c)["objects"][0]["axes"][0]
+    assert out["genres"] == ["g_a", "g_b"]                                 # no repeats, no non-ids
+    publishes(client, c)
+    c["objects"][0]["axes"][0]["genres"] = ["g_gone"]
+    assert "rolled in a genre that does not exist" in refused(client, c)
+    c["objects"][0]["axes"][0]["genres"] = "all"
+    assert saved(client, c)["objects"][0]["axes"][0]["genres"] == []
+
+
 def test_an_axis_is_repaired_not_refused(client: TestClient) -> None:
     c = faced()
     axis = c["objects"][0]["axes"][0]

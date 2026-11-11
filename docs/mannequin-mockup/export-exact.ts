@@ -6,7 +6,7 @@ import { drawnOf } from 'C:/Users/rella/scriblr/scriblr/frontend/src/assets/Inte
 import { rigOf } from 'C:/Users/rella/scriblr/scriblr/frontend/src/assets/Interfaces/writer/characters/portrait/rig'
 import { Shapes, band, lerp, PI, sample } from 'C:/Users/rella/scriblr/scriblr/frontend/src/assets/Interfaces/writer/characters/portrait/paths'
 import { EXPRESSIONS, HEADS, EARS, EYES, BROWS, NOSES, MOUTHS, FACIAL, pick } from 'C:/Users/rella/scriblr/scriblr/frontend/src/assets/Interfaces/writer/characters/portrait/library'
-import { FANTASY_EARS, HOODED } from 'C:/Users/rella/scriblr/scriblr/frontend/src/assets/Interfaces/writer/characters/portrait/fantasyLibrary'
+import { CROWNS, EYE_COUNTS, EYE_STYLES, FANTASY_EARS, HOODED, HORNS, HOODS, ITEMS, NECKLACES } from 'C:/Users/rella/scriblr/scriblr/frontend/src/assets/Interfaces/writer/characters/portrait/fantasyLibrary'
 import { shade, mix } from 'C:/Users/rella/scriblr/scriblr/frontend/src/assets/Interfaces/writer/characters/portrait/colour'
 import { drawBody } from 'C:/Users/rella/scriblr/scriblr/frontend/src/assets/Interfaces/writer/characters/portrait/draw/body'
 import { drawBeard, drawMoustache } from 'C:/Users/rella/scriblr/scriblr/frontend/src/assets/Interfaces/writer/characters/portrait/draw/facial'
@@ -126,7 +126,7 @@ function classify(fill: string, bases: Record<string, string>): { base: string; 
 
 function exportOne(name: string, raw: any) {
   const portrait = normalizePortrait(raw), p = drawnOf(portrait) as any
-  const bases: Record<string, string> = { skin: p.skin, hair: p.hairColor, brow: p.browColor, lip: p.lipColor, eye: p.eyeColor, top: p.topColor, facial: p.facialHairColor, tile: p.tileColor, highlight: p.highlightColor || '', white: '#ffffff' }
+  const bases: Record<string, string> = { skin: p.skin, hair: p.hairColor, brow: p.browColor, lip: p.lipColor, eye: p.eyeColor, top: p.topColor, facial: p.facialHairColor, necklace: p.necklaceColor, horn: p.hornColor, eye2: p.eyeColor2, crown: p.crownColor, hood: p.hoodColor, item: p.itemColor, tile: p.tileColor, highlight: p.highlightColor || '', white: '#ffffff' }
   const shapes = tagged(portrait)
   const out: any[] = []
   let literal = 0
@@ -163,6 +163,10 @@ const options = {
   brows: optionsOf('brows', BROWS, ['brows']), nose: optionsOf('nose', NOSES, ['nose']), mouth: optionsOf('mouth', MOUTHS, ['mouth']),
   // facial hair is two parts of the old drawing (the beard goes under the mouth, the moustache over it), each with every one of the old facial hair options
   beard: optionsOf('facialHair', FACIAL, ['beard']), moustache: optionsOf('facialHair', FACIAL, ['moustache']),
+  // the fantasy parts (phase 6c-3), each drawn by the old engine alone on the default adult
+  fantasyEars: optionsOf('fantasyEars', FANTASY_EARS, ['ears']), horns: optionsOf('horns', HORNS, ['horns']), eyeStyle: optionsOf('eyeStyle', EYE_STYLES, ['eyes']),
+  eyeCount: optionsOf('eyeCount', EYE_COUNTS, ['eyes', 'brows', 'nose']), crown: optionsOf('crown', CROWNS, ['crown']),
+  hood: optionsOf('hood', HOODS, ['hood', 'hoodDown', 'hairFall']), necklace: optionsOf('necklace', NECKLACES, ['necklace']), heldItem: optionsOf('heldItem', ITEMS, ['heldItem']),
 }
 
 // ---- compact data files for the mockup ----

@@ -40,7 +40,7 @@ export function normalizeContent(c: ModelContent): ModelContent {
     name: clean(c.name, NAME_MAX),
     description: clean(c.description, DESCRIPTION_MAX),
     shapes: c.shapes.map(s => ({ ...s, name: clean(s.name, NAME_MAX), mirrorOf: s.mirrorOf ?? null, back: s.back ?? null, zBack: s.zBack ?? null, loose: s.loose ?? null, copyOf: s.copyOf ?? null, hide: s.hide === true, slot: s.slot ?? null, gray: s.gray ?? null, ...paintFields(s) })),
-    objects: c.objects.map(o => ({ ...o, name: clean(o.name, NAME_MAX), mirrorOf: o.mirrorOf ?? null, classOf: o.classOf ?? null, ...fitFields(o), under: [...new Set(o.under ?? [])].slice(0, LIMITS.underMax), hsl: repairHsl(o.hsl), axes: (o.axes ?? []).map(a => ({ ...a, name: clean(a.name, NAME_MAX), roll: repairRoll(a.roll), options: a.options.map(f => ({ ...f, name: clean(f.name, NAME_MAX), looks: repairLooks(f.looks) })) })) })),
+    objects: c.objects.map(o => ({ ...o, name: clean(o.name, NAME_MAX), mirrorOf: o.mirrorOf ?? null, classOf: o.classOf ?? null, ...fitFields(o), under: [...new Set(o.under ?? [])].slice(0, LIMITS.underMax), hsl: repairHsl(o.hsl), axes: (o.axes ?? []).map(a => ({ ...a, name: clean(a.name, NAME_MAX), roll: repairRoll(a.roll), genres: [...new Set(a.genres ?? [])].slice(0, LIMITS.genresMax), options: a.options.map(f => ({ ...f, name: clean(f.name, NAME_MAX), looks: repairLooks(f.looks) })) })) })),
     groups: c.groups.map(g => ({ ...g, name: clean(g.name, NAME_MAX), pivot: g.pivot ?? null, attach: g.attach ?? null, mirrorOf: g.mirrorOf ?? null, states: repairStates(g.states) })),
     axis: c.axis ?? 100,
     ranges: (c.ranges ?? []).map(repairRange),
@@ -774,7 +774,10 @@ function colourFaults(c: ModelContent): string[] {
   const slotIds = new Set((c.slots ?? []).map(sl => sl.id)), genreIds = new Set((c.genres ?? []).map(g => g.id))
   for (const s of c.shapes) if (s.slot && !slotIds.has(s.slot)) faults.push(`Shape ${label(s.name, s.id)} uses a colour slot that does not exist.`)
   for (const sl of c.slots ?? []) for (const k of sl.colours) if (k.genres.some(g => !genreIds.has(g))) faults.push(`Colour ${label(k.name, k.id)} of slot ${label(sl.name, sl.id)} fits a genre that does not exist.`)
-  for (const o of c.objects) if (Object.keys(o.hsl ?? {}).some(sl => !slotIds.has(sl))) faults.push(`Object ${label(o.name, o.id)} locks a colour of a slot that does not exist.`)
+  for (const o of c.objects) {
+    if (Object.keys(o.hsl ?? {}).some(sl => !slotIds.has(sl))) faults.push(`Object ${label(o.name, o.id)} locks a colour of a slot that does not exist.`)
+    for (const axis of o.axes ?? []) if ((axis.genres ?? []).some(g => !genreIds.has(g))) faults.push(`Axis ${label(axis.name, axis.id)} of object ${label(o.name, o.id)} is rolled in a genre that does not exist.`)
+  }
   return faults
 }
 

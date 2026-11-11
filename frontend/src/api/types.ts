@@ -656,7 +656,8 @@ export interface ModelLook { shape: string; slot: string | null; gray: number | 
 export interface ModelForm { id: string; name: string; ovr: ModelOverride[]; looks?: ModelLook[] }
 // A way an object can vary (eye shape, expression, style): its forms, and the one it shows unless another is chosen (initial). An object shows one form of every axis.
 // roll: the chance, in percent, that Randomise changes the axis (100 every time, 0 never); optional: a file saved before it rolls every time.
-export interface ModelAxis { id: string; name: string; options: ModelForm[]; initial: string; roll?: number }
+// genres: the genres of the model the axis is rolled in (none: any); an axis with genres is not rolled for a figure that has no genre or another one.
+export interface ModelAxis { id: string; name: string; options: ModelForm[]; initial: string; roll?: number; genres?: string[] }
 // slot: the colour slot a shape is painted from (a twin follows its original's, a shape that follows the template its template shape's, when none); gray: a fixed gray 0..100 used when there is no slot (an eye white, teeth); neither: the neutral gray every uncoloured model is drawn in.
 // tone: steps lighter (+) or darker (-) than the colour; derive: this shape is a tone of its colour; shade: this is a shading shape, a tone of its slot's colour kept inside the base shapes of its object; grad, blend: gradient and blend mode; clip: the shape it is kept inside; cut: shapes that cut a hole in it; helper: never drawn, only used to clip or cut. A twin and a shape that follows a template take all of these from the shape they copy.
 // copyOf (on a shape of a class member): the shape of the class's template it follows, with no points of its own until it has an outline of its own; hide leaves the inherited shape out of the member. classOf (on an object): the class it is a member of.

@@ -97,6 +97,19 @@ describe('the writer meets the basic model', () => {
     expect(seen.figure.forms).toMatchObject({ 'beard.style': 'goatee', 'moustache.style': 'goatee' })
   })
 
+  it('lists the parts that are off until chosen as extras in the first step, and a choice there puts the part on the figure', async () => {
+    const { user, seen } = setup()
+    const extras = within(screen.getByRole('group', { name: 'Extras' }))
+    for (const name of ['Beard style', 'Moustache style', 'Horns', 'Crown', 'Laurel wreath', 'Flower crown', 'Hood', 'Necklace', 'Number of eyes']) expect(extras.getByRole('combobox', { name }), name).toBeInTheDocument()
+    const art = () => card().querySelector('.charFigLayer--figure')!.innerHTML
+    const before = art()
+    await user.selectOptions(extras.getByRole('combobox', { name: 'Horns' }), 'ram')
+    expect(seen.figure.forms['horns.style']).toBe('ram')
+    expect(art()).not.toBe(before)
+    // the fantasy ears are a part of the ears, reached from them
+    expect(extras.queryByRole('combobox', { name: 'Fantasy ears' })).toBeNull()
+  })
+
   it('draws the beard of the facial hair that is chosen, and nothing of it before', async () => {
     const { user } = setup()
     const art = () => card().querySelector('.charFigLayer--figure')!.innerHTML

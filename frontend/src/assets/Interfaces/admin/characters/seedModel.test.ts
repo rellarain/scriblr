@@ -6,6 +6,7 @@ import { ageOf, agePresets, atAge, blankFigure, cropBox, drawFigure, rollFigure,
 import { applyPreset, restState } from './engine/presets'
 import { seededRng } from './engine/previews'
 import { copyBytes, LIMITS } from './engine/limits'
+import { optionalObjects } from '../../writer/characters/figure/figureEditing'
 import { defaultValues, solve } from './engine/rig'
 import { publishFaults } from './modelContent'
 
@@ -23,9 +24,10 @@ describe('the basic model', () => {
   })
 
   it('has every option of the old portrait as a form of its part: head, ears, eyes, brows, nose and mouth', () => {
-    const count = (id: string) => objectOf(id).axes![0].options.length
+    // the shape of a part is its own axis (the fantasy ears and the eye style are axes of their own, ahead of it)
+    const count = (id: string, axis = id === 'skull' ? 'headShape' : id === 'ears' ? 'ears' : 'shape') => objectOf(id).axes!.find(a => a.id === axis)!.options.length
     expect([count('skull'), count('ears'), count('eyes'), count('brows'), count('nose'), count('mouth')]).toEqual([13, 12, 14, 13, 14, 13])
-    expect(objectOf('eyes').axes![0].initial).toBe('almond')
+    expect(objectOf('eyes').axes!.find(a => a.id === 'shape')!.initial).toBe('almond')
     // the eyes and the brows are one object and its twin, so each eye turns and sizes about its own middle
     expect(seed.objects.filter(o => o.mirrorOf === 'eyes')).toHaveLength(1)
     expect(seed.objects.filter(o => o.mirrorOf === 'brows')).toHaveLength(1)
@@ -146,6 +148,59 @@ describe('the basic model', () => {
     expect(shown({ 'beard.style': 'full' }).length).toBeGreaterThan(0)
     expect(shown({ 'moustache.style': 'handlebar' }).every(id => objectOf('moustache').shapes.includes(id))).toBe(true)
     expect(shown({ 'beard.style': 'chops' })).toHaveLength(2)   // the two mutton chops, one the twin of the other
+  })
+
+  it('has the fantasy parts and the necklaces: ears, eye styles, extra eyes, horns, crowns, wreaths, hoods, each off until chosen and rolled only for the Fantasy genre', () => {
+    const axisOf = (id: string, axis: string) => objectOf(id).axes!.find(a => a.id === axis)!
+    const names = (id: string, axis: string) => axisOf(id, axis).options.map(f => f.id)
+    expect(names('ears', 'fantasy')).toEqual(['none', 'pointed', 'elf', 'longelf', 'goblin', 'bat', 'fin'])
+    expect(names('eyes', 'style')).toEqual(['normal', 'glowing', 'solid', 'slit', 'goat', 'blank'])   // two colours is not here: the twin of an eye cannot have a colour of its own
+    expect(names('extraEyes', 'count')).toEqual(['two', 'third', 'four', 'six', 'cheeks', 'temples'])
+    expect(names('horns', 'style')).toEqual(['none', 'nubs', 'devil', 'ram', 'bull', 'long', 'unicorn', 'antlers', 'stag', 'brow'])
+    expect(names('crown', 'style')).toEqual(['none', 'circlet', 'gem', 'diadem', 'tiara', 'spikes', 'royal'])
+    expect(names('laurel', 'style')).toEqual(['none', 'laurel'])
+    expect(names('flowers', 'style')).toEqual(['none', 'flowers'])
+    expect(names('hood', 'style')).toEqual(['none', 'hood', 'deep', 'pointed', 'cowl', 'down'])
+    expect(names('necklace', 'style')).toEqual(['none', 'chain', 'choker', 'beads', 'pearls', 'pendant', 'amulet', 'locket', 'medallion', 'torc'])
+    const parts: Array<[string, string]> = [['ears', 'fantasy'], ['eyes', 'style'], ['extraEyes', 'count'], ['horns', 'style'], ['crown', 'style'], ['laurel', 'style'], ['flowers', 'style'], ['hood', 'style'], ['necklace', 'style']]
+    for (const [id, axis] of parts) { expect(axisOf(id, axis).genres, id).toEqual(['g_fantasy']); expect(axisOf(id, axis).roll, id).toBe(6) }
+    // the objects that are off to begin with show nothing at rest, and every other form of them shows something
+    const visible = (id: string, forms: Record<string, string> = {}) => objectOf(id).shapes.filter(sid => solve(seed, defaultValues(seed), 'front', { forms }).shapes[sid]?.visible)
+    for (const id of ['extraEyes', 'horns', 'crown', 'laurel', 'flowers', 'hood', 'necklace']) {
+      const axis = objectOf(id).axes![0]
+      expect(visible(id), id).toEqual([])
+      for (const f of axis.options.filter(o => o.id !== axis.initial)) expect(visible(id, { [`${id}.${axis.id}`]: f.id }).length, `${id}: ${f.id}`).toBeGreaterThan(0)
+    }
+    // a hood that hangs down lies behind the body, and one that is up over the hair
+    const hood = (form: string) => seed.shapes.filter(sh => objectOf('hood').shapes.includes(sh.id) && visible('hood', { 'hood.style': form }).includes(sh.id))
+    expect(Math.max(...hood('down').map(sh => sh.z))).toBeLessThan(20)
+    expect(Math.min(...hood('hood').map(sh => sh.z))).toBeGreaterThan(51)
+  })
+
+  it('has a slot of its own for what the fantasy parts are made of: horn, metal, gems, the hood, leaves and blossoms', () => {
+    const slots = new Map(seed.slots!.map(sl => [sl.id, sl]))
+    for (const id of ['k_horn', 'k_metal', 'k_gem', 'k_hood', 'k_leaf', 'k_bloom']) {
+      expect(slots.has(id), id).toBe(true)
+      expect(slots.get(id)!.colours.length, id).toBeGreaterThan(3)
+      expect(seed.shapes.some(sh => sh.slot === id), id).toBe(true)
+    }
+    expect(seed.slots!.length).toBeLessThanOrEqual(LIMITS.slotsWarn)
+  })
+
+  it('rolls the fantasy parts only for a figure set to the Fantasy genre, and then only now and then', () => {
+    const rolled = (genre: string | null) => Array.from({ length: 120 }, (_, s) => rollFigure(seed, { ...blankFigure('basic', seed), genre }, seededRng(s + 1)).forms)
+    const fantasy = (forms: Record<string, string>) => ['ears.fantasy', 'eyes.style', 'extraEyes.count', 'horns.style', 'crown.style', 'hood.style', 'necklace.style'].some(k => forms[k] && !['none', 'normal', 'two'].includes(forms[k]))
+    expect(rolled(null).filter(fantasy)).toEqual([])
+    expect(rolled('g_fiction').filter(fantasy)).toEqual([])
+    const some = rolled('g_fantasy').filter(fantasy).length
+    expect(some).toBeGreaterThan(10); expect(some).toBeLessThan(80)
+  })
+
+  it('offers a part that is off until chosen in the extras of the first step, and not a part that is drawn', () => {
+    const extras = optionalObjects(seed).map(o => o.id)
+    expect(extras).toEqual(expect.arrayContaining(['beard', 'moustache', 'extraEyes', 'horns', 'crown', 'laurel', 'flowers', 'hood', 'necklace']))
+    expect(extras).not.toContain('eyes'); expect(extras).not.toContain('skull')
+    expect(extras.some(id => seed.objects.find(o => o.id === id)!.mirrorOf)).toBe(false)
   })
 
   it('rolls a face that has no beard most of the time and always some hair', () => {

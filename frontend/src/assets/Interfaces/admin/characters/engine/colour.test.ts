@@ -202,6 +202,9 @@ describe('editing the slots, colours and genres of a model', () => {
     c = toggleColourGenre(c, 'k_hair', 'c_hair_1', made.genreId!)
     expect(slotById(c, 'k_hair')!.colours[0].genres).toEqual([made.genreId])
     expect(publishFaults(c)).toEqual([])
+    // an axis rolled only in that genre is rolled in every genre once the genre is gone
+    const axed: ModelContent = { ...c, objects: [{ id: 'o', name: 'O', layer: 'body', shapes: [], axes: [{ id: 'a', name: 'A', initial: 'f', roll: 50, genres: [made.genreId!], options: [{ id: 'f', name: 'F', ovr: [] }] }] }] }
+    expect(removeGenre(axed, made.genreId!).objects[0].axes![0].genres).toEqual([])
     c = removeGenre(c, made.genreId!)
     expect(slotById(c, 'k_hair')!.colours[0].genres).toEqual([])
     expect(c.genres).toHaveLength(3)
@@ -356,6 +359,15 @@ describe('rolling the whole look, with locks', () => {
     // an axis that is not rolled keeps the form the figure already shows, not only the form it starts with
     const kept = rollLook(withRoll(0), seededRng(1), { ...input, forms: { 'oE.aLid': 'shut' } })
     expect(kept.forms['oE.aLid']).toBe('shut')
+  })
+  it('rolls an axis that has genres only for a figure set to one of them', () => {
+    const only = (genres: string[]): ModelContent => ({ ...c, objects: c.objects.map(o => (o.id === 'oE' ? { ...o, axes: o.axes!.map(a => ({ ...a, initial: 'open', roll: 100, genres })) } : o)) })
+    const shown = (content: ModelContent, genre: string | null) => new Set(Array.from({ length: 80 }, (_, s) => rollLook(content, seededRng(s), { ...input, genre }).forms['oE.aLid'] ?? 'open'))
+    expect(shown(only(['g_fantasy']), null)).toEqual(new Set(['open']))
+    expect(shown(only(['g_fantasy']), 'g_fiction')).toEqual(new Set(['open']))
+    expect(shown(only(['g_fantasy']), 'g_fantasy')).toEqual(new Set(['open', 'shut']))
+    expect(shown(only(['g_fiction', 'g_fantasy']), 'g_fiction')).toEqual(new Set(['open', 'shut']))
+    expect(shown(only([]), null)).toEqual(new Set(['open', 'shut']))
   })
   it('ignores a lock on something that is gone, and a locked thing nothing paints from a slot', () => {
     expect(lockedThings(c, ['gone'])).toEqual({ groups: new Set(), objects: new Set() })

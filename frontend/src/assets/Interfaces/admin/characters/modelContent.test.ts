@@ -119,7 +119,7 @@ describe('what publishing checks', () => {
     expect(publishFaults({ ...base, groups: [{ ...base.groups[0], parent: 'g2' }, { ...base.groups[1], parent: 'g1' }] }).join()).toMatch(/circle/)
   })
   it('refuses a copy over the size limit', () => {
-    const big = { ...blankContent('Big'), shapes: Array.from({ length: 120 }, (_, i) => ({ ...shape(`s${i}`, 'x'.repeat(60)), pts: Array.from({ length: 60 }, (_, j) => ({ x: j + 0.123456, y: (j % 9) + 0.654321, m: 'c' as const, hi: [1.123456, 2.123456] as [number, number], ho: [3.123456, 4.123456] as [number, number] })) })) }
+    const big = { ...blankContent('Big'), shapes: Array.from({ length: 560 }, (_, i) => ({ ...shape(`s${i}`, 'x'.repeat(60)), pts: Array.from({ length: 60 }, (_, j) => ({ x: j + 0.123456, y: (j % 9) + 0.654321, m: 'c' as const, hi: [1.123456, 2.123456] as [number, number], ho: [3.123456, 4.123456] as [number, number] })) })) }
     expect(publishFaults(big).join()).toMatch(/KB/)
   })
 })

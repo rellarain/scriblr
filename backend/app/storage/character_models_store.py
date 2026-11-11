@@ -537,6 +537,9 @@ def _colour_faults(content: ModelContent) -> list[str]:
     for o in content.objects:
         if any(k not in slot_ids for k in o.hsl):
             faults.append(f"Object {_label(o.name, o.id)} locks a colour of a slot that does not exist.")
+        for axis in o.axes:
+            if any(g not in genre_ids for g in axis.genres):
+                faults.append(f"Axis {_label(axis.name, axis.id)} of object {_label(o.name, o.id)} is rolled in a genre that does not exist.")
     return faults
 
 

@@ -54,9 +54,14 @@ const ages = content.presets!.filter(p => p.kind === 'Age').flatMap(p => [{ labe
 const builds = content.presets!.filter(p => p.kind === 'Build').map(p => ({ label: p.name, figure: { values: p.values }, crop: 'figure' }))
 const hairs = content.presets!.filter(p => p.kind === 'Hair style').map(p => ({ label: p.name, figure: { values: p.values, forms: p.forms ?? {}, hidden: p.hidden }, crop: 'bust' }))
 const beards = content.presets!.filter(p => p.kind === 'Facial hair').map(p => ({ label: p.name, figure: { values: p.values, forms: p.forms ?? {}, hidden: p.hidden }, crop: 'head' }))
+// every form of the fantasy parts and the necklaces, on the default adult
+const fantasy = [['ears', 'fantasy'], ['eyes', 'style'], ['extraEyes', 'count'], ['horns', 'style'], ['crown', 'style'], ['laurel', 'style'], ['flowers', 'style'], ['hood', 'style'], ['necklace', 'style']].flatMap(([oid, aid]) => {
+  const axis = content.objects.find(o => o.id === oid)!.axes!.find(a => a.id === aid)!
+  return axis.options.filter(f => f.id !== axis.initial).map(f => ({ label: `${oid}: ${f.name}`, figure: { forms: { [`${oid}.${aid}`]: f.id } }, crop: 'bust' }))
+})
 const heads = ['oval', 'square', 'narrow', 'wide', 'pointed'].map(h => ({ label: `Short hair, ${h} head`, figure: { forms: { 'skull.headShape': h } }, crop: 'bust' }))
 const ends = ['eyeSize', 'eyeSpacing', 'eyeTilt', 'eyeOpen', 'browHeight', 'browAngle', 'noseSize', 'mouthSize', 'mouthCurve', 'earSize', 'headTilt'].flatMap(id => {
   const r = content.ranges.find(x => x.id === id)!
   return [{ label: `${r.name} min`, figure: { values: { [id]: r.min } }, crop: 'head' }, { label: `${r.name} max`, figure: { values: { [id]: r.max } }, crop: 'head' }]
 })
-writePreview(`${out}/index.html`, 'Seed model', content, [...hairs, ...beards, ...heads, ...ends, ...expressions, ...ages, ...builds], sheet)
+writePreview(`${out}/index.html`, 'Seed model', content, [...hairs, ...beards, ...fantasy, ...heads, ...ends, ...expressions, ...ages, ...builds], sheet)

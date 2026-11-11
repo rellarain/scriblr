@@ -278,7 +278,7 @@ export function rollFigure(copy: ModelContent, figure: CharacterFigure, rng: Rng
   const slotKey = (p: ModelPreset) => `${p.kind.trim().toLowerCase()}|${p.scope ?? ''}`
   const sparing = (p: ModelPreset): boolean => Object.keys(p.forms ?? {}).some(key => {
     const at = key.lastIndexOf('.'), axis = copy.objects.find(o => o.id === key.slice(0, at))?.axes?.find(a => a.id === key.slice(at + 1))
-    return axis !== undefined && (axis.roll ?? 100) < 100
+    return axis !== undefined && ((axis.roll ?? 100) < 100 || (axis.genres?.length ?? 0) > 0)
   })
   const dressing = new Set(presetsOf(copy).filter(p => p.hidden.length > 0 || sparing(p)).map(slotKey))
   const slots = new Map<string, ModelPreset[]>()

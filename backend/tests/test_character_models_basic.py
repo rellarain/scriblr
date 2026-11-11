@@ -23,7 +23,9 @@ def test_the_basic_model_has_a_body_a_face_and_the_presets():
     assert len([p for p in content.presets if p.kind == "Expression"]) == 13
     assert {f.name for f in content.frames} >= {"Bust", "Face"}
     # every option of the face parts is a form of its object
-    forms = {o.id: len(o.axes[0].options) for o in content.objects if o.axes}
+    # the shape of a part is its own axis (the fantasy ears and the eye style are axes of their own, ahead of it)
+    shape_axis = {"skull": "headShape", "ears": "ears"}
+    forms = {o.id: len(next(a for a in o.axes if a.id == shape_axis.get(o.id, "shape")).options) for o in content.objects if o.axes and o.id in ("skull", "ears", "eyes", "brows", "nose", "mouth")}
     assert forms["eyes"] == 14 and forms["nose"] == 14 and forms["mouth"] == 13 and forms["skull"] == 13 and forms["ears"] == 12 and forms["brows"] == 13
 
 
@@ -44,6 +46,17 @@ def test_the_basic_model_has_hair_in_sections_and_facial_hair_with_a_chance_of_b
     for o in facial.values():
         assert len(o.axes[0].options) == 14 and o.axes[0].initial == "none" and o.axes[0].roll == 15 and o.layer == "hair"
     assert len([p for p in content.presets if p.kind == "Facial hair"]) == 14
+
+
+def test_the_basic_model_has_the_fantasy_parts_rolled_only_for_the_fantasy_genre():
+    content = store.basic_model_content()
+    objects = {o.id: o for o in content.objects}
+    parts = {"ears": "fantasy", "eyes": "style", "extraEyes": "count", "horns": "style", "crown": "style", "laurel": "style", "flowers": "style", "hood": "style", "necklace": "style"}
+    for object_id, axis_id in parts.items():
+        axis = next(a for a in objects[object_id].axes if a.id == axis_id)
+        assert axis.genres == ["g_fantasy"] and axis.roll == 6, object_id
+    assert {"k_horn", "k_metal", "k_gem", "k_hood", "k_leaf", "k_bloom"} <= {sl.id for sl in content.slots}
+    assert len(next(a for a in objects["horns"].axes if a.id == "style").options) == 10
 
 
 def test_a_fresh_install_gets_the_basic_model_published_once(app_data_root: Path):

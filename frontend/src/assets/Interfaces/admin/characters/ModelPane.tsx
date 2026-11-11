@@ -44,7 +44,7 @@ import { bridgeBetween, setLeaves, spotFromClick, type EdgeSpot } from './engine
 import { fadedBy as _fadedBy, setFade, stepFade } from './engine/fadeEdit'
 import { cycleWeight, stepWeight } from './engine/fall'
 import { SIDE_NAMES, addFall, addFallToObject, withWeight } from './engine/fallEdit'
-import { addAxis, addForm, hideInForm, moveAxis, moveForm, overrideState, removeAxis, removeForm, renameAxis, renameForm, setAxisRoll, setInitialForm, setLook, setOverride, useBaseOutline } from './engine/formEdit'
+import { addAxis, addForm, hideInForm, moveAxis, moveForm, overrideState, removeAxis, removeForm, renameAxis, renameForm, setAxisRoll, setInitialForm, toggleAxisGenre, setLook, setOverride, useBaseOutline } from './engine/formEdit'
 import { classKey, presetsOf, targetForShape } from './engine/forms'
 import { apply, inverse, type Box } from './engine/geometry'
 import { addFinger, addGrip, addHand, addHandPoses, addThumb, apartHand, gripAt, gripGrab, gripsOf, mirrorGrip, moveGrip, removeGrip, renameGrip, setPresetGrip, stepGripAngle } from './engine/hands'
@@ -808,6 +808,7 @@ export function ModelPane({ entry, models, makeId, onRemove, onDuplicate, onExpo
     removeAxis: (objectId, axisId) => commit(removeAxis(content, objectId, axisId), true),
     renameAxis: (objectId, axisId, name) => models.edit(entry.id, c => renameAxis(c, objectId, axisId, name), false),
     setAxisRoll: (objectId, axisId, roll) => models.edit(entry.id, c => setAxisRoll(c, objectId, axisId, roll), false),
+    toggleAxisGenre: (objectId, axisId, genreId) => models.edit(entry.id, c => toggleAxisGenre(c, objectId, axisId, genreId), false),
     moveAxis: (objectId, axisId, dir) => commit(moveAxis(content, objectId, axisId, dir), true),
     choose: (objectId, axisId, formId) => test.setForm(objectId, axisId, formId),
     addForm: (objectId, axisId) => {

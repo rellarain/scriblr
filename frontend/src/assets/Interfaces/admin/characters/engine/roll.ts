@@ -46,6 +46,8 @@ export function rollLook(c: ModelContent, rng: Rng, input: RollInput): RollResul
     for (const a of axesFor(c, o)) {
       if (a.options.length === 0) continue
       // an axis that Randomise only sometimes changes (a beard, a hair cut) keeps the form it shows the rest of the time; the dice are thrown for it only when it has a chance
+      // an axis rolled only in some genres is left alone for a figure of another genre, or none
+      if (a.genres && a.genres.length > 0 && !(input.genre && a.genres.includes(input.genre))) continue
       const chance = a.roll ?? 100
       if (chance < 100 && (chance <= 0 || rng() * 100 >= chance)) continue
       forms[formKey(o.id, a.id)] = pick(a.options, rng).id

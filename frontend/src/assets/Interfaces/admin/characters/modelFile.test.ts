@@ -56,6 +56,13 @@ describe('writing and reading a model file', () => {
     expect(new Set(rolls(parseModelFile(serializeModels([withRoll(undefined)])).models[0]))).toEqual(new Set([100]))
     expect(new Set(rolls(parseModelFile(serializeModels([withRoll(400)])).models[0]))).toEqual(new Set([100]))
   })
+  it('keeps the genres an axis is rolled in, once each, and none for a file saved before them', () => {
+    const sample = previewModels()[0].draft
+    const withGenres = (genres: string[] | undefined): ModelContent => ({ ...sample, objects: sample.objects.map(o => ({ ...o, axes: (o.axes ?? []).map(a => ({ ...a, genres })) })) })
+    const genresOf = (c: ModelContent) => c.objects.flatMap(o => (o.axes ?? []).map(a => a.genres))
+    expect(new Set(genresOf(parseModelFile(serializeModels([withGenres(['g_fantasy', 'g_fantasy'])])).models[0]).map(g => JSON.stringify(g)))).toEqual(new Set([JSON.stringify(['g_fantasy'])]))
+    expect(new Set(genresOf(parseModelFile(serializeModels([withGenres(undefined)])).models[0]).map(g => JSON.stringify(g)))).toEqual(new Set(['[]']))
+  })
   it('keeps the colour of a new model, the slot and fixed gray of a shape, and holds the lists to the limits of the server', () => {
     let c = starterContent('Painted')
     c = addGroup(c, newGroup('g', 'G')); c = addObject(c, 'g', { id: 'o', name: 'O', layer: 'body', shapes: [] })

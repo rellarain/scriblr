@@ -185,8 +185,8 @@ def test_a_name_already_published_is_refused(client: TestClient) -> None:
 
 
 def test_a_copy_over_the_size_limit_is_refused(app_data_root: Path) -> None:
-    # 300 shapes of 60 points each is well past the limit once serialized with long names
-    shapes = [{"id": f"s{i}", "name": "x" * 60, "pts": [{"x": j, "y": j % 9, "hi": [1.123456, 2.123456], "ho": [3.123456, 4.123456]} for j in range(60)]} for i in range(300)]
+    # 560 shapes of 60 points each is well past the limit once serialized with long names
+    shapes = [{"id": f"s{i}", "name": "x" * 60, "pts": [{"x": j, "y": j % 9, "hi": [1.123456, 2.123456], "ho": [3.123456, 4.123456]} for j in range(60)]} for i in range(560)]
     c = ModelContent.model_validate({"name": "Big", "shapes": shapes})
     assert store.copy_bytes(c) > MODEL_COPY_MAX_BYTES
     assert any("KB" in f for f in store.publish_faults(c))

@@ -24,6 +24,7 @@ export interface FormActions {
   removeAxis: (objectId: string, axisId: string) => void
   renameAxis: (objectId: string, axisId: string, name: string) => void
   setAxisRoll: (objectId: string, axisId: string, roll: number) => void
+  toggleAxisGenre: (objectId: string, axisId: string, genreId: string) => void
   moveAxis: (objectId: string, axisId: string, dir: -1 | 1) => void
   choose: (objectId: string, axisId: string, formId: string) => void
   addForm: (objectId: string, axisId: string) => void
@@ -132,6 +133,13 @@ function AxisSection({ content, object, owner, readOnly, axis, first, last, stat
 
       {!readOnly && <Stepper label={`Randomise changes ${title}`} value={`${axis.roll ?? 100}%`} bigBy={25} lowerOff={(axis.roll ?? 100) <= 0} raiseOff={(axis.roll ?? 100) >= 100}
         onStep={(dir, big) => actions.setAxisRoll(o, a, (axis.roll ?? 100) + dir * (big ? 25 : 5))} />}
+      {!readOnly && (content.genres ?? []).length > 0 && <div className="cmChips" role="group" aria-label={`Genres ${title} is rolled in`}>
+        <span className="cmStepLabel">Rolled in</span>
+        {(content.genres ?? []).map(g => {
+          const on = (axis.genres ?? []).includes(g.id)
+          return <button key={g.id} type="button" className={`cmChip${on ? ' cmChip--on' : ''}`} aria-pressed={on} title={on ? `Stop rolling ${title} in ${g.name}` : `Roll ${title} in ${g.name} only (none ticked: every genre)`} onClick={() => actions.toggleAxisGenre(o, a, g.id)}>{g.name}</button>
+        })}
+      </div>}
       <div className="cmForms" role="group" aria-label={`Forms of ${title}`}>
         {axis.options.map((f, i) => {
           const on = chosen?.id === f.id

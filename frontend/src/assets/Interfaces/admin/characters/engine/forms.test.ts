@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import type { ModelAxis, ModelContent, ModelPoint, ModelPreset, ModelShape } from '../../../../../api/types'
 import { blankContent, newGroup, normalizeContent, publishFaults, removeGroup, removeObject, removeShape } from '../modelContent'
-import { addAxis, addForm, hideInForm, moveForm, moveAxis, overrideState, removeAxis, removeForm, renameAxis, renameForm, setInitialForm, setOverride, useBaseOutline } from './formEdit'
+import { addAxis, addForm, hideInForm, moveForm, moveAxis, overrideState, removeAxis, removeForm, renameAxis, renameForm, setAxisRoll, setInitialForm, setOverride, toggleAxisGenre, useBaseOutline } from './formEdit'
 import { chosenForm, editTarget, formKey, formsAway, formsByViews, overrideFor } from './forms'
 import { LIMITS, limitNotes } from './limits'
 import { makeTwin } from './pairEdit'
@@ -257,6 +257,17 @@ describe('editing axes and forms', () => {
     for (let i = 0; i < LIMITS.axesMax - 2; i++) full = must(addAxis(full, 'oEye', 'A', make))
     expect(full.objects.find(o => o.id === 'oEye')!.axes!.length).toBe(LIMITS.axesMax)
     expect(refused(addAxis(full, 'oEye', 'One more', make))).toMatch(new RegExp(`at most ${LIMITS.axesMax} axes`))
+  })
+
+  it('sets how often and in which genres Randomise rolls an axis', () => {
+    const c = faced()
+    expect(axisOf(setAxisRoll(c, 'oEye', 'aShape', 40)).roll).toBe(40)
+    expect(axisOf(setAxisRoll(c, 'oEye', 'aShape', 250)).roll).toBe(100)
+    expect(axisOf(setAxisRoll(c, 'oEye', 'aShape', -5)).roll).toBe(0)
+    const once = toggleAxisGenre(c, 'oEye', 'aShape', 'g_fantasy')
+    expect(axisOf(once).genres).toEqual(['g_fantasy'])
+    expect(axisOf(toggleAxisGenre(once, 'oEye', 'aShape', 'g_fiction')).genres).toEqual(['g_fantasy', 'g_fiction'])
+    expect(axisOf(toggleAxisGenre(once, 'oEye', 'aShape', 'g_fantasy')).genres).toEqual([])
   })
 
   it('removes, renames and moves axes', () => {

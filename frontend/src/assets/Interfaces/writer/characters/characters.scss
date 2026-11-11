@@ -106,7 +106,7 @@
 // A figure (the art mannequin) is drawn from a model copy: each shape takes the colour the painting gave it in --shape-fill, set inline like the portrait's own colours.
 .charFigureShape { fill: var(--shape-fill); }
 // The Mannequin panel under the big card: a heading, what it is drawn from, and the choices (a model, a genre, the icon buttons).
-.charMannequin { display: flex; flex-direction: column; gap: var(--space-2); }
+.charMannequin, .charExtras { display: flex; flex-direction: column; gap: var(--space-2); }
 .charCaption { text-align: center; font-size: var(--text-small); color: var(--ink-muted); }
 
 // ---- the figure editor (phase 6b-2): the card, its sheets and parts, and the steps under it ----

@@ -250,6 +250,19 @@ export function objectPartOf(copy: ModelContent, figure: CharacterFigure, object
   }
 }
 
+// The parts the figure has switched off until the writer chooses them (a beard, a horn, a crown): the objects that show nothing with every form at the model's own, that have a
+// form to choose and are not a twin, a member of a family or the pattern of one. A hidden part has no box on the card to point at, so the first step lists them (the writer's way to a beard).
+const optionalCache = new WeakMap<ModelContent, ObjectPart['object'][]>()
+export function optionalObjects(copy: ModelContent): ModelObject[] {
+  const held = optionalCache.get(copy)
+  if (held) return held
+  const rest = solve(copy, defaultValues(copy), 'front')
+  const patterns = new Set(classesOf(copy).map(k => k.template))   // the pattern of a family is never drawn itself: its members are
+  const out = copy.objects.filter(o => !o.mirrorOf && !o.classOf && !patterns.has(o.id) && o.shapes.length > 0 && axesFor(copy, o).some(a => a.options.length > 1) && o.shapes.every(id => !rest.shapes[id]?.visible))
+  optionalCache.set(copy, out)
+  return out
+}
+
 // What the writer can change about an object, in words (the hover tip of its hotspot and the label of the button).
 export function changesOf(part: ObjectPart): string[] {
   const out: string[] = []

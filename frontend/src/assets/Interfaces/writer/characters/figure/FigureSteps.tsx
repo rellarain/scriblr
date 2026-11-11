@@ -6,7 +6,7 @@ import { FALL_SIDES } from '../../../admin/characters/modelContent'
 import { ChevronDownIcon, ChevronUpIcon, DiceIcon, LockIcon } from '../../../../icons'
 import { Field, Slider } from '../CharFields'
 import {
-  FALL_LABELS, NONE, chooseKind, chooseOption, groupPartsOf, isMine, layerListIn, layersIn, lockSheet, moveLayer, objectPartOf, figurePartOf, pickColour, rollPart, setBrightness, setForm, setLock,
+  FALL_LABELS, NONE, chooseKind, chooseOption, groupPartsOf, isMine, layerListIn, layersIn, lockSheet, moveLayer, objectPartOf, optionalObjects, figurePartOf, pickColour, rollPart, setBrightness, setForm, setLock,
   setMember, setOpacity, setPattern, setFall, setWorn, sheetLocked, slotViewOf, type FieldsetPart, type Layers, type MovableLayer, type ObjectPart, type PresetKind, type StateChoice,
 } from './figureEditing'
 import { CardColour, MineBlock, OtherModel, PaletteEditor } from './FigureSettings'
@@ -114,6 +114,23 @@ const Title = ({ children, roll }: { children: ReactNode; roll?: ReactNode }) =>
 
 // ---- step 0: the figure ----
 
+// The parts that are off until chosen (a beard, horns, a crown, a necklace), a list for each: they have no box on the card until they show.
+function Extras({ ctx }: { ctx: Ctx }) {
+  const parts = optionalObjects(ctx.copy).map(o => objectPartOf(ctx.copy, ctx.figure, o.id)).filter((p): p is ObjectPart => p !== null && p.axes.length > 0)
+  if (parts.length === 0) return null
+  return (
+    <div className="charExtras" role="group" aria-label="Extras">
+      <h4 className="charLabel">Extras</h4>
+      <p className="charHint">Parts that are off until you choose them. Once one is on, point at it on the card to change its colour.</p>
+      <div className="charStepGrid">
+        {parts.flatMap(p => p.axes.map(({ axis, value }) => (
+          <Pick key={`${p.owner.id}.${axis.id}`} label={axis.name} value={value} options={axis.options.map(o => ({ id: o.id, name: o.name }))} onChange={id => ctx.apply(f => setForm(f, p.owner.id, axis, id))} />
+        )))}
+      </div>
+    </div>
+  )
+}
+
 export function FigureStep({ ctx, projectId, model, describe, onForget }: { ctx: Ctx; projectId: string; model: FigureModel; describe: string; onForget: () => void }) {
   const part = figurePartOf(ctx.copy, ctx.figure)
   return (
@@ -122,6 +139,7 @@ export function FigureStep({ ctx, projectId, model, describe, onForget }: { ctx:
       {part.kinds.length > 0 && <div className="charStepGrid"><Kinds kinds={part.kinds} ctx={ctx} /></div>}
       <Ranges ranges={part.sliders} ctx={ctx} />
       <Fieldsets parts={part.fieldsets} ctx={ctx} />
+      <Extras ctx={ctx} />
       <PaletteEditor ctx={ctx} />
       <CardColour ctx={ctx} />
       <div className="charMannequin" role="group" aria-label="Mannequin">
