@@ -4279,6 +4279,13 @@ class CharacterFigure(BaseModel):
     genre: Optional[str] = None
     on: list[str] = Field(default_factory=list)
     order: dict[str, list[str]] = Field(default_factory=dict)
+    # Made from the character's portrait by Convert (phase 6c-4): the portrait is still kept, and Back to the old portrait drops this figure again.
+    converted: bool = False
+
+    @field_validator("converted", mode="before")
+    @classmethod
+    def _figure_converted(cls, value: Any) -> bool:
+        return value is True
 
     @field_validator("on", mode="before")
     @classmethod

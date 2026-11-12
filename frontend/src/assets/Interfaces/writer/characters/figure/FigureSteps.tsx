@@ -1,9 +1,9 @@
-import type { ReactNode } from 'react'
+import { useState, type ReactNode } from 'react'
 import type { CharacterFigure, FigureModel, ModelContent, ModelFallSide, ModelLayer, ModelRange, ModelSlot } from '../../../../../api/types'
 import { paletteOf, swatchHex } from '../../../admin/characters/engine/colour'
 import { seededRng } from '../../../admin/characters/engine/previews'
 import { FALL_SIDES } from '../../../admin/characters/modelContent'
-import { ChevronDownIcon, ChevronUpIcon, DiceIcon, LockIcon } from '../../../../icons'
+import { CheckIcon, ChevronDownIcon, ChevronUpIcon, CloseIcon, DiceIcon, LockIcon, UndoIcon } from '../../../../icons'
 import { Field, Slider } from '../CharFields'
 import {
   FALL_LABELS, NONE, chooseKind, chooseOption, groupPartsOf, isMine, layerListIn, layersIn, lockSheet, moveLayer, objectPartOf, optionalObjects, figurePartOf, pickColour, rollPart, setBrightness, setForm, setLock,
@@ -131,8 +131,9 @@ function Extras({ ctx }: { ctx: Ctx }) {
   )
 }
 
-export function FigureStep({ ctx, projectId, model, describe, onForget }: { ctx: Ctx; projectId: string; model: FigureModel; describe: string; onForget: () => void }) {
+export function FigureStep({ ctx, projectId, model, describe, onForget, onRevert }: { ctx: Ctx; projectId: string; model: FigureModel; describe: string; onForget: () => void; onRevert?: () => Promise<boolean> }) {
   const part = figurePartOf(ctx.copy, ctx.figure)
+  const [asking, setAsking] = useState(false)
   return (
     <div className="charStep">
       <p className="charHint">Point at the figure: a sheet shows where each part of it lies. Click a sheet to open it, then click the part you want to change.</p>
@@ -146,9 +147,23 @@ export function FigureStep({ ctx, projectId, model, describe, onForget }: { ctx:
         <h4 className="charLabel">Mannequin</h4>
         <p className="charHint">{describe}</p>
         <OtherModel projectId={projectId} model={model} ctx={ctx} />
-        <div className="charRow">
-          <button type="button" className="charChip" aria-label="Go back to the portrait" title="Stop using the mannequin: the character is drawn from its portrait again" onClick={onForget}>Use the portrait instead</button>
-        </div>
+        {ctx.figure.converted && onRevert ? (
+          asking ? (
+            <div className="charRow" role="group" aria-label="Back to the old portrait">
+              <p className="charHint" role="alert">The mannequin and what was changed on it go, and the story looks and published editions that were converted with it show the old portrait again.</p>
+              <button type="button" className="charIconBtn" aria-label="Yes, back to the old portrait" title="Bring the old portrait back" onClick={() => { void onRevert().then(done => { if (!done) setAsking(false) }) }}><CheckIcon size={16} /></button>
+              <button type="button" className="charIconBtn" aria-label="Keep the mannequin" title="Keep the mannequin" onClick={() => setAsking(false)}><CloseIcon size={16} /></button>
+            </div>
+          ) : (
+            <div className="charRow">
+              <button type="button" className="charChip" aria-label="Back to the old portrait" title="Bring the old portrait back: the mannequin made from it goes" onClick={() => setAsking(true)}><UndoIcon size={14} /> Back to the old portrait</button>
+            </div>
+          )
+        ) : (
+          <div className="charRow">
+            <button type="button" className="charChip" aria-label="Go back to the portrait" title="Stop using the mannequin: the character is drawn from its portrait again" onClick={onForget}>Use the portrait instead</button>
+          </div>
+        )}
         <p className="charHint">The portrait is kept, and is what shows if the mannequin is put away.</p>
       </div>
     </div>

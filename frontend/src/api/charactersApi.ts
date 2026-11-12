@@ -1,5 +1,5 @@
 import { api } from './client'
-import type { CharacterCreate, CharacterDoc, CharacterSummary } from './types'
+import type { CharacterCreate, CharacterDoc, CharacterSummary, ConvertBody, FrozenPortrait } from './types'
 
 // The project's cast. The list has names only; a character is read whole when it is opened and replaced whole when it is saved.
 const base = (projectId: string) => `/projects/${encodeURIComponent(projectId)}/characters`
@@ -27,4 +27,18 @@ export function putCharacter(projectId: string, doc: CharacterDoc): Promise<Char
 
 export function deleteCharacter(projectId: string, characterId: string): Promise<void> {
   return api.delete<void>(`${base(projectId)}/${encodeURIComponent(characterId)}`)
+}
+
+// Convert a character's portrait to a mannequin (phase 6c-4): the portraits of it frozen in editions, keeping the converted figures of the character, its story looks and its editions
+// in one write, and going back to the old portrait.
+export function getFrozenPortraits(projectId: string, characterId: string): Promise<FrozenPortrait[]> {
+  return api.get<FrozenPortrait[]>(`${base(projectId)}/${encodeURIComponent(characterId)}/frozen`)
+}
+
+export function convertCharacter(projectId: string, characterId: string, body: ConvertBody): Promise<CharacterDoc> {
+  return api.post<CharacterDoc>(`${base(projectId)}/${encodeURIComponent(characterId)}/convert`, body)
+}
+
+export function revertCharacter(projectId: string, characterId: string): Promise<CharacterDoc> {
+  return api.post<CharacterDoc>(`${base(projectId)}/${encodeURIComponent(characterId)}/revert`, {})
 }

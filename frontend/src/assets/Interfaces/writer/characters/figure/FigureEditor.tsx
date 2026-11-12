@@ -17,7 +17,7 @@ import { FigureStep, ObjectStep, RegionStep, type Apply, type Ctx } from './Figu
 // character's figure, and undone with the page's Undo. Randomise rolls the whole figure inside its genre; each step has a dice for just that part.
 const seed = (): number => Math.floor(Math.random() * 0x100000000)
 
-export function FigureEditor({ projectId, figure, model, label, setFigure }: { projectId: string; figure: CharacterFigure; model: FigureModel; label: string; setFigure: Characters['setFigure'] }) {
+export function FigureEditor({ projectId, figure, model, label, setFigure, onRevert }: { projectId: string; figure: CharacterFigure; model: FigureModel; label: string; setFigure: Characters['setFigure']; onRevert?: () => Promise<boolean> }) {
   const copy = model.content
   const [view, setView] = useState<View>('front')
   const [frameId, setFrameId] = useState<string | null>(null)
@@ -85,7 +85,7 @@ export function FigureEditor({ projectId, figure, model, label, setFigure }: { p
         </nav>
         {part ? <ObjectStep ctx={ctx} part={part} />
           : here ? <RegionStep ctx={ctx} regionId={here.id} regionName={here.name} layers={layers} onLayers={setLayers} />
-          : <FigureStep ctx={ctx} projectId={projectId} model={model} describe={`Drawn from ${model.name || copy.name || 'a model'}${model.version ? `, version ${model.version}` : ''}.`} onForget={() => setFigure(null)} />}
+          : <FigureStep ctx={ctx} projectId={projectId} model={model} describe={`Drawn from ${model.name || copy.name || 'a model'}${model.version ? `, version ${model.version}` : ''}.`} onForget={() => setFigure(null)} onRevert={onRevert} />}
       </section>
     </div></div>
   )

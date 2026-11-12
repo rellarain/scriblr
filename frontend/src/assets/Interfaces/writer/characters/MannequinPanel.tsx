@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react'
 import { addBasicModel, getPublishedModels } from '../../../../api/characterModelsApi'
 import type { CharacterDoc, CharacterFigure, PublishedModelOut } from '../../../../api/types'
-import { CloseIcon, DiceIcon, UserIcon } from '../../../icons'
+import { CloseIcon, DiceIcon, SwapIcon, UserIcon } from '../../../icons'
 import { genresOf } from '../../admin/characters/engine/colour'
 import { seededRng } from '../../admin/characters/engine/previews'
 import { ensureFigureModel, useFigureCopy } from './figure/figureModelStore'
@@ -14,11 +14,11 @@ import type { Characters } from './useCharacters'
 const seed = () => Math.floor(Math.random() * 0x100000000)
 const message = (err: unknown, fallback: string) => (err instanceof Error ? err.message : fallback)
 
-export function MannequinPanel({ projectId, doc, setFigure }: { projectId: string; doc: CharacterDoc; setFigure: Characters['setFigure'] }) {
-  return doc.figure ? <Have figure={doc.figure} setFigure={setFigure} /> : <Make projectId={projectId} setFigure={setFigure} />
+export function MannequinPanel({ projectId, doc, setFigure, onConvert }: { projectId: string; doc: CharacterDoc; setFigure: Characters['setFigure']; onConvert: () => void }) {
+  return doc.figure ? <Have figure={doc.figure} setFigure={setFigure} /> : <Make projectId={projectId} setFigure={setFigure} onConvert={onConvert} />
 }
 
-function Make({ projectId, setFigure }: { projectId: string; setFigure: Characters['setFigure'] }) {
+function Make({ projectId, setFigure, onConvert }: { projectId: string; setFigure: Characters['setFigure']; onConvert: () => void }) {
   const [models, setModels] = useState<PublishedModelOut[] | null>(null)
   const [modelId, setModelId] = useState('')
   const [genre, setGenre] = useState('')
@@ -81,10 +81,11 @@ function Make({ projectId, setFigure }: { projectId: string; setFigure: Characte
             </select>
           )}
           <button type="button" className="charIconBtn" aria-label="Make a mannequin" title="Make a mannequin: copy this model to the character and roll a first look" disabled={busy} onClick={() => { void make() }}><UserIcon size={16} /></button>
+          <button type="button" className="charIconBtn" aria-label="Convert the portrait to a mannequin" title="Convert this portrait to a mannequin: see the two side by side first" disabled={busy} onClick={onConvert}><SwapIcon size={16} /></button>
         </div>
       )}
       {problem && <p className="charHint" role="alert">{problem}</p>}
-      <p className="charHint">A mannequin is drawn from a model, not from the portrait. The character keeps its own copy of the model, so it does not change when the model is published again.</p>
+      <p className="charHint">A mannequin is drawn from a model, not from the portrait. The character keeps its own copy of the model, so it does not change when the model is published again. Convert makes the mannequin from this portrait instead of rolling one.</p>
     </div>
   )
 }

@@ -6,7 +6,9 @@ from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel, Field, field_validator
 
 from ..deps import get_storage_root
+from ..storage import figure_conversion
 from ..storage import project_store as store
+from ..storage.figure_conversion import ConvertBody, FigureConversionError, FrozenPortrait
 from ..storage.schema import CHARACTER_MAX_PER_PROJECT, CharacterDoc, CharacterFigure, CharacterLook, CharacterPortrait, _figure_or_none, utcnow
 
 router = APIRouter(prefix="/api/projects/{project_id}/characters", tags=["characters"])
@@ -83,6 +85,30 @@ def put_character(project_id: str, character_id: str, body: CharacterDoc, root: 
         body.updatedAt = utcnow()
         store.save_character(root, project_id, body)
     return body
+
+
+@router.get("/{character_id}/frozen", response_model=list[FrozenPortrait])
+def frozen_portraits(project_id: str, character_id: str, root: Path = Depends(get_storage_root)) -> list[FrozenPortrait]:
+    """The portraits of this character frozen in the published editions (what Convert has to turn into figures besides the character's own)."""
+    return figure_conversion.frozen_portraits(root, project_id, character_id)
+
+
+@router.post("/{character_id}/convert", response_model=CharacterDoc)
+def convert_character(project_id: str, character_id: str, body: ConvertBody, root: Path = Depends(get_storage_root)) -> CharacterDoc:
+    """Keep a character's portrait converted to a mannequin: its figure, those of its captured story looks and those frozen in its editions, in one write. The portraits stay."""
+    try:
+        return figure_conversion.convert_character(root, project_id, character_id, body)
+    except FigureConversionError as err:
+        raise HTTPException(status_code=422, detail=str(err)) from err
+
+
+@router.post("/{character_id}/revert", response_model=CharacterDoc)
+def revert_character(project_id: str, character_id: str, root: Path = Depends(get_storage_root)) -> CharacterDoc:
+    """Back to the old portrait: drop the figures that Convert made (the character's, its story looks' and its editions')."""
+    try:
+        return figure_conversion.revert_character(root, project_id, character_id)
+    except FigureConversionError as err:
+        raise HTTPException(status_code=409, detail=str(err)) from err
 
 
 @router.delete("/{character_id}", status_code=204)

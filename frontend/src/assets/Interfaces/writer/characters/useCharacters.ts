@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import { createCharacter, deleteCharacter, getCharacter, listAllCharacters, listCharacters, putCharacter } from '../../../../api/charactersApi'
-import type { CharacterDoc, CharacterFigure, CharacterPortrait, CharacterSummary, LegacyLook } from '../../../../api/types'
+import { convertCharacter, createCharacter, deleteCharacter, getCharacter, listAllCharacters, listCharacters, putCharacter, revertCharacter } from '../../../../api/charactersApi'
+import type { CharacterDoc, CharacterFigure, CharacterPortrait, CharacterSummary, ConvertBody, LegacyLook } from '../../../../api/types'
 import { notifyCastChanged } from './castStore'
 import { buildCharacterFile, figureKeys, importCharacters, type CharacterChoice, type CharacterFile, type CharacterImportResult } from './charFile'
 import { ensureFigureModel, figureCopiesFor } from './figure/figureModelStore'
@@ -214,6 +214,48 @@ export function useCharacters(projectId: string | null) {
   }, [edit])
   const rename = useCallback((name: string) => edit(d => (name.trim() === '' || name === d.name ? d : { ...d, name: name.trim().slice(0, 120) }), 'name'), [edit])
 
+  // Convert the open character's portrait to a mannequin, or go back to the old portrait (phase 6c-4): the server keeps the figures of the character, of its story looks and of its
+  // editions in one write and answers with the character; what was waiting is saved first, and the undo of this character starts again (it is a change of more than the open
+  // document). True when it was done.
+  const settled = useCallback((saved: CharacterDoc) => {
+    const session = current.current
+    if (!session || session.doc.id !== saved.id) return
+    session.doc = saved
+    session.past = []
+    session.future = []
+    session.group = null
+    setDoc(saved)
+    setRev(r => r + 1)
+    setCast(list => list.map(c => (c.id === saved.id ? summaryOf(saved) : c)))
+    notifyCastChanged()
+  }, [])
+  const convert = useCallback(async (body: ConvertBody): Promise<boolean> => {
+    const id = current.current?.doc.id
+    if (!projectId || !id) return false
+    setNotice(undefined)
+    try {
+      await autosaveRef.current.flush()
+      settled(await convertCharacter(projectId, id, body))
+      return true
+    } catch (err) {
+      setNotice(message(err, 'The portrait could not be converted.'))
+      return false
+    }
+  }, [projectId, settled])
+  const revert = useCallback(async (): Promise<boolean> => {
+    const id = current.current?.doc.id
+    if (!projectId || !id) return false
+    setNotice(undefined)
+    try {
+      await autosaveRef.current.flush()
+      settled(await revertCharacter(projectId, id))
+      return true
+    } catch (err) {
+      setNotice(message(err, 'The portrait could not be brought back.'))
+      return false
+    }
+  }, [projectId, settled])
+
   const undo = useCallback(() => {
     const session = current.current
     const prev = session?.past.pop()
@@ -236,11 +278,11 @@ export function useCharacters(projectId: string | null) {
 
   return useMemo(() => ({
     status, loadError, reload: load, cast, openId, doc, rev, notice,
-    open, create, duplicate, remove, exportFile, importFile, edit, setPortrait, setFigure, rename, undo, redo, canUndo, canRedo,
+    open, create, duplicate, remove, exportFile, importFile, edit, setPortrait, setFigure, convert, revert, rename, undo, redo, canUndo, canRedo,
     saveStatus: combineSaveStatus(autosave),
     saveCountdown: combineCountdown(autosave),
     saveNow: autosave.flush,
-  }), [status, loadError, load, cast, openId, doc, rev, notice, open, create, duplicate, remove, exportFile, importFile, edit, setPortrait, setFigure, rename, undo, redo, canUndo, canRedo, autosave])
+  }), [status, loadError, load, cast, openId, doc, rev, notice, open, create, duplicate, remove, exportFile, importFile, edit, setPortrait, setFigure, convert, revert, rename, undo, redo, canUndo, canRedo, autosave])
 }
 
 export type Characters = ReturnType<typeof useCharacters>

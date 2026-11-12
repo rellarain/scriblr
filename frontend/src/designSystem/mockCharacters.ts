@@ -1,4 +1,4 @@
-import type { CharacterCreate, CharacterDoc, CharacterSummary } from '../api/types'
+import type { CharacterCreate, CharacterDoc, CharacterFigure, CharacterSummary, ConvertBody, FrozenPortrait } from '../api/types'
 import { normalizeFigure } from '../assets/Interfaces/writer/characters/figure/figureState'
 import { defaultPortrait, normalizePortrait } from '../assets/Interfaces/writer/characters/portrait/defaults'
 import { emptyStory } from '../assets/Interfaces/writer/characters/story'
@@ -19,8 +19,10 @@ export function newCharacter(id: string, body: CharacterCreate, order: number): 
   return { schemaVersion: 2, id, name: body.name?.trim() || 'Unnamed character', order, portrait: body.portrait ? normalizePortrait(body.portrait) : defaultPortrait(), figure: normalizeFigure(body.figure), look: body.look ?? {}, ...emptyStory(), updatedAt: AT }
 }
 
-export function createMockCharacters(initial: CharacterDoc[] = []) {
+// `frozen` are the portraits the editions of the project hold, by character id (what GET .../frozen answers); the figures that Convert gives them are kept in `editionFigures`.
+export function createMockCharacters(initial: CharacterDoc[] = [], frozen: Record<string, FrozenPortrait[]> = {}) {
   const cast = new Map<string, CharacterDoc>(initial.map(c => [c.id, c]))
+  const editionFigures = new Map<string, CharacterFigure | null>()
   let next = initial.length + 1
   // Every save stamps a new time, as the server does (the console reads the cast again when a time changes).
   let saves = 1
@@ -38,6 +40,26 @@ export function createMockCharacters(initial: CharacterDoc[] = []) {
     if (rest[0] === 'all' && method === 'GET') return ok([...cast.values()].sort((a, b) => a.order - b.order || a.name.localeCompare(b.name)))
     const id = rest[0]
     const found = cast.get(id)
+    if (rest.length === 2 && rest[1] === 'frozen' && method === 'GET') return found ? ok(frozen[id] ?? []) : fail(404, 'Character not found')
+    if (rest.length === 2 && rest[1] === 'convert' && method === 'POST') {
+      if (!found) return fail(404, 'Character not found')
+      const b = body as ConvertBody
+      const figure = normalizeFigure(b.figure)
+      if (!figure) return fail(422, 'the model the figure was made from is not in this project')
+      const states = found.states.map(st => { const f = normalizeFigure(b.states?.[st.id]); return f && st.portrait ? { ...st, figure: { ...f, converted: true } } : st })
+      for (const e of b.editions ?? []) editionFigures.set(`${id}:${e.bookId}:${e.n}`, { ...e.figure, converted: true })
+      const saved: CharacterDoc = { ...found, figure: { ...figure, converted: true }, states, updatedAt: AT }
+      cast.set(id, saved)
+      return ok(saved)
+    }
+    if (rest.length === 2 && rest[1] === 'revert' && method === 'POST') {
+      if (!found) return fail(404, 'Character not found')
+      if (!found.figure?.converted) return fail(409, "this character's mannequin was not made by converting its portrait")
+      for (const key of [...editionFigures.keys()]) if (key.startsWith(`${id}:`)) editionFigures.set(key, null)
+      const saved: CharacterDoc = { ...found, figure: null, states: found.states.map(st => (st.figure?.converted && st.portrait ? { ...st, figure: null } : st)), updatedAt: AT }
+      cast.set(id, saved)
+      return ok(saved)
+    }
     if (method === 'GET') return found ? ok(found) : fail(404, 'Character not found')
     if (method === 'PUT') {
       if (!found) return fail(404, 'Character not found')
@@ -58,7 +80,7 @@ export function createMockCharacters(initial: CharacterDoc[] = []) {
     return fail(405, 'Method not allowed')
   }
 
-  return { route, get cast() { return cast } }
+  return { route, get cast() { return cast }, get editionFigures() { return editionFigures } }
 }
 
 // The cast a preview opens with: two characters with portraits of their own.

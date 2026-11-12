@@ -42,6 +42,7 @@ export function normalizeFigure(raw: unknown): CharacterFigure | null {
     fall: raw.fall === 'left' || raw.fall === 'right' || raw.fall === 'behind' ? raw.fall : 'down',
     locks: list<string>(raw.locks), zoff: map<number>(raw.zoff), mine: list<ModelPreset>(raw.mine), genre: typeof raw.genre === 'string' && raw.genre ? raw.genre : null,
     on: list<string>(raw.on), order: map<string[]>(raw.order),
+    ...(raw.converted === true ? { converted: true } : {}),
   }
 }
 

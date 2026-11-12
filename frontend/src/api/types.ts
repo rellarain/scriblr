@@ -556,7 +556,13 @@ export interface CharacterFigure {
   // object (object id to shape ids, back to front). Both are empty when nothing is chosen.
   on?: string[]
   order?: Record<string, string[]>
+  // Made from the character's portrait by Convert: Back to the old portrait drops it again.
+  converted?: boolean
 }
+// Convert (phase 6c-4): the portrait of a character frozen in an edition of a book, and what Convert sends to keep a conversion (the figure for the character, for each captured
+// story look that holds a portrait and for each edition card).
+export interface FrozenPortrait { bookId: string; n: number; portrait: CharacterPortrait; hasFigure: boolean; converted: boolean }
+export interface ConvertBody { figure: CharacterFigure; states: Record<string, CharacterFigure>; editions: Array<{ bookId: string; n: number; figure: CharacterFigure }> }
 export interface FigureModel { id: string; modelId: string; version: number; name: string; publishedAt: string | null; content: ModelContent }
 export interface FigureModelCreate { modelId: string; version?: number; name?: string; content?: ModelContent }
 export const FIGURE_MAX_MINE = 40

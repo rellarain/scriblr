@@ -1,5 +1,5 @@
 import { vi } from 'vitest'
-import type { CharacterDoc, FigureModel, PublishedModelOut } from '../api/types'
+import type { CharacterDoc, CharacterFigure, FigureModel, FrozenPortrait, PublishedModelOut } from '../api/types'
 import { createMockCharacters } from '../designSystem/mockCharacters'
 import { createMockFigureModels } from '../designSystem/mockFigureModels'
 
@@ -10,14 +10,16 @@ export interface CharactersBackend {
   fetch: ReturnType<typeof vi.fn>
   readonly cast: Map<string, CharacterDoc>
   readonly copies: Map<string, FigureModel>
+  // The figures that Convert gave the portraits frozen in editions (character:book:edition -> figure; null once they were taken back).
+  readonly editionFigures: Map<string, CharacterFigure | null>
   calls: string[]
   of(method: string): string[]
   failNext(path: string, status: number, detail: unknown): void
 }
 
 // `copies` are the model copies the project holds, `published` the models the catalog offers to copy, `basic` the model that asking for the basic one publishes.
-export function charactersBackend(initial: CharacterDoc[] = [], more: { copies?: FigureModel[]; published?: PublishedModelOut[]; basic?: PublishedModelOut } = {}): CharactersBackend {
-  const mock = createMockCharacters(initial)
+export function charactersBackend(initial: CharacterDoc[] = [], more: { copies?: FigureModel[]; published?: PublishedModelOut[]; basic?: PublishedModelOut; frozen?: Record<string, FrozenPortrait[]> } = {}): CharactersBackend {
+  const mock = createMockCharacters(initial, more.frozen)
   const figures = createMockFigureModels(() => more.published ?? [], more.copies ?? [])
   const failures = new Map<string, { status: number; detail: unknown }>()
   const calls: string[] = []
@@ -48,6 +50,7 @@ export function charactersBackend(initial: CharacterDoc[] = [], more: { copies?:
     fetch: fn, calls,
     get cast() { return mock.cast },
     get copies() { return figures.copies },
+    get editionFigures() { return mock.editionFigures },
     of: method => calls.filter(c => c.startsWith(`${method} `)),
     failNext: (path, status, detail) => { failures.set(path, { status, detail }) },
   }

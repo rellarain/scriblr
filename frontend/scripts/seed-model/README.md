@@ -19,3 +19,4 @@ npx vite-node scripts/seed-model/check-fit.ts 0.08                  # how well t
 - `run.ts` compares the body with the mockup's own solve at rest (it must be 0.00), reports the publish faults, writes the JSON and `preview.tsx` writes a page that draws every option next to the old portrait.
 
 The model has to stay under the size limit of a copy (2048 KB, counted by the server, with every default written out); `backend/tests/test_character_models_basic.py` and `src/assets/Interfaces/admin/characters/seedModel.test.ts` check it.
+- `convert-preview.tsx` (`npx vite-node scripts/seed-model/convert-preview.tsx [dir]`) writes a page with twenty-four old portraits (hand-picked cases and random ones) next to what Convert makes of them on the basic model, with the lines the preview would list: a look at the mapping in `figureConvert.ts` after a change to the model or the conversion.

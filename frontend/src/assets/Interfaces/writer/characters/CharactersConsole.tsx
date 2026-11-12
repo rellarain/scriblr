@@ -103,7 +103,7 @@ export default function CharactersConsole({ projectId, outline = [], plotNodes =
       <div className="charSplit">
         <CharacterList c={c} />
         {doc && section === 'appearance' && <AppearanceSection doc={doc} edit={c.edit} rename={c.rename} />}
-        {doc && section === 'portrait' && <PortraitSection projectId={projectId} doc={doc} edit={c.edit} rename={c.rename} setFigure={c.setFigure} />}
+        {doc && section === 'portrait' && <PortraitSection projectId={projectId} doc={doc} edit={c.edit} rename={c.rename} setFigure={c.setFigure} convert={c.convert} revert={c.revert} />}
         {doc && section === 'profile' && <ProfileSection doc={doc} edit={c.edit} />}
         {doc && section === 'relationships' && <RelationshipsSection projectId={projectId} c={c} doc={doc} points={points} />}
         {doc && section === 'cast' && <CastSection c={c} cast={all} doc={doc} onOpen={id => { void c.open(id) }} />}

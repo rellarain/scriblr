@@ -107,6 +107,14 @@
 .charFigureShape { fill: var(--shape-fill); }
 // The Mannequin panel under the big card: a heading, what it is drawn from, and the choices (a model, a genre, the icon buttons).
 .charMannequin, .charExtras { display: flex; flex-direction: column; gap: var(--space-2); }
+// Convert: the old portrait and the mannequin it would become, side by side, and what changes.
+.charConvert { display: flex; flex-direction: column; gap: var(--space-3); }
+.charConvertPair { display: flex; flex-wrap: wrap; gap: var(--space-3); align-items: flex-start; }
+.charConvertFig { margin: 0; display: flex; flex-direction: column; gap: var(--space-1); width: 200px; max-width: 100%; }
+.charConvertFig--whole { width: 110px; }
+.charConvertFig figcaption { font-size: var(--text-small); color: var(--ink-muted); }
+.charConvertArt { display: block; width: 100%; height: auto; }
+.charConvertList ul { margin: var(--space-1) 0 0; padding-left: var(--space-4); display: flex; flex-direction: column; gap: var(--space-1); font-size: var(--text-small); }
 .charCaption { text-align: center; font-size: var(--text-small); color: var(--ink-muted); }
 
 // ---- the figure editor (phase 6b-2): the card, its sheets and parts, and the steps under it ----

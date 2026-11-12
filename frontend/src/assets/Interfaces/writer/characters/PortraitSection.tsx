@@ -1,7 +1,8 @@
-import { useId } from 'react'
+import { useId, useState } from 'react'
 import type { CharacterDoc, CharacterPortrait } from '../../../../api/types'
 import { BodyIcon, BrushIcon, CardIcon, ChevronDownIcon, DiceIcon, EyeIcon, FaceIcon, LockIcon, SparkleIcon } from '../../../icons'
 import { Colour, CommitText, Field, Slider } from './CharFields'
+import { ConvertPreview } from './ConvertPreview'
 import { FigureEditor } from './figure/FigureEditor'
 import { useFigureCopy } from './figure/figureModelStore'
 import { MannequinPanel } from './MannequinPanel'
@@ -102,13 +103,16 @@ export const PORTRAIT_SECTIONS: PortraitSectionSpec[] = [
 // The portrait of the open character: the card as it is drawn (it stays in view while the page scrolls) and beside it the choices it is made of, on one page of sections that
 // open and close. A choice from a list is a dropdown whose entries are drawn as they would look on this character; a colour is a row of swatches and a picker; a few sliders
 // fine-tune the face. Every change is one step of the character's undo (a slider or a colour moved several times in a row is one step).
-export function PortraitSection({ projectId, doc, edit, rename, setFigure }: {
+export function PortraitSection({ projectId, doc, edit, rename, setFigure, convert, revert }: {
   projectId: string
   doc: CharacterDoc
   edit: (change: (d: CharacterDoc) => CharacterDoc, group?: string) => void
   rename: (name: string) => void
   setFigure: Characters['setFigure']
+  convert: Characters['convert']
+  revert: Characters['revert']
 }) {
+  const [converting, setConverting] = useState(false)
   const uid = useId().replace(/[^A-Za-z0-9]/g, '')
   const panels = usePortraitPanels()
   const model = useFigureCopy(doc.figure?.model)
@@ -161,14 +165,17 @@ export function PortraitSection({ projectId, doc, edit, rename, setFigure }: {
 
   // A character with a mannequin whose model copy is here is edited on its figure's own card; one whose copy has not arrived (or is not in this project) keeps this page, which
   // draws its portrait and says where the mannequin stands.
-  if (doc.figure && model) return <FigureEditor key={`${doc.id}:${doc.figure.model}`} projectId={projectId} figure={doc.figure} model={model} label={`${doc.name}, figure`} setFigure={setFigure} />
+  if (doc.figure && model) return <FigureEditor key={`${doc.id}:${doc.figure.model}`} projectId={projectId} figure={doc.figure} model={model} label={`${doc.name}, figure`} setFigure={setFigure} onRevert={revert} />
+
+  // Convert: the old portrait next to the mannequin it would become, before anything changes.
+  if (converting && !doc.figure) return <ConvertPreview key={doc.id} projectId={projectId} doc={doc} convert={convert} onClose={() => setConverting(false)} />
 
   return (
     <div className="charPortrait">
       <section className="charPanel charPanel--start charPortraitStage" aria-label="The portrait card">
         <PortraitCard portrait={p} figure={doc.figure} crop="card" name={doc.name} caption={roleAge(doc.profile)} label={`${doc.name}, ${doc.figure ? 'figure' : 'portrait'}`} className="charPortraitCard charPortraitCard--big" />
         <p className="charHint">The name and the role and age under the card come from Profile. {doc.figure ? 'The card colour is part of the mannequin.' : 'The tile colour is part of the portrait.'}</p>
-        <MannequinPanel projectId={projectId} doc={doc} setFigure={setFigure} />
+        <MannequinPanel projectId={projectId} doc={doc} setFigure={setFigure} onConvert={() => setConverting(true)} />
         {!doc.figure && <div className="charRandom" role="group" aria-label="Randomise">
           <button type="button" className="charIconBtn charDice" aria-label="Randomise the portrait" title="Randomise the portrait: new choices for every section that is not locked" onClick={randomise}>
             <DiceIcon size={20} />
