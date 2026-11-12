@@ -6,6 +6,7 @@ import { useState } from 'react'
 import { describe, expect, it, vi } from 'vitest'
 import type { CharacterFigure, FigureModel, ModelContent } from '../../../../../api/types'
 import type { Characters } from '../useCharacters'
+import { choose, maybePicker, optionNames, picker } from './testPickers'
 import { FigureEditor } from './FigureEditor'
 import { blankFigure } from './figureState'
 
@@ -57,25 +58,24 @@ describe('the writer meets the basic model', () => {
     await user.click(screen.getByRole('button', { name: 'Face' }))
     await user.click(sheet('Face'))
     await user.click([...card().querySelectorAll('.charFigHot')].find(b => /^Eyes \(left\)/.test(b.getAttribute('aria-label') ?? ''))! as HTMLElement)
-    const eyes = screen.getByRole('combobox', { name: /Eye shape/i })
-    expect(within(eyes).getAllByRole('option')).toHaveLength(14)
-    await user.selectOptions(eyes, 'hooded')
+    expect(await optionNames(user, /^Eye shape/i)).toHaveLength(14)
+    await choose(user, /^Eye shape/i, 'hooded')
     expect(seen.figure.forms['eyes.shape']).toBe('hooded')
   })
 
-  it('offers the nine ages, the builds and the expressions of the model in the first step', () => {
+  it('offers the nine ages, the builds and the expressions of the model in the first step', async () => {
     setup()
-    const ages = screen.getByRole('combobox', { name: /^Age/i })
-    expect(within(ages).getAllByRole('option').map(o => o.textContent)).toEqual(expect.arrayContaining(['Infant', 'Toddler', 'Child', 'Teen', 'Young adult', 'Adult', 'Middle-aged', 'Older', 'Elderly']))
-    expect(within(screen.getByRole('combobox', { name: /^Build/i })).getAllByRole('option').length).toBeGreaterThanOrEqual(4)
-    expect(within(screen.getByRole('combobox', { name: /^Expression/i })).getAllByRole('option').length).toBeGreaterThanOrEqual(13)
+    const user = userEvent.setup()
+    expect(await optionNames(user, /^Age/i)).toEqual(expect.arrayContaining(['Infant', 'Toddler', 'Child', 'Teen', 'Young adult', 'Adult', 'Middle-aged', 'Older', 'Elderly']))
+    expect((await optionNames(user, /^Build/i)).length).toBeGreaterThanOrEqual(4)
+    expect((await optionNames(user, /^Expression/i)).length).toBeGreaterThanOrEqual(13)
   })
 
   it('frames a child as a child: choosing the age moves and shrinks the bust the card looks through', async () => {
     const { user, seen } = setup()
     await user.click(screen.getByRole('button', { name: 'Bust' }))
     const adult = viewBox()
-    await user.selectOptions(screen.getByRole('combobox', { name: /^Age/i }), 'age_child')
+    await choose(user, /^Age/i, 'age_child')
     expect(seen.figure.values.height).toBe(62)
     const child = viewBox()
     expect(child[3]).toBeLessThan(adult[3])
@@ -84,30 +84,30 @@ describe('the writer meets the basic model', () => {
 
   it('offers the ready hairstyles and the facial hair in the first step, and a hairstyle sets the sections of the hair together', async () => {
     const { user, seen } = setup()
-    const styles = screen.getByRole('combobox', { name: /^Hair style/i })
-    expect(within(styles).getAllByRole('option').map(o => o.textContent)).toEqual(expect.arrayContaining(['Short', 'Buzzed', 'Pixie', 'Undercut', 'Mohawk', 'Bob', 'Long and wavy', 'Curls', 'Afro', 'Bald']))
-    await user.selectOptions(styles, 'hair_bob')
+    const styles = /^Hair style/i
+    expect(await optionNames(user, styles)).toEqual(expect.arrayContaining(['Short', 'Buzzed', 'Pixie', 'Undercut', 'Mohawk', 'Bob', 'Long and wavy', 'Curls', 'Afro', 'Bald']))
+    await choose(user, styles, 'hair_bob')
     expect(seen.figure.values.len_front_center).toBe(100)
     expect(seen.figure.values.len_back_center).toBe(58)
-    await user.selectOptions(styles, 'hair_bald')
+    await choose(user, styles, 'hair_bald')
     expect(seen.figure.hidden).toEqual(expect.arrayContaining(['hair.front.center', 'hair.back.center']))
-    const facial = screen.getByRole('combobox', { name: /^Facial hair/i })
-    expect(within(facial).getAllByRole('option')).toHaveLength(14)
-    await user.selectOptions(facial, 'facial_goatee')
+    const facial = /^Facial hair/i
+    expect(await optionNames(user, facial)).toHaveLength(14)
+    await choose(user, facial, 'facial_goatee')
     expect(seen.figure.forms).toMatchObject({ 'beard.style': 'goatee', 'moustache.style': 'goatee' })
   })
 
   it('lists the parts that are off until chosen as extras in the first step, and a choice there puts the part on the figure', async () => {
     const { user, seen } = setup()
     const extras = within(screen.getByRole('group', { name: 'Extras' }))
-    for (const name of ['Beard style', 'Moustache style', 'Horns', 'Crown', 'Laurel wreath', 'Flower crown', 'Hood', 'Necklace', 'Number of eyes']) expect(extras.getByRole('combobox', { name }), name).toBeInTheDocument()
+    for (const name of ['Beard style', 'Moustache style', 'Horns', 'Crown', 'Laurel wreath', 'Flower crown', 'Hood', 'Necklace', 'Number of eyes']) expect(picker(name, extras), name).toBeInTheDocument()
     const art = () => card().querySelector('.charFigLayer--figure')!.innerHTML
     const before = art()
-    await user.selectOptions(extras.getByRole('combobox', { name: 'Horns' }), 'ram')
+    await choose(user, 'Horns', 'ram', extras)
     expect(seen.figure.forms['horns.style']).toBe('ram')
     expect(art()).not.toBe(before)
     // the fantasy ears are a part of the ears, reached from them
-    expect(extras.queryByRole('combobox', { name: 'Fantasy ears' })).toBeNull()
+    expect(maybePicker('Fantasy ears', extras)).toBeNull()
   })
 
   it('offers a held item for each hand as an extra, and a pose that holds a hand up with it', async () => {
@@ -115,14 +115,14 @@ describe('the writer meets the basic model', () => {
     const extras = within(screen.getByRole('group', { name: 'Extras' }))
     const art = () => card().querySelector('.charFigLayer--figure')!.innerHTML
     const before = art()
-    for (const name of ['Held item (left hand)', 'Held item (right hand)']) expect(within(extras.getByRole('combobox', { name })).getAllByRole('option')).toHaveLength(15)
-    await user.selectOptions(extras.getByRole('combobox', { name: 'Held item (left hand)' }), 'staff')
+    for (const name of ['Held item (left hand)', 'Held item (right hand)']) expect(await optionNames(user, name, extras)).toHaveLength(15)
+    await choose(user, 'Held item (left hand)', 'staff', extras)
     expect(seen.figure.forms['itemL.item']).toBe('staff')
     expect(art()).not.toBe(before)
     // the right hand has an item of its own
     expect(seen.figure.forms['itemR.item']).toBeUndefined()
     const down = art()
-    await user.selectOptions(screen.getByRole('combobox', { name: /^Pose/i }), 'Left hand up')
+    await choose(user, /^Pose/i, 'Left hand up')
     expect(seen.figure.values.shoulder).toBe(95)
     expect(seen.figure.values.holdL).toBe(-135)
     expect(seen.figure.values.shoulderR).toBeUndefined()
@@ -133,7 +133,7 @@ describe('the writer meets the basic model', () => {
     const { user } = setup()
     const art = () => card().querySelector('.charFigLayer--figure')!.innerHTML
     const before = art()
-    await user.selectOptions(screen.getByRole('combobox', { name: /^Facial hair/i }), 'facial_full')
+    await choose(user, /^Facial hair/i, 'facial_full')
     expect(art()).not.toBe(before)
   })
 

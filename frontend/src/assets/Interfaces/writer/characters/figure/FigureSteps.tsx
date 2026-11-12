@@ -1,5 +1,5 @@
 import { useState, type ReactNode } from 'react'
-import type { CharacterFigure, FigureModel, ModelContent, ModelFallSide, ModelLayer, ModelRange, ModelSlot } from '../../../../../api/types'
+import type { CharacterFigure, FigureModel, ModelAxis, ModelContent, ModelFallSide, ModelLayer, ModelRange, ModelSlot } from '../../../../../api/types'
 import { paletteOf, swatchHex } from '../../../admin/characters/engine/colour'
 import { seededRng } from '../../../admin/characters/engine/previews'
 import { FALL_SIDES } from '../../../admin/characters/modelContent'
@@ -10,7 +10,9 @@ import {
   setMember, setOpacity, setPattern, setFall, setWorn, sheetLocked, slotViewOf, type FieldsetPart, type Layers, type MovableLayer, type ObjectPart, type PresetKind, type StateChoice,
 } from './figureEditing'
 import { CardColour, MineBlock, OtherModel, PaletteEditor } from './FigureSettings'
+import { cropAround, kindCrop } from './figurePictures'
 import { setValue, spanOf, valuesOf } from './figureState'
+import { PictureSelect } from './PictureSelect'
 
 // The controls under the card, one step at a time: the figure as a whole (step 0), what a sheet of the card holds (step 1: its groups, and the clothes worn there) and one part of it
 // (step 2: a part's forms, sliders, colours and what else the model lets a writer change). Everything offered is read from the model copy by figureEditing.ts; a change is a function
@@ -74,13 +76,26 @@ function Ranges({ ranges, ctx }: { ranges: ModelRange[]; ctx: Ctx }) {
   )
 }
 
-function Kinds({ kinds, ctx }: { kinds: PresetKind[]; ctx: Ctx }) {
+// The forms of one axis of a part, as pictures of the part with each form (the part's own place with every form drawn, so the pictures line up).
+function Forms({ ctx, ownerId, axis, value, label }: { ctx: Ctx; ownerId: string; axis: ModelAxis; value: string; label?: string }) {
+  return (
+    <PictureSelect
+      label={label ?? axis.name} value={value} options={axis.options.map(o => ({ id: o.id, name: o.name }))} copy={ctx.copy} figure={ctx.figure}
+      onChange={id => ctx.apply(f => setForm(f, ownerId, axis, id))} figureFor={id => setForm(ctx.figure, ownerId, axis, id)} crop={figures => cropAround(ctx.copy, figures, ownerId)}
+    />
+  )
+}
+
+// The ready looks of a kind (ages, builds, expressions, hairstyles, a part's styles), as pictures: a part's styles through the part's own place (`around`), the others through the
+// frame that suits what the kind is called.
+function Kinds({ kinds, ctx, around }: { kinds: PresetKind[]; ctx: Ctx; around?: string }) {
   return (
     <>
       {kinds.map(k => (
-        <Pick
-          key={k.key} label={k.label} value={k.value} onChange={id => ctx.apply(f => chooseKind(ctx.copy, f, k, id))}
+        <PictureSelect
+          key={k.key} label={k.label} value={k.value} onChange={id => ctx.apply(f => chooseKind(ctx.copy, f, k, id))} copy={ctx.copy} figure={ctx.figure}
           options={[...(k.scoped ? [{ id: NONE, name: 'None' }] : []), ...k.presets.map(p => ({ id: p.id, name: isMine(ctx.figure, p.id) ? `${p.name} (mine)` : p.name }))]}
+          figureFor={id => chooseKind(ctx.copy, ctx.figure, k, id)} crop={k.scoped && around ? (figures => cropAround(ctx.copy, figures, around)) : kindCrop(k.label)}
         />
       ))}
     </>
@@ -123,9 +138,7 @@ function Extras({ ctx }: { ctx: Ctx }) {
       <h4 className="charLabel">Extras</h4>
       <p className="charHint">Parts that are off until you choose them. Once one is on, point at it on the card to change its colour.</p>
       <div className="charStepGrid">
-        {parts.flatMap(p => p.axes.map(({ axis, value }) => (
-          <Pick key={`${p.owner.id}.${axis.id}`} label={axis.name} value={value} options={axis.options.map(o => ({ id: o.id, name: o.name }))} onChange={id => ctx.apply(f => setForm(f, p.owner.id, axis, id))} />
-        )))}
+        {parts.flatMap(p => p.axes.map(({ axis, value }) => <Forms key={`${p.owner.id}.${axis.id}`} ctx={ctx} ownerId={p.owner.id} axis={axis} value={value} />))}
       </div>
     </div>
   )
@@ -307,10 +320,8 @@ export function ObjectStep({ ctx, part }: { ctx: Ctx; part: ObjectPart }) {
             onChange={id => { apply(f => setMember(f, part.family!.klass, id)); ctx.onObject(id) }}
           />
         )}
-        <Kinds kinds={part.kinds} ctx={ctx} />
-        {part.axes.map(({ axis, value }) => (
-          <Pick key={axis.id} label={axis.name} value={value} options={axis.options.map(o => ({ id: o.id, name: o.name }))} onChange={id => apply(f => setForm(f, owner.id, axis, id))} />
-        ))}
+        <Kinds kinds={part.kinds} ctx={ctx} around={owner.id} />
+        {part.axes.map(({ axis, value }) => <Forms key={axis.id} ctx={ctx} ownerId={owner.id} axis={axis} value={value} />)}
         {part.falls && <Pick label="Where it falls" value={ctx.figure.fall} options={FALL_SIDES.map(s => ({ id: s, name: FALL_LABELS[s] }))} onChange={id => apply(f => setFall(f, id as ModelFallSide))} />}
       </div>
       {varies && <MineBlock ctx={ctx} part={part} />}

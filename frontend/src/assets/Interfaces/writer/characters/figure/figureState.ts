@@ -117,14 +117,16 @@ export const coloursFrom = (choices: SlotChoices): Record<string, FigureColour> 
 
 // What a figure is looked at through: the whole figure, the head (the smallest of the model's frames with Face or Head in its name, else the top of the figure), the bust (the
 // smallest frame named Bust, Shoulders or Portrait, else the head: what a small card shows, as a portrait shows head and shoulders) or one of the model's frames.
-export type Crop = 'figure' | 'head' | 'bust' | { frame: string }
+// A crop may also be a box of the model's space (a picture of one part: the part's own place, with room around it).
+export type Crop = 'figure' | 'head' | 'bust' | { frame: string } | { box: Box }
 
 const smallest = (frames: ModelFrame[]): ModelFrame | undefined => [...frames].sort((a, b) => a.w * a.h - b.w * b.h)[0]
 export const frameFor = (copy: ModelContent, crop: Crop): ModelFrame | undefined => {
   if (crop === 'figure') return undefined
+  if (typeof crop === 'object' && 'box' in crop) return undefined
   if (crop === 'head') return smallest(framesOf(copy).filter(f => /face|head/i.test(f.name)))
   if (crop === 'bust') return smallest(framesOf(copy).filter(f => /bust|shoulder|portrait/i.test(f.name))) ?? frameFor(copy, 'head')
-  return framesOf(copy).find(f => f.id === crop.frame)
+  return framesOf(copy).find(f => f.id === (crop as { frame: string }).frame)
 }
 
 // The box the whole figure takes at rest (the same for every figure of a copy, so cards of one model line up), with a margin.
@@ -155,6 +157,7 @@ export function followHeight(box: Box, global: Mat, axis = 100): Box {
 }
 
 export function cropBox(copy: ModelContent, crop: Crop, view: View = 'front', global?: Mat): Box {
+  if (typeof crop === 'object' && 'box' in crop) return crop.box
   const frame = frameFor(copy, crop)
   if (frame) return global ? followHeight(viewBoxOf(frame, view, copy.axis ?? 100), global, copy.axis ?? 100) : viewBoxOf(frame, view, copy.axis ?? 100)
   const whole = restBox(copy, view)
@@ -186,7 +189,7 @@ export function drawFigure(copy: ModelContent, figure: CharacterFigure, crop: Cr
   if (!byFigure) { byFigure = new WeakMap(); drawn.set(copy, byFigure) }
   let byKey = byFigure.get(figure)
   if (!byKey) { byKey = new Map(); byFigure.set(figure, byKey) }
-  const key = `${typeof crop === 'string' ? crop : crop.frame}|${view}|${square ? 1 : 0}`
+  const key = `${typeof crop === 'string' ? crop : 'frame' in crop ? crop.frame : `box:${crop.box.x},${crop.box.y},${crop.box.w},${crop.box.h}`}|${view}|${square ? 1 : 0}`
   const hit = byKey.get(key)
   if (hit) return hit
   const solved = solveFigure(copy, figure, crop, view)

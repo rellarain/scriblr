@@ -596,3 +596,43 @@ export function deleteSwatch(copy: ModelContent, figure: CharacterFigure, id: st
   return { ...figure, palette: gone.palette, colours: coloursFrom(gone.choices) }
 }
 export const setTile = (figure: CharacterFigure, hex: string): CharacterFigure => (/^#[0-9a-f]{6}$/i.test(hex) ? { ...figure, tile: hex.toLowerCase() } : figure)
+
+// ---- the overview (phase 6c-5): every part and ready look of the figure at a glance, in five sections ----
+
+export type OverviewId = 'head' | 'hair' | 'face' | 'body' | 'fantasy'
+// One line of the overview: what it is called, what is chosen (a form or a ready look), and the part it opens (none for a ready look, which is chosen in the first step).
+export interface OverviewRow { key: string; label: string; value: string; objectId: string | null }
+export interface OverviewSection { id: OverviewId; name: string; rows: OverviewRow[] }
+export const OVERVIEW_NAMES: Record<OverviewId, string> = { head: 'Head', hair: 'Hair', face: 'Face', body: 'Body', fantasy: 'Fantasy' }
+const OVERVIEW_ORDER: OverviewId[] = ['head', 'hair', 'face', 'body', 'fantasy']
+const FACE = /eye|brow|nose|mouth|lip/i
+
+// Which section a ready look is in, by what the kind is called.
+const kindSection = (label: string): OverviewId => (/expression/i.test(label) ? 'face' : /hair|facial|beard|moustache/i.test(label) ? 'hair' : 'body')
+
+// The head, hair, face, body and fantasy of a figure, each with the ready looks and the forms of the parts that belong to it, read from the model: a form of a part that is off until it
+// is chosen (a part of the body: horns, extra eyes; a garment that is worn or not is a garment, not fantasy), or that the model draws only for some genres (the fantasy ears, the eye
+// style), is fantasy; hair is the hairstyle and the facial hair; the eyes, brows, nose and mouth are the face; what lies in a group of the head is the head; the rest, clothes and
+// what is held included, is the body. A section with nothing in it is left out.
+export function overviewOf(copy: ModelContent, figure: CharacterFigure): OverviewSection[] {
+  const rows = new Map<OverviewId, OverviewRow[]>(OVERVIEW_ORDER.map(id => [id, []]))
+  for (const k of figurePartOf(copy, figure).kinds) {
+    const chosen = k.presets.find(p => p.id === k.value)
+    rows.get(kindSection(k.label))!.push({ key: `kind.${k.key}`, label: k.label, value: chosen ? chosen.name : 'Custom', objectId: null })
+  }
+  const optional = new Set(optionalObjects(copy).map(o => o.id))
+  const headObjects = new Set(copy.groups.filter(g => /head/i.test(g.id) || /head/i.test(g.name)).flatMap(g => g.objects))
+  for (const o of copy.objects) {
+    if (o.mirrorOf || o.classOf) continue
+    // the hair is its ready looks; the cut of each of its sections is not a choice to list
+    if (o.layer === 'hair') continue
+    const part = objectPartOf(copy, figure, o.id)
+    if (!part) continue
+    for (const { axis, value } of part.axes) {
+      const fantasy = (axis.genres?.length ?? 0) > 0 || (optional.has(o.id) && o.layer !== 'clothing')
+      const id: OverviewId = fantasy ? 'fantasy' : FACE.test(o.id) || FACE.test(o.name) ? 'face' : o.layer === 'clothing' ? 'body' : headObjects.has(o.id) ? 'head' : 'body'
+      rows.get(id)!.push({ key: `${o.id}.${axis.id}`, label: axis.name, value: axis.options.find(f => f.id === value)?.name ?? '', objectId: o.id })
+    }
+  }
+  return OVERVIEW_ORDER.filter(id => rows.get(id)!.length > 0).map(id => ({ id, name: OVERVIEW_NAMES[id], rows: rows.get(id)! }))
+}

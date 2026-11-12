@@ -165,7 +165,7 @@ export function PortraitSection({ projectId, doc, edit, rename, setFigure, conve
 
   // A character with a mannequin whose model copy is here is edited on its figure's own card; one whose copy has not arrived (or is not in this project) keeps this page, which
   // draws its portrait and says where the mannequin stands.
-  if (doc.figure && model) return <FigureEditor key={`${doc.id}:${doc.figure.model}`} projectId={projectId} figure={doc.figure} model={model} label={`${doc.name}, figure`} setFigure={setFigure} onRevert={revert} />
+  if (doc.figure && model) return <FigureEditor key={`${doc.id}:${doc.figure.model}`} projectId={projectId} figure={doc.figure} model={model} label={`${doc.name}, figure`} setFigure={setFigure} onRevert={revert} name={doc.name} caption={roleAge(doc.profile)} />
 
   // Convert: the old portrait next to the mannequin it would become, before anything changes.
   if (converting && !doc.figure) return <ConvertPreview key={doc.id} projectId={projectId} doc={doc} convert={convert} onClose={() => setConverting(false)} />

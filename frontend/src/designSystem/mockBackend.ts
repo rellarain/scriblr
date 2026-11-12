@@ -203,7 +203,13 @@ export function createMockBackend() {
   const cast = createMockCharacters(seedCharacters())
   // The copies of published models the cast's figures are drawn from (a model is copied from the catalog above when a character is given a figure).
   const sample = copyOf(previewModels()[0].draft)
-  const figures = createMockFigureModels(() => (models.route('GET', ['published'], undefined).body as { models: PublishedModelOut[] }).models, [sample])
+  // The models a writer can start from: the catalog's published ones, and the sample as the basic model that comes with the app (the model a new character starts on), so the
+  // Characters card shows the genre beside the plus and a new character comes out as a mannequin.
+  const publishedModels = (): PublishedModelOut[] => {
+    const list = (models.route('GET', ['published'], undefined).body as { models: PublishedModelOut[] }).models
+    return list.some(m => m.id === 'basic') ? list : [...list, { id: 'basic', version: 1, publishedAt: '2026-01-10T09:00:00.000Z', content: sample.content }]
+  }
+  const figures = createMockFigureModels(publishedModels, [sample])
   // Ada is drawn as a mannequin of the sample model, Bram as a portrait, so the cast shows both side by side.
   const ada = cast.cast.get('chr_ada')
   if (ada) ada.figure = { ...blankFigure(sample.id, sample.content), tile: '#cfe0dc', colours: { k_skin: { src: 'colour', id: 'c_skin_3' }, k_hair: { src: 'colour', id: 'c_hair_9' }, k_eye: { src: 'colour', id: 'c_eye_6' }, k_cloth: { src: 'colour', id: 'c_cloth_2' } } }
@@ -236,6 +242,7 @@ export function createMockBackend() {
     if (parts[0] === 'activity' && parts[1] === 'ribbon') return json(ribbonFixture(localDay()))
     if (parts[0] === 'training') { const answer = training.route(method, parts.slice(1), body); return json(answer.body, answer.status) }
     if (parts[0] === 'presets') { const answer = presets.route(method, parts.slice(1), body); return json(answer.body, answer.status) }
+    if (parts[0] === 'character-models' && method === 'GET' && parts[1] === 'published' && parts.length === 2) return json({ models: publishedModels() })
     if (parts[0] === 'character-models') { const answer = models.route(method, parts.slice(1), body); return json(answer.body, answer.status) }
     if (parts[0] === 'reader') return socialRoute(method, parts.slice(1), body) ?? readerRoute(method, parts.slice(1), body)
     if (parts[0] === 'library') {

@@ -4,6 +4,7 @@ import type { CharacterDoc, CharacterFigure, CharacterPortrait, CharacterSummary
 import { notifyCastChanged } from './castStore'
 import { buildCharacterFile, figureKeys, importCharacters, type CharacterChoice, type CharacterFile, type CharacterImportResult } from './charFile'
 import { ensureFigureModel, figureCopiesFor } from './figure/figureModelStore'
+import { startFigure } from './figure/figureStart'
 import { combineCountdown, combineSaveStatus, useAutosave } from '../../../../lib/useAutosave'
 
 // The Characters console's state: the cast (a list of names), the open character as a document, and an undo log for each character that has been opened (kept while
@@ -112,6 +113,22 @@ export function useCharacters(projectId: string | null) {
       return null
     }
   }, [projectId, show])
+
+  // A new character the way the plus makes one (phase 6c-5): a mannequin of the basic model with a look rolled within `genre` (null: any). When the mannequin cannot be made (no
+  // basic model is published, or the models cannot be read) the character starts with the plain portrait, as before; a failure is said, no model is not.
+  const createStarted = useCallback(async (genre: string | null): Promise<string | null> => {
+    if (!projectId) return null
+    let figure: CharacterFigure | null = null
+    let failed = false
+    try {
+      figure = await startFigure(projectId, genre)
+    } catch {
+      failed = true
+    }
+    const id = await create(undefined, figure ? { figure } : undefined)
+    if (id && failed) setNotice('The mannequin could not be made, so this character starts with a portrait. A mannequin can be made in the Portrait section.')
+    return id
+  }, [projectId, create])
 
   // A copy of a character (its portrait and its figure, and a name that says so). It is opened. The figure's model copy is shared, so nothing else is copied.
   const duplicate = useCallback(async (id: string): Promise<string | null> => {
@@ -278,11 +295,11 @@ export function useCharacters(projectId: string | null) {
 
   return useMemo(() => ({
     status, loadError, reload: load, cast, openId, doc, rev, notice,
-    open, create, duplicate, remove, exportFile, importFile, edit, setPortrait, setFigure, convert, revert, rename, undo, redo, canUndo, canRedo,
+    open, create, createStarted, duplicate, remove, exportFile, importFile, edit, setPortrait, setFigure, convert, revert, rename, undo, redo, canUndo, canRedo,
     saveStatus: combineSaveStatus(autosave),
     saveCountdown: combineCountdown(autosave),
     saveNow: autosave.flush,
-  }), [status, loadError, load, cast, openId, doc, rev, notice, open, create, duplicate, remove, exportFile, importFile, edit, setPortrait, setFigure, convert, revert, rename, undo, redo, canUndo, canRedo, autosave])
+  }), [status, loadError, load, cast, openId, doc, rev, notice, open, create, createStarted, duplicate, remove, exportFile, importFile, edit, setPortrait, setFigure, convert, revert, rename, undo, redo, canUndo, canRedo, autosave])
 }
 
 export type Characters = ReturnType<typeof useCharacters>

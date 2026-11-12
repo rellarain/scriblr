@@ -4,9 +4,10 @@ import type { Option } from './portrait/library'
 
 // A dropdown whose choices are pictures: the button shows the chosen one (its picture and its name) and opens a grid of every choice drawn as it would be, each beside its name.
 // It is a listbox: the arrow keys move over the choices (a row at a time too, when they lie in a grid), Home and End go to the first and the last, Enter or Space chooses, Escape
-// closes without choosing, Tab leaves, and typing the first letters of a name goes to it. A click outside closes it. The pictures are only drawn while it is open.
-export function PreviewSelect({ label, options, value, onChange, thumb, disabled = false, bare = false }: {
-  label: string; options: readonly Option[]; value: string; onChange: (id: string) => void; thumb: (option: Option) => ReactNode; disabled?: boolean; bare?: boolean
+// closes without choosing, Tab leaves, and typing the first letters of a name goes to it. A click outside closes it. The pictures are only drawn while it is open (and, unless
+// `buttonThumb` is off, the chosen one on the button). A value that is none of the choices shows the first choice, or, when `custom` is given (a figure that is none of the ready looks), that word with no choice marked.
+export function PreviewSelect({ label, options, value, onChange, thumb, disabled = false, bare = false, buttonThumb = true, custom }: {
+  label: string; options: readonly Option[]; value: string; onChange: (id: string) => void; thumb: (option: Option) => ReactNode; disabled?: boolean; bare?: boolean; buttonThumb?: boolean; custom?: string
 }) {
   const uid = useId().replace(/[^A-Za-z0-9]/g, '')
   const [open, setOpen] = useState(false)
@@ -15,8 +16,9 @@ export function PreviewSelect({ label, options, value, onChange, thumb, disabled
   const button = useRef<HTMLButtonElement>(null)
   const list = useRef<HTMLUListElement>(null)
   const typed = useRef({ text: '', at: 0 })
-  const chosen = Math.max(0, options.findIndex(o => o.id === value))
-  const current = options[chosen] ?? options[0]
+  const found = options.findIndex(o => o.id === value)
+  const chosen = Math.max(0, found)
+  const current = found >= 0 ? options[found] : custom === undefined ? options[0] : null
 
   const show = () => { setActive(chosen); setOpen(true) }
   const close = (back: boolean) => { setOpen(false); if (back) button.current?.focus() }
@@ -77,11 +79,11 @@ export function PreviewSelect({ label, options, value, onChange, thumb, disabled
       <div className="charPickBox">
         <button
           type="button" ref={button} className="charPickBtn" disabled={disabled}
-          aria-haspopup="listbox" aria-expanded={open} aria-controls={open ? `${uid}list` : undefined} aria-label={`${label}: ${current.name}`}
+          aria-haspopup="listbox" aria-expanded={open} aria-controls={open ? `${uid}list` : undefined} aria-label={`${label}: ${current ? current.name : custom}`} data-value={value}
           onClick={() => (open ? close(false) : show())} onKeyDown={onButtonKey}
         >
-          <span className="charPickThumb" aria-hidden="true">{thumb(current)}</span>
-          <span className="charPickName">{current.name}</span>
+          {buttonThumb && current && <span className="charPickThumb" aria-hidden="true">{thumb(current)}</span>}
+          <span className="charPickName">{current ? current.name : custom}</span>
           <ChevronDownIcon size={16} />
         </button>
         {open && (
@@ -90,7 +92,7 @@ export function PreviewSelect({ label, options, value, onChange, thumb, disabled
           >
             {options.map((o, i) => (
               <li
-                key={o.id} id={`${uid}o${i}`} role="option" aria-selected={i === chosen} className={i === active ? 'charPickOpt charPickOpt--active' : 'charPickOpt'}
+                key={o.id} id={`${uid}o${i}`} role="option" data-value={o.id} aria-selected={custom === undefined ? i === chosen : i === found} className={i === active ? 'charPickOpt charPickOpt--active' : 'charPickOpt'}
                 onClick={() => choose(i)} onMouseMove={() => { if (i !== active) setActive(i) }}
               >
                 <span className="charPickThumb charPickThumb--big" aria-hidden="true">{thumb(o)}</span>

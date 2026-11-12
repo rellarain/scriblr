@@ -1,6 +1,6 @@
 import { useCallback, useMemo, useState } from 'react'
 import type { CharacterFigure, FigureModel } from '../../../../../api/types'
-import { BackIcon, ChevronLeftIcon, DiceIcon, FrontIcon, UnlockIcon } from '../../../../icons'
+import { BackIcon, ChevronLeftIcon, DiceIcon, ExportIcon, FrontIcon, GridViewIcon, ImageIcon, UnlockIcon } from '../../../../icons'
 import { genresOf } from '../../../admin/characters/engine/colour'
 import { framesOf } from '../../../admin/characters/engine/frames'
 import { seededRng } from '../../../admin/characters/engine/previews'
@@ -9,7 +9,9 @@ import type { Characters } from '../useCharacters'
 import { FigureCard } from './FigureCard'
 import { ALL_LAYERS, objectPartOf, regionOfObject, regionsOf, unlockAll, type Layers } from './figureEditing'
 import { rollFigure, type Crop } from './figureState'
-import { FigureStep, ObjectStep, RegionStep, type Apply, type Ctx } from './FigureSteps'
+import { cardFileName, downloadCard } from './figureExport'
+import { FigureOverview } from './FigureOverview'
+import { FigureStep, ObjectStep, RegionStep, Toggle, type Apply, type Ctx } from './FigureSteps'
 
 // The writer's editor of a figure, in the character card (phase 6b-2): the figure on its card with the model's frames laid on it as sheets, and under it (beside it when the console is
 // wide) the controls, one step at a time. Step 0 is the figure; click a sheet for step 1, what that part of the figure holds; click a part of the card for step 2, that part. Back
@@ -17,13 +19,22 @@ import { FigureStep, ObjectStep, RegionStep, type Apply, type Ctx } from './Figu
 // character's figure, and undone with the page's Undo. Randomise rolls the whole figure inside its genre; each step has a dice for just that part.
 const seed = (): number => Math.floor(Math.random() * 0x100000000)
 
-export function FigureEditor({ projectId, figure, model, label, setFigure, onRevert }: { projectId: string; figure: CharacterFigure; model: FigureModel; label: string; setFigure: Characters['setFigure']; onRevert?: () => Promise<boolean> }) {
+export function FigureEditor({ projectId, figure, model, label, setFigure, onRevert, name = '', caption = '' }: {
+  projectId: string; figure: CharacterFigure; model: FigureModel; label: string; setFigure: Characters['setFigure']; onRevert?: () => Promise<boolean>
+  // the character's name and its role and age line, for the card that is downloaded
+  name?: string; caption?: string
+}) {
   const copy = model.content
   const [view, setView] = useState<View>('front')
   const [frameId, setFrameId] = useState<string | null>(null)
   const [region, setRegion] = useState<string | null>(null)
   const [objectId, setObjectId] = useState<string | null>(null)
   const [layers, setLayers] = useState<Layers>(ALL_LAYERS)
+  const [overview, setOverview] = useState(false)
+  const [saving, setSaving] = useState(false)
+  const [transparent, setTransparent] = useState(false)
+  const [withName, setWithName] = useState(false)
+  const [saved, setSaved] = useState('')
 
   const regions = useMemo(() => regionsOf(copy), [copy])
   const frames = framesOf(copy)
@@ -31,8 +42,13 @@ export function FigureEditor({ projectId, figure, model, label, setFigure, onRev
   const crop: Crop = frameId && frames.some(f => f.id === frameId) ? { frame: frameId } : 'figure'
   const apply: Apply = useCallback((op, group) => setFigure(op, group ?? null), [setFigure])
 
-  const openRegion = (id: string) => { setRegion(id); setObjectId(null) }
-  const openObject = useCallback((id: string) => { setObjectId(id); setRegion(regionOfObject(copy, id)) }, [copy])
+  const openRegion = (id: string) => { setRegion(id); setObjectId(null); setOverview(false) }
+  const openObject = useCallback((id: string) => { setObjectId(id); setRegion(regionOfObject(copy, id)); setOverview(false) }, [copy])
+  const download = async () => {
+    setSaved('')
+    const done = await downloadCard(copy, figure, crop, view, { transparent, name: withName && name ? name : null, caption }, cardFileName(name))
+    setSaved(done === 'saved' ? 'The card was saved as a picture.' : 'This browser cannot draw the card as a picture.')
+  }
   const back = () => { if (objectId) setObjectId(null); else setRegion(null) }
   const ctx: Ctx = { copy, figure, apply, onObject: openObject }
 
@@ -53,7 +69,7 @@ export function FigureEditor({ projectId, figure, model, label, setFigure, onRev
           <div className="charRow charFigFrames" role="group" aria-label="Frame">
             <button type="button" className="charChip" aria-pressed={crop === 'figure'} title="Look at the whole figure" onClick={() => setFrameId(null)}>Whole figure</button>
             {frames.map(f => (
-              <button key={f.id} type="button" className="charChip" aria-pressed={typeof crop !== 'string' && crop.frame === f.id} title={`Look through the ${f.name} frame`} onClick={() => setFrameId(f.id)}>{f.name}</button>
+              <button key={f.id} type="button" className="charChip" aria-pressed={typeof crop !== 'string' && 'frame' in crop && crop.frame === f.id} title={`Look through the ${f.name} frame`} onClick={() => setFrameId(f.id)}>{f.name}</button>
             ))}
           </div>
         )}
@@ -66,6 +82,10 @@ export function FigureEditor({ projectId, figure, model, label, setFigure, onRev
           )}
           <button type="button" className="charIconBtn charDice" aria-label="Roll a new look" title="Roll a new look within the genre: everything that is not locked" onClick={() => apply(f => rollFigure(copy, f, seededRng(seed())))}><DiceIcon size={20} /></button>
         </div>
+        <div className="charRow charFigCardTools" role="group" aria-label="Card">
+          <button type="button" className="charIconBtn" aria-pressed={overview} aria-label="Overview" title="Overview: every part of the figure at a glance, with a picture of each" onClick={() => setOverview(o => !o)}><GridViewIcon size={18} /></button>
+          <button type="button" className="charIconBtn" aria-pressed={saving} aria-expanded={saving} aria-label="Download the card as a PNG" title="Download the card as a PNG picture" onClick={() => { setSaving(s => !s); setSaved('') }}><ImageIcon size={18} /></button>
+        </div>
         {figure.locks.length > 0 && (
           <div className="charRow charFigLocks" role="group" aria-label="Locks">
             <span className="charHint">{figure.locks.length} locked</span>
@@ -74,11 +94,21 @@ export function FigureEditor({ projectId, figure, model, label, setFigure, onRev
         )}
       </div>
 
+      {saving && (
+        <div className="charRow charFigSave" role="group" aria-label="Download the card">
+          <Toggle label="Transparent background" on={transparent} onChange={setTransparent} />
+          {name && <Toggle label="Name under the card" on={withName} onChange={setWithName} />}
+          <button type="button" className="charIconBtn" aria-label="Save the card as a PNG" title="Save the card as it is framed now (the frame and the view you chose) as a PNG picture" onClick={() => { void download() }}><ExportIcon size={16} /></button>
+          {saved && <span className="charHint" role="status">{saved}</span>}
+        </div>
+      )}
+
       <div className="charFigStage">
         <FigureCard copy={copy} figure={figure} view={view} crop={crop} region={region} objectId={objectId} layers={layers} label={label} onRegion={openRegion} onObject={openObject} />
       </div>
 
       <section className="charPanel charFigSteps" aria-label="Edit the figure">
+        {overview ? <FigureOverview ctx={ctx} onOpen={openObject} onFigure={() => { setOverview(false); setRegion(null); setObjectId(null) }} /> : (<>
         <nav className="charFigCrumbs" aria-label="Where you are">
           {here && <button type="button" className="charIconBtn" aria-label="Back" title="Back one step" onClick={back}><ChevronLeftIcon size={16} /></button>}
           {crumbs.map((c, i) => <button key={`${c.name}${i}`} type="button" className="charFigCrumb" aria-current={c.current ? 'step' : undefined} onClick={c.go}>{c.name}</button>)}
@@ -86,6 +116,7 @@ export function FigureEditor({ projectId, figure, model, label, setFigure, onRev
         {part ? <ObjectStep ctx={ctx} part={part} />
           : here ? <RegionStep ctx={ctx} regionId={here.id} regionName={here.name} layers={layers} onLayers={setLayers} />
           : <FigureStep ctx={ctx} projectId={projectId} model={model} describe={`Drawn from ${model.name || copy.name || 'a model'}${model.version ? `, version ${model.version}` : ''}.`} onForget={() => setFigure(null)} onRevert={onRevert} />}
+        </>)}
       </section>
     </div></div>
   )

@@ -207,4 +207,37 @@ describe('the picture dropdown', () => {
     await user.click(within(list()).getByRole('option', { name: 'Heart' }))
     expect(onPick).toHaveBeenCalledWith('heart')
   })
+
+  it('carries the value it shows on the button and on each choice, so the choice can be found by what it is', async () => {
+    render(<Harness />)
+    expect(button()).toHaveAttribute('data-value', 'oval')
+    await userEvent.setup().click(button())
+    expect(within(list()).getAllByRole('option').map(o => o.getAttribute('data-value'))).toEqual(OPTIONS.map(o => o.id))
+  })
+
+  it('says custom, and marks no choice, for a value that is none of the choices when it is given the word', async () => {
+    render(<PreviewSelect label="Head shape" options={OPTIONS} value="" custom="Custom" onChange={() => undefined} thumb={() => <svg />} />)
+    expect(button()).toHaveAccessibleName('Head shape: Custom')
+    expect(button()).toHaveTextContent('Custom')
+    expect(button()).toHaveAttribute('data-value', '')
+    await userEvent.setup().click(button())
+    expect(within(list()).queryAllByRole('option', { selected: true })).toHaveLength(0)
+  })
+
+  it('marks the choice that is on when it is given the word and the value is one of them', async () => {
+    render(<PreviewSelect label="Head shape" options={OPTIONS} value="square" custom="Custom" onChange={() => undefined} thumb={() => <svg />} />)
+    expect(button()).toHaveAccessibleName('Head shape: Square')
+    await userEvent.setup().click(button())
+    expect(within(list()).getByRole('option', { selected: true })).toHaveTextContent('Square')
+  })
+
+  it('draws no picture on the button when it is told not to, and still draws them in the list', async () => {
+    const drawn = vi.fn()
+    render(<PreviewSelect label="Head shape" options={OPTIONS} value="oval" buttonThumb={false} onChange={() => undefined} thumb={o => { drawn(o.id); return <svg data-testid={`thumb-${o.id}`} /> }} />)
+    expect(drawn).not.toHaveBeenCalled()
+    expect(screen.queryByTestId('thumb-oval')).not.toBeInTheDocument()
+    await userEvent.setup().click(button())
+    expect(drawn).toHaveBeenCalledTimes(OPTIONS.length)
+    expect(within(list()).getAllByTestId(/^thumb-/)).toHaveLength(OPTIONS.length)
+  })
 })

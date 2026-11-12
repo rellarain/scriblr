@@ -6,6 +6,7 @@ import type { CharacterFigure, FigureModel, ModelContent } from '../../../../../
 import { copyOf } from '../../../../../designSystem/mockFigureModels'
 import { previewModels } from '../../../../../designSystem/mockCharacterModels'
 import type { Characters } from '../useCharacters'
+import { choose, optionNames, picker, pickerLabels, pickerValue } from './testPickers'
 import { FigureEditor } from './FigureEditor'
 import { ageOf, blankFigure, cropBox, spanOf } from './figureState'
 
@@ -52,16 +53,16 @@ const steps = () => within(screen.getByRole('region', { name: 'Edit the figure' 
 const sheet = (name: string) => screen.getByRole('button', { name: `${name} sheet` })
 const hot = (name: RegExp | string) => screen.getByRole('button', { name })
 const slider = (name: string) => screen.getByRole('slider', { name }) as HTMLInputElement
-const pick = (user: ReturnType<typeof userEvent.setup>, name: string, value: string) => user.selectOptions(screen.getByRole('combobox', { name }), value)
+const pick = (user: ReturnType<typeof userEvent.setup>, name: string, value: string) => choose(user, name, value)
 
 describe('the card and its toolbar', () => {
-  it('draws the figure on its card, with the view, the frames and Randomise over it', () => {
+  it('draws the figure on its card, with the view, the frames, Randomise and the card tools over it', () => {
     setup()
     expect(screen.getByRole('img', { name: 'Ada, figure' })).toBeInTheDocument()
     const bar = within(screen.getByRole('toolbar', { name: 'View and frame' }))
     expect(bar.getByRole('button', { name: 'Front view' })).toHaveAttribute('aria-pressed', 'true')
     expect(bar.getByRole('button', { name: 'Back view' })).toHaveAttribute('aria-pressed', 'false')
-    expect(bar.getAllByRole('button').map(b => b.getAttribute('aria-label') ?? b.textContent)).toEqual(['Front view', 'Back view', 'Whole figure', 'Head to hands', 'Bust', 'Face', 'Roll a new look'])
+    expect(bar.getAllByRole('button').map(b => b.getAttribute('aria-label') ?? b.textContent)).toEqual(['Front view', 'Back view', 'Whole figure', 'Head to hands', 'Bust', 'Face', 'Roll a new look', 'Overview', 'Download the card as a PNG'])
     expect(bar.getByRole('combobox', { name: 'Genre to roll within' })).toBeInTheDocument()
   })
   it('lays a sheet on the card for each frame, the biggest first, and names each', () => {
@@ -92,12 +93,12 @@ describe('the card and its toolbar', () => {
 })
 
 describe('step 0: the figure', () => {
-  it('has a dropdown for each kind of preset at the one that is on, and the sliders no part holds', () => {
+  it('has a dropdown for each kind of preset at the one that is on, and the sliders no part holds', async () => {
     setup()
-    expect(steps().getAllByRole('combobox').map(s => s.getAttribute('aria-label'))).toEqual(['Pose', 'Expression', 'Build', 'Outfit', 'Weather', 'Age', 'Hand', 'Hand (other side)'])
-    expect(screen.getByRole('combobox', { name: 'Age' })).toHaveValue('p_form43')
-    expect(screen.getByRole('combobox', { name: 'Expression' })).toHaveValue('')
-    expect(within(screen.getByRole('combobox', { name: 'Age' })).getAllByRole('option').map(o => o.textContent)).toEqual(['Infant', 'Child', 'Teen', 'Adult', 'Elder'])
+    expect(pickerLabels(steps())).toEqual(['Pose', 'Expression', 'Build', 'Outfit', 'Weather', 'Age', 'Hand', 'Hand (other side)'])
+    expect(pickerValue('Age')).toBe('p_form43')
+    expect(pickerValue('Expression')).toBe('')
+    expect(await optionNames(userEvent.setup(), 'Age')).toEqual(['Infant', 'Child', 'Teen', 'Adult', 'Elder'])
     const palette = screen.getByRole('group', { name: 'Palette' })
     expect(steps().getAllByRole('slider').filter(s => !palette.contains(s)).map(s => s.getAttribute('aria-label'))).toEqual(['Height'])
   })
@@ -112,7 +113,7 @@ describe('step 0: the figure', () => {
     const { user, seen } = setup()
     await pick(user, 'Age', 'p_form41')
     expect(ageOf(sample.content, seen.figure)?.name).toBe('Child')
-    expect(screen.getByRole('combobox', { name: 'Age' })).toHaveValue('p_form41')
+    expect(pickerValue('Age')).toBe('p_form41')
     await pick(user, 'Outfit', 'p_form36')
     expect(seen.figure.hidden).toContain('o_shirt')
   })
@@ -151,12 +152,12 @@ describe('step 1: a sheet', () => {
     expect(crumbs().getByRole('button', { name: 'Figure' })).not.toHaveAttribute('aria-current')
     const head = within(steps().getByRole('group', { name: 'Head' }))
     expect(head.getAllByRole('slider').map(s => s.getAttribute('aria-label'))).toEqual(['Head tilt', 'Head size'])
-    expect(head.getByRole('combobox', { name: 'Style' })).toHaveValue('__none')
+    expect(pickerValue('Style', head)).toBe('__none')
     await user.click(screen.getByRole('button', { name: 'Back' }))
-    expect(steps().getByRole('combobox', { name: 'Age' })).toBeInTheDocument()
+    expect(picker('Age', steps())).toBeInTheDocument()
     await user.click(sheet('Face'))
     await user.click(crumbs().getByRole('button', { name: 'Figure' }))
-    expect(steps().getByRole('combobox', { name: 'Age' })).toBeInTheDocument()
+    expect(picker('Age', steps())).toBeInTheDocument()
   })
   it('shows a box over each part of it that can be changed, and names what can change', async () => {
     const { user } = setup()
@@ -251,8 +252,8 @@ describe('step 2: a part', () => {
     await user.click(sheet('Face'))
     await user.click(hot(/^Head:/))
     const part = within(steps().getByRole('group', { name: 'Head' }))
-    expect(part.getByRole('combobox', { name: 'Head shape' })).toHaveValue('f_form2')
-    await user.selectOptions(part.getByRole('combobox', { name: 'Head shape' }), 'f_form3')
+    expect(pickerValue('Head shape', part)).toBe('f_form2')
+    await choose(user, 'Head shape', 'f_form3', part)
     expect(seen.figure.forms['o_head.a_form1']).toBe('f_form3')
     const fields = within(part.getByRole('group', { name: 'Head shape' }))
     expect(fields.getAllByRole('slider').map(s => s.getAttribute('aria-label'))).toEqual(['Head width', 'Head height'])
@@ -275,7 +276,7 @@ describe('step 2: a part', () => {
     await user.click(sheet('Head to hands'))
     await user.click(hot(/^Upper arm \(twin\):/))
     expect(steps().getByText(/Upper arm \(twin\) mirrors Upper arm/)).toBeInTheDocument()
-    expect(steps().getByRole('combobox', { name: 'Sleeve' })).toBeInTheDocument()
+    expect(picker('Sleeve', steps())).toBeInTheDocument()
   })
   it('a garment is worn or not, and a fill pattern is on or off', async () => {
     const { user, seen } = setup()
@@ -323,13 +324,13 @@ describe('step 2: a part', () => {
     await user.click(within(colour.getByRole('group', { name: 'Clothing defaults' })).getAllByRole('button')[0])
     expect(colour.getByRole('slider', { name: 'Clothing brightness' })).toBeEnabled()
     expect(part.queryByRole('group', { name: 'Darker shirt' })).toBeNull()
-    await user.selectOptions(part.getByRole('combobox', { name: 'Style' }), 'p_dark')
+    await choose(user, 'Style', 'p_dark', part)
     expect(seen.figure.on).toEqual(['p_dark'])
     expect(colour.getByText(/fixes this colour's saturation and lightness\./)).toBeInTheDocument()
     expect(colour.getByRole('slider', { name: 'Clothing brightness' })).toBeDisabled()
     expect(colour.getByRole('slider', { name: 'Clothing brightness' })).toHaveValue('18')
     expect(part.getByRole('group', { name: 'Darker shirt' })).toBeInTheDocument()
-    await user.selectOptions(part.getByRole('combobox', { name: 'Style' }), '__none')
+    await choose(user, 'Style', '__none', part)
     expect(seen.figure.on).toEqual([])
     expect(part.queryByRole('group', { name: 'Darker shirt' })).toBeNull()
     expect(colour.getByRole('slider', { name: 'Clothing brightness' })).toBeEnabled()
@@ -357,7 +358,7 @@ describe('step 2: a part', () => {
     const { user, seen } = setup()
     await user.click(sheet('Bust'))
     await user.click(hot(/^Ponytail:/))
-    await pick(user, 'Where it falls', 'left')
+    await user.selectOptions(screen.getByRole('combobox', { name: 'Where it falls' }), 'left')
     expect(seen.figure.fall).toBe('left')
   })
 })
@@ -371,7 +372,7 @@ describe('a model with no frames', () => {
     await user.click(sheet('Whole figure'))
     expect(card().querySelectorAll('.charFigHot').length).toBeGreaterThan(5)
     await user.click(hot(/^Head:/))
-    expect(steps().getByRole('combobox', { name: 'Head shape' })).toBeInTheDocument()
+    expect(picker('Head shape', steps())).toBeInTheDocument()
   })
 })
 
@@ -511,7 +512,7 @@ describe('a style of the character\'s own', () => {
     await user.click(hot(/^Head:/))
   }
   async function keepSquare(user: ReturnType<typeof userEvent.setup>, name: string) {
-    await user.selectOptions(part().getByRole('combobox', { name: 'Head shape' }), 'f_form3')
+    await choose(user, 'Head shape', 'f_form3', part())
     if (name) await user.type(part().getByRole('textbox', { name: 'Name for my style' }), name)
     await user.click(part().getByRole('button', { name: 'Save as my style' }))
   }
@@ -521,15 +522,14 @@ describe('a style of the character\'s own', () => {
     await keepSquare(user, 'Square jaw')
     expect(seen.figure.mine).toHaveLength(1)
     expect(seen.figure.mine[0]).toMatchObject({ name: 'Square jaw', scope: 'o_head', forms: { 'o_head.a_form1': 'f_form3' } })
-    const style = part().getByRole('combobox', { name: 'Style' })
-    expect(style).toHaveValue(seen.figure.mine[0].id)
-    expect(within(style).getByRole('option', { name: 'Square jaw (mine)' })).toBeInTheDocument()
+    expect(pickerValue('Style', part())).toBe(seen.figure.mine[0].id)
+    expect(await optionNames(user, 'Style', part())).toContain('Square jaw (mine)')
     expect(part().getByRole('textbox', { name: 'Name of my style' })).toHaveValue('Square jaw')
     expect(part().getByRole('textbox', { name: 'Name for my style' })).toHaveValue('')
     // choosing another head shape means the style is no longer the one that is on, and choosing the style brings the shape back
-    await user.selectOptions(part().getByRole('combobox', { name: 'Head shape' }), 'f_form4')
-    expect(part().getByRole('combobox', { name: 'Style' })).not.toHaveValue(seen.figure.mine[0].id)
-    await user.selectOptions(part().getByRole('combobox', { name: 'Style' }), seen.figure.mine[0].id)
+    await choose(user, 'Head shape', 'f_form4', part())
+    expect(pickerValue('Style', part())).not.toBe(seen.figure.mine[0].id)
+    await choose(user, 'Style', seen.figure.mine[0].id, part())
     expect(seen.figure.forms['o_head.a_form1']).toBe('f_form3')
   })
   it('is called My style 1 when it is not given a name', async () => {
@@ -547,7 +547,7 @@ describe('a style of the character\'s own', () => {
     await user.type(name, 'Strong jaw')
     await user.tab()
     expect(seen.figure.mine[0].name).toBe('Strong jaw')
-    expect(within(part().getByRole('combobox', { name: 'Style' })).getByRole('option', { name: 'Strong jaw (mine)' })).toBeInTheDocument()
+    expect(await optionNames(user, 'Style', part())).toContain('Strong jaw (mine)')
     await user.click(part().getByRole('button', { name: 'Delete my style' }))
     expect(seen.figure.mine).toEqual([])
     expect(part().queryByRole('button', { name: 'Delete my style' })).toBeNull()

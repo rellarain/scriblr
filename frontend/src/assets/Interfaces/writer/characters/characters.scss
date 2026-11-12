@@ -115,6 +115,20 @@
 .charConvertFig figcaption { font-size: var(--text-small); color: var(--ink-muted); }
 .charConvertArt { display: block; width: 100%; height: auto; }
 .charConvertList ul { margin: var(--space-1) 0 0; padding-left: var(--space-4); display: flex; flex-direction: column; gap: var(--space-1); font-size: var(--text-small); }
+// The overview of a figure: every part with a picture of what is chosen for it, and the options of the card that is downloaded.
+.charOverview { display: flex; flex-direction: column; gap: var(--space-3); }
+.charOverviewList { list-style: none; margin: 0; padding: 0; display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: var(--space-2); }
+.charOverviewRow {
+  width: 100%; display: flex; align-items: center; gap: var(--space-2); padding: var(--space-1); border: 0; border-radius: var(--radius-button); background: var(--ov-sink-1); color: var(--ink);
+  font: inherit; text-align: left; cursor: pointer;
+  &:hover { background: var(--ov-sink-2); }
+  &:focus-visible { box-shadow: inset 0 0 0 1px var(--accent); }
+}
+.charOverviewThumb { flex: 0 0 auto; width: 48px; height: 48px; display: block; overflow: hidden; }
+.charOverviewText { display: flex; flex-direction: column; min-width: 0; }
+.charOverviewLabel { font-size: var(--text-small); color: var(--ink-muted); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.charOverviewValue { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.charFigSave { flex-wrap: wrap; align-items: center; }
 .charCaption { text-align: center; font-size: var(--text-small); color: var(--ink-muted); }
 
 // ---- the figure editor (phase 6b-2): the card, its sheets and parts, and the steps under it ----
@@ -281,6 +295,9 @@
 .charWide { grid-column: 1 / -1; }
 .charArea { resize: vertical; min-height: 56px; line-height: 1.4; }
 .charSelect--auto { width: auto; max-width: 100%; }
+// The plus of the cast list with the genre beside it: one unit, so in a narrow column they wrap onto the next line together, at the right.
+.charStart { display: inline-flex; align-items: center; gap: var(--space-2); flex: 0 0 auto; margin-left: auto; }
+.charStartGenre { flex: 0 1 auto; max-width: 7.5em; padding: var(--space-1) var(--space-2); font-size: var(--text-small); text-overflow: ellipsis; }
 .charList2 { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: var(--space-3); }
 .charItem { display: flex; align-items: flex-start; gap: var(--space-3); padding: var(--space-3); background: var(--ov-sink-1); min-width: 0; &--col { flex-direction: column; align-items: stretch; } }
 .charChanges { display: flex; flex-direction: column; gap: var(--space-2); padding: var(--space-3); background: var(--ov-sink-2); }
