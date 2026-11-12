@@ -1,6 +1,5 @@
 import { useEffect, useState } from 'react'
-import { getPublishedModels } from '../../../../../api/characterModelsApi'
-import type { FigureModel, PublishedModelOut } from '../../../../../api/types'
+import type { FigureModel } from '../../../../../api/types'
 import { PlusIcon, SaveIcon, SwapIcon, TrashIcon } from '../../../../icons'
 import { swatchHex } from '../../../admin/characters/engine/colour'
 import { NAME_MAX, SWATCH_NAME_MAX } from '../../../admin/characters/modelContent'
@@ -9,6 +8,7 @@ import { SWATCHES } from '../portrait/registry'
 import { carryOver } from './figureCarry'
 import { addSwatchTo, deleteSwatch, editSwatch, isMine, paletteFor, renameMine, deleteMine, saveMine, setTile, type ObjectPart } from './figureEditing'
 import { ensureFigureModel } from './figureModelStore'
+import { choiceLabel, getModelChoices, type ModelChoice } from './modelChoices'
 import type { Ctx } from './FigureSteps'
 
 // What belongs to the character, not to the model: its palette and the colour of its card, the model it is drawn from (step 0), and the styles it keeps of its own (a part's step).
@@ -62,13 +62,13 @@ export function CardColour({ ctx }: { ctx: Ctx }) {
 // Every published model, and the one this figure is drawn from marked (a newer version of it as such). Pressing Use copies the model into the project (a copy that is there already is
 // used) and carries over what the figure has chosen that the model has too; Undo brings the old model back. Nothing is asked, and nothing is said: the copy is the character's.
 export function OtherModel({ projectId, model, ctx }: { projectId: string; model: FigureModel; ctx: Ctx }) {
-  const [models, setModels] = useState<PublishedModelOut[] | null>(null)
+  const [models, setModels] = useState<ModelChoice[] | null>(null)
   const [chosen, setChosen] = useState('')
   const [busy, setBusy] = useState(false)
   const [problem, setProblem] = useState('')
   useEffect(() => {
     let live = true
-    getPublishedModels().then(r => { if (live) setModels(Array.isArray(r.models) ? r.models : []) }).catch(() => { if (live) { setModels([]); setProblem('The models could not be loaded.') } })
+    getModelChoices().then(list => { if (live) setModels(list) }).catch(() => { if (live) { setModels([]); setProblem('The models could not be loaded.') } })
     return () => { live = false }
   }, [])
   if (models === null) return <p className="charHint" role="status">Looking for models…</p>
@@ -76,7 +76,7 @@ export function OtherModel({ projectId, model, ctx }: { projectId: string; model
   const pick = models.find(m => m.id === chosen) ?? models.find(m => m.id === model.modelId) ?? models[0]
   const same = pick.id === model.modelId
   const inUse = same && pick.version === model.version
-  const tag = (m: PublishedModelOut): string => (m.id === model.modelId ? (m.version === model.version ? ' (in use)' : m.version > model.version ? ' (newer version)' : '') : '')
+  const tag = (m: ModelChoice): string => (m.id === model.modelId ? (m.version === model.version ? ' (in use)' : m.version > model.version ? ' (newer version)' : '') : '')
 
   async function use() {
     setBusy(true)
@@ -93,7 +93,7 @@ export function OtherModel({ projectId, model, ctx }: { projectId: string; model
   return (
     <div className="charRow" role="group" aria-label="Another model">
       <select className="charSelect charSelect--auto" aria-label="Model to use" title="A published model to draw this character from" value={pick.id} onChange={e => setChosen(e.target.value)}>
-        {models.map(m => <option key={m.id} value={m.id}>{`${m.content.name || m.id}${tag(m)}`}</option>)}
+        {models.map(m => <option key={m.id} value={m.id}>{`${choiceLabel(m)}${tag(m)}`}</option>)}
       </select>
       <button type="button" className="charChip" disabled={busy || inUse} title="Draw the character from this model: what it has under the same name is kept" onClick={() => { void use() }}><SwapIcon size={14} /> Use this model</button>
       {problem && <p className="charHint" role="alert">{problem}</p>}

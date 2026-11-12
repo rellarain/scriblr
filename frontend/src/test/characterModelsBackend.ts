@@ -11,13 +11,17 @@ export { draftEntry, liveEntry, modelContent as content } from '../designSystem/
 export interface ModelsBackend {
   fetch: ReturnType<typeof vi.fn>
   entries: ModelEntry[]
+  // the models of the writer's own library
+  ownEntries: ModelEntry[]
   calls: string[]
   // Make the next request to a path fail with this status and message.
   failNext(path: string, status: number, detail: string): void
 }
 
-export function modelsBackend(initial: ModelEntry[]): ModelsBackend {
+export function modelsBackend(initial: ModelEntry[], own: ModelEntry[] = []): ModelsBackend {
   const mock = createMockModels(initial)
+  // the writer's own library (`/my-models`) is another catalog
+  const mine = createMockModels(own)
   const failures = new Map<string, { status: number; detail: string }>()
   const calls: string[] = []
   const reply = (status: number, body: unknown) => ({ ok: status < 400, status, statusText: status < 400 ? 'OK' : 'Error', json: async () => body })
@@ -29,9 +33,9 @@ export function modelsBackend(initial: ModelEntry[]): ModelsBackend {
     const failure = failures.get(path)
     if (failure) { failures.delete(path); return reply(failure.status, { detail: failure.detail }) }
     const parts = path.split('/').filter(Boolean).map(decodeURIComponent)
-    if (parts[0] !== 'character-models') return reply(404, { detail: `unexpected ${method} ${path}` })
+    if (parts[0] !== 'character-models' && parts[0] !== 'my-models') return reply(404, { detail: `unexpected ${method} ${path}` })
     const body = typeof init?.body === 'string' ? JSON.parse(init.body) : undefined
-    const answer = mock.route(method, parts.slice(1), body)
+    const answer = (parts[0] === 'my-models' ? mine : mock).route(method, parts.slice(1), body)
     return reply(answer.status, answer.body)
   })
   vi.stubGlobal('fetch', fn)
@@ -39,6 +43,7 @@ export function modelsBackend(initial: ModelEntry[]): ModelsBackend {
   return {
     fetch: fn, calls,
     get entries() { return mock.state.entries },
+    get ownEntries() { return mine.state.entries },
     failNext: (path, status, detail) => { failures.set(path, { status, detail }) },
   }
 }

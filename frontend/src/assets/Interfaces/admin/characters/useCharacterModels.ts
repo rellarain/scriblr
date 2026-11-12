@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
-import { addBasicModel, discardModelChanges, getModels, publishModel, putModels, restoreModelVersion, unpublishModel } from '../../../../api/characterModelsApi'
+import { addBasicModel, adminModelsApi, type ModelsApi } from '../../../../api/characterModelsApi'
 import type { ModelCatalog, ModelContent, ModelDraftList, ModelEntry } from '../../../../api/types'
 import { combineCountdown, combineSaveStatus, useAutosave } from '../../../../lib/useAutosave'
 import { copyName, moveBefore, normalizeContent, randomId, starterContent, type MakeId } from './modelContent'
@@ -25,8 +25,12 @@ function adoptPublished(local: ModelEntry[], server: ModelEntry[]): ModelEntry[]
 
 // The Characters page's state: the catalog (every model's draft, published copy and versions), edits that autosave like the Writer's
 // (lib/useAutosave.ts: structural edits and text edits both wait for the user's autosave interval, or for Save), and Publish, Unpublish, Discard
-// and Restore, which save what is waiting first. The same shape as usePlotPresets.
-export function useCharacterModels(makeId: MakeId = randomId) {
+// and Restore, which save what is waiting first. The same shape as usePlotPresets. It serves the admin's catalog unless it is given another library (the writer's own models,
+// whose ids all start with `idPrefix`).
+export function useCharacterModels(makeId: MakeId = randomId, library: { api: ModelsApi; idPrefix: string } = { api: adminModelsApi, idPrefix: '' }) {
+  // the library is the one the hook was made for (a ref, so the functions below do not depend on it)
+  const lib = useRef(library)
+  lib.current = library
   const [entries, setEntries] = useState<ModelEntry[]>([])
   const [status, setStatus] = useState<LoadStatus>('loading')
   const [loadError, setLoadError] = useState<string | undefined>(undefined)
@@ -38,7 +42,7 @@ export function useCharacterModels(makeId: MakeId = randomId) {
 
   const draftSave = useAutosave<ModelDraftList>({
     save: async list => {
-      const catalog = await putModels(list)
+      const catalog = await lib.current.api.put(list)
       setEntries(prev => {
         const next = adoptPublished(prev, catalog.models)
         ref.current = next
@@ -59,7 +63,7 @@ export function useCharacterModels(makeId: MakeId = randomId) {
     setStatus('loading')
     setLoadError(undefined)
     try {
-      const catalog = await getModels()
+      const catalog = await lib.current.api.get()
       ref.current = catalog.models
       setEntries(catalog.models)
       setStatus('ready')
@@ -83,7 +87,7 @@ export function useCharacterModels(makeId: MakeId = randomId) {
   }
 
   function addModel(content: ModelContent = starterContent(), afterId?: string): string {
-    const id = makeId('model')
+    const id = lib.current.idPrefix + makeId('model')
     const entry: ModelEntry = { id, draft: content, published: null, history: [], nextVersion: 1 }
     const list = ref.current
     const at = afterId ? list.findIndex(e => e.id === afterId) : -1
@@ -112,7 +116,7 @@ export function useCharacterModels(makeId: MakeId = randomId) {
     let list = ref.current
     const added: Array<{ id: string; name: string }> = []
     for (const content of contents) {
-      const id = makeId('model')
+      const id = lib.current.idPrefix + makeId('model')
       const name = copyName(content.name, list)
       added.push({ id, name })
       list = [...list, { id, draft: { ...content, name }, published: null, history: [], nextVersion: 1 }]
@@ -145,10 +149,10 @@ export function useCharacterModels(makeId: MakeId = randomId) {
   // The basic adult that comes with the app, added and published by the server (what is waiting is saved first).
   const addBasic = () => act(() => addBasicModel())
 
-  const publish = (id: string) => act(() => publishModel(id))
-  const unpublish = (id: string) => act(() => unpublishModel(id))
-  const discard = (id: string) => act(() => discardModelChanges(id))
-  const restore = (id: string, version: number) => act(() => restoreModelVersion(id, version))
+  const publish = (id: string) => act(() => lib.current.api.publish(id))
+  const unpublish = (id: string) => act(() => lib.current.api.unpublish(id))
+  const discard = (id: string) => act(() => lib.current.api.discard(id))
+  const restore = (id: string, version: number) => act(() => lib.current.api.restore(id, version))
 
   return {
     entries, status, loadError, reload: load, busy, actionError, clearActionError: () => setActionError(undefined),

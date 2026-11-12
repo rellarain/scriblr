@@ -1,5 +1,6 @@
 """Global (not project-scoped) storage for the character models, the admin-designed assets of the art mannequin (see schema.py, "Character models").
-Lives at %APPDATA%\\Scriblr\\character-models.json, a sibling of presets.json, and reuses the same atomic-write / quarantine-on-corruption helpers
+Lives at %APPDATA%\\Scriblr\\character-models.json, a sibling of presets.json (and, for the models a writer designs, my-models.json: the same catalog in a second library,
+see MY_LIBRARY), and reuses the same atomic-write / quarantine-on-corruption helpers
 of project_store. The shape of this module is the shape of presets_store: each model has a draft (autosaved from the admin page) and, once
 published, a frozen copy; publishing, unpublishing, discarding and bringing back an earlier version are whole-model operations, and nothing here
 ever touches a project or a character.
@@ -55,8 +56,20 @@ class BasicModelPresentError(ValueError):
     """The catalog already has the basic model."""
 
 
-def _models_path(root: Path) -> Path:
-    return root / "character-models.json"
+class InvalidModelIdError(ValueError):
+    """A model of the writer's library has an id that does not start with MY_ID_PREFIX."""
+
+
+# Two libraries share one shape. The admin's catalog holds the models Scriblr ships and the ones the admin designs; the writer's library holds the models a writer designs
+# for themselves (the Characters console's Models section). Both are published as numbered versions and a character copies a published model into its project, so a
+# model id must say which library it is from: the writer's ids all start with MY_ID_PREFIX, and the catalog's never do.
+ADMIN_LIBRARY = "character-models.json"
+MY_LIBRARY = "my-models.json"
+MY_ID_PREFIX = "my-"
+
+
+def _models_path(root: Path, library: str = ADMIN_LIBRARY) -> Path:
+    return root / library
 
 
 def _published(version: int, content: ModelContent, at: Optional[datetime] = None) -> PublishedModel:
@@ -69,26 +82,26 @@ def default_catalog() -> ModelCatalog:
     return ModelCatalog()
 
 
-def load_models(root: Path) -> ModelCatalog:
+def load_models(root: Path, library: str = ADMIN_LIBRARY) -> ModelCatalog:
     with _lock:
-        path = _models_path(root)
+        path = _models_path(root, library)
         if not path.exists():
             catalog = default_catalog()
-            save_models(root, catalog)
+            save_models(root, catalog, library)
             return catalog
         return project_store._read_shard(path, ModelCatalog)
 
 
-def save_models(root: Path, catalog: ModelCatalog) -> None:
+def save_models(root: Path, catalog: ModelCatalog, library: str = ADMIN_LIBRARY) -> None:
     catalog.schemaVersion = CHARACTER_MODELS_SCHEMA_VERSION
-    project_store._write_shard(root, _models_path(root), catalog)
+    project_store._write_shard(root, _models_path(root, library), catalog)
 
 
-def _mutate(root: Path, change: Callable[[ModelCatalog], None]) -> ModelCatalog:
+def _mutate(root: Path, change: Callable[[ModelCatalog], None], library: str = ADMIN_LIBRARY) -> ModelCatalog:
     with _lock:
-        catalog = load_models(root)
+        catalog = load_models(root, library)
         change(catalog)
-        save_models(root, catalog)
+        save_models(root, catalog, library)
         return catalog
 
 
@@ -104,9 +117,13 @@ def copy_bytes(content: ModelContent) -> int:
     return len(json.dumps(content.model_dump(mode="json"), separators=(",", ":"), ensure_ascii=False).encode("utf-8"))
 
 
-def save_drafts(root: Path, body: ModelDraftList) -> ModelCatalog:
+def save_drafts(root: Path, body: ModelDraftList, library: str = ADMIN_LIBRARY) -> ModelCatalog:
     """Replace the drafts, in the order given. A model already in the catalog keeps its published copy and history; one left out is deleted
-    (with its published copy); a new id starts as an unpublished draft."""
+    (with its published copy); a new id starts as an unpublished draft. A writer's library takes only ids that start with MY_ID_PREFIX."""
+    if library == MY_LIBRARY:
+        for item in body.models:
+            if not item.id.startswith(MY_ID_PREFIX):
+                raise InvalidModelIdError(f"a model of the writer's library has an id that starts with {MY_ID_PREFIX!r}, not {item.id!r}")
 
     def change(catalog: ModelCatalog) -> None:
         existing = {e.id: e for e in catalog.models}
@@ -120,7 +137,7 @@ def save_drafts(root: Path, body: ModelDraftList) -> ModelCatalog:
             entries.append(entry)
         catalog.models = entries
 
-    return _mutate(root, change)
+    return _mutate(root, change, library)
 
 
 def _label(name: str, ident: str) -> str:
@@ -698,7 +715,7 @@ def publish_faults(content: ModelContent) -> list[str]:
     return faults
 
 
-def publish_model(root: Path, model_id: str) -> ModelCatalog:
+def publish_model(root: Path, model_id: str, library: str = ADMIN_LIBRARY) -> ModelCatalog:
     """Freeze the draft as the next published version. The one published until now moves to the history."""
 
     def change(catalog: ModelCatalog) -> None:
@@ -714,10 +731,10 @@ def publish_model(root: Path, model_id: str) -> ModelCatalog:
         entry.published = _published(entry.nextVersion, entry.draft)
         entry.nextVersion += 1
 
-    return _mutate(root, change)
+    return _mutate(root, change, library)
 
 
-def unpublish_model(root: Path, model_id: str) -> ModelCatalog:
+def unpublish_model(root: Path, model_id: str, library: str = ADMIN_LIBRARY) -> ModelCatalog:
     """Take the model out of the Writer's editor. Its versions are kept, and numbering carries on from them."""
 
     def change(catalog: ModelCatalog) -> None:
@@ -727,10 +744,10 @@ def unpublish_model(root: Path, model_id: str) -> ModelCatalog:
         entry.history = [entry.published, *entry.history][:MODEL_HISTORY_MAX]
         entry.published = None
 
-    return _mutate(root, change)
+    return _mutate(root, change, library)
 
 
-def discard_changes(root: Path, model_id: str) -> ModelCatalog:
+def discard_changes(root: Path, model_id: str, library: str = ADMIN_LIBRARY) -> ModelCatalog:
     """Put the draft back to the published copy. A model with no published copy has nothing to go back to, so it is cleared to a blank
     model that keeps its name."""
 
@@ -741,10 +758,10 @@ def discard_changes(root: Path, model_id: str) -> ModelCatalog:
         else:
             entry.draft = ModelContent(name=entry.draft.name)
 
-    return _mutate(root, change)
+    return _mutate(root, change, library)
 
 
-def restore_version(root: Path, model_id: str, version: int) -> ModelCatalog:
+def restore_version(root: Path, model_id: str, version: int, library: str = ADMIN_LIBRARY) -> ModelCatalog:
     """Bring an earlier published version into the draft (it is not published again until Publish)."""
 
     def change(catalog: ModelCatalog) -> None:
@@ -754,16 +771,22 @@ def restore_version(root: Path, model_id: str, version: int) -> ModelCatalog:
             raise UnknownVersionError(f"the model has no version {version}")
         entry.draft = versions[0].content.model_copy(deep=True)
 
-    return _mutate(root, change)
+    return _mutate(root, change, library)
 
 
-def published_models(root: Path) -> PublishedModelList:
+def published_models(root: Path, library: str = ADMIN_LIBRARY) -> PublishedModelList:
     """The models the Writer's editor can offer: those with a published copy, in the catalog's order."""
-    catalog = load_models(root)
+    catalog = load_models(root, library)
     return PublishedModelList(models=[
         PublishedModelOut(id=e.id, version=e.published.version, publishedAt=e.published.publishedAt, content=e.published.content)
         for e in catalog.models if e.published
     ])
+
+
+def find_published(root: Path, model_id: str) -> Optional[PublishedModelOut]:
+    """The published copy of a model from either library (the writer's ids start with MY_ID_PREFIX, so they never meet the catalog's), or None."""
+    library = MY_LIBRARY if model_id.startswith(MY_ID_PREFIX) else ADMIN_LIBRARY
+    return next((m for m in published_models(root, library).models if m.id == model_id), None)
 
 
 # ---- the model that comes with the app ----

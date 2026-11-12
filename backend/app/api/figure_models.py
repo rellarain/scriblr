@@ -40,7 +40,7 @@ def add_figure_model(
     if body.content is not None:
         copy_args = (body.content, body.modelId, body.version or 0, body.name)
     else:
-        published = next((m for m in catalog.published_models(models).models if m.id == body.modelId), None)
+        published = catalog.find_published(models, body.modelId)  # the catalog's or the writer's own library
         if published is None:
             raise HTTPException(status_code=404, detail=f"no published model {body.modelId!r}")
         copy_args = (published.content, published.id, published.version, published.content.name, published.publishedAt)

@@ -43,7 +43,7 @@ backend/
 │       ├── analytics.py             # word-count/goal/flagged-node rollups
 │       ├── scrap.py                  # orphaned-moment detect/restore/permanent-delete
 │       ├── presets_store.py           # global (non-project) plot-preset catalog
-│       ├── character_models_store.py   # global (non-project) character-model catalog (character-models.json)
+│       ├── character_models_store.py   # global (non-project) character-model catalogs: the admin's (character-models.json) and the writer's own (my-models.json)
 │       │                               #   + the basic adult (app/seed/basic_model.json, built by frontend/scripts/seed-model)
 │       ├── user_settings_store.py      # global user settings: time-of-day theme, UI prefs, Writer UI state (kv)
 │       ├── training_schema.py / training_store.py   # Training: the courses (training.json) and one learner's progress (training-progress.json)
@@ -379,7 +379,9 @@ described, now stale, in `docs/data-model.md`).
   nothing is offered by `+ Preset` until it is published, and they can be
   renamed or deleted. A v1 file is upgraded on first load (each preset
   becomes an unpublished draft; the old file is kept as `presets.v1.json`).
-- **Character models** — `ModelCatalog` (`character-models.json`, schema v1): a
+- **Character models** — `ModelCatalog` (`character-models.json`, schema v1; the
+  writer's own models are a second catalog of the same shape in `my-models.json`,
+  with ids that all start with `my-`, phase 7a): a
   global, non-project-scoped catalog of the models the character designer is
   built from (the art mannequin, phases 1, 2, 3a, 3b, 4a, 4b, 5a, 5b and 5c of 7). A model's content is a name, a
   description, **shapes** (a closed or open outline of points, each with a mode
@@ -584,6 +586,7 @@ the one project-independent router).
 | `presets` | `/api/presets` | `GET ""` whole catalog (drafts, published copies, history) · `PUT ""` replace the drafts, in order (published copies and history of the ids kept; an absent id is deleted) · `GET "/published"` what the Plot sidebar offers · `POST "/basic"` add the basic adult that comes with the app, published (409 when it is already there; a fresh install gets it on first start: `seed_on_first_start`, marker `character-models.seeded`) · `POST "/{id}/publish"` (422 with the reasons if the draft is invalid) · `POST "/{id}/unpublish"` · `POST "/{id}/discard"` (back to the published copy, or cleared when there is none) · `POST "/{id}/restore/{version}"` — global (`presets.json`, project-independent) |
 | `figure-models` | `/api/projects/{id}/figure-models` | The frozen copies of published models a project keeps for its characters' figures (`ProjectFile.figureModels`, key to `FigureModel {id, modelId, version, name, publishedAt, content}`; the key is 12 hex digits of a hash of the content, so the same model version copied twice is one entry, and publishing the model again never changes a copy): `GET ""` every copy · `POST ""` `{modelId}` copies the catalog's published model, or `{modelId, version, name, content}` copies the content a character file carries (422 when the copy is over 250 KB or the project holds 40). A copy no character points at is dropped when the project is read; an edition freezes its own copies (`BookEdition.figureModels`), and a book's extras carry the ones the shown characters use (`figureModels`) |
 | `character-models` | `/api/character-models` | `GET ""` whole catalog (drafts, published copies, history) · `PUT ""` replace the drafts, in order (published copies and history kept; an absent id is deleted) · `GET "/published"` what the writer's editor will offer · `POST "/{id}/publish"` (422 with the reasons if the draft is invalid or its copy is over the size limit) · `POST "/{id}/unpublish"` · `POST "/{id}/discard"` · `POST "/{id}/restore/{version}"` — global (`character-models.json`, project-independent) |
+| `my-models` | `/api/my-models` | the writer's own models (the Characters console's *My models* section): the same routes as `character-models` except `/basic`, on `my-models.json`; `PUT` refuses (422) an id that does not start with `my-`; a published model of this library can be copied into a project by `POST /api/projects/{id}/figure-models` like one of the catalog's (the id says which library it is from) — global (`my-models.json`, project-independent) |
 | `feedback` | `/api/feedback` | Helper Inbox (app-level `feedback.json`, acts as the admin in the `X-Admin-Id` header; every call returns the whole anonymous inbox bundle): `GET ""`, `PUT /messages/{id}/validation`, `PUT /cases/{id}/vote` (yes, no, pass), `POST /cases/{id}/solutions`, `PUT /cases/{id}/solutions/{sid}/vote`, `POST /cases/{id}/close` (Planner), `POST /cases/{id}/reopen` (Configurer), `PUT /admins/{id}/roles`, `POST` / `PATCH` / `DELETE /verb-categories[/{id}]` |
 | `user_settings` | `/api/user-settings` | `GET ""` whole doc · `PUT "/theme"` · `PUT "/ui"` · `PUT "/kv/{key}"` / `DELETE "/kv/{key}"` (keys must start `scriblr.`) · `POST "/kv-import"` (one-time localStorage migration; sets only absent keys) — global (`user-settings.json`) |
 

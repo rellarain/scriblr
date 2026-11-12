@@ -114,14 +114,14 @@ export function useCharacters(projectId: string | null) {
     }
   }, [projectId, show])
 
-  // A new character the way the plus makes one (phase 6c-5): a mannequin of the basic model with a look rolled within `genre` (null: any). When the mannequin cannot be made (no
-  // basic model is published, or the models cannot be read) the character starts with the plain portrait, as before; a failure is said, no model is not.
-  const createStarted = useCallback(async (genre: string | null): Promise<string | null> => {
+  // A new character the way the plus makes one (phase 6c-5): a mannequin of the basic model (or of the published model `modelId` asks for) with a look rolled within `genre` (null:
+  // any). When the mannequin cannot be made (no model is published, or the models cannot be read) the character starts with the plain portrait, as before; a failure is said, no model is not.
+  const createStarted = useCallback(async (genre: string | null, modelId?: string): Promise<string | null> => {
     if (!projectId) return null
     let figure: CharacterFigure | null = null
     let failed = false
     try {
-      figure = await startFigure(projectId, genre)
+      figure = await startFigure(projectId, genre, undefined, modelId)
     } catch {
       failed = true
     }

@@ -1,9 +1,11 @@
 import { useRef, useState, type ChangeEvent } from 'react'
-import type { ModelEntry } from '../../../../api/types'
+import { myModelsApi } from '../../../../api/characterModelsApi'
+import type { ModelContent, ModelEntry } from '../../../../api/types'
 import { downloadTextFile, readFileText } from '../plot/presetFile'
 import { ModelPane } from './ModelPane'
 import { ModelFileError, exportFileName, parseModelFile, serializeModels } from './modelFile'
-import { randomId, starterContent } from './modelContent'
+import { copyName, randomId, starterContent } from './modelContent'
+import { ScriblrPicker } from './ScriblrPicker'
 import { useCharacterModels } from './useCharacterModels'
 import './characterModels.scss'
 
@@ -13,8 +15,12 @@ interface ImportNotice { tone: 'ok' | 'error'; lines: string[] }
 // The Designer (an Admin console of its own, beside Configuration): the models character art is drawn from. The canvas fills the console, with the tree of the open model on
 // its left, the editor on its right, the view controls under it and the console tools (undo, redo, save, publish) in the console's header (`toolbarHost`; without one they
 // sit at the top). Edits save to the draft the way the Writer's do (the Save button, and autosave when the user has turned it on); each model is published on its own.
-function DesignerConsole({ toolbarHost = null }: { toolbarHost?: HTMLElement | null }) {
-  const models = useCharacterModels()
+// The same console serves a writer's own models (`library="mine"`, in the Characters console's Models section): another file of models that start with "my-", a copy of one
+// of Scriblr's as a way to begin instead of the basic model's button, and the same drafts, versions and publishing.
+const MY_LIBRARY = { api: myModelsApi, idPrefix: 'my-' }
+function DesignerConsole({ toolbarHost = null, library = 'admin' }: { toolbarHost?: HTMLElement | null; library?: 'admin' | 'mine' }) {
+  const mine = library === 'mine'
+  const models = useCharacterModels(randomId, mine ? MY_LIBRARY : undefined)
   const { entries } = models
   const [selectedId, setSelectedId] = useState<string | null>(null)
   const [listOpen, setListOpen] = useState(false)
@@ -35,6 +41,11 @@ function DesignerConsole({ toolbarHost = null }: { toolbarHost?: HTMLElement | n
   // The basic adult that comes with the app: added and published by the server, then opened.
   async function addBasic() {
     if (await models.addBasic()) select('basic')
+  }
+
+  // A copy of one of Scriblr's models, kept as a draft of the writer's own (named so that it does not repeat a name here), then opened.
+  function addFromScriblr(content: ModelContent) {
+    select(models.addModel({ ...content, name: copyName(content.name, entries) }))
   }
 
   function duplicate(id: string) {
@@ -85,7 +96,7 @@ function DesignerConsole({ toolbarHost = null }: { toolbarHost?: HTMLElement | n
   }
 
   return (
-    <div className="cmPage dzConsole" role="region" aria-label="Designer">
+    <div className="cmPage dzConsole" role="region" aria-label={mine ? 'My models' : 'Designer'}>
       {notice && (
         <div className={`cmToast${notice.tone === 'error' ? ' cmToast--error' : ''}`} role={notice.tone === 'error' ? 'alert' : 'status'}>
           <p><b>{notice.lines[0]}</b></p>
@@ -96,10 +107,16 @@ function DesignerConsole({ toolbarHost = null }: { toolbarHost?: HTMLElement | n
       <input ref={fileInput} type="file" accept=".json,application/json" hidden aria-label="Import character models from a file" onChange={e => void onFile(e)} />
       {entries.length === 0 ? (
         <div className="cmEmpty">
-          <h3>No models yet</h3>
-          <p>A model is the set of shapes a character is drawn from: its body, its clothes and its hair, arranged in groups and objects. Start from the basic model that comes with Scriblr (a bare adult with a face, ages, builds and expressions), or create one and draw its first shape from a template.</p>
+          <h3>{mine ? 'No models of your own yet' : 'No models yet'}</h3>
+          <p>
+            {mine
+              ? 'A model is the set of shapes a character is drawn from: its body, its clothes and its hair, arranged in groups and objects. Yours are kept here for every project. Start from a copy of one of the models that come with Scriblr (the original is never changed), or begin with a blank model and draw its first shape from a template. A model is yours until you publish it; a published one can then be chosen for a character.'
+              : 'A model is the set of shapes a character is drawn from: its body, its clothes and its hair, arranged in groups and objects. Start from the basic model that comes with Scriblr (a bare adult with a face, ages, builds and expressions), or create one and draw its first shape from a template.'}
+          </p>
           <div className="cmFoot">
-            <button type="button" className="cmBtn cmBtn--primary" onClick={() => void addBasic()}>Add the basic model</button>
+            {mine
+              ? <ScriblrPicker buttonClassName="cmBtn cmBtn--primary" button="Duplicate a Scriblr model" onPick={addFromScriblr} />
+              : <button type="button" className="cmBtn cmBtn--primary" onClick={() => void addBasic()}>Add the basic model</button>}
             <button type="button" className="cmBtn" onClick={create}>New model</button>
             <button type="button" className="cmBtn" onClick={() => fileInput.current?.click()}>Import</button>
           </div>
@@ -109,7 +126,8 @@ function DesignerConsole({ toolbarHost = null }: { toolbarHost?: HTMLElement | n
           <ModelPane
             key={current.id} entry={current} models={models} makeId={randomId} onRemove={remove} onDuplicate={duplicate} onExport={e => exportEntries([e])} barHost={toolbarHost}
             nav={{
-              entries, currentId: current.id, open: listOpen, onOpen: setListOpen, onSelect: select, onNew: create, onAddBasic: () => void addBasic(), onImport: () => fileInput.current?.click(),
+              entries, currentId: current.id, open: listOpen, onOpen: setListOpen, onSelect: select, onNew: create, onImport: () => fileInput.current?.click(),
+              ...(mine ? { extraTools: <ScriblrPicker onPick={addFromScriblr} /> } : { onAddBasic: () => void addBasic() }),
               onExportAll: () => exportEntries(entries), onDuplicate: duplicate, onMove: models.moveModel,
             }}
           />

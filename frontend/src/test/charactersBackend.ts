@@ -17,10 +17,11 @@ export interface CharactersBackend {
   failNext(path: string, status: number, detail: unknown): void
 }
 
-// `copies` are the model copies the project holds, `published` the models the catalog offers to copy, `basic` the model that asking for the basic one publishes.
-export function charactersBackend(initial: CharacterDoc[] = [], more: { copies?: FigureModel[]; published?: PublishedModelOut[]; basic?: PublishedModelOut; frozen?: Record<string, FrozenPortrait[]> } = {}): CharactersBackend {
+// `copies` are the model copies the project holds, `published` the models the catalog offers to copy, `mine` the published models of the writer's own library (ids "my-..."), `basic` the
+// model that asking for the basic one publishes.
+export function charactersBackend(initial: CharacterDoc[] = [], more: { copies?: FigureModel[]; published?: PublishedModelOut[]; mine?: PublishedModelOut[]; basic?: PublishedModelOut; frozen?: Record<string, FrozenPortrait[]> } = {}): CharactersBackend {
   const mock = createMockCharacters(initial, more.frozen)
-  const figures = createMockFigureModels(() => more.published ?? [], more.copies ?? [])
+  const figures = createMockFigureModels(() => [...(more.published ?? []), ...(more.mine ?? [])], more.copies ?? [])
   const failures = new Map<string, { status: number; detail: unknown }>()
   const calls: string[] = []
   const reply = (status: number, body: unknown) => ({ ok: status < 400, status, statusText: status < 400 ? 'OK' : 'Error', json: async () => body, text: async () => JSON.stringify(body ?? null) })
@@ -34,6 +35,8 @@ export function charactersBackend(initial: CharacterDoc[] = [], more: { copies?:
     const parts = path.split('/').filter(Boolean).map(decodeURIComponent)
     // /projects/{id}/characters[/{characterId}] and /projects/{id}/figure-models; anything else the page asks for (settings) is answered with an empty document.
     if (parts[0] === 'character-models' && parts[1] === 'published') return reply(200, { models: more.published ?? [] })
+    if (parts[0] === 'my-models' && parts[1] === 'published') return reply(200, { models: more.mine ?? [] })
+    if (parts[0] === 'my-models' && parts.length === 1) return reply(200, { schemaVersion: 1, models: [] })
     if (parts[0] === 'character-models' && parts[1] === 'basic' && method === 'POST') {
       if (!more.basic || (more.published ?? []).some(m => m.id === more.basic!.id)) return reply(409, { detail: 'The basic model is already here.' })
       more.published = [...(more.published ?? []), more.basic]

@@ -5,7 +5,8 @@ import SideResizer from '../levels/SideResizer'
 import { saveBlob } from '../maps/mapExport'
 import { useStoredState } from '../storage'
 import { characterFileName, importRows, parseCharacterFile, type CharacterChoice, type CharacterFile } from './charFile'
-import { START_GENRE_KEY, useStartGenres } from './figure/figureStart'
+import { START_GENRE_KEY, START_MODEL_ID, START_MODEL_KEY, useStartChoices } from './figure/figureStart'
+import { choiceLabel } from './figure/modelChoices'
 import { clampListWidth, LIST_DEFAULT_W, LIST_WIDTH_KEY, listVars } from './listWidth'
 import { PortraitCard } from './PortraitCard'
 import { readableInk } from './portrait/colour'
@@ -31,7 +32,9 @@ export function CharacterList({ c }: { c: Characters }) {
   const [problem, setProblem] = useState('')
   const fileInput = useRef<HTMLInputElement>(null)
   // The genre a new character's first look is rolled within (remembered on this computer; one the model no longer has counts as any).
-  const startGenres = useStartGenres()
+  // The model it starts on (the basic adult unless another published model is picked; remembered the same way).
+  const [storedModel, setStartModel] = useStoredState<string>(START_MODEL_KEY, START_MODEL_ID)
+  const { models: startModels, model: startModel, genres: startGenres } = useStartChoices(storedModel)
   const [storedGenre, setStartGenre] = useStoredState<string>(START_GENRE_KEY, '')
   const startGenre = startGenres.some(g => g.id === storedGenre) ? storedGenre : ''
   // The width of the column: kept on this computer, null until it is dragged. While the handle is dragged the width goes straight to the column's CSS variable (no render per
@@ -66,13 +69,18 @@ export function CharacterList({ c }: { c: Characters }) {
             <button type="button" className="charIconBtn" aria-label="Save the whole cast to a file" title="Save the whole cast to a file" disabled={c.cast.length === 0} onClick={() => { void exportThem(null, 'cast') }}><ExportIcon size={16} /></button>
             <button type="button" className="charIconBtn" aria-label="Import characters from a file" title="Import characters from a file" onClick={() => fileInput.current?.click()}><ImportIcon size={16} /></button>
             <span className="charStart">
+              {startModels.length > 1 && (
+                <select className="charSelect charSelect--auto charStartModel" aria-label="Model a new character starts with" title="The model a new character is drawn from" value={startModel?.id ?? ''} onChange={e => setStartModel(e.target.value)}>
+                  {startModels.map(m => <option key={m.id} value={m.id}>{choiceLabel(m)}</option>)}
+                </select>
+              )}
               {startGenres.length > 0 && (
                 <select className="charSelect charSelect--auto charStartGenre" aria-label="Genre of a new character" title="The genre a new character's first look is rolled within" value={startGenre} onChange={e => setStartGenre(e.target.value)}>
                   <option value="">Any genre</option>
                   {startGenres.map(g => <option key={g.id} value={g.id}>{g.name}</option>)}
                 </select>
               )}
-              <button type="button" className="charIconBtn" aria-label="New character" title="New character: a mannequin with a first look rolled within the genre" onClick={() => { void c.createStarted(startGenre || null) }}><PlusIcon size={16} /></button>
+              <button type="button" className="charIconBtn" aria-label="New character" title="New character: a mannequin with a first look rolled within the genre" onClick={() => { void c.createStarted(startGenre || null, startModel?.id) }}><PlusIcon size={16} /></button>
             </span>
           </span>
           <input ref={fileInput} type="file" accept=".json,application/json" className="charFileInput" aria-label="Character file" tabIndex={-1} onChange={e => { void readFile(e.target.files?.[0]); e.target.value = '' }} />

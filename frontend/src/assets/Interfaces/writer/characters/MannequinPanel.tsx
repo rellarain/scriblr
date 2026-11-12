@@ -1,10 +1,11 @@
 import { useEffect, useState } from 'react'
-import { addBasicModel, getPublishedModels } from '../../../../api/characterModelsApi'
-import type { CharacterDoc, CharacterFigure, PublishedModelOut } from '../../../../api/types'
+import { addBasicModel } from '../../../../api/characterModelsApi'
+import type { CharacterDoc, CharacterFigure } from '../../../../api/types'
 import { CloseIcon, DiceIcon, SwapIcon, UserIcon } from '../../../icons'
 import { genresOf } from '../../admin/characters/engine/colour'
 import { seededRng } from '../../admin/characters/engine/previews'
 import { ensureFigureModel, useFigureCopy } from './figure/figureModelStore'
+import { choiceLabel, getModelChoices, type ModelChoice } from './figure/modelChoices'
 import { blankFigure, rollFigure } from './figure/figureState'
 import type { Characters } from './useCharacters'
 
@@ -19,7 +20,7 @@ export function MannequinPanel({ projectId, doc, setFigure, onConvert }: { proje
 }
 
 function Make({ projectId, setFigure, onConvert }: { projectId: string; setFigure: Characters['setFigure']; onConvert: () => void }) {
-  const [models, setModels] = useState<PublishedModelOut[] | null>(null)
+  const [models, setModels] = useState<ModelChoice[] | null>(null)
   const [modelId, setModelId] = useState('')
   const [genre, setGenre] = useState('')
   const [busy, setBusy] = useState(false)
@@ -27,7 +28,7 @@ function Make({ projectId, setFigure, onConvert }: { projectId: string; setFigur
   const [tick, setTick] = useState(0)
   useEffect(() => {
     let live = true
-    getPublishedModels().then(r => { if (live) setModels(Array.isArray(r.models) ? r.models : []) }).catch(() => { if (live) { setModels([]); setProblem('The models could not be loaded.') } })
+    getModelChoices().then(list => { if (live) setModels(list) }).catch(() => { if (live) { setModels([]); setProblem('The models could not be loaded.') } })
     return () => { live = false }
   }, [tick])
   const chosen = models?.find(m => m.id === modelId) ?? models?.[0]
@@ -65,14 +66,14 @@ function Make({ projectId, setFigure, onConvert }: { projectId: string; setFigur
       {models === null && <p className="charHint" role="status">Looking for models…</p>}
       {models !== null && models.length === 0 && !problem && (
         <div className="charRow">
-          <p className="charHint">No model is published yet. Models are designed and published in Designer; the basic adult that comes with Scriblr can be added here.</p>
+          <p className="charHint">No model is published yet. Models are designed and published in Designer, or in My models; the basic adult that comes with Scriblr can be added here.</p>
           <button type="button" className="charIconBtn" aria-label="Add the basic model" title="Add the basic model that comes with Scriblr, published" disabled={busy} onClick={() => { void addBasic() }}><UserIcon size={16} /></button>
         </div>
       )}
       {chosen && (
         <div className="charRow">
           <select className="charSelect charSelect--auto" aria-label="Model for the mannequin" value={chosen.id} onChange={e => { setModelId(e.target.value); setGenre('') }}>
-            {models!.map(m => <option key={m.id} value={m.id}>{m.content.name}</option>)}
+            {models!.map(m => <option key={m.id} value={m.id}>{choiceLabel(m)}</option>)}
           </select>
           {genres.length > 0 && (
             <select className="charSelect charSelect--auto" aria-label="Genre of the first look" value={genre} onChange={e => setGenre(e.target.value)}>

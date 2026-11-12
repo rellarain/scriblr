@@ -165,6 +165,7 @@ def create_app(static_dir: Optional[Path] = None) -> FastAPI:
     app.include_router(export.router)
     app.include_router(presets.router)
     app.include_router(character_models.router)
+    app.include_router(character_models.my_router)
     app.include_router(admin_config.router)
     app.include_router(user_settings.router)
     app.include_router(feedback.router)

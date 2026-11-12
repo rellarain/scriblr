@@ -13,6 +13,8 @@
 }
 .charEmpty { flex: 1 1 auto; align-items: center; justify-content: center; text-align: center; color: var(--ink-muted); }
 .charSplit { flex: 1 1 auto; display: flex; align-items: stretch; gap: var(--space-5); min-height: 0; min-width: 0; }
+// the writer's own models (the Models section): the designer fills what is left under the bar
+.charModels { flex: 1 1 auto; display: flex; flex-direction: column; min-height: 0; min-width: 0; overflow: hidden; }
 
 // ---- buttons and fields ----
 .charIconBtn {
@@ -297,7 +299,7 @@
 .charSelect--auto { width: auto; max-width: 100%; }
 // The plus of the cast list with the genre beside it: one unit, so in a narrow column they wrap onto the next line together, at the right.
 .charStart { display: inline-flex; align-items: center; gap: var(--space-2); flex: 0 0 auto; margin-left: auto; }
-.charStartGenre { flex: 0 1 auto; max-width: 7.5em; padding: var(--space-1) var(--space-2); font-size: var(--text-small); text-overflow: ellipsis; }
+.charStartGenre, .charStartModel { flex: 0 1 auto; max-width: 7.5em; padding: var(--space-1) var(--space-2); font-size: var(--text-small); text-overflow: ellipsis; }
 .charList2 { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: var(--space-3); }
 .charItem { display: flex; align-items: flex-start; gap: var(--space-3); padding: var(--space-3); background: var(--ov-sink-1); min-width: 0; &--col { flex-direction: column; align-items: stretch; } }
 .charChanges { display: flex; flex-direction: column; gap: var(--space-2); padding: var(--space-3); background: var(--ov-sink-2); }

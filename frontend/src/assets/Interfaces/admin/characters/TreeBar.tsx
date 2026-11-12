@@ -30,8 +30,10 @@ export interface ModelsNav {
   onSelect: (id: string) => void
   onNew: () => void
   onImport: () => void
-  // adds the basic adult that comes with the app (offered while the catalog does not have it)
-  onAddBasic: () => void
+  // adds the basic adult that comes with the app (offered while the catalog does not have it; the writer's own library does not offer it)
+  onAddBasic?: () => void
+  // more tools for the end of the models' row (the writer's library puts its "Duplicate a Scriblr model" menu here)
+  extraTools?: ReactNode
   onExportAll: () => void
   onDuplicate: (id: string) => void
   onMove: (id: string, beforeId: string | null) => void
@@ -395,7 +397,8 @@ export function TreeBar({ content, sel, state, hidden, models, actions }: {
           <span className="dzLevelTools">
             <button type="button" className="cmIconBtn cmIconBtn--small" aria-label="New model" title="New model" onClick={models.onNew}><PlusIcon size={12} /></button>
             <button type="button" className="cmIconBtn cmIconBtn--small" aria-label="Import models from a file" title="Import models from a file" onClick={models.onImport}><ImportIcon size={12} /></button>
-            {!models.entries.some(e => e.id === 'basic') && <button type="button" className="cmIconBtn cmIconBtn--small" aria-label="Add the basic model" title="Add the basic model that comes with Scriblr: a bare adult with a face, ages, builds and expressions, published" onClick={models.onAddBasic}><MannequinIcon size={12} /></button>}
+            {models.onAddBasic && !models.entries.some(e => e.id === 'basic') && <button type="button" className="cmIconBtn cmIconBtn--small" aria-label="Add the basic model" title="Add the basic model that comes with Scriblr: a bare adult with a face, ages, builds and expressions, published" onClick={models.onAddBasic}><MannequinIcon size={12} /></button>}
+            {models.extraTools}
             <button type="button" className="cmIconBtn cmIconBtn--small" aria-label="Export all the models to a file" title="Export all the models to a file" disabled={models.entries.length === 0} onClick={models.onExportAll}><ExportIcon size={12} /></button>
           </span>
         </div>

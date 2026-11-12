@@ -18,7 +18,7 @@ import { getOutline, putOutline } from './outlineApi'
 import { getPlot, putPlot } from './plotApi'
 import { createProject, deleteProject, getProject, getProjectsOverview, updateProject } from './projectsApi'
 import { discardPresetChanges, getPresets, getPublishedPresets, publishPreset, putPresets, restorePresetVersion, unpublishPreset } from './presetsApi'
-import { addBasicModel, discardModelChanges, getModels, getPublishedModels, publishModel, putModels, restoreModelVersion, unpublishModel } from './characterModelsApi'
+import { addBasicModel, discardModelChanges, getModels, getPublishedModels, myModelsApi, publishModel, putModels, restoreModelVersion, unpublishModel } from './characterModelsApi'
 import { listPublications, publishChapter } from './publicationFetch'
 import { clearCompleted, enrol, getTraining, leave, recordAttempt, saveTrainingContent, setCompleted } from './trainingApi'
 
@@ -109,6 +109,13 @@ const CASES: Array<[string, () => Promise<unknown>, string, string, unknown?]> =
   ['unpublishModel', () => unpublishModel(ID), 'POST', `/api/character-models/${ESC}/unpublish`],
   ['discardModelChanges', () => discardModelChanges(ID), 'POST', `/api/character-models/${ESC}/discard`],
   ['restoreModelVersion', () => restoreModelVersion(ID, 3), 'POST', `/api/character-models/${ESC}/restore/3`],
+  ['myModelsApi.get', () => myModelsApi.get(), 'GET', '/api/my-models'],
+  ['myModelsApi.put', () => myModelsApi.put({ models: [] }), 'PUT', '/api/my-models', { models: [] }],
+  ['myModelsApi.published', () => myModelsApi.published(), 'GET', '/api/my-models/published'],
+  ['myModelsApi.publish', () => myModelsApi.publish(ID), 'POST', `/api/my-models/${ESC}/publish`],
+  ['myModelsApi.unpublish', () => myModelsApi.unpublish(ID), 'POST', `/api/my-models/${ESC}/unpublish`],
+  ['myModelsApi.discard', () => myModelsApi.discard(ID), 'POST', `/api/my-models/${ESC}/discard`],
+  ['myModelsApi.restore', () => myModelsApi.restore(ID, 3), 'POST', `/api/my-models/${ESC}/restore/3`],
   ['putMomentDraft', () => putMomentDraft(ID, ID, ID, 'Text'), 'PUT', `/api/projects/${ESC}/draft/chapter/${ESC}/moment/${ESC}`, { outlineNodeId: ID, body: 'Text' }],
 ]
 
