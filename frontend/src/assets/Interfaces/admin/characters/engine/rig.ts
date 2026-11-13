@@ -1,6 +1,6 @@
 import type { ModelAttach, ModelBone, ModelBoneEnd, ModelContent, ModelDrive, ModelFallSide, ModelGroup, ModelObject, ModelPoint, ModelRange, ModelShape } from '../../../../../api/types'
 import { IDENTITY, apply, bezierAt, boxOf, build, clamp, edgeAt, flatten, inverse, mul, pathText, reflectList, rotate, roundCorners, scale, scaleAlong, translate, turnOf, twinIndex, windSign, type Box, type BuiltPoint, type Mat } from './geometry'
-import { classKey, classesOf, lookOf, membersOf, overrideFor, type Choices } from './forms'
+import { carriesOutline, classKey, classesOf, lookOf, membersOf, overrideFor, type Choices } from './forms'
 import { applyDrape, applyFall, hangDirection, squeezeOf } from './fall'
 import { drawOrder } from './order'
 import { PROPS, ROUND_MAX, isDrawingProp, isPaintProp, type PropKey } from './props'
@@ -367,6 +367,11 @@ export function solve(c: ModelContent, values: Values = {}, view: View = 'front'
     const oid = objectOfShape.get(tid), t = oid ? objectMap.get(oid) : undefined
     return t && memberId ? overrideFor(t, tid, choices, memberId) : undefined
   }
+  // Whether that outline is carried (phase O8): what follows the shape reads it.
+  const formCarries = (sid: string, memberId?: string): boolean => {
+    const oid = objectOfShape.get(sid), o = oid ? objectMap.get(oid) : undefined, sh = shapeMap.get(sid)
+    return !!o && !!sh && carriesOutline(o, sh, choices, memberId ?? o.id)
+  }
   // What a class switches off: the template once it has members (it is a pattern; unless it is the thing being shown), and in a family every member but the one
   // shown. A twin goes with the object it mirrors.
   const classOff = new Set<string>()
@@ -459,18 +464,29 @@ export function solve(c: ModelContent, values: Values = {}, view: View = 'front'
 
   // The place, size and turn authored fields give a whole shape or a whole object (phase D3c), added up over every field that changes it; the middle they are about is the
   // shape's own, or the object's at rest. The matrix is a scale, then a turn, then a move, whatever order the sliders are in.
-  interface Wholly { dx: number; dy: number; sx: number; sy: number; turn: number; curve: number; len: number; any: boolean }
-  const noChange = (): Wholly => ({ dx: 0, dy: 0, sx: 1, sy: 1, turn: 0, curve: 0, len: 1, any: false })
+  interface Wholly { dx: number; dy: number; sx: number; sy: number; turn: number; curve: number; len: number; flare: number; any: boolean }
+  const noChange = (): Wholly => ({ dx: 0, dy: 0, sx: 1, sy: 1, turn: 0, curve: 0, len: 1, flare: 0, any: false })
   // The height the points that hold a lock of hair are at (the mean of the points with no weight), which a length stretches the weighted points away from; null for an outline with
   // no such points.
   const rootOf = (list: ModelPoint[]): number | null => {
     const roots = list.filter(p => !((p.w ?? 0) > 0))
     return roots.length > 0 && roots.length < list.length ? roots.reduce((n, p) => n + p.y, 0) / roots.length : null
   }
-  function applyWholly(list: ModelPoint[], w: Wholly, about: [number, number], hang: { root: number | null }) {
+  function applyWholly(list: ModelPoint[], w: Wholly, about: [number, number], hang: { root: number | null; span: [number, number, number] | null }) {
     if (!w.any) return
     // length: the weighted points move away from the root height in proportion to their weight (the texture of the edge is drawn, not moved: see texture.ts)
     if (w.len !== 1 && hang.root !== null) for (const p of list) { const k = p.w ?? 0; if (k > 0) p.y += (p.y - hang.root) * (w.len - 1) * k }
+    // flare (phase O8): the lower half widens about the middle (of the shape or object at rest), nothing at the middle and the most at the bottom, so every shape of an
+    // object flares as one (a jaw and the shadow on it)
+    if (w.flare !== 0 && hang.span) {
+      const [cx, y0, y1] = hang.span, mid = (y0 + y1) / 2, half = Math.max(1e-6, y1 - mid)
+      for (const p of list) {
+        const f = 1 + (w.flare / 100) * clamp((p.y - mid) / half, 0, 1)
+        p.x = cx + (p.x - cx) * f
+        if (p.hi) p.hi = [p.hi[0] * f, p.hi[1]]
+        if (p.ho) p.ho = [p.ho[0] * f, p.ho[1]]
+      }
+    }
     // a curve lifts the two ends of the outline against its middle (the ends are where it is furthest across: a smile for a positive amount), before it is moved or sized
     if (w.curve !== 0 && list.length > 0) {
       let x0 = Infinity, x1 = -Infinity
@@ -495,6 +511,7 @@ export function solve(c: ModelContent, values: Values = {}, view: View = 'front'
     else if (prop === 'rotation') w.turn += a
     else if (prop === 'curve') w.curve += a
     else if (prop === 'length') w.len *= Math.max(0, a / 100)
+    else if (prop === 'flare') w.flare += a
     else return
     w.any = true
   }
@@ -563,9 +580,10 @@ export function solve(c: ModelContent, values: Values = {}, view: View = 'front'
       }
     }
     if (whole.any || objectWhole.any) {
-      applyWholly(list, whole, centreOfPoints(own, sh.closed), { root: rootOf(own) })
+      const mine = spanOf(own, sh.closed)
+      applyWholly(list, whole, centreOfPoints(own, sh.closed), { root: rootOf(own), span: mine })
       const o = ownerId ? objectMap.get(ownerId) : undefined
-      applyWholly(list, objectWhole, (o && objectCentre(o)) ?? centreOfPoints(own, sh.closed), { root: (o && objectRoot(o)) ?? rootOf(own) })
+      applyWholly(list, objectWhole, (o && objectCentre(o)) ?? centreOfPoints(own, sh.closed), { root: (o && objectRoot(o)) ?? rootOf(own), span: (o && objectSpan(o)) ?? mine })
     }
   }
 
@@ -661,8 +679,8 @@ export function solve(c: ModelContent, values: Values = {}, view: View = 'front'
 
   // The outline of a shape that has points of its own: the base outline linked and driven (what the rig reads), and what is drawn: a chosen form's outline in its
   // place, or in the back view the outline of its own for the back. An empty form outline hides the shape in every view. Each is linked, driven by its sliders, moved by its
-  // skin weights, draped and then left to hang, in that order.
-  function plainOutline(sh: ModelShape, Mg: Mat, form: ModelPoint[] | undefined): { rig: ModelPoint[]; drawn: ModelPoint[]; skin?: SolvedSkin } {
+  // skin weights, draped and then left to hang, in that order. A form whose axis carries what follows it (phase O8, `carry`) is what the rig reads too.
+  function plainOutline(sh: ModelShape, Mg: Mat, form: ModelPoint[] | undefined, carry = false): { rig: ModelPoint[]; drawn: ModelPoint[]; skin?: SolvedSkin } {
     const own = groupOfShape.get(sh.id) ?? null
     const outline = (source: ModelPoint[], movesOn: ModelPoint[]) => {
       const list = source.map(copyPoint)
@@ -676,13 +694,16 @@ export function solve(c: ModelContent, values: Values = {}, view: View = 'front'
       if (skinned) creaseCorners(list, sh.closed, skinned.rest, i => movedFrom(list[i], skinned.rest[i]))
       return { list, skinned }
     }
-    const base = outline(sh.pts, sh.pts)
-    const rig = base.list
-    let drawn = rig, other: { list: ModelPoint[]; skinned: ReturnType<typeof skinNow> } | null = null
-    if (form) { other = outline(form, sh.pts); drawn = other.list }
+    let held = outline(sh.pts, sh.pts)
+    let drawn = held.list, other: { list: ModelPoint[]; skinned: ReturnType<typeof skinNow> } | null = null
+    if (form) {
+      other = outline(form, sh.pts); drawn = other.list
+      if (carry && form.length >= 3 && form.length === sh.pts.length) held = other
+    }
     if (view === 'back' && sh.back && sh.back.length >= 3 && !(form && form.length === 0)) { other = outline(sh.back, sh.back); drawn = other.list }
-    if (!base.skinned) return { rig, drawn }
-    return { rig, drawn, skin: { ...base.skinned, ...(other ? { drawn: other.skinned } : {}) } }
+    const rig = held.list
+    if (!held.skinned) return { rig, drawn }
+    return { rig, drawn, skin: { ...held.skinned, ...(other && other !== held ? { drawn: other.skinned } : {}) } }
   }
   const groupMatOf = (shapeId: string): Mat => { const gid = groupOfShape.get(shapeId); return gid ? groupMat(gid) : IDENTITY }
 
@@ -705,6 +726,28 @@ export function solve(c: ModelContent, values: Values = {}, view: View = 'front'
       x0 = Math.min(x0, b.x); y0 = Math.min(y0, b.y); x1 = Math.max(x1, b.x + b.w); y1 = Math.max(y1, b.y + b.h)
     }
     return x1 >= x0 ? [(x0 + x1) / 2, (y0 + y1) / 2] : null
+  }
+
+  // The middle across and the top and bottom of a list of points at rest (what a flare widens about), or of an object's shapes at rest (null when none has an outline).
+  function spanOf(pts: ModelPoint[], closed: boolean): [number, number, number] | null {
+    if (pts.length < 3) return null
+    const b = boxOf(flatten(build(pts, closed), closed))
+    return [b.x + b.w / 2, b.y, b.y + b.h]
+  }
+  const objectSpans = new Map<string, [number, number, number] | null>()
+  function objectSpan(o: ModelObject): [number, number, number] | null {
+    if (objectSpans.has(o.id)) return objectSpans.get(o.id)!
+    let x0 = Infinity, y0 = Infinity, x1 = -Infinity, y1 = -Infinity
+    for (const sid of o.shapes) {
+      let s = shapeMap.get(sid)
+      if (s && s.pts.length < 3 && s.copyOf) s = shapeMap.get(s.copyOf)
+      if (!s || s.pts.length < 3) continue
+      const b = boxOf(flatten(build(s.pts, s.closed), s.closed))
+      x0 = Math.min(x0, b.x); y0 = Math.min(y0, b.y); x1 = Math.max(x1, b.x + b.w); y1 = Math.max(y1, b.y + b.h)
+    }
+    const span: [number, number, number] | null = x1 >= x0 ? [(x0 + x1) / 2, y0, y1] : null
+    objectSpans.set(o.id, span)
+    return span
   }
 
   // The height an object's hair hangs from: the mean of the points with no weight in its shapes at rest (null when none has any).
@@ -886,12 +929,12 @@ export function solve(c: ModelContent, values: Values = {}, view: View = 'front'
       }
       closed = twin.closed
     } else if (tpl && sh.pts.length < 3) {
-      const o = plainOutline(tpl, groupMatOf(tpl.id), memberForm(tpl.id, memberId))
+      const o = plainOutline(tpl, groupMatOf(tpl.id), memberForm(tpl.id, memberId), formCarries(tpl.id, memberId))
       rig = o.rig; drawn = o.drawn; closed = tpl.closed; skin = o.skin
     } else {
       // The rig always reads the base outline. A form gives only the drawn outline (it still gets the shape's links and, when it has as many points as the
       // base, its recorded moves); an empty one hides the shape in every view.
-      const o = plainOutline(sh, Mg, tpl ? memberForm(tpl.id, memberId) : formOutline(sh.id))
+      const o = plainOutline(sh, Mg, tpl ? memberForm(tpl.id, memberId) : formOutline(sh.id), tpl ? formCarries(tpl.id, memberId) : formCarries(sh.id))
       rig = o.rig; drawn = o.drawn; skin = o.skin
       if (tpl) {
         const g = plainOutline(tpl, groupMatOf(tpl.id), memberForm(tpl.id, memberId)).drawn

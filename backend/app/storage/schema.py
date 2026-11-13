@@ -1276,6 +1276,7 @@ MODEL_PROPS: dict[str, tuple[tuple[str, ...], float, float, float]] = {
     "height": (_SHAPE_OR_OBJECT, 100.0, 5.0, 1000.0),
     "rotation": (_SHAPE_OR_OBJECT, 0.0, -360.0, 360.0),
     "curve": (_SHAPE_OR_OBJECT, 0.0, -50.0, 50.0),
+    "flare": (_SHAPE_OR_OBJECT, 0.0, -100.0, 100.0),
     "length": (_SHAPE_OR_OBJECT, 100.0, 0.0, 1000.0),
     "texture": (_SHAPE_OR_OBJECT, 0.0, 0.0, 100.0),
     "opacity": (_SHAPE_OR_OBJECT, 100.0, 0.0, 100.0),
@@ -2109,6 +2110,9 @@ class ModelAxis(BaseModel):
     roll: int = 100
     # the genres of the model the axis is rolled in (none: any): an axis with genres is not rolled for a figure that has no genre or another one (a horn, only for Fantasy)
     genres: list[str] = Field(default_factory=list, max_length=MODEL_GENRES_MAX)
+    # phase O8: the axis carries what follows its shapes: where its chosen form gives a shape an outline with as many points as the shape's own, anchors and links read that
+    # outline (a garment locked to the chest follows a fuller chest); otherwise they read the shape's own outline, as for any form
+    carry: bool = False
 
     @field_validator("name", mode="before")
     @classmethod
@@ -2124,6 +2128,11 @@ class ModelAxis(BaseModel):
             if ident is not None and ident not in out and len(out) < MODEL_GENRES_MAX:
                 out.append(ident)
         return out
+
+    @field_validator("carry", mode="before")
+    @classmethod
+    def _carry(cls, value: Any) -> bool:
+        return value is True
 
     @field_validator("roll", mode="before")
     @classmethod

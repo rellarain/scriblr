@@ -2,7 +2,7 @@
 // anatomy (an artist's mannequin): a smooth outline of skin for each segment (neck, chest, pelvis, arm, palm, each finger, leg, foot, toes) whose points near a joint follow both segments
 // (skin weights, given in build.ts with the engine's Auto), joints as on an anatomical mannequin (pelvis, waist, chest, neck, head, collarbone, shoulder, elbow, wrist, hip,
 // knee, ankle, toes), one-light shading that follows the skin, the sliders, and the bones. The left side is built and then given a twin.
-import type { ModelBind, ModelBone, ModelContent, ModelDrive, ModelGroup, ModelObject, ModelPoint, ModelPointMode, ModelPreset, ModelRange, ModelShape } from '../../src/api/types'
+import type { ModelAxis, ModelBind, ModelBone, ModelContent, ModelDrive, ModelGroup, ModelObject, ModelPoint, ModelPointMode, ModelPreset, ModelRange, ModelShape } from '../../src/api/types'
 import { HAND_POSES, digitOutline, type DigitSpec, type HandRole } from '../../src/assets/Interfaces/admin/characters/engine/hands'
 import { symmetric } from '../../src/assets/Interfaces/admin/characters/engine/geometry'
 import { makeTwin } from '../../src/assets/Interfaces/admin/characters/engine/pairEdit'
@@ -173,11 +173,23 @@ export function handPresets(): ModelPreset[] {
 }
 
 // The one-light shading of the skin (light from the upper left): under the jaw and the far side of the neck, the far side of the torso (one shadow down the chest and the pelvis),
-// the inside of each arm and leg. Every point follows the skin it lies on.
+// the inside of each arm and leg. Every point follows the skin it lies on. Phase O8 adds the definition of the muscles (under the chest muscles, down the middle of the belly,
+// the edge of the shoulder muscle, above the knee: they fade in with the Muscle slider) and the shadow under a full chest (shown only by the Full form of the Chest).
+const PEC: XY[] = [[102.5, 89.5], [110, 93.2], [119, 93.2], [127, 89.4], [131, 84], [128.4, 86.6], [119, 91.4], [110, 91.6], [103.2, 88.4]]
+const BUST: XY[] = [[104, 102.5], [112, 107.6], [122, 107.6], [130, 102.6], [133.5, 95.5], [129.6, 99.6], [122, 104.2], [112, 104.3], [105.2, 100.6]]
+const otherSide = (pts: XY[]): XY[] => [...pts].reverse().map(([x, y, m]) => [r2(200 - x), y, m])
+export const DEFINED: Partial<ModelShape> = { opBy: { slider: 'muscle', hidden: 25, shown: 100 } }
 function shading(shapes: ModelShape[]): ModelShape[] {
   const on = (ids: string[], pts: XY[]) => { const a = anchorsOfShapes(shapes, ids); return pts.map(([x, y, m]) => followNearest(a, x, y, m ?? 'c')) }
   const shade = (id: string, name: string, z: number, t: number, pts: ModelPoint[], over: Partial<ModelShape> = {}): ModelShape => skin(id, name, z, pts, { shade: { kind: 'shadow', t }, ...over })
   return [
+    shade('pecShadeL', 'Under the chest muscle (left)', 22.06, 0.1, on(['chest'], PEC), DEFINED),
+    shade('pecShadeR', 'Under the chest muscle (right)', 22.06, 0.1, on(['chest'], otherSide(PEC)), DEFINED),
+    shade('absShade', 'Down the middle of the belly', 22.07, 0.08, on(['chest'], [[99.6, 104], [100.4, 104], [100.6, 122], [100.4, 141], [99.6, 141], [99.4, 122]]), DEFINED),
+    shade('bustShadeL', 'Under the bust (left)', 22.08, 0.1, on(['chest'], BUST)),
+    shade('bustShadeR', 'Under the bust (right)', 22.08, 0.1, on(['chest'], otherSide(BUST))),
+    shade('deltShadeL', 'Edge of the shoulder muscle', 31.22, 0.09, on(['uarmL'], [[152.2, 99.5], [148, 92.5], [143.6, 86], [142.8, 87.2], [147.2, 93.8], [151.3, 101]]), DEFINED),
+    shade('quadShadeL', 'Above the knee', 20.06, 0.08, on(['legL'], [[104, 261], [108.5, 267.5], [110.5, 275.5], [108, 281], [104.6, 277], [103.2, 269.5]]), DEFINED),
     shade('neckShade', 'Shadow under the jaw', 21.55, 0.12, on(['neck'], [[100, 30], [107, 31], [110.5, 35], [108, 40.5], [100, 42.5], [92, 40.5], [89.5, 35], [93, 31]])),
     shade('neckSide', 'Far side of the neck', 21.56, 0.07, on(['neck'], [[107, 40], [111.5, 40], [112, 50], [114.5, 55], [110, 55], [108, 49]])),
     shade('torsoShade', 'Far side of the torso', 22.05, 0.08, on(['chest', 'pelvis'], [[131, 92], [146, 88], [146, 145], [141, 196], [131, 196], [128.5, 170], [128.5, 140], [130, 112]]), { over: ['pelvis'] }),
@@ -206,12 +218,12 @@ export function bodyParts(mock: any): Body {
   const shapes = [...skins, ...shading(skins), ...hand.shapes]
   const objects: ModelObject[] = [
     obj('neck', 'Neck', ['neck', 'neckShade', 'neckSide']),
-    obj('chest', 'Chest', ['chest', 'torsoShade']),
+    obj('chest', 'Chest', ['chest', 'torsoShade', 'pecShadeL', 'pecShadeR', 'absShade', 'bustShadeL', 'bustShadeR']),
     obj('pelvis', 'Pelvis', ['pelvis']),
-    obj('uarm', 'Arm', ['uarmL', 'armShadeL']),
+    obj('uarm', 'Arm', ['uarmL', 'armShadeL', 'deltShadeL']),
     obj('hand', 'Hand', ['handL']),
     ...hand.objects,
-    obj('leg', 'Leg', ['legL', 'legShadeL']),
+    obj('leg', 'Leg', ['legL', 'legShadeL', 'quadShadeL']),
     obj('foot', 'Foot', ['instepL']),
     obj('toes', 'Toes', ['toesL']),
   ]
@@ -232,6 +244,43 @@ export function bodyParts(mock: any): Body {
     grp('toesL', 'Toes', 'footL', ['toes'], J.ball),
   ]
   return { shapes, objects, groups, twinGroups: ['shoulderL', 'legL'] }
+}
+
+// ---- body forms (phase O8) ----
+
+// 0 below a, rising smoothly to 1 at b, 1 until c, falling to 0 at d.
+const ramp = (y: number, a: number, b: number, c: number, d: number): number => {
+  const s = (t: number) => t * t * (3 - 2 * t)
+  if (y <= a || y >= d) return 0
+  if (y < b) return s((y - a) / (b - a))
+  if (y > c) return s((d - y) / (d - c))
+  return 1
+}
+// A symmetric skin with its sides moved out (or in) by an amount that depends on the height.
+const displaced = (pts: ModelPoint[], dx: (y: number) => number): ModelPoint[] =>
+  pts.map(p => (Math.abs(p.x - 100) < 1e-6 ? { ...p } : { ...p, x: r2(p.x + Math.sign(p.x - 100) * dx(p.y)) }))
+// The Chest (flat, average, full) and the Hips (narrow, average, wide, curvy), forms of the chest and the pelvis drawn from anatomy, not from the old portrait. Both carry what
+// follows them (`carry`: each form has the skin's own points), so the clothes locked to the chest and the pelvis follow the form. The shadow under the bust shows only with
+// the full chest.
+export function bodyForms(c: ModelContent): ModelContent {
+  const chest = c.shapes.find(s => s.id === 'chest')!.pts, pelvis = c.shapes.find(s => s.id === 'pelvis')!.pts
+  const noBust = ['bustShadeL', 'bustShadeR'].map(shape => ({ shape, pts: [] as ModelPoint[] }))
+  const chestAxis: ModelAxis = {
+    id: 'chest', name: 'Chest', initial: 'average', carry: true, options: [
+      { id: 'flat', name: 'Flat', ovr: [{ shape: 'chest', pts: displaced(chest, y => -1.5 * ramp(y, 78, 86, 100, 110)) }, ...noBust] },
+      { id: 'average', name: 'Average', ovr: [...noBust] },
+      { id: 'full', name: 'Full', ovr: [{ shape: 'chest', pts: displaced(chest, y => 3 * ramp(y, 76, 88, 102, 114)) }] },
+    ],
+  }
+  const hipsAxis: ModelAxis = {
+    id: 'hips', name: 'Hips', initial: 'average', carry: true, options: [
+      { id: 'narrow', name: 'Narrow', ovr: [{ shape: 'pelvis', pts: displaced(pelvis, y => -3 * ramp(y, 150, 166, 184, 196)) }] },
+      { id: 'average', name: 'Average', ovr: [] },
+      { id: 'wide', name: 'Wide', ovr: [{ shape: 'pelvis', pts: displaced(pelvis, y => 4 * ramp(y, 148, 166, 184, 197)) }] },
+      { id: 'curvy', name: 'Curvy', ovr: [{ shape: 'pelvis', pts: displaced(pelvis, y => 3.6 * ramp(y, 156, 170, 182, 197)) }] },
+    ],
+  }
+  return { ...c, objects: c.objects.map(o => (o.id === 'chest' ? { ...o, axes: [chestAxis] } : o.id === 'pelvis' ? { ...o, axes: [hipsAxis] } : o)) }
 }
 
 // How far each skin's points follow the segments next to it (the engine's Auto across each joint, over twice the reach). Only the segment that holds a skin's group and the one
@@ -302,6 +351,10 @@ const moves = (shape: string, list: Array<[number, number, number]>, symmetric =
 // A pose slider: Randomise leaves it at rest, so a rolled figure stands naturally.
 const STILL: Partial<ModelRange> = { rand: [0, 0] }
 
+// The arm and the leg made larger: [point, how far out at the slider's maximum] (out of the limb on its outside, into it on its inside, where the muscles are fullest).
+const ARM_SIZE: Array<[number, number]> = [[3, 1], [4, 2.2], [5, 2.6], [6, 2.4], [7, 1.8], [8, 1], [9, 1.2], [10, 1.8], [11, 1.8], [12, 1], [16, -0.8], [17, -1.4], [18, -1.4], [19, -1], [20, -1.6], [21, -2.2], [22, -2.2], [23, -1.6], [24, -0.6]]
+const LEG_SIZE: Array<[number, number]> = [[3, 1.8], [4, 3], [5, 3], [6, 2.4], [7, 1.4], [9, 1.2], [10, 2], [11, 2], [12, 1.2], [18, -0.8], [19, -1.2], [20, -0.8], [22, -0.6], [23, -1], [24, -0.8]]
+
 export function bodyRanges(): ModelRange[] {
   const out: ModelRange[] = []
   out.push(range('height', 'Height', null, 35, 100, 110, '%', [drive({ kind: 'scale', target: 'model', atMin: 35, atMax: 110 })], { rand: [92, 108] }))
@@ -328,6 +381,24 @@ export function bodyRanges(): ModelRange[] {
   out.push(range('hips', 'Hip width', 'torso', 80, 100, 125, '%', [
     moves('pelvis', [[2, 3, -2.5], [3, 8, -6.5], [4, 9, -7], [5, 8, -6.5], [6, 4, -3]], true), moves('legL', [[2, 8, -6.5], [3, 9, -7], [4, 6, -5], [5, 2, -1.5]]),
   ]))
+  // phase O8: the measures of the body, from anatomy (the builds and the ages set them): the neck's width and length, the size of the arms and legs, the jaw (a flare of the
+  // head's lower half), where the features sit in the face (a child's are lower), how soft and how muscular the body is (the definition of the muscles fades in), and a stoop
+  out.push(range('neckWidth', 'Neck width', 'neckJ', 85, 100, 120, '%', [moves('neck', [[1, 2, -1.5], [2, 2.5, -1.9], [3, 2.5, -1.9], [4, 2, -1.5], [5, 1, -0.8]], true)], { rand: [95, 105] }))
+  out.push(range('neckLength', 'Neck length', 'neckJ', 80, 100, 125, '%', [drive({ kind: 'length', id: 'b_neck', atMin: 80, atMax: 125 })], { rand: [96, 104] }))
+  out.push(range('armSize', 'Arm size', 'armL', 85, 100, 130, '%', [moves('uarmL', ARM_SIZE.map(([i, d]) => [i, d, r2(-d / 2)]))], { rand: [95, 106] }))
+  out.push(range('legSize', 'Leg size', 'legL', 85, 100, 130, '%', [moves('legL', LEG_SIZE.map(([i, d]) => [i, d, r2(-d / 2)]))], { rand: [95, 106] }))
+  out.push(range('jawWidth', 'Jaw width', 'head', -20, 0, 20, '%', [prop('skull', 'flare', -20, 20)], { rand: [-5, 5] }))
+  out.push(range('eyeLine', 'Eye line', 'head', -3, 0, 4, '', [prop('eyes', 'y', -3, 4), prop('brows', 'y', -3, 4), prop('ears', 'y', -2.4, 3.2), prop('nose', 'y', -1.8, 2.4), prop('mouth', 'y', -0.9, 1.2)], STILL))
+  out.push(range('soft', 'Softness', 'torso', 0, 0, 100, '%', [
+    moves('chest', [[8, 1, 0], [9, 2, 0], [10, 3, 0], [11, 2.6, 0]], true), moves('pelvis', [[1, 2.5, 0], [2, 2, 0], [3, 1.5, 0]], true),
+    moves('uarmL', [[5, 0.8, 0], [6, 1, 0], [21, -1.2, 0], [22, -1.2, 0], [23, -0.8, 0]]), moves('legL', [[3, 1.2, 0], [4, 2, 0], [5, 1.5, 0], [23, -0.6, 0], [24, -0.8, 0]]),
+  ], { rand: [0, 30] }))
+  out.push(range('muscle', 'Muscle', 'torso', 0, 0, 100, '%', [
+    moves('chest', [[3, 1.2, 0], [4, 1.8, 0], [5, 1.8, 0], [6, 1.2, 0]], true),
+    moves('uarmL', [[3, 0.8, 0], [4, 1.6, 0], [5, 1.8, 0], [6, 1.2, 0], [9, 0.8, 0], [10, 1, 0], [21, -0.8, 0], [22, -1.2, 0], [23, -1, 0]]),
+    moves('legL', [[4, 1.5, 0], [5, 1.5, 0], [6, 1, 0], [10, 1, 0], [11, 0.8, 0]]),
+  ], { rand: [0, 40] }))
+  out.push(range('stoop', 'Stoop', 'neckJ', 0, 0, 100, '%', [drive({ kind: 'depth', id: 'b_neck', atMin: 0, atMax: 40 }), turn('shoulderL', 0, -5)], STILL))
   // the joints of the trunk (the hip tilt is added once the legs have twins: they turn against it, to stand)
   out.push(range('waistBend', 'Waist bend', 'waistJ', -25, 0, 25, '°', [turn('waistJ', 25, -25)], STILL))
   out.push(range('chestBend', 'Chest bend', 'chestJ', -20, 0, 20, '°', [turn('chestJ', 20, -20)], STILL))

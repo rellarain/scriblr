@@ -37,11 +37,14 @@ const cases: Array<{ label: string; portrait: CharacterPortrait }> = [
 const rng = seededRng(7)
 for (let i = 0; i < 12; i++) cases.push({ label: `Random ${i + 1}`, portrait: randomPortrait(base, [], rng) })
 
+// Every picture rendered on its own gets the same ids from React, and on one page a clip or a mask would reach the first picture's: each gets ids of its own.
+let pictures = 0
+const own = (svg: string): string => { const k = `p${++pictures}_`; return svg.replace(/id="/g, `id="${k}`).replace(/url\(#/g, `url(#${k}`).replace(/href="#/g, `href="#${k}`) }
 const row = (c: (typeof cases)[number]): string => {
   const r = convertPortrait(c.portrait, model)
-  const old = renderToStaticMarkup(createElement(Portrait, { portrait: c.portrait, label: '', crop: 'card' as never }))
-  const now = renderToStaticMarkup(createElement(Figure, { copy: content, figure: r.figure, crop: 'bust', label: '' }))
-  const whole = renderToStaticMarkup(createElement(Figure, { copy: content, figure: r.figure, crop: 'figure', label: '' }))
+  const old = own(renderToStaticMarkup(createElement(Portrait, { portrait: c.portrait, label: '', crop: 'card' as never })))
+  const now = own(renderToStaticMarkup(createElement(Figure, { copy: content, figure: r.figure, crop: 'bust', label: '' })))
+  const whole = own(renderToStaticMarkup(createElement(Figure, { copy: content, figure: r.figure, crop: 'figure', label: '' })))
   const lines = convertLines(r).map(l => `<li>${l}</li>`).join('')
   return `<section><h4>${c.label}</h4><div class="r"><div class="a">${old}</div><div class="a">${now}</div><div class="w">${whole}</div><ul>${lines}</ul></div></section>`
 }

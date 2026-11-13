@@ -235,7 +235,7 @@ function axis(v: Record<string, unknown>, id: string): ModelAxis | null {
   const options = withIds(list(v.options), form)
   if (options.length === 0) return null
   const initial = typeof v.initial === 'string' && options.some(o => o.id === v.initial) ? v.initial : options[0].id
-  return { id, name: text(v.name), options, initial, roll: repairRoll(v.roll), genres: [...new Set(list(v.genres).filter((g): g is string => typeof g === 'string'))].slice(0, LIMITS.genresMax) }
+  return { id, name: text(v.name), options, initial, carry: v.carry === true, roll: repairRoll(v.roll), genres: [...new Set(list(v.genres).filter((g): g is string => typeof g === 'string'))].slice(0, LIMITS.genresMax) }
 }
 
 // The parts of a colour an object or a style holds, per slot (phase D3a), as the server keeps them; a map of ids to ids (a variant's styles and picks).

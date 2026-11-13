@@ -319,6 +319,20 @@ describe('the Forms tab', () => {
     expect(roll.getByRole('button', { name: /^Lower/ })).toBeDisabled()
   })
 
+  it('makes an axis carry what follows its shapes, and back, and saves it (phase O8)', async () => {
+    const { user, backend } = await onEye()
+    const carry = axis().getByRole('button', { name: 'Eye shape carries what follows it' })
+    expect(carry).toHaveAttribute('aria-pressed', 'false')
+    expect(carry).toHaveAttribute('title')
+    await user.click(carry)
+    expect(axis().getByRole('button', { name: 'Eye shape carries what follows it' })).toHaveAttribute('aria-pressed', 'true')
+    await save(user)
+    await waitFor(() => expect(axisOf(backend).carry).toBe(true))
+    await user.click(axis().getByRole('button', { name: 'Eye shape carries what follows it' }))
+    await save(user)
+    await waitFor(() => expect(axisOf(backend).carry).toBe(false))
+  })
+
   it('sets the genres an axis is rolled in: one chip for each genre of the model, none ticked meaning every genre', async () => {
     const r = await open([draftEntry('a', faced(c => ({ ...c, genres: [{ id: 'g_fiction', name: 'Fiction' }, { id: 'g_fantasy', name: 'Fantasy' }] })))])
     await pick(r.user, 'Eye')

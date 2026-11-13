@@ -1,4 +1,4 @@
-import type { ModelAxis, ModelClass, ModelContent, ModelForm, ModelLook, ModelObject, ModelPoint, ModelPreset } from '../../../../../api/types'
+import type { ModelAxis, ModelClass, ModelContent, ModelForm, ModelLook, ModelObject, ModelPoint, ModelPreset, ModelShape } from '../../../../../api/types'
 
 // Forms: an object has axes (eye shape, expression, style), each with forms, and shows one form of every axis. What the admin has chosen is test state (like the
 // Try it sliders): `Choices` maps "objectId.axisId" to a form id and is never saved. A form changes the outline of some of the object's shapes; a shape no form
@@ -52,6 +52,16 @@ export function overrideFor(o: ModelObject, shapeId: string, choices: Choices, o
     if (ov) return ov.pts
   }
   return undefined
+}
+
+// Whether the outline the forms give a shape is carried (phase O8): its axis carries what follows it and the outline has as many points as the shape's own, so anchors
+// and links read it.
+export function carriesOutline(o: ModelObject, shape: ModelShape, choices: Choices, ownerId = o.id): boolean {
+  for (const axis of axesOf(o)) {
+    const ov = chosenForm(o, axis, choices, ownerId)?.ovr.find(v => v.shape === shape.id)
+    if (ov) return axis.carry === true && ov.pts.length >= 3 && ov.pts.length === shape.pts.length
+  }
+  return false
 }
 
 // The form being edited: the first axis whose chosen form is not its default (edits to the object's shapes go to that form), or null when the base is.

@@ -357,7 +357,8 @@ def _skin_faults(content: ModelContent, parents: dict[str, Optional[str]], owner
 
 def _form_faults(content: ModelContent) -> list[str]:
     """Forms (phase 3): a form may only change shapes of its own object, never a twin's, and an outline is empty (the shape is hidden in that form) or has at
-    least three points. The front end makes the same checks in the same words (modelContent.formFaults)."""
+    least three points; on an axis that carries what follows it (phase O8) an outline has as many points as the shape's own. The front end makes the same checks
+    in the same words (modelContent.formFaults)."""
     faults: list[str] = []
     shapes = {s.id: s for s in content.shapes}
     for o in content.objects:
@@ -376,6 +377,10 @@ def _form_faults(content: ModelContent) -> list[str]:
                         faults.append(f"Form {name} of {obj} changes a twin; change the original instead.")
                     elif 0 < len(ov.pts) < 3:
                         faults.append(f"Form {name} of {obj} has an outline of fewer than 3 points for shape {_label(shape.name, shape.id)}.")
+                    elif axis.carry and len(ov.pts) >= 3 and len(shape.pts) >= 3 and len(ov.pts) != len(shape.pts):
+                        faults.append(
+                            f"Form {name} of {obj} carries what follows it, but its outline of shape {_label(shape.name, shape.id)} has {len(ov.pts)} points, not {len(shape.pts)}."
+                        )
     return faults
 
 

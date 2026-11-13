@@ -4,16 +4,19 @@ import type { ModelPreset } from '../../src/api/types'
 const preset = (id: string, name: string, kind: string, values: Record<string, number>): ModelPreset => ({ id, name, kind, values, hidden: [] })
 
 // Age: the proportions of the figure (height, the head against it, the legs) and the features that change with age (the eyes and the nose read larger and smaller on a child).
+// Phase O8 adds what anatomy changes with age: a child's neck is shorter, its features sit lower in the face (the eye line below the middle of the head) and its body is
+// softer and rounder; an older body softens and stoops (the neck leans toward the viewer and the shoulders round). An age leaves the build's measures (the neck's width,
+// the arms, the legs, the jaw) to the build, so choosing one never undoes the other.
 export const AGES: ModelPreset[] = [
-  preset('age_infant', 'Infant', 'Age', { height: 36, headSize: 160, legLength: 62, eyeSize: 125, noseSize: 80, mouthSize: 90, earSize: 90, shoulders: 88, waist: 112, hips: 100 }),
-  preset('age_toddler', 'Toddler', 'Age', { height: 46, headSize: 150, legLength: 68, eyeSize: 118, noseSize: 84, mouthSize: 92, earSize: 92, shoulders: 90, waist: 108, hips: 98 }),
-  preset('age_child', 'Child', 'Age', { height: 62, headSize: 125, legLength: 92, eyeSize: 110, noseSize: 90, mouthSize: 95, earSize: 95, shoulders: 92 }),
-  preset('age_teen', 'Teen', 'Age', { height: 84, headSize: 110, legLength: 98, eyeSize: 104, noseSize: 96 }),
+  preset('age_infant', 'Infant', 'Age', { height: 36, headSize: 160, legLength: 62, eyeSize: 125, noseSize: 80, mouthSize: 90, earSize: 90, shoulders: 88, waist: 112, hips: 100, neckLength: 80, eyeLine: 3.5, soft: 90 }),
+  preset('age_toddler', 'Toddler', 'Age', { height: 46, headSize: 150, legLength: 68, eyeSize: 118, noseSize: 84, mouthSize: 92, earSize: 92, shoulders: 90, waist: 108, hips: 98, neckLength: 84, eyeLine: 3, soft: 80 }),
+  preset('age_child', 'Child', 'Age', { height: 62, headSize: 125, legLength: 92, eyeSize: 110, noseSize: 90, mouthSize: 95, earSize: 95, shoulders: 92, neckLength: 88, eyeLine: 2, soft: 50 }),
+  preset('age_teen', 'Teen', 'Age', { height: 84, headSize: 110, legLength: 98, eyeSize: 104, noseSize: 96, neckLength: 96, eyeLine: 0.8, soft: 15 }),
   preset('age_young', 'Young adult', 'Age', { height: 100, eyeSize: 102 }),
   preset('age_adult', 'Adult', 'Age', {}),
-  preset('age_middle', 'Middle-aged', 'Age', { height: 99, waist: 106, hips: 103 }),
-  preset('age_older', 'Older', 'Age', { height: 96, headSize: 101, legLength: 98, waist: 108, shoulders: 97 }),
-  preset('age_elderly', 'Elderly', 'Age', { height: 92, headSize: 102, legLength: 96, waist: 106, shoulders: 93, eyeSize: 96 }),
+  preset('age_middle', 'Middle-aged', 'Age', { height: 99, waist: 106, hips: 103, soft: 20 }),
+  preset('age_older', 'Older', 'Age', { height: 96, headSize: 101, legLength: 98, waist: 108, shoulders: 97, soft: 30, stoop: 12 }),
+  preset('age_elderly', 'Elderly', 'Age', { height: 92, headSize: 102, legLength: 96, waist: 106, shoulders: 93, eyeSize: 96, soft: 40, stoop: 30 }),
 ]
 
 // The poses of the realistic body (phase O4b): sliders of the joints, each side on its own; Sitting turns the thighs toward the viewer (the depth sliders).
@@ -26,11 +29,13 @@ export const POSES: ModelPreset[] = [
   preset('pose_sit', 'Sitting', 'Pose', { thighDepth: 72, thighDepthR: 72, shoulder: 6, shoulderR: 6, elbow: -40, elbowR: -40, foreDepth: 45, foreDepthR: 45 }),
 ]
 
+// Build (phase O8: from anatomy, the slight, average, broad and heavy builds of an artist's references, not the old portrait's): the width of the shoulders, the waist and
+// the hips, the neck, the size of the arms and legs and the jaw (the one place a build touches the face). Muscle is a slider of its own, whatever the build.
 export const BUILDS: ModelPreset[] = [
-  preset('build_slim', 'Slim', 'Build', { shoulders: 94, waist: 88, hips: 92 }),
+  preset('build_slim', 'Slim', 'Build', { shoulders: 95, waist: 90, hips: 94, neckWidth: 92, armSize: 90, legSize: 91, jawWidth: -6 }),
   preset('build_average', 'Average', 'Build', {}),
-  preset('build_broad', 'Broad', 'Build', { shoulders: 112, waist: 106, hips: 104 }),
-  preset('build_heavy', 'Heavy', 'Build', { shoulders: 106, waist: 122, hips: 118 }),
+  preset('build_broad', 'Broad', 'Build', { shoulders: 112, waist: 104, hips: 102, neckWidth: 112, armSize: 112, legSize: 107, jawWidth: 8 }),
+  preset('build_heavy', 'Heavy', 'Build', { shoulders: 106, waist: 122, hips: 116, neckWidth: 116, armSize: 118, legSize: 116, jawWidth: 10 }),
 ]
 
 // The old engine's thirteen expressions as the sliders of the eyes, brows and head (and the smile, when the model has one): how far the lids are open, how high the brows sit and

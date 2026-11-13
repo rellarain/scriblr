@@ -268,11 +268,11 @@ describe('what the sliders do to the drawing', () => {
 
   it('draws finite shapes whatever the slider values are', () => {
     let c = nosed()
-    // a fieldset holds up to 12 fields, so the properties of a shape go to two
+    // a fieldset holds up to 12 fields, so the properties of a shape go to three
     const shapeProps = PROP_KEYS.filter(k => PROPS[k].features.includes('shape'))
     c = must(addFieldset(c, owner, plate, 'Plate', make))
     for (const [k, prop] of shapeProps.entries()) {
-      if (k === 8) c = must(addFieldset(c, owner, plate, 'More', make))
+      if (k === 8 || k === 16) c = must(addFieldset(c, owner, plate, 'More', make))
       const set = fieldsetsOnFeature(c, plate).at(-1)!
       c = must(addField(c, set.id, prop, make))
     }

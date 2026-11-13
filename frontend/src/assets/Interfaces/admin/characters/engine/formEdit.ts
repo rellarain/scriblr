@@ -40,6 +40,8 @@ export function removeAxis(c: ModelContent, objectId: string, axisId: string): M
 
 // How often Randomise changes the axis, in percent (0 never, 100 every time).
 export const setAxisRoll = (c: ModelContent, objectId: string, axisId: string, roll: number): ModelContent => mapAxis(c, objectId, axisId, a => ({ ...a, roll: Math.max(0, Math.min(100, Math.round(roll))) }))
+// Makes the axis carry what follows its shapes (phase O8: anchors and links read the outline its form gives a shape when it has as many points as the shape's own), or not.
+export const setAxisCarry = (c: ModelContent, objectId: string, axisId: string, carry: boolean): ModelContent => mapAxis(c, objectId, axisId, a => ({ ...a, carry }))
 // Rolls the axis in a genre or stops rolling it there (no genre ticked: every genre).
 export const toggleAxisGenre = (c: ModelContent, objectId: string, axisId: string, genreId: string): ModelContent =>
   mapAxis(c, objectId, axisId, a => ({ ...a, genres: (a.genres ?? []).includes(genreId) ? (a.genres ?? []).filter(g => g !== genreId) : [...(a.genres ?? []), genreId] }))

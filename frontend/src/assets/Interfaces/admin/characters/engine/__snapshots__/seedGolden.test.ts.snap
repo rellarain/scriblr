@@ -1,13 +1,13 @@
 // Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
 
-exports[`the basic model draws as it was recorded > at rest, from the back 1`] = `"dc3c0584"`;
+exports[`the basic model draws as it was recorded > at rest, from the back 1`] = `"1988fc29"`;
 
-exports[`the basic model draws as it was recorded > at rest, from the front 1`] = `"4848df2f"`;
+exports[`the basic model draws as it was recorded > at rest, from the front 1`] = `"d01e5516"`;
 
-exports[`the basic model draws as it was recorded > every slider at its least 1`] = `"f1ba9f18"`;
+exports[`the basic model draws as it was recorded > every slider at its least 1`] = `"dbfb3f45"`;
 
-exports[`the basic model draws as it was recorded > every slider at its most 1`] = `"92edde36"`;
+exports[`the basic model draws as it was recorded > every slider at its most 1`] = `"123f17c0"`;
 
-exports[`the basic model draws as it was recorded > seeded random sliders 1`] = `"e7b0ea0e"`;
+exports[`the basic model draws as it was recorded > seeded random sliders 1`] = `"9663a52e"`;
 
-exports[`the basic model draws as it was recorded > seeded random sliders, from the back 1`] = `"f2d474cc"`;
+exports[`the basic model draws as it was recorded > seeded random sliders, from the back 1`] = `"cedae103"`;

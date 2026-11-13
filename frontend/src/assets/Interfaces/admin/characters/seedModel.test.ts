@@ -103,6 +103,60 @@ describe('the basic model', () => {
     expect(seed.groups.find(g => g.id === 'hair')!.objects).toHaveLength(14)
   })
 
+  it('has the chest and the hips as forms that carry the clothes (phase O8)', () => {
+    const axis = (o: string) => seed.objects.find(x => x.id === o)!.axes![0]
+    expect(axis('chest')).toMatchObject({ id: 'chest', carry: true, initial: 'average' })
+    expect(axis('chest').options.map(f => f.id)).toEqual(['flat', 'average', 'full'])
+    expect(axis('pelvis')).toMatchObject({ id: 'hips', carry: true, initial: 'average' })
+    expect(axis('pelvis').options.map(f => f.id)).toEqual(['narrow', 'average', 'wide', 'curvy'])
+    const at = (forms: Record<string, string>) => solve(seed, defaultValues(seed), 'front', { forms }).shapes
+    const width = (s: ReturnType<typeof at>[string], y0: number, y1: number) => { const xs = s.poly.filter(([, y]) => y >= y0 && y <= y1).map(([x]) => x); return Math.max(...xs) - Math.min(...xs) }
+    const average = at({}), full = at({ 'chest.chest': 'full' }), wide = at({ 'pelvis.hips': 'wide' })
+    // the chest is fuller at the bust, and the shirt locked to it goes out with it (as every garment locked to the chest does)
+    expect(width(full.chest, 90, 100)).toBeGreaterThan(width(average.chest, 90, 100) + 4)
+    expect(width(full.shirt, 90, 100)).toBeGreaterThan(width(average.shirt, 90, 100) + 4)
+    expect(width(wide.trouserHip, 170, 185)).toBeGreaterThan(width(average.trouserHip, 170, 185) + 5)
+    // the shadow under the bust shows only with the full chest
+    expect(average.bustShadeL.visible).toBe(false)
+    expect(full.bustShadeL.visible).toBe(true)
+  })
+
+  it('reshapes the body with its builds and ages from anatomy, each leaving the other its own sliders (phase O8)', () => {
+    const of = (id: string) => seed.presets!.find(p => p.id === id)!.values
+    expect(of('build_broad')).toMatchObject({ neckWidth: expect.any(Number), armSize: expect.any(Number), legSize: expect.any(Number), jawWidth: expect.any(Number) })
+    expect(of('build_broad').armSize).toBeGreaterThan(100); expect(of('build_slim').armSize).toBeLessThan(100)
+    expect(of('build_heavy').jawWidth).toBeGreaterThan(0); expect(of('build_slim').jawWidth).toBeLessThan(0)
+    // a child's features sit lower in the face and its neck is shorter; an elder stoops
+    expect(of('age_child').eyeLine).toBeGreaterThan(0); expect(of('age_child').neckLength).toBeLessThan(100); expect(of('age_child').soft).toBeGreaterThan(0)
+    expect(of('age_elderly').stoop).toBeGreaterThan(0)
+    // the new measures belong to one kind or the other, so choosing an age never undoes a build
+    const ageKeys = new Set(seed.presets!.filter(p => p.kind === 'Age').flatMap(p => Object.keys(p.values)))
+    for (const k of ['neckWidth', 'armSize', 'legSize', 'jawWidth']) expect(ageKeys.has(k), k).toBe(false)
+    const buildKeys = new Set(seed.presets!.filter(p => p.kind === 'Build').flatMap(p => Object.keys(p.values)))
+    for (const k of ['neckLength', 'eyeLine', 'soft', 'stoop']) expect(buildKeys.has(k), k).toBe(false)
+    // the jaw widens the lower face only, the eye line moves the features down, the neck slider lengthens it and moves the head
+    const at = (values: Record<string, number>) => solve(seed, { ...defaultValues(seed), ...values }, 'front').shapes
+    const rest = at({}), jaw = at({ jawWidth: 20 }), low = at({ eyeLine: 4 }), long = at({ neckLength: 125 })
+    expect(jaw.skull.box.w).toBeGreaterThan(rest.skull.box.w)
+    expect(jaw.skull.box.y).toBeCloseTo(rest.skull.box.y, 3)
+    const eyesTop = (shapes: typeof rest) => Math.min(...seed.objects.find(o => o.id === 'eyes')!.shapes.filter(id => shapes[id]?.visible).map(id => shapes[id].box.y))
+    expect(eyesTop(low)).toBeGreaterThan(eyesTop(rest) + 3)
+    expect(long.skull.box.y).toBeLessThan(rest.skull.box.y - 2)
+  })
+
+  it('fades in the definition of the muscles with the Muscle slider, whatever the build (phase O8)', () => {
+    const ids = ['pecShadeL', 'pecShadeR', 'absShade', 'deltShadeL', 'quadShadeL']
+    const at = (muscle: number) => solve(seed, { ...defaultValues(seed), muscle }, 'front').shapes
+    for (const id of ids) {
+      expect(at(0)[id].fade, id).toBe(0)
+      expect(at(100)[id].fade, id).toBe(1)
+    }
+    // the other side's twins fade with them
+    const twins = seed.shapes.filter(s => s.mirrorOf === 'deltShadeL' || s.mirrorOf === 'quadShadeL').map(s => s.id)
+    expect(twins).toHaveLength(2)
+    for (const id of twins) expect(at(100)[id].fade, id).toBe(1)
+  })
+
   it('covers the scalp with hair from the front and from behind, with no skin between the sections (phase O7)', () => {
     const styles = seed.presets!.filter(p => p.kind === 'Hair style')
     for (const name of ['Short', 'Long and straight', 'Curls', 'Afro']) {
@@ -110,11 +164,13 @@ describe('the basic model', () => {
       for (const view of ['front', 'back'] as const) {
         const shapes = solve(seed, state.values, view, { forms: state.forms, hidden: state.hidden }).shapes
         const skull = shapes.skull, hair = Object.values(shapes).filter(s => /^h[rc]_/.test(s.id) && s.visible && s.z > skull.z)
-        // the scalp: from the front the head above the hairline, from behind all of it down to the nape (0.8 in from its outline)
+        // the scalp: from the front the head above the hairline; from behind all of it down to the tops of the ears and the nape below them (0.8 in from its outline;
+        // beside the nape, behind the ears, is skin)
         const inside = (x: number, y: number) => [[0, 0], [0.8, 0], [-0.8, 0], [0, 0.8], [0, -0.8]].every(([dx, dy]) => inPolygon(skull.poly, x + dx, y + dy))
+        const scalp = (x: number, y: number) => (view === 'front' ? y <= -5 : y <= 21 || (y <= 31 && Math.abs(x - 100) <= 11))
         const bare: string[] = []
-        for (let y = -12; y <= (view === 'front' ? -5 : 30); y += 1) for (let x = 81; x <= 119; x += 1) {
-          if (!inside(x, y)) continue
+        for (let y = -12; y <= 31; y += 1) for (let x = 81; x <= 119; x += 1) {
+          if (!inside(x, y) || !scalp(x, y)) continue
           if (!hair.some(s => inPolygon(s.poly, x, y))) bare.push(`${x},${y}`)
         }
         expect(bare, `${name}, ${view}`).toEqual([])

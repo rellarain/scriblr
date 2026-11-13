@@ -61,7 +61,7 @@ const scaled = (c: Ctx, id: string, factor: number): void => value(c, id, valueO
 // ---- the face and the body ----
 
 // The build goes over the age instead of replacing it: both set the width of the shoulders, the waist and the hips, and a preset of one kind puts back what the other set, so an infant of
-// a broad build would be a broad adult. The build's values are factors of the age's (the old portrait's build was a factor of its age too).
+// a broad build would be a broad adult. The build's values are factors of the age's (the old portrait's build was a factor of its age too); a slider that rests at 0 (the jaw) adds.
 function buildOver(c: Ctx, id: string): void {
   const build = c.copy.presets?.find(x => x.id === id)
   if (!build) return
@@ -69,7 +69,9 @@ function buildOver(c: Ctx, id: string): void {
   const values = { ...c.state.values }
   for (const key of Object.keys(build.values)) {
     const r = rangeOf(c.copy, key)
-    if (r) values[key] = r1(clamp(((c.state.values[key] ?? r.rest) * (alone.values[key] ?? r.rest)) / (r.rest || 100), r.min, r.max))
+    if (!r) continue
+    const age = c.state.values[key] ?? r.rest, mine = alone.values[key] ?? r.rest
+    values[key] = r1(clamp(r.unit === '%' && r.rest > 0 ? (age * mine) / r.rest : age + mine - r.rest, r.min, r.max))
   }
   c.state = { ...c.state, values, forms: { ...c.state.forms, ...alone.forms }, hidden: [...new Set([...c.state.hidden, ...alone.hidden])] }
 }
@@ -90,8 +92,9 @@ function convertFace(c: Ctx, p: CharacterPortrait): void {
   scaled(c, 'noseSize', p.noseSize)
   scaled(c, 'mouthSize', p.mouthSize)
   scaled(c, 'shoulders', p.shoulderWidth)
-  if (p.chest !== 'average') note(c, 'Body', `The ${p.chest} chest is not in the model: the chest is the average one.`, true)
-  if (Math.abs(p.neckWidth - 1) > 0.02) note(c, 'Body', 'The neck width is not in the model: the neck is the usual width.', true)
+  // the chest and the neck's width carry over (phase O8: the Chest form of the chest, the Neck width slider over the build's)
+  form(c, 'chest.chest', p.chest)
+  scaled(c, 'neckWidth', p.neckWidth)
   if (Math.abs(p.headWidth - 1) > 0.02) note(c, 'Head', 'The head width is not in the model: use another head shape for a wider or narrower head.', true)
   if (Math.abs(p.noseWidth - 1) > 0.03) note(c, 'Nose', 'The nose width is not in the model: the nose is as wide as its size makes it.', true)
   preset(c, `top_${p.top}`)

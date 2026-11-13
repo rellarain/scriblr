@@ -202,3 +202,21 @@ def test_a_preset_may_only_set_sliders_and_hide_things_that_exist(client: TestCl
     assert "Preset Smile sets a slider that does not exist." in detail and "Preset Smile hides something that does not exist." in detail
     c = faced(presets=[{"id": "p", "name": "Hide the head", "hidden": ["g_head"]}])
     publishes(client, c)                                                                    # a group may be hidden too
+
+
+# --------------------------------------------------------------------------- phase O8: an axis that carries what follows it
+
+
+def test_an_axis_may_carry_what_follows_its_shapes_when_its_outlines_keep_their_points(client: TestClient) -> None:
+    assert saved(client, faced())["objects"][0]["axes"][0]["carry"] is False          # a model saved before the field does not carry
+    for sent, kept in ((True, True), (False, False), ("yes", False), (1, False), (None, False)):
+        c = faced()
+        c["objects"][0]["axes"][0]["carry"] = sent
+        assert saved(client, c)["objects"][0]["axes"][0]["carry"] is kept, sent
+    c = faced()
+    c["objects"][0]["axes"][0]["carry"] = True
+    publishes(client, c)                                                                # the wide eye has the eye's four points; a hidden pupil carries nothing
+    c["objects"][0]["axes"][0]["options"][1]["ovr"][0]["pts"] = [*WIDE, {"x": 100, "y": 64, "m": "s"}]
+    assert "Form Wide of Eye carries what follows it, but its outline of shape Eye has 5 points, not 4." in refused(client, c)
+    c["objects"][0]["axes"][0]["carry"] = False
+    publishes(client, c)                                                                # an axis that does not carry may change the number of points

@@ -56,7 +56,7 @@ describe('Convert a portrait to a mannequin', () => {
     expect(await panel.findByRole('img', { name: 'The mannequin it would become' })).toBeInTheDocument()
     expect(panel.getByRole('img', { name: 'The whole mannequin' })).toBeInTheDocument()
     const lines = within(panel.getByRole('group', { name: 'What changes' })).getAllByRole('listitem').map(li => li.textContent)
-    expect(lines).toEqual(['Hair: 2 braids is not in the model: it is drawn as loose hair.', 'Body: The full chest is not in the model: the chest is the average one.'])
+    expect(lines).toEqual(['Hair: 2 braids is not in the model: it is drawn as loose hair.'])   // the full chest carries over (phase O8)
     // the story look that holds a portrait and the edition card are converted with it
     expect(panel.getByRole('note')).toHaveTextContent('1 captured story look and the portrait in 1 published edition will be converted with it.')
     expect(backend.calls).toContain('GET /projects/p1/characters/chr_a/frozen')

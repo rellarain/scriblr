@@ -43,10 +43,14 @@ describe('Convert', () => {
     expect(infant.height).toBe(36); expect(infant.headSize).toBe(160)
     expect(valuesOf(content, conv({ age: 'elderly' }).figure).height).toBe(92)
     // slight is the model's slim build
-    expect(valuesOf(content, conv({ build: 'slight' }).figure).waist).toBe(88)
+    const slim = content.presets!.find(x => x.id === 'build_slim')!.values
+    expect(valuesOf(content, conv({ build: 'slight' }).figure).waist).toBe(slim.waist)
     // the build goes over the age, it does not put it back: a heavy infant is an infant with a wide waist
     expect(valuesOf(content, conv({ age: 'infant', build: 'average' }).figure).waist).toBe(112)
-    expect(valuesOf(content, conv({ age: 'infant', build: 'slight' }).figure).waist).toBeCloseTo(112 * 0.88, 0)
+    expect(valuesOf(content, conv({ age: 'infant', build: 'slight' }).figure).waist).toBeCloseTo(112 * slim.waist / 100, 0)
+    // a slider that rests at 0 (the jaw) adds the build to the age; the build's neck, arms and legs come over whole (an age leaves them alone)
+    const broad = valuesOf(content, conv({ age: 'child', build: 'broad' }).figure), broadPreset = content.presets!.find(x => x.id === 'build_broad')!.values
+    expect(broad.jawWidth).toBe(broadPreset.jawWidth); expect(broad.armSize).toBe(broadPreset.armSize); expect(broad.neckLength).toBeLessThan(100)
     expect(valuesOf(content, conv({ build: 'heavy' }).figure).waist).toBe(122)
     expect(valuesOf(content, conv({ expression: 'surprised' }).figure).eyeOpen).toBe(130)
     for (const age of ['infant', 'toddler', 'child', 'teen', 'young', 'adult', 'middle', 'older', 'elderly']) expect(conv({ age }).notes, age).toEqual([])
@@ -107,10 +111,13 @@ describe('Convert', () => {
     expect(conv({}).notes).toEqual([])
     const lost = convertLines(conv({ chest: 'full', neckWidth: 1.2, headWidth: 1.1, noseWidth: 1.2, eyeStyle: 'twocolour', eyeCount: 'one' }))
     expect(lost).toEqual([
-      'Body: The full chest is not in the model: the chest is the average one.', 'Body: The neck width is not in the model: the neck is the usual width.',
       'Head: The head width is not in the model: use another head shape for a wider or narrower head.', 'Nose: The nose width is not in the model: the nose is as wide as its size makes it.',
       'Eyes: Two-coloured eyes are not in the model: both eyes have the eye colour.', 'Eyes: A single eye is not in the model: the figure has two.',
     ])
+    // the chest and the neck's width carry over (phase O8)
+    const full = conv({ chest: 'full', neckWidth: 1.2 })
+    expect(full.figure.forms['chest.chest']).toBe('full')
+    expect(valuesOf(content, full.figure).neckWidth).toBeCloseTo(120, 0)
     // the necklace and the crown share the metal of the model; the brows and the facial hair follow the hair
     expect(convertLines(conv({ crown: 'diadem', necklace: 'chain', crownColor: '#d9b04a', necklaceColor: '#2b2b33' })).join('|')).toMatch(/share one colour of metal/)
     expect(convertLines(conv({ browColor: '#d9b04a', facialHair: 'full', facialHairColor: '#aa2222' })).join('|')).toMatch(/The brows take the colour of the hair.*Facial hair takes the colour of the hair/)

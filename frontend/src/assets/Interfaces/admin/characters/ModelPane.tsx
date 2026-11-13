@@ -50,7 +50,7 @@ import { cycleWeight, stepWeight } from './engine/fall'
 import { SIDE_NAMES, addFall, addFallToObject, withWeight } from './engine/fallEdit'
 import { alignSkins, weightsOf } from './engine/skin'
 import { autoSkin, bendSlider, clearSkin, copySkin, defaultPartner, mirrorSkin, paintSkin, partnersOf, skinBlocked, smoothSkin, stepPointSkin } from './engine/skinEdit'
-import { addAxis, addForm, hideInForm, moveAxis, moveForm, overrideState, removeAxis, removeForm, renameAxis, renameForm, setAxisRoll, setInitialForm, toggleAxisGenre, setLook, setOverride, useBaseOutline } from './engine/formEdit'
+import { addAxis, addForm, hideInForm, moveAxis, moveForm, overrideState, removeAxis, removeForm, renameAxis, renameForm, setAxisCarry, setAxisRoll, setInitialForm, toggleAxisGenre, setLook, setOverride, useBaseOutline } from './engine/formEdit'
 import { classKey, presetsOf, targetForShape } from './engine/forms'
 import { IDENTITY, apply, build, flatten, inverse, mul, pathText, type Box } from './engine/geometry'
 import { TAPER_DEFAULT, taperOutline, type SpinePoint, type TaperSpec } from './engine/taper'
@@ -863,6 +863,7 @@ export function ModelPane({ entry, models, makeId, onRemove, onDuplicate, onExpo
     removeAxis: (objectId, axisId) => commit(removeAxis(content, objectId, axisId), true),
     renameAxis: (objectId, axisId, name) => models.edit(entry.id, c => renameAxis(c, objectId, axisId, name), false),
     setAxisRoll: (objectId, axisId, roll) => models.edit(entry.id, c => setAxisRoll(c, objectId, axisId, roll), false),
+    setAxisCarry: (objectId, axisId, carry) => models.edit(entry.id, c => setAxisCarry(c, objectId, axisId, carry), false),
     toggleAxisGenre: (objectId, axisId, genreId) => models.edit(entry.id, c => toggleAxisGenre(c, objectId, axisId, genreId), false),
     moveAxis: (objectId, axisId, dir) => commit(moveAxis(content, objectId, axisId, dir), true),
     choose: (objectId, axisId, formId) => test.setForm(objectId, axisId, formId),

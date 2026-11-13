@@ -1,6 +1,6 @@
 import { useDeferredValue, useMemo, useState } from 'react'
 import type { ModelAxis, ModelContent, ModelForm, ModelObject, ModelShape } from '../../../../api/types'
-import { CheckIcon, ChevronDownIcon, ChevronUpIcon, PlayIcon, PlusIcon, SaveIcon, StarIcon, TrashIcon } from '../../../icons'
+import { CheckIcon, ChevronDownIcon, ChevronUpIcon, LinkIcon, PlayIcon, PlusIcon, SaveIcon, StarIcon, TrashIcon } from '../../../icons'
 import type { Selection } from './designerState'
 import { NO_COLOURING, type Colouring } from './engine/colour'
 import { lookState, overrideState, type LookChange } from './engine/formEdit'
@@ -24,6 +24,8 @@ export interface FormActions {
   removeAxis: (objectId: string, axisId: string) => void
   renameAxis: (objectId: string, axisId: string, name: string) => void
   setAxisRoll: (objectId: string, axisId: string, roll: number) => void
+  // phase O8: what follows the object's shapes (anchors, links: a garment) reads the outline the axis's form gives them
+  setAxisCarry: (objectId: string, axisId: string, carry: boolean) => void
   toggleAxisGenre: (objectId: string, axisId: string, genreId: string) => void
   moveAxis: (objectId: string, axisId: string, dir: -1 | 1) => void
   choose: (objectId: string, axisId: string, formId: string) => void
@@ -121,6 +123,9 @@ function AxisSection({ content, object, owner, readOnly, axis, first, last, stat
       {readOnly ? <h3 className="cmInsSub">{title}</h3> : <div className="cmSliderHead">
         <input className="cmSliderName" aria-label={`Name of axis ${title}`} value={axis.name} maxLength={NAME_MAX} placeholder="Name" onChange={e => actions.renameAxis(o, a, e.target.value)} />
         <span className={`cmCount${axis.options.length > LIMITS.formsWarn ? ' cmCount--warn' : ''}`} title="Forms of the axis">{axis.options.length} of {LIMITS.formsMax}</span>
+        <button type="button" className={`cmIconBtn cmIconBtn--small${axis.carry ? ' cmIconBtn--on' : ''}`} aria-pressed={!!axis.carry} aria-label={`${title} carries what follows it`}
+          title={axis.carry ? 'Carries what follows it: anchors and links read the outline its form gives a shape (with as many points as the shape). Click to read the shape\'s own' : 'Make what follows its shapes (anchors, links: a garment) read the outline its form gives them, when it has as many points as the shape'}
+          onClick={() => actions.setAxisCarry(o, a, !axis.carry)}><LinkIcon size={12} /></button>
         <button type="button" className="cmIconBtn cmIconBtn--small" aria-label={`Move axis ${title} earlier`} title="Earlier: its forms win over the axes after it" disabled={first} onClick={() => actions.moveAxis(o, a, -1)}><ChevronUpIcon size={12} /></button>
         <button type="button" className="cmIconBtn cmIconBtn--small" aria-label={`Move axis ${title} later`} title="Later" disabled={last} onClick={() => actions.moveAxis(o, a, 1)}><ChevronDownIcon size={12} /></button>
         {confirm === 'axis' ? (

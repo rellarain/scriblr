@@ -9,7 +9,7 @@ import { apartSlider } from '../../src/assets/Interfaces/admin/characters/engine
 import { autoSkin } from '../../src/assets/Interfaces/admin/characters/engine/skinEdit'
 import { twinIndex } from '../../src/assets/Interfaces/admin/characters/engine/geometry'
 import { breakPair } from '../../src/assets/Interfaces/admin/characters/engine/pairEdit'
-import { DEPTH_SLIDERS, HAND_SIDES, SIDE_SLIDERS, SKIN_WEIGHTS, bodyParts, bodyRanges, bonesOf, drive, handPresets, range, twinBody } from './body'
+import { DEPTH_SLIDERS, HAND_SIDES, SIDE_SLIDERS, SKIN_WEIGHTS, bodyForms, bodyParts, bodyRanges, bonesOf, drive, handPresets, range, twinBody } from './body'
 import { CHIN_Y } from './outline'
 import { loadExact, loadMockupModel, type ExactData, type ExactShape } from './exact'
 import { buildPart, pairUp, type PartSpec } from './face'
@@ -232,6 +232,8 @@ export function buildSeed(): { content: ModelContent; report: Report[] } {
   }
   results.forEach(r => { content = pairUp(content, r, make) })
   content = skinBody(content)
+  // the chest and the hips as forms that carry the clothes (phase O8)
+  content = bodyForms(content)
   content = twinBody(content, body, make)
   content = finishClothes(content)
   // the shading and the folds of the clothes, and the hems that hang (phase O6)

@@ -6,7 +6,7 @@ import type { ModelFeatureKind } from '../../../../../api/types'
 // MODEL_PROPS (schemaParity.test.ts keeps them the same).
 
 export type PropKey =
-  | 'x' | 'y' | 'width' | 'height' | 'rotation' | 'curve' | 'length' | 'texture' | 'opacity' | 'roundness' | 'z' | 'offset'
+  | 'x' | 'y' | 'width' | 'height' | 'rotation' | 'curve' | 'flare' | 'length' | 'texture' | 'opacity' | 'roundness' | 'z' | 'offset'
   | 'fillHue' | 'fillSat' | 'fillLight'
   | 'gradReach' | 'gradBlend' | 'gradDir' | 'gradHue' | 'gradSat' | 'gradLight'
 
@@ -39,6 +39,7 @@ export const PROPS: Record<PropKey, PropSpec> = Object.fromEntries([
   spec({ key: 'height', label: 'Height', group: 'size', features: WHOLE, rest: 100, lo: 5, hi: 1000, unit: '%', slider: [50, 100, 150], amounts: [50, 150], hint: 'Its height as a percent of the height it is drawn with.' }),
   spec({ key: 'rotation', label: 'Rotation', group: 'place', features: WHOLE, rest: 0, lo: -360, hi: 360, unit: '°', slider: [-30, 0, 30], amounts: [-30, 30], hint: 'Turns it about its middle.' }),
   spec({ key: 'curve', label: 'Curve the ends', group: 'place', features: WHOLE, rest: 0, lo: -50, hi: 50, unit: '', slider: [-10, 0, 10], amounts: [-2, 2], hint: 'Lifts the two ends of it against its middle (a smile), or drops them (a frown), in the units of the model.' }),
+  spec({ key: 'flare', label: 'Flare', group: 'size', features: WHOLE, rest: 0, lo: -100, hi: 100, unit: '%', slider: [-30, 0, 30], amounts: [-30, 30], hint: 'Widens the lower half of it (a jaw, a skirt), or narrows it for less than none: nothing at its middle and the most at its bottom, about its middle at rest.' }),
   spec({ key: 'length', label: 'Length', group: 'size', features: WHOLE, rest: 100, lo: 0, hi: 1000, unit: '%', slider: [50, 100, 200], amounts: [50, 200], hint: 'Stretches the free ends of it (the points that have a weight: a lock of hair hangs from the points that hold it) away from the points that hold it, as a percent of how long it is drawn.' }),
   spec({ key: 'texture', label: 'Texture', group: 'look', features: WHOLE, rest: 0, lo: 0, hi: 100, unit: '', slider: [0, 0, 99], amounts: [0, 99], hint: 'Draws the edges of it that hang (between the points that have a weight; all of it when nothing in its object has a weight) with a texture: 0 is straight, then wavy, curly and coily (11, 22 ... 99 are the 2A to 4C of the old portrait). The points stay where they are.' }),
   spec({ key: 'opacity', label: 'Opacity', group: 'look', features: WHOLE, rest: 100, lo: 0, hi: 100, unit: '%', slider: [0, 100, 100], amounts: [0, 100], hint: 'How much of its own opacity it keeps.' }),

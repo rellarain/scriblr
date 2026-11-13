@@ -45,7 +45,7 @@ export function normalizeContent(c: ModelContent): ModelContent {
     name: clean(c.name, NAME_MAX),
     description: clean(c.description, DESCRIPTION_MAX),
     shapes: c.shapes.map(s => ({ ...s, name: clean(s.name, NAME_MAX), mirrorOf: s.mirrorOf ?? null, back: s.back ?? null, zBack: s.zBack ?? null, loose: s.loose ?? null, copyOf: s.copyOf ?? null, hide: s.hide === true, slot: s.slot ?? null, gray: s.gray ?? null, ...paintFields(s) })),
-    objects: c.objects.map(o => ({ ...o, name: clean(o.name, NAME_MAX), mirrorOf: o.mirrorOf ?? null, classOf: o.classOf ?? null, ...fitFields(o), under: [...new Set(o.under ?? [])].slice(0, LIMITS.underMax), drape: repairDrape(o.drape), hsl: repairHsl(o.hsl), axes: (o.axes ?? []).map(a => ({ ...a, name: clean(a.name, NAME_MAX), roll: repairRoll(a.roll), genres: [...new Set(a.genres ?? [])].slice(0, LIMITS.genresMax), options: a.options.map(f => ({ ...f, name: clean(f.name, NAME_MAX), looks: repairLooks(f.looks) })) })) })),
+    objects: c.objects.map(o => ({ ...o, name: clean(o.name, NAME_MAX), mirrorOf: o.mirrorOf ?? null, classOf: o.classOf ?? null, ...fitFields(o), under: [...new Set(o.under ?? [])].slice(0, LIMITS.underMax), drape: repairDrape(o.drape), hsl: repairHsl(o.hsl), axes: (o.axes ?? []).map(a => ({ ...a, name: clean(a.name, NAME_MAX), carry: a.carry === true, roll: repairRoll(a.roll), genres: [...new Set(a.genres ?? [])].slice(0, LIMITS.genresMax), options: a.options.map(f => ({ ...f, name: clean(f.name, NAME_MAX), looks: repairLooks(f.looks) })) })) })),
     groups: c.groups.map(g => ({ ...g, name: clean(g.name, NAME_MAX), pivot: g.pivot ?? null, attach: g.attach ?? null, mirrorOf: g.mirrorOf ?? null, states: repairStates(g.states) })),
     axis: c.axis ?? 100,
     ranges: (c.ranges ?? []).map(repairRange),
@@ -633,7 +633,8 @@ function linkFaults(c: ModelContent): string[] {
   return faults
 }
 
-// Forms: a form may only change shapes of its own object, never a twin's, and an outline is empty (the shape is hidden in that form) or has at least three points.
+// Forms: a form may only change shapes of its own object, never a twin's, and an outline is empty (the shape is hidden in that form) or has at least three points; on an
+// axis that carries what follows it (phase O8) an outline has as many points as the shape's own.
 function formFaults(c: ModelContent): string[] {
   const faults: string[] = []
   const shapes = new Map(c.shapes.map(s => [s.id, s]))
@@ -648,6 +649,7 @@ function formFaults(c: ModelContent): string[] {
           if (!own.has(ov.shape) || !shape) faults.push(`Form ${name} of ${obj} changes a shape that is not in the object.`)
           else if (shape.mirrorOf) faults.push(`Form ${name} of ${obj} changes a twin; change the original instead.`)
           else if (ov.pts.length > 0 && ov.pts.length < 3) faults.push(`Form ${name} of ${obj} has an outline of fewer than 3 points for shape ${label(shape.name, shape.id)}.`)
+          else if (axis.carry && ov.pts.length >= 3 && shape.pts.length >= 3 && ov.pts.length !== shape.pts.length) faults.push(`Form ${name} of ${obj} carries what follows it, but its outline of shape ${label(shape.name, shape.id)} has ${ov.pts.length} points, not ${shape.pts.length}.`)
         }
       }
     }
