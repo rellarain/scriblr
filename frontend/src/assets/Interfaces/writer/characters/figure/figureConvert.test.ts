@@ -68,7 +68,7 @@ describe('Convert', () => {
     expect(conv({ hairStyle: 'undercut', hairLength: 'short' }).figure.hidden).toEqual(expect.arrayContaining(['hair.left.center', 'hair.right.center']))
     expect(conv({ hairStyle: 'mohawk' }).figure.hidden).toEqual(expect.arrayContaining(['hair.left.center']))
     const chest = lens({ hairLength: 'chest', hairTexture: '3B' })
-    expect(chest.len_back_center).toBe(125)
+    expect(chest.len_back_center).toBe(content.presets!.find(x => x.id === 'hair_long')!.values.len_back_center)   // chest-length is the ready long hairstyle
     expect(chest.tex_back_center).toBeCloseTo(55, 0)
     // longer hair is longer, and shorter is shorter
     expect(lens({ hairLength: 'hip' }).len_back_center).toBeGreaterThan(chest.len_back_center)

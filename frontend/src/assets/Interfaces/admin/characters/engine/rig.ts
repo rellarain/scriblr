@@ -5,6 +5,7 @@ import { applyDrape, applyFall, hangDirection, squeezeOf } from './fall'
 import { drawOrder } from './order'
 import { PROPS, ROUND_MAX, isDrawingProp, isPaintProp, type PropKey } from './props'
 import { creaseCorners, influencesFor, isSkinned, skinPoints, type PointSkin, type SkinRig } from './skin'
+import { texturedPath } from './texture'
 
 // The rig: groups hang from parent groups, are fixed to a shape of the parent by an anchor and turn about a pivot, and sliders (ranges) drive them.
 // `solve` turns a model and the slider values into the place and outline of every shape. Ported from the mockup's `M.solve` (docs/mannequin-mockup/
@@ -458,23 +459,18 @@ export function solve(c: ModelContent, values: Values = {}, view: View = 'front'
 
   // The place, size and turn authored fields give a whole shape or a whole object (phase D3c), added up over every field that changes it; the middle they are about is the
   // shape's own, or the object's at rest. The matrix is a scale, then a turn, then a move, whatever order the sliders are in.
-  interface Wholly { dx: number; dy: number; sx: number; sy: number; turn: number; curve: number; len: number; wave: number; any: boolean }
-  const noChange = (): Wholly => ({ dx: 0, dy: 0, sx: 1, sy: 1, turn: 0, curve: 0, len: 1, wave: 0, any: false })
+  interface Wholly { dx: number; dy: number; sx: number; sy: number; turn: number; curve: number; len: number; any: boolean }
+  const noChange = (): Wholly => ({ dx: 0, dy: 0, sx: 1, sy: 1, turn: 0, curve: 0, len: 1, any: false })
   // The height the points that hold a lock of hair are at (the mean of the points with no weight), which a length stretches the weighted points away from; null for an outline with
-  // no such points. `phase` keeps two sections of hair from waving in step.
+  // no such points.
   const rootOf = (list: ModelPoint[]): number | null => {
     const roots = list.filter(p => !((p.w ?? 0) > 0))
     return roots.length > 0 && roots.length < list.length ? roots.reduce((n, p) => n + p.y, 0) / roots.length : null
   }
-  function applyWholly(list: ModelPoint[], w: Wholly, about: [number, number], hang: { root: number | null; phase: number }) {
+  function applyWholly(list: ModelPoint[], w: Wholly, about: [number, number], hang: { root: number | null }) {
     if (!w.any) return
-    // length: the weighted points move away from the root height in proportion to their weight; texture: they are pushed sideways in a wave (gentle for wavy, wider for curly,
-    // tighter for coily)
+    // length: the weighted points move away from the root height in proportion to their weight (the texture of the edge is drawn, not moved: see texture.ts)
     if (w.len !== 1 && hang.root !== null) for (const p of list) { const k = p.w ?? 0; if (k > 0) p.y += (p.y - hang.root) * (w.len - 1) * k }
-    if (w.wave > 0) {
-      const t = clamp(w.wave / 100, 0, 1), amp = 3.1 * t * (0.45 + 0.55 * t), fq = 0.55 + 1.05 * t
-      for (const p of list) { const k = p.w ?? 0; if (k > 0) p.x += amp * Math.sin(p.y * fq + hang.phase) * Math.min(1, k * 1.4) }
-    }
     // a curve lifts the two ends of the outline against its middle (the ends are where it is furthest across: a smile for a positive amount), before it is moved or sized
     if (w.curve !== 0 && list.length > 0) {
       let x0 = Infinity, x1 = -Infinity
@@ -499,7 +495,6 @@ export function solve(c: ModelContent, values: Values = {}, view: View = 'front'
     else if (prop === 'rotation') w.turn += a
     else if (prop === 'curve') w.curve += a
     else if (prop === 'length') w.len *= Math.max(0, a / 100)
-    else if (prop === 'texture') w.wave += a
     else return
     w.any = true
   }
@@ -568,10 +563,9 @@ export function solve(c: ModelContent, values: Values = {}, view: View = 'front'
       }
     }
     if (whole.any || objectWhole.any) {
-      const phase = (sh.id.length * 1.7) % 6.28
-      applyWholly(list, whole, centreOfPoints(own, sh.closed), { root: rootOf(own), phase })
+      applyWholly(list, whole, centreOfPoints(own, sh.closed), { root: rootOf(own) })
       const o = ownerId ? objectMap.get(ownerId) : undefined
-      applyWholly(list, objectWhole, (o && objectCentre(o)) ?? centreOfPoints(own, sh.closed), { root: (o && objectRoot(o)) ?? rootOf(own), phase })
+      applyWholly(list, objectWhole, (o && objectCentre(o)) ?? centreOfPoints(own, sh.closed), { root: (o && objectRoot(o)) ?? rootOf(own) })
     }
   }
 
@@ -786,6 +780,39 @@ export function solve(c: ModelContent, values: Values = {}, view: View = 'front'
     return keep
   }
 
+  // How much texture the edge of a shape is drawn with (phase O7, the `texture` property of the shape or its object, 0..99; see texture.ts): a twin and a shape of a member
+  // go with the shape they follow.
+  const textureDrives = ranges.flatMap(r => r.drives.filter(d => d.kind === 'prop' && d.prop === 'texture').map(d => ({ r, d })))
+  function textureOf(sh: ModelShape, ...others: Array<ModelShape | undefined>): number {
+    if (textureDrives.length === 0) return 0
+    const shapeIds = new Set([sh.id]), objectIds = new Set<string>()
+    for (const o of others) if (o) shapeIds.add(o.id)
+    for (const id of shapeIds) { const oid = objectOfShape.get(id); if (oid) { objectIds.add(oid); const m = objectMap.get(oid)?.mirrorOf; if (m) objectIds.add(m) } }
+    let amount = 0
+    for (const { r, d } of textureDrives) {
+      if ((d.feature === 'shape' && d.shape && shapeIds.has(d.shape)) || (d.feature === 'object' && d.id && objectIds.has(d.id))) amount += propAmount(r, d, val(r))
+    }
+    return clamp(amount, 0, 99)
+  }
+  // Whether any shape of the object a shape is in hangs (has points with a weight): a shape with none of its own in such an object (the cap under a lock of hair) is not
+  // textured, since its edges are roots, not ends.
+  const hangingObjects = new Map<string, boolean>()
+  function inHangingObject(sid: string): boolean {
+    const oid = objectOfShape.get(sid)
+    if (!oid) return false
+    let hangs = hangingObjects.get(oid)
+    if (hangs === undefined) {
+      const o = objectMap.get(oid)
+      hangs = !!o && o.shapes.some(id => {
+        let s = shapeMap.get(id)
+        if (s && s.pts.length < 3 && s.copyOf) s = shapeMap.get(s.copyOf)
+        return !!s && s.pts.some(p => (p.w ?? 0) > 0)
+      })
+      hangingObjects.set(oid, hangs)
+    }
+    return hangs
+  }
+
   // How far authored fields move a shape in the drawing order (phase O2, the `z` property of the shape or its object): an arm that points away from the viewer drops behind the
   // body. A twin goes with the shape or object it mirrors unless that drive keeps to its own side (`mirror: false`, the two sides posed apart).
   const zDrives = ranges.flatMap(r => r.drives.filter(d => d.kind === 'prop' && d.prop === 'z').map(d => ({ r, d })))
@@ -876,12 +903,17 @@ export function solve(c: ModelContent, values: Values = {}, view: View = 'front'
     const off = switchedOff(sh.id)
     // the corners are rounded in the drawing only: `local` and `rig` keep the points as they were drawn, so editing, anchors and links are not affected
     const radius = ok ? radiusOf(sh, twin, tpl, memberId) : 0
-    const fin = ok ? build(radius > 0 ? roundCorners(drawn, closed, radius) : drawn, closed, matrix) : []
+    const shown = ok && radius > 0 ? roundCorners(drawn, closed, radius) : drawn
+    const fin = ok ? build(shown, closed, matrix) : []
     const poly = ok ? flatten(fin, closed) : []
+    // the texture of the edge is in the painted path only: the outline that hit tests and boxes read stays smooth
+    const texture = ok ? textureOf(sh, twin, tpl) : 0, origin = twin ?? tpl ?? sh
+    const textured = texture > 0 && (shown.some(p => (p.w ?? 0) > 0) || !inHangingObject(origin.id))
+    const d = !ok ? '' : textured ? texturedPath(fin, closed, shown.map(p => p.w), texture, origin.id) : pathText(fin, closed)
     out.shapes[sh.id] = {
       id: sh.id, group: groupId, local: drawn, rig, matrix, frame: Mg, ghost,
       pre: rig.length >= 3 ? build(rig, closed, Mg) : [],   // from the base outline even where a form hides the shape: anchors and links still read it
-      d: ok ? pathText(fin, closed) : '', poly, box: poly.length ? boxOf(poly) : NO_BOX,
+      d, poly, box: poly.length ? boxOf(poly) : NO_BOX,
       visible: ok && (sh.view === 'both' || sh.view === view) && !off && !sh.hide, off, fade: fadeOf(sh), z: (view === 'back' && sh.zBack != null ? sh.zBack : sh.z) + zShift(sh),
       ...(skin ? { skin } : {}),
     }

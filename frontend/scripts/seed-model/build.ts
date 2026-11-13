@@ -220,7 +220,7 @@ export function buildSeed(): { content: ModelContent; report: Report[] } {
   })
   const body = bodyParts(mock)
   const clothes = clothesParts(mock, body.shapes)
-  const hair = hairParts(mock, faceShapes.find(s => s.id === 'skull')!.pts)
+  const hair = hairParts()
   // the head hangs from the neck and turns about the chin
   const head: ModelGroup = { id: 'head', name: 'Head', parent: 'neckJ', objects: faceObjects.map(o => o.id), pivot: [100, CHIN_Y], attach: null }
   let content: ModelContent = {

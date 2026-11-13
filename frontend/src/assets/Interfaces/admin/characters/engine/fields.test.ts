@@ -194,7 +194,7 @@ describe('what the sliders do to the drawing', () => {
     expect(after.some((p, i) => Math.abs(p.y - before[i].y) > 0.5)).toBe(true)
   })
 
-  it('stretches the weighted ends of a lock of hair away from its roots, and waves them, whatever the points it is drawn with', () => {
+  it('stretches the weighted ends of a lock of hair away from its roots, and draws them textured, whatever the points it is drawn with', () => {
     // a strip: three roots across the top (no weight) and three tips below (weight 1, 0.5, 1)
     const lock: ModelShape = { ...newShape('lock', 'Lock', 'square', box(80, 10, 40, 40)), slot: 'k_hair', pts: [
       { x: 80, y: 10, m: 's' }, { x: 100, y: 10, m: 's' }, { x: 120, y: 10, m: 's' },
@@ -212,10 +212,13 @@ describe('what the sliders do to the drawing', () => {
     expect(solve(d, {}).shapes.lock.d).toBe(solve(c, {}).shapes.lock.d)        // at rest nothing changed
     const w = withField(c, { feature: 'shape', target: 'lock', i: 0 }, 'texture')
     expect(w.c.ranges[0]).toMatchObject({ min: 0, rest: 0, max: 99 })
-    const waved = solve(w.c, { [w.id]: 99 }).shapes.lock.local, plain = solve(w.c, {}).shapes.lock.local
-    for (const i of [0, 1, 2]) near(waved[i].x, plain[i].x)                    // the roots stay
-    expect([3, 4, 5].some(i => Math.abs(waved[i].x - plain[i].x) > 0.5)).toBe(true)
-    for (const p of waved) expect(Number.isFinite(p.x) && Number.isFinite(p.y)).toBe(true)
+    // the texture is drawn (phase O7): the points and the outline hit tests read stay where they were, and the painted path is another one
+    const waved = solve(w.c, { [w.id]: 99 }).shapes.lock, plain = solve(w.c, {}).shapes.lock
+    waved.local.forEach((p, i) => { near(p.x, plain.local[i].x); near(p.y, plain.local[i].y) })
+    expect(waved.poly).toEqual(plain.poly)
+    expect(waved.d).not.toBe(plain.d)
+    expect(waved.d).not.toMatch(/NaN|undefined/)
+    expect(waved.d.startsWith('M80 10')).toBe(true)                           // the path starts at a root, where the edge is smooth
     // an object's length reaches every shape in it with the roots of its own
     const o = withField(c, { feature: 'object', target: 'oH', i: 0 }, 'length')
     near(solve(o.c, { [o.id]: 200 }).shapes.lock.local[3].y, 10 + 40 * 2)

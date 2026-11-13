@@ -40,7 +40,7 @@ export const PROPS: Record<PropKey, PropSpec> = Object.fromEntries([
   spec({ key: 'rotation', label: 'Rotation', group: 'place', features: WHOLE, rest: 0, lo: -360, hi: 360, unit: '°', slider: [-30, 0, 30], amounts: [-30, 30], hint: 'Turns it about its middle.' }),
   spec({ key: 'curve', label: 'Curve the ends', group: 'place', features: WHOLE, rest: 0, lo: -50, hi: 50, unit: '', slider: [-10, 0, 10], amounts: [-2, 2], hint: 'Lifts the two ends of it against its middle (a smile), or drops them (a frown), in the units of the model.' }),
   spec({ key: 'length', label: 'Length', group: 'size', features: WHOLE, rest: 100, lo: 0, hi: 1000, unit: '%', slider: [50, 100, 200], amounts: [50, 200], hint: 'Stretches the free ends of it (the points that have a weight: a lock of hair hangs from the points that hold it) away from the points that hold it, as a percent of how long it is drawn.' }),
-  spec({ key: 'texture', label: 'Texture', group: 'look', features: WHOLE, rest: 0, lo: 0, hi: 100, unit: '', slider: [0, 0, 99], amounts: [0, 99], hint: 'Waves the free ends of it sideways: 0 is straight, then wavy, curly and coily.' }),
+  spec({ key: 'texture', label: 'Texture', group: 'look', features: WHOLE, rest: 0, lo: 0, hi: 100, unit: '', slider: [0, 0, 99], amounts: [0, 99], hint: 'Draws the edges of it that hang (between the points that have a weight; all of it when nothing in its object has a weight) with a texture: 0 is straight, then wavy, curly and coily (11, 22 ... 99 are the 2A to 4C of the old portrait). The points stay where they are.' }),
   spec({ key: 'opacity', label: 'Opacity', group: 'look', features: WHOLE, rest: 100, lo: 0, hi: 100, unit: '%', slider: [0, 100, 100], amounts: [0, 100], hint: 'How much of its own opacity it keeps.' }),
   spec({ key: 'roundness', label: 'Corner roundness', group: 'look', features: WHOLE, rest: 0, lo: -20, hi: 20, unit: '', slider: [0, 0, 20], amounts: [0, 20], hint: 'Adds to the radius its sharp corners are rounded to (less than none is none).' }),
   spec({ key: 'z', label: 'Depth order', group: 'place', features: WHOLE, rest: 0, lo: -60, hi: 60, unit: '', slider: [-20, 0, 20], amounts: [-20, 20], hint: 'Adds to its depth, so it is drawn in front of more (+) or fewer (-) of the shapes around it: an arm that points away goes behind the body.' }),
@@ -71,5 +71,6 @@ export const GROUP_LABELS: Record<PropGroup, string> = { place: 'Place', size: '
 // The properties that change how a shape is painted rather than where it is: the paint reads these and the solver does not.
 export const PAINT_PROPS: readonly PropKey[] = ['fillHue', 'fillSat', 'fillLight', 'gradReach', 'gradBlend', 'gradDir', 'gradHue', 'gradSat', 'gradLight']
 export const isPaintProp = (k: string | null | undefined): boolean => !!k && (PAINT_PROPS as readonly string[]).includes(k)
-// The properties that change how a shape is drawn without moving its points: its opacity, the rounding of its corners and its depth order (the points stay where they were drawn).
-export const isDrawingProp = (k: string | null | undefined): boolean => k === 'opacity' || k === 'roundness' || k === 'z'
+// The properties that change how a shape is drawn without moving its points: its opacity, the rounding of its corners, its depth order and the texture of its edge
+// (the points stay where they were drawn).
+export const isDrawingProp = (k: string | null | undefined): boolean => k === 'opacity' || k === 'roundness' || k === 'z' || k === 'texture'

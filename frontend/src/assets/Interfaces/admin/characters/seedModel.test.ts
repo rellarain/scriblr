@@ -8,6 +8,7 @@ import { seededRng } from './engine/previews'
 import { copyBytes, LIMITS, linkCount } from './engine/limits'
 import { optionalObjects } from '../../writer/characters/figure/figureEditing'
 import { defaultValues, solve } from './engine/rig'
+import { inPolygon } from './engine/geometry'
 import { publishFaults } from './modelContent'
 
 // The basic adult that comes with the app (backend/app/seed/basic_model.json, written by frontend/scripts/seed-model from the old portrait engine's exact shapes and the
@@ -102,6 +103,43 @@ describe('the basic model', () => {
     expect(seed.groups.find(g => g.id === 'hair')!.objects).toHaveLength(14)
   })
 
+  it('covers the scalp with hair from the front and from behind, with no skin between the sections (phase O7)', () => {
+    const styles = seed.presets!.filter(p => p.kind === 'Hair style')
+    for (const name of ['Short', 'Long and straight', 'Curls', 'Afro']) {
+      const state = applyPreset(seed, restState(seed), styles.find(p => p.name === name)!)
+      for (const view of ['front', 'back'] as const) {
+        const shapes = solve(seed, state.values, view, { forms: state.forms, hidden: state.hidden }).shapes
+        const skull = shapes.skull, hair = Object.values(shapes).filter(s => /^h[rc]_/.test(s.id) && s.visible && s.z > skull.z)
+        // the scalp: from the front the head above the hairline, from behind all of it down to the nape (0.8 in from its outline)
+        const inside = (x: number, y: number) => [[0, 0], [0.8, 0], [-0.8, 0], [0, 0.8], [0, -0.8]].every(([dx, dy]) => inPolygon(skull.poly, x + dx, y + dy))
+        const bare: string[] = []
+        for (let y = -12; y <= (view === 'front' ? -5 : 30); y += 1) for (let x = 81; x <= 119; x += 1) {
+          if (!inside(x, y)) continue
+          if (!hair.some(s => inPolygon(s.poly, x, y))) bare.push(`${x},${y}`)
+        }
+        expect(bare, `${name}, ${view}`).toEqual([])
+      }
+    }
+    // each section has a cap of hair under it, in its own object (hidden with it), drawn just under the piece
+    for (const o of seed.objects.filter(x => x.id.startsWith('hair.'))) {
+      const cap = o.shapes.find(id => id.startsWith('hc_'))!, piece = o.shapes.find(id => id.startsWith('hr_'))!
+      const z = (id: string) => seed.shapes.find(s => s.id === id)!
+      expect(z(cap).z).toBeLessThan(z(piece).z)
+      expect(z(cap).zBack!).toBeLessThan(z(piece).zBack!)
+      expect(z(cap).pts.some(p => (p.w ?? 0) > 0), cap).toBe(false)
+    }
+  })
+
+  it('draws the textured edge only where the hair hangs, the same every time (phase O7)', () => {
+    const at = (values: Record<string, number>) => solve(seed, { ...defaultValues(seed), ...values }, 'front').shapes
+    const plain = at({}), curly = at({ tex_left_center: 66 }), again = at({ tex_left_center: 66 })
+    expect(curly.hr_left_center.d).toBe(again.hr_left_center.d)
+    expect(curly.hr_left_center.d).not.toBe(plain.hr_left_center.d)
+    // the cap under it is not textured, and the outline that is hit and measured stays smooth: only the stand of the curls (the Texture slider's volume) moves it
+    expect(curly.hc_left_center.d).toBe(plain.hc_left_center.d)
+    expect(curly.hr_left_center.d.startsWith(plain.hr_left_center.d.slice(0, plain.hr_left_center.d.indexOf('C', 1)))).toBe(true)
+  })
+
   it('stretches a section from its roots with its Length slider, and waves it with its Texture slider', () => {
     const at = (values: Record<string, number>) => solve(seed, { ...defaultValues(seed), ...values }, 'front').shapes
     const short = at({ len_back_center: 12 }).hr_back_center, long = at({ len_back_center: 90 }).hr_back_center
@@ -127,7 +165,7 @@ describe('the basic model', () => {
     const hairBox = (shapes: ReturnType<typeof drawn>) => Math.max(...Object.entries(shapes).filter(([id, s]) => /^hr_/.test(id) && s.visible).map(([, s]) => s.box.y + s.box.h))
     expect(hairBox(drawn('Buzzed'))).toBeLessThan(hairBox(drawn('Short')))
     expect(hairBox(drawn('Long and straight'))).toBeGreaterThan(hairBox(drawn('Bob')) + 10)
-    expect(Object.entries(drawn('Bald')).filter(([id, s]) => /^h[rs]_/.test(id) && s.visible)).toEqual([])
+    expect(Object.entries(drawn('Bald')).filter(([id, s]) => /^h[rsc]_/.test(id) && s.visible)).toEqual([])
     expect(Object.entries(drawn('Short')).filter(([id, s]) => /^hr_/.test(id) && s.visible).length).toBeGreaterThan(8)
   })
 

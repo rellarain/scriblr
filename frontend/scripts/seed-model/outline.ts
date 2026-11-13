@@ -10,7 +10,6 @@ export type Exact = Array<[number, number, string, number?, number?, number?, nu
 export const HS = 54 / 92
 // Where the chin is: the realistic body (phase O4b) stands seven and a half heads tall on the same feet, so the head is higher than the mockup's (its chin was at 62).
 export const CHIN_Y = 41
-export const MOCK_CHIN_Y = 62
 const r3 = (v: number): number => Math.round(v * 1000) / 1000
 const r2 = (v: number): number => Math.round(v * 100) / 100
 const oldX = (x: number): number => 100 + (x - 100) * HS

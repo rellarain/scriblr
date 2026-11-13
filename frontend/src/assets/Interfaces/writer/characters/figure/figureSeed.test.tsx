@@ -87,8 +87,10 @@ describe('the writer meets the basic model', () => {
     const styles = /^Hair style/i
     expect(await optionNames(user, styles)).toEqual(expect.arrayContaining(['Short', 'Buzzed', 'Pixie', 'Undercut', 'Mohawk', 'Bob', 'Long and wavy', 'Curls', 'Afro', 'Bald']))
     await choose(user, styles, 'hair_bob')
-    expect(seen.figure.values.len_front_center).toBe(100)
-    expect(seen.figure.values.len_back_center).toBe(58)
+    const bob = content.presets!.find(x => x.id === 'hair_bob')!.values
+    expect(seen.figure.values.len_front_center).toBe(bob.len_front_center)
+    expect(seen.figure.values.len_back_center).toBe(bob.len_back_center)
+    expect(bob.len_back_center).toBeGreaterThan(content.ranges.find(r => r.id === 'len_back_center')!.rest)   // longer than the short hair at rest
     await choose(user, styles, 'hair_bald')
     expect(seen.figure.hidden).toEqual(expect.arrayContaining(['hair.front.center', 'hair.back.center']))
     const facial = /^Facial hair/i
