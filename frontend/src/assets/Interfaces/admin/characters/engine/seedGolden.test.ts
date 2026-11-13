@@ -7,8 +7,8 @@ import { seededRng } from './previews'
 import { defaultValues, solve, type Solved, type Values } from './rig'
 
 // The golden drawing of the basic model: what the solver makes of it at rest, in the back view, with every slider at either end and at seeded random values, written down as one
-// digest per case. A change to the solver that leaves a model without skin weights alone (phase O1, O2) must not change any of these; the new body of phase O4 replaces the seed,
-// and these are written again then (vitest -u).
+// digest per case. Written again (vitest -u) when the realistic body of phase O4b replaced the seed; a change to the solver or to the seed that is not meant to change how the basic
+// model draws must leave every one of these as it is.
 const seed: ModelContent = JSON.parse(readFileSync(path.resolve(__dirname, '../../../../../../../backend/app/seed/basic_model.json'), 'utf-8'))
 
 // FNV-1a over the text, as eight hex digits.
@@ -19,7 +19,7 @@ function digest(text: string): string {
 }
 const drawing = (s: Solved): string => digest(s.order.join(',') + '|' + Object.keys(s.shapes).sort().map(id => `${id}:${s.shapes[id].d}:${s.shapes[id].visible ? 1 : 0}`).join('\n') + '|' + JSON.stringify(s.pivots))
 
-describe('the basic model draws as it did before skin weights', () => {
+describe('the basic model draws as it was recorded', () => {
   const at = (pick: (lo: number, rest: number, hi: number) => number): Values => Object.fromEntries(seed.ranges.map(r => [r.id, pick(r.min, r.rest, r.max)]))
   const cases: Array<[string, () => Solved]> = [
     ['at rest, from the front', () => solve(seed, defaultValues(seed), 'front')],

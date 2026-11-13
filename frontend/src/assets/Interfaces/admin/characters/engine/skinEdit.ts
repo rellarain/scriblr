@@ -62,7 +62,10 @@ export function jointBetween(c: ModelContent, own: string, other: string): { joi
   const far = otherIsBelow ? below(c, other) : new Set([other])
   const near = otherIsBelow ? new Set([own]) : below(c, own)
   const a = restCentre(c, far), b = restCentre(c, near)
-  const toward: [number, number] | null = a ? [a[0] - joint[0], a[1] - joint[1]] : b ? [joint[0] - b[0], joint[1] - b[1]] : null
+  // Toward a group below: toward its middle. Toward the group above: away from the middle of the shape's own side (the group above may hold much besides the joint, such as
+  // garments that hang far below it, so its middle says little about which way it lies).
+  const fromFar: [number, number] | null = a ? [a[0] - joint[0], a[1] - joint[1]] : null, fromNear: [number, number] | null = b ? [joint[0] - b[0], joint[1] - b[1]] : null
+  const toward = otherIsBelow ? fromFar ?? fromNear : fromNear ?? fromFar
   return toward && Math.hypot(toward[0], toward[1]) > 1e-6 ? { joint, toward } : null
 }
 

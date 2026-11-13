@@ -16,6 +16,16 @@ export const AGES: ModelPreset[] = [
   preset('age_elderly', 'Elderly', 'Age', { height: 92, headSize: 102, legLength: 96, waist: 106, shoulders: 93, eyeSize: 96 }),
 ]
 
+// The poses of the realistic body (phase O4b): sliders of the joints, each side on its own; Sitting turns the thighs toward the viewer (the depth sliders).
+export const POSES: ModelPreset[] = [
+  preset('pose_contrapposto', 'Contrapposto', 'Pose', { hipTilt: 5, waistBend: -3, chestBend: -3, headTilt: 3, legSpreadR: -2, thighDepthR: 18, shinDepthR: -18, shoulder: 3, shoulderR: 5, elbow: -6, elbowR: -10 }),
+  preset('pose_hips', 'Hands on hips', 'Pose', { shoulder: 40, elbow: -105, wrist: 15, shoulderR: 40, elbowR: -105, wristR: 15 }),
+  preset('pose_crossed', 'Arms crossed', 'Pose', { shoulder: -4, elbow: -98, armDepth: 15, foreDepth: -15, shoulderR: -4, elbowR: -92, armDepthR: 15, foreDepthR: -15 }),
+  preset('pose_chin', 'Hand to chin', 'Pose', { shoulder: -18, armDepth: 55, elbow: -150, wrist: 20, headTilt: 4, shoulderR: -2, elbowR: -70, foreDepthR: 30 }),
+  preset('pose_wave', 'Wave', 'Pose', { shoulder: 95, elbow: 80, headTilt: -3 }),
+  preset('pose_sit', 'Sitting', 'Pose', { thighDepth: 72, thighDepthR: 72, shoulder: 6, shoulderR: 6, elbow: -40, elbowR: -40, foreDepth: 45, foreDepthR: 45 }),
+]
+
 export const BUILDS: ModelPreset[] = [
   preset('build_slim', 'Slim', 'Build', { shoulders: 94, waist: 88, hips: 92 }),
   preset('build_average', 'Average', 'Build', {}),

@@ -97,9 +97,9 @@ describe('Convert', () => {
     expect(conv({ crown: 'tiara' }).figure.forms['crown.style']).toBe('tiara')
     // the picture's right is the figure's left hand
     const right = conv({ heldItem: 'staff', heldSide: 'right' }).figure
-    expect(right.forms['itemL.item']).toBe('staff'); expect(right.values).toMatchObject({ shoulder: 95, elbow: 130, holdL: -135 }); expect(right.values.shoulderR).toBeUndefined()
+    expect(right.forms['itemL.item']).toBe('staff'); expect(right.values).toMatchObject({ shoulder: 25, elbow: 150, armDepth: 75, holdL: 175 }); expect(right.values.shoulderR).toBeUndefined()
     const left = conv({ heldItem: 'lantern', heldSide: 'left' }).figure
-    expect(left.forms['itemR.item']).toBe('lantern'); expect(left.values).toMatchObject({ shoulderR: 95, elbowR: 130, holdR: 135 }); expect(left.values.shoulder).toBeUndefined()
+    expect(left.forms['itemR.item']).toBe('lantern'); expect(left.values).toMatchObject({ shoulderR: 25, elbowR: 150, armDepthR: 75, holdR: -175 }); expect(left.values.shoulder).toBeUndefined()
     expect(Object.keys(conv({}).figure.forms).filter(k => k.startsWith('item'))).toEqual([])
   })
 

@@ -6,6 +6,7 @@ import { apply } from './geometry'
 import { seededRng } from './previews'
 import { defaultValues, isPointDriven, solve, type Values } from './rig'
 import { breakPair } from './pairEdit'
+import { autoSkin } from './skinEdit'
 import { parseModelFile, serializeModels } from '../modelFile'
 import { alignSkins, autoWeights, copiedSkin, mirrorWeights, paintWeights, setWeights, skinFaults, smoothWeights, stepSkin, weightsOf, withPoints } from './skin'
 
@@ -305,5 +306,24 @@ describe('the checks skin weights must pass to publish', () => {
     expect(skinFaults(arm({ mirrorOf: 'other', pts: [] }))).toEqual(['Shape Arm is a twin and has skin weights of its own: skin the original instead.'])
     const hung = arm({}, { groups: [group('up', null, ['oArm'], { pivot: [100, 20] }), group('fore', 'up', ['oFore'], { pivot: [100, 100], attach: { shape: 'arm', kind: 'point', i: 3, t: 0, slider: null, rx: 0.5, ry: 0.5 } })] })
     expect(skinFaults(hung)).toEqual(['Shape Arm is skinned to a group that hangs from it.'])
+  })
+})
+
+describe('Auto toward the group a shape hangs from', () => {
+  it('rises toward it by the shape\'s own side, even when that group holds a garment hanging far below the joint', () => {
+    const rect = (id: string, x0: number, y0: number, x1: number, y1: number): ModelShape => ({ id, name: id, closed: true, z: 40, op: 1, view: 'both', half: 0, template: null, pts: [pt(x0, y0), pt(x1, y0), pt(x1, y1), pt(x0, y1)] })
+    // a pelvis whose group also holds a long coat, and a leg hung from it at y 60
+    const c: ModelContent = {
+      ...blankContent('Leg'),
+      shapes: [rect('trunk', 80, 20, 120, 60), rect('coat', 70, 20, 130, 300), rect('legskin', 90, 50, 110, 200)],
+      objects: [{ id: 'oTrunk', name: 'Trunk', layer: 'body', shapes: ['trunk'] }, { id: 'oCoat', name: 'Coat', layer: 'clothing', shapes: ['coat'] }, { id: 'oLeg', name: 'Leg', layer: 'body', shapes: ['legskin'] }],
+      groups: [group('torso', null, ['oTrunk', 'oCoat'], { pivot: [100, 40] }), group('leg', 'torso', ['oLeg'], { pivot: [100, 60] })],
+    }
+    const e = autoSkin(c, 'legskin', 'torso', 5)
+    expect(e.ok).toBe(true)
+    const w = weightsOf(e.ok ? e.content.shapes.find(s => s.id === 'legskin')! : c.shapes[2], 'torso')
+    // the top of the leg (above the joint) follows the pelvis; the foot of it does not
+    expect(w[0]).toBeGreaterThan(0.9); expect(w[1]).toBeGreaterThan(0.9)
+    expect(w[2]).toBe(0); expect(w[3]).toBe(0)
   })
 })

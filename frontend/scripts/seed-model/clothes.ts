@@ -1,10 +1,13 @@
-// The clothes of the seed model (phase 6c-3b). The outfit is the mockup's: a shirt with a neckline cut out of it and a collar, sleeves, trousers and shoes, each point of which follows a
-// point or an edge of the body (so a garment is draped on whatever body the sliders make), with a looseness slider for the top and the trousers. The necklines are the old portrait's
-// fifteen, drawn again to fit the mannequin's neck and shoulders: one hole cut out of the shirt (a form of it for each neckline, every point of it locked to the chest), a collar round
-// it, and the few things a neckline brings (the buttons of a henley, the flaps of a polo shirt, the drape of a cowl, the roll of a turtleneck).
-// The left-hand pieces are built here; the right-hand ones are mirrored from them once the body has its twins (`finishClothes`), each locked to the twin of the body part it follows.
+// The clothes of the seed model (phase 6c-3b, refitted to the realistic body in phase O4b): a shirt with a neckline cut out of it and a collar, sleeves, trousers and shoes, each point
+// of which follows a point of the body's skin (so a garment is draped on whatever body the sliders make, and bends with the skin at the joints), with a looseness slider for the top and
+// the trousers. The shirt, the sleeves, the trousers and the shoes are drawn as offsets of the skins; the necklines (the old portrait's fifteen), the openings of the jacket and the
+// coat, the skirt, the dress and the underwear were drawn on the mockup's body and are carried over to this one (`remapNeck`, `remapBody`). One hole is cut out of the shirt (a form
+// of it for each neckline, every point of it locked to the chest), with a collar round it and the few things a neckline brings (the buttons of a henley, the flaps of a polo shirt,
+// the drape of a cowl, the roll of a turtleneck). The left-hand pieces are built here; the right-hand ones are mirrored from them once the body has its twins (`finishClothes`), each
+// locked to the twin of the body part it follows.
 import type { ModelBind, ModelContent, ModelForm, ModelObject, ModelPoint, ModelPointMode, ModelPreset, ModelRange, ModelShape } from '../../src/api/types'
-import { range, shapeOf } from './body'
+import { build, flatten } from '../../src/assets/Interfaces/admin/characters/engine/geometry'
+import { ARM, CHEST_HALF, LEG, PELVIS_HALF, range, shapeOf } from './body'
 
 const r2 = (v: number): number => Math.round(v * 100) / 100
 const SWAP: Record<ModelPointMode, ModelPointMode> = { c: 'c', s: 's', cs: 'sc', sc: 'cs' }
@@ -15,7 +18,78 @@ export const TROUSER_SLOT = 'k_trouser'
 
 // A point of the body shapes a garment may follow: where it is and which it is.
 interface Anchor { s: string; i: number; x: number; y: number }
-const anchorsOf = (mock: any, ids: string[]): Anchor[] => ids.flatMap(s => (mock.shapes[s].pts as Array<{ x: number; y: number }>).map((p, i) => ({ s, i, x: p.x, y: p.y })))
+const anchorsOf = (shapes: ModelShape[], ids: string[]): Anchor[] => ids.flatMap(sid => shapes.find(x => x.id === sid)!.pts.map((q, i) => ({ s: sid, i, x: q.x, y: q.y })))
+
+// ---- from the mockup's body to this one (phase O4b) ----
+
+// Heights on the mockup's body and the same places on this one: the crown, the chin, the base of the neck, the shoulders, the waist, the crotch, the knees, the ankles, the soles.
+const HEIGHTS: Array<[number, number]> = [[8, -13], [62, 41], [75, 55], [86, 65.3], [150, 147], [198, 190], [264, 284], [356, 376], [398, 398]]
+const mapY = (y: number): number => {
+  if (y <= HEIGHTS[0][0]) return y + HEIGHTS[0][1] - HEIGHTS[0][0]
+  for (let k = 1; k < HEIGHTS.length; k++) {
+    const [a0, b0] = HEIGHTS[k - 1], [a1, b1] = HEIGHTS[k]
+    if (y <= a1) return b0 + ((y - a0) * (b1 - b0)) / (a1 - a0)
+  }
+  return y
+}
+// Round the neck: down by the neck's difference and a little wider (the realistic neck is wider), less so out toward the shoulders.
+export function remapNeck([x, y, m]: HP): HP {
+  const dx = x - 100, k = 1.06 - 0.09 * Math.min(1, Math.max(0, (Math.abs(dx) - 20) / 20))
+  return m ? [r2(100 + dx * k), r2(y - 20), m] : [r2(100 + dx * k), r2(y - 20)]
+}
+// The half width of a body at a height, from the outlines of its parts (the widest of them there, to the right of the middle).
+const polysOf = (shapes: ModelShape[]): Array<Array<[number, number]>> => shapes.map(x => flatten(build(x.pts, true), true))
+function halfAt(polys: Array<Array<[number, number]>>, y: number): number {
+  let x1 = 0
+  for (const poly of polys) {
+    for (let i = 0; i < poly.length; i++) {
+      const a = poly[i], b = poly[(i + 1) % poly.length]
+      if ((a[1] - y) * (b[1] - y) <= 0 && a[1] !== b[1]) x1 = Math.max(x1, a[0] + ((y - a[1]) / (b[1] - a[1])) * (b[0] - a[0]) - 100)
+    }
+  }
+  return x1
+}
+// A garment of the trunk drawn on the mockup's body, carried to this one: each height to the same place, each width by how much wider or narrower the body is there.
+let widthRatio: (y: number) => number = () => 1
+export function setBodies(mock: any, body: ModelShape[]): void {
+  const old = polysOf(['neck', 'chest', 'abdomen', 'pelvis', 'trapL', 'oblL', 'hipL', 'legL'].map(id => shapeOf(mock, id)))
+  const now = polysOf(body.filter(x => ['neck', 'chest', 'pelvis', 'legL'].includes(x.id)))
+  const table = new Map<number, number>()
+  for (let y = 60; y <= 400; y += 2) {
+    const o = halfAt(old, y), n = halfAt(now, mapY(y))
+    table.set(y, o > 4 && n > 4 ? Math.min(1.25, Math.max(0.8, n / o)) : 1)
+  }
+  widthRatio = (y: number) => {
+    let sum = 0, count = 0
+    for (let k = -6; k <= 6; k += 2) { const v = table.get(Math.round(Math.min(400, Math.max(60, y + k)) / 2) * 2); if (v) { sum += v; count++ } }
+    return count ? sum / count : 1
+  }
+}
+export function remapBody([x, y, m]: HP): HP {
+  if (y <= 88) return remapNeck(m ? [x, y, m] : [x, y])
+  const k = widthRatio(y), out: HP = [r2(100 + (x - 100) * k), r2(mapY(y))]
+  return m ? [out[0], out[1], m] : out
+}
+
+// ---- garments drawn as offsets of the skins ----
+
+type XY3 = [number, number, ModelPointMode?]
+// Points of a skin's outline moved t outward (away from the middle of the outline), as garment points.
+function offsetPoints(outline: XY3[], idx: number[], t: number): HP[] {
+  const n = outline.length, cx = outline.reduce((a, q) => a + q[0], 0) / n, cy = outline.reduce((a, q) => a + q[1], 0) / n
+  return idx.map(i => {
+    const a = outline[(i + n - 1) % n], b = outline[(i + 1) % n], q = outline[i]
+    let nx = b[1] - a[1], ny = -(b[0] - a[0])
+    const len = Math.hypot(nx, ny) || 1
+    nx /= len; ny /= len
+    if (nx * (q[0] - cx) + ny * (q[1] - cy) < 0) { nx = -nx; ny = -ny }
+    return [r2(q[0] + nx * t), r2(q[1] + ny * t)] as HP
+  })
+}
+const range0 = (a: number, b: number): number[] => Array.from({ length: b - a + 1 }, (_, k) => a + k)
+// The whole chest and pelvis as one closed outline (right halves, top to bottom), for offsets across the two.
+const CHEST_FULL: XY3[] = [...CHEST_HALF, ...CHEST_HALF.slice(1, -1).reverse().map(([x, y]) => [200 - x, y] as XY3)]
+const PELVIS_FULL: XY3[] = [...PELVIS_HALF, ...PELVIS_HALF.slice(1, -1).reverse().map(([x, y]) => [200 - x, y] as XY3)]
 
 // A point at (x, y) that follows the nearest of the anchors, at the offset it has from it at rest.
 function followNearest(anchors: Anchor[], x: number, y: number, mode: ModelPointMode = 'c'): ModelPoint {
@@ -61,8 +135,8 @@ const NECKLINES: Neckline[] = [
   { id: 'mock', name: 'Mock neck', hole: TINY, extras: ['mockCollar'] },
   { id: 'turtle', name: 'Turtleneck', hole: TINY, extras: ['turtleCollar'] },
   { id: 'cowl', name: 'Cowl neck', hole: [[100, 75], [117, 77], [116, 90], [100, 103]], extras: ['cowl'] },
-  { id: 'offshoulder', name: 'Off the shoulder', hole: [[100, 70], [150, 70, 's'], [150, 97, 's'], [100, 97, 's']], sleeves: 'none' },
-  { id: 'strapless', name: 'Strapless', hole: [[100, 70], [152, 70, 's'], [152, 116, 's'], [100, 116, 's']], sleeves: 'none' },
+  { id: 'offshoulder', name: 'Off the shoulder', hole: [[100, 70], [158, 70, 's'], [158, 97, 's'], [100, 97, 's']], sleeves: 'none' },
+  { id: 'strapless', name: 'Strapless', hole: [[100, 70], [158, 70, 's'], [158, 116, 's'], [100, 116, 's']], sleeves: 'none' },
 ]
 export const NECKLINE_IDS = NECKLINES.map(n => n.id)
 
@@ -93,27 +167,21 @@ function extraShapes(anchors: Anchor[], neck: Anchor[]): ModelShape[] {
   const cowl: HP[] = [[118, 78], [109, 84.5], [100, 85.8], [91, 84.5], [82, 78], [85, 85], [92, 93], [100, 98], [108, 93], [115, 85]]
   const turtle = (top: number): HP[] => [[100 + 11, top, 's'], [100 + 11, top + 10, 'c'], [114.5, 79], [100, 83, 'c'], [85.5, 79], [100 - 11, top + 10, 'c'], [100 - 11, top, 's']]
   return [
-    shape('placket', 'Placket', 30.6, polygon(anchors, rect(2.3, 83, 111)), { derive: { kind: 'shadow', t: 0.09 } }),
-    ...[11, 19, 27].map((dy, k) => shape(`button${k + 1}`, `Button ${k + 1}`, 30.7, polygon(anchors, circle(100, 80 + dy, 1.1)), { derive: dark })),
-    shape('flapR', 'Collar flap (left)', 31, polygon(anchors, flapR), { tone: 1, loose: 'looseTop' }),
-    shape('flapL', 'Collar flap (right)', 31, polygon(anchors, flapL), { tone: 1, loose: 'looseTop' }),
-    shape('poloPlacket', 'Polo placket', 30.6, polygon(anchors, rect(2.1, 95, 109)), { derive: { kind: 'shadow', t: 0.09 } }),
-    ...[100, 106].map((y, k) => shape(`poloButton${k + 1}`, `Polo button ${k + 1}`, 30.7, polygon(anchors, circle(100, y, 1)), { derive: dark })),
-    shape('cowl', 'Cowl drape', 31, polygon(anchors, cowl), { tone: -1 }),
-    shape('mockCollar', 'Mock neck collar', 31, polygon(neck, turtle(69)), { tone: 1 }),
-    shape('turtleCollar', 'Turtleneck collar', 31, polygon(neck, turtle(58)), { tone: 1 }),
+    shape('placket', 'Placket', 30.6, polygon(anchors, rect(2.3, 83, 111).map(remapNeck)), { derive: { kind: 'shadow', t: 0.09 } }),
+    ...[11, 19, 27].map((dy, k) => shape(`button${k + 1}`, `Button ${k + 1}`, 30.7, polygon(anchors, circle(100, 80 + dy, 1.1).map(remapNeck)), { derive: dark })),
+    shape('flapR', 'Collar flap (left)', 31, polygon(anchors, flapR.map(remapNeck)), { tone: 1, loose: 'looseTop' }),
+    shape('flapL', 'Collar flap (right)', 31, polygon(anchors, flapL.map(remapNeck)), { tone: 1, loose: 'looseTop' }),
+    shape('poloPlacket', 'Polo placket', 30.6, polygon(anchors, rect(2.1, 95, 109).map(remapNeck)), { derive: { kind: 'shadow', t: 0.09 } }),
+    ...[100, 106].map((y, k) => shape(`poloButton${k + 1}`, `Polo button ${k + 1}`, 30.7, polygon(anchors, circle(100, y, 1).map(remapNeck)), { derive: dark })),
+    shape('cowl', 'Cowl drape', 31, polygon(anchors, cowl.map(remapNeck)), { tone: -1 }),
+    shape('mockCollar', 'Mock neck collar', 31, polygon(neck, turtle(69).map(remapNeck)), { tone: 1 }),
+    shape('turtleCollar', 'Turtleneck collar', 31, polygon(neck, turtle(58).map(remapNeck)), { tone: 1 }),
   ]
 }
 
 // ---- the outfit ----
 
-const garment = (mock: any, id: string, over: Partial<ModelShape> = {}): ModelShape => shapeOf(mock, id, { slot: CLOTH_SLOT, gray: null, view: 'both', ...over })
 const hidden = (id: string): { shape: string; pts: ModelPoint[] } => ({ shape: id, pts: [] })
-
-// The points of a form of the mockup's, which keeps them as lists of its own.
-function listOf(mock: any, list: any[]): ModelPoint[] {
-  return shapeOf({ shapes: { tmp: { id: 'tmp', name: 'tmp', pts: list, z: 0, op: 1 } } }, 'tmp').pts
-}
 
 export interface Clothes {
   shapes: ModelShape[]
@@ -122,20 +190,28 @@ export interface Clothes {
   presets: ModelPreset[]
 }
 
-export function clothesParts(mock: any): Clothes {
-  const chest = anchorsOf(mock, ['chest']), neck = anchorsOf(mock, ['neck', 'chest'])
+export function clothesParts(mock: any, body: ModelShape[]): Clothes {
+  setBodies(mock, body)
+  const chest = anchorsOf(body, ['chest']), neck = anchorsOf(body, ['neck', 'chest'])
+  const trunk = anchorsOf(body, ['chest', 'pelvis']), arm = anchorsOf(body, ['uarmL']), legs = anchorsOf(body, ['pelvis', 'legL']), foot = anchorsOf(body, ['instepL', 'toesL'])
   const extras = extraShapes(chest, neck)
   const extraIds = extras.map(e => e.id)
+  const holeOf = (n: Neckline): HP[] => n.hole.map(remapNeck)
+  const sh = (id: string, name: string, z: number, pts: ModelPoint[], over: Partial<ModelShape> = {}): ModelShape => ({ id, name, closed: true, z, op: 1, view: 'both', pts, half: 0, template: null, slot: CLOTH_SLOT, gray: null, ...over })
 
-  // the shirt, its hole and its collar
-  const shirt = garment(mock, 'shirt', { name: 'Shirt', cut: ['neckHole'], loose: 'looseTop', z: 30 })
+  // the shirt: over the shoulders along the trapezius, down the sides to the hips; its hole and its collar
+  const shirtHalf: HP[] = [
+    // (straight from the shoulder to the side under the arm, past the armpit's notch in the chest)
+    [100, 55], ...offsetPoints(CHEST_FULL, [1, 2, 3, 4, 7, 8, 9, 10], 2.2), ...offsetPoints(PELVIS_FULL, [2, 3, 4], 2.8), [141.5, 188, 's'], [100, 190, 's'],
+  ]
+  const shirt = sh('shirt', 'Shirt', 30, fromHalf(trunk, shirtHalf), { cut: ['neckHole'], loose: 'looseTop' })
   const base = NECKLINES[0]
-  const hole: ModelShape = { ...garment(mock, 'neckHole', { name: 'Neckline opening', helper: true, loose: undefined, z: 30.5 }), pts: fromHalf(chest, base.hole) }
-  const collar: ModelShape = { ...garment(mock, 'collar', { name: 'Collar', z: 31, tone: 1 }), pts: fromHalf(chest, collarHalf(base.hole)) }
+  const hole: ModelShape = sh('neckHole', 'Neckline opening', 30.5, fromHalf(chest, holeOf(base)), { helper: true })
+  const collar: ModelShape = sh('collar', 'Collar', 31, fromHalf(chest, collarHalf(holeOf(base))), { tone: 1, loose: 'looseTop' })
   const necklineForms: ModelForm[] = NECKLINES.map(n => {
     const ovr: ModelForm['ovr'] = []
-    if (n.id !== base.id) ovr.push({ shape: 'neckHole', pts: fromHalf(chest, n.hole) })
-    if (n.band) { if (n.id !== base.id) ovr.push({ shape: 'collar', pts: fromHalf(chest, collarHalf(n.hole)) }) } else ovr.push(hidden('collar'))
+    if (n.id !== base.id) ovr.push({ shape: 'neckHole', pts: fromHalf(chest, holeOf(n)) })
+    if (n.band) { if (n.id !== base.id) ovr.push({ shape: 'collar', pts: fromHalf(chest, collarHalf(holeOf(n))) }) } else ovr.push(hidden('collar'))
     for (const id of extraIds) if (!(n.extras ?? []).includes(id)) ovr.push(hidden(id))
     return { id: n.id, name: n.name, ovr }
   })
@@ -144,11 +220,13 @@ export function clothesParts(mock: any): Clothes {
     axes: [{ id: 'neckline', name: 'Neckline', initial: base.id, options: necklineForms }],
   }
 
-  // the sleeves: short to begin with; none or long
-  const sleeveSrc = mock.objects.sleeve.axes[0].options.find((o: any) => o.id === 'long').ovr
-  const upShort = garment(mock, 'sleeveUpL', { name: 'Sleeve, upper arm (left)', z: 32, loose: 'looseTop' })
-  const upLong = listOf(mock, sleeveSrc.sleeveUpL), foreLong = listOf(mock, sleeveSrc.sleeveForeL)
-  const fore: ModelShape = { ...garment(mock, 'sleeveForeL', { name: 'Sleeve, forearm (left)', z: 32, loose: 'looseTop' }), pts: foreLong }
+  // the sleeves (offsets of the arm's skin, so they bend at the elbow with it): short to begin with; none or long
+  const A = ARM as XY3[], off = (idx: number[]) => offsetPoints(A, idx, 2.2)
+  const upShortPts = polygon(arm, [...off([0, 1, 2, 3, 4, 5, 6]), [154.8, 121, 's'], [133.8, 121, 's'], ...off([22, 23, 24])])
+  const upLong = polygon(arm, [...off([0, 1, 2, 3, 4, 5, 6, 7, 8]), [154.2, 146, 's'], [136.6, 145, 's'], ...off([20, 21, 22, 23, 24])])
+  const foreLong = polygon(arm, [[154.2, 141], ...off([9, 10, 11, 12]), [157.6, 194.5, 's'], [141.4, 195, 's'], ...off([16, 17, 18, 19]), [136.6, 141]])
+  const upShort = sh('sleeveUpL', 'Sleeve, upper arm (left)', 32, upShortPts, { loose: 'looseTop' })
+  const fore: ModelShape = sh('sleeveForeL', 'Sleeve, forearm (left)', 32, foreLong, { loose: 'looseTop' })
   const sleeves: ModelObject = {
     id: 'sleeves', name: 'Sleeves', layer: 'clothing', shapes: ['sleeveUpL', 'sleeveUpR', 'sleeveForeL', 'sleeveForeR'],
     axes: [{
@@ -160,10 +238,17 @@ export function clothesParts(mock: any): Clothes {
     }],
   }
 
-  const trouserHip = garment(mock, 'trouserHip', { name: 'Trousers, hips', slot: TROUSER_SLOT, z: 28.2, loose: 'looseBottom' })
-  const trouserL = garment(mock, 'trouserL', { name: 'Trouser leg (left)', slot: TROUSER_SLOT, z: 28.2, loose: 'looseBottom' })
+  // the trousers: from just under the navel over the hips (an offset of the pelvis), and a leg each (an offset of the leg's skin) to the ankle
+  const hipHalf: HP[] = [[100, 150], [134, 150], ...offsetPoints(PELVIS_FULL, [2, 3, 4, 5], 2.4), [119, 199.5], [105, 194.5], [100, 193.5]]
+  const trouserHip = sh('trouserHip', 'Trousers, hips', 28.2, fromHalf(legs, hipHalf), { slot: TROUSER_SLOT, loose: 'looseBottom' })
+  const G = LEG as XY3[]
+  const trouserLeg = polygon(legs, [[G[0][0], G[0][1]], [G[1][0], G[1][1]], ...offsetPoints(G, range0(2, 12), 2.6), [123.2, 371, 's'], [101.8, 371, 's'], ...offsetPoints(G, range0(18, 25), 2.6)])
+  const trouserL = sh('trouserL', 'Trouser leg (left)', 28.2, trouserLeg, { slot: TROUSER_SLOT, loose: 'looseBottom' })
   const trousers: ModelObject = { id: 'trousers', name: 'Trousers', layer: 'clothing', shapes: ['trouserHip', 'trouserL', 'trouserR'] }
-  const shoeL = garment(mock, 'shoeL', { name: 'Shoe (left)', slot: 'k_shoe', z: 28.21, loose: undefined })
+  // the shoes: the foot a little bigger all round, up to the ankle
+  const FOOTPTS: XY3[] = [[104.5, 370], [119, 370], [121.5, 379], [123.5, 387], [121.5, 392], [104.5, 392.5], [102, 388], [102.5, 379]]
+  const shoePts = offsetPoints(FOOTPTS, range0(0, 7), 1.6).map(([x, y], k) => (k < 2 ? [x, y - 1.5] as HP : [x, y] as HP))
+  const shoeL = sh('shoeL', 'Shoe (left)', 28.21, polygon(foot, shoePts), { slot: 'k_shoe' })
   const shoes: ModelObject = { id: 'shoes', name: 'Shoes', layer: 'clothing', shapes: ['shoeL', 'shoeR'] }
 
   const ranges = [
@@ -177,6 +262,7 @@ export function clothesParts(mock: any): Clothes {
   const shapes = [shirt, hole, collar, ...extras, upShort, fore, trouserHip, trouserL, shoeL]
   return { shapes, objects: [shirtObject, sleeves, trousers, shoes], ranges, presets }
 }
+// (the trunk's anchors are made once the body has its twins, in addLayers)
 
 // ---- the right-hand pieces ----
 
@@ -215,10 +301,7 @@ export function finishClothes(c: ModelContent): ModelContent {
 }
 
 function mirrorSides(c: ModelContent): ModelContent {
-  const remap = new Map([['oblR', twinOf(c, 'oblL')], ['hipR', twinOf(c, 'hipL')], ['trapR', twinOf(c, 'trapL')]])
-  let shapes = c.shapes.map(s => (s.pts.some(p => p.bind && remap.has(p.bind.s))
-    ? { ...s, pts: s.pts.map(p => (p.bind && remap.has(p.bind.s) ? { ...p, bind: { ...p.bind, s: remap.get(p.bind.s)! } } : p)) }
-    : s))
+  let shapes = c.shapes
   const withShapes: ModelContent = { ...c, shapes }
   for (const [left, right, , name] of PAIRS) {
     const src = shapes.find(s => s.id === left)!
@@ -270,8 +353,8 @@ const shapeBase = (id: string, name: string, z: number, slot: string, pts: Model
 // What an outer garment (a jacket, a coat) is made of: its body, the opening in front of it (a hole cut out of it) and the lapels round the opening, and long sleeves.
 interface Outer { id: string; name: string; slot: string; z: number; thick: number; lowerFrom: number; lowerBy: number; flare: number; open: HP[]; shut: HP[] }
 const OUTER: Outer[] = [
-  { id: 'jacket', name: 'Jacket', slot: 'k_outer', z: 34, thick: 2.8, lowerFrom: 170, lowerBy: 12, flare: 0, open: [[100, 72], [112.5, 73], [109, 95], [100, 150, 's']], shut: [[100, 72], [111, 73], [107, 86], [100, 112, 's']] },
-  { id: 'coat', name: 'Coat', slot: 'k_outer', z: 36, thick: 3.4, lowerFrom: 168, lowerBy: 58, flare: 5, open: [[100, 72], [113, 73], [109, 96], [100, 170, 's']], shut: [[100, 72], [111.5, 73], [107, 88], [100, 124, 's']] },
+  { id: 'jacket', name: 'Jacket', slot: 'k_outer', z: 34, thick: 2.8, lowerFrom: 165, lowerBy: 12, flare: 0, open: [[100, 72], [112.5, 73], [109, 95], [100, 150, 's']], shut: [[100, 72], [111, 73], [107, 86], [100, 112, 's']] },
+  { id: 'coat', name: 'Coat', slot: 'k_outer', z: 36, thick: 3.4, lowerFrom: 163, lowerBy: 70, flare: 6, open: [[100, 72], [113, 73], [109, 96], [100, 170, 's']], shut: [[100, 72], [111.5, 73], [107, 88], [100, 124, 's']] },
 ]
 
 const SKIRT_LENGTHS: Array<[string, string, number]> = [['mini', 'Mini', 218], ['knee', 'Knee-length', 248], ['midi', 'Midi', 292], ['maxi', 'Maxi', 336]]
@@ -279,7 +362,7 @@ const skirtHalf = (hem: number): HP[] => [[100, 161, 's'], [136, 160, 's'], [140
 const DRESS_NECKS = ['crew', 'vneck', 'scoop', 'square', 'boat']
 
 function addLayers(c: ModelContent): ModelContent {
-  const torso = anchorsOfContent(c, ['chest', 'abdomen', 'pelvis']), chest = anchorsOfContent(c, ['chest'])
+  const torso = anchorsOfContent(c, ['chest', 'pelvis']), chest = anchorsOfContent(c, ['chest'])
   const shirt = c.shapes.find(s => s.id === 'shirt')!
   const shapeById = (id: string) => c.shapes.find(s => s.id === id)!
   const extraShapes: ModelShape[] = [], objects: ModelObject[] = [], presets: ModelPreset[] = []
@@ -289,8 +372,8 @@ function addLayers(c: ModelContent): ModelContent {
   // ---- jacket and coat ----
   for (const o of OUTER) {
     const body = shapeBase(`${o.id}Body`, o.name, o.z, o.slot, thicker(shirt.pts, o.thick, o.lowerFrom, o.lowerBy, o.flare), { cut: [`${o.id}Hole`] })
-    const hole: ModelShape = { ...shapeBase(`${o.id}Hole`, `${o.name} opening`, o.z + 0.1, o.slot, fromHalf(chest, o.open), { loose: undefined }), helper: true }
-    const lapel = shapeBase(`${o.id}Lapel`, `${o.name} lapels`, o.z + 0.2, o.slot, fromHalf(chest, collarHalf(o.open)), { tone: -1 })
+    const hole: ModelShape = { ...shapeBase(`${o.id}Hole`, `${o.name} opening`, o.z + 0.1, o.slot, fromHalf(chest, o.open.map(remapBody)), { loose: undefined }), helper: true }
+    const lapel = shapeBase(`${o.id}Lapel`, `${o.name} lapels`, o.z + 0.2, o.slot, fromHalf(chest, collarHalf(o.open.map(remapBody))), { tone: -1 })
     // the sleeve of a jacket is long: the upper arm of the sleeves' long form, the forearm of the base outline of the forearm sleeve
     const upLong = c.objects.find(ob => ob.id === 'sleeves')!.axes![0].options.find(f => f.id === 'long')!.ovr.find(v => v.shape === 'sleeveUpL')!.pts
     const up = shapeBase(`${o.id}SleeveUpL`, `${o.name} sleeve, upper arm (left)`, o.z + 1, o.slot, thicker(upLong, o.thick - 0.2))
@@ -304,7 +387,7 @@ function addLayers(c: ModelContent): ModelContent {
         id: 'style', name: o.name, initial: 'none', roll: 0, options: [
           { id: 'none', name: 'Not worn', ovr: hideAll(ids) },
           { id: 'open', name: 'Open', ovr: [] },
-          { id: 'shut', name: 'Buttoned', ovr: [{ shape: hole.id, pts: fromHalf(chest, o.shut) }, { shape: lapel.id, pts: fromHalf(chest, collarHalf(o.shut)) }] },
+          { id: 'shut', name: 'Buttoned', ovr: [{ shape: hole.id, pts: fromHalf(chest, o.shut.map(remapBody)) }, { shape: lapel.id, pts: fromHalf(chest, collarHalf(o.shut.map(remapBody))) }] },
         ],
       }],
     })
@@ -312,25 +395,26 @@ function addLayers(c: ModelContent): ModelContent {
   }
 
   // ---- a skirt: a waist at the hips and a hem at a length ----
-  const skirtForms: ModelForm[] = [{ id: 'none', name: 'Not worn', ovr: [hidden('skirtBody')] }, ...SKIRT_LENGTHS.map(([id, name, hem]) => ({ id, name, ovr: id === 'knee' ? [] : [{ shape: 'skirtBody', pts: fromHalf(torso, skirtHalf(hem)) }] }))]
-  extraShapes.push(shapeBase('skirtBody', 'Skirt', 28.8, TROUSER_SLOT, fromHalf(torso, skirtHalf(248)), { loose: 'looseBottom' }))
+  const skirtForms: ModelForm[] = [{ id: 'none', name: 'Not worn', ovr: [hidden('skirtBody')] }, ...SKIRT_LENGTHS.map(([id, name, hem]) => ({ id, name, ovr: id === 'knee' ? [] : [{ shape: 'skirtBody', pts: fromHalf(torso, skirtHalf(hem).map(remapBody)) }] }))]
+  extraShapes.push(shapeBase('skirtBody', 'Skirt', 28.8, TROUSER_SLOT, fromHalf(torso, skirtHalf(248).map(remapBody)), { loose: 'looseBottom' }))
   objects.push({ id: 'skirt', name: 'Skirt', layer: 'clothing', shapes: ['skirtBody'], axes: [{ id: 'length', name: 'Skirt', initial: 'none', roll: 0, options: skirtForms }] })
   presets.push({ id: 'outfit_skirt', name: 'Skirt and top', kind: 'Outfit', values: {}, hidden: ['trousers'], forms: { 'skirt.length': 'knee' } })
 
   // ---- a dress: a top and a skirt in one, with a neckline of its own ----
   const dressHalf: HP[] = [[100, 76], [114.5, 76], [134.8, 77.7], [149, 87], [146.5, 106.6], [141.3, 130], [140, 146], [142, 172], [150, 208], [156, 246, 's'], [100, 250, 's']]
   const dressNecks = NECKLINES.filter(n => DRESS_NECKS.includes(n.id))
-  extraShapes.push(shapeBase('dressBody', 'Dress', 31.5, CLOTH_SLOT, fromHalf(torso, dressHalf), { cut: ['dressHole'] }))
-  extraShapes.push({ ...shapeBase('dressHole', 'Dress neckline opening', 31.6, CLOTH_SLOT, fromHalf(chest, NECKLINES[0].hole), { loose: undefined }), helper: true })
+  // (under the arms, so a sleeveless dress shows the arm in front of it)
+  extraShapes.push(shapeBase('dressBody', 'Dress', 30.2, CLOTH_SLOT, fromHalf(torso, dressHalf.map(remapBody)), { cut: ['dressHole'] }))
+  extraShapes.push({ ...shapeBase('dressHole', 'Dress neckline opening', 30.3, CLOTH_SLOT, fromHalf(chest, NECKLINES[0].hole.map(remapNeck)), { loose: undefined }), helper: true })
   objects.push({
     id: 'dress', name: 'Dress', layer: 'clothing', shapes: ['dressBody', 'dressHole'],
-    axes: [{ id: 'style', name: 'Dress', initial: 'none', roll: 0, options: [{ id: 'none', name: 'Not worn', ovr: hideAll(['dressBody', 'dressHole']) }, ...dressNecks.map(n => ({ id: n.id, name: n.name, ovr: n.id === 'crew' ? [] : [{ shape: 'dressHole', pts: fromHalf(chest, n.hole) }] }))] }],
+    axes: [{ id: 'style', name: 'Dress', initial: 'none', roll: 0, options: [{ id: 'none', name: 'Not worn', ovr: hideAll(['dressBody', 'dressHole']) }, ...dressNecks.map(n => ({ id: n.id, name: n.name, ovr: n.id === 'crew' ? [] : [{ shape: 'dressHole', pts: fromHalf(chest, n.hole.map(remapNeck)) }] }))] }],
   })
   presets.push({ id: 'outfit_dress', name: 'Dress', kind: 'Outfit', values: {}, hidden: ['shirt', 'trousers'], forms: { 'dress.style': 'crew' } })
 
   // ---- underwear: worn under the clothes, bare where there are none ----
-  extraShapes.push(shapeBase('briefs', 'Briefs', 27.6, 'k_under', fromHalf(torso, [[100, 166, 's'], [137, 163], [139, 182], [127, 199, 's'], [100, 205, 's']]), { loose: undefined }))
-  extraShapes.push(shapeBase('bandeau', 'Chest band', 27.6, 'k_under', fromHalf(chest, [[100, 101, 's'], [129, 103], [131, 117], [100, 121, 's']]), { loose: undefined }))
+  extraShapes.push(shapeBase('briefs', 'Briefs', 27.6, 'k_under', fromHalf(torso, ([[100, 166, 's'], [137, 163], [139, 182], [127, 199, 's'], [100, 205, 's']] as HP[]).map(remapBody)), { loose: undefined }))
+  extraShapes.push(shapeBase('bandeau', 'Chest band', 27.6, 'k_under', fromHalf(chest, ([[100, 101, 's'], [129, 103], [131, 117], [100, 121, 's']] as HP[]).map(remapBody)), { loose: undefined }))
   objects.push({ id: 'briefs', name: 'Underwear (bottom)', layer: 'clothing', shapes: ['briefs'], under: ['trousers', 'skirt', 'dress', 'coat'] })
   objects.push({ id: 'bandeau', name: 'Underwear (top)', layer: 'clothing', shapes: ['bandeau'], under: ['shirt', 'dress', 'jacket', 'coat'] })
   presets.push({ id: 'outfit_underwear', name: 'Underwear only', kind: 'Outfit', values: {}, hidden: ['shirt', 'sleeves', 'trousers', 'shoes'], forms: {} })

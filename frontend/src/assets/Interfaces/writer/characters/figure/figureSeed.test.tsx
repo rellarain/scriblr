@@ -41,7 +41,7 @@ describe('the writer meets the basic model', () => {
   it('lays a sheet on the card for each of its frames, the biggest first', () => {
     setup()
     expect(screen.getByRole('img', { name: 'Ada, figure' })).toBeInTheDocument()
-    expect([...card().querySelectorAll('.charFigSheet')].map(s => s.getAttribute('aria-label'))).toEqual(['Full body sheet', 'Hands sheet', 'Bust sheet', 'Face sheet', 'Feet sheet'])
+    expect([...card().querySelectorAll('.charFigSheet')].map(s => s.getAttribute('aria-label'))).toEqual(['Full body sheet', 'Bust sheet', 'Hands sheet', 'Face sheet', 'Feet sheet'])
   })
 
   it('names the parts of the face and their other sides, and a twin is never called one', async () => {
@@ -123,8 +123,8 @@ describe('the writer meets the basic model', () => {
     expect(seen.figure.forms['itemR.item']).toBeUndefined()
     const down = art()
     await choose(user, /^Pose/i, 'Left hand up')
-    expect(seen.figure.values.shoulder).toBe(95)
-    expect(seen.figure.values.holdL).toBe(-135)
+    expect(seen.figure.values.elbow).toBe(150)
+    expect(seen.figure.values.holdL).toBe(175)
     expect(seen.figure.values.shoulderR).toBeUndefined()
     expect(art()).not.toBe(down)
   })

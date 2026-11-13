@@ -4,6 +4,7 @@
 import type { ModelDrive, ModelGroup, ModelObject, ModelPoint, ModelPreset, ModelRange, ModelShape } from '../../src/api/types'
 import { nearestEdge, r2 } from '../../src/assets/Interfaces/admin/characters/engine/geometry'
 import { drive, range, shapeOf } from './body'
+import { CHIN_Y, MOCK_CHIN_Y } from './outline'
 
 const PLANE_NAMES: Record<string, string> = { front: 'Front', top: 'Top', left: 'Left side', right: 'Right side', back: 'Back', nape: 'Nape' }
 const SIDE_NAMES: Record<string, string> = { left: 'left', center: 'centre', right: 'right' }
@@ -43,6 +44,9 @@ const rootOf = (pts: ModelPoint[]): number => {
 
 export interface Hair { shapes: ModelShape[]; objects: ModelObject[]; group: ModelGroup; ranges: ModelRange[]; presets: ModelPreset[] }
 
+// The mockup drew its hair on a head whose chin was at MOCK_CHIN_Y; the model's head is higher (phase O4b), so the pieces are lifted with it.
+const lift = (pts: ModelPoint[]): ModelPoint[] => pts.map(p => ({ ...p, y: Math.round((p.y + CHIN_Y - MOCK_CHIN_Y) * 100) / 100 }))
+
 export function hairParts(mock: any, skull: ModelPoint[]): Hair {
   const shapes: ModelShape[] = [], objects: ModelObject[] = [], ranges: ModelRange[] = []
   const fallDrives: ModelDrive[] = []
@@ -56,7 +60,8 @@ export function hairParts(mock: any, skull: ModelPoint[]): Hair {
     const rest = REST[plane]
     const least = plane === 'left' || plane === 'right' ? 0 : mockRange.min
     const most = Math.min(mockRange.max, Math.floor(rest * 9.9))
-    const base = shapeOf(mock, pid, { name: `Hair piece: ${title}`, zBack: src.zBack ?? null, slot: 'k_hair' })
+    const drawn = shapeOf(mock, pid, { name: `Hair piece: ${title}`, zBack: src.zBack ?? null, slot: 'k_hair' })
+    const base = { ...drawn, pts: lift(drawn.pts) }
     const root = rootOf(relock(base.pts, skull))
     const bake = (pts: ModelPoint[]): ModelPoint[] => stretched(relock(pts, skull), root, f)
     shapes.push({ ...base, pts: bake(base.pts) })
@@ -64,7 +69,7 @@ export function hairParts(mock: any, skull: ModelPoint[]): Hair {
     if (mock.shapes[sid]) {
       const sh = mock.shapes[sid]
       const shade = shapeOf(mock, sid, { name: `Hair shade: ${title}`, zBack: sh.zBack ?? null, slot: 'k_hair', op: sh.op ?? 0.45, shade: { kind: 'shadow', t: sh.shade?.t ?? 0.22 } })
-      shapes.push({ ...shade, pts: stretched(shade.pts, root, f) })
+      shapes.push({ ...shade, pts: stretched(lift(shade.pts), root, f) })
       ids.push(sid)
     }
     const cut = mock.objects[oid].axes[0]
@@ -73,7 +78,7 @@ export function hairParts(mock: any, skull: ModelPoint[]): Hair {
       axes: [{
         id: 'cut', name: 'Cut', initial: cut.def, roll: 0, options: cut.options.map((o: any) => {
           const ovr = o.ovr?.[pid]
-          return { id: o.id, name: o.name, ovr: ovr ? [{ shape: pid, pts: bake(shapeOfPoints(mock, ovr)) }] : [] }
+          return { id: o.id, name: o.name, ovr: ovr ? [{ shape: pid, pts: bake(lift(shapeOfPoints(mock, ovr))) }] : [] }
         }),
       }],
     })
@@ -83,7 +88,7 @@ export function hairParts(mock: any, skull: ModelPoint[]): Hair {
     if (plane === 'back' || plane === 'left' || plane === 'right') for (const id of ids) fallDrives.push(drive({ kind: 'fall', shape: id, atMin: 0, atMax: 100 }))
   }
   ranges.push(range('hairFall', 'Hair fall', 'hair', 0, 0, 100, '%', fallDrives))
-  const group: ModelGroup = { id: 'hair', name: 'Hair', parent: 'head', objects: objects.map(o => o.id), pivot: [100, 54], attach: null }
+  const group: ModelGroup = { id: 'hair', name: 'Hair', parent: 'head', objects: objects.map(o => o.id), pivot: [100, CHIN_Y], attach: null }
   return { shapes, objects, group, ranges, presets: hairStyles() }
 }
 

@@ -10,13 +10,13 @@ import { apartSlider } from '../../src/assets/Interfaces/admin/characters/engine
 import { drive, range } from './body'
 import type { ExactData, ExactShape } from './exact'
 import type { PartResult, PartSpec } from './face'
-import { HS, type Exact } from './outline'
+import { CHIN_Y, HS, type Exact } from './outline'
 
-// Where a hand takes an item, in the mannequin's space with the arm hanging: the middle of the palm.
-export const GRIP_REST = { x: 149, y: 211 }
+// Where a hand takes an item, in the mannequin's space with the arm hanging: the middle of the palm (the hand of the realistic body, phase O4b).
+export const GRIP_REST = { x: 149.7, y: 208.5 }
 
 // The old drawing's space, for a place in the mannequin's.
-const toOld = (m: { x: number; y: number }): { x: number; y: number } => ({ x: 100 + (m.x - 100) / HS, y: 123 - (62 - m.y) / HS })
+const toOld = (m: { x: number; y: number }): { x: number; y: number } => ({ x: 100 + (m.x - 100) / HS, y: 123 - (CHIN_Y - m.y) / HS })
 
 const boxOf = (n: Exact): { x: number; y: number } => {
   const xs = n.map(p => p[0]), ys = n.map(p => p[1])
@@ -110,10 +110,11 @@ export function mirrorItem(left: PartResult): PartResult {
   return { ...left, shapes, object }
 }
 
-// The poses that hold a hand up beside the head: the arm raised to the side and the elbow bent as far as it goes, which brings the hand beside the head, and the item turned back
-// upright about the grip (the hand has turned by the arm and the elbow together).
-const UP = { shoulder: 95, elbow: 130 }
-export const HOLD_ANGLE = -135
+// The poses that hold a hand up beside the head: the upper arm raised a little and turned toward the viewer, the elbow bent as far as it goes, which brings the hand up beside the
+// shoulder (the realistic arm is long: raised to the side, its elbow would leave the card), and the item turned back upright about the grip (the hand has turned by the arm and the
+// elbow together; the item's angle turns the other way round to them).
+const UP = { shoulder: 25, elbow: 150, armDepth: 75 }
+export const HOLD_ANGLE = UP.shoulder + UP.elbow
 
 export interface Items { shapes: ModelShape[]; objects: ModelObject[]; groups: ModelGroup[]; ranges: ModelRange[]; presets: ModelPreset[]; grips: ModelGrip[] }
 
@@ -134,9 +135,9 @@ export function itemParts(c: ModelContent, left: PartResult, right: PartResult):
     shapes: [...left.shapes, ...right.shapes], objects: [left.object, right.object], groups: [l.group, r.group], ranges: [l.range, r.range], grips: [l.grip, r.grip],
     presets: [
       preset('pose_down', 'Arms down', {}),
-      preset('pose_left_up', 'Left hand up', { shoulder: UP.shoulder, elbow: UP.elbow, holdL: HOLD_ANGLE }),
-      preset('pose_right_up', 'Right hand up', { shoulderR: UP.shoulder, elbowR: UP.elbow, holdR: -HOLD_ANGLE }),
-      preset('pose_both_up', 'Both hands up', { shoulder: UP.shoulder, elbow: UP.elbow, holdL: HOLD_ANGLE, shoulderR: UP.shoulder, elbowR: UP.elbow, holdR: -HOLD_ANGLE }),
+      preset('pose_left_up', 'Left hand up', { shoulder: UP.shoulder, elbow: UP.elbow, armDepth: UP.armDepth, holdL: HOLD_ANGLE }),
+      preset('pose_right_up', 'Right hand up', { shoulderR: UP.shoulder, elbowR: UP.elbow, armDepthR: UP.armDepth, holdR: -HOLD_ANGLE }),
+      preset('pose_both_up', 'Both hands up', { shoulder: UP.shoulder, elbow: UP.elbow, armDepth: UP.armDepth, holdL: HOLD_ANGLE, shoulderR: UP.shoulder, elbowR: UP.elbow, armDepthR: UP.armDepth, holdR: -HOLD_ANGLE }),
     ],
   }
 }

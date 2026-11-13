@@ -1,16 +1,21 @@
-// Builds the seed model ("Adult (basic)") as model content: the face from the exact shapes of the old portrait engine, the body from the mockup, a rig, sliders, presets,
-// colour slots and frames. Run by run.ts, which writes backend/app/seed/basic-model.json.
+// Builds the seed model ("Adult (basic)") as model content: the head, face and hair from the exact shapes of the old portrait engine, a realistic body seven and a half heads
+// tall (phase O4b, body.ts), a rig, sliders, presets, colour slots and frames. Run by run.ts, which writes backend/app/seed/basic_model.json.
 import type { ModelContent, ModelFrame, ModelGroup, ModelObject, ModelPreset, ModelShape, ModelSlot } from '../../src/api/types'
 import { FANTASY_SWATCHES } from '../../src/assets/Interfaces/writer/characters/portrait/fantasyLibrary'
 import { standardGenres, standardSlots, starterPalette } from '../../src/assets/Interfaces/admin/characters/engine/standardColours'
 import type { MakeId } from '../../src/assets/Interfaces/admin/characters/modelContent'
-import { bodyParts, bodyRanges, twinBody } from './body'
+import { addDepth, addRange, newRange } from '../../src/assets/Interfaces/admin/characters/engine/rigEdit'
+import { apartSlider } from '../../src/assets/Interfaces/admin/characters/engine/sidesEdit'
+import { autoSkin } from '../../src/assets/Interfaces/admin/characters/engine/skinEdit'
+import { twinIndex } from '../../src/assets/Interfaces/admin/characters/engine/geometry'
+import { DEPTH_SLIDERS, SIDE_SLIDERS, SKIN_WEIGHTS, bodyParts, bodyRanges, bonesOf, drive, range, twinBody } from './body'
+import { CHIN_Y } from './outline'
 import { loadExact, loadMockupModel, type ExactData, type ExactShape } from './exact'
 import { buildPart, pairUp, type PartSpec } from './face'
 import { clothesParts, finishClothes } from './clothes'
 import { hairParts } from './hair'
 import { itemParts, itemSpec, mirrorItem, poseArmsApart, prepareItems } from './items'
-import { AGES, BUILDS, EXPRESSIONS } from './presets'
+import { AGES, BUILDS, EXPRESSIONS, POSES } from './presets'
 
 export const TOLERANCE = 0.08
 
@@ -108,14 +113,64 @@ export interface Report { part: string; channels: number; pairs: string; points:
 function framesOf(c: ModelContent): ModelFrame[] {
   const withTwins = (ids: string[]): string[] => ids.flatMap(id => [id, ...c.groups.filter(g => g.mirrorOf === id).map(g => g.id)])
   const legs = withTwins(['legL']), arms = withTwins(['shoulderL'])
-  const trunk = ['chest', 'abdomen', 'pelvis']
+  const trunk = ['chest', 'pelvis']
+  // the figure stands from the crown (a head above the chin) to the soles at 392; the bust is the head and shoulders, from above the crown to a little under the chest
+  const crown = CHIN_Y - 54
   return [
-    { id: 'full', name: 'Full body', x: 0, y: 0, w: 200, h: 400, hide: [] },
-    { id: 'bust', name: 'Bust', x: 38, y: -22, w: 124, h: 134, hide: legs },
-    { id: 'face', name: 'Face', x: 66, y: -22, w: 68, h: 90, hide: [...legs, ...arms, ...trunk] },
-    { id: 'hands', name: 'Hands', x: 30, y: 120, w: 140, h: 120, hide: [...legs, 'head'] },
-    { id: 'feet', name: 'Feet', x: 70, y: 330, w: 60, h: 70, hide: [...arms, 'neck', ...trunk, 'head'] },
+    { id: 'full', name: 'Full body', x: 0, y: crown - 10, w: 200, h: 402 - (crown - 10), hide: [] },
+    { id: 'bust', name: 'Bust', x: 32, y: crown - 9, w: 136, h: 136, hide: legs },
+    { id: 'face', name: 'Face', x: 66, y: crown - 9, w: 68, h: 80, hide: [...legs, ...arms, ...trunk] },
+    { id: 'hands', name: 'Hands', x: 30, y: 168, w: 140, h: 82, hide: [...legs, 'head'] },
+    { id: 'feet', name: 'Feet', x: 70, y: 340, w: 60, h: 60, hide: [...arms, 'neck', ...trunk, 'head'] },
   ]
+}
+
+// The skin weights of the body (body.ts, SKIN_WEIGHTS): each with the engine's Auto across its joint.
+function skinBody(c: ModelContent): ModelContent {
+  let next = c
+  for (const [shape, group, reach] of SKIN_WEIGHTS) {
+    const e = autoSkin(next, shape, group, reach)
+    if (!e.ok) throw new Error(`skin ${shape} -> ${group}: ${e.reason}`)
+    next = e.content
+  }
+  // the skins in the middle (neck, chest, pelvis) are mirror images of themselves: their weights are made so too (Auto is given before the right arm exists, which leans it)
+  const middle = new Set(['neck', 'chest', 'pelvis'])
+  return {
+    ...next,
+    shapes: next.shapes.map(sh => (middle.has(sh.id) && sh.skin ? {
+      ...sh, skin: sh.skin.map(k => ({ ...k, w: k.w.map((w, i) => Math.round(((w + (k.w[twinIndex(sh.pts, i, 100, 1)] ?? w)) / 2) * 100) / 100) })),
+    } : sh)),
+  }
+}
+
+// The bones, the depth sliders of the limbs, the hip tilt (the legs turn against it, to stand) and the sliders posed each side on its own: all made once the twins are.
+function poseBody(c: ModelContent): ModelContent {
+  let next: ModelContent = { ...c, bones: bonesOf(c), headBone: 'b_head' }
+  for (const [id, name, bone] of DEPTH_SLIDERS) {
+    const start = next.bones!.find(b => b.id === bone)!.start
+    // (as far as 80 degrees each way: a limb can point almost straight at the viewer, as a hand held up beside the head or the thighs of a seated figure do)
+    const made = addRange(next, { ...newRange(id, name, 'depth', start), min: -80, max: 80, rand: [0, 0] })
+    if (!made.ok) throw new Error(`${id}: ${made.reason}`)
+    const e = addDepth(made.content, id, bone)
+    if (!e.ok) throw new Error(`${id}: ${e.reason}`)
+    // the slider's value is the angle
+    next = { ...e.content, ranges: e.content.ranges.map(r => (r.id === id ? { ...r, drives: r.drives.map(d => (d.kind === 'depth' ? { ...d, atMin: -80, atMax: 80 } : d)) } : r)) }
+  }
+  const twinLeg = next.groups.find(g => g.mirrorOf === 'legL')!.id
+  next = {
+    ...next,
+    ranges: [...next.ranges, range('hipTilt', 'Hip tilt', 'torso', -15, 0, 15, '°', [
+      drive({ kind: 'turn', group: 'torso', atMin: 15, atMax: -15 }),
+      drive({ kind: 'turn', group: 'legL', atMin: -15, atMax: 15, mirror: false }),
+      drive({ kind: 'turn', group: twinLeg, atMin: 15, atMax: -15 }),
+    ], { rand: [0, 0] })],
+  }
+  for (const [id, other, name] of SIDE_SLIDERS) {
+    const e = apartSlider(next, id, () => other)
+    if (!e.ok) throw new Error(`${id}: ${e.reason}`)
+    next = { ...e.content, ranges: e.content.ranges.map(r => (r.id === id ? { ...r, name: `${name} (left)` } : r.id === other ? { ...r, name: `${name} (right)`, rand: r.rand } : r)) }
+  }
+  return next
 }
 
 // The two sides are named for the character's: the original is the left (the picture's right) and its twin the right. makeTwin calls a twin "(twin)", which a writer reading the
@@ -146,17 +201,19 @@ export function buildSeed(): { content: ModelContent; report: Report[] } {
     report.push({ part: spec.objectName, channels: r.channels, pairs: r.pairs, points: r.points })
   })
   const body = bodyParts(mock)
-  const clothes = clothesParts(mock)
+  const clothes = clothesParts(mock, body.shapes)
   const hair = hairParts(mock, faceShapes.find(s => s.id === 'skull')!.pts)
-  const head: ModelGroup = { id: 'head', name: 'Head', parent: 'torso', objects: faceObjects.map(o => o.id), pivot: [100, 54], attach: { shape: 'neck', kind: 'point', i: 0, t: 1, slider: null, rx: 0.5, ry: 0 } }
+  // the head hangs from the neck and turns about the chin
+  const head: ModelGroup = { id: 'head', name: 'Head', parent: 'neckJ', objects: faceObjects.map(o => o.id), pivot: [100, CHIN_Y], attach: null }
   let content: ModelContent = {
     name: 'Adult (basic)', description: 'A basic adult in everyday clothes: the body, the head and its features, hair, clothes, fantasy parts and held items, with the ages, builds, expressions, hairstyles, outfits and poses as presets.',
     shapes: [...body.shapes, ...faceShapes, ...hair.shapes, ...clothes.shapes], objects: [...body.objects, ...faceObjects, ...hair.objects, ...clothes.objects],
-    groups: [...body.groups.map(g => (g.id === 'torso' ? { ...g, objects: [...g.objects, ...clothes.objects.map(o => o.id)] } : g)), head, hair.group], axis: 100, ranges: [...bodyRanges(mock), ...hair.ranges, ...clothes.ranges],
-    presets: [...AGES, ...BUILDS, ...EXPRESSIONS, ...hair.presets, ...facialHairPresets(data), ...clothes.presets], classes: [], genres: standardGenres(), palette: starterPalette(), slots: [...standardSlots(), ...fantasySlots(), ...clothingSlots(), ...itemSlots()], bones: [], headBone: null,
+    groups: [...body.groups.map(g => (g.id === 'torso' ? { ...g, objects: [...g.objects, ...clothes.objects.map(o => o.id)] } : g)), head, hair.group], axis: 100, ranges: [...bodyRanges(), ...hair.ranges, ...clothes.ranges],
+    presets: [...AGES, ...BUILDS, ...EXPRESSIONS, ...POSES, ...hair.presets, ...facialHairPresets(data), ...clothes.presets], classes: [], genres: standardGenres(), palette: starterPalette(), slots: [...standardSlots(), ...fantasySlots(), ...clothingSlots(), ...itemSlots()], bones: [], headBone: null,
     frames: [], tile: '#e6d6c3', grips: [], fieldsets: [], patterns: [],
   }
   results.forEach(r => { content = pairUp(content, r, make) })
+  content = skinBody(content)
   content = twinBody(content, body, make)
   content = finishClothes(content)
   content = nameSides(content)
@@ -169,6 +226,7 @@ export function buildSeed(): { content: ModelContent; report: Report[] } {
     ...content, shapes: [...content.shapes, ...items.shapes], objects: [...content.objects, ...items.objects], groups: [...content.groups, ...items.groups],
     ranges: [...content.ranges, ...items.ranges], presets: [...(content.presets ?? []), ...items.presets], grips: items.grips,
   }
+  content = poseBody(content)
   content = { ...content, frames: framesOf(content) }
   return { content, report }
 }

@@ -8,10 +8,13 @@ export type Exact = Array<[number, number, string, number?, number?, number?, nu
 
 // The old drawing is 92 units from the top of the head to the chin in a 200-unit tile; the mannequin's head is 54 tall (the same proportions, a figure of seven and a half heads).
 export const HS = 54 / 92
+// Where the chin is: the realistic body (phase O4b) stands seven and a half heads tall on the same feet, so the head is higher than the mockup's (its chin was at 62).
+export const CHIN_Y = 41
+export const MOCK_CHIN_Y = 62
 const r3 = (v: number): number => Math.round(v * 1000) / 1000
 const r2 = (v: number): number => Math.round(v * 100) / 100
 const oldX = (x: number): number => 100 + (x - 100) * HS
-const oldY = (y: number): number => 62 - (123 - y) * HS
+const oldY = (y: number): number => CHIN_Y - (123 - y) * HS
 
 export function exactPoint(a: Exact[number]): ModelPoint {
   const m = a[2] as ModelPointMode, p: ModelPoint = { x: r3(oldX(a[0])), y: r3(oldY(a[1])), m, hi: null, ho: null }

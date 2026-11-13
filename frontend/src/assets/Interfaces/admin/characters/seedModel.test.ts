@@ -34,7 +34,7 @@ describe('the basic model', () => {
   })
 
   it('has a body that stands, with twins of the arms and legs and the frames of a card', () => {
-    expect(seed.groups.filter(g => g.mirrorOf).map(g => g.mirrorOf).sort()).toEqual(['armL', 'foreL', 'handL', 'legL', 'shinL', 'footL', 'shoulderL'].sort())
+    expect(seed.groups.filter(g => g.mirrorOf).map(g => g.mirrorOf).sort()).toEqual(['armL', 'foreL', 'handL', 'legL', 'shinL', 'footL', 'toesL', 'shoulderL'].sort())
     expect(seed.frames!.map(f => f.name)).toEqual(['Full body', 'Bust', 'Face', 'Hands', 'Feet'])
     const rest = solve(seed, defaultValues(seed), 'front')
     const drawn = Object.values(rest.shapes).filter(s => s.visible)
@@ -259,10 +259,11 @@ describe('the basic model', () => {
 
   it('has the garments follow the body: wider shoulders widen the shirt, spread legs spread the trousers, and the two sides are the same at rest', () => {
     const at = (values: Record<string, number>) => solve(seed, { ...defaultValues(seed), ...values }, 'front').shapes
-    const rest = at({}), wide = at({ shoulders: 120 }), apart = at({ legSpread: 25 })
+    const rest = at({}), wide = at({ shoulders: 120 }), apart = at({ legSpread: 25, legSpreadR: 25 })
     expect(wide.shirt.box.w).toBeGreaterThan(rest.shirt.box.w + 2)
-    expect(apart.trouserL.box.x).not.toBeCloseTo(rest.trouserL.box.x, 0)
-    expect(apart.trouserR.box.x).not.toBeCloseTo(rest.trouserR.box.x, 0)
+    // each leg spreads on its own slider, and its trouser leg goes out with it (its top stays at the crotch)
+    expect(apart.trouserL.box.x + apart.trouserL.box.w).toBeGreaterThan(rest.trouserL.box.x + rest.trouserL.box.w + 10)
+    expect(apart.trouserR.box.x).toBeLessThan(rest.trouserR.box.x - 10)
     for (const [l, r] of [['sleeveUpL', 'sleeveUpR'], ['trouserL', 'trouserR'], ['shoeL', 'shoeR']]) {
       expect(rest[l].box.w, l).toBeCloseTo(rest[r].box.w, 0)
       expect(rest[l].box.x + rest[l].box.w / 2 + rest[r].box.x + rest[r].box.w / 2, `${l} and ${r} are mirror images`).toBeCloseTo(200, 0)
@@ -380,14 +381,15 @@ describe('the basic model', () => {
   })
 
   it('has the poses that hold a hand up as presets of a kind of their own, and an item that opens and unrolls', () => {
+    // the poses of the body (phase O4b) come first, then the ones that hold a hand up
     const poses = seed.presets!.filter(p => p.kind === 'Pose')
-    expect(poses.map(p => p.name)).toEqual(['Arms down', 'Left hand up', 'Right hand up', 'Both hands up'])
+    expect(poses.map(p => p.name)).toEqual(['Contrapposto', 'Hands on hips', 'Arms crossed', 'Hand to chin', 'Wave', 'Sitting', 'Arms down', 'Left hand up', 'Right hand up', 'Both hands up'])
     const ids = new Set(seed.ranges.map(r => r.id))
     for (const p of poses) for (const k of Object.keys(p.values)) expect(ids.has(k), `${p.name} sets ${k}`).toBe(true)
     // the arms down put every arm slider back
     const up = applyPreset(seed, restState(seed), preset('pose_both_up'))
-    expect(up.values.shoulder).toBe(95); expect(up.values.shoulderR).toBe(95)
-    expect(applyPreset(seed, up, preset('pose_down')).values.shoulder ?? 0).toBe(0)
+    expect(up.values.elbow).toBe(150); expect(up.values.elbowR).toBe(150)
+    expect(applyPreset(seed, up, preset('pose_down')).values.elbow ?? 0).toBe(0)
     // a closed book opens and a rolled scroll unrolls: the forms are wider and longer
     expect(itemBox('itemL', 'openbook').w).toBeGreaterThan(itemBox('itemL', 'book').w * 1.5)
     expect(itemBox('itemL', 'openscroll').h).toBeGreaterThan(itemBox('itemL', 'scroll').h * 0.9)

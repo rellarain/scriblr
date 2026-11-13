@@ -1,4 +1,5 @@
-// Builds the seed model, writes it (backend/app/seed/basic_model.json) and a preview page, and compares the body with the mockup's own solve at rest.
+// Builds the seed model, writes it (backend/app/seed/basic_model.json) and a preview page, and reports the body against the canon (phase O4b: how many heads tall it stands,
+// and where its landmarks are against where a figure seven and a half heads tall has them).
 // Usage: npx vite-node scripts/seed-model/run.ts [preview-dir] [seed-file]
 import { mkdirSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
@@ -6,10 +7,12 @@ import { dirname, join, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import type { CharacterFigure } from '../../src/api/types'
 import { copyBytes } from '../../src/assets/Interfaces/admin/characters/engine/limits'
+import { headGuide } from '../../src/assets/Interfaces/admin/characters/engine/guides'
 import { defaultValues, solve } from '../../src/assets/Interfaces/admin/characters/engine/rig'
+import { LANDMARKS } from './body'
 import { publishFaults } from '../../src/assets/Interfaces/admin/characters/modelContent'
 import { buildSeed } from './build'
-import { loadExact, loadMockupModel } from './exact'
+import { loadExact } from './exact'
 import { optionSheet, writePreview } from './preview'
 
 const here = dirname(fileURLToPath(import.meta.url))
@@ -20,23 +23,20 @@ console.log(report.map(r => `${r.part}: ${r.channels} shapes, ${r.pairs}, ${r.po
 console.log(`shapes ${content.shapes.length}, objects ${content.objects.length}, size ${(copyBytes(content) / 1024).toFixed(0)} KB`)
 console.log('faults', publishFaults(content))
 
-// the body against the mockup's own solve at rest: the box of every shape the two share
-const mock = loadMockupModel()
-// the clothes have the mockup's ids too, and are not the body
-const CLOTHES = new Set(['shirt', 'neckHole', 'collar', 'sleeveUpL', 'sleeveUpR', 'sleeveForeL', 'sleeveForeR', 'trouserHip', 'trouserL', 'trouserR', 'shoeL', 'shoeR'])
-const M = (globalThis as any).Mannequin
-const mres = M.solve(mock, M.defaultCfg(mock), 'front')
-const ares = solve(content, defaultValues(content), 'front')
-let worst = 0, worstId = ''
-for (const s of content.shapes) {
-  if (/^(ear|hd|brow|eye|nose|mouth|hr|hs|bd|mo)_/.test(s.id) || CLOTHES.has(s.id) || s.id === 'skull') continue
-  const a = ares.shapes[s.id]?.box, m = mres.shapes[s.id]?.box
-  if (!a || !m) continue
-  const d = Math.max(Math.abs(a.x - m.x), Math.abs(a.y - m.y), Math.abs(a.w - m.w), Math.abs(a.h - m.h))
-  if (d > 0.5) console.log(`  box differs by ${d.toFixed(2)}: ${s.id}`)
-  if (d > worst) { worst = d; worstId = s.id }
+// the body against the canon: heads from the crown, and each landmark as drawn against where it should be
+const rest = solve(content, defaultValues(content), 'front')
+const guide = headGuide(content, rest)
+console.log(`the figure stands ${guide?.heads ?? '?'} heads tall from the crown (a head is ${guide?.unit.toFixed(2) ?? '?'} units)`)
+const box = (id: string) => rest.shapes[id].box
+const drawn: Record<string, number> = {
+  chin: rest.pivots.head[1], elbow: rest.pivots.foreL[1], wrist: rest.pivots.handL[1], knees: rest.pivots.shinL[1], ankles: rest.pivots.footL[1],
+  crotch: Math.max(...rest.shapes.pelvis.pre.filter(q => Math.abs(q.x - 100) < 0.5).map(q => q.y)), fingertips: box('handL').y + box('handL').h, soles: box('instepL').y + box('instepL').h,
 }
-console.log(`worst box difference of the body from the mockup ${worst.toFixed(2)} at ${worstId}`)
+for (const [name, want] of Object.entries(LANDMARKS)) {
+  if (drawn[name] == null) continue
+  const off = drawn[name] - want
+  console.log(`  ${name.padEnd(11)} ${drawn[name].toFixed(1).padStart(6)} (canon ${want.toFixed(1)})${Math.abs(off) > 2 ? `  off by ${off.toFixed(1)}` : ''}`)
+}
 
 mkdirSync(dirname(seedFile), { recursive: true })
 writeFileSync(seedFile, JSON.stringify(content))
